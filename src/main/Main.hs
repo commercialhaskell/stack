@@ -1173,8 +1173,10 @@ withMiniConfigAndLock go inner =
 -- | Project initialization
 initCmd :: InitOpts -> GlobalOpts -> IO ()
 initCmd initOpts go = do
-    pwd <- getCurrentDir
-    withMiniConfigAndLock go (initProject pwd initOpts (globalResolver go))
+    workDir <- getCurrentDir
+    withMiniConfigAndLock go $
+      initProject workDir initOpts $
+      globalResolver go
 
 -- | Create a project directory structure and initialize the stack config.
 newCmd :: (NewOpts,InitOpts) -> GlobalOpts -> IO ()

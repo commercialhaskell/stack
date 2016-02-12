@@ -13,15 +13,15 @@ import           Control.Monad
 import           Control.Monad.Catch             (MonadMask, throwM)
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
-import           Control.Monad.Reader            (asks, MonadReader)
+import           Control.Monad.Reader            (MonadReader, asks)
 import           Control.Monad.Trans.Control     (MonadBaseControl)
 import qualified Data.ByteString.Builder         as B
-import qualified Data.ByteString.Lazy            as L
 import qualified Data.ByteString.Char8           as BC
+import qualified Data.ByteString.Lazy            as L
+import qualified Data.Foldable                   as F
 import           Data.Function                   (on)
 import qualified Data.HashMap.Strict             as HM
 import qualified Data.IntMap                     as IntMap
-import qualified Data.Foldable                   as F
 import           Data.List                       (intersect, maximumBy)
 import           Data.List.Extra                 (nubOrd)
 import           Data.Map                        (Map)
@@ -35,13 +35,13 @@ import           Network.HTTP.Client.Conduit     (HasHttpManager)
 import           Path
 import           Path.IO
 import           Stack.BuildPlan
+import           Stack.Config                    (getSnapshots,
+                                                  makeConcreteResolver)
 import           Stack.Constants
 import           Stack.Solver
 import           Stack.Types
-import           Stack.Types.Internal            ( HasTerminal, HasReExec
-                                                 , HasLogLevel)
-import           Stack.Config                    ( getSnapshots
-                                                 , makeConcreteResolver)
+import           Stack.Types.Internal            (HasLogLevel, HasReExec,
+                                                  HasTerminal)
 import qualified System.FilePath                 as FP
 
 -- | Generate stack.yaml
@@ -57,8 +57,8 @@ initProject
 initProject currDir initOpts mresolver = do
     let dest = currDir </> stackDotYaml
 
+    dirs <- mapM (resolveDir' . T.unpack) (searchDirs initOpts)
     reldest <- toFilePath `liftM` makeRelativeToCurrentDir dest
-
     exists <- doesFileExist dest
     when (not (forceOverwrite initOpts) && exists) $ do
         error ("Stack configuration file " <> reldest <>
@@ -67,8 +67,12 @@ initProject currDir initOpts mresolver = do
 
     let noPkgMsg =  "In order to init, you should have an existing .cabal \
                     \file. Please try \"stack new\" instead."
-
-    cabalfps <- findCabalFiles (includeSubDirs initOpts) currDir
+    let findCabalFiles' = findCabalFiles (includeSubDirs initOpts)
+    cabalfps <- if null dirs
+                then
+                   findCabalFiles' currDir
+                else
+                  liftM concat $ mapM findCabalFiles' dirs
     (bundle, dupPkgs)  <- cabalPackagesCheck cabalfps noPkgMsg Nothing
 
     (r, flags, extraDeps, rbundle) <- getDefaultResolver dest initOpts
@@ -435,12 +439,14 @@ getRecommendedSnapshots snapshots = do
         ]
 
 data InitOpts = InitOpts
-    { useSolver :: Bool
+    { useSolver      :: Bool
     -- ^ Use solver to determine required external dependencies
-    , omitPackages :: Bool
+    , omitPackages   :: Bool
     -- ^ Exclude conflicting or incompatible user packages
     , forceOverwrite :: Bool
     -- ^ Overwrite existing stack.yaml
     , includeSubDirs :: Bool
     -- ^ If True, include all .cabal files found in any sub directories
+    , searchDirs     :: ![T.Text]
+    -- ^ List of sub directories to search for .cabal files
     }
