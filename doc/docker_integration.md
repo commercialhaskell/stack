@@ -87,7 +87,7 @@ In order to preserve the contents of the in-container home directory between
 runs, a special "sandbox" directory is volume-mounted into the container. `stack
 docker reset` will reset that sandbox to its defaults.
 
-Note: this leaves of `~/.stack` (which is separately volume-mounted) alone.
+Note: `~/.stack` is separately volume-mounted, and is left alone during reset.
 
 Command-line options
 -------------------------------------------------------------------------------
