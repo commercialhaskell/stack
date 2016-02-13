@@ -49,7 +49,6 @@ import           Data.Aeson.Extended
 import qualified Data.ByteString as S
 import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Lazy as L
-import           Data.Foldable (forM_)
 import qualified Data.IntMap as IntMap
 import qualified Data.Map as Map
 import           Data.Maybe
