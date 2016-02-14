@@ -319,7 +319,7 @@ Note that this reduces the security of your system.
 <a name="usr-bin-ar-permission-denied"></a>On OS X 10.11 ("El Capitan") and
 later, this is
 [caused by System Integrity Protection (a.k.a. "rootless")](https://github.com/commercialhaskell/stack/issues/563).
-GHC 7.10.2 includes a fix, so this only effects users of GHC 7.8.4. If you
+GHC 7.10.2 includes a fix, so this only affects users of GHC 7.8.4. If you
 cannot upgrade to GHC 7.10.2, you can work around it by
 [disabling System Integrity Protection](#disable-rootless)
 
