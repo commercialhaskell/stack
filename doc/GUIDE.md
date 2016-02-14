@@ -1745,7 +1745,7 @@ There are lots of resources available for learning more about stack:
 * `--verbose` (or `-v`) — much more info about internal operations (useful for bug reports)
 * The [home page](http://haskellstack.org)
 * The [stack mailing list](https://groups.google.com/d/forum/haskell-stack)
-* The [the FAQ](faq.html)
+* The [the FAQ](faq.md)
 * The [stack wiki](https://github.com/commercialhaskell/stack/wiki)
 * The [haskell-stack tag on Stack Overflow](http://stackoverflow.com/questions/tagged/haskell-stack)
 * [Another getting started with stack tutorial](http://seanhess.github.io/2015/08/04/practical-haskell-getting-started.html)
