@@ -1812,20 +1812,25 @@ Travis](travis_ci.html). However, for
 most people, the following example will be sufficient to get started:
 
 ```yaml
+# Copy these contents into the root directory of your Github project in a file
+# named .travis.yml
+
 # Use new container infrastructure to enable caching
 sudo: false
 
 # Choose a lightweight base image; we provide our own build tools.
 language: c
 
-# GHC depends on GMP. You can add other dependencies here as well.
-addons:
-  apt:
-    packages:
-    - libgmp-dev
+# Caching so the next build will be fast too.
+cache:
+  directories:
+  - $HOME/.ghc
+  - $HOME/.cabal
+  - $HOME/.stack
 
-# The different configurations we want to test. You could also do things like
-# change flags or use --stack-yaml to point to a different file.
+# The different configurations we want to test. We have BUILD=cabal which uses
+# cabal-install, and BUILD=stack which uses Stack. More documentation on each
+# of those below.
 #
 # We set the compiler values here to tell Travis to use a different
 # cache file per set of arguments.
@@ -1835,47 +1840,124 @@ addons:
 #     addons: {apt: {packages: [libfcgi-dev,libgmp-dev]}}
 matrix:
   include:
-  - env: ARGS=""
-    compiler: ": # Default"
-  - env: ARGS="--resolver lts-2"
-    compiler: ": # lts-2"
-  - env: ARGS="--resolver lts-3"
-    compiler: ": # lts-3"
-  - env: ARGS="--resolver lts-4"
-    compiler: ": # lts-4"
-  - env: ARGS="--resolver lts"
-    compiler: ": # lts"
-  - env: ARGS="--resolver nightly"
-    compiler: ": # nightly"
-  # Do some testing on OS X as well. Feel free to add more
-  # rows if desired
-  - env: ARGS=""
-    compiler: ": # Default osx"
+  # We grab the appropriate GHC and cabal-install versions from hvr's PPA. See:
+  # https://github.com/hvr/multi-ghc-travis
+  - env: BUILD=cabal GHCVER=7.0.4 CABALVER=1.16
+    compiler: ": #GHC 7.0.4"
+    addons: {apt: {packages: [cabal-install-1.16,ghc-7.0.4], sources: [hvr-ghc]}}
+  - env: BUILD=cabal GHCVER=7.2.2 CABALVER=1.16
+    compiler: ": #GHC 7.2.2"
+    addons: {apt: {packages: [cabal-install-1.16,ghc-7.2.2], sources: [hvr-ghc]}}
+  - env: BUILD=cabal GHCVER=7.4.2 CABALVER=1.16
+    compiler: ": #GHC 7.4.2"
+    addons: {apt: {packages: [cabal-install-1.16,ghc-7.4.2], sources: [hvr-ghc]}}
+  - env: BUILD=cabal GHCVER=7.6.3 CABALVER=1.16
+    compiler: ": #GHC 7.6.3"
+    addons: {apt: {packages: [cabal-install-1.16,ghc-7.6.3], sources: [hvr-ghc]}}
+  - env: BUILD=cabal GHCVER=7.8.4 CABALVER=1.18
+    compiler: ": #GHC 7.8.4"
+    addons: {apt: {packages: [cabal-install-1.18,ghc-7.8.4], sources: [hvr-ghc]}}
+  - env: BUILD=cabal GHCVER=7.10.3 CABALVER=1.22
+    compiler: ": #GHC 7.10.3"
+    addons: {apt: {packages: [cabal-install-1.22,ghc-7.10.3], sources: [hvr-ghc]}}
+
+  # Build with the newest GHC and cabal-install. This is an accepted failure,
+  # see below.
+  - env: BUILD=cabal GHCVER=head  CABALVER=head
+    compiler: ": #GHC HEAD"
+    addons: {apt: {packages: [cabal-install-head,ghc-head], sources: [hvr-ghc]}}
+
+  # The Stack builds. We can pass in arbitrary Stack arguments via the ARGS
+  # variable, such as using --stack-yaml to point to a different file.
+  - env: BUILD=stack ARGS="--resolver lts-2"
+    compiler: ": #stack 7.8.4"
+    addons: {apt: {packages: [ghc-7.8.4], sources: [hvr-ghc]}}
+
+  - env: BUILD=stack ARGS="--resolver lts-3"
+    compiler: ": #stack 7.10.2"
+    addons: {apt: {packages: [ghc-7.10.2], sources: [hvr-ghc]}}
+
+  - env: BUILD=stack ARGS="--resolver lts-5"
+    compiler: ": #stack 7.10.3"
+    addons: {apt: {packages: [ghc-7.10.3], sources: [hvr-ghc]}}
+
+  # Nightly builds are allowed to fail
+  - env: BUILD=stack ARGS="--resolver nightly"
+    compiler: ": #stack nightly"
+    addons: {apt: {packages: [libgmp-dev]}}
+
+  # Build on OS X in addition to Linux
+  - env: BUILD=stack ARGS="--resolver lts-2"
+    compiler: ": #stack 7.8.4 osx"
     os: osx
+
+  - env: BUILD=stack ARGS="--resolver lts-3"
+    compiler: ": #stack 7.10.2 osx"
+    os: osx
+
+  - env: BUILD=stack ARGS="--resolver lts-5"
+    compiler: ": #stack 7.10.3 osx"
+    os: osx
+
+  - env: BUILD=stack ARGS="--resolver nightly"
+    compiler: ": #stack nightly osx"
+    os: osx
+
+  allow_failures:
+  - env: BUILD=cabal GHCVER=head  CABALVER=head
+  - env: BUILD=stack ARGS="--resolver nightly"
 
 before_install:
 # Using compiler above sets CC to an invalid value, so unset it
 - unset CC
 
+# We want to always allow newer versions of packages when building on GHC HEAD
+- CABALARGS=""
+- if [ "x$GHCVER" = "xhead" ]; then CABALARGS=--allow-newer; fi
+
 # Download and unpack the stack executable
+- export PATH=/opt/ghc/$GHCVER/bin:/opt/cabal/$CABALVER/bin:$HOME/.local/bin:$PATH
 - mkdir -p ~/.local/bin
-- export PATH=$HOME/.local/bin:$PATH
-- if [ `uname` = "Darwin" ];
+- |
+  if [ `uname` = "Darwin" ]
   then
-    curl --insecure -L https://www.stackage.org/stack/osx-x86_64 | tar xz --strip-components=1 --include '*/stack' -C ~/.local/bin;
+    curl --insecure -L https://www.stackage.org/stack/osx-x86_64 | tar xz --strip-components=1 --include '*/stack' -C ~/.local/bin
   else
-    curl -L https://www.stackage.org/stack/linux-x86_64 | tar xz --wildcards --strip-components=1 -C ~/.local/bin '*/stack';
+    curl -L https://www.stackage.org/stack/linux-x86_64 | tar xz --wildcards --strip-components=1 -C ~/.local/bin '*/stack'
   fi
 
-# This line does all of the work: installs GHC if necessary, build the library,
-# executables, and test suites, and runs the test suites. --no-terminal works
-# around some quirks in Travis's terminal implementation.
-script: stack $ARGS --no-terminal --install-ghc test --haddock
+install:
+- echo "$(ghc --version) [$(ghc --print-project-git-commit-id 2> /dev/null || echo '?')]"
+- if [ -f configure.ac ]; then autoreconf -i; fi
+- |
+  case "$BUILD" in
+    stack)
+      stack --no-terminal --install-ghc $ARGS test --only-dependencies
+      ;;
+    cabal)
+      cabal --version
+      travis_retry cabal update
+      cabal install --only-dependencies --enable-tests --enable-benchmarks --force-reinstalls --ghc-options=-O0 --reorder-goals --max-backjumps=-1 $CABALARGS
+      ;;
+  esac
 
-# Caching so the next build will be fast too.
-cache:
-  directories:
-  - $HOME/.stack
+script:
+- |
+  case "$BUILD" in
+    stack)
+      stack --no-terminal $ARGS test --haddock --no-haddock-deps
+      ;;
+    cabal)
+      cabal configure --enable-tests --enable-benchmarks -v2 --ghc-options="-O0 -Werror"
+      cabal build
+      cabal check || [ "$CABALVER" == "1.16" ]
+      cabal test
+      cabal sdist
+      cabal copy
+      SRC_TGZ=$(cabal info . | awk '{print $2;exit}').tar.gz && \
+        (cd dist && cabal install --force-reinstalls "$SRC_TGZ")
+      ;;
+  esac
 ```
 
 Not only will this build and test your project against multiple GHC versions
