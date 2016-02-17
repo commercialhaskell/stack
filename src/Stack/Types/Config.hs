@@ -159,6 +159,7 @@ import           Distribution.Version (anyVersion)
 import           Network.HTTP.Client (parseUrl)
 import           Path
 import qualified Paths_stack as Meta
+import           {-# SOURCE #-} Stack.Constants (stackRootEnvVar)
 import           Stack.Types.BuildPlan (SnapName, renderSnapName, parseSnapName)
 import           Stack.Types.Compiler
 import           Stack.Types.Docker
@@ -278,6 +279,9 @@ data Config =
          ,configDefaultTemplate     :: !(Maybe TemplateName)
          -- ^ The default template to use when none is specified.
          -- (If Nothing, the default default is used.)
+         ,configAllowDifferentUser  :: !Bool
+         -- ^ Allow users other than the stack root owner to use the stack
+         -- installation.
          }
 
 -- | Which packages to ghc-options on the command line apply to?
@@ -806,6 +810,9 @@ data ConfigMonoid =
     ,configMonoidDefaultTemplate     :: !(Maybe TemplateName)
     -- ^ The default template to use when none is specified.
     -- (If Nothing, the default default is used.)
+    , configMonoidAllowDifferentUser :: !(Maybe Bool)
+    -- ^ Allow users other than the stack root owner to use the stack
+    -- installation.
     }
   deriving Show
 
@@ -845,6 +852,7 @@ instance Monoid ConfigMonoid where
     , configMonoidApplyGhcOptions = Nothing
     , configMonoidAllowNewer = Nothing
     , configMonoidDefaultTemplate = Nothing
+    , configMonoidAllowDifferentUser = Nothing
     }
   mappend l r = ConfigMonoid
     { configMonoidWorkDir = configMonoidWorkDir l <|> configMonoidWorkDir r
@@ -882,6 +890,7 @@ instance Monoid ConfigMonoid where
     , configMonoidApplyGhcOptions = configMonoidApplyGhcOptions l <|> configMonoidApplyGhcOptions r
     , configMonoidAllowNewer = configMonoidAllowNewer l <|> configMonoidAllowNewer r
     , configMonoidDefaultTemplate = configMonoidDefaultTemplate l <|> configMonoidDefaultTemplate r
+    , configMonoidAllowDifferentUser = configMonoidAllowDifferentUser l <|> configMonoidAllowDifferentUser r
     }
 
 instance FromJSON (ConfigMonoid, [JSONWarning]) where
@@ -946,6 +955,7 @@ parseConfigMonoidJSON obj = do
     configMonoidApplyGhcOptions <- obj ..:? configMonoidApplyGhcOptionsName
     configMonoidAllowNewer <- obj ..:? configMonoidAllowNewerName
     configMonoidDefaultTemplate <- obj ..:? configMonoidDefaultTemplateName
+    configMonoidAllowDifferentUser <- obj ..:? configMonoidAllowDifferentUserName
 
     return ConfigMonoid {..}
   where
@@ -1074,6 +1084,9 @@ configMonoidAllowNewerName = "allow-newer"
 configMonoidDefaultTemplateName :: Text
 configMonoidDefaultTemplateName = "default-template"
 
+configMonoidAllowDifferentUserName :: Text
+configMonoidAllowDifferentUserName = "allow-different-user"
+
 data ConfigException
   = ParseConfigFileException (Path Abs File) ParseException
   | ParseResolverException Text
@@ -1086,6 +1099,9 @@ data ConfigException
   | ResolverPartial Resolver String
   | NoSuchDirectory FilePath
   | ParseGHCVariantException String
+  | BadStackRootEnvVar (Path Abs Dir)
+  | Won'tCreateStackRootInDirectoryOwnedByDifferentUser (Path Abs Dir) (Path Abs Dir) -- ^ @$STACK_ROOT@, parent dir
+  | UserDoesn'tOwnDirectory (Path Abs Dir)
   deriving Typeable
 instance Show ConfigException where
     show (ParseConfigFileException configFile exception) = concat
@@ -1159,6 +1175,30 @@ instance Show ConfigException where
     show (ParseGHCVariantException v) = concat
         [ "Invalid ghc-variant value: "
         , v
+        ]
+    show (BadStackRootEnvVar envStackRoot) = concat
+        [ "Invalid $"
+        , stackRootEnvVar
+        , ": '"
+        , toFilePath envStackRoot
+        , "'. Please provide a valid absolute path."
+        ]
+    show (Won'tCreateStackRootInDirectoryOwnedByDifferentUser envStackRoot parentDir) = concat
+        [ "Preventing creation of $"
+        , stackRootEnvVar
+        , " '"
+        , toFilePath envStackRoot
+        , "'. Parent directory '"
+        , toFilePath parentDir
+        , "' is owned by someone else."
+        ]
+    show (UserDoesn'tOwnDirectory dir) = concat
+        [ "You are not the owner of '"
+        , toFilePath dir
+        , "'. Aborting to protect file permissions."
+        , "\nRetry with '--"
+        , T.unpack configMonoidAllowDifferentUserName
+        , "' to disable this precaution."
         ]
 instance Exception ConfigException
 

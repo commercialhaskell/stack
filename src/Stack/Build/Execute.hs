@@ -70,6 +70,7 @@ import           Stack.Build.Cache
 import           Stack.Build.Haddock
 import           Stack.Build.Installed
 import           Stack.Build.Source
+import           Stack.Config
 import           Stack.Constants
 import           Stack.Coverage
 import           Stack.Fetch as Fetch
@@ -769,6 +770,10 @@ withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} md
 
     withCabal package pkgDir mlogFile inner = do
         config <- asks getConfig
+
+        unless (configAllowDifferentUser config) $
+            checkOwnership (pkgDir </> configWorkDir config)
+
         let envSettings = EnvSettings
                 { esIncludeLocals = taskLocation task == Local
                 , esIncludeGhcPackagePath = False
