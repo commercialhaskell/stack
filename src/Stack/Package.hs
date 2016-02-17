@@ -30,7 +30,6 @@ module Stack.Package
   ,resolvePackageDescription
   ,packageToolDependencies
   ,packageDependencies
-  ,packageIdentifier
   ,autogenDir
   ,checkCabalFileName
   ,printCabalFileWarning
@@ -88,17 +87,10 @@ import           Safe (headDef, tailSafe)
 import           Stack.Build.Installed
 import           Stack.Constants
 import           Stack.Types
-import qualified Stack.Types.PackageIdentifier
 import qualified System.Directory as D
 import           System.FilePath (splitExtensions, replaceExtension)
 import qualified System.FilePath as FilePath
 import           System.IO.Error
-
-packageIdentifier :: Package -> Stack.Types.PackageIdentifier.PackageIdentifier
-packageIdentifier pkg =
-    Stack.Types.PackageIdentifier.PackageIdentifier
-        (packageName pkg)
-        (packageVersion pkg)
 
 -- | Read the raw, unresolved package information.
 readPackageUnresolved :: (MonadIO m, MonadThrow m)

@@ -98,6 +98,10 @@ data Package =
           }
  deriving (Show,Typeable)
 
+packageIdentifier :: Package -> PackageIdentifier
+packageIdentifier pkg =
+    PackageIdentifier (packageName pkg) (packageVersion pkg)
+
 -- | Files that the package depends on, relative to package directory.
 -- Argument is the location of the .cabal file
 newtype GetPackageOpts = GetPackageOpts
