@@ -299,7 +299,7 @@ ghciSetup GhciOpts{..} = do
     directlyWanted <-
         forMaybeM (M.toList (envConfigPackages econfig)) $
         \(dir,validWanted) ->
-             do cabalfp <- getCabalFileName dir
+             do cabalfp <- findOrGenerateCabalFile dir
                 name <- parsePackageNameFromFilePath cabalfp
                 if validWanted
                     then case M.lookup name targets of
