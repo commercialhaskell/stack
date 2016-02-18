@@ -344,5 +344,3 @@ data FileWatchOpts
   | FileWatch
   | FileWatchPoll
   deriving (Show,Eq)
-
-

@@ -306,7 +306,7 @@ buildOptsMonoidParser hide0 =
               , buildMonoidExeProfile = Just True
               , buildMonoidBenchmarkOpts = bopts
                 { beoMonoidAdditionalArgs = beoMonoidAdditionalArgs bopts <>
-                  Just (unwords additionalArgs)
+                  Just (" " <> unwords additionalArgs)
                 }
               , buildMonoidTestOpts = topts
                 { toMonoidAdditionalArgs = (toMonoidAdditionalArgs topts) <>
@@ -321,8 +321,7 @@ buildOptsMonoidParser hide0 =
             topts =
                 buildMonoidTestOpts opts
             additionalArgs =
-                "+RTS" :
-                catMaybes [trac, prof]
+                "+RTS" : catMaybes [trac, prof, Just "-RTS"]
             trac =
                 if tracing
                     then Just "-xc"
