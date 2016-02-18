@@ -18,6 +18,7 @@ module Stack.Constants
     ,rawGithubUrl
     ,stackDotYaml
     ,stackRootEnvVar
+    ,inContainerEnvVar
     ,userDocsDir
     ,configCacheFile
     ,configCabalMod
@@ -299,6 +300,10 @@ stackDotYaml = $(mkRelFile "stack.yaml")
 -- | Environment variable used to override the '~/.stack' location.
 stackRootEnvVar :: String
 stackRootEnvVar = "STACK_ROOT"
+
+-- | Environment variable used to indicate stack is running in container.
+inContainerEnvVar :: String
+inContainerEnvVar = stackProgNameUpper ++ "_IN_CONTAINER"
 
 -- See https://downloads.haskell.org/~ghc/7.10.1/docs/html/libraries/ghc/src/Module.html#integerPackageKey
 wiredInPackages :: HashSet PackageName

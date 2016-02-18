@@ -59,14 +59,14 @@ import           Path.Extra (toFilePathNoTrailingSep)
 import           Path.IO hiding (canonicalizePath)
 import qualified Paths_stack as Meta
 import           Prelude -- Fix redundant import warnings
+import           Stack.Config (getInContainer)
 import           Stack.Constants
 import           Stack.Docker.GlobalDB
 import           Stack.Types
 import           Stack.Types.Internal
 import           Stack.Setup (ensureDockerStackExe)
 import           System.Directory (canonicalizePath,getHomeDirectory)
-import           System.Environment (getEnv,getEnvironment,getProgName,getArgs,getExecutablePath
-                                    ,lookupEnv)
+import           System.Environment (getEnv,getEnvironment,getProgName,getArgs,getExecutablePath)
 import           System.Exit (exitSuccess, exitWith)
 import qualified System.FilePath as FP
 import           System.IO (stderr,stdin,stdout,hIsTerminalDevice)
@@ -237,10 +237,6 @@ preventInContainer inner =
      if inContainer
         then throwM OnlyOnHostException
         else inner
-
--- | 'True' if we are currently running inside a Docker container.
-getInContainer :: (MonadIO m) => m Bool
-getInContainer = liftIO (isJust <$> lookupEnv inContainerEnvVar)
 
 -- | Run a command in a new Docker container, then exit the process.
 runContainerAndExit :: M env m
@@ -877,10 +873,6 @@ fromMaybeProjectRoot = fromMaybe (throw CannotDetermineProjectRootException)
 -- | Use of this variable is deprecated, and only used to detect old images.
 oldSandboxIdEnvVar :: String
 oldSandboxIdEnvVar = "DOCKER_SANDBOX_ID"
-
--- | Environment variable used to indicate stack is running in container.
-inContainerEnvVar :: String
-inContainerEnvVar = stackProgNameUpper ++ "_IN_CONTAINER"
 
 -- | Command-line argument for "docker"
 dockerCmdName :: String
