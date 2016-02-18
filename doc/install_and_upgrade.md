@@ -54,12 +54,6 @@ such.
 
 ## Mac OS X
 
-Note: if you are on OS X 10.11 ("El Capitan") and encounter either of these
-problems, see the linked FAQ entries.
-
-  * [GHC 7.8.4 fails with `/usr/bin/ar: permission denied`](faq.html#usr-bin-ar-permission-denied)
-  * [DYLD_LIBRARY_PATH is ignored](faq.html#dyld-library-path-ignored)
-
 ### Using Homebrew
 
 If you have a popular [brew](http://brew.sh/) tool installed, you can just do:
@@ -86,6 +80,15 @@ will take hours), see
 
 We generally test on the current version of Mac OS X, but stack is known to work on
 Yosemite and Mavericks as well, and may also work on older versions (YMMV).
+
+### Notes
+
+If you are on OS X 10.11 ("El Capitan") and encounter either of these
+problems, see the linked FAQ entries:
+
+  * [GHC 7.8.4 fails with `/usr/bin/ar: permission denied`](faq.html#usr-bin-ar-permission-denied)
+  * [DYLD_LIBRARY_PATH is ignored](faq.html#dyld-library-path-ignored)
+
 
 ## Ubuntu
 

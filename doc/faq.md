@@ -296,7 +296,7 @@ These are written to `*.dump-*` files inside the package's `.stack-work` directo
 
 <a name="dyld-library-path-ignored"></a>If you
 are on Mac OS X 10.11 ("El Capitan") or later, there are upstream issues which
-[prevents the `DYLD_LIBRARY_PATH` environment variable from being passed to GHC](https://github.com/commercialhaskell/stack/issues/1161)
+[prevent the `DYLD_LIBRARY_PATH` environment variable from being passed to GHC](https://github.com/commercialhaskell/stack/issues/1161)
 when System Integrity Protection (a.k.a. "rootless") is enabled. The only
 workaround we are aware of is
 [disabling System Integrity Protection](http://osxdaily.com/2015/10/05/disable-rootless-system-integrity-protection-mac-os-x/).
