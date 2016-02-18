@@ -215,12 +215,23 @@ resolvePackage packageConfig gpkg =
   where
     pkgFiles = GetPackageFiles $
         \cabalfp ->
-             do distDir <- distDirFromDir (parent cabalfp)
+             do let pkgDir = parent cabalfp
+                distDir <- distDirFromDir pkgDir
                 (componentModules,componentFiles,dataFiles',warnings) <-
                     runReaderT
                         (packageDescModulesAndFiles pkg)
                         (cabalfp, buildDir distDir)
-                return (componentModules, componentFiles, S.insert cabalfp dataFiles', warnings)
+                buildFiles <- liftM (S.insert cabalfp) $
+                    if buildType pkg `elem` [Nothing, Just Custom]
+                    then do
+                        let setupHsPath = pkgDir </> $(mkRelFile "Setup.hs")
+                            setupLhsPath = pkgDir </> $(mkRelFile "Setup.lhs")
+                        setupHsExists <- doesFileExist setupHsPath
+                        if setupHsExists then return (S.singleton setupHsPath) else do
+                            setupLhsExists <- doesFileExist setupLhsPath
+                            if setupLhsExists then return (S.singleton setupLhsPath) else return S.empty
+                    else return S.empty
+                return (componentModules, componentFiles, buildFiles <> dataFiles', warnings)
     pkgId = package (packageDescription gpkg)
     name = fromCabalPackageName (pkgName pkgId)
     pkg = resolvePackageDescription packageConfig gpkg
