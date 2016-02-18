@@ -77,8 +77,8 @@ data NewOpts = NewOpts
 -- | Create a new project with the given options.
 new
     :: (HasConfig r, MonadReader r m, MonadLogger m, MonadCatch m, MonadThrow m, MonadIO m, HasHttpManager r, Functor m, Applicative m)
-    => NewOpts -> m (Path Abs Dir)
-new opts = do
+    => NewOpts -> Bool -> m (Path Abs Dir)
+new opts forceOverwrite = do
     pwd <- getCurrentDir
     absDir <- if bare then return pwd
                       else do relDir <- parseRelDir (packageNameString project)
@@ -99,6 +99,7 @@ new opts = do
                     (newOptsNonceParams opts)
                     absDir
                     templateText
+            when (not forceOverwrite && bare) $ checkForOverwrite (M.keys files)
             writeTemplateFiles files
             runTemplateInits absDir
             return absDir
@@ -194,7 +195,7 @@ applyTemplate project template nonceParams dir templateText = do
                  templateText
                  (mkStrContextM (contextFunction context)))
     unless (S.null missingKeys)
-         ($logInfo (T.pack (show (MissingParameters project template missingKeys (configUserConfigPath config)))))
+         ($logInfo ("\n" <> T.pack (show (MissingParameters project template missingKeys (configUserConfigPath config))) <> "\n"))
     files :: Map FilePath LB.ByteString <-
         catch (execWriterT $
                yield (T.encodeUtf8 (LT.toStrict applied)) $$
@@ -229,6 +230,12 @@ applyTemplate project template nonceParams dir templateText = do
                 tell (S.singleton key)
                 return MuNothing
             Just value -> return (MuVariable value)
+
+-- | Check if we're going to overwrite any existing files.
+checkForOverwrite :: (MonadIO m, MonadThrow m) => [Path Abs File] -> m ()
+checkForOverwrite files = do
+    overwrites <- filterM doesFileExist files
+    unless (null overwrites) $ throwM (AttemptedOverwrites overwrites)
 
 -- | Write files to the new project directory.
 writeTemplateFiles
@@ -335,6 +342,7 @@ data NewException
     | AlreadyExists !(Path Abs Dir)
     | MissingParameters !PackageName !TemplateName !(Set String) !(Path Abs File)
     | InvalidTemplate !TemplateName !String
+    | AttemptedOverwrites [Path Abs File]
     deriving (Typeable)
 
 instance Exception NewException
@@ -393,3 +401,7 @@ instance Show NewException where
         "The template \"" <> T.unpack (templateName name) <>
         "\" is invalid and could not be used. " <>
         "The error was: \"" <> why <> "\""
+    show (AttemptedOverwrites fps) =
+        "The template would create the following files, but they already exist:\n" <>
+        unlines (map (("  " ++) . toFilePath) fps) <>
+        "Use --force to ignore this, and overwite these files."

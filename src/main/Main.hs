@@ -1180,7 +1180,7 @@ initCmd initOpts go = do
 newCmd :: (NewOpts,InitOpts) -> GlobalOpts -> IO ()
 newCmd (newOpts,initOpts) go@GlobalOpts{..} = do
     withMiniConfigAndLock go $ do
-        dir <- new newOpts
+        dir <- new newOpts (forceOverwrite initOpts)
         initProject dir initOpts globalResolver
 
 -- | List the available templates.
