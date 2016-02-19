@@ -17,18 +17,18 @@ It features:
 
 Downloads are available by operating system:
 
-* [Windows](install_and_upgrade.html#windows)
-* [Mac OS X](install_and_upgrade.html#mac-os-x)
-* [Ubuntu](install_and_upgrade.html#ubuntu)
-* [Debian](install_and_upgrade.html#debian)
-* [CentOS / Red Hat / Amazon Linux](install_and_upgrade.html#centos-red-hat-amazon-linux)
-* [Fedora](install_and_upgrade.html#fedora)
-* [openSUSE / SUSE Linux Enterprise](install_and_upgrade.html#opensuse-suse-linux-enterprise)
-* [Arch Linux](install_and_upgrade.html#arch-linux)
-* [NixOS](install_and_upgrade.html#nixos)
-* [Linux (general)](install_and_upgrade.html#linux)
+* [Windows](install_and_upgrade.md#windows)
+* [Mac OS X](install_and_upgrade.md#mac-os-x)
+* [Ubuntu](install_and_upgrade.md#ubuntu)
+* [Debian](install_and_upgrade.md#debian)
+* [CentOS / Red Hat / Amazon Linux](install_and_upgrade.md#centos-red-hat-amazon-linux)
+* [Fedora](install_and_upgrade.md#fedora)
+* [openSUSE / SUSE Linux Enterprise](install_and_upgrade.md#opensuse-suse-linux-enterprise)
+* [Arch Linux](install_and_upgrade.md#arch-linux)
+* [NixOS](install_and_upgrade.md#nixos)
+* [Linux (general)](install_and_upgrade.md#linux)
 
-[Upgrade instructions](install_and_upgrade.html#upgrade)
+[Upgrade instructions](install_and_upgrade.md#upgrade)
 
 Note: if you are using cabal-install to install stack, you may need to pass a
 constraint to work around a
@@ -106,7 +106,7 @@ executables.
    Just try to add a new version in the `stack.yaml` file in the `extra-deps` section.
 
 It was a really fast introduction on how to start to code in Haskell using `stack`.
-If you want to go further, we highly recommend you to read the [`stack` guide](GUIDE.html).
+If you want to go further, we highly recommend you to read the [`stack` guide](GUIDE.md).
 
 #### How to contribute
 
@@ -135,13 +135,13 @@ stack build
 #### Complete guide to stack
 
 This repository also contains a complete [user guide to using stack
-](GUIDE.html), covering all of the most common use cases.
+](GUIDE.md), covering all of the most common use cases.
 
 
 #### Questions, Feedback, Discussion
 
 * For frequently asked questions about detailed or specific use-cases, please
-  see [the FAQ](faq.html).
+  see [the FAQ](faq.md).
 * For general questions, comments, feedback and support please write
   to [the stack mailing list](https://groups.google.com/d/forum/haskell-stack).
 * For bugs, issues, or requests please

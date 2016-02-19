@@ -120,7 +120,7 @@ renderStackYaml p =
         _ -> assert False $ B.byteString $ Yaml.encode p
   where
     renderObject o =
-        B.byteString "# For more information, see: http://docs.haskellstack.org/en/stable/yaml_configuration.html\n\n" <>
+        B.byteString "# For more information, see: http://docs.haskellstack.org/en/stable/yaml_configuration/\n\n" <>
         F.foldMap (goComment o) comments <>
         goOthers (o `HM.difference` HM.fromList comments) <>
         B.byteString
@@ -175,7 +175,7 @@ getSnapshots' =
         $logError ""
         $logError "You can try again, or create your stack.yaml file by hand. See:"
         $logError ""
-        $logError "    http://docs.haskellstack.org/en/stable/yaml_configuration.html"
+        $logError "    http://docs.haskellstack.org/en/stable/yaml_configuration/"
         $logError ""
         $logError $ "Exception was: " <> T.pack (show e)
         return Nothing

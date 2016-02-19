@@ -1087,7 +1087,7 @@ instance Show ConfigException where
         , toFilePath configFile
         , "':\n"
         , show exception
-        , "\nSee http://docs.haskellstack.org/en/stable/yaml_configuration.html."
+        , "\nSee http://docs.haskellstack.org/en/stable/yaml_configuration/."
         ]
     show (ParseResolverException t) = concat
         [ "Invalid resolver value: "

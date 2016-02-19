@@ -450,7 +450,7 @@ loadBuildConfig mproject config mresolver mcompiler = do
                            , "# '", encodeUtf8 (T.pack $ toFilePath $ configUserConfigPath config), "' instead.\n"
                            , "#\n"
                            , "# For more information about stack's configuration, see\n"
-                           , "# http://docs.haskellstack.org/en/stable/yaml_configuration.html\n"
+                           , "# http://docs.haskellstack.org/en/stable/yaml_configuration/\n"
                            , "#\n"
                            , Yaml.encode p]
                        S.writeFile (toFilePath $ parent dest </> $(mkRelFile "README.txt")) $ S.concat
@@ -514,7 +514,7 @@ resolvePackageEntry menv projRoot pe = do
             subs -> mapM (resolveDir entryRoot) subs
     case peValidWanted pe of
         Nothing -> return ()
-        Just _ -> $logWarn "Warning: you are using the deprecated valid-wanted field. You should instead use extra-dep. See: http://docs.haskellstack.org/en/stable/yaml_configuration.html#packages"
+        Just _ -> $logWarn "Warning: you are using the deprecated valid-wanted field. You should instead use extra-dep. See: http://docs.haskellstack.org/en/stable/yaml_configuration/#packages"
     return $ map (, not $ peExtraDep pe) paths
 
 -- | Resolve a PackageLocation into a path, downloading and cloning as
@@ -726,7 +726,7 @@ getDefaultUserConfigPath stackRoot = do
         liftIO $ S.writeFile (toFilePath path) $ S.concat
             [ "# This file contains default non-project-specific settings for 'stack', used\n"
             , "# in all projects.  For more information about stack's configuration, see\n"
-            , "# http://docs.haskellstack.org/en/stable/yaml_configuration.html\n"
+            , "# http://docs.haskellstack.org/en/stable/yaml_configuration/\n"
             , "#\n"
             , Yaml.encode (mempty :: Object) ]
     return path

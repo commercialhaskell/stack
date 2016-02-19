@@ -8,7 +8,7 @@ below, and available on
 future, we are open to supporting more OSes (to request one, please
 [submit an issue](https://github.com/commercialhaskell/stack/issues/new)).
 
-Binary packages are signed with this [signing key](SIGNING_KEY.html).
+Binary packages are signed with this [signing key](SIGNING_KEY.md).
 
 If you are writing a script that needs to download the latest binary, you can
 find links that always point to the latest bindists
@@ -86,8 +86,8 @@ Yosemite and Mavericks as well, and may also work on older versions (YMMV).
 If you are on OS X 10.11 ("El Capitan") and encounter either of these
 problems, see the linked FAQ entries:
 
-  * [GHC 7.8.4 fails with `/usr/bin/ar: permission denied`](faq.html#usr-bin-ar-permission-denied)
-  * [DYLD_LIBRARY_PATH is ignored](faq.html#dyld-library-path-ignored)
+  * [GHC 7.8.4 fails with `/usr/bin/ar: permission denied`](faq.md#usr-bin-ar-permission-denied)
+  * [DYLD_LIBRARY_PATH is ignored](faq.md#dyld-library-path-ignored)
 
 
 ## Ubuntu
