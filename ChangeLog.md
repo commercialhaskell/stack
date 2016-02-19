@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased changes
+
+Release notes:
+
+Major changes:
+
+Other enhancements:
+
+Bug fixes:
+
 ## 1.0.4
 
 Release notes:
