@@ -347,8 +347,9 @@ loadLocalPackage bopts targets (name, (lpv, gpkg)) = do
         , lpBenchDeps = packageDeps benchpkg
         , lpTestBench = btpkg
         , lpFiles = files
+        , lpForceDirty = boptsForceDirty bopts
         , lpDirtyFiles =
-            if not (Set.null dirtyFiles) || boptsForceDirty bopts
+            if not (Set.null dirtyFiles)
                 then let tryStripPrefix y =
                           fromMaybe y (stripPrefix (toFilePath $ lpvRoot lpv) y)
                       in Just $ Set.map tryStripPrefix dirtyFiles

@@ -236,6 +236,7 @@ data LocalPackage = LocalPackage
     -- ^ Directory of the package.
     , lpCabalFile     :: !(Path Abs File)
     -- ^ The .cabal file
+    , lpForceDirty    :: !Bool
     , lpDirtyFiles    :: !(Maybe (Set FilePath))
     -- ^ Nothing == not dirty, Just == dirty. Note that the Set may be empty if
     -- we forced the build to treat packages as dirty. Also, the Set may not
