@@ -1,6 +1,6 @@
 # GHCJS
 
-To use GHCJS with stack `>= 0.1.8`, place a GHCJS version in the [`compiler`](http://docs.haskellstack.org/en/stable/yaml_configuration.html#compiler) field of `stack.yaml`.  After this, all stack commands should work with GHCJS, except for `ide`.  In particular:
+To use GHCJS with stack `>= 0.1.8`, place a GHCJS version in the [`compiler`](yaml_configuration.md#compiler) field of `stack.yaml`.  After this, all stack commands should work with GHCJS, except for `ide`.  In particular:
 
 * `stack setup` will install GHCJS from source and boot it, which takes a long time.
 * `stack build` will compile your code to JavaScript.  In particular, the generated code for an executable ends up in `$(stack path --local-install-root)/bin/EXECUTABLE.jsexe/all.js` (bash syntax, where `EXECUTABLE` is the name of your executable).

@@ -1,0 +1,57 @@
+site_name: The Haskell Tool Stack
+site_description: The Haskell Tool Stack
+site_author: Stack contributors
+repo_url: https://github.com/commercialhaskell/stack
+copyright: Copyright (c) 2015-2016, Stack contributors
+docs_dir: doc
+site_dir: _site
+theme: readthedocs
+
+pages:
+- Home: README.md
+- Changelog: ChangeLog.md
+- Contributors Guide: CONTRIBUTING.md
+- Project documentation:
+  - Maintainer guide: MAINTAINER_GUIDE.md
+  - Signing key: SIGNING_KEY.md
+- Tool documentation:
+  - Build command: build_command.md
+  - Dependency visualization: dependency_visualization.md
+  - Docker integration: docker_integration.md
+  - FAQ: faq.md
+  - GHCJS: ghcjs.md
+  - Install/upgrade: install_and_upgrade.md
+  - Nix integration: nix_integration.md
+  - Non-standard project initialization: nonstandard_project_init.md
+  - Shell Auto-completion: shell_autocompletion.md
+  - Travis CI: travis_ci.md
+  - User guide: GUIDE.md
+  - YAML Configuration: yaml_configuration.md
+- Advanced documentation:
+  - Architecture: architecture.md
+
+# These extra_templates exists only to redirect from old Sphinx URLs to new
+# MkDocs URLs. This is more properly done using an HTTP redirect, but
+# unfortunately readthedocs.org's page redirection is broken (see
+# https://github.com/rtfd/readthedocs.org/issues/1826). Once that bug is fixed,
+# these files can be removed.
+extra_templates:
+- index.html
+- CONTRIBUTING.html
+- ChangeLog.html
+- GUIDE.html
+- MAINTAINER_GUIDE.html
+- README.html
+- SIGNING_KEY.html
+- architecture.html
+- build_command.html
+- dependency_visualization.html
+- docker_integration.html
+- faq.html
+- ghcjs.html
+- install_and_upgrade.html
+- nix_integration.html
+- nonstandard_project_init.html
+- shell_autocompletion.html
+- travis_ci.html
+- yaml_configuration.html

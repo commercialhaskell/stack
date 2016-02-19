@@ -2,7 +2,7 @@
 
 ## Bug Reports
 
-Before reporting a bug, please ensure that you are using the latest release (currently stack-1.0.2).  See the [upgrade instructions](http://docs.haskellstack.org/en/stable/install_and_upgrade.html#upgrade) to upgrade.
+Before reporting a bug, please ensure that you are using the latest release (currently stack-1.0.2).  See the [upgrade instructions](http://docs.haskellstack.org/en/stable/install_and_upgrade/#upgrade) to upgrade.
 
 When reporting a bug, please write in the following format:
 

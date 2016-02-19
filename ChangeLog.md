@@ -45,7 +45,7 @@ Release notes:
 - Arch Linux: Stack has been adopted into the
   [official community repository](https://www.archlinux.org/packages/community/x86_64/stack/),
   so we will no longer be updating the AUR with new versions. See the
-  [install/upgrade guide](http://docs.haskellstack.org/en/stable/install_and_upgrade.html#arch-linux)
+  [install/upgrade guide](http://docs.haskellstack.org/en/stable/install_and_upgrade/#arch-linux)
   for current download instructions.
 
 Major changes:
@@ -180,16 +180,16 @@ Release notes:
   source code, so please check the links on the website before submitting a PR
   to fix them.
 * The locations of the
-  [Ubuntu](http://docs.haskellstack.org/en/stable/install_and_upgrade.html#ubuntu)
+  [Ubuntu](http://docs.haskellstack.org/en/stable/install_and_upgrade/#ubuntu)
   and
-  [Debian](http://docs.haskellstack.org/en/stable/install_and_upgrade.html#debian)
+  [Debian](http://docs.haskellstack.org/en/stable/install_and_upgrade/#debian)
   package repositories have changed to have correct URL semantics according to
   Debian's guidelines
   [#1378](https://github.com/commercialhaskell/stack/issues/1378). The old
   locations will continue to work for some months, but we suggest that you
   adjust your `/etc/apt/sources.list.d/fpco.list` to the new location to avoid
   future disruption.
-* [openSUSE and SUSE Linux Enterprise](http://docs.haskellstack.org/en/stable/install_and_upgrade.html#opensuse-suse-linux-enterprise)
+* [openSUSE and SUSE Linux Enterprise](http://docs.haskellstack.org/en/stable/install_and_upgrade/#opensuse-suse-linux-enterprise)
   packages are now available, thanks to [@mimi1vx](https://github.com/mimi1vx).
   Note: there will be some lag before these pick up new versions, as they are
   based on Stackage LTS.
@@ -244,7 +244,7 @@ Major changes:
 
 * GHCJS can now be used with stackage snapshots via the new `compiler` field.
 * Windows installers are now available:
-  [download them here](http://docs.haskellstack.org/en/stable/install_and_upgrade.html#windows)
+  [download them here](http://docs.haskellstack.org/en/stable/install_and_upgrade/#windows)
   [#613](https://github.com/commercialhaskell/stack/issues/613)
 * Docker integration works with non-FPComplete generated images
   [#531](https://github.com/commercialhaskell/stack/issues/531)
@@ -458,7 +458,7 @@ Major changes:
 * Respect TemplateHaskell addDependentFile dependency changes ([#105](https://github.com/commercialhaskell/stack/issues/105))
     * TH dependent files are taken into account when determining whether a package needs to be built.
 * Overhauled target parsing, added `--test` and `--bench` options [#651](https://github.com/commercialhaskell/stack/issues/651)
-    * For details, see [Build commands documentation](http://docs.haskellstack.org/en/stable/build_command.html)
+    * For details, see [Build commands documentation](http://docs.haskellstack.org/en/stable/build_command/)
 
 Other enhancements:
 

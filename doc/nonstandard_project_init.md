@@ -75,7 +75,7 @@ to add lines for packages in your database referencing the sdist locations via a
 
 The recommended stack workflow is to use git submodules instead of a private Hackage. Either by using git submodules and listing the directories in the packages section of `stack.yaml`, or by adding the private dependencies as git URIs with a commit SHA to the `stack.yaml`. This has the large benefit of eliminating the need to manage a Hackage database and pointless version bumps.
 
-For further information see [YAML configuration](yaml_configuration.html)
+For further information see [YAML configuration](yaml_configuration.md)
 
 ### Issues Referenced
   - https://github.com/commercialhaskell/stack/issues/445
