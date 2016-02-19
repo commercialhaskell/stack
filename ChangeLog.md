@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased changes
+## 1.0.4
 
 Release notes:
 
