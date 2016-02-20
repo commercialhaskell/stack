@@ -299,10 +299,10 @@ collect2: error: ld returned 1 exit status
 
 These are written to `*.dump-*` files inside the package's `.stack-work` directory.
 
-#### Why is DYLD_LIBRARY_PATH ignored?
+#### <a name="dyld-library-path-ignored"></a>Why is DYLD_LIBRARY_PATH ignored?
 
-<a name="dyld-library-path-ignored"></a>If you
-are on Mac OS X 10.11 ("El Capitan") or later, there are upstream issues which
+If you are on Mac OS X 10.11 ("El Capitan") or later, there are upstream issues
+which
 [prevent the `DYLD_LIBRARY_PATH` environment variable from being passed to GHC](https://github.com/commercialhaskell/stack/issues/1161)
 when System Integrity Protection (a.k.a. "rootless") is enabled. The only
 workaround we are aware of is
@@ -310,9 +310,9 @@ workaround we are aware of is
 
 **WARNING: Disabling SIP will severely reduce the security of your system, so only do this if absolutely necessary!**
 
-#### Why do I get a `/usr/bin/ar: permission denied` error?
+#### <a name="usr-bin-ar-permission-denied"></a>Why do I get a `/usr/bin/ar: permission denied` error?
 
-<a name="usr-bin-ar-permission-denied"></a>If you are on OS X 10.11 ("El Capitan") or
+If you are on OS X 10.11 ("El Capitan") or
 later, GHC 7.8.4 is
 [incompatible with System Integrity Protection (a.k.a. "rootless")](https://github.com/commercialhaskell/stack/issues/563).
 GHC 7.10.2 includes a fix, so this only effects users of GHC 7.8.4. If you

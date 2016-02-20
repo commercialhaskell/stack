@@ -1,7 +1,7 @@
 # Install/upgrade
 
 Distribution packages are available for [Ubuntu](#ubuntu), [Debian](#debian),
-[CentOS / Red Hat / Amazon Linux](#centos-red-hat-amazon-linux), [Fedora](#fedora) and
+[CentOS / Red Hat / Amazon Linux](#centos), [Fedora](#fedora) and
 [Arch Linux](#arch-linux). Binaries for other operating systems are listed
 below, and available on
 [the Github releases page](https://github.com/fpco/stack/releases). For the
@@ -150,7 +150,7 @@ problems, see the linked FAQ entries:
 
         sudo apt-get update && sudo apt-get install stack -y
 
-## CentOS / Red Hat / Amazon Linux
+## <a name="centos"></a>CentOS / Red Hat / Amazon Linux
 
 *note*: for 32-bit, use the [generic Linux option](#linux)
 
@@ -201,7 +201,7 @@ problems, see the linked FAQ entries:
 
             sudo yum -y install stack
 
-## openSUSE / SUSE Linux Enterprise
+## <a name="suse"></a>openSUSE / SUSE Linux Enterprise
 
 *Note:* openSUSE's and SLE's `stack` package isn't managed by the Stack release
 team, and since it is based on the version in Stackage LTS, and may lag new
