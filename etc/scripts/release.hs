@@ -345,7 +345,7 @@ rules global@Global{..} args = do
         need stageFiles
         return stageFiles
 
-    getDocFiles = getDirectoryFiles "." ["LICENSE", "*.md", "doc//*"]
+    getDocFiles = getDirectoryFiles "." ["LICENSE", "*.md", "doc//*.md"]
 
     distroVersionFromPath path versions =
         let path' = dropDirectoryPrefix releaseDir path
