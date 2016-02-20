@@ -1066,20 +1066,47 @@ logPossibilities dirs mn = do
 -- If the directory contains a file named package.yaml, hpack is used to
 -- generate a .cabal file from it.
 findOrGenerateCabalFile
-    :: (MonadThrow m, MonadIO m)
+    :: forall m. (MonadThrow m, MonadIO m)
     => Path Abs Dir -- ^ package directory
     -> m (Path Abs File)
 findOrGenerateCabalFile pkgDir = do
-    liftIO $ hpack pkgDir
-    files <- liftIO $ findFiles
-        pkgDir
-        (flip hasExtension "cabal" . FL.toFilePath)
-        (const False)
-    case files of
-        [] -> throwM $ PackageNoCabalFileFound pkgDir
-        [x] -> return x
-        _:_ -> throwM $ PackageMultipleCabalFilesFound pkgDir files
-  where hasExtension fp x = FilePath.takeExtension fp == "." ++ x
+    mPackageYaml <- Path.IO.findFile [pkgDir] $(mkRelFile "package.yaml")
+    case mPackageYaml of
+        Nothing -> findCabalFile
+        Just packageYaml -> do
+            eCabalFile <- findCabalFile'
+            case eCabalFile of
+                -- Check that cabal file is fresh enough
+                Right cabalFile -> do 
+                    packageYamlModified <- getModificationTime packageYaml
+                    cabalFileModified <- getModificationTime cabalFile
+                    when (cabalFileModified < packageYamlModified) $ liftIO $ hpack pkgDir
+                    -- Important to research again
+                    findCabalFile
+
+                -- If we cannot find cabal file, but have package.yaml
+                -- run hpack and try to find cabal file again
+                Left (PackageNoCabalFileFound _) -> do
+                    liftIO $ hpack pkgDir
+                    findCabalFile
+
+                -- Rethrow exception
+                Left e -> throwM e
+  where
+    findCabalFile :: m (Path Abs File)
+    findCabalFile = findCabalFile' >>= either throwM return
+
+    findCabalFile' :: m (Either PackageException (Path Abs File))
+    findCabalFile' = do
+        files <- liftIO $ findFiles
+            pkgDir
+            (flip hasExtension "cabal" . FL.toFilePath)
+            (const False)
+        return $ case files of
+            [] -> Left $ PackageNoCabalFileFound pkgDir
+            [x] -> Right x
+            _:_ -> Left $ PackageMultipleCabalFilesFound pkgDir files
+      where hasExtension fp x = FilePath.takeExtension fp == "." ++ x
 
 -- | Generate .cabal file from package.yaml, if necessary.
 hpack :: Path Abs Dir -> IO ()
