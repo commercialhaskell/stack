@@ -12,12 +12,9 @@ Bug fixes:
 
 ## 1.0.4
 
-Release notes:
-
 Major changes:
 
 * Some notable changes in `stack init`:
-
     * Overall it should now be able to initialize almost all existing cabal
       packages out of the box as long as the package itself is consistently
       defined.
@@ -29,24 +26,60 @@ Major changes:
       requirements - [#1674](https://github.com/commercialhaskell/stack/pull/1674).
     * Some more changes for a better user experience. Please refer to
       the doc guide for details.
+* Add support for hpack, alternative package description format
+  [#1679](https://github.com/commercialhaskell/stack/issues/1679)
 
 Other enhancements:
 
 * Docker: pass ~/.ssh and SSH auth socket into container, so that git repos
-  work [#1358](https://github.com/commercialhaskell/stack/issues/1358)
-* Docker: strip suffix from docker --version
+  work [#1358](https://github.com/commercialhaskell/stack/issues/1358).
+* Docker: strip suffix from docker --version.
   [#1653](https://github.com/commercialhaskell/stack/issues/1653)
+* Docker: pass USER and PWD environment bariables into container.
 * On each run, stack will test the stack root directory (~/.stack), and the
   project and package work directories (.stack-work) for whether they are
   owned by the current user and abort if they are not. This precaution can
   be disabled with the `--allow-different-user` flag or `allow-different-user`
   option in the global config (~/.stack/config.yaml).
   [#471](https://github.com/commercialhaskell/stack/issues/471)
+* Added `stack clean --full` option for full working dir cleanup.
+* YAML config: support Zip archives.
+* Redownload build plan if parsing fails
+  [#1702](https://github.com/commercialhaskell/stack/issues/1702).
+* Give mustache templates access to a 'year' tag
+  [#1716](https://github.com/commercialhaskell/stack/pull/1716).
+* Have "stack ghci" warn about module name aliasing.
+* Add "stack ghci --load-local-deps".
+* Build Setup.hs with -rtsopts
+  [#1687](https://github.com/commercialhaskell/stack/issues/1687).
+* `stack init` accepts a list of directories.
+* Add flag infos to DependencyPlanFailures (for better error output in case of
+  flags) [#713](https://github.com/commercialhaskell/stack/issues/713)
+* `stack new --bare` complains for overwrites, and add `--force` option
+  [#1597](https://github.com/commercialhaskell/stack/issues/1597).
 
 Bug fixes:
 
 * Previously, `stack ghci` would fail with `cannot satisfy -package-id` when the
   implicit build step changes the package key of some dependency.
+* Fix: Building with ghcjs: "ghc-pkg: Prelude.chr: bad argument: 2980338"
+  [#1665](https://github.com/commercialhaskell/stack/issues/1665).
+* Fix running test / bench with `--profile` / `--trace`.
+* Fix: build progress counter is no longer visible
+  [#1685](https://github.com/commercialhaskell/stack/issues/1685).
+* Use "-RTS" w/ profiling to allow extra args
+  [#1772](https://github.com/commercialhaskell/stack/issues/1772).
+* Fix withUnpackedTarball7z to find name of srcDir after unpacking
+  (fixes `stack setup` fails for ghcjs project on windows)
+  [#1774](https://github.com/commercialhaskell/stack/issues/1774).
+* Add space before auto-generated bench opts (makes profiling options work
+  uniformly for applications and benchmark suites)
+  [#1771](https://github.com/commercialhaskell/stack/issues/1771).
+* Don't try to find plugin if it resembles flag.
+* Setup.hs changes cause package dirtiness
+  [#1711](https://github.com/commercialhaskell/stack/issues/1711).
+* Send "stack templates" output to stdout
+  [#1792](https://github.com/commercialhaskell/stack/issues/1792).
 
 ## 1.0.2
 
@@ -68,9 +101,9 @@ Other enhancements:
 - Disable locale/codepage hacks when GHC >=7.10.3
   [#1552](https://github.com/commercialhaskell/stack/issues/1552)
 - Specify multiple images to build for `stack image container`
-  [docs](http://docs.haskellstack.org/en/v1.0.2/yaml_configuration.html#image)
+  [docs](http://docs.haskellstack.org/en/stable/yaml_configuration/#image)
 - Specify which executables to include in images for `stack image container`
-  [docs](http://docs.haskellstack.org/en/v1.0.2/yaml_configuration.html#image)
+  [docs](http://docs.haskellstack.org/en/stable/yaml_configuration/#image)
 - Docker: pass supplemantary groups and umask into container
 - If git fetch fails wipe the directory and try again from scratch
   [#1418](https://github.com/commercialhaskell/stack/issues/1418)
