@@ -1,7 +1,7 @@
 site_name: The Haskell Tool Stack
 site_description: The Haskell Tool Stack
 site_author: Stack contributors
-repo_url: https://github.com/commercialhaskell/stack
+repo_url: https://github.com/commercialhaskell/stack/tree/master/doc
 copyright: Copyright (c) 2015-2016, Stack contributors
 docs_dir: doc
 site_dir: _site
@@ -10,25 +10,25 @@ theme: readthedocs
 pages:
 - Home: README.md
 - Changelog: ChangeLog.md
-- Contributors Guide: CONTRIBUTING.md
-- Project documentation:
-  - Maintainer guide: MAINTAINER_GUIDE.md
-  - Signing key: SIGNING_KEY.md
 - Tool documentation:
+  - Install/upgrade: install_and_upgrade.md
+  - User guide: GUIDE.md
+  - FAQ: faq.md
+  - Configuration (Project and Global): yaml_configuration.md
   - Build command: build_command.md
   - Dependency visualization: dependency_visualization.md
   - Docker integration: docker_integration.md
-  - FAQ: faq.md
   - GHCJS: ghcjs.md
-  - Install/upgrade: install_and_upgrade.md
   - Nix integration: nix_integration.md
   - Non-standard project initialization: nonstandard_project_init.md
   - Shell Auto-completion: shell_autocompletion.md
   - Travis CI: travis_ci.md
-  - User guide: GUIDE.md
-  - YAML Configuration: yaml_configuration.md
 - Advanced documentation:
   - Architecture: architecture.md
+- Project documentation:
+  - Contributors Guide: CONTRIBUTING.md
+  - Maintainer guide: MAINTAINER_GUIDE.md
+  - Signing key: SIGNING_KEY.md
 
 # These extra_templates exists only to redirect from old Sphinx URLs to new
 # MkDocs URLs. This is more properly done using an HTTP redirect, but
