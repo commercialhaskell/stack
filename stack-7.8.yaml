@@ -24,4 +24,4 @@ extra-deps:
 - process-1.2.1.0
 - time-1.5.0.1
 - base-compat-0.9.0
-- hpack-0.9.0
+- hpack-0.9.1
