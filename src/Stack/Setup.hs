@@ -583,7 +583,7 @@ getSetupInfo stackSetupYaml manager = do
                              responseBody res $$ CL.consume
                     return $ S8.concat bss
                 Nothing -> liftIO $ S.readFile urlOrFile
-        (si,warnings) <- either throwM return (Yaml.decodeEither' bs)
+        WithJSONWarnings si warnings <- either throwM return (Yaml.decodeEither' bs)
         when (urlOrFile /= defaultStackSetupYaml) $
             logJSONWarnings urlOrFile warnings
         return si

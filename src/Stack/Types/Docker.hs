@@ -98,7 +98,7 @@ data DockerOptsMonoid = DockerOptsMonoid
   deriving (Show)
 
 -- | Decode uninterpreted docker options from JSON/YAML.
-instance FromJSON (DockerOptsMonoid, [JSONWarning]) where
+instance FromJSON (WithJSONWarnings DockerOptsMonoid) where
   parseJSON = withObjectWarnings "DockerOptsMonoid"
     (\o -> do dockerMonoidDefaultEnable    <- pure True
               dockerMonoidEnable           <- o ..:? dockerEnableArgName

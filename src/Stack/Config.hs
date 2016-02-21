@@ -153,7 +153,7 @@ makeConcreteResolver ar = do
                 config <- asks getConfig
                 implicitGlobalDir <- getImplicitGlobalProjectDir config
                 let fp = implicitGlobalDir </> stackDotYaml
-                (ProjectAndConfigMonoid project _, _warnings) <-
+                WithJSONWarnings (ProjectAndConfigMonoid project _) _warnings <-
                     liftIO (Yaml.decodeFileEither $ toFilePath fp)
                     >>= either throwM return
                 return $ projectResolver project
@@ -730,9 +730,9 @@ getExtraConfigs userConfigPath = do
         : maybe [] return (mstackGlobalConfig <|> defaultStackGlobalConfigPath)
 
 -- | Load and parse YAML from the given file.
-loadYaml :: (FromJSON (a, [JSONWarning]), MonadIO m, MonadLogger m) => Path Abs File -> m a
+loadYaml :: (FromJSON (WithJSONWarnings a), MonadIO m, MonadLogger m) => Path Abs File -> m a
 loadYaml path = do
-    (result,warnings) <-
+    WithJSONWarnings result warnings <-
         liftIO $
         Yaml.decodeFileEither (toFilePath path) >>=
         either (throwM . ParseConfigFileException path) return
