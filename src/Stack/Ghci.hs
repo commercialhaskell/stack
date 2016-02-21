@@ -234,7 +234,7 @@ figureOutMainFile bopts mainIsTargets targets0 packages =
       case elemIndex selected candidateIndices  of
         Nothing -> do
             putStrLn
-              "Not loading any maim modules, as no valid module selected"
+              "Not loading any main modules, as no valid module selected"
             putStrLn ""
             return Nothing
         Just op -> do
