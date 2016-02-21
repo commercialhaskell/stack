@@ -221,7 +221,7 @@ resolvePackage packageConfig gpkg =
                     runReaderT
                         (packageDescModulesAndFiles pkg)
                         (cabalfp, buildDir distDir)
-                buildFiles <- liftM (S.insert cabalfp) $
+                setupFiles <-
                     if buildType pkg `elem` [Nothing, Just Custom]
                     then do
                         let setupHsPath = pkgDir </> $(mkRelFile "Setup.hs")
@@ -231,6 +231,10 @@ resolvePackage packageConfig gpkg =
                             setupLhsExists <- doesFileExist setupLhsPath
                             if setupLhsExists then return (S.singleton setupLhsPath) else return S.empty
                     else return S.empty
+                buildFiles <- liftM (S.insert cabalfp . S.union setupFiles) $ do
+                    let hpackPath = pkgDir </> $(mkRelFile Hpack.packageConfig)
+                    hpackExists <- doesFileExist hpackPath
+                    return $ if hpackExists then S.singleton hpackPath else S.empty
                 return (componentModules, componentFiles, buildFiles <> dataFiles', warnings)
     pkgId = package (packageDescription gpkg)
     name = fromCabalPackageName (pkgName pkgId)
