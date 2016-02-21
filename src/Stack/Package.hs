@@ -838,32 +838,41 @@ resolveFilesAndDeps
     => Maybe String         -- ^ Package component name
     -> [Path Abs Dir]       -- ^ Directories to look in.
     -> [DotCabalDescriptor] -- ^ Base names.
-    -> [Text]               -- ^ Extentions.
+    -> [Text]               -- ^ Extensions.
     -> m (Set ModuleName,Set DotCabalPath,[PackageWarning])
 resolveFilesAndDeps component dirs names0 exts = do
-    (dotCabalPaths,foundModules) <- loop names0 S.empty
-    warnings <- warnUnlisted foundModules
+    (dotCabalPaths, foundModules, missingModules) <- loop names0 S.empty
+    warnings <- (++) <$> warnUnlisted foundModules <*> warnMissing missingModules
     return (foundModules, dotCabalPaths, warnings)
   where
-    loop [] doneModules = return (S.empty, doneModules)
+    loop [] _ = return (S.empty, S.empty, [])
     loop names doneModules0 = do
-        resolvedFiles <- resolveFiles dirs names exts
-        pairs <- mapM (getDependencies component) resolvedFiles
-        let doneModules' =
+        resolved <- resolveFiles dirs names exts
+        let foundFiles = mapMaybe snd resolved
+            (foundModules', missingModules') = partition (isJust . snd) resolved
+            foundModules = mapMaybe (dotCabalModule . fst) foundModules'
+            missingModules = mapMaybe (dotCabalModule . fst) missingModules'
+        pairs <- mapM (getDependencies component) foundFiles
+        let doneModules =
                 S.union
                     doneModules0
                     (S.fromList (mapMaybe dotCabalModule names))
             moduleDeps = S.unions (map fst pairs)
             thDepFiles = concatMap snd pairs
-            modulesRemaining = S.difference moduleDeps doneModules'
-        (resolvedFiles',doneModules'') <-
-            loop (map DotCabalModule (S.toList modulesRemaining)) doneModules'
+            modulesRemaining = S.difference moduleDeps doneModules
+        -- Ignore missing modules discovered as dependencies - they may
+        -- have been deleted.
+        (resolvedFiles, resolvedModules, _) <-
+            loop (map DotCabalModule (S.toList modulesRemaining)) doneModules
         return
             ( S.union
                   (S.fromList
-                       (resolvedFiles <> map DotCabalFilePath thDepFiles))
-                  resolvedFiles'
-            , doneModules'')
+                       (foundFiles <> map DotCabalFilePath thDepFiles))
+                  resolvedFiles
+            , S.union
+                  (S.fromList foundModules)
+                  resolvedModules
+            , missingModules)
     warnUnlisted foundModules = do
         let unlistedModules =
                 foundModules `S.difference`
@@ -876,6 +885,15 @@ resolveFilesAndDeps component dirs names0 exts = do
                            cabalfp
                            component
                            (S.toList unlistedModules)]
+    warnMissing missingModules = do
+        cabalfp <- asks fst
+        return $
+            if null missingModules
+               then []
+               else [ MissingModulesWarning
+                           cabalfp
+                           component
+                           missingModules]
 
 -- | Get the dependencies of a Haskell module file.
 getDependencies
@@ -945,10 +963,10 @@ resolveFiles
     :: (MonadIO m, MonadLogger m, MonadThrow m, MonadReader (Path Abs File, Path Abs Dir) m)
     => [Path Abs Dir] -- ^ Directories to look in.
     -> [DotCabalDescriptor] -- ^ Base names.
-    -> [Text] -- ^ Extentions.
-    -> m [DotCabalPath]
+    -> [Text] -- ^ Extensions.
+    -> m [(DotCabalDescriptor, Maybe DotCabalPath)]
 resolveFiles dirs names exts =
-    forMaybeM names (findCandidate dirs exts)
+    forM names (\name -> (name, ) <$> findCandidate dirs exts name)
 
 -- | Find a candidate for the given module-or-filename from the list
 -- of directories and given extensions.
