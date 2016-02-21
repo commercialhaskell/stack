@@ -885,7 +885,9 @@ resolveFilesAndDeps component dirs names0 exts = do
                            cabalfp
                            component
                            (S.toList unlistedModules)]
-    warnMissing missingModules = do
+    warnMissing _missingModules = do
+        return []
+        {- FIXME: the issue with this is it's noisy for modules like Paths_*
         cabalfp <- asks fst
         return $
             if null missingModules
@@ -894,6 +896,8 @@ resolveFilesAndDeps component dirs names0 exts = do
                            cabalfp
                            component
                            missingModules]
+        -}
+
 
 -- | Get the dependencies of a Haskell module file.
 getDependencies
