@@ -21,6 +21,7 @@ module Stack.Package
   ,readPackageUnresolvedBS
   ,resolvePackage
   ,findOrGenerateCabalFile
+  ,hpack
   ,Package(..)
   ,GetPackageFiles(..)
   ,GetPackageOpts(..)

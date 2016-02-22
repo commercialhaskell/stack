@@ -205,8 +205,8 @@ applyTemplate project template nonceParams dir templateText = do
                    throwM (InvalidTemplate template (show e)))
     when (M.null files) $
          throwM (InvalidTemplate template "Template does not contain any files")
-    unless (any (".cabal" `isSuffixOf`) . M.keys $ files) $
-         throwM (InvalidTemplate template "Template does not contain a .cabal\
+    unless (any (\x -> or [".cabal" `isSuffixOf` x, x == "package.yaml"]) . M.keys $ files) $
+         throwM (InvalidTemplate template "Template does not contain a .cabal or `package.yaml`\
                                           \ file")
     liftM
         M.fromList
