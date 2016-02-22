@@ -264,7 +264,7 @@ configFromConfigMonoid configStackRoot configUserConfigPath mresolver mproject c
      configLocalBin <-
          case configMonoidLocalBinPath of
              Nothing -> do
-                 localDir <- getAppUserDataDir $(mkRelDir "local")
+                 localDir <- getAppUserDataDir "local"
                  return $ localDir </> $(mkRelDir "bin")
              Just userPath ->
                  (case mproject of
@@ -641,7 +641,7 @@ determineStackRootAndOwnership = do
     stackRoot <- do
         mstackRoot <- liftIO $ lookupEnv stackRootEnvVar
         case mstackRoot of
-            Nothing -> getAppUserDataDir $(mkRelDir stackProgName)
+            Nothing -> getAppUserDataDir stackProgName
             Just x -> parseAbsDir x
 
     (existingStackRootOrParentDir, userOwnsIt) <- do
