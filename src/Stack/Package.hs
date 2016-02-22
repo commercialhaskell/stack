@@ -846,7 +846,7 @@ resolveFilesAndDeps
     -> m (Set ModuleName,Set DotCabalPath,[PackageWarning])
 resolveFilesAndDeps component dirs names0 exts = do
     (dotCabalPaths, foundModules, missingModules) <- loop names0 S.empty
-    warnings <- (++) <$> warnUnlisted foundModules <*> warnMissing missingModules
+    warnings <- liftM2 (++) (warnUnlisted foundModules) (warnMissing missingModules)
     return (foundModules, dotCabalPaths, warnings)
   where
     loop [] _ = return (S.empty, S.empty, [])
@@ -974,7 +974,7 @@ resolveFiles
     -> [Text] -- ^ Extensions.
     -> m [(DotCabalDescriptor, Maybe DotCabalPath)]
 resolveFiles dirs names exts =
-    forM names (\name -> (name, ) <$> findCandidate dirs exts name)
+    forM names (\name -> liftM (name, ) (findCandidate dirs exts name))
 
 -- | Find a candidate for the given module-or-filename from the list
 -- of directories and given extensions.
