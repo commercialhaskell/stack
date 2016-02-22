@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.4.2
+
+Build with path-io-1.0.0. There are no changes in behaviour from 1.0.4,
+so no binaries are released for this version.
+
 ## 1.0.4.1
 
 Fixes build with aeson-0.11.0.0. There are no changes in behaviour from 1.0.4,
