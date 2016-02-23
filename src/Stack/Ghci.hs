@@ -298,15 +298,15 @@ ghciSetup GhciOpts{..} = do
         sourceMap
     directlyWanted <-
         forMaybeM (M.toList (envConfigPackages econfig)) $
-        \(dir,validWanted) ->
+        \(dir,treatLikeExtraDep) ->
              do cabalfp <- findOrGenerateCabalFile dir
                 name <- parsePackageNameFromFilePath cabalfp
-                if validWanted
-                    then case M.lookup name targets of
+                if treatLikeExtraDep
+                    then return Nothing
+                    else case M.lookup name targets of
                              Just simpleTargets ->
                                  return (Just (name, (cabalfp, simpleTargets)))
                              Nothing -> return Nothing
-                    else return Nothing
     let extraLoadDeps = getExtraLoadDeps ghciLoadLocalDeps sourceMap directlyWanted
     wanted <-
         if (ghciSkipIntermediate && not ghciLoadLocalDeps) || null extraLoadDeps

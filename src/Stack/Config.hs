@@ -532,17 +532,14 @@ resolvePackageEntry
     => EnvOverride
     -> Path Abs Dir -- ^ project root
     -> PackageEntry
-    -> m [(Path Abs Dir, Bool)]
+    -> m [(Path Abs Dir, TreatLikeExtraDep)]
 resolvePackageEntry menv projRoot pe = do
     entryRoot <- resolvePackageLocation menv projRoot (peLocation pe)
     paths <-
         case peSubdirs pe of
             [] -> return [entryRoot]
             subs -> mapM (resolveDir entryRoot) subs
-    case peValidWanted pe of
-        Nothing -> return ()
-        Just _ -> $logWarn "Warning: you are using the deprecated valid-wanted field. You should instead use extra-dep. See: http://docs.haskellstack.org/en/stable/yaml_configuration/#packages"
-    return $ map (, not $ peExtraDep pe) paths
+    return $ map (, peExtraDep pe) paths
 
 -- | Resolve a PackageLocation into a path, downloading and cloning as
 -- necessary.

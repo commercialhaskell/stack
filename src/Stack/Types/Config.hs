@@ -61,7 +61,7 @@ module Stack.Types.Config
   ,LoadConfig(..)
   -- ** PackageEntry & PackageLocation
   ,PackageEntry(..)
-  ,peExtraDep
+  ,TreatLikeExtraDep
   ,PackageLocation(..)
   ,RemotePackageType(..)
   -- ** PackageIndex, IndexName & IndexLocation
@@ -455,8 +455,7 @@ data BuildConfig = BuildConfig
     , bcWantedCompiler :: !CompilerVersion
       -- ^ Compiler version wanted for this build
     , bcPackageEntries :: ![PackageEntry]
-      -- ^ Local packages identified by a path, Bool indicates whether it is
-      -- a non-dependency (the opposite of 'peExtraDep')
+      -- ^ Local packages
     , bcExtraDeps  :: !(Map PackageName Version)
       -- ^ Extra dependencies specified in configuration.
       --
@@ -495,7 +494,7 @@ data EnvConfig = EnvConfig
     {envConfigBuildConfig :: !BuildConfig
     ,envConfigCabalVersion :: !Version
     ,envConfigCompilerVersion :: !CompilerVersion
-    ,envConfigPackages   :: !(Map (Path Abs Dir) Bool)}
+    ,envConfigPackages   :: !(Map (Path Abs Dir) TreatLikeExtraDep)}
 instance HasBuildConfig EnvConfig where
     getBuildConfig = envConfigBuildConfig
 instance HasConfig EnvConfig
@@ -518,31 +517,21 @@ data LoadConfig m = LoadConfig
     }
 
 data PackageEntry = PackageEntry
-    { peExtraDepMaybe :: !(Maybe Bool)
-    -- ^ Is this package a dependency? This means the local package will be
-    -- treated just like an extra-deps: it will only be built as a dependency
-    -- for others, and its test suite/benchmarks will not be run.
-    --
-    -- Useful modifying an upstream package, see:
-    -- https://github.com/commercialhaskell/stack/issues/219
-    -- https://github.com/commercialhaskell/stack/issues/386
-    , peValidWanted :: !(Maybe Bool)
-    -- ^ Deprecated name meaning the opposite of peExtraDep. Only present to
-    -- provide deprecation warnings to users.
+    { peExtraDep :: !TreatLikeExtraDep
     , peLocation :: !PackageLocation
     , peSubdirs :: ![FilePath]
     }
     deriving Show
 
--- | Once peValidWanted is removed, this should just become the field name in PackageEntry.
-peExtraDep :: PackageEntry -> Bool
-peExtraDep pe =
-    case peExtraDepMaybe pe of
-        Just x -> x
-        Nothing ->
-            case peValidWanted pe of
-                Just x -> not x
-                Nothing -> False
+-- | Should a package be treated just like an extra-dep?
+--
+-- 'True' means, it will only be built as a dependency
+-- for others, and its test suite/benchmarks will not be run.
+--
+-- Useful modifying an upstream package, see:
+-- https://github.com/commercialhaskell/stack/issues/219
+-- https://github.com/commercialhaskell/stack/issues/386
+type TreatLikeExtraDep = Bool
 
 instance ToJSON PackageEntry where
     toJSON pe | not (peExtraDep pe) && null (peSubdirs pe) =
@@ -556,14 +545,12 @@ instance FromJSON (PackageEntry, [JSONWarning]) where
     parseJSON (String t) = do
         (loc, _::[JSONWarning]) <- parseJSON $ String t
         return (PackageEntry
-                { peExtraDepMaybe = Nothing
-                , peValidWanted = Nothing
+                { peExtraDep = False
                 , peLocation = loc
                 , peSubdirs = []
                 }, [])
     parseJSON v = withObjectWarnings "PackageEntry" (\o -> PackageEntry
-        <$> o ..:? "extra-dep"
-        <*> o ..:? "valid-wanted"
+        <$> o ..:? "extra-dep" ..!= False
         <*> jsonSubWarnings (o ..: "location")
         <*> o ..:? "subdirs" ..!= []) v
 
@@ -1457,8 +1444,7 @@ instance (warnings ~ [JSONWarning]) => FromJSON (ProjectAndConfigMonoid, warning
 -- | A PackageEntry for the current directory, used as a default
 packageEntryCurrDir :: PackageEntry
 packageEntryCurrDir = PackageEntry
-    { peValidWanted = Nothing
-    , peExtraDepMaybe = Nothing
+    { peExtraDep = False
     , peLocation = PLFilePath "."
     , peSubdirs = []
     }

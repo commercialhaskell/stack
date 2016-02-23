@@ -101,7 +101,7 @@ data LocalPackageView = LocalPackageView
     , lpvRoot       :: !(Path Abs Dir)
     , lpvCabalFP    :: !(Path Abs File)
     , lpvComponents :: !(Set NamedComponent)
-    , lpvExtraDep   :: !Bool
+    , lpvExtraDep   :: !TreatLikeExtraDep
     }
 
 -- | Same as @parseRawTarget@, but also takes directories into account.
