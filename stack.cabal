@@ -59,7 +59,6 @@ library
                      Data.Binary.VersionTagged
                      Data.IORef.RunOnce
                      Data.Maybe.Extra
-                     Data.Set.Monad
                      Distribution.Version.Extra
                      Network.HTTP.Download 
                      Network.HTTP.Download.Verified
