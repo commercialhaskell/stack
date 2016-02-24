@@ -129,8 +129,7 @@ initProject currDir initOpts mresolver = do
 
         pkgs = map toPkg $ Map.elems (fmap (parent . fst) rbundle)
         toPkg dir = PackageEntry
-            { peValidWanted = Nothing
-            , peExtraDepMaybe = Nothing
+            { peExtraDep = False
             , peLocation = PLFilePath $ makeRelDir dir
             , peSubdirs = []
             }
