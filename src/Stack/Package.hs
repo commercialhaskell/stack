@@ -1176,7 +1176,7 @@ resolveFileOrWarn :: (MonadCatch m,MonadIO m,MonadLogger m,MonadReader (Path Abs
                   => FilePath.FilePath
                   -> m (Maybe (Path Abs File))
 resolveFileOrWarn = resolveOrWarn "File" f
-  where f p x = forgivingAbsence (resolveFile p x)
+  where f p x = forgivingAbsence (resolveFile p x) >>= rejectMissingFile
 
 -- | Resolve the directory, if it can't be resolved, warn for the user
 -- (purely to be helpful).
@@ -1184,7 +1184,7 @@ resolveDirOrWarn :: (MonadCatch m,MonadIO m,MonadLogger m,MonadReader (Path Abs 
                  => FilePath.FilePath
                  -> m (Maybe (Path Abs Dir))
 resolveDirOrWarn = resolveOrWarn "Directory" f
-  where f p x = forgivingAbsence (resolveDir p x)
+  where f p x = forgivingAbsence (resolveDir p x) >>= rejectMissingDir
 
 -- | Extract the @PackageIdentifier@ given an exploded haskell package
 -- path.
