@@ -63,7 +63,7 @@ import           Distribution.System            (OS (Windows),
 import           Language.Haskell.TH as TH (location)
 import           Network.HTTP.Client.Conduit (HasHttpManager)
 import           Path
-import           Path.Extra (toFilePathNoTrailingSep)
+import           Path.Extra (toFilePathNoTrailingSep, rejectMissingFile)
 import           Path.IO hiding (findExecutable, makeAbsolute)
 import           Prelude hiding (FilePath, writeFile, any)
 import           Stack.Build.Cache
@@ -371,6 +371,7 @@ executePlan menv boptsCli baseConfigOpts locals globalPackages snapshotPackages 
                         Snap -> snapBin
                         Local -> localBin
             mfp <- forgivingAbsence (resolveFile bindir $ T.unpack name ++ ext)
+              >>= rejectMissingFile
             case mfp of
                 Nothing -> do
                     $logWarn $ T.concat

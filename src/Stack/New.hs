@@ -270,7 +270,7 @@ listTemplates
     => m ()
 listTemplates = do
     templates <- getTemplates
-    mapM_ ($logInfo . templateName) (S.toList templates)
+    mapM_ (liftIO . T.putStrLn . templateName) (S.toList templates)
 
 -- | Get the set of templates.
 getTemplates

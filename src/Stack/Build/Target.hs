@@ -33,6 +33,7 @@ import qualified Data.Set               as Set
 import           Data.Text              (Text)
 import qualified Data.Text              as T
 import           Path
+import           Path.Extra (rejectMissingDir)
 import           Path.IO
 import           Prelude -- Fix redundant import warnings
 import           Stack.Types
@@ -115,6 +116,7 @@ parseRawTargetDirs root locals t =
         Just rt -> return $ Right [(ri, rt)]
         Nothing -> do
             mdir <- forgivingAbsence (resolveDir root (T.unpack t))
+              >>= rejectMissingDir
             case mdir of
                 Nothing -> return $ Left $ "Directory not found: " `T.append` t
                 Just dir ->

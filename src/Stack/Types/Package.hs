@@ -151,6 +151,8 @@ instance Show GetPackageFiles where
 data PackageWarning
     = UnlistedModulesWarning (Path Abs File) (Maybe String) [ModuleName]
       -- ^ Modules found that are not listed in cabal file
+    | MissingModulesWarning (Path Abs File) (Maybe String) [ModuleName]
+      -- ^ Modules not found in file system, which are listed in cabal file
 instance Show PackageWarning where
     show (UnlistedModulesWarning cabalfp component [unlistedModule]) =
         concat
@@ -170,6 +172,25 @@ instance Show PackageWarning where
                    Just c -> " for '" ++ c ++ "'"
             , " component (add to other-modules):\n    "
             , intercalate "\n    " (map display unlistedModules)]
+    show (MissingModulesWarning cabalfp component [missingModule]) =
+        concat
+            [ "module listed in "
+            , toFilePath (filename cabalfp)
+            , case component of
+                   Nothing -> " for library"
+                   Just c -> " for '" ++ c ++ "'"
+            , " component not found in filesystem: "
+            , display missingModule]
+    show (MissingModulesWarning cabalfp component missingModules) =
+        concat
+            [ "modules listed in "
+            , toFilePath (filename cabalfp)
+            , case component of
+                   Nothing -> " for library"
+                   Just c -> " for '" ++ c ++ "'"
+            , " component not found in filesystem:\n    "
+            , intercalate "\n    " (map display missingModules)]
+
 
 -- | Package build configuration
 data PackageConfig =
@@ -236,6 +257,7 @@ data LocalPackage = LocalPackage
     -- ^ Directory of the package.
     , lpCabalFile     :: !(Path Abs File)
     -- ^ The .cabal file
+    , lpForceDirty    :: !Bool
     , lpDirtyFiles    :: !(Maybe (Set FilePath))
     -- ^ Nothing == not dirty, Just == dirty. Note that the Set may be empty if
     -- we forced the build to treat packages as dirty. Also, the Set may not

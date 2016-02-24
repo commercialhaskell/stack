@@ -522,6 +522,7 @@ checkDirtiness ps installed package present wanted = do
                 Nothing -> Just "old configure information not found"
                 Just oldOpts
                     | Just reason <- describeConfigDiff config oldOpts wantConfigCache -> Just reason
+                    | True <- psForceDirty ps -> Just "--force-dirty specified"
                     | Just files <- psDirty ps -> Just $ "local file changes: " <>
                                                          addEllipsis (T.pack $ unwords $ Set.toList files)
                     | otherwise -> Nothing
@@ -605,6 +606,10 @@ describeConfigDiff config old new
     removeMatching xs ys = (xs, ys)
 
     newComponents = configCacheComponents new `Set.difference` configCacheComponents old
+
+psForceDirty :: PackageSource -> Bool
+psForceDirty (PSLocal lp) = lpForceDirty lp
+psForceDirty (PSUpstream {}) = False
 
 psDirty :: PackageSource -> Maybe (Set FilePath)
 psDirty (PSLocal lp) = lpDirtyFiles lp

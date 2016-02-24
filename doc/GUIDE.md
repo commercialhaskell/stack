@@ -48,7 +48,7 @@ all commands work cross-platform, unless explicitly stated otherwise.
 ## Downloading and Installation
 
 The [documentation dedicated to downloading
-stack](install_and_upgrade.html) has the most
+stack](install_and_upgrade.md) has the most
 up-to-date information for a variety of operating systems, including multiple
 GNU/Linux flavors. Instead of repeating that content here, please go check out
 that page and come back here when you can successfully run `stack --version`.
@@ -619,7 +619,7 @@ At the time of writing:
 * Experimental custom snapshot support
 
 The most up-to-date information can always be found in the
-[stack.yaml documentation](yaml_configuration.html#resolver).
+[stack.yaml documentation](yaml_configuration.md#resolver).
 
 ## Existing projects
 
@@ -1227,7 +1227,7 @@ to build.
 
 We're not going to cover the full generality of these arguments here; instead,
 there's [documentation covering the full build command
-syntax](build_command.html).
+syntax](build_command.md).
 Here, we'll just point out a few different types of arguments:
 
 * You can specify a *package name*, e.g. `stack build vector`.
@@ -1364,7 +1364,7 @@ In addition to local directories, you can also refer to packages available in a
 Git repository or in a tarball over HTTP/HTTPS. This can be useful for using a
 modified version of a dependency that hasn't yet been released upstream. This is
 a slightly more advanced usage that we won't go into detail with here, but it's
-covered in the [stack.yaml documentation](yaml_configuration.html#packages).
+covered in the [stack.yaml documentation](yaml_configuration.md#packages).
 
 ## Flags and GHC options
 
@@ -1452,7 +1452,7 @@ confusion.
 Final point: if you have GHC options that you'll be regularly passing to your
 packages, you can add them to your stack.yaml file (starting with
 stack-0.1.4.0). See [the documentation section on
-ghc-options](yaml_configuration.html#ghc-options)
+ghc-options](yaml_configuration.md#ghc-options)
 for more information.
 
 ## path
@@ -1745,7 +1745,7 @@ There are lots of resources available for learning more about stack:
 * `--verbose` (or `-v`) — much more info about internal operations (useful for bug reports)
 * The [home page](http://haskellstack.org)
 * The [stack mailing list](https://groups.google.com/d/forum/haskell-stack)
-* The [the FAQ](faq.html)
+* The [the FAQ](faq.md)
 * The [stack wiki](https://github.com/commercialhaskell/stack/wiki)
 * The [haskell-stack tag on Stack Overflow](http://stackoverflow.com/questions/tagged/haskell-stack)
 * [Another getting started with stack tutorial](http://seanhess.github.io/2015/08/04/practical-haskell-getting-started.html)
@@ -1802,13 +1802,13 @@ getting type information in Emacs. For more information, see
 
 If you'd like to get some insight into the dependency tree of your packages, you
 can use the `stack dot` command and Graphviz. More information is
-[available in the Dependency visualization documentation](dependency_visualization.html).
+[available in the Dependency visualization documentation](dependency_visualization.md).
 
 ### Travis with caching
 
 Many people use Travis CI to test out a project for every Git push. We have [a
 document devoted to
-Travis](travis_ci.html). However, for
+Travis](travis_ci.md). However, for
 most people, the following example will be sufficient to get started:
 
 ```yaml
@@ -1998,7 +1998,7 @@ code inside a Docker image, which means:
   a large initial download, but much faster builds
 
 For more information, see
-[the Docker-integration documentation](docker_integration.html).
+[the Docker-integration documentation](docker_integration.md).
 
 stack can also generate Docker images for you containing your built executables.
 This feature is great for automating deployments from CI. This feature is not
@@ -2062,7 +2062,7 @@ in the common case or even to learn how to use the Nix tools (they're
 called under the hood).
 
 For more information, see
-[the Nix-integration documentation](nix_integration.html).
+[the Nix-integration documentation](nix_integration.md).
 
 ## Power user commands
 
