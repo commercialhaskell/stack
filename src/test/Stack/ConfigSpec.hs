@@ -27,6 +27,32 @@ sampleConfig =
   "resolver: lts-2.10\n" ++
   "packages: ['.']\n"
 
+buildOptsConfig :: String
+buildOptsConfig =
+  "resolver: lts-2.10\n" ++
+  "packages: ['.']\n" ++
+  "build:\n" ++
+  "  library-profiling: true\n" ++
+  "  executable-profiling: true\n" ++
+  "  haddock: true\n" ++
+  "  haddock-deps: true\n" ++
+  "  copy-bins: true\n" ++
+  "  prefetch: true\n" ++
+  "  force-dirty: true\n" ++
+  "  keep-going: true\n" ++
+  "  test: true\n" ++
+  "  test-arguments:\n" ++
+  "    rerun-tests: true\n" ++
+  "    additional-args: ['-fprof']\n" ++
+  "    coverage: true\n" ++
+  "    no-run-tests: true\n" ++
+  "  bench: true\n" ++
+  "  benchmark-opts:\n" ++
+  "    benchmark-arguments: -O2\n" ++
+  "    no-run-benchmarks: true\n" ++
+  "  reconfigure: true\n" ++
+  "  cabal-verbose: true\n"
+
 stackDotYaml :: Path Rel File
 stackDotYaml = $(mkRelFile "stack.yaml")
 
@@ -42,6 +68,9 @@ setup = do
 
 teardown :: T -> IO ()
 teardown _ = return ()
+
+noException :: Selector SomeException
+noException = const False
 
 spec :: Spec
 spec = beforeAll setup $ afterAll teardown $ do
@@ -72,6 +101,28 @@ spec = beforeAll setup $ afterAll teardown $ do
       writeFile (toFilePath stackDotYaml) ""
       -- TODO(danburton): more specific test for exception
       loadConfig' manager `shouldThrow` anyException
+
+    it "parses build config options" $ \T{..} -> inTempDir $ do
+      writeFile (toFilePath stackDotYaml) buildOptsConfig
+      BuildOpts{..} <- configBuild . lcConfig <$> loadConfig' manager
+      boptsLibProfile `shouldBe` True
+      boptsExeProfile `shouldBe` True
+      boptsHaddock `shouldBe` True
+      boptsHaddockDeps `shouldBe` (Just True)
+      boptsInstallExes `shouldBe` True
+      boptsPreFetch `shouldBe` True
+      boptsKeepGoing `shouldBe` (Just True)
+      boptsForceDirty `shouldBe` True
+      boptsTests `shouldBe` True
+      boptsTestOpts `shouldBe` (TestOpts {toRerunTests = True
+                                         ,toAdditionalArgs = ["-fprof"]
+                                         ,toCoverage = True
+                                         ,toDisableRun = True})
+      boptsBenchmarks `shouldBe` True
+      boptsBenchmarkOpts `shouldBe` (BenchmarkOpts {beoAdditionalArgs = Just "-O2"
+                                                   ,beoDisableRun = True})
+      boptsReconfigure `shouldBe` True
+      boptsCabalVerbose `shouldBe` True
 
     it "finds the config file in a parent directory" $ \T{..} -> inTempDir $ do
       writeFile (toFilePath stackDotYaml) sampleConfig

@@ -120,6 +120,7 @@ module Stack.Types.Config
   -- ** Docker entrypoint
   ,DockerEntrypoint(..)
   ,DockerUser(..)
+  ,module X
   ) where
 
 import           Control.Applicative
@@ -173,6 +174,10 @@ import           Stack.Types.TemplateName
 import           Stack.Types.Version
 import           System.PosixCompat.Types (UserID, GroupID, FileMode)
 import           System.Process.Read (EnvOverride)
+
+-- Re-exports
+import          Stack.Types.Config.Build as X
+
 #ifdef mingw32_HOST_OS
 import qualified Crypto.Hash.SHA1 as SHA1
 import qualified Data.ByteString.Base16 as B16
@@ -186,6 +191,8 @@ data Config =
          -- ^ this allows to override .stack-work directory
          ,configUserConfigPath      :: !(Path Abs File)
          -- ^ Path to user configuration file (usually ~/.stack/config.yaml)
+         ,configBuild               :: !BuildOpts
+         -- ^ Build configuration
          ,configDocker              :: !DockerOpts
          -- ^ Docker configuration
          ,configNix                 :: !NixOpts
@@ -730,6 +737,8 @@ data ConfigMonoid =
   ConfigMonoid
     { configMonoidWorkDir            :: !(Maybe FilePath)
     -- ^ See: 'configWorkDir'.
+    , configMonoidBuildOpts          :: !BuildOptsMonoid
+    -- ^ build options.
     , configMonoidDockerOpts         :: !DockerOptsMonoid
     -- ^ Docker options.
     , configMonoidNixOpts            :: !NixOptsMonoid
@@ -806,6 +815,7 @@ data ConfigMonoid =
 instance Monoid ConfigMonoid where
   mempty = ConfigMonoid
     { configMonoidWorkDir = Nothing
+    , configMonoidBuildOpts = mempty
     , configMonoidDockerOpts = mempty
     , configMonoidNixOpts = mempty
     , configMonoidConnectionCount = Nothing
@@ -843,6 +853,7 @@ instance Monoid ConfigMonoid where
     }
   mappend l r = ConfigMonoid
     { configMonoidWorkDir = configMonoidWorkDir l <|> configMonoidWorkDir r
+    , configMonoidBuildOpts = configMonoidBuildOpts l <> configMonoidBuildOpts r
     , configMonoidDockerOpts = configMonoidDockerOpts l <> configMonoidDockerOpts r
     , configMonoidNixOpts = configMonoidNixOpts l <> configMonoidNixOpts r
     , configMonoidConnectionCount = configMonoidConnectionCount l <|> configMonoidConnectionCount r
@@ -889,6 +900,7 @@ instance FromJSON (ConfigMonoid, [JSONWarning]) where
 parseConfigMonoidJSON :: Object -> WarningParser ConfigMonoid
 parseConfigMonoidJSON obj = do
     configMonoidWorkDir <- obj ..:? configMonoidWorkDirName
+    configMonoidBuildOpts <- jsonSubWarnings (obj ..:? configMonoidBuildOptsName ..!= mempty)
     configMonoidDockerOpts <- jsonSubWarnings (obj ..:? configMonoidDockerOptsName ..!= mempty)
     configMonoidNixOpts <- jsonSubWarnings (obj ..:? configMonoidNixOptsName ..!= mempty)
     configMonoidConnectionCount <- obj ..:? configMonoidConnectionCountName
@@ -971,6 +983,9 @@ parseConfigMonoidJSON obj = do
 
 configMonoidWorkDirName :: Text
 configMonoidWorkDirName = "work-dir"
+
+configMonoidBuildOptsName :: Text
+configMonoidBuildOptsName = "build"
 
 configMonoidDockerOptsName :: Text
 configMonoidDockerOptsName = "docker"

@@ -1,3 +1,5 @@
+{-# LANGUAGE Rank2Types #-}
+
 -- | Internal types to the library.
 
 module Stack.Types.Internal where
@@ -5,6 +7,7 @@ module Stack.Types.Internal where
 import Control.Concurrent.MVar
 import Control.Monad.Logger (LogLevel)
 import Data.Text (Text)
+import Lens.Micro
 import Network.HTTP.Client.Conduit (Manager,HasHttpManager(..))
 import Stack.Types.Config
 
@@ -71,3 +74,55 @@ class HasSticky r where
 
 instance HasSticky (Env config) where
   getSticky = envSticky
+
+envEnvConfig :: Lens' (Env EnvConfig) EnvConfig
+envEnvConfig = lens (envConfig)
+                    (\s t -> s {envConfig = t})
+
+buildOptsMonoidHaddock :: Lens' BuildOptsMonoid (Maybe Bool)
+buildOptsMonoidHaddock = lens (buildMonoidHaddock)
+                            (\buildMonoid t -> buildMonoid {buildMonoidHaddock = t})
+
+buildOptsMonoidTests :: Lens' BuildOptsMonoid (Maybe Bool)
+buildOptsMonoidTests = lens (buildMonoidTests)
+                            (\buildMonoid t -> buildMonoid {buildMonoidTests = t})
+
+buildOptsMonoidBenchmarks :: Lens' BuildOptsMonoid (Maybe Bool)
+buildOptsMonoidBenchmarks = lens (buildMonoidBenchmarks)
+                            (\buildMonoid t -> buildMonoid {buildMonoidBenchmarks = t})
+
+buildOptsMonoidInstallExes :: Lens' BuildOptsMonoid (Maybe Bool)
+buildOptsMonoidInstallExes =
+  lens (buildMonoidInstallExes)
+       (\buildMonoid t -> buildMonoid {buildMonoidInstallExes = t})
+
+buildOptsInstallExes :: Lens' BuildOpts Bool
+buildOptsInstallExes =
+  lens (boptsInstallExes)
+       (\bopts t -> bopts {boptsInstallExes = t})
+
+envConfigBuildOpts :: Lens' EnvConfig BuildOpts
+envConfigBuildOpts =
+    lens
+        (\envCfg -> configBuild (bcConfig (envConfigBuildConfig envCfg)))
+        (\envCfg bopts ->
+              envCfg
+              { envConfigBuildConfig = (envConfigBuildConfig envCfg)
+                { bcConfig = (bcConfig (envConfigBuildConfig envCfg))
+                  { configBuild = bopts
+                  }
+                }
+              })
+
+globalOptsBuildOptsMonoid :: Lens' GlobalOpts BuildOptsMonoid
+globalOptsBuildOptsMonoid =
+    lens
+        (\globalOpts ->
+              configMonoidBuildOpts
+                  (globalConfigMonoid globalOpts))
+        (\globalOpts boptsMonoid ->
+              globalOpts
+              { globalConfigMonoid = (globalConfigMonoid globalOpts)
+                { configMonoidBuildOpts = boptsMonoid
+                }
+              })

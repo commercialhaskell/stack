@@ -75,12 +75,14 @@ type M env m = (MonadIO m,MonadReader env m,HasHttpManager env,HasBuildConfig en
 build :: M env m
       => (Set (Path Abs File) -> IO ()) -- ^ callback after discovering all local files
       -> Maybe FileLock
-      -> BuildOpts
+      -> BuildOptsCLI
       -> m ()
-build setLocalFiles mbuildLk bopts = fixCodePage $ do
+build setLocalFiles mbuildLk boptsCli = fixCodePage $ do
+    bopts <- asks (configBuild . getConfig)
+    let profiling = boptsLibProfile bopts || boptsExeProfile bopts
     menv <- getMinimalEnvOverride
 
-    (_, mbp, locals, extraToBuild, sourceMap) <- loadSourceMap NeedTargets bopts
+    (_, mbp, locals, extraToBuild, sourceMap) <- loadSourceMap NeedTargets boptsCli
 
     -- Set local files, necessary for file watching
     stackYaml <- asks $ bcStackYaml . getBuildConfig
@@ -96,7 +98,7 @@ build setLocalFiles mbuildLk bopts = fixCodePage $ do
                          , getInstalledHaddock   = shouldHaddockDeps bopts }
                      sourceMap
 
-    baseConfigOpts <- mkBaseConfigOpts bopts
+    baseConfigOpts <- mkBaseConfigOpts boptsCli
     plan <- withLoadPackage menv $ \loadPackage ->
         constructPlan mbp baseConfigOpts locals extraToBuild localDumpPkgs loadPackage sourceMap installedMap
 
@@ -115,16 +117,14 @@ build setLocalFiles mbuildLk bopts = fixCodePage $ do
     when (boptsPreFetch bopts) $
         preFetch plan
 
-    if boptsDryrun bopts
+    if boptsCLIDryrun boptsCli
         then printPlan plan
-        else executePlan menv bopts baseConfigOpts locals
+        else executePlan menv boptsCli baseConfigOpts locals
                          globalDumpPkgs
                          snapshotDumpPkgs
                          localDumpPkgs
                          installedMap
                          plan
-  where
-    profiling = boptsLibProfile bopts || boptsExeProfile bopts
 
 -- | If all the tasks are local, they don't mutate anything outside of our local directory.
 allLocal :: Plan -> Bool
@@ -209,8 +209,9 @@ warnIfExecutablesWithSameNameCouldBeOverwritten locals plan =
 
 -- | Get the @BaseConfigOpts@ necessary for constructing configure options
 mkBaseConfigOpts :: (MonadIO m, MonadReader env m, HasEnvConfig env, MonadThrow m)
-                 => BuildOpts -> m BaseConfigOpts
-mkBaseConfigOpts bopts = do
+                 => BuildOptsCLI -> m BaseConfigOpts
+mkBaseConfigOpts boptsCli = do
+    bopts <- asks (configBuild . getConfig)
     snapDBPath <- packageDatabaseDeps
     localDBPath <- packageDatabaseLocal
     snapInstallRoot <- installationRootDeps
@@ -222,6 +223,7 @@ mkBaseConfigOpts bopts = do
         , bcoSnapInstallRoot = snapInstallRoot
         , bcoLocalInstallRoot = localInstallRoot
         , bcoBuildOpts = bopts
+        , bcoBuildOptsCLI = boptsCli
         , bcoExtraDBs = packageExtraDBs
         }
 
@@ -337,7 +339,7 @@ queryBuildInfo selectors0 =
 -- | Get the raw build information object
 rawBuildInfo :: M env m => m Value
 rawBuildInfo = do
-    (_, _mbp, locals, _extraToBuild, _sourceMap) <- loadSourceMap NeedTargets defaultBuildOpts
+    (_, _mbp, locals, _extraToBuild, _sourceMap) <- loadSourceMap NeedTargets defaultBuildOptsCLI
     return $ object
         [ "locals" .= Object (HM.fromList $ map localToPair locals)
         ]

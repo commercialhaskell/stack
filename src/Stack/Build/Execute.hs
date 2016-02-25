@@ -199,6 +199,7 @@ data ExecuteEnv = ExecuteEnv
     , eeConfigureLock  :: !(MVar ())
     , eeInstallLock    :: !(MVar ())
     , eeBuildOpts      :: !BuildOpts
+    , eeBuildOptsCLI   :: !BuildOptsCLI
     , eeBaseConfigOpts :: !BaseConfigOpts
     , eeGhcPkgIds      :: !(TVar (Map PackageIdentifier Installed))
     , eeTempDir        :: !(Path Abs Dir)
@@ -285,6 +286,7 @@ getSetupExe setupHs tmpdir = do
 withExecuteEnv :: M env m
                => EnvOverride
                -> BuildOpts
+               -> BuildOptsCLI
                -> BaseConfigOpts
                -> [LocalPackage]
                -> [DumpPackage () ()] -- ^ global packages
@@ -292,7 +294,7 @@ withExecuteEnv :: M env m
                -> [DumpPackage () ()] -- ^ local packages
                -> (ExecuteEnv -> m a)
                -> m a
-withExecuteEnv menv bopts baseConfigOpts locals globalPackages snapshotPackages localPackages inner = do
+withExecuteEnv menv bopts boptsCli baseConfigOpts locals globalPackages snapshotPackages localPackages inner = do
     withSystemTempDir stackProgName $ \tmpdir -> do
         configLock <- newMVar ()
         installLock <- newMVar ()
@@ -307,6 +309,7 @@ withExecuteEnv menv bopts baseConfigOpts locals globalPackages snapshotPackages 
         inner ExecuteEnv
             { eeEnvOverride = menv
             , eeBuildOpts = bopts
+            , eeBuildOptsCLI = boptsCli
              -- Uncertain as to why we cannot run configures in parallel. This appears
              -- to be a Cabal library bug. Original issue:
              -- https://github.com/fpco/stack/issues/84. Ideally we'd be able to remove
@@ -333,7 +336,7 @@ withExecuteEnv menv bopts baseConfigOpts locals globalPackages snapshotPackages 
 -- | Perform the actual plan
 executePlan :: M env m
             => EnvOverride
-            -> BuildOpts
+            -> BuildOptsCLI
             -> BaseConfigOpts
             -> [LocalPackage]
             -> [DumpPackage () ()] -- ^ global packages
@@ -342,8 +345,9 @@ executePlan :: M env m
             -> InstalledMap
             -> Plan
             -> m ()
-executePlan menv bopts baseConfigOpts locals globalPackages snapshotPackages localPackages installedMap plan = do
-    withExecuteEnv menv bopts baseConfigOpts locals globalPackages snapshotPackages localPackages (executePlan' installedMap plan)
+executePlan menv boptsCli baseConfigOpts locals globalPackages snapshotPackages localPackages installedMap plan = do
+    bopts <- asks (configBuild . getConfig)
+    withExecuteEnv menv bopts boptsCli baseConfigOpts locals globalPackages snapshotPackages localPackages (executePlan' installedMap plan)
 
     unless (Map.null $ planInstallExes plan) $ do
         snapBin <- (</> bindirSuffix) `liftM` installationRootDeps
@@ -447,7 +451,7 @@ executePlan menv bopts baseConfigOpts locals globalPackages snapshotPackages loc
                     , esStackExe = True
                     , esLocaleUtf8 = False
                     }
-    forM_ (boptsExec bopts) $ \(cmd, args) -> do
+    forM_ (boptsCLIExec boptsCli) $ \(cmd, args) -> do
         $logProcessRun cmd args
         callProcess (Cmd Nothing cmd menv' args)
 
@@ -1042,7 +1046,7 @@ singleBuild runInBase ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} in
         $ \package cabalfp pkgDir cabal announce _console _mlogFile -> do
             _neededConfig <- ensureConfig cache pkgDir ee (announce ("configure" <> annSuffix)) cabal cabalfp
 
-            if boptsOnlyConfigure eeBuildOpts
+            if boptsCLIOnlyConfigure eeBuildOptsCLI
                 then return Nothing
                 else liftM Just $ realBuild cache package pkgDir cabal announce
 

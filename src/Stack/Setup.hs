@@ -63,6 +63,7 @@ import qualified Data.Yaml as Yaml
 import           Distribution.System (OS, Arch (..), Platform (..))
 import qualified Distribution.System as Cabal
 import           Distribution.Text (simpleParse)
+import           Lens.Micro (set)
 import           Language.Haskell.TH as TH
 import           Network.HTTP.Client.Conduit
 import           Network.HTTP.Download.Verified
@@ -80,7 +81,7 @@ import           Stack.Fetch
 import           Stack.GhcPkg (createDatabase, getCabalPkgVer, getGlobalDB, mkGhcPackagePath)
 import           Stack.Setup.Installed
 import           Stack.Types
-import           Stack.Types.Internal (HasTerminal, HasReExec, HasLogLevel)
+import           Stack.Types.Internal (HasTerminal, HasReExec, HasLogLevel, envConfigBuildOpts, buildOptsInstallExes)
 import           Stack.Types.StackT
 import qualified System.Directory as D
 import           System.Environment (getExecutablePath)
@@ -860,19 +861,19 @@ installGHCJS si archiveFile archiveType destDir = do
     let stackYaml = unpackDir </> $(mkRelFile "stack.yaml")
         destBinDir = destDir </> $(mkRelDir "bin")
     ensureDir destBinDir
-    envConfig <- loadGhcjsEnvConfig stackYaml destBinDir
+    envConfig' <- loadGhcjsEnvConfig stackYaml destBinDir
 
     -- On windows we need to copy options files out of the install dir.  Argh!
     -- This is done before the build, so that if it fails, things fail
     -- earlier.
     mwindowsInstallDir <- case platform of
         Platform _ Cabal.Windows ->
-            liftM Just $ runInnerStackT envConfig installationRootLocal
+            liftM Just $ runInnerStackT envConfig' installationRootLocal
         _ -> return Nothing
 
     $logSticky "Installing GHCJS (this will take a long time) ..."
-    runInnerStackT envConfig $
-        build (\_ -> return ()) Nothing defaultBuildOpts { boptsInstallExes = True }
+    runInnerStackT ((set (envConfigBuildOpts.buildOptsInstallExes) True envConfig')) $
+        (build (\_ -> return ()) Nothing defaultBuildOptsCLI)
     -- Copy over *.options files needed on windows.
     forM_ mwindowsInstallDir $ \dir -> do
         (_, files) <- listDir (dir </> $(mkRelDir "bin"))
@@ -961,7 +962,7 @@ bootGhcjs stackYaml destDir = do
         runInnerStackT envConfig $
             build (\_ -> return ())
                   Nothing
-                  defaultBuildOpts { boptsTargets = ["cabal-install"] }
+                  defaultBuildOptsCLI { boptsCLITargets = ["cabal-install"] }
     $logSticky "Booting GHCJS (this will take a long time) ..."
     let envSettings = defaultEnvSettings { esIncludeGhcPackagePath = False }
     menv' <- liftIO $ configEnvOverride (getConfig envConfig) envSettings

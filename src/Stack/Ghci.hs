@@ -71,7 +71,7 @@ data GhciOpts = GhciOpts
     , ghciLoadLocalDeps      :: !Bool
     , ghciSkipIntermediate   :: !Bool
     , ghciHidePackages       :: !Bool
-    , ghciBuildOpts          :: !BuildOpts
+    , ghciBuildOptsCLI       :: !BuildOptsCLI
     } deriving Show
 
 -- | Necessary information to load a package or its components.
@@ -108,11 +108,8 @@ ghci
     :: (HasConfig r, HasBuildConfig r, HasHttpManager r, MonadMask m, HasLogLevel r, HasTerminal r, HasEnvConfig r, MonadReader r m, MonadIO m, MonadThrow m, MonadLogger m, MonadCatch m, MonadBaseControl IO m)
     => GhciOpts -> m ()
 ghci opts@GhciOpts{..} = do
-    let bopts = ghciBuildOpts
-            { boptsTestOpts = (boptsTestOpts ghciBuildOpts) { toDisableRun = True }
-            , boptsBenchmarkOpts = (boptsBenchmarkOpts ghciBuildOpts) { beoDisableRun = True }
-            }
-    (targets,mainIsTargets,pkgs) <- ghciSetup opts { ghciBuildOpts = bopts }
+    bopts <- asks (configBuild . getConfig)
+    (targets,mainIsTargets,pkgs) <- ghciSetup opts
     config <- asks getConfig
     bconfig <- asks getBuildConfig
     wc <- getWhichCompiler
@@ -263,31 +260,30 @@ ghciSetup
     => GhciOpts
     -> m (Map PackageName SimpleTarget, Maybe (Map PackageName SimpleTarget), [GhciPkgInfo])
 ghciSetup GhciOpts{..} = do
-    let bopts0 = ghciBuildOpts
-    (_,_,targets) <- parseTargetsFromBuildOpts AllowNoTargets bopts0
+    (_,_,targets) <- parseTargetsFromBuildOpts AllowNoTargets ghciBuildOptsCLI 
     mainIsTargets <-
         case ghciMainIs of
             Nothing -> return Nothing
             Just target -> do
-                (_,_,targets') <- parseTargetsFromBuildOpts AllowNoTargets bopts0 { boptsTargets = [target] }
+                (_,_,targets') <- parseTargetsFromBuildOpts AllowNoTargets ghciBuildOptsCLI { boptsCLITargets = [target] }
                 return (Just targets')
     addPkgs <- forM ghciAdditionalPackages $ \name -> do
         let mres = (packageIdentifierName <$> parsePackageIdentifierFromString name)
                 <|> parsePackageNameFromString name
         maybe (throwM $ InvalidPackageOption name) return mres
-    let bopts = bopts0
-            { boptsTargets = boptsTargets bopts0 ++ map T.pack ghciAdditionalPackages
+    let boptsCli = ghciBuildOptsCLI
+            { boptsCLITargets = boptsCLITargets ghciBuildOptsCLI ++ map T.pack ghciAdditionalPackages
             }
     -- Try to build, but optimistically launch GHCi anyway if it fails (#1065)
     unless ghciNoBuild $ do
-        eres <- tryAny $ build (const (return ())) Nothing bopts
+        eres <- tryAny $ build (const (return ())) Nothing boptsCli
         case eres of
             Right () -> return ()
             Left err -> do
                 $logError $ T.pack (show err)
                 $logWarn "Warning: build failed, but optimistically launching GHCi anyway"
     econfig <- asks getEnvConfig
-    (realTargets,_,_,_,sourceMap) <- loadSourceMap AllowNoTargets bopts
+    (realTargets,_,_,_,sourceMap) <- loadSourceMap AllowNoTargets boptsCli
     menv <- getMinimalEnvOverride
     (installedMap, _, _, _) <- getInstalled
         menv
@@ -331,7 +327,7 @@ ghciSetup GhciOpts{..} = do
     infos <-
         forM wanted $
         \(name,(cabalfp,target)) ->
-             makeGhciPkgInfo bopts sourceMap installedMap localLibs addPkgs name cabalfp target
+             makeGhciPkgInfo boptsCli sourceMap installedMap localLibs addPkgs name cabalfp target
     checkForIssues infos
     return (realTargets, mainIsTargets, infos)
   where
@@ -344,7 +340,7 @@ ghciSetup GhciOpts{..} = do
 -- | Make information necessary to load the given package in GHCi.
 makeGhciPkgInfo
     :: (MonadReader r m, HasEnvConfig r, MonadLogger m, MonadIO m, MonadCatch m)
-    => BuildOpts
+    => BuildOptsCLI
     -> SourceMap
     -> InstalledMap
     -> [PackageName]
@@ -353,14 +349,15 @@ makeGhciPkgInfo
     -> Path Abs File
     -> SimpleTarget
     -> m GhciPkgInfo
-makeGhciPkgInfo bopts sourceMap installedMap locals addPkgs name cabalfp target = do
+makeGhciPkgInfo boptsCli sourceMap installedMap locals addPkgs name cabalfp target = do
+    bopts <- asks (configBuild . getConfig)
     econfig <- asks getEnvConfig
     bconfig <- asks getBuildConfig
     let config =
             PackageConfig
             { packageConfigEnableTests = True
             , packageConfigEnableBenchmarks = True
-            , packageConfigFlags = localFlags (boptsFlags bopts) bconfig name
+            , packageConfigFlags = localFlags (boptsCLIFlags boptsCli) bconfig name
             , packageConfigCompilerVersion = envConfigCompilerVersion econfig
             , packageConfigPlatform = configPlatform (getConfig bconfig)
             }
