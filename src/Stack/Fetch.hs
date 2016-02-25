@@ -55,7 +55,7 @@ import           Data.List.NonEmpty             (NonEmpty)
 import qualified Data.List.NonEmpty             as NE
 import           Data.Map                       (Map)
 import qualified Data.Map                       as Map
-import           Data.Maybe                     (maybeToList, catMaybes)
+import           Data.Maybe                     (maybeToList, catMaybes, fromMaybe)
 import           Data.Monoid                    ((<>))
 import           Data.Set                       (Set)
 import qualified Data.Set                       as Set
@@ -63,13 +63,18 @@ import qualified Data.Text                      as T
 import           Data.Text.Encoding             (decodeUtf8)
 import           Data.Typeable                  (Typeable)
 import           Data.Word                      (Word64)
+import qualified Data.Yaml                      as Yaml
+import           Network.HTTP.Client            (checkStatus)
 import           Network.HTTP.Download
+import           Network.HTTP.Types.Status
 import           Path
 import           Path.IO
 import           Prelude -- Fix AMP warning
+import           Stack.Constants
 import           Stack.GhcPkg
 import           Stack.PackageIndex
 import           Stack.Types
+import           Stack.Types.StackT
 import qualified System.Directory               as D
 import           System.FilePath                ((<.>))
 import qualified System.FilePath                as FP
@@ -78,6 +83,8 @@ import           System.IO                      (IOMode (ReadMode),
                                                  withBinaryFile)
 import           System.PosixCompat             (setFileMode)
 import           Text.EditDistance              as ED
+import           Distribution.Version           (anyVersion)
+import           Distribution.Text              (simpleParse)
 
 type PackageCaches = Map PackageIdentifier (PackageIndex, PackageCache)
 
@@ -130,18 +137,71 @@ fetchPackages menv idents = do
     nowUnpacked <- fetchPackages' Nothing toFetch
     assert (Map.null nowUnpacked) (return ())
 
+
+-- TODO(luigy) don't copy this from Stack.BuildPlan
+------------------------------------------------------------------------------------
+-- | Load the 'BuildPlan' for the given snapshot. Will load from a local copy
+-- if available, otherwise downloading from Github.
+loadBuildPlan :: (MonadIO m, MonadThrow m, MonadLogger m, MonadReader env m, HasHttpManager env, HasStackRoot env)
+              => SnapName
+              -> m BuildPlan
+loadBuildPlan name = do
+    env <- ask
+    let stackage = getStackRoot env
+    file' <- parseRelFile $ T.unpack file
+    let fp = buildPlanDir stackage </> file'
+    $logDebug $ "Decoding build plan from: " <> T.pack (toFilePath fp)
+    eres <- liftIO $ Yaml.decodeFileEither $ toFilePath fp
+    case eres of
+        Right bp -> return bp
+        Left e -> do
+            $logDebug $ "Decoding build plan from file failed: " <> T.pack (show e)
+            ensureDir (parent fp)
+            req <- parseUrl $ T.unpack url
+            $logSticky $ "Downloading " <> renderSnapName name <> " build plan ..."
+            $logDebug $ "Downloading build plan from: " <> url
+            _ <- redownload req { checkStatus = handle404 } fp
+            $logStickyDone $ "Downloaded " <> renderSnapName name <> " build plan."
+            liftIO (Yaml.decodeFileEither $ toFilePath fp) >>= either throwM return
+
+  where
+    file = renderSnapName name <> ".yaml"
+    reponame =
+        case name of
+            LTS _ _ -> "lts-haskell"
+            Nightly _ -> "stackage-nightly"
+    url = rawGithubUrl "fpco" reponame "master" file
+    handle404 (Status 404 _) _ _ = Just $ SomeException $ C name
+    handle404 _ _ _              = Nothing
+
+data Coulnd'tDownloadSnap = C SnapName deriving (Typeable, Show)
+instance Exception Coulnd'tDownloadSnap
+------------------------------------------------------------------------------------
+
 -- | Intended to work for the command line command.
-unpackPackages :: (MonadIO m, MonadBaseControl IO m, MonadReader env m, HasHttpManager env, HasConfig env, MonadThrow m, MonadLogger m, MonadCatch m)
+unpackPackages :: (MonadIO m, HasBuildConfig env, MonadBaseControl IO m, MonadReader env m, HasHttpManager env, HasConfig env, MonadThrow m, MonadLogger m, MonadCatch m)
                => EnvOverride
                -> FilePath -- ^ destination
                -> [String] -- ^ names or identifiers
+               -> Bool     -- ^ get latest version
                -> m ()
-unpackPackages menv dest input = do
+unpackPackages menv dest input useLatest = do
     dest' <- resolveDir' dest
-    (names, idents) <- case partitionEithers $ map parse input of
+    (names0, idents0) <- case partitionEithers $ map parse input of
         ([], x) -> return $ partitionEithers x
         (errs, _) -> throwM $ CouldNotParsePackageSelectors errs
-    resolved <- resolvePackages menv (Set.fromList idents) (Set.fromList names)
+    resolver <- asks $ bcResolver . getBuildConfig
+    (names1, idents1) <- case resolver of
+        ResolverSnapshot snapName | not useLatest -> do
+            planPackages <- bpPackages <$> loadBuildPlan snapName
+            let (names', idents') = partitionEithers $ map
+                    (\name -> maybe (Left name) (Right . PackageIdentifier name . ppVersion)
+                        (Map.lookup name planPackages))
+                    names0
+            return (names', idents0 ++ idents')
+        _ -> return (names0, idents0)
+
+    resolved <- resolvePackages menv (Set.fromList idents1) (Set.fromList names1)
     ToFetchResult toFetch alreadyUnpacked <- getToFetch (Just dest') resolved
     unless (Map.null alreadyUnpacked) $
         throwM $ UnpackDirectoryAlreadyExists $ Set.fromList $ map toFilePath $ Map.elems alreadyUnpacked
@@ -209,10 +269,11 @@ resolvePackagesAllowMissing
     -> Set PackageName
     -> m (Set PackageName, Set PackageIdentifier, Map PackageIdentifier ResolvedPackage)
 resolvePackagesAllowMissing menv idents0 names0 = do
-    caches <- getPackageCaches menv
-    let versions = Map.fromListWith max $ map toTuple $ Map.keys caches
+    (caches, pvcaches) <- getPackageCaches menv
+    let preferredVersions = fmap toVersionRange pvcaches
+        versions = Map.mapWithKey (filterBy' preferredVersions) $ groupByPackageName caches
         (missingNames, idents1) = partitionEithers $ map
-            (\name -> maybe (Left name ) (Right . PackageIdentifier name)
+            (\name -> maybe (Left name) (Right . PackageIdentifier name)
                 (Map.lookup name versions))
             (Set.toList names0)
         (missingIdents, resolved) = partitionEithers $ map (goIdent caches)
@@ -227,6 +288,18 @@ resolvePackagesAllowMissing menv idents0 names0 = do
                 { rpCache = cache
                 , rpIndex = index
                 })
+
+    toTuple' (PackageIdentifier name version) = (name, [version])
+
+    groupByPackageName = fmap Set.fromList . Map.fromListWith mappend . map toTuple' . Map.keys
+
+    filterBy' pvs name vs =
+        fromMaybe (Set.findMax vs) $
+            flip latestApplicableVersion vs $ fromMaybe anyVersion $ Map.lookup name pvs
+
+    toVersionRange (_, PreferredVersionsCache raw) = fromMaybe anyVersion $ parse raw
+      where parse = simpleParse . T.unpack . T.dropWhile (/= ' ')
+
 
 data ToFetch = ToFetch
     { tfTarball :: !(Path Abs File)
@@ -268,7 +341,7 @@ withCabalLoader
     -> ((PackageIdentifier -> IO ByteString) -> m a)
     -> m a
 withCabalLoader menv inner = do
-    icaches <- getPackageCaches menv >>= liftIO . newIORef
+    icaches <- fmap fst (getPackageCaches menv) >>= liftIO . newIORef
     env <- ask
 
     -- Want to try updating the index once during a single run for missing
@@ -308,7 +381,7 @@ withCabalLoader menv inner = do
                                     , "Updating and trying again."
                                     ]
                                 updateAllIndices menv
-                                caches <- getPackageCaches menv
+                                (caches, _pvcaches) <- getPackageCaches menv
                                 liftIO $ writeIORef icaches caches
                             return (False, doLookup ident)
                         else return (toUpdate,

@@ -510,7 +510,7 @@ loadBuildConfig mproject config mresolver mcompiler = do
 
     extraPackageDBs <- mapM resolveDir' (projectExtraPackageDBs project)
 
-    packageCaches <- runReaderT (getMinimalEnvOverride >>= getPackageCaches) miniConfig
+    packageCaches <- runReaderT (fst <$> (getMinimalEnvOverride >>= getPackageCaches)) miniConfig
 
     return BuildConfig
         { bcConfig = config

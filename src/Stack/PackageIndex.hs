@@ -47,6 +47,7 @@ import qualified Data.Map.Strict as Map
 import           Data.Monoid
 import           Data.Text (Text)
 import qualified Data.Text as T
+import qualified Data.Text.Encoding as T
 import           Data.Text.Unsafe (unsafeTail)
 
 import           Data.Traversable (forM)
@@ -72,7 +73,12 @@ populateCache
     :: (MonadIO m, MonadReader env m, HasConfig env, HasHttpManager env, MonadLogger m, MonadBaseControl IO m, MonadCatch m)
     => EnvOverride
     -> PackageIndex
-    -> m (Map PackageIdentifier PackageCache)
+    -- Option 1
+    -- -> m (Map PackageName (Map Version PackageCache, Maybe PreferredVersionsCache))
+    -- Option 2
+    -> m (Map PackageIdentifier PackageCache, Map PackageName PreferredVersionsCache)
+    -- Original Option
+    -- -> m (Map PackageIdentifier PackageCache)
 populateCache menv index = do
     requireIndex menv index
     -- This uses full on lazy I/O instead of ResourceT to provide some
@@ -81,8 +87,8 @@ populateCache menv index = do
     let loadPIS = do
             $logSticky "Populating index cache ..."
             lbs <- liftIO $ L.readFile $ Path.toFilePath path
-            loop 0 Map.empty (Tar.read lbs)
-    pis <- loadPIS `C.catch` \e -> do
+            loop 0 (Map.empty, Map.empty) (Tar.read lbs)
+    caches@(pis, _) <- loadPIS `C.catch` \e -> do
         $logWarn $ "Exception encountered when parsing index tarball: "
                 <> T.pack (show (e :: Tar.FormatError))
         $logWarn "Automatically updating index and trying again"
@@ -96,36 +102,42 @@ populateCache menv index = do
 
     $logStickyDone "Populated index cache."
 
-    return pis
+    return caches
   where
-    loop !blockNo !m (Tar.Next e es) =
-        loop (blockNo + entrySizeInBlocks e) (goE blockNo m e) es
-    loop _ m Tar.Done = return m
+    loop !blockNo !ms (Tar.Next e es) =
+        loop (blockNo + entrySizeInBlocks e) (goE blockNo ms e) es
+    loop _ ms Tar.Done = return ms
     loop _ _ (Tar.Fail e) = throwM e
 
-    goE blockNo m e =
+    goE blockNo ms@(mpc,mpvc) e =
         case Tar.entryContent e of
             Tar.NormalFile lbs size ->
                 case parseNameVersion $ Tar.entryPath e of
-                    Just (ident, ".cabal") -> addCabal ident size
-                    Just (ident, ".json") -> addJSON ident lbs
-                    _ -> m
-            _ -> m
+                    Just (ident, ".cabal") -> (addCabal ident size, mpvc)
+                    Just (ident, ".json") -> (addJSON ident lbs, mpvc)
+                    _ -> case parsePreferredVersions $ Tar.entryPath e of
+                             Just !pkg -> (mpc, addPreferredVersion pkg lbs)
+                             _ -> ms
+            _ -> ms
       where
+        addPreferredVersion name lbs =
+            Map.insert name (PreferredVersionsCache (T.decodeUtf8 $ L.toStrict lbs)) mpvc
+
         addCabal ident size = Map.insertWith
             (\_ pcOld -> pcNew { pcDownload = pcDownload pcOld })
             ident
             pcNew
-            m
+            mpc
           where
             pcNew = PackageCache
                 { pcOffset = (blockNo + 1) * 512
                 , pcSize = size
                 , pcDownload = Nothing
                 }
+
         addJSON ident lbs =
             case decode lbs of
-                Nothing -> m
+                Nothing -> mpc
                 Just !pd -> Map.insertWith
                     (\_ pc -> pc { pcDownload = Just pd })
                     ident
@@ -134,13 +146,22 @@ populateCache menv index = do
                         , pcSize = 0
                         , pcDownload = Just pd
                         }
-                    m
+                    mpc
 
     breakSlash x
         | T.null z = Nothing
         | otherwise = Just (y, unsafeTail z)
       where
         (y, z) = T.break (== '/') x
+
+    parsePreferredVersions t1 = do
+        (p', t3) <- breakSlash
+                  $ T.map (\c -> if c == '\\' then '/' else c)
+                  $ T.pack t1
+        p <- parsePackageName p'
+        if t3 == "preferred-versions"
+            then return p
+            else Nothing
 
     parseNameVersion t1 = do
         (p', t3) <- breakSlash
@@ -332,17 +353,22 @@ deleteCache indexName' = do
         Left e -> $logDebug $ "Could not delete cache: " <> T.pack (show e)
         Right () -> $logDebug $ "Deleted index cache at " <> T.pack (toFilePath fp)
 
--- | Load the cached package URLs, or created the cache if necessary.
+-- | Load the cached package URLs, or create the cache if necessary.
 getPackageCaches :: (MonadIO m, MonadLogger m, MonadReader env m, HasConfig env, MonadThrow m, HasHttpManager env, MonadBaseControl IO m, MonadCatch m)
                  => EnvOverride
-                 -> m (Map PackageIdentifier (PackageIndex, PackageCache))
+                 -- Option 1
+                 -- -> m (Map PackageName (Map Version (PackageIndex, PackageCache), (PackageIndex, PreferredVersionsCache)))
+                 -> m (Map PackageIdentifier (PackageIndex, PackageCache), Map PackageName (PackageIndex, PreferredVersionsCache))
 getPackageCaches menv = do
     config <- askConfig
     liftM mconcat $ forM (configPackageIndices config) $ \index -> do
         fp <- configPackageIndexCache (indexName index)
-        PackageCacheMap pis' <- taggedDecodeOrLoad fp $ liftM PackageCacheMap $ populateCache menv index
+        fppvc <- configPreferredVersionsCache (indexName index)
 
-        return (fmap (index,) pis')
+        PackageCacheMap pis' <- taggedDecodeOrLoad fp $ liftM PackageCacheMap (fst <$> populateCache menv index)
+        PreferredVersionsCacheMap pvc' <- taggedDecodeOrLoad fppvc $ liftM PreferredVersionsCacheMap (snd <$> populateCache menv index)
+
+        return (fmap (index,) pis', fmap (index,) pvc')
 
 --------------- Lifted from cabal-install, Distribution.Client.Tar:
 -- | Return the number of blocks in an entry.

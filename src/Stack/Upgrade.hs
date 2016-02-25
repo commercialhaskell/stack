@@ -65,11 +65,11 @@ upgrade gitRepo mresolver builtHash =
                 return $ Just $ tmp </> $(mkRelDir "stack")
       Nothing -> do
         updateAllIndices menv
-        caches <- getPackageCaches menv
+        -- TODO(luigy) use same logic as in Stack.Fetch
+        (caches,_pv) <- getPackageCaches menv
         let latest = Map.fromListWith max
                    $ map toTuple
                    $ Map.keys
-
                    -- Mistaken upload to Hackage, just ignore it
                    $ Map.delete (PackageIdentifier
                         $(mkPackageName "stack")
