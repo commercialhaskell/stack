@@ -73,12 +73,7 @@ populateCache
     :: (MonadIO m, MonadReader env m, HasConfig env, HasHttpManager env, MonadLogger m, MonadBaseControl IO m, MonadCatch m)
     => EnvOverride
     -> PackageIndex
-    -- Option 1
-    -- -> m (Map PackageName (Map Version PackageCache, Maybe PreferredVersionsCache))
-    -- Option 2
     -> m (Map PackageIdentifier PackageCache, Map PackageName PreferredVersionsCache)
-    -- Original Option
-    -- -> m (Map PackageIdentifier PackageCache)
 populateCache menv index = do
     requireIndex menv index
     -- This uses full on lazy I/O instead of ResourceT to provide some
@@ -112,12 +107,11 @@ populateCache menv index = do
     goE blockNo ms@(mpc,mpvc) e =
         case Tar.entryContent e of
             Tar.NormalFile lbs size ->
-                case parseNameVersion $ Tar.entryPath e of
-                    Just (ident, ".cabal") -> (addCabal ident size, mpvc)
-                    Just (ident, ".json") -> (addJSON ident lbs, mpvc)
-                    _ -> case parsePreferredVersions $ Tar.entryPath e of
-                             Just !pkg -> (mpc, addPreferredVersion pkg lbs)
-                             _ -> ms
+                case parseFilePath $ Tar.entryPath e of
+                    Just (Right (ident, ".cabal")) -> (addCabal ident size, mpvc)
+                    Just (Right (ident, ".json")) -> (addJSON ident lbs, mpvc)
+                    Just (Left !pkg) -> (mpc, addPreferredVersion pkg lbs)
+                    _ -> ms
             _ -> ms
       where
         addPreferredVersion name lbs =
@@ -154,26 +148,21 @@ populateCache menv index = do
       where
         (y, z) = T.break (== '/') x
 
-    parsePreferredVersions t1 = do
-        (p', t3) <- breakSlash
-                  $ T.map (\c -> if c == '\\' then '/' else c)
-                  $ T.pack t1
+    formatPath = T.map (\c -> if c == '\\' then '/' else c) . T.pack
+
+    parseFilePath f1 = do
+        (p', t3) <- breakSlash (formatPath f1)
         p <- parsePackageName p'
         if t3 == "preferred-versions"
-            then return p
-            else Nothing
+            then Just (Left p)
+            else do
+                (v', t5) <- breakSlash t3
+                v <- parseVersion v'
+                let (t6, suffix) = T.break (== '.') t5
+                if t6 == p'
+                    then Just $ Right (PackageIdentifier p v, suffix)
+                    else Nothing
 
-    parseNameVersion t1 = do
-        (p', t3) <- breakSlash
-                  $ T.map (\c -> if c == '\\' then '/' else c)
-                  $ T.pack t1
-        p <- parsePackageName p'
-        (v', t5) <- breakSlash t3
-        v <- parseVersion v'
-        let (t6, suffix) = T.break (== '.') t5
-        if t6 == p'
-            then return (PackageIdentifier p v, suffix)
-            else Nothing
 
 data PackageIndexException
   = GitNotAvailable IndexName
