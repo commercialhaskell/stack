@@ -52,6 +52,7 @@ import           Prelude
 import           Stack.BuildPlan
 import           Stack.Constants             (stackDotYaml)
 import           Stack.Package               (printCabalFileWarning
+                                             , hpack
                                              , readPackageUnresolved)
 import           Stack.Setup
 import           Stack.Setup.Installed
@@ -468,12 +469,20 @@ checkResolverSpec gpds flags resolver = do
       -- TODO support custom resolver for stack init
       ResolverCustom {} -> return $ BuildPlanCheckPartial Map.empty Map.empty
 
--- | Finds all files with a .cabal extension under a given directory.
+-- | Finds all files with a .cabal extension under a given directory. If
+-- a `hpack` `package.yaml` file exists, this will be used to generate a cabal
+-- file.
 -- Subdirectories can be included depending on the @recurse@ parameter.
 findCabalFiles :: MonadIO m => Bool -> Path Abs Dir -> m [Path Abs File]
-findCabalFiles recurse dir =
-    liftIO $ findFiles dir isCabal (\subdir -> recurse && not (isIgnored subdir))
+findCabalFiles recurse dir = do
+    hpackFiles <- liftIO $ findFiles dir isHpack dirFilter
+    liftIO $ do
+        forM_ hpackFiles (hpack . parent)
+        findFiles dir isCabal dirFilter
   where
+    isHpack = (== "package.yaml") . toFilePath . filename
+
+    dirFilter subdir = recurse && not (isIgnored subdir)
     isCabal path = ".cabal" `isSuffixOf` toFilePath path
 
     isIgnored path = FP.dropTrailingPathSeparator (toFilePath (dirname path))
