@@ -64,6 +64,8 @@ import           Data.Text.Encoding             (decodeUtf8)
 import           Data.Typeable                  (Typeable)
 import           Data.Word                      (Word64)
 import qualified Data.Yaml                      as Yaml
+import           Distribution.Text              (simpleParse)
+import           Distribution.Version           (anyVersion)
 import           Network.HTTP.Client            (checkStatus)
 import           Network.HTTP.Download
 import           Network.HTTP.Types.Status
@@ -83,8 +85,6 @@ import           System.IO                      (IOMode (ReadMode),
                                                  withBinaryFile)
 import           System.PosixCompat             (setFileMode)
 import           Text.EditDistance              as ED
-import           Distribution.Version           (anyVersion)
-import           Distribution.Text              (simpleParse)
 
 type PackageCaches = Map PackageIdentifier (PackageIndex, PackageCache)
 
@@ -269,9 +269,11 @@ resolvePackagesAllowMissing
     -> Set PackageName
     -> m (Set PackageName, Set PackageIdentifier, Map PackageIdentifier ResolvedPackage)
 resolvePackagesAllowMissing menv idents0 names0 = do
-    (caches, pvcaches) <- getPackageCaches menv
-    let preferredVersions = fmap toVersionRange pvcaches
-        versions = Map.mapWithKey (filterBy' preferredVersions) $ groupByPackageName caches
+    (caches, preferred) <- getPackageCaches menv
+    let preferredVersion = maybe anyVersion toVersionRange . flip Map.lookup preferred
+        latestApplicable name vs =
+            fromMaybe (Set.findMax vs) $ latestApplicableVersion (preferredVersion name) vs
+        versions = Map.mapWithKey latestApplicable $ groupByPackageName caches
         (missingNames, idents1) = partitionEithers $ map
             (\name -> maybe (Left name) (Right . PackageIdentifier name)
                 (Map.lookup name versions))
@@ -292,10 +294,6 @@ resolvePackagesAllowMissing menv idents0 names0 = do
     toTuple' (PackageIdentifier name version) = (name, [version])
 
     groupByPackageName = fmap Set.fromList . Map.fromListWith mappend . map toTuple' . Map.keys
-
-    filterBy' pvs name vs =
-        fromMaybe (Set.findMax vs) $
-            flip latestApplicableVersion vs $ fromMaybe anyVersion $ Map.lookup name pvs
 
     toVersionRange (_, PreferredVersionsCache raw) = fromMaybe anyVersion $ parse raw
       where parse = simpleParse . T.unpack . T.dropWhile (/= ' ')
