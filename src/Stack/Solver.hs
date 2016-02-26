@@ -474,16 +474,13 @@ checkResolverSpec gpds flags resolver = do
 -- file.
 -- Subdirectories can be included depending on the @recurse@ parameter.
 findCabalFiles :: MonadIO m => Bool -> Path Abs Dir -> m [Path Abs File]
-findCabalFiles recurse dir = do
-    hpackFiles <- liftIO $ findFiles dir isHpack dirFilter
-    liftIO $ do
-        forM_ hpackFiles (hpack . parent)
-        findFiles dir isCabal dirFilter
+findCabalFiles recurse dir = liftIO $ do
+    findFiles dir isHpack subdirFilter >>= mapM_ (hpack . parent)
+    findFiles dir isCabal subdirFilter
   where
-    isHpack = (== "package.yaml") . toFilePath . filename
-
-    dirFilter subdir = recurse && not (isIgnored subdir)
-    isCabal path = ".cabal" `isSuffixOf` toFilePath path
+    subdirFilter subdir = recurse && not (isIgnored subdir)
+    isHpack = (== "package.yaml")     . toFilePath . filename
+    isCabal = (".cabal" `isSuffixOf`) . toFilePath
 
     isIgnored path = FP.dropTrailingPathSeparator (toFilePath (dirname path))
                      `Set.member` ignoredDirs

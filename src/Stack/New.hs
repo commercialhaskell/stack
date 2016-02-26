@@ -1,5 +1,6 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
 
@@ -205,9 +206,11 @@ applyTemplate project template nonceParams dir templateText = do
                    throwM (InvalidTemplate template (show e)))
     when (M.null files) $
          throwM (InvalidTemplate template "Template does not contain any files")
-    unless (any (\x -> or [".cabal" `isSuffixOf` x, x == "package.yaml"]) . M.keys $ files) $
-         throwM (InvalidTemplate template "Template does not contain a .cabal or `package.yaml`\
-                                          \ file")
+
+    let isPkgSpec f = ".cabal" `isSuffixOf` f || f == "package.yaml"
+    unless (any isPkgSpec . M.keys $ files) $
+         throwM (InvalidTemplate template "Template does not contain a .cabal \
+                                          \or package.yaml file")
     liftM
         M.fromList
         (mapM
