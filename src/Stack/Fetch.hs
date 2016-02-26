@@ -293,7 +293,7 @@ resolvePackagesAllowMissing menv idents0 names0 = do
 
     toTuple' (PackageIdentifier name version) = (name, [version])
 
-    groupByPackageName = fmap Set.fromList . Map.fromListWith mappend . map toTuple' . Map.keys
+    groupByPackageName = fmap Set.fromList . Map.fromListWith (<>) . map toTuple' . Map.keys
 
     toVersionRange (_, PreferredVersionsCache raw) = fromMaybe anyVersion $ parse raw
       where parse = simpleParse . T.unpack . T.dropWhile (/= ' ')
