@@ -55,7 +55,7 @@ import           Data.List.NonEmpty             (NonEmpty)
 import qualified Data.List.NonEmpty             as NE
 import           Data.Map                       (Map)
 import qualified Data.Map                       as Map
-import           Data.Maybe                     (maybeToList, catMaybes, fromMaybe)
+import           Data.Maybe                     (maybeToList, catMaybes)
 import           Data.Monoid                    ((<>))
 import           Data.Set                       (Set)
 import qualified Data.Set                       as Set
@@ -64,8 +64,6 @@ import           Data.Text.Encoding             (decodeUtf8)
 import           Data.Typeable                  (Typeable)
 import           Data.Word                      (Word64)
 import qualified Data.Yaml                      as Yaml
-import           Distribution.Text              (simpleParse)
-import           Distribution.Version           (anyVersion)
 import           Network.HTTP.Client            (checkStatus)
 import           Network.HTTP.Download
 import           Network.HTTP.Types.Status
@@ -269,12 +267,9 @@ resolvePackagesAllowMissing
     -> Set PackageName
     -> m (Set PackageName, Set PackageIdentifier, Map PackageIdentifier ResolvedPackage)
 resolvePackagesAllowMissing menv idents0 names0 = do
-    (caches, preferred) <- getPackageCaches menv
-    let preferredVersion = maybe anyVersion toVersionRange . flip Map.lookup preferred
-        latestApplicable name vs =
-            fromMaybe (Set.findMax vs) $ latestApplicableVersion (preferredVersion name) vs
-        versions = Map.mapWithKey latestApplicable $ groupByPackageName caches
-        (missingNames, idents1) = partitionEithers $ map
+    (caches, _preferred) <- getPackageCaches menv
+    versions <- getLatestApplicablePackageCache menv
+    let (missingNames, idents1) = partitionEithers $ map
             (\name -> maybe (Left name) (Right . PackageIdentifier name)
                 (Map.lookup name versions))
             (Set.toList names0)
@@ -290,13 +285,6 @@ resolvePackagesAllowMissing menv idents0 names0 = do
                 { rpCache = cache
                 , rpIndex = index
                 })
-
-    toTuple' (PackageIdentifier name version) = (name, [version])
-
-    groupByPackageName = fmap Set.fromList . Map.fromListWith (<>) . map toTuple' . Map.keys
-
-    toVersionRange (_, PreferredVersionsCache raw) = fromMaybe anyVersion $ parse raw
-      where parse = simpleParse . T.unpack . T.dropWhile (/= ' ')
 
 
 data ToFetch = ToFetch

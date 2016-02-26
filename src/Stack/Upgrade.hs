@@ -65,17 +65,8 @@ upgrade gitRepo mresolver builtHash =
                 return $ Just $ tmp </> $(mkRelDir "stack")
       Nothing -> do
         updateAllIndices menv
-        -- TODO(luigy) use same logic as in Stack.Fetch
-        (caches,_pv) <- getPackageCaches menv
-        let latest = Map.fromListWith max
-                   $ map toTuple
-                   $ Map.keys
-                   -- Mistaken upload to Hackage, just ignore it
-                   $ Map.delete (PackageIdentifier
-                        $(mkPackageName "stack")
-                        $(mkVersion "9.9.9"))
+        latest <- getLatestApplicablePackageCache menv
 
-                     caches
         case Map.lookup $(mkPackageName "stack") latest of
             Nothing -> error "No stack found in package indices"
             Just version | version <= fromCabalVersion Paths.version -> do

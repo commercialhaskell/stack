@@ -19,6 +19,7 @@
 module Stack.PackageIndex
     ( updateAllIndices
     , getPackageCaches
+    , getLatestApplicablePackageCache
     ) where
 
 import qualified Codec.Archive.Tar as Tar
@@ -45,7 +46,9 @@ import           Data.Foldable (forM_)
 import           Data.Int (Int64)
 import           Data.Map (Map)
 import qualified Data.Map.Strict as Map
+import           Data.Maybe (fromMaybe)
 import           Data.Monoid
+import qualified Data.Set as Set
 import           Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
@@ -54,6 +57,9 @@ import           Data.Text.Unsafe (unsafeTail)
 import           Data.Traversable (forM)
 
 import           Data.Typeable (Typeable)
+
+import           Distribution.Text              (simpleParse)
+import           Distribution.Version           (anyVersion)
 
 import           Network.HTTP.Download
 import           Path                                  (mkRelDir, parent,
@@ -342,6 +348,25 @@ deleteCache indexName' = do
     case eres of
         Left e -> $logDebug $ "Could not delete cache: " <> T.pack (show e)
         Right () -> $logDebug $ "Deleted index cache at " <> T.pack (toFilePath fp)
+
+-- | Load latest package versions within preferred-versions.
+getLatestApplicablePackageCache
+    :: (MonadIO m, MonadReader env m, HasHttpManager env, HasConfig env, MonadLogger m, MonadThrow m, MonadBaseControl IO m, MonadCatch m)
+    => EnvOverride
+    -> m (Map PackageName Version)
+getLatestApplicablePackageCache menv = do
+    (caches, preferred) <- getPackageCaches menv
+    let preferredVersion = maybe anyVersion toVersionRange . flip Map.lookup preferred
+        latestApplicable name vs =
+            fromMaybe (Set.findMax vs) $ latestApplicableVersion (preferredVersion name) vs
+    return $ Map.mapWithKey latestApplicable $ groupByPackageName caches
+  where
+    toTuple' (PackageIdentifier name version) = (name, [version])
+
+    groupByPackageName = fmap Set.fromList . Map.fromListWith (<>) . map toTuple' . Map.keys
+
+    toVersionRange (_, PreferredVersionsCache raw) = fromMaybe anyVersion $ parse raw
+      where parse = simpleParse . T.unpack . T.dropWhile (/= ' ')
 
 -- | Load the cached package URLs, or create the cache if necessary.
 getPackageCaches :: (MonadIO m, MonadLogger m, MonadReader env m, HasConfig env, MonadThrow m, HasHttpManager env, MonadBaseControl IO m, MonadCatch m)
