@@ -31,7 +31,7 @@ import           Control.Monad.Logger
 import           Control.Monad.Reader (MonadReader, asks)
 import           Control.Monad.Trans.Control (liftBaseWith)
 import           Control.Monad.Trans.Resource
-import           Data.Attoparsec.Text
+import           Data.Attoparsec.Text hiding (try)
 import qualified Data.ByteString as S
 import           Data.Char (isSpace)
 import           Data.Conduit
@@ -1093,7 +1093,11 @@ singleBuild runInBase ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} in
 
         unless isFinalBuild $ withMVar eeInstallLock $ \() -> do
             announce "copy/register"
-            cabal False ["copy"]
+            eres <- try $ cabal False ["copy"]
+            case eres of
+                Left err@CabalExitedUnsuccessfully{} ->
+                    throwM $ CabalCopyFailed (packageSimpleType package) (show err)
+                _ -> return ()
             when (packageHasLibrary package) $ cabal False ["register"]
 
         let (installedPkgDb, installedDumpPkgsTVar) =
@@ -1276,12 +1280,11 @@ singleTest runInBase topts testsToRun ac ee task installedMap = do
                             ExitSuccess -> Map.empty
                             _ -> Map.singleton testName $ Just ec
                     else do
-                        $logError $ T.concat
-                            [ "Test suite "
-                            , testName
-                            , " executable not found for "
-                            , packageNameText $ packageName package
-                            ]
+                        $logError $ T.pack $ show $ TestSuiteExeMissing
+                            (packageSimpleType package)
+                            exeName
+                            (packageNameString (packageName package))
+                            (T.unpack testName)
                         return $ Map.singleton testName Nothing
 
             when needHpc $ do

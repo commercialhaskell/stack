@@ -123,6 +123,8 @@ data StackBuildException
   | SolverGiveUp String
   | SolverMissingCabalInstall
   | SomeTargetsNotBuildable [(PackageName, NamedComponent)]
+  | TestSuiteExeMissing Bool String String String
+  | CabalCopyFailed Bool String
   deriving Typeable
 
 data FlagSource = FSCommandLine | FSStackYaml
@@ -334,6 +336,35 @@ instance Show StackBuildException where
         "The following components have 'buildable: False' set in the cabal configuration, and so cannot be targets:\n    " ++
         T.unpack (renderPkgComponents xs) ++
         "\nTo resolve this, either provide flags such that these components are buildable, or only specify buildable targets."
+    show (TestSuiteExeMissing isSimpleBuildType exeName pkgName testName) =
+        missingExeError isSimpleBuildType $ concat
+            [ "Test suite executable \""
+            , exeName
+            , " not found for "
+            , pkgName
+            , ":test:"
+            , testName
+            ]
+    show (CabalCopyFailed isSimpleBuildType innerMsg) =
+        missingExeError isSimpleBuildType $ concat
+            [ "'cabal copy' failed.  Error message:\n"
+            , innerMsg
+            , "\n"
+            ]
+
+missingExeError :: Bool -> String -> String
+missingExeError isSimpleBuildType msg =
+    unlines $ msg :
+        case possibleCauses of
+            [] -> []
+            [cause] -> ["One possible cause of this issue is:\n* " <> cause]
+            _ -> "Possible causes of this issue:" : map ("* " <>) possibleCauses
+  where
+    possibleCauses =
+        "No module named \"Main\". The 'main-is' source file should usually have a header indicating that it's a 'Main' module." :
+        if isSimpleBuildType
+            then []
+            else ["The Setup.hs file is changing the installation target dir."]
 
 instance Exception StackBuildException
 
