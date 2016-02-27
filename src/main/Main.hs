@@ -236,11 +236,11 @@ commandLineHandler progName isInterpreter = complicatedOptions
                     templatesCmd
                     (pure ())
         addCommand' "init"
-                    "Initialize a stack project based on one or more cabal packages"
+                    "Create stack project config from cabal or hpack package specifications"
                     initCmd
                     initOptsParser
         addCommand' "solver"
-                    "Use a dependency solver to try and determine missing extra-deps"
+                    "Add missing extra-deps to stack project config"
                     solverCmd
                     solverOptsParser
         addCommand' "setup"
