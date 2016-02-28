@@ -32,9 +32,12 @@ import           Data.Monoid
 import qualified Data.Text                       as T
 import qualified Data.Yaml                       as Yaml
 import qualified Distribution.PackageDescription as C
+import qualified Distribution.Text               as C
+import qualified Distribution.Version            as C
 import           Network.HTTP.Client.Conduit     (HasHttpManager)
 import           Path
 import           Path.IO
+import qualified Paths_stack                     as Meta
 import           Stack.BuildPlan
 import           Stack.Config                    (getSnapshots,
                                                   makeConcreteResolver)
@@ -266,6 +269,7 @@ renderStackYaml p ignoredPackages dupPackages =
         , "   git: https://github.com/commercialhaskell/stack.git"
         , "   commit: e7b331f14bcffb8367cd58fbfc8b40ec7642100a"
         , "- location: https://github.com/commercialhaskell/stack/commit/e7b331f14bcffb8367cd58fbfc8b40ec7642100a"
+        , "  extra-dep: true"
         , " subdirs:"
         , " - auto-update"
         , " - wai"
@@ -275,13 +279,17 @@ renderStackYaml p ignoredPackages dupPackages =
         , "will not be run. This is useful for tweaking upstream packages."
         ]
 
-    footerHelp = commentHelp
+    footerHelp =
+        let major = toCabalVersion
+                    $ toMajorVersion $ fromCabalVersion Meta.version
+        in commentHelp
         [ "Control whether we use the GHC we find on the path"
         , "system-ghc: true"
         , ""
         , "Require a specific version of stack, using version ranges"
         , "require-stack-version: -any # Default"
-        , "require-stack-version: >= 1.0.0"
+        , "require-stack-version: \""
+          ++ C.display (C.orLaterVersion major) ++ "\""
         , ""
         , "Override the architecture used by stack, especially useful on Windows"
         , "arch: i386"
