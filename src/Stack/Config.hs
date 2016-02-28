@@ -576,13 +576,14 @@ resolvePackageLocation menv projRoot (PLRemote url remotePackageType) = do
     unless exists $ do
         ignoringAbsence (removeDirRecur dirTmp)
 
-        let cloneAndExtract commandName resetCommand commit = do
+        let cloneAndExtract commandName cloneArgs resetCommand commit = do
                 ensureDir (parent dirTmp)
                 readInNull (parent dirTmp) commandName menv
-                    [ "clone"
-                    , T.unpack url
+                    ("clone" :
+                    cloneArgs ++
+                    [ T.unpack url
                     , toFilePathNoTrailingSep dirTmp
-                    ]
+                    ])
                     Nothing
                 readInNull dirTmp commandName menv
                     (resetCommand ++ [T.unpack commit])
@@ -615,8 +616,8 @@ resolvePackageLocation menv projRoot (PLRemote url remotePackageType) = do
 
                 tryTar `catchAllLog` tryZip `catchAllLog` err
 
-            RPTGit commit -> cloneAndExtract "git" ["reset", "--hard"] commit
-            RPTHg  commit -> cloneAndExtract "hg"  ["update", "-C"]    commit
+            RPTGit commit -> cloneAndExtract "git" ["--recursive"] ["reset", "--hard"] commit
+            RPTHg  commit -> cloneAndExtract "hg"  []              ["update", "-C"]    commit
 
         renameDir dirTmp dir
 
