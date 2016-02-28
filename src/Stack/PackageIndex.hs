@@ -64,8 +64,10 @@ import           Stack.Types.StackT
 import           System.FilePath (takeBaseName, (<.>))
 import           System.IO                             (IOMode (ReadMode, WriteMode),
                                                         withBinaryFile)
-import           System.Process.Read (readInNull, readProcessNull, ReadProcessException(..),
-                                      EnvOverride, doesExecutableExist)
+import           System.Process.Read         (EnvOverride,
+                                              ReadProcessException (..),
+                                              doesExecutableExist, readInNull,
+                                              readProcessNull, tryProcessStdout)
 
 -- | Populate the package index caches and return them.
 populateCache
@@ -253,32 +255,40 @@ updateIndexGit menv indexName' index gitUrl = do
               $logSticky "Fetching package index ..."
               readInNull acfDir "git" menv ["fetch","--tags","--depth=1"] Nothing
             $logStickyDone "Fetched package index."
-            ignoringAbsence (removeFile tarFile)
+
             when (indexGpgVerify index)
-                 (readInNull acfDir
-                             "git"
-                             menv
-                             ["tag","-v","current-hackage"]
-                             (Just (T.unlines ["Signature verification failed. "
-                                              ,"Please ensure you've set up your"
-                                              ,"GPG keychain to accept the D6CF60FD signing key."
-                                              ,"For more information, see:"
-                                              ,"https://github.com/fpco/stackage-update#readme"])))
-            $logDebug ("Exporting a tarball to " <>
-                       (T.pack . toFilePath) tarFile)
-            deleteCache indexName'
-            let tarFileTmp = toFilePath tarFile ++ ".tmp"
-            readInNull acfDir
-                       "git"
-                       menv
-                       ["archive"
-                       ,"--format=tar"
-                       ,"-o"
-                       ,tarFileTmp
-                       ,"current-hackage"]
-                       Nothing
-            tarFileTmpPath <- parseAbsFile tarFileTmp
-            renameFile tarFileTmpPath tarFile
+                (readInNull acfDir "git" menv ["tag","-v","current-hackage"]
+                    (Just (T.unlines ["Signature verification failed. "
+                                     ,"Please ensure you've set up your"
+                                     ,"GPG keychain to accept the D6CF60FD signing key."
+                                     ,"For more information, see:"
+                                     ,"https://github.com/fpco/stackage-update#readme"])))
+
+            -- generate index archive when commit id differs from cloned repo
+            tarId <- getTarCommitId (toFilePath tarFile)
+            cloneId <- getCloneCommitId acfDir
+            unless (tarId `equals` cloneId)
+                (generateArchive acfDir tarFile)
+   where
+     getTarCommitId fp =
+         tryProcessStdout Nothing menv "sh" ["-c","git get-tar-commit-id < "++fp]
+
+     getCloneCommitId dir =
+         tryProcessStdout (Just dir) menv "git" ["rev-parse","current-hackage^{}"]
+
+     equals (Right cid1) (Right cid2) = cid1 == cid2
+     equals _ _ = False
+
+     generateArchive acfDir tarFile = do
+         ignoringAbsence (removeFile tarFile)
+         deleteCache indexName'
+         $logDebug ("Exporting a tarball to " <> (T.pack . toFilePath) tarFile)
+         let tarFileTmp = toFilePath tarFile ++ ".tmp"
+         readInNull acfDir
+             "git" menv ["archive","--format=tar","-o",tarFileTmp,"current-hackage"]
+             Nothing
+         tarFileTmpPath <- parseAbsFile tarFileTmp
+         renameFile tarFileTmpPath tarFile
 
 -- | Update the index tarball via HTTP
 updateIndexHTTP :: (MonadIO m,MonadLogger m
