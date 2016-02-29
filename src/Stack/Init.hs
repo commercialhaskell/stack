@@ -354,23 +354,31 @@ checkBundleResolver stackYaml initOpts bundle resolver = do
     result <- checkResolverSpec gpds Nothing resolver
     case result of
         BuildPlanCheckOk f -> return $ Right (f, Map.empty)
-        BuildPlanCheckPartial f _
+        BuildPlanCheckPartial f e
             | needSolver resolver initOpts -> do
-                $logWarn $ "*** Resolver " <> resolverName resolver
-                            <> " will need external packages: "
-                $logWarn $ indent $ T.pack $ show result
+                warnPartial result
                 solve f
+            | omitPackages initOpts -> do
+                warnPartial result
+                $logWarn "*** Omitting packages with unsatisfied dependencies"
+                return $ Left $ failedUserPkgs e
             | otherwise -> throwM $ ResolverPartial resolver (show result)
         BuildPlanCheckFail _ e _
-            | (omitPackages initOpts) -> do
+            | omitPackages initOpts -> do
                 $logWarn $ "*** Resolver compiler mismatch: "
                            <> resolverName resolver
                 $logWarn $ indent $ T.pack $ show result
-                let failed = Map.unions (Map.elems (fmap deNeededBy e))
-                return $ Left (Map.keys failed)
+                return $ Left $ failedUserPkgs e
             | otherwise -> throwM $ ResolverMismatch resolver (show result)
     where
-      indent t    = T.unlines $ fmap ("    " <>) (T.lines t)
+      indent t  = T.unlines $ fmap ("    " <>) (T.lines t)
+      warnPartial res = do
+          $logWarn $ "*** Resolver " <> resolverName resolver
+                      <> " will need external packages: "
+          $logWarn $ indent $ T.pack $ show res
+
+      failedUserPkgs e = Map.keys $ Map.unions (Map.elems (fmap deNeededBy e))
+
       gpds        = Map.elems (fmap snd bundle)
       solve flags = do
           let cabalDirs      = map parent (Map.elems (fmap fst bundle))

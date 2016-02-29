@@ -1169,6 +1169,7 @@ instance Show ConfigException where
         , "' does not have all the packages to match your requirements.\n"
         , unlines $ fmap ("    " <>) (lines errDesc)
         , "\nHowever, you can try '--solver' to use external packages."
+        , "\nUse '--omit-packages' if you want to create a config anyway."
         ]
     show (NoSuchDirectory dir) = concat
         ["No directory could be located matching the supplied path: "
