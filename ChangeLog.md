@@ -8,6 +8,9 @@ Major changes:
 
 Other enhancements:
 
+* `git` packages with submodules are supported by passing the `--recursive`
+  flag to `git clone`.
+
 Bug fixes:
 
 ## 1.0.4
