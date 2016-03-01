@@ -1,3 +1,7 @@
+-- This file has been generated from package.yaml by hpack version 0.10.0.
+--
+-- see: https://github.com/sol/hpack
+
 name:                stack
 version:             1.0.5
 synopsis:            The Haskell Tool Stack
@@ -6,6 +10,7 @@ description:         Please see the README.md for usage information, and
                      the API for the library is not currently stable, and may
                      change significantly, even between minor releases. It is
                      currently only intended for use by the executable.
+bug-reports:         https://github.com/commercialhaskell/stack/issues
 license:             BSD3
 license-file:        LICENSE
 author:              Commercial Haskell SIG
@@ -23,6 +28,7 @@ extra-source-files:
     test/package-dump/ghc-7.10.txt
     test/package-dump/ghc-7.8.4-osx.txt
     test/package-dump/ghc-7.8.txt
+    test/package-dump/ghc-head.txt
 
 source-repository head
   type: git
@@ -32,10 +38,6 @@ flag disable-git-info
   description: Disable compile-time inclusion of current git info in stack
   manual: True
   default: False
-  -- disabling git info can lead to a quicker workflow in certain
-  -- scenarios when you're developing on stack itself, but
-  -- should otherwise be avoided
-  -- see: https://github.com/commercialhaskell/stack/issues/1425
 
 flag integration-tests
   description: Run the integration test suite
@@ -46,8 +48,6 @@ flag static
   description: Pass -static/-pthread to ghc when linking the stack binary.
   manual: True
   default: False
-  -- Not intended for general use. Simply makes it easier to
-  -- build a fully static binary on Linux platforms that enable it.
 
 library
   hs-source-dirs:
@@ -129,7 +129,6 @@ library
     , uuid
     , zip-archive
     , hpack >= 0.10.0
-
   if os(windows)
     cpp-options: -DWINDOWS
     build-depends:
@@ -137,7 +136,6 @@ library
   else
     build-depends:
         unix >= 2.7.0.1
-
   exposed-modules:
       Control.Concurrent.Execute
       Data.Aeson.Extended
@@ -155,7 +153,6 @@ library
       Options.Applicative.Complicated
       Path.Extra
       Path.Find
-      Paths_stack
       Stack.Build
       Stack.Build.Cache
       Stack.Build.ConstructPlan
@@ -229,7 +226,6 @@ executable stack
   main-is: Main.hs
   hs-source-dirs:
       src/main
-  other-modules: Paths_stack
   ghc-options: -Wall -fwarn-tabs -fwarn-incomplete-uni-patterns -fwarn-incomplete-record-updates -threaded -rtsopts
   build-depends:
       Cabal >= 1.18.1.5
@@ -255,6 +251,9 @@ executable stack
     cpp-options: -DWINDOWS
     build-depends:
         Win32
+  else
+    build-depends:
+        unix >= 2.7.0.1
   if flag(static)
     ld-options: -static -pthread
   if !flag(disable-git-info)
@@ -269,6 +268,7 @@ test-suite stack-integration-test
   main-is: IntegrationSpec.hs
   hs-source-dirs:
       test/integration
+    , test/integration/lib
   ghc-options: -Wall -fwarn-tabs -fwarn-incomplete-uni-patterns -fwarn-incomplete-record-updates -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       async < 2.2
@@ -286,26 +286,17 @@ test-suite stack-integration-test
     , text
     , transformers
     , unix-compat
-
+  if os(windows)
+    cpp-options: -DWINDOWS
+    build-depends:
+        Win32
+  else
+    build-depends:
+        unix >= 2.7.0.1
   if !flag(integration-tests)
     buildable: False
-
-  -- This isn't actually needed to build stack-integration-test, but it makes it
-  -- easier to load up an individual integration test into stack ghci. It's
-  -- still a little involved:
-  --
-  -- stack exec -- stack ghci stack:stack-integration-test --flag stack:integration-tests --no-build
-  --
-  -- Then, in ghci:
-  --
-  -- :cd test/integration/tests/.../files
-  -- :load ../Main.hs
-  -- main
   other-modules:
       StackTest
-  hs-source-dirs:
-      test/integration/lib
-
   default-language: Haskell2010
 
 test-suite stack-test
@@ -336,6 +327,13 @@ test-suite stack-test
     , temporary
     , text
     , transformers
+  if os(windows)
+    cpp-options: -DWINDOWS
+    build-depends:
+        Win32
+  else
+    build-depends:
+        unix >= 2.7.0.1
   other-modules:
       Network.HTTP.Download.VerifiedSpec
       Spec
