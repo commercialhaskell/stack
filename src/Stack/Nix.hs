@@ -107,15 +107,11 @@ runShellAndExit mprojectRoot maresolver mcompiler getCmdArgs = do
                            ,nixopts
                            ,["--command", intercalate " " (cmnd:"$STACK_IN_NIX_EXTRA_ARGS":args)]
                            ]
-
      $logDebug $
          "Using a nix-shell environment " <> (case mshellFile of
             Just path -> "from file: " <> (T.pack (toFilePath path))
             Nothing -> "with nix packages: " <> (T.intercalate ", " pkgs))
-     e <- try (exec envOverride "nix-shell" fullArgs)
-     case e of
-       Left (ProcessExitedUnsuccessfully _ ec) -> liftIO (exitWith ec)
-       Right () -> liftIO exitSuccess
+     exec envOverride "nix-shell" fullArgs
 
 -- | Shell-escape quotes inside the string and enclose it in quotes.
 escape :: String -> String
