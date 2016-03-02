@@ -45,6 +45,13 @@ plainEnvSettings = EnvSettings
     }
 
 -- | Execute a process within the Stack configured environment.
+--
+-- Execution will not return, because either:
+--
+-- 1) On non-windows, execution is taken over by execv of the
+-- sub-process. This allows signals to be propagated (#527)
+--
+-- 2) On windows, an 'ExitCode' exception will be thrown.
 exec :: (MonadIO m, MonadLogger m, MonadThrow m, MonadBaseControl IO m)
      => EnvOverride -> String -> [String] -> m b
 #ifdef WINDOWS
@@ -56,7 +63,10 @@ exec menv cmd0 args = do
     liftIO $ executeFile cmd True args (envHelper menv)
 #endif
 
--- | Execute a spawned process within the Stack configured environment.
+-- | Like 'exec', but does not use 'execv' on non-windows. This way, there
+-- is a sub-process, which is helpful in some cases (#1306)
+--
+-- This function only exits by throwing 'ExitCode'.
 execSpawn :: (MonadIO m, MonadLogger m, MonadThrow m, MonadBaseControl IO m)
      => EnvOverride -> String -> [String] -> m b
 execSpawn menv cmd0 args = do
