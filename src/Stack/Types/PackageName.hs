@@ -164,4 +164,8 @@ packageNameArgument =
     p s =
         case parsePackageNameFromString s of
             Just x -> Right x
-            Nothing -> Left ("Expected valid package name, but got: " ++ s)
+            Nothing -> Left $ unlines
+                [ "Expected valid package name, but got: " ++ s
+                , "Package names consist of one or more alphanumeric words separated by hyphens."
+                , "To avoid ambiguity with version numbers, each of these words must contain at least one letter."
+                ]
