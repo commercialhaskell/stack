@@ -42,7 +42,7 @@ packages:
 extra-deps: []
 ```
 
-The above example specifies that it should include any packages at the root directory (`'.'`), that the `proprietary-dep` package is found in the project's `third-party` folder, that the `conduit` package is found in the project's `github-version-of` folder, and that the `diagrams` package is found in the project's `patched` folder. This autodetects changes and reinstalls the package.
+The above example specifies that it should include the package at the root directory (`'.'`), that the `proprietary-dep` package is found in the project's `third-party` folder, that the `conduit` package is found in the project's `github-version-of` folder, and that the `diagrams` package is found in the project's `patched` folder. This autodetects changes and reinstalls the package.
 
 To install packages directly from a Git repository, use e.g.:
 
@@ -54,7 +54,7 @@ packages:
     commit: somecommitID
 ```
 
-Note that the `- '.'` line has been omitted, so the root directory will not be searched for packages.
+Note that the `- '.'` line has been omitted, so the package in the root directory will not be used.
 
 #### What is the meaning of the arguments given to stack build, test, etc?
 
@@ -139,7 +139,7 @@ See [this issue](https://github.com/commercialhaskell/stack/issues/420) for a de
 
 #### How do I upgrade to GHC 7.10.2 with stack?
 
-If you already have a prior version of GHC use `stack --resolver ghc-7.10 setup --reinstall`. If you don't have any GHC installed, you can skip the `--reinstall`. 
+If you already have a prior version of GHC use `stack --resolver ghc-7.10 setup --reinstall`. If you don't have any GHC installed, you can skip the `--reinstall`.
 
 #### How do I get extra build tools?
 
