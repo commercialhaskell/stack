@@ -311,7 +311,7 @@ persisted across runs, this means that if you `stack exec sudo apt-get install
 some-ubuntu-package`, that package will be installed but then the container it's
 installed in will disappear, thus causing it to have no effect. If you wish to
 make this kind of change permanent, see later instructions for how to create a
-[derivative Docker image](#derivativeimage).
+[derivative Docker image](#derivative-image).
 
 Inside the container, your home directory is a special location that volume-
 mounted from within your project directory's `.stack-work` in such a
@@ -353,26 +353,27 @@ information about managing Docker containers.
 
 Creating your own custom derivative image can be useful if you need to install
 additional Ubuntu packages or make other changes to the operating system. Here
-is an example (replace `custom` if you prefer a different name for your derived
-container):
+is an example (replace `stack-build:custom` if you prefer a different name for
+your derived container, but it's best if the repo name matches what you're
+deriving from, only with a different tag, to avoid recompilation):
 
-    # On host
-    $ stack  --docker-persist --docker-container-name=temp exec --plain bash
+    ;;; On host
+    $ sudo stack  --docker-persist --docker-container-name=temp exec bash
 
-    # In container, make changes to OS
-    $ sudo apt-get install r-cran-numderiv
+    ;;; In container, make changes to OS
+    # apt-get install r-cran-numderiv
     [...]
-    $ exit
+    # exit
 
-    # On host again
-    $ docker commit temp custom
+    ;;; On host again
+    $ docker commit temp stack-build:custom
     $ docker rm temp
 
-Now you have a new Docker image named `custom`. To use the new image, run
+Now you have a new Docker image named `stack-build:custom`. To use the new image, run
 a command such as the following or update the corresponding values in your
 `stack.yaml`:
 
-    stack --docker-image=custom <COMMAND>
+    stack --docker-image=stack-build:custom <COMMAND>
 
 Note, however, that any time a new image is used, you will have to re-do this
 process. You could also use a Dockerfile to make this reusable. Consult the
