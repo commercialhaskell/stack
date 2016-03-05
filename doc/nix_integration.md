@@ -195,42 +195,24 @@ Nix is also a programming language, and as specified
 a fully customized derivation as an environment to use. Here is the
 equivalent of the configuration used in
 [this section](#additions-to-your-stackyaml), but with an explicit
-`shell.nix` file:
+`shell.nix` file (make sure you're using a nixpkgs version later than
+2015-03-05):
 
 ```nix
 with (import <nixpkgs> {});
 
-stdenv.mkDerivation {
-
+haskell.lib.buildStackProject {
   name = "myEnv";
-  
-  buildInputs = [
-    glpk 
-    pcre 
-    haskell.packages.lts-3_13.ghc
-  ];
-  
-  STACK_IN_NIX_EXTRA_ARGS
-      = " --extra-lib-dirs=${glpk}/lib" 
-      + " --extra-include-dirs=${glpk}/include" 
-      + " --extra-lib-dirs=${pcre}/lib" 
-      + " --extra-include-dirs=${pcre}/include"
-  ;
+  buildInputs = [ glpk pcre ];
 }
 ```
 
-Note that in this case, you _have_ to include (a version of) GHC in
-your `buildInputs`! This potentially allows you to use a GHC which is
-not the one of your `resolver:`. Also, you should tell Stack where to
-find the new libraries and headers. This is especially necessary on OS
-X. The special variable `STACK_IN_NIX_EXTRA_ARGS` will be looked for
-by `nix-shell` when running the inner `stack` process.
-`--extra-lib-dirs` and `--extra-include-dirs` are regular `stack
-build` options. You can repeat these options for each dependency.
-
 Defining manually a `shell.nix` file gives you the possibility to
 override some Nix derivations ("packages"), for instance to change
-some build options of the libraries you use.
+some build options of the libraries you use, or to set additional
+environment variables. See the [Nix manual][nix-manual-exprs] for
+more. The `buildStackProject` utility function is documented in the
+[Nixpkgs manual][nixpkgs-manual-haskell].
 
 And now for the `stack.yaml` file:
 
@@ -243,3 +225,6 @@ nix:
 The `stack build` command will behave exactly the same as above. Note
 that specifying both `packages:` and a `shell-file:` results in an
 error. (Comment one out before adding the other.)
+
+[nix-manual-exprs]: http://nixos.org/nix/manual/#chap-writing-nix-expressions
+[nixpkgs-manual-haskell]: https://nixos.org/nixpkgs/manual/#users-guide-to-the-haskell-infrastructure
