@@ -848,6 +848,7 @@ installGHCJS si archiveFile archiveType destDir = do
             $logDebug $ "ziptool: " <> T.pack zipTool
             $logDebug $ "tar: " <> T.pack tarTool
             return $ do
+                ignoringAbsence (removeDirRecur destDir)
                 ignoringAbsence (removeDirRecur unpackDir)
                 readInNull destDir tarTool menv ["xf", toFilePath archiveFile] Nothing
                 innerDir <- expectSingleUnpackedDir archiveFile destDir
