@@ -6,6 +6,8 @@ module Stack.Types.PackageIndex
     ( PackageDownload (..)
     , PackageCache (..)
     , PackageCacheMap (..)
+    , PreferredVersionsCache (..)
+    , PreferredVersionsCacheMap (..)
     ) where
 
 import           Control.Monad (mzero)
@@ -21,6 +23,20 @@ import           Data.Text.Encoding (encodeUtf8)
 import           Data.Word (Word64)
 import           GHC.Generics (Generic)
 import           Stack.Types.PackageIdentifier
+import           Stack.Types.PackageName
+
+data PreferredVersionsCache = PreferredVersionsCache Text
+    deriving (Show, Generic)
+
+instance Binary PreferredVersionsCache
+instance NFData PreferredVersionsCache
+instance HasStructuralInfo PreferredVersionsCache
+
+newtype PreferredVersionsCacheMap = PreferredVersionsCacheMap (Map PackageName PreferredVersionsCache)
+    deriving (Generic, Binary, NFData)
+instance HasStructuralInfo PreferredVersionsCacheMap
+instance HasSemanticVersion PreferredVersionsCacheMap
+
 
 data PackageCache = PackageCache
     { pcOffset :: !Int64

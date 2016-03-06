@@ -72,6 +72,7 @@ module Stack.Types.Config
   ,configPackageIndexGz
   ,configPackageIndexRoot
   ,configPackageTarball
+  ,configPreferredVersionsCache
   ,indexNameText
   ,IndexLocation(..)
   -- ** Project & ProjectAndConfigMonoid
@@ -1223,6 +1224,10 @@ configPackageIndexRoot (IndexName name) = do
 -- | Location of the 00-index.cache file
 configPackageIndexCache :: (MonadReader env m, HasConfig env, MonadThrow m) => IndexName -> m (Path Abs File)
 configPackageIndexCache = liftM (</> $(mkRelFile "00-index.cache")) . configPackageIndexRoot
+
+-- | Location of the preferred-versions.cache file
+configPreferredVersionsCache :: (MonadReader env m, HasConfig env, MonadThrow m) => IndexName -> m (Path Abs File)
+configPreferredVersionsCache = liftM (</> $(mkRelFile "preferred-versions.cache")) . configPackageIndexRoot
 
 -- | Location of the 00-index.tar file
 configPackageIndex :: (MonadReader env m, HasConfig env, MonadThrow m) => IndexName -> m (Path Abs File)
