@@ -601,7 +601,7 @@ resolvePackageLocation menv projRoot (PLRemote url remotePackageType) = do
                         liftIO $ withBinaryFile fp ReadMode $ \h -> do
                             lbs <- L.hGetContents h
                             let entries = Tar.read $ GZip.decompress lbs
-                            Tar.unpack fp entries
+                            Tar.unpack (toFilePath dirTmp) entries
                     tryZip = do
                         $logDebug $ "Trying to unzip " <> T.pack fp
                         archive <- fmap Zip.toArchive $ liftIO $ L.readFile fp
