@@ -133,10 +133,9 @@ ghci opts@GhciOpts{..} = do
              T.unwords (map T.pack (nubOrd omittedOpts)))
     allModules <- checkForDuplicateModules ghciNoLoadModules pkgs
     oiDir <- objectInterfaceDir bconfig
-    (modulesToLoad, thingsToLoad) <- if ghciNoLoadModules then return ([], []) else do
+    (modulesToLoad, mainFile) <- if ghciNoLoadModules then return ([], Nothing) else do
         mainFile <- figureOutMainFile bopts mainIsTargets targets pkgs
-        let thingsToLoad = maybe [] (return . toFilePath) mainFile <> allModules
-        return (allModules, thingsToLoad)
+        return (allModules, mainFile)
     let odir =
             [ "-odir=" <> toFilePathNoTrailingSep oiDir
             , "-hidir=" <> toFilePathNoTrailingSep oiDir ]
@@ -160,9 +159,10 @@ ghci opts@GhciOpts{..} = do
             else do
                 let scriptPath = tmpDir </> $(mkRelFile "ghci-script")
                     fp = toFilePath scriptPath
-                    loadModules = ":load " <> unwords (map show thingsToLoad)
+                    loadModules = ":load " <> unwords (map show modulesToLoad)
+                    addMainFile = maybe "" ((":add " <>) . toFilePath) mainFile
                     bringIntoScope = ":module + " <> unwords modulesToLoad
-                liftIO (writeFile fp (unlines [loadModules,bringIntoScope]))
+                liftIO (writeFile fp (unlines [loadModules,addMainFile,bringIntoScope]))
                 setScriptPerms fp
                 execGhci (macrosOpts ++ ["-ghci-script=" <> fp])
 
