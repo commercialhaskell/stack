@@ -196,7 +196,7 @@ resolvePackages menv idents0 names0 = do
             go >>= either throwM return
         Right x -> return x
   where
-    go = r <$> resolvePackagesAllowMissing menv idents0 names0
+    go = r <$> resolvePackagesAllowMissing idents0 names0
     r (missingNames, missingIdents, idents)
       | not $ Set.null missingNames  = Left $ UnknownPackageNames       missingNames
       | not $ Set.null missingIdents = Left $ UnknownPackageIdentifiers missingIdents ""
@@ -204,11 +204,10 @@ resolvePackages menv idents0 names0 = do
 
 resolvePackagesAllowMissing
     :: (MonadIO m, MonadReader env m, HasHttpManager env, HasConfig env, MonadLogger m, MonadThrow m, MonadBaseControl IO m, MonadCatch m)
-    => EnvOverride
-    -> Set PackageIdentifier
+    => Set PackageIdentifier
     -> Set PackageName
     -> m (Set PackageName, Set PackageIdentifier, Map PackageIdentifier ResolvedPackage)
-resolvePackagesAllowMissing menv idents0 names0 = do
+resolvePackagesAllowMissing idents0 names0 = do
     caches <- getPackageCaches
     let versions = Map.fromListWith max $ map toTuple $ Map.keys caches
         (missingNames, idents1) = partitionEithers $ map

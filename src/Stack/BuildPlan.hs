@@ -266,7 +266,7 @@ addDeps allowMissing compilerVersion toCalc = do
         if allowMissing
             then do
                 (missingNames, missingIdents, m) <-
-                    resolvePackagesAllowMissing menv (Map.keysSet idents0) Set.empty
+                    resolvePackagesAllowMissing (Map.keysSet idents0) Set.empty
                 assert (Set.null missingNames)
                     $ return (m, missingIdents)
             else do
