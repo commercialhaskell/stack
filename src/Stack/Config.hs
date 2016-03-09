@@ -42,7 +42,7 @@ import           Control.Applicative
 import           Control.Arrow ((***))
 import           Control.Exception (assert)
 import           Control.Monad (liftM, unless, when, filterM)
-import           Control.Monad.Catch (MonadThrow, MonadCatch, catchAll, throwM)
+import           Control.Monad.Catch (MonadThrow, MonadCatch, MonadMask, catchAll, throwM)
 import           Control.Monad.Extra (firstJustM)
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger hiding (Loc)
@@ -136,12 +136,12 @@ getImplicitGlobalProjectDir config =
     stackRoot = configStackRoot config
 
 -- | Download the 'Snapshots' value from stackage.org.
-getSnapshots :: (MonadThrow m, MonadIO m, MonadReader env m, HasHttpManager env, HasStackRoot env, HasConfig env)
+getSnapshots :: (MonadThrow m, MonadMask m, MonadIO m, MonadReader env m, HasHttpManager env, HasStackRoot env, HasConfig env)
              => m Snapshots
 getSnapshots = askLatestSnapshotUrl >>= parseUrl . T.unpack >>= downloadJSON
 
 -- | Turn an 'AbstractResolver' into a 'Resolver'.
-makeConcreteResolver :: (MonadIO m, MonadReader env m, HasConfig env, MonadThrow m, HasHttpManager env, MonadLogger m)
+makeConcreteResolver :: (MonadIO m, MonadReader env m, HasConfig env, MonadThrow m, MonadMask m, HasHttpManager env, MonadLogger m)
                      => AbstractResolver
                      -> m Resolver
 makeConcreteResolver (ARResolver r) = return r
@@ -173,7 +173,7 @@ makeConcreteResolver ar = do
 
 -- | Get the latest snapshot resolver available.
 getLatestResolver
-    :: (MonadIO m, MonadThrow m, MonadReader env m, HasConfig env, HasHttpManager env, MonadLogger m)
+    :: (MonadIO m, MonadThrow m, MonadMask m, MonadReader env m, HasConfig env, HasHttpManager env, MonadLogger m)
     => m Resolver
 getLatestResolver = do
     snapshots <- getSnapshots
@@ -376,7 +376,7 @@ loadMiniConfig config = do
 
 -- | Load the configuration, using current directory, environment variables,
 -- and defaults as necessary.
-loadConfig :: (MonadLogger m,MonadIO m,MonadCatch m,MonadThrow m,MonadBaseControl IO m,MonadReader env m,HasHttpManager env,HasTerminal env)
+loadConfig :: (MonadLogger m,MonadIO m,MonadMask m,MonadThrow m,MonadBaseControl IO m,MonadReader env m,HasHttpManager env,HasTerminal env)
            => ConfigMonoid
            -- ^ Config monoid from parsed command-line arguments
            -> Maybe (Path Abs File)
@@ -423,7 +423,7 @@ loadConfig configArgs mstackYaml mresolver = do
 
 -- | Load the build configuration, adds build-specific values to config loaded by @loadConfig@.
 -- values.
-loadBuildConfig :: (MonadLogger m, MonadIO m, MonadCatch m, MonadReader env m, HasHttpManager env, MonadBaseControl IO m, HasTerminal env)
+loadBuildConfig :: (MonadLogger m, MonadIO m, MonadMask m, MonadReader env m, HasHttpManager env, MonadBaseControl IO m, HasTerminal env)
                 => Maybe (Project, Path Abs File, ConfigMonoid)
                 -> Config
                 -> Maybe AbstractResolver -- override resolver

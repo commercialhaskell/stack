@@ -14,6 +14,7 @@ Other enhancements:
   when hpack files change.
 * hpack files can now be used in templates
 * `stack ghci` now runs ghci as a separate process #1306
+* Retry when downloading snapshots and package indices
 
 Bug fixes:
 

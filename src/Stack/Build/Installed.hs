@@ -13,7 +13,7 @@ module Stack.Build.Installed
 
 import           Control.Applicative
 import           Control.Monad
-import           Control.Monad.Catch          (MonadCatch, MonadMask)
+import           Control.Monad.Catch          (MonadMask)
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import           Control.Monad.Reader         (MonadReader, asks)
@@ -43,7 +43,7 @@ import           Stack.PackageDump
 import           Stack.Types
 import           Stack.Types.Internal
 
-type M env m = (MonadIO m,MonadReader env m,HasHttpManager env,HasEnvConfig env,MonadLogger m,MonadBaseControl IO m,MonadCatch m,MonadMask m,HasLogLevel env)
+type M env m = (MonadIO m,MonadReader env m,HasHttpManager env,HasEnvConfig env,MonadLogger m,MonadBaseControl IO m,MonadMask m,HasLogLevel env)
 
 -- | Options for 'getInstalled'.
 data GetInstalledOpts = GetInstalledOpts

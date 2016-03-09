@@ -34,7 +34,7 @@ import           System.Process.Run
 
 type Build e m = (HasBuildConfig e, HasConfig e, HasEnvConfig e, HasTerminal e, MonadBaseControl IO m, MonadCatch m, MonadIO m, MonadLogger m, MonadReader e m)
 
-type Assemble e m = (HasConfig e, HasTerminal e, MonadBaseControl IO m, MonadCatch m, MonadIO m, MonadLogger m, MonadMask m, MonadReader e m)
+type Assemble e m = (HasConfig e, HasTerminal e, MonadBaseControl IO m, MonadIO m, MonadLogger m, MonadMask m, MonadReader e m)
 
 -- | Stages the executables & additional content in a staging
 -- directory under '.stack-work'

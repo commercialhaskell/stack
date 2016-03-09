@@ -15,7 +15,7 @@ import           Control.Applicative
 import           Control.Arrow ((***))
 import           Control.Exception (Exception,throw)
 import           Control.Monad hiding (mapM)
-import           Control.Monad.Catch (MonadCatch)
+import           Control.Monad.Catch (MonadMask)
 import           Control.Monad.IO.Class (MonadIO,liftIO)
 import           Control.Monad.Logger (MonadLogger,logDebug)
 import           Control.Monad.Reader (MonadReader,asks)
@@ -158,7 +158,7 @@ type M env m =
   ,MonadReader env m
   ,MonadLogger m
   ,MonadBaseControl IO m
-  ,MonadCatch m
+  ,MonadMask m
   ,HasConfig env
   ,HasTerminal env
   ,HasReExec env

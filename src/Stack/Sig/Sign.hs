@@ -43,7 +43,7 @@ import qualified System.FilePath as FP
 -- | Sign a haskell package with the given url of the signature
 -- service and a path to a tarball.
 sign
-    :: (MonadCatch m, MonadBaseControl IO m, MonadIO m, MonadMask m, MonadLogger m, MonadThrow m, MonadReader env m, HasConfig env)
+    :: (MonadBaseControl IO m, MonadIO m, MonadMask m, MonadLogger m, MonadThrow m, MonadReader env m, HasConfig env)
     => Maybe (Path Abs Dir) -> String -> Path Abs File -> m ()
 sign Nothing _ _ = throwM SigNoProjectRootException
 sign (Just projectRoot) url filePath = do
@@ -85,7 +85,7 @@ sign (Just projectRoot) url filePath = do
 -- function will write the bytes to the path in a temp dir and sign
 -- the tarball with GPG.
 signTarBytes
-    :: (MonadCatch m, MonadBaseControl IO m, MonadIO m, MonadMask m, MonadLogger m, MonadThrow m, MonadReader env m, HasConfig env)
+    :: (MonadBaseControl IO m, MonadIO m, MonadMask m, MonadLogger m, MonadThrow m, MonadReader env m, HasConfig env)
     => Maybe (Path Abs Dir) -> String -> Path Rel File -> L.ByteString -> m ()
 signTarBytes Nothing _ _ _ = throwM SigNoProjectRootException
 signTarBytes (Just projectRoot) url tarPath bs =
@@ -99,7 +99,7 @@ signTarBytes (Just projectRoot) url tarPath bs =
 -- | Sign a haskell package given the url to the signature service, a
 -- @PackageIdentifier@ and a file path to the package on disk.
 signPackage
-    :: (MonadCatch m, MonadBaseControl IO m, MonadIO m, MonadMask m, MonadLogger m, MonadThrow m)
+    :: (MonadBaseControl IO m, MonadIO m, MonadMask m, MonadLogger m, MonadThrow m)
     => String -> PackageIdentifier -> Path Abs File -> m ()
 signPackage url pkg filePath = do
     $logInfo ("GPG signing " <> T.pack (toFilePath filePath))
@@ -125,7 +125,7 @@ signPackage url pkg filePath = do
         (throwM (GPGSignException "unable to sign & upload package"))
 
 withStackWorkTempDir
-    :: (MonadCatch m, MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasConfig env)
+    :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasConfig env)
     => Path Abs Dir -> (Path Abs Dir -> m ()) -> m ()
 withStackWorkTempDir projectRoot f = do
     uuid <- liftIO nextRandom
