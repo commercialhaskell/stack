@@ -10,8 +10,22 @@ Other enhancements:
 
 * `git` packages with submodules are supported by passing the `--recursive`
   flag to `git clone`.
+* When using [hpack](https://github.com/sol/hpack), only regenerate cabal files
+  when hpack files change.
+* hpack files can now be used in templates
+* `stack ghci` now runs ghci as a separate process #1306
 
 Bug fixes:
+
+* Package tarballs would fail to unpack in 1.0.4
+  [#1884](https://github.com/commercialhaskell/stack/issues/1884).
+* Fixed errant warnings about missing modules, after deleted and removed from
+  cabal file [#921](https://github.com/commercialhaskell/stack/issues/921)
+  [#1805](https://github.com/commercialhaskell/stack/issues/1805).
+* Now considers a package to dirty when the hpack file is changed
+  [#1819](https://github.com/commercialhaskell/stack/issues/1819)
+* Nix: cancelling a stack build now exits properly rather than dropping into a
+  nix-shell [#1778](https://github.com/commercialhaskell/stack/issues/1778)
 
 ## 1.0.4
 
