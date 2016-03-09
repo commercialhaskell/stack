@@ -65,7 +65,7 @@ upgrade gitRepo mresolver builtHash =
                 return $ Just $ tmp </> $(mkRelDir "stack")
       Nothing -> do
         updateAllIndices menv
-        caches <- getPackageCaches menv
+        caches <- getPackageCaches
         let latest = Map.fromListWith max
                    $ map toTuple
                    $ Map.keys

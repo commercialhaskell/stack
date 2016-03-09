@@ -55,6 +55,7 @@ import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Lazy as L
 import           Data.Foldable (forM_)
 import qualified Data.IntMap as IntMap
+import           Data.IORef (newIORef)
 import qualified Data.Map as Map
 import           Data.Maybe
 import           Data.Monoid
@@ -81,7 +82,6 @@ import           Stack.Config.Docker
 import           Stack.Config.Nix
 import           Stack.Constants
 import qualified Stack.Image as Image
-import           Stack.PackageIndex
 import           Stack.Types
 import           Stack.Types.Internal
 import           System.Environment
@@ -303,6 +303,8 @@ configFromConfigMonoid configStackRoot configUserConfigPath mresolver mproject c
             Just True -> return True
             _ -> getInContainer
 
+     configPackageCaches <- liftIO $ newIORef Nothing
+
      return Config {..}
 
 -- | Get the default 'GHCVariant'.  On older Linux systems with libgmp4, returns 'GHCGMP4'.
@@ -514,8 +516,6 @@ loadBuildConfig mproject config mresolver mcompiler = do
 
     extraPackageDBs <- mapM resolveDir' (projectExtraPackageDBs project)
 
-    packageCaches <- runReaderT (getMinimalEnvOverride >>= getPackageCaches) miniConfig
-
     return BuildConfig
         { bcConfig = config
         , bcResolver = projectResolver project
@@ -527,7 +527,6 @@ loadBuildConfig mproject config mresolver mcompiler = do
         , bcFlags = projectFlags project
         , bcImplicitGlobal = isNothing mproject
         , bcGHCVariant = getGHCVariant miniConfig
-        , bcPackageCaches = packageCaches
         }
 
 -- | Resolve a PackageEntry into a list of paths, downloading and cloning as

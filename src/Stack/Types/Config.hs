@@ -140,6 +140,7 @@ import           Data.Binary (Binary)
 import           Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as S8
 import           Data.Either (partitionEithers)
+import           Data.IORef (IORef)
 import           Data.List (stripPrefix)
 import           Data.Hashable (Hashable)
 import           Data.Map (Map)
@@ -289,6 +290,8 @@ data Config =
          ,configAllowDifferentUser  :: !Bool
          -- ^ Allow users other than the stack root owner to use the stack
          -- installation.
+         ,configPackageCaches       :: !(IORef (Maybe (Map PackageIdentifier (PackageIndex, PackageCache))))
+         -- ^ In memory cache of hackage index.
          }
 
 -- | Which packages to ghc-options on the command line apply to?
@@ -482,8 +485,6 @@ data BuildConfig = BuildConfig
       -- for providing better error messages.
     , bcGHCVariant :: !GHCVariant
       -- ^ The variant of GHC used to select a GHC bindist.
-    , bcPackageCaches :: !(Map PackageIdentifier (PackageIndex, PackageCache))
-      -- ^ Shared package cache map
     }
 
 -- | Directory containing the project's stack.yaml file

@@ -61,6 +61,7 @@ import           Stack.BuildPlan (loadMiniBuildPlan, shadowMiniBuildPlan,
                                   parseCustomMiniBuildPlan)
 import           Stack.Constants (wiredInPackages)
 import           Stack.Package
+import           Stack.PackageIndex (getPackageCaches)
 import           Stack.Types
 
 import qualified System.Directory as D
@@ -80,10 +81,11 @@ loadSourceMap needTargets boptsCli = do
     bconfig <- asks getBuildConfig
     rawLocals <- getLocalPackageViews
     (mbp0, cliExtraDeps, targets) <- parseTargetsFromBuildOpts needTargets boptsCli
+    caches <- getPackageCaches
     let latestVersion =
             Map.fromListWith max $
             map toTuple $
-            Map.keys (bcPackageCaches bconfig)
+            Map.keys caches
 
     -- Extend extra-deps to encompass targets requested on the command line
     -- that are not in the snapshot.

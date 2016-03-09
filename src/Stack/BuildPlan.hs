@@ -45,8 +45,8 @@ import qualified Crypto.Hash.SHA256 as SHA256
 import           Data.Aeson.Extended (FromJSON (..), withObject, (.:), (.:?), (.!=))
 import           Data.Binary.VersionTagged (taggedDecodeOrLoad)
 import           Data.ByteString (ByteString)
-import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString as S
+import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Char8 as S8
 import           Data.Either (partitionEithers)
 import qualified Data.Foldable as F
@@ -64,28 +64,29 @@ import           Data.Text.Encoding (encodeUtf8)
 import qualified Data.Traversable as Tr
 import           Data.Typeable (Typeable)
 import           Data.Yaml (decodeEither', decodeFileEither)
+import qualified Distribution.Package as C
 import           Distribution.PackageDescription (GenericPackageDescription,
                                                   flagDefault, flagManual,
                                                   flagName, genPackageFlags,
                                                   executables, exeName, library, libBuildInfo, buildable)
-import           Distribution.System (Platform)
-import qualified Distribution.Package as C
 import qualified Distribution.PackageDescription as C
-import qualified Distribution.Version as C
+import           Distribution.System (Platform)
 import           Distribution.Text (display)
+import qualified Distribution.Version as C
+import           Network.HTTP.Client (checkStatus)
 import           Network.HTTP.Download
 import           Network.HTTP.Types (Status(..))
-import           Network.HTTP.Client (checkStatus)
 import           Path
 import           Path.IO
 import           Prelude -- Fix AMP warning
 import           Stack.Constants
 import           Stack.Fetch
 import           Stack.Package
+import           Stack.PackageIndex
 import           Stack.Types
 import           Stack.Types.StackT
 import qualified System.Directory as D
-import qualified System.FilePath  as FP
+import qualified System.FilePath as FP
 
 data BuildPlanException
     = UnknownPackages
@@ -190,10 +191,11 @@ resolveBuildPlan mbp isShadowed packages
     | Map.null (rsUnknown rs) && Map.null (rsShadowed rs) = return (rsToInstall rs, rsUsedBy rs)
     | otherwise = do
         bconfig <- asks getBuildConfig
+        caches <- getPackageCaches
         let maxVer =
                 Map.fromListWith max $
                 map toTuple $
-                Map.keys (bcPackageCaches bconfig)
+                Map.keys caches
             unknown = flip Map.mapWithKey (rsUnknown rs) $ \ident x ->
                 (Map.lookup ident maxVer, x)
         throwM $ UnknownPackages

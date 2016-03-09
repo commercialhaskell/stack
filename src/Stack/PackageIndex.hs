@@ -19,6 +19,7 @@
 module Stack.PackageIndex
     ( updateAllIndices
     , getPackageCaches
+    , clearPackageCaches
     ) where
 
 import qualified Codec.Archive.Tar as Tar
@@ -41,6 +42,7 @@ import           Data.Conduit.Binary                   (sinkHandle,
                                                         sourceHandle)
 import           Data.Conduit.Zlib (ungzip)
 import           Data.Foldable (forM_)
+import           Data.IORef (readIORef, writeIORef)
 import           Data.Int (Int64)
 import           Data.Map (Map)
 import qualified Data.Map.Strict as Map
@@ -342,17 +344,34 @@ deleteCache indexName' = do
         Left e -> $logDebug $ "Could not delete cache: " <> T.pack (show e)
         Right () -> $logDebug $ "Deleted index cache at " <> T.pack (toFilePath fp)
 
--- | Load the cached package URLs, or created the cache if necessary.
-getPackageCaches :: (MonadIO m, MonadLogger m, MonadReader env m, HasConfig env, MonadThrow m, HasHttpManager env, MonadBaseControl IO m, MonadCatch m)
-                 => EnvOverride
-                 -> m (Map PackageIdentifier (PackageIndex, PackageCache))
-getPackageCaches menv = do
-    config <- askConfig
-    liftM mconcat $ forM (configPackageIndices config) $ \index -> do
-        fp <- configPackageIndexCache (indexName index)
-        PackageCacheMap pis' <- taggedDecodeOrLoad fp $ liftM PackageCacheMap $ populateCache menv index
 
-        return (fmap (index,) pis')
+-- | Load the cached package URLs, or created the cache if necessary.
+--
+-- This has two levels of caching: in memory, and the on-disk cache. So,
+-- feel free to call this function multiple times.
+getPackageCaches :: (MonadIO m, MonadLogger m, MonadReader env m, HasConfig env, MonadThrow m, HasHttpManager env, MonadBaseControl IO m, MonadCatch m)
+                 => m (Map PackageIdentifier (PackageIndex, PackageCache))
+getPackageCaches = do
+    menv <- getMinimalEnvOverride
+    config <- askConfig
+    mcached <- liftIO $ readIORef (configPackageCaches config)
+    case mcached of
+        Just cached -> return cached
+        Nothing -> do
+            result <- liftM mconcat $ forM (configPackageIndices config) $ \index -> do
+                fp <- configPackageIndexCache (indexName index)
+                PackageCacheMap pis' <- taggedDecodeOrLoad fp $ liftM PackageCacheMap $ populateCache menv index
+                return (fmap (index,) pis')
+            liftIO $ writeIORef (configPackageCaches config) (Just result)
+            return result
+
+-- | Clear the in-memory hackage index cache. This is needed when the
+-- hackage index is updated.
+clearPackageCaches :: (MonadIO m, MonadLogger m, MonadReader env m, HasConfig env, MonadThrow m, HasHttpManager env, MonadBaseControl IO m, MonadCatch m)
+                   => m ()
+clearPackageCaches = do
+    cacheRef <- asks (configPackageCaches . getConfig)
+    liftIO $ writeIORef cacheRef Nothing
 
 --------------- Lifted from cabal-install, Distribution.Client.Tar:
 -- | Return the number of blocks in an entry.

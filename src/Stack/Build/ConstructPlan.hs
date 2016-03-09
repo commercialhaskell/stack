@@ -40,10 +40,10 @@ import           Stack.Build.Cache
 import           Stack.Build.Haddock
 import           Stack.Build.Installed
 import           Stack.Build.Source
-import           Stack.Types.Build
 import           Stack.BuildPlan
 import           Stack.Package
 import           Stack.PackageDump
+import           Stack.PackageIndex (getPackageCaches)
 import           Stack.Types
 
 data PackageInfo
@@ -132,11 +132,11 @@ constructPlan :: forall env m.
               -> m Plan
 constructPlan mbp0 baseConfigOpts0 locals extraToBuild0 localDumpPkgs loadPackage0 sourceMap installedMap = do
     let locallyRegistered = Map.fromList $ map (dpGhcPkgId &&& dpPackageIdent) localDumpPkgs
-    bconfig <- asks getBuildConfig
+    caches <- getPackageCaches
     let versions =
             Map.fromListWith Set.union $
             map (second Set.singleton . toTuple) $
-            Map.keys (bcPackageCaches bconfig)
+            Map.keys caches
 
     econfig <- asks getEnvConfig
     let onWanted = void . addDep False . packageName . lpPackage

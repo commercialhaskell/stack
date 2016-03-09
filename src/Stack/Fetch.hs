@@ -209,7 +209,7 @@ resolvePackagesAllowMissing
     -> Set PackageName
     -> m (Set PackageName, Set PackageIdentifier, Map PackageIdentifier ResolvedPackage)
 resolvePackagesAllowMissing menv idents0 names0 = do
-    caches <- getPackageCaches menv
+    caches <- getPackageCaches
     let versions = Map.fromListWith max $ map toTuple $ Map.keys caches
         (missingNames, idents1) = partitionEithers $ map
             (\name -> maybe (Left name ) (Right . PackageIdentifier name)
@@ -268,7 +268,7 @@ withCabalLoader
     -> ((PackageIdentifier -> IO ByteString) -> m a)
     -> m a
 withCabalLoader menv inner = do
-    icaches <- getPackageCaches menv >>= liftIO . newIORef
+    icaches <- getPackageCaches >>= liftIO . newIORef
     env <- ask
 
     -- Want to try updating the index once during a single run for missing
@@ -308,7 +308,8 @@ withCabalLoader menv inner = do
                                     , "Updating and trying again."
                                     ]
                                 updateAllIndices menv
-                                caches <- getPackageCaches menv
+                                clearPackageCaches
+                                caches <- getPackageCaches
                                 liftIO $ writeIORef icaches caches
                             return (False, doLookup ident)
                         else return (toUpdate,
