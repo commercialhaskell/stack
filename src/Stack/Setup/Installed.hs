@@ -88,10 +88,12 @@ getCompilerVersion :: (MonadLogger m, MonadCatch m, MonadBaseControl IO m, Monad
 getCompilerVersion menv wc =
     case wc of
         Ghc -> do
+            $logDebug "Asking GHC for its version"
             bs <- readProcessStdout Nothing menv "ghc" ["--numeric-version"]
             let (_, ghcVersion) = versionFromEnd bs
             GhcVersion <$> parseVersion (T.decodeUtf8 ghcVersion)
         Ghcjs -> do
+            $logDebug "Asking GHCJS for its version"
             -- Output looks like
             --
             -- The Glorious Glasgow Haskell Compilation System for JavaScript, version 0.1.0 (GHC 7.10.2)

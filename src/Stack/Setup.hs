@@ -220,6 +220,7 @@ setupEnv mResolveMissingGHC = do
     menv <- mkEnvOverride platform env
     compilerVer <- getCompilerVersion menv wc
     cabalVer <- getCabalPkgVer menv wc
+    $logDebug "Resolving package entries"
     packages <- mapM
         (resolvePackageEntry menv (bcRoot bconfig))
         (bcPackageEntries bconfig)
@@ -330,7 +331,9 @@ ensureCompiler sopts = do
 
     msystem <-
         if soptsUseSystem sopts
-            then getSystemCompiler menv0 wc
+            then do
+                $logDebug "Getting system compiler version"
+                getSystemCompiler menv0 wc
             else return Nothing
 
     Platform expectedArch _ <- asks getPlatform

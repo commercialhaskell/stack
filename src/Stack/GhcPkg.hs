@@ -45,6 +45,7 @@ import           System.Process.Read
 getGlobalDB :: (MonadIO m, MonadLogger m, MonadBaseControl IO m, MonadCatch m)
             => EnvOverride -> WhichCompiler -> m (Path Abs Dir)
 getGlobalDB menv wc = do
+    $logDebug "Getting global package database location"
     -- This seems like a strange way to get the global package database
     -- location, but I don't know of a better one
     bs <- ghcPkg menv wc [] ["list", "--global"] >>= either throwM return
@@ -160,13 +161,14 @@ unregisterGhcPkgId menv wc cv pkgDb gid ident = do
 -- | Get the version of Cabal from the global package database.
 getCabalPkgVer :: (MonadThrow m, MonadIO m, MonadLogger m, MonadBaseControl IO m, MonadCatch m)
                => EnvOverride -> WhichCompiler -> m Version
-getCabalPkgVer menv wc =
-    findGhcPkgVersion
+getCabalPkgVer menv wc = do
+    $logDebug "Getting Cabal package version"
+    mres <- findGhcPkgVersion
         menv
         wc
         [] -- global DB
-        cabalPackageName >>=
-        maybe (throwM $ Couldn'tFindPkgId cabalPackageName) return
+        cabalPackageName
+    maybe (throwM $ Couldn'tFindPkgId cabalPackageName) return mres
 
 -- | Get the value for GHC_PACKAGE_PATH
 mkGhcPackagePath :: Bool -> Path Abs Dir -> Path Abs Dir -> [Path Abs Dir] -> Path Abs Dir -> Text
