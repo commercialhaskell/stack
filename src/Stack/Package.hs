@@ -1132,6 +1132,12 @@ findOrGenerateCabalFile pkgDir = do
         return $ case files of
             [] -> Left $ PackageNoCabalFileFound pkgDir
             [x] -> Right x
+            -- If there are multiple files, ignore files that start with
+            -- ".". On unixlike environments these are hidden, and this
+            -- character is not valid in package names. The main goal is
+            -- to ignore emacs lock files - see
+            -- https://github.com/commercialhaskell/stack/issues/1897.
+            (filter (not . ("." `isPrefixOf`) . toFilePath . filename) -> [x]) -> Right x
             _:_ -> Left $ PackageMultipleCabalFilesFound pkgDir files
       where hasExtension fp x = FilePath.takeExtension fp == "." ++ x
 
