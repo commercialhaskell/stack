@@ -1104,7 +1104,7 @@ findOrGenerateCabalFile pkgDir = do
             eCabalFile <- findCabalFile'
             case eCabalFile of
                 -- Check that cabal file is fresh enough
-                Right cabalFile -> do 
+                Right cabalFile -> do
                     packageYamlModified <- getModificationTime packageYaml
                     cabalFileModified <- getModificationTime cabalFile
                     when (cabalFileModified < packageYamlModified) $ liftIO $ hpack pkgDir
