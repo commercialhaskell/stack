@@ -231,7 +231,7 @@ FP Complete provides the following public image repositories on Docker Hub:
 
 FP Complete also builds custom variants of these images for their clients.
 
-These images can also be used directory with `docker run` and provide a complete
+These images can also be used directly with `docker run` and provide a complete
 Haskell build environment.
 
 In addition, most Docker images that contain the basics for running GHC can be
