@@ -121,7 +121,7 @@ flags:
 ```
 
 Flags will only affect packages in your `packages` and `extra-deps` settings.
-Packages that come from the snapshot global database or are not affected.
+Packages that come from the snapshot global database are not affected.
 
 ### image
 
