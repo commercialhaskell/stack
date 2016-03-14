@@ -1,3 +1,7 @@
+-- This file has been generated from package.yaml by hpack version 0.10.0.
+--
+-- see: https://github.com/sol/hpack
+
 name:                stack
 version:             1.0.5
 synopsis:            The Haskell Tool Stack
@@ -6,331 +10,339 @@ description:         Please see the README.md for usage information, and
                      the API for the library is not currently stable, and may
                      change significantly, even between minor releases. It is
                      currently only intended for use by the executable.
+bug-reports:         https://github.com/commercialhaskell/stack/issues
 license:             BSD3
 license-file:        LICENSE
 author:              Commercial Haskell SIG
 maintainer:          manny@fpcomplete.com
 category:            Development
 build-type:          Simple
-cabal-version:       >=1.10
+cabal-version:       >= 1.10
 homepage:            http://haskellstack.org
-extra-source-files:  CONTRIBUTING.md
-                     ChangeLog.md
-                     README.md
 
-                     -- Glob would be nice, but apparently Cabal doesn't support it:
-                     --     cabal: filepath wildcard 'test/package-dump/*.txt' does not match any files.
-                     -- Happened during cabal sdist
-                     test/package-dump/ghc-7.8.txt
-                     test/package-dump/ghc-7.8.4-osx.txt
-                     test/package-dump/ghc-7.10.txt
-
-                     stack.yaml
-
-flag integration-tests
-  manual: True
-  default: False
-  description: Run the integration test suite
-
-flag disable-git-info
-  manual: True
-  default: False
-  description: Disable compile-time inclusion of current git info in stack
-  -- disabling git info can lead to a quicker workflow in certain
-  -- scenarios when you're developing on stack itself, but
-  -- should otherwise be avoided
-  -- see: https://github.com/commercialhaskell/stack/issues/1425
-
-flag static
-  manual: True
-  default: False
-  description: Pass -static/-pthread to ghc when linking the stack binary.
-  -- Not intended for general use. Simply makes it easier to
-  -- build a fully static binary on Linux platforms that enable it.
-
-library
-  hs-source-dirs:    src/
-  ghc-options:       -Wall -fwarn-tabs -fwarn-incomplete-uni-patterns -fwarn-incomplete-record-updates
-  exposed-modules:   Control.Concurrent.Execute
-                     Data.Aeson.Extended
-                     Data.Attoparsec.Args
-                     Data.Attoparsec.Combinators
-                     Data.Attoparsec.Interpreter
-                     Data.Binary.VersionTagged
-                     Data.IORef.RunOnce
-                     Data.Maybe.Extra
-                     Distribution.Version.Extra
-                     Network.HTTP.Download 
-                     Network.HTTP.Download.Verified
-                     Options.Applicative.Args
-                     Options.Applicative.Builder.Extra
-                     Options.Applicative.Complicated
-                     Path.Extra
-                     Path.Find
-                     Paths_stack
-                     Stack.Build
-                     Stack.Build.Cache
-                     Stack.Build.ConstructPlan
-                     Stack.Build.Execute
-                     Stack.Build.Haddock
-                     Stack.Build.Installed
-                     Stack.Build.Source
-                     Stack.Build.Target
-                     Stack.BuildPlan
-                     Stack.Clean
-                     Stack.Config
-                     Stack.Config.Build
-                     Stack.Config.Docker
-                     Stack.Config.Nix
-                     Stack.ConfigCmd
-                     Stack.Constants
-                     Stack.Coverage
-                     Stack.Docker
-                     Stack.Docker.GlobalDB
-                     Stack.Dot
-                     Stack.Exec
-                     Stack.Fetch
-                     Stack.FileWatch
-                     Stack.GhcPkg
-                     Stack.Ghci
-                     Stack.Ide
-                     Stack.Image
-                     Stack.Init
-                     Stack.New
-                     Stack.Nix
-                     Stack.Options
-                     Stack.Package
-                     Stack.PackageDump
-                     Stack.PackageIndex
-                     Stack.SDist
-                     Stack.Setup
-                     Stack.Setup.Installed
-                     Stack.Sig
-                     Stack.Sig.GPG
-                     Stack.Sig.Sign
-                     Stack.Solver
-                     Stack.Types
-                     Stack.Types.Build
-                     Stack.Types.BuildPlan
-                     Stack.Types.Compiler
-                     Stack.Types.Config
-                     Stack.Types.Config.Build
-                     Stack.Types.Docker
-                     Stack.Types.FlagName
-                     Stack.Types.GhcPkgId
-                     Stack.Types.Image
-                     Stack.Types.Internal
-                     Stack.Types.Nix
-                     Stack.Types.Package
-                     Stack.Types.PackageIdentifier
-                     Stack.Types.PackageIndex
-                     Stack.Types.PackageName
-                     Stack.Types.Sig
-                     Stack.Types.StackT
-                     Stack.Types.TemplateName
-                     Stack.Types.Version
-                     Stack.Upgrade
-                     Stack.Upload
-                     System.Process.Log
-                     System.Process.PagerEditor
-                     System.Process.Read
-                     System.Process.Run
-  build-depends:     Cabal >= 1.18.1.5
-                   , aeson (>= 0.8.0.2 && < 0.10) || (>= 0.11 && < 0.12)
-                   , ansi-terminal >= 0.6.2.3
-                   , async >= 2.0.2 && < 2.2
-                   , attoparsec >= 0.12.1.5 && < 0.14
-                   , base >= 4.7 && <5
-                   , base16-bytestring
-                   , base64-bytestring
-                   , binary >= 0.7
-                   , binary-tagged >= 0.1.1
-                   , blaze-builder
-                   , byteable
-                   , bytestring
-                   , conduit >= 1.2.4
-                   , conduit-extra >= 1.1.7.1
-                   , containers >= 0.5.5.1
-                   , cryptohash >= 0.11.6
-                   , cryptohash-conduit
-                   , directory >= 1.2.1.0
-                   , edit-distance >= 0.2
-                   , either
-                   , enclosed-exceptions
-                   , errors < 2.2
-                   , exceptions >= 0.8.0.2
-                   , extra
-                   , fast-logger >= 2.3.1
-                   , filelock >= 0.1.0.1
-                   , filepath >= 1.3.0.2
-                   , fsnotify >= 0.2.1
-                   , hashable >= 1.2.3.2
-                   , hpc
-                   , http-client >= 0.4.17
-                   , http-client-tls >= 0.2.2
-                   , http-conduit >= 2.1.7
-                   , http-types >= 0.8.6 && < 0.10
-                   , lifted-base
-                   , microlens >= 0.3.0.0
-                   , monad-control
-                   , monad-logger >= 0.3.13.1
-                   , mtl >= 2.1.3.1
-                   , optparse-applicative >= 0.11 && < 0.13
-                   , path >= 0.5.1
-                   , path-io >= 1.0.0 && < 2.0.0
-                   , persistent >= 2.1.2
-                   , persistent-sqlite >= 2.1.4
-                   , persistent-template >= 2.1.1
-                   , pretty >= 1.1.1.1
-                   , process >= 1.2.0.0
-                   , resourcet >= 1.1.4.1
-                   , retry >= 0.6 && < 0.8
-                   , safe >= 0.3
-                   , semigroups >= 0.5 && < 0.19
-                   , split
-                   , stm >= 2.4.4
-                   , streaming-commons >= 0.1.10.0
-                   , tar >= 0.4.1.0 && < 0.6
-                   , template-haskell >= 2.9.0.0
-                   , temporary >= 1.2.0.3
-                   , text >= 1.2.0.4
-                   , text-binary
-                   , time >= 1.4.2
-                   , transformers >= 0.3.0.0
-                   , transformers-base >= 0.4.4
-                   , unix-compat
-                   , unordered-containers >= 0.2.5.1
-                   , vector >= 0.10.12.3 && < 0.12
-                   , vector-binary-instances
-                   , yaml >= 0.8.10.1
-                   , zlib >= 0.5.4.2 && < 0.7
-                   , deepseq >= 1.4
-                   , hastache
-                   , project-template >= 0.2
-                   , uuid
-                   , zip-archive
-                   , hpack >= 0.10.0
-  if os(windows)
-    cpp-options:     -DWINDOWS
-    build-depends:   Win32
-  else
-    build-depends:   unix >= 2.7.0.1
-  default-language:  Haskell2010
-
-executable stack
-  hs-source-dirs: src/main
-  main-is:        Main.hs
-  ghc-options:    -threaded -rtsopts -Wall -fwarn-tabs -fwarn-incomplete-uni-patterns -fwarn-incomplete-record-updates
-  other-modules:  Paths_stack
-  if flag(static)
-      ld-options: -static -pthread
-
-  build-depends:  Cabal >= 1.18.1.5
-                , base >=4.7 && < 5
-                , bytestring >= 0.10.4.0
-                , containers >= 0.5.5.1
-                , directory
-                , filelock >= 0.1.0.1
-                , filepath
-                , http-client
-                , lifted-base
-                , microlens >= 0.3.0.0
-                , monad-control
-                , monad-logger >= 0.3.13.1
-                , mtl >= 2.1.3.1
-                , optparse-applicative >= 0.11.0.2 && < 0.13
-                , path
-                , path-io >= 0.3.1
-                , stack
-                , text >= 1.2.0.4
-                , transformers
-  default-language:    Haskell2010
-  if os(windows)
-    build-depends:   Win32
-    cpp-options:     -DWINDOWS
-  if !flag(disable-git-info)
-    cpp-options:     -DUSE_GIT_INFO
-    build-depends:   gitrev >= 1.1 && < 1.3
-                   , optparse-simple >= 0.0.3
-
-test-suite stack-test
-  type:           exitcode-stdio-1.0
-  hs-source-dirs: src/test
-  main-is:        Test.hs
-  other-modules:  Spec
-                , Stack.BuildPlanSpec
-                , Stack.Build.ExecuteSpec
-                , Stack.Build.TargetSpec
-                , Stack.ConfigSpec
-                , Stack.DotSpec
-                , Stack.PackageDumpSpec
-                , Stack.ArgsSpec
-                , Stack.NixSpec
-                , Network.HTTP.Download.VerifiedSpec
-  ghc-options:    -threaded -Wall -fwarn-tabs -fwarn-incomplete-uni-patterns -fwarn-incomplete-record-updates
-  build-depends:  Cabal >= 1.18.1.5
-                , QuickCheck
-                , attoparsec < 0.14
-                , base >=4.7 && <5
-                , conduit
-                , conduit-extra
-                , containers >= 0.5.5.1
-                , cryptohash
-                , directory
-                , exceptions
-                , hspec <2.3
-                , http-conduit
-                , monad-logger
-                , path
-                , path-io >= 0.3.1
-                , resourcet
-                , retry >= 0.6 && < 0.8
-                , stack
-                , temporary
-                , text
-                , transformers
-  default-language:    Haskell2010
-
-test-suite stack-integration-test
-  type:           exitcode-stdio-1.0
-  hs-source-dirs: test/integration
-  main-is:        IntegrationSpec.hs
-  ghc-options:    -threaded -rtsopts -with-rtsopts=-N -Wall -fwarn-tabs -fwarn-incomplete-uni-patterns -fwarn-incomplete-record-updates
-
-  if !flag(integration-tests)
-    buildable: False
-
-  build-depends:  async < 2.2
-                , base >= 4.7 && < 5
-                , bytestring
-                , conduit
-                , conduit-extra
-                , containers >= 0.5.5.1
-                , directory
-                , filepath
-                , hspec < 2.3
-                , process
-                , resourcet
-                , temporary
-                , text
-                , transformers
-                , unix-compat
-  default-language:    Haskell2010
-
-  -- This isn't actually needed to build stack-integration-test, but it makes it
-  -- easier to load up an individual integration test into stack ghci. It's
-  -- still a little involved:
-  --
-  -- stack exec -- stack ghci stack:stack-integration-test --flag stack:integration-tests --no-build
-  --
-  -- Then, in ghci:
-  --
-  -- :cd test/integration/tests/.../files
-  -- :load ../Main.hs
-  -- main
-  other-modules: StackTest
-  hs-source-dirs: test/integration/lib
+extra-source-files:
+    ChangeLog.md
+    CONTRIBUTING.md
+    README.md
+    stack.yaml
+    test/package-dump/ghc-7.10.txt
+    test/package-dump/ghc-7.8.4-osx.txt
+    test/package-dump/ghc-7.8.txt
+    test/package-dump/ghc-head.txt
 
 source-repository head
-  type:     git
-  location: https://github.com/commercialhaskell/stack.git
+  type: git
+  location: https://github.com/commercialhaskell/stack
+
+flag disable-git-info
+  description: Disable compile-time inclusion of current git info in stack
+  manual: True
+  default: False
+
+flag integration-tests
+  description: Run the integration test suite
+  manual: True
+  default: False
+
+flag static
+  description: Pass -static/-pthread to ghc when linking the stack binary.
+  manual: True
+  default: False
+
+library
+  hs-source-dirs:
+      src
+  ghc-options: -Wall -fwarn-tabs -fwarn-incomplete-uni-patterns -fwarn-incomplete-record-updates
+  build-depends:
+      Cabal >= 1.18.1.5
+    , aeson (>= 0.8.0.2 && < 0.10) || (>= 0.11 && < 0.12)
+    , ansi-terminal >= 0.6.2.3
+    , async >= 2.0.2 && < 2.2
+    , attoparsec >= 0.12.1.5 && < 0.14
+    , base >= 4.7 && <5
+    , base16-bytestring
+    , base64-bytestring
+    , binary >= 0.7
+    , binary-tagged >= 0.1.1
+    , blaze-builder
+    , byteable
+    , bytestring
+    , conduit >= 1.2.4
+    , conduit-extra >= 1.1.7.1
+    , containers >= 0.5.5.1
+    , cryptohash >= 0.11.6
+    , cryptohash-conduit
+    , directory >= 1.2.1.0
+    , edit-distance >= 0.2
+    , either
+    , enclosed-exceptions
+    , errors < 2.2
+    , exceptions >= 0.8.0.2
+    , extra
+    , fast-logger >= 2.3.1
+    , filelock >= 0.1.0.1
+    , filepath >= 1.3.0.2
+    , fsnotify >= 0.2.1
+    , hashable >= 1.2.3.2
+    , hpc
+    , http-client >= 0.4.17
+    , http-client-tls >= 0.2.2
+    , http-conduit >= 2.1.7
+    , http-types >= 0.8.6 && < 0.10
+    , lifted-base
+    , microlens >= 0.3.0.0
+    , monad-control
+    , monad-logger >= 0.3.13.1
+    , mtl >= 2.1.3.1
+    , optparse-applicative >= 0.11 && < 0.13
+    , path >= 0.5.1
+    , path-io >= 1.0.0 && < 2.0.0
+    , persistent >= 2.1.2
+    , persistent-sqlite >= 2.1.4
+    , persistent-template >= 2.1.1
+    , pretty >= 1.1.1.1
+    , process >= 1.2.0.0
+    , resourcet >= 1.1.4.1
+    , retry >= 0.6 && < 0.8
+    , safe >= 0.3
+    , semigroups >= 0.5 && < 0.19
+    , split
+    , stm >= 2.4.4
+    , streaming-commons >= 0.1.10.0
+    , tar >= 0.4.1.0 && < 0.6
+    , template-haskell >= 2.9.0.0
+    , temporary >= 1.2.0.3
+    , text >= 1.2.0.4
+    , text-binary
+    , time >= 1.4.2
+    , transformers >= 0.3.0.0
+    , transformers-base >= 0.4.4
+    , unix-compat
+    , unordered-containers >= 0.2.5.1
+    , vector >= 0.10.12.3 && < 0.12
+    , vector-binary-instances
+    , yaml >= 0.8.10.1
+    , zlib >= 0.5.4.2 && < 0.7
+    , deepseq >= 1.4
+    , hastache
+    , project-template >= 0.2
+    , uuid
+    , zip-archive
+    , hpack >= 0.10.0
+  if os(windows)
+    cpp-options: -DWINDOWS
+    build-depends:
+        Win32
+  else
+    build-depends:
+        unix >= 2.7.0.1
+  exposed-modules:
+      Control.Concurrent.Execute
+      Data.Aeson.Extended
+      Data.Attoparsec.Args
+      Data.Attoparsec.Combinators
+      Data.Attoparsec.Interpreter
+      Data.Binary.VersionTagged
+      Data.IORef.RunOnce
+      Data.Maybe.Extra
+      Distribution.Version.Extra
+      Network.HTTP.Download
+      Network.HTTP.Download.Verified
+      Options.Applicative.Args
+      Options.Applicative.Builder.Extra
+      Options.Applicative.Complicated
+      Path.Extra
+      Path.Find
+      Stack.Build
+      Stack.Build.Cache
+      Stack.Build.ConstructPlan
+      Stack.Build.Execute
+      Stack.Build.Haddock
+      Stack.Build.Installed
+      Stack.Build.Source
+      Stack.Build.Target
+      Stack.BuildPlan
+      Stack.Clean
+      Stack.Config
+      Stack.Config.Build
+      Stack.Config.Docker
+      Stack.Config.Nix
+      Stack.ConfigCmd
+      Stack.Constants
+      Stack.Coverage
+      Stack.Docker
+      Stack.Docker.GlobalDB
+      Stack.Dot
+      Stack.Exec
+      Stack.Fetch
+      Stack.FileWatch
+      Stack.Ghci
+      Stack.GhcPkg
+      Stack.Ide
+      Stack.Image
+      Stack.Init
+      Stack.New
+      Stack.Nix
+      Stack.Options
+      Stack.Package
+      Stack.PackageDump
+      Stack.PackageIndex
+      Stack.SDist
+      Stack.Setup
+      Stack.Setup.Installed
+      Stack.Sig
+      Stack.Sig.GPG
+      Stack.Sig.Sign
+      Stack.Solver
+      Stack.Types
+      Stack.Types.Build
+      Stack.Types.BuildPlan
+      Stack.Types.Compiler
+      Stack.Types.Config
+      Stack.Types.Config.Build
+      Stack.Types.Docker
+      Stack.Types.FlagName
+      Stack.Types.GhcPkgId
+      Stack.Types.Image
+      Stack.Types.Internal
+      Stack.Types.Nix
+      Stack.Types.Package
+      Stack.Types.PackageIdentifier
+      Stack.Types.PackageIndex
+      Stack.Types.PackageName
+      Stack.Types.Sig
+      Stack.Types.StackT
+      Stack.Types.TemplateName
+      Stack.Types.Version
+      Stack.Upgrade
+      Stack.Upload
+      System.Process.Log
+      System.Process.PagerEditor
+      System.Process.Read
+      System.Process.Run
+  default-language: Haskell2010
+
+executable stack
+  main-is: Main.hs
+  hs-source-dirs:
+      src/main
+  ghc-options: -Wall -fwarn-tabs -fwarn-incomplete-uni-patterns -fwarn-incomplete-record-updates -threaded -rtsopts
+  build-depends:
+      Cabal >= 1.18.1.5
+    , base >=4.7 && < 5
+    , bytestring >= 0.10.4.0
+    , containers >= 0.5.5.1
+    , directory
+    , filelock >= 0.1.0.1
+    , filepath
+    , http-client
+    , lifted-base
+    , microlens >= 0.3.0.0
+    , monad-control
+    , monad-logger >= 0.3.13.1
+    , mtl >= 2.1.3.1
+    , optparse-applicative >= 0.11.0.2 && < 0.13
+    , path
+    , path-io >= 0.3.1
+    , stack
+    , text >= 1.2.0.4
+    , transformers
+  if os(windows)
+    cpp-options: -DWINDOWS
+    build-depends:
+        Win32
+  else
+    build-depends:
+        unix >= 2.7.0.1
+  if flag(static)
+    ld-options: -static -pthread
+  if !flag(disable-git-info)
+    cpp-options: -DUSE_GIT_INFO
+    build-depends:
+        gitrev >= 1.1 && < 1.3
+      , optparse-simple >= 0.0.3
+  default-language: Haskell2010
+
+test-suite stack-integration-test
+  type: exitcode-stdio-1.0
+  main-is: IntegrationSpec.hs
+  hs-source-dirs:
+      test/integration
+    , test/integration/lib
+  ghc-options: -Wall -fwarn-tabs -fwarn-incomplete-uni-patterns -fwarn-incomplete-record-updates -threaded -rtsopts -with-rtsopts=-N
+  build-depends:
+      async < 2.2
+    , base >= 4.7 && < 5
+    , bytestring
+    , conduit
+    , conduit-extra
+    , containers >= 0.5.5.1
+    , directory
+    , filepath
+    , hspec < 2.3
+    , process
+    , resourcet
+    , temporary
+    , text
+    , transformers
+    , unix-compat
+  if os(windows)
+    cpp-options: -DWINDOWS
+    build-depends:
+        Win32
+  else
+    build-depends:
+        unix >= 2.7.0.1
+  if !flag(integration-tests)
+    buildable: False
+  other-modules:
+      StackTest
+  default-language: Haskell2010
+
+test-suite stack-test
+  type: exitcode-stdio-1.0
+  main-is: Test.hs
+  hs-source-dirs:
+      src/test
+  ghc-options: -Wall -fwarn-tabs -fwarn-incomplete-uni-patterns -fwarn-incomplete-record-updates -threaded
+  build-depends:
+      Cabal >= 1.18.1.5
+    , QuickCheck
+    , attoparsec < 0.14
+    , base >=4.7 && <5
+    , conduit
+    , conduit-extra
+    , containers >= 0.5.5.1
+    , cryptohash
+    , directory
+    , exceptions
+    , hspec <2.3
+    , http-conduit
+    , monad-logger
+    , path
+    , path-io >= 0.3.1
+    , resourcet
+    , retry >= 0.6 && < 0.8
+    , stack
+    , temporary
+    , text
+    , transformers
+  if os(windows)
+    cpp-options: -DWINDOWS
+    build-depends:
+        Win32
+  else
+    build-depends:
+        unix >= 2.7.0.1
+  other-modules:
+      Network.HTTP.Download.VerifiedSpec
+      Spec
+      Stack.ArgsSpec
+      Stack.Build.ExecuteSpec
+      Stack.Build.TargetSpec
+      Stack.BuildPlanSpec
+      Stack.ConfigSpec
+      Stack.DotSpec
+      Stack.NixSpec
+      Stack.PackageDumpSpec
+  default-language: Haskell2010
