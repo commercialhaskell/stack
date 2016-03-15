@@ -1318,8 +1318,6 @@ singleBench :: M env m
             -> InstalledMap
             -> m ()
 singleBench runInBase beopts benchesToRun ac ee task installedMap = do
-    -- FIXME: Since this doesn't use cabal, we should be able to avoid using a
-    -- fullblown 'withSingleContext'.
     (allDepsMap, _cache) <- getConfigCache ee task installedMap False True
     withSingleContext runInBase ac ee task (Just allDepsMap) (Just "bench") $ \_package _cabalfp _pkgDir cabal announce _console _mlogFile -> do
         let args = map T.unpack benchesToRun <> maybe []
