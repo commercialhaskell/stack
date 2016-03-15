@@ -60,7 +60,7 @@ library
                      Data.IORef.RunOnce
                      Data.Maybe.Extra
                      Distribution.Version.Extra
-                     Network.HTTP.Download 
+                     Network.HTTP.Download
                      Network.HTTP.Download.Verified
                      Options.Applicative.Args
                      Options.Applicative.Builder.Extra
@@ -281,7 +281,7 @@ test-suite stack-test
                 , hspec <2.3
                 , http-conduit
                 , monad-logger
-                , path
+                , path >= 0.5.7
                 , path-io >= 1.1.0
                 , resourcet
                 , retry >= 0.6 && < 0.8
