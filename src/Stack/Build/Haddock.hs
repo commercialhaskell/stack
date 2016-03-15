@@ -228,7 +228,7 @@ generateHaddockIndex descr envOverride wc dumpPackages docRelFP destDir = do
             ignoringAbsence (removeDirRecur destHtmlAbsDir)
             ensureDir destHtmlAbsDir
             onException
-                (copyDirRecur (parent srcInterfaceAbsFile) destHtmlAbsDir)
+                (copyDirRecur' (parent srcInterfaceAbsFile) destHtmlAbsDir)
                 (ignoringAbsence (removeDirRecur destHtmlAbsDir))
         destHtmlAbsDir = parent destInterfaceAbsFile
 
