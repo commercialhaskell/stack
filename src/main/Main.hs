@@ -203,30 +203,30 @@ commandLineHandler progName isInterpreter = complicatedOptions
 
     addCommands = do
       when (not isInterpreter) (do
-        addCommand' "build"
-                    "Build the package(s) in this directory/configuration"
-                    buildCmd
-                    (buildOptsParser Build)
-        addCommand' "install"
-                    "Shortcut for 'build --copy-bins'"
-                    buildCmd
-                    (buildOptsParser Install)
+        addBuildCommand' "build"
+                         "Build the package(s) in this directory/configuration"
+                         buildCmd
+                         (buildOptsParser Build)
+        addBuildCommand' "install"
+                         "Shortcut for 'build --copy-bins'"
+                         buildCmd
+                         (buildOptsParser Install)
         addCommand' "uninstall"
                     "DEPRECATED: This command performs no actions, and is present for documentation only"
                     uninstallCmd
                     (many $ strArgument $ metavar "IGNORED")
-        addCommand' "test"
-                    "Shortcut for 'build --test'"
-                    buildCmd
-                    (buildOptsParser Test)
-        addCommand' "bench"
-                    "Shortcut for 'build --bench'"
-                    buildCmd
-                    (buildOptsParser Bench)
-        addCommand' "haddock"
-                    "Shortcut for 'build --haddock'"
-                    buildCmd
-                    (buildOptsParser Haddock)
+        addBuildCommand' "test"
+                         "Shortcut for 'build --test'"
+                         buildCmd
+                         (buildOptsParser Test)
+        addBuildCommand' "bench"
+                         "Shortcut for 'build --bench'"
+                         buildCmd
+                         (buildOptsParser Bench)
+        addBuildCommand' "haddock"
+                         "Shortcut for 'build --haddock'"
+                         buildCmd
+                         (buildOptsParser Haddock)
         addCommand' "new"
                     "Create a new project from a template. Run `stack templates' to see available templates."
                     newCmd
@@ -436,6 +436,10 @@ commandLineHandler progName isInterpreter = complicatedOptions
 
         addSubCommands' cmd title =
             addSubCommands cmd title globalFooter (globalOpts OtherCmdGlobalOpts)
+
+        -- Additional helper that hides global options and shows build options
+        addBuildCommand' cmd title constr =
+            addCommand cmd title globalFooter constr (globalOpts BuildCmdGlobalOpts)
 
     globalOpts kind =
         extraHelpOption hide progName (Docker.dockerCmdName ++ "*") Docker.dockerHelpOptName <*>

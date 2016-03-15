@@ -69,6 +69,7 @@ import           Stack.Types.TemplateName
 data GlobalOptsContext
     = OuterGlobalOpts -- ^ Global options before subcommand name
     | OtherCmdGlobalOpts -- ^ Global options following any other subcommand
+    | BuildCmdGlobalOpts
     deriving (Show, Eq)
 
 -- | Parser for bench arguments.
@@ -197,7 +198,7 @@ cleanOptsParser = CleanTargets <$> packages <|> CleanFull <$> doFullClean
              help "Remove whole the work dir, default is .stack-work")
 
 -- | Command-line arguments parser for configuration.
-configOptsParser :: Bool -> Parser ConfigMonoid
+configOptsParser :: GlobalOptsContext -> Parser ConfigMonoid
 configOptsParser hide0 =
     (\workDir buildOpts dockerOpts nixOpts systemGHC installGHC arch os ghcVariant jobs includes libs skipGHCCheck skipMsys localBin modifyCodePage allowDifferentUser -> mempty
         { configMonoidWorkDir = workDir
@@ -224,7 +225,7 @@ configOptsParser hide0 =
             <> help "Override work directory (default: .stack-work)"
             <> hide
             ))
-    <*> buildOptsMonoidParser True
+    <*> buildOptsMonoidParser (hide0 /= BuildCmdGlobalOpts)
     <*> dockerOptsParser True
     <*> nixOptsParser True
     <*> maybeBoolFlags
@@ -247,7 +248,7 @@ configOptsParser hide0 =
            <> help "Operating system, e.g. linux, windows"
            <> hide
             ))
-    <*> optional (ghcVariantParser hide0)
+    <*> optional (ghcVariantParser (hide0 /= OuterGlobalOpts))
     <*> optional (option auto
             ( long "jobs"
            <> short 'j'
@@ -290,7 +291,7 @@ configOptsParser hide0 =
             ("permission for users other than the owner of the stack root " ++
                 "directory to use a stack installation (POSIX only)")
             hide
-  where hide = hideMods hide0
+  where hide = hideMods (hide0 /= OuterGlobalOpts)
 
 buildOptsMonoidParser :: Bool -> Parser BuildOptsMonoid
 buildOptsMonoidParser hide0 =
@@ -693,7 +694,7 @@ globalOptsParser kind defLogLevel =
     optional (strOption (long Docker.reExecArgName <> hidden <> internal)) <*>
     optional (option auto (long dockerEntrypointArgName <> hidden <> internal)) <*>
     logLevelOptsParser hide0 defLogLevel <*>
-    configOptsParser hide0 <*>
+    configOptsParser kind <*>
     optional (abstractResolverOptsParser hide0) <*>
     optional (compilerOptsParser hide0) <*>
     maybeBoolFlags
