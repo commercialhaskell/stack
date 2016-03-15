@@ -26,7 +26,7 @@ import           Data.Either
 import           Data.Function               (on)
 import qualified Data.HashMap.Strict         as HashMap
 import           Data.List                   ( (\\), isSuffixOf, intercalate
-                                             , minimumBy)
+                                             , minimumBy, isPrefixOf)
 import           Data.List.Extra             (groupSortOn)
 import           Data.Map                    (Map)
 import qualified Data.Map                    as Map

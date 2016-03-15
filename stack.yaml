@@ -12,3 +12,4 @@ nix:
 extra-deps:
 - path-io-1.1.0
 - hpack-0.10.0
+- path-0.5.7

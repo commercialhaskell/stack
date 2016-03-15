@@ -6,6 +6,12 @@ Release notes:
 
 Major changes:
 
+Behavior changes:
+
+* `stack init` now ignores symlinks when searching for cabal files. It also now
+  ignores any directory that begins with `.` (as well as `dist` dirs) - before
+  it would only ignore `.git`, `.stack-work`, and `dist`.
+
 Other enhancements:
 
 * `git` packages with submodules are supported by passing the `--recursive`

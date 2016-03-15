@@ -9,6 +9,8 @@ module Path.Find
   ,findInParents)
   where
 
+import Control.Exception (evaluate)
+import Control.DeepSeq (force)
 import Control.Monad
 import Control.Monad.Catch
 import Control.Monad.IO.Class
@@ -16,6 +18,7 @@ import System.IO.Error (isPermissionError)
 import Data.List
 import Path
 import Path.IO hiding (findFiles)
+import System.PosixCompat.Files (getSymbolicLinkStatus, isSymbolicLink)
 
 -- | Find the location of a file matching the given predicate.
 findFileUp :: (MonadIO m,MonadThrow m)
@@ -50,6 +53,12 @@ findPathUp pathType dir p upperBound =
                | otherwise -> findPathUp pathType (parent dir) p upperBound
 
 -- | Find files matching predicate below a root directory.
+--
+-- NOTE: this skips symbolic directory links, to avoid loops. This may
+-- not make sense for all uses of file finding.
+--
+-- TODO: write one of these that traverses symbolic links but
+-- efficiently ignores loops.
 findFiles :: Path Abs Dir            -- ^ Root directory to begin with.
           -> (Path Abs File -> Bool) -- ^ Predicate to match files.
           -> (Path Abs Dir -> Bool)  -- ^ Predicate for which directories to traverse.
@@ -60,13 +69,18 @@ findFiles dir p traversep =
                                          else Nothing)
                                (listDir dir)
                                (\ _ -> return ([], []))
+     filteredFiles <- evaluate $ force (filter p files)
+     filteredDirs <- filterM (fmap not . isSymLink) dirs
      subResults <-
-       forM dirs
+       forM filteredDirs
             (\entry ->
                if traversep entry
                   then findFiles entry p traversep
                   else return [])
-     return (concat (filter p files : subResults))
+     return (concat (filteredFiles : subResults))
+
+isSymLink :: Path Abs t -> IO Bool
+isSymLink = fmap isSymbolicLink . getSymbolicLinkStatus . toFilePath
 
 -- | @findInParents f path@ applies @f@ to @path@ and its 'parent's until
 -- it finds a 'Just' or reaches the root directory.
