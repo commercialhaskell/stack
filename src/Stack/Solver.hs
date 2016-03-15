@@ -482,15 +482,14 @@ findCabalFiles recurse dir = liftIO $ do
     isHpack = (== "package.yaml")     . toFilePath . filename
     isCabal = (".cabal" `isSuffixOf`) . toFilePath
 
-    isIgnored path = FP.dropTrailingPathSeparator (toFilePath (dirname path))
-                     `Set.member` ignoredDirs
+    isIgnored path = "." `isPrefixOf` dirName || dirName `Set.member` ignoredDirs
+      where
+        dirName = FP.dropTrailingPathSeparator (toFilePath (dirname path))
 
 -- | Special directories that we don't want to traverse for .cabal files
 ignoredDirs :: Set FilePath
 ignoredDirs = Set.fromList
-    [ ".git"
-    , "dist"
-    , ".stack-work"
+    [ "dist"
     ]
 
 -- | Perform some basic checks on a list of cabal files to be used for creating
