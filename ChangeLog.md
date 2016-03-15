@@ -8,6 +8,8 @@ Major changes:
 
 Behavior changes:
 
+* Snapshot packages are no longer built with executable profiling. See
+  [#1179](https://github.com/commercialhaskell/stack/issues/1179).
 * `stack init` now ignores symlinks when searching for cabal files. It also now
   ignores any directory that begins with `.` (as well as `dist` dirs) - before
   it would only ignore `.git`, `.stack-work`, and `dist`.
