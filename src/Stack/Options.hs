@@ -25,6 +25,7 @@ module Stack.Options
     ,hpcReportOptsParser
     ,pvpBoundsOption
     ,globalOptsFromMonoid
+    ,splitObjsWarning
     ) where
 
 import           Control.Monad.Logger              (LogLevel (..))
@@ -44,6 +45,7 @@ import           Options.Applicative
 import           Options.Applicative.Args
 import           Options.Applicative.Builder.Extra
 import           Options.Applicative.Types         (fromM, oneM, readerAsk)
+import           Stack.Build                       (splitObjsWarning)
 import           Stack.Clean                       (CleanOpts (..))
 import           Stack.Config                      (packagesParser)
 import           Stack.ConfigCmd
@@ -355,7 +357,7 @@ buildOptsMonoidParser hide0 =
         BuildOptsMonoid <$> libProfiling <*> exeProfiling <*> haddock <*>
         haddockDeps <*> copyBins <*> preFetch <*> keepGoing <*> forceDirty <*>
         tests <*> testOptsParser hide0 <*> benches <*> benchOptsParser hide0 <*> reconfigure <*>
-        cabalVerbose
+        cabalVerbose <*> splitObjs
     libProfiling =
         maybeBoolFlags
             "library-profiling"
@@ -412,6 +414,11 @@ buildOptsMonoidParser hide0 =
         maybeBoolFlags
             "cabal-verbose"
             "Ask Cabal to be verbose in its output"
+            hide
+    splitObjs =
+        maybeBoolFlags
+            "split-objs"
+            ("Enable split-objs, to reduce output size (at the cost of build time). " ++ splitObjsWarning)
             hide
 
 nixOptsParser :: Bool -> Parser NixOptsMonoid

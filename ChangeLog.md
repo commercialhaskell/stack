@@ -16,6 +16,7 @@ Behavior changes:
 
 Other enhancements:
 
+* Experimental support for `--split-objs` added.
 * `git` packages with submodules are supported by passing the `--recursive`
   flag to `git clone`.
 * When using [hpack](https://github.com/sol/hpack), only regenerate cabal files

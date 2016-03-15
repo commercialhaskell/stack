@@ -64,6 +64,8 @@ data BuildOpts =
             -- ^ Perform the configure step even if already configured
             ,boptsCabalVerbose :: !Bool
             -- ^ Ask Cabal to be verbose in its builds
+            ,boptsSplitObjs :: !Bool
+            -- ^ Whether to enable split-objs.
             }
   deriving (Show)
 
@@ -83,6 +85,7 @@ defaultBuildOpts = BuildOpts
     , boptsBenchmarkOpts = defaultBenchmarkOpts
     , boptsReconfigure = False
     , boptsCabalVerbose = False
+    , boptsSplitObjs = False
     }
 
 defaultBuildOptsCLI ::BuildOptsCLI
@@ -136,6 +139,7 @@ data BuildOptsMonoid = BuildOptsMonoid
     , buildMonoidBenchmarkOpts :: !BenchmarkOptsMonoid
     , buildMonoidReconfigure :: !(Maybe Bool)
     , buildMonoidCabalVerbose :: !(Maybe Bool)
+    , buildMonoidSplitObjs :: !(Maybe Bool)
     } deriving (Show)
 
 instance FromJSON (BuildOptsMonoid, [JSONWarning]) where
@@ -154,6 +158,7 @@ instance FromJSON (BuildOptsMonoid, [JSONWarning]) where
               buildMonoidBenchmarkOpts <- jsonSubWarnings (o ..:? buildMonoidBenchmarkOptsArgName ..!= mempty)
               buildMonoidReconfigure <- o ..:? buildMonoidReconfigureArgName
               buildMonoidCabalVerbose <- o ..:? buildMonoidCabalVerboseArgName
+              buildMonoidSplitObjs <- o ..:? buildMonoidSplitObjsName
               return BuildOptsMonoid{..})
 
 buildMonoidLibProfileArgName :: Text
@@ -198,6 +203,9 @@ buildMonoidReconfigureArgName = "reconfigure"
 buildMonoidCabalVerboseArgName :: Text
 buildMonoidCabalVerboseArgName = "cabal-verbose"
 
+buildMonoidSplitObjsName :: Text
+buildMonoidSplitObjsName = "split-objs"
+
 instance Monoid BuildOptsMonoid where
   mempty = BuildOptsMonoid
     {buildMonoidLibProfile = Nothing
@@ -214,6 +222,7 @@ instance Monoid BuildOptsMonoid where
     ,buildMonoidBenchmarkOpts = mempty
     ,buildMonoidReconfigure = Nothing
     ,buildMonoidCabalVerbose = Nothing
+    ,buildMonoidSplitObjs = Nothing
     }
 
   mappend l r = BuildOptsMonoid
@@ -231,6 +240,7 @@ instance Monoid BuildOptsMonoid where
     ,buildMonoidBenchmarkOpts = buildMonoidBenchmarkOpts l <> buildMonoidBenchmarkOpts r
     ,buildMonoidReconfigure = buildMonoidReconfigure l <|> buildMonoidReconfigure r
     ,buildMonoidCabalVerbose = buildMonoidCabalVerbose l <|> buildMonoidCabalVerbose r
+    ,buildMonoidSplitObjs = buildMonoidSplitObjs l <|> buildMonoidSplitObjs r
     }
 
 -- | Which subset of packages to build

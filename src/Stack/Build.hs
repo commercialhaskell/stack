@@ -15,7 +15,8 @@ module Stack.Build
   (build
   ,withLoadPackage
   ,mkBaseConfigOpts
-  ,queryBuildInfo)
+  ,queryBuildInfo
+  ,splitObjsWarning)
   where
 
 import           Control.Monad
@@ -61,7 +62,7 @@ import           Stack.Types.Internal
 import           System.FileLock (FileLock, unlockFile)
 
 #ifdef WINDOWS
-import System.Win32.Console (setConsoleCP, setConsoleOutputCP, getConsoleCP, getConsoleOutputCP)
+import           System.Win32.Console (setConsoleCP, setConsoleOutputCP, getConsoleCP, getConsoleOutputCP)
 import qualified Control.Monad.Catch as Catch
 #endif
 
@@ -112,6 +113,7 @@ build setLocalFiles mbuildLk boptsCli = fixCodePage $ do
                            liftIO $ unlockFile lk
       _ -> return ()
 
+    warnAboutSplitObjs bopts
     warnIfExecutablesWithSameNameCouldBeOverwritten locals plan
 
     when (boptsPreFetch bopts) $
@@ -206,6 +208,19 @@ warnIfExecutablesWithSameNameCouldBeOverwritten locals plan =
             ]
     collect :: Ord k => [(k,v)] -> Map k (NonEmpty v)
     collect = Map.map NE.fromList . Map.fromDistinctAscList . groupSort
+
+warnAboutSplitObjs :: MonadLogger m => BuildOpts -> m ()
+warnAboutSplitObjs bopts | boptsSplitObjs bopts = do
+    $logWarn $ "Building with --split-objs is enabled. " <> T.pack splitObjsWarning
+warnAboutSplitObjs _ = return ()
+
+splitObjsWarning :: String
+splitObjsWarning = unwords
+     [ "Note that this feature is EXPERIMENTAL, and its behavior may be changed and improved."
+     , "You will need to clean your workdirs before use. If you want to compile all dependencies"
+     , "with split-objs, you will need to delete the snapshot (and all snapshots that could"
+     , "reference that snapshot."
+     ]
 
 -- | Get the @BaseConfigOpts@ necessary for constructing configure options
 mkBaseConfigOpts :: (MonadIO m, MonadReader env m, HasEnvConfig env, MonadThrow m)

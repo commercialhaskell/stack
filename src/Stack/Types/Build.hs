@@ -608,6 +608,7 @@ configureOptsNoDir econfig bco deps wanted isLocal package = concat
     [ depOptions
     , ["--enable-library-profiling" | boptsLibProfile bopts || boptsExeProfile bopts]
     , ["--enable-executable-profiling" | boptsExeProfile bopts && isLocal]
+    , ["--enable-split-objs" | boptsSplitObjs bopts]
     , map (\(name,enabled) ->
                        "-f" <>
                        (if enabled

@@ -8,8 +8,7 @@ import           Stack.Types
 
 -- | Interprets BuildOptsMonoid options.
 buildOptsFromMonoid :: BuildOptsMonoid -> BuildOpts
-buildOptsFromMonoid BuildOptsMonoid{..} =
-    defaultBuildOpts
+buildOptsFromMonoid BuildOptsMonoid{..} = BuildOpts
     { boptsLibProfile = fromMaybe
           (boptsLibProfile defaultBuildOpts)
           buildMonoidLibProfile
@@ -42,6 +41,9 @@ buildOptsFromMonoid BuildOptsMonoid{..} =
     , boptsCabalVerbose = fromMaybe
           (boptsCabalVerbose defaultBuildOpts)
           buildMonoidCabalVerbose
+    , boptsSplitObjs = fromMaybe
+          (boptsSplitObjs defaultBuildOpts)
+          buildMonoidSplitObjs
     }
 
 testOptsFromMonoid :: TestOptsMonoid -> TestOpts
