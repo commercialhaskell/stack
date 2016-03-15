@@ -74,6 +74,7 @@ initProject currDir initOpts mresolver = do
                     \file. Please try \"stack new\" instead."
         find  = findCabalFiles (includeSubDirs initOpts)
         dirs' = if null dirs then [currDir] else dirs
+    $logInfo "Looking for .cabal or package.yaml files to use to init the project."
     cabalfps <- liftM concat $ mapM find dirs'
     (bundle, dupPkgs)  <- cabalPackagesCheck cabalfps noPkgMsg Nothing
 
