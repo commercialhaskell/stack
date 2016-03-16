@@ -96,7 +96,7 @@ problems, see the linked FAQ entries:
 
  1. Get the FP Complete key:
 
-        sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 575159689BEFB442
+        sudo apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 575159689BEFB442
 
  2. Add the appropriate source repository (if not sure, run ``lsb_release -a`` to find out your Ubuntu version):
 
@@ -130,7 +130,7 @@ problems, see the linked FAQ entries:
 
  1. Get the FP Complete key:
 
-        sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 575159689BEFB442
+        sudo apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 575159689BEFB442
 
  2. Add the appropriate source repository:
 
