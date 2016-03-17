@@ -951,22 +951,47 @@ bootGhcjs stackYaml destDir = do
     mcabal <- getCabalInstallVersion menv
     shouldInstallCabal <- case mcabal of
         Nothing -> do
-            $logInfo "No cabal-install binary found for use with GHCJS.  Installing a local copy of cabal-install from source."
+            $logInfo "No cabal-install binary found for use with GHCJS."
             return True
         Just v
             | v < $(mkVersion "1.22.4") -> do
                 $logInfo $
-                    "cabal-install found on PATH is too old to be used for booting GHCJS (version " <>
+                    "The cabal-install found on PATH is too old to be used for booting GHCJS (version " <>
                     versionText v <>
-                    ").  Installing a local copy of cabal-install from source."
+                    ")."
+                return True
+            | v >= $(mkVersion "1.23") -> do
+                $logWarn $
+                    "The cabal-install found on PATH is a version stack doesn't know about, version " <>
+                    versionText v <>
+                    ". This may or may not work.\n" <>
+                    "See this issue: https://github.com/ghcjs/ghcjs/issues/470"
+                return False
+            | v >= $(mkVersion "1.22.8") -> do
+                $logWarn $
+                    "The cabal-install found on PATH, version " <>
+                    versionText v <>
+                    ", is >= 1.22.8. That version has a bug preventing ghcjs from booting."
                 return True
             | otherwise -> return False
     when shouldInstallCabal $ do
-        $logSticky "Building cabal-install for use by ghcjs-boot ... "
+        $logInfo "Building a local copy of cabal-install from source."
         runInnerStackT envConfig $
             build (\_ -> return ())
                   Nothing
                   defaultBuildOptsCLI { boptsCLITargets = ["cabal-install"] }
+        mcabal' <- getCabalInstallVersion menv
+        case mcabal' of
+            Nothing ->
+                $logError $
+                    "Failed to get cabal-install version after installing it.\n" <>
+                    "This shouldn't happen, because it gets built to the snapshot bin directory, which should be treated as being on the PATH."
+            Just v | v >= $(mkVersion "1.22.8") && v < $(mkVersion "1.23") ->
+                $logWarn $
+                    "Installed version of cabal-install is in a version range which may not work.\n" <>
+                    "See this issue: https://github.com/ghcjs/ghcjs/issues/470\n" <>
+                    "This version is specified by the stack.yaml file included in the ghcjs tarball.\n"
+            _ -> return ()
     $logSticky "Booting GHCJS (this will take a long time) ..."
     let envSettings = defaultEnvSettings { esIncludeGhcPackagePath = False }
     menv' <- liftIO $ configEnvOverride (getConfig envConfig) envSettings
