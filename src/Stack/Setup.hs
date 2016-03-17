@@ -971,16 +971,20 @@ bootGhcjs stackYaml destDir = do
                 $logWarn $
                     "The cabal-install found on PATH, version " <>
                     versionText v <>
-                    ", is >= 1.22.8. That version has a bug preventing ghcjs from booting."
+                    ", is >= 1.22.8.\n" <>
+                    "That version has a bug preventing ghcjs from booting.\n" <>
+                    "See this issue: https://github.com/ghcjs/ghcjs/issues/470"
                 return True
             | otherwise -> return False
+    let envSettings = defaultEnvSettings { esIncludeGhcPackagePath = False }
+    menv' <- liftIO $ configEnvOverride (getConfig envConfig) envSettings
     when shouldInstallCabal $ do
         $logInfo "Building a local copy of cabal-install from source."
         runInnerStackT envConfig $
             build (\_ -> return ())
                   Nothing
                   defaultBuildOptsCLI { boptsCLITargets = ["cabal-install"] }
-        mcabal' <- getCabalInstallVersion menv
+        mcabal' <- getCabalInstallVersion menv'
         case mcabal' of
             Nothing ->
                 $logError $
@@ -993,8 +997,6 @@ bootGhcjs stackYaml destDir = do
                     "This version is specified by the stack.yaml file included in the ghcjs tarball.\n"
             _ -> return ()
     $logSticky "Booting GHCJS (this will take a long time) ..."
-    let envSettings = defaultEnvSettings { esIncludeGhcPackagePath = False }
-    menv' <- liftIO $ configEnvOverride (getConfig envConfig) envSettings
     runAndLog Nothing "ghcjs-boot" menv' ["--clean"]
     $logStickyDone "GHCJS booted."
 
