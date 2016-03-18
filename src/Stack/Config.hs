@@ -136,9 +136,15 @@ getImplicitGlobalProjectDir config =
     stackRoot = configStackRoot config
 
 -- | Download the 'Snapshots' value from stackage.org.
-getSnapshots :: (MonadThrow m, MonadMask m, MonadIO m, MonadReader env m, HasHttpManager env, HasStackRoot env, HasConfig env)
+getSnapshots :: (MonadThrow m, MonadMask m, MonadIO m, MonadReader env m, HasHttpManager env, HasStackRoot env, HasConfig env, MonadLogger m)
              => m Snapshots
-getSnapshots = askLatestSnapshotUrl >>= parseUrl . T.unpack >>= downloadJSON
+getSnapshots = do
+    latestUrlText <- askLatestSnapshotUrl
+    latestUrl <- parseUrl (T.unpack latestUrlText)
+    $logDebug $ "Downloading snapshot versions file from " <> latestUrlText
+    result <- downloadJSON latestUrl
+    $logDebug $ "Done downloading and parsing snapshot versions file"
+    return result
 
 -- | Turn an 'AbstractResolver' into a 'Resolver'.
 makeConcreteResolver :: (MonadIO m, MonadReader env m, HasConfig env, MonadThrow m, MonadMask m, HasHttpManager env, MonadLogger m)
