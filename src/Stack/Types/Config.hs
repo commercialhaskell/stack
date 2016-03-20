@@ -91,7 +91,7 @@ module Stack.Types.Config
   ,bindirSuffix
   ,configInstalledCache
   ,configMiniBuildPlanCache
-  ,configProjectWorkDir
+  ,getProjectWorkDir
   ,docDirSuffix
   ,flagCacheLocal
   ,extraBinDirs
@@ -1248,15 +1248,15 @@ getWorkDir :: (MonadReader env m, HasConfig env) => m (Path Rel Dir)
 getWorkDir = configWorkDir `liftM` asks getConfig
 
 -- | Per-project work dir
-configProjectWorkDir :: (HasBuildConfig env, MonadReader env m) => m (Path Abs Dir)
-configProjectWorkDir = do
+getProjectWorkDir :: (HasBuildConfig env, MonadReader env m) => m (Path Abs Dir)
+getProjectWorkDir = do
     bc      <- asks getBuildConfig
     workDir <- getWorkDir
     return (bcRoot bc </> workDir)
 
 -- | File containing the installed cache, see "Stack.PackageDump"
 configInstalledCache :: (HasBuildConfig env, MonadReader env m) => m (Path Abs File)
-configInstalledCache = liftM (</> $(mkRelFile "installed-cache.bin")) configProjectWorkDir
+configInstalledCache = liftM (</> $(mkRelFile "installed-cache.bin")) getProjectWorkDir
 
 -- | Relative directory for the platform identifier
 platformOnlyRelDir
@@ -1287,7 +1287,7 @@ installationRootLocal :: (MonadThrow m, MonadReader env m, HasEnvConfig env) => 
 installationRootLocal = do
     bc <- asks getBuildConfig
     psc <- useShaPathOnWindows =<< platformSnapAndCompilerRel
-    return $ configProjectWorkDir bc </> $(mkRelDir "install") </> psc
+    return $ getProjectWorkDir bc </> $(mkRelDir "install") </> psc
 
 -- | Path for platform followed by snapshot name followed by compiler
 -- name.

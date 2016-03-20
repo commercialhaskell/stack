@@ -1153,7 +1153,7 @@ buildLogPath :: (MonadReader env m, HasBuildConfig env, MonadThrow m)
              => Package -> Maybe String -> m (Path Abs File)
 buildLogPath package' msuffix = do
   env <- ask
-  let stack = configProjectWorkDir env
+  let stack = getProjectWorkDir env
   fp <- parseRelFile $ concat $
     packageIdentifierString (packageIdentifier package') :
     maybe id (\suffix -> ("-" :) . (suffix :)) msuffix [".log"]

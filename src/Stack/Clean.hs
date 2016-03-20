@@ -22,7 +22,7 @@ import           Path.IO (ignoringAbsence, removeDirRecur)
 import           Stack.Build.Source (getLocalPackageViews)
 import           Stack.Build.Target (LocalPackageView(..))
 import           Stack.Constants (distDirFromDir, workDirFromDir)
-import           Stack.Types (HasEnvConfig, PackageName, configProjectWorkDir)
+import           Stack.Types (HasEnvConfig, PackageName, getProjectWorkDir)
 
 -- | Deletes build artifacts in the current project.
 --
@@ -52,7 +52,7 @@ dirsToDelete cleanOpts = do
             mapM distDirFromDir (mapMaybe getPkgDir pkgsToClean)
         CleanFull -> do
             pkgWorkDirs <- mapM workDirFromDir (mapMaybe getPkgDir localPkgNames)
-            projectWorkDir <- configProjectWorkDir
+            projectWorkDir <- getProjectWorkDir
             return (projectWorkDir : pkgWorkDirs)
 
 -- | Options for @stack clean@.
