@@ -185,7 +185,7 @@ readFlag = do
 
 -- | Command-line parser for the clean command.
 cleanOptsParser :: Parser CleanOpts
-cleanOptsParser = CleanTargets <$> packages <|> CleanFull <$> doFullClean
+cleanOptsParser = CleanTargets <$> packages <|> doFullClean
   where
     packages =
         many
@@ -193,7 +193,8 @@ cleanOptsParser = CleanTargets <$> packages <|> CleanFull <$> doFullClean
                  (metavar "PACKAGE" <>
                   help "If none specified, clean all local packages"))
     doFullClean =
-        switch
+        flag'
+            CleanFull
             (long "full" <>
              help "Remove whole the work dir, default is .stack-work")
 

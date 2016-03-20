@@ -35,7 +35,7 @@ clean
     -> m ()
 clean (CleanTargets targets) =
     cleanup targets False
-clean (CleanFull _ ) =
+clean CleanFull =
     cleanup [] True
 
 cleanup
@@ -63,12 +63,11 @@ cleanup targets doFullClean = do
         pkgs -> throwM (NonLocalPackages pkgs)
 
 -- | Options for cleaning a project.
-data CleanOpts = CleanTargets
-    { cleanOptsTargets :: [PackageName]
+data CleanOpts
+    = CleanTargets [PackageName]
     -- ^ Names of the packages to clean.
     -- If the list is empty, every local package should be cleaned.
-    }
-    | CleanFull { cleanOptsFull :: Bool }
+    | CleanFull
 
 -- | Exceptions during cleanup.
 newtype StackCleanException
