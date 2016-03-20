@@ -24,9 +24,7 @@ import           Stack.Build.Target (LocalPackageView(..))
 import           Stack.Constants (distDirFromDir, workDirFromDir)
 import           Stack.Types (HasEnvConfig, PackageName, configProjectWorkDir)
 
--- | Reset the build, i.e. remove the @dist@ directory
--- (for example @.stack-work\/dist\/x84_64-linux\/Cabal-1.22.4.0@)
--- for all targets.
+-- | Deletes build artifacts in the current project.
 --
 -- Throws 'StackCleanException'.
 clean
@@ -46,7 +44,7 @@ dirsToDelete cleanOpts = do
     let localPkgNames = Map.keys localPkgViews
         getPkgDir pkgName = fmap (lpvRoot . fst) (Map.lookup pkgName localPkgViews)
     case cleanOpts of
-        CleanTargets targets -> do
+        CleanShallow targets -> do
             pkgsToClean <-
                 case targets \\ localPkgNames of
                     [] -> return (if null targets then localPkgNames else targets)
@@ -57,12 +55,14 @@ dirsToDelete cleanOpts = do
             projectWorkDir <- configProjectWorkDir
             return (projectWorkDir : pkgWorkDirs)
 
--- | Options for cleaning a project.
+-- | Options for @stack clean@.
 data CleanOpts
-    = CleanTargets [PackageName]
-    -- ^ Names of the packages to clean.
-    -- If the list is empty, every local package should be cleaned.
+    = CleanShallow [PackageName]
+    -- ^ Delete the "dist directories" as defined in 'Stack.Constants.distRelativeDir'
+    -- for the given local packages. If no packages are given, all project packages
+    -- should be cleaned.
     | CleanFull
+    -- ^ Delete all work directories in the project.
 
 -- | Exceptions during cleanup.
 newtype StackCleanException

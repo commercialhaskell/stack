@@ -185,7 +185,7 @@ readFlag = do
 
 -- | Command-line parser for the clean command.
 cleanOptsParser :: Parser CleanOpts
-cleanOptsParser = CleanTargets <$> packages <|> doFullClean
+cleanOptsParser = CleanShallow <$> packages <|> doFullClean
   where
     packages =
         many
