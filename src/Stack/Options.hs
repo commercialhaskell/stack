@@ -196,7 +196,7 @@ cleanOptsParser = CleanTargets <$> packages <|> doFullClean
         flag'
             CleanFull
             (long "full" <>
-             help "Remove whole the work dir, default is .stack-work")
+             help "Delete all work directories (.stack-work by default) in the project")
 
 -- | Command-line arguments parser for configuration.
 configOptsParser :: GlobalOptsContext -> Parser ConfigMonoid
