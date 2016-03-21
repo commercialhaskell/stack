@@ -133,8 +133,8 @@ import           Control.Monad.Reader (MonadReader, ask, asks, MonadIO, liftIO)
 import           Data.Aeson.Extended
                  (ToJSON, toJSON, FromJSON, parseJSON, withText, object,
                   (.=), (..:), (..:?), (..!=), Value(String, Object),
-                  withObjectWarnings, WarningParser, Object, jsonSubWarnings, JSONWarning,
-                  jsonSubWarningsT, jsonSubWarningsTT)
+                  withObjectWarnings, WarningParser, Object, jsonSubWarnings,
+                  jsonSubWarningsT, jsonSubWarningsTT, WithJSONWarnings(..), noJSONWarnings)
 import           Data.Attoparsec.Args
 import           Data.Binary (Binary)
 import           Data.ByteString (ByteString)
@@ -321,7 +321,7 @@ data PackageIndex = PackageIndex
     -- ^ Require that hashes and package size information be available for packages in this index
     }
     deriving Show
-instance FromJSON (PackageIndex, [JSONWarning]) where
+instance FromJSON (WithJSONWarnings PackageIndex) where
     parseJSON = withObjectWarnings "PackageIndex" $ \o -> do
         name <- o ..: "name"
         prefix <- o ..: "download-prefix"
@@ -549,14 +549,15 @@ instance ToJSON PackageEntry where
         , "location" .= peLocation pe
         , "subdirs" .= peSubdirs pe
         ]
-instance FromJSON (PackageEntry, [JSONWarning]) where
+instance FromJSON (WithJSONWarnings PackageEntry) where
     parseJSON (String t) = do
-        (loc, _::[JSONWarning]) <- parseJSON $ String t
-        return (PackageEntry
+        WithJSONWarnings loc _ <- parseJSON $ String t
+        return $ noJSONWarnings
+               (PackageEntry
                 { peExtraDep = False
                 , peLocation = loc
                 , peSubdirs = []
-                }, [])
+                })
     parseJSON v = withObjectWarnings "PackageEntry" (\o -> PackageEntry
         <$> o ..:? "extra-dep" ..!= False
         <*> jsonSubWarnings (o ..: "location")
@@ -582,9 +583,9 @@ instance ToJSON PackageLocation where
     toJSON (PLRemote x (RPTGit y)) = toJSON $ T.unwords ["git", x, y]
     toJSON (PLRemote x (RPTHg  y)) = toJSON $ T.unwords ["hg",  x, y]
 
-instance FromJSON (PackageLocation, [JSONWarning]) where
+instance FromJSON (WithJSONWarnings PackageLocation) where
     parseJSON v
-        = ((,[]) <$> withText "PackageLocation" (\t -> http t <|> file t) v)
+        = (noJSONWarnings <$> withText "PackageLocation" (\t -> http t <|> file t) v)
         <|> git v
         <|> hg  v
       where
@@ -655,13 +656,13 @@ instance ToJSON Resolver where
         , "location" .= location
         ]
     toJSON x = toJSON $ resolverName x
-instance FromJSON (Resolver,[JSONWarning]) where
+instance FromJSON (WithJSONWarnings Resolver) where
     -- Strange structuring is to give consistent error messages
     parseJSON v@(Object _) = withObjectWarnings "Resolver" (\o -> ResolverCustom
         <$> o ..: "name"
         <*> o ..: "location") v
 
-    parseJSON (String t) = either (fail . show) return ((,[]) <$> parseResolverText t)
+    parseJSON (String t) = either (fail . show) return (noJSONWarnings <$> parseResolverText t)
 
     parseJSON _ = fail $ "Invalid Resolver, must be Object or String"
 
@@ -892,7 +893,7 @@ instance Monoid ConfigMonoid where
     , configMonoidAllowDifferentUser = configMonoidAllowDifferentUser l <|> configMonoidAllowDifferentUser r
     }
 
-instance FromJSON (ConfigMonoid, [JSONWarning]) where
+instance FromJSON (WithJSONWarnings ConfigMonoid) where
   parseJSON = withObjectWarnings "ConfigMonoid" parseConfigMonoidJSON
 
 -- | Parse a partial configuration.  Used both to parse both a standalone config
@@ -1415,7 +1416,7 @@ getWhichCompiler = asks (whichCompiler . envConfigCompilerVersion . getEnvConfig
 data ProjectAndConfigMonoid
   = ProjectAndConfigMonoid !Project !ConfigMonoid
 
-instance (warnings ~ [JSONWarning]) => FromJSON (ProjectAndConfigMonoid, warnings) where
+instance FromJSON (WithJSONWarnings ProjectAndConfigMonoid) where
     parseJSON = withObjectWarnings "ProjectAndConfigMonoid" $ \o -> do
         dirs <- jsonSubWarningsTT (o ..:? "packages") ..!= [packageEntryCurrDir]
         extraDeps' <- o ..:? "extra-deps" ..!= []
@@ -1538,7 +1539,7 @@ data DownloadInfo = DownloadInfo
     , downloadInfoSha1 :: Maybe ByteString
     } deriving (Show)
 
-instance FromJSON (DownloadInfo, [JSONWarning]) where
+instance FromJSON (WithJSONWarnings DownloadInfo) where
     parseJSON = withObjectWarnings "DownloadInfo" parseDownloadInfoFromObject
 
 -- | Parse JSON in existing object for 'DownloadInfo'
@@ -1560,7 +1561,7 @@ data VersionedDownloadInfo = VersionedDownloadInfo
     }
     deriving Show
 
-instance FromJSON (VersionedDownloadInfo, [JSONWarning]) where
+instance FromJSON (WithJSONWarnings VersionedDownloadInfo) where
     parseJSON = withObjectWarnings "VersionedDownloadInfo" $ \o -> do
         version <- o ..: "version"
         downloadInfo <- parseDownloadInfoFromObject o
@@ -1579,7 +1580,7 @@ data SetupInfo = SetupInfo
     }
     deriving Show
 
-instance FromJSON (SetupInfo, [JSONWarning]) where
+instance FromJSON (WithJSONWarnings SetupInfo) where
     parseJSON = withObjectWarnings "SetupInfo" $ \o -> do
         siSevenzExe <- jsonSubWarningsT (o ..:? "sevenzexe-info")
         siSevenzDll <- jsonSubWarningsT (o ..:? "sevenzdll-info")
@@ -1616,15 +1617,15 @@ data SetupInfoLocation
     | SetupInfoInline SetupInfo
     deriving (Show)
 
-instance FromJSON (SetupInfoLocation, [JSONWarning]) where
+instance FromJSON (WithJSONWarnings SetupInfoLocation) where
     parseJSON v =
-        ((, []) <$>
+        (noJSONWarnings <$>
          withText "SetupInfoFileOrURL" (pure . SetupInfoFileOrURL . T.unpack) v) <|>
         inline
       where
         inline = do
-            (si,w) <- parseJSON v
-            return (SetupInfoInline si, w)
+            WithJSONWarnings si w <- parseJSON v
+            return $ WithJSONWarnings (SetupInfoInline si) w
 
 -- | How PVP bounds should be added to .cabal files
 data PvpBounds

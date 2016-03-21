@@ -37,6 +37,16 @@ Bug fixes:
 * Nix: cancelling a stack build now exits properly rather than dropping into a
   nix-shell [#1778](https://github.com/commercialhaskell/stack/issues/1778)
 
+## 1.0.4.2
+
+Build with path-io-1.0.0. There are no changes in behaviour from 1.0.4,
+so no binaries are released for this version.
+
+## 1.0.4.1
+
+Fixes build with aeson-0.11.0.0. There are no changes in behaviour from 1.0.4,
+so no binaries are released for this version.
+
 ## 1.0.4
 
 Major changes:
@@ -259,7 +269,7 @@ Release notes:
   locations will continue to work for some months, but we suggest that you
   adjust your `/etc/apt/sources.list.d/fpco.list` to the new location to avoid
   future disruption.
-* [openSUSE and SUSE Linux Enterprise](http://docs.haskellstack.org/en/stable/install_and_upgrade/#opensuse-suse-linux-enterprise)
+* [openSUSE and SUSE Linux Enterprise](http://docs.haskellstack.org/en/stable/install_and_upgrade/#suse)
   packages are now available, thanks to [@mimi1vx](https://github.com/mimi1vx).
   Note: there will be some lag before these pick up new versions, as they are
   based on Stackage LTS.

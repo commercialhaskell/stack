@@ -1,9 +1,9 @@
 # Install/upgrade
 
 Distribution packages are available for [Ubuntu](#ubuntu), [Debian](#debian),
-[CentOS / Red Hat / Amazon Linux](#centos-red-hat-amazon-linux), [Fedora](#fedora) and
-[Arch Linux](#arch-linux). Binaries for other operating systems are listed
-below, and available on
+[CentOS / Red Hat / Amazon Linux](#centos), [Fedora](#fedora),
+[Arch Linux](#arch-linux) and unofficially [FreeBSD](#freebsd).
+Binaries for other operating systems are listed below, and available on
 [the Github releases page](https://github.com/fpco/stack/releases). For the
 future, we are open to supporting more OSes (to request one, please
 [submit an issue](https://github.com/commercialhaskell/stack/issues/new)).
@@ -150,7 +150,7 @@ problems, see the linked FAQ entries:
 
         sudo apt-get update && sudo apt-get install stack -y
 
-## CentOS / Red Hat / Amazon Linux
+## <a name="centos"></a>CentOS / Red Hat / Amazon Linux
 
 *note*: for 32-bit, use the [generic Linux option](#linux)
 
@@ -201,7 +201,7 @@ problems, see the linked FAQ entries:
 
             sudo yum -y install stack
 
-## openSUSE / SUSE Linux Enterprise
+## <a name="suse"></a>openSUSE / SUSE Linux Enterprise
 
 *Note:* openSUSE's and SLE's `stack` package isn't managed by the Stack release
 team, and since it is based on the version in Stackage LTS, and may lag new
@@ -284,6 +284,13 @@ Stack](http://nixos.org/nixpkgs/manual/#using-stack-together-with-nix).
 
 Tested on Fedora 20: make sure to install the following packages `sudo yum install perl make automake gcc gmp-devel`.
 For Gentoo users, make sure to have the `ncurses` package with `USE=tinfo` (without it, stack will not be able to install GHC).
+
+## FreeBSD
+
+An unofficial package repository for FreeBSD 10 (amd64 only) and install
+instructions are available at [http://stack-pkg.applicative.tech](http://stack-pkg.applicative.tech/).  The
+repository is not official and as such might lag behind new releases.  See [issue #1253](https://github.com/commercialhaskell/stack/issues/1253)
+for progress on official FreeBSD binaries.
 
 ## Path
 

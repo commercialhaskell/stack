@@ -20,7 +20,8 @@ import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import           Control.Monad.Reader
 import           Control.Monad.Trans.Control
-import           Data.Aeson.Extended         (object, (.=), toJSON, logJSONWarnings)
+import           Data.Aeson.Extended         ( WithJSONWarnings(..), object, (.=), toJSON
+                                             , logJSONWarnings)
 import qualified Data.ByteString             as S
 import           Data.Either
 import           Data.Function               (on)
@@ -706,7 +707,7 @@ solveExtraDeps modStackYaml = do
         writeStackYaml path res deps fl = do
             let fp = toFilePath path
             obj <- liftIO (Yaml.decodeFileEither fp) >>= either throwM return
-            (ProjectAndConfigMonoid _ _, warnings) <-
+            WithJSONWarnings (ProjectAndConfigMonoid _ _) warnings <-
                 liftIO (Yaml.decodeFileEither fp) >>= either throwM return
             logJSONWarnings fp warnings
             let obj' =

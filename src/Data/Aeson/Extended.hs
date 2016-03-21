@@ -7,13 +7,15 @@ module Data.Aeson.Extended (
   , (.:)
   , (.:?)
   -- * JSON Parser that emits warnings
-  , WarningParser
   , JSONWarning (..)
+  , WarningParser
+  , WithJSONWarnings (..)
   , withObjectWarnings
   , jsonSubWarnings
   , jsonSubWarningsT
   , jsonSubWarningsTT
   , logJSONWarnings
+  , noJSONWarnings
   , tellJSONField
   , unWarningParser
   , (..:)
@@ -75,7 +77,7 @@ tellJSONField key = tell (mempty { wpmExpectedFields = Set.singleton key})
 withObjectWarnings :: String
                    -> (Object -> WarningParser a)
                    -> Value
-                   -> Parser (a, [JSONWarning])
+                   -> Parser (WithJSONWarnings a)
 withObjectWarnings expected f =
     withObject expected $
     \obj ->
@@ -86,11 +88,11 @@ withObjectWarnings expected f =
                              (Set.fromList (HashMap.keys obj))
                              (wpmExpectedFields w))
             return
-                ( a
-                , wpmWarnings w ++
-                  case unrecognizedFields of
-                      [] -> []
-                      _ -> [JSONUnrecognizedFields expected unrecognizedFields])
+                (WithJSONWarnings a
+                    (wpmWarnings w ++
+                     case unrecognizedFields of
+                         [] -> []
+                         _ -> [JSONUnrecognizedFields expected unrecognizedFields]))
 
 -- | Convert a 'WarningParser' to a 'Parser'.
 unWarningParser :: WarningParser a -> Parser a
@@ -106,9 +108,9 @@ logJSONWarnings fp =
     mapM_ (\w -> $logWarn ("Warning: " <> T.pack fp <> ": " <> T.pack (show w)))
 
 -- | Handle warnings in a sub-object.
-jsonSubWarnings :: WarningParser (a, [JSONWarning]) -> WarningParser a
+jsonSubWarnings :: WarningParser (WithJSONWarnings a) -> WarningParser a
 jsonSubWarnings f = do
-    (result,warnings) <- f
+    WithJSONWarnings result warnings <- f
     tell
         (mempty
          { wpmWarnings = warnings
@@ -118,17 +120,21 @@ jsonSubWarnings f = do
 -- | Handle warnings in a @Traversable@ of sub-objects.
 jsonSubWarningsT
     :: Traversable t
-    => WarningParser (t (a, [JSONWarning])) -> WarningParser (t a)
+    => WarningParser (t (WithJSONWarnings a)) -> WarningParser (t a)
 jsonSubWarningsT f =
     Traversable.mapM (jsonSubWarnings . return) =<< f
 
 -- | Handle warnings in a @Maybe Traversable@ of sub-objects.
 jsonSubWarningsTT
     :: (Traversable t, Traversable u)
-    => WarningParser (u (t (a, [JSONWarning])))
+    => WarningParser (u (t (WithJSONWarnings a)))
     -> WarningParser (u (t a))
 jsonSubWarningsTT f =
     Traversable.mapM (jsonSubWarningsT . return) =<< f
+
+-- Parsed JSON value without any warnings
+noJSONWarnings :: a -> WithJSONWarnings a
+noJSONWarnings v = WithJSONWarnings v []
 
 -- | JSON parser that warns about unexpected fields in objects.
 type WarningParser a = WriterT WarningParserMonoid Parser a
@@ -147,6 +153,14 @@ instance Monoid WarningParserMonoid where
               (wpmExpectedFields b)
         , wpmWarnings = wpmWarnings a ++ wpmWarnings b
         }
+
+-- Parsed JSON value with its warnings
+data WithJSONWarnings a = WithJSONWarnings a [JSONWarning]
+instance Functor WithJSONWarnings where
+    fmap f (WithJSONWarnings x w) = WithJSONWarnings (f x) w
+instance Monoid a => Monoid (WithJSONWarnings a) where
+    mempty = noJSONWarnings mempty
+    mappend (WithJSONWarnings a aw) (WithJSONWarnings b bw) = WithJSONWarnings (mappend a b) (mappend aw bw)
 
 -- | Warning output from 'WarningParser'.
 data JSONWarning = JSONUnrecognizedFields String [Text]
