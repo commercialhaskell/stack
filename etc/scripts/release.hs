@@ -221,7 +221,7 @@ rules global@Global{..} args = do
     releaseDir </> binaryPkgSignatureFileName %> \out -> do
         need [out -<.> ""]
         _ <- liftIO $ tryJust (guard . isDoesNotExistError) (removeFile out)
-        cmd "gpg --detach-sig --armor"
+        cmd "gpg --detach-sig --digest-algo=sha512 --armor"
             [ "-u", gGpgKey
             , dropExtension out ]
 
@@ -250,6 +250,7 @@ rules global@Global{..} args = do
            need [pkgFile]
            () <- cmd "deb-s3 upload --preserve-versions --bucket download.fpcomplete.com"
                [ "--sign=" ++ gGpgKey
+               , "--gpg-options=--digest-algo=sha512"
                , "--prefix=" ++ dvDistro
                , "--codename=" ++ dvCodeName
                , pkgFile ]
@@ -257,6 +258,7 @@ rules global@Global{..} args = do
            -- configured with it.
            () <- cmd "deb-s3 upload --preserve-versions --bucket download.fpcomplete.com"
                [ "--sign=" ++ gGpgKey
+               , "--gpg-options=--digest-algo=sha512"
                , "--prefix=" ++ dvDistro ++ "/" ++ dvCodeName
                , pkgFile ]
            copyFileChanged pkgFile out
