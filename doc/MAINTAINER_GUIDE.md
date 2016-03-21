@@ -2,6 +2,10 @@
 
 ## Next release:
 
+* Check that GPG signature for
+  [Releases](https://s3.amazonaws.com/download.fpcomplete.com/debian/dists/jessie/Release)
+  uses SHA512, and close
+  [#1943](https://github.com/commercialhaskell/stack/issues/1934)
 * Integrate FreeBSD binaries and packages
   [#1253](https://github.com/commercialhaskell/stack/issues/1253#issuecomment-185993240)
 
