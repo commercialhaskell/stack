@@ -142,7 +142,7 @@ data BuildOptsMonoid = BuildOptsMonoid
     , buildMonoidSplitObjs :: !(Maybe Bool)
     } deriving (Show)
 
-instance FromJSON (BuildOptsMonoid, [JSONWarning]) where
+instance FromJSON (WithJSONWarnings BuildOptsMonoid) where
   parseJSON = withObjectWarnings "BuildOptsMonoid"
     (\o -> do buildMonoidLibProfile <- o ..:? buildMonoidLibProfileArgName
               buildMonoidExeProfile <- o ..:? buildMonoidExeProfileArgName
@@ -276,7 +276,7 @@ data TestOptsMonoid =
     , toMonoidDisableRun :: !(Maybe Bool)
     } deriving (Show)
 
-instance FromJSON (TestOptsMonoid, [JSONWarning]) where
+instance FromJSON (WithJSONWarnings TestOptsMonoid) where
   parseJSON = withObjectWarnings "TestOptsMonoid"
     (\o -> do toMonoidRerunTests <- o ..:? toMonoidRerunTestsArgName
               toMonoidAdditionalArgs <- o ..:? toMonoidAdditionalArgsName ..!= []
@@ -329,7 +329,7 @@ data BenchmarkOptsMonoid =
      , beoMonoidDisableRun :: !(Maybe Bool)
      } deriving (Show)
 
-instance FromJSON (BenchmarkOptsMonoid, [JSONWarning]) where
+instance FromJSON (WithJSONWarnings BenchmarkOptsMonoid) where
   parseJSON = withObjectWarnings "BenchmarkOptsMonoid"
     (\o -> do beoMonoidAdditionalArgs <- o ..:? beoMonoidAdditionalArgsArgName
               beoMonoidDisableRun <- o ..:? beoMonoidDisableRunArgName
