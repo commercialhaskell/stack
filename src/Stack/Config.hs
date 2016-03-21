@@ -321,8 +321,8 @@ getDefaultGHCVariant menv (Platform _ Linux) = do
     $logDebug "Checking whether stack was built with libgmp4"
     isGMP4 <- getIsGMP4 menv
     if isGMP4
-        then $logDebug "Stack was build with libgmp4, so the default ghc-variant will be gmp4"
-        else $logDebug "Stack was not build with libgmp4"
+        then $logDebug "Stack was built with libgmp4, so the default ghc-variant will be gmp4"
+        else $logDebug "Stack was not built with libgmp4"
     return (if isGMP4 then GHCGMP4 else GHCStandard)
 getDefaultGHCVariant _ _ = return GHCStandard
 
