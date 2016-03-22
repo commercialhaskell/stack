@@ -326,13 +326,6 @@ mergeConstraints = Map.mergeWithKey
            else error "Bug: An entry in flag map must have a corresponding \
                       \entry in the version map")
 
-diffConstraints
-    :: (Eq v, Eq f)
-    => (v, f) -> (v, f) -> Maybe (v, f)
-diffConstraints (v, f) (v', f')
-    | (v == v') && (f == f') = Nothing
-    | otherwise              = Just (v, f)
-
 -- | Given a resolver, user package constraints (versions and flags) and extra
 -- dependency constraints determine what extra dependencies are required
 -- outside the resolver snapshot and the specified extra dependencies.
@@ -407,10 +400,19 @@ solveResolverSpec stackYaml cabalDirs
                 -- returned versions or flags different from the snapshot.
                 inSnapChanged = Map.differenceWith diffConstraints
                                                    inSnap snapConstraints
+                -- report stale flags in build plan
+                spuriousFlags = Map.differenceWith diffSpuriousFlags
+                                                   inSnap snapConstraints
                 -- Packages neither in snapshot, nor srcs
                 extra = Map.difference deps (Map.union srcConstraints
                                                        snapConstraints)
                 external = Map.union inSnapChanged extra
+
+            when (not $ Map.null spuriousFlags) $ do
+                $logInfo $ "WARNING! Ignoring the following spurious flags \
+                           \found in the build plan:\n"
+                           <> T.concat (map (uncurry showPackageFlags)
+                                            (Map.toList (fmap snd spuriousFlags)))
 
             $logInfo $ "Successfully determined a build plan with "
                      <> T.pack (show $ Map.size external)
@@ -420,6 +422,30 @@ solveResolverSpec stackYaml cabalDirs
         Left x -> do
             $logInfo $ "*** Failed to arrive at a workable build plan."
             return $ Left x
+    where
+        -- Think of the first map as the deps reported in cabal output and
+        -- the second as the snapshot packages
+
+        -- Note: For flags we only require that the flags in cabal output be a
+        -- subset of the snapshot flags. This is to avoid a false difference
+        -- reporting due to any spurious flags in the build plan which will
+        -- always be absent in the cabal output.
+        diffConstraints
+            :: (Eq v, Eq a, Ord k)
+            => (v, Map k a) -> (v, Map k a) -> Maybe (v, Map k a)
+        diffConstraints (v, f) (v', f')
+            | (v == v') && (f `Map.isSubmapOf` f') = Nothing
+            | otherwise              = Just (v, f)
+
+        -- Report cases where package versions are identical but all flags
+        -- present in snapshot are not present in the cabal output
+        diffSpuriousFlags
+            :: (Eq v, Eq a, Ord k)
+            => (v, Map k a) -> (v, Map k a) -> Maybe (v, Map k a)
+        diffSpuriousFlags (v, f) (v', f')
+            | (v == v') && (not $ Map.null $ f' `Map.difference` f)
+                = Just (v, f' `Map.difference` f)
+            | otherwise              = Nothing
 
 -- | Given a resolver (snpashot, compiler or custom resolver)
 -- return the compiler version, package versions and packages flags

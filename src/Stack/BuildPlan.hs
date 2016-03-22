@@ -28,6 +28,7 @@ module Stack.BuildPlan
     , getToolMap
     , shadowMiniBuildPlan
     , showItems
+    , showPackageFlags
     , parseCustomMiniBuildPlan
     ) where
 
@@ -767,6 +768,21 @@ showItems items = T.concat (map formatItem items)
             , "\n"
             ]
 
+showPackageFlags :: PackageName -> Map FlagName Bool -> Text
+showPackageFlags pkg fl =
+    if (not $ Map.null fl) then
+        T.concat
+            [ "    - "
+            , T.pack $ packageNameString pkg
+            , ": "
+            , T.pack $ intercalate ", "
+                     $ map formatFlags (Map.toList fl)
+            , "\n"
+            ]
+    else ""
+    where
+        formatFlags (f, v) = (show f) ++ " = " ++ (show v)
+
 showMapPackages :: Map PackageName a -> Text
 showMapPackages mp = showItems $ Map.keys mp
 
@@ -818,21 +834,7 @@ showDepErrors flags errs =
 
         flagVals = T.concat (map showFlags userPkgs)
         userPkgs = Map.keys $ Map.unions (Map.elems (fmap deNeededBy errs))
-        showFlags pkg = maybe "" (printFlags pkg) (Map.lookup pkg flags)
-
-        printFlags pkg fl =
-            if (not $ Map.null fl) then
-                T.concat
-                    [ "    - "
-                    , T.pack $ packageNameString pkg
-                    , ": "
-                    , T.pack $ intercalate ", "
-                             $ map formatFlags (Map.toList fl)
-                    , "\n"
-                    ]
-            else ""
-
-        formatFlags (f, v) = (show f) ++ " = " ++ (show v)
+        showFlags pkg = maybe "" (showPackageFlags pkg) (Map.lookup pkg flags)
 
 shadowMiniBuildPlan :: MiniBuildPlan
                     -> Set PackageName
