@@ -386,6 +386,7 @@ data SpecialExecCmd
     = ExecCmd String
     | ExecGhc
     | ExecRunGhc
+    | ExecHoogle
     deriving (Show, Eq)
 
 data ExecOptsExtra
