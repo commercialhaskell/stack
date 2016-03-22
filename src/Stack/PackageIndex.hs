@@ -19,6 +19,7 @@
 module Stack.PackageIndex
     ( updateAllIndices
     , getPackageCaches
+    , getPackageVersions
     , clearPackageCaches
     ) where
 
@@ -46,6 +47,8 @@ import           Data.IORef (readIORef, writeIORef)
 import           Data.Int (Int64)
 import           Data.Map (Map)
 import qualified Data.Map.Strict as Map
+import           Data.Set (Set)
+import qualified Data.Set as Set
 import           Data.Monoid
 import           Data.Text (Text)
 import qualified Data.Text as T
@@ -344,13 +347,24 @@ deleteCache indexName' = do
         Left e -> $logDebug $ "Could not delete cache: " <> T.pack (show e)
         Right () -> $logDebug $ "Deleted index cache at " <> T.pack (toFilePath fp)
 
+-- | Get the known versions for a given package from the package caches.
+--
+-- See 'getPackageCaches' for performance notes.
+getPackageVersions
+    :: (MonadIO m, MonadLogger m, MonadReader env m, HasConfig env, HasHttpManager env, MonadBaseControl IO m, MonadCatch m)
+    => PackageName
+    -> m (Set Version)
+getPackageVersions pkgName = do
+    caches <- getPackageCaches
+    return (Set.fromList [v | PackageIdentifier n v <- Map.keys caches, n == pkgName])
 
--- | Load the cached package URLs, or created the cache if necessary.
+-- | Load the package caches, or create the caches if necessary.
 --
 -- This has two levels of caching: in memory, and the on-disk cache. So,
 -- feel free to call this function multiple times.
-getPackageCaches :: (MonadIO m, MonadLogger m, MonadReader env m, HasConfig env, MonadThrow m, HasHttpManager env, MonadBaseControl IO m, MonadCatch m)
-                 => m (Map PackageIdentifier (PackageIndex, PackageCache))
+getPackageCaches
+    :: (MonadIO m, MonadLogger m, MonadReader env m, HasConfig env, HasHttpManager env, MonadBaseControl IO m, MonadCatch m)
+    => m (Map PackageIdentifier (PackageIndex, PackageCache))
 getPackageCaches = do
     menv <- getMinimalEnvOverride
     config <- askConfig
