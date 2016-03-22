@@ -50,6 +50,8 @@ data PackageException
   | PackageNoCabalFileFound (Path Abs Dir)
   | PackageMultipleCabalFilesFound (Path Abs Dir) [Path Abs File]
   | MismatchedCabalName (Path Abs File) PackageName
+  | UnknownPackageNames (Set PackageName)
+  | UnknownPackageIdentifiers (Set PackageIdentifier) String
   deriving Typeable
 instance Exception PackageException
 instance Show PackageException where
@@ -77,6 +79,13 @@ instance Show PackageException where
         , ".cabal\n"
         , "For more information, see: https://github.com/commercialhaskell/stack/issues/317"
         ]
+    show (UnknownPackageNames names) =
+        "The following packages were not found in your indices: " ++
+        intercalate ", " (map packageNameString $ Set.toList names)
+    show (UnknownPackageIdentifiers idents suggestions) =
+        "The following package identifiers were not found in your indices: " ++
+        intercalate ", " (map packageIdentifierString $ Set.toList idents) ++
+        (if null suggestions then "" else "\n" ++ suggestions)
 
 -- | Some package info.
 data Package =

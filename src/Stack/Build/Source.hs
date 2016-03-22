@@ -441,7 +441,10 @@ extendExtraDeps :: (MonadThrow m, MonadReader env m, HasBuildConfig env)
                 -> Map PackageName Version -- ^ latest versions in indices
                 -> m (Map PackageName Version) -- ^ new extradeps
 extendExtraDeps extraDeps0 cliExtraDeps unknowns latestVersion
-    | null errs = return $ Map.unions $ extraDeps1 : unknowns'
+    | not (Map.null missing) =
+        throwM $ UnknownPackageIdentifiers (toPkgIdents missing) ""
+    | null errs =
+        return $ Map.unions $ extraDeps1 : unknowns'
     | otherwise = do
         bconfig <- asks getBuildConfig
         throwM $ UnknownTargets
@@ -449,7 +452,12 @@ extendExtraDeps extraDeps0 cliExtraDeps unknowns latestVersion
             Map.empty -- TODO check the cliExtraDeps for presence in index
             (bcStackYaml bconfig)
   where
-    extraDeps1 = Map.union extraDeps0 cliExtraDeps
+    (missing, extraDeps1) =
+        Map.partitionWithKey missingFromIndex $ Map.union extraDeps0 cliExtraDeps
+
+    missingFromIndex name _ = isNothing $ Map.lookup name latestVersion
+
+    toPkgIdents = Set.fromList . map fromTuple . Map.toList
 
     (errs, unknowns') = partitionEithers $ map addUnknown $ Set.toList unknowns
     addUnknown pn =

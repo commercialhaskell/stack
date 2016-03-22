@@ -86,8 +86,6 @@ data FetchException
     | Couldn'tReadPackageTarball FilePath SomeException
     | UnpackDirectoryAlreadyExists (Set FilePath)
     | CouldNotParsePackageSelectors [String]
-    | UnknownPackageNames (Set PackageName)
-    | UnknownPackageIdentifiers (Set PackageIdentifier) String
     deriving Typeable
 instance Exception FetchException
 
@@ -110,13 +108,6 @@ instance Show FetchException where
     show (CouldNotParsePackageSelectors strs) =
         "The following package selectors are not valid package names or identifiers: " ++
         intercalate ", " strs
-    show (UnknownPackageNames names) =
-        "The following packages were not found in your indices: " ++
-        intercalate ", " (map packageNameString $ Set.toList names)
-    show (UnknownPackageIdentifiers idents suggestions) =
-        "The following package identifiers were not found in your indices: " ++
-        intercalate ", " (map packageIdentifierString $ Set.toList idents) ++
-        (if null suggestions then "" else "\n" ++ suggestions)
 
 -- | Fetch packages into the cache without unpacking
 fetchPackages :: (MonadIO m, MonadBaseControl IO m, MonadReader env m, HasHttpManager env, HasConfig env, MonadThrow m, MonadLogger m, MonadCatch m)
