@@ -7,10 +7,16 @@ module Path.Extra
   ,dropRoot
   ,parseCollapsedAbsDir
   ,parseCollapsedAbsFile
+  ,rejectMissingFile
+  ,rejectMissingDir
   ) where
 
+import           Control.Monad (liftM)
 import           Control.Monad.Catch
+import           Control.Monad.IO.Class
+import           Data.Bool (bool)
 import           Path
+import           Path.IO
 import           Path.Internal (Path(..))
 import qualified System.FilePath as FP
 
@@ -60,3 +66,31 @@ collapseFilePath = FP.joinPath . reverse . foldl go [] . FP.splitDirectories
 -- Windows).
 dropRoot :: Path Abs t -> Path Rel t
 dropRoot (Path l) = Path (FP.dropDrive l)
+
+-- | If given file in 'Maybe' does not exist, ensure we have 'Nothing'. This
+-- is to be used in conjunction with 'forgivingAbsence' and
+-- 'resolveFile'.
+--
+-- Previously the idiom @forgivingAbsence (relsoveFile …)@ alone was used,
+-- which relied on 'canonicalizePath' throwing 'isDoesNotExistError' when
+-- path does not exist. As it turns out, this behavior is actually not
+-- intentional and unreliable, see
+-- <https://github.com/haskell/directory/issues/44>. This was “fixed” in
+-- version @1.2.3.0@ of @directory@ package (now it never throws). To make
+-- it work with all versions, we need to use the following idiom:
+--
+-- > forgivingAbsence (resolveFile …) >>= rejectMissingFile
+
+rejectMissingFile :: MonadIO m
+  => Maybe (Path Abs File)
+  -> m (Maybe (Path Abs File))
+rejectMissingFile Nothing = return Nothing
+rejectMissingFile (Just p) = bool Nothing (Just p) `liftM` doesFileExist p
+
+-- | See 'rejectMissingFile'.
+
+rejectMissingDir :: MonadIO m
+  => Maybe (Path Abs Dir)
+  -> m (Maybe (Path Abs Dir))
+rejectMissingDir Nothing = return Nothing
+rejectMissingDir (Just p) = bool Nothing (Just p) `liftM` doesDirExist p

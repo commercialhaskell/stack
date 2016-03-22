@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP                   #-}
 {-# LANGUAGE DeriveDataTypeable    #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings     #-}
@@ -25,7 +26,7 @@ module Network.HTTP.Download
 import           Control.Exception           (Exception)
 import           Control.Exception.Enclosed  (handleIO)
 import           Control.Monad               (void)
-import           Control.Monad.Catch         (MonadThrow, throwM)
+import           Control.Monad.Catch         (MonadThrow, MonadMask, throwM)
 import           Control.Monad.IO.Class      (MonadIO, liftIO)
 import           Control.Monad.Reader        (MonadReader, ReaderT, ask,
                                               runReaderT)
@@ -102,37 +103,39 @@ redownload req0 dest = do
                     }
         req2 = req1 { checkStatus = \_ _ _ -> Nothing }
     env <- ask
-    liftIO $ flip runReaderT env $ withResponse req2 $ \res -> case () of
-      ()
-        | responseStatus res == status200 -> liftIO $ do
-            createDirectoryIfMissing True $ takeDirectory destFilePath
+    liftIO $ recoveringHttp drRetryPolicyDefault $ flip runReaderT env $
+      withResponse req2 $ \res -> case () of
+        ()
+          | responseStatus res == status200 -> liftIO $ do
+              createDirectoryIfMissing True $ takeDirectory destFilePath
 
-            -- Order here is important: first delete the etag, then write the
-            -- file, then write the etag. That way, if any step fails, it will
-            -- force the download to happen again.
-            handleIO (const $ return ()) $ removeFile etagFilePath
+              -- Order here is important: first delete the etag, then write the
+              -- file, then write the etag. That way, if any step fails, it will
+              -- force the download to happen again.
+              handleIO (const $ return ()) $ removeFile etagFilePath
 
-            let destFilePathTmp = destFilePath <.> "tmp"
-            withBinaryFile destFilePathTmp WriteMode $ \h ->
-                responseBody res $$ sinkHandle h
-            renameFile destFilePathTmp destFilePath
+              let destFilePathTmp = destFilePath <.> "tmp"
+              withBinaryFile destFilePathTmp WriteMode $ \h ->
+                  responseBody res $$ sinkHandle h
+              renameFile destFilePathTmp destFilePath
 
-            forM_ (lookup "ETag" (responseHeaders res)) $ \e -> do
-                let tmp = etagFilePath <.> "tmp"
-                S.writeFile tmp e
-                renameFile tmp etagFilePath
+              forM_ (lookup "ETag" (responseHeaders res)) $ \e -> do
+                  let tmp = etagFilePath <.> "tmp"
+                  S.writeFile tmp e
+                  renameFile tmp etagFilePath
 
-            return True
-        | responseStatus res == status304 -> return False
-        | otherwise -> throwM $ RedownloadFailed req2 dest $ void res
+              return True
+          | responseStatus res == status304 -> return False
+          | otherwise -> throwM $ RedownloadFailed req2 dest $ void res
 
 -- | Download a JSON value and parse it using a 'FromJSON' instance.
-downloadJSON :: (FromJSON a, MonadReader env m, HasHttpManager env, MonadIO m, MonadThrow m)
+downloadJSON :: (FromJSON a, MonadReader env m, HasHttpManager env, MonadIO m, MonadThrow m, MonadMask m)
              => Request
              -> m a
 downloadJSON req = do
-    val <- liftHTTP $ withResponse req $ \res ->
-        responseBody res $$ sinkParser json'
+    val <- recoveringHttp drRetryPolicyDefault $
+        liftHTTP $ withResponse req $ \res ->
+            responseBody res $$ sinkParser json'
     case parseEither parseJSON val of
         Left e -> throwM $ DownloadJSONException req e
         Right x -> return x

@@ -21,7 +21,7 @@ module Stack.Build.Target
 
 import           Control.Applicative
 import           Control.Arrow          (second)
-import           Control.Monad.Catch    (MonadThrow, throwM)
+import           Control.Monad.Catch    (MonadCatch, throwM)
 import           Control.Monad.IO.Class
 import           Data.Either            (partitionEithers)
 import           Data.Map               (Map)
@@ -33,6 +33,7 @@ import qualified Data.Set               as Set
 import           Data.Text              (Text)
 import qualified Data.Text              as T
 import           Path
+import           Path.Extra (rejectMissingDir)
 import           Path.IO
 import           Prelude -- Fix redundant import warnings
 import           Stack.Types
@@ -101,11 +102,11 @@ data LocalPackageView = LocalPackageView
     , lpvRoot       :: !(Path Abs Dir)
     , lpvCabalFP    :: !(Path Abs File)
     , lpvComponents :: !(Set NamedComponent)
-    , lpvExtraDep   :: !Bool
+    , lpvExtraDep   :: !TreatLikeExtraDep
     }
 
 -- | Same as @parseRawTarget@, but also takes directories into account.
-parseRawTargetDirs :: (MonadIO m, MonadThrow m)
+parseRawTargetDirs :: (MonadIO m, MonadCatch m)
                    => Path Abs Dir -- ^ current directory
                    -> Map PackageName LocalPackageView
                    -> Text
@@ -114,7 +115,8 @@ parseRawTargetDirs root locals t =
     case parseRawTarget t of
         Just rt -> return $ Right [(ri, rt)]
         Nothing -> do
-            mdir <- resolveDirMaybe root $ T.unpack t
+            mdir <- forgivingAbsence (resolveDir root (T.unpack t))
+              >>= rejectMissingDir
             case mdir of
                 Nothing -> return $ Left $ "Directory not found: " `T.append` t
                 Just dir ->
@@ -273,7 +275,7 @@ data NeedTargets
     = NeedTargets
     | AllowNoTargets
 
-parseTargets :: (MonadThrow m, MonadIO m)
+parseTargets :: (MonadCatch m, MonadIO m)
              => NeedTargets -- ^ need at least one target
              -> Bool -- ^ using implicit global project?
              -> Map PackageName Version -- ^ snapshot

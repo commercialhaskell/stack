@@ -4,7 +4,7 @@ Docker integration
 `stack` has support for automatically performing builds inside a Docker
 container, using volume mounts and user ID switching to make it mostly seamless.
 FP Complete provides images for use with stack that include GHC, tools, and
-optionally have all of the Stackage LTS packages pre-installed in in the global
+optionally have all of the Stackage LTS packages pre-installed in the global
 package database.
 
 The primary purpose for using stack/docker this way is for teams to ensure all
@@ -72,10 +72,10 @@ in the last seven days marked for removal.  You can add or remove the `R` in
 the left-most column to flag or unflag an image/container for removal.  When
 you save the file and quit the text editor, those images marked for removal
 will be deleted from your system.  If you wish to abort the cleanup, delete
-all all the lines from your editor.
+all the lines from your editor.
 
 If you use Docker for purposes other than stack, you may have other images on
-your system as well.  These will also appear in in a separate section, but they
+your system as well.  These will also appear in a separate section, but they
 will not be marked for removal by default.
 
 Run `stack docker cleanup --help` to see additional options to customize its
@@ -87,7 +87,7 @@ In order to preserve the contents of the in-container home directory between
 runs, a special "sandbox" directory is volume-mounted into the container. `stack
 docker reset` will reset that sandbox to its defaults.
 
-Note: this leaves of `~/.stack` (which is separately volume-mounted) alone.
+Note: `~/.stack` is separately volume-mounted, and is left alone during reset.
 
 Command-line options
 -------------------------------------------------------------------------------
@@ -231,7 +231,7 @@ FP Complete provides the following public image repositories on Docker Hub:
 
 FP Complete also builds custom variants of these images for their clients.
 
-These images can also be used directory with `docker run` and provide a complete
+These images can also be used directly with `docker run` and provide a complete
 Haskell build environment.
 
 In addition, most Docker images that contain the basics for running GHC can be
@@ -311,7 +311,7 @@ persisted across runs, this means that if you `stack exec sudo apt-get install
 some-ubuntu-package`, that package will be installed but then the container it's
 installed in will disappear, thus causing it to have no effect. If you wish to
 make this kind of change permanent, see later instructions for how to create a
-[derivative Docker image](#derivativeimage).
+[derivative Docker image](#derivative-image).
 
 Inside the container, your home directory is a special location that volume-
 mounted from within your project directory's `.stack-work` in such a
@@ -320,7 +320,7 @@ Stackage snapshots.  In addition, `~/.stack` is volume-mounted from the host.
 
 ### Network
 
-stack containers use use the host's network stack within the container
+stack containers use the host's network stack within the container
 by default, meaning a process running in the container can connect to
 services running on the host, and a server process run within the container
 can be accessed from the host without needing to explicitly publish its port.
@@ -353,26 +353,27 @@ information about managing Docker containers.
 
 Creating your own custom derivative image can be useful if you need to install
 additional Ubuntu packages or make other changes to the operating system. Here
-is an example (replace `custom` if you prefer a different name for your derived
-container):
+is an example (replace `stack-build:custom` if you prefer a different name for
+your derived container, but it's best if the repo name matches what you're
+deriving from, only with a different tag, to avoid recompilation):
 
-    # On host
-    $ stack  --docker-persist --docker-container-name=temp exec --plain bash
+    ;;; On host
+    $ sudo stack  --docker-persist --docker-container-name=temp exec bash
 
-    # In container, make changes to OS
-    $ sudo apt-get install r-cran-numderiv
+    ;;; In container, make changes to OS
+    # apt-get install r-cran-numderiv
     [...]
-    $ exit
+    # exit
 
-    # On host again
-    $ docker commit temp custom
+    ;;; On host again
+    $ docker commit temp stack-build:custom
     $ docker rm temp
 
-Now you have a new Docker image named `custom`. To use the new image, run
+Now you have a new Docker image named `stack-build:custom`. To use the new image, run
 a command such as the following or update the corresponding values in your
 `stack.yaml`:
 
-    stack --docker-image=custom <COMMAND>
+    stack --docker-image=stack-build:custom <COMMAND>
 
 Note, however, that any time a new image is used, you will have to re-do this
 process. You could also use a Dockerfile to make this reusable. Consult the

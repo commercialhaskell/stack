@@ -16,7 +16,7 @@ import qualified Control.Exception.Lifted as EL
 import           Control.Monad hiding (mapM, forM)
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
-import           Control.Monad.Reader (ask, asks, runReaderT)
+import           Control.Monad.Reader (ask, asks,local,runReaderT)
 import           Control.Monad.Trans.Control (MonadBaseControl)
 import           Data.Attoparsec.Args (parseArgs, EscapingMode (Escaping))
 import           Data.Attoparsec.Interpreter (getInterpreterArgs)
@@ -41,6 +41,7 @@ import           Development.GitRev (gitCommitCount, gitHash)
 import           Distribution.System (buildArch, buildPlatform)
 import           Distribution.Text (display)
 import           GHC.IO.Encoding (mkTextEncoding, textEncodingName)
+import           Lens.Micro
 import           Network.HTTP.Client
 import           Options.Applicative
 import           Options.Applicative.Args
@@ -75,7 +76,7 @@ import qualified Stack.Image as Image
 import           Stack.Init
 import           Stack.New
 import           Stack.Options
-import           Stack.Package (getCabalFileName)
+import           Stack.Package (findOrGenerateCabalFile)
 import qualified Stack.PackageIndex
 import           Stack.SDist (getSDistTarball, checkSDistTarball, checkSDistTarball')
 import           Stack.Setup
@@ -86,8 +87,7 @@ import           Stack.Types.Internal
 import           Stack.Types.StackT
 import           Stack.Upgrade
 import qualified Stack.Upload as Upload
-import           System.Directory (canonicalizePath, doesFileExist, doesDirectoryExist, createDirectoryIfMissing)
-import qualified System.Directory as Directory (findExecutable)
+import qualified System.Directory as D
 import           System.Environment (getEnvironment, getProgName, getArgs, withArgs)
 import           System.Exit
 import           System.FileLock (lockFile, tryLockFile, unlockFile, SharedExclusive(Exclusive), FileLock)
@@ -203,30 +203,30 @@ commandLineHandler progName isInterpreter = complicatedOptions
 
     addCommands = do
       when (not isInterpreter) (do
-        addCommand' "build"
-                    "Build the package(s) in this directory/configuration"
-                    buildCmd
-                    (buildOptsParser Build)
-        addCommand' "install"
-                    "Shortcut for 'build --copy-bins'"
-                    buildCmd
-                    (buildOptsParser Install)
+        addBuildCommand' "build"
+                         "Build the package(s) in this directory/configuration"
+                         buildCmd
+                         (buildOptsParser Build)
+        addBuildCommand' "install"
+                         "Shortcut for 'build --copy-bins'"
+                         buildCmd
+                         (buildOptsParser Install)
         addCommand' "uninstall"
                     "DEPRECATED: This command performs no actions, and is present for documentation only"
                     uninstallCmd
                     (many $ strArgument $ metavar "IGNORED")
-        addCommand' "test"
-                    "Shortcut for 'build --test'"
-                    buildCmd
-                    (buildOptsParser Test)
-        addCommand' "bench"
-                    "Shortcut for 'build --bench'"
-                    buildCmd
-                    (buildOptsParser Bench)
-        addCommand' "haddock"
-                    "Shortcut for 'build --haddock'"
-                    buildCmd
-                    (buildOptsParser Haddock)
+        addBuildCommand' "test"
+                         "Shortcut for 'build --test'"
+                         buildCmd
+                         (buildOptsParser Test)
+        addBuildCommand' "bench"
+                         "Shortcut for 'build --bench'"
+                         buildCmd
+                         (buildOptsParser Bench)
+        addBuildCommand' "haddock"
+                         "Shortcut for 'build --haddock'"
+                         buildCmd
+                         (buildOptsParser Haddock)
         addCommand' "new"
                     "Create a new project from a template. Run `stack templates' to see available templates."
                     newCmd
@@ -236,11 +236,11 @@ commandLineHandler progName isInterpreter = complicatedOptions
                     templatesCmd
                     (pure ())
         addCommand' "init"
-                    "Initialize a stack project based on one or more cabal packages"
+                    "Create stack project config from cabal or hpack package specifications"
                     initCmd
                     initOptsParser
         addCommand' "solver"
-                    "Use a dependency solver to try and determine missing extra-deps"
+                    "Add missing extra-deps to stack project config"
                     solverCmd
                     solverOptsParser
         addCommand' "setup"
@@ -437,6 +437,9 @@ commandLineHandler progName isInterpreter = complicatedOptions
         addSubCommands' cmd title =
             addSubCommands cmd title globalFooter (globalOpts OtherCmdGlobalOpts)
 
+        -- Additional helper that hides global options and shows build options
+        addBuildCommand' cmd title constr =
+            addCommand cmd title globalFooter constr (globalOpts BuildCmdGlobalOpts)
 
     globalOpts kind =
         extraHelpOption hide progName (Docker.dockerCmdName ++ "*") Docker.dockerHelpOptName <*>
@@ -456,11 +459,11 @@ secondaryCommandHandler
   -> ParserFailure ParserHelp
   -> IO (ParserFailure ParserHelp)
 secondaryCommandHandler args f =
-    -- don't even try when the argument looks like a path
-    if elem pathSeparator cmd
+    -- don't even try when the argument looks like a path or flag
+    if elem pathSeparator cmd || "-" `isPrefixOf` (head args)
        then return f
     else do
-      mExternalExec <- Directory.findExecutable cmd
+      mExternalExec <- D.findExecutable cmd
       case mExternalExec of
         Just ex -> do
           menv <- getEnvOverride buildPlatform
@@ -483,7 +486,7 @@ interpreterHandler
   -> ParserFailure ParserHelp
   -> IO (GlobalOptsMonoid, (GlobalOpts -> IO (), t))
 interpreterHandler args f = do
-  isFile <- doesFileExist file
+  isFile <- D.doesFileExist file
   if isFile
   then runInterpreterCommand file
   else parseResultHandler (errorCombine (noSuchFile file))
@@ -532,7 +535,7 @@ pathCmd keys go =
             -- So it's not the *minimal* override path.
             menv <- getMinimalEnvOverride
             snap <- packageDatabaseDeps
-            local <- packageDatabaseLocal
+            plocal <- packageDatabaseLocal
             extra <- packageDatabaseExtra
             global <- getGlobalDB menv =<< getWhichCompiler
             snaproot <- installationRootDeps
@@ -558,7 +561,7 @@ pathCmd keys go =
                                     bc
                                     menv
                                     snap
-                                    local
+                                    plocal
                                     global
                                     snaproot
                                     localroot
@@ -762,7 +765,7 @@ withUserFileLock go@GlobalOpts{} dir act = do
         then do
             let lockfile = $(mkRelFile "lockfile")
             let pth = dir </> lockfile
-            liftIO $ createDirectoryIfMissing True (toFilePath dir)
+            ensureDir dir
             -- Just in case of asynchronous exceptions, we need to be careful
             -- when using tryLockFile here:
             EL.bracket (liftIO $ tryLockFile (toFilePath pth) Exclusive)
@@ -872,20 +875,27 @@ cleanCmd :: CleanOpts -> GlobalOpts -> IO ()
 cleanCmd opts go = withBuildConfigAndLock go (const (clean opts))
 
 -- | Helper for build and install commands
-buildCmd :: BuildOpts -> GlobalOpts -> IO ()
+buildCmd :: BuildOptsCLI -> GlobalOpts -> IO ()
 buildCmd opts go = do
-  when (any (("-prof" `elem`) . either (const []) id . parseArgs Escaping) (boptsGhcOptions opts)) $ do
+  when (any (("-prof" `elem`) . either (const []) id . parseArgs Escaping) (boptsCLIGhcOptions opts)) $ do
     hPutStrLn stderr "When building with stack, you should not use the -prof GHC option"
     hPutStrLn stderr "Instead, please use --library-profiling and --executable-profiling"
     hPutStrLn stderr "See: https://github.com/commercialhaskell/stack/issues/1015"
     error "-prof GHC option submitted"
-  case boptsFileWatch opts of
+  case boptsCLIFileWatch opts of
     FileWatchPoll -> fileWatchPoll stderr inner
     FileWatch -> fileWatch stderr inner
     NoFileWatch -> inner $ const $ return ()
   where
-    inner setLocalFiles = withBuildConfigAndLock go $ \lk ->
+    inner setLocalFiles = withBuildConfigAndLock go' $ \lk ->
         Stack.Build.build setLocalFiles lk opts
+    -- Read the build command from the CLI and enable it to run
+    go' = case boptsCLICommand opts of
+               Test -> set (globalOptsBuildOptsMonoid.buildOptsMonoidTests) (Just True) go
+               Haddock -> set (globalOptsBuildOptsMonoid.buildOptsMonoidHaddock) (Just True) go
+               Bench -> set (globalOptsBuildOptsMonoid.buildOptsMonoidBenchmarks) (Just True) go
+               Install -> set (globalOptsBuildOptsMonoid.buildOptsMonoidInstallExes) (Just True) go
+               Build -> go -- Default case is just Build
 
 uninstallCmd :: [String] -> GlobalOpts -> IO ()
 uninstallCmd _ go = withConfigAndLock go $ do
@@ -923,8 +933,8 @@ uploadCmd (args, mpvpBounds, ignoreCheck, shouldSign) go = do
             r <- f x
             (as, bs) <- partitionM f xs
             return $ if r then (x:as, bs) else (as, x:bs)
-    (files, nonFiles) <- partitionM doesFileExist args
-    (dirs, invalid) <- partitionM doesDirectoryExist nonFiles
+    (files, nonFiles) <- partitionM D.doesFileExist args
+    (dirs, invalid) <- partitionM D.doesDirectoryExist nonFiles
     unless (null invalid) $ error $
         "stack upload expects a list sdist tarballs or cabal directories.  Can't find " ++
         show invalid
@@ -940,11 +950,11 @@ uploadCmd (args, mpvpBounds, ignoreCheck, shouldSign) go = do
     withBuildConfigAndLock go $ \_ -> do
         uploader <- getUploader
         unless ignoreCheck $
-            mapM_ (parseRelAsAbsFile >=> checkSDistTarball) files
+            mapM_ (resolveFile' >=> checkSDistTarball) files
         forM_
             files
             (\file ->
-                  do tarFile <- parseRelAsAbsFile file
+                  do tarFile <- resolveFile' file
                      liftIO
                          (Upload.upload uploader (toFilePath tarFile))
                      when
@@ -955,7 +965,7 @@ uploadCmd (args, mpvpBounds, ignoreCheck, shouldSign) go = do
                               tarFile))
         unless (null dirs) $
             forM_ dirs $ \dir -> do
-                pkgDir <- parseRelAsAbsDir dir
+                pkgDir <- resolveDir' dir
                 (tarName, tarBytes) <- getSDistTarball mpvpBounds pkgDir
                 unless ignoreCheck $ checkSDistTarball' tarName tarBytes
                 liftIO $ Upload.uploadBytes uploader tarName tarBytes
@@ -974,12 +984,12 @@ sdistCmd (dirs, mpvpBounds, ignoreCheck) go =
         -- If no directories are specified, build all sdist tarballs.
         dirs' <- if null dirs
             then asks (Map.keys . envConfigPackages . getEnvConfig)
-            else mapM (parseAbsDir <=< liftIO . canonicalizePath) dirs
+            else mapM resolveDir' dirs
         forM_ dirs' $ \dir -> do
             (tarName, tarBytes) <- getSDistTarball mpvpBounds dir
             distDir <- distDirFromDir dir
             tarPath <- (distDir </>) <$> parseRelFile tarName
-            liftIO $ createTree $ parent tarPath
+            ensureDir (parent tarPath)
             liftIO $ L.writeFile (toFilePath tarPath) tarBytes
             unless ignoreCheck (checkSDistTarball tarPath)
             $logInfo $ "Wrote sdist tarball to " <> T.pack (toFilePath tarPath)
@@ -1022,8 +1032,8 @@ execCmd ExecOpts {..} go@GlobalOpts{..} =
                    (ExecRunGhc, args) -> execCompiler "run" args
                let targets = concatMap words eoPackages
                unless (null targets) $
-                   Stack.Build.build (const $ return ()) lk defaultBuildOpts
-                       { boptsTargets = map T.pack targets
+                   Stack.Build.build (const $ return ()) lk defaultBuildOptsCLI
+                       { boptsCLITargets = map T.pack targets
                        }
                munlockFile lk -- Unlock before transferring control away.
                menv <- liftIO $ configEnvOverride config eoEnvSettings
@@ -1049,7 +1059,14 @@ ghciCmd :: GhciOpts -> GlobalOpts -> IO ()
 ghciCmd ghciOpts go@GlobalOpts{..} =
   withBuildConfigAndLock go $ \lk -> do
     munlockFile lk -- Don't hold the lock while in the GHCI.
-    ghci ghciOpts
+    bopts <- asks (configBuild . getConfig)
+    -- override env so running of tests and benchmarks is disabled
+    let boptsLocal = bopts
+               { boptsTestOpts = (boptsTestOpts bopts) { toDisableRun = True }
+               , boptsBenchmarkOpts = (boptsBenchmarkOpts bopts) { beoDisableRun = True }
+               }
+    local (set (envEnvConfig.envConfigBuildOpts) boptsLocal)
+          (ghci ghciOpts)
 
 -- | Run ide-backend in the context of a project.
 ideCmd :: ([Text], [String]) -> GlobalOpts -> IO ()
@@ -1065,7 +1082,7 @@ packagesCmd () go@GlobalOpts{..} =
          locals <-
              forM (M.toList (envConfigPackages econfig)) $
              \(dir,_) ->
-                  do cabalfp <- getCabalFileName dir
+                  do cabalfp <- findOrGenerateCabalFile dir
                      parsePackageNameFromFilePath cabalfp
          forM_ locals (liftIO . putStrLn . packageNameString)
 
@@ -1073,9 +1090,9 @@ packagesCmd () go@GlobalOpts{..} =
 targetsCmd :: Text -> GlobalOpts -> IO ()
 targetsCmd target go@GlobalOpts{..} =
     withBuildConfig go $
-    do let bopts = defaultBuildOpts { boptsTargets = [target] }
-       (_realTargets,_,pkgs) <- ghciSetup bopts False False Nothing []
-       pwd <- getWorkingDir
+    do let boptsCli = defaultBuildOptsCLI { boptsCLITargets = [target] }
+       (_realTargets,_,pkgs) <- ghciSetup (ideGhciOpts boptsCli)
+       pwd <- getCurrentDir
        targets <-
            fmap
                (concat . snd . unzip)
@@ -1128,7 +1145,7 @@ imgDockerCmd rebuild go@GlobalOpts{..} =
               do when rebuild $ Stack.Build.build
                          (const (return ()))
                          lk
-                         defaultBuildOpts
+                         defaultBuildOptsCLI
                  Image.stageContainerImageArtifacts)
         (Just Image.createContainerImageFromStage)
 
@@ -1137,7 +1154,7 @@ sigSignSdistCmd (url,path) go =
     withConfigAndLock
         go
         (do (manager,lc) <- liftIO (loadConfigWithOpts go)
-            tarBall <- parseRelAsAbsFile path
+            tarBall <- resolveFile' path
             runStackTGlobal
                 manager
                 (lcConfig lc)
@@ -1149,7 +1166,7 @@ sigSignSdistCmd (url,path) go =
 loadConfigWithOpts :: GlobalOpts -> IO (Manager,LoadConfig (StackLoggingT IO))
 loadConfigWithOpts go@GlobalOpts{..} = do
     manager <- newTLSManager
-    mstackYaml <- forM globalStackYaml parseRelAsAbsFile
+    mstackYaml <- forM globalStackYaml resolveFile'
     lc <- runStackLoggingTGlobal manager go $ do
         lc <- loadConfig globalConfigMonoid mstackYaml globalResolver
         -- If we have been relaunched in a Docker container, perform in-container initialization
@@ -1175,14 +1192,14 @@ withMiniConfigAndLock go inner =
 -- | Project initialization
 initCmd :: InitOpts -> GlobalOpts -> IO ()
 initCmd initOpts go = do
-    pwd <- getWorkingDir
+    pwd <- getCurrentDir
     withMiniConfigAndLock go (initProject pwd initOpts (globalResolver go))
 
 -- | Create a project directory structure and initialize the stack config.
 newCmd :: (NewOpts,InitOpts) -> GlobalOpts -> IO ()
 newCmd (newOpts,initOpts) go@GlobalOpts{..} = do
     withMiniConfigAndLock go $ do
-        dir <- new newOpts
+        dir <- new newOpts (forceOverwrite initOpts)
         initProject dir initOpts globalResolver
 
 -- | List the available templates.

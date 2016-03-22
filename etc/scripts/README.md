@@ -94,11 +94,9 @@ addition, the following options are accepted:
 * `check`: run pre-release checks.
 * `build`: build and sign the binary distribution.
 * `upload`: upload the binary distribution to the Github release.
-* `ubuntu-packages`: build Ubuntu .deb packages.
-* `ubuntu-upload`: upload Ubuntu .deb packages to private package repository.
-* `debian-packages`: build Debian .deb packages.
-* `debian-upload`: upload Debian .deb packages to private package repository.
-* `centos-packages`: build CentOS .rpm packages.
-* `centos-upload`: upload CentOS .rpm packages to private package repository.
-* `fedora-packages`: build Fedora .rpm packages.
-* `fedora-upload`: upload Fedora .rpm packages to private package repository.
+* `build-<distro>-<ver>`: build package for Linux distribution.
+* `upload-<distro>-<ver>`: upload package for Linux distribution to private package repository.
+* `clean`: delete the build artifacts.
+
+`<distro>` can have one of these values: `ubuntu`, `debian`, `centos`, `fedora`.  
+`<ver>` is the version of the distribution (e.g., `14.04` for Ubuntu).

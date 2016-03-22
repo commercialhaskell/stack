@@ -63,12 +63,13 @@ import qualified Data.Yaml as Yaml
 import           Distribution.System (OS, Arch (..), Platform (..))
 import qualified Distribution.System as Cabal
 import           Distribution.Text (simpleParse)
+import           Lens.Micro (set)
 import           Language.Haskell.TH as TH
 import           Network.HTTP.Client.Conduit
 import           Network.HTTP.Download.Verified
 import           Path
 import           Path.Extra (toFilePathNoTrailingSep)
-import           Path.IO
+import           Path.IO hiding (findExecutable)
 import qualified Paths_stack as Meta
 import           Prelude hiding (concat, elem, any) -- Fix AMP warning
 import           Safe (readMay)
@@ -80,7 +81,7 @@ import           Stack.Fetch
 import           Stack.GhcPkg (createDatabase, getCabalPkgVer, getGlobalDB, mkGhcPackagePath)
 import           Stack.Setup.Installed
 import           Stack.Types
-import           Stack.Types.Internal (HasTerminal, HasReExec, HasLogLevel)
+import           Stack.Types.Internal (HasTerminal, HasReExec, HasLogLevel, envConfigBuildOpts, buildOptsInstallExes)
 import           Stack.Types.StackT
 import qualified System.Directory as D
 import           System.Environment (getExecutablePath)
@@ -158,7 +159,7 @@ instance Show SetupException where
         [ "The GHC located at "
         , toFilePath ghc
         , " failed to compile a sanity check. Please see:\n\n"
-        , "    http://docs.haskellstack.org/en/stable/install_and_upgrade.html\n\n"
+        , "    http://docs.haskellstack.org/en/stable/install_and_upgrade/\n\n"
         , "for more information. Exception was:\n"
         , show e
         ]
@@ -219,6 +220,7 @@ setupEnv mResolveMissingGHC = do
     menv <- mkEnvOverride platform env
     compilerVer <- getCompilerVersion menv wc
     cabalVer <- getCabalPkgVer menv wc
+    $logDebug "Resolving package entries"
     packages <- mapM
         (resolvePackageEntry menv (bcRoot bconfig))
         (bcPackageEntries bconfig)
@@ -329,7 +331,9 @@ ensureCompiler sopts = do
 
     msystem <-
         if soptsUseSystem sopts
-            then getSystemCompiler menv0 wc
+            then do
+                $logDebug "Getting system compiler version"
+                getSystemCompiler menv0 wc
             else return Nothing
 
     Platform expectedArch _ <- asks getPlatform
@@ -446,7 +450,7 @@ ensureDockerStackExe containerPlatform = do
         stackVersion = fromCabalVersion Meta.version
         tool = Tool (PackageIdentifier $(mkPackageName "stack") stackVersion)
     stackExePath <- (</> $(mkRelFile "stack")) <$> installDir programsPath tool
-    stackExeExists <- fileExists stackExePath
+    stackExeExists <- doesFileExist stackExePath
     unless stackExeExists $
         do
            $logInfo $ mconcat ["Downloading Docker-compatible ", T.pack stackProgName, " executable"]
@@ -492,7 +496,7 @@ upgradeCabal menv wc = do
             , T.pack $ versionString newest
             , ". I'm not upgrading Cabal."
             ]
-        else withCanonicalizedSystemTempDirectory "stack-cabal-upgrade" $ \tmpdir -> do
+        else withSystemTempDir "stack-cabal-upgrade" $ \tmpdir -> do
             $logInfo $ T.concat
                 [ "Installing Cabal-"
                 , T.pack $ versionString newest
@@ -583,7 +587,7 @@ getSetupInfo stackSetupYaml manager = do
                              responseBody res $$ CL.consume
                     return $ S8.concat bss
                 Nothing -> liftIO $ S.readFile urlOrFile
-        (si,warnings) <- either throwM return (Yaml.decodeEither' bs)
+        WithJSONWarnings si warnings <- either throwM return (Yaml.decodeEither' bs)
         when (urlOrFile /= defaultStackSetupYaml) $
             logJSONWarnings urlOrFile warnings
         return si
@@ -784,7 +788,7 @@ installGHCPosix version _ archiveFile archiveType destDir = do
     $logDebug $ "make: " <> T.pack makeTool
     $logDebug $ "tar: " <> T.pack tarTool
 
-    withCanonicalizedSystemTempDirectory "stack-setup" $ \root -> do
+    withSystemTempDir "stack-setup" $ \root -> do
         dir <-
             liftM (root </>) $
             parseRelDir $
@@ -847,7 +851,8 @@ installGHCJS si archiveFile archiveType destDir = do
             $logDebug $ "ziptool: " <> T.pack zipTool
             $logDebug $ "tar: " <> T.pack tarTool
             return $ do
-                removeTreeIfExists unpackDir
+                ignoringAbsence (removeDirRecur destDir)
+                ignoringAbsence (removeDirRecur unpackDir)
                 readInNull destDir tarTool menv ["xf", toFilePath archiveFile] Nothing
                 innerDir <- expectSingleUnpackedDir archiveFile destDir
                 renameDir innerDir unpackDir
@@ -859,26 +864,26 @@ installGHCJS si archiveFile archiveType destDir = do
     $logSticky "Setting up GHCJS build environment"
     let stackYaml = unpackDir </> $(mkRelFile "stack.yaml")
         destBinDir = destDir </> $(mkRelDir "bin")
-    createTree destBinDir
-    envConfig <- loadGhcjsEnvConfig stackYaml destBinDir
+    ensureDir destBinDir
+    envConfig' <- loadGhcjsEnvConfig stackYaml destBinDir
 
     -- On windows we need to copy options files out of the install dir.  Argh!
     -- This is done before the build, so that if it fails, things fail
     -- earlier.
     mwindowsInstallDir <- case platform of
         Platform _ Cabal.Windows ->
-            liftM Just $ runInnerStackT envConfig installationRootLocal
+            liftM Just $ runInnerStackT envConfig' installationRootLocal
         _ -> return Nothing
 
     $logSticky "Installing GHCJS (this will take a long time) ..."
-    runInnerStackT envConfig $
-        build (\_ -> return ()) Nothing defaultBuildOpts { boptsInstallExes = True }
+    runInnerStackT ((set (envConfigBuildOpts.buildOptsInstallExes) True envConfig')) $
+        (build (\_ -> return ()) Nothing defaultBuildOptsCLI)
     -- Copy over *.options files needed on windows.
     forM_ mwindowsInstallDir $ \dir -> do
-        (_, files) <- listDirectory (dir </> $(mkRelDir "bin"))
+        (_, files) <- listDir (dir </> $(mkRelDir "bin"))
         forM_ (filter ((".options" `isSuffixOf`). toFilePath) files) $ \optionsFile -> do
             let dest = destDir </> $(mkRelDir "bin") </> filename optionsFile
-            removeFileIfExists dest
+            ignoringAbsence (removeFile dest)
             copyFile optionsFile dest
     $logStickyDone "Installed GHCJS."
 
@@ -895,7 +900,7 @@ installDockerStackExe _ archiveFile _ destDir = do
         checkDependencies $
         (,) <$> checkDependency "gzip" <*> checkDependency "tar"
     menv <- getMinimalEnvOverride
-    createTree destDir
+    ensureDir destDir
     readInNull
         destDir
         tarTool
@@ -924,14 +929,14 @@ ensureGhcjsBooted menv cv shouldBoot  = do
                 -- https://github.com/commercialhaskell/stack/issues/749#issuecomment-147382783
                 -- This only affects the case where GHCJS has been
                 -- installed with an older version and not yet booted.
-                stackYamlExists <- fileExists stackYaml
+                stackYamlExists <- doesFileExist stackYaml
                 actualStackYaml <- if stackYamlExists then return stackYaml
                     else case cv of
                         GhcjsVersion version _ ->
                             liftM ((destDir </> $(mkRelDir "src")) </>) $
                             parseRelFile $ "ghcjs-" ++ versionString version ++ "/stack.yaml"
                         _ -> fail "ensureGhcjsBooted invoked on non GhcjsVersion"
-                actualStackYamlExists <- fileExists actualStackYaml
+                actualStackYamlExists <- doesFileExist actualStackYaml
                 unless actualStackYamlExists $
                     fail "Couldn't find GHCJS stack.yaml in old or new location."
                 bootGhcjs actualStackYaml destDir
@@ -946,25 +951,52 @@ bootGhcjs stackYaml destDir = do
     mcabal <- getCabalInstallVersion menv
     shouldInstallCabal <- case mcabal of
         Nothing -> do
-            $logInfo "No cabal-install binary found for use with GHCJS.  Installing a local copy of cabal-install from source."
+            $logInfo "No cabal-install binary found for use with GHCJS."
             return True
         Just v
             | v < $(mkVersion "1.22.4") -> do
                 $logInfo $
-                    "cabal-install found on PATH is too old to be used for booting GHCJS (version " <>
+                    "The cabal-install found on PATH is too old to be used for booting GHCJS (version " <>
                     versionText v <>
-                    ").  Installing a local copy of cabal-install from source."
+                    ")."
+                return True
+            | v >= $(mkVersion "1.23") -> do
+                $logWarn $
+                    "The cabal-install found on PATH is a version stack doesn't know about, version " <>
+                    versionText v <>
+                    ". This may or may not work.\n" <>
+                    "See this issue: https://github.com/ghcjs/ghcjs/issues/470"
+                return False
+            | v >= $(mkVersion "1.22.8") -> do
+                $logWarn $
+                    "The cabal-install found on PATH, version " <>
+                    versionText v <>
+                    ", is >= 1.22.8.\n" <>
+                    "That version has a bug preventing ghcjs from booting.\n" <>
+                    "See this issue: https://github.com/ghcjs/ghcjs/issues/470"
                 return True
             | otherwise -> return False
+    let envSettings = defaultEnvSettings { esIncludeGhcPackagePath = False }
+    menv' <- liftIO $ configEnvOverride (getConfig envConfig) envSettings
     when shouldInstallCabal $ do
-        $logSticky "Building cabal-install for use by ghcjs-boot ... "
+        $logInfo "Building a local copy of cabal-install from source."
         runInnerStackT envConfig $
             build (\_ -> return ())
                   Nothing
-                  defaultBuildOpts { boptsTargets = ["cabal-install"] }
+                  defaultBuildOptsCLI { boptsCLITargets = ["cabal-install"] }
+        mcabal' <- getCabalInstallVersion menv'
+        case mcabal' of
+            Nothing ->
+                $logError $
+                    "Failed to get cabal-install version after installing it.\n" <>
+                    "This shouldn't happen, because it gets built to the snapshot bin directory, which should be treated as being on the PATH."
+            Just v | v >= $(mkVersion "1.22.8") && v < $(mkVersion "1.23") ->
+                $logWarn $
+                    "Installed version of cabal-install is in a version range which may not work.\n" <>
+                    "See this issue: https://github.com/ghcjs/ghcjs/issues/470\n" <>
+                    "This version is specified by the stack.yaml file included in the ghcjs tarball.\n"
+            _ -> return ()
     $logSticky "Booting GHCJS (this will take a long time) ..."
-    let envSettings = defaultEnvSettings { esIncludeGhcPackagePath = False }
-    menv' <- liftIO $ configEnvOverride (getConfig envConfig) envSettings
     runAndLog Nothing "ghcjs-boot" menv' ["--clean"]
     $logStickyDone "GHCJS booted."
 
@@ -1103,14 +1135,14 @@ withUnpackedTarball7z name si archiveFile archiveType msrcDir destDir = do
             Just x -> parseAbsFile $ T.unpack x
     run7z <- setup7z si
     let tmpName = toFilePathNoTrailingSep (dirname destDir) ++ "-tmp"
-    createTree (parent destDir)
-    withCanonicalizedTempDirectory (toFilePath $ parent destDir) tmpName $ \tmpDir -> do
+    ensureDir (parent destDir)
+    withTempDir (parent destDir) tmpName $ \tmpDir -> do
+        ignoringAbsence (removeDirRecur destDir)
+        run7z (parent archiveFile) archiveFile
+        run7z tmpDir tarFile
         absSrcDir <- case msrcDir of
             Just srcDir -> return $ tmpDir </> srcDir
             Nothing -> expectSingleUnpackedDir archiveFile tmpDir
-        removeTreeIfExists destDir
-        run7z (parent archiveFile) archiveFile
-        run7z tmpDir tarFile
         removeFile tarFile `catchIO` \e ->
             $logWarn (T.concat
                 [ "Exception when removing "
@@ -1122,7 +1154,7 @@ withUnpackedTarball7z name si archiveFile archiveType msrcDir destDir = do
 
 expectSingleUnpackedDir :: (MonadIO m, MonadThrow m) => Path Abs File -> Path Abs Dir -> m (Path Abs Dir)
 expectSingleUnpackedDir archiveFile destDir = do
-    contents <- listDirectory destDir
+    contents <- listDir destDir
     case contents of
         ([dir], []) -> return dir
         _ -> error $ "Expected a single directory within unpacked " ++ toFilePath archiveFile
@@ -1277,13 +1309,12 @@ chunksOverTime diff = do
           else put (lastTime,    acc')
         go
 
-
 -- | Perform a basic sanity check of GHC
 sanityCheck :: (MonadIO m, MonadMask m, MonadLogger m, MonadBaseControl IO m)
             => EnvOverride
             -> WhichCompiler
             -> m ()
-sanityCheck menv wc = withCanonicalizedSystemTempDirectory "stack-sanity-check" $ \dir -> do
+sanityCheck menv wc = withSystemTempDir "stack-sanity-check" $ \dir -> do
     let fp = toFilePath $ dir </> $(mkRelFile "Main.hs")
     liftIO $ writeFile fp $ unlines
         [ "import Distribution.Simple" -- ensure Cabal library is present

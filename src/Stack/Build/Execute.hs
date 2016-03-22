@@ -31,7 +31,7 @@ import           Control.Monad.Logger
 import           Control.Monad.Reader (MonadReader, asks)
 import           Control.Monad.Trans.Control (liftBaseWith)
 import           Control.Monad.Trans.Resource
-import           Data.Attoparsec.Text
+import           Data.Attoparsec.Text hiding (try)
 import qualified Data.ByteString as S
 import           Data.Char (isSpace)
 import           Data.Conduit
@@ -63,13 +63,14 @@ import           Distribution.System            (OS (Windows),
 import           Language.Haskell.TH as TH (location)
 import           Network.HTTP.Client.Conduit (HasHttpManager)
 import           Path
-import           Path.Extra (toFilePathNoTrailingSep)
-import           Path.IO
+import           Path.Extra (toFilePathNoTrailingSep, rejectMissingFile)
+import           Path.IO hiding (findExecutable, makeAbsolute)
 import           Prelude hiding (FilePath, writeFile, any)
 import           Stack.Build.Cache
 import           Stack.Build.Haddock
 import           Stack.Build.Installed
 import           Stack.Build.Source
+import           Stack.Config
 import           Stack.Constants
 import           Stack.Coverage
 import           Stack.Fetch as Fetch
@@ -93,7 +94,7 @@ import           System.Process.Run
 import           System.Process.Internals (createProcess_)
 #endif
 
-type M env m = (MonadIO m,MonadReader env m,HasHttpManager env,HasBuildConfig env,MonadLogger m,MonadBaseControl IO m,MonadCatch m,MonadMask m,HasLogLevel env,HasEnvConfig env,HasTerminal env, HasConfig env)
+type M env m = (MonadIO m,MonadReader env m,HasHttpManager env,HasBuildConfig env,MonadLogger m,MonadBaseControl IO m,MonadMask m,HasLogLevel env,HasEnvConfig env,HasTerminal env, HasConfig env)
 
 -- | Fetch the packages necessary for a build, for example in combination with a dry run.
 preFetch :: M env m => Plan -> m ()
@@ -198,6 +199,7 @@ data ExecuteEnv = ExecuteEnv
     , eeConfigureLock  :: !(MVar ())
     , eeInstallLock    :: !(MVar ())
     , eeBuildOpts      :: !BuildOpts
+    , eeBuildOptsCLI   :: !BuildOptsCLI
     , eeBaseConfigOpts :: !BaseConfigOpts
     , eeGhcPkgIds      :: !(TVar (Map PackageIdentifier Installed))
     , eeTempDir        :: !(Path Abs Dir)
@@ -272,6 +274,7 @@ getSetupExe setupHs tmpdir = do
                     , toFilePath setupHs
                     , "-o"
                     , toFilePath tmpOutputPath
+                    , "-rtsopts"
                     ] ++
                     ["-build-runner" | wc == Ghcjs]
             runCmd' (\cp -> cp { std_out = UseHandle stderr }) (Cmd (Just tmpdir) (compilerExeName wc) menv args) Nothing
@@ -283,6 +286,7 @@ getSetupExe setupHs tmpdir = do
 withExecuteEnv :: M env m
                => EnvOverride
                -> BuildOpts
+               -> BuildOptsCLI
                -> BaseConfigOpts
                -> [LocalPackage]
                -> [DumpPackage () ()] -- ^ global packages
@@ -290,8 +294,8 @@ withExecuteEnv :: M env m
                -> [DumpPackage () ()] -- ^ local packages
                -> (ExecuteEnv -> m a)
                -> m a
-withExecuteEnv menv bopts baseConfigOpts locals globalPackages snapshotPackages localPackages inner = do
-    withCanonicalizedSystemTempDirectory stackProgName $ \tmpdir -> do
+withExecuteEnv menv bopts boptsCli baseConfigOpts locals globalPackages snapshotPackages localPackages inner = do
+    withSystemTempDir stackProgName $ \tmpdir -> do
         configLock <- newMVar ()
         installLock <- newMVar ()
         idMap <- liftIO $ newTVarIO Map.empty
@@ -305,6 +309,7 @@ withExecuteEnv menv bopts baseConfigOpts locals globalPackages snapshotPackages 
         inner ExecuteEnv
             { eeEnvOverride = menv
             , eeBuildOpts = bopts
+            , eeBuildOptsCLI = boptsCli
              -- Uncertain as to why we cannot run configures in parallel. This appears
              -- to be a Cabal library bug. Original issue:
              -- https://github.com/fpco/stack/issues/84. Ideally we'd be able to remove
@@ -331,7 +336,7 @@ withExecuteEnv menv bopts baseConfigOpts locals globalPackages snapshotPackages 
 -- | Perform the actual plan
 executePlan :: M env m
             => EnvOverride
-            -> BuildOpts
+            -> BuildOptsCLI
             -> BaseConfigOpts
             -> [LocalPackage]
             -> [DumpPackage () ()] -- ^ global packages
@@ -340,14 +345,15 @@ executePlan :: M env m
             -> InstalledMap
             -> Plan
             -> m ()
-executePlan menv bopts baseConfigOpts locals globalPackages snapshotPackages localPackages installedMap plan = do
-    withExecuteEnv menv bopts baseConfigOpts locals globalPackages snapshotPackages localPackages (executePlan' installedMap plan)
+executePlan menv boptsCli baseConfigOpts locals globalPackages snapshotPackages localPackages installedMap plan = do
+    bopts <- asks (configBuild . getConfig)
+    withExecuteEnv menv bopts boptsCli baseConfigOpts locals globalPackages snapshotPackages localPackages (executePlan' installedMap plan)
 
     unless (Map.null $ planInstallExes plan) $ do
         snapBin <- (</> bindirSuffix) `liftM` installationRootDeps
         localBin <- (</> bindirSuffix) `liftM` installationRootLocal
         destDir <- asks $ configLocalBin . getConfig
-        createTree destDir
+        ensureDir destDir
 
         destDir' <- liftIO . D.canonicalizePath . toFilePath $ destDir
 
@@ -364,7 +370,8 @@ executePlan menv bopts baseConfigOpts locals globalPackages snapshotPackages loc
                     case loc of
                         Snap -> snapBin
                         Local -> localBin
-            mfp <- resolveFileMaybe bindir $ T.unpack name ++ ext
+            mfp <- forgivingAbsence (resolveFile bindir $ T.unpack name ++ ext)
+              >>= rejectMissingFile
             case mfp of
                 Nothing -> do
                     $logWarn $ T.concat
@@ -444,7 +451,7 @@ executePlan menv bopts baseConfigOpts locals globalPackages snapshotPackages loc
                     , esStackExe = True
                     , esLocaleUtf8 = False
                     }
-    forM_ (boptsExec bopts) $ \(cmd, args) -> do
+    forM_ (boptsCLIExec boptsCli) $ \(cmd, args) -> do
         $logProcessRun cmd args
         callProcess (Cmd Nothing cmd menv' args)
 
@@ -759,7 +766,7 @@ withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} md
         | console = inner Nothing
         | otherwise = do
             logPath <- buildLogPath package msuffix
-            createTree (parent logPath)
+            ensureDir (parent logPath)
             let fp = toFilePath logPath
             bracket
                 (liftIO $ openBinaryFile fp WriteMode)
@@ -768,6 +775,10 @@ withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} md
 
     withCabal package pkgDir mlogFile inner = do
         config <- asks getConfig
+
+        unless (configAllowDifferentUser config) $
+            checkOwnership (pkgDir </> configWorkDir config)
+
         let envSettings = EnvSettings
                 { esIncludeLocals = taskLocation task == Local
                 , esIncludeGhcPackagePath = False
@@ -882,7 +893,7 @@ withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} md
                     distDir <- distDirFromDir pkgDir
                     let setupDir = distDir </> $(mkRelDir "setup")
                         outputFile = setupDir </> $(mkRelFile "setup")
-                    createTree setupDir
+                    ensureDir setupDir
                     compilerPath <-
                         case compiler of
                             Ghc -> getGhcPath
@@ -1035,7 +1046,7 @@ singleBuild runInBase ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} in
         $ \package cabalfp pkgDir cabal announce _console _mlogFile -> do
             _neededConfig <- ensureConfig cache pkgDir ee (announce ("configure" <> annSuffix)) cabal cabalfp
 
-            if boptsOnlyConfigure eeBuildOpts
+            if boptsCLIOnlyConfigure eeBuildOptsCLI
                 then return Nothing
                 else liftM Just $ realBuild cache package pkgDir cabal announce
 
@@ -1082,7 +1093,11 @@ singleBuild runInBase ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} in
 
         unless isFinalBuild $ withMVar eeInstallLock $ \() -> do
             announce "copy/register"
-            cabal False ["copy"]
+            eres <- try $ cabal False ["copy"]
+            case eres of
+                Left err@CabalExitedUnsuccessfully{} ->
+                    throwM $ CabalCopyFailed (packageSimpleType package) (show err)
+                _ -> return ()
             when (packageHasLibrary package) $ cabal False ["register"]
 
         let (installedPkgDb, installedDumpPkgsTVar) =
@@ -1181,7 +1196,7 @@ singleTest runInBase topts testsToRun ac ee task installedMap = do
         when toRun $ do
             buildDir <- distDirFromDir pkgDir
             hpcDir <- hpcDirFromDir pkgDir
-            when needHpc (createTree hpcDir)
+            when needHpc (ensureDir hpcDir)
 
             let suitesToRun
                   = [ testSuitePair
@@ -1204,7 +1219,7 @@ singleTest runInBase topts testsToRun ac ee task installedMap = do
                             _ -> ""
                 tixPath <- liftM (pkgDir </>) $ parseRelFile $ exeName ++ ".tix"
                 exePath <- liftM (buildDir </>) $ parseRelFile $ "build/" ++ testName' ++ "/" ++ exeName
-                exists <- fileExists exePath
+                exists <- doesFileExist exePath
                 menv <- liftIO $    configEnvOverride config EnvSettings
                     { esIncludeLocals = taskLocation task == Local
                     , esIncludeGhcPackagePath = True
@@ -1215,10 +1230,10 @@ singleTest runInBase topts testsToRun ac ee task installedMap = do
                     then do
                         -- We clear out the .tix files before doing a run.
                         when needHpc $ do
-                            tixexists <- fileExists tixPath
+                            tixexists <- doesFileExist tixPath
                             when tixexists $
                                 $logWarn ("Removing HPC file " <> T.pack (toFilePath tixPath))
-                            removeFileIfExists tixPath
+                            ignoringAbsence (removeFile tixPath)
 
                         let args = toAdditionalArgs topts
                             argsDisplay = case args of
@@ -1249,7 +1264,7 @@ singleTest runInBase topts testsToRun ac ee task installedMap = do
                         (Just inH, Nothing, Nothing, ph) <- liftIO $ createProcess_ "singleBuild.runTests" cp
                         when isTestTypeLib $ do
                             logPath <- buildLogPath package (Just stestName)
-                            createTree (parent logPath)
+                            ensureDir (parent logPath)
                             liftIO $ hPutStr inH $ show (logPath, testName)
                         liftIO $ hClose inH
                         ec <- liftIO $ waitForProcess ph
@@ -1265,12 +1280,11 @@ singleTest runInBase topts testsToRun ac ee task installedMap = do
                             ExitSuccess -> Map.empty
                             _ -> Map.singleton testName $ Just ec
                     else do
-                        $logError $ T.concat
-                            [ "Test suite "
-                            , testName
-                            , " executable not found for "
-                            , packageNameText $ packageName package
-                            ]
+                        $logError $ T.pack $ show $ TestSuiteExeMissing
+                            (packageSimpleType package)
+                            exeName
+                            (packageNameString (packageName package))
+                            (T.unpack testName)
                         return $ Map.singleton testName Nothing
 
             when needHpc $ do
@@ -1304,8 +1318,6 @@ singleBench :: M env m
             -> InstalledMap
             -> m ()
 singleBench runInBase beopts benchesToRun ac ee task installedMap = do
-    -- FIXME: Since this doesn't use cabal, we should be able to avoid using a
-    -- fullblown 'withSingleContext'.
     (allDepsMap, _cache) <- getConfigCache ee task installedMap False True
     withSingleContext runInBase ac ee task (Just allDepsMap) (Just "bench") $ \_package _cabalfp _pkgDir cabal announce _console _mlogFile -> do
         let args = map T.unpack benchesToRun <> maybe []
@@ -1325,7 +1337,7 @@ singleBench runInBase beopts benchesToRun ac ee task installedMap = do
           cabal False ("bench" : args)
 
 -- | Strip Template Haskell "Loading package" lines and making paths absolute.
-mungeBuildOutput :: (MonadIO m, MonadThrow m)
+mungeBuildOutput :: (MonadIO m, MonadCatch m)
                  => Bool -- ^ exclude TH loading?
                  -> Bool -- ^ convert paths to absolute?
                  -> Path Abs Dir -- ^ package's root directory
@@ -1351,7 +1363,7 @@ mungeBuildOutput excludeTHLoading makeAbsolute pkgDir = void $
         mabs <-
             if isValidSuffix y
                 then liftM (fmap ((T.takeWhile isSpace x <>) . T.pack . toFilePath)) $
-                        resolveFileMaybe pkgDir (T.unpack $ T.dropWhile isSpace x)
+                        forgivingAbsence (resolveFile pkgDir (T.unpack $ T.dropWhile isSpace x))
                 else return Nothing
         case mabs of
             Nothing -> return bs
@@ -1373,11 +1385,11 @@ mungeBuildOutput excludeTHLoading makeAbsolute pkgDir = void $
 getSetupHs :: Path Abs Dir -- ^ project directory
            -> IO (Path Abs File)
 getSetupHs dir = do
-    exists1 <- fileExists fp1
+    exists1 <- doesFileExist fp1
     if exists1
         then return fp1
         else do
-            exists2 <- fileExists fp2
+            exists2 <- doesFileExist fp2
             if exists2
                 then return fp2
                 else throwM $ NoSetupHsFound dir

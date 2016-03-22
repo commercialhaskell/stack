@@ -1,12 +1,19 @@
 # Maintainer guide
 
+## Next release:
+
+* Check that GPG signature for
+  [Releases](https://s3.amazonaws.com/download.fpcomplete.com/debian/dists/jessie/Release)
+  uses SHA512, and close
+  [#1943](https://github.com/commercialhaskell/stack/issues/1934)
+* Integrate FreeBSD binaries and packages
+  [#1253](https://github.com/commercialhaskell/stack/issues/1253#issuecomment-185993240)
+
 ## Pre-release checks
 
 The following should be tested minimally before a release is considered good
 to go:
 
-* After GHC 8.0: maybe switch to Debian 8 and CentOS 6.7 Vagrant boxes for
-  building Stack binaries (to match GHC bindists) and drop support for Debian 7.
 * Ensure `release` and `stable` branches merged to `master`
 * Integration tests pass on a representative Windows, Mac OS X, and Linux (Linux
   is handled by Jenkins automatically): `stack install --pedantic && stack test
@@ -20,15 +27,19 @@ to go:
 * Build something that depends on `happy` (suggestion: `hlint`), since `happy`
   has special logic for moving around the `dist` directory
 * In master branch:
-    * stack.cabal: bump the version number (to next even third component)
+    * stack.cabal: bump the version number to release (even third
+      component)
     * ChangeLog: rename the "unreleased changes" section to the new version
-* Cut a release candidate branch from master
+* Cut a release candidate branch `rc/vX.Y.Z` from master
 * In master branch:
-    * stack.cabal: bump version to next odd third component
+    * stack.cabal: bump version number to unstable (odd third component)
     * Changelog: add new "unreleased changes" section
-    * stack.yaml: bump to use latest LTS version
+    * stack.yaml: bump to use latest LTS version, and check whether extra-deps
+      still needed
 * In RC branch:
-    * Update the ChangeLog:
+    * Update the ChangeLog
+      ([this comparison](https://github.com/commercialhaskell/stack/compare/release...master)
+      is handy):
         * Check for any important changes that missed getting an entry in Changelog
         * Check for any entries that snuck into the previous version's changes
           due to merges
@@ -37,15 +48,14 @@ to go:
           "obvious" version in sequence (if doing a non-obvious jump) and replace
           with new version
         * Look for any links to "latest" documentation, replace with version tag
-        * Ensure all inter-doc links use `.html` extension (not `.md`)
-        * Ensure all documentation pages listed in `doc/index.rst`
+        * Ensure all documentation pages listed in `mkdocs.yaml`
     * Check that any new Linux distribution versions added to
       `etc/scripts/release.hs` and `etc/scripts/vagrant-releases.sh`
     * Check that no new entries need to be added to
       [releases.yaml](https://github.com/fpco/stackage-content/blob/master/stack/releases.yaml),
       [install_and_upgrade.md](https://github.com/commercialhaskell/stack/blob/master/doc/install_and_upgrade.md),
       and
-      [README.md](https://github.com/commercialhaskell/stack/blob/master/README.md)
+      `README.md`
 
 ## Release process
 
@@ -55,11 +65,16 @@ for requirements to perform the release, and more details about the tool.
 
 * Create a
   [new draft Github release](https://github.com/commercialhaskell/stack/releases/new)
-  with tag `vX.Y.Z` (where X.Y.Z is the stack package's version)
+  with tag and name `vX.Y.Z` (where X.Y.Z is the stack package's version), targetting the
+  RC branch
 
 * On each machine you'll be releasing from, set environment variables:
   `GITHUB_AUTHORIZATION_TOKEN`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`,
-  `AWS_DEFAULT_REGION`
+  `AWS_DEFAULT_REGION`.
+
+    Note: since one of the tools (rpm-s3 on CentOS) doesn't support AWS temporary
+    credentials, you can't use MFA with the AWS credentials (`AWS_SECURITY_TOKEN`
+    is ignored).
 
 * On a machine with Vagrant installed:
     * Run `etc/scripts/vagrant-releases.sh`
@@ -81,14 +96,9 @@ for requirements to perform the release, and more details about the tool.
 
 * Update the `stable` branch similarly
 
+* Delete the RC branch (locally and on origin)
+
 * Publish Github release
-
-* Upload package to Hackage: `stack upload .`
-
-* Upload haddocks to Hackage: `etc/scripts/upload-haddocks.sh`
-
-* On a machine with Vagrant installed:
-    * Run `etc/scripts/vagrant-distros.sh`
 
 * Edit
   [stack-setup-2.yaml](https://github.com/fpco/stackage-content/blob/master/stack/stack-setup-2.yaml),
@@ -98,6 +108,11 @@ for requirements to perform the release, and more details about the tool.
   [readthedocs.org](https://readthedocs.org/projects/stack/versions/), and
   ensure that stable documentation has updated
 
+* Upload package to Hackage: `stack upload . --pvp-bounds=both`
+
+* On a machine with Vagrant installed:
+    * Run `etc/scripts/vagrant-distros.sh`
+
 * Submit a PR for the
   [haskell-stack Homebrew formula](https://github.com/Homebrew/homebrew/blob/master/Library/Formula/haskell-stack.rb)
       * Be sure to update the SHA sum
@@ -105,10 +120,12 @@ for requirements to perform the release, and more details about the tool.
 
 * [Flag the Arch Linux package as out-of-date](https://www.archlinux.org/packages/community/x86_64/stack/flag/)
 
-* Keep an eye on the
-  [Hackage matrix builder](http://matrix.hackage.haskell.org/package/stack)
-
-* Announce to haskell-cafe@haskell.org, haskell-stack@googlegroups.com,
-  commercialhaskell@googlegroups.com mailing lists
+* Upload haddocks to Hackage: `etc/scripts/upload-haddocks.sh`
 
 * Merge any changes made in the RC/release/stable branches to master.
+
+* Announce to haskell-cafe@haskell.org haskell-stack@googlegroups.com
+  commercialhaskell@googlegroups.com mailing lists
+
+* Keep an eye on the
+  [Hackage matrix builder](http://matrix.hackage.haskell.org/package/stack)

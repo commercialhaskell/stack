@@ -15,7 +15,7 @@ import           Control.Applicative
 import           Control.Arrow ((***))
 import           Control.Exception (Exception,throw)
 import           Control.Monad hiding (mapM)
-import           Control.Monad.Catch (try,MonadCatch)
+import           Control.Monad.Catch (MonadMask)
 import           Control.Monad.IO.Class (MonadIO,liftIO)
 import           Control.Monad.Logger (MonadLogger,logDebug)
 import           Control.Monad.Reader (MonadReader,asks)
@@ -25,7 +25,6 @@ import           Data.List (intercalate)
 import           Data.Traversable
 import           Data.Maybe
 import           Data.Monoid
-import           Data.Streaming.Process (ProcessExitedUnsuccessfully(..))
 import qualified Data.Text as T
 import           Data.Version (showVersion)
 import           Data.Typeable (Typeable)
@@ -42,7 +41,6 @@ import           System.Process.Read (getEnvOverride)
 import           Stack.Types
 import           Stack.Types.Internal
 import           System.Environment (lookupEnv,getArgs,getExecutablePath)
-import           System.Exit (exitSuccess, exitWith)
 
 -- | If Nix is enabled, re-runs the currently running OS command in a Nix container.
 -- Otherwise, runs the inner action.
@@ -105,17 +103,15 @@ runShellAndExit mprojectRoot maresolver mcompiler getCmdArgs = do
          fullArgs = concat [if pureShell then ["--pure"] else [],
                             map T.unpack (nixShellOptions (configNix config))
                            ,nixopts
-                           ,["--command", intercalate " " (cmnd:"$STACK_IN_NIX_EXTRA_ARGS":args)]
+                           ,["--run", intercalate " " (cmnd:"$STACK_IN_NIX_EXTRA_ARGS":args)]
                            ]
-
+                           -- Using --run instead of --command so we cannot
+                           -- end up in the nix-shell if stack build is Ctrl-C'd
      $logDebug $
          "Using a nix-shell environment " <> (case mshellFile of
             Just path -> "from file: " <> (T.pack (toFilePath path))
             Nothing -> "with nix packages: " <> (T.intercalate ", " pkgs))
-     e <- try (exec envOverride "nix-shell" fullArgs)
-     case e of
-       Left (ProcessExitedUnsuccessfully _ ec) -> liftIO (exitWith ec)
-       Right () -> liftIO exitSuccess
+     exec envOverride "nix-shell" fullArgs
 
 -- | Shell-escape quotes inside the string and enclose it in quotes.
 escape :: String -> String
@@ -162,7 +158,7 @@ type M env m =
   ,MonadReader env m
   ,MonadLogger m
   ,MonadBaseControl IO m
-  ,MonadCatch m
+  ,MonadMask m
   ,HasConfig env
   ,HasTerminal env
   ,HasReExec env

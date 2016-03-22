@@ -1,5 +1,6 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
 
@@ -77,13 +78,13 @@ data NewOpts = NewOpts
 -- | Create a new project with the given options.
 new
     :: (HasConfig r, MonadReader r m, MonadLogger m, MonadCatch m, MonadThrow m, MonadIO m, HasHttpManager r, Functor m, Applicative m)
-    => NewOpts -> m (Path Abs Dir)
-new opts = do
-    pwd <- getWorkingDir
+    => NewOpts -> Bool -> m (Path Abs Dir)
+new opts forceOverwrite = do
+    pwd <- getCurrentDir
     absDir <- if bare then return pwd
                       else do relDir <- parseRelDir (packageNameString project)
                               liftM (pwd </>) (return relDir)
-    exists <- dirExists absDir
+    exists <- doesDirExist absDir
     configTemplate <- configDefaultTemplate <$> asks getConfig
     let template = fromMaybe defaultTemplateName $ asum [ cliOptionTemplate
                                                         , configTemplate
@@ -99,6 +100,7 @@ new opts = do
                     (newOptsNonceParams opts)
                     absDir
                     templateText
+            when (not forceOverwrite && bare) $ checkForOverwrite (M.keys files)
             writeTemplateFiles files
             runTemplateInits absDir
             return absDir
@@ -151,7 +153,7 @@ loadTemplate name logIt = do
     loadLocalFile path = do
         $logDebug ("Opening local template: \"" <> T.pack (toFilePath path)
                                                 <> "\"")
-        exists <- fileExists path
+        exists <- doesFileExist path
         if exists
             then liftIO (T.readFile (toFilePath path))
             else throwM (FailedToLoadTemplate name (toFilePath path))
@@ -194,7 +196,7 @@ applyTemplate project template nonceParams dir templateText = do
                  templateText
                  (mkStrContextM (contextFunction context)))
     unless (S.null missingKeys)
-         ($logInfo (T.pack (show (MissingParameters project template missingKeys (configUserConfigPath config)))))
+         ($logInfo ("\n" <> T.pack (show (MissingParameters project template missingKeys (configUserConfigPath config))) <> "\n"))
     files :: Map FilePath LB.ByteString <-
         catch (execWriterT $
                yield (T.encodeUtf8 (LT.toStrict applied)) $$
@@ -204,9 +206,11 @@ applyTemplate project template nonceParams dir templateText = do
                    throwM (InvalidTemplate template (show e)))
     when (M.null files) $
          throwM (InvalidTemplate template "Template does not contain any files")
-    unless (any (".cabal" `isSuffixOf`) . M.keys $ files) $
-         throwM (InvalidTemplate template "Template does not contain a .cabal\
-                                          \ file")
+
+    let isPkgSpec f = ".cabal" `isSuffixOf` f || f == "package.yaml"
+    unless (any isPkgSpec . M.keys $ files) $
+         throwM (InvalidTemplate template "Template does not contain a .cabal \
+                                          \or package.yaml file")
     liftM
         M.fromList
         (mapM
@@ -230,6 +234,12 @@ applyTemplate project template nonceParams dir templateText = do
                 return MuNothing
             Just value -> return (MuVariable value)
 
+-- | Check if we're going to overwrite any existing files.
+checkForOverwrite :: (MonadIO m, MonadThrow m) => [Path Abs File] -> m ()
+checkForOverwrite files = do
+    overwrites <- filterM doesFileExist files
+    unless (null overwrites) $ throwM (AttemptedOverwrites overwrites)
+
 -- | Write files to the new project directory.
 writeTemplateFiles
     :: MonadIO m
@@ -238,7 +248,7 @@ writeTemplateFiles files =
     forM_
         (M.toList files)
         (\(fp,bytes) ->
-              do createTree (parent fp)
+              do ensureDir (parent fp)
                  liftIO (LB.writeFile (toFilePath fp) bytes))
 
 -- | Run any initialization functions, such as Git.
@@ -263,7 +273,7 @@ listTemplates
     => m ()
 listTemplates = do
     templates <- getTemplates
-    mapM_ ($logInfo . templateName) (S.toList templates)
+    mapM_ (liftIO . T.putStrLn . templateName) (S.toList templates)
 
 -- | Get the set of templates.
 getTemplates
@@ -335,6 +345,7 @@ data NewException
     | AlreadyExists !(Path Abs Dir)
     | MissingParameters !PackageName !TemplateName !(Set String) !(Path Abs File)
     | InvalidTemplate !TemplateName !String
+    | AttemptedOverwrites [Path Abs File]
     deriving (Typeable)
 
 instance Exception NewException
@@ -393,3 +404,7 @@ instance Show NewException where
         "The template \"" <> T.unpack (templateName name) <>
         "\" is invalid and could not be used. " <>
         "The error was: \"" <> why <> "\""
+    show (AttemptedOverwrites fps) =
+        "The template would create the following files, but they already exist:\n" <>
+        unlines (map (("  " ++) . toFilePath) fps) <>
+        "Use --force to ignore this, and overwite these files."

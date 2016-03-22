@@ -26,7 +26,7 @@ module Stack.Build.Cache
     ) where
 
 import           Control.Exception.Enclosed (handleIO)
-import           Control.Monad.Catch (MonadThrow)
+import           Control.Monad.Catch (MonadThrow, MonadCatch)
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger (MonadLogger)
 import           Control.Monad.Reader
@@ -59,7 +59,7 @@ getInstalledExes :: (MonadReader env m, HasEnvConfig env, MonadIO m, MonadThrow 
                  => InstallLocation -> m [PackageIdentifier]
 getInstalledExes loc = do
     dir <- exeInstalledDir loc
-    (_, files) <- liftIO $ handleIO (const $ return ([], [])) $ listDirectory dir
+    (_, files) <- liftIO $ handleIO (const $ return ([], [])) $ listDir dir
     return $ mapMaybe (parsePackageIdentifierFromString . toFilePath . filename) files
 
 -- | Mark the given executable as installed
@@ -67,7 +67,7 @@ markExeInstalled :: (MonadReader env m, HasEnvConfig env, MonadIO m, MonadThrow 
                  => InstallLocation -> PackageIdentifier -> m ()
 markExeInstalled loc ident = do
     dir <- exeInstalledDir loc
-    createTree dir
+    ensureDir dir
     ident' <- parseRelFile $ packageIdentifierString ident
     let fp = toFilePath $ dir </> ident'
     -- TODO consideration for the future: list all of the executables
@@ -76,12 +76,12 @@ markExeInstalled loc ident = do
     liftIO $ writeFile fp "Installed"
 
 -- | Mark the given executable as not installed
-markExeNotInstalled :: (MonadReader env m, HasEnvConfig env, MonadIO m, MonadThrow m)
+markExeNotInstalled :: (MonadReader env m, HasEnvConfig env, MonadIO m, MonadCatch m)
                     => InstallLocation -> PackageIdentifier -> m ()
 markExeNotInstalled loc ident = do
     dir <- exeInstalledDir loc
     ident' <- parseRelFile $ packageIdentifierString ident
-    removeFileIfExists (dir </> ident')
+    ignoringAbsence (removeFile $ dir </> ident')
 
 -- | Stored on disk to know whether the flags have changed or any
 -- files have changed.
@@ -145,7 +145,7 @@ writeCabalMod :: (MonadIO m, MonadReader env m, HasConfig env, MonadThrow m, Mon
 writeCabalMod dir = writeCache dir configCabalMod
 
 -- | Delete the caches for the project.
-deleteCaches :: (MonadIO m, MonadReader env m, HasConfig env, MonadLogger m, MonadThrow m, HasEnvConfig env)
+deleteCaches :: (MonadIO m, MonadReader env m, HasConfig env, MonadLogger m, MonadCatch m, HasEnvConfig env)
              => Path Abs Dir -> m ()
 deleteCaches dir = do
     {- FIXME confirm that this is acceptable to remove
@@ -153,7 +153,7 @@ deleteCaches dir = do
     removeFileIfExists bfp
     -}
     cfp <- configCacheFile dir
-    removeFileIfExists cfp
+    ignoringAbsence (removeFile cfp)
 
 -- | Write to a cache.
 writeCache :: (BinarySchema a, MonadIO m)
@@ -191,7 +191,7 @@ writeFlagCache :: (MonadIO m, MonadReader env m, HasEnvConfig env, MonadThrow m)
 writeFlagCache gid cache = do
     file <- flagCacheFile gid
     liftIO $ do
-        createTree (parent file)
+        ensureDir (parent file)
         taggedEncodeFile file cache
 
 -- | Mark a test suite as having succeeded
@@ -289,7 +289,7 @@ writePrecompiledCache :: (MonadThrow m, MonadReader env m, HasEnvConfig env, Mon
                       -> m ()
 writePrecompiledCache baseConfigOpts pkgident copts depIDs mghcPkgId exes = do
     file <- precompiledCacheFile pkgident copts depIDs
-    createTree $ parent file
+    ensureDir (parent file)
     mlibpath <-
         case mghcPkgId of
             Executable _ -> return Nothing

@@ -4,11 +4,7 @@
 -- | Constants used throughout the project.
 
 module Stack.Constants
-    (builtConfigFileFromDir
-    ,builtFileFromDir
-    ,buildPlanDir
-    ,configuredFileFromDir
-    ,defaultShakeThreads
+    (buildPlanDir
     ,distDirFromDir
     ,workDirFromDir
     ,distRelativeDir
@@ -18,13 +14,12 @@ module Stack.Constants
     ,rawGithubUrl
     ,stackDotYaml
     ,stackRootEnvVar
-    ,userDocsDir
+    ,inContainerEnvVar
     ,configCacheFile
     ,configCabalMod
     ,buildCacheFile
     ,testSuccessFile
     ,testBuiltFile
-    ,benchBuiltFile
     ,stackProgName
     ,stackProgNameUpper
     ,wiredInPackages
@@ -70,58 +65,6 @@ haskellFileExts = ["hs", "hsc", "lhs"]
 haskellPreprocessorExts :: [Text]
 haskellPreprocessorExts = ["gc", "chs", "hsc", "x", "y", "ly", "cpphs"]
 
--- | The filename used for completed build indicators.
-builtFileFromDir :: (MonadThrow m, MonadReader env m, HasPlatform env,HasEnvConfig env)
-                 => Path Abs Dir
-                 -> m (Path Abs File)
-builtFileFromDir fp = do
-  dist <- distDirFromDir fp
-  return (dist </> $(mkRelFile "stack.gen"))
-
--- | The filename used for completed configure indicators.
-configuredFileFromDir :: (MonadThrow m, MonadReader env m, HasPlatform env,HasEnvConfig env)
-                      => Path Abs Dir
-                      -> m (Path Abs File)
-configuredFileFromDir fp = do
-  dist <- distDirFromDir fp
-  return (dist </> $(mkRelFile "setup-config"))
-
--- | The filename used for completed build indicators.
-builtConfigFileFromDir :: (MonadThrow m, MonadReader env m, HasPlatform env,HasEnvConfig env)
-                       => Path Abs Dir
-                       -> m (Path Abs File)
-builtConfigFileFromDir fp =
-    liftM (fp </>) builtConfigRelativeFile
-
--- | Relative location of completed build indicators.
-builtConfigRelativeFile :: (MonadThrow m, MonadReader env m, HasPlatform env,HasEnvConfig env)
-                        => m (Path Rel File)
-builtConfigRelativeFile = do
-  dist <- distRelativeDir
-  return (dist </> $(mkRelFile "stack.config"))
-
--- | Default shake thread count for parallel builds.
-defaultShakeThreads :: Int
-defaultShakeThreads = 4
-
--- -- | Hoogle database file.
--- hoogleDatabaseFile :: Path Abs Dir -> Path Abs File
--- hoogleDatabaseFile docLoc =
---   docLoc </>
---   $(mkRelFile "default.hoo")
-
--- -- | Extension for hoogle databases.
--- hoogleDbExtension :: String
--- hoogleDbExtension = "hoo"
-
--- -- | Extension of haddock files
--- haddockExtension :: String
--- haddockExtension = "haddock"
-
--- | User documentation directory.
-userDocsDir :: Config -> Path Abs Dir
-userDocsDir config = configStackRoot config </> $(mkRelDir "doc/")
-
 -- | Output .o/.hi directory.
 objectInterfaceDir :: (MonadReader env m, HasConfig env)
   => BuildConfig -> m (Path Abs Dir)
@@ -154,15 +97,6 @@ testBuiltFile :: (MonadThrow m, MonadReader env m, HasPlatform env,HasEnvConfig 
 testBuiltFile dir =
     liftM
         (</> $(mkRelFile "stack-test-built"))
-        (distDirFromDir dir)
-
--- | The filename used to mark benchmarks as having built
-benchBuiltFile :: (MonadThrow m, MonadReader env m, HasPlatform env,HasEnvConfig env)
-               => Path Abs Dir -- ^ Package directory
-               -> m (Path Abs File)
-benchBuiltFile dir =
-    liftM
-        (</> $(mkRelFile "stack-bench-built"))
         (distDirFromDir dir)
 
 -- | The filename used for dirtiness check of config.
@@ -252,20 +186,6 @@ rawGithubUrl org repo branch file = T.concat
     , file
     ]
 
--- -- | Hoogle database file.
--- hoogleDatabaseFile :: Path Abs Dir -> Path Abs File
--- hoogleDatabaseFile docLoc =
---   docLoc </>
---   $(mkRelFile "default.hoo")
-
--- -- | Extension for hoogle databases.
--- hoogleDbExtension :: String
--- hoogleDbExtension = "hoo"
-
--- -- | Extension of haddock files
--- haddockExtension :: String
--- haddockExtension = "haddock"
-
 -- | Docker sandbox from project root.
 projectDockerSandboxDir :: (MonadReader env m, HasConfig env)
   => Path Abs Dir      -- ^ Project root
@@ -299,6 +219,10 @@ stackDotYaml = $(mkRelFile "stack.yaml")
 -- | Environment variable used to override the '~/.stack' location.
 stackRootEnvVar :: String
 stackRootEnvVar = "STACK_ROOT"
+
+-- | Environment variable used to indicate stack is running in container.
+inContainerEnvVar :: String
+inContainerEnvVar = stackProgNameUpper ++ "_IN_CONTAINER"
 
 -- See https://downloads.haskell.org/~ghc/7.10.1/docs/html/libraries/ghc/src/Module.html#integerPackageKey
 wiredInPackages :: HashSet PackageName

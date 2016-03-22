@@ -2,6 +2,8 @@
 
 ## Bug Reports
 
+Before reporting a bug, please ensure that you are using the latest release (currently stack-1.0.4).  See the [upgrade instructions](http://docs.haskellstack.org/en/stable/install_and_upgrade/#upgrade) to upgrade.
+
 When reporting a bug, please write in the following format:
 
 > [Any general summary/comments if desired]
@@ -48,7 +50,9 @@ If you would like to help with documentation, please note that for most cases th
 The documentation is rendered on [haskellstack.org](http://haskellstack.org) by
 readthedocs.org using Sphinx and CommonMark. Since links and formatting vary
 from GFM, please check the documentation there before submitting a PR to fix
-those.
+those.  In particular, links to other documentation files intentionally have
+`.html` extensions instead of `.md`, unfortunately (see
+[#1506](https://github.com/commercialhaskell/stack/issues/1506) for details).
 
 If your changes move or rename files, or subsume Wiki content, please continue to leave a file/page in the old location temporarily, in addition to the new location. This will allow users time to update any shared links to the old location. Please also update any links in other files, or on the Wiki, to point to the new file location.
 

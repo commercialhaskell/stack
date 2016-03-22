@@ -1,14 +1,14 @@
 # Install/upgrade
 
 Distribution packages are available for [Ubuntu](#ubuntu), [Debian](#debian),
-[CentOS / Red Hat / Amazon Linux](#centos-red-hat-amazon-linux), [Fedora](#fedora) and
-[Arch Linux](#arch-linux). Binaries for other operating systems are listed
-below, and available on
+[CentOS / Red Hat / Amazon Linux](#centos), [Fedora](#fedora),
+[Arch Linux](#arch-linux) and unofficially [FreeBSD](#freebsd).
+Binaries for other operating systems are listed below, and available on
 [the Github releases page](https://github.com/fpco/stack/releases). For the
 future, we are open to supporting more OSes (to request one, please
 [submit an issue](https://github.com/commercialhaskell/stack/issues/new)).
 
-Binary packages are signed with this [signing key](SIGNING_KEY.html).
+Binary packages are signed with this [signing key](SIGNING_KEY.md).
 
 If you are writing a script that needs to download the latest binary, you can
 find links that always point to the latest bindists
@@ -54,14 +54,6 @@ such.
 
 ## Mac OS X
 
-Note: if you are on OS X 10.11 ("El Capitan") or later, System Integrity
-Protection (a.k.a. "rootless") can cause two problems:
-
-  * [GHC 7.8.4 fails with `/usr/bin/ar: permission denied`](faq.html#usr-bin-ar-permission-denied)
-  * [DYLD_LIBRARY_PATH is ignored](faq.html#dyld-library-path-ignored)
-
-See the above FAQ links for workarounds.
-
 ### Using Homebrew
 
 If you have a popular [brew](http://brew.sh/) tool installed, you can just do:
@@ -70,10 +62,10 @@ If you have a popular [brew](http://brew.sh/) tool installed, you can just do:
 brew install haskell-stack
 ```
 
-Note: the Homebrew formula and bottles lag slightly behind new Stack releases,
+* The Homebrew formula and bottles lag slightly behind new Stack releases,
 but tend to be updated within a day or two.
-
-Normally, Homebrew will install from a pre-built binary (aka "pour from a
+* At later stage, running `stack setup` might fail with `configure: error: cannot run C compiled programs.` in which case you should run `xcode-select --install`.
+* Normally, Homebrew will install from a pre-built binary (aka "pour from a
 bottle"), but if `brew` starts trying to build everything from source (which
 will take hours), see
 [their FAQ on the topic](https://github.com/Homebrew/homebrew/blob/master/share/doc/homebrew/FAQ.md#why-do-you-compile-everything).
@@ -89,13 +81,22 @@ will take hours), see
 We generally test on the current version of Mac OS X, but stack is known to work on
 Yosemite and Mavericks as well, and may also work on older versions (YMMV).
 
+### Notes
+
+If you are on OS X 10.11 ("El Capitan") and encounter either of these
+problems, see the linked FAQ entries:
+
+  * [GHC 7.8.4 fails with `/usr/bin/ar: permission denied`](faq.md#usr-bin-ar-permission-denied)
+  * [DYLD_LIBRARY_PATH is ignored](faq.md#dyld-library-path-ignored)
+
+
 ## Ubuntu
 
 *note*: for 32-bit, use the [generic Linux option](#linux)
 
  1. Get the FP Complete key:
 
-        sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 575159689BEFB442
+        sudo apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 575159689BEFB442
 
  2. Add the appropriate source repository (if not sure, run ``lsb_release -a`` to find out your Ubuntu version):
 
@@ -129,7 +130,7 @@ Yosemite and Mavericks as well, and may also work on older versions (YMMV).
 
  1. Get the FP Complete key:
 
-        sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 575159689BEFB442
+        sudo apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 575159689BEFB442
 
  2. Add the appropriate source repository:
 
@@ -149,7 +150,7 @@ Yosemite and Mavericks as well, and may also work on older versions (YMMV).
 
         sudo apt-get update && sudo apt-get install stack -y
 
-## CentOS / Red Hat / Amazon Linux
+## <a name="centos"></a>CentOS / Red Hat / Amazon Linux
 
 *note*: for 32-bit, use the [generic Linux option](#linux)
 
@@ -200,7 +201,7 @@ Yosemite and Mavericks as well, and may also work on older versions (YMMV).
 
             sudo yum -y install stack
 
-## openSUSE / SUSE Linux Enterprise
+## <a name="suse"></a>openSUSE / SUSE Linux Enterprise
 
 *Note:* openSUSE's and SLE's `stack` package isn't managed by the Stack release
 team, and since it is based on the version in Stackage LTS, and may lag new
@@ -284,6 +285,13 @@ Stack](http://nixos.org/nixpkgs/manual/#using-stack-together-with-nix).
 Tested on Fedora 20: make sure to install the following packages `sudo yum install perl make automake gcc gmp-devel`.
 For Gentoo users, make sure to have the `ncurses` package with `USE=tinfo` (without it, stack will not be able to install GHC).
 
+## FreeBSD
+
+An unofficial package repository for FreeBSD 10 (amd64 only) and install
+instructions are available at [http://stack-pkg.applicative.tech](http://stack-pkg.applicative.tech/).  The
+repository is not official and as such might lag behind new releases.  See [issue #1253](https://github.com/commercialhaskell/stack/issues/1253)
+for progress on official FreeBSD binaries.
+
 ## Path
 
 You can install stack by copying it anywhere on your PATH environment variable. We recommend installing in the same directory where stack itself will install executables (that way stack is able to upgrade itself!). On Windows, that directory is `%APPDATA%\local\bin`, e.g. "c:\Users\Michael\AppData\Roaming\local\bin". For other systems, use `$HOME/.local/bin`.
@@ -299,8 +307,7 @@ To get tab-completion of commands on bash, just run the following (or add it to
 
     eval "$(stack --bash-completion-script stack)"
 
-For more information and other shells, see [the shell auto-completion wiki
-page](https://github.com/commercialhaskell/stack/wiki/Shell-autocompletion)
+For more information and other shells, see [the shell auto-completion page](shell_autocompletion.md)
 
 ## Upgrade
 

@@ -1,7 +1,7 @@
 # Travis CI
 
 For many use cases, the
-[Travis caching section of the user guide](GUIDE.html#travis-with-caching)
+[Travis caching section of the user guide](GUIDE.md#travis-with-caching)
 will be sufficient.
 
 This page documents how to use Stack on [Travis CI](https://travis-ci.org/). We
@@ -60,7 +60,7 @@ There are two ways to install GHC:
 - Install GHC using [apt plugin](http://docs.travis-ci.com/user/apt/)
 
 See the
-[Travis caching section of the user guide](GUIDE.html#travis-with-caching) for
+[Travis caching section of the user guide](GUIDE.md#travis-with-caching) for
 an example of the first option (letting Stack download GHC). Here, we will
 explain the second option. With single GHC the situation is simple:
 

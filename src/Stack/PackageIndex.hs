@@ -19,6 +19,7 @@
 module Stack.PackageIndex
     ( updateAllIndices
     , getPackageCaches
+    , clearPackageCaches
     ) where
 
 import qualified Codec.Archive.Tar as Tar
@@ -41,6 +42,7 @@ import           Data.Conduit.Binary                   (sinkHandle,
                                                         sourceHandle)
 import           Data.Conduit.Zlib (ungzip)
 import           Data.Foldable (forM_)
+import           Data.IORef (readIORef, writeIORef)
 import           Data.Int (Int64)
 import           Data.Map (Map)
 import qualified Data.Map.Strict as Map
@@ -53,7 +55,6 @@ import           Data.Traversable (forM)
 
 import           Data.Typeable (Typeable)
 
-
 import           Network.HTTP.Download
 import           Path                                  (mkRelDir, parent,
                                                         parseRelDir, toFilePath,
@@ -65,8 +66,10 @@ import           Stack.Types.StackT
 import           System.FilePath (takeBaseName, (<.>))
 import           System.IO                             (IOMode (ReadMode, WriteMode),
                                                         withBinaryFile)
-import           System.Process.Read (readInNull, readProcessNull, ReadProcessException(..),
-                                      EnvOverride, doesExecutableExist)
+import           System.Process.Read         (EnvOverride,
+                                              ReadProcessException (..),
+                                              doesExecutableExist, readInNull,
+                                              readProcessNull, tryProcessStdout)
 
 -- | Populate the package index caches and return them.
 populateCache
@@ -177,20 +180,20 @@ instance Show PackageIndexException where
 
 -- | Require that an index be present, updating if it isn't.
 requireIndex :: (MonadIO m,MonadLogger m
-                ,MonadThrow m,MonadReader env m,HasHttpManager env
+                ,MonadReader env m,HasHttpManager env
                 ,HasConfig env,MonadBaseControl IO m,MonadCatch m)
              => EnvOverride
              -> PackageIndex
              -> m ()
 requireIndex menv index = do
     tarFile <- configPackageIndex $ indexName index
-    exists <- fileExists tarFile
+    exists <- doesFileExist tarFile
     unless exists $ updateIndex menv index
 
 -- | Update all of the package indices
 updateAllIndices
     :: (MonadIO m,MonadLogger m
-       ,MonadThrow m,MonadReader env m,HasHttpManager env
+       ,MonadReader env m,HasHttpManager env
        ,HasConfig env,MonadBaseControl IO m, MonadCatch m)
     => EnvOverride
     -> m ()
@@ -199,7 +202,7 @@ updateAllIndices menv =
 
 -- | Update the index tarball
 updateIndex :: (MonadIO m,MonadLogger m
-               ,MonadThrow m,MonadReader env m,HasHttpManager env
+               ,MonadReader env m,HasHttpManager env
                ,HasConfig env,MonadBaseControl IO m, MonadCatch m)
             => EnvOverride
             -> PackageIndex
@@ -216,7 +219,7 @@ updateIndex menv index =
         (False, ILGit url) -> logUpdate url >> throwM (GitNotAvailable name)
 
 -- | Update the index Git repo and the index tarball
-updateIndexGit :: (MonadIO m,MonadLogger m,MonadThrow m,MonadReader env m,HasConfig env,MonadBaseControl IO m, MonadCatch m)
+updateIndexGit :: (MonadIO m,MonadLogger m,MonadReader env m,HasConfig env,MonadBaseControl IO m, MonadCatch m)
                => EnvOverride
                -> IndexName
                -> PackageIndex
@@ -225,7 +228,7 @@ updateIndexGit :: (MonadIO m,MonadLogger m,MonadThrow m,MonadReader env m,HasCon
 updateIndexGit menv indexName' index gitUrl = do
      tarFile <- configPackageIndex indexName'
      let idxPath = parent tarFile
-     createTree idxPath
+     ensureDir idxPath
      do
             repoName <- parseRelDir $ takeBaseName $ T.unpack gitUrl
             let cloneArgs =
@@ -241,7 +244,7 @@ updateIndexGit menv indexName' index gitUrl = do
                   sDir </>
                   $(mkRelDir "git-update")
                 acfDir = suDir </> repoName
-            repoExists <- dirExists acfDir
+            repoExists <- doesDirExist acfDir
             unless repoExists
                    (readInNull suDir "git" menv cloneArgs Nothing)
             $logSticky "Fetching package index ..."
@@ -249,37 +252,45 @@ updateIndexGit menv indexName' index gitUrl = do
               -- we failed, so wipe the directory and try again, see #1418
               $logWarn (T.pack (show ex))
               $logStickyDone "Failed to fetch package index, retrying."
-              removeTree acfDir
+              removeDirRecur acfDir
               readInNull suDir "git" menv cloneArgs Nothing
               $logSticky "Fetching package index ..."
               readInNull acfDir "git" menv ["fetch","--tags","--depth=1"] Nothing
             $logStickyDone "Fetched package index."
-            removeFileIfExists tarFile
+
             when (indexGpgVerify index)
-                 (readInNull acfDir
-                             "git"
-                             menv
-                             ["tag","-v","current-hackage"]
-                             (Just (T.unlines ["Signature verification failed. "
-                                              ,"Please ensure you've set up your"
-                                              ,"GPG keychain to accept the D6CF60FD signing key."
-                                              ,"For more information, see:"
-                                              ,"https://github.com/fpco/stackage-update#readme"])))
-            $logDebug ("Exporting a tarball to " <>
-                       (T.pack . toFilePath) tarFile)
-            deleteCache indexName'
-            let tarFileTmp = toFilePath tarFile ++ ".tmp"
-            readInNull acfDir
-                       "git"
-                       menv
-                       ["archive"
-                       ,"--format=tar"
-                       ,"-o"
-                       ,tarFileTmp
-                       ,"current-hackage"]
-                       Nothing
-            tarFileTmpPath <- parseAbsFile tarFileTmp
-            renameFile tarFileTmpPath tarFile
+                (readInNull acfDir "git" menv ["tag","-v","current-hackage"]
+                    (Just (T.unlines ["Signature verification failed. "
+                                     ,"Please ensure you've set up your"
+                                     ,"GPG keychain to accept the D6CF60FD signing key."
+                                     ,"For more information, see:"
+                                     ,"https://github.com/fpco/stackage-update#readme"])))
+
+            -- generate index archive when commit id differs from cloned repo
+            tarId <- getTarCommitId (toFilePath tarFile)
+            cloneId <- getCloneCommitId acfDir
+            unless (tarId `equals` cloneId)
+                (generateArchive acfDir tarFile)
+   where
+     getTarCommitId fp =
+         tryProcessStdout Nothing menv "sh" ["-c","git get-tar-commit-id < "++fp]
+
+     getCloneCommitId dir =
+         tryProcessStdout (Just dir) menv "git" ["rev-parse","current-hackage^{}"]
+
+     equals (Right cid1) (Right cid2) = cid1 == cid2
+     equals _ _ = False
+
+     generateArchive acfDir tarFile = do
+         ignoringAbsence (removeFile tarFile)
+         deleteCache indexName'
+         $logDebug ("Exporting a tarball to " <> (T.pack . toFilePath) tarFile)
+         let tarFileTmp = toFilePath tarFile ++ ".tmp"
+         readInNull acfDir
+             "git" menv ["archive","--format=tar","-o",tarFileTmp,"current-hackage"]
+             Nothing
+         tarFileTmpPath <- parseAbsFile tarFileTmp
+         renameFile tarFileTmpPath tarFile
 
 -- | Update the index tarball via HTTP
 updateIndexHTTP :: (MonadIO m,MonadLogger m
@@ -297,7 +308,7 @@ updateIndexHTTP indexName' index url = do
     toUnpack <-
         if wasDownloaded
             then return True
-            else liftM not $ fileExists tar
+            else not `liftM` doesFileExist tar
 
     when toUnpack $ do
         let tmp = toFilePath tar <.> "tmp"
@@ -333,17 +344,34 @@ deleteCache indexName' = do
         Left e -> $logDebug $ "Could not delete cache: " <> T.pack (show e)
         Right () -> $logDebug $ "Deleted index cache at " <> T.pack (toFilePath fp)
 
--- | Load the cached package URLs, or created the cache if necessary.
-getPackageCaches :: (MonadIO m, MonadLogger m, MonadReader env m, HasConfig env, MonadThrow m, HasHttpManager env, MonadBaseControl IO m, MonadCatch m)
-                 => EnvOverride
-                 -> m (Map PackageIdentifier (PackageIndex, PackageCache))
-getPackageCaches menv = do
-    config <- askConfig
-    liftM mconcat $ forM (configPackageIndices config) $ \index -> do
-        fp <- configPackageIndexCache (indexName index)
-        PackageCacheMap pis' <- taggedDecodeOrLoad fp $ liftM PackageCacheMap $ populateCache menv index
 
-        return (fmap (index,) pis')
+-- | Load the cached package URLs, or created the cache if necessary.
+--
+-- This has two levels of caching: in memory, and the on-disk cache. So,
+-- feel free to call this function multiple times.
+getPackageCaches :: (MonadIO m, MonadLogger m, MonadReader env m, HasConfig env, MonadThrow m, HasHttpManager env, MonadBaseControl IO m, MonadCatch m)
+                 => m (Map PackageIdentifier (PackageIndex, PackageCache))
+getPackageCaches = do
+    menv <- getMinimalEnvOverride
+    config <- askConfig
+    mcached <- liftIO $ readIORef (configPackageCaches config)
+    case mcached of
+        Just cached -> return cached
+        Nothing -> do
+            result <- liftM mconcat $ forM (configPackageIndices config) $ \index -> do
+                fp <- configPackageIndexCache (indexName index)
+                PackageCacheMap pis' <- taggedDecodeOrLoad fp $ liftM PackageCacheMap $ populateCache menv index
+                return (fmap (index,) pis')
+            liftIO $ writeIORef (configPackageCaches config) (Just result)
+            return result
+
+-- | Clear the in-memory hackage index cache. This is needed when the
+-- hackage index is updated.
+clearPackageCaches :: (MonadIO m, MonadLogger m, MonadReader env m, HasConfig env, MonadThrow m, HasHttpManager env, MonadBaseControl IO m, MonadCatch m)
+                   => m ()
+clearPackageCaches = do
+    cacheRef <- asks (configPackageCaches . getConfig)
+    liftIO $ writeIORef cacheRef Nothing
 
 --------------- Lifted from cabal-install, Distribution.Client.Tar:
 -- | Return the number of blocks in an entry.

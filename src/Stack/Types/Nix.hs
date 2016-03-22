@@ -52,7 +52,7 @@ data NixOptsMonoid = NixOptsMonoid
   deriving (Eq, Show)
 
 -- | Decode uninterpreted nix options from JSON/YAML.
-instance FromJSON (NixOptsMonoid, [JSONWarning]) where
+instance FromJSON (WithJSONWarnings NixOptsMonoid) where
   parseJSON = withObjectWarnings "NixOptsMonoid"
     (\o -> do nixMonoidDefaultEnable <- pure True
               nixMonoidEnable        <- o ..:? nixEnableArgName

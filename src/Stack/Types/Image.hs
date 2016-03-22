@@ -39,7 +39,7 @@ data ImageOptsMonoid = ImageOptsMonoid
     { imgMonoidDockers :: ![ImageDockerOpts]
     } deriving (Show)
 
-instance FromJSON (ImageOptsMonoid, [JSONWarning]) where
+instance FromJSON (WithJSONWarnings ImageOptsMonoid) where
     parseJSON = withObjectWarnings
             "ImageOptsMonoid"
             (\o ->
@@ -59,7 +59,7 @@ instance Monoid ImageOptsMonoid where
         { imgMonoidDockers = imgMonoidDockers l <> imgMonoidDockers r
         }
 
-instance FromJSON (ImageDockerOpts, [JSONWarning]) where
+instance FromJSON (WithJSONWarnings ImageDockerOpts) where
     parseJSON = withObjectWarnings
             "ImageDockerOpts"
             (\o ->

@@ -9,20 +9,21 @@ module Stack.Init
 
 import           Control.Exception               (assert)
 import           Control.Exception.Enclosed      (catchAny)
-import           Control.Monad                   (when)
+import           Control.Monad
 import           Control.Monad.Catch             (MonadMask, throwM)
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
-import           Control.Monad.Reader            (asks, MonadReader)
+import           Control.Monad.Reader            (MonadReader, asks)
 import           Control.Monad.Trans.Control     (MonadBaseControl)
 import qualified Data.ByteString.Builder         as B
-import qualified Data.ByteString.Lazy            as L
 import qualified Data.ByteString.Char8           as BC
+import qualified Data.ByteString.Lazy            as L
+import qualified Data.Foldable                   as F
 import           Data.Function                   (on)
 import qualified Data.HashMap.Strict             as HM
 import qualified Data.IntMap                     as IntMap
-import qualified Data.Foldable                   as F
-import           Data.List                       (intersect, maximumBy)
+import           Data.List                       ( intercalate, intersect
+                                                 , maximumBy)
 import           Data.List.Extra                 (nubOrd)
 import           Data.Map                        (Map)
 import qualified Data.Map                        as Map
@@ -31,18 +32,20 @@ import           Data.Monoid
 import qualified Data.Text                       as T
 import qualified Data.Yaml                       as Yaml
 import qualified Distribution.PackageDescription as C
+import qualified Distribution.Text               as C
+import qualified Distribution.Version            as C
 import           Network.HTTP.Client.Conduit     (HasHttpManager)
 import           Path
 import           Path.IO
+import qualified Paths_stack                     as Meta
 import           Stack.BuildPlan
+import           Stack.Config                    (getSnapshots,
+                                                  makeConcreteResolver)
 import           Stack.Constants
 import           Stack.Solver
 import           Stack.Types
-import           Stack.Types.Internal            ( HasTerminal, HasReExec
-                                                 , HasLogLevel)
-import           System.Directory                (makeRelativeToCurrentDirectory)
-import           Stack.Config                    ( getSnapshots
-                                                 , makeConcreteResolver)
+import           Stack.Types.Internal            (HasLogLevel, HasReExec,
+                                                  HasTerminal)
 import qualified System.FilePath                 as FP
 
 -- | Generate stack.yaml
@@ -57,20 +60,22 @@ initProject
     -> m ()
 initProject currDir initOpts mresolver = do
     let dest = currDir </> stackDotYaml
-        dest' = toFilePath dest
 
-    reldest <- liftIO $ makeRelativeToCurrentDirectory dest'
+    reldest <- toFilePath `liftM` makeRelativeToCurrentDir dest
 
-    exists <- fileExists dest
+    exists <- doesFileExist dest
     when (not (forceOverwrite initOpts) && exists) $ do
         error ("Stack configuration file " <> reldest <>
                " exists, use 'stack solver' to fix the existing config file or \
                \'--force' to overwrite it.")
 
+    dirs <- mapM (resolveDir' . T.unpack) (searchDirs initOpts)
     let noPkgMsg =  "In order to init, you should have an existing .cabal \
                     \file. Please try \"stack new\" instead."
-
-    cabalfps <- findCabalFiles (includeSubDirs initOpts) currDir
+        find  = findCabalFiles (includeSubDirs initOpts)
+        dirs' = if null dirs then [currDir] else dirs
+    $logInfo "Looking for .cabal or package.yaml files to use to init the project."
+    cabalfps <- liftM concat $ mapM find dirs'
     (bundle, dupPkgs)  <- cabalPackagesCheck cabalfps noPkgMsg Nothing
 
     (r, flags, extraDeps, rbundle) <- getDefaultResolver dest initOpts
@@ -125,12 +130,11 @@ initProject currDir initOpts mresolver = do
                     | otherwise -> assert False $ toFilePath dir
                 Just rel -> toFilePath rel
 
-        makeRel = liftIO . makeRelativeToCurrentDirectory . toFilePath
+        makeRel = fmap toFilePath . makeRelativeToCurrentDir
 
         pkgs = map toPkg $ Map.elems (fmap (parent . fst) rbundle)
         toPkg dir = PackageEntry
-            { peValidWanted = Nothing
-            , peExtraDepMaybe = Nothing
+            { peExtraDep = False
             , peLocation = PLFilePath $ makeRelDir dir
             , peSubdirs = []
             }
@@ -161,7 +165,7 @@ initProject currDir initOpts mresolver = do
         (if exists then "Overwriting existing configuration file: "
          else "Writing configuration to file: ")
         <> T.pack reldest
-    liftIO $ L.writeFile dest'
+    liftIO $ L.writeFile (toFilePath dest)
            $ B.toLazyByteString
            $ renderStackYaml p
                (Map.elems $ fmap (makeRelDir . parent . fst) ignored)
@@ -177,64 +181,128 @@ renderStackYaml p ignoredPackages dupPackages =
         _ -> assert False $ B.byteString $ Yaml.encode p
   where
     renderObject o =
-        B.byteString "# This file was automatically generated by stack init\n" <>
-        B.byteString "# For more information, see: http://docs.haskellstack.org/en/stable/yaml_configuration.html\n\n" <>
-        F.foldMap (goComment o) comments <>
-        goOthers (o `HM.difference` HM.fromList comments) <>
-        B.byteString
-            "# Control whether we use the GHC we find on the path\n\
-            \# system-ghc: true\n\n\
-            \# Require a specific version of stack, using version ranges\n\
-            \# require-stack-version: -any # Default\n\
-            \# require-stack-version: >= 1.0.0\n\n\
-            \# Override the architecture used by stack, especially useful on Windows\n\
-            \# arch: i386\n\
-            \# arch: x86_64\n\n\
-            \# Extra directories used by stack for building\n\
-            \# extra-include-dirs: [/path/to/dir]\n\
-            \# extra-lib-dirs: [/path/to/dir]\n\n\
-            \# Allow a newer minor version of GHC than the snapshot specifies\n\
-            \# compiler-check: newer-minor\n"
-
-    comments =
-        [ ("user-message", "A message to be displayed to the user. Used when autogenerated config ignored some packages or added extra deps.")
-        , ("resolver", "Specifies the GHC version and set of packages available (e.g., lts-3.5, nightly-2015-09-21, ghc-7.10.2)")
-        , ("packages", "Local packages, usually specified by relative directory name")
-        , ("extra-deps", "Packages to be pulled from upstream that are not in the resolver (e.g., acme-missiles-0.3)")
-        , ("flags", "Override default flag values for local packages and extra-deps")
-        , ("extra-package-dbs", "Extra package databases containing global packages")
-        ]
-
-    commentedPackages =
-        let ignoredComment = "# The following packages have been ignored \
-                \due to incompatibility with the resolver compiler or \
-                \dependency conflicts with other packages"
-            dupComment = "# The following packages have been ignored due \
-                \to package name conflict with other packages"
-        in commentPackages ignoredComment ignoredPackages
-           <> commentPackages dupComment dupPackages
-
-    commentPackages comment pkgs
-        | pkgs /= [] =
-            B.byteString (BC.pack $ comment ++ "\n")
-            <> (B.byteString $ BC.pack $ concat
-                 $ (map (\x -> "#- " ++ x ++ "\n") pkgs) ++ ["\n"])
-        | otherwise = ""
+           B.byteString headerHelp
+        <> B.byteString "\n\n"
+        <> F.foldMap (goComment o) comments
+        <> goOthers (o `HM.difference` HM.fromList comments)
+        <> B.byteString footerHelp
 
     goComment o (name, comment) =
         case HM.lookup name o of
             Nothing -> assert (name == "user-message") mempty
             Just v ->
-                B.byteString "# " <>
                 B.byteString comment <>
                 B.byteString "\n" <>
                 B.byteString (Yaml.encode $ Yaml.object [(name, v)]) <>
                 if (name == "packages") then commentedPackages else "" <>
                 B.byteString "\n"
 
+    commentHelp = BC.pack .  intercalate "\n" . map ("# " ++)
+    commentedPackages =
+        let ignoredComment = commentHelp
+                [ "The following packages have been ignored due to incompatibility with the"
+                , "resolver compiler, dependency conflicts with other packages"
+                , "or unsatisfied dependencies."
+                ]
+            dupComment = commentHelp
+                [ "The following packages have been ignored due to package name conflict "
+                , "with other packages."
+                ]
+        in commentPackages ignoredComment ignoredPackages
+           <> commentPackages dupComment dupPackages
+
+    commentPackages comment pkgs
+        | pkgs /= [] =
+               B.byteString comment
+            <> B.byteString "\n"
+            <> (B.byteString $ BC.pack $ concat
+                 $ (map (\x -> "#- " ++ x ++ "\n") pkgs) ++ ["\n"])
+        | otherwise = ""
+
     goOthers o
         | HM.null o = mempty
         | otherwise = assert False $ B.byteString $ Yaml.encode o
+
+    -- Per Section Help
+    comments =
+        [ ("user-message"     , userMsgHelp)
+        , ("resolver"         , resolverHelp)
+        , ("packages"         , packageHelp)
+        , ("extra-deps"       , "# Dependency packages to be pulled from upstream that are not in the resolver\n# (e.g., acme-missiles-0.3)")
+        , ("flags"            , "# Override default flag values for local packages and extra-deps")
+        , ("extra-package-dbs", "# Extra package databases containing global packages")
+        ]
+
+    -- Help strings
+    headerHelp = commentHelp
+        [ "This file was automatically generated by 'stack init'"
+        , ""
+        , "Some commonly used options have been documented as comments in this file."
+        , "For advanced use and comprehensive documentation of the format, please see:"
+        , "http://docs.haskellstack.org/en/stable/yaml_configuration/"
+        ]
+
+    resolverHelp = commentHelp
+        [ "Resolver to choose a 'specific' stackage snapshot or a compiler version."
+        , "A snapshot resolver dictates the compiler version and the set of packages"
+        , "to be used for project dependencies. For example:"
+        , ""
+        , "resolver: lts-3.5"
+        , "resolver: nightly-2015-09-21"
+        , "resolver: ghc-7.10.2"
+        , "resolver: ghcjs-0.1.0_ghc-7.10.2"
+        , "resolver:"
+        , " name: custom-snapshot"
+        , " location: \"./custom-snapshot.yaml\""
+        ]
+
+    userMsgHelp = commentHelp
+        [ "A warning or info to be displayed to the user on config load." ]
+
+    packageHelp = commentHelp
+        [ "User packages to be built."
+        , "Various formats can be used as shown in the example below."
+        , ""
+        , "packages:"
+        , "- some-directory"
+        , "- https://example.com/foo/bar/baz-0.0.2.tar.gz"
+        , "- location:"
+        , "   git: https://github.com/commercialhaskell/stack.git"
+        , "   commit: e7b331f14bcffb8367cd58fbfc8b40ec7642100a"
+        , "- location: https://github.com/commercialhaskell/stack/commit/e7b331f14bcffb8367cd58fbfc8b40ec7642100a"
+        , "  extra-dep: true"
+        , " subdirs:"
+        , " - auto-update"
+        , " - wai"
+        , ""
+        , "A package marked 'extra-dep: true' will only be built if demanded by a"
+        , "non-dependency (i.e. a user package), and its test suites and benchmarks"
+        , "will not be run. This is useful for tweaking upstream packages."
+        ]
+
+    footerHelp =
+        let major = toCabalVersion
+                    $ toMajorVersion $ fromCabalVersion Meta.version
+        in commentHelp
+        [ "Control whether we use the GHC we find on the path"
+        , "system-ghc: true"
+        , ""
+        , "Require a specific version of stack, using version ranges"
+        , "require-stack-version: -any # Default"
+        , "require-stack-version: \""
+          ++ C.display (C.orLaterVersion major) ++ "\""
+        , ""
+        , "Override the architecture used by stack, especially useful on Windows"
+        , "arch: i386"
+        , "arch: x86_64"
+        , ""
+        , "Extra directories used by stack for building"
+        , "extra-include-dirs: [/path/to/dir]"
+        , "extra-lib-dirs: [/path/to/dir]"
+        , ""
+        , "Allow a newer minor version of GHC than the snapshot specifies"
+        , "compiler-check: newer-minor"
+        ]
 
 getSnapshots' :: (MonadIO m, MonadMask m, MonadReader env m, HasConfig env, HasHttpManager env, MonadLogger m, MonadBaseControl IO m)
               => m Snapshots
@@ -251,7 +319,7 @@ getSnapshots' =
         $logError ""
         $logError "You can try again, or create your stack.yaml file by hand. See:"
         $logError ""
-        $logError "    http://docs.haskellstack.org/en/stable/yaml_configuration.html"
+        $logError "    http://docs.haskellstack.org/en/stable/yaml_configuration/"
         $logError ""
         $logError $ "Exception was: " <> T.pack (show e)
         error ""
@@ -355,23 +423,31 @@ checkBundleResolver stackYaml initOpts bundle resolver = do
     result <- checkResolverSpec gpds Nothing resolver
     case result of
         BuildPlanCheckOk f -> return $ Right (f, Map.empty)
-        BuildPlanCheckPartial f _
+        BuildPlanCheckPartial f e
             | needSolver resolver initOpts -> do
-                $logWarn $ "*** Resolver " <> resolverName resolver
-                            <> " will need external packages: "
-                $logWarn $ indent $ T.pack $ show result
+                warnPartial result
                 solve f
+            | omitPackages initOpts -> do
+                warnPartial result
+                $logWarn "*** Omitting packages with unsatisfied dependencies"
+                return $ Left $ failedUserPkgs e
             | otherwise -> throwM $ ResolverPartial resolver (show result)
         BuildPlanCheckFail _ e _
-            | (omitPackages initOpts) -> do
+            | omitPackages initOpts -> do
                 $logWarn $ "*** Resolver compiler mismatch: "
                            <> resolverName resolver
                 $logWarn $ indent $ T.pack $ show result
-                let failed = Map.unions (Map.elems (fmap deNeededBy e))
-                return $ Left (Map.keys failed)
+                return $ Left $ failedUserPkgs e
             | otherwise -> throwM $ ResolverMismatch resolver (show result)
     where
-      indent t    = T.unlines $ fmap ("    " <>) (T.lines t)
+      indent t  = T.unlines $ fmap ("    " <>) (T.lines t)
+      warnPartial res = do
+          $logWarn $ "*** Resolver " <> resolverName resolver
+                      <> " will need external packages: "
+          $logWarn $ indent $ T.pack $ show res
+
+      failedUserPkgs e = Map.keys $ Map.unions (Map.elems (fmap deNeededBy e))
+
       gpds        = Map.elems (fmap snd bundle)
       solve flags = do
           let cabalDirs      = map parent (Map.elems (fmap fst bundle))
@@ -437,9 +513,11 @@ getRecommendedSnapshots snapshots = do
         ]
 
 data InitOpts = InitOpts
-    { useSolver :: Bool
+    { searchDirs     :: ![T.Text]
+    -- ^ List of sub directories to search for .cabal files
+    , useSolver      :: Bool
     -- ^ Use solver to determine required external dependencies
-    , omitPackages :: Bool
+    , omitPackages   :: Bool
     -- ^ Exclude conflicting or incompatible user packages
     , forceOverwrite :: Bool
     -- ^ Overwrite existing stack.yaml

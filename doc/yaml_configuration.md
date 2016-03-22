@@ -89,7 +89,7 @@ packages:
 
 This is a list of package identifiers for additional packages from upstream to
 be included. This is usually used to augment an LTS Haskell or Stackage Nightly
-snapshot with a package that is not present or is at an older version than you
+snapshot with a package that is not present or is at an different version than you
 wish to use.
 
 ```yaml
@@ -121,7 +121,7 @@ flags:
 ```
 
 Flags will only affect packages in your `packages` and `extra-deps` settings.
-Packages that come from the snapshot global database or are not affected.
+Packages that come from the snapshot global database are not affected.
 
 ### image
 
@@ -171,13 +171,13 @@ Non-project config options may go in the global config (`/etc/stack/config.yaml`
 
 ### docker
 
-See [Docker integration](docker_integration.html#configuration).
+See [Docker integration](docker_integration.md#configuration).
 
 ### nix
 
 (since 0.1.10.0)
 
-See [Nix integration](nix_integration.html#configuration).
+See [Nix integration](nix_integration.md#configuration).
 
 ### connection-count
 
@@ -434,6 +434,22 @@ allow-newer: true
 
 Note that this also ignores lower bounds. The name "allow-newer" is chosen to
 match the commonly used cabal option.
+
+### allow-different-user
+
+(Since 1.0.1)
+
+Allow users other than the owner of the stack root directory (typically `~/.stack`)
+to use the stack installation. The default is `false`. POSIX systems only.
+
+```yaml
+allow-different-user: true
+```
+
+The intention of this option is to prevent file permission problems, for example
+as the result of a `stack` command executed under `sudo`.
+
+The option is automatically enabled when `stack` is re-spawned in a Docker process.
 
 ### templates
 

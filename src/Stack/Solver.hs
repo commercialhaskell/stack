@@ -20,13 +20,14 @@ import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import           Control.Monad.Reader
 import           Control.Monad.Trans.Control
-import           Data.Aeson.Extended         (object, (.=), toJSON, logJSONWarnings)
+import           Data.Aeson.Extended         ( WithJSONWarnings(..), object, (.=), toJSON
+                                             , logJSONWarnings)
 import qualified Data.ByteString             as S
 import           Data.Either
 import           Data.Function               (on)
 import qualified Data.HashMap.Strict         as HashMap
 import           Data.List                   ( (\\), isSuffixOf, intercalate
-                                             , minimumBy)
+                                             , minimumBy, isPrefixOf)
 import           Data.List.Extra             (groupSortOn)
 import           Data.Map                    (Map)
 import qualified Data.Map                    as Map
@@ -47,11 +48,12 @@ import qualified Distribution.Text           as C
 import           Network.HTTP.Client.Conduit (HasHttpManager)
 import           Path
 import           Path.Find                   (findFiles)
-import           Path.IO                     (getWorkingDir, parseRelAsAbsDir)
+import           Path.IO                     hiding (findExecutable, findFiles)
 import           Prelude
 import           Stack.BuildPlan
 import           Stack.Constants             (stackDotYaml)
 import           Stack.Package               (printCabalFileWarning
+                                             , hpack
                                              , readPackageUnresolved)
 import           Stack.Setup
 import           Stack.Setup.Installed
@@ -59,12 +61,8 @@ import           Stack.Types
 import           Stack.Types.Internal        ( HasTerminal
                                              , HasReExec
                                              , HasLogLevel)
-import           System.Directory            (copyFile,
-                                              createDirectoryIfMissing,
-                                              getTemporaryDirectory,
-                                              makeRelativeToCurrentDirectory)
+import qualified System.Directory            as D
 import qualified System.FilePath             as FP
-import           System.IO.Temp              (withSystemTempDirectory)
 import           System.Process.Read
 
 data ConstraintType = Constraint | Preference deriving (Eq)
@@ -80,9 +78,10 @@ cabalSolver :: (MonadIO m, MonadLogger m, MonadMask m, MonadBaseControl IO m, Mo
             -> m (Either [PackageName] ConstraintSpec)
 cabalSolver menv cabalfps constraintType
             srcConstraints depConstraints cabalArgs =
-  withSystemTempDirectory "cabal-solver" $ \dir -> do
+  withSystemTempDir "cabal-solver" $ \dir' -> do
 
     let versionConstraints = fmap fst depConstraints
+        dir = toFilePath dir'
     configLines <- getCabalConfig dir constraintType versionConstraints
     let configFile = dir FP.</> "cabal.config"
     liftIO $ S.writeFile configFile $ encodeUtf8 $ T.unlines configLines
@@ -93,7 +92,7 @@ cabalSolver menv cabalfps constraintType
     --
     -- In theory we could use --ignore-sandbox, but not all versions of cabal
     -- support it.
-    tmpdir <- liftIO getTemporaryDirectory >>= parseRelAsAbsDir
+    tmpdir <- getTempDir
 
     let args = ("--config-file=" ++ configFile)
              : "install"
@@ -227,8 +226,8 @@ getCabalConfig dir constraintType constraints = do
         let dstdir = dir FP.</> T.unpack (indexNameText $ indexName index)
             dst = dstdir FP.</> "00-index.tar"
         liftIO $ void $ tryIO $ do
-            createDirectoryIfMissing True dstdir
-            copyFile (toFilePath src) dst
+            D.createDirectoryIfMissing True dstdir
+            D.copyFile (toFilePath src) dst
         return $ T.concat
             [ "remote-repo: "
             , indexNameText $ indexName index
@@ -327,21 +326,14 @@ mergeConstraints = Map.mergeWithKey
            else error "Bug: An entry in flag map must have a corresponding \
                       \entry in the version map")
 
-diffConstraints
-    :: (Eq v, Eq f)
-    => (v, f) -> (v, f) -> Maybe (v, f)
-diffConstraints (v, f) (v', f')
-    | (v == v') && (f == f') = Nothing
-    | otherwise              = Just (v, f)
-
 -- | Given a resolver, user package constraints (versions and flags) and extra
 -- dependency constraints determine what extra dependencies are required
 -- outside the resolver snapshot and the specified extra dependencies.
-
+--
 -- First it tries by using the snapshot and the input extra dependencies
 -- as hard constraints, if no solution is arrived at by using hard
 -- constraints it then tries using them as soft constraints or preferences.
-
+--
 -- It returns either conflicting packages when no solution is arrived at
 -- or the solution in terms of src package flag settings and extra
 -- dependencies.
@@ -408,10 +400,19 @@ solveResolverSpec stackYaml cabalDirs
                 -- returned versions or flags different from the snapshot.
                 inSnapChanged = Map.differenceWith diffConstraints
                                                    inSnap snapConstraints
+                -- report stale flags in build plan
+                spuriousFlags = Map.differenceWith diffSpuriousFlags
+                                                   inSnap snapConstraints
                 -- Packages neither in snapshot, nor srcs
                 extra = Map.difference deps (Map.union srcConstraints
                                                        snapConstraints)
                 external = Map.union inSnapChanged extra
+
+            when (not $ Map.null spuriousFlags) $ do
+                $logInfo $ "WARNING! Ignoring the following spurious flags \
+                           \found in the build plan:\n"
+                           <> T.concat (map (uncurry showPackageFlags)
+                                            (Map.toList (fmap snd spuriousFlags)))
 
             $logInfo $ "Successfully determined a build plan with "
                      <> T.pack (show $ Map.size external)
@@ -421,6 +422,30 @@ solveResolverSpec stackYaml cabalDirs
         Left x -> do
             $logInfo $ "*** Failed to arrive at a workable build plan."
             return $ Left x
+    where
+        -- Think of the first map as the deps reported in cabal output and
+        -- the second as the snapshot packages
+
+        -- Note: For flags we only require that the flags in cabal output be a
+        -- subset of the snapshot flags. This is to avoid a false difference
+        -- reporting due to any spurious flags in the build plan which will
+        -- always be absent in the cabal output.
+        diffConstraints
+            :: (Eq v, Eq a, Ord k)
+            => (v, Map k a) -> (v, Map k a) -> Maybe (v, Map k a)
+        diffConstraints (v, f) (v', f')
+            | (v == v') && (f `Map.isSubmapOf` f') = Nothing
+            | otherwise              = Just (v, f)
+
+        -- Report cases where package versions are identical but all flags
+        -- present in snapshot are not present in the cabal output
+        diffSpuriousFlags
+            :: (Eq v, Eq a, Ord k)
+            => (v, Map k a) -> (v, Map k a) -> Maybe (v, Map k a)
+        diffSpuriousFlags (v, f) (v', f')
+            | (v == v') && (not $ Map.null $ f' `Map.difference` f)
+                = Just (v, f' `Map.difference` f)
+            | otherwise              = Nothing
 
 -- | Given a resolver (snpashot, compiler or custom resolver)
 -- return the compiler version, package versions and packages flags
@@ -453,7 +478,7 @@ getResolverConstraints stackYaml resolver
 -- | Given a bundle of user packages, flag constraints on those packages and a
 -- resolver, determine if the resolver fully, partially or fails to satisfy the
 -- dependencies of the user packages.
-
+--
 -- If the package flags are passed as 'Nothing' then flags are chosen
 -- automatically.
 checkResolverSpec
@@ -471,29 +496,33 @@ checkResolverSpec gpds flags resolver = do
       -- TODO support custom resolver for stack init
       ResolverCustom {} -> return $ BuildPlanCheckPartial Map.empty Map.empty
 
--- | Finds all files with a .cabal extension under a given directory.
+-- | Finds all files with a .cabal extension under a given directory. If
+-- a `hpack` `package.yaml` file exists, this will be used to generate a cabal
+-- file.
 -- Subdirectories can be included depending on the @recurse@ parameter.
 findCabalFiles :: MonadIO m => Bool -> Path Abs Dir -> m [Path Abs File]
-findCabalFiles recurse dir =
-    liftIO $ findFiles dir isCabal (\subdir -> recurse && not (isIgnored subdir))
+findCabalFiles recurse dir = liftIO $ do
+    findFiles dir isHpack subdirFilter >>= mapM_ (hpack . parent)
+    findFiles dir isCabal subdirFilter
   where
-    isCabal path = ".cabal" `isSuffixOf` toFilePath path
+    subdirFilter subdir = recurse && not (isIgnored subdir)
+    isHpack = (== "package.yaml")     . toFilePath . filename
+    isCabal = (".cabal" `isSuffixOf`) . toFilePath
 
-    isIgnored path = FP.dropTrailingPathSeparator (toFilePath (dirname path))
-                     `Set.member` ignoredDirs
+    isIgnored path = "." `isPrefixOf` dirName || dirName `Set.member` ignoredDirs
+      where
+        dirName = FP.dropTrailingPathSeparator (toFilePath (dirname path))
 
 -- | Special directories that we don't want to traverse for .cabal files
 ignoredDirs :: Set FilePath
 ignoredDirs = Set.fromList
-    [ ".git"
-    , "dist"
-    , ".stack-work"
+    [ "dist"
     ]
 
 -- | Perform some basic checks on a list of cabal files to be used for creating
 -- stack config. It checks for duplicate package names, package name and
 -- cabal file name mismatch and reports any issues related to those.
-
+--
 -- If no error occurs it returns filepath and @GenericPackageDescription@s
 -- pairs as well as any filenames for duplicate packages not included in the
 -- pairs.
@@ -511,7 +540,7 @@ cabalPackagesCheck cabalfps noPkgMsg dupErrMsg = do
     when (null cabalfps) $
         error noPkgMsg
 
-    relpaths <- mapM makeRel cabalfps
+    relpaths <- mapM makeRelativeToCurrentDir cabalfps
     $logInfo $ "Using cabal packages:"
     $logInfo $ T.pack (formatGroup relpaths)
 
@@ -531,7 +560,7 @@ cabalPackagesCheck cabalfps noPkgMsg dupErrMsg = do
         nameMismatchPkgs = mapMaybe getNameMismatchPkg packages
 
     when (nameMismatchPkgs /= []) $ do
-        rels <- mapM makeRel nameMismatchPkgs
+        rels <- mapM makeRelativeToCurrentDir nameMismatchPkgs
         error $ "Package name as defined in the .cabal file must match the \
                 \.cabal file name.\n\
                 \Please fix the following packages and try again:\n"
@@ -549,7 +578,7 @@ cabalPackagesCheck cabalfps noPkgMsg dupErrMsg = do
         unique      = packages \\ dupIgnored
 
     when (dupIgnored /= []) $ do
-        dups <- mapM (mapM (makeRel . fst)) (dupGroups packages)
+        dups <- mapM (mapM (makeRelativeToCurrentDir . fst)) (dupGroups packages)
         $logWarn $ T.pack $
             "Following packages have duplicate package names:\n"
             <> intercalate "\n" (map formatGroup dups)
@@ -560,23 +589,22 @@ cabalPackagesCheck cabalfps noPkgMsg dupErrMsg = do
           Just msg -> error msg
 
     return (Map.fromList
-            $ map (\(file, gpd) -> ((gpdPackageName gpd),(file, gpd))) unique
+            $ map (\(file, gpd) -> (gpdPackageName gpd,(file, gpd))) unique
            , map fst dupIgnored)
 
-makeRel :: (MonadIO m) => Path Abs File -> m FilePath
-makeRel = liftIO . makeRelativeToCurrentDirectory . toFilePath
+formatGroup :: [Path Rel File] -> String
+formatGroup = concatMap formatPath
+    where formatPath path = "- " <> toFilePath path <> "\n"
 
-formatGroup :: [String] -> String
-formatGroup = concat . (map formatPath)
-    where formatPath path = "- " <> path <> "\n"
-
-reportMissingCabalFiles
-    :: (MonadIO m, MonadLogger m) => [Path Abs File] -> Bool -> m ()
+reportMissingCabalFiles :: (MonadIO m, MonadThrow m, MonadLogger m)
+  => [Path Abs File]   -- ^ Directories to scan
+  -> Bool              -- ^ Whether to scan sub-directories
+  -> m ()
 reportMissingCabalFiles cabalfps includeSubdirs = do
-    allCabalfps <- findCabalFiles (includeSubdirs) =<< getWorkingDir
+    allCabalfps <- findCabalFiles includeSubdirs =<< getCurrentDir
 
-    relpaths <- mapM makeRel (allCabalfps \\ cabalfps)
-    when (not (null relpaths)) $ do
+    relpaths <- mapM makeRelativeToCurrentDir (allCabalfps \\ cabalfps)
+    unless (null relpaths) $ do
         $logWarn $ "The following packages are missing from the config:"
         $logWarn $ T.pack (formatGroup relpaths)
 
@@ -601,7 +629,7 @@ solveExtraDeps modStackYaml = do
     bconfig <- asks getBuildConfig
 
     let stackYaml = bcStackYaml bconfig
-    relStackYaml <- makeRel stackYaml
+    relStackYaml <- toFilePath <$> makeRelativeToCurrentDir stackYaml
 
     $logInfo $ "Using configuration file: " <> T.pack relStackYaml
     let cabalDirs = Map.keys $ envConfigPackages econfig
@@ -705,7 +733,7 @@ solveExtraDeps modStackYaml = do
         writeStackYaml path res deps fl = do
             let fp = toFilePath path
             obj <- liftIO (Yaml.decodeFileEither fp) >>= either throwM return
-            (ProjectAndConfigMonoid _ _, warnings) <-
+            WithJSONWarnings (ProjectAndConfigMonoid _ _) warnings <-
                 liftIO (Yaml.decodeFileEither fp) >>= either throwM return
             logJSONWarnings fp warnings
             let obj' =

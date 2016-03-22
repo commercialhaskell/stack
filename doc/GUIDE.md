@@ -48,7 +48,7 @@ all commands work cross-platform, unless explicitly stated otherwise.
 ## Downloading and Installation
 
 The [documentation dedicated to downloading
-stack](install_and_upgrade.html) has the most
+stack](install_and_upgrade.md) has the most
 up-to-date information for a variety of operating systems, including multiple
 GNU/Linux flavors. Instead of repeating that content here, please go check out
 that page and come back here when you can successfully run `stack --version`.
@@ -460,7 +460,7 @@ While constructing the BuildPlan the following exceptions were encountered:
     Could not find package acme-missiles in known packages
 
 --  Failure when adding dependencies:
-      acme-missiles: needed (-any), latest is 0.3, but not present in build plan
+      acme-missiles: needed (-any), stack configuration has no specified version (latest applicable is 0.3)
     needed for package: helloworld-0.1.0.0
 
 Recommended action: try adding the following to your extra-deps in /home/michael/helloworld/stack.yaml
@@ -619,7 +619,7 @@ At the time of writing:
 * Experimental custom snapshot support
 
 The most up-to-date information can always be found in the
-[stack.yaml documentation](yaml_configuration.html#resolver).
+[stack.yaml documentation](yaml_configuration.md#resolver).
 
 ## Existing projects
 
@@ -667,7 +667,7 @@ stack init does quite a few things for you behind the scenes:
   nightly, other LTS versions in that order
 
 Assuming it finds a match, it will write your stack.yaml file, and everything
-will work. 
+will work.
 
 #### External Dependencies
 
@@ -737,7 +737,7 @@ Selecting the best among 6 snapshots...
 .
 
 Selected resolver: lts-4.1
-*** Resolver lts-4.1 will need external packages: 
+*** Resolver lts-4.1 will need external packages:
     acme-missiles not found
         - yackage requires -any
         - yackage flags: upload = True
@@ -803,7 +803,7 @@ Selecting the best among 6 snapshots...
 
 *** Failed to arrive at a workable build plan.
 *** Ignoring package: yackage-test
-*** Resolver lts-4.2 will need external packages: 
+*** Resolver lts-4.2 will need external packages:
     acme-missiles not found
         - yackage requires ==0.3
         - yackage flags: upload = True
@@ -840,7 +840,7 @@ the other one.
 Packages may get excluded due to conflicting requirements among user packages
 or due to conflicting requirements between a user package and the resolver
 compiler. If all of the packages have a conflict with the compiler then all of
-them may get commented out. 
+them may get commented out.
 
 When packages are commented out you will see a warning every time you run a
 command which needs the config file. The warning can be disabled by editing the
@@ -863,6 +863,10 @@ You can install the required compiler if not already installed by using the
 
 #### Miscellaneous and diagnostics
 
+_Add selected packages_: If you want to use only selected packages from your
+project directory you can do so by explicitly specifying the package directories
+on the command line.
+
 _Duplicate package names_: If multiple packages under the directory tree have
 same name, stack init will report those and automatically ignore one of them.
 
@@ -875,8 +879,8 @@ a cabal package file. You may want to pay attention to the warnings as
 sometimes they may result in incomprehensible errors later on during dependency
 solving.
 
-_Packages with no names_: If the `Name` field in a cabal file is empty or not
-present then stack init will refuse to continue.
+_Package naming_: If the `Name` field defined in a cabal file does not match
+with the cabal file name then `stack init` will refuse to continue.
 
 _Cabal install errors_: stack init uses `cabal-install` to determine external
 dependencies. When cabal-install encounters errors, cabal errors are displayed
@@ -1223,7 +1227,7 @@ to build.
 
 We're not going to cover the full generality of these arguments here; instead,
 there's [documentation covering the full build command
-syntax](build_command.html).
+syntax](build_command.md).
 Here, we'll just point out a few different types of arguments:
 
 * You can specify a *package name*, e.g. `stack build vector`.
@@ -1360,7 +1364,7 @@ In addition to local directories, you can also refer to packages available in a
 Git repository or in a tarball over HTTP/HTTPS. This can be useful for using a
 modified version of a dependency that hasn't yet been released upstream. This is
 a slightly more advanced usage that we won't go into detail with here, but it's
-covered in the [stack.yaml documentation](yaml_configuration.html#packages).
+covered in the [stack.yaml documentation](yaml_configuration.md#packages).
 
 ## Flags and GHC options
 
@@ -1448,7 +1452,7 @@ confusion.
 Final point: if you have GHC options that you'll be regularly passing to your
 packages, you can add them to your stack.yaml file (starting with
 stack-0.1.4.0). See [the documentation section on
-ghc-options](yaml_configuration.html#ghc-options)
+ghc-options](yaml_configuration.md#ghc-options)
 for more information.
 
 ## path
@@ -1741,7 +1745,7 @@ There are lots of resources available for learning more about stack:
 * `--verbose` (or `-v`) — much more info about internal operations (useful for bug reports)
 * The [home page](http://haskellstack.org)
 * The [stack mailing list](https://groups.google.com/d/forum/haskell-stack)
-* The [the FAQ](faq.html)
+* The [the FAQ](faq.md)
 * The [stack wiki](https://github.com/commercialhaskell/stack/wiki)
 * The [haskell-stack tag on Stack Overflow](http://stackoverflow.com/questions/tagged/haskell-stack)
 * [Another getting started with stack tutorial](http://seanhess.github.io/2015/08/04/practical-haskell-getting-started.html)
@@ -1798,30 +1802,35 @@ getting type information in Emacs. For more information, see
 
 If you'd like to get some insight into the dependency tree of your packages, you
 can use the `stack dot` command and Graphviz. More information is
-[available in the Dependency visualization documentation](dependency_visualization.html).
+[available in the Dependency visualization documentation](dependency_visualization.md).
 
 ### Travis with caching
 
 Many people use Travis CI to test out a project for every Git push. We have [a
 document devoted to
-Travis](travis_ci.html). However, for
+Travis](travis_ci.md). However, for
 most people, the following example will be sufficient to get started:
 
 ```yaml
+# Copy these contents into the root directory of your Github project in a file
+# named .travis.yml
+
 # Use new container infrastructure to enable caching
 sudo: false
 
 # Choose a lightweight base image; we provide our own build tools.
 language: c
 
-# GHC depends on GMP. You can add other dependencies here as well.
-addons:
-  apt:
-    packages:
-    - libgmp-dev
+# Caching so the next build will be fast too.
+cache:
+  directories:
+  - $HOME/.ghc
+  - $HOME/.cabal
+  - $HOME/.stack
 
-# The different configurations we want to test. You could also do things like
-# change flags or use --stack-yaml to point to a different file.
+# The different configurations we want to test. We have BUILD=cabal which uses
+# cabal-install, and BUILD=stack which uses Stack. More documentation on each
+# of those below.
 #
 # We set the compiler values here to tell Travis to use a different
 # cache file per set of arguments.
@@ -1831,47 +1840,132 @@ addons:
 #     addons: {apt: {packages: [libfcgi-dev,libgmp-dev]}}
 matrix:
   include:
-  - env: ARGS=""
-    compiler: ": # Default"
-  - env: ARGS="--resolver lts-2"
-    compiler: ": # lts-2"
-  - env: ARGS="--resolver lts-3"
-    compiler: ": # lts-3"
-  - env: ARGS="--resolver lts-4"
-    compiler: ": # lts-4"
-  - env: ARGS="--resolver lts"
-    compiler: ": # lts"
-  - env: ARGS="--resolver nightly"
-    compiler: ": # nightly"
-  # Do some testing on OS X as well. Feel free to add more
-  # rows if desired
-  - env: ARGS=""
-    compiler: ": # Default osx"
+  # We grab the appropriate GHC and cabal-install versions from hvr's PPA. See:
+  # https://github.com/hvr/multi-ghc-travis
+  - env: BUILD=cabal GHCVER=7.0.4 CABALVER=1.16 HAPPYVER=1.19.5 ALEXVER=3.1.7
+    compiler: ": #GHC 7.0.4"
+    addons: {apt: {packages: [cabal-install-1.16,ghc-7.0.4,happy-1.19.5,alex-3.1.7], sources: [hvr-ghc]}}
+  - env: BUILD=cabal GHCVER=7.2.2 CABALVER=1.16 HAPPYVER=1.19.5 ALEXVER=3.1.7
+    compiler: ": #GHC 7.2.2"
+    addons: {apt: {packages: [cabal-install-1.16,ghc-7.2.2,happy-1.19.5,alex-3.1.7], sources: [hvr-ghc]}}
+  - env: BUILD=cabal GHCVER=7.4.2 CABALVER=1.16 HAPPYVER=1.19.5 ALEXVER=3.1.7
+    compiler: ": #GHC 7.4.2"
+    addons: {apt: {packages: [cabal-install-1.16,ghc-7.4.2,happy-1.19.5,alex-3.1.7], sources: [hvr-ghc]}}
+  - env: BUILD=cabal GHCVER=7.6.3 CABALVER=1.16 HAPPYVER=1.19.5 ALEXVER=3.1.7
+    compiler: ": #GHC 7.6.3"
+    addons: {apt: {packages: [cabal-install-1.16,ghc-7.6.3,happy-1.19.5,alex-3.1.7], sources: [hvr-ghc]}}
+  - env: BUILD=cabal GHCVER=7.8.4 CABALVER=1.18 HAPPYVER=1.19.5 ALEXVER=3.1.7
+    compiler: ": #GHC 7.8.4"
+    addons: {apt: {packages: [cabal-install-1.18,ghc-7.8.4,happy-1.19.5,alex-3.1.7], sources: [hvr-ghc]}}
+  - env: BUILD=cabal GHCVER=7.10.3 CABALVER=1.22 HAPPYVER=1.19.5 ALEXVER=3.1.7
+    compiler: ": #GHC 7.10.3"
+    addons: {apt: {packages: [cabal-install-1.22,ghc-7.10.3,happy-1.19.5,alex-3.1.7], sources: [hvr-ghc]}}
+
+  # Build with the newest GHC and cabal-install. This is an accepted failure,
+  # see below.
+  - env: BUILD=cabal GHCVER=head  CABALVER=head HAPPYVER=1.19.5 ALEXVER=3.1.7
+    compiler: ": #GHC HEAD"
+    addons: {apt: {packages: [cabal-install-head,ghc-head,happy-1.19.5,alex-3.1.7], sources: [hvr-ghc]}}
+
+  # The Stack builds. We can pass in arbitrary Stack arguments via the ARGS
+  # variable, such as using --stack-yaml to point to a different file.
+  - env: BUILD=stack ARGS=""
+    compiler: ": #stack default"
+    addons: {apt: {packages: [ghc-7.8.4], sources: [hvr-ghc]}}
+
+  - env: BUILD=stack ARGS="--resolver lts-2"
+    compiler: ": #stack 7.8.4"
+    addons: {apt: {packages: [ghc-7.8.4], sources: [hvr-ghc]}}
+
+  - env: BUILD=stack ARGS="--resolver lts-3"
+    compiler: ": #stack 7.10.2"
+    addons: {apt: {packages: [ghc-7.10.2], sources: [hvr-ghc]}}
+
+  - env: BUILD=stack ARGS="--resolver lts-5"
+    compiler: ": #stack 7.10.3"
+    addons: {apt: {packages: [ghc-7.10.3], sources: [hvr-ghc]}}
+
+  # Nightly builds are allowed to fail
+  - env: BUILD=stack ARGS="--resolver nightly"
+    compiler: ": #stack nightly"
+    addons: {apt: {packages: [libgmp,libgmp-dev]}}
+
+  # Build on OS X in addition to Linux
+  - env: BUILD=stack ARGS=""
+    compiler: ": #stack default osx"
     os: osx
+
+  - env: BUILD=stack ARGS="--resolver lts-2"
+    compiler: ": #stack 7.8.4 osx"
+    os: osx
+
+  - env: BUILD=stack ARGS="--resolver lts-3"
+    compiler: ": #stack 7.10.2 osx"
+    os: osx
+
+  - env: BUILD=stack ARGS="--resolver lts-5"
+    compiler: ": #stack 7.10.3 osx"
+    os: osx
+
+  - env: BUILD=stack ARGS="--resolver nightly"
+    compiler: ": #stack nightly osx"
+    os: osx
+
+  allow_failures:
+  - env: BUILD=cabal GHCVER=head  CABALVER=head
+  - env: BUILD=stack ARGS="--resolver nightly"
 
 before_install:
 # Using compiler above sets CC to an invalid value, so unset it
 - unset CC
 
+# We want to always allow newer versions of packages when building on GHC HEAD
+- CABALARGS=""
+- if [ "x$GHCVER" = "xhead" ]; then CABALARGS=--allow-newer; fi
+
 # Download and unpack the stack executable
+- export PATH=/opt/ghc/$GHCVER/bin:/opt/cabal/$CABALVER/bin:$HOME/.local/bin:/opt/alex/$ALEXVER/bin:/opt/happy/$HAPPYVER/bin:$PATH
 - mkdir -p ~/.local/bin
-- export PATH=$HOME/.local/bin:$PATH
-- if [ `uname` = "Darwin" ];
+- |
+  if [ `uname` = "Darwin" ]
   then
-    curl --insecure -L https://www.stackage.org/stack/osx-x86_64 | tar xz --strip-components=1 --include '*/stack' -C ~/.local/bin;
+    travis_retry curl --insecure -L https://www.stackage.org/stack/osx-x86_64 | tar xz --strip-components=1 --include '*/stack' -C ~/.local/bin
   else
-    curl -L https://www.stackage.org/stack/linux-x86_64 | tar xz --wildcards --strip-components=1 -C ~/.local/bin '*/stack';
+    travis_retry curl -L https://www.stackage.org/stack/linux-x86_64 | tar xz --wildcards --strip-components=1 -C ~/.local/bin '*/stack'
   fi
 
-# This line does all of the work: installs GHC if necessary, build the library,
-# executables, and test suites, and runs the test suites. --no-terminal works
-# around some quirks in Travis's terminal implementation.
-script: stack $ARGS --no-terminal --install-ghc test --haddock
+install:
+- echo "$(ghc --version) [$(ghc --print-project-git-commit-id 2> /dev/null || echo '?')]"
+- if [ -f configure.ac ]; then autoreconf -i; fi
+- |
+  case "$BUILD" in
+    stack)
+      stack --no-terminal --install-ghc $ARGS test --only-dependencies
+      ;;
+    cabal)
+      cabal --version
+      travis_retry cabal update
+      cabal install --only-dependencies --enable-tests --enable-benchmarks --force-reinstalls --ghc-options=-O0 --reorder-goals --max-backjumps=-1 $CABALARGS
+      ;;
+  esac
 
-# Caching so the next build will be fast too.
-cache:
-  directories:
-  - $HOME/.stack
+script:
+- |
+  case "$BUILD" in
+    stack)
+      stack --no-terminal $ARGS test --haddock --no-haddock-deps
+      ;;
+    cabal)
+      cabal configure --enable-tests --enable-benchmarks -v2 --ghc-options="-O0 -Werror"
+      cabal build
+      cabal check || [ "$CABALVER" == "1.16" ]
+      cabal test
+      cabal sdist
+      cabal copy
+      SRC_TGZ=$(cabal info . | awk '{print $2;exit}').tar.gz && \
+        (cd dist && cabal install --force-reinstalls "$SRC_TGZ")
+      ;;
+  esac
 ```
 
 Not only will this build and test your project against multiple GHC versions
@@ -1912,7 +2006,7 @@ code inside a Docker image, which means:
   a large initial download, but much faster builds
 
 For more information, see
-[the Docker-integration documentation](docker_integration.html).
+[the Docker-integration documentation](docker_integration.md).
 
 stack can also generate Docker images for you containing your built executables.
 This feature is great for automating deployments from CI. This feature is not
@@ -1976,7 +2070,7 @@ in the common case or even to learn how to use the Nix tools (they're
 called under the hood).
 
 For more information, see
-[the Nix-integration documentation](nix_integration.html).
+[the Nix-integration documentation](nix_integration.md).
 
 ## Power user commands
 

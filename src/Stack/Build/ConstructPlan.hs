@@ -40,10 +40,10 @@ import           Stack.Build.Cache
 import           Stack.Build.Haddock
 import           Stack.Build.Installed
 import           Stack.Build.Source
-import           Stack.Types.Build
 import           Stack.BuildPlan
 import           Stack.Package
 import           Stack.PackageDump
+import           Stack.PackageIndex (getPackageCaches)
 import           Stack.Types
 
 data PackageInfo
@@ -132,11 +132,11 @@ constructPlan :: forall env m.
               -> m Plan
 constructPlan mbp0 baseConfigOpts0 locals extraToBuild0 localDumpPkgs loadPackage0 sourceMap installedMap = do
     let locallyRegistered = Map.fromList $ map (dpGhcPkgId &&& dpPackageIdent) localDumpPkgs
-    bconfig <- asks getBuildConfig
+    caches <- getPackageCaches
     let versions =
             Map.fromListWith Set.union $
             map (second Set.singleton . toTuple) $
-            Map.keys (bcPackageCaches bconfig)
+            Map.keys caches
 
     econfig <- asks getEnvConfig
     let onWanted = void . addDep False . packageName . lpPackage
@@ -157,7 +157,7 @@ constructPlan mbp0 baseConfigOpts0 locals extraToBuild0 localDumpPkgs loadPackag
                 toTask (name, ADRToInstall task) = Just (name, task)
                 tasks = M.fromList $ mapMaybe toTask adrs
                 takeSubset =
-                    case boptsBuildSubset $ bcoBuildOpts baseConfigOpts0 of
+                    case boptsCLIBuildSubset $ bcoBuildOptsCLI baseConfigOpts0 of
                         BSAll -> id
                         BSOnlySnapshot -> stripLocals
                         BSOnlyDependencies -> stripNonDeps deps
@@ -481,9 +481,7 @@ addPackageDeps treatAsDep package = do
     case partitionEithers deps of
         ([], pairs) -> return $ Right $ mconcat pairs
         (errs, _) -> return $ Left $ DependencyPlanFailures
-            (PackageIdentifier
-                (packageName package)
-                (packageVersion package))
+            package
             (Map.fromList errs)
   where
     adrVersion (ADRToInstall task) = packageIdentifierVersion $ taskProvides task
@@ -524,6 +522,7 @@ checkDirtiness ps installed package present wanted = do
                 Nothing -> Just "old configure information not found"
                 Just oldOpts
                     | Just reason <- describeConfigDiff config oldOpts wantConfigCache -> Just reason
+                    | True <- psForceDirty ps -> Just "--force-dirty specified"
                     | Just files <- psDirty ps -> Just $ "local file changes: " <>
                                                          addEllipsis (T.pack $ unwords $ Set.toList files)
                     | otherwise -> Nothing
@@ -607,6 +606,10 @@ describeConfigDiff config old new
     removeMatching xs ys = (xs, ys)
 
     newComponents = configCacheComponents new `Set.difference` configCacheComponents old
+
+psForceDirty :: PackageSource -> Bool
+psForceDirty (PSLocal lp) = lpForceDirty lp
+psForceDirty (PSUpstream {}) = False
 
 psDirty :: PackageSource -> Maybe (Set FilePath)
 psDirty (PSLocal lp) = lpDirtyFiles lp

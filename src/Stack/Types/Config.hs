@@ -61,7 +61,7 @@ module Stack.Types.Config
   ,LoadConfig(..)
   -- ** PackageEntry & PackageLocation
   ,PackageEntry(..)
-  ,peExtraDep
+  ,TreatLikeExtraDep
   ,PackageLocation(..)
   ,RemotePackageType(..)
   -- ** PackageIndex, IndexName & IndexLocation
@@ -120,6 +120,7 @@ module Stack.Types.Config
   -- ** Docker entrypoint
   ,DockerEntrypoint(..)
   ,DockerUser(..)
+  ,module X
   ) where
 
 import           Control.Applicative
@@ -132,13 +133,14 @@ import           Control.Monad.Reader (MonadReader, ask, asks, MonadIO, liftIO)
 import           Data.Aeson.Extended
                  (ToJSON, toJSON, FromJSON, parseJSON, withText, object,
                   (.=), (..:), (..:?), (..!=), Value(String, Object),
-                  withObjectWarnings, WarningParser, Object, jsonSubWarnings, JSONWarning,
-                  jsonSubWarningsT, jsonSubWarningsTT)
+                  withObjectWarnings, WarningParser, Object, jsonSubWarnings,
+                  jsonSubWarningsT, jsonSubWarningsTT, WithJSONWarnings(..), noJSONWarnings)
 import           Data.Attoparsec.Args
 import           Data.Binary (Binary)
 import           Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as S8
 import           Data.Either (partitionEithers)
+import           Data.IORef (IORef)
 import           Data.List (stripPrefix)
 import           Data.Hashable (Hashable)
 import           Data.Map (Map)
@@ -159,6 +161,7 @@ import           Distribution.Version (anyVersion)
 import           Network.HTTP.Client (parseUrl)
 import           Path
 import qualified Paths_stack as Meta
+import           {-# SOURCE #-} Stack.Constants (stackRootEnvVar)
 import           Stack.Types.BuildPlan (SnapName, renderSnapName, parseSnapName)
 import           Stack.Types.Compiler
 import           Stack.Types.Docker
@@ -172,6 +175,10 @@ import           Stack.Types.TemplateName
 import           Stack.Types.Version
 import           System.PosixCompat.Types (UserID, GroupID, FileMode)
 import           System.Process.Read (EnvOverride)
+
+-- Re-exports
+import          Stack.Types.Config.Build as X
+
 #ifdef mingw32_HOST_OS
 import qualified Crypto.Hash.SHA1 as SHA1
 import qualified Data.ByteString.Base16 as B16
@@ -185,6 +192,8 @@ data Config =
          -- ^ this allows to override .stack-work directory
          ,configUserConfigPath      :: !(Path Abs File)
          -- ^ Path to user configuration file (usually ~/.stack/config.yaml)
+         ,configBuild               :: !BuildOpts
+         -- ^ Build configuration
          ,configDocker              :: !DockerOpts
          -- ^ Docker configuration
          ,configNix                 :: !NixOpts
@@ -278,6 +287,11 @@ data Config =
          ,configDefaultTemplate     :: !(Maybe TemplateName)
          -- ^ The default template to use when none is specified.
          -- (If Nothing, the default default is used.)
+         ,configAllowDifferentUser  :: !Bool
+         -- ^ Allow users other than the stack root owner to use the stack
+         -- installation.
+         ,configPackageCaches       :: !(IORef (Maybe (Map PackageIdentifier (PackageIndex, PackageCache))))
+         -- ^ In memory cache of hackage index.
          }
 
 -- | Which packages to ghc-options on the command line apply to?
@@ -307,7 +321,7 @@ data PackageIndex = PackageIndex
     -- ^ Require that hashes and package size information be available for packages in this index
     }
     deriving Show
-instance FromJSON (PackageIndex, [JSONWarning]) where
+instance FromJSON (WithJSONWarnings PackageIndex) where
     parseJSON = withObjectWarnings "PackageIndex" $ \o -> do
         name <- o ..: "name"
         prefix <- o ..: "download-prefix"
@@ -451,8 +465,7 @@ data BuildConfig = BuildConfig
     , bcWantedCompiler :: !CompilerVersion
       -- ^ Compiler version wanted for this build
     , bcPackageEntries :: ![PackageEntry]
-      -- ^ Local packages identified by a path, Bool indicates whether it is
-      -- a non-dependency (the opposite of 'peExtraDep')
+      -- ^ Local packages
     , bcExtraDeps  :: !(Map PackageName Version)
       -- ^ Extra dependencies specified in configuration.
       --
@@ -472,8 +485,6 @@ data BuildConfig = BuildConfig
       -- for providing better error messages.
     , bcGHCVariant :: !GHCVariant
       -- ^ The variant of GHC used to select a GHC bindist.
-    , bcPackageCaches :: !(Map PackageIdentifier (PackageIndex, PackageCache))
-      -- ^ Shared package cache map
     }
 
 -- | Directory containing the project's stack.yaml file
@@ -491,7 +502,7 @@ data EnvConfig = EnvConfig
     {envConfigBuildConfig :: !BuildConfig
     ,envConfigCabalVersion :: !Version
     ,envConfigCompilerVersion :: !CompilerVersion
-    ,envConfigPackages   :: !(Map (Path Abs Dir) Bool)}
+    ,envConfigPackages   :: !(Map (Path Abs Dir) TreatLikeExtraDep)}
 instance HasBuildConfig EnvConfig where
     getBuildConfig = envConfigBuildConfig
 instance HasConfig EnvConfig
@@ -514,31 +525,21 @@ data LoadConfig m = LoadConfig
     }
 
 data PackageEntry = PackageEntry
-    { peExtraDepMaybe :: !(Maybe Bool)
-    -- ^ Is this package a dependency? This means the local package will be
-    -- treated just like an extra-deps: it will only be built as a dependency
-    -- for others, and its test suite/benchmarks will not be run.
-    --
-    -- Useful modifying an upstream package, see:
-    -- https://github.com/commercialhaskell/stack/issues/219
-    -- https://github.com/commercialhaskell/stack/issues/386
-    , peValidWanted :: !(Maybe Bool)
-    -- ^ Deprecated name meaning the opposite of peExtraDep. Only present to
-    -- provide deprecation warnings to users.
+    { peExtraDep :: !TreatLikeExtraDep
     , peLocation :: !PackageLocation
     , peSubdirs :: ![FilePath]
     }
     deriving Show
 
--- | Once peValidWanted is removed, this should just become the field name in PackageEntry.
-peExtraDep :: PackageEntry -> Bool
-peExtraDep pe =
-    case peExtraDepMaybe pe of
-        Just x -> x
-        Nothing ->
-            case peValidWanted pe of
-                Just x -> not x
-                Nothing -> False
+-- | Should a package be treated just like an extra-dep?
+--
+-- 'True' means, it will only be built as a dependency
+-- for others, and its test suite/benchmarks will not be run.
+--
+-- Useful modifying an upstream package, see:
+-- https://github.com/commercialhaskell/stack/issues/219
+-- https://github.com/commercialhaskell/stack/issues/386
+type TreatLikeExtraDep = Bool
 
 instance ToJSON PackageEntry where
     toJSON pe | not (peExtraDep pe) && null (peSubdirs pe) =
@@ -548,18 +549,17 @@ instance ToJSON PackageEntry where
         , "location" .= peLocation pe
         , "subdirs" .= peSubdirs pe
         ]
-instance FromJSON (PackageEntry, [JSONWarning]) where
+instance FromJSON (WithJSONWarnings PackageEntry) where
     parseJSON (String t) = do
-        (loc, _::[JSONWarning]) <- parseJSON $ String t
-        return (PackageEntry
-                { peExtraDepMaybe = Nothing
-                , peValidWanted = Nothing
+        WithJSONWarnings loc _ <- parseJSON $ String t
+        return $ noJSONWarnings
+               (PackageEntry
+                { peExtraDep = False
                 , peLocation = loc
                 , peSubdirs = []
-                }, [])
+                })
     parseJSON v = withObjectWarnings "PackageEntry" (\o -> PackageEntry
-        <$> o ..:? "extra-dep"
-        <*> o ..:? "valid-wanted"
+        <$> o ..:? "extra-dep" ..!= False
         <*> jsonSubWarnings (o ..: "location")
         <*> o ..:? "subdirs" ..!= []) v
 
@@ -583,9 +583,9 @@ instance ToJSON PackageLocation where
     toJSON (PLRemote x (RPTGit y)) = toJSON $ T.unwords ["git", x, y]
     toJSON (PLRemote x (RPTHg  y)) = toJSON $ T.unwords ["hg",  x, y]
 
-instance FromJSON (PackageLocation, [JSONWarning]) where
+instance FromJSON (WithJSONWarnings PackageLocation) where
     parseJSON v
-        = ((,[]) <$> withText "PackageLocation" (\t -> http t <|> file t) v)
+        = (noJSONWarnings <$> withText "PackageLocation" (\t -> http t <|> file t) v)
         <|> git v
         <|> hg  v
       where
@@ -656,13 +656,13 @@ instance ToJSON Resolver where
         , "location" .= location
         ]
     toJSON x = toJSON $ resolverName x
-instance FromJSON (Resolver,[JSONWarning]) where
+instance FromJSON (WithJSONWarnings Resolver) where
     -- Strange structuring is to give consistent error messages
     parseJSON v@(Object _) = withObjectWarnings "Resolver" (\o -> ResolverCustom
         <$> o ..: "name"
         <*> o ..: "location") v
 
-    parseJSON (String t) = either (fail . show) return ((,[]) <$> parseResolverText t)
+    parseJSON (String t) = either (fail . show) return (noJSONWarnings <$> parseResolverText t)
 
     parseJSON _ = fail $ "Invalid Resolver, must be Object or String"
 
@@ -739,6 +739,8 @@ data ConfigMonoid =
   ConfigMonoid
     { configMonoidWorkDir            :: !(Maybe FilePath)
     -- ^ See: 'configWorkDir'.
+    , configMonoidBuildOpts          :: !BuildOptsMonoid
+    -- ^ build options.
     , configMonoidDockerOpts         :: !DockerOptsMonoid
     -- ^ Docker options.
     , configMonoidNixOpts            :: !NixOptsMonoid
@@ -806,12 +808,16 @@ data ConfigMonoid =
     ,configMonoidDefaultTemplate     :: !(Maybe TemplateName)
     -- ^ The default template to use when none is specified.
     -- (If Nothing, the default default is used.)
+    , configMonoidAllowDifferentUser :: !(Maybe Bool)
+    -- ^ Allow users other than the stack root owner to use the stack
+    -- installation.
     }
   deriving Show
 
 instance Monoid ConfigMonoid where
   mempty = ConfigMonoid
     { configMonoidWorkDir = Nothing
+    , configMonoidBuildOpts = mempty
     , configMonoidDockerOpts = mempty
     , configMonoidNixOpts = mempty
     , configMonoidConnectionCount = Nothing
@@ -845,9 +851,11 @@ instance Monoid ConfigMonoid where
     , configMonoidApplyGhcOptions = Nothing
     , configMonoidAllowNewer = Nothing
     , configMonoidDefaultTemplate = Nothing
+    , configMonoidAllowDifferentUser = Nothing
     }
   mappend l r = ConfigMonoid
     { configMonoidWorkDir = configMonoidWorkDir l <|> configMonoidWorkDir r
+    , configMonoidBuildOpts = configMonoidBuildOpts l <> configMonoidBuildOpts r
     , configMonoidDockerOpts = configMonoidDockerOpts l <> configMonoidDockerOpts r
     , configMonoidNixOpts = configMonoidNixOpts l <> configMonoidNixOpts r
     , configMonoidConnectionCount = configMonoidConnectionCount l <|> configMonoidConnectionCount r
@@ -882,9 +890,10 @@ instance Monoid ConfigMonoid where
     , configMonoidApplyGhcOptions = configMonoidApplyGhcOptions l <|> configMonoidApplyGhcOptions r
     , configMonoidAllowNewer = configMonoidAllowNewer l <|> configMonoidAllowNewer r
     , configMonoidDefaultTemplate = configMonoidDefaultTemplate l <|> configMonoidDefaultTemplate r
+    , configMonoidAllowDifferentUser = configMonoidAllowDifferentUser l <|> configMonoidAllowDifferentUser r
     }
 
-instance FromJSON (ConfigMonoid, [JSONWarning]) where
+instance FromJSON (WithJSONWarnings ConfigMonoid) where
   parseJSON = withObjectWarnings "ConfigMonoid" parseConfigMonoidJSON
 
 -- | Parse a partial configuration.  Used both to parse both a standalone config
@@ -893,6 +902,7 @@ instance FromJSON (ConfigMonoid, [JSONWarning]) where
 parseConfigMonoidJSON :: Object -> WarningParser ConfigMonoid
 parseConfigMonoidJSON obj = do
     configMonoidWorkDir <- obj ..:? configMonoidWorkDirName
+    configMonoidBuildOpts <- jsonSubWarnings (obj ..:? configMonoidBuildOptsName ..!= mempty)
     configMonoidDockerOpts <- jsonSubWarnings (obj ..:? configMonoidDockerOptsName ..!= mempty)
     configMonoidNixOpts <- jsonSubWarnings (obj ..:? configMonoidNixOptsName ..!= mempty)
     configMonoidConnectionCount <- obj ..:? configMonoidConnectionCountName
@@ -946,6 +956,7 @@ parseConfigMonoidJSON obj = do
     configMonoidApplyGhcOptions <- obj ..:? configMonoidApplyGhcOptionsName
     configMonoidAllowNewer <- obj ..:? configMonoidAllowNewerName
     configMonoidDefaultTemplate <- obj ..:? configMonoidDefaultTemplateName
+    configMonoidAllowDifferentUser <- obj ..:? configMonoidAllowDifferentUserName
 
     return ConfigMonoid {..}
   where
@@ -974,6 +985,9 @@ parseConfigMonoidJSON obj = do
 
 configMonoidWorkDirName :: Text
 configMonoidWorkDirName = "work-dir"
+
+configMonoidBuildOptsName :: Text
+configMonoidBuildOptsName = "build"
 
 configMonoidDockerOptsName :: Text
 configMonoidDockerOptsName = "docker"
@@ -1074,6 +1088,9 @@ configMonoidAllowNewerName = "allow-newer"
 configMonoidDefaultTemplateName :: Text
 configMonoidDefaultTemplateName = "default-template"
 
+configMonoidAllowDifferentUserName :: Text
+configMonoidAllowDifferentUserName = "allow-different-user"
+
 data ConfigException
   = ParseConfigFileException (Path Abs File) ParseException
   | ParseResolverException Text
@@ -1086,6 +1103,9 @@ data ConfigException
   | ResolverPartial Resolver String
   | NoSuchDirectory FilePath
   | ParseGHCVariantException String
+  | BadStackRootEnvVar (Path Abs Dir)
+  | Won'tCreateStackRootInDirectoryOwnedByDifferentUser (Path Abs Dir) (Path Abs Dir) -- ^ @$STACK_ROOT@, parent dir
+  | UserDoesn'tOwnDirectory (Path Abs Dir)
   deriving Typeable
 instance Show ConfigException where
     show (ParseConfigFileException configFile exception) = concat
@@ -1093,7 +1113,7 @@ instance Show ConfigException where
         , toFilePath configFile
         , "':\n"
         , show exception
-        , "\nSee http://docs.haskellstack.org/en/stable/yaml_configuration.html."
+        , "\nSee http://docs.haskellstack.org/en/stable/yaml_configuration/."
         ]
     show (ParseResolverException t) = concat
         [ "Invalid resolver value: "
@@ -1151,6 +1171,7 @@ instance Show ConfigException where
         , "' does not have all the packages to match your requirements.\n"
         , unlines $ fmap ("    " <>) (lines errDesc)
         , "\nHowever, you can try '--solver' to use external packages."
+        , "\nUse '--omit-packages' if you want to create a config anyway."
         ]
     show (NoSuchDirectory dir) = concat
         ["No directory could be located matching the supplied path: "
@@ -1159,6 +1180,30 @@ instance Show ConfigException where
     show (ParseGHCVariantException v) = concat
         [ "Invalid ghc-variant value: "
         , v
+        ]
+    show (BadStackRootEnvVar envStackRoot) = concat
+        [ "Invalid $"
+        , stackRootEnvVar
+        , ": '"
+        , toFilePath envStackRoot
+        , "'. Please provide a valid absolute path."
+        ]
+    show (Won'tCreateStackRootInDirectoryOwnedByDifferentUser envStackRoot parentDir) = concat
+        [ "Preventing creation of $"
+        , stackRootEnvVar
+        , " '"
+        , toFilePath envStackRoot
+        , "'. Parent directory '"
+        , toFilePath parentDir
+        , "' is owned by someone else."
+        ]
+    show (UserDoesn'tOwnDirectory dir) = concat
+        [ "You are not the owner of '"
+        , toFilePath dir
+        , "'. Aborting to protect file permissions."
+        , "\nRetry with '--"
+        , T.unpack configMonoidAllowDifferentUserName
+        , "' to disable this precaution."
         ]
 instance Exception ConfigException
 
@@ -1371,7 +1416,7 @@ getWhichCompiler = asks (whichCompiler . envConfigCompilerVersion . getEnvConfig
 data ProjectAndConfigMonoid
   = ProjectAndConfigMonoid !Project !ConfigMonoid
 
-instance (warnings ~ [JSONWarning]) => FromJSON (ProjectAndConfigMonoid, warnings) where
+instance FromJSON (WithJSONWarnings ProjectAndConfigMonoid) where
     parseJSON = withObjectWarnings "ProjectAndConfigMonoid" $ \o -> do
         dirs <- jsonSubWarningsTT (o ..:? "packages") ..!= [packageEntryCurrDir]
         extraDeps' <- o ..:? "extra-deps" ..!= []
@@ -1417,8 +1462,7 @@ instance (warnings ~ [JSONWarning]) => FromJSON (ProjectAndConfigMonoid, warning
 -- | A PackageEntry for the current directory, used as a default
 packageEntryCurrDir :: PackageEntry
 packageEntryCurrDir = PackageEntry
-    { peValidWanted = Nothing
-    , peExtraDepMaybe = Nothing
+    { peExtraDep = False
     , peLocation = PLFilePath "."
     , peSubdirs = []
     }
@@ -1495,7 +1539,7 @@ data DownloadInfo = DownloadInfo
     , downloadInfoSha1 :: Maybe ByteString
     } deriving (Show)
 
-instance FromJSON (DownloadInfo, [JSONWarning]) where
+instance FromJSON (WithJSONWarnings DownloadInfo) where
     parseJSON = withObjectWarnings "DownloadInfo" parseDownloadInfoFromObject
 
 -- | Parse JSON in existing object for 'DownloadInfo'
@@ -1517,7 +1561,7 @@ data VersionedDownloadInfo = VersionedDownloadInfo
     }
     deriving Show
 
-instance FromJSON (VersionedDownloadInfo, [JSONWarning]) where
+instance FromJSON (WithJSONWarnings VersionedDownloadInfo) where
     parseJSON = withObjectWarnings "VersionedDownloadInfo" $ \o -> do
         version <- o ..: "version"
         downloadInfo <- parseDownloadInfoFromObject o
@@ -1536,7 +1580,7 @@ data SetupInfo = SetupInfo
     }
     deriving Show
 
-instance FromJSON (SetupInfo, [JSONWarning]) where
+instance FromJSON (WithJSONWarnings SetupInfo) where
     parseJSON = withObjectWarnings "SetupInfo" $ \o -> do
         siSevenzExe <- jsonSubWarningsT (o ..:? "sevenzexe-info")
         siSevenzDll <- jsonSubWarningsT (o ..:? "sevenzdll-info")
@@ -1573,15 +1617,15 @@ data SetupInfoLocation
     | SetupInfoInline SetupInfo
     deriving (Show)
 
-instance FromJSON (SetupInfoLocation, [JSONWarning]) where
+instance FromJSON (WithJSONWarnings SetupInfoLocation) where
     parseJSON v =
-        ((, []) <$>
+        (noJSONWarnings <$>
          withText "SetupInfoFileOrURL" (pure . SetupInfoFileOrURL . T.unpack) v) <|>
         inline
       where
         inline = do
-            (si,w) <- parseJSON v
-            return (SetupInfoInline si, w)
+            WithJSONWarnings si w <- parseJSON v
+            return $ WithJSONWarnings (SetupInfoInline si) w
 
 -- | How PVP bounds should be added to .cabal files
 data PvpBounds

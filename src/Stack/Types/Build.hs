@@ -70,10 +70,10 @@ import           GHC.Generics
 import           Path (Path, Abs, File, Dir, mkRelDir, toFilePath, parseRelDir, (</>))
 import           Path.Extra (toFilePathNoTrailingSep)
 import           Prelude
-import           Stack.Types.FlagName
-import           Stack.Types.GhcPkgId
 import           Stack.Types.Compiler
 import           Stack.Types.Config
+import           Stack.Types.FlagName
+import           Stack.Types.GhcPkgId
 import           Stack.Types.Package
 import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageName
@@ -123,6 +123,8 @@ data StackBuildException
   | SolverGiveUp String
   | SolverMissingCabalInstall
   | SomeTargetsNotBuildable [(PackageName, NamedComponent)]
+  | TestSuiteExeMissing Bool String String String
+  | CabalCopyFailed Bool String
   deriving Typeable
 
 data FlagSource = FSCommandLine | FSStackYaml
@@ -334,12 +336,41 @@ instance Show StackBuildException where
         "The following components have 'buildable: False' set in the cabal configuration, and so cannot be targets:\n    " ++
         T.unpack (renderPkgComponents xs) ++
         "\nTo resolve this, either provide flags such that these components are buildable, or only specify buildable targets."
+    show (TestSuiteExeMissing isSimpleBuildType exeName pkgName testName) =
+        missingExeError isSimpleBuildType $ concat
+            [ "Test suite executable \""
+            , exeName
+            , " not found for "
+            , pkgName
+            , ":test:"
+            , testName
+            ]
+    show (CabalCopyFailed isSimpleBuildType innerMsg) =
+        missingExeError isSimpleBuildType $ concat
+            [ "'cabal copy' failed.  Error message:\n"
+            , innerMsg
+            , "\n"
+            ]
+
+missingExeError :: Bool -> String -> String
+missingExeError isSimpleBuildType msg =
+    unlines $ msg :
+        case possibleCauses of
+            [] -> []
+            [cause] -> ["One possible cause of this issue is:\n* " <> cause]
+            _ -> "Possible causes of this issue:" : map ("* " <>) possibleCauses
+  where
+    possibleCauses =
+        "No module named \"Main\". The 'main-is' source file should usually have a header indicating that it's a 'Main' module." :
+        if isSimpleBuildType
+            then []
+            else ["The Setup.hs file is changing the installation target dir."]
 
 instance Exception StackBuildException
 
 data ConstructPlanException
     = DependencyCycleDetected [PackageName]
-    | DependencyPlanFailures PackageIdentifier (Map PackageName (VersionRange, LatestApplicableVersion, BadDependency))
+    | DependencyPlanFailures Package (Map PackageName (VersionRange, LatestApplicableVersion, BadDependency))
     | UnknownPackage PackageName -- TODO perhaps this constructor will be removed, and BadDependency will handle it all
     -- ^ Recommend adding to extra-deps, give a helpful version number?
     deriving (Typeable, Eq)
@@ -360,9 +391,10 @@ instance Show ConstructPlanException where
          (DependencyCycleDetected pNames) ->
            "While checking call stack,\n" ++
            "  dependency cycle detected in packages:" ++ indent (appendLines pNames)
-         (DependencyPlanFailures pIdent (Map.toList -> pDeps)) ->
+         (DependencyPlanFailures pkg (Map.toList -> pDeps)) ->
            "Failure when adding dependencies:" ++ doubleIndent (appendDeps pDeps) ++ "\n" ++
-           "  needed for package: " ++ packageIdentifierString pIdent
+           "  needed for package " ++ packageIdentifierString (packageIdentifier pkg) ++
+           appendFlags (packageFlags pkg)
          (UnknownPackage pName) ->
              "While attempting to add dependency,\n" ++
              "  Could not find package " ++ show pName  ++ " in known packages"
@@ -371,6 +403,12 @@ instance Show ConstructPlanException where
       appendLines = foldr (\pName-> (++) ("\n" ++ show pName)) ""
       indent = dropWhileEnd isSpace . unlines . fmap (\line -> "  " ++ line) . lines
       doubleIndent = indent . indent
+      appendFlags flags =
+          if Map.null flags
+              then ""
+              else " with flags:\n" ++
+                  (doubleIndent . intercalate "\n" . map showFlag . Map.toList) flags
+      showFlag (name, bool) = show name ++ ": " ++ show bool
       appendDeps = foldr (\dep-> (++) ("\n" ++ showDep dep)) ""
       showDep (name, (range, mlatestApplicable, badDep)) = concat
         [ show name
@@ -383,7 +421,7 @@ instance Show ConstructPlanException where
                     Nothing -> ""
                     Just la -> " (latest applicable is " ++ versionString la ++ ")"
            in case badDep of
-                NotInBuildPlan -> "not present in build plan" ++ latestApplicableStr
+                NotInBuildPlan -> "stack configuration has no specified version" ++ latestApplicableStr
                 Couldn'tResolveItsDependencies -> "couldn't resolve its dependencies"
                 DependencyMismatch version ->
                     case mlatestApplicable of
@@ -406,118 +444,6 @@ instance Show ConstructPlanException where
 
 ----------------------------------------------
 
--- | Which subset of packages to build
-data BuildSubset
-    = BSAll
-    | BSOnlySnapshot
-    -- ^ Only install packages in the snapshot database, skipping
-    -- packages intended for the local database.
-    | BSOnlyDependencies
-    deriving (Show, Eq)
-
--- | Configuration for building.
-data BuildOpts =
-  BuildOpts {boptsTargets :: ![Text]
-            ,boptsLibProfile :: !Bool
-            ,boptsExeProfile :: !Bool
-            ,boptsHaddock :: !Bool
-            -- ^ Build haddocks?
-            ,boptsHaddockDeps :: !(Maybe Bool)
-            -- ^ Build haddocks for dependencies?
-            ,boptsDryrun :: !Bool
-            ,boptsGhcOptions :: ![Text]
-            ,boptsFlags :: !(Map (Maybe PackageName) (Map FlagName Bool))
-            ,boptsInstallExes :: !Bool
-            -- ^ Install executables to user path after building?
-            ,boptsPreFetch :: !Bool
-            -- ^ Fetch all packages immediately
-            ,boptsBuildSubset :: !BuildSubset
-            ,boptsFileWatch :: !FileWatchOpts
-            -- ^ Watch files for changes and automatically rebuild
-            ,boptsKeepGoing :: !(Maybe Bool)
-            -- ^ Keep building/running after failure
-            ,boptsForceDirty :: !Bool
-            -- ^ Force treating all local packages as having dirty files
-
-            ,boptsTests :: !Bool
-            -- ^ Turn on tests for local targets
-            ,boptsTestOpts :: !TestOpts
-            -- ^ Additional test arguments
-
-            ,boptsBenchmarks :: !Bool
-            -- ^ Turn on benchmarks for local targets
-            ,boptsBenchmarkOpts :: !BenchmarkOpts
-            -- ^ Additional test arguments
-            ,boptsExec :: ![(String, [String])]
-            -- ^ Commands (with arguments) to run after a successful build
-            ,boptsOnlyConfigure :: !Bool
-            -- ^ Only perform the configure step when building
-            ,boptsReconfigure :: !Bool
-            -- ^ Perform the configure step even if already configured
-            ,boptsCabalVerbose :: !Bool
-            -- ^ Ask Cabal to be verbose in its builds
-            }
-  deriving (Show)
-
-defaultBuildOpts :: BuildOpts
-defaultBuildOpts = BuildOpts
-    { boptsTargets = []
-    , boptsLibProfile = False
-    , boptsExeProfile = False
-    , boptsHaddock = False
-    , boptsHaddockDeps = Nothing
-    , boptsDryrun = False
-    , boptsGhcOptions = []
-    , boptsFlags = Map.empty
-    , boptsInstallExes = False
-    , boptsPreFetch = False
-    , boptsBuildSubset = BSAll
-    , boptsFileWatch = NoFileWatch
-    , boptsKeepGoing = Nothing
-    , boptsForceDirty = False
-    , boptsTests = False
-    , boptsTestOpts = defaultTestOpts
-    , boptsBenchmarks = False
-    , boptsBenchmarkOpts = defaultBenchmarkOpts
-    , boptsExec = []
-    , boptsOnlyConfigure = False
-    , boptsReconfigure = False
-    , boptsCabalVerbose = False
-    }
-
--- | Options for the 'FinalAction' 'DoTests'
-data TestOpts =
-  TestOpts {toRerunTests :: !Bool -- ^ Whether successful tests will be run gain
-           ,toAdditionalArgs :: ![String] -- ^ Arguments passed to the test program
-           ,toCoverage :: !Bool -- ^ Generate a code coverage report
-           ,toDisableRun :: !Bool -- ^ Disable running of tests
-           } deriving (Eq,Show)
-
-defaultTestOpts :: TestOpts
-defaultTestOpts = TestOpts
-    { toRerunTests = True
-    , toAdditionalArgs = []
-    , toCoverage = False
-    , toDisableRun = False
-    }
-
--- | Options for the 'FinalAction' 'DoBenchmarks'
-data BenchmarkOpts =
-  BenchmarkOpts {beoAdditionalArgs :: !(Maybe String) -- ^ Arguments passed to the benchmark program
-                ,beoDisableRun :: !Bool -- ^ Disable running of benchmarks
-                } deriving (Eq,Show)
-
-defaultBenchmarkOpts :: BenchmarkOpts
-defaultBenchmarkOpts = BenchmarkOpts
-    { beoAdditionalArgs = Nothing
-    , beoDisableRun = False
-    }
-
-data FileWatchOpts
-  = NoFileWatch
-  | FileWatch
-  | FileWatchPoll
-  deriving (Show,Eq)
 
 -- | Package dependency oracle.
 newtype PkgDepsOracle =
@@ -620,6 +546,7 @@ data BaseConfigOpts = BaseConfigOpts
     , bcoSnapInstallRoot :: !(Path Abs Dir)
     , bcoLocalInstallRoot :: !(Path Abs Dir)
     , bcoBuildOpts :: !BuildOpts
+    , bcoBuildOptsCLI :: !BuildOptsCLI
     , bcoExtraDBs :: ![(Path Abs Dir)]
     }
 
@@ -680,7 +607,8 @@ configureOptsNoDir :: EnvConfig
 configureOptsNoDir econfig bco deps wanted isLocal package = concat
     [ depOptions
     , ["--enable-library-profiling" | boptsLibProfile bopts || boptsExeProfile bopts]
-    , ["--enable-executable-profiling" | boptsExeProfile bopts]
+    , ["--enable-executable-profiling" | boptsExeProfile bopts && isLocal]
+    , ["--enable-split-objs" | boptsSplitObjs bopts]
     , map (\(name,enabled) ->
                        "-f" <>
                        (if enabled
@@ -698,6 +626,7 @@ configureOptsNoDir econfig bco deps wanted isLocal package = concat
   where
     config = getConfig econfig
     bopts = bcoBuildOpts bco
+    boptsCli = bcoBuildOptsCLI bco
 
     depOptions = map (uncurry toDepOption) $ Map.toList deps
       where
@@ -726,8 +655,11 @@ configureOptsNoDir econfig bco deps wanted isLocal package = concat
         [ Map.findWithDefault [] Nothing (configGhcOptions config)
         , Map.findWithDefault [] (Just $ packageName package) (configGhcOptions config)
         , concat [["-fhpc"] | isLocal && toCoverage (boptsTestOpts bopts)]
+        , if (boptsLibProfile bopts || boptsExeProfile bopts)
+             then ["-auto-all","-caf-all"]
+             else []
         , if includeExtraOptions
-            then boptsGhcOptions bopts
+            then boptsCLIGhcOptions boptsCli
             else []
         ]
 

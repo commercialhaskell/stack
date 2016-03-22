@@ -63,20 +63,20 @@ markInstalled programsPath tool = do
     fpRel <- parseRelFile $ toolString tool ++ ".installed"
     liftIO $ writeFile (toFilePath $ programsPath </> fpRel) "installed"
 
-unmarkInstalled :: (MonadIO m, MonadReader env m, HasConfig env, MonadThrow m)
+unmarkInstalled :: (MonadIO m, MonadReader env m, HasConfig env, MonadCatch m)
                 => Path Abs Dir
                 -> Tool
                 -> m ()
 unmarkInstalled programsPath tool = do
     fpRel <- parseRelFile $ toolString tool ++ ".installed"
-    removeFileIfExists $ programsPath </> fpRel
+    ignoringAbsence (removeFile $ programsPath </> fpRel)
 
 listInstalled :: (MonadIO m, MonadReader env m, HasConfig env, MonadThrow m)
               => Path Abs Dir
               -> m [Tool]
 listInstalled programsPath = do
-    createTree programsPath
-    (_, files) <- listDirectory programsPath
+    ensureDir programsPath
+    (_, files) <- listDir programsPath
     return $ mapMaybe toTool files
   where
     toTool fp = do
@@ -88,10 +88,12 @@ getCompilerVersion :: (MonadLogger m, MonadCatch m, MonadBaseControl IO m, Monad
 getCompilerVersion menv wc =
     case wc of
         Ghc -> do
+            $logDebug "Asking GHC for its version"
             bs <- readProcessStdout Nothing menv "ghc" ["--numeric-version"]
             let (_, ghcVersion) = versionFromEnd bs
             GhcVersion <$> parseVersion (T.decodeUtf8 ghcVersion)
         Ghcjs -> do
+            $logDebug "Asking GHCJS for its version"
             -- Output looks like
             --
             -- The Glorious Glasgow Haskell Compilation System for JavaScript, version 0.1.0 (GHC 7.10.2)

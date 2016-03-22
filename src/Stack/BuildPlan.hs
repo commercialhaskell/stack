@@ -28,6 +28,7 @@ module Stack.BuildPlan
     , getToolMap
     , shadowMiniBuildPlan
     , showItems
+    , showPackageFlags
     , parseCustomMiniBuildPlan
     ) where
 
@@ -45,8 +46,8 @@ import qualified Crypto.Hash.SHA256 as SHA256
 import           Data.Aeson.Extended (FromJSON (..), withObject, (.:), (.:?), (.!=))
 import           Data.Binary.VersionTagged (taggedDecodeOrLoad)
 import           Data.ByteString (ByteString)
-import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString as S
+import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Char8 as S8
 import           Data.Either (partitionEithers)
 import qualified Data.Foldable as F
@@ -64,27 +65,28 @@ import           Data.Text.Encoding (encodeUtf8)
 import qualified Data.Traversable as Tr
 import           Data.Typeable (Typeable)
 import           Data.Yaml (decodeEither', decodeFileEither)
+import qualified Distribution.Package as C
 import           Distribution.PackageDescription (GenericPackageDescription,
                                                   flagDefault, flagManual,
                                                   flagName, genPackageFlags,
                                                   executables, exeName, library, libBuildInfo, buildable)
-import           Distribution.System (Platform)
-import qualified Distribution.Package as C
 import qualified Distribution.PackageDescription as C
-import qualified Distribution.Version as C
+import           Distribution.System (Platform)
 import           Distribution.Text (display)
+import qualified Distribution.Version as C
+import           Network.HTTP.Client (checkStatus)
 import           Network.HTTP.Download
 import           Network.HTTP.Types (Status(..))
-import           Network.HTTP.Client (checkStatus)
 import           Path
 import           Path.IO
 import           Prelude -- Fix AMP warning
 import           Stack.Constants
 import           Stack.Fetch
 import           Stack.Package
+import           Stack.PackageIndex
 import           Stack.Types
 import           Stack.Types.StackT
-import           System.Directory (canonicalizePath)
+import qualified System.Directory as D
 import qualified System.FilePath as FP
 
 data BuildPlanException
@@ -190,10 +192,11 @@ resolveBuildPlan mbp isShadowed packages
     | Map.null (rsUnknown rs) && Map.null (rsShadowed rs) = return (rsToInstall rs, rsUsedBy rs)
     | otherwise = do
         bconfig <- asks getBuildConfig
+        caches <- getPackageCaches
         let maxVer =
                 Map.fromListWith max $
                 map toTuple $
-                Map.keys (bcPackageCaches bconfig)
+                Map.keys caches
             unknown = flip Map.mapWithKey (rsUnknown rs) $ \ident x ->
                 (Map.lookup ident maxVer, x)
         throwM $ UnknownPackages
@@ -264,7 +267,7 @@ addDeps allowMissing compilerVersion toCalc = do
         if allowMissing
             then do
                 (missingNames, missingIdents, m) <-
-                    resolvePackagesAllowMissing menv (Map.keysSet idents0) Set.empty
+                    resolvePackagesAllowMissing (Map.keysSet idents0) Set.empty
                 assert (Set.null missingNames)
                     $ return (m, missingIdents)
             else do
@@ -448,7 +451,7 @@ loadBuildPlan name = do
         Right bp -> return bp
         Left e -> do
             $logDebug $ "Decoding build plan from file failed: " <> T.pack (show e)
-            createTree (parent fp)
+            ensureDir (parent fp)
             req <- parseUrl $ T.unpack url
             $logSticky $ "Downloading " <> renderSnapName name <> " build plan ..."
             $logDebug $ "Downloading build plan from: " <> url
@@ -765,6 +768,21 @@ showItems items = T.concat (map formatItem items)
             , "\n"
             ]
 
+showPackageFlags :: PackageName -> Map FlagName Bool -> Text
+showPackageFlags pkg fl =
+    if (not $ Map.null fl) then
+        T.concat
+            [ "    - "
+            , T.pack $ packageNameString pkg
+            , ": "
+            , T.pack $ intercalate ", "
+                     $ map formatFlags (Map.toList fl)
+            , "\n"
+            ]
+    else ""
+    where
+        formatFlags (f, v) = (show f) ++ " = " ++ (show v)
+
 showMapPackages :: Map PackageName a -> Text
 showMapPackages mp = showItems $ Map.keys mp
 
@@ -783,13 +801,15 @@ showCompilerErrors flags errs compiler =
 
 showDepErrors :: Map PackageName (Map FlagName Bool) -> DepErrors -> Text
 showDepErrors flags errs =
-    T.concat $ map formatError (Map.toList errs)
+    T.concat
+        [ T.concat $ map formatError (Map.toList errs)
+        , if T.null flagVals then ""
+          else ("Using package flags:\n" <> flagVals)
+        ]
     where
         formatError (depName, DepError mversion neededBy) = T.concat
             [ showDepVersion depName mversion
             , T.concat (map showRequirement (Map.toList neededBy))
-            -- TODO only in debug
-            , T.concat (map showFlags (Map.toList neededBy))
             ]
 
         showDepVersion depName mversion = T.concat
@@ -812,22 +832,9 @@ showDepErrors flags errs =
             , "\n"
             ]
 
-        showFlags (user, _) =
-            maybe "" (printFlags user) (Map.lookup user flags)
-
-        printFlags user fl =
-            if (not $ Map.null fl) then
-                T.concat
-                    [ "    - "
-                    , T.pack $ packageNameString user
-                    , " flags: "
-                    , T.pack $ intercalate ", "
-                             $ map formatFlags (Map.toList fl)
-                    , "\n"
-                    ]
-            else ""
-
-        formatFlags (f, v) = (show f) ++ " = " ++ (show v)
+        flagVals = T.concat (map showFlags userPkgs)
+        userPkgs = Map.keys $ Map.unions (Map.elems (fmap deNeededBy errs))
+        showFlags pkg = maybe "" (showPackageFlags pkg) (Map.lookup pkg flags)
 
 shadowMiniBuildPlan :: MiniBuildPlan
                     -> Set PackageName
@@ -917,7 +924,7 @@ parseCustomMiniBuildPlan stackYamlFP url0 = do
         return cacheFP
 
     getYamlFPFromFile url = do
-        fp <- liftIO $ canonicalizePath $ toFilePath (parent stackYamlFP) FP.</> T.unpack (fromMaybe url $
+        fp <- liftIO $ D.canonicalizePath $ toFilePath (parent stackYamlFP) FP.</> T.unpack (fromMaybe url $
             T.stripPrefix "file://" url <|> T.stripPrefix "file:" url)
         parseAbsFile fp
 

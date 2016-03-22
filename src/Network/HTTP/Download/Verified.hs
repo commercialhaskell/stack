@@ -10,6 +10,7 @@
 {-# LANGUAGE StandaloneDeriving    #-}
 module Network.HTTP.Download.Verified
   ( verifiedDownload
+  , recoveringHttp
   , DownloadRequest(..)
   , drRetryPolicyDefault
   , HashCheck(..)
@@ -179,6 +180,28 @@ sinkHashUsing _ = sinkHash
 hashChecksToZipSink :: MonadThrow m => Request -> [HashCheck] -> ZipSink ByteString m ()
 hashChecksToZipSink req = traverse_ (ZipSink . sinkCheckHash req)
 
+-- 'Control.Retry.recovering' customized for HTTP failures
+recoveringHttp :: (MonadMask m, MonadIO m)
+               => RetryPolicy -> m a -> m a
+recoveringHttp retryPolicy =
+#if MIN_VERSION_retry(0,7,0)
+    recovering retryPolicy handlers . const
+#else
+    recovering retryPolicy handlers
+#endif
+  where
+    handlers = [const $ Handler alwaysRetryHttp,const $ Handler retrySomeIO]
+
+    alwaysRetryHttp :: Monad m => HttpException -> m Bool
+    alwaysRetryHttp _ = return True
+
+    retrySomeIO :: Monad m => IOException -> m Bool
+    retrySomeIO e = return $ case ioe_type e of
+                               -- hGetBuf: resource vanished (Connection reset by peer)
+                               ResourceVanished -> True
+                               -- conservatively exclude all others
+                               _ -> False
+
 -- | Copied and extended version of Network.HTTP.Download.download.
 --
 -- Has the following additional features:
@@ -203,27 +226,11 @@ verifiedDownload DownloadRequest{..} destpath progressSink = do
     liftIO $ whenM' getShouldDownload $ do
         createDirectoryIfMissing True dir
         withBinaryFile fptmp WriteMode $ \h ->
-#if MIN_VERSION_retry(0,7,0)
-            recovering drRetryPolicy handlers $ const $
-#else
-            recovering drRetryPolicy handlers $
-#endif
+            recoveringHttp drRetryPolicy $
                 flip runReaderT env $
                     withResponse req (go h)
         renameFile fptmp fp
   where
-    handlers = [const $ Handler alwaysRetryHttp,const $ Handler retrySomeIO]
-
-    alwaysRetryHttp :: Monad m => HttpException -> m Bool
-    alwaysRetryHttp _ = return True
-
-    retrySomeIO :: Monad m => IOException -> m Bool
-    retrySomeIO e = return $ case ioe_type e of
-                               -- hGetBuf: resource vanished (Connection reset by peer)
-                               ResourceVanished -> True
-                               -- conservatively exclude all others
-                               _ -> False
-
     whenM' mp m = do
         p <- mp
         if p then m >> return True else return False

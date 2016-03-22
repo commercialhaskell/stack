@@ -56,16 +56,17 @@ import           GHC.Exts (sortWith)
 import           Network.HTTP.Client.Conduit (HasHttpManager)
 import           Path
 import           Path.Extra (toFilePathNoTrailingSep)
-import           Path.IO
+import           Path.IO hiding (canonicalizePath)
 import qualified Paths_stack as Meta
 import           Prelude -- Fix redundant import warnings
+import           Stack.Config (getInContainer)
 import           Stack.Constants
 import           Stack.Docker.GlobalDB
 import           Stack.Types
 import           Stack.Types.Internal
 import           Stack.Setup (ensureDockerStackExe)
-import           System.Directory (canonicalizePath,getModificationTime)
-import           System.Environment (getEnv,getProgName,getArgs,getExecutablePath,lookupEnv)
+import           System.Directory (canonicalizePath,getHomeDirectory)
+import           System.Environment (getEnv,getEnvironment,getProgName,getArgs,getExecutablePath)
 import           System.Exit (exitSuccess, exitWith)
 import qualified System.FilePath as FP
 import           System.IO (stderr,stdin,stdout,hIsTerminalDevice)
@@ -141,7 +142,7 @@ reexecWithOptionalContainer mprojectRoot =
                   (exePath,exeTimestamp,misCompatible) <-
                       liftIO $
                       do exePath <- liftIO getExecutablePath
-                         exeTimestamp <- liftIO (getModificationTime exePath)
+                         exeTimestamp <- resolveFile' exePath >>= getModificationTime
                          isKnown <-
                              liftIO $
                              getDockerImageExe
@@ -237,10 +238,6 @@ preventInContainer inner =
         then throwM OnlyOnHostException
         else inner
 
--- | 'True' if we are currently running inside a Docker container.
-getInContainer :: (MonadIO m) => m Bool
-getInContainer = liftIO (isJust <$> lookupEnv inContainerEnvVar)
-
 -- | Run a command in a new Docker container, then exit the process.
 runContainerAndExit :: M env m
   => GetCmdArgs env m
@@ -256,20 +253,26 @@ runContainerAndExit getCmdArgs
      let docker = configDocker config
      envOverride <- getEnvOverride (configPlatform config)
      checkDockerVersion envOverride docker
-     (dockerHost,dockerCertPath,bamboo,jenkins) <-
-       liftIO ((,,,) <$> lookupEnv "DOCKER_HOST"
-                     <*> lookupEnv "DOCKER_CERT_PATH"
-                     <*> lookupEnv "bamboo_buildKey"
-                     <*> lookupEnv "JENKINS_HOME")
-     let isRemoteDocker = maybe False (isPrefixOf "tcp://") dockerHost
+     (env,isStdinTerminal,isStderrTerminal,homeDir) <- liftIO $
+       (,,,)
+       <$> getEnvironment
+       <*> hIsTerminalDevice stdin
+       <*> hIsTerminalDevice stderr
+       <*> (parseAbsDir =<< getHomeDirectory)
      isStdoutTerminal <- asks getTerminal
-     (isStdinTerminal,isStderrTerminal) <-
-       liftIO ((,) <$> hIsTerminalDevice stdin
-                   <*> hIsTerminalDevice stderr)
+     let sshDir = homeDir </> sshRelDir
+     sshDirExists <- doesDirExist sshDir
+     let dockerHost = lookup "DOCKER_HOST" env
+         dockerCertPath = lookup "DOCKER_CERT_PATH" env
+         bamboo = lookup "bamboo_buildKey" env
+         jenkins = lookup "JENKINS_HOME" env
+         msshAuthSock = lookup "SSH_AUTH_SOCK" env
+         muserEnv = lookup "USER" env
+         isRemoteDocker = maybe False (isPrefixOf "tcp://") dockerHost
+         image = dockerImage docker
      when (isRemoteDocker &&
            maybe False (isInfixOf "boot2docker") dockerCertPath)
           ($logWarn "Warning: Using boot2docker is NOT supported, and not likely to perform well.")
-     let image = dockerImage docker
      maybeImageInfo <- inspect envOverride image
      imageInfo@Inspect{..} <- case maybeImageInfo of
        Just ii -> return ii
@@ -302,10 +305,10 @@ runContainerAndExit getCmdArgs
                                             </> $(mkRelDir ".local/bin")]
                       (T.pack <$> lookupImageEnv "PATH" imageEnvVars)
      (cmnd,args,envVars,extraMount) <- getCmdArgs docker envOverride imageInfo isRemoteDocker
-     pwd <- getWorkingDir
+     pwd <- getCurrentDir
      liftIO
        (do updateDockerImageLastUsed config iiId (toFilePath projectRoot)
-           mapM_ createTree [sandboxHomeDir, stackRoot])
+           mapM_ (ensureDir) [sandboxHomeDir, stackRoot])
      containerID <- (trim . decodeUtf8) <$> readDockerProcess
        envOverride
        (concat
@@ -316,10 +319,23 @@ runContainerAndExit getCmdArgs
           ,"-e",platformVariantEnvVar ++ "=dk" ++ platformVariant
           ,"-e","HOME=" ++ toFilePathNoTrailingSep sandboxHomeDir
           ,"-e","PATH=" ++ T.unpack newPathEnv
+          ,"-e","PWD=" ++ toFilePathNoTrailingSep pwd
           ,"-v",toFilePathNoTrailingSep stackRoot ++ ":" ++ toFilePathNoTrailingSep stackRoot
           ,"-v",toFilePathNoTrailingSep projectRoot ++ ":" ++ toFilePathNoTrailingSep projectRoot
           ,"-v",toFilePathNoTrailingSep sandboxHomeDir ++ ":" ++ toFilePathNoTrailingSep sandboxHomeDir
           ,"-w",toFilePathNoTrailingSep pwd]
+         ,case muserEnv of
+            Nothing -> []
+            Just userEnv -> ["-e","USER=" ++ userEnv]
+         ,if sshDirExists
+          then ["-v",toFilePathNoTrailingSep sshDir ++ ":" ++
+                     toFilePathNoTrailingSep (sandboxHomeDir </> sshRelDir)]
+          else []
+         ,case msshAuthSock of
+            Nothing -> []
+            Just sshAuthSock ->
+              ["-e","SSH_AUTH_SOCK=" ++ sshAuthSock
+              ,"-v",sshAuthSock ++ ":" ++ sshAuthSock]
            -- Disable the deprecated entrypoint in FP Complete-generated images
          ,["--entrypoint=/usr/bin/env"
              | isJust (lookupImageEnv oldSandboxIdEnvVar imageEnvVars) &&
@@ -386,6 +402,7 @@ runContainerAndExit getCmdArgs
         _ -> Nothing
     mountArg (Mount host container) = ["-v",host ++ ":" ++ container]
     projectRoot = fromMaybeProjectRoot mprojectRoot
+    sshRelDir = $(mkRelDir ".ssh/")
 
 -- | Clean-up old docker images and containers.
 cleanup :: M env m
@@ -681,7 +698,7 @@ checkDockerVersion envOverride docker =
      dockerVersionOut <- readDockerProcess envOverride ["--version"]
      case words (decodeUtf8 dockerVersionOut) of
        (_:_:v:_) ->
-         case parseVersionFromString (dropWhileEnd (not . isDigit) v) of
+         case parseVersionFromString (stripVersion v) of
            Just v'
              | v' < minimumDockerVersion ->
                throwM (DockerTooOldException minimumDockerVersion v')
@@ -695,6 +712,7 @@ checkDockerVersion envOverride docker =
        _ -> throwM InvalidVersionOutputException
   where minimumDockerVersion = $(mkVersion "1.6.0")
         prohibitedDockerVersions = []
+        stripVersion v = fst $ break (== '-') $ dropWhileEnd (not . isDigit) v
 
 -- | Remove the project's Docker sandbox.
 reset :: (MonadIO m, MonadReader env m, HasConfig env)
@@ -732,19 +750,19 @@ entrypoint config@Config{..} DockerEntrypoint{..} =
           -- its original home directory to the host's stack root, to avoid needing to download them
           origStackHomeDir <- parseAbsDir (User.homeDirectory ue)
           let origStackRoot = origStackHomeDir </> $(mkRelDir ("." ++ stackProgName))
-          buildPlanDirExists <- dirExists (buildPlanDir origStackRoot)
+          buildPlanDirExists <- doesDirExist (buildPlanDir origStackRoot)
           when buildPlanDirExists $ do
-            (_, buildPlans) <- listDirectory (buildPlanDir origStackRoot)
+            (_, buildPlans) <- listDir (buildPlanDir origStackRoot)
             forM_ buildPlans $ \srcBuildPlan -> do
               let destBuildPlan = buildPlanDir configStackRoot </> filename srcBuildPlan
-              exists <- fileExists destBuildPlan
+              exists <- doesFileExist destBuildPlan
               unless exists $ do
-                createTree (parent destBuildPlan)
+                ensureDir (parent destBuildPlan)
                 copyFile srcBuildPlan destBuildPlan
           forM_ configPackageIndices $ \pkgIdx -> do
             msrcIndex <- flip runReaderT (config{configStackRoot = origStackRoot}) $ do
                srcIndex <- configPackageIndex (indexName pkgIdx)
-               exists <- fileExists srcIndex
+               exists <- doesFileExist srcIndex
                return $ if exists
                  then Just srcIndex
                  else Nothing
@@ -753,9 +771,9 @@ entrypoint config@Config{..} DockerEntrypoint{..} =
               Just srcIndex -> do
                 flip runReaderT config $ do
                   destIndex <- configPackageIndex (indexName pkgIdx)
-                  exists <- fileExists destIndex
+                  exists <- doesFileExist destIndex
                   unless exists $ do
-                    createTree (parent destIndex)
+                    ensureDir (parent destIndex)
                     copyFile srcIndex destIndex
     return True
   where
@@ -813,12 +831,12 @@ removeDirectoryContents :: Path Abs Dir -- ^ Directory to remove contents of
                         -> [Path Rel File] -- ^ Top-level file names to exclude from removal
                         -> IO ()
 removeDirectoryContents path excludeDirs excludeFiles =
-  do isRootDir <- dirExists path
+  do isRootDir <- doesDirExist path
      when isRootDir
-          (do (lsd,lsf) <- listDirectory path
+          (do (lsd,lsf) <- listDir path
               forM_ lsd
                     (\d -> unless (dirname d `elem` excludeDirs)
-                                  (removeTree d))
+                                  (removeDirRecur d))
               forM_ lsf
                     (\f -> unless (filename f `elem` excludeFiles)
                                   (removeFile f)))
@@ -855,10 +873,6 @@ fromMaybeProjectRoot = fromMaybe (throw CannotDetermineProjectRootException)
 -- | Use of this variable is deprecated, and only used to detect old images.
 oldSandboxIdEnvVar :: String
 oldSandboxIdEnvVar = "DOCKER_SANDBOX_ID"
-
--- | Environment variable used to indicate stack is running in container.
-inContainerEnvVar :: String
-inContainerEnvVar = stackProgNameUpper ++ "_IN_CONTAINER"
 
 -- | Command-line argument for "docker"
 dockerCmdName :: String
@@ -1067,7 +1081,6 @@ type GetCmdArgs env m
   -> Inspect
   -> Bool
   -> m (FilePath,[String],[(String,String)],[Mount])
-
 
 type M env m = (MonadIO m,MonadReader env m,MonadLogger m,MonadBaseControl IO m,MonadCatch m
                ,HasConfig env,HasTerminal env,HasReExec env,HasHttpManager env,MonadMask m)

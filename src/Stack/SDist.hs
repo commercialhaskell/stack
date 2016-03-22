@@ -46,7 +46,7 @@ import           Distribution.Version (simplifyVersionRange, orLaterVersion, ear
 import           Distribution.Version.Extra
 import           Network.HTTP.Client.Conduit (HasHttpManager)
 import           Path
-import           Path.IO
+import           Path.IO hiding (getModificationTime, getPermissions)
 import           Prelude -- Fix redundant import warnings
 import           Stack.Build (mkBaseConfigOpts)
 import           Stack.Build.Execute
@@ -57,8 +57,7 @@ import           Stack.Constants
 import           Stack.Package
 import           Stack.Types
 import           Stack.Types.Internal
-import           System.Directory (getModificationTime, getPermissions, Permissions(..))
-import           System.IO.Temp (withSystemTempDirectory)
+import           System.Directory (getModificationTime, getPermissions)
 import qualified System.FilePath as FP
 
 -- | Special exception to throw when you want to fail because of bad results
@@ -123,7 +122,7 @@ getCabalLbs :: M env m => PvpBounds -> FilePath -> m L.ByteString
 getCabalLbs pvpBounds fp = do
     bs <- liftIO $ S.readFile fp
     (_warnings, gpd) <- readPackageUnresolvedBS Nothing bs
-    (_, _, _, _, sourceMap) <- loadSourceMap AllowNoTargets defaultBuildOpts
+    (_, _, _, _, sourceMap) <- loadSourceMap AllowNoTargets defaultBuildOptsCLI
     menv <- getMinimalEnvOverride
     (installedMap, _, _, _) <- getInstalled menv GetInstalledOpts
                                 { getInstalledProfiling = False
@@ -151,7 +150,6 @@ getCabalLbs pvpBounds fp = do
                       Just (_, installed) -> Just (installedVersion installed)
                       Nothing -> Nothing
 
-
     addUpper version = intersectVersionRanges
         (earlierVersion $ toCabalVersion $ nextMajorVersion version)
     addLower version = intersectVersionRanges
@@ -176,9 +174,9 @@ gtraverseT f =
 -- use-cases.
 readLocalPackage :: M env m => Path Abs Dir -> m LocalPackage
 readLocalPackage pkgDir = do
-    cabalfp <- getCabalFileName pkgDir
+    cabalfp <- findOrGenerateCabalFile pkgDir
     name    <- parsePackageNameFromFilePath cabalfp
-    config  <- getPackageConfig defaultBuildOpts name
+    config  <- getPackageConfig defaultBuildOptsCLI name
     (warnings,package) <- readPackage config cabalfp
     mapM_ (printCabalFileWarning cabalfp) warnings
     return LocalPackage
@@ -191,7 +189,8 @@ readLocalPackage pkgDir = do
         , lpTestDeps = Map.empty
         , lpBenchDeps = Map.empty
         , lpTestBench = Nothing
-        , lpDirtyFiles = Just Set.empty
+        , lpForceDirty = False
+        , lpDirtyFiles = Nothing
         , lpNewBuildCache = Map.empty
         , lpFiles = Set.empty
         , lpComponents = Set.empty
@@ -201,13 +200,14 @@ readLocalPackage pkgDir = do
 -- | Returns a newline-separate list of paths, and the absolute path to the .cabal file.
 getSDistFileList :: M env m => LocalPackage -> m (String, Path Abs File)
 getSDistFileList lp =
-    withCanonicalizedSystemTempDirectory (stackProgName <> "-sdist") $ \tmpdir -> do
+    withSystemTempDir (stackProgName <> "-sdist") $ \tmpdir -> do
         menv <- getMinimalEnvOverride
         let bopts = defaultBuildOpts
-        baseConfigOpts <- mkBaseConfigOpts bopts
-        (_, _mbp, locals, _extraToBuild, _sourceMap) <- loadSourceMap NeedTargets bopts
+        let boptsCli = defaultBuildOptsCLI
+        baseConfigOpts <- mkBaseConfigOpts boptsCli
+        (_, _mbp, locals, _extraToBuild, _sourceMap) <- loadSourceMap NeedTargets boptsCli
         runInBase <- liftBaseWith $ \run -> return (void . run)
-        withExecuteEnv menv bopts baseConfigOpts locals
+        withExecuteEnv menv bopts boptsCli baseConfigOpts locals
             [] [] [] -- provide empty list of globals. This is a hack around custom Setup.hs files
             $ \ee ->
             withSingleContext runInBase ac ee task Nothing (Just "sdist") $ \_package cabalfp _pkgDir cabal _announce _console _mlogFile -> do
@@ -262,16 +262,16 @@ dirsFromFiles dirs = Set.toAscList (Set.delete "." results)
 -- and will throw an exception in case of critical errors.
 --
 -- Note that we temporarily decompress the archive to analyze it.
-checkSDistTarball :: (MonadIO m, MonadMask m, MonadThrow m, MonadCatch m, MonadLogger m, MonadReader env m, HasEnvConfig env)
+checkSDistTarball :: (MonadIO m, MonadMask m, MonadThrow m, MonadLogger m, MonadReader env m, HasEnvConfig env)
   => Path Abs File -- ^ Absolute path to tarball
   -> m ()
 checkSDistTarball tarball = withTempTarGzContents tarball $ \pkgDir' -> do
     pkgDir  <- (pkgDir' </>) `liftM`
         (parseRelDir . FP.takeBaseName . FP.takeBaseName . toFilePath $ tarball)
     --               ^ drop ".tar"     ^ drop ".gz"
-    cabalfp <- getCabalFileName pkgDir
+    cabalfp <- findOrGenerateCabalFile pkgDir
     name    <- parsePackageNameFromFilePath cabalfp
-    config  <- getPackageConfig defaultBuildOpts name
+    config  <- getPackageConfig defaultBuildOptsCLI name
     (gdesc, pkgDesc) <- readPackageDescriptionDir config pkgDir
     $logInfo $
         "Checking package '" <> packageNameText name <> "' for common mistakes"
@@ -292,12 +292,11 @@ checkSDistTarball tarball = withTempTarGzContents tarball $ \pkgDir' -> do
 
 -- | Version of 'checkSDistTarball' that first saves lazy bytestring to
 -- temporary directory and then calls 'checkSDistTarball' on it.
-checkSDistTarball' :: (MonadIO m, MonadMask m, MonadThrow m, MonadCatch m, MonadLogger m, MonadReader env m, HasEnvConfig env)
+checkSDistTarball' :: (MonadIO m, MonadMask m, MonadThrow m, MonadLogger m, MonadReader env m, HasEnvConfig env)
   => String       -- ^ Tarball name
   -> L.ByteString -- ^ Tarball contents as a byte string
   -> m ()
-checkSDistTarball' name bytes = withSystemTempDirectory "stack" $ \tdir -> do
-    tpath   <- parseAbsDir tdir
+checkSDistTarball' name bytes = withSystemTempDir "stack" $ \tpath -> do
     npath   <- (tpath </>) `liftM` parseRelFile name
     liftIO $ L.writeFile (toFilePath npath) bytes
     checkSDistTarball npath
@@ -306,8 +305,7 @@ withTempTarGzContents :: (MonadIO m, MonadMask m, MonadThrow m)
   => Path Abs File         -- ^ Location of tarball
   -> (Path Abs Dir -> m a) -- ^ Perform actions given dir with tarball contents
   -> m a
-withTempTarGzContents apath f = withSystemTempDirectory "stack" $ \tdir -> do
-    tpath   <- parseAbsDir tdir
+withTempTarGzContents apath f = withSystemTempDir "stack" $ \tpath -> do
     archive <- liftIO $ L.readFile (toFilePath apath)
     liftIO . Tar.unpack (toFilePath tpath) . Tar.read . GZip.decompress $ archive
     f tpath

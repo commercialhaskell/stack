@@ -60,6 +60,7 @@ main =
                 gUploadLabel = Nothing
                 gTestHaddocks = True
                 gProjectRoot = "" -- Set to real value velow.
+                gBuildArgs = []
                 global0 = foldl (flip id) Global{..} flags
             -- Need to get paths after options since the '--arch' argument can effect them.
             projectRoot' <- getStackPath global0 "project-root"
@@ -102,6 +103,11 @@ options =
         "Label to give the uploaded release asset"
     , Option "" [noTestHaddocksOptName] (NoArg $ Right $ \g -> g{gTestHaddocks = False})
         "Disable testing building haddocks."
+    , Option "" [buildArgsOptName]
+        (ReqArg
+            (\v -> Right $ \g -> g{gBuildArgs = words v})
+            "\"ARG1 ARG2 ...\"")
+        "Additional arguments to pass to 'stack build'."
     ]
 
 -- | Shake rules.
@@ -149,11 +155,12 @@ rules global@Global{..} args = do
         withTempDir $ \tmpDir -> do
             let cmd0 = cmd (releaseBinDir </> binaryName </> stackExeFileName)
                     (stackArgs global)
+                    gBuildArgs
                     ["--local-bin-path=" ++ tmpDir]
             () <- cmd0 $ concat $ concat
                 [["install --pedantic --no-haddock-deps"], [" --haddock" | gTestHaddocks]]
             () <- cmd0 "install --resolver=lts-4.0 cabal-install"
-            let cmd' = cmd (AddPath [tmpDir] []) stackProgName (stackArgs global)
+            let cmd' = cmd (AddPath [tmpDir] []) stackProgName (stackArgs global) gBuildArgs
             () <- cmd' "test --pedantic --flag stack:integration-tests"
             return ()
         copyFileChanged (releaseBinDir </> binaryName </> stackExeFileName) out
@@ -214,7 +221,7 @@ rules global@Global{..} args = do
     releaseDir </> binaryPkgSignatureFileName %> \out -> do
         need [out -<.> ""]
         _ <- liftIO $ tryJust (guard . isDoesNotExistError) (removeFile out)
-        cmd "gpg --detach-sig --armor"
+        cmd ("gpg " ++ gpgOptions ++ " --detach-sig --armor")
             [ "-u", gGpgKey
             , dropExtension out ]
 
@@ -223,6 +230,7 @@ rules global@Global{..} args = do
         actionOnException
             (cmd stackProgName
                 (stackArgs global)
+                gBuildArgs
                 ["--local-bin-path=" ++ takeDirectory out]
                  "install --pedantic")
             (removeFile out)
@@ -242,6 +250,7 @@ rules global@Global{..} args = do
            need [pkgFile]
            () <- cmd "deb-s3 upload --preserve-versions --bucket download.fpcomplete.com"
                [ "--sign=" ++ gGpgKey
+               , "--gpg-options=" ++ gpgOptions
                , "--prefix=" ++ dvDistro
                , "--codename=" ++ dvCodeName
                , pkgFile ]
@@ -249,6 +258,7 @@ rules global@Global{..} args = do
            -- configured with it.
            () <- cmd "deb-s3 upload --preserve-versions --bucket download.fpcomplete.com"
                [ "--sign=" ++ gGpgKey
+               , "--gpg-options=" ++ gpgOptions
                , "--prefix=" ++ dvDistro ++ "/" ++ dvCodeName
                , pkgFile ]
            copyFileChanged pkgFile out
@@ -345,7 +355,7 @@ rules global@Global{..} args = do
         need stageFiles
         return stageFiles
 
-    getDocFiles = getDirectoryFiles "." ["LICENSE", "*.md", "doc//*"]
+    getDocFiles = getDirectoryFiles "." ["LICENSE", "*.md", "doc//*.md"]
 
     distroVersionFromPath path versions =
         let path' = dropDirectoryPrefix releaseDir path
@@ -582,6 +592,9 @@ uploadLabelOptName = "upload-label"
 noTestHaddocksOptName :: String
 noTestHaddocksOptName = "no-test-haddocks"
 
+buildArgsOptName :: String
+buildArgsOptName = "build-args"
+
 -- | Arguments to pass to all 'stack' invocations.
 stackArgs :: Global -> [String]
 stackArgs Global{..} = ["--install-ghc", "--arch=" ++ display gArch]
@@ -589,6 +602,10 @@ stackArgs Global{..} = ["--install-ghc", "--arch=" ++ display gArch]
 -- | Name of the 'stack' program.
 stackProgName :: FilePath
 stackProgName = "stack"
+
+-- | Options to pass to invocations of gpg
+gpgOptions :: String
+gpgOptions = "--digest-algo=sha512"
 
 -- | Linux distribution/version combination.
 data DistroVersion = DistroVersion
@@ -630,5 +647,6 @@ data Global = Global
     , gArch :: !Arch
     , gBinarySuffix :: !String
     , gUploadLabel :: (Maybe String)
-    , gTestHaddocks :: !Bool }
+    , gTestHaddocks :: !Bool
+    , gBuildArgs :: [String] }
     deriving (Show)

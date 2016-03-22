@@ -65,15 +65,12 @@ import           Data.Typeable                  (Typeable)
 import           Data.Word                      (Word64)
 import           Network.HTTP.Download
 import           Path
-import           Path.IO                         (dirExists, createTree)
+import           Path.IO
 import           Prelude -- Fix AMP warning
 import           Stack.GhcPkg
 import           Stack.PackageIndex
 import           Stack.Types
-import           System.Directory               (canonicalizePath,
-                                                 createDirectoryIfMissing,
-                                                 doesDirectoryExist,
-                                                 renameDirectory)
+import qualified System.Directory               as D
 import           System.FilePath                ((<.>))
 import qualified System.FilePath                as FP
 import           System.IO                      (IOMode (ReadMode),
@@ -140,7 +137,7 @@ unpackPackages :: (MonadIO m, MonadBaseControl IO m, MonadReader env m, HasHttpM
                -> [String] -- ^ names or identifiers
                -> m ()
 unpackPackages menv dest input = do
-    dest' <- liftIO (canonicalizePath dest) >>= parseAbsDir
+    dest' <- resolveDir' dest
     (names, idents) <- case partitionEithers $ map parse input of
         ([], x) -> return $ partitionEithers x
         (errs, _) -> throwM $ CouldNotParsePackageSelectors errs
@@ -199,7 +196,7 @@ resolvePackages menv idents0 names0 = do
             go >>= either throwM return
         Right x -> return x
   where
-    go = r <$> resolvePackagesAllowMissing menv idents0 names0
+    go = r <$> resolvePackagesAllowMissing idents0 names0
     r (missingNames, missingIdents, idents)
       | not $ Set.null missingNames  = Left $ UnknownPackageNames       missingNames
       | not $ Set.null missingIdents = Left $ UnknownPackageIdentifiers missingIdents ""
@@ -207,12 +204,11 @@ resolvePackages menv idents0 names0 = do
 
 resolvePackagesAllowMissing
     :: (MonadIO m, MonadReader env m, HasHttpManager env, HasConfig env, MonadLogger m, MonadThrow m, MonadBaseControl IO m, MonadCatch m)
-    => EnvOverride
-    -> Set PackageIdentifier
+    => Set PackageIdentifier
     -> Set PackageName
     -> m (Set PackageName, Set PackageIdentifier, Map PackageIdentifier ResolvedPackage)
-resolvePackagesAllowMissing menv idents0 names0 = do
-    caches <- getPackageCaches menv
+resolvePackagesAllowMissing idents0 names0 = do
+    caches <- getPackageCaches
     let versions = Map.fromListWith max $ map toTuple $ Map.keys caches
         (missingNames, idents1) = partitionEithers $ map
             (\name -> maybe (Left name ) (Right . PackageIdentifier name)
@@ -271,7 +267,7 @@ withCabalLoader
     -> ((PackageIdentifier -> IO ByteString) -> m a)
     -> m a
 withCabalLoader menv inner = do
-    icaches <- getPackageCaches menv >>= liftIO . newIORef
+    icaches <- getPackageCaches >>= liftIO . newIORef
     env <- ask
 
     -- Want to try updating the index once during a single run for missing
@@ -311,7 +307,8 @@ withCabalLoader menv inner = do
                                     , "Updating and trying again."
                                     ]
                                 updateAllIndices menv
-                                caches <- getPackageCaches menv
+                                clearPackageCaches
+                                caches <- getPackageCaches
                                 liftIO $ writeIORef icaches caches
                             return (False, doLookup ident)
                         else return (toUpdate,
@@ -384,7 +381,7 @@ getToFetch mdest resolvedAll = do
             case mdestDir of
                 Nothing -> return Nothing
                 Just destDir -> do
-                    exists <- dirExists destDir
+                    exists <- doesDirExist destDir
                     return $ if exists then Just destDir else Nothing
         case mexists of
             Just destDir -> return $ Right (ident, destDir)
@@ -465,7 +462,7 @@ fetchPackages' mdistDir toFetchAll = do
             let dest = toFilePath $ parent destDir
                 innerDest = toFilePath destDir
 
-            liftIO $ createDirectoryIfMissing True dest
+            liftIO $ ensureDir (parent destDir)
 
             liftIO $ withBinaryFile fp ReadMode $ \h -> do
                 -- Avoid using L.readFile, which is more likely to leak
@@ -498,15 +495,15 @@ fetchPackages' mdistDir toFetchAll = do
                         let inner = dest FP.</> identStr
                             oldDist = inner FP.</> "dist"
                             newDist = inner FP.</> toFilePath distDir
-                        exists <- doesDirectoryExist oldDist
+                        exists <- D.doesDirectoryExist oldDist
                         when exists $ do
                             -- Previously used takeDirectory, but that got confused
                             -- by trailing slashes, see:
                             -- https://github.com/commercialhaskell/stack/issues/216
                             --
                             -- Instead, use Path which is a bit more resilient
-                            createTree . parent =<< parseAbsDir newDist
-                            renameDirectory oldDist newDist
+                            ensureDir . parent =<< parseAbsDir newDist
+                            D.renameDirectory oldDist newDist
 
                 let cabalFP =
                         innerDest FP.</>
