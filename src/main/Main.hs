@@ -817,7 +817,7 @@ withBuildConfigAndLock go inner =
 withBuildConfigExt
     :: GlobalOpts
     -> Maybe (StackT Config IO ())
-    -- ^ Action to perform after before build.  This will be run on the host
+    -- ^ Action to perform before the build.  This will be run on the host
     -- OS even if Docker is enabled for builds.  The build config is not
     -- available in this action, since that would require build tools to be
     -- installed on the host OS.
