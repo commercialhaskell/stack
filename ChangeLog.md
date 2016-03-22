@@ -24,6 +24,30 @@ Other enhancements:
 * hpack files can now be used in templates
 * `stack ghci` now runs ghci as a separate process #1306
 * Retry when downloading snapshots and package indices
+* Many build options are configurable now in `stack.yaml`:
+``` 
+  build:
+    library-profiling: true
+    executable-profiling: true
+    haddock: true
+    haddock-deps: true
+    copy-bins: true
+    prefetch: true
+    force-dirty: true
+    keep-going: true
+    test: true
+    test-arguments:
+      rerun-tests: true
+      additional-args: ['-fprof']
+      coverage: true
+      no-run-tests: true
+    bench: true
+    benchmark-opts:
+      benchmark-arguments: -O2
+      no-run-benchmarks: true
+    reconfigure: true
+    cabal-verbose: true
+```
 
 Bug fixes:
 
