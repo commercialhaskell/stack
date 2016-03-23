@@ -24,7 +24,6 @@ module Stack.BuildPlan
     , removeSrcPkgDefaultFlags
     , resolveBuildPlan
     , selectBestSnapshot
-    , ToolMap
     , getToolMap
     , shadowMiniBuildPlan
     , showItems
@@ -372,9 +371,6 @@ getDeps mbp isShadowed packages =
                     , rsVisited = Map.insert name shadowed $ rsVisited rs'
                     }
                 return shadowed
-
--- | Look up with packages provide which tools.
-type ToolMap = Map ByteString (Set PackageName)
 
 -- | Map from tool name to package providing it
 getToolMap :: MiniBuildPlan -> Map Text (Set PackageName)
