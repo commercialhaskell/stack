@@ -65,7 +65,7 @@ import           Stack.Docker.GlobalDB
 import           Stack.Types
 import           Stack.Types.Internal
 import           Stack.Setup (ensureDockerStackExe)
-import           System.Directory (canonicalizePath,getHomeDirectory)
+import           System.Directory (canonicalizePath,getHomeDirectory,getTemporaryDirectory)
 import           System.Environment (getEnv,getEnvironment,getProgName,getArgs,getExecutablePath)
 import           System.Exit (exitSuccess, exitWith)
 import qualified System.FilePath as FP
@@ -309,6 +309,7 @@ runContainerAndExit getCmdArgs
      liftIO
        (do updateDockerImageLastUsed config iiId (toFilePath projectRoot)
            mapM_ (ensureDir) [sandboxHomeDir, stackRoot])
+     tmp <- parseAbsDir =<< liftIO getTemporaryDirectory
      containerID <- (trim . decodeUtf8) <$> readDockerProcess
        envOverride
        (concat
@@ -320,6 +321,7 @@ runContainerAndExit getCmdArgs
           ,"-e","HOME=" ++ toFilePathNoTrailingSep sandboxHomeDir
           ,"-e","PATH=" ++ T.unpack newPathEnv
           ,"-e","PWD=" ++ toFilePathNoTrailingSep pwd
+          ,"-v",toFilePathNoTrailingSep tmp ++ ":/tmp"
           ,"-v",toFilePathNoTrailingSep stackRoot ++ ":" ++ toFilePathNoTrailingSep stackRoot
           ,"-v",toFilePathNoTrailingSep projectRoot ++ ":" ++ toFilePathNoTrailingSep projectRoot
           ,"-v",toFilePathNoTrailingSep sandboxHomeDir ++ ":" ++ toFilePathNoTrailingSep sandboxHomeDir
