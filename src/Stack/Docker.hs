@@ -320,6 +320,7 @@ runContainerAndExit getCmdArgs
           ,"-e","HOME=" ++ toFilePathNoTrailingSep sandboxHomeDir
           ,"-e","PATH=" ++ T.unpack newPathEnv
           ,"-e","PWD=" ++ toFilePathNoTrailingSep pwd
+          ,"-v",toFilePathNoTrailingSep homeDir ++ ":" ++ toFilePathNoTrailingSep homeDir
           ,"-v",toFilePathNoTrailingSep stackRoot ++ ":" ++ toFilePathNoTrailingSep stackRoot
           ,"-v",toFilePathNoTrailingSep projectRoot ++ ":" ++ toFilePathNoTrailingSep projectRoot
           ,"-v",toFilePathNoTrailingSep sandboxHomeDir ++ ":" ++ toFilePathNoTrailingSep sandboxHomeDir
