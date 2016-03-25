@@ -1,7 +1,7 @@
+{-# LANGUAGE CPP                #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE FlexibleInstances  #-}
 {-# LANGUAGE OverloadedStrings  #-}
-{-# LANGUAGE RecordWildCards    #-}
 
 {-|
 Module      : Stack.Types.Sig
@@ -14,14 +14,17 @@ Portability : POSIX
 -}
 
 module Stack.Types.Sig
-       (Signature(..), Fingerprint(..), SigException(..))
-       where
+       (Signature(..), Fingerprint, mkFingerprint, SigException(..)) where
+
+#if __GLASGOW_HASKELL__ < 710
+import           Control.Applicative ((<$>))
+#endif
 
 import           Control.Exception (Exception)
 import           Data.Aeson (Value(..), ToJSON(..), FromJSON(..))
 import           Data.ByteString (ByteString)
 import qualified Data.ByteString as SB
-import           Data.Char (isDigit, isAlpha, isSpace)
+import           Data.Char (isHexDigit)
 import           Data.Monoid ((<>))
 import           Data.String (IsString(..))
 import           Data.Text (Text)
@@ -42,27 +45,27 @@ instance Show Signature where
              else show (SB.take 140 s))
 
 -- | The GPG fingerprint.
-newtype Fingerprint = Fingerprint
-    { fingerprintSample :: Text
-    } deriving (Eq,Ord,Show)
+newtype Fingerprint =
+    Fingerprint Text
+    deriving (Eq,Ord)
+
+mkFingerprint :: Text -> Fingerprint
+mkFingerprint = Fingerprint . hexText
+
+hexText :: Text -> Text
+hexText = T.toUpper . T.dropWhile (not . isHexDigit)
+
+instance Show Fingerprint where
+    show (Fingerprint hex) = T.unpack (hexText hex)
 
 instance FromJSON Fingerprint where
-    parseJSON j = do
-        s <- parseJSON j
-        let withoutSpaces = T.filter (not . isSpace) s
-        if T.null withoutSpaces ||
-           T.all
-               (\c ->
-                     isAlpha c || isDigit c || isSpace c)
-               withoutSpaces
-            then return (Fingerprint withoutSpaces)
-            else fail ("Expected fingerprint, but got: " ++ T.unpack s)
+    parseJSON j = Fingerprint . hexText <$> parseJSON j
 
 instance ToJSON Fingerprint where
-    toJSON (Fingerprint txt) = String txt
+    toJSON (Fingerprint hex) = String (hexText hex)
 
 instance IsString Fingerprint where
-    fromString = Fingerprint . T.pack
+    fromString = Fingerprint . hexText . T.pack
 
 instance FromJSON (Aeson PackageName) where
     parseJSON j = do
