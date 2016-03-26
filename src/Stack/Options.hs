@@ -359,7 +359,7 @@ buildOptsMonoidParser hide0 =
         BuildOptsMonoid <$> libProfiling <*> exeProfiling <*> haddock <*>
         haddockDeps <*> copyBins <*> preFetch <*> keepGoing <*> forceDirty <*>
         tests <*> testOptsParser hide0 <*> benches <*> benchOptsParser hide0 <*> reconfigure <*>
-        cabalVerbose <*> splitObjs
+        cabalVerbose <*> cabalVerboseWithLevel <*> splitObjs
     libProfiling =
         maybeBoolFlags
             "library-profiling"
@@ -417,6 +417,13 @@ buildOptsMonoidParser hide0 =
             "cabal-verbose"
             "Ask Cabal to be verbose in its output"
             hide
+    cabalVerboseWithLevel =
+      optional (option auto
+              ( long "cabal-verbose-with-level"
+             <> metavar "LEVEL"
+             <> help "Specify cabal verbosity level: 0,1,2 or 3"
+             <> hide
+              ))
     splitObjs =
         maybeBoolFlags
             "split-objs"

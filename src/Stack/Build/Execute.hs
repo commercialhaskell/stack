@@ -911,7 +911,8 @@ withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} md
                             Ghc -> []
                             Ghcjs -> ["-build-runner"])
                     return (outputFile, setupArgs)
-            runExe exeName $ (if boptsCabalVerbose eeBuildOpts then ("--verbose":) else id) fullArgs
+
+            runExe exeName $ ("--verbose=" ++ (show (boptsCabalVerboseLevel eeBuildOpts))) : fullArgs
 
 singleBuild :: M env m
             => (m () -> IO ())

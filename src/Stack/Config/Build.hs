@@ -41,6 +41,9 @@ buildOptsFromMonoid BuildOptsMonoid{..} = BuildOpts
     , boptsCabalVerbose = fromMaybe
           (boptsCabalVerbose defaultBuildOpts)
           buildMonoidCabalVerbose
+    , boptsCabalVerboseLevel = fromMaybe
+          (boptsCabalVerboseLevel defaultBuildOpts)
+          buildMonoidCabalVerboseWithLevel
     , boptsSplitObjs = fromMaybe
           (boptsSplitObjs defaultBuildOpts)
           buildMonoidSplitObjs

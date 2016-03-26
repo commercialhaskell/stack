@@ -64,6 +64,8 @@ data BuildOpts =
             -- ^ Perform the configure step even if already configured
             ,boptsCabalVerbose :: !Bool
             -- ^ Ask Cabal to be verbose in its builds
+            ,boptsCabalVerboseLevel :: !Int
+            -- ^ Ask Cabal to be verbose in its builds
             ,boptsSplitObjs :: !Bool
             -- ^ Whether to enable split-objs.
             }
@@ -85,6 +87,7 @@ defaultBuildOpts = BuildOpts
     , boptsBenchmarkOpts = defaultBenchmarkOpts
     , boptsReconfigure = False
     , boptsCabalVerbose = False
+    , boptsCabalVerboseLevel = 2
     , boptsSplitObjs = False
     }
 
@@ -139,6 +142,7 @@ data BuildOptsMonoid = BuildOptsMonoid
     , buildMonoidBenchmarkOpts :: !BenchmarkOptsMonoid
     , buildMonoidReconfigure :: !(Maybe Bool)
     , buildMonoidCabalVerbose :: !(Maybe Bool)
+    , buildMonoidCabalVerboseWithLevel :: !(Maybe Int)
     , buildMonoidSplitObjs :: !(Maybe Bool)
     } deriving (Show)
 
@@ -158,6 +162,7 @@ instance FromJSON (WithJSONWarnings BuildOptsMonoid) where
               buildMonoidBenchmarkOpts <- jsonSubWarnings (o ..:? buildMonoidBenchmarkOptsArgName ..!= mempty)
               buildMonoidReconfigure <- o ..:? buildMonoidReconfigureArgName
               buildMonoidCabalVerbose <- o ..:? buildMonoidCabalVerboseArgName
+              buildMonoidCabalVerboseWithLevel <- o ..:? buildMonoidCabalVerboseArgName
               buildMonoidSplitObjs <- o ..:? buildMonoidSplitObjsName
               return BuildOptsMonoid{..})
 
@@ -222,6 +227,7 @@ instance Monoid BuildOptsMonoid where
     ,buildMonoidBenchmarkOpts = mempty
     ,buildMonoidReconfigure = Nothing
     ,buildMonoidCabalVerbose = Nothing
+    , buildMonoidCabalVerboseWithLevel = Nothing
     ,buildMonoidSplitObjs = Nothing
     }
 
@@ -240,6 +246,7 @@ instance Monoid BuildOptsMonoid where
     ,buildMonoidBenchmarkOpts = buildMonoidBenchmarkOpts l <> buildMonoidBenchmarkOpts r
     ,buildMonoidReconfigure = buildMonoidReconfigure l <|> buildMonoidReconfigure r
     ,buildMonoidCabalVerbose = buildMonoidCabalVerbose l <|> buildMonoidCabalVerbose r
+    ,buildMonoidCabalVerboseWithLevel = buildMonoidCabalVerboseWithLevel l <|> buildMonoidCabalVerboseWithLevel r
     ,buildMonoidSplitObjs = buildMonoidSplitObjs l <|> buildMonoidSplitObjs r
     }
 
