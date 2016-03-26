@@ -1,8 +1,9 @@
-{-# LANGUAGE ConstraintKinds   #-}
-{-# LANGUAGE FlexibleContexts  #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RecordWildCards   #-}
-{-# LANGUAGE TemplateHaskell   #-}
+{-# LANGUAGE ConstraintKinds    #-}
+{-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE FlexibleContexts   #-}
+{-# LANGUAGE OverloadedStrings  #-}
+{-# LANGUAGE RecordWildCards    #-}
+{-# LANGUAGE TemplateHaskell    #-}
 
 -- | This module builds Docker (OpenContainer) images.
 module Stack.Image
@@ -21,6 +22,8 @@ import           Data.Char (toLower)
 import qualified Data.Map.Strict as Map
 import           Data.Maybe
 import           Data.Typeable
+import           Data.Text (Text)
+import qualified Data.Text as T
 import           Path
 import           Path.Extra
 import           Path.IO
@@ -56,16 +59,25 @@ stageContainerImageArtifacts = do
 -- in the config file.
 createContainerImageFromStage
     :: Assemble e m
-    => m ()
-createContainerImageFromStage = do
+    => [Text] -> m ()
+createContainerImageFromStage imageNames = do
     config <- asks getConfig
     workingDir <- getCurrentDir
     forM_
-        (zip [0 ..] (imgDockers $ configImage config))
+        (zip
+             [0 ..]
+             (filterImages
+                  (map T.unpack imageNames)
+                  (imgDockers $ configImage config)))
         (\(idx,opts) ->
               do imageDir <- imageStagingDir workingDir idx
                  createDockerImage opts imageDir
                  extendDockerImageWithEntrypoint opts imageDir)
+  where
+    filterImages [] = id -- all: no filter
+    filterImages names = filter (imageNameFound names . imgDockerImageName)
+    imageNameFound names (Just name) = name `elem` names
+    imageNameFound _ _ = False
 
 -- | Stage all the Package executables in the usr/local/bin
 -- subdirectory of a temp directory.
