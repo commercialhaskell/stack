@@ -61,7 +61,7 @@ import           Stack.BuildPlan (loadMiniBuildPlan, shadowMiniBuildPlan,
                                   parseCustomMiniBuildPlan)
 import           Stack.Constants (wiredInPackages)
 import           Stack.Package
-import           Stack.PackageIndex (getPackageCaches)
+import           Stack.PackageIndex (getPackageVersions)
 import           Stack.Types
 
 import qualified System.Directory as D
@@ -81,19 +81,12 @@ loadSourceMap needTargets boptsCli = do
     bconfig <- asks getBuildConfig
     rawLocals <- getLocalPackageViews
     (mbp0, cliExtraDeps, targets) <- parseTargetsFromBuildOpts needTargets boptsCli
-    caches <- getPackageCaches
-    let latestVersion =
-            Map.fromListWith max $
-            map toTuple $
-            Map.keys caches
-
     -- Extend extra-deps to encompass targets requested on the command line
     -- that are not in the snapshot.
     extraDeps0 <- extendExtraDeps
         (bcExtraDeps bconfig)
         cliExtraDeps
         (Map.keysSet $ Map.filter (== STUnknown) targets)
-        latestVersion
 
     locals <- mapM (loadLocalPackage boptsCli targets) $ Map.toList rawLocals
     checkFlagsUsed boptsCli locals extraDeps0 (mbpPackages mbp0)
@@ -434,31 +427,35 @@ localFlags boptsflags bconfig name = Map.unions
 -- Originally part of https://github.com/commercialhaskell/stack/issues/272,
 -- this was then superseded by
 -- https://github.com/commercialhaskell/stack/issues/651
-extendExtraDeps :: (MonadThrow m, MonadReader env m, HasBuildConfig env)
-                => Map PackageName Version -- ^ original extra deps
-                -> Map PackageName Version -- ^ package identifiers from the command line
-                -> Set PackageName -- ^ all packages added on the command line
-                -> Map PackageName Version -- ^ latest versions in indices
-                -> m (Map PackageName Version) -- ^ new extradeps
-extendExtraDeps extraDeps0 cliExtraDeps unknowns latestVersion
-    | null errs = return $ Map.unions $ extraDeps1 : unknowns'
-    | otherwise = do
-        bconfig <- asks getBuildConfig
-        throwM $ UnknownTargets
-            (Set.fromList errs)
-            Map.empty -- TODO check the cliExtraDeps for presence in index
-            (bcStackYaml bconfig)
+extendExtraDeps
+    :: (HasBuildConfig env, MonadIO m, MonadLogger m, MonadReader env m, HasHttpManager env, MonadBaseControl IO m, MonadCatch m)
+    => Map PackageName Version -- ^ original extra deps
+    -> Map PackageName Version -- ^ package identifiers from the command line
+    -> Set PackageName -- ^ all packages added on the command line
+    -> m (Map PackageName Version) -- ^ new extradeps
+extendExtraDeps extraDeps0 cliExtraDeps unknowns = do
+    (errs, unknowns') <- fmap partitionEithers $ mapM addUnknown $ Set.toList unknowns
+    case errs of
+        [] -> return $ Map.unions $ extraDeps1 : unknowns'
+        _ -> do
+            bconfig <- asks getBuildConfig
+            throwM $ UnknownTargets
+                (Set.fromList errs)
+                Map.empty -- TODO check the cliExtraDeps for presence in index
+                (bcStackYaml bconfig)
   where
     extraDeps1 = Map.union extraDeps0 cliExtraDeps
-
-    (errs, unknowns') = partitionEithers $ map addUnknown $ Set.toList unknowns
-    addUnknown pn =
+    addUnknown pn = do
         case Map.lookup pn extraDeps1 of
-            Just _ -> Right Map.empty
-            Nothing ->
-                case Map.lookup pn latestVersion of
-                    Just v -> Right $ Map.singleton pn v
-                    Nothing -> Left pn
+            Just _ -> return (Right Map.empty)
+            Nothing -> do
+                mlatestVersion <- getLatestVersion pn
+                case mlatestVersion of
+                    Just v -> return (Right $ Map.singleton pn v)
+                    Nothing -> return (Left pn)
+    getLatestVersion pn = do
+        vs <- getPackageVersions pn
+        return (fmap fst (Set.maxView vs))
 
 -- | Compare the current filesystem state to the cached information, and
 -- determine (1) if the files are dirty, and (2) the new cache values.

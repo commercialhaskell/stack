@@ -399,13 +399,20 @@ commandLineHandler progName isInterpreter = complicatedOptions
         addSubCommands'
           Image.imgCmdName
           "Subcommands specific to imaging (EXPERIMENTAL)"
-          (addCommand' Image.imgDockerCmdName
-            "Build a Docker image for the project"
-            imgDockerCmd
-            (boolFlags True
-                "build"
-                "building the project before creating the container"
-                idm))
+          (addCommand'
+               Image.imgDockerCmdName
+               "Build a Docker image for the project"
+               imgDockerCmd
+               ((,) <$>
+                boolFlags
+                    True
+                    "build"
+                    "building the project before creating the container"
+                    idm <*>
+                many
+                    (textArgument
+                         (metavar "IMAGE" <>
+                          help "If none specified, build all defined container images"))))
         addSubCommands'
           "hpc"
           "Subcommands specific to Haskell Program Coverage"
@@ -817,7 +824,7 @@ withBuildConfigAndLock go inner =
 withBuildConfigExt
     :: GlobalOpts
     -> Maybe (StackT Config IO ())
-    -- ^ Action to perform after before build.  This will be run on the host
+    -- ^ Action to perform before the build.  This will be run on the host
     -- OS even if Docker is enabled for builds.  The build config is not
     -- available in this action, since that would require build tools to be
     -- installed on the host OS.
@@ -1136,18 +1143,19 @@ cfgSetCmd co go@GlobalOpts{..} =
                       (cfgCmdSet co)
                       env)
 
-imgDockerCmd :: Bool -> GlobalOpts -> IO ()
-imgDockerCmd rebuild go@GlobalOpts{..} =
+imgDockerCmd :: (Bool, [Text]) -> GlobalOpts -> IO ()
+imgDockerCmd (rebuild,images) go@GlobalOpts{..} =
     withBuildConfigExt
         go
         Nothing
         (\lk ->
-              do when rebuild $ Stack.Build.build
+              do when rebuild $
+                     Stack.Build.build
                          (const (return ()))
                          lk
                          defaultBuildOptsCLI
                  Image.stageContainerImageArtifacts)
-        (Just Image.createContainerImageFromStage)
+        (Just $ Image.createContainerImageFromStage images)
 
 sigSignSdistCmd :: (String, String) -> GlobalOpts -> IO ()
 sigSignSdistCmd (url,path) go =

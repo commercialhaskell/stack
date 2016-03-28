@@ -24,7 +24,6 @@ module Stack.BuildPlan
     , removeSrcPkgDefaultFlags
     , resolveBuildPlan
     , selectBestSnapshot
-    , ToolMap
     , getToolMap
     , shadowMiniBuildPlan
     , showItems
@@ -45,7 +44,6 @@ import           Control.Monad.Trans.Control (MonadBaseControl)
 import qualified Crypto.Hash.SHA256 as SHA256
 import           Data.Aeson.Extended (FromJSON (..), withObject, (.:), (.:?), (.!=))
 import           Data.Binary.VersionTagged (taggedDecodeOrLoad)
-import           Data.ByteString (ByteString)
 import qualified Data.ByteString as S
 import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Char8 as S8
@@ -372,9 +370,6 @@ getDeps mbp isShadowed packages =
                     , rsVisited = Map.insert name shadowed $ rsVisited rs'
                     }
                 return shadowed
-
--- | Look up with packages provide which tools.
-type ToolMap = Map ByteString (Set PackageName)
 
 -- | Map from tool name to package providing it
 getToolMap :: MiniBuildPlan -> Map Text (Set PackageName)

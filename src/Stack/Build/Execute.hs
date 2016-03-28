@@ -861,7 +861,7 @@ withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} md
                                     liftIO $ hClose h
                                     runResourceT
                                         $ CB.sourceFile (toFilePath logFile)
-                                        =$= CT.decodeUtf8
+                                        =$= CT.decodeUtf8Lenient
                                         $$ mungeBuildOutput stripTHLoading makeAbsolute pkgDir
                                         =$ CL.consume
                         throwM $ CabalExitedUnsuccessfully
@@ -880,7 +880,7 @@ withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} md
                                 (outputSink False LevelWarn)
                                 (outputSink stripTHLoading LevelInfo)
                     outputSink excludeTH level =
-                        CT.decodeUtf8
+                        CT.decodeUtf8Lenient
                         =$ mungeBuildOutput excludeTH makeAbsolute pkgDir
                         =$ CL.mapM_ (runInBase . monadLoggerLog $(TH.location >>= liftLoc) "" level)
                     -- If users want control, we should add a config option for this
