@@ -412,9 +412,7 @@ commandLineHandler progName isInterpreter = complicatedOptions
                 many
                     (textArgument
                          (metavar "IMAGE" <>
-                          help
-                              ("If none specified, use all container " <>
-                               "images defined in current directory")))))
+                          help "If none specified, build all defined container images"))))
         addSubCommands'
           "hpc"
           "Subcommands specific to Haskell Program Coverage"
