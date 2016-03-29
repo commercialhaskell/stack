@@ -104,6 +104,7 @@ cabalSolver menv cabalfps constraintType
              : "--max-backjumps=-1"
              : "--package-db=clear"
              : "--package-db=global"
+             : "--verbose"
              : cabalArgs ++
                toConstraintArgs (flagConstraints constraintType) ++
                fmap toFilePath cabalfps
@@ -116,16 +117,19 @@ cabalSolver menv cabalfps constraintType
 
   where
     errCheck = T.isInfixOf "Could not resolve dependencies"
+    cabalBuildErrMsg e =
+               ">>>> Cabal errors begin\n"
+            <> e
+            <> "<<<< Cabal errors end\n"
 
     parseCabalErrors err = do
-        let errExit e = error $ "Could not parse cabal-install errors:\n"
-                              ++ (T.unpack e)
+        let errExit e = error $ "Could not parse cabal-install errors:\n\n"
+                              ++ cabalBuildErrMsg (T.unpack e)
             msg = LT.toStrict $ decodeUtf8With lenientDecode err
 
         if errCheck msg then do
-            $logInfo "Attempt failed."
-            $logInfo "\n>>>> Cabal errors begin"
-            $logInfo $ msg <> "<<<< Cabal errors end\n"
+            $logInfo "Attempt failed.\n"
+            $logInfo $ cabalBuildErrMsg msg
             let pkgs = parseConflictingPkgs msg
                 mPkgNames = map (C.simpleParse . T.unpack) pkgs
                 pkgNames  = map (fromCabalPackageName . C.pkgName)
