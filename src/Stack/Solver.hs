@@ -50,6 +50,7 @@ import           Path
 import           Path.Find                   (findFiles)
 import           Path.IO                     hiding (findExecutable, findFiles)
 import           Prelude
+import           Safe                        (headMay)
 import           Stack.BuildPlan
 import           Stack.Constants             (stackDotYaml)
 import           Stack.Package               (printCabalFileWarning
@@ -99,12 +100,10 @@ cabalSolver menv cabalfps constraintType
              : "--enable-tests"
              : "--enable-benchmarks"
              : "--dry-run"
-             : "--only-dependencies"
              : "--reorder-goals"
              : "--max-backjumps=-1"
              : "--package-db=clear"
              : "--package-db=global"
-             : "--verbose"
              : cabalArgs ++
                toConstraintArgs (flagConstraints constraintType) ++
                fmap toFilePath cabalfps
@@ -166,35 +165,47 @@ cabalSolver menv cabalfps constraintType
             (errs, pairs) = partitionEithers $ map parseLine ls
         if null errs
           then return $ Right (Map.fromList pairs)
-          else error $ "Could not parse cabal-install output: " ++ show errs
+          else error $ "The following lines from cabal-install output could \
+                       \not be parsed: \n"
+                       ++ (T.unpack (T.intercalate "\n" errs))
 
+    -- An ugly parser to extract module id and flags
+    parseLine :: Text -> Either Text (PackageName, (Version, Map FlagName Bool))
     parseLine t0 = maybe (Left t0) Right $ do
-        -- Sample output to parse:
+        -- Sample outputs to parse:
         -- text-1.2.1.1 (latest: 1.2.2.0) -integer-simple (via: parsec-3.1.9) (new package))
-        -- An ugly parser to extract module id and flags
-        let t1 = T.concat $
-                 [ T.takeWhile (/= '(')
-                 ,   (T.takeWhile (/= '('))
-                   . (T.drop 1)
-                   . (T.dropWhile (/= ')'))
-                 ] <*> [t0]
+        -- hspec-snap-1.0.0.0 *test (via: servant-snap-0.5) (new package)
+        -- time-locale-compat-0.1.1.1 -old-locale (via: http-api-data-0.2.2) (new package))
 
-        ident':flags' <- Just $ T.words t1
-        PackageIdentifier name version <-
-            parsePackageIdentifierFromString $ T.unpack ident'
-        flags <- mapM parseFlag flags'
-        Just (name, (version, Map.fromList flags))
+        if (not $ T.null t0) then do
+            ident':rest <- Just $ T.words t0
+            PackageIdentifier name version <-
+                parsePackageIdentifierFromString $ T.unpack ident'
+
+            nextWord <- headMay rest
+            rest' <- case T.head nextWord of
+                '(' -> Just $ dropWhile (")" `T.isSuffixOf`) rest
+                '*' -> Just $ dropWhile ("*" `T.isPrefixOf`) rest
+                '+' -> Just rest
+                '-' -> Just rest
+                _ -> Nothing
+
+            let fl = takeWhile (not . ("(" `T.isPrefixOf`)) rest'
+            flags <- mapM parseFlag fl
+            Just (name, (version, Map.fromList flags))
+        else Nothing
+
+    parseFlag :: Text -> Maybe (FlagName, Bool)
     parseFlag t0 = do
-        flag <- parseFlagNameFromString $ T.unpack t1
-        return (flag, enabled)
-      where
-        (t1, enabled) =
-            case T.stripPrefix "-" t0 of
-                Nothing ->
-                    case T.stripPrefix "+" t0 of
-                        Nothing -> (t0, True)
-                        Just x -> (x, True)
-                Just x -> (x, False)
+        (fl, st) <- case T.head t0 of
+                '-' -> Just $ (T.tail t0, False)
+                '+' -> Just $ (T.tail t0, True)
+                _   -> Nothing
+        if (not $ T.null fl) then do
+            flag <- parseFlagNameFromString $ T.unpack fl
+            return (flag, st)
+        else Nothing
+
     toConstraintArgs userFlagMap =
         [formatFlagConstraint package flag enabled
             | (package, fs) <- Map.toList userFlagMap
@@ -366,10 +377,10 @@ solveResolverSpec stackYaml cabalDirs
     let -- Note - The order in Map.union below is important.
         -- We want to override snapshot with extra deps
         depConstraints = Map.union extraConstraints snapConstraints
-        -- Make sure deps do not include any src packages
+        -- Make sure to remove any user packages from the dep constraints
         -- There are two reasons for this:
         -- 1. We do not want snapshot versions to override the sources
-        -- 2. Sources may not have versions leading to bad cabal constraints
+        -- 2. Sources may have blank versions leading to bad cabal constraints
         depOnlyConstraints = Map.difference depConstraints srcConstraints
         solver t = cabalSolver menv cabalDirs t
                                srcConstraints depOnlyConstraints $
@@ -411,6 +422,23 @@ solveResolverSpec stackYaml cabalDirs
                 extra = Map.difference deps (Map.union srcConstraints
                                                        snapConstraints)
                 external = Map.union inSnapChanged extra
+
+            -- Just in case.
+            -- If cabal output contains versions of user packages, those
+            -- versions better be the same as those in our cabal file i.e.
+            -- cabal should not be solving using versions from external
+            -- indices.
+            let outVers  = fmap fst srcs
+                inVers   = fmap fst srcConstraints
+                bothVers = Map.intersectionWith (\v1 v2 -> (v1, v2))
+                                                inVers outVers
+            when (not $ outVers `Map.isSubmapOf` inVers) $ do
+                let msg = "Error: user package versions returned by cabal \
+                          \solver are not the same as the versions in the \
+                          \cabal files:\n"
+                -- TODO We can do better in formatting the message
+                error $ T.unpack $ msg
+                        <> (showItems $ map show (Map.toList bothVers))
 
             when (not $ Map.null spuriousFlags) $ do
                 $logInfo $ "WARNING! Ignoring the following spurious flags \
