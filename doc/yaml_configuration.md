@@ -20,28 +20,51 @@ Project specific options are only valid in the `stack.yaml` file local to a proj
 
 ### packages
 
-This lists all local packages. In the simplest usage, it will be a list of directories, e.g.:
+The `packages` section lists all local (project) packages. The term  _local
+package_ should be differentiated from a _dependency package_. A local package
+is something that you are developing as part of the project. Whereas a
+dependency package is an external package that your project depends on.
+
+In its simplest usage, it will be a list of directories or HTTP(S) URLs to a
+tarball or a zip. For example:
 
 ```yaml
 packages:
-- dir1
-- dir2
-- dir3
+  - .
+  - dir1/dir2
+  - https://example.com/foo/bar/baz-0.0.2.tar.gz
 ```
 
-When the `packages` field is not present, it defaults to looking for a package in the project's root directory:
+Each package directory or location specified must have a valid cabal file
+present. Note that the subdirectories of the directory are not searched for
+cabal files. Subdirectories will have to be specified as independent items in
+the list of packages.
+
+When the `packages` field is not present, it defaults to looking for a package
+in the project's root directory:
 
 ```yaml
 packages:
   - .
 ```
+#### Complex package locations (`location`)
 
-However, it supports three other location types: an HTTP URL referring to a tarball or a zip that can be downloaded, and information on a Git or Mercurial (since 0.1.10.0) repo to clone, together with this SHA1 commit. For example:
+More complex package locations can be specified in a key-value format with
+`location` as a mandatory key.  In addition to `location` some optional
+key-value pairs can be specified to include specific subdirectories or to
+specify package attributes as descibed later in this section.
+
+In its simplest form a `location` key can have a single value in the same way
+as described above for single value items. Alternativel it can have key-value
+pairs as subfields to describe a git or mercurial repository location. For
+example:
 
 ```yaml
 packages:
-- some-directory
-- https://example.com/foo/bar/baz-0.0.2.tar.gz
+- location: .
+- location: dir1/dir2
+- location: https://example.com/foo/bar/baz-0.0.2.tar.gz
+- location: http://github.com/yesodweb/wai/archive/2f8a8e1b771829f4a8a77c0111352ce45a14c30f.zip
 - location:
     git: git@github.com:commercialhaskell/stack.git
     commit: 6a86ee32e5b869a877151f74064572225e1a0398
@@ -50,21 +73,59 @@ packages:
     commit: da39a3ee5e6b4b0d3255bfef95601890afd80709
 ```
 
-Note: it is highly recommended that you only use SHA1 values for a Git or Mercurial commit. Other values may work, but they are not officially supported, and may result in unexpected behavior (namely, stack will not automatically pull to update to new versions).
+Note: it is highly recommended that you only use SHA1 values for a Git or
+Mercurial commit. Other values may work, but they are not officially supported,
+and may result in unexpected behavior (namely, stack will not automatically
+pull to update to new versions).
 
-stack further allows you to tweak your packages by specifying two additional
-settings:
+A `location` key can be accompanied by a `subdirs` key to look for cabal files
+in a list of subdirectories as well in addition to the top level directory.
 
-* A list of subdirectories to build (useful for mega-repos like
+This could be useful for mega-repos like
 [wai](https://github.com/yesodweb/wai/) or
-[digestive-functors](https://github.com/jaspervdj/digestive-functors))
-* Whether a package should be treated as a dependency: a package marked `extra-dep: true` will only be built if demanded by a non-dependency, and its test suites and benchmarks will not be run. This is useful for tweaking upstream packages.
+[digestive-functors](https://github.com/jaspervdj/digestive-functors).
 
-To tie this all together, here's an example of the different settings:
-
+The `subdirs` key can have multiple nested series items specifying a list of
+subdirectories.  For example:
 ```yaml
 packages:
-- local-package
+- location: .
+  subdirs:
+  - subdir1
+  - subdir2
+- location:
+    git: git@github.com:yesodweb/wai
+    commit: 2f8a8e1b771829f4a8a77c0111352ce45a14c30f
+  subdirs:
+  - auto-update
+  - wai
+- location: http://github.com/yesodweb/wai/archive/2f8a8e1b771829f4a8a77c0111352ce45a14c30f.zip
+  subdirs:
+  - auto-update
+  - wai
+```
+
+#### Local dependency packages (`extra-dep`)
+A `location` key can be accompanied by an `extra-dep` key.  When the
+`extra-dep` key is set to `true` it indicates that the package should be
+treated in the same way as a dependency package and not as part of the project.
+This means the following:
+* A _dependency package_ is built only if a user package or its dependencies
+  depend on it. Note that a regular _project package_ is built anyway even if
+  no other package depends on it.
+* Its test suites and benchmarks will not be run.
+* It will not be directly loaded in ghci when `stack ghci` is run. This is
+  important because if you specify huge dependencies as project packages then
+  ghci will have a nightmare loading everything.
+
+This is especially useful when you are tweaking upstream packages or want to
+use latest versions of the upstream packages which are not yet on Hackage or
+Stackage.
+
+For example:
+```yaml
+packages:
+- location: .
 - location: vendor/binary
   extra-dep: true
 - location:
@@ -73,16 +134,7 @@ packages:
   subdirs:
   - auto-update
   - wai
-```
-
-Instead of using Git to clone from Github, it is also possible to use the 'Download commit as Zip' feature of the website. For example:
-
-```yaml
-packages:
-- location: http://github.com/yesodweb/wai/archive/2f8a8e1b771829f4a8a77c0111352ce45a14c30f.zip
-  subdirs:
-  - auto-update
-  - wai
+  extra-dep: true
 ```
 
 ### extra-deps
@@ -96,6 +148,11 @@ wish to use.
 extra-deps:
 - acme-missiles-0.3
 ```
+
+Note that the `extra-dep` attribute in the `packages` section as described in
+an earlier section is used for non-index local or remote packages while the
+`extra-deps` section is for packages to be automatically pulled from an index
+like Hackage.
 
 ### resolver
 
