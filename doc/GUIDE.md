@@ -1362,9 +1362,12 @@ Notice that multiple directories are listed in the `packages` key.
 
 In addition to local directories, you can also refer to packages available in a
 Git repository or in a tarball over HTTP/HTTPS. This can be useful for using a
-modified version of a dependency that hasn't yet been released upstream. This is
-a slightly more advanced usage that we won't go into detail with here, but it's
-covered in the [stack.yaml documentation](yaml_configuration.md#packages).
+modified version of a dependency that hasn't yet been released upstream.
+
+Please note that when adding upstream packages directly to your project it is
+important to distinguish _local packages_ from the upstream _dependency
+packages_. Otherwise you may have trouble running `stack GHCi`. See 
+[stack.yaml documentation](yaml_configuration.md#packages) for more details.
 
 ## Flags and GHC options
 
@@ -1547,6 +1550,13 @@ with:
 But that won't load up locally written modules for access. For that, use the
 `stack ghci` command. To then load modules from your project, use the `:m`
 command (for "module") followed by the module name.
+
+IMPORTANT NOTE: If you have added upstream packages to your project please make
+sure to mark them as *dependency package*s for faster and reliable usage of
+`stack gchi`. Otherwise GHCi may have trouble due to conflicts of compilation
+flags or having to unnecessarily interpret too many modules. See
+[stack.yaml documentation](yaml_configuration.md#packages) to learn how to mark
+a package as a *dependency package*.
 
 ## ghc/runghc
 
