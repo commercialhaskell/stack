@@ -14,17 +14,15 @@ ENV USER user
 ENV HOME /home/$USER
 RUN useradd -m $USER
 
-# GPG CONFIG & KEYS
+# GPG CONFIG & ASCII KEYS
 ADD .gnupg/ $HOME/.gnupg/
 RUN chown -R $USER:$USER $HOME
 RUN chmod -R go-rwsx $HOME
 
-# NIX DIR & GROUP
+# INSTALL NIX
 RUN mkdir /nix
 RUN chown -R $USER:$USER /nix
 RUN groupadd -r nixbld
-
-# INSTALL NIX
 CMD /bin/bash -l
 WORKDIR $HOME
 USER $USER
@@ -32,7 +30,7 @@ RUN curl -s https://nixos.org/nix/install | sh
 RUN echo "\nsource /nix/var/nix/profiles/default/etc/profile.d/nix.sh" \
   | tee -a $HOME/.bash_profile
 
-# GNUPG PROFILES
+# GNUPGs IN PROFILES
 RUN bash -lc "nix-env -p /nix/var/nix/profiles/gpg14 -iA nixpkgs.nix nixpkgs.gnupg1orig"
 RUN bash -lc "nix-env -p /nix/var/nix/profiles/gpg20 -iA nixpkgs.nix nixpkgs.gnupg20"
 RUN bash -lc "nix-env -p /nix/var/nix/profiles/gpg21 -iA nixpkgs.nix nixpkgs.gnupg"
