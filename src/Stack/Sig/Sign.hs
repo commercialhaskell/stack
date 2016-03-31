@@ -46,7 +46,7 @@ sign
     :: (MonadBaseControl IO m, MonadIO m, MonadMask m, MonadLogger m, MonadThrow m, MonadReader env m, HasConfig env)
     => Maybe (Path Abs Dir) -> String -> Path Abs File -> m ()
 sign Nothing _ _ = throwM SigNoProjectRootException
-sign (Just projectRoot) url filePath = do
+sign (Just projectRoot) url filePath =
     withStackWorkTempDir
         projectRoot
         (\tempDir ->
@@ -62,7 +62,7 @@ sign (Just projectRoot) url filePath = do
                          pkg <- cabalFilePackageId (tempDir </> cabalPath)
                          signPackage url pkg filePath)
   where
-    extractCabalFile tempDir (Tar.Next entry entries) = do
+    extractCabalFile tempDir (Tar.Next entry entries) =
         case Tar.entryContent entry of
             (Tar.NormalFile lbs _) ->
                 case FP.splitFileName (Tar.entryPath entry) of
@@ -102,17 +102,16 @@ signPackage
     :: (MonadBaseControl IO m, MonadIO m, MonadMask m, MonadLogger m, MonadThrow m)
     => String -> PackageIdentifier -> Path Abs File -> m ()
 signPackage url pkg filePath = do
-    $logInfo ("GPG signing " <> T.pack (toFilePath filePath))
+    $logInfo ("Signing " <> T.pack (toFilePath filePath))
     sig@(Signature signature) <- GPG.signPackage filePath
     let (PackageIdentifier n v) = pkg
         name = show n
         version = show v
-    verify <- GPG.verifyFile sig filePath
-    fingerprint <- GPG.fullFingerprint verify
+    fingerprint <- GPG.verifyFile sig filePath
     req <-
         parseUrl
             (url <> "/upload/signature/" <> name <> "/" <> version <> "/" <>
-             T.unpack (fingerprintSample fingerprint))
+             show fingerprint)
     let put =
             req
             { method = methodPut
@@ -123,6 +122,7 @@ signPackage url pkg filePath = do
     when
         (responseStatus res /= status200)
         (throwM (GPGSignException "unable to sign & upload package"))
+    $logInfo ("Signed successfully with key " <> (T.pack . show) fingerprint)
 
 withStackWorkTempDir
     :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasConfig env)
