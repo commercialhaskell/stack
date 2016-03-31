@@ -1,9 +1,4 @@
 resolver: lts-5.3
-image:
-  containers:
-    - base: "fpco/ubuntu-with-libgmp:14.04"
-      entrypoints:
-        - stack
 nix:
   # --nix on the command-line to enable.
   enable: false
