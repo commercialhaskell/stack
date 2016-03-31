@@ -1,4 +1,4 @@
-FROM fpco/ubuntu-with-libgmp:14.04
+FROM ubuntu:14.04
 
 # PACKAGES
 ENV DEBIAN_FRONTEND noninteractive
@@ -30,7 +30,7 @@ RUN curl -s https://nixos.org/nix/install | sh
 RUN echo "\nsource /nix/var/nix/profiles/default/etc/profile.d/nix.sh" \
   | tee -a $HOME/.bash_profile
 
-# GNUPGs IN PROFILES
+# INSTALL GNUPGs
 RUN bash -lc "nix-env -p /nix/var/nix/profiles/gpg14 -iA nixpkgs.nix nixpkgs.gnupg1orig"
 RUN bash -lc "nix-env -p /nix/var/nix/profiles/gpg20 -iA nixpkgs.nix nixpkgs.gnupg20"
 RUN bash -lc "nix-env -p /nix/var/nix/profiles/gpg21 -iA nixpkgs.nix nixpkgs.gnupg"
