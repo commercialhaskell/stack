@@ -1,4 +1,8 @@
 resolver: lts-5.3
+image:
+  containers:
+    - base: "fpco/ubuntu-with-gnupg:14.04"
+      name: "fpco/stack:test"
 nix:
   # --nix on the command-line to enable.
   enable: false
