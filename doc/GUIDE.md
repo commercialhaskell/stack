@@ -1470,6 +1470,7 @@ useful.
 ```
 michael@d30748af6d3d:~/wai$ stack path
 global-stack-root: /home/michael/.stack
+stack-root: /home/michael/.stack
 project-root: /home/michael/wai
 config-location: /home/michael/wai/stack.yaml
 bin-path: /home/michael/.stack/snapshots/x86_64-linux/lts-2.17/7.8.4/bin:/home/michael/.stack/programs/x86_64-linux/ghc-7.8.4/bin:/home/michael/.stack/programs/x86_64-linux/ghc-7.10.2/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
@@ -1480,11 +1481,14 @@ extra-include-dirs:
 extra-library-dirs:
 snapshot-pkg-db: /home/michael/.stack/snapshots/x86_64-linux/lts-2.17/7.8.4/pkgdb
 local-pkg-db: /home/michael/wai/.stack-work/install/x86_64-linux/lts-2.17/7.8.4/pkgdb
+global-pkg-db: /home/michael/.stack/programs/x86_64-linux/ghc-7.8.4/lib/ghc-7.8.4/package.conf.d
+ghc-package-path: /home/michael/wai/.stack-work/install/x86_64-linux/lts-2.17/7.8.4/pkgdb:/home/michael/.stack/snapshots/x86_64-linux/lts-2.17/7.8.4/pkgdb:/home/michael/.stack/programs/x86_64-linux/ghc-7.8.4/lib/ghc-7.8.4/package.conf.d
 snapshot-install-root: /home/michael/.stack/snapshots/x86_64-linux/lts-2.17/7.8.4
 local-install-root: /home/michael/wai/.stack-work/install/x86_64-linux/lts-2.17/7.8.4
 snapshot-doc-root: /home/michael/.stack/snapshots/x86_64-linux/lts-2.17/7.8.4/doc
 local-doc-root: /home/michael/wai/.stack-work/install/x86_64-linux/lts-2.17/7.8.4/doc
 dist-dir: .stack-work/dist/x86_64-linux/Cabal-1.18.1.5
+local-hpc-root: /home/michael/wai/.stack-work/install/x86_64-linux/lts-2.17/7.8.4/hpc
 ```
 
 In addition, `stack path` accepts command line arguments to state which of
@@ -1504,7 +1508,7 @@ what needs to be removed:
 
 1. The stack executable itself
 2. The stack root, e.g. `$HOME/.stack` on non-Windows systems.
-    * See `stack path --global-stack-root`
+    * See `stack path --stack-root`
     * On Windows, you will also need to delete `stack path --programs-paths`
 3. Any local `.stack-work` directories inside a project
 

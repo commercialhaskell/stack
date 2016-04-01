@@ -20,6 +20,11 @@ Behavior changes:
   `-rtsopts` was enabled, stack would process `+RTS` options even when intended
   for some other program, such as when used with `stack exec -- prog +RTS`.
   See [#2022](https://github.com/commercialhaskell/stack/issues/2022).
+* For consistency with the `$STACK_ROOT` environment variable, the
+  `stack path --global-stack-root` flag and the `global-stack-root` field
+  in the output of `stack path` are being deprecated and replaced with the
+  `stack-root` flag and output field. See
+  [#1148](https://github.com/commercialhaskell/stack/issues/1148).
 
 Other enhancements:
 
