@@ -14,6 +14,8 @@ module Stack.Constants
     ,rawGithubUrl
     ,stackDotYaml
     ,stackRootEnvVar
+    ,stackRootOptionName
+    ,deprecatedStackRootOptionName
     ,inContainerEnvVar
     ,configCacheFile
     ,configCabalMod
@@ -219,6 +221,19 @@ stackDotYaml = $(mkRelFile "stack.yaml")
 -- | Environment variable used to override the '~/.stack' location.
 stackRootEnvVar :: String
 stackRootEnvVar = "STACK_ROOT"
+
+-- | Option name for the global stack root.
+stackRootOptionName :: String
+stackRootOptionName = "stack-root"
+
+-- | Deprecated option name for the global stack root.
+--
+-- Deprecated since stack-1.0.5.
+--
+-- TODO: Remove occurences of this variable and use 'stackRootOptionName' only
+-- after an appropriate deprecation period.
+deprecatedStackRootOptionName :: String
+deprecatedStackRootOptionName = "global-stack-root"
 
 -- | Environment variable used to indicate stack is running in container.
 inContainerEnvVar :: String

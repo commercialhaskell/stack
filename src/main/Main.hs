@@ -537,20 +537,20 @@ pathCmd keys go =
             distDir <- distRelativeDir
             hpcDir <- hpcReportDir
             compilerPath <- getCompilerPath =<< getWhichCompiler
-            when (deprecatedStackRootOptionName `elem` keys) $
+            when (T.pack deprecatedStackRootOptionName `elem` keys) $
                 liftIO $ forM_
                     [ ""
                     , "'--" <> deprecatedStackRootOptionName <> "' will be removed in a future release."
                     , "Please use '--" <> stackRootOptionName <> "' instead."
                     , ""
                     ]
-                    (T.hPutStrLn stderr)
+                    (hPutStrLn stderr)
             forM_
                 -- filter the chosen paths in flags (keys),
                 -- or show all of them if no specific paths chosen.
                 (filter
                      (\(_,key,_) ->
-                           (null keys && key /= deprecatedStackRootOptionName) || elem key keys)
+                           (null keys && key /= T.pack deprecatedStackRootOptionName) || elem key keys)
                      paths)
                 (\(_,key,path) ->
                       liftIO $ T.putStrLn
@@ -600,7 +600,7 @@ data PathInfo = PathInfo
 paths :: [(String, Text, PathInfo -> Text)]
 paths =
     [ ( "Global stack root directory"
-      , stackRootOptionName
+      , T.pack stackRootOptionName
       , T.pack . toFilePathNoTrailingSep . configStackRoot . bcConfig . piBuildConfig )
     , ( "Project root (derived from stack.yaml file)"
       , "project-root"
@@ -656,19 +656,10 @@ paths =
     , ( "Where HPC reports and tix files are stored"
       , "local-hpc-root"
       , T.pack . toFilePathNoTrailingSep . piHpcDir )
-    , ( "DEPRECATED: Use '--" <> T.unpack stackRootOptionName <> "' instead"
-      , deprecatedStackRootOptionName
+    , ( "DEPRECATED: Use '--" <> stackRootOptionName <> "' instead"
+      , T.pack deprecatedStackRootOptionName
       , T.pack . toFilePathNoTrailingSep . configStackRoot . bcConfig . piBuildConfig )
     ]
-
-stackRootOptionName :: Text
-stackRootOptionName = "stack-root"
-
--- Deprecated since stack-1.0.5.
--- TODO: Remove occurences of this variable and use 'stackRootOptionName' only
--- after an appropriate deprecation period.
-deprecatedStackRootOptionName :: Text
-deprecatedStackRootOptionName = "global-stack-root"
 
 data SetupCmdOpts = SetupCmdOpts
     { scoCompilerVersion :: !(Maybe CompilerVersion)

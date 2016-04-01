@@ -23,7 +23,9 @@ Behavior changes:
 * For consistency with the `$STACK_ROOT` environment variable, the
   `stack path --global-stack-root` flag and the `global-stack-root` field
   in the output of `stack path` are being deprecated and replaced with the
-  `stack-root` flag and output field. See
+  `stack-root` flag and output field.
+  Additionally, the stack root can now be specified via the
+  `--stack-root` command-line flag. See
   [#1148](https://github.com/commercialhaskell/stack/issues/1148).
 
 Other enhancements:
