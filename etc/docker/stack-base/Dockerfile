@@ -22,7 +22,6 @@ RUN chmod -R go-rwsx $HOME
 # INSTALL NIX
 RUN mkdir /nix
 RUN chown -R $USER:$USER /nix
-RUN groupadd -r nixbld
 CMD /bin/bash -l
 WORKDIR $HOME
 USER $USER
