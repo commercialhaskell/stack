@@ -307,7 +307,6 @@ withCabalLoader menv inner = do
                                     , "Updating and trying again."
                                     ]
                                 updateAllIndices menv
-                                clearPackageCaches
                                 caches <- getPackageCaches
                                 liftIO $ writeIORef icaches caches
                             return (False, doLookup ident)

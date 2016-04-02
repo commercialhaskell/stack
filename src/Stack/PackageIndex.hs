@@ -20,7 +20,6 @@ module Stack.PackageIndex
     ( updateAllIndices
     , getPackageCaches
     , getPackageVersions
-    , clearPackageCaches
     ) where
 
 import qualified Codec.Archive.Tar as Tar
@@ -200,7 +199,8 @@ updateAllIndices
        ,HasConfig env,MonadBaseControl IO m, MonadCatch m)
     => EnvOverride
     -> m ()
-updateAllIndices menv =
+updateAllIndices menv = do
+    clearPackageCaches
     asks (configPackageIndices . getConfig) >>= mapM_ (updateIndex menv)
 
 -- | Update the index tarball

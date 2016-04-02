@@ -397,22 +397,22 @@ commandLineHandler progName isInterpreter = complicatedOptions
                         cfgSetCmd
                         configCmdSetParser)
         addSubCommands'
-          Image.imgCmdName
-          "Subcommands specific to imaging (EXPERIMENTAL)"
-          (addCommand'
-               Image.imgDockerCmdName
-               "Build a Docker image for the project"
-               imgDockerCmd
-               ((,) <$>
-                boolFlags
-                    True
-                    "build"
-                    "building the project before creating the container"
-                    idm <*>
-                many
-                    (textArgument
-                         (metavar "IMAGE" <>
-                          help "If none specified, build all defined container images"))))
+            Image.imgCmdName
+            "Subcommands specific to imaging (EXPERIMENTAL)"
+            (addCommand'
+                 Image.imgDockerCmdName
+                 "Build a Docker image for the project"
+                 imgDockerCmd
+                 ((,) <$>
+                  boolFlags
+                      True
+                      "build"
+                      "building the project before creating the container"
+                      idm <*>
+                  many
+                      (textOption
+                           (long "image" <>
+                            help "A specific container image name to build"))))
         addSubCommands'
           "hpc"
           "Subcommands specific to Haskell Program Coverage"

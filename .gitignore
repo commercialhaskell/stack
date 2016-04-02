@@ -20,3 +20,4 @@ tags
 /src/highlight.js
 /src/style.css
 /_site/
+/.dir-locals.el
