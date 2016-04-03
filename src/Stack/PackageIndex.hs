@@ -71,7 +71,8 @@ import           System.IO                             (IOMode (ReadMode, WriteM
 import           System.Process.Read         (EnvOverride,
                                               ReadProcessException (..),
                                               doesExecutableExist, readInNull,
-                                              readProcessNull, tryProcessStdout)
+                                              tryProcessStdout)
+import           System.Process.Run          (Cmd(..), callProcessInheritStderrStdout)
 
 -- | Populate the package index caches and return them.
 populateCache
@@ -251,14 +252,16 @@ updateIndexGit menv indexName' index gitUrl = do
             unless repoExists
                    (readInNull suDir "git" menv cloneArgs Nothing)
             $logSticky "Fetching package index ..."
-            readProcessNull (Just acfDir) menv "git" ["fetch","--tags","--depth=1"] `C.catch` \(ex :: ReadProcessException) -> do
-              -- we failed, so wipe the directory and try again, see #1418
-              $logWarn (T.pack (show ex))
-              $logStickyDone "Failed to fetch package index, retrying."
-              removeDirRecur acfDir
-              readInNull suDir "git" menv cloneArgs Nothing
-              $logSticky "Fetching package index ..."
-              readInNull acfDir "git" menv ["fetch","--tags","--depth=1"] Nothing
+            let runFetch = callProcessInheritStderrStdout
+                    (Cmd (Just acfDir) "git" menv ["fetch","--tags","--depth=1"])
+            runFetch `C.catch` \(ex :: ReadProcessException) -> do
+                -- we failed, so wipe the directory and try again, see #1418
+                $logWarn (T.pack (show ex))
+                $logStickyDone "Failed to fetch package index, retrying."
+                removeDirRecur acfDir
+                readInNull suDir "git" menv cloneArgs Nothing
+                $logSticky "Fetching package index ..."
+                runFetch
             $logStickyDone "Fetched package index."
 
             when (indexGpgVerify index)

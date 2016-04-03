@@ -13,6 +13,7 @@ module System.Process.Run
     ,runCmd'
     ,callProcess
     ,callProcess'
+    ,callProcessInheritStderrStdout
     ,createProcess'
     ,ProcessExitedUnsuccessfully
     ,Cmd(..)
@@ -104,6 +105,11 @@ callProcess' modCP cmd = do
         case exit_code of
             ExitSuccess   -> return ()
             ExitFailure _ -> throwIO (ProcessExitedUnsuccessfully c exit_code)
+
+callProcessInheritStderrStdout :: (MonadIO m, MonadLogger m) => Cmd -> m ()
+callProcessInheritStderrStdout cmd = do
+    let inheritOutput cp = cp { std_in = CreatePipe, std_out = Inherit, std_err = Inherit }
+    callProcess' inheritOutput cmd
 
 -- | Like 'System.Process.Internal.createProcess_', but taking a 'Cmd'.
 -- Note that the 'Handle's provided by 'UseHandle' are not closed
