@@ -13,25 +13,28 @@ module System.Process.Run
     ,runCmd'
     ,callProcess
     ,callProcess'
+    ,createProcess'
     ,ProcessExitedUnsuccessfully
     ,Cmd(..)
     )
     where
 
 import           Control.Exception.Lifted
-import           Control.Monad.Trans.Control (MonadBaseControl)
 import           Control.Monad.IO.Class (MonadIO, liftIO)
 import           Control.Monad.Logger (MonadLogger, logError)
+import           Control.Monad.Trans.Control (MonadBaseControl)
 import           Data.Conduit.Process hiding (callProcess)
 import           Data.Foldable (forM_)
 import           Data.Text (Text)
 import qualified Data.Text as T
+import           Path (Dir, Abs, Path)
 import           Path (toFilePath)
 import           Prelude -- Fix AMP warning
 import           System.Exit (exitWith, ExitCode (..))
+import           System.IO
 import qualified System.Process
+import           System.Process.Log
 import           System.Process.Read
-import           Path (Dir, Abs, Path)
 
 -- | Cmd holds common infos needed to running a process in most cases
 data Cmd = Cmd
@@ -92,15 +95,32 @@ callProcess = callProcess' id
 -- Inherits stdout and stderr.
 callProcess' :: (MonadIO m, MonadLogger m)
              => (CreateProcess -> CreateProcess) -> Cmd -> m ()
-callProcess' modCP (Cmd wd cmd0 menv args) = do
+callProcess' modCP cmd = do
+    c <- modCP <$> cmdToCreateProcess cmd
+    $logCreateProcess c
+    liftIO $ do
+        (_, _, _, p) <- System.Process.createProcess c
+        exit_code <- waitForProcess p
+        case exit_code of
+            ExitSuccess   -> return ()
+            ExitFailure _ -> throwIO (ProcessExitedUnsuccessfully c exit_code)
+
+-- | Like 'System.Process.Internal.createProcess_', but taking a 'Cmd'.
+-- Note that the 'Handle's provided by 'UseHandle' are not closed
+-- automatically.
+createProcess' :: (MonadIO m, MonadLogger m)
+               => String
+               -> (CreateProcess -> CreateProcess)
+               -> Cmd
+               -> m (Maybe Handle, Maybe Handle, Maybe Handle, ProcessHandle)
+createProcess' tag modCP cmd = do
+    c <- modCP <$> cmdToCreateProcess cmd
+    $logCreateProcess c
+    liftIO $ System.Process.createProcess_ tag c
+
+cmdToCreateProcess :: MonadIO m => Cmd -> m CreateProcess
+cmdToCreateProcess (Cmd wd cmd0 menv args) = do
     cmd <- preProcess wd menv cmd0
-    let c = modCP $ (proc cmd args) { delegate_ctlc = True
-                                    , cwd = fmap toFilePath wd
-                                    , env = envHelper menv }
-        action (_, _, _, p) = do
-            exit_code <- waitForProcess p
-            case exit_code of
-              ExitSuccess   -> return ()
-              ExitFailure _ -> throwIO (ProcessExitedUnsuccessfully c exit_code)
-    $logProcessRun cmd args
-    liftIO (System.Process.createProcess c >>= action)
+    return $ (proc cmd args) { delegate_ctlc = True
+                             , cwd = fmap toFilePath wd
+                             , env = envHelper menv }

@@ -38,7 +38,6 @@ import qualified Data.ByteString.Char8 as S8
 import qualified Data.ByteString.Lazy as LBS
 import           Data.Char (isSpace)
 import           Data.Conduit (Conduit, ($$), (=$), await, yield, awaitForever)
-import qualified Data.Conduit.Binary as CB
 import           Data.Conduit.Lift (evalStateC)
 import qualified Data.Conduit.List as CL
 import           Data.Either
@@ -64,7 +63,6 @@ import           Distribution.System (OS, Arch (..), Platform (..))
 import qualified Distribution.System as Cabal
 import           Distribution.Text (simpleParse)
 import           Lens.Micro (set)
-import           Language.Haskell.TH as TH
 import           Network.HTTP.Client.Conduit
 import           Network.HTTP.Download.Verified
 import           Path
@@ -997,16 +995,8 @@ bootGhcjs stackYaml destDir = do
                     "This version is specified by the stack.yaml file included in the ghcjs tarball.\n"
             _ -> return ()
     $logSticky "Booting GHCJS (this will take a long time) ..."
-    runAndLog Nothing "ghcjs-boot" menv' ["--clean"]
+    logProcessStderrStdout Nothing "ghcjs-boot" menv' ["--clean"]
     $logStickyDone "GHCJS booted."
-
--- TODO: something similar is done in Stack.Build.Execute. Create some utilities
--- for this?
-runAndLog :: (MonadIO m, MonadBaseControl IO m, MonadLogger m)
-          => Maybe (Path Abs Dir) -> String -> EnvOverride -> [String] -> m ()
-runAndLog mdir name menv args = liftBaseWith $ \restore -> do
-    let logLines = CB.lines =$ CL.mapM_ (void . restore . monadLoggerLog $(TH.location >>= liftLoc) "" LevelInfo . toLogStr)
-    void $ restore $ sinkProcessStderrStdout mdir menv name args logLines logLines
 
 loadGhcjsEnvConfig :: (MonadIO m, HasHttpManager r, MonadReader r m, HasTerminal r, HasReExec r, HasLogLevel r)
                      => Path Abs File -> Path b t -> m EnvConfig

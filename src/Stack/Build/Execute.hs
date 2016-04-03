@@ -50,7 +50,6 @@ import           Data.Maybe.Extra (forMaybeM)
 import           Data.Monoid ((<>))
 import           Data.Set (Set)
 import qualified Data.Set as Set
-import qualified Data.Streaming.Process as Process
 import           Data.Streaming.Process hiding (callProcess, env)
 import           Data.Text (Text)
 import qualified Data.Text as T
@@ -1252,16 +1251,12 @@ singleTest runInBase topts testsToRun ac ee task installedMap = do
                                 case mlogFile of
                                     Nothing -> Inherit
                                     Just (_, h) -> UseHandle h
-                            cp = (proc (toFilePath exePath) args)
-                                { cwd = Just $ toFilePath pkgDir
-                                , Process.env = envHelper menv
-                                , std_in = CreatePipe
-                                , std_out = output
-                                , std_err = output
-                                }
 
                         -- Use createProcess_ to avoid the log file being closed afterwards
-                        (Just inH, Nothing, Nothing, ph) <- liftIO $ createProcess_ "singleBuild.runTests" cp
+                        (Just inH, Nothing, Nothing, ph) <- createProcess'
+                            stestName
+                            (\cp -> cp { std_in = CreatePipe, std_out = output, std_err = output })
+                            (Cmd (Just pkgDir) (toFilePath exePath) menv args)
                         when isTestTypeLib $ do
                             logPath <- buildLogPath package (Just stestName)
                             ensureDir (parent logPath)

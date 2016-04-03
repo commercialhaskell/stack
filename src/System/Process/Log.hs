@@ -3,7 +3,8 @@
 -- | Separate module because TH.
 
 module System.Process.Log
-    (logProcessRun
+    (logCreateProcess
+    ,logProcessRun
     ,showProcessArgDebug)
     where
 
@@ -12,6 +13,21 @@ import           Data.Monoid
 import           Data.Text (Text)
 import qualified Data.Text as T
 import           Language.Haskell.TH
+import           System.Process (CreateProcess(..), CmdSpec(..))
+
+-- | Log running a process with its arguments, for debugging (-v).
+logCreateProcess :: Q Exp
+logCreateProcess =
+    [|let f :: MonadLogger m => CreateProcess -> m ()
+          f (CreateProcess { cmdspec = ShellCommand shellCmd }) =
+              $logDebug ("Creating shell process: " <> T.pack shellCmd)
+          f (CreateProcess { cmdspec = RawCommand name args }) =
+              $logDebug
+                  ("Creating process: " <> T.pack name <> " " <>
+                   T.intercalate
+                       " "
+                       (map showProcessArgDebug args))
+      in f|]
 
 -- | Log running a process with its arguments, for debugging (-v).
 logProcessRun :: Q Exp

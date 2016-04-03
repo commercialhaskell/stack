@@ -15,6 +15,7 @@ module System.Process.Read
   ,sinkProcessStdout
   ,sinkProcessStderrStdout
   ,sinkProcessStderrStdoutHandle
+  ,logProcessStderrStdout
   ,readProcess
   ,EnvOverride(..)
   ,unEnvOverride
@@ -38,15 +39,16 @@ module System.Process.Read
 import           Control.Arrow ((***), first)
 import           Control.Concurrent.Async (concurrently)
 import           Control.Exception hiding (try, catch)
-import           Control.Monad (join, liftM, unless)
+import           Control.Monad (join, liftM, unless, void)
 import           Control.Monad.Catch (MonadThrow, MonadCatch, throwM, try, catch)
 import           Control.Monad.IO.Class (MonadIO, liftIO)
-import           Control.Monad.Logger (MonadLogger, logError)
-import           Control.Monad.Trans.Control (MonadBaseControl)
+import           Control.Monad.Logger
+import           Control.Monad.Trans.Control (MonadBaseControl, liftBaseWith)
 import qualified Data.ByteString as S
-import qualified Data.ByteString.Lazy as L
 import           Data.ByteString.Builder
+import qualified Data.ByteString.Lazy as L
 import           Data.Conduit
+import qualified Data.Conduit.Binary as CB
 import qualified Data.Conduit.List as CL
 import           Data.Conduit.Process hiding (callProcess)
 import           Data.Foldable (forM_)
@@ -58,10 +60,11 @@ import           Data.Monoid
 import           Data.Text (Text)
 import qualified Data.Text as T
 import           Data.Text.Encoding.Error (lenientDecode)
-import qualified Data.Text.Lazy.Encoding as LT
 import qualified Data.Text.Lazy as LT
+import qualified Data.Text.Lazy.Encoding as LT
 import           Data.Typeable (Typeable)
 import           Distribution.System (OS (Windows), Platform (Platform))
+import           Language.Haskell.TH as TH (location)
 import           Path
 import           Path.IO hiding (findExecutable)
 import           Prelude -- Fix AMP warning
@@ -255,6 +258,17 @@ sinkProcessStdout wd menv name args sinkStdout = do
                     (toLazyByteString stdoutBuilder)
                     (toLazyByteString stderrBuilder))
   return sinkRet
+
+logProcessStderrStdout
+    :: (MonadIO m, MonadBaseControl IO m, MonadLogger m)
+    => Maybe (Path Abs Dir)
+    -> String
+    -> EnvOverride
+    -> [String]
+    -> m ()
+logProcessStderrStdout mdir name menv args = liftBaseWith $ \restore -> do
+    let logLines = CB.lines =$ CL.mapM_ (void . restore . monadLoggerLog $(TH.location >>= liftLoc) "" LevelInfo . toLogStr)
+    void $ restore $ sinkProcessStderrStdout mdir menv name args logLines logLines
 
 -- | Consume the stdout and stderr of a process feeding strict 'S.ByteString's to the consumers.
 sinkProcessStderrStdout :: forall m e o. (MonadIO m, MonadLogger m)
