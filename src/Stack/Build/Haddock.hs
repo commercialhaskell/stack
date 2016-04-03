@@ -11,6 +11,7 @@ module Stack.Build.Haddock
     ( generateLocalHaddockIndex
     , generateDepsHaddockIndex
     , generateSnapHaddockIndex
+    , openHaddocksInBrowser
     , shouldHaddockPackage
     , shouldHaddockDeps
     ) where
@@ -20,6 +21,7 @@ import           Control.Monad
 import           Control.Monad.Catch            (MonadCatch)
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
+import           Control.Monad.Reader
 import           Control.Monad.Trans.Resource
 import qualified Data.Foldable                  as F
 import           Data.Function
@@ -39,12 +41,39 @@ import           Path
 import           Path.Extra
 import           Path.IO
 import           Prelude
-import           Stack.Types.Build
 import           Stack.PackageDump
 import           Stack.Types
 import qualified System.FilePath                as FP
 import           System.IO.Error                (isDoesNotExistError)
 import           System.Process.Read
+import           Web.Browser                    (openBrowser)
+
+openHaddocksInBrowser
+    :: (MonadIO m, MonadReader env m, HasBuildConfig env, MonadThrow m)
+    => BaseConfigOpts
+    -> Map PackageName (PackageIdentifier, InstallLocation)
+    -- ^ Available packages and their locations for the current project
+    -> Set PackageName
+    -- ^ Build targets as determined by 'Stack.Build.Source.loadSourceMap'
+    -> m ()
+openHaddocksInBrowser bco pkgLocations buildTargets = do
+    let cliTargets = (boptsCLITargets . bcoBuildOptsCLI) bco
+    docDir <-
+        case (cliTargets, map (`Map.lookup` pkgLocations) (Set.toList buildTargets)) of
+            ([_], [Just (pkgId, iloc)]) -> do
+                pkgRelDir <- (parseRelDir . packageIdentifierString) pkgId
+                let docLocation =
+                        case iloc of
+                            Snap -> snapDocDir bco
+                            Local -> localDocDir bco
+                return (docLocation </> pkgRelDir)
+            _ -> do
+                inGlobalProject <- asks (bcImplicitGlobal . getBuildConfig)
+                return $
+                    if inGlobalProject
+                        then snapDocDir bco
+                        else localDepsDocDir bco
+    (liftIO . void . openBrowser . toFilePath . haddockIndexFile) docDir
 
 -- | Determine whether we should haddock for a package.
 shouldHaddockPackage :: BuildOpts
@@ -100,7 +129,7 @@ generateDepsHaddockIndex
     -> m ()
 generateDepsHaddockIndex envOverride wc bco globalDumpPkgs snapshotDumpPkgs localDumpPkgs locals = do
     let deps = (mapMaybe (`lookupDumpPackage` allDumpPkgs) . nubOrd . findTransitiveDepends . mapMaybe getGhcPkgId) locals
-        depDocDir = localDocDir bco </> $(mkRelDir "all")
+        depDocDir = localDepsDocDir bco
     generateHaddockIndex
         "local packages and dependencies"
         envOverride
@@ -246,6 +275,10 @@ haddockIndexFile destDir = destDir </> $(mkRelFile "index.html")
 -- | Path of local packages documentation directory.
 localDocDir :: BaseConfigOpts -> Path Abs Dir
 localDocDir bco = bcoLocalInstallRoot bco </> docDirSuffix
+
+-- | Path of documentation directory for the dependencies of local packages
+localDepsDocDir :: BaseConfigOpts -> Path Abs Dir
+localDepsDocDir bco = localDocDir bco </> $(mkRelDir "all")
 
 -- | Path of snapshot packages documentation directory.
 snapDocDir :: BaseConfigOpts -> Path Abs Dir

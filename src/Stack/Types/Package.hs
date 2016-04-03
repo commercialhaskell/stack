@@ -414,7 +414,10 @@ type InstalledMap = Map PackageName (InstallLocation, Installed)
 data Installed = Library PackageIdentifier GhcPkgId | Executable PackageIdentifier
     deriving (Show, Eq, Ord)
 
+installedPackageIdentifier :: Installed -> PackageIdentifier
+installedPackageIdentifier (Library pid _) = pid
+installedPackageIdentifier (Executable pid) = pid
+
 -- | Get the installed Version.
 installedVersion :: Installed -> Version
-installedVersion (Library (PackageIdentifier _ v) _) = v
-installedVersion (Executable (PackageIdentifier _ v)) = v
+installedVersion = packageIdentifierVersion . installedPackageIdentifier

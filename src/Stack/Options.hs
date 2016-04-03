@@ -356,7 +356,7 @@ buildOptsMonoidParser hide0 =
                     \exception" <>
             hide)
     options =
-        BuildOptsMonoid <$> libProfiling <*> exeProfiling <*> haddock <*>
+        BuildOptsMonoid <$> libProfiling <*> exeProfiling <*> haddock <*> openHaddocks <*>
         haddockDeps <*> copyBins <*> preFetch <*> keepGoing <*> forceDirty <*>
         tests <*> testOptsParser hide0 <*> benches <*> benchOptsParser hide0 <*> reconfigure <*>
         cabalVerbose <*> splitObjs
@@ -374,6 +374,11 @@ buildOptsMonoidParser hide0 =
         maybeBoolFlags
             "haddock"
             "generating Haddocks the package(s) in this directory/configuration"
+            hide
+    openHaddocks =
+        maybeBoolFlags
+            "open"
+            "opening the local Haddock documentation in the browser"
             hide
     haddockDeps =
         maybeBoolFlags "haddock-deps" "building Haddocks for dependencies" hide
