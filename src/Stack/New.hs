@@ -30,6 +30,7 @@ import qualified Data.ByteString.Lazy as LB
 import qualified Data.ByteString.Lazy.Char8 as L8
 import           Data.Conduit
 import           Data.Foldable (asum)
+import qualified Data.HashMap.Strict as HM
 import           Data.List
 import           Data.Map.Strict (Map)
 import qualified Data.Map.Strict as M
@@ -46,6 +47,7 @@ import qualified Data.Text.Lazy as LT
 import           Data.Time.Calendar
 import           Data.Time.Clock
 import           Data.Typeable
+import qualified Data.Yaml as Y
 import           Network.HTTP.Client.Conduit hiding (path)
 import           Network.HTTP.Download
 import           Network.HTTP.Types.Status
@@ -58,6 +60,7 @@ import           Stack.Types.TemplateName
 import           System.Process.Run
 import           Text.Hastache
 import           Text.Hastache.Context
+import           Text.Printf
 import           Text.ProjectTemplate
 
 --------------------------------------------------------------------------------
@@ -265,15 +268,25 @@ runTemplateInits dir = do
                   (\(_ :: ProcessExitedUnsuccessfully) ->
                          $logInfo "git init failed to run, ignoring ...")
 
---------------------------------------------------------------------------------
--- Getting templates list
-
+-- | Display the set of templates accompanied with description if available.
 listTemplates
     :: (MonadIO m, MonadThrow m, MonadReader r m, HasHttpManager r, MonadCatch m, MonadLogger m)
     => m ()
 listTemplates = do
     templates <- getTemplates
-    mapM_ (liftIO . T.putStrLn . templateName) (S.toList templates)
+    templateInfo <- getTemplateInfo
+    if not . M.null $ templateInfo then do
+      let keySizes  = map (T.length . templateName) $ S.toList templates
+          padWidth  = show $ maximum keySizes
+          outputfmt = "%-" <> padWidth <> "s %s\n"
+          headerfmt = "%-" <> padWidth <> "s   %s\n"
+      liftIO $ printf headerfmt ("Template"::String) ("Description"::String)
+      forM_ (S.toList templates) (\x -> do
+           let name = templateName x
+               desc = fromMaybe "" $ mappend "- " <$> (M.lookup name templateInfo >>= description)
+           liftIO $ printf outputfmt name desc
+        )
+      else mapM_ (liftIO . T.putStrLn . templateName) (S.toList templates)
 
 -- | Get the set of templates.
 getTemplates
@@ -289,13 +302,36 @@ getTemplates = do
                 Left err -> throwM (BadTemplatesJSON err (responseBody resp))
                 Right value -> return value
         code -> throwM (BadTemplatesResponse code)
+
+getTemplateInfo
+    :: (MonadIO m, MonadThrow m, MonadReader r m, HasHttpManager r, MonadCatch m, MonadLogger m, Functor m)
+    => m (Map Text TemplateInfo)
+getTemplateInfo = do
+  req <- liftM addHeaders (parseUrl defaultTemplateInfoUrl)
+  resp <- catch (Right <$> httpLbs req) (\(ex :: HttpException) -> return . Left $ "Failed to download template info. The HTTP error was: " <> show ex)
+  case resp >>= is200 of
+    Left err -> do
+      liftIO . putStrLn $ err
+      return M.empty
+    Right resp' ->
+      case Y.decodeEither (LB.toStrict $ responseBody resp') :: Either String Object of
+        Left err ->
+          throwM (BadTemplateInfo err)
+        Right o ->
+          return (M.mapMaybe (Y.parseMaybe Y.parseJSON) (M.fromList . HM.toList $ o) :: Map Text TemplateInfo)
   where
-    addHeaders req =
-        req
-        { requestHeaders = [ ("User-Agent", "The Haskell Stack")
-                           , ("Accept", "application/vnd.github.v3+json")] <>
-          requestHeaders req
-        }
+    is200 resp =
+      if statusCode (responseStatus resp) == 200
+        then return resp
+        else Left $ "Unexpected status code while retrieving templates info: " <> show (statusCode $ responseStatus resp)
+
+addHeaders :: Request -> Request
+addHeaders req =
+  req
+    { requestHeaders = [ ("User-Agent", "The Haskell Stack")
+                       , ("Accept", "application/vnd.github.v3+json")] <>
+      requestHeaders req
+    }
 
 -- | Parser the set of templates from the JSON.
 parseTemplateSet :: Value -> Parser (Set TemplateName)
@@ -325,6 +361,11 @@ defaultTemplateUrl :: String
 defaultTemplateUrl =
     "https://raw.githubusercontent.com/commercialhaskell/stack-templates/master"
 
+-- | Default web URL to get a yaml file containing template metadata.
+defaultTemplateInfoUrl :: String
+defaultTemplateInfoUrl =
+    "https://raw.githubusercontent.com/commercialhaskell/stack-templates/master/template-info.yaml"
+
 -- | Default web URL to list the repo contents.
 defaultTemplatesList :: String
 defaultTemplatesList =
@@ -346,6 +387,9 @@ data NewException
     | MissingParameters !PackageName !TemplateName !(Set String) !(Path Abs File)
     | InvalidTemplate !TemplateName !String
     | AttemptedOverwrites [Path Abs File]
+    | FailedToDownloadTemplateInfo !HttpException
+    | BadTemplateInfo !String
+    | BadTemplateInfoResponse !Int
     deriving (Typeable)
 
 instance Exception NewException
@@ -408,3 +452,9 @@ instance Show NewException where
         "The template would create the following files, but they already exist:\n" <>
         unlines (map (("  " ++) . toFilePath) fps) <>
         "Use --force to ignore this, and overwite these files."
+    show (FailedToDownloadTemplateInfo ex) =
+        "Failed to download templates info. The HTTP error was: " <> show ex
+    show (BadTemplateInfo err) =
+        "Template info couldn't be parsed: " <> err
+    show (BadTemplateInfoResponse code) =
+        "Unexpected status code while retrieving templates info: " <> show code

@@ -10,10 +10,12 @@ module Stack.Types.TemplateName where
 import           Control.Error.Safe (justErr)
 import           Control.Applicative
 import           Data.Aeson.Extended (FromJSON, withText, parseJSON)
+import           Data.Aeson.Types (typeMismatch)
 import           Data.Foldable (asum)
 import           Data.Monoid
 import           Data.Text (Text)
 import qualified Data.Text as T
+import           Data.Yaml (Value(Object), (.:?))
 import           Language.Haskell.TH
 import           Network.HTTP.Client (parseUrl)
 import qualified Options.Applicative as O
@@ -37,6 +39,15 @@ data TemplatePath = AbsPath (Path Abs File)
 instance FromJSON TemplateName where
     parseJSON = withText "TemplateName" $
         either fail return . parseTemplateNameFromString . T.unpack
+
+data TemplateInfo = TemplateInfo
+  { author      :: Maybe Text
+  , description :: Maybe Text }
+  deriving (Eq, Ord, Show)
+
+instance FromJSON TemplateInfo where
+  parseJSON (Object v) = TemplateInfo <$> v .:? "author" <*> v .:? "description"
+  parseJSON invalid = typeMismatch "Template Info" invalid
 
 -- | An argument which accepts a template name of the format
 -- @foo.hsfiles@ or @foo@, ultimately normalized to @foo@.
