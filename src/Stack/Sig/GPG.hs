@@ -33,16 +33,14 @@ signPackage
     => Path Abs File -> m Signature
 signPackage path = do
     (code,out,err) <-
-        liftIO
-            (readProcessWithExitCode
-                 "gpg"
-                 [ "--output"
-                 , "-"
-                 , "--use-agent"
-                 , "--detach-sig"
-                 , "--armor"
-                 , toFilePath path]
-                 [])
+        gpg
+            [ "--output"
+            , "-"
+            , "--use-agent"
+            , "--detach-sig"
+            , "--armor"
+            , toFilePath path]
+            []
     if code /= ExitSuccess
         then throwM (GPGSignException (out ++ "\n" ++ err))
         else return (Signature (C.pack out))
@@ -54,11 +52,7 @@ verifyFile
     => Signature -> Path Abs File -> m Fingerprint
 verifyFile (Signature signature) path = do
     (code,out,err) <-
-        liftIO
-            (readProcessWithExitCode
-                 "gpg"
-                 ["--verify", "-", toFilePath path]
-                 (C.unpack signature))
+        gpg ["--verify", "-", toFilePath path] (C.unpack signature)
     if code /= ExitSuccess
         then throwM (GPGVerifyException (out ++ "\n" ++ err))
         else maybe
@@ -71,3 +65,16 @@ verifyFile (Signature signature) path = do
                   find
                       ((==) ["Primary", "key", "fingerprint:"] . take 3)
                       (map words (lines err)))
+
+-- | Try to execute `gpg2` but fallback to `gpg` (as a backup)
+gpg
+    :: (Monad m, MonadIO m)
+    => [String] -> String -> m (ExitCode, String, String)
+gpg args stdin = do
+    (code,out,err) <- liftIO (readProcessWithExitCode "gpg2" args stdin)
+    if code == ExitSuccess
+        then return (code, out, err)
+        else liftIO (readProcessWithExitCode "gpg" args stdin)
+
+-- TODO test on Windows (package?)
+-- TODO test on Mac (w/ GnuPG Suite & homebrew gnupg & gnupg2)
