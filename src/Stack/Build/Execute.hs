@@ -69,6 +69,7 @@ import           Stack.Build.Cache
 import           Stack.Build.Haddock
 import           Stack.Build.Installed
 import           Stack.Build.Source
+import           Stack.Build.Target
 import           Stack.Config
 import           Stack.Constants
 import           Stack.Coverage
@@ -342,11 +343,12 @@ executePlan :: M env m
             -> [DumpPackage () ()] -- ^ snapshot packages
             -> [DumpPackage () ()] -- ^ local packages
             -> InstalledMap
+            -> Map PackageName SimpleTarget
             -> Plan
             -> m ()
-executePlan menv boptsCli baseConfigOpts locals globalPackages snapshotPackages localPackages installedMap plan = do
+executePlan menv boptsCli baseConfigOpts locals globalPackages snapshotPackages localPackages installedMap targets plan = do
     bopts <- asks (configBuild . getConfig)
-    withExecuteEnv menv bopts boptsCli baseConfigOpts locals globalPackages snapshotPackages localPackages (executePlan' installedMap plan)
+    withExecuteEnv menv bopts boptsCli baseConfigOpts locals globalPackages snapshotPackages localPackages (executePlan' installedMap targets plan)
 
     unless (Map.null $ planInstallExes plan) $ do
         snapBin <- (</> bindirSuffix) `liftM` installationRootDeps
@@ -468,10 +470,11 @@ windowsRenameCopy src dest = do
 -- | Perform the actual plan (internal)
 executePlan' :: M env m
              => InstalledMap
+             -> Map PackageName SimpleTarget
              -> Plan
              -> ExecuteEnv
              -> m ()
-executePlan' installedMap0 plan ee@ExecuteEnv {..} = do
+executePlan' installedMap0 targets plan ee@ExecuteEnv {..} = do
     when (toCoverage $ boptsTestOpts eeBuildOpts) deleteHpcReports
     wc <- getWhichCompiler
     cv <- asks $ envConfigCompilerVersion . getEnvConfig
@@ -548,12 +551,19 @@ executePlan' installedMap0 plan ee@ExecuteEnv {..} = do
         generateLocalHaddockIndex eeEnvOverride wc eeBaseConfigOpts localDumpPkgs eeLocals
         generateDepsHaddockIndex eeEnvOverride wc eeBaseConfigOpts eeGlobalDumpPkgs snapshotDumpPkgs localDumpPkgs eeLocals
         generateSnapHaddockIndex eeEnvOverride wc eeBaseConfigOpts eeGlobalDumpPkgs snapshotDumpPkgs
+        when (boptsOpenHaddocks eeBuildOpts) $ do
+            let availablePkgs = Map.unions [planPackages, localPackages, installedPackages]
+            openHaddocksInBrowser eeBaseConfigOpts availablePkgs (Map.keysSet targets)
   where
     installedMap' = Map.difference installedMap0
                   $ Map.fromList
                   $ map (\(ident, _) -> (packageIdentifierName ident, ()))
                   $ Map.elems
                   $ planUnregisterLocal plan
+    planPackages, localPackages, installedPackages :: Map PackageName (PackageIdentifier, InstallLocation)
+    planPackages = Map.map (\task -> (taskProvides task, taskLocation task)) (planTasks plan)
+    localPackages = Map.fromList [(packageName p, (packageIdentifier p, Local)) | p <- map lpPackage eeLocals]
+    installedPackages = Map.map (\(iloc, installed) -> (installedPackageIdentifier installed, iloc)) installedMap'
 
 toActions :: M env m
           => InstalledMap

@@ -37,6 +37,8 @@ data BuildOpts =
             ,boptsExeProfile :: !Bool
             ,boptsHaddock :: !Bool
             -- ^ Build haddocks?
+            ,boptsOpenHaddocks :: !Bool
+            -- ^ Open haddocks in the browser?
             ,boptsHaddockDeps :: !(Maybe Bool)
             -- ^ Build haddocks for dependencies?
             ,boptsInstallExes :: !Bool
@@ -74,6 +76,7 @@ defaultBuildOpts = BuildOpts
     { boptsLibProfile = False
     , boptsExeProfile = False
     , boptsHaddock = False
+    , boptsOpenHaddocks = False
     , boptsHaddockDeps = Nothing
     , boptsInstallExes = False
     , boptsPreFetch = False
@@ -128,6 +131,7 @@ data BuildOptsMonoid = BuildOptsMonoid
     { buildMonoidLibProfile :: !(Maybe Bool)
     , buildMonoidExeProfile :: !(Maybe Bool)
     , buildMonoidHaddock :: !(Maybe Bool)
+    , buildMonoidOpenHaddocks :: !(Maybe Bool)
     , buildMonoidHaddockDeps :: !(Maybe Bool)
     , buildMonoidInstallExes :: !(Maybe Bool)
     , buildMonoidPreFetch :: !(Maybe Bool)
@@ -147,6 +151,7 @@ instance FromJSON (WithJSONWarnings BuildOptsMonoid) where
     (\o -> do buildMonoidLibProfile <- o ..:? buildMonoidLibProfileArgName
               buildMonoidExeProfile <- o ..:? buildMonoidExeProfileArgName
               buildMonoidHaddock <- o ..:? buildMonoidHaddockArgName
+              buildMonoidOpenHaddocks <- o ..:? buildMonoidOpenHaddocksArgName
               buildMonoidHaddockDeps <- o ..:? buildMonoidHaddockDepsArgName
               buildMonoidInstallExes <- o ..:? buildMonoidInstallExesArgName
               buildMonoidPreFetch <- o ..:? buildMonoidPreFetchArgName
@@ -169,6 +174,9 @@ buildMonoidExeProfileArgName = "executable-profiling"
 
 buildMonoidHaddockArgName :: Text
 buildMonoidHaddockArgName = "haddock"
+
+buildMonoidOpenHaddocksArgName :: Text
+buildMonoidOpenHaddocksArgName = "open-haddocks"
 
 buildMonoidHaddockDepsArgName :: Text
 buildMonoidHaddockDepsArgName = "haddock-deps"
@@ -211,6 +219,7 @@ instance Monoid BuildOptsMonoid where
     {buildMonoidLibProfile = Nothing
     ,buildMonoidExeProfile = Nothing
     ,buildMonoidHaddock = Nothing
+    ,buildMonoidOpenHaddocks = Nothing
     ,buildMonoidHaddockDeps = Nothing
     ,buildMonoidInstallExes = Nothing
     ,buildMonoidPreFetch = Nothing
@@ -229,6 +238,7 @@ instance Monoid BuildOptsMonoid where
     {buildMonoidLibProfile = buildMonoidLibProfile l <|> buildMonoidLibProfile r
     ,buildMonoidExeProfile = buildMonoidExeProfile l <|> buildMonoidExeProfile r
     ,buildMonoidHaddock = buildMonoidHaddock l <|> buildMonoidHaddock r
+    ,buildMonoidOpenHaddocks = buildMonoidOpenHaddocks l <|> buildMonoidOpenHaddocks r
     ,buildMonoidHaddockDeps = buildMonoidHaddockDeps l <|> buildMonoidHaddockDeps r
     ,buildMonoidInstallExes = buildMonoidInstallExes l <|> buildMonoidInstallExes r
     ,buildMonoidPreFetch = buildMonoidPreFetch l <|> buildMonoidPreFetch r

@@ -18,6 +18,9 @@ buildOptsFromMonoid BuildOptsMonoid{..} = BuildOpts
     , boptsHaddock = fromMaybe
           (boptsHaddock defaultBuildOpts)
           buildMonoidHaddock
+    , boptsOpenHaddocks = fromMaybe
+          (boptsOpenHaddocks defaultBuildOpts)
+          buildMonoidOpenHaddocks
     , boptsHaddockDeps = buildMonoidHaddockDeps
     , boptsInstallExes = fromMaybe
           (boptsInstallExes defaultBuildOpts)

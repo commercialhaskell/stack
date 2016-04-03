@@ -549,6 +549,7 @@ data BaseConfigOpts = BaseConfigOpts
     , bcoBuildOptsCLI :: !BuildOptsCLI
     , bcoExtraDBs :: ![(Path Abs Dir)]
     }
+    deriving Show
 
 -- | Render a @BaseConfigOpts@ to an actual list of options
 configureOpts :: EnvConfig
