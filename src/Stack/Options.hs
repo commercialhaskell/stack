@@ -754,8 +754,13 @@ logLevelOptsParser hide defLogLevel =
        (short 'v' <> long "verbose" <>
         help ("Enable verbose mode: verbosity level \"" <> showLevel verboseLevel <> "\"") <>
         hideMods hide) <|>
+  flag' (Just silentLevel)
+       (long "silent" <>
+        help ("Enable silent mode: verbosity level \"" <> showLevel silentLevel <> "\"") <>
+        hideMods hide) <|>
   pure defLogLevel
   where verboseLevel = LevelDebug
+        silentLevel = LevelOther "silent"
         showLevel l =
           case l of
             LevelDebug -> "debug"
