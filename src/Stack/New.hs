@@ -304,7 +304,7 @@ getTemplates = do
         code -> throwM (BadTemplatesResponse code)
 
 getTemplateInfo
-    :: (MonadIO m, MonadThrow m, MonadReader r m, HasHttpManager r, MonadCatch m, MonadLogger m)
+    :: (MonadIO m, MonadThrow m, MonadReader r m, HasHttpManager r, MonadCatch m, MonadLogger m, Functor m)
     => m (Map Text TemplateInfo)
 getTemplateInfo = do
   req <- liftM addHeaders (parseUrl defaultTemplateInfoUrl)
