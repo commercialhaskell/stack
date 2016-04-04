@@ -21,6 +21,7 @@ module System.Process.Run
     where
 
 import           Control.Exception.Lifted
+import           Control.Monad (liftM)
 import           Control.Monad.IO.Class (MonadIO, liftIO)
 import           Control.Monad.Logger (MonadLogger, logError)
 import           Control.Monad.Trans.Control (MonadBaseControl)
@@ -97,7 +98,7 @@ callProcess = callProcess' id
 callProcess' :: (MonadIO m, MonadLogger m)
              => (CreateProcess -> CreateProcess) -> Cmd -> m ()
 callProcess' modCP cmd = do
-    c <- modCP <$> cmdToCreateProcess cmd
+    c <- liftM modCP (cmdToCreateProcess cmd)
     $logCreateProcess c
     liftIO $ do
         (_, _, _, p) <- System.Process.createProcess c
@@ -120,7 +121,7 @@ createProcess' :: (MonadIO m, MonadLogger m)
                -> Cmd
                -> m (Maybe Handle, Maybe Handle, Maybe Handle, ProcessHandle)
 createProcess' tag modCP cmd = do
-    c <- modCP <$> cmdToCreateProcess cmd
+    c <- liftM modCP (cmdToCreateProcess cmd)
     $logCreateProcess c
     liftIO $ System.Process.createProcess_ tag c
 
