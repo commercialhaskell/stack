@@ -47,7 +47,7 @@ import qualified Data.Text.Lazy as LT
 import           Data.Time.Calendar
 import           Data.Time.Clock
 import           Data.Typeable
-import qualified Data.Yaml as Y
+import qualified Data.Yaml as Yaml
 import           Network.HTTP.Client.Conduit hiding (path)
 import           Network.HTTP.Download
 import           Network.HTTP.Types.Status
@@ -313,11 +313,11 @@ getTemplateInfo = do
       liftIO . putStrLn $ err
       return M.empty
     Right resp' ->
-      case Y.decodeEither (LB.toStrict $ responseBody resp') :: Either String Object of
+      case Yaml.decodeEither (LB.toStrict $ responseBody resp') :: Either String Object of
         Left err ->
           throwM $ BadTemplateInfo err
         Right o ->
-          return (M.mapMaybe (Y.parseMaybe Y.parseJSON) (M.fromList . HM.toList $ o) :: Map Text TemplateInfo)
+          return (M.mapMaybe (Yaml.parseMaybe Yaml.parseJSON) (M.fromList . HM.toList $ o) :: Map Text TemplateInfo)
   where
     is200 resp =
       if statusCode (responseStatus resp) == 200
