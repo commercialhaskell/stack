@@ -89,7 +89,7 @@ for requirements to perform the release, and more details about the tool.
       [stack-installer README](https://github.com/borsboom/stack-installer#readme)
 
 * Push signed Git tag, matching Github release tag name, e.g.: `git tag -u
-  9BEFB442 vX.Y.Z && git push origin vX.Y.Z`
+  0x575159689BEFB442 vX.Y.Z && git push origin vX.Y.Z`
 
 * Reset the `release` branch to the released commit, e.g.: `git checkout release
   && git merge --ff-only vX.Y.Z && git push origin release`

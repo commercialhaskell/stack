@@ -51,7 +51,7 @@ main =
             gGitRevCount <- length . lines <$> readProcess "git" ["rev-list", "HEAD"] ""
             gGitSha <- trim <$> readProcess "git" ["rev-parse", "HEAD"] ""
             gHomeDir <- getHomeDirectory
-            let gGpgKey = "9BEFB442"
+            let gGpgKey = "0x575159689BEFB442"
                 gAllowDirty = False
                 gGithubReleaseTag = Nothing
                 Platform arch _ = buildPlatform
