@@ -600,9 +600,6 @@ paths =
     , ( "PATH environment variable"
       , "bin-path"
       , T.pack . intercalate [searchPathSeparator] . eoPath . piEnvOverride )
-    , ( "Installed GHCs (unpacked and archives)"
-      , "ghc-paths"
-      , T.pack . toFilePathNoTrailingSep . configLocalPrograms . bcConfig . piBuildConfig )
     , ( "Local bin path where stack installs executables"
       , "local-bin-path"
       , T.pack . toFilePathNoTrailingSep . configLocalBin . bcConfig . piBuildConfig )
