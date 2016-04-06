@@ -2,7 +2,7 @@
 
 ## 1.0.4.3
 
-Bug fixes
+Bug fixes:
 
 * Don't delete contents of ~/.ssh when using `stack clean --full` with Docker
   enabled [#2000](https://github.com/commercialhaskell/stack/issues/2000)
