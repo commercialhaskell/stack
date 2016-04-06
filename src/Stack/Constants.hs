@@ -191,8 +191,7 @@ projectDockerSandboxDir :: (MonadReader env m, HasConfig env)
   => Path Abs Dir      -- ^ Project root
   -> m (Path Abs Dir)  -- ^ Docker sandbox
 projectDockerSandboxDir projectRoot = do
-  workDir <- getWorkDir
-  return $ projectRoot </> workDir </> $(mkRelDir "docker/")
+  return $ projectRoot </> $(mkRelDir ".stack-docker/")
 
 -- | Image staging dir from project root.
 imageStagingDir :: (MonadReader env m, HasConfig env, MonadThrow m)
