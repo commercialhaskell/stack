@@ -108,10 +108,10 @@ signPackage url pkg filePath = do
         name = show n
         version = show v
     fingerprint <- GPG.verifyFile sig filePath
-    req <-
-        parseUrl
-            (url <> "/upload/signature/" <> name <> "/" <> version <> "/" <>
-             show fingerprint)
+    let fullUrl =
+            url <> "/upload/signature/" <> name <> "/" <> version <> "/" <>
+            show fingerprint
+    req <- parseUrl fullUrl
     let put =
             req
             { method = methodPut
@@ -122,7 +122,7 @@ signPackage url pkg filePath = do
     when
         (responseStatus res /= status200)
         (throwM (GPGSignException "unable to sign & upload package"))
-    $logInfo ("Signed successfully with key " <> (T.pack . show) fingerprint)
+    $logInfo ("Signature uploaded to " <> T.pack fullUrl)
 
 withStackWorkTempDir
     :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasConfig env)

@@ -276,23 +276,21 @@ commandLineHandler progName isInterpreter = complicatedOptions
                              <> help "Clone from specified git repository"
                              <> value "https://github.com/commercialhaskell/stack"
                              <> showDefault ))
-        addCommand' "upload"
-                    "Upload a package to Hackage"
-                    uploadCmd
-                    ((,,,)
-                     <$> many (strArgument $ metavar "TARBALL/DIR")
-                     <*> optional pvpBoundsOption
-                     <*> ignoreCheckSwitch
-                     <*> flag False True
-                          (long "sign" <>
-                           help "GPG sign & submit signature"))
-        addCommand' "sdist"
-                    "Create source distribution tarballs"
-                    sdistCmd
-                    ((,,)
-                     <$> many (strArgument $ metavar "DIR")
-                     <*> optional pvpBoundsOption
-                     <*> ignoreCheckSwitch)
+        addCommand'
+            "upload"
+            "Upload a package to Hackage"
+            uploadCmd
+            ((,,,) <$> many (strArgument $ metavar "TARBALL/DIR") <*>
+             optional pvpBoundsOption <*>
+             ignoreCheckSwitch <*>
+             Sig.signOpts)
+        addCommand'
+            "sdist"
+            "Create source distribution tarballs"
+            sdistCmd
+            ((,,,) <$> many (strArgument $ metavar "DIR") <*> optional pvpBoundsOption <*>
+             ignoreCheckSwitch <*>
+             Sig.signOpts)
         addCommand' "dot"
                     "Visualize your project's dependency graph using Graphviz dot"
                     dotCmd
@@ -921,9 +919,9 @@ upgradeCmd (fromGit, repo) go = withConfigAndLock go $
 #endif
 
 -- | Upload to Hackage
-uploadCmd :: ([String], Maybe PvpBounds, Bool, Bool) -> GlobalOpts -> IO ()
+uploadCmd :: ([String], Maybe PvpBounds, Bool, (Bool,String)) -> GlobalOpts -> IO ()
 uploadCmd ([], _, _, _) _ = error "To upload the current package, please run 'stack upload .'"
-uploadCmd (args, mpvpBounds, ignoreCheck, shouldSign) go = do
+uploadCmd (args, mpvpBounds, ignoreCheck, (dontSign, sigServerUrl)) go = do
     let partitionM _ [] = return ([], [])
         partitionM f (x:xs) = do
             r <- f x
@@ -942,7 +940,6 @@ uploadCmd (args, mpvpBounds, ignoreCheck, shouldSign) go = do
             let uploadSettings =
                     Upload.setGetManager (return manager) Upload.defaultUploadSettings
             liftIO $ Upload.mkUploader config uploadSettings
-        sigServiceUrl = "https://sig.commercialhaskell.org/"
     withBuildConfigAndLock go $ \_ -> do
         uploader <- getUploader
         unless ignoreCheck $
@@ -953,11 +950,11 @@ uploadCmd (args, mpvpBounds, ignoreCheck, shouldSign) go = do
                   do tarFile <- resolveFile' file
                      liftIO
                          (Upload.upload uploader (toFilePath tarFile))
-                     when
-                         shouldSign
+                     unless
+                         dontSign
                          (Sig.sign
                               (lcProjectRoot lc)
-                              sigServiceUrl
+                              sigServerUrl
                               tarFile))
         unless (null dirs) $
             forM_ dirs $ \dir -> do
@@ -966,16 +963,16 @@ uploadCmd (args, mpvpBounds, ignoreCheck, shouldSign) go = do
                 unless ignoreCheck $ checkSDistTarball' tarName tarBytes
                 liftIO $ Upload.uploadBytes uploader tarName tarBytes
                 tarPath <- parseRelFile tarName
-                when
-                    shouldSign
+                unless
+                    dontSign
                     (Sig.signTarBytes
                          (lcProjectRoot lc)
-                         sigServiceUrl
+                         sigServerUrl
                          tarPath
                          tarBytes)
 
-sdistCmd :: ([String], Maybe PvpBounds, Bool) -> GlobalOpts -> IO ()
-sdistCmd (dirs, mpvpBounds, ignoreCheck) go =
+sdistCmd :: ([String], Maybe PvpBounds, Bool, (Bool,String)) -> GlobalOpts -> IO ()
+sdistCmd (dirs, mpvpBounds, ignoreCheck, (dontSign,sigServerUrl)) go =
     withBuildConfig go $ do -- No locking needed.
         -- If no directories are specified, build all sdist tarballs.
         dirs' <- if null dirs
@@ -989,6 +986,8 @@ sdistCmd (dirs, mpvpBounds, ignoreCheck) go =
             liftIO $ L.writeFile (toFilePath tarPath) tarBytes
             unless ignoreCheck (checkSDistTarball tarPath)
             $logInfo $ "Wrote sdist tarball to " <> T.pack (toFilePath tarPath)
+            (_,lc) <- liftIO $ loadConfigWithOpts go
+            unless dontSign (Sig.sign (lcProjectRoot lc) sigServerUrl tarPath)
 
 -- | Execute a command.
 execCmd :: ExecOpts -> GlobalOpts -> IO ()
