@@ -309,7 +309,7 @@ addDeps allowMissing compilerVersion toCalc = do
         $ map (\(n, (v, f)) -> (PackageIdentifier n v, Left f))
         $ Map.toList toCalc
 
--- | Resolve all packages necessary to install for
+-- | Resolve all packages necessary to install for the needed packages.
 getDeps :: MiniBuildPlan
         -> (PackageName -> Bool) -- ^ is it shadowed by a local package?
         -> Map PackageName (Set PackageName)

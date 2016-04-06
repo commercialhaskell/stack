@@ -32,8 +32,8 @@ import           Data.Text (Text)
 import qualified Data.Text as T
 import           Data.Text.Encoding (decodeUtf8With)
 import           Data.Text.Encoding.Error (lenientDecode)
-import           Distribution.Package (Dependency (..))
-import           Distribution.Version (anyVersion)
+import qualified Distribution.Package as Cabal
+import qualified Distribution.Version as Cabal
 import           Network.HTTP.Client.Conduit (HasHttpManager)
 import           Prelude hiding (pi, writeFile)
 import           Stack.Build.Cache
@@ -101,7 +101,7 @@ data Ctx = Ctx
     , baseConfigOpts :: !BaseConfigOpts
     , loadPackage    :: !(PackageName -> Version -> Map FlagName Bool -> IO Package)
     , combinedMap    :: !CombinedMap
-    , toolToPackages :: !(Dependency -> Map PackageName VersionRange)
+    , toolToPackages :: !(Cabal.Dependency -> Map PackageName VersionRange)
     , ctxEnvConfig   :: !EnvConfig
     , callStack      :: ![PackageName]
     , extraToBuild   :: !(Set PackageName)
@@ -177,8 +177,8 @@ constructPlan mbp0 baseConfigOpts0 locals extraToBuild0 localDumpPkgs loadPackag
         , baseConfigOpts = baseConfigOpts0
         , loadPackage = loadPackage0
         , combinedMap = combineMap sourceMap installedMap
-        , toolToPackages = \ (Dependency name _) ->
-          maybe Map.empty (Map.fromSet (const anyVersion)) $
+        , toolToPackages = \(Cabal.Dependency name _) ->
+          maybe Map.empty (Map.fromSet (const Cabal.anyVersion)) $
           Map.lookup (T.pack . packageNameString . fromCabalPackageName $ name) toolMap
         , ctxEnvConfig = econfig
         , callStack = []
@@ -628,9 +628,51 @@ psLocal (PSUpstream {}) = False
 packageDepsWithTools :: Package -> M (Map PackageName VersionRange)
 packageDepsWithTools p = do
     ctx <- ask
+    -- TODO: it would be cool to defer these warnings until there's an
+    -- actual issue building the package.
+    -- TODO: check if the tool is on the path before warning?
+    let toEither (Cabal.Dependency name _) mp =
+            case Map.toList mp of
+                [] -> Left (NoToolFound (Cabal.unPackageName name) (packageName p))
+                [_] -> Right mp
+                xs -> Left (AmbiguousToolsFound (Cabal.unPackageName name) (packageName p) (map fst xs))
+        (warnings, toolDeps) =
+             partitionEithers $
+             map (\dep -> toEither dep (toolToPackages ctx dep)) (packageTools p)
+    tell mempty { wWarnings = (map toolWarningText warnings ++) }
+    when (any isNoToolFound warnings) $ do
+        let msg = T.unlines
+                [ "Missing build-tools may be caused by dependencies of the build-tool being overridden by extra-deps."
+                , "This should be fixed soon - see this issue https://github.com/commercialhaskell/stack/issues/595"
+                ]
+        tell mempty { wWarnings = (msg:) }
     return $ Map.unionsWith intersectVersionRanges
            $ packageDeps p
-           : map (toolToPackages ctx) (packageTools p)
+           : toolDeps
+
+data ToolWarning
+    = NoToolFound String PackageName
+    | AmbiguousToolsFound String PackageName [PackageName]
+
+isNoToolFound :: ToolWarning -> Bool
+isNoToolFound NoToolFound{} = True
+isNoToolFound _ = False
+
+toolWarningText :: ToolWarning -> Text
+toolWarningText (NoToolFound toolName pkgName) =
+    "No packages found in snapshot which provide a " <>
+    T.pack (show toolName) <>
+    " executable, which is a build-tool dependency of " <>
+    T.pack (show (packageNameString pkgName))
+toolWarningText (AmbiguousToolsFound toolName pkgName options) =
+    "Multiple packages found in snapshot which provide a " <>
+    T.pack (show toolName) <>
+    " exeuctable, which is a build-tool dependency of " <>
+    T.pack (show (packageNameString pkgName)) <>
+    ", so none will be installed.\n" <>
+    "Here's the list of packages which provide it: " <>
+    T.intercalate ", " (map packageNameText options) <>
+    "\nSince there's no good way to choose, you may need to install it manually."
 
 -- | Strip out anything from the @Plan@ intended for the local database
 stripLocals :: Plan -> Plan
