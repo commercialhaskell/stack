@@ -420,17 +420,6 @@ commandLineHandler progName isInterpreter = complicatedOptions
                         "Generate HPC report a combined HPC report"
                         hpcReportCmd
                         hpcReportOptsParser)
-        addSubCommands'
-          Sig.sigCmdName
-          "Subcommands specific to package signatures (EXPERIMENTAL)"
-          (addSubCommands'
-              Sig.sigSignCmdName
-              "Sign a a single package or all your packages"
-              (addCommand'
-                Sig.sigSignSdistCmdName
-                "Sign a single sdist package file"
-                sigSignSdistCmd
-                Sig.sigSignSdistOpts))
         )
       where
         ignoreCheckSwitch =
@@ -1156,18 +1145,6 @@ imgDockerCmd (rebuild,images) go@GlobalOpts{..} =
                          defaultBuildOptsCLI
                  Image.stageContainerImageArtifacts)
         (Just $ Image.createContainerImageFromStage images)
-
-sigSignSdistCmd :: (String, String) -> GlobalOpts -> IO ()
-sigSignSdistCmd (url,path) go =
-    withConfigAndLock
-        go
-        (do (manager,lc) <- liftIO (loadConfigWithOpts go)
-            tarBall <- resolveFile' path
-            runStackTGlobal
-                manager
-                (lcConfig lc)
-                go
-                (Sig.sign (lcProjectRoot lc) url tarBall))
 
 -- | Load the configuration with a manager. Convenience function used
 -- throughout this module.
