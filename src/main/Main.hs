@@ -1144,7 +1144,8 @@ cfgSetCmd co go@GlobalOpts{..} =
                       env)
 
 imgDockerCmd :: (Bool, [Text]) -> GlobalOpts -> IO ()
-imgDockerCmd (rebuild,images) go@GlobalOpts{..} =
+imgDockerCmd (rebuild,images) go@GlobalOpts{..} = do
+    mProjectRoot <- lcProjectRoot . snd <$> loadConfigWithOpts go
     withBuildConfigExt
         go
         Nothing
@@ -1154,8 +1155,8 @@ imgDockerCmd (rebuild,images) go@GlobalOpts{..} =
                          (const (return ()))
                          lk
                          defaultBuildOptsCLI
-                 Image.stageContainerImageArtifacts)
-        (Just $ Image.createContainerImageFromStage images)
+                 Image.stageContainerImageArtifacts mProjectRoot)
+        (Just $ Image.createContainerImageFromStage mProjectRoot images)
 
 sigSignSdistCmd :: (String, String) -> GlobalOpts -> IO ()
 sigSignSdistCmd (url,path) go =
