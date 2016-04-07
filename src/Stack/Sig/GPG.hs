@@ -1,4 +1,7 @@
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TupleSections #-}
 
 {-|
 Module      : Stack.Sig.GPG
@@ -16,6 +19,7 @@ module Stack.Sig.GPG (signPackage, verifyFile) where
 import           Control.Applicative ((<$>))
 #endif
 
+import           Control.Exception (catch, SomeException)
 import           Control.Monad.Catch (MonadThrow, throwM)
 import           Control.Monad.IO.Class (MonadIO, liftIO)
 import qualified Data.ByteString.Char8 as C
@@ -70,11 +74,14 @@ verifyFile (Signature signature) path = do
 gpg
     :: (Monad m, MonadIO m)
     => [String] -> String -> m (ExitCode, String, String)
-gpg args stdin = do
-    (code,out,err) <- liftIO (readProcessWithExitCode "gpg2" args stdin)
-    if code == ExitSuccess
-        then return (code, out, err)
-        else liftIO (readProcessWithExitCode "gpg" args stdin)
-
--- TODO test on Windows (package?)
--- TODO test on Mac (w/ GnuPG Suite & homebrew gnupg & gnupg2)
+gpg args stdin =
+    liftIO
+        (catch
+             (readProcessWithExitCode "gpg2" args stdin)
+             (oops
+                  (catch
+                       (readProcessWithExitCode "gpg" args stdin)
+                       (return . (, [], [])))))
+  where
+    oops :: IO a -> SomeException -> IO a
+    oops = const
