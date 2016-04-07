@@ -19,7 +19,6 @@ module Stack.Sig.GPG (signPackage, verifyFile) where
 import           Control.Applicative ((<$>))
 #endif
 
-import           Control.Exception (catch, SomeException)
 import           Control.Monad.Catch (MonadThrow, throwM)
 import           Control.Monad.IO.Class (MonadIO, liftIO)
 import qualified Data.ByteString.Char8 as C
@@ -28,6 +27,7 @@ import           Data.Monoid ((<>))
 import qualified Data.Text as T
 import           Path
 import           Stack.Types
+import           System.Directory (findExecutable)
 import           System.Exit (ExitCode(..))
 import           System.Process (readProcessWithExitCode)
 
@@ -72,16 +72,14 @@ verifyFile (Signature signature) path = do
 
 -- | Try to execute `gpg2` but fallback to `gpg` (as a backup)
 gpg
-    :: (Monad m, MonadIO m)
+    :: (Monad m, MonadIO m, MonadThrow m)
     => [String] -> String -> m (ExitCode, String, String)
-gpg args stdin =
-    liftIO
-        (catch
-             (readProcessWithExitCode "gpg2" args stdin)
-             (oops
-                  (catch
-                       (readProcessWithExitCode "gpg" args stdin)
-                       (return . (, [], [])))))
-  where
-    oops :: IO a -> SomeException -> IO a
-    oops = const
+gpg args stdin = do
+    mGpg2Path <- liftIO (findExecutable "gpg2")
+    case mGpg2Path of
+        Just _ -> liftIO (readProcessWithExitCode "gpg2" args stdin)
+        Nothing -> do
+            mGpgPath <- liftIO (findExecutable "gpg")
+            case mGpgPath of
+                Just _ -> liftIO (readProcessWithExitCode "gpg" args stdin)
+                Nothing -> throwM GPGNotFoundException

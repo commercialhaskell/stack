@@ -82,6 +82,7 @@ newtype Aeson a = Aeson
 -- | Exceptions
 data SigException
     = GPGFingerprintException String
+    | GPGNotFoundException
     | GPGSignException String
     | GPGVerifyException String
     | SigInvalidSDistTarBall
@@ -94,6 +95,7 @@ instance Exception SigException
 instance Show SigException where
     show (GPGFingerprintException e) =
         "Error extracting a GPG fingerprint " <> e
+    show GPGNotFoundException = "Unable to find gpg2 or gpg executable"
     show (GPGSignException e) = "Error signing with GPG " <> e
     show (GPGVerifyException e) = "Error verifying with GPG " <> e
     show SigNoProjectRootException = "Missing Project Root"
