@@ -396,7 +396,7 @@ commandLineHandler progName isInterpreter = complicatedOptions
                         configCmdSetParser)
         addSubCommands'
             Image.imgCmdName
-            "Subcommands specific to imaging (EXPERIMENTAL)"
+            "Subcommands specific to imaging"
             (addCommand'
                  Image.imgDockerCmdName
                  "Build a Docker image for the project"
