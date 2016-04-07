@@ -631,11 +631,11 @@ packageDepsWithTools p = do
     -- TODO: it would be cool to defer these warnings until there's an
     -- actual issue building the package.
     -- TODO: check if the tool is on the path before warning?
-    let toEither (Cabal.Dependency name _) mp =
+    let toEither (Cabal.Dependency (Cabal.PackageName name) _) mp =
             case Map.toList mp of
-                [] -> Left (NoToolFound (Cabal.unPackageName name) (packageName p))
+                [] -> Left (NoToolFound name (packageName p))
                 [_] -> Right mp
-                xs -> Left (AmbiguousToolsFound (Cabal.unPackageName name) (packageName p) (map fst xs))
+                xs -> Left (AmbiguousToolsFound name (packageName p) (map fst xs))
         (warnings, toolDeps) =
              partitionEithers $
              map (\dep -> toEither dep (toolToPackages ctx dep)) (packageTools p)
