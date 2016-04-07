@@ -260,8 +260,6 @@ runContainerAndExit getCmdArgs
        <*> hIsTerminalDevice stderr
        <*> (parseAbsDir =<< getHomeDirectory)
      isStdoutTerminal <- asks getTerminal
-     let sshDir = homeDir </> sshRelDir
-     sshDirExists <- doesDirExist sshDir
      let dockerHost = lookup "DOCKER_HOST" env
          dockerCertPath = lookup "DOCKER_CERT_PATH" env
          bamboo = lookup "bamboo_buildKey" env
@@ -309,6 +307,19 @@ runContainerAndExit getCmdArgs
      liftIO
        (do updateDockerImageLastUsed config iiId (toFilePath projectRoot)
            mapM_ (ensureDir) [sandboxHomeDir, stackRoot])
+     -- Since $HOME is now mounted in the same place in the container we can
+     -- just symlink $HOME/.ssh to the right place for the stack docker user
+     let sshDir = homeDir </> sshRelDir
+     sshDirExists <- doesDirExist sshDir
+     sshSandboxDirExists <-
+         liftIO
+             (Files.fileExist
+                 (toFilePathNoTrailingSep (sandboxHomeDir </> sshRelDir)))
+     when (sshDirExists && not sshSandboxDirExists)
+         (liftIO
+             (Files.createSymbolicLink
+                 (toFilePathNoTrailingSep sshDir)
+                 (toFilePathNoTrailingSep (sandboxHomeDir </> sshRelDir))))
      containerID <- (trim . decodeUtf8) <$> readDockerProcess
        envOverride
        (concat
@@ -328,10 +339,6 @@ runContainerAndExit getCmdArgs
          ,case muserEnv of
             Nothing -> []
             Just userEnv -> ["-e","USER=" ++ userEnv]
-         ,if sshDirExists
-          then ["-v",toFilePathNoTrailingSep sshDir ++ ":" ++
-                     toFilePathNoTrailingSep (sandboxHomeDir </> sshRelDir)]
-          else []
          ,case msshAuthSock of
             Nothing -> []
             Just sshAuthSock ->

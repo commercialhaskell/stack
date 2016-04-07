@@ -61,6 +61,13 @@ Bug fixes:
 * Nix: cancelling a stack build now exits properly rather than dropping into a
   nix-shell [#1778](https://github.com/commercialhaskell/stack/issues/1778)
 
+## 1.0.4.3
+
+Bug fixes:
+
+* Don't delete contents of ~/.ssh when using `stack clean --full` with Docker
+  enabled [#2000](https://github.com/commercialhaskell/stack/issues/2000)
+
 ## 1.0.4.2
 
 Build with path-io-1.0.0. There are no changes in behaviour from 1.0.4,
