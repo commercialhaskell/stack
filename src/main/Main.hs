@@ -1132,7 +1132,8 @@ cfgSetCmd co go@GlobalOpts{..} =
                       env)
 
 imgDockerCmd :: (Bool, [Text]) -> GlobalOpts -> IO ()
-imgDockerCmd (rebuild,images) go@GlobalOpts{..} =
+imgDockerCmd (rebuild,images) go@GlobalOpts{..} = do
+    mProjectRoot <- lcProjectRoot . snd <$> loadConfigWithOpts go
     withBuildConfigExt
         go
         Nothing
@@ -1142,8 +1143,8 @@ imgDockerCmd (rebuild,images) go@GlobalOpts{..} =
                          (const (return ()))
                          lk
                          defaultBuildOptsCLI
-                 Image.stageContainerImageArtifacts)
-        (Just $ Image.createContainerImageFromStage images)
+                 Image.stageContainerImageArtifacts mProjectRoot)
+        (Just $ Image.createContainerImageFromStage mProjectRoot images)
 
 -- | Load the configuration with a manager. Convenience function used
 -- throughout this module.
