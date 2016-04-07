@@ -23,7 +23,7 @@ import           Control.Concurrent.MVar.Lifted
 import           Control.Concurrent.STM
 import           Control.Exception.Enclosed (catchIO)
 import           Control.Exception.Lifted
-import           Control.Monad (liftM, when, unless, void, join)
+import           Control.Monad (liftM, when, unless, void)
 import           Control.Monad.Catch (MonadCatch, MonadMask)
 import           Control.Monad.Extra (anyM, (&&^))
 import           Control.Monad.IO.Class
@@ -785,11 +785,8 @@ withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} md
                 , esLocaleUtf8 = True
                 }
         menv <- liftIO $ configEnvOverride config envSettings
-        -- When looking for ghc to build Setup.hs we want to ignore local binaries, see:
-        -- https://github.com/commercialhaskell/stack/issues/1052
-        menvWithoutLocals <- liftIO $ configEnvOverride config envSettings { esIncludeLocals = False }
-        getGhcPath <- runOnce $ liftIO $ join $ findExecutable menvWithoutLocals "ghc"
-        getGhcjsPath <- runOnce $ liftIO $ join $ findExecutable menvWithoutLocals "ghcjs"
+        getGhcPath <- runOnce $ getCompilerPath Ghc
+        getGhcjsPath <- runOnce $ getCompilerPath Ghcjs
         distRelativeDir' <- distRelativeDir
         esetupexehs <-
             -- Avoid broken Setup.hs files causing problems for simple build

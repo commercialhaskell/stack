@@ -1473,7 +1473,7 @@ global-stack-root: /home/michael/.stack
 project-root: /home/michael/wai
 config-location: /home/michael/wai/stack.yaml
 bin-path: /home/michael/.stack/snapshots/x86_64-linux/lts-2.17/7.8.4/bin:/home/michael/.stack/programs/x86_64-linux/ghc-7.8.4/bin:/home/michael/.stack/programs/x86_64-linux/ghc-7.10.2/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-ghc-paths: /home/michael/.stack/programs/x86_64-linux
+compiler-path: /home/michael/.stack/programs/x86_64-linux/ghc-7.8.4/bin/ghc
 local-bin-path: /home/michael/.local/bin
 extra-include-dirs:
 extra-library-dirs:
@@ -1487,16 +1487,13 @@ dist-dir: .stack-work/dist/x86_64-linux/Cabal-1.18.1.5
 ```
 
 In addition, `stack path` accepts command line arguments to state which of
-these keys you're interested in, which can be convenient for scripting. As a
-simple example, let's find out which versions of GHC are installed locally:
+these keys you're interested in, which can be convenient for scripting. As an
+example, let's just get the path to the version of GHC we're using.
 
 ```
-michael@d30748af6d3d:~/wai$ ls $(stack path --ghc-paths)/*.installed
-/home/michael/.stack/programs/x86_64-linux/ghc-7.10.2.installed
-/home/michael/.stack/programs/x86_64-linux/ghc-7.8.4.installed
+michael@d30748af6d3d:~/wai$ stack path --compiler-path
+/home/michael/.stack/programs/x86_64-linux/ghc-7.8.4/bin/ghc
 ```
-
-(Yes, that command requires a \*nix shell, and likely won't run on Windows.)
 
 While we're talking about paths, to wipe our stack install completely, here's
 what needs to be removed:

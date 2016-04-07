@@ -43,6 +43,7 @@ module Stack.Types.Config
   ,EnvConfig(..)
   ,HasEnvConfig(..)
   ,getWhichCompiler
+  ,getCompilerPath
   -- * Details
   -- ** ApplyGhcOptions
   ,ApplyGhcOptions(..)
@@ -126,7 +127,7 @@ module Stack.Types.Config
 import           Control.Applicative
 import           Control.Arrow ((&&&))
 import           Control.Exception
-import           Control.Monad (liftM, mzero, forM)
+import           Control.Monad (liftM, mzero, forM, join)
 import           Control.Monad.Catch (MonadThrow, throwM)
 import           Control.Monad.Logger (LogLevel(..))
 import           Control.Monad.Reader (MonadReader, ask, asks, MonadIO, liftIO)
@@ -174,7 +175,7 @@ import           Stack.Types.PackageName
 import           Stack.Types.TemplateName
 import           Stack.Types.Version
 import           System.PosixCompat.Types (UserID, GroupID, FileMode)
-import           System.Process.Read (EnvOverride)
+import           System.Process.Read (EnvOverride, findExecutable)
 
 -- Re-exports
 import          Stack.Types.Config.Build as X
@@ -1412,6 +1413,19 @@ minimalEnvSettings =
 
 getWhichCompiler :: (MonadReader env m, HasEnvConfig env) => m WhichCompiler
 getWhichCompiler = asks (whichCompiler . envConfigCompilerVersion . getEnvConfig)
+
+-- | Get the path for the given compiler ignoring any local binaries.
+--
+-- https://github.com/commercialhaskell/stack/issues/1052
+getCompilerPath
+    :: (MonadIO m, MonadThrow m, MonadReader env m, HasConfig env)
+    => WhichCompiler
+    -> m (Path Abs File)
+getCompilerPath wc = do
+    config <- asks getConfig
+    eoWithoutLocals <- liftIO $
+        configEnvOverride config minimalEnvSettings { esLocaleUtf8 = True }
+    join (findExecutable eoWithoutLocals (compilerExeName wc))
 
 data ProjectAndConfigMonoid
   = ProjectAndConfigMonoid !Project !ConfigMonoid
