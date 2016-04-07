@@ -250,7 +250,7 @@ rules global@Global{..} args = do
            need [pkgFile]
            () <- cmd "deb-s3 upload --preserve-versions --bucket download.fpcomplete.com"
                [ "--sign=" ++ gGpgKey
-               , "--gpg-options=" ++ gpgOptions
+               , "--gpg-options=" ++ replace "-" "\\-" gpgOptions
                , "--prefix=" ++ dvDistro
                , "--codename=" ++ dvCodeName
                , pkgFile ]
@@ -258,7 +258,7 @@ rules global@Global{..} args = do
            -- configured with it.
            () <- cmd "deb-s3 upload --preserve-versions --bucket download.fpcomplete.com"
                [ "--sign=" ++ gGpgKey
-               , "--gpg-options=" ++ gpgOptions
+               , "--gpg-options=" ++ replace "-" "\\-" gpgOptions
                , "--prefix=" ++ dvDistro ++ "/" ++ dvCodeName
                , pkgFile ]
            copyFileChanged pkgFile out
