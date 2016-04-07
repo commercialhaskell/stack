@@ -40,14 +40,14 @@ type Assemble e m = (HasConfig e, HasTerminal e, MonadBaseControl IO m, MonadIO 
 -- directory under '.stack-work'
 stageContainerImageArtifacts
     :: Build e m
-    => m ()
-stageContainerImageArtifacts = do
+    => Maybe (Path Abs Dir) -> m ()
+stageContainerImageArtifacts mProjectRoot = do
     config <- asks getConfig
-    workingDir <- getCurrentDir
     forM_
         (zip [0 ..] (imgDockers $ configImage config))
         (\(idx,opts) ->
-              do imageDir <- imageStagingDir workingDir idx
+              do imageDir <-
+                     imageStagingDir (fromMaybeProjectRoot mProjectRoot) idx
                  ignoringAbsence (removeDirRecur imageDir)
                  ensureDir imageDir
                  stageExesInDir opts imageDir
@@ -59,10 +59,9 @@ stageContainerImageArtifacts = do
 -- in the config file.
 createContainerImageFromStage
     :: Assemble e m
-    => [Text] -> m ()
-createContainerImageFromStage imageNames = do
+    => Maybe (Path Abs Dir) -> [Text] -> m ()
+createContainerImageFromStage mProjectRoot imageNames = do
     config <- asks getConfig
-    workingDir <- getCurrentDir
     forM_
         (zip
              [0 ..]
@@ -70,7 +69,8 @@ createContainerImageFromStage imageNames = do
                   (map T.unpack imageNames)
                   (imgDockers $ configImage config)))
         (\(idx,opts) ->
-              do imageDir <- imageStagingDir workingDir idx
+              do imageDir <-
+                     imageStagingDir (fromMaybeProjectRoot mProjectRoot) idx
                  createDockerImage opts imageDir
                  extendDockerImageWithEntrypoint opts imageDir)
   where
@@ -180,6 +180,11 @@ extendDockerImageWithEntrypoint dockerConfig dir = do
                                   , dockerImageName ++ "-" ++ ep
                                   , toFilePathNoTrailingSep dir]))
 
+-- | Fail with friendly error if project root not set.
+fromMaybeProjectRoot :: Maybe (Path Abs Dir) -> Path Abs Dir
+fromMaybeProjectRoot =
+    fromMaybe (throw StackImageCannotDetermineProjectRootException)
+
 -- | The command name for dealing with images.
 imgCmdName
     :: String
@@ -199,12 +204,19 @@ imgOptsFromMonoid ImageOptsMonoid{..} =
     }
 
 -- | Stack image exceptions.
-data StackImageException =
-    StackImageDockerBaseUnspecifiedException
-    deriving ((Typeable))
+data StackImageException
+    = StackImageDockerBaseUnspecifiedException  -- ^ Unspecified parent docker
+                                                -- container makes building
+                                                -- impossible
+    | StackImageCannotDetermineProjectRootException  -- ^ Can't determine the
+                                                     -- project root (where to
+                                                     -- put image sandbox).
+    deriving (Typeable)
 
 instance Exception StackImageException
 
 instance Show StackImageException where
     show StackImageDockerBaseUnspecifiedException =
         "You must specify a base docker image on which to place your haskell executables."
+    show StackImageCannotDetermineProjectRootException =
+        "Stack was unable to determine the project root in order to build a container."
