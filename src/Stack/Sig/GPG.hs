@@ -33,7 +33,7 @@ import           System.Process (readProcessWithExitCode)
 
 -- | Sign a file path with GPG, returning the @Signature@.
 signPackage
-    :: (Monad m, MonadIO m, MonadThrow m)
+    :: (MonadIO m, MonadThrow m)
     => Path Abs File -> m Signature
 signPackage path = do
     (code,out,err) <-
@@ -52,7 +52,7 @@ signPackage path = do
 -- | Verify the @Signature@ of a file path returning the
 -- @Fingerprint@.
 verifyFile
-    :: (Monad m, MonadIO m, MonadThrow m)
+    :: (MonadIO m, MonadThrow m)
     => Signature -> Path Abs File -> m Fingerprint
 verifyFile (Signature signature) path = do
     (code,out,err) <-
@@ -72,7 +72,7 @@ verifyFile (Signature signature) path = do
 
 -- | Try to execute `gpg2` but fallback to `gpg` (as a backup)
 gpg
-    :: (Monad m, MonadIO m, MonadThrow m)
+    :: (MonadIO m, MonadThrow m)
     => [String] -> String -> m (ExitCode, String, String)
 gpg args stdin = do
     mGpg2Path <- liftIO (findExecutable "gpg2")
