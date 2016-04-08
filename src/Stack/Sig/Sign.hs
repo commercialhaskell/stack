@@ -13,7 +13,7 @@ Stability   : experimental
 Portability : POSIX
 -}
 
-module Stack.Sig.Sign (sign, signTarBytes) where
+module Stack.Sig.Sign (sign, signPackage, signTarBytes) where
 
 import qualified Codec.Archive.Tar as Tar
 import qualified Codec.Compression.GZip as GZip
@@ -26,8 +26,6 @@ import qualified Data.ByteString.Lazy as BS
 import qualified Data.ByteString.Lazy as L
 import           Data.Monoid ((<>))
 import qualified Data.Text as T
-import           Data.UUID (toString)
-import           Data.UUID.V4 (nextRandom)
 import           Network.HTTP.Conduit
        (Response(..), RequestBody(..), Request(..), httpLbs, newManager,
         tlsManagerSettings)
@@ -43,12 +41,11 @@ import qualified System.FilePath as FP
 -- | Sign a haskell package with the given url of the signature
 -- service and a path to a tarball.
 sign
-    :: (MonadBaseControl IO m, MonadIO m, MonadMask m, MonadLogger m, MonadThrow m, MonadReader env m, HasConfig env)
-    => Maybe (Path Abs Dir) -> String -> Path Abs File -> m ()
-sign Nothing _ _ = throwM SigNoProjectRootException
-sign (Just projectRoot) url filePath =
-    withStackWorkTempDir
-        projectRoot
+    :: (MonadBaseControl IO m, MonadIO m, MonadMask m, MonadLogger m, MonadThrow m)
+    => String -> Path Abs File -> m ()
+sign url filePath =
+    withSystemTempDir
+        "stack"
         (\tempDir ->
               do bytes <-
                      liftIO
@@ -85,16 +82,15 @@ sign (Just projectRoot) url filePath =
 -- function will write the bytes to the path in a temp dir and sign
 -- the tarball with GPG.
 signTarBytes
-    :: (MonadBaseControl IO m, MonadIO m, MonadMask m, MonadLogger m, MonadThrow m, MonadReader env m, HasConfig env)
-    => Maybe (Path Abs Dir) -> String -> Path Rel File -> L.ByteString -> m ()
-signTarBytes Nothing _ _ _ = throwM SigNoProjectRootException
-signTarBytes (Just projectRoot) url tarPath bs =
-    withStackWorkTempDir
-        projectRoot
+    :: (MonadBaseControl IO m, MonadIO m, MonadMask m, MonadLogger m, MonadThrow m)
+    => String -> Path Rel File -> L.ByteString -> m ()
+signTarBytes url tarPath bs =
+    withSystemTempDir
+        "stack"
         (\tempDir ->
               do let tempTarBall = tempDir </> tarPath
                  liftIO (L.writeFile (toFilePath tempTarBall) bs)
-                 sign (Just projectRoot) url tempTarBall)
+                 sign url tempTarBall)
 
 -- | Sign a haskell package given the url to the signature service, a
 -- @PackageIdentifier@ and a file path to the package on disk.
@@ -123,16 +119,3 @@ signPackage url pkg filePath = do
         (responseStatus res /= status200)
         (throwM (GPGSignException "unable to sign & upload package"))
     $logInfo ("Signature uploaded to " <> T.pack fullUrl)
-
-withStackWorkTempDir
-    :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasConfig env)
-    => Path Abs Dir -> (Path Abs Dir -> m ()) -> m ()
-withStackWorkTempDir projectRoot f = do
-    uuid <- liftIO nextRandom
-    uuidPath <- parseRelDir (toString uuid)
-    workDir <- getWorkDir
-    let tempDir = projectRoot </> workDir </> $(mkRelDir "tmp") </> uuidPath
-    bracket
-        (ensureDir tempDir)
-        (const (removeDirRecur tempDir))
-        (const (f tempDir))

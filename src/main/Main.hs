@@ -932,7 +932,6 @@ uploadCmd (args, mpvpBounds, ignoreCheck, (dontSign, sigServerUrl)) go = do
     unless (null invalid) $ error $
         "stack upload expects a list sdist tarballs or cabal directories.  Can't find " ++
         show invalid
-    (_,lc) <- liftIO $ loadConfigWithOpts go
     let getUploader :: (HasStackRoot config, HasPlatform config, HasConfig config) => StackT config IO Upload.Uploader
         getUploader = do
             config <- asks getConfig
@@ -953,7 +952,6 @@ uploadCmd (args, mpvpBounds, ignoreCheck, (dontSign, sigServerUrl)) go = do
                      unless
                          dontSign
                          (Sig.sign
-                              (lcProjectRoot lc)
                               sigServerUrl
                               tarFile))
         unless (null dirs) $
@@ -966,7 +964,6 @@ uploadCmd (args, mpvpBounds, ignoreCheck, (dontSign, sigServerUrl)) go = do
                 unless
                     dontSign
                     (Sig.signTarBytes
-                         (lcProjectRoot lc)
                          sigServerUrl
                          tarPath
                          tarBytes)
@@ -986,8 +983,7 @@ sdistCmd (dirs, mpvpBounds, ignoreCheck, (dontSign,sigServerUrl)) go =
             liftIO $ L.writeFile (toFilePath tarPath) tarBytes
             unless ignoreCheck (checkSDistTarball tarPath)
             $logInfo $ "Wrote sdist tarball to " <> T.pack (toFilePath tarPath)
-            (_,lc) <- liftIO $ loadConfigWithOpts go
-            unless dontSign (Sig.sign (lcProjectRoot lc) sigServerUrl tarPath)
+            unless dontSign (Sig.sign sigServerUrl tarPath)
 
 -- | Execute a command.
 execCmd :: ExecOpts -> GlobalOpts -> IO ()
