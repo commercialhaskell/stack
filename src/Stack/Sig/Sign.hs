@@ -100,12 +100,11 @@ signPackage
 signPackage url pkg filePath = do
     $logInfo ("Signing " <> T.pack (toFilePath filePath))
     sig@(Signature signature) <- gpgSign filePath
-    let (PackageIdentifier n v) = pkg
-        name = show n
-        version = show v
+    let (PackageIdentifier name version) = pkg
     fingerprint <- gpgVerify sig filePath
     let fullUrl =
-            url <> "/upload/signature/" <> name <> "/" <> version <> "/" <>
+            url <> "/upload/signature/" <> show name <> "/" <> show version <>
+            "/" <>
             show fingerprint
     req <- parseUrl fullUrl
     let put =
