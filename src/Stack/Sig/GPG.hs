@@ -13,7 +13,7 @@ Stability   : experimental
 Portability : POSIX
 -}
 
-module Stack.Sig.GPG (signPackage, verifyFile) where
+module Stack.Sig.GPG (gpgSign, gpgVerify) where
 
 #if __GLASGOW_HASKELL__ < 710
 import           Control.Applicative ((<$>))
@@ -32,10 +32,10 @@ import           System.Exit (ExitCode(..))
 import           System.Process (readProcessWithExitCode)
 
 -- | Sign a file path with GPG, returning the @Signature@.
-signPackage
+gpgSign
     :: (MonadIO m, MonadThrow m)
     => Path Abs File -> m Signature
-signPackage path = do
+gpgSign path = do
     (code,out,err) <-
         gpg
             [ "--output"
@@ -51,10 +51,10 @@ signPackage path = do
 
 -- | Verify the @Signature@ of a file path returning the
 -- @Fingerprint@.
-verifyFile
+gpgVerify
     :: (MonadIO m, MonadThrow m)
     => Signature -> Path Abs File -> m Fingerprint
-verifyFile (Signature signature) path = do
+gpgVerify (Signature signature) path = do
     (code,out,err) <-
         gpg ["--verify", "-", toFilePath path] (C.unpack signature)
     if code /= ExitSuccess

@@ -36,7 +36,7 @@ import           Network.HTTP.Types (status200, methodPut)
 import           Path
 import           Path.IO
 import           Stack.Package
-import qualified Stack.Sig.GPG as GPG
+import           Stack.Sig.GPG
 import           Stack.Types
 import qualified System.FilePath as FP
 
@@ -103,11 +103,11 @@ signPackage
     => String -> PackageIdentifier -> Path Abs File -> m ()
 signPackage url pkg filePath = do
     $logInfo ("Signing " <> T.pack (toFilePath filePath))
-    sig@(Signature signature) <- GPG.signPackage filePath
+    sig@(Signature signature) <- gpgSign filePath
     let (PackageIdentifier n v) = pkg
         name = show n
         version = show v
-    fingerprint <- GPG.verifyFile sig filePath
+    fingerprint <- gpgVerify sig filePath
     let fullUrl =
             url <> "/upload/signature/" <> name <> "/" <> version <> "/" <>
             show fingerprint
