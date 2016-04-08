@@ -1,4 +1,4 @@
-# It may seem surprising that we don't dogfood stack itself here. The reason is
+# Here, we test with both stack and cabal. The reasons to test with cabal are
 # twofold:
 #
 # 1. We want to ensure that the bootstrapping case works
