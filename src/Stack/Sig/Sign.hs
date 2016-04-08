@@ -41,7 +41,7 @@ import qualified System.FilePath as FP
 -- | Sign a haskell package with the given url of the signature
 -- service and a path to a tarball.
 sign
-    :: (MonadBaseControl IO m, MonadIO m, MonadMask m, MonadLogger m, MonadThrow m)
+    :: (MonadIO m, MonadLogger m, MonadMask m, MonadThrow m)
     => String -> Path Abs File -> m ()
 sign url filePath =
     withSystemTempDir
@@ -82,7 +82,7 @@ sign url filePath =
 -- function will write the bytes to the path in a temp dir and sign
 -- the tarball with GPG.
 signTarBytes
-    :: (MonadBaseControl IO m, MonadIO m, MonadMask m, MonadLogger m, MonadThrow m)
+    :: (MonadIO m, MonadLogger m, MonadMask m, MonadThrow m)
     => String -> Path Rel File -> L.ByteString -> m ()
 signTarBytes url tarPath bs =
     withSystemTempDir
@@ -95,7 +95,7 @@ signTarBytes url tarPath bs =
 -- | Sign a haskell package given the url to the signature service, a
 -- @PackageIdentifier@ and a file path to the package on disk.
 signPackage
-    :: (MonadBaseControl IO m, MonadIO m, MonadMask m, MonadLogger m, MonadThrow m)
+    :: (MonadIO m, MonadLogger m, MonadThrow m)
     => String -> PackageIdentifier -> Path Abs File -> m ()
 signPackage url pkg filePath = do
     $logInfo ("Signing " <> T.pack (toFilePath filePath))
