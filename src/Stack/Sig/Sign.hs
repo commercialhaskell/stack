@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleContexts  #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RankNTypes        #-}
@@ -15,13 +16,16 @@ Portability : POSIX
 
 module Stack.Sig.Sign (sign, signPackage, signTarBytes) where
 
+#if __GLASGOW_HASKELL__ < 710
+import           Control.Applicative (Applicative(..))
+#endif
+
 import qualified Codec.Archive.Tar as Tar
 import qualified Codec.Compression.GZip as GZip
 import           Control.Monad (when)
 import           Control.Monad.Catch
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
-import           Control.Monad.Trans.Control
 import qualified Data.ByteString.Lazy as BS
 import qualified Data.ByteString.Lazy as L
 import           Data.Monoid ((<>))
@@ -41,7 +45,11 @@ import qualified System.FilePath as FP
 -- | Sign a haskell package with the given url of the signature
 -- service and a path to a tarball.
 sign
+#if __GLASGOW_HASKELL__ < 710
+    :: (Applicative m, MonadIO m, MonadLogger m, MonadMask m, MonadThrow m)
+#else
     :: (MonadIO m, MonadLogger m, MonadMask m, MonadThrow m)
+#endif
     => String -> Path Abs File -> m ()
 sign url filePath =
     withSystemTempDir
@@ -82,7 +90,11 @@ sign url filePath =
 -- function will write the bytes to the path in a temp dir and sign
 -- the tarball with GPG.
 signTarBytes
+#if __GLASGOW_HASKELL__ < 710
+    :: (Applicative m, MonadIO m, MonadLogger m, MonadMask m, MonadThrow m)
+#else
     :: (MonadIO m, MonadLogger m, MonadMask m, MonadThrow m)
+#endif
     => String -> Path Rel File -> L.ByteString -> m ()
 signTarBytes url tarPath bs =
     withSystemTempDir
