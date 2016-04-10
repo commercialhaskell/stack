@@ -285,9 +285,10 @@ parseTargets :: (MonadCatch m, MonadIO m)
              -> [Text] -- ^ command line targets
              -> m (Map PackageName Version, Map PackageName SimpleTarget)
 parseTargets needTargets implicitGlobal snap extras locals currDir textTargets' = do
-    let textTargets =
+    let nonExtraDeps = Map.keys $ Map.filter (not . lpvExtraDep) locals
+        textTargets =
             if null textTargets'
-                then map (T.pack . packageNameString) $ Map.keys $ Map.filter (not . lpvExtraDep) locals
+                then map (T.pack . packageNameString) nonExtraDeps
                 else textTargets'
     erawTargets <- mapM (parseRawTargetDirs currDir locals) textTargets
 
@@ -304,10 +305,12 @@ parseTargets needTargets implicitGlobal snap extras locals currDir textTargets' 
                  then case needTargets of
                         AllowNoTargets ->
                             return (Map.empty, Map.empty)
-                        NeedTargets ->
-                            throwM $ TargetParseException
-                              $ if implicitGlobal
-                                  then ["The specified targets matched no packages.\nPerhaps you need to run 'stack init'?"]
-                                  else ["The specified targets matched no packages"]
+                        NeedTargets
+                            | null textTargets' && implicitGlobal -> throwM $ TargetParseException
+                                ["The specified targets matched no packages.\nPerhaps you need to run 'stack init'?"]
+                            | null textTargets' && null nonExtraDeps -> throwM $ TargetParseException
+                                ["The project contains no local packages (packages not marked with 'extra-dep')"]
+                            | otherwise -> throwM $ TargetParseException
+                                ["The specified targets matched no packages"]
                  else return (Map.unions newExtras, targets)
         else throwM $ TargetParseException errs
