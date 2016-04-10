@@ -164,6 +164,7 @@ import           Path
 import qualified Paths_stack as Meta
 import           {-# SOURCE #-} Stack.Constants (stackRootEnvVar)
 import           Stack.Types.BuildPlan (SnapName, renderSnapName, parseSnapName)
+import           Stack.Types.BuildPlanUrlPrefixes
 import           Stack.Types.Compiler
 import           Stack.Types.Docker
 import           Stack.Types.Nix
@@ -221,6 +222,10 @@ data Config =
          ,configLatestSnapshotUrl   :: !Text
          -- ^ URL for a JSON file containing information on the latest
          -- snapshots available.
+         ,configBuildPlanUrlPrefixes   :: !BuildPlanUrlPrefixes
+         -- ^ URL for a build plan files
+         -- A build plan name (e.g. lts5.9.yaml) is appended when downloading
+         -- the build plan actually.
          ,configPackageIndices      :: ![PackageIndex]
          -- ^ Information on package indices. This is left biased, meaning that
          -- packages in an earlier index will shadow those in a later index.
@@ -752,6 +757,8 @@ data ConfigMonoid =
     -- ^ See: 'configHideTHLoading'
     , configMonoidLatestSnapshotUrl  :: !(Maybe Text)
     -- ^ See: 'configLatestSnapshotUrl'
+    , configMonoidBuildPlanUrlPrefixes :: !BuildPlanUrlPrefixesMonoid
+    -- ^ See: 'configBuildPlanUrlPrefixes
     , configMonoidPackageIndices     :: !(Maybe [PackageIndex])
     -- ^ See: 'configPackageIndices'
     , configMonoidSystemGHC          :: !(Maybe Bool)
@@ -824,6 +831,7 @@ instance Monoid ConfigMonoid where
     , configMonoidConnectionCount = Nothing
     , configMonoidHideTHLoading = Nothing
     , configMonoidLatestSnapshotUrl = Nothing
+    , configMonoidBuildPlanUrlPrefixes = mempty
     , configMonoidPackageIndices = Nothing
     , configMonoidSystemGHC = Nothing
     , configMonoidInstallGHC = Nothing
@@ -862,6 +870,7 @@ instance Monoid ConfigMonoid where
     , configMonoidConnectionCount = configMonoidConnectionCount l <|> configMonoidConnectionCount r
     , configMonoidHideTHLoading = configMonoidHideTHLoading l <|> configMonoidHideTHLoading r
     , configMonoidLatestSnapshotUrl = configMonoidLatestSnapshotUrl l <|> configMonoidLatestSnapshotUrl r
+    , configMonoidBuildPlanUrlPrefixes = configMonoidBuildPlanUrlPrefixes l <> configMonoidBuildPlanUrlPrefixes r
     , configMonoidPackageIndices = configMonoidPackageIndices l <|> configMonoidPackageIndices r
     , configMonoidSystemGHC = configMonoidSystemGHC l <|> configMonoidSystemGHC r
     , configMonoidInstallGHC = configMonoidInstallGHC l <|> configMonoidInstallGHC r
@@ -909,6 +918,7 @@ parseConfigMonoidJSON obj = do
     configMonoidConnectionCount <- obj ..:? configMonoidConnectionCountName
     configMonoidHideTHLoading <- obj ..:? configMonoidHideTHLoadingName
     configMonoidLatestSnapshotUrl <- obj ..:? configMonoidLatestSnapshotUrlName
+    configMonoidBuildPlanUrlPrefixes <- jsonSubWarnings (obj ..:? configMonoidBuildPlanUrlPrefixesName ..!= mempty)
     configMonoidPackageIndices <- jsonSubWarningsTT (obj ..:?  configMonoidPackageIndicesName)
     configMonoidSystemGHC <- obj ..:? configMonoidSystemGHCName
     configMonoidInstallGHC <- obj ..:? configMonoidInstallGHCName
@@ -1004,6 +1014,9 @@ configMonoidHideTHLoadingName = "hide-th-loading"
 
 configMonoidLatestSnapshotUrlName :: Text
 configMonoidLatestSnapshotUrlName = "latest-snapshot-url"
+
+configMonoidBuildPlanUrlPrefixesName :: Text
+configMonoidBuildPlanUrlPrefixesName = "build-plan-url-prefixes"
 
 configMonoidPackageIndicesName :: Text
 configMonoidPackageIndicesName = "package-indices"

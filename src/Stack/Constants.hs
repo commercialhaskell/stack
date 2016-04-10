@@ -11,7 +11,6 @@ module Stack.Constants
     ,haskellModuleExts
     ,imageStagingDir
     ,projectDockerSandboxDir
-    ,rawGithubUrl
     ,stackDotYaml
     ,stackRootEnvVar
     ,inContainerEnvVar
@@ -45,7 +44,6 @@ import           Data.Char (toUpper)
 import           Data.HashSet (HashSet)
 import qualified Data.HashSet as HashSet
 import           Data.Text (Text)
-import qualified Data.Text as T
 import           Path as FL
 import           Prelude
 import           Stack.Types.Compiler
@@ -168,23 +166,6 @@ distRelativeDir = do
         workDir </>
         $(mkRelDir "dist") </>
         platformAndCabal
-
--- | Get a URL for a raw file on Github
-rawGithubUrl :: Text -- ^ user/org name
-             -> Text -- ^ repo name
-             -> Text -- ^ branch name
-             -> Text -- ^ filename
-             -> Text
-rawGithubUrl org repo branch file = T.concat
-    [ "https://raw.githubusercontent.com/"
-    , org
-    , "/"
-    , repo
-    , "/"
-    , branch
-    , "/"
-    , file
-    ]
 
 -- | Docker sandbox from project root.
 projectDockerSandboxDir :: (MonadReader env m, HasConfig env)

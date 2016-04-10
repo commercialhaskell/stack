@@ -78,6 +78,7 @@ import qualified Paths_stack as Meta
 import           Safe (headMay)
 import           Stack.BuildPlan
 import           Stack.Config.Build
+import           Stack.Config.BuildPlanUrlPrefixes
 import           Stack.Config.Docker
 import           Stack.Config.Nix
 import           Stack.Constants
@@ -205,6 +206,7 @@ configFromConfigMonoid configStackRoot configUserConfigPath mresolver mproject c
          configLatestSnapshotUrl = fromMaybe
             "https://s3.amazonaws.com/haddock.stackage.org/snapshots.json"
             configMonoidLatestSnapshotUrl
+         configBuildPlanUrlPrefixes = buildPlanUrlPrefixesFromMonoid configMonoidBuildPlanUrlPrefixes
          configPackageIndices = fromMaybe
             [PackageIndex
                 { indexName = IndexName "Hackage"
