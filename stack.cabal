@@ -220,7 +220,7 @@ library
 executable stack
   hs-source-dirs: src/main
   main-is:        Main.hs
-  ghc-options:    -threaded -rtsopts -Wall -fwarn-tabs -fwarn-incomplete-uni-patterns -fwarn-incomplete-record-updates
+  ghc-options:    -threaded -Wall -fwarn-tabs -fwarn-incomplete-uni-patterns -fwarn-incomplete-record-updates
   other-modules:  Paths_stack
   if flag(static)
       ld-options: -static -pthread

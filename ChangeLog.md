@@ -16,6 +16,10 @@ Behavior changes:
 * The `stack path --ghc-paths` option is renamed to `--programs-path`.
   `--compiler-path` is added, which points directly at the compiler used in
   the current project.
+* The stack executable is no longer built with `-rtsopts`.  Before, when
+  `-rtsopts` was enabled, stack would process `+RTS` options even when intended
+  for some other program, such as when used with `stack exec -- prog +RTS`.
+  See [#2022](https://github.com/commercialhaskell/stack/issues/2022).
 
 Other enhancements:
 
