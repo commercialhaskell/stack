@@ -548,27 +548,6 @@ describeConfigDiff config old new
         ]
     | otherwise = Nothing
   where
-    -- options set by stack
-    isStackOpt t = any (`T.isPrefixOf` t)
-        [ "--dependency="
-        , "--constraint="
-        , "--package-db="
-        , "--libdir="
-        , "--bindir="
-        , "--datadir="
-        , "--libexecdir="
-        , "--sysconfdir"
-        , "--docdir="
-        , "--htmldir="
-        , "--haddockdir="
-        , "--enable-tests"
-        , "--enable-benchmarks"
-        , "--enable-library-profiling"
-        , "--enable-executable-profiling"
-        ] || elem t
-        [ "--user"
-        ]
-
     stripGhcOptions =
         go
       where

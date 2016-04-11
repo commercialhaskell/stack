@@ -34,6 +34,7 @@ module Stack.Types.Build
     ,ConfigCache(..)
     ,ConstructPlanException(..)
     ,configureOpts
+    ,isStackOpt
     ,BadDependency(..)
     ,wantedLocalPackages
     ,FileCacheInfo (..)
@@ -563,6 +564,28 @@ configureOpts econfig bco deps wanted isLocal loc package = ConfigureOpts
     { coDirs = configureOptsDirs bco loc package
     , coNoDirs = configureOptsNoDir econfig bco deps wanted isLocal package
     }
+
+-- options set by stack
+isStackOpt :: Text -> Bool
+isStackOpt t = any (`T.isPrefixOf` t)
+    [ "--dependency="
+    , "--constraint="
+    , "--package-db="
+    , "--libdir="
+    , "--bindir="
+    , "--datadir="
+    , "--libexecdir="
+    , "--sysconfdir"
+    , "--docdir="
+    , "--htmldir="
+    , "--haddockdir="
+    , "--enable-tests"
+    , "--enable-benchmarks"
+    , "--enable-library-profiling"
+    , "--enable-executable-profiling"
+    ] || elem t
+    [ "--user"
+    ]
 
 configureOptsDirs :: BaseConfigOpts
                   -> InstallLocation
