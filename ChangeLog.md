@@ -16,6 +16,7 @@ Behavior changes:
 
 Other enhancements:
 
+* Fix too much rebuilding when enabling/disabling profiling flags.
 * Experimental support for `--split-objs` added.
 * `git` packages with submodules are supported by passing the `--recursive`
   flag to `git clone`.
@@ -25,7 +26,7 @@ Other enhancements:
 * `stack ghci` now runs ghci as a separate process #1306
 * Retry when downloading snapshots and package indices
 * Many build options are configurable now in `stack.yaml`:
-``` 
+```
   build:
     library-profiling: true
     executable-profiling: true
