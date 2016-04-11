@@ -536,6 +536,7 @@ pathCmd keys go =
             localroot <- installationRootLocal
             distDir <- distRelativeDir
             hpcDir <- hpcReportDir
+            compilerPath <- getCompilerPath =<< getWhichCompiler
             forM_
                 -- filter the chosen paths in flags (keys),
                 -- or show all of them if no specific paths chosen.
@@ -561,20 +562,22 @@ pathCmd keys go =
                                     localroot
                                     distDir
                                     hpcDir
-                                    extra))))
+                                    extra
+                                    compilerPath))))
 
 -- | Passed to all the path printers as a source of info.
 data PathInfo = PathInfo
-    { piBuildConfig :: BuildConfig
-    , piEnvOverride :: EnvOverride
-    , piSnapDb      :: Path Abs Dir
-    , piLocalDb     :: Path Abs Dir
-    , piGlobalDb    :: Path Abs Dir
-    , piSnapRoot    :: Path Abs Dir
-    , piLocalRoot   :: Path Abs Dir
-    , piDistDir     :: Path Rel Dir
-    , piHpcDir      :: Path Abs Dir
-    , piExtraDbs    :: [Path Abs Dir]
+    { piBuildConfig  :: BuildConfig
+    , piEnvOverride  :: EnvOverride
+    , piSnapDb       :: Path Abs Dir
+    , piLocalDb      :: Path Abs Dir
+    , piGlobalDb     :: Path Abs Dir
+    , piSnapRoot     :: Path Abs Dir
+    , piLocalRoot    :: Path Abs Dir
+    , piDistDir      :: Path Rel Dir
+    , piHpcDir       :: Path Abs Dir
+    , piExtraDbs     :: [Path Abs Dir]
+    , piCompilerPath :: Path Abs File
     }
 
 -- | The paths of interest to a user. The first tuple string is used
@@ -600,9 +603,12 @@ paths =
     , ( "PATH environment variable"
       , "bin-path"
       , T.pack . intercalate [searchPathSeparator] . eoPath . piEnvOverride )
-    , ( "Installed GHCs (unpacked and archives)"
-      , "ghc-paths"
+    , ( "Install location for GHC and other core tools"
+      , "programs-path"
       , T.pack . toFilePathNoTrailingSep . configLocalPrograms . bcConfig . piBuildConfig )
+    , ( "Compiler (e.g. ghc)"
+      , "compiler-path"
+      , T.pack . toFilePath . piCompilerPath )
     , ( "Local bin path where stack installs executables"
       , "local-bin-path"
       , T.pack . toFilePathNoTrailingSep . configLocalBin . bcConfig . piBuildConfig )

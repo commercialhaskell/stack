@@ -1473,7 +1473,8 @@ global-stack-root: /home/michael/.stack
 project-root: /home/michael/wai
 config-location: /home/michael/wai/stack.yaml
 bin-path: /home/michael/.stack/snapshots/x86_64-linux/lts-2.17/7.8.4/bin:/home/michael/.stack/programs/x86_64-linux/ghc-7.8.4/bin:/home/michael/.stack/programs/x86_64-linux/ghc-7.10.2/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-ghc-paths: /home/michael/.stack/programs/x86_64-linux
+programs-path: /home/michael/.stack/programs/x86_64-linux
+compiler-path: /home/michael/.stack/programs/x86_64-linux/ghc-7.8.4/bin/ghc
 local-bin-path: /home/michael/.local/bin
 extra-include-dirs:
 extra-library-dirs:
@@ -1491,7 +1492,7 @@ these keys you're interested in, which can be convenient for scripting. As a
 simple example, let's find out which versions of GHC are installed locally:
 
 ```
-michael@d30748af6d3d:~/wai$ ls $(stack path --ghc-paths)/*.installed
+michael@d30748af6d3d:~/wai$ ls $(stack path --programs-path)/*.installed
 /home/michael/.stack/programs/x86_64-linux/ghc-7.10.2.installed
 /home/michael/.stack/programs/x86_64-linux/ghc-7.8.4.installed
 ```
@@ -1504,7 +1505,7 @@ what needs to be removed:
 1. The stack executable itself
 2. The stack root, e.g. `$HOME/.stack` on non-Windows systems.
     * See `stack path --global-stack-root`
-    * On Windows, you will also need to delete `stack path --ghc-paths`
+    * On Windows, you will also need to delete `stack path --programs-paths`
 3. Any local `.stack-work` directories inside a project
 
 ## exec
