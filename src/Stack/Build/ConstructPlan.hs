@@ -563,6 +563,8 @@ describeConfigDiff config old new
         , "--haddockdir="
         , "--enable-tests"
         , "--enable-benchmarks"
+        , "--enable-library-profiling"
+        , "--enable-executable-profiling"
         ] || elem t
         [ "--user"
         ]
