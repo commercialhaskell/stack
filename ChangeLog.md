@@ -13,8 +13,9 @@ Behavior changes:
 * `stack init` now ignores symlinks when searching for cabal files. It also now
   ignores any directory that begins with `.` (as well as `dist` dirs) - before
   it would only ignore `.git`, `.stack-work`, and `dist`.
-* `stack path --ghc-paths` is replaced with `--compiler-path` which points
-  directly at the binary used in the current project.
+* The `stack path --ghc-paths` option is renamed to `--programs-path`.
+  `--compiler-path` is added, which points directly at the compiler used in
+  the current project.
 
 Other enhancements:
 

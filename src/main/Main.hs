@@ -603,6 +603,9 @@ paths =
     , ( "PATH environment variable"
       , "bin-path"
       , T.pack . intercalate [searchPathSeparator] . eoPath . piEnvOverride )
+    , ( "Install location for GHC and other core tools"
+      , "programs-path"
+      , T.pack . toFilePathNoTrailingSep . configLocalPrograms . bcConfig . piBuildConfig )
     , ( "Compiler (e.g. ghc)"
       , "compiler-path"
       , T.pack . toFilePath . piCompilerPath )
