@@ -90,7 +90,8 @@ openHaddocksInBrowser bco pkgLocations buildTargets = do
                         getDocIndex
             _ -> getDocIndex
     $logInfo ("Opening " <> T.pack (toFilePath docFile) <> " in the browser.")
-    void $ liftIO $ openBrowser (toFilePath docFile)
+    _ <- liftIO $ openBrowser (toFilePath docFile)
+    return ()
 
 -- | Determine whether we should haddock for a package.
 shouldHaddockPackage :: BuildOpts
