@@ -149,28 +149,16 @@ resolveIdents _ _ _ (ri, RTPackageComponent x y) = Right ((ri, RTPackageComponen
 resolveIdents _ _ _ (ri, RTComponent x) = Right ((ri, RTComponent x), Map.empty)
 resolveIdents _ _ _ (ri, RTPackage x) = Right ((ri, RTPackage x), Map.empty)
 resolveIdents snap extras locals (ri, RTPackageIdentifier (PackageIdentifier name version)) =
-    case mfound of
-        Just (foundPlace, foundVersion) | foundVersion /= version -> Left $ T.pack $ concat
-            [ "Specified target version "
-            , versionString version
-            , " for package "
-            , packageNameString name
-            , " does not match "
-            , foundPlace
-            , " version "
-            , versionString foundVersion
-            ]
-        _ -> Right
-            ( (ri, RTPackage name)
-            , case mfound of
-                -- Add to extra deps since we didn't have it already
-                Nothing -> Map.singleton name version
-                -- Already had it, don't add to extra deps
-                Just _ -> Map.empty
-            )
+    Right ((ri, RTPackage name), newExtras)
   where
+    newExtras =
+        case mfound of
+            -- If the found version matches, no need for an extra-dep.
+            Just (_, foundVersion) | foundVersion == version -> Map.empty
+            -- Otherwise, if there is no specified version or a
+            -- mismatch, add an extra-dep.
+            _ -> Map.singleton name version
     mfound = mlocal <|> mextra <|> msnap
-
     mlocal = (("local", ) . lpvVersion) <$> Map.lookup name locals
     mextra = ("extra-deps", ) <$> Map.lookup name extras
     msnap = ("snapshot", ) <$> Map.lookup name snap
