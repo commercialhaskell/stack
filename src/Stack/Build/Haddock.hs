@@ -16,40 +16,41 @@ module Stack.Build.Haddock
     , shouldHaddockDeps
     ) where
 
-import           Control.Exception              (tryJust, onException)
+import           Control.Exception (tryJust, onException)
 import           Control.Monad
-import           Control.Monad.Catch            (MonadCatch)
+import           Control.Monad.Catch (MonadCatch)
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import           Control.Monad.Reader
 import           Control.Monad.Trans.Resource
-import qualified Data.Foldable                  as F
+import qualified Data.Foldable as F
 import           Data.Function
-import qualified Data.HashSet                   as HS
+import qualified Data.HashSet as HS
 import           Data.List
-import           Data.List.Extra                (nubOrd)
-import           Data.Map.Strict                (Map)
-import qualified Data.Map.Strict                as Map
+import           Data.List.Extra (nubOrd)
+import           Data.Map.Strict (Map)
+import qualified Data.Map.Strict as Map
 import           Data.Maybe
-import           Data.Maybe.Extra               (mapMaybeM)
-import           Data.Set                       (Set)
-import qualified Data.Set                       as Set
-import           Data.Text                      (Text)
-import qualified Data.Text                      as T
-import           Data.Time                      (UTCTime)
+import           Data.Maybe.Extra (mapMaybeM)
+import           Data.Monoid ((<>))
+import           Data.Set (Set)
+import qualified Data.Set as Set
+import           Data.Text (Text)
+import qualified Data.Text as T
+import           Data.Time (UTCTime)
 import           Path
 import           Path.Extra
 import           Path.IO
 import           Prelude
 import           Stack.PackageDump
 import           Stack.Types
-import qualified System.FilePath                as FP
-import           System.IO.Error                (isDoesNotExistError)
+import qualified System.FilePath as FP
+import           System.IO.Error (isDoesNotExistError)
 import           System.Process.Read
-import           Web.Browser                    (openBrowser)
+import           Web.Browser (openBrowser)
 
 openHaddocksInBrowser
-    :: (MonadIO m, MonadReader env m, HasBuildConfig env, MonadThrow m)
+    :: (MonadIO m, MonadReader env m, HasBuildConfig env, MonadThrow m, MonadLogger m)
     => BaseConfigOpts
     -> Map PackageName (PackageIdentifier, InstallLocation)
     -- ^ Available packages and their locations for the current project
@@ -58,7 +59,18 @@ openHaddocksInBrowser
     -> m ()
 openHaddocksInBrowser bco pkgLocations buildTargets = do
     let cliTargets = (boptsCLITargets . bcoBuildOptsCLI) bco
-    docDir <-
+        getDocIndex = do
+            let localDocs = haddockIndexFile (localDepsDocDir bco)
+            localExists <- doesFileExist localDocs
+            if localExists
+                then return localDocs
+                else do
+                    let snapDocs = haddockIndexFile (snapDocDir bco)
+                    snapExists <- doesFileExist snapDocs
+                    if snapExists
+                        then return snapDocs
+                        else fail "No local or snapshot doc index found to open."
+    docFile <-
         case (cliTargets, map (`Map.lookup` pkgLocations) (Set.toList buildTargets)) of
             ([_], [Just (pkgId, iloc)]) -> do
                 pkgRelDir <- (parseRelDir . packageIdentifierString) pkgId
@@ -66,14 +78,19 @@ openHaddocksInBrowser bco pkgLocations buildTargets = do
                         case iloc of
                             Snap -> snapDocDir bco
                             Local -> localDocDir bco
-                return (docLocation </> pkgRelDir)
-            _ -> do
-                inGlobalProject <- asks (bcImplicitGlobal . getBuildConfig)
-                return $
-                    if inGlobalProject
-                        then snapDocDir bco
-                        else localDepsDocDir bco
-    (liftIO . void . openBrowser . toFilePath . haddockIndexFile) docDir
+                let docFile = haddockIndexFile (docLocation </> pkgRelDir)
+                exists <- doesFileExist docFile
+                if exists
+                    then return docFile
+                    else do
+                        $logWarn $
+                            "Expected to find documentation at " <>
+                            T.pack (toFilePath docFile) <>
+                            ", but that file is missing.  Opening doc index instead."
+                        getDocIndex
+            _ -> getDocIndex
+    $logInfo ("Opening " <> T.pack (toFilePath docFile) <> " in the browser.")
+    void $ liftIO $ openBrowser (toFilePath docFile)
 
 -- | Determine whether we should haddock for a package.
 shouldHaddockPackage :: BuildOpts
