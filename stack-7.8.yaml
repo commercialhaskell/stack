@@ -26,3 +26,4 @@ extra-deps:
 - base-compat-0.9.0
 - hpack-0.10.0
 - microlens-0.4.1.0
+- open-browser-0.2.1.0

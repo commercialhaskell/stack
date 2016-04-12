@@ -83,7 +83,7 @@ build setLocalFiles mbuildLk boptsCli = fixCodePage $ do
     let profiling = boptsLibProfile bopts || boptsExeProfile bopts
     menv <- getMinimalEnvOverride
 
-    (_, mbp, locals, extraToBuild, sourceMap) <- loadSourceMap NeedTargets boptsCli
+    (targets, mbp, locals, extraToBuild, sourceMap) <- loadSourceMap NeedTargets boptsCli
 
     -- Set local files, necessary for file watching
     stackYaml <- asks $ bcStackYaml . getBuildConfig
@@ -126,6 +126,7 @@ build setLocalFiles mbuildLk boptsCli = fixCodePage $ do
                          snapshotDumpPkgs
                          localDumpPkgs
                          installedMap
+                         targets
                          plan
 
 -- | If all the tasks are local, they don't mutate anything outside of our local directory.
