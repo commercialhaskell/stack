@@ -32,6 +32,8 @@ Other enhancements:
 
 * `stack haddock --open [PACKAGE]` opens the local haddocks in the browser.
 * Fix too much rebuilding when enabling/disabling profiling flags.
+* `stack build pkg-1.0` will now build `pkg-1.0` even if the snapshot specifies
+  a different version (it introduces a temporary extra-dep)
 * Experimental support for `--split-objs` added.
 * `git` packages with submodules are supported by passing the `--recursive`
   flag to `git clone`.
