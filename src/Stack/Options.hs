@@ -29,7 +29,7 @@ module Stack.Options
     ) where
 
 import           Control.Monad.Logger              (LogLevel (..))
-import           Data.Char                         (isSpace, toLower)
+import           Data.Char                         (isSpace, toLower, toUpper)
 import           Data.List                         (intercalate)
 import           Data.List.Split                   (splitOn)
 import qualified Data.Map                          as Map
@@ -45,11 +45,12 @@ import           Options.Applicative
 import           Options.Applicative.Args
 import           Options.Applicative.Builder.Extra
 import           Options.Applicative.Types         (fromM, oneM, readerAsk)
+import           Path
 import           Stack.Build                       (splitObjsWarning)
 import           Stack.Clean                       (CleanOpts (..))
 import           Stack.Config                      (packagesParser)
 import           Stack.ConfigCmd
-import           Stack.Constants                   (stackProgName)
+import           Stack.Constants
 import           Stack.Coverage                    (HpcReportOpts (..))
 import           Stack.Docker
 import qualified Stack.Docker                      as Docker
@@ -201,8 +202,9 @@ cleanOptsParser = CleanShallow <$> packages <|> doFullClean
 -- | Command-line arguments parser for configuration.
 configOptsParser :: GlobalOptsContext -> Parser ConfigMonoid
 configOptsParser hide0 =
-    (\workDir buildOpts dockerOpts nixOpts systemGHC installGHC arch os ghcVariant jobs includes libs skipGHCCheck skipMsys localBin modifyCodePage allowDifferentUser -> mempty
-        { configMonoidWorkDir = workDir
+    (\stackRoot workDir buildOpts dockerOpts nixOpts systemGHC installGHC arch os ghcVariant jobs includes libs skipGHCCheck skipMsys localBin modifyCodePage allowDifferentUser -> mempty
+        { configMonoidStackRoot = stackRoot
+        , configMonoidWorkDir = workDir
         , configMonoidBuildOpts = buildOpts
         , configMonoidDockerOpts = dockerOpts
         , configMonoidNixOpts = nixOpts
@@ -220,7 +222,14 @@ configOptsParser hide0 =
         , configMonoidModifyCodePage = modifyCodePage
         , configMonoidAllowDifferentUser = allowDifferentUser
         })
-    <$> optional (strOption
+    <$> optional (option readAbsDir
+            ( long stackRootOptionName
+            <> metavar (map toUpper stackRootOptionName)
+            <> help ("Absolute path to the global stack root directory " ++
+                     "(Overrides any STACK_ROOT environment variable)")
+            <> hide
+            ))
+    <*> optional (strOption
             ( long "work-dir"
             <> metavar "WORK-DIR"
             <> help "Override work directory (default: .stack-work)"
@@ -293,6 +302,15 @@ configOptsParser hide0 =
                 "directory to use a stack installation (POSIX only)")
             hide
   where hide = hideMods (hide0 /= OuterGlobalOpts)
+
+readAbsDir :: ReadM (Path Abs Dir)
+readAbsDir = do
+    s <- readerAsk
+    case parseAbsDir s of
+        Just p -> return p
+        Nothing ->
+            readerError
+                ("Failed to parse absolute path to directory: '" ++ s ++ "'")
 
 buildOptsMonoidParser :: Bool -> Parser BuildOptsMonoid
 buildOptsMonoidParser hide0 =

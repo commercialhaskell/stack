@@ -162,7 +162,6 @@ import           Distribution.Version (anyVersion)
 import           Network.HTTP.Client (parseUrl)
 import           Path
 import qualified Paths_stack as Meta
-import           {-# SOURCE #-} Stack.Constants (stackRootEnvVar)
 import           Stack.Types.BuildPlan (SnapName, renderSnapName, parseSnapName)
 import           Stack.Types.Compiler
 import           Stack.Types.Docker
@@ -738,7 +737,9 @@ instance HasBuildConfig BuildConfig where
 -- Configurations may be "cascaded" using mappend (left-biased).
 data ConfigMonoid =
   ConfigMonoid
-    { configMonoidWorkDir            :: !(Maybe FilePath)
+    { configMonoidStackRoot          :: !(Maybe (Path Abs Dir))
+    -- ^ See: 'configStackRoot'
+    , configMonoidWorkDir            :: !(Maybe FilePath)
     -- ^ See: 'configWorkDir'.
     , configMonoidBuildOpts          :: !BuildOptsMonoid
     -- ^ build options.
@@ -817,7 +818,8 @@ data ConfigMonoid =
 
 instance Monoid ConfigMonoid where
   mempty = ConfigMonoid
-    { configMonoidWorkDir = Nothing
+    { configMonoidStackRoot = Nothing
+    , configMonoidWorkDir = Nothing
     , configMonoidBuildOpts = mempty
     , configMonoidDockerOpts = mempty
     , configMonoidNixOpts = mempty
@@ -855,7 +857,8 @@ instance Monoid ConfigMonoid where
     , configMonoidAllowDifferentUser = Nothing
     }
   mappend l r = ConfigMonoid
-    { configMonoidWorkDir = configMonoidWorkDir l <|> configMonoidWorkDir r
+    { configMonoidStackRoot = configMonoidStackRoot l <|> configMonoidStackRoot r
+    , configMonoidWorkDir = configMonoidWorkDir l <|> configMonoidWorkDir r
     , configMonoidBuildOpts = configMonoidBuildOpts l <> configMonoidBuildOpts r
     , configMonoidDockerOpts = configMonoidDockerOpts l <> configMonoidDockerOpts r
     , configMonoidNixOpts = configMonoidNixOpts l <> configMonoidNixOpts r
@@ -902,6 +905,8 @@ instance FromJSON (WithJSONWarnings ConfigMonoid) where
 -- warnings for missing fields.
 parseConfigMonoidJSON :: Object -> WarningParser ConfigMonoid
 parseConfigMonoidJSON obj = do
+    -- Parsing 'stackRoot' from 'stackRoot'/config.yaml would be nonsensical
+    let configMonoidStackRoot = Nothing
     configMonoidWorkDir <- obj ..:? configMonoidWorkDirName
     configMonoidBuildOpts <- jsonSubWarnings (obj ..:? configMonoidBuildOptsName ..!= mempty)
     configMonoidDockerOpts <- jsonSubWarnings (obj ..:? configMonoidDockerOptsName ..!= mempty)
@@ -1104,7 +1109,7 @@ data ConfigException
   | ResolverPartial Resolver String
   | NoSuchDirectory FilePath
   | ParseGHCVariantException String
-  | BadStackRootEnvVar (Path Abs Dir)
+  | BadStackRoot (Path Abs Dir)
   | Won'tCreateStackRootInDirectoryOwnedByDifferentUser (Path Abs Dir) (Path Abs Dir) -- ^ @$STACK_ROOT@, parent dir
   | UserDoesn'tOwnDirectory (Path Abs Dir)
   deriving Typeable
@@ -1182,17 +1187,13 @@ instance Show ConfigException where
         [ "Invalid ghc-variant value: "
         , v
         ]
-    show (BadStackRootEnvVar envStackRoot) = concat
-        [ "Invalid $"
-        , stackRootEnvVar
-        , ": '"
-        , toFilePath envStackRoot
+    show (BadStackRoot stackRoot) = concat
+        [ "Invalid stack root: '"
+        , toFilePath stackRoot
         , "'. Please provide a valid absolute path."
         ]
     show (Won'tCreateStackRootInDirectoryOwnedByDifferentUser envStackRoot parentDir) = concat
-        [ "Preventing creation of $"
-        , stackRootEnvVar
-        , " '"
+        [ "Preventing creation of stack root '"
         , toFilePath envStackRoot
         , "'. Parent directory '"
         , toFilePath parentDir

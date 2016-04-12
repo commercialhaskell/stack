@@ -391,7 +391,7 @@ loadConfig :: (MonadLogger m,MonadIO m,MonadMask m,MonadThrow m,MonadBaseControl
            -- ^ Override resolver
            -> m (LoadConfig m)
 loadConfig configArgs mstackYaml mresolver = do
-    (stackRoot, userOwnsStackRoot) <- determineStackRootAndOwnership
+    (stackRoot, userOwnsStackRoot) <- determineStackRootAndOwnership configArgs
     userConfigPath <- getDefaultUserConfigPath stackRoot
     extraConfigs0 <- getExtraConfigs userConfigPath >>= mapM loadYaml
     let extraConfigs =
@@ -645,19 +645,24 @@ resolvePackageLocation menv projRoot (PLRemote url remotePackageType) = do
 -- On Windows, the second value is always 'True'.
 determineStackRootAndOwnership
     :: (MonadIO m, MonadCatch m)
-    => m (Path Abs Dir, Bool)
-determineStackRootAndOwnership = do
+    => ConfigMonoid
+    -- ^ Parsed command-line arguments
+    -> m (Path Abs Dir, Bool)
+determineStackRootAndOwnership clArgs = do
     stackRoot <- do
-        mstackRoot <- liftIO $ lookupEnv stackRootEnvVar
-        case mstackRoot of
-            Nothing -> getAppUserDataDir stackProgName
-            Just x -> parseAbsDir x
+        case configMonoidStackRoot clArgs of
+            Just x -> return x
+            Nothing -> do
+                mstackRoot <- liftIO $ lookupEnv stackRootEnvVar
+                case mstackRoot of
+                    Nothing -> getAppUserDataDir stackProgName
+                    Just x -> parseAbsDir x
 
     (existingStackRootOrParentDir, userOwnsIt) <- do
         mdirAndOwnership <- findInParents getDirAndOwnership stackRoot
         case mdirAndOwnership of
             Just x -> return x
-            Nothing -> throwM (BadStackRootEnvVar stackRoot)
+            Nothing -> throwM (BadStackRoot stackRoot)
 
     when (existingStackRootOrParentDir /= stackRoot) $
         if userOwnsIt
