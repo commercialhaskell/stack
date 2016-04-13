@@ -932,7 +932,7 @@ ensureGhcjsBooted menv cv shouldBoot  = do
                         GhcjsVersion version _ -> return version
                         _ -> fail "ensureGhcjsBooted invoked on non GhcjsVersion"
                 actualStackYaml <- if stackYamlExists then return stackYaml
-                    else do
+                    else
                         liftM ((destDir </> $(mkRelDir "src")) </>) $
                         parseRelFile $ "ghcjs-" ++ versionString ghcjsVersion ++ "/stack.yaml"
                 actualStackYamlExists <- doesFileExist actualStackYaml
@@ -966,12 +966,12 @@ bootGhcjs ghcjsVersion stackYaml destDir = do
                     ". This may or may not work.\n" <>
                     "See this issue: https://github.com/ghcjs/ghcjs/issues/470"
                 return False
-            | ghcjsVersion >= $(mkVersion "0.3") && v >= $(mkVersion "1.22.8") -> do
+            | ghcjsVersion >= $(mkVersion "0.2.0.20160413") && v >= $(mkVersion "1.22.8") -> do
                 $logWarn $
                     "The cabal-install found on PATH, version " <>
                     versionText v <>
                     ", is >= 1.22.8.\n" <>
-                    "That version has a bug preventing ghcjs < 0.3 from booting.\n" <>
+                    "That version has a bug preventing ghcjs < 0.2.0.20160413 from booting.\n" <>
                     "See this issue: https://github.com/ghcjs/ghcjs/issues/470"
                 return True
             | otherwise -> return False
