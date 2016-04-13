@@ -11,7 +11,7 @@ import           Control.Exception (Exception)
 import           Control.Monad.Catch (MonadCatch, MonadThrow, throwM)
 import           Control.Monad.IO.Class (MonadIO)
 import           Control.Monad.Logger (MonadLogger)
-import           Control.Monad.Reader (MonadReader)
+import           Control.Monad.Reader (MonadReader, asks)
 import           Data.Foldable (forM_)
 import           Data.List ((\\),intercalate)
 import qualified Data.Map.Strict as Map
@@ -22,7 +22,7 @@ import           Path.IO (ignoringAbsence, removeDirRecur)
 import           Stack.Build.Source (getLocalPackageViews)
 import           Stack.Build.Target (LocalPackageView(..))
 import           Stack.Constants (distDirFromDir, workDirFromDir)
-import           Stack.Types (HasEnvConfig, PackageName, getProjectWorkDir)
+import           Stack.Types
 
 -- | Deletes build artifacts in the current project.
 --
@@ -40,18 +40,19 @@ dirsToDelete
     => CleanOpts
     -> m [Path Abs Dir]
 dirsToDelete cleanOpts = do
-    localPkgViews <- getLocalPackageViews
-    let localPkgNames = Map.keys localPkgViews
-        getPkgDir pkgName = fmap (lpvRoot . fst) (Map.lookup pkgName localPkgViews)
+    localPkgDirs <- asks (Map.keys . envConfigPackages . getEnvConfig)
     case cleanOpts of
+        CleanShallow [] -> do
+            mapM distDirFromDir localPkgDirs
         CleanShallow targets -> do
-            pkgsToClean <-
-                case targets \\ localPkgNames of
-                    [] -> return (if null targets then localPkgNames else targets)
-                    xs -> throwM (NonLocalPackages xs)
-            mapM distDirFromDir (mapMaybe getPkgDir pkgsToClean)
+            localPkgViews <- getLocalPackageViews
+            let localPkgNames = Map.keys localPkgViews
+                getPkgDir pkgName = fmap (lpvRoot . fst) (Map.lookup pkgName localPkgViews)
+            case targets \\ localPkgNames of
+                [] -> mapM distDirFromDir (mapMaybe getPkgDir targets)
+                xs -> throwM (NonLocalPackages xs)
         CleanFull -> do
-            pkgWorkDirs <- mapM workDirFromDir (mapMaybe getPkgDir localPkgNames)
+            pkgWorkDirs <- mapM workDirFromDir localPkgDirs
             projectWorkDir <- getProjectWorkDir
             return (projectWorkDir : pkgWorkDirs)
 
