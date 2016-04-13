@@ -24,6 +24,7 @@ import           Control.Arrow          (second)
 import           Control.Monad.Catch    (MonadCatch, throwM)
 import           Control.Monad.IO.Class
 import           Data.Either            (partitionEithers)
+import           Data.Foldable          (asum)
 import           Data.Map               (Map)
 import qualified Data.Map               as Map
 import           Data.Maybe             (mapMaybe)
@@ -154,14 +155,11 @@ resolveIdents snap extras locals (ri, RTPackageIdentifier (PackageIdentifier nam
     newExtras =
         case mfound of
             -- If the found version matches, no need for an extra-dep.
-            Just (_, foundVersion) | foundVersion == version -> Map.empty
+            Just foundVersion | foundVersion == version -> Map.empty
             -- Otherwise, if there is no specified version or a
             -- mismatch, add an extra-dep.
             _ -> Map.singleton name version
-    mfound = mlocal <|> mextra <|> msnap
-    mlocal = (("local", ) . lpvVersion) <$> Map.lookup name locals
-    mextra = ("extra-deps", ) <$> Map.lookup name extras
-    msnap = ("snapshot", ) <$> Map.lookup name snap
+    mfound = asum (map (Map.lookup name) [Map.map lpvVersion locals, extras, snap])
 
 resolveRawTarget :: Map PackageName Version -- ^ snapshot
                  -> Map PackageName Version -- ^ extra deps
