@@ -220,7 +220,7 @@ splitObjsWarning = unwords
      [ "Note that this feature is EXPERIMENTAL, and its behavior may be changed and improved."
      , "You will need to clean your workdirs before use. If you want to compile all dependencies"
      , "with split-objs, you will need to delete the snapshot (and all snapshots that could"
-     , "reference that snapshot."
+     , "reference that snapshot)."
      ]
 
 -- | Get the @BaseConfigOpts@ necessary for constructing configure options
