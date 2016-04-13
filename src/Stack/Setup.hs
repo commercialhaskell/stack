@@ -928,21 +928,22 @@ ensureGhcjsBooted menv cv shouldBoot  = do
                 -- This only affects the case where GHCJS has been
                 -- installed with an older version and not yet booted.
                 stackYamlExists <- doesFileExist stackYaml
-                actualStackYaml <- if stackYamlExists then return stackYaml
-                    else case cv of
-                        GhcjsVersion version _ ->
-                            liftM ((destDir </> $(mkRelDir "src")) </>) $
-                            parseRelFile $ "ghcjs-" ++ versionString version ++ "/stack.yaml"
+                ghcjsVersion <- case cv of
+                        GhcjsVersion version _ -> return version
                         _ -> fail "ensureGhcjsBooted invoked on non GhcjsVersion"
+                actualStackYaml <- if stackYamlExists then return stackYaml
+                    else do
+                        liftM ((destDir </> $(mkRelDir "src")) </>) $
+                        parseRelFile $ "ghcjs-" ++ versionString ghcjsVersion ++ "/stack.yaml"
                 actualStackYamlExists <- doesFileExist actualStackYaml
                 unless actualStackYamlExists $
                     fail "Couldn't find GHCJS stack.yaml in old or new location."
-                bootGhcjs actualStackYaml destDir
+                bootGhcjs ghcjsVersion actualStackYaml destDir
         Left err -> throwM err
 
 bootGhcjs :: (MonadIO m, MonadBaseControl IO m, MonadLogger m, MonadCatch m, HasHttpManager env, HasTerminal env, HasReExec env, HasLogLevel env, MonadReader env m)
-          => Path Abs File -> Path Abs Dir -> m ()
-bootGhcjs stackYaml destDir = do
+          => Version -> Path Abs File -> Path Abs Dir -> m ()
+bootGhcjs ghcjsVersion stackYaml destDir = do
     envConfig <- loadGhcjsEnvConfig stackYaml (destDir </> $(mkRelDir "bin"))
     menv <- liftIO $ configEnvOverride (getConfig envConfig) defaultEnvSettings
     -- Install cabal-install if missing, or if the installed one is old.
@@ -965,12 +966,12 @@ bootGhcjs stackYaml destDir = do
                     ". This may or may not work.\n" <>
                     "See this issue: https://github.com/ghcjs/ghcjs/issues/470"
                 return False
-            | v >= $(mkVersion "1.22.8") -> do
+            | ghcjsVersion >= $(mkVersion "0.3") && v >= $(mkVersion "1.22.8") -> do
                 $logWarn $
                     "The cabal-install found on PATH, version " <>
                     versionText v <>
                     ", is >= 1.22.8.\n" <>
-                    "That version has a bug preventing ghcjs from booting.\n" <>
+                    "That version has a bug preventing ghcjs < 0.3 from booting.\n" <>
                     "See this issue: https://github.com/ghcjs/ghcjs/issues/470"
                 return True
             | otherwise -> return False
