@@ -1366,7 +1366,7 @@ modified version of a dependency that hasn't yet been released upstream.
 
 Please note that when adding upstream packages directly to your project it is
 important to distinguish _local packages_ from the upstream _dependency
-packages_. Otherwise you may have trouble running `stack GHCi`. See 
+packages_. Otherwise you may have trouble running `stack GHCi`. See
 [stack.yaml documentation](yaml_configuration.md#packages) for more details.
 
 ## Flags and GHC options
@@ -1474,8 +1474,9 @@ stack-root: /home/michael/.stack
 project-root: /home/michael/wai
 config-location: /home/michael/wai/stack.yaml
 bin-path: /home/michael/.stack/snapshots/x86_64-linux/lts-2.17/7.8.4/bin:/home/michael/.stack/programs/x86_64-linux/ghc-7.8.4/bin:/home/michael/.stack/programs/x86_64-linux/ghc-7.10.2/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-programs-path: /home/michael/.stack/programs/x86_64-linux
-compiler-path: /home/michael/.stack/programs/x86_64-linux/ghc-7.8.4/bin/ghc
+programs: /home/michael/.stack/programs/x86_64-linux
+compiler: /home/michael/.stack/programs/x86_64-linux/ghc-7.8.4/bin/ghc
+compiler-bin: /home/michael/.stack/programs/x86_64-linux/ghc-7.8.4/bin
 local-bin-path: /home/michael/.local/bin
 extra-include-dirs:
 extra-library-dirs:
@@ -1496,7 +1497,7 @@ these keys you're interested in, which can be convenient for scripting. As a
 simple example, let's find out which versions of GHC are installed locally:
 
 ```
-michael@d30748af6d3d:~/wai$ ls $(stack path --programs-path)/*.installed
+michael@d30748af6d3d:~/wai$ ls $(stack path --programs)/*.installed
 /home/michael/.stack/programs/x86_64-linux/ghc-7.10.2.installed
 /home/michael/.stack/programs/x86_64-linux/ghc-7.8.4.installed
 ```
@@ -1509,7 +1510,7 @@ what needs to be removed:
 1. The stack executable itself
 2. The stack root, e.g. `$HOME/.stack` on non-Windows systems.
     * See `stack path --stack-root`
-    * On Windows, you will also need to delete `stack path --programs-paths`
+    * On Windows, you will also need to delete `stack path --programs`
 3. Any local `.stack-work` directories inside a project
 
 ## exec

@@ -13,13 +13,13 @@ Behavior changes:
 * `stack init` now ignores symlinks when searching for cabal files. It also now
   ignores any directory that begins with `.` (as well as `dist` dirs) - before
   it would only ignore `.git`, `.stack-work`, and `dist`.
-* The `stack path --ghc-paths` option is renamed to `--programs-path`.
-  `--compiler-path` is added, which points directly at the compiler used in
-  the current project.
 * The stack executable is no longer built with `-rtsopts`.  Before, when
   `-rtsopts` was enabled, stack would process `+RTS` options even when intended
   for some other program, such as when used with `stack exec -- prog +RTS`.
   See [#2022](https://github.com/commercialhaskell/stack/issues/2022).
+* The `stack path --ghc-paths` option is deprecated and renamed to `--programs`.
+  `--compiler` is added, which points directly at the compiler used in
+  the current project.  `--compiler-bin` points to the compiler's bin dir.
 * For consistency with the `$STACK_ROOT` environment variable, the
   `stack path --global-stack-root` flag and the `global-stack-root` field
   in the output of `stack path` are being deprecated and replaced with the

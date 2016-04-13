@@ -536,15 +536,14 @@ pathCmd keys go =
             localroot <- installationRootLocal
             distDir <- distRelativeDir
             hpcDir <- hpcReportDir
-            compilerPath <- getCompilerPath =<< getWhichCompiler
-            when (T.pack deprecatedStackRootOptionName `elem` keys) $
-                liftIO $ forM_
-                    [ ""
-                    , "'--" <> deprecatedStackRootOptionName <> "' will be removed in a future release."
-                    , "Please use '--" <> stackRootOptionName <> "' instead."
-                    , ""
-                    ]
-                    (hPutStrLn stderr)
+            compiler <- getCompilerPath =<< getWhichCompiler
+            let deprecated = filter ((`elem` keys) . fst) deprecatedPathKeys
+            liftIO $ forM_ deprecated $ \(oldOption, newOption) -> T.hPutStrLn stderr $ T.unlines
+                [ ""
+                , "'--" <> oldOption <> "' will be removed in a future release."
+                , "Please use '--" <> newOption <> "' instead."
+                , ""
+                ]
             forM_
                 -- filter the chosen paths in flags (keys),
                 -- or show all of them if no specific paths chosen.
@@ -571,7 +570,7 @@ pathCmd keys go =
                                     distDir
                                     hpcDir
                                     extra
-                                    compilerPath))))
+                                    compiler))))
 
 -- | Passed to all the path printers as a source of info.
 data PathInfo = PathInfo
@@ -585,7 +584,7 @@ data PathInfo = PathInfo
     , piDistDir      :: Path Rel Dir
     , piHpcDir       :: Path Abs Dir
     , piExtraDbs     :: [Path Abs Dir]
-    , piCompilerPath :: Path Abs File
+    , piCompiler     :: Path Abs File
     }
 
 -- | The paths of interest to a user. The first tuple string is used
@@ -612,11 +611,14 @@ paths =
       , "bin-path"
       , T.pack . intercalate [searchPathSeparator] . eoPath . piEnvOverride )
     , ( "Install location for GHC and other core tools"
-      , "programs-path"
+      , "programs"
       , T.pack . toFilePathNoTrailingSep . configLocalPrograms . bcConfig . piBuildConfig )
-    , ( "Compiler (e.g. ghc)"
-      , "compiler-path"
-      , T.pack . toFilePath . piCompilerPath )
+    , ( "Compiler binary (e.g. ghc)"
+      , "compiler"
+      , T.pack . toFilePath . piCompiler )
+    , ( "Directory containing the compiler binary (e.g. ghc)"
+      , "compiler-bin"
+      , T.pack . toFilePathNoTrailingSep . parent . piCompiler )
     , ( "Local bin path where stack installs executables"
       , "local-bin-path"
       , T.pack . toFilePathNoTrailingSep . configLocalBin . bcConfig . piBuildConfig )
@@ -656,9 +658,18 @@ paths =
     , ( "Where HPC reports and tix files are stored"
       , "local-hpc-root"
       , T.pack . toFilePathNoTrailingSep . piHpcDir )
+    , ( "DEPRECATED: Use '--programs' instead"
+      , "ghc-paths"
+      , T.pack . toFilePathNoTrailingSep . configLocalPrograms . bcConfig . piBuildConfig )
     , ( "DEPRECATED: Use '--" <> stackRootOptionName <> "' instead"
       , T.pack deprecatedStackRootOptionName
       , T.pack . toFilePathNoTrailingSep . configStackRoot . bcConfig . piBuildConfig )
+    ]
+
+deprecatedPathKeys :: [(Text, Text)]
+deprecatedPathKeys =
+    [ (T.pack deprecatedStackRootOptionName, T.pack stackRootOptionName)
+    , ("ghc-paths", "programs")
     ]
 
 data SetupCmdOpts = SetupCmdOpts
