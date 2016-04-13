@@ -84,23 +84,23 @@ initProject currDir initOpts mresolver = do
     let ignored = Map.difference bundle rbundle
         dupPkgMsg
             | (dupPkgs /= []) =
-                "Warning: Some packages were found to have names conflicting \
-                \with others and have been commented out in the \
-                \packages section.\n"
+                "Warning (added by new or init): Some packages were found to \
+                \have names conflicting with others and have been commented \
+                \out in the packages section.\n"
             | otherwise = ""
 
         missingPkgMsg
             | (Map.size ignored > 0) =
-                "Warning: Some packages were found to be incompatible with \
-                \the resolver and have been left commented out in the \
-                \packages section.\n"
+                "Warning (added by new or init): Some packages were found to \
+                \be incompatible with the resolver and have been left commented \
+                \out in the packages section.\n"
             | otherwise = ""
 
         extraDepMsg
             | (Map.size extraDeps > 0) =
-                "Warning: Specified resolver could not satisfy all \
-                \dependencies. Some external packages have been added \
-                \as dependencies.\n"
+                "Warning (added by new or init): Specified resolver could not \
+                \satisfy all dependencies. Some external packages have been \
+                \added as dependencies.\n"
             | otherwise = ""
 
         makeUserMsg msgs =
