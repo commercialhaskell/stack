@@ -619,8 +619,8 @@ paths =
     , ( "Directory containing the compiler binary (e.g. ghc)"
       , "compiler-bin"
       , T.pack . toFilePathNoTrailingSep . parent . piCompiler )
-    , ( "Local bin path where stack installs executables"
-      , "local-bin-path"
+    , ( "Local bin dir where stack installs executables (e.g. ~/.local/bin)"
+      , "local-bin"
       , T.pack . toFilePathNoTrailingSep . configLocalBin . bcConfig . piBuildConfig )
     , ( "Extra include directories"
       , "extra-include-dirs"
@@ -658,6 +658,9 @@ paths =
     , ( "Where HPC reports and tix files are stored"
       , "local-hpc-root"
       , T.pack . toFilePathNoTrailingSep . piHpcDir )
+    , ( "DEPRECATED: Use '--local-bin' instead"
+      , "local-bin-path"
+      , T.pack . toFilePathNoTrailingSep . configLocalBin . bcConfig . piBuildConfig )
     , ( "DEPRECATED: Use '--programs' instead"
       , "ghc-paths"
       , T.pack . toFilePathNoTrailingSep . configLocalPrograms . bcConfig . piBuildConfig )
@@ -670,6 +673,7 @@ deprecatedPathKeys :: [(Text, Text)]
 deprecatedPathKeys =
     [ (T.pack deprecatedStackRootOptionName, T.pack stackRootOptionName)
     , ("ghc-paths", "programs")
+    , ("local-bin-path", "local-bin")
     ]
 
 data SetupCmdOpts = SetupCmdOpts
