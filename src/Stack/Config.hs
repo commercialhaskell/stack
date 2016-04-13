@@ -402,10 +402,6 @@ loadConfig configArgs mstackYaml mresolver = do
                 extraConfigs0
     mproject <- loadProjectConfig mstackYaml
 
-    let printUserMessage (p, _, _) =
-         maybe (return ()) ($logWarn . T.pack) (projectUserMsg p)
-    maybe (return ()) printUserMessage mproject
-
     let mproject' = (\(project, stackYaml, _) -> (project, stackYaml)) <$> mproject
     config <- configFromConfigMonoid stackRoot userConfigPath mresolver mproject' $ mconcat $
         case mproject of
@@ -440,7 +436,9 @@ loadBuildConfig mproject config mresolver mcompiler = do
     miniConfig <- loadMiniConfig config
 
     (project', stackYamlFP) <- case mproject of
-      Just (project, fp, _) -> return (project, fp)
+      Just (project, fp, _) -> do
+          forM_ (projectUserMsg project) ($logWarn . T.pack)
+          return (project, fp)
       Nothing -> do
             $logInfo "Run from outside a project, using implicit global project config"
             destDir <- getImplicitGlobalProjectDir config
