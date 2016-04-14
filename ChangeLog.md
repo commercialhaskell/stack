@@ -27,6 +27,10 @@ Behavior changes:
   Additionally, the stack root can now be specified via the
   `--stack-root` command-line flag. See
   [#1148](https://github.com/commercialhaskell/stack/issues/1148).
+* `stack sig` GPG-related sub-commands were removed (folded into `upload` and
+  `sdist`)
+* GPG signing of packages is now on by default. Use `--no-signature` with
+  `upload` or `sdist` if you would rather not contribute your package signature.
 
 Other enhancements:
 
