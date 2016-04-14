@@ -14,6 +14,34 @@ need to install a different version of `node`. See
 
 ## Example Configurations
 
+### GHCJS `master` (a.k.a. improved base)
+
+To use the master branch, a.k.a improved base, add the following to your `stack.yaml`:
+
+GHCJS compiled with GHC 7.10.3 LTS-5.12 (stack.yaml upgraded from stock GHCJS)
+```yaml
+compiler: ghcjs-0.2.0.20160414_ghc-7.10.3
+compiler-check: match-exact
+setup-info:
+  ghcjs:
+    source:
+      ghcjs-0.2.0.20160414_ghc-7.10.3:
+        url: https://s3.amazonaws.com/ghcjs/ghcjs-0.2.0.20160414_ghc-7.10.3.tar.gz
+        sha1: 6d6f307503be9e94e0c96ef1308c7cf224d06be3
+```
+
+GHCJS compiled with GHC 7.10.2 LTS-3.6 (stack.yaml that comes with GHCJS)
+```yaml
+compiler: ghcjs-0.2.0.20160414_ghc-7.10.2
+compiler-check: match-exact
+setup-info:
+  ghcjs:
+    source:
+      ghcjs-0.2.0.20160414_ghc-7.10.2:
+        url: https://s3.amazonaws.com/ghcjs/ghcjs-0.2.0.20160414_ghc-7.10.2.tar.gz
+        sha1: f0a7243e781e27ebfe601eebaf5c57422007c142
+```
+
 ### GHCJS (old base)
 
 You can use this resolver for GHCJS (old base) in your `stack.yaml`:
@@ -21,42 +49,6 @@ You can use this resolver for GHCJS (old base) in your `stack.yaml`:
 ```yaml
 compiler: ghcjs-0.1.0.20150924_ghc-7.10.2
 compiler-check: match-exact
-```
-
-### GHCJS `master` (a.k.a. improved base)
-
-To use the master branch, a.k.a improved base, add the following to your `stack.yaml`:
-
-```yaml
-compiler: ghcjs-0.2.0.20151230.3_ghc-7.10.2
-compiler-check: match-exact
-setup-info:
- ghcjs:
-  source:
-   ghcjs-0.2.0.20151230.3_ghc-7.10.2:
-    url: "https://github.com/nrolland/ghcjs/releases/download/v.0.2.0.20151230.3/ghcjs-0.2.0.20151230.3.tar.gz"
-```
-
-or for the 2015-10-29 version
-```yaml
-compiler: ghcjs-0.2.0.20151029_ghc-7.10.2
-compiler-check: match-exact
-setup-info:
-  ghcjs:
-      source:
-            ghcjs-0.2.0.20151029_ghc-7.10.2:
-                    url: "https://github.com/nrolland/ghcjs/releases/download/v0.2.0.20151029/ghcjs-0.2.0.20151029.tar.gz"
-```
-
-or for the 2015-10-01 version
-```yaml
-compiler: ghcjs-0.2.0.20151001_ghc-7.10.2
-compiler-check: match-exact
-setup-info:
-  ghcjs:
-    source:
-      ghcjs-0.2.0.20151001_ghc-7.10.2:
-        url: "https://github.com/fizruk/ghcjs/releases/download/v0.2.0.20151001/ghcjs-0.2.0.20151001.tar.gz"
 ```
 
 ### Custom installed GHCJS (development branch)
