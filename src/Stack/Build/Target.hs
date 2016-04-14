@@ -20,19 +20,19 @@ module Stack.Build.Target
     ) where
 
 import           Control.Applicative
-import           Control.Arrow          (second)
-import           Control.Monad.Catch    (MonadCatch, throwM)
+import           Control.Arrow (second)
+import           Control.Monad.Catch (MonadCatch, throwM)
 import           Control.Monad.IO.Class
-import           Data.Either            (partitionEithers)
-import           Data.Foldable          (asum)
-import           Data.Map               (Map)
-import qualified Data.Map               as Map
-import           Data.Maybe             (mapMaybe)
+import           Data.Either (partitionEithers)
+import           Data.Foldable (asum)
+import           Data.Map (Map)
+import qualified Data.Map as Map
+import           Data.Maybe (mapMaybe)
 import           Data.Monoid
-import           Data.Set               (Set)
-import qualified Data.Set               as Set
-import           Data.Text              (Text)
-import qualified Data.Text              as T
+import           Data.Set (Set)
+import qualified Data.Set as Set
+import           Data.Text (Text)
+import qualified Data.Text as T
 import           Path
 import           Path.Extra (rejectMissingDir)
 import           Path.IO
@@ -150,16 +150,24 @@ resolveIdents _ _ _ (ri, RTPackageComponent x y) = Right ((ri, RTPackageComponen
 resolveIdents _ _ _ (ri, RTComponent x) = Right ((ri, RTComponent x), Map.empty)
 resolveIdents _ _ _ (ri, RTPackage x) = Right ((ri, RTPackage x), Map.empty)
 resolveIdents snap extras locals (ri, RTPackageIdentifier (PackageIdentifier name version)) =
-    Right ((ri, RTPackage name), newExtras)
+    fmap ((ri, RTPackage name), ) newExtras
   where
     newExtras =
-        case mfound of
+        case (Map.lookup name locals, mfound) of
+            -- Error if it matches a local package, pkg idents not
+            -- supported for local.
+            (Just _, _) -> Left $ T.concat
+                [ packageNameText name
+                , " target has a specific version number, but it is a local package."
+                , "\nTo avoid confusion, we will not install the specified version or build the local one."
+                , "\nTo build the local package, specify the target without an explicit version."
+                ]
             -- If the found version matches, no need for an extra-dep.
-            Just foundVersion | foundVersion == version -> Map.empty
+            (_, Just foundVersion) | foundVersion == version -> Right Map.empty
             -- Otherwise, if there is no specified version or a
             -- mismatch, add an extra-dep.
-            _ -> Map.singleton name version
-    mfound = asum (map (Map.lookup name) [Map.map lpvVersion locals, extras, snap])
+            _ -> Right $ Map.singleton name version
+    mfound = asum (map (Map.lookup name) [extras, snap])
 
 resolveRawTarget :: Map PackageName Version -- ^ snapshot
                  -> Map PackageName Version -- ^ extra deps

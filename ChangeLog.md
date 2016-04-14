@@ -31,6 +31,9 @@ Behavior changes:
   `sdist`)
 * GPG signing of packages is now on by default. Use `--no-signature` with
   `upload` or `sdist` if you would rather not contribute your package signature.
+* `stack build pkg-1.2.3` will now build even if the snapshot has a different
+  package version - it is treated as an extra-dep. `stack build local-pkg-1.2.3`
+  is an error even if the version number matches the local package.
 
 Other enhancements:
 
