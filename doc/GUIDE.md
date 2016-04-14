@@ -449,8 +449,20 @@ someFunc :: IO ()
 someFunc = launchMissiles
 ```
 
-In this case, we can add acme-missiles to the .cabal file, but we get a new type
-of error message from `stack build`:
+Again, we add this new dependency to the .cabal file like this:
+
+```
+library
+  hs-source-dirs:      src
+  exposed-modules:     Lib
+  build-depends:       base >= 4.7 && < 5
+                     , text
+                       -- This next line is the new one
+                     , acme-missiles
+  default-language:    Haskell2010
+```
+
+However, rerunning `stack build` shows us the following error message:
 
 ```
 michael@d30748af6d3d:~/helloworld$ stack build
