@@ -30,6 +30,8 @@ complicatedOptions
   -> Maybe String
   -- ^ version string
   -> String
+  -- ^ hpack numeric version, as string
+  -> String
   -- ^ header
   -> String
   -- ^ program description
@@ -41,7 +43,7 @@ complicatedOptions
   -> EitherT b (Writer (Mod CommandFields (b,a))) ()
   -- ^ commands (use 'addCommand')
   -> IO (a,b)
-complicatedOptions numericVersion versionString h pd commonParser mOnFailure commandParser =
+complicatedOptions numericVersion versionString numericHpackVersion h pd commonParser mOnFailure commandParser =
   do args <- getArgs
      (a,(b,c)) <- case execParserPure (prefs noBacktrack) parser args of
        Failure _ | null args -> withArgs ["--help"] (execParser parser)
@@ -54,7 +56,7 @@ complicatedOptions numericVersion versionString h pd commonParser mOnFailure com
         versionOptions =
           case versionString of
             Nothing -> versionOption (showVersion numericVersion)
-            Just s -> versionOption s <*> numericVersionOption
+            Just s -> versionOption s <*> numericVersionOption <*> numericHpackVersionOption
         versionOption s =
           infoOption
             s
@@ -65,6 +67,11 @@ complicatedOptions numericVersion versionString h pd commonParser mOnFailure com
             (showVersion numericVersion)
             (long "numeric-version" <>
              help "Show only version number")
+        numericHpackVersionOption =
+          infoOption
+            numericHpackVersion
+            (long "hpack-numeric-version" <>
+             help "Show only hpack's version number")
 
 -- | Add a command to the options dispatcher.
 addCommand :: String   -- ^ command string

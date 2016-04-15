@@ -116,10 +116,14 @@ versionString' = concat $ concat
     , [" (" ++ commitCount ++ " commits)" | commitCount /= ("1"::String) &&
                                           commitCount /= ("UNKNOWN" :: String)]
     , [" ", display buildArch]
+    , [" hpack-", VERSION_hpack]
     ]
     where commitCount = $gitCommitCount
 #else
-versionString' = showVersion Meta.version ++ ' ' : display buildArch
+versionString' =
+    showVersion Meta.version
+    ++ ' ' : display buildArch
+    ++ " hpack" ++ VERSION_hpack
 #endif
 
 main :: IO ()
@@ -177,6 +181,7 @@ commandLineHandler
 commandLineHandler progName isInterpreter = complicatedOptions
   Meta.version
   (Just versionString')
+  VERSION_hpack
   "stack - The Haskell Tool Stack"
   ""
   (globalOpts OuterGlobalOpts)
