@@ -60,17 +60,18 @@ import           Data.Char (isSpace)
 import           Data.Conduit
 import           Data.Conduit.Attoparsec
 import qualified Data.Conduit.Binary as CB
-import           Data.Conduit.Text(decodeUtf8)
+import           Data.Conduit.Text (decodeUtf8)
 import           Data.List (intercalate)
 import           Data.Text (pack)
 import           Stack.Constants
+import           System.FilePath (takeExtension)
 import           System.IO (IOMode (ReadMode), withBinaryFile, stderr, hPutStrLn)
 
 -- | Parser to extract the stack command line embedded inside a comment
 -- after validating the placement and formatting rules for a valid
 -- interpreter specification.
-interpreterArgsParser :: String -> P.Parser String
-interpreterArgsParser progName = P.option "" sheBangLine *> interpreterComment
+interpreterArgsParser :: Bool -> String -> P.Parser String
+interpreterArgsParser _ progName = P.option "" sheBangLine *> interpreterComment
   where
     sheBangLine =   P.string "#!"
                  *> P.manyTill P.anyChar P.endOfLine
@@ -103,7 +104,9 @@ getInterpreterArgs file = do
     parseFile h =
       CB.sourceHandle h
       =$= decodeUtf8
-      $$ sinkParserEither (interpreterArgsParser stackProgName)
+      $$ sinkParserEither (interpreterArgsParser isLiterate stackProgName)
+
+    isLiterate = takeExtension file == ".lhs"
 
     -- FIXME We should print anything only when explicit verbose mode is
     -- specified by the user on command line. But currently the

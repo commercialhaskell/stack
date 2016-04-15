@@ -46,6 +46,10 @@ interpreterArgsSpec =
           checkLines ""
           checkLines " --x"
           checkLines " --x --y"
+        describe "Literate line comments" $ do
+          checkLiterateLines ""
+          checkLiterateLines " --x"
+          checkLiterateLines " --x --y"
         describe "Block comments" $ do
           checkBlocks ""
           checkBlocks "\n"
@@ -54,16 +58,31 @@ interpreterArgsSpec =
           checkBlocks " --x --y"
           checkBlocks "\n--x\n--y"
           checkBlocks "\n\t--x\n\t--y"
+        describe "Literate block comments" $ do
+          checkLiterateBlocks "" ""
+          checkLiterateBlocks "\n>" ""
+          checkLiterateBlocks " --x" " --x"
+          checkLiterateBlocks "\n>--x" "--x"
+          checkLiterateBlocks " --x --y " "--x --y"
+          checkLiterateBlocks "\n>--x\n>--y" "--x --y"
+          checkLiterateBlocks "\n>\t--x\n>\t--y" "--x --y"
       describe "Failure cases" $ do
         checkFailures
+        describe "Bare directives in literate files" $ do
+          forM_ (interpreterGenValid lineComment []) $
+            testAndCheck (acceptFailure True) []
+          forM_ (interpreterGenValid blockComment []) $
+            testAndCheck (acceptFailure True) []
     where
-      parse s = P.parseOnly (interpreterArgsParser stackProgName) (pack s)
+      parse isLiterate s =
+        P.parseOnly (interpreterArgsParser isLiterate stackProgName) (pack s)
 
-      acceptSuccess args s = case parse s of
+      acceptSuccess :: Bool -> String -> String -> Bool
+      acceptSuccess isLiterate args s = case parse isLiterate s of
                                Right x | words x == words args -> True
                                _ -> False
 
-      acceptFailure _ s =  case parse s of
+      acceptFailure isLiterate _ s =  case parse isLiterate s of
                            Left _ -> True
                            Right _ -> False
 
@@ -72,19 +91,28 @@ interpreterArgsSpec =
 
       checkLines args = forM_
         (interpreterGenValid lineComment args)
-        (testAndCheck acceptSuccess args)
+        (testAndCheck (acceptSuccess False) args)
+
+      checkLiterateLines args = forM_
+        (interpreterGenValid literateLineComment args)
+        (testAndCheck (acceptSuccess True) args)
 
       checkBlocks args = forM_
         (interpreterGenValid blockComment args)
-        (testAndCheck acceptSuccess args)
+        (testAndCheck (acceptSuccess False) args)
+
+      checkLiterateBlocks inp args = forM_
+        (interpreterGenValid literateBlockComment inp)
+        (testAndCheck (acceptSuccess True) args)
 
       checkFailures = forM_
         interpreterGenInvalid
-        (testAndCheck acceptFailure "unused")
+        (testAndCheck (acceptFailure False) "unused")
 
       -- Generate a set of acceptable inputs for given format and args
       interpreterGenValid fmt args = shebang <++> newLine <++> (fmt args)
 
+      interpreterGenInvalid :: [String]
       -- Generate a set of Invalid inputs
       interpreterGenInvalid =
         ["-stack\n"] -- random input
@@ -128,6 +156,12 @@ interpreterArgsSpec =
       lineComment = makeComment makeLine lineSpace
         where makeLine s = "--" ++ s
 
+      literateLineComment = makeComment ("> --" ++) lineSpace
+
       blockSpace = lineSpace <|> newLine
       blockComment = makeComment makeBlock blockSpace
         where makeBlock s = "{-" ++ s ++ "-}"
+
+      literateBlockComment = makeComment
+        (\s -> "> {-" ++ s ++ "-}")
+        (lineSpace <|> map (++ ">") newLine)
