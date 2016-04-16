@@ -71,12 +71,12 @@ import           System.IO (IOMode (ReadMode), withBinaryFile, stderr, hPutStrLn
 -- after validating the placement and formatting rules for a valid
 -- interpreter specification.
 interpreterArgsParser :: Bool -> String -> P.Parser String
-interpreterArgsParser _ progName = P.option "" sheBangLine *> interpreterComment
+interpreterArgsParser isLiterate progName = P.option "" sheBangLine *> interpreterComment
   where
     sheBangLine =   P.string "#!"
                  *> P.manyTill P.anyChar P.endOfLine
 
-    commentStart str =   (P.string str <?> (progName ++ " options comment"))
+    commentStart psr =   (psr <?> (progName ++ " options comment"))
                       *> P.skipSpace
                       *> (P.string (pack progName) <?> show progName)
 
@@ -88,9 +88,24 @@ interpreterArgsParser _ progName = P.option "" sheBangLine *> interpreterComment
       *> ((end >> return "")
           <|> (P.space *> (P.manyTill anyCharNormalizeSpace end <?> "-}")))
 
+    horizontalSpace = P.satisfy P.isHorizontalSpace
+
     lineComment =  comment "--" (P.endOfLine <|> P.endOfInput)
+    literateLineComment = comment
+      (">" *> horizontalSpace *> "--")
+      (P.endOfLine <|> P.endOfInput)
     blockComment = comment "{-" (P.string "-}")
-    interpreterComment = lineComment <|> blockComment
+
+    literateBlockComment =
+      (">" *> horizontalSpace *> "{-")
+      *> P.skipMany (("" <$ horizontalSpace) <|> (P.endOfLine *> ">"))
+      *> (P.string (pack progName) <?> progName)
+      *> (P.manyTill' (P.satisfy (not . P.isEndOfLine)
+                       <|> (' ' <$ (P.endOfLine *> ">" <?> ">"))) "-}")
+
+    interpreterComment = if isLiterate
+                            then literateLineComment <|> literateBlockComment
+                            else lineComment <|> blockComment
 
 -- | Extract stack arguments from a correctly placed and correctly formatted
 -- comment when it is being used as an interpreter
