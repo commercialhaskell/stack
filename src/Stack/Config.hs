@@ -593,7 +593,7 @@ resolvePackageLocation menv projRoot (PLRemote url remotePackageType) = do
                     ])
                     Nothing
                 readInNull dirTmp commandName menv
-                    (resetCommand ++ [T.unpack commit])
+                    (resetCommand ++ [T.unpack commit, "--"])
                     (Just $ "Please ensure that commit " <> commit <>
                       " exists within " <> url)
 
