@@ -462,11 +462,11 @@ loadBuildPlan name = do
 
 buildBuildPlanUrl :: (MonadReader env m, HasConfig env) => SnapName -> Text -> m Text
 buildBuildPlanUrl name file = do
-    urlPrefixes <- asks (configBuildPlanUrlPrefixes . getConfig)
+    urls <- asks (configUrls . getConfig)
     return $
         case name of
-             LTS _ _ -> buildPlanUrlPrefixesLts urlPrefixes <> "/" <> file
-             Nightly _ -> buildPlanUrlPrefixesNightly urlPrefixes <> "/" <> file
+             LTS _ _ -> urlsLtsBuildPlans urls <> "/" <> file
+             Nightly _ -> urlsNightlyBuildPlans urls <> "/" <> file
 
 gpdPackages :: [GenericPackageDescription] -> Map PackageName Version
 gpdPackages gpds = Map.fromList $
