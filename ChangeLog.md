@@ -29,9 +29,13 @@ Behavior changes:
   [#1148](https://github.com/commercialhaskell/stack/issues/1148).
 * `stack sig` GPG-related sub-commands were removed (folded into `upload` and
   `sdist`)
-* GPG signing of packages while uploading is now on by default. Use
-  `--no-signature` with `upload` if you would rather not contribute your package
-  signature.
+* GPG signing of packages while uploading to Hackage is now the default. Use
+  `upload --no-signature` if you would rather not contribute your package
+  signature. If you don't yet have a GPG keyset, read this
+  [blog post on GPG keys](https://fpcomplete.com/blog/2016/04/stack-security-gnupg-keys)
+  We can add a stack.yaml config setting to disable signing if some people
+  desire it. We hope that people will sign. Later we will be adding GPG
+  signature verification options.
 * `stack build pkg-1.2.3` will now build even if the snapshot has a different
   package version - it is treated as an extra-dep. `stack build local-pkg-1.2.3`
   is an error even if the version number matches the local package.
