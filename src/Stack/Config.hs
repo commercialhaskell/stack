@@ -250,7 +250,7 @@ configFromConfigMonoid configStackRoot configUserConfigPath mresolver mproject c
      let configBuild = buildOptsFromMonoid configMonoidBuildOpts
      configDocker <-
          dockerOptsFromMonoid (fmap fst mproject) configStackRoot mresolver configMonoidDockerOpts
-     configNix <- nixOptsFromMonoid (fmap fst mproject) configMonoidNixOpts os
+     configNix <- nixOptsFromMonoid configMonoidNixOpts os
 
      rawEnv <- liftIO getEnvironment
      pathsEnv <- augmentPathMap (map toFilePath configMonoidExtraPath)
@@ -310,6 +310,8 @@ configFromConfigMonoid configStackRoot configUserConfigPath mresolver mproject c
             _ -> getInContainer
 
      configPackageCaches <- liftIO $ newIORef Nothing
+
+     let configMaybeProject = mproject
 
      return Config {..}
 

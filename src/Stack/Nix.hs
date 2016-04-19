@@ -22,25 +22,26 @@ import           Control.Monad.Reader (MonadReader,asks)
 import           Control.Monad.Trans.Control (MonadBaseControl)
 import           Data.Char (toUpper)
 import           Data.List (intercalate)
-import           Data.Traversable
 import           Data.Maybe
 import           Data.Monoid
 import qualified Data.Text as T
-import           Data.Version (showVersion)
+import           Data.Traversable
 import           Data.Typeable (Typeable)
+import           Data.Version (showVersion)
 import           Network.HTTP.Client.Conduit (HasHttpManager)
 import           Path
 import           Path.IO
 import qualified Paths_stack as Meta
 import           Prelude hiding (mapM) -- Fix redundant import warnings
-import           Stack.Constants (stackProgName,platformVariantEnvVar)
 import           Stack.Config (makeConcreteResolver)
+import           Stack.Config.Nix (nixCompiler)
+import           Stack.Constants (stackProgName,platformVariantEnvVar)
 import           Stack.Docker (reExecArgName)
 import           Stack.Exec (exec)
-import           System.Process.Read (getEnvOverride)
 import           Stack.Types
 import           Stack.Types.Internal
 import           System.Environment (lookupEnv,getArgs,getExecutablePath)
+import           System.Process.Read (getEnvOverride)
 
 -- | If Nix is enabled, re-runs the currently running OS command in a Nix container.
 -- Otherwise, runs the inner action.
@@ -83,7 +84,7 @@ runShellAndExit mprojectRoot maresolver mcompiler getCmdArgs = do
          traverse (resolveFile (fromMaybeProjectRoot mprojectRoot)) $
          nixInitFile (configNix config)
      let pkgsInConfig = nixPackages (configNix config)
-         pkgs = pkgsInConfig ++ [nixCompiler (configNix config) mresolver mcompiler]
+         pkgs = pkgsInConfig ++ [nixCompiler config mresolver mcompiler]
          pureShell = nixPureShell (configNix config)
          nixopts = case mshellFile of
            Just fp -> [toFilePath fp]

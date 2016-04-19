@@ -292,6 +292,7 @@ data Config =
          -- installation.
          ,configPackageCaches       :: !(IORef (Maybe (Map PackageIdentifier (PackageIndex, PackageCache))))
          -- ^ In memory cache of hackage index.
+         ,configMaybeProject        :: !(Maybe (Project, Path Abs File))
          }
 
 -- | Which packages to ghc-options on the command line apply to?
