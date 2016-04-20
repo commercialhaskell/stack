@@ -3,24 +3,21 @@
 {-# LANGUAGE TemplateHaskell, OverloadedStrings #-}
 module Stack.NixSpec where
 
-import Test.Hspec
-
-import Control.Monad.Logger
 import Control.Exception
+import Control.Monad.Logger
 import Data.Monoid
 import Network.HTTP.Conduit (Manager)
-import System.Environment
 import Path
-import System.Directory
-import System.IO.Temp (withSystemTempDirectory)
-
-import Stack.Config
-import Stack.Types.Config
-import Stack.Types.StackT
-import Stack.Types.Nix
-
 import Prelude -- to remove the warning about Data.Monoid being redundant on GHC 7.10
-
+import Stack.Config
+import Stack.Config.Nix
+import Stack.Types.Config
+import Stack.Types.Nix
+import Stack.Types.StackT
+import System.Directory
+import System.Environment
+import System.IO.Temp (withSystemTempDirectory)
+import Test.Hspec
 
 sampleConfig :: String
 sampleConfig =
@@ -64,4 +61,4 @@ spec = beforeAll setup $ afterAll teardown $ do
       writeFile (toFilePath stackDotYaml) sampleConfig
       lc <- loadConfig' manager
       (nixPackages $ configNix $ lcConfig lc) `shouldBe` ["glpk"]
-      (nixCompiler $ configNix $ lcConfig lc) Nothing Nothing `shouldBe` "haskell.packages.lts-2_10.ghc"
+      nixCompiler (lcConfig lc) Nothing Nothing `shouldBe` "haskell.packages.lts-2_10.ghc"
