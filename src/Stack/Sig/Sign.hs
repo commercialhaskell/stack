@@ -110,7 +110,6 @@ signPackage
     :: (MonadIO m, MonadLogger m, MonadThrow m)
     => String -> PackageIdentifier -> Path Abs File -> m ()
 signPackage url pkg filePath = do
-    $logInfo ("Signing " <> T.pack (toFilePath filePath))
     sig@(Signature signature) <- gpgSign filePath
     let (PackageIdentifier name version) = pkg
     fingerprint <- gpgVerify sig filePath
