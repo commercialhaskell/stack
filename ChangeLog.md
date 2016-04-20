@@ -90,6 +90,8 @@ Bug fixes:
   [#1819](https://github.com/commercialhaskell/stack/issues/1819)
 * Nix: cancelling a stack build now exits properly rather than dropping into a
   nix-shell [#1778](https://github.com/commercialhaskell/stack/issues/1778)
+* `allow-newer: true` now causes `--exact-configuration` to be passed to Cabal.
+  See [#1579](https://github.com/commercialhaskell/stack/issues/1579)
 
 ## 1.0.4.3
 
