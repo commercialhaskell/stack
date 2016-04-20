@@ -639,25 +639,33 @@ configureOptsNoDir econfig bco deps wanted isLocal package = concat
                            then ""
                            else "-") <>
                        flagNameString name)
-                    (Map.toList (packageFlags package))
+                    (Map.toList flags)
     , concatMap (\x -> ["--ghc-options", T.unpack x]) allGhcOptions
     , map (("--extra-include-dirs=" ++) . T.unpack) (Set.toList (configExtraIncludeDirs config))
     , map (("--extra-lib-dirs=" ++) . T.unpack) (Set.toList (configExtraLibDirs config))
     , if whichCompiler (envConfigCompilerVersion econfig) == Ghcjs
         then ["--ghcjs"]
         else []
+    , if useExactConf then ["--exact-configuration"] else []
     ]
   where
     config = getConfig econfig
     bopts = bcoBuildOpts bco
     boptsCli = bcoBuildOptsCLI bco
 
+    -- TODO: instead always enable this when the cabal version is new
+    -- enough. That way we'll detect bugs with --exact-configuration
+    -- earlier. Cabal also might do less work then.
+    useExactConf = envConfigCabalVersion econfig >= $(mkVersion "1.22")
+
+    -- Unioning atop defaults is needed so that all flags are specified
+    -- with --exact-configuration.
+    flags | useExactConf = packageFlags package `Map.union` packageDefaultFlags package
+          | otherwise = packageFlags package
+
     depOptions = map (uncurry toDepOption) $ Map.toList deps
       where
-        toDepOption =
-            if envConfigCabalVersion econfig >= $(mkVersion "1.22")
-                then toDepOption1_22
-                else toDepOption1_18
+        toDepOption = if useExactConf then toDepOption1_22 else toDepOption1_18
 
     toDepOption1_22 ident gid = concat
         [ "--dependency="

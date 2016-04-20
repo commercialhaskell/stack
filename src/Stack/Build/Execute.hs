@@ -623,10 +623,11 @@ toActions installedMap runInBase ee (mbuild, mfinal) =
     beopts = boptsBenchmarkOpts bopts
 
 -- | Generate the ConfigCache
-getConfigCache :: MonadIO m
+getConfigCache :: M env m
                => ExecuteEnv -> Task -> InstalledMap -> Bool -> Bool
                -> m (Map PackageIdentifier GhcPkgId, ConfigCache)
 getConfigCache ExecuteEnv {..} Task {..} installedMap enableTest enableBench = do
+    useExactConf <- asks (configAllowNewer . getConfig)
     let extra =
             -- We enable tests if the test suite dependencies are already
             -- installed, so that we avoid unnecessary recompilation based on
@@ -635,8 +636,15 @@ getConfigCache ExecuteEnv {..} Task {..} installedMap enableTest enableBench = d
             -- https://github.com/commercialhaskell/stack/issues/805
             case taskType of
                 TTLocal lp -> concat
-                    [ ["--enable-tests" | enableTest || (depsPresent installedMap $ lpTestDeps lp)]
-                    , ["--enable-benchmarks" | enableBench || (depsPresent installedMap $ lpBenchDeps lp)]
+                    -- FIXME: make this work with exact-configuration.
+                    -- Not sure how to plumb the info atm. See
+                    -- https://github.com/commercialhaskell/stack/issues/2049
+                    [ [ "--enable-tests"
+                      | enableTest ||
+                        (not useExactConf && depsPresent installedMap (lpTestDeps lp))]
+                    , [ "--enable-benchmarks"
+                      | enableBench ||
+                        (not useExactConf && depsPresent installedMap (lpBenchDeps lp))]
                     ]
                 _ -> []
     idMap <- liftIO $ readTVarIO eeGhcPkgIds
@@ -707,6 +715,8 @@ ensureConfig newConfigCache pkgDir ExecuteEnv {..} announce cabal cabalfp = do
             return $ case mpath of
                 Nothing -> []
                 Just x -> return $ concat ["--with-", name, "=", toFilePath x]
+        -- Configure cabal with arguments determined by
+        -- Stack.Types.Build.configureOpts
         cabal False $ "configure" : concat
             [ concat exes
             , dirs

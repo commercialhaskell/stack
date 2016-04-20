@@ -68,10 +68,10 @@ import           Data.Version (showVersion)
 import           Distribution.Compiler
 import           Distribution.ModuleName (ModuleName)
 import qualified Distribution.ModuleName as Cabal
-import           Distribution.Package hiding (Package,PackageName,packageName,packageVersion,PackageIdentifier)
 import qualified Distribution.Package as D
-import           Distribution.PackageDescription hiding (FlagName)
+import           Distribution.Package hiding (Package,PackageName,packageName,packageVersion,PackageIdentifier)
 import qualified Distribution.PackageDescription as D
+import           Distribution.PackageDescription hiding (FlagName)
 import           Distribution.PackageDescription.Parse
 import qualified Distribution.PackageDescription.Parse as D
 import           Distribution.ParseUtils
@@ -79,6 +79,8 @@ import           Distribution.Simple.Utils
 import           Distribution.System (OS (..), Arch, Platform (..))
 import           Distribution.Text (display, simpleParse)
 import qualified Distribution.Verbosity as D
+import qualified Hpack
+import qualified Hpack.Config as Hpack
 import           Path as FL
 import           Path.Extra
 import           Path.Find
@@ -92,8 +94,6 @@ import qualified System.Directory as D
 import           System.FilePath (splitExtensions, replaceExtension)
 import qualified System.FilePath as FilePath
 import           System.IO.Error
-import qualified Hpack
-import qualified Hpack.Config as Hpack
 
 -- | Read the raw, unresolved package information.
 readPackageUnresolved :: (MonadIO m, MonadThrow m)
@@ -188,6 +188,8 @@ resolvePackage packageConfig gpkg =
     , packageFiles = pkgFiles
     , packageTools = packageDescTools pkg
     , packageFlags = packageConfigFlags packageConfig
+    , packageDefaultFlags = M.fromList
+      [(fromCabalFlagName (flagName flag), flagDefault flag) | flag <- genPackageFlags gpkg]
     , packageAllDeps = S.fromList (M.keys deps)
     , packageHasLibrary = maybe False (buildable . libBuildInfo) (library pkg)
     , packageTests = M.fromList
@@ -210,8 +212,6 @@ resolvePackage packageConfig gpkg =
           (not . null . exposedModules)
           (library pkg)
     , packageSimpleType = buildType (packageDescription gpkg) == Just Simple
-    , packageDefinedFlags = S.fromList $
-      map (fromCabalFlagName . flagName) $ genPackageFlags gpkg
     }
   where
     pkgFiles = GetPackageFiles $

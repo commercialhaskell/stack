@@ -16,9 +16,11 @@ module Stack.Build
   ,withLoadPackage
   ,mkBaseConfigOpts
   ,queryBuildInfo
-  ,splitObjsWarning)
+  ,splitObjsWarning
+  ,CabalVersionException(..))
   where
 
+import           Control.Exception (Exception)
 import           Control.Monad
 import           Control.Monad.Catch (MonadCatch, MonadMask)
 import           Control.Monad.IO.Class
@@ -43,6 +45,7 @@ import qualified Data.Text as T
 import           Data.Text.Encoding (decodeUtf8)
 import qualified Data.Text.IO as TIO
 import           Data.Text.Read (decimal)
+import           Data.Typeable (Typeable)
 import qualified Data.Vector as V
 import qualified Data.Yaml as Yaml
 import           Network.HTTP.Client.Conduit (HasHttpManager)
@@ -113,6 +116,7 @@ build setLocalFiles mbuildLk boptsCli = fixCodePage $ do
                            liftIO $ unlockFile lk
       _ -> return ()
 
+    checkCabalVersion
     warnAboutSplitObjs bopts
     warnIfExecutablesWithSameNameCouldBeOverwritten locals plan
 
@@ -136,6 +140,23 @@ allLocal =
     map taskLocation .
     Map.elems .
     planTasks
+
+checkCabalVersion :: M env m => m ()
+checkCabalVersion = do
+    allowNewer <- asks (configAllowNewer . getConfig)
+    cabalVer <- asks (envConfigCabalVersion . getEnvConfig)
+    -- https://github.com/haskell/cabal/issues/2023
+    when (allowNewer && cabalVer < $(mkVersion "1.22")) $ throwM $
+        CabalVersionException $
+            "Error: --allow-newer requires at least Cabal version 1.22, but version " ++
+            versionString cabalVer ++
+            " was found."
+
+data CabalVersionException = CabalVersionException { unCabalVersionException :: String }
+    deriving (Typeable)
+
+instance Show CabalVersionException where show = unCabalVersionException
+instance Exception CabalVersionException
 
 -- | See https://github.com/commercialhaskell/stack/issues/1198.
 warnIfExecutablesWithSameNameCouldBeOverwritten

@@ -19,6 +19,7 @@ import qualified Data.ByteString as S
 import           Data.Data
 import           Data.Function
 import           Data.List
+import qualified Data.Map as M
 import           Data.Map.Strict (Map)
 import           Data.Maybe
 import           Data.Monoid
@@ -40,8 +41,8 @@ import           Stack.Types.Compiler
 import           Stack.Types.Config
 import           Stack.Types.FlagName
 import           Stack.Types.GhcPkgId
-import           Stack.Types.PackageName
 import           Stack.Types.PackageIdentifier
+import           Stack.Types.PackageName
 import           Stack.Types.Version
 
 -- | All exceptions thrown by the library.
@@ -87,6 +88,7 @@ data Package =
           ,packageTools :: ![Dependency]                  -- ^ A build tool name.
           ,packageAllDeps :: !(Set PackageName)           -- ^ Original dependencies (not sieved).
           ,packageFlags :: !(Map FlagName Bool)           -- ^ Flags used on package.
+          ,packageDefaultFlags :: !(Map FlagName Bool)    -- ^ Defaults for unspecified flags.
           ,packageHasLibrary :: !Bool                     -- ^ does the package have a buildable library stanza?
           ,packageTests :: !(Map Text TestSuiteInterface) -- ^ names and interfaces of test suites
           ,packageBenchmarks :: !(Set Text)               -- ^ names of benchmarks
@@ -94,13 +96,15 @@ data Package =
           ,packageOpts :: !GetPackageOpts                 -- ^ Args to pass to GHC.
           ,packageHasExposedModules :: !Bool              -- ^ Does the package have exposed modules?
           ,packageSimpleType :: !Bool                     -- ^ Does the package of build-type: Simple
-          ,packageDefinedFlags :: !(Set FlagName)         -- ^ All flags defined in the .cabal file
           }
  deriving (Show,Typeable)
 
 packageIdentifier :: Package -> PackageIdentifier
 packageIdentifier pkg =
     PackageIdentifier (packageName pkg) (packageVersion pkg)
+
+packageDefinedFlags :: Package -> Set FlagName
+packageDefinedFlags = M.keysSet . packageDefaultFlags
 
 -- | Files that the package depends on, relative to package directory.
 -- Argument is the location of the .cabal file
