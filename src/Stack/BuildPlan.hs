@@ -432,7 +432,7 @@ buildPlanFixes mbp = mbp
 
 -- | Load the 'BuildPlan' for the given snapshot. Will load from a local copy
 -- if available, otherwise downloading from Github.
-loadBuildPlan :: (MonadIO m, MonadThrow m, MonadLogger m, MonadReader env m, HasHttpManager env, HasStackRoot env)
+loadBuildPlan :: (MonadIO m, MonadThrow m, MonadLogger m, MonadReader env m, HasHttpManager env, HasStackRoot env, HasConfig env)
               => SnapName
               -> m BuildPlan
 loadBuildPlan name = do
@@ -447,6 +447,7 @@ loadBuildPlan name = do
         Left e -> do
             $logDebug $ "Decoding build plan from file failed: " <> T.pack (show e)
             ensureDir (parent fp)
+            url <- buildBuildPlanUrl name file
             req <- parseUrl $ T.unpack url
             $logSticky $ "Downloading " <> renderSnapName name <> " build plan ..."
             $logDebug $ "Downloading build plan from: " <> url
@@ -456,13 +457,16 @@ loadBuildPlan name = do
 
   where
     file = renderSnapName name <> ".yaml"
-    reponame =
-        case name of
-            LTS _ _ -> "lts-haskell"
-            Nightly _ -> "stackage-nightly"
-    url = rawGithubUrl "fpco" reponame "master" file
     handle404 (Status 404 _) _ _ = Just $ SomeException $ SnapshotNotFound name
     handle404 _ _ _              = Nothing
+
+buildBuildPlanUrl :: (MonadReader env m, HasConfig env) => SnapName -> Text -> m Text
+buildBuildPlanUrl name file = do
+    urls <- asks (configUrls . getConfig)
+    return $
+        case name of
+             LTS _ _ -> urlsLtsBuildPlans urls <> "/" <> file
+             Nightly _ -> urlsNightlyBuildPlans urls <> "/" <> file
 
 gpdPackages :: [GenericPackageDescription] -> Map PackageName Version
 gpdPackages gpds = Map.fromList $
