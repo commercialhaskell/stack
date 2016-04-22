@@ -119,17 +119,30 @@ extraDirs tool = do
                 , dir </> $(mkRelDir "mingw") </> $(mkRelDir "bin")
                 ]
             }
-        (Platform _ Cabal.Windows, "msys2") -> return mempty
+        (Platform Cabal.I386 Cabal.Windows, "msys2") -> return mempty
             { edBins = goList
-                [ dir </> $(mkRelDir "usr") </> $(mkRelDir "bin")
+                [ dir </> $(mkRelDir "mingw32") </> $(mkRelDir "bin")
+                , dir </> $(mkRelDir "usr") </> $(mkRelDir "bin")
+                , dir </> $(mkRelDir "usr") </> $(mkRelDir "local") </> $(mkRelDir "bin")
+                ]
+            , edInclude = goList
+                [ dir </> $(mkRelDir "mingw32") </> $(mkRelDir "include")
+                ]
+            , edLib = goList
+                [ dir </> $(mkRelDir "mingw32") </> $(mkRelDir "lib")
+                ]
+            }
+        (Platform Cabal.X86_64 Cabal.Windows, "msys2") -> return mempty
+            { edBins = goList
+                [ dir </> $(mkRelDir "mingw64") </> $(mkRelDir "bin")
+                , dir </> $(mkRelDir "usr") </> $(mkRelDir "bin")
+                , dir </> $(mkRelDir "usr") </> $(mkRelDir "local") </> $(mkRelDir "bin")
                 ]
             , edInclude = goList
                 [ dir </> $(mkRelDir "mingw64") </> $(mkRelDir "include")
-                , dir </> $(mkRelDir "mingw32") </> $(mkRelDir "include")
                 ]
             , edLib = goList
                 [ dir </> $(mkRelDir "mingw64") </> $(mkRelDir "lib")
-                , dir </> $(mkRelDir "mingw32") </> $(mkRelDir "lib")
                 ]
             }
         (_, isGHC -> True) -> return mempty

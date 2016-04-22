@@ -272,6 +272,13 @@ setupEnv mResolveMissingGHC = do
                                 then Map.union utf8EnvVars
                                 else id)
 
+                        $ case (soptsSkipMsys sopts, platform) of
+                            (False, Platform Cabal.I386   Cabal.Windows)
+                                -> Map.insert "MSYSTEM" "MINGW32"
+                            (False, Platform Cabal.X86_64 Cabal.Windows)
+                                -> Map.insert "MSYSTEM" "MINGW64"
+                            _   -> id
+
                         -- For reasoning and duplication, see: https://github.com/fpco/stack/issues/70
                         $ Map.insert "HASKELL_PACKAGE_SANDBOX" (T.pack $ toFilePathNoTrailingSep deps)
                         $ Map.insert "HASKELL_PACKAGE_SANDBOXES"
@@ -286,6 +293,7 @@ setupEnv mResolveMissingGHC = do
                                         , ""
                                         ])
                         $ Map.insert "HASKELL_DIST_DIR" (T.pack $ toFilePathNoTrailingSep distDir) env
+
                     () <- atomicModifyIORef envRef $ \m' ->
                         (Map.insert es eo m', ())
                     return eo
@@ -1084,16 +1092,17 @@ installMsys2Windows osKey si archiveFile archiveType destDir = do
     msys <- parseRelDir $ "msys" ++ T.unpack (fromMaybe "32" $ T.stripPrefix "windows" osKey)
     withUnpackedTarball7z "MSYS2" si archiveFile archiveType (Just msys) destDir
 
-    platform <- asks getPlatform
-    menv0 <- getMinimalEnvOverride
-    newEnv <- augmentPathMap [toFilePath $ destDir </> $(mkRelDir "usr")
-                                                   </> $(mkRelDir "bin")]
-                             (unEnvOverride menv0)
-    menv <- mkEnvOverride platform newEnv
 
     -- I couldn't find this officially documented anywhere, but you need to run
-    -- the shell once in order to initialize some pacman stuff. Once that run
-    -- happens, you can just run commands as usual.
+    -- the MSYS shell once in order to initialize some pacman stuff. Once that
+    -- run happens, you can just run commands as usual.
+    platform <- asks getPlatform
+    menv0 <- getMinimalEnvOverride
+    newEnv0 <- modifyEnvOverride menv0 $ Map.insert "MSYSTEM" "MSYS"
+    newEnv <- augmentPathMap [toFilePath $ destDir </> $(mkRelDir "usr")
+                                                   </> $(mkRelDir "bin")]
+                             (unEnvOverride newEnv0)
+    menv <- mkEnvOverride platform newEnv
     runCmd (Cmd (Just destDir) "sh" menv ["--login", "-c", "true"]) Nothing
 
     -- No longer installing git, it's unreliable
