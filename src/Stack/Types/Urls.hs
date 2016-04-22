@@ -5,6 +5,7 @@ module Stack.Types.Urls where
 import Control.Applicative
 import Data.Aeson.Extended
 import Data.Text (Text)
+import Data.Monoid
 
 data Urls = Urls
     { urlsLatestSnapshot :: !Text
