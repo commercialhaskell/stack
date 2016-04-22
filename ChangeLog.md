@@ -78,6 +78,8 @@ Other enhancements:
     reconfigure: true
     cabal-verbose: true
 ```
+* A number of URLs are now configurable, useful for firewalls. See
+  [#1794](https://github.com/commercialhaskell/stack/issues/1884).
 
 Bug fixes:
 
