@@ -584,6 +584,7 @@ isStackOpt t = any (`T.isPrefixOf` t)
     , "--enable-benchmarks"
     , "--enable-library-profiling"
     , "--enable-executable-profiling"
+    , "--exact-configuration"
     ] || elem t
     [ "--user"
     ]
@@ -656,7 +657,9 @@ configureOptsNoDir econfig bco deps wanted isLocal package = concat
     -- TODO: instead always enable this when the cabal version is new
     -- enough. That way we'll detect bugs with --exact-configuration
     -- earlier. Cabal also might do less work then.
-    useExactConf = envConfigCabalVersion econfig >= $(mkVersion "1.22")
+    useExactConf = configAllowNewer config
+
+    newerCabal = envConfigCabalVersion econfig >= $(mkVersion "1.22")
 
     -- Unioning atop defaults is needed so that all flags are specified
     -- with --exact-configuration.
@@ -665,7 +668,7 @@ configureOptsNoDir econfig bco deps wanted isLocal package = concat
 
     depOptions = map (uncurry toDepOption) $ Map.toList deps
       where
-        toDepOption = if useExactConf then toDepOption1_22 else toDepOption1_18
+        toDepOption = if newerCabal then toDepOption1_22 else toDepOption1_18
 
     toDepOption1_22 ident gid = concat
         [ "--dependency="
