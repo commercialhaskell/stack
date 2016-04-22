@@ -6,6 +6,7 @@ import Control.Applicative
 import Data.Aeson.Extended
 import Data.Text (Text)
 import Data.Monoid
+import Prelude
 
 data Urls = Urls
     { urlsLatestSnapshot :: !Text
