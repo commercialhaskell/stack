@@ -201,12 +201,14 @@ configFromConfigMonoid
     -> m Config
 configFromConfigMonoid configStackRoot configUserConfigPath mresolver mproject configMonoid@ConfigMonoid{..} = do
      configWorkDir <- parseRelDir (fromMaybe ".stack-work" configMonoidWorkDir)
+     -- This code is to handle the deprecation of latest-snapshot-url
+     configUrls <- case (configMonoidLatestSnapshotUrl, urlsMonoidLatestSnapshot configMonoidUrls) of
+         (Just url, Nothing) -> do
+             $logWarn "The latest-snapshot-url field is deprecated in favor of 'urls' configuration"
+             return (urlsFromMonoid configMonoidUrls) { urlsLatestSnapshot = url }
+         _ -> return (urlsFromMonoid configMonoidUrls)
      let configConnectionCount = fromMaybe 8 configMonoidConnectionCount
          configHideTHLoading = fromMaybe True configMonoidHideTHLoading
-         configLatestSnapshotUrl = fromMaybe
-            "https://s3.amazonaws.com/haddock.stackage.org/snapshots.json"
-            configMonoidLatestSnapshotUrl
-         configUrls = urlsFromMonoid configMonoidUrls
          configPackageIndices = fromMaybe
             [PackageIndex
                 { indexName = IndexName "Hackage"

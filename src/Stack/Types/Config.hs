@@ -218,9 +218,6 @@ data Config =
          -- ^ The variant of GHC requested by the user.
          -- In most cases, use 'BuildConfig' or 'MiniConfig's version instead,
          -- which will have an auto-detected default.
-         ,configLatestSnapshotUrl   :: !Text
-         -- ^ URL for a JSON file containing information on the latest
-         -- snapshots available.
          ,configUrls                :: !Urls
          -- ^ URLs for other files used by stack.
          -- TODO: Better document
@@ -760,7 +757,7 @@ data ConfigMonoid =
     , configMonoidHideTHLoading      :: !(Maybe Bool)
     -- ^ See: 'configHideTHLoading'
     , configMonoidLatestSnapshotUrl  :: !(Maybe Text)
-    -- ^ See: 'configLatestSnapshotUrl'
+    -- ^ Deprecated in favour of 'urlsMonoidLatestSnapshot'
     , configMonoidUrls               :: !UrlsMonoid
     -- ^ See: 'configUrls
     , configMonoidPackageIndices     :: !(Maybe [PackageIndex])
@@ -1231,7 +1228,7 @@ askConfig = liftM getConfig ask
 
 -- | Get the URL to request the information on the latest snapshots
 askLatestSnapshotUrl :: (MonadReader env m, HasConfig env) => m Text
-askLatestSnapshotUrl = asks (configLatestSnapshotUrl . getConfig)
+askLatestSnapshotUrl = asks (urlsLatestSnapshot . configUrls . getConfig)
 
 -- | Root for a specific package index
 configPackageIndexRoot :: (MonadReader env m, HasConfig env, MonadThrow m) => IndexName -> m (Path Abs Dir)
