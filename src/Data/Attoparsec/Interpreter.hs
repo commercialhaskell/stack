@@ -60,22 +60,23 @@ import           Data.Char (isSpace)
 import           Data.Conduit
 import           Data.Conduit.Attoparsec
 import qualified Data.Conduit.Binary as CB
-import           Data.Conduit.Text(decodeUtf8)
+import           Data.Conduit.Text (decodeUtf8)
 import           Data.List (intercalate)
 import           Data.Text (pack)
 import           Stack.Constants
+import           System.FilePath (takeExtension)
 import           System.IO (IOMode (ReadMode), withBinaryFile, stderr, hPutStrLn)
 
 -- | Parser to extract the stack command line embedded inside a comment
 -- after validating the placement and formatting rules for a valid
 -- interpreter specification.
-interpreterArgsParser :: String -> P.Parser String
-interpreterArgsParser progName = P.option "" sheBangLine *> interpreterComment
+interpreterArgsParser :: Bool -> String -> P.Parser String
+interpreterArgsParser isLiterate progName = P.option "" sheBangLine *> interpreterComment
   where
     sheBangLine =   P.string "#!"
                  *> P.manyTill P.anyChar P.endOfLine
 
-    commentStart str =   (P.string str <?> (progName ++ " options comment"))
+    commentStart psr =   (psr <?> (progName ++ " options comment"))
                       *> P.skipSpace
                       *> (P.string (pack progName) <?> show progName)
 
@@ -87,9 +88,24 @@ interpreterArgsParser progName = P.option "" sheBangLine *> interpreterComment
       *> ((end >> return "")
           <|> (P.space *> (P.manyTill anyCharNormalizeSpace end <?> "-}")))
 
+    horizontalSpace = P.satisfy P.isHorizontalSpace
+
     lineComment =  comment "--" (P.endOfLine <|> P.endOfInput)
+    literateLineComment = comment
+      (">" *> horizontalSpace *> "--")
+      (P.endOfLine <|> P.endOfInput)
     blockComment = comment "{-" (P.string "-}")
-    interpreterComment = lineComment <|> blockComment
+
+    literateBlockComment =
+      (">" *> horizontalSpace *> "{-")
+      *> P.skipMany (("" <$ horizontalSpace) <|> (P.endOfLine *> ">"))
+      *> (P.string (pack progName) <?> progName)
+      *> (P.manyTill' (P.satisfy (not . P.isEndOfLine)
+                       <|> (' ' <$ (P.endOfLine *> ">" <?> ">"))) "-}")
+
+    interpreterComment = if isLiterate
+                            then literateLineComment <|> literateBlockComment
+                            else lineComment <|> blockComment
 
 -- | Extract stack arguments from a correctly placed and correctly formatted
 -- comment when it is being used as an interpreter
@@ -103,7 +119,9 @@ getInterpreterArgs file = do
     parseFile h =
       CB.sourceHandle h
       =$= decodeUtf8
-      $$ sinkParserEither (interpreterArgsParser stackProgName)
+      $$ sinkParserEither (interpreterArgsParser isLiterate stackProgName)
+
+    isLiterate = takeExtension file == ".lhs"
 
     -- FIXME We should print anything only when explicit verbose mode is
     -- specified by the user on command line. But currently the
