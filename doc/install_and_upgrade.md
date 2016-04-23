@@ -100,6 +100,10 @@ problems, see the linked FAQ entries:
 
  2. Add the appropriate source repository (if not sure, run ``lsb_release -a`` to find out your Ubuntu version):
 
+      * Ubuntu 16.04 (amd64):
+
+            echo 'deb http://download.fpcomplete.com/ubuntu xenial main'|sudo tee /etc/apt/sources.list.d/fpco.list
+
       * Ubuntu 15.10 (amd64):
 
             echo 'deb http://download.fpcomplete.com/ubuntu wily main'|sudo tee /etc/apt/sources.list.d/fpco.list
