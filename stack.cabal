@@ -181,9 +181,9 @@ library
                    , optparse-applicative >= 0.11 && < 0.13
                    , path >= 0.5.1
                    , path-io >= 1.1.0 && < 2.0.0
-                   , persistent >= 2.1.2
-                   , persistent-sqlite >= 2.1.4
-                   , persistent-template >= 2.1.1
+                   , persistent >= 2.1.2 && < 2.6
+                   , persistent-sqlite >= 2.1.4 && < 2.6
+                   , persistent-template >= 2.1.1 && < 2.6
                    , pretty >= 1.1.1.1
                    , process >= 1.2.0.0
                    , resourcet >= 1.1.4.1

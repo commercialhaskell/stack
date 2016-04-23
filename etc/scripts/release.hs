@@ -429,7 +429,8 @@ rules global@Global{..} args = do
         , ("14.04", "trusty")
         , ("14.10", "utopic")
         , ("15.04", "vivid")
-        , ("15.10", "wily") ]
+        , ("15.10", "wily")
+        , ("16.04", "xenial") ]
     debianVersions =
         [ ("7", "wheezy")
         , ("8", "jessie") ]
