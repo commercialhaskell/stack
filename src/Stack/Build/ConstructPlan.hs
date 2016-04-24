@@ -22,6 +22,8 @@ import           Control.Monad.Trans.Resource
 import           Data.Either
 import           Data.Function
 import           Data.List
+import           Data.HashMap.Lazy (HashMap)
+import qualified Data.HashMap.Lazy as LazyHashMap
 import           Data.Map.Strict (Map)
 import qualified Data.Map.Strict as M
 import qualified Data.Map.Strict as Map
@@ -105,7 +107,7 @@ data Ctx = Ctx
     , ctxEnvConfig   :: !EnvConfig
     , callStack      :: ![PackageName]
     , extraToBuild   :: !(Set PackageName)
-    , ctxVersions    :: !(Map PackageName (Set Version))
+    , ctxVersions    :: !(HashMap PackageName (Set Version))
     , wanted         :: !(Set PackageName)
     , localNames     :: !(Set PackageName)
     }
@@ -134,7 +136,7 @@ constructPlan mbp0 baseConfigOpts0 locals extraToBuild0 localDumpPkgs loadPackag
     let locallyRegistered = Map.fromList $ map (dpGhcPkgId &&& dpPackageIdent) localDumpPkgs
     caches <- getPackageCaches
     let versions =
-            Map.fromListWith Set.union $
+            LazyHashMap.fromListWith Set.union $
             map (second Set.singleton . toTuple) $
             Map.keys caches
 
@@ -431,7 +433,7 @@ addPackageDeps treatAsDep package = do
     deps <- forM (Map.toList deps') $ \(depname, range) -> do
         eres <- addDep treatAsDep depname
         let mlatestApplicable =
-                (latestApplicableVersion range <=< Map.lookup depname) (ctxVersions ctx)
+                (latestApplicableVersion range <=< LazyHashMap.lookup depname) (ctxVersions ctx)
         case eres of
             Left e ->
                 let bd =
