@@ -11,7 +11,7 @@ module Stack.Build.ConstructPlan
     ( constructPlan
     ) where
 
-import           Control.Arrow ((&&&), second)
+import           Control.Arrow ((&&&))
 import           Control.Exception.Lifted
 import           Control.Monad
 import           Control.Monad.Catch (MonadCatch)
@@ -43,7 +43,7 @@ import           Stack.Build.Source
 import           Stack.BuildPlan
 import           Stack.Package
 import           Stack.PackageDump
-import           Stack.PackageIndex (getPackageCaches)
+import           Stack.PackageIndex
 import           Stack.Types
 
 data PackageInfo
@@ -105,7 +105,7 @@ data Ctx = Ctx
     , ctxEnvConfig   :: !EnvConfig
     , callStack      :: ![PackageName]
     , extraToBuild   :: !(Set PackageName)
-    , ctxVersions    :: !(Map PackageName (Set Version))
+    , getVersions    :: !(PackageName -> Set Version)
     , wanted         :: !(Set PackageName)
     , localNames     :: !(Set PackageName)
     }
@@ -133,10 +133,7 @@ constructPlan :: forall env m.
 constructPlan mbp0 baseConfigOpts0 locals extraToBuild0 localDumpPkgs loadPackage0 sourceMap installedMap = do
     let locallyRegistered = Map.fromList $ map (dpGhcPkgId &&& dpPackageIdent) localDumpPkgs
     caches <- getPackageCaches
-    let versions =
-            Map.fromListWith Set.union $
-            map (second Set.singleton . toTuple) $
-            Map.keys caches
+    let getVersions0 name = lookupPackageVersions name caches
 
     econfig <- asks getEnvConfig
     let onWanted = void . addDep False . packageName . lpPackage
@@ -144,7 +141,7 @@ constructPlan mbp0 baseConfigOpts0 locals extraToBuild0 localDumpPkgs loadPackag
             mapM_ onWanted $ filter lpWanted locals
             mapM_ (addDep False) $ Set.toList extraToBuild0
     ((), m, W efinals installExes dirtyReason deps warnings) <-
-        liftIO $ runRWST inner (ctx econfig versions) M.empty
+        liftIO $ runRWST inner (ctx econfig getVersions0) M.empty
     mapM_ $logWarn (warnings [])
     let toEither (_, Left e)  = Left e
         toEither (k, Right v) = Right (k, v)
@@ -172,7 +169,7 @@ constructPlan mbp0 baseConfigOpts0 locals extraToBuild0 localDumpPkgs loadPackag
                 }
         else throwM $ ConstructPlanExceptions errs (bcStackYaml $ getBuildConfig econfig)
   where
-    ctx econfig versions = Ctx
+    ctx econfig getVersions0 = Ctx
         { mbp = mbp0
         , baseConfigOpts = baseConfigOpts0
         , loadPackage = loadPackage0
@@ -183,7 +180,7 @@ constructPlan mbp0 baseConfigOpts0 locals extraToBuild0 localDumpPkgs loadPackag
         , ctxEnvConfig = econfig
         , callStack = []
         , extraToBuild = extraToBuild0
-        , ctxVersions = versions
+        , getVersions = getVersions0
         , wanted = wantedLocalPackages locals
         , localNames = Set.fromList $ map (packageName . lpPackage) locals
         }
@@ -431,7 +428,7 @@ addPackageDeps treatAsDep package = do
     deps <- forM (Map.toList deps') $ \(depname, range) -> do
         eres <- addDep treatAsDep depname
         let mlatestApplicable =
-                (latestApplicableVersion range <=< Map.lookup depname) (ctxVersions ctx)
+                latestApplicableVersion range (getVersions ctx depname)
         case eres of
             Left e ->
                 let bd =

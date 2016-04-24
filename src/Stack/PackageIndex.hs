@@ -20,6 +20,7 @@ module Stack.PackageIndex
     ( updateAllIndices
     , getPackageCaches
     , getPackageVersions
+    , lookupPackageVersions
     ) where
 
 import qualified Codec.Archive.Tar as Tar
@@ -357,9 +358,12 @@ getPackageVersions
     :: (MonadIO m, MonadLogger m, MonadReader env m, HasConfig env, HasHttpManager env, MonadBaseControl IO m, MonadCatch m)
     => PackageName
     -> m (Set Version)
-getPackageVersions pkgName = do
-    caches <- getPackageCaches
-    return (Set.fromList [v | PackageIdentifier n v <- Map.keys caches, n == pkgName])
+getPackageVersions pkgName =
+    fmap (lookupPackageVersions pkgName) getPackageCaches
+
+lookupPackageVersions :: PackageName -> Map PackageIdentifier a -> Set Version
+lookupPackageVersions pkgName pkgCaches =
+    Set.fromList [v | PackageIdentifier n v <- Map.keys pkgCaches, n == pkgName]
 
 -- | Load the package caches, or create the caches if necessary.
 --
