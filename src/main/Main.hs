@@ -988,6 +988,7 @@ uploadCmd (args, mpvpBounds, ignoreCheck, don'tSign, sigServerUrl) go = do
             liftIO $ Upload.mkUploader config uploadSettings
     withBuildConfigAndLock go $ \_ -> do
         uploader <- getUploader
+        manager <- asks envManager
         unless ignoreCheck $
             mapM_ (resolveFile' >=> checkSDistTarball) files
         forM_
@@ -999,6 +1000,7 @@ uploadCmd (args, mpvpBounds, ignoreCheck, don'tSign, sigServerUrl) go = do
                      unless
                          don'tSign
                          (Sig.sign
+                              manager
                               sigServerUrl
                               tarFile))
         unless (null dirs) $
@@ -1011,6 +1013,7 @@ uploadCmd (args, mpvpBounds, ignoreCheck, don'tSign, sigServerUrl) go = do
                 unless
                     don'tSign
                     (Sig.signTarBytes
+                         manager
                          sigServerUrl
                          tarPath
                          tarBytes)
@@ -1022,6 +1025,7 @@ sdistCmd (dirs, mpvpBounds, ignoreCheck, sign, sigServerUrl) go =
         dirs' <- if null dirs
             then asks (Map.keys . envConfigPackages . getEnvConfig)
             else mapM resolveDir' dirs
+        manager <- asks envManager
         forM_ dirs' $ \dir -> do
             (tarName, tarBytes) <- getSDistTarball mpvpBounds dir
             distDir <- distDirFromDir dir
@@ -1030,7 +1034,7 @@ sdistCmd (dirs, mpvpBounds, ignoreCheck, sign, sigServerUrl) go =
             liftIO $ L.writeFile (toFilePath tarPath) tarBytes
             unless ignoreCheck (checkSDistTarball tarPath)
             $logInfo $ "Wrote sdist tarball to " <> T.pack (toFilePath tarPath)
-            when sign (Sig.sign sigServerUrl tarPath)
+            when sign (Sig.sign manager sigServerUrl tarPath)
 
 -- | Execute a command.
 execCmd :: ExecOpts -> GlobalOpts -> IO ()
