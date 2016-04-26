@@ -16,7 +16,7 @@ Portability : POSIX
 module Stack.Sig.GPG (gpgSign, gpgVerify) where
 
 #if __GLASGOW_HASKELL__ < 710
-import           Control.Applicative ((<$>))
+import           Control.Applicative ((<$>), (<*>))
 #endif
 
 import           Control.Monad.Catch (MonadThrow, throwM)
@@ -29,14 +29,16 @@ import           Path
 import           Stack.Types
 import           System.Directory (findExecutable)
 import           System.Exit (ExitCode(..))
-import           System.Process (readProcessWithExitCode)
+import           System.Process (ProcessHandle, runInteractiveProcess,
+                                 waitForProcess)
+import           System.IO (Handle, hGetContents, hPutStrLn)
 
 -- | Sign a file path with GPG, returning the @Signature@.
 gpgSign
     :: (MonadIO m, MonadThrow m)
     => Path Abs File -> m Signature
 gpgSign path = do
-    (code,out,err) <-
+    (_hIn,hOut,hErr,process) <-
         gpg
             [ "--output"
             , "-"
@@ -44,10 +46,15 @@ gpgSign path = do
             , "--detach-sig"
             , "--armor"
             , toFilePath path]
-            []
+    (out,err,code) <-
+        liftIO
+            ((,,) <$>
+             hGetContents hOut <*>
+             hGetContents hErr <*>
+             waitForProcess process)
     if code /= ExitSuccess
-        then throwM (GPGSignException (out ++ "\n" ++ err))
-        else return (Signature (C.pack out))
+        then throwM (GPGSignException $ out <> "\n" <> err)
+        else return (Signature $ C.pack out)
 
 -- | Verify the @Signature@ of a file path returning the
 -- @Fingerprint@.
@@ -55,8 +62,14 @@ gpgVerify
     :: (MonadIO m, MonadThrow m)
     => Signature -> Path Abs File -> m Fingerprint
 gpgVerify (Signature signature) path = do
-    (code,out,err) <-
-        gpg ["--verify", "-", toFilePath path] (C.unpack signature)
+    (hIn,hOut,hErr,process) <- gpg ["--verify", "-", toFilePath path]
+    (_in,out,err,code) <-
+        liftIO
+            ((,,,) <$>
+             hPutStrLn hIn (C.unpack signature) <*>
+             hGetContents hOut <*>
+             hGetContents hErr <*>
+             waitForProcess process)
     if code /= ExitSuccess
         then throwM (GPGVerifyException (out ++ "\n" ++ err))
         else maybe
@@ -73,13 +86,13 @@ gpgVerify (Signature signature) path = do
 -- | Try to execute `gpg2` but fallback to `gpg` (as a backup)
 gpg
     :: (MonadIO m, MonadThrow m)
-    => [String] -> String -> m (ExitCode, String, String)
-gpg args stdin = do
+    => [String] -> m (Handle, Handle, Handle, ProcessHandle)
+gpg args = do
     mGpg2Path <- liftIO (findExecutable "gpg2")
     case mGpg2Path of
-        Just _ -> liftIO (readProcessWithExitCode "gpg2" args stdin)
+        Just _ -> liftIO (runInteractiveProcess "gpg2" args Nothing Nothing)
         Nothing -> do
             mGpgPath <- liftIO (findExecutable "gpg")
             case mGpgPath of
-                Just _ -> liftIO (readProcessWithExitCode "gpg" args stdin)
+                Just _ -> liftIO (runInteractiveProcess "gpg" args Nothing Nothing)
                 Nothing -> throwM GPGNotFoundException
