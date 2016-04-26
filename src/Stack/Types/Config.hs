@@ -143,6 +143,8 @@ import qualified Data.ByteString.Char8 as S8
 import           Data.Either (partitionEithers)
 import           Data.IORef (IORef)
 import           Data.List (stripPrefix)
+import           Data.List.NonEmpty (NonEmpty)
+import qualified Data.List.NonEmpty as NonEmpty
 import           Data.Hashable (Hashable)
 import           Data.Map (Map)
 import qualified Data.Map as Map
@@ -1117,7 +1119,7 @@ data ConfigException
   | UnexpectedArchiveContents [Path Abs Dir] [Path Abs File]
   | UnableToExtractArchive Text (Path Abs File)
   | BadStackVersionException VersionRange
-  | NoMatchingSnapshot [SnapName]
+  | NoMatchingSnapshot (NonEmpty SnapName)
   | ResolverMismatch Resolver String
   | ResolverPartial Resolver String
   | NoSuchDirectory FilePath
@@ -1170,7 +1172,7 @@ instance Show ConfigException where
         [ "None of the following snapshots provides a compiler matching "
         , "your package(s):\n"
         , unlines $ map (\name -> "    - " <> T.unpack (renderSnapName name))
-                        names
+                        (NonEmpty.toList names)
         , "\nYou can try the following options:\n"
         , "    - Use '--omit-packages to exclude mismatching package(s).\n"
         , "    - Use '--resolver' to specify a matching snapshot/resolver\n"

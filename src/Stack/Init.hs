@@ -24,10 +24,11 @@ import qualified Data.HashMap.Strict             as HM
 import qualified Data.IntMap                     as IntMap
 import           Data.List                       ( intercalate, intersect
                                                  , maximumBy)
-import           Data.List.Extra                 (nubOrd)
+import           Data.List.NonEmpty              (NonEmpty(..))
+import qualified Data.List.NonEmpty              as NonEmpty
 import           Data.Map                        (Map)
 import qualified Data.Map                        as Map
-import           Data.Maybe                      (fromJust)
+import           Data.Maybe
 import           Data.Monoid
 import qualified Data.Text                       as T
 import qualified Data.Yaml                       as Yaml
@@ -350,7 +351,7 @@ getDefaultResolver stackYaml initOpts mresolver bundle =
         -- TODO support selecting best across regular and custom snapshots
         selectSnapResolver = do
             let gpds = Map.elems (fmap snd bundle)
-            snaps <- getSnapshots' >>= getRecommendedSnapshots
+            snaps <- fmap getRecommendedSnapshots getSnapshots'
             (s, r) <- selectBestSnapshot gpds snaps
             case r of
                 BuildPlanCheckFail {} | not (omitPackages initOpts)
@@ -499,18 +500,17 @@ checkBundleResolver stackYaml initOpts bundle resolver = do
       needSolver (ResolverCompiler _)  _ = True
       needSolver _ _ = False
 
-getRecommendedSnapshots :: (MonadIO m, MonadMask m, MonadReader env m, HasConfig env, HasHttpManager env, HasGHCVariant env, MonadLogger m, MonadBaseControl IO m)
-                        => Snapshots
-                        -> m [SnapName]
-getRecommendedSnapshots snapshots = do
+getRecommendedSnapshots :: Snapshots -> (NonEmpty SnapName)
+getRecommendedSnapshots snapshots =
     -- in order - Latest LTS, Latest Nightly, all LTS most recent first
-    return $ nubOrd $ concat
-        [ map (uncurry LTS)
-            (take 1 $ reverse $ IntMap.toList $ snapshotsLts snapshots)
-        , [Nightly $ snapshotsNightly snapshots]
-        , map (uncurry LTS)
-            (drop 1 $ reverse $ IntMap.toList $ snapshotsLts snapshots)
-        ]
+    case NonEmpty.nonEmpty ltss of
+        Just (mostRecent :| older)
+            -> mostRecent :| (nightly : older)
+        Nothing
+            -> nightly :| []
+  where
+    ltss = map (uncurry LTS) (IntMap.toDescList $ snapshotsLts snapshots)
+    nightly = Nightly (snapshotsNightly snapshots)
 
 data InitOpts = InitOpts
     { searchDirs     :: ![T.Text]

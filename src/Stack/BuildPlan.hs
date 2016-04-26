@@ -51,6 +51,8 @@ import           Data.Either (partitionEithers)
 import qualified Data.Foldable as F
 import qualified Data.HashSet as HashSet
 import           Data.List (intercalate)
+import           Data.List.NonEmpty (NonEmpty(..))
+import qualified Data.List.NonEmpty as NonEmpty
 import           Data.Map (Map)
 import qualified Data.Map as Map
 import           Data.Maybe (fromJust, fromMaybe, mapMaybe)
@@ -713,32 +715,30 @@ checkSnapBuildPlan gpds flags snap = do
         ghcErrors = Map.filterWithKey isGhcWiredIn
 
 -- | Find a snapshot and set of flags that is compatible with and matches as
--- best as possible with the given 'GenericPackageDescription's. Returns
--- 'Nothing' if no such snapshot is found.
+-- best as possible with the given 'GenericPackageDescription's.
 selectBestSnapshot
     :: ( MonadIO m, MonadCatch m, MonadLogger m, MonadReader env m
        , HasHttpManager env, HasConfig env, HasGHCVariant env
        , MonadBaseControl IO m)
     => [GenericPackageDescription]
-    -> [SnapName]
+    -> NonEmpty SnapName
     -> m (SnapName, BuildPlanCheck)
 selectBestSnapshot gpds snaps = do
     $logInfo $ "Selecting the best among "
-               <> T.pack (show (length snaps))
+               <> T.pack (show (NonEmpty.length snaps))
                <> " snapshots...\n"
-    loop Nothing snaps
+    F.foldr1 go (NonEmpty.map getResult snaps)
     where
-        loop Nothing []          = error "Bug: in best snapshot selection"
-        loop (Just pair) []      = return pair
-        loop bestYet (snap:rest) = do
+        go mold mnew = do
+            old@(_snap, bpc) <- mold
+            case bpc of
+                BuildPlanCheckOk {} -> return old
+                _ -> fmap (betterSnap old) mnew
+
+        getResult snap = do
             result <- checkSnapBuildPlan gpds Nothing snap
             reportResult result snap
-            let new = (snap, result)
-            case result of
-                BuildPlanCheckOk {} -> return new
-                _ -> case bestYet of
-                        Nothing  -> loop (Just new) rest
-                        Just old -> loop (Just (betterSnap old new)) rest
+            return (snap, result)
 
         betterSnap (s1, r1) (s2, r2)
           | compareBuildPlanCheck r1 r2 /= LT = (s1, r1)
