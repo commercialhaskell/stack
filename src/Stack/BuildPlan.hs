@@ -217,7 +217,7 @@ data ResolveState = ResolveState
 toMiniBuildPlan :: (MonadIO m, MonadLogger m, MonadReader env m, HasHttpManager env, MonadThrow m, HasConfig env, MonadBaseControl IO m, MonadCatch m)
                 => CompilerVersion -- ^ Compiler version
                 -> Map PackageName Version -- ^ cores
-                -> Map PackageName (Version, Map FlagName Bool) -- ^ non-core packages
+                -> Map PackageName (Version, Map FlagName Bool, Maybe GitSHA1) -- ^ non-core packages
                 -> m MiniBuildPlan
 toMiniBuildPlan compilerVersion corePackages packages = do
     $logInfo "Caching build plan"
@@ -228,7 +228,7 @@ toMiniBuildPlan compilerVersion corePackages packages = do
     -- remove those from the list of dependencies, since there's no way we'll
     -- ever reinstall them anyway.
     (cores, missingCores) <- addDeps True compilerVersion
-        $ fmap (, Map.empty) corePackages
+        $ fmap (, Map.empty, Nothing) corePackages
 
     (extras, missing) <- addDeps False compilerVersion packages
 
@@ -248,6 +248,7 @@ toMiniBuildPlan compilerVersion corePackages packages = do
                 , mpiToolDeps = Set.empty
                 , mpiExes = Set.empty
                 , mpiHasLibrary = True
+                , mpiGitSHA1 = Nothing
                 })
 
     removeMissingDeps cores mpi = mpi
@@ -258,7 +259,7 @@ toMiniBuildPlan compilerVersion corePackages packages = do
 addDeps :: (MonadIO m, MonadLogger m, MonadReader env m, HasHttpManager env, MonadThrow m, HasConfig env, MonadBaseControl IO m, MonadCatch m)
         => Bool -- ^ allow missing
         -> CompilerVersion -- ^ Compiler version
-        -> Map PackageName (Version, Map FlagName Bool)
+        -> Map PackageName (Version, Map FlagName Bool, Maybe GitSHA1)
         -> m (Map PackageName MiniPackageInfo, Set PackageIdentifier)
 addDeps allowMissing compilerVersion toCalc = do
     menv <- getMinimalEnvOverride
@@ -278,10 +279,11 @@ addDeps allowMissing compilerVersion toCalc = do
                 (indexName $ rpIndex rp,
                     [( ident
                     , rpCache rp
-                    , maybe Map.empty snd $ Map.lookup (packageIdentifierName ident) toCalc
+                    , maybe (Map.empty, Nothing) sndthd3
+                      $ Map.lookup (packageIdentifierName ident) toCalc
                     )])
     res <- forM (Map.toList byIndex) $ \(indexName', pkgs) -> withCabalFiles indexName' pkgs
-        $ \ident flags cabalBS -> do
+        $ \ident (flags, mgitSha) cabalBS -> do
             (_warnings,gpd) <- readPackageUnresolvedBS Nothing cabalBS
             let packageConfig = PackageConfig
                     { packageConfigEnableTests = False
@@ -304,12 +306,15 @@ addDeps allowMissing compilerVersion toCalc = do
                     False
                     (buildable . libBuildInfo)
                     (library pd)
+                , mpiGitSHA1 = mgitSha
                 })
     return (Map.fromList $ concat res, missingIdents)
   where
     idents0 = Map.fromList
-        $ map (\(n, (v, f)) -> (PackageIdentifier n v, Left f))
+        $ map (\(n, (v, f, _gitsha)) -> (PackageIdentifier n v, Left f))
         $ Map.toList toCalc
+
+    sndthd3 (_, x, y) = (x, y)
 
 -- | Resolve all packages necessary to install for the needed packages.
 getDeps :: MiniBuildPlan
@@ -414,6 +419,10 @@ loadMiniBuildPlan name = do
     goPP pp =
         ( ppVersion pp
         , pcFlagOverrides $ ppConstraints pp
+        , ppCabalFileInfo pp
+            >>= fmap (GitSHA1 . encodeUtf8)
+              . Map.lookup "GitSHA1"
+              . cfiHashes
         )
 
 -- | Some hard-coded fixes for build plans, hopefully to be irrelevant over
@@ -891,7 +900,7 @@ parseCustomMiniBuildPlan stackYamlFP url0 = do
         toMiniBuildPlan
             (csCompilerVersion cs)
             Map.empty
-            (Map.fromList $ map addFlags $ Set.toList $ csPackages cs)
+            (fmap addGitSHA $ Map.fromList $ map addFlags $ Set.toList $ csPackages cs)
   where
     getCustomPlanDir = do
         root <- asks $ configStackRoot . getConfig
@@ -916,6 +925,9 @@ parseCustomMiniBuildPlan stackYamlFP url0 = do
         fp <- liftIO $ D.canonicalizePath $ toFilePath (parent stackYamlFP) FP.</> T.unpack (fromMaybe url $
             T.stripPrefix "file://" url <|> T.stripPrefix "file:" url)
         parseAbsFile fp
+
+    -- we add a Nothing since we don't yet collect Git SHAs for custom snapshots
+    addGitSHA (x, y) = (x, y, Nothing)
 
 data CustomSnapshot = CustomSnapshot
     { csCompilerVersion :: !CompilerVersion
