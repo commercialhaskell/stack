@@ -775,7 +775,8 @@ withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} md
             TTLocal lp -> inner (lpPackage lp) (lpCabalFile lp) (lpDir lp)
             TTUpstream package _ gitSHA1 -> do
                 mdist <- liftM Just distRelativeDir
-                m <- unpackPackageIdents eeEnvOverride eeTempDir mdist $ Set.singleton taskProvides
+                m <- unpackPackageIdents eeEnvOverride eeTempDir mdist
+                   $ Map.singleton taskProvides gitSHA1
                 case Map.toList m of
                     [(ident, dir)]
                         | ident == taskProvides -> do
