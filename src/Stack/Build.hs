@@ -30,7 +30,6 @@ import           Control.Monad.Trans.Resource
 import           Data.Aeson (Value (Object, Array), (.=), object)
 import           Data.Function
 import qualified Data.HashMap.Strict as HM
-import           Data.IORef.RunOnce (runOnce)
 import           Data.List ((\\))
 import           Data.List.Extra (groupSort)
 import           Data.List.NonEmpty (NonEmpty(..))
@@ -277,7 +276,7 @@ withLoadPackage :: ( MonadIO m
                 -> m a
 withLoadPackage menv inner = do
     econfig <- asks getEnvConfig
-    withCabalLoader' <- runOnce $ withCabalLoader menv $ \cabalLoader ->
+    withCabalLoader menv $ \cabalLoader ->
         inner $ \name version flags -> do
             bs <- cabalLoader $ PackageIdentifier name version -- TODO automatically update index the first time this fails
 
@@ -286,7 +285,6 @@ withLoadPackage menv inner = do
             -- resolving the package index.
             (_warnings,pkg) <- readPackageBS (depPackageConfig econfig flags) bs
             return pkg
-    withCabalLoader'
   where
     -- | Package config to be used for dependencies
     depPackageConfig :: EnvConfig -> Map FlagName Bool -> PackageConfig
