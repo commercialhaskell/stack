@@ -71,6 +71,7 @@ import           GHC.Generics (Generic, from, to)
 import           Path (Path, Abs, File, Dir, mkRelDir, toFilePath, parseRelDir, (</>))
 import           Path.Extra (toFilePathNoTrailingSep)
 import           Prelude
+import           Stack.Types.BuildPlan (GitSHA1)
 import           Stack.Types.Compiler
 import           Stack.Types.Config
 import           Stack.Types.FlagName
@@ -519,14 +520,14 @@ instance Show TaskConfigOpts where
 -- | The type of a task, either building local code or something from the
 -- package index (upstream)
 data TaskType = TTLocal LocalPackage
-              | TTUpstream Package InstallLocation
+              | TTUpstream Package InstallLocation (Maybe GitSHA1)
     deriving Show
 
 taskLocation :: Task -> InstallLocation
 taskLocation task =
     case taskType task of
         TTLocal _ -> Local
-        TTUpstream _ loc -> loc
+        TTUpstream _ loc _ -> loc
 
 -- | A complete plan of what needs to be built and how to do it
 data Plan = Plan

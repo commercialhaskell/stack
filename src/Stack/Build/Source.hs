@@ -116,8 +116,8 @@ loadSourceMap needTargets boptsCli = do
 
         -- Overwrite any flag settings with those from the config file
         extraDeps3 = Map.mapWithKey
-            (\n (v, f) -> PSUpstream v Local $
-                case ( Map.lookup (Just n) $ boptsCLIFlags boptsCli
+            (\n (v, f) -> PSUpstream v Local
+               (case ( Map.lookup (Just n) $ boptsCLIFlags boptsCli
                      , Map.lookup Nothing $ boptsCLIFlags boptsCli
                      , Map.lookup n $ bcFlags bconfig
                      ) of
@@ -132,6 +132,10 @@ loadSourceMap needTargets boptsCli = do
                         , fromMaybe Map.empty y
                         , fromMaybe Map.empty z
                         ])
+
+                 -- currently have no ability for extra-deps to specify their
+                 -- cabal file hashes
+                 Nothing)
             extraDeps2
 
     let sourceMap = Map.unions

@@ -268,19 +268,23 @@ addDeps allowMissing compilerVersion toCalc = do
         if allowMissing
             then do
                 (missingNames, missingIdents, m) <-
-                    resolvePackagesAllowMissing (Map.keysSet idents0) Set.empty
+                    resolvePackagesAllowMissing (fmap snd idents0) Set.empty
                 assert (Set.null missingNames)
                     $ return (m, missingIdents)
             else do
-                m <- resolvePackages menv (Map.keysSet idents0) Set.empty
+                m <- resolvePackages menv (fmap snd idents0) Set.empty
                 return (m, Set.empty)
     let byIndex = Map.fromListWith (++) $ flip map (Map.toList resolvedMap)
             $ \(ident, rp) ->
-                (indexName $ rpIndex rp,
+                let (cache, sha) =
+                        case Map.lookup (packageIdentifierName ident) toCalc of
+                            Nothing -> (Map.empty, Nothing)
+                            Just (_, x, y) -> (x, y)
+                 in (indexName $ rpIndex rp,
                     [( ident
                     , rpCache rp
-                    , maybe (Map.empty, Nothing) sndthd3
-                      $ Map.lookup (packageIdentifierName ident) toCalc
+                    , sha
+                    , (cache, sha)
                     )])
     res <- forM (Map.toList byIndex) $ \(indexName', pkgs) -> withCabalFiles indexName' pkgs
         $ \ident (flags, mgitSha) cabalBS -> do
@@ -311,10 +315,8 @@ addDeps allowMissing compilerVersion toCalc = do
     return (Map.fromList $ concat res, missingIdents)
   where
     idents0 = Map.fromList
-        $ map (\(n, (v, f, _gitsha)) -> (PackageIdentifier n v, Left f))
+        $ map (\(n, (v, f, gitsha)) -> (PackageIdentifier n v, (Left f, gitsha)))
         $ Map.toList toCalc
-
-    sndthd3 (_, x, y) = (x, y)
 
 -- | Resolve all packages necessary to install for the needed packages.
 getDeps :: MiniBuildPlan

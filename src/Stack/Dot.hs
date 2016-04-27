@@ -189,7 +189,7 @@ createDepLoader :: Applicative m
 createDepLoader sourceMap installed loadPackageDeps pkgName =
   case Map.lookup pkgName sourceMap of
     Just (PSLocal lp) -> pure ((packageAllDeps &&& (Just . packageVersion)) (lpPackage lp))
-    Just (PSUpstream version _ flags) -> loadPackageDeps pkgName version flags
+    Just (PSUpstream version _ flags _) -> loadPackageDeps pkgName version flags
     Nothing -> pure (Set.empty, fmap installedVersion (Map.lookup pkgName installed))
 
 -- | Resolve the direct (depth 0) external dependencies of the given local packages

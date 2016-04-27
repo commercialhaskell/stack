@@ -144,7 +144,7 @@ getCabalLbs pvpBounds fp = do
         lookupVersion name =
           case Map.lookup name sourceMap of
               Just (PSLocal lp) -> Just $ packageVersion $ lpPackage lp
-              Just (PSUpstream version _ _) -> Just version
+              Just (PSUpstream version _ _ _) -> Just version
               Nothing ->
                   case Map.lookup name installedMap of
                       Just (_, installed) -> Just (installedVersion installed)
