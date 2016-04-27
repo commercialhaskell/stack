@@ -55,7 +55,7 @@ import           Data.List.NonEmpty (NonEmpty(..))
 import qualified Data.List.NonEmpty as NonEmpty
 import           Data.Map (Map)
 import qualified Data.Map as Map
-import           Data.Maybe (fromJust, fromMaybe, mapMaybe)
+import           Data.Maybe (fromMaybe, mapMaybe)
 import           Data.Monoid
 import           Data.Set (Set)
 import qualified Data.Set as Set
@@ -536,45 +536,35 @@ selectPackageBuildPlan
     -> GenericPackageDescription
     -> (Map PackageName (Map FlagName Bool), DepErrors)
 selectPackageBuildPlan platform compiler pool gpd =
-    fromJust (go flagOptions Nothing)
-    where
-        go :: [Map FlagName Bool] -> Maybe (Map PackageName (Map FlagName Bool), DepErrors) -> Maybe (Map PackageName (Map FlagName Bool), DepErrors)
-        -- impossible
-        go [] Nothing = assert False Nothing
-        -- last
-        go [] (Just plan) = Just plan
-        -- got the best possible result
-        go _ (Just plan) | Map.null (snd plan) = Just plan
-        -- initial
-        go (flags:rest) Nothing = go rest $ Just (nextPlan flags)
-        -- keep looking for better results
-        go (flags:rest) (Just plan) =
-          go rest $ Just (betterPlan plan (nextPlan flags))
+    (selectPlan . limitSearchSpace . NonEmpty.map makePlan) flagCombinations
+  where
+    selectPlan :: NonEmpty (a, DepErrors) -> (a, DepErrors)
+    selectPlan = F.foldr1 fewerErrors
+      where
+        fewerErrors p1 p2
+            | nErrors p1 == 0 = p1
+            | nErrors p1 <= nErrors p2 = p1
+            | otherwise = p2
+          where nErrors = Map.size . snd
 
-        nextPlan flags = checkPackageBuildPlan platform compiler pool flags gpd
+    -- Avoid exponential complexity in flag combinations making us sad pandas.
+    -- See: https://github.com/commercialhaskell/stack/issues/543
+    limitSearchSpace :: NonEmpty a -> NonEmpty a
+    limitSearchSpace (x :| xs) = x :| take (maxFlagCombinations - 1) xs
+      where maxFlagCombinations = 128
 
-        betterPlan (f1, e1) (f2, e2)
-          | (Map.size e1) <= (Map.size e2) = (f1, e1)
-          | otherwise = (f2, e2)
+    makePlan :: [(FlagName, Bool)] -> (Map PackageName (Map FlagName Bool), DepErrors)
+    makePlan flags = checkPackageBuildPlan platform compiler pool (Map.fromList flags) gpd
 
-        flagName' = fromCabalFlagName . flagName
-
-        -- Avoid exponential complexity in flag combinations making us sad pandas.
-        -- See: https://github.com/commercialhaskell/stack/issues/543
-        maxFlagOptions = 128
-
-        flagOptions :: [Map FlagName Bool]
-        flagOptions = take maxFlagOptions $ map Map.fromList $ mapM getOptions $ genPackageFlags gpd
+    flagCombinations :: NonEmpty [(FlagName, Bool)]
+    flagCombinations = mapM getOptions (genPackageFlags gpd)
+      where
+        getOptions :: C.Flag -> NonEmpty (FlagName, Bool)
         getOptions f
-            | flagManual f = [(flagName' f, flagDefault f)]
-            | flagDefault f =
-                [ (flagName' f, True)
-                , (flagName' f, False)
-                ]
-            | otherwise =
-                [ (flagName' f, False)
-                , (flagName' f, True)
-                ]
+            | flagManual f = (fname, flagDefault f) :| []
+            | flagDefault f = (fname, True) :| [(fname, False)]
+            | otherwise = (fname, False) :| [(fname, True)]
+          where fname = (fromCabalFlagName . flagName) f
 
 -- | Check whether with the given set of flags a package's dependency
 -- constraints can be satisfied against a given build plan or pool of packages.
