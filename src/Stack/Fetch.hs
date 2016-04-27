@@ -55,7 +55,7 @@ import           Data.List.NonEmpty             (NonEmpty)
 import qualified Data.List.NonEmpty             as NE
 import           Data.Map                       (Map)
 import qualified Data.Map                       as Map
-import           Data.Maybe                     (maybeToList, catMaybes)
+import           Data.Maybe                     (maybeToList, catMaybes, fromMaybe)
 import           Data.Monoid                    ((<>))
 import           Data.Set                       (Set)
 import qualified Data.Set                       as Set
@@ -267,7 +267,7 @@ withCabalLoader
     -> ((PackageIdentifier -> IO ByteString) -> m a)
     -> m a
 withCabalLoader menv inner = do
-    icaches <- getPackageCaches >>= liftIO . newIORef
+    icaches <- liftIO (newIORef Nothing)
     env <- ask
 
     -- Want to try updating the index once during a single run for missing
@@ -281,7 +281,14 @@ withCabalLoader menv inner = do
     let doLookup :: PackageIdentifier
                  -> IO ByteString
         doLookup ident = do
-            cachesCurr <- liftIO $ readIORef icaches
+            mcachesCurr <- readIORef icaches
+            cachesCurr <- case mcachesCurr of
+                Just cachesCurr -> return cachesCurr
+                Nothing -> do
+                    runInBase $ do
+                        cachesCurr <- getPackageCaches
+                        liftIO $ writeIORef icaches (Just cachesCurr)
+                    fromMaybe (error "Impossible case in withCabalLoader") <$> readIORef icaches
             eres <- lookupPackageIdentifierExact ident env cachesCurr
             case eres of
                 Just bs -> return bs
@@ -308,7 +315,7 @@ withCabalLoader menv inner = do
                                     ]
                                 updateAllIndices menv
                                 caches <- getPackageCaches
-                                liftIO $ writeIORef icaches caches
+                                liftIO $ writeIORef icaches (Just caches)
                             return (False, doLookup ident)
                         else return (toUpdate,
                                      throwM $ UnknownPackageIdentifiers
