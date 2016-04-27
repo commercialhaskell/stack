@@ -24,11 +24,13 @@ import           Control.Arrow (second)
 import           Control.Monad.Catch (MonadCatch, throwM)
 import           Control.Monad.IO.Class
 import           Data.Either (partitionEithers)
-import           Data.Foldable (asum)
+import           Data.Foldable
+import           Data.List.Extra (groupSort)
+import           Data.List.NonEmpty (NonEmpty((:|)))
+import qualified Data.List.NonEmpty as NonEmpty
 import           Data.Map (Map)
 import qualified Data.Map as Map
 import           Data.Maybe (mapMaybe)
-import           Data.Monoid
 import           Data.Set (Set)
 import qualified Data.Set as Set
 import           Data.Text (Text)
@@ -36,7 +38,7 @@ import qualified Data.Text as T
 import           Path
 import           Path.Extra (rejectMissingDir)
 import           Path.IO
-import           Prelude -- Fix redundant import warnings
+import           Prelude hiding (concat, concatMap) -- Fix redundant import warnings
 import           Stack.Types
 
 -- | The name of a component, which applies to executables, test suites, and benchmarks
@@ -243,23 +245,25 @@ isCompNamed t1 (CBench t2) = t1 == t2
 simplifyTargets :: [(PackageName, (RawInput, SimpleTarget))]
                 -> ([Text], Map PackageName SimpleTarget)
 simplifyTargets =
-    mconcat . map go . Map.toList . Map.fromListWith (++) . fmap (second return)
+    foldMap go . collect
   where
-    go :: (PackageName, [(RawInput, SimpleTarget)])
+    go :: (PackageName, NonEmpty (RawInput, SimpleTarget))
        -> ([Text], Map PackageName SimpleTarget)
-    go (_, []) = error "Stack.Build.Target.simplifyTargets: the impossible happened"
-    go (name, [(_, st)]) = ([], Map.singleton name st)
+    go (name, (_, st) :| []) = ([], Map.singleton name st)
     go (name, pairs) =
-        case partitionEithers $ map (getLocalComp . snd) pairs of
+        case partitionEithers $ map (getLocalComp . snd) (NonEmpty.toList pairs) of
             ([], comps) -> ([], Map.singleton name $ STLocalComps $ Set.unions comps)
             _ ->
                 let err = T.pack $ concat
                         [ "Overlapping targets provided for package "
                         , packageNameString name
                         , ": "
-                        , show $ map (unRawInput . fst) pairs
+                        , show $ map (unRawInput . fst) (NonEmpty.toList pairs)
                         ]
                  in ([err], Map.empty)
+
+    collect :: Ord a => [(a, b)] -> [(a, NonEmpty b)]
+    collect = map (second NonEmpty.fromList) . groupSort
 
     getLocalComp (STLocalComps comps) = Right comps
     getLocalComp _ = Left ()
