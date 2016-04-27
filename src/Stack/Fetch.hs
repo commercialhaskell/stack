@@ -41,6 +41,7 @@ import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import           Control.Monad.Reader           (asks, runReaderT)
 import           Control.Monad.Trans.Control
+import           Control.Monad.Trans.Unlift     (MonadBaseUnlift, askRunBase)
 import "cryptohash" Crypto.Hash                 (SHA512 (..))
 import           Data.ByteString                (ByteString)
 import qualified Data.ByteString                as S
@@ -117,7 +118,7 @@ instance Show FetchException where
         (if null suggestions then "" else "\n" ++ suggestions)
 
 -- | Fetch packages into the cache without unpacking
-fetchPackages :: (MonadIO m, MonadBaseControl IO m, MonadReader env m, HasHttpManager env, HasConfig env, MonadThrow m, MonadLogger m, MonadCatch m)
+fetchPackages :: (MonadIO m, MonadBaseControl IO m, MonadReader env m, HasHttpManager env, HasConfig env, MonadMask m, MonadLogger m)
               => EnvOverride
               -> Set PackageIdentifier
               -> m ()
@@ -129,7 +130,7 @@ fetchPackages menv idents = do
     assert (Map.null nowUnpacked) (return ())
 
 -- | Intended to work for the command line command.
-unpackPackages :: (MonadIO m, MonadBaseControl IO m, MonadReader env m, HasHttpManager env, HasConfig env, MonadThrow m, MonadLogger m, MonadCatch m)
+unpackPackages :: (MonadIO m, MonadBaseControl IO m, MonadReader env m, HasHttpManager env, HasConfig env, MonadMask m, MonadLogger m)
                => EnvOverride
                -> FilePath -- ^ destination
                -> [String] -- ^ names or identifiers
@@ -163,7 +164,7 @@ unpackPackages menv dest input = do
 -- | Ensure that all of the given package idents are unpacked into the build
 -- unpack directory, and return the paths to all of the subdirectories.
 unpackPackageIdents
-    :: (MonadBaseControl IO m, MonadIO m, MonadReader env m, HasHttpManager env, HasConfig env, MonadThrow m, MonadLogger m, MonadCatch m)
+    :: (MonadBaseControl IO m, MonadIO m, MonadReader env m, HasHttpManager env, HasConfig env, MonadMask m, MonadLogger m)
     => EnvOverride
     -> Path Abs Dir -- ^ unpack directory
     -> Maybe (Path Rel Dir) -- ^ the dist rename directory, see: https://github.com/fpco/stack/issues/157
@@ -242,7 +243,7 @@ data ToFetchResult = ToFetchResult
 
 -- | Add the cabal files to a list of idents with their caches.
 withCabalFiles
-    :: (MonadThrow m, MonadIO m, MonadReader env m, HasConfig env)
+    :: (MonadMask m, MonadIO m, MonadLogger m, MonadReader env m, HasConfig env)
     => IndexName
     -> [(PackageIdentifier, PackageCache, a)]
     -> (PackageIdentifier -> a -> ByteString -> IO b)
@@ -260,7 +261,7 @@ withCabalFiles name pkgs f = do
 -- | Provide a function which will load up a cabal @ByteString@ from the
 -- package indices.
 withCabalLoader
-    :: (MonadIO m, MonadReader env m, HasConfig env, MonadLogger m, HasHttpManager env, MonadBaseControl IO m, MonadCatch m)
+    :: (MonadIO m, MonadReader env m, HasConfig env, MonadLogger m, HasHttpManager env, MonadBaseUnlift IO m, MonadMask m)
     => EnvOverride
     -> ((PackageIdentifier -> IO ByteString) -> m a)
     -> m a
@@ -316,11 +317,11 @@ withCabalLoader menv inner = do
     inner doLookup
 
 lookupPackageIdentifierExact
-  :: HasConfig env
+  :: (MonadMask m, MonadIO m, MonadLogger m, HasConfig env)
   => PackageIdentifier
   -> env
   -> PackageCaches
-  -> IO (Maybe ByteString)
+  -> m (Maybe ByteString)
 lookupPackageIdentifierExact ident env caches =
     case Map.lookup ident caches of
         Nothing -> return Nothing
@@ -361,7 +362,7 @@ typoCorrectionCandidates ident =
     . Map.mapKeys getName
 
 -- | Figure out where to fetch from.
-getToFetch :: (MonadThrow m, MonadIO m, MonadReader env m, HasConfig env)
+getToFetch :: (MonadMask m, MonadLogger m, MonadIO m, MonadReader env m, HasConfig env)
            => Maybe (Path Abs Dir) -- ^ directory to unpack into, @Nothing@ means no unpack
            -> Map PackageIdentifier ResolvedPackage
            -> m ToFetchResult

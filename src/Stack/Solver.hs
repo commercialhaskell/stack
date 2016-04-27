@@ -496,7 +496,7 @@ getResolverConstraints stackYaml resolver =
 -- If the package flags are passed as 'Nothing' then flags are chosen
 -- automatically.
 checkResolverSpec
-    :: ( MonadIO m, MonadCatch m, MonadLogger m, MonadReader env m
+    :: ( MonadIO m, MonadMask m, MonadLogger m, MonadReader env m
        , HasHttpManager env, HasConfig env, HasGHCVariant env
        , MonadBaseControl IO m)
     => [C.GenericPackageDescription]

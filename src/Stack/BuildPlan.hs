@@ -214,7 +214,7 @@ data ResolveState = ResolveState
     , rsUsedBy    :: Map PackageName (Set PackageName)
     }
 
-toMiniBuildPlan :: (MonadIO m, MonadLogger m, MonadReader env m, HasHttpManager env, MonadThrow m, HasConfig env, MonadBaseControl IO m, MonadCatch m)
+toMiniBuildPlan :: (MonadIO m, MonadLogger m, MonadReader env m, HasHttpManager env, MonadMask m, HasConfig env, MonadBaseControl IO m)
                 => CompilerVersion -- ^ Compiler version
                 -> Map PackageName Version -- ^ cores
                 -> Map PackageName (Version, Map FlagName Bool, Maybe GitSHA1) -- ^ non-core packages
@@ -256,7 +256,7 @@ toMiniBuildPlan compilerVersion corePackages packages = do
         }
 
 -- | Add in the resolved dependencies from the package index
-addDeps :: (MonadIO m, MonadLogger m, MonadReader env m, HasHttpManager env, MonadThrow m, HasConfig env, MonadBaseControl IO m, MonadCatch m)
+addDeps :: (MonadIO m, MonadLogger m, MonadReader env m, HasHttpManager env, MonadMask m, HasConfig env, MonadBaseControl IO m)
         => Bool -- ^ allow missing
         -> CompilerVersion -- ^ Compiler version
         -> Map PackageName (Version, Map FlagName Bool, Maybe GitSHA1)
@@ -404,7 +404,7 @@ getToolMap mbp =
 
 -- | Load up a 'MiniBuildPlan', preferably from cache
 loadMiniBuildPlan
-    :: (MonadIO m, MonadThrow m, MonadLogger m, MonadReader env m, HasHttpManager env, HasConfig env, HasGHCVariant env, MonadBaseControl IO m, MonadCatch m)
+    :: (MonadIO m, MonadLogger m, MonadReader env m, HasHttpManager env, HasConfig env, HasGHCVariant env, MonadBaseControl IO m, MonadMask m)
     => SnapName
     -> m MiniBuildPlan
 loadMiniBuildPlan name = do
@@ -681,7 +681,7 @@ instance Show BuildPlanCheck where
 -- given snapshot. Returns how well the snapshot satisfies the dependencies of
 -- the packages.
 checkSnapBuildPlan
-    :: ( MonadIO m, MonadCatch m, MonadLogger m, MonadReader env m
+    :: ( MonadIO m, MonadMask m, MonadLogger m, MonadReader env m
        , HasHttpManager env, HasConfig env, HasGHCVariant env
        , MonadBaseControl IO m)
     => [GenericPackageDescription]
@@ -716,7 +716,7 @@ checkSnapBuildPlan gpds flags snap = do
 -- | Find a snapshot and set of flags that is compatible with and matches as
 -- best as possible with the given 'GenericPackageDescription's.
 selectBestSnapshot
-    :: ( MonadIO m, MonadCatch m, MonadLogger m, MonadReader env m
+    :: ( MonadIO m, MonadMask m, MonadLogger m, MonadReader env m
        , HasHttpManager env, HasConfig env, HasGHCVariant env
        , MonadBaseControl IO m)
     => [GenericPackageDescription]
@@ -880,7 +880,7 @@ shadowMiniBuildPlan (MiniBuildPlan cv pkgs0) shadowed =
                 Just False -> Right
                 Nothing -> assert False Right
 
-parseCustomMiniBuildPlan :: (MonadIO m, MonadCatch m, MonadLogger m, MonadReader env m, HasHttpManager env, HasConfig env, MonadBaseControl IO m)
+parseCustomMiniBuildPlan :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasHttpManager env, HasConfig env, MonadBaseControl IO m)
                          => Path Abs File -- ^ stack.yaml file location
                          -> T.Text -> m MiniBuildPlan
 parseCustomMiniBuildPlan stackYamlFP url0 = do

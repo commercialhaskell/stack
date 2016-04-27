@@ -15,7 +15,7 @@ import           Control.Monad.Catch
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import           Control.Monad.Reader
-import           Control.Monad.Trans.Control (MonadBaseControl)
+import           Control.Monad.Trans.Unlift (MonadBaseUnlift)
 import           Data.List
 import           Data.Maybe
 import           Data.Monoid
@@ -39,7 +39,7 @@ import           System.Process.Run
 -- given options and configure it with the load paths and extensions
 -- of those targets.
 ide
-    :: (HasConfig r, HasBuildConfig r, HasTerminal r, HasLogLevel r, MonadMask m, HasEnvConfig r, MonadReader r m, MonadIO m, MonadThrow m, MonadLogger m, MonadBaseControl IO m, HasHttpManager r)
+    :: (HasConfig r, HasBuildConfig r, HasTerminal r, HasLogLevel r, MonadMask m, HasEnvConfig r, MonadReader r m, MonadIO m, MonadLogger m, MonadBaseUnlift IO m, HasHttpManager r)
     => [Text] -- ^ Targets.
     -> [String] -- ^ GHC options.
     -> m ()

@@ -18,7 +18,7 @@ module Stack.Coverage
 import           Control.Applicative
 import           Control.Exception.Lifted
 import           Control.Monad (liftM, when, unless, void)
-import           Control.Monad.Catch (MonadCatch)
+import           Control.Monad.Catch (MonadMask)
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import           Control.Monad.Reader (MonadReader, asks)
@@ -53,7 +53,7 @@ import           Text.Hastache (htmlEscape)
 import           Trace.Hpc.Tix
 
 -- | Invoked at the beginning of running with "--coverage"
-deleteHpcReports :: (MonadIO m, MonadCatch m, MonadReader env m, HasEnvConfig env)
+deleteHpcReports :: (MonadIO m, MonadMask m, MonadReader env m, HasEnvConfig env)
                  => m ()
 deleteHpcReports = do
     hpcDir <- hpcReportDir
@@ -61,7 +61,7 @@ deleteHpcReports = do
 
 -- | Move a tix file into a sub-directory of the hpc report directory. Deletes the old one if one is
 -- present.
-updateTixFile :: (MonadIO m,MonadReader env m,HasConfig env,MonadLogger m,MonadBaseControl IO m,MonadCatch m,HasEnvConfig env)
+updateTixFile :: (MonadIO m,MonadReader env m,HasConfig env,MonadLogger m,MonadBaseControl IO m,MonadMask m,HasEnvConfig env)
             => PackageName -> Path Abs File -> String -> m ()
 updateTixFile pkgName tixSrc testName = do
     exists <- doesFileExist tixSrc
@@ -79,7 +79,7 @@ updateTixFile pkgName tixSrc testName = do
                 ignoringAbsence (removeFile tixSrc)
 
 -- | Get the directory used for hpc reports for the given pkgId.
-hpcPkgPath :: (MonadIO m,MonadReader env m,HasConfig env,MonadLogger m,MonadBaseControl IO m,MonadCatch m,HasEnvConfig env)
+hpcPkgPath :: (MonadIO m,MonadReader env m,HasConfig env,MonadLogger m,MonadBaseControl IO m,MonadMask m,HasEnvConfig env)
             => PackageName -> m (Path Abs Dir)
 hpcPkgPath pkgName = do
     outputDir <- hpcReportDir
@@ -88,7 +88,7 @@ hpcPkgPath pkgName = do
 
 -- | Get the tix file location, given the name of the file (without extension), and the package
 -- identifier string.
-tixFilePath :: (MonadIO m,MonadReader env m,HasConfig env,MonadLogger m,MonadBaseControl IO m,MonadCatch m,HasEnvConfig env)
+tixFilePath :: (MonadIO m,MonadReader env m,HasConfig env,MonadLogger m,MonadBaseControl IO m,MonadMask m,HasEnvConfig env)
             => PackageName -> String ->  m (Path Abs File)
 tixFilePath pkgName testName = do
     pkgPath <- hpcPkgPath pkgName
@@ -96,7 +96,7 @@ tixFilePath pkgName testName = do
     return (pkgPath </> tixRel)
 
 -- | Generates the HTML coverage report and shows a textual coverage summary for a package.
-generateHpcReport :: (MonadIO m,MonadReader env m,HasConfig env,MonadLogger m,MonadBaseControl IO m,MonadCatch m,HasEnvConfig env)
+generateHpcReport :: (MonadIO m,MonadReader env m,HasConfig env,MonadLogger m,MonadBaseControl IO m,MonadMask m,HasEnvConfig env)
                   => Path Abs Dir -> Package -> [Text] -> m ()
 generateHpcReport pkgDir package tests = do
     -- If we're using > GHC 7.10, the hpc 'include' parameter must specify a ghc package key. See
@@ -133,7 +133,7 @@ generateHpcReport pkgDir package tests = do
                         Nothing -> []
                 generateHpcReportInternal tixSrc reportDir report extraArgs extraArgs
 
-generateHpcReportInternal :: (MonadIO m,MonadReader env m,HasConfig env,MonadLogger m,MonadBaseControl IO m,MonadCatch m,HasEnvConfig env)
+generateHpcReportInternal :: (MonadIO m,MonadReader env m,HasConfig env,MonadLogger m,MonadBaseControl IO m,MonadMask m,HasEnvConfig env)
                           => Path Abs File -> Path Abs Dir -> Text -> [String] -> [String] -> m ()
 generateHpcReportInternal tixSrc reportDir report extraMarkupArgs extraReportArgs = do
     -- If a .tix file exists, move it to the HPC output directory and generate a report for it.
@@ -204,7 +204,7 @@ data HpcReportOpts = HpcReportOpts
     , hroptsDestDir :: Maybe String
     } deriving (Show)
 
-generateHpcReportForTargets :: (MonadIO m, HasHttpManager env, MonadReader env m, MonadBaseControl IO m, MonadCatch m, MonadLogger m, HasEnvConfig env)
+generateHpcReportForTargets :: (MonadIO m, HasHttpManager env, MonadReader env m, MonadBaseControl IO m, MonadMask m, MonadLogger m, HasEnvConfig env)
                             => HpcReportOpts -> m ()
 generateHpcReportForTargets opts = do
     let (tixFiles, targetNames) = partition (".tix" `T.isSuffixOf`) (hroptsInputs opts)
@@ -257,7 +257,7 @@ generateHpcReportForTargets opts = do
             return dest
     generateUnionReport "combined report" reportDir tixPaths
 
-generateHpcUnifiedReport :: (MonadIO m,MonadReader env m,HasConfig env,MonadLogger m,MonadBaseControl IO m,MonadCatch m,HasEnvConfig env)
+generateHpcUnifiedReport :: (MonadIO m,MonadReader env m,HasConfig env,MonadLogger m,MonadBaseControl IO m,MonadMask m,HasEnvConfig env)
                          => m ()
 generateHpcUnifiedReport = do
     outputDir <- hpcReportDir
@@ -278,7 +278,7 @@ generateHpcUnifiedReport = do
             ]
         else generateUnionReport "unified report" reportDir tixFiles
 
-generateUnionReport :: (MonadIO m,MonadReader env m,HasConfig env,MonadLogger m,MonadBaseControl IO m,MonadCatch m,HasEnvConfig env)
+generateUnionReport :: (MonadIO m,MonadReader env m,HasConfig env,MonadLogger m,MonadBaseControl IO m,MonadMask m,HasEnvConfig env)
                     => Text -> Path Abs Dir -> [Path Abs File] -> m ()
 generateUnionReport report reportDir tixFiles = do
     (errs, tix) <- fmap (unionTixes . map removeExeModules) (mapMaybeM readTixOrLog tixFiles)
@@ -315,7 +315,7 @@ unionTixes tixes = (Map.keys errs, Tix (Map.elems outputs))
         | hash1 == hash2 && len1 == len2 = Right (TixModule k hash1 len1 (zipWith (+) tix1 tix2))
     merge _ _ = Left ()
 
-generateHpcMarkupIndex :: (MonadIO m,MonadReader env m,MonadLogger m,MonadCatch m,HasEnvConfig env)
+generateHpcMarkupIndex :: (MonadIO m,MonadReader env m,MonadLogger m,MonadMask m,HasEnvConfig env)
                        => m ()
 generateHpcMarkupIndex = do
     outputDir <- hpcReportDir
