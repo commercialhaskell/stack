@@ -278,7 +278,7 @@ withLoadPackage menv inner = do
     econfig <- asks getEnvConfig
     withCabalLoader menv $ \cabalLoader ->
         inner $ \name version flags -> do
-            bs <- cabalLoader $ PackageIdentifier name version -- TODO automatically update index the first time this fails
+            bs <- cabalLoader $ PackageIdentifier name version
 
             -- Intentionally ignore warnings, as it's not really
             -- appropriate to print a bunch of warnings out while
