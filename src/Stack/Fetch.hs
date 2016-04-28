@@ -55,7 +55,7 @@ import           Data.List.NonEmpty             (NonEmpty)
 import qualified Data.List.NonEmpty             as NE
 import           Data.Map                       (Map)
 import qualified Data.Map                       as Map
-import           Data.Maybe                     (maybeToList, catMaybes, fromMaybe)
+import           Data.Maybe                     (maybeToList, catMaybes)
 import           Data.Monoid                    ((<>))
 import           Data.Set                       (Set)
 import qualified Data.Set                       as Set
@@ -267,12 +267,13 @@ withCabalLoader
     -> ((PackageIdentifier -> IO ByteString) -> m a)
     -> m a
 withCabalLoader menv inner = do
-    icaches <- liftIO (newIORef Nothing)
     env <- ask
 
     -- Want to try updating the index once during a single run for missing
     -- package identifiers. We also want to ensure we only update once at a
     -- time
+    --
+    -- TODO: probably makes sense to move this concern into getPackageCaches
     updateRef <- liftIO $ newMVar True
 
     runInBase <- liftBaseWith $ \run -> return (void . run)
@@ -281,23 +282,21 @@ withCabalLoader menv inner = do
     let doLookup :: PackageIdentifier
                  -> IO ByteString
         doLookup ident = do
-            mcachesCurr <- readIORef icaches
-            cachesCurr <- case mcachesCurr of
-                Just cachesCurr -> return cachesCurr
-                Nothing -> do
-                    runInBase $ do
-                        cachesCurr <- getPackageCaches
-                        liftIO $ writeIORef icaches (Just cachesCurr)
-                    fromMaybe (error "Impossible case in withCabalLoader") <$> readIORef icaches
-            eres <- lookupPackageIdentifierExact ident env cachesCurr
+            -- TODO: Use monad base control properly.
+            icaches <- newIORef (error "Impossible evaluation in withCabalLoader")
+            runInBase $ do
+                caches <- getPackageCaches
+                liftIO $ writeIORef icaches caches
+            caches <- readIORef icaches
+            eres <- lookupPackageIdentifierExact ident env caches
             case eres of
                 Just bs -> return bs
                 -- Update the cache and try again
                 Nothing -> do
-                    let fuzzy = fuzzyLookupCandidates ident cachesCurr
+                    let fuzzy = fuzzyLookupCandidates ident caches
                         suggestions = case fuzzy of
                             Nothing ->
-                              case typoCorrectionCandidates ident cachesCurr of
+                              case typoCorrectionCandidates ident caches of
                                   Nothing -> ""
                                   Just cs -> "Perhaps you meant " <>
                                     orSeparated cs <> "?"
@@ -314,8 +313,8 @@ withCabalLoader menv inner = do
                                     , "Updating and trying again."
                                     ]
                                 updateAllIndices menv
-                                caches <- getPackageCaches
-                                liftIO $ writeIORef icaches (Just caches)
+                                _ <- getPackageCaches
+                                return ()
                             return (False, doLookup ident)
                         else return (toUpdate,
                                      throwM $ UnknownPackageIdentifiers
