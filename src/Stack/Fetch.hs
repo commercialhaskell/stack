@@ -60,7 +60,7 @@ import qualified Data.List.NonEmpty             as NE
 import           Data.Map                       (Map)
 import qualified Data.Map                       as Map
 import           Data.Maybe                     (maybeToList, catMaybes)
-import           Data.Monoid                    ((<>))
+import           Data.Monoid
 import           Data.Set                       (Set)
 import qualified Data.Set                       as Set
 import           Data.String                    (fromString)
