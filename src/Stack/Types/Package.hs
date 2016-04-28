@@ -34,7 +34,7 @@ import           Distribution.Package hiding (Package,PackageName,packageName,pa
 import           Distribution.PackageDescription (TestSuiteInterface)
 import           Distribution.System (Platform (..))
 import           Distribution.Text (display)
-import           GHC.Generics
+import           GHC.Generics (Generic)
 import           Path as FL
 import           Prelude
 import           Stack.Types.Compiler

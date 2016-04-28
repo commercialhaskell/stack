@@ -67,7 +67,7 @@ import           Data.Time.Clock
 import           Distribution.System (Arch)
 import           Distribution.PackageDescription (TestSuiteInterface)
 import           Distribution.Text (display)
-import           GHC.Generics
+import           GHC.Generics (Generic, from, to)
 import           Path (Path, Abs, File, Dir, mkRelDir, toFilePath, parseRelDir, (</>))
 import           Path.Extra (toFilePathNoTrailingSep)
 import           Prelude

@@ -1,5 +1,11 @@
 resolver: nightly-2016-04-19
-compiler: ghc-8.0
+compiler: ghc-8.0.0.20160421
+compiler-check: match-exact
+setup-info:
+  ghc:
+    linux64:
+      8.0.0.20160421:
+        url: "http://downloads.haskell.org/~ghc/8.0.1-rc4/ghc-8.0.0.20160421-x86_64-deb8-linux.tar.xz"
 image:
   containers:
     - base: "fpco/stack-base" # see ./etc/docker/stack-base/Dockerfile
@@ -15,10 +21,31 @@ extra-deps:
 - path-io-1.1.0
 - transformers-0.5.2.0
 - unix-2.7.2.0
+- persistent-template-2.5.1
+- persistent-2.5
 packages:
 - .
+# https://github.com/ekmett/either/issues/44
 - location:
     git: https://github.com/ekmett/either
     commit: 40261cf
+  extra-dep: true
+# Not the commit this links to, but discussed on
+# https://github.com/haskell/bytestring/commit/717f1151751fceb4e49874737dd0f15839ffd541
+- location:
+    git: https://github.com/haskell/bytestring
+    commit: 994a845
+  extra-dep: true
+- location:
+    git: https://github.com/haskell/containers
+    commit: d0ad235
+  extra-dep: true
+- location:
+    git: https://github.com/mgsloan/hpack
+    commit: e7b53c8
+  extra-dep: true
+- location:
+    git: https://github.com/fpco/monad-unlift
+    commit: bf6fb29
   extra-dep: true
 allow-newer: true
