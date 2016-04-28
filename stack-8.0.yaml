@@ -41,6 +41,7 @@ packages:
     git: https://github.com/haskell/containers
     commit: d0ad235
   extra-dep: true
+# https://github.com/sol/hpack/pull/92
 - location:
     git: https://github.com/mgsloan/hpack
     commit: e7b53c8
