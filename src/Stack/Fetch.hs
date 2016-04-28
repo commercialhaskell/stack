@@ -48,8 +48,6 @@ import qualified Data.ByteString.Lazy           as L
 import           Data.Either                    (partitionEithers)
 import qualified Data.Foldable                  as F
 import           Data.Function                  (fix)
-import           Data.IORef                     (newIORef, readIORef,
-                                                 writeIORef)
 import           Data.List                      (intercalate)
 import           Data.List.NonEmpty             (NonEmpty)
 import qualified Data.List.NonEmpty             as NE
@@ -262,7 +260,7 @@ withCabalFiles name pkgs f = do
 -- | Provide a function which will load up a cabal @ByteString@ from the
 -- package indices.
 withCabalLoader
-    :: (MonadThrow m, MonadIO m, MonadReader env m, HasConfig env, MonadLogger m, HasHttpManager env, MonadBaseControl IO m, MonadCatch m)
+    :: (MonadIO m, MonadReader env m, HasConfig env, MonadLogger m, HasHttpManager env, MonadBaseControl IO m, MonadCatch m)
     => EnvOverride
     -> ((PackageIdentifier -> IO ByteString) -> m a)
     -> m a
@@ -276,18 +274,14 @@ withCabalLoader menv inner = do
     -- TODO: probably makes sense to move this concern into getPackageCaches
     updateRef <- liftIO $ newMVar True
 
+    loadCaches <- getPackageCachesIO
     runInBase <- liftBaseWith $ \run -> return (void . run)
 
     -- TODO in the future, keep all of the necessary @Handle@s open
     let doLookup :: PackageIdentifier
                  -> IO ByteString
         doLookup ident = do
-            -- TODO: Use monad base control properly.
-            icaches <- newIORef (error "Impossible evaluation in withCabalLoader")
-            runInBase $ do
-                caches <- getPackageCaches
-                liftIO $ writeIORef icaches caches
-            caches <- readIORef icaches
+            caches <- loadCaches
             eres <- lookupPackageIdentifierExact ident env caches
             case eres of
                 Just bs -> return bs

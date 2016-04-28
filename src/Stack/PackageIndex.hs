@@ -19,14 +19,16 @@
 module Stack.PackageIndex
     ( updateAllIndices
     , getPackageCaches
+    , getPackageCachesIO
     , getPackageVersions
+    , getPackageVersionsIO
     , lookupPackageVersions
     ) where
 
 import qualified Codec.Archive.Tar as Tar
 import           Control.Exception (Exception)
 import           Control.Exception.Enclosed (tryIO)
-import           Control.Monad (unless, when, liftM)
+import           Control.Monad (unless, when, liftM, void)
 import           Control.Monad.Catch (MonadThrow, throwM, MonadCatch)
 import qualified Control.Monad.Catch as C
 import           Control.Monad.IO.Class (MonadIO, liftIO)
@@ -43,7 +45,7 @@ import           Data.Conduit.Binary                   (sinkHandle,
                                                         sourceHandle)
 import           Data.Conduit.Zlib (ungzip)
 import           Data.Foldable (forM_)
-import           Data.IORef (readIORef, writeIORef)
+import           Data.IORef
 import           Data.Int (Int64)
 import           Data.Map (Map)
 import qualified Data.Map.Strict as Map
@@ -351,6 +353,15 @@ deleteCache indexName' = do
         Left e -> $logDebug $ "Could not delete cache: " <> T.pack (show e)
         Right () -> $logDebug $ "Deleted index cache at " <> T.pack (toFilePath fp)
 
+-- | Lookup a package's versions from 'IO'.
+getPackageVersionsIO
+    :: (MonadIO m, MonadReader env m, HasConfig env, MonadLogger m, HasHttpManager env, MonadBaseControl IO m, MonadCatch m)
+    => m (PackageName -> IO (Set Version))
+getPackageVersionsIO = do
+    getCaches <- getPackageCachesIO
+    return $ \name ->
+        fmap (lookupPackageVersions name) getCaches
+
 -- | Get the known versions for a given package from the package caches.
 --
 -- See 'getPackageCaches' for performance notes.
@@ -364,6 +375,26 @@ getPackageVersions pkgName =
 lookupPackageVersions :: PackageName -> Map PackageIdentifier a -> Set Version
 lookupPackageVersions pkgName pkgCaches =
     Set.fromList [v | PackageIdentifier n v <- Map.keys pkgCaches, n == pkgName]
+
+-- | Access the package caches from 'IO'.
+--
+-- FIXME: This is a temporary solution until a better solution
+-- to access the package caches from Stack.Build.ConstructPlan
+-- has been found.
+getPackageCachesIO
+    :: (MonadIO m, MonadReader env m, HasConfig env, MonadLogger m, HasHttpManager env, MonadBaseControl IO m, MonadCatch m)
+    => m (IO (Map PackageIdentifier (PackageIndex, PackageCache)))
+getPackageCachesIO = toIO getPackageCaches
+  where
+    toIO :: (MonadIO m, MonadBaseControl IO m) => m a -> m (IO a)
+    toIO m = do
+        runInBase <- liftBaseWith $ \run -> return (void . run)
+        return $ do
+            i <- newIORef (error "Impossible evaluation in toIO")
+            runInBase $ do
+                x <- m
+                liftIO $ writeIORef i x
+            readIORef i
 
 -- | Load the package caches, or create the caches if necessary.
 --
