@@ -104,9 +104,9 @@ With Nix enabled, `stack build` and `stack exec` will automatically
 launch themselves in a local build environment (using `nix-shell`
 behind the scenes).
 
-If `enable:` is set to `false`, you can still build in a nix-shell by
-passing the `--nix` flag to stack, for instance `stack --nix build`.
-Passing any `--nix*` option to the command line will do the same.
+If `enable:` is omitted or set to `false`, you can still build in a nix-shell by
+passing the `--nix` flag to stack, for instance `stack --nix build`.  Passing
+any `--nix*` option to the command line will do the same.
 
 **Known limitation on OS X:** currently, `stack --nix ghci` fails on
 OS X, due to a bug in GHCi when working with external shared
@@ -162,9 +162,10 @@ Here is a commented configuration file, showing the default values:
 ```yaml
 nix:
 
-  # true by default when the nix section is present. Set
-  # it to `false` to disable using Nix.
-  enable: true
+  # false by default. Must be present and set to `true` to enable Nix.
+  # You can set set it in your `$HOME/.stack/config.yaml` to enable
+  # Nix for all your projects without having to repeat it
+  # enable: true
 
   # true by default. Tells Nix whether to run in a pure shell or not.
   pure: true
