@@ -399,7 +399,7 @@ loadConfig :: (MonadLogger m,MonadIO m,MonadMask m,MonadThrow m,MonadBaseControl
 loadConfig configArgs mstackYaml mresolver = do
     (stackRoot, userOwnsStackRoot) <- determineStackRootAndOwnership configArgs
     userConfigPath <- getDefaultUserConfigPath stackRoot
-    extraConfigs0 <- getExtraConfigs userConfigPath >>= mapM loadYaml
+    extraConfigs0 <- getExtraConfigs userConfigPath >>= mapM loadConfigYaml
     let extraConfigs =
             -- non-project config files' existence of a docker section should never default docker
             -- to enabled, so make it look like they didn't exist
@@ -456,7 +456,7 @@ loadBuildConfig mproject config mresolver mcompiler = do
             exists <- doesFileExist dest
             if exists
                then do
-                   ProjectAndConfigMonoid project _ <- loadYaml dest
+                   ProjectAndConfigMonoid project _ <- loadConfigYaml dest
                    when (getTerminal env) $
                        case mresolver of
                            Nothing ->
@@ -747,15 +747,28 @@ getExtraConfigs userConfigPath = do
         $ fromMaybe userConfigPath mstackConfig
         : maybe [] return (mstackGlobalConfig <|> defaultStackGlobalConfigPath)
 
+-- | Load and parse YAML from the given conig file. Throws
+-- 'ParseConfigFileException' when there's a decoding error.
+loadConfigYaml
+    :: (FromJSON (WithJSONWarnings a), MonadIO m, MonadLogger m)
+    => Path Abs File -> m a
+loadConfigYaml path = do
+    eres <- loadYaml path
+    case eres of
+        Left err -> liftIO $ throwM (ParseConfigFileException path err)
+        Right res -> return res
+
 -- | Load and parse YAML from the given file.
-loadYaml :: (FromJSON (WithJSONWarnings a), MonadIO m, MonadLogger m) => Path Abs File -> m a
+loadYaml
+    :: (FromJSON (WithJSONWarnings a), MonadIO m, MonadLogger m)
+    => Path Abs File -> m (Either Yaml.ParseException a)
 loadYaml path = do
-    WithJSONWarnings result warnings <-
-        liftIO $
-        Yaml.decodeFileEither (toFilePath path) >>=
-        either (throwM . ParseConfigFileException path) return
-    logJSONWarnings (toFilePath path) warnings
-    return result
+    eres <- liftIO $ Yaml.decodeFileEither (toFilePath path)
+    case eres  of
+        Left err -> return (Left err)
+        Right (WithJSONWarnings res warnings) -> do
+            logJSONWarnings (toFilePath path) warnings
+            return (Right res)
 
 -- | Get the location of the project config file, if it exists.
 getProjectConfig :: (MonadIO m, MonadThrow m, MonadLogger m)
@@ -802,7 +815,7 @@ loadProjectConfig mstackYaml = do
             return Nothing
   where
     load fp = do
-        ProjectAndConfigMonoid project config <- loadYaml fp
+        ProjectAndConfigMonoid project config <- loadConfigYaml fp
         return $ Just (project, fp, config)
 
 -- | Get the location of the default stack configuration file.
