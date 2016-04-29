@@ -108,14 +108,6 @@ problems, see the linked FAQ entries:
 
             echo 'deb http://download.fpcomplete.com/ubuntu wily main'|sudo tee /etc/apt/sources.list.d/fpco.list
 
-      * Ubuntu 15.04 (amd64):
-
-            echo 'deb http://download.fpcomplete.com/ubuntu vivid main'|sudo tee /etc/apt/sources.list.d/fpco.list
-
-      * Ubuntu 14.10 (amd64)
-
-            echo 'deb http://download.fpcomplete.com/ubuntu utopic main'|sudo tee /etc/apt/sources.list.d/fpco.list
-
       * Ubuntu 14.04 (amd64)
 
             echo 'deb http://download.fpcomplete.com/ubuntu trusty main'|sudo tee /etc/apt/sources.list.d/fpco.list
@@ -177,11 +169,9 @@ problems, see the linked FAQ entries:
 *Note*: for 32-bit, you can use this
  [Fedora Copr repo](https://copr.fedoraproject.org/coprs/petersen/stack/) (not
  managed by the Stack release team, so not guaranteed to have the very latest
- version) which can be enabled with:
+ version) which can be enabled with: `sudo dnf copr enable petersen/stack`
 
-    sudo dnf copr enable petersen/stack
-
- 1. Add the appropriate source repository:
+   1. Add the appropriate source repository:
 
       * Fedora 23 (x86_64)
 
@@ -191,19 +181,9 @@ problems, see the linked FAQ entries:
 
             curl -sSL https://s3.amazonaws.com/download.fpcomplete.com/fedora/22/fpco.repo | sudo tee /etc/yum.repos.d/fpco.repo
 
-      * Fedora 21 (x86_64)
+   2. Install:
 
-            curl -sSL https://s3.amazonaws.com/download.fpcomplete.com/fedora/21/fpco.repo | sudo tee /etc/yum.repos.d/fpco.repo
-
- 2. Install:
-
-      * Fedora 22 and above
-
-            sudo dnf -y install stack
-
-      * Fedora < 22
-
-            sudo yum -y install stack
+        sudo dnf -y install stack
 
 ## <a name="suse"></a>openSUSE / SUSE Linux Enterprise
 
