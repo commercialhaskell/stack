@@ -12,5 +12,5 @@ nix:
   packages:
     - zlib
 extra-deps:
-- hpack-0.12.0
+- hpack-0.13.0
 - path-io-1.1.0
