@@ -2,6 +2,8 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE TemplateHaskell       #-}
+{-# LANGUAGE ScopedTypeVariables   #-}
+{-# LANGUAGE TypeFamilies          #-}
 module Stack.Solver
     ( checkResolverSpec
     , cabalPackagesCheck
@@ -553,7 +555,7 @@ cabalPackagesCheck cabalfps noPkgMsg dupErrMsg = do
     when (null cabalfps) $
         error noPkgMsg
 
-    relpaths <- mapM makeRelativeToCurrentDir cabalfps
+    relpaths <- mapM prettyPath cabalfps
     $logInfo $ "Using cabal packages:"
     $logInfo $ T.pack (formatGroup relpaths)
 
@@ -573,7 +575,7 @@ cabalPackagesCheck cabalfps noPkgMsg dupErrMsg = do
         nameMismatchPkgs = mapMaybe getNameMismatchPkg packages
 
     when (nameMismatchPkgs /= []) $ do
-        rels <- mapM makeRelativeToCurrentDir nameMismatchPkgs
+        rels <- mapM prettyPath nameMismatchPkgs
         error $ "Package name as defined in the .cabal file must match the \
                 \.cabal file name.\n\
                 \Please fix the following packages and try again:\n"
@@ -591,7 +593,7 @@ cabalPackagesCheck cabalfps noPkgMsg dupErrMsg = do
         unique      = packages \\ dupIgnored
 
     when (dupIgnored /= []) $ do
-        dups <- mapM (mapM (makeRelativeToCurrentDir . fst)) (dupGroups packages)
+        dups <- mapM (mapM (prettyPath. fst)) (dupGroups packages)
         $logWarn $ T.pack $
             "Following packages have duplicate package names:\n"
             <> intercalate "\n" (map formatGroup dups)
@@ -605,9 +607,8 @@ cabalPackagesCheck cabalfps noPkgMsg dupErrMsg = do
             $ map (\(file, gpd) -> (gpdPackageName gpd,(file, gpd))) unique
            , map fst dupIgnored)
 
-formatGroup :: [Path Rel File] -> String
-formatGroup = concatMap formatPath
-    where formatPath path = "- " <> toFilePath path <> "\n"
+formatGroup :: [String] -> String
+formatGroup = concatMap (\path -> "- " <> path <> "\n")
 
 reportMissingCabalFiles :: (MonadIO m, MonadThrow m, MonadLogger m)
   => [Path Abs File]   -- ^ Directories to scan
@@ -616,7 +617,7 @@ reportMissingCabalFiles :: (MonadIO m, MonadThrow m, MonadLogger m)
 reportMissingCabalFiles cabalfps includeSubdirs = do
     allCabalfps <- findCabalFiles includeSubdirs =<< getCurrentDir
 
-    relpaths <- mapM makeRelativeToCurrentDir (allCabalfps \\ cabalfps)
+    relpaths <- mapM prettyPath (allCabalfps \\ cabalfps)
     unless (null relpaths) $ do
         $logWarn $ "The following packages are missing from the config:"
         $logWarn $ T.pack (formatGroup relpaths)
@@ -763,3 +764,12 @@ solveExtraDeps modStackYaml = do
             , "        - Add any missing remote packages.\n"
             , "        - Add extra dependencies to guide solver.\n"
             ]
+
+prettyPath
+    :: forall r t m. (MonadIO m, RelPath (Path r t) ~ Path Rel t, AnyPath (Path r t))
+    => Path r t -> m String
+prettyPath path = do
+    eres <- liftIO $ try $ makeRelativeToCurrentDir path
+    return $ case eres of
+        Left (_ :: PathParseException) -> toFilePath path
+        Right res -> toFilePath (res :: Path Rel t)
