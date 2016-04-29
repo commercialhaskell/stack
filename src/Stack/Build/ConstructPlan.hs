@@ -105,7 +105,7 @@ data Ctx = Ctx
     , ctxEnvConfig   :: !EnvConfig
     , callStack      :: ![PackageName]
     , extraToBuild   :: !(Set PackageName)
-    , getVersions    :: !(PackageName -> Set Version)
+    , getVersions    :: !(PackageName -> IO (Set Version))
     , wanted         :: !(Set PackageName)
     , localNames     :: !(Set PackageName)
     }
@@ -132,8 +132,7 @@ constructPlan :: forall env m.
               -> m Plan
 constructPlan mbp0 baseConfigOpts0 locals extraToBuild0 localDumpPkgs loadPackage0 sourceMap installedMap = do
     let locallyRegistered = Map.fromList $ map (dpGhcPkgId &&& dpPackageIdent) localDumpPkgs
-    caches <- getPackageCaches
-    let getVersions0 name = lookupPackageVersions name caches
+    getVersions0 <- getPackageVersionsIO
 
     econfig <- asks getEnvConfig
     let onWanted = void . addDep False . packageName . lpPackage
@@ -427,15 +426,17 @@ addPackageDeps treatAsDep package = do
     deps' <- packageDepsWithTools package
     deps <- forM (Map.toList deps') $ \(depname, range) -> do
         eres <- addDep treatAsDep depname
-        let mlatestApplicable =
-                latestApplicableVersion range (getVersions ctx depname)
+        let getLatestApplicable = do
+                vs <- liftIO $ getVersions ctx depname
+                return (latestApplicableVersion range vs)
         case eres of
-            Left e ->
+            Left e -> do
                 let bd =
                         case e of
                             UnknownPackage name -> assert (name == depname) NotInBuildPlan
                             _ -> Couldn'tResolveItsDependencies
-                 in return $ Left (depname, (range, mlatestApplicable, bd))
+                mlatestApplicable <- getLatestApplicable
+                return $ Left (depname, (range, mlatestApplicable, bd))
             Right adr -> do
                 inRange <- if adrVersion adr `withinRange` range
                     then return True
@@ -474,7 +475,9 @@ addPackageDeps treatAsDep package = do
                             (Set.empty, Map.empty, loc)
                         ADRFound loc (Library ident gid) -> return $ Right
                             (Set.empty, Map.singleton ident gid, loc)
-                    else return $ Left (depname, (range, mlatestApplicable, DependencyMismatch $ adrVersion adr))
+                    else do
+                        mlatestApplicable <- getLatestApplicable
+                        return $ Left (depname, (range, mlatestApplicable, DependencyMismatch $ adrVersion adr))
     case partitionEithers deps of
         ([], pairs) -> return $ Right $ mconcat pairs
         (errs, _) -> return $ Left $ DependencyPlanFailures
