@@ -39,6 +39,10 @@ Behavior changes:
 * `stack build pkg-1.2.3` will now build even if the snapshot has a different
   package version - it is treated as an extra-dep. `stack build local-pkg-1.2.3`
   is an error even if the version number matches the local package.
+* Having a `nix:` section no longer implies enabling nix build. This allows the
+  user to globally configure whether nix is used (unless the project overrides
+  the default explicitly). See
+  [#1924](https://github.com/commercialhaskell/stack/issues/1924).
 
 Other enhancements:
 
