@@ -98,6 +98,9 @@ Bug fixes:
   nix-shell [#1778](https://github.com/commercialhaskell/stack/issues/1778)
 * `allow-newer: true` now causes `--exact-configuration` to be passed to Cabal.
   See [#1579](https://github.com/commercialhaskell/stack/issues/1579)
+* `stack solver` no longer fails with `InvalidRelFile` for relative package
+  paths including `..`. See
+  [#1954](https://github.com/commercialhaskell/stack/issues/1954).
 
 ## 1.0.4.3
 
