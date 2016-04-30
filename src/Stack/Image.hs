@@ -110,11 +110,11 @@ syncAddContentToDir opts dir = do
     forM_
         (Map.toList imgAdd)
         (\(source,dest) ->
-              do sourcePath <- parseRelDir source
+              do sourcePath <- resolveDir (bcRoot bconfig) source
                  destPath <- parseAbsDir dest
                  let destFullPath = dir </> dropRoot destPath
                  ensureDir destFullPath
-                 copyDirRecur (bcRoot bconfig </> sourcePath) destFullPath)
+                 copyDirRecur sourcePath destFullPath)
 
 -- | Derive an image name from the project directory.
 imageName
