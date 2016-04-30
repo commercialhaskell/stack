@@ -660,7 +660,7 @@ solveExtraDeps modStackYaml = do
     (bundle, _) <- cabalPackagesCheck cabalfps noPkgMsg (Just dupPkgFooter)
 
     let gpds              = Map.elems $ fmap snd bundle
-        oldFlags          = bcFlags bconfig
+        oldFlags          = unPackageFlags (bcFlags bconfig)
         oldExtraVersions  = bcExtraDeps bconfig
         resolver          = bcResolver bconfig
         oldSrcs           = gpdPackages gpds

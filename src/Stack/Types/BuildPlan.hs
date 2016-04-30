@@ -424,6 +424,7 @@ instance FromJSON a => FromJSON (Map ExeName a) where
 data MiniBuildPlan = MiniBuildPlan
     { mbpCompilerVersion :: !CompilerVersion
     , mbpPackages :: !(Map PackageName MiniPackageInfo)
+    , mbpAllowNewer :: !Bool
     }
     deriving (Generic, Show, Eq)
 instance Binary MiniBuildPlan
@@ -435,6 +436,7 @@ instance HasSemanticVersion MiniBuildPlan
 data MiniPackageInfo = MiniPackageInfo
     { mpiVersion :: !Version
     , mpiFlags :: !(Map FlagName Bool)
+    , mpiGhcOptions :: ![Text]
     , mpiPackageDeps :: !(Set PackageName)
     , mpiToolDeps :: !(Set Text)
     -- ^ Due to ambiguity in Cabal, it is unclear whether this refers to the

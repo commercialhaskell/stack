@@ -184,6 +184,7 @@ resolvePackage packageConfig gpkg =
     , packageDeps = deps
     , packageFiles = pkgFiles
     , packageTools = packageDescTools pkg
+    , packageGhcOptions = packageConfigGhcOptions packageConfig
     , packageFlags = packageConfigFlags packageConfig
     , packageDefaultFlags = M.fromList
       [(fromCabalFlagName (flagName flag), flagDefault flag) | flag <- genPackageFlags gpkg]
@@ -335,13 +336,14 @@ generateBuildInfoOpts sourceMap installedMap mcabalMacros cabalDir distDir omitP
                   makeObjectFilePathFromC cabalDir componentName distDir)
                  cfiles
     cfiles = mapMaybe dotCabalCFilePath (S.toList dotCabalPaths)
+    -- Generates: -package=base -package=base16-bytestring-0.1.1.6 ...
     deps =
         concat
             [ case M.lookup name installedMap of
                 Just (_, Stack.Types.Library _ident ipid) -> ["-package-id=" <> ghcPkgIdString ipid]
                 _ -> ["-package=" <> packageNameString name <>
                  maybe "" -- This empty case applies to e.g. base.
-                     ((("-" <>) . versionString) . sourceVersion)
+                     ((("-" <>) . versionString) . piiVersion)
                      (M.lookup name sourceMap)]
             | name <- pkgs]
     pkgs =
@@ -350,9 +352,6 @@ generateBuildInfoOpts sourceMap installedMap mcabalMacros cabalDir distDir omitP
         | Dependency cname _ <- targetBuildDepends b
         , let name = fromCabalPackageName cname
         , name `notElem` omitPkgs]
-    -- Generates: -package=base -package=base16-bytestring-0.1.1.6 ...
-    sourceVersion (PSUpstream ver _ _ _) = ver
-    sourceVersion (PSLocal localPkg) = packageVersion (lpPackage localPkg)
     ghcOpts = concatMap snd . filter (isGhc . fst) . options
       where
         isGhc GHC = True

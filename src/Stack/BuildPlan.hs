@@ -42,7 +42,7 @@ import           Control.Monad.State.Strict      (State, execState, get, modify,
                                                   put)
 import           Control.Monad.Trans.Control (MonadBaseControl)
 import qualified Crypto.Hash.SHA256 as SHA256
-import           Data.Aeson.Extended (FromJSON (..), withObject, (.:), (.:?), (.!=))
+import           Data.Aeson.Extended (WithJSONWarnings(..), logJSONWarnings)
 import           Data.Binary.VersionTagged (taggedDecodeOrLoad)
 import qualified Data.ByteString as S
 import qualified Data.ByteString.Base16 as B16
@@ -216,10 +216,11 @@ data ResolveState = ResolveState
 
 toMiniBuildPlan :: (MonadIO m, MonadLogger m, MonadReader env m, HasHttpManager env, MonadMask m, HasConfig env, MonadBaseControl IO m)
                 => CompilerVersion -- ^ Compiler version
+                -> Bool -- ^ Require allow-newer?
                 -> Map PackageName Version -- ^ cores
-                -> Map PackageName (Version, Map FlagName Bool, Maybe GitSHA1) -- ^ non-core packages
+                -> Map PackageName (Version, Map FlagName Bool, [Text], Maybe GitSHA1) -- ^ non-core packages
                 -> m MiniBuildPlan
-toMiniBuildPlan compilerVersion corePackages packages = do
+toMiniBuildPlan compilerVersion requireAllowNewer corePackages packages = do
     $logInfo "Caching build plan"
 
     -- Determine the dependencies of all of the packages in the build plan. We
@@ -228,7 +229,7 @@ toMiniBuildPlan compilerVersion corePackages packages = do
     -- remove those from the list of dependencies, since there's no way we'll
     -- ever reinstall them anyway.
     (cores, missingCores) <- addDeps True compilerVersion
-        $ fmap (, Map.empty, Nothing) corePackages
+        $ fmap (, Map.empty, [], Nothing) corePackages
 
     (extras, missing) <- addDeps False compilerVersion packages
 
@@ -239,11 +240,13 @@ toMiniBuildPlan compilerVersion corePackages packages = do
             , extras
             , Map.fromList $ map goCore $ Set.toList missingCores
             ]
+        , mbpAllowNewer = requireAllowNewer
         }
   where
     goCore (PackageIdentifier name version) = (name, MiniPackageInfo
                 { mpiVersion = version
                 , mpiFlags = Map.empty
+                , mpiGhcOptions = []
                 , mpiPackageDeps = Set.empty
                 , mpiToolDeps = Set.empty
                 , mpiExes = Set.empty
@@ -259,7 +262,7 @@ toMiniBuildPlan compilerVersion corePackages packages = do
 addDeps :: (MonadIO m, MonadLogger m, MonadReader env m, HasHttpManager env, MonadMask m, HasConfig env, MonadBaseControl IO m)
         => Bool -- ^ allow missing
         -> CompilerVersion -- ^ Compiler version
-        -> Map PackageName (Version, Map FlagName Bool, Maybe GitSHA1)
+        -> Map PackageName (Version, Map FlagName Bool, [Text], Maybe GitSHA1)
         -> m (Map PackageName MiniPackageInfo, Set PackageIdentifier)
 addDeps allowMissing compilerVersion toCalc = do
     menv <- getMinimalEnvOverride
@@ -268,31 +271,32 @@ addDeps allowMissing compilerVersion toCalc = do
         if allowMissing
             then do
                 (missingNames, missingIdents, m) <-
-                    resolvePackagesAllowMissing (fmap snd idents0) Set.empty
+                    resolvePackagesAllowMissing shaMap Set.empty
                 assert (Set.null missingNames)
                     $ return (m, missingIdents)
             else do
-                m <- resolvePackages menv (fmap snd idents0) Set.empty
+                m <- resolvePackages menv shaMap Set.empty
                 return (m, Set.empty)
     let byIndex = Map.fromListWith (++) $ flip map (Map.toList resolvedMap)
             $ \(ident, rp) ->
-                let (cache, sha) =
+                let (cache, ghcOptions, sha) =
                         case Map.lookup (packageIdentifierName ident) toCalc of
-                            Nothing -> (Map.empty, Nothing)
-                            Just (_, x, y) -> (x, y)
+                            Nothing -> (Map.empty, [], Nothing)
+                            Just (_, x, y, z) -> (x, y, z)
                  in (indexName $ rpIndex rp,
                     [( ident
                     , rpCache rp
                     , sha
-                    , (cache, sha)
+                    , (cache, ghcOptions, sha)
                     )])
     res <- forM (Map.toList byIndex) $ \(indexName', pkgs) -> withCabalFiles indexName' pkgs
-        $ \ident (flags, mgitSha) cabalBS -> do
+        $ \ident (flags, ghcOptions, mgitSha) cabalBS -> do
             (_warnings,gpd) <- readPackageUnresolvedBS Nothing cabalBS
             let packageConfig = PackageConfig
                     { packageConfigEnableTests = False
                     , packageConfigEnableBenchmarks = False
                     , packageConfigFlags = flags
+                    , packageConfigGhcOptions = ghcOptions
                     , packageConfigCompilerVersion = compilerVersion
                     , packageConfigPlatform = platform
                     }
@@ -303,6 +307,7 @@ addDeps allowMissing compilerVersion toCalc = do
             return (name, MiniPackageInfo
                 { mpiVersion = packageIdentifierVersion ident
                 , mpiFlags = flags
+                , mpiGhcOptions = ghcOptions
                 , mpiPackageDeps = notMe $ packageDependencies pd
                 , mpiToolDeps = Map.keysSet $ packageToolDependencies pd
                 , mpiExes = exes
@@ -314,8 +319,8 @@ addDeps allowMissing compilerVersion toCalc = do
                 })
     return (Map.fromList $ concat res, missingIdents)
   where
-    idents0 = Map.fromList
-        $ map (\(n, (v, f, gitsha)) -> (PackageIdentifier n v, (Left f, gitsha)))
+    shaMap = Map.fromList
+        $ map (\(n, (v, _f, _ghcOptions, gitsha)) -> (PackageIdentifier n v, gitsha))
         $ Map.toList toCalc
 
 -- | Resolve all packages necessary to install for the needed packages.
@@ -415,12 +420,16 @@ loadMiniBuildPlan name = do
         bp <- loadBuildPlan name
         toMiniBuildPlan
             (siCompilerVersion $ bpSystemInfo bp)
+            -- TODO: allow-newer in BuildPlan?
+            False
             (siCorePackages $ bpSystemInfo bp)
             (fmap goPP $ bpPackages bp)
   where
     goPP pp =
         ( ppVersion pp
         , pcFlagOverrides $ ppConstraints pp
+         -- TODO: store ghc options in BuildPlan?
+        , []
         , ppCabalFileInfo pp
             >>= fmap (GitSHA1 . encodeUtf8)
               . Map.lookup "GitSHA1"
@@ -509,6 +518,7 @@ gpdPackageDeps gpd cv platform flags =
             { packageConfigEnableTests = True
             , packageConfigEnableBenchmarks = True
             , packageConfigFlags = flags
+            , packageConfigGhcOptions = []
             , packageConfigCompilerVersion = cv
             , packageConfigPlatform = platform
             }
@@ -839,8 +849,8 @@ showDepErrors flags errs =
 shadowMiniBuildPlan :: MiniBuildPlan
                     -> Set PackageName
                     -> (MiniBuildPlan, Map PackageName MiniPackageInfo)
-shadowMiniBuildPlan (MiniBuildPlan cv pkgs0) shadowed =
-    (MiniBuildPlan cv $ Map.fromList met, Map.fromList unmet)
+shadowMiniBuildPlan (MiniBuildPlan cv pkgs0 allowNewer) shadowed =
+    (MiniBuildPlan cv (Map.fromList met) allowNewer, Map.fromList unmet)
   where
     pkgs1 = Map.difference pkgs0 $ Map.fromSet (\_ -> ()) shadowed
 
@@ -895,14 +905,36 @@ parseCustomMiniBuildPlan stackYamlFP url0 = do
     let binaryFP = customPlanDir </> $(mkRelDir "bin") </> binaryFilename
 
     taggedDecodeOrLoad binaryFP $ do
-        cs <- either throwM return $ decodeEither' yamlBS
-        let addFlags :: PackageIdentifier -> (PackageName, (Version, Map FlagName Bool))
+        WithJSONWarnings result warnings <-
+             either (throwM . ParseCustomSnapshotException url0) return $
+             decodeEither' yamlBS
+        logJSONWarnings (toFilePath yamlFP) warnings
+        let (CustomSnapshot
+                mcompilerVersion
+                packages
+                (PackageFlags flags)
+                ghcOptions
+                allowNewer) = result
+        let addFlags :: PackageIdentifier -> (PackageName, (Version, Map FlagName Bool, [Text]))
             addFlags (PackageIdentifier name ver) =
-                (name, (ver, fromMaybe Map.empty $ Map.lookup name $ csFlags cs))
-        toMiniBuildPlan
-            (csCompilerVersion cs)
-            Map.empty
-            (fmap addGitSHA $ Map.fromList $ map addFlags $ Set.toList $ csPackages cs)
+                ( name
+                , ( ver
+                  , Map.findWithDefault Map.empty name flags
+                  -- NOTE: similar to 'allGhcOptions' in Stack.Types.Build
+                  , ghcOptionsFor name ghcOptions
+                  )
+                )
+        case mcompilerVersion of
+            Just compilerVersion ->
+                toMiniBuildPlan
+                    compilerVersion
+                    (fromMaybe False allowNewer)
+                    Map.empty
+                    (fmap addGitSHA $ Map.fromList $ map addFlags $ Set.toList packages)
+            Nothing -> do
+                -- TODO: proper exception type
+                fail $ "Failed to load custom snapshot at " ++
+                    T.unpack url0 ++ ", because no compiler is specified."
   where
     getCustomPlanDir = do
         root <- asks $ configStackRoot . getConfig
@@ -929,18 +961,4 @@ parseCustomMiniBuildPlan stackYamlFP url0 = do
         parseAbsFile fp
 
     -- we add a Nothing since we don't yet collect Git SHAs for custom snapshots
-    addGitSHA (x, y) = (x, y, Nothing)
-
-data CustomSnapshot = CustomSnapshot
-    { csCompilerVersion :: !CompilerVersion
-    , csPackages :: !(Set PackageIdentifier)
-    , csFlags :: !(Map PackageName (Map FlagName Bool))
-    }
-instance FromJSON CustomSnapshot where
-    parseJSON = withObject "CustomSnapshot" $ \o -> CustomSnapshot
-        <$> ((o .: "compiler") >>= \t ->
-                case parseCompilerVersion t of
-                    Nothing -> fail $ "Invalid compiler: " ++ T.unpack t
-                    Just compilerVersion -> return compilerVersion)
-        <*> o .: "packages"
-        <*> o .:? "flags" .!= Map.empty
+    addGitSHA (x, y, z) = (x, y, z, Nothing)

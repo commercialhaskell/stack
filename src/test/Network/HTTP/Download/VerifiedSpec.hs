@@ -3,6 +3,8 @@ module Network.HTTP.Download.VerifiedSpec where
 
 import Crypto.Hash
 import Control.Monad (unless)
+import Control.Monad.IO.Class (MonadIO)
+import Control.Monad.Logger (LoggingT, runStdoutLoggingT)
 import Control.Monad.Trans.Reader
 import Control.Retry (limitRetries)
 import Data.Maybe
@@ -65,8 +67,8 @@ data T = T
   { manager :: Manager
   }
 
-runWith :: Manager -> ReaderT Manager m r -> m r
-runWith = flip runReaderT
+runWith :: MonadIO m => Manager -> ReaderT Manager (LoggingT m) r -> m r
+runWith manager = runStdoutLoggingT . flip runReaderT manager
 
 setup :: IO T
 setup = do

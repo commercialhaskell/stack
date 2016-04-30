@@ -83,6 +83,7 @@ spec = beforeAll setup $ afterAll teardown $ do
             mkMPI deps = MiniPackageInfo
                 { mpiVersion = version
                 , mpiFlags = Map.empty
+                , mpiGhcOptions = []
                 , mpiPackageDeps = Set.fromList $ map pn $ words deps
                 , mpiToolDeps = Set.empty
                 , mpiExes = Set.empty
@@ -99,6 +100,7 @@ spec = beforeAll setup $ afterAll teardown $ do
             mkMBP pkgs = MiniBuildPlan
                 { mbpCompilerVersion = GhcVersion version
                 , mbpPackages = Map.fromList pkgs
+                , mbpAllowNewer = False
                 }
             mbpAll = mkMBP [resourcet, conduit, conduitExtra, text, attoparsec, aeson]
             test name input shadowed output extra =

@@ -51,7 +51,7 @@ import           Prelude -- Fix redundant import warnings
 import           Stack.Build (mkBaseConfigOpts)
 import           Stack.Build.Execute
 import           Stack.Build.Installed
-import           Stack.Build.Source (loadSourceMap, getPackageConfig)
+import           Stack.Build.Source (loadSourceMap, getDefaultPackageConfig)
 import           Stack.Build.Target
 import           Stack.Constants
 import           Stack.Package
@@ -144,7 +144,7 @@ getCabalLbs pvpBounds fp = do
         lookupVersion name =
           case Map.lookup name sourceMap of
               Just (PSLocal lp) -> Just $ packageVersion $ lpPackage lp
-              Just (PSUpstream version _ _ _) -> Just version
+              Just (PSUpstream version _ _ _ _) -> Just version
               Nothing ->
                   case Map.lookup name installedMap of
                       Just (_, installed) -> Just (installedVersion installed)
@@ -175,8 +175,7 @@ gtraverseT f =
 readLocalPackage :: M env m => Path Abs Dir -> m LocalPackage
 readLocalPackage pkgDir = do
     cabalfp <- findOrGenerateCabalFile pkgDir
-    name    <- parsePackageNameFromFilePath cabalfp
-    config  <- getPackageConfig defaultBuildOptsCLI name
+    config  <- getDefaultPackageConfig
     (warnings,package) <- readPackage config cabalfp
     mapM_ (printCabalFileWarning cabalfp) warnings
     return LocalPackage
@@ -271,7 +270,7 @@ checkSDistTarball tarball = withTempTarGzContents tarball $ \pkgDir' -> do
     --               ^ drop ".tar"     ^ drop ".gz"
     cabalfp <- findOrGenerateCabalFile pkgDir
     name    <- parsePackageNameFromFilePath cabalfp
-    config  <- getPackageConfig defaultBuildOptsCLI name
+    config  <- getDefaultPackageConfig
     (gdesc, pkgDesc) <- readPackageDescriptionDir config pkgDir
     $logInfo $
         "Checking package '" <> packageNameText name <> "' for common mistakes"

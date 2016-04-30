@@ -298,7 +298,7 @@ configFromConfigMonoid configStackRoot configUserConfigPath mresolver mproject c
 
      let configTemplateParams = configMonoidTemplateParameters
          configScmInit = getFirst configMonoidScmInit
-         configGhcOptions = getCliOptionMap configMonoidGhcOptions
+         configGhcOptions = configMonoidGhcOptions
          configSetupInfoLocations = configMonoidSetupInfoLocations
          configPvpBounds = fromFirst PvpBoundsNone configMonoidPvpBounds
          configModifyCodePage = fromFirst True configMonoidModifyCodePage

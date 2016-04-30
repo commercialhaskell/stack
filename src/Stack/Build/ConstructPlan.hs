@@ -102,7 +102,7 @@ type M = RWST
 data Ctx = Ctx
     { mbp            :: !MiniBuildPlan
     , baseConfigOpts :: !BaseConfigOpts
-    , loadPackage    :: !(PackageName -> Version -> Map FlagName Bool -> IO Package)
+    , loadPackage    :: !(PackageName -> Version -> Map FlagName Bool -> [Text] -> IO Package)
     , combinedMap    :: !CombinedMap
     , toolToPackages :: !(Cabal.Dependency -> Map PackageName VersionRange)
     , ctxEnvConfig   :: !EnvConfig
@@ -129,7 +129,7 @@ constructPlan :: forall env m.
               -> [LocalPackage]
               -> Set PackageName -- ^ additional packages that must be built
               -> [DumpPackage () ()] -- ^ locally registered
-              -> (PackageName -> Version -> Map FlagName Bool -> IO Package) -- ^ load upstream package
+              -> (PackageName -> Version -> Map FlagName Bool -> [Text] -> IO Package) -- ^ load upstream package
               -> SourceMap
               -> InstalledMap
               -> m Plan
@@ -205,7 +205,7 @@ mkUnregisterLocal tasks dirtyReason locallyRegistered sourceMap =
         case M.lookup name tasks of
             Nothing ->
                 case M.lookup name sourceMap of
-                    Just (PSUpstream _ Snap _ _) -> Map.singleton gid
+                    Just (PSUpstream _ Snap _ _ _) -> Map.singleton gid
                         ( ident
                         , Just "Switching to snapshot installed package"
                         )
@@ -234,7 +234,6 @@ addFinal lp package isAllInOne = do
                             (getEnvConfig ctx)
                             (baseConfigOpts ctx)
                             allDeps
-                            True -- wanted
                             True -- local
                             Local
                             package
@@ -279,14 +278,16 @@ tellExecutables :: PackageName -> PackageSource -> M ()
 tellExecutables _ (PSLocal lp)
     | lpWanted lp = tellExecutablesPackage Local $ lpPackage lp
     | otherwise = return ()
-tellExecutables name (PSUpstream version loc flags _) =
+-- Ignores ghcOptions because they don't matter for enumerating
+-- executables.
+tellExecutables name (PSUpstream version loc flags _ghcOptions _gitSha) =
     tellExecutablesUpstream name version loc flags
 
 tellExecutablesUpstream :: PackageName -> Version -> InstallLocation -> Map FlagName Bool -> M ()
 tellExecutablesUpstream name version loc flags = do
     ctx <- ask
     when (name `Set.member` extraToBuild ctx) $ do
-        p <- liftIO $ loadPackage ctx name version flags
+        p <- liftIO $ loadPackage ctx name version flags []
         tellExecutablesPackage loc p
 
 tellExecutablesPackage :: InstallLocation -> Package -> M ()
@@ -319,8 +320,8 @@ installPackage :: Bool -- ^ is this being used by a dependency?
 installPackage treatAsDep name ps minstalled = do
     ctx <- ask
     case ps of
-        PSUpstream version _ flags _ -> do
-            package <- liftIO $ loadPackage ctx name version flags
+        PSUpstream version _ flags ghcOptions _ -> do
+            package <- liftIO $ loadPackage ctx name version flags ghcOptions
             resolveDepsAndInstall False treatAsDep ps package minstalled
         PSLocal lp ->
             case lpTestBench lp of
@@ -403,7 +404,6 @@ installPackageGivenDeps isAllInOne ps package minstalled (missing, present, minL
                         (getEnvConfig ctx)
                         (baseConfigOpts ctx)
                         allDeps
-                        (psWanted ps)
                         (psLocal ps)
                         -- An assertion to check for a recurrence of
                         -- https://github.com/commercialhaskell/stack/issues/345
@@ -413,7 +413,7 @@ installPackageGivenDeps isAllInOne ps package minstalled (missing, present, minL
             , taskType =
                 case ps of
                     PSLocal lp -> TTLocal lp
-                    PSUpstream _ loc _ sha -> TTUpstream package (loc <> minLoc) sha
+                    PSUpstream _ loc _ _ sha -> TTUpstream package (loc <> minLoc) sha
             , taskAllInOne = isAllInOne
             }
 
@@ -503,7 +503,6 @@ checkDirtiness ps installed package present wanted = do
             (getEnvConfig ctx)
             (baseConfigOpts ctx)
             present
-            (psWanted ps)
             (psLocal ps)
             (piiLocation ps) -- should be Local always
             package
@@ -598,10 +597,6 @@ psForceDirty (PSUpstream {}) = False
 psDirty :: PackageSource -> Maybe (Set FilePath)
 psDirty (PSLocal lp) = lpDirtyFiles lp
 psDirty (PSUpstream {}) = Nothing -- files never change in an upstream package
-
-psWanted :: PackageSource -> Bool
-psWanted (PSLocal lp) = lpWanted lp
-psWanted (PSUpstream {}) = False
 
 psLocal :: PackageSource -> Bool
 psLocal (PSLocal _) = True

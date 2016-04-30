@@ -99,11 +99,11 @@ createDependencyGraph dotOpts = do
     let depLoader =
           createDepLoader sourceMap
                           installedMap
-                          (fmap3 (packageAllDeps &&& (Just . packageVersion)) loader)
+                          (fmap4 (packageAllDeps &&& (Just . packageVersion)) loader)
     liftIO $ resolveDependencies (dotDependencyDepth dotOpts) graph depLoader)
   where -- fmap a function over the result of a function with 3 arguments
-        fmap3 :: Functor f => (d -> e) -> (a -> b -> c -> f d) -> a -> b -> c -> f e
-        fmap3 f g a b c = f <$> g a b c
+        fmap4 :: Functor f => (r -> r') -> (a -> b -> c -> d -> f r) -> a -> b -> c -> d -> f r'
+        fmap4 f g a b c d = f <$> g a b c d
 
         fst4 :: (a,b,c,d) -> a
         fst4 (x,_,_,_) = x
@@ -183,13 +183,13 @@ resolveDependencies limit graph loadPackageDeps = do
 createDepLoader :: Applicative m
                 => Map PackageName PackageSource
                 -> Map PackageName Installed
-                -> (PackageName -> Version -> Map FlagName Bool -> m (Set PackageName,Maybe Version))
+                -> (PackageName -> Version -> Map FlagName Bool -> [Text] -> m (Set PackageName,Maybe Version))
                 -> PackageName
                 -> m (Set PackageName, Maybe Version)
 createDepLoader sourceMap installed loadPackageDeps pkgName =
   case Map.lookup pkgName sourceMap of
     Just (PSLocal lp) -> pure ((packageAllDeps &&& (Just . packageVersion)) (lpPackage lp))
-    Just (PSUpstream version _ flags _) -> loadPackageDeps pkgName version flags
+    Just (PSUpstream version _ flags ghcOptions _) -> loadPackageDeps pkgName version flags ghcOptions
     Nothing -> pure (Set.empty, fmap installedVersion (Map.lookup pkgName installed))
 
 -- | Resolve the direct (depth 0) external dependencies of the given local packages

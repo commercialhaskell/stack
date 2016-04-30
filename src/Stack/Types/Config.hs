@@ -52,7 +52,6 @@ module Stack.Types.Config
   ,ConfigException(..)
   -- ** ConfigMonoid
   ,ConfigMonoid(..)
-  ,CliOptionMap(..)
   -- ** EnvSettings
   ,EnvSettings(..)
   ,minimalEnvSettings
@@ -91,6 +90,13 @@ module Stack.Types.Config
   ,AbstractResolver(..)
   -- ** SCM
   ,SCM(..)
+  -- ** CustomSnapshot
+  ,CustomSnapshot(..)
+  -- ** GhcOptions
+  ,GhcOptions(..)
+  ,ghcOptionsFor
+  -- ** PackageFlags
+  ,PackageFlags(..)
   -- * Paths
   ,bindirSuffix
   ,configInstalledCache
@@ -278,7 +284,7 @@ data Config =
          -- ^ Parameters for templates.
          ,configScmInit             :: !(Maybe SCM)
          -- ^ Initialize SCM (e.g. git) when creating new projects.
-         ,configGhcOptions          :: !(Map (Maybe PackageName) [Text])
+         ,configGhcOptions          :: !GhcOptions
          -- ^ Additional GHC options to apply to either all packages (Nothing)
          -- or a specific package (Just).
          ,configSetupInfoLocations  :: ![SetupInfoLocation]
@@ -482,7 +488,7 @@ data BuildConfig = BuildConfig
       --
       -- Note: if the STACK_YAML environment variable is used, this may be
       -- different from bcRoot </> "stack.yaml"
-    , bcFlags      :: !(Map PackageName (Map FlagName Bool))
+    , bcFlags      :: !PackageFlags
       -- ^ Per-package flag overrides
     , bcImplicitGlobal :: !Bool
       -- ^ Are we loading from the implicit global stack.yaml? This is useful
@@ -617,7 +623,7 @@ data Project = Project
     , projectExtraDeps :: !(Map PackageName Version)
     -- ^ Components of the package list referring to package/version combos,
     -- see: https://github.com/fpco/stack/issues/41
-    , projectFlags :: !(Map PackageName (Map FlagName Bool))
+    , projectFlags :: !PackageFlags
     -- ^ Per-package flag overrides
     , projectResolver :: !Resolver
     -- ^ How we resolve which dependencies to use
@@ -795,7 +801,7 @@ data ConfigMonoid =
     -- ^ Template parameters.
     ,configMonoidScmInit             :: !(First SCM)
     -- ^ Initialize SCM (e.g. git init) when making new projects?
-    ,configMonoidGhcOptions          :: !(CliOptionMap (Maybe PackageName) Text)
+    ,configMonoidGhcOptions          :: !GhcOptions
     -- ^ See 'configGhcOptions'
     ,configMonoidExtraPath           :: ![Path Abs Dir]
     -- ^ Additional paths to search for executables in
@@ -871,12 +877,7 @@ parseConfigMonoidJSON obj = do
           return (First scmInit,fromMaybe M.empty params)
     configMonoidCompilerCheck <- First <$> obj ..:? configMonoidCompilerCheckName
 
-    mghcoptions <- obj ..:? configMonoidGhcOptionsName
-    configMonoidGhcOptions <-
-        CliOptionMap <$>
-            case mghcoptions of
-                Nothing -> return mempty
-                Just m -> fmap Map.fromList $ mapM handleGhcOptions $ Map.toList m
+    configMonoidGhcOptions <- obj ..:? configMonoidGhcOptionsName ..!= mempty
 
     extraPath <- obj ..:? configMonoidExtraPathName ..!= []
     configMonoidExtraPath <- forM extraPath $
@@ -897,19 +898,6 @@ parseConfigMonoidJSON obj = do
 
     return ConfigMonoid {..}
   where
-    handleGhcOptions :: Monad m => (Text, Text) -> m (Maybe PackageName, [Text])
-    handleGhcOptions (name', vals') = do
-        name <-
-            if name' == "*"
-                then return Nothing
-                else case parsePackageNameFromString $ T.unpack name' of
-                        Left e -> fail $ show e
-                        Right x -> return $ Just x
-
-        case parseArgs Escaping vals' of
-            Left e -> fail e
-            Right vals -> return (name, map T.pack vals)
-
     handleExplicitSetupDep :: Monad m => (Text, Bool) -> m (Maybe PackageName, Bool)
     handleExplicitSetupDep (name', b) = do
         name <-
@@ -1031,19 +1019,9 @@ configMonoidDefaultTemplateName = "default-template"
 configMonoidAllowDifferentUserName :: Text
 configMonoidAllowDifferentUserName = "allow-different-user"
 
--- | 'Map' monoid under @'Map.unionWith' '(++)'@ for collecting command line options.
-newtype CliOptionMap k option = CliOptionMap { getCliOptionMap :: Map k [option] }
-    deriving Show
-
-instance Ord k => Monoid (CliOptionMap k option) where
-    mempty = CliOptionMap Map.empty
-    -- FIXME: Should 'mappend' be defined with @'Map.unionWith' ('flip' '(++)')@
-    -- instead, so the options from the left argument override the ones on the right?
-    -- See https://github.com/commercialhaskell/stack/issues/2078.
-    mappend (CliOptionMap l) (CliOptionMap r) = CliOptionMap (Map.unionWith (++) l r)
-
 data ConfigException
   = ParseConfigFileException (Path Abs File) ParseException
+  | ParseCustomSnapshotException Text ParseException
   | ParseResolverException Text
   | NoProjectConfigFound (Path Abs Dir) (Maybe Text)
   | UnexpectedArchiveContents [Path Abs Dir] [Path Abs File]
@@ -1065,6 +1043,14 @@ instance Show ConfigException where
         , "':\n"
         , show exception
         , "\nSee http://docs.haskellstack.org/en/stable/yaml_configuration/."
+        ]
+    show (ParseCustomSnapshotException url exception) = concat
+        [ "Could not parse '"
+        , T.unpack url
+        , "':\n"
+        , show exception
+        -- FIXME: Link to docs about custom snapshots
+        -- , "\nSee http://docs.haskellstack.org/en/stable/yaml_configuration/."
         ]
     show (ParseResolverException t) = concat
         [ "Invalid resolver value: "
@@ -1664,3 +1650,93 @@ data DockerUser = DockerUser
     , duGroups :: [GroupID] -- ^ Supplemantal groups
     , duUmask :: FileMode -- ^ File creation mask }
     } deriving (Read,Show)
+
+-- TODO: See section of
+-- https://github.com/commercialhaskell/stack/issues/1265 about
+-- rationalizing the config. It would also be nice to share more code.
+-- For now it's more convenient just to extend this type. However, it's
+-- unpleasant that it has overlap with both 'Project' and 'Config'.
+data CustomSnapshot = CustomSnapshot
+    { csCompilerVersion :: !(Maybe CompilerVersion)
+    , csPackages :: !(Set PackageIdentifier)
+    , csFlags :: !PackageFlags
+    , csGhcOptions :: !GhcOptions
+    , csAllowNewer :: !(Maybe Bool)
+    }
+
+instance FromJSON (WithJSONWarnings CustomSnapshot) where
+    parseJSON = withObjectWarnings "CustomSnapshot" $ \o -> CustomSnapshot
+        <$> o ..:? "compiler"
+        <*> o ..:? "packages" ..!= mempty
+        <*> o ..:? "flags" ..!= mempty
+        <*> o ..:? configMonoidGhcOptionsName ..!= mempty
+        <*> o ..:? configMonoidAllowNewerName
+
+instance Monoid CustomSnapshot where
+    mempty = CustomSnapshot
+        { csCompilerVersion = Nothing
+        , csPackages = mempty
+        , csFlags = mempty
+        , csGhcOptions = mempty
+        , csAllowNewer = Nothing
+        }
+    mappend l r = CustomSnapshot
+        { csCompilerVersion = csCompilerVersion l <|> csCompilerVersion r
+        , csPackages = csPackages l <> csPackages r
+        , csFlags = csFlags l <> csFlags r
+        , csGhcOptions = csGhcOptions l <> csGhcOptions r
+        , csAllowNewer = csAllowNewer l <|> csAllowNewer r
+        }
+
+newtype GhcOptions = GhcOptions
+    { unGhcOptions :: Map (Maybe PackageName) [Text] }
+    deriving Show
+
+instance FromJSON GhcOptions where
+    parseJSON val = do
+        ghcOptions <- parseJSON val
+        fmap (GhcOptions . Map.fromList) $ mapM handleGhcOptions $ Map.toList ghcOptions
+      where
+        handleGhcOptions :: Monad m => (Text, Text) -> m (Maybe PackageName, [Text])
+        handleGhcOptions (name', vals') = do
+            name <-
+                if name' == "*"
+                    then return Nothing
+                    else case parsePackageNameFromString $ T.unpack name' of
+                            Left e -> fail $ show e
+                            Right x -> return $ Just x
+
+            case parseArgs Escaping vals' of
+                Left e -> fail e
+                Right vals -> return (name, map T.pack vals)
+
+instance Monoid GhcOptions where
+    mempty = GhcOptions mempty
+    -- FIXME: Should GhcOptions really monoid like this? Keeping it this
+    -- way preserves the behavior of the ConfigMonoid. However, this
+    -- means there isn't the ability to fully override snapshot
+    -- ghc-options in the same way there is for flags. Do we want to
+    -- change the semantics here? (particularly for extensible
+    -- snapshots)
+    mappend (GhcOptions l) (GhcOptions r) =
+        GhcOptions (Map.unionWith (++) l r)
+
+ghcOptionsFor :: PackageName -> GhcOptions -> [Text]
+ghcOptionsFor name (GhcOptions mp) =
+    M.findWithDefault [] Nothing mp ++
+    M.findWithDefault [] (Just name) mp
+
+newtype PackageFlags = PackageFlags
+    { unPackageFlags :: Map PackageName (Map FlagName Bool) }
+    deriving Show
+
+instance FromJSON PackageFlags where
+    parseJSON val = PackageFlags <$> parseJSON val
+
+instance ToJSON PackageFlags where
+    toJSON = toJSON . unPackageFlags
+
+instance Monoid PackageFlags where
+    mempty = PackageFlags mempty
+    mappend (PackageFlags l) (PackageFlags r) =
+        PackageFlags (Map.unionWith Map.union l r)
