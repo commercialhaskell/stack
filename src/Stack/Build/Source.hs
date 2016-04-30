@@ -213,7 +213,7 @@ parseTargetsFromBuildOpts needTargets boptscli = do
                     }
             ResolverCustom _ url -> do
                 stackYamlFP <- asks $ bcStackYaml . getBuildConfig
-                parseCustomMiniBuildPlan stackYamlFP url
+                parseCustomMiniBuildPlan (Just stackYamlFP) url
     rawLocals <- getLocalPackageViews
     workingDir <- getCurrentDir
 

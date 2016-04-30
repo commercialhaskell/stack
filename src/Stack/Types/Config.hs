@@ -1659,34 +1659,22 @@ data DockerUser = DockerUser
 data CustomSnapshot = CustomSnapshot
     { csCompilerVersion :: !(Maybe CompilerVersion)
     , csPackages :: !(Set PackageIdentifier)
+    , csDropPackages :: !(Set PackageName)
     , csFlags :: !PackageFlags
     , csGhcOptions :: !GhcOptions
     , csAllowNewer :: !(Maybe Bool)
     }
 
-instance FromJSON (WithJSONWarnings CustomSnapshot) where
-    parseJSON = withObjectWarnings "CustomSnapshot" $ \o -> CustomSnapshot
-        <$> o ..:? "compiler"
-        <*> o ..:? "packages" ..!= mempty
-        <*> o ..:? "flags" ..!= mempty
-        <*> o ..:? configMonoidGhcOptionsName ..!= mempty
-        <*> o ..:? configMonoidAllowNewerName
-
-instance Monoid CustomSnapshot where
-    mempty = CustomSnapshot
-        { csCompilerVersion = Nothing
-        , csPackages = mempty
-        , csFlags = mempty
-        , csGhcOptions = mempty
-        , csAllowNewer = Nothing
-        }
-    mappend l r = CustomSnapshot
-        { csCompilerVersion = csCompilerVersion l <|> csCompilerVersion r
-        , csPackages = csPackages l <> csPackages r
-        , csFlags = csFlags l <> csFlags r
-        , csGhcOptions = csGhcOptions l <> csGhcOptions r
-        , csAllowNewer = csAllowNewer l <|> csAllowNewer r
-        }
+instance FromJSON (WithJSONWarnings (CustomSnapshot, Maybe Resolver)) where
+    parseJSON = withObjectWarnings "CustomSnapshot" $ \o -> (,)
+        <$> (CustomSnapshot
+            <$> o ..:? "compiler"
+            <*> o ..:? "packages" ..!= mempty
+            <*> o ..:? "drop-packages" ..!= mempty
+            <*> o ..:? "flags" ..!= mempty
+            <*> o ..:? configMonoidGhcOptionsName ..!= mempty
+            <*> o ..:? configMonoidAllowNewerName)
+        <*> jsonSubWarningsT (o ..:? "resolver")
 
 newtype GhcOptions = GhcOptions
     { unGhcOptions :: Map (Maybe PackageName) [Text] }

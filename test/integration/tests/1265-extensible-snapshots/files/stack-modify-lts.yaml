@@ -1,0 +1,4 @@
+resolver:
+    name: snapshot-modify-lts
+    location: snapshot-modify-lts.yaml
+packages: []

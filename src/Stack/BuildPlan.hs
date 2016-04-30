@@ -95,6 +95,7 @@ data BuildPlanException
         (Map PackageName (Maybe Version, Set PackageName)) -- truly unknown
         (Map PackageName (Set PackageIdentifier)) -- shadowed
     | SnapshotNotFound SnapName
+    | FilepathInDownloadedSnapshot T.Text
     deriving (Typeable)
 instance Exception BuildPlanException
 instance Show BuildPlanException where
@@ -174,6 +175,11 @@ instance Show BuildPlanException where
                       $ Set.toList
                       $ Set.unions
                       $ Map.elems shadowed
+    show (FilepathInDownloadedSnapshot url) = unlines
+        [ "Downloaded snapshot specified a 'resolver: { location: filepath }' "
+        , "field, but filepaths are not allowed in downloaded snapshots.\n"
+        , "Filepath specified: " ++ T.unpack url
+        ]
 
 -- | Determine the necessary packages to install to have the given set of
 -- packages available.
@@ -221,8 +227,6 @@ toMiniBuildPlan :: (MonadIO m, MonadLogger m, MonadReader env m, HasHttpManager 
                 -> Map PackageName (Version, Map FlagName Bool, [Text], Maybe GitSHA1) -- ^ non-core packages
                 -> m MiniBuildPlan
 toMiniBuildPlan compilerVersion requireAllowNewer corePackages packages = do
-    $logInfo "Caching build plan"
-
     -- Determine the dependencies of all of the packages in the build plan. We
     -- handle core packages specially, because some of them will not be in the
     -- package index. For those, we allow missing packages to exist, and then
@@ -408,6 +412,24 @@ getToolMap mbp =
         map (flip Map.singleton (Set.singleton pname) . unExeName)
       $ Set.toList
       $ mpiExes mpi
+
+loadResolver
+    :: (MonadIO m, MonadThrow m, MonadLogger m, MonadReader env m, HasHttpManager env, HasConfig env, HasGHCVariant env, MonadBaseControl IO m, MonadMask m)
+    => Maybe (Path Abs File)
+    -> Resolver
+    -> m MiniBuildPlan
+loadResolver mconfigPath resolver =
+    case resolver of
+        ResolverSnapshot snap -> loadMiniBuildPlan snap
+        -- TODO(mgsloan): Not sure what this FIXME means
+        -- FIXME instead of passing the stackYaml dir we should maintain
+        -- the file URL in the custom resolver always relative to stackYaml.
+        ResolverCustom _ url -> parseCustomMiniBuildPlan mconfigPath url
+        ResolverCompiler compiler -> return MiniBuildPlan
+            { mbpCompilerVersion = compiler
+            , mbpPackages = mempty
+            , mbpAllowNewer = False
+            }
 
 -- | Load up a 'MiniBuildPlan', preferably from cache
 loadMiniBuildPlan
@@ -892,11 +914,20 @@ shadowMiniBuildPlan (MiniBuildPlan cv pkgs0 allowNewer) shadowed =
                 Just False -> Right
                 Nothing -> assert False Right
 
-parseCustomMiniBuildPlan :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasHttpManager env, HasConfig env, MonadBaseControl IO m)
-                         => Path Abs File -- ^ stack.yaml file location
-                         -> T.Text -> m MiniBuildPlan
-parseCustomMiniBuildPlan stackYamlFP url0 = do
-    yamlFP <- getYamlFP url0
+parseCustomMiniBuildPlan
+    :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasHttpManager env, HasConfig env, HasGHCVariant env, MonadBaseControl IO m)
+    => Maybe (Path Abs File) -- ^ Root directory for when url is a filepath
+    -> T.Text
+    -> m MiniBuildPlan
+parseCustomMiniBuildPlan mconfigPath url0 = do
+    $logDebug $ "Loading " <> url0 <> " build plan"
+    eyamlFP <- getYamlFP url0
+    let yamlFP = either id id eyamlFP
+
+    -- FIXME: determine custom snapshot path based on contents. Ideally,
+    -- use a hash scheme that ignores formatting differences (works on
+    -- the data), so that an implicit snapshot (TBD) will hash to the
+    -- same thing as a custom snapshot.
 
     yamlBS <- liftIO $ S.readFile $ toFilePath yamlFP
     let yamlHash = S8.unpack $ B16.encode $ SHA256.hash yamlBS
@@ -905,36 +936,33 @@ parseCustomMiniBuildPlan stackYamlFP url0 = do
     let binaryFP = customPlanDir </> $(mkRelDir "bin") </> binaryFilename
 
     taggedDecodeOrLoad binaryFP $ do
-        WithJSONWarnings result warnings <-
+        WithJSONWarnings (cs0, mresolver) warnings <-
              either (throwM . ParseCustomSnapshotException url0) return $
              decodeEither' yamlBS
-        logJSONWarnings (toFilePath yamlFP) warnings
-        let (CustomSnapshot
-                mcompilerVersion
-                packages
-                (PackageFlags flags)
-                ghcOptions
-                allowNewer) = result
-        let addFlags :: PackageIdentifier -> (PackageName, (Version, Map FlagName Bool, [Text]))
-            addFlags (PackageIdentifier name ver) =
-                ( name
-                , ( ver
-                  , Map.findWithDefault Map.empty name flags
-                  -- NOTE: similar to 'allGhcOptions' in Stack.Types.Build
-                  , ghcOptionsFor name ghcOptions
-                  )
-                )
-        case mcompilerVersion of
-            Just compilerVersion ->
-                toMiniBuildPlan
-                    compilerVersion
-                    (fromMaybe False allowNewer)
-                    Map.empty
-                    (fmap addGitSHA $ Map.fromList $ map addFlags $ Set.toList packages)
-            Nothing -> do
-                -- TODO: proper exception type
+        logJSONWarnings (T.unpack url0) warnings
+        case (mresolver, csCompilerVersion cs0) of
+            (Nothing, Nothing) ->
                 fail $ "Failed to load custom snapshot at " ++
-                    T.unpack url0 ++ ", because no compiler is specified."
+                    T.unpack url0 ++
+                    ", because no 'compiler' or 'resolver' is specified."
+            (Nothing, Just cv) ->
+                applyCustomSnapshot cs0 MiniBuildPlan
+                    { mbpCompilerVersion = cv
+                    , mbpPackages = mempty
+                    , mbpAllowNewer = False
+                    }
+            -- Even though we ignore the compiler version here, it gets
+            -- used due to applyCustomSnapshot
+            (Just resolver, _) -> do
+                -- Load referenced resolver. If the custom snapshot is
+                -- stored at a user location, then allow relative
+                -- filepath custom snapshots.
+                mbp <- loadResolver customFile resolver
+                applyCustomSnapshot cs0 mbp
+              where
+                customFile = case eyamlFP of
+                    Left _ -> Nothing
+                    Right fp -> Just fp
   where
     getCustomPlanDir = do
         root <- asks $ configStackRoot . getConfig
@@ -953,12 +981,47 @@ parseCustomMiniBuildPlan stackYamlFP url0 = do
 
         let cacheFP = customPlanDir </> $(mkRelDir "yaml") </> hashFP
         _ <- download req cacheFP
-        return cacheFP
+        return (Left cacheFP)
 
-    getYamlFPFromFile url = do
-        fp <- liftIO $ D.canonicalizePath $ toFilePath (parent stackYamlFP) FP.</> T.unpack (fromMaybe url $
-            T.stripPrefix "file://" url <|> T.stripPrefix "file:" url)
-        parseAbsFile fp
+    getYamlFPFromFile url =
+        case mconfigPath of
+           Nothing -> throwM $ FilepathInDownloadedSnapshot url
+           Just configPath -> do
+               fp <- liftIO $ D.canonicalizePath $ toFilePath (parent configPath) FP.</> T.unpack (fromMaybe url $
+                   T.stripPrefix "file://" url <|> T.stripPrefix "file:" url)
+               Right <$> parseAbsFile fp
 
-    -- we add a Nothing since we don't yet collect Git SHAs for custom snapshots
-    addGitSHA (x, y, z) = (x, y, z, Nothing)
+applyCustomSnapshot
+    :: (MonadIO m, MonadLogger m, MonadReader env m, HasHttpManager env, MonadThrow m, HasConfig env, MonadBaseControl IO m, MonadMask m)
+    => CustomSnapshot
+    -> MiniBuildPlan
+    -> m MiniBuildPlan
+applyCustomSnapshot cs mbp0 = do
+    let CustomSnapshot mcompilerVersion
+                       packages
+                       dropPackages
+                       (PackageFlags flags)
+                       ghcOptions
+                       mallowNewer
+            = cs
+        addFlagsAndOpts :: PackageIdentifier -> (PackageName, (Version, Map FlagName Bool, [Text], Maybe GitSHA1))
+        addFlagsAndOpts (PackageIdentifier name ver) =
+            ( name
+            , ( ver
+              , Map.findWithDefault Map.empty name flags
+              -- NOTE: similar to 'allGhcOptions' in Stack.Types.Build
+              , ghcOptionsFor name ghcOptions
+              -- we add a Nothing since we don't yet collect Git SHAs for custom snapshots
+              , Nothing
+              )
+            )
+        packageMap = Map.fromList $ map addFlagsAndOpts $ Set.toList packages
+        cv = fromMaybe (mbpCompilerVersion mbp0) mcompilerVersion
+        packages0 =
+             mbpPackages mbp0 `Map.difference` (Map.fromSet (\_ -> ()) dropPackages)
+    mbp1 <- toMiniBuildPlan cv False mempty packageMap
+    return $ MiniBuildPlan
+        { mbpCompilerVersion = cv
+        , mbpPackages = Map.union (mbpPackages mbp1) packages0
+        , mbpAllowNewer = fromMaybe (mbpAllowNewer mbp0) mallowNewer
+        }

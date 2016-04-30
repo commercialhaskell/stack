@@ -481,7 +481,7 @@ getResolverConstraints stackYaml resolver =
         ResolverCustom _ url -> do
             -- FIXME instead of passing the stackYaml dir we should maintain
             -- the file URL in the custom resolver always relative to stackYaml.
-            mbp <- parseCustomMiniBuildPlan stackYaml url
+            mbp <- parseCustomMiniBuildPlan (Just stackYaml) url
             return (mbpCompilerVersion mbp, mbpConstraints mbp)
         ResolverCompiler compiler ->
             return (compiler, Map.empty)

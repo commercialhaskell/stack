@@ -1,15 +1,7 @@
-compiler: ghc-7.10
+resolver:
+    name: test-snapshot-2
+    location: snapshot-2.yaml
 packages:
-# Just the first thing I found via github search that conditionally adds exports
-# based on flags.
-#
-# TODO: check that the decoder interface is present (and that this flag matters)
-- SHA-1.6.4
-- binary-0.8.0.0
-flags:
-    SHA:
-        DecoderInterface: true
-# FIXME: test this better
-ghc-options:
-    SHA: "-Wall"
-allow-newer: true
+- microlens-0.4.3.0
+drop-packages:
+- zlib

@@ -520,7 +520,7 @@ loadBuildConfig mproject config mresolver mcompiler = do
                     mbp <- runReaderT (loadMiniBuildPlan snapName) miniConfig
                     return $ mbpCompilerVersion mbp
                 ResolverCustom _name url -> do
-                    mbp <- runReaderT (parseCustomMiniBuildPlan stackYamlFP url) miniConfig
+                    mbp <- runReaderT (parseCustomMiniBuildPlan (Just stackYamlFP) url) miniConfig
                     return $ mbpCompilerVersion mbp
                 ResolverCompiler wantedCompiler -> return wantedCompiler
 
