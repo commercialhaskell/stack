@@ -999,7 +999,8 @@ uploadCmd (args, mpvpBounds, ignoreCheck, don'tSign, sigServerUrl) go = do
                          (Upload.upload uploader (toFilePath tarFile))
                      unless
                          don'tSign
-                         (Sig.sign
+                         (void $
+                          Sig.sign
                               manager
                               sigServerUrl
                               tarFile))
@@ -1012,7 +1013,8 @@ uploadCmd (args, mpvpBounds, ignoreCheck, don'tSign, sigServerUrl) go = do
                 tarPath <- parseRelFile tarName
                 unless
                     don'tSign
-                    (Sig.signTarBytes
+                    (void $
+                     Sig.signTarBytes
                          manager
                          sigServerUrl
                          tarPath
@@ -1034,7 +1036,7 @@ sdistCmd (dirs, mpvpBounds, ignoreCheck, sign, sigServerUrl) go =
             liftIO $ L.writeFile (toFilePath tarPath) tarBytes
             unless ignoreCheck (checkSDistTarball tarPath)
             $logInfo $ "Wrote sdist tarball to " <> T.pack (toFilePath tarPath)
-            when sign (Sig.sign manager sigServerUrl tarPath)
+            when sign (void $ Sig.sign manager sigServerUrl tarPath)
 
 -- | Execute a command.
 execCmd :: ExecOpts -> GlobalOpts -> IO ()

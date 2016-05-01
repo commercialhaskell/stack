@@ -50,7 +50,7 @@ sign
 #else
     :: (MonadIO m, MonadLogger m, MonadMask m, MonadThrow m)
 #endif
-    => Manager -> String -> Path Abs File -> m ()
+    => Manager -> String -> Path Abs File -> m Signature
 sign manager url filePath =
     withSystemTempDir
         "stack"
@@ -95,7 +95,7 @@ signTarBytes
 #else
     :: (MonadIO m, MonadLogger m, MonadMask m, MonadThrow m)
 #endif
-    => Manager -> String -> Path Rel File -> L.ByteString -> m ()
+    => Manager -> String -> Path Rel File -> L.ByteString -> m Signature
 signTarBytes manager url tarPath bs =
     withSystemTempDir
         "stack"
@@ -108,7 +108,7 @@ signTarBytes manager url tarPath bs =
 -- @PackageIdentifier@ and a file path to the package on disk.
 signPackage
     :: (MonadIO m, MonadLogger m, MonadThrow m)
-    => Manager -> String -> PackageIdentifier -> Path Abs File -> m ()
+    => Manager -> String -> PackageIdentifier -> Path Abs File -> m Signature
 signPackage manager url pkg filePath = do
     sig@(Signature signature) <- gpgSign filePath
     let (PackageIdentifier name version) = pkg
@@ -128,3 +128,4 @@ signPackage manager url pkg filePath = do
         (responseStatus res /= status200)
         (throwM (GPGSignException "unable to sign & upload package"))
     $logInfo ("Signature uploaded to " <> T.pack fullUrl)
+    return sig
