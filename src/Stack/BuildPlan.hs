@@ -2,6 +2,7 @@
 {-# LANGUAGE DeriveGeneric      #-}
 {-# LANGUAGE EmptyDataDecls     #-}
 {-# LANGUAGE FlexibleContexts   #-}
+{-# LANGUAGE GADTs              #-}
 {-# LANGUAGE OverloadedStrings  #-}
 {-# LANGUAGE TemplateHaskell    #-}
 {-# LANGUAGE TupleSections      #-}
@@ -20,6 +21,7 @@ module Stack.BuildPlan
     , gpdPackageName
     , MiniBuildPlan(..)
     , MiniPackageInfo(..)
+    , loadResolver
     , loadMiniBuildPlan
     , removeSrcPkgDefaultFlags
     , resolveBuildPlan
@@ -43,7 +45,7 @@ import           Control.Monad.State.Strict      (State, execState, get, modify,
 import           Control.Monad.Trans.Control (MonadBaseControl)
 import qualified Crypto.Hash.SHA256 as SHA256
 import           Data.Aeson.Extended (WithJSONWarnings(..), logJSONWarnings)
-import           Data.Binary.VersionTagged (taggedDecodeOrLoad)
+import           Data.Binary.VersionTagged (taggedDecodeOrLoad, decodeFileOrFailDeep)
 import qualified Data.ByteString as S
 import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Char8 as S8
@@ -55,13 +57,13 @@ import           Data.List.NonEmpty (NonEmpty(..))
 import qualified Data.List.NonEmpty as NonEmpty
 import           Data.Map (Map)
 import qualified Data.Map as Map
-import           Data.Maybe (fromMaybe, mapMaybe)
+import           Data.Maybe (fromMaybe, mapMaybe, isNothing)
 import           Data.Monoid
 import           Data.Set (Set)
 import qualified Data.Set as Set
 import           Data.Text (Text)
 import qualified Data.Text as T
-import           Data.Text.Encoding (encodeUtf8)
+import           Data.Text.Encoding (encodeUtf8, decodeUtf8)
 import qualified Data.Traversable as Tr
 import           Data.Typeable (Typeable)
 import           Data.Yaml (decodeEither', decodeFileEither)
@@ -86,8 +88,6 @@ import           Stack.Package
 import           Stack.PackageIndex
 import           Stack.Types
 import           Stack.Types.StackT
-import qualified System.Directory as D
-import qualified System.FilePath as FP
 
 data BuildPlanException
     = UnknownPackages
@@ -96,6 +96,7 @@ data BuildPlanException
         (Map PackageName (Set PackageIdentifier)) -- shadowed
     | SnapshotNotFound SnapName
     | FilepathInDownloadedSnapshot T.Text
+    | NeitherCompilerOrResolverSpecified T.Text
     deriving (Typeable)
 instance Exception BuildPlanException
 instance Show BuildPlanException where
@@ -180,6 +181,10 @@ instance Show BuildPlanException where
         , "field, but filepaths are not allowed in downloaded snapshots.\n"
         , "Filepath specified: " ++ T.unpack url
         ]
+    show (NeitherCompilerOrResolverSpecified url) =
+        "Failed to load custom snapshot at " ++
+        T.unpack url ++
+        ", because no 'compiler' or 'resolver' is specified."
 
 -- | Determine the necessary packages to install to have the given set of
 -- packages available.
@@ -417,19 +422,25 @@ loadResolver
     :: (MonadIO m, MonadThrow m, MonadLogger m, MonadReader env m, HasHttpManager env, HasConfig env, HasGHCVariant env, MonadBaseControl IO m, MonadMask m)
     => Maybe (Path Abs File)
     -> Resolver
-    -> m MiniBuildPlan
+    -> m (MiniBuildPlan, LoadedResolver)
 loadResolver mconfigPath resolver =
     case resolver of
-        ResolverSnapshot snap -> loadMiniBuildPlan snap
+        ResolverSnapshot snap ->
+            liftM (, ResolverSnapshot snap) $ loadMiniBuildPlan snap
         -- TODO(mgsloan): Not sure what this FIXME means
         -- FIXME instead of passing the stackYaml dir we should maintain
         -- the file URL in the custom resolver always relative to stackYaml.
-        ResolverCustom _ url -> parseCustomMiniBuildPlan mconfigPath url
-        ResolverCompiler compiler -> return MiniBuildPlan
-            { mbpCompilerVersion = compiler
-            , mbpPackages = mempty
-            , mbpAllowNewer = False
-            }
+        ResolverCustom name url -> do
+            (mbp, hash) <- parseCustomMiniBuildPlan mconfigPath url
+            return (mbp, ResolverCustomLoaded name url (decodeUtf8 hash))
+        ResolverCompiler compiler -> return
+            ( MiniBuildPlan
+                { mbpCompilerVersion = compiler
+                , mbpPackages = mempty
+                , mbpAllowNewer = False
+                }
+            , ResolverCompiler compiler
+            )
 
 -- | Load up a 'MiniBuildPlan', preferably from cache
 loadMiniBuildPlan
@@ -914,82 +925,147 @@ shadowMiniBuildPlan (MiniBuildPlan cv pkgs0 allowNewer) shadowed =
                 Just False -> Right
                 Nothing -> assert False Right
 
+-- This works differently for snapshots fetched from URL and those
+-- fetched from file:
+--
+-- 1) If downloading the snapshot from a URL, assume the fetched data is
+-- immutable. Hash the URL in order to determine the location of the
+-- cached download. The file contents of the snapshot determines the
+-- hash for looking up cached MBP.
+--
+-- 2) If loading the snapshot from a file, load all of the involved
+-- snapshot files. The hash used to determine the cached MBP is the hash
+-- of the concatenation of the parent's hash with the snapshot contents.
+--
+-- Why this difference? We want to make it easy to simply edit snapshots
+-- in the filesystem, but we want caching for remote snapshots. In order
+-- to avoid reparsing / reloading all the yaml for remote snapshots, we
+-- need a different hash system.
+
+-- TODO: This could probably be more efficient if it first merged the
+-- custom snapshots, and then applied them to the MBP. It is nice to
+-- apply directly, because then we have the guarantee that it's
+-- semantically identical to snapshot extension. If this optimization is
+-- implemented, note that the direct Monoid for CustomSnapshot is not
+-- correct. Crucially, if a package is present in the snapshot, its
+-- flags and ghc-options are not based on settings from prior snapshots.
+-- TODO: This semantics should be discussed / documented more.
+
+-- TODO: allow a hash check in the resolver. This adds safety /
+-- correctness, allowing you to ensure that you are indeed getting the
+-- right custom snapshot.
+
+-- TODO: Allow custom plan to specify a name.
+
 parseCustomMiniBuildPlan
     :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasHttpManager env, HasConfig env, HasGHCVariant env, MonadBaseControl IO m)
     => Maybe (Path Abs File) -- ^ Root directory for when url is a filepath
     -> T.Text
-    -> m MiniBuildPlan
-parseCustomMiniBuildPlan mconfigPath url0 = do
+    -> m (MiniBuildPlan, S8.ByteString)
+parseCustomMiniBuildPlan mconfigPath0 url0 = do
     $logDebug $ "Loading " <> url0 <> " build plan"
-    eyamlFP <- getYamlFP url0
-    let yamlFP = either id id eyamlFP
-
-    -- FIXME: determine custom snapshot path based on contents. Ideally,
-    -- use a hash scheme that ignores formatting differences (works on
-    -- the data), so that an implicit snapshot (TBD) will hash to the
-    -- same thing as a custom snapshot.
-
-    yamlBS <- liftIO $ S.readFile $ toFilePath yamlFP
-    let yamlHash = S8.unpack $ B16.encode $ SHA256.hash yamlBS
-    binaryFilename <- parseRelFile $ yamlHash ++ ".bin"
-    customPlanDir <- getCustomPlanDir
-    let binaryFP = customPlanDir </> $(mkRelDir "bin") </> binaryFilename
-
-    taggedDecodeOrLoad binaryFP $ do
-        WithJSONWarnings (cs0, mresolver) warnings <-
+    case parseUrl $ T.unpack url0 of
+        Just req -> downloadCustom url0 req
+        Nothing ->
+           case mconfigPath0 of
+               Nothing -> throwM $ FilepathInDownloadedSnapshot url0
+               Just configPath -> do
+                   (getMbp, hash) <- readCustom configPath url0
+                   mbp <- getMbp
+                   return (mbp, hash)
+  where
+    downloadCustom url req = do
+        let urlHash = S8.unpack $ B16.encode $ SHA256.hash $ encodeUtf8 url
+        hashFP <- parseRelFile $ urlHash ++ ".yaml"
+        customPlanDir <- getCustomPlanDir
+        let cacheFP = customPlanDir </> $(mkRelDir "yaml") </> hashFP
+        _ <- download req cacheFP
+        yamlBS <- liftIO $ S.readFile $ toFilePath cacheFP
+        let yamlHash = b16Hash yamlBS
+        binaryPath <- getBinaryPath yamlHash
+        liftM (, yamlHash) $ taggedDecodeOrLoad binaryPath $ do
+            (cs, mresolver) <- decodeYaml yamlBS
+            parentMbp <- case (csCompilerVersion cs, mresolver) of
+                (Nothing, Nothing) -> throwM (NeitherCompilerOrResolverSpecified url)
+                (Just cv, Nothing) -> return (compilerBuildPlan cv)
+                -- NOTE: ignoring the parent's hash, even though
+                -- there could be one. URL snapshot's hash are
+                -- determined just from their contents.
+                (_, Just resolver) -> liftM fst (loadResolver Nothing resolver)
+            applyCustomSnapshot cs parentMbp
+    readCustom configPath path = do
+        yamlFP <- resolveFile (parent configPath) (T.unpack $ fromMaybe path $
+            T.stripPrefix "file://" path <|> T.stripPrefix "file:" path)
+        yamlBS <- liftIO $ S.readFile $ toFilePath yamlFP
+        (cs, mresolver) <- decodeYaml yamlBS
+        (getMbp, hash) <- case mresolver of
+            Just (ResolverCustom _ url ) ->
+                case parseUrl $ T.unpack url of
+                    Just req -> do
+                        let getMbp = do
+                                -- Ignore custom hash, under the
+                                -- assumption that the URL is sufficient
+                                -- for identity.
+                                (mbp, _) <- downloadCustom url req
+                                return mbp
+                        return (getMbp, b16Hash yamlBS)
+                    Nothing -> do
+                        (getMbp0, hash0) <- readCustom yamlFP url
+                        let hash = b16Hash (hash0 <> yamlBS)
+                            getMbp = do
+                                binaryPath <- getBinaryPath hash
+                                -- Idea here is to not waste time
+                                -- writing out intermediate cache files,
+                                -- but check for them.
+                                exists <- doesFileExist binaryPath
+                                if exists
+                                    then do
+                                        eres <- decodeFileOrFailDeep binaryPath
+                                        case eres of
+                                            Right (Just mbp) -> return mbp
+                                            -- Invalid format cache file, remove.
+                                            _ -> do
+                                                removeFile binaryPath
+                                                getMbp0
+                                    else getMbp0
+                        return (getMbp, hash)
+            Just resolver -> do
+                -- NOTE: in the cases where we don't have a hash, the
+                -- normal resolver name is enough. Since this name is
+                -- part of the yaml file, it ends up in our hash.
+                let hash = b16Hash yamlBS
+                    getMbp = do
+                        (mbp, resolver') <- loadResolver (Just configPath) resolver
+                        let mhash = customResolverHash resolver'
+                        assert (isNothing mhash) (return mbp)
+                return (getMbp, hash)
+            Nothing -> do
+                case csCompilerVersion cs of
+                    Nothing -> throwM (NeitherCompilerOrResolverSpecified path)
+                    Just cv -> do
+                        let hash = b16Hash yamlBS
+                            getMbp = return (compilerBuildPlan cv)
+                        return (getMbp, hash)
+        return (applyCustomSnapshot cs =<< getMbp, hash)
+    getBinaryPath hash = do
+        binaryFilename <- parseRelFile $ S8.unpack hash ++ ".bin"
+        customPlanDir <- getCustomPlanDir
+        return $ customPlanDir </> $(mkRelDir "bin") </> binaryFilename
+    decodeYaml yamlBS = do
+        WithJSONWarnings res warnings <-
              either (throwM . ParseCustomSnapshotException url0) return $
              decodeEither' yamlBS
         logJSONWarnings (T.unpack url0) warnings
-        case (mresolver, csCompilerVersion cs0) of
-            (Nothing, Nothing) ->
-                fail $ "Failed to load custom snapshot at " ++
-                    T.unpack url0 ++
-                    ", because no 'compiler' or 'resolver' is specified."
-            (Nothing, Just cv) ->
-                applyCustomSnapshot cs0 MiniBuildPlan
-                    { mbpCompilerVersion = cv
-                    , mbpPackages = mempty
-                    , mbpAllowNewer = False
-                    }
-            -- Even though we ignore the compiler version here, it gets
-            -- used due to applyCustomSnapshot
-            (Just resolver, _) -> do
-                -- Load referenced resolver. If the custom snapshot is
-                -- stored at a user location, then allow relative
-                -- filepath custom snapshots.
-                mbp <- loadResolver customFile resolver
-                applyCustomSnapshot cs0 mbp
-              where
-                customFile = case eyamlFP of
-                    Left _ -> Nothing
-                    Right fp -> Just fp
-  where
+        return res
+    compilerBuildPlan cv = MiniBuildPlan
+         { mbpCompilerVersion = cv
+         , mbpPackages = mempty
+         , mbpAllowNewer = False
+         }
     getCustomPlanDir = do
         root <- asks $ configStackRoot . getConfig
         return $ root </> $(mkRelDir "custom-plan")
-
-    -- Get the path to the YAML file
-    getYamlFP url =
-        case parseUrl $ T.unpack url of
-            Just req -> getYamlFPFromReq url req
-            Nothing -> getYamlFPFromFile url
-
-    getYamlFPFromReq url req = do
-        let hashStr = S8.unpack $ B16.encode $ SHA256.hash $ encodeUtf8 url
-        hashFP <- parseRelFile $ hashStr ++ ".yaml"
-        customPlanDir <- getCustomPlanDir
-
-        let cacheFP = customPlanDir </> $(mkRelDir "yaml") </> hashFP
-        _ <- download req cacheFP
-        return (Left cacheFP)
-
-    getYamlFPFromFile url =
-        case mconfigPath of
-           Nothing -> throwM $ FilepathInDownloadedSnapshot url
-           Just configPath -> do
-               fp <- liftIO $ D.canonicalizePath $ toFilePath (parent configPath) FP.</> T.unpack (fromMaybe url $
-                   T.stripPrefix "file://" url <|> T.stripPrefix "file:" url)
-               Right <$> parseAbsFile fp
+    b16Hash = B16.encode . SHA256.hash
 
 applyCustomSnapshot
     :: (MonadIO m, MonadLogger m, MonadReader env m, HasHttpManager env, MonadThrow m, HasConfig env, MonadBaseControl IO m, MonadMask m)

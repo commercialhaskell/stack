@@ -58,8 +58,7 @@ import           Path.IO
 import           Prelude
 import           Stack.Build.Cache
 import           Stack.Build.Target
-import           Stack.BuildPlan (loadMiniBuildPlan, shadowMiniBuildPlan,
-                                  parseCustomMiniBuildPlan)
+import           Stack.BuildPlan (shadowMiniBuildPlan)
 import           Stack.Constants (wiredInPackages)
 import           Stack.Package
 import           Stack.PackageIndex (getPackageVersions)
@@ -198,9 +197,6 @@ parseTargetsFromBuildOpts needTargets boptscli = do
     bconfig <- asks getBuildConfig
     mbp0 <-
         case bcResolver bconfig of
-            ResolverSnapshot snapName -> do
-                $logDebug $ "Checking resolver: " <> renderSnapName snapName
-                loadMiniBuildPlan snapName
             ResolverCompiler _ -> do
                 -- We ignore the resolver version, as it might be
                 -- GhcMajorVersion, and we want the exact version
@@ -211,9 +207,7 @@ parseTargetsFromBuildOpts needTargets boptscli = do
                     , mbpPackages = Map.empty
                     , mbpAllowNewer = False
                     }
-            ResolverCustom _ url -> do
-                stackYamlFP <- asks $ bcStackYaml . getBuildConfig
-                parseCustomMiniBuildPlan (Just stackYamlFP) url
+            _ -> return (bcWantedMiniBuildPlan bconfig)
     rawLocals <- getLocalPackageViews
     workingDir <- getCurrentDir
 

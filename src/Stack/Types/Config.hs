@@ -11,6 +11,9 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE StandaloneDeriving #-}
 
 -- | The Config type.
 
@@ -32,6 +35,7 @@ module Stack.Types.Config
   ,BuildConfig(..)
   ,bcRoot
   ,bcWorkDir
+  ,bcWantedCompiler
   ,HasBuildConfig(..)
   -- ** GHCVariant & HasGHCVariant
   ,GHCVariant(..)
@@ -84,9 +88,14 @@ module Stack.Types.Config
   ,PvpBounds(..)
   ,parsePvpBounds
   -- ** Resolver & AbstractResolver
-  ,Resolver(..)
+  ,Resolver
+  ,LoadedResolver
+  ,ResolverThat's(..)
   ,parseResolverText
+  ,resolverDirName
   ,resolverName
+  ,customResolverHash
+  ,toResolverNotLoaded
   ,AbstractResolver(..)
   -- ** SCM
   ,SCM(..)
@@ -175,7 +184,7 @@ import           Generics.Deriving.Monoid (memptydefault, mappenddefault)
 import           Network.HTTP.Client (parseUrl)
 import           Path
 import qualified Paths_stack as Meta
-import           Stack.Types.BuildPlan (SnapName, renderSnapName, parseSnapName)
+import           Stack.Types.BuildPlan (MiniBuildPlan(..), SnapName, renderSnapName, parseSnapName)
 import           Stack.Types.Urls
 import           Stack.Types.Compiler
 import           Stack.Types.Docker
@@ -469,10 +478,10 @@ defaultLogLevel = LevelInfo
 -- 'Config' in order to determine the values here.
 data BuildConfig = BuildConfig
     { bcConfig     :: !Config
-    , bcResolver   :: !Resolver
+    , bcResolver   :: !LoadedResolver
       -- ^ How we resolve which dependencies to install given a set of
       -- packages.
-    , bcWantedCompiler :: !CompilerVersion
+    , bcWantedMiniBuildPlan :: !MiniBuildPlan
       -- ^ Compiler version wanted for this build
     , bcPackageEntries :: ![PackageEntry]
       -- ^ Local packages
@@ -506,6 +515,9 @@ bcWorkDir :: (MonadReader env m, HasConfig env) => BuildConfig -> m (Path Abs Di
 bcWorkDir bconfig = do
   workDir <- getWorkDir
   return (bcRoot bconfig </> workDir)
+
+bcWantedCompiler :: BuildConfig -> CompilerVersion
+bcWantedCompiler = mbpCompilerVersion . bcWantedMiniBuildPlan
 
 -- | Configuration after the environment has been setup.
 data EnvConfig = EnvConfig
@@ -644,29 +656,45 @@ instance ToJSON Project where
         , "extra-package-dbs" .= projectExtraPackageDBs p
         ])
 
+data IsLoaded = Loaded | NotLoaded
+
+type LoadedResolver = ResolverThat's 'Loaded
+type Resolver = ResolverThat's 'NotLoaded
+
 -- | How we resolve which dependencies to install given a set of packages.
-data Resolver
-  = ResolverSnapshot SnapName
-  -- ^ Use an official snapshot from the Stackage project, either an LTS
-  -- Haskell or Stackage Nightly
+data ResolverThat's (l :: IsLoaded) where
+    -- | Use an official snapshot from the Stackage project, either an LTS
+    -- Haskell or Stackage Nightly
+    ResolverSnapshot :: !SnapName -> ResolverThat's l
+    -- | Require a specific compiler version, but otherwise provide no
+    -- build plan. Intended for use cases where end user wishes to
+    -- specify all upstream dependencies manually, such as using a
+    -- dependency solver.
+    ResolverCompiler :: !CompilerVersion -> ResolverThat's l
+    -- | A custom resolver based on the given name and URL. When a URL is
+    -- provided, it file is to be completely immutable. Filepaths are
+    -- always loaded. This constructor is used before the build-plan has
+    -- been loaded, as we do not yet know the custom snapshot's hash.
+    ResolverCustom :: !Text -> !Text -> ResolverThat's 'NotLoaded
+    -- | Like 'ResolverCustom', but after loading the build-plan, so we
+    -- have a hash. This is necessary in order to identify the location
+    -- files are stored for the resolver.
+    ResolverCustomLoaded :: !Text -> !Text -> !Text -> ResolverThat's 'Loaded
 
-  | ResolverCompiler !CompilerVersion
-  -- ^ Require a specific compiler version, but otherwise provide no build plan.
-  -- Intended for use cases where end user wishes to specify all upstream
-  -- dependencies manually, such as using a dependency solver.
+deriving instance Show (ResolverThat's k)
 
-  | ResolverCustom !Text !Text
-  -- ^ A custom resolver based on the given name and URL. This file is assumed
-  -- to be completely immutable.
-  deriving (Show)
-
-instance ToJSON Resolver where
-    toJSON (ResolverCustom name location) = object
-        [ "name" .= name
-        , "location" .= location
-        ]
-    toJSON x = toJSON $ resolverName x
-instance FromJSON (WithJSONWarnings Resolver) where
+instance ToJSON (ResolverThat's k) where
+    toJSON x = case x of
+        ResolverSnapshot{} -> toJSON $ resolverName x
+        ResolverCompiler{} -> toJSON $ resolverName x
+        ResolverCustom n l -> handleCustom n l
+        ResolverCustomLoaded n l _ -> handleCustom n l
+      where
+        handleCustom n l = object
+             [ "name" .= n
+             , "location" .= l
+             ]
+instance FromJSON (WithJSONWarnings (ResolverThat's 'NotLoaded)) where
     -- Strange structuring is to give consistent error messages
     parseJSON v@(Object _) = withObjectWarnings "Resolver" (\o -> ResolverCustom
         <$> o ..: "name"
@@ -678,10 +706,22 @@ instance FromJSON (WithJSONWarnings Resolver) where
 
 -- | Convert a Resolver into its @Text@ representation, as will be used by
 -- directory names
-resolverName :: Resolver -> Text
+resolverDirName :: LoadedResolver -> Text
+resolverDirName (ResolverSnapshot name) = renderSnapName name
+resolverDirName (ResolverCompiler v) = compilerVersionText v
+resolverDirName (ResolverCustomLoaded name _ hash) = "custom-" <> name <> "-" <> hash
+
+-- | Convert a Resolver into its @Text@ representation for human
+-- presentation.
+resolverName :: ResolverThat's l -> Text
 resolverName (ResolverSnapshot name) = renderSnapName name
 resolverName (ResolverCompiler v) = compilerVersionText v
 resolverName (ResolverCustom name _) = "custom-" <> name
+resolverName (ResolverCustomLoaded name _ _) = "custom-" <> name
+
+customResolverHash :: LoadedResolver-> Maybe Text
+customResolverHash (ResolverCustomLoaded _ _ hash) = Just hash
+customResolverHash _ = Nothing
 
 -- | Try to parse a @Resolver@ from a @Text@. Won't work for complex resolvers (like custom).
 parseResolverText :: MonadThrow m => Text -> m Resolver
@@ -689,6 +729,12 @@ parseResolverText t
     | Right x <- parseSnapName t = return $ ResolverSnapshot x
     | Just v <- parseCompilerVersion t = return $ ResolverCompiler v
     | otherwise = throwM $ ParseResolverException t
+
+toResolverNotLoaded :: LoadedResolver -> Resolver
+toResolverNotLoaded r = case r of
+    ResolverSnapshot s -> ResolverSnapshot s
+    ResolverCompiler v -> ResolverCompiler v
+    ResolverCustomLoaded n l _ -> ResolverCustom n l
 
 -- | Class for environment values which have access to the stack root
 class HasStackRoot env where
@@ -1028,7 +1074,7 @@ data ConfigException
   | UnableToExtractArchive Text (Path Abs File)
   | BadStackVersionException VersionRange
   | NoMatchingSnapshot (NonEmpty SnapName)
-  | ResolverMismatch Resolver String
+  | forall l. ResolverMismatch (ResolverThat's l) String
   | ResolverPartial Resolver String
   | NoSuchDirectory FilePath
   | ParseGHCVariantException String
@@ -1253,7 +1299,7 @@ platformSnapAndCompilerRel
 platformSnapAndCompilerRel = do
     bc <- asks getBuildConfig
     platform <- platformGhcRelDir
-    name <- parseRelDir $ T.unpack $ resolverName $ bcResolver bc
+    name <- parseRelDir $ T.unpack $ resolverDirName $ bcResolver bc
     ghc <- compilerVersionDir
     useShaPathOnWindows (platform </> name </> ghc)
 

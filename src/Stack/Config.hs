@@ -512,24 +512,15 @@ loadBuildConfig mproject config mresolver mcompiler = do
             , projectCompiler = mcompiler <|> projectCompiler project'
             }
 
-    wantedCompiler <-
-        case projectCompiler project of
-            Just wantedCompiler -> return wantedCompiler
-            Nothing -> case projectResolver project of
-                ResolverSnapshot snapName -> do
-                    mbp <- runReaderT (loadMiniBuildPlan snapName) miniConfig
-                    return $ mbpCompilerVersion mbp
-                ResolverCustom _name url -> do
-                    mbp <- runReaderT (parseCustomMiniBuildPlan (Just stackYamlFP) url) miniConfig
-                    return $ mbpCompilerVersion mbp
-                ResolverCompiler wantedCompiler -> return wantedCompiler
+    (mbp, loadedResolver) <- flip runReaderT miniConfig $
+        loadResolver (Just stackYamlFP) (projectResolver project)
 
     extraPackageDBs <- mapM resolveDir' (projectExtraPackageDBs project)
 
     return BuildConfig
         { bcConfig = config
-        , bcResolver = projectResolver project
-        , bcWantedCompiler = wantedCompiler
+        , bcResolver = loadedResolver
+        , bcWantedMiniBuildPlan = mbp
         , bcPackageEntries = projectPackages project
         , bcExtraDeps = projectExtraDeps project
         , bcExtraPackageDBs = extraPackageDBs
