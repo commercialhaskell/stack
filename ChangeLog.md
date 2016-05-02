@@ -8,6 +8,14 @@ Major changes:
 
 Behavior changes:
 
+Other enhancements:
+
+Bug fixes:
+
+## 1.1.0
+
+Behavior changes:
+
 * Snapshot packages are no longer built with executable profiling. See
   [#1179](https://github.com/commercialhaskell/stack/issues/1179).
 * `stack init` now ignores symlinks when searching for cabal files. It also now
