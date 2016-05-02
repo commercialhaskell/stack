@@ -144,7 +144,7 @@ Other enhancements:
   work [#1358](https://github.com/commercialhaskell/stack/issues/1358).
 * Docker: strip suffix from docker --version.
   [#1653](https://github.com/commercialhaskell/stack/issues/1653)
-* Docker: pass USER and PWD environment bariables into container.
+* Docker: pass USER and PWD environment variables into container.
 * On each run, stack will test the stack root directory (~/.stack), and the
   project and package work directories (.stack-work) for whether they are
   owned by the current user and abort if they are not. This precaution can
