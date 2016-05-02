@@ -1,4 +1,3 @@
-{-# LANGUAGE CPP                #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE FlexibleInstances  #-}
 {-# LANGUAGE OverloadedStrings  #-}
@@ -16,9 +15,8 @@ Portability : POSIX
 module Stack.Types.Sig
        (Signature(..), Fingerprint, mkFingerprint, SigException(..)) where
 
-#if __GLASGOW_HASKELL__ < 710
-import           Control.Applicative ((<$>))
-#endif
+import Prelude ()
+import Prelude.Compat
 
 import           Control.Exception (Exception)
 import           Data.Aeson (Value(..), ToJSON(..), FromJSON(..))

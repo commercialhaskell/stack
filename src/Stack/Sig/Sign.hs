@@ -16,9 +16,8 @@ Portability : POSIX
 
 module Stack.Sig.Sign (sign, signPackage, signTarBytes) where
 
-#if __GLASGOW_HASKELL__ < 710
-import           Control.Applicative (Applicative(..))
-#endif
+import Prelude ()
+import Prelude.Compat
 
 import qualified Codec.Archive.Tar as Tar
 import qualified Codec.Compression.GZip as GZip

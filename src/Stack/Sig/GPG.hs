@@ -1,6 +1,4 @@
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TupleSections #-}
 
 {-|
@@ -15,9 +13,8 @@ Portability : POSIX
 
 module Stack.Sig.GPG (gpgSign, gpgVerify) where
 
-#if __GLASGOW_HASKELL__ < 710
-import           Control.Applicative ((<$>), (<*>))
-#endif
+import Prelude ()
+import Prelude.Compat
 
 import           Control.Monad.Catch (MonadThrow, throwM)
 import           Control.Monad.IO.Class (MonadIO, liftIO)

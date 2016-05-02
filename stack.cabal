@@ -143,6 +143,7 @@ library
                    , async >= 2.0.2 && < 2.2
                    , attoparsec >= 0.12.1.5 && < 0.14
                    , base >= 4.7 && <5
+                   , base-compat >=0.6 && <0.10
                    , base16-bytestring
                    , base64-bytestring
                    , binary >= 0.7
@@ -187,6 +188,7 @@ library
                    , pretty >= 1.1.1.1
                    , process >= 1.2.0.0
                    , resourcet >= 1.1.4.1
+                   , regex-applicative-text >=0.1.0.1 && <0.2
                    , retry >= 0.6 && < 0.8
                    , safe >= 0.3
                    , semigroups >= 0.5 && < 0.19
