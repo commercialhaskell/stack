@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -9,7 +10,6 @@
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE ViewPatterns #-}
-{-# LANGUAGE CPP #-}
 
 -- | Dealing with Cabal.
 
@@ -37,21 +37,19 @@ module Stack.Package
   ,cabalFilePackageId)
   where
 
-#if __GLASGOW_HASKELL__ < 710
-import           Control.Applicative (Applicative, (<$>), (<*>))
-#endif
+import Prelude ()
+import Prelude.Compat
 
 import           Control.Arrow ((&&&))
 import           Control.Exception hiding (try,catch)
-import           Control.Monad
+import           Control.Monad (liftM, liftM2, (<=<), when, forM)
 import           Control.Monad.Catch
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger (MonadLogger,logWarn)
-import           Control.Monad.Reader
+import           Control.Monad.Reader (MonadReader,runReaderT,ask,asks)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Char8 as C8
-import           Data.Function
-import           Data.List
+import           Data.List.Compat
 import           Data.List.Extra (nubOrd)
 import           Data.Map.Strict (Map)
 import qualified Data.Map.Strict as M
@@ -85,7 +83,6 @@ import           Path as FL
 import           Path.Extra
 import           Path.Find
 import           Path.IO hiding (findFiles)
-import           Prelude
 import           Safe (headDef, tailSafe)
 import           Stack.Build.Installed
 import           Stack.Constants

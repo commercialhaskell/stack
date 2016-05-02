@@ -12,19 +12,26 @@ module Stack.Solver
     , mergeConstraints
     , solveExtraDeps
     , solveResolverSpec
+    -- * Internal - for tests
+    , parseCabalOutputLine
     ) where
+
+import Prelude ()
+import Prelude.Compat
 
 import           Control.Applicative
 import           Control.Exception (assert)
 import           Control.Exception.Enclosed  (tryIO)
+import           Control.Monad               (when,void,join,liftM,unless,zipWithM_)
 import           Control.Monad.Catch
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
-import           Control.Monad.Reader
+import           Control.Monad.Reader        (MonadReader, asks)
 import           Control.Monad.Trans.Control
 import           Data.Aeson.Extended         ( WithJSONWarnings(..), object, (.=), toJSON
                                              , logJSONWarnings)
 import qualified Data.ByteString             as S
+import           Data.Char                   (isSpace)
 import           Data.Either
 import           Data.Function               (on)
 import qualified Data.HashMap.Strict         as HashMap
@@ -43,16 +50,16 @@ import           Data.Text.Encoding          (decodeUtf8, encodeUtf8)
 import           Data.Text.Encoding.Error    (lenientDecode)
 import qualified Data.Text.Lazy              as LT
 import           Data.Text.Lazy.Encoding     (decodeUtf8With)
+import           Data.Tuple                  (swap)
 import qualified Data.Yaml                   as Yaml
 import qualified Distribution.Package        as C
 import qualified Distribution.PackageDescription as C
 import qualified Distribution.Text           as C
 import           Network.HTTP.Client.Conduit (HasHttpManager)
+import           Text.Regex.Applicative.Text (match, sym, psym, anySym, few)
 import           Path
 import           Path.Find                   (findFiles)
 import           Path.IO                     hiding (findExecutable, findFiles)
-import           Prelude
-import           Safe                        (headMay)
 import           Stack.BuildPlan
 import           Stack.Constants             (stackDotYaml)
 import           Stack.Package               (printCabalFileWarning
@@ -67,6 +74,7 @@ import           Stack.Types.Internal        ( HasTerminal
 import qualified System.Directory            as D
 import qualified System.FilePath             as FP
 import           System.Process.Read
+
 
 data ConstraintType = Constraint | Preference deriving (Eq)
 type ConstraintSpec = Map PackageName (Version, Map FlagName Bool)
@@ -164,49 +172,13 @@ cabalSolver menv cabalfps constraintType
                $ dropWhile (not . T.isPrefixOf "In order, ")
                $ T.lines
                $ decodeUtf8 bs
-            (errs, pairs) = partitionEithers $ map parseLine ls
+            (errs, pairs) = partitionEithers $ map parseCabalOutputLine ls
         if null errs
           then return $ Right (Map.fromList pairs)
           else error $ "The following lines from cabal-install output could \
                        \not be parsed: \n"
                        ++ (T.unpack (T.intercalate "\n" errs))
 
-    -- An ugly parser to extract module id and flags
-    parseLine :: Text -> Either Text (PackageName, (Version, Map FlagName Bool))
-    parseLine t0 = maybe (Left t0) Right $ do
-        -- Sample outputs to parse:
-        -- text-1.2.1.1 (latest: 1.2.2.0) -integer-simple (via: parsec-3.1.9) (new package))
-        -- hspec-snap-1.0.0.0 *test (via: servant-snap-0.5) (new package)
-        -- time-locale-compat-0.1.1.1 -old-locale (via: http-api-data-0.2.2) (new package))
-
-        if (not $ T.null t0) then do
-            ident':rest <- Just $ T.words t0
-            PackageIdentifier name version <-
-                parsePackageIdentifierFromString $ T.unpack ident'
-
-            nextWord <- headMay rest
-            rest' <- case T.head nextWord of
-                '(' -> Just $ dropWhile (")" `T.isSuffixOf`) rest
-                '*' -> Just $ dropWhile ("*" `T.isPrefixOf`) rest
-                '+' -> Just rest
-                '-' -> Just rest
-                _ -> Nothing
-
-            let fl = takeWhile (not . ("(" `T.isPrefixOf`)) rest'
-            flags <- mapM parseFlag fl
-            Just (name, (version, Map.fromList flags))
-        else Nothing
-
-    parseFlag :: Text -> Maybe (FlagName, Bool)
-    parseFlag t0 = do
-        (fl, st) <- case T.head t0 of
-                '-' -> Just $ (T.tail t0, False)
-                '+' -> Just $ (T.tail t0, True)
-                _   -> Nothing
-        if (not $ T.null fl) then do
-            flag <- parseFlagNameFromString $ T.unpack fl
-            return (flag, st)
-        else Nothing
 
     toConstraintArgs userFlagMap =
         [formatFlagConstraint package flag enabled
@@ -226,6 +198,33 @@ cabalSolver menv cabalfps constraintType
     -- keep the src package flags unchanged
     -- TODO - this should be done only for manual flags.
     flagConstraints Preference = fmap snd srcConstraints
+
+
+    -- An ugly parser to extract module id and flags
+parseCabalOutputLine :: Text -> Either Text (PackageName, (Version, Map FlagName Bool))
+parseCabalOutputLine t0 = maybe (Left t0) Right . join .  match re $ t0
+    -- Sample outputs to parse:
+    -- text-1.2.1.1 (latest: 1.2.2.0) -integer-simple (via: parsec-3.1.9) (new package))
+    -- hspec-snap-1.0.0.0 *test (via: servant-snap-0.5) (new package)
+    -- time-locale-compat-0.1.1.1 -old-locale (via: http-api-data-0.2.2) (new package))
+    -- flowdock-rest-0.2.0.0 -aeson-compat *test (via: haxl-fxtra-0.0.0.0) (new package)
+  where
+    re = mk <$> some (psym $ not . isSpace) <*> many (lexeme reMaybeFlag)
+
+    reMaybeFlag = 
+        (\s -> Just (True, s))  <$ sym '+' <*> some (psym $ not . isSpace) <|>
+        (\s -> Just (False, s)) <$ sym '-' <*> some (psym $ not . isSpace) <|>
+        Nothing <$ sym '*' <* some (psym $ not . isSpace) <|>
+        Nothing <$ sym '(' <* few anySym <* sym ')'
+
+    mk :: String -> [Maybe (Bool, String)] -> Maybe (PackageName, (Version, Map FlagName Bool))
+    mk ident fl = do
+        PackageIdentifier name version <-
+            parsePackageIdentifierFromString ident
+        fl' <- (traverse . traverse) parseFlagNameFromString $ catMaybes fl
+        return (name, (version, Map.fromList $ map swap fl'))
+
+    lexeme r = some (psym isSpace) *> r
 
 getCabalConfig :: (MonadLogger m, MonadReader env m, HasConfig env, MonadIO m, MonadThrow m)
                => FilePath -- ^ temp dir

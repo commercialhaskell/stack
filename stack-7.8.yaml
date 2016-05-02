@@ -45,3 +45,4 @@ extra-deps:
 - x509-system-1.6.3
 - http-client-tls-0.2.4
 - connection-0.2.5
+- regex-applicative-text-0.1.0.1
