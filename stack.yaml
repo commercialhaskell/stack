@@ -12,6 +12,7 @@ nix:
   packages:
     - zlib
 extra-deps:
+- Cabal-1.24.0.0
 - hpack-0.14.0
 - path-io-1.1.0
 - th-lift-instances-0.1.7
