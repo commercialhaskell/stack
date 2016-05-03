@@ -26,7 +26,7 @@ To create a signed binary package, you need:
 To create signed Windows executables, you also need:
 
 - `signtool.exe`, which is installed with the
-  [Windows SDK](microsoft.com/en-us/download/confirmation.aspx?id=8279).
+  [Windows SDK](http://microsoft.com/en-us/download/confirmation.aspx?id=8279).
 - "FP Complete, Corporation" code signing key installed. See
   [instructions for creating one with StartSSL](https://forum.startcom.org/viewtopic.php?p=5480&sid=143a360f30427e979f6c5b05c2df82cc#p5480).
 
