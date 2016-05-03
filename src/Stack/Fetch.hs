@@ -326,7 +326,7 @@ withCabalLoader menv inner = do
                  -> IO ByteString
         doLookup ident = do
             caches <- loadCaches
-            eres <- unlift $ lookupPackageIdentifierExact ident env cachesCurr
+            eres <- unlift $ lookupPackageIdentifierExact ident env caches
             case eres of
                 Just bs -> return bs
                 -- Update the cache and try again
