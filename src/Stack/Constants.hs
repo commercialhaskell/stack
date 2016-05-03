@@ -209,7 +209,7 @@ stackRootOptionName = "stack-root"
 
 -- | Deprecated option name for the global stack root.
 --
--- Deprecated since stack-1.0.5.
+-- Deprecated since stack-1.1.0.
 --
 -- TODO: Remove occurences of this variable and use 'stackRootOptionName' only
 -- after an appropriate deprecation period.
