@@ -60,6 +60,7 @@ library
                      Data.Binary.VersionTagged
                      Data.IORef.RunOnce
                      Data.Maybe.Extra
+                     Data.Monoid.Extra
                      Distribution.Version.Extra
                      Network.HTTP.Download
                      Network.HTTP.Download.Verified
@@ -168,6 +169,7 @@ library
                    , filelock >= 0.1.0.1
                    , filepath >= 1.3.0.2
                    , fsnotify >= 0.2.1
+                   , generic-deriving
                    , hashable >= 1.2.3.2
                    , hit
                    , hpc

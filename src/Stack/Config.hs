@@ -58,7 +58,7 @@ import qualified Data.IntMap as IntMap
 import           Data.IORef (newIORef)
 import qualified Data.Map as Map
 import           Data.Maybe
-import           Data.Monoid
+import           Data.Monoid.Extra
 import qualified Data.Text as T
 import           Data.Text.Encoding (encodeUtf8, decodeUtf8, decodeUtf8With)
 import           Data.Text.Encoding.Error (lenientDecode)
@@ -200,16 +200,16 @@ configFromConfigMonoid
     -> ConfigMonoid
     -> m Config
 configFromConfigMonoid configStackRoot configUserConfigPath mresolver mproject configMonoid@ConfigMonoid{..} = do
-     configWorkDir <- parseRelDir (fromMaybe ".stack-work" configMonoidWorkDir)
+     configWorkDir <- parseRelDir (fromFirst ".stack-work" configMonoidWorkDir)
      -- This code is to handle the deprecation of latest-snapshot-url
-     configUrls <- case (configMonoidLatestSnapshotUrl, urlsMonoidLatestSnapshot configMonoidUrls) of
+     configUrls <- case (getFirst configMonoidLatestSnapshotUrl, getFirst (urlsMonoidLatestSnapshot configMonoidUrls)) of
          (Just url, Nothing) -> do
              $logWarn "The latest-snapshot-url field is deprecated in favor of 'urls' configuration"
              return (urlsFromMonoid configMonoidUrls) { urlsLatestSnapshot = url }
          _ -> return (urlsFromMonoid configMonoidUrls)
-     let configConnectionCount = fromMaybe 8 configMonoidConnectionCount
-         configHideTHLoading = fromMaybe True configMonoidHideTHLoading
-         configPackageIndices = fromMaybe
+     let configConnectionCount = fromFirst 8 configMonoidConnectionCount
+         configHideTHLoading = fromFirst True configMonoidHideTHLoading
+         configPackageIndices = fromFirst
             [PackageIndex
                 { indexName = IndexName "Hackage"
                 , indexLocation = ILGitHttp
@@ -221,12 +221,12 @@ configFromConfigMonoid configStackRoot configUserConfigPath mresolver mproject c
                 }]
             configMonoidPackageIndices
 
-         configGHCVariant0 = configMonoidGHCVariant
+         configGHCVariant0 = getFirst configMonoidGHCVariant
 
-         configSystemGHC = fromMaybe (isNothing configGHCVariant0) configMonoidSystemGHC
-         configInstallGHC = fromMaybe False configMonoidInstallGHC
-         configSkipGHCCheck = fromMaybe False configMonoidSkipGHCCheck
-         configSkipMsys = fromMaybe False configMonoidSkipMsys
+         configSystemGHC = fromFirst (isNothing configGHCVariant0) configMonoidSystemGHC
+         configInstallGHC = fromFirst False configMonoidInstallGHC
+         configSkipGHCCheck = fromFirst False configMonoidSkipGHCCheck
+         configSkipMsys = fromFirst False configMonoidSkipMsys
 
          configExtraIncludeDirs = configMonoidExtraIncludeDirs
          configExtraLibDirs = configMonoidExtraLibDirs
@@ -235,18 +235,18 @@ configFromConfigMonoid configStackRoot configUserConfigPath mresolver mproject c
          -- in the future, allow it to be configured.
          (Platform defArch defOS) = buildPlatform
          arch = fromMaybe defArch
-              $ configMonoidArch >>= Distribution.Text.simpleParse
+              $ (getFirst configMonoidArch) >>= Distribution.Text.simpleParse
          os = fromMaybe defOS
-            $ configMonoidOS >>= Distribution.Text.simpleParse
+            $ (getFirst configMonoidOS) >>= Distribution.Text.simpleParse
          configPlatform = Platform arch os
 
-         configRequireStackVersion = simplifyVersionRange configMonoidRequireStackVersion
+         configRequireStackVersion = simplifyVersionRange (getIntersectingVersionRange configMonoidRequireStackVersion)
 
          configConfigMonoid = configMonoid
 
          configImage = Image.imgOptsFromMonoid configMonoidImageOpts
 
-         configCompilerCheck = fromMaybe MatchMinor configMonoidCompilerCheck
+         configCompilerCheck = fromFirst MatchMinor configMonoidCompilerCheck
 
      configPlatformVariant <- liftIO $
          maybe PlatformVariantNone PlatformVariant <$> lookupEnv platformVariantEnvVar
@@ -274,7 +274,7 @@ configFromConfigMonoid configStackRoot configUserConfigPath mresolver mproject c
      let configLocalPrograms = configLocalProgramsBase </> platformOnlyDir
 
      configLocalBin <-
-         case configMonoidLocalBinPath of
+         case getFirst configMonoidLocalBinPath of
              Nothing -> do
                  localDir <- getAppUserDataDir "local"
                  return $ localDir </> $(mkRelDir "bin")
@@ -291,25 +291,25 @@ configFromConfigMonoid configStackRoot configUserConfigPath mresolver mproject c
                  const (throwM (NoSuchDirectory userPath))
 
      configJobs <-
-        case configMonoidJobs of
+        case getFirst configMonoidJobs of
             Nothing -> liftIO getNumProcessors
             Just i -> return i
-     let configConcurrentTests = fromMaybe True configMonoidConcurrentTests
+     let configConcurrentTests = fromFirst True configMonoidConcurrentTests
 
      let configTemplateParams = configMonoidTemplateParameters
-         configScmInit = configMonoidScmInit
-         configGhcOptions = configMonoidGhcOptions
+         configScmInit = getFirst configMonoidScmInit
+         configGhcOptions = getCliOptionMap configMonoidGhcOptions
          configSetupInfoLocations = configMonoidSetupInfoLocations
-         configPvpBounds = fromMaybe PvpBoundsNone configMonoidPvpBounds
-         configModifyCodePage = fromMaybe True configMonoidModifyCodePage
+         configPvpBounds = fromFirst PvpBoundsNone configMonoidPvpBounds
+         configModifyCodePage = fromFirst True configMonoidModifyCodePage
          configExplicitSetupDeps = configMonoidExplicitSetupDeps
-         configRebuildGhcOptions = fromMaybe False configMonoidRebuildGhcOptions
-         configApplyGhcOptions = fromMaybe AGOLocals configMonoidApplyGhcOptions
-         configAllowNewer = fromMaybe False configMonoidAllowNewer
-         configDefaultTemplate = configMonoidDefaultTemplate
+         configRebuildGhcOptions = fromFirst False configMonoidRebuildGhcOptions
+         configApplyGhcOptions = fromFirst AGOLocals configMonoidApplyGhcOptions
+         configAllowNewer = fromFirst False configMonoidAllowNewer
+         configDefaultTemplate = getFirst configMonoidDefaultTemplate
 
      configAllowDifferentUser <-
-        case configMonoidAllowDifferentUser of
+        case getFirst configMonoidAllowDifferentUser of
             Just True -> return True
             _ -> getInContainer
 
@@ -404,7 +404,7 @@ loadConfig configArgs mstackYaml mresolver = do
             -- non-project config files' existence of a docker section should never default docker
             -- to enabled, so make it look like they didn't exist
             map (\c -> c {configMonoidDockerOpts =
-                              (configMonoidDockerOpts c) {dockerMonoidDefaultEnable = False}})
+                              (configMonoidDockerOpts c) {dockerMonoidDefaultEnable = Any False}})
                 extraConfigs0
     mproject <- loadProjectConfig mstackYaml
 
@@ -654,7 +654,7 @@ determineStackRootAndOwnership
     -> m (Path Abs Dir, Bool)
 determineStackRootAndOwnership clArgs = do
     stackRoot <- do
-        case configMonoidStackRoot clArgs of
+        case getFirst (configMonoidStackRoot clArgs) of
             Just x -> return x
             Nothing -> do
                 mstackRoot <- liftIO $ lookupEnv stackRootEnvVar

@@ -1013,8 +1013,8 @@ loadGhcjsEnvConfig :: (MonadIO m, HasHttpManager r, MonadReader r m, HasTerminal
 loadGhcjsEnvConfig stackYaml binPath = runInnerStackLoggingT $ do
     lc <- loadConfig
         (mempty
-            { configMonoidInstallGHC = Just True
-            , configMonoidLocalBinPath = Just (toFilePath binPath)
+            { configMonoidInstallGHC = First (Just True)
+            , configMonoidLocalBinPath = First (Just (toFilePath binPath))
             })
         (Just stackYaml)
         Nothing

@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveGeneric         #-}
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings     #-}
@@ -34,6 +35,8 @@ import           Data.Text.Encoding (decodeUtf8With)
 import           Data.Text.Encoding.Error (lenientDecode)
 import qualified Distribution.Package as Cabal
 import qualified Distribution.Version as Cabal
+import           GHC.Generics (Generic)
+import           Generics.Deriving.Monoid (memptydefault, mappenddefault)
 import           Network.HTTP.Client.Conduit (HasHttpManager)
 import           Prelude hiding (pi, writeFile)
 import           Stack.Build.Cache
@@ -85,10 +88,10 @@ data W = W
     -- ^ Packages which count as dependencies
     , wWarnings :: !([Text] -> [Text])
     -- ^ Warnings
-    }
+    } deriving Generic
 instance Monoid W where
-    mempty = W mempty mempty mempty mempty mempty
-    mappend (W a b c d e) (W w x y z z') = W (mappend a w) (mappend b x) (mappend c y) (mappend d z) (mappend e z')
+    mempty = memptydefault
+    mappend = mappenddefault
 
 type M = RWST
     Ctx

@@ -1,4 +1,8 @@
-{-# LANGUAGE OverloadedStrings, RecordWildCards, TemplateHaskell, TupleSections #-}
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TupleSections #-}
 
 -- | Extensions to Aeson parsing of objects.
 module Data.Aeson.Extended (
@@ -37,6 +41,8 @@ import Data.Text (unpack, Text)
 import qualified Data.Text as T
 import Data.Traversable
 import qualified Data.Traversable as Traversable
+import GHC.Generics (Generic)
+import Generics.Deriving.Monoid (mappenddefault, memptydefault)
 import Prelude -- Fix redundant import warnings
 
 -- | Extends @.:@ warning to include field name.
@@ -143,24 +149,19 @@ type WarningParser a = WriterT WarningParserMonoid Parser a
 data WarningParserMonoid = WarningParserMonoid
     { wpmExpectedFields :: !(Set Text)
     , wpmWarnings :: [JSONWarning]
-    }
+    } deriving Generic
 instance Monoid WarningParserMonoid where
-    mempty = WarningParserMonoid Set.empty []
-    mappend a b =
-        WarningParserMonoid
-        { wpmExpectedFields = Set.union
-              (wpmExpectedFields a)
-              (wpmExpectedFields b)
-        , wpmWarnings = wpmWarnings a ++ wpmWarnings b
-        }
+    mempty = memptydefault
+    mappend = mappenddefault
 
 -- Parsed JSON value with its warnings
 data WithJSONWarnings a = WithJSONWarnings a [JSONWarning]
+    deriving Generic
 instance Functor WithJSONWarnings where
     fmap f (WithJSONWarnings x w) = WithJSONWarnings (f x) w
 instance Monoid a => Monoid (WithJSONWarnings a) where
-    mempty = noJSONWarnings mempty
-    mappend (WithJSONWarnings a aw) (WithJSONWarnings b bw) = WithJSONWarnings (mappend a b) (mappend aw bw)
+    mempty = memptydefault
+    mappend = mappenddefault
 
 -- | Warning output from 'WarningParser'.
 data JSONWarning = JSONUnrecognizedFields String [Text]

@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
@@ -31,6 +32,8 @@ import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import           Distribution.System (Platform (..))
 import qualified Distribution.System as Cabal
+import           GHC.Generics (Generic)
+import           Generics.Deriving.Monoid (mappenddefault, memptydefault)
 import           Path
 import           Path.Extra (toFilePathNoTrailingSep)
 import           Path.IO
@@ -167,13 +170,10 @@ data ExtraDirs = ExtraDirs
     { edBins :: ![FilePath]
     , edInclude :: ![FilePath]
     , edLib :: ![FilePath]
-    } deriving (Show)
+    } deriving (Show, Generic)
 instance Monoid ExtraDirs where
-    mempty = ExtraDirs [] [] []
-    mappend (ExtraDirs a b c) (ExtraDirs x y z) = ExtraDirs
-        (a ++ x)
-        (b ++ y)
-        (c ++ z)
+    mempty = memptydefault
+    mappend = mappenddefault
 
 installDir :: (MonadReader env m, HasConfig env, MonadThrow m, MonadLogger m)
            => Path Abs Dir

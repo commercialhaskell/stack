@@ -1,4 +1,7 @@
-{-# LANGUAGE OverloadedStrings, FlexibleInstances, RecordWildCards #-}
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards #-}
 
 -- | Docker types.
 
@@ -13,6 +16,8 @@ import Data.Text (Text)
 import qualified Data.Text as T
 import Distribution.Text (simpleParse)
 import Distribution.Version (anyVersion)
+import GHC.Generics (Generic)
+import Generics.Deriving.Monoid (mappenddefault, memptydefault)
 import Path
 import Stack.Types.Version
 
@@ -58,26 +63,26 @@ data DockerOpts = DockerOpts
 -- | An uninterpreted representation of docker options.
 -- Configurations may be "cascaded" using mappend (left-biased).
 data DockerOptsMonoid = DockerOptsMonoid
-  {dockerMonoidDefaultEnable :: !Bool
+  {dockerMonoidDefaultEnable :: !Any
     -- ^ Should Docker be defaulted to enabled (does @docker:@ section exist in the config)?
-  ,dockerMonoidEnable :: !(Maybe Bool)
+  ,dockerMonoidEnable :: !(First Bool)
     -- ^ Is using Docker enabled?
-  ,dockerMonoidRepoOrImage :: !(Maybe DockerMonoidRepoOrImage)
+  ,dockerMonoidRepoOrImage :: !(First DockerMonoidRepoOrImage)
     -- ^ Docker repository name (e.g. @fpco/stack-build@ or @fpco/stack-full:lts-2.8@)
-  ,dockerMonoidRegistryLogin :: !(Maybe Bool)
+  ,dockerMonoidRegistryLogin :: !(First Bool)
     -- ^ Does registry require login for pulls?
-  ,dockerMonoidRegistryUsername :: !(Maybe String)
+  ,dockerMonoidRegistryUsername :: !(First String)
     -- ^ Optional username for Docker registry.
-  ,dockerMonoidRegistryPassword :: !(Maybe String)
+  ,dockerMonoidRegistryPassword :: !(First String)
     -- ^ Optional password for Docker registry.
-  ,dockerMonoidAutoPull :: !(Maybe Bool)
+  ,dockerMonoidAutoPull :: !(First Bool)
     -- ^ Automatically pull new images.
-  ,dockerMonoidDetach :: !(Maybe Bool)
+  ,dockerMonoidDetach :: !(First Bool)
     -- ^ Whether to run a detached container
-  ,dockerMonoidPersist :: !(Maybe Bool)
+  ,dockerMonoidPersist :: !(First Bool)
     -- ^ Create a persistent container (don't remove it when finished).  Implied by
     -- `dockerDetach`.
-  ,dockerMonoidContainerName :: !(Maybe String)
+  ,dockerMonoidContainerName :: !(First String)
     -- ^ Container name to use, only makes sense from command-line with `dockerPersist`
     -- or `dockerDetach`.
   ,dockerMonoidRunArgs :: ![String]
@@ -86,86 +91,49 @@ data DockerOptsMonoid = DockerOptsMonoid
     -- ^ Volumes to mount in the container
   ,dockerMonoidEnv :: ![String]
     -- ^ Environment variables to set in the container
-  ,dockerMonoidDatabasePath :: !(Maybe String)
+  ,dockerMonoidDatabasePath :: !(First String)
     -- ^ Location of image usage database.
-  ,dockerMonoidStackExe :: !(Maybe String)
+  ,dockerMonoidStackExe :: !(First String)
     -- ^ Location of container-compatible stack executable
-  ,dockerMonoidSetUser :: !(Maybe Bool)
+  ,dockerMonoidSetUser :: !(First Bool)
    -- ^ Set in-container user to match host's
-  ,dockerMonoidRequireDockerVersion :: !VersionRange
+  ,dockerMonoidRequireDockerVersion :: !IntersectingVersionRange
   -- ^ See: 'dockerRequireDockerVersion'
   }
-  deriving (Show)
+  deriving (Show, Generic)
 
 -- | Decode uninterpreted docker options from JSON/YAML.
 instance FromJSON (WithJSONWarnings DockerOptsMonoid) where
   parseJSON = withObjectWarnings "DockerOptsMonoid"
-    (\o -> do dockerMonoidDefaultEnable    <- pure True
-              dockerMonoidEnable           <- o ..:? dockerEnableArgName
-              dockerMonoidRepoOrImage      <- ((Just . DockerMonoidImage) <$> o ..: dockerImageArgName) <|>
+    (\o -> do dockerMonoidDefaultEnable    <- pure (Any True)
+              dockerMonoidEnable           <- First <$> o ..:? dockerEnableArgName
+              dockerMonoidRepoOrImage      <- First <$>
+                                              (((Just . DockerMonoidImage) <$> o ..: dockerImageArgName) <|>
                                               ((Just . DockerMonoidRepo) <$> o ..: dockerRepoArgName) <|>
-                                              pure Nothing
-              dockerMonoidRegistryLogin    <- o ..:? dockerRegistryLoginArgName
-              dockerMonoidRegistryUsername <- o ..:? dockerRegistryUsernameArgName
-              dockerMonoidRegistryPassword <- o ..:? dockerRegistryPasswordArgName
-              dockerMonoidAutoPull         <- o ..:? dockerAutoPullArgName
-              dockerMonoidDetach           <- o ..:? dockerDetachArgName
-              dockerMonoidPersist          <- o ..:? dockerPersistArgName
-              dockerMonoidContainerName    <- o ..:? dockerContainerNameArgName
+                                              pure Nothing)
+              dockerMonoidRegistryLogin    <- First <$> o ..:? dockerRegistryLoginArgName
+              dockerMonoidRegistryUsername <- First <$> o ..:? dockerRegistryUsernameArgName
+              dockerMonoidRegistryPassword <- First <$> o ..:? dockerRegistryPasswordArgName
+              dockerMonoidAutoPull         <- First <$> o ..:? dockerAutoPullArgName
+              dockerMonoidDetach           <- First <$> o ..:? dockerDetachArgName
+              dockerMonoidPersist          <- First <$> o ..:? dockerPersistArgName
+              dockerMonoidContainerName    <- First <$> o ..:? dockerContainerNameArgName
               dockerMonoidRunArgs          <- o ..:? dockerRunArgsArgName ..!= []
               dockerMonoidMount            <- o ..:? dockerMountArgName ..!= []
               dockerMonoidEnv              <- o ..:? dockerEnvArgName ..!= []
-              dockerMonoidDatabasePath     <- o ..:? dockerDatabasePathArgName
-              dockerMonoidStackExe         <- o ..:? dockerStackExeArgName
-              dockerMonoidSetUser          <- o ..:? dockerSetUserArgName
+              dockerMonoidDatabasePath     <- First <$> o ..:? dockerDatabasePathArgName
+              dockerMonoidStackExe         <- First <$> o ..:? dockerStackExeArgName
+              dockerMonoidSetUser          <- First <$> o ..:? dockerSetUserArgName
               dockerMonoidRequireDockerVersion
-                                           <- unVersionRangeJSON <$>
+                                           <- IntersectingVersionRange <$> unVersionRangeJSON <$>
                                                  o ..:? dockerRequireDockerVersionArgName
                                                    ..!= VersionRangeJSON anyVersion
               return DockerOptsMonoid{..})
 
 -- | Left-biased combine Docker options
 instance Monoid DockerOptsMonoid where
-  mempty = DockerOptsMonoid
-    {dockerMonoidDefaultEnable    = False
-    ,dockerMonoidEnable           = Nothing
-    ,dockerMonoidRepoOrImage      = Nothing
-    ,dockerMonoidRegistryLogin    = Nothing
-    ,dockerMonoidRegistryUsername = Nothing
-    ,dockerMonoidRegistryPassword = Nothing
-    ,dockerMonoidAutoPull         = Nothing
-    ,dockerMonoidDetach           = Nothing
-    ,dockerMonoidPersist          = Nothing
-    ,dockerMonoidContainerName    = Nothing
-    ,dockerMonoidRunArgs          = []
-    ,dockerMonoidMount            = []
-    ,dockerMonoidEnv              = []
-    ,dockerMonoidDatabasePath     = Nothing
-    ,dockerMonoidStackExe         = Nothing
-    ,dockerMonoidSetUser          = Nothing
-    ,dockerMonoidRequireDockerVersion = anyVersion
-    }
-  mappend l r = DockerOptsMonoid
-    {dockerMonoidDefaultEnable    = dockerMonoidDefaultEnable l || dockerMonoidDefaultEnable r
-    ,dockerMonoidEnable           = dockerMonoidEnable l <|> dockerMonoidEnable r
-    ,dockerMonoidRepoOrImage      = dockerMonoidRepoOrImage l <|> dockerMonoidRepoOrImage r
-    ,dockerMonoidRegistryLogin    = dockerMonoidRegistryLogin l <|> dockerMonoidRegistryLogin r
-    ,dockerMonoidRegistryUsername = dockerMonoidRegistryUsername l <|> dockerMonoidRegistryUsername r
-    ,dockerMonoidRegistryPassword = dockerMonoidRegistryPassword l <|> dockerMonoidRegistryPassword r
-    ,dockerMonoidAutoPull         = dockerMonoidAutoPull l <|> dockerMonoidAutoPull r
-    ,dockerMonoidDetach           = dockerMonoidDetach l <|> dockerMonoidDetach r
-    ,dockerMonoidPersist          = dockerMonoidPersist l <|> dockerMonoidPersist r
-    ,dockerMonoidContainerName    = dockerMonoidContainerName l <|> dockerMonoidContainerName r
-    ,dockerMonoidRunArgs          = dockerMonoidRunArgs r <> dockerMonoidRunArgs l
-    ,dockerMonoidMount            = dockerMonoidMount r <> dockerMonoidMount l
-    ,dockerMonoidEnv              = dockerMonoidEnv r <> dockerMonoidEnv l
-    ,dockerMonoidDatabasePath     = dockerMonoidDatabasePath l <|> dockerMonoidDatabasePath r
-    ,dockerMonoidStackExe         = dockerMonoidStackExe l <|> dockerMonoidStackExe r
-    ,dockerMonoidSetUser          = dockerMonoidSetUser l <|> dockerMonoidSetUser r
-    ,dockerMonoidRequireDockerVersion
-                                  = intersectVersionRanges (dockerMonoidRequireDockerVersion l)
-                                                           (dockerMonoidRequireDockerVersion r)
-    }
+  mempty = memptydefault
+  mappend = mappenddefault
 
 -- | Where to get the `stack` executable to run in Docker containers
 data DockerStackExe

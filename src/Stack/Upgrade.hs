@@ -13,7 +13,7 @@ import           Control.Monad.Trans.Control
 import           Data.Foldable               (forM_)
 import qualified Data.Map                    as Map
 import           Data.Maybe                  (isNothing)
-import           Data.Monoid                 ((<>))
+import           Data.Monoid.Extra
 import qualified Data.Monoid
 import qualified Data.Text as T
 import           Lens.Micro                  (set)
@@ -94,7 +94,7 @@ upgrade gitRepo mresolver builtHash =
         bconfig <- runInnerStackLoggingT $ do
             lc <- loadConfig
                 (configConfigMonoid config <> Data.Monoid.mempty
-                    { configMonoidInstallGHC = Just True
+                    { configMonoidInstallGHC = First (Just True)
                     })
                 (Just $ dir </> $(mkRelFile "stack.yaml"))
                 mresolver

@@ -3,14 +3,14 @@
 module Stack.Config.Urls (urlsFromMonoid) where
 
 import           Stack.Types
-import           Data.Maybe
+import           Data.Monoid.Extra
 
 urlsFromMonoid :: UrlsMonoid -> Urls
 urlsFromMonoid monoid =
     Urls
-        (fromMaybe defaultLatestSnapshot    $ urlsMonoidLatestSnapshot    monoid)
-        (fromMaybe defaultLtsBuildPlans     $ urlsMonoidLtsBuildPlans     monoid)
-        (fromMaybe defaultNightlyBuildPlans $ urlsMonoidNightlyBuildPlans monoid)
+        (fromFirst defaultLatestSnapshot    $ urlsMonoidLatestSnapshot    monoid)
+        (fromFirst defaultLtsBuildPlans     $ urlsMonoidLtsBuildPlans     monoid)
+        (fromFirst defaultNightlyBuildPlans $ urlsMonoidNightlyBuildPlans monoid)
     where
     defaultLatestSnapshot =
         "https://www.stackage.org/download/snapshots.json"
