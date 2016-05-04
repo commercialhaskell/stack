@@ -8,6 +8,7 @@ import Control.Monad
 import Control.Monad.Catch (throwM, MonadThrow)
 import Data.List (find)
 import Data.Maybe
+import Data.Monoid.Extra
 import qualified Data.Text as T
 import Data.Typeable (Typeable)
 import Distribution.Version (simplifyVersionRange)
@@ -24,7 +25,7 @@ dockerOptsFromMonoid
     -> m DockerOpts
 dockerOptsFromMonoid mproject stackRoot maresolver DockerOptsMonoid{..} = do
     let dockerEnable =
-            fromMaybe dockerMonoidDefaultEnable dockerMonoidEnable
+            fromFirst (getAny dockerMonoidDefaultEnable) dockerMonoidEnable
         dockerImage =
             let mresolver =
                     case maresolver of
@@ -47,7 +48,7 @@ dockerOptsFromMonoid mproject stackRoot maresolver DockerOptsMonoid{..} = do
                                     throw
                                         (ResolverNotSupportedException $
                                          show resolver)
-            in case dockerMonoidRepoOrImage of
+            in case getFirst dockerMonoidRepoOrImage of
                    Nothing -> "fpco/stack-build" ++ defaultTag
                    Just (DockerMonoidImage image) -> image
                    Just (DockerMonoidRepo repo) ->
@@ -57,29 +58,30 @@ dockerOptsFromMonoid mproject stackRoot maresolver DockerOptsMonoid{..} = do
                                repo
                            Nothing -> repo ++ defaultTag
         dockerRegistryLogin =
-            fromMaybe
-                (isJust (emptyToNothing dockerMonoidRegistryUsername))
+            fromFirst
+                (isJust (emptyToNothing (getFirst dockerMonoidRegistryUsername)))
                 dockerMonoidRegistryLogin
-        dockerRegistryUsername = emptyToNothing dockerMonoidRegistryUsername
-        dockerRegistryPassword = emptyToNothing dockerMonoidRegistryPassword
-        dockerAutoPull = fromMaybe False dockerMonoidAutoPull
-        dockerDetach = fromMaybe False dockerMonoidDetach
-        dockerPersist = fromMaybe False dockerMonoidPersist
-        dockerContainerName = emptyToNothing dockerMonoidContainerName
+        dockerRegistryUsername = emptyToNothing (getFirst dockerMonoidRegistryUsername)
+        dockerRegistryPassword = emptyToNothing (getFirst dockerMonoidRegistryPassword)
+        dockerAutoPull = fromFirst False dockerMonoidAutoPull
+        dockerDetach = fromFirst False dockerMonoidDetach
+        dockerPersist = fromFirst False dockerMonoidPersist
+        dockerContainerName = emptyToNothing (getFirst dockerMonoidContainerName)
         dockerRunArgs = dockerMonoidRunArgs
         dockerMount = dockerMonoidMount
         dockerEnv = dockerMonoidEnv
-        dockerSetUser = dockerMonoidSetUser
-        dockerRequireDockerVersion = simplifyVersionRange dockerMonoidRequireDockerVersion
+        dockerSetUser = getFirst dockerMonoidSetUser
+        dockerRequireDockerVersion =
+            simplifyVersionRange (getIntersectingVersionRange dockerMonoidRequireDockerVersion)
     dockerDatabasePath <-
-        case dockerMonoidDatabasePath of
+        case getFirst dockerMonoidDatabasePath of
             Nothing -> return $ stackRoot </> $(mkRelFile "docker.db")
             Just fp ->
                 case parseAbsFile fp of
                     Left e -> throwM (InvalidDatabasePathException e)
                     Right p -> return p
     dockerStackExe <-
-        case dockerMonoidStackExe of
+        case getFirst dockerMonoidStackExe of
             Just e -> liftM Just (parseDockerStackExe e)
             Nothing -> return Nothing
     return DockerOpts{..}

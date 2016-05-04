@@ -4,15 +4,18 @@ module Options.Applicative.Builder.Extra
   (boolFlags
   ,boolFlagsNoDefault
   ,maybeBoolFlags
+  ,firstBoolFlags
   ,enableDisableFlags
   ,enableDisableFlagsNoDefault
   ,extraHelpOption
   ,execExtraHelp
   ,textOption
-  ,textArgument)
-  where
+  ,textArgument
+  ,optionalFirst
+  ) where
 
 import Control.Monad (when)
+import Data.Monoid
 import Options.Applicative
 import Options.Applicative.Types (readerAsk)
 import System.Environment (withArgs)
@@ -41,6 +44,10 @@ maybeBoolFlags :: String                       -- ^ Flag name
                -> Mod FlagFields (Maybe Bool)
                -> Parser (Maybe Bool)
 maybeBoolFlags = enableDisableFlags Nothing (Just True) (Just False)
+
+-- | Like 'maybeBoolFlags', but parsing a 'First'.
+firstBoolFlags :: String -> String -> Mod FlagFields (Maybe Bool) -> Parser (First Bool)
+firstBoolFlags long0 help0 mod0 = First <$> maybeBoolFlags long0 help0 mod0
 
 -- | Enable/disable flags for any type.
 enableDisableFlags :: (Eq a)
@@ -127,3 +134,7 @@ textOption = option (T.pack <$> readerAsk)
 -- | 'argument', specialized to 'Text'.
 textArgument :: Mod ArgumentFields Text -> Parser Text
 textArgument = argument (T.pack <$> readerAsk)
+
+-- | Like 'optional', but returning a 'First'.
+optionalFirst :: Alternative f => f a -> f (First a)
+optionalFirst = fmap First . optional

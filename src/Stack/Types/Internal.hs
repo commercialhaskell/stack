@@ -6,6 +6,7 @@ module Stack.Types.Internal where
 
 import Control.Concurrent.MVar
 import Control.Monad.Logger (LogLevel)
+import Data.Monoid.Extra
 import Data.Text (Text)
 import Lens.Micro
 import Network.HTTP.Client.Conduit (Manager,HasHttpManager(..))
@@ -80,21 +81,21 @@ envEnvConfig = lens (envConfig)
                     (\s t -> s {envConfig = t})
 
 buildOptsMonoidHaddock :: Lens' BuildOptsMonoid (Maybe Bool)
-buildOptsMonoidHaddock = lens (buildMonoidHaddock)
-                            (\buildMonoid t -> buildMonoid {buildMonoidHaddock = t})
+buildOptsMonoidHaddock = lens (getFirst . buildMonoidHaddock)
+                            (\buildMonoid t -> buildMonoid {buildMonoidHaddock = First t})
 
 buildOptsMonoidTests :: Lens' BuildOptsMonoid (Maybe Bool)
-buildOptsMonoidTests = lens (buildMonoidTests)
-                            (\buildMonoid t -> buildMonoid {buildMonoidTests = t})
+buildOptsMonoidTests = lens (getFirst . buildMonoidTests)
+                            (\buildMonoid t -> buildMonoid {buildMonoidTests = First t})
 
 buildOptsMonoidBenchmarks :: Lens' BuildOptsMonoid (Maybe Bool)
-buildOptsMonoidBenchmarks = lens (buildMonoidBenchmarks)
-                            (\buildMonoid t -> buildMonoid {buildMonoidBenchmarks = t})
+buildOptsMonoidBenchmarks = lens (getFirst . buildMonoidBenchmarks)
+                            (\buildMonoid t -> buildMonoid {buildMonoidBenchmarks = First t})
 
 buildOptsMonoidInstallExes :: Lens' BuildOptsMonoid (Maybe Bool)
 buildOptsMonoidInstallExes =
-  lens (buildMonoidInstallExes)
-       (\buildMonoid t -> buildMonoid {buildMonoidInstallExes = t})
+  lens (getFirst . buildMonoidInstallExes)
+       (\buildMonoid t -> buildMonoid {buildMonoidInstallExes = First t})
 
 buildOptsInstallExes :: Lens' BuildOpts Bool
 buildOptsInstallExes =

@@ -3,48 +3,48 @@
 -- | Build configuration
 module Stack.Config.Build where
 
-import           Data.Maybe          (fromMaybe)
+import           Data.Monoid.Extra
 import           Stack.Types
 
 -- | Interprets BuildOptsMonoid options.
 buildOptsFromMonoid :: BuildOptsMonoid -> BuildOpts
 buildOptsFromMonoid BuildOptsMonoid{..} = BuildOpts
-    { boptsLibProfile = fromMaybe
+    { boptsLibProfile = fromFirst
           (boptsLibProfile defaultBuildOpts)
           buildMonoidLibProfile
-    , boptsExeProfile = fromMaybe
+    , boptsExeProfile = fromFirst
           (boptsExeProfile defaultBuildOpts)
           buildMonoidExeProfile
-    , boptsHaddock = fromMaybe
+    , boptsHaddock = fromFirst
           (boptsHaddock defaultBuildOpts)
           buildMonoidHaddock
-    , boptsOpenHaddocks = fromMaybe
+    , boptsOpenHaddocks = fromFirst
           (boptsOpenHaddocks defaultBuildOpts)
           buildMonoidOpenHaddocks
-    , boptsHaddockDeps = buildMonoidHaddockDeps
-    , boptsInstallExes = fromMaybe
+    , boptsHaddockDeps = getFirst buildMonoidHaddockDeps
+    , boptsInstallExes = fromFirst
           (boptsInstallExes defaultBuildOpts)
           buildMonoidInstallExes
-    , boptsPreFetch = fromMaybe
+    , boptsPreFetch = fromFirst
           (boptsPreFetch defaultBuildOpts)
           buildMonoidPreFetch
-    , boptsKeepGoing = buildMonoidKeepGoing
-    , boptsForceDirty = fromMaybe
+    , boptsKeepGoing = getFirst buildMonoidKeepGoing
+    , boptsForceDirty = fromFirst
           (boptsForceDirty defaultBuildOpts)
           buildMonoidForceDirty
-    , boptsTests = fromMaybe (boptsTests defaultBuildOpts) buildMonoidTests
+    , boptsTests = fromFirst (boptsTests defaultBuildOpts) buildMonoidTests
     , boptsTestOpts = testOptsFromMonoid buildMonoidTestOpts
-    , boptsBenchmarks = fromMaybe
+    , boptsBenchmarks = fromFirst
           (boptsBenchmarks defaultBuildOpts)
           buildMonoidBenchmarks
     , boptsBenchmarkOpts = benchmarkOptsFromMonoid buildMonoidBenchmarkOpts
-    , boptsReconfigure = fromMaybe
+    , boptsReconfigure = fromFirst
           (boptsReconfigure defaultBuildOpts)
           buildMonoidReconfigure
-    , boptsCabalVerbose = fromMaybe
+    , boptsCabalVerbose = fromFirst
           (boptsCabalVerbose defaultBuildOpts)
           buildMonoidCabalVerbose
-    , boptsSplitObjs = fromMaybe
+    , boptsSplitObjs = fromFirst
           (boptsSplitObjs defaultBuildOpts)
           buildMonoidSplitObjs
     }
@@ -52,17 +52,17 @@ buildOptsFromMonoid BuildOptsMonoid{..} = BuildOpts
 testOptsFromMonoid :: TestOptsMonoid -> TestOpts
 testOptsFromMonoid TestOptsMonoid{..} =
     defaultTestOpts
-    { toRerunTests = fromMaybe (toRerunTests defaultTestOpts) toMonoidRerunTests
+    { toRerunTests = fromFirst (toRerunTests defaultTestOpts) toMonoidRerunTests
     , toAdditionalArgs = toMonoidAdditionalArgs
-    , toCoverage = fromMaybe (toCoverage defaultTestOpts) toMonoidCoverage
-    , toDisableRun = fromMaybe (toDisableRun defaultTestOpts) toMonoidDisableRun
+    , toCoverage = fromFirst (toCoverage defaultTestOpts) toMonoidCoverage
+    , toDisableRun = fromFirst (toDisableRun defaultTestOpts) toMonoidDisableRun
     }
 
 benchmarkOptsFromMonoid :: BenchmarkOptsMonoid -> BenchmarkOpts
 benchmarkOptsFromMonoid BenchmarkOptsMonoid{..} =
     defaultBenchmarkOpts
-    { beoAdditionalArgs = beoMonoidAdditionalArgs
-    , beoDisableRun = fromMaybe
+    { beoAdditionalArgs = getFirst beoMonoidAdditionalArgs
+    , beoDisableRun = fromFirst
           (beoDisableRun defaultBenchmarkOpts)
           beoMonoidDisableRun
     }

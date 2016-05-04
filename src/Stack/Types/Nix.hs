@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
@@ -10,6 +11,8 @@ import Control.Applicative
 import Data.Aeson.Extended
 import Data.Text (Text)
 import Data.Monoid
+import GHC.Generics (Generic)
+import Generics.Deriving.Monoid (mappenddefault, memptydefault)
 import Prelude
 
 -- | Nix configuration. Parameterize by resolver type to avoid cyclic
@@ -29,55 +32,39 @@ data NixOpts = NixOpts
 -- | An uninterpreted representation of nix options.
 -- Configurations may be "cascaded" using mappend (left-biased).
 data NixOptsMonoid = NixOptsMonoid
-  {nixMonoidDefaultEnable :: !Bool
+  {nixMonoidDefaultEnable :: !Any
     -- ^ Should nix-shell be defaulted to enabled (does @nix:@ section exist in the config)?
-  ,nixMonoidEnable :: !(Maybe Bool)
+  ,nixMonoidEnable :: !(First Bool)
     -- ^ Is using nix-shell enabled?
-  ,nixMonoidPureShell :: !(Maybe Bool)
+  ,nixMonoidPureShell :: !(First Bool)
     -- ^ Should the nix-shell be pure
-  ,nixMonoidPackages :: !(Maybe [Text])
+  ,nixMonoidPackages :: !(First [Text])
     -- ^ System packages to use (given to nix-shell)
-  ,nixMonoidInitFile :: !(Maybe FilePath)
+  ,nixMonoidInitFile :: !(First FilePath)
     -- ^ The path of a file containing preconfiguration of the environment (e.g shell.nix)
-  ,nixMonoidShellOptions :: !(Maybe [Text])
+  ,nixMonoidShellOptions :: !(First [Text])
     -- ^ Options to be given to the nix-shell command line
-  ,nixMonoidPath :: !(Maybe [Text])
+  ,nixMonoidPath :: !(First [Text])
     -- ^ Override parts of NIX_PATH (notably 'nixpkgs')
   }
-  deriving (Eq, Show)
+  deriving (Eq, Show, Generic)
 
 -- | Decode uninterpreted nix options from JSON/YAML.
 instance FromJSON (WithJSONWarnings NixOptsMonoid) where
   parseJSON = withObjectWarnings "NixOptsMonoid"
-    (\o -> do nixMonoidDefaultEnable <- pure False
-              nixMonoidEnable        <- o ..:? nixEnableArgName
-              nixMonoidPureShell     <- o ..:? nixPureShellArgName
-              nixMonoidPackages      <- o ..:? nixPackagesArgName
-              nixMonoidInitFile      <- o ..:? nixInitFileArgName
-              nixMonoidShellOptions  <- o ..:? nixShellOptsArgName
-              nixMonoidPath          <- o ..:? nixPathArgName
+    (\o -> do nixMonoidDefaultEnable <- pure (Any False)
+              nixMonoidEnable        <- First <$> o ..:? nixEnableArgName
+              nixMonoidPureShell     <- First <$> o ..:? nixPureShellArgName
+              nixMonoidPackages      <- First <$> o ..:? nixPackagesArgName
+              nixMonoidInitFile      <- First <$> o ..:? nixInitFileArgName
+              nixMonoidShellOptions  <- First <$> o ..:? nixShellOptsArgName
+              nixMonoidPath          <- First <$> o ..:? nixPathArgName
               return NixOptsMonoid{..})
 
 -- | Left-biased combine Nix options
 instance Monoid NixOptsMonoid where
-  mempty = NixOptsMonoid
-    {nixMonoidDefaultEnable = False
-    ,nixMonoidEnable        = Nothing
-    ,nixMonoidPureShell     = Nothing
-    ,nixMonoidPackages      = Nothing
-    ,nixMonoidInitFile      = Nothing
-    ,nixMonoidShellOptions  = Nothing
-    ,nixMonoidPath          = Nothing
-    }
-  mappend l r = NixOptsMonoid
-    {nixMonoidDefaultEnable = nixMonoidDefaultEnable l || nixMonoidDefaultEnable r
-    ,nixMonoidEnable        = nixMonoidEnable l <|> nixMonoidEnable r
-    ,nixMonoidPureShell     = nixMonoidPureShell l <|> nixMonoidPureShell r
-    ,nixMonoidPackages      = nixMonoidPackages l <|> nixMonoidPackages r
-    ,nixMonoidInitFile      = nixMonoidInitFile l <|> nixMonoidInitFile r
-    ,nixMonoidShellOptions  = nixMonoidShellOptions l <|> nixMonoidShellOptions r
-    ,nixMonoidPath          = nixMonoidPath l <|> nixMonoidPath r
-    }
+  mempty = memptydefault
+  mappend = mappenddefault
 
 -- | Nix enable argument name.
 nixEnableArgName :: Text

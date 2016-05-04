@@ -11,6 +11,7 @@
 module Stack.Types.Version
   (Version
   ,Cabal.VersionRange -- TODO in the future should have a newtype wrapper
+  ,IntersectingVersionRange(..)
   ,VersionCheck(..)
   ,versionParser
   ,parseVersion
@@ -41,6 +42,7 @@ import           Data.List
 import           Data.Map (Map)
 import qualified Data.Map as Map
 import           Data.Maybe (listToMaybe)
+import           Data.Monoid
 import           Data.Set (Set)
 import qualified Data.Set as Set
 import           Data.Text (Text)
@@ -104,6 +106,15 @@ instance FromJSON a => FromJSON (Map Version a) where
         go (k, v) = do
             k' <- either (fail . show) return $ parseVersionFromString k
             return (k', v)
+
+newtype IntersectingVersionRange =
+    IntersectingVersionRange { getIntersectingVersionRange :: Cabal.VersionRange }
+    deriving Show
+
+instance Monoid IntersectingVersionRange where
+    mempty = IntersectingVersionRange Cabal.anyVersion
+    mappend (IntersectingVersionRange l) (IntersectingVersionRange r) =
+        IntersectingVersionRange (l `Cabal.intersectVersionRanges` r)
 
 -- | Attoparsec parser for a package version.
 versionParser :: Parser Version

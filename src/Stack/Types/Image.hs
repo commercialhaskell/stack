@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
@@ -11,6 +12,8 @@ import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Maybe (maybeToList)
 import Data.Text (Text)
+import GHC.Generics (Generic)
+import Generics.Deriving.Monoid (mappenddefault, memptydefault)
 import Prelude -- Fix redundant import warnings
 
 -- | Image options. Currently only Docker image options.
@@ -37,7 +40,7 @@ data ImageDockerOpts = ImageDockerOpts
 
 data ImageOptsMonoid = ImageOptsMonoid
     { imgMonoidDockers :: ![ImageDockerOpts]
-    } deriving (Show)
+    } deriving (Show, Generic)
 
 instance FromJSON (WithJSONWarnings ImageOptsMonoid) where
     parseJSON = withObjectWarnings
@@ -52,12 +55,8 @@ instance FromJSON (WithJSONWarnings ImageOptsMonoid) where
                          })
 
 instance Monoid ImageOptsMonoid where
-    mempty = ImageOptsMonoid
-        { imgMonoidDockers = []
-        }
-    mappend l r = ImageOptsMonoid
-        { imgMonoidDockers = imgMonoidDockers l <> imgMonoidDockers r
-        }
+    mempty = memptydefault
+    mappend = mappenddefault
 
 instance FromJSON (WithJSONWarnings ImageDockerOpts) where
     parseJSON = withObjectWarnings

@@ -1,4 +1,6 @@
-{-# LANGUAGE OverloadedStrings, FlexibleInstances #-}
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module Stack.Types.Urls where
 
@@ -6,6 +8,8 @@ import Control.Applicative
 import Data.Aeson.Extended
 import Data.Text (Text)
 import Data.Monoid
+import GHC.Generics (Generic)
+import Generics.Deriving.Monoid (memptydefault, mappenddefault)
 import Prelude
 
 data Urls = Urls
@@ -24,11 +28,11 @@ instance FromJSON (WithJSONWarnings Urls) where
             <*> o ..: "nightly-build-plans"
 
 data UrlsMonoid = UrlsMonoid
-    { urlsMonoidLatestSnapshot :: !(Maybe Text)
-    , urlsMonoidLtsBuildPlans :: !(Maybe Text)
-    , urlsMonoidNightlyBuildPlans :: !(Maybe Text)
+    { urlsMonoidLatestSnapshot :: !(First Text)
+    , urlsMonoidLtsBuildPlans :: !(First Text)
+    , urlsMonoidNightlyBuildPlans :: !(First Text)
     }
-    deriving Show
+    deriving (Show, Generic)
 
 instance FromJSON (WithJSONWarnings UrlsMonoid) where
     parseJSON = withObjectWarnings "UrlsMonoid" $ \o -> do
@@ -38,9 +42,5 @@ instance FromJSON (WithJSONWarnings UrlsMonoid) where
             <*> o ..: "nightly-build-plans"
 
 instance Monoid UrlsMonoid where
-    mempty = UrlsMonoid Nothing Nothing Nothing
-    mappend l r = UrlsMonoid
-      { urlsMonoidLatestSnapshot = urlsMonoidLatestSnapshot l <|> urlsMonoidLatestSnapshot r
-      , urlsMonoidLtsBuildPlans = urlsMonoidLtsBuildPlans l <|> urlsMonoidLtsBuildPlans r
-      , urlsMonoidNightlyBuildPlans = urlsMonoidNightlyBuildPlans l <|> urlsMonoidNightlyBuildPlans r
-      }
+    mempty = memptydefault
+    mappend = mappenddefault

@@ -36,7 +36,7 @@ import qualified Data.Map                          as Map
 import           Data.Map.Strict                   (Map)
 import qualified Data.Map.Strict                   as M
 import           Data.Maybe
-import           Data.Monoid
+import           Data.Monoid.Extra
 import qualified Data.Set                          as Set
 import qualified Data.Text                         as T
 import           Data.Text.Read                    (decimal)
@@ -77,12 +77,12 @@ data GlobalOptsContext
 -- FIXME hiding options
 benchOptsParser :: Bool -> Parser BenchmarkOptsMonoid
 benchOptsParser hide0 = BenchmarkOptsMonoid
-        <$> optional (strOption (long "benchmark-arguments" <>
+        <$> optionalFirst (strOption (long "benchmark-arguments" <>
                                  metavar "BENCH_ARGS" <>
                                  help ("Forward BENCH_ARGS to the benchmark suite. " <>
                                        "Supports templates from `cabal bench`") <>
                                  hide))
-        <*> optional (switch (long "no-run-benchmarks" <>
+        <*> optionalFirst (switch (long "no-run-benchmarks" <>
                           help "Disable running of benchmarks. (Benchmarks will still be built.)" <>
                              hide))
    where hide = hideMods hide0
@@ -222,14 +222,14 @@ configOptsParser hide0 =
         , configMonoidModifyCodePage = modifyCodePage
         , configMonoidAllowDifferentUser = allowDifferentUser
         })
-    <$> optional (option readAbsDir
+    <$> optionalFirst (option readAbsDir
             ( long stackRootOptionName
             <> metavar (map toUpper stackRootOptionName)
             <> help ("Absolute path to the global stack root directory " ++
                      "(Overrides any STACK_ROOT environment variable)")
             <> hide
             ))
-    <*> optional (strOption
+    <*> optionalFirst (strOption
             ( long "work-dir"
             <> metavar "WORK-DIR"
             <> help "Override work directory (default: .stack-work)"
@@ -238,28 +238,28 @@ configOptsParser hide0 =
     <*> buildOptsMonoidParser (hide0 /= BuildCmdGlobalOpts)
     <*> dockerOptsParser True
     <*> nixOptsParser True
-    <*> maybeBoolFlags
+    <*> firstBoolFlags
             "system-ghc"
             "using the system installed GHC (on the PATH) if available and a matching version"
             hide
-    <*> maybeBoolFlags
+    <*> firstBoolFlags
             "install-ghc"
             "downloading and installing GHC if necessary (can be done manually with stack setup)"
             hide
-    <*> optional (strOption
+    <*> optionalFirst (strOption
             ( long "arch"
            <> metavar "ARCH"
            <> help "System architecture, e.g. i386, x86_64"
            <> hide
             ))
-    <*> optional (strOption
+    <*> optionalFirst (strOption
             ( long "os"
            <> metavar "OS"
            <> help "Operating system, e.g. linux, windows"
            <> hide
             ))
-    <*> optional (ghcVariantParser (hide0 /= OuterGlobalOpts))
-    <*> optional (option auto
+    <*> optionalFirst (ghcVariantParser (hide0 /= OuterGlobalOpts))
+    <*> optionalFirst (option auto
             ( long "jobs"
            <> short 'j'
            <> metavar "JOBS"
@@ -278,25 +278,25 @@ configOptsParser hide0 =
            <> help "Extra directories to check for libraries"
            <> hide
             )))
-    <*> maybeBoolFlags
+    <*> firstBoolFlags
             "skip-ghc-check"
             "skipping the GHC version and architecture check"
             hide
-    <*> maybeBoolFlags
+    <*> firstBoolFlags
             "skip-msys"
             "skipping the local MSYS installation (Windows only)"
             hide
-    <*> optional (strOption
+    <*> optionalFirst (strOption
              ( long "local-bin-path"
             <> metavar "DIR"
             <> help "Install binaries to DIR"
             <> hide
              ))
-    <*> maybeBoolFlags
+    <*> firstBoolFlags
             "modify-code-page"
             "setting the codepage to support UTF-8 (Windows only)"
             hide
-    <*> maybeBoolFlags
+    <*> firstBoolFlags
             "allow-different-user"
             ("permission for users other than the owner of the stack root " ++
                 "directory to use a stack installation (POSIX only)")
@@ -324,11 +324,11 @@ buildOptsMonoidParser hide0 =
         enable opts
           | tracing || profiling =
               opts
-              { buildMonoidLibProfile = Just True
-              , buildMonoidExeProfile = Just True
+              { buildMonoidLibProfile = First (Just True)
+              , buildMonoidExeProfile = First (Just True)
               , buildMonoidBenchmarkOpts = bopts
-                { beoMonoidAdditionalArgs = beoMonoidAdditionalArgs bopts <>
-                  Just (" " <> unwords additionalArgs)
+                { beoMonoidAdditionalArgs = First (getFirst (beoMonoidAdditionalArgs bopts) <>
+                  Just (" " <> unwords additionalArgs))
                 }
               , buildMonoidTestOpts = topts
                 { toMonoidAdditionalArgs = (toMonoidAdditionalArgs topts) <>
@@ -379,69 +379,69 @@ buildOptsMonoidParser hide0 =
         tests <*> testOptsParser hide0 <*> benches <*> benchOptsParser hide0 <*> reconfigure <*>
         cabalVerbose <*> splitObjs
     libProfiling =
-        maybeBoolFlags
+        firstBoolFlags
             "library-profiling"
             "library profiling for TARGETs and all its dependencies"
             hide
     exeProfiling =
-        maybeBoolFlags
+        firstBoolFlags
             "executable-profiling"
             "executable profiling for TARGETs and all its dependencies"
             hide
     haddock =
-        maybeBoolFlags
+        firstBoolFlags
             "haddock"
             "generating Haddocks the package(s) in this directory/configuration"
             hide
     openHaddocks =
-        maybeBoolFlags
+        firstBoolFlags
             "open"
             "opening the local Haddock documentation in the browser"
             hide
     haddockDeps =
-        maybeBoolFlags "haddock-deps" "building Haddocks for dependencies" hide
+        firstBoolFlags "haddock-deps" "building Haddocks for dependencies" hide
     copyBins =
-        maybeBoolFlags
+        firstBoolFlags
             "copy-bins"
             "copying binaries to the local-bin-path (see 'stack path')"
             hide
     keepGoing =
-        maybeBoolFlags
+        firstBoolFlags
             "keep-going"
             "continue running after a step fails (default: false for build, true for test/bench)"
             hide
     preFetch =
-        maybeBoolFlags
+        firstBoolFlags
             "prefetch"
              "Fetch packages necessary for the build immediately, useful with --dry-run"
              hide
     forceDirty =
-        maybeBoolFlags
+        firstBoolFlags
             "force-dirty"
             "Force treating all local packages as having dirty files (useful for cases where stack can't detect a file change"
             hide
     tests =
-        maybeBoolFlags
+        firstBoolFlags
             "test"
             "testing the package(s) in this directory/configuration"
             hide
     benches =
-        maybeBoolFlags
+        firstBoolFlags
             "bench"
             "benchmarking the package(s) in this directory/configuration"
             hide
     reconfigure =
-        maybeBoolFlags
+        firstBoolFlags
              "reconfigure"
              "Perform the configure step even if unnecessary. Useful in some corner cases with custom Setup.hs files"
             hide
     cabalVerbose =
-        maybeBoolFlags
+        firstBoolFlags
             "cabal-verbose"
             "Ask Cabal to be verbose in its output"
             hide
     splitObjs =
-        maybeBoolFlags
+        firstBoolFlags
             "split-objs"
             ("Enable split-objs, to reduce output size (at the cost of build time). " ++ splitObjsWarning)
             hide
@@ -449,77 +449,85 @@ buildOptsMonoidParser hide0 =
 nixOptsParser :: Bool -> Parser NixOptsMonoid
 nixOptsParser hide0 = overrideActivation <$>
   (NixOptsMonoid
-  <$> pure False
-  <*> maybeBoolFlags nixCmdName
+  <$> pure (Any False)
+  <*> firstBoolFlags nixCmdName
                      "use of a Nix-shell"
                      hide
-  <*> maybeBoolFlags "nix-pure"
+  <*> firstBoolFlags "nix-pure"
                      "use of a pure Nix-shell"
                      hide
-  <*> (fmap (map T.pack)
-       <$> optional (argsOption (long "nix-packages" <>
-                                 metavar "NAMES" <>
-                                 help "List of packages that should be available in the nix-shell (space separated)" <>
-                                 hide)))
-  <*> optional (option str (long "nix-shell-file" <>
-                            metavar "FILEPATH" <>
-                            help "Nix file to be used to launch a nix-shell (for regular Nix users)" <>
-                            hide))
-  <*> (fmap (map T.pack)
-       <$> optional (argsOption (long "nix-shell-options" <>
-                                 metavar "OPTIONS" <>
-                                 help "Additional options passed to nix-shell" <>
-                                 hide)))
-  <*> (fmap (map T.pack)
-       <$> optional (argsOption (long "nix-path" <>
-                                 metavar "PATH_OPTIONS" <>
-                                 help "Additional options to override NIX_PATH parts (notably 'nixpkgs')" <>
-                                 hide)))
+  <*> optionalFirst
+          (textArgsOption
+              (long "nix-packages" <>
+               metavar "NAMES" <>
+               help "List of packages that should be available in the nix-shell (space separated)" <>
+               hide))
+  <*> optionalFirst
+          (option
+              str
+              (long "nix-shell-file" <>
+               metavar "FILEPATH" <>
+               help "Nix file to be used to launch a nix-shell (for regular Nix users)" <>
+               hide))
+  <*> optionalFirst
+          (textArgsOption
+              (long "nix-shell-options" <>
+               metavar "OPTIONS" <>
+               help "Additional options passed to nix-shell" <>
+               hide))
+  <*> optionalFirst
+          (textArgsOption
+              (long "nix-path" <>
+               metavar "PATH_OPTIONS" <>
+               help "Additional options to override NIX_PATH parts (notably 'nixpkgs')" <>
+               hide))
   )
   where
     hide = hideMods hide0
     overrideActivation m =
-      if m /= mempty then m { nixMonoidEnable = Just . fromMaybe True $ nixMonoidEnable m }
+      if m /= mempty then m { nixMonoidEnable = (First . Just . fromFirst True) (nixMonoidEnable m) }
       else m
+    textArgsOption = fmap (map T.pack) . argsOption
 
 -- | Options parser configuration for Docker.
 dockerOptsParser :: Bool -> Parser DockerOptsMonoid
 dockerOptsParser hide0 =
     DockerOptsMonoid
-    <$> pure False
-    <*> maybeBoolFlags dockerCmdName
+    <$> pure (Any False)
+    <*> firstBoolFlags dockerCmdName
                        "using a Docker container"
                        hide
-    <*> ((Just . DockerMonoidRepo) <$> option str (long (dockerOptName dockerRepoArgName) <>
-                                                   hide <>
-                                                   metavar "NAME" <>
-                                                   help "Docker repository name") <|>
-         (Just . DockerMonoidImage) <$> option str (long (dockerOptName dockerImageArgName) <>
-                                                    hide <>
-                                                    metavar "IMAGE" <>
-                                                    help "Exact Docker image ID (overrides docker-repo)") <|>
+    <*> fmap First
+           ((Just . DockerMonoidRepo) <$> option str (long (dockerOptName dockerRepoArgName) <>
+                                                     hide <>
+                                                     metavar "NAME" <>
+                                                     help "Docker repository name") <|>
+             (Just . DockerMonoidImage) <$> option str (long (dockerOptName dockerImageArgName) <>
+                                                      hide <>
+                                                      metavar "IMAGE" <>
+                                                      help "Exact Docker image ID (overrides docker-repo)") <|>
          pure Nothing)
-    <*> maybeBoolFlags (dockerOptName dockerRegistryLoginArgName)
+    <*> firstBoolFlags (dockerOptName dockerRegistryLoginArgName)
                        "registry requires login"
                        hide
-    <*> maybeStrOption (long (dockerOptName dockerRegistryUsernameArgName) <>
+    <*> firstStrOption (long (dockerOptName dockerRegistryUsernameArgName) <>
                         hide <>
                         metavar "USERNAME" <>
                         help "Docker registry username")
-    <*> maybeStrOption (long (dockerOptName dockerRegistryPasswordArgName) <>
+    <*> firstStrOption (long (dockerOptName dockerRegistryPasswordArgName) <>
                         hide <>
                         metavar "PASSWORD" <>
                         help "Docker registry password")
-    <*> maybeBoolFlags (dockerOptName dockerAutoPullArgName)
+    <*> firstBoolFlags (dockerOptName dockerAutoPullArgName)
                        "automatic pulling latest version of image"
                        hide
-    <*> maybeBoolFlags (dockerOptName dockerDetachArgName)
+    <*> firstBoolFlags (dockerOptName dockerDetachArgName)
                        "running a detached Docker container"
                        hide
-    <*> maybeBoolFlags (dockerOptName dockerPersistArgName)
+    <*> firstBoolFlags (dockerOptName dockerPersistArgName)
                        "not deleting container after it exits"
                        hide
-    <*> maybeStrOption (long (dockerOptName dockerContainerNameArgName) <>
+    <*> firstStrOption (long (dockerOptName dockerContainerNameArgName) <>
                         hide <>
                         metavar "NAME" <>
                         help "Docker container name")
@@ -538,11 +546,11 @@ dockerOptsParser hide0 =
                                 metavar "NAME=VALUE" <>
                                 help ("Set environment variable in container " ++
                                       "(may specify multiple times)")))
-    <*> maybeStrOption (long (dockerOptName dockerDatabasePathArgName) <>
+    <*> firstStrOption (long (dockerOptName dockerDatabasePathArgName) <>
                         hide <>
                         metavar "PATH" <>
                         help "Location of image usage tracking database")
-    <*> maybeStrOption
+    <*> firstStrOption
             (long(dockerOptName dockerStackExeArgName) <>
              hide <>
              metavar (intercalate "|"
@@ -553,13 +561,13 @@ dockerOptsParser hide0 =
              help (concat [ "Location of "
                           , stackProgName
                           , " executable used in container" ]))
-    <*> maybeBoolFlags (dockerOptName dockerSetUserArgName)
+    <*> firstBoolFlags (dockerOptName dockerSetUserArgName)
                        "setting user in container to match host"
                        hide
-    <*> pure anyVersion
+    <*> pure (IntersectingVersionRange anyVersion)
   where
     dockerOptName optName = dockerCmdName ++ "-" ++ T.unpack optName
-    maybeStrOption = optional . option str
+    firstStrOption = optionalFirst . option str
     hide = hideMods hide0
 
 -- | Parser for docker cleanup arguments.
@@ -715,21 +723,23 @@ execOptsExtraParser = eoPlainParser <|>
 globalOptsParser :: GlobalOptsContext -> Maybe LogLevel -> Parser GlobalOptsMonoid
 globalOptsParser kind defLogLevel =
     GlobalOptsMonoid <$>
-    optional (strOption (long Docker.reExecArgName <> hidden <> internal)) <*>
-    optional (option auto (long dockerEntrypointArgName <> hidden <> internal)) <*>
-    logLevelOptsParser hide0 defLogLevel <*>
+    optionalFirst (strOption (long Docker.reExecArgName <> hidden <> internal)) <*>
+    optionalFirst (option auto (long dockerEntrypointArgName <> hidden <> internal)) <*>
+    (First <$> logLevelOptsParser hide0 defLogLevel) <*>
     configOptsParser kind <*>
-    optional (abstractResolverOptsParser hide0) <*>
-    optional (compilerOptsParser hide0) <*>
-    maybeBoolFlags
+    optionalFirst (abstractResolverOptsParser hide0) <*>
+    optionalFirst (compilerOptsParser hide0) <*>
+    firstBoolFlags
         "terminal"
         "overriding terminal detection in the case of running in a false terminal"
         hide <*>
-    optional (strOption (long "stack-yaml" <>
-                         metavar "STACK-YAML" <>
-                         help ("Override project stack.yaml file " <>
-                               "(overrides any STACK_YAML environment variable)") <>
-                         hide))
+    optionalFirst
+        (strOption
+            (long "stack-yaml" <>
+             metavar "STACK-YAML" <>
+             help ("Override project stack.yaml file " <>
+                   "(overrides any STACK_YAML environment variable)") <>
+             hide))
   where
     hide = hideMods hide0
     hide0 = kind /= OuterGlobalOpts
@@ -737,14 +747,14 @@ globalOptsParser kind defLogLevel =
 -- | Create GlobalOpts from GlobalOptsMonoid.
 globalOptsFromMonoid :: Bool -> GlobalOptsMonoid -> GlobalOpts
 globalOptsFromMonoid defaultTerminal GlobalOptsMonoid{..} = GlobalOpts
-    { globalReExecVersion = globalMonoidReExecVersion
-    , globalDockerEntrypoint = globalMonoidDockerEntrypoint
-    , globalLogLevel = fromMaybe defaultLogLevel globalMonoidLogLevel
+    { globalReExecVersion = getFirst globalMonoidReExecVersion
+    , globalDockerEntrypoint = getFirst globalMonoidDockerEntrypoint
+    , globalLogLevel = fromFirst defaultLogLevel globalMonoidLogLevel
     , globalConfigMonoid = globalMonoidConfigMonoid
-    , globalResolver = globalMonoidResolver
-    , globalCompiler = globalMonoidCompiler
-    , globalTerminal = fromMaybe defaultTerminal globalMonoidTerminal
-    , globalStackYaml = globalMonoidStackYaml }
+    , globalResolver = getFirst globalMonoidResolver
+    , globalCompiler = getFirst globalMonoidCompiler
+    , globalTerminal = fromFirst defaultTerminal globalMonoidTerminal
+    , globalStackYaml = getFirst globalMonoidStackYaml }
 
 initOptsParser :: Parser InitOpts
 initOptsParser =
@@ -864,22 +874,30 @@ solverOptsParser = boolFlags False
 -- | Parser for test arguments.
 -- FIXME hide args
 testOptsParser :: Bool -> Parser TestOptsMonoid
-testOptsParser hide0 = TestOptsMonoid
-       <$> maybeBoolFlags
-                          "rerun-tests"
-                          "running already successful tests"
-                          hide
-       <*> fmap (fromMaybe [])
-                (optional (argsOption(long "test-arguments" <>
-                                      metavar "TEST_ARGS" <>
-                                      help "Arguments passed in to the test suite program"
-                                     <> hide)))
-      <*> optional (switch (long "coverage" <>
-                          help "Generate a code coverage report"
-                          <> hide))
-      <*> optional (switch (long "no-run-tests" <>
-                          help "Disable running of tests. (Tests will still be built.)"
-                          <> hide))
+testOptsParser hide0 =
+    TestOptsMonoid
+        <$> firstBoolFlags
+                "rerun-tests"
+                "running already successful tests"
+                hide
+        <*> fmap
+                (fromMaybe [])
+                (optional
+                    (argsOption
+                        (long "test-arguments" <>
+                         metavar "TEST_ARGS" <>
+                         help "Arguments passed in to the test suite program" <>
+                         hide)))
+        <*> optionalFirst
+                (switch
+                    (long "coverage" <>
+                     help "Generate a code coverage report" <>
+                     hide))
+        <*> optionalFirst
+                (switch
+                    (long "no-run-tests" <>
+                     help "Disable running of tests. (Tests will still be built.)" <>
+                     hide))
    where hide = hideMods hide0
 
 -- | Parser for @stack new@.

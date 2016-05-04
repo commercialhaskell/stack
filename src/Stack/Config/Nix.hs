@@ -9,8 +9,9 @@ module Stack.Config.Nix
 
 import Control.Applicative
 import Control.Monad (join, when)
-import qualified Data.Text as T
 import Data.Maybe
+import Data.Monoid.Extra
+import qualified Data.Text as T
 import Data.Typeable
 import Distribution.System (OS (..))
 import Stack.Types
@@ -25,15 +26,15 @@ nixOptsFromMonoid
     -> OS
     -> m NixOpts
 nixOptsFromMonoid NixOptsMonoid{..} os = do
-    let nixEnable = fromMaybe nixMonoidDefaultEnable nixMonoidEnable
+    let nixEnable = fromFirst (getAny nixMonoidDefaultEnable) nixMonoidEnable
         defaultPure = case os of
           OSX -> False
           _ -> True
-        nixPureShell = fromMaybe defaultPure nixMonoidPureShell
-        nixPackages = fromMaybe [] nixMonoidPackages
-        nixInitFile = nixMonoidInitFile
-        nixShellOptions = fromMaybe [] nixMonoidShellOptions
-                          ++ prefixAll (T.pack "-I") (fromMaybe [] nixMonoidPath)
+        nixPureShell = fromFirst defaultPure nixMonoidPureShell
+        nixPackages = fromFirst [] nixMonoidPackages
+        nixInitFile = getFirst nixMonoidInitFile
+        nixShellOptions = fromFirst [] nixMonoidShellOptions
+                          ++ prefixAll (T.pack "-I") (fromFirst [] nixMonoidPath)
     when (not (null nixPackages) && isJust nixInitFile) $
        throwM NixCannotUseShellFileAndPackagesException
     return NixOpts{..}
