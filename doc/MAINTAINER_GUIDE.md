@@ -129,3 +129,71 @@ for requirements to perform the release, and more details about the tool.
 
 * Keep an eye on the
   [Hackage matrix builder](http://matrix.hackage.haskell.org/package/stack)
+
+## Setting up a Windows VM for releases
+
+These instructions are a bit rough, but has the steps to get the Windows machine
+set up.
+
+ 1. Download VM image:
+    https://developer.microsoft.com/en-us/microsoft-edge/tools/vms/mac/
+
+ 2. Launch the VM using Virtualbox and the image downloaded
+
+ 3. Adjust settings:
+    * Number of CPUs: match the host
+    * Memory: at least 3 GB
+    * Video RAM: the minimum recommended by Virtualbox
+    * Enable 3D and 2D accelerated mode
+    * Enabled shared clipboard (both directions)
+
+ 4. Install the VMware guest additions, and reboot
+
+ 5. Configure a shared folder for your home directory on the host, and mount it on Z:
+
+ 6. Install Windows SDK (for signtool):
+    http://microsoft.com/en-us/download/confirmation.aspx?id=8279
+
+ 7. Install msysgit: https://msysgit.github.io/
+
+ 8. Install nsis-2.46.5-Unicode-setup.exe from http://www.scratchpaper.com/
+
+ 9: Install Stack using the Windows 64-bit installer
+
+10. Visit https://hackage.haskell.org/ in Edge to ensure system has correct CA
+    certificates
+
+11. Get the object code certificate from
+    [password-store](https://github.com/fpco/password-store), in
+    `certificates/code_signing/fpcomplete_corporation_startssl_2015-09-22.pfx`.
+    Double click it in explorer and import it
+
+12. Run in command prompt:
+
+        md C:\p
+        md C:\p\tmp
+        cd \p
+        md c:\tmp
+
+13. Create `C:\p\env.bat`:
+
+        SET STACK_ROOT=C:\p\.sr
+        SET TEMP=C:\p\tmp
+        SET TMP=C:\p\tmp
+        SET PATH=C:\Users\IEUser\AppData\Roaming\local\bin;"c:\Program Files\Git\usr\bin";"C:\Program Files\Microsoft SDKs\Windows\v7.1\Bin";%PATH%
+
+14. Run `C:\p\env.bat` (do this every time you open a new command prompt)
+
+15. Import the `dev@fpcomplete.com` (0x575159689BEFB442) GPG secret key
+
+16. Run in command prompt (adjust the `user.email` and `user.name` settings):
+
+        stack setup
+        stack install cabal-install
+        md %HOMEPATH%\.ssh
+        copy z:\.ssh\id_rsa %HOMEPATH%\.ssh
+        git config --global user.email manny@fpcomplete.com
+        git config --global user.name "Emanuel Borsboom"
+        git config --global push.default simple
+        git clone git@github.com:commercialhaskell/stack.git
+        git clone git@github.com:borsboom/stack-installer.git
