@@ -91,7 +91,6 @@ loadSourceMap needTargets boptsCli = do
     locals <- mapM (loadLocalPackage boptsCli targets) $ Map.toList rawLocals
     checkFlagsUsed boptsCli locals extraDeps0 (mbpPackages mbp0)
     checkComponentsBuildable locals
-    warnAllowNewer mbp0
 
     let
         -- loadLocals returns PackageName (foo) and PackageIdentifier (bar-1.2.3) targets separately;
@@ -205,7 +204,6 @@ parseTargetsFromBuildOpts needTargets boptscli = do
                 return MiniBuildPlan
                     { mbpCompilerVersion = version
                     , mbpPackages = Map.empty
-                    , mbpAllowNewer = False
                     }
             _ -> return (bcWantedMiniBuildPlan bconfig)
     rawLocals <- getLocalPackageViews
@@ -590,21 +588,6 @@ checkComponentsBuildable lps =
         | lp <- lps
         , c <- Set.toList (lpUnbuildable lp)
         ]
-
-warnAllowNewer :: (MonadThrow m, MonadLogger m, MonadReader env m, HasConfig env)
-               => MiniBuildPlan -> m ()
-warnAllowNewer mpb = do
-    -- TODO: Perhaps we should just have the snapshot setting imply
-    -- allow-newer? I just didn't want to make 'configAllowNewer'
-    -- non-authoritative about whether allow-newer is enabled.
-    allowNewer <- asks (configAllowNewer . getConfig)
-    when (mbpAllowNewer mpb && not allowNewer) $ do
-        $logWarn $ T.unlines
-            [ ""
-            , "WARNING: The snapshot specifies that allow-newer needs to be used."
-            , "You should probably add 'allow-newer: true' to suppress this warning."
-            , ""
-            ]
 
 getDefaultPackageConfig :: (MonadIO m, MonadThrow m, MonadCatch m, MonadLogger m, MonadReader env m, HasEnvConfig env)
   => m PackageConfig

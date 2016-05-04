@@ -100,7 +100,6 @@ spec = beforeAll setup $ afterAll teardown $ do
             mkMBP pkgs = MiniBuildPlan
                 { mbpCompilerVersion = GhcVersion version
                 , mbpPackages = Map.fromList pkgs
-                , mbpAllowNewer = False
                 }
             mbpAll = mkMBP [resourcet, conduit, conduitExtra, text, attoparsec, aeson]
             test name input shadowed output extra =

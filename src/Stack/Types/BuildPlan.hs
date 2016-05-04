@@ -424,7 +424,6 @@ instance FromJSON a => FromJSON (Map ExeName a) where
 data MiniBuildPlan = MiniBuildPlan
     { mbpCompilerVersion :: !CompilerVersion
     , mbpPackages :: !(Map PackageName MiniPackageInfo)
-    , mbpAllowNewer :: !Bool
     }
     deriving (Generic, Show, Eq)
 instance Binary MiniBuildPlan

@@ -6,4 +6,3 @@ packages:
 # FIXME: test these here
 flags: {}
 ghc-options: {}
-allow-newer: true

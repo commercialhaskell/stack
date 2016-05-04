@@ -1708,7 +1708,6 @@ data CustomSnapshot = CustomSnapshot
     , csDropPackages :: !(Set PackageName)
     , csFlags :: !PackageFlags
     , csGhcOptions :: !GhcOptions
-    , csAllowNewer :: !(Maybe Bool)
     }
 
 instance FromJSON (WithJSONWarnings (CustomSnapshot, Maybe Resolver)) where
@@ -1718,8 +1717,7 @@ instance FromJSON (WithJSONWarnings (CustomSnapshot, Maybe Resolver)) where
             <*> o ..:? "packages" ..!= mempty
             <*> o ..:? "drop-packages" ..!= mempty
             <*> o ..:? "flags" ..!= mempty
-            <*> o ..:? configMonoidGhcOptionsName ..!= mempty
-            <*> o ..:? configMonoidAllowNewerName)
+            <*> o ..:? configMonoidGhcOptionsName ..!= mempty)
         <*> jsonSubWarningsT (o ..:? "resolver")
 
 newtype GhcOptions = GhcOptions

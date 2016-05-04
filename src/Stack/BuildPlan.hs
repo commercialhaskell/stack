@@ -227,11 +227,10 @@ data ResolveState = ResolveState
 
 toMiniBuildPlan :: (MonadIO m, MonadLogger m, MonadReader env m, HasHttpManager env, MonadMask m, HasConfig env, MonadBaseControl IO m)
                 => CompilerVersion -- ^ Compiler version
-                -> Bool -- ^ Require allow-newer?
                 -> Map PackageName Version -- ^ cores
                 -> Map PackageName (Version, Map FlagName Bool, [Text], Maybe GitSHA1) -- ^ non-core packages
                 -> m MiniBuildPlan
-toMiniBuildPlan compilerVersion requireAllowNewer corePackages packages = do
+toMiniBuildPlan compilerVersion corePackages packages = do
     -- Determine the dependencies of all of the packages in the build plan. We
     -- handle core packages specially, because some of them will not be in the
     -- package index. For those, we allow missing packages to exist, and then
@@ -249,7 +248,6 @@ toMiniBuildPlan compilerVersion requireAllowNewer corePackages packages = do
             , extras
             , Map.fromList $ map goCore $ Set.toList missingCores
             ]
-        , mbpAllowNewer = requireAllowNewer
         }
   where
     goCore (PackageIdentifier name version) = (name, MiniPackageInfo
@@ -437,7 +435,6 @@ loadResolver mconfigPath resolver =
             ( MiniBuildPlan
                 { mbpCompilerVersion = compiler
                 , mbpPackages = mempty
-                , mbpAllowNewer = False
                 }
             , ResolverCompiler compiler
             )
@@ -453,8 +450,6 @@ loadMiniBuildPlan name = do
         bp <- loadBuildPlan name
         toMiniBuildPlan
             (siCompilerVersion $ bpSystemInfo bp)
-            -- TODO: allow-newer in BuildPlan?
-            False
             (siCorePackages $ bpSystemInfo bp)
             (fmap goPP $ bpPackages bp)
   where
@@ -882,8 +877,8 @@ showDepErrors flags errs =
 shadowMiniBuildPlan :: MiniBuildPlan
                     -> Set PackageName
                     -> (MiniBuildPlan, Map PackageName MiniPackageInfo)
-shadowMiniBuildPlan (MiniBuildPlan cv pkgs0 allowNewer) shadowed =
-    (MiniBuildPlan cv (Map.fromList met) allowNewer, Map.fromList unmet)
+shadowMiniBuildPlan (MiniBuildPlan cv pkgs0) shadowed =
+    (MiniBuildPlan cv (Map.fromList met), Map.fromList unmet)
   where
     pkgs1 = Map.difference pkgs0 $ Map.fromSet (\_ -> ()) shadowed
 
@@ -1060,7 +1055,6 @@ parseCustomMiniBuildPlan mconfigPath0 url0 = do
     compilerBuildPlan cv = MiniBuildPlan
          { mbpCompilerVersion = cv
          , mbpPackages = mempty
-         , mbpAllowNewer = False
          }
     getCustomPlanDir = do
         root <- asks $ configStackRoot . getConfig
@@ -1078,7 +1072,6 @@ applyCustomSnapshot cs mbp0 = do
                        dropPackages
                        (PackageFlags flags)
                        ghcOptions
-                       mallowNewer
             = cs
         addFlagsAndOpts :: PackageIdentifier -> (PackageName, (Version, Map FlagName Bool, [Text], Maybe GitSHA1))
         addFlagsAndOpts (PackageIdentifier name ver) =
@@ -1095,9 +1088,8 @@ applyCustomSnapshot cs mbp0 = do
         cv = fromMaybe (mbpCompilerVersion mbp0) mcompilerVersion
         packages0 =
              mbpPackages mbp0 `Map.difference` (Map.fromSet (\_ -> ()) dropPackages)
-    mbp1 <- toMiniBuildPlan cv False mempty packageMap
+    mbp1 <- toMiniBuildPlan cv mempty packageMap
     return $ MiniBuildPlan
         { mbpCompilerVersion = cv
         , mbpPackages = Map.union (mbpPackages mbp1) packages0
-        , mbpAllowNewer = fromMaybe (mbpAllowNewer mbp0) mallowNewer
         }
