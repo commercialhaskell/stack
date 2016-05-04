@@ -14,6 +14,11 @@ Bug fixes:
 
 ## 1.1.0
 
+Release notes:
+
+* Added Ubuntu 16.04 LTS (xenial) Apt repo.
+* No longer uploading new versions to Fedora 21 repo.
+
 Behavior changes:
 
 * Snapshot packages are no longer built with executable profiling. See
@@ -46,11 +51,16 @@ Behavior changes:
   signature verification options.
 * `stack build pkg-1.2.3` will now build even if the snapshot has a different
   package version - it is treated as an extra-dep. `stack build local-pkg-1.2.3`
-  is an error even if the version number matches the local package.
+  is an error even if the version number matches the local package
+  [#2028](https://github.com/commercialhaskell/stack/issues/2028).
 * Having a `nix:` section no longer implies enabling nix build. This allows the
   user to globally configure whether nix is used (unless the project overrides
   the default explicitly). See
   [#1924](https://github.com/commercialhaskell/stack/issues/1924).
+* Remove deprecated valid-wanted field.
+* Docker: mount home directory in container [#1949](https://github.com/commercialhaskell/stack/issues/1949).
+* Deprecate `--local-bin-path` instead `--local-bin`.
+* `stack image`: allow absolute source paths for `add`.
 
 Other enhancements:
 
@@ -58,13 +68,15 @@ Other enhancements:
 * Fix too much rebuilding when enabling/disabling profiling flags.
 * `stack build pkg-1.0` will now build `pkg-1.0` even if the snapshot specifies
   a different version (it introduces a temporary extra-dep)
-* Experimental support for `--split-objs` added.
+* Experimental support for `--split-objs` added
+  [#1284](https://github.com/commercialhaskell/stack/issues/1284).
 * `git` packages with submodules are supported by passing the `--recursive`
   flag to `git clone`.
 * When using [hpack](https://github.com/sol/hpack), only regenerate cabal files
   when hpack files change.
 * hpack files can now be used in templates
-* `stack ghci` now runs ghci as a separate process #1306
+* `stack ghci` now runs ghci as a separate process
+  [#1306](https://github.com/commercialhaskell/stack/issues/1306)
 * Retry when downloading snapshots and package indices
 * Many build options are configurable now in `stack.yaml`:
 ```
@@ -92,23 +104,48 @@ Other enhancements:
 ```
 * A number of URLs are now configurable, useful for firewalls. See
   [#1794](https://github.com/commercialhaskell/stack/issues/1884).
+* Suggest causes when executables are missing.
+* Allow `--omit-packages` even without `--solver`.
+* Improve the generated stack.yaml.
+* Improve ghci results after :load Main module collision with main file path.
+* Only load the hackage index if necessary
+  [#1883](https://github.com/commercialhaskell/stack/issues/1883), [#1892](https://github.com/commercialhaskell/stack/issues/1892).
+* init: allow local packages to be deps of deps
+  [#1965](https://github.com/commercialhaskell/stack/issues/1965).
+* Always use full fingerprints from GPG
+  [#1952](https://github.com/commercialhaskell/stack/issues/1952).
+* Default to using `gpg2` and fall back to `gpg`
+  [#1976](https://github.com/commercialhaskell/stack/issues/1976).
+* Add a flag for --verbosity silent.
+* Add `haddock --open` flag [#1396](https://github.com/commercialhaskell/stack/issues/1396).
 
 Bug fixes:
 
-* Package tarballs would fail to unpack in 1.0.4
+* Package tarballs would fail to unpack.
   [#1884](https://github.com/commercialhaskell/stack/issues/1884).
 * Fixed errant warnings about missing modules, after deleted and removed from
   cabal file [#921](https://github.com/commercialhaskell/stack/issues/921)
   [#1805](https://github.com/commercialhaskell/stack/issues/1805).
 * Now considers a package to dirty when the hpack file is changed
-  [#1819](https://github.com/commercialhaskell/stack/issues/1819)
+  [#1819](https://github.com/commercialhaskell/stack/issues/1819).
 * Nix: cancelling a stack build now exits properly rather than dropping into a
-  nix-shell [#1778](https://github.com/commercialhaskell/stack/issues/1778)
+  nix-shell [#1778](https://github.com/commercialhaskell/stack/issues/1778).
 * `allow-newer: true` now causes `--exact-configuration` to be passed to Cabal.
-  See [#1579](https://github.com/commercialhaskell/stack/issues/1579)
+  See [#1579](https://github.com/commercialhaskell/stack/issues/1579).
 * `stack solver` no longer fails with `InvalidRelFile` for relative package
   paths including `..`. See
   [#1954](https://github.com/commercialhaskell/stack/issues/1954).
+* Ignore emacs lock files when finding .cabal
+  [#1897](https://github.com/commercialhaskell/stack/issues/1897).
+* Use lenient UTF-8 decode for build output
+  [#1945](https://github.com/commercialhaskell/stack/issues/1945).
+* Clear index cache whenever index updated
+  [#1962](https://github.com/commercialhaskell/stack/issues/1962).
+* Fix: Building a container image drops a .stack-work dir in the current working
+  (sub)directory
+  [#1975](https://github.com/commercialhaskell/stack/issues/1975).
+* Fix: Rebuilding when disabling profiling
+  [#2023](https://github.com/commercialhaskell/stack/issues/2023).
 
 ## 1.0.4.3
 
@@ -457,6 +494,8 @@ Other enhancements:
 * `stack new` disallows package names with "words" consisting solely of numbers
   [#1336](https://github.com/commercialhaskell/stack/issues/1336)
 * `stack build --fast` turns off optimizations
+* Show progress while downloading package index
+  [#1223](https://github.com/commercialhaskell/stack/issues/1223).
 
 Bug fixes:
 

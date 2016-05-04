@@ -17,6 +17,7 @@ homepage:            http://haskellstack.org
 extra-source-files:  CONTRIBUTING.md
                      ChangeLog.md
                      README.md
+                     doc/*.md
 
                      -- Glob would be nice, but apparently Cabal doesn't support it:
                      --     cabal: filepath wildcard 'test/package-dump/*.txt' does not match any files.
