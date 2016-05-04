@@ -42,7 +42,7 @@ import Prelude.Compat
 
 import           Control.Arrow ((&&&))
 import           Control.Exception hiding (try,catch)
-import           Control.Monad (liftM, liftM2, (<=<), when, forM)
+import           Control.Monad (liftM, liftM2, (<=<), when, forM, forM_)
 import           Control.Monad.Catch
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
@@ -1125,8 +1125,18 @@ hpack pkgDir = do
     when exists $ do
         let fpt = T.pack (toFilePath hpackFile)
         $logDebug $ "Running hpack on " <> fpt
-        liftIO $ Hpack.hpack (toFilePath pkgDir) True
-        $logDebug  $ "Done running hpack on " <> fpt
+        r <- liftIO $ Hpack.hpackResult (toFilePath pkgDir)
+        forM_ (Hpack.resultWarnings r) $ \w -> $logWarn ("WARNING: " <> T.pack w)
+        let cabalFile = T.pack (Hpack.resultCabalFile r)
+        case Hpack.resultStatus r of
+            Hpack.Generated -> $logDebug $
+                "hpack generated a modified version of " <> cabalFile
+            Hpack.OutputUnchanged -> $logDebug $
+                "hpack output unchanged in " <> cabalFile
+            -- NOTE: this is 'logInfo' so it will be outputted to the
+            -- user by default.
+            Hpack.AlreadyGeneratedByNewerHpack -> $logWarn $
+                "WARNING: " <> cabalFile <> " was generated with a newer version of hpack, please upgrade and try again."
 
 -- | Path for the package's build log.
 buildLogPath :: (MonadReader env m, HasBuildConfig env, MonadThrow m)
