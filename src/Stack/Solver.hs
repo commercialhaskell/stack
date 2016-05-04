@@ -505,10 +505,10 @@ checkResolverSpec gpds flags resolver = do
 -- a `hpack` `package.yaml` file exists, this will be used to generate a cabal
 -- file.
 -- Subdirectories can be included depending on the @recurse@ parameter.
-findCabalFiles :: MonadIO m => Bool -> Path Abs Dir -> m [Path Abs File]
-findCabalFiles recurse dir = liftIO $ do
-    findFiles dir isHpack subdirFilter >>= mapM_ (hpack . parent)
-    findFiles dir isCabal subdirFilter
+findCabalFiles :: (MonadIO m, MonadLogger m) => Bool -> Path Abs Dir -> m [Path Abs File]
+findCabalFiles recurse dir = do
+    liftIO (findFiles dir isHpack subdirFilter) >>= mapM_ (hpack . parent)
+    liftIO (findFiles dir isCabal subdirFilter)
   where
     subdirFilter subdir = recurse && not (isIgnored subdir)
     isHpack = (== "package.yaml")     . toFilePath . filename
