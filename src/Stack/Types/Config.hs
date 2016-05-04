@@ -72,6 +72,7 @@ module Stack.Types.Config
   ,configPackageIndexCache
   ,configPackageIndexGz
   ,configPackageIndexRoot
+  ,configPackageIndexRepo
   ,configPackageTarball
   ,indexNameText
   ,IndexLocation(..)
@@ -176,6 +177,7 @@ import           Stack.Types.PackageIndex
 import           Stack.Types.PackageName
 import           Stack.Types.TemplateName
 import           Stack.Types.Version
+import           System.FilePath (takeBaseName)
 import           System.PosixCompat.Types (UserID, GroupID, FileMode)
 import           System.Process.Read (EnvOverride, findExecutable)
 
@@ -1238,6 +1240,29 @@ configPackageIndexRoot (IndexName name) = do
     config <- asks getConfig
     dir <- parseRelDir $ S8.unpack name
     return (configStackRoot config </> $(mkRelDir "indices") </> dir)
+
+-- | Git repo directory for a specific package index, returns 'Nothing' if not
+-- a Git repo
+configPackageIndexRepo :: (MonadReader env m, HasConfig env, MonadThrow m) => IndexName -> m (Maybe (Path Abs Dir))
+configPackageIndexRepo name = do
+    indices <- asks $ configPackageIndices . getConfig
+    case filter (\p -> indexName p == name) indices of
+        [index] -> do
+            let murl =
+                    case indexLocation index of
+                        ILGit x -> Just x
+                        ILHttp _ -> Nothing
+                        ILGitHttp x _ -> Just x
+            case murl of
+                Nothing -> return Nothing
+                Just url -> do
+                    sDir <- configPackageIndexRoot name
+                    repoName <- parseRelDir $ takeBaseName $ T.unpack url
+                    let suDir =
+                          sDir </>
+                          $(mkRelDir "git-update")
+                    return $ Just $ suDir </> repoName
+        _ -> assert False $ return Nothing
 
 -- | Location of the 00-index.cache file
 configPackageIndexCache :: (MonadReader env m, HasConfig env, MonadThrow m) => IndexName -> m (Path Abs File)

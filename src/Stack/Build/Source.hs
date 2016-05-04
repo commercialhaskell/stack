@@ -23,7 +23,7 @@ import           Control.Applicative
 import           Control.Arrow ((&&&))
 import           Control.Exception (assert, catch)
 import           Control.Monad
-import           Control.Monad.Catch (MonadCatch)
+import           Control.Monad.Catch (MonadMask)
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import           Control.Monad.Reader (MonadReader, asks)
@@ -68,7 +68,7 @@ import qualified System.Directory as D
 import           System.IO (withBinaryFile, IOMode (ReadMode))
 import           System.IO.Error (isDoesNotExistError)
 
-loadSourceMap :: (MonadIO m, MonadCatch m, MonadReader env m, HasBuildConfig env, MonadBaseControl IO m, HasHttpManager env, MonadLogger m, HasEnvConfig env)
+loadSourceMap :: (MonadIO m, MonadMask m, MonadReader env m, HasBuildConfig env, MonadBaseControl IO m, HasHttpManager env, MonadLogger m, HasEnvConfig env)
               => NeedTargets
               -> BuildOptsCLI
               -> m ( Map PackageName SimpleTarget
@@ -116,8 +116,8 @@ loadSourceMap needTargets boptsCli = do
 
         -- Overwrite any flag settings with those from the config file
         extraDeps3 = Map.mapWithKey
-            (\n (v, f) -> PSUpstream v Local $
-                case ( Map.lookup (Just n) $ boptsCLIFlags boptsCli
+            (\n (v, f) -> PSUpstream v Local
+               (case ( Map.lookup (Just n) $ boptsCLIFlags boptsCli
                      , Map.lookup Nothing $ boptsCLIFlags boptsCli
                      , Map.lookup n $ bcFlags bconfig
                      ) of
@@ -132,6 +132,10 @@ loadSourceMap needTargets boptsCli = do
                         , fromMaybe Map.empty y
                         , fromMaybe Map.empty z
                         ])
+
+                 -- currently have no ability for extra-deps to specify their
+                 -- cabal file hashes
+                 Nothing)
             extraDeps2
 
     let sourceMap = Map.unions
@@ -140,14 +144,14 @@ loadSourceMap needTargets boptsCli = do
                  in (packageName p, PSLocal lp)
             , extraDeps3
             , flip fmap (mbpPackages mbp) $ \mpi ->
-                PSUpstream (mpiVersion mpi) Snap (mpiFlags mpi)
+                PSUpstream (mpiVersion mpi) Snap (mpiFlags mpi) (mpiGitSHA1 mpi)
             ] `Map.difference` Map.fromList (map (, ()) (HashSet.toList wiredInPackages))
 
     return (targets, mbp, locals, nonLocalTargets, sourceMap)
 
 -- | Use the build options and environment to parse targets.
 parseTargetsFromBuildOpts
-    :: (MonadIO m, MonadCatch m, MonadReader env m, HasBuildConfig env, MonadBaseControl IO m, HasHttpManager env, MonadLogger m, HasEnvConfig env)
+    :: (MonadIO m, MonadMask m, MonadReader env m, HasBuildConfig env, MonadBaseControl IO m, HasHttpManager env, MonadLogger m, HasEnvConfig env)
     => NeedTargets
     -> BuildOptsCLI
     -> m (MiniBuildPlan, M.Map PackageName Version, M.Map PackageName SimpleTarget)
@@ -275,7 +279,7 @@ splitComponents =
 -- based on the selected components
 loadLocalPackage
     :: forall m env.
-       (MonadReader env m, HasEnvConfig env, MonadCatch m, MonadLogger m, MonadIO m)
+       (MonadReader env m, HasEnvConfig env, MonadMask m, MonadLogger m, MonadIO m)
     => BuildOptsCLI
     -> Map PackageName SimpleTarget
     -> (PackageName, (LocalPackageView, GenericPackageDescription))
@@ -428,7 +432,7 @@ localFlags boptsflags bconfig name = Map.unions
 -- this was then superseded by
 -- https://github.com/commercialhaskell/stack/issues/651
 extendExtraDeps
-    :: (HasBuildConfig env, MonadIO m, MonadLogger m, MonadReader env m, HasHttpManager env, MonadBaseControl IO m, MonadCatch m)
+    :: (HasBuildConfig env, MonadIO m, MonadLogger m, MonadReader env m, HasHttpManager env, MonadBaseControl IO m, MonadMask m)
     => Map PackageName Version -- ^ original extra deps
     -> Map PackageName Version -- ^ package identifiers from the command line
     -> Set PackageName -- ^ all packages added on the command line
@@ -489,7 +493,7 @@ checkBuildCache oldCache files = liftIO $ do
 
 -- | Returns entries to add to the build cache for any newly found unlisted modules
 addUnlistedToBuildCache
-    :: (MonadIO m, MonadReader env m, MonadCatch m, MonadLogger m, HasEnvConfig env)
+    :: (MonadIO m, MonadReader env m, MonadMask m, MonadLogger m, HasEnvConfig env)
     => ModTime
     -> Package
     -> Path Abs File
@@ -516,7 +520,7 @@ addUnlistedToBuildCache preBuildTime pkg cabalFP buildCache = do
 
 -- | Gets list of Paths for files in a package
 getPackageFilesSimple
-    :: (MonadIO m, MonadReader env m, MonadCatch m, MonadLogger m, HasEnvConfig env)
+    :: (MonadIO m, MonadReader env m, MonadMask m, MonadLogger m, HasEnvConfig env)
     => Package -> Path Abs File -> m (Set (Path Abs File), [PackageWarning])
 getPackageFilesSimple pkg cabalFP = do
     (_,compFiles,cabalFiles,warnings) <-
@@ -565,7 +569,7 @@ checkComponentsBuildable lps =
         ]
 
 -- | Get 'PackageConfig' for package given its name.
-getPackageConfig :: (MonadIO m, MonadThrow m, MonadCatch m, MonadLogger m, MonadReader env m, HasEnvConfig env)
+getPackageConfig :: (MonadIO m, MonadThrow m, MonadMask m, MonadLogger m, MonadReader env m, HasEnvConfig env)
   => BuildOptsCLI
   -> PackageName
   -> m PackageConfig

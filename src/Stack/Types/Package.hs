@@ -37,6 +37,7 @@ import           Distribution.Text (display)
 import           GHC.Generics (Generic)
 import           Path as FL
 import           Prelude
+import           Stack.Types.BuildPlan (GitSHA1)
 import           Stack.Types.Compiler
 import           Stack.Types.Config
 import           Stack.Types.FlagName
@@ -219,17 +220,17 @@ type SourceMap = Map PackageName PackageSource
 -- | Where the package's source is located: local directory or package index
 data PackageSource
     = PSLocal LocalPackage
-    | PSUpstream Version InstallLocation (Map FlagName Bool)
+    | PSUpstream Version InstallLocation (Map FlagName Bool) (Maybe GitSHA1)
     -- ^ Upstream packages could be installed in either local or snapshot
     -- databases; this is what 'InstallLocation' specifies.
     deriving Show
 
 instance PackageInstallInfo PackageSource where
     piiVersion (PSLocal lp) = packageVersion $ lpPackage lp
-    piiVersion (PSUpstream v _ _) = v
+    piiVersion (PSUpstream v _ _ _) = v
 
     piiLocation (PSLocal _) = Local
-    piiLocation (PSUpstream _ loc _) = loc
+    piiLocation (PSUpstream _ loc _ _) = loc
 
 -- | Datatype which tells how which version of a package to install and where
 -- to install it into

@@ -10,6 +10,9 @@ Behavior changes:
 
 Other enhancements:
 
+* Grab Cabal files via Git SHA to avoid regressions from Hackage revisions
+  [#2070](https://github.com/commercialhaskell/stack/pull/2070)
+
 Bug fixes:
 
 ## 1.1.0

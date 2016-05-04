@@ -87,6 +87,7 @@ spec = beforeAll setup $ afterAll teardown $ do
                 , mpiToolDeps = Set.empty
                 , mpiExes = Set.empty
                 , mpiHasLibrary = True
+                , mpiGitSHA1 = Nothing
                 }
             go x y = (pn x, mkMPI y)
             resourcet = go "resourcet" ""

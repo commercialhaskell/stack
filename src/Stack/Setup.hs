@@ -486,7 +486,7 @@ upgradeCabal :: (MonadIO m, MonadLogger m, MonadReader env m, HasHttpManager env
              -> m ()
 upgradeCabal menv wc = do
     let name = $(mkPackageName "Cabal")
-    rmap <- resolvePackages menv Set.empty (Set.singleton name)
+    rmap <- resolvePackages menv Map.empty (Set.singleton name)
     newest <-
         case Map.keys rmap of
             [] -> error "No Cabal library found in index, cannot upgrade"
@@ -510,7 +510,8 @@ upgradeCabal menv wc = do
                 , T.pack $ versionString installed
                 ]
             let ident = PackageIdentifier name newest
-            m <- unpackPackageIdents menv tmpdir Nothing (Set.singleton ident)
+            -- Nothing below: use the newest .cabal file revision
+            m <- unpackPackageIdents menv tmpdir Nothing (Map.singleton ident Nothing)
 
             compilerPath <- join $ findExecutable menv (compilerExeName wc)
             newestDir <- parseRelDir $ versionString newest

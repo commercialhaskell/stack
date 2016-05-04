@@ -351,7 +351,7 @@ generateBuildInfoOpts sourceMap installedMap mcabalMacros cabalDir distDir omitP
         , let name = fromCabalPackageName cname
         , name `notElem` omitPkgs]
     -- Generates: -package=base -package=base16-bytestring-0.1.1.6 ...
-    sourceVersion (PSUpstream ver _ _) = ver
+    sourceVersion (PSUpstream ver _ _ _) = ver
     sourceVersion (PSLocal localPkg) = packageVersion (lpPackage localPkg)
     ghcOpts = concatMap snd . filter (isGhc . fst) . options
       where

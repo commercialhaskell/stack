@@ -202,7 +202,7 @@ mkUnregisterLocal tasks dirtyReason locallyRegistered sourceMap =
         case M.lookup name tasks of
             Nothing ->
                 case M.lookup name sourceMap of
-                    Just (PSUpstream _ Snap _) -> Map.singleton gid
+                    Just (PSUpstream _ Snap _ _) -> Map.singleton gid
                         ( ident
                         , Just "Switching to snapshot installed package"
                         )
@@ -276,7 +276,7 @@ tellExecutables :: PackageName -> PackageSource -> M ()
 tellExecutables _ (PSLocal lp)
     | lpWanted lp = tellExecutablesPackage Local $ lpPackage lp
     | otherwise = return ()
-tellExecutables name (PSUpstream version loc flags) =
+tellExecutables name (PSUpstream version loc flags _) =
     tellExecutablesUpstream name version loc flags
 
 tellExecutablesUpstream :: PackageName -> Version -> InstallLocation -> Map FlagName Bool -> M ()
@@ -316,7 +316,7 @@ installPackage :: Bool -- ^ is this being used by a dependency?
 installPackage treatAsDep name ps minstalled = do
     ctx <- ask
     case ps of
-        PSUpstream version _ flags -> do
+        PSUpstream version _ flags _ -> do
             package <- liftIO $ loadPackage ctx name version flags
             resolveDepsAndInstall False treatAsDep ps package minstalled
         PSLocal lp ->
@@ -410,7 +410,7 @@ installPackageGivenDeps isAllInOne ps package minstalled (missing, present, minL
             , taskType =
                 case ps of
                     PSLocal lp -> TTLocal lp
-                    PSUpstream _ loc _ -> TTUpstream package $ loc <> minLoc
+                    PSUpstream _ loc _ sha -> TTUpstream package (loc <> minLoc) sha
             , taskAllInOne = isAllInOne
             }
 
@@ -667,8 +667,8 @@ stripLocals plan = plan
     checkTask task =
         case taskType task of
             TTLocal _ -> False
-            TTUpstream _ Local -> False
-            TTUpstream _ Snap -> True
+            TTUpstream _ Local _ -> False
+            TTUpstream _ Snap _ -> True
 
 stripNonDeps :: Set PackageName -> Plan -> Plan
 stripNonDeps deps plan = plan

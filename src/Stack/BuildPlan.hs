@@ -214,10 +214,10 @@ data ResolveState = ResolveState
     , rsUsedBy    :: Map PackageName (Set PackageName)
     }
 
-toMiniBuildPlan :: (MonadIO m, MonadLogger m, MonadReader env m, HasHttpManager env, MonadThrow m, HasConfig env, MonadBaseControl IO m, MonadCatch m)
+toMiniBuildPlan :: (MonadIO m, MonadLogger m, MonadReader env m, HasHttpManager env, MonadMask m, HasConfig env, MonadBaseControl IO m)
                 => CompilerVersion -- ^ Compiler version
                 -> Map PackageName Version -- ^ cores
-                -> Map PackageName (Version, Map FlagName Bool) -- ^ non-core packages
+                -> Map PackageName (Version, Map FlagName Bool, Maybe GitSHA1) -- ^ non-core packages
                 -> m MiniBuildPlan
 toMiniBuildPlan compilerVersion corePackages packages = do
     $logInfo "Caching build plan"
@@ -228,7 +228,7 @@ toMiniBuildPlan compilerVersion corePackages packages = do
     -- remove those from the list of dependencies, since there's no way we'll
     -- ever reinstall them anyway.
     (cores, missingCores) <- addDeps True compilerVersion
-        $ fmap (, Map.empty) corePackages
+        $ fmap (, Map.empty, Nothing) corePackages
 
     (extras, missing) <- addDeps False compilerVersion packages
 
@@ -248,6 +248,7 @@ toMiniBuildPlan compilerVersion corePackages packages = do
                 , mpiToolDeps = Set.empty
                 , mpiExes = Set.empty
                 , mpiHasLibrary = True
+                , mpiGitSHA1 = Nothing
                 })
 
     removeMissingDeps cores mpi = mpi
@@ -255,10 +256,10 @@ toMiniBuildPlan compilerVersion corePackages packages = do
         }
 
 -- | Add in the resolved dependencies from the package index
-addDeps :: (MonadIO m, MonadLogger m, MonadReader env m, HasHttpManager env, MonadThrow m, HasConfig env, MonadBaseControl IO m, MonadCatch m)
+addDeps :: (MonadIO m, MonadLogger m, MonadReader env m, HasHttpManager env, MonadMask m, HasConfig env, MonadBaseControl IO m)
         => Bool -- ^ allow missing
         -> CompilerVersion -- ^ Compiler version
-        -> Map PackageName (Version, Map FlagName Bool)
+        -> Map PackageName (Version, Map FlagName Bool, Maybe GitSHA1)
         -> m (Map PackageName MiniPackageInfo, Set PackageIdentifier)
 addDeps allowMissing compilerVersion toCalc = do
     menv <- getMinimalEnvOverride
@@ -267,21 +268,26 @@ addDeps allowMissing compilerVersion toCalc = do
         if allowMissing
             then do
                 (missingNames, missingIdents, m) <-
-                    resolvePackagesAllowMissing (Map.keysSet idents0) Set.empty
+                    resolvePackagesAllowMissing (fmap snd idents0) Set.empty
                 assert (Set.null missingNames)
                     $ return (m, missingIdents)
             else do
-                m <- resolvePackages menv (Map.keysSet idents0) Set.empty
+                m <- resolvePackages menv (fmap snd idents0) Set.empty
                 return (m, Set.empty)
     let byIndex = Map.fromListWith (++) $ flip map (Map.toList resolvedMap)
             $ \(ident, rp) ->
-                (indexName $ rpIndex rp,
+                let (cache, sha) =
+                        case Map.lookup (packageIdentifierName ident) toCalc of
+                            Nothing -> (Map.empty, Nothing)
+                            Just (_, x, y) -> (x, y)
+                 in (indexName $ rpIndex rp,
                     [( ident
                     , rpCache rp
-                    , maybe Map.empty snd $ Map.lookup (packageIdentifierName ident) toCalc
+                    , sha
+                    , (cache, sha)
                     )])
     res <- forM (Map.toList byIndex) $ \(indexName', pkgs) -> withCabalFiles indexName' pkgs
-        $ \ident flags cabalBS -> do
+        $ \ident (flags, mgitSha) cabalBS -> do
             (_warnings,gpd) <- readPackageUnresolvedBS Nothing cabalBS
             let packageConfig = PackageConfig
                     { packageConfigEnableTests = False
@@ -304,11 +310,12 @@ addDeps allowMissing compilerVersion toCalc = do
                     False
                     (buildable . libBuildInfo)
                     (library pd)
+                , mpiGitSHA1 = mgitSha
                 })
     return (Map.fromList $ concat res, missingIdents)
   where
     idents0 = Map.fromList
-        $ map (\(n, (v, f)) -> (PackageIdentifier n v, Left f))
+        $ map (\(n, (v, f, gitsha)) -> (PackageIdentifier n v, (Left f, gitsha)))
         $ Map.toList toCalc
 
 -- | Resolve all packages necessary to install for the needed packages.
@@ -399,7 +406,7 @@ getToolMap mbp =
 
 -- | Load up a 'MiniBuildPlan', preferably from cache
 loadMiniBuildPlan
-    :: (MonadIO m, MonadThrow m, MonadLogger m, MonadReader env m, HasHttpManager env, HasConfig env, HasGHCVariant env, MonadBaseControl IO m, MonadCatch m)
+    :: (MonadIO m, MonadLogger m, MonadReader env m, HasHttpManager env, HasConfig env, HasGHCVariant env, MonadBaseControl IO m, MonadMask m)
     => SnapName
     -> m MiniBuildPlan
 loadMiniBuildPlan name = do
@@ -414,6 +421,10 @@ loadMiniBuildPlan name = do
     goPP pp =
         ( ppVersion pp
         , pcFlagOverrides $ ppConstraints pp
+        , ppCabalFileInfo pp
+            >>= fmap (GitSHA1 . encodeUtf8)
+              . Map.lookup "GitSHA1"
+              . cfiHashes
         )
 
 -- | Some hard-coded fixes for build plans, hopefully to be irrelevant over
@@ -672,7 +683,7 @@ instance Show BuildPlanCheck where
 -- given snapshot. Returns how well the snapshot satisfies the dependencies of
 -- the packages.
 checkSnapBuildPlan
-    :: ( MonadIO m, MonadCatch m, MonadLogger m, MonadReader env m
+    :: ( MonadIO m, MonadMask m, MonadLogger m, MonadReader env m
        , HasHttpManager env, HasConfig env, HasGHCVariant env
        , MonadBaseControl IO m)
     => [GenericPackageDescription]
@@ -707,7 +718,7 @@ checkSnapBuildPlan gpds flags snap = do
 -- | Find a snapshot and set of flags that is compatible with and matches as
 -- best as possible with the given 'GenericPackageDescription's.
 selectBestSnapshot
-    :: ( MonadIO m, MonadCatch m, MonadLogger m, MonadReader env m
+    :: ( MonadIO m, MonadMask m, MonadLogger m, MonadReader env m
        , HasHttpManager env, HasConfig env, HasGHCVariant env
        , MonadBaseControl IO m)
     => [GenericPackageDescription]
@@ -871,7 +882,7 @@ shadowMiniBuildPlan (MiniBuildPlan cv pkgs0) shadowed =
                 Just False -> Right
                 Nothing -> assert False Right
 
-parseCustomMiniBuildPlan :: (MonadIO m, MonadCatch m, MonadLogger m, MonadReader env m, HasHttpManager env, HasConfig env, MonadBaseControl IO m)
+parseCustomMiniBuildPlan :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasHttpManager env, HasConfig env, MonadBaseControl IO m)
                          => Path Abs File -- ^ stack.yaml file location
                          -> T.Text -> m MiniBuildPlan
 parseCustomMiniBuildPlan stackYamlFP url0 = do
@@ -891,7 +902,7 @@ parseCustomMiniBuildPlan stackYamlFP url0 = do
         toMiniBuildPlan
             (csCompilerVersion cs)
             Map.empty
-            (Map.fromList $ map addFlags $ Set.toList $ csPackages cs)
+            (fmap addGitSHA $ Map.fromList $ map addFlags $ Set.toList $ csPackages cs)
   where
     getCustomPlanDir = do
         root <- asks $ configStackRoot . getConfig
@@ -916,6 +927,9 @@ parseCustomMiniBuildPlan stackYamlFP url0 = do
         fp <- liftIO $ D.canonicalizePath $ toFilePath (parent stackYamlFP) FP.</> T.unpack (fromMaybe url $
             T.stripPrefix "file://" url <|> T.stripPrefix "file:" url)
         parseAbsFile fp
+
+    -- we add a Nothing since we don't yet collect Git SHAs for custom snapshots
+    addGitSHA (x, y) = (x, y, Nothing)
 
 data CustomSnapshot = CustomSnapshot
     { csCompilerVersion :: !CompilerVersion

@@ -15,7 +15,6 @@ import qualified Data.Map                    as Map
 import           Data.Maybe                  (isNothing)
 import           Data.Monoid                 ((<>))
 import qualified Data.Monoid
-import qualified Data.Set                    as Set
 import qualified Data.Text as T
 import           Lens.Micro                  (set)
 import           Network.HTTP.Client.Conduit (HasHttpManager)
@@ -83,7 +82,9 @@ upgrade gitRepo mresolver builtHash =
                 return Nothing
             Just version -> do
                 let ident = PackageIdentifier $(mkPackageName "stack") version
-                paths <- unpackPackageIdents menv tmp Nothing $ Set.singleton ident
+                paths <- unpackPackageIdents menv tmp Nothing
+                    -- accept latest cabal revision by not supplying a Git SHA
+                    $ Map.singleton ident Nothing
                 case Map.lookup ident paths of
                     Nothing -> error "Stack.Upgrade.upgrade: invariant violated, unpacked directory not found"
                     Just path -> return $ Just path

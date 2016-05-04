@@ -21,6 +21,8 @@ module Stack.Types.BuildPlan
     , SnapName (..)
     , MiniBuildPlan (..)
     , MiniPackageInfo (..)
+    , CabalFileInfo (..)
+    , GitSHA1 (..)
     , renderSnapName
     , parseSnapName
     ) where
@@ -33,6 +35,7 @@ import           Data.Aeson                      (FromJSON (..), ToJSON (..),
                                                   object, withObject, withText,
                                                   (.!=), (.:), (.:?), (.=))
 import           Data.Binary.VersionTagged
+import           Data.ByteString                 (ByteString)
 import           Data.Hashable                   (Hashable)
 import qualified Data.HashMap.Strict             as HashMap
 import           Data.IntMap                     (IntMap)
@@ -101,6 +104,7 @@ instance FromJSON BuildPlan where
 
 data PackagePlan = PackagePlan
     { ppVersion     :: Version
+    , ppCabalFileInfo :: Maybe CabalFileInfo
     , ppGithubPings :: Set Text
     , ppUsers       :: Set PackageName
     , ppConstraints :: PackageConstraints
@@ -110,6 +114,7 @@ data PackagePlan = PackagePlan
 
 instance ToJSON PackagePlan where
     toJSON PackagePlan {..} = object
+        $ maybe id (\cfi -> (("cabal-file-info" .= cfi):)) ppCabalFileInfo $
         [ "version"      .= ppVersion
         , "github-pings" .= ppGithubPings
         , "users"        .= ppUsers
@@ -119,11 +124,31 @@ instance ToJSON PackagePlan where
 instance FromJSON PackagePlan where
     parseJSON = withObject "PackageBuild" $ \o -> do
         ppVersion <- o .: "version"
+        ppCabalFileInfo <- o .:? "cabal-file-info"
         ppGithubPings <- o .:? "github-pings" .!= mempty
         ppUsers <- o .:? "users" .!= mempty
         ppConstraints <- o .: "constraints"
         ppDesc <- o .: "description"
         return PackagePlan {..}
+
+-- | Information on the contents of a cabal file
+data CabalFileInfo = CabalFileInfo
+    { cfiSize :: !Int
+    -- ^ File size in bytes
+    , cfiHashes :: !(Map.Map Text Text)
+    -- ^ Various hashes of the file contents
+    }
+    deriving (Show, Eq, Generic)
+instance ToJSON CabalFileInfo where
+    toJSON CabalFileInfo {..} = object
+        [ "size" .= cfiSize
+        , "hashes" .= cfiHashes
+        ]
+instance FromJSON CabalFileInfo where
+    parseJSON = withObject "CabalFileInfo" $ \o -> do
+        cfiSize <- o .: "size"
+        cfiHashes <- o .: "hashes"
+        return CabalFileInfo {..}
 
 display :: DT.Text a => a -> Text
 display = fromString . DT.display
@@ -420,8 +445,15 @@ data MiniPackageInfo = MiniPackageInfo
     -- ^ Executables provided by this package
     , mpiHasLibrary :: !Bool
     -- ^ Is there a library present?
+    , mpiGitSHA1 :: !(Maybe GitSHA1)
+    -- ^ An optional SHA1 representation in hex format of the blob containing
+    -- the cabal file contents. Useful for grabbing the correct cabal file
+    -- revision directly from a Git repo
     }
     deriving (Generic, Show, Eq)
 instance Binary MiniPackageInfo
 instance HasStructuralInfo MiniPackageInfo
 instance NFData MiniPackageInfo
+
+newtype GitSHA1 = GitSHA1 ByteString
+    deriving (Generic, Show, Eq, NFData, HasStructuralInfo, Binary)

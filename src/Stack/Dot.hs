@@ -16,7 +16,7 @@ import           Control.Monad.Catch (MonadCatch,MonadMask)
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger (MonadLogger)
 import           Control.Monad.Reader (MonadReader)
-import           Control.Monad.Trans.Control (MonadBaseControl)
+import           Control.Monad.Trans.Unlift (MonadBaseUnlift)
 import qualified Data.Foldable as F
 import qualified Data.HashSet as HashSet
 import           Data.Map (Map)
@@ -55,7 +55,7 @@ data DotOpts = DotOpts
 dot :: (HasEnvConfig env
        ,HasHttpManager env
        ,HasLogLevel env
-       ,MonadBaseControl IO m
+       ,MonadBaseUnlift IO m
        ,MonadCatch m
        ,MonadLogger m
        ,MonadIO m
@@ -81,7 +81,7 @@ createDependencyGraph :: (HasEnvConfig env
                          ,HasHttpManager env
                          ,HasLogLevel env
                          ,MonadLogger m
-                         ,MonadBaseControl IO m
+                         ,MonadBaseUnlift IO m
                          ,MonadCatch m
                          ,MonadIO m
                          ,MonadMask m
@@ -111,7 +111,7 @@ createDependencyGraph dotOpts = do
 listDependencies :: (HasEnvConfig env
                     ,HasHttpManager env
                     ,HasLogLevel env
-                    ,MonadBaseControl IO m
+                    ,MonadBaseUnlift IO m
                     ,MonadCatch m
                     ,MonadLogger m
                     ,MonadMask m
@@ -189,7 +189,7 @@ createDepLoader :: Applicative m
 createDepLoader sourceMap installed loadPackageDeps pkgName =
   case Map.lookup pkgName sourceMap of
     Just (PSLocal lp) -> pure ((packageAllDeps &&& (Just . packageVersion)) (lpPackage lp))
-    Just (PSUpstream version _ flags) -> loadPackageDeps pkgName version flags
+    Just (PSUpstream version _ flags _) -> loadPackageDeps pkgName version flags
     Nothing -> pure (Set.empty, fmap installedVersion (Map.lookup pkgName installed))
 
 -- | Resolve the direct (depth 0) external dependencies of the given local packages

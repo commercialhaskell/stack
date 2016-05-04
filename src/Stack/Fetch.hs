@@ -34,6 +34,7 @@ import           Control.Concurrent.STM         (TVar, atomically, modifyTVar,
                                                  newTVarIO, readTVar,
                                                  readTVarIO, writeTVar)
 import           Control.Exception              (assert)
+import           Control.Exception.Enclosed     (tryIO)
 import           Control.Monad                  (join, liftM, unless, void,
                                                  when)
 import           Control.Monad.Catch
@@ -41,6 +42,7 @@ import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import           Control.Monad.Reader           (asks, runReaderT)
 import           Control.Monad.Trans.Control
+import           Control.Monad.Trans.Unlift     (MonadBaseUnlift, askRunBase)
 import "cryptohash" Crypto.Hash                 (SHA512 (..))
 import           Data.ByteString                (ByteString)
 import qualified Data.ByteString                as S
@@ -48,15 +50,20 @@ import qualified Data.ByteString.Lazy           as L
 import           Data.Either                    (partitionEithers)
 import qualified Data.Foldable                  as F
 import           Data.Function                  (fix)
+import qualified Data.Git                       as Git
+import qualified Data.Git.Ref                   as Git
+import qualified Data.Git.Storage               as Git
+import qualified Data.Git.Storage.Object        as Git
 import           Data.List                      (intercalate)
 import           Data.List.NonEmpty             (NonEmpty)
 import qualified Data.List.NonEmpty             as NE
 import           Data.Map                       (Map)
 import qualified Data.Map                       as Map
 import           Data.Maybe                     (maybeToList, catMaybes)
-import           Data.Monoid                    ((<>))
+import           Data.Monoid
 import           Data.Set                       (Set)
 import qualified Data.Set                       as Set
+import           Data.String                    (fromString)
 import qualified Data.Text                      as T
 import           Data.Text.Encoding             (decodeUtf8)
 import           Data.Typeable                  (Typeable)
@@ -73,7 +80,8 @@ import           System.FilePath                ((<.>))
 import qualified System.FilePath                as FP
 import           System.IO                      (IOMode (ReadMode),
                                                  SeekMode (AbsoluteSeek), hSeek,
-                                                 withBinaryFile)
+                                                 withBinaryFile, openBinaryFile,
+                                                 hClose)
 import           System.PosixCompat             (setFileMode)
 import           Text.EditDistance              as ED
 
@@ -117,19 +125,23 @@ instance Show FetchException where
         (if null suggestions then "" else "\n" ++ suggestions)
 
 -- | Fetch packages into the cache without unpacking
-fetchPackages :: (MonadIO m, MonadBaseControl IO m, MonadReader env m, HasHttpManager env, HasConfig env, MonadThrow m, MonadLogger m, MonadCatch m)
+fetchPackages :: (MonadIO m, MonadBaseControl IO m, MonadReader env m, HasHttpManager env, HasConfig env, MonadMask m, MonadLogger m)
               => EnvOverride
               -> Set PackageIdentifier
               -> m ()
-fetchPackages menv idents = do
+fetchPackages menv idents' = do
     resolved <- resolvePackages menv idents Set.empty
     ToFetchResult toFetch alreadyUnpacked <- getToFetch Nothing resolved
     assert (Map.null alreadyUnpacked) (return ())
     nowUnpacked <- fetchPackages' Nothing toFetch
     assert (Map.null nowUnpacked) (return ())
+  where
+    -- Since we're just fetching tarballs and not unpacking cabal files, we can
+    -- always provide a Nothing Git SHA
+    idents = Map.fromList $ map (, Nothing) $ Set.toList idents'
 
 -- | Intended to work for the command line command.
-unpackPackages :: (MonadIO m, MonadBaseControl IO m, MonadReader env m, HasHttpManager env, HasConfig env, MonadThrow m, MonadLogger m, MonadCatch m)
+unpackPackages :: (MonadIO m, MonadBaseControl IO m, MonadReader env m, HasHttpManager env, HasConfig env, MonadMask m, MonadLogger m)
                => EnvOverride
                -> FilePath -- ^ destination
                -> [String] -- ^ names or identifiers
@@ -139,7 +151,9 @@ unpackPackages menv dest input = do
     (names, idents) <- case partitionEithers $ map parse input of
         ([], x) -> return $ partitionEithers x
         (errs, _) -> throwM $ CouldNotParsePackageSelectors errs
-    resolved <- resolvePackages menv (Set.fromList idents) (Set.fromList names)
+    resolved <- resolvePackages menv
+        (Map.fromList $ map (, Nothing) idents)
+        (Set.fromList names)
     ToFetchResult toFetch alreadyUnpacked <- getToFetch (Just dest') resolved
     unless (Map.null alreadyUnpacked) $
         throwM $ UnpackDirectoryAlreadyExists $ Set.fromList $ map toFilePath $ Map.elems alreadyUnpacked
@@ -163,11 +177,11 @@ unpackPackages menv dest input = do
 -- | Ensure that all of the given package idents are unpacked into the build
 -- unpack directory, and return the paths to all of the subdirectories.
 unpackPackageIdents
-    :: (MonadBaseControl IO m, MonadIO m, MonadReader env m, HasHttpManager env, HasConfig env, MonadThrow m, MonadLogger m, MonadCatch m)
+    :: (MonadBaseControl IO m, MonadIO m, MonadReader env m, HasHttpManager env, HasConfig env, MonadMask m, MonadLogger m)
     => EnvOverride
     -> Path Abs Dir -- ^ unpack directory
     -> Maybe (Path Rel Dir) -- ^ the dist rename directory, see: https://github.com/fpco/stack/issues/157
-    -> Set PackageIdentifier
+    -> Map PackageIdentifier (Maybe GitSHA1)
     -> m (Map PackageIdentifier (Path Abs Dir))
 unpackPackageIdents menv unpackDir mdistDir idents = do
     resolved <- resolvePackages menv idents Set.empty
@@ -178,12 +192,13 @@ unpackPackageIdents menv unpackDir mdistDir idents = do
 data ResolvedPackage = ResolvedPackage
     { rpCache :: !PackageCache
     , rpIndex :: !PackageIndex
+    , rpGitSHA1 :: !(Maybe GitSHA1)
     }
 
 -- | Resolve a set of package names and identifiers into @FetchPackage@ values.
 resolvePackages :: (MonadIO m, MonadReader env m, HasHttpManager env, HasConfig env, MonadLogger m, MonadBaseControl IO m, MonadCatch m)
                 => EnvOverride
-                -> Set PackageIdentifier
+                -> Map PackageIdentifier (Maybe GitSHA1)
                 -> Set PackageName
                 -> m (Map PackageIdentifier ResolvedPackage)
 resolvePackages menv idents0 names0 = do
@@ -202,7 +217,7 @@ resolvePackages menv idents0 names0 = do
 
 resolvePackagesAllowMissing
     :: (MonadIO m, MonadReader env m, HasHttpManager env, HasConfig env, MonadLogger m, MonadThrow m, MonadBaseControl IO m, MonadCatch m)
-    => Set PackageIdentifier
+    => Map PackageIdentifier (Maybe GitSHA1)
     -> Set PackageName
     -> m (Set PackageName, Set PackageIdentifier, Map PackageIdentifier ResolvedPackage)
 resolvePackagesAllowMissing idents0 names0 = do
@@ -213,16 +228,17 @@ resolvePackagesAllowMissing idents0 names0 = do
                 (Map.lookup name versions))
             (Set.toList names0)
         (missingIdents, resolved) = partitionEithers $ map (goIdent caches)
-                                  $ Set.toList
-                                  $ idents0 <> Set.fromList idents1
+                                  $ Map.toList
+                                  $ idents0 <> Map.fromList (map (, Nothing) idents1)
     return (Set.fromList missingNames, Set.fromList missingIdents, Map.fromList resolved)
   where
-    goIdent caches ident =
+    goIdent caches (ident, mgitsha) =
         case Map.lookup ident caches of
             Nothing -> Left ident
             Just (index, cache) -> Right (ident, ResolvedPackage
                 { rpCache = cache
                 , rpIndex = index
+                , rpGitSHA1 = mgitsha
                 })
 
 data ToFetch = ToFetch
@@ -242,17 +258,44 @@ data ToFetchResult = ToFetchResult
 
 -- | Add the cabal files to a list of idents with their caches.
 withCabalFiles
-    :: (MonadThrow m, MonadIO m, MonadReader env m, HasConfig env)
+    :: (MonadMask m, MonadIO m, MonadLogger m, MonadReader env m, HasConfig env)
     => IndexName
-    -> [(PackageIdentifier, PackageCache, a)]
+    -> [(PackageIdentifier, PackageCache, Maybe GitSHA1, a)]
     -> (PackageIdentifier -> a -> ByteString -> IO b)
     -> m [b]
 withCabalFiles name pkgs f = do
     indexPath <- configPackageIndex name
-    liftIO $ withBinaryFile (toFilePath indexPath) ReadMode $ \h ->
-        mapM (goPkg h) pkgs
+    mgitRepo <- configPackageIndexRepo name
+    bracket
+        (liftIO $ openBinaryFile (toFilePath indexPath) ReadMode)
+        (liftIO . hClose) $ \h ->
+            let inner mgit = mapM (goPkg h mgit) pkgs
+             in case mgitRepo of
+                    Nothing -> inner Nothing
+                    Just repo -> bracket
+                        (liftIO $ Git.openRepo
+                                $ fromString
+                                $ toFilePath repo FP.</> ".git")
+                        (liftIO . Git.closeRepo)
+                        (inner . Just)
   where
-    goPkg h (ident, pc, tf) = do
+    goPkg h (Just git) (ident, pc, Just (GitSHA1 sha), tf) = do
+        let ref = Git.fromHex sha
+        mobj <- liftIO $ tryIO $ Git.getObject git ref True
+        case mobj of
+            Right (Just (Git.ObjBlob (Git.Blob bs))) -> liftIO $ f ident tf (L.toStrict bs)
+            -- fallback when the appropriate SHA isn't found
+            e -> do
+                $logWarn $ mconcat
+                    [ "Did not find .cabal file for "
+                    , T.pack $ packageIdentifierString ident
+                    , " with Git SHA of "
+                    , decodeUtf8 sha
+                    , "\n"
+                    , T.pack $ show e
+                    ]
+                goPkg h Nothing (ident, pc, Nothing, tf)
+    goPkg h _mgit (ident, pc, _mgitsha, tf) = liftIO $ do
         hSeek h AbsoluteSeek $ fromIntegral $ pcOffset pc
         cabalBS <- S.hGet h $ fromIntegral $ pcSize pc
         f ident tf cabalBS
@@ -260,7 +303,7 @@ withCabalFiles name pkgs f = do
 -- | Provide a function which will load up a cabal @ByteString@ from the
 -- package indices.
 withCabalLoader
-    :: (MonadIO m, MonadReader env m, HasConfig env, MonadLogger m, HasHttpManager env, MonadBaseControl IO m, MonadCatch m)
+    :: (MonadIO m, MonadReader env m, HasConfig env, MonadLogger m, HasHttpManager env, MonadBaseUnlift IO m, MonadMask m)
     => EnvOverride
     -> ((PackageIdentifier -> IO ByteString) -> m a)
     -> m a
@@ -276,13 +319,14 @@ withCabalLoader menv inner = do
 
     loadCaches <- getPackageCachesIO
     runInBase <- liftBaseWith $ \run -> return (void . run)
+    unlift <- askRunBase
 
     -- TODO in the future, keep all of the necessary @Handle@s open
     let doLookup :: PackageIdentifier
                  -> IO ByteString
         doLookup ident = do
             caches <- loadCaches
-            eres <- lookupPackageIdentifierExact ident env caches
+            eres <- unlift $ lookupPackageIdentifierExact ident env caches
             case eres of
                 Just bs -> return bs
                 -- Update the cache and try again
@@ -316,17 +360,17 @@ withCabalLoader menv inner = do
     inner doLookup
 
 lookupPackageIdentifierExact
-  :: HasConfig env
+  :: (MonadMask m, MonadIO m, MonadLogger m, HasConfig env)
   => PackageIdentifier
   -> env
   -> PackageCaches
-  -> IO (Maybe ByteString)
+  -> m (Maybe ByteString)
 lookupPackageIdentifierExact ident env caches =
     case Map.lookup ident caches of
         Nothing -> return Nothing
         Just (index, cache) -> do
             [bs] <- flip runReaderT env
-                  $ withCabalFiles (indexName index) [(ident, cache, ())]
+                  $ withCabalFiles (indexName index) [(ident, cache, Nothing, ())]
                   $ \_ _ bs -> return bs
             return $ Just bs
 
@@ -361,7 +405,7 @@ typoCorrectionCandidates ident =
     . Map.mapKeys getName
 
 -- | Figure out where to fetch from.
-getToFetch :: (MonadThrow m, MonadIO m, MonadReader env m, HasConfig env)
+getToFetch :: (MonadMask m, MonadLogger m, MonadIO m, MonadReader env m, HasConfig env)
            => Maybe (Path Abs Dir) -- ^ directory to unpack into, @Nothing@ means no unpack
            -> Map PackageIdentifier ResolvedPackage
            -> m ToFetchResult
@@ -389,7 +433,7 @@ getToFetch mdest resolvedAll = do
                     d = pcDownload $ rpCache resolved
                     targz = T.pack $ packageIdentifierString ident ++ ".tar.gz"
                 tarball <- configPackageTarball (indexName index) ident
-                return $ Left (indexName index, [(ident, rpCache resolved, ToFetch
+                return $ Left (indexName index, [(ident, rpCache resolved, rpGitSHA1 resolved, ToFetch
                     { tfTarball = tarball
                     , tfDestDir = mdestDir
                     , tfUrl = case d of

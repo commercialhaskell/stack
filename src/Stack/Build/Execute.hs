@@ -113,7 +113,7 @@ preFetch plan
     toIdent (name, task) =
         case taskType task of
             TTLocal _ -> Set.empty
-            TTUpstream package _ -> Set.singleton $ PackageIdentifier
+            TTUpstream package _ _ -> Set.singleton $ PackageIdentifier
                 name
                 (packageVersion package)
 
@@ -187,7 +187,7 @@ displayTask task = T.pack $ concat
         TTLocal lp -> concat
             [ toFilePath $ lpDir lp
             ]
-        TTUpstream _ _ -> "package index"
+        TTUpstream _ _ _ -> "package index"
     , if Set.null missing
         then ""
         else ", after: " ++ intercalate "," (map packageIdentifierString $ Set.toList missing)
@@ -665,7 +665,7 @@ getConfigCache ExecuteEnv {..} Task {..} installedMap enableTest enableBench = d
             , configCacheComponents =
                 case taskType of
                     TTLocal lp -> Set.map renderComponent $ lpComponents lp
-                    TTUpstream _ _ -> Set.empty
+                    TTUpstream _ _ _ -> Set.empty
             , configCacheHaddock =
                 shouldHaddockPackage eeBuildOpts eeWanted (packageIdentifierName taskProvides)
             }
@@ -764,7 +764,7 @@ withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} md
     wanted =
         case taskType of
             TTLocal lp -> lpWanted lp
-            TTUpstream _ _ -> False
+            TTUpstream _ _ _ -> False
 
     console = wanted
            && all (\(ActionId ident _) -> ident == taskProvides) (Set.toList acRemaining)
@@ -773,9 +773,10 @@ withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} md
     withPackage inner =
         case taskType of
             TTLocal lp -> inner (lpPackage lp) (lpCabalFile lp) (lpDir lp)
-            TTUpstream package _ -> do
+            TTUpstream package _ gitSHA1 -> do
                 mdist <- liftM Just distRelativeDir
-                m <- unpackPackageIdents eeEnvOverride eeTempDir mdist $ Set.singleton taskProvides
+                m <- unpackPackageIdents eeEnvOverride eeTempDir mdist
+                   $ Map.singleton taskProvides gitSHA1
                 case Map.toList m of
                     [(ident, dir)]
                         | ident == taskProvides -> do
@@ -1078,7 +1079,7 @@ singleBuild runInBase ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} in
             TTLocal lp -> do
                 when enableTests $ unsetTestSuccess pkgDir
                 writeBuildCache pkgDir $ lpNewBuildCache lp
-            TTUpstream _ _ -> return ()
+            TTUpstream _ _ _ -> return ()
 
         () <- announce ("build" <> annSuffix)
         config <- asks getConfig
@@ -1170,7 +1171,7 @@ checkForUnlistedFiles (TTLocal lp) preBuildTime pkgDir = do
     unless (null addBuildCache) $
         writeBuildCache pkgDir $
         Map.unions (lpNewBuildCache lp : addBuildCache)
-checkForUnlistedFiles (TTUpstream _ _) _ _ = return ()
+checkForUnlistedFiles (TTUpstream _ _ _) _ _ = return ()
 
 -- | Determine if all of the dependencies given are installed
 depsPresent :: InstalledMap -> Map PackageName VersionRange -> Bool

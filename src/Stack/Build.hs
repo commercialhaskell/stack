@@ -22,11 +22,12 @@ module Stack.Build
 
 import           Control.Exception (Exception)
 import           Control.Monad
-import           Control.Monad.Catch (MonadCatch, MonadMask)
+import           Control.Monad.Catch (MonadMask, MonadMask)
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import           Control.Monad.Reader (MonadReader, asks)
 import           Control.Monad.Trans.Resource
+import           Control.Monad.Trans.Unlift (MonadBaseUnlift)
 import           Data.Aeson (Value (Object, Array), (.=), object)
 import           Data.Function
 import qualified Data.HashMap.Strict as HM
@@ -68,7 +69,7 @@ import           System.Win32.Console (setConsoleCP, setConsoleOutputCP, getCons
 import qualified Control.Monad.Catch as Catch
 #endif
 
-type M env m = (MonadIO m,MonadReader env m,HasHttpManager env,HasBuildConfig env,MonadLogger m,MonadBaseControl IO m,MonadMask m,HasLogLevel env,HasEnvConfig env,HasTerminal env)
+type M env m = (MonadIO m,MonadReader env m,HasHttpManager env,HasBuildConfig env,MonadLogger m,MonadBaseUnlift IO m,MonadMask m,HasLogLevel env,HasEnvConfig env,HasTerminal env)
 
 -- | Build.
 --
@@ -267,8 +268,8 @@ mkBaseConfigOpts boptsCli = do
 withLoadPackage :: ( MonadIO m
                    , HasHttpManager env
                    , MonadReader env m
-                   , MonadBaseControl IO m
-                   , MonadCatch m
+                   , MonadBaseUnlift IO m
+                   , MonadMask m
                    , MonadLogger m
                    , HasEnvConfig env)
                 => EnvOverride
