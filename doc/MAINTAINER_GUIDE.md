@@ -31,7 +31,7 @@
       still needed
 * In RC branch:
     * Update the ChangeLog
-      ([this comparison](https://github.com/commercialhaskell/stack/compare/release...master)
+      ([this comparison](https://github.com/commercialhaskell/stack/compare/stable...master)
       is handy):
         * Check for any important changes that missed getting an entry in Changelog
         * Check for any entries that snuck into the previous version's changes
@@ -88,17 +88,12 @@ for requirements to perform the release, and more details about the tool.
     * Release Windows installers. See
       [stack-installer README](https://github.com/borsboom/stack-installer#readme)
 
-* Push signed Git tag, matching Github release tag name, e.g.: `git tag -u
-  0x575159689BEFB442 vX.Y.Z && git push origin vX.Y.Z`
-
-* Reset the `release` branch to the released commit, e.g.: `git checkout release
-  && git merge --ff-only vX.Y.Z && git push origin release`
-
-* Update the `stable` branch similarly
-
-* Delete the RC branch (locally and on origin)
-
 * Publish Github release
+
+* Upload package to Hackage: `stack upload . --pvp-bounds=both`
+
+* On a machine with Vagrant installed:
+    * Run `etc/scripts/vagrant-distros.sh`
 
 * Edit
   [stack-setup-2.yaml](https://github.com/fpco/stackage-content/blob/master/stack/stack-setup-2.yaml),
@@ -108,17 +103,22 @@ for requirements to perform the release, and more details about the tool.
   [readthedocs.org](https://readthedocs.org/projects/stack/versions/), and
   ensure that stable documentation has updated
 
-* Upload package to Hackage: `stack upload . --pvp-bounds=both`
-
-* On a machine with Vagrant installed:
-    * Run `etc/scripts/vagrant-distros.sh`
-
 * Submit a PR for the
-  [haskell-stack Homebrew formula](https://github.com/Homebrew/homebrew/blob/master/Library/Formula/haskell-stack.rb)
+  [haskell-stack Homebrew formula](https://github.com/Homebrew/homebrew-core/blob/master/Formula/haskell-stack.rb)
       * Be sure to update the SHA sum
       * The commit message should just be `haskell-stack <VERSION>`
 
 * [Flag the Arch Linux package as out-of-date](https://www.archlinux.org/packages/community/x86_64/stack/flag/)
+
+* Push signed Git tag, matching Github release tag name, e.g.: `git tag -u
+  0x575159689BEFB442 vX.Y.Z && git push origin vX.Y.Z`
+
+* Reset the `release` branch to the released commit, e.g.: `git checkout release
+  && git merge --ff-only vX.Y.Z && git push origin release`
+
+* Update the `stable` branch similarly
+
+* Delete the RC branch (locally and on origin)
 
 * Upload haddocks to Hackage: `etc/scripts/upload-haddocks.sh`
 
