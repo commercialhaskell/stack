@@ -59,7 +59,8 @@ gpgVerify
     :: (MonadIO m, MonadThrow m)
     => Signature -> Path Abs File -> m Fingerprint
 gpgVerify (Signature signature) path = do
-    (hIn,hOut,hErr,process) <- gpg ["--verify", "-", toFilePath path]
+    (hIn,hOut,hErr,process) <-
+        gpg ["--verify", "--with-fingerprint", "-", toFilePath path]
     (_in,out,err,code) <-
         liftIO
             ((,,,) <$>
