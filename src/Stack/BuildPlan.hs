@@ -625,7 +625,7 @@ data DepError = DepError
 instance Monoid DepError where
     mempty = DepError Nothing Map.empty
     mappend (DepError a x) (DepError b y) = DepError
-        (maybe a Just b)
+        (assert (a == b) a)
         (Map.unionWith C.intersectVersionRanges x y)
 
 -- | Given a bundle of packages (a list of @GenericPackageDescriptions@'s) to
