@@ -512,8 +512,11 @@ loadBuildConfig mproject config mresolver mcompiler = do
             , projectCompiler = mcompiler <|> projectCompiler project'
             }
 
-    (mbp, loadedResolver) <- flip runReaderT miniConfig $
+    (mbp0, loadedResolver) <- flip runReaderT miniConfig $
         loadResolver (Just stackYamlFP) (projectResolver project)
+    let mbp = case projectCompiler project of
+            Just compiler -> mbp0 { mbpCompilerVersion = compiler }
+            Nothing -> mbp0
 
     extraPackageDBs <- mapM resolveDir' (projectExtraPackageDBs project)
 
