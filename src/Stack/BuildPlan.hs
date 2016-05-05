@@ -47,7 +47,7 @@ import qualified Crypto.Hash.SHA256 as SHA256
 import           Data.Aeson.Extended (WithJSONWarnings(..), logJSONWarnings)
 import           Data.Binary.VersionTagged (taggedDecodeOrLoad, decodeFileOrFailDeep)
 import qualified Data.ByteString as S
-import qualified Data.ByteString.Base16 as B16
+import qualified Data.ByteString.Base64.URL as B64URL
 import qualified Data.ByteString.Char8 as S8
 import           Data.Either (partitionEithers)
 import qualified Data.Foldable as F
@@ -63,7 +63,7 @@ import           Data.Set (Set)
 import qualified Data.Set as Set
 import           Data.Text (Text)
 import qualified Data.Text as T
-import           Data.Text.Encoding (encodeUtf8, decodeUtf8)
+import           Data.Text.Encoding (encodeUtf8)
 import qualified Data.Traversable as Tr
 import           Data.Typeable (Typeable)
 import           Data.Yaml (decodeEither', decodeFileEither)
@@ -430,7 +430,7 @@ loadResolver mconfigPath resolver =
         -- the file URL in the custom resolver always relative to stackYaml.
         ResolverCustom name url -> do
             (mbp, hash) <- parseCustomMiniBuildPlan mconfigPath url
-            return (mbp, ResolverCustomLoaded name url (decodeUtf8 hash))
+            return (mbp, ResolverCustomLoaded name url hash)
         ResolverCompiler compiler -> return
             ( MiniBuildPlan
                 { mbpCompilerVersion = compiler
@@ -956,7 +956,7 @@ parseCustomMiniBuildPlan
     :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasHttpManager env, HasConfig env, HasGHCVariant env, MonadBaseControl IO m)
     => Maybe (Path Abs File) -- ^ Root directory for when url is a filepath
     -> T.Text
-    -> m (MiniBuildPlan, S8.ByteString)
+    -> m (MiniBuildPlan, SnapshotHash)
 parseCustomMiniBuildPlan mconfigPath0 url0 = do
     $logDebug $ "Loading " <> url0 <> " build plan"
     case parseUrl $ T.unpack url0 of
@@ -970,13 +970,13 @@ parseCustomMiniBuildPlan mconfigPath0 url0 = do
                    return (mbp, hash)
   where
     downloadCustom url req = do
-        let urlHash = S8.unpack $ B16.encode $ SHA256.hash $ encodeUtf8 url
+        let urlHash = S8.unpack $ trimmedSnapshotHash $ doHash $ encodeUtf8 url
         hashFP <- parseRelFile $ urlHash ++ ".yaml"
         customPlanDir <- getCustomPlanDir
         let cacheFP = customPlanDir </> $(mkRelDir "yaml") </> hashFP
         _ <- download req cacheFP
         yamlBS <- liftIO $ S.readFile $ toFilePath cacheFP
-        let yamlHash = b16Hash yamlBS
+        let yamlHash = doHash yamlBS
         binaryPath <- getBinaryPath yamlHash
         liftM (, yamlHash) $ taggedDecodeOrLoad binaryPath $ do
             (cs, mresolver) <- decodeYaml yamlBS
@@ -1003,10 +1003,10 @@ parseCustomMiniBuildPlan mconfigPath0 url0 = do
                                 -- for identity.
                                 (mbp, _) <- downloadCustom url req
                                 return mbp
-                        return (getMbp, b16Hash yamlBS)
+                        return (getMbp, doHash yamlBS)
                     Nothing -> do
-                        (getMbp0, hash0) <- readCustom yamlFP url
-                        let hash = b16Hash (hash0 <> yamlBS)
+                        (getMbp0, SnapshotHash hash0) <- readCustom yamlFP url
+                        let hash = doHash (hash0 <> yamlBS)
                             getMbp = do
                                 binaryPath <- getBinaryPath hash
                                 -- Idea here is to not waste time
@@ -1028,7 +1028,7 @@ parseCustomMiniBuildPlan mconfigPath0 url0 = do
                 -- NOTE: in the cases where we don't have a hash, the
                 -- normal resolver name is enough. Since this name is
                 -- part of the yaml file, it ends up in our hash.
-                let hash = b16Hash yamlBS
+                let hash = doHash yamlBS
                     getMbp = do
                         (mbp, resolver') <- loadResolver (Just configPath) resolver
                         let mhash = customResolverHash resolver'
@@ -1038,12 +1038,12 @@ parseCustomMiniBuildPlan mconfigPath0 url0 = do
                 case csCompilerVersion cs of
                     Nothing -> throwM (NeitherCompilerOrResolverSpecified path)
                     Just cv -> do
-                        let hash = b16Hash yamlBS
+                        let hash = doHash yamlBS
                             getMbp = return (compilerBuildPlan cv)
                         return (getMbp, hash)
         return (applyCustomSnapshot cs =<< getMbp, hash)
     getBinaryPath hash = do
-        binaryFilename <- parseRelFile $ S8.unpack hash ++ ".bin"
+        binaryFilename <- parseRelFile $ S8.unpack (trimmedSnapshotHash hash) ++ ".bin"
         customPlanDir <- getCustomPlanDir
         return $ customPlanDir </> $(mkRelDir "bin") </> binaryFilename
     decodeYaml yamlBS = do
@@ -1059,7 +1059,7 @@ parseCustomMiniBuildPlan mconfigPath0 url0 = do
     getCustomPlanDir = do
         root <- asks $ configStackRoot . getConfig
         return $ root </> $(mkRelDir "custom-plan")
-    b16Hash = B16.encode . SHA256.hash
+    doHash = SnapshotHash . B64URL.encode . SHA256.hash
 
 applyCustomSnapshot
     :: (MonadIO m, MonadLogger m, MonadReader env m, HasHttpManager env, MonadThrow m, HasConfig env, MonadBaseControl IO m, MonadMask m)

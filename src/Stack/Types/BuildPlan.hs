@@ -25,6 +25,8 @@ module Stack.Types.BuildPlan
     , GitSHA1 (..)
     , renderSnapName
     , parseSnapName
+    , SnapshotHash (..)
+    , trimmedSnapshotHash
     ) where
 
 import           Control.Applicative
@@ -36,6 +38,7 @@ import           Data.Aeson                      (FromJSON (..), ToJSON (..),
                                                   (.!=), (.:), (.:?), (.=))
 import           Data.Binary.VersionTagged
 import           Data.ByteString                 (ByteString)
+import qualified Data.ByteString                 as BS
 import           Data.Hashable                   (Hashable)
 import qualified Data.HashMap.Strict             as HashMap
 import           Data.IntMap                     (IntMap)
@@ -458,3 +461,9 @@ instance NFData MiniPackageInfo
 
 newtype GitSHA1 = GitSHA1 ByteString
     deriving (Generic, Show, Eq, NFData, HasStructuralInfo, Binary)
+
+newtype SnapshotHash = SnapshotHash { unShapshotHash :: ByteString }
+    deriving (Generic, Show, Eq)
+
+trimmedSnapshotHash :: SnapshotHash -> ByteString
+trimmedSnapshotHash = BS.take 12 . unShapshotHash

@@ -184,7 +184,7 @@ import           Generics.Deriving.Monoid (memptydefault, mappenddefault)
 import           Network.HTTP.Client (parseUrl)
 import           Path
 import qualified Paths_stack as Meta
-import           Stack.Types.BuildPlan (MiniBuildPlan(..), SnapName, renderSnapName, parseSnapName)
+import           Stack.Types.BuildPlan (MiniBuildPlan(..), SnapName, renderSnapName, parseSnapName, SnapshotHash (..), trimmedSnapshotHash)
 import           Stack.Types.Urls
 import           Stack.Types.Compiler
 import           Stack.Types.Docker
@@ -679,7 +679,7 @@ data ResolverThat's (l :: IsLoaded) where
     -- | Like 'ResolverCustom', but after loading the build-plan, so we
     -- have a hash. This is necessary in order to identify the location
     -- files are stored for the resolver.
-    ResolverCustomLoaded :: !Text -> !Text -> !Text -> ResolverThat's 'Loaded
+    ResolverCustomLoaded :: !Text -> !Text -> !SnapshotHash -> ResolverThat's 'Loaded
 
 deriving instance Show (ResolverThat's k)
 
@@ -709,7 +709,7 @@ instance FromJSON (WithJSONWarnings (ResolverThat's 'NotLoaded)) where
 resolverDirName :: LoadedResolver -> Text
 resolverDirName (ResolverSnapshot name) = renderSnapName name
 resolverDirName (ResolverCompiler v) = compilerVersionText v
-resolverDirName (ResolverCustomLoaded name _ hash) = "custom-" <> name <> "-" <> hash
+resolverDirName (ResolverCustomLoaded name _ hash) = "custom-" <> name <> "-" <> decodeUtf8 (trimmedSnapshotHash hash)
 
 -- | Convert a Resolver into its @Text@ representation for human
 -- presentation.
@@ -719,7 +719,7 @@ resolverName (ResolverCompiler v) = compilerVersionText v
 resolverName (ResolverCustom name _) = "custom-" <> name
 resolverName (ResolverCustomLoaded name _ _) = "custom-" <> name
 
-customResolverHash :: LoadedResolver-> Maybe Text
+customResolverHash :: LoadedResolver-> Maybe SnapshotHash
 customResolverHash (ResolverCustomLoaded _ _ hash) = Just hash
 customResolverHash _ = Nothing
 
