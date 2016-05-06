@@ -1,5 +1,7 @@
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE TupleSections #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 {-|
 Module      : Stack.Sig.GPG
@@ -16,8 +18,10 @@ module Stack.Sig.GPG (gpgSign, gpgVerify) where
 import Prelude ()
 import Prelude.Compat
 
+import           Control.Monad (when)
 import           Control.Monad.Catch (MonadThrow, throwM)
 import           Control.Monad.IO.Class (MonadIO, liftIO)
+import           Control.Monad.Logger (MonadLogger, logWarn)
 import qualified Data.ByteString.Char8 as C
 import           Data.List (find)
 import           Data.Monoid ((<>))
@@ -25,16 +29,18 @@ import qualified Data.Text as T
 import           Path
 import           Stack.Types
 import           System.Directory (findExecutable)
+import           System.Environment (lookupEnv)
 import           System.Exit (ExitCode(..))
+import           System.IO (Handle, hGetContents, hPutStrLn)
 import           System.Process (ProcessHandle, runInteractiveProcess,
                                  waitForProcess)
-import           System.IO (Handle, hGetContents, hPutStrLn)
 
 -- | Sign a file path with GPG, returning the @Signature@.
 gpgSign
-    :: (MonadIO m, MonadThrow m)
+    :: (MonadIO m, MonadLogger m, MonadThrow m)
     => Path Abs File -> m Signature
 gpgSign path = do
+    gpgWarnTTY
     (_hIn,hOut,hErr,process) <-
         gpg
             [ "--output"
@@ -92,5 +98,15 @@ gpg args = do
         Nothing -> do
             mGpgPath <- liftIO (findExecutable "gpg")
             case mGpgPath of
-                Just _ -> liftIO (runInteractiveProcess "gpg" args Nothing Nothing)
+                Just _ ->
+                    liftIO (runInteractiveProcess "gpg" args Nothing Nothing)
                 Nothing -> throwM GPGNotFoundException
+
+gpgWarnTTY
+    :: (MonadIO m, MonadLogger m)
+    => m ()
+gpgWarnTTY = do
+    mTTY <- liftIO (lookupEnv "GPG_TTY")
+    when
+        (null mTTY)
+        ($logWarn "Environment variable GPG_TTY is not set (see `man gpg-agent`)")
