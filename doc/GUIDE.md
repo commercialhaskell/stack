@@ -430,7 +430,7 @@ Completed all 2 actions.
 This output means that the text package was downloaded, configured, built, and
 locally installed. Once that was done, we moved on to building our local package
 (helloworld). At no point did we need to ask stack to build dependencies — it
-does so automatically.
+does so automatically. Also, note that package names are case-sensitive.
 
 ### extra-deps
 
