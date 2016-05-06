@@ -30,6 +30,10 @@ pages:
   - Maintainer guide: MAINTAINER_GUIDE.md
   - Signing key: SIGNING_KEY.md
 
+markdown_extensions:
+- toc:
+    permalink: true
+
 # These extra_templates exists only to redirect from old Sphinx URLs to new
 # MkDocs URLs. This is more properly done using an HTTP redirect, but
 # unfortunately readthedocs.org's page redirection is broken (see
