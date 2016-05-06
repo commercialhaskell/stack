@@ -24,6 +24,7 @@
 module Stack.Config
   (MiniConfig
   ,loadConfig
+  ,loadConfigMaybeProject
   ,loadMiniConfig
   ,packagesParser
   ,resolvePackageEntry
@@ -376,27 +377,27 @@ instance HasGHCVariant MiniConfig where
 -- | Load the 'MiniConfig'.
 loadMiniConfig
     :: (MonadIO m, HasHttpManager a, MonadReader a m, MonadBaseControl IO m, MonadCatch m, MonadLogger m)
-    => Config -> m MiniConfig
-loadMiniConfig config = do
+    => Manager -> Config -> m MiniConfig
+loadMiniConfig manager config = do
     menv <- liftIO $ configEnvOverride config minimalEnvSettings
-    manager <- getHttpManager <$> ask
     ghcVariant <-
         case configGHCVariant0 config of
             Just ghcVariant -> return ghcVariant
             Nothing -> getDefaultGHCVariant menv (configPlatform config)
     return (MiniConfig manager ghcVariant config)
 
--- | Load the configuration, using current directory, environment variables,
--- and defaults as necessary.
-loadConfig :: (MonadLogger m,MonadIO m,MonadMask m,MonadThrow m,MonadBaseControl IO m,MonadReader env m,HasHttpManager env,HasTerminal env)
-           => ConfigMonoid
-           -- ^ Config monoid from parsed command-line arguments
-           -> Maybe (Path Abs File)
-           -- ^ Override stack.yaml
-           -> Maybe AbstractResolver
-           -- ^ Override resolver
-           -> m (LoadConfig m)
-loadConfig configArgs mstackYaml mresolver = do
+-- Load the configuration, using environment variables, and defaults as
+-- necessary.
+loadConfigMaybeProject
+    :: (MonadLogger m,MonadIO m,MonadMask m,MonadThrow m,MonadBaseControl IO m,MonadReader env m,HasHttpManager env,HasTerminal env)
+    => ConfigMonoid
+    -- ^ Config monoid from parsed command-line arguments
+    -> Maybe AbstractResolver
+    -- ^ Override resolver
+    -> Maybe (Project, Path Abs File, ConfigMonoid)
+    -- ^ Project config to use, if any
+    -> m (LoadConfig m)
+loadConfigMaybeProject configArgs mresolver mproject = do
     (stackRoot, userOwnsStackRoot) <- determineStackRootAndOwnership configArgs
     userConfigPath <- getDefaultUserConfigPath stackRoot
     extraConfigs0 <- getExtraConfigs userConfigPath >>= mapM loadConfigYaml
@@ -406,8 +407,6 @@ loadConfig configArgs mstackYaml mresolver = do
             map (\c -> c {configMonoidDockerOpts =
                               (configMonoidDockerOpts c) {dockerMonoidDefaultEnable = Any False}})
                 extraConfigs0
-    mproject <- loadProjectConfig mstackYaml
-
     let mproject' = (\(project, stackYaml, _) -> (project, stackYaml)) <$> mproject
     config <- configFromConfigMonoid stackRoot userConfigPath mresolver mproject' $ mconcat $
         case mproject of
@@ -429,6 +428,20 @@ loadConfig configArgs mstackYaml mresolver = do
         , lcProjectRoot     = mprojectRoot
         }
 
+-- | Load the configuration, using current directory, environment variables,
+-- and defaults as necessary. The passed @Maybe (Path Abs File)@ is an
+-- override for the location of the project's stack.yaml.
+loadConfig :: (MonadLogger m,MonadIO m,MonadMask m,MonadThrow m,MonadBaseControl IO m,MonadReader env m,HasHttpManager env,HasTerminal env)
+           => ConfigMonoid
+           -- ^ Config monoid from parsed command-line arguments
+           -> Maybe AbstractResolver
+           -- ^ Override resolver
+           -> Maybe (Path Abs File)
+           -- ^ Override stack.yaml
+           -> m (LoadConfig m)
+loadConfig configArgs mresolver mstackYaml =
+    loadProjectConfig mstackYaml >>= loadConfigMaybeProject configArgs mresolver
+
 -- | Load the build configuration, adds build-specific values to config loaded by @loadConfig@.
 -- values.
 loadBuildConfig :: (MonadLogger m, MonadIO m, MonadMask m, MonadReader env m, HasHttpManager env, MonadBaseControl IO m, HasTerminal env)
@@ -439,7 +452,8 @@ loadBuildConfig :: (MonadLogger m, MonadIO m, MonadMask m, MonadReader env m, Ha
                 -> m BuildConfig
 loadBuildConfig mproject config mresolver mcompiler = do
     env <- ask
-    miniConfig <- loadMiniConfig config
+    manager <- getHttpManager <$> ask
+    miniConfig <- loadMiniConfig manager config
 
     (project', stackYamlFP) <- case mproject of
       Just (project, fp, _) -> do

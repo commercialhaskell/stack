@@ -96,8 +96,8 @@ upgrade gitRepo mresolver builtHash =
                 (configConfigMonoid config <> Data.Monoid.mempty
                     { configMonoidInstallGHC = First (Just True)
                     })
-                (Just $ dir </> $(mkRelFile "stack.yaml"))
                 mresolver
+                (Just $ dir </> $(mkRelFile "stack.yaml"))
             lcLoadBuildConfig lc Nothing
         envConfig1 <- runInnerStackT bconfig $ setupEnv $ Just $
             "Try rerunning with --install-ghc to install the correct GHC into " <>

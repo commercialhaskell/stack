@@ -1016,8 +1016,8 @@ loadGhcjsEnvConfig stackYaml binPath = runInnerStackLoggingT $ do
             { configMonoidInstallGHC = First (Just True)
             , configMonoidLocalBinPath = First (Just (toFilePath binPath))
             })
-        (Just stackYaml)
         Nothing
+        (Just stackYaml)
     bconfig <- lcLoadBuildConfig lc Nothing
     runInnerStackT bconfig $ setupEnv Nothing
 
