@@ -22,6 +22,9 @@ Other enhancements:
 
 Bug fixes:
 
+* Now ignore project config when doing `stack init` or `stack new`. See
+  [#2110](https://github.com/commercialhaskell/stack/issues/2110).
+
 ## 1.1.0
 
 Release notes:
