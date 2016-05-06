@@ -35,7 +35,7 @@ module Stack.BuildPlan
 
 import           Control.Applicative
 import           Control.Exception (assert)
-import           Control.Monad (liftM, forM)
+import           Control.Monad (liftM, forM, unless)
 import           Control.Monad.Catch
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
@@ -45,7 +45,7 @@ import           Control.Monad.State.Strict      (State, execState, get, modify,
 import           Control.Monad.Trans.Control (MonadBaseControl)
 import qualified Crypto.Hash.SHA256 as SHA256
 import           Data.Aeson.Extended (WithJSONWarnings(..), logJSONWarnings)
-import           Data.Binary.VersionTagged (taggedDecodeOrLoad, decodeFileOrFailDeep)
+import           Data.Binary.VersionTagged (taggedDecodeOrLoad, decodeFileOrFailDeep, taggedEncodeFile)
 import qualified Data.ByteString as S
 import qualified Data.ByteString.Base64.URL as B64URL
 import qualified Data.ByteString.Char8 as S8
@@ -967,6 +967,15 @@ parseCustomMiniBuildPlan mconfigPath0 url0 = do
                Just configPath -> do
                    (getMbp, hash) <- readCustom configPath url0
                    mbp <- getMbp
+                   -- NOTE: We make the choice of only writing a cache
+                   -- file for the full MBP, not the intermediate ones.
+                   -- This isn't necessarily the best choice if we want
+                   -- to share work extended snapshots. I think only
+                   -- writing this one is more efficient for common
+                   -- cases.
+                   binaryPath <- getBinaryPath hash
+                   alreadyCached <- doesFileExist binaryPath
+                   unless alreadyCached $ taggedEncodeFile binaryPath mbp
                    return (mbp, hash)
   where
     downloadCustom url req = do
