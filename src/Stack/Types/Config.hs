@@ -661,22 +661,25 @@ data IsLoaded = Loaded | NotLoaded
 type LoadedResolver = ResolverThat's 'Loaded
 type Resolver = ResolverThat's 'NotLoaded
 
+-- TODO: once GHC 8.0 is the lowest version we support, make these into
+-- actual haddock comments...
+
 -- | How we resolve which dependencies to install given a set of packages.
 data ResolverThat's (l :: IsLoaded) where
-    -- | Use an official snapshot from the Stackage project, either an LTS
-    -- Haskell or Stackage Nightly
+    -- Use an official snapshot from the Stackage project, either an LTS
+    -- Haskell or Stackage Nightly.
     ResolverSnapshot :: !SnapName -> ResolverThat's l
-    -- | Require a specific compiler version, but otherwise provide no
+    -- Require a specific compiler version, but otherwise provide no
     -- build plan. Intended for use cases where end user wishes to
     -- specify all upstream dependencies manually, such as using a
     -- dependency solver.
     ResolverCompiler :: !CompilerVersion -> ResolverThat's l
-    -- | A custom resolver based on the given name and URL. When a URL is
+    -- A custom resolver based on the given name and URL. When a URL is
     -- provided, it file is to be completely immutable. Filepaths are
     -- always loaded. This constructor is used before the build-plan has
     -- been loaded, as we do not yet know the custom snapshot's hash.
     ResolverCustom :: !Text -> !Text -> ResolverThat's 'NotLoaded
-    -- | Like 'ResolverCustom', but after loading the build-plan, so we
+    -- Like 'ResolverCustom', but after loading the build-plan, so we
     -- have a hash. This is necessary in order to identify the location
     -- files are stored for the resolver.
     ResolverCustomLoaded :: !Text -> !Text -> !SnapshotHash -> ResolverThat's 'Loaded
