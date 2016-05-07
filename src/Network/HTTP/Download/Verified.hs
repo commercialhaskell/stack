@@ -8,6 +8,7 @@
 {-# LANGUAGE RankNTypes            #-}
 {-# LANGUAGE GADTs                 #-}
 {-# LANGUAGE StandaloneDeriving    #-}
+{-# LANGUAGE TemplateHaskell       #-}
 module Network.HTTP.Download.Verified
   ( verifiedDownload
   , recoveringHttp
@@ -19,38 +20,41 @@ module Network.HTTP.Download.Verified
   , VerifiedDownloadException(..)
   ) where
 
-import qualified Data.List as List
-import qualified Data.ByteString as ByteString
-import qualified Data.ByteString.Base64 as B64
-import qualified Data.Conduit.Binary as CB
-import qualified Data.Conduit.List as CL
-import qualified Data.Text as Text
-import qualified Data.Text.Encoding as Text
+import qualified    Data.List as List
+import qualified    Data.ByteString as ByteString
+import qualified    Data.ByteString.Base64 as B64
+import qualified    Data.Conduit.Binary as CB
+import qualified    Data.Conduit.List as CL
+import qualified    Data.Text as Text
+import qualified    Data.Text.Encoding as Text
 
-import Control.Monad
-import Control.Monad.Catch
-import Control.Monad.IO.Class
-import Control.Monad.Reader
-import Control.Retry (recovering,limitRetries,RetryPolicy,constantDelay)
-import Control.Applicative
+import              Control.Applicative
+import              Control.Monad
+import              Control.Monad.Catch
+import              Control.Monad.IO.Class
+import              Control.Monad.Logger (logDebug, MonadLogger)
+import              Control.Monad.Reader
+import              Control.Retry (recovering,limitRetries,RetryPolicy,constantDelay)
 import "cryptohash" Crypto.Hash
-import Crypto.Hash.Conduit (sinkHash)
-import Data.ByteString (ByteString)
-import Data.ByteString.Char8 (readInteger)
-import Data.Conduit
-import Data.Conduit.Binary (sourceHandle, sinkHandle)
-import Data.Foldable (traverse_,for_)
-import Data.Monoid
-import Data.String
-import Data.Typeable (Typeable)
-import GHC.IO.Exception (IOException(..),IOErrorType(..))
-import Network.HTTP.Client.Conduit
-import Network.HTTP.Types.Header (hContentLength, hContentMD5)
-import Path
-import Prelude -- Fix AMP warning
-import System.FilePath((<.>))
-import System.Directory
-import System.IO
+import              Crypto.Hash.Conduit (sinkHash)
+import              Data.ByteString (ByteString)
+import              Data.ByteString.Char8 (readInteger)
+import              Data.Conduit
+import              Data.Conduit.Binary (sourceHandle, sinkHandle)
+import              Data.Foldable (traverse_,for_)
+import              Data.Monoid
+import              Data.String
+import              Data.Text.Encoding (decodeUtf8With)
+import              Data.Text.Encoding.Error (lenientDecode)
+import              Data.Typeable (Typeable)
+import              GHC.IO.Exception (IOException(..),IOErrorType(..))
+import              Network.HTTP.Client.Conduit
+import              Network.HTTP.Types.Header (hContentLength, hContentMD5)
+import              Path
+import              Prelude -- Fix AMP warning
+import              System.Directory
+import              System.FilePath ((<.>))
+import              System.IO
 
 -- | A request together with some checks to perform.
 data DownloadRequest = DownloadRequest
@@ -215,7 +219,7 @@ recoveringHttp retryPolicy =
 -- Throws VerifiedDownloadException.
 -- Throws IOExceptions related to file system operations.
 -- Throws HttpException.
-verifiedDownload :: (MonadReader env m, HasHttpManager env, MonadIO m)
+verifiedDownload :: (MonadReader env m, HasHttpManager env, MonadIO m, MonadLogger m)
          => DownloadRequest
          -> Path Abs File -- ^ destination
          -> (Maybe Integer -> Sink ByteString (ReaderT env IO) ()) -- ^ custom hook to observe progress
@@ -223,13 +227,15 @@ verifiedDownload :: (MonadReader env m, HasHttpManager env, MonadIO m)
 verifiedDownload DownloadRequest{..} destpath progressSink = do
     let req = drRequest
     env <- ask
-    liftIO $ whenM' getShouldDownload $ do
-        createDirectoryIfMissing True dir
-        withBinaryFile fptmp WriteMode $ \h ->
-            recoveringHttp drRetryPolicy $
-                flip runReaderT env $
-                    withResponse req (go h)
-        renameFile fptmp fp
+    whenM' (liftIO getShouldDownload) $ do
+        $logDebug $ "Downloading " <> decodeUtf8With lenientDecode (path req)
+        liftIO $ do
+            createDirectoryIfMissing True dir
+            withBinaryFile fptmp WriteMode $ \h ->
+                recoveringHttp drRetryPolicy $
+                    flip runReaderT env $
+                        withResponse req (go h)
+            renameFile fptmp fp
   where
     whenM' mp m = do
         p <- mp

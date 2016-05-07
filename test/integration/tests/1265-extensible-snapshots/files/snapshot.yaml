@@ -1,0 +1,7 @@
+resolver:
+    name: test-snapshot-2
+    location: snapshot-2.yaml
+packages:
+- microlens-0.4.3.0
+drop-packages:
+- zlib

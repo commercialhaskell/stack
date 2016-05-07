@@ -6,14 +6,24 @@ Release notes:
 
 Major changes:
 
+* Extensible custom snapshots implemented. These allow you to define snapshots
+which extend other snapshots. See
+[#863](https://github.com/commercialhaskell/stack/issues/863). Local file custom
+snapshots can now be safely updated without changing their name.  Remote custom
+snapshots should still be treated as immutable.
+
 Behavior changes:
 
 Other enhancements:
 
 * Grab Cabal files via Git SHA to avoid regressions from Hackage revisions
   [#2070](https://github.com/commercialhaskell/stack/pull/2070)
+* Custom snapshots now support `ghc-options`.
 
 Bug fixes:
+
+* Now ignore project config when doing `stack init` or `stack new`. See
+  [#2110](https://github.com/commercialhaskell/stack/issues/2110).
 
 ## 1.1.0
 

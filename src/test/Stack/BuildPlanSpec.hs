@@ -83,6 +83,7 @@ spec = beforeAll setup $ afterAll teardown $ do
             mkMPI deps = MiniPackageInfo
                 { mpiVersion = version
                 , mpiFlags = Map.empty
+                , mpiGhcOptions = []
                 , mpiPackageDeps = Set.fromList $ map pn $ words deps
                 , mpiToolDeps = Set.empty
                 , mpiExes = Set.empty

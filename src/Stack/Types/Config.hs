@@ -11,6 +11,9 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE StandaloneDeriving #-}
 
 -- | The Config type.
 
@@ -32,6 +35,7 @@ module Stack.Types.Config
   ,BuildConfig(..)
   ,bcRoot
   ,bcWorkDir
+  ,bcWantedCompiler
   ,HasBuildConfig(..)
   -- ** GHCVariant & HasGHCVariant
   ,GHCVariant(..)
@@ -52,7 +56,6 @@ module Stack.Types.Config
   ,ConfigException(..)
   -- ** ConfigMonoid
   ,ConfigMonoid(..)
-  ,CliOptionMap(..)
   -- ** EnvSettings
   ,EnvSettings(..)
   ,minimalEnvSettings
@@ -85,12 +88,24 @@ module Stack.Types.Config
   ,PvpBounds(..)
   ,parsePvpBounds
   -- ** Resolver & AbstractResolver
-  ,Resolver(..)
+  ,Resolver
+  ,LoadedResolver
+  ,ResolverThat's(..)
   ,parseResolverText
+  ,resolverDirName
   ,resolverName
+  ,customResolverHash
+  ,toResolverNotLoaded
   ,AbstractResolver(..)
   -- ** SCM
   ,SCM(..)
+  -- ** CustomSnapshot
+  ,CustomSnapshot(..)
+  -- ** GhcOptions
+  ,GhcOptions(..)
+  ,ghcOptionsFor
+  -- ** PackageFlags
+  ,PackageFlags(..)
   -- * Paths
   ,bindirSuffix
   ,configInstalledCache
@@ -169,7 +184,7 @@ import           Generics.Deriving.Monoid (memptydefault, mappenddefault)
 import           Network.HTTP.Client (parseUrl)
 import           Path
 import qualified Paths_stack as Meta
-import           Stack.Types.BuildPlan (SnapName, renderSnapName, parseSnapName)
+import           Stack.Types.BuildPlan (MiniBuildPlan(..), SnapName, renderSnapName, parseSnapName, SnapshotHash (..), trimmedSnapshotHash)
 import           Stack.Types.Urls
 import           Stack.Types.Compiler
 import           Stack.Types.Docker
@@ -278,7 +293,7 @@ data Config =
          -- ^ Parameters for templates.
          ,configScmInit             :: !(Maybe SCM)
          -- ^ Initialize SCM (e.g. git) when creating new projects.
-         ,configGhcOptions          :: !(Map (Maybe PackageName) [Text])
+         ,configGhcOptions          :: !GhcOptions
          -- ^ Additional GHC options to apply to either all packages (Nothing)
          -- or a specific package (Just).
          ,configSetupInfoLocations  :: ![SetupInfoLocation]
@@ -463,10 +478,10 @@ defaultLogLevel = LevelInfo
 -- 'Config' in order to determine the values here.
 data BuildConfig = BuildConfig
     { bcConfig     :: !Config
-    , bcResolver   :: !Resolver
+    , bcResolver   :: !LoadedResolver
       -- ^ How we resolve which dependencies to install given a set of
       -- packages.
-    , bcWantedCompiler :: !CompilerVersion
+    , bcWantedMiniBuildPlan :: !MiniBuildPlan
       -- ^ Compiler version wanted for this build
     , bcPackageEntries :: ![PackageEntry]
       -- ^ Local packages
@@ -482,7 +497,7 @@ data BuildConfig = BuildConfig
       --
       -- Note: if the STACK_YAML environment variable is used, this may be
       -- different from bcRoot </> "stack.yaml"
-    , bcFlags      :: !(Map PackageName (Map FlagName Bool))
+    , bcFlags      :: !PackageFlags
       -- ^ Per-package flag overrides
     , bcImplicitGlobal :: !Bool
       -- ^ Are we loading from the implicit global stack.yaml? This is useful
@@ -500,6 +515,9 @@ bcWorkDir :: (MonadReader env m, HasConfig env) => BuildConfig -> m (Path Abs Di
 bcWorkDir bconfig = do
   workDir <- getWorkDir
   return (bcRoot bconfig </> workDir)
+
+bcWantedCompiler :: BuildConfig -> CompilerVersion
+bcWantedCompiler = mbpCompilerVersion . bcWantedMiniBuildPlan
 
 -- | Configuration after the environment has been setup.
 data EnvConfig = EnvConfig
@@ -617,7 +635,7 @@ data Project = Project
     , projectExtraDeps :: !(Map PackageName Version)
     -- ^ Components of the package list referring to package/version combos,
     -- see: https://github.com/fpco/stack/issues/41
-    , projectFlags :: !(Map PackageName (Map FlagName Bool))
+    , projectFlags :: !PackageFlags
     -- ^ Per-package flag overrides
     , projectResolver :: !Resolver
     -- ^ How we resolve which dependencies to use
@@ -638,29 +656,48 @@ instance ToJSON Project where
         , "extra-package-dbs" .= projectExtraPackageDBs p
         ])
 
+data IsLoaded = Loaded | NotLoaded
+
+type LoadedResolver = ResolverThat's 'Loaded
+type Resolver = ResolverThat's 'NotLoaded
+
+-- TODO: once GHC 8.0 is the lowest version we support, make these into
+-- actual haddock comments...
+
 -- | How we resolve which dependencies to install given a set of packages.
-data Resolver
-  = ResolverSnapshot SnapName
-  -- ^ Use an official snapshot from the Stackage project, either an LTS
-  -- Haskell or Stackage Nightly
+data ResolverThat's (l :: IsLoaded) where
+    -- Use an official snapshot from the Stackage project, either an LTS
+    -- Haskell or Stackage Nightly.
+    ResolverSnapshot :: !SnapName -> ResolverThat's l
+    -- Require a specific compiler version, but otherwise provide no
+    -- build plan. Intended for use cases where end user wishes to
+    -- specify all upstream dependencies manually, such as using a
+    -- dependency solver.
+    ResolverCompiler :: !CompilerVersion -> ResolverThat's l
+    -- A custom resolver based on the given name and URL. When a URL is
+    -- provided, it file is to be completely immutable. Filepaths are
+    -- always loaded. This constructor is used before the build-plan has
+    -- been loaded, as we do not yet know the custom snapshot's hash.
+    ResolverCustom :: !Text -> !Text -> ResolverThat's 'NotLoaded
+    -- Like 'ResolverCustom', but after loading the build-plan, so we
+    -- have a hash. This is necessary in order to identify the location
+    -- files are stored for the resolver.
+    ResolverCustomLoaded :: !Text -> !Text -> !SnapshotHash -> ResolverThat's 'Loaded
 
-  | ResolverCompiler !CompilerVersion
-  -- ^ Require a specific compiler version, but otherwise provide no build plan.
-  -- Intended for use cases where end user wishes to specify all upstream
-  -- dependencies manually, such as using a dependency solver.
+deriving instance Show (ResolverThat's k)
 
-  | ResolverCustom !Text !Text
-  -- ^ A custom resolver based on the given name and URL. This file is assumed
-  -- to be completely immutable.
-  deriving (Show)
-
-instance ToJSON Resolver where
-    toJSON (ResolverCustom name location) = object
-        [ "name" .= name
-        , "location" .= location
-        ]
-    toJSON x = toJSON $ resolverName x
-instance FromJSON (WithJSONWarnings Resolver) where
+instance ToJSON (ResolverThat's k) where
+    toJSON x = case x of
+        ResolverSnapshot{} -> toJSON $ resolverName x
+        ResolverCompiler{} -> toJSON $ resolverName x
+        ResolverCustom n l -> handleCustom n l
+        ResolverCustomLoaded n l _ -> handleCustom n l
+      where
+        handleCustom n l = object
+             [ "name" .= n
+             , "location" .= l
+             ]
+instance FromJSON (WithJSONWarnings (ResolverThat's 'NotLoaded)) where
     -- Strange structuring is to give consistent error messages
     parseJSON v@(Object _) = withObjectWarnings "Resolver" (\o -> ResolverCustom
         <$> o ..: "name"
@@ -672,10 +709,22 @@ instance FromJSON (WithJSONWarnings Resolver) where
 
 -- | Convert a Resolver into its @Text@ representation, as will be used by
 -- directory names
-resolverName :: Resolver -> Text
+resolverDirName :: LoadedResolver -> Text
+resolverDirName (ResolverSnapshot name) = renderSnapName name
+resolverDirName (ResolverCompiler v) = compilerVersionText v
+resolverDirName (ResolverCustomLoaded name _ hash) = "custom-" <> name <> "-" <> decodeUtf8 (trimmedSnapshotHash hash)
+
+-- | Convert a Resolver into its @Text@ representation for human
+-- presentation.
+resolverName :: ResolverThat's l -> Text
 resolverName (ResolverSnapshot name) = renderSnapName name
 resolverName (ResolverCompiler v) = compilerVersionText v
 resolverName (ResolverCustom name _) = "custom-" <> name
+resolverName (ResolverCustomLoaded name _ _) = "custom-" <> name
+
+customResolverHash :: LoadedResolver-> Maybe SnapshotHash
+customResolverHash (ResolverCustomLoaded _ _ hash) = Just hash
+customResolverHash _ = Nothing
 
 -- | Try to parse a @Resolver@ from a @Text@. Won't work for complex resolvers (like custom).
 parseResolverText :: MonadThrow m => Text -> m Resolver
@@ -683,6 +732,12 @@ parseResolverText t
     | Right x <- parseSnapName t = return $ ResolverSnapshot x
     | Just v <- parseCompilerVersion t = return $ ResolverCompiler v
     | otherwise = throwM $ ParseResolverException t
+
+toResolverNotLoaded :: LoadedResolver -> Resolver
+toResolverNotLoaded r = case r of
+    ResolverSnapshot s -> ResolverSnapshot s
+    ResolverCompiler v -> ResolverCompiler v
+    ResolverCustomLoaded n l _ -> ResolverCustom n l
 
 -- | Class for environment values which have access to the stack root
 class HasStackRoot env where
@@ -795,7 +850,7 @@ data ConfigMonoid =
     -- ^ Template parameters.
     ,configMonoidScmInit             :: !(First SCM)
     -- ^ Initialize SCM (e.g. git init) when making new projects?
-    ,configMonoidGhcOptions          :: !(CliOptionMap (Maybe PackageName) Text)
+    ,configMonoidGhcOptions          :: !GhcOptions
     -- ^ See 'configGhcOptions'
     ,configMonoidExtraPath           :: ![Path Abs Dir]
     -- ^ Additional paths to search for executables in
@@ -871,12 +926,7 @@ parseConfigMonoidJSON obj = do
           return (First scmInit,fromMaybe M.empty params)
     configMonoidCompilerCheck <- First <$> obj ..:? configMonoidCompilerCheckName
 
-    mghcoptions <- obj ..:? configMonoidGhcOptionsName
-    configMonoidGhcOptions <-
-        CliOptionMap <$>
-            case mghcoptions of
-                Nothing -> return mempty
-                Just m -> fmap Map.fromList $ mapM handleGhcOptions $ Map.toList m
+    configMonoidGhcOptions <- obj ..:? configMonoidGhcOptionsName ..!= mempty
 
     extraPath <- obj ..:? configMonoidExtraPathName ..!= []
     configMonoidExtraPath <- forM extraPath $
@@ -897,19 +947,6 @@ parseConfigMonoidJSON obj = do
 
     return ConfigMonoid {..}
   where
-    handleGhcOptions :: Monad m => (Text, Text) -> m (Maybe PackageName, [Text])
-    handleGhcOptions (name', vals') = do
-        name <-
-            if name' == "*"
-                then return Nothing
-                else case parsePackageNameFromString $ T.unpack name' of
-                        Left e -> fail $ show e
-                        Right x -> return $ Just x
-
-        case parseArgs Escaping vals' of
-            Left e -> fail e
-            Right vals -> return (name, map T.pack vals)
-
     handleExplicitSetupDep :: Monad m => (Text, Bool) -> m (Maybe PackageName, Bool)
     handleExplicitSetupDep (name', b) = do
         name <-
@@ -1031,26 +1068,16 @@ configMonoidDefaultTemplateName = "default-template"
 configMonoidAllowDifferentUserName :: Text
 configMonoidAllowDifferentUserName = "allow-different-user"
 
--- | 'Map' monoid under @'Map.unionWith' '(++)'@ for collecting command line options.
-newtype CliOptionMap k option = CliOptionMap { getCliOptionMap :: Map k [option] }
-    deriving Show
-
-instance Ord k => Monoid (CliOptionMap k option) where
-    mempty = CliOptionMap Map.empty
-    -- FIXME: Should 'mappend' be defined with @'Map.unionWith' ('flip' '(++)')@
-    -- instead, so the options from the left argument override the ones on the right?
-    -- See https://github.com/commercialhaskell/stack/issues/2078.
-    mappend (CliOptionMap l) (CliOptionMap r) = CliOptionMap (Map.unionWith (++) l r)
-
 data ConfigException
   = ParseConfigFileException (Path Abs File) ParseException
+  | ParseCustomSnapshotException Text ParseException
   | ParseResolverException Text
   | NoProjectConfigFound (Path Abs Dir) (Maybe Text)
   | UnexpectedArchiveContents [Path Abs Dir] [Path Abs File]
   | UnableToExtractArchive Text (Path Abs File)
   | BadStackVersionException VersionRange
   | NoMatchingSnapshot (NonEmpty SnapName)
-  | ResolverMismatch Resolver String
+  | forall l. ResolverMismatch (ResolverThat's l) String
   | ResolverPartial Resolver String
   | NoSuchDirectory FilePath
   | ParseGHCVariantException String
@@ -1065,6 +1092,14 @@ instance Show ConfigException where
         , "':\n"
         , show exception
         , "\nSee http://docs.haskellstack.org/en/stable/yaml_configuration/."
+        ]
+    show (ParseCustomSnapshotException url exception) = concat
+        [ "Could not parse '"
+        , T.unpack url
+        , "':\n"
+        , show exception
+        -- FIXME: Link to docs about custom snapshots
+        -- , "\nSee http://docs.haskellstack.org/en/stable/yaml_configuration/."
         ]
     show (ParseResolverException t) = concat
         [ "Invalid resolver value: "
@@ -1267,7 +1302,7 @@ platformSnapAndCompilerRel
 platformSnapAndCompilerRel = do
     bc <- asks getBuildConfig
     platform <- platformGhcRelDir
-    name <- parseRelDir $ T.unpack $ resolverName $ bcResolver bc
+    name <- parseRelDir $ T.unpack $ resolverDirName $ bcResolver bc
     ghc <- compilerVersionDir
     useShaPathOnWindows (platform </> name </> ghc)
 
@@ -1664,3 +1699,79 @@ data DockerUser = DockerUser
     , duGroups :: [GroupID] -- ^ Supplemantal groups
     , duUmask :: FileMode -- ^ File creation mask }
     } deriving (Read,Show)
+
+-- TODO: See section of
+-- https://github.com/commercialhaskell/stack/issues/1265 about
+-- rationalizing the config. It would also be nice to share more code.
+-- For now it's more convenient just to extend this type. However, it's
+-- unpleasant that it has overlap with both 'Project' and 'Config'.
+data CustomSnapshot = CustomSnapshot
+    { csCompilerVersion :: !(Maybe CompilerVersion)
+    , csPackages :: !(Set PackageIdentifier)
+    , csDropPackages :: !(Set PackageName)
+    , csFlags :: !PackageFlags
+    , csGhcOptions :: !GhcOptions
+    }
+
+instance FromJSON (WithJSONWarnings (CustomSnapshot, Maybe Resolver)) where
+    parseJSON = withObjectWarnings "CustomSnapshot" $ \o -> (,)
+        <$> (CustomSnapshot
+            <$> o ..:? "compiler"
+            <*> o ..:? "packages" ..!= mempty
+            <*> o ..:? "drop-packages" ..!= mempty
+            <*> o ..:? "flags" ..!= mempty
+            <*> o ..:? configMonoidGhcOptionsName ..!= mempty)
+        <*> jsonSubWarningsT (o ..:? "resolver")
+
+newtype GhcOptions = GhcOptions
+    { unGhcOptions :: Map (Maybe PackageName) [Text] }
+    deriving Show
+
+instance FromJSON GhcOptions where
+    parseJSON val = do
+        ghcOptions <- parseJSON val
+        fmap (GhcOptions . Map.fromList) $ mapM handleGhcOptions $ Map.toList ghcOptions
+      where
+        handleGhcOptions :: Monad m => (Text, Text) -> m (Maybe PackageName, [Text])
+        handleGhcOptions (name', vals') = do
+            name <-
+                if name' == "*"
+                    then return Nothing
+                    else case parsePackageNameFromString $ T.unpack name' of
+                            Left e -> fail $ show e
+                            Right x -> return $ Just x
+
+            case parseArgs Escaping vals' of
+                Left e -> fail e
+                Right vals -> return (name, map T.pack vals)
+
+instance Monoid GhcOptions where
+    mempty = GhcOptions mempty
+    -- FIXME: Should GhcOptions really monoid like this? Keeping it this
+    -- way preserves the behavior of the ConfigMonoid. However, this
+    -- means there isn't the ability to fully override snapshot
+    -- ghc-options in the same way there is for flags. Do we want to
+    -- change the semantics here? (particularly for extensible
+    -- snapshots)
+    mappend (GhcOptions l) (GhcOptions r) =
+        GhcOptions (Map.unionWith (++) l r)
+
+ghcOptionsFor :: PackageName -> GhcOptions -> [Text]
+ghcOptionsFor name (GhcOptions mp) =
+    M.findWithDefault [] Nothing mp ++
+    M.findWithDefault [] (Just name) mp
+
+newtype PackageFlags = PackageFlags
+    { unPackageFlags :: Map PackageName (Map FlagName Bool) }
+    deriving Show
+
+instance FromJSON PackageFlags where
+    parseJSON val = PackageFlags <$> parseJSON val
+
+instance ToJSON PackageFlags where
+    toJSON = toJSON . unPackageFlags
+
+instance Monoid PackageFlags where
+    mempty = PackageFlags mempty
+    mappend (PackageFlags l) (PackageFlags r) =
+        PackageFlags (Map.unionWith Map.union l r)

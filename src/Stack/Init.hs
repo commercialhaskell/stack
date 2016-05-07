@@ -118,7 +118,7 @@ initProject currDir initOpts mresolver = do
             { projectUserMsg = if userMsg == "" then Nothing else Just userMsg
             , projectPackages = pkgs
             , projectExtraDeps = extraDeps
-            , projectFlags = removeSrcPkgDefaultFlags gpds flags
+            , projectFlags = PackageFlags (removeSrcPkgDefaultFlags gpds flags)
             , projectResolver = r
             , projectCompiler = Nothing
             , projectExtraPackageDBs = []

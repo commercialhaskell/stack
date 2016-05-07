@@ -473,21 +473,12 @@ getResolverConstraints
     -> Resolver
     -> m (CompilerVersion,
           Map PackageName (Version, Map FlagName Bool))
-getResolverConstraints stackYaml resolver =
-    case resolver of
-        ResolverSnapshot snapName -> do
-            mbp <- loadMiniBuildPlan snapName
-            return (mbpCompilerVersion mbp, mbpConstraints mbp)
-        ResolverCustom _ url -> do
-            -- FIXME instead of passing the stackYaml dir we should maintain
-            -- the file URL in the custom resolver always relative to stackYaml.
-            mbp <- parseCustomMiniBuildPlan stackYaml url
-            return (mbpCompilerVersion mbp, mbpConstraints mbp)
-        ResolverCompiler compiler ->
-            return (compiler, Map.empty)
-    where
-      mpiConstraints mpi = (mpiVersion mpi, mpiFlags mpi)
-      mbpConstraints mbp = fmap mpiConstraints (mbpPackages mbp)
+getResolverConstraints stackYaml resolver = do
+    (mbp, _loadedResolver) <- loadResolver (Just stackYaml) resolver
+    return (mbpCompilerVersion mbp, mbpConstraints mbp)
+  where
+    mpiConstraints mpi = (mpiVersion mpi, mpiFlags mpi)
+    mbpConstraints mbp = fmap mpiConstraints (mbpPackages mbp)
 
 -- | Given a bundle of user packages, flag constraints on those packages and a
 -- resolver, determine if the resolver fully, partially or fails to satisfy the
@@ -660,7 +651,7 @@ solveExtraDeps modStackYaml = do
     (bundle, _) <- cabalPackagesCheck cabalfps noPkgMsg (Just dupPkgFooter)
 
     let gpds              = Map.elems $ fmap snd bundle
-        oldFlags          = bcFlags bconfig
+        oldFlags          = unPackageFlags (bcFlags bconfig)
         oldExtraVersions  = bcExtraDeps bconfig
         resolver          = bcResolver bconfig
         oldSrcs           = gpdPackages gpds
@@ -670,13 +661,14 @@ solveExtraDeps modStackYaml = do
         srcConstraints    = mergeConstraints oldSrcs oldSrcFlags
         extraConstraints  = mergeConstraints oldExtraVersions oldExtraFlags
 
-    resolverResult <- checkResolverSpec gpds (Just oldSrcFlags) resolver
+    let resolver' = toResolverNotLoaded resolver
+    resolverResult <- checkResolverSpec gpds (Just oldSrcFlags) resolver'
     resultSpecs <- case resolverResult of
         BuildPlanCheckOk flags ->
             return $ Just ((mergeConstraints oldSrcs flags), Map.empty)
         BuildPlanCheckPartial {} -> do
             eres <- solveResolverSpec stackYaml cabalDirs
-                              (resolver, srcConstraints, extraConstraints)
+                              (resolver', srcConstraints, extraConstraints)
             -- TODO Solver should also use the init code to ignore incompatible
             -- packages
             return $ either (const Nothing) Just eres

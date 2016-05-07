@@ -3,6 +3,7 @@
 {-# LANGUAGE TemplateHaskell       #-}
 {-# LANGUAGE TupleSections         #-}
 {-# LANGUAGE ConstraintKinds       #-}
+{-# LANGUAGE OverloadedStrings     #-}
 -- | Cache information about previous builds
 module Stack.Build.Cache
     ( tryGetBuildCache
@@ -28,7 +29,7 @@ module Stack.Build.Cache
 import           Control.Exception.Enclosed (handleIO)
 import           Control.Monad.Catch (MonadThrow, MonadCatch)
 import           Control.Monad.IO.Class
-import           Control.Monad.Logger (MonadLogger)
+import           Control.Monad.Logger (MonadLogger, logDebug)
 import           Control.Monad.Reader
 import qualified Crypto.Hash.SHA256 as SHA256
 import qualified Data.Binary as Binary (encode)
@@ -37,6 +38,7 @@ import qualified Data.ByteString.Char8 as S8
 import qualified Data.ByteString.Base16 as B16
 import           Data.Map (Map)
 import           Data.Maybe (fromMaybe, mapMaybe)
+import           Data.Monoid ((<>))
 import           Data.Set (Set)
 import qualified Data.Set as Set
 import           Data.Text (Text)
@@ -234,7 +236,7 @@ checkTestSuccess dir =
 -- | The file containing information on the given package/configuration
 -- combination. The filename contains a hash of the non-directory configure
 -- options for quick lookup if there's a match.
-precompiledCacheFile :: (MonadThrow m, MonadReader env m, HasEnvConfig env)
+precompiledCacheFile :: (MonadThrow m, MonadReader env m, HasEnvConfig env, MonadLogger m)
                      => PackageIdentifier
                      -> ConfigureOpts
                      -> Set GhcPkgId -- ^ dependencies
@@ -255,14 +257,13 @@ precompiledCacheFile pkgident copts installedPackageIDs = do
     -- unnecessarily.
     --
     -- See issue: https://github.com/commercialhaskell/stack/issues/1103
-    let cacheInput
-            | envConfigCabalVersion ec >= $(mkVersion "1.22") =
-                Binary.encode $ coNoDirs copts
-            | otherwise =
-                Binary.encode
-                    ( coNoDirs copts
-                    , installedPackageIDs
-                    )
+    let computeCacheSource input = do
+            $logDebug $ "Precompiled cache input = " <> T.pack (show input)
+            return $ Binary.encode input
+    cacheInput <-
+        if envConfigCabalVersion ec >= $(mkVersion "1.22")
+            then computeCacheSource (coNoDirs copts)
+            else computeCacheSource (coNoDirs copts, installedPackageIDs)
 
     -- We only pay attention to non-directory options. We don't want to avoid a
     -- cache hit just because it was installed in a different directory.
@@ -279,7 +280,7 @@ precompiledCacheFile pkgident copts installedPackageIDs = do
          </> copts'
 
 -- | Write out information about a newly built package
-writePrecompiledCache :: (MonadThrow m, MonadReader env m, HasEnvConfig env, MonadIO m)
+writePrecompiledCache :: (MonadThrow m, MonadReader env m, HasEnvConfig env, MonadIO m, MonadLogger m)
                       => BaseConfigOpts
                       -> PackageIdentifier
                       -> ConfigureOpts
@@ -306,7 +307,7 @@ writePrecompiledCache baseConfigOpts pkgident copts depIDs mghcPkgId exes = do
 
 -- | Check the cache for a precompiled package matching the given
 -- configuration.
-readPrecompiledCache :: (MonadThrow m, MonadReader env m, HasEnvConfig env, MonadIO m)
+readPrecompiledCache :: (MonadThrow m, MonadReader env m, HasEnvConfig env, MonadIO m, MonadLogger m)
                      => PackageIdentifier -- ^ target package
                      -> ConfigureOpts
                      -> Set GhcPkgId -- ^ dependencies

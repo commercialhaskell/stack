@@ -557,14 +557,13 @@ data BaseConfigOpts = BaseConfigOpts
 configureOpts :: EnvConfig
               -> BaseConfigOpts
               -> Map PackageIdentifier GhcPkgId -- ^ dependencies
-              -> Bool -- ^ wanted?
               -> Bool -- ^ local non-extra-dep?
               -> InstallLocation
               -> Package
               -> ConfigureOpts
-configureOpts econfig bco deps wanted isLocal loc package = ConfigureOpts
+configureOpts econfig bco deps isLocal loc package = ConfigureOpts
     { coDirs = configureOptsDirs bco loc package
-    , coNoDirs = configureOptsNoDir econfig bco deps wanted isLocal package
+    , coNoDirs = configureOptsNoDir econfig bco deps isLocal package
     }
 
 -- options set by stack
@@ -626,11 +625,10 @@ configureOptsDirs bco loc package = concat
 configureOptsNoDir :: EnvConfig
                    -> BaseConfigOpts
                    -> Map PackageIdentifier GhcPkgId -- ^ dependencies
-                   -> Bool -- ^ wanted?
                    -> Bool -- ^ is this a local, non-extra-dep?
                    -> Package
                    -> [String]
-configureOptsNoDir econfig bco deps wanted isLocal package = concat
+configureOptsNoDir econfig bco deps isLocal package = concat
     [ depOptions
     , ["--enable-library-profiling" | boptsLibProfile bopts || boptsExeProfile bopts]
     , ["--enable-executable-profiling" | boptsExeProfile bopts && isLocal]
@@ -642,7 +640,7 @@ configureOptsNoDir econfig bco deps wanted isLocal package = concat
                            else "-") <>
                        flagNameString name)
                     (Map.toList flags)
-    , concatMap (\x -> ["--ghc-options", T.unpack x]) allGhcOptions
+    , concatMap (\x -> ["--ghc-options", T.unpack x]) (packageGhcOptions package)
     , map (("--extra-include-dirs=" ++) . T.unpack) (Set.toList (configExtraIncludeDirs config))
     , map (("--extra-lib-dirs=" ++) . T.unpack) (Set.toList (configExtraLibDirs config))
     , if whichCompiler (envConfigCompilerVersion econfig) == Ghcjs
@@ -653,7 +651,6 @@ configureOptsNoDir econfig bco deps wanted isLocal package = concat
   where
     config = getConfig econfig
     bopts = bcoBuildOpts bco
-    boptsCli = bcoBuildOptsCLI bco
 
     -- TODO: instead always enable this when the cabal version is new
     -- enough. That way we'll detect bugs with --exact-configuration
@@ -686,24 +683,6 @@ configureOptsNoDir econfig bco deps wanted isLocal package = concat
         ]
       where
         PackageIdentifier name version = ident
-
-    allGhcOptions = concat
-        [ Map.findWithDefault [] Nothing (configGhcOptions config)
-        , Map.findWithDefault [] (Just $ packageName package) (configGhcOptions config)
-        , concat [["-fhpc"] | isLocal && toCoverage (boptsTestOpts bopts)]
-        , if (boptsLibProfile bopts || boptsExeProfile bopts)
-             then ["-auto-all","-caf-all"]
-             else []
-        , if includeExtraOptions
-            then boptsCLIGhcOptions boptsCli
-            else []
-        ]
-
-    includeExtraOptions =
-        case configApplyGhcOptions config of
-            AGOTargets -> wanted
-            AGOLocals -> isLocal
-            AGOEverything -> True
 
 -- | Get set of wanted package names from locals.
 wantedLocalPackages :: [LocalPackage] -> Set PackageName

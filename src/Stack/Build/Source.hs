@@ -11,11 +11,12 @@ module Stack.Build.Source
     ( loadSourceMap
     , SourceMap
     , PackageSource (..)
-    , localFlags
+    , getLocalFlags
+    , getGhcOptions
     , getLocalPackageViews
-    , loadLocalPackage
     , parseTargetsFromBuildOpts
     , addUnlistedToBuildCache
+    , getDefaultPackageConfig
     , getPackageConfig
     ) where
 
@@ -23,7 +24,7 @@ import           Control.Applicative
 import           Control.Arrow ((&&&))
 import           Control.Exception (assert, catch)
 import           Control.Monad
-import           Control.Monad.Catch (MonadMask)
+import           Control.Monad.Catch (MonadMask, MonadCatch)
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import           Control.Monad.Reader (MonadReader, asks)
@@ -57,8 +58,7 @@ import           Path.IO
 import           Prelude
 import           Stack.Build.Cache
 import           Stack.Build.Target
-import           Stack.BuildPlan (loadMiniBuildPlan, shadowMiniBuildPlan,
-                                  parseCustomMiniBuildPlan)
+import           Stack.BuildPlan (shadowMiniBuildPlan)
 import           Stack.Constants (wiredInPackages)
 import           Stack.Package
 import           Stack.PackageIndex (getPackageVersions)
@@ -111,31 +111,34 @@ loadSourceMap needTargets boptsCli = do
         -- Add the extra deps from the stack.yaml file to the deps grabbed from
         -- the snapshot
         extraDeps2 = Map.union
-            (Map.map (\v -> (v, Map.empty)) extraDeps0)
-            (Map.map (mpiVersion &&& mpiFlags) extraDeps1)
+            (Map.map (\v -> (v, Map.empty, [])) extraDeps0)
+            (Map.map (\mpi -> (mpiVersion mpi, mpiFlags mpi, mpiGhcOptions mpi)) extraDeps1)
 
-        -- Overwrite any flag settings with those from the config file
+        -- Add flag and ghc-option settings from the config file / cli
         extraDeps3 = Map.mapWithKey
-            (\n (v, f) -> PSUpstream v Local
-               (case ( Map.lookup (Just n) $ boptsCLIFlags boptsCli
-                     , Map.lookup Nothing $ boptsCLIFlags boptsCli
-                     , Map.lookup n $ bcFlags bconfig
-                     ) of
-                    -- Didn't have any flag overrides, fall back to the flags
-                    -- defined in the snapshot.
-                    (Nothing, Nothing, Nothing) -> f
-                    -- Either command line flag for this package, general
-                    -- command line flag, or flag in stack.yaml is defined.
-                    -- Take all of those and ignore the snapshot flags.
-                    (x, y, z) -> Map.unions
-                        [ fromMaybe Map.empty x
-                        , fromMaybe Map.empty y
-                        , fromMaybe Map.empty z
-                        ])
-
+            (\n (v, flags0, ghcOptions0) ->
+                let flags =
+                        case ( Map.lookup (Just n) $ boptsCLIFlags boptsCli
+                             , Map.lookup Nothing $ boptsCLIFlags boptsCli
+                             , Map.lookup n $ unPackageFlags $ bcFlags bconfig
+                             ) of
+                            -- Didn't have any flag overrides, fall back to the flags
+                            -- defined in the snapshot.
+                            (Nothing, Nothing, Nothing) -> flags0
+                            -- Either command line flag for this package, general
+                            -- command line flag, or flag in stack.yaml is defined.
+                            -- Take all of those and ignore the snapshot flags.
+                            (x, y, z) -> Map.unions
+                                [ fromMaybe Map.empty x
+                                , fromMaybe Map.empty y
+                                , fromMaybe Map.empty z
+                                ]
+                    ghcOptions =
+                        ghcOptions0 ++
+                        getGhcOptions bconfig boptsCli n False False
                  -- currently have no ability for extra-deps to specify their
                  -- cabal file hashes
-                 Nothing)
+                in PSUpstream v Local flags ghcOptions Nothing)
             extraDeps2
 
     let sourceMap = Map.unions
@@ -144,10 +147,44 @@ loadSourceMap needTargets boptsCli = do
                  in (packageName p, PSLocal lp)
             , extraDeps3
             , flip fmap (mbpPackages mbp) $ \mpi ->
-                PSUpstream (mpiVersion mpi) Snap (mpiFlags mpi) (mpiGitSHA1 mpi)
+                PSUpstream (mpiVersion mpi) Snap (mpiFlags mpi) (mpiGhcOptions mpi) (mpiGitSHA1 mpi)
             ] `Map.difference` Map.fromList (map (, ()) (HashSet.toList wiredInPackages))
 
     return (targets, mbp, locals, nonLocalTargets, sourceMap)
+
+-- | All flags for a local package
+getLocalFlags
+    :: BuildConfig
+    -> BuildOptsCLI
+    -> PackageName
+    -> Map FlagName Bool
+getLocalFlags bconfig boptsCli name = Map.unions
+    [ Map.findWithDefault Map.empty (Just name) cliFlags
+    , Map.findWithDefault Map.empty Nothing cliFlags
+    , Map.findWithDefault Map.empty name (unPackageFlags (bcFlags bconfig))
+    ]
+  where
+    cliFlags = boptsCLIFlags boptsCli
+
+getGhcOptions :: BuildConfig -> BuildOptsCLI -> PackageName -> Bool -> Bool -> [Text]
+getGhcOptions bconfig boptsCli name isTarget isLocal = concat
+    [ ghcOptionsFor name (configGhcOptions config)
+    , concat [["-fhpc"] | isLocal && toCoverage (boptsTestOpts bopts)]
+    , if (boptsLibProfile bopts || boptsExeProfile bopts)
+         then ["-auto-all","-caf-all"]
+         else []
+    , if includeExtraOptions
+         then boptsCLIGhcOptions boptsCli
+         else []
+    ]
+  where
+    bopts = configBuild config
+    config = bcConfig bconfig
+    includeExtraOptions =
+        case configApplyGhcOptions config of
+            AGOTargets -> isTarget
+            AGOLocals -> isLocal
+            AGOEverything -> True
 
 -- | Use the build options and environment to parse targets.
 parseTargetsFromBuildOpts
@@ -159,9 +196,6 @@ parseTargetsFromBuildOpts needTargets boptscli = do
     bconfig <- asks getBuildConfig
     mbp0 <-
         case bcResolver bconfig of
-            ResolverSnapshot snapName -> do
-                $logDebug $ "Checking resolver: " <> renderSnapName snapName
-                loadMiniBuildPlan snapName
             ResolverCompiler _ -> do
                 -- We ignore the resolver version, as it might be
                 -- GhcMajorVersion, and we want the exact version
@@ -171,9 +205,7 @@ parseTargetsFromBuildOpts needTargets boptscli = do
                     { mbpCompilerVersion = version
                     , mbpPackages = Map.empty
                     }
-            ResolverCustom _ url -> do
-                stackYamlFP <- asks $ bcStackYaml . getBuildConfig
-                parseCustomMiniBuildPlan stackYamlFP url
+            _ -> return (bcWantedMiniBuildPlan bconfig)
     rawLocals <- getLocalPackageViews
     workingDir <- getCurrentDir
 
@@ -285,11 +317,11 @@ loadLocalPackage
     -> (PackageName, (LocalPackageView, GenericPackageDescription))
     -> m LocalPackage
 loadLocalPackage boptsCli targets (name, (lpv, gpkg)) = do
-    config  <- getPackageConfig boptsCli name
+    let mtarget = Map.lookup name targets
+    config  <- getPackageConfig boptsCli name (isJust mtarget) True
     bopts <- asks (configBuild . getConfig)
     let pkg = resolvePackage config gpkg
 
-        mtarget = Map.lookup name targets
         (exes, tests, benches) =
             case mtarget of
                 Just (STLocalComps comps) -> splitComponents $ Set.toList comps
@@ -384,7 +416,7 @@ checkFlagsUsed boptsCli lps extraDeps snapshot = do
         -- Check if flags specified in stack.yaml and the command line are
         -- used, see https://github.com/commercialhaskell/stack/issues/617
     let flags = map (, FSCommandLine) [(k, v) | (Just k, v) <- Map.toList $ boptsCLIFlags boptsCli]
-             ++ map (, FSStackYaml) (Map.toList $ bcFlags bconfig)
+             ++ map (, FSStackYaml) (Map.toList $ unPackageFlags $ bcFlags bconfig)
 
         localNameMap = Map.fromList $ map (packageName . lpPackage &&& lpPackage) lps
         checkFlagUsed ((name, userFlags), source) =
@@ -414,17 +446,6 @@ checkFlagsUsed boptsCli lps extraDeps snapshot = do
         $ throwM
         $ InvalidFlagSpecification
         $ Set.fromList unusedFlags
-
--- | All flags for a local package
-localFlags :: Map (Maybe PackageName) (Map FlagName Bool)
-           -> BuildConfig
-           -> PackageName
-           -> Map FlagName Bool
-localFlags boptsflags bconfig name = Map.unions
-    [ Map.findWithDefault Map.empty (Just name) boptsflags
-    , Map.findWithDefault Map.empty Nothing boptsflags
-    , Map.findWithDefault Map.empty name (bcFlags bconfig)
-    ]
 
 -- | Add in necessary packages to extra dependencies
 --
@@ -568,18 +589,35 @@ checkComponentsBuildable lps =
         , c <- Set.toList (lpUnbuildable lp)
         ]
 
--- | Get 'PackageConfig' for package given its name.
-getPackageConfig :: (MonadIO m, MonadThrow m, MonadMask m, MonadLogger m, MonadReader env m, HasEnvConfig env)
-  => BuildOptsCLI
-  -> PackageName
-  -> m PackageConfig
-getPackageConfig boptsCli name = do
+getDefaultPackageConfig :: (MonadIO m, MonadThrow m, MonadCatch m, MonadLogger m, MonadReader env m, HasEnvConfig env)
+  => m PackageConfig
+getDefaultPackageConfig = do
   econfig <- asks getEnvConfig
   bconfig <- asks getBuildConfig
   return PackageConfig
     { packageConfigEnableTests = False
     , packageConfigEnableBenchmarks = False
-    , packageConfigFlags = localFlags (boptsCLIFlags boptsCli) bconfig name
+    , packageConfigFlags = M.empty
+    , packageConfigGhcOptions = []
+    , packageConfigCompilerVersion = envConfigCompilerVersion econfig
+    , packageConfigPlatform = configPlatform $ getConfig bconfig
+    }
+
+-- | Get 'PackageConfig' for package given its name.
+getPackageConfig :: (MonadIO m, MonadThrow m, MonadMask m, MonadLogger m, MonadReader env m, HasEnvConfig env)
+  => BuildOptsCLI
+  -> PackageName
+  -> Bool
+  -> Bool
+  -> m PackageConfig
+getPackageConfig boptsCli name isTarget isLocal = do
+  econfig <- asks getEnvConfig
+  bconfig <- asks getBuildConfig
+  return PackageConfig
+    { packageConfigEnableTests = False
+    , packageConfigEnableBenchmarks = False
+    , packageConfigFlags = getLocalFlags bconfig boptsCli name
+    , packageConfigGhcOptions = getGhcOptions bconfig boptsCli name isTarget isLocal
     , packageConfigCompilerVersion = envConfigCompilerVersion econfig
     , packageConfigPlatform = configPlatform $ getConfig bconfig
     }

@@ -2,6 +2,7 @@
 {-# LANGUAGE DeriveGeneric      #-}
 {-# LANGUAGE EmptyDataDecls     #-}
 {-# LANGUAGE FlexibleContexts   #-}
+{-# LANGUAGE GADTs              #-}
 {-# LANGUAGE OverloadedStrings  #-}
 {-# LANGUAGE TemplateHaskell    #-}
 {-# LANGUAGE TupleSections      #-}
@@ -20,6 +21,7 @@ module Stack.BuildPlan
     , gpdPackageName
     , MiniBuildPlan(..)
     , MiniPackageInfo(..)
+    , loadResolver
     , loadMiniBuildPlan
     , removeSrcPkgDefaultFlags
     , resolveBuildPlan
@@ -33,7 +35,7 @@ module Stack.BuildPlan
 
 import           Control.Applicative
 import           Control.Exception (assert)
-import           Control.Monad (liftM, forM)
+import           Control.Monad (liftM, forM, unless)
 import           Control.Monad.Catch
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
@@ -42,10 +44,10 @@ import           Control.Monad.State.Strict      (State, execState, get, modify,
                                                   put)
 import           Control.Monad.Trans.Control (MonadBaseControl)
 import qualified Crypto.Hash.SHA256 as SHA256
-import           Data.Aeson.Extended (FromJSON (..), withObject, (.:), (.:?), (.!=))
-import           Data.Binary.VersionTagged (taggedDecodeOrLoad)
+import           Data.Aeson.Extended (WithJSONWarnings(..), logJSONWarnings)
+import           Data.Binary.VersionTagged (taggedDecodeOrLoad, decodeFileOrFailDeep, taggedEncodeFile)
 import qualified Data.ByteString as S
-import qualified Data.ByteString.Base16 as B16
+import qualified Data.ByteString.Base64.URL as B64URL
 import qualified Data.ByteString.Char8 as S8
 import           Data.Either (partitionEithers)
 import qualified Data.Foldable as F
@@ -55,7 +57,7 @@ import           Data.List.NonEmpty (NonEmpty(..))
 import qualified Data.List.NonEmpty as NonEmpty
 import           Data.Map (Map)
 import qualified Data.Map as Map
-import           Data.Maybe (fromMaybe, mapMaybe)
+import           Data.Maybe (fromMaybe, mapMaybe, isNothing)
 import           Data.Monoid
 import           Data.Set (Set)
 import qualified Data.Set as Set
@@ -86,8 +88,6 @@ import           Stack.Package
 import           Stack.PackageIndex
 import           Stack.Types
 import           Stack.Types.StackT
-import qualified System.Directory as D
-import qualified System.FilePath as FP
 
 data BuildPlanException
     = UnknownPackages
@@ -95,6 +95,8 @@ data BuildPlanException
         (Map PackageName (Maybe Version, Set PackageName)) -- truly unknown
         (Map PackageName (Set PackageIdentifier)) -- shadowed
     | SnapshotNotFound SnapName
+    | FilepathInDownloadedSnapshot T.Text
+    | NeitherCompilerOrResolverSpecified T.Text
     deriving (Typeable)
 instance Exception BuildPlanException
 instance Show BuildPlanException where
@@ -174,6 +176,15 @@ instance Show BuildPlanException where
                       $ Set.toList
                       $ Set.unions
                       $ Map.elems shadowed
+    show (FilepathInDownloadedSnapshot url) = unlines
+        [ "Downloaded snapshot specified a 'resolver: { location: filepath }' "
+        , "field, but filepaths are not allowed in downloaded snapshots.\n"
+        , "Filepath specified: " ++ T.unpack url
+        ]
+    show (NeitherCompilerOrResolverSpecified url) =
+        "Failed to load custom snapshot at " ++
+        T.unpack url ++
+        ", because no 'compiler' or 'resolver' is specified."
 
 -- | Determine the necessary packages to install to have the given set of
 -- packages available.
@@ -217,18 +228,16 @@ data ResolveState = ResolveState
 toMiniBuildPlan :: (MonadIO m, MonadLogger m, MonadReader env m, HasHttpManager env, MonadMask m, HasConfig env, MonadBaseControl IO m)
                 => CompilerVersion -- ^ Compiler version
                 -> Map PackageName Version -- ^ cores
-                -> Map PackageName (Version, Map FlagName Bool, Maybe GitSHA1) -- ^ non-core packages
+                -> Map PackageName (Version, Map FlagName Bool, [Text], Maybe GitSHA1) -- ^ non-core packages
                 -> m MiniBuildPlan
 toMiniBuildPlan compilerVersion corePackages packages = do
-    $logInfo "Caching build plan"
-
     -- Determine the dependencies of all of the packages in the build plan. We
     -- handle core packages specially, because some of them will not be in the
     -- package index. For those, we allow missing packages to exist, and then
     -- remove those from the list of dependencies, since there's no way we'll
     -- ever reinstall them anyway.
     (cores, missingCores) <- addDeps True compilerVersion
-        $ fmap (, Map.empty, Nothing) corePackages
+        $ fmap (, Map.empty, [], Nothing) corePackages
 
     (extras, missing) <- addDeps False compilerVersion packages
 
@@ -244,6 +253,7 @@ toMiniBuildPlan compilerVersion corePackages packages = do
     goCore (PackageIdentifier name version) = (name, MiniPackageInfo
                 { mpiVersion = version
                 , mpiFlags = Map.empty
+                , mpiGhcOptions = []
                 , mpiPackageDeps = Set.empty
                 , mpiToolDeps = Set.empty
                 , mpiExes = Set.empty
@@ -259,7 +269,7 @@ toMiniBuildPlan compilerVersion corePackages packages = do
 addDeps :: (MonadIO m, MonadLogger m, MonadReader env m, HasHttpManager env, MonadMask m, HasConfig env, MonadBaseControl IO m)
         => Bool -- ^ allow missing
         -> CompilerVersion -- ^ Compiler version
-        -> Map PackageName (Version, Map FlagName Bool, Maybe GitSHA1)
+        -> Map PackageName (Version, Map FlagName Bool, [Text], Maybe GitSHA1)
         -> m (Map PackageName MiniPackageInfo, Set PackageIdentifier)
 addDeps allowMissing compilerVersion toCalc = do
     menv <- getMinimalEnvOverride
@@ -268,31 +278,32 @@ addDeps allowMissing compilerVersion toCalc = do
         if allowMissing
             then do
                 (missingNames, missingIdents, m) <-
-                    resolvePackagesAllowMissing (fmap snd idents0) Set.empty
+                    resolvePackagesAllowMissing shaMap Set.empty
                 assert (Set.null missingNames)
                     $ return (m, missingIdents)
             else do
-                m <- resolvePackages menv (fmap snd idents0) Set.empty
+                m <- resolvePackages menv shaMap Set.empty
                 return (m, Set.empty)
     let byIndex = Map.fromListWith (++) $ flip map (Map.toList resolvedMap)
             $ \(ident, rp) ->
-                let (cache, sha) =
+                let (cache, ghcOptions, sha) =
                         case Map.lookup (packageIdentifierName ident) toCalc of
-                            Nothing -> (Map.empty, Nothing)
-                            Just (_, x, y) -> (x, y)
+                            Nothing -> (Map.empty, [], Nothing)
+                            Just (_, x, y, z) -> (x, y, z)
                  in (indexName $ rpIndex rp,
                     [( ident
                     , rpCache rp
                     , sha
-                    , (cache, sha)
+                    , (cache, ghcOptions, sha)
                     )])
     res <- forM (Map.toList byIndex) $ \(indexName', pkgs) -> withCabalFiles indexName' pkgs
-        $ \ident (flags, mgitSha) cabalBS -> do
+        $ \ident (flags, ghcOptions, mgitSha) cabalBS -> do
             (_warnings,gpd) <- readPackageUnresolvedBS Nothing cabalBS
             let packageConfig = PackageConfig
                     { packageConfigEnableTests = False
                     , packageConfigEnableBenchmarks = False
                     , packageConfigFlags = flags
+                    , packageConfigGhcOptions = ghcOptions
                     , packageConfigCompilerVersion = compilerVersion
                     , packageConfigPlatform = platform
                     }
@@ -303,6 +314,7 @@ addDeps allowMissing compilerVersion toCalc = do
             return (name, MiniPackageInfo
                 { mpiVersion = packageIdentifierVersion ident
                 , mpiFlags = flags
+                , mpiGhcOptions = ghcOptions
                 , mpiPackageDeps = notMe $ packageDependencies pd
                 , mpiToolDeps = Map.keysSet $ packageToolDependencies pd
                 , mpiExes = exes
@@ -314,8 +326,8 @@ addDeps allowMissing compilerVersion toCalc = do
                 })
     return (Map.fromList $ concat res, missingIdents)
   where
-    idents0 = Map.fromList
-        $ map (\(n, (v, f, gitsha)) -> (PackageIdentifier n v, (Left f, gitsha)))
+    shaMap = Map.fromList
+        $ map (\(n, (v, _f, _ghcOptions, gitsha)) -> (PackageIdentifier n v, gitsha))
         $ Map.toList toCalc
 
 -- | Resolve all packages necessary to install for the needed packages.
@@ -404,6 +416,29 @@ getToolMap mbp =
       $ Set.toList
       $ mpiExes mpi
 
+loadResolver
+    :: (MonadIO m, MonadThrow m, MonadLogger m, MonadReader env m, HasHttpManager env, HasConfig env, HasGHCVariant env, MonadBaseControl IO m, MonadMask m)
+    => Maybe (Path Abs File)
+    -> Resolver
+    -> m (MiniBuildPlan, LoadedResolver)
+loadResolver mconfigPath resolver =
+    case resolver of
+        ResolverSnapshot snap ->
+            liftM (, ResolverSnapshot snap) $ loadMiniBuildPlan snap
+        -- TODO(mgsloan): Not sure what this FIXME means
+        -- FIXME instead of passing the stackYaml dir we should maintain
+        -- the file URL in the custom resolver always relative to stackYaml.
+        ResolverCustom name url -> do
+            (mbp, hash) <- parseCustomMiniBuildPlan mconfigPath url
+            return (mbp, ResolverCustomLoaded name url hash)
+        ResolverCompiler compiler -> return
+            ( MiniBuildPlan
+                { mbpCompilerVersion = compiler
+                , mbpPackages = mempty
+                }
+            , ResolverCompiler compiler
+            )
+
 -- | Load up a 'MiniBuildPlan', preferably from cache
 loadMiniBuildPlan
     :: (MonadIO m, MonadLogger m, MonadReader env m, HasHttpManager env, HasConfig env, HasGHCVariant env, MonadBaseControl IO m, MonadMask m)
@@ -421,6 +456,8 @@ loadMiniBuildPlan name = do
     goPP pp =
         ( ppVersion pp
         , pcFlagOverrides $ ppConstraints pp
+         -- TODO: store ghc options in BuildPlan?
+        , []
         , ppCabalFileInfo pp
             >>= fmap (GitSHA1 . encodeUtf8)
               . Map.lookup "GitSHA1"
@@ -509,6 +546,7 @@ gpdPackageDeps gpd cv platform flags =
             { packageConfigEnableTests = True
             , packageConfigEnableBenchmarks = True
             , packageConfigFlags = flags
+            , packageConfigGhcOptions = []
             , packageConfigCompilerVersion = cv
             , packageConfigPlatform = platform
             }
@@ -840,7 +878,7 @@ shadowMiniBuildPlan :: MiniBuildPlan
                     -> Set PackageName
                     -> (MiniBuildPlan, Map PackageName MiniPackageInfo)
 shadowMiniBuildPlan (MiniBuildPlan cv pkgs0) shadowed =
-    (MiniBuildPlan cv $ Map.fromList met, Map.fromList unmet)
+    (MiniBuildPlan cv (Map.fromList met), Map.fromList unmet)
   where
     pkgs1 = Map.difference pkgs0 $ Map.fromSet (\_ -> ()) shadowed
 
@@ -882,65 +920,185 @@ shadowMiniBuildPlan (MiniBuildPlan cv pkgs0) shadowed =
                 Just False -> Right
                 Nothing -> assert False Right
 
-parseCustomMiniBuildPlan :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasHttpManager env, HasConfig env, MonadBaseControl IO m)
-                         => Path Abs File -- ^ stack.yaml file location
-                         -> T.Text -> m MiniBuildPlan
-parseCustomMiniBuildPlan stackYamlFP url0 = do
-    yamlFP <- getYamlFP url0
+-- This works differently for snapshots fetched from URL and those
+-- fetched from file:
+--
+-- 1) If downloading the snapshot from a URL, assume the fetched data is
+-- immutable. Hash the URL in order to determine the location of the
+-- cached download. The file contents of the snapshot determines the
+-- hash for looking up cached MBP.
+--
+-- 2) If loading the snapshot from a file, load all of the involved
+-- snapshot files. The hash used to determine the cached MBP is the hash
+-- of the concatenation of the parent's hash with the snapshot contents.
+--
+-- Why this difference? We want to make it easy to simply edit snapshots
+-- in the filesystem, but we want caching for remote snapshots. In order
+-- to avoid reparsing / reloading all the yaml for remote snapshots, we
+-- need a different hash system.
 
-    yamlBS <- liftIO $ S.readFile $ toFilePath yamlFP
-    let yamlHash = S8.unpack $ B16.encode $ SHA256.hash yamlBS
-    binaryFilename <- parseRelFile $ yamlHash ++ ".bin"
-    customPlanDir <- getCustomPlanDir
-    let binaryFP = customPlanDir </> $(mkRelDir "bin") </> binaryFilename
+-- TODO: This could probably be more efficient if it first merged the
+-- custom snapshots, and then applied them to the MBP. It is nice to
+-- apply directly, because then we have the guarantee that it's
+-- semantically identical to snapshot extension. If this optimization is
+-- implemented, note that the direct Monoid for CustomSnapshot is not
+-- correct. Crucially, if a package is present in the snapshot, its
+-- flags and ghc-options are not based on settings from prior snapshots.
+-- TODO: This semantics should be discussed / documented more.
 
-    taggedDecodeOrLoad binaryFP $ do
-        cs <- either throwM return $ decodeEither' yamlBS
-        let addFlags :: PackageIdentifier -> (PackageName, (Version, Map FlagName Bool))
-            addFlags (PackageIdentifier name ver) =
-                (name, (ver, fromMaybe Map.empty $ Map.lookup name $ csFlags cs))
-        toMiniBuildPlan
-            (csCompilerVersion cs)
-            Map.empty
-            (fmap addGitSHA $ Map.fromList $ map addFlags $ Set.toList $ csPackages cs)
+-- TODO: allow a hash check in the resolver. This adds safety /
+-- correctness, allowing you to ensure that you are indeed getting the
+-- right custom snapshot.
+
+-- TODO: Allow custom plan to specify a name.
+
+parseCustomMiniBuildPlan
+    :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasHttpManager env, HasConfig env, HasGHCVariant env, MonadBaseControl IO m)
+    => Maybe (Path Abs File) -- ^ Root directory for when url is a filepath
+    -> T.Text
+    -> m (MiniBuildPlan, SnapshotHash)
+parseCustomMiniBuildPlan mconfigPath0 url0 = do
+    $logDebug $ "Loading " <> url0 <> " build plan"
+    case parseUrl $ T.unpack url0 of
+        Just req -> downloadCustom url0 req
+        Nothing ->
+           case mconfigPath0 of
+               Nothing -> throwM $ FilepathInDownloadedSnapshot url0
+               Just configPath -> do
+                   (getMbp, hash) <- readCustom configPath url0
+                   mbp <- getMbp
+                   -- NOTE: We make the choice of only writing a cache
+                   -- file for the full MBP, not the intermediate ones.
+                   -- This isn't necessarily the best choice if we want
+                   -- to share work extended snapshots. I think only
+                   -- writing this one is more efficient for common
+                   -- cases.
+                   binaryPath <- getBinaryPath hash
+                   alreadyCached <- doesFileExist binaryPath
+                   unless alreadyCached $ taggedEncodeFile binaryPath mbp
+                   return (mbp, hash)
   where
+    downloadCustom url req = do
+        let urlHash = S8.unpack $ trimmedSnapshotHash $ doHash $ encodeUtf8 url
+        hashFP <- parseRelFile $ urlHash ++ ".yaml"
+        customPlanDir <- getCustomPlanDir
+        let cacheFP = customPlanDir </> $(mkRelDir "yaml") </> hashFP
+        _ <- download req cacheFP
+        yamlBS <- liftIO $ S.readFile $ toFilePath cacheFP
+        let yamlHash = doHash yamlBS
+        binaryPath <- getBinaryPath yamlHash
+        liftM (, yamlHash) $ taggedDecodeOrLoad binaryPath $ do
+            (cs, mresolver) <- decodeYaml yamlBS
+            parentMbp <- case (csCompilerVersion cs, mresolver) of
+                (Nothing, Nothing) -> throwM (NeitherCompilerOrResolverSpecified url)
+                (Just cv, Nothing) -> return (compilerBuildPlan cv)
+                -- NOTE: ignoring the parent's hash, even though
+                -- there could be one. URL snapshot's hash are
+                -- determined just from their contents.
+                (_, Just resolver) -> liftM fst (loadResolver Nothing resolver)
+            applyCustomSnapshot cs parentMbp
+    readCustom configPath path = do
+        yamlFP <- resolveFile (parent configPath) (T.unpack $ fromMaybe path $
+            T.stripPrefix "file://" path <|> T.stripPrefix "file:" path)
+        yamlBS <- liftIO $ S.readFile $ toFilePath yamlFP
+        (cs, mresolver) <- decodeYaml yamlBS
+        (getMbp, hash) <- case mresolver of
+            Just (ResolverCustom _ url ) ->
+                case parseUrl $ T.unpack url of
+                    Just req -> do
+                        let getMbp = do
+                                -- Ignore custom hash, under the
+                                -- assumption that the URL is sufficient
+                                -- for identity.
+                                (mbp, _) <- downloadCustom url req
+                                return mbp
+                        return (getMbp, doHash yamlBS)
+                    Nothing -> do
+                        (getMbp0, SnapshotHash hash0) <- readCustom yamlFP url
+                        let hash = doHash (hash0 <> yamlBS)
+                            getMbp = do
+                                binaryPath <- getBinaryPath hash
+                                -- Idea here is to not waste time
+                                -- writing out intermediate cache files,
+                                -- but check for them.
+                                exists <- doesFileExist binaryPath
+                                if exists
+                                    then do
+                                        eres <- decodeFileOrFailDeep binaryPath
+                                        case eres of
+                                            Right (Just mbp) -> return mbp
+                                            -- Invalid format cache file, remove.
+                                            _ -> do
+                                                removeFile binaryPath
+                                                getMbp0
+                                    else getMbp0
+                        return (getMbp, hash)
+            Just resolver -> do
+                -- NOTE: in the cases where we don't have a hash, the
+                -- normal resolver name is enough. Since this name is
+                -- part of the yaml file, it ends up in our hash.
+                let hash = doHash yamlBS
+                    getMbp = do
+                        (mbp, resolver') <- loadResolver (Just configPath) resolver
+                        let mhash = customResolverHash resolver'
+                        assert (isNothing mhash) (return mbp)
+                return (getMbp, hash)
+            Nothing -> do
+                case csCompilerVersion cs of
+                    Nothing -> throwM (NeitherCompilerOrResolverSpecified path)
+                    Just cv -> do
+                        let hash = doHash yamlBS
+                            getMbp = return (compilerBuildPlan cv)
+                        return (getMbp, hash)
+        return (applyCustomSnapshot cs =<< getMbp, hash)
+    getBinaryPath hash = do
+        binaryFilename <- parseRelFile $ S8.unpack (trimmedSnapshotHash hash) ++ ".bin"
+        customPlanDir <- getCustomPlanDir
+        return $ customPlanDir </> $(mkRelDir "bin") </> binaryFilename
+    decodeYaml yamlBS = do
+        WithJSONWarnings res warnings <-
+             either (throwM . ParseCustomSnapshotException url0) return $
+             decodeEither' yamlBS
+        logJSONWarnings (T.unpack url0) warnings
+        return res
+    compilerBuildPlan cv = MiniBuildPlan
+         { mbpCompilerVersion = cv
+         , mbpPackages = mempty
+         }
     getCustomPlanDir = do
         root <- asks $ configStackRoot . getConfig
         return $ root </> $(mkRelDir "custom-plan")
+    doHash = SnapshotHash . B64URL.encode . SHA256.hash
 
-    -- Get the path to the YAML file
-    getYamlFP url =
-        case parseUrl $ T.unpack url of
-            Just req -> getYamlFPFromReq url req
-            Nothing -> getYamlFPFromFile url
-
-    getYamlFPFromReq url req = do
-        let hashStr = S8.unpack $ B16.encode $ SHA256.hash $ encodeUtf8 url
-        hashFP <- parseRelFile $ hashStr ++ ".yaml"
-        customPlanDir <- getCustomPlanDir
-
-        let cacheFP = customPlanDir </> $(mkRelDir "yaml") </> hashFP
-        _ <- download req cacheFP
-        return cacheFP
-
-    getYamlFPFromFile url = do
-        fp <- liftIO $ D.canonicalizePath $ toFilePath (parent stackYamlFP) FP.</> T.unpack (fromMaybe url $
-            T.stripPrefix "file://" url <|> T.stripPrefix "file:" url)
-        parseAbsFile fp
-
-    -- we add a Nothing since we don't yet collect Git SHAs for custom snapshots
-    addGitSHA (x, y) = (x, y, Nothing)
-
-data CustomSnapshot = CustomSnapshot
-    { csCompilerVersion :: !CompilerVersion
-    , csPackages :: !(Set PackageIdentifier)
-    , csFlags :: !(Map PackageName (Map FlagName Bool))
-    }
-instance FromJSON CustomSnapshot where
-    parseJSON = withObject "CustomSnapshot" $ \o -> CustomSnapshot
-        <$> ((o .: "compiler") >>= \t ->
-                case parseCompilerVersion t of
-                    Nothing -> fail $ "Invalid compiler: " ++ T.unpack t
-                    Just compilerVersion -> return compilerVersion)
-        <*> o .: "packages"
-        <*> o .:? "flags" .!= Map.empty
+applyCustomSnapshot
+    :: (MonadIO m, MonadLogger m, MonadReader env m, HasHttpManager env, MonadThrow m, HasConfig env, MonadBaseControl IO m, MonadMask m)
+    => CustomSnapshot
+    -> MiniBuildPlan
+    -> m MiniBuildPlan
+applyCustomSnapshot cs mbp0 = do
+    let CustomSnapshot mcompilerVersion
+                       packages
+                       dropPackages
+                       (PackageFlags flags)
+                       ghcOptions
+            = cs
+        addFlagsAndOpts :: PackageIdentifier -> (PackageName, (Version, Map FlagName Bool, [Text], Maybe GitSHA1))
+        addFlagsAndOpts (PackageIdentifier name ver) =
+            ( name
+            , ( ver
+              , Map.findWithDefault Map.empty name flags
+              -- NOTE: similar to 'allGhcOptions' in Stack.Types.Build
+              , ghcOptionsFor name ghcOptions
+              -- we add a Nothing since we don't yet collect Git SHAs for custom snapshots
+              , Nothing
+              )
+            )
+        packageMap = Map.fromList $ map addFlagsAndOpts $ Set.toList packages
+        cv = fromMaybe (mbpCompilerVersion mbp0) mcompilerVersion
+        packages0 =
+             mbpPackages mbp0 `Map.difference` (Map.fromSet (\_ -> ()) dropPackages)
+    mbp1 <- toMiniBuildPlan cv mempty packageMap
+    return $ MiniBuildPlan
+        { mbpCompilerVersion = cv
+        , mbpPackages = Map.union (mbpPackages mbp1) packages0
+        }

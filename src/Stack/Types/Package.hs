@@ -88,6 +88,7 @@ data Package =
           ,packageDeps :: !(Map PackageName VersionRange) -- ^ Packages that the package depends on.
           ,packageTools :: ![Dependency]                  -- ^ A build tool name.
           ,packageAllDeps :: !(Set PackageName)           -- ^ Original dependencies (not sieved).
+          ,packageGhcOptions :: ![Text]                   -- ^ Ghc options used on package.
           ,packageFlags :: !(Map FlagName Bool)           -- ^ Flags used on package.
           ,packageDefaultFlags :: !(Map FlagName Bool)    -- ^ Defaults for unspecified flags.
           ,packageHasLibrary :: !Bool                     -- ^ does the package have a buildable library stanza?
@@ -201,7 +202,8 @@ instance Show PackageWarning where
 data PackageConfig =
   PackageConfig {packageConfigEnableTests :: !Bool                -- ^ Are tests enabled?
                 ,packageConfigEnableBenchmarks :: !Bool           -- ^ Are benchmarks enabled?
-                ,packageConfigFlags :: !(Map FlagName Bool)       -- ^ Package config flags.
+                ,packageConfigFlags :: !(Map FlagName Bool)       -- ^ Configured flags.
+                ,packageConfigGhcOptions :: ![Text]               -- ^ Configured ghc options.
                 ,packageConfigCompilerVersion :: !CompilerVersion -- ^ GHC version
                 ,packageConfigPlatform :: !Platform               -- ^ host platform
                 }
@@ -220,17 +222,17 @@ type SourceMap = Map PackageName PackageSource
 -- | Where the package's source is located: local directory or package index
 data PackageSource
     = PSLocal LocalPackage
-    | PSUpstream Version InstallLocation (Map FlagName Bool) (Maybe GitSHA1)
+    | PSUpstream Version InstallLocation (Map FlagName Bool) [Text] (Maybe GitSHA1)
     -- ^ Upstream packages could be installed in either local or snapshot
     -- databases; this is what 'InstallLocation' specifies.
     deriving Show
 
 instance PackageInstallInfo PackageSource where
     piiVersion (PSLocal lp) = packageVersion $ lpPackage lp
-    piiVersion (PSUpstream v _ _ _) = v
+    piiVersion (PSUpstream v _ _ _ _) = v
 
     piiLocation (PSLocal _) = Local
-    piiLocation (PSUpstream _ loc _ _) = loc
+    piiLocation (PSUpstream _ loc _ _ _) = loc
 
 -- | Datatype which tells how which version of a package to install and where
 -- to install it into

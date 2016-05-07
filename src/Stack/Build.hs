@@ -273,26 +273,27 @@ withLoadPackage :: ( MonadIO m
                    , MonadLogger m
                    , HasEnvConfig env)
                 => EnvOverride
-                -> ((PackageName -> Version -> Map FlagName Bool -> IO Package) -> m a)
+                -> ((PackageName -> Version -> Map FlagName Bool -> [Text] -> IO Package) -> m a)
                 -> m a
 withLoadPackage menv inner = do
     econfig <- asks getEnvConfig
     withCabalLoader menv $ \cabalLoader ->
-        inner $ \name version flags -> do
+        inner $ \name version flags ghcOptions -> do
             bs <- cabalLoader $ PackageIdentifier name version
 
             -- Intentionally ignore warnings, as it's not really
             -- appropriate to print a bunch of warnings out while
             -- resolving the package index.
-            (_warnings,pkg) <- readPackageBS (depPackageConfig econfig flags) bs
+            (_warnings,pkg) <- readPackageBS (depPackageConfig econfig flags ghcOptions) bs
             return pkg
   where
     -- | Package config to be used for dependencies
-    depPackageConfig :: EnvConfig -> Map FlagName Bool -> PackageConfig
-    depPackageConfig econfig flags = PackageConfig
+    depPackageConfig :: EnvConfig -> Map FlagName Bool -> [Text] -> PackageConfig
+    depPackageConfig econfig flags ghcOptions = PackageConfig
         { packageConfigEnableTests = False
         , packageConfigEnableBenchmarks = False
         , packageConfigFlags = flags
+        , packageConfigGhcOptions = ghcOptions
         , packageConfigCompilerVersion = envConfigCompilerVersion econfig
         , packageConfigPlatform = configPlatform (getConfig econfig)
         }

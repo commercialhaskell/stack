@@ -2,6 +2,7 @@
 {-# LANGUAGE DeriveDataTypeable    #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings     #-}
+{-# LANGUAGE TemplateHaskell  #-}
 module Network.HTTP.Download
     ( verifiedDownload
     , DownloadRequest(..)
@@ -28,6 +29,7 @@ import           Control.Exception.Enclosed  (handleIO)
 import           Control.Monad               (void)
 import           Control.Monad.Catch         (MonadThrow, MonadMask, throwM)
 import           Control.Monad.IO.Class      (MonadIO, liftIO)
+import           Control.Monad.Logger        (MonadLogger, logDebug)
 import           Control.Monad.Reader        (MonadReader, ReaderT, ask,
                                               runReaderT)
 import           Data.Aeson.Extended         (FromJSON, parseJSON)
@@ -40,7 +42,11 @@ import           Data.Conduit.Attoparsec     (sinkParser)
 import           Data.Conduit.Binary         (sinkHandle, sourceHandle)
 import qualified Data.Conduit.Binary         as CB
 import           Data.Foldable               (forM_)
+import           Data.Monoid                 ((<>))
+import           Data.Text.Encoding.Error    (lenientDecode)
+import           Data.Text.Encoding          (decodeUtf8With)
 import           Data.Typeable               (Typeable)
+import           Network.HTTP.Client         (path)
 import           Network.HTTP.Client.Conduit (HasHttpManager, Manager, Request,
                                               Response, checkStatus,
                                               getHttpManager, parseUrl,
@@ -64,7 +70,7 @@ import           System.IO                   (IOMode (ReadMode),
 -- appropriate destination.
 --
 -- Throws an exception if things go wrong
-download :: (MonadReader env m, HasHttpManager env, MonadIO m)
+download :: (MonadReader env m, HasHttpManager env, MonadIO m, MonadLogger m)
          => Request
          -> Path Abs File -- ^ destination
          -> m Bool -- ^ Was a downloaded performed (True) or did the file already exist (False)?
@@ -81,11 +87,12 @@ download req destpath = do
 -- | Same as 'download', but will download a file a second time if it is already present.
 --
 -- Returns 'True' if the file was downloaded, 'False' otherwise
-redownload :: (MonadReader env m, HasHttpManager env, MonadIO m)
+redownload :: (MonadReader env m, HasHttpManager env, MonadIO m, MonadLogger m)
            => Request
            -> Path Abs File -- ^ destination
            -> m Bool
 redownload req0 dest = do
+    $logDebug $ "Downloading " <> decodeUtf8With lenientDecode (path req0)
     let destFilePath = toFilePath dest
         etagFilePath = destFilePath <.> "etag"
 

@@ -124,7 +124,7 @@ ghci opts@GhciOpts{..} = do
             getUserOptions Nothing ++
             concatMap (getUserOptions . Just . ghciPkgName) pkgs
         getUserOptions mpkg =
-            map T.unpack (M.findWithDefault [] mpkg (configGhcOptions config))
+            map T.unpack (M.findWithDefault [] mpkg (unGhcOptions (configGhcOptions config)))
         badForGhci x =
             isPrefixOf "-O" x || elem x (words "-debug -threaded -ticky -static -Werror")
     unless (null omittedOpts) $
@@ -260,7 +260,7 @@ ghciSetup
     => GhciOpts
     -> m (Map PackageName SimpleTarget, Maybe (Map PackageName SimpleTarget), [GhciPkgInfo])
 ghciSetup GhciOpts{..} = do
-    (_,_,targets) <- parseTargetsFromBuildOpts AllowNoTargets ghciBuildOptsCLI 
+    (_,_,targets) <- parseTargetsFromBuildOpts AllowNoTargets ghciBuildOptsCLI
     mainIsTargets <-
         case ghciMainIs of
             Nothing -> return Nothing
@@ -357,7 +357,8 @@ makeGhciPkgInfo boptsCli sourceMap installedMap locals addPkgs name cabalfp targ
             PackageConfig
             { packageConfigEnableTests = True
             , packageConfigEnableBenchmarks = True
-            , packageConfigFlags = localFlags (boptsCLIFlags boptsCli) bconfig name
+            , packageConfigFlags = getLocalFlags bconfig boptsCli name
+            , packageConfigGhcOptions = getGhcOptions bconfig boptsCli name True True
             , packageConfigCompilerVersion = envConfigCompilerVersion econfig
             , packageConfigPlatform = configPlatform (getConfig bconfig)
             }

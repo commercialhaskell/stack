@@ -45,6 +45,7 @@ cfgCmdSet (ConfigCmdSetResolver newResolver) = do
     (projectYamlConfig :: Yaml.Object) <-
         liftIO (Yaml.decodeFileEither stackYamlFp) >>=
         either throwM return
+    -- TODO: custom snapshot support?
     newResolverText <- fmap resolverName (makeConcreteResolver newResolver)
     -- We checking here that the snapshot actually exists
     snap <- parseSnapName newResolverText

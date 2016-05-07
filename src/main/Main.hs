@@ -751,7 +751,7 @@ setupCmd SetupCmdOpts{..} go@GlobalOpts{..} = do
                                  , configCompilerCheck (lcConfig lc)
                                  , Just $ bcStackYaml bc
                                  )
-              miniConfig <- loadMiniConfig (lcConfig lc)
+              miniConfig <- loadMiniConfig manager (lcConfig lc)
               mpaths <- runStackTGlobal manager miniConfig go $
                   ensureCompiler SetupOpts
                   { soptsInstallIfMissing = True
@@ -1202,7 +1202,7 @@ loadConfigWithOpts go@GlobalOpts{..} = do
     manager <- newTLSManager
     mstackYaml <- forM globalStackYaml resolveFile'
     lc <- runStackLoggingTGlobal manager go $ do
-        lc <- loadConfig globalConfigMonoid mstackYaml globalResolver
+        lc <- loadConfig globalConfigMonoid globalResolver mstackYaml
         -- If we have been relaunched in a Docker container, perform in-container initialization
         -- (switch UID, etc.).  We do this after first loading the configuration since it must
         -- happen ASAP but needs a configuration.
@@ -1214,14 +1214,14 @@ loadConfigWithOpts go@GlobalOpts{..} = do
 
 withMiniConfigAndLock
     :: GlobalOpts
-    -> StackT MiniConfig (StackT Config IO) ()
+    -> StackT MiniConfig IO ()
     -> IO ()
-withMiniConfigAndLock go inner =
-    withConfigAndLock go $ do
-       config <- asks getConfig
-       miniConfig <- loadMiniConfig config
-       manager <- asks getHttpManager
-       runStackTGlobal manager miniConfig go inner
+withMiniConfigAndLock go@GlobalOpts{..} inner = do
+    manager <- newTLSManager
+    miniConfig <- runStackLoggingTGlobal manager go $ do
+        lc <- loadConfigMaybeProject globalConfigMonoid globalResolver Nothing
+        loadMiniConfig manager (lcConfig lc)
+    runStackTGlobal manager miniConfig go inner
 
 -- | Project initialization
 initCmd :: InitOpts -> GlobalOpts -> IO ()
