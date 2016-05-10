@@ -145,17 +145,17 @@ otherwise noted.
       # If true, the container will be run "detached" (in the background).  Refer
       # to the Docker users guide for information about how to manage containers.
       # This option would rarely make sense in the configuration file, but can be
-      # useful on the command-line.  When true, implies `persistent`.`
+      # useful on the command-line.  When true, implies `persist`.`
       detach: false
 
       # If true, the container will not be deleted after it terminates.  Refer to
       # the Docker users guide for information about how to manage containers. This
       # option would rarely make sense in the configuration file, but can be
-      # useful on the command-line.  `detach` implies `persistent`.
-      persistent: false
+      # useful on the command-line.  `detach` implies `persist`.
+      persist: false
 
       # What to name the Docker container.  Only useful with `detach` or
-      # `persistent` true.  (default none)
+      # `persist` true.  (default none)
       container-name: "example-name"
 
       # Additional arguments to pass to `docker run`.  (default none)
