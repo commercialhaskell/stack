@@ -58,7 +58,7 @@ Behavior changes:
 * GPG signing of packages while uploading to Hackage is now the default. Use
   `upload --no-signature` if you would rather not contribute your package
   signature. If you don't yet have a GPG keyset, read this
-  [blog post on GPG keys](https://fpcomplete.com/blog/2016/04/stack-security-gnupg-keys)
+  [blog post on GPG keys](https://fpcomplete.com/blog/2016/05/stack-security-gnupg-keys).
   We can add a stack.yaml config setting to disable signing if some people
   desire it. We hope that people will sign. Later we will be adding GPG
   signature verification options.
