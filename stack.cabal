@@ -218,7 +218,7 @@ library
                    , hastache
                    , project-template >= 0.2
                    , zip-archive
-                   , hpack >= 0.10.0 && < 0.14
+                   , hpack >= 0.10.0 && < 0.15
   if os(windows)
     cpp-options:     -DWINDOWS
     build-depends:   Win32
