@@ -1,4 +1,4 @@
-{-# LANGUAGE RecordWildCards, DeriveDataTypeable #-}
+{-# LANGUAGE RecordWildCards, DeriveDataTypeable, OverloadedStrings #-}
 
 -- | Nix configuration
 module Stack.Config.Nix
@@ -46,7 +46,18 @@ nixCompiler config resolverOverride compilerOverride =
   let mproject = fst <$> configMaybeProject config
       mresolver = resolverOverride <|> fmap projectResolver mproject
       mcompiler = compilerOverride <|> join (fmap projectCompiler mproject)
-      nixCompilerFromVersion v = T.filter (/= '.') $ T.append (T.pack "haskell.compiler.ghc") (versionText v)
+
+      -- These are the latest minor versions for each respective major version available in nixpkgs
+      fixMinor "8.0" = "8.0.1"
+      fixMinor "7.10" = "7.10.3"
+      fixMinor "7.8" = "7.8.4"
+      fixMinor "7.6" = "7.6.3"
+      fixMinor "7.4" = "7.4.2"
+      fixMinor "7.2" = "7.2.2"
+      fixMinor "6.12" = "6.12.3"
+      fixMinor "6.10" = "6.10.4"
+      fixMinor v = v
+      nixCompilerFromVersion v = T.append (T.pack "haskell.compiler.ghc") (T.filter (/= '.') (fixMinor (versionText v)))
   in case (mresolver, mcompiler)  of
        (_, Just (GhcVersion v)) -> nixCompilerFromVersion v
        (Just (ResolverCompiler (GhcVersion v)), _) -> nixCompilerFromVersion v
