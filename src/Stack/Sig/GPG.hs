@@ -18,12 +18,12 @@ module Stack.Sig.GPG (gpgSign, gpgVerify) where
 import Prelude ()
 import Prelude.Compat
 
-import           Control.Monad (when)
+import           Control.Monad (unless, when)
 import           Control.Monad.Catch (MonadThrow, throwM)
 import           Control.Monad.IO.Class (MonadIO, liftIO)
 import           Control.Monad.Logger (MonadLogger, logWarn)
 import qualified Data.ByteString.Char8 as C
-import           Data.List (find)
+import           Data.List (find, isPrefixOf)
 import           Data.Monoid ((<>))
 import qualified Data.Text as T
 import           Path
@@ -32,6 +32,7 @@ import           System.Directory (findExecutable)
 import           System.Environment (lookupEnv)
 import           System.Exit (ExitCode(..))
 import           System.IO (Handle, hGetContents, hPutStrLn)
+import           System.Info (os)
 import           System.Process (ProcessHandle, runInteractiveProcess,
                                  waitForProcess)
 
@@ -102,11 +103,15 @@ gpg args = do
                     liftIO (runInteractiveProcess "gpg" args Nothing Nothing)
                 Nothing -> throwM GPGNotFoundException
 
-gpgWarnTTY
-    :: (MonadIO m, MonadLogger m)
-    => m ()
-gpgWarnTTY = do
-    mTTY <- liftIO (lookupEnv "GPG_TTY")
-    when
-        (null mTTY)
-        ($logWarn "Environment variable GPG_TTY is not set (see `man gpg-agent`)")
+-- | `man gpg-agent` shows that you need GPG_TTY environment variable set to
+-- properly deal with interactions with gpg-agent. (Doesn't apply to Windows
+-- though)
+gpgWarnTTY :: (MonadIO m, MonadLogger m) => m ()
+gpgWarnTTY =
+    unless
+        ("ming" `isPrefixOf` os)
+        (do mTTY <- liftIO (lookupEnv "GPG_TTY")
+            when
+                (null mTTY)
+                ($logWarn
+                     "Environment variable GPG_TTY is not set (see `man gpg-agent`)"))
