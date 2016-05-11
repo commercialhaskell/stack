@@ -989,14 +989,16 @@ singleBuild runInBase ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} in
                     (configCacheDeps cache)
                 case mpc of
                     Nothing -> return Nothing
+                    -- Only pay attention to precompiled caches that refer to packages within
+                    -- the snapshot.
                     Just pc | maybe False
                                     (bcoSnapInstallRoot eeBaseConfigOpts `isParentOf`)
                                     (parseAbsFile =<< (pcLibrary pc)) ->
-                        -- If old precompiled cache files are left around but snapshots are deleted,
-                        -- it is possible for the precompiled file to refer to the very library
-                        -- we're building, and if flags are changed it may try to copy the library
-                        -- to itself. This check prevents that from happening.
                         return Nothing
+                    -- If old precompiled cache files are left around but snapshots are deleted,
+                    -- it is possible for the precompiled file to refer to the very library
+                    -- we're building, and if flags are changed it may try to copy the library
+                    -- to itself. This check prevents that from happening.
                     Just pc | otherwise -> do
                         let allM _ [] = return True
                             allM f (x:xs) = do
