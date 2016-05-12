@@ -628,7 +628,7 @@ paths =
       , "programs"
       , T.pack . toFilePathNoTrailingSep . configLocalPrograms . bcConfig . piBuildConfig )
     , ( "Compiler binary (e.g. ghc)"
-      , "compiler"
+      , "compiler-exe"
       , T.pack . toFilePath . piCompiler )
     , ( "Directory containing the compiler binary (e.g. ghc)"
       , "compiler-bin"

@@ -14,6 +14,12 @@ snapshots should still be treated as immutable.
 
 Behavior changes:
 
+* `stack path --compiler` was added in the last release, to yield a path to the
+  compiler. Unfortunately, `--compiler` is a global option that is useful to use
+  with `stack path`. The same functionality is now provided by `stack path
+  --compiler-exe`. See
+  [#2123](https://github.com/commercialhaskell/stack/issues/2123)
+
 Other enhancements:
 
 * Grab Cabal files via Git SHA to avoid regressions from Hackage revisions
