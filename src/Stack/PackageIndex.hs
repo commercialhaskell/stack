@@ -76,6 +76,7 @@ import           System.Process.Read         (EnvOverride,
                                               doesExecutableExist, readInNull,
                                               tryProcessStdout)
 import           System.Process.Run          (Cmd(..), callProcessInheritStderrStdout)
+import           Data.Streaming.Process      (ProcessExitedUnsuccessfully(..))
 
 -- | Populate the package index caches and return them.
 populateCache
@@ -257,7 +258,7 @@ updateIndexGit menv indexName' index gitUrl = do
             $logSticky "Fetching package index ..."
             let runFetch = callProcessInheritStderrStdout
                     (Cmd (Just acfDir) "git" menv ["fetch","--tags","--depth=1"])
-            runFetch `C.catch` \(ex :: ReadProcessException) -> do
+            runFetch `C.catch` \(ex :: ProcessExitedUnsuccessfully) -> do
                 -- we failed, so wipe the directory and try again, see #1418
                 $logWarn (T.pack (show ex))
                 $logStickyDone "Failed to fetch package index, retrying."
