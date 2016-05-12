@@ -43,7 +43,7 @@ import           Control.Applicative
 import           Control.Arrow ((***))
 import           Control.Exception (assert)
 import           Control.Monad (liftM, unless, when, filterM)
-import           Control.Monad.Catch (MonadThrow, MonadCatch, MonadMask, catchAll, throwM)
+import           Control.Monad.Catch (MonadThrow, MonadCatch, MonadMask, catchAll, throwM, catch)
 import           Control.Monad.Extra (firstJustM)
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger hiding (Loc)
@@ -575,11 +575,15 @@ resolvePackageLocation
     -> m (Path Abs Dir)
 resolvePackageLocation _ projRoot (PLFilePath fp) = resolveDir projRoot fp
 resolvePackageLocation menv projRoot (PLRemote url remotePackageType) = do
+    -- NOTE: we used to include the commit in the package location. This
+    -- allowed us to quickly check if the dir exists, and use it if it
+    -- does. Now, we instead always do a reset. This is still pretty
+    -- fast - a no-op git reset is around 0.01 seconds on my machine.
     workDir <- getWorkDir
     let nameBeforeHashing = case remotePackageType of
             RPTHttp        -> url
-            RPTGit commit  -> T.unwords [url, commit]
-            RPTHg  commit  -> T.unwords [url, commit, "hg"]
+            RPTGit commit  -> url
+            RPTHg  commit  -> T.unwords [url, "hg"]
         name = T.unpack $ decodeUtf8 $ B16.encode $ SHA256.hash $ encodeUtf8 nameBeforeHashing
         root = projRoot </> workDir </> $(mkRelDir "downloaded")
         fileExtension = case remotePackageType of
@@ -591,28 +595,40 @@ resolvePackageLocation menv projRoot (PLRemote url remotePackageType) = do
     dirRelTmp <- parseRelDir $ name ++ ".tmp"
     let file = root </> fileRel
         dir = root </> dirRel
-        dirTmp = root </> dirRelTmp
 
     exists <- doesDirExist dir
-    unless exists $ do
-        ignoringAbsence (removeDirRecur dirTmp)
-
-        let cloneAndExtract commandName cloneArgs resetCommand commit = do
-                ensureDir (parent dirTmp)
-                readInNull (parent dirTmp) commandName menv
+    let cloneAndExtract commandName cloneArgs resetCommand commit = do
+            ensureDir (parent dir)
+            (if exists then doReset True else doClone >> doReset True) `catch` \case
+                ReadProcessException{} -> do
+                    ignoringAbsence (removeDirRecur dir)
+                    doClone
+                    doReset False
+                _ -> return ()
+            return dir
+          where
+            doClone =
+                readProcessNull (Just (parent dir)) menv commandName
                     ("clone" :
                     cloneArgs ++
                     [ T.unpack url
-                    , toFilePathNoTrailingSep dirTmp
+                    , toFilePathNoTrailingSep dir
                     ])
-                    Nothing
-                readInNull dirTmp commandName menv
+            doReset firstTry =
+                readProcessNull (Just dir) menv commandName
                     (resetCommand ++ [T.unpack commit, "--"])
-                    (Just $ "Please ensure that commit " <> commit <>
-                      " exists within " <> url)
+                    `catch` \case
+                        ex@ReadProcessException{} -> do
+                            unless firstTry $ $logInfo $
+                                "Please ensure that commit " <> commit <> " exists within " <> url
+                            throwM ex
+                        ex -> throwM ex
+    case remotePackageType of
+        RPTHttp -> do
+            unless exists $ do
+                let dirTmp = root </> dirRelTmp
+                ignoringAbsence (removeDirRecur dirTmp)
 
-        case remotePackageType of
-            RPTHttp -> do
                 let fp = toFilePath file
                 req <- parseUrl $ T.unpack url
                 _ <- download req file
@@ -636,21 +652,17 @@ resolvePackageLocation menv projRoot (PLRemote url remotePackageType) = do
                             handler
 
                 tryTar `catchAllLog` tryZip `catchAllLog` err
+                renameDir dirTmp dir
+            x <- listDir dir
+            case x of
+                ([dir'], []) -> return dir'
+                (dirs, files) -> do
+                    ignoringAbsence (removeFile file)
+                    ignoringAbsence (removeDirRecur dir)
+                    throwM $ UnexpectedArchiveContents dirs files
 
-            RPTGit commit -> cloneAndExtract "git" ["--recursive"] ["reset", "--hard"] commit
-            RPTHg  commit -> cloneAndExtract "hg"  []              ["update", "-C"]    commit
-
-        renameDir dirTmp dir
-
-    case remotePackageType of
-        RPTHttp -> do x <- listDir dir
-                      case x of
-                          ([dir'], []) -> return dir'
-                          (dirs, files) -> do
-                              ignoringAbsence (removeFile file)
-                              ignoringAbsence (removeDirRecur dir)
-                              throwM $ UnexpectedArchiveContents dirs files
-        _ -> return dir
+        RPTGit commit -> cloneAndExtract "git" ["--recursive"] ["reset", "--hard"] commit
+        RPTHg  commit -> cloneAndExtract "hg"  []              ["update", "-C"]    commit
 
 -- | Get the stack root, e.g. @~/.stack@, and determine whether the user owns it.
 --
