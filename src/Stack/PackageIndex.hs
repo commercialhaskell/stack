@@ -72,7 +72,6 @@ import           System.FilePath (takeBaseName, (<.>))
 import           System.IO                             (IOMode (ReadMode, WriteMode),
                                                         withBinaryFile)
 import           System.Process.Read         (EnvOverride,
-                                              ReadProcessException (..),
                                               doesExecutableExist, readInNull,
                                               tryProcessStdout)
 import           System.Process.Run          (Cmd(..), callProcessInheritStderrStdout)
