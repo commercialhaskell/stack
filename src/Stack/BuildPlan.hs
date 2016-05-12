@@ -639,7 +639,7 @@ checkPackageDeps :: PackageName -- ^ package using dependencies, for constructin
           -> Map PackageName Version -- ^ Available package pool or index
           -> DepErrors
 checkPackageDeps myName deps packages =
-    Map.unionsWith mappend $ map go $ Map.toList deps
+    Map.unionsWith combineDepError $ map go $ Map.toList deps
   where
     go :: (PackageName, VersionRange) -> DepErrors
     go (name, range) =
@@ -660,11 +660,11 @@ data DepError = DepError
     { deVersion :: !(Maybe Version)
     , deNeededBy :: !(Map PackageName VersionRange)
     } deriving Show
-instance Monoid DepError where
-    mempty = DepError Nothing Map.empty
-    mappend (DepError a x) (DepError b y) = DepError
-        (assert (a == b) a)
-        (Map.unionWith C.intersectVersionRanges x y)
+
+-- | Combine two 'DepError's for the same 'Version'.
+combineDepError :: DepError -> DepError -> DepError
+combineDepError (DepError a x) (DepError b y) =
+    assert (a == b) $ DepError a (Map.unionWith C.intersectVersionRanges x y)
 
 -- | Given a bundle of packages (a list of @GenericPackageDescriptions@'s) to
 -- build and an available package pool (snapshot) check whether the bundle's
@@ -679,7 +679,7 @@ checkBundleBuildPlan
     -> (Map PackageName (Map FlagName Bool), DepErrors)
 checkBundleBuildPlan platform compiler pool flags gpds =
     (Map.unionsWith dupError (map fst plans)
-    , Map.unionsWith mappend (map snd plans))
+    , Map.unionsWith combineDepError (map snd plans))
 
     where
         plans = map (pkgPlan flags) gpds
