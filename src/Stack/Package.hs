@@ -42,10 +42,10 @@ import Prelude.Compat
 
 import           Control.Arrow ((&&&))
 import           Control.Exception hiding (try,catch)
-import           Control.Monad (liftM, liftM2, (<=<), when, forM)
+import           Control.Monad (liftM, liftM2, (<=<), when, forM, forM_)
 import           Control.Monad.Catch
 import           Control.Monad.IO.Class
-import           Control.Monad.Logger (MonadLogger,logWarn)
+import           Control.Monad.Logger (MonadLogger,logWarn,logDebug)
 import           Control.Monad.Reader (MonadReader,runReaderT,ask,asks)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Char8 as C8
@@ -1089,7 +1089,7 @@ logPossibilities dirs mn = do
 -- If the directory contains a file named package.yaml, hpack is used to
 -- generate a .cabal file from it.
 findOrGenerateCabalFile
-    :: forall m. (MonadThrow m, MonadIO m)
+    :: forall m. (MonadThrow m, MonadIO m, MonadLogger m)
     => Path Abs Dir -- ^ package directory
     -> m (Path Abs File)
 findOrGenerateCabalFile pkgDir = do
@@ -1103,14 +1103,14 @@ findOrGenerateCabalFile pkgDir = do
                 Right cabalFile -> do
                     packageYamlModified <- getModificationTime packageYaml
                     cabalFileModified <- getModificationTime cabalFile
-                    when (cabalFileModified < packageYamlModified) $ liftIO $ hpack pkgDir
+                    when (cabalFileModified < packageYamlModified) $ hpack pkgDir
                     -- Important to research again
                     findCabalFile
 
                 -- If we cannot find cabal file, but have package.yaml
                 -- run hpack and try to find cabal file again
                 Left (PackageNoCabalFileFound _) -> do
-                    liftIO $ hpack pkgDir
+                    hpack pkgDir
                     findCabalFile
 
                 -- Rethrow exception
@@ -1138,11 +1138,22 @@ findOrGenerateCabalFile pkgDir = do
       where hasExtension fp x = FilePath.takeExtension fp == "." ++ x
 
 -- | Generate .cabal file from package.yaml, if necessary.
-hpack :: Path Abs Dir -> IO ()
+hpack :: (MonadIO m, MonadLogger m) => Path Abs Dir -> m ()
 hpack pkgDir = do
     exists <- doesFileExist (pkgDir </> $(mkRelFile Hpack.packageConfig))
     when exists $ do
-        Hpack.hpack (toFilePath pkgDir) True
+        r <- liftIO $ Hpack.hpackResult (toFilePath pkgDir)
+        forM_ (Hpack.resultWarnings r) $ \w -> $logWarn ("WARNING: " <> T.pack w)
+        let cabalFile = T.pack (Hpack.resultCabalFile r)
+        case Hpack.resultStatus r of
+            Hpack.Generated -> $logDebug $
+                "hpack generated a modified version of " <> cabalFile
+            Hpack.OutputUnchanged -> $logDebug $
+                "hpack output unchanged in " <> cabalFile
+            -- NOTE: this is 'logInfo' so it will be outputted to the
+            -- user by default.
+            Hpack.AlreadyGeneratedByNewerHpack -> $logWarn $
+                "WARNING: " <> cabalFile <> " was generated with a newer version of hpack, please upgrade and try again."
 
 -- | Path for the package's build log.
 buildLogPath :: (MonadReader env m, HasBuildConfig env, MonadThrow m)
