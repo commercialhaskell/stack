@@ -22,16 +22,17 @@ module Stack.Types.FlagName
   where
 
 import           Control.Applicative
+import           Control.DeepSeq (NFData)
 import           Control.Monad.Catch
 import           Data.Aeson.Extended
-import           Data.Attoparsec.Text
 import           Data.Attoparsec.Combinators
-import           Data.Binary.VersionTagged
+import           Data.Attoparsec.Text
 import           Data.Char (isLetter, isDigit, toLower)
 import           Data.Data
 import           Data.Hashable
 import           Data.Map (Map)
 import qualified Data.Map as Map
+import           Data.Store (Store)
 import           Data.Text (Text)
 import qualified Data.Text as T
 import           Data.Text.Binary ()
@@ -51,8 +52,7 @@ instance Show FlagNameParseFail where
 -- | A flag name.
 newtype FlagName =
   FlagName Text
-  deriving (Typeable,Data,Generic,Hashable,Binary,NFData)
-instance HasStructuralInfo FlagName
+  deriving (Typeable,Data,Generic,Hashable,Store,NFData)
 instance Eq FlagName where
     x == y = compare x y == EQ
 instance Ord FlagName where

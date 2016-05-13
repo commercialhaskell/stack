@@ -311,7 +311,7 @@ splitComponents =
 -- based on the selected components
 loadLocalPackage
     :: forall m env.
-       (MonadReader env m, HasEnvConfig env, MonadMask m, MonadLogger m, MonadIO m)
+       (MonadReader env m, HasEnvConfig env, MonadMask m, MonadLogger m, MonadIO m, MonadBaseControl IO m)
     => BuildOptsCLI
     -> Map PackageName SimpleTarget
     -> (PackageName, (LocalPackageView, GenericPackageDescription))

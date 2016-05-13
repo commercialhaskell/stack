@@ -28,14 +28,14 @@ import           Control.DeepSeq
 import           Control.Monad
 import           Control.Monad.Catch
 import           Data.Aeson.Extended
-import           Data.Attoparsec.Text
 import           Data.Attoparsec.Combinators
-import           Data.Binary.VersionTagged (Binary, HasStructuralInfo)
+import           Data.Attoparsec.Text
 import           Data.Data
 import           Data.Hashable
 import           Data.List (intercalate)
 import           Data.Map (Map)
 import qualified Data.Map as Map
+import           Data.Store (Store)
 import           Data.Text (Text)
 import qualified Data.Text as T
 import           Data.Text.Binary ()
@@ -43,8 +43,8 @@ import qualified Distribution.Package as Cabal
 import           GHC.Generics
 import           Language.Haskell.TH
 import           Language.Haskell.TH.Syntax
-import           Path
 import qualified Options.Applicative as O
+import           Path
 
 -- | A parse fail.
 data PackageNameParseFail
@@ -61,7 +61,7 @@ instance Show PackageNameParseFail where
 -- | A package name.
 newtype PackageName =
   PackageName Text
-  deriving (Eq,Ord,Typeable,Data,Generic,Hashable,Binary,NFData)
+  deriving (Eq,Ord,Typeable,Data,Generic,Hashable,NFData,Store)
 
 instance Lift PackageName where
   lift (PackageName n) =
@@ -70,8 +70,6 @@ instance Lift PackageName where
 
 instance Show PackageName where
   show (PackageName n) = T.unpack n
-
-instance HasStructuralInfo PackageName
 
 instance ToJSON PackageName where
     toJSON = toJSON . packageNameText

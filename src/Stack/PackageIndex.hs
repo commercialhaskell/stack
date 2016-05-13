@@ -38,7 +38,7 @@ import           Control.Monad.Reader (asks)
 import           Control.Monad.Trans.Control
 
 import           Data.Aeson.Extended
-import           Data.Binary.VersionTagged
+import           Data.Store.VersionTagged
 import qualified Data.ByteString.Lazy as L
 import           Data.Conduit (($$), (=$))
 import           Data.Conduit.Binary                   (sinkHandle,

@@ -45,7 +45,7 @@ import           Control.Monad.State.Strict      (State, execState, get, modify,
 import           Control.Monad.Trans.Control (MonadBaseControl)
 import qualified Crypto.Hash.SHA256 as SHA256
 import           Data.Aeson.Extended (WithJSONWarnings(..), logJSONWarnings)
-import           Data.Binary.VersionTagged (taggedDecodeOrLoad, decodeFileOrFailDeep, taggedEncodeFile)
+import           Data.Store.VersionTagged (taggedDecodeOrLoad, decodeFileMaybe, taggedEncodeFile)
 import qualified Data.ByteString as S
 import qualified Data.ByteString.Base64.URL as B64URL
 import qualified Data.ByteString.Char8 as S8
@@ -1024,11 +1024,11 @@ parseCustomMiniBuildPlan mconfigPath0 url0 = do
                                 exists <- doesFileExist binaryPath
                                 if exists
                                     then do
-                                        eres <- decodeFileOrFailDeep binaryPath
+                                        eres <- decodeFileMaybe binaryPath
                                         case eres of
-                                            Right (Just mbp) -> return mbp
+                                            Just mbp -> return mbp
                                             -- Invalid format cache file, remove.
-                                            _ -> do
+                                            Nothing -> do
                                                 removeFile binaryPath
                                                 getMbp0
                                     else getMbp0

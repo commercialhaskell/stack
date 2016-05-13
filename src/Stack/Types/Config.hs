@@ -155,7 +155,6 @@ import           Data.Aeson.Extended
                   withObjectWarnings, WarningParser, Object, jsonSubWarnings,
                   jsonSubWarningsT, jsonSubWarningsTT, WithJSONWarnings(..), noJSONWarnings)
 import           Data.Attoparsec.Args
-import           Data.Binary (Binary)
 import           Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as S8
 import           Data.Either (partitionEithers)
@@ -171,6 +170,7 @@ import           Data.Maybe
 import           Data.Monoid.Extra
 import           Data.Set (Set)
 import qualified Data.Set as Set
+import           Data.Store (Store)
 import           Data.Text (Text)
 import qualified Data.Text as T
 import           Data.Text.Encoding (encodeUtf8, decodeUtf8)
@@ -375,7 +375,7 @@ instance FromJSON (WithJSONWarnings PackageIndex) where
 
 -- | Unique name for a package index
 newtype IndexName = IndexName { unIndexName :: ByteString }
-    deriving (Show, Eq, Ord, Hashable, Binary)
+    deriving (Show, Eq, Ord, Hashable, Store)
 indexNameText :: IndexName -> Text
 indexNameText = decodeUtf8 . unIndexName
 instance ToJSON IndexName where

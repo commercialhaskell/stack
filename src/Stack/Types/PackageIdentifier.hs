@@ -22,9 +22,9 @@ import           Control.Exception (Exception)
 import           Control.Monad.Catch (MonadThrow, throwM)
 import           Data.Aeson.Extended
 import           Data.Attoparsec.Text
-import           Data.Binary.VersionTagged (Binary, HasStructuralInfo)
 import           Data.Data
 import           Data.Hashable
+import           Data.Store (Store)
 import           Data.Text (Text)
 import qualified Data.Text as T
 import           GHC.Generics
@@ -53,8 +53,7 @@ instance NFData PackageIdentifier where
       seq (rnf p) (rnf v)
 
 instance Hashable PackageIdentifier
-instance Binary PackageIdentifier
-instance HasStructuralInfo PackageIdentifier
+instance Store PackageIdentifier
 
 instance Show PackageIdentifier where
   show = show . packageIdentifierString

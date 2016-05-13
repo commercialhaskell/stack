@@ -47,3 +47,6 @@ extra-deps:
 - connection-0.2.5
 - regex-applicative-text-0.1.0.1
 - monad-unlift-0.1.1.0
+- th-reify-many-0.1.6
+- store-0.1.0.0
+- th-orphans-0.13.1

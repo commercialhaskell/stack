@@ -1,6 +1,8 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE DataKinds #-}
 
 module Stack.Types.PackageIndex
     ( PackageDownload (..)
@@ -8,14 +10,15 @@ module Stack.Types.PackageIndex
     , PackageCacheMap (..)
     ) where
 
+import           Control.DeepSeq (NFData)
 import           Control.Monad (mzero)
 import           Data.Aeson.Extended
-import qualified Data.Binary as Binary
-import           Data.Binary.VersionTagged
 import           Data.ByteString (ByteString)
 import           Data.Int (Int64)
 import           Data.Map (Map)
 import qualified Data.Map.Strict as Map
+import           Data.Store (Store)
+import           Data.Store.TypeHash (mkManyHasTypeHash)
 import           Data.Text (Text)
 import           Data.Text.Encoding (encodeUtf8)
 import           Data.Word (Word64)
@@ -29,25 +32,21 @@ data PackageCache = PackageCache
     -- ^ size in bytes of the .cabal file
     , pcDownload :: !(Maybe PackageDownload)
     }
-    deriving (Generic)
+    deriving (Generic, Eq, Show)
 
-instance Binary PackageCache
+instance Store PackageCache
 instance NFData PackageCache
-instance HasStructuralInfo PackageCache
 
 newtype PackageCacheMap = PackageCacheMap (Map PackageIdentifier PackageCache)
-    deriving (Generic, Binary, NFData)
-instance HasStructuralInfo PackageCacheMap
-instance HasSemanticVersion PackageCacheMap
+    deriving (Generic, Store, NFData, Eq, Show)
 
 data PackageDownload = PackageDownload
     { pdSHA512 :: !ByteString
     , pdUrl    :: !ByteString
     , pdSize   :: !Word64
     }
-    deriving (Show, Generic)
-instance Binary.Binary PackageDownload
-instance HasStructuralInfo PackageDownload
+    deriving (Show, Generic, Eq)
+instance Store PackageDownload
 instance NFData PackageDownload
 instance FromJSON PackageDownload where
     parseJSON = withObject "Package" $ \o -> do
@@ -64,3 +63,5 @@ instance FromJSON PackageDownload where
             , pdUrl = encodeUtf8 url
             , pdSize = size
             }
+
+$(mkManyHasTypeHash [ [t| PackageCacheMap |] ])

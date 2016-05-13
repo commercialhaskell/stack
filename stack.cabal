@@ -51,16 +51,16 @@ flag static
 
 library
   hs-source-dirs:    src/
-  ghc-options:       -Wall -fwarn-tabs -fwarn-incomplete-uni-patterns -fwarn-incomplete-record-updates
+  ghc-options:       -Wall -fwarn-tabs -fwarn-incomplete-uni-patterns -fwarn-incomplete-record-updates -fwarn-identities
   exposed-modules:   Control.Concurrent.Execute
                      Data.Aeson.Extended
                      Data.Attoparsec.Args
                      Data.Attoparsec.Combinators
                      Data.Attoparsec.Interpreter
-                     Data.Binary.VersionTagged
                      Data.IORef.RunOnce
                      Data.Maybe.Extra
                      Data.Monoid.Extra
+                     Data.Store.VersionTagged
                      Distribution.Version.Extra
                      Network.HTTP.Download
                      Network.HTTP.Download.Verified
@@ -219,6 +219,7 @@ library
                    , project-template >= 0.2
                    , zip-archive
                    , hpack >= 0.10.0 && < 0.15
+                   , store
   if os(windows)
     cpp-options:     -DWINDOWS
     build-depends:   Win32
@@ -275,6 +276,7 @@ test-suite stack-test
                 , Stack.PackageDumpSpec
                 , Stack.ArgsSpec
                 , Stack.NixSpec
+                , Stack.StoreSpec
                 , Network.HTTP.Download.VerifiedSpec
   ghc-options:    -threaded -Wall -fwarn-tabs -fwarn-incomplete-uni-patterns -fwarn-incomplete-record-updates
   build-depends:  Cabal >= 1.18.1.5 && < 1.25
@@ -298,6 +300,13 @@ test-suite stack-test
                 , temporary
                 , text
                 , transformers
+                , mono-traversable
+                , th-reify-many
+                , smallcheck
+                , bytestring
+                , store
+                , vector
+                , template-haskell
   default-language:    Haskell2010
 
 test-suite stack-integration-test

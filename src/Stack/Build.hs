@@ -69,7 +69,7 @@ import           System.Win32.Console (setConsoleCP, setConsoleOutputCP, getCons
 import qualified Control.Monad.Catch as Catch
 #endif
 
-type M env m = (MonadIO m,MonadReader env m,HasHttpManager env,HasBuildConfig env,MonadLogger m,MonadBaseUnlift IO m,MonadMask m,HasLogLevel env,HasEnvConfig env,HasTerminal env)
+type M env m = (MonadIO m,MonadReader env m,HasHttpManager env,HasBuildConfig env,MonadLoggerIO m,MonadBaseUnlift IO m,MonadMask m,HasLogLevel env,HasEnvConfig env,HasTerminal env)
 
 -- | Build.
 --

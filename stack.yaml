@@ -15,3 +15,11 @@ extra-deps:
 - hpack-0.14.0
 - path-io-1.1.0
 - th-lift-instances-0.1.6
+- th-reify-many-0.1.6
+- th-utilities-0.1.0.1
+- store-0.1.0.0
+- th-orphans-0.13.1
+packages:
+- .
+- location: ../store
+  extra-dep: true

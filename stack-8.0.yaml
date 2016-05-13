@@ -27,6 +27,10 @@ extra-deps:
 - persistent-template-2.5.1
 - persistent-2.5
 - monad-unlift-0.1.2.0
+- th-utilities-0.1.0.1
+- th-reify-many-0.1.6
+- store-0.1.0.0
+- th-orphans-0.13.1
 packages:
 - .
 # https://github.com/ekmett/either/issues/44

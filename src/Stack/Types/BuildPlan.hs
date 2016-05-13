@@ -4,6 +4,8 @@
 {-# LANGUAGE OverloadedStrings          #-}
 {-# LANGUAGE RecordWildCards            #-}
 {-# LANGUAGE FlexibleInstances          #-}
+{-# LANGUAGE TemplateHaskell            #-}
+{-# LANGUAGE DataKinds                  #-}
 -- | Shared types for various stackage packages.
 module Stack.Types.BuildPlan
     ( -- * Types
@@ -30,36 +32,36 @@ module Stack.Types.BuildPlan
     ) where
 
 import           Control.Applicative
-import           Control.Arrow                   ((&&&))
-import           Control.Exception               (Exception)
-import           Control.Monad.Catch             (MonadThrow, throwM)
-import           Data.Aeson                      (FromJSON (..), ToJSON (..),
-                                                  object, withObject, withText,
-                                                  (.!=), (.:), (.:?), (.=))
-import           Data.Binary.VersionTagged
-import           Data.ByteString                 (ByteString)
-import qualified Data.ByteString                 as BS
-import           Data.Hashable                   (Hashable)
-import qualified Data.HashMap.Strict             as HashMap
-import           Data.IntMap                     (IntMap)
-import qualified Data.IntMap                     as IntMap
-import           Data.Map                        (Map)
-import qualified Data.Map                        as Map
-import           Data.Maybe                      (fromMaybe)
+import           Control.Arrow ((&&&))
+import           Control.DeepSeq (NFData)
+import           Control.Exception (Exception)
+import           Control.Monad.Catch (MonadThrow, throwM)
+import           Data.Aeson (FromJSON (..), ToJSON (..), object, withObject, withText, (.!=), (.:), (.:?), (.=))
+import           Data.ByteString (ByteString)
+import qualified Data.ByteString as BS
+import qualified Data.HashMap.Strict as HashMap
+import           Data.Hashable (Hashable)
+import           Data.IntMap (IntMap)
+import qualified Data.IntMap as IntMap
+import           Data.Map (Map)
+import qualified Data.Map as Map
+import           Data.Maybe (fromMaybe)
 import           Data.Monoid
-import           Data.Set                        (Set)
-import           Data.String                     (IsString, fromString)
-import           Data.Text                       (Text, pack, unpack)
-import qualified Data.Text                       as T
-import Data.Text.Read (decimal)
-import           Data.Time                       (Day)
-import qualified Data.Traversable                as T
-import           Data.Typeable                   (TypeRep, Typeable, typeOf)
-import           Data.Vector                     (Vector)
-import           Distribution.System             (Arch, OS (..))
-import qualified Distribution.Text               as DT
-import qualified Distribution.Version            as C
-import           GHC.Generics                    (Generic)
+import           Data.Set (Set)
+import           Data.Store (Store)
+import           Data.Store.TypeHash (mkManyHasTypeHash)
+import           Data.String (IsString, fromString)
+import           Data.Text (Text, pack, unpack)
+import qualified Data.Text as T
+import           Data.Text.Read (decimal)
+import           Data.Time (Day)
+import qualified Data.Traversable as T
+import           Data.Typeable (TypeRep, Typeable, typeOf)
+import           Data.Vector (Vector)
+import           Distribution.System (Arch, OS (..))
+import qualified Distribution.Text as DT
+import qualified Distribution.Version as C
+import           GHC.Generics (Generic)
 import           Prelude -- Fix AMP warning
 import           Safe (readMay)
 import           Stack.Types.Compiler
@@ -277,8 +279,7 @@ newtype Maintainer = Maintainer { unMaintainer :: Text }
 
 -- | Name of an executable.
 newtype ExeName = ExeName { unExeName :: Text }
-    deriving (Show, Eq, Ord, Hashable, IsString, Generic, Binary, NFData)
-instance HasStructuralInfo ExeName
+    deriving (Show, Eq, Ord, Hashable, IsString, Generic, Store, NFData)
 instance ToJSON ExeName where
     toJSON = toJSON . unExeName
 instance FromJSON ExeName where
@@ -429,10 +430,8 @@ data MiniBuildPlan = MiniBuildPlan
     , mbpPackages :: !(Map PackageName MiniPackageInfo)
     }
     deriving (Generic, Show, Eq)
-instance Binary MiniBuildPlan
+instance Store MiniBuildPlan
 instance NFData MiniBuildPlan
-instance HasStructuralInfo MiniBuildPlan
-instance HasSemanticVersion MiniBuildPlan
 
 -- | Information on a single package for the 'MiniBuildPlan'.
 data MiniPackageInfo = MiniPackageInfo
@@ -455,15 +454,16 @@ data MiniPackageInfo = MiniPackageInfo
     -- revision directly from a Git repo
     }
     deriving (Generic, Show, Eq)
-instance Binary MiniPackageInfo
-instance HasStructuralInfo MiniPackageInfo
+instance Store MiniPackageInfo
 instance NFData MiniPackageInfo
 
 newtype GitSHA1 = GitSHA1 ByteString
-    deriving (Generic, Show, Eq, NFData, HasStructuralInfo, Binary)
+    deriving (Generic, Show, Eq, NFData, Store)
 
 newtype SnapshotHash = SnapshotHash { unShapshotHash :: ByteString }
     deriving (Generic, Show, Eq)
 
 trimmedSnapshotHash :: SnapshotHash -> ByteString
 trimmedSnapshotHash = BS.take 12 . unShapshotHash
+
+$(mkManyHasTypeHash [ [t| MiniBuildPlan |] ])
