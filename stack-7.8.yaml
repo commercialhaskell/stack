@@ -6,6 +6,10 @@ extra-deps:
 - hpack-0.14.0
 - QuickCheck-2.8.2
 - nats-1
+- th-reify-many-0.1.6
+- th-utilities-0.1.0.1
+- store-0.1.0.0
+- th-orphans-0.13.1
 flags:
   QuickCheck:
     base4point8: false

@@ -35,7 +35,6 @@ import           Control.DeepSeq
 import           Control.Monad.Catch
 import           Data.Aeson.Extended
 import           Data.Attoparsec.Text
-import           Data.Binary.VersionTagged (Binary, HasStructuralInfo)
 import           Data.Data
 import           Data.Hashable
 import           Data.List
@@ -45,10 +44,9 @@ import           Data.Maybe (listToMaybe)
 import           Data.Monoid
 import           Data.Set (Set)
 import qualified Data.Set as Set
+import           Data.Store (Store)
 import           Data.Text (Text)
 import qualified Data.Text as T
-import           Data.Text.Binary ()
-import           Data.Vector.Binary ()
 import           Data.Vector.Unboxed (Vector)
 import qualified Data.Vector.Unboxed as V
 import           Data.Word
@@ -71,8 +69,7 @@ instance Show VersionParseFail where
 -- | A package version.
 newtype Version =
   Version {unVersion :: Vector Word}
-  deriving (Eq,Ord,Typeable,Data,Generic,Binary,NFData)
-instance HasStructuralInfo Version
+  deriving (Eq,Ord,Typeable,Data,Generic,Store,NFData)
 
 instance Hashable Version where
   hashWithSalt i = hashWithSalt i . V.toList . unVersion

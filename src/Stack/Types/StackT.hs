@@ -84,7 +84,10 @@ instance MonadTransControl (StackT config) where
 
 -- | Takes the configured log level into account.
 instance (MonadIO m) => MonadLogger (StackT config m) where
-  monadLoggerLog = stickyLoggerFunc
+    monadLoggerLog = stickyLoggerFunc
+
+instance MonadIO m => MonadLoggerIO (StackT config m) where
+    askLoggerIO = getStickyLoggerFunc
 
 -- | Run a Stack action, using global options.
 runStackTGlobal :: (MonadIO m)
@@ -216,13 +219,30 @@ newTLSManager = liftIO $ newManager tlsManagerSettings
 
 --------------------------------------------------------------------------------
 -- Logging functionality
-stickyLoggerFunc :: (HasSticky r, HasLogLevel r, HasSupportsUnicode r, ToLogStr msg, MonadReader r m, MonadIO m)
-                 => Loc -> LogSource -> LogLevel -> msg -> m ()
+stickyLoggerFunc
+    :: (HasSticky r, HasLogLevel r, HasSupportsUnicode r, ToLogStr msg, MonadReader r m, MonadIO m)
+    => Loc -> LogSource -> LogLevel -> msg -> m ()
 stickyLoggerFunc loc src level msg = do
-    Sticky mref <- asks getSticky
+    func <- getStickyLoggerFunc
+    liftIO $ func loc src level msg
+
+getStickyLoggerFunc
+    :: (HasSticky r, HasLogLevel r, HasSupportsUnicode r, ToLogStr msg, MonadReader r m, MonadIO m)
+    => m (Loc -> LogSource -> LogLevel -> msg -> IO ())
+getStickyLoggerFunc = stickyLoggerFuncImpl
+    <$> asks getSticky
+    <*> asks getLogLevel
+    <*> asks getSupportsUnicode
+
+stickyLoggerFuncImpl
+    :: ToLogStr msg
+    => Sticky -> LogLevel -> Bool
+    -> (Loc -> LogSource -> LogLevel -> msg -> IO ())
+stickyLoggerFuncImpl (Sticky mref) maxLogLevel supportsUnicode loc src level msg =
     case mref of
         Nothing ->
             loggerFunc
+                maxLogLevel
                 out
                 loc
                 src
@@ -232,22 +252,15 @@ stickyLoggerFunc loc src level msg = do
                      _ -> level)
                 msg
         Just ref -> do
-            sticky <- liftIO (takeMVar ref)
-            let backSpaceChar =
-                    '\8'
-                repeating =
-                    S8.replicate
-                        (maybe 0 T.length sticky)
-                clear =
-                    liftIO
-                        (S8.hPutStr out
-                             (repeating backSpaceChar <>
-                              repeating ' ' <>
-                              repeating backSpaceChar))
-            maxLogLevel <- asks getLogLevel
+            sticky <- takeMVar ref
+            let backSpaceChar = '\8'
+                repeating = S8.replicate (maybe 0 T.length sticky)
+                clear = S8.hPutStr out
+                    (repeating backSpaceChar <>
+                     repeating ' ' <>
+                     repeating backSpaceChar)
 
             -- Convert some GHC-generated Unicode characters as necessary
-            supportsUnicode <- asks getSupportsUnicode
             let msgText
                     | supportsUnicode = msgTextRaw
                     | otherwise = T.map replaceUnicode msgTextRaw
@@ -256,25 +269,27 @@ stickyLoggerFunc loc src level msg = do
                 case level of
                     LevelOther "sticky-done" -> do
                         clear
-                        liftIO (T.hPutStrLn out msgText >> hFlush out)
+                        T.hPutStrLn out msgText
+                        hFlush out
                         return Nothing
                     LevelOther "sticky" -> do
                         clear
-                        liftIO (T.hPutStr out msgText >> hFlush out)
+                        T.hPutStr out msgText
+                        hFlush out
                         return (Just msgText)
                     _
                       | level >= maxLogLevel -> do
                           clear
-                          loggerFunc out loc src level $ toLogStr msgText
+                          loggerFunc maxLogLevel out loc src level $ toLogStr msgText
                           case sticky of
                               Nothing ->
                                   return Nothing
                               Just line -> do
-                                  liftIO (T.hPutStr out line >> hFlush out)
+                                  T.hPutStr out line >> hFlush out
                                   return sticky
                       | otherwise ->
                           return sticky
-            liftIO (putMVar ref newState)
+            putMVar ref newState
   where
     out = stderr
     msgTextRaw = T.decodeUtf8With T.lenientDecode msgBytes
@@ -287,14 +302,13 @@ replaceUnicode '\x2019' = '\''
 replaceUnicode c = c
 
 -- | Logging function takes the log level into account.
-loggerFunc :: (MonadIO m,ToLogStr msg,MonadReader r m,HasLogLevel r)
-           => Handle -> Loc -> Text -> LogLevel -> msg -> m ()
-loggerFunc outputChannel loc _src level msg =
-  do maxLogLevel <- asks getLogLevel
-     when (level >= maxLogLevel)
-          (liftIO (do out <- getOutput maxLogLevel
-                      T.hPutStrLn outputChannel out))
-  where getOutput maxLogLevel =
+loggerFunc :: ToLogStr msg
+           => LogLevel -> Handle -> Loc -> Text -> LogLevel -> msg -> IO ()
+loggerFunc maxLogLevel outputChannel loc _src level msg =
+   when (level >= maxLogLevel)
+        (liftIO (do out <- getOutput
+                    T.hPutStrLn outputChannel out))
+  where getOutput =
           do timestamp <- getTimestamp
              l <- getLevel
              lc <- getLoc

@@ -18,7 +18,6 @@ extra-deps:
 - persistent-2.5
 - monad-unlift-0.1.2.0
 - aeson-0.11.2.0
-
 - Cabal-1.24.0.0
 - array-0.5.1.1
 - binary-0.8.3.0
@@ -38,6 +37,10 @@ extra-deps:
 - transformers-0.5.2.0
 - transformers-compat-0.5.1.4
 - unix-2.7.2.0
+- th-reify-many-0.1.6
+- th-utilities-0.1.0.1
+- store-0.1.0.0
+- th-orphans-0.13.1
 packages:
 - .
 - location:

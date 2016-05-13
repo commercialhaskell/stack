@@ -44,9 +44,8 @@ module Stack.Types.Build
 
 import           Control.DeepSeq
 import           Control.Exception
-
-import           Data.Binary (getWord8, putWord8, gput, gget)
-import           Data.Binary.VersionTagged
+import           Data.Binary (Binary)
+import           Data.Binary.Tagged (HasSemanticVersion, HasStructuralInfo)
 import qualified Data.ByteString as S
 import           Data.Char (isSpace)
 import           Data.Data
@@ -58,16 +57,18 @@ import           Data.Maybe
 import           Data.Monoid
 import           Data.Set (Set)
 import qualified Data.Set as Set
+import           Data.Store.Internal (Store)
+import           Data.Store.TypeHash (mkManyHasTypeHash)
 import           Data.Text (Text)
 import qualified Data.Text as T
 import           Data.Text.Encoding (decodeUtf8With)
 import           Data.Text.Encoding.Error (lenientDecode)
 import           Data.Time.Calendar
 import           Data.Time.Clock
-import           Distribution.System (Arch)
 import           Distribution.PackageDescription (TestSuiteInterface)
+import           Distribution.System (Arch)
 import           Distribution.Text (display)
-import           GHC.Generics (Generic, from, to)
+import           GHC.Generics (Generic)
 import           Path (Path, Abs, File, Dir, mkRelDir, toFilePath, parseRelDir, (</>))
 import           Path.Extra (toFilePathNoTrailingSep)
 import           Prelude
@@ -450,7 +451,7 @@ instance Show ConstructPlanException where
 -- | Package dependency oracle.
 newtype PkgDepsOracle =
     PkgDeps PackageName
-    deriving (Show,Typeable,Eq,Hashable,Binary,NFData)
+    deriving (Show,Typeable,Eq,Hashable,Store,NFData)
 
 -- | Stored on disk to know whether the flags have changed or any
 -- files have changed.
@@ -470,23 +471,8 @@ data ConfigCache = ConfigCache
       -- ^ Are haddocks to be built?
     }
     deriving (Generic,Eq,Show)
-instance Binary ConfigCache where
-    put x = do
-        -- magic string
-        putWord8 1
-        putWord8 3
-        putWord8 4
-        putWord8 8
-        gput $ from x
-    get = do
-        1 <- getWord8
-        3 <- getWord8
-        4 <- getWord8
-        8 <- getWord8
-        fmap to gget
+instance Store ConfigCache
 instance NFData ConfigCache
-instance HasStructuralInfo ConfigCache
-instance HasSemanticVersion ConfigCache
 
 -- | A task to perform when building
 data Task = Task
@@ -706,8 +692,7 @@ data ConfigureOpts = ConfigureOpts
     , coNoDirs :: ![String]
     }
     deriving (Show, Eq, Generic)
-instance Binary ConfigureOpts
-instance HasStructuralInfo ConfigureOpts
+instance Store ConfigureOpts
 instance NFData ConfigureOpts
 
 -- | Information on a compiled package: the library conf file (if relevant),
@@ -723,4 +708,10 @@ data PrecompiledCache = PrecompiledCache
 instance Binary PrecompiledCache
 instance HasSemanticVersion PrecompiledCache
 instance HasStructuralInfo PrecompiledCache
+instance Store PrecompiledCache
 instance NFData PrecompiledCache
+
+$(mkManyHasTypeHash
+    [ [t| PrecompiledCache |]
+    , [t| ConfigCache |]
+    ])

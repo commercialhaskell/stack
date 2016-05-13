@@ -9,8 +9,8 @@ module Stack.Types.Nix where
 
 import Control.Applicative
 import Data.Aeson.Extended
-import Data.Text (Text)
 import Data.Monoid
+import Data.Text (Text)
 import GHC.Generics (Generic)
 import Generics.Deriving.Monoid (mappenddefault, memptydefault)
 import Prelude

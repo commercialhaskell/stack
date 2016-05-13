@@ -17,7 +17,7 @@ import           Control.Exception.Lifted
 import           Control.Monad
 import           Control.Monad.Catch (MonadCatch)
 import           Control.Monad.IO.Class
-import           Control.Monad.Logger (MonadLogger, logWarn)
+import           Control.Monad.Logger
 import           Control.Monad.RWS.Strict
 import           Control.Monad.Trans.Resource
 import           Data.Either
@@ -111,6 +111,7 @@ data Ctx = Ctx
     , getVersions    :: !(PackageName -> IO (Set Version))
     , wanted         :: !(Set PackageName)
     , localNames     :: !(Set PackageName)
+    , logFunc        :: Loc -> LogSource -> LogLevel -> LogStr -> IO ()
     }
 
 instance HasStackRoot Ctx
@@ -123,7 +124,7 @@ instance HasEnvConfig Ctx where
     getEnvConfig = ctxEnvConfig
 
 constructPlan :: forall env m.
-                 (MonadCatch m, MonadReader env m, HasEnvConfig env, MonadIO m, MonadLogger m, MonadBaseControl IO m, HasHttpManager env)
+                 (MonadCatch m, MonadReader env m, HasEnvConfig env, MonadIO m, MonadLoggerIO m, MonadBaseControl IO m, HasHttpManager env)
               => MiniBuildPlan
               -> BaseConfigOpts
               -> [LocalPackage]
@@ -142,8 +143,9 @@ constructPlan mbp0 baseConfigOpts0 locals extraToBuild0 localDumpPkgs loadPackag
     let inner = do
             mapM_ onWanted $ filter lpWanted locals
             mapM_ (addDep False) $ Set.toList extraToBuild0
+    lf <- askLoggerIO
     ((), m, W efinals installExes dirtyReason deps warnings) <-
-        liftIO $ runRWST inner (ctx econfig getVersions0) M.empty
+        liftIO $ runRWST inner (ctx econfig getVersions0 lf) M.empty
     mapM_ $logWarn (warnings [])
     let toEither (_, Left e)  = Left e
         toEither (k, Right v) = Right (k, v)
@@ -171,7 +173,7 @@ constructPlan mbp0 baseConfigOpts0 locals extraToBuild0 localDumpPkgs loadPackag
                 }
         else throwM $ ConstructPlanExceptions errs (bcStackYaml $ getBuildConfig econfig)
   where
-    ctx econfig getVersions0 = Ctx
+    ctx econfig getVersions0 lf = Ctx
         { mbp = mbp0
         , baseConfigOpts = baseConfigOpts0
         , loadPackage = loadPackage0
@@ -185,6 +187,7 @@ constructPlan mbp0 baseConfigOpts0 locals extraToBuild0 localDumpPkgs loadPackag
         , getVersions = getVersions0
         , wanted = wantedLocalPackages locals
         , localNames = Set.fromList $ map (packageName . lpPackage) locals
+        , logFunc = lf
         }
     -- TODO Currently, this will only consider and install tools from the
     -- snapshot. It will not automatically install build tools from extra-deps
@@ -498,7 +501,7 @@ checkDirtiness :: PackageSource
                -> M Bool
 checkDirtiness ps installed package present wanted = do
     ctx <- ask
-    moldOpts <- tryGetFlagCache installed
+    moldOpts <- flip runLoggingT (logFunc ctx) $ tryGetFlagCache installed
     let configOpts = configureOpts
             (getEnvConfig ctx)
             (baseConfigOpts ctx)
