@@ -25,11 +25,15 @@ Other enhancements:
 * Grab Cabal files via Git SHA to avoid regressions from Hackage revisions
   [#2070](https://github.com/commercialhaskell/stack/pull/2070)
 * Custom snapshots now support `ghc-options`.
+* Package git repos are now re-used rather than re-cloned. See
+  [#1620](https://github.com/commercialhaskell/stack/issues/1620)
 
 Bug fixes:
 
 * Now ignore project config when doing `stack init` or `stack new`. See
   [#2110](https://github.com/commercialhaskell/stack/issues/2110).
+* Packages specified by git repo can now have submodules. See
+  [#2133](https://github.com/commercialhaskell/stack/issues/2133)
 
 ## 1.1.0
 
