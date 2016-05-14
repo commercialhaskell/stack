@@ -211,7 +211,7 @@ parseCabalOutputLine t0 = maybe (Left t0) Right . join .  match re $ t0
   where
     re = mk <$> some (psym $ not . isSpace) <*> many (lexeme reMaybeFlag)
 
-    reMaybeFlag = 
+    reMaybeFlag =
         (\s -> Just (True, s))  <$ sym '+' <*> some (psym $ not . isSpace) <|>
         (\s -> Just (False, s)) <$ sym '-' <*> some (psym $ not . isSpace) <|>
         Nothing <$ sym '*' <* some (psym $ not . isSpace) <|>
@@ -505,10 +505,10 @@ checkResolverSpec gpds flags resolver = do
 -- a `hpack` `package.yaml` file exists, this will be used to generate a cabal
 -- file.
 -- Subdirectories can be included depending on the @recurse@ parameter.
-findCabalFiles :: MonadIO m => Bool -> Path Abs Dir -> m [Path Abs File]
-findCabalFiles recurse dir = liftIO $ do
-    findFiles dir isHpack subdirFilter >>= mapM_ (hpack . parent)
-    findFiles dir isCabal subdirFilter
+findCabalFiles :: (MonadIO m, MonadLogger m) => Bool -> Path Abs Dir -> m [Path Abs File]
+findCabalFiles recurse dir = do
+    liftIO (findFiles dir isHpack subdirFilter) >>= mapM_ (hpack . parent)
+    liftIO (findFiles dir isCabal subdirFilter)
   where
     subdirFilter subdir = recurse && not (isIgnored subdir)
     isHpack = (== "package.yaml")     . toFilePath . filename
