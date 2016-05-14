@@ -559,7 +559,7 @@ resolveGlobFiles =
         mapM resolveFileOrWarn names
     matchDirFileGlob' dir glob =
         catch
-            (liftIO (matchDirFileGlob_ dir glob))
+            (matchDirFileGlob_ dir glob)
             (\(e :: IOException) ->
                   if isUserError e
                       then do
@@ -584,22 +584,28 @@ resolveGlobFiles =
 -- ["test/package-dump/ghc-7.8.txt","test/package-dump/ghc-7.10.txt"]
 -- @
 --
-matchDirFileGlob_ :: String -> String -> IO [String]
+matchDirFileGlob_ :: (MonadLogger m, MonadIO m) => String -> String -> m [String]
 matchDirFileGlob_ dir filepath = case parseFileGlob filepath of
-  Nothing -> die $ "invalid file glob '" ++ filepath
-                ++ "'. Wildcards '*' are only allowed in place of the file"
-                ++ " name, not in the directory name or file extension."
-                ++ " If a wildcard is used it must be with an file extension."
+  Nothing -> liftIO $ die $
+      "invalid file glob '" ++ filepath
+      ++ "'. Wildcards '*' are only allowed in place of the file"
+      ++ " name, not in the directory name or file extension."
+      ++ " If a wildcard is used it must be with an file extension."
   Just (NoGlob filepath') -> return [filepath']
   Just (FileGlob dir' ext) -> do
-    files <- D.getDirectoryContents (dir FilePath.</> dir')
-    case   [ dir' FilePath.</> file
-           | file <- files
-           , let (name, ext') = splitExtensions file
-           , not (null name) && isSuffixOf ext ext' ] of
-      []      -> die $ "filepath wildcard '" ++ filepath
-                    ++ "' does not match any files."
-      matches -> return matches
+    efiles <- liftIO $ try $ D.getDirectoryContents (dir FilePath.</> dir')
+    let matches =
+            case efiles of
+                Left (_ :: IOException) -> []
+                Right files ->
+                    [ dir' FilePath.</> file
+                    | file <- files
+                    , let (name, ext') = splitExtensions file
+                    , not (null name) && isSuffixOf ext ext'
+                    ]
+    when (null matches) $
+        $logWarn $ "WARNING: filepath wildcard '" <> T.pack filepath <> "' does not match any files."
+    return matches
 
 -- | Get all files referenced by the benchmark.
 benchmarkFiles
