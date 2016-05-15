@@ -821,10 +821,15 @@ withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} md
                 (True, Just setupExe) -> return $ Left setupExe
                 _ -> liftIO $ fmap Right $ getSetupHs pkgDir
         inner $ \stripTHLoading args -> do
-            let cabalPackageArg =
-                    "-package=" ++ packageIdentifierString
-                                       (PackageIdentifier cabalPackageName
-                                                          eeCabalPkgVer)
+            let cabalPackageArg
+                    -- Omit cabal package dependency when building
+                    -- Cabal. See
+                    -- https://github.com/commercialhaskell/stack/issues/1356
+                    | packageName package == $(mkPackageName "Cabal") = []
+                    | otherwise =
+                        ["-package=" ++ packageIdentifierString
+                                            (PackageIdentifier cabalPackageName
+                                                              eeCabalPkgVer)]
                 packageArgs =
                     case mdeps of
                         -- This branch is taken when
@@ -844,10 +849,10 @@ withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} md
                                 ) ++
                                 ( ("-package-db=" ++ toFilePathNoTrailingSep (bcoSnapDB eeBaseConfigOpts))
                                 : ("-package-db=" ++ toFilePathNoTrailingSep (bcoLocalDB eeBaseConfigOpts))
-                                : "-hide-all-packages"
-                                : cabalPackageArg
-                                : map ("-package-id=" ++) depsMinusCabal
-                                )
+                                : ["-hide-all-packages"]
+                                ) ++
+                                cabalPackageArg ++
+                                map ("-package-id=" ++) depsMinusCabal
                         -- This branch is usually taken for builds, and
                         -- is always taken for `stack sdist`.
                         --
@@ -866,11 +871,11 @@ withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} md
                         -- sdist` or when explicitly requested in the
                         -- stack.yaml file.
                         _ ->
-                              cabalPackageArg
-                            : "-clear-package-db"
+                              cabalPackageArg ++
+                            ("-clear-package-db"
                             : "-global-package-db"
                             : map (("-package-db=" ++) . toFilePathNoTrailingSep) (bcoExtraDBs eeBaseConfigOpts)
-                           ++ ["-package-db=" ++ toFilePathNoTrailingSep (bcoSnapDB eeBaseConfigOpts)]
+                           ++ ["-package-db=" ++ toFilePathNoTrailingSep (bcoSnapDB eeBaseConfigOpts)])
 
                 setupArgs = ("--builddir=" ++ toFilePathNoTrailingSep distRelativeDir') : args
                 runExe exeName fullArgs =
