@@ -243,8 +243,6 @@ configFromConfigMonoid configStackRoot configUserConfigPath mresolver mproject c
 
          configRequireStackVersion = simplifyVersionRange (getIntersectingVersionRange configMonoidRequireStackVersion)
 
-         configConfigMonoid = configMonoid
-
          configImage = Image.imgOptsFromMonoid configMonoidImageOpts
 
          configCompilerCheck = fromFirst MatchMinor configMonoidCompilerCheck

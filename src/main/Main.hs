@@ -827,31 +827,48 @@ withUserFileLock go@GlobalOpts{} dir act = do
                                             act $ Just lk))
         else act Nothing
 
-withConfigAndLock :: GlobalOpts
-           -> StackT Config IO ()
-           -> IO ()
+withConfigAndLock
+    :: GlobalOpts
+    -> StackT Config IO ()
+    -> IO ()
 withConfigAndLock go@GlobalOpts{..} inner = do
     (manager, lc) <- loadConfigWithOpts go
     withUserFileLock go (configStackRoot $ lcConfig lc) $ \lk ->
-     runStackTGlobal manager (lcConfig lc) go $
-        Docker.reexecWithOptionalContainer (lcProjectRoot lc)
-            Nothing
-            (runStackTGlobal manager (lcConfig lc) go inner)
-            Nothing
-            (Just $ munlockFile lk)
+        runStackTGlobal manager (lcConfig lc) go $
+            Docker.reexecWithOptionalContainer
+                (lcProjectRoot lc)
+                Nothing
+                (runStackTGlobal manager (lcConfig lc) go inner)
+                Nothing
+                (Just $ munlockFile lk)
+
+-- | Loads global config, ignoring any configuration which would be
+-- loaded due to $PWD.
+withGlobalConfigAndLock
+    :: GlobalOpts
+    -> StackT Config IO ()
+    -> IO ()
+withGlobalConfigAndLock go@GlobalOpts{..} inner = do
+    manager <- newTLSManager
+    lc <- runStackLoggingTGlobal manager go $
+        loadConfigMaybeProject globalConfigMonoid Nothing Nothing
+    withUserFileLock go (configStackRoot $ lcConfig lc) $ \_lk ->
+        runStackTGlobal manager (lcConfig lc) go inner
 
 -- For now the non-locking version just unlocks immediately.
 -- That is, there's still a serialization point.
-withBuildConfig :: GlobalOpts
-               -> StackT EnvConfig IO ()
-               -> IO ()
+withBuildConfig
+    :: GlobalOpts
+    -> StackT EnvConfig IO ()
+    -> IO ()
 withBuildConfig go inner =
     withBuildConfigAndLock go (\lk -> do munlockFile lk
                                          inner)
 
-withBuildConfigAndLock :: GlobalOpts
-                 -> (Maybe FileLock -> StackT EnvConfig IO ())
-                 -> IO ()
+withBuildConfigAndLock
+    :: GlobalOpts
+    -> (Maybe FileLock -> StackT EnvConfig IO ())
+    -> IO ()
 withBuildConfigAndLock go inner =
     withBuildConfigExt go Nothing inner Nothing
 
@@ -956,8 +973,9 @@ updateCmd () go = withConfigAndLock go $
     getMinimalEnvOverride >>= Stack.PackageIndex.updateAllIndices
 
 upgradeCmd :: (Bool, String) -> GlobalOpts -> IO ()
-upgradeCmd (fromGit, repo) go = withConfigAndLock go $
-    upgrade (if fromGit then Just repo else Nothing)
+upgradeCmd (fromGit, repo) go = withGlobalConfigAndLock go $ do
+    upgrade (globalConfigMonoid go)
+            (if fromGit then Just repo else Nothing)
             (globalResolver go)
 #ifdef USE_GIT_INFO
             (find (/= "UNKNOWN") [$gitHash])

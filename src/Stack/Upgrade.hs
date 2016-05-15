@@ -8,13 +8,12 @@ import           Control.Monad               (when)
 import           Control.Monad.Catch
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
-import           Control.Monad.Reader        (MonadReader, asks)
+import           Control.Monad.Reader        (MonadReader)
 import           Control.Monad.Trans.Control
 import           Data.Foldable               (forM_)
 import qualified Data.Map                    as Map
 import           Data.Maybe                  (isNothing)
 import           Data.Monoid.Extra
-import qualified Data.Monoid
 import qualified Data.Text as T
 import           Lens.Micro                  (set)
 import           Network.HTTP.Client.Conduit (HasHttpManager)
@@ -33,11 +32,12 @@ import           System.Process              (readProcess)
 import           System.Process.Run
 
 upgrade :: (MonadIO m, MonadMask m, MonadReader env m, HasConfig env, HasHttpManager env, MonadLogger m, HasTerminal env, HasReExec env, HasLogLevel env, MonadBaseControl IO m)
-        => Maybe String -- ^ git repository to use
+        => ConfigMonoid
+        -> Maybe String -- ^ git repository to use
         -> Maybe AbstractResolver
         -> Maybe String -- ^ git hash at time of building, if known
         -> m ()
-upgrade gitRepo mresolver builtHash =
+upgrade gConfigMonoid gitRepo mresolver builtHash =
   withSystemTempDir "stack-upgrade" $ \tmp -> do
     menv <- getMinimalEnvOverride
     mdir <- case gitRepo of
@@ -89,19 +89,15 @@ upgrade gitRepo mresolver builtHash =
                     Nothing -> error "Stack.Upgrade.upgrade: invariant violated, unpacked directory not found"
                     Just path -> return $ Just path
 
-    config <- asks getConfig
     forM_ mdir $ \dir -> do
-        bconfig <- runInnerStackLoggingT $ do
-            lc <- loadConfig
-                (configConfigMonoid config <> Data.Monoid.mempty
-                    { configMonoidInstallGHC = First (Just True)
-                    })
-                mresolver
-                (Just $ dir </> $(mkRelFile "stack.yaml"))
-            lcLoadBuildConfig lc Nothing
+        lc <- loadConfig
+            gConfigMonoid
+            mresolver
+            (Just $ dir </> $(mkRelFile "stack.yaml"))
+        bconfig <- lcLoadBuildConfig lc Nothing
         envConfig1 <- runInnerStackT bconfig $ setupEnv $ Just $
             "Try rerunning with --install-ghc to install the correct GHC into " <>
-            T.pack (toFilePath (configLocalPrograms config))
+            T.pack (toFilePath (configLocalPrograms (getConfig bconfig)))
         runInnerStackT (set (envConfigBuildOpts.buildOptsInstallExes) True envConfig1) $
             build (const $ return ()) Nothing defaultBuildOptsCLI
                 { boptsCLITargets = ["stack"]
