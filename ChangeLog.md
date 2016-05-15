@@ -19,6 +19,13 @@ Behavior changes:
   with `stack path`. The same functionality is now provided by `stack path
   --compiler-exe`. See
   [#2123](https://github.com/commercialhaskell/stack/issues/2123)
+* For packages specified in terms of a git or hg repo, the hash used in the
+  location has changed.  This means that existing downloads from older stack
+  versions won't be used.  This is a side-effect of the fix to
+  [#2133](https://github.com/commercialhaskell/stack/issues/2133)
+* `stack upgrade` no longer pays attention to local stack.yaml files, just the
+  global config and CLI options.
+  [#1392](https://github.com/commercialhaskell/stack/issues/1392)
 
 Other enhancements:
 
@@ -27,6 +34,8 @@ Other enhancements:
 * Custom snapshots now support `ghc-options`.
 * Package git repos are now re-used rather than re-cloned. See
   [#1620](https://github.com/commercialhaskell/stack/issues/1620)
+* `DESTDIR` is filtered from environment when installing GHC. See
+  [#1460](https://github.com/commercialhaskell/stack/issues/1460)
 
 Bug fixes:
 
@@ -34,6 +43,16 @@ Bug fixes:
   [#2110](https://github.com/commercialhaskell/stack/issues/2110).
 * Packages specified by git repo can now have submodules. See
   [#2133](https://github.com/commercialhaskell/stack/issues/2133)
+* Fix of hackage index fetch retry. See re-opening of
+  [#1418](https://github.com/commercialhaskell/stack/issues/1418#issuecomment-217633843)
+* HPack now picks up changes to filesystem other than package.yaml.  See
+  [#2051](https://github.com/commercialhaskell/stack/issues/2051)
+* "stack solver" no longer suggests --omit-packages. See
+  [#2031](https://github.com/commercialhaskell/stack/issues/2031)
+* Fixed an issue with building Cabal's Setup.hs. See
+  [#1356](https://github.com/commercialhaskell/stack/issues/1356)
+* Package dirtiness now pays attention to deleted files. See
+  [#1841](https://github.com/commercialhaskell/stack/issues/1841)
 
 ## 1.1.0
 
