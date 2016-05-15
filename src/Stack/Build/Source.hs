@@ -20,53 +20,54 @@ module Stack.Build.Source
     , getPackageConfig
     ) where
 
-import           Control.Applicative
-import           Control.Arrow ((&&&))
-import           Control.Exception (assert, catch)
-import           Control.Monad
-import           Control.Monad.Catch (MonadMask, MonadCatch)
-import           Control.Monad.IO.Class
-import           Control.Monad.Logger
-import           Control.Monad.Reader (MonadReader, asks)
-import           Control.Monad.Trans.Resource
+import              Control.Applicative
+import              Control.Arrow ((&&&))
+import              Control.Exception (assert, catch)
+import              Control.Monad
+import              Control.Monad.Catch (MonadMask, MonadCatch)
+import              Control.Monad.IO.Class
+import              Control.Monad.Logger
+import              Control.Monad.Reader (MonadReader, asks)
+import              Control.Monad.Trans.Resource
 import "cryptohash" Crypto.Hash (Digest, SHA256)
-import           Crypto.Hash.Conduit (sinkHash)
-import qualified Data.ByteString as S
-import           Data.Byteable (toBytes)
-import           Data.Conduit (($$), ZipSink (..))
-import qualified Data.Conduit.Binary as CB
-import qualified Data.Conduit.List as CL
-import           Data.Either
-import           Data.Function
-import qualified Data.HashSet as HashSet
-import           Data.List
-import qualified Data.Map as Map
-import           Data.Map.Strict (Map)
-import qualified Data.Map.Strict as M
-import           Data.Maybe
-import           Data.Monoid
-import           Data.Set (Set)
-import qualified Data.Set as Set
-import           Data.Text (Text)
-import qualified Data.Text as T
-import           Distribution.Package (pkgName, pkgVersion)
-import           Distribution.PackageDescription (GenericPackageDescription, package, packageDescription)
-import qualified Distribution.PackageDescription as C
-import           Network.HTTP.Client.Conduit (HasHttpManager)
-import           Path
-import           Path.IO
-import           Prelude
-import           Stack.Build.Cache
-import           Stack.Build.Target
-import           Stack.BuildPlan (shadowMiniBuildPlan)
-import           Stack.Constants (wiredInPackages)
-import           Stack.Package
-import           Stack.PackageIndex (getPackageVersions)
-import           Stack.Types
+import              Crypto.Hash.Conduit (sinkHash)
+import qualified    Data.ByteString as S
+import              Data.Byteable (toBytes)
+import              Data.Conduit (($$), ZipSink (..))
+import qualified    Data.Conduit.Binary as CB
+import qualified    Data.Conduit.List as CL
+import              Data.Either
+import              Data.Function
+import qualified    Data.HashSet as HashSet
+import              Data.List
+import qualified    Data.Map as Map
+import              Data.Map.Strict (Map)
+import qualified    Data.Map.Strict as M
+import              Data.Maybe
+import              Data.Monoid
+import              Data.Set (Set)
+import qualified    Data.Set as Set
+import              Data.Text (Text)
+import qualified    Data.Text as T
+import              Distribution.Package (pkgName, pkgVersion)
+import              Distribution.PackageDescription (GenericPackageDescription, package, packageDescription)
+import qualified    Distribution.PackageDescription as C
+import              Network.HTTP.Client.Conduit (HasHttpManager)
+import              Path
+import              Path.IO
+import              Prelude
+import              Stack.Build.Cache
+import              Stack.Build.Target
+import              Stack.BuildPlan (shadowMiniBuildPlan)
+import              Stack.Constants (wiredInPackages)
+import              Stack.Package
+import              Stack.PackageIndex (getPackageVersions)
+import              Stack.Types
 
-import qualified System.Directory as D
-import           System.IO (withBinaryFile, IOMode (ReadMode))
-import           System.IO.Error (isDoesNotExistError)
+import qualified    System.Directory as D
+import              System.FilePath (takeFileName)
+import              System.IO (withBinaryFile, IOMode (ReadMode))
+import              System.IO.Error (isDoesNotExistError)
 
 loadSourceMap :: (MonadIO m, MonadMask m, MonadReader env m, HasBuildConfig env, MonadBaseControl IO m, HasHttpManager env, MonadLogger m, HasEnvConfig env)
               => NeedTargets
@@ -365,12 +366,9 @@ loadLocalPackage boptsCli targets (name, (lpv, gpkg)) = do
     mbuildCache <- tryGetBuildCache $ lpvRoot lpv
     (files,_) <- getPackageFilesSimple pkg (lpvCabalFP lpv)
 
-    -- Filter out the cabal_macros file to avoid spurious recompilations
-    let filteredFiles = Set.filter ((/= $(mkRelFile "cabal_macros.h")) . filename) files
-
     (dirtyFiles, newBuildCache) <- checkBuildCache
         (fromMaybe Map.empty mbuildCache)
-        (map toFilePath $ Set.toList filteredFiles)
+        (Set.toList files)
 
     return LocalPackage
         { lpPackage = pkg
@@ -484,33 +482,41 @@ extendExtraDeps extraDeps0 cliExtraDeps unknowns = do
 
 -- | Compare the current filesystem state to the cached information, and
 -- determine (1) if the files are dirty, and (2) the new cache values.
-checkBuildCache :: MonadIO m
+checkBuildCache :: forall m. (MonadIO m, MonadLogger m)
                 => Map FilePath FileCacheInfo -- ^ old cache
-                -> [FilePath] -- ^ files in package
+                -> [Path Abs File] -- ^ files in package
                 -> m (Set FilePath, Map FilePath FileCacheInfo)
-checkBuildCache oldCache files = liftIO $ do
-    (dirtyFiles, m) <- mconcat <$> mapM go files
-    return (dirtyFiles, m)
+checkBuildCache oldCache files = do
+    fileTimes <- liftM Map.fromList $ forM files $ \fp -> do
+        mmodTime <- liftIO (getModTimeMaybe (toFilePath fp))
+        return (toFilePath fp, mmodTime)
+    liftM (mconcat . Map.elems) $ sequence $
+        Map.mergeWithKey
+            (\fp mmodTime fci -> Just (go fp mmodTime (Just fci)))
+            (Map.mapWithKey (\fp mmodTime -> go fp mmodTime Nothing))
+            (Map.mapWithKey (\fp fci -> go fp Nothing (Just fci)))
+            fileTimes
+            oldCache
   where
-    go fp = do
-        mmodTime <- getModTimeMaybe fp
-        case mmodTime of
-            Nothing -> return (Set.empty, Map.empty)
-            Just modTime' -> do
-                (isDirty, newFci) <-
-                    case Map.lookup fp oldCache of
-                        Just fci
-                            | fciModTime fci == modTime' -> return (False, fci)
-                            | otherwise -> do
-                                newFci <- calcFci modTime' fp
-                                let isDirty =
-                                        fciSize fci /= fciSize newFci ||
-                                        fciHash fci /= fciHash newFci
-                                return (isDirty, newFci)
-                        Nothing -> do
-                            newFci <- calcFci modTime' fp
-                            return (True, newFci)
-                return (if isDirty then Set.singleton fp else Set.empty, Map.singleton fp newFci)
+    go :: FilePath -> Maybe ModTime -> Maybe FileCacheInfo -> m (Set FilePath, Map FilePath FileCacheInfo)
+    -- Filter out the cabal_macros file to avoid spurious recompilations
+    go fp _ _ | takeFileName fp == "cabal_macros.h" = return (Set.empty, Map.empty)
+    -- Common case where it's in the cache and on the filesystem.
+    go fp (Just modTime') (Just fci)
+        | fciModTime fci == modTime' = return (Set.empty, Map.empty)
+        | otherwise = do
+            newFci <- calcFci modTime' fp
+            let isDirty =
+                    fciSize fci /= fciSize newFci ||
+                    fciHash fci /= fciHash newFci
+                newDirty = if isDirty then Set.singleton fp else Set.empty
+            return (newDirty, Map.singleton fp newFci)
+    -- Missing file. Add it to dirty files, but no FileCacheInfo.
+    go fp Nothing _ = return (Set.singleton fp, Map.empty)
+    -- Missing cache. Add it to dirty files and compute FileCacheInfo.
+    go fp (Just modTime') Nothing = do
+        newFci <- calcFci modTime' fp
+        return (Set.singleton fp, Map.singleton fp newFci)
 
 -- | Returns entries to add to the build cache for any newly found unlisted modules
 addUnlistedToBuildCache
