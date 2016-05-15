@@ -23,7 +23,7 @@ module Stack.Build.Source
 import              Control.Applicative
 import              Control.Arrow ((&&&))
 import              Control.Exception (assert, catch)
-import              Control.Monad
+import              Control.Monad hiding (sequence)
 import              Control.Monad.Catch (MonadMask, MonadCatch)
 import              Control.Monad.IO.Class
 import              Control.Monad.Logger
@@ -49,13 +49,14 @@ import              Data.Set (Set)
 import qualified    Data.Set as Set
 import              Data.Text (Text)
 import qualified    Data.Text as T
+import              Data.Traversable (sequence)
 import              Distribution.Package (pkgName, pkgVersion)
 import              Distribution.PackageDescription (GenericPackageDescription, package, packageDescription)
 import qualified    Distribution.PackageDescription as C
 import              Network.HTTP.Client.Conduit (HasHttpManager)
 import              Path
 import              Path.IO
-import              Prelude
+import              Prelude hiding (sequence)
 import              Stack.Build.Cache
 import              Stack.Build.Target
 import              Stack.BuildPlan (shadowMiniBuildPlan)
@@ -63,7 +64,6 @@ import              Stack.Constants (wiredInPackages)
 import              Stack.Package
 import              Stack.PackageIndex (getPackageVersions)
 import              Stack.Types
-
 import qualified    System.Directory as D
 import              System.FilePath (takeFileName)
 import              System.IO (withBinaryFile, IOMode (ReadMode))

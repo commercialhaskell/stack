@@ -200,7 +200,7 @@ configFromConfigMonoid
     -> Maybe (Project, Path Abs File)
     -> ConfigMonoid
     -> m Config
-configFromConfigMonoid configStackRoot configUserConfigPath mresolver mproject configMonoid@ConfigMonoid{..} = do
+configFromConfigMonoid configStackRoot configUserConfigPath mresolver mproject ConfigMonoid{..} = do
      configWorkDir <- parseRelDir (fromFirst ".stack-work" configMonoidWorkDir)
      -- This code is to handle the deprecation of latest-snapshot-url
      configUrls <- case (getFirst configMonoidLatestSnapshotUrl, getFirst (urlsMonoidLatestSnapshot configMonoidUrls)) of
@@ -579,9 +579,9 @@ resolvePackageLocation menv projRoot (PLRemote url remotePackageType) = do
     -- fast - a no-op git reset is around 0.01 seconds on my machine.
     workDir <- getWorkDir
     let nameBeforeHashing = case remotePackageType of
-            RPTHttp        -> url
-            RPTGit commit  -> url
-            RPTHg  commit  -> T.unwords [url, "hg"]
+            RPTHttp{} -> url
+            RPTGit{} -> url
+            RPTHg{} -> T.unwords [url, "hg"]
         -- TODO: dedupe with code for snapshot hash?
         name = T.unpack $ decodeUtf8 $ S.take 12 $ B64URL.encode $ SHA256.hash $ encodeUtf8 nameBeforeHashing
         root = projRoot </> workDir </> $(mkRelDir "downloaded")
