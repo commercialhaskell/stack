@@ -53,6 +53,8 @@ Bug fixes:
   [#1356](https://github.com/commercialhaskell/stack/issues/1356)
 * Package dirtiness now pays attention to deleted files. See
   [#1841](https://github.com/commercialhaskell/stack/issues/1841)
+* `stack ghci` now uses `extra-lib-dirs` and `extra-include-dirs`. See
+  [#1656](https://github.com/commercialhaskell/stack/issues/1656)
 
 ## 1.1.0
 

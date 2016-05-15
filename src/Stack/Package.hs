@@ -10,6 +10,7 @@
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE RecordWildCards #-}
 
 -- | Dealing with Cabal.
 
@@ -194,11 +195,11 @@ resolvePackage packageConfig gpkg =
       [(T.pack (testName t), testInterface t) | t <- testSuites pkg
                                               , buildable (testBuildInfo t)]
     , packageBenchmarks = S.fromList
-      [T.pack (benchmarkName b) | b <- benchmarks pkg
-                                , buildable (benchmarkBuildInfo b)]
+      [T.pack (benchmarkName biBuildInfo) | biBuildInfo <- benchmarks pkg
+                                          , buildable (benchmarkBuildInfo biBuildInfo)]
     , packageExes = S.fromList
-      [T.pack (exeName b) | b <- executables pkg
-                          , buildable (buildInfo b)]
+      [T.pack (exeName biBuildInfo) | biBuildInfo <- executables pkg
+                                    , buildable (buildInfo biBuildInfo)]
     , packageOpts = GetPackageOpts $
       \sourceMap installedMap omitPkgs addPkgs cabalfp ->
            do (componentsModules,componentFiles,_,_) <- getPackageFiles pkgFiles cabalfp
@@ -254,6 +255,7 @@ generatePkgDescOpts
     -> Map NamedComponent (Set DotCabalPath)
     -> m (Map NamedComponent BuildInfoOpts)
 generatePkgDescOpts sourceMap installedMap omitPkgs addPkgs cabalfp pkg componentPaths = do
+    config <- asks getConfig
     distDir <- distDirFromDir cabalDir
     let cabalMacros = autogenDir distDir </> $(mkRelFile "cabal_macros.h")
     exists <- doesFileExist cabalMacros
@@ -263,17 +265,21 @@ generatePkgDescOpts sourceMap installedMap omitPkgs addPkgs cabalfp pkg componen
                 else Nothing
     let generate namedComponent binfo =
             ( namedComponent
-            , generateBuildInfoOpts
-                  sourceMap
-                  installedMap
-                  mcabalMacros
-                  cabalDir
-                  distDir
-                  omitPkgs
-                  addPkgs
-                  binfo
-                  (fromMaybe mempty (M.lookup namedComponent componentPaths))
-                  namedComponent)
+            , generateBuildInfoOpts BioInput
+                { biSourceMap = sourceMap
+                , biInstalledMap = installedMap
+                , biCabalMacros = mcabalMacros
+                , biCabalDir = cabalDir
+                , biDistDir = distDir
+                , biOmitPackages = omitPkgs
+                , biAddPackages = addPkgs
+                , biBuildInfo = binfo
+                , biDotCabalPaths = fromMaybe mempty (M.lookup namedComponent componentPaths)
+                , biConfigLibDirs = configExtraLibDirs config
+                , biConfigIncludeDirs = configExtraIncludeDirs config
+                , biComponentName = namedComponent
+                }
+            )
     return
         ( M.fromList
               (concat
@@ -302,22 +308,26 @@ generatePkgDescOpts sourceMap installedMap omitPkgs addPkgs cabalfp pkg componen
   where
     cabalDir = parent cabalfp
 
+data BioInput = BioInput
+    { biSourceMap :: !SourceMap
+    , biInstalledMap :: !InstalledMap
+    , biCabalMacros :: !(Maybe (Path Abs File))
+    , biCabalDir :: !(Path Abs Dir)
+    , biDistDir :: !(Path Abs Dir)
+    , biOmitPackages :: ![PackageName]
+    , biAddPackages :: ![PackageName]
+    , biBuildInfo :: !BuildInfo
+    , biDotCabalPaths :: !(Set DotCabalPath)
+    , biConfigLibDirs :: !(Set Text)
+    , biConfigIncludeDirs :: !(Set Text)
+    , biComponentName :: !NamedComponent
+    }
+
 -- | Generate GHC options for the target.
-generateBuildInfoOpts
-    :: SourceMap
-    -> InstalledMap
-    -> Maybe (Path Abs File)
-    -> Path Abs Dir
-    -> Path Abs Dir
-    -> [PackageName]
-    -> [PackageName]
-    -> BuildInfo
-    -> Set DotCabalPath
-    -> NamedComponent
-    -> BuildInfoOpts
-generateBuildInfoOpts sourceMap installedMap mcabalMacros cabalDir distDir omitPkgs addPkgs b dotCabalPaths componentName =
+generateBuildInfoOpts :: BioInput -> BuildInfoOpts
+generateBuildInfoOpts BioInput {..} =
     BuildInfoOpts
-        { bioOpts = ghcOpts b ++ cppOptions b
+        { bioOpts = ghcOpts ++ cppOptions biBuildInfo
         -- NOTE for future changes: Due to this use of nubOrd (and other uses
         -- downstream), these generated options must not rely on multiple
         -- argument sequences.  For example, ["--main-is", "Foo.hs", "--main-
@@ -326,68 +336,72 @@ generateBuildInfoOpts sourceMap installedMap mcabalMacros cabalDir distDir omitP
         --
         -- See https://github.com/commercialhaskell/stack/issues/1255
         , bioOneWordOpts = nubOrd $ concat
-            [extOpts b, srcOpts, includeOpts, extra b, extraDirs, fworks b, cObjectFiles]
+            [extOpts, srcOpts, includeOpts, libOpts, fworks, cObjectFiles]
         , bioPackageFlags = deps
-        , bioCabalMacros = mcabalMacros
+        , bioCabalMacros = biCabalMacros
         }
   where
     cObjectFiles =
         mapMaybe (fmap toFilePath .
-                  makeObjectFilePathFromC cabalDir componentName distDir)
+                  makeObjectFilePathFromC biCabalDir biComponentName biDistDir)
                  cfiles
-    cfiles = mapMaybe dotCabalCFilePath (S.toList dotCabalPaths)
+    cfiles = mapMaybe dotCabalCFilePath (S.toList biDotCabalPaths)
     -- Generates: -package=base -package=base16-bytestring-0.1.1.6 ...
     deps =
         concat
-            [ case M.lookup name installedMap of
+            [ case M.lookup name biInstalledMap of
                 Just (_, Stack.Types.Library _ident ipid) -> ["-package-id=" <> ghcPkgIdString ipid]
                 _ -> ["-package=" <> packageNameString name <>
                  maybe "" -- This empty case applies to e.g. base.
                      ((("-" <>) . versionString) . piiVersion)
-                     (M.lookup name sourceMap)]
+                     (M.lookup name biSourceMap)]
             | name <- pkgs]
     pkgs =
-        addPkgs ++
+        biAddPackages ++
         [ name
-        | Dependency cname _ <- targetBuildDepends b
+        | Dependency cname _ <- targetBuildDepends biBuildInfo
         , let name = fromCabalPackageName cname
-        , name `notElem` omitPkgs]
-    ghcOpts = concatMap snd . filter (isGhc . fst) . options
+        , name `notElem` biOmitPackages]
+    ghcOpts = concatMap snd . filter (isGhc . fst) $ options biBuildInfo
       where
         isGhc GHC = True
         isGhc _ = False
-    extOpts = map (("-X" ++) . display) . usedExtensions
+    extOpts = map (("-X" ++) . display) (usedExtensions biBuildInfo)
     srcOpts =
         map
             (("-i" <>) . toFilePathNoTrailingSep)
-            ([cabalDir | null (hsSourceDirs b)] <>
-             mapMaybe toIncludeDir (hsSourceDirs b) <>
-             [autogenDir distDir,buildDir distDir] <>
-             [makeGenDir (buildDir distDir)
-             | Just makeGenDir <- [fileGenDirFromComponentName componentName]]) ++
-        ["-stubdir=" ++ toFilePathNoTrailingSep (buildDir distDir)]
-    toIncludeDir "." = Just cabalDir
-    toIncludeDir x = fmap (cabalDir </>) (parseRelDir x)
+            ([biCabalDir | null (hsSourceDirs biBuildInfo)] <>
+             mapMaybe toIncludeDir (hsSourceDirs biBuildInfo) <>
+             [autogenDir biDistDir,buildDir biDistDir] <>
+             [makeGenDir (buildDir biDistDir)
+             | Just makeGenDir <- [fileGenDirFromComponentName biComponentName]]) ++
+        ["-stubdir=" ++ toFilePathNoTrailingSep (buildDir biDistDir)]
+    toIncludeDir "." = Just biCabalDir
+    toIncludeDir x = fmap (biCabalDir </>) (parseRelDir x)
     includeOpts =
-        [ "-I" <> toFilePathNoTrailingSep absDir
-        | dir <- includeDirs b
-        , absDir <- case (parseAbsDir dir, parseRelDir dir) of
-          (Just ab, _       ) -> [ab]
-          (_      , Just rel) -> [cabalDir </> rel]
-          (Nothing, Nothing ) -> []
+        map ("-I" <>) (configExtraIncludeDirs <> pkgIncludeOpts)
+    configExtraIncludeDirs =
+        map T.unpack (S.toList biConfigIncludeDirs)
+    pkgIncludeOpts =
+        [ toFilePathNoTrailingSep absDir
+        | dir <- includeDirs biBuildInfo
+        , absDir <- handleDir dir
         ]
-    extra
-        = map ("-l" <>)
-        . extraLibs
-    extraDirs =
-        [ "-L" <> toFilePathNoTrailingSep absDir
-        | dir <- extraLibDirs b
-        , absDir <- case (parseAbsDir dir, parseRelDir dir) of
-          (Just ab, _       ) -> [ab]
-          (_      , Just rel) -> [cabalDir </> rel]
-          (Nothing, Nothing ) -> []
+    libOpts =
+        map ("-l" <>) (extraLibs biBuildInfo) <>
+        map ("-L" <>) (configExtraLibDirs <> pkgLibDirs)
+    configExtraLibDirs =
+        map T.unpack (S.toList biConfigLibDirs)
+    pkgLibDirs =
+        [ toFilePathNoTrailingSep absDir
+        | dir <- extraLibDirs biBuildInfo
+        , absDir <- handleDir dir
         ]
-    fworks = map (\fwk -> "-framework=" <> fwk) . frameworks
+    handleDir dir = case (parseAbsDir dir, parseRelDir dir) of
+       (Just ab, _       ) -> [ab]
+       (_      , Just rel) -> [biCabalDir </> rel]
+       (Nothing, Nothing ) -> []
+    fworks = map (\fwk -> "-framework=" <> fwk) (frameworks biBuildInfo)
 
 -- | Make the .o path from the .c file path for a component. Example:
 --
