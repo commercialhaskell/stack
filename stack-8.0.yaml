@@ -1,4 +1,4 @@
-resolver: nightly-2016-04-19
+resolver: nightly-2016-05-13
 compiler: ghc-8.0.0.20160421
 compiler-check: match-exact
 setup-info:
@@ -29,11 +29,6 @@ extra-deps:
 - monad-unlift-0.1.2.0
 packages:
 - .
-# https://github.com/ekmett/either/issues/44
-- location:
-    git: https://github.com/ekmett/either
-    commit: 40261cf
-  extra-dep: true
 # Not the commit this links to, but discussed on
 # https://github.com/haskell/bytestring/commit/717f1151751fceb4e49874737dd0f15839ffd541
 - location:
