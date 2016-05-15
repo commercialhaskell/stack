@@ -26,6 +26,9 @@ Behavior changes:
 * `stack upgrade` no longer pays attention to local stack.yaml files, just the
   global config and CLI options.
   [#1392](https://github.com/commercialhaskell/stack/issues/1392)
+* `stack ghci` now uses `:add` instead of `:load`, making it potentially work
+  better with user scripts. See
+  [#1888](https://github.com/commercialhaskell/stack/issues/1888)
 
 Other enhancements:
 

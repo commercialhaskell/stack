@@ -159,7 +159,7 @@ ghci opts@GhciOpts{..} = do
             else do
                 let scriptPath = tmpDir </> $(mkRelFile "ghci-script")
                     fp = toFilePath scriptPath
-                    loadModules = ":load " <> unwords (map show modulesToLoad)
+                    loadModules = ":add " <> unwords (map show modulesToLoad)
                     addMainFile = maybe "" ((":add " <>) . toFilePath) mainFile
                     bringIntoScope = ":module + " <> unwords modulesToLoad
                 liftIO (writeFile fp (unlines [loadModules,addMainFile,bringIntoScope]))
