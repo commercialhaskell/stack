@@ -40,7 +40,7 @@ Other enhancements:
 Bug fixes:
 
 * Now ignore project config when doing `stack init` or `stack new`. See
-  [#2110](https://github.com/commercialhaskell/stack/issues/2110).
+  [#2110](https://github.com/commercialhaskell/stack/issues/2110)
 * Packages specified by git repo can now have submodules. See
   [#2133](https://github.com/commercialhaskell/stack/issues/2133)
 * Fix of hackage index fetch retry. See re-opening of
@@ -55,6 +55,9 @@ Bug fixes:
   [#1841](https://github.com/commercialhaskell/stack/issues/1841)
 * `stack ghci` now uses `extra-lib-dirs` and `extra-include-dirs`. See
   [#1656](https://github.com/commercialhaskell/stack/issues/1656)
+* Relative paths outside of source dir added via `qAddDependentFile` are now
+  checked for dirtiness. See
+  [#1982](https://github.com/commercialhaskell/stack/issues/1982)
 
 ## 1.1.0
 

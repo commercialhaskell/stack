@@ -855,7 +855,7 @@ depRange (Dependency _ r) = r
 -- extensions, plus find any of their module and TemplateHaskell
 -- dependencies.
 resolveFilesAndDeps
-    :: (MonadIO m, MonadLogger m, MonadThrow m, MonadReader (Path Abs File, Path Abs Dir) m)
+    :: (MonadIO m, MonadLogger m, MonadThrow m, MonadCatch m, MonadReader (Path Abs File, Path Abs Dir) m)
     => Maybe String         -- ^ Package component name
     -> [Path Abs Dir]       -- ^ Directories to look in.
     -> [DotCabalDescriptor] -- ^ Base names.
@@ -922,7 +922,7 @@ resolveFilesAndDeps component dirs names0 exts = do
 
 -- | Get the dependencies of a Haskell module file.
 getDependencies
-    :: (MonadReader (Path Abs File, Path Abs Dir) m, MonadIO m)
+    :: (MonadReader (Path Abs File, Path Abs Dir) m, MonadIO m, MonadCatch m, MonadLogger m)
     => Maybe String -> DotCabalPath -> m (Set ModuleName, [Path Abs File])
 getDependencies component dotCabalPath =
     case dotCabalPath of
@@ -951,7 +951,7 @@ getDependencies component dotCabalPath =
 
 -- | Parse a .dump-hi file into a set of modules and files.
 parseDumpHI
-    :: (MonadReader (Path Abs File, void) m, MonadIO m)
+    :: (MonadReader (Path Abs File, void) m, MonadIO m, MonadCatch m, MonadLogger m)
     => FilePath -> m (Set ModuleName, [Path Abs File])
 parseDumpHI dumpHIPath = do
     dir <- asks (parent . fst)
@@ -969,17 +969,17 @@ parseDumpHI dumpHIPath = do
             -- The dependent file path is surrounded by quotes but is not escaped.
             -- It can be an absolute or relative path.
             mapMaybe
-                (parseAbsOrRelFile dir <=<
-                 (fmap T.unpack .
+                ((fmap T.unpack .
                   (T.stripSuffix "\"" <=< T.stripPrefix "\"") .
                   T.dropWhileEnd (== '\r') . decodeUtf8 . C8.dropWhile (/= '"'))) $
             filter ("addDependentFile \"" `C8.isPrefixOf`) dumpHI
-    return (moduleDeps, thDeps)
-  where
-    parseAbsOrRelFile dir fp =
-        case parseRelFile fp of
-            Just rel -> Just (dir </> rel)
-            Nothing -> parseAbsFile fp
+    thDepsResolved <- liftM catMaybes $ forM thDeps $ \x -> do
+        mresolved <- forgivingAbsence (resolveFile dir x) >>= rejectMissingFile
+        when (isNothing mresolved) $
+            $logWarn $ "Warning: qAddDepedency path listed in " <> T.pack dumpHIPath <>
+                " does not exist: " <> T.pack x
+        return mresolved
+    return (moduleDeps, thDepsResolved)
 
 -- | Try to resolve the list of base names in the given directory by
 -- looking for unique instances of base names applied with the given
