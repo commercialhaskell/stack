@@ -18,6 +18,7 @@ module Stack.Ghci
 
 import           Control.Applicative
 import           Control.Exception.Enclosed (tryAny)
+import           Control.Monad
 import           Control.Monad.Catch
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
@@ -29,6 +30,7 @@ import           Data.Either
 import           Data.Function
 import           Data.List
 import           Data.List.Extra (nubOrd)
+import           Data.List.Split (splitOn)
 import           Data.Map.Strict (Map)
 import qualified Data.Map.Strict as M
 import           Data.Maybe
@@ -54,6 +56,7 @@ import           Stack.Exec
 import           Stack.Package
 import           Stack.Types
 import           Stack.Types.Internal
+import           System.FilePath (takeBaseName)
 import           Text.Read (readMaybe)
 
 #ifndef WINDOWS
@@ -134,8 +137,22 @@ ghci opts@GhciOpts{..} = do
     allModules <- checkForDuplicateModules ghciNoLoadModules pkgs
     oiDir <- objectInterfaceDir bconfig
     (modulesToLoad, mainFile) <- if ghciNoLoadModules then return ([], Nothing) else do
-        mainFile <- figureOutMainFile bopts mainIsTargets targets pkgs
-        return (allModules, mainFile)
+        mmainFile <- figureOutMainFile bopts mainIsTargets targets pkgs
+        modulesToLoad <- case mmainFile of
+            Just mainFile -> do
+                let (_, mfDirs, mfName) = filePathPieces mainFile
+                    mainPathPieces = map toFilePath mfDirs ++ [takeBaseName (toFilePath mfName)]
+                liftM catMaybes $ forM allModules $ \mn -> do
+                    let matchesModule = splitOn "." mn `isSuffixOf` mainPathPieces
+                    if matchesModule
+                        then do
+                            $logWarn $ "Warning: Omitting load of module " <> T.pack mn <>
+                               ", because it matches the filepath of the Main target, " <>
+                               T.pack (toFilePath mainFile)
+                            return Nothing
+                        else return (Just mn)
+            Nothing -> return allModules
+        return (modulesToLoad, mmainFile)
     let odir =
             [ "-odir=" <> toFilePathNoTrailingSep oiDir
             , "-hidir=" <> toFilePathNoTrailingSep oiDir ]
@@ -544,3 +561,10 @@ setScriptPerms fp = do
         , Posix.otherReadMode
         ]
 #endif
+
+filePathPieces :: Path Abs File -> (Path Abs Dir, [Path Rel Dir], Path Rel File)
+filePathPieces x0 = go (parent x0, [], filename x0)
+  where
+    go (x, dirs, fp)
+        | parent x == x = (x, dirs, fp)
+        | otherwise = (parent x, dirname x : dirs, fp)
