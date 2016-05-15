@@ -86,9 +86,19 @@ through the most common stack commands.
 
 ### stack new
 
-We'll start off with the `stack new` command to create a new
-*project*. We'll call our project `helloworld`, and we'll use the
-`new-template` project template:
+We'll start off with the `stack new` command to create a new *project*, that
+will contain a Haskell *package* of the same name. So let's pick a valid
+package name first:
+
+> A package is identified by a globally-unique package name, which consists
+of one or more alphanumeric words separated by hyphens. To avoid ambiguity,
+each of these words should contain at least one letter. Chaos will result if
+two distinct packages with the same name are installed on the same system.
+
+(From the [Cabal users guide](https://www.haskell.org/cabal/users-guide/developing-packages.html#developing-packages))
+
+We'll call our project `helloworld`, and we'll use the `new-template` project
+template:
 
 ```
 michael@d30748af6d3d:~$ stack new helloworld new-template
