@@ -54,6 +54,8 @@ module Stack.Types.Config
   ,ApplyGhcOptions(..)
   -- ** ConfigException
   ,ConfigException(..)
+  -- ** WhichSolverCmd
+  ,WhichSolverCmd(..)
   -- ** ConfigMonoid
   ,ConfigMonoid(..)
   -- ** EnvSettings
@@ -1076,9 +1078,9 @@ data ConfigException
   | UnexpectedArchiveContents [Path Abs Dir] [Path Abs File]
   | UnableToExtractArchive Text (Path Abs File)
   | BadStackVersionException VersionRange
-  | NoMatchingSnapshot (NonEmpty SnapName)
-  | forall l. ResolverMismatch (ResolverThat's l) String
-  | ResolverPartial Resolver String
+  | NoMatchingSnapshot WhichSolverCmd (NonEmpty SnapName)
+  | forall l. ResolverMismatch WhichSolverCmd (ResolverThat's l) String
+  | ResolverPartial WhichSolverCmd Resolver String
   | NoSuchDirectory FilePath
   | ParseGHCVariantException String
   | BadStackRoot (Path Abs Dir)
@@ -1133,31 +1135,27 @@ instance Show ConfigException where
         ,"version range specified in stack.yaml ("
         , T.unpack (versionRangeText requiredRange)
         , ")." ]
-    show (NoMatchingSnapshot names) = concat
+    show (NoMatchingSnapshot whichCmd names) = concat $
         [ "None of the following snapshots provides a compiler matching "
         , "your package(s):\n"
         , unlines $ map (\name -> "    - " <> T.unpack (renderSnapName name))
                         (NonEmpty.toList names)
-        , "\nYou can try the following options:\n"
-        , "    - Use '--omit-packages to exclude mismatching package(s).\n"
-        , "    - Use '--resolver' to specify a matching snapshot/resolver\n"
+        , showOptions whichCmd
         ]
-    show (ResolverMismatch resolver errDesc) = concat
+    show (ResolverMismatch whichCmd resolver errDesc) = concat
         [ "Resolver '"
         , T.unpack (resolverName resolver)
         , "' does not have a matching compiler to build some or all of your "
         , "package(s).\n"
         , errDesc
-        , "\nHowever, you can try '--omit-packages to exclude mismatching "
-        , "package(s)."
+        , showOptions whichCmd
         ]
-    show (ResolverPartial resolver errDesc) = concat
+    show (ResolverPartial whichCmd resolver errDesc) = concat
         [ "Resolver '"
         , T.unpack (resolverName resolver)
         , "' does not have all the packages to match your requirements.\n"
         , unlines $ fmap ("    " <>) (lines errDesc)
-        , "\nHowever, you can try '--solver' to use external packages."
-        , "\nUse '--omit-packages' if you want to create a config anyway."
+        , showOptions whichCmd
         ]
     show (NoSuchDirectory dir) = concat
         ["No directory could be located matching the supplied path: "
@@ -1188,6 +1186,20 @@ instance Show ConfigException where
         , "' to disable this precaution."
         ]
 instance Exception ConfigException
+
+showOptions :: WhichSolverCmd -> String
+showOptions whichCmd = unlines $ ["\nThis may be resolved by:"] ++ options
+  where
+    options =
+        case whichCmd of
+            IsSolverCmd -> [useResolver]
+            IsInitCmd -> both
+            IsNewCmd -> both
+    both = [omitPackages, useResolver]
+    omitPackages = "    - Using '--omit-packages to exclude mismatching package(s)."
+    useResolver  = "    - Using '--resolver' to specify a matching snapshot/resolver"
+
+data WhichSolverCmd = IsInitCmd | IsSolverCmd | IsNewCmd
 
 -- | Helper function to ask the environment and apply getConfig
 askConfig :: (MonadReader env m, HasConfig env) => m Config

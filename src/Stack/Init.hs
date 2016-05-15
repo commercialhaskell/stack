@@ -55,11 +55,12 @@ initProject
        , MonadReader env m, HasConfig env , HasGHCVariant env
        , HasHttpManager env , HasLogLevel env , HasReExec env
        , HasTerminal env)
-    => Path Abs Dir
+    => WhichSolverCmd
+    -> Path Abs Dir
     -> InitOpts
     -> Maybe AbstractResolver
     -> m ()
-initProject currDir initOpts mresolver = do
+initProject whichCmd currDir initOpts mresolver = do
     let dest = currDir </> stackDotYaml
 
     reldest <- toFilePath `liftM` makeRelativeToCurrentDir dest
@@ -79,7 +80,7 @@ initProject currDir initOpts mresolver = do
     cabalfps <- liftM concat $ mapM find dirs'
     (bundle, dupPkgs)  <- cabalPackagesCheck cabalfps noPkgMsg Nothing
 
-    (r, flags, extraDeps, rbundle) <- getDefaultResolver dest initOpts
+    (r, flags, extraDeps, rbundle) <- getDefaultResolver whichCmd dest initOpts
                                                          mresolver bundle
 
     let ignored = Map.difference bundle rbundle
@@ -331,7 +332,8 @@ getDefaultResolver
        , MonadReader env m, HasConfig env , HasGHCVariant env
        , HasHttpManager env , HasLogLevel env , HasReExec env
        , HasTerminal env)
-    => Path Abs File   -- ^ stack.yaml
+    => WhichSolverCmd
+    -> Path Abs File   -- ^ stack.yaml
     -> InitOpts
     -> Maybe AbstractResolver
     -> Map PackageName (Path Abs File, C.GenericPackageDescription)
@@ -344,9 +346,9 @@ getDefaultResolver
        --   , Flags for src packages and extra deps
        --   , Extra dependencies
        --   , Src packages actually considered)
-getDefaultResolver stackYaml initOpts mresolver bundle =
+getDefaultResolver whichCmd stackYaml initOpts mresolver bundle =
     maybe selectSnapResolver makeConcreteResolver mresolver
-      >>= getWorkingResolverPlan stackYaml initOpts bundle
+      >>= getWorkingResolverPlan whichCmd stackYaml initOpts bundle
     where
         -- TODO support selecting best across regular and custom snapshots
         selectSnapResolver = do
@@ -355,7 +357,7 @@ getDefaultResolver stackYaml initOpts mresolver bundle =
             (s, r) <- selectBestSnapshot gpds snaps
             case r of
                 BuildPlanCheckFail {} | not (omitPackages initOpts)
-                        -> throwM (NoMatchingSnapshot snaps)
+                        -> throwM (NoMatchingSnapshot whichCmd snaps)
                 _ -> return $ ResolverSnapshot s
 
 getWorkingResolverPlan
@@ -363,7 +365,8 @@ getWorkingResolverPlan
        , MonadReader env m, HasConfig env , HasGHCVariant env
        , HasHttpManager env , HasLogLevel env , HasReExec env
        , HasTerminal env)
-    => Path Abs File   -- ^ stack.yaml
+    => WhichSolverCmd
+    -> Path Abs File   -- ^ stack.yaml
     -> InitOpts
     -> Map PackageName (Path Abs File, C.GenericPackageDescription)
        -- ^ Src package name: cabal dir, cabal package description
@@ -376,12 +379,12 @@ getWorkingResolverPlan
        --   , Flags for src packages and extra deps
        --   , Extra dependencies
        --   , Src packages actually considered)
-getWorkingResolverPlan stackYaml initOpts bundle resolver = do
+getWorkingResolverPlan whichCmd stackYaml initOpts bundle resolver = do
     $logInfo $ "Selected resolver: " <> resolverName resolver
     go bundle
     where
         go info = do
-            eres <- checkBundleResolver stackYaml initOpts info resolver
+            eres <- checkBundleResolver whichCmd stackYaml initOpts info resolver
             -- if some packages failed try again using the rest
             case eres of
                 Right (f, edeps)-> return (resolver, f, edeps, info)
@@ -413,14 +416,15 @@ checkBundleResolver
        , MonadReader env m, HasConfig env , HasGHCVariant env
        , HasHttpManager env , HasLogLevel env , HasReExec env
        , HasTerminal env)
-    => Path Abs File   -- ^ stack.yaml
+    => WhichSolverCmd
+    -> Path Abs File   -- ^ stack.yaml
     -> InitOpts
     -> Map PackageName (Path Abs File, C.GenericPackageDescription)
        -- ^ Src package name: cabal dir, cabal package description
     -> Resolver
     -> m (Either [PackageName] ( Map PackageName (Map FlagName Bool)
                                , Map PackageName Version))
-checkBundleResolver stackYaml initOpts bundle resolver = do
+checkBundleResolver whichCmd stackYaml initOpts bundle resolver = do
     result <- checkResolverSpec gpds Nothing resolver
     case result of
         BuildPlanCheckOk f -> return $ Right (f, Map.empty)
@@ -432,14 +436,14 @@ checkBundleResolver stackYaml initOpts bundle resolver = do
                 warnPartial result
                 $logWarn "*** Omitting packages with unsatisfied dependencies"
                 return $ Left $ failedUserPkgs e
-            | otherwise -> throwM $ ResolverPartial resolver (show result)
+            | otherwise -> throwM $ ResolverPartial whichCmd resolver (show result)
         BuildPlanCheckFail _ e _
             | omitPackages initOpts -> do
                 $logWarn $ "*** Resolver compiler mismatch: "
                            <> resolverName resolver
                 $logWarn $ indent $ T.pack $ show result
                 return $ Left $ failedUserPkgs e
-            | otherwise -> throwM $ ResolverMismatch resolver (show result)
+            | otherwise -> throwM $ ResolverMismatch whichCmd resolver (show result)
     where
       indent t  = T.unlines $ fmap ("    " <>) (T.lines t)
       warnPartial res = do

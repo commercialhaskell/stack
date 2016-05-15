@@ -673,7 +673,7 @@ solveExtraDeps modStackYaml = do
             -- packages
             return $ either (const Nothing) Just eres
         BuildPlanCheckFail {} ->
-            throwM $ ResolverMismatch resolver (show resolverResult)
+            throwM $ ResolverMismatch IsSolverCmd resolver (show resolverResult)
 
     (srcs, edeps) <- case resultSpecs of
         Nothing -> throwM (SolverGiveUp giveUpMsg)
