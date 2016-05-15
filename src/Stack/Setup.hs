@@ -1339,7 +1339,9 @@ removeHaskellEnvVars =
     Map.delete "GHC_PACKAGE_PATH" .
     Map.delete "HASKELL_PACKAGE_SANDBOX" .
     Map.delete "HASKELL_PACKAGE_SANDBOXES" .
-    Map.delete "HASKELL_DIST_DIR"
+    Map.delete "HASKELL_DIST_DIR" .
+    -- https://github.com/commercialhaskell/stack/issues/1460
+    Map.delete "DESTDIR"
 
 -- | Get map of environment variables to set to change the GHC's encoding to UTF-8
 getUtf8EnvVars
