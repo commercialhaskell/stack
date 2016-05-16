@@ -98,17 +98,17 @@ instance HasSemanticVersion BuildCache
 instance NFData BuildCache
 
 -- | Try to read the dirtiness cache for the given package directory.
-tryGetBuildCache :: (MonadIO m, MonadReader env m, HasConfig env, MonadThrow m, MonadLogger m, HasEnvConfig env)
+tryGetBuildCache :: (MonadIO m, MonadReader env m, MonadThrow m, HasEnvConfig env)
                  => Path Abs Dir -> m (Maybe (Map FilePath FileCacheInfo))
 tryGetBuildCache = liftM (fmap buildCacheTimes) . tryGetCache buildCacheFile
 
 -- | Try to read the dirtiness cache for the given package directory.
-tryGetConfigCache :: (MonadIO m, MonadReader env m, HasConfig env, MonadThrow m, MonadLogger m, HasEnvConfig env)
+tryGetConfigCache :: (MonadIO m, MonadReader env m, MonadThrow m, HasEnvConfig env)
                   => Path Abs Dir -> m (Maybe ConfigCache)
 tryGetConfigCache = tryGetCache configCacheFile
 
 -- | Try to read the mod time of the cabal file from the last build
-tryGetCabalMod :: (MonadIO m, MonadReader env m, HasConfig env, MonadThrow m, MonadLogger m, HasEnvConfig env)
+tryGetCabalMod :: (MonadIO m, MonadReader env m, MonadThrow m, HasEnvConfig env)
                => Path Abs Dir -> m (Maybe ModTime)
 tryGetCabalMod = tryGetCache configCabalMod
 
@@ -122,7 +122,7 @@ tryGetCache get' dir = do
     decodeFileOrFailDeep fp
 
 -- | Write the dirtiness cache for this package's files.
-writeBuildCache :: (MonadIO m, MonadReader env m, HasConfig env, MonadThrow m, MonadLogger m, HasEnvConfig env)
+writeBuildCache :: (MonadIO m, MonadReader env m, MonadThrow m, HasEnvConfig env)
                 => Path Abs Dir -> Map FilePath FileCacheInfo -> m ()
 writeBuildCache dir times =
     writeCache
@@ -133,21 +133,21 @@ writeBuildCache dir times =
          }
 
 -- | Write the dirtiness cache for this package's configuration.
-writeConfigCache :: (MonadIO m, MonadReader env m, HasConfig env, MonadThrow m, MonadLogger m, HasEnvConfig env)
+writeConfigCache :: (MonadIO m, MonadReader env m, MonadThrow m, HasEnvConfig env)
                 => Path Abs Dir
                 -> ConfigCache
                 -> m ()
 writeConfigCache dir = writeCache dir configCacheFile
 
 -- | See 'tryGetCabalMod'
-writeCabalMod :: (MonadIO m, MonadReader env m, HasConfig env, MonadThrow m, MonadLogger m, HasEnvConfig env)
+writeCabalMod :: (MonadIO m, MonadReader env m, MonadThrow m, HasEnvConfig env)
               => Path Abs Dir
               -> ModTime
               -> m ()
 writeCabalMod dir = writeCache dir configCabalMod
 
 -- | Delete the caches for the project.
-deleteCaches :: (MonadIO m, MonadReader env m, HasConfig env, MonadLogger m, MonadCatch m, HasEnvConfig env)
+deleteCaches :: (MonadIO m, MonadReader env m, MonadCatch m, HasEnvConfig env)
              => Path Abs Dir -> m ()
 deleteCaches dir = do
     {- FIXME confirm that this is acceptable to remove
@@ -197,7 +197,7 @@ writeFlagCache gid cache = do
         taggedEncodeFile file cache
 
 -- | Mark a test suite as having succeeded
-setTestSuccess :: (MonadIO m, MonadLogger m, MonadThrow m, MonadReader env m, HasConfig env, HasEnvConfig env)
+setTestSuccess :: (MonadIO m, MonadThrow m, MonadReader env m, HasEnvConfig env)
                => Path Abs Dir
                -> m ()
 setTestSuccess dir =
@@ -207,7 +207,7 @@ setTestSuccess dir =
         True
 
 -- | Mark a test suite as not having succeeded
-unsetTestSuccess :: (MonadIO m, MonadLogger m, MonadThrow m, MonadReader env m, HasConfig env, HasEnvConfig env)
+unsetTestSuccess :: (MonadIO m, MonadThrow m, MonadReader env m, HasEnvConfig env)
                  => Path Abs Dir
                  -> m ()
 unsetTestSuccess dir =
@@ -217,7 +217,7 @@ unsetTestSuccess dir =
         False
 
 -- | Check if the test suite already passed
-checkTestSuccess :: (MonadIO m, MonadLogger m, MonadThrow m, MonadReader env m, HasConfig env, HasEnvConfig env)
+checkTestSuccess :: (MonadIO m, MonadThrow m, MonadReader env m, HasEnvConfig env)
                  => Path Abs Dir
                  -> m Bool
 checkTestSuccess dir =

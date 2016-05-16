@@ -10,7 +10,7 @@ module Stack.ConfigCmd
        ,cfgCmdSetName
        ,cfgCmdName) where
 
-import           Control.Monad.Catch (MonadMask, throwM, MonadThrow)
+import           Control.Monad.Catch (MonadMask, throwM)
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import           Control.Monad.Reader (MonadReader, asks)
@@ -30,11 +30,9 @@ cfgCmdSet :: ( MonadIO m
              , MonadBaseControl IO m
              , MonadMask m
              , MonadReader env m
-             , HasConfig env
              , HasBuildConfig env
              , HasHttpManager env
              , HasGHCVariant env
-             , MonadThrow m
              , MonadLogger m)
              => ConfigCmdSet -> m ()
 cfgCmdSet (ConfigCmdSetResolver newResolver) = do

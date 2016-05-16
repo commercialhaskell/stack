@@ -1307,7 +1307,7 @@ installationRootLocal = do
 -- | Path for platform followed by snapshot name followed by compiler
 -- name.
 platformSnapAndCompilerRel
-    :: (MonadReader env m, HasPlatform env, HasEnvConfig env, MonadThrow m)
+    :: (MonadReader env m, HasEnvConfig env, MonadThrow m)
     => m (Path Rel Dir)
 platformSnapAndCompilerRel = do
     bc <- asks getBuildConfig

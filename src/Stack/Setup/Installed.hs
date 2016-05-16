@@ -58,7 +58,7 @@ parseToolText (parseCompilerVersion -> Just (cv@GhcjsVersion{})) = Just (ToolGhc
 parseToolText (parsePackageIdentifierFromString . T.unpack -> Just pkgId) = Just (Tool pkgId)
 parseToolText _ = Nothing
 
-markInstalled :: (MonadIO m, MonadReader env m, HasConfig env, MonadThrow m)
+markInstalled :: (MonadIO m, MonadThrow m)
               => Path Abs Dir
               -> Tool
               -> m ()
@@ -66,7 +66,7 @@ markInstalled programsPath tool = do
     fpRel <- parseRelFile $ toolString tool ++ ".installed"
     liftIO $ writeFile (toFilePath $ programsPath </> fpRel) "installed"
 
-unmarkInstalled :: (MonadIO m, MonadReader env m, HasConfig env, MonadCatch m)
+unmarkInstalled :: (MonadIO m, MonadCatch m)
                 => Path Abs Dir
                 -> Tool
                 -> m ()
@@ -74,7 +74,7 @@ unmarkInstalled programsPath tool = do
     fpRel <- parseRelFile $ toolString tool ++ ".installed"
     ignoringAbsence (removeFile $ programsPath </> fpRel)
 
-listInstalled :: (MonadIO m, MonadReader env m, HasConfig env, MonadThrow m)
+listInstalled :: (MonadIO m, MonadThrow m)
               => Path Abs Dir
               -> m [Tool]
 listInstalled programsPath = do
@@ -175,7 +175,7 @@ instance Monoid ExtraDirs where
     mempty = memptydefault
     mappend = mappenddefault
 
-installDir :: (MonadReader env m, HasConfig env, MonadThrow m, MonadLogger m)
+installDir :: (MonadReader env m, MonadThrow m)
            => Path Abs Dir
            -> Tool
            -> m (Path Abs Dir)

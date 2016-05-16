@@ -27,7 +27,7 @@ module Network.HTTP.Download
 import           Control.Exception           (Exception)
 import           Control.Exception.Enclosed  (handleIO)
 import           Control.Monad               (void)
-import           Control.Monad.Catch         (MonadThrow, MonadMask, throwM)
+import           Control.Monad.Catch         (MonadMask, throwM)
 import           Control.Monad.IO.Class      (MonadIO, liftIO)
 import           Control.Monad.Logger        (MonadLogger, logDebug)
 import           Control.Monad.Reader        (MonadReader, ReaderT, ask,
@@ -136,7 +136,7 @@ redownload req0 dest = do
           | otherwise -> throwM $ RedownloadFailed req2 dest $ void res
 
 -- | Download a JSON value and parse it using a 'FromJSON' instance.
-downloadJSON :: (FromJSON a, MonadReader env m, HasHttpManager env, MonadIO m, MonadThrow m, MonadMask m)
+downloadJSON :: (FromJSON a, MonadReader env m, HasHttpManager env, MonadIO m, MonadMask m)
              => Request
              -> m a
 downloadJSON req = do

@@ -21,7 +21,6 @@ import           Control.Monad
 import           Control.Monad.Catch (MonadCatch)
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
-import           Control.Monad.Reader
 import           Control.Monad.Trans.Resource
 import qualified Data.Foldable as F
 import           Data.Function
@@ -50,7 +49,7 @@ import           System.Process.Read
 import           Web.Browser (openBrowser)
 
 openHaddocksInBrowser
-    :: (MonadIO m, MonadReader env m, HasBuildConfig env, MonadThrow m, MonadLogger m)
+    :: (MonadIO m, MonadThrow m, MonadLogger m)
     => BaseConfigOpts
     -> Map PackageName (PackageIdentifier, InstallLocation)
     -- ^ Available packages and their locations for the current project
@@ -111,7 +110,7 @@ shouldHaddockDeps bopts = fromMaybe (boptsHaddock bopts) (boptsHaddockDeps bopts
 
 -- | Generate Haddock index and contents for local packages.
 generateLocalHaddockIndex
-    :: (MonadIO m, MonadCatch m, MonadThrow m, MonadLogger m, MonadBaseControl IO m)
+    :: (MonadIO m, MonadCatch m, MonadLogger m, MonadBaseControl IO m)
     => EnvOverride
     -> WhichCompiler
     -> BaseConfigOpts
@@ -136,7 +135,7 @@ generateLocalHaddockIndex envOverride wc bco localDumpPkgs locals = do
 
 -- | Generate Haddock index and contents for local packages and their dependencies.
 generateDepsHaddockIndex
-    :: (MonadIO m, MonadCatch m, MonadThrow m, MonadLogger m, MonadBaseControl IO m)
+    :: (MonadIO m, MonadCatch m, MonadLogger m, MonadBaseControl IO m)
     => EnvOverride
     -> WhichCompiler
     -> BaseConfigOpts
@@ -180,7 +179,7 @@ generateDepsHaddockIndex envOverride wc bco globalDumpPkgs snapshotDumpPkgs loca
 
 -- | Generate Haddock index and contents for all snapshot packages.
 generateSnapHaddockIndex
-    :: (MonadIO m, MonadCatch m, MonadThrow m, MonadLogger m, MonadBaseControl IO m)
+    :: (MonadIO m, MonadCatch m, MonadLogger m, MonadBaseControl IO m)
     => EnvOverride
     -> WhichCompiler
     -> BaseConfigOpts

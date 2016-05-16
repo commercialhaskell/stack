@@ -419,7 +419,7 @@ getPackageCaches = do
 
 -- | Clear the in-memory hackage index cache. This is needed when the
 -- hackage index is updated.
-clearPackageCaches :: (MonadIO m, MonadLogger m, MonadReader env m, HasConfig env, MonadThrow m, HasHttpManager env, MonadBaseControl IO m, MonadCatch m)
+clearPackageCaches :: (MonadIO m, MonadReader env m, HasConfig env)
                    => m ()
 clearPackageCaches = do
     cacheRef <- asks (configPackageCaches . getConfig)

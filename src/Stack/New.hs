@@ -17,7 +17,6 @@ module Stack.New
     , listTemplates)
     where
 
-import           Control.Applicative
 import           Control.Monad
 import           Control.Monad.Catch
 import           Control.Monad.IO.Class
@@ -80,7 +79,7 @@ data NewOpts = NewOpts
 
 -- | Create a new project with the given options.
 new
-    :: (HasConfig r, MonadReader r m, MonadLogger m, MonadCatch m, MonadThrow m, MonadIO m, HasHttpManager r, Functor m, Applicative m)
+    :: (HasConfig r, MonadReader r m, MonadLogger m, MonadCatch m, MonadIO m, HasHttpManager r)
     => NewOpts -> Bool -> m (Path Abs Dir)
 new opts forceOverwrite = do
     pwd <- getCurrentDir
@@ -88,7 +87,7 @@ new opts forceOverwrite = do
                       else do relDir <- parseRelDir (packageNameString project)
                               liftM (pwd </>) (return relDir)
     exists <- doesDirExist absDir
-    configTemplate <- configDefaultTemplate <$> asks getConfig
+    configTemplate <- asks (configDefaultTemplate . getConfig)
     let template = fromMaybe defaultTemplateName $ asum [ cliOptionTemplate
                                                         , configTemplate
                                                         ]
@@ -130,10 +129,10 @@ data TemplateFrom = LocalTemp | RemoteTemp
 -- | Download and read in a template's text content.
 loadTemplate
     :: forall m r.
-       (HasConfig r, HasHttpManager r, MonadReader r m, MonadIO m, MonadThrow m, MonadCatch m, MonadLogger m, Functor m, Applicative m)
+       (HasConfig r, HasHttpManager r, MonadReader r m, MonadIO m, MonadThrow m, MonadCatch m, MonadLogger m)
     => TemplateName -> (TemplateFrom -> m ()) -> m Text
 loadTemplate name logIt = do
-    templateDir <- templatesDir <$> asks getConfig
+    templateDir <- asks (templatesDir . getConfig)
     case templatePath name of
         AbsPath absFile -> logIt LocalTemp >> loadLocalFile absFile
         UrlPath s -> do
@@ -144,7 +143,9 @@ loadTemplate name logIt = do
             downloadTemplate req (templateDir </> rel)
         RelPath relFile ->
             catch
-                (loadLocalFile relFile <* logIt LocalTemp)
+                (do f <- loadLocalFile relFile
+                    logIt LocalTemp
+                    return f)
                 (\(e :: NewException) ->
                       case relRequest relFile of
                         Just req -> downloadTemplate req
@@ -174,7 +175,7 @@ loadTemplate name logIt = do
 
 -- | Apply and unpack a template into a directory.
 applyTemplate
-    :: (MonadIO m, MonadThrow m, MonadCatch m, MonadReader r m, HasConfig r, MonadLogger m)
+    :: (MonadIO m, MonadCatch m, MonadReader r m, HasConfig r, MonadLogger m)
     => PackageName
     -> TemplateName
     -> Map Text Text
@@ -270,7 +271,7 @@ runTemplateInits dir = do
 
 -- | Display the set of templates accompanied with description if available.
 listTemplates
-    :: (MonadIO m, MonadThrow m, MonadReader r m, HasHttpManager r, MonadCatch m, MonadLogger m)
+    :: (MonadIO m, MonadReader r m, HasHttpManager r, MonadCatch m)
     => m ()
 listTemplates = do
     templates <- getTemplates
@@ -289,7 +290,7 @@ listTemplates = do
 
 -- | Get the set of templates.
 getTemplates
-    :: (MonadIO m, MonadThrow m, MonadReader r m, HasHttpManager r, MonadCatch m)
+    :: (MonadIO m, MonadReader r m, HasHttpManager r, MonadCatch m)
     => m (Set TemplateName)
 getTemplates = do
     req <- liftM addHeaders (parseUrl defaultTemplatesList)
@@ -303,7 +304,7 @@ getTemplates = do
         code -> throwM (BadTemplatesResponse code)
 
 getTemplateInfo
-    :: (MonadIO m, MonadThrow m, MonadReader r m, HasHttpManager r, MonadCatch m, MonadLogger m)
+    :: (MonadIO m, MonadReader r m, HasHttpManager r, MonadCatch m)
     => m (Map Text TemplateInfo)
 getTemplateInfo = do
   req <- liftM addHeaders (parseUrl defaultTemplateInfoUrl)

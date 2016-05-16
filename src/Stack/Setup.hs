@@ -712,7 +712,7 @@ getWantedCompilerInfo key versionCheck wanted toCV pairs_ =
         sortBy (flip (comparing fst)) $
         filter (isWantedCompiler versionCheck wanted . toCV . fst) (Map.toList pairs_)
 
-getGhcKey :: (MonadReader env m, MonadThrow m, HasPlatform env, HasGHCVariant env, MonadLogger m, MonadIO m, MonadCatch m, MonadBaseControl IO m)
+getGhcKey :: (MonadReader env m, HasPlatform env, HasGHCVariant env, MonadCatch m)
           => m Text
 getGhcKey = do
     ghcVariant <- asks getGHCVariant
@@ -720,7 +720,7 @@ getGhcKey = do
     osKey <- getOSKey platform
     return $ osKey <> T.pack (ghcVariantSuffix ghcVariant)
 
-getOSKey :: (MonadReader env m, MonadThrow m, HasPlatform env, MonadLogger m, MonadIO m, MonadCatch m, MonadBaseControl IO m)
+getOSKey :: (MonadThrow m)
          => Platform -> m Text
 getOSKey platform =
     case platform of
@@ -896,7 +896,7 @@ installGHCJS si archiveFile archiveType destDir = do
 
 -- Install the downloaded stack binary distribution
 installDockerStackExe
-    :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasConfig env, HasHttpManager env, MonadBaseControl IO m)
+    :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasConfig env, MonadBaseControl IO m)
     => SetupInfo
     -> Path Abs File
     -> ArchiveType

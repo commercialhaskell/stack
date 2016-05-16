@@ -45,9 +45,9 @@ import qualified System.FilePath as FP
 -- service and a path to a tarball.
 sign
 #if __GLASGOW_HASKELL__ < 710
-    :: (Applicative m, MonadIO m, MonadLogger m, MonadMask m, MonadThrow m)
+    :: (Applicative m, MonadIO m, MonadLogger m, MonadMask m)
 #else
-    :: (MonadIO m, MonadLogger m, MonadMask m, MonadThrow m)
+    :: (MonadIO m, MonadLogger m, MonadMask m)
 #endif
     => Manager -> String -> Path Abs File -> m Signature
 sign manager url filePath =
@@ -90,9 +90,9 @@ sign manager url filePath =
 -- the tarball with GPG.
 signTarBytes
 #if __GLASGOW_HASKELL__ < 710
-    :: (Applicative m, MonadIO m, MonadLogger m, MonadMask m, MonadThrow m)
+    :: (Applicative m, MonadIO m, MonadLogger m, MonadMask m)
 #else
-    :: (MonadIO m, MonadLogger m, MonadMask m, MonadThrow m)
+    :: (MonadIO m, MonadLogger m, MonadMask m)
 #endif
     => Manager -> String -> Path Rel File -> L.ByteString -> m Signature
 signTarBytes manager url tarPath bs =

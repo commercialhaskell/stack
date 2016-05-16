@@ -50,8 +50,7 @@ firstBoolFlags :: String -> String -> Mod FlagFields (Maybe Bool) -> Parser (Fir
 firstBoolFlags long0 help0 mod0 = First <$> maybeBoolFlags long0 help0 mod0
 
 -- | Enable/disable flags for any type.
-enableDisableFlags :: (Eq a)
-                   => a                 -- ^ Default value
+enableDisableFlags :: a                 -- ^ Default value
                    -> a                 -- ^ Enabled value
                    -> a                 -- ^ Disabled value
                    -> String            -- ^ Name
@@ -63,8 +62,7 @@ enableDisableFlags defaultValue enabledValue disabledValue name helpSuffix mods 
   pure defaultValue
 
 -- | Enable/disable flags for any type, without a default (to allow chaining with '<|>')
-enableDisableFlagsNoDefault :: (Eq a)
-                            => a                 -- ^ Enabled value
+enableDisableFlagsNoDefault :: a                 -- ^ Enabled value
                             -> a                 -- ^ Disabled value
                             -> String            -- ^ Name
                             -> String            -- ^ Help suffix

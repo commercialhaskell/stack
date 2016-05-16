@@ -82,7 +82,6 @@ createDependencyGraph :: (HasEnvConfig env
                          ,HasLogLevel env
                          ,MonadLogger m
                          ,MonadBaseUnlift IO m
-                         ,MonadCatch m
                          ,MonadIO m
                          ,MonadMask m
                          ,MonadReader env m)
@@ -112,7 +111,6 @@ listDependencies :: (HasEnvConfig env
                     ,HasHttpManager env
                     ,HasLogLevel env
                     ,MonadBaseUnlift IO m
-                    ,MonadCatch m
                     ,MonadLogger m
                     ,MonadMask m
                     ,MonadIO m
@@ -232,14 +230,14 @@ printLocalNodes dotOpts locals = liftIO $ Text.putStrLn (Text.intercalate "\n" l
         lpNodes = map (applyStyle . nodeName) (F.toList locals)
 
 -- | Print nodes without dependencies
-printLeaves :: (Applicative m, MonadIO m)
+printLeaves :: MonadIO m
             => Map PackageName (Set PackageName,Maybe Version)
             -> m ()
-printLeaves = F.traverse_ printLeaf . Map.keysSet . Map.filter Set.null . fmap fst
+printLeaves = F.mapM_ printLeaf . Map.keysSet . Map.filter Set.null . fmap fst
 
 -- | @printDedges p ps@ prints an edge from p to every ps
-printEdges :: (Applicative m, MonadIO m) => PackageName -> Set PackageName -> m ()
-printEdges package deps = F.for_ deps (printEdge package)
+printEdges :: MonadIO m => PackageName -> Set PackageName -> m ()
+printEdges package deps = F.forM_ deps (printEdge package)
 
 -- | Print an edge between the two package names
 printEdge :: MonadIO m => PackageName -> PackageName -> m ()

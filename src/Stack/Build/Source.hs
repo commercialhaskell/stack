@@ -24,7 +24,7 @@ import              Control.Applicative
 import              Control.Arrow ((&&&))
 import              Control.Exception (assert, catch)
 import              Control.Monad hiding (sequence)
-import              Control.Monad.Catch (MonadMask, MonadCatch)
+import              Control.Monad.Catch (MonadMask)
 import              Control.Monad.IO.Class
 import              Control.Monad.Logger
 import              Control.Monad.Reader (MonadReader, asks)
@@ -69,7 +69,7 @@ import              System.FilePath (takeFileName)
 import              System.IO (withBinaryFile, IOMode (ReadMode))
 import              System.IO.Error (isDoesNotExistError)
 
-loadSourceMap :: (MonadIO m, MonadMask m, MonadReader env m, HasBuildConfig env, MonadBaseControl IO m, HasHttpManager env, MonadLogger m, HasEnvConfig env)
+loadSourceMap :: (MonadIO m, MonadMask m, MonadReader env m, MonadBaseControl IO m, HasHttpManager env, MonadLogger m, HasEnvConfig env)
               => NeedTargets
               -> BuildOptsCLI
               -> m ( Map PackageName SimpleTarget
@@ -189,7 +189,7 @@ getGhcOptions bconfig boptsCli name isTarget isLocal = concat
 
 -- | Use the build options and environment to parse targets.
 parseTargetsFromBuildOpts
-    :: (MonadIO m, MonadMask m, MonadReader env m, HasBuildConfig env, MonadBaseControl IO m, HasHttpManager env, MonadLogger m, HasEnvConfig env)
+    :: (MonadIO m, MonadMask m, MonadReader env m, MonadLogger m, HasEnvConfig env)
     => NeedTargets
     -> BuildOptsCLI
     -> m (MiniBuildPlan, M.Map PackageName Version, M.Map PackageName SimpleTarget)
@@ -482,7 +482,7 @@ extendExtraDeps extraDeps0 cliExtraDeps unknowns = do
 
 -- | Compare the current filesystem state to the cached information, and
 -- determine (1) if the files are dirty, and (2) the new cache values.
-checkBuildCache :: forall m. (MonadIO m, MonadLogger m)
+checkBuildCache :: forall m. (MonadIO m)
                 => Map FilePath FileCacheInfo -- ^ old cache
                 -> [Path Abs File] -- ^ files in package
                 -> m (Set FilePath, Map FilePath FileCacheInfo)
@@ -595,7 +595,7 @@ checkComponentsBuildable lps =
         , c <- Set.toList (lpUnbuildable lp)
         ]
 
-getDefaultPackageConfig :: (MonadIO m, MonadThrow m, MonadCatch m, MonadLogger m, MonadReader env m, HasEnvConfig env)
+getDefaultPackageConfig :: (MonadIO m, MonadReader env m, HasEnvConfig env)
   => m PackageConfig
 getDefaultPackageConfig = do
   econfig <- asks getEnvConfig
@@ -610,7 +610,7 @@ getDefaultPackageConfig = do
     }
 
 -- | Get 'PackageConfig' for package given its name.
-getPackageConfig :: (MonadIO m, MonadThrow m, MonadMask m, MonadLogger m, MonadReader env m, HasEnvConfig env)
+getPackageConfig :: (MonadIO m, MonadReader env m, HasEnvConfig env)
   => BuildOptsCLI
   -> PackageName
   -> Bool
