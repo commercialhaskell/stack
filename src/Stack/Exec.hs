@@ -3,6 +3,10 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE OverloadedStrings #-}
 
+#if __GLASGOW_HASKELL__ >= 800
+{-# OPTIONS_GHC -Wno-redundant-constraints #-}
+#endif
+
 -- | Execute commands within the properly configured Stack
 -- environment.
 
@@ -51,7 +55,7 @@ plainEnvSettings = EnvSettings
 -- sub-process. This allows signals to be propagated (#527)
 --
 -- 2) On windows, an 'ExitCode' exception will be thrown.
-exec :: (MonadIO m, MonadLogger m)
+exec :: (MonadIO m, MonadLogger m, MonadBaseControl IO m)
      => EnvOverride -> String -> [String] -> m b
 #ifdef WINDOWS
 exec = execSpawn
