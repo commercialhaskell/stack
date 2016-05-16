@@ -27,6 +27,7 @@ extra-deps:
 - persistent-template-2.5.1
 - persistent-2.5
 - monad-unlift-0.1.2.0
+- aeson-0.11.2.0
 packages:
 - .
 # Not the commit this links to, but discussed on
