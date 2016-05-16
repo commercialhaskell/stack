@@ -1212,6 +1212,7 @@ cabalFilePackageId fp = do
     pkgDescr <- liftIO (D.readPackageDescription D.silent $ toFilePath fp)
     (toStackPI . D.package . D.packageDescription) pkgDescr
   where
-    toStackPI (D.PackageIdentifier (D.PackageName name) ver) =
-        PackageIdentifier <$> parsePackageNameFromString name <*>
-        parseVersionFromString (showVersion ver)
+    toStackPI (D.PackageIdentifier (D.PackageName name) ver) = do
+        name' <- parsePackageNameFromString name
+        ver' <- parseVersionFromString (showVersion ver)
+        return (PackageIdentifier name' ver')
