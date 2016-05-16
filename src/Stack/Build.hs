@@ -300,8 +300,8 @@ withLoadPackage menv inner = do
 
 -- | Set the code page for this process as necessary. Only applies to Windows.
 -- See: https://github.com/commercialhaskell/stack/issues/738
-fixCodePage :: M env m => m a -> m a
 #ifdef WINDOWS
+fixCodePage :: M env m => m a -> m a
 fixCodePage inner = do
     mcp <- asks $ configModifyCodePage . getConfig
     ec <- asks getEnvConfig
@@ -343,6 +343,7 @@ fixCodePage inner = do
         , " codepage to UTF-8 (65001) to ensure correct output from GHC"
         ]
 #else
+fixCodePage :: a -> a
 fixCodePage = id
 #endif
 

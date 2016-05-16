@@ -467,8 +467,7 @@ solveResolverSpec stackYaml cabalDirs
 getResolverConstraints
     :: ( MonadBaseControl IO m, MonadIO m, MonadLogger m, MonadMask m
        , MonadReader env m, HasConfig env , HasGHCVariant env
-       , HasHttpManager env , HasLogLevel env , HasReExec env
-       , HasTerminal env)
+       , HasHttpManager env)
     => Path Abs File
     -> Resolver
     -> m (CompilerVersion,
@@ -623,9 +622,8 @@ reportMissingCabalFiles cabalfps includeSubdirs = do
 -- extra dependencies so that the specified packages can be compiled.
 solveExtraDeps
     :: ( MonadBaseControl IO m, MonadIO m, MonadLogger m, MonadMask m
-       , MonadReader env m, HasConfig env , HasEnvConfig env, HasGHCVariant env
-       , HasHttpManager env , HasLogLevel env , HasReExec env
-       , HasTerminal env)
+       , MonadReader env m, HasEnvConfig env, HasHttpManager env
+       , HasLogLevel env, HasReExec env, HasTerminal env)
     => Bool -- ^ modify stack.yaml?
     -> m ()
 solveExtraDeps modStackYaml = do

@@ -108,7 +108,7 @@ instance Show GhciException where
 -- given options and configure it with the load paths and extensions
 -- of those targets.
 ghci
-    :: (HasConfig r, HasBuildConfig r, HasHttpManager r, MonadMask m, HasLogLevel r, HasTerminal r, HasEnvConfig r, MonadReader r m, MonadIO m, MonadLogger m, MonadBaseUnlift IO m)
+    :: (HasBuildConfig r, HasHttpManager r, MonadMask m, HasLogLevel r, HasTerminal r, HasEnvConfig r, MonadReader r m, MonadIO m, MonadLogger m, MonadBaseUnlift IO m)
     => GhciOpts -> m ()
 ghci opts@GhciOpts{..} = do
     bopts <- asks (configBuild . getConfig)
@@ -187,7 +187,7 @@ ghci opts@GhciOpts{..} = do
 -- is none, sometimes it's unambiguous, sometimes it's
 -- ambiguous. Warns and returns nothing if it's ambiguous.
 figureOutMainFile
-    :: (Monad m, MonadLogger m, MonadIO m)
+    :: (MonadLogger m, MonadIO m)
     => BuildOpts
     -> Maybe (Map PackageName SimpleTarget)
     -> Map PackageName SimpleTarget
@@ -273,7 +273,7 @@ figureOutMainFile bopts mainIsTargets targets0 packages =
 -- | Create a list of infos for each target containing necessary
 -- information to load that package/components.
 ghciSetup
-    :: (HasConfig r, HasHttpManager r, HasBuildConfig r, MonadMask m, HasTerminal r, HasLogLevel r, HasEnvConfig r, MonadReader r m, MonadIO m, MonadThrow m, MonadLogger m, MonadBaseUnlift IO m)
+    :: (HasHttpManager r, HasBuildConfig r, MonadMask m, HasTerminal r, HasLogLevel r, HasEnvConfig r, MonadReader r m, MonadIO m, MonadLogger m, MonadBaseUnlift IO m)
     => GhciOpts
     -> m (Map PackageName SimpleTarget, Maybe (Map PackageName SimpleTarget), [GhciPkgInfo])
 ghciSetup GhciOpts{..} = do

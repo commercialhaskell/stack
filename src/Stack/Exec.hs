@@ -10,7 +10,6 @@ module Stack.Exec where
 
 import           Control.Monad.Reader
 import           Control.Monad.Logger
-import           Control.Monad.Catch hiding (try)
 import           Control.Monad.Trans.Control (MonadBaseControl)
 import           Stack.Types
 import           System.Process.Log
@@ -52,7 +51,7 @@ plainEnvSettings = EnvSettings
 -- sub-process. This allows signals to be propagated (#527)
 --
 -- 2) On windows, an 'ExitCode' exception will be thrown.
-exec :: (MonadIO m, MonadLogger m, MonadThrow m, MonadBaseControl IO m)
+exec :: (MonadIO m, MonadLogger m)
      => EnvOverride -> String -> [String] -> m b
 #ifdef WINDOWS
 exec = execSpawn
@@ -67,7 +66,7 @@ exec menv cmd0 args = do
 -- is a sub-process, which is helpful in some cases (#1306)
 --
 -- This function only exits by throwing 'ExitCode'.
-execSpawn :: (MonadIO m, MonadLogger m, MonadThrow m, MonadBaseControl IO m)
+execSpawn :: (MonadIO m, MonadLogger m, MonadBaseControl IO m)
      => EnvOverride -> String -> [String] -> m b
 execSpawn menv cmd0 args = do
     $logProcessRun cmd0 args

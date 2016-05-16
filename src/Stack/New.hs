@@ -80,7 +80,7 @@ data NewOpts = NewOpts
 
 -- | Create a new project with the given options.
 new
-    :: (HasConfig r, MonadReader r m, MonadLogger m, MonadCatch m, MonadThrow m, MonadIO m, HasHttpManager r, Functor m, Applicative m)
+    :: (HasConfig r, MonadReader r m, MonadLogger m, MonadCatch m, MonadIO m, HasHttpManager r)
     => NewOpts -> Bool -> m (Path Abs Dir)
 new opts forceOverwrite = do
     pwd <- getCurrentDir
@@ -174,7 +174,7 @@ loadTemplate name logIt = do
 
 -- | Apply and unpack a template into a directory.
 applyTemplate
-    :: (MonadIO m, MonadThrow m, MonadCatch m, MonadReader r m, HasConfig r, MonadLogger m)
+    :: (MonadIO m, MonadCatch m, MonadReader r m, HasConfig r, MonadLogger m)
     => PackageName
     -> TemplateName
     -> Map Text Text
@@ -270,7 +270,7 @@ runTemplateInits dir = do
 
 -- | Display the set of templates accompanied with description if available.
 listTemplates
-    :: (MonadIO m, MonadThrow m, MonadReader r m, HasHttpManager r, MonadCatch m, MonadLogger m)
+    :: (MonadIO m, MonadReader r m, HasHttpManager r, MonadCatch m)
     => m ()
 listTemplates = do
     templates <- getTemplates
@@ -289,7 +289,7 @@ listTemplates = do
 
 -- | Get the set of templates.
 getTemplates
-    :: (MonadIO m, MonadThrow m, MonadReader r m, HasHttpManager r, MonadCatch m)
+    :: (MonadIO m, MonadReader r m, HasHttpManager r, MonadCatch m)
     => m (Set TemplateName)
 getTemplates = do
     req <- liftM addHeaders (parseUrl defaultTemplatesList)
@@ -303,7 +303,7 @@ getTemplates = do
         code -> throwM (BadTemplatesResponse code)
 
 getTemplateInfo
-    :: (MonadIO m, MonadThrow m, MonadReader r m, HasHttpManager r, MonadCatch m, MonadLogger m)
+    :: (MonadIO m, MonadReader r m, HasHttpManager r, MonadCatch m)
     => m (Map Text TemplateInfo)
 getTemplateInfo = do
   req <- liftM addHeaders (parseUrl defaultTemplateInfoUrl)

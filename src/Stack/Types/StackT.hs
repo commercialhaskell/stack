@@ -87,13 +87,13 @@ instance (MonadIO m) => MonadLogger (StackT config m) where
   monadLoggerLog = stickyLoggerFunc
 
 -- | Run a Stack action, using global options.
-runStackTGlobal :: (MonadIO m,MonadBaseControl IO m)
+runStackTGlobal :: (MonadIO m)
                 => Manager -> config -> GlobalOpts -> StackT config m a -> m a
 runStackTGlobal manager config GlobalOpts{..} =
     runStackT manager globalLogLevel config globalTerminal (isJust globalReExecVersion)
 
 -- | Run a Stack action.
-runStackT :: (MonadIO m,MonadBaseControl IO m)
+runStackT :: (MonadIO m)
           => Manager -> LogLevel -> config -> Bool -> Bool -> StackT config m a -> m a
 runStackT manager logLevel config terminal reExec m = do
     canUseUnicode <- liftIO getCanUseUnicode

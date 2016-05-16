@@ -82,7 +82,6 @@ createDependencyGraph :: (HasEnvConfig env
                          ,HasLogLevel env
                          ,MonadLogger m
                          ,MonadBaseUnlift IO m
-                         ,MonadCatch m
                          ,MonadIO m
                          ,MonadMask m
                          ,MonadReader env m)
@@ -112,7 +111,6 @@ listDependencies :: (HasEnvConfig env
                     ,HasHttpManager env
                     ,HasLogLevel env
                     ,MonadBaseUnlift IO m
-                    ,MonadCatch m
                     ,MonadLogger m
                     ,MonadMask m
                     ,MonadIO m

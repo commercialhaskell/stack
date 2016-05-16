@@ -59,7 +59,7 @@ getGlobalDB menv wc = do
     firstLine = S8.takeWhile (\c -> c /= '\r' && c /= '\n')
 
 -- | Run the ghc-pkg executable
-ghcPkg :: (MonadIO m, MonadLogger m, MonadBaseControl IO m, MonadCatch m, MonadThrow m)
+ghcPkg :: (MonadIO m, MonadLogger m, MonadBaseControl IO m, MonadCatch m)
        => EnvOverride
        -> WhichCompiler
        -> [Path Abs Dir]
@@ -77,7 +77,7 @@ ghcPkg menv wc pkgDbs args = do
     args' = packageDbFlags pkgDbs ++ args
 
 -- | Create a package database in the given directory, if it doesn't exist.
-createDatabase :: (MonadIO m, MonadLogger m, MonadBaseControl IO m, MonadCatch m, MonadThrow m)
+createDatabase :: (MonadIO m, MonadLogger m, MonadBaseControl IO m, MonadCatch m)
                => EnvOverride -> WhichCompiler -> Path Abs Dir -> m ()
 createDatabase menv wc db = do
     exists <- doesDirExist db
@@ -102,7 +102,7 @@ packageDbFlags pkgDbs =
 
 -- | Get the value of a field of the package.
 findGhcPkgField
-    :: (MonadIO m, MonadLogger m, MonadBaseControl IO m, MonadCatch m, MonadThrow m)
+    :: (MonadIO m, MonadLogger m, MonadBaseControl IO m, MonadCatch m)
     => EnvOverride
     -> WhichCompiler
     -> [Path Abs Dir] -- ^ package databases
@@ -125,7 +125,7 @@ findGhcPkgField menv wc pkgDbs name field = do
     stripCR t = fromMaybe t (T.stripSuffix "\r" t)
 
 -- | Get the version of the package
-findGhcPkgVersion :: (MonadIO m, MonadLogger m, MonadBaseControl IO m, MonadCatch m, MonadThrow m)
+findGhcPkgVersion :: (MonadIO m, MonadLogger m, MonadBaseControl IO m, MonadCatch m)
                   => EnvOverride
                   -> WhichCompiler
                   -> [Path Abs Dir] -- ^ package databases
@@ -137,7 +137,7 @@ findGhcPkgVersion menv wc pkgDbs name = do
         Just !v -> return (parseVersion v)
         _ -> return Nothing
 
-unregisterGhcPkgId :: (MonadIO m, MonadLogger m, MonadThrow m, MonadCatch m, MonadBaseControl IO m)
+unregisterGhcPkgId :: (MonadIO m, MonadLogger m, MonadCatch m, MonadBaseControl IO m)
                     => EnvOverride
                     -> WhichCompiler
                     -> CompilerVersion

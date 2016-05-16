@@ -77,7 +77,7 @@ instance NFData InstalledCacheEntry
 
 -- | Call ghc-pkg dump with appropriate flags and stream to the given @Sink@, for a single database
 ghcPkgDump
-    :: (MonadIO m, MonadLogger m, MonadBaseControl IO m, MonadCatch m, MonadThrow m)
+    :: (MonadIO m, MonadLogger m, MonadBaseControl IO m, MonadCatch m)
     => EnvOverride
     -> WhichCompiler
     -> [Path Abs Dir] -- ^ if empty, use global
@@ -87,7 +87,7 @@ ghcPkgDump = ghcPkgCmdArgs ["dump"]
 
 -- | Call ghc-pkg describe with appropriate flags and stream to the given @Sink@, for a single database
 ghcPkgDescribe
-    :: (MonadIO m, MonadLogger m, MonadBaseControl IO m, MonadCatch m, MonadThrow m)
+    :: (MonadIO m, MonadLogger m, MonadBaseControl IO m, MonadCatch m)
     => PackageName
     -> EnvOverride
     -> WhichCompiler
@@ -98,7 +98,7 @@ ghcPkgDescribe pkgName = ghcPkgCmdArgs ["describe", "--simple-output", packageNa
 
 -- | Call ghc-pkg and stream to the given @Sink@, for a single database
 ghcPkgCmdArgs
-    :: (MonadIO m, MonadLogger m, MonadBaseControl IO m, MonadCatch m, MonadThrow m)
+    :: (MonadIO m, MonadLogger m, MonadBaseControl IO m, MonadCatch m)
     => [String]
     -> EnvOverride
     -> WhichCompiler

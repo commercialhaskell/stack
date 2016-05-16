@@ -216,7 +216,7 @@ resolvePackages menv idents0 names0 = do
       | otherwise                    = Right idents
 
 resolvePackagesAllowMissing
-    :: (MonadIO m, MonadReader env m, HasHttpManager env, HasConfig env, MonadLogger m, MonadThrow m, MonadBaseControl IO m, MonadCatch m)
+    :: (MonadIO m, MonadReader env m, HasHttpManager env, HasConfig env, MonadLogger m, MonadBaseControl IO m, MonadCatch m)
     => Map PackageIdentifier (Maybe GitSHA1)
     -> Set PackageName
     -> m (Set PackageName, Set PackageIdentifier, Map PackageIdentifier ResolvedPackage)
@@ -479,7 +479,7 @@ fetchPackages' mdistDir toFetchAll = do
 
     liftIO $ readTVarIO outputVar
   where
-    go :: (MonadIO m,Functor m,MonadThrow m,MonadLogger m,MonadReader env m,HasHttpManager env)
+    go :: (MonadIO m,MonadThrow m,MonadLogger m,MonadReader env m,HasHttpManager env)
        => TVar (Map PackageIdentifier (Path Abs Dir))
        -> (m () -> IO ())
        -> (PackageIdentifier, ToFetch)

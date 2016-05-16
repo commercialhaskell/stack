@@ -118,7 +118,7 @@ readPackageUnresolvedBS mcabalfp bs =
     dropBOM t = fromMaybe t $ T.stripPrefix "\xFEFF" t
 
 -- | Reads and exposes the package information
-readPackage :: (MonadLogger m, MonadIO m, MonadThrow m, MonadCatch m)
+readPackage :: (MonadLogger m, MonadIO m, MonadCatch m)
             => PackageConfig
             -> Path Abs File
             -> m ([PWarning],Package)
@@ -137,7 +137,7 @@ readPackageBS packageConfig bs =
 
 -- | Get 'GenericPackageDescription' and 'PackageDescription' reading info
 -- from given directory.
-readPackageDescriptionDir :: (MonadLogger m, MonadIO m, MonadThrow m, MonadCatch m)
+readPackageDescriptionDir :: (MonadLogger m, MonadIO m, MonadCatch m)
   => PackageConfig
   -> Path Abs Dir
   -> m (GenericPackageDescription, PackageDescription)
@@ -245,7 +245,7 @@ resolvePackage packageConfig gpkg =
 -- options which apply generally to the package, not one specific
 -- component.
 generatePkgDescOpts
-    :: (HasEnvConfig env, HasPlatform env, MonadThrow m, MonadReader env m, MonadIO m)
+    :: (HasEnvConfig env, MonadThrow m, MonadReader env m, MonadIO m)
     => SourceMap
     -> InstalledMap
     -> [PackageName] -- ^ Packages to omit from the "-package" / "-package-id" flags
@@ -511,7 +511,7 @@ allBuildInfo' pkg_descr = [ bi | Just lib <- [library pkg_descr]
 
 -- | Get all files referenced by the package.
 packageDescModulesAndFiles
-    :: (MonadLogger m, MonadIO m, MonadThrow m, MonadReader (Path Abs File, Path Abs Dir) m, MonadCatch m)
+    :: (MonadLogger m, MonadIO m, MonadReader (Path Abs File, Path Abs Dir) m, MonadCatch m)
     => PackageDescription
     -> m (Map NamedComponent (Set ModuleName), Map NamedComponent (Set DotCabalPath), Set (Path Abs File), [PackageWarning])
 packageDescModulesAndFiles pkg = do
@@ -554,7 +554,7 @@ packageDescModulesAndFiles pkg = do
     foldTuples = foldl' (<>) (M.empty, M.empty, [])
 
 -- | Resolve globbing of files (e.g. data files) to absolute paths.
-resolveGlobFiles :: (MonadLogger m,MonadIO m,MonadThrow m,MonadReader (Path Abs File, Path Abs Dir) m,MonadCatch m)
+resolveGlobFiles :: (MonadLogger m,MonadIO m,MonadReader (Path Abs File, Path Abs Dir) m,MonadCatch m)
                  => [String] -> m (Set (Path Abs File))
 resolveGlobFiles =
     liftM (S.fromList . catMaybes . concat) .
@@ -855,7 +855,7 @@ depRange (Dependency _ r) = r
 -- extensions, plus find any of their module and TemplateHaskell
 -- dependencies.
 resolveFilesAndDeps
-    :: (MonadIO m, MonadLogger m, MonadThrow m, MonadCatch m, MonadReader (Path Abs File, Path Abs Dir) m)
+    :: (MonadIO m, MonadLogger m, MonadCatch m, MonadReader (Path Abs File, Path Abs Dir) m)
     => Maybe String         -- ^ Package component name
     -> [Path Abs Dir]       -- ^ Directories to look in.
     -> [DotCabalDescriptor] -- ^ Base names.
@@ -1206,7 +1206,7 @@ resolveDirOrWarn = resolveOrWarn "Directory" f
 -- | Extract the @PackageIdentifier@ given an exploded haskell package
 -- path.
 cabalFilePackageId
-    :: (Applicative m, MonadIO m, MonadThrow m)
+    :: (MonadIO m, MonadThrow m)
     => Path Abs File -> m PackageIdentifier
 cabalFilePackageId fp = do
     pkgDescr <- liftIO (D.readPackageDescription D.silent $ toFilePath fp)

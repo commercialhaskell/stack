@@ -417,7 +417,7 @@ getToolMap mbp =
       $ mpiExes mpi
 
 loadResolver
-    :: (MonadIO m, MonadThrow m, MonadLogger m, MonadReader env m, HasHttpManager env, HasConfig env, HasGHCVariant env, MonadBaseControl IO m, MonadMask m)
+    :: (MonadIO m, MonadLogger m, MonadReader env m, HasHttpManager env, HasConfig env, HasGHCVariant env, MonadBaseControl IO m, MonadMask m)
     => Maybe (Path Abs File)
     -> Resolver
     -> m (MiniBuildPlan, LoadedResolver)
@@ -482,7 +482,7 @@ buildPlanFixes mbp = mbp
 
 -- | Load the 'BuildPlan' for the given snapshot. Will load from a local copy
 -- if available, otherwise downloading from Github.
-loadBuildPlan :: (MonadIO m, MonadThrow m, MonadLogger m, MonadReader env m, HasHttpManager env, HasStackRoot env, HasConfig env)
+loadBuildPlan :: (MonadIO m, MonadThrow m, MonadLogger m, MonadReader env m, HasHttpManager env, HasConfig env)
               => SnapName
               -> m BuildPlan
 loadBuildPlan name = do
@@ -1071,7 +1071,7 @@ parseCustomMiniBuildPlan mconfigPath0 url0 = do
     doHash = SnapshotHash . B64URL.encode . SHA256.hash
 
 applyCustomSnapshot
-    :: (MonadIO m, MonadLogger m, MonadReader env m, HasHttpManager env, MonadThrow m, HasConfig env, MonadBaseControl IO m, MonadMask m)
+    :: (MonadIO m, MonadLogger m, MonadReader env m, HasHttpManager env, HasConfig env, MonadBaseControl IO m, MonadMask m)
     => CustomSnapshot
     -> MiniBuildPlan
     -> m MiniBuildPlan

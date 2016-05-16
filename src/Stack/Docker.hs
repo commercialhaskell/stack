@@ -640,7 +640,7 @@ cleanup opts =
     containerStr = "container"
 
 -- | Inspect Docker image or container.
-inspect :: (MonadIO m,MonadThrow m,MonadLogger m,MonadBaseControl IO m,MonadCatch m)
+inspect :: (MonadIO m,MonadLogger m,MonadBaseControl IO m,MonadCatch m)
         => EnvOverride -> String -> m (Maybe Inspect)
 inspect envOverride image =
   do results <- inspects envOverride [image]
@@ -650,7 +650,7 @@ inspect envOverride image =
        _ -> throwM (InvalidInspectOutputException "expect a single result")
 
 -- | Inspect multiple Docker images and/or containers.
-inspects :: (MonadIO m, MonadThrow m, MonadLogger m, MonadBaseControl IO m, MonadCatch m)
+inspects :: (MonadIO m, MonadLogger m, MonadBaseControl IO m, MonadCatch m)
          => EnvOverride -> [String] -> m (Map String Inspect)
 inspects _ [] = return Map.empty
 inspects envOverride images =
@@ -698,7 +698,7 @@ pullImage envOverride docker image =
 
 -- | Check docker version (throws exception if incorrect)
 checkDockerVersion
-    :: (MonadIO m, MonadThrow m, MonadLogger m, MonadBaseControl IO m, MonadCatch m)
+    :: (MonadIO m, MonadLogger m, MonadBaseControl IO m, MonadCatch m)
     => EnvOverride -> DockerOpts -> m ()
 checkDockerVersion envOverride docker =
   do dockerExists <- doesExecutableExist envOverride "docker"

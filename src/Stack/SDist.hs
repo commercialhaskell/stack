@@ -261,7 +261,7 @@ dirsFromFiles dirs = Set.toAscList (Set.delete "." results)
 -- and will throw an exception in case of critical errors.
 --
 -- Note that we temporarily decompress the archive to analyze it.
-checkSDistTarball :: (MonadIO m, MonadMask m, MonadThrow m, MonadLogger m, MonadReader env m, HasEnvConfig env)
+checkSDistTarball :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasEnvConfig env)
   => Path Abs File -- ^ Absolute path to tarball
   -> m ()
 checkSDistTarball tarball = withTempTarGzContents tarball $ \pkgDir' -> do
@@ -291,7 +291,7 @@ checkSDistTarball tarball = withTempTarGzContents tarball $ \pkgDir' -> do
 
 -- | Version of 'checkSDistTarball' that first saves lazy bytestring to
 -- temporary directory and then calls 'checkSDistTarball' on it.
-checkSDistTarball' :: (MonadIO m, MonadMask m, MonadThrow m, MonadLogger m, MonadReader env m, HasEnvConfig env)
+checkSDistTarball' :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasEnvConfig env)
   => String       -- ^ Tarball name
   -> L.ByteString -- ^ Tarball contents as a byte string
   -> m ()
@@ -300,7 +300,7 @@ checkSDistTarball' name bytes = withSystemTempDir "stack" $ \tpath -> do
     liftIO $ L.writeFile (toFilePath npath) bytes
     checkSDistTarball npath
 
-withTempTarGzContents :: (MonadIO m, MonadMask m, MonadThrow m)
+withTempTarGzContents :: (MonadIO m, MonadMask m)
   => Path Abs File         -- ^ Location of tarball
   -> (Path Abs Dir -> m a) -- ^ Perform actions given dir with tarball contents
   -> m a
