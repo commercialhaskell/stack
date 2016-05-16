@@ -92,8 +92,7 @@ package name first:
 
 > A package is identified by a globally-unique package name, which consists
 of one or more alphanumeric words separated by hyphens. To avoid ambiguity,
-each of these words should contain at least one letter. Chaos will result if
-two distinct packages with the same name are installed on the same system.
+each of these words should contain at least one letter.
 
 (From the [Cabal users guide](https://www.haskell.org/cabal/users-guide/developing-packages.html#developing-packages))
 
