@@ -216,8 +216,8 @@ newTLSManager = liftIO $ newManager tlsManagerSettings
 
 --------------------------------------------------------------------------------
 -- Logging functionality
-stickyLoggerFunc :: (HasSticky r, HasLogLevel r, HasSupportsUnicode r, ToLogStr msg, MonadReader r (t m), MonadTrans t, MonadIO (t m))
-                 => Loc -> LogSource -> LogLevel -> msg -> t m ()
+stickyLoggerFunc :: (HasSticky r, HasLogLevel r, HasSupportsUnicode r, ToLogStr msg, MonadReader r m, MonadIO m)
+                 => Loc -> LogSource -> LogLevel -> msg -> m ()
 stickyLoggerFunc loc src level msg = do
     Sticky mref <- asks getSticky
     case mref of

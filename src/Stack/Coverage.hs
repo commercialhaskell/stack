@@ -4,6 +4,7 @@
 {-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE TemplateHaskell       #-}
 {-# LANGUAGE FlexibleInstances     #-}
+{-# LANGUAGE LambdaCase            #-}
 -- | Generate HPC (Haskell Program Coverage) reports
 module Stack.Coverage
     ( deleteHpcReports
@@ -292,9 +293,12 @@ generateUnionReport report reportDir tixFiles = do
 
 readTixOrLog :: (MonadLogger m, MonadIO m, MonadBaseControl IO m) => Path b File -> m (Maybe Tix)
 readTixOrLog path = do
-    mtix <- liftIO (readTix (toFilePath path)) `catch` \(ErrorCall err) -> do
-        $logError $ "Error while reading tix: " <> T.pack err
-        return Nothing
+    mtix <- liftIO (readTix (toFilePath path)) `catch` \case
+        ErrorCall err -> do
+            $logError $ "Error while reading tix: " <> T.pack err
+            return Nothing
+        -- https://ghc.haskell.org/trac/ghc/ticket/8779
+        _ -> fail "Impossible case in readTixOrLog"
     when (isNothing mtix) $
         $logError $ "Failed to read tix file " <> T.pack (toFilePath path)
     return mtix
