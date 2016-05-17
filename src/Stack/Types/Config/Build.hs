@@ -16,6 +16,9 @@ module Stack.Types.Config.Build
     , TestOpts(..)
     , defaultTestOpts
     , TestOptsMonoid(..)
+    , HaddockOpts(..)
+    , defaultHaddockOpts
+    , HaddockOptsMonoid(..)
     , BenchmarkOpts(..)
     , defaultBenchmarkOpts
     , BenchmarkOptsMonoid(..)
@@ -43,6 +46,8 @@ data BuildOpts =
             ,boptsExeProfile :: !Bool
             ,boptsHaddock :: !Bool
             -- ^ Build haddocks?
+            ,boptsHaddockOpts :: !HaddockOpts
+            -- ^ Options to pass to haddock
             ,boptsOpenHaddocks :: !Bool
             -- ^ Open haddocks in the browser?
             ,boptsHaddockDeps :: !(Maybe Bool)
@@ -82,6 +87,7 @@ defaultBuildOpts = BuildOpts
     { boptsLibProfile = False
     , boptsExeProfile = False
     , boptsHaddock = False
+    , boptsHaddockOpts = defaultHaddockOpts
     , boptsOpenHaddocks = False
     , boptsHaddockDeps = Nothing
     , boptsInstallExes = False
@@ -137,6 +143,7 @@ data BuildOptsMonoid = BuildOptsMonoid
     { buildMonoidLibProfile :: !(First Bool)
     , buildMonoidExeProfile :: !(First Bool)
     , buildMonoidHaddock :: !(First Bool)
+    , buildMonoidHaddockOpts :: !HaddockOptsMonoid
     , buildMonoidOpenHaddocks :: !(First Bool)
     , buildMonoidHaddockDeps :: !(First Bool)
     , buildMonoidInstallExes :: !(First Bool)
@@ -157,6 +164,7 @@ instance FromJSON (WithJSONWarnings BuildOptsMonoid) where
     (\o -> do buildMonoidLibProfile <- First <$> o ..:? buildMonoidLibProfileArgName
               buildMonoidExeProfile <-First <$>  o ..:? buildMonoidExeProfileArgName
               buildMonoidHaddock <- First <$> o ..:? buildMonoidHaddockArgName
+              buildMonoidHaddockOpts <- jsonSubWarnings (o ..:? buildMonoidHaddockOptsArgName ..!= mempty)
               buildMonoidOpenHaddocks <- First <$> o ..:? buildMonoidOpenHaddocksArgName
               buildMonoidHaddockDeps <- First <$> o ..:? buildMonoidHaddockDepsArgName
               buildMonoidInstallExes <- First <$> o ..:? buildMonoidInstallExesArgName
@@ -180,6 +188,9 @@ buildMonoidExeProfileArgName = "executable-profiling"
 
 buildMonoidHaddockArgName :: Text
 buildMonoidHaddockArgName = "haddock"
+
+buildMonoidHaddockOptsArgName :: Text
+buildMonoidHaddockOptsArgName = "haddock-arguments"
 
 buildMonoidOpenHaddocksArgName :: Text
 buildMonoidOpenHaddocksArgName = "open-haddocks"
@@ -280,6 +291,33 @@ toMonoidDisableRunArgName = "no-run-tests"
 instance Monoid TestOptsMonoid where
   mempty = memptydefault
   mappend = mappenddefault
+
+
+
+-- | Haddock Options
+data HaddockOpts =
+  HaddockOpts { toHaddockArgs :: ![String] -- ^ Arguments passed to haddock program
+              } deriving (Eq,Show)
+
+data HaddockOptsMonoid =
+  HaddockOptsMonoid {toMonoidHaddockArgs :: ![String]
+                    } deriving (Show, Generic)
+
+defaultHaddockOpts :: HaddockOpts
+defaultHaddockOpts = HaddockOpts {toHaddockArgs = []}
+
+instance FromJSON (WithJSONWarnings HaddockOptsMonoid) where
+  parseJSON = withObjectWarnings "HaddockOptsMonoid"
+    (\o -> do toMonoidHaddockArgs <- o ..:? toMonoidHaddockArgsName ..!= []
+              return HaddockOptsMonoid{..})
+
+instance Monoid HaddockOptsMonoid where
+  mempty = memptydefault
+  mappend = mappenddefault
+
+toMonoidHaddockArgsName :: Text
+toMonoidHaddockArgsName = "haddock-args"
+
 
 -- | Options for the 'FinalAction' 'DoBenchmarks'
 data BenchmarkOpts =

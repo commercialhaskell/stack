@@ -129,6 +129,7 @@ generateLocalHaddockIndex envOverride wc bco localDumpPkgs locals = do
         "local packages"
         envOverride
         wc
+        (boptsHaddockOpts (bcoBuildOpts bco))
         dumpPackages
         "."
         (localDocDir bco)
@@ -151,6 +152,7 @@ generateDepsHaddockIndex envOverride wc bco globalDumpPkgs snapshotDumpPkgs loca
         "local packages and dependencies"
         envOverride
         wc
+        (boptsHaddockOpts (bcoBuildOpts bco))
         deps
         ".."
         depDocDir
@@ -191,6 +193,7 @@ generateSnapHaddockIndex envOverride wc bco globalDumpPkgs snapshotDumpPkgs =
         "snapshot packages"
         envOverride
         wc
+        (boptsHaddockOpts (bcoBuildOpts bco))
         (Map.elems snapshotDumpPkgs ++ Map.elems globalDumpPkgs)
         "."
         (snapDocDir bco)
@@ -201,11 +204,12 @@ generateHaddockIndex
     => Text
     -> EnvOverride
     -> WhichCompiler
+    -> HaddockOpts
     -> [DumpPackage () ()]
     -> FilePath
     -> Path Abs Dir
     -> m ()
-generateHaddockIndex descr envOverride wc dumpPackages docRelFP destDir = do
+generateHaddockIndex descr envOverride wc hdopts dumpPackages docRelFP destDir = do
     ensureDir destDir
     interfaceOpts <- (liftIO . fmap nubOrd . mapMaybeM toInterfaceOpt) dumpPackages
     unless (null interfaceOpts) $ do
@@ -225,10 +229,12 @@ generateHaddockIndex descr envOverride wc dumpPackages docRelFP destDir = do
                 (Just destDir)
                 envOverride
                 (haddockExeName wc)
-                (["--gen-contents", "--gen-index"] ++ [x | (xs,_,_,_) <- interfaceOpts, x <- xs])
+                (toHaddockArgs hdopts ++
+                 ["--gen-contents", "--gen-index"] ++
+                 [x | (xs,_,_,_) <- interfaceOpts, x <- xs])
   where
     toInterfaceOpt :: DumpPackage a b -> IO (Maybe ([String], UTCTime, Path Abs File, Path Abs File))
-    toInterfaceOpt DumpPackage {..} = do
+    toInterfaceOpt DumpPackage {..} =
         case dpHaddockInterfaces of
             [] -> return Nothing
             srcInterfaceFP:_ -> do
