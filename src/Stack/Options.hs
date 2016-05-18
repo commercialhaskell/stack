@@ -22,6 +22,7 @@ module Stack.Options
     ,ghciOptsParser
     ,solverOptsParser
     ,testOptsParser
+    ,haddockOptsParser
     ,hpcReportOptsParser
     ,pvpBoundsOption
     ,globalOptsFromMonoid
@@ -374,7 +375,8 @@ buildOptsMonoidParser hide0 =
                     \exception" <>
             hide)
     options =
-        BuildOptsMonoid <$> libProfiling <*> exeProfiling <*> haddock <*> openHaddocks <*>
+        BuildOptsMonoid <$> libProfiling <*> exeProfiling <*> haddock <*>
+        haddockOptsParser hide0 <*> openHaddocks <*>
         haddockDeps <*> copyBins <*> preFetch <*> keepGoing <*> forceDirty <*>
         tests <*> testOptsParser hide0 <*> benches <*> benchOptsParser hide0 <*> reconfigure <*>
         cabalVerbose <*> splitObjs
@@ -870,6 +872,18 @@ solverOptsParser = boolFlags False
     "update-config"
     "Automatically update stack.yaml with the solver's recommendations"
     idm
+
+-- | Parser for haddock arguments.
+haddockOptsParser :: Bool -> Parser HaddockOptsMonoid
+haddockOptsParser hide0 =
+  HaddockOptsMonoid <$> fmap (fromMaybe [])
+                             (optional
+                              (argsOption
+                               (long "haddock-arguments" <>
+                                metavar "HADDOCK_ARGS" <>
+                                help "Arguments passed to the haddock program" <>
+                                hide)))
+  where hide = hideMods hide0
 
 -- | Parser for test arguments.
 -- FIXME hide args

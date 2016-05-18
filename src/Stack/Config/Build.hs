@@ -18,6 +18,7 @@ buildOptsFromMonoid BuildOptsMonoid{..} = BuildOpts
     , boptsHaddock = fromFirst
           (boptsHaddock defaultBuildOpts)
           buildMonoidHaddock
+    , boptsHaddockOpts = haddockOptsFromMonoid buildMonoidHaddockOpts
     , boptsOpenHaddocks = fromFirst
           (boptsOpenHaddocks defaultBuildOpts)
           buildMonoidOpenHaddocks
@@ -48,6 +49,12 @@ buildOptsFromMonoid BuildOptsMonoid{..} = BuildOpts
           (boptsSplitObjs defaultBuildOpts)
           buildMonoidSplitObjs
     }
+
+
+haddockOptsFromMonoid :: HaddockOptsMonoid -> HaddockOpts
+haddockOptsFromMonoid HaddockOptsMonoid{..} =
+    defaultHaddockOpts
+    {toHaddockArgs = toMonoidHaddockArgs}
 
 testOptsFromMonoid :: TestOptsMonoid -> TestOpts
 testOptsFromMonoid TestOptsMonoid{..} =
