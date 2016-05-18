@@ -525,7 +525,7 @@ information about it at
 * A full list of all packages available in this snapshot
 * The ability to perform a Hoogle search on the packages in this snapshot
 * A [list of all modules](https://www.stackage.org/lts-3.2/docs) in a snapshot,
-  which an be useful when trying to determine which package to add to your
+  which can be useful when trying to determine which package to add to your
   .cabal file
 
 You can also see a [list of all available
