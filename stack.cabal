@@ -242,6 +242,7 @@ executable stack
                 , directory
                 , filelock >= 0.1.0.1
                 , filepath
+                , hpack
                 , http-client
                 , lifted-base
                 , microlens >= 0.3.0.0
