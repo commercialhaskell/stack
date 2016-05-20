@@ -2168,7 +2168,7 @@ users. Here's a quick rundown:
 
 The following command installs with profiling enabled:
 
-`stack install --enable-executable-profiling --enable-library-profiling
+`stack install --executable-profiling --library-profiling
 --ghc-options="-rtsopts"`
 
 This command will allow you to use various tools to profile the time,
