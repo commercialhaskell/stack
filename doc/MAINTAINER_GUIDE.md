@@ -99,10 +99,6 @@ for requirements to perform the release, and more details about the tool.
   [stack-setup-2.yaml](https://github.com/fpco/stackage-content/blob/master/stack/stack-setup-2.yaml),
   and add the new linux64 stack bindist
 
-* Activate version for new release tag on
-  [readthedocs.org](https://readthedocs.org/projects/stack/versions/), and
-  ensure that stable documentation has updated
-
 * Submit a PR for the
   [haskell-stack Homebrew formula](https://github.com/Homebrew/homebrew-core/blob/master/Formula/haskell-stack.rb)
       * Be sure to update the SHA sum
@@ -110,7 +106,7 @@ for requirements to perform the release, and more details about the tool.
 
 * [Flag the Arch Linux package as out-of-date](https://www.archlinux.org/packages/community/x86_64/stack/flag/)
 
-* Push signed Git tag, matching Github release tag name, e.g.: `git tag -u
+* Push signed Git tag, matching Github release tag name, e.g.: `git tag -d vX.Y.Z && git tag -u
   0x575159689BEFB442 vX.Y.Z && git push origin vX.Y.Z`
 
 * Reset the `release` branch to the released commit, e.g.: `git checkout release
@@ -119,6 +115,10 @@ for requirements to perform the release, and more details about the tool.
 * Update the `stable` branch similarly
 
 * Delete the RC branch (locally and on origin)
+
+* Activate version for new release tag on
+  [readthedocs.org](https://readthedocs.org/projects/stack/versions/), and
+  ensure that stable documentation has updated
 
 * Upload haddocks to Hackage: `etc/scripts/upload-haddocks.sh`
 
@@ -195,5 +195,6 @@ set up.
         git config --global user.email manny@fpcomplete.com
         git config --global user.name "Emanuel Borsboom"
         git config --global push.default simple
+        git config --global core.autocrlf true
         git clone git@github.com:commercialhaskell/stack.git
         git clone git@github.com:borsboom/stack-installer.git
