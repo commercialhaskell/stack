@@ -1,10 +1,5 @@
 # Maintainer guide
 
-## Next release:
-
-* Integrate FreeBSD binaries and packages
-  [#1253](https://github.com/commercialhaskell/stack/issues/1253#issuecomment-185993240)
-
 ## Pre-release steps
 
 * Ensure `release` and `stable` branches merged to `master`
@@ -43,11 +38,12 @@
         * Look for any links to "latest" documentation, replace with version tag
         * Ensure all documentation pages listed in `mkdocs.yaml`
     * Check that any new Linux distribution versions added to
-      `etc/scripts/release.hs` and `etc/scripts/vagrant-releases.sh`.
+      `etc/scripts/release.hs` and `etc/scripts/vagrant-releases.sh`
         * [Ubuntu](https://wiki.ubuntu.com/Releases)
         * [Debian](https://www.debian.org/releases/) (keep at least latest two)
         * [CentOS](https://wiki.centos.org/Download)
         * [Fedora](https://fedoraproject.org/wiki/Releases)
+    * Check for new FreeBSD release
     * Check that no new entries need to be added to
       [releases.yaml](https://github.com/fpco/stackage-content/blob/master/stack/releases.yaml),
       [install_and_upgrade.md](https://github.com/commercialhaskell/stack/blob/master/doc/install_and_upgrade.md),

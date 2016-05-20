@@ -2,6 +2,12 @@
 
 ## 1.1.2
 
+Release notes:
+
+* Official FreeBSD binaries are
+  [now available](http://docs.haskellstack.org/en/stable/install_and_upgrade/#freebsd)
+  [#1253](https://github.com/commercialhaskell/stack/issues/1253).
+
 Major changes:
 
 * Extensible custom snapshots implemented. These allow you to define snapshots
