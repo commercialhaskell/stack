@@ -271,6 +271,20 @@ For Gentoo users, make sure to have the `ncurses` package with `USE=tinfo` (with
 
 ## FreeBSD
 
+(only 64-bit currently available, tested on FreeBSD 10.3-RELEASE)
+
+* Install required dependencies:
+
+        pkg install devel/gmake perl5 lang/gcc misc/compat8x misc/compat9x converters/libiconv ca_root_nss
+
+* Download the latest release:
+
+    * [FreeBSD 64-bit](https://www.stackage.org/stack/freebsd-x86_64)
+
+* Extract the archive and place `stack` somewhere on your `$PATH` (see [Path section below](#path))
+
+* Now you can run `stack` from the terminal.
+
 An unofficial package repository for FreeBSD 10 (amd64 only) and install
 instructions are available at [http://stack-pkg.applicative.tech](http://stack-pkg.applicative.tech/).  The
 repository is not official and as such might lag behind new releases.  See [issue #1253](https://github.com/commercialhaskell/stack/issues/1253)

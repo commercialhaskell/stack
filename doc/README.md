@@ -27,7 +27,7 @@ Downloads are available by operating system:
 * [Arch Linux](install_and_upgrade.md#arch-linux)
 * [NixOS](install_and_upgrade.md#nixos)
 * [Linux (general)](install_and_upgrade.md#linux)
-* [FreeBSD (unofficial)](install_and_upgrade.md#freebsd)
+* [FreeBSD](install_and_upgrade.md#freebsd)
 
 [Upgrade instructions](install_and_upgrade.md#upgrade)
 
