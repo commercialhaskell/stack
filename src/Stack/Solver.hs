@@ -40,7 +40,7 @@ import           Data.List                   ( (\\), isSuffixOf, intercalate
 import           Data.List.Extra             (groupSortOn)
 import           Data.Map                    (Map)
 import qualified Data.Map                    as Map
-import           Data.Maybe                  (catMaybes, isNothing, mapMaybe)
+import           Data.Maybe                  (catMaybes, isNothing, mapMaybe, fromMaybe)
 import           Data.Monoid
 import           Data.Set                    (Set)
 import qualified Data.Set                    as Set
@@ -170,6 +170,7 @@ cabalSolver menv cabalfps constraintType
     parseCabalOutput bs = do
         let ls = drop 1
                $ dropWhile (not . T.isPrefixOf "In order, ")
+               $ map stripCR
                $ T.lines
                $ decodeUtf8 bs
             (errs, pairs) = partitionEithers $ map parseCabalOutputLine ls
@@ -179,6 +180,7 @@ cabalSolver menv cabalfps constraintType
                        \not be parsed: \n"
                        ++ (T.unpack (T.intercalate "\n" errs))
 
+    stripCR t = fromMaybe t (T.stripSuffix "\r" t)
 
     toConstraintArgs userFlagMap =
         [formatFlagConstraint package flag enabled

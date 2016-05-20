@@ -16,6 +16,10 @@ Bug fixes:
 
 Release notes:
 
+* Official FreeBSD binaries are
+  [now available](http://docs.haskellstack.org/en/stable/install_and_upgrade/#freebsd)
+  [#1253](https://github.com/commercialhaskell/stack/issues/1253).
+
 Major changes:
 
 * Extensible custom snapshots implemented. These allow you to define snapshots
@@ -53,6 +57,7 @@ Other enhancements:
   [#1460](https://github.com/commercialhaskell/stack/issues/1460)
 * `stack haddock` now supports `--hadock-arguments`. See
   [#2144](https://github.com/commercialhaskell/stack/issues/2144)
+* Signing: warn if GPG_TTY is not set as per `man gpg-agent`
 
 Bug fixes:
 
@@ -75,6 +80,7 @@ Bug fixes:
 * Relative paths outside of source dir added via `qAddDependentFile` are now
   checked for dirtiness. See
   [#1982](https://github.com/commercialhaskell/stack/issues/1982)
+* Signing: always use `--with-fingerprints`
 
 ## 1.1.0
 
