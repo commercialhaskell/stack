@@ -42,7 +42,7 @@ import           System.Process.Read
 data Cmd = Cmd
   { cmdDirectoryToRunIn :: Maybe (Path Abs Dir) -- ^ directory to run in
   , cmdCommandToRun :: FilePath -- ^ command to run
-  , cmdEnvOverride::EnvOverride
+  , cmdEnvOverride :: EnvOverride
   , cmdCommandLineArguments :: [String] -- ^ command line arguments
   }
 

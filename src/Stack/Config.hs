@@ -43,7 +43,7 @@ import           Control.Applicative
 import           Control.Arrow ((***))
 import           Control.Exception (assert)
 import           Control.Monad (liftM, unless, when, filterM)
-import           Control.Monad.Catch (MonadThrow, MonadCatch, MonadMask, catchAll, throwM, catch)
+import           Control.Monad.Catch (MonadThrow, MonadCatch, MonadMask, catchAll, throwM, catch, handle)
 import           Control.Monad.Extra (firstJustM)
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger hiding (Loc)
@@ -55,8 +55,8 @@ import qualified Data.ByteString as S
 import qualified Data.ByteString.Base64.URL as B64URL
 import qualified Data.ByteString.Lazy as L
 import           Data.Foldable (forM_)
-import qualified Data.IntMap as IntMap
 import           Data.IORef (newIORef)
+import qualified Data.IntMap as IntMap
 import qualified Data.Map as Map
 import           Data.Maybe
 import           Data.Monoid.Extra
@@ -79,9 +79,9 @@ import qualified Paths_stack as Meta
 import           Safe (headMay)
 import           Stack.BuildPlan
 import           Stack.Config.Build
-import           Stack.Config.Urls
 import           Stack.Config.Docker
 import           Stack.Config.Nix
+import           Stack.Config.Urls
 import           Stack.Constants
 import qualified Stack.Image as Image
 import           Stack.Types
@@ -91,6 +91,7 @@ import           System.IO
 import           System.PosixCompat.Files (fileOwner, getFileStatus)
 import           System.PosixCompat.User (getEffectiveUserID)
 import           System.Process.Read
+import           System.Process.Run
 
 -- | If deprecated path exists, use it and print a warning.
 -- Otherwise, return the new path.
@@ -598,21 +599,32 @@ resolvePackageLocation menv projRoot (PLRemote url remotePackageType) = do
     exists <- doesDirExist dir
     let cloneAndExtract commandName cloneArgs resetCommand commit = do
             ensureDir (parent dir)
-            (if exists then doReset True else doClone >> doReset True) `catch` \case
+            if exists
+                then handleError (doReset True)
+                else do
+                    doClone
+                    doReset False
+            return dir
+          where
+            handleError = handle $ \case
                 ReadProcessException{} -> do
+                    $logInfo $ "Failed to reset to commit " <> commit <> ", deleting and re-cloning."
                     ignoringAbsence (removeDirRecur dir)
                     doClone
                     doReset False
-                _ -> return ()
-            return dir
-          where
+                err -> throwM err
             doClone =
-                readProcessNull (Just (parent dir)) menv commandName
-                    ("clone" :
-                    cloneArgs ++
-                    [ T.unpack url
-                    , toFilePathNoTrailingSep dir
-                    ])
+                callProcessInheritStderrStdout Cmd
+                    { cmdDirectoryToRunIn = Just (parent dir)
+                    , cmdCommandToRun = commandName
+                    , cmdEnvOverride = menv
+                    , cmdCommandLineArguments =
+                        ("clone" :
+                        cloneArgs ++
+                        [ T.unpack url
+                        , toFilePathNoTrailingSep dir
+                        ])
+                    }
             doReset firstTry =
                 readProcessNull (Just dir) menv commandName
                     (resetCommand ++ [T.unpack commit, "--"])
