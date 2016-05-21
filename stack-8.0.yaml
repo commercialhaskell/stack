@@ -1,14 +1,14 @@
 resolver: nightly-2016-05-13
-compiler: ghc-8.0.0.20160421
+compiler: ghc-8.0.1
 compiler-check: match-exact
 setup-info:
   ghc:
     linux64:
-      8.0.0.20160421:
-        url: "http://downloads.haskell.org/~ghc/8.0.1-rc4/ghc-8.0.0.20160421-x86_64-deb8-linux.tar.xz"
+      8.0.1:
+        url: "http://downloads.haskell.org/~ghc/8.0.1/ghc-8.0.1-x86_64-deb8-linux.tar.xz"
     macosx:
-      8.0.0.20160421:
-        url: "https://downloads.haskell.org/~ghc/8.0.1-rc4/ghc-8.0.0.20160421-x86_64-apple-darwin.tar.xz"
+      8.0.1:
+        url: "http://downloads.haskell.org/~ghc/8.0.1/ghc-8.0.1-x86_64-apple-darwin.tar.xz"
 image:
   containers:
     - base: "fpco/stack-base" # see ./etc/docker/stack-base/Dockerfile
