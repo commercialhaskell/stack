@@ -194,3 +194,22 @@ set up.
         git config --global core.autocrlf true
         git clone git@github.com:commercialhaskell/stack.git
         git clone git@github.com:borsboom/stack-installer.git
+
+## Adding a new GHC version
+
+  * Push new tag to our fork:
+
+        git clone git@github.com:commercialhaskell/ghc.git
+        cd ghc
+        git remote add upstream git@github.com:ghc/ghc.git
+        git fetch upstream
+        git push origin ghc-X.Y.Z-release
+
+  * [Publish a new Github release](https://github.com/commercialhaskell/ghc/releases/new)
+    with tag `ghc-X.Y.Z-release` and same name.
+
+  * [Edit stack-setup-2.yaml](https://github.com/fpco/stackage-content/edit/master/stack/stack-setup-2.yaml)
+    and add the new bindists. For each one, download the bindist from
+    https://www.haskell.org/ghc/download_ghc_X_Y_Z and upload it to the
+    just-created Github release, and refer to the Github version in the YAML. Be
+    sure to update the `content-length` and `sha1` values.
