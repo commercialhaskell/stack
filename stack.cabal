@@ -96,7 +96,6 @@ library
                      Stack.FileWatch
                      Stack.GhcPkg
                      Stack.Ghci
-                     Stack.Ide
                      Stack.Image
                      Stack.Init
                      Stack.New

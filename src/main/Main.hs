@@ -44,7 +44,6 @@ import           GHC.IO.Encoding (mkTextEncoding, textEncodingName)
 import           Lens.Micro
 import           Network.HTTP.Client
 import           Options.Applicative
-import           Options.Applicative.Args
 import           Options.Applicative.Help (errorHelp, stringChunk, vcatChunks)
 import           Options.Applicative.Builder.Extra
 import           Options.Applicative.Complicated
@@ -71,7 +70,6 @@ import           Stack.Fetch
 import           Stack.FileWatch
 import           Stack.GhcPkg (getGlobalDB, mkGhcPackagePath)
 import           Stack.Ghci
-import           Stack.Ide
 import qualified Stack.Image as Image
 import           Stack.Init
 import           Stack.New
@@ -363,28 +361,10 @@ commandLineHandler progName isInterpreter = complicatedOptions
             "ide"
             "IDE-specific commands"
             (do addCommand'
-                    "start"
-                    "Start the ide-backend service"
-                    ideCmd
-                    ((,) <$> many (textArgument
-                                      (metavar "TARGET" <>
-                                       help ("If none specified, use all " <>
-                                             "packages defined in current directory")))
-                          <*> argsOption (long "ghc-options" <>
-                                        metavar "OPTION" <>
-                                        help "Additional options passed to GHCi" <>
-                                        value []))
-                addCommand'
                     "packages"
                     "List all available local loadable packages"
                     packagesCmd
-                    (pure ())
-                addCommand'
-                    "load-targets"
-                    "List all load targets for a package target"
-                    targetsCmd
-                    (textArgument
-                        (metavar "TARGET")))
+                    (pure ()))
         addSubCommands'
           Docker.dockerCmdName
           "Subcommands specific to Docker use"
@@ -1130,12 +1110,6 @@ ghciCmd ghciOpts go@GlobalOpts{..} =
     local (set (envEnvConfig.envConfigBuildOpts) boptsLocal)
           (ghci ghciOpts)
 
--- | Run ide-backend in the context of a project.
-ideCmd :: ([Text], [String]) -> GlobalOpts -> IO ()
-ideCmd (targets,args) go@GlobalOpts{..} =
-    withBuildConfig go $ -- No locking needed.
-      ide targets args
-
 -- | List packages in the project.
 packagesCmd :: () -> GlobalOpts -> IO ()
 packagesCmd () go@GlobalOpts{..} =
@@ -1147,19 +1121,6 @@ packagesCmd () go@GlobalOpts{..} =
                   do cabalfp <- findOrGenerateCabalFile dir
                      parsePackageNameFromFilePath cabalfp
          forM_ locals (liftIO . putStrLn . packageNameString)
-
--- | List load targets for a package target.
-targetsCmd :: Text -> GlobalOpts -> IO ()
-targetsCmd target go@GlobalOpts{..} =
-    withBuildConfig go $
-    do let boptsCli = defaultBuildOptsCLI { boptsCLITargets = [target] }
-       (_realTargets,_,pkgs) <- ghciSetup (ideGhciOpts boptsCli)
-       pwd <- getCurrentDir
-       targets <-
-           fmap
-               (concat . snd . unzip)
-               (mapM (getPackageOptsAndTargetFiles pwd) pkgs)
-       forM_ targets (liftIO . putStrLn)
 
 -- | Pull the current Docker image.
 dockerPullCmd :: () -> GlobalOpts -> IO ()

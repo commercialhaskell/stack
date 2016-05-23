@@ -568,3 +568,45 @@ filePathPieces x0 = go (parent x0, [], filename x0)
     go (x, dirs, fp)
         | parent x == x = (x, dirs, fp)
         | otherwise = (parent x, dirname x : dirs, fp)
+
+{- Copied from Stack.Ide, may be useful in the future
+
+-- | Get options and target files for the given package info.
+getPackageOptsAndTargetFiles
+    :: (MonadThrow m, MonadIO m, MonadReader env m, HasEnvConfig env)
+    => Path Abs Dir -> GhciPkgInfo -> m ([FilePath], [FilePath])
+getPackageOptsAndTargetFiles pwd pkg = do
+    dist <- distDirFromDir (ghciPkgDir pkg)
+    let autogen = autogenDir dist
+    paths_foo <-
+        liftM
+            (autogen </>)
+            (parseRelFile
+                 ("Paths_" ++ packageNameString (ghciPkgName pkg) ++ ".hs"))
+    paths_foo_exists <- doesFileExist paths_foo
+    let ghcOptions bio =
+            bioOneWordOpts bio ++
+            bioOpts bio ++
+            bioPackageFlags bio ++
+            maybe [] (\cabalMacros -> ["-optP-include", "-optP" <> toFilePath cabalMacros]) (bioCabalMacros bio)
+    return
+        ( ("--dist-dir=" <> toFilePathNoTrailingSep dist) :
+          map ("--ghc-option=" ++) (concatMap (ghcOptions . snd) (ghciPkgOpts pkg))
+        , mapMaybe
+              (fmap toFilePath . stripDir pwd)
+              (S.toList (ghciPkgCFiles pkg) <> S.toList (ghciPkgModFiles pkg) <>
+               [paths_foo | paths_foo_exists]))
+
+-- | List load targets for a package target.
+targetsCmd :: Text -> GlobalOpts -> IO ()
+targetsCmd target go@GlobalOpts{..} =
+    withBuildConfig go $
+    do let boptsCli = defaultBuildOptsCLI { boptsCLITargets = [target] }
+       (_realTargets,_,pkgs) <- ghciSetup (ideGhciOpts boptsCli)
+       pwd <- getCurrentDir
+       targets <-
+           fmap
+               (concat . snd . unzip)
+               (mapM (getPackageOptsAndTargetFiles pwd) pkgs)
+       forM_ targets (liftIO . putStrLn)
+-}
