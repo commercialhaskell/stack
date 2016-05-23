@@ -291,9 +291,8 @@ withCabalFiles name pkgs f = do
                     , T.pack $ packageIdentifierString ident
                     , " with Git SHA of "
                     , decodeUtf8 sha
-                    , "\n"
-                    , T.pack $ show e
                     ]
+                $logDebug (T.pack (show e))
                 goPkg h Nothing (ident, pc, Nothing, tf)
     goPkg h _mgit (ident, pc, _mgitsha, tf) = liftIO $ do
         hSeek h AbsoluteSeek $ fromIntegral $ pcOffset pc
