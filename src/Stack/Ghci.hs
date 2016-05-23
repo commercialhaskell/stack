@@ -291,16 +291,15 @@ ghciSetup GhciOpts{..} = do
     let boptsCli = ghciBuildOptsCLI
             { boptsCLITargets = boptsCLITargets ghciBuildOptsCLI ++ map T.pack ghciAdditionalPackages
             }
+    (realTargets,_,_,_,sourceMap) <- loadSourceMap AllowNoTargets boptsCli
     -- Try to build, but optimistically launch GHCi anyway if it fails (#1065)
-    unless ghciNoBuild $ do
+    when (not ghciNoBuild && not (M.null realTargets)) $ do
         eres <- tryAny $ build (const (return ())) Nothing boptsCli
         case eres of
             Right () -> return ()
             Left err -> do
                 $logError $ T.pack (show err)
                 $logWarn "Warning: build failed, but optimistically launching GHCi anyway"
-    econfig <- asks getEnvConfig
-    (realTargets,_,_,_,sourceMap) <- loadSourceMap AllowNoTargets boptsCli
     menv <- getMinimalEnvOverride
     (installedMap, _, _, _) <- getInstalled
         menv
@@ -309,6 +308,7 @@ ghciSetup GhciOpts{..} = do
             , getInstalledHaddock   = False
             }
         sourceMap
+    econfig <- asks getEnvConfig
     directlyWanted <-
         forMaybeM (M.toList (envConfigPackages econfig)) $
         \(dir,treatLikeExtraDep) ->
