@@ -125,7 +125,7 @@ tryGetCabalMod :: (MonadIO m, MonadReader env m, HasConfig env, MonadThrow m, Mo
 tryGetCabalMod = tryGetCache configCabalMod
 
 -- | Try to load a cache.
-tryGetCache :: (MonadIO m, Store a, MonadBaseControl IO m, MonadLogger m)
+tryGetCache :: (MonadIO m, Store a, HasTypeHash a, MonadBaseControl IO m, MonadLogger m)
             => (Path Abs Dir -> m (Path Abs File))
             -> Path Abs Dir
             -> m (Maybe a)
@@ -328,7 +328,7 @@ readPrecompiledCache pkgident copts depIDs = do
     (file, getOldFile) <- precompiledCacheFile pkgident copts depIDs
     mres <- decodeFileMaybe file
     case mres of
-        Just res -> return res
+        Just res -> return (Just res)
         Nothing -> do
             -- Fallback on trying the old binary format.
             oldFile <- getOldFile

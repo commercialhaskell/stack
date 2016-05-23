@@ -21,7 +21,6 @@ import Data.Monoid ((<>))
 import Data.Store
 import Data.Store.TypeHash
 import qualified Data.Text as T
-import Data.Text.Encoding (encodeUtf8)
 import Path
 import Path.IO (ensureDir)
 
@@ -35,8 +34,6 @@ taggedEncodeFile fp x = do
     $logDebug $ "Encoding " <> fpt
     ensureDir (parent fp)
     let encoded = encode (Tagged x)
-    -- liftIO $ BS.appendFile "encode-log" $ encodeUtf8 fpt <> " is " <> encoded <> "DONE"
-    -- $logDebug $ "Encoded: " <> decodeUtf8 (B16.encode encoded)
     assert (decodeEx encoded == Tagged x) $ liftIO $ BS.writeFile (toFilePath fp) encoded
     $logDebug $ "Finished writing " <> fpt
 
@@ -57,11 +54,11 @@ taggedDecodeOrLoad fp mx = do
             x <- mx
             taggedEncodeFile fp x
             return x
-        Just (Tagged x) -> do
+        Just x -> do
             $logDebug $ "Success decoding " <> fpt
             return x
 
-decodeFileMaybe :: (Store a, MonadIO m, MonadLogger m, MonadBaseControl IO m)
+decodeFileMaybe :: (Store a, HasTypeHash a, MonadIO m, MonadLogger m, MonadBaseControl IO m)
                 => Path loc File
                 -> m (Maybe a)
 decodeFileMaybe fp = do
@@ -70,10 +67,9 @@ decodeFileMaybe fp = do
         return Nothing
     case mbs of
         Nothing -> return Nothing
-        Just bs -> do
-            liftIO (Just <$> decodeIO bs) `catch` \(err :: PeekException) -> do
+        Just bs ->
+            liftIO (do (Tagged res) <- decodeIO bs
+                       return (Just res)) `catch` \(err :: PeekException) -> do
                  let fpt = T.pack (toFilePath fp)
                  $logDebug ("Error while decoding " <> fpt <> ": " <> T.pack (show err) <> " (this might not be an error, when switching between stack versions)")
-                 -- liftIO $ BS.appendFile "decode-error-log" $ encodeUtf8 fpt <> " is " <> bs <> "DONE"
-                 -- $logDebug $ "Input: " <> decodeUtf8 (B16.encode bs)
                  return Nothing
