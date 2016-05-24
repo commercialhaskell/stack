@@ -33,10 +33,11 @@ module Stack.Build.Cache
 
 import           Control.DeepSeq (NFData)
 import           Control.Exception.Enclosed (handleIO, tryAnyDeep)
+import           Control.Monad (liftM)
 import           Control.Monad.Catch (MonadThrow, MonadCatch)
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger (MonadLogger, logDebug)
-import           Control.Monad.Reader
+import           Control.Monad.Reader (MonadReader, asks)
 import           Control.Monad.Trans.Control (MonadBaseControl)
 import qualified Crypto.Hash.SHA256 as SHA256
 import           Data.Binary (Binary (..))
@@ -47,6 +48,7 @@ import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Base64.URL as B64URL
 import qualified Data.ByteString.Char8 as S8
 import qualified Data.ByteString.Lazy as LBS
+import           Data.Foldable (forM_)
 import           Data.Map (Map)
 import           Data.Maybe (fromMaybe, mapMaybe)
 import           Data.Monoid ((<>))
@@ -58,6 +60,7 @@ import           Data.Store.TypeHash (HasTypeHash, mkManyHasTypeHash)
 import           Data.Store.VersionTagged
 import           Data.Text (Text)
 import qualified Data.Text as T
+import           Data.Traversable (forM)
 import           GHC.Generics (Generic)
 import           Path
 import           Path.IO

@@ -7,6 +7,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Stack.StoreSpec where
 
+import           Control.Applicative
 import qualified Data.ByteString as BS
 import           Data.Containers (mapFromList, setFromList)
 import           Data.Int
@@ -19,11 +20,12 @@ import qualified Data.Vector.Unboxed as UV
 import           Data.Word
 import           Language.Haskell.TH
 import           Language.Haskell.TH.ReifyMany
+import           Prelude
+import           Stack.Build.Cache (BuildCache(..))
 import           Stack.PackageDump
 import           Stack.Types
 import           Test.Hspec
 import           Test.SmallCheck.Series
-import           Stack.Build.Cache (BuildCache(..))
 
 -- NOTE: these were copied from Data.Store. Should probably be moved to
 -- smallcheck.

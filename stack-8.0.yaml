@@ -37,9 +37,10 @@ extra-deps:
 - transformers-0.5.2.0
 - transformers-compat-0.5.1.4
 - unix-2.7.2.0
+- th-lift-instances-0.1.7
 - th-reify-many-0.1.6
 - th-utilities-0.1.0.1
-- store-0.1.0.0
+- store-0.1.0.1
 - th-orphans-0.13.1
 packages:
 - .

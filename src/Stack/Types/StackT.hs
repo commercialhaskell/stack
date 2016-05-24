@@ -229,10 +229,11 @@ stickyLoggerFunc loc src level msg = do
 getStickyLoggerFunc
     :: (HasSticky r, HasLogLevel r, HasSupportsUnicode r, ToLogStr msg, MonadReader r m, MonadIO m)
     => m (Loc -> LogSource -> LogLevel -> msg -> IO ())
-getStickyLoggerFunc = stickyLoggerFuncImpl
-    <$> asks getSticky
-    <*> asks getLogLevel
-    <*> asks getSupportsUnicode
+getStickyLoggerFunc = do
+    sticky <- asks getSticky
+    logLevel <- asks getLogLevel
+    supportsUnicode <- asks getSupportsUnicode
+    return $ stickyLoggerFuncImpl sticky logLevel supportsUnicode
 
 stickyLoggerFuncImpl
     :: ToLogStr msg

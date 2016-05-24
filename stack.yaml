@@ -14,9 +14,9 @@ nix:
 extra-deps:
 - hpack-0.14.0
 - path-io-1.1.0
-- th-lift-instances-0.1.6
+- th-lift-instances-0.1.7
 - aeson-0.11.2.0
 - th-reify-many-0.1.6
-- th-utilities-0.1.0.1
-- store-0.1.0.0
+- th-utilities-0.1.1.0
+- store-0.1.0.1
 - th-orphans-0.13.1

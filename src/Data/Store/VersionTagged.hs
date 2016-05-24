@@ -12,6 +12,7 @@ module Data.Store.VersionTagged
     , decodeFileMaybe
     ) where
 
+import Control.Applicative
 import Control.Exception.Lifted (catch, IOException, assert)
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import Control.Monad.Logger
@@ -23,6 +24,7 @@ import Data.Store.TypeHash
 import qualified Data.Text as T
 import Path
 import Path.IO (ensureDir)
+import Prelude
 
 -- | Write to the given file, with a binary-tagged tag.
 taggedEncodeFile :: (Store a, HasTypeHash a, MonadIO m, MonadLogger m, Eq a)
