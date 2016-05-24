@@ -2,11 +2,11 @@
 
 This page is intended to fully document all configuration options available in the stack.yaml file. Note that this page is likely to be both *incomplete* and sometimes *inaccurate*. If you see such cases, please update the page, and if you're not sure how, open an issue labeled "question".
 
-The stack.yaml configuration options break down into [project specific](#project-config) options in:
+The stack.yaml configuration options break down into [project-specific](#project-config) options in:
 
 - `<project dir>/stack.yaml`
 
-and [non-project specific](#non-project-config) options in:
+and [non-project-specific](#non-project-config) options in:
 
 - `/etc/stack/config.yaml` -- for system global non-project default options
 -  `~/.stack/config.yaml` -- for user non-project default options
@@ -14,9 +14,36 @@ and [non-project specific](#non-project-config) options in:
 
 *Note:* When stack is invoked outside a stack project it will source project specific options from `~/.stack/global/stack.yaml`.  Options in this file will be ignored for a project with its own `<project dir>/stack.yaml`.
 
-## Project config
+## Project-specific config
 
-Project specific options are only valid in the `stack.yaml` file local to a project, not in the user or global config files.
+Project-specific options are only valid in the `stack.yaml` file local to a project, not in the user or global config files.
+
+> Note: We define **project** to mean a directory that contains a `stack.yaml`
+> file. We define **package** the same way that Cabal defines a package. (This
+> means a single `.cabal` file---which may contain a library, a test suite, and
+> multiple executables.) Note that a single **Stack project** may contain
+> several **packages**---which might be located in a directory on your
+> computer, on Hackage, in a remote Git or Mercurial repository, or even in a
+> tarball somewhere on the internet.
+
+In your project-specific options, you specify both **which of your packages**
+to build and **which dependencies to use** when building these packages. Stack
+treats _packages_ and _dependencies_ differently. For dependencies, Stack only
+builds the library part, while for packages Stack builds the library, the
+executables, and the test suite.
+
+The below sections will show you how to tell Stack where to find your packages
+and dependencies.
+
+Note that, using the options described below, it **is possible** to specify in
+your `stack.yaml` multiple sources of the same package/dependency. For example,
+you might specify a version of a project on your local machine, a Stackage
+snapshot that contains the same package, as well as a version of the same
+package on Hackage. For simplicity, **Stack will only use one version of each
+package/dependency.** There are rules that dictate how Stack chooses which
+version to use. Read [the section on
+"shadowing"](http://docs.haskellstack.org/en/stable/architecture/#shadowing) to
+learn more about these rules.
 
 ### packages
 
@@ -222,7 +249,7 @@ as a reminder for the user to review the configuration and make any changes if
 needed. The user can delete this message if the generated configuration is
 acceptable.
 
-## Non-project config
+## Non-project-specific config
 
 Non-project config options may go in the global config (`/etc/stack/config.yaml`) or the user config (`~/.stack/config.yaml`).
 
