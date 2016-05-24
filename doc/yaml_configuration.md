@@ -16,34 +16,24 @@ and [non-project-specific](#non-project-config) options in:
 
 ## Project-specific config
 
-Project-specific options are only valid in the `stack.yaml` file local to a project, not in the user or global config files.
+Project-specific options are only valid in the `stack.yaml` file local to a
+project, not in the user or global config files.
 
 > Note: We define **project** to mean a directory that contains a `stack.yaml`
-> file. We define **package** the same way that Cabal defines a package. (This
-> means a single `.cabal` file---which may contain a library, a test suite, and
-> multiple executables.) Note that a single **Stack project** may contain
-> several **packages**---which might be located in a directory on your
-> computer, on Hackage, in a remote Git or Mercurial repository, or even in a
-> tarball somewhere on the internet.
+> file, which specifies how to build a set of packages. We define **package** to
+> be a package with a `.cabal file.
 
-In your project-specific options, you specify both **which of your packages**
-to build and **which dependencies to use** when building these packages. Stack
-treats _packages_ and _dependencies_ differently. For dependencies, Stack only
-builds the library part, while for packages Stack builds the library, the
-executables, and the test suite.
+In your project-specific options, you specify both **which local packages** to
+build and **which dependencies to use** when building these packages. Unlike the
+user's local packages, these dependencies aren't built by default. They only get
+built when needed.
 
-The below sections will show you how to tell Stack where to find your packages
-and dependencies.
-
-Note that, using the options described below, it **is possible** to specify in
-your `stack.yaml` multiple sources of the same package/dependency. For example,
-you might specify a version of a project on your local machine, a Stackage
-snapshot that contains the same package, as well as a version of the same
-package on Hackage. For simplicity, **Stack will only use one version of each
-package/dependency.** There are rules that dictate how Stack chooses which
-version to use. Read [the section on
-"shadowing"](http://docs.haskellstack.org/en/stable/architecture/#shadowing) to
-learn more about these rules.
+Shadowing semantics, described
+[here](http://docs.haskellstack.org/en/stable/architecture/#shadowing), are
+applied to your configuration. So, if you add a package to your `packages` list,
+it will be used even if you're using a snapshot that specifies a particular
+version. Similarly, `extra-deps` will shadow the version specified in the
+resolver.
 
 ### packages
 
