@@ -35,11 +35,11 @@ executables, and the test suite.
 The below sections will show you how to tell Stack where to find your packages
 and dependencies.
 
-Note, using the options described below, it **is possible** to specify in your
-`stack.yaml` multiple sources of the same package/dependency. For example, you
-might specify a version of a project on your local machine, a Stackage snapshot
-that contains the same package, as well as a version of the same package on
-Hackage. For simplicity, **Stack will only use one version of each
+Note that, using the options described below, it **is possible** to specify in
+your `stack.yaml` multiple sources of the same package/dependency. For example,
+you might specify a version of a project on your local machine, a Stackage
+snapshot that contains the same package, as well as a version of the same
+package on Hackage. For simplicity, **Stack will only use one version of each
 package/dependency.** There are rules that dictate how Stack chooses which
 version to use. Read [the section on
 "shadowing"](http://docs.haskellstack.org/en/stable/architecture/#shadowing) to
