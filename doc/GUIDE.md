@@ -2017,8 +2017,13 @@ script:
         cd $dir
         cabal check || [ "$CABALVER" == "1.16" ]
         cabal sdist
-        SRC_TGZ=$(cabal info . | awk '{print $2;exit}').tar.gz && \
-          (cd dist && cabal install --force-reinstalls "$SRC_TGZ")
+        PKGVER=$(cabal info . | awk '{print $2;exit}')
+        SRC_TGZ=$PKGVER.tar.gz
+        cd dist
+        tar zxfv "$SRC_TGZ"
+        cd "$PKGVER"
+        cabal configure --enable-tests
+        cabal build
         cd $ORIGDIR
       done
       ;;
