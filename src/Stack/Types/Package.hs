@@ -3,6 +3,8 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE DataKinds #-}
 -- |
 
 module Stack.Types.Package where
@@ -13,8 +15,6 @@ import           Control.Monad.Catch
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger (MonadLogger)
 import           Control.Monad.Reader
-import           Data.Binary
-import           Data.Binary.VersionTagged
 import qualified Data.ByteString as S
 import           Data.Data
 import           Data.Function
@@ -25,9 +25,12 @@ import           Data.Maybe
 import           Data.Monoid
 import           Data.Set (Set)
 import qualified Data.Set as Set
+import           Data.Store (Store)
+import           Data.Store.TypeHash (mkManyHasTypeHash)
 import           Data.Text (Text)
 import qualified Data.Text as T
 import           Data.Text.Encoding (encodeUtf8, decodeUtf8)
+import           Data.Word (Word64)
 import           Distribution.InstalledPackageInfo (PError)
 import           Distribution.ModuleName (ModuleName)
 import           Distribution.Package hiding (Package,PackageName,packageName,packageVersion,PackageIdentifier)
@@ -347,17 +350,13 @@ data FileCacheInfo = FileCacheInfo
     , fciSize :: !Word64
     , fciHash :: !S.ByteString
     }
-    deriving (Generic, Show)
-instance Binary FileCacheInfo
-instance HasStructuralInfo FileCacheInfo
+    deriving (Generic, Show, Eq)
+instance Store FileCacheInfo
 instance NFData FileCacheInfo
 
 -- | Used for storage and comparison.
 newtype ModTime = ModTime (Integer,Rational)
-  deriving (Ord,Show,Generic,Eq,NFData,Binary)
-
-instance HasStructuralInfo ModTime
-instance HasSemanticVersion ModTime
+  deriving (Ord,Show,Generic,Eq,NFData,Store)
 
 -- | A descriptor from a .cabal file indicating one of the following:
 --
@@ -428,3 +427,5 @@ installedPackageIdentifier (Executable pid) = pid
 -- | Get the installed Version.
 installedVersion :: Installed -> Version
 installedVersion = packageIdentifierVersion . installedPackageIdentifier
+
+$(mkManyHasTypeHash [ [t| ModTime |] ])

@@ -6,10 +6,10 @@ module Stack.Types.Compiler where
 
 import           Control.DeepSeq
 import           Data.Aeson
-import           Data.Binary.VersionTagged (Binary, HasStructuralInfo)
 import           Data.Map (Map)
 import qualified Data.Map as Map
 import           Data.Monoid ((<>))
+import           Data.Store (Store)
 import qualified Data.Text as T
 import           GHC.Generics (Generic)
 import           Stack.Types.Version
@@ -34,8 +34,7 @@ data CompilerVersion
         {-# UNPACK #-} !Version -- GHCJS version
         {-# UNPACK #-} !Version -- GHC version
     deriving (Generic, Show, Eq, Ord)
-instance Binary CompilerVersion
-instance HasStructuralInfo CompilerVersion
+instance Store CompilerVersion
 instance NFData CompilerVersion
 instance ToJSON CompilerVersion where
     toJSON = toJSON . compilerVersionText

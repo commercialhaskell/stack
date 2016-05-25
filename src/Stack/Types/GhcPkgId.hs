@@ -11,13 +11,15 @@ module Stack.Types.GhcPkgId
   where
 
 import           Control.Applicative
+import           Control.DeepSeq
 import           Control.Monad.Catch
 import           Data.Aeson.Extended
 import           Data.Attoparsec.Text
-import           Data.Binary (getWord8, putWord8)
-import           Data.Binary.VersionTagged
+import           Data.Binary (Binary(..), putWord8, getWord8)
+import           Data.Binary.Tagged
 import           Data.Data
 import           Data.Hashable
+import           Data.Store
 import           Data.Text (Text)
 import qualified Data.Text as T
 import           GHC.Generics
@@ -52,6 +54,7 @@ instance Binary GhcPkgId where
         fmap GhcPkgId get
 instance NFData GhcPkgId
 instance HasStructuralInfo GhcPkgId
+instance Store GhcPkgId
 
 instance Show GhcPkgId where
   show = show . ghcPkgIdString
