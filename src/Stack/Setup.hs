@@ -636,6 +636,7 @@ downloadAndInstallTool :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader en
                        -> (SetupInfo -> Path Abs File -> ArchiveType -> Path Abs Dir -> m ())
                        -> m Tool
 downloadAndInstallTool programsDir si downloadInfo tool installer = do
+    ensureDir programsDir
     (file, at) <- downloadFromInfo programsDir downloadInfo tool
     dir <- installDir programsDir tool
     unmarkInstalled programsDir tool
@@ -749,6 +750,7 @@ downloadFromInfo programsDir downloadInfo tool = do
             _ -> error $ "Unknown extension for url: " ++ T.unpack url
     relfile <- parseRelFile $ toolString tool ++ extension
     let path = programsDir </> relfile
+    ensureDir programsDir
     chattyDownload (T.pack (toolString tool)) downloadInfo path
     return (path, at)
   where
@@ -1168,6 +1170,7 @@ setup7z :: (MonadReader env m, HasHttpManager env, HasConfig env, MonadThrow m, 
         -> m (Path Abs Dir -> Path Abs File -> n ())
 setup7z si = do
     dir <- asks $ configLocalPrograms . getConfig
+    ensureDir dir
     let exe = dir </> $(mkRelFile "7z.exe")
         dll = dir </> $(mkRelFile "7z.dll")
     case (siSevenzDll si, siSevenzExe si) of

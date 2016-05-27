@@ -3,6 +3,8 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE LambdaCase #-}
+
 module Stack.Setup.Installed
     ( getCompilerVersion
     , markInstalled
@@ -78,9 +80,10 @@ listInstalled :: (MonadIO m, MonadThrow m)
               => Path Abs Dir
               -> m [Tool]
 listInstalled programsPath = do
-    ensureDir programsPath
-    (_, files) <- listDir programsPath
-    return $ mapMaybe toTool files
+    doesDirExist programsPath >>= \case
+        False -> return []
+        True -> do (_, files) <- listDir programsPath
+                   return $ mapMaybe toTool files
   where
     toTool fp = do
         x <- T.stripSuffix ".installed" $ T.pack $ toFilePath $ filename fp
