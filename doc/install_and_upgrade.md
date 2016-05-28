@@ -54,7 +54,23 @@ such.
 
 ## Mac OS X
 
+### Manual download
+
+* Download the latest release:
+    * [Mac OS X 64-bit](https://www.stackage.org/stack/osx-x86_64)
+* Extract the archive and place `stack` somewhere on your `$PATH` (see
+  [Path section below](#path))
+* Now you can run `stack` from the terminal.
+
+We generally test on the current version of Mac OS X, but stack is known to work on
+Yosemite and Mavericks as well, and may also work on older versions (YMMV).
+
 ### Using Homebrew
+
+**Warning:** the Homebrew version of stack-1.1.2 has some
+[problems](https://github.com/commercialhaskell/stack/issues/2182) not present
+in the official binary distribution used in the manual download.  As such, we
+do not currently recommend installing Stack using Homebrew.
 
 If you have a popular [brew](http://brew.sh/) tool installed, you can just do:
 
@@ -70,16 +86,7 @@ bottle"), but if `brew` starts trying to build everything from source (which
 will take hours), see
 [their FAQ on the topic](https://github.com/Homebrew/homebrew/blob/master/share/doc/homebrew/FAQ.md#why-do-you-compile-everything).
 
-### Manual download
 
-* Download the latest release:
-    * [Mac OS X 64-bit](https://www.stackage.org/stack/osx-x86_64)
-* Extract the archive and place `stack` somewhere on your `$PATH` (see
-  [Path section below](#path))
-* Now you can run `stack` from the terminal.
-
-We generally test on the current version of Mac OS X, but stack is known to work on
-Yosemite and Mavericks as well, and may also work on older versions (YMMV).
 
 ### Notes
 
