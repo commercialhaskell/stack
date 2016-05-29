@@ -1826,8 +1826,15 @@ Selected resolver: lts-3.2
 Wrote project config to: /home/michael/my-yesod-project/stack.yaml
 ```
 
-To add more templates, see [the stack-templates
-repository](https://github.com/commercialhaskell/stack-templates#readme).
+Alternatively you can use your own templates by specifying the path:
+
+```
+stack new project ~/location/of/your/template.hsfiles
+```
+
+As a starting point you can use [the "simple" template](https://github.com/commercialhaskell/stack-templates/blob/master/simple.hsfiles).
+An introduction into template-writing and a place for submitting official templates, 
+you will find at [the stack-templates repository](https://github.com/commercialhaskell/stack-templates#readme).
 
 ### IDE
 
