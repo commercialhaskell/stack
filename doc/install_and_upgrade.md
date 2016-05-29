@@ -67,17 +67,17 @@ Yosemite and Mavericks as well, and may also work on older versions (YMMV).
 
 ### Using Homebrew
 
-**Warning:** the Homebrew version of stack-1.1.2 has some
-[problems](https://github.com/commercialhaskell/stack/issues/2182) not present
-in the official binary distribution used in the manual download.  As such, we
-do not currently recommend installing Stack using Homebrew.
-
 If you have a popular [brew](http://brew.sh/) tool installed, you can just do:
 
 ```
 brew install haskell-stack
 ```
 
+* **Warning:** Homebrew is not officially supported because their
+build is not guaranteed to use the same dependency versions as official
+binaries, which can introduce bugs (e.g.
+[#2182](https://github.com/commercialhaskell/stack/issues/2182)).
+As such, we recommend using the manual download instead.
 * The Homebrew formula and bottles lag slightly behind new Stack releases,
 but tend to be updated within a day or two.
 * At later stage, running `stack setup` might fail with `configure: error: cannot run C compiled programs.` in which case you should run `xcode-select --install`.
@@ -85,8 +85,6 @@ but tend to be updated within a day or two.
 bottle"), but if `brew` starts trying to build everything from source (which
 will take hours), see
 [their FAQ on the topic](https://github.com/Homebrew/homebrew/blob/master/share/doc/homebrew/FAQ.md#why-do-you-compile-everything).
-
-
 
 ### Notes
 
