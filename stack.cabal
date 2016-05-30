@@ -134,6 +134,7 @@ library
                      Stack.Types.Version
                      Stack.Upgrade
                      Stack.Upload
+                     Text.PrettyPrint.Leijen.Extended
                      System.Process.Log
                      System.Process.PagerEditor
                      System.Process.Read
@@ -222,6 +223,7 @@ library
                    , zip-archive
                    , hpack >= 0.14.0 && < 0.15
                    , store
+                   , annotated-wl-pprint
   if os(windows)
     cpp-options:     -DWINDOWS
     build-depends:   Win32

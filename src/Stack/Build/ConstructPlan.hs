@@ -29,15 +29,19 @@ import qualified Data.Map.Strict as Map
 import           Data.Maybe
 import           Data.Set (Set)
 import qualified Data.Set as Set
+import           Data.String (fromString)
 import           Data.Text (Text)
 import qualified Data.Text as T
 import           Data.Text.Encoding (decodeUtf8With)
 import           Data.Text.Encoding.Error (lenientDecode)
+import           Data.Typeable
 import qualified Distribution.Package as Cabal
+import qualified Distribution.Text as C
 import qualified Distribution.Version as Cabal
 import           GHC.Generics (Generic)
 import           Generics.Deriving.Monoid (memptydefault, mappenddefault)
 import           Network.HTTP.Client.Conduit (HasHttpManager)
+import           Path
 import           Prelude hiding (pi, writeFile)
 import           Stack.Build.Cache
 import           Stack.Build.Haddock
@@ -48,6 +52,8 @@ import           Stack.Package
 import           Stack.PackageDump
 import           Stack.PackageIndex
 import           Stack.Types
+import           Stack.Types.Internal (HasTerminal)
+import           Text.PrettyPrint.Leijen.Extended
 
 data PackageInfo
     = PIOnlyInstalled InstallLocation Installed
@@ -124,7 +130,7 @@ instance HasEnvConfig Ctx where
     getEnvConfig = ctxEnvConfig
 
 constructPlan :: forall env m.
-                 (MonadCatch m, MonadReader env m, HasEnvConfig env, MonadIO m, MonadLoggerIO m, MonadBaseControl IO m, HasHttpManager env)
+                 (MonadCatch m, MonadReader env m, HasEnvConfig env, MonadIO m, MonadLoggerIO m, MonadBaseControl IO m, HasHttpManager env, HasTerminal env)
               => MiniBuildPlan
               -> BaseConfigOpts
               -> [LocalPackage]
@@ -171,7 +177,9 @@ constructPlan mbp0 baseConfigOpts0 locals extraToBuild0 localDumpPkgs loadPackag
                         then installExes
                         else Map.empty
                 }
-        else throwM $ ConstructPlanExceptions errs (bcStackYaml $ getBuildConfig econfig)
+        else do
+            $displayError $ pprintExceptions errs (bcStackYaml (getBuildConfig econfig))
+            throwM $ ConstructPlanFailed "Plan construction failed."
   where
     ctx econfig getVersions0 lf = Ctx
         { mbp = mbp0
@@ -440,7 +448,7 @@ addPackageDeps treatAsDep package = do
                 let bd =
                         case e of
                             UnknownPackage name -> assert (name == depname) NotInBuildPlan
-                            _ -> Couldn'tResolveItsDependencies
+                            _ -> Couldn'tResolveItsDependencies (packageVersion package)
                 mlatestApplicable <- getLatestApplicable
                 return $ Left (depname, (range, mlatestApplicable, bd))
             Right adr -> do
@@ -692,3 +700,103 @@ inSnapshot name version = do
         guard $ not $ name `Set.member` ls
         mpi <- Map.lookup name (mbpPackages p)
         return $ mpiVersion mpi == version
+
+data ConstructPlanException
+    = DependencyCycleDetected [PackageName]
+    | DependencyPlanFailures Package (Map PackageName (VersionRange, LatestApplicableVersion, BadDependency))
+    | UnknownPackage PackageName -- TODO perhaps this constructor will be removed, and BadDependency will handle it all
+    -- ^ Recommend adding to extra-deps, give a helpful version number?
+    deriving (Typeable, Eq)
+
+-- | For display purposes only, Nothing if package not found
+type LatestApplicableVersion = Maybe Version
+
+-- | Reason why a dependency was not used
+data BadDependency
+    = NotInBuildPlan
+    | Couldn'tResolveItsDependencies Version
+    | DependencyMismatch Version
+    deriving (Typeable, Eq)
+
+pprintExceptions :: [ConstructPlanException] -> Path Abs File -> AnsiDoc
+pprintExceptions exceptions stackYaml =
+    line <>
+    "While constructing the build plan, the following exceptions were encountered:" <> line <> line <>
+    mconcat (intersperse (line <> line) (mapMaybe pprintException exceptions')) <> line <>
+    if Map.null extras then "" else
+        line <>
+        "Recommended action: try adding the following to your extra-deps in" <+>
+        toAnsiDoc (display stackYaml) <> ":" <>
+        line <>
+        vsep (map pprintExtra (Map.toList extras)) <>
+        line <>
+        line <>
+        "You may also want to try the 'stack solver' command" <> line <> line
+  where
+    exceptions' = nub exceptions
+
+    extras = Map.unions $ map getExtras exceptions'
+    getExtras (DependencyCycleDetected _) = Map.empty
+    getExtras (UnknownPackage _) = Map.empty
+    getExtras (DependencyPlanFailures _ m) =
+       Map.unions $ map go $ Map.toList m
+     where
+       go (name, (_range, Just version, NotInBuildPlan)) =
+           Map.singleton name version
+       go _ = Map.empty
+    pprintExtra (name, version) =
+      fromString (concat ["- ", packageNameString name, "-", versionString version])
+
+    pprintException (DependencyCycleDetected pNames) = Just $ dullred $
+        "Dependency cycle detected in packages:" <> line <>
+        indent 4 (encloseSep "[" "]" "," (map (fromString . packageNameString) pNames))
+    pprintException (DependencyPlanFailures pkg (Map.toList -> pDeps)) =
+        case mapMaybe pprintDep pDeps of
+            [] -> Nothing
+            depErrors -> Just $
+                "In the dependencies for" <+>
+                yellow (fromString (packageIdentifierString (packageIdentifier pkg))) <>
+                pprintFlags (packageFlags pkg) <> ":" <> line <>
+                indent 4 (vsep depErrors)
+    -- Skip these because they are redundant with 'NotInBuildPlan' info.
+    pprintException (UnknownPackage _) = Nothing
+
+    pprintFlags flags
+        | Map.null flags = ""
+        | otherwise = parens $ sep $ map pprintFlag $ Map.toList flags
+    pprintFlag (name, True) = "+" <> fromString (show name)
+    pprintFlag (name, False) = "-" <> fromString (show name)
+
+    pprintDep (name, (range, mlatestApplicable, badDep)) = case badDep of
+        NotInBuildPlan -> Just $
+            dullred pkgName <+>
+            align ("must match" <+> goodRange <> "," <> softline <>
+                   "but the stack configuration has no specified version" <>
+                   latestApplicable Nothing)
+        -- TODO: For local packages, suggest editing constraints
+        DependencyMismatch version -> Just $
+            dullred (pkgIdent version) <+>
+            align ("must match" <+> goodRange <>
+                   latestApplicable (Just version))
+        -- TODO: optionally show these?
+        --
+        -- I think the main useful info is these explain why missing
+        -- packages are needed. Instead lets give the user the shortest
+        -- path from a target to the package.
+        Couldn'tResolveItsDependencies _version ->
+            Nothing
+            -- yellow (pkgIdent version <> ":") <+>
+            -- align ("couldn't resolve its dependencies" <>
+            --        latestApplicable (Just version))
+      where
+        goodRange = green (fromString (C.display range))
+        pkgName = fromString (packageNameString name)
+        pkgIdent version = fromString $ packageIdentifierString (PackageIdentifier name version)
+        latestApplicable mversion =
+            case mlatestApplicable of
+                Nothing -> ""
+                Just la
+                    | mlatestApplicable == mversion -> softline <>
+                        "(latest applicable is specified)"
+                    | otherwise -> softline <>
+                        "(latest applicable is " <> green (fromString (versionString la)) <> ")"
