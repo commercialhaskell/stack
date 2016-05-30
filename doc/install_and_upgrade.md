@@ -267,11 +267,9 @@ Stack](http://nixos.org/nixpkgs/manual/#using-stack-together-with-nix).
 * Ensure you have required system dependencies installed.  These include GCC, GNU make, xz, perl, libgmp, libffi, and zlib.  We also recommend Git and GPG.  To install these using your package manager:
     * Debian / Ubuntu: `sudo apt-get install g++ gcc libc6-dev libffi-dev libgmp-dev make xz-utils zlib1g-dev git gnupg`
     * Fedora / CentOS: `sudo dnf install perl make automake gcc gmp-devel libffi zlib xz tar git gnupg` (use `yum` instead of `dnf` on CentOS and Fedora <= 21)
+    * Gentoo users, make sure to have the `ncurses` package with `USE=tinfo` (without it, stack will not be able to install GHC).
 
 * Now you can run `stack` from the terminal.
-
-Tested on Fedora 20: make sure to install the following packages `sudo yum install perl make automake gcc gmp-devel`.
-For Gentoo users, make sure to have the `ncurses` package with `USE=tinfo` (without it, stack will not be able to install GHC).
 
 ## FreeBSD
 
