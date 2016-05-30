@@ -54,17 +54,6 @@ such.
 
 ## Mac OS X
 
-### Manual download
-
-* Download the latest release:
-    * [Mac OS X 64-bit](https://www.stackage.org/stack/osx-x86_64)
-* Extract the archive and place `stack` somewhere on your `$PATH` (see
-  [Path section below](#path))
-* Now you can run `stack` from the terminal.
-
-We generally test on the current version of Mac OS X, but stack is known to work on
-Yosemite and Mavericks as well, and may also work on older versions (YMMV).
-
 ### Using Homebrew
 
 If you have a popular [brew](http://brew.sh/) tool installed, you can just do:
@@ -77,6 +66,17 @@ but tend to be updated within a day or two.
 bottle"), but if `brew` starts trying to build everything from source (which
 will take hours), see
 [their FAQ on the topic](https://github.com/Homebrew/homebrew/blob/master/share/doc/homebrew/FAQ.md#why-do-you-compile-everything).
+
+### Manual download
+
+* Download the latest release:
+    * [Mac OS X 64-bit](https://www.stackage.org/stack/osx-x86_64)
+* Extract the archive and place `stack` somewhere on your `$PATH` (see
+  [Path section below](#path))
+* Now you can run `stack` from the terminal.
+
+We generally test on the current version of Mac OS X, but stack is known to work on
+Yosemite and Mavericks as well, and may also work on older versions (YMMV).
 
 ### Notes
 
@@ -264,10 +264,12 @@ Stack](http://nixos.org/nixpkgs/manual/#using-stack-together-with-nix).
 
 * Extract the archive and place `stack` somewhere on your `$PATH` (see [Path section below](#path))
 
-* Now you can run `stack` from the terminal.
+* Ensure you have required system dependencies installed.  These include GCC, GNU make, xz, perl, libgmp, libffi, and zlib.  We also recommend Git and GPG.  To install these using your package manager:
+    * Debian / Ubuntu: `sudo apt-get install g++ gcc libc6-dev libffi-dev libgmp-dev make xz-utils zlib1g-dev git gnupg`
+    * Fedora / CentOS: `sudo dnf install perl make automake gcc gmp-devel libffi zlib xz tar git gnupg` (use `yum` instead of `dnf` on CentOS and Fedora <= 21)
+    * Gentoo users, make sure to have the `ncurses` package with `USE=tinfo` (without it, stack will not be able to install GHC).
 
-Tested on Fedora 20: make sure to install the following packages `sudo yum install perl make automake gcc gmp-devel`.
-For Gentoo users, make sure to have the `ncurses` package with `USE=tinfo` (without it, stack will not be able to install GHC).
+* Now you can run `stack` from the terminal.
 
 ## FreeBSD
 
