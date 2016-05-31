@@ -467,7 +467,13 @@ ensureDockerStackExe containerPlatform = do
                    Just versions ->
                        case Map.lookup stackVersion versions of
                            Just x -> return x
-                           Nothing -> throwM (DockerStackExeNotFound stackVersion osKey)
+                           Nothing ->
+                               case mapMaybe (matchMinor stackVersion) (Map.keys versions) of
+                                   (v:_) ->
+                                       case Map.lookup v versions of
+                                           Just x -> return x
+                                           Nothing ->  throwM (DockerStackExeNotFound v osKey)
+                                   [] -> throwM (DockerStackExeNotFound stackVersion osKey)
                    Nothing -> throwM (DockerStackExeNotFound stackVersion osKey)
            _ <-
                downloadAndInstallTool
@@ -478,6 +484,11 @@ ensureDockerStackExe containerPlatform = do
                    installDockerStackExe
            return ()
     return stackExePath
+  where
+    matchMinor stackVersion v =
+        if checkVersion MatchMinor stackVersion v
+            then Just v
+            else Nothing
 
 -- | Install the newest version of Cabal globally
 upgradeCabal :: (MonadIO m, MonadLogger m, MonadReader env m, HasHttpManager env, HasConfig env, MonadBaseControl IO m, MonadMask m)

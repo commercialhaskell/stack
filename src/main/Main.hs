@@ -153,9 +153,11 @@ main = do
       let global = globalOptsFromMonoid isTerminal globalMonoid
       when (globalLogLevel global == LevelDebug) $ hPutStrLn stderr versionString'
       case globalReExecVersion global of
-          Just expectVersion
-              | expectVersion /= showVersion Meta.version ->
-                  throwIO $ InvalidReExecVersion expectVersion (showVersion Meta.version)
+          Just expectVersion -> do
+              expectVersion' <- parseVersionFromString expectVersion
+              if checkVersion MatchMinor expectVersion' (fromCabalVersion Meta.version)
+                  then return ()
+                  else throwIO $ InvalidReExecVersion expectVersion (showVersion Meta.version)
           _ -> return ()
       run global `catch` \e ->
           -- This special handler stops "stack: " from being printed before the
