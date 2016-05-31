@@ -43,7 +43,7 @@ RUN rm $HOME/.gnupg/*.asc $HOME/.gnupg/trust
 
 # INSTALL STACK, BOOTSTRAP LTS & GHC & UNINSTALL STACK
 RUN bash -lc 'nix-env -i stack ghc'
-RUN bash -lc 'stack setup --resolver=lts-5.15'
+RUN bash -lc 'stack setup --resolver=lts-6.0'
 
 # SET THE DEFAULT PROFILE TO GPG 1.4
 RUN bash -lc 'nix-env -S /nix/var/nix/profiles/gpg14'

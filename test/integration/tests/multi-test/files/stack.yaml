@@ -4,4 +4,4 @@ packages:
 - sub-package
 - cyclic
 extra-deps: []
-resolver: lts-5.0
+resolver: lts-6.0

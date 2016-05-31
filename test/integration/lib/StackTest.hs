@@ -129,4 +129,4 @@ isMacOSX = os == "darwin"
 -- version is released, pass this argument to @stack@ when running in
 -- a global context.  The LTS major version here should match that of
 -- the main @stack.yaml@.
-defaultResolverArg = "--resolver=lts-5"
+defaultResolverArg = "--resolver=lts-6.0"
