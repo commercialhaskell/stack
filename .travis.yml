@@ -61,12 +61,6 @@ matrix:
     # the fix to #1570 (but HEAD does)
     - env: BUILD=stack GHCVER=head STACK_YAML=stack-8.0.yaml
 
-    # See https://github.com/commercialhaskell/stack/issues/2121
-    - env: BUILD=cabal CABALVER=1.22 GHCVER=7.10.2
-
-    # See https://github.com/commercialhaskell/stack/issues/2190
-    - env: BUILD=cabal CABALVER=1.18 GHCVER=7.8.4
-
 # Note: the distinction between `before_install` and `install` is not important.
 # - in before_install we install build tools
 # - in install we install (haskell) dependencies
