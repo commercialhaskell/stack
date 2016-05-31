@@ -136,6 +136,14 @@ import System.IO (Handle)
 import qualified Text.PrettyPrint.Annotated.Leijen as P
 import Text.PrettyPrint.Annotated.Leijen hiding ((<>), display)
 
+-- TODO: consider smashing together the code for wl-annotated-pprint and
+-- wl-pprint-text. The code here already handles doing the
+-- ansi-wl-pprint stuff (better!) atop wl-annotated-pprint. So the
+-- result would be a package unifying 3 different wl inspired packages.
+--
+-- Perhaps it can still have native string support, by adding a type
+-- parameter to Doc?
+
 instance Monoid (Doc a) where
     mappend = (P.<>)
     mempty = empty

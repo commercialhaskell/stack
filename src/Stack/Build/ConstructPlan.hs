@@ -1,12 +1,13 @@
-{-# LANGUAGE DeriveGeneric         #-}
-{-# LANGUAGE FlexibleContexts      #-}
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE OverloadedStrings     #-}
-{-# LANGUAGE RecordWildCards       #-}
-{-# LANGUAGE ScopedTypeVariables   #-}
-{-# LANGUAGE TemplateHaskell       #-}
-{-# LANGUAGE TupleSections         #-}
-{-# LANGUAGE ViewPatterns          #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TupleSections #-}
+{-# LANGUAGE ViewPatterns #-}
 -- | Construct a @Plan@ for how to build
 module Stack.Build.ConstructPlan
     ( constructPlan
@@ -36,7 +37,7 @@ import           Data.Text.Encoding (decodeUtf8With)
 import           Data.Text.Encoding.Error (lenientDecode)
 import           Data.Typeable
 import qualified Distribution.Package as Cabal
-import qualified Distribution.Text as C
+import qualified Distribution.Text as Cabal
 import qualified Distribution.Version as Cabal
 import           GHC.Generics (Generic)
 import           Generics.Deriving.Monoid (memptydefault, mappenddefault)
@@ -84,6 +85,8 @@ data AddDepRes
     | ADRFound InstallLocation Installed
     deriving Show
 
+type ParentMap = MonoidMap PackageName (First Version, [(PackageIdentifier, VersionRange)])
+
 data W = W
     { wFinals :: !(Map PackageName (Either ConstructPlanException Task))
     , wInstall :: !(Map Text InstallLocation)
@@ -94,6 +97,8 @@ data W = W
     -- ^ Packages which count as dependencies
     , wWarnings :: !([Text] -> [Text])
     -- ^ Warnings
+    , wParents :: !ParentMap
+    -- ^ Which packages a given package depends on, along with the package's version
     } deriving Generic
 instance Monoid W where
     mempty = memptydefault
@@ -150,7 +155,7 @@ constructPlan mbp0 baseConfigOpts0 locals extraToBuild0 localDumpPkgs loadPackag
             mapM_ onWanted $ filter lpWanted locals
             mapM_ (addDep False) $ Set.toList extraToBuild0
     lf <- askLoggerIO
-    ((), m, W efinals installExes dirtyReason deps warnings) <-
+    ((), m, W efinals installExes dirtyReason deps warnings parents) <-
         liftIO $ runRWST inner (ctx econfig getVersions0 lf) M.empty
     mapM_ $logWarn (warnings [])
     let toEither (_, Left e)  = Left e
@@ -178,7 +183,7 @@ constructPlan mbp0 baseConfigOpts0 locals extraToBuild0 localDumpPkgs loadPackag
                         else Map.empty
                 }
         else do
-            $displayError $ pprintExceptions errs (bcStackYaml (getBuildConfig econfig))
+            $displayError $ pprintExceptions errs (bcStackYaml (getBuildConfig econfig)) parents (wantedLocalPackages locals)
             throwM $ ConstructPlanFailed "Plan construction failed."
   where
     ctx econfig getVersions0 lf = Ctx
@@ -445,6 +450,7 @@ addPackageDeps treatAsDep package = do
                 return (latestApplicableVersion range vs)
         case eres of
             Left e -> do
+                addParent depname range Nothing
                 let bd =
                         case e of
                             UnknownPackage name -> assert (name == depname) NotInBuildPlan
@@ -452,6 +458,7 @@ addPackageDeps treatAsDep package = do
                 mlatestApplicable <- getLatestApplicable
                 return $ Left (depname, (range, mlatestApplicable, bd))
             Right adr -> do
+                addParent depname range Nothing
                 inRange <- if adrVersion adr `withinRange` range
                     then return True
                     else do
@@ -500,6 +507,9 @@ addPackageDeps treatAsDep package = do
   where
     adrVersion (ADRToInstall task) = packageIdentifierVersion $ taskProvides task
     adrVersion (ADRFound _ installed) = installedVersion installed
+    addParent depname range mversion = tell mempty { wParents = MonoidMap $ M.singleton depname val }
+      where
+        val = (First mversion, [(packageIdentifier package, range)])
 
 checkDirtiness :: PackageSource
                -> Installed
@@ -718,8 +728,16 @@ data BadDependency
     | DependencyMismatch Version
     deriving (Typeable, Eq)
 
-pprintExceptions :: [ConstructPlanException] -> Path Abs File -> AnsiDoc
-pprintExceptions exceptions stackYaml =
+-- TODO: Consider intersecting version ranges for multiple deps on a
+-- package.  This is why VersionRange is in the parent map.
+
+pprintExceptions
+    :: [ConstructPlanException]
+    -> Path Abs File
+    -> ParentMap
+    -> Set PackageName
+    -> AnsiDoc
+pprintExceptions exceptions stackYaml parentMap wanted =
     line <>
     "While constructing the build plan, the following exceptions were encountered:" <> line <> line <>
     mconcat (intersperse (line <> line) (mapMaybe pprintException exceptions')) <> line <>
@@ -731,7 +749,8 @@ pprintExceptions exceptions stackYaml =
         vsep (map pprintExtra (Map.toList extras)) <>
         line <>
         line <>
-        "You may also want to try the 'stack solver' command" <> line <> line
+        "You may also want to try the 'stack solver' command" <> line <> line <>
+        fromString (show parentMap)
   where
     exceptions' = nub exceptions
 
@@ -754,10 +773,22 @@ pprintExceptions exceptions stackYaml =
         case mapMaybe pprintDep pDeps of
             [] -> Nothing
             depErrors -> Just $
-                "In the dependencies for" <+>
-                yellow (fromString (packageIdentifierString (packageIdentifier pkg))) <>
+                "In the dependencies for" <+> pkgIdent <>
                 pprintFlags (packageFlags pkg) <> ":" <> line <>
-                indent 4 (vsep depErrors)
+                indent 4 (vsep depErrors) <>
+                case getShortestDepsPath parentMap wanted (packageName pkg) of
+                    [] -> mempty
+                    [target,_] -> line <> "needed since" <+> pkgTarget target <+> "is a build target."
+                    (target:path) -> line <> "needed due to " <> encloseSep "" "" " -> " pathElems
+                      where
+                        pathElems =
+                            [pkgTarget target] ++
+                            map (fromString . packageIdentifierString) path ++
+                            [pkgIdent]
+              where
+                pkgIdent = yellow (fromString (packageIdentifierString (packageIdentifier pkg)))
+                pkgTarget = cyan . fromString . packageIdentifierString
+        -- TODO: optionally show these?
     -- Skip these because they are redundant with 'NotInBuildPlan' info.
     pprintException (UnknownPackage _) = Nothing
 
@@ -778,7 +809,6 @@ pprintExceptions exceptions stackYaml =
             dullred (pkgIdent version) <+>
             align ("must match" <+> goodRange <>
                    latestApplicable (Just version))
-        -- TODO: optionally show these?
         --
         -- I think the main useful info is these explain why missing
         -- packages are needed. Instead lets give the user the shortest
@@ -789,7 +819,7 @@ pprintExceptions exceptions stackYaml =
             -- align ("couldn't resolve its dependencies" <>
             --        latestApplicable (Just version))
       where
-        goodRange = green (fromString (C.display range))
+        goodRange = green (fromString (Cabal.display range))
         pkgName = fromString (packageNameString name)
         pkgIdent version = fromString $ packageIdentifierString (PackageIdentifier name version)
         latestApplicable mversion =
@@ -800,3 +830,65 @@ pprintExceptions exceptions stackYaml =
                         "(latest applicable is specified)"
                     | otherwise -> softline <>
                         "(latest applicable is " <> green (fromString (versionString la)) <> ")"
+
+-- | Get the shortest reason for the package to be in the build plan. In
+-- other words, trace the parent dependencies back to a 'wanted'
+-- package.
+getShortestDepsPath
+    :: ParentMap
+    -> Set PackageName
+    -> PackageName
+    -> [PackageIdentifier]
+getShortestDepsPath (MonoidMap parentsMap) wanted name =
+    case M.lookup name parentsMap of
+        Nothing -> []
+        Just (_, parents) -> findShortest 256 paths0
+          where
+            paths0 = M.fromList $ map (\(ident, _) -> (packageIdentifierName ident, startDepsPath ident)) parents
+  where
+    -- The 'paths' map is a map from PackageName to the shortest path
+    -- found to get there. It is the frontier of our breadth-first
+    -- search of dependencies.
+    findShortest :: Int -> Map PackageName DepsPath -> [PackageIdentifier]
+    findShortest fuel _ | fuel <= 0 =
+        [PackageIdentifier $(mkPackageName "stack-ran-out-of-jet-fuel") $(mkVersion "0")]
+    findShortest _ paths | M.null paths = []
+    findShortest fuel paths =
+        case targets of
+            [] -> findShortest (fuel - 1) $ M.fromListWith chooseBest $ concatMap extendPath recurses
+            _ -> let (DepsPath _ _ path) = minimum (map snd targets) in path
+      where
+        (targets, recurses) = partition (\(n, _) -> n `elem` wanted) (M.toList paths)
+    chooseBest :: DepsPath -> DepsPath -> DepsPath
+    chooseBest x y = if x > y then x else y
+    -- Extend a path to all its parents.
+    extendPath :: (PackageName, DepsPath) -> [(PackageName, DepsPath)]
+    extendPath (n, dp) =
+        case M.lookup n parentsMap of
+            Nothing -> []
+            Just (_, parents) -> map (\(pkgId, _) -> (packageIdentifierName pkgId, extendDepsPath pkgId dp)) parents
+
+data DepsPath = DepsPath Int Int [PackageIdentifier]
+    deriving (Eq, Ord, Show)
+
+startDepsPath :: PackageIdentifier -> DepsPath
+startDepsPath ident =
+    DepsPath 1 nameLength [ident]
+  where
+    nameLength = T.length (packageNameText (packageIdentifierName ident))
+
+extendDepsPath :: PackageIdentifier -> DepsPath -> DepsPath
+extendDepsPath ident (DepsPath cnt len idents) =
+    DepsPath (cnt + 1) (len + nameLength) (ident : idents)
+  where
+    nameLength = T.length (packageNameText (packageIdentifierName ident))
+
+-- Utility newtype wrapper to make make Map's Monoid also use the
+-- element's Monoid.
+
+newtype MonoidMap k a = MonoidMap (Map k a)
+    deriving (Eq, Ord, Read, Show, Generic, Functor)
+
+instance (Ord k, Monoid a) => Monoid (MonoidMap k a) where
+    mappend (MonoidMap mp1) (MonoidMap mp2) = MonoidMap (M.unionWith mappend mp1 mp2)
+    mempty = MonoidMap mempty
