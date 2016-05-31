@@ -66,6 +66,7 @@ import           Path
 import           Path.IO
 import           Stack.Constants
 import           Stack.Types
+import qualified System.FilePath as FilePath
 
 -- | Directory containing files to mark an executable as installed
 exeInstalledDir :: (MonadReader env m, HasEnvConfig env, MonadThrow m)
@@ -306,15 +307,19 @@ writePrecompiledCache :: (MonadThrow m, MonadReader env m, HasEnvConfig env, Mon
 writePrecompiledCache baseConfigOpts pkgident copts depIDs mghcPkgId exes = do
     (file, _) <- precompiledCacheFile pkgident copts depIDs
     ensureDir (parent file)
+    ec <- asks getEnvConfig
+    let stackRootRelative = makeRelative (getStackRoot ec)
     mlibpath <-
         case mghcPkgId of
             Executable _ -> return Nothing
             Library _ ipid -> liftM Just $ do
                 ipid' <- parseRelFile $ ghcPkgIdString ipid ++ ".conf"
-                return $ toFilePath $ bcoSnapDB baseConfigOpts </> ipid'
+                relPath <- stackRootRelative $ bcoSnapDB baseConfigOpts </> ipid'
+                return $ toFilePath $ relPath
     exes' <- forM (Set.toList exes) $ \exe -> do
         name <- parseRelFile $ T.unpack exe
-        return $ toFilePath $ bcoSnapInstallRoot baseConfigOpts </> bindirSuffix </> name
+        relPath <- stackRootRelative $ bcoSnapInstallRoot baseConfigOpts </> bindirSuffix </> name
+        return $ toFilePath $ relPath
     taggedEncodeFile file PrecompiledCache
         { pcLibrary = mlibpath
         , pcExes = exes'
@@ -328,14 +333,25 @@ readPrecompiledCache :: (MonadThrow m, MonadReader env m, HasEnvConfig env, Mona
                      -> Set GhcPkgId -- ^ dependencies
                      -> m (Maybe PrecompiledCache)
 readPrecompiledCache pkgident copts depIDs = do
+    ec <- asks getEnvConfig
+    let toAbsPath path = do
+          if FilePath.isAbsolute path
+              then path -- Only older version store absolute path
+              else toFilePath (getStackRoot ec) FilePath.</> path
+    let toAbsPC pc =
+            PrecompiledCache
+                  { pcLibrary = fmap toAbsPath (pcLibrary pc)
+                  , pcExes = map toAbsPath (pcExes pc)
+                  }
+
     (file, getOldFile) <- precompiledCacheFile pkgident copts depIDs
     mres <- decodeFileMaybe file
     case mres of
-        Just res -> return (Just res)
+        Just res -> return (Just $ toAbsPC res)
         Nothing -> do
             -- Fallback on trying the old binary format.
             oldFile <- getOldFile
-            mpc <- binaryDecodeFileOrFailDeep oldFile
+            mpc <- fmap (fmap toAbsPC) $ binaryDecodeFileOrFailDeep oldFile
             -- Write out file in new format. Keep old file around for
             -- the benefit of older stack versions.
             forM_ mpc (taggedEncodeFile file)
