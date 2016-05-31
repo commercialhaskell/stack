@@ -37,6 +37,7 @@ import              Control.Monad.Reader
 import              Control.Retry (recovering,limitRetries,RetryPolicy,constantDelay)
 import "cryptohash" Crypto.Hash
 import              Crypto.Hash.Conduit (sinkHash)
+import              Data.Byteable (toBytes)
 import              Data.ByteString (ByteString)
 import              Data.ByteString.Char8 (readInteger)
 import              Data.Conduit
@@ -115,7 +116,7 @@ instance Show VerifiedDownloadException where
     show (WrongDigest req algo expected actual) =
         "Download expectation failure: content hash (" ++ algo ++  ")\n"
         ++ "Expected: " ++ displayCheckHexDigest expected ++ "\n"
-        ++ "Actual:   " ++ actual ++ "\n"
+        ++ "Actual:   " ++ show actual ++ "\n"
         ++ "For: " ++ show (getUri req)
 
 instance Exception VerifiedDownloadException
@@ -138,8 +139,7 @@ displayCheckHexDigest :: CheckHexDigest -> String
 displayCheckHexDigest (CheckHexDigestString s) = s ++ " (String)"
 displayCheckHexDigest (CheckHexDigestByteString s) = displayByteString s ++ " (ByteString)"
 displayCheckHexDigest (CheckHexDigestHeader h) =
-      displayByteString (B64.decodeLenient h) ++ " (Header. unencoded: "
-      ++ displayByteString h ++ ")"
+      show (B64.decodeLenient h) ++ " (Header. unencoded: " ++ show h ++ ")"
 
 
 -- | Make sure that the hash digest for a finite stream of bytes
@@ -154,11 +154,13 @@ sinkCheckHash req HashCheck{..} = do
     digest <- sinkHashUsing hashCheckAlgorithm
     let actualDigestString = show digest
     let actualDigestHexByteString = digestToHexByteString digest
+    let actualDigestBytes = toBytes digest
 
     let passedCheck = case hashCheckHexDigest of
           CheckHexDigestString s -> s == actualDigestString
           CheckHexDigestByteString b -> b == actualDigestHexByteString
           CheckHexDigestHeader b -> B64.decodeLenient b == actualDigestHexByteString
+            || B64.decodeLenient b == actualDigestBytes
             -- A hack to allow hackage tarballs to download.
             -- They should really base64-encode their md5 header as per rfc2616#sec14.15.
             -- https://github.com/commercialhaskell/stack/issues/240
