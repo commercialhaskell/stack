@@ -32,7 +32,7 @@ module Stack.Build.Cache
     ) where
 
 import           Control.DeepSeq (NFData)
-import           Control.Exception.Enclosed (handleIO, tryAnyDeep)
+import           Control.Exception.Enclosed (handleIO)
 import           Control.Monad (liftM)
 import           Control.Monad.Catch (MonadThrow, MonadCatch)
 import           Control.Monad.IO.Class
@@ -40,15 +40,8 @@ import           Control.Monad.Logger (MonadLogger, logDebug)
 import           Control.Monad.Reader (MonadReader, asks)
 import           Control.Monad.Trans.Control (MonadBaseControl)
 import qualified Crypto.Hash.SHA256 as SHA256
-import           Data.Binary (Binary (..))
-import qualified Data.Binary as Binary
-import           Data.Binary.Tagged (HasStructuralInfo, HasSemanticVersion)
-import qualified Data.Binary.Tagged as BinaryTagged
-import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Base64.URL as B64URL
 import qualified Data.ByteString.Char8 as S8
-import qualified Data.ByteString.Lazy as LBS
-import           Data.Foldable (forM_)
 import           Data.Map (Map)
 import           Data.Maybe (fromMaybe, mapMaybe)
 import           Data.Monoid ((<>))
@@ -260,7 +253,7 @@ precompiledCacheFile :: (MonadThrow m, MonadReader env m, HasEnvConfig env, Mona
                      => PackageIdentifier
                      -> ConfigureOpts
                      -> Set GhcPkgId -- ^ dependencies
-                     -> m (Path Abs File, m (Path Abs File))
+                     -> m (Path Abs File)
 precompiledCacheFile pkgident copts installedPackageIDs = do
     ec <- asks getEnvConfig
 
@@ -270,17 +263,7 @@ precompiledCacheFile pkgident copts installedPackageIDs = do
     platformRelDir <- platformGhcRelDir
 
     let input = (coNoDirs copts, installedPackageIDs)
-
-    -- In Cabal versions 1.22 and later, the configure options contain the
-    -- installed package IDs, which is what we need for a unique hash.
-    -- Unfortunately, earlier Cabals don't have the information, so we must
-    -- supplement it with the installed package IDs directly.
-    -- See issue: https://github.com/commercialhaskell/stack/issues/1103
-    let oldHash = B16.encode $ SHA256.hash $ LBS.toStrict $
-            if envConfigCabalVersion ec >= $(mkVersion "1.22")
-                then Binary.encode (coNoDirs copts)
-                else Binary.encode input
-        hashToPath hash = do
+    let hashToPath hash = do
             hashPath <- parseRelFile $ S8.unpack hash
             return $ getStackRoot ec
                  </> $(mkRelDir "precompiled")
@@ -291,8 +274,7 @@ precompiledCacheFile pkgident copts installedPackageIDs = do
                  </> hashPath
 
     $logDebug $ "Precompiled cache input = " <> T.pack (show input)
-    newPath <- hashToPath $ B64URL.encode $ SHA256.hash $ Store.encode input
-    return (newPath, hashToPath oldHash)
+    hashToPath $ B64URL.encode $ SHA256.hash $ Store.encode input
 
 -- | Write out information about a newly built package
 writePrecompiledCache :: (MonadThrow m, MonadReader env m, HasEnvConfig env, MonadIO m, MonadLogger m)
@@ -304,7 +286,7 @@ writePrecompiledCache :: (MonadThrow m, MonadReader env m, HasEnvConfig env, Mon
                       -> Set Text -- ^ executables
                       -> m ()
 writePrecompiledCache baseConfigOpts pkgident copts depIDs mghcPkgId exes = do
-    (file, _) <- precompiledCacheFile pkgident copts depIDs
+    file <- precompiledCacheFile pkgident copts depIDs
     ensureDir (parent file)
     mlibpath <-
         case mghcPkgId of
@@ -328,32 +310,8 @@ readPrecompiledCache :: (MonadThrow m, MonadReader env m, HasEnvConfig env, Mona
                      -> Set GhcPkgId -- ^ dependencies
                      -> m (Maybe PrecompiledCache)
 readPrecompiledCache pkgident copts depIDs = do
-    (file, getOldFile) <- precompiledCacheFile pkgident copts depIDs
-    mres <- decodeFileMaybe file
-    case mres of
-        Just res -> return (Just res)
-        Nothing -> do
-            -- Fallback on trying the old binary format.
-            oldFile <- getOldFile
-            mpc <- binaryDecodeFileOrFailDeep oldFile
-            -- Write out file in new format. Keep old file around for
-            -- the benefit of older stack versions.
-            forM_ mpc (taggedEncodeFile file)
-            return mpc
-
--- | Ensure that there are no lurking exceptions deep inside the parsed
--- value... because that happens unfortunately. See
--- https://github.com/commercialhaskell/stack/issues/554
-binaryDecodeFileOrFailDeep :: (BinarySchema a, MonadIO m)
-                           => Path loc File
-                           -> m (Maybe a)
-binaryDecodeFileOrFailDeep fp = liftIO $ fmap (either (\_ -> Nothing) id) $ tryAnyDeep $ do
-    eres <- BinaryTagged.taggedDecodeFileOrFail (toFilePath fp)
-    case eres of
-        Left _ -> return Nothing
-        Right x -> return (Just x)
-
-type BinarySchema a = (Binary a, NFData a, HasStructuralInfo a, HasSemanticVersion a)
+    file <- precompiledCacheFile pkgident copts depIDs
+    decodeFileMaybe file
 
 $(mkManyHasTypeHash
     [ [t| BuildCache |]
