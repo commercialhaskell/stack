@@ -17,3 +17,9 @@ extra-deps:
 - th-utilities-0.1.1.0
 - store-0.1.0.1
 - th-orphans-0.13.1
+- hspec-smallcheck-0.4.1
+- mono-traversable-0.10.2
+- optparse-simple-0.0.3
+- retry-0.7.3
+- dlist-instances-0.1
+- persistent-sqlite-2.5
