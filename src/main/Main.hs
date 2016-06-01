@@ -11,6 +11,7 @@
 
 module Main (main) where
 
+import qualified Build_stack
 import           Control.Exception
 import qualified Control.Exception.Lifted as EL
 import           Control.Monad hiding (mapM, forM)
@@ -181,6 +182,7 @@ commandLineHandler
 commandLineHandler progName isInterpreter = complicatedOptions
   Meta.version
   (Just versionString')
+  ("Compiled with:\n" ++ unlines (map ("- " ++) Build_stack.deps))
   VERSION_hpack
   "stack - The Haskell Tool Stack"
   ""
