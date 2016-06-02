@@ -44,8 +44,6 @@ module Stack.Types.Build
 
 import           Control.DeepSeq
 import           Control.Exception
-import           Data.Binary (Binary)
-import           Data.Binary.Tagged (HasSemanticVersion, HasStructuralInfo)
 import qualified Data.ByteString as S
 import           Data.Char (isSpace)
 import           Data.Data
@@ -705,9 +703,6 @@ data PrecompiledCache = PrecompiledCache
     -- ^ Full paths to executables
     }
     deriving (Show, Eq, Generic)
-instance Binary PrecompiledCache
-instance HasSemanticVersion PrecompiledCache
-instance HasStructuralInfo PrecompiledCache
 instance Store PrecompiledCache
 instance NFData PrecompiledCache
 
