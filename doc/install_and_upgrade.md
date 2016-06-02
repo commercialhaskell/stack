@@ -289,8 +289,7 @@ Stack](http://nixos.org/nixpkgs/manual/#using-stack-together-with-nix).
 
 An unofficial package repository for FreeBSD 10 (amd64 only) and install
 instructions are available at [http://stack-pkg.applicative.tech](http://stack-pkg.applicative.tech/).  The
-repository is not official and as such might lag behind new releases.  See [issue #1253](https://github.com/commercialhaskell/stack/issues/1253)
-for progress on official FreeBSD binaries.
+repository is not official and as such might lag behind new releases.
 
 ## Path
 
