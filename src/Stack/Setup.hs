@@ -1,16 +1,12 @@
-{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE DeriveDataTypeable #-} -- ghc < 7.10
 {-# LANGUAGE DeriveFunctor #-}
-{-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE ViewPatterns #-}
-{-# LANGUAGE PackageImports        #-}
-{-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE DeriveDataTypeable #-}
-{-# LANGUAGE TupleSections #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE PackageImports #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE ViewPatterns #-}
 
 module Stack.Setup
   ( setupEnv
@@ -63,7 +59,8 @@ import           Distribution.System (OS, Arch (..), Platform (..))
 import qualified Distribution.System as Cabal
 import           Distribution.Text (simpleParse)
 import           Lens.Micro (set)
-import           Network.HTTP.Client.Conduit
+import           Network.HTTP.Client.Conduit (HasHttpManager, Manager, getHttpManager, parseUrl,
+                                              responseBody, withResponse)
 import           Network.HTTP.Download.Verified
 import           Path
 import           Path.Extra (toFilePathNoTrailingSep)
@@ -547,7 +544,7 @@ upgradeCabal menv wc = do
                     , "dir="
                     , installRoot FP.</> name'
                     ]
-                args = ( "configure": map dirArgument (words "lib bin data doc") )
+                args = "configure" : map dirArgument (words "lib bin data doc")
             runCmd (Cmd (Just dir) setupExe menv args) Nothing
             runCmd (Cmd (Just dir) setupExe menv ["build"]) Nothing
             runCmd (Cmd (Just dir) setupExe menv ["install"]) Nothing
@@ -661,7 +658,7 @@ downloadAndInstallCompiler :: (MonadIO m, MonadMask m, MonadLogger m, MonadReade
                            -> VersionCheck
                            -> Maybe String
                            -> m Tool
-downloadAndInstallCompiler si wanted@(GhcVersion{}) versionCheck mbindistURL = do
+downloadAndInstallCompiler si wanted@GhcVersion{} versionCheck mbindistURL = do
     ghcVariant <- asks getGHCVariant
     (selectedVersion, downloadInfo) <- case mbindistURL of
         Just bindistURL -> do
@@ -758,16 +755,22 @@ downloadFromInfo programsDir downloadInfo tool = do
             ".tar.bz2" -> return TarBz2
             ".tar.gz" -> return TarGz
             ".7z.exe" -> return SevenZ
-            _ -> error $ "Unknown extension for url: " ++ T.unpack url
+            _ -> fail $ "Unknown extension for url: " ++ url
     relfile <- parseRelFile $ toolString tool ++ extension
-    let path = programsDir </> relfile
-    ensureDir programsDir
-    chattyDownload (T.pack (toolString tool)) downloadInfo path
+    path <- case url of
+        (parseUrl -> Just _) -> do
+            let path = programsDir </> relfile
+            ensureDir programsDir
+            chattyDownload (T.pack (toolString tool)) downloadInfo path
+            return path
+        (parseAbsFile -> Just path) ->
+            return path
+        _ ->
+            fail $ "'url' must be either an HTTP URL or a file path: " ++ url
     return (path, at)
   where
-    url = downloadInfoUrl downloadInfo
-    extension =
-        loop $ T.unpack url
+    url = T.unpack $ downloadInfoUrl downloadInfo
+    extension = loop url
       where
         loop fp
             | ext `elem` [".tar", ".bz2", ".xz", ".exe", ".7z", ".gz"] = loop fp' ++ ext
@@ -896,8 +899,8 @@ installGHCJS si archiveFile archiveType destDir = do
         _ -> return Nothing
 
     $logSticky "Installing GHCJS (this will take a long time) ..."
-    runInnerStackT ((set (envConfigBuildOpts.buildOptsInstallExes) True envConfig')) $
-        (build (\_ -> return ()) Nothing defaultBuildOptsCLI)
+    runInnerStackT (set (envConfigBuildOpts.buildOptsInstallExes) True envConfig') $
+        build (\_ -> return ()) Nothing defaultBuildOptsCLI
     -- Copy over *.options files needed on windows.
     forM_ mwindowsInstallDir $ \dir -> do
         (_, files) <- listDir (dir </> $(mkRelDir "bin"))
@@ -1362,7 +1365,7 @@ getUtf8EnvVars
     :: forall m env.
        (MonadReader env m, HasPlatform env, MonadLogger m, MonadCatch m, MonadBaseControl IO m, MonadIO m)
     => EnvOverride -> CompilerVersion -> m (Map Text Text)
-getUtf8EnvVars menv compilerVer = do
+getUtf8EnvVars menv compilerVer =
     if getGhcVersion compilerVer >= $(mkVersion "7.10.3")
         -- GHC_CHARENC supported by GHC >=7.10.3
         then return $ Map.singleton "GHC_CHARENC" "UTF-8"
