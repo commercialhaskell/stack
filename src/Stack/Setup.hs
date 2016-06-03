@@ -767,9 +767,11 @@ downloadFromInfo programsDir downloadInfo tool = do
             let DownloadInfo{downloadInfoContentLength=contentLength, downloadInfoSha1=sha1} =
                     downloadInfo
             when (isJust contentLength) $
-                $logWarn "`content-length` should not be specified when `url` is a file path"
+                $logWarn  "`content-length` in not checked \n\
+                          \and should not be specified when `url` is a file path"
             when (isJust sha1) $
-                $logWarn "`sha1` should not be specified when `url` is a file path"
+                $logWarn  "`sha1` is not checked and \n\
+                          \should not be specified when `url` is a file path"
             return path
         _ ->
             fail $ "`url` must be either an HTTP URL or absolute file path: " ++ url

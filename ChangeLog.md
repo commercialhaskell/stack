@@ -10,6 +10,9 @@ Behavior changes:
 
 Other enhancements:
 
+* `setup-info` in stack.yaml and in stack-setup.yaml, also `--ghc-bindist` command-line option
+  now support absolute file path in `url` field.
+
 Bug fixes:
 
 ## 1.1.2

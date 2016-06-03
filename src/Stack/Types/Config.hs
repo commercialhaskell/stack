@@ -1559,6 +1559,7 @@ parseGHCVariant s =
 -- | Information for a file to download.
 data DownloadInfo = DownloadInfo
     { downloadInfoUrl :: Text
+      -- ^ URL or absolute file path
     , downloadInfoContentLength :: Maybe Int
     , downloadInfoSha1 :: Maybe ByteString
     } deriving (Show)
