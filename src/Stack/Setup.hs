@@ -763,10 +763,16 @@ downloadFromInfo programsDir downloadInfo tool = do
             ensureDir programsDir
             chattyDownload (T.pack (toolString tool)) downloadInfo path
             return path
-        (parseAbsFile -> Just path) ->
+        (parseAbsFile -> Just path) -> do
+            let DownloadInfo{downloadInfoContentLength=contentLength, downloadInfoSha1=sha1} =
+                    downloadInfo
+            when (isJust contentLength) $
+                $logWarn "`content-length` should not be specified when `url` is a file path"
+            when (isJust sha1) $
+                $logWarn "`sha1` should not be specified when `url` is a file path"
             return path
         _ ->
-            fail $ "'url' must be either an HTTP URL or a file path: " ++ url
+            fail $ "`url` must be either an HTTP URL or absolute file path: " ++ url
     return (path, at)
   where
     url = T.unpack $ downloadInfoUrl downloadInfo
