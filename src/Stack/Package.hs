@@ -21,6 +21,7 @@ module Stack.Package
   ,readPackageUnresolved
   ,readPackageUnresolvedBS
   ,resolvePackage
+  ,packageFromPackageDescription
   ,findOrGenerateCabalFile
   ,hpack
   ,Package(..)
@@ -179,6 +180,16 @@ resolvePackage :: PackageConfig
                -> GenericPackageDescription
                -> Package
 resolvePackage packageConfig gpkg =
+    packageFromPackageDescription
+        packageConfig
+        gpkg
+        (resolvePackageDescription packageConfig gpkg)
+
+packageFromPackageDescription :: PackageConfig
+                              -> GenericPackageDescription
+                              -> PackageDescription
+                              -> Package
+packageFromPackageDescription packageConfig gpkg pkg =
     Package
     { packageName = name
     , packageVersion = fromCabalVersion (pkgVersion pkgId)
@@ -210,7 +221,7 @@ resolvePackage packageConfig gpkg =
           False
           (not . null . exposedModules)
           (library pkg)
-    , packageSimpleType = buildType (packageDescription gpkg) == Just Simple
+    , packageSimpleType = buildType pkg == Just Simple
     }
   where
     pkgFiles = GetPackageFiles $
@@ -236,9 +247,8 @@ resolvePackage packageConfig gpkg =
                     hpackExists <- doesFileExist hpackPath
                     return $ if hpackExists then S.singleton hpackPath else S.empty
                 return (componentModules, componentFiles, buildFiles <> dataFiles', warnings)
-    pkgId = package (packageDescription gpkg)
+    pkgId = package pkg
     name = fromCabalPackageName (pkgName pkgId)
-    pkg = resolvePackageDescription packageConfig gpkg
     deps = M.filterWithKey (const . (/= name)) (packageDependencies pkg)
 
 -- | Generate GHC options for the package's components, and a list of
