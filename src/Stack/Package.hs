@@ -18,6 +18,7 @@ module Stack.Package
   (readPackage
   ,readPackageBS
   ,readPackageDescriptionDir
+  ,readDotBuildinfo
   ,readPackageUnresolved
   ,readPackageUnresolvedBS
   ,resolvePackage
@@ -146,6 +147,17 @@ readPackageDescriptionDir config pkgDir = do
     cabalfp <- findOrGenerateCabalFile pkgDir
     gdesc   <- liftM snd (readPackageUnresolved cabalfp)
     return (gdesc, resolvePackageDescription config gdesc)
+
+-- | Read @<package>.buildinfo@ ancillary files produced by some Setup.hs hooks.
+-- The file includes Cabal file syntax to be merged into the package description
+-- derived from the package's .cabal file.
+--
+-- NOTE: not to be confused with BuildInfo, an Stack-internal datatype.
+readDotBuildinfo :: MonadIO m
+                 => Path Abs File
+                 -> m HookedBuildInfo
+readDotBuildinfo buildinfofp =
+    liftIO $ readHookedBuildInfo D.silent (toFilePath buildinfofp)
 
 -- | Print cabal file warnings.
 printCabalFileWarning

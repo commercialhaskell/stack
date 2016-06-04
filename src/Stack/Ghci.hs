@@ -18,12 +18,12 @@ module Stack.Ghci
 
 import           Control.Applicative
 import           Control.Exception.Enclosed (tryAny)
-import           Control.Monad
+import           Control.Monad hiding (forM)
 import           Control.Monad.Catch
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
-import           Control.Monad.RWS.Strict
-import           Control.Monad.State.Strict
+import           Control.Monad.State.Strict (State, execState, get, modify)
+import           Control.Monad.Reader (MonadReader, asks)
 import           Control.Monad.Trans.Unlift (MonadBaseUnlift)
 import qualified Data.ByteString.Char8 as S8
 import           Data.Either
@@ -35,12 +35,15 @@ import           Data.Map.Strict (Map)
 import qualified Data.Map.Strict as M
 import           Data.Maybe
 import           Data.Maybe.Extra (forMaybeM)
+import           Data.Monoid
 import           Data.Set (Set)
 import qualified Data.Set as S
+import           Data.Traversable (forM)
 import           Data.Text (Text)
 import qualified Data.Text as T
 import           Data.Typeable (Typeable)
 import           Distribution.ModuleName (ModuleName)
+import           Distribution.PackageDescription (updatePackageDescription)
 import           Distribution.Text (display)
 import           Network.HTTP.Client.Conduit
 import           Path
@@ -379,7 +382,21 @@ makeGhciPkgInfo boptsCli sourceMap installedMap locals addPkgs name cabalfp targ
             , packageConfigCompilerVersion = envConfigCompilerVersion econfig
             , packageConfigPlatform = configPlatform (getConfig bconfig)
             }
-    (warnings,pkg) <- readPackage config cabalfp
+    (warnings,gpkgdesc) <- readPackageUnresolved cabalfp
+
+    -- Source the package's *.buildinfo file created by configure if any. See
+    -- https://www.haskell.org/cabal/users-guide/developing-packages.html#system-dependent-parameters
+    buildinfofp <- parseRelFile (T.unpack (packageNameText name) ++ ".buildinfo")
+    hasDotBuildinfo <- doesFileExist (parent cabalfp </> buildinfofp)
+    let mbuildinfofp
+          | hasDotBuildinfo = Just (parent cabalfp </> buildinfofp)
+          | otherwise = Nothing
+    mbuildinfo <- forM mbuildinfofp readDotBuildinfo
+    let pkg =
+            packageFromPackageDescription config gpkgdesc $
+            maybe id (updatePackageDescription) mbuildinfo $
+            resolvePackageDescription config gpkgdesc
+
     mapM_ (printCabalFileWarning cabalfp) warnings
     (mods,files,opts) <- getPackageOpts (packageOpts pkg) sourceMap installedMap locals addPkgs cabalfp
     let filteredOpts = filterWanted opts
