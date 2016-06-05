@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
@@ -858,7 +859,7 @@ getShortestDepsPath (MonoidMap parentsMap) wanted name =
             [] -> findShortest (fuel - 1) $ M.fromListWith chooseBest $ concatMap extendPath recurses
             _ -> let (DepsPath _ _ path) = minimum (map snd targets) in path
       where
-        (targets, recurses) = partition (\(n, _) -> n `elem` wanted) (M.toList paths)
+        (targets, recurses) = partition (\(n, _) -> n `Set.member` wanted) (M.toList paths)
     chooseBest :: DepsPath -> DepsPath -> DepsPath
     chooseBest x y = if x > y then x else y
     -- Extend a path to all its parents.

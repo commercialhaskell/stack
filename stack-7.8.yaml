@@ -61,6 +61,7 @@ extra-deps:
 - th-utilities-0.1.1.0
 - th-orphans-0.13.1
 - base-orphans-0.5.4
+- annotated-wl-pprint-0.7.0
 flags:
   time-locale-compat:
     old-locale: false
