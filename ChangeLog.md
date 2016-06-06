@@ -10,6 +10,10 @@ Behavior changes:
 
 Other enhancements:
 
+* Stack/Nix: Passes the right ghc derivation as an argument to the `shell.nix` when a
+  custom `shell.nix` is used
+  See [#2243](https://github.com/commercialhaskell/stack/issues/2243)
+
 Bug fixes:
 
 ## 1.1.2
