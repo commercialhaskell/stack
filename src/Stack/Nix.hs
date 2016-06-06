@@ -84,10 +84,12 @@ runShellAndExit mprojectRoot maresolver mcompiler getCmdArgs = do
          traverse (resolveFile (fromMaybeProjectRoot mprojectRoot)) $
          nixInitFile (configNix config)
      let pkgsInConfig = nixPackages (configNix config)
-         pkgs = pkgsInConfig ++ [nixCompiler config mresolver mcompiler]
+         ghc = nixCompiler config mresolver mcompiler
+         pkgs = pkgsInConfig ++ [ghc]
          pureShell = nixPureShell (configNix config)
          nixopts = case mshellFile of
-           Just fp -> [toFilePath fp]
+           Just fp -> [toFilePath fp, "--arg", "ghc"
+                      ,"with (import <nixpkgs> {}); " ++ T.unpack ghc]
            Nothing -> ["-E", T.unpack $ T.intercalate " " $ concat
                               [["with (import <nixpkgs> {});"
                                ,"runCommand \"myEnv\" {"

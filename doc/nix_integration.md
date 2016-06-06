@@ -200,20 +200,24 @@ equivalent of the configuration used in
 2015-03-05):
 
 ```nix
+{ghc}:
 with (import <nixpkgs> {});
 
 haskell.lib.buildStackProject {
   name = "myEnv";
-  buildInputs = [ glpk pcre ];
+  buildInputs = [ ghc glpk pcre ];
 }
 ```
 
-Defining manually a `shell.nix` file gives you the possibility to
-override some Nix derivations ("packages"), for instance to change
-some build options of the libraries you use, or to set additional
-environment variables. See the [Nix manual][nix-manual-exprs] for
-more. The `buildStackProject` utility function is documented in the
-[Nixpkgs manual][nixpkgs-manual-haskell].
+Defining manually a `shell.nix` file gives you the possibility to override some
+Nix derivations ("packages"), for instance to change some build options of the
+libraries you use, or to set additional environment variables. See the
+[Nix manual][nix-manual-exprs] for more. The `buildStackProject` utility
+function is documented in the [Nixpkgs manual][nixpkgs-manual-haskell].  In such
+case, stack expect this file to define a function of exactly one argument that
+should be called `ghc` (as arguments within a set are non-positional), which you
+should give to `buildInputs`. This is the ghc from the resolver you set in the
+`stack.yaml`.
 
 And now for the `stack.yaml` file:
 
