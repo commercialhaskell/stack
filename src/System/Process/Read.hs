@@ -112,11 +112,15 @@ mkEnvOverride platform tm' = do
     return EnvOverride
         { eoTextMap = tm
         , eoStringList = map (T.unpack *** T.unpack) $ Map.toList tm
-        , eoPath = maybe [] (FP.splitSearchPath . T.unpack) (Map.lookup "PATH" tm)
+        , eoPath =
+             (if isWindows then (".":) else id)
+             (maybe [] (FP.splitSearchPath . T.unpack) (Map.lookup "PATH" tm))
         , eoExeCache = ref
         , eoExeExtensions =
             if isWindows
-                then ["", ".exe", ".bat", ".com"]
+                then case Map.lookup "PATHEXT" tm of
+                        Nothing -> ["", ".exe", ".bat", ".com"]
+                        Just t -> map T.unpack $ "" : T.splitOn ";" t
                 else [""]
         , eoPlatform = platform
         }
