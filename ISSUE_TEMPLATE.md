@@ -45,3 +45,10 @@ $ stack <your command here> <args> --verbose
 $ stack --version
 Version 0.0.2, Git revision 6a86ee32e5b869a877151f74064572225e1a0398
 ```
+
+### Method of installation
+
+* Official binary, downloaded from stackage.org or fpcomplete's package repository
+* Via cabal-install
+* An unofficial package repository (please specify which)
+* Other (please specify)
