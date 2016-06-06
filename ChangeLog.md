@@ -16,6 +16,9 @@ Other enhancements:
 
 Bug fixes:
 
+* Support most executable extensions on Windows
+  [#2225](https://github.com/commercialhaskell/stack/issues/2225)
+
 ## 1.1.2
 
 Release notes:
