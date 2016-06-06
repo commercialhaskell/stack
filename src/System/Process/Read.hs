@@ -55,7 +55,7 @@ import           Data.Foldable (forM_)
 import           Data.IORef
 import           Data.Map (Map)
 import qualified Data.Map as Map
-import           Data.Maybe (isJust, maybeToList)
+import           Data.Maybe (isJust, maybeToList, fromMaybe)
 import           Data.Monoid
 import           Data.Text (Text)
 import qualified Data.Text as T
@@ -118,9 +118,10 @@ mkEnvOverride platform tm' = do
         , eoExeCache = ref
         , eoExeExtensions =
             if isWindows
-                then case Map.lookup "PATHEXT" tm of
-                        Nothing -> ["", ".exe", ".bat", ".com"]
-                        Just t -> map T.unpack $ "" : T.splitOn ";" t
+                then let pathext = fromMaybe
+                           ".COM;.EXE;.BAT;.CMD;.VBS;.VBE;.JS;.JSE;.WSF;.WSH;.MSC"
+                           (Map.lookup "PATHEXT" tm)
+                      in map T.unpack $ "" : T.splitOn ";" pathext
                 else [""]
         , eoPlatform = platform
         }
