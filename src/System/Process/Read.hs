@@ -81,7 +81,7 @@ data EnvOverride = EnvOverride
     , eoStringList :: [(String, String)] -- ^ Environment variables as association list
     , eoPath :: [FilePath] -- ^ List of directories searched for executables (@PATH@)
     , eoExeCache :: IORef (Map FilePath (Either ReadProcessException (Path Abs File)))
-    , eoExeExtension :: String -- ^ @""@ or @".exe"@, depending on the platform
+    , eoExeExtensions :: [String] -- ^ @[""]@ on non-Windows systems, @["", ".exe", ".bat"]@ on Windows
     , eoPlatform :: Platform
     }
 
@@ -114,7 +114,10 @@ mkEnvOverride platform tm' = do
         , eoStringList = map (T.unpack *** T.unpack) $ Map.toList tm
         , eoPath = maybe [] (FP.splitSearchPath . T.unpack) (Map.lookup "PATH" tm)
         , eoExeCache = ref
-        , eoExeExtension = if isWindows then ".exe" else ""
+        , eoExeExtensions =
+            if isWindows
+                then ["", ".exe", ".bat", ".com"]
+                else [""]
         , eoPlatform = platform
         }
   where
@@ -336,10 +339,7 @@ findExecutable :: (MonadIO m, MonadThrow n)
   -> String            -- ^ Name of executable
   -> m (n (Path Abs File)) -- ^ Full path to that executable on success
 findExecutable eo name0 | any FP.isPathSeparator name0 = do
-    let names0
-            | null (eoExeExtension eo) = [name0]
-            -- Support `stack exec foo/bar.exe` on Windows
-            | otherwise = [name0 ++ eoExeExtension eo, name0]
+    let names0 = map (name0 ++) (eoExeExtensions eo)
         testNames [] = return $ throwM $ ExecutableNotFoundAt name0
         testNames (name:names) = do
             exists <- liftIO $ D.doesFileExist name
@@ -357,10 +357,7 @@ findExecutable eo name = liftIO $ do
             let loop [] = return $ Left $ ExecutableNotFound name (eoPath eo)
                 loop (dir:dirs) = do
                     let fp0 = dir FP.</> name
-                        fps0
-                            | null (eoExeExtension eo) = [fp0]
-                            -- Support `stack exec foo.exe` on Windows
-                            | otherwise = [fp0 ++ eoExeExtension eo, fp0]
+                        fps0 = map (fp0 ++) (eoExeExtensions eo)
                         testFPs [] = loop dirs
                         testFPs (fp:fps) = do
                             exists <- D.doesFileExist fp
