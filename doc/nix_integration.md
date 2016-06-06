@@ -204,8 +204,9 @@ equivalent of the configuration used in
 with (import <nixpkgs> {});
 
 haskell.lib.buildStackProject {
+  inherit ghc;
   name = "myEnv";
-  buildInputs = [ ghc glpk pcre ];
+  buildInputs = [ glpk pcre ];
 }
 ```
 
@@ -216,8 +217,8 @@ libraries you use, or to set additional environment variables. See the
 function is documented in the [Nixpkgs manual][nixpkgs-manual-haskell].  In such
 case, stack expect this file to define a function of exactly one argument that
 should be called `ghc` (as arguments within a set are non-positional), which you
-should give to `buildInputs`. This is the ghc from the resolver you set in the
-`stack.yaml`.
+should give to `buildStackProject`. This is the ghc from the resolver you set in
+the `stack.yaml`.
 
 And now for the `stack.yaml` file:
 
