@@ -1,3 +1,8 @@
+Do you have a question regarding stack's usage that isn't covered by [the docs](http://haskellstack.org)?
+In that case please ask your question on [Stack Overflow](http://stackoverflow.com) and use [the haskell-stack tag](http://stackoverflow.com/questions/tagged/haskell-stack).
+This way your question will be more easily discoverable by other people with the same question.
+
+
 If you're reporting a bug please follow the steps below:
 
 Make sure that you are using the latest release (currently stack-1.1.2).
