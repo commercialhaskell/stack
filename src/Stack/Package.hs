@@ -18,9 +18,11 @@ module Stack.Package
   (readPackage
   ,readPackageBS
   ,readPackageDescriptionDir
+  ,readDotBuildinfo
   ,readPackageUnresolved
   ,readPackageUnresolvedBS
   ,resolvePackage
+  ,packageFromPackageDescription
   ,findOrGenerateCabalFile
   ,hpack
   ,Package(..)
@@ -146,6 +148,17 @@ readPackageDescriptionDir config pkgDir = do
     gdesc   <- liftM snd (readPackageUnresolved cabalfp)
     return (gdesc, resolvePackageDescription config gdesc)
 
+-- | Read @<package>.buildinfo@ ancillary files produced by some Setup.hs hooks.
+-- The file includes Cabal file syntax to be merged into the package description
+-- derived from the package's .cabal file.
+--
+-- NOTE: not to be confused with BuildInfo, an Stack-internal datatype.
+readDotBuildinfo :: MonadIO m
+                 => Path Abs File
+                 -> m HookedBuildInfo
+readDotBuildinfo buildinfofp =
+    liftIO $ readHookedBuildInfo D.silent (toFilePath buildinfofp)
+
 -- | Print cabal file warnings.
 printCabalFileWarning
     :: (MonadLogger m)
@@ -179,6 +192,16 @@ resolvePackage :: PackageConfig
                -> GenericPackageDescription
                -> Package
 resolvePackage packageConfig gpkg =
+    packageFromPackageDescription
+        packageConfig
+        gpkg
+        (resolvePackageDescription packageConfig gpkg)
+
+packageFromPackageDescription :: PackageConfig
+                              -> GenericPackageDescription
+                              -> PackageDescription
+                              -> Package
+packageFromPackageDescription packageConfig gpkg pkg =
     Package
     { packageName = name
     , packageVersion = fromCabalVersion (pkgVersion pkgId)
@@ -210,7 +233,7 @@ resolvePackage packageConfig gpkg =
           False
           (not . null . exposedModules)
           (library pkg)
-    , packageSimpleType = buildType (packageDescription gpkg) == Just Simple
+    , packageSimpleType = buildType pkg == Just Simple
     }
   where
     pkgFiles = GetPackageFiles $
@@ -236,9 +259,8 @@ resolvePackage packageConfig gpkg =
                     hpackExists <- doesFileExist hpackPath
                     return $ if hpackExists then S.singleton hpackPath else S.empty
                 return (componentModules, componentFiles, buildFiles <> dataFiles', warnings)
-    pkgId = package (packageDescription gpkg)
+    pkgId = package pkg
     name = fromCabalPackageName (pkgName pkgId)
-    pkg = resolvePackageDescription packageConfig gpkg
     deps = M.filterWithKey (const . (/= name)) (packageDependencies pkg)
 
 -- | Generate GHC options for the package's components, and a list of
