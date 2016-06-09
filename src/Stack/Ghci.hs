@@ -562,7 +562,7 @@ preprocessCabalMacros pkgs out = liftIO $ do
     let fps = nubOrd (concatMap (mapMaybe (bioCabalMacros . snd) . ghciPkgOpts) pkgs)
     files <- mapM (S8.readFile . toFilePath) fps
     if null files then return [] else do
-        S8.writeFile (toFilePath out) $ S8.concat $ map (<> "\n#undef CURRENT_PACKAGE_KEY\n") files
+        S8.writeFile (toFilePath out) $ S8.concat $ map (<> "\n#undef CURRENT_PACKAGE_KEY\n#undef CURRENT_COMPONENT_ID\n") files
         return ["-optP-include", "-optP" <> toFilePath out]
 
 setScriptPerms :: MonadIO m => FilePath -> m ()
