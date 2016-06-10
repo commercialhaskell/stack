@@ -220,7 +220,7 @@ library
                    , deepseq >= 1.4
                    , hastache
                    , project-template >= 0.2
-                   , zip-archive
+                   , zip-archive < 0.4
                    , hpack >= 0.14.0 && < 0.15
   if os(windows)
     cpp-options:     -DWINDOWS
