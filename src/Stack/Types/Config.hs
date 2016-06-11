@@ -282,6 +282,8 @@ data Config =
          -- ^ Require a version of stack within this range.
          ,configJobs                :: !Int
          -- ^ How many concurrent jobs to run, defaults to number of capabilities
+         ,configOverrideGccPath     :: !(Maybe Text)
+         -- ^ Optional gcc override path
          ,configExtraIncludeDirs    :: !(Set Text)
          -- ^ --extra-include-dirs arguments
          ,configExtraLibDirs        :: !(Set Text)
@@ -840,6 +842,8 @@ data ConfigMonoid =
     -- ^ See: 'configExtraIncludeDirs'
     ,configMonoidExtraLibDirs        :: !(Set Text)
     -- ^ See: 'configExtraLibDirs'
+    , configMonoidOverrideGccPath    :: !(First Text)
+    -- ^ Allow users to override the path to gcc
     ,configMonoidConcurrentTests     :: !(First Bool)
     -- ^ See: 'configConcurrentTests'
     ,configMonoidLocalBinPath        :: !(First FilePath)
@@ -913,6 +917,7 @@ parseConfigMonoidJSON obj = do
     configMonoidJobs <- First <$> obj ..:? configMonoidJobsName
     configMonoidExtraIncludeDirs <- obj ..:?  configMonoidExtraIncludeDirsName ..!= Set.empty
     configMonoidExtraLibDirs <- obj ..:?  configMonoidExtraLibDirsName ..!= Set.empty
+    configMonoidOverrideGccPath <- First <$> obj ..:? configMonoidOverrideGccPathName
     configMonoidConcurrentTests <- First <$> obj ..:? configMonoidConcurrentTestsName
     configMonoidLocalBinPath <- First <$> obj ..:? configMonoidLocalBinPathName
     configMonoidImageOpts <- jsonSubWarnings (obj ..:?  configMonoidImageOptsName ..!= mempty)
@@ -1016,6 +1021,9 @@ configMonoidExtraIncludeDirsName = "extra-include-dirs"
 
 configMonoidExtraLibDirsName :: Text
 configMonoidExtraLibDirsName = "extra-lib-dirs"
+
+configMonoidOverrideGccPathName :: Text
+configMonoidOverrideGccPathName = "with-gcc"
 
 configMonoidConcurrentTestsName :: Text
 configMonoidConcurrentTestsName = "concurrent-tests"
