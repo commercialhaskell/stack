@@ -281,7 +281,7 @@ configOptsParser hide0 =
            <> hide
             )))
     <*> optionalFirst (textOption
-             ( long "with-ghc"
+             ( long "with-gcc"
             <> metavar "PATH-TO-GCC"
             <> help "Use gcc found at PATH-TO-GCC"
             <> hide
