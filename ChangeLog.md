@@ -14,6 +14,9 @@ Other enhancements:
   custom `shell.nix` is used
   See [#2243](https://github.com/commercialhaskell/stack/issues/2243)
 
+* Add the ability to explictly specify a gcc executable.
+  [#593](https://github.com/commercialhaskell/stack/issues/593)
+
 Bug fixes:
 
 * Support most executable extensions on Windows

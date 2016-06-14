@@ -345,6 +345,14 @@ extra-lib-dirs:
 - /opt/foo/lib
 ```
 
+### with-ghc
+
+Specify a path to gcc explicitly, rather than relying on the normal path resolution.
+
+```yaml
+with-gcc: /usr/local/bin/gcc-5
+```
+
 ### compiler-check
 
 (Since 0.1.4)
