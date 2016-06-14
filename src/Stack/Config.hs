@@ -202,7 +202,7 @@ configFromConfigMonoid
     -> ConfigMonoid
     -> m Config
 configFromConfigMonoid configStackRoot configUserConfigPath mresolver mproject ConfigMonoid{..} = do
-     configWorkDir <- parseRelDir (fromFirst ".stack-work" configMonoidWorkDir)
+     let configWorkDir = fromFirst $(mkRelDir ".stack-work") configMonoidWorkDir
      -- This code is to handle the deprecation of latest-snapshot-url
      configUrls <- case (getFirst configMonoidLatestSnapshotUrl, getFirst (urlsMonoidLatestSnapshot configMonoidUrls)) of
          (Just url, Nothing) -> do

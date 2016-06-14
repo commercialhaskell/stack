@@ -149,7 +149,7 @@ module Stack.Types.Config
 import           Control.Applicative
 import           Control.Arrow ((&&&))
 import           Control.Exception
-import           Control.Monad (liftM, mzero, forM, join)
+import           Control.Monad (liftM, mzero, join)
 import           Control.Monad.Catch (MonadThrow, throwM)
 import           Control.Monad.Logger (LogLevel(..))
 import           Control.Monad.Reader (MonadReader, ask, asks, MonadIO, liftIO)
@@ -810,7 +810,7 @@ data ConfigMonoid =
   ConfigMonoid
     { configMonoidStackRoot          :: !(First (Path Abs Dir))
     -- ^ See: 'configStackRoot'
-    , configMonoidWorkDir            :: !(First FilePath)
+    , configMonoidWorkDir            :: !(First (Path Rel Dir))
     -- ^ See: 'configWorkDir'.
     , configMonoidBuildOpts          :: !BuildOptsMonoid
     -- ^ build options.
@@ -942,11 +942,7 @@ parseConfigMonoidJSON obj = do
     configMonoidCompilerCheck <- First <$> obj ..:? configMonoidCompilerCheckName
 
     configMonoidGhcOptions <- obj ..:? configMonoidGhcOptionsName ..!= mempty
-
-    extraPath <- obj ..:? configMonoidExtraPathName ..!= []
-    configMonoidExtraPath <- forM extraPath $
-        either (fail . show) return . parseAbsDir . T.unpack
-
+    configMonoidExtraPath <- obj ..:? configMonoidExtraPathName ..!= []
     configMonoidSetupInfoLocations <-
         maybeToList <$> jsonSubWarningsT (obj ..:?  configMonoidSetupInfoLocationsName)
     configMonoidPvpBounds <- First <$> obj ..:? configMonoidPvpBoundsName

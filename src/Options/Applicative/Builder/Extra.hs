@@ -12,9 +12,11 @@ module Options.Applicative.Builder.Extra
   ,textOption
   ,textArgument
   ,optionalFirst
+  ,eitherReader'
   ) where
 
 import Control.Monad (when)
+import Data.Either.Combinators
 import Data.Monoid
 import Options.Applicative
 import Options.Applicative.Types (readerAsk)
@@ -136,3 +138,7 @@ textArgument = argument (T.pack <$> readerAsk)
 -- | Like 'optional', but returning a 'First'.
 optionalFirst :: Alternative f => f a -> f (First a)
 optionalFirst = fmap First . optional
+
+-- | Like 'eitherReader', but accepting any @'Show' e@ on the 'Left'.
+eitherReader' :: Show e => (String -> Either e a) -> ReadM a
+eitherReader' f = eitherReader (mapLeft show . f)

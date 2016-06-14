@@ -224,14 +224,14 @@ configOptsParser hide0 =
         , configMonoidModifyCodePage = modifyCodePage
         , configMonoidAllowDifferentUser = allowDifferentUser
         })
-    <$> optionalFirst (option readAbsDir
+    <$> optionalFirst (option (eitherReader' parseAbsDir)
             ( long stackRootOptionName
             <> metavar (map toUpper stackRootOptionName)
             <> help ("Absolute path to the global stack root directory " ++
                      "(Overrides any STACK_ROOT environment variable)")
             <> hide
             ))
-    <*> optionalFirst (strOption
+    <*> optionalFirst (option (eitherReader' parseRelDir)
             ( long "work-dir"
             <> metavar "WORK-DIR"
             <> help "Override work directory (default: .stack-work)"
@@ -310,15 +310,6 @@ configOptsParser hide0 =
                 "directory to use a stack installation (POSIX only)")
             hide
   where hide = hideMods (hide0 /= OuterGlobalOpts)
-
-readAbsDir :: ReadM (Path Abs Dir)
-readAbsDir = do
-    s <- readerAsk
-    case parseAbsDir s of
-        Just p -> return p
-        Nothing ->
-            readerError
-                ("Failed to parse absolute path to directory: '" ++ s ++ "'")
 
 buildOptsMonoidParser :: Bool -> Parser BuildOptsMonoid
 buildOptsMonoidParser hide0 =
