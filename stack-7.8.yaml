@@ -7,7 +7,7 @@ resolver: lts-2.22
 #     - base: "fpco/stack-base" # see ./etc/docker/stack-base/Dockerfile
 #       name: "fpco/stack-test"
 extra-deps:
-- path-0.5.7
+- path-0.5.8
 - path-io-1.1.0
 - directory-1.2.2.0
 - Win32-notify-0.3.0.1
