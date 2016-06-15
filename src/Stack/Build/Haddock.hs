@@ -229,7 +229,7 @@ generateHaddockIndex descr envOverride wc hdopts dumpPackages docRelFP destDir =
                 (Just destDir)
                 envOverride
                 (haddockExeName wc)
-                (toHaddockArgs hdopts ++
+                (hoAdditionalArgs hdopts ++
                  ["--gen-contents", "--gen-index"] ++
                  [x | (xs,_,_,_) <- interfaceOpts, x <- xs])
   where
