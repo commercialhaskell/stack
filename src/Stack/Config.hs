@@ -258,7 +258,7 @@ configFromConfigMonoid configStackRoot configUserConfigPath mresolver mproject C
      configNix <- nixOptsFromMonoid configMonoidNixOpts os
 
      rawEnv <- liftIO getEnvironment
-     pathsEnv <- augmentPathMap (map toFilePath configMonoidExtraPath)
+     pathsEnv <- augmentPathMap configMonoidExtraPath
                                 (Map.fromList (map (T.pack *** T.pack) rawEnv))
      origEnv <- mkEnvOverride configPlatform pathsEnv
      let configEnvOverride _ = return origEnv

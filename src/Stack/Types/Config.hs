@@ -287,9 +287,9 @@ data Config =
          -- ^ How many concurrent jobs to run, defaults to number of capabilities
          ,configOverrideGccPath     :: !(Maybe Text)
          -- ^ Optional gcc override path
-         ,configExtraIncludeDirs    :: !(Set Text)
+         ,configExtraIncludeDirs    :: !(Set (Path Abs Dir))
          -- ^ --extra-include-dirs arguments
-         ,configExtraLibDirs        :: !(Set Text)
+         ,configExtraLibDirs        :: !(Set (Path Abs Dir))
          -- ^ --extra-lib-dirs arguments
          ,configConcurrentTests     :: !Bool
          -- ^ Run test suites concurrently
@@ -848,9 +848,9 @@ data ConfigMonoid =
     -- ^ Used for overriding the GHC variant
     ,configMonoidJobs                :: !(First Int)
     -- ^ See: 'configJobs'
-    ,configMonoidExtraIncludeDirs    :: !(Set Text)
+    ,configMonoidExtraIncludeDirs    :: !(Set (Path Abs Dir))
     -- ^ See: 'configExtraIncludeDirs'
-    ,configMonoidExtraLibDirs        :: !(Set Text)
+    ,configMonoidExtraLibDirs        :: !(Set (Path Abs Dir))
     -- ^ See: 'configExtraLibDirs'
     , configMonoidOverrideGccPath    :: !(First Text)
     -- ^ Allow users to override the path to gcc

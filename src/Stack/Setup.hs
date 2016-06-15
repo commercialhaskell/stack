@@ -232,9 +232,8 @@ setupEnv mResolveMissingGHC = do
     -- extra installation bin directories
     mkDirs <- runReaderT extraBinDirs envConfig0
     let mpath = Map.lookup "PATH" env
-        mkDirs' = map toFilePath . mkDirs
-    depsPath <- augmentPath (mkDirs' False) mpath
-    localsPath <- augmentPath (mkDirs' True) mpath
+    depsPath <- augmentPath (mkDirs False) mpath
+    localsPath <- augmentPath (mkDirs True) mpath
 
     deps <- runReaderT packageDatabaseDeps envConfig0
     createDatabase menv wc deps
@@ -314,10 +313,10 @@ addIncludeLib :: ExtraDirs -> Config -> Config
 addIncludeLib (ExtraDirs _bins includes libs) config = config
     { configExtraIncludeDirs = Set.union
         (configExtraIncludeDirs config)
-        (Set.fromList $ map T.pack includes)
+        (Set.fromList includes)
     , configExtraLibDirs = Set.union
         (configExtraLibDirs config)
-        (Set.fromList $ map T.pack libs)
+        (Set.fromList libs)
     }
 
 -- | Ensure compiler (ghc or ghcjs) is installed and provide the PATHs to add if necessary
@@ -1113,8 +1112,7 @@ installMsys2Windows osKey si archiveFile archiveType destDir = do
     platform <- asks getPlatform
     menv0 <- getMinimalEnvOverride
     newEnv0 <- modifyEnvOverride menv0 $ Map.insert "MSYSTEM" "MSYS"
-    newEnv <- augmentPathMap [toFilePath $ destDir </> $(mkRelDir "usr")
-                                                   </> $(mkRelDir "bin")]
+    newEnv <- augmentPathMap [destDir </> $(mkRelDir "usr") </> $(mkRelDir "bin")]
                              (unEnvOverride newEnv0)
     menv <- mkEnvOverride platform newEnv
     runCmd (Cmd (Just destDir) "sh" menv ["--login", "-c", "true"]) Nothing

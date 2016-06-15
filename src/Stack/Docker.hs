@@ -189,7 +189,7 @@ reexecWithOptionalContainer mprojectRoot =
         exePath <- ensureDockerStackExe dockerContainerPlatform
         cmdArgs args (toFilePath exePath)
     cmdArgs args exePath = do
-        let mountPath = hostBinDir FP.</> FP.takeBaseName exePath
+        let mountPath = toFilePath hostBinDir FP.</> FP.takeBaseName exePath
         return (mountPath, args, [], [Mount exePath mountPath])
 
 -- | If Docker is enabled, re-runs the OS command returned by the second argument in a
@@ -299,8 +299,7 @@ runContainerAndExit getCmdArgs
                          (isTerm || (isNothing bamboo && isNothing jenkins))
      newPathEnv <- augmentPath
                       [ hostBinDir
-                      , toFilePathNoTrailingSep $ sandboxHomeDir
-                                            </> $(mkRelDir ".local/bin")]
+                      , sandboxHomeDir </> $(mkRelDir ".local/bin")]
                       (T.pack <$> lookupImageEnv "PATH" imageEnvVars)
      (cmnd,args,envVars,extraMount) <- getCmdArgs docker envOverride imageInfo isRemoteDocker
      pwd <- getCurrentDir
@@ -862,8 +861,8 @@ homeDirName :: Path Rel Dir
 homeDirName = $(mkRelDir "_home/")
 
 -- | Directory where 'stack' executable is bind-mounted in Docker container
-hostBinDir :: FilePath
-hostBinDir = "/opt/host/bin"
+hostBinDir :: Path Abs Dir
+hostBinDir = $(mkAbsDir "/opt/host/bin")
 
 -- | Convenience function to decode ByteString to String.
 decodeUtf8 :: BS.ByteString -> String

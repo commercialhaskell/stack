@@ -46,7 +46,6 @@ import           Options.Applicative
 import           Options.Applicative.Args
 import           Options.Applicative.Builder.Extra
 import           Options.Applicative.Types         (fromM, oneM, readerAsk)
-import           Path
 import           Stack.Build                       (splitObjsWarning)
 import           Stack.Clean                       (CleanOpts (..))
 import           Stack.Config                      (packagesParser)
@@ -224,14 +223,14 @@ configOptsParser hide0 =
         , configMonoidModifyCodePage = modifyCodePage
         , configMonoidAllowDifferentUser = allowDifferentUser
         })
-    <$> optionalFirst (option (eitherReader' parseAbsDir)
+    <$> optionalFirst (absDirOption
             ( long stackRootOptionName
             <> metavar (map toUpper stackRootOptionName)
             <> help ("Absolute path to the global stack root directory " ++
                      "(Overrides any STACK_ROOT environment variable)")
             <> hide
             ))
-    <*> optionalFirst (option (eitherReader' parseRelDir)
+    <*> optionalFirst (relDirOption
             ( long "work-dir"
             <> metavar "WORK-DIR"
             <> help "Override work directory (default: .stack-work)"
@@ -268,13 +267,13 @@ configOptsParser hide0 =
            <> help "Number of concurrent jobs to run"
            <> hide
             ))
-    <*> fmap Set.fromList (many (textOption
+    <*> fmap Set.fromList (many (absDirOption
             ( long "extra-include-dirs"
            <> metavar "DIR"
            <> help "Extra directories to check for C header files"
            <> hide
             )))
-    <*> fmap Set.fromList (many (textOption
+    <*> fmap Set.fromList (many (absDirOption
             ( long "extra-lib-dirs"
            <> metavar "DIR"
            <> help "Extra directories to check for libraries"

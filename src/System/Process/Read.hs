@@ -67,6 +67,7 @@ import           Data.Typeable (Typeable)
 import           Distribution.System (OS (Windows), Platform (Platform))
 import           Language.Haskell.TH as TH (location)
 import           Path
+import           Path.Extra
 import           Path.IO hiding (findExecutable)
 import           Prelude -- Fix AMP warning
 import qualified System.Directory as D
@@ -404,16 +405,16 @@ instance Show PathException where
         ] ++ paths
 
 -- | Augment the PATH environment variable with the given extra paths.
-augmentPath :: MonadThrow m => [FilePath] -> Maybe Text -> m Text
+augmentPath :: MonadThrow m => [Path Abs Dir] -> Maybe Text -> m Text
 augmentPath dirs mpath =
-  do let illegal = filter (FP.searchPathSeparator `elem`) dirs
+  do let illegal = filter (FP.searchPathSeparator `elem`) (map toFilePath dirs)
      unless (null illegal) (throwM $ PathsInvalidInPath illegal)
      return $ T.intercalate (T.singleton FP.searchPathSeparator)
-            $ map (T.pack . FP.dropTrailingPathSeparator) dirs
+            $ map (T.pack . toFilePathNoTrailingSep) dirs
             ++ maybeToList mpath
 
 -- | Apply 'augmentPath' on the PATH value in the given Map.
-augmentPathMap :: MonadThrow m => [FilePath] -> Map Text Text
+augmentPathMap :: MonadThrow m => [Path Abs Dir] -> Map Text Text
                                -> m (Map Text Text)
 augmentPathMap dirs origEnv =
   do path <- augmentPath dirs mpath
