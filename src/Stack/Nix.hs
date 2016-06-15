@@ -33,7 +33,6 @@ import           Path
 import           Path.IO
 import qualified Paths_stack as Meta
 import           Prelude hiding (mapM) -- Fix redundant import warnings
-import           Stack.Config (makeConcreteResolver)
 import           Stack.Config.Nix (nixCompiler)
 import           Stack.Constants (stackProgName,platformVariantEnvVar)
 import           Stack.Docker (reExecArgName)
