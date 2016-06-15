@@ -545,11 +545,12 @@ dockerOptsParser hide0 =
                                 metavar "NAME=VALUE" <>
                                 help ("Set environment variable in container " ++
                                       "(may specify multiple times)")))
-    <*> firstStrOption (long (dockerOptName dockerDatabasePathArgName) <>
-                        hide <>
-                        metavar "PATH" <>
-                        help "Location of image usage tracking database")
-    <*> firstStrOption
+    <*> optionalFirst (absFileOption
+            (long (dockerOptName dockerDatabasePathArgName) <>
+             hide <>
+             metavar "PATH" <>
+             help "Location of image usage tracking database"))
+    <*> optionalFirst (option (eitherReader' parseDockerStackExe)
             (long(dockerOptName dockerStackExeArgName) <>
              hide <>
              metavar (intercalate "|"
@@ -559,7 +560,7 @@ dockerOptsParser hide0 =
                           , "PATH" ]) <>
              help (concat [ "Location of "
                           , stackProgName
-                          , " executable used in container" ]))
+                          , " executable used in container" ])))
     <*> firstBoolFlags (dockerOptName dockerSetUserArgName)
                        "setting user in container to match host"
                        hide

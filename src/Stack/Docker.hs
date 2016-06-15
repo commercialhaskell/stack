@@ -48,10 +48,7 @@ import           Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import           Data.Time (UTCTime,LocalTime(..),diffDays,utcToLocalTime,getZonedTime,ZonedTime(..))
-import           Data.Typeable (Typeable)
 import           Data.Version (showVersion)
-import           Distribution.System (Platform (Platform),Arch (X86_64),OS (Linux))
-import           Distribution.Text (display)
 import           GHC.Exts (sortWith)
 import           Network.HTTP.Client.Conduit (HasHttpManager)
 import           Path
@@ -881,29 +878,6 @@ fromMaybeProjectRoot = fromMaybe (throw CannotDetermineProjectRootException)
 oldSandboxIdEnvVar :: String
 oldSandboxIdEnvVar = "DOCKER_SANDBOX_ID"
 
--- | Command-line argument for "docker"
-dockerCmdName :: String
-dockerCmdName = "docker"
-
-dockerHelpOptName :: String
-dockerHelpOptName = dockerCmdName ++ "-help"
-
--- | Command-line argument for @docker pull@.
-dockerPullCmdName :: String
-dockerPullCmdName = "pull"
-
--- | Command-line argument for @docker cleanup@.
-dockerCleanupCmdName :: String
-dockerCleanupCmdName = "cleanup"
-
--- | Command-line option for @--internal-re-exec-version@.
-reExecArgName :: String
-reExecArgName = "internal-re-exec-version"
-
--- | Platform that Docker containers run
-dockerContainerPlatform :: Platform
-dockerContainerPlatform = Platform X86_64 Linux
-
 -- | Options for 'cleanup'.
 data CleanupOpts = CleanupOpts
   { dcAction                                :: !CleanupAction
@@ -950,135 +924,6 @@ instance FromJSON ImageConfig where
        ImageConfig
          <$> fmap join (o .:? "Env") .!= []
          <*> fmap join (o .:? "Entrypoint") .!= []
-
--- | Exceptions thrown by Stack.Docker.
-data StackDockerException
-  = DockerMustBeEnabledException
-    -- ^ Docker must be enabled to use the command.
-  | OnlyOnHostException
-    -- ^ Command must be run on host OS (not in a container).
-  | InspectFailedException String
-    -- ^ @docker inspect@ failed.
-  | NotPulledException String
-    -- ^ Image does not exist.
-  | InvalidCleanupCommandException String
-    -- ^ Input to @docker cleanup@ has invalid command.
-  | InvalidImagesOutputException String
-    -- ^ Invalid output from @docker images@.
-  | InvalidPSOutputException String
-    -- ^ Invalid output from @docker ps@.
-  | InvalidInspectOutputException String
-    -- ^ Invalid output from @docker inspect@.
-  | PullFailedException String
-    -- ^ Could not pull a Docker image.
-  | DockerTooOldException Version Version
-    -- ^ Installed version of @docker@ below minimum version.
-  | DockerVersionProhibitedException [Version] Version
-    -- ^ Installed version of @docker@ is prohibited.
-  | BadDockerVersionException VersionRange Version
-    -- ^ Installed version of @docker@ is out of range specified in config file.
-  | InvalidVersionOutputException
-    -- ^ Invalid output from @docker --version@.
-  | HostStackTooOldException Version (Maybe Version)
-    -- ^ Version of @stack@ on host is too old for version in image.
-  | ContainerStackTooOldException Version Version
-    -- ^ Version of @stack@ in container/image is too old for version on host.
-  | CannotDetermineProjectRootException
-    -- ^ Can't determine the project root (where to put docker sandbox).
-  | DockerNotInstalledException
-    -- ^ @docker --version@ failed.
-  | UnsupportedStackExeHostPlatformException
-    -- ^ Using host stack-exe on unsupported platform.
-  deriving (Typeable)
-
--- | Exception instance for StackDockerException.
-instance Exception StackDockerException
-
--- | Show instance for StackDockerException.
-instance Show StackDockerException where
-  show DockerMustBeEnabledException =
-    "Docker must be enabled in your configuration file to use this command."
-  show OnlyOnHostException =
-    "This command must be run on host OS (not in a Docker container)."
-  show (InspectFailedException image) =
-    concat ["'docker inspect' failed for image after pull: ",image,"."]
-  show (NotPulledException image) =
-    concat ["The Docker image referenced by your configuration file"
-           ," has not\nbeen downloaded:\n    "
-           ,image
-           ,"\n\nRun '"
-           ,unwords [stackProgName, dockerCmdName, dockerPullCmdName]
-           ,"' to download it, then try again."]
-  show (InvalidCleanupCommandException line) =
-    concat ["Invalid line in cleanup commands: '",line,"'."]
-  show (InvalidImagesOutputException line) =
-    concat ["Invalid 'docker images' output line: '",line,"'."]
-  show (InvalidPSOutputException line) =
-    concat ["Invalid 'docker ps' output line: '",line,"'."]
-  show (InvalidInspectOutputException msg) =
-    concat ["Invalid 'docker inspect' output: ",msg,"."]
-  show (PullFailedException image) =
-    concat ["Could not pull Docker image:\n    "
-           ,image
-           ,"\nThere may not be an image on the registry for your resolver's LTS version in\n"
-           ,"your configuration file."]
-  show (DockerTooOldException minVersion haveVersion) =
-    concat ["Minimum docker version '"
-           ,versionString minVersion
-           ,"' is required by "
-           ,stackProgName
-           ," (you have '"
-           ,versionString haveVersion
-           ,"')."]
-  show (DockerVersionProhibitedException prohibitedVersions haveVersion) =
-    concat ["These Docker versions are incompatible with "
-           ,stackProgName
-           ," (you have '"
-           ,versionString haveVersion
-           ,"'): "
-           ,intercalate ", " (map versionString prohibitedVersions)
-           ,"."]
-  show (BadDockerVersionException requiredRange haveVersion) =
-    concat ["The version of 'docker' you are using ("
-           ,show haveVersion
-           ,") is outside the required\n"
-           ,"version range specified in stack.yaml ("
-           ,T.unpack (versionRangeText requiredRange)
-           ,")."]
-  show InvalidVersionOutputException =
-    "Cannot get Docker version (invalid 'docker --version' output)."
-  show (HostStackTooOldException minVersion (Just hostVersion)) =
-    concat ["The host's version of '"
-           ,stackProgName
-           ,"' is too old for this Docker image.\nVersion "
-           ,versionString minVersion
-           ," is required; you have "
-           ,versionString hostVersion
-           ,"."]
-  show (HostStackTooOldException minVersion Nothing) =
-    concat ["The host's version of '"
-           ,stackProgName
-           ,"' is too old.\nVersion "
-           ,versionString minVersion
-           ," is required."]
-  show (ContainerStackTooOldException requiredVersion containerVersion) =
-    concat ["The Docker container's version of '"
-           ,stackProgName
-           ,"' is too old.\nVersion "
-           ,versionString requiredVersion
-           ," is required; the container has "
-           ,versionString containerVersion
-           ,"."]
-  show CannotDetermineProjectRootException =
-    "Cannot determine project root directory for Docker sandbox."
-  show DockerNotInstalledException =
-    "Cannot find 'docker' in PATH.  Is Docker installed?"
-  show UnsupportedStackExeHostPlatformException = concat
-    [ "Using host's "
-    , stackProgName
-    , " executable in Docker container is only supported on "
-    , display dockerContainerPlatform
-    , " platform" ]
 
 -- | Function to get command and arguments to run in Docker container
 type GetCmdArgs env m

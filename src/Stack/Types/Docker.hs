@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -8,17 +9,20 @@
 module Stack.Types.Docker where
 
 import Control.Applicative
-import Control.Monad
-import Control.Monad.Catch (MonadThrow)
+import Control.Monad.Catch
 import Data.Aeson.Extended
+import Data.List (intercalate)
 import Data.Monoid
 import Data.Text (Text)
 import qualified Data.Text as T
-import Distribution.Text (simpleParse)
+import Data.Typeable
+import Distribution.System (Platform(..), OS(..), Arch(..))
+import Distribution.Text (simpleParse, display)
 import Distribution.Version (anyVersion)
 import GHC.Generics (Generic)
 import Generics.Deriving.Monoid (mappenddefault, memptydefault)
 import Path
+import {-# SOURCE #-} Stack.Constants
 import Stack.Types.Version
 
 -- | Docker configuration.
@@ -91,9 +95,9 @@ data DockerOptsMonoid = DockerOptsMonoid
     -- ^ Volumes to mount in the container
   ,dockerMonoidEnv :: ![String]
     -- ^ Environment variables to set in the container
-  ,dockerMonoidDatabasePath :: !(First String)
+  ,dockerMonoidDatabasePath :: !(First (Path Abs File))
     -- ^ Location of image usage database.
-  ,dockerMonoidStackExe :: !(First String)
+  ,dockerMonoidStackExe :: !(First DockerStackExe)
     -- ^ Location of container-compatible stack executable
   ,dockerMonoidSetUser :: !(First Bool)
    -- ^ Set in-container user to match host's
@@ -143,13 +147,22 @@ data DockerStackExe
     | DockerStackExePath (Path Abs File) -- ^ Executable at given path
     deriving (Show)
 
+instance FromJSON DockerStackExe where
+    parseJSON a = do
+        s <- parseJSON a
+        case parseDockerStackExe s of
+            Right dse -> return dse
+            Left e -> fail (show e)
+
 -- | Parse 'DockerStackExe'.
 parseDockerStackExe :: (MonadThrow m) => String -> m DockerStackExe
 parseDockerStackExe t
     | t == dockerStackExeDownloadVal = return DockerStackExeDownload
     | t == dockerStackExeHostVal = return DockerStackExeHost
     | t == dockerStackExeImageVal = return DockerStackExeImage
-    | otherwise = liftM DockerStackExePath (parseAbsFile t)
+    | otherwise = case parseAbsFile t of
+        Just p -> return (DockerStackExePath p)
+        Nothing -> throwM (DockerStackExeParseException t)
 
 -- | Docker volume mount.
 data Mount = Mount String String
@@ -187,6 +200,145 @@ instance FromJSON VersionRangeJSON where
                 (\s -> maybe (fail ("Invalid cabal-style VersionRange: " ++ T.unpack s))
                              (return . VersionRangeJSON)
                              (Distribution.Text.simpleParse (T.unpack s)))
+
+-- | Exceptions thrown by Stack.Docker.
+data StackDockerException
+    = DockerMustBeEnabledException
+      -- ^ Docker must be enabled to use the command.
+    | OnlyOnHostException
+      -- ^ Command must be run on host OS (not in a container).
+    | InspectFailedException String
+      -- ^ @docker inspect@ failed.
+    | NotPulledException String
+      -- ^ Image does not exist.
+    | InvalidCleanupCommandException String
+      -- ^ Input to @docker cleanup@ has invalid command.
+    | InvalidImagesOutputException String
+      -- ^ Invalid output from @docker images@.
+    | InvalidPSOutputException String
+      -- ^ Invalid output from @docker ps@.
+    | InvalidInspectOutputException String
+      -- ^ Invalid output from @docker inspect@.
+    | PullFailedException String
+      -- ^ Could not pull a Docker image.
+    | DockerTooOldException Version Version
+      -- ^ Installed version of @docker@ below minimum version.
+    | DockerVersionProhibitedException [Version] Version
+      -- ^ Installed version of @docker@ is prohibited.
+    | BadDockerVersionException VersionRange Version
+      -- ^ Installed version of @docker@ is out of range specified in config file.
+    | InvalidVersionOutputException
+      -- ^ Invalid output from @docker --version@.
+    | HostStackTooOldException Version (Maybe Version)
+      -- ^ Version of @stack@ on host is too old for version in image.
+    | ContainerStackTooOldException Version Version
+      -- ^ Version of @stack@ in container/image is too old for version on host.
+    | CannotDetermineProjectRootException
+      -- ^ Can't determine the project root (where to put docker sandbox).
+    | DockerNotInstalledException
+      -- ^ @docker --version@ failed.
+    | UnsupportedStackExeHostPlatformException
+      -- ^ Using host stack-exe on unsupported platform.
+    | DockerStackExeParseException String
+      -- ^ @stack-exe@ option fails to parse.
+    deriving (Typeable)
+instance Exception StackDockerException
+
+instance Show StackDockerException where
+    show DockerMustBeEnabledException =
+        "Docker must be enabled in your configuration file to use this command."
+    show OnlyOnHostException =
+        "This command must be run on host OS (not in a Docker container)."
+    show (InspectFailedException image) =
+        concat ["'docker inspect' failed for image after pull: ",image,"."]
+    show (NotPulledException image) =
+        concat ["The Docker image referenced by your configuration file"
+               ," has not\nbeen downloaded:\n    "
+               ,image
+               ,"\n\nRun '"
+               ,unwords [stackProgName, dockerCmdName, dockerPullCmdName]
+               ,"' to download it, then try again."]
+    show (InvalidCleanupCommandException line) =
+        concat ["Invalid line in cleanup commands: '",line,"'."]
+    show (InvalidImagesOutputException line) =
+        concat ["Invalid 'docker images' output line: '",line,"'."]
+    show (InvalidPSOutputException line) =
+        concat ["Invalid 'docker ps' output line: '",line,"'."]
+    show (InvalidInspectOutputException msg) =
+        concat ["Invalid 'docker inspect' output: ",msg,"."]
+    show (PullFailedException image) =
+        concat ["Could not pull Docker image:\n    "
+               ,image
+               ,"\nThere may not be an image on the registry for your resolver's LTS version in\n"
+               ,"your configuration file."]
+    show (DockerTooOldException minVersion haveVersion) =
+        concat ["Minimum docker version '"
+               ,versionString minVersion
+               ,"' is required by "
+               ,stackProgName
+               ," (you have '"
+               ,versionString haveVersion
+               ,"')."]
+    show (DockerVersionProhibitedException prohibitedVersions haveVersion) =
+        concat ["These Docker versions are incompatible with "
+               ,stackProgName
+               ," (you have '"
+               ,versionString haveVersion
+               ,"'): "
+               ,intercalate ", " (map versionString prohibitedVersions)
+               ,"."]
+    show (BadDockerVersionException requiredRange haveVersion) =
+        concat ["The version of 'docker' you are using ("
+               ,show haveVersion
+               ,") is outside the required\n"
+               ,"version range specified in stack.yaml ("
+               ,T.unpack (versionRangeText requiredRange)
+               ,")."]
+    show InvalidVersionOutputException =
+        "Cannot get Docker version (invalid 'docker --version' output)."
+    show (HostStackTooOldException minVersion (Just hostVersion)) =
+        concat ["The host's version of '"
+               ,stackProgName
+               ,"' is too old for this Docker image.\nVersion "
+               ,versionString minVersion
+               ," is required; you have "
+               ,versionString hostVersion
+               ,"."]
+    show (HostStackTooOldException minVersion Nothing) =
+        concat ["The host's version of '"
+               ,stackProgName
+               ,"' is too old.\nVersion "
+               ,versionString minVersion
+               ," is required."]
+    show (ContainerStackTooOldException requiredVersion containerVersion) =
+        concat ["The Docker container's version of '"
+               ,stackProgName
+               ,"' is too old.\nVersion "
+               ,versionString requiredVersion
+               ," is required; the container has "
+               ,versionString containerVersion
+               ,"."]
+    show CannotDetermineProjectRootException =
+        "Cannot determine project root directory for Docker sandbox."
+    show DockerNotInstalledException =
+        "Cannot find 'docker' in PATH.  Is Docker installed?"
+    show UnsupportedStackExeHostPlatformException = concat
+        [ "Using host's "
+        , stackProgName
+        , " executable in Docker container is only supported on "
+        , display dockerContainerPlatform
+        , " platform" ]
+    show (DockerStackExeParseException s) = concat
+        [ "Failed to parse "
+        , show s
+        , ". Expected "
+        , show dockerStackExeDownloadVal
+        , ", "
+        , show dockerStackExeHostVal
+        , ", "
+        , show dockerStackExeImageVal
+        , " or absolute path to executable."
+        ]
 
 -- | Docker enable argument name.
 dockerEnableArgName :: Text
@@ -271,3 +423,26 @@ dockerRequireDockerVersionArgName = "require-docker-version"
 -- | Argument name used to pass docker entrypoint data (only used internally)
 dockerEntrypointArgName :: String
 dockerEntrypointArgName = "internal-docker-entrypoint"
+
+-- | Command-line argument for "docker"
+dockerCmdName :: String
+dockerCmdName = "docker"
+
+dockerHelpOptName :: String
+dockerHelpOptName = dockerCmdName ++ "-help"
+
+-- | Command-line argument for @docker pull@.
+dockerPullCmdName :: String
+dockerPullCmdName = "pull"
+
+-- | Command-line argument for @docker cleanup@.
+dockerCleanupCmdName :: String
+dockerCleanupCmdName = "cleanup"
+
+-- | Command-line option for @--internal-re-exec-version@.
+reExecArgName :: String
+reExecArgName = "internal-re-exec-version"
+
+-- | Platform that Docker containers run
+dockerContainerPlatform :: Platform
+dockerContainerPlatform = Platform X86_64 Linux

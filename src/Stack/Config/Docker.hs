@@ -4,8 +4,7 @@
 module Stack.Config.Docker where
 
 import Control.Exception.Lifted
-import Control.Monad
-import Control.Monad.Catch (throwM, MonadThrow)
+import Control.Monad.Catch (MonadThrow)
 import Data.List (find)
 import Data.Maybe
 import Data.Monoid.Extra
@@ -73,17 +72,8 @@ dockerOptsFromMonoid mproject stackRoot maresolver DockerOptsMonoid{..} = do
         dockerSetUser = getFirst dockerMonoidSetUser
         dockerRequireDockerVersion =
             simplifyVersionRange (getIntersectingVersionRange dockerMonoidRequireDockerVersion)
-    dockerDatabasePath <-
-        case getFirst dockerMonoidDatabasePath of
-            Nothing -> return $ stackRoot </> $(mkRelFile "docker.db")
-            Just fp ->
-                case parseAbsFile fp of
-                    Left e -> throwM (InvalidDatabasePathException e)
-                    Right p -> return p
-    dockerStackExe <-
-        case getFirst dockerMonoidStackExe of
-            Just e -> liftM Just (parseDockerStackExe e)
-            Nothing -> return Nothing
+        dockerDatabasePath = fromFirst (stackRoot </> $(mkRelFile "docker.db")) dockerMonoidDatabasePath
+        dockerStackExe = getFirst dockerMonoidStackExe
     return DockerOpts{..}
   where emptyToNothing Nothing = Nothing
         emptyToNothing (Just s) | null s = Nothing

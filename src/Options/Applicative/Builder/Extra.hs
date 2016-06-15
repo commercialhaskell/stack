@@ -16,6 +16,7 @@ module Options.Applicative.Builder.Extra
   ,relFileOption
   ,absDirOption
   ,relDirOption
+  ,eitherReader'
   ) where
 
 import Control.Monad (when)
