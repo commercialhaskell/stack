@@ -30,7 +30,7 @@ data ImageDockerOpts = ImageDockerOpts
     , imgDockerEntrypoints :: !(Maybe [String])
       -- ^ Maybe have a specific ENTRYPOINT list that will be used to
       -- create images.
-    , imgDockerAdd :: !(Map FilePath FilePath)
+    , imgDockerAdd :: !(Map FilePath (Path Abs Dir))
       -- ^ Maybe have some static project content to include in a
       -- specific directory in all the images.
     , imgDockerImageName :: !(Maybe String)

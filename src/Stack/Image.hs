@@ -114,9 +114,8 @@ syncAddContentToDir opts dir = do
     let imgAdd = imgDockerAdd opts
     forM_
         (Map.toList imgAdd)
-        (\(source,dest) ->
+        (\(source,destPath) ->
               do sourcePath <- resolveDir (bcRoot bconfig) source
-                 destPath <- parseAbsDir dest
                  let destFullPath = dir </> dropRoot destPath
                  ensureDir destFullPath
                  copyDirRecur sourcePath destFullPath)
