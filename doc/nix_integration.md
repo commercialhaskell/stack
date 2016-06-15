@@ -40,37 +40,36 @@ a version of GHC matching the configured resolver. Enabling Nix
 support means packages will always be built using a GHC available
 inside the shell, rather than your globally installed one if any.
 
-Note that in this mode `stack` can use only those resolvers that have
-already been mirrored into the Nix package repository. The
-[Nixpkgs master branch](https://github.com/NixOS/nixpkgs/tree/master/pkgs/development/haskell-modules)
-usually picks up new resolvers such as Stackage nightlies and LTS
-versions within two or three days. Then it takes another two or three
+Note that in this mode `stack` can use only GHC versions than have
+already been mirrored into the Nix package repository.
+The [Nixpkgs master branch](https://github.com/NixOS/nixpkgs/tree/master/pkgs/development/haskell-modules)
+usually picks up new versions quickly, but it takes two or three
 days before those updates arrive in the `unstable` channel. Release
 channels, like `nixos-15.09`, receive those updates only
 occasionally -- say, every two or three months --, so you should not
-expect them to have the latest resolvers available. Fresh Nix installs
+expect them to have the latest compiler available. Fresh NixOS installs
 use a release version by default.
 
-To know for sure whether a given resolver as available on your system,
+To know for sure whether a given compiler is available on your system,
 you can use the command
 
 ```sh
-$ nix-env -f "<nixpkgs>" -qaP -A haskell.packages.lts-3_13.ghc
-haskell.packages.lts-3_13.ghc  ghc-7.10.2
+$ nix-env -f "<nixpkgs>" -qaP -A haskell.compiler.ghc801
+haskell.compiler.ghc801  ghc-8.0.1
 ```
 
 to check whether it's available. If Nix doesn't know that resolver
 yet, then you'll see the following error message instead:
 
 ```sh
-$ nix-env -f "<nixpkgs>" -qaP -A haskell.packages.lts-3_99.ghc
-error: attribute ‘lts-3_99’ in selection path ‘haskell.packages.lts-3_99.ghc’ not found
+$ nix-env -f "<nixpkgs>" -qaP -A haskell.compiler.ghc999
+error: attribute ‘ghc999’ in selection path ‘haskell.compiler.ghc999’ not found
 ```
 
-You can list all known Haskell package sets in Nix with the following:
+You can list all known Haskell compilers in Nix with the following:
 
 ```sh
-$ nix-instantiate --eval -E "with import <nixpkgs> {}; lib.attrNames haskell.packages"
+$ nix-instantiate --eval -E "with import <nixpkgs> {}; lib.attrNames haskell.compiler"
 ```
 
 Alternatively, install `nix-repl`, a convenient tool to explore
@@ -86,7 +85,7 @@ autocomplete:
 
 ```sh
 nix-repl> :l <nixpkgs>
-nix-repl> haskell.packages.lts-<Tab>
+nix-repl> haskell.compiler.ghc<Tab>
 ```
 
 You can type and evaluate any nix expression in the nix-repl, such as
