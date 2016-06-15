@@ -100,10 +100,9 @@ stageExesInDir opts dir = do
             forM_
                 exes
                 (\exe ->
-                      do exeRelFile <- parseRelFile exe
-                         copyFile
-                             (srcBinPath </> exeRelFile)
-                             (destBinPath </> exeRelFile))
+                      copyFile
+                          (srcBinPath </> exe)
+                          (destBinPath </> exe))
 
 -- | Add any additional files into the temp directory, respecting the
 -- (Source, Destination) mapping.

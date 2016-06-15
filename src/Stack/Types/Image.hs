@@ -14,6 +14,7 @@ import Data.Maybe (maybeToList)
 import Data.Text (Text)
 import GHC.Generics (Generic)
 import Generics.Deriving.Monoid (mappenddefault, memptydefault)
+import Path
 import Prelude -- Fix redundant import warnings
 
 -- | Image options. Currently only Docker image options.
@@ -34,7 +35,7 @@ data ImageDockerOpts = ImageDockerOpts
       -- specific directory in all the images.
     , imgDockerImageName :: !(Maybe String)
       -- ^ Maybe have a name for the image we are creating
-    , imgDockerExecutables :: !(Maybe [FilePath])
+    , imgDockerExecutables :: !(Maybe [Path Rel File])
       -- ^ Filenames of executables to add (if Nothing, add them all)
     } deriving (Show)
 
