@@ -18,44 +18,25 @@ cache:
 
 matrix:
   include:
-    - env: BUILD=cabal CABALVER=1.18 GHCVER=7.8.4
-      compiler: ": #GHC 7.8.4"
-      addons: {apt: {packages: [cabal-install-1.18,ghc-7.8.4], sources: [hvr-ghc]}}
-
-    - env: BUILD=cabal CABALVER=1.22 GHCVER=7.10.1
-      compiler: ": #GHC 7.10.1"
-      addons: {apt: {packages: [cabal-install-1.22,ghc-7.10.1], sources: [hvr-ghc]}}
-
-    - env: BUILD=cabal CABALVER=1.22 GHCVER=7.10.2
-      compiler: ": #GHC 7.10.2"
-      addons: {apt: {packages: [cabal-install-1.22,ghc-7.10.2], sources: [hvr-ghc]}}
-
     - env: BUILD=cabal CABALVER=1.22 GHCVER=7.10.3
       compiler: ": #GHC 7.10.3"
       addons: {apt: {packages: [cabal-install-1.22,ghc-7.10.3], sources: [hvr-ghc]}}
 
+    - env: BUILD=cabal CABALVER=1.24 GHCVER=8.0.1
+      compiler: ": #GHC 8.0.1"
+      addons: {apt: {packages: [cabal-install-1.24,ghc-8.0.1], sources: [hvr-ghc]}}
+
     - env: BUILD=stack GHCVER=7.8.4 STACK_YAML=stack-7.8.yaml
       compiler: ": #stack 7.8.4"
-      addons: {apt: {packages: [cabal-install-head,ghc-7.8.4], sources: [hvr-ghc]}}
-
-    - env: BUILD=stack GHCVER=7.10.3 STACK_YAML=stack.yaml
-      compiler: ": #stack 7.10.3"
-      addons: {apt: {packages: [cabal-install-head,ghc-7.10.3], sources: [hvr-ghc]}}
-
-    - env: BUILD=stack GHCVER=head STACK_YAML=stack-8.0.yaml
-      compiler: ": #stack 8.0"
-      addons: {apt: {packages: [cabal-install-head,ghc-head], sources: [hvr-ghc]}}
-
-    - env: BUILD=cabal CABALVER=head GHCVER=head
-      compiler: ": #GHC head"
-      addons: {apt: {packages: [cabal-install-head,ghc-head], sources: [hvr-ghc]}}
+      addons: {apt: {packages: [ghc-7.8.4], sources: [hvr-ghc]}}
 
     - env: BUILD=stack STACK_YAML=stack.yaml
       compiler: ": #stack 7.10.3 osx"
       os: osx
 
-  allow_failures:
-    - env: BUILD=cabal CABALVER=head GHCVER=head
+    - env: BUILD=stack GHCVER=8.0.1 STACK_YAML=stack-8.0.yaml
+      compiler: ": #stack 8.0.1"
+      addons: {apt: {packages: [ghc-8.0.1], sources: [hvr-ghc]}}
 
 # Note: the distinction between `before_install` and `install` is not important.
 # - in before_install we install build tools
