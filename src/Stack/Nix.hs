@@ -48,16 +48,15 @@ import           System.Process.Read (getEnvOverride)
 reexecWithOptionalShell
     :: M env m
     => Maybe (Path Abs Dir)
-    -> Maybe AbstractResolver
-    -> Maybe CompilerVersion
+    -> CompilerVersion
     -> IO ()
     -> m ()
-reexecWithOptionalShell mprojectRoot maresolver mcompiler inner =
+reexecWithOptionalShell mprojectRoot compilerVersion inner =
   do config <- asks getConfig
      inShell <- getInShell
      isReExec <- asks getReExec
      if nixEnable (configNix config) && not inShell && not isReExec
-       then runShellAndExit mprojectRoot maresolver mcompiler getCmdArgs
+       then runShellAndExit mprojectRoot compilerVersion getCmdArgs
        else liftIO inner
   where
     getCmdArgs = do
@@ -71,20 +70,18 @@ reexecWithOptionalShell mprojectRoot maresolver mcompiler inner =
 runShellAndExit
     :: M env m
     => Maybe (Path Abs Dir)
-    -> Maybe AbstractResolver
-    -> Maybe CompilerVersion
+    -> CompilerVersion
     -> m (String, [String])
     -> m ()
-runShellAndExit mprojectRoot maresolver mcompiler getCmdArgs = do
+runShellAndExit mprojectRoot compilerVersion getCmdArgs = do
      config <- asks getConfig
-     mresolver <- mapM makeConcreteResolver maresolver
      envOverride <- getEnvOverride (configPlatform config)
      (cmnd,args) <- fmap (escape *** map escape) getCmdArgs
      mshellFile <-
          traverse (resolveFile (fromMaybeProjectRoot mprojectRoot)) $
          nixInitFile (configNix config)
      let pkgsInConfig = nixPackages (configNix config)
-         ghc = nixCompiler config mresolver mcompiler
+         ghc = nixCompiler compilerVersion
          pkgs = pkgsInConfig ++ [ghc]
          libsAndIncludes =
            map (\p -> ("${" <> p <> "}/lib", "${" <> p <> "}/include ")) pkgs
