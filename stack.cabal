@@ -189,7 +189,7 @@ library
                    , persistent >= 2.1.2 && < 2.6
                        -- persistent-sqlite-2.5.0.1 has a bug
                        -- (see https://github.com/yesodweb/persistent/pull/561#issuecomment-222329087)
-                   , persistent-sqlite >= 2.1.4 && < 2.5.0.1
+                   , persistent-sqlite (>= 2.1.4 && < 2.5.0.1) || (> 2.5.0.1 && < 2.6)
                    , persistent-template >= 2.1.1 && < 2.6
                    , pretty >= 1.1.1.1
                    , process >= 1.2.0.0 && < 1.5
@@ -219,7 +219,7 @@ library
                    , deepseq >= 1.4
                    , hastache
                    , project-template >= 0.2
-                   , zip-archive
+                   , zip-archive < 0.4
                    , hpack >= 0.14.0 && < 0.15
                    , store
   if os(windows)
