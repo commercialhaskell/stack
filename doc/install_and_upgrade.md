@@ -1,5 +1,13 @@
 # Install/upgrade
 
+For many Un*x operating systems, all you need to do is run:
+
+    curl -sSL https://get.haskellstack.org/ | sh
+
+or:
+
+    wget -qO- https://get.haskellstack.org/ | sh
+
 Distribution packages are available for [Ubuntu](#ubuntu), [Debian](#debian),
 [CentOS / Red Hat / Amazon Linux](#centos), [Fedora](#fedora),
 [Arch Linux](#arch-linux) and unofficially [FreeBSD](#freebsd).

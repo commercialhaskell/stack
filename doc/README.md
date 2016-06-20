@@ -15,7 +15,16 @@ It features:
 
 #### How to install
 
-Downloads are available by operating system:
+For many Un*x operating systems, all you need to do is run:
+
+    curl -sSL https://get.haskellstack.org/ | sh
+
+or:
+
+    wget -qO- https://get.haskellstack.org/ | sh
+
+For detailed instructions and downloads, instructions are available by
+operating system/distribution:
 
 * [Windows](install_and_upgrade.md#windows)
 * [Mac OS X](install_and_upgrade.md#mac-os-x)
@@ -30,11 +39,6 @@ Downloads are available by operating system:
 * [FreeBSD](install_and_upgrade.md#freebsd)
 
 [Upgrade instructions](install_and_upgrade.md#upgrade)
-
-Note: if you are using cabal-install to install stack, you may need to pass a
-constraint to work around a
-[Cabal issue](https://github.com/haskell/cabal/issues/2759): `cabal install
---constraint 'mono-traversable >= 0.9' stack`.
 
 #### Quick Start Guide
 
