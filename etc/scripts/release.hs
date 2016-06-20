@@ -272,7 +272,7 @@ rules global@Global{..} args = do
             need inputFiles
             cmd "fpm -f -s dir -t deb"
                 "--deb-recommends git --deb-recommends gnupg"
-                "-d g++ -d gcc -d libc6-dev -d libffi-dev -d libgmp-dev -d make -d xz-utils -d zlib1g-dev"
+                "-d g++ -d gcc -d libc6-dev -d libffi-dev -d libgmp-dev -d make -d xz-utils -d zlib1g-dev -d netbase -d ca-certificates"
                 ["-n", stackProgName
                 ,"-C", debStagingDir dv
                 ,"-v", debPackageVersionStr dv
