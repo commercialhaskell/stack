@@ -317,6 +317,10 @@ commandLineHandler progName isInterpreter = complicatedOptions
                     "Run ghc"
                     execCmd
                     (execOptsParser $ Just ExecGhc)
+        addCommand' "hoogle"
+                    "Search the local packages with Hoogle"
+                    execCmd
+                    (execOptsParser $ Just ExecHoogle)
         addCommand' "ghci"
                     "Run ghci in the context of package(s) (experimental)"
                     ghciCmd
@@ -1043,11 +1047,13 @@ execCmd :: ExecOpts -> GlobalOpts -> IO ()
 execCmd ExecOpts {..} go@GlobalOpts{..} =
     case eoExtra of
         ExecOptsPlain -> do
+            (manager,lc) <- liftIO $ loadConfigWithOpts go
             (cmd, args) <- case (eoCmd, eoArgs) of
                  (ExecCmd cmd, args) -> return (cmd, args)
                  (ExecGhc, args) -> return ("ghc", args)
                  (ExecRunGhc, args) -> return ("runghc", args)
-            (manager,lc) <- liftIO $ loadConfigWithOpts go
+                 (ExecHoogle, args) ->
+                     return ("hoogle", makeHoogleArgs (lcConfig lc) args)
             withUserFileLock go (configStackRoot $ lcConfig lc) $ \lk ->
               runStackTGlobal manager (lcConfig lc) go $
                 Docker.reexecWithOptionalContainer
@@ -1062,7 +1068,7 @@ execCmd ExecOpts {..} go@GlobalOpts{..} =
                             globalResolver
                             globalCompiler
                             (runStackTGlobal manager (lcConfig lc) go $
-                                exec menv cmd args))
+                                execWithProperSetup (lcConfig lc) menv cmd args))
                     Nothing
                     Nothing -- Unlocked already above.
         ExecOptsEmbellished {..} ->
@@ -1070,6 +1076,8 @@ execCmd ExecOpts {..} go@GlobalOpts{..} =
                config <- asks getConfig
                (cmd, args) <- case (eoCmd, eoArgs) of
                    (ExecCmd cmd, args) -> return (cmd, args)
+                   (ExecHoogle, args) ->
+                       return ("hoogle", makeHoogleArgs config args)
                    (ExecGhc, args) -> execCompiler "" args
                     -- NOTE: this won't currently work for GHCJS, because it doesn't have
                     -- a runghcjs binary. It probably will someday, though.
@@ -1081,12 +1089,38 @@ execCmd ExecOpts {..} go@GlobalOpts{..} =
                        }
                munlockFile lk -- Unlock before transferring control away.
                menv <- liftIO $ configEnvOverride config eoEnvSettings
-               exec menv cmd args
+               execWithProperSetup config menv cmd args
   where
+    execWithProperSetup config menv cmd args =
+        do case eoCmd of
+             ExecHoogle ->
+                 unless (isHoogleGenerateCommand args)
+                        (ensureHoogleDatabase menv config)
+             _ -> return ()
+           exec menv cmd args
     execCompiler cmdPrefix args = do
         wc <- getWhichCompiler
         let cmd = cmdPrefix ++ compilerExeName wc
         return (cmd, args)
+    isHoogleGenerateCommand args =
+        take 1 (filter (not . isPrefixOf "-") args) == ["generate"]
+    ensureHoogleDatabase menv config =
+        do exists <- doesFileExist (hoogleDatabaseFile config)
+           if exists
+              then return ()
+              else do $logWarn "Hoogle database doesn't exist."
+                      $logInfo "Running: stack hoogle -- generate --local"
+                      $logInfo "You can re-run this command later to update the database."
+                      exec menv "hoogle" (makeHoogleArgs config ["generate","--local"])
+    makeHoogleArgs config args =
+        args ++ [hoogleDatabaseFlag config]
+        -- We add it at the end because putting it before the command
+        -- causes it to be misinterpreted, whereas this works in all
+        -- cases. Don't fiddle with this.
+    hoogleDatabaseFlag config =
+        "--database=" ++ toFilePath (hoogleDatabaseFile config)
+    hoogleDatabaseFile config =
+        configWorkDir config </> $(mkRelFile "hoogle")
 
 -- | Evaluate some haskell code inline.
 evalCmd :: EvalOpts -> GlobalOpts -> IO ()
