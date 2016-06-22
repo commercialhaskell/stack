@@ -680,7 +680,7 @@ solveExtraDeps modStackYaml = do
         Nothing -> throwM (SolverGiveUp giveUpMsg)
         Just x -> return x
 
-    moldResolver <- asks (fmap (projectResolver . fst) . configMaybeProject . getConfig)
+    mOldResolver <- asks (fmap (projectResolver . fst) . configMaybeProject . getConfig)
 
     let
         flags = removeSrcPkgDefaultFlags gpds (fmap snd (Map.union srcs edeps))
@@ -698,14 +698,14 @@ solveExtraDeps modStackYaml = do
 
         changed =    any (not . Map.null) [newVersions, goneVersions]
                   || any (not . Map.null) [newFlags, goneFlags]
-                  || any (/= resolver') moldResolver
+                  || any (/= resolver') mOldResolver
 
     if changed then do
         $logInfo ""
         $logInfo $ "The following changes will be made to "
                    <> T.pack relStackYaml <> ":"
 
-        printResolver moldResolver resolver'
+        printResolver mOldResolver resolver'
 
         printFlags newFlags  "* Flags to be added"
         printDeps  newVersions   "* Dependencies to be added"
@@ -726,8 +726,8 @@ solveExtraDeps modStackYaml = do
     where
         indent t = T.unlines $ fmap ("    " <>) (T.lines t)
 
-        printResolver moldRes res = do
-            forM_ moldRes $ \oldRes ->
+        printResolver mOldRes res = do
+            forM_ mOldRes $ \oldRes ->
                 when (res /= oldRes) $ do
                     $logInfo $ T.concat
                         [ "* Resolver changes from "
