@@ -33,6 +33,7 @@ import           Data.Aeson.Extended         ( WithJSONWarnings(..), object, (.=
 import qualified Data.ByteString             as S
 import           Data.Char                   (isSpace)
 import           Data.Either
+import           Data.Foldable               (forM_)
 import           Data.Function               (on)
 import qualified Data.HashMap.Strict         as HashMap
 import           Data.List                   ( (\\), isSuffixOf, intercalate
@@ -679,6 +680,8 @@ solveExtraDeps modStackYaml = do
         Nothing -> throwM (SolverGiveUp giveUpMsg)
         Just x -> return x
 
+    moldResolver <- asks (fmap (projectResolver . fst) . configMaybeProject . getConfig)
+
     let
         flags = removeSrcPkgDefaultFlags gpds (fmap snd (Map.union srcs edeps))
         versions = fmap fst edeps
@@ -695,14 +698,14 @@ solveExtraDeps modStackYaml = do
 
         changed =    any (not . Map.null) [newVersions, goneVersions]
                   || any (not . Map.null) [newFlags, goneFlags]
+                  || any (/= resolver') moldResolver
 
     if changed then do
         $logInfo ""
         $logInfo $ "The following changes will be made to "
                    <> T.pack relStackYaml <> ":"
 
-        -- TODO print whether resolver changed from previous
-        $logInfo $ "* Resolver is " <> resolverName resolver
+        printResolver moldResolver resolver'
 
         printFlags newFlags  "* Flags to be added"
         printDeps  newVersions   "* Dependencies to be added"
@@ -722,6 +725,16 @@ solveExtraDeps modStackYaml = do
 
     where
         indent t = T.unlines $ fmap ("    " <>) (T.lines t)
+
+        printResolver moldRes res = do
+            forM_ moldRes $ \oldRes ->
+                when (res /= oldRes) $ do
+                    $logInfo $ T.concat
+                        [ "* Resolver changes from "
+                        , resolverName oldRes
+                        , " to "
+                        , resolverName res
+                        ]
 
         printFlags fl msg = do
             when ((not . Map.null) fl) $ do

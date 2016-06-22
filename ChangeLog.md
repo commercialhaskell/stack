@@ -18,6 +18,8 @@ Bug fixes:
 
 * Support most executable extensions on Windows
   [#2225](https://github.com/commercialhaskell/stack/issues/2225)
+* Detect resolver change in `stack solver`
+  [#2252](https://github.com/commercialhaskell/stack/issues/2252)
 
 ## 1.1.2
 

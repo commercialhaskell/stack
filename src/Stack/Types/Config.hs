@@ -684,6 +684,7 @@ data ResolverThat's (l :: IsLoaded) where
     -- files are stored for the resolver.
     ResolverCustomLoaded :: !Text -> !Text -> !SnapshotHash -> ResolverThat's 'Loaded
 
+deriving instance Eq (ResolverThat's k)
 deriving instance Show (ResolverThat's k)
 
 instance ToJSON (ResolverThat's k) where
