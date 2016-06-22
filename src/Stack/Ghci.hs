@@ -179,8 +179,8 @@ ghci opts@GhciOpts{..} = do
             else do
                 let scriptPath = tmpDir </> $(mkRelFile "ghci-script")
                     fp = toFilePath scriptPath
-                    loadModules = ":add " <> unwords (map show modulesToLoad)
-                    addMainFile = maybe "" ((":add " <>) . toFilePath) mainFile
+                    loadModules = ":add " <> unwords (map quoteFileName modulesToLoad)
+                    addMainFile = maybe "" ((":add " <>) . quoteFileName . toFilePath) mainFile
                     bringIntoScope = ":module + " <> unwords modulesToLoad
                 liftIO (writeFile fp (unlines [loadModules,addMainFile,bringIntoScope]))
                 setScriptPerms fp
@@ -627,3 +627,10 @@ targetsCmd target go@GlobalOpts{..} =
                (mapM (getPackageOptsAndTargetFiles pwd) pkgs)
        forM_ targets (liftIO . putStrLn)
 -}
+
+-- | Make sure that a filename with spaces in it gets the proper quotes.
+quoteFileName :: String -> String
+quoteFileName x =
+    if any (==' ') x
+        then "\"" ++ x ++ "\""
+        else x
