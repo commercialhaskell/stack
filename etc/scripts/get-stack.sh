@@ -91,7 +91,7 @@ sudocmd() {
 
 # Adds the FPCo key to the keyring and adds the given repo to the apt sources
 add_apt_repo() {
-  echo $1 | sudocmd tee /etc/apt/sources.list.d/fpco.list > /dev/null
+  echo "$1" | sudocmd tee /etc/apt/sources.list.d/fpco.list > /dev/null
   sudocmd apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 575159689BEFB442
 }
 
@@ -355,9 +355,9 @@ distro_info() {
 
   try_lsb() {
     if has_lsb_release ; then
-      local DIST="$(parse_lsb 'if(/Distributor ID:\s+([^ ]+)/) { print "\L$1"; }')"
-      local VERSION="$(parse_lsb 'if(/Release:\s+([^ ]+)/) { print "\L$1"; }')"
-      echo "$DIST;$VERSION"
+      TL_DIST="$(parse_lsb 'if(/Distributor ID:\s+([^ ]+)/) { print "\L$1"; }')"
+      TL_VERSION="$(parse_lsb 'if(/Release:\s+([^ ]+)/) { print "\L$1"; }')"
+      echo "$TL_DIST;$TL_VERSION"
     else
       return 1
     fi
@@ -376,9 +376,9 @@ distro_info() {
       parse_release 'if(/^(DISTRIB_RELEASE|VERSION_ID)\s*=\s*"?([^"]+)/) { print $2; exit 0; }'
     }
 
-    local RELEASE="$(parse_release_id);$(parse_release_version)"
+    TR_RELEASE="$(parse_release_id);$(parse_release_version)"
 
-    if [ ";" = "$RELEASE" ] ; then
+    if [ ";" = "$TR_RELEASE" ] ; then
       if [ -e /etc/arch-release ] ; then
         # /etc/arch-release exists but is often empty
         echo "arch;"
@@ -389,7 +389,7 @@ distro_info() {
         return 1
       fi
     else
-      echo "$RELEASE"
+      echo "$TR_RELEASE"
     fi
   }
 
@@ -431,7 +431,7 @@ do_distro() {
     fi
   fi
 
-  IFS=";" read DISTRO VERSION <<GETDISTRO
+  IFS=";" read -r DISTRO VERSION <<GETDISTRO
 $(distro_info)
 GETDISTRO
 
@@ -442,16 +442,16 @@ GETDISTRO
 
   case "$DISTRO" in
     ubuntu)
-      do_ubuntu_install $VERSION
+      do_ubuntu_install "$VERSION"
       ;;
     debian|kali)
-      do_debian_install $VERSION
+      do_debian_install "$VERSION"
       ;;
     fedora)
-      do_fedora_install $VERSION
+      do_fedora_install "$VERSION"
       ;;
     centos|rhel)
-      do_centos_install $VERSION
+      do_centos_install "$VERSION"
       ;;
     *)
       do_sloppy_install
@@ -502,12 +502,12 @@ check_dl_tools() {
 
 # Download a Stack bindst and install it in /usr/local/bin/stack.
 install_from_bindist() {
-    local URL="https://www.stackage.org/stack/$1"
+    IFB_URL="https://www.stackage.org/stack/$1"
     check_dl_tools
     #TODO: the checksum or GPG signaure should be checked.
     make_temp_dir
 
-    dl_to_stdout "$URL" | tar xzf - -C "$STACK_TEMP_DIR"
+    dl_to_stdout "$IFB_URL" | tar xzf - -C "$STACK_TEMP_DIR"
     sudocmd install -c -o 0 -g 0 -m 0755 "$STACK_TEMP_DIR"/*/stack "$USR_LOCAL_BIN/stack"
 
     post_install_separator
@@ -633,7 +633,7 @@ has_dnf() {
 
 # Check whether the given command exists
 has_cmd() {
-  command -v $1 > /dev/null 2>&1
+  command -v "$1" > /dev/null 2>&1
 }
 
 # Check whether the given path is listed in the PATH environment variable
