@@ -56,7 +56,7 @@ reexecWithOptionalShell mprojectRoot getCompilerVersion inner =
   do config <- asks getConfig
      inShell <- getInShell
      isReExec <- asks getReExec
-     if nixEnable (configNix config) && not inShell && not isReExec
+     if nixEnable (configNix config) && not inShell  -- && not isReExec
        then runShellAndExit mprojectRoot getCompilerVersion getCmdArgs
        else liftIO inner
   where
