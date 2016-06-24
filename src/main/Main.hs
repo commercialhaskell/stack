@@ -20,6 +20,7 @@ import           Control.Monad.Reader (ask, asks,local,runReaderT)
 import           Control.Monad.Trans.Control (MonadBaseControl)
 import           Data.Attoparsec.Args (parseArgs, EscapingMode (Escaping))
 import           Data.Attoparsec.Interpreter (getInterpreterArgs)
+import qualified Data.ByteString.Char8 as S8
 import qualified Data.ByteString.Lazy as L
 import           Data.IORef
 import           Data.List
@@ -1124,12 +1125,12 @@ hoogleCmd (args,setup,rebuild) go = withBuildConfig go pathToHaddocks
                 if setup
                     then do
                         $logWarn
-                            "Hoogle isn't installed. Automatically installing (use --no-setup to disable) ..."
+                            "Hoogle isn't installed or is too old. Automatically installing (use --no-setup to disable) ..."
                         installHoogle
                         haddocksToDb
                     else do
                         $logError
-                            "Hoogle isn't installed. Not installing it due to --no-setup."
+                            "Hoogle isn't installed or is too old. Not installing it due to --no-setup."
                         bail
     haddocksToDb :: StackT EnvConfig IO ()
     haddocksToDb = do
@@ -1140,8 +1141,8 @@ hoogleCmd (args,setup,rebuild) go = withBuildConfig go pathToHaddocks
                      then do
                          $logWarn
                              (if rebuild
-                                 then "Rebuilding database ..."
-                                 else "No Hoogle database yet. Automatically building haddocks and hoogle database (use --no-setup to disable) ...")
+                                  then "Rebuilding database ..."
+                                  else "No Hoogle database yet. Automatically building haddocks and hoogle database (use --no-setup to disable) ...")
                          buildHaddocks
                          $logInfo "Built docs."
                          generateDb
@@ -1173,24 +1174,24 @@ hoogleCmd (args,setup,rebuild) go = withBuildConfig go pathToHaddocks
                  (\(_ :: ExitCode) ->
                        return ()))
     installHoogle :: StackT EnvConfig IO ()
-    installHoogle =
-        do config <- asks getConfig
-           menv <- liftIO $ configEnvOverride config envSettings
-           liftIO
-               (catch
-                    (withBuildConfigAndLock
-                         go
-                         (\lk ->
-                               Stack.Build.build
-                                   (const (return ()))
-                                   lk
-                                   defaultBuildOptsCLI
-                                   { boptsCLITargets = ["hoogle-5.0"]
-                                   }))
-                    (\(e :: ExitCode) ->
-                          case e of
-                              ExitSuccess -> resetExeCache menv
-                              _ -> throwIO e))
+    installHoogle = do
+        config <- asks getConfig
+        menv <- liftIO $ configEnvOverride config envSettings
+        liftIO
+            (catch
+                 (withBuildConfigAndLock
+                      go
+                      (\lk ->
+                            Stack.Build.build
+                                (const (return ()))
+                                lk
+                                defaultBuildOptsCLI
+                                { boptsCLITargets = ["hoogle-5.0"]
+                                }))
+                 (\(e :: ExitCode) ->
+                       case e of
+                           ExitSuccess -> resetExeCache menv
+                           _ -> throwIO e))
     runHoogle :: [String] -> StackT EnvConfig IO ()
     runHoogle hoogleArgs = do
         config <- asks getConfig
@@ -1213,7 +1214,10 @@ hoogleCmd (args,setup,rebuild) go = withBuildConfig go pathToHaddocks
     checkHoogleInPath = do
         config <- asks getConfig
         menv <- liftIO $ configEnvOverride config envSettings
-        System.Process.Read.doesExecutableExist menv "hoogle"
+        result <- tryProcessStdout Nothing menv "hoogle" ["--numeric-version"]
+        case fmap (reads . S8.unpack) result of
+          Right [(ver :: Double,_)] -> return (ver >= 5.0)
+          _ -> return False
     envSettings =
         EnvSettings
         { esIncludeLocals = True
