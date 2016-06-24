@@ -322,6 +322,8 @@ rules global@Global{..} args = do
             need inputFiles
             cmd "fpm -s dir -t rpm"
                 "-d perl -d make -d automake -d gcc -d gmp-devel -d libffi -d zlib -d xz -d tar"
+                (concat
+                    [["-d", "ncurses-compat-libs"] | dvDistro == fedoraDistro && dvVersion == "24"])
                 ["-n", stackProgName
                 ,"-C", rpmStagingDir dv
                 ,"-v", rpmPackageVersionStr dv
@@ -439,7 +441,8 @@ rules global@Global{..} args = do
         , ("6", "el6") ]
     fedoraVersions =
         [ ("22", "fc22")
-        , ("23", "fc23") ]
+        , ("23", "fc23")
+        , ("24", "fc24") ]
 
     ubuntuDistro = "ubuntu"
     debianDistro = "debian"

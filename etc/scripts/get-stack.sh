@@ -201,6 +201,9 @@ do_debian_install() {
 do_fedora_install() {
   install_dependencies() {
     dnf_install_pkgs perl make automake gcc gmp-devel libffi zlib xz tar
+    if [ "$1" == "24" ] ; then
+      dnf_install_pkgs ncurses-compat-libs-6.0
+    fi
   }
   dnf_install_stack() {
     dnf_install_pkgs stack
@@ -212,6 +215,10 @@ do_fedora_install() {
   if is_64_bit ; then
     check_dl_tools
     case "$1" in
+      "24"*)
+        dl_to_stdout https://s3.amazonaws.com/download.fpcomplete.com/fedora/24/fpco.repo | sudocmd tee /etc/yum.repos.d/fpco.repo >/dev/null
+        dnf_install_stack
+        ;;
       "23"*)
         dl_to_stdout https://s3.amazonaws.com/download.fpcomplete.com/fedora/23/fpco.repo | sudocmd tee /etc/yum.repos.d/fpco.repo >/dev/null
         dnf_install_stack
@@ -221,7 +228,7 @@ do_fedora_install() {
         dnf_install_stack
         ;;
       *)
-        install_dependencies
+        install_dependencies "$1"
         info ""
         info "No packages available for Fedora $1, using generic bindist..."
         info ""
@@ -229,7 +236,7 @@ do_fedora_install() {
         ;;
     esac
   else
-    install_dependencies
+    install_dependencies "$1"
     info ""
     info "No packages available for 32-bit Fedora $1, using generic bindist..."
     info ""
@@ -537,7 +544,7 @@ install_64bit_freebsd_binary() {
   install_from_bindist "freebsd-x86_64"
 }
 
-# Attempt to install packages using whiever of apt-get, dnf, or yum is
+# Attempt to install packages using whichever of apt-get, dnf, or yum is
 # available.
 try_install_pkgs() {
   if has_apt_get ; then
