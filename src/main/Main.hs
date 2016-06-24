@@ -1175,6 +1175,33 @@ hoogleCmd (args,setup,rebuild) go = withBuildConfig go pathToHaddocks
                        return ()))
     installHoogle :: StackT EnvConfig IO ()
     installHoogle = do
+        let hooglePackageName = $(mkPackageName "hoogle")
+            hoogleMinVersion = $(mkVersion "5.0")
+            hoogleMinIdent =
+                PackageIdentifier hooglePackageName hoogleMinVersion
+        hooglePackageIdentifier <-
+            do (_,_,resolved) <-
+                   resolvePackagesAllowMissing
+                       mempty
+                       (Set.fromList [hooglePackageName])
+               return
+                   (case find
+                             ((== hooglePackageName) . packageIdentifierName)
+                             (Map.keys resolved) of
+                        Just ident@(PackageIdentifier _ ver)
+                          | ver >= hoogleMinVersion -> Right ident
+                        _ -> Left hoogleMinIdent)
+        case hooglePackageIdentifier of
+            Left{} ->
+                $logInfo
+                    ("Minimum " <> packageIdentifierText hoogleMinIdent <>
+                     " is not in your index. Installing the minimum version.")
+            Right ident ->
+                $logInfo
+                    ("Minimum version is " <> packageIdentifierText hoogleMinIdent <>
+                     ". Found acceptable " <>
+                     packageIdentifierText ident <>
+                     " in your index, installing it.")
         config <- asks getConfig
         menv <- liftIO $ configEnvOverride config envSettings
         liftIO
@@ -1186,7 +1213,11 @@ hoogleCmd (args,setup,rebuild) go = withBuildConfig go pathToHaddocks
                                 (const (return ()))
                                 lk
                                 defaultBuildOptsCLI
-                                { boptsCLITargets = ["hoogle-5.0"]
+                                { boptsCLITargets = [ packageIdentifierText
+                                                          (either
+                                                               id
+                                                               id
+                                                               hooglePackageIdentifier)]
                                 }))
                  (\(e :: ExitCode) ->
                        case e of
@@ -1216,8 +1247,8 @@ hoogleCmd (args,setup,rebuild) go = withBuildConfig go pathToHaddocks
         menv <- liftIO $ configEnvOverride config envSettings
         result <- tryProcessStdout Nothing menv "hoogle" ["--numeric-version"]
         case fmap (reads . S8.unpack) result of
-          Right [(ver :: Double,_)] -> return (ver >= 5.0)
-          _ -> return False
+            Right [(ver :: Double,_)] -> return (ver >= 5.0)
+            _ -> return False
     envSettings =
         EnvSettings
         { esIncludeLocals = True
