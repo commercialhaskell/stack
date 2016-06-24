@@ -1185,7 +1185,7 @@ hoogleCmd (args,setup,rebuild) go = withBuildConfig go pathToHaddocks
                                    (const (return ()))
                                    lk
                                    defaultBuildOptsCLI
-                                   { boptsCLITargets = ["hoogle"]
+                                   { boptsCLITargets = ["hoogle-5.0"]
                                    }))
                     (\(e :: ExitCode) ->
                           case e of
