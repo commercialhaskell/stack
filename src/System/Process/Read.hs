@@ -33,6 +33,7 @@ module System.Process.Read
   ,ReadProcessException (..)
   ,augmentPath
   ,augmentPathMap
+  ,resetExeCache
   )
   where
 
@@ -377,6 +378,10 @@ findExecutable eo name = liftIO $ do
                 (Map.insert name epath m', ())
             return epath
     return $ either throwM return epath
+
+-- | Reset the executable cache.
+resetExeCache :: MonadIO m => EnvOverride -> m ()
+resetExeCache eo = liftIO (atomicModifyIORef (eoExeCache eo) (const mempty))
 
 -- | Load up an 'EnvOverride' from the standard environment.
 getEnvOverride :: MonadIO m => Platform -> m EnvOverride

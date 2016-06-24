@@ -20,6 +20,7 @@ import           Control.Monad.Reader (ask, asks,local,runReaderT)
 import           Control.Monad.Trans.Control (MonadBaseControl)
 import           Data.Attoparsec.Args (parseArgs, EscapingMode (Escaping))
 import           Data.Attoparsec.Interpreter (getInterpreterArgs)
+import qualified Data.ByteString.Char8 as S8
 import qualified Data.ByteString.Lazy as L
 import           Data.IORef
 import           Data.List
@@ -35,6 +36,8 @@ import qualified Data.Text.IO as T
 import           Data.Traversable
 import           Data.Typeable (Typeable)
 import           Data.Version (showVersion)
+import           System.Process.Read
+import           System.Process.Run
 #ifdef USE_GIT_INFO
 import           Development.GitRev (gitCommitCount, gitHash)
 #endif
@@ -91,7 +94,6 @@ import           System.Exit
 import           System.FileLock (lockFile, tryLockFile, unlockFile, SharedExclusive(Exclusive), FileLock)
 import           System.FilePath (pathSeparator, searchPathSeparator)
 import           System.IO (hIsTerminalDevice, stderr, stdin, stdout, hSetBuffering, BufferMode(..), hPutStrLn, Handle, hGetEncoding, hSetEncoding)
-import           System.Process.Read
 
 -- | Change the character encoding of the given Handle to transliterate
 -- on unsupported characters instead of throwing an exception
@@ -325,6 +327,18 @@ commandLineHandler progName isInterpreter = complicatedOptions
                     "Run ghci in the context of package(s) (experimental) (alias for 'ghci')"
                     ghciCmd
                     ghciOptsParser
+        addCommand' "hoogle"
+                    "Run hoogle in the context of the current Stack config"
+                    hoogleCmd
+                    ((,,) <$> many (strArgument (metavar "ARG"))
+                          <*> boolFlags
+                                  True
+                                  "setup"
+                                  "If needed: Install hoogle, build haddocks, generate a hoogle database"
+                                  idm
+                          <*> switch
+                                  (long "rebuild" <>
+                                   help "Rebuild the hoogle database"))
         )
 
       -- These two are the only commands allowed in interpreter mode as well
@@ -1097,6 +1111,151 @@ evalCmd EvalOpts {..} go@GlobalOpts {..} = execCmd execOpts go
                    , eoArgs = ["-e", evalArg]
                    , eoExtra = evalExtra
                    }
+
+-- | Hoogle command.
+hoogleCmd :: ([String],Bool,Bool) -> GlobalOpts -> IO ()
+hoogleCmd (args,setup,rebuild) go = withBuildConfig go pathToHaddocks
+  where
+    pathToHaddocks :: StackT EnvConfig IO ()
+    pathToHaddocks = do
+        hoogleIsInPath <- checkHoogleInPath
+        if hoogleIsInPath
+            then haddocksToDb
+            else do
+                if setup
+                    then do
+                        $logWarn
+                            "Hoogle isn't installed or is too old. Automatically installing (use --no-setup to disable) ..."
+                        installHoogle
+                        haddocksToDb
+                    else do
+                        $logError
+                            "Hoogle isn't installed or is too old. Not installing it due to --no-setup."
+                        bail
+    haddocksToDb :: StackT EnvConfig IO ()
+    haddocksToDb = do
+        databaseExists <- checkDatabaseExists
+        if databaseExists && not rebuild
+            then runHoogle args
+            else if setup || rebuild
+                     then do
+                         $logWarn
+                             (if rebuild
+                                  then "Rebuilding database ..."
+                                  else "No Hoogle database yet. Automatically building haddocks and hoogle database (use --no-setup to disable) ...")
+                         buildHaddocks
+                         $logInfo "Built docs."
+                         generateDb
+                         $logInfo "Generated DB."
+                         runHoogle args
+                     else do
+                         $logError
+                             "No Hoogle database. Not building one due to --no-setup"
+                         bail
+    generateDb :: StackT EnvConfig IO ()
+    generateDb = do
+        do dir <- hoogleRoot
+           createDirIfMissing True dir
+           runHoogle ["generate", "--local"]
+    buildHaddocks :: StackT EnvConfig IO ()
+    buildHaddocks =
+        liftIO
+            (catch
+                 (withBuildConfigAndLock
+                      (set
+                           (globalOptsBuildOptsMonoid . buildOptsMonoidHaddock)
+                           (Just True)
+                           go)
+                      (\lk ->
+                            Stack.Build.build
+                                (const (return ()))
+                                lk
+                                defaultBuildOptsCLI))
+                 (\(_ :: ExitCode) ->
+                       return ()))
+    installHoogle :: StackT EnvConfig IO ()
+    installHoogle = do
+        let hooglePackageName = $(mkPackageName "hoogle")
+            hoogleMinVersion = $(mkVersion "5.0")
+            hoogleMinIdent =
+                PackageIdentifier hooglePackageName hoogleMinVersion
+        hooglePackageIdentifier <-
+            do (_,_,resolved) <-
+                   resolvePackagesAllowMissing
+                       mempty
+                       (Set.fromList [hooglePackageName])
+               return
+                   (case find
+                             ((== hooglePackageName) . packageIdentifierName)
+                             (Map.keys resolved) of
+                        Just ident@(PackageIdentifier _ ver)
+                          | ver >= hoogleMinVersion -> Right ident
+                        _ -> Left hoogleMinIdent)
+        case hooglePackageIdentifier of
+            Left{} ->
+                $logInfo
+                    ("Minimum " <> packageIdentifierText hoogleMinIdent <>
+                     " is not in your index. Installing the minimum version.")
+            Right ident ->
+                $logInfo
+                    ("Minimum version is " <> packageIdentifierText hoogleMinIdent <>
+                     ". Found acceptable " <>
+                     packageIdentifierText ident <>
+                     " in your index, installing it.")
+        config <- asks getConfig
+        menv <- liftIO $ configEnvOverride config envSettings
+        liftIO
+            (catch
+                 (withBuildConfigAndLock
+                      go
+                      (\lk ->
+                            Stack.Build.build
+                                (const (return ()))
+                                lk
+                                defaultBuildOptsCLI
+                                { boptsCLITargets = [ packageIdentifierText
+                                                          (either
+                                                               id
+                                                               id
+                                                               hooglePackageIdentifier)]
+                                }))
+                 (\(e :: ExitCode) ->
+                       case e of
+                           ExitSuccess -> resetExeCache menv
+                           _ -> throwIO e))
+    runHoogle :: [String] -> StackT EnvConfig IO ()
+    runHoogle hoogleArgs = do
+        config <- asks getConfig
+        menv <- liftIO $ configEnvOverride config envSettings
+        dbpath <- hoogleDatabasePath
+        let databaseArg = ["--database=" ++ toFilePath dbpath]
+        runCmd
+            (Cmd
+             { cmdDirectoryToRunIn = Nothing
+             , cmdCommandToRun = "hoogle"
+             , cmdEnvOverride = menv
+             , cmdCommandLineArguments = hoogleArgs ++ databaseArg
+             })
+            Nothing
+    bail :: StackT EnvConfig IO ()
+    bail = liftIO (exitWith (ExitFailure (-1)))
+    checkDatabaseExists = do
+        path <- hoogleDatabasePath
+        liftIO (doesFileExist path)
+    checkHoogleInPath = do
+        config <- asks getConfig
+        menv <- liftIO $ configEnvOverride config envSettings
+        result <- tryProcessStdout Nothing menv "hoogle" ["--numeric-version"]
+        case fmap (reads . S8.unpack) result of
+            Right [(ver :: Double,_)] -> return (ver >= 5.0)
+            _ -> return False
+    envSettings =
+        EnvSettings
+        { esIncludeLocals = True
+        , esIncludeGhcPackagePath = True
+        , esStackExe = True
+        , esLocaleUtf8 = False
+        }
 
 -- | Run GHCi in the context of a project.
 ghciCmd :: GhciOpts -> GlobalOpts -> IO ()

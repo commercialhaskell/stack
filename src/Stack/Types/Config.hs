@@ -119,6 +119,8 @@ module Stack.Types.Config
   ,hpcReportDir
   ,installationRootDeps
   ,installationRootLocal
+  ,hoogleRoot
+  ,hoogleDatabasePath
   ,packageDatabaseDeps
   ,packageDatabaseExtra
   ,packageDatabaseLocal
@@ -1304,6 +1306,19 @@ installationRootLocal = do
     bc <- asks getBuildConfig
     psc <- useShaPathOnWindows =<< platformSnapAndCompilerRel
     return $ getProjectWorkDir bc </> $(mkRelDir "install") </> psc
+
+-- | Hoogle directory.
+hoogleRoot :: (MonadThrow m, MonadReader env m, HasEnvConfig env) => m (Path Abs Dir)
+hoogleRoot = do
+    bc <- asks getBuildConfig
+    psc <- useShaPathOnWindows =<< platformSnapAndCompilerRel
+    return $ getProjectWorkDir bc </> $(mkRelDir "hoogle") </> psc
+
+-- | Get the hoogle database path.
+hoogleDatabasePath :: (MonadThrow m, MonadReader env m, HasEnvConfig env) => m (Path Abs File)
+hoogleDatabasePath = do
+    dir <- hoogleRoot
+    return (dir </> $(mkRelFile "database.hoo"))
 
 -- | Path for platform followed by snapshot name followed by compiler
 -- name.
