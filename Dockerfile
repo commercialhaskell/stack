@@ -12,7 +12,7 @@ RUN (. /home/nix-dummy-usr/.nix-profile/etc/profile.d/nix.sh && \
      nix-channel --add https://nixos.org/channels/nixpkgs-unstable nixpkgs && \
      nix-channel --update nixpkgs)
 
-ADD .stack-work/install/x86_64-linux/lts-6.0/7.10.3/bin/stack /usr/bin/stack.copied
+ADD .stack-work/install/x86_64-linux/lts-6.0/7.10.3/bin/stack /usr/bin/stack.copied.113
 
 RUN ( \
      # echo "#!/bin/bash" > /usr/bin/nix-shell && \
@@ -21,15 +21,18 @@ RUN ( \
      rm /usr/bin/stack && \
 #     mv /usr/bin/stack /usr/bin/stack.bin && \
      echo "#!/bin/bash" > /usr/bin/stack && \
-     echo "export HOME=/home/_stack && source /home/nix-dummy-usr/.nix-profile/etc/profile.d/nix.sh && nix-channel --update nixpkgs && file \${NIX_PATH/nixpkgs=} && /usr/bin/stack.copied \"\$@\"" >> /usr/bin/stack && \
+     echo "export HOME=/home/nix-dummy-usr && source /home/nix-dummy-usr/.nix-profile/etc/profile.d/nix.sh && file \${NIX_PATH/nixpkgs=} && /usr/bin/stack.copied.113 \"\$@\"" >> /usr/bin/stack && \
      chmod +x /usr/bin/stack)
 
+RUN usermod -a -G nixbld nix-dummy-usr
+
+RUN (. /home/nix-dummy-usr/.nix-profile/etc/profile.d/nix.sh && nix-env -f '<nixpkgs>' -iA haskell.compiler.ghc7103 glpk pcre)
+
 #RUN chmod 777 -R /nix
-#RUN usermod -a -G nixbld nix-dummy-usr
 
 
 
-# Phheww... Ok, It's still hacky but I managed to make it work with
+# It's still hacky but I managed to make it work with
 # `--docker-stack-exe image --no-docker-set-user`
 # and by creating a script in the container that takes the place of `/usr/bin/stack`
 # and goes like this:
@@ -48,3 +51,5 @@ RUN ( \
 # Problems with stack/docker:
 #   HOME variable isn't set in the
 #   HOME (/home/_stack) is mounted by stack, so
+
+# Ping @borsboom with a PR
