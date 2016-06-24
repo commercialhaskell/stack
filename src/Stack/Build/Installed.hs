@@ -8,6 +8,7 @@ module Stack.Build.Installed
     ( InstalledMap
     , Installed (..)
     , GetInstalledOpts (..)
+    , defaultGetInstalledOpts
     , getInstalled
     ) where
 
@@ -53,10 +54,18 @@ data GetInstalledOpts = GetInstalledOpts
       -- ^ Require haddocks?
     }
 
+defaultGetInstalledOpts :: GetInstalledOpts
+defaultGetInstalledOpts = GetInstalledOpts
+    { getInstalledProfiling = False
+    , getInstalledHaddock = False
+    }
+
 -- | Returns the new InstalledMap and all of the locally registered packages.
 getInstalled :: (M env m, PackageInstallInfo pii)
              => EnvOverride
              -> GetInstalledOpts
+             -- TODO: Clarify what the Map is used for and what properties it
+             -- should have.
              -> Map PackageName pii -- ^ does not contain any installed information
              -> m ( InstalledMap
                   , [DumpPackage () ()] -- globally installed

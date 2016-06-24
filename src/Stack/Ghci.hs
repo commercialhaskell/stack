@@ -306,10 +306,7 @@ ghciSetup GhciOpts{..} = do
     menv <- getMinimalEnvOverride
     (installedMap, _, _, _) <- getInstalled
         menv
-        GetInstalledOpts
-            { getInstalledProfiling = False
-            , getInstalledHaddock   = False
-            }
+        defaultGetInstalledOpts
         sourceMap
     econfig <- asks getEnvConfig
     directlyWanted <-

@@ -24,7 +24,9 @@ module Stack.Options
     ,testOptsParser
     ,haddockOptsParser
     ,hpcReportOptsParser
+    ,sdistOptsParser
     ,pvpBoundsOption
+    ,pvpBoundsOptsParser
     ,globalOptsFromMonoid
     ,splitObjsWarning
     ) where
@@ -60,6 +62,7 @@ import           Stack.Ghci                        (GhciOpts (..))
 import           Stack.Init
 import           Stack.New
 import           Stack.Nix
+import           Stack.SDist
 import           Stack.Types
 import           Stack.Types.TemplateName
 
@@ -944,6 +947,29 @@ hpcReportOptsParser = HpcReportOpts
     <$> many (textArgument $ metavar "TARGET_OR_TIX")
     <*> switch (long "all" <> help "Use results from all packages and components")
     <*> optional (strOption (long "destdir" <> help "Output directy for HTML report"))
+
+sdistOptsParser :: Parser SDistOpts
+sdistOptsParser = SDistOpts
+    <$> many (strArgument $ metavar "DIR")
+    <*> optional pvpBoundsOptsParser
+    <*> switch (long "ignore-check" <> help "Do not check package for common mistakes")
+    <*> switch (long "sign" <> help "Sign & upload signatures")
+    <*> strOption
+            (long "sig-server" <> metavar "URL" <> showDefault <>
+             value "https://sig.commercialhaskell.org" <>
+             help "URL")
+
+pvpBoundsOptsParser :: Parser PvpBoundsOpts
+pvpBoundsOptsParser = PvpBoundsOpts
+    <$> pvpBoundsOption
+    <*> many (option readDependencyConfigurationSource
+                (long "also-considering" <>
+                 help "Extra dependency configs to consider during bounds generation" <>
+                 metavar "RESOLVER_OR_STACK_YAML"))
+  where
+    readDependencyConfigurationSource =
+        DCSResolver <$> readAbstractResolver <|>
+        DCSProjectConfig <$> str
 
 pvpBoundsOption :: Parser PvpBounds
 pvpBoundsOption =
