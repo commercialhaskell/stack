@@ -1,5 +1,13 @@
 # Install/upgrade
 
+For many Un*x operating systems, all you need to do is run:
+
+    curl -sSL https://get.haskellstack.org/ | sh
+
+or:
+
+    wget -qO- https://get.haskellstack.org/ | sh
+
 Distribution packages are available for [Ubuntu](#ubuntu), [Debian](#debian),
 [CentOS / Red Hat / Amazon Linux](#centos), [Fedora](#fedora),
 [Arch Linux](#arch-linux) and unofficially [FreeBSD](#freebsd).
@@ -218,7 +226,7 @@ new releases by some days.
   - [stack](https://www.archlinux.org/packages/community/x86_64/stack/) _latest stable version_
   - [haskell-stack-git](https://aur.archlinux.org/packages/haskell-stack-git/) _git version_
 
-In order to install stack from Hackage or from source, you will need the [libtinfo-5](https://aur.archlinux.org/packages/libtinfo-5/) Arch Linux package installed.  If this package is not installed, stack will not be able to install GHC.
+In order to use `stack setup`, you will need the [ncurses5-compat-libs](https://aur.archlinux.org/packages/ncurses5-compat-libs/) Arch Linux package installed.  If this package is not installed, Stack will not be able to install GHC.
 
 If you use the [ArchHaskell repository](https://wiki.archlinux.org/index.php/ArchHaskell), you can also get the `haskell-stack-tool` package from there.
 
