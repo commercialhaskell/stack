@@ -181,6 +181,10 @@ problems, see the linked FAQ entries:
 
    1. Add the appropriate source repository:
 
+      * Fedora 24 (x86_64)
+
+            curl -sSL https://s3.amazonaws.com/download.fpcomplete.com/fedora/24/fpco.repo | sudo tee /etc/yum.repos.d/fpco.repo
+
       * Fedora 23 (x86_64)
 
             curl -sSL https://s3.amazonaws.com/download.fpcomplete.com/fedora/23/fpco.repo | sudo tee /etc/yum.repos.d/fpco.repo
@@ -275,6 +279,7 @@ Stack](http://nixos.org/nixpkgs/manual/#using-stack-together-with-nix).
 * Ensure you have required system dependencies installed.  These include GCC, GNU make, xz, perl, libgmp, libffi, and zlib.  We also recommend Git and GPG.  To install these using your package manager:
     * Debian / Ubuntu: `sudo apt-get install g++ gcc libc6-dev libffi-dev libgmp-dev make xz-utils zlib1g-dev git gnupg`
     * Fedora / CentOS: `sudo dnf install perl make automake gcc gmp-devel libffi zlib xz tar git gnupg` (use `yum` instead of `dnf` on CentOS and Fedora <= 21)
+        * Fedora 24: Also `sudo dnf install ncurses-compat-libs`
     * Gentoo users, make sure to have the `ncurses` package with `USE=tinfo` (without it, stack will not be able to install GHC).
 
 * Now you can run `stack` from the terminal.
