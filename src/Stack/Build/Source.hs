@@ -147,8 +147,9 @@ loadSourceMap needTargets boptsCli = do
                 let p = lpPackage lp
                  in (packageName p, PSLocal lp)
             , extraDeps3
-            , flip fmap (mbpPackages mbp) $ \mpi ->
-                PSUpstream (mpiVersion mpi) Snap (mpiFlags mpi) (mpiGhcOptions mpi) (mpiGitSHA1 mpi)
+            , flip Map.mapWithKey (mbpPackages mbp) $ \n mpi ->
+                let configOpts = getGhcOptions bconfig boptsCli n False False
+                 in PSUpstream (mpiVersion mpi) Snap (mpiFlags mpi) (mpiGhcOptions mpi ++ configOpts) (mpiGitSHA1 mpi)
             ] `Map.difference` Map.fromList (map (, ()) (HashSet.toList wiredInPackages))
 
     return (targets, mbp, locals, nonLocalTargets, sourceMap)
