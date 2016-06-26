@@ -257,7 +257,7 @@ figureOutMainFile bopts mainIsTargets targets0 packages =
         Just op -> do
             let (_,_,fp) = candidates !! op
             putStrLn
-              ("Loading main module from cadidate " <>
+              ("Loading main module from candidate " <>
               show (op + 1) <> ", --main-is " <>
               toFilePath fp)
             putStrLn ""
