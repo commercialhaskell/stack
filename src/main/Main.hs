@@ -1,3 +1,4 @@
+{-# LANGUAGE TupleSections #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -60,6 +61,8 @@ import           Path.IO
 import qualified Paths_stack as Meta
 import           Prelude hiding (pi, mapM)
 import           Stack.Build
+import           Stack.Build.Target
+import           Stack.Build.Source
 import           Stack.Clean (CleanOpts, clean)
 import           Stack.Config
 import           Stack.ConfigCmd as ConfigCmd
@@ -380,6 +383,11 @@ commandLineHandler progName isInterpreter = complicatedOptions
                     "packages"
                     "List all available local loadable packages"
                     packagesCmd
+                    (pure ())
+                addCommand'
+                    "targets"
+                    "List all available stack targets"
+                    targetsCmd
                     (pure ()))
         addSubCommands'
           Docker.dockerCmdName
@@ -1282,6 +1290,23 @@ packagesCmd () go@GlobalOpts{..} =
                   do cabalfp <- findOrGenerateCabalFile dir
                      parsePackageNameFromFilePath cabalfp
          forM_ locals (liftIO . putStrLn . packageNameString)
+
+-- | List targets in the project.
+targetsCmd :: () -> GlobalOpts -> IO ()
+targetsCmd () go@GlobalOpts{..} =
+    withBuildConfig go $
+    do rawLocals <- getLocalPackageViews
+       $logInfo
+           (T.intercalate
+                "\n"
+                (map
+                     renderPkgComponent
+                     (concatMap
+                          toNameAndComponent
+                          (M.toList (M.map fst rawLocals)))))
+  where
+    toNameAndComponent (packageName,view) =
+        map (packageName, ) (Set.toList (lpvComponents view))
 
 -- | Pull the current Docker image.
 dockerPullCmd :: () -> GlobalOpts -> IO ()
