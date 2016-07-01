@@ -632,5 +632,5 @@ targetsCmd target go@GlobalOpts{..} =
 quoteFileName :: String -> String
 quoteFileName x =
     if any (==' ') x
-        then "\"" ++ x ++ "\""
+        then show x
         else x
