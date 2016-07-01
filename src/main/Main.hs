@@ -498,18 +498,32 @@ interpreterHandler
   -> ParserFailure ParserHelp
   -> IO (GlobalOptsMonoid, (GlobalOpts -> IO (), t))
 interpreterHandler args f = do
-  isFile <- D.doesFileExist file
-  if isFile
-  then runInterpreterCommand file
-  else parseResultHandler (errorCombine (noSuchFile file))
+  -- args can include top-level config such as --extra-lib-dirs=... (set by
+  -- nix-shell) - we need to find the first argument which is a file, everything
+  -- afterwards is an argument to the script, everything before is an argument
+  -- to Stack
+  (stackArgs, fileArgs) <- spanM (fmap not . D.doesFileExist) args
+  case fileArgs of
+    (file:fileArgs') -> runInterpreterCommand file stackArgs fileArgs'
+    [] -> parseResultHandler (errorCombine (noSuchFile firstArg))
   where
-    file = head args
+    firstArg = head args
 
-    -- if the filename contains a path separator then we know that it is not a
-    -- command it is a file to be interpreted. In that case we only show the
+    spanM _ [] = return ([], [])
+    spanM p xs@(x:xs') = do
+      r <- p x
+      if r
+      then do
+        (ys, zs) <- spanM p xs'
+        return (x:ys, zs)
+      else
+        return ([], xs)
+
+    -- if the first argument contains a path separator then it might be a file,
+    -- or a Stack option referencing a file. In that case we only show the
     -- interpreter error message and exclude the command related error messages.
     errorCombine =
-      if elem pathSeparator file
+      if elem pathSeparator firstArg
       then overrideErrorHelp
       else vcatErrorHelp
 
@@ -520,11 +534,11 @@ interpreterHandler args f = do
     noSuchFile name = errorHelp $ stringChunk
       ("File does not exist or is not a regular file `" ++ name ++ "'")
 
-    runInterpreterCommand path = do
+    runInterpreterCommand path stackArgs fileArgs = do
       progName <- getProgName
       iargs <- getInterpreterArgs path
       let parseCmdLine = commandLineHandler progName True
-      let cmdArgs = iargs ++ "--" : args
+      let cmdArgs = stackArgs ++ iargs ++ "--" : path : fileArgs
        -- TODO show the command in verbose mode
        -- hPutStrLn stderr $ unwords $
        --   ["Running", "[" ++ progName, unwords cmdArgs ++ "]"]
