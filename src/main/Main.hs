@@ -30,12 +30,10 @@ import           Data.List
 import qualified Data.Map as Map
 import qualified Data.Map.Strict as M
 import           Data.Maybe
-import           Data.Maybe.Extra (mapMaybeA)
 import           Data.Monoid
 import qualified Data.Set as Set
 import           Data.Text (Text)
 import qualified Data.Text as T
-import qualified Data.Text.IO as T
 import           Data.Traversable
 import           Data.Typeable (Typeable)
 import           Data.Version (showVersion)
@@ -58,7 +56,6 @@ import           Options.Applicative.Simple (simpleVersion)
 #endif
 import           Options.Applicative.Types (readerAsk, ParserHelp(..))
 import           Path
-import           Path.Extra (toFilePathNoTrailingSep)
 import           Path.IO
 import qualified Paths_stack as Meta
 import           Prelude hiding (pi, mapM)
@@ -76,7 +73,6 @@ import           Stack.Exec
 import qualified Stack.Nix as Nix
 import           Stack.Fetch
 import           Stack.FileWatch
-import           Stack.GhcPkg (getGlobalDB, mkGhcPackagePath)
 import           Stack.Ghci
 import qualified Stack.Image as Image
 import           Stack.Init
@@ -84,6 +80,7 @@ import           Stack.New
 import           Stack.Options
 import           Stack.Package (findOrGenerateCabalFile)
 import qualified Stack.PackageIndex
+import qualified Stack.Path
 import           Stack.SDist (getSDistTarball, checkSDistTarball, checkSDistTarball')
 import           Stack.Setup
 import qualified Stack.Sig as Sig
@@ -97,7 +94,7 @@ import qualified System.Directory as D
 import           System.Environment (getEnvironment, getProgName, getArgs, withArgs)
 import           System.Exit
 import           System.FileLock (lockFile, tryLockFile, unlockFile, SharedExclusive(Exclusive), FileLock)
-import           System.FilePath (pathSeparator, searchPathSeparator)
+import           System.FilePath (pathSeparator)
 import           System.IO (hIsTerminalDevice, stderr, stdin, stdout, hSetBuffering, BufferMode(..), hPutStrLn, Handle, hGetEncoding, hSetEncoding)
 
 -- | Change the character encoding of the given Handle to transliterate
@@ -262,13 +259,7 @@ commandLineHandler progName isInterpreter = complicatedOptions
         addCommand' "path"
                     "Print out handy path information"
                     pathCmd
-                    (mapMaybeA
-                        (\(desc,name,_) ->
-                             flag Nothing
-                                  (Just name)
-                                  (long (T.unpack name) <>
-                                   help desc))
-                        paths)
+                    Stack.Path.pathParser
         addCommand' "unpack"
                     "Unpack one or more packages locally"
                     unpackCmd
@@ -543,168 +534,8 @@ interpreterHandler args f = do
       (a,b) <- withArgs cmdArgs parseCmdLine
       return (a,(b,mempty))
 
--- | Print out useful path information in a human-readable format (and
--- support others later).
 pathCmd :: [Text] -> GlobalOpts -> IO ()
-pathCmd keys go =
-    withBuildConfig
-        go
-        (do env <- ask
-            let cfg = envConfig env
-                bc = envConfigBuildConfig cfg
-            -- This is the modified 'bin-path',
-            -- including the local GHC or MSYS if not configured to operate on
-            -- global GHC.
-            -- It was set up in 'withBuildConfigAndLock -> withBuildConfigExt -> setupEnv'.
-            -- So it's not the *minimal* override path.
-            menv <- getMinimalEnvOverride
-            snap <- packageDatabaseDeps
-            plocal <- packageDatabaseLocal
-            extra <- packageDatabaseExtra
-            global <- getGlobalDB menv =<< getWhichCompiler
-            snaproot <- installationRootDeps
-            localroot <- installationRootLocal
-            distDir <- distRelativeDir
-            hpcDir <- hpcReportDir
-            compiler <- getCompilerPath =<< getWhichCompiler
-            let deprecated = filter ((`elem` keys) . fst) deprecatedPathKeys
-            liftIO $ forM_ deprecated $ \(oldOption, newOption) -> T.hPutStrLn stderr $ T.unlines
-                [ ""
-                , "'--" <> oldOption <> "' will be removed in a future release."
-                , "Please use '--" <> newOption <> "' instead."
-                , ""
-                ]
-            forM_
-                -- filter the chosen paths in flags (keys),
-                -- or show all of them if no specific paths chosen.
-                (filter
-                     (\(_,key,_) ->
-                           (null keys && key /= T.pack deprecatedStackRootOptionName) || elem key keys)
-                     paths)
-                (\(_,key,path) ->
-                      liftIO $ T.putStrLn
-                          -- If a single path type is requested, output it directly.
-                          -- Otherwise, name all the paths.
-                          ((if length keys == 1
-                               then ""
-                               else key <> ": ") <>
-                           path
-                               (PathInfo
-                                    bc
-                                    menv
-                                    snap
-                                    plocal
-                                    global
-                                    snaproot
-                                    localroot
-                                    distDir
-                                    hpcDir
-                                    extra
-                                    compiler))))
-
--- | Passed to all the path printers as a source of info.
-data PathInfo = PathInfo
-    { piBuildConfig  :: BuildConfig
-    , piEnvOverride  :: EnvOverride
-    , piSnapDb       :: Path Abs Dir
-    , piLocalDb      :: Path Abs Dir
-    , piGlobalDb     :: Path Abs Dir
-    , piSnapRoot     :: Path Abs Dir
-    , piLocalRoot    :: Path Abs Dir
-    , piDistDir      :: Path Rel Dir
-    , piHpcDir       :: Path Abs Dir
-    , piExtraDbs     :: [Path Abs Dir]
-    , piCompiler     :: Path Abs File
-    }
-
--- | The paths of interest to a user. The first tuple string is used
--- for a description that the optparse flag uses, and the second
--- string as a machine-readable key and also for @--foo@ flags. The user
--- can choose a specific path to list like @--stack-root@. But
--- really it's mainly for the documentation aspect.
---
--- When printing output we generate @PathInfo@ and pass it to the
--- function to generate an appropriate string.  Trailing slashes are
--- removed, see #506
-paths :: [(String, Text, PathInfo -> Text)]
-paths =
-    [ ( "Global stack root directory"
-      , T.pack stackRootOptionName
-      , T.pack . toFilePathNoTrailingSep . configStackRoot . bcConfig . piBuildConfig )
-    , ( "Project root (derived from stack.yaml file)"
-      , "project-root"
-      , T.pack . toFilePathNoTrailingSep . bcRoot . piBuildConfig )
-    , ( "Configuration location (where the stack.yaml file is)"
-      , "config-location"
-      , T.pack . toFilePath . bcStackYaml . piBuildConfig )
-    , ( "PATH environment variable"
-      , "bin-path"
-      , T.pack . intercalate [searchPathSeparator] . eoPath . piEnvOverride )
-    , ( "Install location for GHC and other core tools"
-      , "programs"
-      , T.pack . toFilePathNoTrailingSep . configLocalPrograms . bcConfig . piBuildConfig )
-    , ( "Compiler binary (e.g. ghc)"
-      , "compiler-exe"
-      , T.pack . toFilePath . piCompiler )
-    , ( "Directory containing the compiler binary (e.g. ghc)"
-      , "compiler-bin"
-      , T.pack . toFilePathNoTrailingSep . parent . piCompiler )
-    , ( "Local bin dir where stack installs executables (e.g. ~/.local/bin)"
-      , "local-bin"
-      , T.pack . toFilePathNoTrailingSep . configLocalBin . bcConfig . piBuildConfig )
-    , ( "Extra include directories"
-      , "extra-include-dirs"
-      , T.intercalate ", " . Set.elems . configExtraIncludeDirs . bcConfig . piBuildConfig )
-    , ( "Extra library directories"
-      , "extra-library-dirs"
-      , T.intercalate ", " . Set.elems . configExtraLibDirs . bcConfig . piBuildConfig )
-    , ( "Snapshot package database"
-      , "snapshot-pkg-db"
-      , T.pack . toFilePathNoTrailingSep . piSnapDb )
-    , ( "Local project package database"
-      , "local-pkg-db"
-      , T.pack . toFilePathNoTrailingSep . piLocalDb )
-    , ( "Global package database"
-      , "global-pkg-db"
-      , T.pack . toFilePathNoTrailingSep . piGlobalDb )
-    , ( "GHC_PACKAGE_PATH environment variable"
-      , "ghc-package-path"
-      , \pi -> mkGhcPackagePath True (piLocalDb pi) (piSnapDb pi) (piExtraDbs pi) (piGlobalDb pi))
-    , ( "Snapshot installation root"
-      , "snapshot-install-root"
-      , T.pack . toFilePathNoTrailingSep . piSnapRoot )
-    , ( "Local project installation root"
-      , "local-install-root"
-      , T.pack . toFilePathNoTrailingSep . piLocalRoot )
-    , ( "Snapshot documentation root"
-      , "snapshot-doc-root"
-      , \pi -> T.pack (toFilePathNoTrailingSep (piSnapRoot pi </> docDirSuffix)))
-    , ( "Local project documentation root"
-      , "local-doc-root"
-      , \pi -> T.pack (toFilePathNoTrailingSep (piLocalRoot pi </> docDirSuffix)))
-    , ( "Dist work directory"
-      , "dist-dir"
-      , T.pack . toFilePathNoTrailingSep . piDistDir )
-    , ( "Where HPC reports and tix files are stored"
-      , "local-hpc-root"
-      , T.pack . toFilePathNoTrailingSep . piHpcDir )
-    , ( "DEPRECATED: Use '--local-bin' instead"
-      , "local-bin-path"
-      , T.pack . toFilePathNoTrailingSep . configLocalBin . bcConfig . piBuildConfig )
-    , ( "DEPRECATED: Use '--programs' instead"
-      , "ghc-paths"
-      , T.pack . toFilePathNoTrailingSep . configLocalPrograms . bcConfig . piBuildConfig )
-    , ( "DEPRECATED: Use '--" <> stackRootOptionName <> "' instead"
-      , T.pack deprecatedStackRootOptionName
-      , T.pack . toFilePathNoTrailingSep . configStackRoot . bcConfig . piBuildConfig )
-    ]
-
-deprecatedPathKeys :: [(Text, Text)]
-deprecatedPathKeys =
-    [ (T.pack deprecatedStackRootOptionName, T.pack stackRootOptionName)
-    , ("ghc-paths", "programs")
-    , ("local-bin-path", "local-bin")
-    ]
+pathCmd keys go = withBuildConfig go (Stack.Path.path keys)
 
 data SetupCmdOpts = SetupCmdOpts
     { scoCompilerVersion :: !(Maybe CompilerVersion)
