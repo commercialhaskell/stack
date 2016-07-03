@@ -156,6 +156,7 @@ library
                    , blaze-builder
                    , byteable
                    , bytestring >= 0.10.4.0
+                   , clock
                    , conduit >= 1.2.4
                    , conduit-extra >= 1.1.7.1
                    , containers >= 0.5.5.1
