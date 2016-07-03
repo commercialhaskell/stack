@@ -280,12 +280,15 @@ ghciSetup
     => GhciOpts
     -> m (Map PackageName SimpleTarget, Maybe (Map PackageName SimpleTarget), [GhciPkgInfo])
 ghciSetup GhciOpts{..} = do
-    (_,_,targets) <- parseTargetsFromBuildOpts AllowNoTargets ghciBuildOptsCLI
+    (_,_,targets) <- parseTargetsFromBuildOpts Nothing AllowNoTargets ghciBuildOptsCLI
     mainIsTargets <-
         case ghciMainIs of
             Nothing -> return Nothing
             Just target -> do
-                (_,_,targets') <- parseTargetsFromBuildOpts AllowNoTargets ghciBuildOptsCLI { boptsCLITargets = [target] }
+                (_,_,targets') <- parseTargetsFromBuildOpts
+                    Nothing
+                    AllowNoTargets
+                    ghciBuildOptsCLI { boptsCLITargets = [target] }
                 return (Just targets')
     addPkgs <- forM ghciAdditionalPackages $ \name -> do
         let mres = (packageIdentifierName <$> parsePackageIdentifierFromString name)
