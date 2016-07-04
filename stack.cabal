@@ -108,6 +108,7 @@ library
                      Stack.SDist
                      Stack.Setup
                      Stack.Setup.Installed
+                     Stack.SetupCmd
                      Stack.Sig
                      Stack.Sig.GPG
                      Stack.Sig.Sign

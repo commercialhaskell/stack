@@ -54,7 +54,7 @@ import           Options.Applicative.Complicated
 #ifdef USE_GIT_INFO
 import           Options.Applicative.Simple (simpleVersion)
 #endif
-import           Options.Applicative.Types (readerAsk, ParserHelp(..))
+import           Options.Applicative.Types (ParserHelp(..))
 import           Path
 import           Path.IO
 import qualified Paths_stack as Meta
@@ -83,6 +83,7 @@ import qualified Stack.PackageIndex
 import qualified Stack.Path
 import           Stack.SDist (getSDistTarball, checkSDistTarball, checkSDistTarball')
 import           Stack.Setup
+import           Stack.SetupCmd
 import qualified Stack.Sig as Sig
 import           Stack.Solver (solveExtraDeps)
 import           Stack.Types
@@ -537,49 +538,8 @@ interpreterHandler args f = do
 pathCmd :: [Text] -> GlobalOpts -> IO ()
 pathCmd keys go = withBuildConfig go (Stack.Path.path keys)
 
-data SetupCmdOpts = SetupCmdOpts
-    { scoCompilerVersion :: !(Maybe CompilerVersion)
-    , scoForceReinstall  :: !Bool
-    , scoUpgradeCabal    :: !Bool
-    , scoStackSetupYaml  :: !String
-    , scoGHCBindistURL   :: !(Maybe String)
-    }
-
-setupParser :: Parser SetupCmdOpts
-setupParser = SetupCmdOpts
-    <$> optional (argument readVersion
-            (metavar "GHC_VERSION" <>
-             help ("Version of GHC to install, e.g. 7.10.2. " ++
-                   "The default is to install the version implied by the resolver.")))
-    <*> boolFlags False
-            "reinstall"
-            "reinstalling GHC, even if available (implies no-system-ghc)"
-            idm
-    <*> boolFlags False
-            "upgrade-cabal"
-            "installing the newest version of the Cabal library globally"
-            idm
-    <*> strOption
-            ( long "stack-setup-yaml"
-           <> help "Location of the main stack-setup.yaml file"
-           <> value defaultStackSetupYaml
-           <> showDefault )
-    <*> optional (strOption
-            (long "ghc-bindist"
-           <> metavar "URL"
-           <> help "Alternate GHC binary distribution (requires custom --ghc-variant)"))
-  where
-    readVersion = do
-        s <- readerAsk
-        case parseCompilerVersion ("ghc-" <> T.pack s) of
-            Nothing ->
-                case parseCompilerVersion (T.pack s) of
-                    Nothing -> readerError $ "Invalid version: " ++ s
-                    Just x -> return x
-            Just x -> return x
-
 setupCmd :: SetupCmdOpts -> GlobalOpts -> IO ()
-setupCmd SetupCmdOpts{..} go@GlobalOpts{..} = do
+setupCmd sco@SetupCmdOpts{..} go@GlobalOpts{..} = do
   (manager,lc) <- loadConfigWithOpts go
   withUserFileLock go (configStackRoot $ lcConfig lc) $ \lk ->
     runStackTGlobal manager (lcConfig lc) go $
@@ -599,32 +559,8 @@ setupCmd SetupCmdOpts{..} go@GlobalOpts{..} = do
                                  , Just $ bcStackYaml bc
                                  )
               miniConfig <- loadMiniConfig manager (lcConfig lc)
-              mpaths <- runStackTGlobal manager miniConfig go $
-                  ensureCompiler SetupOpts
-                  { soptsInstallIfMissing = True
-                  , soptsUseSystem =
-                    configSystemGHC (lcConfig lc) && not scoForceReinstall
-                  , soptsWantedCompiler = wantedCompiler
-                  , soptsCompilerCheck = compilerCheck
-                  , soptsStackYaml = mstack
-                  , soptsForceReinstall = scoForceReinstall
-                  , soptsSanityCheck = True
-                  , soptsSkipGhcCheck = False
-                  , soptsSkipMsys = configSkipMsys $ lcConfig lc
-                  , soptsUpgradeCabal = scoUpgradeCabal
-                  , soptsResolveMissingGHC = Nothing
-                  , soptsStackSetupYaml = scoStackSetupYaml
-                  , soptsGHCBindistURL = scoGHCBindistURL
-                  }
-              let compiler = case wantedCompiler of
-                      GhcVersion _ -> "GHC"
-                      GhcjsVersion {} -> "GHCJS"
-              case mpaths of
-                  Nothing -> $logInfo $ "stack will use the " <> compiler <> " on your PATH"
-                  Just _ -> $logInfo $ "stack will use a locally installed " <> compiler
-              $logInfo "For more information on paths, see 'stack path' and 'stack exec env'"
-              $logInfo $ "To use this " <> compiler <> " and packages outside of a project, consider using:"
-              $logInfo "stack ghc, stack ghci, stack runghc, or stack exec"
+              runStackTGlobal manager miniConfig go $
+                  setup sco wantedCompiler compilerCheck mstack
               )
           Nothing
           (Just $ munlockFile lk)
