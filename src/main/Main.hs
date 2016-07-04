@@ -3,17 +3,14 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE ViewPatterns #-}
 
 -- | Main stack tool entry point.
 
 module Main (main) where
 
 import           Control.Exception
-import qualified Control.Exception.Lifted as EL
 import           Control.Monad hiding (mapM, forM)
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
@@ -25,7 +22,6 @@ import           Data.Attoparsec.Args (parseArgs, EscapingMode (Escaping))
 import           Data.Attoparsec.Interpreter (getInterpreterArgs)
 import qualified Data.ByteString.Char8 as S8
 import qualified Data.ByteString.Lazy as L
-import           Data.IORef
 import           Data.List
 import qualified Data.Map as Map
 import qualified Data.Map.Strict as M
@@ -46,7 +42,6 @@ import           Distribution.System (buildArch, buildPlatform)
 import           Distribution.Text (display)
 import           GHC.IO.Encoding (mkTextEncoding, textEncodingName)
 import           Lens.Micro
-import           Network.HTTP.Client
 import           Options.Applicative
 import           Options.Applicative.Help (errorHelp, stringChunk, vcatChunks)
 import           Options.Applicative.Builder.Extra
@@ -81,8 +76,8 @@ import           Stack.Options
 import           Stack.Package (findOrGenerateCabalFile)
 import qualified Stack.PackageIndex
 import qualified Stack.Path
+import           Stack.Runners
 import           Stack.SDist (getSDistTarball, checkSDistTarball, checkSDistTarball')
-import           Stack.Setup
 import           Stack.SetupCmd
 import qualified Stack.Sig as Sig
 import           Stack.Solver (solveExtraDeps)
@@ -92,9 +87,8 @@ import           Stack.Types.StackT
 import           Stack.Upgrade
 import qualified Stack.Upload as Upload
 import qualified System.Directory as D
-import           System.Environment (getEnvironment, getProgName, getArgs, withArgs)
+import           System.Environment (getProgName, getArgs, withArgs)
 import           System.Exit
-import           System.FileLock (lockFile, tryLockFile, unlockFile, SharedExclusive(Exclusive), FileLock)
 import           System.FilePath (pathSeparator)
 import           System.IO (hIsTerminalDevice, stderr, stdin, stdout, hSetBuffering, BufferMode(..), hPutStrLn, Handle, hGetEncoding, hSetEncoding)
 
@@ -565,154 +559,6 @@ setupCmd sco@SetupCmdOpts{..} go@GlobalOpts{..} = do
           Nothing
           (Just $ munlockFile lk)
 
--- | Unlock a lock file, if the value is Just
-munlockFile :: MonadIO m => Maybe FileLock -> m ()
-munlockFile Nothing = return ()
-munlockFile (Just lk) = liftIO $ unlockFile lk
-
--- | Enforce mutual exclusion of every action running via this
--- function, on this path, on this users account.
---
--- A lock file is created inside the given directory.  Currently,
--- stack uses locks per-snapshot.  In the future, stack may refine
--- this to an even more fine-grain locking approach.
---
-withUserFileLock :: (MonadBaseControl IO m, MonadIO m)
-                 => GlobalOpts
-                 -> Path Abs Dir
-                 -> (Maybe FileLock -> m a)
-                 -> m a
-withUserFileLock go@GlobalOpts{} dir act = do
-    env <- liftIO getEnvironment
-    let toLock = lookup "STACK_LOCK" env == Just "true"
-    if toLock
-        then do
-            let lockfile = $(mkRelFile "lockfile")
-            let pth = dir </> lockfile
-            ensureDir dir
-            -- Just in case of asynchronous exceptions, we need to be careful
-            -- when using tryLockFile here:
-            EL.bracket (liftIO $ tryLockFile (toFilePath pth) Exclusive)
-                       (maybe (return ()) (liftIO . unlockFile))
-                       (\fstTry ->
-                        case fstTry of
-                          Just lk -> EL.finally (act $ Just lk) (liftIO $ unlockFile lk)
-                          Nothing ->
-                            do let chatter = globalLogLevel go /= LevelOther "silent"
-                               when chatter $
-                                 liftIO $ hPutStrLn stderr $ "Failed to grab lock ("++show pth++
-                                                     "); other stack instance running.  Waiting..."
-                               EL.bracket (liftIO $ lockFile (toFilePath pth) Exclusive)
-                                          (liftIO . unlockFile)
-                                          (\lk -> do
-                                            when chatter $
-                                              liftIO $ hPutStrLn stderr "Lock acquired, proceeding."
-                                            act $ Just lk))
-        else act Nothing
-
-withConfigAndLock
-    :: GlobalOpts
-    -> StackT Config IO ()
-    -> IO ()
-withConfigAndLock go@GlobalOpts{..} inner = do
-    (manager, lc) <- loadConfigWithOpts go
-    withUserFileLock go (configStackRoot $ lcConfig lc) $ \lk ->
-        runStackTGlobal manager (lcConfig lc) go $
-            Docker.reexecWithOptionalContainer
-                (lcProjectRoot lc)
-                Nothing
-                (runStackTGlobal manager (lcConfig lc) go inner)
-                Nothing
-                (Just $ munlockFile lk)
-
--- | Loads global config, ignoring any configuration which would be
--- loaded due to $PWD.
-withGlobalConfigAndLock
-    :: GlobalOpts
-    -> StackT Config IO ()
-    -> IO ()
-withGlobalConfigAndLock go@GlobalOpts{..} inner = do
-    manager <- newTLSManager
-    lc <- runStackLoggingTGlobal manager go $
-        loadConfigMaybeProject globalConfigMonoid Nothing Nothing
-    withUserFileLock go (configStackRoot $ lcConfig lc) $ \_lk ->
-        runStackTGlobal manager (lcConfig lc) go inner
-
--- For now the non-locking version just unlocks immediately.
--- That is, there's still a serialization point.
-withBuildConfig
-    :: GlobalOpts
-    -> StackT EnvConfig IO ()
-    -> IO ()
-withBuildConfig go inner =
-    withBuildConfigAndLock go (\lk -> do munlockFile lk
-                                         inner)
-
-withBuildConfigAndLock
-    :: GlobalOpts
-    -> (Maybe FileLock -> StackT EnvConfig IO ())
-    -> IO ()
-withBuildConfigAndLock go inner =
-    withBuildConfigExt go Nothing inner Nothing
-
-withBuildConfigExt
-    :: GlobalOpts
-    -> Maybe (StackT Config IO ())
-    -- ^ Action to perform before the build.  This will be run on the host
-    -- OS even if Docker is enabled for builds.  The build config is not
-    -- available in this action, since that would require build tools to be
-    -- installed on the host OS.
-    -> (Maybe FileLock -> StackT EnvConfig IO ())
-    -- ^ Action that uses the build config.  If Docker is enabled for builds,
-    -- this will be run in a Docker container.
-    -> Maybe (StackT Config IO ())
-    -- ^ Action to perform after the build.  This will be run on the host
-    -- OS even if Docker is enabled for builds.  The build config is not
-    -- available in this action, since that would require build tools to be
-    -- installed on the host OS.
-    -> IO ()
-withBuildConfigExt go@GlobalOpts{..} mbefore inner mafter = do
-    (manager, lc) <- loadConfigWithOpts go
-
-    withUserFileLock go (configStackRoot $ lcConfig lc) $ \lk0 -> do
-      -- A local bit of state for communication between callbacks:
-      curLk <- newIORef lk0
-      let inner' lk =
-            -- Locking policy:  This is only used for build commands, which
-            -- only need to lock the snapshot, not the global lock.  We
-            -- trade in the lock here.
-            do dir <- installationRootDeps
-               -- Hand-over-hand locking:
-               withUserFileLock go dir $ \lk2 -> do
-                 liftIO $ writeIORef curLk lk2
-                 liftIO $ munlockFile lk
-                 $logDebug "Starting to execute command inside EnvConfig"
-                 inner lk2
-
-      let inner'' lk = do
-              bconfig <- runStackLoggingTGlobal manager go $
-                  lcLoadBuildConfig lc globalCompiler
-              envConfig <-
-                 runStackTGlobal
-                     manager bconfig go
-                     (setupEnv Nothing)
-              runStackTGlobal
-                  manager
-                  envConfig
-                  go
-                  (inner' lk)
-
-      runStackTGlobal manager (lcConfig lc) go $
-        Docker.reexecWithOptionalContainer
-                 (lcProjectRoot lc)
-                 mbefore
-                 (runStackTGlobal manager (lcConfig lc) go $
-                    Nix.reexecWithOptionalShell (lcProjectRoot lc) globalResolver globalCompiler (inner'' lk0))
-                 mafter
-                 (Just $ liftIO $
-                      do lk' <- readIORef curLk
-                         munlockFile lk')
-
 cleanCmd :: CleanOpts -> GlobalOpts -> IO ()
 cleanCmd opts go = withBuildConfigAndLock go (const (clean opts))
 
@@ -1139,34 +985,6 @@ imgDockerCmd (rebuild,images) go@GlobalOpts{..} = do
                          defaultBuildOptsCLI
                  Image.stageContainerImageArtifacts mProjectRoot)
         (Just $ Image.createContainerImageFromStage mProjectRoot images)
-
--- | Load the configuration with a manager. Convenience function used
--- throughout this module.
-loadConfigWithOpts :: GlobalOpts -> IO (Manager,LoadConfig (StackLoggingT IO))
-loadConfigWithOpts go@GlobalOpts{..} = do
-    manager <- newTLSManager
-    mstackYaml <- forM globalStackYaml resolveFile'
-    lc <- runStackLoggingTGlobal manager go $ do
-        lc <- loadConfig globalConfigMonoid globalResolver mstackYaml
-        -- If we have been relaunched in a Docker container, perform in-container initialization
-        -- (switch UID, etc.).  We do this after first loading the configuration since it must
-        -- happen ASAP but needs a configuration.
-        case globalDockerEntrypoint of
-            Just de -> Docker.entrypoint (lcConfig lc) de
-            Nothing -> return ()
-        return lc
-    return (manager,lc)
-
-withMiniConfigAndLock
-    :: GlobalOpts
-    -> StackT MiniConfig IO ()
-    -> IO ()
-withMiniConfigAndLock go@GlobalOpts{..} inner = do
-    manager <- newTLSManager
-    miniConfig <- runStackLoggingTGlobal manager go $ do
-        lc <- loadConfigMaybeProject globalConfigMonoid globalResolver Nothing
-        loadMiniConfig manager (lcConfig lc)
-    runStackTGlobal manager miniConfig go inner
 
 -- | Project initialization
 initCmd :: InitOpts -> GlobalOpts -> IO ()

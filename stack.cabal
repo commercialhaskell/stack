@@ -105,6 +105,7 @@ library
                      Stack.PackageDump
                      Stack.PackageIndex
                      Stack.Path
+                     Stack.Runners
                      Stack.SDist
                      Stack.Setup
                      Stack.Setup.Installed
