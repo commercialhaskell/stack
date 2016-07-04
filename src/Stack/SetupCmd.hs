@@ -10,6 +10,7 @@ module Stack.SetupCmd
     , SetupCmdOpts(..)
     ) where
 
+import           Control.Applicative
 import           Control.Monad.Catch
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
@@ -22,6 +23,7 @@ import qualified Options.Applicative.Builder.Extra as OA
 import qualified Options.Applicative.Types as OA
 import           Network.HTTP.Client
 import           Path
+import           Prelude -- silence redundant import warnings
 import           Stack.Setup
 import           Stack.Types.Compiler
 import           Stack.Types.Config

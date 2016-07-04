@@ -16,12 +16,13 @@ module Stack.Runners
     , munlockFile
     ) where
 
-import           Control.Monad
+import           Control.Monad hiding (forM)
 import           Control.Monad.Logger
 import           Control.Exception.Lifted as EL
 import           Control.Monad.IO.Class
 import           Control.Monad.Trans.Control
 import           Data.IORef
+import           Data.Traversable
 import           Network.HTTP.Client
 import           Path
 import           Path.IO
