@@ -57,10 +57,6 @@ matrix:
   allow_failures:
     - env: BUILD=cabal CABALVER=head GHCVER=head
 
-    # This fails to build because the most recent release of stack does not have
-    # the fix to #1570 (but HEAD does)
-    - env: BUILD=stack GHCVER=head STACK_YAML=stack-8.0.yaml
-
 # Note: the distinction between `before_install` and `install` is not important.
 # - in before_install we install build tools
 # - in install we install (haskell) dependencies
