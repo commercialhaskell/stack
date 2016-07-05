@@ -484,7 +484,7 @@ fetchPackages' mdistDir toFetchAll = do
        -> (PackageIdentifier, ToFetch)
        -> m ()
     go outputVar runInBase (ident, toFetch) = do
-        req <- parseUrl $ T.unpack $ tfUrl toFetch
+        req <- parseUrlThrow $ T.unpack $ tfUrl toFetch
         let destpath = tfTarball toFetch
 
         let toHashCheck bs = HashCheck SHA512 (CheckHexDigestByteString bs)

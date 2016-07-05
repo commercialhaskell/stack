@@ -185,7 +185,7 @@ import qualified Distribution.Text
 import           Distribution.Version (anyVersion)
 import           GHC.Generics (Generic)
 import           Generics.Deriving.Monoid (memptydefault, mappenddefault)
-import           Network.HTTP.Client (parseUrl)
+import           Network.HTTP.Client (parseRequest)
 import           Path
 import qualified Paths_stack as Meta
 import           Stack.Types.BuildPlan (MiniBuildPlan(..), SnapName, renderSnapName, parseSnapName, SnapshotHash (..), trimmedSnapshotHash)
@@ -615,7 +615,7 @@ instance FromJSON (WithJSONWarnings PackageLocation) where
       where
         file t = pure $ PLFilePath $ T.unpack t
         http t =
-            case parseUrl $ T.unpack t of
+            case parseRequest $ T.unpack t of
                 Left  _ -> mzero
                 Right _ -> return $ PLRemote t RPTHttp
 

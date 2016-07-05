@@ -116,7 +116,7 @@ signPackage manager url pkg filePath = do
             url <> "/upload/signature/" <> show name <> "/" <> show version <>
             "/" <>
             show fingerprint
-    req <- parseUrl fullUrl
+    req <- parseUrlThrow fullUrl
     let put =
             req
             { method = methodPut

@@ -27,7 +27,7 @@ getExamplePath dir = do
 -- | An example DownloadRequest that uses a SHA1
 exampleReq :: DownloadRequest
 exampleReq = fromMaybe (error "exampleReq") $ do
-    req <- parseUrl "http://download.fpcomplete.com/stackage-cli/linux64/cabal-install-1.22.4.0.tar.gz"
+    let req = parseRequest_ "http://download.fpcomplete.com/stackage-cli/linux64/cabal-install-1.22.4.0.tar.gz"
     return DownloadRequest
         { drRequest = req
         , drHashChecks = [exampleHashCheck]
@@ -143,7 +143,7 @@ spec = beforeAll setup $ afterAll teardown $ do
     -- https://github.com/commercialhaskell/stack/issues/240
     it "can download hackage tarballs" $ \T{..} -> withTempDir' $ \dir -> do
       dest <- fmap (dir </>) $ parseRelFile "acme-missiles-0.3.tar.gz"
-      req <- parseUrl "http://hackage.haskell.org/package/acme-missiles-0.3/acme-missiles-0.3.tar.gz"
+      let req = parseRequest_ "http://hackage.haskell.org/package/acme-missiles-0.3/acme-missiles-0.3.tar.gz"
       let dReq = DownloadRequest
             { drRequest = req
             , drHashChecks = []

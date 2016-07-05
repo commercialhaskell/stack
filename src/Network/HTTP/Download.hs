@@ -16,7 +16,7 @@ module Network.HTTP.Download
     , download
     , redownload
     , downloadJSON
-    , parseUrl
+    , parseUrlThrow
     , liftHTTP
     , ask
     , getHttpManager
@@ -46,10 +46,10 @@ import           Data.Monoid                 ((<>))
 import           Data.Text.Encoding.Error    (lenientDecode)
 import           Data.Text.Encoding          (decodeUtf8With)
 import           Data.Typeable               (Typeable)
-import           Network.HTTP.Client         (path)
+import           Network.HTTP.Client         (path, checkResponse)
 import           Network.HTTP.Client.Conduit (HasHttpManager, Manager, Request,
-                                              Response, checkStatus,
-                                              getHttpManager, parseUrl,
+                                              Response,
+                                              getHttpManager, parseUrlThrow,
                                               requestHeaders, responseBody,
                                               responseHeaders, responseStatus,
                                               withResponse)
@@ -108,7 +108,7 @@ redownload req0 dest = do
                         requestHeaders req0 ++
                         [("If-None-Match", L.toStrict etag)]
                     }
-        req2 = req1 { checkStatus = \_ _ _ -> Nothing }
+        req2 = req1 { checkResponse = \_ _ -> return () }
     env <- ask
     liftIO $ recoveringHttp drRetryPolicyDefault $ flip runReaderT env $
       withResponse req2 $ \res -> case () of

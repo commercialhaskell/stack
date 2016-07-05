@@ -136,9 +136,7 @@ loadTemplate name logIt = do
     case templatePath name of
         AbsPath absFile -> logIt LocalTemp >> loadLocalFile absFile
         UrlPath s -> do
-            let req = fromMaybe (error "impossible happened: already valid \
-                                       \URL couldn't be parsed")
-                                (parseUrl s)
+            let req = parseRequest_ s
                 rel = fromMaybe backupUrlRelPath (parseRelFile s)
             downloadTemplate req (templateDir </> rel)
         RelPath relFile ->
@@ -162,7 +160,7 @@ loadTemplate name logIt = do
             then liftIO (T.readFile (toFilePath path))
             else throwM (FailedToLoadTemplate name (toFilePath path))
     relRequest :: MonadThrow n => Path Rel File -> n Request
-    relRequest rel = parseUrl (defaultTemplateUrl <> "/" <> toFilePath rel)
+    relRequest rel = parseUrlThrow (defaultTemplateUrl <> "/" <> toFilePath rel)
     downloadTemplate :: Request -> Path Abs File -> m Text
     downloadTemplate req path = do
         logIt RemoteTemp
@@ -293,7 +291,7 @@ getTemplates
     :: (MonadIO m, MonadReader r m, HasHttpManager r, MonadCatch m)
     => m (Set TemplateName)
 getTemplates = do
-    req <- liftM addHeaders (parseUrl defaultTemplatesList)
+    req <- liftM addHeaders (parseUrlThrow defaultTemplatesList)
     resp <- catch (httpLbs req) (throwM . FailedToDownloadTemplates)
     case statusCode (responseStatus resp) of
         200 ->
@@ -307,7 +305,7 @@ getTemplateInfo
     :: (MonadIO m, MonadReader r m, HasHttpManager r, MonadCatch m)
     => m (Map Text TemplateInfo)
 getTemplateInfo = do
-  req <- liftM addHeaders (parseUrl defaultTemplateInfoUrl)
+  req <- liftM addHeaders (parseUrlThrow defaultTemplateInfoUrl)
   resp <- catch (liftM Right $ httpLbs req) (\(ex :: HttpException) -> return . Left $ "Failed to download template info. The HTTP error was: " <> show ex)
   case resp >>= is200 of
     Left err -> do

@@ -16,3 +16,6 @@ extra-deps:
 - th-utilities-0.1.1.0
 - store-0.1.0.1
 - th-orphans-0.13.1
+- http-client-0.5.0
+- http-client-tls-0.3.0
+- http-conduit-2.2.0
