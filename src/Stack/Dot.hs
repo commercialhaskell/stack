@@ -31,7 +31,7 @@ import qualified Data.Traversable as T
 import           Network.HTTP.Client.Conduit (HasHttpManager)
 import           Prelude -- Fix redundant import warnings
 import           Stack.Build (withLoadPackage)
-import           Stack.Build.Installed (getInstalled, GetInstalledOpts(..))
+import           Stack.Build.Installed (getInstalled, defaultGetInstalledOpts)
 import           Stack.Build.Source
 import           Stack.Build.Target
 import           Stack.Constants
@@ -92,7 +92,7 @@ createDependencyGraph dotOpts = do
   let graph = Map.fromList (localDependencies dotOpts locals)
   menv <- getMinimalEnvOverride
   installedMap <- fmap snd . fst4 <$> getInstalled menv
-                                                   (GetInstalledOpts False False)
+                                                   defaultGetInstalledOpts
                                                    sourceMap
   withLoadPackage menv (\loader -> do
     let depLoader =

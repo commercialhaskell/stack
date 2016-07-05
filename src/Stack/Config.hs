@@ -26,6 +26,7 @@ module Stack.Config
   ,loadConfig
   ,loadConfigMaybeProject
   ,loadMiniConfig
+  ,loadProjectConfig
   ,packagesParser
   ,resolvePackageEntry
   ,getImplicitGlobalProjectDir

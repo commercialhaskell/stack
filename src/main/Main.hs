@@ -24,11 +24,9 @@ import           Control.Monad.Writer.Lazy (Writer)
 import           Data.Attoparsec.Args (parseArgs, EscapingMode (Escaping))
 import           Data.Attoparsec.Interpreter (getInterpreterArgs)
 import qualified Data.ByteString.Char8 as S8
-import qualified Data.ByteString.Lazy as L
 import           Data.IORef
 import           Data.List
 import qualified Data.Map as Map
-import qualified Data.Map.Strict as M
 import           Data.Maybe
 import           Data.Maybe.Extra (mapMaybeA)
 import           Data.Monoid
@@ -84,7 +82,8 @@ import           Stack.New
 import           Stack.Options
 import           Stack.Package (findOrGenerateCabalFile)
 import qualified Stack.PackageIndex
-import           Stack.SDist (getSDistTarball, checkSDistTarball, checkSDistTarball')
+import           Stack.SDist (PvpBoundsOpts, SDistOpts)
+import qualified Stack.SDist as SDist
 import           Stack.Setup
 import qualified Stack.Sig as Sig
 import           Stack.Solver (solveExtraDeps)
@@ -293,7 +292,7 @@ commandLineHandler progName isInterpreter = complicatedOptions
             "Upload a package to Hackage"
             uploadCmd
             ((,,,,) <$> many (strArgument $ metavar "TARBALL/DIR") <*>
-             optional pvpBoundsOption <*>
+             optional pvpBoundsOptsParser <*>
              ignoreCheckSwitch <*>
              switch (long "no-signature" <> help "Do not sign & upload signatures") <*>
              strOption
@@ -304,14 +303,7 @@ commandLineHandler progName isInterpreter = complicatedOptions
             "sdist"
             "Create source distribution tarballs"
             sdistCmd
-            ((,,,,) <$> many (strArgument $ metavar "DIR") <*>
-             optional pvpBoundsOption <*>
-             ignoreCheckSwitch <*>
-             switch (long "sign" <> help "Sign & upload signatures") <*>
-             strOption
-             (long "sig-server" <> metavar "URL" <> showDefault <>
-              value "https://sig.commercialhaskell.org" <>
-              help "URL"))
+            sdistOptsParser
         addCommand' "dot"
                     "Visualize your project's dependency graph using Graphviz dot"
                     dotCmd
@@ -1000,9 +992,9 @@ upgradeCmd (fromGit, repo) go = withGlobalConfigAndLock go $ do
 #endif
 
 -- | Upload to Hackage
-uploadCmd :: ([String], Maybe PvpBounds, Bool, Bool, String) -> GlobalOpts -> IO ()
+uploadCmd :: ([String], Maybe PvpBoundsOpts, Bool, Bool, String) -> GlobalOpts -> IO ()
 uploadCmd ([], _, _, _, _) _ = error "To upload the current package, please run 'stack upload .'"
-uploadCmd (args, mpvpBounds, ignoreCheck, don'tSign, sigServerUrl) go = do
+uploadCmd (args, mpvpBoundsOpts, ignoreCheck, don'tSign, sigServerUrl) go = do
     let partitionM _ [] = return ([], [])
         partitionM f (x:xs) = do
             r <- f x
@@ -1024,7 +1016,7 @@ uploadCmd (args, mpvpBounds, ignoreCheck, don'tSign, sigServerUrl) go = do
         uploader <- getUploader
         manager <- asks envManager
         unless ignoreCheck $
-            mapM_ (resolveFile' >=> checkSDistTarball) files
+            mapM_ (resolveFile' >=> SDist.checkSDistTarball) files
         forM_
             files
             (\file ->
@@ -1041,8 +1033,8 @@ uploadCmd (args, mpvpBounds, ignoreCheck, don'tSign, sigServerUrl) go = do
         unless (null dirs) $
             forM_ dirs $ \dir -> do
                 pkgDir <- resolveDir' dir
-                (tarName, tarBytes) <- getSDistTarball mpvpBounds pkgDir
-                unless ignoreCheck $ checkSDistTarball' tarName tarBytes
+                (tarName, tarBytes) <- SDist.getSDistTarball mpvpBoundsOpts pkgDir
+                unless ignoreCheck $ SDist.checkSDistTarball' tarName tarBytes
                 liftIO $ Upload.uploadBytes uploader tarName tarBytes
                 tarPath <- parseRelFile tarName
                 unless
@@ -1054,23 +1046,9 @@ uploadCmd (args, mpvpBounds, ignoreCheck, don'tSign, sigServerUrl) go = do
                          tarPath
                          tarBytes)
 
-sdistCmd :: ([String], Maybe PvpBounds, Bool, Bool, String) -> GlobalOpts -> IO ()
-sdistCmd (dirs, mpvpBounds, ignoreCheck, sign, sigServerUrl) go =
-    withBuildConfig go $ do -- No locking needed.
-        -- If no directories are specified, build all sdist tarballs.
-        dirs' <- if null dirs
-            then asks (Map.keys . envConfigPackages . getEnvConfig)
-            else mapM resolveDir' dirs
-        manager <- asks envManager
-        forM_ dirs' $ \dir -> do
-            (tarName, tarBytes) <- getSDistTarball mpvpBounds dir
-            distDir <- distDirFromDir dir
-            tarPath <- (distDir </>) <$> parseRelFile tarName
-            ensureDir (parent tarPath)
-            liftIO $ L.writeFile (toFilePath tarPath) tarBytes
-            unless ignoreCheck (checkSDistTarball tarPath)
-            $logInfo $ "Wrote sdist tarball to " <> T.pack (toFilePath tarPath)
-            when sign (void $ Sig.sign manager sigServerUrl tarPath)
+sdistCmd :: SDistOpts -> GlobalOpts -> IO ()
+sdistCmd opts go =
+    withBuildConfig go (SDist.sdist opts) -- No locking needed.
 
 -- | Execute a command.
 execCmd :: ExecOpts -> GlobalOpts -> IO ()
@@ -1297,7 +1275,7 @@ packagesCmd () go@GlobalOpts{..} =
     withBuildConfig go $
       do econfig <- asks getEnvConfig
          locals <-
-             forM (M.toList (envConfigPackages econfig)) $
+             forM (Map.toList (envConfigPackages econfig)) $
              \(dir,_) ->
                   do cabalfp <- findOrGenerateCabalFile dir
                      parsePackageNameFromFilePath cabalfp
@@ -1315,7 +1293,7 @@ targetsCmd () go@GlobalOpts{..} =
                      renderPkgComponent
                      (concatMap
                           toNameAndComponent
-                          (M.toList (M.map fst rawLocals)))))
+                          (Map.toList (Map.map fst rawLocals)))))
   where
     toNameAndComponent (packageName,view) =
         map (packageName, ) (Set.toList (lpvComponents view))

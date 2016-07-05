@@ -418,7 +418,7 @@ getToolMap mbp =
 
 loadResolver
     :: (MonadIO m, MonadLogger m, MonadReader env m, HasHttpManager env, HasConfig env, HasGHCVariant env, MonadBaseControl IO m, MonadMask m)
-    => Maybe (Path Abs File)
+    => Maybe (Path Abs File) -- ^ Optional path to project config file
     -> Resolver
     -> m (MiniBuildPlan, LoadedResolver)
 loadResolver mconfigPath resolver =
@@ -954,7 +954,7 @@ shadowMiniBuildPlan (MiniBuildPlan cv pkgs0) shadowed =
 
 parseCustomMiniBuildPlan
     :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasHttpManager env, HasConfig env, HasGHCVariant env, MonadBaseControl IO m)
-    => Maybe (Path Abs File) -- ^ Root directory for when url is a filepath
+    => Maybe (Path Abs File) -- ^ Optional path to project config file
     -> T.Text
     -> m (MiniBuildPlan, SnapshotHash)
 parseCustomMiniBuildPlan mconfigPath0 url0 = do
