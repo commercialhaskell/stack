@@ -62,6 +62,7 @@ extra-deps:
 - th-orphans-0.13.1
 - base-orphans-0.5.4
 - tar-0.5.0.3
+- clock-0.7.2
 flags:
   time-locale-compat:
     old-locale: false
