@@ -19,6 +19,8 @@ import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import           Control.Monad.Reader (ask, asks,local,runReaderT)
 import           Control.Monad.Trans.Control (MonadBaseControl)
+import           Control.Monad.Trans.Either (EitherT)
+import           Control.Monad.Writer.Lazy (Writer)
 import           Data.Attoparsec.Args (parseArgs, EscapingMode (Escaping))
 import           Data.Attoparsec.Interpreter (getInterpreterArgs)
 import qualified Data.ByteString.Char8 as S8
@@ -443,16 +445,23 @@ commandLineHandler progName isInterpreter = complicatedOptions
                     <> help "Do not check package for common mistakes")
 
         -- addCommand hiding global options
+        addCommand' :: String -> String -> (a -> GlobalOpts -> IO ()) -> Parser a
+                    -> AddCommand
         addCommand' cmd title constr =
             addCommand cmd title globalFooter constr (globalOpts OtherCmdGlobalOpts)
 
+        addSubCommands' :: String -> String -> AddCommand
+                        -> AddCommand
         addSubCommands' cmd title =
             addSubCommands cmd title globalFooter (globalOpts OtherCmdGlobalOpts)
 
         -- Additional helper that hides global options and shows build options
+        addBuildCommand' :: String -> String -> (a -> GlobalOpts -> IO ()) -> Parser a
+                         -> AddCommand
         addBuildCommand' cmd title constr =
             addCommand cmd title globalFooter constr (globalOpts BuildCmdGlobalOpts)
 
+    globalOpts :: GlobalOptsContext -> Parser GlobalOptsMonoid
     globalOpts kind =
         extraHelpOption hide progName (Docker.dockerCmdName ++ "*") Docker.dockerHelpOptName <*>
         extraHelpOption hide progName (Nix.nixCmdName ++ "*") Nix.nixHelpOptName <*>
@@ -462,6 +471,9 @@ commandLineHandler progName isInterpreter = complicatedOptions
         where hide = kind /= OuterGlobalOpts
 
     globalFooter = "Run 'stack --help' for global options that apply to all subcommands."
+
+type AddCommand =
+    EitherT (GlobalOpts -> IO ()) (Writer (Mod CommandFields ((GlobalOpts -> IO ()), GlobalOptsMonoid))) ()
 
 -- | fall-through to external executables in `git` style if they exist
 -- (i.e. `stack something` looks for `stack-something` before
