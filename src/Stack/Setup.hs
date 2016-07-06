@@ -595,7 +595,7 @@ getSetupInfo stackSetupYaml manager = do
     loadSetupInfo (SetupInfoInline si) = return si
     loadSetupInfo (SetupInfoFileOrURL urlOrFile) = do
         bs <-
-            case parseUrl urlOrFile of
+            case parseUrlThrow urlOrFile of
                 Just req -> do
                     bss <-
                         liftIO $
@@ -1209,7 +1209,7 @@ chattyDownload :: (MonadReader env m, HasHttpManager env, MonadIO m, MonadLogger
                -> m ()
 chattyDownload label downloadInfo path = do
     let url = downloadInfoUrl downloadInfo
-    req <- parseUrl $ T.unpack url
+    req <- parseUrlThrow $ T.unpack url
     $logSticky $ T.concat
       [ "Preparing to download "
       , label

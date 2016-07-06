@@ -172,9 +172,9 @@ library
                    , hashable >= 1.2.3.2
                    , hit
                    , hpc
-                   , http-client >= 0.4.17
-                   , http-client-tls >= 0.2.2
-                   , http-conduit >= 2.1.7
+                   , http-client >= 0.5.0
+                   , http-client-tls >= 0.3.0
+                   , http-conduit >= 2.2.0
                    , http-types >= 0.8.6 && < 0.10
                    , lifted-base
                    , microlens >= 0.3.0.0

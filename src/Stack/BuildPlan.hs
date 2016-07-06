@@ -76,9 +76,7 @@ import qualified Distribution.PackageDescription as C
 import           Distribution.System (Platform)
 import           Distribution.Text (display)
 import qualified Distribution.Version as C
-import           Network.HTTP.Client (checkStatus)
 import           Network.HTTP.Download
-import           Network.HTTP.Types (Status(..))
 import           Path
 import           Path.IO
 import           Prelude -- Fix AMP warning
@@ -498,17 +496,15 @@ loadBuildPlan name = do
             $logDebug $ "Decoding build plan from file failed: " <> T.pack (show e)
             ensureDir (parent fp)
             url <- buildBuildPlanUrl name file
-            req <- parseUrl $ T.unpack url
+            req <- parseRequest $ T.unpack url
             $logSticky $ "Downloading " <> renderSnapName name <> " build plan ..."
             $logDebug $ "Downloading build plan from: " <> url
-            _ <- redownload req { checkStatus = handle404 } fp
+            _ <- redownload req fp
             $logStickyDone $ "Downloaded " <> renderSnapName name <> " build plan."
             liftIO (decodeFileEither $ toFilePath fp) >>= either throwM return
 
   where
     file = renderSnapName name <> ".yaml"
-    handle404 (Status 404 _) _ _ = Just $ SomeException $ SnapshotNotFound name
-    handle404 _ _ _              = Nothing
 
 buildBuildPlanUrl :: (MonadReader env m, HasConfig env) => SnapName -> Text -> m Text
 buildBuildPlanUrl name file = do
@@ -959,7 +955,7 @@ parseCustomMiniBuildPlan
     -> m (MiniBuildPlan, SnapshotHash)
 parseCustomMiniBuildPlan mconfigPath0 url0 = do
     $logDebug $ "Loading " <> url0 <> " build plan"
-    case parseUrl $ T.unpack url0 of
+    case parseUrlThrow $ T.unpack url0 of
         Just req -> downloadCustom url0 req
         Nothing ->
            case mconfigPath0 of
@@ -1004,7 +1000,7 @@ parseCustomMiniBuildPlan mconfigPath0 url0 = do
         (cs, mresolver) <- decodeYaml yamlBS
         (getMbp, hash) <- case mresolver of
             Just (ResolverCustom _ url ) ->
-                case parseUrl $ T.unpack url of
+                case parseUrlThrow $ T.unpack url of
                     Just req -> do
                         let getMbp = do
                                 -- Ignore custom hash, under the

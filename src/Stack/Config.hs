@@ -68,7 +68,7 @@ import           Distribution.System (OS (..), Platform (..), buildPlatform)
 import qualified Distribution.Text
 import           Distribution.Version (simplifyVersionRange)
 import           GHC.Conc (getNumProcessors)
-import           Network.HTTP.Client.Conduit (HasHttpManager, getHttpManager, Manager, parseUrl)
+import           Network.HTTP.Client.Conduit (HasHttpManager, getHttpManager, Manager, parseUrlThrow)
 import           Network.HTTP.Download (download, downloadJSON)
 import           Options.Applicative (Parser, strOption, long, help)
 import           Path
@@ -143,7 +143,7 @@ getSnapshots :: (MonadThrow m, MonadMask m, MonadIO m, MonadReader env m, HasHtt
              => m Snapshots
 getSnapshots = do
     latestUrlText <- askLatestSnapshotUrl
-    latestUrl <- parseUrl (T.unpack latestUrlText)
+    latestUrl <- parseUrlThrow (T.unpack latestUrlText)
     $logDebug $ "Downloading snapshot versions file from " <> latestUrlText
     result <- downloadJSON latestUrl
     $logDebug $ "Done downloading and parsing snapshot versions file"
@@ -641,7 +641,7 @@ resolvePackageLocation menv projRoot (PLRemote url remotePackageType) = do
                 ignoringAbsence (removeDirRecur dirTmp)
 
                 let fp = toFilePath file
-                req <- parseUrl $ T.unpack url
+                req <- parseUrlThrow $ T.unpack url
                 _ <- download req file
 
                 let tryTar = do

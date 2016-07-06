@@ -48,8 +48,8 @@ import           Network.HTTP.Client                   (BodyReader, Manager,
                                                         Response,
                                                         RequestBody(RequestBodyLBS),
                                                         applyBasicAuth, brRead,
-                                                        checkStatus, newManager,
-                                                        parseUrl,
+                                                        newManager,
+                                                        parseRequest,
                                                         requestHeaders,
                                                         responseBody,
                                                         responseStatus,
@@ -195,10 +195,9 @@ mkUploader config us = do
     manager <- usGetManager us
     (creds, fromFile') <- loadCreds $ usCredsSource us config
     when (not fromFile' && usSaveCreds us) $ saveCreds config creds
-    req0 <- parseUrl $ usUploadUrl us
+    req0 <- parseRequest $ usUploadUrl us
     let req1 = req0
             { requestHeaders = [("Accept", "text/plain")]
-            , checkStatus = \_ _ _ -> Nothing
             }
     return Uploader
         { upload_ = \tarName bytes -> do

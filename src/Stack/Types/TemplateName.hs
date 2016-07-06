@@ -17,7 +17,7 @@ import           Data.Text (Text)
 import qualified Data.Text as T
 import           Data.Yaml (Value(Object), (.:?))
 import           Language.Haskell.TH
-import           Network.HTTP.Client (parseUrl)
+import           Network.HTTP.Client (parseRequest)
 import qualified Options.Applicative as O
 import           Path
 import           Path.Internal
@@ -83,7 +83,7 @@ parseTemplateNameFromString fname =
                                            $ asum (validParses prefix hsf orig)
     validParses prefix hsf orig =
         -- NOTE: order is important
-        [ TemplateName (T.pack orig) . UrlPath <$> (parseUrl orig *> Just orig)
+        [ TemplateName (T.pack orig) . UrlPath <$> (parseRequest orig *> Just orig)
         , TemplateName prefix        . AbsPath <$> parseAbsFile hsf
         , TemplateName prefix        . RelPath <$> parseRelFile hsf
         ]
