@@ -15,7 +15,6 @@ import           Control.Monad hiding (mapM, forM)
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import           Control.Monad.Reader (ask, asks,local,runReaderT)
-import           Control.Monad.Trans.Control (MonadBaseControl)
 import           Control.Monad.Trans.Either (EitherT)
 import           Control.Monad.Writer.Lazy (Writer)
 import           Data.Attoparsec.Args (parseArgs, EscapingMode (Escaping))
