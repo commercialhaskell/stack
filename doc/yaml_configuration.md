@@ -21,7 +21,7 @@ project, not in the user or global config files.
 
 > Note: We define **project** to mean a directory that contains a `stack.yaml`
 > file, which specifies how to build a set of packages. We define **package** to
-> be a package with a `.cabal file.
+> be a package with a `.cabal` file.
 
 In your project-specific options, you specify both **which local packages** to
 build and **which dependencies to use** when building these packages. Unlike the
