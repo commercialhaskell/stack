@@ -23,10 +23,8 @@ import           Data.Attoparsec.Interpreter (getInterpreterArgs)
 import qualified Data.ByteString.Lazy as L
 import           Data.List
 import qualified Data.Map as Map
-import qualified Data.Map.Strict as M
 import           Data.Maybe
 import           Data.Monoid
-import qualified Data.Set as Set
 import           Data.Text (Text)
 import qualified Data.Text as T
 import           Data.Traversable
@@ -53,8 +51,6 @@ import           Path.IO
 import qualified Paths_stack as Meta
 import           Prelude hiding (pi, mapM)
 import           Stack.Build
-import           Stack.Build.Target
-import           Stack.Build.Source
 import           Stack.Clean (CleanOpts, clean)
 import           Stack.Config
 import           Stack.ConfigCmd as ConfigCmd
@@ -68,11 +64,11 @@ import           Stack.Fetch
 import           Stack.FileWatch
 import           Stack.Ghci
 import           Stack.Hoogle
+import qualified Stack.IDE as IDE
 import qualified Stack.Image as Image
 import           Stack.Init
 import           Stack.New
 import           Stack.Options
-import           Stack.Package (findOrGenerateCabalFile)
 import qualified Stack.PackageIndex
 import qualified Stack.Path
 import           Stack.Runners
@@ -369,12 +365,12 @@ commandLineHandler progName isInterpreter = complicatedOptions
             (do addCommand'
                     "packages"
                     "List all available local loadable packages"
-                    packagesCmd
+                    idePackagesCmd
                     (pure ())
                 addCommand'
                     "targets"
                     "List all available stack targets"
-                    targetsCmd
+                    ideTargetsCmd
                     (pure ()))
         addSubCommands'
           Docker.dockerCmdName
@@ -760,33 +756,14 @@ ghciCmd ghciOpts go@GlobalOpts{..} =
           (ghci ghciOpts)
 
 -- | List packages in the project.
-packagesCmd :: () -> GlobalOpts -> IO ()
-packagesCmd () go@GlobalOpts{..} =
-    withBuildConfig go $
-      do econfig <- asks getEnvConfig
-         locals <-
-             forM (M.toList (envConfigPackages econfig)) $
-             \(dir,_) ->
-                  do cabalfp <- findOrGenerateCabalFile dir
-                     parsePackageNameFromFilePath cabalfp
-         forM_ locals (liftIO . putStrLn . packageNameString)
+idePackagesCmd :: () -> GlobalOpts -> IO ()
+idePackagesCmd () go =
+    withBuildConfig go IDE.listPackages
 
 -- | List targets in the project.
-targetsCmd :: () -> GlobalOpts -> IO ()
-targetsCmd () go@GlobalOpts{..} =
-    withBuildConfig go $
-    do rawLocals <- getLocalPackageViews
-       $logInfo
-           (T.intercalate
-                "\n"
-                (map
-                     renderPkgComponent
-                     (concatMap
-                          toNameAndComponent
-                          (M.toList (M.map fst rawLocals)))))
-  where
-    toNameAndComponent (packageName,view) =
-        map (packageName, ) (Set.toList (lpvComponents view))
+ideTargetsCmd :: () -> GlobalOpts -> IO ()
+ideTargetsCmd () go =
+    withBuildConfig go IDE.listTargets
 
 -- | Pull the current Docker image.
 dockerPullCmd :: () -> GlobalOpts -> IO ()

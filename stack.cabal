@@ -97,6 +97,7 @@ library
                      Stack.GhcPkg
                      Stack.Ghci
                      Stack.Hoogle
+                     Stack.IDE
                      Stack.Image
                      Stack.Init
                      Stack.New
