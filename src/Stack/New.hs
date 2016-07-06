@@ -160,7 +160,7 @@ loadTemplate name logIt = do
             then liftIO (T.readFile (toFilePath path))
             else throwM (FailedToLoadTemplate name (toFilePath path))
     relRequest :: MonadThrow n => Path Rel File -> n Request
-    relRequest rel = parseUrlThrow (defaultTemplateUrl <> "/" <> toFilePath rel)
+    relRequest rel = parseRequest (defaultTemplateUrl <> "/" <> toFilePath rel)
     downloadTemplate :: Request -> Path Abs File -> m Text
     downloadTemplate req path = do
         logIt RemoteTemp

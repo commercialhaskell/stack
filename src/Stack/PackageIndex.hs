@@ -309,7 +309,7 @@ updateIndexHTTP :: (MonadIO m,MonadLogger m
                 -> Text -- ^ url
                 -> m ()
 updateIndexHTTP indexName' index url = do
-    req <- parseUrlThrow $ T.unpack url
+    req <- parseRequest $ T.unpack url
     $logInfo ("Downloading package index from " <> url)
     gz <- configPackageIndexGz indexName'
     tar <- configPackageIndex indexName'

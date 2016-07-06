@@ -76,9 +76,7 @@ import qualified Distribution.PackageDescription as C
 import           Distribution.System (Platform)
 import           Distribution.Text (display)
 import qualified Distribution.Version as C
-import           Network.HTTP.Client (checkResponse, responseStatus, parseRequest)
 import           Network.HTTP.Download
-import           Network.HTTP.Types (Status(..))
 import           Path
 import           Path.IO
 import           Prelude -- Fix AMP warning
@@ -501,16 +499,12 @@ loadBuildPlan name = do
             req <- parseRequest $ T.unpack url
             $logSticky $ "Downloading " <> renderSnapName name <> " build plan ..."
             $logDebug $ "Downloading build plan from: " <> url
-            _ <- redownload req { checkResponse = handle404 } fp
+            _ <- redownload req fp
             $logStickyDone $ "Downloaded " <> renderSnapName name <> " build plan."
             liftIO (decodeFileEither $ toFilePath fp) >>= either throwM return
 
   where
     file = renderSnapName name <> ".yaml"
-    handle404 _req resp =
-        case responseStatus resp of
-            Status 404 _ -> throwM $ SomeException $ SnapshotNotFound name
-            _ -> return ()
 
 buildBuildPlanUrl :: (MonadReader env m, HasConfig env) => SnapName -> Text -> m Text
 buildBuildPlanUrl name file = do

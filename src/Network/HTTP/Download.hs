@@ -16,6 +16,7 @@ module Network.HTTP.Download
     , download
     , redownload
     , downloadJSON
+    , parseRequest
     , parseUrlThrow
     , liftHTTP
     , ask
@@ -48,7 +49,7 @@ import           Data.Text.Encoding          (decodeUtf8With)
 import           Data.Typeable               (Typeable)
 import           Network.HTTP.Client         (path, checkResponse)
 import           Network.HTTP.Client.Conduit (HasHttpManager, Manager, Request,
-                                              Response,
+                                              Response, parseRequest,
                                               getHttpManager, parseUrlThrow,
                                               requestHeaders, responseBody,
                                               responseHeaders, responseStatus,
