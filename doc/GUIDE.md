@@ -1642,6 +1642,13 @@ ensure the turtle package is available.
 If you're on Windows: you can run `stack turtle.hs` instead of `./turtle.hs`.
 The shebang line is not required in that case.
 
+### Stack configuration for scripts
+
+If the current working directory is inside a project then that project's stack
+configuration is effective when running the script. Otherwise the script uses
+the global project configuration specified in
+`~/.stack/global-project/stack.yaml`.
+
 ### Specifying interpreter options
 
 The stack interpreter options comment must specify a single valid stack command
