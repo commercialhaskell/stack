@@ -195,6 +195,7 @@ parseTargetsFromBuildOpts
     -> BuildOptsCLI
     -> m (MiniBuildPlan, M.Map PackageName Version, M.Map PackageName SimpleTarget)
 parseTargetsFromBuildOpts needTargets boptscli = do
+    $logDebug "Parsing the targets"
     bconfig <- asks getBuildConfig
     mbp0 <-
         case bcResolver bconfig of
@@ -258,6 +259,7 @@ convertSnapshotToExtra snapshot extra0 locals = go Map.empty
 getLocalPackageViews :: (MonadThrow m, MonadIO m, MonadReader env m, HasEnvConfig env, MonadLogger m)
                      => m (Map PackageName (LocalPackageView, GenericPackageDescription))
 getLocalPackageViews = do
+    $logDebug "Parsing the cabal files of the local packages"
     econfig <- asks getEnvConfig
     locals <- forM (Map.toList $ envConfigPackages econfig) $ \(dir, treatLikeExtraDep) -> do
         cabalfp <- findOrGenerateCabalFile dir

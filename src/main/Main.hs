@@ -919,6 +919,7 @@ withBuildConfigExt go@GlobalOpts{..} mbefore inner mafter = do
                withUserFileLock go dir $ \lk2 -> do
                  liftIO $ writeIORef curLk lk2
                  liftIO $ munlockFile lk
+                 $logDebug "Starting to execute command inside EnvConfig"
                  inner lk2
 
       let inner'' lk = do

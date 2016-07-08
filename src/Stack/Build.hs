@@ -161,7 +161,8 @@ instance Exception CabalVersionException
 -- | See https://github.com/commercialhaskell/stack/issues/1198.
 warnIfExecutablesWithSameNameCouldBeOverwritten
     :: MonadLogger m => [LocalPackage] -> Plan -> m ()
-warnIfExecutablesWithSameNameCouldBeOverwritten locals plan =
+warnIfExecutablesWithSameNameCouldBeOverwritten locals plan = do
+    $logDebug "Checking if we are going to build multiple executables with the same name"
     forM_ (Map.toList warnings) $ \(exe,(toBuild,otherLocals)) -> do
         let exe_s
                 | length toBuild > 1 = "several executables with the same name:"

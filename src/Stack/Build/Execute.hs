@@ -348,6 +348,7 @@ executePlan :: M env m
             -> Plan
             -> m ()
 executePlan menv boptsCli baseConfigOpts locals globalPackages snapshotPackages localPackages installedMap targets plan = do
+    $logDebug "Executing the build plan"
     bopts <- asks (configBuild . getConfig)
     withExecuteEnv menv bopts boptsCli baseConfigOpts locals globalPackages snapshotPackages localPackages (executePlan' installedMap targets plan)
 
