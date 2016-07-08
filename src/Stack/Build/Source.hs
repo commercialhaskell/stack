@@ -22,6 +22,7 @@ module Stack.Build.Source
 
 import              Control.Applicative
 import              Control.Arrow ((&&&))
+import              Control.Concurrent.Async.Lifted (forConcurrently)
 import              Control.Exception (assert, catch)
 import              Control.Monad hiding (sequence)
 import              Control.Monad.Catch (MonadMask)
@@ -190,7 +191,7 @@ getGhcOptions bconfig boptsCli name isTarget isLocal = concat
 
 -- | Use the build options and environment to parse targets.
 parseTargetsFromBuildOpts
-    :: (MonadIO m, MonadMask m, MonadReader env m, MonadLogger m, HasEnvConfig env)
+    :: (MonadIO m, MonadMask m, MonadReader env m, MonadLogger m, HasEnvConfig env, MonadBaseControl IO m)
     => NeedTargets
     -> BuildOptsCLI
     -> m (MiniBuildPlan, M.Map PackageName Version, M.Map PackageName SimpleTarget)
@@ -256,12 +257,12 @@ convertSnapshotToExtra snapshot extra0 locals = go Map.empty
                 go (Map.insert flag version extra) flags
 
 -- | Parse out the local package views for the current project
-getLocalPackageViews :: (MonadThrow m, MonadIO m, MonadReader env m, HasEnvConfig env, MonadLogger m)
+getLocalPackageViews :: (MonadThrow m, MonadIO m, MonadReader env m, HasEnvConfig env, MonadLogger m, MonadBaseControl IO m)
                      => m (Map PackageName (LocalPackageView, GenericPackageDescription))
 getLocalPackageViews = do
     $logDebug "Parsing the cabal files of the local packages"
     econfig <- asks getEnvConfig
-    locals <- forM (Map.toList $ envConfigPackages econfig) $ \(dir, treatLikeExtraDep) -> do
+    locals <- forConcurrently (Map.toList $ envConfigPackages econfig) $ \(dir, treatLikeExtraDep) -> do
         cabalfp <- findOrGenerateCabalFile dir
         (warnings,gpkg) <- readPackageUnresolved cabalfp
         mapM_ (printCabalFileWarning cabalfp) warnings
