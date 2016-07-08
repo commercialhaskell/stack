@@ -1,4 +1,5 @@
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE FlexibleContexts #-}
 
 -- | Clean a project.
 module Stack.Clean
@@ -12,6 +13,7 @@ import           Control.Monad.Catch (MonadCatch, MonadThrow, throwM)
 import           Control.Monad.IO.Class (MonadIO)
 import           Control.Monad.Logger (MonadLogger)
 import           Control.Monad.Reader (MonadReader, asks)
+import           Control.Monad.Trans.Control (MonadBaseControl)
 import           Data.Foldable (forM_)
 import           Data.List ((\\),intercalate)
 import qualified Data.Map.Strict as Map
@@ -28,7 +30,7 @@ import           Stack.Types
 --
 -- Throws 'StackCleanException'.
 clean
-    :: (MonadCatch m, MonadIO m, MonadReader env m, HasEnvConfig env, MonadLogger m)
+    :: (MonadCatch m, MonadIO m, MonadReader env m, HasEnvConfig env, MonadLogger m, MonadBaseControl IO m)
     => CleanOpts
     -> m ()
 clean cleanOpts = do
@@ -36,7 +38,7 @@ clean cleanOpts = do
     forM_ dirs (ignoringAbsence . removeDirRecur)
 
 dirsToDelete
-    :: (MonadThrow m, MonadIO m, MonadReader env m, HasEnvConfig env, MonadLogger m)
+    :: (MonadThrow m, MonadIO m, MonadReader env m, HasEnvConfig env, MonadLogger m, MonadBaseControl IO m)
     => CleanOpts
     -> m [Path Abs Dir]
 dirsToDelete cleanOpts = do
