@@ -64,6 +64,7 @@ getInstalled :: (M env m, PackageInstallInfo pii)
                   , [DumpPackage () ()] -- locally installed
                   )
 getInstalled menv opts sourceMap = do
+    $logDebug "Finding out which packages are already installed"
     snapDBPath <- packageDatabaseDeps
     localDBPath <- packageDatabaseLocal
     extraDBPaths <- packageDatabaseExtra

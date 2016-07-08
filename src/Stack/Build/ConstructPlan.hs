@@ -135,6 +135,7 @@ constructPlan :: forall env m.
               -> InstalledMap
               -> m Plan
 constructPlan mbp0 baseConfigOpts0 locals extraToBuild0 localDumpPkgs loadPackage0 sourceMap installedMap = do
+    $logDebug "Constructing the build plan"
     let locallyRegistered = Map.fromList $ map (dpGhcPkgId &&& dpPackageIdent) localDumpPkgs
     getVersions0 <- getPackageVersionsIO
 
