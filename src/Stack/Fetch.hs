@@ -506,7 +506,7 @@ fetchPackages' mdistDir toFetchAll = do
             let dest = toFilePath $ parent destDir
                 innerDest = toFilePath destDir
 
-            liftIO $ untar fp identStr dest
+            unexpectedEntries <- liftIO $ untar fp identStr dest
 
             liftIO $ do
                 case mdistDir of
@@ -533,18 +533,51 @@ fetchPackages' mdistDir toFetchAll = do
                 S.writeFile cabalFP $ tfCabal toFetch
 
                 atomically $ modifyTVar outputVar $ Map.insert ident destDir
+            $logWarn $ mconcat $ map (\(path, entryType) -> "Unexpected entry type " <> entryType <> " for entry " <> T.pack path) unexpectedEntries
 
 -- | Internal function used to unpack tarball.
-untar :: FilePath -> FilePath -> FilePath -> IO ()
+--
+-- Takes a path to a .tar.gz file, the name of the directory it should contain,
+-- and a destination folder to extract the tarball into. Returns unexpected
+-- entries, as pairs of paths and descriptions.
+untar :: FilePath -> FilePath -> FilePath -> IO [(FilePath, T.Text)]
 untar fp identStr dest = do
   D.createDirectoryIfMissing True dest
   withBinaryFile fp ReadMode $ \h -> do
                 -- Avoid using L.readFile, which is more likely to leak
                 -- resources
                 lbs <- L.hGetContents h
-                let entries = fmap (either wrap wrap)
+                let rawEntries = fmap (either wrap wrap)
                             $ Tar.checkTarbomb identStr
                             $ Tar.read $ decompress lbs
+
+                    filterEntries
+                      :: Monoid w => (Tar.Entry -> (Bool, w))
+                         -> Tar.Entries b -> (Tar.Entries b, w)
+                    -- Allow collecting warnings, Writer-monad style.
+                    filterEntries f =
+                      Tar.foldEntries
+                        (\e -> let (res, w) = f e in
+                            \(rest, wOld) -> ((if res then Tar.Next e else id) rest, wOld <> w))
+                        (Tar.Done, mempty)
+                        (\err -> (Tar.Fail err, mempty))
+
+                    extractableEntry e =
+                      case Tar.entryContent e of
+                        Tar.NormalFile _ _ -> (True, [])
+                        Tar.Directory -> (True, [])
+                        Tar.SymbolicLink _ -> (True, [])
+                        Tar.HardLink _ -> (True, [])
+                        Tar.OtherEntryType 'g' _ _ -> (False, [])
+                        Tar.OtherEntryType 'x' _ _ -> (False, [])
+                        Tar.CharacterDevice _ _ -> (False, [(path, "character device")])
+                        Tar.BlockDevice _ _ -> (False, [(path, "block device")])
+                        Tar.NamedPipe -> (False, [(path, "named pipe")])
+                        Tar.OtherEntryType code _ _ -> (False, [(path, "other entry type with code " <> T.pack (show code))])
+                        where
+                          path = Tar.fromTarPath $ Tar.entryTarPath e
+                    (entries, unexpectedEntries) = filterEntries extractableEntry rawEntries
+
                     wrap :: Exception e => e -> FetchException
                     wrap = Couldn'tReadPackageTarball fp . toException
 
@@ -556,10 +589,13 @@ untar fp identStr dest = do
                     filePerms = catMaybes $ Tar.foldEntries (\e -> (:) (Just $ getPerms e))
                                                             [] (const []) entries
                 Tar.unpack dest entries
-                -- Reset file permissions as they were in the tarball
+                -- Reset file permissions as they were in the tarball, but only
+                -- for extracted entries (whence filterEntries extractableEntry above).
+                -- See https://github.com/commercialhaskell/stack/issues/2361
                 mapM_ (\(fp', perm) -> setFileMode
                     (FP.dropTrailingPathSeparator fp')
                     perm) filePerms
+                return unexpectedEntries
 
 parMapM_ :: (F.Foldable f,MonadIO m,MonadBaseControl IO m)
          => Int
