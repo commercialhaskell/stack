@@ -558,7 +558,9 @@ packageDescModulesAndFiles pkg = do
             (mapM
                  (asModuleAndFileMap benchComponent benchmarkFiles)
                  (benchmarks pkg))
-    (dfiles) <- resolveGlobFiles (map (dataDir pkg FilePath.</>) (dataFiles pkg))
+    (dfiles) <- resolveGlobFiles
+                    (extraSrcFiles pkg
+                        ++ map (dataDir pkg FilePath.</>) (dataFiles pkg))
     let modules = libraryMods <> executableMods <> testMods <> benchModules
         files =
             libDotCabalFiles <> exeDotCabalFiles <> testDotCabalFiles <>
