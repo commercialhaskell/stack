@@ -86,22 +86,27 @@ runShellAndExit mprojectRoot maresolver mcompiler getCmdArgs = do
      let pkgsInConfig = nixPackages (configNix config)
          ghc = nixCompiler config mresolver mcompiler
          pkgs = pkgsInConfig ++ [ghc]
+         libsAndIncludes =
+           map (\p -> ("${" <> p <> "}/lib", "${" <> p <> "}/include ")) pkgs
          pureShell = nixPureShell (configNix config)
          nixopts = case mshellFile of
            Just fp -> [toFilePath fp, "--arg", "ghc"
                       ,"with (import <nixpkgs> {}); " ++ T.unpack ghc]
-           Nothing -> ["-E", T.unpack $ T.intercalate " " $ concat
-                              [["with (import <nixpkgs> {});"
-                               ,"runCommand \"myEnv\" {"
-                               ,"buildInputs=lib.optional stdenv.isLinux glibcLocales ++ ["],pkgs,["];"
-                               ,T.pack platformVariantEnvVar <> "=''nix'';"
-                               ,T.pack inShellEnvVar <> "=1;"
-                               ,"STACK_IN_NIX_EXTRA_ARGS=''"]
-                               ,      (map (\p -> T.concat
-                                                  ["--extra-lib-dirs=${",p,"}/lib"
-                                                  ," --extra-include-dirs=${",p,"}/include "])
-                                           pkgs), ["'' ;"
-                               ,"} \"\""]]]
+           Nothing -> ["-E", T.unpack $ T.concat
+                              ["with (import <nixpkgs> {}); "
+                               ,"runCommand \"myEnv\" { "
+                               ,"buildInputs=lib.optional stdenv.isLinux glibcLocales ++ [", T.intercalate " " pkgs, "]; "
+                               ,T.pack platformVariantEnvVar <> "=''nix''; "
+                               ,T.pack inShellEnvVar <> "=1; "
+                               ,"LD_LIBRARY_PATH=''"  -- LD_LIBRARY_PATH is set because for now it's
+                                                                -- needed by builds using Template Haskell
+                               ,      (T.intercalate ":" (map fst libsAndIncludes)), "'' ; "
+                               ,"STACK_IN_NIX_EXTRA_ARGS=''"
+                               ,      T.intercalate " " (map (\(lib, include) ->
+                                                               "--extra-lib-dirs=" <> lib
+                                                               <> " --extra-include-dirs=" <> include)
+                                                         libsAndIncludes), "'' ; "
+                               ,"} \"\""]]
                     -- glibcLocales is necessary on Linux to avoid warnings about GHC being incapable to set the locale.
          fullArgs = concat [if pureShell then ["--pure"] else [],
                             map T.unpack (nixShellOptions (configNix config))
