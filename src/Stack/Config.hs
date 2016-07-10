@@ -232,6 +232,7 @@ configFromConfigMonoid configStackRoot configUserConfigPath mresolver mproject C
 
          configExtraIncludeDirs = configMonoidExtraIncludeDirs
          configExtraLibDirs = configMonoidExtraLibDirs
+         configOverrideGccPath = getFirst configMonoidOverrideGccPath
 
          -- Only place in the codebase where platform is hard-coded. In theory
          -- in the future, allow it to be configured.

@@ -203,7 +203,7 @@ cleanOptsParser = CleanShallow <$> packages <|> doFullClean
 -- | Command-line arguments parser for configuration.
 configOptsParser :: GlobalOptsContext -> Parser ConfigMonoid
 configOptsParser hide0 =
-    (\stackRoot workDir buildOpts dockerOpts nixOpts systemGHC installGHC arch os ghcVariant jobs includes libs skipGHCCheck skipMsys localBin modifyCodePage allowDifferentUser -> mempty
+    (\stackRoot workDir buildOpts dockerOpts nixOpts systemGHC installGHC arch os ghcVariant jobs includes libs overrideGccPath skipGHCCheck skipMsys localBin modifyCodePage allowDifferentUser -> mempty
         { configMonoidStackRoot = stackRoot
         , configMonoidWorkDir = workDir
         , configMonoidBuildOpts = buildOpts
@@ -218,6 +218,7 @@ configOptsParser hide0 =
         , configMonoidJobs = jobs
         , configMonoidExtraIncludeDirs = includes
         , configMonoidExtraLibDirs = libs
+        , configMonoidOverrideGccPath = overrideGccPath
         , configMonoidSkipMsys = skipMsys
         , configMonoidLocalBinPath = localBin
         , configMonoidModifyCodePage = modifyCodePage
@@ -279,6 +280,12 @@ configOptsParser hide0 =
            <> help "Extra directories to check for libraries"
            <> hide
             )))
+    <*> optionalFirst (textOption
+             ( long "with-gcc"
+            <> metavar "PATH-TO-GCC"
+            <> help "Use gcc found at PATH-TO-GCC"
+            <> hide
+             ))
     <*> firstBoolFlags
             "skip-ghc-check"
             "skipping the GHC version and architecture check"
