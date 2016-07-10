@@ -145,7 +145,7 @@ otherwise noted.
       # If true, the container will be run "detached" (in the background).  Refer
       # to the Docker users guide for information about how to manage containers.
       # This option would rarely make sense in the configuration file, but can be
-      # useful on the command-line.  When true, implies `persist`.`
+      # useful on the command-line.  When true, implies `persist`.
       detach: false
 
       # If true, the container will not be deleted after it terminates.  Refer to
