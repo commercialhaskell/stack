@@ -172,7 +172,7 @@ otherwise noted.
 
       # Environment variables to set in the container.  Environment variables
       # are not automatically inherited from the host, so if you need any specific
-      # variables, use the '--docker-env` command-line argument version of this to
+      # variables, use the `--docker-env` command-line argument version of this to
       # pass them in.  (default none)
       env:
         - "FOO=BAR"
