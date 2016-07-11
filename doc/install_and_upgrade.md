@@ -258,7 +258,7 @@ Alternatively, the package can be built from source as follows.
 
 For more information on using Stack together with Nix, please see [the NixOS
 manual section on
-Stack](http://nixos.org/nixpkgs/manual/#using-stack-together-with-nix).
+Stack](http://nixos.org/nixpkgs/manual/#how-to-build-a-haskell-project-using-stack).
 
 ## Linux
 
