@@ -1210,7 +1210,7 @@ imgDockerCmd (rebuild,images) go@GlobalOpts{..} = do
                          (const (return ()))
                          lk
                          defaultBuildOptsCLI
-                 Image.stageContainerImageArtifacts mProjectRoot)
+                 Image.stageContainerImageArtifacts mProjectRoot images)
         (Just $ Image.createContainerImageFromStage mProjectRoot images)
 
 -- | Load the configuration with a manager. Convenience function used
