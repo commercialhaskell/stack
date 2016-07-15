@@ -633,10 +633,8 @@ configureOptsNoDir econfig bco deps isLocal package = concat
     , map (("--extra-include-dirs=" ++) . T.unpack) (Set.toList (configExtraIncludeDirs config))
     , map (("--extra-lib-dirs=" ++) . T.unpack) (Set.toList (configExtraLibDirs config))
     , maybe [] (\customGcc -> ["--with-gcc=" ++ T.unpack customGcc]) (configOverrideGccPath config)
-    , if whichCompiler (envConfigCompilerVersion econfig) == Ghcjs
-        then ["--ghcjs"]
-        else []
-    , if useExactConf then ["--exact-configuration"] else []
+    , ["--ghcjs" | whichCompiler (envConfigCompilerVersion econfig) == Ghcjs]
+    , ["--exact-configuration" | useExactConf]
     ]
   where
     config = getConfig econfig
