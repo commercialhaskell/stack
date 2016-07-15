@@ -40,11 +40,15 @@ type Assemble e m = (HasConfig e, HasTerminal e, MonadBaseControl IO m, MonadIO 
 -- directory under '.stack-work'
 stageContainerImageArtifacts
     :: Build e m
-    => Maybe (Path Abs Dir) -> m ()
-stageContainerImageArtifacts mProjectRoot = do
+    => Maybe (Path Abs Dir) -> [Text] -> m ()
+stageContainerImageArtifacts mProjectRoot imageNames = do
     config <- asks getConfig
     forM_
-        (zip [0 ..] (imgDockers $ configImage config))
+        (zip
+             [0 ..]
+             (filterImages
+                  (map T.unpack imageNames)
+                  (imgDockers $ configImage config)))
         (\(idx,opts) ->
               do imageDir <-
                      imageStagingDir (fromMaybeProjectRoot mProjectRoot) idx
@@ -73,9 +77,11 @@ createContainerImageFromStage mProjectRoot imageNames = do
                      imageStagingDir (fromMaybeProjectRoot mProjectRoot) idx
                  createDockerImage opts imageDir
                  extendDockerImageWithEntrypoint opts imageDir)
+
+filterImages :: [String] -> [ImageDockerOpts] -> [ImageDockerOpts]
+filterImages [] = id -- all: no filter
+filterImages names = filter (imageNameFound names . imgDockerImageName)
   where
-    filterImages [] = id -- all: no filter
-    filterImages names = filter (imageNameFound names . imgDockerImageName)
     imageNameFound names (Just name) = name `elem` names
     imageNameFound _ _ = False
 
