@@ -21,6 +21,8 @@ Other enhancements:
 
 Bug fixes:
 
+* Fix cabal warning about use of a deprecated cabal flag
+  [#2350](https://github.com/commercialhaskell/stack/issues/2350)
 * Support most executable extensions on Windows
   [#2225](https://github.com/commercialhaskell/stack/issues/2225)
 * Detect resolver change in `stack solver`
