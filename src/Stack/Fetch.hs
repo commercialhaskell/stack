@@ -16,6 +16,7 @@ module Stack.Fetch
     ( unpackPackages
     , unpackPackageIdents
     , fetchPackages
+    , untar
     , resolvePackages
     , resolvePackagesAllowMissing
     , ResolvedPackage (..)
@@ -505,30 +506,7 @@ fetchPackages' mdistDir toFetchAll = do
             let dest = toFilePath $ parent destDir
                 innerDest = toFilePath destDir
 
-            liftIO $ D.createDirectoryIfMissing True dest
-
-            liftIO $ withBinaryFile fp ReadMode $ \h -> do
-                -- Avoid using L.readFile, which is more likely to leak
-                -- resources
-                lbs <- L.hGetContents h
-                let entries = fmap (either wrap wrap)
-                            $ Tar.checkTarbomb identStr
-                            $ Tar.read $ decompress lbs
-                    wrap :: Exception e => e -> FetchException
-                    wrap = Couldn'tReadPackageTarball fp . toException
-
-                    getPerms :: Tar.Entry -> (FilePath, Tar.Permissions)
-                    getPerms e = (dest FP.</> Tar.fromTarPath (Tar.entryTarPath e),
-                                  Tar.entryPermissions e)
-
-                    filePerms :: [(FilePath, Tar.Permissions)]
-                    filePerms = catMaybes $ Tar.foldEntries (\e -> (:) (Just $ getPerms e))
-                                                            [] (const []) entries
-                Tar.unpack dest entries
-                -- Reset file permissions as they were in the tarball
-                mapM_ (\(fp', perm) -> setFileMode
-                    (FP.dropTrailingPathSeparator fp')
-                    perm) filePerms
+            liftIO $ untar fp identStr dest
 
             liftIO $ do
                 case mdistDir of
@@ -555,6 +533,33 @@ fetchPackages' mdistDir toFetchAll = do
                 S.writeFile cabalFP $ tfCabal toFetch
 
                 atomically $ modifyTVar outputVar $ Map.insert ident destDir
+
+-- | Internal function used to unpack tarball.
+untar :: FilePath -> FilePath -> FilePath -> IO ()
+untar fp identStr dest = do
+  D.createDirectoryIfMissing True dest
+  withBinaryFile fp ReadMode $ \h -> do
+                -- Avoid using L.readFile, which is more likely to leak
+                -- resources
+                lbs <- L.hGetContents h
+                let entries = fmap (either wrap wrap)
+                            $ Tar.checkTarbomb identStr
+                            $ Tar.read $ decompress lbs
+                    wrap :: Exception e => e -> FetchException
+                    wrap = Couldn'tReadPackageTarball fp . toException
+
+                    getPerms :: Tar.Entry -> (FilePath, Tar.Permissions)
+                    getPerms e = (dest FP.</> Tar.fromTarPath (Tar.entryTarPath e),
+                                  Tar.entryPermissions e)
+
+                    filePerms :: [(FilePath, Tar.Permissions)]
+                    filePerms = catMaybes $ Tar.foldEntries (\e -> (:) (Just $ getPerms e))
+                                                            [] (const []) entries
+                Tar.unpack dest entries
+                -- Reset file permissions as they were in the tarball
+                mapM_ (\(fp', perm) -> setFileMode
+                    (FP.dropTrailingPathSeparator fp')
+                    perm) filePerms
 
 parMapM_ :: (F.Foldable f,MonadIO m,MonadBaseControl IO m)
          => Int
