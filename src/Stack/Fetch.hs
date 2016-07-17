@@ -505,7 +505,7 @@ fetchPackages' mdistDir toFetchAll = do
             let dest = toFilePath $ parent destDir
                 innerDest = toFilePath destDir
 
-            liftIO $ ensureDir (parent destDir)
+            liftIO $ D.createDirectoryIfMissing True dest
 
             liftIO $ withBinaryFile fp ReadMode $ \h -> do
                 -- Avoid using L.readFile, which is more likely to leak
