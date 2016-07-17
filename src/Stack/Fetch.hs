@@ -497,6 +497,7 @@ fetchPackages' mdistDir toFetchAll = do
         let progressSink _ =
                 liftIO $ runInBase $ $logInfo $ packageIdentifierText ident <> ": download"
         _ <- verifiedDownload downloadReq destpath progressSink
+        let identStr = packageIdentifierString ident
 
         let fp = toFilePath destpath
 
@@ -515,7 +516,6 @@ fetchPackages' mdistDir toFetchAll = do
                             $ Tar.read $ decompress lbs
                     wrap :: Exception e => e -> FetchException
                     wrap = Couldn'tReadPackageTarball fp . toException
-                    identStr = packageIdentifierString ident
 
                     getPerms :: Tar.Entry -> (FilePath, Tar.Permissions)
                     getPerms e = (dest FP.</> Tar.fromTarPath (Tar.entryTarPath e),
@@ -530,6 +530,7 @@ fetchPackages' mdistDir toFetchAll = do
                     (FP.dropTrailingPathSeparator fp')
                     perm) filePerms
 
+            liftIO $ do
                 case mdistDir of
                     Nothing -> return ()
                     -- See: https://github.com/fpco/stack/issues/157
