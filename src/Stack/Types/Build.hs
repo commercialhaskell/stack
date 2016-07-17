@@ -619,7 +619,7 @@ configureOptsNoDir econfig bco deps isLocal package = concat
     [ depOptions
     , ["--enable-library-profiling" | boptsLibProfile bopts || boptsExeProfile bopts]
     -- Cabal < 1.21.1 does not support --enable-profiling, use --enable-executable-profiling instead
-    , let profFlag = "--enable-" <> (if newerProfFlagCabal then "" else "executable-") <> "profiling"
+    , let profFlag = "--enable-" <> concat ["executable-" | newerCabal] <> "profiling"
       in [ profFlag | boptsExeProfile bopts && isLocal]
     , ["--enable-split-objs" | boptsSplitObjs bopts]
     , map (\(name,enabled) ->
@@ -645,9 +645,7 @@ configureOptsNoDir econfig bco deps isLocal package = concat
     -- earlier. Cabal also might do less work then.
     useExactConf = configAllowNewer config
 
-    cabalVersion = envConfigCabalVersion econfig
-    newerCabal = cabalVersion >= $(mkVersion "1.22")
-    newerProfFlagCabal = cabalVersion >= $(mkVersion "1.21.1")
+    newerCabal = envConfigCabalVersion econfig >= $(mkVersion "1.22")
 
     -- Unioning atop defaults is needed so that all flags are specified
     -- with --exact-configuration.
