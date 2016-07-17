@@ -196,7 +196,7 @@ library
                    , persistent-sqlite (>= 2.1.4 && < 2.5.0.1) || (> 2.5.0.1 && < 2.6)
                    , persistent-template >= 2.1.1 && < 2.6
                    , pretty >= 1.1.1.1
-                   , process >= 1.2.0.0 && < 1.5
+                   , process >= 1.2.1.0 && < 1.5
                    , regex-applicative-text >=0.1.0.1 && <0.2
                    , resourcet >= 1.1.4.1
                    , retry >= 0.6 && < 0.8
