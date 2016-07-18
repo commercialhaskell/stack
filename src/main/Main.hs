@@ -813,7 +813,7 @@ imgDockerCmd (rebuild,images) go@GlobalOpts{..} = do
                          (const (return ()))
                          lk
                          defaultBuildOptsCLI
-                 Image.stageContainerImageArtifacts mProjectRoot)
+                 Image.stageContainerImageArtifacts mProjectRoot images)
         (Just $ Image.createContainerImageFromStage mProjectRoot images)
 
 -- | Project initialization
