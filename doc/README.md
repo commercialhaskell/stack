@@ -3,7 +3,7 @@
 Stack is a cross-platform program for developing Haskell
 projects. It is aimed at Haskellers both new and experienced.
 
-<img src="http://i.imgur.com/WW69oTj.gif" width="50%" align="right">
+<img src="https://i.imgur.com/WW69oTj.gif" width="50%" align="right">
 
 It features:
 
