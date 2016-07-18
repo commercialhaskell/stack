@@ -619,7 +619,7 @@ configureOptsNoDir econfig bco deps isLocal package = concat
     [ depOptions
     , ["--enable-library-profiling" | boptsLibProfile bopts || boptsExeProfile bopts]
     -- Cabal < 1.21.1 does not support --enable-profiling, use --enable-executable-profiling instead
-    , let profFlag = "--enable-" <> concat ["executable-" | newerCabal] <> "profiling"
+    , let profFlag = "--enable-" <> concat ["executable-" | not newerCabal] <> "profiling"
       in [ profFlag | boptsExeProfile bopts && isLocal]
     , ["--enable-split-objs" | boptsSplitObjs bopts]
     , map (\(name,enabled) ->
