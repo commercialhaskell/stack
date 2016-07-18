@@ -527,6 +527,12 @@ bcWantedCompiler = mbpCompilerVersion . bcWantedMiniBuildPlan
 data EnvConfig = EnvConfig
     {envConfigBuildConfig :: !BuildConfig
     ,envConfigCabalVersion :: !Version
+    -- ^ This is the version of Cabal that stack will use to compile Setup.hs files
+    -- in the build process.
+    --
+    -- Note that this is not necessarily the same version as the one that stack
+    -- depends on as a library and which is displayed when running
+    -- @stack list-dependencies | grep Cabal@ in the stack project.
     ,envConfigCompilerVersion :: !CompilerVersion
     ,envConfigPackages   :: !(Map (Path Abs Dir) TreatLikeExtraDep)}
 instance HasBuildConfig EnvConfig where
