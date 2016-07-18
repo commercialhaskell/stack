@@ -570,6 +570,7 @@ isStackOpt t = any (`T.isPrefixOf` t)
     , "--enable-benchmarks"
     , "--enable-library-profiling"
     , "--enable-executable-profiling"
+    , "--enable-profiling"
     , "--exact-configuration"
     ] || elem t
     [ "--user"
@@ -617,7 +618,9 @@ configureOptsNoDir :: EnvConfig
 configureOptsNoDir econfig bco deps isLocal package = concat
     [ depOptions
     , ["--enable-library-profiling" | boptsLibProfile bopts || boptsExeProfile bopts]
-    , ["--enable-executable-profiling" | boptsExeProfile bopts && isLocal]
+    -- Cabal < 1.21.1 does not support --enable-profiling, use --enable-executable-profiling instead
+    , let profFlag = "--enable-" <> concat ["executable-" | not newerCabal] <> "profiling"
+      in [ profFlag | boptsExeProfile bopts && isLocal]
     , ["--enable-split-objs" | boptsSplitObjs bopts]
     , map (\(name,enabled) ->
                        "-f" <>
@@ -630,10 +633,8 @@ configureOptsNoDir econfig bco deps isLocal package = concat
     , map (("--extra-include-dirs=" ++) . T.unpack) (Set.toList (configExtraIncludeDirs config))
     , map (("--extra-lib-dirs=" ++) . T.unpack) (Set.toList (configExtraLibDirs config))
     , maybe [] (\customGcc -> ["--with-gcc=" ++ T.unpack customGcc]) (configOverrideGccPath config)
-    , if whichCompiler (envConfigCompilerVersion econfig) == Ghcjs
-        then ["--ghcjs"]
-        else []
-    , if useExactConf then ["--exact-configuration"] else []
+    , ["--ghcjs" | whichCompiler (envConfigCompilerVersion econfig) == Ghcjs]
+    , ["--exact-configuration" | useExactConf]
     ]
   where
     config = getConfig econfig
