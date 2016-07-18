@@ -96,6 +96,8 @@ library
                      Stack.FileWatch
                      Stack.GhcPkg
                      Stack.Ghci
+                     Stack.Hoogle
+                     Stack.IDE
                      Stack.Image
                      Stack.Init
                      Stack.New
@@ -104,9 +106,12 @@ library
                      Stack.Package
                      Stack.PackageDump
                      Stack.PackageIndex
+                     Stack.Path
+                     Stack.Runners
                      Stack.SDist
                      Stack.Setup
                      Stack.Setup.Installed
+                     Stack.SetupCmd
                      Stack.Sig
                      Stack.Sig.GPG
                      Stack.Sig.Sign

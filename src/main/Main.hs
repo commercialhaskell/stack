@@ -3,44 +3,33 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE ViewPatterns #-}
 
 -- | Main stack tool entry point.
 
 module Main (main) where
 
 import           Control.Exception
-import qualified Control.Exception.Lifted as EL
 import           Control.Monad hiding (mapM, forM)
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import           Control.Monad.Reader (ask, asks,local,runReaderT)
-import           Control.Monad.Trans.Control (MonadBaseControl)
 import           Control.Monad.Trans.Either (EitherT)
 import           Control.Monad.Writer.Lazy (Writer)
 import           Data.Attoparsec.Args (parseArgs, EscapingMode (Escaping))
 import           Data.Attoparsec.Interpreter (getInterpreterArgs)
-import qualified Data.ByteString.Char8 as S8
 import qualified Data.ByteString.Lazy as L
-import           Data.IORef
 import           Data.List
 import qualified Data.Map as Map
-import qualified Data.Map.Strict as M
 import           Data.Maybe
-import           Data.Maybe.Extra (mapMaybeA)
 import           Data.Monoid
-import qualified Data.Set as Set
 import           Data.Text (Text)
 import qualified Data.Text as T
-import qualified Data.Text.IO as T
 import           Data.Traversable
 import           Data.Typeable (Typeable)
 import           Data.Version (showVersion)
 import           System.Process.Read
-import           System.Process.Run
 #ifdef USE_GIT_INFO
 import           Development.GitRev (gitCommitCount, gitHash)
 #endif
@@ -48,7 +37,6 @@ import           Distribution.System (buildArch, buildPlatform)
 import           Distribution.Text (display)
 import           GHC.IO.Encoding (mkTextEncoding, textEncodingName)
 import           Lens.Micro
-import           Network.HTTP.Client
 import           Options.Applicative
 import           Options.Applicative.Help (errorHelp, stringChunk, vcatChunks)
 import           Options.Applicative.Builder.Extra
@@ -56,15 +44,12 @@ import           Options.Applicative.Complicated
 #ifdef USE_GIT_INFO
 import           Options.Applicative.Simple (simpleVersion)
 #endif
-import           Options.Applicative.Types (readerAsk, ParserHelp(..))
+import           Options.Applicative.Types (ParserHelp(..))
 import           Path
-import           Path.Extra (toFilePathNoTrailingSep)
 import           Path.IO
 import qualified Paths_stack as Meta
 import           Prelude hiding (pi, mapM)
 import           Stack.Build
-import           Stack.Build.Target
-import           Stack.Build.Source
 import           Stack.Clean (CleanOpts, clean)
 import           Stack.Config
 import           Stack.ConfigCmd as ConfigCmd
@@ -76,16 +61,18 @@ import           Stack.Exec
 import qualified Stack.Nix as Nix
 import           Stack.Fetch
 import           Stack.FileWatch
-import           Stack.GhcPkg (getGlobalDB, mkGhcPackagePath)
 import           Stack.Ghci
+import           Stack.Hoogle
+import qualified Stack.IDE as IDE
 import qualified Stack.Image as Image
 import           Stack.Init
 import           Stack.New
 import           Stack.Options
-import           Stack.Package (findOrGenerateCabalFile)
 import qualified Stack.PackageIndex
+import qualified Stack.Path
+import           Stack.Runners
 import           Stack.SDist (getSDistTarball, checkSDistTarball, checkSDistTarball')
-import           Stack.Setup
+import           Stack.SetupCmd
 import qualified Stack.Sig as Sig
 import           Stack.Solver (solveExtraDeps)
 import           Stack.Types
@@ -94,10 +81,9 @@ import           Stack.Types.StackT
 import           Stack.Upgrade
 import qualified Stack.Upload as Upload
 import qualified System.Directory as D
-import           System.Environment (getEnvironment, getProgName, getArgs, withArgs)
+import           System.Environment (getProgName, getArgs, withArgs)
 import           System.Exit
-import           System.FileLock (lockFile, tryLockFile, unlockFile, SharedExclusive(Exclusive), FileLock)
-import           System.FilePath (pathSeparator, searchPathSeparator)
+import           System.FilePath (pathSeparator)
 import           System.IO (hIsTerminalDevice, stderr, stdin, stdout, hSetBuffering, BufferMode(..), hPutStrLn, Handle, hGetEncoding, hSetEncoding)
 
 -- | Change the character encoding of the given Handle to transliterate
@@ -262,13 +248,7 @@ commandLineHandler progName isInterpreter = complicatedOptions
         addCommand' "path"
                     "Print out handy path information"
                     pathCmd
-                    (mapMaybeA
-                        (\(desc,name,_) ->
-                             flag Nothing
-                                  (Just name)
-                                  (long (T.unpack name) <>
-                                   help desc))
-                        paths)
+                    Stack.Path.pathParser
         addCommand' "unpack"
                     "Unpack one or more packages locally"
                     unpackCmd
@@ -384,12 +364,12 @@ commandLineHandler progName isInterpreter = complicatedOptions
             (do addCommand'
                     "packages"
                     "List all available local loadable packages"
-                    packagesCmd
+                    idePackagesCmd
                     (pure ())
                 addCommand'
                     "targets"
                     "List all available stack targets"
-                    targetsCmd
+                    ideTargetsCmd
                     (pure ()))
         addSubCommands'
           Docker.dockerCmdName
@@ -543,212 +523,11 @@ interpreterHandler args f = do
       (a,b) <- withArgs cmdArgs parseCmdLine
       return (a,(b,mempty))
 
--- | Print out useful path information in a human-readable format (and
--- support others later).
 pathCmd :: [Text] -> GlobalOpts -> IO ()
-pathCmd keys go =
-    withBuildConfig
-        go
-        (do env <- ask
-            let cfg = envConfig env
-                bc = envConfigBuildConfig cfg
-            -- This is the modified 'bin-path',
-            -- including the local GHC or MSYS if not configured to operate on
-            -- global GHC.
-            -- It was set up in 'withBuildConfigAndLock -> withBuildConfigExt -> setupEnv'.
-            -- So it's not the *minimal* override path.
-            menv <- getMinimalEnvOverride
-            snap <- packageDatabaseDeps
-            plocal <- packageDatabaseLocal
-            extra <- packageDatabaseExtra
-            global <- getGlobalDB menv =<< getWhichCompiler
-            snaproot <- installationRootDeps
-            localroot <- installationRootLocal
-            distDir <- distRelativeDir
-            hpcDir <- hpcReportDir
-            compiler <- getCompilerPath =<< getWhichCompiler
-            let deprecated = filter ((`elem` keys) . fst) deprecatedPathKeys
-            liftIO $ forM_ deprecated $ \(oldOption, newOption) -> T.hPutStrLn stderr $ T.unlines
-                [ ""
-                , "'--" <> oldOption <> "' will be removed in a future release."
-                , "Please use '--" <> newOption <> "' instead."
-                , ""
-                ]
-            forM_
-                -- filter the chosen paths in flags (keys),
-                -- or show all of them if no specific paths chosen.
-                (filter
-                     (\(_,key,_) ->
-                           (null keys && key /= T.pack deprecatedStackRootOptionName) || elem key keys)
-                     paths)
-                (\(_,key,path) ->
-                      liftIO $ T.putStrLn
-                          -- If a single path type is requested, output it directly.
-                          -- Otherwise, name all the paths.
-                          ((if length keys == 1
-                               then ""
-                               else key <> ": ") <>
-                           path
-                               (PathInfo
-                                    bc
-                                    menv
-                                    snap
-                                    plocal
-                                    global
-                                    snaproot
-                                    localroot
-                                    distDir
-                                    hpcDir
-                                    extra
-                                    compiler))))
-
--- | Passed to all the path printers as a source of info.
-data PathInfo = PathInfo
-    { piBuildConfig  :: BuildConfig
-    , piEnvOverride  :: EnvOverride
-    , piSnapDb       :: Path Abs Dir
-    , piLocalDb      :: Path Abs Dir
-    , piGlobalDb     :: Path Abs Dir
-    , piSnapRoot     :: Path Abs Dir
-    , piLocalRoot    :: Path Abs Dir
-    , piDistDir      :: Path Rel Dir
-    , piHpcDir       :: Path Abs Dir
-    , piExtraDbs     :: [Path Abs Dir]
-    , piCompiler     :: Path Abs File
-    }
-
--- | The paths of interest to a user. The first tuple string is used
--- for a description that the optparse flag uses, and the second
--- string as a machine-readable key and also for @--foo@ flags. The user
--- can choose a specific path to list like @--stack-root@. But
--- really it's mainly for the documentation aspect.
---
--- When printing output we generate @PathInfo@ and pass it to the
--- function to generate an appropriate string.  Trailing slashes are
--- removed, see #506
-paths :: [(String, Text, PathInfo -> Text)]
-paths =
-    [ ( "Global stack root directory"
-      , T.pack stackRootOptionName
-      , T.pack . toFilePathNoTrailingSep . configStackRoot . bcConfig . piBuildConfig )
-    , ( "Project root (derived from stack.yaml file)"
-      , "project-root"
-      , T.pack . toFilePathNoTrailingSep . bcRoot . piBuildConfig )
-    , ( "Configuration location (where the stack.yaml file is)"
-      , "config-location"
-      , T.pack . toFilePath . bcStackYaml . piBuildConfig )
-    , ( "PATH environment variable"
-      , "bin-path"
-      , T.pack . intercalate [searchPathSeparator] . eoPath . piEnvOverride )
-    , ( "Install location for GHC and other core tools"
-      , "programs"
-      , T.pack . toFilePathNoTrailingSep . configLocalPrograms . bcConfig . piBuildConfig )
-    , ( "Compiler binary (e.g. ghc)"
-      , "compiler-exe"
-      , T.pack . toFilePath . piCompiler )
-    , ( "Directory containing the compiler binary (e.g. ghc)"
-      , "compiler-bin"
-      , T.pack . toFilePathNoTrailingSep . parent . piCompiler )
-    , ( "Local bin dir where stack installs executables (e.g. ~/.local/bin)"
-      , "local-bin"
-      , T.pack . toFilePathNoTrailingSep . configLocalBin . bcConfig . piBuildConfig )
-    , ( "Extra include directories"
-      , "extra-include-dirs"
-      , T.intercalate ", " . Set.elems . configExtraIncludeDirs . bcConfig . piBuildConfig )
-    , ( "Extra library directories"
-      , "extra-library-dirs"
-      , T.intercalate ", " . Set.elems . configExtraLibDirs . bcConfig . piBuildConfig )
-    , ( "Snapshot package database"
-      , "snapshot-pkg-db"
-      , T.pack . toFilePathNoTrailingSep . piSnapDb )
-    , ( "Local project package database"
-      , "local-pkg-db"
-      , T.pack . toFilePathNoTrailingSep . piLocalDb )
-    , ( "Global package database"
-      , "global-pkg-db"
-      , T.pack . toFilePathNoTrailingSep . piGlobalDb )
-    , ( "GHC_PACKAGE_PATH environment variable"
-      , "ghc-package-path"
-      , \pi -> mkGhcPackagePath True (piLocalDb pi) (piSnapDb pi) (piExtraDbs pi) (piGlobalDb pi))
-    , ( "Snapshot installation root"
-      , "snapshot-install-root"
-      , T.pack . toFilePathNoTrailingSep . piSnapRoot )
-    , ( "Local project installation root"
-      , "local-install-root"
-      , T.pack . toFilePathNoTrailingSep . piLocalRoot )
-    , ( "Snapshot documentation root"
-      , "snapshot-doc-root"
-      , \pi -> T.pack (toFilePathNoTrailingSep (piSnapRoot pi </> docDirSuffix)))
-    , ( "Local project documentation root"
-      , "local-doc-root"
-      , \pi -> T.pack (toFilePathNoTrailingSep (piLocalRoot pi </> docDirSuffix)))
-    , ( "Dist work directory"
-      , "dist-dir"
-      , T.pack . toFilePathNoTrailingSep . piDistDir )
-    , ( "Where HPC reports and tix files are stored"
-      , "local-hpc-root"
-      , T.pack . toFilePathNoTrailingSep . piHpcDir )
-    , ( "DEPRECATED: Use '--local-bin' instead"
-      , "local-bin-path"
-      , T.pack . toFilePathNoTrailingSep . configLocalBin . bcConfig . piBuildConfig )
-    , ( "DEPRECATED: Use '--programs' instead"
-      , "ghc-paths"
-      , T.pack . toFilePathNoTrailingSep . configLocalPrograms . bcConfig . piBuildConfig )
-    , ( "DEPRECATED: Use '--" <> stackRootOptionName <> "' instead"
-      , T.pack deprecatedStackRootOptionName
-      , T.pack . toFilePathNoTrailingSep . configStackRoot . bcConfig . piBuildConfig )
-    ]
-
-deprecatedPathKeys :: [(Text, Text)]
-deprecatedPathKeys =
-    [ (T.pack deprecatedStackRootOptionName, T.pack stackRootOptionName)
-    , ("ghc-paths", "programs")
-    , ("local-bin-path", "local-bin")
-    ]
-
-data SetupCmdOpts = SetupCmdOpts
-    { scoCompilerVersion :: !(Maybe CompilerVersion)
-    , scoForceReinstall  :: !Bool
-    , scoUpgradeCabal    :: !Bool
-    , scoStackSetupYaml  :: !String
-    , scoGHCBindistURL   :: !(Maybe String)
-    }
-
-setupParser :: Parser SetupCmdOpts
-setupParser = SetupCmdOpts
-    <$> optional (argument readVersion
-            (metavar "GHC_VERSION" <>
-             help ("Version of GHC to install, e.g. 7.10.2. " ++
-                   "The default is to install the version implied by the resolver.")))
-    <*> boolFlags False
-            "reinstall"
-            "reinstalling GHC, even if available (implies no-system-ghc)"
-            idm
-    <*> boolFlags False
-            "upgrade-cabal"
-            "installing the newest version of the Cabal library globally"
-            idm
-    <*> strOption
-            ( long "stack-setup-yaml"
-           <> help "Location of the main stack-setup.yaml file"
-           <> value defaultStackSetupYaml
-           <> showDefault )
-    <*> optional (strOption
-            (long "ghc-bindist"
-           <> metavar "URL"
-           <> help "Alternate GHC binary distribution (requires custom --ghc-variant)"))
-  where
-    readVersion = do
-        s <- readerAsk
-        case parseCompilerVersion ("ghc-" <> T.pack s) of
-            Nothing ->
-                case parseCompilerVersion (T.pack s) of
-                    Nothing -> readerError $ "Invalid version: " ++ s
-                    Just x -> return x
-            Just x -> return x
+pathCmd keys go = withBuildConfig go (Stack.Path.path keys)
 
 setupCmd :: SetupCmdOpts -> GlobalOpts -> IO ()
-setupCmd SetupCmdOpts{..} go@GlobalOpts{..} = do
+setupCmd sco@SetupCmdOpts{..} go@GlobalOpts{..} = do
   (manager,lc) <- loadConfigWithOpts go
   withUserFileLock go (configStackRoot $ lcConfig lc) $ \lk ->
     runStackTGlobal manager (lcConfig lc) go $
@@ -768,183 +547,11 @@ setupCmd SetupCmdOpts{..} go@GlobalOpts{..} = do
                                  , Just $ bcStackYaml bc
                                  )
               miniConfig <- loadMiniConfig manager (lcConfig lc)
-              mpaths <- runStackTGlobal manager miniConfig go $
-                  ensureCompiler SetupOpts
-                  { soptsInstallIfMissing = True
-                  , soptsUseSystem =
-                    configSystemGHC (lcConfig lc) && not scoForceReinstall
-                  , soptsWantedCompiler = wantedCompiler
-                  , soptsCompilerCheck = compilerCheck
-                  , soptsStackYaml = mstack
-                  , soptsForceReinstall = scoForceReinstall
-                  , soptsSanityCheck = True
-                  , soptsSkipGhcCheck = False
-                  , soptsSkipMsys = configSkipMsys $ lcConfig lc
-                  , soptsUpgradeCabal = scoUpgradeCabal
-                  , soptsResolveMissingGHC = Nothing
-                  , soptsStackSetupYaml = scoStackSetupYaml
-                  , soptsGHCBindistURL = scoGHCBindistURL
-                  }
-              let compiler = case wantedCompiler of
-                      GhcVersion _ -> "GHC"
-                      GhcjsVersion {} -> "GHCJS"
-              case mpaths of
-                  Nothing -> $logInfo $ "stack will use the " <> compiler <> " on your PATH"
-                  Just _ -> $logInfo $ "stack will use a locally installed " <> compiler
-              $logInfo "For more information on paths, see 'stack path' and 'stack exec env'"
-              $logInfo $ "To use this " <> compiler <> " and packages outside of a project, consider using:"
-              $logInfo "stack ghc, stack ghci, stack runghc, or stack exec"
+              runStackTGlobal manager miniConfig go $
+                  setup sco wantedCompiler compilerCheck mstack
               )
           Nothing
           (Just $ munlockFile lk)
-
--- | Unlock a lock file, if the value is Just
-munlockFile :: MonadIO m => Maybe FileLock -> m ()
-munlockFile Nothing = return ()
-munlockFile (Just lk) = liftIO $ unlockFile lk
-
--- | Enforce mutual exclusion of every action running via this
--- function, on this path, on this users account.
---
--- A lock file is created inside the given directory.  Currently,
--- stack uses locks per-snapshot.  In the future, stack may refine
--- this to an even more fine-grain locking approach.
---
-withUserFileLock :: (MonadBaseControl IO m, MonadIO m)
-                 => GlobalOpts
-                 -> Path Abs Dir
-                 -> (Maybe FileLock -> m a)
-                 -> m a
-withUserFileLock go@GlobalOpts{} dir act = do
-    env <- liftIO getEnvironment
-    let toLock = lookup "STACK_LOCK" env == Just "true"
-    if toLock
-        then do
-            let lockfile = $(mkRelFile "lockfile")
-            let pth = dir </> lockfile
-            ensureDir dir
-            -- Just in case of asynchronous exceptions, we need to be careful
-            -- when using tryLockFile here:
-            EL.bracket (liftIO $ tryLockFile (toFilePath pth) Exclusive)
-                       (maybe (return ()) (liftIO . unlockFile))
-                       (\fstTry ->
-                        case fstTry of
-                          Just lk -> EL.finally (act $ Just lk) (liftIO $ unlockFile lk)
-                          Nothing ->
-                            do let chatter = globalLogLevel go /= LevelOther "silent"
-                               when chatter $
-                                 liftIO $ hPutStrLn stderr $ "Failed to grab lock ("++show pth++
-                                                     "); other stack instance running.  Waiting..."
-                               EL.bracket (liftIO $ lockFile (toFilePath pth) Exclusive)
-                                          (liftIO . unlockFile)
-                                          (\lk -> do
-                                            when chatter $
-                                              liftIO $ hPutStrLn stderr "Lock acquired, proceeding."
-                                            act $ Just lk))
-        else act Nothing
-
-withConfigAndLock
-    :: GlobalOpts
-    -> StackT Config IO ()
-    -> IO ()
-withConfigAndLock go@GlobalOpts{..} inner = do
-    (manager, lc) <- loadConfigWithOpts go
-    withUserFileLock go (configStackRoot $ lcConfig lc) $ \lk ->
-        runStackTGlobal manager (lcConfig lc) go $
-            Docker.reexecWithOptionalContainer
-                (lcProjectRoot lc)
-                Nothing
-                (runStackTGlobal manager (lcConfig lc) go inner)
-                Nothing
-                (Just $ munlockFile lk)
-
--- | Loads global config, ignoring any configuration which would be
--- loaded due to $PWD.
-withGlobalConfigAndLock
-    :: GlobalOpts
-    -> StackT Config IO ()
-    -> IO ()
-withGlobalConfigAndLock go@GlobalOpts{..} inner = do
-    manager <- newTLSManager
-    lc <- runStackLoggingTGlobal manager go $
-        loadConfigMaybeProject globalConfigMonoid Nothing Nothing
-    withUserFileLock go (configStackRoot $ lcConfig lc) $ \_lk ->
-        runStackTGlobal manager (lcConfig lc) go inner
-
--- For now the non-locking version just unlocks immediately.
--- That is, there's still a serialization point.
-withBuildConfig
-    :: GlobalOpts
-    -> StackT EnvConfig IO ()
-    -> IO ()
-withBuildConfig go inner =
-    withBuildConfigAndLock go (\lk -> do munlockFile lk
-                                         inner)
-
-withBuildConfigAndLock
-    :: GlobalOpts
-    -> (Maybe FileLock -> StackT EnvConfig IO ())
-    -> IO ()
-withBuildConfigAndLock go inner =
-    withBuildConfigExt go Nothing inner Nothing
-
-withBuildConfigExt
-    :: GlobalOpts
-    -> Maybe (StackT Config IO ())
-    -- ^ Action to perform before the build.  This will be run on the host
-    -- OS even if Docker is enabled for builds.  The build config is not
-    -- available in this action, since that would require build tools to be
-    -- installed on the host OS.
-    -> (Maybe FileLock -> StackT EnvConfig IO ())
-    -- ^ Action that uses the build config.  If Docker is enabled for builds,
-    -- this will be run in a Docker container.
-    -> Maybe (StackT Config IO ())
-    -- ^ Action to perform after the build.  This will be run on the host
-    -- OS even if Docker is enabled for builds.  The build config is not
-    -- available in this action, since that would require build tools to be
-    -- installed on the host OS.
-    -> IO ()
-withBuildConfigExt go@GlobalOpts{..} mbefore inner mafter = do
-    (manager, lc) <- loadConfigWithOpts go
-
-    withUserFileLock go (configStackRoot $ lcConfig lc) $ \lk0 -> do
-      -- A local bit of state for communication between callbacks:
-      curLk <- newIORef lk0
-      let inner' lk =
-            -- Locking policy:  This is only used for build commands, which
-            -- only need to lock the snapshot, not the global lock.  We
-            -- trade in the lock here.
-            do dir <- installationRootDeps
-               -- Hand-over-hand locking:
-               withUserFileLock go dir $ \lk2 -> do
-                 liftIO $ writeIORef curLk lk2
-                 liftIO $ munlockFile lk
-                 $logDebug "Starting to execute command inside EnvConfig"
-                 inner lk2
-
-      let inner'' lk = do
-              bconfig <- runStackLoggingTGlobal manager go $
-                  lcLoadBuildConfig lc globalCompiler
-              envConfig <-
-                 runStackTGlobal
-                     manager bconfig go
-                     (setupEnv Nothing)
-              runStackTGlobal
-                  manager
-                  envConfig
-                  go
-                  (inner' lk)
-
-      runStackTGlobal manager (lcConfig lc) go $
-        Docker.reexecWithOptionalContainer
-                 (lcProjectRoot lc)
-                 mbefore
-                 (runStackTGlobal manager (lcConfig lc) go $
-                    Nix.reexecWithOptionalShell (lcProjectRoot lc) globalResolver globalCompiler (inner'' lk0))
-                 mafter
-                 (Just $ liftIO $
-                      do lk' <- readIORef curLk
-                         munlockFile lk')
 
 cleanCmd :: CleanOpts -> GlobalOpts -> IO ()
 cleanCmd opts go = withBuildConfigAndLock go (const (clean opts))
@@ -1133,151 +740,6 @@ evalCmd EvalOpts {..} go@GlobalOpts {..} = execCmd execOpts go
                    , eoExtra = evalExtra
                    }
 
--- | Hoogle command.
-hoogleCmd :: ([String],Bool,Bool) -> GlobalOpts -> IO ()
-hoogleCmd (args,setup,rebuild) go = withBuildConfig go pathToHaddocks
-  where
-    pathToHaddocks :: StackT EnvConfig IO ()
-    pathToHaddocks = do
-        hoogleIsInPath <- checkHoogleInPath
-        if hoogleIsInPath
-            then haddocksToDb
-            else do
-                if setup
-                    then do
-                        $logWarn
-                            "Hoogle isn't installed or is too old. Automatically installing (use --no-setup to disable) ..."
-                        installHoogle
-                        haddocksToDb
-                    else do
-                        $logError
-                            "Hoogle isn't installed or is too old. Not installing it due to --no-setup."
-                        bail
-    haddocksToDb :: StackT EnvConfig IO ()
-    haddocksToDb = do
-        databaseExists <- checkDatabaseExists
-        if databaseExists && not rebuild
-            then runHoogle args
-            else if setup || rebuild
-                     then do
-                         $logWarn
-                             (if rebuild
-                                  then "Rebuilding database ..."
-                                  else "No Hoogle database yet. Automatically building haddocks and hoogle database (use --no-setup to disable) ...")
-                         buildHaddocks
-                         $logInfo "Built docs."
-                         generateDb
-                         $logInfo "Generated DB."
-                         runHoogle args
-                     else do
-                         $logError
-                             "No Hoogle database. Not building one due to --no-setup"
-                         bail
-    generateDb :: StackT EnvConfig IO ()
-    generateDb = do
-        do dir <- hoogleRoot
-           createDirIfMissing True dir
-           runHoogle ["generate", "--local"]
-    buildHaddocks :: StackT EnvConfig IO ()
-    buildHaddocks =
-        liftIO
-            (catch
-                 (withBuildConfigAndLock
-                      (set
-                           (globalOptsBuildOptsMonoid . buildOptsMonoidHaddock)
-                           (Just True)
-                           go)
-                      (\lk ->
-                            Stack.Build.build
-                                (const (return ()))
-                                lk
-                                defaultBuildOptsCLI))
-                 (\(_ :: ExitCode) ->
-                       return ()))
-    installHoogle :: StackT EnvConfig IO ()
-    installHoogle = do
-        let hooglePackageName = $(mkPackageName "hoogle")
-            hoogleMinVersion = $(mkVersion "5.0")
-            hoogleMinIdent =
-                PackageIdentifier hooglePackageName hoogleMinVersion
-        hooglePackageIdentifier <-
-            do (_,_,resolved) <-
-                   resolvePackagesAllowMissing
-                       mempty
-                       (Set.fromList [hooglePackageName])
-               return
-                   (case find
-                             ((== hooglePackageName) . packageIdentifierName)
-                             (Map.keys resolved) of
-                        Just ident@(PackageIdentifier _ ver)
-                          | ver >= hoogleMinVersion -> Right ident
-                        _ -> Left hoogleMinIdent)
-        case hooglePackageIdentifier of
-            Left{} ->
-                $logInfo
-                    ("Minimum " <> packageIdentifierText hoogleMinIdent <>
-                     " is not in your index. Installing the minimum version.")
-            Right ident ->
-                $logInfo
-                    ("Minimum version is " <> packageIdentifierText hoogleMinIdent <>
-                     ". Found acceptable " <>
-                     packageIdentifierText ident <>
-                     " in your index, installing it.")
-        config <- asks getConfig
-        menv <- liftIO $ configEnvOverride config envSettings
-        liftIO
-            (catch
-                 (withBuildConfigAndLock
-                      go
-                      (\lk ->
-                            Stack.Build.build
-                                (const (return ()))
-                                lk
-                                defaultBuildOptsCLI
-                                { boptsCLITargets = [ packageIdentifierText
-                                                          (either
-                                                               id
-                                                               id
-                                                               hooglePackageIdentifier)]
-                                }))
-                 (\(e :: ExitCode) ->
-                       case e of
-                           ExitSuccess -> resetExeCache menv
-                           _ -> throwIO e))
-    runHoogle :: [String] -> StackT EnvConfig IO ()
-    runHoogle hoogleArgs = do
-        config <- asks getConfig
-        menv <- liftIO $ configEnvOverride config envSettings
-        dbpath <- hoogleDatabasePath
-        let databaseArg = ["--database=" ++ toFilePath dbpath]
-        runCmd
-            (Cmd
-             { cmdDirectoryToRunIn = Nothing
-             , cmdCommandToRun = "hoogle"
-             , cmdEnvOverride = menv
-             , cmdCommandLineArguments = hoogleArgs ++ databaseArg
-             })
-            Nothing
-    bail :: StackT EnvConfig IO ()
-    bail = liftIO (exitWith (ExitFailure (-1)))
-    checkDatabaseExists = do
-        path <- hoogleDatabasePath
-        liftIO (doesFileExist path)
-    checkHoogleInPath = do
-        config <- asks getConfig
-        menv <- liftIO $ configEnvOverride config envSettings
-        result <- tryProcessStdout Nothing menv "hoogle" ["--numeric-version"]
-        case fmap (reads . S8.unpack) result of
-            Right [(ver :: Double,_)] -> return (ver >= 5.0)
-            _ -> return False
-    envSettings =
-        EnvSettings
-        { esIncludeLocals = True
-        , esIncludeGhcPackagePath = True
-        , esStackExe = True
-        , esLocaleUtf8 = False
-        }
-
 -- | Run GHCi in the context of a project.
 ghciCmd :: GhciOpts -> GlobalOpts -> IO ()
 ghciCmd ghciOpts go@GlobalOpts{..} =
@@ -1293,33 +755,14 @@ ghciCmd ghciOpts go@GlobalOpts{..} =
           (ghci ghciOpts)
 
 -- | List packages in the project.
-packagesCmd :: () -> GlobalOpts -> IO ()
-packagesCmd () go@GlobalOpts{..} =
-    withBuildConfig go $
-      do econfig <- asks getEnvConfig
-         locals <-
-             forM (M.toList (envConfigPackages econfig)) $
-             \(dir,_) ->
-                  do cabalfp <- findOrGenerateCabalFile dir
-                     parsePackageNameFromFilePath cabalfp
-         forM_ locals (liftIO . putStrLn . packageNameString)
+idePackagesCmd :: () -> GlobalOpts -> IO ()
+idePackagesCmd () go =
+    withBuildConfig go IDE.listPackages
 
 -- | List targets in the project.
-targetsCmd :: () -> GlobalOpts -> IO ()
-targetsCmd () go@GlobalOpts{..} =
-    withBuildConfig go $
-    do rawLocals <- getLocalPackageViews
-       $logInfo
-           (T.intercalate
-                "\n"
-                (map
-                     renderPkgComponent
-                     (concatMap
-                          toNameAndComponent
-                          (M.toList (M.map fst rawLocals)))))
-  where
-    toNameAndComponent (packageName,view) =
-        map (packageName, ) (Set.toList (lpvComponents view))
+ideTargetsCmd :: () -> GlobalOpts -> IO ()
+ideTargetsCmd () go =
+    withBuildConfig go IDE.listTargets
 
 -- | Pull the current Docker image.
 dockerPullCmd :: () -> GlobalOpts -> IO ()
@@ -1372,34 +815,6 @@ imgDockerCmd (rebuild,images) go@GlobalOpts{..} = do
                          defaultBuildOptsCLI
                  Image.stageContainerImageArtifacts mProjectRoot)
         (Just $ Image.createContainerImageFromStage mProjectRoot images)
-
--- | Load the configuration with a manager. Convenience function used
--- throughout this module.
-loadConfigWithOpts :: GlobalOpts -> IO (Manager,LoadConfig (StackLoggingT IO))
-loadConfigWithOpts go@GlobalOpts{..} = do
-    manager <- newTLSManager
-    mstackYaml <- forM globalStackYaml resolveFile'
-    lc <- runStackLoggingTGlobal manager go $ do
-        lc <- loadConfig globalConfigMonoid globalResolver mstackYaml
-        -- If we have been relaunched in a Docker container, perform in-container initialization
-        -- (switch UID, etc.).  We do this after first loading the configuration since it must
-        -- happen ASAP but needs a configuration.
-        case globalDockerEntrypoint of
-            Just de -> Docker.entrypoint (lcConfig lc) de
-            Nothing -> return ()
-        return lc
-    return (manager,lc)
-
-withMiniConfigAndLock
-    :: GlobalOpts
-    -> StackT MiniConfig IO ()
-    -> IO ()
-withMiniConfigAndLock go@GlobalOpts{..} inner = do
-    manager <- newTLSManager
-    miniConfig <- runStackLoggingTGlobal manager go $ do
-        lc <- loadConfigMaybeProject globalConfigMonoid globalResolver Nothing
-        loadMiniConfig manager (lcConfig lc)
-    runStackTGlobal manager miniConfig go inner
 
 -- | Project initialization
 initCmd :: InitOpts -> GlobalOpts -> IO ()
