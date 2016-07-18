@@ -541,14 +541,14 @@ fetchPackages' mdistDir toFetchAll = do
 -- and a destination folder to extract the tarball into. Returns unexpected
 -- entries, as pairs of paths and descriptions.
 untar :: FilePath -> FilePath -> FilePath -> IO [(FilePath, T.Text)]
-untar fp identStr dest = do
+untar tarFP expectedTarFolder dest = do
   D.createDirectoryIfMissing True dest
-  withBinaryFile fp ReadMode $ \h -> do
+  withBinaryFile tarFP ReadMode $ \h -> do
                 -- Avoid using L.readFile, which is more likely to leak
                 -- resources
                 lbs <- L.hGetContents h
                 let rawEntries = fmap (either wrap wrap)
-                            $ Tar.checkTarbomb identStr
+                            $ Tar.checkTarbomb expectedTarFolder
                             $ Tar.read $ decompress lbs
 
                     filterEntries
@@ -579,7 +579,7 @@ untar fp identStr dest = do
                     (entries, unexpectedEntries) = filterEntries extractableEntry rawEntries
 
                     wrap :: Exception e => e -> FetchException
-                    wrap = Couldn'tReadPackageTarball fp . toException
+                    wrap = Couldn'tReadPackageTarball tarFP . toException
 
                     getPerms :: Tar.Entry -> (FilePath, Tar.Permissions)
                     getPerms e = (dest FP.</> Tar.fromTarPath (Tar.entryTarPath e),
@@ -592,8 +592,8 @@ untar fp identStr dest = do
                 -- Reset file permissions as they were in the tarball, but only
                 -- for extracted entries (whence filterEntries extractableEntry above).
                 -- See https://github.com/commercialhaskell/stack/issues/2361
-                mapM_ (\(fp', perm) -> setFileMode
-                    (FP.dropTrailingPathSeparator fp')
+                mapM_ (\(fp, perm) -> setFileMode
+                    (FP.dropTrailingPathSeparator fp)
                     perm) filePerms
                 return unexpectedEntries
 
