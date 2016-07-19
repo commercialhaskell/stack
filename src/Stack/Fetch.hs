@@ -77,7 +77,6 @@ import           Prelude -- Fix AMP warning
 import           Stack.GhcPkg
 import           Stack.PackageIndex
 import           Stack.Types
-import qualified System.Directory               as D
 import           System.FilePath                ((<.>))
 import qualified System.FilePath                as FP
 import           System.IO                      (IOMode (ReadMode),
@@ -499,12 +498,11 @@ fetchPackages' mdistDir toFetchAll = do
         let progressSink _ =
                 liftIO $ runInBase $ $logInfo $ packageIdentifierText ident <> ": download"
         _ <- verifiedDownload downloadReq destpath progressSink
-        let identStr = packageIdentifierString ident
-        identStrP <- parseRelDir identStr
+
+        identStrP <- parseRelDir $ packageIdentifierString ident
 
         F.forM_ (tfDestDir toFetch) $ \destDir -> do
-            let dest = toFilePath $ parent destDir
-                innerDest = toFilePath destDir
+            let innerDest = toFilePath destDir
 
             unexpectedEntries <- liftIO $ untar destpath identStrP (parent destDir)
 
@@ -513,18 +511,18 @@ fetchPackages' mdistDir toFetchAll = do
                     Nothing -> return ()
                     -- See: https://github.com/fpco/stack/issues/157
                     Just distDir -> do
-                        let inner = dest FP.</> identStr
-                            oldDist = inner FP.</> "dist"
-                            newDist = inner FP.</> toFilePath distDir
-                        exists <- D.doesDirectoryExist oldDist
+                        let inner = parent destDir </> identStrP
+                            oldDist = inner </> $(mkRelDir "dist")
+                            newDist = inner </> distDir
+                        exists <- doesDirExist oldDist
                         when exists $ do
                             -- Previously used takeDirectory, but that got confused
                             -- by trailing slashes, see:
                             -- https://github.com/commercialhaskell/stack/issues/216
                             --
                             -- Instead, use Path which is a bit more resilient
-                            ensureDir . parent =<< parseAbsDir newDist
-                            D.renameDirectory oldDist newDist
+                            ensureDir $ parent newDist
+                            renameDir oldDist newDist
 
                 let cabalFP =
                         innerDest FP.</>
