@@ -180,6 +180,7 @@ import qualified Data.Text as T
 import           Data.Text.Encoding (encodeUtf8, decodeUtf8)
 import           Data.Typeable
 import           Data.Yaml (ParseException)
+import qualified Data.Yaml as Yaml
 import           Distribution.System (Platform)
 import qualified Distribution.Text
 import           Distribution.Version (anyVersion)
@@ -1101,14 +1102,14 @@ instance Show ConfigException where
         [ "Could not parse '"
         , toFilePath configFile
         , "':\n"
-        , show exception
+        , Yaml.prettyPrintParseException exception
         , "\nSee http://docs.haskellstack.org/en/stable/yaml_configuration/."
         ]
     show (ParseCustomSnapshotException url exception) = concat
         [ "Could not parse '"
         , T.unpack url
         , "':\n"
-        , show exception
+        , Yaml.prettyPrintParseException exception
         -- FIXME: Link to docs about custom snapshots
         -- , "\nSee http://docs.haskellstack.org/en/stable/yaml_configuration/."
         ]
