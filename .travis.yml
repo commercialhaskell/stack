@@ -18,9 +18,9 @@ cache:
 
 matrix:
   include:
-    - env: BUILD=cabal CABALVER=1.18 GHCVER=7.8.4 STACK_YAML=stack-7.8.yaml
+    - env: BUILD=cabal CABALVER=1.22 GHCVER=7.8.4 STACK_YAML=stack-7.8.yaml
       compiler: ": #GHC 7.8.4"
-      addons: {apt: {packages: [cabal-install-1.18,ghc-7.8.4], sources: [hvr-ghc]}}
+      addons: {apt: {packages: [cabal-install-1.22,ghc-7.8.4], sources: [hvr-ghc]}}
 
     - env: BUILD=cabal CABALVER=1.22 GHCVER=7.10.1
       compiler: ": #GHC 7.10.1"
