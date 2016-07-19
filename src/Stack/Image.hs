@@ -82,7 +82,7 @@ filterImages :: [String] -> [ImageDockerOpts] -> [ImageDockerOpts]
 filterImages [] = id -- all: no filter
 filterImages names = filter (imageNameFound names . imgDockerImageName)
   where
-    imageNameFound names (Just name) = name `elem` names
+    imageNameFound names' (Just name) = name `elem` names'
     imageNameFound _ _ = False
 
 -- | Stage all the Package executables in the usr/local/bin
