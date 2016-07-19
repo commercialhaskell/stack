@@ -108,7 +108,8 @@ getSDistTarball mpvpBounds pkgDir = do
         packFile fp
             | tweakCabal && isCabalFp fp = do
                 lbs <- getCabalLbs pvpBounds $ toFilePath cabalfp
-                return $ Tar.fileEntry (tarPath False fp) lbs
+                currTime <- liftIO getPOSIXTime -- Seconds from UNIX epoch
+                return $ (Tar.fileEntry (tarPath False fp) lbs) { Tar.entryTime = floor currTime }
             | otherwise = packWith packFileEntry False fp
         isCabalFp fp = toFilePath pkgDir FP.</> fp == toFilePath cabalfp
         tarName = pkgId FP.<.> "tar.gz"
