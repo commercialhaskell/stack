@@ -71,6 +71,7 @@ import           Data.Typeable                  (Typeable)
 import           Data.Word                      (Word64)
 import           Network.HTTP.Download
 import           Path
+import           Path.Extra (toFilePathNoTrailingSep)
 import           Path.IO
 import           Prelude -- Fix AMP warning
 import           Stack.GhcPkg
@@ -499,14 +500,13 @@ fetchPackages' mdistDir toFetchAll = do
                 liftIO $ runInBase $ $logInfo $ packageIdentifierText ident <> ": download"
         _ <- verifiedDownload downloadReq destpath progressSink
         let identStr = packageIdentifierString ident
-
-        let fp = toFilePath destpath
+        identStrP <- parseRelDir identStr
 
         F.forM_ (tfDestDir toFetch) $ \destDir -> do
             let dest = toFilePath $ parent destDir
                 innerDest = toFilePath destDir
 
-            unexpectedEntries <- liftIO $ untar fp identStr dest
+            unexpectedEntries <- liftIO $ untar destpath identStrP (parent destDir)
 
             liftIO $ do
                 case mdistDir of
@@ -540,15 +540,15 @@ fetchPackages' mdistDir toFetchAll = do
 -- Takes a path to a .tar.gz file, the name of the directory it should contain,
 -- and a destination folder to extract the tarball into. Returns unexpected
 -- entries, as pairs of paths and descriptions.
-untar :: FilePath -> FilePath -> FilePath -> IO [(FilePath, T.Text)]
-untar tarFP expectedTarFolder dest = do
-  D.createDirectoryIfMissing True dest
-  withBinaryFile tarFP ReadMode $ \h -> do
+untar :: forall b1 b2. Path b1 File -> Path Rel Dir -> Path b2 Dir -> IO [(FilePath, T.Text)]
+untar tarPath expectedTarFolder destDirParent = do
+  ensureDir destDirParent
+  withBinaryFile (toFilePath tarPath) ReadMode $ \h -> do
                 -- Avoid using L.readFile, which is more likely to leak
                 -- resources
                 lbs <- L.hGetContents h
                 let rawEntries = fmap (either wrap wrap)
-                            $ Tar.checkTarbomb expectedTarFolder
+                            $ Tar.checkTarbomb (toFilePathNoTrailingSep expectedTarFolder)
                             $ Tar.read $ decompress lbs
 
                     filterEntries
@@ -579,16 +579,16 @@ untar tarFP expectedTarFolder dest = do
                     (entries, unexpectedEntries) = filterEntries extractableEntry rawEntries
 
                     wrap :: Exception e => e -> FetchException
-                    wrap = Couldn'tReadPackageTarball tarFP . toException
+                    wrap = Couldn'tReadPackageTarball (toFilePath tarPath) . toException
 
                     getPerms :: Tar.Entry -> (FilePath, Tar.Permissions)
-                    getPerms e = (dest FP.</> Tar.fromTarPath (Tar.entryTarPath e),
+                    getPerms e = (toFilePath destDirParent FP.</> Tar.fromTarPath (Tar.entryTarPath e),
                                   Tar.entryPermissions e)
 
                     filePerms :: [(FilePath, Tar.Permissions)]
                     filePerms = catMaybes $ Tar.foldEntries (\e -> (:) (Just $ getPerms e))
                                                             [] (const []) entries
-                Tar.unpack dest entries
+                Tar.unpack (toFilePath destDirParent) entries
                 -- Reset file permissions as they were in the tarball, but only
                 -- for extracted entries (whence filterEntries extractableEntry above).
                 -- See https://github.com/commercialhaskell/stack/issues/2361
