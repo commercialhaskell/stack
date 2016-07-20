@@ -27,6 +27,8 @@ Bug fixes:
   [#2225](https://github.com/commercialhaskell/stack/issues/2225)
 * Detect resolver change in `stack solver`
   [#2252](https://github.com/commercialhaskell/stack/issues/2252)
+* Ignore special entries when unpacking tarballs
+  [#2361](https://github.com/commercialhaskell/stack/issues/2361)
 
 ## 1.1.2
 

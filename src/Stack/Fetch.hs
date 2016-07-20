@@ -16,6 +16,7 @@ module Stack.Fetch
     ( unpackPackages
     , unpackPackageIdents
     , fetchPackages
+    , untar
     , resolvePackages
     , resolvePackagesAllowMissing
     , ResolvedPackage (..)
@@ -70,12 +71,12 @@ import           Data.Typeable                  (Typeable)
 import           Data.Word                      (Word64)
 import           Network.HTTP.Download
 import           Path
+import           Path.Extra (toFilePathNoTrailingSep)
 import           Path.IO
 import           Prelude -- Fix AMP warning
 import           Stack.GhcPkg
 import           Stack.PackageIndex
 import           Stack.Types
-import qualified System.Directory               as D
 import           System.FilePath                ((<.>))
 import qualified System.FilePath                as FP
 import           System.IO                      (IOMode (ReadMode),
@@ -498,54 +499,30 @@ fetchPackages' mdistDir toFetchAll = do
                 liftIO $ runInBase $ $logInfo $ packageIdentifierText ident <> ": download"
         _ <- verifiedDownload downloadReq destpath progressSink
 
-        let fp = toFilePath destpath
+        identStrP <- parseRelDir $ packageIdentifierString ident
 
         F.forM_ (tfDestDir toFetch) $ \destDir -> do
-            let dest = toFilePath $ parent destDir
-                innerDest = toFilePath destDir
+            let innerDest = toFilePath destDir
 
-            liftIO $ ensureDir (parent destDir)
+            unexpectedEntries <- liftIO $ untar destpath identStrP (parent destDir)
 
-            liftIO $ withBinaryFile fp ReadMode $ \h -> do
-                -- Avoid using L.readFile, which is more likely to leak
-                -- resources
-                lbs <- L.hGetContents h
-                let entries = fmap (either wrap wrap)
-                            $ Tar.checkTarbomb identStr
-                            $ Tar.read $ decompress lbs
-                    wrap :: Exception e => e -> FetchException
-                    wrap = Couldn'tReadPackageTarball fp . toException
-                    identStr = packageIdentifierString ident
-
-                    getPerms :: Tar.Entry -> (FilePath, Tar.Permissions)
-                    getPerms e = (dest FP.</> Tar.fromTarPath (Tar.entryTarPath e),
-                                  Tar.entryPermissions e)
-
-                    filePerms :: [(FilePath, Tar.Permissions)]
-                    filePerms = catMaybes $ Tar.foldEntries (\e -> (:) (Just $ getPerms e))
-                                                            [] (const []) entries
-                Tar.unpack dest entries
-                -- Reset file permissions as they were in the tarball
-                mapM_ (\(fp', perm) -> setFileMode
-                    (FP.dropTrailingPathSeparator fp')
-                    perm) filePerms
-
+            liftIO $ do
                 case mdistDir of
                     Nothing -> return ()
                     -- See: https://github.com/fpco/stack/issues/157
                     Just distDir -> do
-                        let inner = dest FP.</> identStr
-                            oldDist = inner FP.</> "dist"
-                            newDist = inner FP.</> toFilePath distDir
-                        exists <- D.doesDirectoryExist oldDist
+                        let inner = parent destDir </> identStrP
+                            oldDist = inner </> $(mkRelDir "dist")
+                            newDist = inner </> distDir
+                        exists <- doesDirExist oldDist
                         when exists $ do
                             -- Previously used takeDirectory, but that got confused
                             -- by trailing slashes, see:
                             -- https://github.com/commercialhaskell/stack/issues/216
                             --
                             -- Instead, use Path which is a bit more resilient
-                            ensureDir . parent =<< parseAbsDir newDist
-                            D.renameDirectory oldDist newDist
+                            ensureDir $ parent newDist
+                            renameDir oldDist newDist
 
                 let cabalFP =
                         innerDest FP.</>
@@ -554,6 +531,69 @@ fetchPackages' mdistDir toFetchAll = do
                 S.writeFile cabalFP $ tfCabal toFetch
 
                 atomically $ modifyTVar outputVar $ Map.insert ident destDir
+            $logWarn $ mconcat $ map (\(path, entryType) -> "Unexpected entry type " <> entryType <> " for entry " <> T.pack path) unexpectedEntries
+
+-- | Internal function used to unpack tarball.
+--
+-- Takes a path to a .tar.gz file, the name of the directory it should contain,
+-- and a destination folder to extract the tarball into. Returns unexpected
+-- entries, as pairs of paths and descriptions.
+untar :: forall b1 b2. Path b1 File -> Path Rel Dir -> Path b2 Dir -> IO [(FilePath, T.Text)]
+untar tarPath expectedTarFolder destDirParent = do
+  ensureDir destDirParent
+  withBinaryFile (toFilePath tarPath) ReadMode $ \h -> do
+                -- Avoid using L.readFile, which is more likely to leak
+                -- resources
+                lbs <- L.hGetContents h
+                let rawEntries = fmap (either wrap wrap)
+                            $ Tar.checkTarbomb (toFilePathNoTrailingSep expectedTarFolder)
+                            $ Tar.read $ decompress lbs
+
+                    filterEntries
+                      :: Monoid w => (Tar.Entry -> (Bool, w))
+                         -> Tar.Entries b -> (Tar.Entries b, w)
+                    -- Allow collecting warnings, Writer-monad style.
+                    filterEntries f =
+                      Tar.foldEntries
+                        (\e -> let (res, w) = f e in
+                            \(rest, wOld) -> ((if res then Tar.Next e else id) rest, wOld <> w))
+                        (Tar.Done, mempty)
+                        (\err -> (Tar.Fail err, mempty))
+
+                    extractableEntry e =
+                      case Tar.entryContent e of
+                        Tar.NormalFile _ _ -> (True, [])
+                        Tar.Directory -> (True, [])
+                        Tar.SymbolicLink _ -> (True, [])
+                        Tar.HardLink _ -> (True, [])
+                        Tar.OtherEntryType 'g' _ _ -> (False, [])
+                        Tar.OtherEntryType 'x' _ _ -> (False, [])
+                        Tar.CharacterDevice _ _ -> (False, [(path, "character device")])
+                        Tar.BlockDevice _ _ -> (False, [(path, "block device")])
+                        Tar.NamedPipe -> (False, [(path, "named pipe")])
+                        Tar.OtherEntryType code _ _ -> (False, [(path, "other entry type with code " <> T.pack (show code))])
+                        where
+                          path = Tar.fromTarPath $ Tar.entryTarPath e
+                    (entries, unexpectedEntries) = filterEntries extractableEntry rawEntries
+
+                    wrap :: Exception e => e -> FetchException
+                    wrap = Couldn'tReadPackageTarball (toFilePath tarPath) . toException
+
+                    getPerms :: Tar.Entry -> (FilePath, Tar.Permissions)
+                    getPerms e = (toFilePath destDirParent FP.</> Tar.fromTarPath (Tar.entryTarPath e),
+                                  Tar.entryPermissions e)
+
+                    filePerms :: [(FilePath, Tar.Permissions)]
+                    filePerms = catMaybes $ Tar.foldEntries (\e -> (:) (Just $ getPerms e))
+                                                            [] (const []) entries
+                Tar.unpack (toFilePath destDirParent) entries
+                -- Reset file permissions as they were in the tarball, but only
+                -- for extracted entries (whence filterEntries extractableEntry above).
+                -- See https://github.com/commercialhaskell/stack/issues/2361
+                mapM_ (\(fp, perm) -> setFileMode
+                    (FP.dropTrailingPathSeparator fp)
+                    perm) filePerms
+                return unexpectedEntries
 
 parMapM_ :: (F.Foldable f,MonadIO m,MonadBaseControl IO m)
          => Int
