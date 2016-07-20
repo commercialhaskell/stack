@@ -217,7 +217,6 @@ generateHpcReportForTargets opts = do
              when (hroptsAll opts && not (null targetNames)) $
                  $logWarn $ "Since --all is used, it is redundant to specify these targets: " <> T.pack (show targetNames)
              (_,_,targets) <- parseTargetsFromBuildOpts
-                 Nothing
                  AllowNoTargets
                  defaultBuildOptsCLI
                     { boptsCLITargets = if hroptsAll opts then [] else targetNames }
