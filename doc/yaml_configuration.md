@@ -519,6 +519,7 @@ The 5 parameters are: `author-email`, `author-name`, `category`, `copyright` and
 * _category_ - sets the `category` property in cabal. This is used in Hackage. For examples of categories see [Packages by category](https://hackage.haskell.org/packages/). It makes sense for `category` to be set on a per project basis because it is uncommon for all projects a user creates to belong to the same category. The category can be set per project by passing `-p "category:value"` to the `stack new` command.
 * _copyright_ - sets the `copyright` property in cabal. It is typically the name of the holder of the copyright on the package and the year(s) from which copyright is claimed. For example: `Copyright: (c) 2006-2007 Joe Bloggs`
 * _github-username_ - used to generate `homepage` and `source-repository` in cabal. For instance `github-username: myusername` and `stack new my-project new-template` would result:
+
 ```yaml
 homepage: http://github.com/myusername/my-project#readme
 
@@ -537,3 +538,19 @@ templates:
     copyright: 'Copyright: (c) 2016 Your Name'
     github-username: yourusername
 ```
+
+# urls
+
+Customize the URLs where `stack` looks for snapshot build plans.
+
+The default configuration is
+
+```yaml
+urls:
+  latest-snapshot: https://www.stackage.org/download/snapshots.json
+  lts-build-plans: https://raw.githubusercontent.com/fpco/lts-haskell/master/
+  nightly-build-plans: https://raw.githubusercontent.com/fpco/stackage-nightly/master/
+```
+
+**Note:** The `latest-snapshot-url` field has been deprecated in favor of `latest-snapshot`
+and will be removed in a future version of `stack`.
