@@ -632,7 +632,7 @@ configureOptsNoDir econfig bco deps isLocal package = concat
     , concatMap (\x -> ["--ghc-options", T.unpack x]) (packageGhcOptions package)
     , map (("--extra-include-dirs=" ++) . toFilePathNoTrailingSep) (Set.toList (configExtraIncludeDirs config))
     , map (("--extra-lib-dirs=" ++) . toFilePathNoTrailingSep) (Set.toList (configExtraLibDirs config))
-    , maybe [] (\customGcc -> ["--with-gcc=" ++ T.unpack customGcc]) (configOverrideGccPath config)
+    , maybe [] (\customGcc -> ["--with-gcc=" ++ toFilePath customGcc]) (configOverrideGccPath config)
     , ["--ghcjs" | whichCompiler (envConfigCompilerVersion econfig) == Ghcjs]
     , ["--exact-configuration" | useExactConf]
     ]

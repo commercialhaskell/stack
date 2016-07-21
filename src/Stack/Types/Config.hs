@@ -285,7 +285,7 @@ data Config =
          -- ^ Require a version of stack within this range.
          ,configJobs                :: !Int
          -- ^ How many concurrent jobs to run, defaults to number of capabilities
-         ,configOverrideGccPath     :: !(Maybe Text)
+         ,configOverrideGccPath     :: !(Maybe (Path Abs File))
          -- ^ Optional gcc override path
          ,configExtraIncludeDirs    :: !(Set (Path Abs Dir))
          -- ^ --extra-include-dirs arguments
@@ -852,7 +852,7 @@ data ConfigMonoid =
     -- ^ See: 'configExtraIncludeDirs'
     ,configMonoidExtraLibDirs        :: !(Set (Path Abs Dir))
     -- ^ See: 'configExtraLibDirs'
-    , configMonoidOverrideGccPath    :: !(First Text)
+    , configMonoidOverrideGccPath    :: !(First (Path Abs File))
     -- ^ Allow users to override the path to gcc
     ,configMonoidConcurrentTests     :: !(First Bool)
     -- ^ See: 'configConcurrentTests'

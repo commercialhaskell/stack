@@ -279,7 +279,7 @@ configOptsParser hide0 =
            <> help "Extra directories to check for libraries"
            <> hide
             )))
-    <*> optionalFirst (textOption
+    <*> optionalFirst (absFileOption
              ( long "with-gcc"
             <> metavar "PATH-TO-GCC"
             <> help "Use gcc found at PATH-TO-GCC"
