@@ -18,6 +18,9 @@ Other enhancements:
 
 * Add the ability to explictly specify a gcc executable.
   [#593](https://github.com/commercialhaskell/stack/issues/593)
+* Nix: No longer uses LTS mirroring in nixpkgs. Gives to nix-shell a derivation
+  like `haskell.compiler.ghc801`
+  See [#2259](https://github.com/commercialhaskell/stack/issues/2259)
 
 Bug fixes:
 

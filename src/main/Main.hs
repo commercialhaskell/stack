@@ -543,13 +543,14 @@ pathCmd keys go = withBuildConfig go (Stack.Path.path keys)
 setupCmd :: SetupCmdOpts -> GlobalOpts -> IO ()
 setupCmd sco@SetupCmdOpts{..} go@GlobalOpts{..} = do
   (manager,lc) <- loadConfigWithOpts go
-  withUserFileLock go (configStackRoot $ lcConfig lc) $ \lk ->
-    runStackTGlobal manager (lcConfig lc) go $
+  withUserFileLock go (configStackRoot $ lcConfig lc) $ \lk -> do
+    compilerVersion <- loadCompilerVersion manager go lc
+    runStackTGlobal manager (lcConfig lc) go $ do
       Docker.reexecWithOptionalContainer
           (lcProjectRoot lc)
           Nothing
           (runStackTGlobal manager (lcConfig lc) go $
-           Nix.reexecWithOptionalShell (lcProjectRoot lc) globalResolver globalCompiler $
+           Nix.reexecWithOptionalShell (lcProjectRoot lc) compilerVersion $
            runStackLoggingTGlobal manager go $ do
               (wantedCompiler, compilerCheck, mstack) <-
                   case scoCompilerVersion of
@@ -704,7 +705,8 @@ execCmd ExecOpts {..} go@GlobalOpts{..} =
                  (ExecGhc, args) -> return ("ghc", args)
                  (ExecRunGhc, args) -> return ("runghc", args)
             (manager,lc) <- liftIO $ loadConfigWithOpts go
-            withUserFileLock go (configStackRoot $ lcConfig lc) $ \lk ->
+            withUserFileLock go (configStackRoot $ lcConfig lc) $ \lk -> do
+              compilerVersion <- loadCompilerVersion manager go lc
               runStackTGlobal manager (lcConfig lc) go $
                 Docker.reexecWithOptionalContainer
                     (lcProjectRoot lc)
@@ -715,8 +717,7 @@ execCmd ExecOpts {..} go@GlobalOpts{..} =
                         menv <- liftIO $ configEnvOverride config plainEnvSettings
                         Nix.reexecWithOptionalShell
                             (lcProjectRoot lc)
-                            globalResolver
-                            globalCompiler
+                            compilerVersion
                             (runStackTGlobal manager (lcConfig lc) go $
                                 exec menv cmd args))
                     Nothing

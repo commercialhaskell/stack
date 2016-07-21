@@ -12,6 +12,7 @@ module Stack.Runners
     , withBuildConfig
     , withBuildConfigExt
     , loadConfigWithOpts
+    , loadCompilerVersion
     , withUserFileLock
     , munlockFile
     ) where
@@ -30,11 +31,21 @@ import           Stack.Config
 import qualified Stack.Docker as Docker
 import qualified Stack.Nix as Nix
 import           Stack.Setup
+import           Stack.Types.Compiler (CompilerVersion)
 import           Stack.Types.Config
 import           Stack.Types.StackT
 import           System.Environment (getEnvironment)
 import           System.IO
 import           System.FileLock
+
+loadCompilerVersion :: Manager
+                    -> GlobalOpts
+                    -> LoadConfig (StackLoggingT IO)
+                    -> IO CompilerVersion
+loadCompilerVersion manager go lc = do
+    bconfig <- runStackLoggingTGlobal manager go $
+      lcLoadBuildConfig lc (globalCompiler go)
+    return $ bcWantedCompiler bconfig
 
 -- | Enforce mutual exclusion of every action running via this
 -- function, on this path, on this users account.
@@ -168,12 +179,13 @@ withBuildConfigExt go@GlobalOpts{..} mbefore inner mafter = do
                   go
                   (inner' lk)
 
+      compilerVersion <- loadCompilerVersion manager go lc
       runStackTGlobal manager (lcConfig lc) go $
         Docker.reexecWithOptionalContainer
                  (lcProjectRoot lc)
                  mbefore
                  (runStackTGlobal manager (lcConfig lc) go $
-                    Nix.reexecWithOptionalShell (lcProjectRoot lc) globalResolver globalCompiler (inner'' lk0))
+                    Nix.reexecWithOptionalShell (lcProjectRoot lc) compilerVersion (inner'' lk0))
                  mafter
                  (Just $ liftIO $
                       do lk' <- readIORef curLk

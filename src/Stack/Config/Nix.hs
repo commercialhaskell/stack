@@ -7,8 +7,7 @@ module Stack.Config.Nix
        ,StackNixException(..)
        ) where
 
-import Control.Applicative
-import Control.Monad (join, when)
+import Control.Monad (when)
 import Data.Maybe
 import Data.Monoid.Extra
 import qualified Data.Text as T
@@ -41,13 +40,9 @@ nixOptsFromMonoid NixOptsMonoid{..} os = do
   where prefixAll p (x:xs) = p : x : prefixAll p xs
         prefixAll _ _      = []
 
-nixCompiler :: Config -> Maybe Resolver -> Maybe CompilerVersion -> T.Text
-nixCompiler config resolverOverride compilerOverride =
-  let mproject = fst <$> configMaybeProject config
-      mresolver = resolverOverride <|> fmap projectResolver mproject
-      mcompiler = compilerOverride <|> join (fmap projectCompiler mproject)
-
-      -- These are the latest minor versions for each respective major version available in nixpkgs
+nixCompiler :: CompilerVersion -> T.Text
+nixCompiler compilerVersion =
+  let -- These are the latest minor versions for each respective major version available in nixpkgs
       fixMinor "8.0" = "8.0.1"
       fixMinor "7.10" = "7.10.3"
       fixMinor "7.8" = "7.8.4"
@@ -57,13 +52,12 @@ nixCompiler config resolverOverride compilerOverride =
       fixMinor "6.12" = "6.12.3"
       fixMinor "6.10" = "6.10.4"
       fixMinor v = v
-      nixCompilerFromVersion v = T.append (T.pack "haskell.compiler.ghc") (T.filter (/= '.') (fixMinor (versionText v)))
-  in case (mresolver, mcompiler)  of
-       (_, Just (GhcVersion v)) -> nixCompilerFromVersion v
-       (Just (ResolverCompiler (GhcVersion v)), _) -> nixCompilerFromVersion v
-       (Just (ResolverSnapshot (LTS x y)), _) ->
-         T.pack ("haskell.packages.lts-" ++ show x ++ "_" ++ show y ++ ".ghc")
-       _ -> T.pack "ghc"
+      nixCompilerFromVersion v = T.append (T.pack "haskell.compiler.ghc")
+                                          (T.filter (/= '.')
+                                             (fixMinor (versionText v)))
+  in case compilerVersion of
+       GhcVersion v -> nixCompilerFromVersion v
+       _ -> error "Only GHC is supported by now by stack --nix"
 
 -- Exceptions thown specifically by Stack.Nix
 data StackNixException
