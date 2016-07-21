@@ -15,6 +15,7 @@ module Stack.Build.Source
     , getGhcOptions
     , getLocalPackageViews
     , parseTargetsFromBuildOpts
+    , parseTargetsFromBuildOptsWith
     , addUnlistedToBuildCache
     , getDefaultPackageConfig
     , getPackageConfig
@@ -81,7 +82,7 @@ loadSourceMap :: (MonadIO m, MonadMask m, MonadReader env m, MonadBaseControl IO
 loadSourceMap needTargets boptsCli = do
     bconfig <- asks getBuildConfig
     rawLocals <- getLocalPackageViews
-    (mbp0, cliExtraDeps, targets) <- parseTargetsFromBuildOpts needTargets boptsCli
+    (mbp0, cliExtraDeps, targets) <- parseTargetsFromBuildOptsWith rawLocals needTargets boptsCli
     -- Extend extra-deps to encompass targets requested on the command line
     -- that are not in the snapshot.
     extraDeps0 <- extendExtraDeps
@@ -189,12 +190,26 @@ getGhcOptions bconfig boptsCli name isTarget isLocal = concat
             AGOEverything -> True
 
 -- | Use the build options and environment to parse targets.
+--
+-- If the local packages views are already known, use 'parseTargetsFromBuildOptsWith'
+-- instead.
 parseTargetsFromBuildOpts
     :: (MonadIO m, MonadMask m, MonadReader env m, MonadLogger m, HasEnvConfig env)
     => NeedTargets
     -> BuildOptsCLI
     -> m (MiniBuildPlan, M.Map PackageName Version, M.Map PackageName SimpleTarget)
 parseTargetsFromBuildOpts needTargets boptscli = do
+    rawLocals <- getLocalPackageViews
+    parseTargetsFromBuildOptsWith rawLocals needTargets boptscli
+
+parseTargetsFromBuildOptsWith
+    :: (MonadIO m, MonadMask m, MonadReader env m, MonadLogger m, HasEnvConfig env)
+    => Map PackageName (LocalPackageView, GenericPackageDescription)
+       -- ^ Local package views
+    -> NeedTargets
+    -> BuildOptsCLI
+    -> m (MiniBuildPlan, M.Map PackageName Version, M.Map PackageName SimpleTarget)
+parseTargetsFromBuildOptsWith rawLocals needTargets boptscli = do
     $logDebug "Parsing the targets"
     bconfig <- asks getBuildConfig
     mbp0 <-
@@ -209,7 +224,6 @@ parseTargetsFromBuildOpts needTargets boptscli = do
                     , mbpPackages = Map.empty
                     }
             _ -> return (bcWantedMiniBuildPlan bconfig)
-    rawLocals <- getLocalPackageViews
     workingDir <- getCurrentDir
 
     let snapshot = mpiVersion <$> mbpPackages mbp0
