@@ -12,3 +12,4 @@ extra-deps:
 - http-client-0.5.0
 - http-conduit-2.2.0
 - http-client-tls-0.3.0
+- unicode-transforms-0.1.0.1
