@@ -327,7 +327,7 @@ data Config =
          ,configMaybeProject        :: !(Maybe (Project, Path Abs File))
          }
 
--- | Which packages to ghc-options on the command line apply to?
+-- | Which packages do ghc-options on the command line apply to?
 data ApplyGhcOptions = AGOTargets -- ^ all local targets
                      | AGOLocals -- ^ all local packages, even non-targets
                      | AGOEverything -- ^ every package
