@@ -12,12 +12,19 @@ module Options.Applicative.Builder.Extra
   ,textOption
   ,textArgument
   ,optionalFirst
+  ,absFileOption
+  ,relFileOption
+  ,absDirOption
+  ,relDirOption
+  ,eitherReader'
   ) where
 
 import Control.Monad (when)
+import Data.Either.Combinators
 import Data.Monoid
 import Options.Applicative
 import Options.Applicative.Types (readerAsk)
+import Path
 import System.Environment (withArgs)
 import System.FilePath (takeBaseName)
 import Data.Text (Text)
@@ -136,3 +143,19 @@ textArgument = argument (T.pack <$> readerAsk)
 -- | Like 'optional', but returning a 'First'.
 optionalFirst :: Alternative f => f a -> f (First a)
 optionalFirst = fmap First . optional
+
+absFileOption :: Mod OptionFields (Path Abs File) -> Parser (Path Abs File)
+absFileOption = option (eitherReader' parseAbsFile)
+
+relFileOption :: Mod OptionFields (Path Rel File) -> Parser (Path Rel File)
+relFileOption = option (eitherReader' parseRelFile)
+
+absDirOption :: Mod OptionFields (Path Abs Dir) -> Parser (Path Abs Dir)
+absDirOption = option (eitherReader' parseAbsDir)
+
+relDirOption :: Mod OptionFields (Path Rel Dir) -> Parser (Path Rel Dir)
+relDirOption = option (eitherReader' parseRelDir)
+
+-- | Like 'eitherReader', but accepting any @'Show' e@ on the 'Left'.
+eitherReader' :: Show e => (String -> Either e a) -> ReadM a
+eitherReader' f = eitherReader (mapLeft show . f)

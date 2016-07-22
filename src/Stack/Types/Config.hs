@@ -149,7 +149,7 @@ module Stack.Types.Config
 import           Control.Applicative
 import           Control.Arrow ((&&&))
 import           Control.Exception
-import           Control.Monad (liftM, mzero, forM, join)
+import           Control.Monad (liftM, mzero, join)
 import           Control.Monad.Catch (MonadThrow, throwM)
 import           Control.Monad.Logger (LogLevel(..))
 import           Control.Monad.Reader (MonadReader, ask, asks, MonadIO, liftIO)
@@ -285,11 +285,11 @@ data Config =
          -- ^ Require a version of stack within this range.
          ,configJobs                :: !Int
          -- ^ How many concurrent jobs to run, defaults to number of capabilities
-         ,configOverrideGccPath     :: !(Maybe Text)
+         ,configOverrideGccPath     :: !(Maybe (Path Abs File))
          -- ^ Optional gcc override path
-         ,configExtraIncludeDirs    :: !(Set Text)
+         ,configExtraIncludeDirs    :: !(Set (Path Abs Dir))
          -- ^ --extra-include-dirs arguments
-         ,configExtraLibDirs        :: !(Set Text)
+         ,configExtraLibDirs        :: !(Set (Path Abs Dir))
          -- ^ --extra-lib-dirs arguments
          ,configConcurrentTests     :: !Bool
          -- ^ Run test suites concurrently
@@ -810,7 +810,7 @@ data ConfigMonoid =
   ConfigMonoid
     { configMonoidStackRoot          :: !(First (Path Abs Dir))
     -- ^ See: 'configStackRoot'
-    , configMonoidWorkDir            :: !(First FilePath)
+    , configMonoidWorkDir            :: !(First (Path Rel Dir))
     -- ^ See: 'configWorkDir'.
     , configMonoidBuildOpts          :: !BuildOptsMonoid
     -- ^ build options.
@@ -848,11 +848,11 @@ data ConfigMonoid =
     -- ^ Used for overriding the GHC variant
     ,configMonoidJobs                :: !(First Int)
     -- ^ See: 'configJobs'
-    ,configMonoidExtraIncludeDirs    :: !(Set Text)
+    ,configMonoidExtraIncludeDirs    :: !(Set (Path Abs Dir))
     -- ^ See: 'configExtraIncludeDirs'
-    ,configMonoidExtraLibDirs        :: !(Set Text)
+    ,configMonoidExtraLibDirs        :: !(Set (Path Abs Dir))
     -- ^ See: 'configExtraLibDirs'
-    , configMonoidOverrideGccPath    :: !(First Text)
+    , configMonoidOverrideGccPath    :: !(First (Path Abs File))
     -- ^ Allow users to override the path to gcc
     ,configMonoidConcurrentTests     :: !(First Bool)
     -- ^ See: 'configConcurrentTests'
@@ -942,11 +942,7 @@ parseConfigMonoidJSON obj = do
     configMonoidCompilerCheck <- First <$> obj ..:? configMonoidCompilerCheckName
 
     configMonoidGhcOptions <- obj ..:? configMonoidGhcOptionsName ..!= mempty
-
-    extraPath <- obj ..:? configMonoidExtraPathName ..!= []
-    configMonoidExtraPath <- forM extraPath $
-        either (fail . show) return . parseAbsDir . T.unpack
-
+    configMonoidExtraPath <- obj ..:? configMonoidExtraPathName ..!= []
     configMonoidSetupInfoLocations <-
         maybeToList <$> jsonSubWarningsT (obj ..:?  configMonoidSetupInfoLocationsName)
     configMonoidPvpBounds <- First <$> obj ..:? configMonoidPvpBoundsName

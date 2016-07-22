@@ -151,10 +151,10 @@ paths =
       , T.pack . toFilePathNoTrailingSep . configLocalBin . bcConfig . piBuildConfig )
     , ( "Extra include directories"
       , "extra-include-dirs"
-      , T.intercalate ", " . Set.elems . configExtraIncludeDirs . bcConfig . piBuildConfig )
+      , T.intercalate ", " . map (T.pack . toFilePathNoTrailingSep) . Set.elems . configExtraIncludeDirs . bcConfig . piBuildConfig )
     , ( "Extra library directories"
       , "extra-library-dirs"
-      , T.intercalate ", " . Set.elems . configExtraLibDirs . bcConfig . piBuildConfig )
+      , T.intercalate ", " . map (T.pack . toFilePathNoTrailingSep) . Set.elems . configExtraLibDirs . bcConfig . piBuildConfig )
     , ( "Snapshot package database"
       , "snapshot-pkg-db"
       , T.pack . toFilePathNoTrailingSep . piSnapDb )

@@ -54,7 +54,7 @@ buildOptsFromMonoid BuildOptsMonoid{..} = BuildOpts
 haddockOptsFromMonoid :: HaddockOptsMonoid -> HaddockOpts
 haddockOptsFromMonoid HaddockOptsMonoid{..} =
     defaultHaddockOpts
-    {toHaddockArgs = toMonoidHaddockArgs}
+    {hoAdditionalArgs = hoMonoidAdditionalArgs}
 
 testOptsFromMonoid :: TestOptsMonoid -> TestOpts
 testOptsFromMonoid TestOptsMonoid{..} =

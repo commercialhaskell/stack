@@ -1,4 +1,4 @@
-resolver: nightly-2016-05-27
+resolver: nightly-2016-07-19
 image:
   containers:
     - base: "fpco/stack-base" # see ./etc/docker/stack-base/Dockerfile
@@ -9,20 +9,6 @@ nix:
   packages:
     - zlib
 extra-deps:
-- hpack-0.14.0
-- path-io-1.1.0
-- th-lift-instances-0.1.7
-- aeson-0.11.2.0
-- th-reify-many-0.1.6
-- th-utilities-0.1.1.0
-- store-0.1.0.1
-- th-orphans-0.13.1
-- hspec-smallcheck-0.4.1
-- mono-traversable-0.10.2
-- optparse-simple-0.0.3
-- retry-0.7.3
-- dlist-instances-0.1
-- persistent-sqlite-2.5
 - http-client-0.5.0
 - http-conduit-2.2.0
 - http-client-tls-0.3.0

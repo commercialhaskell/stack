@@ -202,7 +202,7 @@ configFromConfigMonoid
     -> ConfigMonoid
     -> m Config
 configFromConfigMonoid configStackRoot configUserConfigPath mresolver mproject ConfigMonoid{..} = do
-     configWorkDir <- parseRelDir (fromFirst ".stack-work" configMonoidWorkDir)
+     let configWorkDir = fromFirst $(mkRelDir ".stack-work") configMonoidWorkDir
      -- This code is to handle the deprecation of latest-snapshot-url
      configUrls <- case (getFirst configMonoidLatestSnapshotUrl, getFirst (urlsMonoidLatestSnapshot configMonoidUrls)) of
          (Just url, Nothing) -> do
@@ -258,7 +258,7 @@ configFromConfigMonoid configStackRoot configUserConfigPath mresolver mproject C
      configNix <- nixOptsFromMonoid configMonoidNixOpts os
 
      rawEnv <- liftIO getEnvironment
-     pathsEnv <- augmentPathMap (map toFilePath configMonoidExtraPath)
+     pathsEnv <- augmentPathMap configMonoidExtraPath
                                 (Map.fromList (map (T.pack *** T.pack) rawEnv))
      origEnv <- mkEnvOverride configPlatform pathsEnv
      let configEnvOverride _ = return origEnv

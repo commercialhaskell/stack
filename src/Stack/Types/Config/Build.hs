@@ -296,27 +296,27 @@ instance Monoid TestOptsMonoid where
 
 -- | Haddock Options
 data HaddockOpts =
-  HaddockOpts { toHaddockArgs :: ![String] -- ^ Arguments passed to haddock program
+  HaddockOpts { hoAdditionalArgs :: ![String] -- ^ Arguments passed to haddock program
               } deriving (Eq,Show)
 
 data HaddockOptsMonoid =
-  HaddockOptsMonoid {toMonoidHaddockArgs :: ![String]
+  HaddockOptsMonoid {hoMonoidAdditionalArgs :: ![String]
                     } deriving (Show, Generic)
 
 defaultHaddockOpts :: HaddockOpts
-defaultHaddockOpts = HaddockOpts {toHaddockArgs = []}
+defaultHaddockOpts = HaddockOpts {hoAdditionalArgs = []}
 
 instance FromJSON (WithJSONWarnings HaddockOptsMonoid) where
   parseJSON = withObjectWarnings "HaddockOptsMonoid"
-    (\o -> do toMonoidHaddockArgs <- o ..:? toMonoidHaddockArgsName ..!= []
+    (\o -> do hoMonoidAdditionalArgs <- o ..:? hoMonoidAdditionalArgsName ..!= []
               return HaddockOptsMonoid{..})
 
 instance Monoid HaddockOptsMonoid where
   mempty = memptydefault
   mappend = mappenddefault
 
-toMonoidHaddockArgsName :: Text
-toMonoidHaddockArgsName = "haddock-args"
+hoMonoidAdditionalArgsName :: Text
+hoMonoidAdditionalArgsName = "haddock-args"
 
 
 -- | Options for the 'FinalAction' 'DoBenchmarks'

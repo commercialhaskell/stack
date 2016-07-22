@@ -46,7 +46,6 @@ import           Options.Applicative
 import           Options.Applicative.Args
 import           Options.Applicative.Builder.Extra
 import           Options.Applicative.Types         (fromM, oneM, readerAsk)
-import           Path
 import           Stack.Build                       (splitObjsWarning)
 import           Stack.Clean                       (CleanOpts (..))
 import           Stack.Config                      (packagesParser)
@@ -224,14 +223,14 @@ configOptsParser hide0 =
         , configMonoidModifyCodePage = modifyCodePage
         , configMonoidAllowDifferentUser = allowDifferentUser
         })
-    <$> optionalFirst (option readAbsDir
+    <$> optionalFirst (absDirOption
             ( long stackRootOptionName
             <> metavar (map toUpper stackRootOptionName)
             <> help ("Absolute path to the global stack root directory " ++
                      "(Overrides any STACK_ROOT environment variable)")
             <> hide
             ))
-    <*> optionalFirst (strOption
+    <*> optionalFirst (relDirOption
             ( long "work-dir"
             <> metavar "WORK-DIR"
             <> help "Override work directory (default: .stack-work)"
@@ -268,19 +267,19 @@ configOptsParser hide0 =
            <> help "Number of concurrent jobs to run"
            <> hide
             ))
-    <*> fmap Set.fromList (many (textOption
+    <*> fmap Set.fromList (many (absDirOption
             ( long "extra-include-dirs"
            <> metavar "DIR"
            <> help "Extra directories to check for C header files"
            <> hide
             )))
-    <*> fmap Set.fromList (many (textOption
+    <*> fmap Set.fromList (many (absDirOption
             ( long "extra-lib-dirs"
            <> metavar "DIR"
            <> help "Extra directories to check for libraries"
            <> hide
             )))
-    <*> optionalFirst (textOption
+    <*> optionalFirst (absFileOption
              ( long "with-gcc"
             <> metavar "PATH-TO-GCC"
             <> help "Use gcc found at PATH-TO-GCC"
@@ -310,15 +309,6 @@ configOptsParser hide0 =
                 "directory to use a stack installation (POSIX only)")
             hide
   where hide = hideMods (hide0 /= OuterGlobalOpts)
-
-readAbsDir :: ReadM (Path Abs Dir)
-readAbsDir = do
-    s <- readerAsk
-    case parseAbsDir s of
-        Just p -> return p
-        Nothing ->
-            readerError
-                ("Failed to parse absolute path to directory: '" ++ s ++ "'")
 
 buildOptsMonoidParser :: Bool -> Parser BuildOptsMonoid
 buildOptsMonoidParser hide0 =
@@ -555,11 +545,12 @@ dockerOptsParser hide0 =
                                 metavar "NAME=VALUE" <>
                                 help ("Set environment variable in container " ++
                                       "(may specify multiple times)")))
-    <*> firstStrOption (long (dockerOptName dockerDatabasePathArgName) <>
-                        hide <>
-                        metavar "PATH" <>
-                        help "Location of image usage tracking database")
-    <*> firstStrOption
+    <*> optionalFirst (absFileOption
+            (long (dockerOptName dockerDatabasePathArgName) <>
+             hide <>
+             metavar "PATH" <>
+             help "Location of image usage tracking database"))
+    <*> optionalFirst (option (eitherReader' parseDockerStackExe)
             (long(dockerOptName dockerStackExeArgName) <>
              hide <>
              metavar (intercalate "|"
@@ -569,7 +560,7 @@ dockerOptsParser hide0 =
                           , "PATH" ]) <>
              help (concat [ "Location of "
                           , stackProgName
-                          , " executable used in container" ]))
+                          , " executable used in container" ])))
     <*> firstBoolFlags (dockerOptName dockerSetUserArgName)
                        "setting user in container to match host"
                        hide

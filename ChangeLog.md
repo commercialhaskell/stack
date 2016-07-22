@@ -16,6 +16,9 @@ Other enhancements:
 * Stack/Nix: Sets `LD_LIBRARY_PATH` so packages using C libs for Template Haskell can work
   (See _e.g._ [this HaskellR issue](https://github.com/tweag/HaskellR/issues/253))
 
+* Parse CLI arguments and configuration files into less permissive types,
+  improving error messages for bad inputs.
+  [#2267](https://github.com/commercialhaskell/stack/issues/2267)
 * Add the ability to explictly specify a gcc executable.
   [#593](https://github.com/commercialhaskell/stack/issues/593)
 * Nix: No longer uses LTS mirroring in nixpkgs. Gives to nix-shell a derivation

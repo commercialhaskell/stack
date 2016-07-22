@@ -37,7 +37,6 @@ import qualified Distribution.System as Cabal
 import           GHC.Generics (Generic)
 import           Generics.Deriving.Monoid (mappenddefault, memptydefault)
 import           Path
-import           Path.Extra (toFilePathNoTrailingSep)
 import           Path.IO
 import           Prelude hiding (concat, elem) -- Fix AMP warning
 import           Stack.Types
@@ -120,44 +119,44 @@ extraDirs tool = do
     dir <- installDir (configLocalPrograms config) tool
     case (configPlatform config, toolNameString tool) of
         (Platform _ Cabal.Windows, isGHC -> True) -> return mempty
-            { edBins = goList
+            { edBins =
                 [ dir </> $(mkRelDir "bin")
                 , dir </> $(mkRelDir "mingw") </> $(mkRelDir "bin")
                 ]
             }
         (Platform Cabal.I386 Cabal.Windows, "msys2") -> return mempty
-            { edBins = goList
+            { edBins =
                 [ dir </> $(mkRelDir "mingw32") </> $(mkRelDir "bin")
                 , dir </> $(mkRelDir "usr") </> $(mkRelDir "bin")
                 , dir </> $(mkRelDir "usr") </> $(mkRelDir "local") </> $(mkRelDir "bin")
                 ]
-            , edInclude = goList
+            , edInclude =
                 [ dir </> $(mkRelDir "mingw32") </> $(mkRelDir "include")
                 ]
-            , edLib = goList
+            , edLib =
                 [ dir </> $(mkRelDir "mingw32") </> $(mkRelDir "lib")
                 ]
             }
         (Platform Cabal.X86_64 Cabal.Windows, "msys2") -> return mempty
-            { edBins = goList
+            { edBins =
                 [ dir </> $(mkRelDir "mingw64") </> $(mkRelDir "bin")
                 , dir </> $(mkRelDir "usr") </> $(mkRelDir "bin")
                 , dir </> $(mkRelDir "usr") </> $(mkRelDir "local") </> $(mkRelDir "bin")
                 ]
-            , edInclude = goList
+            , edInclude =
                 [ dir </> $(mkRelDir "mingw64") </> $(mkRelDir "include")
                 ]
-            , edLib = goList
+            , edLib =
                 [ dir </> $(mkRelDir "mingw64") </> $(mkRelDir "lib")
                 ]
             }
         (_, isGHC -> True) -> return mempty
-            { edBins = goList
+            { edBins =
                 [ dir </> $(mkRelDir "bin")
                 ]
             }
         (_, isGHCJS -> True) -> return mempty
-            { edBins = goList
+            { edBins =
                 [ dir </> $(mkRelDir "bin")
                 ]
             }
@@ -165,14 +164,13 @@ extraDirs tool = do
             $logWarn $ "binDirs: unexpected OS/tool combo: " <> T.pack (show (x, toolName))
             return mempty
   where
-    goList = map toFilePathNoTrailingSep
     isGHC n = "ghc" == n || "ghc-" `isPrefixOf` n
     isGHCJS n = "ghcjs" == n
 
 data ExtraDirs = ExtraDirs
-    { edBins :: ![FilePath]
-    , edInclude :: ![FilePath]
-    , edLib :: ![FilePath]
+    { edBins :: ![Path Abs Dir]
+    , edInclude :: ![Path Abs Dir]
+    , edLib :: ![Path Abs Dir]
     } deriving (Show, Generic)
 instance Monoid ExtraDirs where
     mempty = memptydefault

@@ -100,10 +100,9 @@ stageExesInDir opts dir = do
             forM_
                 exes
                 (\exe ->
-                      do exeRelFile <- parseRelFile exe
-                         copyFile
-                             (srcBinPath </> exeRelFile)
-                             (destBinPath </> exeRelFile))
+                      copyFile
+                          (srcBinPath </> exe)
+                          (destBinPath </> exe))
 
 -- | Add any additional files into the temp directory, respecting the
 -- (Source, Destination) mapping.
@@ -115,9 +114,8 @@ syncAddContentToDir opts dir = do
     let imgAdd = imgDockerAdd opts
     forM_
         (Map.toList imgAdd)
-        (\(source,dest) ->
+        (\(source,destPath) ->
               do sourcePath <- resolveDir (bcRoot bconfig) source
-                 destPath <- parseAbsDir dest
                  let destFullPath = dir </> dropRoot destPath
                  ensureDir destFullPath
                  copyDirRecur sourcePath destFullPath)

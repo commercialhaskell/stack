@@ -35,7 +35,6 @@ import qualified Paths_stack as Meta
 import           Prelude hiding (mapM) -- Fix redundant import warnings
 import           Stack.Config.Nix (nixCompiler)
 import           Stack.Constants (stackProgName,platformVariantEnvVar)
-import           Stack.Docker (reExecArgName)
 import           Stack.Exec (exec)
 import           Stack.Types
 import           Stack.Types.Internal
@@ -126,7 +125,7 @@ escape str = "'" ++ foldr (\c -> if c == '\'' then
 
 -- | Fail with friendly error if project root not set.
 fromMaybeProjectRoot :: Maybe (Path Abs Dir) -> Path Abs Dir
-fromMaybeProjectRoot = fromMaybe (throw CannotDetermineProjectRootException)
+fromMaybeProjectRoot = fromMaybe (throw CannotDetermineProjectRoot)
 
 -- | 'True' if we are currently running inside a Nix.
 getInShell :: (MonadIO m) => m Bool
@@ -147,14 +146,14 @@ nixHelpOptName = nixCmdName ++ "-help"
 
 -- | Exceptions thrown by "Stack.Nix".
 data StackNixException
-  = CannotDetermineProjectRootException
+  = CannotDetermineProjectRoot
     -- ^ Can't determine the project root (location of the shell file if any).
   deriving (Typeable)
 
 instance Exception StackNixException
 
 instance Show StackNixException where
-  show CannotDetermineProjectRootException =
+  show CannotDetermineProjectRoot =
     "Cannot determine project root directory."
 
 type M env m =
