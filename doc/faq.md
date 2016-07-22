@@ -265,6 +265,17 @@ when it detects an option change by default. This behavior can be changed though
 To force recompilation manually, use the `--force-dirty` flag. If this still doesn't lead to a rebuild,
 add the `-fforce-recomp` flag to your `--ghc-options`.
 
+## Why doesn't stack apply my `--ghc-options` to my dependencies?
+
+By default, stack applies command line GHC options only to local packages (these are all
+the packages that are specified in the `packages` section of your `stack.yaml`).
+For an explanation of this choice see [this discussion on the issue tracker](https://github.com/commercialhaskell/stack/issues/827#issuecomment-133263678).
+
+If you still want to set specific GHC options for a dependency, use the [`ghc-options` option](yaml_configuration.md#ghc-options) in your
+`stack.yaml` or global `~/.stack/config.yaml`.
+
+To change the set of packages that command line GHC options apply to, use the [`apply-ghc-options` option](yaml_configuration.md#apply-ghc-options).
+
 ## stack setup on a windows system only tells me to add certain paths to the PATH variable instead of doing it
 
 If you are using a powershell session, it is easy to automate even that step:
