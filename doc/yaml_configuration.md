@@ -371,7 +371,31 @@ ghc-options:
 Caveat emptor: setting options like this will affect your snapshot packages,
 which can lead to unpredictable behavior versus official Stackage snapshots.
 This is in contrast to the `ghc-options` command line flag, which will only
-affect local packages.
+affect the packages specified by the [`apply-ghc-options` option](yaml_configuration.md#apply-ghc-options).
+
+### apply-ghc-options
+
+(Since 0.1.6)
+
+Which packages do ghc-options on the command line get applied to? Before 0.1.6, the default value was `targets`
+
+```yaml
+apply-ghc-options: locals # all local packages, the default
+# apply-ghc-options: targets # all local packages that are targets
+# apply-ghc-options: everything # applied even to snapshot and extra-deps
+```
+
+Note that `everything` is a slightly dangerous value, as it can break invariants about your snapshot database.
+
+### rebuild-ghc-options
+
+(Since 0.1.6)
+
+Should we rebuild a package when its GHC options change? Before 0.1.6, this was a non-configurable true. However, in most cases, the flag is used to affect optimization levels and warning behavior, for which GHC itself doesn't actually recompile the modules anyway. Therefore, the new behavior is to not recompile on an options change, but this behavior can be changed back with the following:
+
+```yaml
+rebuild-ghc-options: true
+```
 
 ### ghc-variant
 
@@ -454,30 +478,6 @@ explicit-setup-deps:
     "*": true # change the default
     entropy: false # override the new default for one package
 ```
-
-### rebuild-ghc-options
-
-(Since 0.1.6)
-
-Should we rebuild a package when its GHC options change? Before 0.1.6, this was a non-configurable true. However, in most cases, the flag is used to affect optimization levels and warning behavior, for which GHC itself doesn't actually recompile the modules anyway. Therefore, the new behavior is to not recompile on an options change, but this behavior can be changed back with the following:
-
-```yaml
-rebuild-ghc-options: true
-```
-
-### apply-ghc-options
-
-(Since 0.1.6)
-
-Which packages do ghc-options on the command line get applied to? Before 0.1.6, the default value was `targets`
-
-```yaml
-apply-ghc-options: locals # all local packages, the default
-# apply-ghc-options: targets # all local packages that are targets
-# apply-ghc-options: everything # applied even to snapshot and extra-deps
-```
-
-Note that `everything` is a slightly dangerous value, as it can break invariants about your snapshot database.
 
 ### allow-newer
 
