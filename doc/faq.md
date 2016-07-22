@@ -331,3 +331,7 @@ The workaround is to quote the `"--"`, e.g.:
     stack exec "--" cabal --version
 
 This is known to be a problem on Windows 7, but seems to be fixed on Windows 10.
+
+# Does stack also install the system/C libraries that some Cabal packages depend on?
+
+No, this is out of scope.
