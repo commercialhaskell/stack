@@ -256,13 +256,25 @@ don't have enough RAM you will get errors about disk space.  If this happens to
 you, please _manually_ set TMPDIR before launching Stack to some directory on the
 disk.
 
-## stack sometimes rebuilds based on flag changes when I wouldn't expect it to. How come?
+## Why doesn't stack rebuild my project when I specify `--ghc-options` on the command line?
 
-stack tries to give you reproducibility whenever possible. In some cases, this means that you get a recompile when one may not seem necessary. The most common example is running something like this in a multi-package project:
+Because GHC options often only affect optimization levels and warning behavior, stack doesn't recompile
+when it detects an option change by default. This behavior can be changed though by setting the
+[`rebuild-ghc-options` option](yaml_configuration.md#rebuild-ghc-options) to `true`.
 
-    stack build --ghc-options -O0 && stack build --ghc-options -O0 one-of-the-packages
+To force recompilation manually, use the `--force-dirty` flag. If this still doesn't lead to a rebuild,
+add the `-fforce-recomp` flag to your `--ghc-options`.
 
-This may end up recompiling local dependencies of `one-of-the-packages` without optimizations on. Whether stack should or shouldn't do this depends on the needs of the user at the time, and unfortunately we can't make a solution that will make everyone happy in all cases. If you're curious for details, there's [a long discussion about it](https://github.com/commercialhaskell/stack/issues/382) on the issue tracker.
+## Why doesn't stack apply my `--ghc-options` to my dependencies?
+
+By default, stack applies command line GHC options only to local packages (these are all
+the packages that are specified in the `packages` section of your `stack.yaml`).
+For an explanation of this choice see [this discussion on the issue tracker](https://github.com/commercialhaskell/stack/issues/827#issuecomment-133263678).
+
+If you still want to set specific GHC options for a dependency, use the [`ghc-options` option](yaml_configuration.md#ghc-options) in your
+`stack.yaml` or global `~/.stack/config.yaml`.
+
+To change the set of packages that command line GHC options apply to, use the [`apply-ghc-options` option](yaml_configuration.md#apply-ghc-options).
 
 ## stack setup on a windows system only tells me to add certain paths to the PATH variable instead of doing it
 
