@@ -613,8 +613,8 @@ data RemotePackageType
 instance ToJSON PackageLocation where
     toJSON (PLFilePath fp) = toJSON fp
     toJSON (PLRemote t RPTHttp) = toJSON t
-    toJSON (PLRemote x (RPTGit y)) = toJSON $ T.unwords ["git", x, y]
-    toJSON (PLRemote x (RPTHg  y)) = toJSON $ T.unwords ["hg",  x, y]
+    toJSON (PLRemote x (RPTGit y)) = object [("git", toJSON x), ("commit", toJSON y)]
+    toJSON (PLRemote x (RPTHg  y)) = object [( "hg", toJSON x), ("commit", toJSON y)]
 
 instance FromJSON (WithJSONWarnings PackageLocation) where
     parseJSON v
