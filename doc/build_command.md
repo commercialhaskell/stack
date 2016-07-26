@@ -2,10 +2,11 @@
 
 ## Overview
 
-The primary command you use in stack is build. This page describes the details
-of build's command line interface. The goal of the interface is to do the right
-thing for simple input, and allow a lot of flexibility for more complicated
-goals.
+The primary command you use in stack is build. This page describes the build
+command's interface. The goal of the interface is to do the right thing for
+simple input, and allow a lot of flexibility for more complicated goals. See the
+[build command section of the user guide](GUIDE.md#the-build-command) for info
+beyond the CLI aspects of the build command.
 
 ## Synonyms
 
@@ -79,15 +80,37 @@ implicitly pass in all of your local packages. If you only want to target
 packages in the current directory or deeper, you can pass in `.`, e.g. `stack
 build .`.
 
-### Examples
+## Controlling what gets built
 
-FIXME: what examples would be helpful? Need feedback on what's confusing above
+Stack will automatically build the necessary
+dependencies. See the
+[build command section of the user guide](GUIDE.md#the-build-command) for
+details of how these dependencies get specified.
 
-## Dependencies
+In addition to specifying targets, you can also control what gets built with the
+following flags:
 
-stack will always automatically build all dependencies necessary for its targets.
+* `--haddock`, to build documentation.  This may cause a lot of packages to get
+  re-built, so that the documentation links work.
 
-## Other flags
+* `--force-dirty`, to force rebuild of packages even when it doesn't seem
+  necessary based on file dirtiness.
+
+* `--reconfigure`, to force reconfiguration even when it doesn't seem necessary
+  based on file dirtiness. This is sometimes useful with custom Setup.hs files,
+  in particular when they depend on external data files.
+
+* `--dry-run`, to build nothing and output information about the build plan.
+
+* `--only-dependencies`, to skip building the targets.
+
+* `--only-snapshot`, to only build snapshot dependencies, which are cached and
+  shared with other projects.
+
+* `--keep-going`, to continue building packages even after some build step
+  fails. The packages which depend upon the failed build won't get built.
+
+## Flags
 
 There are a number of other flags accepted by `stack build`. Instead of listing
 all of them, please use `stack build --help`. Some particularly convenient ones
