@@ -358,7 +358,7 @@ buildOptsMonoidParser hide0 =
              help
                  "Enable profiling in libraries, executables, etc. \
                     \for all expressions and generate a profiling report\
-                    \ in exec or benchmarks" <>
+                    \ in tests or benchmarks" <>
             hide)
 
     trace =

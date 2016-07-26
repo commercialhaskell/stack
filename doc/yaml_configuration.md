@@ -396,7 +396,31 @@ ghc-options:
 Caveat emptor: setting options like this will affect your snapshot packages,
 which can lead to unpredictable behavior versus official Stackage snapshots.
 This is in contrast to the `ghc-options` command line flag, which will only
-affect local packages.
+affect the packages specified by the [`apply-ghc-options` option](yaml_configuration.md#apply-ghc-options).
+
+### apply-ghc-options
+
+(Since 0.1.6)
+
+Which packages do ghc-options on the command line get applied to? Before 0.1.6, the default value was `targets`
+
+```yaml
+apply-ghc-options: locals # all local packages, the default
+# apply-ghc-options: targets # all local packages that are targets
+# apply-ghc-options: everything # applied even to snapshot and extra-deps
+```
+
+Note that `everything` is a slightly dangerous value, as it can break invariants about your snapshot database.
+
+### rebuild-ghc-options
+
+(Since 0.1.6)
+
+Should we rebuild a package when its GHC options change? Before 0.1.6, this was a non-configurable true. However, in most cases, the flag is used to affect optimization levels and warning behavior, for which GHC itself doesn't actually recompile the modules anyway. Therefore, the new behavior is to not recompile on an options change, but this behavior can be changed back with the following:
+
+```yaml
+rebuild-ghc-options: true
+```
 
 ### ghc-variant
 
@@ -480,30 +504,6 @@ explicit-setup-deps:
     entropy: false # override the new default for one package
 ```
 
-### rebuild-ghc-options
-
-(Since 0.1.6)
-
-Should we rebuild a package when its GHC options change? Before 0.1.6, this was a non-configurable true. However, in most cases, the flag is used to affect optimization levels and warning behavior, for which GHC itself doesn't actually recompile the modules anyway. Therefore, the new behavior is to not recompile on an options change, but this behavior can be changed back with the following:
-
-```yaml
-rebuild-ghc-options: true
-```
-
-### apply-ghc-options
-
-(Since 0.1.6)
-
-Which packages do ghc-options on the command line get applied to? Before 0.1.6, the default value was `targets`
-
-```yaml
-apply-ghc-options: locals # all local packages, the default
-# apply-ghc-options: targets # all local packages that are targets
-# apply-ghc-options: everything # applied even to snapshot and extra-deps
-```
-
-Note that `everything` is a slightly dangerous value, as it can break invariants about your snapshot database.
-
 ### allow-newer
 
 (Since 0.1.7)
@@ -544,6 +544,7 @@ The 5 parameters are: `author-email`, `author-name`, `category`, `copyright` and
 * _category_ - sets the `category` property in cabal. This is used in Hackage. For examples of categories see [Packages by category](https://hackage.haskell.org/packages/). It makes sense for `category` to be set on a per project basis because it is uncommon for all projects a user creates to belong to the same category. The category can be set per project by passing `-p "category:value"` to the `stack new` command.
 * _copyright_ - sets the `copyright` property in cabal. It is typically the name of the holder of the copyright on the package and the year(s) from which copyright is claimed. For example: `Copyright: (c) 2006-2007 Joe Bloggs`
 * _github-username_ - used to generate `homepage` and `source-repository` in cabal. For instance `github-username: myusername` and `stack new my-project new-template` would result:
+
 ```yaml
 homepage: http://github.com/myusername/my-project#readme
 
@@ -562,3 +563,19 @@ templates:
     copyright: 'Copyright: (c) 2016 Your Name'
     github-username: yourusername
 ```
+
+# urls
+
+Customize the URLs where `stack` looks for snapshot build plans.
+
+The default configuration is
+
+```yaml
+urls:
+  latest-snapshot: https://www.stackage.org/download/snapshots.json
+  lts-build-plans: https://raw.githubusercontent.com/fpco/lts-haskell/master/
+  nightly-build-plans: https://raw.githubusercontent.com/fpco/stackage-nightly/master/
+```
+
+**Note:** The `latest-snapshot-url` field has been deprecated in favor of `latest-snapshot`
+and will be removed in a future version of `stack`.

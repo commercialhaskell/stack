@@ -33,29 +33,3 @@ pages:
 markdown_extensions:
 - toc:
     permalink: true
-
-# These extra_templates exists only to redirect from old Sphinx URLs to new
-# MkDocs URLs. This is more properly done using an HTTP redirect, but
-# unfortunately readthedocs.org's page redirection is broken (see
-# https://github.com/rtfd/readthedocs.org/issues/1826). Once that bug is fixed,
-# these files can be removed.
-extra_templates:
-- index.html
-- CONTRIBUTING.html
-- ChangeLog.html
-- GUIDE.html
-- MAINTAINER_GUIDE.html
-- README.html
-- SIGNING_KEY.html
-- architecture.html
-- build_command.html
-- dependency_visualization.html
-- docker_integration.html
-- faq.html
-- ghcjs.html
-- install_and_upgrade.html
-- nix_integration.html
-- nonstandard_project_init.html
-- shell_autocompletion.html
-- travis_ci.html
-- yaml_configuration.html

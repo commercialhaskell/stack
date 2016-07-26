@@ -1840,7 +1840,7 @@ stack new project ~/location/of/your/template.hsfiles
 ```
 
 As a starting point you can use [the "simple" template](https://github.com/commercialhaskell/stack-templates/blob/master/simple.hsfiles).
-An introduction into template-writing and a place for submitting official templates, 
+An introduction into template-writing and a place for submitting official templates,
 you will find at [the stack-templates repository](https://github.com/commercialhaskell/stack-templates#readme).
 
 ### IDE
@@ -2188,24 +2188,46 @@ users. Here's a quick rundown:
 
 ## Debugging
 
-The following command installs with profiling enabled:
+To profile a component of the current project, simply pass the `--profile`
+flag to `stack`. The `--profile` flag turns on the `--enable-library-profiling`
+and `--enable-executable-profiling` Cabal options _and_ passes the `+RTS -p`
+runtime options to any testsuites and benchmarks.
 
-`stack install --executable-profiling --library-profiling
---ghc-options="-rtsopts"`
+For example the following command will build the `my-tests` testsuite with
+profiling options and create a `my-tests.prof` file in the current directory
+as a result of the test run.
 
-This command will allow you to use various tools to profile the time,
-allocation, heap, and more of a program. The `-prof` GHC option is unnecessary
-and will result in a warning. Additional compilation options can be added to
-`--ghc-options` if needed. To see a general overview of the time and allocation
-of a program called `main` compiled with the above command, you can run
+    stack test --profile my-tests
 
-`./main +RTS -p`
+The `my-tests.prof` file now contains time and allocation info for the test run.
 
-to generate a `main.prof` file containing the requested profiling information.
-Alternatively, you can use `stack exec main -- +RTS -p`, where `--` allows you
-to specify parameters for `main` executable (without `--` the `stack`
-executable would use those parameters instead).
+To create a profiling report for an executable, e.g. `my-exe`, you can
+run
 
+     stack exec -- my-exe +RTS -p
+
+For more fine-grained control of compilation options there are the
+`--library-profiling` and `--executable-profiling` flags which will turn on the
+`--enable-library-profiling` and `--enable-executable-profiling` Cabal
+options respectively.
+Custom GHC options can be passed in with `--ghc-options "more options here"`.
+
+To enable compilation with profiling options by default you can add the
+following snippet to your `stack.yaml` or `~/.stack/config.yaml`:
+
+```
+build:
+  library-profiling: true
+  executable-profiling: true
+```
+
+### Tracing
+
+To generate a backtrace in case of exceptions during a test or benchmarks run,
+use the `--trace` flag. Like `--profile` this compiles with profiling options,
+but adds the `+RTS -xc` runtime option.
+
+### Further reading
 
 For more commands and uses, see [the official GHC chapter on
 profiling](https://downloads.haskell.org/~ghc/latest/docs/html/users_guide/profiling.html),
