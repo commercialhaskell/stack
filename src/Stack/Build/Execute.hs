@@ -87,7 +87,7 @@ import           System.Exit (ExitCode (ExitSuccess))
 import qualified System.FilePath as FP
 import           System.IO
 import           System.PosixCompat.Files (createLink)
-import           System.Process.Log (showProcessArgDebug)
+import           System.Process.Log (showProcessArgDebug, withProcessTimeLog)
 import           System.Process.Read
 import           System.Process.Run
 
@@ -454,9 +454,9 @@ executePlan menv boptsCli baseConfigOpts locals globalPackages snapshotPackages 
                     , esStackExe = True
                     , esLocaleUtf8 = False
                     }
-    forM_ (boptsCLIExec boptsCli) $ \(cmd, args) -> do
-        $logProcessRun cmd args
-        callProcess (Cmd Nothing cmd menv' args)
+    forM_ (boptsCLIExec boptsCli) $ \(cmd, args) ->
+        $withProcessTimeLog cmd args $
+            callProcess (Cmd Nothing cmd menv' args)
 
 -- | Windows can't write over the current executable. Instead, we rename the
 -- current executable to something else and then do the copy.

@@ -87,6 +87,7 @@ import           System.Exit (ExitCode (ExitSuccess))
 import           System.FilePath (searchPathSeparator)
 import qualified System.FilePath as FP
 import           System.Process (rawSystem)
+import           System.Process.Log (withProcessTimeLog)
 import           System.Process.Read
 import           System.Process.Run (runCmd, Cmd(..))
 import           Text.Printf (printf)
@@ -1194,8 +1195,8 @@ setup7z si = do
                         , "-y"
                         , toFilePath archive
                         ]
-                $logProcessRun cmd args
-                ec <- liftIO $ rawSystem cmd args
+                ec <- $withProcessTimeLog cmd args $
+                    liftIO $ rawSystem cmd args
                 when (ec /= ExitSuccess)
                     $ liftIO $ throwM (ProblemWhileDecompressing archive)
         _ -> throwM SetupInfoMissingSevenz
