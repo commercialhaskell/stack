@@ -15,15 +15,18 @@ fetch_stack_linux() {
   curl -sL https://www.stackage.org/stack/linux-x86_64 | tar xz --wildcards --strip-components=1 -C ~/.local/bin '*/stack';
 }
 
+# We need stack to generate cabal files with precise bounds, even for cabal
+# builds.
+mkdir -p ~/.local/bin;
+if [ `uname` = "Darwin" ]; then
+  travis_retry fetch_stack_osx
+else
+  travis_retry fetch_stack_linux
+fi
+
 case "$BUILD" in
   stack)
-    mkdir -p ~/.local/bin;
-    if [ `uname` = "Darwin" ]; then
-      travis_retry fetch_stack_osx
-    else
-      travis_retry fetch_stack_linux
-    fi;
-
+    # However, we only need stack to download GHC for stack builds.
     travis_retry stack --no-terminal setup;
     ;;
   cabal)
