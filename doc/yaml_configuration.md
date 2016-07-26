@@ -508,6 +508,42 @@ as the result of a `stack` command executed under `sudo`.
 
 The option is automatically enabled when `stack` is re-spawned in a Docker process.
 
+### build
+
+(Since 1.1.0)
+
+Allows setting build options which are usually specified on the CLI.  Here are
+the settings with their defaults:
+
+```yaml
+build:
+  library-profiling: false
+  executable-profiling: false
+  copy-bins: false
+  prefetch: false
+  keep-going: false
+
+  # NOTE: global usage of haddock can cause build failures when documentation is
+  # incorrectly formatted.  This could also affect scripts which use stack.
+  haddock: false
+  haddock-arguments: ""
+  open-haddocks: false    # --open
+  haddock-deps: false     # if unspecified, defaults to true if haddock is set
+
+  # These are inadvisable to use in your global configuration, as they make the
+  # stack build CLI behave quite differently.
+  test: false
+  test-arguments: ""
+  bench: false
+  benchmark-opts: ""
+  force-dirty: false
+  reconfigure: false
+```
+
+The meanings of these settings correspond directly with the CLI flags of the
+same name. See the [build command docs](build_command.md) and the
+[users guide](GUIDE.md#the-build-command) for more info.
+
 ### templates
 
 Templates used with `stack new` have a number of parameters that affect the generated code. These can be set for all new projects you create. The result of them can be observed in the generated LICENSE and cabal files.
