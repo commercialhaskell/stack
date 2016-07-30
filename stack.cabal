@@ -306,6 +306,7 @@ test-suite stack-test
                 , hspec <2.3
                 , http-conduit
                 , monad-logger
+                , neat-interpolation
                 , path >= 0.5.7
                 , path-io >= 1.1.0 && < 2.0.0
                 , resourcet

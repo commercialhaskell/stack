@@ -14,6 +14,9 @@ module Stack.Ghci
     , GhciException(..)
     , ghciSetup
     , ghci
+
+    -- TODO: Address what should and should not be exported.
+    , renderLegacyGhciScript
     ) where
 
 import           Control.Applicative
@@ -171,20 +174,41 @@ ghci opts@GhciOpts{..} = do
                  -- include CWD.
                   "-i" :
                   odir <> pkgopts <> ghciArgs <> extras)
-    withSystemTempDir "ghci" $ \tmpDir -> do
-        let macrosFile = tmpDir </> $(mkRelFile "cabal_macros.h")
-        macrosOpts <- preprocessCabalMacros pkgs macrosFile
-        if ghciNoLoadModules
-            then execGhci macrosOpts
-            else do
-                let scriptPath = tmpDir </> $(mkRelFile "ghci-script")
-                    fp = toFilePath scriptPath
-                    loadModules = ":add " <> unwords (map quoteFileName modulesToLoad)
-                    addMainFile = maybe "" ((":add " <>) . quoteFileName . toFilePath) mainFile
-                    bringIntoScope = ":module + " <> unwords modulesToLoad
-                liftIO (writeFile fp (unlines [loadModules,addMainFile,bringIntoScope]))
-                setScriptPerms fp
-                execGhci (macrosOpts ++ ["-ghci-script=" <> fp])
+
+    withSystemTempDir "ghci" $ \tmpDirectory -> do
+      macrosOptions <- writeMacrosFile tmpDirectory pkgs
+      if ghciNoLoadModules
+          then execGhci macrosOptions
+          else do
+              scriptPath <- writeGhciScript tmpDirectory (renderLegacyGhciScript modulesToLoad mainFile)
+              execGhci (macrosOptions ++ ["-ghci-script=" <> toFilePath scriptPath])
+
+writeMacrosFile :: (MonadIO m) => Path Abs Dir -> [GhciPkgInfo] -> m [String]
+writeMacrosFile tmpDirectory packages = do
+  macrosOptions <- preprocessCabalMacros packages macrosFile
+  return macrosOptions
+  where
+    macrosFile = tmpDirectory </> $(mkRelFile "cabal_macros.h")
+
+writeGhciScript :: (MonadIO m) => Path Abs Dir -> String -> m (Path Abs File)
+writeGhciScript tmpDirectory script = do
+  liftIO $ writeFile scriptFilePath script
+  setScriptPerms scriptFilePath
+  return scriptPath
+  where
+    scriptPath = tmpDirectory </> $(mkRelFile "ghci-script")
+    scriptFilePath = toFilePath scriptPath
+
+renderLegacyGhciScript :: [String] -> Maybe (Path b t) -> String
+renderLegacyGhciScript modulesToLoad mainFile =
+    let loadModules = ":add" <> case unwords (map quoteFileName modulesToLoad) of
+                                  [] -> ""
+                                  xs -> " " <> xs
+        addMainFile = maybe "" ((":add " <>) . quoteFileName . toFilePath) mainFile
+        bringIntoScope = ":module +" <> case unwords modulesToLoad of
+                                          [] -> ""
+                                          xs -> " " <> xs
+    in unlines [loadModules,addMainFile,bringIntoScope]
 
 -- | Figure out the main-is file to load based on the targets. Sometimes there
 -- is none, sometimes it's unambiguous, sometimes it's
