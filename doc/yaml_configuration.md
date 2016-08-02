@@ -345,7 +345,7 @@ extra-lib-dirs:
 - /opt/foo/lib
 ```
 
-### with-ghc
+### with-gcc
 
 Specify a path to gcc explicitly, rather than relying on the normal path resolution.
 
