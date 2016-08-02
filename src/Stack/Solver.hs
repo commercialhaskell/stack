@@ -76,8 +76,7 @@ import qualified System.Directory            as D
 import qualified System.FilePath             as FP
 import           System.Process.Read
 
-import qualified Data.Text.Normalize         as T ( normalize )
-import           Data.Unicode.Types          ( NormalizationMode(NFC) )
+import qualified Data.Text.Normalize         as T ( normalize , NormalizationMode(NFC) )
 
 data ConstraintType = Constraint | Preference deriving (Eq)
 type ConstraintSpec = Map PackageName (Version, Map FlagName Bool)
@@ -562,10 +561,9 @@ cabalPackagesCheck cabalfps noPkgMsg dupErrMsg = do
     -- Just the latter check is enough to cover both the cases
 
     let packages  = zip cabalfps gpds
-        -- XXX taken from https://github.com/ppelleti/normalization-insensitive, see #1810
-        unicodeNormalize = T.unpack . T.normalize NFC . T.pack
+        normalizeString = T.unpack . T.normalize T.NFC . T.pack
         getNameMismatchPkg (fp, gpd)
-            | (unicodeNormalize . show . gpdPackageName) gpd /= (unicodeNormalize . FP.takeBaseName . toFilePath) fp
+            | (normalizeString . show . gpdPackageName) gpd /= (normalizeString . FP.takeBaseName . toFilePath) fp
                 = Just fp
             | otherwise = Nothing
         nameMismatchPkgs = mapMaybe getNameMismatchPkg packages
