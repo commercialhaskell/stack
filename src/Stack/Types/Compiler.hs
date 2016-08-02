@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleInstances #-}
 
@@ -6,6 +7,7 @@ module Stack.Types.Compiler where
 
 import           Control.DeepSeq
 import           Data.Aeson
+import           Data.Data
 import           Data.Map (Map)
 import qualified Data.Map as Map
 import           Data.Monoid ((<>))
@@ -33,7 +35,7 @@ data CompilerVersion
     | GhcjsVersion
         {-# UNPACK #-} !Version -- GHCJS version
         {-# UNPACK #-} !Version -- GHC version
-    deriving (Generic, Show, Eq, Ord)
+    deriving (Generic, Show, Eq, Ord, Data, Typeable)
 instance Store CompilerVersion
 instance NFData CompilerVersion
 instance ToJSON CompilerVersion where

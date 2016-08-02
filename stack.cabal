@@ -129,6 +129,7 @@ library
                      Stack.Types.Internal
                      Stack.Types.Nix
                      Stack.Types.Package
+                     Stack.Types.PackageDump
                      Stack.Types.PackageIdentifier
                      Stack.Types.PackageIndex
                      Stack.Types.PackageName

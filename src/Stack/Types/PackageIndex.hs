@@ -4,6 +4,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE DeriveDataTypeable #-}
 
 module Stack.Types.PackageIndex
     ( PackageDownload (..)
@@ -21,11 +22,11 @@ import           Control.Monad (mzero)
 import           Data.Aeson.Extended
 import           Data.ByteString (ByteString)
 import           Data.Hashable (Hashable)
+import           Data.Data (Data, Typeable)
 import           Data.Int (Int64)
 import           Data.Map (Map)
 import qualified Data.Map.Strict as Map
 import           Data.Store (Store)
-import           Data.Store.TypeHash (mkManyHasTypeHash)
 import           Data.Text (Text)
 import qualified Data.Text as T
 import           Data.Text.Encoding (encodeUtf8, decodeUtf8)
@@ -41,20 +42,20 @@ data PackageCache = PackageCache
     -- ^ size in bytes of the .cabal file
     , pcDownload :: !(Maybe PackageDownload)
     }
-    deriving (Generic, Eq, Show)
+    deriving (Generic, Eq, Show, Data, Typeable)
 
 instance Store PackageCache
 instance NFData PackageCache
 
 newtype PackageCacheMap = PackageCacheMap (Map PackageIdentifier PackageCache)
-    deriving (Generic, Store, NFData, Eq, Show)
+    deriving (Generic, Store, NFData, Eq, Show, Data, Typeable)
 
 data PackageDownload = PackageDownload
     { pdSHA512 :: !ByteString
     , pdUrl    :: !ByteString
     , pdSize   :: !Word64
     }
-    deriving (Show, Generic, Eq)
+    deriving (Show, Generic, Eq, Data, Typeable)
 instance Store PackageDownload
 instance NFData PackageDownload
 instance FromJSON PackageDownload where
@@ -72,9 +73,6 @@ instance FromJSON PackageDownload where
             , pdUrl = encodeUtf8 url
             , pdSize = size
             }
-
-$(mkManyHasTypeHash [ [t| PackageCacheMap |] ])
-
 
 -- | Unique name for a package index
 newtype IndexName = IndexName { unIndexName :: ByteString }

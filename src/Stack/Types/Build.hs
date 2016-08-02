@@ -31,7 +31,10 @@ module Stack.Types.Build
     ,defaultBuildOpts
     ,TaskType(..)
     ,TaskConfigOpts(..)
+    ,BuildCache(..)
+    ,buildCacheVC
     ,ConfigCache(..)
+    ,configCacheVC
     ,ConstructPlanException(..)
     ,configureOpts
     ,isStackOpt
@@ -39,7 +42,8 @@ module Stack.Types.Build
     ,wantedLocalPackages
     ,FileCacheInfo (..)
     ,ConfigureOpts (..)
-    ,PrecompiledCache (..))
+    ,PrecompiledCache (..)
+    ,precompiledCacheVC)
     where
 
 import           Control.DeepSeq
@@ -58,7 +62,8 @@ import           Data.Monoid
 import           Data.Set (Set)
 import qualified Data.Set as Set
 import           Data.Store.Internal (Store)
-import           Data.Store.TypeHash (mkManyHasTypeHash)
+import           Data.Store.Version
+import           Data.Store.VersionTagged
 import           Data.Text (Text)
 import qualified Data.Text as T
 import           Data.Text.Encoding (decodeUtf8With)
@@ -453,8 +458,19 @@ newtype PkgDepsOracle =
     PkgDeps PackageName
     deriving (Show,Typeable,Eq,Hashable,Store,NFData)
 
--- | Stored on disk to know whether the flags have changed or any
--- files have changed.
+-- | Stored on disk to know whether the files have changed.
+data BuildCache = BuildCache
+    { buildCacheTimes :: !(Map FilePath FileCacheInfo)
+      -- ^ Modification times of files.
+    }
+    deriving (Generic, Eq, Show, Data, Typeable)
+instance NFData BuildCache
+instance Store BuildCache
+
+buildCacheVC :: VersionConfig BuildCache
+buildCacheVC = storeVersionConfig "build-v1" "KVUoviSWWAd7tiRRGeWAvd0UIN4="
+
+-- | Stored on disk to know whether the flags have changed.
 data ConfigCache = ConfigCache
     { configCacheOpts :: !ConfigureOpts
       -- ^ All options used for this package.
@@ -470,9 +486,12 @@ data ConfigCache = ConfigCache
     , configCacheHaddock :: !Bool
       -- ^ Are haddocks to be built?
     }
-    deriving (Generic,Eq,Show)
+    deriving (Generic, Eq, Show, Data, Typeable)
 instance Store ConfigCache
 instance NFData ConfigCache
+
+configCacheVC :: VersionConfig ConfigCache
+configCacheVC = storeVersionConfig "config-v1" "NMEzMXpksE1h7STRzlQ2f6Glkjo="
 
 -- | A task to perform when building
 data Task = Task
@@ -693,7 +712,7 @@ data ConfigureOpts = ConfigureOpts
     -- if we can use an existing precompiled cache.
     , coNoDirs :: ![String]
     }
-    deriving (Show, Eq, Generic)
+    deriving (Show, Eq, Generic, Data, Typeable)
 instance Store ConfigureOpts
 instance NFData ConfigureOpts
 
@@ -706,14 +725,12 @@ data PrecompiledCache = PrecompiledCache
     , pcExes    :: ![FilePath]
     -- ^ Full paths to executables
     }
-    deriving (Show, Eq, Generic)
+    deriving (Show, Eq, Generic, Data, Typeable)
 instance Binary PrecompiledCache
 instance HasSemanticVersion PrecompiledCache
 instance HasStructuralInfo PrecompiledCache
 instance Store PrecompiledCache
 instance NFData PrecompiledCache
 
-$(mkManyHasTypeHash
-    [ [t| PrecompiledCache |]
-    , [t| ConfigCache |]
-    ])
+precompiledCacheVC :: VersionConfig PrecompiledCache
+precompiledCacheVC = storeVersionConfig "precompiled-v1" "eMzSOwaHJMamA5iNKs1A025frlQ="

@@ -45,7 +45,7 @@ import           Control.Monad.State.Strict      (State, execState, get, modify,
 import           Control.Monad.Trans.Control (MonadBaseControl)
 import qualified Crypto.Hash.SHA256 as SHA256
 import           Data.Aeson.Extended (WithJSONWarnings(..), logJSONWarnings)
-import           Data.Store.VersionTagged (taggedDecodeOrLoad, decodeFileMaybe, taggedEncodeFile)
+import           Data.Store.VersionTagged
 import qualified Data.ByteString as S
 import qualified Data.ByteString.Base64.URL as B64URL
 import qualified Data.ByteString.Char8 as S8
@@ -452,7 +452,7 @@ loadMiniBuildPlan
     -> m MiniBuildPlan
 loadMiniBuildPlan name = do
     path <- configMiniBuildPlanCache name
-    taggedDecodeOrLoad path $ liftM buildPlanFixes $ do
+    $(versionedDecodeOrLoad miniBuildPlanVC) path $ liftM buildPlanFixes $ do
         bp <- loadBuildPlan name
         toMiniBuildPlan
             (siCompilerVersion $ bpSystemInfo bp)
@@ -979,7 +979,7 @@ parseCustomMiniBuildPlan mconfigPath0 url0 = do
                    -- cases.
                    binaryPath <- getBinaryPath hash
                    alreadyCached <- doesFileExist binaryPath
-                   unless alreadyCached $ taggedEncodeFile binaryPath mbp
+                   unless alreadyCached $ $(versionedEncodeFile miniBuildPlanVC) binaryPath mbp
                    return (mbp, hash)
   where
     downloadCustom url req = do
@@ -991,7 +991,7 @@ parseCustomMiniBuildPlan mconfigPath0 url0 = do
         yamlBS <- liftIO $ S.readFile $ toFilePath cacheFP
         let yamlHash = doHash yamlBS
         binaryPath <- getBinaryPath yamlHash
-        liftM (, yamlHash) $ taggedDecodeOrLoad binaryPath $ do
+        liftM (, yamlHash) $ $(versionedDecodeOrLoad miniBuildPlanVC) binaryPath $ do
             (cs, mresolver) <- decodeYaml yamlBS
             parentMbp <- case (csCompilerVersion cs, mresolver) of
                 (Nothing, Nothing) -> throwM (NeitherCompilerOrResolverSpecified url)
@@ -1028,7 +1028,7 @@ parseCustomMiniBuildPlan mconfigPath0 url0 = do
                                 exists <- doesFileExist binaryPath
                                 if exists
                                     then do
-                                        eres <- decodeFileMaybe binaryPath
+                                        eres <- $(versionedDecodeFile miniBuildPlanVC) binaryPath
                                         case eres of
                                             Just mbp -> return mbp
                                             -- Invalid format cache file, remove.
