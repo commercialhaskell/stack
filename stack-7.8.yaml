@@ -62,6 +62,7 @@ extra-deps:
 - th-orphans-0.13.1
 - base-orphans-0.5.4
 - tar-0.5.0.3
+- unicode-transforms-0.1.0.1
 flags:
   time-locale-compat:
     old-locale: false
