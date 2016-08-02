@@ -69,7 +69,7 @@ spec = do
                 }
               ]
             res = scriptToLazyByteString $ renderScriptIntero pkgs
-        res `shouldBe` ":cd-ghc /src/package-a/\n:add Lib.A\n"
+        res `shouldBe` ":cd-ghc /src/package-a/\n:add Lib.A\n:module + Lib.A\n"
 
 -- Exptected GHCi scripts
 

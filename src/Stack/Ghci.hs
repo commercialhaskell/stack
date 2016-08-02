@@ -217,7 +217,10 @@ renderScriptGhci :: [GhciPkgInfo] -> GhciScript
 renderScriptGhci = undefined
 
 renderScriptIntero :: [GhciPkgInfo] -> GhciScript
-renderScriptIntero = mconcat . fmap renderPkg
+renderScriptIntero pkgs =
+  let addPhase    = mconcat $ fmap renderPkg pkgs
+      modulePhase = cmdModule $ foldl' S.union S.empty (fmap ghciPkgModules pkgs)
+   in addPhase <> modulePhase
   where
     renderPkg pkg = cmdCdGhc (ghciPkgDir pkg)
                  <> cmdAdd (ghciPkgModules pkg)
