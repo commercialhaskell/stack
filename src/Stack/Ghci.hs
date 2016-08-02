@@ -17,6 +17,7 @@ module Stack.Ghci
 
     -- TODO: Address what should and should not be exported.
     , renderLegacyGhciScript
+    , renderScriptIntero
     ) where
 
 import           Control.Applicative
@@ -45,6 +46,7 @@ import           Data.Traversable (forM)
 import           Data.Text (Text)
 import qualified Data.Text as T
 import           Data.Typeable (Typeable)
+import qualified Data.Vector as V
 import           Distribution.ModuleName (ModuleName)
 import           Distribution.PackageDescription (updatePackageDescription)
 import           Distribution.Text (display)
@@ -59,6 +61,7 @@ import           Stack.Build.Source
 import           Stack.Build.Target
 import           Stack.Constants
 import           Stack.Exec
+import           Stack.Ghci.Script
 import           Stack.Package
 import           Stack.Types
 import           Stack.Types.Internal
@@ -209,6 +212,15 @@ renderLegacyGhciScript modulesToLoad mainFile =
                                           [] -> ""
                                           xs -> " " <> xs
     in unlines [loadModules,addMainFile,bringIntoScope]
+
+renderScriptGhci :: [GhciPkgInfo] -> Text
+renderScriptGhci = undefined
+
+renderScriptIntero :: [GhciPkgInfo] -> Text
+renderScriptIntero = scriptToText . mconcat . fmap renderPkg
+  where
+    renderPkg pkg = cmdCdGhc (ghciPkgDir pkg)
+                 <> cmdAdd (ghciPkgModules pkg)
 
 -- | Figure out the main-is file to load based on the targets. Sometimes there
 -- is none, sometimes it's unambiguous, sometimes it's

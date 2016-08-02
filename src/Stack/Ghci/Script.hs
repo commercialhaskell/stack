@@ -2,10 +2,11 @@
 
 module Stack.Ghci.Script
   ( GhciScript
-  , GhciCommand (..)
-  , emptyScript
+  , ModuleName
 
-  , appendCommand
+  , cmdAdd
+  , cmdCdGhc
+  , cmdModule
 
   , scriptToText
   , scriptToLazyText
@@ -14,34 +15,42 @@ module Stack.Ghci.Script
 
 import           Data.Monoid
 import           Data.List
+import           Data.Set (Set)
+import qualified Data.Set as S
 import           Data.Text (Text)
-import qualified Data.Text.Lazy as LT
-import           Data.Text.Lazy.Builder
-import           Data.Vector (Vector)
-import qualified Data.Vector as V
+import qualified Data.Text.Lazy as LT hiding (singleton)
+import           Data.Text.Lazy.Builder (Builder)
+import qualified Data.Text.Lazy.Builder as LT
 import           Path
+
+import           Distribution.ModuleName hiding (toFilePath)
 
 newtype GhciScript = GhciScript { unGhciScript :: [GhciCommand] }
 
-emptyScript :: GhciScript
-emptyScript = GhciScript []
-
-type ModuleName = Text
+instance Monoid GhciScript where
+  mempty = GhciScript []
+  (GhciScript xs) `mappend` (GhciScript ys) = GhciScript (ys <> xs)
 
 data GhciCommand
-  = Add (Vector ModuleName)
+  = Add (Set ModuleName)
   | CdGhc (Path Abs Dir)
-  | Module (Vector ModuleName)
+  | Module (Set ModuleName)
   deriving (Show)
 
-appendCommand :: GhciCommand -> GhciScript -> GhciScript
-appendCommand cmd (GhciScript backwardScript) = GhciScript (cmd:backwardScript)
+cmdAdd :: Set ModuleName -> GhciScript
+cmdAdd = GhciScript . (:[]) . Add
+
+cmdCdGhc :: Path Abs Dir -> GhciScript
+cmdCdGhc = GhciScript . (:[]) . CdGhc
+
+cmdModule :: Set ModuleName -> GhciScript
+cmdModule = GhciScript . (:[]) . Module
 
 scriptToText :: GhciScript -> Text
 scriptToText = LT.toStrict . scriptToLazyText
 
 scriptToLazyText :: GhciScript -> LT.Text
-scriptToLazyText = toLazyText . scriptToBuilder
+scriptToLazyText = LT.toLazyText . scriptToBuilder
 
 scriptToBuilder :: GhciScript -> Builder
 scriptToBuilder backwardScript = mconcat $ fmap commandToBuilder script
@@ -53,18 +62,22 @@ scriptToBuilder backwardScript = mconcat $ fmap commandToBuilder script
 commandToBuilder :: GhciCommand -> Builder
 
 commandToBuilder (Add modules)
-  | V.null modules = mempty
+  | S.null modules = mempty
   | otherwise      =
-       fromText ":add "
-    <> (mconcat $ intersperse (singleton ' ') $ V.toList $ fmap fromText modules)
-    <> singleton '\n'
+       LT.fromText ":add "
+    <> (mconcat $ intersperse (LT.singleton ' ')
+        $ fmap (LT.fromString . mconcat . intersperse "." . components)
+        $ S.toAscList modules)
+    <> LT.singleton '\n'
 
 commandToBuilder (CdGhc path) =
-  fromText ":cd-ghc " <> fromString (toFilePath path)
+  LT.fromText ":cd-ghc " <> LT.fromString (toFilePath path) <> LT.singleton '\n'
 
 commandToBuilder (Module modules)
-  | V.null modules = fromText ":module +"
+  | S.null modules = LT.fromText ":module +\n"
   | otherwise      =
-       fromText ":module + "
-    <> (mconcat $ intersperse (singleton ' ') $ V.toList $ fmap fromText modules)
-    <> singleton '\n'
+       LT.fromText ":module + "
+    <> (mconcat $ intersperse (LT.singleton ' ')
+        $ fmap (LT.fromString . mconcat . intersperse "." . components)
+        $ S.toAscList modules)
+    <> LT.singleton '\n'
