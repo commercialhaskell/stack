@@ -213,11 +213,11 @@ renderLegacyGhciScript modulesToLoad mainFile =
                                           xs -> " " <> xs
     in unlines [loadModules,addMainFile,bringIntoScope]
 
-renderScriptGhci :: [GhciPkgInfo] -> Text
+renderScriptGhci :: [GhciPkgInfo] -> GhciScript
 renderScriptGhci = undefined
 
-renderScriptIntero :: [GhciPkgInfo] -> Text
-renderScriptIntero = scriptToText . mconcat . fmap renderPkg
+renderScriptIntero :: [GhciPkgInfo] -> GhciScript
+renderScriptIntero = mconcat . fmap renderPkg
   where
     renderPkg pkg = cmdCdGhc (ghciPkgDir pkg)
                  <> cmdAdd (ghciPkgModules pkg)

@@ -8,20 +8,22 @@ module Stack.Ghci.Script
   , cmdCdGhc
   , cmdModule
 
-  , scriptToText
-  , scriptToLazyText
+  , scriptToLazyByteString
   , scriptToBuilder
+  , scriptToFile
   ) where
 
+import           Control.Exception
+import           Data.ByteString.Lazy (ByteString)
+import           Data.ByteString.Builder
 import           Data.Monoid
 import           Data.List
 import           Data.Set (Set)
 import qualified Data.Set as S
 import           Data.Text (Text)
-import qualified Data.Text.Lazy as LT hiding (singleton)
-import           Data.Text.Lazy.Builder (Builder)
-import qualified Data.Text.Lazy.Builder as LT
+import           Data.Text.Encoding (encodeUtf8Builder)
 import           Path
+import           System.IO
 
 import           Distribution.ModuleName hiding (toFilePath)
 
@@ -46,38 +48,47 @@ cmdCdGhc = GhciScript . (:[]) . CdGhc
 cmdModule :: Set ModuleName -> GhciScript
 cmdModule = GhciScript . (:[]) . Module
 
-scriptToText :: GhciScript -> Text
-scriptToText = LT.toStrict . scriptToLazyText
-
-scriptToLazyText :: GhciScript -> LT.Text
-scriptToLazyText = LT.toLazyText . scriptToBuilder
+scriptToLazyByteString :: GhciScript -> ByteString
+scriptToLazyByteString = toLazyByteString . scriptToBuilder
 
 scriptToBuilder :: GhciScript -> Builder
 scriptToBuilder backwardScript = mconcat $ fmap commandToBuilder script
   where
     script = reverse $ unGhciScript backwardScript
 
+scriptToFile :: Path Abs File -> GhciScript -> IO ()
+scriptToFile path script =
+  bracket (openFile filepath WriteMode) hClose
+    $ \hdl -> do hSetBuffering hdl (BlockBuffering Nothing)
+                 hSetBinaryMode hdl True
+                 hPutBuilder hdl (scriptToBuilder script)
+  where
+    filepath = toFilePath path
+
 -- Command conversion
+
+fromText :: Text -> Builder
+fromText = encodeUtf8Builder
 
 commandToBuilder :: GhciCommand -> Builder
 
 commandToBuilder (Add modules)
   | S.null modules = mempty
   | otherwise      =
-       LT.fromText ":add "
-    <> (mconcat $ intersperse (LT.singleton ' ')
-        $ fmap (LT.fromString . mconcat . intersperse "." . components)
+       fromText ":add "
+    <> (mconcat $ intersperse (fromText " ")
+        $ fmap (stringUtf8 . mconcat . intersperse "." . components)
         $ S.toAscList modules)
-    <> LT.singleton '\n'
+    <> fromText "\n"
 
 commandToBuilder (CdGhc path) =
-  LT.fromText ":cd-ghc " <> LT.fromString (toFilePath path) <> LT.singleton '\n'
+  fromText ":cd-ghc " <> stringUtf8 (toFilePath path) <> fromText "\n"
 
 commandToBuilder (Module modules)
-  | S.null modules = LT.fromText ":module +\n"
+  | S.null modules = fromText ":module +\n"
   | otherwise      =
-       LT.fromText ":module + "
-    <> (mconcat $ intersperse (LT.singleton ' ')
-        $ fmap (LT.fromString . mconcat . intersperse "." . components)
+       fromText ":module + "
+    <> (mconcat $ intersperse (fromText " ")
+        $ fmap (stringUtf8 . mconcat . intersperse "." . components)
         $ S.toAscList modules)
-    <> LT.singleton '\n'
+    <> fromText "\n"

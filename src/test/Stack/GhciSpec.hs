@@ -18,6 +18,7 @@ import           NeatInterpolation
 import           Path
 
 import           Stack.Ghci
+import           Stack.Ghci.Script (scriptToLazyByteString)
 
 spec :: Spec
 spec = do
@@ -67,7 +68,7 @@ spec = do
                   }
                 }
               ]
-            res = renderScriptIntero pkgs
+            res = scriptToLazyByteString $ renderScriptIntero pkgs
         res `shouldBe` ":cd-ghc /src/package-a/\n:add Lib.A\n"
 
 -- Exptected GHCi scripts
