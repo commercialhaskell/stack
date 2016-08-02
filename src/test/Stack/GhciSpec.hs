@@ -36,6 +36,38 @@ spec = do
         renderLegacyGhciScript ["Lib.A", "Lib.B"] Nothing
           `shouldBe` T.unpack ghciScript_multipleProjectsWithLib
 
+      it "should render GHCi scripts" $ do
+        let pkgs =
+              [ GhciPkgInfo
+                { ghciPkgModules = S.fromList [fromString "Lib.A"]
+                , ghciPkgDir = $(mkAbsDir "/src/package-a")
+                , ghciPkgName = $(mkPackageName "package-a")
+                , ghciPkgOpts = []
+                , ghciPkgModFiles = S.empty
+                , ghciPkgCFiles = S.empty
+                , ghciPkgMainIs = M.empty
+                , ghciPkgPackage = Package
+                  { packageName = $(mkPackageName "package-a")
+                  , packageVersion = $(mkVersion "0.1.0.0")
+                  , packageFiles = GetPackageFiles undefined
+                  , packageDeps = M.empty
+                  , packageTools = []
+                  , packageAllDeps = S.empty
+                  , packageGhcOptions = []
+                  , packageFlags = M.empty
+                  , packageDefaultFlags = M.empty
+                  , packageHasLibrary = True
+                  , packageTests = M.empty
+                  , packageBenchmarks = S.empty
+                  , packageExes = S.empty
+                  , packageOpts = GetPackageOpts undefined
+                  , packageHasExposedModules = True
+                  , packageSimpleType = True
+                  }
+                }
+              ]
+            res = scriptToLazyByteString $ renderScriptGhci pkgs
+        res `shouldBe` ":add Lib.A\n:module + Lib.A\n"
 
 
       it "should render intero scripts" $ do

@@ -17,6 +17,7 @@ module Stack.Ghci
 
     -- TODO: Address what should and should not be exported.
     , renderLegacyGhciScript
+    , renderScriptGhci
     , renderScriptIntero
     ) where
 
@@ -214,7 +215,12 @@ renderLegacyGhciScript modulesToLoad mainFile =
     in unlines [loadModules,addMainFile,bringIntoScope]
 
 renderScriptGhci :: [GhciPkgInfo] -> GhciScript
-renderScriptGhci = undefined
+renderScriptGhci pkgs =
+  let addPhase    = mconcat $ fmap renderPkg pkgs
+      modulePhase = cmdModule $ foldl' S.union S.empty (fmap ghciPkgModules pkgs)
+   in addPhase <> modulePhase
+  where
+    renderPkg pkg = cmdAdd (ghciPkgModules pkg)
 
 renderScriptIntero :: [GhciPkgInfo] -> GhciScript
 renderScriptIntero pkgs =

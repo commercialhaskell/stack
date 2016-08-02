@@ -285,6 +285,8 @@ test-suite stack-test
                 , Stack.Build.TargetSpec
                 , Stack.ConfigSpec
                 , Stack.DotSpec
+                , Stack.GhciSpec
+                , Stack.Ghci.ScriptSpec
                 , Stack.PackageDumpSpec
                 , Stack.ArgsSpec
                 , Stack.NixSpec
