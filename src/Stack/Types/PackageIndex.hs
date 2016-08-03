@@ -1,4 +1,5 @@
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
@@ -8,21 +9,29 @@ module Stack.Types.PackageIndex
     ( PackageDownload (..)
     , PackageCache (..)
     , PackageCacheMap (..)
+    -- ** PackageIndex, IndexName & IndexLocation
+    , PackageIndex(..)
+    , IndexName(..)
+    , indexNameText
+    , IndexLocation(..)
     ) where
 
 import           Control.DeepSeq (NFData)
 import           Control.Monad (mzero)
 import           Data.Aeson.Extended
 import           Data.ByteString (ByteString)
+import           Data.Hashable (Hashable)
 import           Data.Int (Int64)
 import           Data.Map (Map)
 import qualified Data.Map.Strict as Map
 import           Data.Store (Store)
 import           Data.Store.TypeHash (mkManyHasTypeHash)
 import           Data.Text (Text)
-import           Data.Text.Encoding (encodeUtf8)
+import qualified Data.Text as T
+import           Data.Text.Encoding (encodeUtf8, decodeUtf8)
 import           Data.Word (Word64)
 import           GHC.Generics (Generic)
+import           Path
 import           Stack.Types.PackageIdentifier
 
 data PackageCache = PackageCache
@@ -65,3 +74,61 @@ instance FromJSON PackageDownload where
             }
 
 $(mkManyHasTypeHash [ [t| PackageCacheMap |] ])
+
+
+-- | Unique name for a package index
+newtype IndexName = IndexName { unIndexName :: ByteString }
+    deriving (Show, Eq, Ord, Hashable, Store)
+indexNameText :: IndexName -> Text
+indexNameText = decodeUtf8 . unIndexName
+instance ToJSON IndexName where
+    toJSON = toJSON . indexNameText
+
+instance FromJSON IndexName where
+    parseJSON = withText "IndexName" $ \t ->
+        case parseRelDir (T.unpack t) of
+            Left e -> fail $ "Invalid index name: " ++ show e
+            Right _ -> return $ IndexName $ encodeUtf8 t
+
+-- | Location of the package index. This ensures that at least one of Git or
+-- HTTP is available.
+data IndexLocation = ILGit !Text | ILHttp !Text | ILGitHttp !Text !Text
+    deriving (Show, Eq, Ord)
+
+
+-- | Information on a single package index
+data PackageIndex = PackageIndex
+    { indexName :: !IndexName
+    , indexLocation :: !IndexLocation
+    , indexDownloadPrefix :: !Text
+    -- ^ URL prefix for downloading packages
+    , indexGpgVerify :: !Bool
+    -- ^ GPG-verify the package index during download. Only applies to Git
+    -- repositories for now.
+    , indexRequireHashes :: !Bool
+    -- ^ Require that hashes and package size information be available for packages in this index
+    }
+    deriving Show
+instance FromJSON (WithJSONWarnings PackageIndex) where
+    parseJSON = withObjectWarnings "PackageIndex" $ \o -> do
+        name <- o ..: "name"
+        prefix <- o ..: "download-prefix"
+        mgit <- o ..:? "git"
+        mhttp <- o ..:? "http"
+        loc <-
+            case (mgit, mhttp) of
+                (Nothing, Nothing) -> fail $
+                    "Must provide either Git or HTTP URL for " ++
+                    T.unpack (indexNameText name)
+                (Just git, Nothing) -> return $ ILGit git
+                (Nothing, Just http) -> return $ ILHttp http
+                (Just git, Just http) -> return $ ILGitHttp git http
+        gpgVerify <- o ..:? "gpg-verify" ..!= False
+        reqHashes <- o ..:? "require-hashes" ..!= False
+        return PackageIndex
+            { indexName = name
+            , indexLocation = loc
+            , indexDownloadPrefix = prefix
+            , indexGpgVerify = gpgVerify
+            , indexRequireHashes = reqHashes
+            }

@@ -73,16 +73,19 @@ module Stack.Types.Config
   ,PackageLocation(..)
   ,RemotePackageType(..)
   -- ** PackageIndex, IndexName & IndexLocation
+
+  -- Re-exports
   ,PackageIndex(..)
   ,IndexName(..)
+  ,indexNameText
+  ,IndexLocation(..)
+  -- Config fields
   ,configPackageIndex
   ,configPackageIndexCache
   ,configPackageIndexGz
   ,configPackageIndexRoot
   ,configPackageIndexRepo
   ,configPackageTarball
-  ,indexNameText
-  ,IndexLocation(..)
   -- ** Project & ProjectAndConfigMonoid
   ,Project(..)
   ,ProjectAndConfigMonoid(..)
@@ -166,7 +169,6 @@ import           Data.IORef (IORef)
 import           Data.List (stripPrefix)
 import           Data.List.NonEmpty (NonEmpty)
 import qualified Data.List.NonEmpty as NonEmpty
-import           Data.Hashable (Hashable)
 import           Data.Map (Map)
 import qualified Data.Map as Map
 import qualified Data.Map.Strict as M
@@ -174,7 +176,6 @@ import           Data.Maybe
 import           Data.Monoid.Extra
 import           Data.Set (Set)
 import qualified Data.Set as Set
-import           Data.Store (Store)
 import           Data.Text (Text)
 import qualified Data.Text as T
 import           Data.Text.Encoding (encodeUtf8, decodeUtf8)
@@ -340,61 +341,6 @@ instance FromJSON ApplyGhcOptions where
             "locals" -> return AGOLocals
             "everything" -> return AGOEverything
             _ -> fail $ "Invalid ApplyGhcOptions: " ++ show t
-
--- | Information on a single package index
-data PackageIndex = PackageIndex
-    { indexName :: !IndexName
-    , indexLocation :: !IndexLocation
-    , indexDownloadPrefix :: !Text
-    -- ^ URL prefix for downloading packages
-    , indexGpgVerify :: !Bool
-    -- ^ GPG-verify the package index during download. Only applies to Git
-    -- repositories for now.
-    , indexRequireHashes :: !Bool
-    -- ^ Require that hashes and package size information be available for packages in this index
-    }
-    deriving Show
-instance FromJSON (WithJSONWarnings PackageIndex) where
-    parseJSON = withObjectWarnings "PackageIndex" $ \o -> do
-        name <- o ..: "name"
-        prefix <- o ..: "download-prefix"
-        mgit <- o ..:? "git"
-        mhttp <- o ..:? "http"
-        loc <-
-            case (mgit, mhttp) of
-                (Nothing, Nothing) -> fail $
-                    "Must provide either Git or HTTP URL for " ++
-                    T.unpack (indexNameText name)
-                (Just git, Nothing) -> return $ ILGit git
-                (Nothing, Just http) -> return $ ILHttp http
-                (Just git, Just http) -> return $ ILGitHttp git http
-        gpgVerify <- o ..:? "gpg-verify" ..!= False
-        reqHashes <- o ..:? "require-hashes" ..!= False
-        return PackageIndex
-            { indexName = name
-            , indexLocation = loc
-            , indexDownloadPrefix = prefix
-            , indexGpgVerify = gpgVerify
-            , indexRequireHashes = reqHashes
-            }
-
--- | Unique name for a package index
-newtype IndexName = IndexName { unIndexName :: ByteString }
-    deriving (Show, Eq, Ord, Hashable, Store)
-indexNameText :: IndexName -> Text
-indexNameText = decodeUtf8 . unIndexName
-instance ToJSON IndexName where
-    toJSON = toJSON . indexNameText
-instance FromJSON IndexName where
-    parseJSON = withText "IndexName" $ \t ->
-        case parseRelDir (T.unpack t) of
-            Left e -> fail $ "Invalid index name: " ++ show e
-            Right _ -> return $ IndexName $ encodeUtf8 t
-
--- | Location of the package index. This ensures that at least one of Git or
--- HTTP is available.
-data IndexLocation = ILGit !Text | ILHttp !Text | ILGitHttp !Text !Text
-    deriving (Show, Eq, Ord)
 
 -- | Controls which version of the environment is used
 data EnvSettings = EnvSettings
