@@ -47,8 +47,6 @@ import           Data.Traversable (forM)
 import           Data.Text (Text)
 import qualified Data.Text as T
 import           Data.Typeable (Typeable)
-import qualified Data.Vector as V
-import           Distribution.ModuleName (ModuleName)
 import           Distribution.PackageDescription (updatePackageDescription)
 import           Distribution.Text (display)
 import           Network.HTTP.Client.Conduit
