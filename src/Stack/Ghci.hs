@@ -184,7 +184,7 @@ ghci opts@GhciOpts{..} = do
       if ghciNoLoadModules
           then execGhci macrosOptions
           else do
-              scriptPath <- writeGhciScript tmpDirectory (renderLegacyGhciScript modulesToLoad mainFile)
+              scriptPath <- writeGhciScript tmpDirectory (renderScriptGhci pkgs mainFile)
               execGhci (macrosOptions ++ ["-ghci-script=" <> toFilePath scriptPath])
 
 writeMacrosFile :: (MonadIO m) => Path Abs Dir -> [GhciPkgInfo] -> m [String]
@@ -194,9 +194,9 @@ writeMacrosFile tmpDirectory packages = do
   where
     macrosFile = tmpDirectory </> $(mkRelFile "cabal_macros.h")
 
-writeGhciScript :: (MonadIO m) => Path Abs Dir -> String -> m (Path Abs File)
+writeGhciScript :: (MonadIO m) => Path Abs Dir -> GhciScript -> m (Path Abs File)
 writeGhciScript tmpDirectory script = do
-  liftIO $ writeFile scriptFilePath script
+  liftIO $ scriptToFile scriptPath script
   setScriptPerms scriptFilePath
   return scriptPath
   where
@@ -214,19 +214,32 @@ renderLegacyGhciScript modulesToLoad mainFile =
                                           xs -> " " <> xs
     in unlines [loadModules,addMainFile,bringIntoScope]
 
-renderScriptGhci :: [GhciPkgInfo] -> GhciScript
-renderScriptGhci pkgs =
+findOwningPackageForMain :: [GhciPkgInfo] -> Path Abs File -> Maybe GhciPkgInfo
+findOwningPackageForMain pkgs mainFile =
+  find (\pkg -> toFilePath (ghciPkgDir pkg) `isPrefixOf` toFilePath mainFile) pkgs
+
+renderScriptGhci :: [GhciPkgInfo] -> Maybe (Path Abs File) -> GhciScript
+renderScriptGhci pkgs mainFile =
   let addPhase    = mconcat $ fmap renderPkg pkgs
+      mainPhase   = case mainFile of
+                      Just path -> cmdAddFile path
+                      Nothing   -> mempty
       modulePhase = cmdModule $ foldl' S.union S.empty (fmap ghciPkgModules pkgs)
-   in addPhase <> modulePhase
+   in addPhase <> mainPhase <> modulePhase
   where
     renderPkg pkg = cmdAdd (ghciPkgModules pkg)
 
-renderScriptIntero :: [GhciPkgInfo] -> GhciScript
-renderScriptIntero pkgs =
+renderScriptIntero :: [GhciPkgInfo] -> Maybe (Path Abs File) -> GhciScript
+renderScriptIntero pkgs mainFile =
   let addPhase    = mconcat $ fmap renderPkg pkgs
+      mainPhase   = case mainFile of
+                      Just path ->
+                        case findOwningPackageForMain pkgs path of
+                          Just mainPkg -> cmdCdGhc (ghciPkgDir mainPkg) <> cmdAddFile path
+                          Nothing      -> cmdAddFile path
+                      Nothing   -> mempty
       modulePhase = cmdModule $ foldl' S.union S.empty (fmap ghciPkgModules pkgs)
-   in addPhase <> modulePhase
+   in addPhase <> mainPhase <> modulePhase
   where
     renderPkg pkg = cmdCdGhc (ghciPkgDir pkg)
                  <> cmdAdd (ghciPkgModules pkg)
