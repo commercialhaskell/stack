@@ -34,6 +34,12 @@ spec = do
           let script = cmdAdd (S.fromList [fromString "Lib.A", fromString "Lib.B"])
           scriptToLazyByteString script `shouldBe` ":add Lib.A Lib.B\n"
 
+      describe ":add (by file)" $ do
+        it "should render a full file path" $ do
+          let script = cmdAddFile $(mkAbsFile "/Users/someone/src/project/package-a/src/Main.hs")
+          scriptToLazyByteString script `shouldBe`
+            ":add /Users/someone/src/project/package-a/src/Main.hs\n"
+
       describe ":cd-ghc" $ do
         it "should render a full absolute path" $ do
           let script = cmdCdGhc $(mkAbsDir "/Users/someone/src/project/package-a")
