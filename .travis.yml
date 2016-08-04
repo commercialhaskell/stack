@@ -72,7 +72,7 @@ install:
 script:
  - set -e; case "$BUILD" in
      stack)
-       stack --no-terminal test --haddock --no-haddock-deps;;
+       stack --no-terminal test --haddock --no-haddock-deps --ghc-options="-Werror";;
      cabal)
        cabal configure --enable-tests --enable-benchmarks -v2 --ghc-options="-O0 -Werror";
        cabal build;
