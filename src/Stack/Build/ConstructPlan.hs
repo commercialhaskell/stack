@@ -124,7 +124,7 @@ instance HasEnvConfig Ctx where
     getEnvConfig = ctxEnvConfig
 
 constructPlan :: forall env m.
-                 (MonadCatch m, MonadReader env m, HasEnvConfig env, MonadIO m, MonadLoggerIO m, MonadBaseControl IO m, HasHttpManager env)
+                 (MonadCatch m, MonadReader env m, HasEnvConfig env, MonadLoggerIO m, MonadBaseControl IO m, HasHttpManager env)
               => MiniBuildPlan
               -> BaseConfigOpts
               -> [LocalPackage]

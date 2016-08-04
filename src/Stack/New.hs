@@ -129,7 +129,7 @@ data TemplateFrom = LocalTemp | RemoteTemp
 -- | Download and read in a template's text content.
 loadTemplate
     :: forall m r.
-       (HasConfig r, HasHttpManager r, MonadReader r m, MonadIO m, MonadThrow m, MonadCatch m, MonadLogger m)
+       (HasConfig r, HasHttpManager r, MonadReader r m, MonadIO m, MonadCatch m, MonadLogger m)
     => TemplateName -> (TemplateFrom -> m ()) -> m Text
 loadTemplate name logIt = do
     templateDir <- asks (templatesDir . getConfig)
