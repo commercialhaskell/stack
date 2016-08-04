@@ -304,7 +304,7 @@ test-suite stack-test
                 , directory >= 1.2.1.0
                 , exceptions
                 , filepath
-                , hspec <2.3
+                , hspec >= 2.2 && <2.3
                 , http-conduit
                 , monad-logger
                 , path >= 0.5.7
@@ -341,7 +341,7 @@ test-suite stack-integration-test
                 , containers >= 0.5.5.1
                 , directory >= 1.2.1.0
                 , filepath >= 1.3.0.2
-                , hspec < 2.3
+                , hspec >= 2.2 && < 2.3
                 , process >= 1.2.0.0 && < 1.5
                 , resourcet
                 , temporary
