@@ -70,7 +70,7 @@ install:
    esac
 
 script:
- - case "$BUILD" in
+ - set -e; case "$BUILD" in
      stack)
        stack --no-terminal test --haddock --no-haddock-deps;;
      cabal)
