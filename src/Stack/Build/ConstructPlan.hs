@@ -47,7 +47,14 @@ import           Stack.BuildPlan
 import           Stack.Package
 import           Stack.PackageDump
 import           Stack.PackageIndex
-import           Stack.Types
+import           Stack.Types.FlagName
+import           Stack.Types.GhcPkgId
+import           Stack.Types.PackageIdentifier
+import           Stack.Types.PackageName
+import           Stack.Types.Version
+import           Stack.Types.Config
+import           Stack.Types.Build
+import           Stack.Types.Package
 
 data PackageInfo
     = PIOnlyInstalled InstallLocation Installed

@@ -84,7 +84,15 @@ import           Stack.Constants
 import           Stack.Fetch
 import           Stack.Package
 import           Stack.PackageIndex
-import           Stack.Types
+import           Stack.Types.BuildPlan
+import           Stack.Types.FlagName
+import           Stack.Types.PackageIdentifier
+import           Stack.Types.PackageIndex
+import           Stack.Types.PackageName
+import           Stack.Types.Version
+import           Stack.Types.Config
+import           Stack.Types.Urls
+import           Stack.Types.Compiler
 import           Stack.Types.StackT
 
 data BuildPlanException

@@ -22,7 +22,8 @@ import           Path.IO (ignoringAbsence, removeDirRecur)
 import           Stack.Build.Source (getLocalPackageViews)
 import           Stack.Build.Target (LocalPackageView(..))
 import           Stack.Constants (distDirFromDir, workDirFromDir)
-import           Stack.Types
+import           Stack.Types.PackageName
+import           Stack.Types.Config
 
 -- | Deletes build artifacts in the current project.
 --

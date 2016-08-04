@@ -15,7 +15,7 @@ module Stack.Exec where
 import           Control.Monad.Reader
 import           Control.Monad.Logger
 import           Control.Monad.Trans.Control (MonadBaseControl)
-import           Stack.Types
+import           Stack.Types.Config
 import           System.Process.Log
 
 import           Control.Exception.Lifted

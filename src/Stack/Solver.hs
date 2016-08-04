@@ -68,7 +68,14 @@ import           Stack.Package               (printCabalFileWarning
                                              , readPackageUnresolved)
 import           Stack.Setup
 import           Stack.Setup.Installed
-import           Stack.Types
+import           Stack.Types.FlagName
+import           Stack.Types.PackageIdentifier
+import           Stack.Types.PackageIndex
+import           Stack.Types.PackageName
+import           Stack.Types.Version
+import           Stack.Types.Config
+import           Stack.Types.Build
+import           Stack.Types.Compiler
 import           Stack.Types.Internal        ( HasTerminal
                                              , HasReExec
                                              , HasLogLevel)

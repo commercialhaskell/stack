@@ -4,7 +4,9 @@
 module Stack.SolverSpec where
 
 import           Data.Text (unpack)
-import           Stack.Types
+import           Stack.Types.FlagName
+import           Stack.Types.PackageName
+import           Stack.Types.Version
 import           Test.Hspec
 import qualified Data.Map as Map
 

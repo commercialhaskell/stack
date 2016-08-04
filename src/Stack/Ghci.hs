@@ -57,7 +57,12 @@ import           Stack.Build.Target
 import           Stack.Constants
 import           Stack.Exec
 import           Stack.Package
-import           Stack.Types
+import           Stack.Types.PackageIdentifier
+import           Stack.Types.PackageName
+import           Stack.Types.Config
+import           Stack.Types.Build
+import           Stack.Types.Package
+import           Stack.Types.Compiler
 import           Stack.Types.Internal
 import           System.FilePath (takeBaseName)
 import           Text.Read (readMaybe)

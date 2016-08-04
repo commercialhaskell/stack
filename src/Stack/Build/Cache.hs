@@ -65,7 +65,12 @@ import           GHC.Generics (Generic)
 import           Path
 import           Path.IO
 import           Stack.Constants
-import           Stack.Types
+import           Stack.Types.GhcPkgId
+import           Stack.Types.PackageIdentifier
+import           Stack.Types.Version
+import           Stack.Types.Config
+import           Stack.Types.Build
+import           Stack.Types.Compiler
 import qualified System.FilePath as FilePath
 
 -- | Directory containing files to mark an executable as installed

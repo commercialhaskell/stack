@@ -66,7 +66,11 @@ import           Path                                  (mkRelDir, parent,
                                                         parseAbsFile, (</>))
 import           Path.IO
 import           Prelude -- Fix AMP warning
-import           Stack.Types
+import           Stack.Types.Config
+import           Stack.Types.PackageIdentifier
+import           Stack.Types.PackageIndex
+import           Stack.Types.PackageName
+import           Stack.Types.Version
 import           Stack.Types.StackT
 import           System.FilePath (takeBaseName, (<.>))
 import           System.IO                             (IOMode (ReadMode, WriteMode),

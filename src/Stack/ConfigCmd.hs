@@ -22,7 +22,8 @@ import           Network.HTTP.Client.Conduit (HasHttpManager)
 import           Path
 import           Stack.BuildPlan
 import           Stack.Config (makeConcreteResolver)
-import           Stack.Types
+import           Stack.Types.BuildPlan
+import           Stack.Types.Config
 
 data ConfigCmdSet = ConfigCmdSetResolver AbstractResolver
 

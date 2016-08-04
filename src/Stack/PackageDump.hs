@@ -59,7 +59,11 @@ import           Path.Extra (toFilePathNoTrailingSep)
 import           Path.IO (ensureDir)
 import           Prelude -- Fix AMP warning
 import           Stack.GhcPkg
-import           Stack.Types
+import           Stack.Types.GhcPkgId
+import           Stack.Types.PackageIdentifier
+import           Stack.Types.PackageName
+import           Stack.Types.Version
+import           Stack.Types.Compiler
 import           System.Directory (getDirectoryContents, doesFileExist)
 import           System.Process.Read
 

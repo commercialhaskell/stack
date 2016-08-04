@@ -13,7 +13,8 @@ import           Data.Maybe (fromMaybe)
 import           Data.Set (Set)
 import qualified Data.Set as Set
 import           Data.Text (Text)
-import           Stack.Types
+import           Stack.Types.PackageName
+import           Stack.Types.Version
 import           Test.Hspec
 import           Test.Hspec.QuickCheck (prop)
 import           Test.QuickCheck (forAll,choose,Gen)

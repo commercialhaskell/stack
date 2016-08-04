@@ -78,7 +78,14 @@ import           Stack.Fetch as Fetch
 import           Stack.GhcPkg
 import           Stack.Package
 import           Stack.PackageDump
-import           Stack.Types
+import           Stack.Types.GhcPkgId
+import           Stack.Types.PackageIdentifier
+import           Stack.Types.PackageName
+import           Stack.Types.Version
+import           Stack.Types.Config
+import           Stack.Types.Build
+import           Stack.Types.Package
+import           Stack.Types.Compiler
 import           Stack.Types.Internal
 import           Stack.Types.StackT
 import qualified System.Directory as D

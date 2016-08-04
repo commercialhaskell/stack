@@ -44,7 +44,12 @@ import           Stack.Config                    (getSnapshots,
                                                   makeConcreteResolver)
 import           Stack.Constants
 import           Stack.Solver
-import           Stack.Types
+import           Stack.Types.BuildPlan
+import           Stack.Types.FlagName
+import           Stack.Types.PackageName
+import           Stack.Types.Version
+import           Stack.Types.Config
+import           Stack.Types.Build
 import           Stack.Types.Internal            (HasLogLevel, HasReExec,
                                                   HasTerminal)
 import qualified System.FilePath                 as FP

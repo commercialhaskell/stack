@@ -20,7 +20,7 @@ import           Data.Set                 (Set)
 import qualified Data.Set                 as Set
 import           Data.Typeable            (Typeable)
 import           Prelude -- Fix AMP warning
-import           Stack.Types
+import           Stack.Types.PackageIdentifier
 
 data ActionType
     = ATBuild
