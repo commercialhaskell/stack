@@ -102,7 +102,7 @@ setup SetupCmdOpts{..} wantedCompiler compilerCheck mstack = do
             GhcjsVersion {} -> "GHCJS"
     case mpaths of
         Nothing -> $logInfo $ "stack will use the " <> compiler <> " on your PATH"
-        Just _ -> $logInfo $ "stack will use a locally installed " <> compiler
+        Just _ -> $logInfo $ "stack will use a sandboxed " <> compiler <> " it installed"
     $logInfo "For more information on paths, see 'stack path' and 'stack exec env'"
     $logInfo $ "To use this " <> compiler <> " and packages outside of a project, consider using:"
     $logInfo "stack ghc, stack ghci, stack runghc, or stack exec"
