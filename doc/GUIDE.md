@@ -142,7 +142,7 @@ Let's run stack setup:
 michael@d30748af6d3d:~/helloworld$ stack setup
 Downloaded ghc-7.10.2.
 Installed GHC.
-stack will use a locally installed GHC
+stack will use a sandboxed GHC it installed
 For more information on paths, see 'stack path' and 'stack exec env'
 To use this GHC and packages outside of a project, consider using:
 stack ghc, stack ghci, stack runghc, or stack exec
@@ -325,15 +325,15 @@ let's run `setup` a second time:
 
 ```
 michael@d30748af6d3d:~/helloworld$ stack setup
-stack will use a locally installed GHC
+stack will use a sandboxed GHC it installed
 For more information on paths, see 'stack path' and 'stack exec env'
 To use this GHC and packages outside of a project, consider using:
 stack ghc, stack ghci, stack runghc, or stack exec
 ```
 
 Thankfully, the command is smart enough to know not to perform an installation
-twice. `setup` will either use the first GHC it finds on your PATH, or a locally
-installed version. As the command output above indicates, you can use `stack
+twice. `setup` will either use the first GHC it finds on your PATH, or a sandboxed
+version after installing it. As the command output above indicates, you can use `stack
 path` for quite a bit of path information (which we'll play with more later).
 For now, we'll just look at where GHC is installed:
 
@@ -1515,7 +1515,7 @@ local-hpc-root: /home/michael/wai/.stack-work/install/x86_64-linux/lts-2.17/7.8.
 
 In addition, `stack path` accepts command line arguments to state which of
 these keys you're interested in, which can be convenient for scripting. As a
-simple example, let's find out which versions of GHC are installed locally:
+simple example, let's find out the sandboxed versions of GHC that stack installed:
 
 ```
 michael@d30748af6d3d:~/wai$ ls $(stack path --programs)/*.installed

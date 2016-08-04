@@ -277,7 +277,7 @@ data Config =
          ,configSkipGHCCheck        :: !Bool
          -- ^ Don't bother checking the GHC version or architecture.
          ,configSkipMsys            :: !Bool
-         -- ^ On Windows: don't use a locally installed MSYS
+         -- ^ On Windows: don't use a sandboxed MSYS
          ,configCompilerCheck       :: !VersionCheck
          -- ^ Specifies which versions of the compiler are acceptable.
          ,configLocalBin            :: !(Path Abs Dir)
