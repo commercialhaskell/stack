@@ -16,6 +16,51 @@ See the
 blog post for more information about the motivation and implementation of stack's
 Docker support.
 
+Prerequisites
+-------------------------------------------------------------------------------
+
+### Supported operating systems
+
+**Linux 64-bit**: Docker use requires machine (virtual or metal) running a Linux
+distribution
+[that Docker supports](https://docs.docker.com/installation/#installation), with
+a 64-bit kernel. If you do not already have one, we suggest Ubuntu 14.04
+("trusty") since this is what we test with.
+
+**Mac OS X**: [Docker for Mac](https://docs.docker.com/docker-for-mac/) is the
+supported way to use Docker integration on OS X (the older Docker Machine
+(boot2docker) approach to using Docker on OS X is not supported due to issues
+with host volume mounting that make Stack nearly unusable for anything but the
+most trivial projects).
+
+Other Un*xen are not officially supported but there are ways to get them working.
+See [#194](https://github.com/commercialhaskell/stack/issues/194) for details
+and workarounds.
+
+**Windows does not work at all** (see
+[#2421](https://github.com/commercialhaskell/stack/issues/2421)).
+
+### Docker
+
+Install the latest version of Docker by following the
+[instructions for your operating system](http://docs.docker.com/installation/).
+
+The Docker client should be able to connect to the Docker daemon as a non-root
+user. For example (from
+[here](http://docs.docker.com/installation/ubuntulinux/#ubuntu-raring-1304-and-saucy-1310-64-bit)):
+
+    # Add the connected user "${USER}" to the docker group.
+    # Change the user name to match your preferred user.
+    sudo gpasswd -a ${USER} docker
+
+    # Restart the Docker daemon.
+    sudo service docker restart
+
+You will now need to log out and log in again for the group addition
+to take effect.
+
+Note the above has security implications.  See [security](#security) for more.
+
 Usage
 -------------------------------------------------------------------------------
 
@@ -30,7 +75,8 @@ The most basic configuration is to add this to your project's `stack.yaml`:
     docker:
         enable: true
 
-See [configuration](#configuration) for additional options.
+See [configuration](#configuration) for additional options. You can enable it on
+the command-line using `stack --docker`.
 
 ### Use stack as normal
 
@@ -238,43 +284,6 @@ In addition, most Docker images that contain the basics for running GHC can be
 used with Stack's Docker integration. For example, the
 [official Haskell image repository](https://hub.docker.com/_/haskell/) works.
 See [Custom images](#custom-images) for more details.
-
-Prerequisites
--------------------------------------------------------------------------------
-
-### Linux 64-bit
-
-Docker use requires machine (virtual or metal) running a Linux distribution
-[that Docker supports](https://docs.docker.com/installation/#installation), with
-a 64-bit kernel. If you do not already have one, we suggest Ubuntu 14.04
-("trusty") since this is what we test with.
-
-While Docker does support non-Linux operating systems through the `boot2docker`
-VM, there are issues with host volume mounting that prevent stack from being
-usable in this configuration. See
-[#194](https://github.com/commercialhaskell/stack/issues/194) for details and
-workarounds.
-
-### Docker
-
-Install the latest version of Docker by following the
-[instructions for your operating system](http://docs.docker.com/installation/).
-
-The Docker client should be able to connect to the Docker daemon as a non-root
-user. For example (from
-[here](http://docs.docker.com/installation/ubuntulinux/#ubuntu-raring-1304-and-saucy-1310-64-bit)):
-
-    # Add the connected user "${USER}" to the docker group.
-    # Change the user name to match your preferred user.
-    sudo gpasswd -a ${USER} docker
-
-    # Restart the Docker daemon.
-    sudo service docker restart
-
-You will now need to log out and log in again for the group addition
-to take effect.
-
-Note the above has security implications.  See [security](#security) for more.
 
 Security
 -------------------------------------------------------------------------------
