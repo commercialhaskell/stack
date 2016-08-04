@@ -68,6 +68,9 @@ import           Stack.Types.Config
 import           Stack.Types.Build
 import           Stack.Types.Package
 import           Stack.Types.Internal
+#ifdef WINDOWS
+import           Stack.Types.Compiler
+#endif
 import           System.FileLock (FileLock, unlockFile)
 
 #ifdef WINDOWS
