@@ -75,7 +75,9 @@ import           Stack.SDist (getSDistTarball, checkSDistTarball, checkSDistTarb
 import           Stack.SetupCmd
 import qualified Stack.Sig as Sig
 import           Stack.Solver (solveExtraDeps)
-import           Stack.Types
+import           Stack.Types.Version
+import           Stack.Types.Config
+import           Stack.Types.Compiler
 import           Stack.Types.Internal
 import           Stack.Types.StackT
 import           Stack.Upgrade

@@ -40,7 +40,12 @@ import           Stack.Types.Version
 import           Stack.Constants
 import           Stack.GhcPkg
 import           Stack.PackageDump
-import           Stack.Types
+import           Stack.Types.GhcPkgId
+import           Stack.Types.PackageIdentifier
+import           Stack.Types.PackageName
+import           Stack.Types.Config
+import           Stack.Types.Package
+import           Stack.Types.Compiler
 import           Stack.Types.Internal
 
 type M env m = (MonadIO m,MonadReader env m,HasHttpManager env,HasEnvConfig env,MonadLogger m,MonadBaseControl IO m,MonadMask m,HasLogLevel env)

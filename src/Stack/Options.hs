@@ -59,7 +59,13 @@ import           Stack.Ghci                        (GhciOpts (..))
 import           Stack.Init
 import           Stack.New
 import           Stack.Nix
-import           Stack.Types
+import           Stack.Types.FlagName
+import           Stack.Types.PackageName
+import           Stack.Types.Version
+import           Stack.Types.Config
+import           Stack.Types.Docker
+import           Stack.Types.Nix
+import           Stack.Types.Compiler
 import           Stack.Types.TemplateName
 
 -- | Allows adjust global options depending on their context

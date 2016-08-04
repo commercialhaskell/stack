@@ -9,7 +9,11 @@ import qualified Data.Conduit.Binary as CB
 import           Data.Conduit.Text (decodeUtf8)
 import Control.Monad.Trans.Resource (runResourceT)
 import Stack.PackageDump
-import Stack.Types
+import Stack.Types.GhcPkgId
+import Stack.Types.PackageIdentifier
+import Stack.Types.PackageName
+import Stack.Types.Version
+import Stack.Types.Compiler
 import Test.Hspec
 import Test.Hspec.QuickCheck
 import System.Process.Read

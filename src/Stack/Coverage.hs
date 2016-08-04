@@ -46,7 +46,12 @@ import           Stack.Build.Source (parseTargetsFromBuildOpts)
 import           Stack.Build.Target
 import           Stack.Constants
 import           Stack.Package
-import           Stack.Types
+import           Stack.Types.PackageIdentifier
+import           Stack.Types.PackageName
+import           Stack.Types.Version
+import           Stack.Types.Config
+import           Stack.Types.Package
+import           Stack.Types.Compiler
 import           System.FilePath (isPathSeparator)
 import           System.Process.Read
 import           Text.Hastache (htmlEscape)

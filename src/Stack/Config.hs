@@ -84,8 +84,13 @@ import           Stack.Config.Nix
 import           Stack.Config.Urls
 import           Stack.Constants
 import qualified Stack.Image as Image
-import           Stack.Types
+import           Stack.Types.Config
+import           Stack.Types.BuildPlan
+import           Stack.Types.Docker
+import           Stack.Types.Compiler
 import           Stack.Types.Internal
+import           Stack.Types.Urls
+import           Stack.Types.Version
 import           System.Environment
 import           System.IO
 import           System.PosixCompat.Files (fileOwner, getFileStatus)

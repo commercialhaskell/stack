@@ -78,7 +78,13 @@ import           Stack.Exec (defaultEnvSettings)
 import           Stack.Fetch
 import           Stack.GhcPkg (createDatabase, getCabalPkgVer, getGlobalDB, mkGhcPackagePath)
 import           Stack.Setup.Installed
-import           Stack.Types
+import           Stack.Types.PackageIdentifier
+import           Stack.Types.PackageName
+import           Stack.Types.Version
+import           Stack.Types.Config
+import           Stack.Types.Docker
+import           Stack.Types.Build
+import           Stack.Types.Compiler
 import           Stack.Types.Internal (HasTerminal, HasReExec, HasLogLevel, envConfigBuildOpts, buildOptsInstallExes)
 import           Stack.Types.StackT
 import qualified System.Directory as D

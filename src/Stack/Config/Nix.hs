@@ -13,7 +13,9 @@ import Data.Monoid.Extra
 import qualified Data.Text as T
 import Data.Typeable
 import Distribution.System (OS (..))
-import Stack.Types
+import Stack.Types.Version
+import Stack.Types.Nix
+import Stack.Types.Compiler
 import Control.Exception.Lifted
 import Control.Monad.Catch (throwM,MonadCatch)
 import Prelude

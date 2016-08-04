@@ -28,7 +28,8 @@ import           Path
 import           Path.Extra
 import           Path.IO
 import           Stack.Constants
-import           Stack.Types
+import           Stack.Types.Config
+import           Stack.Types.Image
 import           Stack.Types.Internal
 import           System.Process.Run
 

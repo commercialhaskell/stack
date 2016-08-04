@@ -54,7 +54,8 @@ import           Path
 import           Path.IO
 import           Prelude
 import           Stack.Constants
-import           Stack.Types
+import           Stack.Types.PackageName
+import           Stack.Types.Config
 import           Stack.Types.TemplateName
 import           System.Process.Run
 import           Text.Hastache

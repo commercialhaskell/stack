@@ -59,7 +59,7 @@ import           Network.HTTP.Client.TLS               (tlsManagerSettings)
 import           Network.HTTP.Types                    (statusCode)
 import           Path                                  (toFilePath)
 import           Prelude -- Fix redundant import warnings
-import           Stack.Types
+import           Stack.Types.Config
 import           System.Directory                      (createDirectoryIfMissing,
                                                         removeFile)
 import           System.FilePath                       ((</>), takeFileName)

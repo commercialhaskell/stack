@@ -18,7 +18,11 @@ import System.Environment
 import System.IO.Temp (withSystemTempDirectory)
 import Test.Hspec
 import Stack.Config
-import Stack.Types
+import Stack.Types.BuildPlan
+import Stack.Types.PackageName
+import Stack.Types.Version
+import Stack.Types.Config
+import Stack.Types.Compiler
 import Stack.Types.StackT
 
 data T = T
