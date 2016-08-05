@@ -227,7 +227,7 @@ stickyLoggerFunc loc src level msg = do
     liftIO $ func loc src level msg
 
 getStickyLoggerFunc
-    :: (HasSticky r, HasLogLevel r, HasSupportsUnicode r, ToLogStr msg, MonadReader r m, MonadIO m)
+    :: (HasSticky r, HasLogLevel r, HasSupportsUnicode r, ToLogStr msg, MonadReader r m)
     => m (Loc -> LogSource -> LogLevel -> msg -> IO ())
 getStickyLoggerFunc = do
     sticky <- asks getSticky

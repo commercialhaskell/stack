@@ -47,7 +47,7 @@ instance Monad m => Serial m BS.ByteString where
 instance (Monad m, Serial m a, Ord a) => Serial m (Set a) where
     series = fmap setFromList series
 
-addMinAndMaxBounds :: forall a. (Bounded a, Eq a, Num a) => [a] -> [a]
+addMinAndMaxBounds :: forall a. (Bounded a, Eq a) => [a] -> [a]
 addMinAndMaxBounds xs =
     (if (minBound :: a) `notElem` xs then [minBound] else []) ++
     (if (maxBound :: a) `notElem` xs && (maxBound :: a) /= minBound then maxBound : xs else xs)

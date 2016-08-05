@@ -119,7 +119,7 @@ instance Store BuildCache
 instance NFData BuildCache
 
 -- | Try to read the dirtiness cache for the given package directory.
-tryGetBuildCache :: (MonadIO m, MonadReader env m, HasConfig env, MonadThrow m, MonadLogger m, HasEnvConfig env, MonadBaseControl IO m)
+tryGetBuildCache :: (MonadIO m, MonadReader env m, MonadThrow m, MonadLogger m, HasEnvConfig env, MonadBaseControl IO m)
                  => Path Abs Dir -> m (Maybe (Map FilePath FileCacheInfo))
 tryGetBuildCache = liftM (fmap buildCacheTimes) . tryGetCache buildCacheFile
 
@@ -179,7 +179,7 @@ deleteCaches dir = do
     ignoringAbsence (removeFile cfp)
 
 -- | Write to a cache.
-writeCache :: (Store a, NFData a, HasTypeHash a, Eq a, MonadIO m, MonadLogger m)
+writeCache :: (Store a, HasTypeHash a, Eq a, MonadIO m, MonadLogger m)
            => Path Abs Dir
            -> (Path Abs Dir -> m (Path Abs File))
            -> a
@@ -207,7 +207,7 @@ tryGetFlagCache gid = do
     fp <- flagCacheFile gid
     decodeFileMaybe fp
 
-writeFlagCache :: (MonadIO m, MonadReader env m, HasEnvConfig env, MonadThrow m, MonadLogger m, MonadBaseControl IO m)
+writeFlagCache :: (MonadIO m, MonadReader env m, HasEnvConfig env, MonadThrow m, MonadLogger m)
                => Installed
                -> ConfigCache
                -> m ()
