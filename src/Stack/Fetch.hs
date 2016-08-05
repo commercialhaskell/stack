@@ -531,7 +531,9 @@ fetchPackages' mdistDir toFetchAll = do
                 S.writeFile cabalFP $ tfCabal toFetch
 
                 atomically $ modifyTVar outputVar $ Map.insert ident destDir
-            $logWarn $ mconcat $ map (\(path, entryType) -> "Unexpected entry type " <> entryType <> " for entry " <> T.pack path) unexpectedEntries
+
+            F.forM_ unexpectedEntries $ \(path, entryType) ->
+                logWarnN $ "Unexpected entry type " <> entryType <> " for entry " <> T.pack path
 
 -- | Internal function used to unpack tarball.
 --
