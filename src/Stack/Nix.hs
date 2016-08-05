@@ -84,27 +84,29 @@ runShellAndExit mprojectRoot compilerVersion getCmdArgs = do
      let pkgsInConfig = nixPackages (configNix config)
          ghc = nixCompiler compilerVersion
          pkgs = pkgsInConfig ++ [ghc]
-         libsAndIncludes =
-           map (\p -> ("${" <> p <> "}/lib", "${" <> p <> "}/include ")) pkgs
+         pkgsStr = "[" <> T.intercalate " " pkgs <> "]"
          pureShell = nixPureShell (configNix config)
          nixopts = case mshellFile of
            Just fp -> [toFilePath fp, "--arg", "ghc"
                       ,"with (import <nixpkgs> {}); " ++ T.unpack ghc]
            Nothing -> ["-E", T.unpack $ T.concat
                               ["with (import <nixpkgs> {}); "
-                               ,"runCommand \"myEnv\" { "
-                               ,"buildInputs=lib.optional stdenv.isLinux glibcLocales ++ [", T.intercalate " " pkgs, "]; "
-                               ,T.pack platformVariantEnvVar <> "=''nix''; "
-                               ,T.pack inShellEnvVar <> "=1; "
-                               ,"LD_LIBRARY_PATH=''"  -- LD_LIBRARY_PATH is set because for now it's
-                                                                -- needed by builds using Template Haskell
-                               ,      (T.intercalate ":" (map fst libsAndIncludes)), "'' ; "
-                               ,"STACK_IN_NIX_EXTRA_ARGS=''"
-                               ,      T.intercalate " " (map (\(lib, include) ->
-                                                               "--extra-lib-dirs=" <> lib
-                                                               <> " --extra-include-dirs=" <> include)
-                                                         libsAndIncludes), "'' ; "
-                               ,"} \"\""]]
+                              ,"let inputs = ",pkgsStr,"; "
+                              ,    "libPath = lib.makeLibraryPath inputs; "
+                              ,    "stackExtraArgs = lib.concatStrings ("
+                              ,      "lib.foldl' (acc: p: acc ++ [\" --extra-lib-dirs \" p]) [] "
+                              ,        "(lib.splitString '':'' libPath) ++ "
+                              ,      "lib.foldl' (acc: p: acc ++ [\" --extra-include-dirs \" p]) [] "
+                              ,        "(lib.splitString '':'' (lib.makeSearchPathOutput ''dev'' ''include'' inputs))"
+                              ,    "); in "
+                              ,"runCommand ''myEnv'' { "
+                              ,"buildInputs = lib.optional stdenv.isLinux glibcLocales ++ inputs; "
+                              ,T.pack platformVariantEnvVar <> "=''nix''; "
+                              ,T.pack inShellEnvVar <> "=1; "
+                              ,"LD_LIBRARY_PATH = libPath;"  -- LD_LIBRARY_PATH is set because for now it's
+                               -- needed by builds using Template Haskell
+                              ,"STACK_IN_NIX_EXTRA_ARGS = stackExtraArgs; "
+                              ,"} \"\""]]
                     -- glibcLocales is necessary on Linux to avoid warnings about GHC being incapable to set the locale.
          fullArgs = concat [if pureShell then ["--pure"] else [],
                             map T.unpack (nixShellOptions (configNix config))
