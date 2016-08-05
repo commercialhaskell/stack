@@ -533,7 +533,7 @@ fetchPackages' mdistDir toFetchAll = do
                 atomically $ modifyTVar outputVar $ Map.insert ident destDir
 
             F.forM_ unexpectedEntries $ \(path, entryType) ->
-                logWarnN $ "Unexpected entry type " <> entryType <> " for entry " <> T.pack path
+                $logWarn $ "Unexpected entry type " <> entryType <> " for entry " <> T.pack path
 
 -- | Internal function used to unpack tarball.
 --
