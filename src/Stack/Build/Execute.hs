@@ -1417,12 +1417,16 @@ mungeBuildOutput excludeTHLoading makeAbsolute pkgDir = void $
             Nothing -> return bs
             Just fp -> return $ fp `T.append` y
 
-    -- | Match the line:column format at the end of lines
+    -- | Match the error location format at the end of lines
     isValidSuffix = isRight . parseOnly lineCol
-    lineCol = char ':' >> (decimal :: Parser Int)
-           >> char ':' >> (decimal :: Parser Int)
+    lineCol = char ':'
+           >> choice
+                [ num >> char ':' >> num >> optional (char '-' >> num) >> return ()
+                , char '(' >> num >> char ',' >> num >> string ")-(" >> num >> char ',' >> num >> char ')' >> return ()
+                ]
            >> char ':'
            >> return ()
+        where num = some digit
 
     -- | Strip @\r@ characters from the byte vector. Used because Windows.
     stripCarriageReturn :: Text -> Text
