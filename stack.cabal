@@ -49,6 +49,11 @@ flag static
   -- Not intended for general use. Simply makes it easier to
   -- build a fully static binary on Linux platforms that enable it.
 
+flag hide-dependency-versions
+  manual: True
+  default: False
+  description: Hides dependency versions from "stack --version", used only by building with stack.yaml
+
 library
   hs-source-dirs:    src/
   ghc-options:       -Wall -fwarn-tabs -fwarn-incomplete-uni-patterns -fwarn-incomplete-record-updates -fwarn-identities
@@ -278,6 +283,8 @@ executable stack
     cpp-options:     -DUSE_GIT_INFO
     build-depends:   gitrev >= 1.1 && < 1.3
                    , optparse-simple >= 0.0.3
+  if flag(hide-dependency-versions)
+    cpp-options:     -DHIDE_DEP_VERSIONS
 
 test-suite stack-test
   type:           exitcode-stdio-1.0
