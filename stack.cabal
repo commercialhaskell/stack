@@ -11,7 +11,7 @@ license-file:        LICENSE
 author:              Commercial Haskell SIG
 maintainer:          manny@fpcomplete.com
 category:            Development
-build-type:          Simple
+build-type:          Custom
 cabal-version:       >=1.10
 homepage:            http://haskellstack.org
 extra-source-files:  CONTRIBUTING.md

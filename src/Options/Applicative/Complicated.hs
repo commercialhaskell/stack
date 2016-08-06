@@ -30,6 +30,8 @@ complicatedOptions
   -> Maybe String
   -- ^ version string
   -> String
+  -- ^ dependencies list
+  -> String
   -- ^ hpack numeric version, as string
   -> String
   -- ^ header
@@ -43,7 +45,7 @@ complicatedOptions
   -> EitherT b (Writer (Mod CommandFields (b,a))) ()
   -- ^ commands (use 'addCommand')
   -> IO (a,b)
-complicatedOptions numericVersion versionString numericHpackVersion h pd commonParser mOnFailure commandParser =
+complicatedOptions numericVersion versionString depsString numericHpackVersion h pd commonParser mOnFailure commandParser =
   do args <- getArgs
      (a,(b,c)) <- case execParserPure (prefs noBacktrack) parser args of
        Failure _ | null args -> withArgs ["--help"] (execParser parser)
