@@ -26,6 +26,7 @@ Other enhancements:
   See [#2259](https://github.com/commercialhaskell/stack/issues/2259)
 * Perform some subprocesses during setup concurrently, slightly speeding up most
   commands. [#2346](https://github.com/commercialhaskell/stack/pull/2346)
+* Support for absolute file path in `url` field of `setup-info` or `--ghc-bindist`
 
 Bug fixes:
 

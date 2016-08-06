@@ -532,11 +532,11 @@ instance FromJSON (WithJSONWarnings PackageEntry) where
     parseJSON (String t) = do
         WithJSONWarnings loc _ <- parseJSON $ String t
         return $ noJSONWarnings
-               (PackageEntry
+            PackageEntry
                 { peExtraDep = False
                 , peLocation = loc
                 , peSubdirs = []
-                })
+                }
     parseJSON v = withObjectWarnings "PackageEntry" (\o -> PackageEntry
         <$> o ..:? "extra-dep" ..!= False
         <*> jsonSubWarnings (o ..: "location")
@@ -604,14 +604,14 @@ data Project = Project
 
 instance ToJSON Project where
     toJSON p = object $
-        (maybe id (\cv -> (("compiler" .= cv) :)) (projectCompiler p))
-        ((maybe id (\msg -> (("user-message" .= msg) :)) (projectUserMsg p))
+        maybe id (\cv -> (("compiler" .= cv) :)) (projectCompiler p) $
+        maybe id (\msg -> (("user-message" .= msg) :)) (projectUserMsg p)
         [ "packages"          .= projectPackages p
         , "extra-deps"        .= map fromTuple (Map.toList $ projectExtraDeps p)
         , "flags"             .= projectFlags p
         , "resolver"          .= projectResolver p
         , "extra-package-dbs" .= projectExtraPackageDBs p
-        ])
+        ]
 
 data IsLoaded = Loaded | NotLoaded
 
@@ -663,7 +663,7 @@ instance FromJSON (WithJSONWarnings (ResolverThat's 'NotLoaded)) where
 
     parseJSON (String t) = either (fail . show) return (noJSONWarnings <$> parseResolverText t)
 
-    parseJSON _ = fail $ "Invalid Resolver, must be Object or String"
+    parseJSON _ = fail "Invalid Resolver, must be Object or String"
 
 -- | Convert a Resolver into its @Text@ representation, as will be used by
 -- directory names
@@ -1093,7 +1093,7 @@ instance Show ConfigException where
         ,"version range specified in stack.yaml ("
         , T.unpack (versionRangeText requiredRange)
         , ")." ]
-    show (NoMatchingSnapshot whichCmd names) = concat $
+    show (NoMatchingSnapshot whichCmd names) = concat
         [ "None of the following snapshots provides a compiler matching "
         , "your package(s):\n"
         , unlines $ map (\name -> "    - " <> T.unpack (renderSnapName name))
@@ -1115,14 +1115,10 @@ instance Show ConfigException where
         , unlines $ fmap ("    " <>) (lines errDesc)
         , showOptions whichCmd
         ]
-    show (NoSuchDirectory dir) = concat
-        ["No directory could be located matching the supplied path: "
-        ,dir
-        ]
-    show (ParseGHCVariantException v) = concat
-        [ "Invalid ghc-variant value: "
-        , v
-        ]
+    show (NoSuchDirectory dir) =
+        "No directory could be located matching the supplied path: " ++ dir
+    show (ParseGHCVariantException v) =
+        "Invalid ghc-variant value: " ++ v
     show (BadStackRoot stackRoot) = concat
         [ "Invalid stack root: '"
         , toFilePath stackRoot
@@ -1146,7 +1142,7 @@ instance Show ConfigException where
 instance Exception ConfigException
 
 showOptions :: WhichSolverCmd -> String
-showOptions whichCmd = unlines $ ["\nThis may be resolved by:"] ++ options
+showOptions whichCmd = unlines $ "\nThis may be resolved by:" : options
   where
     options =
         case whichCmd of
@@ -1536,6 +1532,7 @@ parseGHCVariant s =
 -- | Information for a file to download.
 data DownloadInfo = DownloadInfo
     { downloadInfoUrl :: Text
+      -- ^ URL or absolute file path
     , downloadInfoContentLength :: Maybe Int
     , downloadInfoSha1 :: Maybe ByteString
     } deriving (Show)

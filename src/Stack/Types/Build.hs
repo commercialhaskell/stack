@@ -35,7 +35,6 @@ module Stack.Types.Build
     ,buildCacheVC
     ,ConfigCache(..)
     ,configCacheVC
-    ,ConstructPlanException(..)
     ,configureOpts
     ,isStackOpt
     ,wantedLocalPackages
