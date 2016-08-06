@@ -23,6 +23,7 @@ module Stack.Setup
   ) where
 
 import           Control.Applicative
+import           Control.Concurrent.Async.Lifted (Concurrently(..))
 import           Control.Exception.Enclosed (catchIO, tryAny)
 import           Control.Monad (liftM, when, join, void, unless)
 import           Control.Monad.Catch
@@ -220,10 +221,13 @@ setupEnv mResolveMissingGHC = do
     menv0 <- getMinimalEnvOverride
     env <- removeHaskellEnvVars
              <$> augmentPathMap (maybe [] edBins mghcBin) (unEnvOverride menv0)
-
     menv <- mkEnvOverride platform env
-    compilerVer <- getCompilerVersion menv wc
-    cabalVer <- getCabalPkgVer menv wc
+
+    (compilerVer, cabalVer, globaldb) <- runConcurrently $ (,,)
+        <$> Concurrently (getCompilerVersion menv wc)
+        <*> Concurrently (getCabalPkgVer menv wc)
+        <*> Concurrently (getGlobalDB menv wc)
+
     $logDebug "Resolving package entries"
     packages <- mapM
         (resolvePackageEntry menv (bcRoot bconfig))
@@ -245,7 +249,6 @@ setupEnv mResolveMissingGHC = do
     createDatabase menv wc deps
     localdb <- runReaderT packageDatabaseLocal envConfig0
     createDatabase menv wc localdb
-    globaldb <- getGlobalDB menv wc
     extras <- runReaderT packageDatabaseExtra envConfig0
     let mkGPP locals = mkGhcPackagePath locals localdb deps extras globaldb
 

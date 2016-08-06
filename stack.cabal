@@ -180,6 +180,7 @@ library
                    , http-client-tls >= 0.3.0
                    , http-conduit >= 2.2.0
                    , http-types >= 0.8.6 && < 0.10
+                   , lifted-async
                        -- https://github.com/basvandijk/lifted-base/issues/31
                    , lifted-base < 0.2.3.7 || > 0.2.3.7
                    , microlens >= 0.3.0.0
