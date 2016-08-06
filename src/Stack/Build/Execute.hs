@@ -5,6 +5,7 @@
 {-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE RecordWildCards       #-}
 {-# LANGUAGE TemplateHaskell       #-}
+{-# LANGUAGE LambdaCase            #-}
 -- | Perform a build
 module Stack.Build.Execute
     ( printPlan
@@ -1096,18 +1097,33 @@ singleBuild runInBase ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} in
                 writeBuildCache pkgDir $ lpNewBuildCache lp
             TTUpstream _ _ _ -> return ()
 
+        -- FIXME: only output these if they're in the build plan.
+
+        preBuildTime <- modTime <$> liftIO getCurrentTime
+        let postBuildCheck succeeded = do
+                warnings <- checkForUnlistedFiles taskType preBuildTime pkgDir
+                let hasUnlistedModule = any $ \case
+                        UnlistedModulesWarning{} -> True
+                        _ -> False
+                when (not (null warnings)) $ $logInfo ""
+                when (not succeeded && hasUnlistedModule warnings) $ do
+                    $logInfo "If the above build failed with a linker error or .so/DLL error, addressing these may help:"
+                mapM_ ($logWarn . ("Warning: " <>) . T.pack . show) warnings
+
         () <- announce ("build" <> annSuffix)
         config <- asks getConfig
         extraOpts <- extraBuildOptions eeBuildOpts
-        preBuildTime <- modTime <$> liftIO getCurrentTime
-        cabal (configHideTHLoading config) $ ("build" :) $ (++ extraOpts) $
+        (cabal (configHideTHLoading config) $ ("build" :) $ (++ extraOpts) $
             case (taskType, taskAllInOne, isFinalBuild) of
                 (_, True, True) -> fail "Invariant violated: cannot have an all-in-one build that also has a final build step."
                 (TTLocal lp, False, False) -> primaryComponentOptions lp
                 (TTLocal lp, False, True) -> finalComponentOptions lp
                 (TTLocal lp, True, False) -> primaryComponentOptions lp ++ finalComponentOptions lp
-                (TTUpstream{}, _, _) -> []
-        checkForUnlistedFiles taskType preBuildTime pkgDir
+                (TTUpstream{}, _, _) -> [])
+          `catch` \ex -> case ex of
+              CabalExitedUnsuccessfully{} -> postBuildCheck False >> throwM ex
+              _ -> throwM ex
+        postBuildCheck True
 
         when (doHaddock package) $ do
             announce "haddock"
@@ -1174,7 +1190,7 @@ singleBuild runInBase ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} in
             _ -> error "singleBuild: invariant violated: multiple results when describing installed package"
 
 -- | Check if any unlisted files have been found, and add them to the build cache.
-checkForUnlistedFiles :: M env m => TaskType -> ModTime -> Path Abs Dir -> m ()
+checkForUnlistedFiles :: M env m => TaskType -> ModTime -> Path Abs Dir -> m [PackageWarning]
 checkForUnlistedFiles (TTLocal lp) preBuildTime pkgDir = do
     (addBuildCache,warnings) <-
         addUnlistedToBuildCache
@@ -1182,11 +1198,11 @@ checkForUnlistedFiles (TTLocal lp) preBuildTime pkgDir = do
             (lpPackage lp)
             (lpCabalFile lp)
             (lpNewBuildCache lp)
-    mapM_ ($logWarn . ("Warning: " <>) . T.pack . show) warnings
     unless (null addBuildCache) $
         writeBuildCache pkgDir $
         Map.unions (lpNewBuildCache lp : addBuildCache)
-checkForUnlistedFiles (TTUpstream _ _ _) _ _ = return ()
+    return warnings
+checkForUnlistedFiles (TTUpstream _ _ _) _ _ = return []
 
 -- | Determine if all of the dependencies given are installed
 depsPresent :: InstalledMap -> Map PackageName VersionRange -> Bool
