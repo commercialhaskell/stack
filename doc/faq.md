@@ -355,4 +355,17 @@ This is known to be a problem on Windows 7, but seems to be fixed on Windows 10.
 
 # Does stack also install the system/C libraries that some Cabal packages depend on?
 
-No, this is out of scope.
+No, this is currently out of the scope of stack's target set of features.
+Instead of attempting to automate the installation of 3rd party dependencies, we
+have the following approaches for handling system dependencies:
+
+* Nix and docker help make your build and execution environment deterministic
+  and predictable. This way, you can install system dependencies into a
+  container, and share this container with all developers.
+
+* If you have installed some libraries into a non-standard location,
+  [`extra-lib-dirs` / `extra-include-dirs`](yaml_configuration.md#extra-include-dirsextra-lib-dirs)
+  to specify it.
+
+In the future, stack might give OS specific suggestions for how to install
+system libraries.
