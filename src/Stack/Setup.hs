@@ -60,9 +60,8 @@ import              Distribution.System (OS, Arch (..), Platform (..))
 import qualified    Distribution.System as Cabal
 import              Distribution.Text (simpleParse)
 import              Lens.Micro (set)
-import              Network.HTTP.Client.Conduit (HasHttpManager, Manager, getHttpManager, parseUrl,
+import              Network.HTTP.Client.Conduit (HasHttpManager, Manager, getHttpManager, parseUrlThrow,
                                                  responseBody, withResponse)
-import              Network.HTTP.Download (parseUrlThrow)
 import              Network.HTTP.Download.Verified
 import              Path
 import              Path.Extra (toFilePathNoTrailingSep)
@@ -768,7 +767,7 @@ downloadFromInfo programsDir downloadInfo tool = do
             _ -> fail $ "Unknown extension for url: " ++ url
     relfile <- parseRelFile $ toolString tool ++ extension
     path <- case url of
-        (parseUrl -> Just _) -> do
+        (parseUrlThrow -> Just _) -> do
             let path = programsDir </> relfile
             ensureDir programsDir
             chattyDownload (T.pack (toolString tool)) downloadInfo path

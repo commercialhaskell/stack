@@ -471,7 +471,7 @@ addPackageDeps treatAsDep package = do
                 inRange <- if adrVersion adr `withinRange` range
                     then return True
                     else do
-                        let warn reason =
+                        let warn_ reason =
                                 tell mempty { wWarnings = (msg:) }
                               where
                                 msg = T.concat
@@ -487,14 +487,14 @@ addPackageDeps treatAsDep package = do
                         allowNewer <- asks $ configAllowNewer . getConfig
                         if allowNewer
                             then do
-                                warn " (allow-newer enabled)"
+                                warn_ " (allow-newer enabled)"
                                 return True
                             else do
                                 x <- inSnapshot (packageName package) (packageVersion package)
                                 y <- inSnapshot depname (adrVersion adr)
                                 if x && y
                                     then do
-                                        warn " (trusting snapshot over Hackage revisions)"
+                                        warn_ " (trusting snapshot over Hackage revisions)"
                                         return True
                                     else return False
                 if inRange
