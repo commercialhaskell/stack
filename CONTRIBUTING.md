@@ -2,43 +2,7 @@
 
 ## Bug Reports
 
-Before reporting a bug, please ensure that you are using the latest release (currently stack-1.1.2).  See the [upgrade instructions](http://docs.haskellstack.org/en/stable/install_and_upgrade/#upgrade) to upgrade.
-
-When reporting a bug, please write in the following format:
-
-> [Any general summary/comments if desired]
-
-> **Steps to reproduce:**
-
-> 1. _Remove directory *blah*._
-> 2. _Run command `stack blah`._
-> 3. _Edit file blah._
-> 3. _Run command `stack blah`._
-
-> **Expected:**
-
-> _What I expected to see and happen._
-
-> **Actual:**
-
-> _What actually happened._
->
-> Here is the `stack --version` output:
->
-> ```
-> $ stack --version
-> Version 0.0.2, Git revision 6a86ee32e5b869a877151f74064572225e1a0398
-> ```
-> Here is the command I ran **with `--verbose`**:
->
-> ```
-> $ stack <your command here> <args> --verbose
-> <output>
-> ```
-
-With `--verbose` mode we can see what the tool is doing and when. Without this output it is much more difficult to surmise what's going on with your issue. If the above output is larger than a page, paste it in a private [Gist](https://gist.github.com/) instead.
-
-Include any `.yaml` configuration if relevant.
+Please [open an issue](https://github.com/commercialhaskell/stack/issues/new) and use the provided template to include all necessary details.
 
 The more detailed your report, the faster it can be resolved and will ensure it is resolved in the right way. Once your bug has been resolved, the responsible will tag the issue as _Needs confirmation_ and assign the issue back to you. Once you have tested and confirmed that the issue is resolved, close the issue. If you are not a member of the project, you will be asked for confirmation and we will close it.
 
