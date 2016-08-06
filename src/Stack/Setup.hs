@@ -819,10 +819,16 @@ installGHCPosix version _ archiveFile archiveType destDir = do
             TarBz2 -> return "bzip2"
             TarGz -> return "gzip"
             SevenZ -> error "Don't know how to deal with .7z files on non-Windows"
+    -- Slight hack: OpenBSD's tar doesn't support xz.
+    -- https://github.com/commercialhaskell/stack/issues/2283#issuecomment-237980986
+    let tarDep =
+          case (platform, archiveType) of
+            (Platform _ Cabal.OpenBSD, TarXz) -> checkDependency "gtar"
+            _ -> checkDependency "tar"
     (zipTool, makeTool, tarTool) <- checkDependencies $ (,,)
         <$> checkDependency zipTool'
         <*> (checkDependency "gmake" <|> checkDependency "make")
-        <*> checkDependency "tar"
+        <*> tarDep
 
     $logDebug $ "ziptool: " <> T.pack zipTool
     $logDebug $ "make: " <> T.pack makeTool
