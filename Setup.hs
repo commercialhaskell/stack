@@ -5,14 +5,14 @@ import Data.List ( nub, sortBy )
 import Data.Ord ( comparing )
 import Data.Version ( showVersion )
 import Distribution.Package ( PackageName(PackageName), PackageId, InstalledPackageId, packageVersion, packageName )
-import Distribution.PackageDescription ( PackageDescription(), TestSuite(..), Executable(..) )
+import Distribution.PackageDescription ( PackageDescription(), Executable(..) )
 import Distribution.InstalledPackageInfo (sourcePackageId, installedPackageId)
 import Distribution.Simple ( defaultMainWithHooks, UserHooks(..), simpleUserHooks )
 import Distribution.Simple.Utils ( rewriteFile, createDirectoryIfMissingVerbose )
 import Distribution.Simple.BuildPaths ( autogenModulesDir )
 import Distribution.Simple.PackageIndex (allPackages, dependencyClosure)
 import Distribution.Simple.Setup ( BuildFlags(buildVerbosity), fromFlag )
-import Distribution.Simple.LocalBuildInfo ( installedPkgs, withLibLBI, withTestLBI, withExeLBI, LocalBuildInfo(), ComponentLocalBuildInfo(componentPackageDeps) )
+import Distribution.Simple.LocalBuildInfo ( installedPkgs, withLibLBI, withExeLBI, LocalBuildInfo(), ComponentLocalBuildInfo(componentPackageDeps) )
 import Distribution.Verbosity ( Verbosity )
 import System.FilePath ( (</>) )
 
@@ -28,16 +28,6 @@ generateBuildModule verbosity pkg lbi = do
   let dir = autogenModulesDir lbi
   createDirectoryIfMissingVerbose verbosity True dir
   withLibLBI pkg lbi $ \_ libcfg -> do
-    withTestLBI pkg lbi $ \suite clbi ->
-      rewriteFile (dir </> "Build_" ++ testName suite ++ ".hs") $ unlines
-        [ "module Build_" ++ testName suite ++ " where"
-        , ""
-        , "autogen_dir :: String"
-        , "autogen_dir = " ++ show dir
-        , ""
-        , "deps :: [String]"
-        , "deps = " ++ (show $ formatdeps (transDeps libcfg clbi))
-        ]
     withExeLBI pkg lbi $ \exe clbi ->
       rewriteFile (dir </> "Build_" ++ exeName exe ++ ".hs") $ unlines
         [ "module Build_" ++ exeName exe ++ " where"
