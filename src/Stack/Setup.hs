@@ -645,7 +645,7 @@ getInstalledGhcjs installed goodVersion =
     goodPackage (ToolGhcjs cv) = if goodVersion cv then Just cv else Nothing
     goodPackage _ = Nothing
 
-downloadAndInstallTool :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasConfig env, HasHttpManager env, MonadBaseControl IO m)
+downloadAndInstallTool :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasHttpManager env, MonadBaseControl IO m)
                        => Path Abs Dir
                        -> SetupInfo
                        -> DownloadInfo
@@ -755,7 +755,7 @@ getOSKey platform =
         Platform arch os -> throwM $ UnsupportedSetupCombo os arch
 
 downloadFromInfo
-    :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasConfig env, HasHttpManager env, MonadBaseControl IO m)
+    :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasHttpManager env, MonadBaseControl IO m)
     => Path Abs Dir -> DownloadInfo -> Tool -> m (Path Abs File, ArchiveType)
 downloadFromInfo programsDir downloadInfo tool = do
     at <-

@@ -226,7 +226,7 @@ displayAnsi :: (Display a, HasAnsiAnn (Ann a)) => a -> T.Text
 displayAnsi = LT.toStrict . displayAnsiSimple . renderDefault . toAnsiDoc . display
 
 hDisplayAnsi
-    :: (Display a, HasAnsiAnn (Ann a), MonadIO m, MonadReader env m)
+    :: (Display a, HasAnsiAnn (Ann a), MonadIO m)
     => Handle -> a -> m ()
 hDisplayAnsi h x = liftIO $ do
     useAnsi <- hSupportsANSI h

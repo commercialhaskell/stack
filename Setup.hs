@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -fno-warn-warnings-deprecations #-}
 module Main (main) where
 
 import Data.List ( nub, sortBy )
