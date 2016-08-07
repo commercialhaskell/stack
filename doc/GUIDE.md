@@ -457,9 +457,6 @@ library
                      , containers
 ```
 
-Often it's a good idea to specify exact versions of dependencies, but we didn't do that here: stack was able to
-find versions that are compatible with our project.
-
 After adding these two dependencies, we can again run `stack build` to have them installed:
 
 ```
@@ -486,9 +483,6 @@ helloworld 0.1.0.0
 integer-gmp 1.0.0.0
 text 1.2.2.1
 ```
-
-As our project grows in size, it may prove useful to have a comprehensive list of the packages and versions we are relying on.
-
 
 ### extra-deps
 
