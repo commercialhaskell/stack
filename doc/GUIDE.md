@@ -441,6 +441,49 @@ locally installed. Once that was done, we moved on to building our local package
 (helloworld). At no point did we need to ask stack to build dependencies — it
 does so automatically.
 
+### Listing Dependencies
+
+Let's have stack add a few more dependencies to our project. First, we'll include two new packages in the
+`build-depends` section for our library in our `helloworld.cabal`:
+
+```
+library
+  hs-source-dirs:      src
+  exposed-modules:     Lib
+  build-depends:       base >= 4.7 && < 5
+                     , text
+                     -- a couple more dependencies...
+                     , filepath
+                     , containers
+```
+
+After adding these two dependencies, we can again run `stack build` to have them installed:
+
+```
+michael@d30748af6d3d:~/helloworld$ stack build
+helloworld-0.1.0.0: unregistering (dependencies changed)
+helloworld-0.1.0.0: configure
+Configuring helloworld-0.1.0.0...
+...
+```
+
+Finally, to find out which versions of these libraries stack installed, we can ask stack to `list-dependencies`:
+
+```
+michael@d30748af6d3d:~/helloworld$ stack list-dependencies
+array 0.5.1.0
+base 4.8.2.0
+binary 0.7.5.0
+bytestring 0.10.6.0
+containers 0.5.6.2
+deepseq 1.4.1.1
+filepath 1.4.0.0
+ghc-prim 0.4.0.0
+helloworld 0.1.0.0
+integer-gmp 1.0.0.0
+text 1.2.2.1
+```
+
 ### extra-deps
 
 Let's try a more off-the-beaten-track package: the joke
