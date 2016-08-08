@@ -813,16 +813,22 @@ installGHCPosix version _ archiveFile archiveType destDir = do
     menv0 <- getMinimalEnvOverride
     menv <- mkEnvOverride platform (removeHaskellEnvVars (unEnvOverride menv0))
     $logDebug $ "menv = " <> T.pack (show (unEnvOverride menv))
-    zipTool' <-
+    (zipTool', compOpt) <-
         case archiveType of
-            TarXz -> return "xz"
-            TarBz2 -> return "bzip2"
-            TarGz -> return "gzip"
+            TarXz -> return ("xz", 'J')
+            TarBz2 -> return ("bzip2", 'j')
+            TarGz -> return ("gzip", 'z')
             SevenZ -> error "Don't know how to deal with .7z files on non-Windows"
+    -- Slight hack: OpenBSD's tar doesn't support xz.
+    -- https://github.com/commercialhaskell/stack/issues/2283#issuecomment-237980986
+    let tarDep =
+          case (platform, archiveType) of
+            (Platform _ Cabal.OpenBSD, TarXz) -> checkDependency "gtar"
+            _ -> checkDependency "tar"
     (zipTool, makeTool, tarTool) <- checkDependencies $ (,,)
         <$> checkDependency zipTool'
         <*> (checkDependency "gmake" <|> checkDependency "make")
-        <*> checkDependency "tar"
+        <*> tarDep
 
     $logDebug $ "ziptool: " <> T.pack zipTool
     $logDebug $ "make: " <> T.pack makeTool
@@ -836,7 +842,7 @@ installGHCPosix version _ archiveFile archiveType destDir = do
 
         $logSticky $ T.concat ["Unpacking GHC into ", T.pack . toFilePath $ root, " ..."]
         $logDebug $ "Unpacking " <> T.pack (toFilePath archiveFile)
-        readInNull root tarTool menv ["xf", toFilePath archiveFile] Nothing
+        readInNull root tarTool menv [compOpt : "xf", toFilePath archiveFile] Nothing
 
         $logSticky "Configuring GHC ..."
         readInNull dir (toFilePath $ dir </> $(mkRelFile "configure"))
