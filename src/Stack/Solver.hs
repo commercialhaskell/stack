@@ -36,6 +36,7 @@ import           Data.Either
 import           Data.Foldable               (forM_)
 import           Data.Function               (on)
 import qualified Data.HashMap.Strict         as HashMap
+import qualified Data.HashSet                as HashSet
 import           Data.List                   ( (\\), isSuffixOf, intercalate
                                              , minimumBy, isPrefixOf)
 import           Data.List.Extra             (groupSortOn)
@@ -62,7 +63,7 @@ import           Path
 import           Path.Find                   (findFiles)
 import           Path.IO                     hiding (findExecutable, findFiles)
 import           Stack.BuildPlan
-import           Stack.Constants             (stackDotYaml)
+import           Stack.Constants             (stackDotYaml, wiredInPackages)
 import           Stack.Package               (printCabalFileWarning
                                              , hpack
                                              , readPackageUnresolved)
@@ -265,6 +266,7 @@ getCabalConfig dir constraintType constraints = do
         assert (not . null . versionString $ version) $
             T.concat
               [ (if constraintType == Constraint
+                    || name `HashSet.member` wiredInPackages
                  then "constraint: "
                  else "preference: ")
               , T.pack $ packageNameString name
