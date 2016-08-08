@@ -2,8 +2,8 @@
 
 (since 0.1.10.0)
 
-When using the Nix integration, Haskell dependencies are handled as usual: they
-are downloaded from Stackage and build locally by Stack. Nix is used by Stack to
+When using the Nix integration, Haskell dependencies are handled as usual: They
+are downloaded from Stackage and built locally by Stack. Nix is used by Stack to
 provide the _non-Haskell_ dependencies needed by these Haskell packages.
 
 `stack` can automatically create a build environment (the equivalent

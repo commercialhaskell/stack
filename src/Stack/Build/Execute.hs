@@ -5,6 +5,7 @@
 {-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE RecordWildCards       #-}
 {-# LANGUAGE TemplateHaskell       #-}
+{-# LANGUAGE LambdaCase            #-}
 -- | Perform a build
 module Stack.Build.Execute
     ( printPlan
@@ -78,7 +79,14 @@ import           Stack.Fetch as Fetch
 import           Stack.GhcPkg
 import           Stack.Package
 import           Stack.PackageDump
-import           Stack.Types
+import           Stack.Types.GhcPkgId
+import           Stack.Types.PackageIdentifier
+import           Stack.Types.PackageName
+import           Stack.Types.Version
+import           Stack.Types.Config
+import           Stack.Types.Build
+import           Stack.Types.Package
+import           Stack.Types.Compiler
 import           Stack.Types.Internal
 import           Stack.Types.StackT
 import qualified System.Directory as D
@@ -87,7 +95,7 @@ import           System.Exit (ExitCode (ExitSuccess))
 import qualified System.FilePath as FP
 import           System.IO
 import           System.PosixCompat.Files (createLink)
-import           System.Process.Log (showProcessArgDebug)
+import           System.Process.Log (showProcessArgDebug, withProcessTimeLog)
 import           System.Process.Read
 import           System.Process.Run
 
@@ -454,9 +462,9 @@ executePlan menv boptsCli baseConfigOpts locals globalPackages snapshotPackages 
                     , esStackExe = True
                     , esLocaleUtf8 = False
                     }
-    forM_ (boptsCLIExec boptsCli) $ \(cmd, args) -> do
-        $logProcessRun cmd args
-        callProcess (Cmd Nothing cmd menv' args)
+    forM_ (boptsCLIExec boptsCli) $ \(cmd, args) ->
+        $withProcessTimeLog cmd args $
+            callProcess (Cmd Nothing cmd menv' args)
 
 -- | Windows can't write over the current executable. Instead, we rename the
 -- current executable to something else and then do the copy.
@@ -1089,18 +1097,33 @@ singleBuild runInBase ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} in
                 writeBuildCache pkgDir $ lpNewBuildCache lp
             TTUpstream _ _ _ -> return ()
 
+        -- FIXME: only output these if they're in the build plan.
+
+        preBuildTime <- modTime <$> liftIO getCurrentTime
+        let postBuildCheck succeeded = do
+                warnings <- checkForUnlistedFiles taskType preBuildTime pkgDir
+                let hasUnlistedModule = any $ \case
+                        UnlistedModulesWarning{} -> True
+                        _ -> False
+                when (not (null warnings)) $ $logInfo ""
+                when (not succeeded && hasUnlistedModule warnings) $ do
+                    $logInfo "If the above build failed with a linker error or .so/DLL error, addressing these may help:"
+                mapM_ ($logWarn . ("Warning: " <>) . T.pack . show) warnings
+
         () <- announce ("build" <> annSuffix)
         config <- asks getConfig
         extraOpts <- extraBuildOptions eeBuildOpts
-        preBuildTime <- modTime <$> liftIO getCurrentTime
-        cabal (configHideTHLoading config) $ ("build" :) $ (++ extraOpts) $
+        (cabal (configHideTHLoading config) $ ("build" :) $ (++ extraOpts) $
             case (taskType, taskAllInOne, isFinalBuild) of
                 (_, True, True) -> fail "Invariant violated: cannot have an all-in-one build that also has a final build step."
                 (TTLocal lp, False, False) -> primaryComponentOptions lp
                 (TTLocal lp, False, True) -> finalComponentOptions lp
                 (TTLocal lp, True, False) -> primaryComponentOptions lp ++ finalComponentOptions lp
-                (TTUpstream{}, _, _) -> []
-        checkForUnlistedFiles taskType preBuildTime pkgDir
+                (TTUpstream{}, _, _) -> [])
+          `catch` \ex -> case ex of
+              CabalExitedUnsuccessfully{} -> postBuildCheck False >> throwM ex
+              _ -> throwM ex
+        postBuildCheck True
 
         when (doHaddock package) $ do
             announce "haddock"
@@ -1167,7 +1190,7 @@ singleBuild runInBase ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} in
             _ -> error "singleBuild: invariant violated: multiple results when describing installed package"
 
 -- | Check if any unlisted files have been found, and add them to the build cache.
-checkForUnlistedFiles :: M env m => TaskType -> ModTime -> Path Abs Dir -> m ()
+checkForUnlistedFiles :: M env m => TaskType -> ModTime -> Path Abs Dir -> m [PackageWarning]
 checkForUnlistedFiles (TTLocal lp) preBuildTime pkgDir = do
     (addBuildCache,warnings) <-
         addUnlistedToBuildCache
@@ -1175,11 +1198,11 @@ checkForUnlistedFiles (TTLocal lp) preBuildTime pkgDir = do
             (lpPackage lp)
             (lpCabalFile lp)
             (lpNewBuildCache lp)
-    mapM_ ($logWarn . ("Warning: " <>) . T.pack . show) warnings
     unless (null addBuildCache) $
         writeBuildCache pkgDir $
         Map.unions (lpNewBuildCache lp : addBuildCache)
-checkForUnlistedFiles (TTUpstream _ _ _) _ _ = return ()
+    return warnings
+checkForUnlistedFiles (TTUpstream _ _ _) _ _ = return []
 
 -- | Determine if all of the dependencies given are installed
 depsPresent :: InstalledMap -> Map PackageName VersionRange -> Bool
@@ -1394,12 +1417,16 @@ mungeBuildOutput excludeTHLoading makeAbsolute pkgDir = void $
             Nothing -> return bs
             Just fp -> return $ fp `T.append` y
 
-    -- | Match the line:column format at the end of lines
+    -- | Match the error location format at the end of lines
     isValidSuffix = isRight . parseOnly lineCol
-    lineCol = char ':' >> (decimal :: Parser Int)
-           >> char ':' >> (decimal :: Parser Int)
+    lineCol = char ':'
+           >> choice
+                [ num >> char ':' >> num >> optional (char '-' >> num) >> return ()
+                , char '(' >> num >> char ',' >> num >> string ")-(" >> num >> char ',' >> num >> char ')' >> return ()
+                ]
            >> char ':'
            >> return ()
+        where num = some digit
 
     -- | Strip @\r@ characters from the byte vector. Used because Windows.
     stripCarriageReturn :: Text -> Text

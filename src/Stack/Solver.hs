@@ -36,6 +36,7 @@ import           Data.Either
 import           Data.Foldable               (forM_)
 import           Data.Function               (on)
 import qualified Data.HashMap.Strict         as HashMap
+import qualified Data.HashSet                as HashSet
 import           Data.List                   ( (\\), isSuffixOf, intercalate
                                              , minimumBy, isPrefixOf)
 import           Data.List.Extra             (groupSortOn)
@@ -62,13 +63,20 @@ import           Path
 import           Path.Find                   (findFiles)
 import           Path.IO                     hiding (findExecutable, findFiles)
 import           Stack.BuildPlan
-import           Stack.Constants             (stackDotYaml)
+import           Stack.Constants             (stackDotYaml, wiredInPackages)
 import           Stack.Package               (printCabalFileWarning
                                              , hpack
                                              , readPackageUnresolved)
 import           Stack.Setup
 import           Stack.Setup.Installed
-import           Stack.Types
+import           Stack.Types.FlagName
+import           Stack.Types.PackageIdentifier
+import           Stack.Types.PackageIndex
+import           Stack.Types.PackageName
+import           Stack.Types.Version
+import           Stack.Types.Config
+import           Stack.Types.Build
+import           Stack.Types.Compiler
 import           Stack.Types.Internal        ( HasTerminal
                                              , HasReExec
                                              , HasLogLevel)
@@ -76,6 +84,7 @@ import qualified System.Directory            as D
 import qualified System.FilePath             as FP
 import           System.Process.Read
 
+import qualified Data.Text.Normalize         as T ( normalize , NormalizationMode(NFC) )
 
 data ConstraintType = Constraint | Preference deriving (Eq)
 type ConstraintSpec = Map PackageName (Version, Map FlagName Bool)
@@ -257,6 +266,7 @@ getCabalConfig dir constraintType constraints = do
         assert (not . null . versionString $ version) $
             T.concat
               [ (if constraintType == Constraint
+                    || name `HashSet.member` wiredInPackages
                  then "constraint: "
                  else "preference: ")
               , T.pack $ packageNameString name
@@ -560,8 +570,9 @@ cabalPackagesCheck cabalfps noPkgMsg dupErrMsg = do
     -- Just the latter check is enough to cover both the cases
 
     let packages  = zip cabalfps gpds
+        normalizeString = T.unpack . T.normalize T.NFC . T.pack
         getNameMismatchPkg (fp, gpd)
-            | (show . gpdPackageName) gpd /= (FP.takeBaseName . toFilePath) fp
+            | (normalizeString . show . gpdPackageName) gpd /= (normalizeString . FP.takeBaseName . toFilePath) fp
                 = Just fp
             | otherwise = Nothing
         nameMismatchPkgs = mapMaybe getNameMismatchPkg packages

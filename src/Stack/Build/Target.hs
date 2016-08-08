@@ -39,7 +39,12 @@ import           Path
 import           Path.Extra (rejectMissingDir)
 import           Path.IO
 import           Prelude hiding (concat, concatMap) -- Fix redundant import warnings
-import           Stack.Types
+import           Stack.Types.PackageIdentifier
+import           Stack.Types.PackageName
+import           Stack.Types.Version
+import           Stack.Types.Config
+import           Stack.Types.Build
+import           Stack.Types.Package
 
 -- | The name of a component, which applies to executables, test suites, and benchmarks
 type ComponentName = Text

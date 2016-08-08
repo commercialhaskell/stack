@@ -37,6 +37,7 @@
           with new version
         * Look for any links to "latest" documentation, replace with version tag
         * Ensure all documentation pages listed in `mkdocs.yaml`
+    * Update the ISSUE_TEMPLATE.md to point at the new version.
     * Check that any new Linux distribution versions added to
       `etc/scripts/release.hs` and `etc/scripts/vagrant-releases.sh`
         * [Ubuntu](https://wiki.ubuntu.com/Releases)

@@ -54,18 +54,21 @@ import           Data.Maybe (fromMaybe, mapMaybe)
 import           Data.Monoid ((<>))
 import           Data.Set (Set)
 import qualified Data.Set as Set
-import           Data.Store (Store)
 import qualified Data.Store as Store
-import           Data.Store.TypeHash (HasTypeHash, mkManyHasTypeHash)
 import           Data.Store.VersionTagged
 import           Data.Text (Text)
 import qualified Data.Text as T
 import           Data.Traversable (forM)
-import           GHC.Generics (Generic)
 import           Path
 import           Path.IO
 import           Stack.Constants
-import           Stack.Types
+import           Stack.Types.Build
+import           Stack.Types.Compiler
+import           Stack.Types.Config
+import           Stack.Types.GhcPkgId
+import           Stack.Types.Package
+import           Stack.Types.PackageIdentifier
+import           Stack.Types.Version
 import qualified System.FilePath as FilePath
 
 -- | Directory containing files to mark an executable as installed
@@ -103,64 +106,47 @@ markExeNotInstalled loc ident = do
     ident' <- parseRelFile $ packageIdentifierString ident
     ignoringAbsence (removeFile $ dir </> ident')
 
--- | Stored on disk to know whether the flags have changed or any
--- files have changed.
-data BuildCache = BuildCache
-    { buildCacheTimes :: !(Map FilePath FileCacheInfo)
-      -- ^ Modification times of files.
-    }
-    deriving (Generic, Eq, Show)
-instance Store BuildCache
-instance NFData BuildCache
-
 -- | Try to read the dirtiness cache for the given package directory.
-tryGetBuildCache :: (MonadIO m, MonadReader env m, HasConfig env, MonadThrow m, MonadLogger m, HasEnvConfig env, MonadBaseControl IO m)
+tryGetBuildCache :: (MonadIO m, MonadReader env m, MonadThrow m, MonadLogger m, HasEnvConfig env, MonadBaseControl IO m)
                  => Path Abs Dir -> m (Maybe (Map FilePath FileCacheInfo))
-tryGetBuildCache = liftM (fmap buildCacheTimes) . tryGetCache buildCacheFile
+tryGetBuildCache dir = liftM (fmap buildCacheTimes) . $(versionedDecodeFile buildCacheVC) =<< buildCacheFile dir
 
 -- | Try to read the dirtiness cache for the given package directory.
 tryGetConfigCache :: (MonadIO m, MonadReader env m, MonadThrow m, HasEnvConfig env, MonadBaseControl IO m, MonadLogger m)
                   => Path Abs Dir -> m (Maybe ConfigCache)
-tryGetConfigCache = tryGetCache configCacheFile
+tryGetConfigCache dir = $(versionedDecodeFile configCacheVC) =<< configCacheFile dir
 
 -- | Try to read the mod time of the cabal file from the last build
 tryGetCabalMod :: (MonadIO m, MonadReader env m, MonadThrow m, HasEnvConfig env, MonadBaseControl IO m, MonadLogger m)
                => Path Abs Dir -> m (Maybe ModTime)
-tryGetCabalMod = tryGetCache configCabalMod
-
--- | Try to load a cache.
-tryGetCache :: (MonadIO m, Store a, HasTypeHash a, MonadBaseControl IO m, MonadLogger m)
-            => (Path Abs Dir -> m (Path Abs File))
-            -> Path Abs Dir
-            -> m (Maybe a)
-tryGetCache get' dir = do
-    fp <- get' dir
-    decodeFileMaybe fp
+tryGetCabalMod dir = $(versionedDecodeFile modTimeVC) =<< configCabalMod dir
 
 -- | Write the dirtiness cache for this package's files.
 writeBuildCache :: (MonadIO m, MonadReader env m, MonadThrow m, HasEnvConfig env, MonadLogger m)
                 => Path Abs Dir -> Map FilePath FileCacheInfo -> m ()
-writeBuildCache dir times =
-    writeCache
-        dir
-        buildCacheFile
-        BuildCache
-         { buildCacheTimes = times
-         }
+writeBuildCache dir times = do
+    fp <- buildCacheFile dir
+    $(versionedEncodeFile buildCacheVC) fp BuildCache
+        { buildCacheTimes = times
+        }
 
 -- | Write the dirtiness cache for this package's configuration.
 writeConfigCache :: (MonadIO m, MonadReader env m, MonadThrow m, HasEnvConfig env, MonadLogger m)
                 => Path Abs Dir
                 -> ConfigCache
                 -> m ()
-writeConfigCache dir = writeCache dir configCacheFile
+writeConfigCache dir x = do
+    fp <- configCacheFile dir
+    $(versionedEncodeFile configCacheVC) fp x
 
 -- | See 'tryGetCabalMod'
 writeCabalMod :: (MonadIO m, MonadReader env m, MonadThrow m, HasEnvConfig env, MonadLogger m)
               => Path Abs Dir
               -> ModTime
               -> m ()
-writeCabalMod dir = writeCache dir configCabalMod
+writeCabalMod dir x = do
+    fp <- configCabalMod dir
+    $(versionedEncodeFile modTimeVC) fp x
 
 -- | Delete the caches for the project.
 deleteCaches :: (MonadIO m, MonadReader env m, MonadCatch m, HasEnvConfig env)
@@ -172,16 +158,6 @@ deleteCaches dir = do
     -}
     cfp <- configCacheFile dir
     ignoringAbsence (removeFile cfp)
-
--- | Write to a cache.
-writeCache :: (Store a, NFData a, HasTypeHash a, Eq a, MonadIO m, MonadLogger m)
-           => Path Abs Dir
-           -> (Path Abs Dir -> m (Path Abs File))
-           -> a
-           -> m ()
-writeCache dir get' content = do
-    fp <- get' dir
-    taggedEncodeFile fp content
 
 flagCacheFile :: (MonadIO m, MonadThrow m, MonadReader env m, HasEnvConfig env)
               => Installed
@@ -200,36 +176,32 @@ tryGetFlagCache :: (MonadIO m, MonadThrow m, MonadReader env m, HasEnvConfig env
                 -> m (Maybe ConfigCache)
 tryGetFlagCache gid = do
     fp <- flagCacheFile gid
-    decodeFileMaybe fp
+    $(versionedDecodeFile configCacheVC) fp
 
-writeFlagCache :: (MonadIO m, MonadReader env m, HasEnvConfig env, MonadThrow m, MonadLogger m, MonadBaseControl IO m)
+writeFlagCache :: (MonadIO m, MonadReader env m, HasEnvConfig env, MonadThrow m, MonadLogger m)
                => Installed
                -> ConfigCache
                -> m ()
 writeFlagCache gid cache = do
     file <- flagCacheFile gid
     ensureDir (parent file)
-    taggedEncodeFile file cache
+    $(versionedEncodeFile configCacheVC) file cache
 
 -- | Mark a test suite as having succeeded
 setTestSuccess :: (MonadIO m, MonadThrow m, MonadReader env m, HasEnvConfig env, MonadLogger m)
                => Path Abs Dir
                -> m ()
-setTestSuccess dir =
-    writeCache
-        dir
-        testSuccessFile
-        True
+setTestSuccess dir = do
+    fp <- testSuccessFile dir
+    $(versionedEncodeFile testSuccessVC) fp True
 
 -- | Mark a test suite as not having succeeded
 unsetTestSuccess :: (MonadIO m, MonadThrow m, MonadReader env m, HasEnvConfig env, MonadLogger m)
                  => Path Abs Dir
                  -> m ()
-unsetTestSuccess dir =
-    writeCache
-        dir
-        testSuccessFile
-        False
+unsetTestSuccess dir = do
+    fp <- testSuccessFile dir
+    $(versionedEncodeFile testSuccessVC) fp False
 
 -- | Check if the test suite already passed
 checkTestSuccess :: (MonadIO m, MonadThrow m, MonadReader env m, HasEnvConfig env, MonadBaseControl IO m, MonadLogger m)
@@ -238,7 +210,7 @@ checkTestSuccess :: (MonadIO m, MonadThrow m, MonadReader env m, HasEnvConfig en
 checkTestSuccess dir =
     liftM
         (fromMaybe False)
-        (tryGetCache testSuccessFile dir)
+        ($(versionedDecodeFile testSuccessVC) =<< testSuccessFile dir)
 
 --------------------------------------
 -- Precompiled Cache
@@ -320,7 +292,7 @@ writePrecompiledCache baseConfigOpts pkgident copts depIDs mghcPkgId exes = do
         name <- parseRelFile $ T.unpack exe
         relPath <- stackRootRelative $ bcoSnapInstallRoot baseConfigOpts </> bindirSuffix </> name
         return $ toFilePath $ relPath
-    taggedEncodeFile file PrecompiledCache
+    $(versionedEncodeFile precompiledCacheVC) file PrecompiledCache
         { pcLibrary = mlibpath
         , pcExes = exes'
         }
@@ -345,7 +317,7 @@ readPrecompiledCache pkgident copts depIDs = do
                   }
 
     (file, getOldFile) <- precompiledCacheFile pkgident copts depIDs
-    mres <- decodeFileMaybe file
+    mres <- $(versionedDecodeFile precompiledCacheVC) file
     case mres of
         Just res -> return (Just $ toAbsPC res)
         Nothing -> do
@@ -354,7 +326,7 @@ readPrecompiledCache pkgident copts depIDs = do
             mpc <- fmap (fmap toAbsPC) $ binaryDecodeFileOrFailDeep oldFile
             -- Write out file in new format. Keep old file around for
             -- the benefit of older stack versions.
-            forM_ mpc (taggedEncodeFile file)
+            forM_ mpc ($(versionedEncodeFile precompiledCacheVC) file)
             return mpc
 
 -- | Ensure that there are no lurking exceptions deep inside the parsed
@@ -370,10 +342,3 @@ binaryDecodeFileOrFailDeep fp = liftIO $ fmap (either (\_ -> Nothing) id) $ tryA
         Right x -> return (Just x)
 
 type BinarySchema a = (Binary a, NFData a, HasStructuralInfo a, HasSemanticVersion a)
-
-$(mkManyHasTypeHash
-    [ [t| BuildCache |]
-    -- TODO: put this orphan elsewhere? Not sure if we want tons of
-    -- instances of HasTypeHash or not.
-    , [t| Bool |]
-    ])

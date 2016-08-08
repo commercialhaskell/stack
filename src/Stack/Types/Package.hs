@@ -26,7 +26,8 @@ import           Data.Monoid
 import           Data.Set (Set)
 import qualified Data.Set as Set
 import           Data.Store (Store)
-import           Data.Store.TypeHash (mkManyHasTypeHash)
+import           Data.Store.Version (VersionConfig)
+import           Data.Store.VersionTagged (storeVersionConfig)
 import           Data.Text (Text)
 import qualified Data.Text as T
 import           Data.Text.Encoding (encodeUtf8, decodeUtf8)
@@ -350,13 +351,19 @@ data FileCacheInfo = FileCacheInfo
     , fciSize :: !Word64
     , fciHash :: !S.ByteString
     }
-    deriving (Generic, Show, Eq)
+    deriving (Generic, Show, Eq, Data, Typeable)
 instance Store FileCacheInfo
 instance NFData FileCacheInfo
 
 -- | Used for storage and comparison.
 newtype ModTime = ModTime (Integer,Rational)
-  deriving (Ord,Show,Generic,Eq,NFData,Store)
+  deriving (Ord, Show, Generic, Eq, NFData, Store, Data, Typeable)
+
+modTimeVC :: VersionConfig ModTime
+modTimeVC = storeVersionConfig "mod-time-v1" "UBECpUI0JvM_SBOnRNdaiF9_yOU="
+
+testSuccessVC :: VersionConfig Bool
+testSuccessVC = storeVersionConfig "test-v1" "jC_GB0SGtbpRQbDlm7oQJP7thu8="
 
 -- | A descriptor from a .cabal file indicating one of the following:
 --
@@ -427,5 +434,3 @@ installedPackageIdentifier (Executable pid) = pid
 -- | Get the installed Version.
 installedVersion :: Installed -> Version
 installedVersion = packageIdentifierVersion . installedPackageIdentifier
-
-$(mkManyHasTypeHash [ [t| ModTime |] ])

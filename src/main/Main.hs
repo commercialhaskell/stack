@@ -10,6 +10,9 @@
 
 module Main (main) where
 
+#ifndef HIDE_DEP_VERSIONS
+import qualified Build_stack
+#endif
 import           Control.Exception
 import           Control.Monad hiding (mapM, forM)
 import           Control.Monad.IO.Class
@@ -75,7 +78,9 @@ import           Stack.SDist (getSDistTarball, checkSDistTarball, checkSDistTarb
 import           Stack.SetupCmd
 import qualified Stack.Sig as Sig
 import           Stack.Solver (solveExtraDeps)
-import           Stack.Types
+import           Stack.Types.Version
+import           Stack.Types.Config
+import           Stack.Types.Compiler
 import           Stack.Types.Internal
 import           Stack.Types.StackT
 import           Stack.Upgrade
@@ -107,14 +112,21 @@ versionString' = concat $ concat
     , [" (" ++ commitCount ++ " commits)" | commitCount /= ("1"::String) &&
                                           commitCount /= ("UNKNOWN" :: String)]
     , [" ", display buildArch]
-    , [" hpack-", VERSION_hpack]
+    , [depsString]
     ]
-    where commitCount = $gitCommitCount
+  where
+    commitCount = $gitCommitCount
 #else
 versionString' =
     showVersion Meta.version
     ++ ' ' : display buildArch
-    ++ " hpack" ++ VERSION_hpack
+    depsString
+  where
+#endif
+#ifdef HIDE_DEP_VERSIONS
+    depsString = (" hpack-" ++ VERSION_hpack)
+#else
+    depsString = ("\nCompiled with:\n" ++ unlines (map ("- " ++) Build_stack.deps))
 #endif
 
 main :: IO ()

@@ -59,7 +59,10 @@ import           Prelude -- Fix redundant import warnings
 import           Stack.Config (getInContainer)
 import           Stack.Constants
 import           Stack.Docker.GlobalDB
-import           Stack.Types
+import           Stack.Types.PackageIndex
+import           Stack.Types.Version
+import           Stack.Types.Config
+import           Stack.Types.Docker
 import           Stack.Types.Internal
 import           Stack.Setup (ensureDockerStackExe)
 import           System.Directory (canonicalizePath,getHomeDirectory)

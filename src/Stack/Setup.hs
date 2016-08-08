@@ -1,16 +1,12 @@
-{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE DeriveDataTypeable #-} -- ghc < 7.10
 {-# LANGUAGE DeriveFunctor #-}
-{-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE ViewPatterns #-}
-{-# LANGUAGE PackageImports        #-}
-{-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE DeriveDataTypeable #-}
-{-# LANGUAGE TupleSections #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE PackageImports #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE ViewPatterns #-}
 
 module Stack.Setup
   ( setupEnv
@@ -22,74 +18,83 @@ module Stack.Setup
   , removeHaskellEnvVars
   ) where
 
-import           Control.Applicative
-import           Control.Exception.Enclosed (catchIO, tryAny)
-import           Control.Monad (liftM, when, join, void, unless)
-import           Control.Monad.Catch
-import           Control.Monad.IO.Class (MonadIO, liftIO)
-import           Control.Monad.Logger
-import           Control.Monad.Reader (MonadReader, ReaderT (..), asks)
-import           Control.Monad.State (get, put, modify)
-import           Control.Monad.Trans.Control
+import              Control.Applicative
+import              Control.Concurrent.Async.Lifted (Concurrently(..))
+import              Control.Exception.Enclosed (catchIO, tryAny)
+import              Control.Monad (liftM, when, join, void, unless)
+import              Control.Monad.Catch
+import              Control.Monad.IO.Class (MonadIO, liftIO)
+import              Control.Monad.Logger
+import              Control.Monad.Reader (MonadReader, ReaderT (..), asks)
+import              Control.Monad.State (get, put, modify)
+import              Control.Monad.Trans.Control
 import "cryptohash" Crypto.Hash (SHA1(SHA1))
-import           Data.Aeson.Extended
-import qualified Data.ByteString as S
-import qualified Data.ByteString.Char8 as S8
-import qualified Data.ByteString.Lazy as LBS
-import           Data.Char (isSpace)
-import           Data.Conduit (Conduit, ($$), (=$), await, yield, awaitForever)
-import           Data.Conduit.Lift (evalStateC)
-import qualified Data.Conduit.List as CL
-import           Data.Either
-import           Data.Foldable hiding (concatMap, or, maximum)
-import           Data.IORef
-import           Data.IORef.RunOnce (runOnce)
-import           Data.List hiding (concat, elem, maximumBy, any)
-import           Data.Map (Map)
-import qualified Data.Map as Map
-import           Data.Maybe
-import           Data.Monoid
-import           Data.Ord (comparing)
-import           Data.Set (Set)
-import qualified Data.Set as Set
-import           Data.Text (Text)
-import qualified Data.Text as T
-import qualified Data.Text.Encoding as T
-import qualified Data.Text.Encoding.Error as T
-import           Data.Time.Clock (NominalDiffTime, diffUTCTime, getCurrentTime)
-import           Data.Typeable (Typeable)
-import qualified Data.Yaml as Yaml
-import           Distribution.System (OS, Arch (..), Platform (..))
-import qualified Distribution.System as Cabal
-import           Distribution.Text (simpleParse)
-import           Lens.Micro (set)
-import           Network.HTTP.Client.Conduit
-import           Network.HTTP.Download.Verified
-import           Path
-import           Path.Extra (toFilePathNoTrailingSep)
-import           Path.IO hiding (findExecutable)
-import qualified Paths_stack as Meta
-import           Prelude hiding (concat, elem, any) -- Fix AMP warning
-import           Safe (readMay)
-import           Stack.Build (build)
-import           Stack.Config (resolvePackageEntry, loadConfig)
-import           Stack.Constants (distRelativeDir, stackProgName)
-import           Stack.Exec (defaultEnvSettings)
-import           Stack.Fetch
-import           Stack.GhcPkg (createDatabase, getCabalPkgVer, getGlobalDB, mkGhcPackagePath)
-import           Stack.Setup.Installed
-import           Stack.Types
-import           Stack.Types.Internal (HasTerminal, HasReExec, HasLogLevel, envConfigBuildOpts, buildOptsInstallExes)
-import           Stack.Types.StackT
-import qualified System.Directory as D
-import           System.Environment (getExecutablePath)
-import           System.Exit (ExitCode (ExitSuccess))
-import           System.FilePath (searchPathSeparator)
-import qualified System.FilePath as FP
-import           System.Process (rawSystem)
-import           System.Process.Read
-import           System.Process.Run (runCmd, Cmd(..))
-import           Text.Printf (printf)
+import              Data.Aeson.Extended
+import qualified    Data.ByteString as S
+import qualified    Data.ByteString.Char8 as S8
+import qualified    Data.ByteString.Lazy as LBS
+import              Data.Char (isSpace)
+import              Data.Conduit (Conduit, ($$), (=$), await, yield, awaitForever)
+import              Data.Conduit.Lift (evalStateC)
+import qualified    Data.Conduit.List as CL
+import              Data.Either
+import              Data.Foldable hiding (concatMap, or, maximum)
+import              Data.IORef
+import              Data.IORef.RunOnce (runOnce)
+import              Data.List hiding (concat, elem, maximumBy, any)
+import              Data.Map (Map)
+import qualified    Data.Map as Map
+import              Data.Maybe
+import              Data.Monoid
+import              Data.Ord (comparing)
+import              Data.Set (Set)
+import qualified    Data.Set as Set
+import              Data.Text (Text)
+import qualified    Data.Text as T
+import qualified    Data.Text.Encoding as T
+import qualified    Data.Text.Encoding.Error as T
+import              Data.Time.Clock (NominalDiffTime, diffUTCTime, getCurrentTime)
+import              Data.Typeable (Typeable)
+import qualified    Data.Yaml as Yaml
+import              Distribution.System (OS, Arch (..), Platform (..))
+import qualified    Distribution.System as Cabal
+import              Distribution.Text (simpleParse)
+import              Lens.Micro (set)
+import              Network.HTTP.Client.Conduit (HasHttpManager, Manager, getHttpManager, parseUrlThrow,
+                                                 responseBody, withResponse)
+import              Network.HTTP.Download.Verified
+import              Path
+import              Path.Extra (toFilePathNoTrailingSep)
+import              Path.IO hiding (findExecutable)
+import qualified    Paths_stack as Meta
+import              Prelude hiding (concat, elem, any) -- Fix AMP warning
+import              Safe (readMay)
+import              Stack.Build (build)
+import              Stack.Config (resolvePackageEntry, loadConfig)
+import              Stack.Constants (distRelativeDir, stackProgName)
+import              Stack.Exec (defaultEnvSettings)
+import              Stack.Fetch
+import              Stack.GhcPkg (createDatabase, getCabalPkgVer, getGlobalDB, mkGhcPackagePath)
+import              Stack.Setup.Installed
+import              Stack.Types.Build
+import              Stack.Types.Compiler
+import              Stack.Types.Config
+import              Stack.Types.Docker
+import              Stack.Types.Internal (HasTerminal, HasReExec, HasLogLevel, envConfigBuildOpts, buildOptsInstallExes)
+import              Stack.Types.PackageIdentifier
+import              Stack.Types.PackageName
+import              Stack.Types.StackT
+import              Stack.Types.Version
+import qualified    System.Directory as D
+import              System.Environment (getExecutablePath)
+import              System.Exit (ExitCode (ExitSuccess))
+import              System.FilePath (searchPathSeparator)
+import qualified    System.FilePath as FP
+import              System.Process (rawSystem)
+import              System.Process.Log (withProcessTimeLog)
+import              System.Process.Read
+import              System.Process.Run (runCmd, Cmd(..))
+import              Text.Printf (printf)
 
 -- | Default location of the stack-setup.yaml file
 defaultStackSetupYaml :: String
@@ -214,10 +219,13 @@ setupEnv mResolveMissingGHC = do
     menv0 <- getMinimalEnvOverride
     env <- removeHaskellEnvVars
              <$> augmentPathMap (maybe [] edBins mghcBin) (unEnvOverride menv0)
-
     menv <- mkEnvOverride platform env
-    compilerVer <- getCompilerVersion menv wc
-    cabalVer <- getCabalPkgVer menv wc
+
+    (compilerVer, cabalVer, globaldb) <- runConcurrently $ (,,)
+        <$> Concurrently (getCompilerVersion menv wc)
+        <*> Concurrently (getCabalPkgVer menv wc)
+        <*> Concurrently (getGlobalDB menv wc)
+
     $logDebug "Resolving package entries"
     packages <- mapM
         (resolvePackageEntry menv (bcRoot bconfig))
@@ -239,7 +247,6 @@ setupEnv mResolveMissingGHC = do
     createDatabase menv wc deps
     localdb <- runReaderT packageDatabaseLocal envConfig0
     createDatabase menv wc localdb
-    globaldb <- getGlobalDB menv wc
     extras <- runReaderT packageDatabaseExtra envConfig0
     let mkGPP locals = mkGhcPackagePath locals localdb deps extras globaldb
 
@@ -546,7 +553,7 @@ upgradeCabal menv wc = do
                     , "dir="
                     , installRoot FP.</> name'
                     ]
-                args = ( "configure": map dirArgument (words "lib bin data doc") )
+                args = "configure" : map dirArgument (words "lib bin data doc")
             runCmd (Cmd (Just dir) setupExe menv args) Nothing
             runCmd (Cmd (Just dir) setupExe menv ["build"]) Nothing
             runCmd (Cmd (Just dir) setupExe menv ["install"]) Nothing
@@ -638,7 +645,7 @@ getInstalledGhcjs installed goodVersion =
     goodPackage (ToolGhcjs cv) = if goodVersion cv then Just cv else Nothing
     goodPackage _ = Nothing
 
-downloadAndInstallTool :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasConfig env, HasHttpManager env, MonadBaseControl IO m)
+downloadAndInstallTool :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasHttpManager env, MonadBaseControl IO m)
                        => Path Abs Dir
                        -> SetupInfo
                        -> DownloadInfo
@@ -660,7 +667,7 @@ downloadAndInstallCompiler :: (MonadIO m, MonadMask m, MonadLogger m, MonadReade
                            -> VersionCheck
                            -> Maybe String
                            -> m Tool
-downloadAndInstallCompiler si wanted@(GhcVersion{}) versionCheck mbindistURL = do
+downloadAndInstallCompiler si wanted@GhcVersion{} versionCheck mbindistURL = do
     ghcVariant <- asks getGHCVariant
     (selectedVersion, downloadInfo) <- case mbindistURL of
         Just bindistURL -> do
@@ -748,7 +755,7 @@ getOSKey platform =
         Platform arch os -> throwM $ UnsupportedSetupCombo os arch
 
 downloadFromInfo
-    :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasConfig env, HasHttpManager env, MonadBaseControl IO m)
+    :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasHttpManager env, MonadBaseControl IO m)
     => Path Abs Dir -> DownloadInfo -> Tool -> m (Path Abs File, ArchiveType)
 downloadFromInfo programsDir downloadInfo tool = do
     at <-
@@ -757,16 +764,30 @@ downloadFromInfo programsDir downloadInfo tool = do
             ".tar.bz2" -> return TarBz2
             ".tar.gz" -> return TarGz
             ".7z.exe" -> return SevenZ
-            _ -> error $ "Unknown extension for url: " ++ T.unpack url
+            _ -> fail $ "Unknown extension for url: " ++ url
     relfile <- parseRelFile $ toolString tool ++ extension
-    let path = programsDir </> relfile
-    ensureDir programsDir
-    chattyDownload (T.pack (toolString tool)) downloadInfo path
+    path <- case url of
+        (parseUrlThrow -> Just _) -> do
+            let path = programsDir </> relfile
+            ensureDir programsDir
+            chattyDownload (T.pack (toolString tool)) downloadInfo path
+            return path
+        (parseAbsFile -> Just path) -> do
+            let DownloadInfo{downloadInfoContentLength=contentLength, downloadInfoSha1=sha1} =
+                    downloadInfo
+            when (isJust contentLength) $
+                $logWarn  "`content-length` in not checked \n\
+                          \and should not be specified when `url` is a file path"
+            when (isJust sha1) $
+                $logWarn  "`sha1` is not checked and \n\
+                          \should not be specified when `url` is a file path"
+            return path
+        _ ->
+            fail $ "`url` must be either an HTTP URL or absolute file path: " ++ url
     return (path, at)
   where
-    url = downloadInfoUrl downloadInfo
-    extension =
-        loop $ T.unpack url
+    url = T.unpack $ downloadInfoUrl downloadInfo
+    extension = loop url
       where
         loop fp
             | ext `elem` [".tar", ".bz2", ".xz", ".exe", ".7z", ".gz"] = loop fp' ++ ext
@@ -792,16 +813,22 @@ installGHCPosix version _ archiveFile archiveType destDir = do
     menv0 <- getMinimalEnvOverride
     menv <- mkEnvOverride platform (removeHaskellEnvVars (unEnvOverride menv0))
     $logDebug $ "menv = " <> T.pack (show (unEnvOverride menv))
-    zipTool' <-
+    (zipTool', compOpt) <-
         case archiveType of
-            TarXz -> return "xz"
-            TarBz2 -> return "bzip2"
-            TarGz -> return "gzip"
+            TarXz -> return ("xz", 'J')
+            TarBz2 -> return ("bzip2", 'j')
+            TarGz -> return ("gzip", 'z')
             SevenZ -> error "Don't know how to deal with .7z files on non-Windows"
+    -- Slight hack: OpenBSD's tar doesn't support xz.
+    -- https://github.com/commercialhaskell/stack/issues/2283#issuecomment-237980986
+    let tarDep =
+          case (platform, archiveType) of
+            (Platform _ Cabal.OpenBSD, TarXz) -> checkDependency "gtar"
+            _ -> checkDependency "tar"
     (zipTool, makeTool, tarTool) <- checkDependencies $ (,,)
         <$> checkDependency zipTool'
         <*> (checkDependency "gmake" <|> checkDependency "make")
-        <*> checkDependency "tar"
+        <*> tarDep
 
     $logDebug $ "ziptool: " <> T.pack zipTool
     $logDebug $ "make: " <> T.pack makeTool
@@ -815,7 +842,7 @@ installGHCPosix version _ archiveFile archiveType destDir = do
 
         $logSticky $ T.concat ["Unpacking GHC into ", T.pack . toFilePath $ root, " ..."]
         $logDebug $ "Unpacking " <> T.pack (toFilePath archiveFile)
-        readInNull root tarTool menv ["xf", toFilePath archiveFile] Nothing
+        readInNull root tarTool menv [compOpt : "xf", toFilePath archiveFile] Nothing
 
         $logSticky "Configuring GHC ..."
         readInNull dir (toFilePath $ dir </> $(mkRelFile "configure"))
@@ -895,8 +922,8 @@ installGHCJS si archiveFile archiveType destDir = do
         _ -> return Nothing
 
     $logSticky "Installing GHCJS (this will take a long time) ..."
-    runInnerStackT ((set (envConfigBuildOpts.buildOptsInstallExes) True envConfig')) $
-        (build (\_ -> return ()) Nothing defaultBuildOptsCLI)
+    runInnerStackT (set (envConfigBuildOpts.buildOptsInstallExes) True envConfig') $
+        build (\_ -> return ()) Nothing defaultBuildOptsCLI
     -- Copy over *.options files needed on windows.
     forM_ mwindowsInstallDir $ \dir -> do
         (_, files) <- listDir (dir </> $(mkRelDir "bin"))
@@ -1194,8 +1221,8 @@ setup7z si = do
                         , "-y"
                         , toFilePath archive
                         ]
-                $logProcessRun cmd args
-                ec <- liftIO $ rawSystem cmd args
+                ec <- $withProcessTimeLog cmd args $
+                    liftIO $ rawSystem cmd args
                 when (ec /= ExitSuccess)
                     $ liftIO $ throwM (ProblemWhileDecompressing archive)
         _ -> throwM SetupInfoMissingSevenz
@@ -1360,7 +1387,7 @@ getUtf8EnvVars
     :: forall m env.
        (MonadReader env m, HasPlatform env, MonadLogger m, MonadCatch m, MonadBaseControl IO m, MonadIO m)
     => EnvOverride -> CompilerVersion -> m (Map Text Text)
-getUtf8EnvVars menv compilerVer = do
+getUtf8EnvVars menv compilerVer =
     if getGhcVersion compilerVer >= $(mkVersion "7.10.3")
         -- GHC_CHARENC supported by GHC >=7.10.3
         then return $ Map.singleton "GHC_CHARENC" "UTF-8"

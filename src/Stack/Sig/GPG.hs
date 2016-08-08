@@ -27,7 +27,7 @@ import           Data.List (find, isPrefixOf)
 import           Data.Monoid ((<>))
 import qualified Data.Text as T
 import           Path
-import           Stack.Types
+import           Stack.Types.Sig
 import           System.Directory (findExecutable)
 import           System.Environment (lookupEnv)
 import           System.Exit (ExitCode(..))

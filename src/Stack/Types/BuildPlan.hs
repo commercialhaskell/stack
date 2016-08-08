@@ -22,6 +22,7 @@ module Stack.Types.BuildPlan
     , Component (..)
     , SnapName (..)
     , MiniBuildPlan (..)
+    , miniBuildPlanVC
     , MiniPackageInfo (..)
     , CabalFileInfo (..)
     , GitSHA1 (..)
@@ -39,6 +40,7 @@ import           Control.Monad.Catch (MonadThrow, throwM)
 import           Data.Aeson (FromJSON (..), ToJSON (..), object, withObject, withText, (.!=), (.:), (.:?), (.=))
 import           Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
+import           Data.Data
 import qualified Data.HashMap.Strict as HashMap
 import           Data.Hashable (Hashable)
 import           Data.IntMap (IntMap)
@@ -49,14 +51,14 @@ import           Data.Maybe (fromMaybe)
 import           Data.Monoid
 import           Data.Set (Set)
 import           Data.Store (Store)
-import           Data.Store.TypeHash (mkManyHasTypeHash)
+import           Data.Store.Version
+import           Data.Store.VersionTagged
 import           Data.String (IsString, fromString)
 import           Data.Text (Text, pack, unpack)
 import qualified Data.Text as T
 import           Data.Text.Read (decimal)
 import           Data.Time (Day)
 import qualified Data.Traversable as T
-import           Data.Typeable (TypeRep, Typeable, typeOf)
 import           Data.Vector (Vector)
 import           Distribution.System (Arch, OS (..))
 import qualified Distribution.Text as DT
@@ -279,7 +281,7 @@ newtype Maintainer = Maintainer { unMaintainer :: Text }
 
 -- | Name of an executable.
 newtype ExeName = ExeName { unExeName :: Text }
-    deriving (Show, Eq, Ord, Hashable, IsString, Generic, Store, NFData)
+    deriving (Show, Eq, Ord, Hashable, IsString, Generic, Store, NFData, Data, Typeable)
 instance ToJSON ExeName where
     toJSON = toJSON . unExeName
 instance FromJSON ExeName where
@@ -429,9 +431,12 @@ data MiniBuildPlan = MiniBuildPlan
     { mbpCompilerVersion :: !CompilerVersion
     , mbpPackages :: !(Map PackageName MiniPackageInfo)
     }
-    deriving (Generic, Show, Eq)
+    deriving (Generic, Show, Eq, Data, Typeable)
 instance Store MiniBuildPlan
 instance NFData MiniBuildPlan
+
+miniBuildPlanVC :: VersionConfig MiniBuildPlan
+miniBuildPlanVC = storeVersionConfig "mbp-v1" "C8q73RrYq3plf9hDCapjWpnm_yc="
 
 -- | Information on a single package for the 'MiniBuildPlan'.
 data MiniPackageInfo = MiniPackageInfo
@@ -453,17 +458,15 @@ data MiniPackageInfo = MiniPackageInfo
     -- the cabal file contents. Useful for grabbing the correct cabal file
     -- revision directly from a Git repo
     }
-    deriving (Generic, Show, Eq)
+    deriving (Generic, Show, Eq, Data, Typeable)
 instance Store MiniPackageInfo
 instance NFData MiniPackageInfo
 
 newtype GitSHA1 = GitSHA1 ByteString
-    deriving (Generic, Show, Eq, NFData, Store)
+    deriving (Generic, Show, Eq, NFData, Store, Data, Typeable)
 
 newtype SnapshotHash = SnapshotHash { unShapshotHash :: ByteString }
     deriving (Generic, Show, Eq)
 
 trimmedSnapshotHash :: SnapshotHash -> ByteString
 trimmedSnapshotHash = BS.take 12 . unShapshotHash
-
-$(mkManyHasTypeHash [ [t| MiniBuildPlan |] ])

@@ -17,6 +17,7 @@ data Env config =
   Env {envConfig :: !config
       ,envLogLevel :: !LogLevel
       ,envTerminal :: !Bool
+      ,envAnsiTerminal :: !Bool
       ,envReExec :: !Bool
       ,envManager :: !Manager
       ,envSticky :: !Sticky
@@ -50,9 +51,11 @@ instance HasLogLevel LogLevel where
 
 class HasTerminal r where
   getTerminal :: r -> Bool
+  getAnsiTerminal :: r -> Bool
 
 instance HasTerminal (Env config) where
   getTerminal = envTerminal
+  getAnsiTerminal = envAnsiTerminal
 
 class HasReExec r where
   getReExec :: r -> Bool

@@ -89,7 +89,15 @@ import           Path.IO hiding (findFiles)
 import           Safe (headDef, tailSafe)
 import           Stack.Build.Installed
 import           Stack.Constants
-import           Stack.Types
+import           Stack.Types.FlagName
+import           Stack.Types.GhcPkgId
+import           Stack.Types.PackageIdentifier
+import           Stack.Types.PackageName
+import           Stack.Types.Version
+import           Stack.Types.Config
+import           Stack.Types.Build
+import           Stack.Types.Package
+import           Stack.Types.Compiler
 import qualified System.Directory as D
 import           System.FilePath (splitExtensions, replaceExtension)
 import qualified System.FilePath as FilePath
@@ -372,7 +380,7 @@ generateBuildInfoOpts BioInput {..} =
     deps =
         concat
             [ case M.lookup name biInstalledMap of
-                Just (_, Stack.Types.Library _ident ipid) -> ["-package-id=" <> ghcPkgIdString ipid]
+                Just (_, Stack.Types.Package.Library _ident ipid) -> ["-package-id=" <> ghcPkgIdString ipid]
                 _ -> ["-package=" <> packageNameString name <>
                  maybe "" -- This empty case applies to e.g. base.
                      ((("-" <>) . versionString) . piiVersion)

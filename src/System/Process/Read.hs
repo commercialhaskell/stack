@@ -29,7 +29,6 @@ module System.Process.Read
   ,preProcess
   ,readProcessNull
   ,readInNull
-  ,logProcessRun
   ,ReadProcessException (..)
   ,augmentPath
   ,augmentPathMap
@@ -290,11 +289,11 @@ sinkProcessStderrStdout :: forall m e o. (MonadIO m, MonadLogger m)
                         -> Sink S.ByteString IO o -- ^ Sink for stdout
                         -> m (e,o)
 sinkProcessStderrStdout wd menv name args sinkStderr sinkStdout = do
-  $logProcessRun name args
   name' <- preProcess wd menv name
-  liftIO $ withCheckedProcess
-      (proc name' args) { env = envHelper menv, cwd = fmap toFilePath wd }
-      (\ClosedStream out err -> f err out)
+  $withProcessTimeLog name' args $
+      liftIO $ withCheckedProcess
+          (proc name' args) { env = envHelper menv, cwd = fmap toFilePath wd }
+          (\ClosedStream out err -> f err out)
   where
     f :: Source IO S.ByteString -> Source IO S.ByteString -> IO (e, o)
     f err out = (err $$ sinkStderr) `concurrently` (out $$ sinkStdout)
@@ -308,16 +307,16 @@ sinkProcessStderrStdoutHandle :: (MonadIO m, MonadLogger m)
                               -> Handle
                               -> m ()
 sinkProcessStderrStdoutHandle wd menv name args err out = do
-  $logProcessRun name args
   name' <- preProcess wd menv name
-  liftIO $ withCheckedProcess
-      (proc name' args)
-          { env = envHelper menv
-          , cwd = fmap toFilePath wd
-          , std_err = UseHandle err
-          , std_out = UseHandle out
-          }
-      (\ClosedStream UseProvidedHandle UseProvidedHandle -> return ())
+  $withProcessTimeLog name' args $
+      liftIO $ withCheckedProcess
+          (proc name' args)
+              { env = envHelper menv
+              , cwd = fmap toFilePath wd
+              , std_err = UseHandle err
+              , std_out = UseHandle out
+              }
+          (\ClosedStream UseProvidedHandle UseProvidedHandle -> return ())
 
 -- | Perform pre-call-process tasks.  Ensure the working directory exists and find the
 -- executable path.

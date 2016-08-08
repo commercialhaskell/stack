@@ -2,7 +2,7 @@
 
 module Stack.Config.Urls (urlsFromMonoid) where
 
-import           Stack.Types
+import           Stack.Types.Urls
 import           Data.Monoid.Extra
 
 urlsFromMonoid :: UrlsMonoid -> Urls

@@ -142,7 +142,7 @@ Let's run stack setup:
 michael@d30748af6d3d:~/helloworld$ stack setup
 Downloaded ghc-7.10.2.
 Installed GHC.
-stack will use a locally installed GHC
+stack will use a sandboxed GHC it installed
 For more information on paths, see 'stack path' and 'stack exec env'
 To use this GHC and packages outside of a project, consider using:
 stack ghc, stack ghci, stack runghc, or stack exec
@@ -325,15 +325,15 @@ let's run `setup` a second time:
 
 ```
 michael@d30748af6d3d:~/helloworld$ stack setup
-stack will use a locally installed GHC
+stack will use a sandboxed GHC it installed
 For more information on paths, see 'stack path' and 'stack exec env'
 To use this GHC and packages outside of a project, consider using:
 stack ghc, stack ghci, stack runghc, or stack exec
 ```
 
 Thankfully, the command is smart enough to know not to perform an installation
-twice. `setup` will either use the first GHC it finds on your PATH, or a locally
-installed version. As the command output above indicates, you can use `stack
+twice. `setup` will either use the first GHC it finds on your PATH, or a sandboxed
+version after installing it. As the command output above indicates, you can use `stack
 path` for quite a bit of path information (which we'll play with more later).
 For now, we'll just look at where GHC is installed:
 
@@ -440,6 +440,49 @@ This output means that the text package was downloaded, configured, built, and
 locally installed. Once that was done, we moved on to building our local package
 (helloworld). At no point did we need to ask stack to build dependencies — it
 does so automatically.
+
+### Listing Dependencies
+
+Let's have stack add a few more dependencies to our project. First, we'll include two new packages in the
+`build-depends` section for our library in our `helloworld.cabal`:
+
+```
+library
+  hs-source-dirs:      src
+  exposed-modules:     Lib
+  build-depends:       base >= 4.7 && < 5
+                     , text
+                     -- a couple more dependencies...
+                     , filepath
+                     , containers
+```
+
+After adding these two dependencies, we can again run `stack build` to have them installed:
+
+```
+michael@d30748af6d3d:~/helloworld$ stack build
+helloworld-0.1.0.0: unregistering (dependencies changed)
+helloworld-0.1.0.0: configure
+Configuring helloworld-0.1.0.0...
+...
+```
+
+Finally, to find out which versions of these libraries stack installed, we can ask stack to `list-dependencies`:
+
+```
+michael@d30748af6d3d:~/helloworld$ stack list-dependencies
+array 0.5.1.0
+base 4.8.2.0
+binary 0.7.5.0
+bytestring 0.10.6.0
+containers 0.5.6.2
+deepseq 1.4.1.1
+filepath 1.4.0.0
+ghc-prim 0.4.0.0
+helloworld 0.1.0.0
+integer-gmp 1.0.0.0
+text 1.2.2.1
+```
 
 ### extra-deps
 
@@ -1515,7 +1558,7 @@ local-hpc-root: /home/michael/wai/.stack-work/install/x86_64-linux/lts-2.17/7.8.
 
 In addition, `stack path` accepts command line arguments to state which of
 these keys you're interested in, which can be convenient for scripting. As a
-simple example, let's find out which versions of GHC are installed locally:
+simple example, let's find out the sandboxed versions of GHC that stack installed:
 
 ```
 michael@d30748af6d3d:~/wai$ ls $(stack path --programs)/*.installed

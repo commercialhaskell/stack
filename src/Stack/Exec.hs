@@ -15,7 +15,7 @@ module Stack.Exec where
 import           Control.Monad.Reader
 import           Control.Monad.Logger
 import           Control.Monad.Trans.Control (MonadBaseControl)
-import           Stack.Types
+import           Stack.Types.Config
 import           System.Process.Log
 
 import           Control.Exception.Lifted
@@ -61,9 +61,9 @@ exec :: (MonadIO m, MonadLogger m, MonadBaseControl IO m)
 exec = execSpawn
 #else
 exec menv cmd0 args = do
-    $logProcessRun cmd0 args
     cmd <- preProcess Nothing menv cmd0
-    liftIO $ executeFile cmd True args (envHelper menv)
+    $withProcessTimeLog cmd args $
+        liftIO $ executeFile cmd True args (envHelper menv)
 #endif
 
 -- | Like 'exec', but does not use 'execv' on non-windows. This way, there
@@ -73,8 +73,8 @@ exec menv cmd0 args = do
 execSpawn :: (MonadIO m, MonadLogger m, MonadBaseControl IO m)
      => EnvOverride -> String -> [String] -> m b
 execSpawn menv cmd0 args = do
-    $logProcessRun cmd0 args
-    e <- try (callProcess (Cmd Nothing cmd0 menv args))
+    e <- $withProcessTimeLog cmd0 args $
+        try (callProcess (Cmd Nothing cmd0 menv args))
     liftIO $ case e of
         Left (ProcessExitedUnsuccessfully _ ec) -> exitWith ec
         Right () -> exitSuccess

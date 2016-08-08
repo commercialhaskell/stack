@@ -73,16 +73,19 @@ module Stack.Types.Config
   ,PackageLocation(..)
   ,RemotePackageType(..)
   -- ** PackageIndex, IndexName & IndexLocation
+
+  -- Re-exports
   ,PackageIndex(..)
   ,IndexName(..)
+  ,indexNameText
+  ,IndexLocation(..)
+  -- Config fields
   ,configPackageIndex
   ,configPackageIndexCache
   ,configPackageIndexGz
   ,configPackageIndexRoot
   ,configPackageIndexRepo
   ,configPackageTarball
-  ,indexNameText
-  ,IndexLocation(..)
   -- ** Project & ProjectAndConfigMonoid
   ,Project(..)
   ,ProjectAndConfigMonoid(..)
@@ -166,7 +169,6 @@ import           Data.IORef (IORef)
 import           Data.List (stripPrefix)
 import           Data.List.NonEmpty (NonEmpty)
 import qualified Data.List.NonEmpty as NonEmpty
-import           Data.Hashable (Hashable)
 import           Data.Map (Map)
 import qualified Data.Map as Map
 import qualified Data.Map.Strict as M
@@ -174,7 +176,6 @@ import           Data.Maybe
 import           Data.Monoid.Extra
 import           Data.Set (Set)
 import qualified Data.Set as Set
-import           Data.Store (Store)
 import           Data.Text (Text)
 import qualified Data.Text as T
 import           Data.Text.Encoding (encodeUtf8, decodeUtf8)
@@ -276,7 +277,7 @@ data Config =
          ,configSkipGHCCheck        :: !Bool
          -- ^ Don't bother checking the GHC version or architecture.
          ,configSkipMsys            :: !Bool
-         -- ^ On Windows: don't use a locally installed MSYS
+         -- ^ On Windows: don't use a sandboxed MSYS
          ,configCompilerCheck       :: !VersionCheck
          -- ^ Specifies which versions of the compiler are acceptable.
          ,configLocalBin            :: !(Path Abs Dir)
@@ -340,61 +341,6 @@ instance FromJSON ApplyGhcOptions where
             "locals" -> return AGOLocals
             "everything" -> return AGOEverything
             _ -> fail $ "Invalid ApplyGhcOptions: " ++ show t
-
--- | Information on a single package index
-data PackageIndex = PackageIndex
-    { indexName :: !IndexName
-    , indexLocation :: !IndexLocation
-    , indexDownloadPrefix :: !Text
-    -- ^ URL prefix for downloading packages
-    , indexGpgVerify :: !Bool
-    -- ^ GPG-verify the package index during download. Only applies to Git
-    -- repositories for now.
-    , indexRequireHashes :: !Bool
-    -- ^ Require that hashes and package size information be available for packages in this index
-    }
-    deriving Show
-instance FromJSON (WithJSONWarnings PackageIndex) where
-    parseJSON = withObjectWarnings "PackageIndex" $ \o -> do
-        name <- o ..: "name"
-        prefix <- o ..: "download-prefix"
-        mgit <- o ..:? "git"
-        mhttp <- o ..:? "http"
-        loc <-
-            case (mgit, mhttp) of
-                (Nothing, Nothing) -> fail $
-                    "Must provide either Git or HTTP URL for " ++
-                    T.unpack (indexNameText name)
-                (Just git, Nothing) -> return $ ILGit git
-                (Nothing, Just http) -> return $ ILHttp http
-                (Just git, Just http) -> return $ ILGitHttp git http
-        gpgVerify <- o ..:? "gpg-verify" ..!= False
-        reqHashes <- o ..:? "require-hashes" ..!= False
-        return PackageIndex
-            { indexName = name
-            , indexLocation = loc
-            , indexDownloadPrefix = prefix
-            , indexGpgVerify = gpgVerify
-            , indexRequireHashes = reqHashes
-            }
-
--- | Unique name for a package index
-newtype IndexName = IndexName { unIndexName :: ByteString }
-    deriving (Show, Eq, Ord, Hashable, Store)
-indexNameText :: IndexName -> Text
-indexNameText = decodeUtf8 . unIndexName
-instance ToJSON IndexName where
-    toJSON = toJSON . indexNameText
-instance FromJSON IndexName where
-    parseJSON = withText "IndexName" $ \t ->
-        case parseRelDir (T.unpack t) of
-            Left e -> fail $ "Invalid index name: " ++ show e
-            Right _ -> return $ IndexName $ encodeUtf8 t
-
--- | Location of the package index. This ensures that at least one of Git or
--- HTTP is available.
-data IndexLocation = ILGit !Text | ILHttp !Text | ILGitHttp !Text !Text
-    deriving (Show, Eq, Ord)
 
 -- | Controls which version of the environment is used
 data EnvSettings = EnvSettings
@@ -586,11 +532,11 @@ instance FromJSON (WithJSONWarnings PackageEntry) where
     parseJSON (String t) = do
         WithJSONWarnings loc _ <- parseJSON $ String t
         return $ noJSONWarnings
-               (PackageEntry
+            PackageEntry
                 { peExtraDep = False
                 , peLocation = loc
                 , peSubdirs = []
-                })
+                }
     parseJSON v = withObjectWarnings "PackageEntry" (\o -> PackageEntry
         <$> o ..:? "extra-dep" ..!= False
         <*> jsonSubWarnings (o ..: "location")
@@ -613,8 +559,8 @@ data RemotePackageType
 instance ToJSON PackageLocation where
     toJSON (PLFilePath fp) = toJSON fp
     toJSON (PLRemote t RPTHttp) = toJSON t
-    toJSON (PLRemote x (RPTGit y)) = toJSON $ T.unwords ["git", x, y]
-    toJSON (PLRemote x (RPTHg  y)) = toJSON $ T.unwords ["hg",  x, y]
+    toJSON (PLRemote x (RPTGit y)) = object [("git", toJSON x), ("commit", toJSON y)]
+    toJSON (PLRemote x (RPTHg  y)) = object [( "hg", toJSON x), ("commit", toJSON y)]
 
 instance FromJSON (WithJSONWarnings PackageLocation) where
     parseJSON v
@@ -658,14 +604,14 @@ data Project = Project
 
 instance ToJSON Project where
     toJSON p = object $
-        (maybe id (\cv -> (("compiler" .= cv) :)) (projectCompiler p))
-        ((maybe id (\msg -> (("user-message" .= msg) :)) (projectUserMsg p))
+        maybe id (\cv -> (("compiler" .= cv) :)) (projectCompiler p) $
+        maybe id (\msg -> (("user-message" .= msg) :)) (projectUserMsg p)
         [ "packages"          .= projectPackages p
         , "extra-deps"        .= map fromTuple (Map.toList $ projectExtraDeps p)
         , "flags"             .= projectFlags p
         , "resolver"          .= projectResolver p
         , "extra-package-dbs" .= projectExtraPackageDBs p
-        ])
+        ]
 
 data IsLoaded = Loaded | NotLoaded
 
@@ -717,7 +663,7 @@ instance FromJSON (WithJSONWarnings (ResolverThat's 'NotLoaded)) where
 
     parseJSON (String t) = either (fail . show) return (noJSONWarnings <$> parseResolverText t)
 
-    parseJSON _ = fail $ "Invalid Resolver, must be Object or String"
+    parseJSON _ = fail "Invalid Resolver, must be Object or String"
 
 -- | Convert a Resolver into its @Text@ representation, as will be used by
 -- directory names
@@ -1147,7 +1093,7 @@ instance Show ConfigException where
         ,"version range specified in stack.yaml ("
         , T.unpack (versionRangeText requiredRange)
         , ")." ]
-    show (NoMatchingSnapshot whichCmd names) = concat $
+    show (NoMatchingSnapshot whichCmd names) = concat
         [ "None of the following snapshots provides a compiler matching "
         , "your package(s):\n"
         , unlines $ map (\name -> "    - " <> T.unpack (renderSnapName name))
@@ -1169,14 +1115,10 @@ instance Show ConfigException where
         , unlines $ fmap ("    " <>) (lines errDesc)
         , showOptions whichCmd
         ]
-    show (NoSuchDirectory dir) = concat
-        ["No directory could be located matching the supplied path: "
-        ,dir
-        ]
-    show (ParseGHCVariantException v) = concat
-        [ "Invalid ghc-variant value: "
-        , v
-        ]
+    show (NoSuchDirectory dir) =
+        "No directory could be located matching the supplied path: " ++ dir
+    show (ParseGHCVariantException v) =
+        "Invalid ghc-variant value: " ++ v
     show (BadStackRoot stackRoot) = concat
         [ "Invalid stack root: '"
         , toFilePath stackRoot
@@ -1200,7 +1142,7 @@ instance Show ConfigException where
 instance Exception ConfigException
 
 showOptions :: WhichSolverCmd -> String
-showOptions whichCmd = unlines $ ["\nThis may be resolved by:"] ++ options
+showOptions whichCmd = unlines $ "\nThis may be resolved by:" : options
   where
     options =
         case whichCmd of
@@ -1590,6 +1532,7 @@ parseGHCVariant s =
 -- | Information for a file to download.
 data DownloadInfo = DownloadInfo
     { downloadInfoUrl :: Text
+      -- ^ URL or absolute file path
     , downloadInfoContentLength :: Maybe Int
     , downloadInfoSha1 :: Maybe ByteString
     } deriving (Show)

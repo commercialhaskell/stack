@@ -66,7 +66,11 @@ import           Path                                  (mkRelDir, parent,
                                                         parseAbsFile, (</>))
 import           Path.IO
 import           Prelude -- Fix AMP warning
-import           Stack.Types
+import           Stack.Types.Config
+import           Stack.Types.PackageIdentifier
+import           Stack.Types.PackageIndex
+import           Stack.Types.PackageName
+import           Stack.Types.Version
 import           Stack.Types.StackT
 import           System.FilePath (takeBaseName, (<.>))
 import           System.IO                             (IOMode (ReadMode, WriteMode),
@@ -76,6 +80,7 @@ import           System.Process.Read         (EnvOverride,
                                               tryProcessStdout)
 import           System.Process.Run          (Cmd(..), callProcessInheritStderrStdout)
 import           Data.Streaming.Process      (ProcessExitedUnsuccessfully(..))
+import           Data.Store.Version
 
 -- | Populate the package index caches and return them.
 populateCache
@@ -412,7 +417,11 @@ getPackageCaches = do
         Nothing -> do
             result <- liftM mconcat $ forM (configPackageIndices config) $ \index -> do
                 fp <- configPackageIndexCache (indexName index)
-                PackageCacheMap pis' <- taggedDecodeOrLoad fp $ liftM PackageCacheMap $ populateCache menv index
+                PackageCacheMap pis' <-
+                    $(versionedDecodeOrLoad (storeVersionConfig "pkg-v1" "aHzcZ6_w3rL6NtEJUqEfh6fcjAc="
+                                             :: VersionConfig PackageCacheMap))
+                    fp
+                    (liftM PackageCacheMap (populateCache menv index))
                 return (fmap (index,) pis')
             liftIO $ writeIORef (configPackageCaches config) (Just result)
             return result

@@ -36,7 +36,10 @@ import           Prelude hiding (mapM) -- Fix redundant import warnings
 import           Stack.Config.Nix (nixCompiler)
 import           Stack.Constants (stackProgName,platformVariantEnvVar)
 import           Stack.Exec (exec)
-import           Stack.Types
+import           Stack.Types.Config
+import           Stack.Types.Docker
+import           Stack.Types.Nix
+import           Stack.Types.Compiler
 import           Stack.Types.Internal
 import           System.Environment (lookupEnv,getArgs,getExecutablePath)
 import           System.Process.Read (getEnvOverride)

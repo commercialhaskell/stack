@@ -64,7 +64,13 @@ import              Stack.BuildPlan (shadowMiniBuildPlan)
 import              Stack.Constants (wiredInPackages)
 import              Stack.Package
 import              Stack.PackageIndex (getPackageVersions)
-import              Stack.Types
+import              Stack.Types.BuildPlan
+import              Stack.Types.FlagName
+import              Stack.Types.PackageName
+import              Stack.Types.Version
+import              Stack.Types.Config
+import              Stack.Types.Build
+import              Stack.Types.Package
 import qualified    System.Directory as D
 import              System.FilePath (takeFileName)
 import              System.IO (withBinaryFile, IOMode (ReadMode))

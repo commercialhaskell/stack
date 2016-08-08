@@ -345,7 +345,7 @@ extra-lib-dirs:
 - /opt/foo/lib
 ```
 
-### with-ghc
+### with-gcc
 
 Specify a path to gcc explicitly, rather than relying on the normal path resolution.
 
@@ -452,6 +452,8 @@ setup-info:
       7.10.2:
         url: "https://example.com/ghc-7.10.2-i386-unknown-mingw32-foo.tar.xz"
 ```
+
+`url` may be either URL or (since UNRELEASED) absolute file path.
 
 ### pvp-bounds
 

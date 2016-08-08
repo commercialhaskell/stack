@@ -31,15 +31,17 @@ module Stack.Types.Build
     ,defaultBuildOpts
     ,TaskType(..)
     ,TaskConfigOpts(..)
+    ,BuildCache(..)
+    ,buildCacheVC
     ,ConfigCache(..)
-    ,ConstructPlanException(..)
+    ,configCacheVC
     ,configureOpts
     ,isStackOpt
-    ,BadDependency(..)
     ,wantedLocalPackages
     ,FileCacheInfo (..)
     ,ConfigureOpts (..)
-    ,PrecompiledCache (..))
+    ,PrecompiledCache (..)
+    ,precompiledCacheVC)
     where
 
 import           Control.DeepSeq
@@ -50,7 +52,7 @@ import qualified Data.ByteString as S
 import           Data.Char (isSpace)
 import           Data.Data
 import           Data.Hashable
-import           Data.List (dropWhileEnd, nub, intercalate)
+import           Data.List (dropWhileEnd, intercalate)
 import qualified Data.Map as Map
 import           Data.Map.Strict (Map)
 import           Data.Maybe
@@ -58,7 +60,8 @@ import           Data.Monoid
 import           Data.Set (Set)
 import qualified Data.Set as Set
 import           Data.Store.Internal (Store)
-import           Data.Store.TypeHash (mkManyHasTypeHash)
+import           Data.Store.Version
+import           Data.Store.VersionTagged
 import           Data.Text (Text)
 import qualified Data.Text as T
 import           Data.Text.Encoding (decodeUtf8With)
@@ -67,7 +70,7 @@ import           Data.Time.Calendar
 import           Data.Time.Clock
 import           Distribution.PackageDescription (TestSuiteInterface)
 import           Distribution.System (Arch)
-import           Distribution.Text (display)
+import qualified Distribution.Text as C
 import           GHC.Generics (Generic)
 import           Path (Path, Abs, File, Dir, mkRelDir, toFilePath, parseRelDir, (</>))
 import           Path.Extra (toFilePathNoTrailingSep)
@@ -104,9 +107,7 @@ data StackBuildException
     (Path Abs File) -- stack.yaml
   | TestSuiteFailure PackageIdentifier (Map Text (Maybe ExitCode)) (Maybe (Path Abs File)) S.ByteString
   | TestSuiteTypeUnsupported TestSuiteInterface
-  | ConstructPlanExceptions
-        [ConstructPlanException]
-        (Path Abs File) -- stack.yaml
+  | ConstructPlanFailed String
   | CabalExitedUnsuccessfully
         ExitCode
         PackageIdentifier
@@ -151,7 +152,7 @@ instance Show StackBuildException where
                         [ "Compiler version mismatched, found "
                         , compilerVersionString actual
                         , " ("
-                        , display arch
+                        , C.display arch
                         , ")"
                         , ", but expected "
                         ]
@@ -161,7 +162,7 @@ instance Show StackBuildException where
                     NewerMinor -> "minor version match or newer with "
                 , compilerVersionString expected
                 , " ("
-                , display earch
+                , C.display earch
                 , ghcVariantSuffix ghcVariant
                 , ") (based on "
                 , case mstack of
@@ -217,34 +218,6 @@ instance Show StackBuildException where
           doubleIndent = indent . indent
     show (TestSuiteTypeUnsupported interface) =
               ("Unsupported test suite type: " <> show interface)
-    show (ConstructPlanExceptions exceptions stackYaml) =
-        "While constructing the BuildPlan the following exceptions were encountered:" ++
-        appendExceptions exceptions' ++
-        if Map.null extras then "" else (unlines
-                $ ("\n\nRecommended action: try adding the following to your extra-deps in "
-                    ++ toFilePath stackYaml)
-                : map (\(name, version) -> concat
-                    [ "- "
-                    , packageNameString name
-                    , "-"
-                    , versionString version
-                    ]) (Map.toList extras)
-                    ++ ["", "You may also want to try the 'stack solver' command"]
-                )
-         where
-             exceptions' = removeDuplicates exceptions
-             appendExceptions = foldr (\e -> (++) ("\n\n--" ++ show e)) ""
-             removeDuplicates = nub
-             extras = Map.unions $ map getExtras exceptions'
-
-             getExtras (DependencyCycleDetected _) = Map.empty
-             getExtras (UnknownPackage _) = Map.empty
-             getExtras (DependencyPlanFailures _ m) =
-                Map.unions $ map go $ Map.toList m
-              where
-                go (name, (_range, Just version, NotInBuildPlan)) =
-                    Map.singleton name version
-                go _ = Map.empty
      -- Supressing duplicate output
     show (CabalExitedUnsuccessfully exitCode taskProvides' execName fullArgs logFiles bss) =
         let fullCmd = unwords
@@ -354,6 +327,7 @@ instance Show StackBuildException where
             , innerMsg
             , "\n"
             ]
+    show (ConstructPlanFailed msg) = msg
 
 missingExeError :: Bool -> String -> String
 missingExeError isSimpleBuildType msg =
@@ -371,90 +345,26 @@ missingExeError isSimpleBuildType msg =
 
 instance Exception StackBuildException
 
-data ConstructPlanException
-    = DependencyCycleDetected [PackageName]
-    | DependencyPlanFailures Package (Map PackageName (VersionRange, LatestApplicableVersion, BadDependency))
-    | UnknownPackage PackageName -- TODO perhaps this constructor will be removed, and BadDependency will handle it all
-    -- ^ Recommend adding to extra-deps, give a helpful version number?
-    deriving (Typeable, Eq)
-
--- | For display purposes only, Nothing if package not found
-type LatestApplicableVersion = Maybe Version
-
--- | Reason why a dependency was not used
-data BadDependency
-    = NotInBuildPlan
-    | Couldn'tResolveItsDependencies
-    | DependencyMismatch Version
-    deriving (Typeable, Eq)
-
-instance Show ConstructPlanException where
-  show e =
-    let details = case e of
-         (DependencyCycleDetected pNames) ->
-           "While checking call stack,\n" ++
-           "  dependency cycle detected in packages:" ++ indent (appendLines pNames)
-         (DependencyPlanFailures pkg (Map.toList -> pDeps)) ->
-           "Failure when adding dependencies:" ++ doubleIndent (appendDeps pDeps) ++ "\n" ++
-           "  needed for package " ++ packageIdentifierString (packageIdentifier pkg) ++
-           appendFlags (packageFlags pkg)
-         (UnknownPackage pName) ->
-             "While attempting to add dependency,\n" ++
-             "  Could not find package " ++ show pName  ++ " in known packages"
-    in indent details
-     where
-      appendLines = foldr (\pName-> (++) ("\n" ++ show pName)) ""
-      indent = dropWhileEnd isSpace . unlines . fmap (\line -> "  " ++ line) . lines
-      doubleIndent = indent . indent
-      appendFlags flags =
-          if Map.null flags
-              then ""
-              else " with flags:\n" ++
-                  (doubleIndent . intercalate "\n" . map showFlag . Map.toList) flags
-      showFlag (name, bool) = show name ++ ": " ++ show bool
-      appendDeps = foldr (\dep-> (++) ("\n" ++ showDep dep)) ""
-      showDep (name, (range, mlatestApplicable, badDep)) = concat
-        [ show name
-        , ": needed ("
-        , display range
-        , ")"
-        , ", "
-        , let latestApplicableStr =
-                case mlatestApplicable of
-                    Nothing -> ""
-                    Just la -> " (latest applicable is " ++ versionString la ++ ")"
-           in case badDep of
-                NotInBuildPlan -> "stack configuration has no specified version" ++ latestApplicableStr
-                Couldn'tResolveItsDependencies -> "couldn't resolve its dependencies"
-                DependencyMismatch version ->
-                    case mlatestApplicable of
-                        Just la
-                            | la == version ->
-                                versionString version ++
-                                " found (latest applicable version available)"
-                        _ -> versionString version ++ " found" ++ latestApplicableStr
-        ]
-         {- TODO Perhaps change the showDep function to look more like this:
-          dropQuotes = filter ((/=) '\"')
-         (VersionOutsideRange pName pIdentifier versionRange) ->
-             "Exception: Stack.Build.VersionOutsideRange\n" ++
-             "  While adding dependency for package " ++ show pName ++ ",\n" ++
-             "  " ++ dropQuotes (show pIdentifier) ++ " was found to be outside its allowed version range.\n" ++
-             "  Allowed version range is " ++ display versionRange ++ ",\n" ++
-             "  should you correct the version range for " ++ dropQuotes (show pIdentifier) ++ ", found in [extra-deps] in the project's stack.yaml?"
-             -}
-
-
 ----------------------------------------------
-
 
 -- | Package dependency oracle.
 newtype PkgDepsOracle =
     PkgDeps PackageName
     deriving (Show,Typeable,Eq,Hashable,Store,NFData)
 
--- | Stored on disk to know whether the flags have changed or any
--- files have changed.
+-- | Stored on disk to know whether the files have changed.
+data BuildCache = BuildCache
+    { buildCacheTimes :: !(Map FilePath FileCacheInfo)
+      -- ^ Modification times of files.
+    }
+    deriving (Generic, Eq, Show, Data, Typeable)
+instance NFData BuildCache
+instance Store BuildCache
+
+buildCacheVC :: VersionConfig BuildCache
+buildCacheVC = storeVersionConfig "build-v1" "KVUoviSWWAd7tiRRGeWAvd0UIN4="
+
+-- | Stored on disk to know whether the flags have changed.
 data ConfigCache = ConfigCache
     { configCacheOpts :: !ConfigureOpts
       -- ^ All options used for this package.
@@ -470,9 +380,12 @@ data ConfigCache = ConfigCache
     , configCacheHaddock :: !Bool
       -- ^ Are haddocks to be built?
     }
-    deriving (Generic,Eq,Show)
+    deriving (Generic, Eq, Show, Data, Typeable)
 instance Store ConfigCache
 instance NFData ConfigCache
+
+configCacheVC :: VersionConfig ConfigCache
+configCacheVC = storeVersionConfig "config-v1" "NMEzMXpksE1h7STRzlQ2f6Glkjo="
 
 -- | A task to perform when building
 data Task = Task
@@ -693,7 +606,7 @@ data ConfigureOpts = ConfigureOpts
     -- if we can use an existing precompiled cache.
     , coNoDirs :: ![String]
     }
-    deriving (Show, Eq, Generic)
+    deriving (Show, Eq, Generic, Data, Typeable)
 instance Store ConfigureOpts
 instance NFData ConfigureOpts
 
@@ -706,14 +619,12 @@ data PrecompiledCache = PrecompiledCache
     , pcExes    :: ![FilePath]
     -- ^ Full paths to executables
     }
-    deriving (Show, Eq, Generic)
+    deriving (Show, Eq, Generic, Data, Typeable)
 instance Binary PrecompiledCache
 instance HasSemanticVersion PrecompiledCache
 instance HasStructuralInfo PrecompiledCache
 instance Store PrecompiledCache
 instance NFData PrecompiledCache
 
-$(mkManyHasTypeHash
-    [ [t| PrecompiledCache |]
-    , [t| ConfigCache |]
-    ])
+precompiledCacheVC :: VersionConfig PrecompiledCache
+precompiledCacheVC = storeVersionConfig "precompiled-v1" "eMzSOwaHJMamA5iNKs1A025frlQ="

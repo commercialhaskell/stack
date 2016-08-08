@@ -12,7 +12,10 @@ import qualified Data.Text as T
 import Data.Typeable (Typeable)
 import Distribution.Version (simplifyVersionRange)
 import Path
-import Stack.Types
+import Stack.Types.BuildPlan
+import Stack.Types.Version
+import Stack.Types.Config
+import Stack.Types.Docker
 
 -- | Interprets DockerOptsMonoid options.
 dockerOptsFromMonoid

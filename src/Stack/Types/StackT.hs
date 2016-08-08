@@ -54,6 +54,7 @@ import           Stack.Types.Internal
 import           Stack.Types.Config (GlobalOpts (..))
 import           System.IO
 import           System.Log.FastLogger
+import           System.Console.ANSI (hSupportsANSI)
 
 #ifndef MIN_VERSION_time
 #define MIN_VERSION_time(x, y, z) 0
@@ -99,13 +100,14 @@ runStackTGlobal manager config GlobalOpts{..} =
 runStackT :: (MonadIO m)
           => Manager -> LogLevel -> config -> Bool -> Bool -> StackT config m a -> m a
 runStackT manager logLevel config terminal reExec m = do
+    ansiTerminal <- liftIO $ hSupportsANSI stderr
     canUseUnicode <- liftIO getCanUseUnicode
     withSticky
         terminal
         (\sticky ->
               runReaderT
                   (unStackT m)
-                  (Env config logLevel terminal reExec manager sticky canUseUnicode))
+                  (Env config logLevel terminal ansiTerminal reExec manager sticky canUseUnicode))
 
 -- | Taken from GHC: determine if we should use Unicode syntax
 getCanUseUnicode :: IO Bool
@@ -124,6 +126,7 @@ getCanUseUnicode = do
 data LoggingEnv = LoggingEnv
     { lenvLogLevel :: !LogLevel
     , lenvTerminal :: !Bool
+    , lenvAnsiTerminal :: !Bool
     , lenvReExec :: !Bool
     , lenvManager :: !Manager
     , lenvSticky :: !Sticky
@@ -163,6 +166,7 @@ instance HasHttpManager LoggingEnv where
 
 instance HasTerminal LoggingEnv where
     getTerminal = lenvTerminal
+    getAnsiTerminal = lenvAnsiTerminal
 
 instance HasReExec LoggingEnv where
     getReExec = lenvReExec
@@ -198,6 +202,7 @@ runStackLoggingTGlobal manager GlobalOpts{..} =
 runStackLoggingT :: MonadIO m
                  => Manager -> LogLevel -> Bool -> Bool -> StackLoggingT m a -> m a
 runStackLoggingT manager logLevel terminal reExec m = do
+    ansiTerminal <- liftIO $ hSupportsANSI stderr
     canUseUnicode <- liftIO getCanUseUnicode
     withSticky
         terminal
@@ -209,6 +214,7 @@ runStackLoggingT manager logLevel terminal reExec m = do
                   , lenvManager = manager
                   , lenvSticky = sticky
                   , lenvTerminal = terminal
+                  , lenvAnsiTerminal = ansiTerminal
                   , lenvReExec = reExec
                   , lenvSupportsUnicode = canUseUnicode
                   })
@@ -227,7 +233,7 @@ stickyLoggerFunc loc src level msg = do
     liftIO $ func loc src level msg
 
 getStickyLoggerFunc
-    :: (HasSticky r, HasLogLevel r, HasSupportsUnicode r, ToLogStr msg, MonadReader r m, MonadIO m)
+    :: (HasSticky r, HasLogLevel r, HasSupportsUnicode r, ToLogStr msg, MonadReader r m)
     => m (Loc -> LogSource -> LogLevel -> msg -> IO ())
 getStickyLoggerFunc = do
     sticky <- asks getSticky

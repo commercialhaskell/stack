@@ -38,7 +38,8 @@ import           Path
 import           Path.IO
 import           Stack.Package
 import           Stack.Sig.GPG
-import           Stack.Types
+import           Stack.Types.PackageIdentifier
+import           Stack.Types.Sig
 import qualified System.FilePath as FP
 
 -- | Sign a haskell package with the given url of the signature

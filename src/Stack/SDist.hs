@@ -55,7 +55,12 @@ import           Stack.Build.Source (loadSourceMap, getDefaultPackageConfig)
 import           Stack.Build.Target
 import           Stack.Constants
 import           Stack.Package
-import           Stack.Types
+import           Stack.Types.PackageIdentifier
+import           Stack.Types.PackageName
+import           Stack.Types.Version
+import           Stack.Types.Config
+import           Stack.Types.Build
+import           Stack.Types.Package
 import           Stack.Types.Internal
 import           System.Directory (getModificationTime, getPermissions)
 import qualified System.FilePath as FP

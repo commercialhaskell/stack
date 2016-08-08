@@ -2,7 +2,6 @@
 module Network.HTTP.Download.VerifiedSpec where
 
 import Crypto.Hash
-import Control.Monad (unless)
 import Control.Monad.IO.Class (MonadIO)
 import Control.Monad.Logger (LoggingT, runStdoutLoggingT)
 import Control.Monad.Trans.Reader
@@ -12,7 +11,7 @@ import Network.HTTP.Client.Conduit
 import Network.HTTP.Download.Verified
 import Path
 import Path.IO
-import Test.Hspec hiding (shouldNotBe, shouldNotReturn)
+import Test.Hspec
 
 -- TODO: share across test files
 withTempDir' :: (Path Abs Dir -> IO a) -> IO a
@@ -77,15 +76,6 @@ setup = do
 
 teardown :: T -> IO ()
 teardown _ = return ()
-
-shouldNotBe :: (Show a, Eq a) => a -> a -> Expectation
-actual `shouldNotBe` expected =
-    unless (actual /= expected) (expectationFailure msg)
-  where
-    msg = "Value was exactly what it shouldn't be: " ++ show expected
-
-shouldNotReturn :: (Show a, Eq a) => IO a -> a -> Expectation
-action `shouldNotReturn` unexpected = action >>= (`shouldNotBe` unexpected)
 
 spec :: Spec
 spec = beforeAll setup $ afterAll teardown $ do

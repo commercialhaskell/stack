@@ -37,7 +37,12 @@ import           Path.Extra (toFilePathNoTrailingSep)
 import           Path.IO
 import           Prelude hiding (FilePath)
 import           Stack.Constants
-import           Stack.Types
+import           Stack.Types.Build
+import           Stack.Types.GhcPkgId
+import           Stack.Types.PackageIdentifier
+import           Stack.Types.Compiler
+import           Stack.Types.PackageName
+import           Stack.Types.Version
 import           System.FilePath (searchPathSeparator)
 import           System.Process.Read
 

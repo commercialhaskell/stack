@@ -7,6 +7,11 @@ resolver: lts-2.22
 #     - base: "fpco/stack-base" # see ./etc/docker/stack-base/Dockerfile
 #       name: "fpco/stack-test"
 extra-deps:
+- hspec-2.2.3
+- hspec-core-2.2.3
+- hspec-discover-2.2.3
+- hspec-expectations-0.7.2
+- hspec-smallcheck-0.4.1
 - path-0.5.8
 - path-io-1.1.0
 - directory-1.2.2.0
@@ -55,13 +60,17 @@ extra-deps:
 - http-api-data-0.2.2
 - time-locale-compat-0.1.1.1
 - persistent-2.5
-- store-0.1.0.1
+- store-0.2.1.0
+- store-core-0.2.0.0
 - th-reify-many-0.1.6
 - th-lift-instances-0.1.7
-- th-utilities-0.1.1.0
+- th-utilities-0.2.0.1
 - th-orphans-0.13.1
 - base-orphans-0.5.4
 - tar-0.5.0.3
+- unicode-transforms-0.1.0.1
+- clock-0.7.2
+- annotated-wl-pprint-0.7.0
 flags:
   time-locale-compat:
     old-locale: false

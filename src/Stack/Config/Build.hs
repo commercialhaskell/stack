@@ -4,7 +4,7 @@
 module Stack.Config.Build where
 
 import           Data.Monoid.Extra
-import           Stack.Types
+import           Stack.Types.Config
 
 -- | Interprets BuildOptsMonoid options.
 buildOptsFromMonoid :: BuildOptsMonoid -> BuildOpts
