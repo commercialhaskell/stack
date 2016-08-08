@@ -53,6 +53,7 @@ import           Stack.BuildPlan
 import           Stack.Package
 import           Stack.PackageDump
 import           Stack.PackageIndex
+import           Stack.PrettyPrint
 import           Stack.Types.Build
 import           Stack.Types.Config
 import           Stack.Types.FlagName
@@ -62,7 +63,6 @@ import           Stack.Types.Package
 import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageName
 import           Stack.Types.Version
-import           Text.PrettyPrint.Leijen.Extended
 
 data PackageInfo
     = PIOnlyInstalled InstallLocation Installed
@@ -192,7 +192,7 @@ constructPlan mbp0 baseConfigOpts0 locals extraToBuild0 localDumpPkgs loadPackag
                         else Map.empty
                 }
         else do
-            $displayError $ pprintExceptions errs (bcStackYaml (getBuildConfig econfig)) parents (wantedLocalPackages locals)
+            $prettyError $ pprintExceptions errs (bcStackYaml (getBuildConfig econfig)) parents (wantedLocalPackages locals)
             throwM $ ConstructPlanFailed "Plan construction failed."
   where
     ctx econfig getVersions0 lf = Ctx
@@ -758,8 +758,7 @@ pprintExceptions exceptions stackYaml parentMap wanted =
         vsep (map pprintExtra (Map.toList extras)) <>
         line <>
         line <>
-        "You may also want to try the 'stack solver' command" <> line <> line <>
-        fromString (show parentMap)
+        "You may also want to try the 'stack solver' command"
   where
     exceptions' = nub exceptions
 
@@ -775,7 +774,7 @@ pprintExceptions exceptions stackYaml parentMap wanted =
     pprintExtra (name, version) =
       fromString (concat ["- ", packageNameString name, "-", versionString version])
 
-    pprintException (DependencyCycleDetected pNames) = Just $ dullred $
+    pprintException (DependencyCycleDetected pNames) = Just $ errorRed $
         "Dependency cycle detected in packages:" <> line <>
         indent 4 (encloseSep "[" "]" "," (map (fromString . packageNameString) pNames))
     pprintException (DependencyPlanFailures pkg (Map.toList -> pDeps)) =
@@ -787,16 +786,15 @@ pprintExceptions exceptions stackYaml parentMap wanted =
                 indent 4 (vsep depErrors) <>
                 case getShortestDepsPath parentMap wanted (packageName pkg) of
                     [] -> mempty
-                    [target,_] -> line <> "needed since" <+> pkgTarget target <+> "is a build target."
+                    [target,_] -> line <> "needed since" <+> displayTargetPkgId target <+> "is a build target."
                     (target:path) -> line <> "needed due to " <> encloseSep "" "" " -> " pathElems
                       where
                         pathElems =
-                            [pkgTarget target] ++
-                            map (fromString . packageIdentifierString) path ++
+                            [displayTargetPkgId target] ++
+                            map display path ++
                             [pkgIdent]
               where
-                pkgIdent = yellow (fromString (packageIdentifierString (packageIdentifier pkg)))
-                pkgTarget = cyan . fromString . packageIdentifierString
+                pkgIdent = displayCurrentPkgId (packageIdentifier pkg)
         -- TODO: optionally show these?
     -- Skip these because they are redundant with 'NotInBuildPlan' info.
     pprintException (UnknownPackage _) = Nothing
@@ -809,28 +807,22 @@ pprintExceptions exceptions stackYaml parentMap wanted =
 
     pprintDep (name, (range, mlatestApplicable, badDep)) = case badDep of
         NotInBuildPlan -> Just $
-            dullred pkgName <+>
+            errorRed (display name) <+>
             align ("must match" <+> goodRange <> "," <> softline <>
                    "but the stack configuration has no specified version" <>
                    latestApplicable Nothing)
         -- TODO: For local packages, suggest editing constraints
         DependencyMismatch version -> Just $
-            dullred (pkgIdent version) <+>
+            displayErrorPkgId (PackageIdentifier name version) <+>
             align ("must match" <+> goodRange <>
                    latestApplicable (Just version))
-        --
         -- I think the main useful info is these explain why missing
         -- packages are needed. Instead lets give the user the shortest
         -- path from a target to the package.
         Couldn'tResolveItsDependencies _version ->
             Nothing
-            -- yellow (pkgIdent version <> ":") <+>
-            -- align ("couldn't resolve its dependencies" <>
-            --        latestApplicable (Just version))
       where
-        goodRange = green (fromString (Cabal.display range))
-        pkgName = fromString (packageNameString name)
-        pkgIdent version = fromString $ packageIdentifierString (PackageIdentifier name version)
+        goodRange = goodGreen (fromString (Cabal.display range))
         latestApplicable mversion =
             case mlatestApplicable of
                 Nothing -> ""
@@ -838,7 +830,7 @@ pprintExceptions exceptions stackYaml parentMap wanted =
                     | mlatestApplicable == mversion -> softline <>
                         "(latest applicable is specified)"
                     | otherwise -> softline <>
-                        "(latest applicable is " <> green (fromString (versionString la)) <> ")"
+                        "(latest applicable is " <> goodGreen (display la) <> ")"
 
 -- | Get the shortest reason for the package to be in the build plan. In
 -- other words, trace the parent dependencies back to a 'wanted'

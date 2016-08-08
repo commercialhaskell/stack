@@ -20,21 +20,21 @@ module Text.PrettyPrint.Leijen.Extended
   -- * Pretty-print typeclass
   Display(..),
 
-  -- * Logging based on pretty-print typeclass
-  debug, info, warn, displayError,
-
   -- * Ansi terminal Doc
   --
   -- See "System.Console.ANSI" for 'SGR' values to use beyond the colors
   -- provided.
   AnsiDoc, AnsiAnn(..), HasAnsiAnn(..),
-  hDisplayAnsi, displayAnsi, displayPlain,
+  hDisplayAnsi, displayAnsi, displayPlain, renderDefault,
 
   -- ** Color combinators
   black, red, green, yellow, blue, magenta, cyan, white,
   dullblack, dullred, dullgreen, dullyellow, dullblue, dullmagenta, dullcyan, dullwhite,
   onblack, onred, ongreen, onyellow, onblue, onmagenta, oncyan, onwhite,
   ondullblack, ondullred, ondullgreen, ondullyellow, ondullblue, ondullmagenta, ondullcyan, ondullwhite,
+
+  -- ** Intensity combinators
+  bold, faint, normal,
 
   -- * Selective re-exports from "Text.PrettyPrint.Annotated.Leijen"
   --
@@ -117,7 +117,6 @@ module Text.PrettyPrint.Leijen.Extended
   -- @
   ) where
 
-import Control.Monad.Logger
 import Control.Monad.Reader
 import Data.Either (partitionEithers)
 import qualified Data.Map.Strict as M
@@ -128,10 +127,7 @@ import qualified Data.Text as T
 import qualified Data.Text.IO as T
 import qualified Data.Text.Lazy as LT
 import qualified Data.Text.Lazy.Builder as LTB
-import Language.Haskell.TH
-import Path
-import Stack.Types.Internal
-import System.Console.ANSI (Color(..), ColorIntensity(..), ConsoleLayer(..), SGR(..), setSGRCode, hSupportsANSI)
+import System.Console.ANSI (Color(..), ColorIntensity(..), ConsoleLayer(..), ConsoleIntensity(..), SGR(..), setSGRCode, hSupportsANSI)
 import System.IO (Handle)
 import qualified Text.PrettyPrint.Annotated.Leijen as P
 import Text.PrettyPrint.Annotated.Leijen hiding ((<>), display)
@@ -153,54 +149,15 @@ instance Monoid (Doc a) where
 
 class Display a where
     type Ann a
-    type Ann a = ()
+    type Ann a = AnsiAnn
     display :: a -> Doc (Ann a)
     default display :: Show a => a -> Doc (Ann a)
     display = fromString . show
-
-instance Display (Path b t)
 
 instance Display (Doc a) where
     type Ann (Doc a) = a
     display = id
 
-displayPlain :: Display a => a -> T.Text
-displayPlain = LT.toStrict . displayAnsiSimple . renderDefault . fmap (\_ -> mempty) . display
-
--- TODO: tweak these settings more?
--- TODO: options for settings if this is released as a lib
-
-renderDefault :: Doc a -> SimpleDoc a
-renderDefault = renderPretty 1 120
-
--- TODO: switch to using implicit callstacks once 7.8 support is dropped
-
-debug :: Q Exp
-debug = do
-    loc <- location
-    [e| monadLoggerLog loc "" LevelDebug <=< displayAnsiIfPossible |]
-
-info :: Q Exp
-info = do
-    loc <- location
-    [e| monadLoggerLog loc "" LevelInfo <=< displayAnsiIfPossible |]
-
-warn :: Q Exp
-warn = do
-    loc <- location
-    [e| monadLoggerLog loc "" LevelWarn <=< displayAnsiIfPossible |]
-
-displayError :: Q Exp
-displayError = do
-    loc <- location
-    [e| monadLoggerLog loc "" LevelError <=< displayAnsiIfPossible |]
-
-displayAnsiIfPossible
-    :: (HasTerminal env, MonadReader env m, Display a, HasAnsiAnn (Ann a))
-    => a -> m T.Text
-displayAnsiIfPossible x = do
-    useAnsi <- asks getAnsiTerminal
-    return $ if useAnsi then displayAnsi x else displayPlain x
 
 --------------------------------------------------------------------------------
 -- Ansi Doc
@@ -221,6 +178,15 @@ instance HasAnsiAnn AnsiAnn where
 
 instance HasAnsiAnn () where
     getAnsiAnn _ = mempty
+
+displayPlain :: Display a => a -> T.Text
+displayPlain = LT.toStrict . displayAnsiSimple . renderDefault . fmap (\_ -> mempty) . display
+
+-- TODO: tweak these settings more?
+-- TODO: options for settings if this is released as a lib
+
+renderDefault :: Doc a -> SimpleDoc a
+renderDefault = renderPretty 1 120
 
 displayAnsi :: (Display a, HasAnsiAnn (Ann a)) => a -> T.Text
 displayAnsi = LT.toStrict . displayAnsiSimple . renderDefault . toAnsiDoc . display
@@ -314,6 +280,13 @@ colorFunctions color =
 ansiAnn :: [SGR] -> Doc AnsiAnn -> Doc AnsiAnn
 ansiAnn = annotate . AnsiAnn
 
+-- Intensity combinators
+
+bold, faint, normal :: Doc AnsiAnn -> Doc AnsiAnn
+bold = ansiAnn [SetConsoleIntensity BoldIntensity]
+faint = ansiAnn [SetConsoleIntensity FaintIntensity]
+normal = ansiAnn [SetConsoleIntensity NormalIntensity]
+
 -- | Tags for each field of state in SGR (Select Graphics Rendition).
 --
 -- It's a bit of a hack that 'TagReset' is included.
@@ -339,40 +312,3 @@ getSGRTag SetVisible{}                  = TagVisible
 getSGRTag SetSwapForegroundBackground{} = TagSwapForegroundBackground
 getSGRTag (SetColor Foreground _ _)     = TagColorForeground
 getSGRTag (SetColor Background _ _)     = TagColorBackground
-
--- Probably overkill. Doesn't work well due to variadic + monad poly
-
-{-
-class LogDisplay ann t where
-    logDisplay :: Loc -> LogSource -> LogLevel -> ([Doc ann] -> [Doc ann]) -> t
-
-instance (LogDisplay ann t, Display a, ann ~ Ann a) => LogDisplay ann (a -> t) where
-    logDisplay loc src lvl f x = logDisplay loc src lvl (f . (display x:))
-
-instance (MonadLogger m, MonadReader env m, HasTerminal env, HasAnsiAnn ann, a ~ ()) => LogDisplay ann (m a) where
-    logDisplay loc src lvl f = do
-        useAnsi <- asks getAnsiTerminal
-        let result = hsep (f [])
-            output = if useAnsi then displayAnsi result else displayPlain result
-        monadLoggerLog loc src lvl output
-
-debug :: Q Exp
-debug = do
-    loc <- location
-    [e| logDisplay loc "" LevelDebug id |]
-
-info :: Q Exp
-info = do
-    loc <- location
-    [e| logDisplay loc "" LevelInfo id |]
-
-warn :: Q Exp
-warn = do
-    loc <- location
-    [e| logDisplay loc "" LevelInfo id |]
-
-displayError :: Q Exp
-displayError = do
-    loc <- location
-    [e| logDisplay loc "" LevelInfo id |]
--}

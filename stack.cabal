@@ -112,6 +112,7 @@ library
                      Stack.PackageDump
                      Stack.PackageIndex
                      Stack.Path
+                     Stack.PrettyPrint
                      Stack.Runners
                      Stack.SDist
                      Stack.Setup
