@@ -9,7 +9,6 @@ import qualified Data.ByteString.Lazy as LBS
 import qualified Data.Map as M
 import qualified Data.Set as S
 import           Data.Text (Text)
-import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import           Distribution.ModuleName
 import           Stack.Types.Package
@@ -26,19 +25,6 @@ spec :: Spec
 spec = do
   describe "GHCi" $ do
     describe "Script rendering" $ do
-      describe "should render legacy GHCi scripts" $ do
-        it "should render legacy script when given project:exe" $ do
-          renderLegacyGhciScript [] (Just $(mkAbsFile "/Users/someone/src/project-a/exe/Main.hs"))
-            `shouldBe` T.unpack ghciLegacyScript_projectWithMain
-
-        it "should render legacy script when given project" $ do
-          renderLegacyGhciScript ["Lib.A"] (Just $(mkAbsFile "/Users/someone/src/project-a/exe/Main.hs"))
-            `shouldBe` T.unpack ghciLegacyScript_projectWithLibAndMain
-
-        it "should render legacy script when given multiple project:lib" $ do
-          renderLegacyGhciScript ["Lib.A", "Lib.B"] Nothing
-            `shouldBe` T.unpack ghciLegacyScript_multipleProjectsWithLib
-
       describe "should render GHCi scripts" $ do
         it "with one library package" $ do
           let res = scriptToLazyByteString $ renderScriptGhci packages_singlePackage Nothing

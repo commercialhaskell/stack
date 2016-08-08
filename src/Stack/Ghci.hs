@@ -16,7 +16,6 @@ module Stack.Ghci
     , ghci
 
     -- TODO: Address what should and should not be exported.
-    , renderLegacyGhciScript
     , renderScriptGhci
     , renderScriptIntero
     ) where
@@ -35,7 +34,6 @@ import           Data.Either
 import           Data.Function
 import           Data.List
 import           Data.List.Extra (nubOrd)
-import           Data.List.Split (splitOn)
 import           Data.Map.Strict (Map)
 import qualified Data.Map.Strict as M
 import           Data.Maybe
@@ -64,7 +62,6 @@ import           Stack.Ghci.Script
 import           Stack.Package
 import           Stack.Types
 import           Stack.Types.Internal
-import           System.FilePath (takeBaseName)
 import           Text.Read (readMaybe)
 
 #ifndef WINDOWS
@@ -142,25 +139,8 @@ ghci opts@GhciOpts{..} = do
         $logWarn
             ("The following GHC options are incompatible with GHCi and have not been passed to it: " <>
              T.unwords (map T.pack (nubOrd omittedOpts)))
-    allModules <- checkForDuplicateModules ghciNoLoadModules pkgs
+    mainFile <- figureOutMainFile bopts mainIsTargets targets pkgs
     oiDir <- objectInterfaceDir bconfig
-    (modulesToLoad, mainFile) <- if ghciNoLoadModules then return ([], Nothing) else do
-        mmainFile <- figureOutMainFile bopts mainIsTargets targets pkgs
-        modulesToLoad <- case mmainFile of
-            Just mainFile -> do
-                let (_, mfDirs, mfName) = filePathPieces mainFile
-                    mainPathPieces = map toFilePath mfDirs ++ [takeBaseName (toFilePath mfName)]
-                liftM catMaybes $ forM allModules $ \mn -> do
-                    let matchesModule = splitOn "." mn `isSuffixOf` mainPathPieces
-                    if matchesModule
-                        then do
-                            $logWarn $ "Warning: Omitting load of module " <> T.pack mn <>
-                               ", because it matches the filepath of the Main target, " <>
-                               T.pack (toFilePath mainFile)
-                            return Nothing
-                        else return (Just mn)
-            Nothing -> return allModules
-        return (modulesToLoad, mmainFile)
     let odir =
             [ "-odir=" <> toFilePathNoTrailingSep oiDir
             , "-hidir=" <> toFilePathNoTrailingSep oiDir ]
@@ -182,6 +162,7 @@ ghci opts@GhciOpts{..} = do
       if ghciNoLoadModules
           then execGhci macrosOptions
           else do
+              checkForDuplicateModules pkgs
               scriptPath <- writeGhciScript tmpDirectory (renderScriptGhci pkgs mainFile)
               execGhci (macrosOptions ++ ["-ghci-script=" <> toFilePath scriptPath])
 
@@ -200,17 +181,6 @@ writeGhciScript tmpDirectory script = do
   where
     scriptPath = tmpDirectory </> $(mkRelFile "ghci-script")
     scriptFilePath = toFilePath scriptPath
-
-renderLegacyGhciScript :: [String] -> Maybe (Path b t) -> String
-renderLegacyGhciScript modulesToLoad mainFile =
-    let loadModules = ":add" <> case unwords (map quoteFileName modulesToLoad) of
-                                  [] -> ""
-                                  xs -> " " <> xs
-        addMainFile = maybe "" ((":add " <>) . quoteFileName . toFilePath) mainFile
-        bringIntoScope = ":module +" <> case unwords modulesToLoad of
-                                          [] -> ""
-                                          xs -> " " <> xs
-    in unlines [loadModules,addMainFile,bringIntoScope]
 
 findOwningPackageForMain :: [GhciPkgInfo] -> Path Abs File -> Maybe GhciPkgInfo
 findOwningPackageForMain pkgs mainFile =
@@ -554,15 +524,14 @@ borderedWarning f = do
     $logWarn ""
     return x
 
-checkForDuplicateModules :: (MonadThrow m, MonadLogger m) => Bool -> [GhciPkgInfo] -> m [String]
-checkForDuplicateModules noLoadModules pkgs = do
+checkForDuplicateModules :: (MonadThrow m, MonadLogger m) => [GhciPkgInfo] -> m ()
+checkForDuplicateModules pkgs = do
     unless (null duplicates) $ do
         borderedWarning $ do
             $logWarn "The following modules are present in multiple packages:"
             forM_ duplicates $ \(mn, pns) -> do
                 $logWarn (" * " <> T.pack mn <> " (in " <> T.intercalate ", " (map packageNameText pns) <> ")")
-        unless noLoadModules $ throwM LoadingDuplicateModules
-    return (map fst allModules)
+        throwM LoadingDuplicateModules
   where
     duplicates, allModules :: [(String, [PackageName])]
     duplicates = filter (not . null . tail . snd) allModules
@@ -635,13 +604,6 @@ setScriptPerms fp = do
         ]
 #endif
 
-filePathPieces :: Path Abs File -> (Path Abs Dir, [Path Rel Dir], Path Rel File)
-filePathPieces x0 = go (parent x0, [], filename x0)
-  where
-    go (x, dirs, fp)
-        | parent x == x = (x, dirs, fp)
-        | otherwise = (parent x, dirname x : dirs, fp)
-
 {- Copied from Stack.Ide, may be useful in the future
 
 -- | Get options and target files for the given package info.
@@ -683,10 +645,3 @@ targetsCmd target go@GlobalOpts{..} =
                (mapM (getPackageOptsAndTargetFiles pwd) pkgs)
        forM_ targets (liftIO . putStrLn)
 -}
-
--- | Make sure that a filename with spaces in it gets the proper quotes.
-quoteFileName :: String -> String
-quoteFileName x =
-    if any (==' ') x
-        then show x
-        else x

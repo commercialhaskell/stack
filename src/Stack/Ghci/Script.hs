@@ -82,21 +82,28 @@ commandToBuilder (Add modules)
   | otherwise      =
        fromText ":add "
     <> (mconcat $ intersperse (fromText " ")
-        $ fmap (stringUtf8 . mconcat . intersperse "." . components)
+        $ fmap (stringUtf8 . quoteFileName . mconcat . intersperse "." . components)
         $ S.toAscList modules)
     <> fromText "\n"
 
 commandToBuilder (AddFile path) =
-  fromText ":add " <> stringUtf8 (toFilePath path) <> fromText "\n"
+  fromText ":add " <> stringUtf8 (quoteFileName (toFilePath path)) <> fromText "\n"
 
 commandToBuilder (CdGhc path) =
-  fromText ":cd-ghc " <> stringUtf8 (toFilePath path) <> fromText "\n"
+  fromText ":cd-ghc " <> stringUtf8 (quoteFileName (toFilePath path)) <> fromText "\n"
 
 commandToBuilder (Module modules)
   | S.null modules = fromText ":module +\n"
   | otherwise      =
        fromText ":module + "
     <> (mconcat $ intersperse (fromText " ")
-        $ fmap (stringUtf8 . mconcat . intersperse "." . components)
+        $ fmap (stringUtf8 . quoteFileName . mconcat . intersperse "." . components)
         $ S.toAscList modules)
     <> fromText "\n"
+
+-- | Make sure that a filename with spaces in it gets the proper quotes.
+quoteFileName :: String -> String
+quoteFileName x =
+    if any (==' ') x
+        then show x
+        else x
