@@ -82,8 +82,8 @@ execSpawn menv cmd0 args = do
 execObserve :: (MonadIO m, MonadLogger m, MonadBaseControl IO m)
     => EnvOverride -> String -> [String] -> m String
 execObserve menv cmd0 args = do
-    $logProcessRun cmd0 args
-    e <- try (callProcessObserveStdout (Cmd Nothing cmd0 menv args))
+    e <- $withProcessTimeLog cmd0 args $
+        try (callProcessObserveStdout (Cmd Nothing cmd0 menv args))
     case e of
         Left (ProcessExitedUnsuccessfully _ ec) -> liftIO $ exitWith ec
         Right s -> return s
