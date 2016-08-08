@@ -156,6 +156,12 @@ ghci opts@GhciOpts{..} = do
                  -- include CWD.
                   "-i" :
                   odir <> pkgopts <> ghciArgs <> extras)
+        interrogateExeForRenderFunction = do
+            menv <- liftIO $ configEnvOverride config defaultEnvSettings
+            output <- execObserve menv (fromMaybe (compilerExeName wc) ghciGhcCommand) ["--version"]
+            if "Intero" `isPrefixOf` output
+                then return renderScriptIntero
+                else return renderScriptGhci
 
     withSystemTempDir "ghci" $ \tmpDirectory -> do
       macrosOptions <- writeMacrosFile tmpDirectory pkgs
@@ -163,7 +169,8 @@ ghci opts@GhciOpts{..} = do
           then execGhci macrosOptions
           else do
               checkForDuplicateModules pkgs
-              scriptPath <- writeGhciScript tmpDirectory (renderScriptGhci pkgs mainFile)
+              renderFn <- interrogateExeForRenderFunction
+              scriptPath <- writeGhciScript tmpDirectory (renderFn pkgs mainFile)
               execGhci (macrosOptions ++ ["-ghci-script=" <> toFilePath scriptPath])
 
 writeMacrosFile :: (MonadIO m) => Path Abs Dir -> [GhciPkgInfo] -> m [String]

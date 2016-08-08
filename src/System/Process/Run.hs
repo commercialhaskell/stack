@@ -14,6 +14,7 @@ module System.Process.Run
     ,callProcess
     ,callProcess'
     ,callProcessInheritStderrStdout
+    ,callProcessObserveStdout
     ,createProcess'
     ,ProcessExitedUnsuccessfully
     ,Cmd(..)
@@ -111,6 +112,20 @@ callProcessInheritStderrStdout :: (MonadIO m, MonadLogger m) => Cmd -> m ()
 callProcessInheritStderrStdout cmd = do
     let inheritOutput cp = cp { std_in = CreatePipe, std_out = Inherit, std_err = Inherit }
     callProcess' inheritOutput cmd
+
+callProcessObserveStdout :: (MonadIO m, MonadLogger m) => Cmd -> m String
+callProcessObserveStdout cmd = do
+    c <- liftM modCP (cmdToCreateProcess cmd)
+    $logCreateProcess c
+    liftIO $ do
+        (_, Just hStdout, _, p) <- System.Process.createProcess c
+        hSetBuffering hStdout NoBuffering
+        exit_code <- waitForProcess p
+        case exit_code of
+            ExitSuccess   -> hGetLine hStdout
+            ExitFailure _ -> throwIO (ProcessExitedUnsuccessfully c exit_code)
+  where
+    modCP c = c { std_in = CreatePipe, std_out = CreatePipe, std_err = Inherit }
 
 -- | Like 'System.Process.Internal.createProcess_', but taking a 'Cmd'.
 -- Note that the 'Handle's provided by 'UseHandle' are not closed
