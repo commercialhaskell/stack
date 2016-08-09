@@ -71,6 +71,7 @@ extra-deps:
 - unicode-transforms-0.1.0.1
 - clock-0.7.2
 - annotated-wl-pprint-0.7.0
+- neat-interpolation-0.3.2
 flags:
   time-locale-compat:
     old-locale: false
