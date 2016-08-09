@@ -50,7 +50,6 @@ import           Data.Conduit
 import qualified Data.Conduit.Binary as CB
 import qualified Data.Conduit.List as CL
 import           Data.Conduit.Process hiding (callProcess)
-import           Data.Foldable (forM_)
 import           Data.IORef
 import           Data.Map (Map)
 import qualified Data.Map as Map
