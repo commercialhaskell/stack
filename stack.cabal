@@ -101,6 +101,7 @@ library
                      Stack.FileWatch
                      Stack.GhcPkg
                      Stack.Ghci
+                     Stack.Ghci.Script
                      Stack.Hoogle
                      Stack.IDE
                      Stack.Image
@@ -297,6 +298,8 @@ test-suite stack-test
                 , Stack.Build.TargetSpec
                 , Stack.ConfigSpec
                 , Stack.DotSpec
+                , Stack.GhciSpec
+                , Stack.Ghci.ScriptSpec
                 , Stack.PackageDumpSpec
                 , Stack.ArgsSpec
                 , Stack.NixSpec
@@ -319,6 +322,7 @@ test-suite stack-test
                 , hspec >= 2.2 && <2.3
                 , http-conduit
                 , monad-logger
+                , neat-interpolation
                 , path >= 0.5.7
                 , path-io >= 1.1.0 && < 2.0.0
                 , resourcet

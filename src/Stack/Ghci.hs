@@ -14,6 +14,10 @@ module Stack.Ghci
     , GhciException(..)
     , ghciSetup
     , ghci
+
+    -- TODO: Address what should and should not be exported.
+    , renderScriptGhci
+    , renderScriptIntero
     ) where
 
 import           Control.Applicative
@@ -30,7 +34,6 @@ import           Data.Either
 import           Data.Function
 import           Data.List
 import           Data.List.Extra (nubOrd)
-import           Data.List.Split (splitOn)
 import           Data.Map.Strict (Map)
 import qualified Data.Map.Strict as M
 import           Data.Maybe
@@ -42,7 +45,6 @@ import           Data.Traversable (forM)
 import           Data.Text (Text)
 import qualified Data.Text as T
 import           Data.Typeable (Typeable)
-import           Distribution.ModuleName (ModuleName)
 import           Distribution.PackageDescription (updatePackageDescription)
 import           Distribution.Text (display)
 import           Network.HTTP.Client.Conduit
@@ -56,6 +58,7 @@ import           Stack.Build.Source
 import           Stack.Build.Target
 import           Stack.Constants
 import           Stack.Exec
+import           Stack.Ghci.Script
 import           Stack.Package
 import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageName
@@ -64,7 +67,6 @@ import           Stack.Types.Build
 import           Stack.Types.Package
 import           Stack.Types.Compiler
 import           Stack.Types.Internal
-import           System.FilePath (takeBaseName)
 import           Text.Read (readMaybe)
 
 #ifndef WINDOWS
@@ -142,25 +144,8 @@ ghci opts@GhciOpts{..} = do
         $logWarn
             ("The following GHC options are incompatible with GHCi and have not been passed to it: " <>
              T.unwords (map T.pack (nubOrd omittedOpts)))
-    allModules <- checkForDuplicateModules ghciNoLoadModules pkgs
+    mainFile <- figureOutMainFile bopts mainIsTargets targets pkgs
     oiDir <- objectInterfaceDir bconfig
-    (modulesToLoad, mainFile) <- if ghciNoLoadModules then return ([], Nothing) else do
-        mmainFile <- figureOutMainFile bopts mainIsTargets targets pkgs
-        modulesToLoad <- case mmainFile of
-            Just mainFile -> do
-                let (_, mfDirs, mfName) = filePathPieces mainFile
-                    mainPathPieces = map toFilePath mfDirs ++ [takeBaseName (toFilePath mfName)]
-                liftM catMaybes $ forM allModules $ \mn -> do
-                    let matchesModule = splitOn "." mn `isSuffixOf` mainPathPieces
-                    if matchesModule
-                        then do
-                            $logWarn $ "Warning: Omitting load of module " <> T.pack mn <>
-                               ", because it matches the filepath of the Main target, " <>
-                               T.pack (toFilePath mainFile)
-                            return Nothing
-                        else return (Just mn)
-            Nothing -> return allModules
-        return (modulesToLoad, mmainFile)
     let odir =
             [ "-odir=" <> toFilePathNoTrailingSep oiDir
             , "-hidir=" <> toFilePathNoTrailingSep oiDir ]
@@ -176,20 +161,68 @@ ghci opts@GhciOpts{..} = do
                  -- include CWD.
                   "-i" :
                   odir <> pkgopts <> ghciArgs <> extras)
-    withSystemTempDir "ghci" $ \tmpDir -> do
-        let macrosFile = tmpDir </> $(mkRelFile "cabal_macros.h")
-        macrosOpts <- preprocessCabalMacros pkgs macrosFile
-        if ghciNoLoadModules
-            then execGhci macrosOpts
-            else do
-                let scriptPath = tmpDir </> $(mkRelFile "ghci-script")
-                    fp = toFilePath scriptPath
-                    loadModules = ":add " <> unwords (map quoteFileName modulesToLoad)
-                    addMainFile = maybe "" ((":add " <>) . quoteFileName . toFilePath) mainFile
-                    bringIntoScope = ":module + " <> unwords modulesToLoad
-                liftIO (writeFile fp (unlines [loadModules,addMainFile,bringIntoScope]))
-                setScriptPerms fp
-                execGhci (macrosOpts ++ ["-ghci-script=" <> fp])
+        interrogateExeForRenderFunction = do
+            menv <- liftIO $ configEnvOverride config defaultEnvSettings
+            output <- execObserve menv (fromMaybe (compilerExeName wc) ghciGhcCommand) ["--version"]
+            if "Intero" `isPrefixOf` output
+                then return renderScriptIntero
+                else return renderScriptGhci
+
+    withSystemTempDir "ghci" $ \tmpDirectory -> do
+      macrosOptions <- writeMacrosFile tmpDirectory pkgs
+      if ghciNoLoadModules
+          then execGhci macrosOptions
+          else do
+              checkForDuplicateModules pkgs
+              renderFn <- interrogateExeForRenderFunction
+              scriptPath <- writeGhciScript tmpDirectory (renderFn pkgs mainFile)
+              execGhci (macrosOptions ++ ["-ghci-script=" <> toFilePath scriptPath])
+
+writeMacrosFile :: (MonadIO m) => Path Abs Dir -> [GhciPkgInfo] -> m [String]
+writeMacrosFile tmpDirectory packages = do
+  macrosOptions <- preprocessCabalMacros packages macrosFile
+  return macrosOptions
+  where
+    macrosFile = tmpDirectory </> $(mkRelFile "cabal_macros.h")
+
+writeGhciScript :: (MonadIO m) => Path Abs Dir -> GhciScript -> m (Path Abs File)
+writeGhciScript tmpDirectory script = do
+  liftIO $ scriptToFile scriptPath script
+  setScriptPerms scriptFilePath
+  return scriptPath
+  where
+    scriptPath = tmpDirectory </> $(mkRelFile "ghci-script")
+    scriptFilePath = toFilePath scriptPath
+
+findOwningPackageForMain :: [GhciPkgInfo] -> Path Abs File -> Maybe GhciPkgInfo
+findOwningPackageForMain pkgs mainFile =
+  find (\pkg -> toFilePath (ghciPkgDir pkg) `isPrefixOf` toFilePath mainFile) pkgs
+
+renderScriptGhci :: [GhciPkgInfo] -> Maybe (Path Abs File) -> GhciScript
+renderScriptGhci pkgs mainFile =
+  let addPhase    = mconcat $ fmap renderPkg pkgs
+      mainPhase   = case mainFile of
+                      Just path -> cmdAddFile path
+                      Nothing   -> mempty
+      modulePhase = cmdModule $ foldl' S.union S.empty (fmap ghciPkgModules pkgs)
+   in addPhase <> mainPhase <> modulePhase
+  where
+    renderPkg pkg = cmdAdd (ghciPkgModules pkg)
+
+renderScriptIntero :: [GhciPkgInfo] -> Maybe (Path Abs File) -> GhciScript
+renderScriptIntero pkgs mainFile =
+  let addPhase    = mconcat $ fmap renderPkg pkgs
+      mainPhase   = case mainFile of
+                      Just path ->
+                        case findOwningPackageForMain pkgs path of
+                          Just mainPkg -> cmdCdGhc (ghciPkgDir mainPkg) <> cmdAddFile path
+                          Nothing      -> cmdAddFile path
+                      Nothing   -> mempty
+      modulePhase = cmdModule $ foldl' S.union S.empty (fmap ghciPkgModules pkgs)
+   in addPhase <> mainPhase <> modulePhase
+  where
+    renderPkg pkg = cmdCdGhc (ghciPkgDir pkg)
+                 <> cmdAdd (ghciPkgModules pkg)
 
 -- | Figure out the main-is file to load based on the targets. Sometimes there
 -- is none, sometimes it's unambiguous, sometimes it's
@@ -503,15 +536,14 @@ borderedWarning f = do
     $logWarn ""
     return x
 
-checkForDuplicateModules :: (MonadThrow m, MonadLogger m) => Bool -> [GhciPkgInfo] -> m [String]
-checkForDuplicateModules noLoadModules pkgs = do
+checkForDuplicateModules :: (MonadThrow m, MonadLogger m) => [GhciPkgInfo] -> m ()
+checkForDuplicateModules pkgs = do
     unless (null duplicates) $ do
         borderedWarning $ do
             $logWarn "The following modules are present in multiple packages:"
             forM_ duplicates $ \(mn, pns) -> do
                 $logWarn (" * " <> T.pack mn <> " (in " <> T.intercalate ", " (map packageNameText pns) <> ")")
-        unless noLoadModules $ throwM LoadingDuplicateModules
-    return (map fst allModules)
+        throwM LoadingDuplicateModules
   where
     duplicates, allModules :: [(String, [PackageName])]
     duplicates = filter (not . null . tail . snd) allModules
@@ -584,13 +616,6 @@ setScriptPerms fp = do
         ]
 #endif
 
-filePathPieces :: Path Abs File -> (Path Abs Dir, [Path Rel Dir], Path Rel File)
-filePathPieces x0 = go (parent x0, [], filename x0)
-  where
-    go (x, dirs, fp)
-        | parent x == x = (x, dirs, fp)
-        | otherwise = (parent x, dirname x : dirs, fp)
-
 {- Copied from Stack.Ide, may be useful in the future
 
 -- | Get options and target files for the given package info.
@@ -632,10 +657,3 @@ targetsCmd target go@GlobalOpts{..} =
                (mapM (getPackageOptsAndTargetFiles pwd) pkgs)
        forM_ targets (liftIO . putStrLn)
 -}
-
--- | Make sure that a filename with spaces in it gets the proper quotes.
-quoteFileName :: String -> String
-quoteFileName x =
-    if any (==' ') x
-        then show x
-        else x

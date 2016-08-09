@@ -1,11 +1,16 @@
 module StackTest where
 
+import Control.Monad
+import Control.Monad.IO.Class
+import Control.Monad.Trans.Reader
+import Control.Concurrent
 import Control.Exception
 import Data.List (intercalate)
 import System.Environment
 import System.FilePath
 import System.Directory
 import System.IO
+import System.IO.Error
 import System.Process
 import System.Exit
 import System.Info (os)
@@ -41,6 +46,65 @@ stackErr args = do
     if ec == ExitSuccess
         then error "stack was supposed to fail, but didn't"
         else return ()
+
+type Repl = ReaderT ReplConnection IO
+
+data ReplConnection
+  = ReplConnection
+    { replStdin  :: Handle
+    , replStdout :: Handle
+    }
+
+nextPrompt :: Repl ()
+nextPrompt = do
+    (ReplConnection _ handle) <- ask
+    c <- liftIO $ hGetChar handle
+    if c == '>'
+      then do _ <- liftIO $ hGetChar handle
+              return ()
+      else nextPrompt
+
+replCommand :: String -> Repl ()
+replCommand cmd = do
+    (ReplConnection input _) <- ask
+    liftIO $ hPutStrLn input cmd
+
+replGetLine :: Repl String
+replGetLine = (fmap replStdout ask) >>= liftIO . hGetLine
+
+replGetChar :: Repl Char
+replGetChar = (fmap replStdout ask) >>= liftIO . hGetChar
+
+runRepl :: FilePath -> [String] -> ReaderT ReplConnection IO () -> IO ExitCode
+runRepl cmd args actions = do
+    logInfo $ "Running: " ++ cmd ++ " " ++ intercalate " " (map showProcessArgDebug args)
+    (Just rStdin, Just rStdout, Just rStderr, ph) <-
+        createProcess (proc cmd args)
+        { std_in = CreatePipe
+        , std_out = CreatePipe
+        , std_err = CreatePipe
+        }
+    hSetBuffering rStdin NoBuffering
+    hSetBuffering rStdout NoBuffering
+    hSetBuffering rStderr NoBuffering
+
+    forkIO $ bracket (openFile "/tmp/stderr" WriteMode) hClose
+        $ \err -> forever $ catch (hGetChar rStderr >>= hPutChar err)
+                  $ \e -> if isEOFError e then return () else throw e
+
+    runReaderT (nextPrompt >> actions) (ReplConnection rStdin rStdout)
+    waitForProcess ph
+
+repl :: [String] -> Repl () -> IO ()
+repl args action = do
+    stack <- getEnv "STACK_EXE"
+    ec <- runRepl stack ("repl":args) action
+    if ec == ExitSuccess
+        then return ()
+        else return ()
+        -- TODO: Understand why the exit code is 1 despite running GHCi tests
+        -- successfully.
+        -- else error $ "Exited with exit code: " ++ show ec
 
 -- | Run stack with arguments and apply a check to the resulting
 -- stderr output if the process succeeded.

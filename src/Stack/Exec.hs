@@ -21,7 +21,7 @@ import           System.Process.Log
 import           Control.Exception.Lifted
 import           Data.Streaming.Process (ProcessExitedUnsuccessfully(..))
 import           System.Exit
-import           System.Process.Run (callProcess, Cmd(..))
+import           System.Process.Run (callProcess, callProcessObserveStdout, Cmd(..))
 #ifdef WINDOWS
 import           System.Process.Read (EnvOverride)
 #else
@@ -78,3 +78,12 @@ execSpawn menv cmd0 args = do
     liftIO $ case e of
         Left (ProcessExitedUnsuccessfully _ ec) -> exitWith ec
         Right () -> exitSuccess
+
+execObserve :: (MonadIO m, MonadLogger m, MonadBaseControl IO m)
+    => EnvOverride -> String -> [String] -> m String
+execObserve menv cmd0 args = do
+    e <- $withProcessTimeLog cmd0 args $
+        try (callProcessObserveStdout (Cmd Nothing cmd0 menv args))
+    case e of
+        Left (ProcessExitedUnsuccessfully _ ec) -> liftIO $ exitWith ec
+        Right s -> return s
