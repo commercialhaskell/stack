@@ -17,8 +17,9 @@ module Stack.Coverage
     ) where
 
 import           Control.Applicative
+import           Control.Exception.Enclosed (handleIO)
 import           Control.Exception.Lifted
-import           Control.Monad (liftM, when, unless, void)
+import           Control.Monad (liftM, when, unless, void, (<=<))
 import           Control.Monad.Catch (MonadMask)
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
@@ -117,13 +118,12 @@ generateHpcReport pkgDir package tests = do
         -- Look in the inplace DB for the package key.
         -- See https://github.com/commercialhaskell/stack/issues/1181#issuecomment-148968986
         else do
-            mghcPkgKey <- findPackageKeyForBuiltPackage pkgDir (packageIdentifier package)
-            case mghcPkgKey of
-                Nothing -> do
-                    let msg = "Failed to find GHC package key for " <> pkgName
-                    $logError msg
-                    return $ Left msg
-                Just ghcPkgKey -> return $ Right $ Just $ T.unpack ghcPkgKey
+            eghcPkgKey <- findPackageKeyForBuiltPackage pkgDir (packageIdentifier package)
+            case eghcPkgKey of
+                Left err -> do
+                    $logError err
+                    return $ Left err
+                Right ghcPkgKey -> return $ Right $ Just $ T.unpack ghcPkgKey
     forM_ tests $ \testName -> do
         tixSrc <- tixFilePath (packageName package) (T.unpack testName)
         let report = "coverage report for " <> pkgName <> "'s test-suite \"" <> testName <> "\""
@@ -395,15 +395,34 @@ sanitize = LT.toStrict . htmlEscape . LT.pack
 dirnameString :: Path r Dir -> String
 dirnameString = dropWhileEnd isPathSeparator . toFilePath . dirname
 
-findPackageKeyForBuiltPackage :: (MonadIO m, MonadReader env m, MonadThrow m, HasEnvConfig env)
-                              => Path Abs Dir -> PackageIdentifier -> m (Maybe Text)
+findPackageKeyForBuiltPackage :: (MonadIO m, MonadBaseControl IO m, MonadReader env m, MonadThrow m, MonadLogger m, HasEnvConfig env)
+                              => Path Abs Dir -> PackageIdentifier -> m (Either Text Text)
 findPackageKeyForBuiltPackage pkgDir pkgId = do
     distDir <- distDirFromDir pkgDir
-    path <- liftM (distDir </>) $
-        parseRelFile ("package.conf.inplace/" ++ packageIdentifierString pkgId ++ "-inplace.conf")
-    exists <- doesFileExist path
-    if exists
+    let inplaceDir = distDir </> $(mkRelDir "package.conf.inplace")
+        pkgIdStr = packageIdentifierString pkgId
+        notFoundErr = return $ Left $ "Failed to find package key for " <> T.pack pkgIdStr
+    cabalVer <- asks (envConfigCabalVersion . getEnvConfig)
+    if cabalVer < $(mkVersion "1.24")
         then do
-            contents <- liftIO $ T.readFile (toFilePath path)
-            return $ asum (map (T.stripPrefix "key: ") (T.lines contents))
-        else return Nothing
+            path <- liftM (inplaceDir </>) $ parseRelFile (pkgIdStr ++ "-inplace.conf")
+            $logDebug $ "Parsing config in Cabal < 1.24 location: " <> T.pack (toFilePath path)
+            exists <- doesFileExist path
+            if exists
+                then do
+                    contents <- liftIO $ T.readFile (toFilePath path)
+                    case asum (map (T.stripPrefix "key: ") (T.lines contents)) of
+                        Just result -> return $ Right result
+                        Nothing -> notFoundErr
+                else notFoundErr
+        else do
+            -- With Cabal-1.24, it's in a different location.
+            $logDebug $ "Scanning " <> T.pack (toFilePath inplaceDir) <> " for files matching " <> T.pack pkgIdStr
+            (_, files) <- handleIO (const $ return ([], [])) $ listDir inplaceDir
+            $logDebug $ T.pack (show files)
+            case mapMaybe ( (T.stripSuffix ".conf" <=< T.stripPrefix (T.pack (pkgIdStr ++ "-")))
+                          . T.pack . toFilePath . filename) files of
+                [] -> notFoundErr
+                [result] -> return (Right result)
+                _ -> return $ Left $ "Multiple package keys found in " <>
+                    T.pack (toFilePath inplaceDir) <> ". Maybe try 'stack clean' on this package?"
