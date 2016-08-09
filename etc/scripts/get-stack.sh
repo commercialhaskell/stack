@@ -511,7 +511,7 @@ check_dl_tools() {
 install_from_bindist() {
     IFB_URL="https://www.stackage.org/stack/$1"
     check_dl_tools
-    #TODO: the checksum or GPG signaure should be checked.
+    #TODO: the checksum or GPG signature should be checked.
     make_temp_dir
 
     dl_to_stdout "$IFB_URL" | tar xzf - -C "$STACK_TEMP_DIR"
