@@ -40,6 +40,8 @@ Bug fixes:
   [#2252](https://github.com/commercialhaskell/stack/issues/2252)
 * Ignore special entries when unpacking tarballs
   [#2361](https://github.com/commercialhaskell/stack/issues/2361)
+* Fixes src directory pollution of `style.css` and `highlight.js` with GHC 8's
+  haddock [#2429](https://github.com/commercialhaskell/stack/issues/2429)
 
 ## 1.1.2
 
