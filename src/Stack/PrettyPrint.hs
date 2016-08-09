@@ -12,7 +12,7 @@ module Stack.PrettyPrint
       -- * Color utils
       -- | These are preferred to colors directly, so that we can
       -- encourage consistency of color meanings.
-    , errorRed, goodGreen
+    , errorRed, goodGreen, shellMagenta
     , displayTargetPkgId, displayCurrentPkgId, displayErrorPkgId
       -- * Re-exports from "Text.PrettyPrint.Leijen.Extended"
     , Display(..), AnsiDoc, AnsiAnn(..), HasAnsiAnn(..), Doc
@@ -70,6 +70,9 @@ errorRed = dullred
 
 goodGreen :: AnsiDoc -> AnsiDoc
 goodGreen = green
+
+shellMagenta :: AnsiDoc -> AnsiDoc
+shellMagenta = magenta
 
 displayTargetPkgId :: PackageIdentifier -> AnsiDoc
 displayTargetPkgId = cyan . display

@@ -17,6 +17,7 @@ module Stack.Setup.Installed
     , ExtraDirs (..)
     , extraDirs
     , installDir
+    , tempInstallDir
     ) where
 
 import           Control.Applicative
@@ -186,4 +187,12 @@ installDir :: (MonadReader env m, MonadThrow m)
            -> m (Path Abs Dir)
 installDir programsDir tool = do
     reldir <- parseRelDir $ toolString tool
+    return $ programsDir </> reldir
+
+tempInstallDir :: (MonadReader env m, MonadThrow m)
+           => Path Abs Dir
+           -> Tool
+           -> m (Path Abs Dir)
+tempInstallDir programsDir tool = do
+    reldir <- parseRelDir $ toolString tool ++ ".temp"
     return $ programsDir </> reldir

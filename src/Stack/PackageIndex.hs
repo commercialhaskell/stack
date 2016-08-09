@@ -33,12 +33,10 @@ import           Control.Monad.Catch (MonadThrow, throwM, MonadCatch)
 import qualified Control.Monad.Catch as C
 import           Control.Monad.IO.Class (MonadIO, liftIO)
 import           Control.Monad.Logger                  (MonadLogger, logDebug,
-                                                        logInfo, logWarn)
+                                                        logInfo, logWarn, logError)
 import           Control.Monad.Reader (asks)
 import           Control.Monad.Trans.Control
-
 import           Data.Aeson.Extended
-import           Data.Store.VersionTagged
 import qualified Data.ByteString.Lazy as L
 import           Data.Conduit (($$), (=$))
 import           Data.Conduit.Binary                   (sinkHandle,
@@ -49,38 +47,32 @@ import           Data.IORef
 import           Data.Int (Int64)
 import           Data.Map (Map)
 import qualified Data.Map.Strict as Map
+import           Data.Monoid
 import           Data.Set (Set)
 import qualified Data.Set as Set
-import           Data.Monoid
+import           Data.Store.Version
+import           Data.Store.VersionTagged
+import           Data.Streaming.Process (ProcessExitedUnsuccessfully(..))
 import           Data.Text (Text)
 import qualified Data.Text as T
 import           Data.Text.Unsafe (unsafeTail)
-
 import           Data.Traversable (forM)
-
 import           Data.Typeable (Typeable)
-
 import           Network.HTTP.Download
-import           Path                                  (mkRelDir, parent,
-                                                        parseRelDir, toFilePath,
-                                                        parseAbsFile, (</>))
+import           Path (mkRelDir, parent, parseRelDir, toFilePath, parseAbsFile, (</>))
 import           Path.IO
 import           Prelude -- Fix AMP warning
 import           Stack.Types.Config
 import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageIndex
 import           Stack.Types.PackageName
-import           Stack.Types.Version
 import           Stack.Types.StackT
+import           Stack.Types.Version
 import           System.FilePath (takeBaseName, (<.>))
-import           System.IO                             (IOMode (ReadMode, WriteMode),
-                                                        withBinaryFile)
-import           System.Process.Read         (EnvOverride,
-                                              doesExecutableExist, readInNull,
-                                              tryProcessStdout)
-import           System.Process.Run          (Cmd(..), callProcessInheritStderrStdout)
-import           Data.Streaming.Process      (ProcessExitedUnsuccessfully(..))
-import           Data.Store.Version
+import           System.IO (IOMode (ReadMode, WriteMode), withBinaryFile)
+import           System.Process.Read (EnvOverride, ReadProcessException(..), doesExecutableExist, readProcessNull, tryProcessStdout)
+import           System.Process.Run (Cmd(..), callProcessInheritStderrStdout)
+import           System.Exit (exitFailure)
 
 -- | Populate the package index caches and return them.
 populateCache
@@ -258,7 +250,7 @@ updateIndexGit menv indexName' index gitUrl = do
                 acfDir = suDir </> repoName
             repoExists <- doesDirExist acfDir
             unless repoExists
-                   (readInNull suDir "git" menv cloneArgs Nothing)
+                   (readProcessNull (Just suDir) menv "git" cloneArgs)
             $logSticky "Fetching package index ..."
             let runFetch = callProcessInheritStderrStdout
                     (Cmd (Just acfDir) "git" menv ["fetch","--tags","--depth=1"])
@@ -267,19 +259,26 @@ updateIndexGit menv indexName' index gitUrl = do
                 $logWarn (T.pack (show ex))
                 $logStickyDone "Failed to fetch package index, retrying."
                 removeDirRecur acfDir
-                readInNull suDir "git" menv cloneArgs Nothing
+                readProcessNull (Just suDir) menv "git" cloneArgs
                 $logSticky "Fetching package index ..."
                 runFetch
             $logStickyDone "Fetched package index."
 
-            when (indexGpgVerify index)
-                (readInNull acfDir "git" menv ["tag","-v","current-hackage"]
-                    (Just (T.unlines ["Signature verification failed. "
-                                     ,"Please ensure you've set up your"
-                                     ,"GPG keychain to accept the D6CF60FD signing key."
-                                     ,"For more information, see:"
-                                     ,"https://github.com/fpco/stackage-update#readme"])))
-
+            when (indexGpgVerify index) $ do
+                 result <- C.try $ readProcessNull (Just acfDir) menv "git" ["tag","-v","current-hackage"]
+                 case result of
+                     Left ex -> do
+                         $logError (T.pack (show ex))
+                         case ex of
+                             ReadProcessException{} -> $logError $ T.unlines
+                                 ["Signature verification failed. "
+                                 ,"Please ensure you've set up your"
+                                 ,"GPG keychain to accept the D6CF60FD signing key."
+                                 ,"For more information, see:"
+                                 ,"https://github.com/fpco/stackage-update#readme"]
+                             _ -> return ()
+                         liftIO exitFailure
+                     Right () -> return ()
             -- generate index archive when commit id differs from cloned repo
             tarId <- getTarCommitId (toFilePath tarFile)
             cloneId <- getCloneCommitId acfDir
@@ -300,9 +299,8 @@ updateIndexGit menv indexName' index gitUrl = do
          deleteCache indexName'
          $logDebug ("Exporting a tarball to " <> (T.pack . toFilePath) tarFile)
          let tarFileTmp = toFilePath tarFile ++ ".tmp"
-         readInNull acfDir
-             "git" menv ["archive","--format=tar","-o",tarFileTmp,"current-hackage"]
-             Nothing
+         readProcessNull (Just acfDir) menv
+             "git" ["archive","--format=tar","-o",tarFileTmp,"current-hackage"]
          tarFileTmpPath <- parseAbsFile tarFileTmp
          renameFile tarFileTmpPath tarFile
 

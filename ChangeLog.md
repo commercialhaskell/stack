@@ -27,6 +27,8 @@ Other enhancements:
 * Perform some subprocesses during setup concurrently, slightly speeding up most
   commands. [#2346](https://github.com/commercialhaskell/stack/pull/2346)
 * Support for absolute file path in `url` field of `setup-info` or `--ghc-bindist`
+* `stack setup` no longer unpacks to the system temp dir on posix systems.
+  [#996](https://github.com/commercialhaskell/stack/issues/996)
 
 Bug fixes:
 

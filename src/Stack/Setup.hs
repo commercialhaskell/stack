@@ -7,6 +7,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module Stack.Setup
   ( setupEnv
@@ -49,6 +50,7 @@ import              Data.Monoid
 import              Data.Ord (comparing)
 import              Data.Set (Set)
 import qualified    Data.Set as Set
+import              Data.String
 import              Data.Text (Text)
 import qualified    Data.Text as T
 import qualified    Data.Text.Encoding as T
@@ -75,6 +77,7 @@ import              Stack.Constants (distRelativeDir, stackProgName)
 import              Stack.Exec (defaultEnvSettings)
 import              Stack.Fetch
 import              Stack.GhcPkg (createDatabase, getCabalPkgVer, getGlobalDB, mkGhcPackagePath)
+import              Stack.PrettyPrint
 import              Stack.Setup.Installed
 import              Stack.Types.Build
 import              Stack.Types.Compiler
@@ -87,7 +90,7 @@ import              Stack.Types.StackT
 import              Stack.Types.Version
 import qualified    System.Directory as D
 import              System.Environment (getExecutablePath)
-import              System.Exit (ExitCode (ExitSuccess))
+import              System.Exit (ExitCode (..), exitFailure)
 import              System.FilePath (searchPathSeparator)
 import qualified    System.FilePath as FP
 import              System.Process (rawSystem)
@@ -650,15 +653,19 @@ downloadAndInstallTool :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader en
                        -> SetupInfo
                        -> DownloadInfo
                        -> Tool
-                       -> (SetupInfo -> Path Abs File -> ArchiveType -> Path Abs Dir -> m ())
+                       -> (SetupInfo -> Path Abs File -> ArchiveType -> Path Abs Dir -> Path Abs Dir -> m ())
                        -> m Tool
 downloadAndInstallTool programsDir si downloadInfo tool installer = do
     ensureDir programsDir
     (file, at) <- downloadFromInfo programsDir downloadInfo tool
     dir <- installDir programsDir tool
+    tempDir <- tempInstallDir programsDir tool
+    ignoringAbsence (removeDirRecur tempDir)
+    ensureDir tempDir
     unmarkInstalled programsDir tool
-    installer si file at dir
+    installer si file at tempDir dir
     markInstalled programsDir tool
+    ignoringAbsence (removeDirRecur tempDir)
     return tool
 
 downloadAndInstallCompiler :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasConfig env, HasGHCVariant env, HasHttpManager env, HasTerminal env, HasReExec env, HasLogLevel env, MonadBaseControl IO m)
@@ -801,14 +808,15 @@ data ArchiveType
     | TarGz
     | SevenZ
 
-installGHCPosix :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasConfig env, HasHttpManager env, MonadBaseControl IO m)
+installGHCPosix :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasConfig env, HasHttpManager env, MonadBaseControl IO m, HasTerminal env)
                 => Version
                 -> SetupInfo
                 -> Path Abs File
                 -> ArchiveType
                 -> Path Abs Dir
+                -> Path Abs Dir
                 -> m ()
-installGHCPosix version _ archiveFile archiveType destDir = do
+installGHCPosix version _ archiveFile archiveType tempDir destDir = do
     platform <- asks getPlatform
     menv0 <- getMinimalEnvOverride
     menv <- mkEnvOverride platform (removeHaskellEnvVars (unEnvOverride menv0))
@@ -834,33 +842,50 @@ installGHCPosix version _ archiveFile archiveType destDir = do
     $logDebug $ "make: " <> T.pack makeTool
     $logDebug $ "tar: " <> T.pack tarTool
 
-    withSystemTempDir "stack-setup" $ \root -> do
-        dir <-
-            liftM (root </>) $
-            parseRelDir $
-            "ghc-" ++ versionString version
+    dir <-
+        liftM (tempDir </>) $
+        parseRelDir $
+        "ghc-" ++ versionString version
 
-        $logSticky $ T.concat ["Unpacking GHC into ", T.pack . toFilePath $ root, " ..."]
-        $logDebug $ "Unpacking " <> T.pack (toFilePath archiveFile)
-        readInNull root tarTool menv [compOpt : "xf", toFilePath archiveFile] Nothing
+    let runStep step wd cmd args = do
+            result <- try (readProcessNull (Just wd) menv cmd args)
+            case result of
+                Right _ -> return ()
+                Left ex -> do
+                    $logError (T.pack (show (ex :: ReadProcessException)))
+                    $prettyError $
+                        hang 2
+                          ("Error encountered while" <+> step <+> "GHC with" <> line <>
+                           shellMagenta (fromString (unwords (cmd : args))) <> line <>
+                           -- TODO: Figure out how to insert \ in the appropriate spots
+                           -- hang 2 (shellMagenta (fillSep (fromString cmd : map fromString args))) <> line <>
+                           "run in " <> display wd) <> line <> line <>
+                        "The following directories may now contain files, but won't be used by stack:" <> line <>
+                        "  -" <+> display tempDir <> line <>
+                        "  -" <+> display destDir <> line
+                    liftIO exitFailure
 
-        $logSticky "Configuring GHC ..."
-        readInNull dir (toFilePath $ dir </> $(mkRelFile "configure"))
-                   menv ["--prefix=" ++ toFilePath destDir] Nothing
+    $logSticky $ T.concat ["Unpacking GHC into ", T.pack . toFilePath $ tempDir, " ..."]
+    $logDebug $ "Unpacking " <> T.pack (toFilePath archiveFile)
+    runStep "unpacking" tempDir tarTool [compOpt : "xf", toFilePath archiveFile]
 
-        $logSticky "Installing GHC ..."
-        readInNull dir makeTool menv ["install"] Nothing
+    $logSticky "Configuring GHC ..."
+    runStep "configuring" dir (toFilePath $ dir </> $(mkRelFile "configure")) ["--prefix=" ++ toFilePath destDir]
 
-        $logStickyDone $ "Installed GHC."
-        $logDebug $ "GHC installed to " <> T.pack (toFilePath destDir)
+    $logSticky "Installing GHC ..."
+    runStep "installing" dir makeTool ["install"]
+
+    $logStickyDone $ "Installed GHC."
+    $logDebug $ "GHC installed to " <> T.pack (toFilePath destDir)
 
 installGHCJS :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasConfig env, HasHttpManager env, HasTerminal env, HasReExec env, HasLogLevel env, MonadBaseControl IO m)
              => SetupInfo
              -> Path Abs File
              -> ArchiveType
              -> Path Abs Dir
+             -> Path Abs Dir
              -> m ()
-installGHCJS si archiveFile archiveType destDir = do
+installGHCJS si archiveFile archiveType _tempDir destDir = do
     platform <- asks getPlatform
     menv0 <- getMinimalEnvOverride
     -- This ensures that locking is disabled for the invocations of
@@ -869,7 +894,7 @@ installGHCJS si archiveFile archiveType destDir = do
     menv <- mkEnvOverride platform (removeLockVar (removeHaskellEnvVars (unEnvOverride menv0)))
     $logDebug $ "menv = " <> T.pack (show (unEnvOverride menv))
 
-    -- NOTE: this is a bit of a hack - instead of using a temp
+    -- NOTE: this is a bit of a hack - instead of using the temp
     -- directory, leave the unpacked source tarball in the destination
     -- directory. This way, the absolute paths in the wrapper scripts
     -- will point to executables that exist in
@@ -899,7 +924,7 @@ installGHCJS si archiveFile archiveType destDir = do
             return $ do
                 ignoringAbsence (removeDirRecur destDir)
                 ignoringAbsence (removeDirRecur unpackDir)
-                readInNull destDir tarTool menv ["xf", toFilePath archiveFile] Nothing
+                readProcessNull (Just destDir) menv tarTool ["xf", toFilePath archiveFile]
                 innerDir <- expectSingleUnpackedDir archiveFile destDir
                 renameDir innerDir unpackDir
 
@@ -940,19 +965,19 @@ installDockerStackExe
     -> Path Abs File
     -> ArchiveType
     -> Path Abs Dir
+    -> Path Abs Dir
     -> m ()
-installDockerStackExe _ archiveFile _ destDir = do
+installDockerStackExe _ archiveFile _ _tempDir destDir = do
     (_,tarTool) <-
         checkDependencies $
         (,) <$> checkDependency "gzip" <*> checkDependency "tar"
     menv <- getMinimalEnvOverride
     ensureDir destDir
-    readInNull
-        destDir
-        tarTool
+    readProcessNull
+        (Just destDir)
         menv
+        tarTool
         ["xf", toFilePath archiveFile, "--strip-components", "1"]
-        Nothing
 
 ensureGhcjsBooted :: (MonadIO m, MonadBaseControl IO m, MonadLogger m, MonadCatch m, HasConfig env, HasHttpManager env, HasTerminal env, HasReExec env, HasLogLevel env, MonadReader env m)
                   => EnvOverride -> CompilerVersion -> Bool -> m ()
@@ -1108,8 +1133,9 @@ installGHCWindows :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, 
                   -> Path Abs File
                   -> ArchiveType
                   -> Path Abs Dir
+                  -> Path Abs Dir
                   -> m ()
-installGHCWindows version si archiveFile archiveType destDir = do
+installGHCWindows version si archiveFile archiveType _tempDir destDir = do
     tarComponent <- parseRelDir $ "ghc-" ++ versionString version
     withUnpackedTarball7z "GHC" si archiveFile archiveType (Just tarComponent) destDir
     $logInfo $ "GHC installed to " <> T.pack (toFilePath destDir)
@@ -1120,8 +1146,9 @@ installMsys2Windows :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m
                   -> Path Abs File
                   -> ArchiveType
                   -> Path Abs Dir
+                  -> Path Abs Dir
                   -> m ()
-installMsys2Windows osKey si archiveFile archiveType destDir = do
+installMsys2Windows osKey si archiveFile archiveType _tempDir destDir = do
     exists <- liftIO $ D.doesDirectoryExist $ toFilePath destDir
     when exists $ liftIO (D.removeDirectoryRecursive $ toFilePath destDir) `catchIO` \e -> do
         $logError $ T.pack $

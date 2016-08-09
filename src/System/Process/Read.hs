@@ -28,7 +28,6 @@ module System.Process.Read
   ,envSearchPath
   ,preProcess
   ,readProcessNull
-  ,readInNull
   ,ReadProcessException (..)
   ,augmentPath
   ,augmentPathMap
@@ -152,26 +151,6 @@ readProcessNull :: (MonadIO m, MonadLogger m, MonadBaseControl IO m, MonadCatch 
                 -> m ()
 readProcessNull wd menv name args =
     sinkProcessStdout wd menv name args CL.sinkNull
-
--- | Run the given command in the given directory. If it exits with anything
--- but success, print an error and then call 'exitWith' to exit the program.
-readInNull :: (MonadIO m, MonadLogger m, MonadBaseControl IO m, MonadCatch m)
-           => Path Abs Dir -- ^ Directory to run in
-           -> FilePath -- ^ Command to run
-           -> EnvOverride
-           -> [String] -- ^ Command line arguments
-           -> Maybe Text -- ^ Optional additional error message
-           -> m ()
-readInNull wd cmd menv args errMsg = do
-    result <- try (readProcessNull (Just wd) menv cmd args)
-    case result of
-        Left ex -> do
-            $logError (T.pack (show ex))
-            case ex of
-                ReadProcessException{} -> forM_ errMsg $logError
-                _ -> return ()
-            liftIO exitFailure
-        Right () -> return ()
 
 -- | Try to produce a strict 'S.ByteString' from the stdout of a
 -- process.
