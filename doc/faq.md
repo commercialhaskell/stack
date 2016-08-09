@@ -292,8 +292,7 @@ See [issue #644](https://github.com/commercialhaskell/stack/issues/644) for more
 
 ## I get strange `ld` errors about recompiling with "-fPIC"
 
-Some users (myself included!) have come across a linker errors (example below) that seem to be dependent on the local environment, i.e. the package may compile on a different machine. There is no known workaround (if you come across one please include details), however the issue has been reported to be [non-deterministic](https://github.com/commercialhaskell/stack/issues/614)
-in some cases. I've had success using the docker functionality to build the project on a machine that would not compile it otherwise.
+Some users (myself included!) have come across a linker errors (example below) that seem to be dependent on the local environment, i.e. the package may compile on a different machine. The issue has been reported to be [non-deterministic](https://github.com/commercialhaskell/stack/issues/614) in some cases. I've had success using the docker functionality to build the project on a machine that would not compile it otherwise.
 
 ```
 tmp-0.1.0.0: build
@@ -308,6 +307,14 @@ collect2: error: ld returned 1 exit status
       /home/philip/.stack/programs/x86_64-linux/ghc-7.10.1/bin/runghc-7.10.1 -package=Cabal-1.22.2.0 -clear-package-db -global-package-db /home/philip/tmp/Setup.hs --builddir=dist-stack/x86_64-linux/Cabal-1.22.2.0/ build
     Process exited with code: ExitFailure 1
 ```
+
+The issue may be related to the use of hardening flags in some cases, specifically those related to producing position independent executables (PIE). This is tracked upstream in the [following ticket](https://ghc.haskell.org/trac/ghc/ticket/9007). Some distributions add such hardening flags by default which may be the cause of some instances of the problem. Therefore, a possible workaround might be to turn off PIE related flags.
+
+In Arch Linux, the support for this is provided by the `hardening-wrapper` package. Some possible workarounds:
+* Selectively disabling its PIE forcing by setting `HARDENING_PIE=0` in `/etc/hardening-wrapper.conf`.
+* Uninstalling the `hardening-wrapper` package and logging out then into your account again.
+
+If you manage to work around this in other distributions, please include instructions here.
 
 ## Where does the output from `--ghc-options=-ddump-splices` (and other `-ddump*` options) go?
 
