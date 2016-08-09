@@ -59,7 +59,7 @@ import           Data.Text.Unsafe (unsafeTail)
 import           Data.Traversable (forM)
 import           Data.Typeable (Typeable)
 import           Network.HTTP.Download
-import           Path (mkRelDir, parent, parseRelDir, toFilePath, parseAbsFile, (</>))
+import           Path (mkRelDir, mkRelFile, parent, parseRelDir, toFilePath, parseAbsFile, (</>))
 import           Path.IO
 import           Prelude -- Fix AMP warning
 import           Stack.Types.Config
@@ -239,8 +239,6 @@ updateIndexGit menv indexName' index gitUrl = do
                   ["clone"
                   ,T.unpack gitUrl
                   ,toFilePath repoName
-                  ,"--depth"
-                  ,"1"
                   ,"-b" --
                   ,"display"]
             sDir <- configPackageIndexRoot indexName'
@@ -251,9 +249,13 @@ updateIndexGit menv indexName' index gitUrl = do
             repoExists <- doesDirExist acfDir
             unless repoExists
                    (readProcessNull (Just suDir) menv "git" cloneArgs)
+            isShallow <- doesFileExist $ acfDir </> $(mkRelDir ".git") </> $(mkRelFile "shallow")
+            when isShallow $ do
+              $logWarn "Shallow package index repo detected, transitioning to a full clone..."
+              (readProcessNull (Just acfDir) menv "git" ["fetch", "--unshallow"])
             $logSticky "Fetching package index ..."
             let runFetch = callProcessInheritStderrStdout
-                    (Cmd (Just acfDir) "git" menv ["fetch","--tags","--depth=1"])
+                    (Cmd (Just acfDir) "git" menv ["fetch","--tags"])
             runFetch `C.catch` \(ex :: ProcessExitedUnsuccessfully) -> do
                 -- we failed, so wipe the directory and try again, see #1418
                 $logWarn (T.pack (show ex))
