@@ -53,6 +53,7 @@ import           Language.Haskell.TH.Syntax (lift)
 import           Network.HTTP.Client.Conduit (HasHttpManager(..))
 import           Network.HTTP.Conduit
 import           Prelude -- Fix AMP warning
+import           System.FilePath
 import           Stack.Types.Config (GlobalOpts (..))
 import           Stack.Types.Internal
 import           System.Console.ANSI
@@ -374,7 +375,7 @@ loggerFunc supportsAnsi maxLogLevel outputChannel loc _src level msg =
            file = loc_filename loc
            line = show . fst . loc_start
            char = show . snd . loc_start
-       dirRoot = $(lift . T.unpack . fromJust . T.stripSuffix "src/Stack/Types/StackT.hs" . T.pack . loc_filename =<< location)
+       dirRoot = $(lift . fromJust . stripSuffix "src" </> "Stack" </> "Types" </> "StackT.hs" . loc_filename =<< location)
 
 -- | The length of a timestamp in the format "YYYY-MM-DD hh:mm:ss.μμμμμμ".
 -- This definition is top-level in order to avoid multiple reevaluation at runtime.
