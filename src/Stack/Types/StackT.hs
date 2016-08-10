@@ -8,6 +8,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE TemplateHaskell #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 -- | The monad used for the command-line executable @stack@.
@@ -33,10 +34,11 @@ import           Control.Monad.Base
 import           Control.Monad.Catch
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
-import           Control.Monad.Reader
+import           Control.Monad.Reader hiding (lift)
 import           Control.Monad.Trans.Control
 import qualified Data.ByteString.Char8 as S8
 import           Data.Char
+import           Data.List (stripPrefix)
 import           Data.Maybe
 import           Data.Monoid
 import           Data.Text (Text)
@@ -47,14 +49,15 @@ import qualified Data.Text.IO as T
 import           Data.Time
 import           GHC.Foreign (withCString, peekCString)
 import           Language.Haskell.TH
+import           Language.Haskell.TH.Syntax (lift)
 import           Network.HTTP.Client.Conduit (HasHttpManager(..))
 import           Network.HTTP.Conduit
 import           Prelude -- Fix AMP warning
-import           Stack.Types.Internal
 import           Stack.Types.Config (GlobalOpts (..))
+import           Stack.Types.Internal
+import           System.Console.ANSI
 import           System.IO
 import           System.Log.FastLogger
-import           System.Console.ANSI (hSupportsANSI)
 
 #ifndef MIN_VERSION_time
 #define MIN_VERSION_time(x, y, z) 0
@@ -226,29 +229,31 @@ newTLSManager = liftIO $ newManager tlsManagerSettings
 --------------------------------------------------------------------------------
 -- Logging functionality
 stickyLoggerFunc
-    :: (HasSticky r, HasLogLevel r, HasSupportsUnicode r, ToLogStr msg, MonadReader r m, MonadIO m)
+    :: (HasSticky r, HasLogLevel r, HasSupportsUnicode r, HasTerminal r, ToLogStr msg, MonadReader r m, MonadIO m)
     => Loc -> LogSource -> LogLevel -> msg -> m ()
 stickyLoggerFunc loc src level msg = do
     func <- getStickyLoggerFunc
     liftIO $ func loc src level msg
 
 getStickyLoggerFunc
-    :: (HasSticky r, HasLogLevel r, HasSupportsUnicode r, ToLogStr msg, MonadReader r m)
+    :: (HasSticky r, HasLogLevel r, HasSupportsUnicode r, HasTerminal r, ToLogStr msg, MonadReader r m)
     => m (Loc -> LogSource -> LogLevel -> msg -> IO ())
 getStickyLoggerFunc = do
     sticky <- asks getSticky
     logLevel <- asks getLogLevel
     supportsUnicode <- asks getSupportsUnicode
-    return $ stickyLoggerFuncImpl sticky logLevel supportsUnicode
+    supportsAnsi <- asks getAnsiTerminal
+    return $ stickyLoggerFuncImpl sticky logLevel supportsUnicode supportsAnsi
 
 stickyLoggerFuncImpl
     :: ToLogStr msg
-    => Sticky -> LogLevel -> Bool
+    => Sticky -> LogLevel -> Bool -> Bool
     -> (Loc -> LogSource -> LogLevel -> msg -> IO ())
-stickyLoggerFuncImpl (Sticky mref) maxLogLevel supportsUnicode loc src level msg =
+stickyLoggerFuncImpl (Sticky mref) maxLogLevel supportsUnicode supportsAnsi loc src level msg =
     case mref of
         Nothing ->
             loggerFunc
+                supportsAnsi
                 maxLogLevel
                 out
                 loc
@@ -287,7 +292,7 @@ stickyLoggerFuncImpl (Sticky mref) maxLogLevel supportsUnicode loc src level msg
                     _
                       | level >= maxLogLevel -> do
                           clear
-                          loggerFunc maxLogLevel out loc src level $ toLogStr msgText
+                          loggerFunc supportsAnsi maxLogLevel out loc src level $ toLogStr msgText
                           case sticky of
                               Nothing ->
                                   return Nothing
@@ -310,46 +315,66 @@ replaceUnicode c = c
 
 -- | Logging function takes the log level into account.
 loggerFunc :: ToLogStr msg
-           => LogLevel -> Handle -> Loc -> Text -> LogLevel -> msg -> IO ()
-loggerFunc maxLogLevel outputChannel loc _src level msg =
+           => Bool -> LogLevel -> Handle -> Loc -> Text -> LogLevel -> msg -> IO ()
+loggerFunc supportsAnsi maxLogLevel outputChannel loc _src level msg =
    when (level >= maxLogLevel)
         (liftIO (do out <- getOutput
                     T.hPutStrLn outputChannel out))
-  where getOutput =
-          do timestamp <- getTimestamp
-             l <- getLevel
-             lc <- getLoc
-             return (T.pack timestamp <> T.pack l <> T.decodeUtf8 (fromLogStr (toLogStr msg)) <> T.pack lc)
-          where getTimestamp
-                  | maxLogLevel <= LevelDebug =
-                    do now <- getZonedTime
-                       return (formatTime' now ++ ": ")
-                  | otherwise = return ""
-                  where
-                    formatTime' =
-                        take timestampLength . formatTime defaultTimeLocale "%F %T.%q"
-                getLevel
-                  | maxLogLevel <= LevelDebug =
-                    return ("[" ++
-                            map toLower (drop 5 (show level)) ++
-                            "] ")
-                  | otherwise = return ""
-                getLoc
-                  | maxLogLevel <= LevelDebug =
-                    return (" @(" ++ fileLocStr ++ ")")
-                  | otherwise = return ""
-                fileLocStr =
-                  loc_package loc ++
-                  ':' :
-                  loc_module loc ++
-                  ' ' :
-                  loc_filename loc ++
-                  ':' :
-                  line loc ++
-                  ':' :
-                  char loc
-                  where line = show . fst . loc_start
-                        char = show . snd . loc_start
+  where
+    getOutput = do
+      timestamp <- getTimestamp
+      l <- getLevel
+      lc <- getLoc
+      return $ T.concat
+        [ T.pack timestamp
+        , T.pack l
+        , T.pack (ansi [Reset])
+        , T.decodeUtf8 (fromLogStr (toLogStr msg))
+        , T.pack lc
+        , T.pack (ansi [Reset])
+        ]
+     where
+       ansi xs | supportsAnsi = setSGRCode xs
+               | otherwise = ""
+       getTimestamp
+         | maxLogLevel <= LevelDebug =
+           do now <- getZonedTime
+              return $
+                  ansi [SetColor Foreground Vivid Black]
+                  ++ formatTime' now ++ ": "
+         | otherwise = return ""
+         where
+           formatTime' =
+               take timestampLength . formatTime defaultTimeLocale "%F %T.%q"
+       getLevel
+         | maxLogLevel <= LevelDebug =
+           return ((case level of
+                      LevelDebug -> ansi [SetColor Foreground Dull Green]
+                      LevelInfo -> ansi [SetColor Foreground Dull Blue]
+                      LevelWarn -> ansi [SetColor Foreground Dull Yellow]
+                      LevelError -> ansi [SetColor Foreground Dull Red]
+                      LevelOther _ -> ansi [SetColor Foreground Dull Magenta]) ++
+                   "[" ++
+                   map toLower (drop 5 (show level)) ++
+                   "] ")
+         | otherwise = return ""
+       getLoc
+         | maxLogLevel <= LevelDebug =
+           return $
+               ansi [SetColor Foreground Vivid Black] ++
+               "\n@(" ++ fileLocStr ++ ")"
+         | otherwise = return ""
+       fileLocStr =
+         fromMaybe file (stripPrefix dirRoot file) ++
+         ':' :
+         line loc ++
+         ':' :
+         char loc
+         where
+           file = loc_filename loc
+           line = show . fst . loc_start
+           char = show . snd . loc_start
+       dirRoot = $(lift . T.unpack . fromJust . T.stripSuffix "src/Stack/Types/StackT.hs" . T.pack . loc_filename =<< location)
 
 -- | The length of a timestamp in the format "YYYY-MM-DD hh:mm:ss.μμμμμμ".
 -- This definition is top-level in order to avoid multiple reevaluation at runtime.
