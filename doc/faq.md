@@ -246,6 +246,7 @@ Cf. issue [#425](https://github.com/commercialhaskell/stack/issues/425).
 Stack makes use of a temporary directory for some commands (/tmp by default on linux). If there is not enough free space in this directory, stack may fail (see issue [#429](https://github.com/commercialhaskell/stack/issues/429) ). For instance `stack setup` with a GHC installation requires roughly 1GB free.
 
 A custom temporary directory can be forced:
+
 * on Linux by setting the environment variable TMPDIR (eg `$ TMPDIR=path-to-tmp stack setup`)
 * on Windows by setting one of the environment variable (given in priority order), TMP, TEMP, USERPROFILE
 
@@ -311,6 +312,7 @@ collect2: error: ld returned 1 exit status
 The issue may be related to the use of hardening flags in some cases, specifically those related to producing position independent executables (PIE). This is tracked upstream in the [following ticket](https://ghc.haskell.org/trac/ghc/ticket/9007). Some distributions add such hardening flags by default which may be the cause of some instances of the problem. Therefore, a possible workaround might be to turn off PIE related flags.
 
 In Arch Linux, the support for this is provided by the `hardening-wrapper` package. Some possible workarounds:
+
 * Selectively disabling its PIE forcing by setting `HARDENING_PIE=0` in `/etc/hardening-wrapper.conf`.
 * Uninstalling the `hardening-wrapper` package and logging out then into your account again.
 
