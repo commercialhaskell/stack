@@ -82,6 +82,10 @@ updateTixFile pkgName tixSrc testName = do
             Nothing -> $logError $ "Failed to read " <> T.pack (toFilePath tixSrc)
             Just tix -> do
                 liftIO $ writeTix (toFilePath tixDest) (removeExeModules tix)
+                -- TODO: ideally we'd do a file move, but IIRC this can
+                -- have problems. Something about moving between drives
+                -- on windows?
+                copyFile tixSrc =<< parseAbsFile (toFilePath tixDest ++ ".premunging")
                 ignoringAbsence (removeFile tixSrc)
 
 -- | Get the directory used for hpc reports for the given pkgId.
@@ -202,6 +206,7 @@ generateHpcReportInternal tixSrc reportDir report extraMarkupArgs extraReportArg
                         : ("--destdir=" ++ toFilePathNoTrailingSep reportDir)
                         : (args ++ extraMarkupArgs)
                         )
+
 
 data HpcReportOpts = HpcReportOpts
     { hroptsInputs :: [Text]
