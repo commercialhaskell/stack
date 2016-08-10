@@ -468,7 +468,8 @@ wantedPackageComponents _ _ _ = S.empty
 checkForIssues :: (MonadThrow m, MonadLogger m) => [GhciPkgInfo] -> m ()
 checkForIssues pkgs = do
     unless (null issues) $ borderedWarning $ do
-        $logWarn "There are issues with this project which may prevent GHCi from working properly."
+        $logWarn "Warning: There are cabal settings for this project which may prevent GHCi from loading your code properly."
+        $logWarn "In some cases it can also load some projects which would otherwise fail to build."
         $logWarn ""
         mapM_ $logWarn $ intercalate [""] issues
         $logWarn ""
