@@ -715,7 +715,7 @@ execCmd ExecOpts {..} go@GlobalOpts{..} =
             (cmd, args) <- case (eoCmd, eoArgs) of
                  (ExecCmd cmd, args) -> return (cmd, args)
                  (ExecGhc, args) -> return ("ghc", args)
-                 (ExecRunGhc, args) -> return ("runghc", args)
+                 (ExecRunGhc, args) -> return ("ghc", "-e" : "Main.main" : args)
             (manager,lc) <- liftIO $ loadConfigWithOpts go
             withUserFileLock go (configStackRoot $ lcConfig lc) $ \lk -> do
               compilerVersion <- loadCompilerVersion manager go lc
@@ -742,7 +742,7 @@ execCmd ExecOpts {..} go@GlobalOpts{..} =
                    (ExecGhc, args) -> execCompiler "" args
                     -- NOTE: this won't currently work for GHCJS, because it doesn't have
                     -- a runghcjs binary. It probably will someday, though.
-                   (ExecRunGhc, args) -> execCompiler "run" args
+                   (ExecRunGhc, args) -> execCompiler "" ("-e" : "Main.main" : args)
                let targets = concatMap words eoPackages
                unless (null targets) $
                    Stack.Build.build (const $ return ()) lk defaultBuildOptsCLI
