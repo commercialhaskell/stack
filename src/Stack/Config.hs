@@ -244,8 +244,7 @@ configFromConfigMonoid configStackRoot configUserConfigPath mresolver mproject C
          (Platform defArch defOS) = buildPlatform
          arch = fromMaybe defArch
               $ (getFirst configMonoidArch) >>= Distribution.Text.simpleParse
-         os = fromMaybe defOS
-            $ (getFirst configMonoidOS) >>= Distribution.Text.simpleParse
+         os = defOS
          configPlatform = Platform arch os
 
          configRequireStackVersion = simplifyVersionRange (getIntersectingVersionRange configMonoidRequireStackVersion)
