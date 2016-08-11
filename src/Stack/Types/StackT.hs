@@ -375,7 +375,7 @@ loggerFunc supportsAnsi maxLogLevel outputChannel loc _src level msg =
            file = loc_filename loc
            line = show . fst . loc_start
            char = show . snd . loc_start
-       dirRoot = $(lift . T.unpack . fromJust . T.stripSuffix (T.pack $ "src" </> "Stack" </> "Types" </> "StackT.hs") . T.pack . loc_filename =<< location)
+       dirRoot = $(lift . T.unpack . fromJust . T.stripSuffix (T.pack $ "Stack" </> "Types" </> "StackT.hs") . T.pack . loc_filename =<< location)
 
 -- | The length of a timestamp in the format "YYYY-MM-DD hh:mm:ss.μμμμμμ".
 -- This definition is top-level in order to avoid multiple reevaluation at runtime.
