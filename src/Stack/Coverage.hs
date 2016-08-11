@@ -109,25 +109,29 @@ tixFilePath pkgName testName = do
 generateHpcReport :: (MonadIO m,MonadReader env m,MonadLogger m,MonadBaseControl IO m,MonadMask m,HasEnvConfig env)
                   => Path Abs Dir -> Package -> [Text] -> m ()
 generateHpcReport pkgDir package tests = do
+    compilerVersion <- asks (envConfigCompilerVersion . getEnvConfig)
     -- If we're using > GHC 7.10, the hpc 'include' parameter must specify a ghc package key. See
     -- https://github.com/commercialhaskell/stack/issues/785
     let pkgName = packageNameText (packageName package)
         pkgId = packageIdentifierString (packageIdentifier package)
-    compilerVersion <- asks (envConfigCompilerVersion . getEnvConfig)
+        ghcVersion = getGhcVersion compilerVersion
     eincludeName <-
         -- Pre-7.8 uses plain PKG-version in tix files.
-        if getGhcVersion compilerVersion < $(mkVersion "7.10") then return $ Right $ Just pkgId
+        if ghcVersion < $(mkVersion "7.10") then return $ Right $ Just pkgId
         -- We don't expect to find a package key if there is no library.
         else if not (packageHasLibrary package) then return $ Right Nothing
         -- Look in the inplace DB for the package key.
         -- See https://github.com/commercialhaskell/stack/issues/1181#issuecomment-148968986
         else do
-            eghcPkgKey <- findPackageKeyForBuiltPackage pkgDir (packageIdentifier package)
-            case eghcPkgKey of
+            -- GHC 8.0 uses package id instead of package key.
+            -- See https://github.com/commercialhaskell/stack/issues/2424
+            let hpcNameField = if ghcVersion >= $(mkVersion "8.0") then "id" else "key"
+            eincludeName <- findPackageFieldForBuiltPackage pkgDir (packageIdentifier package) hpcNameField
+            case eincludeName of
                 Left err -> do
                     $logError err
                     return $ Left err
-                Right ghcPkgKey -> return $ Right $ Just $ T.unpack ghcPkgKey
+                Right includeName -> return $ Right $ Just $ T.unpack includeName
     forM_ tests $ \testName -> do
         tixSrc <- tixFilePath (packageName package) (T.unpack testName)
         let report = "coverage report for " <> pkgName <> "'s test-suite \"" <> testName <> "\""
@@ -400,34 +404,32 @@ sanitize = LT.toStrict . htmlEscape . LT.pack
 dirnameString :: Path r Dir -> String
 dirnameString = dropWhileEnd isPathSeparator . toFilePath . dirname
 
-findPackageKeyForBuiltPackage :: (MonadIO m, MonadBaseControl IO m, MonadReader env m, MonadThrow m, MonadLogger m, HasEnvConfig env)
-                              => Path Abs Dir -> PackageIdentifier -> m (Either Text Text)
-findPackageKeyForBuiltPackage pkgDir pkgId = do
+findPackageFieldForBuiltPackage :: (MonadIO m,MonadBaseControl IO m,MonadReader env m,MonadThrow m,MonadLogger m,HasEnvConfig env) => Path Abs Dir -> PackageIdentifier -> Text -> m (Either Text Text)
+findPackageFieldForBuiltPackage pkgDir pkgId field = do
     distDir <- distDirFromDir pkgDir
     let inplaceDir = distDir </> $(mkRelDir "package.conf.inplace")
         pkgIdStr = packageIdentifierString pkgId
         notFoundErr = return $ Left $ "Failed to find package key for " <> T.pack pkgIdStr
+        extractField path = do
+            contents <- liftIO $ T.readFile (toFilePath path)
+            case asum (map (T.stripPrefix (field <> ": ")) (T.lines contents)) of
+                Just result -> return $ Right result
+                Nothing -> notFoundErr
     cabalVer <- asks (envConfigCabalVersion . getEnvConfig)
     if cabalVer < $(mkVersion "1.24")
         then do
             path <- liftM (inplaceDir </>) $ parseRelFile (pkgIdStr ++ "-inplace.conf")
             $logDebug $ "Parsing config in Cabal < 1.24 location: " <> T.pack (toFilePath path)
             exists <- doesFileExist path
-            if exists
-                then do
-                    contents <- liftIO $ T.readFile (toFilePath path)
-                    case asum (map (T.stripPrefix "key: ") (T.lines contents)) of
-                        Just result -> return $ Right result
-                        Nothing -> notFoundErr
-                else notFoundErr
+            if exists then extractField path else notFoundErr
         else do
             -- With Cabal-1.24, it's in a different location.
             $logDebug $ "Scanning " <> T.pack (toFilePath inplaceDir) <> " for files matching " <> T.pack pkgIdStr
             (_, files) <- handleIO (const $ return ([], [])) $ listDir inplaceDir
             $logDebug $ T.pack (show files)
-            case mapMaybe ( (T.stripSuffix ".conf" <=< T.stripPrefix (T.pack (pkgIdStr ++ "-")))
-                          . T.pack . toFilePath . filename) files of
+            case mapMaybe (\file -> fmap (const file) . (T.stripSuffix ".conf" <=< T.stripPrefix (T.pack (pkgIdStr ++ "-")))
+                          . T.pack . toFilePath . filename $ file) files of
                 [] -> notFoundErr
-                [result] -> return (Right result)
-                _ -> return $ Left $ "Multiple package keys found in " <>
+                [path] -> extractField path
+                _ -> return $ Left $ "Multiple files matching " <> T.pack (pkgIdStr ++ "-*.conf") <> " found in " <>
                     T.pack (toFilePath inplaceDir) <> ". Maybe try 'stack clean' on this package?"
