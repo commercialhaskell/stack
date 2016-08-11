@@ -204,7 +204,9 @@ renderStackYaml p ignoredPackages dupPackages =
                 if (name == "packages") then commentedPackages else "" <>
                 B.byteString "\n"
 
-    commentHelp = BC.pack .  intercalate "\n" . map ("# " ++)
+    commentLine l | null l = "#"
+                  | otherwise = "# " ++ l
+    commentHelp = BC.pack .  intercalate "\n" . map commentLine
     commentedPackages =
         let ignoredComment = commentHelp
                 [ "The following packages have been ignored due to incompatibility with the"
