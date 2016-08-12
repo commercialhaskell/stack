@@ -545,7 +545,8 @@ interpreterHandler args f = do
       progName <- getProgName
       iargs <- getInterpreterArgs path
       let parseCmdLine = commandLineHandler progName True
-      let cmdArgs = stackArgs ++ iargs ++ "--" : path : fileArgs
+          separator = if "--" `elem` iargs then [] else ["--"]
+          cmdArgs = stackArgs ++ iargs ++ separator ++ path : fileArgs
        -- TODO show the command in verbose mode
        -- hPutStrLn stderr $ unwords $
        --   ["Running", "[" ++ progName, unwords cmdArgs ++ "]"]
@@ -745,7 +746,9 @@ execCmd ExecOpts {..} go@GlobalOpts{..} =
                    (ExecGhc, args) -> execCompiler "" args
                     -- NOTE: this won't currently work for GHCJS, because it doesn't have
                     -- a runghcjs binary. It probably will someday, though.
-                   (ExecRunGhc, args) -> execCompiler "" ("-e" : "Main.main" : args)
+                   (ExecRunGhc, args) ->
+                        let opts = concatMap (\x -> ["-package", x]) eoPackages
+                        in execCompiler "" (opts ++ ("-e" : "Main.main" : args))
                let targets = concatMap words eoPackages
                unless (null targets) $
                    Stack.Build.build (const $ return ()) lk defaultBuildOptsCLI
