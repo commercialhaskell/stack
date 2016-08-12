@@ -41,11 +41,13 @@ import           Data.Monoid.Extra
 import qualified Data.Set                          as Set
 import qualified Data.Text                         as T
 import           Data.Text.Read                    (decimal)
+import           Data.Version                      (showVersion)
 import           Distribution.Version              (anyVersion)
 import           Options.Applicative
 import           Options.Applicative.Args
 import           Options.Applicative.Builder.Extra
 import           Options.Applicative.Types         (fromM, oneM, readerAsk)
+import           Paths_stack                       as Meta
 import           Stack.Build                       (splitObjsWarning)
 import           Stack.Clean                       (CleanOpts (..))
 import           Stack.Config                      (packagesParser)
@@ -101,7 +103,10 @@ buildOptsParser cmd =
     many
         (textArgument
              (metavar "TARGET" <>
-              help "If none specified, use all packages")) <*>
+              help ("If none specified, use all packages. " <>
+                    "See https://docs.haskellstack.org/en/v" <>
+                    showVersion Meta.version <>
+                    "/build_command/#target-syntax for details."))) <*>
     switch
         (long "dry-run" <>
          help "Don't build anything, just prepare to") <*>
