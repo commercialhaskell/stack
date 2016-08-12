@@ -189,6 +189,9 @@ commandLineHandler progName isInterpreter = complicatedOptions
   VERSION_hpack
   "stack - The Haskell Tool Stack"
   ""
+  ("stack's documentation is available at https://docs.haskellstack.org/en/v" <>
+   showVersion Meta.version <>
+   "/README/")
   (globalOpts OuterGlobalOpts)
   (Just failureCallback)
   addCommands

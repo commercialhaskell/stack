@@ -34,7 +34,9 @@ complicatedOptions
   -> String
   -- ^ header
   -> String
-  -- ^ program description
+  -- ^ program description (displayed between usage and options listing in the help output)
+  -> String
+  -- ^ footer
   -> Parser a
   -- ^ common settings
   -> Maybe (ParserFailure ParserHelp -> [String] -> IO (a,(b,a)))
@@ -43,7 +45,7 @@ complicatedOptions
   -> EitherT b (Writer (Mod CommandFields (b,a))) ()
   -- ^ commands (use 'addCommand')
   -> IO (a,b)
-complicatedOptions numericVersion versionString numericHpackVersion h pd commonParser mOnFailure commandParser =
+complicatedOptions numericVersion versionString numericHpackVersion h pd footerStr commonParser mOnFailure commandParser =
   do args <- getArgs
      (a,(b,c)) <- case execParserPure (prefs noBacktrack) parser args of
        Failure _ | null args -> withArgs ["--help"] (execParser parser)
@@ -52,7 +54,7 @@ complicatedOptions numericVersion versionString numericHpackVersion h pd commonP
        parseResult -> handleParseResult parseResult
      return (mappend c a,b)
   where parser = info (helpOption <*> versionOptions <*> complicatedParser commonParser commandParser) desc
-        desc = fullDesc <> header h <> progDesc pd
+        desc = fullDesc <> header h <> progDesc pd <> footer footerStr
         versionOptions =
           case versionString of
             Nothing -> versionOption (showVersion numericVersion)
