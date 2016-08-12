@@ -9,8 +9,15 @@ module Path.Extra
   ,parseCollapsedAbsFile
   ,rejectMissingFile
   ,rejectMissingDir
+  ,pathToByteString
+  ,pathToLazyByteString
+  ,pathToText
   ) where
 
+import qualified Data.ByteString.Lazy.Char8 as BSL
+import qualified Data.ByteString.Char8 as BS
+import qualified Data.Text as T
+import qualified Data.Text.Encoding as T
 import           Control.Monad (liftM)
 import           Control.Monad.Catch
 import           Control.Monad.IO.Class
@@ -94,3 +101,14 @@ rejectMissingDir :: MonadIO m
   -> m (Maybe (Path Abs Dir))
 rejectMissingDir Nothing = return Nothing
 rejectMissingDir (Just p) = bool Nothing (Just p) `liftM` doesDirExist p
+
+-- | Convert to a lazy ByteString using toFilePath and UTF8.
+pathToLazyByteString :: Path b t -> BSL.ByteString
+pathToLazyByteString = BSL.fromStrict . pathToByteString
+
+-- | Convert to a ByteString using toFilePath and UTF8.
+pathToByteString :: Path b t -> BS.ByteString
+pathToByteString = T.encodeUtf8 . pathToText
+
+pathToText :: Path b t -> T.Text
+pathToText = T.pack . toFilePath
