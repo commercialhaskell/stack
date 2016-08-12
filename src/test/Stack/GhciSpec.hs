@@ -9,6 +9,7 @@ import qualified Data.ByteString.Lazy as LBS
 import qualified Data.Map as M
 import qualified Data.Set as S
 import           Data.Text (Text)
+import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import           Distribution.ModuleName
 import           Stack.Types.Package
@@ -17,9 +18,38 @@ import           Stack.Types.Version
 import           Test.Hspec
 import           NeatInterpolation
 import           Path
+import           Path.Extra (pathToText)
+import qualified System.FilePath as FP
 
 import           Stack.Ghci
 import           Stack.Ghci.Script (scriptToLazyByteString)
+import           Stack.Ghci.PortableFakePaths
+
+textToLazy :: Text -> LBS.ByteString
+textToLazy = LBS.fromStrict . T.encodeUtf8
+
+-- | Matches two strings, after converting line-ends in the second to Unix ones
+-- (in a hacky way) and converting both to the same type. Workaround for
+-- https://github.com/nikita-volkov/neat-interpolation/issues/14.
+shouldBeLE :: LBS.ByteString -> Text -> Expectation
+shouldBeLE actual expected = shouldBe actual (textToLazy $ T.filter (/= '\r') expected)
+
+baseProjDir, projDirA, projDirB :: Path Abs Dir
+baseProjDir = $(mkAbsDir $ defaultDrive FP.</> "Users" FP.</> "someone" FP.</> "src")
+projDirA = baseProjDir </> $(mkRelDir "project-a")
+projDirB = baseProjDir </> $(mkRelDir "project-b")
+
+relFile :: Path Rel File
+relFile = $(mkRelFile $ "exe" FP.</> "Main.hs")
+
+absFile :: Path Abs File
+absFile = projDirA </> relFile
+
+projDirAT, projDirBT, relFileT, absFileT :: Text
+projDirAT = pathToText projDirA
+projDirBT = pathToText projDirB
+relFileT = pathToText relFile
+absFileT = pathToText absFile
 
 spec :: Spec
 spec = do
@@ -28,46 +58,46 @@ spec = do
       describe "should render GHCi scripts" $ do
         it "with one library package" $ do
           let res = scriptToLazyByteString $ renderScriptGhci packages_singlePackage Nothing
-          res `shouldBe` (LBS.fromStrict $ T.encodeUtf8 ghciScript_projectWithLib)
+          res `shouldBeLE` ghciScript_projectWithLib
 
         it "with one main package" $ do
           let res = scriptToLazyByteString $ renderScriptGhci []
-                                                              (Just $(mkAbsFile "/Users/someone/src/project-a/exe/Main.hs"))
-          res `shouldBe` (LBS.fromStrict $ T.encodeUtf8 ghciScript_projectWithMain)
+                                                              (Just absFile)
+          res `shouldBeLE` ghciScript_projectWithMain
 
         it "with one library and main package" $ do
           let res = scriptToLazyByteString $ renderScriptGhci packages_singlePackage
-                                                              (Just $(mkAbsFile "/Users/someone/src/project-a/exe/Main.hs"))
-          res `shouldBe` (LBS.fromStrict $ T.encodeUtf8 ghciScript_projectWithLibAndMain)
+                                                              (Just absFile)
+          res `shouldBeLE` ghciScript_projectWithLibAndMain
 
         it "with multiple library packages" $ do
           let res = scriptToLazyByteString $ renderScriptGhci packages_multiplePackages Nothing
-          res `shouldBe` (LBS.fromStrict $ T.encodeUtf8 ghciScript_multipleProjectsWithLib)
+          res `shouldBeLE` ghciScript_multipleProjectsWithLib
 
       describe "should render intero scripts" $ do
         it "with one library package" $ do
           let res = scriptToLazyByteString $ renderScriptIntero packages_singlePackage Nothing
-          res `shouldBe` (LBS.fromStrict $ T.encodeUtf8 interoScript_projectWithLib)
+          res `shouldBeLE` interoScript_projectWithLib
 
         it "with one main package" $ do
           let res = scriptToLazyByteString $ renderScriptIntero packages_singlePackage
-                                                              (Just $(mkAbsFile "/Users/someone/src/project-a/exe/Main.hs"))
-          res `shouldBe` (LBS.fromStrict $ T.encodeUtf8 interoScript_projectWithMain)
+                                                              (Just absFile)
+          res `shouldBeLE` interoScript_projectWithMain
 
         it "with one library and main package" $ do
           let res = scriptToLazyByteString $ renderScriptIntero packages_singlePackage
-                                                              (Just $(mkAbsFile "/Users/someone/src/project-a/exe/Main.hs"))
-          res `shouldBe` (LBS.fromStrict $ T.encodeUtf8 interoScript_projectWithLibAndMain)
+                                                              (Just absFile)
+          res `shouldBeLE` interoScript_projectWithLibAndMain
 
         it "with multiple library packages" $ do
           let res = scriptToLazyByteString $ renderScriptIntero packages_multiplePackages Nothing
-          res `shouldBe` (LBS.fromStrict $ T.encodeUtf8 interoScript_multipleProjectsWithLib)
+          res `shouldBeLE` interoScript_multipleProjectsWithLib
 
 -- Exptected Intero scripts
 
 interoScript_projectWithLib :: Text
 interoScript_projectWithLib = [text|
-:cd-ghc /Users/someone/src/project-a/
+:cd-ghc $projDirAT
 :add Lib.A
 :module + Lib.A
 
@@ -75,29 +105,29 @@ interoScript_projectWithLib = [text|
 
 interoScript_projectWithMain :: Text
 interoScript_projectWithMain = [text|
-:cd-ghc /Users/someone/src/project-a/
+:cd-ghc $projDirAT
 :add Lib.A
-:cd-ghc /Users/someone/src/project-a/
-:add /Users/someone/src/project-a/exe/Main.hs
+:cd-ghc $projDirAT
+:add $absFileT
 :module + Lib.A
 
 |]
 
 interoScript_projectWithLibAndMain :: Text
 interoScript_projectWithLibAndMain = [text|
-:cd-ghc /Users/someone/src/project-a/
+:cd-ghc $projDirAT
 :add Lib.A
-:cd-ghc /Users/someone/src/project-a/
-:add /Users/someone/src/project-a/exe/Main.hs
+:cd-ghc $projDirAT
+:add $absFileT
 :module + Lib.A
 
 |]
 
 interoScript_multipleProjectsWithLib :: Text
 interoScript_multipleProjectsWithLib = [text|
-:cd-ghc /Users/someone/src/project-a/
+:cd-ghc $projDirAT
 :add Lib.A
-:cd-ghc /Users/someone/src/project-b/
+:cd-ghc $projDirBT
 :add Lib.B
 :module + Lib.A Lib.B
 
@@ -114,7 +144,7 @@ ghciScript_projectWithLib = [text|
 
 ghciScript_projectWithMain :: Text
 ghciScript_projectWithMain = [text|
-:add /Users/someone/src/project-a/exe/Main.hs
+:add $absFileT
 :module +
 
 |]
@@ -122,7 +152,7 @@ ghciScript_projectWithMain = [text|
 ghciScript_projectWithLibAndMain :: Text
 ghciScript_projectWithLibAndMain = [text|
 :add Lib.A
-:add /Users/someone/src/project-a/exe/Main.hs
+:add $absFileT
 :module + Lib.A
 
 |]
@@ -140,14 +170,14 @@ ghciScript_multipleProjectsWithLib = [text|
 ghciLegacyScript_projectWithMain :: Text
 ghciLegacyScript_projectWithMain = [text|
 :add
-:add /Users/someone/src/project-a/exe/Main.hs
+:add $absFileT
 :module +
 |]
 
 ghciLegacyScript_projectWithLibAndMain :: Text
 ghciLegacyScript_projectWithLibAndMain = [text|
 :add Lib.A
-:add /Users/someone/src/project-a/exe/Main.hs
+:add $absFileT
 :module + Lib.A
 |]
 
@@ -164,7 +194,7 @@ packages_singlePackage :: [GhciPkgInfo]
 packages_singlePackage =
   [ GhciPkgInfo
     { ghciPkgModules = S.fromList [fromString "Lib.A"]
-    , ghciPkgDir = $(mkAbsDir "/Users/someone/src/project-a")
+    , ghciPkgDir = projDirA
     , ghciPkgName = $(mkPackageName "package-a")
     , ghciPkgOpts = []
     , ghciPkgModFiles = S.empty
@@ -196,7 +226,7 @@ packages_multiplePackages :: [GhciPkgInfo]
 packages_multiplePackages =
   [ GhciPkgInfo
     { ghciPkgModules = S.fromList [fromString "Lib.A"]
-    , ghciPkgDir = $(mkAbsDir "/Users/someone/src/project-a")
+    , ghciPkgDir = projDirA
     , ghciPkgName = $(mkPackageName "package-a")
     , ghciPkgOpts = []
     , ghciPkgModFiles = S.empty
@@ -224,7 +254,7 @@ packages_multiplePackages =
     }
   , GhciPkgInfo
     { ghciPkgModules = S.fromList [fromString "Lib.B"]
-    , ghciPkgDir = $(mkAbsDir "/Users/someone/src/project-b")
+    , ghciPkgDir = projDirB
     , ghciPkgName = $(mkPackageName "package-b")
     , ghciPkgOpts = []
     , ghciPkgModFiles = S.empty
