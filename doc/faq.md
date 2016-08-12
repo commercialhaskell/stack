@@ -353,7 +353,7 @@ The workaround is to quote the `"--"`, e.g.:
 
 This is known to be a problem on Windows 7, but seems to be fixed on Windows 10.
 
-# Does stack also install the system/C libraries that some Cabal packages depend on?
+## Does stack also install the system/C libraries that some Cabal packages depend on?
 
 No, this is currently out of the scope of stack's target set of features.
 Instead of attempting to automate the installation of 3rd party dependencies, we
@@ -369,3 +369,18 @@ have the following approaches for handling system dependencies:
 
 In the future, stack might give OS specific suggestions for how to install
 system libraries.
+
+## How can I make `stack` aware of my custom SSL certificates?
+
+### OS X
+
+In principle, you can use the following command to add a certificate to your system certificate keychain:
+
+    sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain <certificate>
+
+Some users have reported issues with this approach, see [#907](https://github.com/commercialhaskell/stack/issues/907) for more information.
+
+### Other *NIX OSs
+
+Use the `SYSTEM_CERTIFICATE_PATH` environment variable to point at the directory
+where you keep your SSL certificates.
