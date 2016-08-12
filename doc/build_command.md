@@ -80,6 +80,8 @@ implicitly pass in all of your local packages. If you only want to target
 packages in the current directory or deeper, you can pass in `.`, e.g. `stack
 build .`.
 
+To get a list of the available targets in your project, use `stack ide targets`.
+
 ## Controlling what gets built
 
 Stack will automatically build the necessary
