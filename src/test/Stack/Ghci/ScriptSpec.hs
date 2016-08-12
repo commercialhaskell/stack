@@ -9,7 +9,10 @@ import           Data.Monoid
 import qualified Data.Set as S
 import           Distribution.ModuleName
 import           Test.Hspec
+import qualified System.FilePath as FP
+import           Stack.Ghci.PortableFakePaths
 import           Path
+import           Path.Extra (pathToLazyByteString)
 
 import           Stack.Ghci.Script
 
@@ -20,10 +23,11 @@ spec = do
 
       describe "script" $ do
         it "should seperate commands with a newline" $ do
-          let script = cmdCdGhc $(mkAbsDir "/src/package-a")
+          let dir = $(mkAbsDir $ defaultDrive FP.</> "src" FP.</> "package-a")
+              script = cmdCdGhc dir
                     <> cmdAdd [fromString "Lib.A"]
           scriptToLazyByteString script `shouldBe`
-            ":cd-ghc /src/package-a/\n:add Lib.A\n"
+            ":cd-ghc " <> pathToLazyByteString dir <> "\n:add Lib.A\n"
 
       describe ":add" $ do
         it "should not render empty add commands" $ do
@@ -36,15 +40,17 @@ spec = do
 
       describe ":add (by file)" $ do
         it "should render a full file path" $ do
-          let script = cmdAddFile $(mkAbsFile "/Users/someone/src/project/package-a/src/Main.hs")
+          let file = $(mkAbsFile $ defaultDrive FP.</> "Users" FP.</> "someone" FP.</> "src" FP.</> "project" FP.</> "package-a" FP.</> "src" FP.</> "Main.hs")
+              script = cmdAddFile file
           scriptToLazyByteString script `shouldBe`
-            ":add /Users/someone/src/project/package-a/src/Main.hs\n"
+            ":add " <> pathToLazyByteString file <> "\n"
 
       describe ":cd-ghc" $ do
         it "should render a full absolute path" $ do
-          let script = cmdCdGhc $(mkAbsDir "/Users/someone/src/project/package-a")
+          let dir = $(mkAbsDir $ defaultDrive FP.</> "Users" FP.</> "someone" FP.</> "src" FP.</> "project" FP.</> "package-a")
+              script = cmdCdGhc dir
           scriptToLazyByteString script `shouldBe`
-            ":cd-ghc /Users/someone/src/project/package-a/\n"
+            ":cd-ghc " <> pathToLazyByteString dir <> "\n"
 
       describe ":module" $ do
         it "should render empty module as ':module +'" $ do

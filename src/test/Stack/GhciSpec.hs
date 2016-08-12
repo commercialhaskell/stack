@@ -18,19 +18,22 @@ import           Test.Hspec
 import           NeatInterpolation
 import           Path
 import           Path.Extra (pathToText)
+import qualified System.FilePath as FP
 
 import           Stack.Ghci
 import           Stack.Ghci.Script (scriptToLazyByteString)
+import           Stack.Ghci.PortableFakePaths
 
 textToLazy :: Text -> LBS.ByteString
 textToLazy = LBS.fromStrict . T.encodeUtf8
 
-projDirA, projDirB :: Path Abs Dir
-projDirA = $(mkAbsDir "/Users/someone/src/project-a")
-projDirB = $(mkAbsDir "/Users/someone/src/project-b")
+baseProjDir, projDirA, projDirB :: Path Abs Dir
+baseProjDir = $(mkAbsDir $ defaultDrive FP.</> "Users" FP.</> "someone" FP.</> "src")
+projDirA = baseProjDir </> $(mkRelDir "project-a")
+projDirB = baseProjDir </> $(mkRelDir "project-b")
 
 relFile :: Path Rel File
-relFile = $(mkRelFile "exe/Main.hs")
+relFile = $(mkRelFile $ "exe" FP.</> "Main.hs")
 
 absFile :: Path Abs File
 absFile = projDirA </> relFile

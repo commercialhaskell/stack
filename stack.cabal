@@ -300,6 +300,7 @@ test-suite stack-test
                 , Stack.DotSpec
                 , Stack.GhciSpec
                 , Stack.Ghci.ScriptSpec
+                , Stack.Ghci.PortableFakePaths
                 , Stack.PackageDumpSpec
                 , Stack.ArgsSpec
                 , Stack.NixSpec
@@ -339,6 +340,8 @@ test-suite stack-test
                 , vector
                 , template-haskell
   default-language:    Haskell2010
+  if os(windows)
+    cpp-options:     -DWINDOWS
 
 test-suite stack-integration-test
   type:           exitcode-stdio-1.0
