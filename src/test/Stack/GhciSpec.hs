@@ -9,6 +9,7 @@ import qualified Data.ByteString.Lazy as LBS
 import qualified Data.Map as M
 import qualified Data.Set as S
 import           Data.Text (Text)
+import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import           Distribution.ModuleName
 import           Stack.Types.Package
@@ -26,6 +27,12 @@ import           Stack.Ghci.PortableFakePaths
 
 textToLazy :: Text -> LBS.ByteString
 textToLazy = LBS.fromStrict . T.encodeUtf8
+
+-- | Matches two strings, after converting line-ends in the second to Unix ones
+-- (in a hacky way) and converting both to the same type. Workaround for
+-- https://github.com/nikita-volkov/neat-interpolation/issues/14.
+shouldBeLE :: LBS.ByteString -> Text -> Expectation
+shouldBeLE actual expected = shouldBe actual (textToLazy $ T.filter (/= '\r') expected)
 
 baseProjDir, projDirA, projDirB :: Path Abs Dir
 baseProjDir = $(mkAbsDir $ defaultDrive FP.</> "Users" FP.</> "someone" FP.</> "src")
@@ -51,40 +58,40 @@ spec = do
       describe "should render GHCi scripts" $ do
         it "with one library package" $ do
           let res = scriptToLazyByteString $ renderScriptGhci packages_singlePackage Nothing
-          res `shouldBe` textToLazy ghciScript_projectWithLib
+          res `shouldBeLE` ghciScript_projectWithLib
 
         it "with one main package" $ do
           let res = scriptToLazyByteString $ renderScriptGhci []
                                                               (Just absFile)
-          res `shouldBe` textToLazy ghciScript_projectWithMain
+          res `shouldBeLE` ghciScript_projectWithMain
 
         it "with one library and main package" $ do
           let res = scriptToLazyByteString $ renderScriptGhci packages_singlePackage
                                                               (Just absFile)
-          res `shouldBe` textToLazy ghciScript_projectWithLibAndMain
+          res `shouldBeLE` ghciScript_projectWithLibAndMain
 
         it "with multiple library packages" $ do
           let res = scriptToLazyByteString $ renderScriptGhci packages_multiplePackages Nothing
-          res `shouldBe` textToLazy ghciScript_multipleProjectsWithLib
+          res `shouldBeLE` ghciScript_multipleProjectsWithLib
 
       describe "should render intero scripts" $ do
         it "with one library package" $ do
           let res = scriptToLazyByteString $ renderScriptIntero packages_singlePackage Nothing
-          res `shouldBe` textToLazy interoScript_projectWithLib
+          res `shouldBeLE` interoScript_projectWithLib
 
         it "with one main package" $ do
           let res = scriptToLazyByteString $ renderScriptIntero packages_singlePackage
                                                               (Just absFile)
-          res `shouldBe` textToLazy interoScript_projectWithMain
+          res `shouldBeLE` interoScript_projectWithMain
 
         it "with one library and main package" $ do
           let res = scriptToLazyByteString $ renderScriptIntero packages_singlePackage
                                                               (Just absFile)
-          res `shouldBe` textToLazy interoScript_projectWithLibAndMain
+          res `shouldBeLE` interoScript_projectWithLibAndMain
 
         it "with multiple library packages" $ do
           let res = scriptToLazyByteString $ renderScriptIntero packages_multiplePackages Nothing
-          res `shouldBe` textToLazy interoScript_multipleProjectsWithLib
+          res `shouldBeLE` interoScript_multipleProjectsWithLib
 
 -- Exptected Intero scripts
 
