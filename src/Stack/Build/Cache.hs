@@ -50,6 +50,7 @@ import qualified Data.ByteString.Char8 as S8
 import qualified Data.ByteString.Lazy as LBS
 import           Data.Foldable (forM_)
 import           Data.Map (Map)
+import qualified Data.Map as M
 import           Data.Maybe (fromMaybe, mapMaybe)
 import           Data.Monoid ((<>))
 import           Data.Set (Set)
@@ -83,16 +84,29 @@ getInstalledExes :: (MonadReader env m, HasEnvConfig env, MonadIO m, MonadThrow 
 getInstalledExes loc = do
     dir <- exeInstalledDir loc
     (_, files) <- liftIO $ handleIO (const $ return ([], [])) $ listDir dir
-    return $ mapMaybe (parsePackageIdentifierFromString . toFilePath . filename) files
+    return $
+        concat $
+        M.elems $
+        -- If there are multiple install records (from a stack version
+        -- before https://github.com/commercialhaskell/stack/issues/2373
+        -- was fixed), then we don't know which is correct - ignore them.
+        M.fromListWith (\_ _ -> []) $
+        map (\x -> (packageIdentifierName x, [x])) $
+        mapMaybe (parsePackageIdentifierFromString . toFilePath . filename) files
 
 -- | Mark the given executable as installed
-markExeInstalled :: (MonadReader env m, HasEnvConfig env, MonadIO m, MonadThrow m)
+markExeInstalled :: (MonadReader env m, HasEnvConfig env, MonadIO m, MonadCatch m)
                  => InstallLocation -> PackageIdentifier -> m ()
 markExeInstalled loc ident = do
     dir <- exeInstalledDir loc
     ensureDir dir
     ident' <- parseRelFile $ packageIdentifierString ident
     let fp = toFilePath $ dir </> ident'
+    -- Remove old install records for this package.
+    -- TODO: This is a bit in-efficient. Put all this metadata into one file?
+    installed <- getInstalledExes loc
+    forM_ (filter (\x -> packageIdentifierName ident == packageIdentifierName x) installed)
+          (markExeNotInstalled loc)
     -- TODO consideration for the future: list all of the executables
     -- installed, and invalidate this file in getInstalledExes if they no
     -- longer exist
