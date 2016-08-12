@@ -786,8 +786,6 @@ data ConfigMonoid =
     -- ^ See: 'configCompilerCheck'
     ,configMonoidRequireStackVersion :: !IntersectingVersionRange
     -- ^ See: 'configRequireStackVersion'
-    ,configMonoidOS                  :: !(First String)
-    -- ^ Used for overriding the platform
     ,configMonoidArch                :: !(First String)
     -- ^ Used for overriding the platform
     ,configMonoidGHCVariant          :: !(First GHCVariant)
@@ -867,7 +865,6 @@ parseConfigMonoidJSON obj = do
     configMonoidRequireStackVersion <- IntersectingVersionRange <$> unVersionRangeJSON <$>
                                        obj ..:? configMonoidRequireStackVersionName
                                            ..!= VersionRangeJSON anyVersion
-    configMonoidOS <- First <$> obj ..:? configMonoidOSName
     configMonoidArch <- First <$> obj ..:? configMonoidArchName
     configMonoidGHCVariant <- First <$> obj ..:? configMonoidGHCVariantName
     configMonoidJobs <- First <$> obj ..:? configMonoidJobsName
@@ -955,9 +952,6 @@ configMonoidSkipMsysName = "skip-msys"
 
 configMonoidRequireStackVersionName :: Text
 configMonoidRequireStackVersionName = "require-stack-version"
-
-configMonoidOSName :: Text
-configMonoidOSName = "os"
 
 configMonoidArchName :: Text
 configMonoidArchName = "arch"

@@ -208,7 +208,7 @@ cleanOptsParser = CleanShallow <$> packages <|> doFullClean
 -- | Command-line arguments parser for configuration.
 configOptsParser :: GlobalOptsContext -> Parser ConfigMonoid
 configOptsParser hide0 =
-    (\stackRoot workDir buildOpts dockerOpts nixOpts systemGHC installGHC arch os ghcVariant jobs includes libs overrideGccPath skipGHCCheck skipMsys localBin modifyCodePage allowDifferentUser -> mempty
+    (\stackRoot workDir buildOpts dockerOpts nixOpts systemGHC installGHC arch ghcVariant jobs includes libs overrideGccPath skipGHCCheck skipMsys localBin modifyCodePage allowDifferentUser -> mempty
         { configMonoidStackRoot = stackRoot
         , configMonoidWorkDir = workDir
         , configMonoidBuildOpts = buildOpts
@@ -218,7 +218,6 @@ configOptsParser hide0 =
         , configMonoidInstallGHC = installGHC
         , configMonoidSkipGHCCheck = skipGHCCheck
         , configMonoidArch = arch
-        , configMonoidOS = os
         , configMonoidGHCVariant = ghcVariant
         , configMonoidJobs = jobs
         , configMonoidExtraIncludeDirs = includes
@@ -257,12 +256,6 @@ configOptsParser hide0 =
             ( long "arch"
            <> metavar "ARCH"
            <> help "System architecture, e.g. i386, x86_64"
-           <> hide
-            ))
-    <*> optionalFirst (strOption
-            ( long "os"
-           <> metavar "OS"
-           <> help "Operating system, e.g. linux, windows"
            <> hide
             ))
     <*> optionalFirst (ghcVariantParser (hide0 /= OuterGlobalOpts))
