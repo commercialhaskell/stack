@@ -1729,6 +1729,7 @@ specific configuration. If required, the script will install everything it
 needs automatically on any machine that it runs on. To make a script always
 work irrespective of any specific environment configuration you can do the
 following:
+
 1. Use the `--install-ghc` option to install the compiler automatically
 2. Explicitly specify all packages required by the script using the
 `--package` option. Use `-hide-all-packages` ghc option to force
