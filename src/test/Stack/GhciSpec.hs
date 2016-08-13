@@ -11,7 +11,7 @@ import qualified Data.Set as S
 import           Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
-import           Distribution.ModuleName
+import qualified Distribution.ModuleName as ModuleName
 import           Stack.Types.Package
 import           Stack.Types.PackageName
 import           Stack.Types.Version
@@ -193,7 +193,7 @@ ghciLegacyScript_multipleProjectsWithLib = [text|
 packages_singlePackage :: [GhciPkgInfo]
 packages_singlePackage =
   [ GhciPkgInfo
-    { ghciPkgModules = S.fromList [fromString "Lib.A"]
+    { ghciPkgModules = S.fromList [ModuleName.fromString "Lib.A"]
     , ghciPkgDir = projDirA
     , ghciPkgName = $(mkPackageName "package-a")
     , ghciPkgOpts = []
@@ -225,7 +225,7 @@ packages_singlePackage =
 packages_multiplePackages :: [GhciPkgInfo]
 packages_multiplePackages =
   [ GhciPkgInfo
-    { ghciPkgModules = S.fromList [fromString "Lib.A"]
+    { ghciPkgModules = S.fromList [ModuleName.fromString "Lib.A"]
     , ghciPkgDir = projDirA
     , ghciPkgName = $(mkPackageName "package-a")
     , ghciPkgOpts = []
@@ -253,7 +253,7 @@ packages_multiplePackages =
       }
     }
   , GhciPkgInfo
-    { ghciPkgModules = S.fromList [fromString "Lib.B"]
+    { ghciPkgModules = S.fromList [ModuleName.fromString "Lib.B"]
     , ghciPkgDir = projDirB
     , ghciPkgName = $(mkPackageName "package-b")
     , ghciPkgOpts = []
