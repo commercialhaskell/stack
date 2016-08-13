@@ -76,11 +76,7 @@ get_arch() {
 
 # exits with code 0 if a 64-bit architecture is detected as described above
 is_64_bit() {
-  if [ "$(get_arch)" = 64 ] ; then
-    return 0
-  else
-    return 1
-  fi
+  test "$(get_arch)" = 64
 }
 
 # Adds a `sudo` prefix if sudo is available to execute the given command
