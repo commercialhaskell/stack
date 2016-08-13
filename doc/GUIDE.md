@@ -1692,6 +1692,9 @@ configuration is effective when running the script. Otherwise the script uses
 the global project configuration specified in
 `~/.stack/global-project/stack.yaml`.
 
+You have the option to make the script independent of any configuration by
+using the `-hide-all-packages` ghc options as describe below.
+
 ### Specifying interpreter options
 
 The stack interpreter options comment must specify a single valid stack command
@@ -1702,8 +1705,10 @@ be the first line in the file. The comment must always start in the first
 column of the line.
 
 When many options are needed a block style comment may be more convenient to
-split the command on multiple lines for better readability. Here is an example
-of a multi line block comment:
+split the command on multiple lines for better readability. You can also
+specify ghc options the same way as you would on command line i.e. by
+separating the stack options and ghc options with a `--`. Here is an example of
+a multi line block comment with ghc options:
 
 ```
   #!/usr/bin/env stack
@@ -1712,8 +1717,43 @@ of a multi line block comment:
     --install-ghc
     runghc
     --package turtle
+    --
+    -hide-all-packages
   -}
 ```
+
+### Writing independent and reliable scripts
+
+Independent means that the script is independent of any prior deployment
+specific configuration. If required, the script will install everything it
+needs automatically on any machine that it runs on. To make a script always
+work irrespective of any specific environment configuration you can do the
+following:
+1. Use the `--install-ghc` option to install the compiler automatically
+2. Explicitly specify all packages required by the script using the
+`--package` option. Use `-hide-all-packages` ghc option to force
+explicit specification of all packages.
+
+Reliable means the script will use exactly the same version of all packages
+every time it runs so that the script does not break by accidentally using
+incompatible package versions. To achieve that use an explicit `--resolver`
+stack option.
+
+Here is an interpreter comment for a completely self-contained and reproducible
+version of our toy example:
+```
+  #!/usr/bin/env stack
+  {- stack
+    --resolver lts-3.2
+    --install-ghc
+    runghc
+    --package base
+    --package turtle
+    --
+    -hide-all-packages
+  -}
+```
+
 ## Finding project configs, and the implicit global
 
 Whenever you run something with stack, it needs a stack.yaml project file. The
