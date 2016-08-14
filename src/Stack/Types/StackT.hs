@@ -88,7 +88,7 @@ instance MonadTransControl (StackT config) where
     restoreT = defaultRestoreT StackT
 
 -- | Takes the configured log level into account.
-instance (MonadIO m) => MonadLogger (StackT config m) where
+instance MonadIO m => MonadLogger (StackT config m) where
     monadLoggerLog = stickyLoggerFunc
 
 instance MonadIO m => MonadLoggerIO (StackT config m) where
