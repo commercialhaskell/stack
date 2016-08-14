@@ -63,7 +63,7 @@ import           Data.Monoid.Extra
 import qualified Data.Text as T
 import           Data.Text.Encoding (encodeUtf8, decodeUtf8, decodeUtf8With)
 import           Data.Text.Encoding.Error (lenientDecode)
-import qualified Data.Yaml as Yaml
+import qualified Data.Yaml.Extra as Yaml
 import           Distribution.System (OS (..), Platform (..), buildPlatform)
 import qualified Distribution.Text
 import           Distribution.Version (simplifyVersionRange)

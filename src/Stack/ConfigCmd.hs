@@ -17,7 +17,7 @@ import           Control.Monad.Reader (MonadReader, asks)
 import           Control.Monad.Trans.Control (MonadBaseControl)
 import qualified Data.ByteString as S
 import qualified Data.HashMap.Strict as HMap
-import qualified Data.Yaml as Yaml
+import qualified Data.Yaml.Extra as Yaml
 import           Network.HTTP.Client.Conduit (HasHttpManager)
 import           Path
 import           Stack.BuildPlan
