@@ -142,6 +142,8 @@ envHelper :: EnvOverride -> Maybe [(String, String)]
 envHelper = Just . eoStringList
 
 -- | Read from the process, ignoring any output.
+--
+-- Throws a 'ReadProcessException' exception if the process fails.
 readProcessNull :: (MonadIO m, MonadLogger m, MonadBaseControl IO m, MonadCatch m)
                 => Maybe (Path Abs Dir) -- ^ Optional working directory
                 -> EnvOverride
@@ -215,6 +217,8 @@ instance Exception ReadProcessException
 -- If the process fails, spits out stdout and stderr as error log
 -- level. Should not be used for long-running processes or ones with
 -- lots of output; for that use 'sinkProcessStdoutLogStderr'.
+--
+-- Throws a 'ReadProcessException' if unsuccessful.
 sinkProcessStdout
     :: (MonadIO m, MonadLogger m, MonadBaseControl IO m, MonadCatch m)
     => Maybe (Path Abs Dir) -- ^ Optional directory to run in
@@ -258,6 +262,8 @@ logProcessStderrStdout mdir name menv args = liftBaseWith $ \restore -> do
     void $ restore $ sinkProcessStderrStdout mdir menv name args logLines logLines
 
 -- | Consume the stdout and stderr of a process feeding strict 'S.ByteString's to the consumers.
+--
+-- Throws a 'ReadProcessException' if unsuccessful in launching, or 'ProcessExitedUnsuccessfully' if the process itself fails.
 sinkProcessStderrStdout :: forall m e o. (MonadIO m, MonadLogger m)
                         => Maybe (Path Abs Dir) -- ^ Optional directory to run in
                         -> EnvOverride
@@ -277,6 +283,8 @@ sinkProcessStderrStdout wd menv name args sinkStderr sinkStdout = do
     f err out = (err $$ sinkStderr) `concurrently` (out $$ sinkStdout)
 
 -- | Like sinkProcessStderrStdout, but receives Handles for stderr and stdout instead of 'Sink's.
+--
+-- Throws a 'ReadProcessException' if unsuccessful in launching, or 'ProcessExitedUnsuccessfully' if the process itself fails.
 sinkProcessStderrStdoutHandle :: (MonadIO m, MonadLogger m)
                               => Maybe (Path Abs Dir) -- ^ Optional directory to run in
                               -> EnvOverride
@@ -299,6 +307,8 @@ sinkProcessStderrStdoutHandle wd menv name args err out = do
 
 -- | Perform pre-call-process tasks.  Ensure the working directory exists and find the
 -- executable path.
+--
+-- Throws a 'ReadProcessException' if unsuccessful.
 preProcess :: (MonadIO m)
   => Maybe (Path Abs Dir) -- ^ Optional directory to create if necessary
   -> EnvOverride       -- ^ How to override environment
