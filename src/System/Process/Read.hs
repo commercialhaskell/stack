@@ -345,7 +345,8 @@ findExecutable eo name = liftIO $ do
                         testFPs [] = loop dirs
                         testFPs (fp:fps) = do
                             exists <- D.doesFileExist fp
-                            if exists
+                            existsExec <- if exists then liftM D.executable $ D.getPermissions fp else return False
+                            if existsExec
                                 then do
                                     fp' <- D.makeAbsolute fp >>= parseAbsFile
                                     return $ return fp'
