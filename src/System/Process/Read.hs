@@ -164,7 +164,7 @@ tryProcessStdout wd menv name args =
 
 -- | Produce a strict 'S.ByteString' from the stdout of a process.
 --
--- Throws a 'ReadProcessException' exception if the  process fails.
+-- Throws a 'ReadProcessException' exception if the process fails.
 readProcessStdout :: (MonadIO m, MonadLogger m, MonadBaseControl IO m, MonadCatch m)
                   => Maybe (Path Abs Dir) -- ^ Optional directory to run in
                   -> EnvOverride
@@ -276,6 +276,7 @@ sinkProcessStderrStdout wd menv name args sinkStderr sinkStdout = do
     f :: Source IO S.ByteString -> Source IO S.ByteString -> IO (e, o)
     f err out = (err $$ sinkStderr) `concurrently` (out $$ sinkStdout)
 
+-- | Like sinkProcessStderrStdout, but receives Handles for stderr and stdout instead of 'Sink's.
 sinkProcessStderrStdoutHandle :: (MonadIO m, MonadLogger m)
                               => Maybe (Path Abs Dir) -- ^ Optional directory to run in
                               -> EnvOverride
