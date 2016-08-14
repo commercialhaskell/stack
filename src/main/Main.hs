@@ -120,7 +120,7 @@ versionString' = concat $ concat
 versionString' =
     showVersion Meta.version
     ++ ' ' : display buildArch
-    depsString
+    ++ depsString
   where
 #endif
 #ifdef HIDE_DEP_VERSIONS
