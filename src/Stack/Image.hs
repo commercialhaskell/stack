@@ -80,10 +80,10 @@ createContainerImageFromStage mProjectRoot imageNames = do
 
 filterImages :: [String] -> [ImageDockerOpts] -> [ImageDockerOpts]
 filterImages [] = id -- all: no filter
-filterImages names = filter (imageNameFound names . imgDockerImageName)
+filterImages names = filter (imageNameFound . imgDockerImageName)
   where
-    imageNameFound names (Just name) = name `elem` names
-    imageNameFound _ _ = False
+    imageNameFound (Just name) = name `elem` names
+    imageNameFound _ = False
 
 -- | Stage all the Package executables in the usr/local/bin
 -- subdirectory of a temp directory.
