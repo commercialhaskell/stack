@@ -246,6 +246,7 @@ Cf. issue [#425](https://github.com/commercialhaskell/stack/issues/425).
 Stack makes use of a temporary directory for some commands (/tmp by default on linux). If there is not enough free space in this directory, stack may fail (see issue [#429](https://github.com/commercialhaskell/stack/issues/429) ). For instance `stack setup` with a GHC installation requires roughly 1GB free.
 
 A custom temporary directory can be forced:
+
 * on Linux by setting the environment variable TMPDIR (eg `$ TMPDIR=path-to-tmp stack setup`)
 * on Windows by setting one of the environment variable (given in priority order), TMP, TEMP, USERPROFILE
 
@@ -311,6 +312,7 @@ collect2: error: ld returned 1 exit status
 The issue may be related to the use of hardening flags in some cases, specifically those related to producing position independent executables (PIE). This is tracked upstream in the [following ticket](https://ghc.haskell.org/trac/ghc/ticket/9007). Some distributions add such hardening flags by default which may be the cause of some instances of the problem. Therefore, a possible workaround might be to turn off PIE related flags.
 
 In Arch Linux, the support for this is provided by the `hardening-wrapper` package. Some possible workarounds:
+
 * Selectively disabling its PIE forcing by setting `HARDENING_PIE=0` in `/etc/hardening-wrapper.conf`.
 * Uninstalling the `hardening-wrapper` package and logging out then into your account again.
 
@@ -351,7 +353,7 @@ The workaround is to quote the `"--"`, e.g.:
 
 This is known to be a problem on Windows 7, but seems to be fixed on Windows 10.
 
-# Does stack also install the system/C libraries that some Cabal packages depend on?
+## Does stack also install the system/C libraries that some Cabal packages depend on?
 
 No, this is currently out of the scope of stack's target set of features.
 Instead of attempting to automate the installation of 3rd party dependencies, we
@@ -367,3 +369,18 @@ have the following approaches for handling system dependencies:
 
 In the future, stack might give OS specific suggestions for how to install
 system libraries.
+
+## How can I make `stack` aware of my custom SSL certificates?
+
+### OS X
+
+In principle, you can use the following command to add a certificate to your system certificate keychain:
+
+    sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain <certificate>
+
+Some users have reported issues with this approach, see [#907](https://github.com/commercialhaskell/stack/issues/907) for more information.
+
+### Other *NIX OSs
+
+Use the `SYSTEM_CERTIFICATE_PATH` environment variable to point at the directory
+where you keep your SSL certificates.

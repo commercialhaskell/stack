@@ -202,10 +202,10 @@ library
                    , optparse-applicative >= 0.11 && < 0.13
                    , path >= 0.5.8
                    , path-io >= 1.1.0 && < 2.0.0
-                   , persistent >= 2.1.2 && < 2.6
+                   , persistent >= 2.1.2 && < 2.7
                        -- persistent-sqlite-2.5.0.1 has a bug
                        -- (see https://github.com/yesodweb/persistent/pull/561#issuecomment-222329087)
-                   , persistent-sqlite (>= 2.1.4 && < 2.5.0.1) || (> 2.5.0.1 && < 2.6)
+                   , persistent-sqlite (>= 2.1.4 && < 2.5.0.1) || (> 2.5.0.1 && < 2.7)
                    , persistent-template >= 2.1.1 && < 2.6
                    , pretty >= 1.1.1.1
                    , process >= 1.2.1.0 && < 1.5

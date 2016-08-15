@@ -11,6 +11,7 @@ Vagrant.configure(2) do |config|
     set -xe
     export PATH=/usr/local/bin:$PATH
     yum -y check-update || true
+    yum -y upgrade ca-certificates
     yum -y install epel-release
     yum -y install perl make automake gcc gmp-devel zlib-devel rpm-build tar which git xz python-boto deltarpm python-deltarpm rpm-build rpm-sign ncurses-devel
     if ! which stack; then
@@ -21,6 +22,7 @@ Vagrant.configure(2) do |config|
     if ! which fpm; then
         yum -y install ruby-devel
         yum -y install rubygems
+        gem install json --version '< 1.8.0'
         gem install fpm --version '< 1.4.0'
     fi
     if ! [[ -d /opt/rpm-s3 ]]; then

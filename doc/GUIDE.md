@@ -2311,6 +2311,13 @@ To generate a backtrace in case of exceptions during a test or benchmarks run,
 use the `--trace` flag. Like `--profile` this compiles with profiling options,
 but adds the `+RTS -xc` runtime option.
 
+### DWARF
+
+`stack` currently doesn't support debugging and profiling with
+[DWARF information](https://ghc.haskell.org/trac/ghc/wiki/DWARF)
+as it strips executables automatically. This may change in the future (see
+[#877](https://github.com/commercialhaskell/stack/issues/877)).
+
 ### Further reading
 
 For more commands and uses, see [the official GHC chapter on
