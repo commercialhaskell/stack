@@ -740,7 +740,14 @@ execCmd ExecOpts {..} go@GlobalOpts{..} =
                     Nothing -- Unlocked already above.
         ExecOptsEmbellished {..} ->
            withBuildConfigAndLock go $ \lk -> do
+               let targets = concatMap words eoPackages
+               unless (null targets) $
+                   Stack.Build.build (const $ return ()) lk defaultBuildOptsCLI
+                       { boptsCLITargets = map T.pack targets
+                       }
+
                config <- asks getConfig
+               menv <- liftIO $ configEnvOverride config eoEnvSettings
                (cmd, args) <- case (eoCmd, eoArgs) of
                    (ExecCmd cmd, args) -> return (cmd, args)
                    (ExecGhc, args) -> execCompiler "" args
@@ -749,13 +756,7 @@ execCmd ExecOpts {..} go@GlobalOpts{..} =
                    (ExecRunGhc, args) ->
                         let opts = concatMap (\x -> ["-package", x]) eoPackages
                         in execCompiler "" (opts ++ ("-e" : "Main.main" : args))
-               let targets = concatMap words eoPackages
-               unless (null targets) $
-                   Stack.Build.build (const $ return ()) lk defaultBuildOptsCLI
-                       { boptsCLITargets = map T.pack targets
-                       }
                munlockFile lk -- Unlock before transferring control away.
-               menv <- liftIO $ configEnvOverride config eoEnvSettings
                exec menv cmd args
   where
     execCompiler cmdPrefix args = do
