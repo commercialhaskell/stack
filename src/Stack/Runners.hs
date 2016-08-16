@@ -179,13 +179,13 @@ withBuildConfigExt go@GlobalOpts{..} mbefore inner mafter = do
                   go
                   (inner' lk)
 
-      compilerVersion <- loadCompilerVersion manager go lc
+      let getCompilerVersion = loadCompilerVersion manager go lc
       runStackTGlobal manager (lcConfig lc) go $
         Docker.reexecWithOptionalContainer
                  (lcProjectRoot lc)
                  mbefore
                  (runStackTGlobal manager (lcConfig lc) go $
-                    Nix.reexecWithOptionalShell (lcProjectRoot lc) compilerVersion (inner'' lk0))
+                    Nix.reexecWithOptionalShell (lcProjectRoot lc) getCompilerVersion (inner'' lk0))
                  mafter
                  (Just $ liftIO $
                       do lk' <- readIORef curLk

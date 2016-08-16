@@ -49,15 +49,15 @@ import           System.Process.Read (getEnvOverride)
 reexecWithOptionalShell
     :: M env m
     => Maybe (Path Abs Dir)
-    -> CompilerVersion
+    -> IO CompilerVersion
     -> IO ()
     -> m ()
-reexecWithOptionalShell mprojectRoot compilerVersion inner =
+reexecWithOptionalShell mprojectRoot getCompilerVersion inner =
   do config <- asks getConfig
      inShell <- getInShell
      isReExec <- asks getReExec
      if nixEnable (configNix config) && not inShell && not isReExec
-       then runShellAndExit mprojectRoot compilerVersion getCmdArgs
+       then runShellAndExit mprojectRoot getCompilerVersion getCmdArgs
        else liftIO inner
   where
     getCmdArgs = do
@@ -71,16 +71,17 @@ reexecWithOptionalShell mprojectRoot compilerVersion inner =
 runShellAndExit
     :: M env m
     => Maybe (Path Abs Dir)
-    -> CompilerVersion
+    -> IO CompilerVersion
     -> m (String, [String])
     -> m ()
-runShellAndExit mprojectRoot compilerVersion getCmdArgs = do
+runShellAndExit mprojectRoot getCompilerVersion getCmdArgs = do
      config <- asks getConfig
      envOverride <- getEnvOverride (configPlatform config)
      (cmnd,args) <- fmap (escape *** map escape) getCmdArgs
      mshellFile <-
          traverse (resolveFile (fromMaybeProjectRoot mprojectRoot)) $
          nixInitFile (configNix config)
+     compilerVersion <- liftIO getCompilerVersion
      let pkgsInConfig = nixPackages (configNix config)
          ghc = nixCompiler compilerVersion
          pkgs = pkgsInConfig ++ [ghc]

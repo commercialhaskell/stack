@@ -562,13 +562,13 @@ setupCmd :: SetupCmdOpts -> GlobalOpts -> IO ()
 setupCmd sco@SetupCmdOpts{..} go@GlobalOpts{..} = do
   (manager,lc) <- loadConfigWithOpts go
   withUserFileLock go (configStackRoot $ lcConfig lc) $ \lk -> do
-    compilerVersion <- loadCompilerVersion manager go lc
+    let getCompilerVersion = loadCompilerVersion manager go lc
     runStackTGlobal manager (lcConfig lc) go $ do
       Docker.reexecWithOptionalContainer
           (lcProjectRoot lc)
           Nothing
           (runStackTGlobal manager (lcConfig lc) go $
-           Nix.reexecWithOptionalShell (lcProjectRoot lc) compilerVersion $
+           Nix.reexecWithOptionalShell (lcProjectRoot lc) getCompilerVersion $
            runStackLoggingTGlobal manager go $ do
               (wantedCompiler, compilerCheck, mstack) <-
                   case scoCompilerVersion of
@@ -724,7 +724,7 @@ execCmd ExecOpts {..} go@GlobalOpts{..} =
                  (ExecRunGhc, args) -> return ("ghc", "-e" : "Main.main" : args)
             (manager,lc) <- liftIO $ loadConfigWithOpts go
             withUserFileLock go (configStackRoot $ lcConfig lc) $ \lk -> do
-              compilerVersion <- loadCompilerVersion manager go lc
+              let getCompilerVersion = loadCompilerVersion manager go lc
               runStackTGlobal manager (lcConfig lc) go $
                 Docker.reexecWithOptionalContainer
                     (lcProjectRoot lc)
@@ -735,7 +735,7 @@ execCmd ExecOpts {..} go@GlobalOpts{..} =
                         menv <- liftIO $ configEnvOverride config plainEnvSettings
                         Nix.reexecWithOptionalShell
                             (lcProjectRoot lc)
-                            compilerVersion
+                            getCompilerVersion
                             (runStackTGlobal manager (lcConfig lc) go $
                                 exec menv cmd args))
                     Nothing
