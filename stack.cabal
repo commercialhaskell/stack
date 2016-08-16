@@ -66,6 +66,7 @@ library
                      Data.Maybe.Extra
                      Data.Monoid.Extra
                      Data.Store.VersionTagged
+                     Data.Yaml.Extra
                      Distribution.Version.Extra
                      Network.HTTP.Download
                      Network.HTTP.Download.Verified

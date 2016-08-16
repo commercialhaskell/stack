@@ -66,7 +66,7 @@ import qualified Data.Text as T
 import           Data.Text.Encoding (encodeUtf8)
 import qualified Data.Traversable as Tr
 import           Data.Typeable (Typeable)
-import           Data.Yaml (decodeEither', decodeFileEither)
+import           Data.Yaml.Extra (decodeEither', decodeFileEither)
 import qualified Distribution.Package as C
 import           Distribution.PackageDescription (GenericPackageDescription,
                                                   flagDefault, flagManual,
