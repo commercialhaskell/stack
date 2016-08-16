@@ -1692,9 +1692,6 @@ configuration is effective when running the script. Otherwise the script uses
 the global project configuration specified in
 `~/.stack/global-project/stack.yaml`.
 
-You have the option to make the script independent of any configuration by
-using the `-hide-all-packages` ghc options as describe below.
-
 ### Specifying interpreter options
 
 The stack interpreter options comment must specify a single valid stack command
