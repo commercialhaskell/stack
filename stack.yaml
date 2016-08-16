@@ -22,6 +22,7 @@ extra-deps:
 - http-conduit-2.2.0
 - path-0.5.8
 - unicode-transforms-0.1.0.1
+- optparse-applicative-0.13.0.0
 flags:
   stack:
     hide-dependency-versions: true

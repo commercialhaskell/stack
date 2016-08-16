@@ -141,9 +141,9 @@ complicatedParser commonParser commandParser =
 hsubparser' :: Mod CommandFields a -> Parser a
 hsubparser' m = mkParser d g rdr
   where
-    Mod _ d g = m `mappend` metavar "COMMAND|FILE"
-    (cmds, subs) = mkCommand m
-    rdr = CmdReader cmds (fmap add_helper . subs)
+    Mod _ d g = metavar "COMMAND|FILE" `mappend` m
+    (groupName, cmds, subs) = mkCommand m
+    rdr = CmdReader groupName cmds (fmap add_helper . subs)
     add_helper pinfo = pinfo
       { infoParser = infoParser pinfo <**> helpOption }
 
