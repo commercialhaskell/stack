@@ -1,6 +1,7 @@
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell #-}
@@ -61,6 +62,7 @@ import           Stack.Coverage
 import qualified Stack.Docker as Docker
 import           Stack.Dot
 import           Stack.Exec
+import           Stack.GhcPkg (findGhcPkgField)
 import qualified Stack.Nix as Nix
 import           Stack.Fetch
 import           Stack.FileWatch
@@ -740,28 +742,40 @@ execCmd ExecOpts {..} go@GlobalOpts{..} =
                     Nothing -- Unlocked already above.
         ExecOptsEmbellished {..} ->
            withBuildConfigAndLock go $ \lk -> do
-               config <- asks getConfig
-               (cmd, args) <- case (eoCmd, eoArgs) of
-                   (ExecCmd cmd, args) -> return (cmd, args)
-                   (ExecGhc, args) -> execCompiler "" args
-                    -- NOTE: this won't currently work for GHCJS, because it doesn't have
-                    -- a runghcjs binary. It probably will someday, though.
-                   (ExecRunGhc, args) ->
-                        let opts = concatMap (\x -> ["-package", x]) eoPackages
-                        in execCompiler "" (opts ++ ("-e" : "Main.main" : args))
                let targets = concatMap words eoPackages
                unless (null targets) $
                    Stack.Build.build (const $ return ()) lk defaultBuildOptsCLI
                        { boptsCLITargets = map T.pack targets
                        }
-               munlockFile lk -- Unlock before transferring control away.
+
+               config <- asks getConfig
                menv <- liftIO $ configEnvOverride config eoEnvSettings
+               (cmd, args) <- case (eoCmd, eoArgs) of
+                   (ExecCmd cmd, args) -> return (cmd, args)
+                   (ExecGhc, args) -> getGhcCmd menv eoPackages [] args
+                    -- NOTE: this won't currently work for GHCJS, because it doesn't have
+                    -- a runghcjs binary. It probably will someday, though.
+                   (ExecRunGhc, args) ->
+                        getGhcCmd menv eoPackages ["-e", "Main.main"] args
+               munlockFile lk -- Unlock before transferring control away.
                exec menv cmd args
   where
-    execCompiler cmdPrefix args = do
-        wc <- getWhichCompiler
-        let cmd = cmdPrefix ++ compilerExeName wc
-        return (cmd, args)
+      -- return the package-id of the first package in GHC_PACKAGE_PATH
+      getPkgId menv wc name = do
+          mId <- findGhcPkgField menv wc [] name "id"
+          case mId of
+              Just i -> return (head $ words (T.unpack i))
+              -- should never happen as we have already installed the packages
+              _      -> error ("Could not find package id of package " ++ name)
+
+      getPkgOpts menv wc pkgs = do
+          ids <- mapM (getPkgId menv wc) pkgs
+          return $ concatMap (\x -> ["-package-id", x]) ids
+
+      getGhcCmd menv pkgs prefix args = do
+          wc <- getWhichCompiler
+          pkgopts <- getPkgOpts menv wc pkgs
+          return (compilerExeName wc, prefix ++ pkgopts ++ args)
 
 -- | Evaluate some haskell code inline.
 evalCmd :: EvalOpts -> GlobalOpts -> IO ()
