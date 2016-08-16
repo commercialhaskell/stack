@@ -72,6 +72,7 @@ extra-deps:
 - clock-0.7.2
 - annotated-wl-pprint-0.7.0
 - neat-interpolation-0.3.2
+- optparse-applicative-0.13.0.0
 flags:
   time-locale-compat:
     old-locale: false
