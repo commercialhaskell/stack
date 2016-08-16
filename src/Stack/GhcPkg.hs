@@ -13,6 +13,7 @@ module Stack.GhcPkg
   (getGlobalDB
   ,EnvOverride
   ,envHelper
+  ,findGhcPkgField
   ,createDatabase
   ,unregisterGhcPkgId
   ,getCabalPkgVer
