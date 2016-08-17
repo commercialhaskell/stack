@@ -31,7 +31,7 @@ import           Path
 import           Path.IO
 import qualified Paths_stack as Meta
 import           Prelude hiding (mapM) -- Fix redundant import warnings
-import           Stack.Config (makeConcreteResolver, getInNixShell, getInContainer)
+import           Stack.Config (getInNixShell, getInContainer)
 import           Stack.Config.Nix (nixCompiler)
 import           Stack.Constants (platformVariantEnvVar,inNixShellEnvVar)
 import           Stack.Exec (exec)
@@ -65,7 +65,7 @@ reexecWithOptionalShell mprojectRoot getCompilerVersion inner =
            exePath <- liftIO getExecutablePath
            return (exePath, args)
      if nixEnable (configNix config) && not inShell && (not isReExec || inContainer)
-        then runShellAndExit mprojectRoot maresolver mcompiler getCmdArgs
+        then runShellAndExit mprojectRoot getCompilerVersion getCmdArgs
         else liftIO inner
     
 
