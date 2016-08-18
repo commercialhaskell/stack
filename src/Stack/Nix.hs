@@ -33,7 +33,7 @@ import qualified Paths_stack as Meta
 import           Prelude hiding (mapM) -- Fix redundant import warnings
 import           Stack.Config (getInNixShell, getInContainer)
 import           Stack.Config.Nix (nixCompiler)
-import           Stack.Constants (platformVariantEnvVar,inNixShellEnvVar)
+import           Stack.Constants (platformVariantEnvVar,inNixShellEnvVar,inContainerEnvVar)
 import           Stack.Exec (exec)
 import           Stack.Types.Config
 import           Stack.Types.Docker
@@ -56,6 +56,8 @@ reexecWithOptionalShell mprojectRoot getCompilerVersion inner =
      inShell <- getInNixShell
      inContainer <- getInContainer
      isReExec <- asks getReExec
+     liftIO $ putStrLn $ ">>> inContainer: " ++ show inContainer ++
+                         ", inShell: " ++ show inShell
      let getCmdArgs = do
            origArgs <- liftIO getArgs
            let args | inContainer = origArgs  -- internal-re-exec version already passed
@@ -83,6 +85,7 @@ runShellAndExit mprojectRoot getCompilerVersion getCmdArgs = do
          traverse (resolveFile (fromMaybeProjectRoot mprojectRoot)) $
          nixInitFile (configNix config)
      compilerVersion <- liftIO getCompilerVersion
+     inContainer <- getInContainer
      let pkgsInConfig = nixPackages (configNix config)
          ghc = nixCompiler compilerVersion
          pkgs = pkgsInConfig ++ [ghc]
@@ -105,6 +108,11 @@ runShellAndExit mprojectRoot getCompilerVersion getCmdArgs = do
                               ,"buildInputs = lib.optional stdenv.isLinux glibcLocales ++ inputs; "
                               ,T.pack platformVariantEnvVar <> "=''nix''; "
                               ,T.pack inNixShellEnvVar <> "=1; "
+                              ,if inContainer
+                                  -- If shell is pure, this env var would not
+                                  -- be seen by stack inside nix
+                                  then T.pack inContainerEnvVar <> "=1; "
+                                  else ""
                               ,"LD_LIBRARY_PATH = libPath;"  -- LD_LIBRARY_PATH is set because for now it's
                                -- needed by builds using Template Haskell
                               ,"STACK_IN_NIX_EXTRA_ARGS = stackExtraArgs; "
