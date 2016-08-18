@@ -313,22 +313,10 @@ commandLineHandler progName isInterpreter = complicatedOptions
                     "Visualize your project's dependency graph using Graphviz dot"
                     dotCmd
                     dotOptsParser
-        addCommand' "exec"
-                    "Execute a command"
-                    execCmd
-                    (execOptsParser Nothing)
         addCommand' "ghc"
                     "Run ghc"
                     execCmd
                     (execOptsParser $ Just ExecGhc)
-        addCommand' "ghci"
-                    "Run ghci in the context of package(s) (experimental)"
-                    ghciCmd
-                    ghciOptsParser
-        addCommand' "repl"
-                    "Run ghci in the context of package(s) (experimental) (alias for 'ghci')"
-                    ghciCmd
-                    ghciOptsParser
         addCommand' "hoogle"
                     "Run hoogle in the context of the current Stack config"
                     hoogleCmd
@@ -343,7 +331,19 @@ commandLineHandler progName isInterpreter = complicatedOptions
                                    help "Rebuild the hoogle database"))
         )
 
-      -- These two are the only commands allowed in interpreter mode as well
+      -- These are the only commands allowed in interpreter mode as well
+      addCommand' "exec"
+                  "Execute a command"
+                  execCmd
+                  (execOptsParser Nothing)
+      addCommand' "ghci"
+                  "Run ghci in the context of package(s) (experimental)"
+                  ghciCmd
+                  ghciOptsParser
+      addCommand' "repl"
+                  "Run ghci in the context of package(s) (experimental) (alias for 'ghci')"
+                  ghciCmd
+                  ghciOptsParser
       addCommand' "runghc"
                   "Run runghc"
                   execCmd
