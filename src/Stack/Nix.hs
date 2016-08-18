@@ -56,8 +56,6 @@ reexecWithOptionalShell mprojectRoot getCompilerVersion inner =
      inShell <- getInNixShell
      inContainer <- getInContainer
      isReExec <- asks getReExec
-     liftIO $ putStrLn $ ">>> inContainer: " ++ show inContainer ++
-                         ", inShell: " ++ show inShell
      let getCmdArgs = do
            origArgs <- liftIO getArgs
            let args | inContainer = origArgs  -- internal-re-exec version already passed
