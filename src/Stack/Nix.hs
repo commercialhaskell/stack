@@ -42,6 +42,7 @@ import           Stack.Types.Nix
 import           Stack.Types.Compiler
 import           Stack.Types.Internal
 import           System.Environment (lookupEnv,getArgs,getExecutablePath)
+import qualified System.FilePath  as F
 import           System.Process.Read (getEnvOverride)
 
 -- | If Nix is enabled, re-runs the currently running OS command in a Nix container.
@@ -87,6 +88,7 @@ runShellAndExit mprojectRoot getCompilerVersion getCmdArgs = do
          pkgs = pkgsInConfig ++ [ghc]
          pkgsStr = "[" <> T.intercalate " " pkgs <> "]"
          pureShell = nixPureShell (configNix config)
+         addGCRoots = nixAddGCRoots (configNix config)
          nixopts = case mshellFile of
            Just fp -> [toFilePath fp, "--arg", "ghc"
                       ,"with (import <nixpkgs> {}); " ++ T.unpack ghc]
@@ -109,8 +111,11 @@ runShellAndExit mprojectRoot getCompilerVersion getCmdArgs = do
                               ,"STACK_IN_NIX_EXTRA_ARGS = stackExtraArgs; "
                               ,"} \"\""]]
                     -- glibcLocales is necessary on Linux to avoid warnings about GHC being incapable to set the locale.
-         fullArgs = concat [if pureShell then ["--pure"] else [],
-                            map T.unpack (nixShellOptions (configNix config))
+         fullArgs = concat [if pureShell then ["--pure"] else []
+                           ,if addGCRoots then ["--indirect", "--add-root"
+                                               ,toFilePath (configWorkDir config)
+                                                F.</> "nix-gc-symlinks" F.</> "gc-root"] else []
+                           ,map T.unpack (nixShellOptions (configNix config))
                            ,nixopts
                            ,["--run", intercalate " " (cmnd:"$STACK_IN_NIX_EXTRA_ARGS":args)]
                            ]

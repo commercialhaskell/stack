@@ -26,6 +26,8 @@ data NixOpts = NixOpts
     -- ^ The path of a file containing preconfiguration of the environment (e.g shell.nix)
   ,nixShellOptions :: ![Text]
     -- ^ Options to be given to the nix-shell command line
+  ,nixAddGCRoots :: !Bool
+    -- ^ Should we register gc roots so running nix-collect-garbage doesn't remove nix dependencies
   }
   deriving (Show)
 
@@ -46,6 +48,8 @@ data NixOptsMonoid = NixOptsMonoid
     -- ^ Options to be given to the nix-shell command line
   ,nixMonoidPath :: !(First [Text])
     -- ^ Override parts of NIX_PATH (notably 'nixpkgs')
+  ,nixMonoidAddGCRoots :: !(First Bool)
+    -- ^ Should we register gc roots so running nix-collect-garbage doesn't remove nix dependencies
   }
   deriving (Eq, Show, Generic)
 
@@ -59,6 +63,7 @@ instance FromJSON (WithJSONWarnings NixOptsMonoid) where
               nixMonoidInitFile      <- First <$> o ..:? nixInitFileArgName
               nixMonoidShellOptions  <- First <$> o ..:? nixShellOptsArgName
               nixMonoidPath          <- First <$> o ..:? nixPathArgName
+              nixMonoidAddGCRoots    <- First <$> o ..:? nixAddGCRootsArgName
               return NixOptsMonoid{..})
 
 -- | Left-biased combine Nix options
@@ -89,3 +94,7 @@ nixShellOptsArgName = "nix-shell-options"
 -- | NIX_PATH override argument name
 nixPathArgName :: Text
 nixPathArgName = "path"
+
+-- | Add GC roots arg name
+nixAddGCRootsArgName :: Text
+nixAddGCRootsArgName = "add-gc-roots"
