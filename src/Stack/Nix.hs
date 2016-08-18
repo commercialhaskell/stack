@@ -40,7 +40,7 @@ import           Stack.Types.Docker
 import           Stack.Types.Nix
 import           Stack.Types.Compiler
 import           Stack.Types.Internal
-import           System.Environment (getArgs,getExecutablePath)
+import           System.Environment (getArgs,getExecutablePath,lookupEnv)
 import           System.Process.Read (getEnvOverride)
 
 -- | If Nix is enabled, re-runs the currently running OS command in a Nix container.
@@ -125,8 +125,10 @@ runShellAndExit mprojectRoot getCompilerVersion getCmdArgs = do
                            ]
                            -- Using --run instead of --command so we cannot
                            -- end up in the nix-shell if stack build is Ctrl-C'd
+     pathVar <- liftIO $ lookupEnv "PATH"
+     $logDebug $ "PATH is: " <> T.pack (show pathVar)
      $logDebug $
-         "Using a nix-shell environment " <> (case mshellFile of
+       "Using a nix-shell environment " <> (case mshellFile of
             Just path -> "from file: " <> (T.pack (toFilePath path))
             Nothing -> "with nix packages: " <> (T.intercalate ", " pkgs))
      exec envOverride "nix-shell" fullArgs
