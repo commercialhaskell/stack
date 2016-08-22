@@ -290,7 +290,7 @@ setupCompiler compiler = do
           , "compiler available on your PATH." ]
 
     config <- asks getConfig
-    mpaths <- ensureCompiler SetupOpts
+    mpaths <- fst <$> ensureCompiler SetupOpts
         { soptsInstallIfMissing  = configInstallGHC config
         , soptsUseSystem         = configSystemGHC config
         , soptsWantedCompiler    = compiler

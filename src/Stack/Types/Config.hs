@@ -44,6 +44,10 @@ module Stack.Types.Config
   ,parseGHCVariant
   ,HasGHCVariant(..)
   ,snapshotsDir
+  -- ** CompilerBuild
+  ,CompilerBuild(..)
+  ,compilerBuildName
+  ,compilerBuildSuffix
   -- ** EnvConfig & HasEnvConfig
   ,EnvConfig(..)
   ,HasEnvConfig(..)
@@ -481,6 +485,7 @@ data EnvConfig = EnvConfig
     -- depends on as a library and which is displayed when running
     -- @stack list-dependencies | grep Cabal@ in the stack project.
     ,envConfigCompilerVersion :: !CompilerVersion
+    ,envConfigCompilerBuild :: !CompilerBuild
     ,envConfigPackages   :: !(Map (Path Abs Dir) TreatLikeExtraDep)}
 instance HasBuildConfig EnvConfig where
     getBuildConfig = envConfigBuildConfig
@@ -1233,7 +1238,7 @@ platformOnlyRelDir = do
     parseRelDir (Distribution.Text.display platform ++ platformVariantSuffix platformVariant)
 
 -- | Directory containing snapshots
-snapshotsDir :: (MonadReader env m, HasConfig env, HasGHCVariant env, MonadThrow m) => m (Path Abs Dir)
+snapshotsDir :: (MonadReader env m, HasEnvConfig env, MonadThrow m) => m (Path Abs Dir)
 snapshotsDir = do
     config <- asks getConfig
     platform <- platformGhcRelDir
@@ -1279,17 +1284,35 @@ platformSnapAndCompilerRel = do
     ghc <- compilerVersionDir
     useShaPathOnWindows (platform </> name </> ghc)
 
--- | Relative directory for the platform identifier
+-- | Relative directory for the platform and GHC identifier
 platformGhcRelDir
-    :: (MonadReader env m, HasPlatform env, HasGHCVariant env, MonadThrow m)
+    :: (MonadReader env m, HasEnvConfig env, MonadThrow m)
     => m (Path Rel Dir)
 platformGhcRelDir = do
+    envConfig <- asks getEnvConfig
+    verOnly <- platformGhcVerOnlyRelDirStr
+    parseRelDir (mconcat [ verOnly
+                         , compilerBuildSuffix (envConfigCompilerBuild envConfig)])
+
+-- | Relative directory for the platform and GHC identifier without GHC bindist build
+platformGhcVerOnlyRelDir
+    :: (MonadReader env m, HasPlatform env, HasGHCVariant env, MonadThrow m)
+    => m (Path Rel Dir)
+platformGhcVerOnlyRelDir =
+    parseRelDir =<< platformGhcVerOnlyRelDirStr
+
+-- | Relative directory for the platform and GHC identifier without GHC bindist build
+-- (before parsing into a Path)
+platformGhcVerOnlyRelDirStr
+    :: (MonadReader env m, HasPlatform env, HasGHCVariant env)
+    => m FilePath
+platformGhcVerOnlyRelDirStr = do
     platform <- asks getPlatform
     platformVariant <- asks getPlatformVariant
     ghcVariant <- asks getGHCVariant
-    parseRelDir (mconcat [ Distribution.Text.display platform
-                         , platformVariantSuffix platformVariant
-                         , ghcVariantSuffix ghcVariant ])
+    return $ mconcat [ Distribution.Text.display platform
+                     , platformVariantSuffix platformVariant
+                     , ghcVariantSuffix ghcVariant ]
 
 -- | This is an attempt to shorten stack paths on Windows to decrease our
 -- chances of hitting 260 symbol path limit. The idea is to calculate
@@ -1340,7 +1363,7 @@ configMiniBuildPlanCache :: (MonadThrow m, MonadReader env m, HasConfig env, Has
                          -> m (Path Abs File)
 configMiniBuildPlanCache name = do
     root <- asks getStackRoot
-    platform <- platformGhcRelDir
+    platform <- platformGhcVerOnlyRelDir
     file <- parseRelFile $ T.unpack (renderSnapName name) ++ ".cache"
     -- Yes, cached plans differ based on platform
     return (root </> $(mkRelDir "build-plan-cache") </> platform </> file)
@@ -1484,8 +1507,6 @@ platformVariantSuffix (PlatformVariant v) = "-" ++ v
 -- | Specialized bariant of GHC (e.g. libgmp4 or integer-simple)
 data GHCVariant
     = GHCStandard -- ^ Standard bindist
-    | GHCGMP4 -- ^ Bindist that supports libgmp4 (centos66)
-    | GHCArch -- ^ Bindist built on Arch Linux (bleeding-edge)
     | GHCIntegerSimple -- ^ Bindist that uses integer-simple
     | GHCCustom String -- ^ Other bindists
     deriving (Show)
@@ -1500,8 +1521,6 @@ instance FromJSON GHCVariant where
 -- | Render a GHC variant to a String.
 ghcVariantName :: GHCVariant -> String
 ghcVariantName GHCStandard = "standard"
-ghcVariantName GHCGMP4 = "gmp4"
-ghcVariantName GHCArch = "arch"
 ghcVariantName GHCIntegerSimple = "integersimple"
 ghcVariantName (GHCCustom name) = "custom-" ++ name
 
@@ -1518,10 +1537,23 @@ parseGHCVariant s =
         Nothing
           | s == "" -> return GHCStandard
           | s == "standard" -> return GHCStandard
-          | s == "gmp4" -> return GHCGMP4
-          | s == "arch" -> return GHCArch
           | s == "integersimple" -> return GHCIntegerSimple
           | otherwise -> return (GHCCustom s)
+
+-- | Build of the compiler distribution (e.g. standard, gmp4, tinfo6)
+data CompilerBuild
+  = CompilerBuildStandard
+  | CompilerBuildSpecialized String
+
+-- | Descriptive name for compiler build
+compilerBuildName :: CompilerBuild -> String
+compilerBuildName CompilerBuildStandard = "standard"
+compilerBuildName (CompilerBuildSpecialized s) = s
+
+-- | Suffix to use for filenames/directories constructed with compiler build
+compilerBuildSuffix :: CompilerBuild -> String
+compilerBuildSuffix CompilerBuildStandard = ""
+compilerBuildSuffix (CompilerBuildSpecialized s) = '-' : s
 
 -- | Information for a file to download.
 data DownloadInfo = DownloadInfo

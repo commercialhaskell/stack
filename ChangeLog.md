@@ -29,6 +29,8 @@ Other enhancements:
 * Support for absolute file path in `url` field of `setup-info` or `--ghc-bindist`
 * `stack setup` no longer unpacks to the system temp dir on posix systems.
   [#996](https://github.com/commercialhaskell/stack/issues/996)
+* Detects system with libtinfo6 and can download alternate GHC bindists
+  [#2302](https://github.com/commercialhaskell/stack/issues/2302).
 
 Bug fixes:
 
