@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased changes
+
+Release notes:
+
+Major changes:
+
+Behavior changes:
+
+Other enhancements:
+
+Bug fixes:
+
 ## 1.2.0
 
 Release notes:
