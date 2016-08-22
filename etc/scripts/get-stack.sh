@@ -197,9 +197,6 @@ do_debian_install() {
 do_fedora_install() {
   install_dependencies() {
     dnf_install_pkgs perl make automake gcc gmp-devel libffi zlib xz tar
-    if [ "$1" == "24" ] ; then
-      dnf_install_pkgs ncurses-compat-libs-6.0
-    fi
   }
   dnf_install_stack() {
     dnf_install_pkgs stack
