@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased changes
+## 1.2.0
 
 Release notes:
 
