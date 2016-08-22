@@ -816,6 +816,7 @@ getOSKey platform =
         Platform X86_64 Cabal.OpenBSD -> return "openbsd64"
         Platform I386   Cabal.Windows -> return "windows32"
         Platform X86_64 Cabal.Windows -> return "windows64"
+        Platform Arm    Cabal.Linux   -> return "linux-armv7"
         Platform arch os -> throwM $ UnsupportedSetupCombo os arch
 
 downloadFromInfo
