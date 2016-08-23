@@ -209,8 +209,47 @@ set up.
   * [Publish a new Github release](https://github.com/commercialhaskell/ghc/releases/new)
     with tag `ghc-X.Y.Z-release` and same name.
 
+  * Down all the relevant GHC bindists from https://www.haskell.org/ghc/download_ghc_X_Y_Z and upload them to the just-created Github release (see
+    [stack-setup-2.yaml](https://github.com/fpco/stackage-content/blob/master/stack/stack-setup-2.yaml)
+    for the ones we used in the last GHC release).
+
+    In the case of OS X, repackage the `.xz` bindist as a `.bz2`, since OS X does
+    not include `xz` by default or provide an easy way to install it.
+
+  * Build any additional required bindists (see below for instructions)
+
+      * libtinfo6 (etc/vagrant/fedora24-x86_64)
+
   * [Edit stack-setup-2.yaml](https://github.com/fpco/stackage-content/edit/master/stack/stack-setup-2.yaml)
-    and add the new bindists. For each one, download the bindist from
-    https://www.haskell.org/ghc/download_ghc_X_Y_Z and upload it to the
-    just-created Github release, and refer to the Github version in the YAML. Be
-    sure to update the `content-length` and `sha1` values.
+    and add the new bindists, pointing to the Github release version. Be sure to
+    update the `content-length` and `sha1` values.
+
+### Building GHC
+
+Set the `GHC_VERSION` environment variable to the version to build,
+then run (from [here](https://ghc.haskell.org/trac/ghc/wiki/Newcomers)):
+
+    git config --global url."git://github.com/ghc/packages-".insteadOf git://github.com/ghc/packages/ && \
+    git clone -b ghc-${GHC_VERSION}-release --recursive git://github.com/ghc/ghc ghc-${GHC_VERSION} && \
+    cd ghc-${GHC_VERSION}/ && \
+    cp mk/build.mk.sample mk/build.mk && \
+    sed -i 's/^#BuildFlavour *= *perf$/BuildFlavour = perf/' mk/build.mk && \
+    ./boot && \
+    ./configure --enable-tarballs-autodownload && \
+    sed -i 's/^TAR_COMP *= *bzip2$/TAR_COMP = xz/' mk/config.mk && \
+    make -j$(cat /proc/cpuinfo|grep processor|wc -l) && \
+    make binary-dist
+
+GHC 7.8.4 is slightly different:
+
+    git config --global url."git://github.com/ghc/packages-".insteadOf git://github.com/ghc/packages/ && \
+    git clone -b ghc-${GHC_VERSION}-release --recursive git://github.com/ghc/ghc ghc-${GHC_VERSION} && \
+    cd ghc-${GHC_VERSION}/ && \
+    ./sync-all --extra --nofib -r git://git.haskell.org get -b ghc-7.8 && \
+    cp mk/build.mk.sample mk/build.mk && \
+    sed -i 's/^#BuildFlavour *= *perf$/BuildFlavour = perf/' mk/build.mk && \
+    perl boot && \
+    ./configure && \
+    sed -i 's/^TAR_COMP *= *bzip2$/TAR_COMP = xz/' mk/config.mk && \
+    make -j$(cat /proc/cpuinfo|grep processor|wc -l) && \
+    make binary-dist
