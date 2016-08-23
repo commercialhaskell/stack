@@ -1,6 +1,6 @@
 Vagrant.configure(2) do |config|
   config.vm.box = "kaorimatz/openbsd-5.9-amd64"
-  config.vm.synced_folder "../../..", "/vagrant", type: "rsync", rsync__exclude: [".stack-work/", "_release/"], rsync__args: ["--verbose", "--archive", "--delete", "-z"]
+  config.vm.synced_folder "../../..", "/vagrant", type: "rsync", rsync__verbose: true, rsync__exclude: [".stack-work/", "_release/", ".cabal-sandbox/", "cabal.sandbox.config", "dist/"], rsync__args: ["--verbose", "--archive", "--delete", "-z"]
   config.vm.provider "virtualbox" do |vb|
     vb.memory = "2048"
   end
@@ -11,7 +11,7 @@ Vagrant.configure(2) do |config|
     pkg_add xz bzip2 gmp libffi gmake git awscli gnupg-1.4.19p0
 
     #TODO: use a newer version of stack that supports `stack setup` on OpenBSD for bootstrap
-    curl -sSL https://s3.amazonaws.com/download.fpcomplete.com/dev-tools/stack/stack-1.1.3.20160521-openbsd.gz \
+    curl -sSL https://download.fpcomplete.com/dev-tools/stack/stack-1.1.3.20160521-openbsd.gz \
       | gzip -dc > /usr/local/bin/stack
     chmod a+x /usr/local/bin/stack
 
