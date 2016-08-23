@@ -42,6 +42,9 @@ Bug fixes:
   [#2225](https://github.com/commercialhaskell/stack/issues/2225)
 * Detect resolver change in `stack solver`
   [#2252](https://github.com/commercialhaskell/stack/issues/2252)
+* Fix a bug in docker image creation where the wrong base image was
+  selected
+  [#2376](https://github.com/commercialhaskell/stack/issues/2376)
 * Ignore special entries when unpacking tarballs
   [#2361](https://github.com/commercialhaskell/stack/issues/2361)
 * Fixes src directory pollution of `style.css` and `highlight.js` with GHC 8's
