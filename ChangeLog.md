@@ -15,7 +15,8 @@ Other enhancements:
   See [#2243](https://github.com/commercialhaskell/stack/issues/2243)
 * Stack/Nix: Sets `LD_LIBRARY_PATH` so packages using C libs for Template Haskell can work
   (See _e.g._ [this HaskellR issue](https://github.com/tweag/HaskellR/issues/253))
-
+* Stack/nix: Dependencies can be added as nix GC roots, so they are not removed
+  when running `nix-collect-garbage`
 * Parse CLI arguments and configuration files into less permissive types,
   improving error messages for bad inputs.
   [#2267](https://github.com/commercialhaskell/stack/issues/2267)
