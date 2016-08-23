@@ -186,6 +186,14 @@ nix:
   # `[nixpkgs=/my/local/nixpkgs/clone]` that will be used to override
   # NIX_PATH.
   path: []
+  
+  # false by default. Whether to add your nix dependencies as nix garbage
+  # collection roots. This way, calling nix-collect-garbage will not remove
+  # those packages from the nix store, saving you some time when running
+  # stack build again with nix support activated.
+  # This creates a `nix-gc-symlinks` directory in the project `.stack-work`.
+  # To revert that, just delete this `nix-gc-symlinks` directory.
+  add-gc-roots: false
 ```
 
 ## Using a custom shell.nix file
