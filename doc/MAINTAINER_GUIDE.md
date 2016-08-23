@@ -226,8 +226,9 @@ set up.
 
 ### Building GHC
 
-Set the `GHC_VERSION` environment variable to the version to build,
-then run (from [here](https://ghc.haskell.org/trac/ghc/wiki/Newcomers)):
+Set the `GHC_VERSION` environment variable to the version to build.
+
+For GHC >= 7.10.2, run (from [here](https://ghc.haskell.org/trac/ghc/wiki/Newcomers)):
 
     git config --global url."git://github.com/ghc/packages-".insteadOf git://github.com/ghc/packages/ && \
     git clone -b ghc-${GHC_VERSION}-release --recursive git://github.com/ghc/ghc ghc-${GHC_VERSION} && \

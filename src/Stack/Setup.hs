@@ -8,6 +8,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE MultiWayIf #-}
 
 module Stack.Setup
   ( setupEnv
@@ -472,7 +473,7 @@ getGhcBuild menv = do
     -- that GHC does (i.e. built in same environment as the GHC bindist). The algorithm would go
     -- something like this:
     --
-    -- check for previous 'uname -a' plus compiler version/variant in cache
+    -- check for previous 'uname -a'/`ldconfig -p` plus compiler version/variant in cache
     -- if cached, then use that as suffix
     -- otherwise:
     --     download setup-info
@@ -482,30 +483,49 @@ getGhcBuild menv = do
     --         try running it
     --         if successful, then choose that
     --             cache compiler suffix with the uname -a and ldconfig -p output hash plus compiler version
+    --
+    -- Of course, could also try to make a static GHC bindist instead of all this rigamarole.
 
     platform <- asks getPlatform
     case platform of
         Platform _ Linux -> do
             eldconfigOut <- tryProcessStdout Nothing menv "ldconfig" ["-p"]
-            let efirstWords = fmap (mapMaybe (headMay . T.words) .
-                    T.lines . T.decodeUtf8With T.lenientDecode) eldconfigOut
-            case efirstWords of
-                Right firstWords
-                    | "libtinfo.so.6" `elem` firstWords
-                      && not ("libtinfo.so.5" `elem` firstWords) -> do
-                        $logDebug "Found libtinfo.so.6; using tinfo6 GHC build"
-                        return (CompilerBuildSpecialized "tinfo6")
-                    | "libgmp.so.3" `elem` firstWords
-                      && not ("libgmp.so.10" `elem` firstWords) -> do
-                        $logDebug "Found libgmp.so.3; using gmp4 GHC build"
-                        return (CompilerBuildSpecialized "gmp4")
-                    | otherwise -> do
-                        $logDebug "Did not find libtinfo.so.6 or libgmp.so.3; using standard GHC build"
-                        return CompilerBuildStandard
-                Left _ -> do
-                    $logDebug "ldconfig -p failed; falling back to using standard GHC build"
-                    return CompilerBuildStandard
-        _ -> return CompilerBuildStandard
+            let firstWords = case eldconfigOut of
+                    Right ldconfigOut -> mapMaybe (headMay . T.words) $
+                        T.lines $ T.decodeUtf8With T.lenientDecode ldconfigOut
+                    Left _ -> []
+                checkLib lib
+                    | libT `elem` firstWords = do
+                        $logDebug ("Found shared library " <> libT <> " in 'ldconfig -p' output")
+                        return True
+                    | otherwise = do
+                        -- There doesn't seem to be an easy way to get the true list of directories
+                        -- to scan for shared libs, but this works for the case we care about here: Arch Linux
+                        e <- doesFileExist ($(mkAbsDir "/usr/lib") </> lib)
+                        if e
+                            then $logDebug ("Found shared library " <> libT <> " in /usr/lib")
+                            else $logDebug ("Did not find shared library " <> libT)
+                        return e
+                  where
+                    libT = T.pack (toFilePath lib)
+            hastinfo5 <- checkLib $(mkRelFile "libtinfo.so.5")
+            hastinfo6 <- checkLib $(mkRelFile "libtinfo.so.6")
+            hasncurses6 <- checkLib $(mkRelFile "libncursesw.so.6")
+            hasgmp5 <- checkLib $(mkRelFile "libgmp.so.10")
+            hasgmp4 <- checkLib $(mkRelFile "libgmp.so.3")
+            if  | hastinfo5 && hasgmp5 -> useBuild CompilerBuildStandard
+                | hastinfo6 && hasgmp5 -> useBuild (CompilerBuildSpecialized "tinfo6")
+                | hasncurses6 && hasgmp5 -> useBuild (CompilerBuildSpecialized "ncurses6")
+                | hasgmp4 && hastinfo5 -> useBuild (CompilerBuildSpecialized "gmp4")
+                | otherwise -> useBuild CompilerBuildStandard
+        _ -> useBuild CompilerBuildStandard
+  where
+    useBuild CompilerBuildStandard = do
+        $logDebug "Using standard GHC build"
+        return (CompilerBuildStandard)
+    useBuild (CompilerBuildSpecialized s) = do
+        $logDebug ("Using " <> T.pack s <> " GHC build")
+        return (CompilerBuildSpecialized s)
 
 -- | Ensure Docker container-compatible 'stack' executable is downloaded
 ensureDockerStackExe
