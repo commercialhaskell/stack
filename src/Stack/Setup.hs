@@ -9,6 +9,7 @@
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE MultiWayIf #-}
+{-# LANGUAGE CPP #-}
 
 module Stack.Setup
   ( setupEnv
@@ -498,14 +499,19 @@ getGhcBuild menv = do
                     | libT `elem` firstWords = do
                         $logDebug ("Found shared library " <> libT <> " in 'ldconfig -p' output")
                         return True
+#ifndef WINDOWS
+                    -- $(mkAbsDir "/usr/lib") fails to compile on Windows, thus the CPP
                     | otherwise = do
+                        -- This is a workaround for the fact that libtinfo.so.6 doesn't appear in
+                        -- the 'ldconfig -p' output on Arch even when it exists.
                         -- There doesn't seem to be an easy way to get the true list of directories
-                        -- to scan for shared libs, but this works for the case we care about here: Arch Linux
+                        -- to scan for shared libs, but this works for our particular case.
                         e <- doesFileExist ($(mkAbsDir "/usr/lib") </> lib)
                         if e
                             then $logDebug ("Found shared library " <> libT <> " in /usr/lib")
                             else $logDebug ("Did not find shared library " <> libT)
                         return e
+#endif
                   where
                     libT = T.pack (toFilePath lib)
             hastinfo5 <- checkLib $(mkRelFile "libtinfo.so.5")
@@ -861,11 +867,11 @@ downloadFromInfo programsDir downloadInfo tool = do
             let DownloadInfo{downloadInfoContentLength=contentLength, downloadInfoSha1=sha1} =
                     downloadInfo
             when (isJust contentLength) $
-                $logWarn  "`content-length` in not checked \n\
-                          \and should not be specified when `url` is a file path"
+                $logWarn ("`content-length` in not checked \n" <>
+                          "and should not be specified when `url` is a file path")
             when (isJust sha1) $
-                $logWarn  "`sha1` is not checked and \n\
-                          \should not be specified when `url` is a file path"
+                $logWarn ("`sha1` is not checked and \n" <>
+                          "should not be specified when `url` is a file path")
             return path
         _ ->
             fail $ "`url` must be either an HTTP URL or absolute file path: " ++ url
