@@ -11,6 +11,14 @@ Major changes:
   autogen files and run preprocessors. The `--no-build` flag is now deprecated
   because it should no longer be necessary. See
   [#1364](https://github.com/commercialhaskell/stack/issues/1364)
+* Stack will now always use its own GHC installation, even when a suitable GHC
+  installation is available on the PATH. To get the old behaviour, use
+  the `--system-ghc` flag or set `system-ghc: true` in your ~/.stack/config.yaml.
+
+  NB: Scripts that previously used stack in combination with a system GHC
+  installation should now include a `stack setup` line or use the `--install-ghc`
+  flag.
+  [#2221](https://github.com/commercialhaskell/stack/issues/2221)
 
 Behavior changes:
 

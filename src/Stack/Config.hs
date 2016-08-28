@@ -240,9 +240,12 @@ configFromConfigMonoid configStackRoot configUserConfigPath mresolver mproject C
 
          configGHCVariant0 = getFirst configMonoidGHCVariant
          configGHCBuild = getFirst configMonoidGHCBuild
+         configSystemGHC = fromFirst False configMonoidSystemGHC
 
-         configSystemGHC = fromFirst (isNothing configGHCVariant0) configMonoidSystemGHC
-         configInstallGHC = fromFirst False configMonoidInstallGHC
+     when (isJust configGHCVariant0 && configSystemGHC) $
+         throwM ManualGHCVariantSettingsAreIncompatibleWithSystemGHC
+
+     let configInstallGHC = fromFirst False configMonoidInstallGHC
          configSkipGHCCheck = fromFirst False configMonoidSkipGHCCheck
          configSkipMsys = fromFirst False configMonoidSkipMsys
 

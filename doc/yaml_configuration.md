@@ -306,13 +306,13 @@ other projects by installing into your shared snapshot database.
 
 ### system-ghc
 
-Enables or disables using the GHC available on the PATH. Useful to disable if
-you want to force stack to use its own installed GHC (via `stack setup`), in
-cases where your system GHC my be incomplete for some reason. Default is `true`.
+Enables or disables using the GHC available on the PATH.
+Useful to disable if you want to save the time, bandwidth or storage space needed to setup an isolated GHC.
+Default is `false`.
 
 ```yaml
-# Turn off system GHC
-system-ghc: false
+# Turn on system GHC
+system-ghc: true
 ```
 
 ### install-ghc
@@ -451,6 +451,8 @@ Specify a variant binary distribution of GHC to use.  Known values:
 * any other value: Use a custom GHC bindist. You should specify
   [setup-info](#setup-info) so `stack setup` knows where to download it, or
   pass the `stack setup --ghc-bindist` argument on the command-line
+
+This option is incompatible with `system-ghc: true`.
 
 ### ghc-build
 

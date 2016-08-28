@@ -1111,6 +1111,7 @@ data ConfigException
   | Won'tCreateStackRootInDirectoryOwnedByDifferentUser (Path Abs Dir) (Path Abs Dir) -- ^ @$STACK_ROOT@, parent dir
   | UserDoesn'tOwnDirectory (Path Abs Dir)
   | FailedToCloneRepo String
+  | ManualGHCVariantSettingsAreIncompatibleWithSystemGHC
   deriving Typeable
 instance Show ConfigException where
     show (ParseConfigFileException configFile exception) = concat
@@ -1212,6 +1213,13 @@ instance Show ConfigException where
         , " to clone the repo.  Please ensure that "
         , commandName
         , " is installed and available to stack on your PATH environment variable."
+        ]
+    show ManualGHCVariantSettingsAreIncompatibleWithSystemGHC = T.unpack $ T.concat
+        [ "stack can only control the "
+        , configMonoidGHCVariantName
+        , " of its own GHC installations. Please use '--no-"
+        , configMonoidSystemGHCName
+        , "'."
         ]
 instance Exception ConfigException
 

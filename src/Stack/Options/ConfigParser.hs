@@ -57,7 +57,7 @@ configOptsParser hide0 =
     <*> nixOptsParser True
     <*> firstBoolFlags
             "system-ghc"
-            "using the system installed GHC (on the PATH) if available and a matching version"
+            "using the system installed GHC (on the PATH) if available and a matching version. Disabled by default."
             hide
     <*> firstBoolFlags
             "install-ghc"
