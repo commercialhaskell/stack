@@ -1856,6 +1856,7 @@ Now the differences:
       sandboxes__, everything is (essentially) sandboxed by default.
 
 __Other tools for comparison (including active and historical)__
+
 * [cabal-dev](https://hackage.haskell.org/package/cabal-dev) (deprecated in favor of cabal-install)
 * [cabal-meta](https://hackage.haskell.org/package/cabal-meta) inspired a lot of the multi-package functionality of stack. If you're still using cabal-install, cabal-meta is relevant. For stack work, the feature set is fully subsumed by stack.
 * [cabal-src](https://hackage.haskell.org/package/cabal-src) is mostly irrelevant in the presence of both stack and cabal sandboxes, both of which make it easier to add additional package sources easily. The mega-sdist executable that ships with cabal-src is, however, still relevant. Its functionality may some day be folded into stack
