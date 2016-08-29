@@ -11,4 +11,6 @@ main = do
     stackErr ["build"]
     doesNotExist "stack.yaml"
 
-    stack [defaultResolverArg, "exec", "./foo.bat"]
+    if isWindows
+        then stack [defaultResolverArg, "exec", "./foo.bat"]
+        else stack [defaultResolverArg, "exec", "./foo.sh"]

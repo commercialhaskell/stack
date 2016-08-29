@@ -85,7 +85,7 @@ runCmd' modCP cmd@(Cmd{..}) mbErrMsg = do
 
 -- | Like 'System.Process.callProcess', but takes an optional working directory and
 -- environment override, and throws 'ProcessExitedUnsuccessfully' if the
--- process exits unsuccessfully.
+-- process exits unsuccessfully and a 'ReadProcessException' if the executable is not found.
 --
 -- Inherits stdout and stderr.
 callProcess :: (MonadIO m, MonadLogger m) => Cmd -> m ()
@@ -93,7 +93,7 @@ callProcess = callProcess' id
 
 -- | Like 'System.Process.callProcess', but takes an optional working directory and
 -- environment override, and throws 'ProcessExitedUnsuccessfully' if the
--- process exits unsuccessfully.
+-- process exits unsuccessfully and a 'ReadProcessException' if the executable is not found.
 --
 -- Inherits stdout and stderr.
 callProcess' :: (MonadIO m, MonadLogger m)
@@ -140,6 +140,7 @@ createProcess' tag modCP cmd = do
     $logCreateProcess c
     liftIO $ System.Process.createProcess_ tag c
 
+-- Throws a 'ReadProcessException' if process is not found.
 cmdToCreateProcess :: MonadIO m => Cmd -> m CreateProcess
 cmdToCreateProcess (Cmd wd cmd0 menv args) = do
     cmd <- preProcess wd menv cmd0

@@ -36,6 +36,7 @@ nixOptsFromMonoid NixOptsMonoid{..} os = do
         nixInitFile = getFirst nixMonoidInitFile
         nixShellOptions = fromFirst [] nixMonoidShellOptions
                           ++ prefixAll (T.pack "-I") (fromFirst [] nixMonoidPath)
+        nixAddGCRoots   = fromFirst False nixMonoidAddGCRoots
     when (not (null nixPackages) && isJust nixInitFile) $
        throwM NixCannotUseShellFileAndPackagesException
     return NixOpts{..}

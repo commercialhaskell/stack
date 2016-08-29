@@ -82,7 +82,7 @@ setup
     -> m ()
 setup SetupCmdOpts{..} wantedCompiler compilerCheck mstack = do
     Config{..} <- asks getConfig
-    mpaths <- ensureCompiler SetupOpts
+    mpaths <- fst <$> ensureCompiler SetupOpts
         { soptsInstallIfMissing = True
         , soptsUseSystem = configSystemGHC && not scoForceReinstall
         , soptsWantedCompiler = wantedCompiler

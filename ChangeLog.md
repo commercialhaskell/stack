@@ -10,6 +10,18 @@ Behavior changes:
 
 Other enhancements:
 
+Bug fixes:
+
+## 1.2.0
+
+Release notes:
+
+Major changes:
+
+Behavior changes:
+
+Other enhancements:
+
 * Nix & docker can be activated at the same time, in order to run stack in a nix-shell
   in a container, preferably from an image already containing the nix dependencies
   in its /nix/store
@@ -18,7 +30,8 @@ Other enhancements:
   See [#2243](https://github.com/commercialhaskell/stack/issues/2243)
 * Stack/Nix: Sets `LD_LIBRARY_PATH` so packages using C libs for Template Haskell can work
   (See _e.g._ [this HaskellR issue](https://github.com/tweag/HaskellR/issues/253))
-
+* Stack/nix: Dependencies can be added as nix GC roots, so they are not removed
+  when running `nix-collect-garbage`
 * Parse CLI arguments and configuration files into less permissive types,
   improving error messages for bad inputs.
   [#2267](https://github.com/commercialhaskell/stack/issues/2267)
@@ -32,6 +45,10 @@ Other enhancements:
 * Support for absolute file path in `url` field of `setup-info` or `--ghc-bindist`
 * `stack setup` no longer unpacks to the system temp dir on posix systems.
   [#996](https://github.com/commercialhaskell/stack/issues/996)
+* `stack setup` detects libtinfo6 and can downloads alternate GHC bindists
+  [#2302](https://github.com/commercialhaskell/stack/issues/2302).
+* `stack setup` detects Linux ARMv7 downloads appropriate GHC bindist
+  [#2103](https://github.com/commercialhaskell/stack/issues/2103)
 
 Bug fixes:
 

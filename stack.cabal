@@ -1,5 +1,5 @@
 name:                stack
-version:             1.1.3
+version:             1.2.1
 synopsis:            The Haskell Tool Stack
 description:         Please see the README.md for usage information, and
                      the wiki on Github for more details.  Also, note that
@@ -178,12 +178,12 @@ library
                    , enclosed-exceptions
                    , errors < 2.2
                    , exceptions >= 0.8.0.2
-                   , extra
+                   , extra < 1.6
                    , fast-logger >= 2.3.1
                    , filelock >= 0.1.0.1
                    , filepath >= 1.3.0.2
                    , fsnotify >= 0.2.1
-                   , generic-deriving < 1.11
+                   , generic-deriving < 1.12
                    , hashable >= 1.2.3.2
                    , hit
                    , hpc

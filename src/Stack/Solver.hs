@@ -136,6 +136,7 @@ cabalSolver menv cabalfps constraintType
 
   where
     errCheck = T.isInfixOf "Could not resolve dependencies"
+    linesNoCR = map stripCR . T.lines
     cabalBuildErrMsg e =
                ">>>> Cabal errors begin\n"
             <> e
@@ -167,7 +168,7 @@ cabalSolver menv cabalfps constraintType
         else errExit msg
 
     parseConflictingPkgs msg =
-        let ls = dropWhile (not . errCheck) $ T.lines msg
+        let ls = dropWhile (not . errCheck) $ linesNoCR msg
             select s = ((T.isPrefixOf "trying:" s)
                       || (T.isPrefixOf "next goal:" s))
                       && (T.isSuffixOf "(user goal)" s)
@@ -180,8 +181,7 @@ cabalSolver menv cabalfps constraintType
     parseCabalOutput bs = do
         let ls = drop 1
                $ dropWhile (not . T.isPrefixOf "In order, ")
-               $ map stripCR
-               $ T.lines
+               $ linesNoCR
                $ decodeUtf8 bs
             (errs, pairs) = partitionEithers $ map parseCabalOutputLine ls
         if null errs
@@ -290,7 +290,7 @@ setupCompiler compiler = do
           , "compiler available on your PATH." ]
 
     config <- asks getConfig
-    mpaths <- ensureCompiler SetupOpts
+    mpaths <- fst <$> ensureCompiler SetupOpts
         { soptsInstallIfMissing  = configInstallGHC config
         , soptsUseSystem         = configSystemGHC config
         , soptsWantedCompiler    = compiler

@@ -197,9 +197,6 @@ do_debian_install() {
 do_fedora_install() {
   install_dependencies() {
     dnf_install_pkgs perl make automake gcc gmp-devel libffi zlib xz tar
-    if [ "$1" == "24" ] ; then
-      dnf_install_pkgs ncurses-compat-libs-6.0
-    fi
   }
   dnf_install_stack() {
     dnf_install_pkgs stack
@@ -212,15 +209,15 @@ do_fedora_install() {
     check_dl_tools
     case "$1" in
       "24"*)
-        dl_to_stdout https://s3.amazonaws.com/download.fpcomplete.com/fedora/24/fpco.repo | sudocmd tee /etc/yum.repos.d/fpco.repo >/dev/null
+        dl_to_stdout https://download.fpcomplete.com/fedora/24/fpco.repo | sudocmd tee /etc/yum.repos.d/fpco.repo >/dev/null
         dnf_install_stack
         ;;
       "23"*)
-        dl_to_stdout https://s3.amazonaws.com/download.fpcomplete.com/fedora/23/fpco.repo | sudocmd tee /etc/yum.repos.d/fpco.repo >/dev/null
+        dl_to_stdout https://download.fpcomplete.com/fedora/23/fpco.repo | sudocmd tee /etc/yum.repos.d/fpco.repo >/dev/null
         dnf_install_stack
         ;;
       "22"*)
-        dl_to_stdout https://s3.amazonaws.com/download.fpcomplete.com/fedora/22/fpco.repo | sudocmd tee /etc/yum.repos.d/fpco.repo >/dev/null
+        dl_to_stdout https://download.fpcomplete.com/fedora/22/fpco.repo | sudocmd tee /etc/yum.repos.d/fpco.repo >/dev/null
         dnf_install_stack
         ;;
       *)
@@ -259,11 +256,11 @@ do_centos_install() {
     check_dl_tools
     case "$1" in
       "7"|"7."*)
-        dl_to_stdout https://s3.amazonaws.com/download.fpcomplete.com/centos/7/fpco.repo | sudocmd tee /etc/yum.repos.d/fpco.repo >/dev/null
+        dl_to_stdout https://download.fpcomplete.com/centos/7/fpco.repo | sudocmd tee /etc/yum.repos.d/fpco.repo >/dev/null
         install_package
         ;;
       "6"|"6."*)
-        dl_to_stdout https://s3.amazonaws.com/download.fpcomplete.com/centos/6/fpco.repo | sudocmd tee /etc/yum.repos.d/fpco.repo >/dev/null
+        dl_to_stdout https://download.fpcomplete.com/centos/6/fpco.repo | sudocmd tee /etc/yum.repos.d/fpco.repo >/dev/null
         install_package
         ;;
       *)

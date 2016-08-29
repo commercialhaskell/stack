@@ -29,7 +29,6 @@ module Stack.Config
   ,packagesParser
   ,resolvePackageEntry
   ,getImplicitGlobalProjectDir
-  ,getIsGMP4
   ,getSnapshots
   ,makeConcreteResolver
   ,checkOwnership
@@ -62,8 +61,7 @@ import qualified Data.Map as Map
 import           Data.Maybe
 import           Data.Monoid.Extra
 import qualified Data.Text as T
-import           Data.Text.Encoding (encodeUtf8, decodeUtf8, decodeUtf8With)
-import           Data.Text.Encoding.Error (lenientDecode)
+import           Data.Text.Encoding (encodeUtf8, decodeUtf8)
 import qualified Data.Yaml.Extra as Yaml
 import           Distribution.System (OS (..), Platform (..), buildPlatform)
 import qualified Distribution.Text
@@ -77,7 +75,6 @@ import           Path.Extra (toFilePathNoTrailingSep)
 import           Path.Find (findInParents)
 import           Path.IO
 import qualified Paths_stack as Meta
-import           Safe (headMay)
 import           Stack.BuildPlan
 import           Stack.Config.Build
 import           Stack.Config.Docker
@@ -325,35 +322,6 @@ configFromConfigMonoid configStackRoot configUserConfigPath mresolver mproject C
 
      return Config {..}
 
--- | Get the default 'GHCVariant'.  On older Linux systems with libgmp4, returns 'GHCGMP4'.
-getDefaultGHCVariant
-    :: (MonadIO m, MonadBaseControl IO m, MonadCatch m, MonadLogger m)
-    => EnvOverride -> Platform -> m GHCVariant
-getDefaultGHCVariant menv (Platform _ Linux) = do
-    $logDebug "Checking whether stack was built with libgmp4"
-    isGMP4 <- getIsGMP4 menv
-    if isGMP4
-        then $logDebug "Stack was built with libgmp4, so the default ghc-variant will be gmp4"
-        else $logDebug "Stack was not built with libgmp4"
-    return (if isGMP4 then GHCGMP4 else GHCStandard)
-getDefaultGHCVariant _ _ = return GHCStandard
-
--- Determine whether 'stack' is linked with libgmp4 (libgmp.so.3)
-getIsGMP4
-    :: (MonadIO m, MonadBaseControl IO m, MonadCatch m, MonadLogger m)
-    => EnvOverride -> m Bool
-getIsGMP4 menv = do
-    executablePath <- liftIO getExecutablePath
-    elddOut <- tryProcessStdout Nothing menv "ldd" [executablePath]
-    return $
-        case elddOut of
-            Left _ -> False
-            Right lddOut -> hasLineWithFirstWord "libgmp.so.3" lddOut
-  where
-    hasLineWithFirstWord w =
-        elem (Just w) .
-        map (headMay . T.words) . T.lines . decodeUtf8With lenientDecode
-
 -- | Get the directory on Windows where we should install extra programs. For
 -- more information, see discussion at:
 -- https://github.com/fpco/minghc/issues/43#issuecomment-99737383
@@ -381,14 +349,10 @@ instance HasGHCVariant MiniConfig where
 
 -- | Load the 'MiniConfig'.
 loadMiniConfig
-    :: (MonadIO m, MonadBaseControl IO m, MonadCatch m, MonadLogger m)
+    :: (MonadIO m)
     => Manager -> Config -> m MiniConfig
 loadMiniConfig manager config = do
-    menv <- liftIO $ configEnvOverride config minimalEnvSettings
-    ghcVariant <-
-        case configGHCVariant0 config of
-            Just ghcVariant -> return ghcVariant
-            Nothing -> getDefaultGHCVariant menv (configPlatform config)
+    let ghcVariant = fromMaybe GHCStandard (configGHCVariant0 config)
     return (MiniConfig manager ghcVariant config)
 
 -- Load the configuration, using environment variables, and defaults as

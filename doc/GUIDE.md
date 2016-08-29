@@ -62,7 +62,7 @@ michael@d30748af6d3d:~$ sudo apt-get install wget
 michael@d30748af6d3d:~$ stack
 -bash: stack: command not found
 # Get the signing key for the package repo
-michael@d30748af6d3d:~$ wget -q -O- https://s3.amazonaws.com/download.fpcomplete.com/ubuntu/fpco.key | sudo apt-key add -
+michael@d30748af6d3d:~$ wget -q -O- https://download.fpcomplete.com/ubuntu/fpco.key | sudo apt-key add -
 OK
 michael@d30748af6d3d:~$ echo 'deb http://download.fpcomplete.com/ubuntu/trusty stable main'|sudo tee /etc/apt/sources.list.d/fpco.list
 deb http://download.fpcomplete.com/ubuntu/trusty stable main

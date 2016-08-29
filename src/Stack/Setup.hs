@@ -58,7 +58,7 @@ import qualified    Data.Text.Encoding.Error as T
 import              Data.Time.Clock (NominalDiffTime, diffUTCTime, getCurrentTime)
 import              Data.Typeable (Typeable)
 import qualified    Data.Yaml as Yaml
-import              Distribution.System (OS, Arch (..), Platform (..))
+import              Distribution.System (OS (Linux), Arch (..), Platform (..))
 import qualified    Distribution.System as Cabal
 import              Distribution.Text (simpleParse)
 import              Lens.Micro (set)
@@ -70,7 +70,7 @@ import              Path.Extra (toFilePathNoTrailingSep)
 import              Path.IO hiding (findExecutable)
 import qualified    Paths_stack as Meta
 import              Prelude hiding (concat, elem, any) -- Fix AMP warning
-import              Safe (readMay)
+import              Safe (headMay, readMay)
 import              Stack.Build (build)
 import              Stack.Config (resolvePackageEntry, loadConfig)
 import              Stack.Constants (distRelativeDir, stackProgName)
@@ -215,7 +215,7 @@ setupEnv mResolveMissingGHC = do
             , soptsGHCBindistURL = Nothing
             }
 
-    mghcBin <- ensureCompiler sopts
+    (mghcBin, compilerBuild) <- ensureCompiler sopts
 
     -- Modify the initial environment to include the GHC path, if a local GHC
     -- is being used
@@ -237,6 +237,7 @@ setupEnv mResolveMissingGHC = do
             { envConfigBuildConfig = bconfig
             , envConfigCabalVersion = cabalVer
             , envConfigCompilerVersion = compilerVer
+            , envConfigCompilerBuild = compilerBuild
             , envConfigPackages = Map.fromList $ concat packages
             }
 
@@ -315,6 +316,7 @@ setupEnv mResolveMissingGHC = do
             }
         , envConfigCabalVersion = cabalVer
         , envConfigCompilerVersion = compilerVer
+        , envConfigCompilerBuild = compilerBuild
         , envConfigPackages = envConfigPackages envConfig0
         }
 
@@ -332,7 +334,7 @@ addIncludeLib (ExtraDirs _bins includes libs) config = config
 -- | Ensure compiler (ghc or ghcjs) is installed and provide the PATHs to add if necessary
 ensureCompiler :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasConfig env, HasHttpManager env, HasTerminal env, HasReExec env, HasLogLevel env, HasGHCVariant env, MonadBaseControl IO m)
                => SetupOpts
-               -> m (Maybe ExtraDirs)
+               -> m (Maybe ExtraDirs, CompilerBuild)
 ensureCompiler sopts = do
     let wc = whichCompiler (soptsWantedCompiler sopts)
     when (getGhcVersion (soptsWantedCompiler sopts) < $(mkVersion "7.8")) $ do
@@ -363,7 +365,7 @@ ensureCompiler sopts = do
 
         -- If we need to install a GHC or MSYS, try to do so
         -- Return the additional directory paths of GHC & MSYS.
-    mtools <- if needLocal
+    (mtools, compilerBuild) <- if needLocal
         then do
             getSetupInfo' <- runOnce (getSetupInfo (soptsStackSetupYaml sopts) =<< asks getHttpManager)
 
@@ -373,17 +375,20 @@ ensureCompiler sopts = do
             -- Install GHC
             ghcVariant <- asks getGHCVariant
             config <- asks getConfig
-            ghcPkgName <- parsePackageNameFromString ("ghc" ++ ghcVariantSuffix ghcVariant)
-            let installedCompiler =
+            (installedCompiler, compilerBuild) <-
                     case wc of
-                        Ghc -> getInstalledTool installed ghcPkgName (isWanted . GhcVersion)
-                        Ghcjs -> getInstalledGhcjs installed isWanted
+                        Ghc -> do
+                            ghcBuild <- getGhcBuild menv0
+                            ghcPkgName <- parsePackageNameFromString ("ghc" ++ ghcVariantSuffix ghcVariant ++ compilerBuildSuffix ghcBuild)
+                            return (getInstalledTool installed ghcPkgName (isWanted . GhcVersion), ghcBuild)
+                        Ghcjs -> return (getInstalledGhcjs installed isWanted, CompilerBuildStandard)
             compilerTool <- case installedCompiler of
                 Just tool -> return tool
                 Nothing
                     | soptsInstallIfMissing sopts -> do
                         si <- getSetupInfo'
                         downloadAndInstallCompiler
+                            compilerBuild
                             si
                             (soptsWantedCompiler sopts)
                             (soptsCompilerCheck sopts)
@@ -393,6 +398,7 @@ ensureCompiler sopts = do
                             msystem
                             (soptsWantedCompiler sopts, expectedArch)
                             ghcVariant
+                            compilerBuild
                             (soptsCompilerCheck sopts)
                             (soptsStackYaml sopts)
                             (fromMaybe
@@ -421,8 +427,8 @@ ensureCompiler sopts = do
                                 return Nothing
                 _ -> return Nothing
 
-            return $ Just (compilerTool, mmsys2Tool)
-        else return Nothing
+            return (Just (compilerTool, mmsys2Tool), compilerBuild)
+        else return (Nothing, CompilerBuildStandard)
 
     mpaths <- case mtools of
         Nothing -> return Nothing
@@ -452,9 +458,56 @@ ensureCompiler sopts = do
 
     when (soptsSanityCheck sopts) $ sanityCheck menv wc
 
-    return mpaths
+    return (mpaths, compilerBuild)
 
--- Ensure Docker container-compatible 'stack' executable is downloaded
+-- | Determine which GHC build to use dependong on which shared libraries are available
+-- on the system.
+getGhcBuild
+    :: (MonadIO m, MonadBaseControl IO m, MonadCatch m, MonadLogger m, HasPlatform env, MonadReader env m)
+    => EnvOverride -> m CompilerBuild
+getGhcBuild menv = do
+
+    -- TODO: a more reliable, flexible, and data driven approach would be to actually download small
+    -- "test" executables (from setup-info) that link to the same gmp/tinfo versions
+    -- that GHC does (i.e. built in same environment as the GHC bindist). The algorithm would go
+    -- something like this:
+    --
+    -- check for previous 'uname -a' plus compiler version/variant in cache
+    -- if cached, then use that as suffix
+    -- otherwise:
+    --     download setup-info
+    --     go through all with right prefix for os/version/variant
+    --     first try "standard" (no extra suffix), then the rest
+    --         download "compatibility check" exe if not already downloaded
+    --         try running it
+    --         if successful, then choose that
+    --             cache compiler suffix with the uname -a and ldconfig -p output hash plus compiler version
+
+    platform <- asks getPlatform
+    case platform of
+        Platform _ Linux -> do
+            eldconfigOut <- tryProcessStdout Nothing menv "ldconfig" ["-p"]
+            let efirstWords = fmap (mapMaybe (headMay . T.words) .
+                    T.lines . T.decodeUtf8With T.lenientDecode) eldconfigOut
+            case efirstWords of
+                Right firstWords
+                    | "libtinfo.so.6" `elem` firstWords
+                      && not ("libtinfo.so.5" `elem` firstWords) -> do
+                        $logDebug "Found libtinfo.so.6; using tinfo6 GHC build"
+                        return (CompilerBuildSpecialized "tinfo6")
+                    | "libgmp.so.3" `elem` firstWords
+                      && not ("libgmp.so.10" `elem` firstWords) -> do
+                        $logDebug "Found libgmp.so.3; using gmp4 GHC build"
+                        return (CompilerBuildSpecialized "gmp4")
+                    | otherwise -> do
+                        $logDebug "Did not find libtinfo.so.6 or libgmp.so.3; using standard GHC build"
+                        return CompilerBuildStandard
+                Left _ -> do
+                    $logDebug "ldconfig -p failed; falling back to using standard GHC build"
+                    return CompilerBuildStandard
+        _ -> return CompilerBuildStandard
+
+-- | Ensure Docker container-compatible 'stack' executable is downloaded
 ensureDockerStackExe
     :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasConfig env, HasHttpManager env, MonadBaseControl IO m)
     => Platform -> m (Path Abs File)
@@ -669,12 +722,13 @@ downloadAndInstallTool programsDir si downloadInfo tool installer = do
     return tool
 
 downloadAndInstallCompiler :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasConfig env, HasGHCVariant env, HasHttpManager env, HasTerminal env, HasReExec env, HasLogLevel env, MonadBaseControl IO m)
-                           => SetupInfo
+                           => CompilerBuild
+                           -> SetupInfo
                            -> CompilerVersion
                            -> VersionCheck
                            -> Maybe String
                            -> m Tool
-downloadAndInstallCompiler si wanted@GhcVersion{} versionCheck mbindistURL = do
+downloadAndInstallCompiler ghcBuild si wanted@GhcVersion{} versionCheck mbindistURL = do
     ghcVariant <- asks getGHCVariant
     (selectedVersion, downloadInfo) <- case mbindistURL of
         Just bindistURL -> do
@@ -687,7 +741,7 @@ downloadAndInstallCompiler si wanted@GhcVersion{} versionCheck mbindistURL = do
                 _ ->
                     throwM WantedMustBeGHC
         _ -> do
-            ghcKey <- getGhcKey
+            ghcKey <- getGhcKey ghcBuild
             case Map.lookup ghcKey $ siGHCs si of
                 Nothing -> throwM $ UnknownOSKey ghcKey
                 Just pairs_ -> getWantedCompilerInfo ghcKey versionCheck wanted GhcVersion pairs_
@@ -701,16 +755,19 @@ downloadAndInstallCompiler si wanted@GhcVersion{} versionCheck mbindistURL = do
         (case ghcVariant of
             GHCStandard -> ""
             v -> " (" <> T.pack (ghcVariantName v) <> ")") <>
+        (case ghcBuild of
+            CompilerBuildStandard -> ""
+            b -> " (" <> T.pack (compilerBuildName b) <> ")") <>
         " to an isolated location."
     $logInfo "This will not interfere with any system-level installation."
-    ghcPkgName <- parsePackageNameFromString ("ghc" ++ ghcVariantSuffix ghcVariant)
+    ghcPkgName <- parsePackageNameFromString ("ghc" ++ ghcVariantSuffix ghcVariant ++ compilerBuildSuffix ghcBuild)
     let tool = Tool $ PackageIdentifier ghcPkgName selectedVersion
     downloadAndInstallTool (configLocalPrograms config) si downloadInfo tool installer
-downloadAndInstallCompiler si wanted versionCheck _mbindistUrl = do
+downloadAndInstallCompiler compilerBuild si wanted versionCheck _mbindistUrl = do
     config <- asks getConfig
     ghcVariant <- asks getGHCVariant
-    case ghcVariant of
-        GHCStandard -> return ()
+    case (ghcVariant, compilerBuild) of
+        (GHCStandard, CompilerBuildStandard) -> return ()
         _ -> throwM GHCJSRequiresStandardVariant
     (selectedVersion, downloadInfo) <- case Map.lookup "source" $ siGHCJSs si of
         Nothing -> throwM $ UnknownOSKey "source"
@@ -738,12 +795,12 @@ getWantedCompilerInfo key versionCheck wanted toCV pairs_ =
         filter (isWantedCompiler versionCheck wanted . toCV . fst) (Map.toList pairs_)
 
 getGhcKey :: (MonadReader env m, HasPlatform env, HasGHCVariant env, MonadCatch m)
-          => m Text
-getGhcKey = do
+          => CompilerBuild -> m Text
+getGhcKey ghcBuild = do
     ghcVariant <- asks getGHCVariant
     platform <- asks getPlatform
     osKey <- getOSKey platform
-    return $ osKey <> T.pack (ghcVariantSuffix ghcVariant)
+    return $ osKey <> T.pack (ghcVariantSuffix ghcVariant) <> T.pack (compilerBuildSuffix ghcBuild)
 
 getOSKey :: (MonadThrow m)
          => Platform -> m Text
@@ -759,6 +816,7 @@ getOSKey platform =
         Platform X86_64 Cabal.OpenBSD -> return "openbsd64"
         Platform I386   Cabal.Windows -> return "windows32"
         Platform X86_64 Cabal.Windows -> return "windows64"
+        Platform Arm    Cabal.Linux   -> return "linux-armv7"
         Platform arch os -> throwM $ UnsupportedSetupCombo os arch
 
 downloadFromInfo

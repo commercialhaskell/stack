@@ -313,22 +313,10 @@ commandLineHandler progName isInterpreter = complicatedOptions
                     "Visualize your project's dependency graph using Graphviz dot"
                     dotCmd
                     dotOptsParser
-        addCommand' "exec"
-                    "Execute a command"
-                    execCmd
-                    (execOptsParser Nothing)
         addCommand' "ghc"
                     "Run ghc"
                     execCmd
                     (execOptsParser $ Just ExecGhc)
-        addCommand' "ghci"
-                    "Run ghci in the context of package(s) (experimental)"
-                    ghciCmd
-                    ghciOptsParser
-        addCommand' "repl"
-                    "Run ghci in the context of package(s) (experimental) (alias for 'ghci')"
-                    ghciCmd
-                    ghciOptsParser
         addCommand' "hoogle"
                     "Run hoogle in the context of the current Stack config"
                     hoogleCmd
@@ -343,7 +331,19 @@ commandLineHandler progName isInterpreter = complicatedOptions
                                    help "Rebuild the hoogle database"))
         )
 
-      -- These two are the only commands allowed in interpreter mode as well
+      -- These are the only commands allowed in interpreter mode as well
+      addCommand' "exec"
+                  "Execute a command"
+                  execCmd
+                  (execOptsParser Nothing)
+      addCommand' "ghci"
+                  "Run ghci in the context of package(s) (experimental)"
+                  ghciCmd
+                  ghciOptsParser
+      addCommand' "repl"
+                  "Run ghci in the context of package(s) (experimental) (alias for 'ghci')"
+                  ghciCmd
+                  ghciOptsParser
       addCommand' "runghc"
                   "Run runghc"
                   execCmd
@@ -721,7 +721,7 @@ execCmd ExecOpts {..} go@GlobalOpts{..} =
             (cmd, args) <- case (eoCmd, eoArgs) of
                  (ExecCmd cmd, args) -> return (cmd, args)
                  (ExecGhc, args) -> return ("ghc", args)
-                 (ExecRunGhc, args) -> return ("ghc", "-e" : "Main.main" : args)
+                 (ExecRunGhc, args) -> return ("runghc", args)
             (manager,lc) <- liftIO $ loadConfigWithOpts go
             withUserFileLock go (configStackRoot $ lcConfig lc) $ \lk -> do
               let getCompilerVersion = loadCompilerVersion manager go lc
@@ -752,11 +752,11 @@ execCmd ExecOpts {..} go@GlobalOpts{..} =
                menv <- liftIO $ configEnvOverride config eoEnvSettings
                (cmd, args) <- case (eoCmd, eoArgs) of
                    (ExecCmd cmd, args) -> return (cmd, args)
-                   (ExecGhc, args) -> getGhcCmd menv eoPackages [] args
+                   (ExecGhc, args) -> getGhcCmd "" menv eoPackages args
                     -- NOTE: this won't currently work for GHCJS, because it doesn't have
                     -- a runghcjs binary. It probably will someday, though.
                    (ExecRunGhc, args) ->
-                        getGhcCmd menv eoPackages ["-e", "Main.main"] args
+                       getGhcCmd "run" menv eoPackages args
                munlockFile lk -- Unlock before transferring control away.
                exec menv cmd args
   where
@@ -770,12 +770,13 @@ execCmd ExecOpts {..} go@GlobalOpts{..} =
 
       getPkgOpts menv wc pkgs = do
           ids <- mapM (getPkgId menv wc) pkgs
-          return $ concatMap (\x -> ["-package-id", x]) ids
+          let pkgIdOpts x = ["--ghc-arg=-package-id", "--ghc-arg=" ++ x]
+          return $ concatMap pkgIdOpts ids
 
-      getGhcCmd menv pkgs prefix args = do
+      getGhcCmd prefix menv pkgs args = do
           wc <- getWhichCompiler
           pkgopts <- getPkgOpts menv wc pkgs
-          return (compilerExeName wc, prefix ++ pkgopts ++ args)
+          return (prefix ++ compilerExeName wc, pkgopts ++ args)
 
 -- | Evaluate some haskell code inline.
 evalCmd :: EvalOpts -> GlobalOpts -> IO ()

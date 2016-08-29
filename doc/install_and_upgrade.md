@@ -162,11 +162,11 @@ problems, see the linked FAQ entries:
 
       * CentOS 7 / RHEL 7 (x86_64)
 
-            curl -sSL https://s3.amazonaws.com/download.fpcomplete.com/centos/7/fpco.repo | sudo tee /etc/yum.repos.d/fpco.repo
+            curl -sSL https://download.fpcomplete.com/centos/7/fpco.repo | sudo tee /etc/yum.repos.d/fpco.repo
 
       * CentOS 6 / RHEL 6 (x86_64)
 
-            curl -sSL https://s3.amazonaws.com/download.fpcomplete.com/centos/6/fpco.repo | sudo tee /etc/yum.repos.d/fpco.repo
+            curl -sSL https://download.fpcomplete.com/centos/6/fpco.repo | sudo tee /etc/yum.repos.d/fpco.repo
 
  2. Install:
 
@@ -183,15 +183,15 @@ problems, see the linked FAQ entries:
 
       * Fedora 24 (x86_64)
 
-            curl -sSL https://s3.amazonaws.com/download.fpcomplete.com/fedora/24/fpco.repo | sudo tee /etc/yum.repos.d/fpco.repo
+            curl -sSL https://download.fpcomplete.com/fedora/24/fpco.repo | sudo tee /etc/yum.repos.d/fpco.repo
 
       * Fedora 23 (x86_64)
 
-            curl -sSL https://s3.amazonaws.com/download.fpcomplete.com/fedora/23/fpco.repo | sudo tee /etc/yum.repos.d/fpco.repo
+            curl -sSL https://download.fpcomplete.com/fedora/23/fpco.repo | sudo tee /etc/yum.repos.d/fpco.repo
 
       * Fedora 22 (x86_64)
 
-            curl -sSL https://s3.amazonaws.com/download.fpcomplete.com/fedora/22/fpco.repo | sudo tee /etc/yum.repos.d/fpco.repo
+            curl -sSL https://download.fpcomplete.com/fedora/22/fpco.repo | sudo tee /etc/yum.repos.d/fpco.repo
 
    2. Install:
 
@@ -279,7 +279,6 @@ Stack](http://nixos.org/nixpkgs/manual/#how-to-build-a-haskell-project-using-sta
 * Ensure you have required system dependencies installed.  These include GCC, GNU make, xz, perl, libgmp, libffi, and zlib.  We also recommend Git and GPG.  To install these using your package manager:
     * Debian / Ubuntu: `sudo apt-get install g++ gcc libc6-dev libffi-dev libgmp-dev make xz-utils zlib1g-dev git gnupg`
     * Fedora / CentOS: `sudo dnf install perl make automake gcc gmp-devel libffi zlib xz tar git gnupg` (use `yum` instead of `dnf` on CentOS and Fedora <= 21)
-        * Fedora 24: Also `sudo dnf install ncurses-compat-libs`
     * Arch Linux: `sudo pacman -S make gcc ncurses git gnupg xz zlib gmp libffi zlib`
         * In order to use `stack setup`, you will need the [ncurses5-compat-libs](https://aur.archlinux.org/packages/ncurses5-compat-libs/) AUR package installed.  If this package is not installed, Stack will not be able to install GHC.
     * Gentoo users, make sure to have the `ncurses` package with `USE=tinfo` (without it, stack will not be able to install GHC).

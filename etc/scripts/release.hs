@@ -322,8 +322,6 @@ rules global@Global{..} args = do
             need inputFiles
             cmd "fpm -s dir -t rpm"
                 "-d perl -d make -d automake -d gcc -d gmp-devel -d libffi -d zlib -d xz -d tar"
-                (concat
-                    [["-d", "ncurses-compat-libs"] | dvDistro == fedoraDistro && dvVersion == "24"])
                 ["-n", stackProgName
                 ,"-C", rpmStagingDir dv
                 ,"-v", rpmPackageVersionStr dv
