@@ -770,8 +770,7 @@ execCmd ExecOpts {..} go@GlobalOpts{..} =
 
       getPkgOpts menv wc pkgs = do
           ids <- mapM (getPkgId menv wc) pkgs
-          let pkgIdOpts x = ["--ghc-arg=-package-id", "--ghc-arg=" ++ x]
-          return $ concatMap pkgIdOpts ids
+          return $ map ("-package-id=" ++) ids
 
       getGhcCmd prefix menv pkgs args = do
           wc <- getWhichCompiler
