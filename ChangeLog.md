@@ -4,6 +4,11 @@
 
 Release notes:
 
+* The fix for
+  [#2175](https://github.com/commercialhaskell/stack/issues/2175)
+  entails that stack must perform a full clone of a large Git repo of
+  Hackage meta-information. The total download size is about 200 MB.
+  Please be aware of this when upgrading your stack installation.
 * On many Un*x systems, stack can now be installed with a simple
   one-liner: `wget -qO- https://get.haskellstack.org/ | sh`
 * Bindists for Fedora 24 are now available.
