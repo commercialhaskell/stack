@@ -11,11 +11,12 @@ Release notes:
   Please be aware of this when upgrading your stack installation.
 * On many Un*x systems, stack can now be installed with a simple
   one-liner: `wget -qO- https://get.haskellstack.org/ | sh`
-* Bindists for Fedora 24 are now available.
+* 64-bit GHC bindists have been built for Linux systems with
+  libtinfo6/libncurses6 (such as Fedora 24 and Arch Linux), and `stack setup`
+  will detect when to use them.
 
 Major changes:
 
-* Use the `store` package for binary serialization of most caches.
 * Add `stack hoogle` command.
   [#55](https://github.com/commercialhaskell/stack/issues/55)
 * Support for absolute file path in `url` field of `setup-info` or `--ghc-bindist`
@@ -27,17 +28,21 @@ Behavior changes:
 
 * Remove `stack ide start` and `stack ide load-targets` commands.
   [#2178](https://github.com/commercialhaskell/stack/issues/2178)
-* Only require minor version match for Docker stack exe.
-  This way, we can make patch releases for version bounds and similar
-  build issues without needing to upload new binaries for Docker.
 * Support .buildinfo files in `stack ghci`.
   [#2242](https://github.com/commercialhaskell/stack/pull/2242)
 * Support -ferror-spans syntax in GHC error messages.
 * Avoid unpacking ghc to `/tmp`
   [#996](https://github.com/commercialhaskell/stack/issues/996)
+* The Linux `gmp4` GHC bindist is no longer considered a full-fledged GHC
+  variant and can no longer be specified using the `ghc-variant` option,
+  and instead is treated more like a slightly different platform.
 
 Other enhancements:
 
+* Use the `store` package for binary serialization of most caches.
+* Only require minor version match for Docker stack exe.
+  This way, we can make patch releases for version bounds and similar
+  build issues without needing to upload new binaries for Docker.
 * Stack/Nix: Passes the right ghc derivation as an argument to the `shell.nix` when a
   custom `shell.nix` is used
   See [#2243](https://github.com/commercialhaskell/stack/issues/2243)
@@ -55,7 +60,8 @@ Other enhancements:
   commands. [#2346](https://github.com/commercialhaskell/stack/pull/2346)
 * `stack setup` no longer unpacks to the system temp dir on posix systems.
   [#996](https://github.com/commercialhaskell/stack/issues/996)
-* `stack setup` detects libtinfo6 and can downloads alternate GHC bindists
+* `stack setup` detects libtinfo6 and ncurses6 and can download alternate GHC
+  bindists [#257](https://github.com/commercialhaskell/stack/issues/257)
   [#2302](https://github.com/commercialhaskell/stack/issues/2302).
 * `stack setup` detects Linux ARMv7 downloads appropriate GHC bindist
   [#2103](https://github.com/commercialhaskell/stack/issues/2103)
