@@ -5,7 +5,7 @@ This way your question will be more easily discoverable by other people with the
 
 If you're reporting a bug please follow the steps below:
 
-Make sure that you are using the latest release (currently stack-1.1.2).
+Make sure that you are using the latest release (currently stack-1.2.0).
 See the [upgrade instructions](http://docs.haskellstack.org/en/stable/install_and_upgrade/#upgrade) to upgrade.
 
 Please use the following schema for your bug report:
