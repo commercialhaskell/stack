@@ -340,7 +340,7 @@ do_sloppy_install() {
   info "Since this installer doesn't support your Linux distribution,"
   info "there is no guarantee that 'stack' will work at all!  You may"
   info "need to manually install some system info dependencies for GHC:"
-  info "  gcc, make, libffi, zlib, libgmp5, and libtinfo5"
+  info "  gcc, make, libffi, zlib, libgmp and libtinfo"
   info "Please see http://docs.haskellstack.org/en/stable/install_and_upgrade/"
   info "Pull requests to add support for this distro would be welcome!"
   info ""
