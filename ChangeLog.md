@@ -139,6 +139,8 @@ Bug fixes:
   Scripts can now automatically open in the repl by using `exec ghci`
   instead of `runghc` in the shebang command.
   [#2510](https://github.com/commercialhaskell/stack/issues/2510)
+* Now consider a package to be dirty when an extra-source-file is changed.
+  See [#2040](https://github.com/commercialhaskell/stack/issues/2040)
 
 ## 1.1.2
 
@@ -209,9 +211,6 @@ Bug fixes:
   checked for dirtiness. See
   [#1982](https://github.com/commercialhaskell/stack/issues/1982)
 * Signing: always use `--with-fingerprints`
-  [#2110](https://github.com/commercialhaskell/stack/issues/2110).
-* Now consider a package to be dirty when an extra-source-file is changed.
-  See [#2040](https://github.com/commercialhaskell/stack/issues/2040).
 
 ## 1.1.0
 
