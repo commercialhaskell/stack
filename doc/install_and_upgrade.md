@@ -230,9 +230,11 @@ new releases by some days.
   - [stack](https://www.archlinux.org/packages/community/x86_64/stack/) _latest stable version_
   - [haskell-stack-git](https://aur.archlinux.org/packages/haskell-stack-git/) _git version_
 
-In order to use `stack setup`, you will need the
-[libtinfo](https://aur.archlinux.org/packages/libtinfo/) AUR package installed.
-If this package is not installed, Stack will not be able to install GHC.
+In order to use `stack setup` with older versions of GHC or on a 32-bit system,
+you may need the
+[ncurses5-compat-libs](https://aur.archlinux.org/packages/ncurses5-compat-libs/)
+AUR package installed. If this package is not installed, Stack may not be able
+to install older (< 7.10.3) or 32-bit GHC versions.
 
 If you use the
 [ArchHaskell repository](https://wiki.archlinux.org/index.php/ArchHaskell), you
@@ -283,11 +285,17 @@ Stack](http://nixos.org/nixpkgs/manual/#how-to-build-a-haskell-project-using-sta
 * Ensure you have required system dependencies installed.  These include GCC, GNU make, xz, perl, libgmp, libffi, and zlib.  We also recommend Git and GPG.  To install these using your package manager:
     * Debian / Ubuntu: `sudo apt-get install g++ gcc libc6-dev libffi-dev libgmp-dev make xz-utils zlib1g-dev git gnupg`
     * Fedora / CentOS: `sudo dnf install perl make automake gcc gmp-devel libffi zlib xz tar git gnupg` (use `yum` instead of `dnf` on CentOS and Fedora <= 21)
+        * Fedora 24: In order to use `stack setup` on a 32-bit system, you may
+          need to run `sudo dnf install ncurses-compat-libs`. If this package is
+          not installed, Stack may not be able to install 32-bit GHC versions.
+        Also `sudo dnf install ncurses-compat-libs` if you nee
     * Arch Linux: `sudo pacman -S make gcc ncurses git gnupg xz zlib gmp libffi zlib`
-        * In order to use `stack setup`, you will need the
-          [libtinfo](https://aur.archlinux.org/packages/libtinfo/) AUR package
-          installed. If this package is not installed, Stack will not be able to
-          install GHC.
+
+        * In order to use `stack setup` with older versions of GHC or on a
+          32-bit system, you may need the
+          [ncurses5-compat-libs](https://aur.archlinux.org/packages/ncurses5-compat-libs/)
+          AUR package installed. If this package is not installed, Stack may not
+          be able to install older (< 7.10.3) or 32-bit GHC versions.
     * Gentoo users, make sure to have the `ncurses` package with `USE=tinfo` (without it, stack will not be able to install GHC).
 
 * Now you can run `stack` from the terminal.
