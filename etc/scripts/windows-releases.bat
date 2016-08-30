@@ -10,7 +10,7 @@ cd etc\scripts
 stack --install-ghc install
 if errorlevel 1 exit /b
 cd ..\..
-%RELEASE_SCRIPT% --no-test-haddocks --arch=i386 --upload-label="Windows 32-bit" %1 %2 %3 %4 %5 %6 %7 %8 %9 release
+%RELEASE_SCRIPT% --no-test-haddocks --arch=i386 %1 %2 %3 %4 %5 %6 %7 %8 %9 release
 if errorlevel 1 exit /b
-%RELEASE_SCRIPT% --no-test-haddocks --arch=x86_64 --upload-label="Windows 64-bit" %1 %2 %3 %4 %5 %6 %7 %8 %9 release
+%RELEASE_SCRIPT% --no-test-haddocks --arch=x86_64 %1 %2 %3 %4 %5 %6 %7 %8 %9 release
 if errorlevel 1 exit /b
