@@ -2,7 +2,7 @@
 # vi: set ft=ruby :
 Vagrant.configure(2) do |config|
   config.vm.box = "puppetlabs/centos-6.6-64-nocm"
-  config.vm.synced_folder "../../..", "/vagrant", type: "rsync", rsync__verbose: true, rsync__exclude: [".stack-work/", "_release/", ".cabal-sandbox/", "cabal.sandbox.config", "dist/"], rsync__args: ["--verbose", "--archive", "--delete", "-z"]
+  config.vm.synced_folder "../../..", "/vagrant", type: "rsync", rsync__verbose: true, rsync__exclude: [".stack-work/", "_release/", ".cabal-sandbox/", "cabal.sandbox.config", "dist/", ".#*#"], rsync__args: ["--verbose", "--archive", "--delete", "-z"]
   config.vm.provider "virtualbox" do |vb|
     vb.memory = "2048"
   end
