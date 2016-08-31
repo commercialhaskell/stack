@@ -57,7 +57,7 @@ before_install:
 
 install:
  - echo "$(ghc --version) [$(ghc --print-project-git-commit-id 2> /dev/null || echo '?')]"
- - echo "stack location: $(which stack)"
+ - echo "stack is located at $(which stack)"
  - stack --version
  - case "$BUILD" in
      stack)
