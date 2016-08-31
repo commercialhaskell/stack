@@ -2,7 +2,7 @@ Vagrant.configure(2) do |config|
   config.vm.box = "kaorimatz/openbsd-5.9-amd64"
   config.vm.synced_folder "../../..", "/vagrant", type: "rsync", rsync__verbose: true, rsync__exclude: [".stack-work/", "_release/", ".cabal-sandbox/", "cabal.sandbox.config", "dist/", ".#*#"], rsync__args: ["--verbose", "--archive", "--delete", "-z"]
   config.vm.provider "virtualbox" do |vb|
-    vb.memory = "2048"
+    vb.memory = "3072"
   end
   config.ssh.forward_agent = true
   config.ssh.shell = "/bin/sh"
