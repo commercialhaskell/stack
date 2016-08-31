@@ -363,11 +363,38 @@ ensureCompiler sopts = do
                 arch /= expectedArch
         isWanted = isWantedCompiler (soptsCompilerCheck sopts) (soptsWantedCompiler sopts)
 
+    getSetupInfo' <- runOnce (getSetupInfo (soptsStackSetupYaml sopts) =<< asks getHttpManager)
+
+    let getMmsys2Tool = do
+            platform <- asks getPlatform
+            localPrograms <- asks $ configLocalPrograms . getConfig
+            installed <- listInstalled localPrograms
+
+            case platform of
+                Platform _ Cabal.Windows | not (soptsSkipMsys sopts) ->
+                    case getInstalledTool installed $(mkPackageName "msys2") (const True) of
+                        Just tool -> return (Just tool)
+                        Nothing
+                            | soptsInstallIfMissing sopts -> do
+                                si <- getSetupInfo'
+                                osKey <- getOSKey platform
+                                config <- asks getConfig
+                                VersionedDownloadInfo version info <-
+                                    case Map.lookup osKey $ siMsys2 si of
+                                        Just x -> return x
+                                        Nothing -> error $ "MSYS2 not found for " ++ T.unpack osKey
+                                let tool = Tool (PackageIdentifier $(mkPackageName "msys2") version)
+                                Just <$> downloadAndInstallTool (configLocalPrograms config) si info tool (installMsys2Windows osKey)
+                            | otherwise -> do
+                                $logWarn "Continuing despite missing tool: msys2"
+                                return Nothing
+                _ -> return Nothing
+
+
         -- If we need to install a GHC or MSYS, try to do so
         -- Return the additional directory paths of GHC & MSYS.
     (mtools, compilerBuild) <- if needLocal
         then do
-            getSetupInfo' <- runOnce (getSetupInfo (soptsStackSetupYaml sopts) =<< asks getHttpManager)
 
             localPrograms <- asks $ configLocalPrograms . getConfig
             installed <- listInstalled localPrograms
@@ -407,34 +434,18 @@ ensureCompiler sopts = do
                                 $ soptsResolveMissingGHC sopts)
 
             -- Install msys2 on windows, if necessary
-            platform <- asks getPlatform
-            mmsys2Tool <- case platform of
-                Platform _ Cabal.Windows | not (soptsSkipMsys sopts) ->
-                    case getInstalledTool installed $(mkPackageName "msys2") (const True) of
-                        Just tool -> return (Just tool)
-                        Nothing
-                            | soptsInstallIfMissing sopts -> do
-                                si <- getSetupInfo'
-                                osKey <- getOSKey platform
-                                VersionedDownloadInfo version info <-
-                                    case Map.lookup osKey $ siMsys2 si of
-                                        Just x -> return x
-                                        Nothing -> error $ "MSYS2 not found for " ++ T.unpack osKey
-                                let tool = Tool (PackageIdentifier $(mkPackageName "msys2") version)
-                                Just <$> downloadAndInstallTool (configLocalPrograms config) si info tool (installMsys2Windows osKey)
-                            | otherwise -> do
-                                $logWarn "Continuing despite missing tool: msys2"
-                                return Nothing
-                _ -> return Nothing
-
-            return (Just (compilerTool, mmsys2Tool), compilerBuild)
-        else return (Nothing, CompilerBuildStandard)
+            mmsys2Tool <- getMmsys2Tool
+            return (Just (Just compilerTool, mmsys2Tool), compilerBuild)
+        -- Have the right ghc, may still need msys
+        else do
+            mmsys2Tool <- getMmsys2Tool
+            return (Just (Nothing, mmsys2Tool), CompilerBuildStandard)
 
     mpaths <- case mtools of
         Nothing -> return Nothing
         Just (compilerTool, mmsys2Tool) -> do
             -- Add GHC's and MSYS's paths to the config.
-            let idents = catMaybes [Just compilerTool, mmsys2Tool]
+            let idents = catMaybes [compilerTool, mmsys2Tool]
             paths <- mapM extraDirs idents
             return $ Just $ mconcat paths
 
@@ -453,7 +464,7 @@ ensureCompiler sopts = do
         upgradeCabal menv wc
 
     case mtools of
-        Just (ToolGhcjs cv, _) -> ensureGhcjsBooted menv cv (soptsInstallIfMissing sopts)
+        Just (Just (ToolGhcjs cv), _) -> ensureGhcjsBooted menv cv (soptsInstallIfMissing sopts)
         _ -> return ()
 
     when (soptsSanityCheck sopts) $ sanityCheck menv wc
