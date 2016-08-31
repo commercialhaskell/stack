@@ -57,14 +57,15 @@ before_install:
 
 install:
  - echo "$(ghc --version) [$(ghc --print-project-git-commit-id 2> /dev/null || echo '?')]"
- - echo "stack is located at $(which stack)"
- - stack --version
  - case "$BUILD" in
      stack)
        stack --no-terminal test --only-dependencies;;
      cabal)
        cabal --version;
        travis_retry cabal update;
+       rm -rf $HOME/.cabal/bin;
+       echo "stack is located at $(which stack)";
+       stack --version;
        rm -f $(stack --compiler=ghc-$GHCVER path --dist-dir)/stack-*.tar.gz &&
        stack --compiler=ghc-$GHCVER sdist --pvp-bounds=both &&
        tar xf $(stack --compiler=ghc-$GHCVER path --dist-dir)/stack-*.tar.gz --wildcards --strip-components=1 '*/stack.cabal' &&
