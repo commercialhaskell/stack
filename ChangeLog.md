@@ -22,6 +22,9 @@ Behavior changes:
 
 Other enhancements:
 
+* Nix & docker can be activated at the same time, in order to run stack in a nix-shell
+  in a container, preferably from an image already containing the nix dependencies
+  in its /nix/store
 * Stack/Nix: Passes the right ghc derivation as an argument to the `shell.nix` when a
   custom `shell.nix` is used
   See [#2243](https://github.com/commercialhaskell/stack/issues/2243)

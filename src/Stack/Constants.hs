@@ -16,6 +16,7 @@ module Stack.Constants
     ,stackRootOptionName
     ,deprecatedStackRootOptionName
     ,inContainerEnvVar
+    ,inNixShellEnvVar
     ,configCacheFile
     ,configCabalMod
     ,buildCacheFile
@@ -219,6 +220,12 @@ deprecatedStackRootOptionName = "global-stack-root"
 -- | Environment variable used to indicate stack is running in container.
 inContainerEnvVar :: String
 inContainerEnvVar = stackProgNameUpper ++ "_IN_CONTAINER"
+
+-- | Environment variable used to indicate stack is running in container.
+-- although we already have STACK_IN_NIX_EXTRA_ARGS that is set in the same conditions,
+-- it can happen that STACK_IN_NIX_EXTRA_ARGS is set to empty.
+inNixShellEnvVar :: String
+inNixShellEnvVar = concat [map toUpper stackProgName,"_IN_NIXSHELL"]
 
 -- See https://downloads.haskell.org/~ghc/7.10.1/docs/html/libraries/ghc/src/Module.html#integerPackageKey
 wiredInPackages :: HashSet PackageName

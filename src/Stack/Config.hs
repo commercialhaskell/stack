@@ -33,6 +33,7 @@ module Stack.Config
   ,makeConcreteResolver
   ,checkOwnership
   ,getInContainer
+  ,getInNixShell
   ) where
 
 import qualified Codec.Archive.Tar as Tar
@@ -726,6 +727,10 @@ isOwnedByUser path = liftIO $ do
 -- | 'True' if we are currently running inside a Docker container.
 getInContainer :: (MonadIO m) => m Bool
 getInContainer = liftIO (isJust <$> lookupEnv inContainerEnvVar)
+
+-- | 'True' if we are currently running inside a Nix.
+getInNixShell :: (MonadIO m) => m Bool
+getInNixShell = liftIO (isJust <$> lookupEnv inNixShellEnvVar)
 
 -- | Determine the extra config file locations which exist.
 --
