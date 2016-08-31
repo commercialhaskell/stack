@@ -63,7 +63,7 @@ install:
      cabal)
        cabal --version;
        travis_retry cabal update;
-       rm -rf $HOME/.cabal/bin;
+       rm -f $HOME/.cabal/bin/stack;
        echo "stack is located at $(which stack)";
        stack --version;
        rm -f $(stack --compiler=ghc-$GHCVER path --dist-dir)/stack-*.tar.gz &&
