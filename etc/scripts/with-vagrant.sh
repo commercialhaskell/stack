@@ -12,5 +12,5 @@ vagrant up
 
 vagrant provision
 vagrant rsync
-vagrant ssh -c "set -xe; $3 export GITHUB_AUTH_TOKEN=$GITHUB_AUTH_TOKEN; export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID; export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY; export AWS_DEFAULT_REGION=$AWS_DEFAULT_REGION; export AWS_SESSION_TOKEN=$AWS_SESSION_TOKEN; gpg --import /vagrant/gpg-secret-key.asc~; cd /vagrant; for x in CONTRIBUTING ChangeLog; do rm -f doc/\$x.md; ln -s ../\$x.md doc/\$x.md; done; (cd etc/scripts; stack --install-ghc build); \$(cd etc/scripts; stack exec which stack-release-script) --no-test-haddocks $2"
+vagrant ssh -c "set -xe; $3 export GITHUB_AUTH_TOKEN=$GITHUB_AUTH_TOKEN; export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID; export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY; export AWS_DEFAULT_REGION=$AWS_DEFAULT_REGION; export AWS_SESSION_TOKEN=$AWS_SESSION_TOKEN; gpg --import /vagrant/gpg-secret-key.asc~ || true; cd /vagrant; for x in CONTRIBUTING ChangeLog; do rm -f doc/\$x.md; ln -s ../\$x.md doc/\$x.md; done; (cd etc/scripts; stack --install-ghc build); \$(cd etc/scripts; stack exec which stack-release-script) --no-test-haddocks $2"
 vagrant halt || vagrant halt -f
