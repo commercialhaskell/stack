@@ -378,7 +378,7 @@ buildOptsMonoidParser hide0 =
     options =
         BuildOptsMonoid <$> libProfiling <*> exeProfiling <*> haddock <*>
         haddockOptsParser hide0 <*> openHaddocks <*>
-        haddockDeps <*> copyBins <*> preFetch <*> keepGoing <*> forceDirty <*>
+        haddockDeps <*> haddockInternal <*> copyBins <*> preFetch <*> keepGoing <*> forceDirty <*>
         tests <*> testOptsParser hide0 <*> benches <*> benchOptsParser hide0 <*> reconfigure <*>
         cabalVerbose <*> splitObjs
     libProfiling =
@@ -403,6 +403,11 @@ buildOptsMonoidParser hide0 =
             hide
     haddockDeps =
         firstBoolFlags "haddock-deps" "building Haddocks for dependencies" hide
+    haddockInternal =
+        firstBoolFlags
+            "haddock-internal"
+            "building Haddocks for internal modules (like cabal haddock --internal)"
+            hide
     copyBins =
         firstBoolFlags
             "copy-bins"

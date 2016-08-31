@@ -10,6 +10,9 @@ Behavior changes:
 
 Other enhancements:
 
+* `stack haddock` now supports `--haddock-internal`. See
+  [#2229](https://github.com/commercialhaskell/stack/issues/2229)
+
 Bug fixes:
 
 ## 1.2.0
