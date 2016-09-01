@@ -12,6 +12,9 @@ Other enhancements:
 
 Bug fixes:
 
+* Add proper support for non-ASCII characters in file paths for the `sdist` command.
+  See [#2549](https://github.com/commercialhaskell/stack/issues/2549)
+
 ## 1.2.0
 
 Release notes:
