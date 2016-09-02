@@ -62,6 +62,8 @@ module Stack.Types.Config
   ,WhichSolverCmd(..)
   -- ** ConfigMonoid
   ,ConfigMonoid(..)
+  ,configMonoidInstallGHCName
+  ,configMonoidSystemGHCName
   -- ** EnvSettings
   ,EnvSettings(..)
   ,minimalEnvSettings
@@ -106,6 +108,7 @@ module Stack.Types.Config
   ,customResolverHash
   ,toResolverNotLoaded
   ,AbstractResolver(..)
+  ,readAbstractResolver
   -- ** SCM
   ,SCM(..)
   -- ** CustomSnapshot
@@ -183,6 +186,7 @@ import qualified Data.Set as Set
 import           Data.Text (Text)
 import qualified Data.Text as T
 import           Data.Text.Encoding (encodeUtf8, decodeUtf8)
+import           Data.Text.Read (decimal)
 import           Data.Typeable
 import           Data.Yaml (ParseException)
 import qualified Data.Yaml as Yaml
@@ -192,6 +196,9 @@ import           Distribution.Version (anyVersion)
 import           GHC.Generics (Generic)
 import           Generics.Deriving.Monoid (memptydefault, mappenddefault)
 import           Network.HTTP.Client (parseRequest)
+import           Options.Applicative (ReadM)
+import qualified Options.Applicative as OA
+import qualified Options.Applicative.Types as OA
 import           Path
 import qualified Paths_stack as Meta
 import           Stack.Types.BuildPlan (MiniBuildPlan(..), SnapName, renderSnapName, parseSnapName, SnapshotHash (..), trimmedSnapshotHash)
@@ -423,6 +430,20 @@ data AbstractResolver
     | ARResolver !Resolver
     | ARGlobal
     deriving Show
+
+readAbstractResolver :: ReadM AbstractResolver
+readAbstractResolver = do
+    s <- OA.readerAsk
+    case s of
+        "global" -> return ARGlobal
+        "nightly" -> return ARLatestNightly
+        "lts" -> return ARLatestLTS
+        'l':'t':'s':'-':x | Right (x', "") <- decimal $ T.pack x ->
+            return $ ARLatestLTSMajor x'
+        _ ->
+            case parseResolverText $ T.pack s of
+                Left e -> OA.readerError $ show e
+                Right x -> return $ ARResolver x
 
 -- | Default logging level should be something useful but not crazy.
 defaultLogLevel :: LogLevel

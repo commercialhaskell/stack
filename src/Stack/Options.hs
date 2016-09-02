@@ -7,7 +7,6 @@ module Stack.Options
     ,benchOptsParser
     ,buildOptsParser
     ,cleanOptsParser
-    ,configCmdSetParser
     ,configOptsParser
     ,dockerOptsParser
     ,dockerCleanupOptsParser
@@ -40,18 +39,16 @@ import           Data.Maybe
 import           Data.Monoid.Extra
 import qualified Data.Set                          as Set
 import qualified Data.Text                         as T
-import           Data.Text.Read                    (decimal)
 import           Data.Version                      (showVersion)
 import           Distribution.Version              (anyVersion)
 import           Options.Applicative
 import           Options.Applicative.Args
 import           Options.Applicative.Builder.Extra
-import           Options.Applicative.Types         (fromM, oneM, readerAsk)
+import           Options.Applicative.Types         (readerAsk)
 import           Paths_stack                       as Meta
 import           Stack.Build                       (splitObjsWarning)
 import           Stack.Clean                       (CleanOpts (..))
 import           Stack.Config                      (packagesParser)
-import           Stack.ConfigCmd
 import           Stack.Constants
 import           Stack.Coverage                    (HpcReportOpts (..))
 import           Stack.Docker
@@ -825,20 +822,6 @@ abstractResolverOptsParser hide =
          help "Override resolver in project file" <>
          hideMods hide)
 
-readAbstractResolver :: ReadM AbstractResolver
-readAbstractResolver = do
-    s <- readerAsk
-    case s of
-        "global" -> return ARGlobal
-        "nightly" -> return ARLatestNightly
-        "lts" -> return ARLatestLTS
-        'l':'t':'s':'-':x | Right (x', "") <- decimal $ T.pack x ->
-            return $ ARLatestLTSMajor x'
-        _ ->
-            case parseResolverText $ T.pack s of
-                Left e -> readerError $ show e
-                Right x -> return $ ARResolver x
-
 compilerOptsParser :: Bool -> Parser CompilerVersion
 compilerOptsParser hide =
     option readCompilerVersion
@@ -965,26 +948,6 @@ pvpBoundsOption =
                 readerError e
             Right v ->
                 return v
-
-configCmdSetParser :: Parser ConfigCmdSet
-configCmdSetParser =
-    fromM
-        (do field <-
-                oneM
-                    (strArgument
-                         (metavar "FIELD VALUE"))
-            oneM (fieldToValParser field))
-  where
-    fieldToValParser :: String -> Parser ConfigCmdSet
-    fieldToValParser s =
-        case s of
-            "resolver" ->
-                ConfigCmdSetResolver <$>
-                argument
-                    readAbstractResolver
-                    idm
-            _ ->
-                error "parse stack config set field: only set resolver is implemented"
 
 -- | If argument is True, hides the option from usage and help
 hideMods :: Bool -> Mod f a
