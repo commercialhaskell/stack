@@ -173,7 +173,6 @@ library
                    , cryptohash >= 0.11.6
                    , cryptohash-conduit
                    , directory >= 1.2.1.0
-                   , edit-distance >= 0.2
                    , either
                    , enclosed-exceptions
                    , errors < 2.2
@@ -223,6 +222,7 @@ library
                    , temporary >= 1.2.0.3
                    , text >= 1.2.0.4
                    , text-binary
+                   , text-metrics >= 0.1 && < 0.2
                    , time >= 1.4.2 && < 1.7
                    , tls >= 1.3.8
                    , transformers >= 0.3.0.0 && < 0.6

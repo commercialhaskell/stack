@@ -20,6 +20,7 @@ extra-deps:
 - http-client-tls-0.3.0
 - http-conduit-2.2.0
 - optparse-applicative-0.13.0.0
+- text-metrics-0.1.0
 flags:
   stack:
     hide-dependency-versions: true
