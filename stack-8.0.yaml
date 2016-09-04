@@ -17,3 +17,4 @@ extra-deps:
 - store-core-0.2.0.0
 - th-utilities-0.2.0.1
 - optparse-applicative-0.13.0.0
+- text-metrics-0.1.0

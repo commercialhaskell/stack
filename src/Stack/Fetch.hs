@@ -67,6 +67,7 @@ import qualified Data.Set                       as Set
 import           Data.String                    (fromString)
 import qualified Data.Text                      as T
 import           Data.Text.Encoding             (decodeUtf8)
+import           Data.Text.Metrics
 import           Data.Typeable                  (Typeable)
 import           Data.Word                      (Word64)
 import           Network.HTTP.Download
@@ -89,7 +90,6 @@ import           System.IO                      (IOMode (ReadMode),
                                                  withBinaryFile, openBinaryFile,
                                                  hClose)
 import           System.PosixCompat             (setFileMode)
-import           Text.EditDistance              as ED
 
 type PackageCaches = Map PackageIdentifier (PackageIndex, PackageCache)
 
@@ -344,7 +344,7 @@ withCabalLoader menv inner = do
                                   Just cs -> "Perhaps you meant " <>
                                     orSeparated cs <> "?"
                             Just cs -> "Possible candidates: " <>
-                              commaSeparated (NE.map packageIdentifierString cs)
+                              commaSeparated (NE.map packageIdentifierText cs)
                               <> "."
                     join $ modifyMVar updateRef $ \toUpdate ->
                         if toUpdate then do
@@ -361,7 +361,7 @@ withCabalLoader menv inner = do
                             return (False, doLookup ident)
                         else return (toUpdate,
                                      throwM $ UnknownPackageIdentifiers
-                                       (Set.singleton ident) suggestions)
+                                       (Set.singleton ident) (T.unpack suggestions))
     inner doLookup
 
 lookupPackageIdentifierExact
@@ -400,9 +400,9 @@ fuzzyLookupCandidates (PackageIdentifier name ver) caches =
 typoCorrectionCandidates
   :: PackageIdentifier
   -> PackageCaches
-  -> Maybe (NonEmpty String)
+  -> Maybe (NonEmpty T.Text)
 typoCorrectionCandidates ident =
-  let getName = packageNameString . packageIdentifierName
+  let getName = packageNameText . packageIdentifierName
       name    = getName ident
   in  NE.nonEmpty
     . Map.keys
@@ -627,14 +627,11 @@ parMapM_ cnt f xs0 = do
         workers i = Concurrently worker *> workers (i - 1)
     liftIO $ runConcurrently $ workers cnt
 
-damerauLevenshtein :: String -> String -> Int
-damerauLevenshtein = ED.restrictedDamerauLevenshteinDistance ED.defaultEditCosts
-
-orSeparated :: NonEmpty String -> String
+orSeparated :: NonEmpty T.Text -> T.Text
 orSeparated xs
   | NE.length xs == 1 = NE.head xs
   | NE.length xs == 2 = NE.head xs <> " or " <> NE.last xs
-  | otherwise = intercalate ", " (NE.init xs) <> ", or " <> NE.last xs
+  | otherwise = T.intercalate ", " (NE.init xs) <> ", or " <> NE.last xs
 
-commaSeparated :: NonEmpty String -> String
+commaSeparated :: NonEmpty T.Text -> T.Text
 commaSeparated = F.fold . NE.intersperse ", "

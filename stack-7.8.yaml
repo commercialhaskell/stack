@@ -73,6 +73,7 @@ extra-deps:
 - annotated-wl-pprint-0.7.0
 - neat-interpolation-0.3.2
 - optparse-applicative-0.13.0.0
+- text-metrics-0.1.0
 flags:
   time-locale-compat:
     old-locale: false
