@@ -11,6 +11,7 @@ module Stack.ConfigCmd
        ,cfgCmdSetName
        ,cfgCmdName) where
 
+import           Control.Applicative
 import           Control.Monad.Catch (MonadMask, throwM)
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
@@ -27,6 +28,7 @@ import           Network.HTTP.Client.Conduit (HasHttpManager)
 import qualified Options.Applicative as OA
 import qualified Options.Applicative.Types as OA
 import           Path
+import           Prelude -- Silence redundant import warnings
 import           Stack.BuildPlan
 import           Stack.Config (makeConcreteResolver)
 import           Stack.Types.BuildPlan
