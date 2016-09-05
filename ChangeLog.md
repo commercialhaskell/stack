@@ -10,6 +10,8 @@ Behavior changes:
 
 Other enhancements:
 
+* Add`support for `system-ghc` and `install-ghc` fields to `stack config set` command.
+
 Bug fixes:
 
 ## 1.2.0
