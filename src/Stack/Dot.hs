@@ -128,7 +128,7 @@ listDependencies sep = do
   resultGraph <- createDependencyGraph dotOpts
   void (Map.traverseWithKey go (snd <$> resultGraph))
     where go name v = liftIO (Text.putStrLn $
-                                Text.pack (packageNameString name) <>
+                                packageNameText name <>
                                 sep <>
                                 maybe "<unknown>" (Text.pack . show) v)
 
@@ -250,7 +250,7 @@ printEdge from to = liftIO $ Text.putStrLn (Text.concat [ nodeName from, " -> ",
 
 -- | Convert a package name to a graph node name.
 nodeName :: PackageName -> Text
-nodeName name = "\"" <> Text.pack (packageNameString name) <> "\""
+nodeName name = "\"" <> packageNameText name <> "\""
 
 -- | Print a node with no dependencies
 printLeaf :: MonadIO m => PackageName -> m ()
