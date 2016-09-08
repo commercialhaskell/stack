@@ -33,6 +33,7 @@ import qualified Data.Text as T
 import           Data.Text.Encoding (encodeUtf8, decodeUtf8)
 import           Data.Word (Word64)
 import           Distribution.InstalledPackageInfo (PError)
+import           Distribution.License (License)
 import           Distribution.ModuleName (ModuleName)
 import           Distribution.Package hiding (Package,PackageName,packageName,packageVersion,PackageIdentifier)
 import           Distribution.PackageDescription (TestSuiteInterface)
@@ -88,6 +89,7 @@ instance Show PackageException where
 data Package =
   Package {packageName :: !PackageName                    -- ^ Name of the package.
           ,packageVersion :: !Version                     -- ^ Version of the package
+          ,packageLicense :: !License                     -- ^ The license the package was released under.
           ,packageFiles :: !GetPackageFiles               -- ^ Get all files of the package.
           ,packageDeps :: !(Map PackageName VersionRange) -- ^ Packages that the package depends on.
           ,packageTools :: ![Dependency]                  -- ^ A build tool name.
