@@ -103,9 +103,11 @@ options =
         "Label to give the uploaded release asset"
     , Option "" [noTestHaddocksOptName] (NoArg $ Right $ \g -> g{gTestHaddocks = False})
         "Disable testing building haddocks."
+    , Option "" [staticOptName] (NoArg $ Right $ \g -> g{gBuildArgs = gBuildArgs g ++ ["--split-objs", "--ghc-options=-optc-Os -optl-static -fPIC"]})
+        "Build a static binary."
     , Option "" [buildArgsOptName]
         (ReqArg
-            (\v -> Right $ \g -> g{gBuildArgs = words v})
+            (\v -> Right $ \g -> g{gBuildArgs = gBuildArgs g ++ words v})
             "\"ARG1 ARG2 ...\"")
         "Additional arguments to pass to 'stack build'."
     ]
@@ -153,15 +155,16 @@ rules global@Global{..} args = do
         when (not gAllowDirty && not (null (trim dirty))) $
             error ("Working tree is dirty.  Use --" ++ allowDirtyOptName ++ " option to continue anyway.")
         withTempDir $ \tmpDir -> do
-            let cmd0 = cmd (releaseBinDir </> binaryName </> stackExeFileName)
+            let cmd0 c = cmd (releaseBinDir </> binaryName </> stackExeFileName)
                     (stackArgs global)
-                    gBuildArgs
                     ["--local-bin-path=" ++ tmpDir]
-            () <- cmd0 $ concat $ concat
-                [["install --pedantic --no-haddock-deps"], [" --haddock" | gTestHaddocks]]
-            () <- cmd0 "install --resolver=lts-6.0 cabal-install"
-            let cmd' = cmd (AddPath [tmpDir] []) stackProgName (stackArgs global) gBuildArgs
-            () <- cmd' "test --pedantic --flag stack:integration-tests"
+                    c
+                    gBuildArgs
+            () <- cmd0 "install" $ concat $ concat
+                [["--pedantic --no-haddock-deps"], [" --haddock" | gTestHaddocks]]
+            () <- cmd0 "install" "--resolver=lts-6.0 cabal-install"
+            let cmd' c = cmd (AddPath [tmpDir] []) stackProgName (stackArgs global) c gBuildArgs
+            () <- cmd' "test" "--pedantic --flag stack:integration-tests"
             return ()
         copyFileChanged (releaseBinDir </> binaryName </> stackExeFileName) out
 
@@ -230,9 +233,10 @@ rules global@Global{..} args = do
         actionOnException
             (cmd stackProgName
                 (stackArgs global)
-                gBuildArgs
                 ["--local-bin-path=" ++ takeDirectory out]
-                 "install --pedantic")
+                "install"
+                gBuildArgs
+                "--pedantic")
             (removeFile out)
 
     debDistroRules ubuntuDistro ubuntuVersions
@@ -593,8 +597,13 @@ uploadLabelOptName = "upload-label"
 noTestHaddocksOptName :: String
 noTestHaddocksOptName = "no-test-haddocks"
 
+-- | @--build-args@ command-line option name.
 buildArgsOptName :: String
 buildArgsOptName = "build-args"
+
+-- | @--static@ command-line option name.
+staticOptName :: String
+staticOptName = "static"
 
 -- | Arguments to pass to all 'stack' invocations.
 stackArgs :: Global -> [String]

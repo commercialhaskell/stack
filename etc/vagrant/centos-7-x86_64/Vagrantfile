@@ -2,9 +2,9 @@
 # vi: set ft=ruby :
 Vagrant.configure(2) do |config|
   config.vm.box = "puppetlabs/centos-7.0-64-nocm"
-  config.vm.synced_folder "../../..", "/vagrant", type: "rsync", rsync__exclude: [".stack-work/", "_release/"], rsync__args: ["--verbose", "--archive", "--delete", "-z"]
+  config.vm.synced_folder "../../..", "/vagrant", type: "rsync", rsync__verbose: true, rsync__exclude: [".stack-work/", "_release/", ".cabal-sandbox/", "cabal.sandbox.config", "dist/", ".#*#"], rsync__args: ["--verbose", "--archive", "--delete", "-z"]
   config.vm.provider "virtualbox" do |vb|
-    vb.memory = "2048"
+    vb.memory = "3072"
   end
   config.ssh.forward_agent = true
   config.vm.provision "shell", inline: <<-SHELL
@@ -14,12 +14,13 @@ Vagrant.configure(2) do |config|
     yum -y install epel-release
     yum -y install perl make automake gcc gmp-devel zlib-devel tar which git python-boto deltarpm python-deltarpm rpm-build rpm-sign ncurses-devel
     if ! which stack; then
-      curl -sSL https://s3.amazonaws.com/download.fpcomplete.com/centos/7/fpco.repo >/etc/yum.repos.d/fpco.repo
+      curl -sSL https://download.fpcomplete.com/centos/7/fpco.repo >/etc/yum.repos.d/fpco.repo
       yum -y check-update || true
     fi
     yum -y install stack
     if ! which fpm; then
         yum -y install ruby-devel
+        gem install json --version '< 1.8.0'
         gem install fpm --version '< 1.4.0'
     fi
     if ! [[ -d /opt/rpm-s3 ]]; then

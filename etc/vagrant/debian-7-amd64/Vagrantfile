@@ -2,9 +2,9 @@
 # vi: set ft=ruby :
 Vagrant.configure(2) do |config|
   config.vm.box = "puppetlabs/debian-7.8-64-nocm"
-  config.vm.synced_folder "../../..", "/vagrant", type: "rsync", rsync__exclude: [".stack-work/", "_release/"], rsync__args: ["--verbose", "--archive", "--delete", "-z"]
+  config.vm.synced_folder "../../..", "/vagrant", type: "rsync", rsync__verbose: true, rsync__exclude: [".stack-work/", "_release/", ".cabal-sandbox/", "cabal.sandbox.config", "dist/", ".#*#"], rsync__args: ["--verbose", "--archive", "--delete", "-z"]
   config.vm.provider "virtualbox" do |vb|
-    vb.memory = "2048"
+    vb.memory = "3072"
   end
   config.ssh.forward_agent = true
   config.vm.provision "shell", inline: <<-SHELL
@@ -22,6 +22,7 @@ Vagrant.configure(2) do |config|
     if ! which fpm; then
         apt-get install -y ruby-dev libffi-dev make build-essential
         apt-get install -y rubygems || true
+        gem install json --version '< 1.8.0'
         gem install fpm --version '< 1.4.0'
     fi
     if ! which deb-s3; then

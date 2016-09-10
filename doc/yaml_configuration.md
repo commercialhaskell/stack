@@ -429,8 +429,6 @@ rebuild-ghc-options: true
 Specify a variant binary distribution of GHC to use.  Known values:
 
 * `standard`: This is the default, uses the standard GHC binary distribution
-* `gmp4`: Use the "centos6" GHC bindist, for Linux systems with libgmp4 (aka
-  `libgmp.so.3`), such as CentOS 6. This variant will be used automatically on such systems; you should not need to specify it in the configuration
 * `integersimple`: Use a GHC bindist that uses
   [integer-simple instead of GMP](https://ghc.haskell.org/trac/ghc/wiki/ReplacingGMPNotes)
 * any other value: Use a custom GHC bindist. You should specify
