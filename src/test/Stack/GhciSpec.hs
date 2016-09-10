@@ -11,6 +11,7 @@ import qualified Data.Set as S
 import           Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
+import           Distribution.License (License (BSD3))
 import qualified Distribution.ModuleName as ModuleName
 import           Stack.Types.Package
 import           Stack.Types.PackageName
@@ -204,6 +205,7 @@ packages_singlePackage =
       Package
       { packageName = $(mkPackageName "package-a")
       , packageVersion = $(mkVersion "0.1.0.0")
+      , packageLicense = BSD3
       , packageFiles = GetPackageFiles undefined
       , packageDeps = M.empty
       , packageTools = []
@@ -236,6 +238,7 @@ packages_multiplePackages =
       Package
       { packageName = $(mkPackageName "package-a")
       , packageVersion = $(mkVersion "0.1.0.0")
+      , packageLicense = BSD3
       , packageFiles = GetPackageFiles undefined
       , packageDeps = M.empty
       , packageTools = []
@@ -264,6 +267,7 @@ packages_multiplePackages =
       Package
       { packageName = $(mkPackageName "package-b")
       , packageVersion = $(mkVersion "0.1.0.0")
+      , packageLicense = BSD3
       , packageFiles = GetPackageFiles undefined
       , packageDeps = M.empty
       , packageTools = []
