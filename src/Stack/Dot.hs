@@ -63,6 +63,8 @@ data ListDepsOpts = ListDepsOpts
     -- ^ The normal dot options.
     , listDepsSep :: Text
     -- ^ Separator between the package name and details.
+    , listDepsLicense :: Bool
+    -- ^ Print dependency licenses instead of versions.
     }
 
 -- | Visualize the project's dependencies as a graphviz graph
@@ -160,10 +162,12 @@ listDependencies opts = do
   (_, resultGraph) <- createPrunedDependencyGraph dotOpts
   void (Map.traverseWithKey go (snd <$> resultGraph))
     where go name payload =
-            liftIO (Text.putStrLn $
-                    packageNameText name <>
-                    (listDepsSep opts) <>
-                    maybe "<unknown>" (Text.pack . show) (fst payload))
+            let payloadText =
+                    if listDepsLicense opts
+                      then maybe "<unknown>" (Text.pack . show) (snd payload)
+                      else maybe "<unknown>" (Text.pack . show) (fst payload)
+                line = packageNameText name <> (listDepsSep opts) <> payloadText
+            in  liftIO $ Text.putStrLn $ line
 
 -- | @pruneGraph dontPrune toPrune graph@ prunes all packages in
 -- @graph@ with a name in @toPrune@ and removes resulting orphans

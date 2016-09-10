@@ -53,4 +53,8 @@ listDepsOptsParser = ListDepsOpts
                                         "and package version.") <>
                                   value " " <>
                                   showDefault))
+                 <*> (boolFlags False
+                                "license"
+                                "printing of dependency licenses instead of versions"
+                                idm)
   where escapeSep sep = T.replace "\\t" "\t" (T.replace "\\n" "\n" sep)
