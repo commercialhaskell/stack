@@ -14,8 +14,8 @@ nix:
 extra-deps:
 - th-lift-instances-0.1.7
 - th-utilities-0.2.0.1
-- store-0.2.1.0
-- store-core-0.2.0.0
+- store-0.2.1.1
+- store-core-0.2.0.1
 - th-orphans-0.13.1
 - http-client-0.5.0
 - http-client-tls-0.3.0

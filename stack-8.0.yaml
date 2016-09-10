@@ -13,7 +13,7 @@ extra-deps:
 - http-conduit-2.2.0
 - http-client-tls-0.3.0
 - unicode-transforms-0.1.0.1
-- store-0.2.1.0
-- store-core-0.2.0.0
+- store-0.2.1.1
+- store-core-0.2.0.1
 - th-utilities-0.2.0.1
 - optparse-applicative-0.13.0.0
