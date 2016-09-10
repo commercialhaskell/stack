@@ -2,9 +2,7 @@ module Stack.Options.DockerParser where
 
 import           Data.Char
 import           Data.List                         (intercalate)
-import           Data.List.Split                   (splitOn)
 import           Data.Monoid.Extra
-import qualified Data.Set                          as Set
 import qualified Data.Text                         as T
 import           Distribution.Version              (anyVersion)
 import           Options.Applicative
@@ -13,7 +11,6 @@ import           Options.Applicative.Builder.Extra
 import           Stack.Constants
 import           Stack.Docker
 import qualified Stack.Docker                      as Docker
-import           Stack.Dot
 import           Stack.Options.Utils
 import           Stack.Types.Version
 import           Stack.Types.Docker
@@ -144,35 +141,3 @@ dockerCleanupOptsParser =
                          Nothing -> " (default)")) <|>
           pure def'
         toDescr = map (\c -> if c == '-' then ' ' else c)
-
--- | Parser for arguments to `stack dot`
-dotOptsParser :: Parser DotOpts
-dotOptsParser = DotOpts
-            <$> includeExternal
-            <*> includeBase
-            <*> depthLimit
-            <*> fmap (maybe Set.empty Set.fromList . fmap splitNames) prunedPkgs
-  where includeExternal = boolFlags False
-                                    "external"
-                                    "inclusion of external dependencies"
-                                    idm
-        includeBase = boolFlags True
-                                "include-base"
-                                "inclusion of dependencies on base"
-                                idm
-        depthLimit =
-            optional (option auto
-                             (long "depth" <>
-                              metavar "DEPTH" <>
-                              help ("Limit the depth of dependency resolution " <>
-                                    "(Default: No limit)")))
-        prunedPkgs = optional (strOption
-                                   (long "prune" <>
-                                    metavar "PACKAGES" <>
-                                    help ("Prune each package name " <>
-                                          "from the comma separated list " <>
-                                          "of package names PACKAGES")))
-
-        splitNames :: String -> [String]
-        splitNames = map (takeWhile (not . isSpace) . dropWhile isSpace) . splitOn ","
-

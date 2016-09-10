@@ -115,6 +115,7 @@ library
                      Stack.Options.CleanParser
                      Stack.Options.ConfigParser
                      Stack.Options.DockerParser
+                     Stack.Options.DotParser
                      Stack.Options.ExecParser
                      Stack.Options.GhcBuildParser
                      Stack.Options.GhciParser

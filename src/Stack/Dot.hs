@@ -4,6 +4,7 @@
 module Stack.Dot (dot
                  ,listDependencies
                  ,DotOpts(..)
+                 ,ListDepsOpts(..)
                  ,resolveDependencies
                  ,printGraph
                  ,pruneGraph
@@ -56,6 +57,13 @@ data DotOpts = DotOpts
     -- ^ Package names to prune from the graph
     }
 
+data ListDepsOpts = ListDepsOpts
+    { listDepsDotOpts :: DotOpts
+    -- ^ The normal dot options.
+    , listDepsSep :: Text
+    -- ^ Separator between the package name and details.
+    }
+
 -- | Visualize the project's dependencies as a graphviz graph
 dot :: (HasEnvConfig env
        ,HasHttpManager env
@@ -70,13 +78,31 @@ dot :: (HasEnvConfig env
     => DotOpts
     -> m ()
 dot dotOpts = do
-    localNames <- liftM Map.keysSet getLocalPackageViews
-    resultGraph <- createDependencyGraph dotOpts
-    let pkgsToPrune = if dotIncludeBase dotOpts
-                         then dotPrune dotOpts
-                         else Set.insert "base" (dotPrune dotOpts)
-        prunedGraph = pruneGraph localNames pkgsToPrune resultGraph
-    printGraph dotOpts localNames prunedGraph
+  (localNames, prunedGraph) <- createPrunedDependencyGraph dotOpts
+  printGraph dotOpts localNames prunedGraph
+
+-- | Create the dependency graph and also prune it as specified in the dot
+-- options. Returns a set of local names and and a map from package names to
+-- dependencies.
+createPrunedDependencyGraph :: (HasEnvConfig env
+                               ,HasHttpManager env
+                               ,HasLogLevel env
+                               ,MonadLogger m
+                               ,MonadBaseUnlift IO m
+                               ,MonadIO m
+                               ,MonadMask m
+                               ,MonadReader env m)
+                            => DotOpts
+                            -> m (Set PackageName,
+                                  Map PackageName (Set PackageName, Maybe Version))
+createPrunedDependencyGraph dotOpts = do
+  localNames <- liftM Map.keysSet getLocalPackageViews
+  resultGraph <- createDependencyGraph dotOpts
+  let pkgsToPrune = if dotIncludeBase dotOpts
+                       then dotPrune dotOpts
+                       else Set.insert "base" (dotPrune dotOpts)
+      prunedGraph = pruneGraph localNames pkgsToPrune resultGraph
+  return (localNames, prunedGraph)
 
 -- | Create the dependency graph, the result is a map from a package
 -- name to a tuple of dependencies and a version if available.  This
@@ -121,15 +147,15 @@ listDependencies :: (HasEnvConfig env
                     ,MonadIO m
                     ,MonadReader env m
                     )
-                  => Text
+                  => ListDepsOpts
                   -> m ()
-listDependencies sep = do
-  let dotOpts = DotOpts True True Nothing Set.empty
-  resultGraph <- createDependencyGraph dotOpts
+listDependencies opts = do
+  let dotOpts = listDepsDotOpts opts
+  (_, resultGraph) <- createPrunedDependencyGraph dotOpts
   void (Map.traverseWithKey go (snd <$> resultGraph))
     where go name v = liftIO (Text.putStrLn $
                                 packageNameText name <>
-                                sep <>
+                                (listDepsSep opts) <>
                                 maybe "<unknown>" (Text.pack . show) v)
 
 -- | @pruneGraph dontPrune toPrune graph@ prunes all packages in
