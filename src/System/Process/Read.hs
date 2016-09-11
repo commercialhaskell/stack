@@ -37,6 +37,7 @@ module System.Process.Read
   )
   where
 
+import           Control.Applicative
 import           Control.Arrow ((***), first)
 import           Control.Concurrent.Async (concurrently)
 import           Control.Exception hiding (try, catch)
@@ -75,6 +76,7 @@ import           System.Exit
 import qualified System.FilePath as FP
 import           System.IO (Handle)
 import           System.Process.Log
+import           Prelude () -- Hide post-AMP warnings
 
 -- | Override the environment received by a child process.
 data EnvOverride = EnvOverride
