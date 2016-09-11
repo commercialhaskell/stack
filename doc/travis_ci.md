@@ -16,6 +16,12 @@ ready to be used on your projects:
   and OS X. The configuration is significantly more involved to allow
   for all of this branching behavior.
 
+  __NOTE__: It is likely going to be necessary to modify this configuration to
+  match the needs of your project, such as tweaking the build matrix to alter
+  which GHC versions you test against, or to specify GHC-version-specific
+  `stack.yaml` files if necessary. Don't be surprised if it doesn't work the
+  first time around. See the multiple GHC section below for more information.
+
 Each of these configurations is ready to be used immediately, just
 copy-paste the content into the `.travis.yml` file in the root or your
 repo, enable Travis on the repo, and you're good to go.
