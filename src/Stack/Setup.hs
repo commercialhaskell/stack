@@ -476,7 +476,7 @@ ensureCompiler sopts = do
 -- | Determine which GHC build to use dependong on which shared libraries are available
 -- on the system.
 getGhcBuild
-    :: (MonadIO m, MonadBaseControl IO m, MonadCatch m, MonadLogger m, HasPlatform env, HasConfig env, MonadReader env m)
+    :: (MonadIO m, MonadBaseControl IO m, MonadCatch m, MonadLogger m, HasConfig env, MonadReader env m)
     => EnvOverride -> m CompilerBuild
 getGhcBuild menv = do
 

@@ -195,7 +195,7 @@ readProcessStdout wd menv name args =
 -- | Produce strict 'S.ByteString's from the stderr and stdout of a process.
 --
 -- Throws a 'ReadProcessException' exception if the process fails.
-readProcessStderrStdout :: (MonadIO m, MonadLogger m, MonadBaseControl IO m, MonadCatch m)
+readProcessStderrStdout :: (MonadIO m, MonadLogger m, MonadBaseControl IO m)
                         => Maybe (Path Abs Dir) -- ^ Optional directory to run in
                         -> EnvOverride
                         -> String -- ^ Command
