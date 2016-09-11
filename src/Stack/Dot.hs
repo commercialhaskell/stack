@@ -13,7 +13,7 @@ module Stack.Dot (dot
 import           Control.Applicative
 import           Control.Arrow ((&&&))
 import           Control.Monad (liftM, void)
-import           Control.Monad.Catch (MonadCatch,MonadMask)
+import           Control.Monad.Catch (MonadMask)
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger (MonadLogger)
 import           Control.Monad.Reader (MonadReader)
@@ -72,7 +72,6 @@ dot :: (HasEnvConfig env
        ,HasHttpManager env
        ,HasLogLevel env
        ,MonadBaseUnlift IO m
-       ,MonadCatch m
        ,MonadLogger m
        ,MonadIO m
        ,MonadMask m
