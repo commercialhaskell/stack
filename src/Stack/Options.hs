@@ -210,7 +210,7 @@ cleanOptsParser = CleanShallow <$> packages <|> doFullClean
 -- | Command-line arguments parser for configuration.
 configOptsParser :: GlobalOptsContext -> Parser ConfigMonoid
 configOptsParser hide0 =
-    (\stackRoot workDir buildOpts dockerOpts nixOpts systemGHC installGHC arch ghcVariant jobs includes libs overrideGccPath skipGHCCheck skipMsys localBin modifyCodePage allowDifferentUser -> mempty
+    (\stackRoot workDir buildOpts dockerOpts nixOpts systemGHC installGHC arch ghcVariant ghcBuild jobs includes libs overrideGccPath skipGHCCheck skipMsys localBin modifyCodePage allowDifferentUser -> mempty
         { configMonoidStackRoot = stackRoot
         , configMonoidWorkDir = workDir
         , configMonoidBuildOpts = buildOpts
@@ -221,6 +221,7 @@ configOptsParser hide0 =
         , configMonoidSkipGHCCheck = skipGHCCheck
         , configMonoidArch = arch
         , configMonoidGHCVariant = ghcVariant
+        , configMonoidGHCBuild = ghcBuild
         , configMonoidJobs = jobs
         , configMonoidExtraIncludeDirs = includes
         , configMonoidExtraLibDirs = libs
@@ -261,6 +262,7 @@ configOptsParser hide0 =
            <> hide
             ))
     <*> optionalFirst (ghcVariantParser (hide0 /= OuterGlobalOpts))
+    <*> optionalFirst (ghcBuildParser (hide0 /= OuterGlobalOpts))
     <*> optionalFirst (option auto
             ( long "jobs"
            <> short 'j'
@@ -851,6 +853,23 @@ ghcVariantParser hide =
     readGHCVariant = do
         s <- readerAsk
         case parseGHCVariant s of
+            Left e -> readerError (show e)
+            Right v -> return v
+
+-- | GHC build parser
+ghcBuildParser :: Bool -> Parser CompilerBuild
+ghcBuildParser hide =
+    option
+        readGHCBuild
+        (long "ghc-build" <> metavar "BUILD" <>
+         help
+             "Specialized GHC build, e.g. 'gmp4' or 'standard' (usually auto-detected)" <>
+         hideMods hide
+        )
+  where
+    readGHCBuild = do
+        s <- readerAsk
+        case parseCompilerBuild s of
             Left e -> readerError (show e)
             Right v -> return v
 

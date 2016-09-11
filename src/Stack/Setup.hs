@@ -476,67 +476,85 @@ ensureCompiler sopts = do
 -- | Determine which GHC build to use dependong on which shared libraries are available
 -- on the system.
 getGhcBuild
-    :: (MonadIO m, MonadBaseControl IO m, MonadCatch m, MonadLogger m, HasPlatform env, MonadReader env m)
+    :: (MonadIO m, MonadBaseControl IO m, MonadCatch m, MonadLogger m, HasPlatform env, HasConfig env, MonadReader env m)
     => EnvOverride -> m CompilerBuild
 getGhcBuild menv = do
 
-    -- TODO: a more reliable, flexible, and data driven approach would be to actually download small
-    -- "test" executables (from setup-info) that link to the same gmp/tinfo versions
-    -- that GHC does (i.e. built in same environment as the GHC bindist). The algorithm would go
-    -- something like this:
-    --
-    -- check for previous 'uname -a'/`ldconfig -p` plus compiler version/variant in cache
-    -- if cached, then use that as suffix
-    -- otherwise:
-    --     download setup-info
-    --     go through all with right prefix for os/version/variant
-    --     first try "standard" (no extra suffix), then the rest
-    --         download "compatibility check" exe if not already downloaded
-    --         try running it
-    --         if successful, then choose that
-    --             cache compiler suffix with the uname -a and ldconfig -p output hash plus compiler version
-    --
-    -- Of course, could also try to make a static GHC bindist instead of all this rigamarole.
-
-    platform <- asks getPlatform
-    case platform of
-        Platform _ Linux -> do
-            eldconfigOut <- tryProcessStdout Nothing menv "ldconfig" ["-p"]
-            let firstWords = case eldconfigOut of
-                    Right ldconfigOut -> mapMaybe (headMay . T.words) $
-                        T.lines $ T.decodeUtf8With T.lenientDecode ldconfigOut
-                    Left _ -> []
-                checkLib lib
-                    | libT `elem` firstWords = do
-                        $logDebug ("Found shared library " <> libT <> " in 'ldconfig -p' output")
-                        return True
-#ifndef WINDOWS
-                    -- (mkAbsDir "/usr/lib") fails to compile on Windows, thus the CPP
-                    | otherwise = do
-                        -- This is a workaround for the fact that libtinfo.so.6 doesn't appear in
-                        -- the 'ldconfig -p' output on Arch even when it exists.
-                        -- There doesn't seem to be an easy way to get the true list of directories
-                        -- to scan for shared libs, but this works for our particular case.
-                        e <- doesFileExist ($(mkAbsDir "/usr/lib") </> lib)
-                        if e
-                            then $logDebug ("Found shared library " <> libT <> " in /usr/lib")
-                            else $logDebug ("Did not find shared library " <> libT)
-                        return e
-#endif
-                  where
-                    libT = T.pack (toFilePath lib)
-            hastinfo5 <- checkLib $(mkRelFile "libtinfo.so.5")
-            hastinfo6 <- checkLib $(mkRelFile "libtinfo.so.6")
-            hasncurses6 <- checkLib $(mkRelFile "libncursesw.so.6")
-            hasgmp5 <- checkLib $(mkRelFile "libgmp.so.10")
-            hasgmp4 <- checkLib $(mkRelFile "libgmp.so.3")
-            if  | hastinfo5 && hasgmp5 -> useBuild CompilerBuildStandard
-                | hastinfo6 && hasgmp5 -> useBuild (CompilerBuildSpecialized "tinfo6")
-                | hasncurses6 && hasgmp5 -> useBuild (CompilerBuildSpecialized "ncurses6")
-                | hasgmp4 && hastinfo5 -> useBuild (CompilerBuildSpecialized "gmp4")
-                | otherwise -> useBuild CompilerBuildStandard
-        _ -> useBuild CompilerBuildStandard
+    config <- asks getConfig
+    case configGHCBuild config of
+        Just ghcBuild -> return ghcBuild
+        Nothing -> determineGhcBuild
   where
+    determineGhcBuild = do
+        -- TODO: a more reliable, flexible, and data driven approach would be to actually download small
+        -- "test" executables (from setup-info) that link to the same gmp/tinfo versions
+        -- that GHC does (i.e. built in same environment as the GHC bindist). The algorithm would go
+        -- something like this:
+        --
+        -- check for previous 'uname -a'/`ldconfig -p` plus compiler version/variant in cache
+        -- if cached, then use that as suffix
+        -- otherwise:
+        --     download setup-info
+        --     go through all with right prefix for os/version/variant
+        --     first try "standard" (no extra suffix), then the rest
+        --         download "compatibility check" exe if not already downloaded
+        --         try running it
+        --         if successful, then choose that
+        --             cache compiler suffix with the uname -a and ldconfig -p output hash plus compiler version
+        --
+        -- Of course, could also try to make a static GHC bindist instead of all this rigamarole.
+
+        platform <- asks getPlatform
+        case platform of
+            Platform _ Linux -> do
+                eldconfigOut <- tryProcessStdout Nothing menv "ldconfig" ["-p"]
+                egccErrOut <- tryProcessStderrStdout Nothing menv "gcc" ["-v"]
+                let firstWords = case eldconfigOut of
+                        Right ldconfigOut -> mapMaybe (headMay . T.words) $
+                            T.lines $ T.decodeUtf8With T.lenientDecode ldconfigOut
+                        Left _ -> []
+                    checkLib lib
+                        | libT `elem` firstWords = do
+                            $logDebug ("Found shared library " <> libT <> " in 'ldconfig -p' output")
+                            return True
+#ifndef WINDOWS
+                        -- (mkAbsDir "/usr/lib") fails to compile on Windows, thus the CPP
+                        | otherwise = do
+                            -- This is a workaround for the fact that libtinfo.so.6 doesn't appear in
+                            -- the 'ldconfig -p' output on Arch even when it exists.
+                            -- There doesn't seem to be an easy way to get the true list of directories
+                            -- to scan for shared libs, but this works for our particular case.
+                            e <- doesFileExist ($(mkAbsDir "/usr/lib") </> lib)
+                            if e
+                                then $logDebug ("Found shared library " <> libT <> " in /usr/lib")
+                                else $logDebug ("Did not find shared library " <> libT)
+                            return e
+#endif
+                      where
+                        libT = T.pack (toFilePath lib)
+                    noPie = case egccErrOut of
+                        Right (gccErr,gccOut) ->
+                            "--enable-default-pie" `elem` (S8.words (gccOut <> gccErr))
+                        Left _ -> False
+                hastinfo5 <- checkLib $(mkRelFile "libtinfo.so.5")
+                hastinfo6 <- checkLib $(mkRelFile "libtinfo.so.6")
+                hasncurses6 <- checkLib $(mkRelFile "libncursesw.so.6")
+                hasgmp5 <- checkLib $(mkRelFile "libgmp.so.10")
+                hasgmp4 <- checkLib $(mkRelFile "libgmp.so.3")
+                let libComponents =
+                        if  | hastinfo5 && hasgmp5 -> []
+                            | hastinfo6 && hasgmp5 -> ["tinfo6"]
+                            | hasncurses6 && hasgmp5 -> ["ncurses6"]
+                            | hasgmp4 && hastinfo5 -> ["gmp4"]
+                            | otherwise -> []
+                    pieComponents =
+                        if noPie
+                            then ["nopie"]
+                            else []
+                case (concat [libComponents, pieComponents]) of
+                    [] -> useBuild CompilerBuildStandard
+                    components -> useBuild (CompilerBuildSpecialized (intercalate "-" components))
+            _ -> useBuild CompilerBuildStandard
     useBuild CompilerBuildStandard = do
         $logDebug "Using standard GHC build"
         return (CompilerBuildStandard)
@@ -774,7 +792,7 @@ downloadAndInstallCompiler ghcBuild si wanted@GhcVersion{} versionCheck mbindist
                 _ -> throwM RequireCustomGHCVariant
             case wanted of
                 GhcVersion version ->
-                    return (version, DownloadInfo (T.pack bindistURL) Nothing Nothing)
+                    return (version, GHCDownloadInfo mempty mempty (DownloadInfo (T.pack bindistURL) Nothing Nothing))
                 _ ->
                     throwM WantedMustBeGHC
         _ -> do
@@ -786,7 +804,7 @@ downloadAndInstallCompiler ghcBuild si wanted@GhcVersion{} versionCheck mbindist
     let installer =
             case configPlatform config of
                 Platform _ Cabal.Windows -> installGHCWindows selectedVersion
-                _ -> installGHCPosix selectedVersion
+                _ -> installGHCPosix selectedVersion downloadInfo
     $logInfo $
         "Preparing to install GHC" <>
         (case ghcVariant of
@@ -799,7 +817,7 @@ downloadAndInstallCompiler ghcBuild si wanted@GhcVersion{} versionCheck mbindist
     $logInfo "This will not interfere with any system-level installation."
     ghcPkgName <- parsePackageNameFromString ("ghc" ++ ghcVariantSuffix ghcVariant ++ compilerBuildSuffix ghcBuild)
     let tool = Tool $ PackageIdentifier ghcPkgName selectedVersion
-    downloadAndInstallTool (configLocalPrograms config) si downloadInfo tool installer
+    downloadAndInstallTool (configLocalPrograms config) si (gdiDownloadInfo downloadInfo) tool installer
 downloadAndInstallCompiler compilerBuild si wanted versionCheck _mbindistUrl = do
     config <- asks getConfig
     ghcVariant <- asks getGHCVariant
@@ -905,13 +923,14 @@ data ArchiveType
 
 installGHCPosix :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasConfig env, HasHttpManager env, MonadBaseControl IO m, HasTerminal env)
                 => Version
+                -> GHCDownloadInfo
                 -> SetupInfo
                 -> Path Abs File
                 -> ArchiveType
                 -> Path Abs Dir
                 -> Path Abs Dir
                 -> m ()
-installGHCPosix version _ archiveFile archiveType tempDir destDir = do
+installGHCPosix version downloadInfo _ archiveFile archiveType tempDir destDir = do
     platform <- asks getPlatform
     menv0 <- getMinimalEnvOverride
     menv <- mkEnvOverride platform (removeHaskellEnvVars (unEnvOverride menv0))
@@ -942,8 +961,9 @@ installGHCPosix version _ archiveFile archiveType tempDir destDir = do
         parseRelDir $
         "ghc-" ++ versionString version
 
-    let runStep step wd cmd args = do
-            result <- try (readProcessNull (Just wd) menv cmd args)
+    let runStep step wd env cmd args = do
+            menv' <- modifyEnvOverride menv (Map.union env)
+            result <- try (readProcessNull (Just wd) menv' cmd args)
             case result of
                 Right _ -> return ()
                 Left ex -> do
@@ -962,13 +982,16 @@ installGHCPosix version _ archiveFile archiveType tempDir destDir = do
 
     $logSticky $ T.concat ["Unpacking GHC into ", T.pack . toFilePath $ tempDir, " ..."]
     $logDebug $ "Unpacking " <> T.pack (toFilePath archiveFile)
-    runStep "unpacking" tempDir tarTool [compOpt : "xf", toFilePath archiveFile]
+    runStep "unpacking" tempDir mempty tarTool [compOpt : "xf", toFilePath archiveFile]
 
     $logSticky "Configuring GHC ..."
-    runStep "configuring" dir (toFilePath $ dir </> $(mkRelFile "configure")) ["--prefix=" ++ toFilePath destDir]
+    runStep "configuring" dir
+        (gdiConfigureEnv downloadInfo)
+        (toFilePath $ dir </> $(mkRelFile "configure"))
+        (("--prefix=" ++ toFilePath destDir) : map T.unpack (gdiConfigureOpts downloadInfo))
 
     $logSticky "Installing GHC ..."
-    runStep "installing" dir makeTool ["install"]
+    runStep "installing" dir mempty makeTool ["install"]
 
     $logStickyDone $ "Installed GHC."
     $logDebug $ "GHC installed to " <> T.pack (toFilePath destDir)

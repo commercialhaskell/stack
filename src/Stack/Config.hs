@@ -227,6 +227,7 @@ configFromConfigMonoid configStackRoot configUserConfigPath mresolver mproject C
             configMonoidPackageIndices
 
          configGHCVariant0 = getFirst configMonoidGHCVariant
+         configGHCBuild = getFirst configMonoidGHCBuild
 
          configSystemGHC = fromFirst (isNothing configGHCVariant0) configMonoidSystemGHC
          configInstallGHC = fromFirst False configMonoidInstallGHC

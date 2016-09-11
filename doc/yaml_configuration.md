@@ -435,6 +435,14 @@ Specify a variant binary distribution of GHC to use.  Known values:
   [setup-info](#setup-info) so `stack setup` knows where to download it, or
   pass the `stack setup --ghc-bindist` argument on the command-line
 
+### ghc-build
+
+(Since 1.2.1)
+
+Specify a specialized architecture bindist to use.  Normally this is
+determined automatically, but you can override the autodetected value here.
+Possible arguments include `standard`, `gmp4`, `tinfo6`, and `nopie`.
+
 ### setup-info
 
 (Since 0.1.5)
@@ -451,7 +459,7 @@ setup-info:
         url: "https://example.com/ghc-7.10.2-i386-unknown-mingw32-foo.tar.xz"
 ```
 
-`url` may be either URL or (since UNRELEASED) absolute file path.
+`url` may be either URL or (since 1.2.0) absolute file path.
 
 ### pvp-bounds
 

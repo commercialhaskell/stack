@@ -10,7 +10,12 @@ Behavior changes:
 
 Other enhancements:
 
-* Add`support for `system-ghc` and `install-ghc` fields to `stack config set` command.
+* Add support for `system-ghc` and `install-ghc` fields to `stack config set` command.
+* Add `ghc-build` option to override autodetected GHC build to use (e.g. gmp4,
+  tinfo6, nopie) on Linux.
+* `stack setup` detects systems where gcc enables PIE by default (such as Ubuntu
+  16.10) and adjusts the GHC `configure` options accordingly.
+  [#2542](https://github.com/commercialhaskell/stack/issues/2542)
 
 Bug fixes:
 

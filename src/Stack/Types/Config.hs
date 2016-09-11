@@ -48,6 +48,7 @@ module Stack.Types.Config
   ,CompilerBuild(..)
   ,compilerBuildName
   ,compilerBuildSuffix
+  ,parseCompilerBuild
   -- ** EnvConfig & HasEnvConfig
   ,EnvConfig(..)
   ,HasEnvConfig(..)
@@ -148,6 +149,7 @@ module Stack.Types.Config
   -- ** Setup
   ,DownloadInfo(..)
   ,VersionedDownloadInfo(..)
+  ,GHCDownloadInfo(..)
   ,SetupInfo(..)
   ,SetupInfoLocation(..)
   -- ** Docker entrypoint
@@ -258,6 +260,8 @@ data Config =
          -- ^ The variant of GHC requested by the user.
          -- In most cases, use 'BuildConfig' or 'MiniConfig's version instead,
          -- which will have an auto-detected default.
+         ,configGHCBuild            :: !(Maybe CompilerBuild)
+         -- ^ Override build of the compiler distribution (e.g. standard, gmp4, tinfo6)
          ,configUrls                :: !Urls
          -- ^ URLs for other files used by stack.
          -- TODO: Better document
@@ -815,7 +819,9 @@ data ConfigMonoid =
     ,configMonoidArch                :: !(First String)
     -- ^ Used for overriding the platform
     ,configMonoidGHCVariant          :: !(First GHCVariant)
-    -- ^ Used for overriding the GHC variant
+    -- ^ Used for overriding the platform
+    ,configMonoidGHCBuild            :: !(First CompilerBuild)
+    -- ^ Used for overriding the GHC build
     ,configMonoidJobs                :: !(First Int)
     -- ^ See: 'configJobs'
     ,configMonoidExtraIncludeDirs    :: !(Set (Path Abs Dir))
@@ -893,6 +899,7 @@ parseConfigMonoidJSON obj = do
                                            ..!= VersionRangeJSON anyVersion
     configMonoidArch <- First <$> obj ..:? configMonoidArchName
     configMonoidGHCVariant <- First <$> obj ..:? configMonoidGHCVariantName
+    configMonoidGHCBuild <- First <$> obj ..:? configMonoidGHCBuildName
     configMonoidJobs <- First <$> obj ..:? configMonoidJobsName
     configMonoidExtraIncludeDirs <- obj ..:?  configMonoidExtraIncludeDirsName ..!= Set.empty
     configMonoidExtraLibDirs <- obj ..:?  configMonoidExtraLibDirsName ..!= Set.empty
@@ -984,6 +991,9 @@ configMonoidArchName = "arch"
 
 configMonoidGHCVariantName :: Text
 configMonoidGHCVariantName = "ghc-variant"
+
+configMonoidGHCBuildName :: Text
+configMonoidGHCBuildName = "ghc-build"
 
 configMonoidJobsName :: Text
 configMonoidJobsName = "jobs"
@@ -1563,8 +1573,16 @@ parseGHCVariant s =
 
 -- | Build of the compiler distribution (e.g. standard, gmp4, tinfo6)
 data CompilerBuild
-  = CompilerBuildStandard
-  | CompilerBuildSpecialized String
+    = CompilerBuildStandard
+    | CompilerBuildSpecialized String
+    deriving (Show)
+
+instance FromJSON CompilerBuild where
+    -- Strange structuring is to give consistent error messages
+    parseJSON =
+        withText
+            "CompilerBuild"
+            (either (fail . show) return . parseCompilerBuild . T.unpack)
 
 -- | Descriptive name for compiler build
 compilerBuildName :: CompilerBuild -> String
@@ -1575,6 +1593,12 @@ compilerBuildName (CompilerBuildSpecialized s) = s
 compilerBuildSuffix :: CompilerBuild -> String
 compilerBuildSuffix CompilerBuildStandard = ""
 compilerBuildSuffix (CompilerBuildSpecialized s) = '-' : s
+
+-- | Parse compiler build from a String.
+parseCompilerBuild :: (MonadThrow m) => String -> m CompilerBuild
+parseCompilerBuild "" = return CompilerBuildStandard
+parseCompilerBuild "standard" = return CompilerBuildStandard
+parseCompilerBuild name = return (CompilerBuildSpecialized name)
 
 -- | Information for a file to download.
 data DownloadInfo = DownloadInfo
@@ -1615,11 +1639,29 @@ instance FromJSON (WithJSONWarnings VersionedDownloadInfo) where
             , vdiDownloadInfo = downloadInfo
             }
 
+data GHCDownloadInfo = GHCDownloadInfo
+    { gdiConfigureOpts :: [Text]
+    , gdiConfigureEnv :: Map Text Text
+    , gdiDownloadInfo :: DownloadInfo
+    }
+    deriving Show
+
+instance FromJSON (WithJSONWarnings GHCDownloadInfo) where
+    parseJSON = withObjectWarnings "GHCDownloadInfo" $ \o -> do
+        configureOpts <- o ..:? "configure-opts" ..!= mempty
+        configureEnv <- o ..:? "configure-env" ..!= mempty
+        downloadInfo <- parseDownloadInfoFromObject o
+        return GHCDownloadInfo
+            { gdiConfigureOpts = configureOpts
+            , gdiConfigureEnv = configureEnv
+            , gdiDownloadInfo = downloadInfo
+            }
+
 data SetupInfo = SetupInfo
     { siSevenzExe :: Maybe DownloadInfo
     , siSevenzDll :: Maybe DownloadInfo
     , siMsys2 :: Map Text VersionedDownloadInfo
-    , siGHCs :: Map Text (Map Version DownloadInfo)
+    , siGHCs :: Map Text (Map Version GHCDownloadInfo)
     , siGHCJSs :: Map Text (Map CompilerVersion DownloadInfo)
     , siStack :: Map Text (Map Version DownloadInfo)
     }

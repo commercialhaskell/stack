@@ -11,7 +11,9 @@
 
 module System.Process.Read
   (readProcessStdout
+  ,readProcessStderrStdout
   ,tryProcessStdout
+  ,tryProcessStderrStdout
   ,sinkProcessStdout
   ,sinkProcessStderrStdout
   ,sinkProcessStderrStdoutHandle
@@ -164,6 +166,17 @@ tryProcessStdout :: (MonadIO m, MonadLogger m, MonadBaseControl IO m, MonadCatch
 tryProcessStdout wd menv name args =
     try (readProcessStdout wd menv name args)
 
+-- | Try to produce strict 'S.ByteString's from the stderr and stdout of a
+-- process.
+tryProcessStderrStdout :: (MonadIO m, MonadLogger m, MonadBaseControl IO m, MonadCatch m)
+                       => Maybe (Path Abs Dir) -- ^ Optional directory to run in
+                       -> EnvOverride
+                       -> String -- ^ Command
+                       -> [String] -- ^ Command line arguments
+                       -> m (Either ReadProcessException (S.ByteString, S.ByteString))
+tryProcessStderrStdout wd menv name args =
+    try (readProcessStderrStdout wd menv name args)
+
 -- | Produce a strict 'S.ByteString' from the stdout of a process.
 --
 -- Throws a 'ReadProcessException' exception if the process fails.
@@ -176,6 +189,19 @@ readProcessStdout :: (MonadIO m, MonadLogger m, MonadBaseControl IO m, MonadCatc
 readProcessStdout wd menv name args =
   sinkProcessStdout wd menv name args CL.consume >>=
   liftIO . evaluate . S.concat
+
+-- | Produce strict 'S.ByteString's from the stderr and stdout of a process.
+--
+-- Throws a 'ReadProcessException' exception if the process fails.
+readProcessStderrStdout :: (MonadIO m, MonadLogger m, MonadBaseControl IO m, MonadCatch m)
+                        => Maybe (Path Abs Dir) -- ^ Optional directory to run in
+                        -> EnvOverride
+                        -> String -- ^ Command
+                        -> [String] -- ^ Command line arguments
+                        -> m (S.ByteString, S.ByteString)
+readProcessStderrStdout wd menv name args = do
+  (e, o) <- sinkProcessStderrStdout wd menv name args CL.consume CL.consume
+  liftIO $ (,) <$> evaluate (S.concat e) <*> evaluate (S.concat o)
 
 -- | An exception while trying to read from process.
 data ReadProcessException
