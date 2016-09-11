@@ -220,7 +220,7 @@ packages and the tools. See [Docker integration](docker_integration.md) for deta
 
 ## How do I use this with Travis CI?
 
-See the [Travis section in the GUIDE](GUIDE.md#travis-with-caching)
+See the [Travis CI instructions](travis_ci.md)
 
 ## What is licensing restrictions on Windows?
 

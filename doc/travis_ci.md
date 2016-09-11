@@ -80,10 +80,9 @@ There are two ways to install GHC:
 - Let Stack download GHC
 - Install GHC using [apt plugin](http://docs.travis-ci.com/user/apt/)
 
-See the
-[Travis caching section of the user guide](GUIDE.md#travis-with-caching) for
-an example of the first option (letting Stack download GHC). Here, we will
-explain the second option. With single GHC the situation is simple:
+See the above scripts for an example of the first option (letting Stack
+download GHC). Here, we will explain the second option. With single GHC the
+situation is simple:
 
 ```yaml
 before_install:
