@@ -72,7 +72,17 @@ import qualified Stack.IDE as IDE
 import qualified Stack.Image as Image
 import           Stack.Init
 import           Stack.New
-import           Stack.Options
+import           Stack.Options.BuildParser
+import           Stack.Options.CleanParser
+import           Stack.Options.DockerParser
+import           Stack.Options.ExecParser
+import           Stack.Options.GhciParser
+import           Stack.Options.GlobalParser
+import           Stack.Options.HpcReportParser
+import           Stack.Options.NewParser
+import           Stack.Options.NixParser
+import           Stack.Options.SolverParser
+import           Stack.Options.Utils
 import qualified Stack.PackageIndex
 import qualified Stack.Path
 import           Stack.Runners
