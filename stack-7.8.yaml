@@ -48,7 +48,7 @@ extra-deps:
 - x509-validation-1.6.3
 - x509-store-1.6.1
 - x509-system-1.6.3
-- http-client-tls-0.3.0
+- http-client-tls-0.3.1
 - connection-0.2.5
 - regex-applicative-text-0.1.0.1
 - monad-unlift-0.1.1.0
