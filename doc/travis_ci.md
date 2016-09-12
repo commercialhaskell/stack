@@ -1,11 +1,38 @@
 # Travis CI
 
-For many use cases, the
-[Travis caching section of the user guide](GUIDE.md#travis-with-caching)
-will be sufficient.
+This page documents how to use Stack on
+[Travis CI](https://travis-ci.org/). We assume you have basic
+familiarity with Travis. We provide two fully baked example files
+ready to be used on your projects:
 
-This page documents how to use Stack on [Travis CI](https://travis-ci.org/). We
-assume you have basic familiarity with Travis.
+* [The simple Travis configuration](https://raw.githubusercontent.com/commercialhaskell/stack/master/doc/travis-simple.yml)
+  is intended for applications that do not require multiple GHC
+  support or cross-platform support. It builds and tests your project
+  with just the settings present in your `stack.yaml` file.
+* [The complex Travis configuration](https://raw.githubusercontent.com/commercialhaskell/stack/master/doc/travis-complex.yml)
+  is intended for projects that need to support multiple GHC versions
+  and multiple OSes, such as open source libraries to be released to
+  Hackage. It tests against cabal-install, as well as Stack on Linux
+  and OS X. The configuration is significantly more involved to allow
+  for all of this branching behavior.
+
+  __NOTE__: It is likely going to be necessary to modify this configuration to
+  match the needs of your project, such as tweaking the build matrix to alter
+  which GHC versions you test against, or to specify GHC-version-specific
+  `stack.yaml` files if necessary. Don't be surprised if it doesn't work the
+  first time around. See the multiple GHC section below for more information.
+
+Each of these configurations is ready to be used immediately, just
+copy-paste the content into the `.travis.yml` file in the root or your
+repo, enable Travis on the repo, and you're good to go.
+
+You may also be interested in using AppVeyor, which supports Windows
+builds, for more cross-platform testing. There's a
+[short blog post available on how to do this](http://www.snoyman.com/blog/2016/08/appveyor-haskell-windows-ci).
+
+The rest of this document explains the details of common Travis
+configurations for those of you who want to tweak the above
+configuration files or write your own.
 
 *Note:* both Travis and Stack infrastructures are actively developed. We try to
  document best practices at the moment.
@@ -59,10 +86,9 @@ There are two ways to install GHC:
 - Let Stack download GHC
 - Install GHC using [apt plugin](http://docs.travis-ci.com/user/apt/)
 
-See the
-[Travis caching section of the user guide](GUIDE.md#travis-with-caching) for
-an example of the first option (letting Stack download GHC). Here, we will
-explain the second option. With single GHC the situation is simple:
+See the above scripts for an example of the first option (letting Stack
+download GHC). Here, we will explain the second option. With single GHC the
+situation is simple:
 
 ```yaml
 before_install:
@@ -130,6 +156,10 @@ script:
   - stack --no-terminal --skip-ghc-check test
 ```
 
+In case you're wondering: we need `--no-terminal` because stack does some fancy
+sticky display on smart terminals to give nicer status and progress messages,
+and the terminal detection is broken on Travis.
+
 ## Other details
 
 Some Stack commands will run for long time (when cache is cold) without
@@ -149,3 +179,14 @@ install:
 - [simonmichael/hledger](https://github.com/simonmichael/hledger/blob/master/.travis.yml)
 - [fpco/wai-middleware-crowd](https://github.com/fpco/wai-middleware-crowd/blob/master/.travis.yml)
 - [commercialhaskell/all-cabal-hashes-tool](https://github.com/commercialhaskell/all-cabal-hashes-tool/blob/master/.travis.yml)
+
+## Future enhancements
+
+Once Travis whitelists the stack .deb files, we'll be able to simply include
+stack in the `addons` section, and automatically use the newest version of
+stack, avoiding that complicated `before_install` section This is being
+tracked in the
+[apt-source-whitelist](https://github.com/travis-ci/apt-source-whitelist/pull/7)
+and
+[apt-package-whitelist](https://github.com/travis-ci/apt-package-whitelist/issues/379)
+issue trackers.
