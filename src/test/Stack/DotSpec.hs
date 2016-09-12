@@ -22,8 +22,8 @@ import           Test.QuickCheck (forAll,choose,Gen)
 
 import           Stack.Dot
 
-dummyPayload :: (Maybe Version, Maybe License)
-dummyPayload = (parseVersionFromString "0.0.0.0", Just BSD3)
+dummyPayload :: DotPayload
+dummyPayload = DotPayload (parseVersionFromString "0.0.0.0") (Just BSD3)
 
 spec :: Spec
 spec = do
@@ -82,7 +82,7 @@ pkgName = fromMaybe failure . parsePackageName
    failure = error "Internal error during package name creation in DotSpec.pkgName"
 
 -- Stub, simulates the function to load package dependecies
-stubLoader :: PackageName -> Identity (Set PackageName, (Maybe Version, Maybe License))
+stubLoader :: PackageName -> Identity (Set PackageName, DotPayload)
 stubLoader name = return . (, dummyPayload) . Set.fromList . map pkgName $ case show name of
   "StateVar" -> ["stm","transformers"]
   "array" -> []

@@ -4,6 +4,7 @@
 module Stack.Dot (dot
                  ,listDependencies
                  ,DotOpts(..)
+                 ,DotPayload(..)
                  ,ListDepsOpts(..)
                  ,resolveDependencies
                  ,printGraph
@@ -83,8 +84,13 @@ dot dotOpts = do
   (localNames, prunedGraph) <- createPrunedDependencyGraph dotOpts
   printGraph dotOpts localNames prunedGraph
 
--- | Information about a package, when available.
-type Payload = (Maybe Version, Maybe License)
+-- | Information about a package in the dependency graph, when available.
+data DotPayload = DotPayload
+  { payloadVersion :: Maybe Version
+  -- ^ The package version.
+  , payloadLicense :: Maybe License
+  -- ^ The license the package was released under.
+  } deriving (Eq, Show)
 
 -- | Create the dependency graph and also prune it as specified in the dot
 -- options. Returns a set of local names and and a map from package names to
@@ -99,7 +105,7 @@ createPrunedDependencyGraph :: (HasEnvConfig env
                                ,MonadReader env m)
                             => DotOpts
                             -> m (Set PackageName,
-                                  Map PackageName (Set PackageName, Payload))
+                                  Map PackageName (Set PackageName, DotPayload))
 createPrunedDependencyGraph dotOpts = do
   localNames <- liftM Map.keysSet getLocalPackageViews
   resultGraph <- createDependencyGraph dotOpts
@@ -122,7 +128,7 @@ createDependencyGraph :: (HasEnvConfig env
                          ,MonadMask m
                          ,MonadReader env m)
                        => DotOpts
-                       -> m (Map PackageName (Set PackageName, Payload))
+                       -> m (Map PackageName (Set PackageName, DotPayload))
 createDependencyGraph dotOpts = do
   (_,_,locals,_,sourceMap) <- loadSourceMap NeedTargets defaultBuildOptsCLI
   let graph = Map.fromList (localDependencies dotOpts locals)
@@ -143,7 +149,7 @@ createDependencyGraph dotOpts = do
         fst4 :: (a,b,c,d) -> a
         fst4 (x,_,_,_) = x
 
-        makePayload pkg = (Just $ packageVersion pkg, Just $ packageLicense pkg)
+        makePayload pkg = DotPayload (Just $ packageVersion pkg) (Just $ packageLicense pkg)
 
 listDependencies :: (HasEnvConfig env
                     ,HasHttpManager env
@@ -163,8 +169,8 @@ listDependencies opts = do
     where go name payload =
             let payloadText =
                     if listDepsLicense opts
-                      then maybe "<unknown>" (Text.pack . show) (snd payload)
-                      else maybe "<unknown>" (Text.pack . show) (fst payload)
+                      then maybe "<unknown>" (Text.pack . show) (payloadLicense payload)
+                      else maybe "<unknown>" (Text.pack . show) (payloadVersion payload)
                 line = packageNameText name <> (listDepsSep opts) <> payloadText
             in  liftIO $ Text.putStrLn $ line
 
@@ -201,9 +207,9 @@ pruneUnreachable dontPrune = fixpoint prune
 -- | Resolve the dependency graph up to (Just depth) or until fixpoint is reached
 resolveDependencies :: (Applicative m, Monad m)
                     => Maybe Int
-                    -> Map PackageName (Set PackageName, Payload)
-                    -> (PackageName -> m (Set PackageName, Payload))
-                    -> m (Map PackageName (Set PackageName, Payload))
+                    -> Map PackageName (Set PackageName, DotPayload)
+                    -> (PackageName -> m (Set PackageName, DotPayload))
+                    -> m (Map PackageName (Set PackageName, DotPayload))
 resolveDependencies (Just 0) graph _ = return graph
 resolveDependencies limit graph loadPackageDeps = do
   let values = Set.unions (fst <$> Map.elems graph)
@@ -222,20 +228,20 @@ resolveDependencies limit graph loadPackageDeps = do
 createDepLoader :: Applicative m
                 => Map PackageName PackageSource
                 -> Map PackageName Installed
-                -> (PackageName -> Version -> Map FlagName Bool -> [Text] -> m (Set PackageName, Payload))
+                -> (PackageName -> Version -> Map FlagName Bool -> [Text] -> m (Set PackageName, DotPayload))
                 -> PackageName
-                -> m (Set PackageName, Payload)
+                -> m (Set PackageName, DotPayload)
 createDepLoader sourceMap installed loadPackageDeps pkgName =
   case Map.lookup pkgName sourceMap of
     Just (PSLocal lp) -> pure ((packageAllDeps &&& payloadFromLocal) (lpPackage lp))
     Just (PSUpstream version _ flags ghcOptions _) -> loadPackageDeps pkgName version flags ghcOptions
     Nothing -> pure (Set.empty, payloadFromInstalled (Map.lookup pkgName installed))
   where
-    payloadFromLocal pkg = (Just $ packageVersion pkg, Just $ packageLicense pkg)
-    payloadFromInstalled maybePkg = (fmap installedVersion maybePkg, Nothing)
+    payloadFromLocal pkg = DotPayload (Just $ packageVersion pkg) (Just $ packageLicense pkg)
+    payloadFromInstalled maybePkg = DotPayload (fmap installedVersion maybePkg) Nothing
 
 -- | Resolve the direct (depth 0) external dependencies of the given local packages
-localDependencies :: DotOpts -> [LocalPackage] -> [(PackageName, (Set PackageName, Payload))]
+localDependencies :: DotOpts -> [LocalPackage] -> [(PackageName, (Set PackageName, DotPayload))]
 localDependencies dotOpts locals =
     map (\lp -> (packageName (lpPackage lp), (deps lp, lpPayload $ lpPackage lp))) locals
   where deps lp = if dotIncludeExternal dotOpts
@@ -243,13 +249,13 @@ localDependencies dotOpts locals =
                 else Set.intersection localNames (packageAllDeps (lpPackage lp))
         lpName lp = packageName (lpPackage lp)
         localNames = Set.fromList $ map (packageName . lpPackage) locals
-        lpPayload lp = (Just $ packageVersion lp, Just $ packageLicense lp)
+        lpPayload lp = DotPayload (Just $ packageVersion lp) (Just $ packageLicense lp)
 
 -- | Print a graphviz graph of the edges in the Map and highlight the given local packages
 printGraph :: (Applicative m, MonadIO m)
            => DotOpts
            -> Set PackageName -- ^ all locals
-           -> Map PackageName (Set PackageName, Payload)
+           -> Map PackageName (Set PackageName, DotPayload)
            -> m ()
 printGraph dotOpts locals graph = do
   liftIO $ Text.putStrLn "strict digraph deps {"
@@ -275,7 +281,7 @@ printLocalNodes dotOpts locals = liftIO $ Text.putStrLn (Text.intercalate "\n" l
 
 -- | Print nodes without dependencies
 printLeaves :: MonadIO m
-            => Map PackageName (Set PackageName, Payload)
+            => Map PackageName (Set PackageName, DotPayload)
             -> m ()
 printLeaves = F.mapM_ printLeaf . Map.keysSet . Map.filter Set.null . fmap fst
 
