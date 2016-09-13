@@ -1,6 +1,9 @@
 # YAML Configuration
 
-This page is intended to fully document all configuration options available in the stack.yaml file. Note that this page is likely to be both *incomplete* and sometimes *inaccurate*. If you see such cases, please update the page, and if you're not sure how, open an issue labeled "question".
+This page is intended to fully document all configuration options available in
+the stack.yaml file. Note that this page is likely to be both *incomplete* and
+sometimes *inaccurate*. If you see such cases, please update the page, and if
+you're not sure how, open an issue labeled "question".
 
 The stack.yaml configuration options break down into [project-specific](#project-config) options in:
 
@@ -12,7 +15,9 @@ and [non-project-specific](#non-project-config) options in:
 -  `~/.stack/config.yaml` -- for user non-project default options
 - The project file itself may also contain non-project specific options
 
-*Note:* When stack is invoked outside a stack project it will source project specific options from `~/.stack/global/stack.yaml`.  Options in this file will be ignored for a project with its own `<project dir>/stack.yaml`.
+*Note:* When stack is invoked outside a stack project it will source project
+specific options from `~/.stack/global/stack.yaml`.  Options in this file will
+be ignored for a project with its own `<project dir>/stack.yaml`.
 
 ## Project-specific config
 
@@ -182,7 +187,9 @@ Specifies how dependencies are resolved. There are currently four resolver types
     * For GHCJS this looks like `resolver: ghcjs-0.1.0_ghc-7.10.2`.
 * [Custom snapshot](https://github.com/commercialhaskell/stack/wiki/Custom-Snapshot)
 
-Each of these resolvers will also determine what constraints are placed on the compiler version. See the [compiler-check](#compiler-check) option for some additional control over compiler version.
+Each of these resolvers will also determine what constraints are placed on the
+compiler version. See the [compiler-check](#compiler-check) option for some
+additional control over compiler version.
 
 ### flags
 
@@ -315,7 +322,8 @@ which means stack will prompt you to run `stack setup` as needed.
 
 ### skip-ghc-check
 
-Should we skip the check to confirm that your system GHC version (on the PATH) matches what your project expects? Default is `false`.
+Should we skip the check to confirm that your system GHC version (on the PATH)
+matches what your project expects? Default is `false`.
 
 ### require-stack-version
 
@@ -359,9 +367,14 @@ with-gcc: /usr/local/bin/gcc-5
 
 Specifies how the compiler version in the resolver is matched against concrete versions. Valid values:
 
-* `match-minor`: make sure that the first three components match, but allow patch-level differences. For example< 7.8.4.1 and 7.8.4.2 would both match 7.8.4. This is useful to allow for custom patch levels of a compiler. This is the default
+* `match-minor`: make sure that the first three components match, but allow
+  patch-level differences. For example< 7.8.4.1 and 7.8.4.2 would both match
+  7.8.4. This is useful to allow for custom patch levels of a compiler. This is
+  the default
 * `match-exact`: the entire version number must match precisely
-* `newer-minor`: the third component can be increased, e.g. if your resolver is `ghc-7.10.1`, then 7.10.2 will also be allowed. This was the default up through stack 0.1.3
+* `newer-minor`: the third component can be increased, e.g. if your resolver is
+  `ghc-7.10.1`, then 7.10.2 will also be allowed. This was the default up
+  through stack 0.1.3
 
 ### compiler
 
@@ -416,7 +429,11 @@ Note that `everything` is a slightly dangerous value, as it can break invariants
 
 (Since 0.1.6)
 
-Should we rebuild a package when its GHC options change? Before 0.1.6, this was a non-configurable true. However, in most cases, the flag is used to affect optimization levels and warning behavior, for which GHC itself doesn't actually recompile the modules anyway. Therefore, the new behavior is to not recompile on an options change, but this behavior can be changed back with the following:
+Should we rebuild a package when its GHC options change? Before 0.1.6, this was
+a non-configurable true. However, in most cases, the flag is used to affect
+optimization levels and warning behavior, for which GHC itself doesn't actually
+recompile the modules anyway. Therefore, the new behavior is to not recompile
+on an options change, but this behavior can be changed back with the following:
 
 ```yaml
 rebuild-ghc-options: true
@@ -472,8 +489,10 @@ lower bounds), and both (and upper and lower bounds). The algorithm it follows
 is:
 
 * If an upper or lower bound already exists on a dependency, it's left alone
-* When adding a lower bound, we look at the current version specified by stack.yaml, and set it as the lower bound (e.g., `foo >= 1.2.3`)
-* When adding an upper bound, we require less than the next major version (e.g., `foo < 1.3`)
+* When adding a lower bound, we look at the current version specified by
+  stack.yaml, and set it as the lower bound (e.g., `foo >= 1.2.3`)
+* When adding an upper bound, we require less than the next major version
+  (e.g., `foo < 1.3`)
 
 ```yaml
 pvp-bounds: none
@@ -579,15 +598,27 @@ same name. See the [build command docs](build_command.md) and the
 
 ### templates
 
-Templates used with `stack new` have a number of parameters that affect the generated code. These can be set for all new projects you create. The result of them can be observed in the generated LICENSE and cabal files.
+Templates used with `stack new` have a number of parameters that affect the
+generated code. These can be set for all new projects you create. The result of
+them can be observed in the generated LICENSE and cabal files.
 
 The 5 parameters are: `author-email`, `author-name`, `category`, `copyright` and `github-username`.
 
 * _author-email_ - sets the `maintainer` property in cabal
-* _author-name_ - sets the `author` property in cabal and the name used in LICENSE
-* _category_ - sets the `category` property in cabal. This is used in Hackage. For examples of categories see [Packages by category](https://hackage.haskell.org/packages/). It makes sense for `category` to be set on a per project basis because it is uncommon for all projects a user creates to belong to the same category. The category can be set per project by passing `-p "category:value"` to the `stack new` command.
-* _copyright_ - sets the `copyright` property in cabal. It is typically the name of the holder of the copyright on the package and the year(s) from which copyright is claimed. For example: `Copyright: (c) 2006-2007 Joe Bloggs`
-* _github-username_ - used to generate `homepage` and `source-repository` in cabal. For instance `github-username: myusername` and `stack new my-project new-template` would result:
+* _author-name_ - sets the `author` property in cabal and the name used in
+  LICENSE
+* _category_ - sets the `category` property in cabal. This is used in Hackage.
+  For examples of categories see [Packages by
+  category](https://hackage.haskell.org/packages/). It makes sense for
+  `category` to be set on a per project basis because it is uncommon for all
+  projects a user creates to belong to the same category. The category can be
+  set per project by passing `-p "category:value"` to the `stack new` command.
+* _copyright_ - sets the `copyright` property in cabal. It is typically the
+  name of the holder of the copyright on the package and the year(s) from which
+  copyright is claimed. For example: `Copyright: (c) 2006-2007 Joe Bloggs`
+* _github-username_ - used to generate `homepage` and `source-repository` in
+  cabal. For instance `github-username: myusername` and `stack new my-project
+  new-template` would result:
 
 ```yaml
 homepage: http://github.com/myusername/my-project#readme

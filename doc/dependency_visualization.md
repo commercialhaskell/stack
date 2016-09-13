@@ -1,6 +1,7 @@
 # Dependency visualization
 
-You can use stack to visualize the dependencies between your packages and optionally also external dependencies.
+You can use stack to visualize the dependencies between your packages and
+optionally also external dependencies.
 
 As an example, let's look at `wreq`:
 
@@ -15,7 +16,8 @@ $ stack dot --external | dot -Tpng -o wreq.png
 ```
 [![wreq_ext](https://cloud.githubusercontent.com/assets/591567/8478621/d247247e-20d2-11e5-993d-79096e382abd.png)](https://cloud.githubusercontent.com/assets/591567/8478621/d247247e-20d2-11e5-993d-79096e382abd.png)
 
-Well that is certainly a lot.  As a start we can exclude `base` and then depending on our needs we can either limit the depth:
+Well that is certainly a lot.  As a start we can exclude `base` and then
+depending on our needs we can either limit the depth:
 
 ```
 $ stack dot --no-include-base --external --depth 1 | dot -Tpng -o wreq.png
