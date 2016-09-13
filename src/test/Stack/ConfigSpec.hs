@@ -8,6 +8,7 @@ import Control.Monad.Logger
 import Control.Exception
 import Data.Maybe
 import Data.Monoid
+import Network.HTTP.Client.TLS (getGlobalManager)
 import Network.HTTP.Conduit (Manager)
 import Path
 import Path.IO
@@ -62,7 +63,7 @@ data T = T
 
 setup :: IO T
 setup = do
-  manager <- newTLSManager
+  manager <- getGlobalManager
   unsetEnv "STACK_YAML"
   return T{..}
 

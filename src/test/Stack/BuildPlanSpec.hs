@@ -11,6 +11,7 @@ import Control.Monad.Catch (try)
 import Data.Monoid
 import qualified Data.Map as Map
 import qualified Data.Set as Set
+import Network.HTTP.Client.TLS (getGlobalManager)
 import Network.HTTP.Conduit (Manager)
 import Prelude -- Fix redundant import warnings
 import System.Directory
@@ -31,7 +32,7 @@ data T = T
 
 setup :: IO T
 setup = do
-  manager <- newTLSManager
+  manager <- getGlobalManager
   unsetEnv "STACK_YAML"
   return T{..}
 
