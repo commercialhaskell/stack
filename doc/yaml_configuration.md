@@ -451,7 +451,7 @@ setup-info:
         url: "https://example.com/ghc-7.10.2-i386-unknown-mingw32-foo.tar.xz"
 ```
 
-`url` may be either URL or (since UNRELEASED) absolute file path.
+`url` may be either URL or (since 1.2.0) absolute file path.
 
 ### pvp-bounds
 
