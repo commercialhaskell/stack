@@ -60,8 +60,8 @@ extra-deps:
 - http-api-data-0.2.2
 - time-locale-compat-0.1.1.1
 - persistent-2.5
-- store-0.2.1.1
-- store-core-0.2.0.1
+- store-0.2.1.2
+- store-core-0.2.0.2
 - th-reify-many-0.1.6
 - th-lift-instances-0.1.7
 - th-utilities-0.2.0.1

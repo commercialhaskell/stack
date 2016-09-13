@@ -239,7 +239,7 @@ library
                    , project-template >= 0.2
                    , zip-archive < 0.4
                    , hpack >= 0.14.0 && < 0.16
-                   , store >= 0.2.1.1
+                   , store >= 0.2.1.0
                    , annotated-wl-pprint
   if os(windows)
     cpp-options:     -DWINDOWS
@@ -337,7 +337,7 @@ test-suite stack-test
                 , th-reify-many
                 , smallcheck
                 , bytestring
-                , store >= 0.2.1.1
+                , store >= 0.2.1.0
                 , vector
                 , template-haskell
   default-language:    Haskell2010
