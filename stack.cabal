@@ -109,7 +109,27 @@ library
                      Stack.Init
                      Stack.New
                      Stack.Nix
-                     Stack.Options
+                     Stack.Options.BenchParser
+                     Stack.Options.BuildMonoidParser
+                     Stack.Options.BuildParser
+                     Stack.Options.CleanParser
+                     Stack.Options.ConfigParser
+                     Stack.Options.DockerParser
+                     Stack.Options.ExecParser
+                     Stack.Options.GhcBuildParser
+                     Stack.Options.GhciParser
+                     Stack.Options.GhcVariantParser
+                     Stack.Options.GlobalParser
+                     Stack.Options.HaddockParser
+                     Stack.Options.HpcReportParser
+                     Stack.Options.LogLevelParser
+                     Stack.Options.NewParser
+                     Stack.Options.NixParser
+                     Stack.Options.PackageParser
+                     Stack.Options.ResolverParser
+                     Stack.Options.SolverParser
+                     Stack.Options.TestParser
+                     Stack.Options.Utils
                      Stack.Package
                      Stack.PackageDump
                      Stack.PackageIndex
