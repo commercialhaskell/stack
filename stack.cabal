@@ -186,7 +186,7 @@ library
                    , hashable >= 1.2.3.2
                    , hit
                    , hpc
-                   , http-client >= 0.5.0
+                   , http-client >= 0.5.3.1
                    , http-client-tls >= 0.3.1
                    , http-conduit >= 2.2.0
                    , http-types >= 0.8.6 && < 0.10
