@@ -154,7 +154,7 @@ main = do
 
   eGlobalRun <- try $ commandLineHandler progName False
   case eGlobalRun of
-    Left (exitCode :: ExitCode) -> do
+    Left (exitCode :: ExitCode) ->
       throwIO exitCode
     Right (globalMonoid,run) -> do
       let global = globalOptsFromMonoid isTerminal globalMonoid
@@ -162,9 +162,8 @@ main = do
       case globalReExecVersion global of
           Just expectVersion -> do
               expectVersion' <- parseVersionFromString expectVersion
-              if checkVersion MatchMinor expectVersion' (fromCabalVersion Meta.version)
-                  then return ()
-                  else throwIO $ InvalidReExecVersion expectVersion (showVersion Meta.version)
+              unless (checkVersion MatchMinor expectVersion' (fromCabalVersion Meta.version))
+                  $ throwIO $ InvalidReExecVersion expectVersion (showVersion Meta.version)
           _ -> return ()
       run global `catch` \e ->
           -- This special handler stops "stack: " from being printed before the
@@ -217,7 +216,7 @@ commandLineHandler progName isInterpreter = complicatedOptions
       else handleParseResult (Failure f)
 
     addCommands = do
-      when (not isInterpreter) (do
+      unless isInterpreter (do
         addBuildCommand' "build"
                          "Build the package(s) in this directory/configuration"
                          buildCmd
@@ -353,7 +352,7 @@ commandLineHandler progName isInterpreter = complicatedOptions
                   execCmd
                   (execOptsParser $ Just ExecRunGhc)
 
-      when (not isInterpreter) (do
+      unless isInterpreter (do
         addCommand' "eval"
                     "Evaluate some haskell code inline. Shortcut for 'stack exec ghc -- -e CODE'"
                     evalCmd
@@ -532,7 +531,7 @@ interpreterHandler args f = do
     -- or a Stack option referencing a file. In that case we only show the
     -- interpreter error message and exclude the command related error messages.
     errorCombine =
-      if elem pathSeparator firstArg
+      if pathSeparator `elem` firstArg
       then overrideErrorHelp
       else vcatErrorHelp
 
@@ -563,7 +562,7 @@ setupCmd sco@SetupCmdOpts{..} go@GlobalOpts{..} = do
   (manager,lc) <- loadConfigWithOpts go
   withUserFileLock go (configStackRoot $ lcConfig lc) $ \lk -> do
     let getCompilerVersion = loadCompilerVersion manager go lc
-    runStackTGlobal manager (lcConfig lc) go $ do
+    runStackTGlobal manager (lcConfig lc) go $
       Docker.reexecWithOptionalContainer
           (lcProjectRoot lc)
           Nothing
@@ -630,7 +629,7 @@ updateCmd () go = withConfigAndLock go $
     getMinimalEnvOverride >>= Stack.PackageIndex.updateAllIndices
 
 upgradeCmd :: (Bool, String) -> GlobalOpts -> IO ()
-upgradeCmd (fromGit, repo) go = withGlobalConfigAndLock go $ do
+upgradeCmd (fromGit, repo) go = withGlobalConfigAndLock go $
     upgrade (globalConfigMonoid go)
             (if fromGit then Just repo else Nothing)
             (globalResolver go)
@@ -871,7 +870,7 @@ initCmd initOpts go = do
 
 -- | Create a project directory structure and initialize the stack config.
 newCmd :: (NewOpts,InitOpts) -> GlobalOpts -> IO ()
-newCmd (newOpts,initOpts) go@GlobalOpts{..} = do
+newCmd (newOpts,initOpts) go@GlobalOpts{..} =
     withMiniConfigAndLock go $ do
         dir <- new newOpts (forceOverwrite initOpts)
         initProject IsNewCmd dir initOpts globalResolver
