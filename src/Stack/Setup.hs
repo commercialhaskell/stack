@@ -504,9 +504,11 @@ getGhcBuild menv = do
                     | libT `elem` firstWords = do
                         $logDebug ("Found shared library " <> libT <> " in 'ldconfig -p' output")
                         return True
-#ifndef WINDOWS
-                    -- (mkAbsDir "/usr/lib") fails to compile on Windows, thus the CPP
                     | otherwise = do
+#ifdef WINDOWS
+                        -- (mkAbsDir "/usr/lib") fails to compile on Windows, thus the CPP
+                        return False
+#else
                         -- This is a workaround for the fact that libtinfo.so.6 doesn't appear in
                         -- the 'ldconfig -p' output on Arch even when it exists.
                         -- There doesn't seem to be an easy way to get the true list of directories
