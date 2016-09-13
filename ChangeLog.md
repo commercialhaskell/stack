@@ -14,6 +14,7 @@ Release notes:
 * 64-bit GHC bindists have been built for Linux systems with
   libtinfo6/libncurses6 (such as Fedora 24 and Arch Linux), and `stack setup`
   will detect when to use them.
+* Added Ubuntu 16.10 (yakkety) Apt repo.
 
 Major changes:
 

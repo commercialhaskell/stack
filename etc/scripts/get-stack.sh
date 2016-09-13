@@ -120,6 +120,10 @@ do_ubuntu_install() {
 
   if is_64_bit ; then
     case "$1" in
+      16.10)
+        add_apt_repo 'deb http://download.fpcomplete.com/ubuntu yakkety main'
+        apt_update_and_install
+        ;;
       16.04)
         add_apt_repo 'deb http://download.fpcomplete.com/ubuntu xenial main'
         apt_update_and_install
