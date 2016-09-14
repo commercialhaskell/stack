@@ -39,7 +39,6 @@ import           Data.Aeson                            (FromJSON (..),
                                                         (.:), (.=))
 import qualified Data.ByteString.Char8                 as S
 import qualified Data.ByteString.Lazy                  as L
-import           Data.Maybe                            (fromMaybe)
 import           Data.Text                             (Text)
 import qualified Data.Text                             as T
 import           Data.Text.Encoding                    (encodeUtf8)
@@ -210,9 +209,15 @@ mkUploader config us = do
                     (encodeUtf8 $ hcPassword creds)
                     req2
                     manager
+            req3 <-
+                case mreq3 of
+                    Nothing -> do
+                        putStrLn $ "WARNING: No HTTP digest prompt found, this will probably fail"
+                        return req2
+                    Just req3 -> return req3
             putStr $ "Uploading " ++ tarName ++ "... "
             hFlush stdout
-            withResponse (fromMaybe req2 mreq3) manager $ \res ->
+            withResponse req3 manager $ \res ->
                 case statusCode $ responseStatus res of
                     200 -> putStrLn "done!"
                     401 -> do
