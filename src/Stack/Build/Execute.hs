@@ -317,6 +317,7 @@ withExecuteEnv menv bopts boptsCli baseConfigOpts locals globalPackages snapshot
         snapshotPackagesTVar <- liftIO $ newTVarIO (toDumpPackagesByGhcPkgId snapshotPackages)
         localPackagesTVar <- liftIO $ newTVarIO (toDumpPackagesByGhcPkgId localPackages)
         logFilesTChan <- liftIO $ atomically newTChan
+        let totalWanted = length $ filter lpWanted locals
         inner ExecuteEnv
             { eeEnvOverride = menv
             , eeBuildOpts = bopts
@@ -333,7 +334,7 @@ withExecuteEnv menv bopts boptsCli baseConfigOpts locals globalPackages snapshot
             , eeSetupHs = setupHs
             , eeSetupExe = setupExe
             , eeCabalPkgVer = cabalPkgVer
-            , eeTotalWanted = length $ filter lpWanted locals
+            , eeTotalWanted = totalWanted
             , eeWanted = wantedLocalPackages locals
             , eeLocals = locals
             , eeGlobalDB = globalDB
@@ -341,21 +342,31 @@ withExecuteEnv menv bopts boptsCli baseConfigOpts locals globalPackages snapshot
             , eeSnapshotDumpPkgs = snapshotPackagesTVar
             , eeLocalDumpPkgs = localPackagesTVar
             , eeLogFiles = logFilesTChan
-            } `finally` dumpLogs logFilesTChan
+            } `finally` dumpLogs logFilesTChan totalWanted
   where
     toDumpPackagesByGhcPkgId = Map.fromList . map (\dp -> (dpGhcPkgId dp, dp))
 
-    dumpLogs chan = do
-        toDump <- asks (configDumpLogs . getConfig)
-        when toDump loop
+    dumpLogs chan totalWanted = do
+        allLogs <- liftIO $ atomically drainChan
+        unless (null allLogs) $ do
+            toDump <- asks (configDumpLogs . getConfig)
+            when toDump $ mapM_ dumpLog allLogs
+
+            when (not toDump && totalWanted > 1) $ $logInfo $ T.concat
+                [ "Build output has been captured to log files, use "
+                , "--dump-logs to see it on the console"
+                ]
+
+            $logInfo "The following log files have been saved:"
+            mapM_ ($logInfo . T.pack . toFilePath) allLogs
       where
-        loop = do
-            mfilepath <- liftIO $ atomically $ tryReadTChan chan
-            case mfilepath of
-                Nothing -> return ()
-                Just filepath -> do
-                    dumpLog filepath
-                    loop
+        drainChan = do
+            mx <- tryReadTChan chan
+            case mx of
+                Nothing -> return []
+                Just x -> do
+                    xs <- drainChan
+                    return $ x:xs
 
     dumpLog filepath = do
         $logInfo $ T.pack $ "\nDumping log file: " ++ toFilePath filepath ++ "\n"
