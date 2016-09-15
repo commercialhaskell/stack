@@ -48,6 +48,7 @@ module Stack.Types.Config
   ,CompilerBuild(..)
   ,compilerBuildName
   ,compilerBuildSuffix
+  ,parseCompilerBuild
   -- ** EnvConfig & HasEnvConfig
   ,EnvConfig(..)
   ,HasEnvConfig(..)
@@ -62,6 +63,8 @@ module Stack.Types.Config
   ,WhichSolverCmd(..)
   -- ** ConfigMonoid
   ,ConfigMonoid(..)
+  ,configMonoidInstallGHCName
+  ,configMonoidSystemGHCName
   -- ** EnvSettings
   ,EnvSettings(..)
   ,minimalEnvSettings
@@ -106,6 +109,7 @@ module Stack.Types.Config
   ,customResolverHash
   ,toResolverNotLoaded
   ,AbstractResolver(..)
+  ,readAbstractResolver
   -- ** SCM
   ,SCM(..)
   -- ** CustomSnapshot
@@ -145,6 +149,7 @@ module Stack.Types.Config
   -- ** Setup
   ,DownloadInfo(..)
   ,VersionedDownloadInfo(..)
+  ,GHCDownloadInfo(..)
   ,SetupInfo(..)
   ,SetupInfoLocation(..)
   -- ** Docker entrypoint
@@ -183,6 +188,7 @@ import qualified Data.Set as Set
 import           Data.Text (Text)
 import qualified Data.Text as T
 import           Data.Text.Encoding (encodeUtf8, decodeUtf8)
+import           Data.Text.Read (decimal)
 import           Data.Typeable
 import           Data.Yaml (ParseException)
 import qualified Data.Yaml as Yaml
@@ -192,6 +198,9 @@ import           Distribution.Version (anyVersion)
 import           GHC.Generics (Generic)
 import           Generics.Deriving.Monoid (memptydefault, mappenddefault)
 import           Network.HTTP.Client (parseRequest)
+import           Options.Applicative (ReadM)
+import qualified Options.Applicative as OA
+import qualified Options.Applicative.Types as OA
 import           Path
 import qualified Paths_stack as Meta
 import           Stack.Types.BuildPlan (MiniBuildPlan(..), SnapName, renderSnapName, parseSnapName, SnapshotHash (..), trimmedSnapshotHash)
@@ -251,6 +260,8 @@ data Config =
          -- ^ The variant of GHC requested by the user.
          -- In most cases, use 'BuildConfig' or 'MiniConfig's version instead,
          -- which will have an auto-detected default.
+         ,configGHCBuild            :: !(Maybe CompilerBuild)
+         -- ^ Override build of the compiler distribution (e.g. standard, gmp4, tinfo6)
          ,configUrls                :: !Urls
          -- ^ URLs for other files used by stack.
          -- TODO: Better document
@@ -423,6 +434,20 @@ data AbstractResolver
     | ARResolver !Resolver
     | ARGlobal
     deriving Show
+
+readAbstractResolver :: ReadM AbstractResolver
+readAbstractResolver = do
+    s <- OA.readerAsk
+    case s of
+        "global" -> return ARGlobal
+        "nightly" -> return ARLatestNightly
+        "lts" -> return ARLatestLTS
+        'l':'t':'s':'-':x | Right (x', "") <- decimal $ T.pack x ->
+            return $ ARLatestLTSMajor x'
+        _ ->
+            case parseResolverText $ T.pack s of
+                Left e -> OA.readerError $ show e
+                Right x -> return $ ARResolver x
 
 -- | Default logging level should be something useful but not crazy.
 defaultLogLevel :: LogLevel
@@ -794,7 +819,9 @@ data ConfigMonoid =
     ,configMonoidArch                :: !(First String)
     -- ^ Used for overriding the platform
     ,configMonoidGHCVariant          :: !(First GHCVariant)
-    -- ^ Used for overriding the GHC variant
+    -- ^ Used for overriding the platform
+    ,configMonoidGHCBuild            :: !(First CompilerBuild)
+    -- ^ Used for overriding the GHC build
     ,configMonoidJobs                :: !(First Int)
     -- ^ See: 'configJobs'
     ,configMonoidExtraIncludeDirs    :: !(Set (Path Abs Dir))
@@ -872,6 +899,7 @@ parseConfigMonoidJSON obj = do
                                            ..!= VersionRangeJSON anyVersion
     configMonoidArch <- First <$> obj ..:? configMonoidArchName
     configMonoidGHCVariant <- First <$> obj ..:? configMonoidGHCVariantName
+    configMonoidGHCBuild <- First <$> obj ..:? configMonoidGHCBuildName
     configMonoidJobs <- First <$> obj ..:? configMonoidJobsName
     configMonoidExtraIncludeDirs <- obj ..:?  configMonoidExtraIncludeDirsName ..!= Set.empty
     configMonoidExtraLibDirs <- obj ..:?  configMonoidExtraLibDirsName ..!= Set.empty
@@ -963,6 +991,9 @@ configMonoidArchName = "arch"
 
 configMonoidGHCVariantName :: Text
 configMonoidGHCVariantName = "ghc-variant"
+
+configMonoidGHCBuildName :: Text
+configMonoidGHCBuildName = "ghc-build"
 
 configMonoidJobsName :: Text
 configMonoidJobsName = "jobs"
@@ -1542,8 +1573,16 @@ parseGHCVariant s =
 
 -- | Build of the compiler distribution (e.g. standard, gmp4, tinfo6)
 data CompilerBuild
-  = CompilerBuildStandard
-  | CompilerBuildSpecialized String
+    = CompilerBuildStandard
+    | CompilerBuildSpecialized String
+    deriving (Show)
+
+instance FromJSON CompilerBuild where
+    -- Strange structuring is to give consistent error messages
+    parseJSON =
+        withText
+            "CompilerBuild"
+            (either (fail . show) return . parseCompilerBuild . T.unpack)
 
 -- | Descriptive name for compiler build
 compilerBuildName :: CompilerBuild -> String
@@ -1554,6 +1593,12 @@ compilerBuildName (CompilerBuildSpecialized s) = s
 compilerBuildSuffix :: CompilerBuild -> String
 compilerBuildSuffix CompilerBuildStandard = ""
 compilerBuildSuffix (CompilerBuildSpecialized s) = '-' : s
+
+-- | Parse compiler build from a String.
+parseCompilerBuild :: (MonadThrow m) => String -> m CompilerBuild
+parseCompilerBuild "" = return CompilerBuildStandard
+parseCompilerBuild "standard" = return CompilerBuildStandard
+parseCompilerBuild name = return (CompilerBuildSpecialized name)
 
 -- | Information for a file to download.
 data DownloadInfo = DownloadInfo
@@ -1594,11 +1639,29 @@ instance FromJSON (WithJSONWarnings VersionedDownloadInfo) where
             , vdiDownloadInfo = downloadInfo
             }
 
+data GHCDownloadInfo = GHCDownloadInfo
+    { gdiConfigureOpts :: [Text]
+    , gdiConfigureEnv :: Map Text Text
+    , gdiDownloadInfo :: DownloadInfo
+    }
+    deriving Show
+
+instance FromJSON (WithJSONWarnings GHCDownloadInfo) where
+    parseJSON = withObjectWarnings "GHCDownloadInfo" $ \o -> do
+        configureOpts <- o ..:? "configure-opts" ..!= mempty
+        configureEnv <- o ..:? "configure-env" ..!= mempty
+        downloadInfo <- parseDownloadInfoFromObject o
+        return GHCDownloadInfo
+            { gdiConfigureOpts = configureOpts
+            , gdiConfigureEnv = configureEnv
+            , gdiDownloadInfo = downloadInfo
+            }
+
 data SetupInfo = SetupInfo
     { siSevenzExe :: Maybe DownloadInfo
     , siSevenzDll :: Maybe DownloadInfo
     , siMsys2 :: Map Text VersionedDownloadInfo
-    , siGHCs :: Map Text (Map Version DownloadInfo)
+    , siGHCs :: Map Text (Map Version GHCDownloadInfo)
     , siGHCJSs :: Map Text (Map CompilerVersion DownloadInfo)
     , siStack :: Map Text (Map Version DownloadInfo)
     }

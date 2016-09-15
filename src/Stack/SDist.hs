@@ -25,6 +25,7 @@ import           Control.Monad.Reader (MonadReader, asks)
 import           Control.Monad.Trans.Control (liftBaseWith)
 import           Control.Monad.Trans.Resource
 import qualified Data.ByteString as S
+import qualified Data.ByteString.Char8 as S8
 import qualified Data.ByteString.Lazy as L
 import           Data.Data (Data, Typeable, cast, gmapT)
 import           Data.Either (partitionEithers)
@@ -36,6 +37,7 @@ import           Data.Maybe (fromMaybe)
 import           Data.Monoid ((<>))
 import qualified Data.Set as Set
 import qualified Data.Text as T
+import qualified Data.Text.Encoding as T
 import qualified Data.Text.Lazy as TL
 import qualified Data.Text.Lazy.Encoding as TLE
 import           Data.Time.Clock.POSIX
@@ -107,7 +109,12 @@ getSDistTarball mpvpBounds pkgDir = do
     -- However, it seems less error prone and more predictable to read
     -- everything in at once, so that's what we're doing for now:
     let tarPath isDir fp = either error id
-            (Tar.toTarPath isDir (pkgId FP.</> fp))
+            (Tar.toTarPath isDir (forceUtf8Enc (pkgId FP.</> fp)))
+        -- convert a String of proper characters to a String of bytes
+        -- in UTF8 encoding masquerading as characters. This is
+        -- necessary for tricking the tar package into proper
+        -- character encoding.
+        forceUtf8Enc = S8.unpack . T.encodeUtf8 . T.pack
         packWith f isDir fp = liftIO $ f (pkgFp FP.</> fp) (tarPath isDir fp)
         packDir = packWith Tar.packDirectoryEntry True
         packFile fp

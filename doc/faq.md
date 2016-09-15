@@ -1,20 +1,31 @@
 # FAQ
 
 So that this doesn't become repetitive: for the reasons behind the answers
-below, see the [Architecture](architecture.md) page. The goal of the answers here is to be as
-helpful and concise as possible.
+below, see the [Architecture](architecture.md) page. The goal of the answers
+here is to be as helpful and concise as possible.
 
 ## Where is stack installed and will it interfere with `ghc` (etc) I already have installed?
 
-Stack itself is installed in normal system locations based on the mechanism you used (see the [Install and upgrade](install_and_upgrade.md) page). Stack installs the Stackage libraries in `~/.stack` and any project libraries or extra dependencies in a `.stack-work` directory within each project's directory. None of this should affect any existing Haskell tools at all.
+Stack itself is installed in normal system locations based on the mechanism you
+used (see the [Install and upgrade](install_and_upgrade.md) page). Stack
+installs the Stackage libraries in `~/.stack` and any project libraries or
+extra dependencies in a `.stack-work` directory within each project's
+directory. None of this should affect any existing Haskell tools at all.
 
 ## What is the relationship between stack and cabal?
 
 * Cabal-the-library is used by stack to build your Haskell code.
-* cabal-install (the executable) is used by stack for its dependency solver functionality.
-* A .cabal file is provided for each package, and defines all package-level metadata just like it does in the cabal-install world: modules, executables, test suites, etc. No change at all on this front.
-* A stack.yaml file references 1 or more packages, and provides information on where dependencies come from.
-* `stack build` currently initializes a stack.yaml from the existing .cabal file. Project initialization is something that is still being discussed and there may be more options here for new projects in the future (see issue [253](https://github.com/commercialhaskell/stack/issues/253))
+* cabal-install (the executable) is used by stack for its dependency solver
+  functionality.
+* A .cabal file is provided for each package, and defines all package-level
+  metadata just like it does in the cabal-install world: modules, executables,
+  test suites, etc. No change at all on this front.
+* A stack.yaml file references 1 or more packages, and provides information on
+  where dependencies come from.
+* `stack build` currently initializes a stack.yaml from the existing .cabal
+  file. Project initialization is something that is still being discussed and
+  there may be more options here for new projects in the future (see issue
+  [253](https://github.com/commercialhaskell/stack/issues/253))
 
 ## I need to use a different version of a package than what is provided by the LTS Haskell snapshot I'm using, what should I do?
 
@@ -30,7 +41,9 @@ extra-deps:
 
 ## I need to use a package (or version of a package) that is not available on hackage, what should I do?
 
-Add it to the `packages` list in your project's `stack.yaml`, specifying the package's source code location relative to the directory where your `stack.yaml` file lives, e.g.
+Add it to the `packages` list in your project's `stack.yaml`, specifying the
+package's source code location relative to the directory where your
+`stack.yaml` file lives, e.g.
 
 ```yaml
 resolver: lts-2.10
@@ -42,7 +55,12 @@ packages:
 extra-deps: []
 ```
 
-The above example specifies that it should include the package at the root directory (`'.'`), that the `proprietary-dep` package is found in the project's `third-party` folder, that the `conduit` package is found in the project's `github-version-of` folder, and that the `diagrams` package is found in the project's `patched` folder. This autodetects changes and reinstalls the package.
+The above example specifies that it should include the package at the root
+directory (`'.'`), that the `proprietary-dep` package is found in the project's
+`third-party` folder, that the `conduit` package is found in the project's
+`github-version-of` folder, and that the `diagrams` package is found in the
+project's `patched` folder. This autodetects changes and reinstalls the
+package.
 
 To install packages directly from a Git repository, use e.g.:
 
@@ -60,9 +78,13 @@ Note that the `- '.'` line has been omitted, so the package in the root director
 
 Those are the targets of the build, and can have one of three formats:
 
-* A package name (e.g., `my-package`) will mean that the `my-package` package must be built
-* A package identifier (e.g., `my-package-1.2.3`), which includes a specific version. This is useful for passing to `stack install` for getting a specific version from upstream
-* A directory (e.g., `./my-package`) for including a local directory's package, including any packages in subdirectories
+* A package name (e.g., `my-package`) will mean that the `my-package` package
+  must be built
+* A package identifier (e.g., `my-package-1.2.3`), which includes a specific
+  version. This is useful for passing to `stack install` for getting a specific
+  version from upstream
+* A directory (e.g., `./my-package`) for including a local directory's package,
+  including any packages in subdirectories
 
 ## I need to modify an upstream package, how should I do it?
 
@@ -74,7 +96,10 @@ project.
 
 ## Am I required to use a Stackage snapshot to use stack?
 
-No, not at all. If you prefer dependency solving to curation, you can continue with that workflow. Instead of describing the details of how that works here, it's probably easiest to just say: run `stack init --solver` and look at the generated stack.yaml.
+No, not at all. If you prefer dependency solving to curation, you can continue
+with that workflow. Instead of describing the details of how that works here,
+it's probably easiest to just say: run `stack init --solver` and look at the
+generated stack.yaml.
 
 ## How do I use this with sandboxes?
 
@@ -85,12 +110,18 @@ installed packages with actions taken in other projects.
 
 ## Can I run `cabal` commands inside `stack exec`?
 
-With a recent enough version of cabal-install (>= 1.22), you can. For older versions, due to [haskell/cabal#1800](https://github.com/haskell/cabal/issues/1800), this does not work. Note that even with recent versions, for some commands you may need this extra level of indirection:
+With a recent enough version of cabal-install (>= 1.22), you can. For older
+versions, due to
+[haskell/cabal#1800](https://github.com/haskell/cabal/issues/1800), this does
+not work. Note that even with recent versions, for some commands you may need
+this extra level of indirection:
 ```
 $ stack exec -- cabal exec -- cabal <command>
 ```
 
-However, virtually all `cabal` commands have an equivalent in stack, so this should not be necessary. In particular, `cabal` users may be accustomed to the `cabal run` command. In stack:
+However, virtually all `cabal` commands have an equivalent in stack, so this
+should not be necessary. In particular, `cabal` users may be accustomed to the
+`cabal run` command. In stack:
 ```
 $ stack build && stack exec <program-name>
 ```
@@ -124,29 +155,38 @@ the following line to your .cabal file:
 
 ## I already have GHC installed, can I still use stack?
 
-Yes. stack will default to using whatever GHC is on your `PATH`. If that GHC is a
-compatible version with the snapshot you're using, it will simply use it.
-Otherwise, it will prompt you to run `stack setup`. Note that `stack setup` installs GHC into `~/.stack/programs/$platform/ghc-$version/` and not a global location.
+Yes. stack will default to using whatever GHC is on your `PATH`. If that GHC is
+a compatible version with the snapshot you're using, it will simply use it.
+Otherwise, it will prompt you to run `stack setup`. Note that `stack setup`
+installs GHC into `~/.stack/programs/$platform/ghc-$version/` and not a global
+location.
 
 Note that GHC installation doesn't work for all OSes, so in some cases the
 first option will need to install GHC yourself.
 
 ## How does stack determine what GHC to use?
 
-It uses the first GHC that it finds on the `PATH`. If that GHC does not comply with the various requirements (version, architecture) that your project needs, it will prompt you to run `stack setup` to get it. `stack` is fully aware of all GHCs that it has installed itself.
+It uses the first GHC that it finds on the `PATH`. If that GHC does not comply
+with the various requirements (version, architecture) that your project needs,
+it will prompt you to run `stack setup` to get it. `stack` is fully aware of
+all GHCs that it has installed itself.
 
 See [this issue](https://github.com/commercialhaskell/stack/issues/420) for a detailed discussion.
 
 ## How do I upgrade to GHC 7.10.2 with stack?
 
-If you already have a prior version of GHC use `stack --resolver ghc-7.10 setup --reinstall`. If you don't have any GHC installed, you can skip the `--reinstall`.
+If you already have a prior version of GHC use `stack --resolver ghc-7.10 setup
+--reinstall`. If you don't have any GHC installed, you can skip the
+`--reinstall`.
 
 ## How do I get extra build tools?
 
 stack will automatically install build tools required by your packages or their
 dependencies, in particular alex and happy.
 
-__NOTE__: This works when using lts or nightly resolvers, not with ghc or custom resolvers. You can manually install build tools by running, e.g., `stack build alex happy`.
+__NOTE__: This works when using lts or nightly resolvers, not with ghc or
+custom resolvers. You can manually install build tools by running, e.g., `stack
+build alex happy`.
 
 ## How does stack choose which snapshot to use when creating a new config file?
 
@@ -163,7 +203,14 @@ any directory and still use your packages.
 
 ## My tests are failing. What should I do?
 
-Like all other targets, `stack test` runs test suites in parallel by default. This can cause problems with test suites that depend on global resources such as a database or binding to a fixed port number. A quick hack is to force stack to run all test suites in sequence, using `stack test --jobs=1`. For test suites to run in parallel developers should ensure that their test suites do not depend on global resources (e.g. by asking the OS for a random port to bind to) and where unavoidable, add a lock in order to serialize access to shared resources.
+Like all other targets, `stack test` runs test suites in parallel by default.
+This can cause problems with test suites that depend on global resources such
+as a database or binding to a fixed port number. A quick hack is to force stack
+to run all test suites in sequence, using `stack test --jobs=1`. For test
+suites to run in parallel developers should ensure that their test suites do
+not depend on global resources (e.g. by asking the OS for a random port to bind
+to) and where unavoidable, add a lock in order to serialize access to shared
+resources.
 
 ## Can I get bash autocompletion?
 
@@ -220,30 +267,51 @@ packages and the tools. See [Docker integration](docker_integration.md) for deta
 
 ## How do I use this with Travis CI?
 
-See the [Travis section in the GUIDE](GUIDE.md#travis-with-caching)
+See the [Travis CI instructions](travis_ci.md)
 
 ## What is licensing restrictions on Windows?
 
-Currently on Windows GHC produces binaries linked statically with [GNU Multiple Precision Arithmetic Library](https://gmplib.org/) (GMP), which is used by [integer-gmp](https://hackage.haskell.org/package/integer-gmp) library to provide big integer implementation for Haskell. Contrary to the majority of Haskell code licensed under permissive BSD3 license, GMP library is licensed under LGPL, which means resulting binaries [have to be provided with source code or object files](http://www.gnu.org/licenses/gpl-faq.html#LGPLStaticVsDynamic). That may or may not be acceptable for your situation. Current workaround is to use GHC built with alternative big integer implementation called integer-simple, which is free from LGPL limitations as it's pure Haskell and does not use GMP. Unfortunately it has yet to be available out of the box with stack. See [issue #399](https://github.com/commercialhaskell/stack/issues/399) for the ongoing effort and information on workarounds.
+Currently on Windows GHC produces binaries linked statically with [GNU Multiple
+Precision Arithmetic Library](https://gmplib.org/) (GMP), which is used by
+[integer-gmp](https://hackage.haskell.org/package/integer-gmp) library to
+provide big integer implementation for Haskell. Contrary to the majority of
+Haskell code licensed under permissive BSD3 license, GMP library is licensed
+under LGPL, which means resulting binaries [have to be provided with source
+code or object files](http://www.gnu.org/licenses/gpl-faq.html#LGPLStaticVsDynamic).
+That may or may not be acceptable for your situation. Current workaround is to
+use GHC built with alternative big integer implementation called
+integer-simple, which is free from LGPL limitations as it's pure Haskell and
+does not use GMP.  Unfortunately it has yet to be available out of the box with
+stack. See [issue #399](https://github.com/commercialhaskell/stack/issues/399)
+for the ongoing effort and information on workarounds.
 
 ## How to get a working executable on Windows?
 
-When executing a binary after building with `stack build` (e.g. for target "foo"), the command `foo.exe` might complain about missing runtime libraries (whereas `stack exec foo` works).
+When executing a binary after building with `stack build` (e.g. for target
+"foo"), the command `foo.exe` might complain about missing runtime libraries
+(whereas `stack exec foo` works).
 
-Windows is not able to find the necessary C++ libraries from the standard prompt because they're not in the PATH environment variable. `stack exec` works because it's modifying PATH to include extra things.
+Windows is not able to find the necessary C++ libraries from the standard
+prompt because they're not in the PATH environment variable. `stack exec` works
+because it's modifying PATH to include extra things.
 
-Those libraries are shipped with GHC (and, theoretically in some cases, MSYS). The easiest way to find them is `stack exec which`. E.g.
+Those libraries are shipped with GHC (and, theoretically in some cases, MSYS).
+The easiest way to find them is `stack exec which`. E.g.
 
     >stack exec which libstdc++-6.dll
     /c/Users/Michael/AppData/Local/Programs/stack/i386-windows/ghc-7.8.4/mingw/bin/libstdc++-6.dll
 
-A quick workaround is adding this path to the PATH environment variable or copying the files somewhere Windows finds them (cf. https://msdn.microsoft.com/de-de/library/7d83bc18.aspx).
+A quick workaround is adding this path to the PATH environment variable or
+copying the files somewhere Windows finds them (cf. https://msdn.microsoft.com/de-de/library/7d83bc18.aspx).
 
 Cf. issue [#425](https://github.com/commercialhaskell/stack/issues/425).
 
 ## Can I change stack's default temporary directory?
 
-Stack makes use of a temporary directory for some commands (/tmp by default on linux). If there is not enough free space in this directory, stack may fail (see issue [#429](https://github.com/commercialhaskell/stack/issues/429) ). For instance `stack setup` with a GHC installation requires roughly 1GB free.
+Stack makes use of a temporary directory for some commands (/tmp by default on
+linux). If there is not enough free space in this directory, stack may fail
+(see issue [#429](https://github.com/commercialhaskell/stack/issues/429) ). For
+instance `stack setup` with a GHC installation requires roughly 1GB free.
 
 A custom temporary directory can be forced:
 
@@ -285,7 +353,11 @@ If you are using a powershell session, it is easy to automate even that step:
 
 ## How do I reset / remove Stack (such as to to do a completely fresh build)?
 
-The first thing to remove is project-specific `.stack-work` directory within the project's directory. Next, remove `~/.stack` directory overall. You may have errors if you remove the latter but leave the former. Removing Stack itself will relate to how it was installed, and if you used GHC installed outside of Stack, that would need to be removed separately.
+The first thing to remove is project-specific `.stack-work` directory within
+the project's directory. Next, remove `~/.stack` directory overall. You may
+have errors if you remove the latter but leave the former. Removing Stack
+itself will relate to how it was installed, and if you used GHC installed
+outside of Stack, that would need to be removed separately.
 
 ## How does stack handle parallel builds? What exactly does it run in parallel?
 
@@ -293,7 +365,12 @@ See [issue #644](https://github.com/commercialhaskell/stack/issues/644) for more
 
 ## I get strange `ld` errors about recompiling with "-fPIC"
 
-Some users (myself included!) have come across a linker errors (example below) that seem to be dependent on the local environment, i.e. the package may compile on a different machine. The issue has been reported to be [non-deterministic](https://github.com/commercialhaskell/stack/issues/614) in some cases. I've had success using the docker functionality to build the project on a machine that would not compile it otherwise.
+Some users (myself included!) have come across a linker errors (example below)
+that seem to be dependent on the local environment, i.e. the package may
+compile on a different machine. The issue has been reported to be
+[non-deterministic](https://github.com/commercialhaskell/stack/issues/614) in
+some cases. I've had success using the docker functionality to build the
+project on a machine that would not compile it otherwise.
 
 ```
 tmp-0.1.0.0: build
@@ -309,9 +386,16 @@ collect2: error: ld returned 1 exit status
     Process exited with code: ExitFailure 1
 ```
 
-The issue may be related to the use of hardening flags in some cases, specifically those related to producing position independent executables (PIE). This is tracked upstream in the [following ticket](https://ghc.haskell.org/trac/ghc/ticket/9007). Some distributions add such hardening flags by default which may be the cause of some instances of the problem. Therefore, a possible workaround might be to turn off PIE related flags.
+The issue may be related to the use of hardening flags in some cases,
+specifically those related to producing position independent executables (PIE).
+This is tracked upstream in the [following
+ticket](https://ghc.haskell.org/trac/ghc/ticket/9007). Some distributions add
+such hardening flags by default which may be the cause of some instances of the
+problem. Therefore, a possible workaround might be to turn off PIE related
+flags.
 
-In Arch Linux, the support for this is provided by the `hardening-wrapper` package. Some possible workarounds:
+In Arch Linux, the support for this is provided by the `hardening-wrapper`
+package. Some possible workarounds:
 
 * Selectively disabling its PIE forcing by setting `HARDENING_PIE=0` in `/etc/hardening-wrapper.conf`.
 * Uninstalling the `hardening-wrapper` package and logging out then into your account again.
@@ -378,7 +462,9 @@ In principle, you can use the following command to add a certificate to your sys
 
     sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain <certificate>
 
-Some users have reported issues with this approach, see [#907](https://github.com/commercialhaskell/stack/issues/907) for more information.
+Some users have reported issues with this approach, see
+[#907](https://github.com/commercialhaskell/stack/issues/907) for more
+information.
 
 ### Other *NIX OSs
 

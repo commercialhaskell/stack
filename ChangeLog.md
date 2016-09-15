@@ -8,23 +8,72 @@ Major changes:
 
 Behavior changes:
 
+* Switch the "Run from outside project" messages to debug-level, to
+  avoid spamming users in the normal case of non-project usage
+
 Other enhancements:
 
 * `stack haddock` now supports `--haddock-internal`. See
   [#2229](https://github.com/commercialhaskell/stack/issues/2229)
+* Add support for `system-ghc` and `install-ghc` fields to `stack config set` command.
+* Add `ghc-build` option to override autodetected GHC build to use (e.g. gmp4,
+  tinfo6, nopie) on Linux.
+* `stack setup` detects systems where gcc enables PIE by default (such as Ubuntu
+  16.10) and adjusts the GHC `configure` options accordingly.
+  [#2542](https://github.com/commercialhaskell/stack/issues/2542)
+* Upload to Hackage with HTTP digest instead of HTTP basic.
 
 Bug fixes:
+
+* Add proper support for non-ASCII characters in file paths for the `sdist` command.
+  See [#2549](https://github.com/commercialhaskell/stack/issues/2549)
 
 ## 1.2.0
 
 Release notes:
 
+* The fix for
+  [#2175](https://github.com/commercialhaskell/stack/issues/2175)
+  entails that stack must perform a full clone of a large Git repo of
+  Hackage meta-information. The total download size is about 200 MB.
+  Please be aware of this when upgrading your stack installation.
+* On many Un*x systems, stack can now be installed with a simple
+  one-liner: `wget -qO- https://get.haskellstack.org/ | sh`
+* 64-bit GHC bindists have been built for Linux systems with
+  libtinfo6/libncurses6 (such as Fedora 24 and Arch Linux), and `stack setup`
+  will detect when to use them.
+
 Major changes:
+
+* Add `stack hoogle` command.
+  [#55](https://github.com/commercialhaskell/stack/issues/55)
+* Support for absolute file path in `url` field of `setup-info` or `--ghc-bindist`
+* Add support for rendering GHCi scripts targeting different GHCi like
+  applications
+  [#2457](https://github.com/commercialhaskell/stack/pull/2457)
 
 Behavior changes:
 
+* Remove `stack ide start` and `stack ide load-targets` commands.
+  [#2178](https://github.com/commercialhaskell/stack/issues/2178)
+* Support .buildinfo files in `stack ghci`.
+  [#2242](https://github.com/commercialhaskell/stack/pull/2242)
+* Support -ferror-spans syntax in GHC error messages.
+* Avoid unpacking ghc to `/tmp`
+  [#996](https://github.com/commercialhaskell/stack/issues/996)
+* The Linux `gmp4` GHC bindist is no longer considered a full-fledged GHC
+  variant and can no longer be specified using the `ghc-variant` option,
+  and instead is treated more like a slightly different platform.
+
 Other enhancements:
 
+* Nix & docker can be activated at the same time, in order to run stack in a nix-shell
+  in a container, preferably from an image already containing the nix dependencies
+  in its /nix/store
+* Use the `store` package for binary serialization of most caches.
+* Only require minor version match for Docker stack exe.
+  This way, we can make patch releases for version bounds and similar
+  build issues without needing to upload new binaries for Docker.
 * Stack/Nix: Passes the right ghc derivation as an argument to the `shell.nix` when a
   custom `shell.nix` is used
   See [#2243](https://github.com/commercialhaskell/stack/issues/2243)
@@ -42,13 +91,36 @@ Other enhancements:
   See [#2259](https://github.com/commercialhaskell/stack/issues/2259)
 * Perform some subprocesses during setup concurrently, slightly speeding up most
   commands. [#2346](https://github.com/commercialhaskell/stack/pull/2346)
-* Support for absolute file path in `url` field of `setup-info` or `--ghc-bindist`
 * `stack setup` no longer unpacks to the system temp dir on posix systems.
   [#996](https://github.com/commercialhaskell/stack/issues/996)
-* `stack setup` detects libtinfo6 and can downloads alternate GHC bindists
+* `stack setup` detects libtinfo6 and ncurses6 and can download alternate GHC
+  bindists [#257](https://github.com/commercialhaskell/stack/issues/257)
   [#2302](https://github.com/commercialhaskell/stack/issues/2302).
 * `stack setup` detects Linux ARMv7 downloads appropriate GHC bindist
   [#2103](https://github.com/commercialhaskell/stack/issues/2103)
+* Custom `stack` binaries list dependency versions in output for `--version`.
+  See [#2222](https://github.com/commercialhaskell/stack/issues/2222)
+  and [#2450](https://github.com/commercialhaskell/stack/issues/2450).
+* Use a pretty printer to output dependency resolution errors.
+  [#1912](https://github.com/commercialhaskell/stack/issues/1912)
+* Remove the `--os` flag
+  [#2227](https://github.com/commercialhaskell/stack/issues/2227)
+* Add 'netbase' and 'ca-certificates' as dependency for .deb packages.
+  [#2293](https://github.com/commercialhaskell/stack/issues/2293).
+* Add `stack ide targets` command.
+* Enhance debug logging with subprocess timings.
+* Pretty-print YAML parse errors
+  [#2374](https://github.com/commercialhaskell/stack/issues/2374)
+* Clarify confusing `stack setup` output
+  [#2314](https://github.com/commercialhaskell/stack/issues/2314)
+* Delete `Stack.Types` multimodule to improve build times
+  [#2405](https://github.com/commercialhaskell/stack/issues/2405)
+* Remove spurious newlines in build logs
+  [#2418](https://github.com/commercialhaskell/stack/issues/2418)
+* Interpreter: Provide a way to hide implicit packages
+  [#1208](https://github.com/commercialhaskell/stack/issues/1208)
+* Check executability in exec lookup
+  [#2489](https://github.com/commercialhaskell/stack/issues/2489)
 
 Bug fixes:
 
@@ -58,12 +130,50 @@ Bug fixes:
   [#2225](https://github.com/commercialhaskell/stack/issues/2225)
 * Detect resolver change in `stack solver`
   [#2252](https://github.com/commercialhaskell/stack/issues/2252)
+* Fix a bug in docker image creation where the wrong base image was
+  selected
+  [#2376](https://github.com/commercialhaskell/stack/issues/2376)
 * Ignore special entries when unpacking tarballs
   [#2361](https://github.com/commercialhaskell/stack/issues/2361)
 * Fixes src directory pollution of `style.css` and `highlight.js` with GHC 8's
   haddock [#2429](https://github.com/commercialhaskell/stack/issues/2429)
-* Remove the `--os` flag
-  [#2227](https://github.com/commercialhaskell/stack/issues/2227)
+* Handle filepaths with spaces in `stack ghci`
+  [#2266](https://github.com/commercialhaskell/stack/issues/2266)
+* Apply ghc-options to snapshot packages
+  [#2289](https://github.com/commercialhaskell/stack/issues/2289)
+* stack sdist: Fix timestamp in tarball
+  [#2394](https://github.com/commercialhaskell/stack/pull/2394)
+* Allow global Stack arguments with a script
+  [#2316](https://github.com/commercialhaskell/stack/issues/2316)
+* Inconsistency between ToJSON and FromJSON instances of PackageLocation
+  [#2412](https://github.com/commercialhaskell/stack/pull/2412)
+* Perform Unicode normalization on filepaths
+  [#1810](https://github.com/commercialhaskell/stack/issues/1810)
+* Solver: always keep ghc wired-in as hard constraints
+  [#2453](https://github.com/commercialhaskell/stack/issues/2453)
+* Support OpenBSD's tar where possible, require GNU tar for xz support
+  [#2283](https://github.com/commercialhaskell/stack/issues/2283)
+* Fix using --coverage with Cabal-1.24
+  [#2424](https://github.com/commercialhaskell/stack/issues/2424)
+* When marking exe installed, remove old version
+  [#2373](https://github.com/commercialhaskell/stack/issues/2373)
+* Stop truncating all-cabal-hashes git repo
+  [#2175](https://github.com/commercialhaskell/stack/issues/2175)
+* Handle non-ASCII filenames on Windows
+  [#2491](https://github.com/commercialhaskell/stack/issues/2491)
+* Avoid using multiple versions of a package in script interpreter
+  by passing package-id to ghc/runghc
+  [#1957](https://github.com/commercialhaskell/stack/issues/1957)
+* Only pre-load compiler version when using nix integration
+  [#2459](https://github.com/commercialhaskell/stack/issues/2459)
+* Solver: parse cabal errors also on Windows
+  [#2502](https://github.com/commercialhaskell/stack/issues/2502)
+* Allow exec and ghci commands in interpreter mode.
+  Scripts can now automatically open in the repl by using `exec ghci`
+  instead of `runghc` in the shebang command.
+  [#2510](https://github.com/commercialhaskell/stack/issues/2510)
+* Now consider a package to be dirty when an extra-source-file is changed.
+  See [#2040](https://github.com/commercialhaskell/stack/issues/2040)
 
 ## 1.1.2
 
@@ -134,9 +244,6 @@ Bug fixes:
   checked for dirtiness. See
   [#1982](https://github.com/commercialhaskell/stack/issues/1982)
 * Signing: always use `--with-fingerprints`
-  [#2110](https://github.com/commercialhaskell/stack/issues/2110).
-* Now consider a package to be dirty when an extra-source-file is changed.
-  See [#2040](https://github.com/commercialhaskell/stack/issues/2040).
 
 ## 1.1.0
 

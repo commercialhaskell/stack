@@ -60,20 +60,49 @@ In addition to a number of options (like the aforementioned `--test`), `stack
 build` takes a list of zero or more *targets* to be built. There are a number
 of different syntaxes supported for this list:
 
-*   *package*, e.g. `stack build foobar`, is the most commonly used target. It will try to find the package in the following locations: local packages, extra dependencies, snapshots, and package index (e.g. Hackage). If it's found in the package index, then the latest version of that package from the index is implicitly added to your extra dependencies.
+*   *package*, e.g. `stack build foobar`, is the most commonly used target. It
+    will try to find the package in the following locations: local packages,
+    extra dependencies, snapshots, and package index (e.g. Hackage). If it's
+    found in the package index, then the latest version of that package from
+    the index is implicitly added to your extra dependencies.
 
-    This is where the `--test` and `--bench` flags come into play. If the package is a local package, then all of the test suite and benchmark components are selected to be built, respectively. In any event, the library and executable components are also selected to be built.
+    This is where the `--test` and `--bench` flags come into play. If the
+    package is a local package, then all of the test suite and benchmark
+    components are selected to be built, respectively. In any event, the
+    library and executable components are also selected to be built.
 
-*   *package identifier*, e.g. `stack build foobar-1.2.3`, is usually used to include specific package versions from the index. If the version selected conflicts with an existing local package or extra dep, then stack fails with an error. Otherwise, this is the same as calling `stack build foobar`, except instead of using the latest version from the index, the version specified is used.
+*   *package identifier*, e.g. `stack build foobar-1.2.3`, is usually used to
+    include specific package versions from the index. If the version selected
+    conflicts with an existing local package or extra dep, then stack fails
+    with an error. Otherwise, this is the same as calling `stack build foobar`,
+    except instead of using the latest version from the index, the version
+    specified is used.
 
-*   *component*. Instead of referring to an entire package and letting stack decide which components to build, you select individual components from inside a package. This can be done for more fine-grained control over which test suites to run, or to have a faster compilation cycle. There are multiple ways to refer to a specific component (provided for convenience):
+*   *component*. Instead of referring to an entire package and letting stack
+    decide which components to build, you select individual components from
+    inside a package. This can be done for more fine-grained control over which
+    test suites to run, or to have a faster compilation cycle. There are
+    multiple ways to refer to a specific component (provided for convenience):
 
-    * `packagename:comptype:compname` is the most explicit. The available comptypes are `exe`, `test`, and `bench`.
-    * `packagename:compname` allows you to leave off the component type, as that will (almost?) always be redundant with the component name. For example, `stack build mypackage:mytestsuite`.
-    * `:compname` is a useful shortcut, saying "find the component in all of the local packages." This will result in an error if multiple packages have a component with the same name. To continue the above example, `stack build :mytestsuite`.
-        * Side note: the commonly requested `run` command is not available because it's a simple combination of `stack build :exename && stack exec exename`
+    * `packagename:comptype:compname` is the most explicit. The available
+      comptypes are `exe`, `test`, and `bench`.
+    * `packagename:compname` allows you to leave off the component type, as
+      that will (almost?) always be redundant with the component name. For
+      example, `stack build mypackage:mytestsuite`.
+    * `:compname` is a useful shortcut, saying "find the component in all of
+      the local packages." This will result in an error if multiple packages
+      have a component with the same name. To continue the above example,
+      `stack build :mytestsuite`.
+        * Side note: the commonly requested `run` command is not available
+          because it's a simple combination of `stack build :exename && stack
+          exec exename`
 
-* *directory*, e.g. `stack build foo/bar`, will find all local packages that exist in the given directory hierarchy and then follow the same procedure as passing in package names as mentioned above. There's an important caveat here: if your directory name is parsed as one of the above target types, it will be treated as that. Explicitly starting your target with `./` can be a good way to avoid that, e.g. `stack build ./foo`
+* *directory*, e.g. `stack build foo/bar`, will find all local packages that
+  exist in the given directory hierarchy and then follow the same procedure as
+  passing in package names as mentioned above. There's an important caveat
+  here: if your directory name is parsed as one of the above target types, it
+  will be treated as that. Explicitly starting your target with `./` can be a
+  good way to avoid that, e.g. `stack build ./foo`
 
 Finally: if you provide no targets (e.g., running `stack build`), stack will
 implicitly pass in all of your local packages. If you only want to target
@@ -131,11 +160,15 @@ stack build --file-watch --test --copy-bins --haddock wai-extra :warp warp:docte
 
 This command will:
 
-* Start stack up in file watch mode, waiting for files in your project to change. When first starting, and each time a file changes, it will do all of the following.
+* Start stack up in file watch mode, waiting for files in your project to
+  change. When first starting, and each time a file changes, it will do all of
+  the following.
 * Build the wai-extra package and its test suites
 * Build the `warp` executable
-* Build the warp package's doctest component (which, as you may guess, is a test site)
-* Run all of the wai-extra package's test suite components and the doctest test suite component
+* Build the warp package's doctest component (which, as you may guess, is a
+  test site)
+* Run all of the wai-extra package's test suite components and the doctest test
+  suite component
 * If all of that succeeds:
     * Copy generated executables to the local bin path
     * Run the command `echo Yay, it worked!`
