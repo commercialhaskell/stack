@@ -20,7 +20,7 @@ extra-deps:
 - project-template-0.2.0
 - filelock-0.1.0.1
 - gitrev-1.2.0
-- http-client-0.5.0
+- http-client-0.5.3.1
 - http-conduit-2.2.0
 - ignore-0.1.1.0
 - binary-tagged-0.1.3.1
@@ -48,7 +48,7 @@ extra-deps:
 - x509-validation-1.6.3
 - x509-store-1.6.1
 - x509-system-1.6.3
-- http-client-tls-0.3.0
+- http-client-tls-0.3.1
 - connection-0.2.5
 - regex-applicative-text-0.1.0.1
 - monad-unlift-0.1.1.0
