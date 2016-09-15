@@ -430,7 +430,7 @@ loadBuildConfig mproject config mresolver mcompiler = do
           forM_ (projectUserMsg project) ($logWarn . T.pack)
           return (project, fp)
       Nothing -> do
-            $logInfo "Run from outside a project, using implicit global project config"
+            $logDebug "Run from outside a project, using implicit global project config"
             destDir <- getImplicitGlobalProjectDir config
             let dest :: Path Abs File
                 dest = destDir </> stackDotYaml
@@ -444,7 +444,7 @@ loadBuildConfig mproject config mresolver mcompiler = do
                    when (getTerminal env) $
                        case mresolver of
                            Nothing ->
-                               $logInfo ("Using resolver: " <> resolverName (projectResolver project) <>
+                               $logDebug ("Using resolver: " <> resolverName (projectResolver project) <>
                                          " from implicit global project's config file: " <> T.pack dest')
                            Just aresolver -> do
                                let name =
@@ -454,7 +454,7 @@ loadBuildConfig mproject config mresolver mcompiler = do
                                             ARLatestLTS -> "lts"
                                             ARLatestLTSMajor x -> T.pack $ "lts-" ++ show x
                                             ARGlobal -> "global"
-                               $logInfo ("Using resolver: " <> name <>
+                               $logDebug ("Using resolver: " <> name <>
                                          " specified on command line")
                    return (project, dest)
                else do

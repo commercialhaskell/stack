@@ -8,6 +8,9 @@ Major changes:
 
 Behavior changes:
 
+* Switch the "Run from outside project" messages to debug-level, to
+  avoid spamming users in the normal case of non-project usage
+
 Other enhancements:
 
 * Add support for `system-ghc` and `install-ghc` fields to `stack config set` command.
