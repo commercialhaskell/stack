@@ -213,6 +213,7 @@ packageFromPackageDescription packageConfig gpkg pkg =
     Package
     { packageName = name
     , packageVersion = fromCabalVersion (pkgVersion pkgId)
+    , packageLicense = license pkg
     , packageDeps = deps
     , packageFiles = pkgFiles
     , packageTools = packageDescTools pkg

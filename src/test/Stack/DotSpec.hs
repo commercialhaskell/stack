@@ -13,6 +13,7 @@ import           Data.Maybe (fromMaybe)
 import           Data.Set (Set)
 import qualified Data.Set as Set
 import           Data.Text (Text)
+import           Distribution.License (License (BSD3))
 import           Stack.Types.PackageName
 import           Stack.Types.Version
 import           Test.Hspec
@@ -21,14 +22,14 @@ import           Test.QuickCheck (forAll,choose,Gen)
 
 import           Stack.Dot
 
-dummyVersion :: Version
-dummyVersion = fromMaybe (error "dotspec: parser error") (parseVersionFromString "0.0.0.0")
+dummyPayload :: DotPayload
+dummyPayload = DotPayload (parseVersionFromString "0.0.0.0") (Just BSD3)
 
 spec :: Spec
 spec = do
   let graph =
          Map.mapKeys pkgName
-       . fmap (\p -> (Set.map pkgName p, Just dummyVersion))
+       . fmap (\p -> (Set.map pkgName p, dummyPayload))
        . Map.fromList $ [("one",Set.fromList ["base","free"])
                         ,("two",Set.fromList ["base","free","mtl","transformers","one"])
                         ]
@@ -38,7 +39,7 @@ spec = do
 
     it "with depth 1, more dependencies are resolved" $ do
       let graph' = Map.insert (pkgName "cycle")
-                              (Set.singleton (pkgName "cycle"), Just dummyVersion)
+                              (Set.singleton (pkgName "cycle"), dummyPayload)
                               graph
           resultGraph = runIdentity (resolveDependencies (Just 0) graph stubLoader)
           resultGraph' = runIdentity (resolveDependencies (Just 1) graph' stubLoader)
@@ -46,7 +47,7 @@ spec = do
 
     it "cycles are ignored" $ do
        let graph' = Map.insert (pkgName "cycle")
-                               (Set.singleton (pkgName "cycle"), Just dummyVersion)
+                               (Set.singleton (pkgName "cycle"), dummyPayload)
                                 graph
            resultGraph = resolveDependencies Nothing graph stubLoader
            resultGraph' = resolveDependencies Nothing graph' stubLoader
@@ -81,8 +82,8 @@ pkgName = fromMaybe failure . parsePackageName
    failure = error "Internal error during package name creation in DotSpec.pkgName"
 
 -- Stub, simulates the function to load package dependecies
-stubLoader :: PackageName -> Identity (Set PackageName, Maybe Version)
-stubLoader name = return . (, Just dummyVersion) . Set.fromList . map pkgName $ case show name of
+stubLoader :: PackageName -> Identity (Set PackageName, DotPayload)
+stubLoader name = return . (, dummyPayload) . Set.fromList . map pkgName $ case show name of
   "StateVar" -> ["stm","transformers"]
   "array" -> []
   "bifunctors" -> ["semigroupoids","semigroups","tagged"]

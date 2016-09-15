@@ -75,6 +75,7 @@ import           Stack.New
 import           Stack.Options.BuildParser
 import           Stack.Options.CleanParser
 import           Stack.Options.DockerParser
+import           Stack.Options.DotParser
 import           Stack.Options.ExecParser
 import           Stack.Options.GhciParser
 import           Stack.Options.GlobalParser
@@ -321,7 +322,7 @@ commandLineHandler progName isInterpreter = complicatedOptions
         addCommand' "dot"
                     "Visualize your project's dependency graph using Graphviz dot"
                     dotCmd
-                    dotOptsParser
+                    (dotOptsParser False) -- Default for --external is False.
         addCommand' "ghc"
                     "Run ghc"
                     execCmd
@@ -374,12 +375,7 @@ commandLineHandler progName isInterpreter = complicatedOptions
         addCommand' "list-dependencies"
                     "List the dependencies"
                     listDependenciesCmd
-                    (textOption (long "separator" <>
-                                 metavar "SEP" <>
-                                 help ("Separator between package name " <>
-                                       "and package version.") <>
-                                 value " " <>
-                                 showDefault))
+                    listDepsOptsParser
         addCommand' "query"
                     "Query general build information (experimental)"
                     queryCmd
@@ -901,9 +897,8 @@ dotCmd :: DotOpts -> GlobalOpts -> IO ()
 dotCmd dotOpts go = withBuildConfigAndLock go (\_ -> dot dotOpts)
 
 -- | List the dependencies
-listDependenciesCmd :: Text -> GlobalOpts -> IO ()
-listDependenciesCmd sep go = withBuildConfig go (listDependencies sep')
-  where sep' = T.replace "\\t" "\t" (T.replace "\\n" "\n" sep)
+listDependenciesCmd :: ListDepsOpts -> GlobalOpts -> IO ()
+listDependenciesCmd opts go = withBuildConfig go $ listDependencies opts
 
 -- | Query build information
 queryCmd :: [String] -> GlobalOpts -> IO ()
