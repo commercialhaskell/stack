@@ -340,6 +340,8 @@ data Config =
          -- installation.
          ,configPackageCaches       :: !(IORef (Maybe (Map PackageIdentifier (PackageIndex, PackageCache))))
          -- ^ In memory cache of hackage index.
+         ,configDumpLogs            :: !Bool
+         -- ^ Dump logs of local non-dependencies when doing a build.
          ,configMaybeProject        :: !(Maybe (Project, Path Abs File))
          }
 
@@ -864,6 +866,8 @@ data ConfigMonoid =
     , configMonoidAllowDifferentUser :: !(First Bool)
     -- ^ Allow users other than the stack root owner to use the stack
     -- installation.
+    , configMonoidDumpLogs           :: !(First Bool)
+    -- ^ See 'configDumpLogs'
     }
   deriving (Show, Generic)
 
@@ -931,6 +935,7 @@ parseConfigMonoidJSON obj = do
     configMonoidAllowNewer <- First <$> obj ..:? configMonoidAllowNewerName
     configMonoidDefaultTemplate <- First <$> obj ..:? configMonoidDefaultTemplateName
     configMonoidAllowDifferentUser <- First <$> obj ..:? configMonoidAllowDifferentUserName
+    configMonoidDumpLogs <- First <$> obj ..:? configMonoidDumpLogsName
 
     return ConfigMonoid {..}
   where
@@ -1057,6 +1062,9 @@ configMonoidDefaultTemplateName = "default-template"
 
 configMonoidAllowDifferentUserName :: Text
 configMonoidAllowDifferentUserName = "allow-different-user"
+
+configMonoidDumpLogsName :: Text
+configMonoidDumpLogsName = "dump-logs"
 
 data ConfigException
   = ParseConfigFileException (Path Abs File) ParseException

@@ -596,6 +596,20 @@ The meanings of these settings correspond directly with the CLI flags of the
 same name. See the [build command docs](build_command.md) and the
 [users guide](GUIDE.md#the-build-command) for more info.
 
+### dump-logs
+
+(Since XXX)
+
+Tell Stack to print the log output from all local non-dependency
+packages to the console. By default, Stack will only do this when
+building a single target package, to avoid generating unnecessarily
+verbose output. This can be useful when you want to see warnings from
+all of your packages.
+
+```yaml
+dump-logs: true
+```
+
 ### templates
 
 Templates used with `stack new` have a number of parameters that affect the

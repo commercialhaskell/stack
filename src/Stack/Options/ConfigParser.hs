@@ -17,7 +17,7 @@ import           Stack.Types.Config
 -- | Command-line arguments parser for configuration.
 configOptsParser :: GlobalOptsContext -> Parser ConfigMonoid
 configOptsParser hide0 =
-    (\stackRoot workDir buildOpts dockerOpts nixOpts systemGHC installGHC arch ghcVariant ghcBuild jobs includes libs overrideGccPath skipGHCCheck skipMsys localBin modifyCodePage allowDifferentUser -> mempty
+    (\stackRoot workDir buildOpts dockerOpts nixOpts systemGHC installGHC arch ghcVariant ghcBuild jobs includes libs overrideGccPath skipGHCCheck skipMsys localBin modifyCodePage allowDifferentUser dumpLogs -> mempty
         { configMonoidStackRoot = stackRoot
         , configMonoidWorkDir = workDir
         , configMonoidBuildOpts = buildOpts
@@ -37,6 +37,7 @@ configOptsParser hide0 =
         , configMonoidLocalBinPath = localBin
         , configMonoidModifyCodePage = modifyCodePage
         , configMonoidAllowDifferentUser = allowDifferentUser
+        , configMonoidDumpLogs = dumpLogs
         })
     <$> optionalFirst (absDirOption
             ( long stackRootOptionName
@@ -117,5 +118,9 @@ configOptsParser hide0 =
             "allow-different-user"
             ("permission for users other than the owner of the stack root " ++
                 "directory to use a stack installation (POSIX only)")
+            hide
+    <*> firstBoolFlags
+            "dump-logs"
+            "dump the build output logs for local packages to the console"
             hide
   where hide = hideMods (hide0 /= OuterGlobalOpts)
