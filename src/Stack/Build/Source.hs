@@ -351,10 +351,10 @@ loadLocalPackage boptsCli targets (name, (lpv, gpkg)) = do
                 Just (STLocalComps comps) -> splitComponents $ Set.toList comps
                 Just STLocalAll ->
                     ( packageExes pkg
-                    , if boptsTests bopts
+                    , if boptsTests bopts && not (lpvExtraDep lpv)
                         then Map.keysSet (packageTests pkg)
                         else Set.empty
-                    , if boptsBenchmarks bopts
+                    , if boptsBenchmarks bopts && not (lpvExtraDep lpv)
                         then packageBenchmarks pkg
                         else Set.empty
                     )
