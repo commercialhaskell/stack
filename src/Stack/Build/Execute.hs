@@ -348,17 +348,20 @@ withExecuteEnv menv bopts boptsCli baseConfigOpts locals globalPackages snapshot
 
     dumpLogs chan totalWanted = do
         allLogs <- liftIO $ atomically drainChan
-        unless (null allLogs) $ do
-            toDump <- asks (configDumpLogs . getConfig)
-            when toDump $ mapM_ dumpLog allLogs
+        case allLogs of
+            -- No log files generated, nothing to dump
+            [] -> return ()
+            firstLog:_ -> do
+                toDump <- asks (configDumpLogs . getConfig)
+                when toDump $ mapM_ dumpLog allLogs
 
-            when (not toDump && totalWanted > 1) $ $logInfo $ T.concat
-                [ "Build output has been captured to log files, use "
-                , "--dump-logs to see it on the console"
-                ]
+                when (not toDump && totalWanted > 1) $ $logInfo $ T.concat
+                    [ "Build output has been captured to log files, use "
+                    , "--dump-logs to see it on the console"
+                    ]
 
-            $logInfo "The following log files have been saved:"
-            mapM_ ($logInfo . T.pack . toFilePath) allLogs
+                $logInfo $ T.pack $ "Log files have been written to: "
+                        ++ toFilePath (parent firstLog)
       where
         drainChan = do
             mx <- tryReadTChan chan
