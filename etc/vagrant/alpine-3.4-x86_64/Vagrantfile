@@ -12,7 +12,11 @@ Vagrant.configure(2) do |config|
     apk add alpine-sdk linux-headers musl-dev gmp-dev zlib-dev ghc git rsync gnupg
     cp /usr/lib/gcc/x86_64-alpine-linux-musl/5.3.0/crtbeginT.o /usr/lib/gcc/x86_64-alpine-linux-musl/5.3.0/crtbeginT.o.orig
     cp /usr/lib/gcc/x86_64-alpine-linux-musl/5.3.0/crtbeginS.o /usr/lib/gcc/x86_64-alpine-linux-musl/5.3.0/crtbeginT.o
-    curl -sSLo /usr/local/bin/stack https://download.fpcomplete.com/temp/manny/stack-alpine-static
+    if ! which stack; then
+      curl -sSL https://www.stackage.org/stack/linux-x86_64-linux \
+        | tar xzvf - --wildcards --strip-components=1 -C /usr/local/bin '*/stack'
+      chmod a+x /usr/local/bin/stack
+    fi
     chmod a+x /usr/local/bin/stack
     chown vagrant:vagrant /vagrant
   SHELL

@@ -1,5 +1,13 @@
 # Maintainer guide
 
+## Next release:
+
+* Consider moving all the release scripts stuff to a separate repo, or make it
+  easy to run the release tools from a separate repo than the version of Stack
+  being released. This will make it much easier to adjust the release process as
+  we go without ending up with stack binaries build from different git commit
+  IDs.
+
 ## Pre-release steps
 
 * Ensure `release` and `stable` branches merged to `master`
@@ -33,8 +41,8 @@
           due to merges
     * Review documentation for any changes that need to be made
         * Search for old Stack version, unstable stack version, and the next
-          "obvious" version in sequence (if doing a non-obvious jump) and replace
-          with new version
+          "obvious" version in sequence (if doing a non-obvious jump), and
+          `UNRELEASED` and replace with new version
         * Look for any links to "latest" documentation, replace with version tag
         * Ensure all documentation pages listed in `mkdocs.yaml`
     * Update the ISSUE_TEMPLATE.md to point at the new version.
@@ -44,7 +52,7 @@
         * [Debian](https://www.debian.org/releases/) (keep at least latest two)
         * [CentOS](https://wiki.centos.org/Download)
         * [Fedora](https://fedoraproject.org/wiki/Releases)
-    * Check for new FreeBSD release
+    * Check for new [FreeBSD release](https://www.freebsd.org/releases/).
     * Check that no new entries need to be added to
       [releases.yaml](https://github.com/fpco/stackage-content/blob/master/stack/releases.yaml),
       [install_and_upgrade.md](https://github.com/commercialhaskell/stack/blob/master/doc/install_and_upgrade.md),
@@ -69,9 +77,9 @@ for requirements to perform the release, and more details about the tool.
   `GITHUB_AUTHORIZATION_TOKEN`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`,
   `AWS_DEFAULT_REGION`.
 
-    Note: since one of the tools (rpm-s3 on CentOS) doesn't support AWS temporary
-    credentials, you can't use MFA with the AWS credentials (`AWS_SECURITY_TOKEN`
-    is ignored).
+    Note: since one of the tools (rpm-s3 on CentOS) doesn't support AWS
+    temporary credentials, you can't use MFA with the AWS credentials
+    (`AWS_SECURITY_TOKEN` is ignored).
 
 * On a machine with Vagrant installed:
     * Run `etc/scripts/vagrant-releases.sh`
@@ -85,7 +93,14 @@ for requirements to perform the release, and more details about the tool.
     * Release Windows installers. See
       [stack-installer README](https://github.com/borsboom/stack-installer#readme)
 
-* Publish Github release
+* On Linux ARMv7:
+    * Run `etc/scripts/linux-armv7-release.sh`
+
+* Build sdist using `stack sdist . --pvp-bounds=both`, and upload it to the
+  Github release with a name like `stack-X.Y.Z-sdist-0.tar.gz`.
+
+* Publish Github release. Use e.g. `git shortlog -s v1.1.2..rc/v1.2.0|sed
+  's/^[0-9 ]*/* /'|sort -f` to get the list of contributors.
 
 * Upload package to Hackage: `stack upload . --pvp-bounds=both`
 
@@ -96,15 +111,16 @@ for requirements to perform the release, and more details about the tool.
   [stack-setup-2.yaml](https://github.com/fpco/stackage-content/blob/master/stack/stack-setup-2.yaml),
   and add the new linux64 stack bindist
 
-* Submit a PR for the
+* (SKIP) Submit a PR for the
   [haskell-stack Homebrew formula](https://github.com/Homebrew/homebrew-core/blob/master/Formula/haskell-stack.rb)
+      * Ensure that the formula use the sdist uploaded to the Github release
       * Be sure to update the SHA sum
       * The commit message should just be `haskell-stack <VERSION>`
 
-* [Flag the Arch Linux package as out-of-date](https://www.archlinux.org/packages/community/x86_64/stack/flag/)
+* (SKIP) [Flag the Arch Linux package as out-of-date](https://www.archlinux.org/packages/community/x86_64/stack/flag/)
 
 * Push signed Git tag, matching Github release tag name, e.g.: `git tag -d vX.Y.Z && git tag -u
-  0x575159689BEFB442 vX.Y.Z && git push origin vX.Y.Z`
+  0x575159689BEFB442 vX.Y.Z && git push -f origin vX.Y.Z`
 
 * Reset the `release` branch to the released commit, e.g.: `git checkout release
   && git merge --ff-only vX.Y.Z && git push origin release`
@@ -121,7 +137,7 @@ for requirements to perform the release, and more details about the tool.
 
 * Merge any changes made in the RC/release/stable branches to master.
 
-* Announce to haskell-cafe@haskell.org haskell-stack@googlegroups.com
+* Announce to haskell-cafe@haskell.org, haskell-stack@googlegroups.com,
   commercialhaskell@googlegroups.com mailing lists
 
 * Keep an eye on the
@@ -146,44 +162,48 @@ set up.
 
  4. Install the VMware guest additions, and reboot
 
- 5. Configure a shared folder for your home directory on the host, and mount it on Z:
+ 5. In **Settings**->**Update & Security**->**Windows Update**->**Advanced options**:
+     * Change **Choose how updates are installed** to **Notify to schedule restart**
+     * Check **Defer upgrades**
 
- 6. Install Windows SDK (for signtool):
+ 6. Configure a shared folder for your home directory on the host, and mount it on Z:
+
+ 7. Install Windows SDK (for signtool):
     http://microsoft.com/en-us/download/confirmation.aspx?id=8279
 
- 7. Install msysgit: https://msysgit.github.io/
+ 8. Install msysgit: https://msysgit.github.io/
 
- 8. Install nsis-2.46.5-Unicode-setup.exe from http://www.scratchpaper.com/
+ 9. Install nsis-2.46.5-Unicode-setup.exe from http://www.scratchpaper.com/
 
- 9: Install Stack using the Windows 64-bit installer
+10: Install Stack using the Windows 64-bit installer
 
-10. Visit https://hackage.haskell.org/ in Edge to ensure system has correct CA
+11. Visit https://hackage.haskell.org/ in Edge to ensure system has correct CA
     certificates
 
-11. Get the object code certificate from
+12. Get the object code certificate from
     [password-store](https://github.com/fpco/password-store), in
     `certificates/code_signing/fpcomplete_corporation_startssl_2015-09-22.pfx`.
     Double click it in explorer and import it
 
-12. Run in command prompt:
+13. Run in command prompt:
 
         md C:\p
         md C:\p\tmp
         cd \p
         md c:\tmp
 
-13. Create `C:\p\env.bat`:
+14. Create `C:\p\env.bat`:
 
         SET STACK_ROOT=C:\p\.sr
         SET TEMP=C:\p\tmp
         SET TMP=C:\p\tmp
         SET PATH=C:\Users\IEUser\AppData\Roaming\local\bin;"c:\Program Files\Git\usr\bin";"C:\Program Files\Microsoft SDKs\Windows\v7.1\Bin";%PATH%
 
-14. Run `C:\p\env.bat` (do this every time you open a new command prompt)
+15. Run `C:\p\env.bat` (do this every time you open a new command prompt)
 
-15. Import the `dev@fpcomplete.com` (0x575159689BEFB442) GPG secret key
+16. Import the `dev@fpcomplete.com` (0x575159689BEFB442) GPG secret key
 
-16. Run in command prompt (adjust the `user.email` and `user.name` settings):
+17. Run in command prompt (adjust the `user.email` and `user.name` settings):
 
         stack setup
         stack install cabal-install
@@ -195,6 +215,129 @@ set up.
         git config --global core.autocrlf true
         git clone git@github.com:commercialhaskell/stack.git
         git clone git@github.com:borsboom/stack-installer.git
+
+## Setting up an ARM VM for releases
+
+These instructions assume the host system is running OS X. Some steps will vary
+with a different host OS.
+
+### Install qemu on host
+
+    brew install qemu
+
+### Install fuse-ext2
+
+    brew install e2fsprogs m4 automake autoconf libtool && \
+    git clone https://github.com/alperakcan/fuse-ext2.git && \
+    cd fuse-ext2 && \
+
+Add `m4_ifdef([AM_PROG_AR], [AM_PROG_AR])` to the `configure.ac` after
+`m4_ifdef([AC_PROG_LIB],[AC_PROG_LIB],[m4_warn(portability,[Missing AC_PROJ_LIB])])`
+line.
+
+    PKG_CONFIG_PATH="$(brew --prefix e2fsprogs)/lib/pkgconfig" \
+        CFLAGS="-idirafter/$(brew --prefix e2fsprogs)/include -idirafter/usr/local/include/osxfuse" \
+        LDFLAGS="-L$(brew --prefix e2fsprogs)/lib" \
+        ./configure
+
+### Create VM and install Debian in it
+
+    wget http://ftp.de.debian.org/debian/dists/jessie/main/installer-armhf/current/images/netboot/initrd.gz && \
+    wget http://ftp.de.debian.org/debian/dists/jessie/main/installer-armhf/current/images/netboot/vmlinuz && \
+    wget http://ftp.de.debian.org/debian/dists/jessie/main/installer-armhf/current/images/device-tree/vexpress-v2p-ca9.dtb && \
+    qemu-img create -f raw armdisk.raw 15G && \
+    qemu-system-arm -M vexpress-a9 -cpu cortex-a9 -kernel vmlinuz -initrd initrd.gz -sd armdisk.raw -append "root=/dev/mmcblk0p2" -m 1024M -redir tcp:2223::22 -dtb vexpress-v2p-ca9.dtb -append "console=ttyAMA0,115200" -serial stdio
+
+Now the Debian installer will run.  Add at least 1 GB SWAP during installation.
+
+### Get boot files after install
+
+    hdiutil attach -imagekey diskimage-class=CRawDiskImage -nomount armdisk.raw && \
+    mkdir -p /Volumes/armdeb && \
+    fuse-ext2 /dev/disk2s1 /Volumes/armdeb/ && \
+    cp /Volumes/armdeb/vmlinuz-3.16.0-4-armmp . && \
+    cp /Volumes/armdeb/initrd.img-3.16.0-4-armmp . && \
+    hdiutil detach /dev/disk2
+
+### Boot VM
+
+    qemu-system-arm -M vexpress-a9 -cpu cortex-a9 -kernel vmlinuz-3.16.0-4-armmp -initrd initrd.img-3.16.0-4-armmp -sd armdisk.raw -m 1024M -dtb vexpress-v2p-ca9.dtb -append "root=/dev/mmcblk0p2 console=ttyAMA0,115200" -serial stdio -redir tcp:2223::22
+
+### Setup rest of system
+
+Log onto the VM as root, then (replace `<<<USERNAME>>>` with the user you set up
+during Debian installation):
+
+    apt-get update && \
+    apt-get install -y sudo && \
+    adduser <<<USERNAME>>> sudo
+
+Now you can SSH to the VM using `ssh -p 2223 <<<USERNAME>>>@localhost` and use `sudo` in
+the shell.
+
+### Install GHC/clang
+
+NOTE: the Debian jessie `llvm` packge does not work (executables built with it
+just exit with "schedule: re-entered unsafely.").
+
+    sudo apt-get install -y g++ gcc libc6-dev libffi-dev libgmp-dev make xz-utils zlib1g-dev git gnupg && \
+    wget http://llvm.org/releases/3.5.2/clang+llvm-3.5.2-armv7a-linux-gnueabihf.tar.xz && \
+    sudo tar xvf clang+llvm-3.5.2-armv7a-linux-gnueabihf.tar.xz -C /opt && \
+    http://downloads.haskell.org/~ghc/7.10.3/ghc-7.10.3-armv7-deb8-linux.tar.xz
+    tar xvf ghc-7.10.3-armv7-deb8-linux.tar.xz && \
+    cd ghc-7.10.3 && \
+    ./configure --prefix=/opt/ghc-7.10.3 && \
+    sudo make install && \
+    cd ..
+
+Run this now and add it to the `.profile`:
+
+    export PATH="$HOME/.local/bin:/opt/ghc-7.10.3/bin:/opt/clang+llvm-3.5.2-armv7a-linux-gnueabihf/bin:$PATH"
+
+Note: to install GHC 8.0.1/clang 3.7.1 instead, use:
+
+    wget http://llvm.org/releases/3.7.1/clang+llvm-3.7.1-armv7a-linux-gnueabihf.tar.xz && \
+    sudo tar xvf clang+llvm-3.7.1-armv7a-linux-gnueabihf.tar.xz -C /opt && \
+    wget http://downloads.haskell.org/~ghc/8.0.1/ghc-8.0.1-armv7-deb8-linux.tar.xz && \
+    tar xvf ghc-8.0.1-armv7-deb8-linux.tar.xz && \
+    cd ghc-8.0.1 && \
+    ./configure --prefix=/opt/ghc-8.0.1 && \
+    sudo make install && \
+    cd ..
+
+### Install Stack
+
+Get an [existing `stack` binary](github.com/commercialhaskell/stack/releases)
+and put it in `~/.local/bin`. If that is not possible, bootstrap Stack using
+this process:
+
+    wget https://www.haskell.org/cabal/release/cabal-install-1.24.0.0/cabal-install-1.24.0.0.tar.gz &&&&& \
+    tar xvf cabal-install-1.24.0.0.tar.gz && \
+    cd cabal-install-1.24.0.0 && \
+    EXTRA_CONFIGURE_OPTS="" ./bootstrap.sh && \
+    cd .. && \
+    export PATH="$HOME/.cabal/bin:$PATH" && \
+    cabal update
+
+Edit `~/.cabal/config`, and set `executable-stripping: False` and
+`library-stripping: False`.
+
+    cabal unpack stack && \
+    cd stack-* && \
+    cabal install && \
+    mv ~/.cabal/bin/stack ~/.local/bin
+
+### Resources
+
+  - http://mashu.github.io/2015/08/12/QEMU-Debian-armhf.html
+  - https://www.aurel32.net/info/debian_arm_qemu.php
+  - http://linuxdeveloper.blogspot.ca/2011/08/how-to-install-arm-debian-on-ubuntu.html
+  - http://www.macworld.com/article/2855038/how-to-mount-and-manage-non-native-file-systems-in-os-x-with-fuse.html
+  - https://github.com/alperakcan/fuse-ext2#mac-os
+  - https://github.com/alperakcan/fuse-ext2/issues/31#issuecomment-214713801
+  - https://github.com/alperakcan/fuse-ext2/issues/33#issuecomment-216758378
+  - https://github.com/alperakcan/fuse-ext2/issues/32#issuecomment-216758019
+  - http://osxdaily.com/2007/03/23/create-a-ram-disk-in-mac-os-x/
 
 ## Adding a new GHC version
 
@@ -218,7 +361,8 @@ set up.
 
   * Build any additional required bindists (see below for instructions)
 
-      * libtinfo6 (etc/vagrant/fedora24-x86_64)
+      * tinfo6 (`etc/vagrant/fedora24-x86_64`)
+      * ncurses6 (`etc/vagrant/arch-x86_64`)
 
   * [Edit stack-setup-2.yaml](https://github.com/fpco/stackage-content/edit/master/stack/stack-setup-2.yaml)
     and add the new bindists, pointing to the Github release version. Be sure to
@@ -226,9 +370,16 @@ set up.
 
 ### Building GHC
 
-Set the `GHC_VERSION` environment variable to the version to build.
+On systems with a small `/tmp`, you should set TMP and TEMP to an alternate
+location.
 
-For GHC >= 7.10.2, run (from [here](https://ghc.haskell.org/trac/ghc/wiki/Newcomers)):
+For GHC >= 7.10.2, set the `GHC_VERSION` environment variable to the version to build:
+
+    * `export GHC_VERSION=8.0.1`
+    * `export GHC_VERSION=7.10.3a`
+    * `export GHC_VERSION=7.10.2`
+
+then, run (from [here](https://ghc.haskell.org/trac/ghc/wiki/Newcomers)):
 
     git config --global url."git://github.com/ghc/packages-".insteadOf git://github.com/ghc/packages/ && \
     git clone -b ghc-${GHC_VERSION}-release --recursive git://github.com/ghc/ghc ghc-${GHC_VERSION} && \
@@ -243,6 +394,7 @@ For GHC >= 7.10.2, run (from [here](https://ghc.haskell.org/trac/ghc/wiki/Newcom
 
 GHC 7.8.4 is slightly different:
 
+    export GHC_VERSION=7.8.4 && \
     git config --global url."git://github.com/ghc/packages-".insteadOf git://github.com/ghc/packages/ && \
     git clone -b ghc-${GHC_VERSION}-release --recursive git://github.com/ghc/ghc ghc-${GHC_VERSION} && \
     cd ghc-${GHC_VERSION}/ && \
