@@ -8,13 +8,11 @@ Vagrant.configure(2) do |config|
   config.ssh.shell = "/bin/sh"
   config.vm.provision "shell", inline: <<-SHELL
     set -xe
+    pkg install -y devel/gmake perl5 lang/gcc misc/compat8x misc/compat9x converters/libiconv ca_root_nss awscli git gnupg
     if ! which stack; then
-      mkdir -p /usr/local/etc/pkg/repos
-      cd /usr/local/etc/pkg/repos
-      fetch --no-verify-peer --no-verify-hostname https://stack-pkg.applicative.tech/stack-pkg-applicative-tech.conf
-      fetch --no-verify-peer --no-verify-hostname https://stack-pkg.applicative.tech/stack-pkg-applicative-tech.pub
-      pkg update
+      curl -sSL https://www.stackage.org/stack/freebsd-x86_64 \
+        | tar xzvf - --strip-components=1 -C /usr/local/bin '*/stack'
+      chmod a+x /usr/local/bin/stack
     fi
-    pkg install -y stack ca_root_nss gmake awscli git gnupg
   SHELL
 end

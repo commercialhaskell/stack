@@ -33,17 +33,33 @@ Bug fixes:
 
 Release notes:
 
+* On many Un*x systems, Stack can now be installed with a simple
+  one-liner:
+
+        wget -qO- https://get.haskellstack.org/ | sh
+
 * The fix for
   [#2175](https://github.com/commercialhaskell/stack/issues/2175)
   entails that stack must perform a full clone of a large Git repo of
   Hackage meta-information. The total download size is about 200 MB.
   Please be aware of this when upgrading your stack installation.
-* On many Un*x systems, stack can now be installed with a simple
-  one-liner: `wget -qO- https://get.haskellstack.org/ | sh`
-* 64-bit GHC bindists have been built for Linux systems with
-  libtinfo6/libncurses6 (such as Fedora 24 and Arch Linux), and `stack setup`
-  will detect when to use them.
-* Added Ubuntu 16.10 (yakkety) Apt repo.
+
+* If you use Mac OS X, you may want to delay upgrading to macOS Sierra as there
+  are reports of GHC panics when building some packages (including Stack
+  itself). See [#2577](https://github.com/commercialhaskell/stack/issues/2577)
+
+* This version of Stack does not build on ARM or PowerPC systems (see
+  [store#37](https://github.com/fpco/store/issues/37)).  Please stay with
+  version 1.1.2 for now on those architectures.  This will be rectified soon!
+
+* We are now releasing a
+  [statically linked Stack binary for 64-bit Linux](https://www.stackage.org/stack/linux-x86_64-static).
+  Please try it and let us know if you run into any trouble on your platform.
+
+* We are planning some changes to our Linux releases, including dropping our
+  Ubuntu, Debian, CentOS, and Fedora package repositories and switching to
+  statically linked binaries.  We would value your feedback in
+  [#2534](https://github.com/commercialhaskell/stack/issues/2534).
 
 Major changes:
 
