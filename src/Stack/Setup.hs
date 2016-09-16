@@ -507,7 +507,12 @@ getGhcBuild menv = do
         platform <- asks getPlatform
         case platform of
             Platform _ Linux -> do
-                eldconfigOut <- tryProcessStdout Nothing menv "ldconfig" ["-p"]
+                -- Some systems don't have ldconfig in the PATH, so make sure to look in /sbin and /usr/sbin as well
+                sbinEnv <- modifyEnvOverride menv $
+                    Map.insert "PATH" $
+                    "/sbin:/usr/sbin" <>
+                    (maybe "" (":" <>) $ Map.lookup "PATH" (eoTextMap menv))
+                eldconfigOut <- tryProcessStdout Nothing sbinEnv "ldconfig" ["-p"]
                 egccErrOut <- tryProcessStderrStdout Nothing menv "gcc" ["-v"]
                 let firstWords = case eldconfigOut of
                         Right ldconfigOut -> mapMaybe (headMay . T.words) $
