@@ -70,10 +70,10 @@ replCommand cmd = do
     liftIO $ hPutStrLn input cmd
 
 replGetLine :: Repl String
-replGetLine = (fmap replStdout ask) >>= liftIO . hGetLine
+replGetLine = fmap replStdout ask >>= liftIO . hGetLine
 
 replGetChar :: Repl Char
-replGetChar = (fmap replStdout ask) >>= liftIO . hGetChar
+replGetChar = fmap replStdout ask >>= liftIO . hGetChar
 
 runRepl :: FilePath -> [String] -> ReaderT ReplConnection IO () -> IO ExitCode
 runRepl cmd args actions = do

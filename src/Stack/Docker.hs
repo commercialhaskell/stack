@@ -306,7 +306,7 @@ runContainerAndExit getCmdArgs
      pwd <- getCurrentDir
      liftIO
        (do updateDockerImageLastUsed config iiId (toFilePath projectRoot)
-           mapM_ (ensureDir) [sandboxHomeDir, stackRoot])
+           mapM_ ensureDir [sandboxHomeDir, stackRoot])
      -- Since $HOME is now mounted in the same place in the container we can
      -- just symlink $HOME/.ssh to the right place for the stack docker user
      let sshDir = homeDir </> sshRelDir

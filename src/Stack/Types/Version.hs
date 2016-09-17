@@ -116,7 +116,7 @@ instance Monoid IntersectingVersionRange where
 -- | Attoparsec parser for a package version.
 versionParser :: Parser Version
 versionParser =
-  do ls <- ((:) <$> num <*> many num')
+  do ls <- (:) <$> num <*> many num'
      let !v = V.fromList ls
      return (Version v)
   where num = decimal

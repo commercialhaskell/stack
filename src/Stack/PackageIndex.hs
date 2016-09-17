@@ -252,7 +252,7 @@ updateIndexGit menv indexName' index gitUrl = do
             isShallow <- doesFileExist $ acfDir </> $(mkRelDir ".git") </> $(mkRelFile "shallow")
             when isShallow $ do
               $logWarn "Shallow package index repo detected, transitioning to a full clone..."
-              (readProcessNull (Just acfDir) menv "git" ["fetch", "--unshallow"])
+              readProcessNull (Just acfDir) menv "git" ["fetch", "--unshallow"]
             $logSticky "Fetching package index ..."
             let runFetch = callProcessInheritStderrStdout
                     (Cmd (Just acfDir) "git" menv ["fetch","--tags"])

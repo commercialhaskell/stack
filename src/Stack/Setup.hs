@@ -541,7 +541,7 @@ getGhcBuild menv = do
                         libT = T.pack (toFilePath lib)
                     noPie = case egccErrOut of
                         Right (gccErr,gccOut) ->
-                            "--enable-default-pie" `elem` (S8.words (gccOut <> gccErr))
+                            "--enable-default-pie" `elem` S8.words (gccOut <> gccErr)
                         Left _ -> False
                 hastinfo5 <- checkLib $(mkRelFile "libtinfo.so.5")
                 hastinfo6 <- checkLib $(mkRelFile "libtinfo.so.6")
@@ -558,13 +558,13 @@ getGhcBuild menv = do
                         if noPie
                             then ["nopie"]
                             else []
-                case (concat [libComponents, pieComponents]) of
+                case concat [libComponents, pieComponents] of
                     [] -> useBuild CompilerBuildStandard
                     components -> useBuild (CompilerBuildSpecialized (intercalate "-" components))
             _ -> useBuild CompilerBuildStandard
     useBuild CompilerBuildStandard = do
         $logDebug "Using standard GHC build"
-        return (CompilerBuildStandard)
+        return CompilerBuildStandard
     useBuild (CompilerBuildSpecialized s) = do
         $logDebug ("Using " <> T.pack s <> " GHC build")
         return (CompilerBuildSpecialized s)

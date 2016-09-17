@@ -15,13 +15,13 @@ import Stack.Solver
 spec :: Spec
 spec =
   describe "Stack.Solver" $ do
-    successfulExample 
+    successfulExample
       "text-1.2.1.1 (latest: 1.2.2.0) -integer-simple (via: parsec-3.1.9) (new package)"
       $(mkPackageName "text")
       $(mkVersion "1.2.1.1")
       [ ($(mkFlagName "integer-simple"), False)
       ]
-    successfulExample 
+    successfulExample
       "hspec-snap-1.0.0.0 *test (via: servant-snap-0.5) (new package)"
       $(mkPackageName "hspec-snap")
       $(mkVersion "1.0.0.0")
@@ -40,5 +40,5 @@ spec =
       ]
   where
     successfulExample input pkgName pkgVersion flags =
-      it ("parses " ++ unpack input) $ 
+      it ("parses " ++ unpack input) $
         parseCabalOutputLine input `shouldBe` Right (pkgName, (pkgVersion, Map.fromList flags))

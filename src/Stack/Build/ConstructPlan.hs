@@ -329,7 +329,7 @@ tellExecutablesPackage loc p = do
         goSource (PSLocal lp)
             | lpWanted lp = exeComponents (lpComponents lp)
             | otherwise = Set.empty
-        goSource (PSUpstream{}) = Set.empty
+        goSource PSUpstream{} = Set.empty
 
     tell mempty { wInstall = Map.fromList $ map (, loc) $ Set.toList $ filterComps myComps $ packageExes p }
   where
@@ -622,15 +622,15 @@ describeConfigDiff config old new
 
 psForceDirty :: PackageSource -> Bool
 psForceDirty (PSLocal lp) = lpForceDirty lp
-psForceDirty (PSUpstream {}) = False
+psForceDirty PSUpstream {} = False
 
 psDirty :: PackageSource -> Maybe (Set FilePath)
 psDirty (PSLocal lp) = lpDirtyFiles lp
-psDirty (PSUpstream {}) = Nothing -- files never change in an upstream package
+psDirty PSUpstream {} = Nothing -- files never change in an upstream package
 
 psLocal :: PackageSource -> Bool
 psLocal (PSLocal _) = True
-psLocal (PSUpstream {}) = False
+psLocal PSUpstream{} = False
 
 -- | Get all of the dependencies for a given package, including guessed build
 -- tool dependencies.

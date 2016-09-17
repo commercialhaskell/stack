@@ -45,7 +45,7 @@ dotOptsParser externalDefault =
 -- | Parser for arguments to `stack list-dependencies`.
 listDepsOptsParser :: Parser ListDepsOpts
 listDepsOptsParser = ListDepsOpts
-                 <$> (dotOptsParser True) -- Default for --external is True.
+                 <$> dotOptsParser True -- Default for --external is True.
                  <*> fmap escapeSep
                      (textOption (long "separator" <>
                                   metavar "SEP" <>
@@ -53,8 +53,8 @@ listDepsOptsParser = ListDepsOpts
                                         "and package version.") <>
                                   value " " <>
                                   showDefault))
-                 <*> (boolFlags False
+                 <*> boolFlags False
                                 "license"
                                 "printing of dependency licenses instead of versions"
-                                idm)
+                                idm
   where escapeSep sep = T.replace "\\t" "\t" (T.replace "\\n" "\n" sep)

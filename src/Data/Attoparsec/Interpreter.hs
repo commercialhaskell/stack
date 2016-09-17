@@ -100,8 +100,8 @@ interpreterArgsParser isLiterate progName = P.option "" sheBangLine *> interpret
       (">" *> horizontalSpace *> "{-")
       *> P.skipMany (("" <$ horizontalSpace) <|> (P.endOfLine *> ">"))
       *> (P.string (pack progName) <?> progName)
-      *> (P.manyTill' (P.satisfy (not . P.isEndOfLine)
-                       <|> (' ' <$ (P.endOfLine *> ">" <?> ">"))) "-}")
+      *> P.manyTill' (P.satisfy (not . P.isEndOfLine)
+                       <|> (' ' <$ (P.endOfLine *> ">" <?> ">"))) "-}"
 
     interpreterComment = if isLiterate
                             then literateLineComment <|> literateBlockComment
@@ -140,8 +140,7 @@ getInterpreterArgs file = do
       case P.parseOnly (argsParser Escaping) (pack str) of
         Left err -> handleFailure ("Error parsing command specified in the \
                         \stack options comment: " ++ err)
-        Right [] -> handleFailure ("Empty argument list in stack options \
-                        \comment")
+        Right [] -> handleFailure "Empty argument list in stack options comment"
         Right args -> return args
 
     decodeError e =
@@ -149,6 +148,6 @@ getInterpreterArgs file = do
         ParseError ctxs _ (Position line col) ->
           if length ctxs == 0
           then "Parse error"
-          else ("Expecting " ++ (intercalate " or " ctxs))
-          ++ " at line " ++ (show line) ++ ", column " ++ (show col)
+          else ("Expecting " ++ intercalate " or " ctxs)
+          ++ " at line " ++ show line ++ ", column " ++ show col
         DivergentParser -> "Divergent parser"

@@ -567,7 +567,7 @@ packageDescModulesAndFiles pkg = do
             (mapM
                  (asModuleAndFileMap benchComponent benchmarkFiles)
                  (benchmarks pkg))
-    (dfiles) <- resolveGlobFiles
+    dfiles <- resolveGlobFiles
                     (extraSrcFiles pkg
                         ++ map (dataDir pkg FilePath.</>) (dataFiles pkg))
     let modules = libraryMods <> executableMods <> testMods <> benchModules
@@ -1002,9 +1002,9 @@ parseDumpHI dumpHIPath = do
             -- The dependent file path is surrounded by quotes but is not escaped.
             -- It can be an absolute or relative path.
             mapMaybe
-                ((fmap T.unpack .
+                (fmap T.unpack .
                   (T.stripSuffix "\"" <=< T.stripPrefix "\"") .
-                  T.dropWhileEnd (== '\r') . decodeUtf8 . C8.dropWhile (/= '"'))) $
+                  T.dropWhileEnd (== '\r') . decodeUtf8 . C8.dropWhile (/= '"')) $
             filter ("addDependentFile \"" `C8.isPrefixOf`) dumpHI
     thDepsResolved <- liftM catMaybes $ forM thDeps $ \x -> do
         mresolved <- forgivingAbsence (resolveFile dir x) >>= rejectMissingFile

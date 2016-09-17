@@ -139,7 +139,7 @@ versionString' =
 #ifdef HIDE_DEP_VERSIONS
     depsString = (" hpack-" ++ VERSION_hpack)
 #else
-    depsString = ("\nCompiled with:\n" ++ unlines (map ("- " ++) Build_stack.deps))
+    depsString = "\nCompiled with:\n" ++ unlines (map ("- " ++) Build_stack.deps)
 #endif
 
 main :: IO ()
@@ -201,7 +201,7 @@ commandLineHandler progName isInterpreter = complicatedOptions
   VERSION_hpack
   "stack - The Haskell Tool Stack"
   ""
-  ("stack's documentation is available at https://docs.haskellstack.org/")
+  "stack's documentation is available at https://docs.haskellstack.org/"
   (globalOpts OuterGlobalOpts)
   (Just failureCallback)
   addCommands
@@ -473,7 +473,7 @@ commandLineHandler progName isInterpreter = complicatedOptions
     globalFooter = "Run 'stack --help' for global options that apply to all subcommands."
 
 type AddCommand =
-    EitherT (GlobalOpts -> IO ()) (Writer (Mod CommandFields ((GlobalOpts -> IO ()), GlobalOptsMonoid))) ()
+    EitherT (GlobalOpts -> IO ()) (Writer (Mod CommandFields (GlobalOpts -> IO (), GlobalOptsMonoid))) ()
 
 -- | fall-through to external executables in `git` style if they exist
 -- (i.e. `stack something` looks for `stack-something` before
@@ -484,7 +484,7 @@ secondaryCommandHandler
   -> IO (ParserFailure ParserHelp)
 secondaryCommandHandler args f =
     -- don't even try when the argument looks like a path or flag
-    if elem pathSeparator cmd || "-" `isPrefixOf` (head args)
+    if elem pathSeparator cmd || "-" `isPrefixOf` head args
        then return f
     else do
       mExternalExec <- D.findExecutable cmd
@@ -500,7 +500,7 @@ secondaryCommandHandler args f =
   where
     -- FIXME this is broken when any options are specified before the command
     -- e.g. stack --verbosity silent cmd
-    cmd = stackProgName ++ "-" ++ (head args)
+    cmd = stackProgName ++ "-" ++ head args
     noSuchCmd name = errorHelp $ stringChunk
       ("Auxiliary command not found in path `" ++ name ++ "'")
 
