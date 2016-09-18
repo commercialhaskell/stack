@@ -56,7 +56,8 @@ import           Network.HTTP.Client                   (BodyReader, Manager,
                                                         withResponse)
 import           Network.HTTP.Client.MultipartFormData (formDataBody, partFileRequestBody)
 import           Network.HTTP.Client.TLS               (tlsManagerSettings,
-                                                        applyDigestAuth)
+                                                        applyDigestAuth,
+                                                        displayDigestAuthException)
 import           Network.HTTP.Types                    (statusCode)
 import           Path                                  (toFilePath)
 import           Prelude -- Fix redundant import warnings
@@ -204,17 +205,20 @@ mkUploader config us = do
         { upload_ = \tarName bytes -> do
             let formData = [partFileRequestBody "package" tarName (RequestBodyLBS bytes)]
             req2 <- formDataBody formData req1
-            mreq3 <- applyDigestAuth
+            ereq3 <- applyDigestAuth
                     (encodeUtf8 $ hcUsername creds)
                     (encodeUtf8 $ hcPassword creds)
                     req2
                     manager
             req3 <-
-                case mreq3 of
-                    Nothing -> do
+                case ereq3 of
+                    Left e -> do
                         putStrLn $ "WARNING: No HTTP digest prompt found, this will probably fail"
+                        case E.fromException e of
+                            Just e' -> putStrLn $ displayDigestAuthException e'
+                            Nothing -> print e
                         return req2
-                    Just req3 -> return req3
+                    Right req3 -> return req3
             putStr $ "Uploading " ++ tarName ++ "... "
             hFlush stdout
             withResponse req3 manager $ \res ->
