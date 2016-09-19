@@ -28,6 +28,9 @@ Bug fixes:
 
 * Add proper support for non-ASCII characters in file paths for the `sdist` command.
   See [#2549](https://github.com/commercialhaskell/stack/issues/2549)
+* Never treat `extra-dep` local packages as targets. This ensures
+  things like test suites are not run for these packages, and that
+  build output is not hidden due to their presence.
 
 ## 1.2.0
 
