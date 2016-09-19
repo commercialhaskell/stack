@@ -10,6 +10,9 @@ Behavior changes:
 
 * Switch the "Run from outside project" messages to debug-level, to
   avoid spamming users in the normal case of non-project usage
+* If a remote package is specified (such as a Git repo) without an explicit
+  `extra-dep` setting, a warning is given to the user to provide one
+  explicitly.
 
 Other enhancements:
 

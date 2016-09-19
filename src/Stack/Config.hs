@@ -533,7 +533,27 @@ resolvePackageEntry menv projRoot pe = do
         case peSubdirs pe of
             [] -> return [entryRoot]
             subs -> mapM (resolveDir entryRoot) subs
-    return $ map (, peExtraDep pe) paths
+    extraDep <-
+        case peExtraDepMaybe pe of
+            Just e -> return e
+            Nothing ->
+                case peLocation pe of
+                    PLFilePath _ ->
+                        -- we don't give a warning on missing explicit
+                        -- value here, user intent is almost always
+                        -- the default for a local directory
+                        return False
+                    PLRemote url _ -> do
+                        $logWarn $ mconcat
+                            [ "No extra-dep setting found for package at URL:\n\n"
+                            , url
+                            , "\n\n"
+                            , "This is usually a mistake, external packages "
+                            , "should typically\nbe treated as extra-deps to avoid "
+                            , "spurious test case failures."
+                            ]
+                        return False
+    return $ map (, extraDep) paths
 
 -- | Resolve a PackageLocation into a path, downloading and cloning as
 -- necessary.
