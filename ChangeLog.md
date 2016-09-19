@@ -34,6 +34,9 @@ Bug fixes:
 * Never treat `extra-dep` local packages as targets. This ensures
   things like test suites are not run for these packages, and that
   build output is not hidden due to their presence.
+* Fix a resource leak in `sinkProcessStderrStdout` which could affect
+  much of the codebase, in particular copying precompiled
+  packages. [#1979](https://github.com/commercialhaskell/stack/issues/1979)
 
 ## 1.2.0
 
