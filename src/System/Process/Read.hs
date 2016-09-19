@@ -74,7 +74,7 @@ import qualified System.Directory as D
 import           System.Environment (getEnvironment)
 import           System.Exit
 import qualified System.FilePath as FP
-import           System.IO (Handle)
+import           System.IO (Handle, hClose)
 import           System.Process.Log
 import           Prelude () -- Hide post-AMP warnings
 
@@ -307,8 +307,21 @@ sinkProcessStderrStdout wd menv name args sinkStderr sinkStdout = do
           (proc name' args) { env = envHelper menv, cwd = fmap toFilePath wd }
           (\ClosedStream out err -> f err out)
   where
-    f :: Source IO S.ByteString -> Source IO S.ByteString -> IO (e, o)
-    f err out = (err $$ sinkStderr) `concurrently` (out $$ sinkStdout)
+
+    -- There is a bug in streaming-commons or conduit-extra which
+    -- leads to a file descriptor leak. Ideally, we should be able to
+    -- simply use the following code. Instead, we're using the code
+    -- below it, which is explicit in closing Handles. When the
+    -- upstream bug is fixed, we can consider moving back to the
+    -- simpler code, though there's really no downside to the more
+    -- complex version used here.
+    --
+    -- f :: Source IO S.ByteString -> Source IO S.ByteString -> IO (e, o)
+    -- f err out = (err $$ sinkStderr) `concurrently` (out $$ sinkStdout)
+
+    f :: Handle -> Handle -> IO (e, o)
+    f err out = ((CB.sourceHandle err $$ sinkStderr) `concurrently` (CB.sourceHandle out $$ sinkStdout))
+        `finally` hClose err `finally` hClose out
 
 -- | Like sinkProcessStderrStdout, but receives Handles for stderr and stdout instead of 'Sink's.
 --
