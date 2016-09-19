@@ -311,6 +311,7 @@ configFromConfigMonoid configStackRoot configUserConfigPath mresolver mproject C
          configApplyGhcOptions = fromFirst AGOLocals configMonoidApplyGhcOptions
          configAllowNewer = fromFirst False configMonoidAllowNewer
          configDefaultTemplate = getFirst configMonoidDefaultTemplate
+         configDumpLogs = fromFirst False configMonoidDumpLogs
 
      configAllowDifferentUser <-
         case getFirst configMonoidAllowDifferentUser of

@@ -224,6 +224,7 @@ data ExecuteEnv = ExecuteEnv
     , eeGlobalDumpPkgs :: !(Map GhcPkgId (DumpPackage () ()))
     , eeSnapshotDumpPkgs :: !(TVar (Map GhcPkgId (DumpPackage () ())))
     , eeLocalDumpPkgs  :: !(TVar (Map GhcPkgId (DumpPackage () ())))
+    , eeLogFiles       :: !(TChan (Path Abs File))
     }
 
 -- | Get a compiled Setup exe
@@ -315,6 +316,8 @@ withExecuteEnv menv bopts boptsCli baseConfigOpts locals globalPackages snapshot
         globalDB <- getGlobalDB menv =<< getWhichCompiler
         snapshotPackagesTVar <- liftIO $ newTVarIO (toDumpPackagesByGhcPkgId snapshotPackages)
         localPackagesTVar <- liftIO $ newTVarIO (toDumpPackagesByGhcPkgId localPackages)
+        logFilesTChan <- liftIO $ atomically newTChan
+        let totalWanted = length $ filter lpWanted locals
         inner ExecuteEnv
             { eeEnvOverride = menv
             , eeBuildOpts = bopts
@@ -331,16 +334,51 @@ withExecuteEnv menv bopts boptsCli baseConfigOpts locals globalPackages snapshot
             , eeSetupHs = setupHs
             , eeSetupExe = setupExe
             , eeCabalPkgVer = cabalPkgVer
-            , eeTotalWanted = length $ filter lpWanted locals
+            , eeTotalWanted = totalWanted
             , eeWanted = wantedLocalPackages locals
             , eeLocals = locals
             , eeGlobalDB = globalDB
             , eeGlobalDumpPkgs = toDumpPackagesByGhcPkgId globalPackages
             , eeSnapshotDumpPkgs = snapshotPackagesTVar
             , eeLocalDumpPkgs = localPackagesTVar
-            }
+            , eeLogFiles = logFilesTChan
+            } `finally` dumpLogs logFilesTChan totalWanted
   where
     toDumpPackagesByGhcPkgId = Map.fromList . map (\dp -> (dpGhcPkgId dp, dp))
+
+    dumpLogs chan totalWanted = do
+        allLogs <- liftIO $ atomically drainChan
+        case allLogs of
+            -- No log files generated, nothing to dump
+            [] -> return ()
+            firstLog:_ -> do
+                toDump <- asks (configDumpLogs . getConfig)
+                when toDump $ mapM_ dumpLog allLogs
+
+                when (not toDump && totalWanted > 1) $ $logInfo $ T.concat
+                    [ "Build output has been captured to log files, use "
+                    , "--dump-logs to see it on the console"
+                    ]
+
+                $logInfo $ T.pack $ "Log files have been written to: "
+                        ++ toFilePath (parent firstLog)
+      where
+        drainChan = do
+            mx <- tryReadTChan chan
+            case mx of
+                Nothing -> return []
+                Just x -> do
+                    xs <- drainChan
+                    return $ x:xs
+
+    dumpLog filepath = do
+        $logInfo $ T.pack $ "\nDumping log file: " ++ toFilePath filepath ++ "\n"
+        runResourceT
+            $ CB.sourceFile (toFilePath filepath)
+           $$ CT.decodeUtf8Lenient
+           =$ CT.lines
+           =$ CL.mapM_ $logInfo
+        $logInfo $ T.pack $ "\nEnd of log file: " ++ toFilePath filepath ++ "\n"
 
 -- | Perform the actual plan
 executePlan :: M env m
@@ -801,6 +839,13 @@ withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} md
             logPath <- buildLogPath package msuffix
             ensureDir (parent logPath)
             let fp = toFilePath logPath
+
+            -- We only want to dump logs for local non-dependency packages
+            case taskType of
+                TTLocal lp | lpWanted lp ->
+                    liftIO $ atomically $ writeTChan eeLogFiles logPath
+                _ -> return ()
+
             bracket
                 (liftIO $ openBinaryFile fp WriteMode)
                 (liftIO . hClose)

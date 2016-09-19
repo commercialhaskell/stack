@@ -172,3 +172,16 @@ This command will:
 * If all of that succeeds:
     * Copy generated executables to the local bin path
     * Run the command `echo Yay, it worked!`
+
+## Build output
+
+When building a single target package (e.g., `stack build` in a project with
+only one package, or `stack build package-name` in a multi-package project),
+the build output from GHC will be hidden for building all dependencies, and
+will be displayed for the one target package.
+
+By default, when building multiple target packages, the output from these will
+also end up in a log file instead of on the console, to avoid problems of
+interleaved output and decrease console noise. If you would like to see this
+content instead, you can use the `--dump-logs` command line option, or add
+`dump-logs: true` to your `stack.yaml` file.
