@@ -25,6 +25,7 @@ import           Control.Monad.Trans.Control
 import           Data.IORef
 import           Data.Traversable
 import           Network.HTTP.Client
+import           Network.HTTP.Client.TLS (getGlobalManager)
 import           Path
 import           Path.IO
 import           Stack.Config
@@ -109,7 +110,7 @@ withGlobalConfigAndLock
     -> StackT Config IO ()
     -> IO ()
 withGlobalConfigAndLock go@GlobalOpts{..} inner = do
-    manager <- newTLSManager
+    manager <- getGlobalManager
     lc <- runStackLoggingTGlobal manager go $
         loadConfigMaybeProject globalConfigMonoid Nothing Nothing
     withUserFileLock go (configStackRoot $ lcConfig lc) $ \_lk ->
@@ -195,7 +196,7 @@ withBuildConfigExt go@GlobalOpts{..} mbefore inner mafter = do
 -- throughout this module.
 loadConfigWithOpts :: GlobalOpts -> IO (Manager,LoadConfig (StackLoggingT IO))
 loadConfigWithOpts go@GlobalOpts{..} = do
-    manager <- newTLSManager
+    manager <- getGlobalManager
     mstackYaml <- forM globalStackYaml resolveFile'
     lc <- runStackLoggingTGlobal manager go $ do
         lc <- loadConfig globalConfigMonoid globalResolver mstackYaml
@@ -213,7 +214,7 @@ withMiniConfigAndLock
     -> StackT MiniConfig IO ()
     -> IO ()
 withMiniConfigAndLock go@GlobalOpts{..} inner = do
-    manager <- newTLSManager
+    manager <- getGlobalManager
     miniConfig <- runStackLoggingTGlobal manager go $ do
         lc <- loadConfigMaybeProject globalConfigMonoid globalResolver Nothing
         loadMiniConfig manager (lcConfig lc)

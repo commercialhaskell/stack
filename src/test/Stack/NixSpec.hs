@@ -7,6 +7,7 @@ import Control.Exception
 import Control.Monad.Logger
 import Data.Monoid
 import Network.HTTP.Conduit (Manager)
+import Network.HTTP.Client.TLS (getGlobalManager)
 import Path
 import Prelude -- to remove the warning about Data.Monoid being redundant on GHC 7.10
 import Stack.Config
@@ -38,7 +39,7 @@ data T = T
 
 setup :: IO T
 setup = do
-  manager <- newTLSManager
+  manager <- getGlobalManager
   unsetEnv "STACK_YAML"
   return T{..}
 

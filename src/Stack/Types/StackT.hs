@@ -22,7 +22,6 @@ module Stack.Types.StackT
   ,runStackLoggingTGlobal
   ,runInnerStackT
   ,runInnerStackLoggingT
-  ,newTLSManager
   ,logSticky
   ,logStickyDone)
   where
@@ -222,10 +221,6 @@ runStackLoggingT manager logLevel terminal reExec m = do
                   , lenvReExec = reExec
                   , lenvSupportsUnicode = canUseUnicode
                   })
-
--- | Convenience for getting a 'Manager'
-newTLSManager :: MonadIO m => m Manager
-newTLSManager = liftIO $ newManager tlsManagerSettings
 
 --------------------------------------------------------------------------------
 -- Logging functionality

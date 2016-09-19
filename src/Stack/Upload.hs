@@ -48,14 +48,13 @@ import           Network.HTTP.Client                   (BodyReader, Manager,
                                                         Response,
                                                         RequestBody(RequestBodyLBS),
                                                         brRead,
-                                                        newManager,
                                                         parseRequest,
                                                         requestHeaders,
                                                         responseBody,
                                                         responseStatus,
                                                         withResponse)
 import           Network.HTTP.Client.MultipartFormData (formDataBody, partFileRequestBody)
-import           Network.HTTP.Client.TLS               (tlsManagerSettings,
+import           Network.HTTP.Client.TLS               (getGlobalManager,
                                                         applyDigestAuth,
                                                         displayDigestAuthException)
 import           Network.HTTP.Types                    (statusCode)
@@ -295,7 +294,7 @@ data UploadSettings = UploadSettings
 defaultUploadSettings :: UploadSettings
 defaultUploadSettings = UploadSettings
     { usUploadUrl = "https://hackage.haskell.org/packages/"
-    , usGetManager = newManager tlsManagerSettings
+    , usGetManager = getGlobalManager
     , usCredsSource = fromAnywhere
     , usSaveCreds = True
     }
@@ -310,7 +309,7 @@ setUploadUrl x us = us { usUploadUrl = x }
 
 -- | How to get an HTTP connection manager.
 --
--- Default: @newManager tlsManagerSettings@
+-- Default: @getGlobalManager@
 --
 -- Since 0.1.0.0
 setGetManager :: IO Manager -> UploadSettings -> UploadSettings

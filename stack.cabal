@@ -343,6 +343,7 @@ test-suite stack-test
                 , exceptions
                 , filepath
                 , hspec >= 2.2 && <2.3
+                , http-client-tls
                 , http-conduit
                 , monad-logger
                 , neat-interpolation >= 0.3

@@ -8,6 +8,7 @@ import Control.Monad.Trans.Reader
 import Control.Retry (limitRetries)
 import Data.Maybe
 import Network.HTTP.Client.Conduit
+import Network.HTTP.Client.TLS (getGlobalManager)
 import Network.HTTP.Download.Verified
 import Path
 import Path.IO
@@ -71,7 +72,7 @@ runWith manager = runStdoutLoggingT . flip runReaderT manager
 
 setup :: IO T
 setup = do
-  manager <- newManager
+  manager <- getGlobalManager
   return T{..}
 
 teardown :: T -> IO ()
