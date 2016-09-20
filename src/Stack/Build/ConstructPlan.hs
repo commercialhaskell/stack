@@ -622,11 +622,11 @@ describeConfigDiff config old new
 
 psForceDirty :: PackageSource -> Bool
 psForceDirty (PSLocal lp) = lpForceDirty lp
-psForceDirty PSUpstream {} = False
+psForceDirty PSUpstream{} = False
 
 psDirty :: PackageSource -> Maybe (Set FilePath)
 psDirty (PSLocal lp) = lpDirtyFiles lp
-psDirty PSUpstream {} = Nothing -- files never change in an upstream package
+psDirty PSUpstream{} = Nothing -- files never change in an upstream package
 
 psLocal :: PackageSource -> Bool
 psLocal (PSLocal _) = True
