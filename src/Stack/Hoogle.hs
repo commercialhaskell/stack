@@ -150,12 +150,12 @@ hoogleCmd (args,setup,rebuild) go = withBuildConfig go pathToHaddocks
         dbpath <- hoogleDatabasePath
         let databaseArg = ["--database=" ++ toFilePath dbpath]
         runCmd
-            (Cmd
+            Cmd
              { cmdDirectoryToRunIn = Nothing
              , cmdCommandToRun = "hoogle"
              , cmdEnvOverride = menv
              , cmdCommandLineArguments = hoogleArgs ++ databaseArg
-             })
+             }
             Nothing
     bail :: StackT EnvConfig IO ()
     bail = liftIO (exitWith (ExitFailure (-1)))

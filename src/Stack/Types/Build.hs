@@ -142,10 +142,10 @@ data UnusedFlags = UFNoPackage FlagSource PackageName
 
 instance Show StackBuildException where
     show (Couldn'tFindPkgId name) =
-              ("After installing " <> packageNameString name <>
+              "After installing " <> packageNameString name <>
                ", the package id couldn't be found " <> "(via ghc-pkg describe " <>
                packageNameString name <> "). This shouldn't happen, " <>
-               "please report as a bug")
+               "please report as a bug"
     show (CompilerVersionMismatch mactual (expected, earch) ghcVariant ghcBuild check mstack resolution) = concat
                 [ case mactual of
                     Nothing -> "No compiler found, expected "
@@ -219,7 +219,7 @@ instance Show StackBuildException where
           indent = dropWhileEnd isSpace . unlines . fmap (\line -> "  " ++ line) . lines
           doubleIndent = indent . indent
     show (TestSuiteTypeUnsupported interface) =
-              ("Unsupported test suite type: " <> show interface)
+              "Unsupported test suite type: " <> show interface
      -- Supressing duplicate output
     show (CabalExitedUnsuccessfully exitCode taskProvides' execName fullArgs logFiles bss) =
         let fullCmd = unwords
@@ -450,7 +450,7 @@ data BaseConfigOpts = BaseConfigOpts
     , bcoLocalInstallRoot :: !(Path Abs Dir)
     , bcoBuildOpts :: !BuildOpts
     , bcoBuildOptsCLI :: !BuildOptsCLI
-    , bcoExtraDBs :: ![(Path Abs Dir)]
+    , bcoExtraDBs :: ![Path Abs Dir]
     }
     deriving Show
 

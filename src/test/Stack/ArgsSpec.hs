@@ -110,7 +110,7 @@ interpreterArgsSpec =
         (testAndCheck (acceptFailure False) "unused")
 
       -- Generate a set of acceptable inputs for given format and args
-      interpreterGenValid fmt args = shebang <++> newLine <++> (fmt args)
+      interpreterGenValid fmt args = shebang <++> newLine <++> fmt args
 
       interpreterGenInvalid :: [String]
       -- Generate a set of Invalid inputs
@@ -150,7 +150,7 @@ interpreterArgsSpec =
       -- A command starts with zero or more whitespace followed by "stack"
       makeComment maker space args =
         let makePrefix s = (s <|> [""]) <++> [stackProgName]
-        in (maker <$> ((makePrefix space) <++> [args])) <++> postComment
+        in (maker <$> (makePrefix space <++> [args])) <++> postComment
 
       lineSpace = [" "] <|> ["\t"]
       lineComment = makeComment makeLine lineSpace

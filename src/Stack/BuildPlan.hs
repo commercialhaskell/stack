@@ -812,7 +812,7 @@ showItems items = T.concat (map formatItem items)
 
 showPackageFlags :: PackageName -> Map FlagName Bool -> Text
 showPackageFlags pkg fl =
-    if (not $ Map.null fl) then
+    if not $ Map.null fl then
         T.concat
             [ "    - "
             , T.pack $ packageNameString pkg
@@ -823,7 +823,7 @@ showPackageFlags pkg fl =
             ]
     else ""
     where
-        formatFlags (f, v) = (show f) ++ " = " ++ (show v)
+        formatFlags (f, v) = show f ++ " = " ++ show v
 
 showMapPackages :: Map PackageName a -> Text
 showMapPackages mp = showItems $ Map.keys mp
@@ -846,7 +846,7 @@ showDepErrors flags errs =
     T.concat
         [ T.concat $ map formatError (Map.toList errs)
         , if T.null flagVals then ""
-          else ("Using package flags:\n" <> flagVals)
+          else "Using package flags:\n" <> flagVals
         ]
     where
         formatError (depName, DepError mversion neededBy) = T.concat
@@ -1100,7 +1100,7 @@ applyCustomSnapshot cs mbp0 = do
         packageMap = Map.fromList $ map addFlagsAndOpts $ Set.toList packages
         cv = fromMaybe (mbpCompilerVersion mbp0) mcompilerVersion
         packages0 =
-             mbpPackages mbp0 `Map.difference` (Map.fromSet (\_ -> ()) dropPackages)
+             mbpPackages mbp0 `Map.difference` Map.fromSet (\_ -> ()) dropPackages
     mbp1 <- toMiniBuildPlan cv mempty packageMap
     return $ MiniBuildPlan
         { mbpCompilerVersion = cv

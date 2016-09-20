@@ -64,7 +64,7 @@ runCmd' :: forall (m :: * -> *).
       -> Cmd
       -> Maybe Text  -- ^ optional additional error message
       -> m ()
-runCmd' modCP cmd@(Cmd{..}) mbErrMsg = do
+runCmd' modCP cmd@Cmd{..} mbErrMsg = do
     result <- try (callProcess' modCP cmd)
     case result of
         Left (ProcessExitedUnsuccessfully _ ec) -> do

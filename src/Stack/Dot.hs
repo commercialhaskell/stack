@@ -171,7 +171,7 @@ listDependencies opts = do
                     if listDepsLicense opts
                       then maybe "<unknown>" (Text.pack . show) (payloadLicense payload)
                       else maybe "<unknown>" (Text.pack . show) (payloadVersion payload)
-                line = packageNameText name <> (listDepsSep opts) <> payloadText
+                line = packageNameText name <> listDepsSep opts <> payloadText
             in  liftIO $ Text.putStrLn $ line
 
 -- | @pruneGraph dontPrune toPrune graph@ prunes all packages in

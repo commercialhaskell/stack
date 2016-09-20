@@ -242,7 +242,7 @@ configFromConfigMonoid configStackRoot configUserConfigPath mresolver mproject C
          -- in the future, allow it to be configured.
          (Platform defArch defOS) = buildPlatform
          arch = fromMaybe defArch
-              $ (getFirst configMonoidArch) >>= Distribution.Text.simpleParse
+              $ getFirst configMonoidArch >>= Distribution.Text.simpleParse
          os = defOS
          configPlatform = Platform arch os
 
@@ -611,11 +611,11 @@ resolvePackageLocation menv projRoot (PLRemote url remotePackageType) = do
                     , cmdCommandToRun = commandName
                     , cmdEnvOverride = menv
                     , cmdCommandLineArguments =
-                        ("clone" :
+                        "clone" :
                         cloneArgs ++
                         [ T.unpack url
                         , toFilePathNoTrailingSep dir
-                        ])
+                        ]
                     }
             doReset firstTry =
                 readProcessNull (Just dir) menv commandName

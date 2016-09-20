@@ -432,7 +432,7 @@ makeGhciPkgInfo boptsCli sourceMap installedMap locals addPkgs name cabalfp targ
     mbuildinfo <- forM mbuildinfofp readDotBuildinfo
     let pkg =
             packageFromPackageDescription config gpkgdesc $
-            maybe id (updatePackageDescription) mbuildinfo $
+            maybe id updatePackageDescription mbuildinfo $
             resolvePackageDescription config gpkgdesc
 
     mapM_ (printCabalFileWarning cabalfp) warnings

@@ -632,7 +632,7 @@ toActions installedMap runInBase ee (mbuild, mfinal) =
                 [ Action
                     { actionId = ActionId taskProvides ATBuild
                     , actionDeps =
-                        (Set.map (\ident -> ActionId ident ATBuild) (tcoMissing taskConfigOpts))
+                        Set.map (\ident -> ActionId ident ATBuild) (tcoMissing taskConfigOpts)
                     , actionDo = \ac -> runInBase $ singleBuild runInBase ac ee task installedMap False
                     }
                 ]
@@ -1052,7 +1052,7 @@ singleBuild runInBase ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} in
                     -- the snapshot.
                     Just pc | maybe False
                                     (bcoSnapInstallRoot eeBaseConfigOpts `isParentOf`)
-                                    (parseAbsFile =<< (pcLibrary pc)) ->
+                                    (parseAbsFile =<< pcLibrary pc) ->
                         return Nothing
                     -- If old precompiled cache files are left around but snapshots are deleted,
                     -- it is possible for the precompiled file to refer to the very library

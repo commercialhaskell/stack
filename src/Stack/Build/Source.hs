@@ -179,7 +179,7 @@ getGhcOptions :: BuildConfig -> BuildOptsCLI -> PackageName -> Bool -> Bool -> [
 getGhcOptions bconfig boptsCli name isTarget isLocal = concat
     [ ghcOptionsFor name (configGhcOptions config)
     , concat [["-fhpc"] | isLocal && toCoverage (boptsTestOpts bopts)]
-    , if (boptsLibProfile bopts || boptsExeProfile bopts)
+    , if boptsLibProfile bopts || boptsExeProfile bopts
          then ["-auto-all","-caf-all"]
          else []
     , if includeExtraOptions

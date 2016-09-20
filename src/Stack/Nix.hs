@@ -68,7 +68,7 @@ reexecWithOptionalShell mprojectRoot getCompilerVersion inner =
      if nixEnable (configNix config) && not inShell && (not isReExec || inContainer)
         then runShellAndExit mprojectRoot getCompilerVersion getCmdArgs
         else liftIO inner
-    
+
 
 runShellAndExit
     :: M env m
@@ -132,8 +132,8 @@ runShellAndExit mprojectRoot getCompilerVersion getCmdArgs = do
      $logDebug $ "PATH is: " <> T.pack (show pathVar)
      $logDebug $
        "Using a nix-shell environment " <> (case mshellFile of
-            Just path -> "from file: " <> (T.pack (toFilePath path))
-            Nothing -> "with nix packages: " <> (T.intercalate ", " pkgs))
+            Just path -> "from file: " <> T.pack (toFilePath path)
+            Nothing -> "with nix packages: " <> T.intercalate ", " pkgs)
      exec envOverride "nix-shell" fullArgs
 
 -- | Shell-escape quotes inside the string and enclose it in quotes.

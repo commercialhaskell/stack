@@ -90,21 +90,21 @@ initProject whichCmd currDir initOpts mresolver = do
 
     let ignored = Map.difference bundle rbundle
         dupPkgMsg
-            | (dupPkgs /= []) =
+            | dupPkgs /= [] =
                 "Warning (added by new or init): Some packages were found to \
                 \have names conflicting with others and have been commented \
                 \out in the packages section.\n"
             | otherwise = ""
 
         missingPkgMsg
-            | (Map.size ignored > 0) =
+            | Map.size ignored > 0 =
                 "Warning (added by new or init): Some packages were found to \
                 \be incompatible with the resolver and have been left commented \
                 \out in the packages section.\n"
             | otherwise = ""
 
         extraDepMsg
-            | (Map.size extraDeps > 0) =
+            | Map.size extraDeps > 0 =
                 "Warning (added by new or init): Specified resolver could not \
                 \satisfy all dependencies. Some external packages have been \
                 \added as dependencies.\n"
@@ -201,7 +201,7 @@ renderStackYaml p ignoredPackages dupPackages =
                 B.byteString comment <>
                 B.byteString "\n" <>
                 B.byteString (Yaml.encode $ Yaml.object [(name, v)]) <>
-                if (name == "packages") then commentedPackages else "" <>
+                if name == "packages" then commentedPackages else "" <>
                 B.byteString "\n"
 
     commentLine l | null l = "#"
@@ -225,7 +225,7 @@ renderStackYaml p ignoredPackages dupPackages =
                B.byteString comment
             <> B.byteString "\n"
             <> (B.byteString $ BC.pack $ concat
-                 $ (map (\x -> "#- " ++ x ++ "\n") pkgs) ++ ["\n"])
+                 $ map (\x -> "#- " ++ x ++ "\n") pkgs ++ ["\n"])
         | otherwise = ""
 
     goOthers o
@@ -402,7 +402,7 @@ getWorkingResolverPlan whichCmd stackYaml initOpts bundle resolver = do
                                  \config anyway."
                         return (resolver, Map.empty, Map.empty, Map.empty)
                     | otherwise -> do
-                        when ((Map.size available) == (Map.size info)) $
+                        when (Map.size available == Map.size info) $
                             error "Bug: No packages to ignore"
 
                         if length ignored > 1 then do
@@ -507,11 +507,11 @@ checkBundleResolver whichCmd stackYaml initOpts bundle resolver = do
           , "    - Update external packages with 'stack update' and try again.\n"
           ]
 
-      needSolver _ (InitOpts {useSolver = True}) = True
+      needSolver _ InitOpts {useSolver = True} = True
       needSolver (ResolverCompiler _)  _ = True
       needSolver _ _ = False
 
-getRecommendedSnapshots :: Snapshots -> (NonEmpty SnapName)
+getRecommendedSnapshots :: Snapshots -> NonEmpty SnapName
 getRecommendedSnapshots snapshots =
     -- in order - Latest LTS, Latest Nightly, all LTS most recent first
     case NonEmpty.nonEmpty ltss of

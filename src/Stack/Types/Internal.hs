@@ -80,7 +80,7 @@ instance HasSticky (Env config) where
   getSticky = envSticky
 
 envEnvConfig :: Lens' (Env EnvConfig) EnvConfig
-envEnvConfig = lens (envConfig)
+envEnvConfig = lens envConfig
                     (\s t -> s {envConfig = t})
 
 buildOptsMonoidHaddock :: Lens' BuildOptsMonoid (Maybe Bool)
@@ -102,7 +102,7 @@ buildOptsMonoidInstallExes =
 
 buildOptsInstallExes :: Lens' BuildOpts Bool
 buildOptsInstallExes =
-  lens (boptsInstallExes)
+  lens boptsInstallExes
        (\bopts t -> bopts {boptsInstallExes = t})
 
 envConfigBuildOpts :: Lens' EnvConfig BuildOpts

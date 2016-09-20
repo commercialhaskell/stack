@@ -86,9 +86,9 @@ getInstalled menv opts sourceMap = do
 
     (installedLibs0, globalDumpPkgs) <- loadDatabase' Nothing []
     (installedLibs1, _extraInstalled) <-
-      (foldM (\lhs' pkgdb ->
+      foldM (\lhs' pkgdb ->
         loadDatabase' (Just (ExtraGlobal, pkgdb)) (fst lhs')
-        ) (installedLibs0, globalDumpPkgs) extraDBPaths)
+        ) (installedLibs0, globalDumpPkgs) extraDBPaths
     (installedLibs2, snapshotDumpPkgs) <-
         loadDatabase' (Just (InstalledTo Snap, snapDBPath)) installedLibs1
     (installedLibs3, localDumpPkgs) <-

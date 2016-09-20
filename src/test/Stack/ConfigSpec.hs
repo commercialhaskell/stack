@@ -109,19 +109,19 @@ spec = beforeAll setup $ afterAll teardown $ do
       boptsLibProfile `shouldBe` True
       boptsExeProfile `shouldBe` True
       boptsHaddock `shouldBe` True
-      boptsHaddockDeps `shouldBe` (Just True)
+      boptsHaddockDeps `shouldBe` Just True
       boptsInstallExes `shouldBe` True
       boptsPreFetch `shouldBe` True
-      boptsKeepGoing `shouldBe` (Just True)
+      boptsKeepGoing `shouldBe` Just True
       boptsForceDirty `shouldBe` True
       boptsTests `shouldBe` True
-      boptsTestOpts `shouldBe` (TestOpts {toRerunTests = True
+      boptsTestOpts `shouldBe` TestOpts {toRerunTests = True
                                          ,toAdditionalArgs = ["-fprof"]
                                          ,toCoverage = True
-                                         ,toDisableRun = True})
+                                         ,toDisableRun = True}
       boptsBenchmarks `shouldBe` True
-      boptsBenchmarkOpts `shouldBe` (BenchmarkOpts {beoAdditionalArgs = Just "-O2"
-                                                   ,beoDisableRun = True})
+      boptsBenchmarkOpts `shouldBe` BenchmarkOpts {beoAdditionalArgs = Just "-O2"
+                                                   ,beoDisableRun = True}
       boptsReconfigure `shouldBe` True
       boptsCabalVerbose `shouldBe` True
 

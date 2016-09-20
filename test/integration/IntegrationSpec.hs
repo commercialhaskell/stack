@@ -47,7 +47,7 @@ main = do
 
     envOrig <- getEnvironment
 
-    withSystemTempDirectory ("stack-integration-home") $ \newHome -> do
+    withSystemTempDirectory "stack-integration-home" $ \newHome -> do
         let env' = Map.toList
                  $ Map.insert "STACK_EXE" stack
                  $ Map.insert "HOME" newHome

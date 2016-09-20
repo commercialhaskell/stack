@@ -157,7 +157,7 @@ cabalSolver menv cabalfps constraintType
 
             when (any isNothing mPkgNames) $ do
                   $logInfo $ "*** Only some package names could be parsed: " <>
-                      (T.pack (intercalate ", " (map show pkgNames)))
+                      T.pack (intercalate ", " (map show pkgNames))
                   error $ T.unpack $
                        "*** User packages involved in cabal failure: "
                        <> (T.intercalate ", " $ parseConflictingPkgs msg)
@@ -169,13 +169,13 @@ cabalSolver menv cabalfps constraintType
 
     parseConflictingPkgs msg =
         let ls = dropWhile (not . errCheck) $ linesNoCR msg
-            select s = ((T.isPrefixOf "trying:" s)
-                      || (T.isPrefixOf "next goal:" s))
-                      && (T.isSuffixOf "(user goal)" s)
-            pkgName =   (take 1)
+            select s = (T.isPrefixOf "trying:" s
+                      || T.isPrefixOf "next goal:" s)
+                      && T.isSuffixOf "(user goal)" s
+            pkgName =   take 1
                       . T.words
-                      . (T.drop 1)
-                      . (T.dropWhile (/= ':'))
+                      . T.drop 1
+                      . T.dropWhile (/= ':')
         in concat $ map pkgName (filter select ls)
 
     parseCabalOutput bs = do
@@ -188,7 +188,7 @@ cabalSolver menv cabalfps constraintType
           then return $ Right (Map.fromList pairs)
           else error $ "The following lines from cabal-install output could \
                        \not be parsed: \n"
-                       ++ (T.unpack (T.intercalate "\n" errs))
+                       ++ T.unpack (T.intercalate "\n" errs)
 
     stripCR t = fromMaybe t (T.stripSuffix "\r" t)
 
@@ -265,10 +265,10 @@ getCabalConfig dir constraintType constraints = do
     goConstraint (name, version) =
         assert (not . null . versionString $ version) $
             T.concat
-              [ (if constraintType == Constraint
-                    || name `HashSet.member` wiredInPackages
-                 then "constraint: "
-                 else "preference: ")
+              [ if constraintType == Constraint
+                   || name `HashSet.member` wiredInPackages
+                then "constraint: "
+                else "preference: "
               , T.pack $ packageNameString name
               , "=="
               , T.pack $ versionString version
@@ -399,9 +399,9 @@ solveResolverSpec stackYaml cabalDirs
         solver t = cabalSolver menv cabalDirs t
                                srcConstraints depOnlyConstraints $
                           ["-v"] -- TODO make it conditional on debug
-                       ++ ["--ghcjs" | (whichCompiler compilerVer) == Ghcjs]
+                       ++ ["--ghcjs" | whichCompiler compilerVer == Ghcjs]
 
-    let srcNames = (T.intercalate " and ") $
+    let srcNames = T.intercalate " and " $
           ["packages from " <> resolverName resolver
               | not (Map.null snapConstraints)] ++
           [T.pack ((show $ Map.size extraConstraints) <> " external packages")
@@ -582,7 +582,7 @@ cabalPackagesCheck cabalfps noPkgMsg dupErrMsg = do
         error $ "Package name as defined in the .cabal file must match the \
                 \.cabal file name.\n\
                 \Please fix the following packages and try again:\n"
-                <> (formatGroup rels)
+                <> formatGroup rels
 
     let dupGroups = filter ((> 1) . length)
                             . groupSortOn (gpdPackageName . snd)
@@ -677,7 +677,7 @@ solveExtraDeps modStackYaml = do
     resolverResult <- checkResolverSpec gpds (Just oldSrcFlags) resolver'
     resultSpecs <- case resolverResult of
         BuildPlanCheckOk flags ->
-            return $ Just ((mergeConstraints oldSrcs flags), Map.empty)
+            return $ Just (mergeConstraints oldSrcs flags, Map.empty)
         BuildPlanCheckPartial {} -> do
             eres <- solveResolverSpec stackYaml cabalDirs
                               (resolver', srcConstraints, extraConstraints)
@@ -757,7 +757,7 @@ solveExtraDeps modStackYaml = do
             when ((not . Map.null) deps) $ do
                 $logInfo $ T.pack msg
                 $logInfo $ indent $ decodeUtf8 $ Yaml.encode $ object $
-                        [("extra-deps" .= map fromTuple (Map.toList deps))]
+                        ["extra-deps" .= map fromTuple (Map.toList deps)]
 
         writeStackYaml path res deps fl = do
             let fp = toFilePath path
