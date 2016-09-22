@@ -62,7 +62,28 @@ such.
 
 ## Mac OS X
 
+
+We generally test on the current version of Mac OS X, but Stack is known to work on
+Yosemite and Mavericks as well, and may also work on older versions (YMMV).
+
+**macOS Sierra warning**: There are new limitations in the dynamic linker that
+are causing problems for GHC when building projects with many
+dependencies. See
+[#2577](https://github.com/commercialhaskell/stack/issues/2577) for more
+information.
+
+### Manual download
+
+* Download the latest release:
+    * [Mac OS X 64-bit](https://www.stackage.org/stack/osx-x86_64)
+* Extract the archive and place `stack` somewhere on your `$PATH` (see
+  [Path section below](#path))
+* Now you can run `stack` from the terminal.
+
 ### Using Homebrew
+
+**macOS Sierra warning**: Homebrew's haskell-stack formula may not currently
+work on Sierra, so we suggest using the manual above for now.
 
 If you have a popular [brew](http://brew.sh/) tool installed, you can just do:
 
@@ -74,17 +95,6 @@ but tend to be updated within a day or two.
 bottle"), but if `brew` starts trying to build everything from source (which
 will take hours), see
 [their FAQ on the topic](https://github.com/Homebrew/homebrew/blob/master/share/doc/homebrew/FAQ.md#why-do-you-compile-everything).
-
-### Manual download
-
-* Download the latest release:
-    * [Mac OS X 64-bit](https://www.stackage.org/stack/osx-x86_64)
-* Extract the archive and place `stack` somewhere on your `$PATH` (see
-  [Path section below](#path))
-* Now you can run `stack` from the terminal.
-
-We generally test on the current version of Mac OS X, but stack is known to work on
-Yosemite and Mavericks as well, and may also work on older versions (YMMV).
 
 ### Notes
 

@@ -298,19 +298,20 @@ do_centos_install() {
 # If 'brew' exists, installs using Homebrew.  Otherwise, installs
 # the generic bindist.
 do_osx_install() {
-  if has_brew ; then
-    info "Since you have 'brew', installing using Homebrew."
-    info ""
-    brew update
-    brew install haskell-stack
-    post_install_separator
-    info "Installed Homebrew 'haskell-stack' formula."
-    info ""
-  else
-    info "Since you do not have 'brew', using generic bindist..."
+  #if has_brew ; then
+  #  info "Since you have 'brew', installing using Homebrew."
+  #  info ""
+  #  brew update
+  #  brew install haskell-stack
+  #  post_install_separator
+  #  info "Installed Homebrew 'haskell-stack' formula."
+  #  info ""
+  #else
+  #  info "Since you do not have 'brew', using generic bindist..."
+    info "Using generic bindist..."
     info ""
     install_64bit_osx_binary
-  fi
+  #fi
   info "NOTE: You may need to run 'xcode-select --install' to set"
   info "      up the Xcode command-line tools, which Stack uses."
   info ""
@@ -611,9 +612,9 @@ has_getconf() {
 }
 
 # Check whether 'brew' command exists
-has_brew() {
-  has_cmd brew
-}
+#has_brew() {
+#  has_cmd brew
+#}
 
 # Check whether 'perl' command exists
 has_perl() {
