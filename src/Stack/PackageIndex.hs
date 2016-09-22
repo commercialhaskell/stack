@@ -6,6 +6,7 @@
 {-# LANGUAGE GADTs                      #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE KindSignatures             #-}
+{-# LANGUAGE LambdaCase                 #-}
 {-# LANGUAGE MultiParamTypeClasses      #-}
 {-# LANGUAGE OverloadedStrings          #-}
 {-# LANGUAGE PatternGuards              #-}
@@ -247,12 +248,19 @@ updateIndexGit menv indexName' index gitUrl = do
                   $(mkRelDir "git-update")
                 acfDir = suDir </> repoName
             repoExists <- doesDirExist acfDir
-            unless repoExists
-                   (readProcessNull (Just suDir) menv "git" cloneArgs)
+            let doClone = readProcessNull (Just suDir) menv "git" cloneArgs
+            unless repoExists doClone
             isShallow <- doesFileExist $ acfDir </> $(mkRelDir ".git") </> $(mkRelFile "shallow")
             when isShallow $ do
               $logWarn "Shallow package index repo detected, transitioning to a full clone..."
-              readProcessNull (Just acfDir) menv "git" ["fetch", "--unshallow"]
+              let handleUnshallowError =
+                    C.handle $ \case
+                      ReadProcessException{} -> do
+                        $logInfo $ "Failed to convert to full clone, deleting and re-cloning."
+                        ignoringAbsence (removeDirRecur acfDir)
+                        doClone
+                      err -> throwM err
+              handleUnshallowError (readProcessNull (Just acfDir) menv "git" ["fetch", "--unshallow"])
             $logSticky "Fetching package index ..."
             let runFetch = callProcessInheritStderrStdout
                     (Cmd (Just acfDir) "git" menv ["fetch","--tags"])
