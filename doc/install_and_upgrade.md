@@ -63,8 +63,9 @@ such.
 ## Mac OS X
 
 
-We generally test on the current version of Mac OS X, but Stack is known to work on
-Yosemite and Mavericks as well, and may also work on older versions (YMMV).
+We generally test on the current version of Mac OS X, but Stack is known to work
+on El Capitan, Yosemite and Mavericks as well, and may also work on older
+versions (YMMV).
 
 **macOS Sierra warning**: There are new limitations in the dynamic linker that
 are causing problems for GHC when building projects with many
