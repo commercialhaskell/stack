@@ -16,6 +16,8 @@ Behavior changes:
 
 Other enhancements:
 
+* `stack haddock` now supports `--haddock-internal`. See
+  [#2229](https://github.com/commercialhaskell/stack/issues/2229)
 * Add support for `system-ghc` and `install-ghc` fields to `stack config set` command.
 * Add `ghc-build` option to override autodetected GHC build to use (e.g. gmp4,
   tinfo6, nopie) on Linux.

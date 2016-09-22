@@ -581,6 +581,7 @@ build:
   haddock-arguments: ""
   open-haddocks: false    # --open
   haddock-deps: false     # if unspecified, defaults to true if haddock is set
+  haddock-internal: false
 
   # These are inadvisable to use in your global configuration, as they make the
   # stack build CLI behave quite differently.

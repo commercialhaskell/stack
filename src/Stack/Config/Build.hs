@@ -23,6 +23,9 @@ buildOptsFromMonoid BuildOptsMonoid{..} = BuildOpts
           (boptsOpenHaddocks defaultBuildOpts)
           buildMonoidOpenHaddocks
     , boptsHaddockDeps = getFirst buildMonoidHaddockDeps
+    , boptsHaddockInternal = fromFirst
+          (boptsHaddockInternal defaultBuildOpts)
+          buildMonoidHaddockInternal
     , boptsInstallExes = fromFirst
           (boptsInstallExes defaultBuildOpts)
           buildMonoidInstallExes

@@ -52,6 +52,8 @@ data BuildOpts =
             -- ^ Open haddocks in the browser?
             ,boptsHaddockDeps :: !(Maybe Bool)
             -- ^ Build haddocks for dependencies?
+            ,boptsHaddockInternal :: !Bool
+            -- ^ Build haddocks for all symbols and packages, like @cabal haddock --internal@
             ,boptsInstallExes :: !Bool
             -- ^ Install executables to user path after building?
             ,boptsPreFetch :: !Bool
@@ -90,6 +92,7 @@ defaultBuildOpts = BuildOpts
     , boptsHaddockOpts = defaultHaddockOpts
     , boptsOpenHaddocks = False
     , boptsHaddockDeps = Nothing
+    , boptsHaddockInternal = False
     , boptsInstallExes = False
     , boptsPreFetch = False
     , boptsKeepGoing = Nothing
@@ -146,6 +149,7 @@ data BuildOptsMonoid = BuildOptsMonoid
     , buildMonoidHaddockOpts :: !HaddockOptsMonoid
     , buildMonoidOpenHaddocks :: !(First Bool)
     , buildMonoidHaddockDeps :: !(First Bool)
+    , buildMonoidHaddockInternal :: !(First Bool)
     , buildMonoidInstallExes :: !(First Bool)
     , buildMonoidPreFetch :: !(First Bool)
     , buildMonoidKeepGoing :: !(First Bool)
@@ -167,6 +171,7 @@ instance FromJSON (WithJSONWarnings BuildOptsMonoid) where
               buildMonoidHaddockOpts <- jsonSubWarnings (o ..:? buildMonoidHaddockOptsArgName ..!= mempty)
               buildMonoidOpenHaddocks <- First <$> o ..:? buildMonoidOpenHaddocksArgName
               buildMonoidHaddockDeps <- First <$> o ..:? buildMonoidHaddockDepsArgName
+              buildMonoidHaddockInternal <- First <$> o ..:? buildMonoidHaddockInternalArgName
               buildMonoidInstallExes <- First <$> o ..:? buildMonoidInstallExesArgName
               buildMonoidPreFetch <- First <$> o ..:? buildMonoidPreFetchArgName
               buildMonoidKeepGoing <- First <$> o ..:? buildMonoidKeepGoingArgName
@@ -197,6 +202,9 @@ buildMonoidOpenHaddocksArgName = "open-haddocks"
 
 buildMonoidHaddockDepsArgName :: Text
 buildMonoidHaddockDepsArgName = "haddock-deps"
+
+buildMonoidHaddockInternalArgName :: Text
+buildMonoidHaddockInternalArgName = "haddock-internal"
 
 buildMonoidInstallExesArgName :: Text
 buildMonoidInstallExesArgName = "copy-bins"
