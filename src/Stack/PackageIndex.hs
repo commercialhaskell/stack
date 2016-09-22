@@ -255,7 +255,7 @@ updateIndexGit menv indexName' index gitUrl = do
               $logWarn "Shallow package index repo detected, transitioning to a full clone..."
               let handleUnshallowError =
                     C.handle $ \case
-                      ReadProcessException{} -> do
+                      ProcessFailed{} -> do
                         $logInfo $ "Failed to convert to full clone, deleting and re-cloning."
                         ignoringAbsence (removeDirRecur acfDir)
                         doClone
@@ -280,7 +280,7 @@ updateIndexGit menv indexName' index gitUrl = do
                      Left ex -> do
                          $logError (T.pack (show ex))
                          case ex of
-                             ReadProcessException{} -> $logError $ T.unlines
+                             ProcessFailed{} -> $logError $ T.unlines
                                  ["Signature verification failed. "
                                  ,"Please ensure you've set up your"
                                  ,"GPG keychain to accept the D6CF60FD signing key."

@@ -599,7 +599,7 @@ resolvePackageLocation menv projRoot (PLRemote url remotePackageType) = do
             return dir
           where
             handleError = handle $ \case
-                ReadProcessException{} -> do
+                ProcessFailed{} -> do
                     $logInfo $ "Failed to reset to commit " <> commit <> ", deleting and re-cloning."
                     ignoringAbsence (removeDirRecur dir)
                     doClone
@@ -621,7 +621,7 @@ resolvePackageLocation menv projRoot (PLRemote url remotePackageType) = do
                 readProcessNull (Just dir) menv commandName
                     (resetCommand ++ [T.unpack commit, "--"])
                     `catch` \case
-                        ex@ReadProcessException{} -> do
+                        ex@ProcessFailed{} -> do
                             unless firstTry $ $logInfo $
                                 "Please ensure that commit " <> commit <> " exists within " <> url
                             throwM ex

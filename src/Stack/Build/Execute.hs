@@ -1093,7 +1093,7 @@ singleBuild runInBase ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} in
                         , packageIdentifierString taskProvides
                         ])
                     (\ex -> case ex of
-                        ReadProcessException{} -> return ()
+                        ProcessFailed{} -> return ()
                         _ -> throwM ex)
 
                 readProcessNull Nothing menv' ghcPkgExe

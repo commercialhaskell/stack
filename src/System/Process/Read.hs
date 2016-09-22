@@ -207,13 +207,14 @@ readProcessStderrStdout wd menv name args = do
 
 -- | An exception while trying to read from process.
 data ReadProcessException
-    = ReadProcessException CreateProcess ExitCode L.ByteString L.ByteString
+    = ProcessFailed CreateProcess ExitCode L.ByteString L.ByteString
+    -- ^ @'ProcessFailed' createProcess exitCode stdout stderr@
     | NoPathFound
     | ExecutableNotFound String [FilePath]
     | ExecutableNotFoundAt FilePath
     deriving Typeable
 instance Show ReadProcessException where
-    show (ReadProcessException cp ec out err) = concat $
+    show (ProcessFailed cp ec out err) = concat $
         [ "Running "
         , showSpec $ cmdspec cp] ++
         maybe [] (\x -> [" in directory ", x]) (cwd cp) ++
@@ -271,7 +272,7 @@ sinkProcessStdout wd menv name args sinkStdout = do
           (\(ProcessExitedUnsuccessfully cp ec) ->
                do stderrBuilder <- liftIO (readIORef stderrBuffer)
                   stdoutBuilder <- liftIO (readIORef stdoutBuffer)
-                  throwM $ ReadProcessException
+                  throwM $ ProcessFailed
                     cp
                     ec
                     (toLazyByteString stdoutBuilder)

@@ -130,7 +130,7 @@ cabalSolver menv cabalfps constraintType
 
     catch (liftM Right (readProcessStdout (Just tmpdir) menv "cabal" args))
           (\ex -> case ex of
-              ReadProcessException _ _ _ err -> return $ Left err
+              ProcessFailed _ _ _ err -> return $ Left err
               _ -> throwM ex)
     >>= either parseCabalErrors parseCabalOutput
 

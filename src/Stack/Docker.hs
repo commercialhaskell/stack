@@ -481,7 +481,7 @@ cleanup opts =
                         | otherwise -> throwM (InvalidCleanupCommandException line)
              e <- try (readDockerProcess envOverride args)
              case e of
-               Left ex@ReadProcessException{} ->
+               Left ex@ProcessFailed{} ->
                  $logError (concatT ["Could not remove: '",v,"': ", show ex])
                Left e' -> throwM e'
                Right _ -> return ()
@@ -662,7 +662,7 @@ inspects envOverride images =
          case eitherDecode (LBS.pack (filter isAscii (decodeUtf8 inspectOut))) of
            Left msg -> throwM (InvalidInspectOutputException msg)
            Right results -> return (Map.fromList (map (\r -> (iiId r,r)) results))
-       Left (ReadProcessException _ _ _ err)
+       Left (ProcessFailed _ _ _ err)
          | "Error: No such image" `LBS.isPrefixOf` err -> return Map.empty
        Left e -> throwM e
 
