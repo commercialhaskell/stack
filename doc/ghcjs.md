@@ -105,7 +105,7 @@ setup-info:
     source:
       ghcjs-0.2.0.9006019_ghc-7.10.3:
          url: http://tolysz.org/ghcjs/lts-6.19-9006019.tar.gz
-         sha1: ef4264d5a93b269ee4ec8f9d5139da030331d65a 
+         sha1: ef4264d5a93b269ee4ec8f9d5139da030331d65a
 ```
 
 Or for the latest (with more features):
@@ -120,13 +120,18 @@ setup-info:
       ghcjs-0.2.1.9007001_ghc-8.0.1:
           url: http://tolysz.org/ghcjs/ghc-8.0-2016-09-26-lts-7.1-9007001-mem.tar.gz
           sha1: e640724883238593e2d2f7f03991cb413ec0347b
-```          
+```
 The later can be generated via: https://github.com/tolysz/prepare-ghcjs
 the fromer is a bit more manual.
 
 Older resolvers:
 
 |resolver|url|sha1|
-|---|---|---| 
+|---|---|---|
 | lts-6.18 | http://tolysz.org/ghcjs/lts-6.18-9006019.tar.gz | 3e9f345116c851349a5a551ffd94f7e0b74bfabb |
 
+## Setting up GHCJS on Windows
+
+If `stack setup` command fails to successfully complete with message: `commitBuffer: invalid argument (invalid character)`, it means you have a locale problem.
+This problem is not exclusive to GHCJS, and might happen also during other builds. A workaround is to set _Language for non-Unicode programs_ to _English (US)_.
+For details see [stack issue #1448](https://github.com/commercialhaskell/stack/issues/1448).
