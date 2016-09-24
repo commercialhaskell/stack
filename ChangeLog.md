@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased changes
+## 1.2.1 (Unreleased)
 
 Release notes:
 
@@ -42,6 +42,9 @@ Bug fixes:
 * Fix a resource leak in `sinkProcessStderrStdout` which could affect
   much of the codebase, in particular copying precompiled
   packages. [#1979](https://github.com/commercialhaskell/stack/issues/1979)
+* Docker: ensure that interrupted extraction process does not cause corrupt file
+  when downloading a Docker-compatible Stack executable
+  [#2568](https://github.com/commercialhaskell/stack/issues/2568)
 
 ## 1.2.0
 

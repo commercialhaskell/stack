@@ -1092,17 +1092,20 @@ installDockerStackExe
     -> Path Abs Dir
     -> Path Abs Dir
     -> m ()
-installDockerStackExe _ archiveFile _ _tempDir destDir = do
+installDockerStackExe _ archiveFile _ tempDir destDir = do
     (_,tarTool) <-
         checkDependencies $
         (,) <$> checkDependency "gzip" <*> checkDependency "tar"
     menv <- getMinimalEnvOverride
-    ensureDir destDir
     readProcessNull
-        (Just destDir)
+        (Just tempDir)
         menv
         tarTool
         ["xf", toFilePath archiveFile, "--strip-components", "1"]
+    ensureDir destDir
+    renameFile
+        (tempDir </> $(mkRelFile stackProgName))
+        (destDir </> $(mkRelFile stackProgName))
 
 ensureGhcjsBooted :: (MonadIO m, MonadBaseControl IO m, MonadLogger m, MonadCatch m, HasConfig env, HasHttpManager env, HasTerminal env, HasReExec env, HasLogLevel env, MonadReader env m)
                   => EnvOverride -> CompilerVersion -> Bool -> m ()
