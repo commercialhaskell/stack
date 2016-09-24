@@ -104,3 +104,9 @@ You can also put both the yaml files in the same directory, and have e.g.
 If you don't want to use a snapshot, instead place the ghcjs version in the
 `resolver` field of your `stack.yaml`.  This is also necessary when using stack
 `< 0.1.8`.
+
+## Setting up GHCJS on Windows
+
+If `stack setup` command fails to successfully complete with message: `commitBuffer: invalid argument (invalid character)`, it means you have a locale problem.
+This problem is not exclusive to GHCJS, and might happen also during other builds. A workaround is to set _Language for non-Unicode programs_ to _English (US)_.
+For details see [stack issue #1448](https://github.com/commercialhaskell/stack/issues/1448).
