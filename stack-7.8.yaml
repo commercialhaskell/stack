@@ -74,6 +74,7 @@ extra-deps:
 - neat-interpolation-0.3.2
 - optparse-applicative-0.13.0.0
 - text-metrics-0.1.0
+- pid1-0.1.0.0
 flags:
   time-locale-compat:
     old-locale: false
