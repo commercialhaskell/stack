@@ -179,7 +179,7 @@ paths =
     , ( "Local project documentation root"
       , "local-doc-root"
       , \pi' -> T.pack (toFilePathNoTrailingSep (piLocalRoot pi' </> docDirSuffix)))
-    , ( "Dist work directory"
+    , ( "Dist work directory, relative to package directory"
       , "dist-dir"
       , T.pack . toFilePathNoTrailingSep . piDistDir )
     , ( "Where HPC reports and tix files are stored"
