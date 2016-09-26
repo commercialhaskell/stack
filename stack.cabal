@@ -267,6 +267,7 @@ library
     build-depends:   Win32
   else
     build-depends:   unix >= 2.7.0.1
+                   , pid1 >= 0.1 && < 0.2
   default-language:  Haskell2010
 
 executable stack

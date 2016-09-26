@@ -25,7 +25,7 @@ import           System.Process.Run (callProcess, callProcessObserveStdout, Cmd(
 #ifdef WINDOWS
 import           System.Process.Read (EnvOverride)
 #else
-import           System.Posix.Process (executeFile)
+import qualified System.Process.PID1 as PID1
 import           System.Process.Read (EnvOverride, envHelper, preProcess)
 #endif
 
@@ -63,7 +63,7 @@ exec = execSpawn
 exec menv cmd0 args = do
     cmd <- preProcess Nothing menv cmd0
     $withProcessTimeLog cmd args $
-        liftIO $ executeFile cmd True args (envHelper menv)
+        liftIO $ PID1.run cmd args (envHelper menv)
 #endif
 
 -- | Like 'exec', but does not use 'execv' on non-windows. This way, there
