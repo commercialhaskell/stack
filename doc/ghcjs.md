@@ -86,3 +86,40 @@ You can also put both the yaml files in the same directory, and have e.g. `ghcjs
 ## Using stack without a snapshot
 
 If you don't want to use a snapshot, instead place the ghcjs version in the `resolver` field of your `stack.yaml`.  This is also necessary when using stack `< 0.1.8`.
+
+## Comunity Repacks
+
+Each version of resolvers can potentially have diferent versions of packages that the upstream bundle has.
+One way of remeding this situation is to repack the bundle and include packages at version from the resolver.
+Until `ghcjs` will recognise `stack` we need to install a separate version of `ghcjs` for each resolver. In the future we would need to reinstall only if the version of booted packages change or maybe just boot it for the new resolver.
+
+However it is only a possible future development.
+Currently, for more recent snapshots one could try:
+```yaml
+resolver: lts-6.18
+compiler: ghcjs-0.2.0.9006018_ghc-7.10.3
+compiler-check: match-exact
+
+setup-info:
+  ghcjs:
+    source:
+      ghcjs-0.2.0.9006018_ghc-7.10.3:
+         url: http://tolysz.org/ghcjs/lts-6.18-9006018.tar.gz
+         sha1: 3e9f345116c851349a5a551ffd94f7e0b74bfabb
+```
+
+Or for the latest (with more features):
+```yaml
+resolver: lts-7.1
+compiler: ghcjs-0.2.1.9007001_ghc-8.0.1
+compiler-check: match-exact
+
+setup-info:
+  ghcjs:
+    source:
+      ghcjs-0.2.1.9007001_ghc-8.0.1:
+          url: http://tolysz.org/ghcjs/ghc-8.0-2016-09-26-lts-7.1-9007001-mem.tar.gz
+          sha1: e640724883238593e2d2f7f03991cb413ec0347b
+```          
+The later can be generated via: https://github.com/tolysz/prepare-ghcjs
+the fromer is a bit more manual.
