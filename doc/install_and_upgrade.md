@@ -64,7 +64,7 @@ such.
 
 ### Using Homebrew
 
-If you have a popular [brew](http://brew.sh/) tool installed, you can just do:
+If you have the popular [brew](http://brew.sh/) tool installed, you can just do:
 
     brew install haskell-stack
 
