@@ -96,16 +96,16 @@ Until `ghcjs` will recognise `stack` we need to install a separate version of `g
 However it is only a possible future development.
 Currently, for more recent snapshots one could try:
 ```yaml
-resolver: lts-6.18
-compiler: ghcjs-0.2.0.9006018_ghc-7.10.3
+resolver: lts-6.19
+compiler: ghcjs-0.2.0.9006019_ghc-7.10.3
 compiler-check: match-exact
 
 setup-info:
   ghcjs:
     source:
-      ghcjs-0.2.0.9006018_ghc-7.10.3:
-         url: http://tolysz.org/ghcjs/lts-6.18-9006018.tar.gz
-         sha1: 3e9f345116c851349a5a551ffd94f7e0b74bfabb
+      ghcjs-0.2.0.9006019_ghc-7.10.3:
+         url: http://tolysz.org/ghcjs/lts-6.19-9006019.tar.gz
+         sha1: ef4264d5a93b269ee4ec8f9d5139da030331d65a 
 ```
 
 Or for the latest (with more features):
@@ -123,3 +123,10 @@ setup-info:
 ```          
 The later can be generated via: https://github.com/tolysz/prepare-ghcjs
 the fromer is a bit more manual.
+
+Older resolvers:
+
+|resolver|url|sha1|
+|---|---|---| 
+| lts-6.18 | http://tolysz.org/ghcjs/lts-6.18-9006019.tar.gz | 3e9f345116c851349a5a551ffd94f7e0b74bfabb |
+
