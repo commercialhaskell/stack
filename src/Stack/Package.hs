@@ -931,12 +931,10 @@ resolveFilesAndDeps component dirs names0 exts = do
         let unlistedModules =
                 foundModules `S.difference`
                 S.fromList (mapMaybe dotCabalModule names0)
-        cabalfp <- asks fst
         return $
             if S.null unlistedModules
                 then []
                 else [ UnlistedModulesWarning
-                           cabalfp
                            component
                            (S.toList unlistedModules)]
     warnMissing _missingModules = do

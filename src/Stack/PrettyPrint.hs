@@ -26,6 +26,7 @@ module Stack.PrettyPrint
 
 import           Control.Monad.Logger
 import           Control.Monad.Reader
+import           Data.Monoid
 import           Data.String (fromString)
 import qualified Data.Text as T
 import           Language.Haskell.TH
@@ -58,15 +59,18 @@ prettyInfo = do
 prettyWarn :: Q Exp
 prettyWarn = do
     loc <- location
-    [e| monadLoggerLog loc "" LevelWarn <=< displayAnsiIfPossible |]
+    [e| monadLoggerLog loc "" LevelWarn <=< displayAnsiIfPossible . (line <>) . (warningYellow "Warning:" <+>) |]
 
 prettyError :: Q Exp
 prettyError = do
     loc <- location
-    [e| monadLoggerLog loc "" LevelError <=< displayAnsiIfPossible |]
+    [e| monadLoggerLog loc "" LevelError <=< displayAnsiIfPossible . (line <>) . (errorRed "Error:" <+>) |]
 
 errorRed :: AnsiDoc -> AnsiDoc
 errorRed = dullred
+
+warningYellow :: AnsiDoc -> AnsiDoc
+warningYellow = yellow
 
 goodGreen :: AnsiDoc -> AnsiDoc
 goodGreen = green

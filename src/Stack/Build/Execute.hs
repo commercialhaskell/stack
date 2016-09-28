@@ -52,6 +52,7 @@ import           Data.Monoid ((<>))
 import           Data.Set (Set)
 import qualified Data.Set as Set
 import           Data.Streaming.Process hiding (callProcess, env)
+import           Data.String
 import           Data.Text (Text)
 import qualified Data.Text as T
 import           Data.Text.Encoding (decodeUtf8)
@@ -61,6 +62,7 @@ import           Data.Tuple
 import qualified Distribution.PackageDescription as C
 import           Distribution.System            (OS (Windows),
                                                  Platform (Platform))
+import qualified Distribution.Text as C
 import           Language.Haskell.TH as TH (location)
 import           Network.HTTP.Client.Conduit (HasHttpManager)
 import           Path
@@ -79,16 +81,17 @@ import           Stack.Fetch as Fetch
 import           Stack.GhcPkg
 import           Stack.Package
 import           Stack.PackageDump
+import           Stack.PrettyPrint
+import           Stack.Types.Build
+import           Stack.Types.Compiler
+import           Stack.Types.Config
 import           Stack.Types.GhcPkgId
+import           Stack.Types.Internal
+import           Stack.Types.Package
 import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageName
-import           Stack.Types.Version
-import           Stack.Types.Config
-import           Stack.Types.Build
-import           Stack.Types.Package
-import           Stack.Types.Compiler
-import           Stack.Types.Internal
 import           Stack.Types.StackT
+import           Stack.Types.Version
 import qualified System.Directory as D
 import           System.Environment (getExecutablePath)
 import           System.Exit (ExitCode (ExitSuccess))
@@ -1145,15 +1148,28 @@ singleBuild runInBase ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} in
         -- FIXME: only output these if they're in the build plan.
 
         preBuildTime <- modTime <$> liftIO getCurrentTime
-        let postBuildCheck succeeded = do
-                warnings <- checkForUnlistedFiles taskType preBuildTime pkgDir
-                let hasUnlistedModule = any $ \case
-                        UnlistedModulesWarning{} -> True
-                        _ -> False
-                when (not (null warnings)) $ $logInfo ""
-                when (not succeeded && hasUnlistedModule warnings) $ do
-                    $logInfo "If the above build failed with a linker error or .so/DLL error, addressing these may help:"
-                mapM_ ($logWarn . ("Warning: " <>) . T.pack . show) warnings
+        let postBuildCheck _succeeded = do
+                mlocalWarnings <- case taskType of
+                    TTLocal lp -> do
+                        warnings <- checkForUnlistedFiles taskType preBuildTime pkgDir
+                        return (Just (lpCabalFile lp, warnings))
+                    _ -> return Nothing
+                -- NOTE: once
+                -- https://github.com/commercialhaskell/stack/issues/2649
+                -- is resolved, we will want to partition the warnings
+                -- based on variety, and output in different lists.
+                let showModuleWarning (UnlistedModulesWarning mcomp modules) =
+                      "- In" <+>
+                      maybe "the library component" (\c -> fromString c <+> "component") mcomp <>
+                      ":" <> line <>
+                      indent 4 (mconcat $ intersperse line $ map (goodGreen . fromString . C.display) modules)
+                forM_ mlocalWarnings $ \(cabalfp, warnings) -> do
+                    when (not (null warnings)) $ $prettyWarn $
+                        "The following modules should be added to exposed-modules or other-modules in" <+>
+                        display cabalfp <> ":" <> line <>
+                        indent 4 (mconcat $ map showModuleWarning warnings) <>
+                        line <> line <>
+                        "Missing modules in the cabal file are likely to cause undefined reference errors from the linker, along with other problems."
 
         () <- announce ("build" <> annSuffix)
         config <- asks getConfig

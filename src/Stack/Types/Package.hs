@@ -38,7 +38,6 @@ import           Distribution.ModuleName (ModuleName)
 import           Distribution.Package hiding (Package,PackageName,packageName,packageVersion,PackageIdentifier)
 import           Distribution.PackageDescription (TestSuiteInterface)
 import           Distribution.System (Platform (..))
-import           Distribution.Text (display)
 import           GHC.Generics (Generic)
 import           Path as FL
 import           Prelude
@@ -161,7 +160,7 @@ instance Show GetPackageFiles where
 
 -- | Warning generated when reading a package
 data PackageWarning
-    = UnlistedModulesWarning (Path Abs File) (Maybe String) [ModuleName]
+    = UnlistedModulesWarning (Maybe String) [ModuleName]
       -- ^ Modules found that are not listed in cabal file
 
     -- TODO: bring this back - see
@@ -170,47 +169,6 @@ data PackageWarning
     | MissingModulesWarning (Path Abs File) (Maybe String) [ModuleName]
       -- ^ Modules not found in file system, which are listed in cabal file
     -}
-
-instance Show PackageWarning where
-    show (UnlistedModulesWarning cabalfp component [unlistedModule]) =
-        concat
-            [ "module not listed in "
-            , toFilePath (filename cabalfp)
-            , case component of
-                   Nothing -> " for library"
-                   Just c -> " for '" ++ c ++ "'"
-            , " component (add to other-modules): "
-            , display unlistedModule]
-    show (UnlistedModulesWarning cabalfp component unlistedModules) =
-        concat
-            [ "modules not listed in "
-            , toFilePath (filename cabalfp)
-            , case component of
-                   Nothing -> " for library"
-                   Just c -> " for '" ++ c ++ "'"
-            , " component (add to other-modules):\n    "
-            , intercalate "\n    " (map display unlistedModules)]
-    {-
-    show (MissingModulesWarning cabalfp component [missingModule]) =
-        concat
-            [ "module listed in "
-            , toFilePath (filename cabalfp)
-            , case component of
-                   Nothing -> " for library"
-                   Just c -> " for '" ++ c ++ "'"
-            , " component not found in filesystem: "
-            , display missingModule]
-    show (MissingModulesWarning cabalfp component missingModules) =
-        concat
-            [ "modules listed in "
-            , toFilePath (filename cabalfp)
-            , case component of
-                   Nothing -> " for library"
-                   Just c -> " for '" ++ c ++ "'"
-            , " component not found in filesystem:\n    "
-            , intercalate "\n    " (map display missingModules)]
-    -}
-
 
 -- | Package build configuration
 data PackageConfig =
