@@ -163,8 +163,14 @@ instance Show GetPackageFiles where
 data PackageWarning
     = UnlistedModulesWarning (Path Abs File) (Maybe String) [ModuleName]
       -- ^ Modules found that are not listed in cabal file
+
+    -- TODO: bring this back - see
+    -- https://github.com/commercialhaskell/stack/issues/2649
+    {-
     | MissingModulesWarning (Path Abs File) (Maybe String) [ModuleName]
       -- ^ Modules not found in file system, which are listed in cabal file
+    -}
+
 instance Show PackageWarning where
     show (UnlistedModulesWarning cabalfp component [unlistedModule]) =
         concat
@@ -184,6 +190,7 @@ instance Show PackageWarning where
                    Just c -> " for '" ++ c ++ "'"
             , " component (add to other-modules):\n    "
             , intercalate "\n    " (map display unlistedModules)]
+    {-
     show (MissingModulesWarning cabalfp component [missingModule]) =
         concat
             [ "module listed in "
@@ -202,6 +209,7 @@ instance Show PackageWarning where
                    Just c -> " for '" ++ c ++ "'"
             , " component not found in filesystem:\n    "
             , intercalate "\n    " (map display missingModules)]
+    -}
 
 
 -- | Package build configuration

@@ -941,7 +941,9 @@ resolveFilesAndDeps component dirs names0 exts = do
                            (S.toList unlistedModules)]
     warnMissing _missingModules = do
         return []
-        {- FIXME: the issue with this is it's noisy for modules like Paths_*
+        -- TODO: bring this back - see
+        -- https://github.com/commercialhaskell/stack/issues/2649
+        {-
         cabalfp <- asks fst
         return $
             if null missingModules
