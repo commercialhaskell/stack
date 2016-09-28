@@ -308,7 +308,8 @@ other projects by installing into your shared snapshot database.
 
 Enables or disables using the GHC available on the PATH.
 Useful to disable if you want to save the time, bandwidth or storage space needed to setup an isolated GHC.
-Default is `false`.
+Default is `false` unless the [Docker](docker_integration.md) or [Nix](nix_integration.md) integration is enabled.
+In a Nix-enabled configuration, stack is incompatible with `system-ghc: false`.
 
 ```yaml
 # Turn on system GHC
