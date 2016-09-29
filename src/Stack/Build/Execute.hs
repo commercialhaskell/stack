@@ -48,7 +48,7 @@ import           Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import           Data.Maybe
 import           Data.Maybe.Extra (forMaybeM)
-import           Data.Monoid ((<>))
+import           Data.Monoid
 import           Data.Set (Set)
 import qualified Data.Set as Set
 import           Data.Streaming.Process hiding (callProcess, env)
