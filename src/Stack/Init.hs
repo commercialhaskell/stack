@@ -149,7 +149,7 @@ initProject whichCmd currDir initOpts mresolver = do
 
     $logInfo $ "Initialising configuration using resolver: " <> resolverName r
     $logInfo $ "Total number of user packages considered: "
-               <> (T.pack $ show $ (Map.size bundle + length dupPkgs))
+               <> (T.pack $ show (Map.size bundle + length dupPkgs))
 
     when (dupPkgs /= []) $ do
         $logWarn $ "Warning! Ignoring "
@@ -163,7 +163,7 @@ initProject whichCmd currDir initOpts mresolver = do
                    <> (T.pack $ show $ Map.size ignored)
                    <> " packages due to dependency conflicts:"
         rels <- mapM makeRel (Map.elems (fmap fst ignored))
-        $logWarn $ indent $ showItems $ rels
+        $logWarn $ indent $ showItems rels
 
     when (Map.size extraDeps > 0) $ do
         $logWarn $ "Warning! " <> (T.pack $ show $ Map.size extraDeps)

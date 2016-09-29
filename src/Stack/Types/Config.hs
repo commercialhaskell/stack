@@ -582,7 +582,7 @@ instance ToJSON PackageEntry where
     toJSON pe | not (peExtraDepDef pe) && null (peSubdirs pe) =
         toJSON $ peLocation pe
     toJSON pe = object $
-        (maybe id (\e -> (("extra-dep" .= e):)) (peExtraDepMaybe pe))
+        maybe id (\e -> (("extra-dep" .= e):)) (peExtraDepMaybe pe)
         [ "location" .= peLocation pe
         , "subdirs" .= peSubdirs pe
         ]

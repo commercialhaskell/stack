@@ -289,7 +289,7 @@ setupCompiler compiler = do
           , "compiler available on your PATH." ]
 
     config <- asks getConfig
-    mpaths <- fst <$> ensureCompiler SetupOpts
+    fst <$> ensureCompiler SetupOpts
         { soptsInstallIfMissing  = configInstallGHC config
         , soptsUseSystem         = configSystemGHC config
         , soptsWantedCompiler    = compiler
@@ -305,8 +305,6 @@ setupCompiler compiler = do
         , soptsStackSetupYaml    = defaultStackSetupYaml
         , soptsGHCBindistURL     = Nothing
         }
-
-    return mpaths
 
 setupCabalEnv
     :: ( MonadBaseControl IO m, MonadIO m, MonadLogger m, MonadMask m
@@ -755,7 +753,7 @@ solveExtraDeps modStackYaml = do
         printDeps deps msg = do
             when ((not . Map.null) deps) $ do
                 $logInfo $ T.pack msg
-                $logInfo $ indent $ decodeUtf8 $ Yaml.encode $ object $
+                $logInfo $ indent $ decodeUtf8 $ Yaml.encode $ object
                         ["extra-deps" .= map fromTuple (Map.toList deps)]
 
         writeStackYaml path res deps fl = do

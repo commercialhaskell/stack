@@ -212,7 +212,7 @@ mkUploader config us = do
             req3 <-
                 case ereq3 of
                     Left e -> do
-                        putStrLn $ "WARNING: No HTTP digest prompt found, this will probably fail"
+                        putStrLn "WARNING: No HTTP digest prompt found, this will probably fail"
                         case E.fromException e of
                             Just e' -> putStrLn $ displayDigestAuthException e'
                             Nothing -> print e

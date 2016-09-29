@@ -1049,7 +1049,7 @@ singleBuild runInBase ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} in
 
     annSuffix = if result == "" then "" else " (" <> result <> ")"
       where
-        result = T.intercalate " + " $ concat $
+        result = T.intercalate " + " $ concat
             [ ["lib" | taskAllInOne && hasLib]
             , ["exe" | taskAllInOne && hasExe]
             , ["test" | enableTests]

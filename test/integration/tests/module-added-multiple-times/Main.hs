@@ -1,4 +1,4 @@
-{-# LANGUAGE BangPatterns #-}
+
 
 import Control.Monad
 import Data.List
