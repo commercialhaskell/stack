@@ -4,7 +4,7 @@
 {-# LANGUAGE OverloadedStrings          #-}
 {-# LANGUAGE RecordWildCards            #-}
 {-# LANGUAGE FlexibleInstances          #-}
-{-# LANGUAGE TemplateHaskell            #-}
+
 {-# LANGUAGE DataKinds                  #-}
 -- | Shared types for various stackage packages.
 module Stack.Types.BuildPlan
@@ -121,7 +121,7 @@ data PackagePlan = PackagePlan
 
 instance ToJSON PackagePlan where
     toJSON PackagePlan {..} = object
-        $ maybe id (\cfi -> (("cabal-file-info" .= cfi):)) ppCabalFileInfo $
+        $ maybe id (\cfi -> (("cabal-file-info" .= cfi):)) ppCabalFileInfo
         [ "version"      .= ppVersion
         , "github-pings" .= ppGithubPings
         , "users"        .= ppUsers

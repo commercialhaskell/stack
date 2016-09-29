@@ -1102,7 +1102,7 @@ applyCustomSnapshot cs mbp0 = do
         packages0 =
              mbpPackages mbp0 `Map.difference` Map.fromSet (\_ -> ()) dropPackages
     mbp1 <- toMiniBuildPlan cv mempty packageMap
-    return $ MiniBuildPlan
+    return MiniBuildPlan
         { mbpCompilerVersion = cv
         , mbpPackages = Map.union (mbpPackages mbp1) packages0
         }

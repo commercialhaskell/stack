@@ -301,11 +301,11 @@ writePrecompiledCache baseConfigOpts pkgident copts depIDs mghcPkgId exes = do
             Library _ ipid -> liftM Just $ do
                 ipid' <- parseRelFile $ ghcPkgIdString ipid ++ ".conf"
                 relPath <- stackRootRelative $ bcoSnapDB baseConfigOpts </> ipid'
-                return $ toFilePath $ relPath
+                return $ toFilePath relPath
     exes' <- forM (Set.toList exes) $ \exe -> do
         name <- parseRelFile $ T.unpack exe
         relPath <- stackRootRelative $ bcoSnapInstallRoot baseConfigOpts </> bindirSuffix </> name
-        return $ toFilePath $ relPath
+        return $ toFilePath relPath
     $(versionedEncodeFile precompiledCacheVC) file PrecompiledCache
         { pcLibrary = mlibpath
         , pcExes = exes'

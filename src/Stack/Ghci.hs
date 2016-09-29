@@ -180,8 +180,7 @@ ghci opts@GhciOpts{..} = do
 
 writeMacrosFile :: (MonadIO m) => Path Abs Dir -> [GhciPkgInfo] -> m [String]
 writeMacrosFile tmpDirectory packages = do
-  macrosOptions <- preprocessCabalMacros packages macrosFile
-  return macrosOptions
+  preprocessCabalMacros packages macrosFile
   where
     macrosFile = tmpDirectory </> $(mkRelFile "cabal_macros.h")
 
