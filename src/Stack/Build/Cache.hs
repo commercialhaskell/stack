@@ -337,7 +337,7 @@ readPrecompiledCache pkgident copts depIDs = do
         Nothing -> do
             -- Fallback on trying the old binary format.
             oldFile <- getOldFile
-            mpc <- fmap (fmap toAbsPC) $ binaryDecodeFileOrFailDeep oldFile
+            mpc <- fmap toAbsPC <$> binaryDecodeFileOrFailDeep oldFile
             -- Write out file in new format. Keep old file around for
             -- the benefit of older stack versions.
             forM_ mpc ($(versionedEncodeFile precompiledCacheVC) file)

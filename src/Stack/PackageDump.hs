@@ -269,14 +269,12 @@ data PackageDumpException
     deriving Typeable
 instance Exception PackageDumpException
 instance Show PackageDumpException where
-    show (MissingSingleField name values) = unlines $ concat
-        [ return $ concat
-            [ "Expected single value for field name "
-            , show name
-            , " when parsing ghc-pkg dump output:"
-            ]
-        , map (\(k, v) -> "    " ++ show (k, v)) (Map.toList values)
-        ]
+    show (MissingSingleField name values) = unlines $
+      (return $ concat
+        [ "Expected single value for field name "
+        , show name
+        , " when parsing ghc-pkg dump output:"
+        ]) ++ map (\(k, v) -> "    " ++ show (k, v)) (Map.toList values)
     show (Couldn'tParseField name ls) =
         "Couldn't parse the field " ++ show name ++ " from lines: " ++ show ls
 

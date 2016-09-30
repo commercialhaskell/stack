@@ -102,5 +102,4 @@ instance Show StackDockerConfigException where
             , "\nUse an LTS resolver, or set the '"
             , T.unpack dockerImageArgName
             , "' explicitly, in your configuration file."]
-    show (InvalidDatabasePathException ex) =
-        concat ["Invalid database path: ", show ex]
+    show (InvalidDatabasePathException ex) = "Invalid database path: " ++ show ex

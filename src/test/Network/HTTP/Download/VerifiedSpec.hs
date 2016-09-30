@@ -133,7 +133,7 @@ spec = beforeAll setup $ afterAll teardown $ do
 
     -- https://github.com/commercialhaskell/stack/issues/240
     it "can download hackage tarballs" $ \T{..} -> withTempDir' $ \dir -> do
-      dest <- fmap (dir </>) $ parseRelFile "acme-missiles-0.3.tar.gz"
+      dest <- (dir </>) <$> parseRelFile "acme-missiles-0.3.tar.gz"
       let req = parseRequest_ "http://hackage.haskell.org/package/acme-missiles-0.3/acme-missiles-0.3.tar.gz"
       let dReq = DownloadRequest
             { drRequest = req

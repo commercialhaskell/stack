@@ -17,16 +17,14 @@ import System.Info (os)
 
 run' :: FilePath -> [String] -> IO ExitCode
 run' cmd args = do
-    logInfo $ "Running: " ++ cmd ++ " " ++ intercalate " " (map showProcessArgDebug args)
+    logInfo $ "Running: " ++ cmd ++ " " ++ unwords (map showProcessArgDebug args)
     (Nothing, Nothing, Nothing, ph) <- createProcess (proc cmd args)
     waitForProcess ph
 
 run :: FilePath -> [String] -> IO ()
 run cmd args = do
     ec <- run' cmd args
-    if ec == ExitSuccess
-        then return ()
-        else error $ "Exited with exit code: " ++ show ec
+    unless (ec == ExitSuccess) $ error $ "Exited with exit code: " ++ show ec
 
 stack' :: [String] -> IO ExitCode
 stack' args = do
@@ -36,16 +34,12 @@ stack' args = do
 stack :: [String] -> IO ()
 stack args = do
     ec <- stack' args
-    if ec == ExitSuccess
-        then return ()
-        else error $ "Exited with exit code: " ++ show ec
+    unless (ec == ExitSuccess) $ error $ "Exited with exit code: " ++ show ec
 
 stackErr :: [String] -> IO ()
 stackErr args = do
     ec <- stack' args
-    if ec == ExitSuccess
-        then error "stack was supposed to fail, but didn't"
-        else return ()
+    when (ec == ExitSuccess) $ error "stack was supposed to fail, but didn't"
 
 type Repl = ReaderT ReplConnection IO
 
@@ -77,7 +71,7 @@ replGetChar = fmap replStdout ask >>= liftIO . hGetChar
 
 runRepl :: FilePath -> [String] -> ReaderT ReplConnection IO () -> IO ExitCode
 runRepl cmd args actions = do
-    logInfo $ "Running: " ++ cmd ++ " " ++ intercalate " " (map showProcessArgDebug args)
+    logInfo $ "Running: " ++ cmd ++ " " ++ unwords (map showProcessArgDebug args)
     (Just rStdin, Just rStdout, Just rStderr, ph) <-
         createProcess (proc cmd args)
         { std_in = CreatePipe
@@ -88,9 +82,9 @@ runRepl cmd args actions = do
     hSetBuffering rStdout NoBuffering
     hSetBuffering rStderr NoBuffering
 
-    forkIO $ bracket (openFile "/tmp/stderr" WriteMode) hClose
+    forkIO $ withFile "/tmp/stderr" WriteMode
         $ \err -> forever $ catch (hGetChar rStderr >>= hPutChar err)
-                  $ \e -> if isEOFError e then return () else throw e
+                  $ \e -> unless (isEOFError e) $ throw e
 
     runReaderT (nextPrompt >> actions) (ReplConnection rStdin rStdout)
     waitForProcess ph
@@ -99,9 +93,7 @@ repl :: [String] -> Repl () -> IO ()
 repl args action = do
     stack <- getEnv "STACK_EXE"
     ec <- runRepl stack ("repl":args) action
-    if ec == ExitSuccess
-        then return ()
-        else return ()
+    unless (ec == ExitSuccess) $ return ()
         -- TODO: Understand why the exit code is 1 despite running GHCi tests
         -- successfully.
         -- else error $ "Exited with exit code: " ++ show ec
@@ -111,7 +103,7 @@ repl args action = do
 stackCheckStderr :: [String] -> (String -> IO ()) -> IO ()
 stackCheckStderr args check = do
     stack <- getEnv "STACK_EXE"
-    logInfo $ "Running: " ++ stack ++ " " ++ intercalate " " (map showProcessArgDebug args)
+    logInfo $ "Running: " ++ stack ++ " " ++ unwords (map showProcessArgDebug args)
     (ec, _, err) <- readProcessWithExitCode stack args ""
     hPutStr stderr err
     if ec /= ExitSuccess
@@ -156,13 +148,8 @@ fileContentsMatch f1 f2 = do
     doesExist f2
     f1Contents <- readFile f1
     f2Contents <- readFile f2
-    if f1Contents == f2Contents
-          then return ()
-          else error
-                   ("contents do not match for " ++
-                    show f1 ++
-                    " " ++
-                    show f2)
+    unless (f1Contents == f2Contents) $ error
+      "contents do not match for " ++ show f1 ++ " " ++ show f2
 
 logInfo :: String -> IO ()
 logInfo = hPutStrLn stderr

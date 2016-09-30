@@ -230,7 +230,7 @@ spec = do
                     , ((3, 'a'), [(1, 'c')])
                     , ((4, 'a'), [(2, 'a')])
                     ]
-                actual = fmap fst $ pruneDeps fst fst snd bestPrune prunes
+                actual = fst <$> pruneDeps fst fst snd bestPrune prunes
             actual `shouldBe` Map.fromList
                 [ (1, (1, 'b'))
                 , (2, (2, 'a'))
@@ -240,7 +240,7 @@ spec = do
         prop "invariant holds" $ \prunes' ->
             -- Force uniqueness
             let prunes = Map.toList $ Map.fromList prunes'
-             in checkDepsPresent prunes $ fmap fst $ pruneDeps fst fst snd bestPrune prunes
+             in checkDepsPresent prunes $ fst <$> pruneDeps fst fst snd bestPrune prunes
 
 type PruneCheck = ((Int, Char), [(Int, Char)])
 

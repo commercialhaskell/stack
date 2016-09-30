@@ -14,7 +14,7 @@ module Stack.Ghci.Script
   , scriptToFile
   ) where
 
-import           Control.Exception
+import           Control.Applicative
 import           Data.ByteString.Lazy (ByteString)
 import           Data.ByteString.Builder
 import           Data.Monoid
@@ -63,7 +63,7 @@ scriptToBuilder backwardScript = mconcat $ fmap commandToBuilder script
 
 scriptToFile :: Path Abs File -> GhciScript -> IO ()
 scriptToFile path script =
-  bracket (openFile filepath WriteMode) hClose
+  withFile filepath WriteMode
     $ \hdl -> do hSetBuffering hdl (BlockBuffering Nothing)
                  hSetBinaryMode hdl True
                  hPutBuilder hdl (scriptToBuilder script)
@@ -82,8 +82,7 @@ commandToBuilder (Add modules)
   | otherwise      =
        fromText ":add "
     <> (mconcat $ intersperse (fromText " ")
-        $ fmap (stringUtf8 . quoteFileName . mconcat . intersperse "." . components)
-        $ S.toAscList modules)
+        $ (stringUtf8 . quoteFileName . mconcat . intersperse "." . components) <$> S.toAscList modules)
     <> fromText "\n"
 
 commandToBuilder (AddFile path) =
@@ -97,13 +96,9 @@ commandToBuilder (Module modules)
   | otherwise      =
        fromText ":module + "
     <> (mconcat $ intersperse (fromText " ")
-        $ fmap (stringUtf8 . quoteFileName . mconcat . intersperse "." . components)
-        $ S.toAscList modules)
+        $ (stringUtf8 . quoteFileName . mconcat . intersperse "." . components) <$> S.toAscList modules)
     <> fromText "\n"
 
 -- | Make sure that a filename with spaces in it gets the proper quotes.
 quoteFileName :: String -> String
-quoteFileName x =
-    if any (==' ') x
-        then show x
-        else x
+quoteFileName x = if elem ' ' x then show x else x

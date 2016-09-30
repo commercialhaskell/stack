@@ -19,7 +19,6 @@ import           Control.Monad.IO.Class (MonadIO,liftIO)
 import           Control.Monad.Logger (MonadLogger,logDebug)
 import           Control.Monad.Reader (MonadReader,asks)
 import           Control.Monad.Trans.Control (MonadBaseControl)
-import           Data.List (intercalate)
 import           Data.Maybe
 import           Data.Monoid
 import qualified Data.Text as T
@@ -122,7 +121,7 @@ runShellAndExit mprojectRoot getCompilerVersion getCmdArgs = do
                                                 F.</> "nix-gc-symlinks" F.</> "gc-root"] else []
                            ,map T.unpack (nixShellOptions (configNix config))
                            ,nixopts
-                           ,["--run", intercalate " " (cmnd:"$STACK_IN_NIX_EXTRA_ARGS":args)]
+                           ,["--run", unwords (cmnd:"$STACK_IN_NIX_EXTRA_ARGS":args)]
                            ]
                            -- Using --run instead of --command so we cannot
                            -- end up in the nix-shell if stack build is Ctrl-C'd

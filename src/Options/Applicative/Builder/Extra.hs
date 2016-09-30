@@ -93,8 +93,8 @@ enableDisableFlagsNoDefault enabledValue disabledValue name helpSuffix mods =
             mods)) <|>
        flag'
            disabledValue
-           (long (concat ["[no-]", name]) <>
-            help (concat ["Enable/disable ", helpSuffix]) <>
+           (long ("[no-]" ++ name) <>
+            help ("Enable/disable " ++ helpSuffix) <>
             mods))
 
 -- | Show an extra help option (e.g. @--docker-help@ shows help for all @--docker*@ args).

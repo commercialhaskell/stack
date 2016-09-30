@@ -199,7 +199,7 @@ displayTask task = T.pack $ concat
         TTLocal lp -> concat
             [ toFilePath $ lpDir lp
             ]
-        TTUpstream _ _ _ -> "package index"
+        TTUpstream{} -> "package index"
     , if Set.null missing
         then ""
         else ", after: " ++ intercalate "," (map packageIdentifierString $ Set.toList missing)
@@ -262,8 +262,8 @@ getSetupExe setupHs tmpdir = do
             $(mkRelDir "setup-exe-cache") </>
             platformDir
 
-    exePath <- fmap (setupDir </>) $ parseRelFile exeNameS
-    jsExePath <- fmap (setupDir </>) $ parseRelDir jsExeNameS
+    exePath <- (setupDir </>) <$> parseRelFile exeNameS
+    jsExePath <- (setupDir </>) <$> parseRelDir jsExeNameS
 
     exists <- liftIO $ D.doesFileExist $ toFilePath exePath
 
@@ -386,9 +386,7 @@ withExecuteEnv menv bopts boptsCli baseConfigOpts locals globalPackages snapshot
          =$ CL.map stripCR
          =$ CL.filter isWarning
          =$ CL.take 1
-      if (null firstWarning)
-        then return ()
-        else dumpLog " due to warnings" (pkgDir, filepath)
+      unless (null firstWarning) $ dumpLog " due to warnings" (pkgDir, filepath)
 
     isWarning t = ": Warning:" `T.isSuffixOf` t
 
@@ -583,9 +581,7 @@ executePlan' installedMap0 targets plan ee@ExecuteEnv {..} = do
     threads <- asks $ configJobs . getConfig
     concurrentTests <- asks $ configConcurrentTests . getConfig
     let keepGoing =
-            case boptsKeepGoing eeBuildOpts of
-                Just kg -> kg
-                Nothing -> boptsTests eeBuildOpts || boptsBenchmarks eeBuildOpts
+            fromMaybe (boptsTests eeBuildOpts || boptsBenchmarks eeBuildOpts) (boptsKeepGoing eeBuildOpts)
         concurrentFinal =
             -- TODO it probably makes more sense to use a lock for test suites
             -- and just have the execution blocked. Turning off all concurrency
@@ -607,9 +603,7 @@ executePlan' installedMap0 targets plan ee@ExecuteEnv {..} = do
                         check $ done /= prev
                         return done
                     loop done
-        if total > 1
-            then loop 0
-            else return ()
+        when (total > 1) $ loop 0
     when (toCoverage $ boptsTestOpts eeBuildOpts) $ do
         generateHpcUnifiedReport
         generateHpcMarkupIndex
@@ -703,17 +697,12 @@ getConfigCache ExecuteEnv {..} Task {..} installedMap enableTest enableBench = d
             -- 'stack test'. See:
             -- https://github.com/commercialhaskell/stack/issues/805
             case taskType of
-                TTLocal lp -> concat
-                    -- FIXME: make this work with exact-configuration.
-                    -- Not sure how to plumb the info atm. See
-                    -- https://github.com/commercialhaskell/stack/issues/2049
-                    [ [ "--enable-tests"
-                      | enableTest ||
-                        (not useExactConf && depsPresent installedMap (lpTestDeps lp))]
-                    , [ "--enable-benchmarks"
-                      | enableBench ||
-                        (not useExactConf && depsPresent installedMap (lpBenchDeps lp))]
-                    ]
+                TTLocal lp ->
+                  -- FIXME: make this work with exact-configuration.
+                  -- Not sure how to plumb the info atm. See
+                  -- https://github.com/commercialhaskell/stack/issues/2049
+                  [ "--enable-tests" | enableTest || (not useExactConf && depsPresent installedMap (lpTestDeps lp))] ++
+                  [ "--enable-benchmarks" | enableBench || (not useExactConf && depsPresent installedMap (lpBenchDeps lp))]
                 _ -> []
     idMap <- liftIO $ readTVarIO eeGhcPkgIds
     let getMissing ident =
@@ -733,7 +722,7 @@ getConfigCache ExecuteEnv {..} Task {..} installedMap enableTest enableBench = d
             , configCacheComponents =
                 case taskType of
                     TTLocal lp -> Set.map renderComponent $ lpComponents lp
-                    TTUpstream _ _ _ -> Set.empty
+                    TTUpstream{} -> Set.empty
             , configCacheHaddock =
                 shouldHaddockPackage eeBuildOpts eeWanted (packageIdentifierName taskProvides)
             }
@@ -832,7 +821,7 @@ withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} md
     wanted =
         case taskType of
             TTLocal lp -> lpWanted lp
-            TTUpstream _ _ _ -> False
+            TTUpstream{} -> False
 
     console = wanted
            && all (\(ActionId ident _) -> ident == taskProvides) (Set.toList acRemaining)
@@ -894,7 +883,7 @@ withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} md
             -- https://github.com/commercialhaskell/stack/issues/370
             case (packageSimpleType package, eeSetupExe) of
                 (True, Just setupExe) -> return $ Left setupExe
-                _ -> liftIO $ fmap Right $ getSetupHs pkgDir
+                _ -> liftIO $ Right <$> getSetupHs pkgDir
         inner $ \stripTHLoading args -> do
             let cabalPackageArg
                     -- Omit cabal package dependency when building
@@ -1161,7 +1150,7 @@ singleBuild runInBase ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} in
             TTLocal lp -> do
                 when enableTests $ unsetTestSuccess pkgDir
                 writeBuildCache pkgDir $ lpNewBuildCache lp
-            TTUpstream _ _ _ -> return ()
+            TTUpstream{} -> return ()
 
         -- FIXME: only output these if they're in the build plan.
 
@@ -1182,7 +1171,7 @@ singleBuild runInBase ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} in
                       ":" <> line <>
                       indent 4 (mconcat $ intersperse line $ map (goodGreen . fromString . C.display) modules)
                 forM_ mlocalWarnings $ \(cabalfp, warnings) -> do
-                    when (not (null warnings)) $ $prettyWarn $
+                    unless (null warnings) $ $prettyWarn $
                         "The following modules should be added to exposed-modules or other-modules in" <+>
                         display cabalfp <> ":" <> line <>
                         indent 4 (mconcat $ map showModuleWarning warnings) <>
@@ -1282,7 +1271,7 @@ checkForUnlistedFiles (TTLocal lp) preBuildTime pkgDir = do
         writeBuildCache pkgDir $
         Map.unions (lpNewBuildCache lp : addBuildCache)
     return warnings
-checkForUnlistedFiles (TTUpstream _ _ _) _ _ = return []
+checkForUnlistedFiles TTUpstream{} _ _ = return []
 
 -- | Determine if all of the dependencies given are installed
 depsPresent :: InstalledMap -> Map PackageName VersionRange -> Bool
@@ -1531,22 +1520,21 @@ getSetupHs dir = do
 extraBuildOptions :: M env m => BuildOpts -> m [String]
 extraBuildOptions bopts = do
     let ddumpOpts = " -ddump-hi -ddump-to-file"
-    case toCoverage (boptsTestOpts bopts) of
-      True -> do
+    if toCoverage (boptsTestOpts bopts)
+      then do
         hpcIndexDir <- toFilePathNoTrailingSep <$> hpcRelativeDir
         return ["--ghc-options", "-hpcdir " ++ hpcIndexDir ++ ddumpOpts]
-      False -> return ["--ghc-options", ddumpOpts]
+      else
+        return ["--ghc-options", ddumpOpts]
 
 -- Library and executable build components.
 primaryComponentOptions :: LocalPackage -> [String]
-primaryComponentOptions lp = concat
-    [ ["lib:" ++ packageNameString (packageName (lpPackage lp))
+primaryComponentOptions lp = ["lib:" ++ packageNameString (packageName (lpPackage lp))
       -- TODO: get this information from target parsing instead,
       -- which will allow users to turn off library building if
       -- desired
-      | packageHasLibrary (lpPackage lp)]
-    , map (T.unpack . T.append "exe:") $ Set.toList $ exesToBuild lp
-    ]
+      | packageHasLibrary (lpPackage lp)] ++
+      (map (T.unpack . T.append "exe:") $ Set.toList $ exesToBuild lp)
 
 exesToBuild :: LocalPackage -> Set Text
 exesToBuild lp = packageExes (lpPackage lp)

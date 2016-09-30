@@ -558,7 +558,7 @@ getGhcBuild menv = do
                         if noPie
                             then ["nopie"]
                             else []
-                case concat [libComponents, pieComponents] of
+                case libComponents ++ pieComponents of
                     [] -> useBuild CompilerBuildStandard
                     components -> useBuild (CompilerBuildSpecialized (intercalate "-" components))
             _ -> useBuild CompilerBuildStandard

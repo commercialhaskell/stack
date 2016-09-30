@@ -11,6 +11,7 @@ module Stack.Build.Installed
     , getInstalled
     ) where
 
+import           Control.Arrow
 import           Control.Applicative
 import           Control.Monad
 import           Control.Monad.Catch (MonadMask)
@@ -167,7 +168,7 @@ loadDatabase menv opts mcache sourceMap mdb lhs0 = do
     mloc = fmap fst mdb
     sinkDP = conduitProfilingCache
           =$ conduitHaddockCache
-          =$ CL.map (\dp -> (isAllowed opts mcache sourceMap mloc dp, toLoadHelper mloc dp))
+          =$ CL.map (isAllowed opts mcache sourceMap mloc &&& toLoadHelper mloc)
           =$ CL.consume
     sink = getZipSink $ (,)
         <$> ZipSink sinkDP

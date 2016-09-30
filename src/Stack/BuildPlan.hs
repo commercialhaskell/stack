@@ -165,10 +165,7 @@ instance Show BuildPlanException where
                 , ["Note: further dependencies may need to be added"]
                 ]
           where
-            go (dep, users) | Set.null users = concat
-                [ packageNameString dep
-                , " (internal stack error: this should never be null)"
-                ]
+            go (dep, users) | Set.null users = packageNameString dep ++ " (internal stack error: this should never be null)"
             go (dep, users) = concat
                 [ packageNameString dep
                 , " (used by "
@@ -457,7 +454,7 @@ loadMiniBuildPlan name = do
         toMiniBuildPlan
             (siCompilerVersion $ bpSystemInfo bp)
             (siCorePackages $ bpSystemInfo bp)
-            (fmap goPP $ bpPackages bp)
+            (goPP <$> bpPackages bp)
   where
     goPP pp =
         ( ppVersion pp
@@ -691,7 +688,7 @@ checkBundleBuildPlan platform compiler pool flags gpds =
             selectPackageBuildPlan platform compiler pool' gpd
         pkgPlan (Just f) gpd =
             checkPackageBuildPlan platform compiler pool' (flags' f gpd) gpd
-        flags' f gpd = maybe Map.empty id (Map.lookup (gpdPackageName gpd) f)
+        flags' f gpd = fromMaybe Map.empty (Map.lookup (gpdPackageName gpd) f)
         pool' = Map.union (gpdPackages gpds) pool
 
         dupError _ _ = error "Bug: Duplicate packages are not expected here"
@@ -738,7 +735,7 @@ checkSnapBuildPlan gpds flags snap = do
 
     let
         compiler = mbpCompilerVersion mbp
-        snapPkgs = fmap mpiVersion $ mbpPackages mbp
+        snapPkgs = mpiVersion <$> mbpPackages mbp
         (f, errs) = checkBundleBuildPlan platform compiler snapPkgs flags gpds
         cerrs = compilerErrors compiler errs
 

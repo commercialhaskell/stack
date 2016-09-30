@@ -2,6 +2,7 @@ import StackTest
 import System.Directory
 import System.FilePath
 
+{-# ANN module "HLint: ignore Use unless" #-}
 main :: IO ()
 main =
     if isWindows
