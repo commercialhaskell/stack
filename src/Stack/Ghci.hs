@@ -26,8 +26,9 @@ import           Control.Monad hiding (forM)
 import           Control.Monad.Catch
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
-import           Control.Monad.State.Strict (State, execState, get, modify)
 import           Control.Monad.Reader (MonadReader, asks)
+import           Control.Monad.State.Strict (State, execState, get, modify)
+import           Control.Monad.Trans.Control
 import           Control.Monad.Trans.Unlift (MonadBaseUnlift)
 import qualified Data.ByteString.Char8 as S8
 import           Data.Either
@@ -41,9 +42,9 @@ import           Data.Maybe.Extra (forMaybeM)
 import           Data.Monoid
 import           Data.Set (Set)
 import qualified Data.Set as S
-import           Data.Traversable (forM)
 import           Data.Text (Text)
 import qualified Data.Text as T
+import           Data.Traversable (forM)
 import           Data.Typeable (Typeable)
 import           Distribution.PackageDescription (updatePackageDescription)
 import           Distribution.Text (display)
@@ -60,13 +61,13 @@ import           Stack.Constants
 import           Stack.Exec
 import           Stack.Ghci.Script
 import           Stack.Package
+import           Stack.Types.Build
+import           Stack.Types.Compiler
+import           Stack.Types.Config
+import           Stack.Types.Internal
+import           Stack.Types.Package
 import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageName
-import           Stack.Types.Config
-import           Stack.Types.Build
-import           Stack.Types.Package
-import           Stack.Types.Compiler
-import           Stack.Types.Internal
 import           Text.Read (readMaybe)
 
 #ifndef WINDOWS
@@ -396,7 +397,7 @@ ghciSetup GhciOpts{..} = do
 
 -- | Make information necessary to load the given package in GHCi.
 makeGhciPkgInfo
-    :: (MonadReader r m, HasEnvConfig r, MonadLogger m, MonadIO m, MonadCatch m)
+    :: (MonadReader r m, HasEnvConfig r, HasTerminal r, MonadLogger m, MonadIO m, MonadCatch m, MonadBaseControl IO m)
     => BuildOptsCLI
     -> SourceMap
     -> InstalledMap

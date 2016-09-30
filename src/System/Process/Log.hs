@@ -9,8 +9,8 @@ module System.Process.Log
     ,showProcessArgDebug)
     where
 
-import           Control.Monad.Logger
 import           Control.Monad.IO.Class
+import           Control.Monad.Logger
 import           Data.Monoid
 import           Data.Text (Text)
 import qualified Data.Text as T
@@ -48,15 +48,20 @@ withProcessTimeLog =
               x <- proc
               end <- liftIO $ Clock.getTime Clock.Monotonic
               let diff = Clock.diffTimeSpec start end
+              -- useAnsi <- asks getAnsiTerminal
+              let useAnsi = True
               $logDebug
-                  ("Process finished in " <> timeSpecMilliSecondText diff <>
+                  ("Process finished in " <>
+                  (if useAnsi then "\ESC[92m" else "") <> -- green
+                  timeSpecMilliSecondText diff <>
+                  (if useAnsi then "\ESC[0m" else "") <> -- reset
                    ": " <> cmdText)
               return x
       in f|]
 
 timeSpecMilliSecondText :: Clock.TimeSpec -> Text
 timeSpecMilliSecondText t =
-    (T.pack . show . (`div` 10^(6 :: Int)) . Clock.toNanoSecs) t <> " ms"
+    (T.pack . show . (`div` 10^(6 :: Int)) . Clock.toNanoSecs) t <> "ms"
 
 -- | Show a process arg including speechmarks when necessary. Just for
 -- debugging purposes, not functionally important.

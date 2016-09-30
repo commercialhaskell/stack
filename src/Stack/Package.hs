@@ -40,8 +40,8 @@ module Stack.Package
   ,cabalFilePackageId)
   where
 
-import Prelude ()
-import Prelude.Compat
+import           Prelude ()
+import           Prelude.Compat
 
 import           Control.Arrow ((&&&))
 import           Control.Exception hiding (try,catch)
@@ -78,7 +78,7 @@ import qualified Distribution.PackageDescription.Parse as D
 import           Distribution.ParseUtils
 import           Distribution.Simple.Utils
 import           Distribution.System (OS (..), Arch, Platform (..))
-import           Distribution.Text (display, simpleParse)
+import qualified Distribution.Text as D
 import qualified Distribution.Verbosity as D
 import qualified Hpack
 import qualified Hpack.Config as Hpack
@@ -89,15 +89,16 @@ import           Path.IO hiding (findFiles)
 import           Safe (headDef, tailSafe)
 import           Stack.Build.Installed
 import           Stack.Constants
+import           Stack.PrettyPrint
+import           Stack.Types.Build
+import           Stack.Types.Compiler
+import           Stack.Types.Config
 import           Stack.Types.FlagName
 import           Stack.Types.GhcPkgId
+import           Stack.Types.Package
 import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageName
 import           Stack.Types.Version
-import           Stack.Types.Config
-import           Stack.Types.Build
-import           Stack.Types.Package
-import           Stack.Types.Compiler
 import qualified System.Directory as D
 import           System.FilePath (splitExtensions, replaceExtension)
 import qualified System.FilePath as FilePath
@@ -178,10 +179,10 @@ printCabalFileWarning cabalfp =
                 ("Cabal file warning in " <> T.pack (toFilePath cabalfp) <>
                  ": " <>
                  T.pack x)
-        (UTFWarning line msg) ->
+        (UTFWarning ln msg) ->
             $logWarn
                 ("Cabal file warning in " <> T.pack (toFilePath cabalfp) <> ":" <>
-                 T.pack (show line) <>
+                 T.pack (show ln) <>
                  ": " <>
                  T.pack msg)
 
@@ -246,28 +247,28 @@ packageFromPackageDescription packageConfig gpkg pkg =
     }
   where
     pkgFiles = GetPackageFiles $
-        \cabalfp ->
-             do let pkgDir = parent cabalfp
-                distDir <- distDirFromDir pkgDir
-                (componentModules,componentFiles,dataFiles',warnings) <-
-                    runReaderT
-                        (packageDescModulesAndFiles pkg)
-                        (cabalfp, buildDir distDir)
-                setupFiles <-
-                    if buildType pkg `elem` [Nothing, Just Custom]
-                    then do
-                        let setupHsPath = pkgDir </> $(mkRelFile "Setup.hs")
-                            setupLhsPath = pkgDir </> $(mkRelFile "Setup.lhs")
-                        setupHsExists <- doesFileExist setupHsPath
-                        if setupHsExists then return (S.singleton setupHsPath) else do
-                            setupLhsExists <- doesFileExist setupLhsPath
-                            if setupLhsExists then return (S.singleton setupLhsPath) else return S.empty
-                    else return S.empty
-                buildFiles <- liftM (S.insert cabalfp . S.union setupFiles) $ do
-                    let hpackPath = pkgDir </> $(mkRelFile Hpack.packageConfig)
-                    hpackExists <- doesFileExist hpackPath
-                    return $ if hpackExists then S.singleton hpackPath else S.empty
-                return (componentModules, componentFiles, buildFiles <> dataFiles', warnings)
+        \cabalfp -> $debugBracket ("getPackageFiles" <+> display cabalfp) $ do
+             let pkgDir = parent cabalfp
+             distDir <- distDirFromDir pkgDir
+             (componentModules,componentFiles,dataFiles',warnings) <-
+                 runReaderT
+                     (packageDescModulesAndFiles pkg)
+                     (cabalfp, buildDir distDir)
+             setupFiles <-
+                 if buildType pkg `elem` [Nothing, Just Custom]
+                 then do
+                     let setupHsPath = pkgDir </> $(mkRelFile "Setup.hs")
+                         setupLhsPath = pkgDir </> $(mkRelFile "Setup.lhs")
+                     setupHsExists <- doesFileExist setupHsPath
+                     if setupHsExists then return (S.singleton setupHsPath) else do
+                         setupLhsExists <- doesFileExist setupLhsPath
+                         if setupLhsExists then return (S.singleton setupLhsPath) else return S.empty
+                 else return S.empty
+             buildFiles <- liftM (S.insert cabalfp . S.union setupFiles) $ do
+                 let hpackPath = pkgDir </> $(mkRelFile Hpack.packageConfig)
+                 hpackExists <- doesFileExist hpackPath
+                 return $ if hpackExists then S.singleton hpackPath else S.empty
+             return (componentModules, componentFiles, buildFiles <> dataFiles', warnings)
     pkgId = package pkg
     name = fromCabalPackageName (pkgName pkgId)
     deps = M.filterWithKey (const . (/= name)) (packageDependencies pkg)
@@ -397,7 +398,7 @@ generateBuildInfoOpts BioInput {..} =
       where
         isGhc GHC = True
         isGhc _ = False
-    extOpts = map (("-X" ++) . display) (usedExtensions biBuildInfo)
+    extOpts = map (("-X" ++) . D.display) (usedExtensions biBuildInfo)
     srcOpts =
         map
             (("-i" <>) . toFilePathNoTrailingSep)
@@ -993,7 +994,7 @@ parseDumpHI dumpHIPath = do
             dropWhile (not . ("module dependencies:" `C8.isPrefixOf`)) dumpHI
         moduleDeps =
             S.fromList $
-            mapMaybe (simpleParse . T.unpack . decodeUtf8) $
+            mapMaybe (D.simpleParse . T.unpack . decodeUtf8) $
             C8.words $
             C8.concat $
             C8.dropWhile (/= ' ') (headDef "" startModuleDeps) :
@@ -1042,7 +1043,7 @@ findCandidate dirs exts name = do
         [] -> do
             case name of
                 DotCabalModule mn
-                  | display mn /= paths_pkg pkg -> logPossibilities dirs mn
+                  | D.display mn /= paths_pkg pkg -> logPossibilities dirs mn
                 _ -> return ()
             return Nothing
         (candidate:rest) -> do
@@ -1094,7 +1095,7 @@ warnMultiple name candidate rest =
          T.intercalate "," (map (T.pack . toFilePath) rest) <>
          "), picking " <>
          T.pack (toFilePath candidate))
-  where showName (DotCabalModule name') = T.pack (display name')
+  where showName (DotCabalModule name') = T.pack (D.display name')
         showName (DotCabalMain fp) = T.pack fp
         showName (DotCabalFile fp) = T.pack fp
         showName (DotCabalCFile fp) = T.pack fp
@@ -1114,7 +1115,7 @@ logPossibilities dirs mn = do
         _ ->
             $logWarn
                 ("Unable to find a known candidate for the Cabal entry \"" <>
-                 T.pack (display mn) <>
+                 T.pack (D.display mn) <>
                  "\", but did find: " <>
                  T.intercalate ", " (map (T.pack . toFilePath) possibilities) <>
                  ". If you are using a custom preprocessor for this module " <>
@@ -1129,7 +1130,7 @@ logPossibilities dirs mn = do
                          (map
                               filename
                               (filter
-                                   (isPrefixOf (display name) .
+                                   (isPrefixOf (D.display name) .
                                     toFilePath . filename)
                                    files)))
             dirs

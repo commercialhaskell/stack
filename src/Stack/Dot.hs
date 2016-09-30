@@ -45,7 +45,7 @@ import           Stack.Types.Version
 import           Stack.Types.Config
 import           Stack.Types.Build
 import           Stack.Types.Package
-import           Stack.Types.Internal (HasLogLevel)
+import           Stack.Types.Internal (HasLogLevel, HasTerminal)
 
 -- | Options record for @stack dot@
 data DotOpts = DotOpts
@@ -72,6 +72,7 @@ data ListDepsOpts = ListDepsOpts
 dot :: (HasEnvConfig env
        ,HasHttpManager env
        ,HasLogLevel env
+       ,HasTerminal env
        ,MonadBaseUnlift IO m
        ,MonadLogger m
        ,MonadIO m
@@ -98,6 +99,7 @@ data DotPayload = DotPayload
 createPrunedDependencyGraph :: (HasEnvConfig env
                                ,HasHttpManager env
                                ,HasLogLevel env
+                               ,HasTerminal env
                                ,MonadLogger m
                                ,MonadBaseUnlift IO m
                                ,MonadIO m
@@ -122,6 +124,7 @@ createPrunedDependencyGraph dotOpts = do
 createDependencyGraph :: (HasEnvConfig env
                          ,HasHttpManager env
                          ,HasLogLevel env
+                         ,HasTerminal env
                          ,MonadLogger m
                          ,MonadBaseUnlift IO m
                          ,MonadIO m
@@ -154,6 +157,7 @@ createDependencyGraph dotOpts = do
 listDependencies :: (HasEnvConfig env
                     ,HasHttpManager env
                     ,HasLogLevel env
+                    ,HasTerminal env
                     ,MonadBaseUnlift IO m
                     ,MonadLogger m
                     ,MonadMask m

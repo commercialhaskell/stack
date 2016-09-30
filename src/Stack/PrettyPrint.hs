@@ -2,6 +2,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module Stack.PrettyPrint
     (
@@ -9,11 +10,13 @@ module Stack.PrettyPrint
       displayPlain, displayAnsiIfPossible
       -- * Logging based on pretty-print typeclass
     , prettyDebug, prettyInfo, prettyWarn, prettyError
+    , debugBracket
       -- * Color utils
       -- | These are preferred to colors directly, so that we can
       -- encourage consistency of color meanings.
     , errorRed, goodGreen, shellMagenta
     , displayTargetPkgId, displayCurrentPkgId, displayErrorPkgId
+    , displayMilliseconds
       -- * Re-exports from "Text.PrettyPrint.Leijen.Extended"
     , Display(..), AnsiDoc, AnsiAnn(..), HasAnsiAnn(..), Doc
     , nest, line, linebreak, group, softline, softbreak
@@ -24,6 +27,7 @@ module Stack.PrettyPrint
     , enclose, squotes, dquotes, parens, angles, braces, brackets
     ) where
 
+import           Control.Exception.Lifted
 import           Control.Monad.Logger
 import           Control.Monad.Reader
 import           Data.Monoid
@@ -35,6 +39,7 @@ import           Stack.Types.Internal
 import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageName
 import           Stack.Types.Version
+import qualified System.Clock as Clock
 import           Text.PrettyPrint.Leijen.Extended
 
 displayAnsiIfPossible
@@ -65,6 +70,26 @@ prettyError :: Q Exp
 prettyError = do
     loc <- location
     [e| monadLoggerLog loc "" LevelError <=< displayAnsiIfPossible . (line <>) . (errorRed "Error:" <+>) |]
+
+debugBracket :: Q Exp
+debugBracket = do
+    loc <- location
+    [e| \msg f -> do
+            let output = monadLoggerLog loc "" LevelDebug <=< displayAnsiIfPossible
+            output $ "Start: " <> msg
+            start <- liftIO $ Clock.getTime Clock.Monotonic
+            x <- f `catch` \ex -> do
+                end <- liftIO $ Clock.getTime Clock.Monotonic
+                let diff = Clock.diffTimeSpec start end
+                output $ "Finished with exception in" <+> displayMilliseconds diff <> ":" <+>
+                    msg <> line <>
+                    "Exception thrown: " <> fromString (show ex)
+                throw (ex :: SomeException)
+            end <- liftIO $ Clock.getTime Clock.Monotonic
+            let diff = Clock.diffTimeSpec start end
+            output $ "Finished in" <+> displayMilliseconds diff <> ":" <+> msg
+            return x
+      |]
 
 errorRed :: AnsiDoc -> AnsiDoc
 errorRed = dullred
@@ -101,3 +126,8 @@ instance Display (Path b File) where
 
 instance Display (Path b Dir) where
     display = bold . blue . fromString . toFilePath
+
+-- Display milliseconds.
+displayMilliseconds :: Clock.TimeSpec -> AnsiDoc
+displayMilliseconds t = goodGreen $
+    (fromString . show . (`div` 10^(6 :: Int)) . Clock.toNanoSecs) t <> "ms"

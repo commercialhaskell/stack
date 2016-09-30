@@ -3,10 +3,8 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RankNTypes #-}
-
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE DataKinds #-}
--- |
-
 module Stack.Types.Package where
 
 import           Control.DeepSeq
@@ -15,6 +13,7 @@ import           Control.Monad.Catch
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger (MonadLogger)
 import           Control.Monad.Reader
+import           Control.Monad.Trans.Control
 import qualified Data.ByteString as S
 import           Data.Data
 import           Data.Function
@@ -46,6 +45,7 @@ import           Stack.Types.Compiler
 import           Stack.Types.Config
 import           Stack.Types.FlagName
 import           Stack.Types.GhcPkgId
+import           Stack.Types.Internal (HasTerminal)
 import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageName
 import           Stack.Types.Version
@@ -116,7 +116,7 @@ packageDefinedFlags = M.keysSet . packageDefaultFlags
 -- | Files that the package depends on, relative to package directory.
 -- Argument is the location of the .cabal file
 newtype GetPackageOpts = GetPackageOpts
-    { getPackageOpts :: forall env m. (MonadIO m,HasEnvConfig env, HasPlatform env, MonadThrow m, MonadReader env m, MonadLogger m, MonadCatch m)
+    { getPackageOpts :: forall env m. (MonadIO m,HasEnvConfig env, HasPlatform env, MonadThrow m, MonadReader env m, MonadLogger m, MonadCatch m, HasTerminal env, MonadBaseControl IO m)
                      => SourceMap
                      -> InstalledMap
                      -> [PackageName]
@@ -148,7 +148,7 @@ data CabalFileType
 -- | Files that the package depends on, relative to package directory.
 -- Argument is the location of the .cabal file
 newtype GetPackageFiles = GetPackageFiles
-    { getPackageFiles :: forall m env. (MonadIO m, MonadLogger m, MonadThrow m, MonadCatch m, MonadReader env m, HasPlatform env, HasEnvConfig env)
+    { getPackageFiles :: forall m env. (MonadIO m, MonadLogger m, MonadThrow m, MonadCatch m, MonadReader env m, HasPlatform env, HasEnvConfig env, HasTerminal env, MonadBaseControl IO m)
                       => Path Abs File
                       -> m (Map NamedComponent (Set ModuleName)
                            ,Map NamedComponent (Set DotCabalPath)
