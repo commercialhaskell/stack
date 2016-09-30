@@ -68,6 +68,7 @@ data PackageInfo
     = PIOnlyInstalled InstallLocation Installed
     | PIOnlySource PackageSource
     | PIBoth PackageSource Installed
+    deriving (Show)
 
 combineSourceInstalled :: PackageSource
                        -> (InstallLocation, Installed)
@@ -192,6 +193,7 @@ constructPlan mbp0 baseConfigOpts0 locals extraToBuild0 localDumpPkgs loadPackag
                         else Map.empty
                 }
         else do
+            planDebug $ show errs
             $prettyError $ pprintExceptions errs (bcStackYaml (getBuildConfig econfig)) parents (wantedLocalPackages locals)
             throwM $ ConstructPlanFailed "Plan construction failed."
   where
@@ -277,12 +279,18 @@ addDep treatAsDep' name = do
     when treatAsDep $ markAsDep name
     m <- get
     case Map.lookup name m of
-        Just res -> return res
+        Just res -> do
+            planDebug $ "addDep: Using cached result for " ++ show name ++ ": " ++ show res
+            return res
         Nothing -> do
             res <- if name `elem` callStack ctx
-                then return $ Left $ DependencyCycleDetected $ name : callStack ctx
-                else local (\ctx' -> ctx' { callStack = name : callStack ctx' }) $
-                    case Map.lookup name $ combinedMap ctx of
+                then do
+                    planDebug $ "addDep: Detected cycle " ++ show name ++ ": " ++ show (callStack ctx)
+                    return $ Left $ DependencyCycleDetected $ name : callStack ctx
+                else local (\ctx' -> ctx' { callStack = name : callStack ctx' }) $ do
+                    let mpackageInfo = Map.lookup name $ combinedMap ctx
+                    planDebug $ "addDep: Package info for " ++ show name ++ ": " ++ show mpackageInfo
+                    case mpackageInfo of
                         -- TODO look up in the package index and see if there's a
                         -- recommendation available
                         Nothing -> return $ Left $ UnknownPackage name
@@ -296,7 +304,7 @@ addDep treatAsDep' name = do
                         Just (PIBoth ps installed) -> do
                             tellExecutables name ps
                             installPackage treatAsDep name ps (Just installed)
-            modify $ Map.insert name res
+            updateLibMap name res
             return res
 
 tellExecutables :: PackageName -> PackageSource -> M ()
@@ -373,6 +381,7 @@ installPackage treatAsDep name ps minstalled = do
                             -- Reset the state to how it was before
                             -- attempting to find an all-in-one build
                             -- plan.
+                            planDebug $ "installPackage: Before trying cyclic plan, resetting lib result map to " ++ show s
                             put s
                             -- Otherwise, fall back on building the
                             -- tests / benchmarks in a separate step.
@@ -380,7 +389,7 @@ installPackage treatAsDep name ps minstalled = do
                             when (isRight res') $ do
                                 -- Insert it into the map so that it's
                                 -- available for addFinal.
-                                modify $ Map.insert name res'
+                                updateLibMap name res'
                                 addFinal lp tb False
                             return res'
 
@@ -441,6 +450,14 @@ installPackageGivenDeps isAllInOne ps package minstalled (missing, present, minL
                     PSUpstream _ loc _ _ sha -> TTUpstream package (loc <> minLoc) sha
             , taskAllInOne = isAllInOne
             }
+
+-- Update response in the lib map. If it is an error, and there's
+-- already an error about cyclic dependencies, prefer the cyclic error.
+updateLibMap :: PackageName -> Either ConstructPlanException AddDepRes -> M ()
+updateLibMap name val = modify $ \mp ->
+    case (M.lookup name mp, val) of
+        (Just (Left DependencyCycleDetected{}), Left _) -> mp
+        _ -> M.insert name val mp
 
 addEllipsis :: Text -> Text
 addEllipsis t
@@ -725,7 +742,7 @@ data ConstructPlanException
     | DependencyPlanFailures Package (Map PackageName (VersionRange, LatestApplicableVersion, BadDependency))
     | UnknownPackage PackageName -- TODO perhaps this constructor will be removed, and BadDependency will handle it all
     -- ^ Recommend adding to extra-deps, give a helpful version number?
-    deriving (Typeable, Eq)
+    deriving (Typeable, Eq, Show)
 
 -- | For display purposes only, Nothing if package not found
 type LatestApplicableVersion = Maybe Version
@@ -735,7 +752,7 @@ data BadDependency
     = NotInBuildPlan
     | Couldn'tResolveItsDependencies Version
     | DependencyMismatch Version
-    deriving (Typeable, Eq)
+    deriving (Typeable, Eq, Show)
 
 -- TODO: Consider intersecting version ranges for multiple deps on a
 -- package.  This is why VersionRange is in the parent map.
@@ -747,7 +764,6 @@ pprintExceptions
     -> Set PackageName
     -> AnsiDoc
 pprintExceptions exceptions stackYaml parentMap wanted =
-    line <>
     "While constructing the build plan, the following exceptions were encountered:" <> line <> line <>
     mconcat (intersperse (line <> line) (mapMaybe pprintException exceptions')) <> line <>
     if Map.null extras then "" else
@@ -774,9 +790,9 @@ pprintExceptions exceptions stackYaml parentMap wanted =
     pprintExtra (name, version) =
       fromString (concat ["- ", packageNameString name, "-", versionString version])
 
-    pprintException (DependencyCycleDetected pNames) = Just $ errorRed $
+    pprintException (DependencyCycleDetected pNames) = Just $
         "Dependency cycle detected in packages:" <> line <>
-        indent 4 (encloseSep "[" "]" "," (map (fromString . packageNameString) pNames))
+        indent 4 (encloseSep "[" "]" "," (map (errorRed . fromString . packageNameString) pNames))
     pprintException (DependencyPlanFailures pkg (Map.toList -> pDeps)) =
         case mapMaybe pprintDep pDeps of
             [] -> Nothing
@@ -819,8 +835,7 @@ pprintExceptions exceptions stackYaml parentMap wanted =
         -- I think the main useful info is these explain why missing
         -- packages are needed. Instead lets give the user the shortest
         -- path from a target to the package.
-        Couldn'tResolveItsDependencies _version ->
-            Nothing
+        Couldn'tResolveItsDependencies _version -> Nothing
       where
         goodRange = goodGreen (fromString (Cabal.display range))
         latestApplicable mversion =
@@ -901,3 +916,7 @@ newtype MonoidMap k a = MonoidMap (Map k a)
 instance (Ord k, Monoid a) => Monoid (MonoidMap k a) where
     mappend (MonoidMap mp1) (MonoidMap mp2) = MonoidMap (M.unionWith mappend mp1 mp2)
     mempty = MonoidMap mempty
+
+-- Switch this to 'True' to enable some debugging putStrLn in this module
+planDebug :: MonadIO m => String -> m ()
+planDebug = if False then liftIO . putStrLn else \_ -> return ()
