@@ -62,18 +62,16 @@ such.
 
 ## Mac OS X
 
-### Using Homebrew
 
-If you have the popular [brew](http://brew.sh/) tool installed, you can just do:
+We generally test on the current version of Mac OS X, but Stack is known to work
+on El Capitan, Yosemite and Mavericks as well, and may also work on older
+versions (YMMV).
 
-    brew install haskell-stack
-
-* The Homebrew formula and bottles are **unofficial** and lag slightly behind new Stack releases,
-but tend to be updated within a day or two.
-* Normally, Homebrew will install from a pre-built binary (aka "pour from a
-bottle"), but if `brew` starts trying to build everything from source (which
-will take hours), see
-[their FAQ on the topic](https://github.com/Homebrew/homebrew/blob/master/share/doc/homebrew/FAQ.md#why-do-you-compile-everything).
+**macOS Sierra warning**: There are new limitations in the dynamic linker that
+are causing problems for GHC when building projects with many
+dependencies. See
+[#2577](https://github.com/commercialhaskell/stack/issues/2577) for more
+information.
 
 ### Manual download
 
@@ -83,8 +81,21 @@ will take hours), see
   [Path section below](#path))
 * Now you can run `stack` from the terminal.
 
-We generally test on the current version of Mac OS X, but stack is known to work on
-Yosemite and Mavericks as well, and may also work on older versions (YMMV).
+### Using Homebrew
+
+**macOS Sierra warning**: Homebrew's haskell-stack formula may not currently
+work on Sierra, so we suggest using the manual above for now.
+
+If you have a popular [brew](http://brew.sh/) tool installed, you can just do:
+
+    brew install haskell-stack
+
+* The Homebrew formula and bottles are **unofficial** and lag slightly behind new Stack releases,
+but tend to be updated within a day or two.
+* Normally, Homebrew will install from a pre-built binary (aka "pour from a
+bottle"), but if `brew` starts trying to build everything from source (which
+will take hours), see
+[their FAQ on the topic](https://github.com/Homebrew/homebrew/blob/master/share/doc/homebrew/FAQ.md#why-do-you-compile-everything).
 
 ### Notes
 
@@ -219,7 +230,7 @@ releases by ten days or more.
 
       * SUSE Linux Enterprise 12
 
-            sudo zypper ar http://download.opensuse.org/repositories/devel:/languages:/haskell/SLE_12/devel:languages:haskell.repo 
+            sudo zypper ar http://download.opensuse.org/repositories/devel:/languages:/haskell/SLE_12/devel:languages:haskell.repo
 
  2. Install:
 
