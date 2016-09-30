@@ -28,6 +28,8 @@ Other enhancements:
 * Make `stack list-dependencies` understand all of the `stack dot` options too.
 * Add the ability for `stack list-dependencies` to list dependency licenses by
   passing the `--license` flag.
+* Dump logs that contain warnings for any local non-dependency packages
+  [#2545](https://github.com/commercialhaskell/stack/issues/2545)
 * Add the `dump-logs` config option and `--dump-logs` command line
   option to get full build output on the
   console. [#426](https://github.com/commercialhaskell/stack/issues/426)

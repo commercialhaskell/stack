@@ -599,16 +599,17 @@ same name. See the [build command docs](build_command.md) and the
 
 ### dump-logs
 
-(Since XXX)
+(Since UNRELEASED)
 
-Tell Stack to print the log output from all local non-dependency
-packages to the console. By default, Stack will only do this when
-building a single target package, to avoid generating unnecessarily
-verbose output. This can be useful when you want to see warnings from
-all of your packages.
+Control which log output from local non-dependency packages to print to the
+console. By default, Stack will only do this when building a single target
+package or if the log contains warnings, to avoid generating unnecessarily
+verbose output.
 
 ```yaml
-dump-logs: true
+dump-logs: none      # don't dump logs even if they contain warnings
+dump-logs: warning   # default: dump logs that contain warnings
+dump-logs: all       # dump all logs for local non-dependency packages
 ```
 
 ### templates

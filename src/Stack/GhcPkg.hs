@@ -33,6 +33,7 @@ import           Data.Maybe
 import           Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
+import           Data.Text.Extra (stripCR)
 import           Path (Path, Abs, Dir, toFilePath, parent)
 import           Path.Extra (toFilePathNoTrailingSep)
 import           Path.IO
@@ -127,8 +128,6 @@ findGhcPkgField menv wc pkgDbs name field = do
             Left{} -> Nothing
             Right lbs ->
                 fmap (stripCR . T.decodeUtf8) $ listToMaybe $ S8.lines lbs
-  where
-    stripCR t = fromMaybe t (T.stripSuffix "\r" t)
 
 -- | Get the version of the package
 findGhcPkgVersion :: (MonadIO m, MonadLogger m, MonadBaseControl IO m, MonadCatch m)

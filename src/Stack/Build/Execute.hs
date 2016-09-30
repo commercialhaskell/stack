@@ -56,6 +56,7 @@ import           Data.String
 import           Data.Text (Text)
 import qualified Data.Text as T
 import           Data.Text.Encoding (decodeUtf8)
+import           Data.Text.Extra (stripCR)
 import           Data.Time.Clock (getCurrentTime)
 import           Data.Traversable (forM)
 import           Data.Tuple
@@ -227,7 +228,7 @@ data ExecuteEnv = ExecuteEnv
     , eeGlobalDumpPkgs :: !(Map GhcPkgId (DumpPackage () ()))
     , eeSnapshotDumpPkgs :: !(TVar (Map GhcPkgId (DumpPackage () ())))
     , eeLocalDumpPkgs  :: !(TVar (Map GhcPkgId (DumpPackage () ())))
-    , eeLogFiles       :: !(TChan (Path Abs File))
+    , eeLogFiles       :: !(TChan (Path Abs Dir, Path Abs File))
     }
 
 -- | Get a compiled Setup exe
@@ -350,21 +351,24 @@ withExecuteEnv menv bopts boptsCli baseConfigOpts locals globalPackages snapshot
     toDumpPackagesByGhcPkgId = Map.fromList . map (\dp -> (dpGhcPkgId dp, dp))
 
     dumpLogs chan totalWanted = do
-        allLogs <- liftIO $ atomically drainChan
+        allLogs <- fmap reverse $ liftIO $ atomically drainChan
         case allLogs of
             -- No log files generated, nothing to dump
             [] -> return ()
             firstLog:_ -> do
                 toDump <- asks (configDumpLogs . getConfig)
-                when toDump $ mapM_ dumpLog allLogs
-
-                when (not toDump && totalWanted > 1) $ $logInfo $ T.concat
-                    [ "Build output has been captured to log files, use "
-                    , "--dump-logs to see it on the console"
-                    ]
-
+                case toDump of
+                    DumpAllLogs -> mapM_ (dumpLog "") allLogs
+                    DumpWarningLogs -> mapM_ dumpLogIfWarning allLogs
+                    DumpNoLogs
+                        | totalWanted > 1 ->
+                            $logInfo $ T.concat
+                                [ "Build output has been captured to log files, use "
+                                , "--dump-logs to see it on the console"
+                                ]
+                        | otherwise -> return ()
                 $logInfo $ T.pack $ "Log files have been written to: "
-                        ++ toFilePath (parent firstLog)
+                        ++ toFilePath (parent (snd firstLog))
       where
         drainChan = do
             mx <- tryReadTChan chan
@@ -374,14 +378,28 @@ withExecuteEnv menv bopts boptsCli baseConfigOpts locals globalPackages snapshot
                     xs <- drainChan
                     return $ x:xs
 
-    dumpLog filepath = do
-        $logInfo $ T.pack $ "\nDumping log file: " ++ toFilePath filepath ++ "\n"
+    dumpLogIfWarning (pkgDir, filepath) = do
+      firstWarning <- runResourceT
+          $ CB.sourceFile (toFilePath filepath)
+         $$ CT.decodeUtf8Lenient
+         =$ CT.lines
+         =$ CL.map stripCR
+         =$ CL.filter isWarning
+         =$ CL.take 1
+      if (null firstWarning)
+        then return ()
+        else dumpLog " due to warnings" (pkgDir, filepath)
+
+    isWarning t = ": Warning:" `T.isSuffixOf` t
+
+    dumpLog msgSuffix (pkgDir, filepath) = do
+        $logInfo $ T.pack $ concat ["\n--  Dumping log file", msgSuffix, ": ", toFilePath filepath, "\n"]
         runResourceT
             $ CB.sourceFile (toFilePath filepath)
            $$ CT.decodeUtf8Lenient
-           =$ CT.lines
+           =$ mungeBuildOutput True True pkgDir
            =$ CL.mapM_ $logInfo
-        $logInfo $ T.pack $ "\nEnd of log file: " ++ toFilePath filepath ++ "\n"
+        $logInfo $ T.pack $ "\n--  End of log file: " ++ toFilePath filepath ++ "\n"
 
 -- | Perform the actual plan
 executePlan :: M env m
@@ -805,7 +823,7 @@ withSingleContext :: M env m
                   -> m a
 withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} mdeps msuffix inner0 =
     withPackage $ \package cabalfp pkgDir ->
-    withLogFile package $ \mlogFile ->
+    withLogFile pkgDir package $ \mlogFile ->
     withCabal package pkgDir mlogFile $ \cabal ->
     inner0 package cabalfp pkgDir cabal announce console mlogFile
   where
@@ -836,7 +854,7 @@ withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} md
                             inner package cabalfp dir
                     _ -> error $ "withPackage: invariant violated: " ++ show m
 
-    withLogFile package inner
+    withLogFile pkgDir package inner
         | console = inner Nothing
         | otherwise = do
             logPath <- buildLogPath package msuffix
@@ -846,7 +864,7 @@ withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} md
             -- We only want to dump logs for local non-dependency packages
             case taskType of
                 TTLocal lp | lpWanted lp ->
-                    liftIO $ atomically $ writeTChan eeLogFiles logPath
+                    liftIO $ atomically $ writeTChan eeLogFiles (pkgDir, logPath)
                 _ -> return ()
 
             bracket
@@ -1454,7 +1472,7 @@ mungeBuildOutput :: (MonadIO m, MonadCatch m)
                  -> ConduitM Text Text m ()
 mungeBuildOutput excludeTHLoading makeAbsolute pkgDir = void $
     CT.lines
-    =$ CL.map stripCarriageReturn
+    =$ CL.map stripCR
     =$ CL.filter (not . isTHLoading)
     =$ CL.mapM toAbsolutePath
   where
@@ -1489,10 +1507,6 @@ mungeBuildOutput excludeTHLoading makeAbsolute pkgDir = void $
            >> char ':'
            >> return ()
         where num = some digit
-
-    -- | Strip @\r@ characters from the byte vector. Used because Windows.
-    stripCarriageReturn :: Text -> Text
-    stripCarriageReturn = T.filter (/= '\r')
 
 -- | Find the Setup.hs or Setup.lhs in the given directory. If none exists,
 -- throw an exception.

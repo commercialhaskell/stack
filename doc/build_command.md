@@ -181,7 +181,7 @@ the build output from GHC will be hidden for building all dependencies, and
 will be displayed for the one target package.
 
 By default, when building multiple target packages, the output from these will
-also end up in a log file instead of on the console, to avoid problems of
-interleaved output and decrease console noise. If you would like to see this
-content instead, you can use the `--dump-logs` command line option, or add
-`dump-logs: true` to your `stack.yaml` file.
+end up in a log file instead of on the console unless it contains errors or
+warnings, to avoid problems of interleaved output and decrease console noise.
+If you would like to see this content instead, you can use the `--dump-logs`
+command line option, or add `dump-logs: all` to your `stack.yaml` file.

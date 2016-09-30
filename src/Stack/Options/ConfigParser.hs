@@ -119,8 +119,13 @@ configOptsParser hide0 =
             ("permission for users other than the owner of the stack root " ++
                 "directory to use a stack installation (POSIX only)")
             hide
-    <*> firstBoolFlags
-            "dump-logs"
-            "dump the build output logs for local packages to the console"
-            hide
-  where hide = hideMods (hide0 /= OuterGlobalOpts)
+    <*> fmap toDumpLogs
+            (firstBoolFlags
+             "dump-logs"
+             "dump the build output logs for local packages to the console"
+             hide)
+  where
+    hide = hideMods (hide0 /= OuterGlobalOpts)
+    toDumpLogs (First (Just True)) = First (Just DumpAllLogs)
+    toDumpLogs (First (Just False)) = First (Just DumpNoLogs)
+    toDumpLogs (First Nothing) = First Nothing

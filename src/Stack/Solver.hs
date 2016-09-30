@@ -42,7 +42,7 @@ import           Data.List                   ( (\\), isSuffixOf, intercalate
 import           Data.List.Extra             (groupSortOn)
 import           Data.Map                    (Map)
 import qualified Data.Map                    as Map
-import           Data.Maybe                  (catMaybes, isNothing, mapMaybe, fromMaybe)
+import           Data.Maybe                  (catMaybes, isNothing, mapMaybe)
 import           Data.Monoid
 import           Data.Set                    (Set)
 import qualified Data.Set                    as Set
@@ -50,6 +50,7 @@ import           Data.Text                   (Text)
 import qualified Data.Text                   as T
 import           Data.Text.Encoding          (decodeUtf8, encodeUtf8)
 import           Data.Text.Encoding.Error    (lenientDecode)
+import           Data.Text.Extra             (stripCR)
 import qualified Data.Text.Lazy              as LT
 import           Data.Text.Lazy.Encoding     (decodeUtf8With)
 import           Data.Tuple                  (swap)
@@ -189,8 +190,6 @@ cabalSolver menv cabalfps constraintType
           else error $ "The following lines from cabal-install output could \
                        \not be parsed: \n"
                        ++ T.unpack (T.intercalate "\n" errs)
-
-    stripCR t = fromMaybe t (T.stripSuffix "\r" t)
 
     toConstraintArgs userFlagMap =
         [formatFlagConstraint package flag enabled

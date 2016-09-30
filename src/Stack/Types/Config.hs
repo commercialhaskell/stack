@@ -65,6 +65,8 @@ module Stack.Types.Config
   ,ConfigMonoid(..)
   ,configMonoidInstallGHCName
   ,configMonoidSystemGHCName
+  -- ** DumpLogs
+  ,DumpLogs(..)
   -- ** EnvSettings
   ,EnvSettings(..)
   ,minimalEnvSettings
@@ -167,7 +169,7 @@ import           Control.Monad.Logger (LogLevel(..))
 import           Control.Monad.Reader (MonadReader, ask, asks, MonadIO, liftIO)
 import           Data.Aeson.Extended
                  (ToJSON, toJSON, FromJSON, parseJSON, withText, object,
-                  (.=), (..:), (..:?), (..!=), Value(String, Object),
+                  (.=), (..:), (..:?), (..!=), Value(Bool, String, Object),
                   withObjectWarnings, WarningParser, Object, jsonSubWarnings,
                   jsonSubWarningsT, jsonSubWarningsTT, WithJSONWarnings(..), noJSONWarnings)
 import           Data.Attoparsec.Args
@@ -340,7 +342,7 @@ data Config =
          -- installation.
          ,configPackageCaches       :: !(IORef (Maybe (Map PackageIdentifier (PackageIndex, PackageCache))))
          -- ^ In memory cache of hackage index.
-         ,configDumpLogs            :: !Bool
+         ,configDumpLogs            :: !DumpLogs
          -- ^ Dump logs of local non-dependencies when doing a build.
          ,configMaybeProject        :: !(Maybe (Project, Path Abs File))
          }
@@ -358,6 +360,26 @@ instance FromJSON ApplyGhcOptions where
             "locals" -> return AGOLocals
             "everything" -> return AGOEverything
             _ -> fail $ "Invalid ApplyGhcOptions: " ++ show t
+
+-- | Which build log files to dump
+data DumpLogs
+  = DumpNoLogs -- ^ don't dump any logfiles
+  | DumpWarningLogs -- ^ dump logfiles containing warnings
+  | DumpAllLogs -- ^ dump all logfiles
+  deriving (Show, Read, Eq, Ord, Enum, Bounded)
+
+instance FromJSON DumpLogs where
+  parseJSON (Bool True) = return DumpAllLogs
+  parseJSON (Bool False) = return DumpNoLogs
+  parseJSON v =
+    withText
+      "DumpLogs"
+      (\t ->
+          if | t == "none" -> return DumpNoLogs
+             | t == "warning" -> return DumpWarningLogs
+             | t == "all" -> return DumpAllLogs
+             | otherwise -> fail ("Invalid DumpLogs: " ++ show t))
+      v
 
 -- | Controls which version of the environment is used
 data EnvSettings = EnvSettings
@@ -870,7 +892,7 @@ data ConfigMonoid =
     , configMonoidAllowDifferentUser :: !(First Bool)
     -- ^ Allow users other than the stack root owner to use the stack
     -- installation.
-    , configMonoidDumpLogs           :: !(First Bool)
+    , configMonoidDumpLogs           :: !(First DumpLogs)
     -- ^ See 'configDumpLogs'
     }
   deriving (Show, Generic)
@@ -1093,7 +1115,7 @@ instance Show ConfigException where
         , toFilePath configFile
         , "':\n"
         , Yaml.prettyPrintParseException exception
-        , "\nSee http://docs.haskellstack.org/en/stable/yaml_configuration/."
+        , "\nSee http://docs.haskellstack.org/en/stable/yaml_configuration/"
         ]
     show (ParseCustomSnapshotException url exception) = concat
         [ "Could not parse '"
@@ -1101,7 +1123,7 @@ instance Show ConfigException where
         , "':\n"
         , Yaml.prettyPrintParseException exception
         -- FIXME: Link to docs about custom snapshots
-        -- , "\nSee http://docs.haskellstack.org/en/stable/yaml_configuration/."
+        -- , "\nSee http://docs.haskellstack.org/en/stable/yaml_configuration/"
         ]
     show (ParseResolverException t) = concat
         [ "Invalid resolver value: "
