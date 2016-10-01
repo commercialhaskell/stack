@@ -53,21 +53,19 @@ parseCollapsedAbsFile = parseAbsFile . collapseFilePath
 -- > collapseFilePath "parent/foo/.." ==  "parent"
 -- > collapseFilePath "/parent/foo/../../bar" ==  "/bar"
 --
--- (borrowed from @Text.Pandoc.Shared@)
+-- (adapted from @Text.Pandoc.Shared@)
 collapseFilePath :: FilePath -> FilePath
 collapseFilePath = FP.joinPath . reverse . foldl go [] . FP.splitDirectories
   where
     go rs "." = rs
     go r@(p:rs) ".." = case p of
                             ".." -> "..":r
-                            (checkPathSeperator -> Just True) -> "..":r
+                            (checkPathSeparator -> True) -> "..":r
                             _ -> rs
-    go _ (checkPathSeperator -> Just True) = [[FP.pathSeparator]]
+    go _ (checkPathSeparator -> True) = [[FP.pathSeparator]]
     go rs x = x:rs
-    isSingleton [] = Nothing
-    isSingleton [x] = Just x
-    isSingleton _ = Nothing
-    checkPathSeperator = fmap FP.isPathSeparator . isSingleton
+    checkPathSeparator [x] = FP.isPathSeparator x
+    checkPathSeparator _ = False
 
 -- | Drop the root (either @\/@ on POSIX or @C:\\@, @D:\\@, etc. on
 -- Windows).
