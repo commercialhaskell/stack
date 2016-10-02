@@ -23,6 +23,7 @@ pages:
   - Non-standard project initialization: nonstandard_project_init.md
   - Shell Auto-completion: shell_autocompletion.md
   - Travis CI: travis_ci.md
+  - Code Coverage: coverage.md
 - Advanced documentation:
   - Architecture: architecture.md
 - Project documentation:
