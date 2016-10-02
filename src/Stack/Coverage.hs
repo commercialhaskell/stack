@@ -33,6 +33,7 @@ import qualified Data.Map.Strict as Map
 import           Data.Maybe
 import           Data.Maybe.Extra (mapMaybeM)
 import           Data.Monoid ((<>))
+import           Data.String
 import           Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
@@ -47,16 +48,19 @@ import           Stack.Build.Source (parseTargetsFromBuildOpts)
 import           Stack.Build.Target
 import           Stack.Constants
 import           Stack.Package
+import           Stack.PrettyPrint
+import           Stack.Types.Compiler
+import           Stack.Types.Config
+import           Stack.Types.Internal (HasTerminal)
+import           Stack.Types.Package
 import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageName
 import           Stack.Types.Version
-import           Stack.Types.Config
-import           Stack.Types.Package
-import           Stack.Types.Compiler
 import           System.FilePath (isPathSeparator)
 import           System.Process.Read
 import           Text.Hastache (htmlEscape)
 import           Trace.Hpc.Tix
+import           Web.Browser (openBrowser)
 
 -- | Invoked at the beginning of running with "--coverage"
 deleteHpcReports :: (MonadIO m, MonadMask m, MonadReader env m, HasEnvConfig env)
@@ -106,7 +110,7 @@ tixFilePath pkgName testName = do
     return (pkgPath </> tixRel)
 
 -- | Generates the HTML coverage report and shows a textual coverage summary for a package.
-generateHpcReport :: (MonadIO m,MonadReader env m,MonadLogger m,MonadBaseControl IO m,MonadMask m,HasEnvConfig env)
+generateHpcReport :: (MonadIO m,MonadReader env m,MonadLogger m,MonadBaseControl IO m,MonadMask m,HasEnvConfig env,HasTerminal env)
                   => Path Abs Dir -> Package -> [Text] -> m ()
 generateHpcReport pkgDir package tests = do
     compilerVersion <- asks (envConfigCompilerVersion . getEnvConfig)
@@ -144,25 +148,29 @@ generateHpcReport pkgDir package tests = do
                 let extraArgs = case mincludeName of
                         Just includeName -> ["--include", includeName ++ ":"]
                         Nothing -> []
-                generateHpcReportInternal tixSrc reportDir report extraArgs extraArgs
+                mreportPath <- generateHpcReportInternal tixSrc reportDir report extraArgs extraArgs
+                mapM_ (displayReportPath report) mreportPath
 
-generateHpcReportInternal :: (MonadIO m,MonadReader env m,MonadLogger m,MonadBaseControl IO m,MonadMask m,HasEnvConfig env)
-                          => Path Abs File -> Path Abs Dir -> Text -> [String] -> [String] -> m ()
+generateHpcReportInternal :: (MonadIO m,MonadReader env m,MonadLogger m,MonadBaseControl IO m,MonadMask m,HasEnvConfig env,HasTerminal env)
+                          => Path Abs File -> Path Abs Dir -> Text -> [String] -> [String] -> m (Maybe (Path Abs File))
 generateHpcReportInternal tixSrc reportDir report extraMarkupArgs extraReportArgs = do
     -- If a .tix file exists, move it to the HPC output directory and generate a report for it.
     tixFileExists <- doesFileExist tixSrc
     if not tixFileExists
-        then $logError $ T.concat
-            [ "Didn't find .tix for "
-            , report
-            , " - expected to find it at "
-            , T.pack (toFilePath tixSrc)
-            , "."
-            ]
+        then do
+            $logError $ T.concat
+                 [ "Didn't find .tix for "
+                 , report
+                 , " - expected to find it at "
+                 , T.pack (toFilePath tixSrc)
+                 , "."
+                 ]
+            return Nothing
         else (`catch` \err -> do
                  let msg = show (err :: ReadProcessException)
                  $logError (T.pack msg)
-                 generateHpcErrorReport reportDir $ sanitize msg) $
+                 generateHpcErrorReport reportDir $ sanitize msg
+                 return Nothing) $
              (`onException` $logError ("Error occurred while producing " <> report)) $ do
             -- Directories for .mix files.
             hpcRelDir <- hpcRelativeDir
@@ -197,12 +205,11 @@ generateHpcReportInternal tixSrc reportDir report extraMarkupArgs extraReportArg
                             ]
                     $logError (msg False)
                     generateHpcErrorReport reportDir (msg True)
+                    return Nothing
                 else do
+                    let reportPath = reportDir </> $(mkRelFile "hpc_index.html")
                     -- Print output, stripping @\r@ characters because Windows.
                     forM_ outputLines ($logInfo . T.decodeUtf8)
-                    $logInfo
-                        ("The " <> report <> " is available at " <>
-                         T.pack (toFilePath (reportDir </> $(mkRelFile "hpc_index.html"))))
                     -- Generate the markup.
                     void $ readProcessStdout Nothing menv "hpc"
                         ( "markup"
@@ -210,15 +217,16 @@ generateHpcReportInternal tixSrc reportDir report extraMarkupArgs extraReportArg
                         : ("--destdir=" ++ toFilePathNoTrailingSep reportDir)
                         : (args ++ extraMarkupArgs)
                         )
-
+                    return (Just reportPath)
 
 data HpcReportOpts = HpcReportOpts
     { hroptsInputs :: [Text]
     , hroptsAll :: Bool
     , hroptsDestDir :: Maybe String
+    , hroptsOpenBrowser :: Bool
     } deriving (Show)
 
-generateHpcReportForTargets :: (MonadIO m, MonadReader env m, MonadBaseControl IO m, MonadMask m, MonadLogger m, HasEnvConfig env)
+generateHpcReportForTargets :: (MonadIO m, MonadReader env m, MonadBaseControl IO m, MonadMask m, MonadLogger m, HasEnvConfig env, HasTerminal env)
                             => HpcReportOpts -> m ()
 generateHpcReportForTargets opts = do
     let (tixFiles, targetNames) = partition (".tix" `T.isSuffixOf`) (hroptsInputs opts)
@@ -271,9 +279,16 @@ generateHpcReportForTargets opts = do
             dest <- resolveDir' destDir
             ensureDir dest
             return dest
-    generateUnionReport "combined report" reportDir tixPaths
+    let report = "combined report"
+    mreportPath <- generateUnionReport report reportDir tixPaths
+    forM_ mreportPath $ \reportPath ->
+        if hroptsOpenBrowser opts
+            then do
+                $prettyInfo $ "Opening" <+> display reportPath <+> "in the browser."
+                void $ liftIO $ openBrowser (toFilePath reportPath)
+            else displayReportPath report reportPath
 
-generateHpcUnifiedReport :: (MonadIO m,MonadReader env m,MonadLogger m,MonadBaseControl IO m,MonadMask m,HasEnvConfig env)
+generateHpcUnifiedReport :: (MonadIO m,MonadReader env m,MonadLogger m,MonadBaseControl IO m,MonadMask m,HasEnvConfig env,HasTerminal env)
                          => m ()
 generateHpcUnifiedReport = do
     outputDir <- hpcReportDir
@@ -292,10 +307,13 @@ generateHpcUnifiedReport = do
             , T.pack (toFilePath outputDir)
             , ", so not generating a unified coverage report."
             ]
-        else generateUnionReport "unified report" reportDir tixFiles
+        else do
+            let report = "unified report"
+            mreportPath <- generateUnionReport report reportDir tixFiles
+            mapM_ (displayReportPath report) mreportPath
 
-generateUnionReport :: (MonadIO m,MonadReader env m,MonadLogger m,MonadBaseControl IO m,MonadMask m,HasEnvConfig env)
-                    => Text -> Path Abs Dir -> [Path Abs File] -> m ()
+generateUnionReport :: (MonadIO m,MonadReader env m,MonadLogger m,MonadBaseControl IO m,MonadMask m,HasEnvConfig env,HasTerminal env)
+                    => Text -> Path Abs Dir -> [Path Abs File] -> m (Maybe (Path Abs File))
 generateUnionReport report reportDir tixFiles = do
     (errs, tix) <- fmap (unionTixes . map removeExeModules) (mapMaybeM readTixOrLog tixFiles)
     $logDebug $ "Using the following tix files: " <> T.pack (show tixFiles)
@@ -435,3 +453,8 @@ findPackageFieldForBuiltPackage pkgDir pkgId field = do
                 [path] -> extractField path
                 _ -> return $ Left $ "Multiple files matching " <> T.pack (pkgIdStr ++ "-*.conf") <> " found in " <>
                     T.pack (toFilePath inplaceDir) <> ". Maybe try 'stack clean' on this package?"
+
+displayReportPath :: (MonadReader env m, MonadLogger m, HasAnsiAnn (Ann a), Display a, HasTerminal env)
+                  => Text -> a -> m ()
+displayReportPath report reportPath =
+     $prettyInfo $ "The" <+> fromString (T.unpack report) <+> "is available at" <+> display reportPath

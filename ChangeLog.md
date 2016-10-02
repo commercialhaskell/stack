@@ -33,6 +33,8 @@ Other enhancements:
 * Add the `dump-logs` config option and `--dump-logs` command line
   option to get full build output on the
   console. [#426](https://github.com/commercialhaskell/stack/issues/426)
+* Add the `--open` option to "stack hpc report" command, causing the report to
+  be opened in the browser.
 
 Bug fixes:
 
