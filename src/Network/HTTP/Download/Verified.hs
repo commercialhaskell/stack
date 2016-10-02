@@ -233,8 +233,8 @@ verifiedDownload DownloadRequest{..} destpath progressSink = do
         $logDebug $ "Downloading " <> decodeUtf8With lenientDecode (path req)
         liftIO $ do
             createDirectoryIfMissing True dir
-            withBinaryFile fptmp WriteMode $ \h ->
-                recoveringHttp drRetryPolicy $
+            recoveringHttp drRetryPolicy $
+                withBinaryFile fptmp WriteMode $ \h ->
                     flip runReaderT env $
                         withResponse req (go h)
             renameFile fptmp fp
