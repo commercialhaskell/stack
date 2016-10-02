@@ -50,6 +50,8 @@ Bug fixes:
 * Docker: ensure that interrupted extraction process does not cause corrupt file
   when downloading a Docker-compatible Stack executable
   [#2568](https://github.com/commercialhaskell/stack/issues/2568)
+* Fixed running `stack hpc report` on package targets.
+  [#2664](https://github.com/commercialhaskell/stack/issues/2664)
 
 ## 1.2.0
 
