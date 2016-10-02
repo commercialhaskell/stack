@@ -36,6 +36,9 @@ Other enhancements:
 
 Bug fixes:
 
+* Fixed a gnarly bug where programs and package tarballs sometimes have
+  corrupted downloads. See
+  [#2657](https://github.com/commercialhaskell/stack/issues/2568).
 * Add proper support for non-ASCII characters in file paths for the `sdist` command.
   See [#2549](https://github.com/commercialhaskell/stack/issues/2549)
 * Never treat `extra-dep` local packages as targets. This ensures
