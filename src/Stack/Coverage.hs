@@ -247,7 +247,7 @@ generateHpcReportForTargets opts = do
                          forM (toList comps) $ \nc ->
                              case nc of
                                  CTest testName ->
-                                     liftM (pkgPath </>) $ parseRelFile (T.unpack testName ++ ".tix")
+                                     liftM (pkgPath </>) $ parseRelFile (T.unpack testName ++ "/" ++ T.unpack testName ++ ".tix")
                                  _ -> fail $
                                      "Can't specify anything except test-suites as hpc report targets (" ++
                                      packageNameString name ++
@@ -257,8 +257,10 @@ generateHpcReportForTargets opts = do
                          exists <- doesDirExist pkgPath
                          if exists
                              then do
-                                 (_, files) <- listDir pkgPath
-                                 return (filter ((".tix" `isSuffixOf`) . toFilePath) files)
+                                 (dirs, _) <- listDir pkgPath
+                                 liftM concat $ forM dirs $ \dir -> do
+                                     (_, files) <- listDir dir
+                                     return (filter ((".tix" `isSuffixOf`) . toFilePath) files)
                              else return []
     tixPaths <- liftM (++ targetTixFiles) $ mapM (resolveFile' . T.unpack) tixFiles
     when (null tixPaths) $

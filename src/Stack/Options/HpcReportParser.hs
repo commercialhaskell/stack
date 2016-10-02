@@ -12,8 +12,8 @@ import           Stack.Types.Config
 hpcReportOptsParser :: Parser HpcReportOpts
 hpcReportOptsParser = HpcReportOpts
     <$> many (textArgument $ metavar "TARGET_OR_TIX")
-    <*> switch (long "all" <> help "Use results from all packages and components")
-    <*> optional (strOption (long "destdir" <> help "Output directy for HTML report"))
+    <*> switch (long "all" <> help "Use results from all packages and components involved in previous --coverage run")
+    <*> optional (strOption (long "destdir" <> help "Output directory for HTML report"))
 
 pvpBoundsOption :: Parser PvpBounds
 pvpBoundsOption =

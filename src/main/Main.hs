@@ -435,7 +435,7 @@ commandLineHandler progName isInterpreter = complicatedOptions
           "hpc"
           "Subcommands specific to Haskell Program Coverage"
           (addCommand' "report"
-                        "Generate HPC report a combined HPC report"
+                        "Generate unified HPC coverage report from tix files and project targets"
                         hpcReportCmd
                         hpcReportOptsParser)
         )
