@@ -185,7 +185,7 @@ Specifies how dependencies are resolved. There are currently four resolver types
 * No snapshot, just use packages shipped with the compiler
     * For GHC this looks like `resolver: ghc-7.10.2`
     * For GHCJS this looks like `resolver: ghcjs-0.1.0_ghc-7.10.2`.
-* [Custom snapshot](https://github.com/commercialhaskell/stack/wiki/Custom-Snapshot)
+* [Custom snapshot](custom_snapshot.md)
 
 Each of these resolvers will also determine what constraints are placed on the
 compiler version. See the [compiler-check](#compiler-check) option for some
