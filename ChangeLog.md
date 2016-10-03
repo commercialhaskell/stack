@@ -54,6 +54,9 @@ Bug fixes:
   [#2568](https://github.com/commercialhaskell/stack/issues/2568)
 * Fixed running `stack hpc report` on package targets.
   [#2664](https://github.com/commercialhaskell/stack/issues/2664)
+* Fix a long-standing performance regression where stack would parse the .dump-hi
+  files of the library components of local packages twice.
+  [#2658](https://github.com/commercialhaskell/stack/pull/2658)
 
 ## 1.2.0
 
