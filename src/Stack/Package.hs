@@ -734,7 +734,7 @@ libraryFiles lib = do
         resolveFilesAndDeps
             Nothing
             (dirs ++ [dir])
-            (names <> exposed)
+            names
             haskellModuleExts
     cfiles <- buildOtherSources build
     return (modules, files <> cfiles, warnings)
