@@ -24,6 +24,18 @@ option only if you already know Nix and have special requirements,
 such as using custom Nix packages that override the standard ones or
 using system libraries with special requirements.
 
+### Checking Nix installation
+
+Follow the instructions on the
+[Nix download page](http://nixos.org/nix/download.html) to install Nix.  After
+doing so, when opening a terminal, the nix commands (`nix-build`, `nix-shell`,
+etc) should be available.  If they are not, it should be because the file
+located at `$HOME/.nix-profile/etc/profile.d/nix.sh` is not sourced by your shell.
+
+You should either run `source ~/.nix-profile/etc/profile.d/nix.sh` manually
+everytime you open a terminal and need Nix or add this command to your
+`~/.bashrc` or `~/.bash_profile`.
+
 ### Additions to your `stack.yaml`
 
 Add a section to your `stack.yaml` as follows:
