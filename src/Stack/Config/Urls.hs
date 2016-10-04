@@ -13,7 +13,7 @@ urlsFromMonoid monoid =
         (fromFirst defaultNightlyBuildPlans $ urlsMonoidNightlyBuildPlans monoid)
     where
     defaultLatestSnapshot =
-        "https://www.stackage.org/download/snapshots.json"
+        "https://s3.amazonaws.com/haddock.stackage.org/snapshots.json"
     defaultLtsBuildPlans =
         "https://raw.githubusercontent.com/fpco/lts-haskell/master/"
     defaultNightlyBuildPlans =
