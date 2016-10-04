@@ -149,9 +149,9 @@ generateHpcReport pkgDir package tests = do
                         Just includeName -> ["--include", includeName ++ ":"]
                         Nothing -> []
                 mreportPath <- generateHpcReportInternal tixSrc reportDir report extraArgs extraArgs
-                mapM_ (displayReportPath report) mreportPath
+                forM_ mreportPath (displayReportPath report)
 
-generateHpcReportInternal :: (MonadIO m,MonadReader env m,MonadLogger m,MonadBaseControl IO m,MonadMask m,HasEnvConfig env,HasTerminal env)
+generateHpcReportInternal :: (MonadIO m,MonadReader env m,MonadLogger m,MonadBaseControl IO m,MonadMask m,HasEnvConfig env)
                           => Path Abs File -> Path Abs Dir -> Text -> [String] -> [String] -> m (Maybe (Path Abs File))
 generateHpcReportInternal tixSrc reportDir report extraMarkupArgs extraReportArgs = do
     -- If a .tix file exists, move it to the HPC output directory and generate a report for it.
@@ -310,9 +310,9 @@ generateHpcUnifiedReport = do
         else do
             let report = "unified report"
             mreportPath <- generateUnionReport report reportDir tixFiles
-            mapM_ (displayReportPath report) mreportPath
+            forM_ mreportPath (displayReportPath report)
 
-generateUnionReport :: (MonadIO m,MonadReader env m,MonadLogger m,MonadBaseControl IO m,MonadMask m,HasEnvConfig env,HasTerminal env)
+generateUnionReport :: (MonadIO m,MonadReader env m,MonadLogger m,MonadBaseControl IO m,MonadMask m,HasEnvConfig env)
                     => Text -> Path Abs Dir -> [Path Abs File] -> m (Maybe (Path Abs File))
 generateUnionReport report reportDir tixFiles = do
     (errs, tix) <- fmap (unionTixes . map removeExeModules) (mapMaybeM readTixOrLog tixFiles)
