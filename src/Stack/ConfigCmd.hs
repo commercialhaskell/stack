@@ -1,6 +1,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 -- | Make changes to project or global configuration.
 module Stack.ConfigCmd
@@ -73,7 +74,13 @@ cfgCmdSet cmd = do
     newValue <- cfgCmdSetValue cmd
     let cmdKey = cfgCmdSetOptionName cmd
         config' = HMap.insert cmdKey newValue config
-    liftIO (S.writeFile configFilePath (Yaml.encode config'))
+    if config' == config
+        then $logInfo
+                 (T.pack configFilePath <>
+                  " already contained the intended configuration and remains unchanged.")
+        else do
+            liftIO (S.writeFile configFilePath (Yaml.encode config'))
+            $logInfo (T.pack configFilePath <> " has been updated.")
 
 cfgCmdSetValue
     :: ( MonadIO m
