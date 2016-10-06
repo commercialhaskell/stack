@@ -76,17 +76,15 @@ However, advanced users may want to understand exactly how `--coverage` works:
    it will be deleted.
 
 4. After a test run, it will expect a `test-name.tix` file to exist. This file
-   will then get loaded, transformed, and outputed to `$(stack path
-   --local-hpc-root)/pkg-name/test-name/test-name.tix)`.  The transformation
-   removes any coverage information for executables.  This has the following
-   effects:
+   will then get loaded, modified, and outputted to `$(stack path
+   --local-hpc-root)/pkg-name/test-name/test-name.tix)`.
 
-   * It means that coverage information will be for the library code, rather
-     than executable modules.
-
-   * It makes it possible to directly union multiple `*.tix` files from
-     different executables (assuming they are using the exact same versions of
-     the local packages).
+   The `.tix` file gets modified to remove coverage file that isn't associated
+   with a library. So, this means that you won't get coverage information for
+   the modules compiled in the `executable` or `test-suite` stanza of your cabal
+   file. This makes it possible to directly union multiple `*.tix` files from
+   different executables (assuming they are using the exact same versions of the
+   local packages).
 
    If there is enough popular demand, it may be possible in the future to give
    coverage information for modules that are compiled directly into the
