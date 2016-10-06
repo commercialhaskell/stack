@@ -24,7 +24,7 @@ you can now use the custom snapshot like this:
 resolver:
   name: simple-snapshot  # Human readable name for the snapshot
   location: simple-snapshot.yaml
-  ```
+```
 
 This is an example of a custom snapshot stored in the filesystem. They are
 assumed to be mutable, so you are free to modify it. We detect that the snapshot
