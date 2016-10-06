@@ -91,9 +91,16 @@ However, advanced users may want to understand exactly how `--coverage` works:
    executable. See
    [#1359](https://github.com/commercialhaskell/stack/issues/1359).
 
-5. After the build completes, if there are multiple output `*.tix` files, they
-   get combined into a unified report.
+5. Once we have a `.tix` file for a test, we also generate a textual and HTML
+   report for it. The textual report is sent to the terminal. The index of the
+   test-specific HTML report is available at `$(stack path
+   --local-hpc-root)/pkg-name/test-name/index.html`
 
-6. Finally, an index of the resulting coverage reports is generated. It links to
+6. After the build completes, if there are multiple output `*.tix` files, they
+   get combined into a unified report. The index of this report will be
+   available at `$(stack path --local-hpc-root)/combined/all/index.html`
+
+7. Finally, an index of the resulting coverage reports is generated. It links to
    the individual coverage reports (one for each test-suite), as well as the
-   unified report.
+   unified report. This index is available at `$(stack path
+   --local-hpc-root)/index.html`
