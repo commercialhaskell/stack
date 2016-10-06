@@ -39,6 +39,9 @@ Other enhancements:
   which causes it to modify the global user configuration (`~/.stack/config.yaml`)
   instead of the project configuration.
   [#2675](https://github.com/commercialhaskell/stack/pull/2675)
+* Information on the latest available snapshots is now downloaded from S3 instead of
+  stackage.org, increasing reliability in case of stackage.org outages.
+  [#2653](https://github.com/commercialhaskell/stack/pull/2653)
 
 Bug fixes:
 
