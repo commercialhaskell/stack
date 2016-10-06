@@ -1,11 +1,13 @@
 # GHCJS
 
-To use GHCJS with stack `>= 0.1.8`, place a GHCJS version in the [`compiler`](yaml_configuration.md#compiler) field of `stack.yaml`.  After this, all stack commands should work with GHCJS, except for `ide`.  In particular:
+To use GHCJS with stack, place a GHCJS version in the [`compiler`](yaml_configuration.md#compiler) field of `stack.yaml`.  After this, all stack commands should work with GHCJS!  In particular:
 
 * `stack setup` will install GHCJS from source and boot it, which takes a long time.
+
 * `stack build` will compile your code to JavaScript.  In particular, the generated code for an executable ends up in `$(stack path --local-install-root)/bin/EXECUTABLE.jsexe/all.js` (bash syntax, where `EXECUTABLE` is the name of your executable).
 
-You can also build existing stack projects which target GHC, and instead build them with GHCJS.  For example: `stack build --compiler ghcjs-0.1.0.20150924_ghc-7.10.2`
+You can also build existing stack projects which target GHC, and instead build
+them with GHCJS.  For example: `stack build --compiler ghcjs-0.2.0.9006020_ghc-7.10.3`
 
 Sidenote: If you receive a message like `The program 'ghcjs' version >=0.1 is
 required but the version of .../ghcjs could not be determined.`, then you may
@@ -14,11 +16,12 @@ need to install a different version of `node`. See
 
 ## Example Configurations
 
-### Stack based repacks
+### Recent versions of GHCJS, repacked for stack
 
-Upstream `ghcjs` bundles have some specific version of packages, and each version of stack resolver can potentially have a different version of those packages. We might ignore those differences and it usually works, but it might as well break if the package has some different semantics or we install the same package with 2 resolvers.
-One way of remedying this situation is to repack the bundle to use packages at versions from the resolver. This will allow using multiple resolvers for different projects without a clash.
-Using other ways of installing `ghcjs` might require purging `~/.ghcjs` or even `~/.stack` each time we use a different resolver.
+These versions of GHCJS were created by
+[Marcin Tolysz](https://github.com/tolysz), and were particularly crafted to
+include package versions which match those expected by particular stackage
+snapshots.
 
 For `ghcjs` based on `ghc-7.10.3` one could try:
 ```yaml
@@ -38,7 +41,7 @@ Or for the latest one based on `ghc-8.0.1` (with more features):
 ```yaml
 resolver: lts-7.2
 compiler: ghcjs-0.2.1.9007002_ghc-8.0.1
-compiler-check: match-exact  
+compiler-check: match-exact
 
 setup-info:
   ghcjs:
@@ -58,38 +61,25 @@ Older resolvers:
 | lts-6.19 | http://ghcjs.tolysz.org/lts-6.19-9006019.tar.gz | ef4264d5a93b269ee4ec8f9d5139da030331d65a |
 | lts-6.18 | http://ghcjs.tolysz.org/lts-6.18-9006018.tar.gz | 3e9f345116c851349a5a551ffd94f7e0b74bfabb |
 
+If you do not use the same resolver, say, an older LTS snapshot, you will get
+some warnings like this:
 
-### GHCJS `master` (a.k.a. improved base)
-
-To use the master branch, a.k.a improved base, add the following to your `stack.yaml`:
-
-GHCJS compiled with GHC 7.10.3 LTS-5.12 (stack.yaml upgraded from stock GHCJS)
-```yaml
-compiler: ghcjs-0.2.0.20160414_ghc-7.10.3
-compiler-check: match-exact
-setup-info:
-  ghcjs:
-    source:
-      ghcjs-0.2.0.20160414_ghc-7.10.3:
-        url: https://s3.amazonaws.com/ghcjs/ghcjs-0.2.0.20160414_ghc-7.10.3.tar.gz
-        sha1: 6d6f307503be9e94e0c96ef1308c7cf224d06be3
+```
+Ignoring that the GHCJS boot package "aeson" has a different version, 0.9.0.1, than the resolver's wanted version, 0.8.0.2
+Ignoring that the GHCJS boot package "attoparsec" has a different version, 0.13.0.1, than the resolver's wanted version, 0.12.1.6
+Ignoring that the GHCJS boot package "scientific" has a different version, 0.3.3.8, than the resolver's wanted version, 0.3.4.2
+...
 ```
 
-GHCJS compiled with GHC 7.10.2 LTS-3.6 (stack.yaml that comes with GHCJS)
-```yaml
-compiler: ghcjs-0.2.0.20160414_ghc-7.10.2
-compiler-check: match-exact
-setup-info:
-  ghcjs:
-    source:
-      ghcjs-0.2.0.20160414_ghc-7.10.2:
-        url: https://s3.amazonaws.com/ghcjs/ghcjs-0.2.0.20160414_ghc-7.10.2.tar.gz
-        sha1: f0a7243e781e27ebfe601eebaf5c57422007c142
-```
+These warnings can usually be safely ignored, but they do indicate a divergence
+between your snapshot's packages, and those that are being used to compile your
+project. You will normally get these warnings when using a GHCJS tarball that
+has not been packaged with a particular snapshot in mind.
 
 ### GHCJS (old base)
 
-You can use this resolver for GHCJS (old base) in your `stack.yaml`:
+If you want to build some older GHCJS packages, you may need to use the "old
+base" GHCJS.  To do this, use the following compiler info:
 
 ```yaml
 compiler: ghcjs-0.1.0.20150924_ghc-7.10.2
