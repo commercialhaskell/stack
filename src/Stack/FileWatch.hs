@@ -7,13 +7,14 @@ module Stack.FileWatch
     ) where
 
 import Blaze.ByteString.Builder (toLazyByteString, copyByteString)
-import Blaze.ByteString.Builder.Char.Utf8 (fromShow)
+import qualified Blaze.ByteString.Builder.Char.Utf8 as BUtf8
 import Control.Concurrent.Async (race_)
 import Control.Concurrent.STM
 import Control.Exception (Exception, fromException)
 import Control.Exception.Enclosed (tryAny)
 import Control.Monad (forever, unless, when)
 import qualified Data.ByteString.Lazy as L
+import Data.List.Extra
 import qualified Data.Map.Strict as Map
 import Data.Monoid ((<>))
 import Data.Set (Set)
@@ -30,7 +31,23 @@ import System.IO (Handle, stdout, stderr, hPutStrLn)
 -- | Print an exception to stderr
 printExceptionStderr :: Exception e => e -> IO ()
 printExceptionStderr e =
-    L.hPut stderr $ toLazyByteString $ fromShow e <> copyByteString "\n"
+    L.hPut stderr $ toLazyByteString $ (BUtf8.fromString $ break100 $ show e) <> copyByteString "\n"
+
+-- | Try to limit line lengths to 100 characters.
+break100 :: String -> String
+break100 = intercalate "\n" . concatMap makeChunks . lines
+  where
+    makeChunks = map unwords . chunksOfSize 100 . words
+
+-- | @chunksOfSize size strings@ splits a given list of strings into chunks not exceeding @size@
+-- characters. If that is impossible, it uses singleton chunks.
+--
+-- Taken from Mokhov, Mitchell, Peyton Jones, Marlow: Non-recursive Make Considered Harmful
+chunksOfSize :: Int -> [String] -> [[String]]
+chunksOfSize n = repeatedly $ \xs ->
+    let ys = takeWhile (<= n) $ scanl1 (+) $ map length xs
+    in splitAt (max 1 $ length ys) xs
+
 
 fileWatch :: Handle
           -> ((Set (Path Abs File) -> IO ()) -> IO ())
