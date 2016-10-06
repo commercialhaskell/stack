@@ -64,6 +64,8 @@ Bug fixes:
 * Fix a long-standing performance regression where stack would parse the .dump-hi
   files of the library components of local packages twice.
   [#2658](https://github.com/commercialhaskell/stack/pull/2658)
+* Fixed a regression in "stack ghci --no-load", where it would prompt for a main
+  module to load. [#2603](https://github.com/commercialhaskell/stack/pull/2603)
 
 ## 1.2.0
 

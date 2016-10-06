@@ -145,7 +145,6 @@ ghci opts@GhciOpts{..} = do
         $logWarn
             ("The following GHC options are incompatible with GHCi and have not been passed to it: " <>
              T.unwords (map T.pack (nubOrd omittedOpts)))
-    mainFile <- figureOutMainFile bopts mainIsTargets targets pkgs
     oiDir <- objectInterfaceDir bconfig
     let odir =
             [ "-odir=" <> toFilePathNoTrailingSep oiDir
@@ -176,6 +175,7 @@ ghci opts@GhciOpts{..} = do
           else do
               checkForDuplicateModules pkgs
               renderFn <- interrogateExeForRenderFunction
+              mainFile <- figureOutMainFile bopts mainIsTargets targets pkgs
               scriptPath <- writeGhciScript tmpDirectory (renderFn pkgs mainFile)
               execGhci (macrosOptions ++ ["-ghci-script=" <> toFilePath scriptPath])
 
