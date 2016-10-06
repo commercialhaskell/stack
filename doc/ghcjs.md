@@ -11,8 +11,8 @@ them with GHCJS.  For example: `stack build --compiler ghcjs-0.2.0.9006020_ghc-7
 
 Sidenote: If you receive a message like `The program 'ghcjs' version >=0.1 is
 required but the version of .../ghcjs could not be determined.`, then you may
-need to install a different version of `node`. See [stack issue
-#1496](https://github.com/commercialhaskell/stack/issues/1496).
+need to install a different version of `node`. See
+[issue #1496](https://github.com/commercialhaskell/stack/issues/1496).
 
 ## Example Configurations
 
