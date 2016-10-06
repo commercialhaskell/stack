@@ -1,9 +1,9 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TemplateHaskell #-}
 
--- | Make changes to the stack yaml file
-
+-- | Make changes to project or global configuration.
 module Stack.ConfigCmd
        (ConfigCmdSet(..)
        ,configCmdSetParser
@@ -19,8 +19,7 @@ import           Control.Monad.Reader (MonadReader, asks)
 import           Control.Monad.Trans.Control (MonadBaseControl)
 import qualified Data.ByteString as S
 import qualified Data.HashMap.Strict as HMap
-import           Data.Map (Map)
-import qualified Data.Map.Strict as Map
+import           Data.Monoid
 import           Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Yaml.Extra as Yaml
@@ -36,8 +35,22 @@ import           Stack.Types.Config
 
 data ConfigCmdSet
     = ConfigCmdSetResolver AbstractResolver
-    | ConfigCmdSetSystemGhc Bool
-    | ConfigCmdSetInstallGhc Bool
+    | ConfigCmdSetSystemGhc CommandScope
+                            Bool
+    | ConfigCmdSetInstallGhc CommandScope
+                             Bool
+
+data CommandScope
+    = CommandScopeGlobal
+      -- ^ Apply changes to the global configuration,
+      --   typically at @~/.stack/config.yaml@.
+    | CommandScopeProject
+      -- ^ Apply changes to the project @stack.yaml@.
+
+configCmdSetScope :: ConfigCmdSet -> CommandScope
+configCmdSetScope (ConfigCmdSetResolver _) = CommandScopeProject
+configCmdSetScope (ConfigCmdSetSystemGhc scope _) = scope
+configCmdSetScope (ConfigCmdSetInstallGhc scope _) = scope
 
 cfgCmdSet :: ( MonadIO m
              , MonadBaseControl IO m
@@ -49,25 +62,25 @@ cfgCmdSet :: ( MonadIO m
              , MonadLogger m)
              => ConfigCmdSet -> m ()
 cfgCmdSet cmd = do
-    stackYaml <- fmap bcStackYaml (asks getBuildConfig)
-    let stackYamlFp =
-            toFilePath stackYaml
+    configFilePath <-
+        asks
+            (toFilePath .
+             case configCmdSetScope cmd of
+                 CommandScopeProject -> bcStackYaml . getBuildConfig
+                 CommandScopeGlobal -> configUserConfigPath . getConfig)
     -- We don't need to worry about checking for a valid yaml here
-    (projectYamlConfig :: Yaml.Object) <-
-        liftIO (Yaml.decodeFileEither stackYamlFp) >>=
-        either throwM return
+    (config :: Yaml.Object) <-
+        liftIO (Yaml.decodeFileEither configFilePath) >>= either throwM return
     newValue <- cfgCmdSetValue cmd
     let cmdKey = cfgCmdSetOptionName cmd
-        projectYamlConfig' =
-            HMap.insert
-                cmdKey
-                newValue
-                projectYamlConfig
-    liftIO
-        (S.writeFile
-             stackYamlFp
-             (Yaml.encode projectYamlConfig'))
-    return ()
+        config' = HMap.insert cmdKey newValue config
+    if config' == config
+        then $logInfo
+                 (T.pack configFilePath <>
+                  " already contained the intended configuration and remains unchanged.")
+        else do
+            liftIO (S.writeFile configFilePath (Yaml.encode config'))
+            $logInfo (T.pack configFilePath <> " has been updated.")
 
 cfgCmdSetValue
     :: ( MonadIO m
@@ -87,15 +100,15 @@ cfgCmdSetValue (ConfigCmdSetResolver newResolver) = do
     snap <- parseSnapName newResolverText
     _ <- loadMiniBuildPlan snap
     return (Yaml.String newResolverText)
-cfgCmdSetValue (ConfigCmdSetSystemGhc bool) = do
+cfgCmdSetValue (ConfigCmdSetSystemGhc _ bool) =
     return (Yaml.Bool bool)
-cfgCmdSetValue (ConfigCmdSetInstallGhc bool) = do
+cfgCmdSetValue (ConfigCmdSetInstallGhc _ bool) =
     return (Yaml.Bool bool)
 
 cfgCmdSetOptionName :: ConfigCmdSet -> Text
 cfgCmdSetOptionName (ConfigCmdSetResolver _) = "resolver"
-cfgCmdSetOptionName (ConfigCmdSetSystemGhc _) = configMonoidSystemGHCName
-cfgCmdSetOptionName (ConfigCmdSetInstallGhc _) = configMonoidInstallGHCName
+cfgCmdSetOptionName (ConfigCmdSetSystemGhc _ _) = configMonoidSystemGHCName
+cfgCmdSetOptionName (ConfigCmdSetInstallGhc _ _) = configMonoidInstallGHCName
 
 cfgCmdName :: String
 cfgCmdName = "config"
@@ -105,39 +118,40 @@ cfgCmdSetName = "set"
 
 configCmdSetParser :: OA.Parser ConfigCmdSet
 configCmdSetParser =
-    OA.fromM
-        (do field <-
-                OA.oneM
-                    (OA.strArgument
-                         (OA.metavar "FIELD VALUE"))
-            OA.oneM (fieldToValParser field))
-  where
-    fieldToValParser :: String -> OA.Parser ConfigCmdSet
-    fieldToValParser s =
-        Map.findWithDefault
-            (error $ concat $
-                 [ "Invalid field "
-                 , show s
-                 , ": Only the following fields are currently implemented:"
-                 ] ++
-                 map
-                     (("\n  - " ++) . T.unpack)
-                     (Map.keys fieldToValParser'))
-            (T.pack s)
-            fieldToValParser'
-    fieldToValParser' :: Map Text (OA.Parser ConfigCmdSet)
-    fieldToValParser' =
-        Map.fromList
-            [ ( "resolver"
-              , ConfigCmdSetResolver <$>
-                OA.argument
-                    readAbstractResolver
-                    OA.idm)
-            , ( configMonoidSystemGHCName
-              , ConfigCmdSetSystemGhc <$> boolArgument)
-            , ( configMonoidInstallGHCName
-              , ConfigCmdSetInstallGhc <$> boolArgument)
-            ]
+    OA.hsubparser $
+    mconcat
+        [ OA.command
+              "resolver"
+              (OA.info
+                   (ConfigCmdSetResolver <$>
+                    OA.argument
+                        readAbstractResolver
+                        (OA.metavar "RESOLVER" <>
+                         OA.help "E.g. \"nightly\" or \"lts-7.2\""))
+                   (OA.progDesc
+                        "Change the resolver of the current project. See https://docs.haskellstack.org/en/stable/yaml_configuration/#resolver for more info."))
+        , OA.command
+              (T.unpack configMonoidSystemGHCName)
+              (OA.info
+                   (ConfigCmdSetSystemGhc <$> scopeFlag <*> boolArgument)
+                   (OA.progDesc
+                        "Configure whether stack should use a system GHC installation or not."))
+        , OA.command
+              (T.unpack configMonoidInstallGHCName)
+              (OA.info
+                   (ConfigCmdSetInstallGhc <$> scopeFlag <*> boolArgument)
+                   (OA.progDesc
+                        "Configure whether stack should automatically install GHC when necessary."))
+        ]
+
+scopeFlag :: OA.Parser CommandScope
+scopeFlag =
+    OA.flag
+        CommandScopeProject
+        CommandScopeGlobal
+        (OA.long "global" <>
+         OA.help
+             "Modify the global configuration (typically at \"~/.stack/config.yaml\") instead of the project stack.yaml.")
 
 readBool :: OA.ReadM Bool
 readBool = do
@@ -148,4 +162,4 @@ readBool = do
         _ -> OA.readerError ("Invalid value " ++ show s ++ ": Expected \"true\" or \"false\"")
 
 boolArgument :: OA.Parser Bool
-boolArgument = OA.argument readBool OA.idm
+boolArgument = OA.argument readBool (OA.metavar "true/false")
