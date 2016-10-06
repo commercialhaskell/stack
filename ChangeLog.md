@@ -35,6 +35,10 @@ Other enhancements:
   console. [#426](https://github.com/commercialhaskell/stack/issues/426)
 * Add the `--open` option to "stack hpc report" command, causing the report to
   be opened in the browser.
+* The `stack config set` command now accepts a `--global` flag for suitable fields
+  which causes it to modify the global user configuration (`~/.stack/config.yaml`)
+  instead of the project configuration.
+  [#2675](https://github.com/commercialhaskell/stack/pull/2675)
 
 Bug fixes:
 
