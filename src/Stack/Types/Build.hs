@@ -52,7 +52,7 @@ import qualified Data.ByteString as S
 import           Data.Char (isSpace)
 import           Data.Data
 import           Data.Hashable
-import           Data.List (dropWhileEnd, intercalate)
+import           Data.List.Extra
 import qualified Data.Map as Map
 import           Data.Map.Strict (Map)
 import           Data.Maybe
@@ -93,14 +93,13 @@ import           System.Process.Log (showProcessArgDebug)
 data StackBuildException
   = Couldn'tFindPkgId PackageName
   | CompilerVersionMismatch
-        (Maybe (CompilerVersion, Arch))
-        (CompilerVersion, Arch)
-        GHCVariant
-        CompilerBuild
+        (Maybe (CompilerVersion, Arch)) -- found
+        (CompilerVersion, Arch) -- expected
+        GHCVariant -- expected
+        CompilerBuild -- expected
         VersionCheck
-        (Maybe (Path Abs File))
+        (Maybe (Path Abs File)) -- Path to the stack.yaml file
         Text -- recommended resolution
-  -- ^ Path to the stack.yaml file
   | Couldn'tParseTargets [Text]
   | UnknownTargets
     (Set PackageName) -- no known version

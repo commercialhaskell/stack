@@ -109,6 +109,7 @@ defaultStackSetupYaml =
 data SetupOpts = SetupOpts
     { soptsInstallIfMissing :: !Bool
     , soptsUseSystem :: !Bool
+    -- ^ Should we use a system compiler installation, if available?
     , soptsWantedCompiler :: !CompilerVersion
     , soptsCompilerCheck :: !VersionCheck
     , soptsStackYaml :: !(Maybe (Path Abs File))
@@ -357,13 +358,11 @@ ensureCompiler sopts = do
 
     Platform expectedArch _ <- asks getPlatform
 
-    let needLocal = case msystem of
-            Nothing -> True
-            Just _ | soptsSkipGhcCheck sopts -> False
-            Just (system, arch) ->
-                not (isWanted system) ||
-                arch /= expectedArch
+    let canUseCompiler compilerVersion arch
+            | soptsSkipGhcCheck sopts = True
+            | otherwise = isWanted compilerVersion && arch == expectedArch
         isWanted = isWantedCompiler (soptsCompilerCheck sopts) (soptsWantedCompiler sopts)
+        needLocal = not (any (uncurry canUseCompiler) msystem)
 
     getSetupInfo' <- runOnce (getSetupInfo (soptsStackSetupYaml sopts) =<< asks getHttpManager)
 
@@ -422,7 +421,23 @@ ensureCompiler sopts = do
                             (soptsWantedCompiler sopts)
                             (soptsCompilerCheck sopts)
                             (soptsGHCBindistURL sopts)
-                    | otherwise ->
+                    | otherwise -> do
+                        recommendSystemGhc <-
+                            if soptsUseSystem sopts
+                                then return False
+                                else do
+                                    msystemGhc <- getSystemCompiler menv0 wc
+                                    return (any (uncurry canUseCompiler) msystemGhc)
+                        let suggestion = fromMaybe
+                                (mconcat
+                                     ([ "To install the correct GHC into "
+                                      , T.pack (toFilePath (configLocalPrograms config))
+                                      , ", try running \"stack setup\" or use the \"--install-ghc\" flag."
+                                      ] ++
+                                      [ " To use your system GHC installation, run \"stack config set system-ghc --global true\", or use the \"--system-ghc\" flag."
+                                      | recommendSystemGhc
+                                      ]))
+                                (soptsResolveMissingGHC sopts)
                         throwM $ CompilerVersionMismatch
                             msystem
                             (soptsWantedCompiler sopts, expectedArch)
@@ -430,11 +445,7 @@ ensureCompiler sopts = do
                             compilerBuild
                             (soptsCompilerCheck sopts)
                             (soptsStackYaml sopts)
-                            (fromMaybe
-                                ("Try running \"stack setup\" to install the correct GHC into "
-                                <> T.pack (toFilePath (configLocalPrograms config))
-                                <> " or use \"--system-ghc\" to use a suitable compiler available on your PATH.")
-                                $ soptsResolveMissingGHC sopts)
+                            suggestion
 
             -- Install msys2 on windows, if necessary
             mmsys2Tool <- getMmsys2Tool
