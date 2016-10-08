@@ -487,9 +487,7 @@ isStackOpt t = any (`T.isPrefixOf` t)
     , "--enable-executable-profiling"
     , "--enable-profiling"
     , "--exact-configuration"
-    ] || elem t
-    [ "--user"
-    ]
+    ] || t == "--user"
 
 configureOptsDirs :: BaseConfigOpts
                   -> InstallLocation

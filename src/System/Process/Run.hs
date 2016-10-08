@@ -30,8 +30,7 @@ import           Data.Conduit.Process hiding (callProcess)
 import           Data.Foldable (forM_)
 import           Data.Text (Text)
 import qualified Data.Text as T
-import           Path (Dir, Abs, Path)
-import           Path (toFilePath)
+import           Path (Dir, Abs, Path, toFilePath)
 import           Prelude -- Fix AMP warning
 import           System.Exit (exitWith, ExitCode (..))
 import           System.IO

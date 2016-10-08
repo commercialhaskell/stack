@@ -1,5 +1,6 @@
 import StackTest
 
+{-# ANN module "HLint: ignore Use unless" #-}
 main :: IO ()
 main =
     if isWindows

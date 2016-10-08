@@ -22,7 +22,7 @@ import Prelude.Compat
 import           Control.Applicative
 import           Control.Exception (assert)
 import           Control.Exception.Enclosed  (tryIO)
-import           Control.Monad               (when,void,join,liftM,unless,zipWithM_)
+import           Control.Monad               (when,void,join,liftM,unless,mapAndUnzipM, zipWithM_)
 import           Control.Monad.Catch
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
@@ -177,7 +177,7 @@ cabalSolver menv cabalfps constraintType
                       . T.words
                       . T.drop 1
                       . T.dropWhile (/= ':')
-        in concat $ map pkgName (filter select ls)
+        in concatMap pkgName (filter select ls)
 
     parseCabalOutput bs = do
         let ls = drop 1
@@ -393,10 +393,9 @@ solveResolverSpec stackYaml cabalDirs
         -- 1. We do not want snapshot versions to override the sources
         -- 2. Sources may have blank versions leading to bad cabal constraints
         depOnlyConstraints = Map.difference depConstraints srcConstraints
-        solver t = cabalSolver menv cabalDirs t
-                               srcConstraints depOnlyConstraints $
-                          ["-v"] -- TODO make it conditional on debug
-                       ++ ["--ghcjs" | whichCompiler compilerVer == Ghcjs]
+        solver t = cabalSolver menv cabalDirs t srcConstraints depOnlyConstraints $
+                     "-v" : -- TODO make it conditional on debug
+                     ["--ghcjs" | whichCompiler compilerVer == Ghcjs]
 
     let srcNames = T.intercalate " and " $
           ["packages from " <> resolverName resolver
@@ -440,7 +439,7 @@ solveResolverSpec stackYaml cabalDirs
                 inVers   = fmap fst srcConstraints
                 bothVers = Map.intersectionWith (\v1 v2 -> (v1, v2))
                                                 inVers outVers
-            when (not $ outVers `Map.isSubmapOf` inVers) $ do
+            unless (outVers `Map.isSubmapOf` inVers) $ do
                 let msg = "Error: user package versions returned by cabal \
                           \solver are not the same as the versions in the \
                           \cabal files:\n"
@@ -558,7 +557,7 @@ cabalPackagesCheck cabalfps noPkgMsg dupErrMsg = do
     $logInfo $ "Using cabal packages:"
     $logInfo $ T.pack (formatGroup relpaths)
 
-    (warnings, gpds) <- fmap unzip (mapM readPackageUnresolved cabalfps)
+    (warnings, gpds) <- mapAndUnzipM readPackageUnresolved cabalfps
     zipWithM_ (mapM_ . printCabalFileWarning) cabalfps warnings
 
     -- package name cannot be empty or missing otherwise
@@ -745,13 +744,13 @@ solveExtraDeps modStackYaml = do
                         ]
 
         printFlags fl msg = do
-            when ((not . Map.null) fl) $ do
+            unless (Map.null fl) $ do
                 $logInfo $ T.pack msg
                 $logInfo $ indent $ decodeUtf8 $ Yaml.encode
                                   $ object ["flags" .= fl]
 
         printDeps deps msg = do
-            when ((not . Map.null) deps) $ do
+            unless (Map.null deps) $ do
                 $logInfo $ T.pack msg
                 $logInfo $ indent $ decodeUtf8 $ Yaml.encode $ object
                         ["extra-deps" .= map fromTuple (Map.toList deps)]

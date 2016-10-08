@@ -29,7 +29,7 @@ import           Control.Monad.IO.Class (MonadIO,liftIO)
 import           Control.Monad.Logger (MonadLogger,logError,logInfo,logWarn)
 import           Control.Monad.Reader (MonadReader,asks,runReaderT)
 import           Control.Monad.Writer (execWriter,runWriter,tell)
-import           Control.Monad.Trans.Control (MonadBaseControl)
+import           Control.Monad.Trans.Control (MonadBaseControl, liftBaseWith)
 import qualified "cryptohash" Crypto.Hash as Hash
 import           Data.Aeson.Extended (FromJSON(..),(.:),(.:?),(.!=),eitherDecode)
 import           Data.ByteString.Builder (stringUtf8,charUtf8,toLazyByteString)
@@ -82,7 +82,6 @@ import           Text.Printf (printf)
 
 #ifndef WINDOWS
 import           Control.Concurrent (threadDelay)
-import           Control.Monad.Trans.Control (liftBaseWith)
 import           System.Posix.Signals
 import qualified System.Posix.User as PosixUser
 #endif
@@ -720,7 +719,7 @@ checkDockerVersion envOverride docker =
        _ -> throwM InvalidVersionOutputException
   where minimumDockerVersion = $(mkVersion "1.6.0")
         prohibitedDockerVersions = []
-        stripVersion v = fst $ break (== '-') $ dropWhileEnd (not . isDigit) v
+        stripVersion v = takeWhile (/= '-') (dropWhileEnd (not . isDigit) v)
 
 -- | Remove the project's Docker sandbox.
 reset :: (MonadIO m, MonadReader env m, HasConfig env)

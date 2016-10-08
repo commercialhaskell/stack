@@ -415,7 +415,7 @@ getWorkingResolverPlan whichCmd stackYaml initOpts bundle resolver = do
                         go available
                     where
                       indent t   = T.unlines $ fmap ("    " <>) (T.lines t)
-                      isAvailable k _ = not (k `elem` ignored)
+                      isAvailable k _ = notElem k ignored
                       available       = Map.filterWithKey isAvailable info
 
 checkBundleResolver
@@ -488,8 +488,8 @@ checkBundleResolver whichCmd stackYaml initOpts bundle resolver = do
               getFlags pkg = fromJust (Map.lookup pkg flags)
               deps pkg = gpdPackageDeps (getGpd pkg) compiler platform
                                         (getFlags pkg)
-              allDeps = concat $ map (Map.keys . deps) packages
-              isIndependent pkg = not $ pkg `elem` allDeps
+              allDeps = concatMap (Map.keys . deps) packages
+              isIndependent pkg = notElem pkg allDeps
 
               -- prefer to reject packages in deeper directories
               path pkg = fst (fromJust (Map.lookup pkg bundle))

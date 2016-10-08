@@ -20,6 +20,7 @@ module Stack.Ghci
     , renderScriptIntero
     ) where
 
+import           Control.Arrow
 import           Control.Applicative
 import           Control.Exception.Enclosed (tryAny)
 import           Control.Monad hiding (forM)
@@ -550,7 +551,7 @@ checkForDuplicateModules pkgs = do
     duplicates = filter (not . null . tail . snd) allModules
     allModules =
         M.toList $ M.fromListWith (++) $
-        concatMap (\pkg -> map (, [ghciPkgName pkg]) (map display (S.toList (ghciPkgModules pkg)))) pkgs
+        concatMap (\pkg -> map ((, [ghciPkgName pkg]) . display) (S.toList (ghciPkgModules pkg))) pkgs
 
 -- Adds in intermediate dependencies between ghci targets. Note that it
 -- will return a Lib component for these intermediate dependencies even
@@ -569,7 +570,7 @@ getExtraLoadDeps loadAllDeps sourceMap targets =
     (\mp -> foldl' (flip M.delete) mp (map fst targets)) $
     M.mapMaybe id $
     execState (mapM_ (mapM_ go . getDeps . fst) targets)
-              (M.fromList (map (\(k, x) -> (k, Just x)) targets))
+              (M.fromList (map (second Just) targets))
   where
     getDeps :: PackageName -> [PackageName]
     getDeps name =
