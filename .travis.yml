@@ -17,6 +17,7 @@ cache:
         - $HOME/.stack
 
 matrix:
+  fast_finish: true
   include:
     - env: BUILD=cabal CABALVER=1.24 GHCVER=7.8.4 STACK_YAML=stack-7.8.yaml
       compiler: ": #GHC 7.8.4"
