@@ -42,6 +42,8 @@ Other enhancements:
 * Information on the latest available snapshots is now downloaded from S3 instead of
   stackage.org, increasing reliability in case of stackage.org outages.
   [#2653](https://github.com/commercialhaskell/stack/pull/2653)
+* Try to limit line lengths in exception messages to 100 chars.
+  [#2683](https://github.com/commercialhaskell/stack/pull/2683)
 
 Bug fixes:
 
