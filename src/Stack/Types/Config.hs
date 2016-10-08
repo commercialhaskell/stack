@@ -1108,6 +1108,7 @@ data ConfigException
   | BadStackRoot (Path Abs Dir)
   | Won'tCreateStackRootInDirectoryOwnedByDifferentUser (Path Abs Dir) (Path Abs Dir) -- ^ @$STACK_ROOT@, parent dir
   | UserDoesn'tOwnDirectory (Path Abs Dir)
+  | FailedToCloneRepo String
   deriving Typeable
 instance Show ConfigException where
     show (ParseConfigFileException configFile exception) = concat
@@ -1202,6 +1203,13 @@ instance Show ConfigException where
         , "\nRetry with '--"
         , T.unpack configMonoidAllowDifferentUserName
         , "' to disable this precaution."
+        ]
+    show (FailedToCloneRepo commandName) = concat
+        [ "Failed to use "
+        , commandName
+        , " to clone the repo.  Please ensure that "
+        , commandName
+        , " is installed and available to stack on your PATH environment variable."
         ]
 instance Exception ConfigException
 

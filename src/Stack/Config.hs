@@ -590,12 +590,14 @@ resolvePackageLocation menv projRoot (PLRemote url remotePackageType) = do
 
     exists <- doesDirExist dir
     let cloneAndExtract commandName cloneArgs resetCommand commit = do
-            ensureDir (parent dir)
+            ensureDir root
             if exists
                 then handleError (doReset True)
                 else do
                     doClone
                     doReset False
+            created <- doesDirExist dir
+            unless created $ throwM $ FailedToCloneRepo commandName
             return dir
           where
             handleError = handle $ \case
