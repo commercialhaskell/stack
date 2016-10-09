@@ -2,6 +2,7 @@
 module Network.HTTP.Download.VerifiedSpec where
 
 import Crypto.Hash
+import Control.Applicative
 import Control.Monad.IO.Class (MonadIO)
 import Control.Monad.Logger (LoggingT, runStdoutLoggingT)
 import Control.Monad.Trans.Reader
@@ -12,6 +13,7 @@ import Network.HTTP.Client.TLS (getGlobalManager)
 import Network.HTTP.Download.Verified
 import Path
 import Path.IO
+import Prelude
 import Test.Hspec
 
 -- TODO: share across test files

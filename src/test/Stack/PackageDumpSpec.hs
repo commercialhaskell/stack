@@ -1,27 +1,29 @@
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE TupleSections #-}
+{-# LANGUAGE TemplateHaskell   #-}
+{-# LANGUAGE TupleSections     #-}
 module Stack.PackageDumpSpec where
 
-import Data.Conduit
-import qualified Data.Conduit.List as CL
-import qualified Data.Conduit.Binary as CB
-import           Data.Conduit.Text (decodeUtf8)
-import Control.Monad.Trans.Resource (runResourceT)
-import Stack.PackageDump
-import Stack.Types.GhcPkgId
-import Stack.Types.PackageIdentifier
-import Stack.Types.PackageName
-import Stack.Types.Version
-import Stack.Types.Compiler
-import Test.Hspec
-import Test.Hspec.QuickCheck
-import System.Process.Read
-import Control.Monad.Logger
-import Distribution.System (buildPlatform)
-import qualified Data.Map as Map
-import Data.Map (Map)
-import qualified Data.Set as Set
+import           Control.Applicative
+import           Control.Monad.Logger
+import           Control.Monad.Trans.Resource  (runResourceT)
+import           Data.Conduit
+import qualified Data.Conduit.Binary           as CB
+import qualified Data.Conduit.List             as CL
+import           Data.Conduit.Text             (decodeUtf8)
+import           Data.Map                      (Map)
+import qualified Data.Map                      as Map
+import qualified Data.Set                      as Set
+import           Distribution.System           (buildPlatform)
+import           Prelude
+import           Stack.PackageDump
+import           Stack.Types.Compiler
+import           Stack.Types.GhcPkgId
+import           Stack.Types.PackageIdentifier
+import           Stack.Types.PackageName
+import           Stack.Types.Version
+import           System.Process.Read
+import           Test.Hspec
+import           Test.Hspec.QuickCheck
 
 main :: IO ()
 main = hspec spec
