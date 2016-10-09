@@ -148,8 +148,8 @@ fileContentsMatch f1 f2 = do
     doesExist f2
     f1Contents <- readFile f1
     f2Contents <- readFile f2
-    unless (f1Contents == f2Contents) $ error
-      "contents do not match for " ++ show f1 ++ " " ++ show f2
+    unless (f1Contents == f2Contents) $
+        error ("contents do not match for " ++ show f1 ++ " " ++ show f2)
 
 logInfo :: String -> IO ()
 logInfo = hPutStrLn stderr
