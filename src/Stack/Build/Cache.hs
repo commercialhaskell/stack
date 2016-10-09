@@ -31,6 +31,7 @@ module Stack.Build.Cache
     , BuildCache(..)
     ) where
 
+import           Control.Applicative
 import           Control.DeepSeq (NFData)
 import           Control.Exception.Enclosed (handleIO, tryAnyDeep)
 import           Control.Monad (liftM)
@@ -62,6 +63,7 @@ import qualified Data.Text as T
 import           Data.Traversable (forM)
 import           Path
 import           Path.IO
+import           Prelude -- Fix redundant import warnings
 import           Stack.Constants
 import           Stack.Types.Build
 import           Stack.Types.Compiler

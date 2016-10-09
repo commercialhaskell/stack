@@ -24,6 +24,7 @@ import qualified Data.Set as S
 import           Data.Text (Text)
 import           Data.Text.Encoding (encodeUtf8Builder)
 import           Path
+import           Prelude -- Fix redundant imports warnings
 import           System.IO
 
 import           Distribution.ModuleName hiding (toFilePath)
