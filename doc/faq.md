@@ -155,23 +155,39 @@ the following line to your .cabal file:
 
 ## I already have GHC installed, can I still use stack?
 
-Yes. stack will default to using whatever GHC is on your `PATH`. If that GHC is
-a compatible version with the snapshot you're using, it will simply use it.
-Otherwise, it will prompt you to run `stack setup`. Note that `stack setup`
-installs GHC into `~/.stack/programs/$platform/ghc-$version/` and not a global
-location.
+Yes. In its default configuration, stack will simply ignore any system GHC
+installation and use a sandboxed GHC that it has installed itself (typically
+via the `stack setup` command). You can find these sandboxed GHC installations
+in `~/.stack/programs/$platform/ghc-$version/`.
 
-Note that GHC installation doesn't work for all OSes, so in some cases the
-first option will need to install GHC yourself.
+If you would like stack to use your system GHC installation, use the
+[`--system-ghc` flag](yaml_configuration.md#system-ghc) or run
+`stack config set system-ghc --global true` to make stack check your
+`PATH` for a suitable GHC by default.
+
+Note that stack can only use a system GHC installation if its version is
+compatible with the configuration of the current project, particularly the
+[`resolver` setting](yaml_configuration.md#resolver).
+
+Note that GHC installation doesn't work for all OSes, so in some cases you
+will need to use `system-ghc` and install GHC yourself.
 
 ## How does stack determine what GHC to use?
 
-It uses the first GHC that it finds on the `PATH`. If that GHC does not comply
-with the various requirements (version, architecture) that your project needs,
-it will prompt you to run `stack setup` to get it. `stack` is fully aware of
-all GHCs that it has installed itself.
+In its default configuration, stack determines from the current project which
+GHC version, architecture etc. it needs. It then looks in
+`~/.stack/programs/$platform/ghc-$version/` for a compatible GHC, requesting
+to install one via `stack setup` if none is found.
 
-See [this issue](https://github.com/commercialhaskell/stack/issues/420) for a detailed discussion.
+If you are using the [`--system-ghc` flag](yaml_configuration.md/#system-ghc) or
+have configured `system-ghc: true` either in the project `stack.yaml`
+or the global `~/.stack/config.yaml`, stack will use the first GHC that it finds
+on your `PATH`, falling back on its sandboxed installations only if the found GHC
+doesn't comply with the various requirements (version, architecture) that your
+project needs.
+
+See [this issue](https://github.com/commercialhaskell/stack/issues/420) for a
+detailed discussion of stack's behavior when `system-ghc` is enabled.
 
 ## How do I upgrade to GHC 7.10.2 with stack?
 
