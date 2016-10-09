@@ -1,20 +1,20 @@
 {-# LANGUAGE RecordWildCards #-}
 module Network.HTTP.Download.VerifiedSpec where
 
-import Crypto.Hash
-import Control.Applicative
-import Control.Monad.IO.Class (MonadIO)
-import Control.Monad.Logger (LoggingT, runStdoutLoggingT)
-import Control.Monad.Trans.Reader
-import Control.Retry (limitRetries)
-import Data.Maybe
-import Network.HTTP.Client.Conduit
-import Network.HTTP.Client.TLS (getGlobalManager)
-import Network.HTTP.Download.Verified
-import Path
-import Path.IO
-import Prelude
-import Test.Hspec
+import           Control.Applicative
+import           Control.Monad.IO.Class         (MonadIO)
+import           Control.Monad.Logger           (LoggingT, runStdoutLoggingT)
+import           Control.Monad.Trans.Reader
+import           Control.Retry                  (limitRetries)
+import           Crypto.Hash
+import           Data.Maybe
+import           Network.HTTP.Client.Conduit
+import           Network.HTTP.Client.TLS        (getGlobalManager)
+import           Network.HTTP.Download.Verified
+import           Path
+import           Path.IO
+import           Prelude -- Fix redundant imports warnings
+import           Test.Hspec
 
 -- TODO: share across test files
 withTempDir' :: (Path Abs Dir -> IO a) -> IO a

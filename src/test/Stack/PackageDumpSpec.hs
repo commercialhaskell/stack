@@ -14,7 +14,7 @@ import           Data.Map                      (Map)
 import qualified Data.Map                      as Map
 import qualified Data.Set                      as Set
 import           Distribution.System           (buildPlatform)
-import           Prelude
+import           Prelude -- Fix redundant imports warnings
 import           Stack.PackageDump
 import           Stack.Types.Compiler
 import           Stack.Types.GhcPkgId
