@@ -345,6 +345,8 @@ data Config =
          ,configDumpLogs            :: !DumpLogs
          -- ^ Dump logs of local non-dependencies when doing a build.
          ,configMaybeProject        :: !(Maybe (Project, Path Abs File))
+         -- ^ 'Just' when a local project can be found, 'Nothing' when stack must
+         -- fall back on the implicit global project.
          }
 
 -- | Which packages do ghc-options on the command line apply to?

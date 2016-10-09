@@ -29,6 +29,7 @@ module Stack.Config
   ,packagesParser
   ,resolvePackageEntry
   ,getImplicitGlobalProjectDir
+  ,getStackYaml
   ,getSnapshots
   ,makeConcreteResolver
   ,checkOwnership
@@ -140,6 +141,17 @@ getImplicitGlobalProjectDir config =
         (implicitGlobalProjectDirDeprecated stackRoot)
   where
     stackRoot = configStackRoot config
+
+-- | This is slightly more expensive than @'asks' ('bcStackYaml' '.' 'getBuildConfig')@
+-- and should only be used when no 'BuildConfig' is at hand.
+getStackYaml
+    :: (MonadIO m, MonadLogger m, MonadReader env m, HasConfig env)
+    => m (Path Abs File)
+getStackYaml = do
+    config <- asks getConfig
+    case configMaybeProject config of
+        Just (_project, stackYaml) -> return stackYaml
+        Nothing -> liftM (</> stackDotYaml) (getImplicitGlobalProjectDir config)
 
 -- | Download the 'Snapshots' value from stackage.org.
 getSnapshots :: (MonadThrow m, MonadMask m, MonadIO m, MonadReader env m, HasHttpManager env, HasConfig env, MonadLogger m)

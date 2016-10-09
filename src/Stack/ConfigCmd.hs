@@ -12,6 +12,7 @@ module Stack.ConfigCmd
        ,cfgCmdName) where
 
 import           Control.Applicative
+import           Control.Monad
 import           Control.Monad.Catch (MonadMask, throwM)
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
@@ -29,7 +30,7 @@ import qualified Options.Applicative.Types as OA
 import           Path
 import           Prelude -- Silence redundant import warnings
 import           Stack.BuildPlan
-import           Stack.Config (makeConcreteResolver)
+import           Stack.Config (makeConcreteResolver, getStackYaml)
 import           Stack.Types.BuildPlan
 import           Stack.Types.Config
 
@@ -56,18 +57,18 @@ cfgCmdSet :: ( MonadIO m
              , MonadBaseControl IO m
              , MonadMask m
              , MonadReader env m
-             , HasBuildConfig env
+             , HasConfig env
              , HasHttpManager env
              , HasGHCVariant env
              , MonadLogger m)
              => ConfigCmdSet -> m ()
 cfgCmdSet cmd = do
     configFilePath <-
-        asks
-            (toFilePath .
-             case configCmdSetScope cmd of
-                 CommandScopeProject -> bcStackYaml . getBuildConfig
-                 CommandScopeGlobal -> configUserConfigPath . getConfig)
+        liftM
+            toFilePath
+            (case configCmdSetScope cmd of
+                 CommandScopeProject -> getStackYaml
+                 CommandScopeGlobal -> asks (configUserConfigPath . getConfig))
     -- We don't need to worry about checking for a valid yaml here
     (config :: Yaml.Object) <-
         liftIO (Yaml.decodeFileEither configFilePath) >>= either throwM return
@@ -87,7 +88,7 @@ cfgCmdSetValue
        , MonadBaseControl IO m
        , MonadMask m
        , MonadReader env m
-       , HasBuildConfig env
+       , HasConfig env
        , HasHttpManager env
        , HasGHCVariant env
        , MonadLogger m)
