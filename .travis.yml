@@ -45,8 +45,6 @@ matrix:
 
     allow_failures:
       - env: BUILD=stack STACK_YAML=stack.yaml
-        compiler: ": #stack 7.10.3 osx"
-        os: osx
 
 
 # Note: the distinction between `before_install` and `install` is not important.
