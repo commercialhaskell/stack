@@ -32,14 +32,17 @@ import           Control.Monad.Logger
 import           Control.Monad.Reader (MonadReader, asks)
 import           Control.Monad.Trans.Control (liftBaseWith)
 import           Control.Monad.Trans.Resource
+import qualified Crypto.Hash.SHA256 as SHA256
 import           Data.Attoparsec.Text hiding (try)
 import qualified Data.ByteString as S
+import qualified Data.ByteString.Base64.URL as B64URL
 import           Data.Char (isSpace)
 import           Data.Conduit
 import qualified Data.Conduit.Binary as CB
 import qualified Data.Conduit.List as CL
 import qualified Data.Conduit.Text as CT
 import           Data.Either (isRight)
+import           Data.FileEmbed (embedFile, makeRelativeToProject)
 import           Data.Foldable (forM_, any)
 import           Data.Function
 import           Data.IORef.RunOnce (runOnce)
@@ -55,7 +58,7 @@ import           Data.Streaming.Process hiding (callProcess, env)
 import           Data.String
 import           Data.Text (Text)
 import qualified Data.Text as T
-import           Data.Text.Encoding (decodeUtf8)
+import           Data.Text.Encoding (decodeUtf8, encodeUtf8)
 import           Data.Text.Extra (stripCR)
 import           Data.Time.Clock (getCurrentTime)
 import           Data.Traversable (forM)
@@ -218,6 +221,8 @@ data ExecuteEnv = ExecuteEnv
     , eeTempDir        :: !(Path Abs Dir)
     , eeSetupHs        :: !(Path Abs File)
     -- ^ Temporary Setup.hs for simple builds
+    , eeSetupShimHs    :: !(Path Abs File)
+    -- ^ Temporary SetupShim.hs, to provide access to initial-build-steps
     , eeSetupExe       :: !(Maybe (Path Abs File))
     -- ^ Compiled version of eeSetupHs
     , eeCabalPkgVer    :: !Version
@@ -231,20 +236,46 @@ data ExecuteEnv = ExecuteEnv
     , eeLogFiles       :: !(TChan (Path Abs Dir, Path Abs File))
     }
 
+buildSetupArgs :: [String]
+buildSetupArgs =
+     [ "-rtsopts"
+     , "-threaded"
+     , "-clear-package-db"
+     , "-global-package-db"
+     , "-hide-all-packages"
+     , "-package"
+     , "base"
+     , "-main-is"
+     , "StackSetupShim.mainOverride"
+     ]
+
+setupGhciShimCode :: S.ByteString
+setupGhciShimCode = $(do
+    path <- makeRelativeToProject "src/setup-shim/StackSetupShim.hs"
+    embedFile path)
+
+simpleSetupHash :: String
+simpleSetupHash =
+    T.unpack $ decodeUtf8 $ S.take 8 $ B64URL.encode $ SHA256.hash $
+    encodeUtf8 (T.pack (unwords buildSetupArgs)) <> setupGhciShimCode
+
 -- | Get a compiled Setup exe
 getSetupExe :: M env m
             => Path Abs File -- ^ Setup.hs input file
+            -> Path Abs File -- ^ SetupShim.hs input file
             -> Path Abs Dir -- ^ temporary directory
             -> m (Maybe (Path Abs File))
-getSetupExe setupHs tmpdir = do
+getSetupExe setupHs setupShimHs tmpdir = do
     wc <- getWhichCompiler
     econfig <- asks getEnvConfig
     platformDir <- platformGhcRelDir
     let config = getConfig econfig
         baseNameS = concat
-            [ "setup-Simple-Cabal-"
+            [ "Cabal-simple_"
+            , simpleSetupHash
+            , "_"
             , versionString $ envConfigCabalVersion econfig
-            , "-"
+            , "_"
             , compilerVersionString $ envConfigCompilerVersion econfig
             ]
         exeNameS = baseNameS ++
@@ -277,19 +308,13 @@ getSetupExe setupHs tmpdir = do
             liftIO $ D.createDirectoryIfMissing True $ toFilePath setupDir
 
             menv <- getMinimalEnvOverride
-            let args =
-                    [ "-clear-package-db"
-                    , "-global-package-db"
-                    , "-hide-all-packages"
-                    , "-package"
-                    , "base"
-                    , "-package"
+            let args = buildSetupArgs ++
+                    [ "-package"
                     , "Cabal-" ++ versionString (envConfigCabalVersion econfig)
                     , toFilePath setupHs
+                    , toFilePath setupShimHs
                     , "-o"
                     , toFilePath tmpOutputPath
-                    , "-rtsopts"
-                    , "-threaded"
                     ] ++
                     ["-build-runner" | wc == Ghcjs]
             runCmd' (\cp -> cp { std_out = UseHandle stderr }) (Cmd (Just tmpdir) (compilerExeName wc) menv args) Nothing
@@ -314,9 +339,11 @@ withExecuteEnv menv bopts boptsCli baseConfigOpts locals globalPackages snapshot
         configLock <- newMVar ()
         installLock <- newMVar ()
         idMap <- liftIO $ newTVarIO Map.empty
-        let setupHs = tmpdir </> $(mkRelFile "Setup.hs")
+        let setupHs = tmpdir </> $(mkRelFile "Main.hs")
         liftIO $ writeFile (toFilePath setupHs) "import Distribution.Simple\nmain = defaultMain"
-        setupExe <- getSetupExe setupHs tmpdir
+        let setupShimHs = tmpdir </> $(mkRelFile "SetupShim.hs")
+        liftIO $ S.writeFile (toFilePath setupShimHs) setupGhciShimCode
+        setupExe <- getSetupExe setupHs setupShimHs tmpdir
         cabalPkgVer <- asks (envConfigCabalVersion . getEnvConfig)
         globalDB <- getGlobalDB menv =<< getWhichCompiler
         snapshotPackagesTVar <- liftIO $ newTVarIO (toDumpPackagesByGhcPkgId snapshotPackages)
@@ -337,6 +364,7 @@ withExecuteEnv menv bopts boptsCli baseConfigOpts locals globalPackages snapshot
             , eeGhcPkgIds = idMap
             , eeTempDir = tmpdir
             , eeSetupHs = setupHs
+            , eeSetupShimHs = setupShimHs
             , eeSetupExe = setupExe
             , eeCabalPkgVer = cabalPkgVer
             , eeTotalWanted = totalWanted
@@ -996,6 +1024,9 @@ withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} md
                         , "-i", "-i."
                         ] ++ packageArgs ++
                         [ toFilePath setuphs
+                        , toFilePath eeSetupShimHs
+                        , "-main-is"
+                        , "StackSetupShim.mainOverride"
                         , "-o", toFilePath outputFile
                         , "-threaded"
                         ] ++
@@ -1140,9 +1171,21 @@ singleBuild runInBase ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} in
         $ \package cabalfp pkgDir cabal announce _console _mlogFile -> do
             _neededConfig <- ensureConfig cache pkgDir ee (announce ("configure" <> annSuffix)) cabal cabalfp
 
-            if boptsCLIOnlyConfigure eeBuildOptsCLI
-                then return Nothing
-                else liftM Just $ realBuild cache package pkgDir cabal announce
+            case ( boptsCLIOnlyConfigure eeBuildOptsCLI
+                 , boptsCLIInitialBuildSteps eeBuildOptsCLI && isTarget) of
+                (True, _) -> return Nothing
+                (_, True) -> do
+                    initialBuildSteps cabal announce
+                    return Nothing
+                _ -> liftM Just $ realBuild cache package pkgDir cabal announce
+
+    isTarget = case taskType of
+        TTLocal lp -> lpWanted lp
+        _ -> False
+
+    initialBuildSteps cabal announce = do
+        () <- announce ("initial-build-steps" <> annSuffix)
+        cabal False ["repl", "stack-initial-build-steps"]
 
     realBuild cache package pkgDir cabal announce = do
         wc <- getWhichCompiler

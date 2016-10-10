@@ -76,7 +76,11 @@ buildOptsParser cmd =
         (long "only-configure" <>
          help
              "Only perform the configure step, not any builds. Intended for tool usage, may break when used on multiple packages at once!") <*>
-    pure cmd
+    pure cmd <*>
+    switch
+        (long "initial-build-steps" <>
+         help "For target packages, only run initial build steps needed for GHCi" <>
+         internal)
 
 targetsParser :: Parser [Text]
 targetsParser =

@@ -12,8 +12,7 @@ import           Stack.Types.Config
 -- | Parser for GHCI options
 ghciOptsParser :: Parser GhciOpts
 ghciOptsParser = GhciOpts
-             <$> switch (long "no-build" <> help "Don't build before launching GHCi")
-             <*> fmap concat (many (argsOption (long "ghci-options" <>
+             <$> fmap concat (many (argsOption (long "ghci-options" <>
                                        metavar "OPTION" <>
                                        help "Additional options passed to GHCi")))
              <*> optional
@@ -33,3 +32,4 @@ ghciOptsParser = GhciOpts
              <*> switch (long "skip-intermediate-deps" <> help "Skip loading intermediate target dependencies")
              <*> boolFlags True "package-hiding" "package hiding" idm
              <*> buildOptsParser Build
+             <*> switch (long "no-build" <> help "Don't build before launching GHCi (deprecated, should be unneeded)")

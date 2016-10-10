@@ -6,6 +6,12 @@ Release notes:
 
 Major changes:
 
+* `stack ghci` now defaults to skipping the build of target packages, because
+  support has been added for invoking "initial build steps", which create
+  autogen files and run preprocessors. The `--no-build` flag is now deprecated
+  because it should no longer be necessary. See
+  [#1364](https://github.com/commercialhaskell/stack/issues/1364)
+
 Behavior changes:
 
 * Switch the "Run from outside project" messages to debug-level, to
