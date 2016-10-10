@@ -43,6 +43,12 @@ matrix:
       compiler: ": #stack 8.0.1"
       addons: {apt: {packages: [ghc-8.0.1], sources: [hvr-ghc]}}
 
+    allow_failures:
+      - env: BUILD=stack STACK_YAML=stack.yaml
+        compiler: ": #stack 7.10.3 osx"
+        os: osx
+
+
 # Note: the distinction between `before_install` and `install` is not important.
 # - in before_install we install build tools
 # - in install we install (haskell) dependencies
