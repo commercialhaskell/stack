@@ -2,14 +2,15 @@
 
 module Stack.Options.DotParser where
 
-import           Data.Char                         (isSpace)
-import           Data.List.Split                   (splitOn)
+import           Data.Char (isSpace)
+import           Data.List.Split (splitOn)
 import           Data.Monoid.Extra
-import qualified Data.Set                          as Set
-import qualified Data.Text                         as T
+import qualified Data.Set as Set
+import qualified Data.Text as T
 import           Options.Applicative
 import           Options.Applicative.Builder.Extra
 import           Stack.Dot
+import           Stack.Options.BuildParser (targetsParser, flagsParser)
 
 -- | Parser for arguments to `stack dot`
 dotOptsParser :: Bool -> Parser DotOpts
@@ -18,6 +19,10 @@ dotOptsParser externalDefault =
           <*> includeBase
           <*> depthLimit
           <*> fmap (maybe Set.empty Set.fromList . fmap splitNames) prunedPkgs
+          <*> targetsParser
+          <*> flagsParser
+          <*> testTargets
+          <*> benchTargets
   where includeExternal = boolFlags externalDefault
                                     "external"
                                     "inclusion of external dependencies"
@@ -38,6 +43,10 @@ dotOptsParser externalDefault =
                                     help ("Prune each package name " <>
                                           "from the comma separated list " <>
                                           "of package names PACKAGES")))
+        testTargets = switch (long "test" <>
+                              help "Consider dependencies of test components")
+        benchTargets = switch (long "bench" <>
+                               help "Consider dependencies of benchmark components")
 
         splitNames :: String -> [String]
         splitNames = map (takeWhile (not . isSpace) . dropWhile isSpace) . splitOn ","

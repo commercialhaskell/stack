@@ -1,6 +1,7 @@
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TemplateHaskell #-}
 module Stack.Dot (dot
                  ,listDependencies
                  ,DotOpts(..)
@@ -49,22 +50,30 @@ import           Stack.Types.Internal (HasLogLevel, HasTerminal)
 
 -- | Options record for @stack dot@
 data DotOpts = DotOpts
-    { dotIncludeExternal :: Bool
+    { dotIncludeExternal :: !Bool
     -- ^ Include external dependencies
-    , dotIncludeBase :: Bool
+    , dotIncludeBase :: !Bool
     -- ^ Include dependencies on base
-    , dotDependencyDepth :: Maybe Int
+    , dotDependencyDepth :: !(Maybe Int)
     -- ^ Limit the depth of dependency resolution to (Just n) or continue until fixpoint
-    , dotPrune :: Set String
+    , dotPrune :: !(Set String)
     -- ^ Package names to prune from the graph
+    , dotTargets :: [Text]
+    -- ^ stack TARGETs to trace dependencies for
+    , dotFlags :: !(Map (Maybe PackageName) (Map FlagName Bool))
+    -- ^ Flags to apply when calculating dependencies
+    , dotTestTargets :: Bool
+    -- ^ Like the "--test" flag for build, affects the meaning of 'dotTargets'.
+    , dotBenchTargets :: Bool
+    -- ^ Like the "--bench" flag for build, affects the meaning of 'dotTargets'.
     }
 
 data ListDepsOpts = ListDepsOpts
-    { listDepsDotOpts :: DotOpts
+    { listDepsDotOpts :: !DotOpts
     -- ^ The normal dot options.
-    , listDepsSep :: Text
+    , listDepsSep :: !Text
     -- ^ Separator between the package name and details.
-    , listDepsLicense :: Bool
+    , listDepsLicense :: !Bool
     -- ^ Print dependency licenses instead of versions.
     }
 
@@ -134,7 +143,10 @@ createDependencyGraph :: (HasEnvConfig env
                        -> m (Map PackageName (Set PackageName, DotPayload))
 createDependencyGraph dotOpts = do
   (_,_,locals,_,sourceMap) <- loadSourceMap NeedTargets defaultBuildOptsCLI
-  let graph = Map.fromList (localDependencies dotOpts locals)
+      { boptsCLITargets = dotTargets dotOpts
+      , boptsCLIFlags = dotFlags dotOpts
+      }
+  let graph = Map.fromList (localDependencies dotOpts (filter lpWanted locals))
   menv <- getMinimalEnvOverride
   installedMap <- fmap snd . fst4 <$> getInstalled menv
                                                    (GetInstalledOpts False False)
@@ -229,7 +241,7 @@ resolveDependencies limit graph loadPackageDeps = do
   where unifier (pkgs1,v1) (pkgs2,_) = (Set.union pkgs1 pkgs2, v1)
 
 -- | Given a SourceMap and a dependency loader, load the set of dependencies for a package
-createDepLoader :: Applicative m
+createDepLoader :: (Monad m, Applicative m)
                 => Map PackageName PackageSource
                 -> Map PackageName Installed
                 -> (PackageName -> Version -> Map FlagName Bool -> [Text] -> m (Set PackageName, DotPayload))
@@ -237,7 +249,9 @@ createDepLoader :: Applicative m
                 -> m (Set PackageName, DotPayload)
 createDepLoader sourceMap installed loadPackageDeps pkgName =
   case Map.lookup pkgName sourceMap of
-    Just (PSLocal lp) -> pure ((packageAllDeps &&& payloadFromLocal) (lpPackage lp))
+    Just (PSLocal lp) -> return (packageAllDeps pkg, payloadFromLocal pkg)
+      where
+        pkg = localPackageToPackage lp
     Just (PSUpstream version _ flags ghcOptions _) -> loadPackageDeps pkgName version flags ghcOptions
     Nothing -> pure (Set.empty, payloadFromInstalled (Map.lookup pkgName installed))
   where
@@ -247,13 +261,15 @@ createDepLoader sourceMap installed loadPackageDeps pkgName =
 -- | Resolve the direct (depth 0) external dependencies of the given local packages
 localDependencies :: DotOpts -> [LocalPackage] -> [(PackageName, (Set PackageName, DotPayload))]
 localDependencies dotOpts locals =
-    map (\lp -> (packageName (lpPackage lp), (deps lp, lpPayload $ lpPackage lp))) locals
-  where deps lp = if dotIncludeExternal dotOpts
-                then Set.delete (lpName lp) (packageAllDeps (lpPackage lp))
-                else Set.intersection localNames (packageAllDeps (lpPackage lp))
-        lpName lp = packageName (lpPackage lp)
+    map (\lp -> let pkg = localPackageToPackage lp
+                 in (packageName pkg, (deps pkg, lpPayload pkg)))
+        locals
+  where deps pkg =
+          if dotIncludeExternal dotOpts
+            then Set.delete (packageName pkg) (packageAllDeps pkg)
+            else Set.intersection localNames (packageAllDeps pkg)
         localNames = Set.fromList $ map (packageName . lpPackage) locals
-        lpPayload lp = DotPayload (Just $ packageVersion lp) (Just $ packageLicense lp)
+        lpPayload pkg = DotPayload (Just $ packageVersion pkg) (Just $ packageLicense pkg)
 
 -- | Print a graphviz graph of the edges in the Map and highlight the given local packages
 printGraph :: (Applicative m, MonadIO m)
@@ -311,3 +327,9 @@ printLeaf package = liftIO . Text.putStrLn . Text.concat $
 -- | Check if the package is wired in (shipped with) ghc
 isWiredIn :: PackageName -> Bool
 isWiredIn = (`HashSet.member` wiredInPackages)
+
+localPackageToPackage :: LocalPackage -> Package
+localPackageToPackage lp =
+  case lpTestBench lp of
+    Nothing -> lpPackage lp
+    Just tb -> tb

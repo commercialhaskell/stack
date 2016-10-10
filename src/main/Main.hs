@@ -843,10 +843,13 @@ dockerCleanupCmd cleanupOpts go@GlobalOpts{..} = do
             Docker.cleanup cleanupOpts
 
 cfgSetCmd :: ConfigCmd.ConfigCmdSet -> GlobalOpts -> IO ()
-cfgSetCmd co go@GlobalOpts {..} =
-    withMiniConfigAndLock go $
-    do env <- ask
-       runReaderT (cfgCmdSet co) env
+cfgSetCmd co go@GlobalOpts{..} =
+    withBuildConfigAndLock
+        go
+        (\_ -> do env <- ask
+                  runReaderT
+                      (cfgCmdSet co)
+                      env)
 
 imgDockerCmd :: (Bool, [Text]) -> GlobalOpts -> IO ()
 imgDockerCmd (rebuild,images) go@GlobalOpts{..} = do
@@ -889,11 +892,20 @@ solverCmd fixStackYaml go =
 
 -- | Visualize dependencies
 dotCmd :: DotOpts -> GlobalOpts -> IO ()
-dotCmd dotOpts go = withBuildConfigAndLock go (\_ -> dot dotOpts)
+dotCmd dotOpts go = withBuildConfigDot dotOpts go $ dot dotOpts
 
 -- | List the dependencies
 listDependenciesCmd :: ListDepsOpts -> GlobalOpts -> IO ()
-listDependenciesCmd opts go = withBuildConfig go $ listDependencies opts
+listDependenciesCmd opts go = withBuildConfigDot (listDepsDotOpts opts) go $ listDependencies opts
+
+-- Plumbing for --test and --bench flags
+withBuildConfigDot :: DotOpts -> GlobalOpts -> StackT EnvConfig IO () -> IO ()
+withBuildConfigDot opts go f = withBuildConfig go' f
+  where
+    go' =
+        (if dotTestTargets opts then set (globalOptsBuildOptsMonoid.buildOptsMonoidTests) (Just True) else id) $
+        (if dotBenchTargets opts then set (globalOptsBuildOptsMonoid.buildOptsMonoidBenchmarks) (Just True) else id) $
+        go
 
 -- | Query build information
 queryCmd :: [String] -> GlobalOpts -> IO ()

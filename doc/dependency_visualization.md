@@ -43,3 +43,13 @@ and pass in options to `dot` or use another graph layout engine like `twopi`:
 $ stack dot --external --prune base,lens,wreq-examples,http-client,aeson,tls,http-client-tls,exceptions | twopi -Groot=wreq -Goverlap=false -Tpng -o wreq_pruned.png
 ```
 [![wreq_pruned](https://cloud.githubusercontent.com/assets/591567/8495538/9fae1184-216e-11e5-9931-99e6147f8aed.png)](https://cloud.githubusercontent.com/assets/591567/8495538/9fae1184-216e-11e5-9931-99e6147f8aed.png)
+
+## Specifying local targets and flags
+
+The `dot` and `list-dependencies` commands both also accept the following
+options which affect how local packages are considered:
+
+* `TARGET`, same as the targets passed to `build`
+* `--test`, specifying that test components should be considered
+* `--bench`, specifying that benchmark components should be considered
+* `--flag`, specifying flags which may affect cabal file `build-depends`

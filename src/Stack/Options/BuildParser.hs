@@ -2,28 +2,25 @@
 
 module Stack.Options.BuildParser where
 
-import qualified Data.Map                          as Map
+import qualified Data.Map as Map
 import           Data.Monoid.Extra
-import           Data.Version                      (showVersion)
+import           Data.Text (Text)
+import           Data.Version (showVersion)
 import           Options.Applicative
 import           Options.Applicative.Args
 import           Options.Applicative.Builder.Extra
-import           Paths_stack                       as Meta
-import           Stack.Options.PackageParser       (readFlag)
+import           Paths_stack as Meta
+import           Stack.Options.PackageParser (readFlag)
 import           Stack.Types.Config
+import           Stack.Types.FlagName
+import           Stack.Types.PackageName
 
 -- | Parser for CLI-only build arguments
 buildOptsParser :: BuildCommand
                 -> Parser BuildOptsCLI
 buildOptsParser cmd =
     BuildOptsCLI <$>
-    many
-        (textArgument
-             (metavar "TARGET" <>
-              help ("If none specified, use all packages. " <>
-                    "See https://docs.haskellstack.org/en/v" <>
-                    showVersion Meta.version <>
-                    "/build_command/#target-syntax for details."))) <*>
+    targetsParser <*>
     switch
         (long "dry-run" <>
          help "Don't build anything, just prepare to") <*>
@@ -44,15 +41,7 @@ buildOptsParser cmd =
               (long "ghc-options" <>
                metavar "OPTION" <>
                help "Additional options passed to GHC"))) <*>
-    (Map.unionsWith Map.union <$>
-     many
-         (option
-              readFlag
-              (long "flag" <>
-               metavar "PACKAGE:[-]FLAG" <>
-               help
-                   ("Override flags set in stack.yaml " <>
-                    "(applies to local packages and extra-deps)")))) <*>
+    flagsParser <*>
     (flag'
          BSOnlyDependencies
          (long "dependencies-only" <>
@@ -88,3 +77,25 @@ buildOptsParser cmd =
          help
              "Only perform the configure step, not any builds. Intended for tool usage, may break when used on multiple packages at once!") <*>
     pure cmd
+
+targetsParser :: Parser [Text]
+targetsParser =
+    many
+        (textArgument
+             (metavar "TARGET" <>
+              help ("If none specified, use all local packages. " <>
+                    "See https://docs.haskellstack.org/en/v" <>
+                    showVersion Meta.version <>
+                    "/build_command/#target-syntax for details.")))
+
+flagsParser :: Parser (Map.Map (Maybe PackageName) (Map.Map FlagName Bool))
+flagsParser =
+     (Map.unionsWith Map.union <$>
+     many
+         (option
+              readFlag
+              (long "flag" <>
+               metavar "PACKAGE:[-]FLAG" <>
+               help
+                   ("Override flags set in stack.yaml " <>
+                    "(applies to local packages and extra-deps)"))))
