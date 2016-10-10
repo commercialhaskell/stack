@@ -289,6 +289,7 @@ getSetupExe setupHs tmpdir = do
                     , "-o"
                     , toFilePath tmpOutputPath
                     , "-rtsopts"
+                    , "-threaded"
                     ] ++
                     ["-build-runner" | wc == Ghcjs]
             runCmd' (\cp -> cp { std_out = UseHandle stderr }) (Cmd (Just tmpdir) (compilerExeName wc) menv args) Nothing
@@ -996,6 +997,7 @@ withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} md
                         ] ++ packageArgs ++
                         [ toFilePath setuphs
                         , "-o", toFilePath outputFile
+                        , "-threaded"
                         ] ++
                         (case compiler of
                             Ghc -> []
