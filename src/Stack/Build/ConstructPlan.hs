@@ -354,11 +354,14 @@ installPackage treatAsDep name ps minstalled = do
     ctx <- ask
     case ps of
         PSUpstream version _ flags ghcOptions _ -> do
+            planDebug $ "installPackage: Doing all-in-one build for upstream package " ++ show name
             package <- liftIO $ loadPackage ctx name version flags ghcOptions
-            resolveDepsAndInstall False treatAsDep ps package minstalled
+            resolveDepsAndInstall True treatAsDep ps package minstalled
         PSLocal lp ->
             case lpTestBench lp of
-                Nothing -> resolveDepsAndInstall False treatAsDep ps (lpPackage lp) minstalled
+                Nothing -> do
+                    planDebug $ "installPackage: No test / bench component for " ++ show name ++ " so doing an all-in-one build."
+                    resolveDepsAndInstall True treatAsDep ps (lpPackage lp) minstalled
                 Just tb -> do
                     -- Attempt to find a plan which performs an all-in-one
                     -- build.  Ignore the writer action + reset the state if
@@ -372,6 +375,7 @@ installPackage treatAsDep name ps minstalled = do
                         return (res, writerFunc)
                     case res of
                         Right deps -> do
+                          planDebug $ "installPackage: For " ++ show name ++ ", successfully added package deps"
                           adr <- installPackageGivenDeps True ps tb minstalled deps
                           -- FIXME: this redundantly adds the deps (but
                           -- they'll all just get looked up in the map)
