@@ -42,6 +42,9 @@ Other enhancements:
 * Information on the latest available snapshots is now downloaded from S3 instead of
   stackage.org, increasing reliability in case of stackage.org outages.
   [#2653](https://github.com/commercialhaskell/stack/pull/2653)
+* `stack dot` and `stack list-dependencies` now take targets and flags.
+  [#1919](https://github.com/commercialhaskell/stack/issues/1919)
+
 
 Bug fixes:
 
