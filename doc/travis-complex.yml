@@ -95,9 +95,10 @@ matrix:
     compiler: ": #stack default osx"
     os: osx
 
-  - env: BUILD=stack ARGS="--resolver lts-2"
-    compiler: ": #stack 7.8.4 osx"
-    os: osx
+  # Travis includes an OS X which is incompatible with GHC 7.8.4
+  #- env: BUILD=stack ARGS="--resolver lts-2"
+  #  compiler: ": #stack 7.8.4 osx"
+  #  os: osx
 
   - env: BUILD=stack ARGS="--resolver lts-3"
     compiler: ": #stack 7.10.2 osx"
