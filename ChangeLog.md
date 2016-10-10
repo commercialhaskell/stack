@@ -66,6 +66,8 @@ Bug fixes:
   [#2658](https://github.com/commercialhaskell/stack/pull/2658)
 * Fixed a regression in "stack ghci --no-load", where it would prompt for a main
   module to load. [#2603](https://github.com/commercialhaskell/stack/pull/2603)
+* Build Setup.hs files with the threaded RTS, mirroring the behavior of
+  cabal-install and enabling more complex build systems in those files.
 
 ## 1.2.0
 
