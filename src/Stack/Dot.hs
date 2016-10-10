@@ -241,7 +241,7 @@ resolveDependencies limit graph loadPackageDeps = do
   where unifier (pkgs1,v1) (pkgs2,_) = (Set.union pkgs1 pkgs2, v1)
 
 -- | Given a SourceMap and a dependency loader, load the set of dependencies for a package
-createDepLoader :: (Monad m, Applicative m)
+createDepLoader :: Applicative m
                 => Map PackageName PackageSource
                 -> Map PackageName Installed
                 -> (PackageName -> Version -> Map FlagName Bool -> [Text] -> m (Set PackageName, DotPayload))
@@ -249,7 +249,7 @@ createDepLoader :: (Monad m, Applicative m)
                 -> m (Set PackageName, DotPayload)
 createDepLoader sourceMap installed loadPackageDeps pkgName =
   case Map.lookup pkgName sourceMap of
-    Just (PSLocal lp) -> return (packageAllDeps pkg, payloadFromLocal pkg)
+    Just (PSLocal lp) -> pure (packageAllDeps pkg, payloadFromLocal pkg)
       where
         pkg = localPackageToPackage lp
     Just (PSUpstream version _ flags ghcOptions _) -> loadPackageDeps pkgName version flags ghcOptions
