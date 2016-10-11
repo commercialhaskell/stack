@@ -55,3 +55,34 @@ Please include a
 entry and
 [documentation](https://github.com/commercialhaskell/stack/tree/master/doc/)
 updates with your pull request.
+
+## Code Quality
+
+The Stack projects uses [HLint](https://github.com/ndmitchell/hlint) as a code
+quality tool.
+
+Note that stack contributors need not dogmatically follow the suggested hints
+but are encouraged to debate their usefulness. If you find a hint is not useful
+and detracts from readability, consider marking it in the [configuration
+file](https://github.com/commercialhaskell/stack/blob/master/HLint.hs) to
+be ignored.
+
+Quoting [@mgsloan](https://github.com/commercialhaskell/stack/pulls?utf8=%E2%9C%93&q=is%3Apr%20author%3Amgsloan):
+
+> We are optimizing for code clarity, not code concision or what HLint thinks.
+
+You can install HLint with stack. You might want to install it in the global
+project in case you run into dependency conflicts. HLint can report hints in
+your favourite text editor. Refer to the HLint repository for more details.
+
+To install:
+
+```
+stack install hlint
+```
+
+Once installed, you can check your changes with:
+
+```
+hlint src/ test/ --cpp-simple
+```
