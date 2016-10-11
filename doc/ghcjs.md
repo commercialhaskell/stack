@@ -39,16 +39,16 @@ setup-info:
 
 Or for the latest one based on `ghc-8.0.1` (with more features):
 ```yaml
-resolver: lts-7.2
-compiler: ghcjs-0.2.1.9007002_ghc-8.0.1
+resolver: lts-7.3
+compiler: ghcjs-0.2.1.9007003_ghc-8.0.1
 compiler-check: match-exact
 
 setup-info:
   ghcjs:
     source:
-      ghcjs-0.2.1.9007002_ghc-8.0.1:
-          url: http://ghcjs.tolysz.org/ghc-8.0-2016-10-01-lts-7.2-9007002.tar.gz
-          sha1: a41ae415328e2b257d40724d13d1386390c26322
+      ghcjs-0.2.1.9007003_ghc-8.0.1:
+          url: http://ghcjs.tolysz.org/ghc-8.0-2016-10-11-lts-7.3-9007003.tar.gz
+          sha1: 3196fd5eaed670416083cf3678396d02c50096de
 ```
 The later can be generated via: https://github.com/tolysz/prepare-ghcjs
 the fromer is a bit more manual. Those bundles are only tested against the latest `node-6.7.0`.
@@ -57,6 +57,7 @@ Older resolvers:
 
 |resolver|url|sha1|
 |---|---|---|
+| lts-7.2 | http://ghcjs.tolysz.org/ghc-8.0-2016-10-01-lts-7.2-9007002.tar.gz | a41ae415328e2b257d40724d13d1386390c26322 | 
 | lts-7.1 | http://ghcjs.tolysz.org/ghc-8.0-2016-09-26-lts-7.1-9007001-mem.tar.gz | e640724883238593e2d2f7f03991cb413ec0347b |
 | lts-6.19 | http://ghcjs.tolysz.org/lts-6.19-9006019.tar.gz | ef4264d5a93b269ee4ec8f9d5139da030331d65a |
 | lts-6.18 | http://ghcjs.tolysz.org/lts-6.18-9006018.tar.gz | 3e9f345116c851349a5a551ffd94f7e0b74bfabb |
