@@ -149,24 +149,24 @@ initProject whichCmd currDir initOpts mresolver = do
 
     $logInfo $ "Initialising configuration using resolver: " <> resolverName r
     $logInfo $ "Total number of user packages considered: "
-               <> (T.pack $ show (Map.size bundle + length dupPkgs))
+               <> T.pack (show (Map.size bundle + length dupPkgs))
 
     when (dupPkgs /= []) $ do
         $logWarn $ "Warning! Ignoring "
-                   <> (T.pack $ show $ length dupPkgs)
+                   <> T.pack (show $ length dupPkgs)
                    <> " duplicate packages:"
         rels <- mapM makeRel dupPkgs
         $logWarn $ indent $ showItems rels
 
     when (Map.size ignored > 0) $ do
         $logWarn $ "Warning! Ignoring "
-                   <> (T.pack $ show $ Map.size ignored)
+                   <> T.pack (show $ Map.size ignored)
                    <> " packages due to dependency conflicts:"
         rels <- mapM makeRel (Map.elems (fmap fst ignored))
         $logWarn $ indent $ showItems rels
 
     when (Map.size extraDeps > 0) $ do
-        $logWarn $ "Warning! " <> (T.pack $ show $ Map.size extraDeps)
+        $logWarn $ "Warning! " <> T.pack (show $ Map.size extraDeps)
                    <> " external dependencies were added."
     $logInfo $
         (if exists then "Overwriting existing configuration file: "
@@ -224,7 +224,7 @@ renderStackYaml p ignoredPackages dupPackages =
         | pkgs /= [] =
                B.byteString comment
             <> B.byteString "\n"
-            <> (B.byteString $ BC.pack $ concat
+            <> B.byteString (BC.pack $ concat
                  $ map (\x -> "#- " ++ x ++ "\n") pkgs ++ ["\n"])
         | otherwise = ""
 
@@ -410,12 +410,12 @@ getWorkingResolverPlan whichCmd stackYaml initOpts bundle resolver = do
                           $logWarn $ indent $ showItems ignored
                         else
                           $logWarn $ "*** Ignoring package: "
-                                 <> (T.pack $ packageNameString (head ignored))
+                                 <> T.pack (packageNameString (head ignored))
 
                         go available
                     where
                       indent t   = T.unlines $ fmap ("    " <>) (T.lines t)
-                      isAvailable k _ = notElem k ignored
+                      isAvailable k _ = k `notElem` ignored
                       available       = Map.filterWithKey isAvailable info
 
 checkBundleResolver
@@ -475,7 +475,7 @@ checkBundleResolver whichCmd stackYaml initOpts bundle resolver = do
                       pkg <- findOneIndependent srcpkgs flags
                       return $ Left [pkg]
                   | otherwise -> throwM (SolverGiveUp giveUpMsg)
-                  where srcpkgs = intersect (Map.keys bundle) packages
+                  where srcpkgs = Map.keys bundle `intersect` packages
 
       -- among a list of packages find one on which none among the rest of the
       -- packages depend. This package is a good candidate to be removed from
@@ -489,7 +489,7 @@ checkBundleResolver whichCmd stackYaml initOpts bundle resolver = do
               deps pkg = gpdPackageDeps (getGpd pkg) compiler platform
                                         (getFlags pkg)
               allDeps = concatMap (Map.keys . deps) packages
-              isIndependent pkg = notElem pkg allDeps
+              isIndependent pkg = pkg `notElem` allDeps
 
               -- prefer to reject packages in deeper directories
               path pkg = fst (fromJust (Map.lookup pkg bundle))

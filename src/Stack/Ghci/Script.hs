@@ -82,7 +82,7 @@ commandToBuilder (Add modules)
   | S.null modules = mempty
   | otherwise      =
        fromText ":add "
-    <> (mconcat $ intersperse (fromText " ")
+    <> mconcat (intersperse (fromText " ")
         $ (stringUtf8 . quoteFileName . mconcat . intersperse "." . components) <$> S.toAscList modules)
     <> fromText "\n"
 
@@ -96,10 +96,10 @@ commandToBuilder (Module modules)
   | S.null modules = fromText ":module +\n"
   | otherwise      =
        fromText ":module + "
-    <> (mconcat $ intersperse (fromText " ")
+    <> mconcat (intersperse (fromText " ")
         $ (stringUtf8 . quoteFileName . mconcat . intersperse "." . components) <$> S.toAscList modules)
     <> fromText "\n"
 
 -- | Make sure that a filename with spaces in it gets the proper quotes.
 quoteFileName :: String -> String
-quoteFileName x = if elem ' ' x then show x else x
+quoteFileName x = if ' ' `elem` x then show x else x

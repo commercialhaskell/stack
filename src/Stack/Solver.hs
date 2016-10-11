@@ -161,7 +161,7 @@ cabalSolver menv cabalfps constraintType
                       T.pack (intercalate ", " (map show pkgNames))
                   error $ T.unpack $
                        "*** User packages involved in cabal failure: "
-                       <> (T.intercalate ", " $ parseConflictingPkgs msg)
+                       <> T.intercalate ", " (parseConflictingPkgs msg)
 
             if pkgNames /= [] then do
                   return $ Left pkgNames
@@ -400,7 +400,7 @@ solveResolverSpec stackYaml cabalDirs
     let srcNames = T.intercalate " and " $
           ["packages from " <> resolverName resolver
               | not (Map.null snapConstraints)] ++
-          [T.pack ((show $ Map.size extraConstraints) <> " external packages")
+          [T.pack (show (Map.size extraConstraints) <> " external packages")
               | not (Map.null extraConstraints)]
 
     $logInfo "Asking cabal to calculate a build plan..."
@@ -445,7 +445,7 @@ solveResolverSpec stackYaml cabalDirs
                           \cabal files:\n"
                 -- TODO We can do better in formatting the message
                 error $ T.unpack $ msg
-                        <> (showItems $ map show (Map.toList bothVers))
+                        <> showItems (map show (Map.toList bothVers))
 
             $logInfo $ "Successfully determined a build plan with "
                      <> T.pack (show $ Map.size external)

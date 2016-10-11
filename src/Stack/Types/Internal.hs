@@ -108,7 +108,7 @@ buildOptsInstallExes =
 envConfigBuildOpts :: Lens' EnvConfig BuildOpts
 envConfigBuildOpts =
     lens
-        (\envCfg -> configBuild (bcConfig (envConfigBuildConfig envCfg)))
+        (configBuild . bcConfig . envConfigBuildConfig)
         (\envCfg bopts ->
               envCfg
               { envConfigBuildConfig = (envConfigBuildConfig envCfg)
@@ -121,9 +121,7 @@ envConfigBuildOpts =
 globalOptsBuildOptsMonoid :: Lens' GlobalOpts BuildOptsMonoid
 globalOptsBuildOptsMonoid =
     lens
-        (\globalOpts ->
-              configMonoidBuildOpts
-                  (globalConfigMonoid globalOpts))
+        (configMonoidBuildOpts . globalConfigMonoid)
         (\globalOpts boptsMonoid ->
               globalOpts
               { globalConfigMonoid = (globalConfigMonoid globalOpts)

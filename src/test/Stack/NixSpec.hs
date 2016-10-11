@@ -59,11 +59,11 @@ spec = beforeAll setup $ afterAll teardown $ do
     it "sees that the nix shell is enabled" $ \T{..} -> inTempDir $ do
       writeFile (toFilePath stackDotYaml) sampleConfig
       lc <- loadConfig' manager
-      (nixEnable $ configNix $ lcConfig lc) `shouldBe` True
+      nixEnable (configNix $ lcConfig lc) `shouldBe` True
     it "sees that the only package asked for is glpk and asks for the correct GHC derivation" $
       \T{..} -> inTempDir $ do
         writeFile (toFilePath stackDotYaml) sampleConfig
         lc <- loadConfig' manager
-        (nixPackages $ configNix $ lcConfig lc) `shouldBe` ["glpk"]
+        nixPackages (configNix $ lcConfig lc) `shouldBe` ["glpk"]
         v <- parseVersion "7.10.3"
         nixCompiler (GhcVersion v) `shouldBe` "haskell.compiler.ghc7103"

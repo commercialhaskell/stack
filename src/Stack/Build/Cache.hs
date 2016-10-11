@@ -351,7 +351,7 @@ readPrecompiledCache pkgident copts depIDs = do
 binaryDecodeFileOrFailDeep :: (BinarySchema a, MonadIO m)
                            => Path loc File
                            -> m (Maybe a)
-binaryDecodeFileOrFailDeep fp = liftIO $ fmap (either (\_ -> Nothing) id) $ tryAnyDeep $ do
+binaryDecodeFileOrFailDeep fp = liftIO $ fmap (either (const Nothing) id) $ tryAnyDeep $ do
     eres <- BinaryTagged.taggedDecodeFileOrFail (toFilePath fp)
     case eres of
         Left _ -> return Nothing

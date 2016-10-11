@@ -881,7 +881,7 @@ shadowMiniBuildPlan :: MiniBuildPlan
 shadowMiniBuildPlan (MiniBuildPlan cv pkgs0) shadowed =
     (MiniBuildPlan cv (Map.fromList met), Map.fromList unmet)
   where
-    pkgs1 = Map.difference pkgs0 $ Map.fromSet (\_ -> ()) shadowed
+    pkgs1 = Map.difference pkgs0 $ Map.fromSet (const ()) shadowed
 
     depsMet = flip execState Map.empty $ mapM_ (check Set.empty) (Map.keys pkgs1)
 
@@ -1097,7 +1097,7 @@ applyCustomSnapshot cs mbp0 = do
         packageMap = Map.fromList $ map addFlagsAndOpts $ Set.toList packages
         cv = fromMaybe (mbpCompilerVersion mbp0) mcompilerVersion
         packages0 =
-             mbpPackages mbp0 `Map.difference` Map.fromSet (\_ -> ()) dropPackages
+             mbpPackages mbp0 `Map.difference` Map.fromSet (const ()) dropPackages
     mbp1 <- toMiniBuildPlan cv mempty packageMap
     return MiniBuildPlan
         { mbpCompilerVersion = cv

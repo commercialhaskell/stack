@@ -196,9 +196,7 @@ displayTask task = T.pack $ concat
         Local -> "local"
     , ", source="
     , case taskType task of
-        TTLocal lp -> concat
-            [ toFilePath $ lpDir lp
-            ]
+        TTLocal lp -> toFilePath $ lpDir lp
         TTUpstream{} -> "package index"
     , if Set.null missing
         then ""
@@ -1070,7 +1068,7 @@ singleBuild runInBase ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} in
                     -- it is possible for the precompiled file to refer to the very library
                     -- we're building, and if flags are changed it may try to copy the library
                     -- to itself. This check prevents that from happening.
-                    Just pc | otherwise -> do
+                    Just pc -> do
                         let allM _ [] = return True
                             allM f (x:xs) = do
                                 b <- f x
@@ -1183,7 +1181,7 @@ singleBuild runInBase ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} in
         () <- announce ("build" <> annSuffix)
         config <- asks getConfig
         extraOpts <- extraBuildOptions eeBuildOpts
-        (cabal (configHideTHLoading config) $ ("build" :) $ (++ extraOpts) $
+        cabal (configHideTHLoading config) (("build" :) $ (++ extraOpts) $
             case (taskType, taskAllInOne, isFinalBuild) of
                 (_, True, True) -> fail "Invariant violated: cannot have an all-in-one build that also has a final build step."
                 (TTLocal lp, False, False) -> primaryComponentOptions lp
@@ -1536,7 +1534,7 @@ primaryComponentOptions lp = ["lib:" ++ packageNameString (packageName (lpPackag
       -- which will allow users to turn off library building if
       -- desired
       | packageHasLibrary (lpPackage lp)] ++
-      (map (T.unpack . T.append "exe:") $ Set.toList $ exesToBuild lp)
+      map (T.unpack . T.append "exe:") (Set.toList $ exesToBuild lp)
 
 exesToBuild :: LocalPackage -> Set Text
 exesToBuild lp = packageExes (lpPackage lp)

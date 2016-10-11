@@ -146,7 +146,7 @@ getInterpreterArgs file = do
     decodeError e =
       case e of
         ParseError ctxs _ (Position line col) ->
-          if length ctxs == 0
+          if null ctxs
           then "Parse error"
           else ("Expecting " ++ intercalate " or " ctxs)
           ++ " at line " ++ show line ++ ", column " ++ show col

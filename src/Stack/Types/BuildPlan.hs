@@ -402,8 +402,7 @@ data Snapshots = Snapshots
 instance FromJSON Snapshots where
     parseJSON = withObject "Snapshots" $ \o -> Snapshots
         <$> (o .: "nightly" >>= parseNightly)
-        <*> (fmap IntMap.unions
-                $ mapM (parseLTS . snd)
+        <*> fmap IntMap.unions (mapM (parseLTS . snd)
                 $ filter (isLTS . fst)
                 $ HashMap.toList o)
       where

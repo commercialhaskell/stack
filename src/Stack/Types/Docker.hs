@@ -129,9 +129,9 @@ instance FromJSON (WithJSONWarnings DockerOptsMonoid) where
               dockerMonoidStackExe         <- First <$> o ..:? dockerStackExeArgName
               dockerMonoidSetUser          <- First <$> o ..:? dockerSetUserArgName
               dockerMonoidRequireDockerVersion
-                                           <- IntersectingVersionRange <$> unVersionRangeJSON <$>
+                                           <- IntersectingVersionRange . unVersionRangeJSON <$> (
                                                  o ..:? dockerRequireDockerVersionArgName
-                                                   ..!= VersionRangeJSON anyVersion
+                                                   ..!= VersionRangeJSON anyVersion)
               return DockerOptsMonoid{..})
 
 -- | Left-biased combine Docker options

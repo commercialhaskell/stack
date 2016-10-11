@@ -90,7 +90,7 @@ targetsParser =
 
 flagsParser :: Parser (Map.Map (Maybe PackageName) (Map.Map FlagName Bool))
 flagsParser =
-     (Map.unionsWith Map.union <$>
+     Map.unionsWith Map.union <$>
      many
          (option
               readFlag
@@ -98,4 +98,4 @@ flagsParser =
                metavar "PACKAGE:[-]FLAG" <>
                help
                    ("Override flags set in stack.yaml " <>
-                    "(applies to local packages and extra-deps)"))))
+                    "(applies to local packages and extra-deps)")))
