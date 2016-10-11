@@ -523,8 +523,8 @@ packageDescTools :: PackageDescription -> [Dependency]
 packageDescTools = concatMap buildTools . allBuildInfo'
 
 -- | This is a copy-paste from Cabal's @allBuildInfo@ function, but with the
--- @buildable@ test removed. The reason is that (surprise) Cabal is broken,
--- see: https://github.com/haskell/cabal/issues/1725
+-- @buildable@ test removed. The implementation is broken.
+-- See: https://github.com/haskell/cabal/issues/1725
 allBuildInfo' :: PackageDescription -> [BuildInfo]
 allBuildInfo' pkg_descr = [ bi | Just lib <- [library pkg_descr]
                               , let bi = libBuildInfo lib

@@ -270,7 +270,7 @@ data PackageDumpException
 instance Exception PackageDumpException
 instance Show PackageDumpException where
     show (MissingSingleField name values) = unlines $
-      (return $ concat
+      return (concat
         [ "Expected single value for field name "
         , show name
         , " when parsing ghc-pkg dump output:"

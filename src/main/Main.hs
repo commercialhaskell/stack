@@ -137,7 +137,7 @@ versionString' =
   where
 #endif
 #ifdef HIDE_DEP_VERSIONS
-    depsString = (" hpack-" ++ VERSION_hpack)
+    depsString = " hpack-" ++ VERSION_hpack
 #else
     depsString = "\nCompiled with:\n" ++ unlines (map ("- " ++) Build_stack.deps)
 #endif
@@ -904,7 +904,7 @@ withBuildConfigDot opts go f = withBuildConfig go' f
   where
     go' =
         (if dotTestTargets opts then set (globalOptsBuildOptsMonoid.buildOptsMonoidTests) (Just True) else id) $
-        (if dotBenchTargets opts then set (globalOptsBuildOptsMonoid.buildOptsMonoidBenchmarks) (Just True) else id) $
+        (if dotBenchTargets opts then set (globalOptsBuildOptsMonoid.buildOptsMonoidBenchmarks) (Just True) else id)
         go
 
 -- | Query build information

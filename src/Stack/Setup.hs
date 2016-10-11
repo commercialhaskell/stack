@@ -511,7 +511,7 @@ getGhcBuild menv = do
                 sbinEnv <- modifyEnvOverride menv $
                     Map.insert "PATH" $
                     "/sbin:/usr/sbin" <>
-                    (maybe "" (":" <>) $ Map.lookup "PATH" (eoTextMap menv))
+                    maybe "" (":" <>) (Map.lookup "PATH" (eoTextMap menv))
                 eldconfigOut <- tryProcessStdout Nothing sbinEnv "ldconfig" ["-p"]
                 egccErrOut <- tryProcessStderrStdout Nothing menv "gcc" ["-v"]
                 let firstWords = case eldconfigOut of

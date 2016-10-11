@@ -926,9 +926,9 @@ parseConfigMonoidJSON obj = do
     configMonoidInstallGHC <- First <$> obj ..:? configMonoidInstallGHCName
     configMonoidSkipGHCCheck <- First <$> obj ..:? configMonoidSkipGHCCheckName
     configMonoidSkipMsys <- First <$> obj ..:? configMonoidSkipMsysName
-    configMonoidRequireStackVersion <- IntersectingVersionRange <$> unVersionRangeJSON <$>
+    configMonoidRequireStackVersion <- IntersectingVersionRange . unVersionRangeJSON <$> (
                                        obj ..:? configMonoidRequireStackVersionName
-                                           ..!= VersionRangeJSON anyVersion
+                                           ..!= VersionRangeJSON anyVersion)
     configMonoidArch <- First <$> obj ..:? configMonoidArchName
     configMonoidGHCVariant <- First <$> obj ..:? configMonoidGHCVariantName
     configMonoidGHCBuild <- First <$> obj ..:? configMonoidGHCBuildName

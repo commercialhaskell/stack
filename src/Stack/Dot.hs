@@ -1,7 +1,7 @@
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TemplateHaskell #-}
+
 module Stack.Dot (dot
                  ,listDependencies
                  ,DotOpts(..)
@@ -24,6 +24,7 @@ import qualified Data.Foldable as F
 import qualified Data.HashSet as HashSet
 import           Data.Map (Map)
 import qualified Data.Map as Map
+import           Data.Maybe
 import           Data.Monoid ((<>))
 import           Data.Set (Set)
 import qualified Data.Set as Set
@@ -330,6 +331,4 @@ isWiredIn = (`HashSet.member` wiredInPackages)
 
 localPackageToPackage :: LocalPackage -> Package
 localPackageToPackage lp =
-  case lpTestBench lp of
-    Nothing -> lpPackage lp
-    Just tb -> tb
+  fromMaybe (lpPackage lp) (lpTestBench lp)

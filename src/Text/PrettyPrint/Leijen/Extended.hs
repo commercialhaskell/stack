@@ -180,7 +180,7 @@ instance HasAnsiAnn () where
     getAnsiAnn _ = mempty
 
 displayPlain :: Display a => a -> T.Text
-displayPlain = LT.toStrict . displayAnsiSimple . renderDefault . fmap (\_ -> mempty) . display
+displayPlain = LT.toStrict . displayAnsiSimple . renderDefault . fmap (const mempty) . display
 
 -- TODO: tweak these settings more?
 -- TODO: options for settings if this is released as a lib
@@ -208,7 +208,7 @@ displayAnsiSimple doc =
             new = if Reset `elem` sgrs
                       then M.fromList sgrs'
                       else foldl (\mp (tag, sgr) -> M.insert tag sgr mp) old sgrs'
-        (extra, contents) <- local (\_ -> new) inner
+        (extra, contents) <- local (const new) inner
         return (extra, transitionCodes old new <> contents <> transitionCodes new old)
     transitionCodes old new =
         case (null removals, null additions) of
