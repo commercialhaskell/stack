@@ -105,6 +105,11 @@ buildOptsInstallExes =
   lens boptsInstallExes
        (\bopts t -> bopts {boptsInstallExes = t})
 
+buildOptsHaddock :: Lens' BuildOpts Bool
+buildOptsHaddock =
+  lens boptsHaddock
+       (\bopts t -> bopts {boptsHaddock = t})
+
 envConfigBuildOpts :: Lens' EnvConfig BuildOpts
 envConfigBuildOpts =
     lens

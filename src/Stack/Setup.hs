@@ -85,7 +85,7 @@ import              Stack.Types.Build
 import              Stack.Types.Compiler
 import              Stack.Types.Config
 import              Stack.Types.Docker
-import              Stack.Types.Internal (HasTerminal, HasReExec, HasLogLevel, envConfigBuildOpts, buildOptsInstallExes)
+import              Stack.Types.Internal (HasTerminal, HasReExec, HasLogLevel, envConfigBuildOpts, buildOptsInstallExes, buildOptsHaddock)
 import              Stack.Types.PackageIdentifier
 import              Stack.Types.PackageName
 import              Stack.Types.StackT
@@ -1072,7 +1072,8 @@ installGHCJS si archiveFile archiveType _tempDir destDir = do
         _ -> return Nothing
 
     $logSticky "Installing GHCJS (this will take a long time) ..."
-    runInnerStackT (set (envConfigBuildOpts.buildOptsInstallExes) True envConfig') $
+    runInnerStackT (set (envConfigBuildOpts.buildOptsInstallExes) True $
+                    set (envConfigBuildOpts.buildOptsHaddock) False $ envConfig') $
         build (\_ -> return ()) Nothing defaultBuildOptsCLI
     -- Copy over *.options files needed on windows.
     forM_ mwindowsInstallDir $ \dir -> do
