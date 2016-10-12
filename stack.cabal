@@ -18,6 +18,7 @@ extra-source-files:  CONTRIBUTING.md
                      ChangeLog.md
                      README.md
                      doc/*.md
+                     src/setup-shim/StackSetupShim.hs
 
                      -- Glob would be nice, but apparently Cabal doesn't support it:
                      --     cabal: filepath wildcard 'test/package-dump/*.txt' does not match any files.
