@@ -117,6 +117,7 @@ defaultBuildOptsCLI = BuildOptsCLI
     , boptsCLIExec = []
     , boptsCLIOnlyConfigure = False
     , boptsCLICommand = Build
+    , boptsCLIInitialBuildSteps = False
     }
 
 -- | Build options that may only be specified from the CLI
@@ -130,6 +131,7 @@ data BuildOptsCLI = BuildOptsCLI
     , boptsCLIExec :: ![(String, [String])]
     , boptsCLIOnlyConfigure :: !Bool
     , boptsCLICommand :: !BuildCommand
+    , boptsCLIInitialBuildSteps :: !Bool
     } deriving Show
 
 -- | Command sum type for conditional arguments.

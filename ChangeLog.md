@@ -6,6 +6,12 @@ Release notes:
 
 Major changes:
 
+* `stack ghci` now defaults to skipping the build of target packages, because
+  support has been added for invoking "initial build steps", which create
+  autogen files and run preprocessors. The `--no-build` flag is now deprecated
+  because it should no longer be necessary. See
+  [#1364](https://github.com/commercialhaskell/stack/issues/1364)
+
 Behavior changes:
 
 * Switch the "Run from outside project" messages to debug-level, to
@@ -45,7 +51,6 @@ Other enhancements:
 * `stack dot` and `stack list-dependencies` now take targets and flags.
   [#1919](https://github.com/commercialhaskell/stack/issues/1919)
 
-
 Bug fixes:
 
 * Fixed a gnarly bug where programs and package tarballs sometimes have
@@ -71,6 +76,10 @@ Bug fixes:
   module to load. [#2603](https://github.com/commercialhaskell/stack/pull/2603)
 * Build Setup.hs files with the threaded RTS, mirroring the behavior of
   cabal-install and enabling more complex build systems in those files.
+* Fixed dirtiness checking for GHCJS packages by assuming dirtiness, since we
+  don't get .ddump-hi info. See
+  [#2341](https://github.com/commercialhaskell/stack/issues/2341) and
+  [ghcjs/#533](https://github.com/ghcjs/ghcjs/issues/533)
 
 ## 1.2.0
 

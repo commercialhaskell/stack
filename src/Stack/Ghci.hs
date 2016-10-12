@@ -77,8 +77,7 @@ import qualified System.Posix.Files as Posix
 
 -- | Command-line options for GHC.
 data GhciOpts = GhciOpts
-    { ghciNoBuild            :: !Bool
-    , ghciArgs               :: ![String]
+    { ghciArgs               :: ![String]
     , ghciGhcCommand         :: !(Maybe FilePath)
     , ghciNoLoadModules      :: !Bool
     , ghciAdditionalPackages :: ![String]
@@ -87,6 +86,7 @@ data GhciOpts = GhciOpts
     , ghciSkipIntermediate   :: !Bool
     , ghciHidePackages       :: !Bool
     , ghciBuildOptsCLI       :: !BuildOptsCLI
+    , ghciNoBuild            :: !Bool
     } deriving Show
 
 -- | Necessary information to load a package or its components.
@@ -334,9 +334,16 @@ ghciSetup GhciOpts{..} = do
             { boptsCLITargets = boptsCLITargets ghciBuildOptsCLI ++ map T.pack ghciAdditionalPackages
             }
     (realTargets,_,_,_,sourceMap) <- loadSourceMap AllowNoTargets boptsCli
+    when ghciNoBuild $ $logInfo $ T.unlines
+        [ ""
+        , "NOTE: the --no-build flag should no longer be needed, and is now deprecated."
+        , "See this resolved issue: https://github.com/commercialhaskell/stack/issues/1364"
+        ]
     -- Try to build, but optimistically launch GHCi anyway if it fails (#1065)
     when (not ghciNoBuild && not (M.null realTargets)) $ do
         eres <- tryAny $ build (const (return ())) Nothing boptsCli
+            { boptsCLIInitialBuildSteps = True
+            }
         case eres of
             Right () -> return ()
             Left err -> do
