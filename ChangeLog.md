@@ -13,7 +13,9 @@ Major changes:
   [#1364](https://github.com/commercialhaskell/stack/issues/1364)
 * Stack will now always use its own GHC installation, even when a suitable GHC
   installation is available on the PATH. To get the old behaviour, use
-  the `--system-ghc` flag or set `system-ghc: true` in your ~/.stack/config.yaml.
+  the `--system-ghc` flag or run `stack config set system-ghc --global true`.
+  Docker- and Nix-enabled projects continue to use the GHC installations
+  in their environment by default.
 
   NB: Scripts that previously used stack in combination with a system GHC
   installation should now include a `stack setup` line or use the `--install-ghc`
