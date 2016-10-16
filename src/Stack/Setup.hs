@@ -1085,7 +1085,7 @@ installGHCJS si archiveFile archiveType _tempDir destDir = do
 
     $logSticky "Installing GHCJS (this will take a long time) ..."
     runInnerStackT (set (envConfigBuildOpts.buildOptsInstallExes) True $
-                    set (envConfigBuildOpts.buildOptsHaddock) False $ envConfig') $
+                    set (envConfigBuildOpts.buildOptsHaddock) False envConfig') $
         build (\_ -> return ()) Nothing defaultBuildOptsCLI
     -- Copy over *.options files needed on windows.
     forM_ mwindowsInstallDir $ \dir -> do
