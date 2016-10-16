@@ -7,9 +7,9 @@ module HLint.HLint where
 import "hint" HLint.Default
 import "hint" HLint.Builtin.All
 
--- Related to 'Hide post-AMP warnings' comment
 ignore "Use fewer imports" =
-  System.Process.Read
+  System.Process.Read  -- Related to 'Hide post-AMP warnings' comment
+  Stack.Exec  -- ifdef for System.Process.Read
 
 -- Related to 'explicit pattern matching is clearer' comment
 ignore "Use fromMaybe" =

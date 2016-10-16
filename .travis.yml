@@ -43,11 +43,14 @@ matrix:
       compiler: ": #stack 8.0.1"
       addons: {apt: {packages: [ghc-8.0.1], sources: [hvr-ghc]}}
 
+    - env: BUILD=style GHCVER=8.0.1 STACK_YAML=stack-8.0.yaml
+      compiler: ": #stack 8.0.1"
+      addons: {apt: {packages: [ghc-8.0.1], sources: [hvr-ghc]}}
+
   allow_failures:
     - env: BUILD=stack STACK_YAML=stack.yaml
       compiler: ": #stack 7.10.3 osx"
       os: osx
-
 
 # Note: the distinction between `before_install` and `install` is not important.
 # - in before_install we install build tools
@@ -55,6 +58,8 @@ matrix:
 before_install:
  - unset CC
  - case "$BUILD" in
+     style)
+       export PATH=$HOME/.local/bin:/opt/ghc/$GHCVER/bin:$PATH;;
      stack)
        export PATH=$HOME/.local/bin:/opt/ghc/$GHCVER/bin:$PATH;;
      cabal)
@@ -65,6 +70,8 @@ before_install:
 install:
  - echo "$(ghc --version) [$(ghc --print-project-git-commit-id 2> /dev/null || echo '?')]"
  - case "$BUILD" in
+     style)
+       stack --no-terminal install hlint;;
      stack)
        stack --no-terminal test --only-dependencies;;
      cabal)
@@ -81,6 +88,9 @@ install:
 
 script:
  - set -e; case "$BUILD" in
+     style)
+       hlint src/ test/ --cpp-simple --hint=HLint.hs;
+       stack --no-terminal build --pedantic;;
      stack)
        stack --no-terminal test --haddock --no-haddock-deps --ghc-options="-Werror";;
      cabal)

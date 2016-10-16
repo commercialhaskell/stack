@@ -65,7 +65,8 @@ Note that stack contributors need not dogmatically follow the suggested hints
 but are encouraged to debate their usefulness. If you find a hint is not useful
 and detracts from readability, consider marking it in the [configuration
 file](https://github.com/commercialhaskell/stack/blob/master/HLint.hs) to
-be ignored.
+be ignored. Please refer to the [HLint manual](https://github.com/ndmitchell/hlint#ignoring-hints)
+for configuration syntax.
 
 Quoting [@mgsloan](https://github.com/commercialhaskell/stack/pulls?utf8=%E2%9C%93&q=is%3Apr%20author%3Amgsloan):
 
@@ -84,5 +85,8 @@ stack install hlint
 Once installed, you can check your changes with:
 
 ```
-hlint src/ test/ --cpp-simple
+hlint src/ test/ --cpp-simple --hint=HLint.hs
 ```
+
+Where `--cpp-simple` strips `#` lines and `--hint` explicitly specifies the
+configuration file.
