@@ -252,10 +252,13 @@ setupGhciShimCode = $(do
     path <- makeRelativeToProject "src/setup-shim/StackSetupShim.hs"
     embedFile path)
 
+simpleSetupCode :: S.ByteString
+simpleSetupCode = "import Distribution.Simple\nmain = defaultMain"
+
 simpleSetupHash :: String
 simpleSetupHash =
     T.unpack $ decodeUtf8 $ S.take 8 $ B64URL.encode $ SHA256.hash $
-    encodeUtf8 (T.pack (unwords buildSetupArgs)) <> setupGhciShimCode
+    encodeUtf8 (T.pack (unwords buildSetupArgs)) <> setupGhciShimCode <> simpleSetupCode
 
 -- | Get a compiled Setup exe
 getSetupExe :: M env m
@@ -302,9 +305,7 @@ getSetupExe setupHs setupShimHs tmpdir = do
             tmpExePath <- fmap (setupDir </>) $ parseRelFile $ "tmp-" ++ exeNameS
             tmpOutputPath <- fmap (setupDir </>) $ parseRelFile $ "tmp-" ++ outputNameS
             tmpJsExePath <- fmap (setupDir </>) $ parseRelDir $ "tmp-" ++ jsExeNameS
-
-            liftIO $ D.createDirectoryIfMissing True $ toFilePath setupDir
-
+            ensureDir setupDir
             menv <- getMinimalEnvOverride
             let args = buildSetupArgs ++
                     [ "-package"
@@ -337,11 +338,23 @@ withExecuteEnv menv bopts boptsCli baseConfigOpts locals globalPackages snapshot
         configLock <- newMVar ()
         installLock <- newMVar ()
         idMap <- liftIO $ newTVarIO Map.empty
-        let setupHs = tmpdir </> $(mkRelFile "Main.hs")
-        liftIO $ writeFile (toFilePath setupHs) "import Distribution.Simple\nmain = defaultMain"
-        let setupShimHs = tmpdir </> $(mkRelFile "SetupShim.hs")
-        liftIO $ S.writeFile (toFilePath setupShimHs) setupGhciShimCode
+        config <- asks (getConfig . getEnvConfig)
+
+        -- Create files for simple setup and setup shim, if necessary
+        let setupSrcDir =
+                configStackRoot config </>
+                $(mkRelDir "setup-exe-src")
+        ensureDir setupSrcDir
+        setupFileName <- parseRelFile ("setup-" ++ simpleSetupHash ++ ".hs")
+        let setupHs = setupSrcDir </> setupFileName
+        setupHsExists <- doesFileExist setupHs
+        unless setupHsExists $ liftIO $ S.writeFile (toFilePath setupHs) simpleSetupCode
+        setupShimFileName <- parseRelFile ("setup-shim-" ++ simpleSetupHash ++ ".hs")
+        let setupShimHs = setupSrcDir </> setupShimFileName
+        setupShimHsExists <- doesFileExist setupShimHs
+        unless setupShimHsExists $ liftIO $ S.writeFile (toFilePath setupShimHs) setupGhciShimCode
         setupExe <- getSetupExe setupHs setupShimHs tmpdir
+
         cabalPkgVer <- asks (envConfigCabalVersion . getEnvConfig)
         globalDB <- getGlobalDB menv =<< getWhichCompiler
         snapshotPackagesTVar <- liftIO $ newTVarIO (toDumpPackagesByGhcPkgId snapshotPackages)
