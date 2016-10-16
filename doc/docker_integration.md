@@ -78,6 +78,13 @@ The most basic configuration is to add this to your project's `stack.yaml`:
 See [configuration](#configuration) for additional options. You can enable it on
 the command-line using `stack --docker`.
 
+Please note that in a docker-enabled configuration, stack uses the GHC installed
+in the Docker container by default. To use a compiler installed by stack, add
+
+    system-ghc: false
+
+(see [`system-ghc`](yaml_configuration.md#system-ghc)).
+
 ### Use stack as normal
 
 With Docker enabled, most stack sub-commands will automatically launch

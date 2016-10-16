@@ -88,6 +88,7 @@ import           Stack.Types.BuildPlan
 import           Stack.Types.Docker
 import           Stack.Types.Compiler
 import           Stack.Types.Internal
+import           Stack.Types.Nix
 import           Stack.Types.Urls
 import           Stack.Types.Version
 import           System.Environment
@@ -240,8 +241,6 @@ configFromConfigMonoid configStackRoot configUserConfigPath mresolver mproject C
 
          configGHCVariant0 = getFirst configMonoidGHCVariant
          configGHCBuild = getFirst configMonoidGHCBuild
-
-         configSystemGHC = fromFirst (isNothing configGHCVariant0) configMonoidSystemGHC
          configInstallGHC = fromFirst False configMonoidInstallGHC
          configSkipGHCCheck = fromFirst False configMonoidSkipGHCCheck
          configSkipMsys = fromFirst False configMonoidSkipMsys
@@ -271,6 +270,19 @@ configFromConfigMonoid configStackRoot configUserConfigPath mresolver mproject C
      configDocker <-
          dockerOptsFromMonoid (fmap fst mproject) configStackRoot mresolver configMonoidDockerOpts
      configNix <- nixOptsFromMonoid configMonoidNixOpts os
+
+     configSystemGHC <-
+         case (getFirst configMonoidSystemGHC, nixEnable configNix) of
+             (Just False, True) ->
+                 throwM NixRequiresSystemGhc
+             _ ->
+                 return
+                     (fromFirst
+                         (dockerEnable configDocker || nixEnable configNix)
+                         configMonoidSystemGHC)
+
+     when (isJust configGHCVariant0 && configSystemGHC) $
+         throwM ManualGHCVariantSettingsAreIncompatibleWithSystemGHC
 
      rawEnv <- liftIO getEnvironment
      pathsEnv <- augmentPathMap configMonoidExtraPath

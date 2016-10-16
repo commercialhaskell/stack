@@ -332,8 +332,7 @@ stack ghc, stack ghci, stack runghc, or stack exec
 ```
 
 Thankfully, the command is smart enough to know not to perform an installation
-twice. `setup` will either use the first GHC it finds on your PATH, or a sandboxed
-version after installing it. As the command output above indicates, you can use `stack
+twice. As the command output above indicates, you can use `stack
 path` for quite a bit of path information (which we'll play with more later).
 For now, we'll just look at where GHC is installed:
 

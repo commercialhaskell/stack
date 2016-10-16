@@ -92,6 +92,10 @@ situation is simple:
 
 ```yaml
 before_install:
+  # Install stack as above
+  # ...
+  # Configure stack to use the system GHC installation
+  - stack config set system-ghc --global true
   - export PATH=/opt/ghc/7.10.2/bin:$PATH
 
 addons:

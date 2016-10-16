@@ -21,7 +21,7 @@ dockerOptsParser hide0 =
     DockerOptsMonoid
     <$> pure (Any False)
     <*> firstBoolFlags dockerCmdName
-                       "using a Docker container"
+                       "using a Docker container. Implies 'system-ghc: true'"
                        hide
     <*> fmap First
            ((Just . DockerMonoidRepo) <$> option str (long (dockerOptName dockerRepoArgName) <>
