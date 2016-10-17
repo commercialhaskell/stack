@@ -302,7 +302,7 @@ setupCompiler compiler = do
         , soptsSkipMsys          = configSkipMsys config
         , soptsUpgradeCabal      = False
         , soptsResolveMissingGHC = msg
-        , soptsStackSetupYaml    = defaultStackSetupYaml
+        , soptsSetupInfoYaml    = defaultSetupInfoYaml
         , soptsGHCBindistURL     = Nothing
         }
 

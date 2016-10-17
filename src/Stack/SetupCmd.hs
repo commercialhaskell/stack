@@ -34,7 +34,7 @@ data SetupCmdOpts = SetupCmdOpts
     { scoCompilerVersion :: !(Maybe CompilerVersion)
     , scoForceReinstall  :: !Bool
     , scoUpgradeCabal    :: !Bool
-    , scoStackSetupYaml  :: !String
+    , scoSetupInfoYaml   :: !String
     , scoGHCBindistURL   :: !(Maybe String)
     }
 
@@ -55,7 +55,7 @@ setupParser = SetupCmdOpts
     <*> OA.strOption
             ( OA.long "stack-setup-yaml"
            <> OA.help "Location of the main stack-setup.yaml file"
-           <> OA.value defaultStackSetupYaml
+           <> OA.value defaultSetupInfoYaml
            <> OA.showDefault )
     <*> OA.optional (OA.strOption
             (OA.long "ghc-bindist"
@@ -94,7 +94,7 @@ setup SetupCmdOpts{..} wantedCompiler compilerCheck mstack = do
         , soptsSkipMsys = configSkipMsys
         , soptsUpgradeCabal = scoUpgradeCabal
         , soptsResolveMissingGHC = Nothing
-        , soptsStackSetupYaml = scoStackSetupYaml
+        , soptsSetupInfoYaml = scoSetupInfoYaml
         , soptsGHCBindistURL = scoGHCBindistURL
         }
     let compiler = case wantedCompiler of
