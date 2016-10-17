@@ -551,6 +551,8 @@ try_install_pkgs() {
     dnf_install_pkgs "$@"
   elif has_yum ; then
     yum_install_pkgs "$@"
+  elif has_apk ; then
+    apk_install_pkgs "$@"
   else
     return 1
   fi
@@ -569,6 +571,11 @@ dnf_install_pkgs() {
 # Install packages using yum
 yum_install_pkgs() {
   sudocmd yum install -y ${QUIET:+-q} "$@"
+}
+
+# Install packages using apk
+apk_install_pkgs() {
+  sudocmd apk add --update ${QUIET:+-q} "$@"
 }
 
 # Get installed Stack version, if any
@@ -629,6 +636,11 @@ has_apt_get() {
 # Check whether 'yum' command exists
 has_yum() {
   has_cmd yum
+}
+
+# Check whether 'apk' command exists
+has_apk() {
+  has_cmd apk
 }
 
 # Check whether 'dnf' command exists
