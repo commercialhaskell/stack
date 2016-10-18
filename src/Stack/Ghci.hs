@@ -136,6 +136,7 @@ ghci opts@GhciOpts{..} = do
         genOpts = nubOrd (concatMap (concatMap (oneWordOpts . snd) . ghciPkgOpts) pkgs)
         (omittedOpts, ghcOpts) = partition badForGhci $
             concatMap (concatMap (bioOpts . snd) . ghciPkgOpts) pkgs ++
+            map T.unpack (boptsCLIGhcOptions ghciBuildOptsCLI) ++
             getUserOptions Nothing ++
             concatMap (getUserOptions . Just . ghciPkgName) pkgs
         getUserOptions mpkg =

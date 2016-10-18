@@ -64,6 +64,8 @@ Other enhancements:
   on discussion in [#2647](https://github.com/commercialhaskell/stack/issues/2647).
 * The `--main-is` flag for GHCI now implies the TARGET, fixing
   [#1845](https://github.com/commercialhaskell/stack/issues/1845).
+* `stack ghci` will now use CLI `--ghc-options`.
+  [#2199](https://github.com/commercialhaskell/stack/issues/2199)
 
 Bug fixes:
 
