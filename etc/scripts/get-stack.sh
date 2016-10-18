@@ -331,6 +331,19 @@ do_freebsd_install() {
   fi
 }
 
+# Alpine distro install
+do_alpine_install() {
+  install_dependencies() {
+    apk_install_pkgs gmp libgcc xz make
+  }
+  install_dependencies
+  if is_64_bit ; then
+      install_64bit_static_binary
+  else
+      install_32bit_standard_binary
+  fi
+}
+
 # Attempts to install on unsupported Linux distribution by downloading
 # the bindist.
 do_sloppy_install() {
@@ -458,6 +471,9 @@ GETDISTRO
     centos|rhel)
       do_centos_install "$VERSION"
       ;;
+    alpine)
+      do_alpine_install "$VERSION"
+      ;;
     *)
       do_sloppy_install
   esac
@@ -528,6 +544,10 @@ install_32bit_standard_binary() {
 
 install_64bit_standard_binary() {
   install_from_bindist "linux-x86_64"
+}
+
+install_64bit_static_binary() {
+  install_from_bindist "linux-x86_64-static"
 }
 
 install_32bit_gmp4_linked_binary() {
