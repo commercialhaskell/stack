@@ -17,7 +17,7 @@ module Stack.Setup
   , ensureDockerStackExe
   , getSystemCompiler
   , SetupOpts (..)
-  , defaultStackSetupYaml
+  , defaultSetupInfoYaml
   , removeHaskellEnvVars
   ) where
 
@@ -102,8 +102,8 @@ import              System.Process.Run (runCmd, Cmd(..))
 import              Text.Printf (printf)
 
 -- | Default location of the stack-setup.yaml file
-defaultStackSetupYaml :: String
-defaultStackSetupYaml =
+defaultSetupInfoYaml :: String
+defaultSetupInfoYaml =
     "https://raw.githubusercontent.com/fpco/stackage-content/master/stack/stack-setup-2.yaml"
 
 data SetupOpts = SetupOpts
@@ -126,7 +126,7 @@ data SetupOpts = SetupOpts
     -- version. Only works reliably with a stack-managed installation.
     , soptsResolveMissingGHC :: !(Maybe Text)
     -- ^ Message shown to user for how to resolve the missing GHC
-    , soptsStackSetupYaml :: !FilePath
+    , soptsSetupInfoYaml :: !FilePath
     -- ^ Location of the main stack-setup.yaml file
     , soptsGHCBindistURL :: !(Maybe String)
     -- ^ Alternate GHC binary distribution (requires custom GHCVariant)
@@ -214,7 +214,7 @@ setupEnv mResolveMissingGHC = do
             , soptsSkipMsys = configSkipMsys $ bcConfig bconfig
             , soptsUpgradeCabal = False
             , soptsResolveMissingGHC = mResolveMissingGHC
-            , soptsStackSetupYaml = defaultStackSetupYaml
+            , soptsSetupInfoYaml = defaultSetupInfoYaml
             , soptsGHCBindistURL = Nothing
             }
 
@@ -364,7 +364,7 @@ ensureCompiler sopts = do
         isWanted = isWantedCompiler (soptsCompilerCheck sopts) (soptsWantedCompiler sopts)
         needLocal = not (any (uncurry canUseCompiler) msystem)
 
-    getSetupInfo' <- runOnce (getSetupInfo (soptsStackSetupYaml sopts) =<< asks getHttpManager)
+    getSetupInfo' <- runOnce (getSetupInfo (soptsSetupInfoYaml sopts) =<< asks getHttpManager)
 
     let getMmsys2Tool = do
             platform <- asks getPlatform
@@ -596,7 +596,7 @@ ensureDockerStackExe containerPlatform = do
     unless stackExeExists $
         do
            $logInfo $ mconcat ["Downloading Docker-compatible ", T.pack stackProgName, " executable"]
-           si <- getSetupInfo defaultStackSetupYaml =<< asks getHttpManager
+           si <- getSetupInfo defaultSetupInfoYaml =<< asks getHttpManager
            osKey <- getOSKey containerPlatform
            info <-
                case Map.lookup osKey (siStack si) of
@@ -742,7 +742,7 @@ getSetupInfo stackSetupYaml manager = do
                     return $ S8.concat bss
                 Nothing -> liftIO $ S.readFile urlOrFile
         WithJSONWarnings si warnings <- either throwM return (Yaml.decodeEither' bs)
-        when (urlOrFile /= defaultStackSetupYaml) $
+        when (urlOrFile /= defaultSetupInfoYaml) $
             logJSONWarnings urlOrFile warnings
         return si
 

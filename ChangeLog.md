@@ -60,6 +60,8 @@ Other enhancements:
   [#2653](https://github.com/commercialhaskell/stack/pull/2653)
 * `stack dot` and `stack list-dependencies` now take targets and flags.
   [#1919](https://github.com/commercialhaskell/stack/issues/1919)
+* Deprecate `stack setup --stack-setup-yaml` for `--setup-info-yaml` based
+  on discussion in [#2647](https://github.com/commercialhaskell/stack/issues/2647).
 
 Bug fixes:
 
