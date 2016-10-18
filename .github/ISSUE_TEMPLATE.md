@@ -43,7 +43,7 @@ $ stack <your command here> <args> --verbose
 
 ```
 $ stack --version
-Version 0.0.2, Git revision 6a86ee32e5b869a877151f74064572225e1a0398
+Version 1.2.0, Git revision 241cd07d576d9c0c0e712e83d947e3dd64541c42 (4054 commits) x86_64 hpack-0.14.0
 ```
 
 ### Method of installation
