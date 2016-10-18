@@ -319,7 +319,9 @@ ghciSetup
     => GhciOpts
     -> m (Map PackageName SimpleTarget, Maybe (Map PackageName SimpleTarget), [GhciPkgInfo])
 ghciSetup GhciOpts{..} = do
-    (_,_,targets) <- parseTargetsFromBuildOpts AllowNoTargets ghciBuildOptsCLI
+    let boptsCli0 = ghciBuildOptsCLI
+            { boptsCLITargets = boptsCLITargets ghciBuildOptsCLI ++ maybeToList ghciMainIs }
+    (_,_,targets) <- parseTargetsFromBuildOpts AllowNoTargets boptsCli0
     mainIsTargets <-
         case ghciMainIs of
             Nothing -> return Nothing
@@ -330,8 +332,8 @@ ghciSetup GhciOpts{..} = do
         let mres = (packageIdentifierName <$> parsePackageIdentifierFromString name)
                 <|> parsePackageNameFromString name
         maybe (throwM $ InvalidPackageOption name) return mres
-    let boptsCli = ghciBuildOptsCLI
-            { boptsCLITargets = boptsCLITargets ghciBuildOptsCLI ++ map T.pack ghciAdditionalPackages
+    let boptsCli = boptsCli0
+            { boptsCLITargets = boptsCLITargets boptsCli0 ++ map T.pack ghciAdditionalPackages
             }
     (realTargets,_,_,_,sourceMap) <- loadSourceMap AllowNoTargets boptsCli
     when ghciNoBuild $ $logInfo $ T.unlines
