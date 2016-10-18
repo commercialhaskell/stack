@@ -422,8 +422,10 @@ If you manage to work around this in other distributions, please include instruc
 
 These are written to `*.dump-*` files inside the package's `.stack-work`
 directory. Specifically, they will be available at `PKG-DIR/$(stack path
---dist)/build/SOURCE-PATH`, where `SOURCE-PATH` is the path to the source file,
-relative to the location of the `*.cabal` file.
+--dist-dir)/build/SOURCE-PATH`, where `SOURCE-PATH` is the path to the source
+file, relative to the location of the `*.cabal` file. When building named
+components such as test-suites, `SOURCE-PATH` will also include
+`COMPONENT/COMPONENT-tmp`, where `COMPONENT` is the name of the component.
 
 ## <a name="dyld-library-path-ignored"></a>Why is DYLD_LIBRARY_PATH ignored?
 
