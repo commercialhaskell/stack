@@ -38,6 +38,19 @@ data SetupCmdOpts = SetupCmdOpts
     , scoGHCBindistURL   :: !(Maybe String)
     }
 
+setupYamlCompatParser :: OA.Parser String
+setupYamlCompatParser = stackSetupYaml <|> setupInfoYaml
+    where stackSetupYaml = OA.strOption (
+               OA.long "stack-setup-yaml"
+            <> OA.help "DEPRECATED: Use 'setup-info-yaml' instead"
+            <> OA.metavar "URL"
+            <> OA.hidden )
+          setupInfoYaml  = OA.strOption (
+               OA.long "setup-info-yaml"
+            <> OA.help "Alternate URL or absolute path for stack dependencies"
+            <> OA.metavar "URL"
+            <> OA.value defaultSetupInfoYaml )
+
 setupParser :: OA.Parser SetupCmdOpts
 setupParser = SetupCmdOpts
     <$> OA.optional (OA.argument readVersion
@@ -52,11 +65,7 @@ setupParser = SetupCmdOpts
             "upgrade-cabal"
             "installing the newest version of the Cabal library globally"
             OA.idm
-    <*> OA.strOption
-            ( OA.long "stack-setup-yaml"
-           <> OA.help "Location of the main stack-setup.yaml file"
-           <> OA.value defaultSetupInfoYaml
-           <> OA.showDefault )
+    <*> setupYamlCompatParser
     <*> OA.optional (OA.strOption
             (OA.long "ghc-bindist"
            <> OA.metavar "URL"
