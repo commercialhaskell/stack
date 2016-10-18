@@ -55,7 +55,6 @@ import           Stack.PackageDump
 import           Stack.PackageIndex
 import           Stack.PrettyPrint
 import           Stack.Types.Build
-import           Stack.Types.Compiler
 import           Stack.Types.Config
 import           Stack.Types.FlagName
 import           Stack.Types.GhcPkgId
@@ -71,13 +70,11 @@ data PackageInfo
     | PIBoth PackageSource Installed
     deriving (Show)
 
-combineSourceInstalled :: WhichCompiler
-                       -> PackageSource
+combineSourceInstalled :: PackageSource
                        -> (InstallLocation, Installed)
                        -> PackageInfo
-combineSourceInstalled wc ps (location, installed) =
-    -- NOTE: special case for GHCJS - we expect some packages to differ
-    (if wc /= Ghcjs then assert (piiVersion ps == installedVersion installed) else id) $
+combineSourceInstalled ps (location, installed) =
+    assert (piiVersion ps == installedVersion installed) $
     assert (piiLocation ps == location) $
     case location of
         -- Always trust something in the snapshot
@@ -86,9 +83,9 @@ combineSourceInstalled wc ps (location, installed) =
 
 type CombinedMap = Map PackageName PackageInfo
 
-combineMap :: WhichCompiler -> SourceMap -> InstalledMap -> CombinedMap
-combineMap wc = Map.mergeWithKey
-    (\_ s i -> Just $ combineSourceInstalled wc s i)
+combineMap :: SourceMap -> InstalledMap -> CombinedMap
+combineMap = Map.mergeWithKey
+    (\_ s i -> Just $ combineSourceInstalled s i)
     (fmap PIOnlySource)
     (fmap (uncurry PIOnlyInstalled))
 
@@ -168,9 +165,8 @@ constructPlan mbp0 baseConfigOpts0 locals extraToBuild0 localDumpPkgs loadPackag
             mapM_ onWanted $ filter lpWanted locals
             mapM_ (addDep False) $ Set.toList extraToBuild0
     lf <- askLoggerIO
-    wc <- getWhichCompiler
     ((), m, W efinals installExes dirtyReason deps warnings parents) <-
-        liftIO $ runRWST inner (ctx wc econfig getVersions0 lf) M.empty
+        liftIO $ runRWST inner (ctx econfig getVersions0 lf) M.empty
     mapM_ $logWarn (warnings [])
     let toEither (_, Left e)  = Left e
         toEither (k, Right v) = Right (k, v)
@@ -201,11 +197,11 @@ constructPlan mbp0 baseConfigOpts0 locals extraToBuild0 localDumpPkgs loadPackag
             $prettyError $ pprintExceptions errs (bcStackYaml (getBuildConfig econfig)) parents (wantedLocalPackages locals)
             throwM $ ConstructPlanFailed "Plan construction failed."
   where
-    ctx wc econfig getVersions0 lf = Ctx
+    ctx econfig getVersions0 lf = Ctx
         { mbp = mbp0
         , baseConfigOpts = baseConfigOpts0
         , loadPackage = loadPackage0
-        , combinedMap = combineMap wc sourceMap installedMap
+        , combinedMap = combineMap sourceMap installedMap
         , toolToPackages = \(Cabal.Dependency name _) ->
           maybe Map.empty (Map.fromSet (const Cabal.anyVersion)) $
           Map.lookup (T.pack . packageNameString . fromCabalPackageName $ name) toolMap
@@ -552,34 +548,30 @@ checkDirtiness :: PackageSource
                -> Set PackageName
                -> M Bool
 checkDirtiness ps installed package present wanted = do
-    wc <- getWhichCompiler
-    mreason <- case (ps, wc) of
-        (PSLocal _, Ghcjs) -> return $ Just "local ghcjs package always dirty"
-        _ -> do
-            ctx <- ask
-            moldOpts <- flip runLoggingT (logFunc ctx) $ tryGetFlagCache installed
-            let configOpts = configureOpts
-                    (getEnvConfig ctx)
-                    (baseConfigOpts ctx)
-                    present
-                    (psLocal ps)
-                    (piiLocation ps) -- should be Local always
-                    package
-                buildOpts = bcoBuildOpts (baseConfigOpts ctx)
-                wantConfigCache = ConfigCache
-                    { configCacheOpts = configOpts
-                    , configCacheDeps = Set.fromList $ Map.elems present
-                    , configCacheComponents =
-                        case ps of
-                            PSLocal lp -> Set.map renderComponent $ lpComponents lp
-                            PSUpstream{} -> Set.empty
-                    , configCacheHaddock =
-                        shouldHaddockPackage buildOpts wanted (packageName package) ||
-                        -- Disabling haddocks when old config had haddocks doesn't make dirty.
-                        maybe False configCacheHaddock moldOpts
-                    }
-            let config = getConfig ctx
-            return $ case moldOpts of
+    ctx <- ask
+    moldOpts <- flip runLoggingT (logFunc ctx) $ tryGetFlagCache installed
+    let configOpts = configureOpts
+            (getEnvConfig ctx)
+            (baseConfigOpts ctx)
+            present
+            (psLocal ps)
+            (piiLocation ps) -- should be Local always
+            package
+        buildOpts = bcoBuildOpts (baseConfigOpts ctx)
+        wantConfigCache = ConfigCache
+            { configCacheOpts = configOpts
+            , configCacheDeps = Set.fromList $ Map.elems present
+            , configCacheComponents =
+                case ps of
+                    PSLocal lp -> Set.map renderComponent $ lpComponents lp
+                    PSUpstream{} -> Set.empty
+            , configCacheHaddock =
+                shouldHaddockPackage buildOpts wanted (packageName package) ||
+                -- Disabling haddocks when old config had haddocks doesn't make dirty.
+                maybe False configCacheHaddock moldOpts
+            }
+    let mreason =
+            case moldOpts of
                 Nothing -> Just "old configure information not found"
                 Just oldOpts
                     | Just reason <- describeConfigDiff config oldOpts wantConfigCache -> Just reason
@@ -587,6 +579,7 @@ checkDirtiness ps installed package present wanted = do
                     | Just files <- psDirty ps -> Just $ "local file changes: " <>
                                                          addEllipsis (T.pack $ unwords $ Set.toList files)
                     | otherwise -> Nothing
+        config = getConfig ctx
     case mreason of
         Nothing -> return False
         Just reason -> do
