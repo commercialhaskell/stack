@@ -75,6 +75,7 @@ import           GHC.Generics (Generic)
 import           Path (Path, Abs, File, Dir, mkRelDir, toFilePath, parseRelDir, (</>))
 import           Path.Extra (toFilePathNoTrailingSep)
 import           Prelude
+import           Stack.Constants
 import           Stack.Types.BuildPlan (GitSHA1)
 import           Stack.Types.Compiler
 import           Stack.Types.Config
@@ -541,7 +542,7 @@ configureOptsNoDir econfig bco deps isLocal package = concat
                            else "-") <>
                        flagNameString name)
                     (Map.toList flags)
-    , concatMap (\x -> ["--ghc-options", T.unpack x]) (packageGhcOptions package)
+    , concatMap (\x -> [compilerOptionsCabalFlag wc, T.unpack x]) (packageGhcOptions package)
     , map (("--extra-include-dirs=" ++) . toFilePathNoTrailingSep) (Set.toList (configExtraIncludeDirs config))
     , map (("--extra-lib-dirs=" ++) . toFilePathNoTrailingSep) (Set.toList (configExtraLibDirs config))
     , maybe [] (\customGcc -> ["--with-gcc=" ++ toFilePath customGcc]) (configOverrideGccPath config)
@@ -549,6 +550,7 @@ configureOptsNoDir econfig bco deps isLocal package = concat
     , ["--exact-configuration" | useExactConf]
     ]
   where
+    wc = whichCompiler (envConfigCompilerVersion econfig)
     config = getConfig econfig
     bopts = bcoBuildOpts bco
 

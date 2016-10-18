@@ -38,6 +38,7 @@ module Stack.Constants
     ,defaultGlobalConfigPathDeprecated
     ,defaultGlobalConfigPath
     ,platformVariantEnvVar
+    ,compilerOptionsCabalFlag
     )
     where
 
@@ -341,3 +342,9 @@ buildPlanDir = (</> $(mkRelDir "build-plan"))
 -- names.  Used to ensure incompatible binaries aren't shared between Docker builds and host
 platformVariantEnvVar :: String
 platformVariantEnvVar = stackProgNameUpper ++ "_PLATFORM_VARIANT"
+
+-- | Provides --ghc-options for 'Ghc', and similarly, --ghcjs-options
+-- for 'Ghcjs'.
+compilerOptionsCabalFlag :: WhichCompiler -> String
+compilerOptionsCabalFlag Ghc = "--ghc-options"
+compilerOptionsCabalFlag Ghcjs = "--ghcjs-options"

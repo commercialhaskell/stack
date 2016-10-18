@@ -647,6 +647,7 @@ getPackageOptsAndTargetFiles pwd pkg = do
             maybe [] (\cabalMacros -> ["-optP-include", "-optP" <> toFilePath cabalMacros]) (bioCabalMacros bio)
     return
         ( ("--dist-dir=" <> toFilePathNoTrailingSep dist) :
+          -- FIXME: use compilerOptionsCabalFlag
           map ("--ghc-option=" ++) (concatMap (ghcOptions . snd) (ghciPkgOpts pkg))
         , mapMaybe
               (fmap toFilePath . stripDir pwd)

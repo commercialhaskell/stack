@@ -86,10 +86,10 @@ Bug fixes:
   module to load. [#2603](https://github.com/commercialhaskell/stack/pull/2603)
 * Build Setup.hs files with the threaded RTS, mirroring the behavior of
   cabal-install and enabling more complex build systems in those files.
-* Fixed dirtiness checking for GHCJS packages by assuming dirtiness, since we
-  don't get .ddump-hi info. See
-  [#2341](https://github.com/commercialhaskell/stack/issues/2341) and
-  [ghcjs/#533](https://github.com/ghcjs/ghcjs/issues/533)
+* Fixed a bug in passing along `--ghc-options` to ghcjs.  They were being
+  provided as `--ghc-options` to Cabal, when it needs to be `--ghcjs-options`.
+  [#2714](https://github.com/commercialhaskell/stack/issues/2714)
+
 
 ## 1.2.0
 

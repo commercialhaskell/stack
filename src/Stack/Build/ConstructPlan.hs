@@ -50,11 +50,13 @@ import           Stack.Build.Haddock
 import           Stack.Build.Installed
 import           Stack.Build.Source
 import           Stack.BuildPlan
+import           Stack.Constants
 import           Stack.Package
 import           Stack.PackageDump
 import           Stack.PackageIndex
 import           Stack.PrettyPrint
 import           Stack.Types.Build
+import           Stack.Types.Compiler
 import           Stack.Types.Config
 import           Stack.Types.FlagName
 import           Stack.Types.GhcPkgId
@@ -605,18 +607,22 @@ describeConfigDiff config old new
         go
       where
         go [] = []
-        go ("--ghc-option":x:xs) = go' x xs
-        go ("--ghc-options":x:xs) = go' x xs
-        go ((T.stripPrefix "--ghc-option=" -> Just x):xs) = go' x xs
-        go ((T.stripPrefix "--ghc-options=" -> Just x):xs) = go' x xs
+        go ("--ghc-option":x:xs) = go' Ghc x xs
+        go ("--ghc-options":x:xs) = go' Ghc x xs
+        go ((T.stripPrefix "--ghc-option=" -> Just x):xs) = go' Ghc x xs
+        go ((T.stripPrefix "--ghc-options=" -> Just x):xs) = go' Ghc x xs
+        go ("--ghcjs-option":x:xs) = go' Ghcjs x xs
+        go ("--ghcjs-options":x:xs) = go' Ghcjs x xs
+        go ((T.stripPrefix "--ghcjs-option=" -> Just x):xs) = go' Ghcjs x xs
+        go ((T.stripPrefix "--ghcjs-options=" -> Just x):xs) = go' Ghcjs x xs
         go (x:xs) = x : go xs
 
-        go' x xs = checkKeepers x $ go xs
+        go' wc x xs = checkKeepers wc x $ go xs
 
-        checkKeepers x xs =
+        checkKeepers wc x xs =
             case filter isKeeper $ T.words x of
                 [] -> xs
-                keepers -> "--ghc-options" : T.unwords keepers : xs
+                keepers -> T.pack (compilerOptionsCabalFlag wc) : T.unwords keepers : xs
 
         -- GHC options which affect build results and therefore should always
         -- force a rebuild

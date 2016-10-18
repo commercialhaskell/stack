@@ -1236,7 +1236,7 @@ singleBuild runInBase ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} in
 
         () <- announce ("build" <> annSuffix)
         config <- asks getConfig
-        extraOpts <- extraBuildOptions eeBuildOpts
+        extraOpts <- extraBuildOptions wc eeBuildOpts
         cabal (configHideTHLoading config) (("build" :) $ (++ extraOpts) $
             case (taskType, taskAllInOne, isFinalBuild) of
                 (_, True, True) -> fail "Invariant violated: cannot have an all-in-one build that also has a final build step."
@@ -1573,15 +1573,16 @@ getSetupHs dir = do
 -- Do not pass `-hpcdir` as GHC option if the coverage is not enabled.
 -- This helps running stack-compiled programs with dynamic interpreters like `hint`.
 -- Cfr: https://github.com/commercialhaskell/stack/issues/997
-extraBuildOptions :: M env m => BuildOpts -> m [String]
-extraBuildOptions bopts = do
+extraBuildOptions :: M env m => WhichCompiler -> BuildOpts -> m [String]
+extraBuildOptions wc bopts = do
     let ddumpOpts = " -ddump-hi -ddump-to-file"
+        optsFlag = compilerOptionsCabalFlag wc
     if toCoverage (boptsTestOpts bopts)
       then do
         hpcIndexDir <- toFilePathNoTrailingSep <$> hpcRelativeDir
-        return ["--ghc-options", "-hpcdir " ++ hpcIndexDir ++ ddumpOpts]
+        return [optsFlag, "-hpcdir " ++ hpcIndexDir ++ ddumpOpts]
       else
-        return ["--ghc-options", ddumpOpts]
+        return [optsFlag, ddumpOpts]
 
 -- Library and executable build components.
 primaryComponentOptions :: LocalPackage -> [String]
