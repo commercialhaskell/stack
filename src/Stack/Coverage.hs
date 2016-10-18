@@ -231,8 +231,8 @@ generateHpcReportForTargets :: (MonadIO m, MonadReader env m, MonadBaseControl I
 generateHpcReportForTargets opts = do
     let (tixFiles, targetNames) = partition (".tix" `T.isSuffixOf`) (hroptsInputs opts)
     targetTixFiles <-
-         -- When there aren't any package component arguments, then
-         -- don't default to all package components.
+         -- When there aren't any package component arguments, and --all
+         -- isn't passed, default to not considering any targets.
          if not (hroptsAll opts) && null targetNames
          then return []
          else do
@@ -270,11 +270,20 @@ generateHpcReportForTargets opts = do
                                      (_, files) <- listDir dir
                                      return (filter ((".tix" `isSuffixOf`) . toFilePath) files)
                              else return []
-    tixPaths <- liftM (++ targetTixFiles) $ mapM (resolveFile' . T.unpack) tixFiles
+    outputDir <- hpcReportDir
+    let extraTixFilesDir = outputDir </> $(mkRelDir "extra-tix-files")
+    extraTixDirExists <- doesDirExist extraTixFilesDir
+    extraTixFiles <-
+        if extraTixDirExists
+            then do
+                (_, files) <- listDir extraTixFilesDir
+                return $ filter ((".tix" `isSuffixOf`) . toFilePath) files
+            else return []
+    tixPaths <- liftM (\xs -> xs ++ extraTixFiles ++ targetTixFiles) $ mapM (resolveFile' . T.unpack) tixFiles
     when (null tixPaths) $
         fail "Not generating combined report, because no targets or tix files are specified."
     reportDir <- case hroptsDestDir opts of
-        Nothing -> liftM (</> $(mkRelDir "combined/custom")) hpcReportDir
+        Nothing -> return (outputDir </> $(mkRelDir "combined/custom"))
         Just destDir -> do
             dest <- resolveDir' destDir
             ensureDir dest
