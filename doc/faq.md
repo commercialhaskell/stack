@@ -420,7 +420,10 @@ If you manage to work around this in other distributions, please include instruc
 
 ## Where does the output from `--ghc-options=-ddump-splices` (and other `-ddump*` options) go?
 
-These are written to `*.dump-*` files inside the package's `.stack-work` directory.
+These are written to `*.dump-*` files inside the package's `.stack-work`
+directory. Specifically, they will be available at `PKG-DIR/$(stack path
+--dist)/build/SOURCE-PATH`, where `SOURCE-PATH` is the path to the source file,
+relative to the location of the `*.cabal` file.
 
 ## <a name="dyld-library-path-ignored"></a>Why is DYLD_LIBRARY_PATH ignored?
 
