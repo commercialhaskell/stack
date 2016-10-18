@@ -62,6 +62,8 @@ Other enhancements:
   [#1919](https://github.com/commercialhaskell/stack/issues/1919)
 * Deprecate `stack setup --stack-setup-yaml` for `--setup-info-yaml` based
   on discussion in [#2647](https://github.com/commercialhaskell/stack/issues/2647).
+* The `--main-is` flag for GHCI now implies the TARGET, fixing
+  [#1845](https://github.com/commercialhaskell/stack/issues/1845).
 
 Bug fixes:
 
