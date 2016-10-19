@@ -10,7 +10,7 @@ import qualified Data.Text as T
 import           Options.Applicative
 import           Options.Applicative.Builder.Extra
 import           Stack.Dot
-import           Stack.Options.BuildParser (targetsParser, flagsParser)
+import           Stack.Options.BuildParser
 
 -- | Parser for arguments to `stack dot`
 dotOptsParser :: Bool -> Parser DotOpts
@@ -19,7 +19,7 @@ dotOptsParser externalDefault =
           <*> includeBase
           <*> depthLimit
           <*> fmap (maybe Set.empty Set.fromList . fmap splitNames) prunedPkgs
-          <*> targetsParser
+          <*> targetsParser NormalBuildOpts
           <*> flagsParser
           <*> testTargets
           <*> benchTargets

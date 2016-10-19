@@ -36,6 +36,7 @@ import qualified Data.Text as T
 import           Language.Haskell.TH
 import           Path
 import           Stack.Types.Internal
+import           Stack.Types.Package
 import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageName
 import           Stack.Types.Version
@@ -126,6 +127,9 @@ instance Display (Path b File) where
 
 instance Display (Path b Dir) where
     display = bold . blue . fromString . toFilePath
+
+instance Display (PackageName, NamedComponent) where
+    display = cyan . fromString . T.unpack . renderPkgComponent
 
 -- Display milliseconds.
 displayMilliseconds :: Clock.TimeSpec -> AnsiDoc

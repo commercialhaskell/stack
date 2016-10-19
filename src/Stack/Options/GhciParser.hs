@@ -31,5 +31,5 @@ ghciOptsParser = GhciOpts
              <*> switch (long "load-local-deps" <> help "Load all local dependencies of your targets")
              <*> switch (long "skip-intermediate-deps" <> help "Skip loading intermediate target dependencies")
              <*> boolFlags True "package-hiding" "package hiding" idm
-             <*> buildOptsParser Build
+             <*> buildOptsParser GhciBuildOpts Build
              <*> switch (long "no-build" <> help "Don't build before launching GHCi (deprecated, should be unneeded)")

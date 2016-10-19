@@ -229,11 +229,11 @@ commandLineHandler progName isInterpreter = complicatedOptions
         addBuildCommand' "build"
                          "Build the package(s) in this directory/configuration"
                          buildCmd
-                         (buildOptsParser Build)
+                         (buildOptsParser NormalBuildOpts Build)
         addBuildCommand' "install"
                          "Shortcut for 'build --copy-bins'"
                          buildCmd
-                         (buildOptsParser Install)
+                         (buildOptsParser NormalBuildOpts Install)
         addCommand' "uninstall"
                     "DEPRECATED: This command performs no actions, and is present for documentation only"
                     uninstallCmd
@@ -241,15 +241,15 @@ commandLineHandler progName isInterpreter = complicatedOptions
         addBuildCommand' "test"
                          "Shortcut for 'build --test'"
                          buildCmd
-                         (buildOptsParser Test)
+                         (buildOptsParser NormalBuildOpts Test)
         addBuildCommand' "bench"
                          "Shortcut for 'build --bench'"
                          buildCmd
-                         (buildOptsParser Bench)
+                         (buildOptsParser NormalBuildOpts Bench)
         addBuildCommand' "haddock"
                          "Shortcut for 'build --haddock'"
                          buildCmd
-                         (buildOptsParser Haddock)
+                         (buildOptsParser NormalBuildOpts Haddock)
         addCommand' "new"
                     "Create a new project from a template. Run `stack templates' to see available templates."
                     newCmd
