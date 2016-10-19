@@ -81,7 +81,8 @@ type M r m = (HasBuildConfig r, HasHttpManager r, MonadMask m, HasLogLevel r, Ha
 
 -- | Command-line options for GHC.
 data GhciOpts = GhciOpts
-    { ghciArgs               :: ![String]
+    { ghciTargets            :: ![Text]
+    , ghciArgs               :: ![String]
     , ghciGhcCommand         :: !(Maybe FilePath)
     , ghciNoLoadModules      :: !Bool
     , ghciAdditionalPackages :: ![String]
@@ -89,7 +90,6 @@ data GhciOpts = GhciOpts
     , ghciLoadLocalDeps      :: !Bool
     , ghciSkipIntermediate   :: !Bool
     , ghciHidePackages       :: !Bool
-    , ghciTargets            :: ![Text]
     , ghciNoBuild            :: !Bool
     } deriving Show
 
