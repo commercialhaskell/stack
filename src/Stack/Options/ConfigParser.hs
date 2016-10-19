@@ -52,7 +52,7 @@ configOptsParser hide0 =
             <> help "Override work directory (default: .stack-work)"
             <> hide
             ))
-    <*> buildOptsMonoidParser (hide0 /= BuildCmdGlobalOpts)
+    <*> buildOptsMonoidParser hide0
     <*> dockerOptsParser True
     <*> nixOptsParser True
     <*> firstBoolFlags

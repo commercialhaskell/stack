@@ -19,7 +19,7 @@ dotOptsParser externalDefault =
           <*> includeBase
           <*> depthLimit
           <*> fmap (maybe Set.empty Set.fromList . fmap splitNames) prunedPkgs
-          <*> targetsParser NormalBuildOpts
+          <*> targetsParser
           <*> flagsParser
           <*> testTargets
           <*> benchTargets

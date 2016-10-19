@@ -16,4 +16,5 @@ data GlobalOptsContext
     = OuterGlobalOpts -- ^ Global options before subcommand name
     | OtherCmdGlobalOpts -- ^ Global options following any other subcommand
     | BuildCmdGlobalOpts
+    | GhciCmdGlobalOpts
     deriving (Show, Eq)

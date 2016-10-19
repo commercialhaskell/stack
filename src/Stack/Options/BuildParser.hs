@@ -15,15 +15,12 @@ import           Stack.Types.Config
 import           Stack.Types.FlagName
 import           Stack.Types.PackageName
 
-data BuildOptsVariant = NormalBuildOpts | GhciBuildOpts
-
 -- | Parser for CLI-only build arguments
-buildOptsParser :: BuildOptsVariant
-                -> BuildCommand
+buildOptsParser :: BuildCommand
                 -> Parser BuildOptsCLI
-buildOptsParser variant cmd =
+buildOptsParser cmd =
     BuildOptsCLI <$>
-    targetsParser variant <*>
+    targetsParser <*>
     switch
         (long "dry-run" <>
          help "Don't build anything, just prepare to") <*>
@@ -85,8 +82,8 @@ buildOptsParser variant cmd =
          help "For target packages, only run initial build steps needed for GHCi" <>
          internal)
 
-targetsParser :: BuildOptsVariant -> Parser [Text]
-targetsParser NormalBuildOpts =
+targetsParser :: Parser [Text]
+targetsParser =
     many
         (textArgument
              (metavar "TARGET" <>
@@ -94,15 +91,6 @@ targetsParser NormalBuildOpts =
                     "See https://docs.haskellstack.org/en/v" <>
                     showVersion Meta.version <>
                     "/build_command/#target-syntax for details.")))
-targetsParser GhciBuildOpts =
-    many
-        (textArgument
-             (metavar "TARGET/FILE" <>
-              help ("If none specified, use all local packages. " <>
-                    "See https://docs.haskellstack.org/en/v" <>
-                    showVersion Meta.version <>
-                    "/build_command/#target-syntax for details. " <>
-                    "If a path to a .hs or .lhs file is specified, it will be loaded.")))
 
 flagsParser :: Parser (Map.Map (Maybe PackageName) (Map.Map FlagName Bool))
 flagsParser =

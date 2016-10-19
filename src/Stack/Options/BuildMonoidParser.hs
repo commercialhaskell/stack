@@ -11,12 +11,15 @@ import           Stack.Options.HaddockParser
 import           Stack.Options.Utils
 import           Stack.Types.Config.Build
 
-buildOptsMonoidParser :: Bool -> Parser BuildOptsMonoid
+buildOptsMonoidParser :: GlobalOptsContext -> Parser BuildOptsMonoid
 buildOptsMonoidParser hide0 =
     transform <$> trace <*> profile <*> options
   where
+    hideBool = hide0 /= BuildCmdGlobalOpts
     hide =
-        hideMods hide0
+        hideMods hideBool
+    hideExceptGhci =
+        hideMods (hide0 `notElem` [BuildCmdGlobalOpts, GhciCmdGlobalOpts])
     transform tracing profiling =
         enable
       where
@@ -60,7 +63,7 @@ buildOptsMonoidParser hide0 =
                  "Enable profiling in libraries, executables, etc. \
                     \for all expressions and generate a profiling report\
                     \ in tests or benchmarks" <>
-            hide)
+            hideExceptGhci)
 
     trace =
         flag
@@ -71,13 +74,13 @@ buildOptsMonoidParser hide0 =
                  "Enable profiling in libraries, executables, etc. \
                     \for all expressions and generate a backtrace on \
                     \exception" <>
-            hide)
+            hideExceptGhci)
     options =
         BuildOptsMonoid <$> libProfiling <*> exeProfiling <*> haddock <*>
-        haddockOptsParser hide0 <*> openHaddocks <*> haddockDeps <*>
+        haddockOptsParser hideBool <*> openHaddocks <*> haddockDeps <*>
         haddockInternal <*> copyBins <*> preFetch <*> keepGoing <*>
-        forceDirty <*> tests <*> testOptsParser hide0 <*> benches <*>
-        benchOptsParser hide0 <*> reconfigure <*>
+        forceDirty <*> tests <*> testOptsParser hideBool <*> benches <*>
+        benchOptsParser hideBool <*> reconfigure <*>
         cabalVerbose <*> splitObjs
     libProfiling =
         firstBoolFlags
@@ -130,12 +133,12 @@ buildOptsMonoidParser hide0 =
         firstBoolFlags
             "test"
             "testing the package(s) in this directory/configuration"
-            hide
+            hideExceptGhci
     benches =
         firstBoolFlags
             "bench"
             "benchmarking the package(s) in this directory/configuration"
-            hide
+            hideExceptGhci
     reconfigure =
         firstBoolFlags
              "reconfigure"

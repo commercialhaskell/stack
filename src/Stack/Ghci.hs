@@ -89,7 +89,7 @@ data GhciOpts = GhciOpts
     , ghciLoadLocalDeps      :: !Bool
     , ghciSkipIntermediate   :: !Bool
     , ghciHidePackages       :: !Bool
-    , ghciBuildOptsCLI       :: !BuildOptsCLI
+    , ghciTargets            :: ![Text]
     , ghciNoBuild            :: !Bool
     } deriving Show
 
@@ -136,12 +136,12 @@ instance Show GhciException where
 ghci :: M r m => GhciOpts -> m ()
 ghci opts@GhciOpts{..} = do
     -- Load source map, without explicit targets, to collect all info.
-    (_, _, locals, _, sourceMap) <- loadSourceMap AllowNoTargets ghciBuildOptsCLI
+    (_, _, locals, _, sourceMap) <- loadSourceMap AllowNoTargets defaultBuildOptsCLI
         { boptsCLITargets = [] }
     -- Parse --main-is argument.
-    mainIsTargets <- parseMainIsTargets ghciBuildOptsCLI ghciMainIs
+    mainIsTargets <- parseMainIsTargets ghciMainIs
     -- Parse to either file targets or build targets
-    etargets <- preprocessTargets ghciBuildOptsCLI
+    etargets <- preprocessTargets ghciTargets
     (inputTargets, mfileTargets) <- case etargets of
         Left rawFileTargets -> do
             case mainIsTargets of
@@ -151,7 +151,7 @@ ghci opts@GhciOpts{..} = do
             (targetMap, fileInfo, extraFiles) <- findFileTargets locals rawFileTargets
             return (targetMap, Just (fileInfo, extraFiles))
         Right rawTargets -> do
-            (_,_,normalTargets) <- parseTargetsFromBuildOpts AllowNoTargets ghciBuildOptsCLI
+            (_,_,normalTargets) <- parseTargetsFromBuildOpts AllowNoTargets defaultBuildOptsCLI
                 { boptsCLITargets = rawTargets }
             return (normalTargets, Nothing)
     -- Make sure the targets are known.
@@ -163,16 +163,16 @@ ghci opts@GhciOpts{..} = do
     -- Build required dependencies and setup local packages.
     buildDepsAndInitialSteps opts (map (packageNameText . fst) localTargets)
     -- Load the list of modules _after_ building, to catch changes in unlisted dependencies (#1180)
-    pkgs <- getGhciPkgInfos ghciBuildOptsCLI sourceMap addPkgs (fmap fst mfileTargets) localTargets
+    pkgs <- getGhciPkgInfos sourceMap addPkgs (fmap fst mfileTargets) localTargets
     checkForIssues pkgs
     -- Finally, do the invocation of ghci
     runGhci opts localTargets mainIsTargets pkgs
 
-preprocessTargets :: M r m => BuildOptsCLI -> m (Either [Path Abs File] [Text])
-preprocessTargets boptsCLI = do
+preprocessTargets :: M r m => [Text] -> m (Either [Path Abs File] [Text])
+preprocessTargets rawTargets = do
     let (fileTargetsRaw, normalTargets) =
             partition (\t -> ".hs" `T.isSuffixOf` t || ".lhs" `T.isSuffixOf` t)
-                      (boptsCLITargets boptsCLI)
+                      rawTargets
     fileTargets <- forM fileTargetsRaw $ \fp0 -> do
         let fp = T.unpack fp0
         mpath <- forgivingAbsence (resolveFile' fp)
@@ -184,9 +184,9 @@ preprocessTargets boptsCLI = do
         (False, _) -> return (Left fileTargets)
         _ -> return (Right normalTargets)
 
-parseMainIsTargets :: M env m => BuildOptsCLI -> Maybe Text -> m (Maybe (Map PackageName SimpleTarget))
-parseMainIsTargets boptsCli mtarget = forM mtarget $ \target -> do
-     (_,_,targets) <- parseTargetsFromBuildOpts AllowNoTargets boptsCli
+parseMainIsTargets :: M env m => Maybe Text -> m (Maybe (Map PackageName SimpleTarget))
+parseMainIsTargets mtarget = forM mtarget $ \target -> do
+     (_,_,targets) <- parseTargetsFromBuildOpts AllowNoTargets defaultBuildOptsCLI
          { boptsCLITargets = [target] }
      return targets
 
@@ -306,7 +306,7 @@ buildDepsAndInitialSteps GhciOpts{..} targets0 = do
     -- If necessary, do the build, for local packagee targets, only do
     -- 'initialBuildSteps'.
     when (not ghciNoBuild && not (null targets)) $ do
-        eres <- tryAny $ build (const (return ())) Nothing ghciBuildOptsCLI
+        eres <- tryAny $ build (const (return ())) Nothing defaultBuildOptsCLI
             { boptsCLITargets = targets
             , boptsCLIInitialBuildSteps = True
             }
@@ -341,7 +341,6 @@ runGhci GhciOpts{..} targets mainIsTargets pkgs = do
         genOpts = nubOrd (concatMap (concatMap (oneWordOpts . snd) . ghciPkgOpts) pkgs)
         (omittedOpts, ghcOpts) = partition badForGhci $
             concatMap (concatMap (bioOpts . snd) . ghciPkgOpts) pkgs ++
-            map T.unpack (boptsCLIGhcOptions ghciBuildOptsCLI) ++
             getUserOptions Nothing ++
             concatMap (getUserOptions . Just . ghciPkgName) pkgs
         getUserOptions mpkg =
@@ -530,13 +529,12 @@ figureOutMainFile bopts mainIsTargets targets0 packages = do
 
 getGhciPkgInfos
     :: M env m
-    => BuildOptsCLI
-    -> SourceMap
+    => SourceMap
     -> [PackageName]
     -> Maybe (Map PackageName (Set (Path Abs File)))
     -> [(PackageName, (Path Abs File, SimpleTarget))]
     -> m [GhciPkgInfo]
-getGhciPkgInfos boptsCli sourceMap addPkgs mfileTargets localTargets = do
+getGhciPkgInfos sourceMap addPkgs mfileTargets localTargets = do
     menv <- getMinimalEnvOverride
     (installedMap, _, _, _) <- getInstalled
         menv
@@ -547,13 +545,12 @@ getGhciPkgInfos boptsCli sourceMap addPkgs mfileTargets localTargets = do
         sourceMap
     let localLibs = [name | (name, (_, target)) <- localTargets, hasLocalComp isCLib target]
     forM localTargets $ \(name, (cabalfp, target)) ->
-        makeGhciPkgInfo boptsCli sourceMap installedMap localLibs addPkgs mfileTargets name cabalfp target
+        makeGhciPkgInfo sourceMap installedMap localLibs addPkgs mfileTargets name cabalfp target
 
 -- | Make information necessary to load the given package in GHCi.
 makeGhciPkgInfo
     :: (MonadReader r m, HasEnvConfig r, HasTerminal r, MonadLogger m, MonadIO m, MonadCatch m, MonadBaseControl IO m)
-    => BuildOptsCLI
-    -> SourceMap
+    => SourceMap
     -> InstalledMap
     -> [PackageName]
     -> [PackageName]
@@ -562,7 +559,7 @@ makeGhciPkgInfo
     -> Path Abs File
     -> SimpleTarget
     -> m GhciPkgInfo
-makeGhciPkgInfo boptsCli sourceMap installedMap locals addPkgs mfileTargets name cabalfp target = do
+makeGhciPkgInfo sourceMap installedMap locals addPkgs mfileTargets name cabalfp target = do
     bopts <- asks (configBuild . getConfig)
     econfig <- asks getEnvConfig
     bconfig <- asks getBuildConfig
@@ -570,8 +567,8 @@ makeGhciPkgInfo boptsCli sourceMap installedMap locals addPkgs mfileTargets name
             PackageConfig
             { packageConfigEnableTests = True
             , packageConfigEnableBenchmarks = True
-            , packageConfigFlags = getLocalFlags bconfig boptsCli name
-            , packageConfigGhcOptions = getGhcOptions bconfig boptsCli name True True
+            , packageConfigFlags = getLocalFlags bconfig defaultBuildOptsCLI name
+            , packageConfigGhcOptions = getGhcOptions bconfig defaultBuildOptsCLI name True True
             , packageConfigCompilerVersion = envConfigCompilerVersion econfig
             , packageConfigPlatform = configPlatform (getConfig bconfig)
             }

@@ -229,11 +229,11 @@ commandLineHandler progName isInterpreter = complicatedOptions
         addBuildCommand' "build"
                          "Build the package(s) in this directory/configuration"
                          buildCmd
-                         (buildOptsParser NormalBuildOpts Build)
+                         (buildOptsParser Build)
         addBuildCommand' "install"
                          "Shortcut for 'build --copy-bins'"
                          buildCmd
-                         (buildOptsParser NormalBuildOpts Install)
+                         (buildOptsParser Install)
         addCommand' "uninstall"
                     "DEPRECATED: This command performs no actions, and is present for documentation only"
                     uninstallCmd
@@ -241,15 +241,15 @@ commandLineHandler progName isInterpreter = complicatedOptions
         addBuildCommand' "test"
                          "Shortcut for 'build --test'"
                          buildCmd
-                         (buildOptsParser NormalBuildOpts Test)
+                         (buildOptsParser Test)
         addBuildCommand' "bench"
                          "Shortcut for 'build --bench'"
                          buildCmd
-                         (buildOptsParser NormalBuildOpts Bench)
+                         (buildOptsParser Bench)
         addBuildCommand' "haddock"
                          "Shortcut for 'build --haddock'"
                          buildCmd
-                         (buildOptsParser NormalBuildOpts Haddock)
+                         (buildOptsParser Haddock)
         addCommand' "new"
                     "Create a new project from a template. Run `stack templates' to see available templates."
                     newCmd
@@ -344,14 +344,14 @@ commandLineHandler progName isInterpreter = complicatedOptions
                   "Execute a command"
                   execCmd
                   (execOptsParser Nothing)
-      addCommand' "ghci"
-                  "Run ghci in the context of package(s) (experimental)"
-                  ghciCmd
-                  ghciOptsParser
-      addCommand' "repl"
-                  "Run ghci in the context of package(s) (experimental) (alias for 'ghci')"
-                  ghciCmd
-                  ghciOptsParser
+      addGhciCommand' "ghci"
+                      "Run ghci in the context of package(s) (experimental)"
+                      ghciCmd
+                      ghciOptsParser
+      addGhciCommand' "repl"
+                      "Run ghci in the context of package(s) (experimental) (alias for 'ghci')"
+                      ghciCmd
+                      ghciOptsParser
       addCommand' "runghc"
                   "Run runghc"
                   execCmd
@@ -460,6 +460,12 @@ commandLineHandler progName isInterpreter = complicatedOptions
                          -> AddCommand
         addBuildCommand' cmd title constr =
             addCommand cmd title globalFooter constr (globalOpts BuildCmdGlobalOpts)
+
+        -- Additional helper that hides global options and shows some ghci options
+        addGhciCommand' :: String -> String -> (a -> GlobalOpts -> IO ()) -> Parser a
+                         -> AddCommand
+        addGhciCommand' cmd title constr =
+            addCommand cmd title globalFooter constr (globalOpts GhciCmdGlobalOpts)
 
     globalOpts :: GlobalOptsContext -> Parser GlobalOptsMonoid
     globalOpts kind =
