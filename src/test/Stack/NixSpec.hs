@@ -26,6 +26,7 @@ sampleConfig :: String
 sampleConfig =
   "resolver: lts-2.10\n" ++
   "packages: ['.']\n" ++
+  "system-ghc: true\n" ++
   "nix:\n" ++
   "   enable: True\n" ++
   "   packages: [glpk]"
