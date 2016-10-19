@@ -201,6 +201,7 @@ packages_singlePackage =
     , ghciPkgModFiles = S.empty
     , ghciPkgCFiles = S.empty
     , ghciPkgMainIs = M.empty
+    , ghciPkgTargetFiles = Nothing
     , ghciPkgPackage =
       Package
       { packageName = $(mkPackageName "package-a")
@@ -234,6 +235,7 @@ packages_multiplePackages =
     , ghciPkgModFiles = S.empty
     , ghciPkgCFiles = S.empty
     , ghciPkgMainIs = M.empty
+    , ghciPkgTargetFiles = Nothing
     , ghciPkgPackage =
       Package
       { packageName = $(mkPackageName "package-a")
@@ -263,6 +265,7 @@ packages_multiplePackages =
     , ghciPkgModFiles = S.empty
     , ghciPkgCFiles = S.empty
     , ghciPkgMainIs = M.empty
+    , ghciPkgTargetFiles = Nothing
     , ghciPkgPackage =
       Package
       { packageName = $(mkPackageName "package-b")
