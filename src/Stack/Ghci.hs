@@ -229,12 +229,12 @@ findFileTargets locals fileTargets = do
     let (extraFiles, associatedFiles) = partitionEithers results
         targetMap =
             foldl unionSimpleTargets M.empty $
-            map (\(_, (name, comp)) -> M.singleton name (STLocalComps (S.singleton comp))) $
-            associatedFiles
+            map (\(_, (name, comp)) -> M.singleton name (STLocalComps (S.singleton comp)))
+                associatedFiles
         infoMap =
             foldl (M.unionWith S.union) M.empty $
             map (\(fp, (name, _)) -> M.singleton name (S.singleton fp))
-            associatedFiles
+                associatedFiles
     return (targetMap, infoMap, extraFiles)
 
 checkTargets
@@ -243,11 +243,9 @@ checkTargets
     -> m ()
 checkTargets mp = do
     let filtered = M.filter (== STUnknown) mp
-    if M.null filtered
-        then return ()
-        else do
-            bconfig <- asks getBuildConfig
-            throwM $ UnknownTargets (M.keysSet filtered) M.empty (bcStackYaml bconfig)
+    unless (M.null filtered) $ do
+        bconfig <- asks getBuildConfig
+        throwM $ UnknownTargets (M.keysSet filtered) M.empty (bcStackYaml bconfig)
 
 getAllLocalTargets
     :: M r m
