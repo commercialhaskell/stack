@@ -27,9 +27,8 @@ import           Control.Monad hiding (forM)
 import           Control.Monad.Catch
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
-import           Control.Monad.Reader (MonadReader, asks)
+import           Control.Monad.Reader (asks)
 import           Control.Monad.State.Strict (State, execState, get, modify)
-import           Control.Monad.Trans.Control
 import           Control.Monad.Trans.Unlift (MonadBaseUnlift)
 import qualified Data.ByteString.Char8 as S8
 import           Data.Either
@@ -50,7 +49,6 @@ import           Data.Traversable (forM)
 import           Data.Typeable (Typeable)
 import qualified Distribution.PackageDescription as C
 import qualified Distribution.Text as C
-import           Network.HTTP.Client.Conduit
 import           Path
 import           Path.Extra (toFilePathNoTrailingSep)
 import           Path.IO
@@ -67,17 +65,15 @@ import           Stack.PrettyPrint
 import           Stack.Types.Build
 import           Stack.Types.Compiler
 import           Stack.Types.Config
-import           Stack.Types.Internal
 import           Stack.Types.Package
 import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageName
+import           Stack.Types.StackT
 import           Text.Read (readMaybe)
 
 #ifndef WINDOWS
 import qualified System.Posix.Files as Posix
 #endif
-
-type M r m = (HasBuildConfig r, HasHttpManager r, MonadMask m, HasLogLevel r, HasTerminal r, HasEnvConfig r, MonadReader r m, MonadLoggerIO m, MonadBaseUnlift IO m)
 
 -- | Command-line options for GHC.
 data GhciOpts = GhciOpts
@@ -133,7 +129,7 @@ instance Show GhciException where
 -- | Launch a GHCi session for the given local package targets with the
 -- given options and configure it with the load paths and extensions
 -- of those targets.
-ghci :: M r m => GhciOpts -> m ()
+ghci :: (StackM r m, HasEnvConfig r, MonadBaseUnlift IO m) => GhciOpts -> m ()
 ghci opts@GhciOpts{..} = do
     -- Load source map, without explicit targets, to collect all info.
     (_, _, locals, _, sourceMap) <- loadSourceMap AllowNoTargets defaultBuildOptsCLI
@@ -168,7 +164,7 @@ ghci opts@GhciOpts{..} = do
     -- Finally, do the invocation of ghci
     runGhci opts localTargets mainIsTargets pkgs
 
-preprocessTargets :: M r m => [Text] -> m (Either [Path Abs File] [Text])
+preprocessTargets :: (StackM r m, HasEnvConfig r, MonadBaseUnlift IO m) => [Text] -> m (Either [Path Abs File] [Text])
 preprocessTargets rawTargets = do
     let (fileTargetsRaw, normalTargets) =
             partition (\t -> ".hs" `T.isSuffixOf` t || ".lhs" `T.isSuffixOf` t)
@@ -184,14 +180,14 @@ preprocessTargets rawTargets = do
         (False, _) -> return (Left fileTargets)
         _ -> return (Right normalTargets)
 
-parseMainIsTargets :: M env m => Maybe Text -> m (Maybe (Map PackageName SimpleTarget))
+parseMainIsTargets :: (StackM r m, HasEnvConfig r, MonadBaseUnlift IO m) => Maybe Text -> m (Maybe (Map PackageName SimpleTarget))
 parseMainIsTargets mtarget = forM mtarget $ \target -> do
      (_,_,targets) <- parseTargetsFromBuildOpts AllowNoTargets defaultBuildOptsCLI
          { boptsCLITargets = [target] }
      return targets
 
 findFileTargets
-    :: M env m
+    :: (StackM r m, HasEnvConfig r, MonadBaseUnlift IO m)
     => [LocalPackage]
     -> [Path Abs File]
     -> m (Map PackageName SimpleTarget, Map PackageName (Set (Path Abs File)), [Path Abs File])
@@ -238,7 +234,7 @@ findFileTargets locals fileTargets = do
     return (targetMap, infoMap, extraFiles)
 
 checkTargets
-    :: M r m
+    :: (StackM r m, HasEnvConfig r, MonadBaseUnlift IO m)
     => Map PackageName SimpleTarget
     -> m ()
 checkTargets mp = do
@@ -248,7 +244,7 @@ checkTargets mp = do
         throwM $ UnknownTargets (M.keysSet filtered) M.empty (bcStackYaml bconfig)
 
 getAllLocalTargets
-    :: M r m
+    :: (StackM r m, HasEnvConfig r, MonadBaseUnlift IO m)
     => GhciOpts
     -> Map PackageName SimpleTarget
     -> Maybe (Map PackageName SimpleTarget)
@@ -294,7 +290,7 @@ getAllLocalTargets GhciOpts{..} targets0 mainIsTargets sourceMap = do
                     ]
             return (directlyWanted ++ extraLoadDeps)
 
-buildDepsAndInitialSteps :: M r m => GhciOpts -> [Text] -> m ()
+buildDepsAndInitialSteps :: (StackM r m, HasEnvConfig r, MonadBaseUnlift IO m) => GhciOpts -> [Text] -> m ()
 buildDepsAndInitialSteps GhciOpts{..} targets0 = do
     -- Deprecation notice about --no-build
     when ghciNoBuild $ $prettyWarn $
@@ -321,7 +317,7 @@ checkAdditionalPackages pkgs = forM pkgs $ \name -> do
     maybe (throwM $ InvalidPackageOption name) return mres
 
 runGhci
-    :: M r m
+    :: (StackM r m, HasEnvConfig r, MonadBaseUnlift IO m)
     => GhciOpts
     -> [(PackageName, (Path Abs File, SimpleTarget))]
     -> Maybe (Map PackageName SimpleTarget)
@@ -441,7 +437,7 @@ getFileTargets = concatMap (concatMap S.toList . maybeToList . ghciPkgTargetFile
 -- is none, sometimes it's unambiguous, sometimes it's
 -- ambiguous. Warns and returns nothing if it's ambiguous.
 figureOutMainFile
-    :: M env m
+    :: (StackM r m, HasEnvConfig r)
     => BuildOpts
     -> Maybe (Map PackageName SimpleTarget)
     -> [(PackageName, (Path Abs File, SimpleTarget))]
@@ -526,7 +522,7 @@ figureOutMainFile bopts mainIsTargets targets0 packages = do
         "--main-is " <> packageNameText pkg <> ":" <> renderComp comp
 
 getGhciPkgInfos
-    :: M env m
+    :: (StackM r m, HasEnvConfig r)
     => SourceMap
     -> [PackageName]
     -> Maybe (Map PackageName (Set (Path Abs File)))
@@ -547,7 +543,7 @@ getGhciPkgInfos sourceMap addPkgs mfileTargets localTargets = do
 
 -- | Make information necessary to load the given package in GHCi.
 makeGhciPkgInfo
-    :: (MonadReader r m, HasEnvConfig r, HasTerminal r, MonadLogger m, MonadIO m, MonadCatch m, MonadBaseControl IO m)
+    :: (StackM r m, HasEnvConfig r)
     => SourceMap
     -> InstalledMap
     -> [PackageName]

@@ -5,18 +5,14 @@
 module Stack.Upgrade (upgrade) where
 
 import           Control.Monad               (when)
-import           Control.Monad.Catch
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
-import           Control.Monad.Reader        (MonadReader)
-import           Control.Monad.Trans.Control
 import           Data.Foldable               (forM_)
 import qualified Data.Map                    as Map
 import           Data.Maybe                  (isNothing)
 import           Data.Monoid.Extra
 import qualified Data.Text as T
 import           Lens.Micro                  (set)
-import           Network.HTTP.Client.Conduit (HasHttpManager)
 import           Path
 import           Path.IO
 import qualified Paths_stack as Paths
@@ -34,7 +30,7 @@ import           Stack.Types.StackT
 import           System.Process              (readProcess)
 import           System.Process.Run
 
-upgrade :: (MonadIO m, MonadMask m, MonadReader env m, HasConfig env, HasHttpManager env, MonadLogger m, HasTerminal env, HasReExec env, HasLogLevel env, MonadBaseControl IO m)
+upgrade :: (StackM env m, HasConfig env)
         => ConfigMonoid
         -> Maybe String -- ^ git repository to use
         -> Maybe AbstractResolver

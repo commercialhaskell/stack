@@ -15,9 +15,7 @@ import           Control.Exception.Lifted hiding (finally)
 import           Control.Monad
 import           Control.Monad.Catch hiding (bracket)
 import           Control.Monad.IO.Class
-import           Control.Monad.Logger
 import           Control.Monad.Reader
-import           Control.Monad.Trans.Control
 import           Data.Char (toLower)
 import qualified Data.Map.Strict as Map
 import           Data.Maybe
@@ -30,17 +28,13 @@ import           Path.IO
 import           Stack.Constants
 import           Stack.Types.Config
 import           Stack.Types.Image
-import           Stack.Types.Internal
+import           Stack.Types.StackT
 import           System.Process.Run
-
-type Build e m = (HasBuildConfig e, HasConfig e, HasEnvConfig e, HasTerminal e, MonadBaseControl IO m, MonadCatch m, MonadIO m, MonadLogger m, MonadReader e m)
-
-type Assemble e m = (HasConfig e, HasTerminal e, MonadBaseControl IO m, MonadIO m, MonadLogger m, MonadMask m, MonadReader e m)
 
 -- | Stages the executables & additional content in a staging
 -- directory under '.stack-work'
 stageContainerImageArtifacts
-    :: Build e m
+    :: (StackM env m, HasEnvConfig env)
     => Maybe (Path Abs Dir) -> [Text] -> m ()
 stageContainerImageArtifacts mProjectRoot imageNames = do
     config <- asks getConfig
@@ -63,7 +57,7 @@ stageContainerImageArtifacts mProjectRoot imageNames = do
 -- extended with an ENTRYPOINT specified for each `entrypoint` listed
 -- in the config file.
 createContainerImageFromStage
-    :: Assemble e m
+    :: (StackM env m, HasConfig env)
     => Maybe (Path Abs Dir) -> [Text] -> m ()
 createContainerImageFromStage mProjectRoot imageNames = do
     config <- asks getConfig
@@ -89,7 +83,7 @@ filterImages names = filter (imageNameFound . imgDockerImageName)
 -- | Stage all the Package executables in the usr/local/bin
 -- subdirectory of a temp directory.
 stageExesInDir
-    :: Build e m
+    :: (StackM env m, HasEnvConfig env)
     => ImageDockerOpts -> Path Abs Dir -> m ()
 stageExesInDir opts dir = do
     srcBinPath <- fmap (</> $(mkRelDir "bin")) installationRootLocal
@@ -108,7 +102,7 @@ stageExesInDir opts dir = do
 -- | Add any additional files into the temp directory, respecting the
 -- (Source, Destination) mapping.
 syncAddContentToDir
-    :: Build e m
+    :: (StackM env m, HasEnvConfig env)
     => ImageDockerOpts -> Path Abs Dir -> m ()
 syncAddContentToDir opts dir = do
     bconfig <- asks getBuildConfig
@@ -129,7 +123,7 @@ imageName = map toLower . toFilePathNoTrailingSep . dirname
 -- | Create a general purpose docker image from the temporary
 -- directory of executables & static content.
 createDockerImage
-    :: Assemble e m
+    :: (StackM env m, HasConfig env)
     => ImageDockerOpts -> Path Abs Dir -> m ()
 createDockerImage dockerConfig dir = do
     menv <- getMinimalEnvOverride
@@ -151,7 +145,7 @@ createDockerImage dockerConfig dir = do
 
 -- | Extend the general purpose docker image with entrypoints (if specified).
 extendDockerImageWithEntrypoint
-    :: Assemble e m
+    :: (StackM env m, HasConfig env)
     => ImageDockerOpts -> Path Abs Dir -> m ()
 extendDockerImageWithEntrypoint dockerConfig dir = do
     menv <- getMinimalEnvOverride

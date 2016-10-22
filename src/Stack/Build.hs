@@ -22,7 +22,6 @@ module Stack.Build
 
 import           Control.Exception (Exception)
 import           Control.Monad
-import           Control.Monad.Catch (MonadMask, MonadMask)
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import           Control.Monad.Reader (MonadReader, asks)
@@ -48,7 +47,6 @@ import           Data.Text.Read (decimal)
 import           Data.Typeable (Typeable)
 import qualified Data.Vector as V
 import qualified Data.Yaml as Yaml
-import           Network.HTTP.Client.Conduit (HasHttpManager)
 import           Path
 import           Prelude hiding (FilePath, writeFile)
 import           Stack.Build.ConstructPlan
@@ -60,14 +58,15 @@ import           Stack.Build.Target
 import           Stack.Fetch as Fetch
 import           Stack.GhcPkg
 import           Stack.Package
+import           Stack.Types.Build
+import           Stack.Types.Config
 import           Stack.Types.FlagName
+import           Stack.Types.Package
 import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageName
+import           Stack.Types.StackT
 import           Stack.Types.Version
-import           Stack.Types.Config
-import           Stack.Types.Build
-import           Stack.Types.Package
-import           Stack.Types.Internal
+
 #ifdef WINDOWS
 import           Stack.Types.Compiler
 #endif
@@ -78,14 +77,12 @@ import           System.Win32.Console (setConsoleCP, setConsoleOutputCP, getCons
 import qualified Control.Monad.Catch as Catch
 #endif
 
-type M env m = (MonadIO m,MonadReader env m,HasHttpManager env,HasBuildConfig env,MonadLoggerIO m,MonadBaseUnlift IO m,MonadMask m,HasLogLevel env,HasEnvConfig env,HasTerminal env)
-
 -- | Build.
 --
 --   If a buildLock is passed there is an important contract here.  That lock must
 --   protect the snapshot, and it must be safe to unlock it if there are no further
 --   modifications to the snapshot to be performed by this build.
-build :: M env m
+build :: (StackM env m, HasEnvConfig env, MonadBaseUnlift IO m)
       => (Set (Path Abs File) -> IO ()) -- ^ callback after discovering all local files
       -> Maybe FileLock
       -> BuildOptsCLI
@@ -150,7 +147,7 @@ allLocal =
     Map.elems .
     planTasks
 
-checkCabalVersion :: M env m => m ()
+checkCabalVersion :: (StackM env m, HasEnvConfig env) => m ()
 checkCabalVersion = do
     allowNewer <- asks (configAllowNewer . getConfig)
     cabalVer <- asks (envConfigCabalVersion . getEnvConfig)
@@ -275,13 +272,7 @@ mkBaseConfigOpts boptsCli = do
         }
 
 -- | Provide a function for loading package information from the package index
-withLoadPackage :: ( MonadIO m
-                   , HasHttpManager env
-                   , MonadReader env m
-                   , MonadBaseUnlift IO m
-                   , MonadMask m
-                   , MonadLogger m
-                   , HasEnvConfig env)
+withLoadPackage :: (StackM env m, HasEnvConfig env, MonadBaseUnlift IO m)
                 => EnvOverride
                 -> ((PackageName -> Version -> Map FlagName Bool -> [Text] -> IO Package) -> m a)
                 -> m a
@@ -311,7 +302,7 @@ withLoadPackage menv inner = do
 -- | Set the code page for this process as necessary. Only applies to Windows.
 -- See: https://github.com/commercialhaskell/stack/issues/738
 #ifdef WINDOWS
-fixCodePage :: M env m => m a -> m a
+fixCodePage :: (StackM env m, HasBuildConfig env) => m a -> m a
 fixCodePage inner = do
     mcp <- asks $ configModifyCodePage . getConfig
     ec <- asks getEnvConfig
@@ -358,7 +349,7 @@ fixCodePage = id
 #endif
 
 -- | Query information about the build and print the result to stdout in YAML format.
-queryBuildInfo :: M env m
+queryBuildInfo :: (StackM env m, HasEnvConfig env)
                => [Text] -- ^ selectors
                -> m ()
 queryBuildInfo selectors0 =
@@ -385,7 +376,7 @@ queryBuildInfo selectors0 =
         err msg = error $ msg ++ ": " ++ show (front [sel])
 
 -- | Get the raw build information object
-rawBuildInfo :: M env m => m Value
+rawBuildInfo :: (StackM env m, HasEnvConfig env) => m Value
 rawBuildInfo = do
     (_, _mbp, locals, _extraToBuild, _sourceMap) <- loadSourceMap NeedTargets defaultBuildOptsCLI
     return $ object

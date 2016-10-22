@@ -45,9 +45,9 @@ import           Stack.Types.Compiler
 import           Stack.Types.Config
 import           Stack.Types.FlagName
 import           Stack.Types.GhcPkgId
-import           Stack.Types.Internal (HasTerminal)
 import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageName
+import           Stack.Types.StackT (StackM)
 import           Stack.Types.Version
 
 -- | All exceptions thrown by the library.
@@ -116,7 +116,7 @@ packageDefinedFlags = M.keysSet . packageDefaultFlags
 -- | Files that the package depends on, relative to package directory.
 -- Argument is the location of the .cabal file
 newtype GetPackageOpts = GetPackageOpts
-    { getPackageOpts :: forall env m. (MonadIO m,HasEnvConfig env, HasPlatform env, MonadThrow m, MonadReader env m, MonadLogger m, MonadCatch m, HasTerminal env, MonadBaseControl IO m)
+    { getPackageOpts :: forall env m. (StackM env m, HasEnvConfig env)
                      => SourceMap
                      -> InstalledMap
                      -> [PackageName]
@@ -148,7 +148,7 @@ data CabalFileType
 -- | Files that the package depends on, relative to package directory.
 -- Argument is the location of the .cabal file
 newtype GetPackageFiles = GetPackageFiles
-    { getPackageFiles :: forall m env. (MonadIO m, MonadLogger m, MonadThrow m, MonadCatch m, MonadReader env m, HasPlatform env, HasEnvConfig env, HasTerminal env, MonadBaseControl IO m)
+    { getPackageFiles :: forall m env. (StackM env m, HasEnvConfig env)
                       => Path Abs File
                       -> m (Map NamedComponent (Set ModuleName)
                            ,Map NamedComponent (Set DotCabalPath)

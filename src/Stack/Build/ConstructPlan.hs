@@ -17,7 +17,6 @@ module Stack.Build.ConstructPlan
 import           Control.Arrow ((&&&))
 import           Control.Exception.Lifted
 import           Control.Monad
-import           Control.Monad.Catch (MonadCatch)
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import           Control.Monad.RWS.Strict
@@ -42,7 +41,6 @@ import qualified Distribution.Text as Cabal
 import qualified Distribution.Version as Cabal
 import           GHC.Generics (Generic)
 import           Generics.Deriving.Monoid (memptydefault, mappenddefault)
-import           Network.HTTP.Client.Conduit (HasHttpManager)
 import           Path
 import           Prelude hiding (pi, writeFile)
 import           Stack.Build.Cache
@@ -60,10 +58,10 @@ import           Stack.Types.Compiler
 import           Stack.Types.Config
 import           Stack.Types.FlagName
 import           Stack.Types.GhcPkgId
-import           Stack.Types.Internal (HasTerminal)
 import           Stack.Types.Package
 import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageName
+import           Stack.Types.StackT (StackM)
 import           Stack.Types.Version
 
 data PackageInfo
@@ -145,8 +143,7 @@ instance HasBuildConfig Ctx where
 instance HasEnvConfig Ctx where
     getEnvConfig = ctxEnvConfig
 
-constructPlan :: forall env m.
-                 (MonadCatch m, MonadReader env m, HasEnvConfig env, MonadLoggerIO m, MonadBaseControl IO m, HasHttpManager env, HasTerminal env)
+constructPlan :: forall env m. (StackM env m, HasEnvConfig env)
               => MiniBuildPlan
               -> BaseConfigOpts
               -> [LocalPackage]

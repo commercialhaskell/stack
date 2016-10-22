@@ -11,23 +11,19 @@ module Stack.SetupCmd
     ) where
 
 import           Control.Applicative
-import           Control.Monad.Catch
-import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import           Control.Monad.Reader
-import           Control.Monad.Trans.Control
 import           Data.Monoid
 import qualified Data.Text as T
 import qualified Options.Applicative as OA
 import qualified Options.Applicative.Builder.Extra as OA
 import qualified Options.Applicative.Types as OA
-import           Network.HTTP.Client
 import           Path
 import           Prelude -- silence redundant import warnings
 import           Stack.Setup
 import           Stack.Types.Compiler
 import           Stack.Types.Config
-import           Stack.Types.Internal
+import           Stack.Types.StackT
 import           Stack.Types.Version
 
 data SetupCmdOpts = SetupCmdOpts
@@ -81,9 +77,7 @@ setupParser = SetupCmdOpts
             Just x -> return x
 
 setup
-    :: (MonadIO m, MonadLogger m, MonadReader env m, HasConfig env,
-        MonadBaseControl IO m, MonadMask m, HasHttpManager env,
-        HasGHCVariant env, HasTerminal env, HasReExec env, HasLogLevel env)
+    :: (StackM env m, HasConfig env, HasGHCVariant env)
     => SetupCmdOpts
     -> CompilerVersion
     -> VersionCheck

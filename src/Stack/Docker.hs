@@ -24,7 +24,7 @@ import           Control.Applicative
 import           Control.Concurrent.MVar.Lifted (MVar,modifyMVar_,newMVar)
 import           Control.Exception.Lifted
 import           Control.Monad
-import           Control.Monad.Catch (MonadThrow,throwM,MonadCatch,MonadMask)
+import           Control.Monad.Catch (MonadThrow,throwM,MonadCatch)
 import           Control.Monad.IO.Class (MonadIO,liftIO)
 import           Control.Monad.Logger (MonadLogger,logError,logInfo,logWarn)
 import           Control.Monad.Reader (MonadReader,asks,runReaderT)
@@ -50,7 +50,6 @@ import qualified Data.Text.Encoding as T
 import           Data.Time (UTCTime,LocalTime(..),diffDays,utcToLocalTime,getZonedTime,ZonedTime(..))
 import           Data.Version (showVersion)
 import           GHC.Exts (sortWith)
-import           Network.HTTP.Client.Conduit (HasHttpManager)
 import           Path
 import           Path.Extra (toFilePathNoTrailingSep)
 import           Path.IO hiding (canonicalizePath)
@@ -64,6 +63,7 @@ import           Stack.Types.Version
 import           Stack.Types.Config
 import           Stack.Types.Docker
 import           Stack.Types.Internal
+import           Stack.Types.StackT
 import           Stack.Setup (ensureDockerStackExe)
 import           System.Directory (canonicalizePath,getHomeDirectory)
 import           System.Environment (getEnv,getEnvironment,getProgName,getArgs,getExecutablePath)
@@ -94,7 +94,7 @@ import qualified System.Posix.User as PosixUser
 -- for this is releasing a lock.  After launching reexecution, the host process becomes
 -- nothing but an manager for the call into docker and thus may not hold the lock.
 reexecWithOptionalContainer
-    :: M env m
+    :: (StackM env m, HasConfig env)
     => Maybe (Path Abs Dir)
     -> Maybe (m ())
     -> IO ()
@@ -196,7 +196,7 @@ reexecWithOptionalContainer mprojectRoot =
 --
 -- This takes an optional release action just like `reexecWithOptionalContainer`.
 execWithOptionalContainer
-    :: M env m
+    :: (StackM env m, HasConfig env)
     => Maybe (Path Abs Dir)
     -> GetCmdArgs env m
     -> Maybe (m ())
@@ -238,7 +238,7 @@ preventInContainer inner =
         else inner
 
 -- | Run a command in a new Docker container, then exit the process.
-runContainerAndExit :: M env m
+runContainerAndExit :: (StackM env m, HasConfig env)
   => GetCmdArgs env m
   -> Maybe (Path Abs Dir) -- ^ Project root (maybe)
   -> m ()              -- ^ Action to run before
@@ -412,7 +412,7 @@ runContainerAndExit getCmdArgs
     sshRelDir = $(mkRelDir ".ssh/")
 
 -- | Clean-up old docker images and containers.
-cleanup :: M env m
+cleanup :: (StackM env m, HasConfig env)
         => CleanupOpts -> m ()
 cleanup opts =
   do config <- asks getConfig
@@ -666,7 +666,7 @@ inspects envOverride images =
        Left e -> throwM e
 
 -- | Pull latest version of configured Docker image from registry.
-pull :: M env m => m ()
+pull :: (StackM env m, HasConfig env) => m ()
 pull =
   do config <- asks getConfig
      let docker = configDocker config
@@ -930,12 +930,9 @@ instance FromJSON ImageConfig where
 
 -- | Function to get command and arguments to run in Docker container
 type GetCmdArgs env m
-   = M env m
+   = (StackM env m, HasConfig env)
   => DockerOpts
   -> EnvOverride
   -> Inspect
   -> Bool
   -> m (FilePath,[String],[(String,String)],[Mount])
-
-type M env m = (MonadIO m,MonadReader env m,MonadLogger m,MonadBaseControl IO m,MonadCatch m
-               ,HasConfig env,HasTerminal env,HasReExec env,HasHttpManager env,MonadMask m)

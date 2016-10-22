@@ -15,10 +15,7 @@ module Stack.Dot (dot
 import           Control.Applicative
 import           Control.Arrow ((&&&))
 import           Control.Monad (liftM, void)
-import           Control.Monad.Catch (MonadMask)
 import           Control.Monad.IO.Class
-import           Control.Monad.Logger (MonadLogger)
-import           Control.Monad.Reader (MonadReader)
 import           Control.Monad.Trans.Unlift (MonadBaseUnlift)
 import qualified Data.Foldable as F
 import qualified Data.HashSet as HashSet
@@ -33,7 +30,6 @@ import qualified Data.Text as Text
 import qualified Data.Text.IO as Text
 import qualified Data.Traversable as T
 import           Distribution.License (License)
-import           Network.HTTP.Client.Conduit (HasHttpManager)
 import           Prelude -- Fix redundant import warnings
 import           Stack.Build (withLoadPackage)
 import           Stack.Build.Installed (getInstalled, GetInstalledOpts(..))
@@ -41,13 +37,13 @@ import           Stack.Build.Source
 import           Stack.Build.Target
 import           Stack.Constants
 import           Stack.Package
-import           Stack.Types.FlagName
-import           Stack.Types.PackageName
-import           Stack.Types.Version
-import           Stack.Types.Config
 import           Stack.Types.Build
+import           Stack.Types.Config
+import           Stack.Types.FlagName
 import           Stack.Types.Package
-import           Stack.Types.Internal (HasLogLevel, HasTerminal)
+import           Stack.Types.PackageName
+import           Stack.Types.StackT
+import           Stack.Types.Version
 
 -- | Options record for @stack dot@
 data DotOpts = DotOpts
@@ -79,16 +75,7 @@ data ListDepsOpts = ListDepsOpts
     }
 
 -- | Visualize the project's dependencies as a graphviz graph
-dot :: (HasEnvConfig env
-       ,HasHttpManager env
-       ,HasLogLevel env
-       ,HasTerminal env
-       ,MonadBaseUnlift IO m
-       ,MonadLogger m
-       ,MonadIO m
-       ,MonadMask m
-       ,MonadReader env m
-       )
+dot :: (StackM env m, HasEnvConfig env, MonadBaseUnlift IO m)
     => DotOpts
     -> m ()
 dot dotOpts = do
@@ -106,15 +93,7 @@ data DotPayload = DotPayload
 -- | Create the dependency graph and also prune it as specified in the dot
 -- options. Returns a set of local names and and a map from package names to
 -- dependencies.
-createPrunedDependencyGraph :: (HasEnvConfig env
-                               ,HasHttpManager env
-                               ,HasLogLevel env
-                               ,HasTerminal env
-                               ,MonadLogger m
-                               ,MonadBaseUnlift IO m
-                               ,MonadIO m
-                               ,MonadMask m
-                               ,MonadReader env m)
+createPrunedDependencyGraph :: (StackM env m, HasEnvConfig env, MonadBaseUnlift IO m)
                             => DotOpts
                             -> m (Set PackageName,
                                   Map PackageName (Set PackageName, DotPayload))
@@ -131,15 +110,7 @@ createPrunedDependencyGraph dotOpts = do
 -- name to a tuple of dependencies and payload if available. This
 -- function mainly gathers the required arguments for
 -- @resolveDependencies@.
-createDependencyGraph :: (HasEnvConfig env
-                         ,HasHttpManager env
-                         ,HasLogLevel env
-                         ,HasTerminal env
-                         ,MonadLogger m
-                         ,MonadBaseUnlift IO m
-                         ,MonadIO m
-                         ,MonadMask m
-                         ,MonadReader env m)
+createDependencyGraph :: (StackM env m, HasEnvConfig env, MonadBaseUnlift IO m)
                        => DotOpts
                        -> m (Map PackageName (Set PackageName, DotPayload))
 createDependencyGraph dotOpts = do
@@ -167,16 +138,7 @@ createDependencyGraph dotOpts = do
 
         makePayload pkg = DotPayload (Just $ packageVersion pkg) (Just $ packageLicense pkg)
 
-listDependencies :: (HasEnvConfig env
-                    ,HasHttpManager env
-                    ,HasLogLevel env
-                    ,HasTerminal env
-                    ,MonadBaseUnlift IO m
-                    ,MonadLogger m
-                    ,MonadMask m
-                    ,MonadIO m
-                    ,MonadReader env m
-                    )
+listDependencies :: (StackM env m, HasEnvConfig env, MonadBaseUnlift IO m)
                   => ListDepsOpts
                   -> m ()
 listDependencies opts = do

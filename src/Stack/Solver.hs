@@ -16,81 +16,78 @@ module Stack.Solver
     , parseCabalOutputLine
     ) where
 
-import Prelude ()
-import Prelude.Compat
+import           Prelude ()
+import           Prelude.Compat
 
 import           Control.Applicative
 import           Control.Exception (assert)
-import           Control.Exception.Enclosed  (tryIO)
-import           Control.Monad               (when,void,join,liftM,unless,mapAndUnzipM, zipWithM_)
+import           Control.Exception.Enclosed (tryIO)
+import           Control.Monad (when,void,join,liftM,unless,mapAndUnzipM, zipWithM_)
 import           Control.Monad.Catch
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
-import           Control.Monad.Reader        (MonadReader, asks)
+import           Control.Monad.Reader (MonadReader, asks)
 import           Control.Monad.Trans.Control
 import           Data.Aeson.Extended         ( WithJSONWarnings(..), object, (.=), toJSON
                                              , logJSONWarnings)
-import qualified Data.ByteString             as S
-import           Data.Char                   (isSpace)
+import qualified Data.ByteString as S
+import           Data.Char (isSpace)
 import           Data.Either
-import           Data.Foldable               (forM_)
-import           Data.Function               (on)
-import qualified Data.HashMap.Strict         as HashMap
-import qualified Data.HashSet                as HashSet
+import           Data.Foldable (forM_)
+import           Data.Function (on)
+import qualified Data.HashMap.Strict as HashMap
+import qualified Data.HashSet as HashSet
 import           Data.List                   ( (\\), isSuffixOf, intercalate
                                              , minimumBy, isPrefixOf)
-import           Data.List.Extra             (groupSortOn)
-import           Data.Map                    (Map)
-import qualified Data.Map                    as Map
-import           Data.Maybe                  (catMaybes, isNothing, mapMaybe)
+import           Data.List.Extra (groupSortOn)
+import           Data.Map (Map)
+import qualified Data.Map as Map
+import           Data.Maybe (catMaybes, isNothing, mapMaybe)
 import           Data.Monoid
-import           Data.Set                    (Set)
-import qualified Data.Set                    as Set
-import           Data.Text                   (Text)
-import qualified Data.Text                   as T
-import           Data.Text.Encoding          (decodeUtf8, encodeUtf8)
-import           Data.Text.Encoding.Error    (lenientDecode)
-import           Data.Text.Extra             (stripCR)
-import qualified Data.Text.Lazy              as LT
-import           Data.Text.Lazy.Encoding     (decodeUtf8With)
-import           Data.Tuple                  (swap)
-import qualified Data.Yaml.Extra             as Yaml
-import qualified Distribution.Package        as C
+import           Data.Set (Set)
+import qualified Data.Set as Set
+import           Data.Text (Text)
+import qualified Data.Text as T
+import           Data.Text.Encoding (decodeUtf8, encodeUtf8)
+import           Data.Text.Encoding.Error (lenientDecode)
+import           Data.Text.Extra (stripCR)
+import qualified Data.Text.Lazy as LT
+import           Data.Text.Lazy.Encoding (decodeUtf8With)
+import           Data.Tuple (swap)
+import qualified Data.Yaml.Extra as Yaml
+import qualified Distribution.Package as C
 import qualified Distribution.PackageDescription as C
-import qualified Distribution.Text           as C
+import qualified Distribution.Text as C
 import           Network.HTTP.Client.Conduit (HasHttpManager)
-import           Text.Regex.Applicative.Text (match, sym, psym, anySym, few)
 import           Path
-import           Path.Find                   (findFiles)
-import           Path.IO                     hiding (findExecutable, findFiles)
+import           Path.Find (findFiles)
+import           Path.IO hiding (findExecutable, findFiles)
 import           Stack.BuildPlan
-import           Stack.Constants             (stackDotYaml, wiredInPackages)
+import           Stack.Constants (stackDotYaml, wiredInPackages)
 import           Stack.Package               (printCabalFileWarning
                                              , hpack
                                              , readPackageUnresolved)
 import           Stack.Setup
 import           Stack.Setup.Installed
-import           Stack.Types.FlagName
-import           Stack.Types.PackageIdentifier
-import           Stack.Types.PackageIndex
-import           Stack.Types.PackageName
-import           Stack.Types.Version
-import           Stack.Types.Config
 import           Stack.Types.Build
 import           Stack.Types.Compiler
-import           Stack.Types.Internal        ( HasTerminal
-                                             , HasReExec
-                                             , HasLogLevel)
-import qualified System.Directory            as D
-import qualified System.FilePath             as FP
+import           Stack.Types.Config
+import           Stack.Types.FlagName
+import           Stack.Types.PackageIdentifier
+import           Stack.Types.PackageName
+import           Stack.Types.StackT (StackM)
+import           Stack.Types.Version
+import qualified System.Directory as D
+import qualified System.FilePath as FP
 import           System.Process.Read
+import           Text.Regex.Applicative.Text (match, sym, psym, anySym, few)
 
-import qualified Data.Text.Normalize         as T ( normalize , NormalizationMode(NFC) )
+import qualified Data.Text.Normalize as T ( normalize , NormalizationMode(NFC) )
 
 data ConstraintType = Constraint | Preference deriving (Eq)
 type ConstraintSpec = Map PackageName (Version, Map FlagName Bool)
 
-cabalSolver :: (MonadIO m, MonadLogger m, MonadMask m, MonadBaseControl IO m, MonadReader env m, HasConfig env)
+cabalSolver :: (StackM env m, HasConfig env)
             => EnvOverride
             -> [Path Abs Dir] -- ^ cabal files
             -> ConstraintType
@@ -237,7 +234,7 @@ parseCabalOutputLine t0 = maybe (Left t0) Right . join .  match re $ t0
 
     lexeme r = some (psym isSpace) *> r
 
-getCabalConfig :: (MonadLogger m, MonadReader env m, HasConfig env, MonadIO m, MonadThrow m)
+getCabalConfig :: (StackM env m, HasConfig env)
                => FilePath -- ^ temp dir
                -> ConstraintType
                -> Map PackageName Version -- ^ constraints
@@ -274,10 +271,7 @@ getCabalConfig dir constraintType constraints = do
               ]
 
 setupCompiler
-    :: ( MonadBaseControl IO m, MonadIO m, MonadLogger m, MonadMask m
-       , MonadReader env m, HasConfig env , HasGHCVariant env
-       , HasHttpManager env , HasLogLevel env , HasReExec env
-       , HasTerminal env)
+    :: (StackM env m, HasConfig env, HasGHCVariant env)
     => CompilerVersion
     -> m (Maybe ExtraDirs)
 setupCompiler compiler = do
@@ -307,10 +301,7 @@ setupCompiler compiler = do
         }
 
 setupCabalEnv
-    :: ( MonadBaseControl IO m, MonadIO m, MonadLogger m, MonadMask m
-       , MonadReader env m, HasConfig env , HasGHCVariant env
-       , HasHttpManager env , HasLogLevel env , HasReExec env
-       , HasTerminal env)
+    :: (StackM env m, HasConfig env, HasGHCVariant env)
     => CompilerVersion
     -> m EnvOverride
 setupCabalEnv compiler = do
@@ -364,10 +355,7 @@ mergeConstraints = Map.mergeWithKey
 -- or the solution in terms of src package flag settings and extra
 -- dependencies.
 solveResolverSpec
-    :: ( MonadBaseControl IO m, MonadIO m, MonadLogger m, MonadMask m
-       , MonadReader env m, HasConfig env , HasGHCVariant env
-       , HasHttpManager env , HasLogLevel env , HasReExec env
-       , HasTerminal env)
+    :: (StackM env m, HasConfig env, HasGHCVariant env)
     => Path Abs File  -- ^ stack.yaml file location
     -> [Path Abs Dir] -- ^ package dirs containing cabal files
     -> ( Resolver
@@ -540,10 +528,7 @@ ignoredDirs = Set.fromList
 -- pairs as well as any filenames for duplicate packages not included in the
 -- pairs.
 cabalPackagesCheck
-    :: ( MonadBaseControl IO m, MonadIO m, MonadLogger m, MonadMask m
-       , MonadReader env m, HasConfig env , HasGHCVariant env
-       , HasHttpManager env , HasLogLevel env , HasReExec env
-       , HasTerminal env)
+    :: (StackM env m, HasConfig env, HasGHCVariant env)
      => [Path Abs File]
      -> String
      -> Maybe String
@@ -631,9 +616,7 @@ reportMissingCabalFiles cabalfps includeSubdirs = do
 -- dependencies in an existing stack.yaml and suggest changes in flags or
 -- extra dependencies so that the specified packages can be compiled.
 solveExtraDeps
-    :: ( MonadBaseControl IO m, MonadIO m, MonadLogger m, MonadMask m
-       , MonadReader env m, HasEnvConfig env, HasHttpManager env
-       , HasLogLevel env, HasReExec env, HasTerminal env)
+    :: (StackM env m, HasEnvConfig env)
     => Bool -- ^ modify stack.yaml?
     -> m ()
 solveExtraDeps modStackYaml = do

@@ -6,6 +6,7 @@
 {-# LANGUAGE RecordWildCards       #-}
 {-# LANGUAGE TemplateHaskell       #-}
 {-# LANGUAGE LambdaCase            #-}
+{-# LANGUAGE TypeFamilies          #-}
 -- | Perform a build
 module Stack.Build.Execute
     ( printPlan
@@ -25,11 +26,11 @@ import           Control.Concurrent.STM
 import           Control.Exception.Enclosed (catchIO)
 import           Control.Exception.Lifted
 import           Control.Monad (liftM, when, unless, void)
-import           Control.Monad.Catch (MonadCatch, MonadMask)
+import           Control.Monad.Catch (MonadCatch)
 import           Control.Monad.Extra (anyM, (&&^))
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
-import           Control.Monad.Reader (MonadReader, asks)
+import           Control.Monad.Reader (asks)
 import           Control.Monad.Trans.Control (liftBaseWith)
 import           Control.Monad.Trans.Resource
 import qualified Crypto.Hash.SHA256 as SHA256
@@ -68,7 +69,6 @@ import           Distribution.System            (OS (Windows),
                                                  Platform (Platform))
 import qualified Distribution.Text as C
 import           Language.Haskell.TH as TH (location)
-import           Network.HTTP.Client.Conduit (HasHttpManager)
 import           Path
 import           Path.Extra (toFilePathNoTrailingSep, rejectMissingFile)
 import           Path.IO hiding (findExecutable, makeAbsolute)
@@ -110,10 +110,8 @@ import           System.Process.Run
 import           System.Process.Internals (createProcess_)
 #endif
 
-type M env m = (MonadIO m,MonadReader env m,HasHttpManager env,HasBuildConfig env,MonadLogger m,MonadBaseControl IO m,MonadMask m,HasLogLevel env,HasEnvConfig env,HasTerminal env, HasConfig env)
-
 -- | Fetch the packages necessary for a build, for example in combination with a dry run.
-preFetch :: M env m => Plan -> m ()
+preFetch :: (StackM env m, HasEnvConfig env) => Plan -> m ()
 preFetch plan
     | Set.null idents = $logDebug "Nothing to fetch"
     | otherwise = do
@@ -133,7 +131,7 @@ preFetch plan
                 (packageVersion package)
 
 -- | Print a description of build plan for human consumption.
-printPlan :: M env m
+printPlan :: (StackM env m, HasEnvConfig env)
           => Plan
           -> m ()
 printPlan plan = do
@@ -261,7 +259,7 @@ simpleSetupHash =
     encodeUtf8 (T.pack (unwords buildSetupArgs)) <> setupGhciShimCode <> simpleSetupCode
 
 -- | Get a compiled Setup exe
-getSetupExe :: M env m
+getSetupExe :: (StackM env m, HasEnvConfig env)
             => Path Abs File -- ^ Setup.hs input file
             -> Path Abs File -- ^ SetupShim.hs input file
             -> Path Abs Dir -- ^ temporary directory
@@ -322,7 +320,7 @@ getSetupExe setupHs setupShimHs tmpdir = do
             return $ Just exePath
 
 -- | Execute a callback that takes an 'ExecuteEnv'.
-withExecuteEnv :: M env m
+withExecuteEnv :: (StackM env m, HasEnvConfig env)
                => EnvOverride
                -> BuildOpts
                -> BuildOptsCLI
@@ -440,7 +438,7 @@ withExecuteEnv menv bopts boptsCli baseConfigOpts locals globalPackages snapshot
         $logInfo $ T.pack $ "\n--  End of log file: " ++ toFilePath filepath ++ "\n"
 
 -- | Perform the actual plan
-executePlan :: M env m
+executePlan :: (StackM env m, HasEnvConfig env)
             => EnvOverride
             -> BuildOptsCLI
             -> BaseConfigOpts
@@ -575,7 +573,7 @@ windowsRenameCopy src dest = do
     old = dest ++ ".old"
 
 -- | Perform the actual plan (internal)
-executePlan' :: M env m
+executePlan' :: (StackM env m, HasEnvConfig env)
              => InstalledMap
              -> Map PackageName SimpleTarget
              -> Plan
@@ -671,7 +669,7 @@ executePlan' installedMap0 targets plan ee@ExecuteEnv {..} = do
                   $ Map.elems
                   $ planUnregisterLocal plan
 
-toActions :: M env m
+toActions :: (StackM env m, HasEnvConfig env)
           => InstalledMap
           -> (m () -> IO ())
           -> ExecuteEnv
@@ -725,7 +723,7 @@ toActions installedMap runInBase ee (mbuild, mfinal) =
     beopts = boptsBenchmarkOpts bopts
 
 -- | Generate the ConfigCache
-getConfigCache :: M env m
+getConfigCache :: (StackM env m, HasEnvConfig env)
                => ExecuteEnv -> Task -> InstalledMap -> Bool -> Bool
                -> m (Map PackageIdentifier GhcPkgId, ConfigCache)
 getConfigCache ExecuteEnv {..} Task {..} installedMap enableTest enableBench = do
@@ -770,7 +768,7 @@ getConfigCache ExecuteEnv {..} Task {..} installedMap enableTest enableBench = d
     return (allDepsMap, cache)
 
 -- | Ensure that the configuration for the package matches what is given
-ensureConfig :: M env m
+ensureConfig :: (StackM env m, HasEnvConfig env)
              => ConfigCache -- ^ newConfigCache
              -> Path Abs Dir -- ^ package directory
              -> ExecuteEnv
@@ -831,7 +829,7 @@ announceTask task x = $logInfo $ T.concat
     , x
     ]
 
-withSingleContext :: M env m
+withSingleContext :: (StackM env m, HasEnvConfig env)
                   => (m () -> IO ())
                   -> ActionContext
                   -> ExecuteEnv
@@ -1047,7 +1045,7 @@ withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} md
                     return (outputFile, setupArgs)
             runExe exeName $ (if boptsCabalVerbose eeBuildOpts then ("--verbose":) else id) fullArgs
 
-singleBuild :: M env m
+singleBuild :: (StackM env m, HasEnvConfig env)
             => (m () -> IO ())
             -> ActionContext
             -> ExecuteEnv
@@ -1315,7 +1313,7 @@ singleBuild runInBase ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} in
             _ -> error "singleBuild: invariant violated: multiple results when describing installed package"
 
 -- | Check if any unlisted files have been found, and add them to the build cache.
-checkForUnlistedFiles :: M env m => TaskType -> ModTime -> Path Abs Dir -> m [PackageWarning]
+checkForUnlistedFiles :: (StackM env m, HasEnvConfig env) => TaskType -> ModTime -> Path Abs Dir -> m [PackageWarning]
 checkForUnlistedFiles (TTLocal lp) preBuildTime pkgDir = do
     (addBuildCache,warnings) <-
         addUnlistedToBuildCache
@@ -1338,7 +1336,7 @@ depsPresent installedMap deps = all
             Nothing -> False)
     (Map.toList deps)
 
-singleTest :: M env m
+singleTest :: (StackM env m, HasEnvConfig env)
            => (m () -> IO ())
            -> TestOpts
            -> [Text]
@@ -1481,7 +1479,7 @@ singleTest runInBase topts testsToRun ac ee task installedMap = do
                 (fmap fst mlogFile)
                 bs
 
-singleBench :: M env m
+singleBench :: (StackM env m, HasEnvConfig env)
             => (m () -> IO ())
             -> BenchmarkOpts
             -> [Text]
@@ -1573,7 +1571,7 @@ getSetupHs dir = do
 -- Do not pass `-hpcdir` as GHC option if the coverage is not enabled.
 -- This helps running stack-compiled programs with dynamic interpreters like `hint`.
 -- Cfr: https://github.com/commercialhaskell/stack/issues/997
-extraBuildOptions :: M env m => WhichCompiler -> BuildOpts -> m [String]
+extraBuildOptions :: (StackM env m, HasEnvConfig env) => WhichCompiler -> BuildOpts -> m [String]
 extraBuildOptions wc bopts = do
     let ddumpOpts = " -ddump-hi -ddump-to-file"
         optsFlag = compilerOptionsCabalFlag wc

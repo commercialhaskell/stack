@@ -5,6 +5,7 @@
 {-# LANGUAGE TemplateHaskell       #-}
 {-# LANGUAGE ViewPatterns          #-}
 {-# LANGUAGE DeriveDataTypeable    #-}
+{-# LANGUAGE TypeFamilies          #-}
 -- Create a source distribution tarball
 module Stack.SDist
     ( getSDistTarball
@@ -21,9 +22,8 @@ import           Control.Monad (unless, void, liftM)
 import           Control.Monad.Catch
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
-import           Control.Monad.Reader (MonadReader, asks)
+import           Control.Monad.Reader (asks)
 import           Control.Monad.Trans.Control (liftBaseWith)
-import           Control.Monad.Trans.Resource
 import qualified Data.ByteString as S
 import qualified Data.ByteString.Char8 as S8
 import qualified Data.ByteString.Lazy as L
@@ -46,7 +46,6 @@ import qualified Distribution.PackageDescription.Check as Check
 import           Distribution.PackageDescription.PrettyPrint (showGenericPackageDescription)
 import           Distribution.Version (simplifyVersionRange, orLaterVersion, earlierVersion)
 import           Distribution.Version.Extra
-import           Network.HTTP.Client.Conduit (HasHttpManager)
 import           Path
 import           Path.IO hiding (getModificationTime, getPermissions)
 import           Prelude -- Fix redundant import warnings
@@ -57,13 +56,13 @@ import           Stack.Build.Source (loadSourceMap, getDefaultPackageConfig)
 import           Stack.Build.Target
 import           Stack.Constants
 import           Stack.Package
+import           Stack.Types.Build
+import           Stack.Types.Config
+import           Stack.Types.Package
 import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageName
+import           Stack.Types.StackT
 import           Stack.Types.Version
-import           Stack.Types.Config
-import           Stack.Types.Build
-import           Stack.Types.Package
-import           Stack.Types.Internal
 import           System.Directory (getModificationTime, getPermissions)
 import qualified System.FilePath as FP
 
@@ -81,8 +80,6 @@ instance Show CheckException where
     "Package check reported the following errors:\n" ++
     (intercalate "\n" . fmap show . NE.toList $ xs)
 
-type M env m = (MonadIO m,MonadReader env m,HasHttpManager env,MonadLogger m,MonadBaseControl IO m,MonadMask m,HasLogLevel env,HasEnvConfig env,HasTerminal env)
-
 -- | Given the path to a local package, creates its source
 -- distribution tarball.
 --
@@ -90,7 +87,7 @@ type M env m = (MonadIO m,MonadReader env m,HasHttpManager env,MonadLogger m,Mon
 -- tarball is not written to the disk and instead yielded as a lazy
 -- bytestring.
 getSDistTarball
-  :: M env m
+  :: (StackM env m, HasEnvConfig env)
   => Maybe PvpBounds            -- ^ Override Config value
   -> Path Abs Dir               -- ^ Path to local package
   -> m (FilePath, L.ByteString) -- ^ Filename and tarball contents
@@ -131,7 +128,7 @@ getSDistTarball mpvpBounds pkgDir = do
     return (tarName, GZip.compress (Tar.write (dirEntries ++ fileEntries)))
 
 -- | Get the PVP bounds-enabled version of the given cabal file
-getCabalLbs :: M env m => PvpBounds -> FilePath -> m L.ByteString
+getCabalLbs :: (StackM env m, HasEnvConfig env) => PvpBounds -> FilePath -> m L.ByteString
 getCabalLbs pvpBounds fp = do
     bs <- liftIO $ S.readFile fp
     (_warnings, gpd) <- readPackageUnresolvedBS Nothing bs
@@ -185,7 +182,7 @@ gtraverseT f =
 -- | Read in a 'LocalPackage' config.  This makes some default decisions
 -- about 'LocalPackage' fields that might not be appropriate for other
 -- use-cases.
-readLocalPackage :: M env m => Path Abs Dir -> m LocalPackage
+readLocalPackage :: (StackM env m, HasEnvConfig env) => Path Abs Dir -> m LocalPackage
 readLocalPackage pkgDir = do
     cabalfp <- findOrGenerateCabalFile pkgDir
     config  <- getDefaultPackageConfig
@@ -210,7 +207,7 @@ readLocalPackage pkgDir = do
         }
 
 -- | Returns a newline-separate list of paths, and the absolute path to the .cabal file.
-getSDistFileList :: M env m => LocalPackage -> m (String, Path Abs File)
+getSDistFileList :: (StackM env m, HasEnvConfig env) => LocalPackage -> m (String, Path Abs File)
 getSDistFileList lp =
     withSystemTempDir (stackProgName <> "-sdist") $ \tmpdir -> do
         menv <- getMinimalEnvOverride
@@ -241,7 +238,7 @@ getSDistFileList lp =
         , taskAllInOne = True
         }
 
-normalizeTarballPaths :: M env m => [FilePath] -> m [FilePath]
+normalizeTarballPaths :: (StackM env m, HasEnvConfig env) => [FilePath] -> m [FilePath]
 normalizeTarballPaths fps = do
     -- TODO: consider whether erroring out is better - otherwise the
     -- user might upload an incomplete tar?
@@ -274,7 +271,7 @@ dirsFromFiles dirs = Set.toAscList (Set.delete "." results)
 -- and will throw an exception in case of critical errors.
 --
 -- Note that we temporarily decompress the archive to analyze it.
-checkSDistTarball :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasEnvConfig env)
+checkSDistTarball :: (StackM env m, HasEnvConfig env)
   => Path Abs File -- ^ Absolute path to tarball
   -> m ()
 checkSDistTarball tarball = withTempTarGzContents tarball $ \pkgDir' -> do
@@ -304,7 +301,7 @@ checkSDistTarball tarball = withTempTarGzContents tarball $ \pkgDir' -> do
 
 -- | Version of 'checkSDistTarball' that first saves lazy bytestring to
 -- temporary directory and then calls 'checkSDistTarball' on it.
-checkSDistTarball' :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasEnvConfig env)
+checkSDistTarball' :: (StackM env m, HasEnvConfig env)
   => String       -- ^ Tarball name
   -> L.ByteString -- ^ Tarball contents as a byte string
   -> m ()

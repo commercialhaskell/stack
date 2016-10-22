@@ -9,6 +9,7 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE ConstraintKinds #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 -- | The monad used for the command-line executable @stack@.
@@ -16,6 +17,8 @@
 module Stack.Types.StackT
   (StackT
   ,StackLoggingT
+  ,HasEnv
+  ,StackM
   ,runStackT
   ,runStackTGlobal
   ,runStackLoggingT
@@ -52,10 +55,10 @@ import           Language.Haskell.TH.Syntax (lift)
 import           Network.HTTP.Client.Conduit (HasHttpManager(..))
 import           Network.HTTP.Conduit
 import           Prelude -- Fix AMP warning
-import           System.FilePath
 import           Stack.Types.Config (GlobalOpts (..))
 import           Stack.Types.Internal
 import           System.Console.ANSI
+import           System.FilePath
 import           System.IO
 import           System.Log.FastLogger
 
@@ -65,6 +68,13 @@ import           System.Log.FastLogger
 #if !MIN_VERSION_time(1, 5, 0)
 import           System.Locale
 #endif
+
+type HasEnv r = (HasHttpManager r, HasLogLevel r, HasTerminal r, HasReExec r
+                , HasSticky r, HasSupportsUnicode r)
+
+-- | Constraint synonym for constraints commonly satisifed by monads used in stack.
+type StackM r m =
+    (MonadReader r m, MonadIO m, MonadBaseControl IO m, MonadLoggerIO m, MonadMask m, HasEnv r)
 
 --------------------------------------------------------------------------------
 -- Main StackT monad transformer
@@ -177,7 +187,7 @@ instance HasReExec LoggingEnv where
 instance HasSupportsUnicode LoggingEnv where
     getSupportsUnicode = lenvSupportsUnicode
 
-runInnerStackT :: (HasHttpManager r, HasLogLevel r, HasTerminal r, HasReExec r, MonadReader r m, MonadIO m)
+runInnerStackT :: (HasEnv r, MonadReader r m, MonadIO m)
                => config -> StackT config IO a -> m a
 runInnerStackT config inner = do
     manager <- asks getHttpManager
@@ -186,7 +196,7 @@ runInnerStackT config inner = do
     reExec <- asks getReExec
     liftIO $ runStackT manager logLevel config terminal reExec inner
 
-runInnerStackLoggingT :: (HasHttpManager r, HasLogLevel r, HasTerminal r, HasReExec r, MonadReader r m, MonadIO m)
+runInnerStackLoggingT :: (HasEnv r, MonadReader r m, MonadIO m)
                       => StackLoggingT IO a -> m a
 runInnerStackLoggingT inner = do
     manager <- asks getHttpManager
@@ -225,14 +235,14 @@ runStackLoggingT manager logLevel terminal reExec m = do
 --------------------------------------------------------------------------------
 -- Logging functionality
 stickyLoggerFunc
-    :: (HasSticky r, HasLogLevel r, HasSupportsUnicode r, HasTerminal r, ToLogStr msg, MonadReader r m, MonadIO m)
+    :: (HasEnv r, ToLogStr msg, MonadReader r m, MonadIO m)
     => Loc -> LogSource -> LogLevel -> msg -> m ()
 stickyLoggerFunc loc src level msg = do
     func <- getStickyLoggerFunc
     liftIO $ func loc src level msg
 
 getStickyLoggerFunc
-    :: (HasSticky r, HasLogLevel r, HasSupportsUnicode r, HasTerminal r, ToLogStr msg, MonadReader r m)
+    :: (HasEnv r, ToLogStr msg, MonadReader r m)
     => m (Loc -> LogSource -> LogLevel -> msg -> IO ())
 getStickyLoggerFunc = do
     sticky <- asks getSticky

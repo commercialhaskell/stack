@@ -85,7 +85,7 @@ import              Stack.Types.Build
 import              Stack.Types.Compiler
 import              Stack.Types.Config
 import              Stack.Types.Docker
-import              Stack.Types.Internal (HasTerminal, HasReExec, HasLogLevel, envConfigBuildOpts, buildOptsInstallExes, buildOptsHaddock)
+import              Stack.Types.Internal (envConfigBuildOpts, buildOptsInstallExes, buildOptsHaddock)
 import              Stack.Types.PackageIdentifier
 import              Stack.Types.PackageName
 import              Stack.Types.StackT
@@ -195,7 +195,7 @@ instance Show SetupException where
         , "' option to specify a location"]
 
 -- | Modify the environment variables (like PATH) appropriately, possibly doing installation too
-setupEnv :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasBuildConfig env, HasHttpManager env, HasTerminal env, HasReExec env, HasLogLevel env, HasGHCVariant env, MonadBaseControl IO m)
+setupEnv :: (StackM env m, HasBuildConfig env, HasGHCVariant env)
          => Maybe Text -- ^ Message to give user when necessary GHC is not available
          -> m EnvConfig
 setupEnv mResolveMissingGHC = do
@@ -335,7 +335,7 @@ addIncludeLib (ExtraDirs _bins includes libs) config = config
     }
 
 -- | Ensure compiler (ghc or ghcjs) is installed and provide the PATHs to add if necessary
-ensureCompiler :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasConfig env, HasHttpManager env, HasTerminal env, HasReExec env, HasLogLevel env, HasGHCVariant env, MonadBaseControl IO m)
+ensureCompiler :: (StackM env m, HasConfig env, HasGHCVariant env)
                => SetupOpts
                -> m (Maybe ExtraDirs, CompilerBuild)
 ensureCompiler sopts = do
@@ -488,7 +488,7 @@ ensureCompiler sopts = do
 -- | Determine which GHC build to use dependong on which shared libraries are available
 -- on the system.
 getGhcBuild
-    :: (MonadIO m, MonadBaseControl IO m, MonadCatch m, MonadLogger m, HasConfig env, MonadReader env m)
+    :: (StackM env m, HasConfig env)
     => EnvOverride -> m CompilerBuild
 getGhcBuild menv = do
 
@@ -583,7 +583,7 @@ getGhcBuild menv = do
 
 -- | Ensure Docker container-compatible 'stack' executable is downloaded
 ensureDockerStackExe
-    :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasConfig env, HasHttpManager env, MonadBaseControl IO m)
+    :: (StackM env m, HasConfig env)
     => Platform -> m (Path Abs File)
 ensureDockerStackExe containerPlatform = do
     config <- asks getConfig
@@ -795,7 +795,7 @@ downloadAndInstallTool programsDir si downloadInfo tool installer = do
     ignoringAbsence (removeDirRecur tempDir)
     return tool
 
-downloadAndInstallCompiler :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasConfig env, HasGHCVariant env, HasHttpManager env, HasTerminal env, HasReExec env, HasLogLevel env, MonadBaseControl IO m)
+downloadAndInstallCompiler :: (StackM env m, HasConfig env, HasGHCVariant env)
                            => CompilerBuild
                            -> SetupInfo
                            -> CompilerVersion
@@ -940,7 +940,7 @@ data ArchiveType
     | TarGz
     | SevenZ
 
-installGHCPosix :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasConfig env, HasHttpManager env, MonadBaseControl IO m, HasTerminal env)
+installGHCPosix :: (StackM env m, HasConfig env)
                 => Version
                 -> GHCDownloadInfo
                 -> SetupInfo
@@ -1015,7 +1015,7 @@ installGHCPosix version downloadInfo _ archiveFile archiveType tempDir destDir =
     $logStickyDone $ "Installed GHC."
     $logDebug $ "GHC installed to " <> T.pack (toFilePath destDir)
 
-installGHCJS :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasConfig env, HasHttpManager env, HasTerminal env, HasReExec env, HasLogLevel env, MonadBaseControl IO m)
+installGHCJS :: (StackM env m, HasConfig env)
              => SetupInfo
              -> Path Abs File
              -> ArchiveType
@@ -1098,7 +1098,7 @@ installGHCJS si archiveFile archiveType _tempDir destDir = do
 
 -- Install the downloaded stack binary distribution
 installDockerStackExe
-    :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasConfig env, MonadBaseControl IO m)
+    :: (StackM env m, HasConfig env)
     => SetupInfo
     -> Path Abs File
     -> ArchiveType
@@ -1120,7 +1120,7 @@ installDockerStackExe _ archiveFile _ tempDir destDir = do
         (tempDir </> $(mkRelFile stackProgName))
         (destDir </> $(mkRelFile stackProgName))
 
-ensureGhcjsBooted :: (MonadIO m, MonadBaseControl IO m, MonadLogger m, MonadCatch m, HasConfig env, HasHttpManager env, HasTerminal env, HasReExec env, HasLogLevel env, MonadReader env m)
+ensureGhcjsBooted :: (StackM env m, HasConfig env)
                   => EnvOverride -> CompilerVersion -> Bool -> m ()
 ensureGhcjsBooted menv cv shouldBoot  = do
     eres <- try $ sinkProcessStdout Nothing menv "ghcjs" [] (return ())
@@ -1155,7 +1155,7 @@ ensureGhcjsBooted menv cv shouldBoot  = do
                 bootGhcjs ghcjsVersion actualStackYaml destDir
         Left err -> throwM err
 
-bootGhcjs :: (MonadIO m, MonadBaseControl IO m, MonadLogger m, MonadCatch m, HasHttpManager env, HasTerminal env, HasReExec env, HasLogLevel env, MonadReader env m)
+bootGhcjs :: StackM env m
           => Version -> Path Abs File -> Path Abs Dir -> m ()
 bootGhcjs ghcjsVersion stackYaml destDir = do
     envConfig <- loadGhcjsEnvConfig stackYaml (destDir </> $(mkRelDir "bin"))
@@ -1213,8 +1213,8 @@ bootGhcjs ghcjsVersion stackYaml destDir = do
     logProcessStderrStdout Nothing "ghcjs-boot" menv' ["--clean"]
     $logStickyDone "GHCJS booted."
 
-loadGhcjsEnvConfig :: (MonadIO m, HasHttpManager r, MonadReader r m, HasTerminal r, HasReExec r, HasLogLevel r)
-                     => Path Abs File -> Path b t -> m EnvConfig
+loadGhcjsEnvConfig :: StackM env m
+                   => Path Abs File -> Path b t -> m EnvConfig
 loadGhcjsEnvConfig stackYaml binPath = runInnerStackLoggingT $ do
     lc <- loadConfig
         (mempty

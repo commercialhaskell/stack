@@ -21,7 +21,6 @@ import           Control.Monad
 import           Control.Monad.Catch (MonadCatch)
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
-import           Control.Monad.Reader (MonadReader)
 import           Control.Monad.Trans.Resource
 import qualified Data.Foldable as F
 import           Data.Function
@@ -48,17 +47,17 @@ import           Stack.Types.Build
 import           Stack.Types.Compiler
 import           Stack.Types.Config
 import           Stack.Types.GhcPkgId
-import           Stack.Types.Internal (HasTerminal)
 import           Stack.Types.Package
 import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageName
+import           Stack.Types.StackT (StackM)
 import qualified System.FilePath as FP
 import           System.IO.Error (isDoesNotExistError)
 import           System.Process.Read
 import           Web.Browser (openBrowser)
 
 openHaddocksInBrowser
-    :: (MonadIO m, MonadThrow m, MonadLogger m, MonadReader env m, HasTerminal env)
+    :: StackM env m
     => BaseConfigOpts
     -> Map PackageName (PackageIdentifier, InstallLocation)
     -- ^ Available packages and their locations for the current project

@@ -68,16 +68,16 @@ import              Stack.Types.Build
 import              Stack.Types.BuildPlan
 import              Stack.Types.Config
 import              Stack.Types.FlagName
-import              Stack.Types.Internal (HasTerminal)
 import              Stack.Types.Package
 import              Stack.Types.PackageName
+import              Stack.Types.StackT
 import              Stack.Types.Version
 import qualified    System.Directory as D
 import              System.FilePath (takeFileName)
 import              System.IO (withBinaryFile, IOMode (ReadMode))
 import              System.IO.Error (isDoesNotExistError)
 
-loadSourceMap :: (MonadIO m, MonadMask m, MonadReader env m, MonadBaseControl IO m, HasHttpManager env, MonadLogger m, HasEnvConfig env, HasTerminal env)
+loadSourceMap :: (StackM env m, HasEnvConfig env)
               => NeedTargets
               -> BuildOptsCLI
               -> m ( Map PackageName SimpleTarget
@@ -335,8 +335,7 @@ splitComponents =
 -- | Upgrade the initial local package info to a full-blown @LocalPackage@
 -- based on the selected components
 loadLocalPackage
-    :: forall m env.
-       (MonadReader env m, HasEnvConfig env, HasTerminal env, MonadMask m, MonadLogger m, MonadIO m, MonadBaseControl IO m)
+    :: forall m env. (StackM env m, HasEnvConfig env)
     => BuildOptsCLI
     -> Map PackageName SimpleTarget
     -> (PackageName, (LocalPackageView, GenericPackageDescription))
@@ -552,7 +551,7 @@ checkBuildCache oldCache files = do
 
 -- | Returns entries to add to the build cache for any newly found unlisted modules
 addUnlistedToBuildCache
-    :: (MonadIO m, MonadReader env m, MonadMask m, MonadLogger m, HasEnvConfig env, HasTerminal env, MonadBaseControl IO m)
+    :: (StackM env m, HasEnvConfig env)
     => ModTime
     -> Package
     -> Path Abs File
@@ -579,7 +578,7 @@ addUnlistedToBuildCache preBuildTime pkg cabalFP buildCache = do
 
 -- | Gets list of Paths for files in a package
 getPackageFilesSimple
-    :: (MonadIO m, MonadReader env m, MonadMask m, MonadLogger m, HasEnvConfig env, HasTerminal env, MonadBaseControl IO m)
+    :: (StackM env m, HasEnvConfig env)
     => Package -> Path Abs File -> m (Set (Path Abs File), [PackageWarning])
 getPackageFilesSimple pkg cabalFP = do
     (_,compFiles,cabalFiles,warnings) <-

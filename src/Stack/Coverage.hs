@@ -20,10 +20,9 @@ import           Control.Applicative
 import           Control.Exception.Enclosed (handleIO)
 import           Control.Exception.Lifted
 import           Control.Monad (liftM, when, unless, void, (<=<))
-import           Control.Monad.Catch (MonadMask)
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
-import           Control.Monad.Reader (MonadReader, asks)
+import           Control.Monad.Reader (asks)
 import           Control.Monad.Trans.Resource
 import qualified Data.ByteString.Char8 as S8
 import           Data.Foldable (forM_, asum, toList)
@@ -51,10 +50,10 @@ import           Stack.Package
 import           Stack.PrettyPrint
 import           Stack.Types.Compiler
 import           Stack.Types.Config
-import           Stack.Types.Internal (HasTerminal)
 import           Stack.Types.Package
 import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageName
+import           Stack.Types.StackT (StackM)
 import           Stack.Types.Version
 import           System.FilePath (isPathSeparator)
 import           System.Process.Read
@@ -63,7 +62,7 @@ import           Trace.Hpc.Tix
 import           Web.Browser (openBrowser)
 
 -- | Invoked at the beginning of running with "--coverage"
-deleteHpcReports :: (MonadIO m, MonadMask m, MonadReader env m, HasEnvConfig env)
+deleteHpcReports :: (StackM env m, HasEnvConfig env)
                  => m ()
 deleteHpcReports = do
     hpcDir <- hpcReportDir
@@ -71,8 +70,8 @@ deleteHpcReports = do
 
 -- | Move a tix file into a sub-directory of the hpc report directory. Deletes the old one if one is
 -- present.
-updateTixFile :: (MonadIO m,MonadReader env m,MonadLogger m,MonadBaseControl IO m,MonadMask m,HasEnvConfig env)
-            => PackageName -> Path Abs File -> String -> m ()
+updateTixFile :: (StackM env m, HasEnvConfig env)
+              => PackageName -> Path Abs File -> String -> m ()
 updateTixFile pkgName tixSrc testName = do
     exists <- doesFileExist tixSrc
     when exists $ do
@@ -93,7 +92,7 @@ updateTixFile pkgName tixSrc testName = do
                 ignoringAbsence (removeFile tixSrc)
 
 -- | Get the directory used for hpc reports for the given pkgId.
-hpcPkgPath :: (MonadIO m,MonadReader env m,MonadMask m,HasEnvConfig env)
+hpcPkgPath :: (StackM env m, HasEnvConfig env)
             => PackageName -> m (Path Abs Dir)
 hpcPkgPath pkgName = do
     outputDir <- hpcReportDir
@@ -102,7 +101,7 @@ hpcPkgPath pkgName = do
 
 -- | Get the tix file location, given the name of the file (without extension), and the package
 -- identifier string.
-tixFilePath :: (MonadIO m,MonadReader env m,MonadMask m,HasEnvConfig env)
+tixFilePath :: (StackM env m, HasEnvConfig env)
             => PackageName -> String ->  m (Path Abs File)
 tixFilePath pkgName testName = do
     pkgPath <- hpcPkgPath pkgName
@@ -110,7 +109,7 @@ tixFilePath pkgName testName = do
     return (pkgPath </> tixRel)
 
 -- | Generates the HTML coverage report and shows a textual coverage summary for a package.
-generateHpcReport :: (MonadIO m,MonadReader env m,MonadLogger m,MonadBaseControl IO m,MonadMask m,HasEnvConfig env,HasTerminal env)
+generateHpcReport :: (StackM env m, HasEnvConfig env)
                   => Path Abs Dir -> Package -> [Text] -> m ()
 generateHpcReport pkgDir package tests = do
     compilerVersion <- asks (envConfigCompilerVersion . getEnvConfig)
@@ -151,7 +150,7 @@ generateHpcReport pkgDir package tests = do
                 mreportPath <- generateHpcReportInternal tixSrc reportDir report extraArgs extraArgs
                 forM_ mreportPath (displayReportPath report)
 
-generateHpcReportInternal :: (MonadIO m,MonadReader env m,MonadLogger m,MonadBaseControl IO m,MonadMask m,HasEnvConfig env)
+generateHpcReportInternal :: (StackM env m, HasEnvConfig env)
                           => Path Abs File -> Path Abs Dir -> Text -> [String] -> [String] -> m (Maybe (Path Abs File))
 generateHpcReportInternal tixSrc reportDir report extraMarkupArgs extraReportArgs = do
     -- If a .tix file exists, move it to the HPC output directory and generate a report for it.
@@ -226,7 +225,7 @@ data HpcReportOpts = HpcReportOpts
     , hroptsOpenBrowser :: Bool
     } deriving (Show)
 
-generateHpcReportForTargets :: (MonadIO m, MonadReader env m, MonadBaseControl IO m, MonadMask m, MonadLogger m, HasEnvConfig env, HasTerminal env)
+generateHpcReportForTargets :: (StackM env m, HasEnvConfig env)
                             => HpcReportOpts -> m ()
 generateHpcReportForTargets opts = do
     let (tixFiles, targetNames) = partition (".tix" `T.isSuffixOf`) (hroptsInputs opts)
@@ -297,7 +296,7 @@ generateHpcReportForTargets opts = do
                 void $ liftIO $ openBrowser (toFilePath reportPath)
             else displayReportPath report reportPath
 
-generateHpcUnifiedReport :: (MonadIO m,MonadReader env m,MonadLogger m,MonadBaseControl IO m,MonadMask m,HasEnvConfig env,HasTerminal env)
+generateHpcUnifiedReport :: (StackM env m, HasEnvConfig env)
                          => m ()
 generateHpcUnifiedReport = do
     outputDir <- hpcReportDir
@@ -321,7 +320,7 @@ generateHpcUnifiedReport = do
             mreportPath <- generateUnionReport report reportDir tixFiles
             forM_ mreportPath (displayReportPath report)
 
-generateUnionReport :: (MonadIO m,MonadReader env m,MonadLogger m,MonadBaseControl IO m,MonadMask m,HasEnvConfig env)
+generateUnionReport :: (StackM env m, HasEnvConfig env)
                     => Text -> Path Abs Dir -> [Path Abs File] -> m (Maybe (Path Abs File))
 generateUnionReport report reportDir tixFiles = do
     (errs, tix) <- fmap (unionTixes . map removeExeModules) (mapMaybeM readTixOrLog tixFiles)
@@ -358,7 +357,7 @@ unionTixes tixes = (Map.keys errs, Tix (Map.elems outputs))
         | hash1 == hash2 && len1 == len2 = Right (TixModule k hash1 len1 (zipWith (+) tix1 tix2))
     merge _ _ = Left ()
 
-generateHpcMarkupIndex :: (MonadIO m,MonadReader env m,MonadLogger m,MonadMask m,HasEnvConfig env)
+generateHpcMarkupIndex :: (StackM env m, HasEnvConfig env)
                        => m ()
 generateHpcMarkupIndex = do
     outputDir <- hpcReportDir
@@ -433,7 +432,9 @@ sanitize = LT.toStrict . htmlEscape . LT.pack
 dirnameString :: Path r Dir -> String
 dirnameString = dropWhileEnd isPathSeparator . toFilePath . dirname
 
-findPackageFieldForBuiltPackage :: (MonadIO m,MonadBaseControl IO m,MonadReader env m,MonadThrow m,MonadLogger m,HasEnvConfig env) => Path Abs Dir -> PackageIdentifier -> Text -> m (Either Text Text)
+findPackageFieldForBuiltPackage
+    :: (StackM env m, HasEnvConfig env)
+    => Path Abs Dir -> PackageIdentifier -> Text -> m (Either Text Text)
 findPackageFieldForBuiltPackage pkgDir pkgId field = do
     distDir <- distDirFromDir pkgDir
     let inplaceDir = distDir </> $(mkRelDir "package.conf.inplace")
@@ -463,7 +464,7 @@ findPackageFieldForBuiltPackage pkgDir pkgId field = do
                 _ -> return $ Left $ "Multiple files matching " <> T.pack (pkgIdStr ++ "-*.conf") <> " found in " <>
                     T.pack (toFilePath inplaceDir) <> ". Maybe try 'stack clean' on this package?"
 
-displayReportPath :: (MonadReader env m, MonadLogger m, HasAnsiAnn (Ann a), Display a, HasTerminal env)
+displayReportPath :: (StackM env m, HasAnsiAnn (Ann a), Display a)
                   => Text -> a -> m ()
 displayReportPath report reportPath =
      $prettyInfo $ "The" <+> fromString (T.unpack report) <+> "is available at" <+> display reportPath

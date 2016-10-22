@@ -14,18 +14,15 @@ module Stack.Nix
 import           Control.Arrow ((***))
 import           Control.Exception (Exception,throw)
 import           Control.Monad hiding (mapM)
-import           Control.Monad.Catch (MonadMask)
-import           Control.Monad.IO.Class (MonadIO,liftIO)
-import           Control.Monad.Logger (MonadLogger,logDebug)
-import           Control.Monad.Reader (MonadReader,asks)
-import           Control.Monad.Trans.Control (MonadBaseControl)
+import           Control.Monad.IO.Class (liftIO)
+import           Control.Monad.Logger (logDebug)
+import           Control.Monad.Reader (asks)
 import           Data.Maybe
 import           Data.Monoid
 import qualified Data.Text as T
 import           Data.Traversable
 import           Data.Typeable (Typeable)
 import           Data.Version (showVersion)
-import           Network.HTTP.Client.Conduit (HasHttpManager)
 import           Path
 import           Path.IO
 import qualified Paths_stack as Meta
@@ -39,6 +36,7 @@ import           Stack.Types.Docker
 import           Stack.Types.Nix
 import           Stack.Types.Compiler
 import           Stack.Types.Internal
+import           Stack.Types.StackT
 import           System.Environment (getArgs,getExecutablePath,lookupEnv)
 import qualified System.FilePath  as F
 import           System.Process.Read (getEnvOverride)
@@ -46,7 +44,7 @@ import           System.Process.Read (getEnvOverride)
 -- | If Nix is enabled, re-runs the currently running OS command in a Nix container.
 -- Otherwise, runs the inner action.
 reexecWithOptionalShell
-    :: M env m
+    :: (StackM env m, HasConfig env)
     => Maybe (Path Abs Dir)
     -> IO CompilerVersion
     -> IO ()
@@ -70,7 +68,7 @@ reexecWithOptionalShell mprojectRoot getCompilerVersion inner =
 
 
 runShellAndExit
-    :: M env m
+    :: (StackM env m, HasConfig env)
     => Maybe (Path Abs Dir)
     -> IO CompilerVersion
     -> m (String, [String])
@@ -162,15 +160,3 @@ instance Exception StackNixException
 instance Show StackNixException where
   show CannotDetermineProjectRoot =
     "Cannot determine project root directory."
-
-type M env m =
-  (MonadIO m
-  ,MonadReader env m
-  ,MonadLogger m
-  ,MonadBaseControl IO m
-  ,MonadMask m
-  ,HasConfig env
-  ,HasTerminal env
-  ,HasReExec env
-  ,HasHttpManager env
-  )
