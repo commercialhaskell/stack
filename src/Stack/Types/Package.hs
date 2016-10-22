@@ -5,15 +5,11 @@
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE ConstraintKinds #-}
 module Stack.Types.Package where
 
 import           Control.DeepSeq
 import           Control.Exception hiding (try,catch)
-import           Control.Monad.Catch
-import           Control.Monad.IO.Class
-import           Control.Monad.Logger (MonadLogger)
-import           Control.Monad.Reader
-import           Control.Monad.Trans.Control
 import qualified Data.ByteString as S
 import           Data.Data
 import           Data.Function

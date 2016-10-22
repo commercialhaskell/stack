@@ -164,7 +164,7 @@ ghci opts@GhciOpts{..} = do
     -- Finally, do the invocation of ghci
     runGhci opts localTargets mainIsTargets pkgs
 
-preprocessTargets :: (StackM r m, HasEnvConfig r, MonadBaseUnlift IO m) => [Text] -> m (Either [Path Abs File] [Text])
+preprocessTargets :: (StackM r m) => [Text] -> m (Either [Path Abs File] [Text])
 preprocessTargets rawTargets = do
     let (fileTargetsRaw, normalTargets) =
             partition (\t -> ".hs" `T.isSuffixOf` t || ".lhs" `T.isSuffixOf` t)
@@ -180,14 +180,14 @@ preprocessTargets rawTargets = do
         (False, _) -> return (Left fileTargets)
         _ -> return (Right normalTargets)
 
-parseMainIsTargets :: (StackM r m, HasEnvConfig r, MonadBaseUnlift IO m) => Maybe Text -> m (Maybe (Map PackageName SimpleTarget))
+parseMainIsTargets :: (StackM r m, HasEnvConfig r) => Maybe Text -> m (Maybe (Map PackageName SimpleTarget))
 parseMainIsTargets mtarget = forM mtarget $ \target -> do
      (_,_,targets) <- parseTargetsFromBuildOpts AllowNoTargets defaultBuildOptsCLI
          { boptsCLITargets = [target] }
      return targets
 
 findFileTargets
-    :: (StackM r m, HasEnvConfig r, MonadBaseUnlift IO m)
+    :: (StackM r m, HasEnvConfig r)
     => [LocalPackage]
     -> [Path Abs File]
     -> m (Map PackageName SimpleTarget, Map PackageName (Set (Path Abs File)), [Path Abs File])
@@ -234,7 +234,7 @@ findFileTargets locals fileTargets = do
     return (targetMap, infoMap, extraFiles)
 
 checkTargets
-    :: (StackM r m, HasEnvConfig r, MonadBaseUnlift IO m)
+    :: (StackM r m, HasEnvConfig r)
     => Map PackageName SimpleTarget
     -> m ()
 checkTargets mp = do
@@ -244,7 +244,7 @@ checkTargets mp = do
         throwM $ UnknownTargets (M.keysSet filtered) M.empty (bcStackYaml bconfig)
 
 getAllLocalTargets
-    :: (StackM r m, HasEnvConfig r, MonadBaseUnlift IO m)
+    :: (StackM r m, HasEnvConfig r)
     => GhciOpts
     -> Map PackageName SimpleTarget
     -> Maybe (Map PackageName SimpleTarget)
@@ -317,7 +317,7 @@ checkAdditionalPackages pkgs = forM pkgs $ \name -> do
     maybe (throwM $ InvalidPackageOption name) return mres
 
 runGhci
-    :: (StackM r m, HasEnvConfig r, MonadBaseUnlift IO m)
+    :: (StackM r m, HasEnvConfig r)
     => GhciOpts
     -> [(PackageName, (Path Abs File, SimpleTarget))]
     -> Maybe (Map PackageName SimpleTarget)
@@ -437,7 +437,7 @@ getFileTargets = concatMap (concatMap S.toList . maybeToList . ghciPkgTargetFile
 -- is none, sometimes it's unambiguous, sometimes it's
 -- ambiguous. Warns and returns nothing if it's ambiguous.
 figureOutMainFile
-    :: (StackM r m, HasEnvConfig r)
+    :: (StackM r m)
     => BuildOpts
     -> Maybe (Map PackageName SimpleTarget)
     -> [(PackageName, (Path Abs File, SimpleTarget))]

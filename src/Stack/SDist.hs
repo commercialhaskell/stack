@@ -238,7 +238,7 @@ getSDistFileList lp =
         , taskAllInOne = True
         }
 
-normalizeTarballPaths :: (StackM env m, HasEnvConfig env) => [FilePath] -> m [FilePath]
+normalizeTarballPaths :: (StackM env m) => [FilePath] -> m [FilePath]
 normalizeTarballPaths fps = do
     -- TODO: consider whether erroring out is better - otherwise the
     -- user might upload an incomplete tar?

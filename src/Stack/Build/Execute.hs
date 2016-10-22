@@ -131,7 +131,7 @@ preFetch plan
                 (packageVersion package)
 
 -- | Print a description of build plan for human consumption.
-printPlan :: (StackM env m, HasEnvConfig env)
+printPlan :: (StackM env m)
           => Plan
           -> m ()
 printPlan plan = do
