@@ -189,7 +189,11 @@ applyTemplate project template nonceParams dir templateText = do
       return $ T.pack . show $ year
     let context = M.union (M.union nonceParams extraParams) configParams
           where
+            nameAsVarId = T.replace "-" "_" $ packageNameText project
+            nameAsModule = T.filter (/= '-') $ T.toTitle $ packageNameText project
             extraParams = M.fromList [ ("name", packageNameText project)
+                                     , ("name-as-varid", nameAsVarId)
+                                     , ("name-as-module", nameAsModule)
                                      , ("year", currentYear) ]
             configParams = configTemplateParams config
     (applied,missingKeys) <-
