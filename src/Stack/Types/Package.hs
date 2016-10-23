@@ -62,9 +62,12 @@ instance Show PackageException where
             Just file -> ' ' : toFilePath file) ++
         ": " ++
         show err
-    show (PackageNoCabalFileFound dir) =
-        "No .cabal file found in directory " ++
-        toFilePath dir
+    show (PackageNoCabalFileFound dir) = concat
+        [ "Stack looks for packages in the directories configured in"
+        , " the 'packages' variable defined in your stack.yaml\n"
+        , "The current entry points to " ++ toFilePath dir ++
+          " but no .cabal file could be found there."
+        ]
     show (PackageMultipleCabalFilesFound dir files) =
         "Multiple .cabal files found in directory " ++
         toFilePath dir ++
