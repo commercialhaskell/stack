@@ -6,6 +6,7 @@
 {-# LANGUAGE TemplateHaskell       #-}
 {-# LANGUAGE TupleSections         #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
+{-# LANGUAGE ConstraintKinds #-}
 -- Load information on package sources
 module Stack.Build.Source
     ( loadSourceMap
