@@ -91,8 +91,8 @@ spec = beforeAll setup $ afterAll teardown $ do
         bracket_ setVar resetVar action
 
   describe "loadConfig" $ do
-    let loadConfig' m = runStackLoggingT m logLevel False False (loadConfig mempty Nothing Nothing)
-    let loadBuildConfigRest m = runStackLoggingT m logLevel False False
+    let loadConfig' m = runStackT m () logLevel True False ColorAuto False (loadConfig mempty Nothing Nothing)
+    let loadBuildConfigRest m = runStackT m () logLevel True False ColorAuto False
     -- TODO(danburton): make sure parent dirs also don't have config file
     it "works even if no config file exists" $ \T{..} -> example $ do
       _config <- loadConfig' manager

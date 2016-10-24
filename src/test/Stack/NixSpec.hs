@@ -49,7 +49,7 @@ teardown _ = return ()
 
 spec :: Spec
 spec = beforeAll setup $ afterAll teardown $ do
-  let loadConfig' m = runStackLoggingT m LevelDebug False False (loadConfig mempty Nothing Nothing)
+  let loadConfig' m = runStackT m () LevelDebug True False ColorAuto False (loadConfig mempty Nothing Nothing)
       inTempDir action = do
         currentDirectory <- getCurrentDirectory
         withSystemTempDirectory "Stack_ConfigSpec" $ \tempDir -> do
