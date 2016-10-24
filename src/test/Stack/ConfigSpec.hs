@@ -4,24 +4,25 @@
 module Stack.ConfigSpec where
 
 import Control.Applicative
-import Control.Monad.Logger
 import Control.Exception
+import Control.Monad.Logger
+import Data.Aeson.Extended
+import Data.Either
 import Data.Maybe
 import Data.Monoid
+import Data.Yaml
 import Network.HTTP.Client.TLS (getGlobalManager)
 import Network.HTTP.Conduit (Manager)
 import Path
 import Path.IO
---import System.FilePath
 import Prelude -- Fix redundant import warnings
+import Stack.Config
+import Stack.Types.Config
+import Stack.Types.StackT
 import System.Directory
 import System.Environment
 import System.IO.Temp (withSystemTempDirectory)
 import Test.Hspec
-
-import Stack.Config
-import Stack.Types.Config
-import Stack.Types.StackT
 
 sampleConfig :: String
 sampleConfig =
@@ -159,3 +160,9 @@ spec = beforeAll setup $ afterAll teardown $ do
             BuildConfig{..} <- loadBuildConfigRest manager
                                 (lcLoadBuildConfig Nothing)
             bcStackYaml `shouldBe` yamlAbs
+
+  describe "defaultConfigYaml" $
+    it "is parseable" $ \_ -> do
+        let parsed :: Either String (WithJSONWarnings ConfigMonoid)
+            parsed = decodeEither defaultConfigYaml
+        isRight parsed `shouldBe` True

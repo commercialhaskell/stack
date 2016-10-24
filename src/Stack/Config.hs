@@ -36,6 +36,7 @@ module Stack.Config
   ,checkOwnership
   ,getInContainer
   ,getInNixShell
+  ,defaultConfigYaml
   ) where
 
 import qualified Codec.Archive.Tar as Tar
@@ -902,13 +903,26 @@ getDefaultUserConfigPath stackRoot = do
         (defaultUserConfigPathDeprecated stackRoot)
     unless exists $ do
         ensureDir (parent path)
-        liftIO $ S.writeFile (toFilePath path) $ S.concat
-            [ "# This file contains default non-project-specific settings for 'stack', used\n"
-            , "# in all projects.  For more information about stack's configuration, see\n"
-            , "# http://docs.haskellstack.org/en/stable/yaml_configuration/\n"
-            , "#\n"
-            , Yaml.encode (mempty :: Object) ]
+        liftIO $ S.writeFile (toFilePath path) defaultConfigYaml
     return path
 
 packagesParser :: Parser [String]
 packagesParser = many (strOption (long "package" <> help "Additional packages that must be installed"))
+
+defaultConfigYaml :: S.ByteString
+defaultConfigYaml = S.intercalate "\n"
+     [ "# This file contains default non-project-specific settings for 'stack', used"
+     , "# in all projects.  For more information about stack's configuration, see"
+     , "# http://docs.haskellstack.org/en/stable/yaml_configuration/"
+     , ""
+     , "# The following parameters are used by \"stack new\" to automatically fill fields"
+     , "# in the cabal config. We recommend uncommenting them and filling them out if"
+     , "# you intend to use 'stack new'."
+     , "# See https://docs.haskellstack.org/en/stable/yaml_configuration/#templates"
+     , "templates:"
+     , "  params:"
+     , "#    author-name:"
+     , "#    author-email:"
+     , "#    copyright:"
+     , "#    github-username:"
+     ]
