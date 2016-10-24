@@ -269,18 +269,10 @@ generateHpcReportForTargets opts = do
                                      (_, files) <- listDir dir
                                      return (filter ((".tix" `isSuffixOf`) . toFilePath) files)
                              else return []
-    outputDir <- hpcReportDir
-    let extraTixFilesDir = outputDir </> $(mkRelDir "extra-tix-files")
-    extraTixDirExists <- doesDirExist extraTixFilesDir
-    extraTixFiles <-
-        if extraTixDirExists
-            then do
-                (_, files) <- listDir extraTixFilesDir
-                return $ filter ((".tix" `isSuffixOf`) . toFilePath) files
-            else return []
-    tixPaths <- liftM (\xs -> xs ++ extraTixFiles ++ targetTixFiles) $ mapM (resolveFile' . T.unpack) tixFiles
+    tixPaths <- liftM (\xs -> xs ++ targetTixFiles) $ mapM (resolveFile' . T.unpack) tixFiles
     when (null tixPaths) $
         fail "Not generating combined report, because no targets or tix files are specified."
+    outputDir <- hpcReportDir
     reportDir <- case hroptsDestDir opts of
         Nothing -> return (outputDir </> $(mkRelDir "combined/custom"))
         Just destDir -> do
@@ -302,12 +294,14 @@ generateHpcUnifiedReport = do
     outputDir <- hpcReportDir
     ensureDir outputDir
     (dirs, _) <- listDir outputDir
-    tixFiles <- liftM (concat . concat) $ forM (filter (("combined" /=) . dirnameString) dirs) $ \dir -> do
+    tixFiles0 <- liftM (concat . concat) $ forM (filter (("combined" /=) . dirnameString) dirs) $ \dir -> do
         (dirs', _) <- listDir dir
         forM dirs' $ \dir' -> do
             (_, files) <- listDir dir'
             return (filter ((".tix" `isSuffixOf`) . toFilePath) files)
-    let reportDir = outputDir </> $(mkRelDir "combined/all")
+    extraTixFiles <- findExtraTixFiles
+    let tixFiles = tixFiles0  ++ extraTixFiles
+        reportDir = outputDir </> $(mkRelDir "combined/all")
     if length tixFiles < 2
         then $logInfo $ T.concat
             [ if null tixFiles then "No tix files" else "Only one tix file"
@@ -468,3 +462,14 @@ displayReportPath :: (StackM env m, HasAnsiAnn (Ann a), Display a)
                   => Text -> a -> m ()
 displayReportPath report reportPath =
      $prettyInfo $ "The" <+> fromString (T.unpack report) <+> "is available at" <+> display reportPath
+
+findExtraTixFiles :: (StackM env m , HasEnvConfig env) => m [Path Abs File]
+findExtraTixFiles = do
+    outputDir <- hpcReportDir
+    let dir = outputDir </> $(mkRelDir "extra-tix-files")
+    dirExists <- doesDirExist dir
+    if dirExists
+        then do
+            (_, files) <- listDir dir
+            return $ filter ((".tix" `isSuffixOf`) . toFilePath) files
+        else return []
