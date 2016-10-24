@@ -54,8 +54,9 @@ import           Path
 import           Path.IO
 import           Prelude
 import           Stack.Constants
-import           Stack.Types.PackageName
 import           Stack.Types.Config
+import           Stack.Types.PackageName
+import           Stack.Types.StackT
 import           Stack.Types.TemplateName
 import           System.Process.Run
 import           Text.Hastache
@@ -80,7 +81,7 @@ data NewOpts = NewOpts
 
 -- | Create a new project with the given options.
 new
-    :: (HasConfig r, MonadReader r m, MonadLogger m, MonadCatch m, MonadIO m, HasHttpManager r)
+    :: (StackM env m, HasConfig env)
     => NewOpts -> Bool -> m (Path Abs Dir)
 new opts forceOverwrite = do
     pwd <- getCurrentDir
@@ -129,8 +130,7 @@ data TemplateFrom = LocalTemp | RemoteTemp
 
 -- | Download and read in a template's text content.
 loadTemplate
-    :: forall m r.
-       (HasConfig r, HasHttpManager r, MonadReader r m, MonadIO m, MonadCatch m, MonadLogger m)
+    :: forall env m. (StackM env m, HasConfig env)
     => TemplateName -> (TemplateFrom -> m ()) -> m Text
 loadTemplate name logIt = do
     templateDir <- asks (templatesDir . getConfig)
@@ -174,7 +174,7 @@ loadTemplate name logIt = do
 
 -- | Apply and unpack a template into a directory.
 applyTemplate
-    :: (MonadIO m, MonadCatch m, MonadReader r m, HasConfig r, MonadLogger m)
+    :: (StackM env m, HasConfig env)
     => PackageName
     -> TemplateName
     -> Map Text Text
@@ -260,7 +260,7 @@ writeTemplateFiles files =
 
 -- | Run any initialization functions, such as Git.
 runTemplateInits
-    :: (MonadIO m, MonadReader r m, HasConfig r, MonadLogger m, MonadCatch m)
+    :: (StackM env m, HasConfig env)
     => Path Abs Dir -> m ()
 runTemplateInits dir = do
     menv <- getMinimalEnvOverride
@@ -273,9 +273,7 @@ runTemplateInits dir = do
                          $logInfo "git init failed to run, ignoring ...")
 
 -- | Display the set of templates accompanied with description if available.
-listTemplates
-    :: (MonadIO m, MonadReader r m, HasHttpManager r, MonadCatch m)
-    => m ()
+listTemplates :: StackM env m => m ()
 listTemplates = do
     templates <- getTemplates
     templateInfo <- getTemplateInfo
@@ -292,9 +290,7 @@ listTemplates = do
       else mapM_ (liftIO . T.putStrLn . templateName) (S.toList templates)
 
 -- | Get the set of templates.
-getTemplates
-    :: (MonadIO m, MonadReader r m, HasHttpManager r, MonadCatch m)
-    => m (Set TemplateName)
+getTemplates :: StackM env m => m (Set TemplateName)
 getTemplates = do
     req <- liftM addHeaders (parseUrlThrow defaultTemplatesList)
     resp <- catch (httpLbs req) (throwM . FailedToDownloadTemplates)
@@ -306,9 +302,7 @@ getTemplates = do
                 Right value -> return value
         code -> throwM (BadTemplatesResponse code)
 
-getTemplateInfo
-    :: (MonadIO m, MonadReader r m, HasHttpManager r, MonadCatch m)
-    => m (Map Text TemplateInfo)
+getTemplateInfo :: StackM env m => m (Map Text TemplateInfo)
 getTemplateInfo = do
   req <- liftM addHeaders (parseUrlThrow defaultTemplateInfoUrl)
   resp <- catch (liftM Right $ httpLbs req) (\(ex :: HttpException) -> return . Left $ "Failed to download template info. The HTTP error was: " <> show ex)

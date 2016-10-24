@@ -1,7 +1,9 @@
+{-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE DefaultSignatures #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE MultiWayIf #-}
@@ -44,6 +46,8 @@ module Stack.Types.Config
   ,parseGHCVariant
   ,HasGHCVariant(..)
   ,snapshotsDir
+  -- ** Constraint synonym for use with StackMini
+  ,StackMiniM
   -- ** CompilerBuild
   ,CompilerBuild(..)
   ,compilerBuildName
@@ -166,9 +170,10 @@ import           Control.Applicative
 import           Control.Arrow ((&&&))
 import           Control.Exception
 import           Control.Monad (liftM, mzero, join)
-import           Control.Monad.Catch (MonadThrow, throwM)
-import           Control.Monad.Logger (LogLevel(..))
+import           Control.Monad.Catch (MonadThrow, MonadMask, throwM)
+import           Control.Monad.Logger (LogLevel(..), MonadLoggerIO)
 import           Control.Monad.Reader (MonadReader, ask, asks, MonadIO, liftIO)
+import           Control.Monad.Trans.Control
 import           Data.Aeson.Extended
                  (ToJSON, toJSON, FromJSON, parseJSON, withText, object,
                   (.=), (..:), (..:?), (..!=), Value(Bool, String, Object),
@@ -202,6 +207,7 @@ import           Distribution.Version (anyVersion)
 import           GHC.Generics (Generic)
 import           Generics.Deriving.Monoid (memptydefault, mappenddefault)
 import           Network.HTTP.Client (parseRequest)
+import           Network.HTTP.Client.Conduit (HasHttpManager)
 import           Options.Applicative (ReadM)
 import qualified Options.Applicative as OA
 import qualified Options.Applicative.Types as OA
@@ -827,6 +833,12 @@ instance HasConfig BuildConfig
 instance HasBuildConfig BuildConfig where
     getBuildConfig = id
     {-# INLINE getBuildConfig #-}
+
+-- | Constraint synonym for constraints satisfied by a 'MiniConfig'
+-- environment.
+type StackMiniM r m =
+    ( MonadReader r m, MonadIO m, MonadBaseControl IO m, MonadLoggerIO m, MonadMask m, HasHttpManager r
+    )
 
 -- An uninterpreted representation of configuration options.
 -- Configurations may be "cascaded" using mappend (left-biased).

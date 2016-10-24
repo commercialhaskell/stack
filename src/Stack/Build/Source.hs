@@ -26,7 +26,6 @@ import              Control.Applicative
 import              Control.Arrow ((&&&))
 import              Control.Exception (assert, catch)
 import              Control.Monad hiding (sequence)
-import              Control.Monad.Catch (MonadMask)
 import              Control.Monad.IO.Class
 import              Control.Monad.Logger
 import              Control.Monad.Reader (MonadReader, asks)
@@ -55,7 +54,6 @@ import              Data.Traversable (sequence)
 import              Distribution.Package (pkgName, pkgVersion)
 import              Distribution.PackageDescription (GenericPackageDescription, package, packageDescription)
 import qualified    Distribution.PackageDescription as C
-import              Network.HTTP.Client.Conduit (HasHttpManager)
 import              Path
 import              Path.IO
 import              Prelude hiding (sequence)
@@ -202,7 +200,7 @@ getGhcOptions bconfig boptsCli name isTarget isLocal = concat
 -- If the local packages views are already known, use 'parseTargetsFromBuildOptsWith'
 -- instead.
 parseTargetsFromBuildOpts
-    :: (MonadIO m, MonadMask m, MonadReader env m, MonadLogger m, HasEnvConfig env)
+    :: (StackM env m, HasEnvConfig env)
     => NeedTargets
     -> BuildOptsCLI
     -> m (MiniBuildPlan, M.Map PackageName Version, M.Map PackageName SimpleTarget)
@@ -211,7 +209,7 @@ parseTargetsFromBuildOpts needTargets boptscli = do
     parseTargetsFromBuildOptsWith rawLocals needTargets boptscli
 
 parseTargetsFromBuildOptsWith
-    :: (MonadIO m, MonadMask m, MonadReader env m, MonadLogger m, HasEnvConfig env)
+    :: (StackM env m, HasEnvConfig env)
     => Map PackageName (LocalPackageView, GenericPackageDescription)
        -- ^ Local package views
     -> NeedTargets
@@ -278,7 +276,7 @@ convertSnapshotToExtra snapshot extra0 locals = go Map.empty
                 go (Map.insert flag version extra) flags
 
 -- | Parse out the local package views for the current project
-getLocalPackageViews :: (MonadThrow m, MonadIO m, MonadReader env m, HasEnvConfig env, MonadLogger m)
+getLocalPackageViews :: (StackM env m, HasEnvConfig env)
                      => m (Map PackageName (LocalPackageView, GenericPackageDescription))
 getLocalPackageViews = do
     $logDebug "Parsing the cabal files of the local packages"
@@ -483,7 +481,7 @@ checkFlagsUsed boptsCli lps extraDeps snapshot = do
 -- this was then superseded by
 -- https://github.com/commercialhaskell/stack/issues/651
 extendExtraDeps
-    :: (HasBuildConfig env, MonadIO m, MonadLogger m, MonadReader env m, HasHttpManager env, MonadBaseControl IO m, MonadMask m)
+    :: (StackM env m, HasBuildConfig env)
     => Map PackageName Version -- ^ original extra deps
     -> Map PackageName Version -- ^ package identifiers from the command line
     -> Set PackageName -- ^ all packages added on the command line

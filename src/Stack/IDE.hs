@@ -1,3 +1,5 @@
+{-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TupleSections #-}
@@ -8,7 +10,6 @@ module Stack.IDE
     , listTargets
     ) where
 
-import           Control.Monad.Catch
 import           Control.Monad.Logger
 import           Control.Monad.Reader
 import qualified Data.Map as Map
@@ -20,11 +21,10 @@ import           Stack.Package (findOrGenerateCabalFile)
 import           Stack.Types.Config
 import           Stack.Types.Package
 import           Stack.Types.PackageName
+import           Stack.Types.StackT
 
 -- | List the packages inside the current project.
-listPackages
-    :: (MonadIO m, MonadReader env m, HasEnvConfig env, MonadThrow m, MonadLogger m)
-    => m ()
+listPackages :: (StackM env m, HasEnvConfig env) => m ()
 listPackages = do
     -- TODO: Instead of setting up an entire EnvConfig only to look up the package directories,
     -- make do with a Config (and the Project inside) and use resolvePackageEntry to get
@@ -36,9 +36,7 @@ listPackages = do
         ($logInfo . packageNameText) pkgName
 
 -- | List the targets in the current project.
-listTargets
-    :: (MonadIO m, MonadReader env m, HasEnvConfig env, MonadThrow m, MonadLogger m)
-    => m ()
+listTargets :: (StackM env m, HasEnvConfig env) => m ()
 listTargets =
     do rawLocals <- getLocalPackageViews
        $logInfo

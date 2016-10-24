@@ -40,10 +40,11 @@ import           Generics.Deriving.Monoid (mappenddefault, memptydefault)
 import           Path
 import           Path.IO
 import           Prelude hiding (concat, elem) -- Fix AMP warning
-import           Stack.Types.PackageIdentifier
 import           Stack.Types.Compiler
 import           Stack.Types.Config
+import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageName
+import           Stack.Types.StackT
 import           Stack.Types.Version
 import           System.Process.Read
 
@@ -116,7 +117,7 @@ getCompilerVersion menv wc =
     isValid c = c == '.' || ('0' <= c && c <= '9')
 
 -- | Binary directories for the given installed package
-extraDirs :: (MonadReader env m, HasConfig env, MonadThrow m, MonadLogger m)
+extraDirs :: (StackM env m, HasConfig env)
           => Tool
           -> m ExtraDirs
 extraDirs tool = do

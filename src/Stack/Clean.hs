@@ -1,4 +1,6 @@
+{-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE FlexibleContexts #-}
 
 -- | Clean a project.
 module Stack.Clean
@@ -8,10 +10,8 @@ module Stack.Clean
     ) where
 
 import           Control.Exception (Exception)
-import           Control.Monad.Catch (MonadCatch, MonadThrow, throwM)
-import           Control.Monad.IO.Class (MonadIO)
-import           Control.Monad.Logger (MonadLogger)
-import           Control.Monad.Reader (MonadReader, asks)
+import           Control.Monad.Catch (throwM)
+import           Control.Monad.Reader (asks)
 import           Data.Foldable (forM_)
 import           Data.List ((\\),intercalate)
 import qualified Data.Map.Strict as Map
@@ -24,12 +24,13 @@ import           Stack.Build.Target (LocalPackageView(..))
 import           Stack.Constants (distDirFromDir, workDirFromDir)
 import           Stack.Types.PackageName
 import           Stack.Types.Config
+import           Stack.Types.StackT
 
 -- | Deletes build artifacts in the current project.
 --
 -- Throws 'StackCleanException'.
 clean
-    :: (MonadCatch m, MonadIO m, MonadReader env m, HasEnvConfig env, MonadLogger m)
+    :: (StackM env m, HasEnvConfig env)
     => CleanOpts
     -> m ()
 clean cleanOpts = do
@@ -37,7 +38,7 @@ clean cleanOpts = do
     forM_ dirs (ignoringAbsence . removeDirRecur)
 
 dirsToDelete
-    :: (MonadThrow m, MonadIO m, MonadReader env m, HasEnvConfig env, MonadLogger m)
+    :: (StackM env m, HasEnvConfig env)
     => CleanOpts
     -> m [Path Abs Dir]
 dirsToDelete cleanOpts = do

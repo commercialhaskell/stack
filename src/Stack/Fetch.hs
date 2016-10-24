@@ -24,72 +24,66 @@ module Stack.Fetch
     , withCabalLoader
     ) where
 
-import qualified Codec.Archive.Tar              as Tar
-import qualified Codec.Archive.Tar.Check        as Tar
-import qualified Codec.Archive.Tar.Entry        as Tar
-import           Codec.Compression.GZip         (decompress)
-import           Control.Applicative
-import           Control.Concurrent.Async       (Concurrently (..))
-import           Control.Concurrent.MVar.Lifted (modifyMVar, newMVar)
-import           Control.Concurrent.STM         (TVar, atomically, modifyTVar,
-                                                 newTVarIO, readTVar,
-                                                 readTVarIO, writeTVar)
-import           Control.Exception              (assert)
-import           Control.Exception.Enclosed     (tryIO)
-import           Control.Monad                  (join, liftM, unless, void,
-                                                 when)
-import           Control.Monad.Catch
-import           Control.Monad.IO.Class
-import           Control.Monad.Logger
-import           Control.Monad.Reader           (asks, runReaderT)
-import           Control.Monad.Trans.Control
-import           Control.Monad.Trans.Unlift     (MonadBaseUnlift, askRunBase)
-import "cryptohash" Crypto.Hash                 (SHA512 (..))
-import           Data.ByteString                (ByteString)
-import qualified Data.ByteString                as S
-import qualified Data.ByteString.Lazy           as L
-import           Data.Either                    (partitionEithers)
-import qualified Data.Foldable                  as F
-import           Data.Function                  (fix)
-import qualified Data.Git                       as Git
-import qualified Data.Git.Ref                   as Git
-import qualified Data.Git.Storage               as Git
-import qualified Data.Git.Storage.Object        as Git
-import           Data.List                      (intercalate)
-import           Data.List.NonEmpty             (NonEmpty)
-import qualified Data.List.NonEmpty             as NE
-import           Data.Map                       (Map)
-import qualified Data.Map                       as Map
-import           Data.Maybe                     (maybeToList, catMaybes)
-import           Data.Monoid
-import           Data.Set                       (Set)
-import qualified Data.Set                       as Set
-import           Data.String                    (fromString)
-import qualified Data.Text                      as T
-import           Data.Text.Encoding             (decodeUtf8)
-import           Data.Text.Metrics
-import           Data.Typeable                  (Typeable)
-import           Data.Word                      (Word64)
-import           Network.HTTP.Download
-import           Path
-import           Path.Extra (toFilePathNoTrailingSep)
-import           Path.IO
-import           Prelude -- Fix AMP warning
-import           Stack.GhcPkg
-import           Stack.PackageIndex
-import           Stack.Types.BuildPlan
-import           Stack.Types.PackageIdentifier
-import           Stack.Types.PackageIndex
-import           Stack.Types.PackageName
-import           Stack.Types.Version
-import           Stack.Types.Config
-import           System.FilePath                ((<.>))
-import qualified System.FilePath                as FP
-import           System.IO                      (IOMode (ReadMode),
-                                                 SeekMode (AbsoluteSeek), hSeek,
-                                                 withBinaryFile, openBinaryFile,
-                                                 hClose)
-import           System.PosixCompat             (setFileMode)
+import qualified    Codec.Archive.Tar as Tar
+import qualified    Codec.Archive.Tar.Check as Tar
+import qualified    Codec.Archive.Tar.Entry as Tar
+import              Codec.Compression.GZip (decompress)
+import              Control.Applicative
+import              Control.Concurrent.Async (Concurrently (..))
+import              Control.Concurrent.MVar.Lifted (modifyMVar, newMVar)
+import              Control.Concurrent.STM
+import              Control.Exception (assert)
+import              Control.Exception.Enclosed (tryIO)
+import              Control.Monad (join, liftM, unless, void, when)
+import              Control.Monad.Catch
+import              Control.Monad.IO.Class
+import              Control.Monad.Logger
+import              Control.Monad.Reader (asks, runReaderT)
+import              Control.Monad.Trans.Control
+import              Control.Monad.Trans.Unlift (MonadBaseUnlift, askRunBase)
+import "cryptohash" Crypto.Hash (SHA512 (..))
+import              Data.ByteString (ByteString)
+import qualified    Data.ByteString as S
+import qualified    Data.ByteString.Lazy as L
+import              Data.Either (partitionEithers)
+import qualified    Data.Foldable as F
+import              Data.Function (fix)
+import qualified    Data.Git as Git
+import qualified    Data.Git.Ref as Git
+import qualified    Data.Git.Storage as Git
+import qualified    Data.Git.Storage.Object as Git
+import              Data.List (intercalate)
+import              Data.List.NonEmpty (NonEmpty)
+import qualified    Data.List.NonEmpty as NE
+import              Data.Map (Map)
+import qualified    Data.Map as Map
+import              Data.Maybe (maybeToList, catMaybes)
+import              Data.Monoid
+import              Data.Set (Set)
+import qualified    Data.Set as Set
+import              Data.String (fromString)
+import qualified    Data.Text as T
+import              Data.Text.Encoding (decodeUtf8)
+import              Data.Text.Metrics
+import              Data.Typeable (Typeable)
+import              Data.Word (Word64)
+import              Network.HTTP.Download
+import              Path
+import              Path.Extra (toFilePathNoTrailingSep)
+import              Path.IO
+import              Prelude -- Fix AMP warning
+import              Stack.GhcPkg
+import              Stack.PackageIndex
+import              Stack.Types.BuildPlan
+import              Stack.Types.Config
+import              Stack.Types.PackageIdentifier
+import              Stack.Types.PackageIndex
+import              Stack.Types.PackageName
+import              Stack.Types.Version
+import              System.FilePath ((<.>))
+import qualified    System.FilePath as FP
+import              System.IO
+import              System.PosixCompat (setFileMode)
 
 type PackageCaches = Map PackageIdentifier (PackageIndex, PackageCache)
 
@@ -131,7 +125,7 @@ instance Show FetchException where
         (if null suggestions then "" else "\n" ++ suggestions)
 
 -- | Fetch packages into the cache without unpacking
-fetchPackages :: (MonadIO m, MonadBaseControl IO m, MonadReader env m, HasHttpManager env, HasConfig env, MonadMask m, MonadLogger m)
+fetchPackages :: (StackMiniM env m, HasConfig env)
               => EnvOverride
               -> Set PackageIdentifier
               -> m ()
@@ -147,7 +141,7 @@ fetchPackages menv idents' = do
     idents = Map.fromList $ map (, Nothing) $ Set.toList idents'
 
 -- | Intended to work for the command line command.
-unpackPackages :: (MonadIO m, MonadBaseControl IO m, MonadReader env m, HasHttpManager env, HasConfig env, MonadMask m, MonadLogger m)
+unpackPackages :: (StackMiniM env m, HasConfig env)
                => EnvOverride
                -> FilePath -- ^ destination
                -> [String] -- ^ names or identifiers
@@ -183,7 +177,7 @@ unpackPackages menv dest input = do
 -- | Ensure that all of the given package idents are unpacked into the build
 -- unpack directory, and return the paths to all of the subdirectories.
 unpackPackageIdents
-    :: (MonadBaseControl IO m, MonadIO m, MonadReader env m, HasHttpManager env, HasConfig env, MonadMask m, MonadLogger m)
+    :: (StackMiniM env m, HasConfig env)
     => EnvOverride
     -> Path Abs Dir -- ^ unpack directory
     -> Maybe (Path Rel Dir) -- ^ the dist rename directory, see: https://github.com/fpco/stack/issues/157
@@ -202,7 +196,7 @@ data ResolvedPackage = ResolvedPackage
     }
 
 -- | Resolve a set of package names and identifiers into @FetchPackage@ values.
-resolvePackages :: (MonadIO m, MonadReader env m, HasHttpManager env, HasConfig env, MonadLogger m, MonadBaseControl IO m, MonadCatch m)
+resolvePackages :: (StackMiniM env m, HasConfig env)
                 => EnvOverride
                 -> Map PackageIdentifier (Maybe GitSHA1)
                 -> Set PackageName
@@ -222,7 +216,7 @@ resolvePackages menv idents0 names0 = do
       | otherwise                    = Right idents
 
 resolvePackagesAllowMissing
-    :: (MonadIO m, MonadReader env m, HasHttpManager env, HasConfig env, MonadLogger m, MonadBaseControl IO m, MonadCatch m)
+    :: (StackMiniM env m, HasConfig env)
     => Map PackageIdentifier (Maybe GitSHA1)
     -> Set PackageName
     -> m (Set PackageName, Set PackageIdentifier, Map PackageIdentifier ResolvedPackage)
@@ -264,7 +258,7 @@ data ToFetchResult = ToFetchResult
 
 -- | Add the cabal files to a list of idents with their caches.
 withCabalFiles
-    :: (MonadMask m, MonadIO m, MonadLogger m, MonadReader env m, HasConfig env)
+    :: (StackMiniM env m, HasConfig env)
     => IndexName
     -> [(PackageIdentifier, PackageCache, Maybe GitSHA1, a)]
     -> (PackageIdentifier -> a -> ByteString -> IO b)
@@ -308,7 +302,7 @@ withCabalFiles name pkgs f = do
 -- | Provide a function which will load up a cabal @ByteString@ from the
 -- package indices.
 withCabalLoader
-    :: (MonadIO m, MonadReader env m, HasConfig env, MonadLogger m, HasHttpManager env, MonadBaseUnlift IO m, MonadMask m)
+    :: (StackMiniM env m, HasConfig env, MonadBaseUnlift IO m)
     => EnvOverride
     -> ((PackageIdentifier -> IO ByteString) -> m a)
     -> m a
@@ -365,7 +359,7 @@ withCabalLoader menv inner = do
     inner doLookup
 
 lookupPackageIdentifierExact
-  :: (MonadMask m, MonadIO m, MonadLogger m, HasConfig env)
+  :: (StackMiniM env m, HasConfig env)
   => PackageIdentifier
   -> env
   -> PackageCaches
@@ -410,7 +404,7 @@ typoCorrectionCandidates ident =
     . Map.mapKeys getName
 
 -- | Figure out where to fetch from.
-getToFetch :: (MonadMask m, MonadLogger m, MonadIO m, MonadReader env m, HasConfig env)
+getToFetch :: (StackMiniM env m, HasConfig env)
            => Maybe (Path Abs Dir) -- ^ directory to unpack into, @Nothing@ means no unpack
            -> Map PackageIdentifier ResolvedPackage
            -> m ToFetchResult
@@ -468,7 +462,7 @@ getToFetch mdest resolvedAll = do
 -- @
 --
 -- Since 0.1.0.0
-fetchPackages' :: (MonadIO m,MonadReader env m,HasHttpManager env,HasConfig env,MonadLogger m,MonadThrow m,MonadBaseControl IO m)
+fetchPackages' :: (StackMiniM env m, HasConfig env)
                => Maybe (Path Rel Dir) -- ^ the dist rename directory, see: https://github.com/fpco/stack/issues/157
                -> Map PackageIdentifier ToFetch
                -> m (Map PackageIdentifier (Path Abs Dir))

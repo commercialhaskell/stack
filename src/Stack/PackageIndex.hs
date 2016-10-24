@@ -30,18 +30,16 @@ import qualified Codec.Archive.Tar as Tar
 import           Control.Exception (Exception)
 import           Control.Exception.Enclosed (tryIO)
 import           Control.Monad (unless, when, liftM, void)
-import           Control.Monad.Catch (MonadThrow, throwM, MonadCatch)
+import           Control.Monad.Catch (throwM)
 import qualified Control.Monad.Catch as C
 import           Control.Monad.IO.Class (MonadIO, liftIO)
-import           Control.Monad.Logger                  (MonadLogger, logDebug,
-                                                        logInfo, logWarn, logError)
+import           Control.Monad.Logger (logDebug, logInfo, logWarn, logError)
 import           Control.Monad.Reader (asks)
 import           Control.Monad.Trans.Control
 import           Data.Aeson.Extended
 import qualified Data.ByteString.Lazy as L
 import           Data.Conduit (($$), (=$))
-import           Data.Conduit.Binary                   (sinkHandle,
-                                                        sourceHandle)
+import           Data.Conduit.Binary (sinkHandle, sourceHandle)
 import           Data.Conduit.Zlib (ungzip)
 import           Data.Foldable (forM_)
 import           Data.IORef
@@ -77,7 +75,7 @@ import           System.Exit (exitFailure)
 
 -- | Populate the package index caches and return them.
 populateCache
-    :: (MonadIO m, MonadReader env m, HasConfig env, HasHttpManager env, MonadLogger m, MonadBaseControl IO m, MonadCatch m)
+    :: (StackMiniM env m, HasConfig env)
     => EnvOverride
     -> PackageIndex
     -> m (Map PackageIdentifier PackageCache)
@@ -183,35 +181,23 @@ instance Show PackageIndexException where
         ]
 
 -- | Require that an index be present, updating if it isn't.
-requireIndex :: (MonadIO m,MonadLogger m
-                ,MonadReader env m,HasHttpManager env
-                ,HasConfig env,MonadBaseControl IO m,MonadCatch m)
-             => EnvOverride
-             -> PackageIndex
-             -> m ()
+requireIndex :: (StackMiniM env m, HasConfig env)
+             => EnvOverride -> PackageIndex -> m ()
 requireIndex menv index = do
     tarFile <- configPackageIndex $ indexName index
     exists <- doesFileExist tarFile
     unless exists $ updateIndex menv index
 
 -- | Update all of the package indices
-updateAllIndices
-    :: (MonadIO m,MonadLogger m
-       ,MonadReader env m,HasHttpManager env
-       ,HasConfig env,MonadBaseControl IO m, MonadCatch m)
-    => EnvOverride
-    -> m ()
+updateAllIndices :: (StackMiniM env m, HasConfig env)
+                 => EnvOverride -> m ()
 updateAllIndices menv = do
     clearPackageCaches
     asks (configPackageIndices . getConfig) >>= mapM_ (updateIndex menv)
 
 -- | Update the index tarball
-updateIndex :: (MonadIO m,MonadLogger m
-               ,MonadReader env m,HasHttpManager env
-               ,HasConfig env,MonadBaseControl IO m, MonadCatch m)
-            => EnvOverride
-            -> PackageIndex
-            -> m ()
+updateIndex :: (StackMiniM env m, HasConfig env)
+            => EnvOverride -> PackageIndex -> m ()
 updateIndex menv index =
   do let name = indexName index
          logUpdate mirror = $logSticky $ "Updating package index " <> indexNameText (indexName index) <> " (mirrored at " <> mirror  <> ") ..."
@@ -224,7 +210,7 @@ updateIndex menv index =
         (False, ILGit url) -> logUpdate url >> throwM (GitNotAvailable name)
 
 -- | Update the index Git repo and the index tarball
-updateIndexGit :: (MonadIO m,MonadLogger m,MonadReader env m,HasConfig env,MonadBaseControl IO m, MonadCatch m)
+updateIndexGit :: (StackMiniM env m, HasConfig env)
                => EnvOverride
                -> IndexName
                -> PackageIndex
@@ -315,8 +301,7 @@ updateIndexGit menv indexName' index gitUrl = do
          renameFile tarFileTmpPath tarFile
 
 -- | Update the index tarball via HTTP
-updateIndexHTTP :: (MonadIO m,MonadLogger m
-                   ,MonadThrow m,MonadReader env m,HasHttpManager env,HasConfig env)
+updateIndexHTTP :: (StackMiniM env m, HasConfig env)
                 => IndexName
                 -> PackageIndex
                 -> Text -- ^ url
@@ -358,7 +343,9 @@ isGitInstalled :: MonadIO m
 isGitInstalled = flip doesExecutableExist "git"
 
 -- | Delete the package index cache
-deleteCache :: (MonadIO m, MonadReader env m, HasConfig env, MonadLogger m, MonadThrow m) => IndexName -> m ()
+deleteCache
+    :: (StackMiniM env m, HasConfig env)
+    => IndexName -> m ()
 deleteCache indexName' = do
     fp <- configPackageIndexCache indexName'
     eres <- liftIO $ tryIO $ removeFile fp
@@ -368,7 +355,7 @@ deleteCache indexName' = do
 
 -- | Lookup a package's versions from 'IO'.
 getPackageVersionsIO
-    :: (MonadIO m, MonadReader env m, HasConfig env, MonadLogger m, HasHttpManager env, MonadBaseControl IO m, MonadCatch m)
+    :: (StackMiniM env m, HasConfig env)
     => m (PackageName -> IO (Set Version))
 getPackageVersionsIO = do
     getCaches <- getPackageCachesIO
@@ -379,7 +366,7 @@ getPackageVersionsIO = do
 --
 -- See 'getPackageCaches' for performance notes.
 getPackageVersions
-    :: (MonadIO m, MonadLogger m, MonadReader env m, HasConfig env, HasHttpManager env, MonadBaseControl IO m, MonadCatch m)
+    :: (StackMiniM env m, HasConfig env)
     => PackageName
     -> m (Set Version)
 getPackageVersions pkgName =
@@ -395,7 +382,7 @@ lookupPackageVersions pkgName pkgCaches =
 -- to access the package caches from Stack.Build.ConstructPlan
 -- has been found.
 getPackageCachesIO
-    :: (MonadIO m, MonadReader env m, HasConfig env, MonadLogger m, HasHttpManager env, MonadBaseControl IO m, MonadCatch m)
+    :: (StackMiniM env m, HasConfig env)
     => m (IO (Map PackageIdentifier (PackageIndex, PackageCache)))
 getPackageCachesIO = toIO getPackageCaches
   where
@@ -414,7 +401,7 @@ getPackageCachesIO = toIO getPackageCaches
 -- This has two levels of caching: in memory, and the on-disk cache. So,
 -- feel free to call this function multiple times.
 getPackageCaches
-    :: (MonadIO m, MonadLogger m, MonadReader env m, HasConfig env, HasHttpManager env, MonadBaseControl IO m, MonadCatch m)
+    :: (StackMiniM env m, HasConfig env)
     => m (Map PackageIdentifier (PackageIndex, PackageCache))
 getPackageCaches = do
     menv <- getMinimalEnvOverride
@@ -436,8 +423,7 @@ getPackageCaches = do
 
 -- | Clear the in-memory hackage index cache. This is needed when the
 -- hackage index is updated.
-clearPackageCaches :: (MonadIO m, MonadReader env m, HasConfig env)
-                   => m ()
+clearPackageCaches :: (StackMiniM env m, HasConfig env) => m ()
 clearPackageCaches = do
     cacheRef <- asks (configPackageCaches . getConfig)
     liftIO $ writeIORef cacheRef Nothing

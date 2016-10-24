@@ -13,18 +13,16 @@ module Stack.ConfigCmd
 
 import           Control.Applicative
 import           Control.Monad
-import           Control.Monad.Catch (MonadMask, throwM)
+import           Control.Monad.Catch (throwM)
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
-import           Control.Monad.Reader (MonadReader, asks)
-import           Control.Monad.Trans.Control (MonadBaseControl)
+import           Control.Monad.Reader (asks)
 import qualified Data.ByteString as S
 import qualified Data.HashMap.Strict as HMap
 import           Data.Monoid
 import           Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Yaml.Extra as Yaml
-import           Network.HTTP.Client.Conduit (HasHttpManager)
 import qualified Options.Applicative as OA
 import qualified Options.Applicative.Types as OA
 import           Path
@@ -53,15 +51,9 @@ configCmdSetScope (ConfigCmdSetResolver _) = CommandScopeProject
 configCmdSetScope (ConfigCmdSetSystemGhc scope _) = scope
 configCmdSetScope (ConfigCmdSetInstallGhc scope _) = scope
 
-cfgCmdSet :: ( MonadIO m
-             , MonadBaseControl IO m
-             , MonadMask m
-             , MonadReader env m
-             , HasConfig env
-             , HasHttpManager env
-             , HasGHCVariant env
-             , MonadLogger m)
-             => ConfigCmdSet -> m ()
+cfgCmdSet
+    :: (StackMiniM env m, HasConfig env, HasGHCVariant env)
+    => ConfigCmdSet -> m ()
 cfgCmdSet cmd = do
     configFilePath <-
         liftM
@@ -84,16 +76,8 @@ cfgCmdSet cmd = do
             $logInfo (T.pack configFilePath <> " has been updated.")
 
 cfgCmdSetValue
-    :: ( MonadIO m
-       , MonadBaseControl IO m
-       , MonadMask m
-       , MonadReader env m
-       , HasConfig env
-       , HasHttpManager env
-       , HasGHCVariant env
-       , MonadLogger m)
-    => ConfigCmdSet
-    -> m Yaml.Value
+    :: (StackMiniM env m, HasConfig env, HasGHCVariant env)
+    => ConfigCmdSet -> m Yaml.Value
 cfgCmdSetValue (ConfigCmdSetResolver newResolver) = do
     -- TODO: custom snapshot support?
     newResolverText <- fmap resolverName (makeConcreteResolver newResolver)

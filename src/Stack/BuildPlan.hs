@@ -42,7 +42,6 @@ import           Control.Monad.Logger
 import           Control.Monad.Reader (asks)
 import           Control.Monad.State.Strict      (State, execState, get, modify,
                                                   put)
-import           Control.Monad.Trans.Control (MonadBaseControl)
 import qualified Crypto.Hash.SHA256 as SHA256
 import           Data.Aeson.Extended (WithJSONWarnings(..), logJSONWarnings)
 import           Data.Store.VersionTagged
@@ -195,13 +194,14 @@ instance Show BuildPlanException where
 -- This function will not provide test suite and benchmark dependencies.
 --
 -- This may fail if a target package is not present in the @BuildPlan@.
-resolveBuildPlan :: (MonadThrow m, MonadIO m, MonadReader env m, HasBuildConfig env, MonadLogger m, HasHttpManager env, MonadBaseControl IO m,MonadCatch m)
-                 => MiniBuildPlan
-                 -> (PackageName -> Bool) -- ^ is it shadowed by a local package?
-                 -> Map PackageName (Set PackageName) -- ^ required packages, and users of it
-                 -> m ( Map PackageName (Version, Map FlagName Bool)
-                      , Map PackageName (Set PackageName)
-                      )
+resolveBuildPlan
+    :: (StackMiniM env m, HasBuildConfig env)
+    => MiniBuildPlan
+    -> (PackageName -> Bool) -- ^ is it shadowed by a local package?
+    -> Map PackageName (Set PackageName) -- ^ required packages, and users of it
+    -> m ( Map PackageName (Version, Map FlagName Bool)
+         , Map PackageName (Set PackageName)
+         )
 resolveBuildPlan mbp isShadowed packages
     | Map.null (rsUnknown rs) && Map.null (rsShadowed rs) = return (rsToInstall rs, rsUsedBy rs)
     | otherwise = do
@@ -228,11 +228,12 @@ data ResolveState = ResolveState
     , rsUsedBy    :: Map PackageName (Set PackageName)
     }
 
-toMiniBuildPlan :: (MonadIO m, MonadLogger m, MonadReader env m, HasHttpManager env, MonadMask m, HasConfig env, MonadBaseControl IO m)
-                => CompilerVersion -- ^ Compiler version
-                -> Map PackageName Version -- ^ cores
-                -> Map PackageName (Version, Map FlagName Bool, [Text], Maybe GitSHA1) -- ^ non-core packages
-                -> m MiniBuildPlan
+toMiniBuildPlan
+    :: (StackMiniM env m, HasConfig env)
+    => CompilerVersion -- ^ Compiler version
+    -> Map PackageName Version -- ^ cores
+    -> Map PackageName (Version, Map FlagName Bool, [Text], Maybe GitSHA1) -- ^ non-core packages
+    -> m MiniBuildPlan
 toMiniBuildPlan compilerVersion corePackages packages = do
     -- Determine the dependencies of all of the packages in the build plan. We
     -- handle core packages specially, because some of them will not be in the
@@ -269,11 +270,12 @@ toMiniBuildPlan compilerVersion corePackages packages = do
         }
 
 -- | Add in the resolved dependencies from the package index
-addDeps :: (MonadIO m, MonadLogger m, MonadReader env m, HasHttpManager env, MonadMask m, HasConfig env, MonadBaseControl IO m)
-        => Bool -- ^ allow missing
-        -> CompilerVersion -- ^ Compiler version
-        -> Map PackageName (Version, Map FlagName Bool, [Text], Maybe GitSHA1)
-        -> m (Map PackageName MiniPackageInfo, Set PackageIdentifier)
+addDeps
+    :: (StackMiniM env m, HasConfig env)
+    => Bool -- ^ allow missing
+    -> CompilerVersion -- ^ Compiler version
+    -> Map PackageName (Version, Map FlagName Bool, [Text], Maybe GitSHA1)
+    -> m (Map PackageName MiniPackageInfo, Set PackageIdentifier)
 addDeps allowMissing compilerVersion toCalc = do
     menv <- getMinimalEnvOverride
     platform <- asks $ configPlatform . getConfig
@@ -420,7 +422,7 @@ getToolMap mbp =
       $ mpiExes mpi
 
 loadResolver
-    :: (MonadIO m, MonadLogger m, MonadReader env m, HasHttpManager env, HasConfig env, HasGHCVariant env, MonadBaseControl IO m, MonadMask m)
+    :: (StackMiniM env m, HasConfig env, HasGHCVariant env)
     => Maybe (Path Abs File)
     -> Resolver
     -> m (MiniBuildPlan, LoadedResolver)
@@ -444,9 +446,8 @@ loadResolver mconfigPath resolver =
 
 -- | Load up a 'MiniBuildPlan', preferably from cache
 loadMiniBuildPlan
-    :: (MonadIO m, MonadLogger m, MonadReader env m, HasHttpManager env, HasConfig env, HasGHCVariant env, MonadBaseControl IO m, MonadMask m)
-    => SnapName
-    -> m MiniBuildPlan
+    :: (StackMiniM env m, HasConfig env, HasGHCVariant env)
+    => SnapName -> m MiniBuildPlan
 loadMiniBuildPlan name = do
     path <- configMiniBuildPlanCache name
     $(versionedDecodeOrLoad miniBuildPlanVC) path $ liftM buildPlanFixes $ do
@@ -485,9 +486,7 @@ buildPlanFixes mbp = mbp
 
 -- | Load the 'BuildPlan' for the given snapshot. Will load from a local copy
 -- if available, otherwise downloading from Github.
-loadBuildPlan :: (MonadIO m, MonadThrow m, MonadLogger m, MonadReader env m, HasHttpManager env, HasConfig env)
-              => SnapName
-              -> m BuildPlan
+loadBuildPlan :: (StackMiniM env m, HasConfig env) => SnapName -> m BuildPlan
 loadBuildPlan name = do
     env <- ask
     let stackage = getStackRoot env
@@ -635,10 +634,11 @@ checkPackageBuildPlan platform compiler pool flags gpd =
 -- | Checks if the given package dependencies can be satisfied by the given set
 -- of packages. Will fail if a package is either missing or has a version
 -- outside of the version range.
-checkPackageDeps :: PackageName -- ^ package using dependencies, for constructing DepErrors
-          -> Map PackageName VersionRange -- ^ dependency constraints
-          -> Map PackageName Version -- ^ Available package pool or index
-          -> DepErrors
+checkPackageDeps
+    :: PackageName -- ^ package using dependencies, for constructing DepErrors
+    -> Map PackageName VersionRange -- ^ dependency constraints
+    -> Map PackageName Version -- ^ Available package pool or index
+    -> DepErrors
 checkPackageDeps myName deps packages =
     Map.unionsWith combineDepError $ map go $ Map.toList deps
   where
@@ -722,9 +722,7 @@ instance Show BuildPlanCheck where
 -- given snapshot. Returns how well the snapshot satisfies the dependencies of
 -- the packages.
 checkSnapBuildPlan
-    :: ( MonadIO m, MonadMask m, MonadLogger m, MonadReader env m
-       , HasHttpManager env, HasConfig env, HasGHCVariant env
-       , MonadBaseControl IO m)
+    :: (StackM env m, HasConfig env, HasGHCVariant env)
     => [GenericPackageDescription]
     -> Maybe (Map PackageName (Map FlagName Bool))
     -> SnapName
@@ -757,9 +755,7 @@ checkSnapBuildPlan gpds flags snap = do
 -- | Find a snapshot and set of flags that is compatible with and matches as
 -- best as possible with the given 'GenericPackageDescription's.
 selectBestSnapshot
-    :: ( MonadIO m, MonadMask m, MonadLogger m, MonadReader env m
-       , HasHttpManager env, HasConfig env, HasGHCVariant env
-       , MonadBaseControl IO m)
+    :: (StackM env m, HasConfig env, HasGHCVariant env)
     => [GenericPackageDescription]
     -> NonEmpty SnapName
     -> m (SnapName, BuildPlanCheck)
@@ -954,7 +950,7 @@ shadowMiniBuildPlan (MiniBuildPlan cv pkgs0) shadowed =
 -- TODO: Allow custom plan to specify a name.
 
 parseCustomMiniBuildPlan
-    :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasHttpManager env, HasConfig env, HasGHCVariant env, MonadBaseControl IO m)
+    :: (StackMiniM env m, HasConfig env, HasGHCVariant env)
     => Maybe (Path Abs File) -- ^ Root directory for when url is a filepath
     -> T.Text
     -> m (MiniBuildPlan, SnapshotHash)
@@ -1072,7 +1068,7 @@ parseCustomMiniBuildPlan mconfigPath0 url0 = do
     doHash = SnapshotHash . B64URL.encode . SHA256.hash
 
 applyCustomSnapshot
-    :: (MonadIO m, MonadLogger m, MonadReader env m, HasHttpManager env, HasConfig env, MonadBaseControl IO m, MonadMask m)
+    :: (StackMiniM env m, HasConfig env)
     => CustomSnapshot
     -> MiniBuildPlan
     -> m MiniBuildPlan

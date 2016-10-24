@@ -44,12 +44,11 @@ import           Control.Applicative
 import           Control.Arrow ((***))
 import           Control.Exception (assert)
 import           Control.Monad (liftM, unless, when, filterM)
-import           Control.Monad.Catch (MonadThrow, MonadCatch, MonadMask, catchAll, throwM, catch, handle)
+import           Control.Monad.Catch (MonadThrow, MonadCatch, catchAll, throwM, catch, handle)
 import           Control.Monad.Extra (firstJustM)
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger hiding (Loc)
-import           Control.Monad.Reader (MonadReader, ask, asks, runReaderT)
-import           Control.Monad.Trans.Control (MonadBaseControl)
+import           Control.Monad.Reader (ask, asks, runReaderT)
 import qualified Crypto.Hash.SHA256 as SHA256
 import           Data.Aeson.Extended
 import qualified Data.ByteString as S
@@ -83,12 +82,13 @@ import           Stack.Config.Nix
 import           Stack.Config.Urls
 import           Stack.Constants
 import qualified Stack.Image as Image
-import           Stack.Types.Config
 import           Stack.Types.BuildPlan
-import           Stack.Types.Docker
 import           Stack.Types.Compiler
+import           Stack.Types.Config
+import           Stack.Types.Docker
 import           Stack.Types.Internal
 import           Stack.Types.Nix
+import           Stack.Types.StackT
 import           Stack.Types.Urls
 import           Stack.Types.Version
 import           System.Environment
@@ -146,7 +146,7 @@ getImplicitGlobalProjectDir config =
 -- | This is slightly more expensive than @'asks' ('bcStackYaml' '.' 'getBuildConfig')@
 -- and should only be used when no 'BuildConfig' is at hand.
 getStackYaml
-    :: (MonadIO m, MonadLogger m, MonadReader env m, HasConfig env)
+    :: (StackMiniM env m, HasConfig env)
     => m (Path Abs File)
 getStackYaml = do
     config <- asks getConfig
@@ -155,8 +155,9 @@ getStackYaml = do
         Nothing -> liftM (</> stackDotYaml) (getImplicitGlobalProjectDir config)
 
 -- | Download the 'Snapshots' value from stackage.org.
-getSnapshots :: (MonadThrow m, MonadMask m, MonadIO m, MonadReader env m, HasHttpManager env, HasConfig env, MonadLogger m)
-             => m Snapshots
+getSnapshots
+    :: (StackMiniM env m, HasConfig env)
+    => m Snapshots
 getSnapshots = do
     latestUrlText <- askLatestSnapshotUrl
     latestUrl <- parseUrlThrow (T.unpack latestUrlText)
@@ -166,9 +167,10 @@ getSnapshots = do
     return result
 
 -- | Turn an 'AbstractResolver' into a 'Resolver'.
-makeConcreteResolver :: (MonadIO m, MonadReader env m, HasConfig env, MonadThrow m, MonadMask m, HasHttpManager env, MonadLogger m)
-                     => AbstractResolver
-                     -> m Resolver
+makeConcreteResolver
+    :: (StackMiniM env m, HasConfig env)
+    => AbstractResolver
+    -> m Resolver
 makeConcreteResolver (ARResolver r) = return r
 makeConcreteResolver ar = do
     snapshots <- getSnapshots
@@ -197,9 +199,7 @@ makeConcreteResolver ar = do
     return r
 
 -- | Get the latest snapshot resolver available.
-getLatestResolver
-    :: (MonadIO m, MonadMask m, MonadReader env m, HasConfig env, HasHttpManager env, MonadLogger m)
-    => m Resolver
+getLatestResolver :: (StackMiniM env m, HasConfig env) => m Resolver
 getLatestResolver = do
     snapshots <- getSnapshots
     let mlts = do
@@ -375,7 +375,7 @@ instance HasGHCVariant MiniConfig where
 
 -- | Load the 'MiniConfig'.
 loadMiniConfig
-    :: (MonadIO m)
+    :: MonadIO m
     => Manager -> Config -> m MiniConfig
 loadMiniConfig manager config = do
     let ghcVariant = fromMaybe GHCStandard (configGHCVariant0 config)
@@ -384,7 +384,7 @@ loadMiniConfig manager config = do
 -- Load the configuration, using environment variables, and defaults as
 -- necessary.
 loadConfigMaybeProject
-    :: (MonadLogger m,MonadIO m,MonadMask m,MonadBaseControl IO m,MonadReader env m,HasHttpManager env,HasTerminal env)
+    :: StackM env m
     => ConfigMonoid
     -- ^ Config monoid from parsed command-line arguments
     -> Maybe AbstractResolver
@@ -426,7 +426,7 @@ loadConfigMaybeProject configArgs mresolver mproject = do
 -- | Load the configuration, using current directory, environment variables,
 -- and defaults as necessary. The passed @Maybe (Path Abs File)@ is an
 -- override for the location of the project's stack.yaml.
-loadConfig :: (MonadLogger m,MonadIO m,MonadMask m,MonadBaseControl IO m,MonadReader env m,HasHttpManager env,HasTerminal env)
+loadConfig :: StackM env m
            => ConfigMonoid
            -- ^ Config monoid from parsed command-line arguments
            -> Maybe AbstractResolver
@@ -439,7 +439,7 @@ loadConfig configArgs mresolver mstackYaml =
 
 -- | Load the build configuration, adds build-specific values to config loaded by @loadConfig@.
 -- values.
-loadBuildConfig :: (MonadLogger m, MonadIO m, MonadMask m, MonadReader env m, HasHttpManager env, MonadBaseControl IO m, HasTerminal env)
+loadBuildConfig :: StackM env m
                 => Maybe (Project, Path Abs File, ConfigMonoid)
                 -> Config
                 -> Maybe AbstractResolver -- override resolver
@@ -545,8 +545,7 @@ loadBuildConfig mproject config mresolver mcompiler = do
 -- | Resolve a PackageEntry into a list of paths, downloading and cloning as
 -- necessary.
 resolvePackageEntry
-    :: (MonadIO m, MonadReader env m, HasHttpManager env, MonadLogger m, MonadCatch m
-       ,MonadBaseControl IO m, HasConfig env)
+    :: (StackMiniM env m, HasConfig env)
     => EnvOverride
     -> Path Abs Dir -- ^ project root
     -> PackageEntry
@@ -582,8 +581,7 @@ resolvePackageEntry menv projRoot pe = do
 -- | Resolve a PackageLocation into a path, downloading and cloning as
 -- necessary.
 resolvePackageLocation
-    :: (MonadIO m, MonadReader env m, HasHttpManager env, MonadLogger m, MonadCatch m
-       ,MonadBaseControl IO m, HasConfig env)
+    :: (StackMiniM env m, HasConfig env)
     => EnvOverride
     -> Path Abs Dir -- ^ project root
     -> PackageLocation

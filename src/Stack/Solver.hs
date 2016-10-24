@@ -27,8 +27,7 @@ import           Control.Monad (when,void,join,liftM,unless,mapAndUnzipM, zipWit
 import           Control.Monad.Catch
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
-import           Control.Monad.Reader (MonadReader, asks)
-import           Control.Monad.Trans.Control
+import           Control.Monad.Reader (asks)
 import           Data.Aeson.Extended         ( WithJSONWarnings(..), object, (.=), toJSON
                                              , logJSONWarnings)
 import qualified Data.ByteString as S
@@ -59,7 +58,6 @@ import qualified Data.Yaml.Extra as Yaml
 import qualified Distribution.Package as C
 import qualified Distribution.PackageDescription as C
 import qualified Distribution.Text as C
-import           Network.HTTP.Client.Conduit (HasHttpManager)
 import           Path
 import           Path.Find (findFiles)
 import           Path.IO hiding (findExecutable, findFiles)
@@ -463,9 +461,7 @@ solveResolverSpec stackYaml cabalDirs
 -- return the compiler version, package versions and packages flags
 -- for that resolver.
 getResolverConstraints
-    :: ( MonadBaseControl IO m, MonadIO m, MonadLogger m, MonadMask m
-       , MonadReader env m, HasConfig env , HasGHCVariant env
-       , HasHttpManager env)
+    :: (StackM env m, HasConfig env, HasGHCVariant env)
     => Path Abs File
     -> Resolver
     -> m (CompilerVersion,
@@ -484,9 +480,7 @@ getResolverConstraints stackYaml resolver = do
 -- If the package flags are passed as 'Nothing' then flags are chosen
 -- automatically.
 checkResolverSpec
-    :: ( MonadIO m, MonadMask m, MonadLogger m, MonadReader env m
-       , HasHttpManager env, HasConfig env, HasGHCVariant env
-       , MonadBaseControl IO m)
+    :: (StackM env m, HasConfig env, HasGHCVariant env)
     => [C.GenericPackageDescription]
     -> Maybe (Map PackageName (Map FlagName Bool))
     -> Resolver
