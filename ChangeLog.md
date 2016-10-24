@@ -66,6 +66,8 @@ Other enhancements:
   [#1845](https://github.com/commercialhaskell/stack/issues/1845).
 * `stack ghci` no longer takes all build options, as many weren't useful
   [#2199](https://github.com/commercialhaskell/stack/issues/2199)
+* `--no-time-in-log` option, to make verbose logs more diffable
+  [#2727](https://github.com/commercialhaskell/stack/issues/2727)
 
 Bug fixes:
 
