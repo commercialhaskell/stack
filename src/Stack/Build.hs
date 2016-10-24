@@ -184,7 +184,7 @@ warnMissingExtraDeps installed extraDeps = do
                         then return $ Just $
                             fromString (packageNameString n ++ "-" ++ versionString v)
                         else return Nothing
-    when (not (null missingExtraDeps)) $
+    unless (null missingExtraDeps) $
         $prettyWarn $
             "Some extra-deps are neither installed nor in the index:" <> line <>
             indent 4 (bulletedList missingExtraDeps)
@@ -327,7 +327,7 @@ withLoadPackage menv inner = do
 -- | Set the code page for this process as necessary. Only applies to Windows.
 -- See: https://github.com/commercialhaskell/stack/issues/738
 #ifdef WINDOWS
-fixCodePage :: (StackM env m, HasBuildConfig env) => m a -> m a
+fixCodePage :: (StackM env m, HasBuildConfig env, HasEnvConfig env) => m a -> m a
 fixCodePage inner = do
     mcp <- asks $ configModifyCodePage . getConfig
     ec <- asks getEnvConfig
