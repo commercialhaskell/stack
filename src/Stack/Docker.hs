@@ -67,17 +67,17 @@ import           Stack.Types.StackT
 import           Stack.Setup (ensureDockerStackExe)
 import           System.Directory (canonicalizePath,getHomeDirectory)
 import           System.Environment (getEnv,getEnvironment,getProgName,getArgs,getExecutablePath)
-import           System.Exit (exitSuccess, exitWith)
+import           System.Exit (exitSuccess, exitWith, ExitCode(..))
 import qualified System.FilePath as FP
-import           System.IO (stderr,stdin,stdout,hIsTerminalDevice)
+import           System.IO (stderr,stdin,stdout,hIsTerminalDevice, hClose)
 import           System.IO.Error (isDoesNotExistError)
 import           System.IO.Unsafe (unsafePerformIO)
 import qualified System.PosixCompat.User as User
 import qualified System.PosixCompat.Files as Files
+import           System.Process (CreateProcess(..), StdStream(..), waitForProcess)
 import           System.Process.PagerEditor (editByteString)
 import           System.Process.Read
 import           System.Process.Run
-import           System.Process (CreateProcess(delegate_ctlc))
 import           Text.Printf (printf)
 
 #ifndef WINDOWS
@@ -690,10 +690,21 @@ pullImage envOverride docker image =
                    ,maybe [] (\n -> ["--username=" ++ n]) (dockerRegistryUsername docker)
                    ,maybe [] (\p -> ["--password=" ++ p]) (dockerRegistryPassword docker)
                    ,[takeWhile (/= '/') image]]))
-     e <- try (callProcess (Cmd Nothing "docker" envOverride ["pull",image]))
-     case e of
-       Left (ProcessExitedUnsuccessfully _ _) -> throwM (PullFailedException image)
-       Right () -> return ()
+     -- We redirect the stdout of the process to stderr so that the output
+     -- of @docker pull@ will not interfere with the output of other
+     -- commands when using --auto-docker-pull. See issue #2733.
+     let stdoutToStderr cp = cp
+           { std_out = UseHandle stderr
+           , std_err = UseHandle stderr
+           , std_in = CreatePipe
+           }
+     (Just hin, _, _, ph) <- createProcess' "pullImage" stdoutToStderr $
+       Cmd Nothing "docker" envOverride ["pull",image]
+     liftIO (hClose hin)
+     ec <- liftIO (waitForProcess ph)
+     case ec of
+       ExitSuccess -> return ()
+       ExitFailure _ -> throwM (PullFailedException image)
 
 -- | Check docker version (throws exception if incorrect)
 checkDockerVersion
