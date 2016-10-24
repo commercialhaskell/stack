@@ -41,10 +41,10 @@ import           System.FileLock
 
 loadCompilerVersion :: Manager
                     -> GlobalOpts
-                    -> LoadConfig (StackLoggingT IO)
+                    -> LoadConfig (StackT () IO)
                     -> IO CompilerVersion
 loadCompilerVersion manager go lc = do
-    bconfig <- runStackLoggingTGlobal manager go $
+    bconfig <- runStackTGlobal manager () go $
       lcLoadBuildConfig lc (globalCompiler go)
     return $ bcWantedCompiler bconfig
 
@@ -111,7 +111,7 @@ withGlobalConfigAndLock
     -> IO ()
 withGlobalConfigAndLock go@GlobalOpts{..} inner = do
     manager <- getGlobalManager
-    lc <- runStackLoggingTGlobal manager go $
+    lc <- runStackTGlobal manager () go $
         loadConfigMaybeProject globalConfigMonoid Nothing Nothing
     withUserFileLock go (configStackRoot $ lcConfig lc) $ \_lk ->
         runStackTGlobal manager (lcConfig lc) go inner
@@ -168,7 +168,7 @@ withBuildConfigExt go@GlobalOpts{..} mbefore inner mafter = do
                  inner lk2
 
       let inner'' lk = do
-              bconfig <- runStackLoggingTGlobal manager go $
+              bconfig <- runStackTGlobal manager () go $
                   lcLoadBuildConfig lc globalCompiler
               envConfig <-
                  runStackTGlobal
@@ -194,11 +194,11 @@ withBuildConfigExt go@GlobalOpts{..} mbefore inner mafter = do
 
 -- | Load the configuration with a manager. Convenience function used
 -- throughout this module.
-loadConfigWithOpts :: GlobalOpts -> IO (Manager,LoadConfig (StackLoggingT IO))
+loadConfigWithOpts :: GlobalOpts -> IO (Manager,LoadConfig (StackT () IO))
 loadConfigWithOpts go@GlobalOpts{..} = do
     manager <- getGlobalManager
     mstackYaml <- forM globalStackYaml resolveFile'
-    lc <- runStackLoggingTGlobal manager go $ do
+    lc <- runStackTGlobal manager () go $ do
         lc <- loadConfig globalConfigMonoid globalResolver mstackYaml
         -- If we have been relaunched in a Docker container, perform in-container initialization
         -- (switch UID, etc.).  We do this after first loading the configuration since it must
@@ -215,7 +215,7 @@ withMiniConfigAndLock
     -> IO ()
 withMiniConfigAndLock go@GlobalOpts{..} inner = do
     manager <- getGlobalManager
-    miniConfig <- runStackLoggingTGlobal manager go $ do
+    miniConfig <- runStackTGlobal manager () go $ do
         lc <- loadConfigMaybeProject globalConfigMonoid globalResolver Nothing
         loadMiniConfig manager (lcConfig lc)
     runStackTGlobal manager miniConfig go inner

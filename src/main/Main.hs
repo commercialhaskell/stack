@@ -578,7 +578,7 @@ setupCmd sco@SetupCmdOpts{..} go@GlobalOpts{..} = do
           Nothing
           (runStackTGlobal manager (lcConfig lc) go $
            Nix.reexecWithOptionalShell (lcProjectRoot lc) getCompilerVersion $
-           runStackLoggingTGlobal manager go $ do
+           runStackTGlobal manager () go $ do
               (wantedCompiler, compilerCheck, mstack) <-
                   case scoCompilerVersion of
                       Just v -> return (v, MatchMinor, Nothing)

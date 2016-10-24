@@ -16,15 +16,11 @@
 
 module Stack.Types.StackT
   (StackT
-  ,StackLoggingT
   ,HasEnv
   ,StackM
   ,runStackT
   ,runStackTGlobal
-  ,runStackLoggingT
-  ,runStackLoggingTGlobal
   ,runInnerStackT
-  ,runInnerStackLoggingT
   ,logSticky
   ,logStickyDone)
   where
@@ -69,8 +65,8 @@ import           System.Log.FastLogger
 import           System.Locale
 #endif
 
-type HasEnv r = (HasHttpManager r, HasLogLevel r, HasTerminal r, HasReExec r
-                , HasSticky r, HasSupportsUnicode r)
+-- | Constraint synonym for all of the common environment instances
+type HasEnv r = (HasHttpManager r, HasLogOptions r, HasTerminal r, HasReExec r, HasSticky r)
 
 -- | Constraint synonym for constraints commonly satisifed by monads used in stack.
 type StackM r m =
@@ -107,20 +103,27 @@ instance MonadIO m => MonadLoggerIO (StackT config m) where
 runStackTGlobal :: (MonadIO m)
                 => Manager -> config -> GlobalOpts -> StackT config m a -> m a
 runStackTGlobal manager config GlobalOpts{..} =
-    runStackT manager globalLogLevel config globalTerminal (isJust globalReExecVersion)
+   runStackT manager config globalLogLevel globalTimeInLog globalTerminal (isJust globalReExecVersion)
 
--- | Run a Stack action.
 runStackT :: (MonadIO m)
-          => Manager -> LogLevel -> config -> Bool -> Bool -> StackT config m a -> m a
-runStackT manager logLevel config terminal reExec m = do
+          => Manager -> config -> LogLevel -> Bool -> Bool -> Bool -> StackT config m a -> m a
+runStackT manager config logLevel useTime terminal reExec m = do
     ansiTerminal <- liftIO $ hSupportsANSI stderr
     canUseUnicode <- liftIO getCanUseUnicode
-    withSticky
-        terminal
-        (\sticky ->
-              runReaderT
-                  (unStackT m)
-                  (Env config logLevel terminal ansiTerminal reExec manager sticky canUseUnicode))
+    withSticky terminal $ \sticky -> runReaderT (unStackT m) Env
+        { envConfig = config
+        , envReExec = reExec
+        , envManager = manager
+        , envLogOptions = LogOptions
+            { logUseColor = ansiTerminal
+            , logUseUnicode = canUseUnicode
+            , logUseTime = useTime
+            , logMinLevel = logLevel
+            , logVerboseFormat = logLevel <= LevelDebug
+            }
+        , envTerminal = terminal
+        , envSticky = sticky
+        }
 
 -- | Taken from GHC: determine if we should use Unicode syntax
 getCanUseUnicode :: IO Bool
@@ -132,105 +135,22 @@ getCanUseUnicode = do
             return (str == str')
     test `catchIOError` \_ -> return False
 
---------------------------------------------------------------------------------
--- Logging only StackLoggingT monad transformer
-
--- | Monadic environment for 'StackLoggingT'.
-data LoggingEnv = LoggingEnv
-    { lenvLogLevel :: !LogLevel
-    , lenvTerminal :: !Bool
-    , lenvAnsiTerminal :: !Bool
-    , lenvReExec :: !Bool
-    , lenvManager :: !Manager
-    , lenvSticky :: !Sticky
-    , lenvSupportsUnicode :: !Bool
-    }
-
--- | The monad used for logging in the executable @stack@ before
--- anything has been initialized.
-newtype StackLoggingT m a = StackLoggingT
-    { unStackLoggingT :: ReaderT LoggingEnv m a
-    } deriving (Functor,Applicative,Monad,MonadIO,MonadThrow,MonadReader LoggingEnv,MonadCatch,MonadMask,MonadTrans)
-
-deriving instance (MonadBase b m) => MonadBase b (StackLoggingT m)
-
-instance MonadBaseControl b m => MonadBaseControl b (StackLoggingT m) where
-    type StM (StackLoggingT m) a = ComposeSt StackLoggingT m a
-    liftBaseWith     = defaultLiftBaseWith
-    restoreM         = defaultRestoreM
-
-instance MonadTransControl StackLoggingT where
-    type StT StackLoggingT a = StT (ReaderT LoggingEnv) a
-    liftWith = defaultLiftWith StackLoggingT unStackLoggingT
-    restoreT = defaultRestoreT StackLoggingT
-
--- | Takes the configured log level into account.
-instance (MonadIO m) => MonadLogger (StackLoggingT m) where
-    monadLoggerLog = stickyLoggerFunc
-
-instance HasSticky LoggingEnv where
-    getSticky = lenvSticky
-
-instance HasLogLevel LoggingEnv where
-    getLogLevel = lenvLogLevel
-
-instance HasHttpManager LoggingEnv where
-    getHttpManager = lenvManager
-
-instance HasTerminal LoggingEnv where
-    getTerminal = lenvTerminal
-    getAnsiTerminal = lenvAnsiTerminal
-
-instance HasReExec LoggingEnv where
-    getReExec = lenvReExec
-
-instance HasSupportsUnicode LoggingEnv where
-    getSupportsUnicode = lenvSupportsUnicode
-
 runInnerStackT :: (HasEnv r, MonadReader r m, MonadIO m)
                => config -> StackT config IO a -> m a
 runInnerStackT config inner = do
-    manager <- asks getHttpManager
-    logLevel <- asks getLogLevel
-    terminal <- asks getTerminal
     reExec <- asks getReExec
-    liftIO $ runStackT manager logLevel config terminal reExec inner
-
-runInnerStackLoggingT :: (HasEnv r, MonadReader r m, MonadIO m)
-                      => StackLoggingT IO a -> m a
-runInnerStackLoggingT inner = do
     manager <- asks getHttpManager
-    logLevel <- asks getLogLevel
+    logOptions <- asks getLogOptions
     terminal <- asks getTerminal
-    reExec <- asks getReExec
-    liftIO $ runStackLoggingT manager logLevel terminal reExec inner
-
--- | Run the logging monad, using global options.
-runStackLoggingTGlobal :: MonadIO m
-                       => Manager -> GlobalOpts -> StackLoggingT m a -> m a
-runStackLoggingTGlobal manager GlobalOpts{..} =
-    runStackLoggingT manager globalLogLevel globalTerminal (isJust globalReExecVersion)
-
--- | Run the logging monad.
-runStackLoggingT :: MonadIO m
-                 => Manager -> LogLevel -> Bool -> Bool -> StackLoggingT m a -> m a
-runStackLoggingT manager logLevel terminal reExec m = do
-    ansiTerminal <- liftIO $ hSupportsANSI stderr
-    canUseUnicode <- liftIO getCanUseUnicode
-    withSticky
-        terminal
-        (\sticky ->
-              runReaderT
-                  (unStackLoggingT m)
-                  LoggingEnv
-                  { lenvLogLevel = logLevel
-                  , lenvManager = manager
-                  , lenvSticky = sticky
-                  , lenvTerminal = terminal
-                  , lenvAnsiTerminal = ansiTerminal
-                  , lenvReExec = reExec
-                  , lenvSupportsUnicode = canUseUnicode
-                  })
+    sticky <- asks getSticky
+    liftIO $ runReaderT (unStackT inner) Env
+        { envConfig = config
+        , envReExec = reExec
+        , envManager = manager
+        , envLogOptions = logOptions
+        , envTerminal = terminal
+        , envSticky = sticky
+        }
 
 --------------------------------------------------------------------------------
 -- Logging functionality
@@ -246,21 +166,18 @@ getStickyLoggerFunc
     => m (Loc -> LogSource -> LogLevel -> msg -> IO ())
 getStickyLoggerFunc = do
     sticky <- asks getSticky
-    logLevel <- asks getLogLevel
-    supportsUnicode <- asks getSupportsUnicode
-    supportsAnsi <- asks getAnsiTerminal
-    return $ stickyLoggerFuncImpl sticky logLevel supportsUnicode supportsAnsi
+    lo <- asks getLogOptions
+    return $ stickyLoggerFuncImpl sticky lo
 
 stickyLoggerFuncImpl
     :: ToLogStr msg
-    => Sticky -> LogLevel -> Bool -> Bool
+    => Sticky -> LogOptions
     -> (Loc -> LogSource -> LogLevel -> msg -> IO ())
-stickyLoggerFuncImpl (Sticky mref) maxLogLevel supportsUnicode supportsAnsi loc src level msg =
+stickyLoggerFuncImpl (Sticky mref) lo loc src level msg =
     case mref of
         Nothing ->
             loggerFunc
-                supportsAnsi
-                maxLogLevel
+                lo
                 out
                 loc
                 src
@@ -280,7 +197,7 @@ stickyLoggerFuncImpl (Sticky mref) maxLogLevel supportsUnicode supportsAnsi loc 
 
             -- Convert some GHC-generated Unicode characters as necessary
             let msgText
-                    | supportsUnicode = msgTextRaw
+                    | logUseUnicode lo = msgTextRaw
                     | otherwise = T.map replaceUnicode msgTextRaw
 
             newState <-
@@ -296,9 +213,9 @@ stickyLoggerFuncImpl (Sticky mref) maxLogLevel supportsUnicode supportsAnsi loc 
                         hFlush out
                         return (Just msgText)
                     _
-                      | level >= maxLogLevel -> do
+                      | level >= logMinLevel lo -> do
                           clear
-                          loggerFunc supportsAnsi maxLogLevel out loc src level $ toLogStr msgText
+                          loggerFunc lo out loc src level $ toLogStr msgText
                           case sticky of
                               Nothing ->
                                   return Nothing
@@ -321,9 +238,9 @@ replaceUnicode c = c
 
 -- | Logging function takes the log level into account.
 loggerFunc :: ToLogStr msg
-           => Bool -> LogLevel -> Handle -> Loc -> Text -> LogLevel -> msg -> IO ()
-loggerFunc supportsAnsi maxLogLevel outputChannel loc _src level msg =
-   when (level >= maxLogLevel)
+           => LogOptions -> Handle -> Loc -> Text -> LogLevel -> msg -> IO ()
+loggerFunc lo outputChannel loc _src level msg =
+   when (level >= logMinLevel lo)
         (liftIO (do out <- getOutput
                     T.hPutStrLn outputChannel out))
   where
@@ -340,10 +257,10 @@ loggerFunc supportsAnsi maxLogLevel outputChannel loc _src level msg =
         , T.pack (ansi [Reset])
         ]
      where
-       ansi xs | supportsAnsi = setSGRCode xs
+       ansi xs | logUseColor lo = setSGRCode xs
                | otherwise = ""
        getTimestamp
-         | maxLogLevel <= LevelDebug =
+         | logVerboseFormat lo && logUseTime lo =
            do now <- getZonedTime
               return $
                   ansi [SetColor Foreground Vivid Black]
@@ -353,7 +270,7 @@ loggerFunc supportsAnsi maxLogLevel outputChannel loc _src level msg =
            formatTime' =
                take timestampLength . formatTime defaultTimeLocale "%F %T.%q"
        getLevel
-         | maxLogLevel <= LevelDebug =
+         | logVerboseFormat lo =
            return ((case level of
                       LevelDebug -> ansi [SetColor Foreground Dull Green]
                       LevelInfo -> ansi [SetColor Foreground Dull Blue]
@@ -365,7 +282,7 @@ loggerFunc supportsAnsi maxLogLevel outputChannel loc _src level msg =
                    "] ")
          | otherwise = return ""
        getLoc
-         | maxLogLevel <= LevelDebug =
+         | logVerboseFormat lo =
            return $
                ansi [SetColor Foreground Vivid Black] ++
                "\n@(" ++ fileLocStr ++ ")"

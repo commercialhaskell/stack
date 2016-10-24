@@ -1216,7 +1216,7 @@ bootGhcjs ghcjsVersion stackYaml destDir = do
 
 loadGhcjsEnvConfig :: StackM env m
                    => Path Abs File -> Path b t -> m EnvConfig
-loadGhcjsEnvConfig stackYaml binPath = runInnerStackLoggingT $ do
+loadGhcjsEnvConfig stackYaml binPath = runInnerStackT () $ do
     lc <- loadConfig
         (mempty
             { configMonoidInstallGHC = First (Just True)

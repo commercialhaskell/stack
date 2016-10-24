@@ -206,23 +206,23 @@ import qualified Options.Applicative.Types as OA
 import           Path
 import qualified Paths_stack as Meta
 import           Stack.Types.BuildPlan (MiniBuildPlan(..), SnapName, renderSnapName, parseSnapName, SnapshotHash (..), trimmedSnapshotHash)
-import           Stack.Types.Urls
 import           Stack.Types.Compiler
 import           Stack.Types.Docker
-import           Stack.Types.Nix
 import           Stack.Types.FlagName
 import           Stack.Types.Image
+import           Stack.Types.Nix
 import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageIndex
 import           Stack.Types.PackageName
 import           Stack.Types.TemplateName
+import           Stack.Types.Urls
 import           Stack.Types.Version
 import           System.FilePath (takeBaseName)
 import           System.PosixCompat.Types (UserID, GroupID, FileMode)
 import           System.Process.Read (EnvOverride, findExecutable)
 
 -- Re-exports
-import          Stack.Types.Config.Build as X
+import           Stack.Types.Config.Build as X
 
 #ifdef mingw32_HOST_OS
 import qualified Crypto.Hash.SHA1 as SHA1
@@ -427,6 +427,7 @@ data GlobalOpts = GlobalOpts
     , globalDockerEntrypoint :: !(Maybe DockerEntrypoint)
       -- ^ Data used when stack is acting as a Docker entrypoint (internal use only)
     , globalLogLevel     :: !LogLevel -- ^ Log level
+    , globalTimeInLog    :: !Bool -- ^ Whether to include timings in logs.
     , globalConfigMonoid :: !ConfigMonoid -- ^ Config monoid, for passing into 'loadConfig'
     , globalResolver     :: !(Maybe AbstractResolver) -- ^ Resolver override
     , globalCompiler     :: !(Maybe CompilerVersion) -- ^ Compiler override
@@ -440,6 +441,7 @@ data GlobalOptsMonoid = GlobalOptsMonoid
     , globalMonoidDockerEntrypoint :: !(First DockerEntrypoint)
       -- ^ Data used when stack is acting as a Docker entrypoint (internal use only)
     , globalMonoidLogLevel     :: !(First LogLevel) -- ^ Log level
+    , globalMonoidTimeInLog    :: !(First Bool) -- ^ Whether to include timings in logs.
     , globalMonoidConfigMonoid :: !ConfigMonoid -- ^ Config monoid, for passing into 'loadConfig'
     , globalMonoidResolver     :: !(First AbstractResolver) -- ^ Resolver override
     , globalMonoidCompiler     :: !(First CompilerVersion) -- ^ Compiler override

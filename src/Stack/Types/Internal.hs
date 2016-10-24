@@ -15,13 +15,12 @@ import Stack.Types.Config
 -- | Monadic environment.
 data Env config =
   Env {envConfig :: !config
-      ,envLogLevel :: !LogLevel
-      ,envTerminal :: !Bool
-      ,envAnsiTerminal :: !Bool
       ,envReExec :: !Bool
       ,envManager :: !Manager
+      ,envLogOptions :: !LogOptions
+      ,envTerminal :: !Bool
       ,envSticky :: !Sticky
-      ,envSupportsUnicode :: !Bool}
+      }
 
 instance HasStackRoot config => HasStackRoot (Env config) where
     getStackRoot = getStackRoot . envConfig
@@ -40,22 +39,11 @@ instance HasEnvConfig config => HasEnvConfig (Env config) where
 instance HasHttpManager (Env config) where
   getHttpManager = envManager
 
-class HasLogLevel r where
-  getLogLevel :: r -> LogLevel
-
-instance HasLogLevel (Env config) where
-  getLogLevel = envLogLevel
-
-instance HasLogLevel LogLevel where
-  getLogLevel = id
-
 class HasTerminal r where
   getTerminal :: r -> Bool
-  getAnsiTerminal :: r -> Bool
 
 instance HasTerminal (Env config) where
   getTerminal = envTerminal
-  getAnsiTerminal = envAnsiTerminal
 
 class HasReExec r where
   getReExec :: r -> Bool
@@ -63,21 +51,29 @@ class HasReExec r where
 instance HasReExec (Env config) where
   getReExec = envReExec
 
-class HasSupportsUnicode r where
-  getSupportsUnicode :: r -> Bool
-
-instance HasSupportsUnicode (Env config) where
-  getSupportsUnicode = envSupportsUnicode
-
 newtype Sticky = Sticky
-    { unSticky :: Maybe (MVar (Maybe Text))
-    }
+  { unSticky :: Maybe (MVar (Maybe Text))
+  }
 
 class HasSticky r where
-    getSticky :: r -> Sticky
+  getSticky :: r -> Sticky
 
 instance HasSticky (Env config) where
   getSticky = envSticky
+
+data LogOptions = LogOptions
+  { logUseColor :: Bool
+  , logUseUnicode :: Bool
+  , logUseTime :: Bool
+  , logMinLevel :: LogLevel
+  , logVerboseFormat :: Bool
+  }
+
+class HasLogOptions r where
+  getLogOptions :: r -> LogOptions
+
+instance HasLogOptions (Env config) where
+  getLogOptions = envLogOptions
 
 envEnvConfig :: Lens' (Env EnvConfig) EnvConfig
 envEnvConfig = lens envConfig

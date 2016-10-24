@@ -22,6 +22,10 @@ globalOptsParser kind defLogLevel =
     optionalFirst (strOption (long Docker.reExecArgName <> hidden <> internal)) <*>
     optionalFirst (option auto (long dockerEntrypointArgName <> hidden <> internal)) <*>
     (First <$> logLevelOptsParser hide0 defLogLevel) <*>
+    firstBoolFlags
+        "time-in-log"
+        "inclusion of timings in logs, for the purposes of using diff with logs"
+        hide <*>
     configOptsParser kind <*>
     optionalFirst (abstractResolverOptsParser hide0) <*>
     optionalFirst (compilerOptsParser hide0) <*>
@@ -46,6 +50,7 @@ globalOptsFromMonoid defaultTerminal GlobalOptsMonoid{..} = GlobalOpts
     { globalReExecVersion = getFirst globalMonoidReExecVersion
     , globalDockerEntrypoint = getFirst globalMonoidDockerEntrypoint
     , globalLogLevel = fromFirst defaultLogLevel globalMonoidLogLevel
+    , globalTimeInLog = fromFirst True globalMonoidTimeInLog
     , globalConfigMonoid = globalMonoidConfigMonoid
     , globalResolver = getFirst globalMonoidResolver
     , globalCompiler = getFirst globalMonoidCompiler

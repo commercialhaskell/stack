@@ -7,7 +7,7 @@
 module Stack.PrettyPrint
     (
       -- * Pretty printing functions
-      displayPlain, displayAnsiIfPossible
+      displayPlain, displayWithColor
       -- * Logging based on pretty-print typeclass
     , prettyDebug, prettyInfo, prettyWarn, prettyError
     , debugBracket
@@ -43,11 +43,11 @@ import           Stack.Types.Version
 import qualified System.Clock as Clock
 import           Text.PrettyPrint.Leijen.Extended
 
-displayAnsiIfPossible
-    :: (HasTerminal env, MonadReader env m, Display a, HasAnsiAnn (Ann a))
+displayWithColor
+    :: (HasLogOptions env, MonadReader env m, Display a, HasAnsiAnn (Ann a))
     => a -> m T.Text
-displayAnsiIfPossible x = do
-    useAnsi <- asks getAnsiTerminal
+displayWithColor x = do
+    useAnsi <- asks (logUseColor . getLogOptions)
     return $ if useAnsi then displayAnsi x else displayPlain x
 
 -- TODO: switch to using implicit callstacks once 7.8 support is dropped
@@ -55,28 +55,28 @@ displayAnsiIfPossible x = do
 prettyDebug :: Q Exp
 prettyDebug = do
     loc <- location
-    [e| monadLoggerLog loc "" LevelDebug <=< displayAnsiIfPossible |]
+    [e| monadLoggerLog loc "" LevelDebug <=< displayWithColor |]
 
 prettyInfo :: Q Exp
 prettyInfo = do
     loc <- location
-    [e| monadLoggerLog loc "" LevelInfo <=< displayAnsiIfPossible |]
+    [e| monadLoggerLog loc "" LevelInfo <=< displayWithColor |]
 
 prettyWarn :: Q Exp
 prettyWarn = do
     loc <- location
-    [e| monadLoggerLog loc "" LevelWarn <=< displayAnsiIfPossible . (line <>) . (warningYellow "Warning:" <+>) |]
+    [e| monadLoggerLog loc "" LevelWarn <=< displayWithColor . (line <>) . (warningYellow "Warning:" <+>) |]
 
 prettyError :: Q Exp
 prettyError = do
     loc <- location
-    [e| monadLoggerLog loc "" LevelError <=< displayAnsiIfPossible . (line <>) . (errorRed "Error:" <+>) |]
+    [e| monadLoggerLog loc "" LevelError <=< displayWithColor . (line <>) . (errorRed "Error:" <+>) |]
 
 debugBracket :: Q Exp
 debugBracket = do
     loc <- location
     [e| \msg f -> do
-            let output = monadLoggerLog loc "" LevelDebug <=< displayAnsiIfPossible
+            let output = monadLoggerLog loc "" LevelDebug <=< displayWithColor
             output $ "Start: " <> msg
             start <- liftIO $ Clock.getTime Clock.Monotonic
             x <- f `catch` \ex -> do
