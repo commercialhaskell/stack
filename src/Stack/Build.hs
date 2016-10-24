@@ -36,9 +36,11 @@ import           Data.List.NonEmpty (NonEmpty(..))
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Map as Map
 import           Data.Map.Strict (Map)
+import           Data.Maybe (catMaybes)
 import           Data.Monoid
 import           Data.Set (Set)
 import qualified Data.Set as Set
+import           Data.String
 import           Data.Text (Text)
 import qualified Data.Text as T
 import           Data.Text.Encoding (decodeUtf8)
@@ -58,6 +60,8 @@ import           Stack.Build.Target
 import           Stack.Fetch as Fetch
 import           Stack.GhcPkg
 import           Stack.Package
+import           Stack.PackageIndex
+import           Stack.PrettyPrint
 import           Stack.Types.Build
 import           Stack.Types.Config
 import           Stack.Types.FlagName
@@ -92,7 +96,7 @@ build setLocalFiles mbuildLk boptsCli = fixCodePage $ do
     let profiling = boptsLibProfile bopts || boptsExeProfile bopts
     menv <- getMinimalEnvOverride
 
-    (targets, mbp, locals, extraToBuild, sourceMap) <- loadSourceMap NeedTargets boptsCli
+    (targets, mbp, locals, extraToBuild, extraDeps, sourceMap) <- loadSourceMapFull NeedTargets boptsCli
 
     -- Set local files, necessary for file watching
     stackYaml <- asks $ bcStackYaml . getBuildConfig
@@ -107,6 +111,8 @@ build setLocalFiles mbuildLk boptsCli = fixCodePage $ do
                          { getInstalledProfiling = profiling
                          , getInstalledHaddock   = shouldHaddockDeps bopts }
                      sourceMap
+
+    warnMissingExtraDeps installedMap extraDeps
 
     baseConfigOpts <- mkBaseConfigOpts boptsCli
     plan <- withLoadPackage menv $ \loadPackage ->
@@ -163,6 +169,25 @@ data CabalVersionException = CabalVersionException { unCabalVersionException :: 
 
 instance Show CabalVersionException where show = unCabalVersionException
 instance Exception CabalVersionException
+
+warnMissingExtraDeps
+    :: (StackM env m, HasConfig env)
+    => InstalledMap -> Map PackageName Version -> m ()
+warnMissingExtraDeps installed extraDeps = do
+    missingExtraDeps <-
+        fmap catMaybes $ forM (Map.toList extraDeps) $ \(n, v) ->
+            if Map.member n installed
+                then return Nothing
+                else do
+                    vs <- getPackageVersions n
+                    if Set.null vs
+                        then return $ Just $
+                            fromString (packageNameString n ++ "-" ++ versionString v)
+                        else return Nothing
+    when (not (null missingExtraDeps)) $
+        $prettyWarn $
+            "Some extra-deps are neither installed nor in the index:" <> line <>
+            indent 4 (bulletedList missingExtraDeps)
 
 -- | See https://github.com/commercialhaskell/stack/issues/1198.
 warnIfExecutablesWithSameNameCouldBeOverwritten
@@ -378,7 +403,7 @@ queryBuildInfo selectors0 =
 -- | Get the raw build information object
 rawBuildInfo :: (StackM env m, HasEnvConfig env) => m Value
 rawBuildInfo = do
-    (_, _mbp, locals, _extraToBuild, _sourceMap) <- loadSourceMap NeedTargets defaultBuildOptsCLI
+    (locals, _sourceMap) <- loadSourceMap NeedTargets defaultBuildOptsCLI
     return $ object
         [ "locals" .= Object (HM.fromList $ map localToPair locals)
         ]

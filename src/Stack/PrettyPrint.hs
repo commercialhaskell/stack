@@ -17,6 +17,8 @@ module Stack.PrettyPrint
     , errorRed, goodGreen, shellMagenta
     , displayTargetPkgId, displayCurrentPkgId, displayErrorPkgId
     , displayMilliseconds
+      -- * Formatting utils
+    , bulletedList
       -- * Re-exports from "Text.PrettyPrint.Leijen.Extended"
     , Display(..), AnsiDoc, AnsiAnn(..), HasAnsiAnn(..), Doc
     , nest, line, linebreak, group, softline, softbreak
@@ -30,6 +32,7 @@ module Stack.PrettyPrint
 import           Control.Exception.Lifted
 import           Control.Monad.Logger
 import           Control.Monad.Reader
+import           Data.List (intersperse)
 import           Data.Monoid
 import           Data.String (fromString)
 import qualified Data.Text as T
@@ -135,3 +138,6 @@ instance Display (PackageName, NamedComponent) where
 displayMilliseconds :: Clock.TimeSpec -> AnsiDoc
 displayMilliseconds t = goodGreen $
     (fromString . show . (`div` 10^(6 :: Int)) . Clock.toNanoSecs) t <> "ms"
+
+bulletedList :: [AnsiDoc] -> AnsiDoc
+bulletedList = mconcat . intersperse line . map ("*" <+>)

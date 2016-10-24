@@ -132,7 +132,7 @@ instance Show GhciException where
 ghci :: (StackM r m, HasEnvConfig r, MonadBaseUnlift IO m) => GhciOpts -> m ()
 ghci opts@GhciOpts{..} = do
     -- Load source map, without explicit targets, to collect all info.
-    (_, _, locals, _, sourceMap) <- loadSourceMap AllowNoTargets defaultBuildOptsCLI
+    (locals, sourceMap) <- loadSourceMap AllowNoTargets defaultBuildOptsCLI
         { boptsCLITargets = [] }
     -- Parse --main-is argument.
     mainIsTargets <- parseMainIsTargets ghciMainIs

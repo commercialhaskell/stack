@@ -10,6 +10,7 @@
 -- Load information on package sources
 module Stack.Build.Source
     ( loadSourceMap
+    , loadSourceMapFull
     , SourceMap
     , PackageSource (..)
     , getLocalFlags
@@ -76,16 +77,29 @@ import              System.FilePath (takeFileName)
 import              System.IO (withBinaryFile, IOMode (ReadMode))
 import              System.IO.Error (isDoesNotExistError)
 
+-- | Like 'loadSourceMapFull', but doesn't return values that aren't as
+-- commonly needed.
 loadSourceMap :: (StackM env m, HasEnvConfig env)
               => NeedTargets
               -> BuildOptsCLI
-              -> m ( Map PackageName SimpleTarget
-                   , MiniBuildPlan
-                   , [LocalPackage]
-                   , Set PackageName -- non-local targets
+              -> m ( [LocalPackage]
                    , SourceMap
                    )
 loadSourceMap needTargets boptsCli = do
+    (_, _, locals, _, _, sourceMap) <- loadSourceMapFull needTargets boptsCli
+    return (locals, sourceMap)
+
+loadSourceMapFull :: (StackM env m, HasEnvConfig env)
+                  => NeedTargets
+                  -> BuildOptsCLI
+                  -> m ( Map PackageName SimpleTarget
+                       , MiniBuildPlan
+                       , [LocalPackage]
+                       , Set PackageName -- non-local targets
+                       , Map PackageName Version -- extra-deps from configuration and cli
+                       , SourceMap
+                       )
+loadSourceMapFull needTargets boptsCli = do
     bconfig <- asks getBuildConfig
     rawLocals <- getLocalPackageViews
     (mbp0, cliExtraDeps, targets) <- parseTargetsFromBuildOptsWith rawLocals needTargets boptsCli
@@ -159,7 +173,7 @@ loadSourceMap needTargets boptsCli = do
                  in PSUpstream (mpiVersion mpi) Snap (mpiFlags mpi) (mpiGhcOptions mpi ++ configOpts) (mpiGitSHA1 mpi)
             ] `Map.difference` Map.fromList (map (, ()) (HashSet.toList wiredInPackages))
 
-    return (targets, mbp, locals, nonLocalTargets, sourceMap)
+    return (targets, mbp, locals, nonLocalTargets, extraDeps0, sourceMap)
 
 -- | All flags for a local package
 getLocalFlags

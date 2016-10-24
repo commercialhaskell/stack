@@ -70,6 +70,8 @@ Other enhancements:
   [#2727](https://github.com/commercialhaskell/stack/issues/2727)
   * `--color` option added to override auto-detection of ANSI support
   [#2725](https://github.com/commercialhaskell/stack/issues/2725)
+  * Missing extra-deps are now warned about, adding a degree of typo detection
+  [#1521](https://github.com/commercialhaskell/stack/issues/1521)
 
 Bug fixes:
 

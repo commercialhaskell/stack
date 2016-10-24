@@ -132,7 +132,7 @@ getCabalLbs :: (StackM env m, HasEnvConfig env) => PvpBounds -> FilePath -> m L.
 getCabalLbs pvpBounds fp = do
     bs <- liftIO $ S.readFile fp
     (_warnings, gpd) <- readPackageUnresolvedBS Nothing bs
-    (_, _, _, _, sourceMap) <- loadSourceMap AllowNoTargets defaultBuildOptsCLI
+    (_, sourceMap) <- loadSourceMap AllowNoTargets defaultBuildOptsCLI
     menv <- getMinimalEnvOverride
     (installedMap, _, _, _) <- getInstalled menv GetInstalledOpts
                                 { getInstalledProfiling = False
@@ -214,7 +214,7 @@ getSDistFileList lp =
         let bopts = defaultBuildOpts
         let boptsCli = defaultBuildOptsCLI
         baseConfigOpts <- mkBaseConfigOpts boptsCli
-        (_, _mbp, locals, _extraToBuild, _sourceMap) <- loadSourceMap NeedTargets boptsCli
+        (locals, _) <- loadSourceMap NeedTargets boptsCli
         runInBase <- liftBaseWith $ \run -> return (void . run)
         withExecuteEnv menv bopts boptsCli baseConfigOpts locals
             [] [] [] -- provide empty list of globals. This is a hack around custom Setup.hs files
