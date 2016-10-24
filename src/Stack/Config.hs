@@ -905,9 +905,7 @@ getDefaultUserConfigPath stackRoot = do
         liftIO $ S.writeFile (toFilePath path) $ S.concat
             [ "# This file contains default non-project-specific settings for 'stack', used\n"
             , "# in all projects.  For more information about stack's configuration, see\n"
-            , "# http://docs.haskellstack.org/en/stable/yaml_configuration/\n"
-            , "#\n"
-            , Yaml.encode (mempty :: Object) ]
+            , "# http://docs.haskellstack.org/en/stable/yaml_configuration/" ]
     return path
 
 packagesParser :: Parser [String]
