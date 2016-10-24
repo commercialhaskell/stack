@@ -167,13 +167,13 @@ and the terminal detection is broken on Travis.
 ## Other details
 
 Some Stack commands will run for long time (when cache is cold) without
-producing any output. For Travis not to timeout, one can wrap commands in
-[a simple script](https://github.com/futurice/fum2github/blob/master/travis_long).
+producing any output. To avoid timeouts, use the built in [travis_wait](https://docs.travis-ci.com/user/common-build-problems/#Build-times-out-because-no-output-was-received).
+
 
 ```yaml
 install:
-  - ./travis_long stack --no-terminal --skip-ghc-check setup
-  - ./travis_long stack --no-terminal --skip-ghc-check test --only-snapshot
+  - travis_wait stack --no-terminal --skip-ghc-check setup
+  - travis_wait stack --no-terminal --skip-ghc-check test --only-snapshot
 ```
 
 ## Examples
