@@ -112,6 +112,8 @@ module Stack.Types.Config
   ,toResolverNotLoaded
   ,AbstractResolver(..)
   ,readAbstractResolver
+  ,ColorWhen(..)
+  ,readColorWhen
   -- ** SCM
   ,SCM(..)
   -- ** CustomSnapshot
@@ -432,6 +434,7 @@ data GlobalOpts = GlobalOpts
     , globalResolver     :: !(Maybe AbstractResolver) -- ^ Resolver override
     , globalCompiler     :: !(Maybe CompilerVersion) -- ^ Compiler override
     , globalTerminal     :: !Bool -- ^ We're in a terminal?
+    , globalColorWhen    :: !ColorWhen -- ^ When to use ansi terminal colors
     , globalStackYaml    :: !(Maybe FilePath) -- ^ Override project stack.yaml
     } deriving (Show)
 
@@ -446,6 +449,7 @@ data GlobalOptsMonoid = GlobalOptsMonoid
     , globalMonoidResolver     :: !(First AbstractResolver) -- ^ Resolver override
     , globalMonoidCompiler     :: !(First CompilerVersion) -- ^ Compiler override
     , globalMonoidTerminal     :: !(First Bool) -- ^ We're in a terminal?
+    , globalMonoidColorWhen    :: !(First ColorWhen) -- ^ When to use ansi colors
     , globalMonoidStackYaml    :: !(First FilePath) -- ^ Override project stack.yaml
     } deriving (Show, Generic)
 
@@ -480,6 +484,18 @@ readAbstractResolver = do
 -- | Default logging level should be something useful but not crazy.
 defaultLogLevel :: LogLevel
 defaultLogLevel = LevelInfo
+
+data ColorWhen = ColorNever | ColorAlways | ColorAuto
+    deriving (Show, Generic)
+
+readColorWhen :: ReadM ColorWhen
+readColorWhen = do
+    s <- OA.readerAsk
+    case s of
+        "never" -> return ColorNever
+        "always" -> return ColorAlways
+        "auto" -> return ColorAuto
+        _ -> OA.readerError "Expected values of color option are 'never', 'always', or 'auto'."
 
 -- | A superset of 'Config' adding information on how to build code. The reason
 -- for this breakdown is because we will need some of the information from

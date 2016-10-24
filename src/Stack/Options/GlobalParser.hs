@@ -33,6 +33,10 @@ globalOptsParser kind defLogLevel =
         "terminal"
         "overriding terminal detection in the case of running in a false terminal"
         hide <*>
+    optionalFirst (option readColorWhen
+        (long "color" <>
+         metavar "WHEN" <>
+         help "Specify when to use color in output; WHEN is 'always', 'never', or 'auto'")) <*>
     optionalFirst
         (strOption
             (long "stack-yaml" <>
@@ -55,6 +59,7 @@ globalOptsFromMonoid defaultTerminal GlobalOptsMonoid{..} = GlobalOpts
     , globalResolver = getFirst globalMonoidResolver
     , globalCompiler = getFirst globalMonoidCompiler
     , globalTerminal = fromFirst defaultTerminal globalMonoidTerminal
+    , globalColorWhen = fromFirst ColorAuto globalMonoidColorWhen
     , globalStackYaml = getFirst globalMonoidStackYaml }
 
 initOptsParser :: Parser InitOpts

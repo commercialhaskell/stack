@@ -68,6 +68,8 @@ Other enhancements:
   [#2199](https://github.com/commercialhaskell/stack/issues/2199)
 * `--no-time-in-log` option, to make verbose logs more diffable
   [#2727](https://github.com/commercialhaskell/stack/issues/2727)
+  * `--color` option added to override auto-detection of ANSI support
+  [#2725](https://github.com/commercialhaskell/stack/issues/2725)
 
 Bug fixes:
 

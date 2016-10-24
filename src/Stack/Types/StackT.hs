@@ -51,7 +51,7 @@ import           Language.Haskell.TH.Syntax (lift)
 import           Network.HTTP.Client.Conduit (HasHttpManager(..))
 import           Network.HTTP.Conduit
 import           Prelude -- Fix AMP warning
-import           Stack.Types.Config (GlobalOpts (..))
+import           Stack.Types.Config (GlobalOpts (..), ColorWhen(..))
 import           Stack.Types.Internal
 import           System.Console.ANSI
 import           System.FilePath
@@ -103,19 +103,22 @@ instance MonadIO m => MonadLoggerIO (StackT config m) where
 runStackTGlobal :: (MonadIO m)
                 => Manager -> config -> GlobalOpts -> StackT config m a -> m a
 runStackTGlobal manager config GlobalOpts{..} =
-   runStackT manager config globalLogLevel globalTimeInLog globalTerminal (isJust globalReExecVersion)
+   runStackT manager config globalLogLevel globalTimeInLog globalTerminal globalColorWhen (isJust globalReExecVersion)
 
 runStackT :: (MonadIO m)
-          => Manager -> config -> LogLevel -> Bool -> Bool -> Bool -> StackT config m a -> m a
-runStackT manager config logLevel useTime terminal reExec m = do
-    ansiTerminal <- liftIO $ hSupportsANSI stderr
+          => Manager -> config -> LogLevel -> Bool -> Bool -> ColorWhen -> Bool -> StackT config m a -> m a
+runStackT manager config logLevel useTime terminal colorWhen reExec m = do
+    useColor <- case colorWhen of
+        ColorNever -> return False
+        ColorAlways -> return True
+        ColorAuto -> liftIO $ hSupportsANSI stderr
     canUseUnicode <- liftIO getCanUseUnicode
     withSticky terminal $ \sticky -> runReaderT (unStackT m) Env
         { envConfig = config
         , envReExec = reExec
         , envManager = manager
         , envLogOptions = LogOptions
-            { logUseColor = ansiTerminal
+            { logUseColor = useColor
             , logUseUnicode = canUseUnicode
             , logUseTime = useTime
             , logMinLevel = logLevel
