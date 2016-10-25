@@ -675,7 +675,7 @@ pull =
      pullImage envOverride docker (dockerImage docker)
 
 -- | Pull Docker image from registry.
-pullImage :: (MonadLogger m,MonadIO m,MonadThrow m,MonadBaseControl IO m)
+pullImage :: (MonadLogger m,MonadIO m,MonadThrow m)
           => EnvOverride -> DockerOpts -> String -> m ()
 pullImage envOverride docker image =
   do $logInfo (concatT ["Pulling image from registry: '",image,"'"])
