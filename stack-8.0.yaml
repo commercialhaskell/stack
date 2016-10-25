@@ -9,7 +9,7 @@ nix:
   packages:
     - zlib
 extra-deps:
-- http-client-0.5.3.1
+- http-client-0.5.3.3
 - http-conduit-2.2.0
 - http-client-tls-0.3.3
 - optparse-applicative-0.13.0.0

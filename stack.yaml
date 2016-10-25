@@ -16,7 +16,7 @@ extra-deps:
 - store-0.2.1.2
 - store-core-0.2.0.2
 - th-orphans-0.13.1
-- http-client-0.5.3.1
+- http-client-0.5.3.3
 - http-client-tls-0.3.3
 - http-conduit-2.2.0
 - optparse-applicative-0.13.0.0
