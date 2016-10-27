@@ -13,8 +13,8 @@ nix:
     - zlib
 extra-deps:
 - th-utilities-0.2.0.1
-- store-0.2.1.2
-- store-core-0.2.0.2
+- store-0.3
+- store-core-0.3
 - th-orphans-0.13.1
 - http-client-0.5.3.3
 - http-client-tls-0.3.3
