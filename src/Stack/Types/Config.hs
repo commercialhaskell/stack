@@ -1197,7 +1197,7 @@ instance Show ConfigException where
         , "your package(s):\n"
         , unlines $ map (\name -> "    - " <> T.unpack (renderSnapName name))
                         (NonEmpty.toList names)
-        , showOptions whichCmd
+        , showOptions whichCmd Don'tSuggestSolver
         ]
     show (ResolverMismatch whichCmd resolver errDesc) = concat
         [ "Resolver '"
@@ -1205,7 +1205,7 @@ instance Show ConfigException where
         , "' does not have a matching compiler to build some or all of your "
         , "package(s).\n"
         , errDesc
-        , showOptions whichCmd
+        , showOptions whichCmd Don'tSuggestSolver
         ]
     show (ResolverPartial whichCmd resolver errDesc) = concat
         [ "Resolver '"
@@ -1213,6 +1213,9 @@ instance Show ConfigException where
         , "' does not have all the packages to match your requirements.\n"
         , unlines $ fmap ("    " <>) (lines errDesc)
         , showOptions whichCmd
+            (case whichCmd of
+                IsSolverCmd -> Don'tSuggestSolver
+                _ -> SuggestSolver)
         ]
     show (NoSuchDirectory dir) =
         "No directory could be located matching the supplied path: " ++ dir
@@ -1260,19 +1263,25 @@ instance Show ConfigException where
         ]
 instance Exception ConfigException
 
-showOptions :: WhichSolverCmd -> String
-showOptions whichCmd = unlines $ "\nThis may be resolved by:" : options
+showOptions :: WhichSolverCmd -> SuggestSolver -> String
+showOptions whichCmd suggestSolver = unlines $ "\nThis may be resolved by:" : options
   where
     options =
-        case whichCmd of
+        (case suggestSolver of
+            SuggestSolver -> [useSolver]
+            Don'tSuggestSolver -> []) ++
+        (case whichCmd of
             IsSolverCmd -> [useResolver]
             IsInitCmd -> both
-            IsNewCmd -> both
+            IsNewCmd -> both)
     both = [omitPackages, useResolver]
+    useSolver    = "    - Using '--solver' to ask cabal-install to generate extra-deps, atop the chosen snapshot."
     omitPackages = "    - Using '--omit-packages to exclude mismatching package(s)."
     useResolver  = "    - Using '--resolver' to specify a matching snapshot/resolver"
 
 data WhichSolverCmd = IsInitCmd | IsSolverCmd | IsNewCmd
+
+data SuggestSolver = SuggestSolver | Don'tSuggestSolver
 
 -- | Helper function to ask the environment and apply getConfig
 askConfig :: (MonadReader env m, HasConfig env) => m Config
