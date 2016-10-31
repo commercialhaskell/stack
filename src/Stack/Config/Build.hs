@@ -15,6 +15,12 @@ buildOptsFromMonoid BuildOptsMonoid{..} = BuildOpts
     , boptsExeProfile = fromFirst
           (boptsExeProfile defaultBuildOpts)
           buildMonoidExeProfile
+    , boptsLibStrip = fromFirst
+          (boptsLibStrip defaultBuildOpts)
+          buildMonoidLibStrip
+    , boptsExeStrip = fromFirst
+          (boptsExeStrip defaultBuildOpts)
+          buildMonoidExeStrip
     , boptsHaddock = fromFirst
           (boptsHaddock defaultBuildOpts)
           buildMonoidHaddock
