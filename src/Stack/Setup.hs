@@ -554,8 +554,12 @@ getGhcBuild menv = do
                         libT = T.pack (toFilePath lib)
                     noPie = case egccErrOut of
                         Right (gccErr,gccOut) ->
-                            "--enable-default-pie" `elem` S8.words (gccOut <> gccErr)
+                            "--enable-default-pie" `elem` S8.words gccOutput || "Gentoo Hardened" `S8.isInfixOf` gccOutput
+                                where gccOutput = gccOut <> gccErr
                         Left _ -> False
+                $logDebug $ if noPie
+                               then "PIE disabled"
+                               else "PIE enabled"
                 hastinfo5 <- checkLib $(mkRelFile "libtinfo.so.5")
                 hastinfo6 <- checkLib $(mkRelFile "libtinfo.so.6")
                 hasncurses6 <- checkLib $(mkRelFile "libncursesw.so.6")
