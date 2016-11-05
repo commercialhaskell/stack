@@ -250,7 +250,7 @@ library
                    , tls >= 1.3.8
                    , transformers >= 0.3.0.0 && < 0.6
                    , transformers-base >= 0.4.4
-                   , unicode-transforms >= 0.1 && <0.2
+                   , unicode-transforms >= 0.1 && <0.3
                    , unix-compat
                    , unordered-containers >= 0.2.5.1
                    , vector >= 0.10.12.3 && < 0.12
