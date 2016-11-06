@@ -697,8 +697,11 @@ resolvePackageLocation menv projRoot (PLRemote url remotePackageType) = do
                     ignoringAbsence (removeDirRecur dir)
                     throwM $ UnexpectedArchiveContents dirs files
 
-        RPTGit commit -> cloneAndExtract "git" ["--recursive"] ["reset", "--hard"] commit
-        RPTHg  commit -> cloneAndExtract "hg"  []              ["update", "-C"]    commit
+        -- Passes in --git-dir to git and --repository to hg, in order
+        -- to avoid the update commands being applied to the user's
+        -- repo.  See https://github.com/commercialhaskell/stack/issues/2748
+        RPTGit commit -> cloneAndExtract "git" ["--recursive"] ["--git-dir=.git", "reset", "--hard"] commit
+        RPTHg  commit -> cloneAndExtract "hg"  []              ["--repository", ".", "update", "-C"] commit
 
 -- | Get the stack root, e.g. @~/.stack@, and determine whether the user owns it.
 --

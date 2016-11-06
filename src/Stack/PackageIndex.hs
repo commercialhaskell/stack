@@ -247,10 +247,12 @@ updateIndexGit menv indexName' index gitUrl = do
                         ignoringAbsence (removeDirRecur acfDir)
                         doClone
                       err -> throwM err
-              handleUnshallowError (readProcessNull (Just acfDir) menv "git" ["fetch", "--unshallow"])
+              handleUnshallowError $
+                  readProcessNull (Just acfDir) menv "git"
+                                  ["--git-dir=.git", "fetch", "--unshallow"]
             $logSticky "Fetching package index ..."
             let runFetch = callProcessInheritStderrStdout
-                    (Cmd (Just acfDir) "git" menv ["fetch","--tags"])
+                    (Cmd (Just acfDir) "git" menv ["--git-dir=.git","fetch","--tags"])
             runFetch `C.catch` \(ex :: ProcessExitedUnsuccessfully) -> do
                 -- we failed, so wipe the directory and try again, see #1418
                 $logWarn (T.pack (show ex))
