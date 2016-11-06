@@ -485,8 +485,15 @@ loadBuildConfig mproject config mresolver mcompiler = do
                                          " specified on command line")
                    return (project, dest)
                else do
-                   r <- runReaderT getLatestResolver miniConfig
-                   $logInfo ("Using latest snapshot resolver: " <> resolverName r)
+                   r <- case mresolver of
+                       Just aresolver -> do
+                           r' <- runReaderT (makeConcreteResolver aresolver) miniConfig
+                           $logInfo ("Using resolver: " <> resolverName r' <> " specified on command line")
+                           return r'
+                       Nothing -> do
+                           r'' <- runReaderT getLatestResolver miniConfig
+                           $logInfo ("Using latest snapshot resolver: " <> resolverName r'')
+                           return r''
                    $logInfo ("Writing implicit global project config file to: " <> T.pack dest')
                    $logInfo "Note: You can change the snapshot via the resolver field there."
                    let p = Project
