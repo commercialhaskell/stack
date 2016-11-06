@@ -24,6 +24,9 @@ Major changes:
 
 Behavior changes:
 
+* Passing `--resolver X` with a Stack command which forces creation of a global
+  project config, will pass resolver X into the initial config.
+  See [#2579](https://github.com/commercialhaskell/stack/issues/2229).
 * Switch the "Run from outside project" messages to debug-level, to
   avoid spamming users in the normal case of non-project usage
 * If a remote package is specified (such as a Git repo) without an explicit
