@@ -34,3 +34,4 @@ ignore "Use fmap"  -- specific to GHC 7.8 compat
 ignore "Parse error"  -- we trust the compiler over HLint
 ignore "Use ==" -- Creates infinite loops in `EQ` using expressions
 ignore "Evaluate"
+ignore "Use unless"

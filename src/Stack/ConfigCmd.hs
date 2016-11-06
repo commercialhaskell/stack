@@ -14,7 +14,7 @@ module Stack.ConfigCmd
 
 import           Control.Applicative
 import           Control.Monad
-import           Control.Monad.Catch (throwM)
+import           Control.Monad.Catch (throwM, try)
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import           Control.Monad.Reader (asks)
@@ -77,14 +77,15 @@ cfgCmdSet cmd = do
             $logInfo (T.pack configFilePath <> " has been updated.")
 
 cfgCmdSetValue
-    :: (StackMiniM env m, HasConfig env, HasGHCVariant env)
+    :: forall m env . (StackMiniM env m, HasConfig env, HasGHCVariant env)
     => ConfigCmdSet -> m Yaml.Value
 cfgCmdSetValue (ConfigCmdSetResolver newResolver) = do
     -- TODO: custom snapshot support?
     newResolverText <- fmap resolverName (makeConcreteResolver newResolver)
-    -- We checking here that the snapshot actually exists
-    snap <- parseSnapName newResolverText
-    _ <- loadMiniBuildPlan snap
+    _ <- try $ parseSnapName newResolverText >>= loadMiniBuildPlan
+               :: m (Either BuildPlanTypesException MiniBuildPlan)
+    _ <- try $ parseResolverText newResolverText
+               :: m (Either ConfigException Resolver)
     return (Yaml.String newResolverText)
 cfgCmdSetValue (ConfigCmdSetSystemGhc _ bool) =
     return (Yaml.Bool bool)
@@ -113,7 +114,7 @@ configCmdSetParser =
                     OA.argument
                         readAbstractResolver
                         (OA.metavar "RESOLVER" <>
-                         OA.help "E.g. \"nightly\" or \"lts-7.2\""))
+                         OA.help "E.g. \"nightly\" or \"lts-7.2\" or \"ghc-7.8\""))
                    (OA.progDesc
                         "Change the resolver of the current project. See https://docs.haskellstack.org/en/stable/yaml_configuration/#resolver for more info."))
         , OA.command

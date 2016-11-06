@@ -10,6 +10,7 @@
 module Stack.Types.BuildPlan
     ( -- * Types
       BuildPlan (..)
+    , BuildPlanTypesException
     , PackagePlan (..)
     , PackageConstraints (..)
     , TestState (..)
