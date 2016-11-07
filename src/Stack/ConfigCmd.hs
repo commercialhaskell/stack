@@ -32,6 +32,7 @@ import           Stack.BuildPlan
 import           Stack.Config (makeConcreteResolver, getStackYaml)
 import           Stack.Types.BuildPlan
 import           Stack.Types.Config
+import           Stack.Types.Resolver
 
 data ConfigCmdSet
     = ConfigCmdSetResolver AbstractResolver

@@ -3,19 +3,20 @@
 -- | Docker configuration
 module Stack.Config.Docker where
 
-import Control.Exception.Lifted
-import Control.Monad.Catch (MonadThrow)
-import Data.List (find)
-import Data.Maybe
-import Data.Monoid.Extra
+import           Control.Exception.Lifted
+import           Control.Monad.Catch (MonadThrow)
+import           Data.List (find)
+import           Data.Maybe
+import           Data.Monoid.Extra
 import qualified Data.Text as T
-import Data.Typeable (Typeable)
-import Distribution.Version (simplifyVersionRange)
-import Path
-import Stack.Types.BuildPlan
-import Stack.Types.Version
-import Stack.Types.Config
-import Stack.Types.Docker
+import           Data.Typeable (Typeable)
+import           Distribution.Version (simplifyVersionRange)
+import           Path
+import           Stack.Types.BuildPlan
+import           Stack.Types.Version
+import           Stack.Types.Config
+import           Stack.Types.Docker
+import           Stack.Types.Resolver
 
 -- | Interprets DockerOptsMonoid options.
 dockerOptsFromMonoid
