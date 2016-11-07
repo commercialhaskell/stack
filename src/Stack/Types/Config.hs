@@ -48,11 +48,6 @@ module Stack.Types.Config
   ,snapshotsDir
   -- ** Constraint synonym for use with StackMini
   ,StackMiniM
-  -- ** CompilerBuild
-  ,CompilerBuild(..)
-  ,compilerBuildName
-  ,compilerBuildSuffix
-  ,parseCompilerBuild
   -- ** EnvConfig & HasEnvConfig
   ,EnvConfig(..)
   ,HasEnvConfig(..)
@@ -215,6 +210,7 @@ import           Path
 import qualified Paths_stack as Meta
 import           Stack.Types.BuildPlan (MiniBuildPlan(..), SnapName, renderSnapName, parseSnapName, SnapshotHash (..), trimmedSnapshotHash)
 import           Stack.Types.Compiler
+import           Stack.Types.CompilerBuild
 import           Stack.Types.Docker
 import           Stack.Types.FlagName
 import           Stack.Types.Image
@@ -1670,34 +1666,6 @@ parseGHCVariant s =
           | otherwise -> return (GHCCustom s)
 
 -- | Build of the compiler distribution (e.g. standard, gmp4, tinfo6)
-data CompilerBuild
-    = CompilerBuildStandard
-    | CompilerBuildSpecialized String
-    deriving (Show)
-
-instance FromJSON CompilerBuild where
-    -- Strange structuring is to give consistent error messages
-    parseJSON =
-        withText
-            "CompilerBuild"
-            (either (fail . show) return . parseCompilerBuild . T.unpack)
-
--- | Descriptive name for compiler build
-compilerBuildName :: CompilerBuild -> String
-compilerBuildName CompilerBuildStandard = "standard"
-compilerBuildName (CompilerBuildSpecialized s) = s
-
--- | Suffix to use for filenames/directories constructed with compiler build
-compilerBuildSuffix :: CompilerBuild -> String
-compilerBuildSuffix CompilerBuildStandard = ""
-compilerBuildSuffix (CompilerBuildSpecialized s) = '-' : s
-
--- | Parse compiler build from a String.
-parseCompilerBuild :: (MonadThrow m) => String -> m CompilerBuild
-parseCompilerBuild "" = return CompilerBuildStandard
-parseCompilerBuild "standard" = return CompilerBuildStandard
-parseCompilerBuild name = return (CompilerBuildSpecialized name)
-
 -- | Information for a file to download.
 data DownloadInfo = DownloadInfo
     { downloadInfoUrl :: Text

@@ -84,6 +84,7 @@ import              Stack.PrettyPrint
 import              Stack.Setup.Installed
 import              Stack.Types.Build
 import              Stack.Types.Compiler
+import              Stack.Types.CompilerBuild
 import              Stack.Types.Config
 import              Stack.Types.Docker
 import              Stack.Types.Internal (envConfigBuildOpts, buildOptsInstallExes, buildOptsHaddock)

@@ -149,6 +149,7 @@ library
                      Stack.Solver
                      Stack.Types.Build
                      Stack.Types.BuildPlan
+                     Stack.Types.CompilerBuild
                      Stack.Types.Urls
                      Stack.Types.Compiler
                      Stack.Types.Config
