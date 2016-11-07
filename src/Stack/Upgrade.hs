@@ -27,6 +27,7 @@ import           Stack.Types.PackageName
 import           Stack.Types.Version
 import           Stack.Types.Config
 import           Stack.Types.Internal
+import           Stack.Types.Resolver
 import           Stack.Types.StackT
 import           System.Process              (readProcess)
 import           System.Process.Run

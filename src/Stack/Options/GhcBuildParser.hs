@@ -4,7 +4,7 @@ import           Data.Monoid.Extra
 import           Options.Applicative
 import           Options.Applicative.Types
 import           Stack.Options.Utils
-import           Stack.Types.Config
+import           Stack.Types.CompilerBuild
 
 -- | GHC build parser
 ghcBuildParser :: Bool -> Parser CompilerBuild

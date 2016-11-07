@@ -78,6 +78,7 @@ import           Prelude
 import           Stack.Constants
 import           Stack.Types.BuildPlan (GitSHA1)
 import           Stack.Types.Compiler
+import           Stack.Types.CompilerBuild
 import           Stack.Types.Config
 import           Stack.Types.FlagName
 import           Stack.Types.GhcPkgId

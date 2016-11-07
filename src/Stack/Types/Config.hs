@@ -48,11 +48,6 @@ module Stack.Types.Config
   ,snapshotsDir
   -- ** Constraint synonym for use with StackMini
   ,StackMiniM
-  -- ** CompilerBuild
-  ,CompilerBuild(..)
-  ,compilerBuildName
-  ,compilerBuildSuffix
-  ,parseCompilerBuild
   -- ** EnvConfig & HasEnvConfig
   ,EnvConfig(..)
   ,HasEnvConfig(..)
@@ -105,17 +100,7 @@ module Stack.Types.Config
   -- ** PvpBounds
   ,PvpBounds(..)
   ,parsePvpBounds
-  -- ** Resolver & AbstractResolver
-  ,Resolver
-  ,LoadedResolver
-  ,ResolverThat's(..)
-  ,parseResolverText
-  ,resolverDirName
-  ,resolverName
-  ,customResolverHash
-  ,toResolverNotLoaded
-  ,AbstractResolver(..)
-  ,readAbstractResolver
+  -- ** ColorWhen
   ,ColorWhen(..)
   ,readColorWhen
   -- ** SCM
@@ -170,13 +155,13 @@ import           Control.Applicative
 import           Control.Arrow ((&&&))
 import           Control.Exception
 import           Control.Monad (liftM, mzero, join)
-import           Control.Monad.Catch (MonadThrow, MonadMask, throwM)
+import           Control.Monad.Catch (MonadThrow, MonadMask)
 import           Control.Monad.Logger (LogLevel(..), MonadLoggerIO)
 import           Control.Monad.Reader (MonadReader, ask, asks, MonadIO, liftIO)
 import           Control.Monad.Trans.Control
 import           Data.Aeson.Extended
                  (ToJSON, toJSON, FromJSON, parseJSON, withText, object,
-                  (.=), (..:), (..:?), (..!=), Value(Bool, String, Object),
+                  (.=), (..:), (..:?), (..!=), Value(Bool, String),
                   withObjectWarnings, WarningParser, Object, jsonSubWarnings,
                   jsonSubWarningsT, jsonSubWarningsTT, WithJSONWarnings(..), noJSONWarnings)
 import           Data.Attoparsec.Args
@@ -196,8 +181,7 @@ import           Data.Set (Set)
 import qualified Data.Set as Set
 import           Data.Text (Text)
 import qualified Data.Text as T
-import           Data.Text.Encoding (encodeUtf8, decodeUtf8)
-import           Data.Text.Read (decimal)
+import           Data.Text.Encoding (encodeUtf8)
 import           Data.Typeable
 import           Data.Yaml (ParseException)
 import qualified Data.Yaml as Yaml
@@ -213,8 +197,9 @@ import qualified Options.Applicative as OA
 import qualified Options.Applicative.Types as OA
 import           Path
 import qualified Paths_stack as Meta
-import           Stack.Types.BuildPlan (MiniBuildPlan(..), SnapName, renderSnapName, parseSnapName, SnapshotHash (..), trimmedSnapshotHash)
+import           Stack.Types.BuildPlan (MiniBuildPlan(..), SnapName, renderSnapName)
 import           Stack.Types.Compiler
+import           Stack.Types.CompilerBuild
 import           Stack.Types.Docker
 import           Stack.Types.FlagName
 import           Stack.Types.Image
@@ -222,6 +207,7 @@ import           Stack.Types.Nix
 import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageIndex
 import           Stack.Types.PackageName
+import           Stack.Types.Resolver
 import           Stack.Types.TemplateName
 import           Stack.Types.Urls
 import           Stack.Types.Version
@@ -463,30 +449,6 @@ instance Monoid GlobalOptsMonoid where
     mempty = memptydefault
     mappend = mappenddefault
 
--- | Either an actual resolver value, or an abstract description of one (e.g.,
--- latest nightly).
-data AbstractResolver
-    = ARLatestNightly
-    | ARLatestLTS
-    | ARLatestLTSMajor !Int
-    | ARResolver !Resolver
-    | ARGlobal
-    deriving Show
-
-readAbstractResolver :: ReadM AbstractResolver
-readAbstractResolver = do
-    s <- OA.readerAsk
-    case s of
-        "global" -> return ARGlobal
-        "nightly" -> return ARLatestNightly
-        "lts" -> return ARLatestLTS
-        'l':'t':'s':'-':x | Right (x', "") <- decimal $ T.pack x ->
-            return $ ARLatestLTSMajor x'
-        _ ->
-            case parseResolverText $ T.pack s of
-                Left e -> OA.readerError $ show e
-                Right x -> return $ ARResolver x
-
 -- | Default logging level should be something useful but not crazy.
 defaultLogLevel :: LogLevel
 defaultLogLevel = LevelInfo
@@ -696,90 +658,6 @@ instance ToJSON Project where
         , "resolver"          .= projectResolver p
         , "extra-package-dbs" .= projectExtraPackageDBs p
         ]
-
-data IsLoaded = Loaded | NotLoaded
-
-type LoadedResolver = ResolverThat's 'Loaded
-type Resolver = ResolverThat's 'NotLoaded
-
--- TODO: once GHC 8.0 is the lowest version we support, make these into
--- actual haddock comments...
-
--- | How we resolve which dependencies to install given a set of packages.
-data ResolverThat's (l :: IsLoaded) where
-    -- Use an official snapshot from the Stackage project, either an LTS
-    -- Haskell or Stackage Nightly.
-    ResolverSnapshot :: !SnapName -> ResolverThat's l
-    -- Require a specific compiler version, but otherwise provide no
-    -- build plan. Intended for use cases where end user wishes to
-    -- specify all upstream dependencies manually, such as using a
-    -- dependency solver.
-    ResolverCompiler :: !CompilerVersion -> ResolverThat's l
-    -- A custom resolver based on the given name and URL. When a URL is
-    -- provided, it file is to be completely immutable. Filepaths are
-    -- always loaded. This constructor is used before the build-plan has
-    -- been loaded, as we do not yet know the custom snapshot's hash.
-    ResolverCustom :: !Text -> !Text -> ResolverThat's 'NotLoaded
-    -- Like 'ResolverCustom', but after loading the build-plan, so we
-    -- have a hash. This is necessary in order to identify the location
-    -- files are stored for the resolver.
-    ResolverCustomLoaded :: !Text -> !Text -> !SnapshotHash -> ResolverThat's 'Loaded
-
-deriving instance Eq (ResolverThat's k)
-deriving instance Show (ResolverThat's k)
-
-instance ToJSON (ResolverThat's k) where
-    toJSON x = case x of
-        ResolverSnapshot{} -> toJSON $ resolverName x
-        ResolverCompiler{} -> toJSON $ resolverName x
-        ResolverCustom n l -> handleCustom n l
-        ResolverCustomLoaded n l _ -> handleCustom n l
-      where
-        handleCustom n l = object
-             [ "name" .= n
-             , "location" .= l
-             ]
-instance FromJSON (WithJSONWarnings (ResolverThat's 'NotLoaded)) where
-    -- Strange structuring is to give consistent error messages
-    parseJSON v@(Object _) = withObjectWarnings "Resolver" (\o -> ResolverCustom
-        <$> o ..: "name"
-        <*> o ..: "location") v
-
-    parseJSON (String t) = either (fail . show) return (noJSONWarnings <$> parseResolverText t)
-
-    parseJSON _ = fail "Invalid Resolver, must be Object or String"
-
--- | Convert a Resolver into its @Text@ representation, as will be used by
--- directory names
-resolverDirName :: LoadedResolver -> Text
-resolverDirName (ResolverSnapshot name) = renderSnapName name
-resolverDirName (ResolverCompiler v) = compilerVersionText v
-resolverDirName (ResolverCustomLoaded name _ hash) = "custom-" <> name <> "-" <> decodeUtf8 (trimmedSnapshotHash hash)
-
--- | Convert a Resolver into its @Text@ representation for human
--- presentation.
-resolverName :: ResolverThat's l -> Text
-resolverName (ResolverSnapshot name) = renderSnapName name
-resolverName (ResolverCompiler v) = compilerVersionText v
-resolverName (ResolverCustom name _) = "custom-" <> name
-resolverName (ResolverCustomLoaded name _ _) = "custom-" <> name
-
-customResolverHash :: LoadedResolver-> Maybe SnapshotHash
-customResolverHash (ResolverCustomLoaded _ _ hash) = Just hash
-customResolverHash _ = Nothing
-
--- | Try to parse a @Resolver@ from a @Text@. Won't work for complex resolvers (like custom).
-parseResolverText :: MonadThrow m => Text -> m Resolver
-parseResolverText t
-    | Right x <- parseSnapName t = return $ ResolverSnapshot x
-    | Just v <- parseCompilerVersion t = return $ ResolverCompiler v
-    | otherwise = throwM $ ParseResolverException t
-
-toResolverNotLoaded :: LoadedResolver -> Resolver
-toResolverNotLoaded r = case r of
-    ResolverSnapshot s -> ResolverSnapshot s
-    ResolverCompiler v -> ResolverCompiler v
-    ResolverCustomLoaded n l _ -> ResolverCustom n l
 
 -- | Class for environment values which have access to the stack root
 class HasStackRoot env where
@@ -1670,34 +1548,6 @@ parseGHCVariant s =
           | otherwise -> return (GHCCustom s)
 
 -- | Build of the compiler distribution (e.g. standard, gmp4, tinfo6)
-data CompilerBuild
-    = CompilerBuildStandard
-    | CompilerBuildSpecialized String
-    deriving (Show)
-
-instance FromJSON CompilerBuild where
-    -- Strange structuring is to give consistent error messages
-    parseJSON =
-        withText
-            "CompilerBuild"
-            (either (fail . show) return . parseCompilerBuild . T.unpack)
-
--- | Descriptive name for compiler build
-compilerBuildName :: CompilerBuild -> String
-compilerBuildName CompilerBuildStandard = "standard"
-compilerBuildName (CompilerBuildSpecialized s) = s
-
--- | Suffix to use for filenames/directories constructed with compiler build
-compilerBuildSuffix :: CompilerBuild -> String
-compilerBuildSuffix CompilerBuildStandard = ""
-compilerBuildSuffix (CompilerBuildSpecialized s) = '-' : s
-
--- | Parse compiler build from a String.
-parseCompilerBuild :: (MonadThrow m) => String -> m CompilerBuild
-parseCompilerBuild "" = return CompilerBuildStandard
-parseCompilerBuild "standard" = return CompilerBuildStandard
-parseCompilerBuild name = return (CompilerBuildSpecialized name)
-
 -- | Information for a file to download.
 data DownloadInfo = DownloadInfo
     { downloadInfoUrl :: Text

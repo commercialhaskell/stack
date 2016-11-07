@@ -90,6 +90,7 @@ import           Stack.Types.Config
 import           Stack.Types.Docker
 import           Stack.Types.Internal
 import           Stack.Types.Nix
+import           Stack.Types.Resolver
 import           Stack.Types.StackT
 import           Stack.Types.Urls
 import           Stack.Types.Version

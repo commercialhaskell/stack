@@ -149,6 +149,7 @@ library
                      Stack.Solver
                      Stack.Types.Build
                      Stack.Types.BuildPlan
+                     Stack.Types.CompilerBuild
                      Stack.Types.Urls
                      Stack.Types.Compiler
                      Stack.Types.Config
@@ -164,6 +165,7 @@ library
                      Stack.Types.PackageIdentifier
                      Stack.Types.PackageIndex
                      Stack.Types.PackageName
+                     Stack.Types.Resolver
                      Stack.Types.Sig
                      Stack.Types.StackT
                      Stack.Types.TemplateName
