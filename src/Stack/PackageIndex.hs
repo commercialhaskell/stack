@@ -247,6 +247,8 @@ updateIndexGit menv indexName' index gitUrl = do
                         ignoringAbsence (removeDirRecur acfDir)
                         doClone
                       err -> throwM err
+              -- See https://github.com/commercialhaskell/stack/issues/2748
+              -- for an explanation of --git-dir=.git
               handleUnshallowError $
                   readProcessNull (Just acfDir) menv "git"
                                   ["--git-dir=.git", "fetch", "--unshallow"]
@@ -264,7 +266,7 @@ updateIndexGit menv indexName' index gitUrl = do
             $logStickyDone "Fetched package index."
 
             when (indexGpgVerify index) $ do
-                 result <- C.try $ readProcessNull (Just acfDir) menv "git" ["tag","-v","current-hackage"]
+                 result <- C.try $ readProcessNull (Just acfDir) menv "git" ["--git-dir=.git","tag","-v","current-hackage"]
                  case result of
                      Left ex -> do
                          $logError (T.pack (show ex))
@@ -299,7 +301,7 @@ updateIndexGit menv indexName' index gitUrl = do
          $logDebug ("Exporting a tarball to " <> (T.pack . toFilePath) tarFile)
          let tarFileTmp = toFilePath tarFile ++ ".tmp"
          readProcessNull (Just acfDir) menv
-             "git" ["archive","--format=tar","-o",tarFileTmp,"current-hackage"]
+             "git" ["--git-dir=.git","archive","--format=tar","-o",tarFileTmp,"current-hackage"]
          tarFileTmpPath <- parseAbsFile tarFileTmp
          renameFile tarFileTmpPath tarFile
 
