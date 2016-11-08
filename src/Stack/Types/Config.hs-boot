@@ -1,5 +1,4 @@
 {-# LANGUAGE ExistentialQuantification #-}
-{-# LANGUAGE DeriveDataTypeable #-}
 
 module Stack.Types.Config where
 
@@ -7,7 +6,6 @@ import           Control.Exception
 import           Data.List.NonEmpty (NonEmpty)
 import           Distribution.Version
 import           Data.Text (Text)
-import           Data.Typeable
 import           Data.Yaml (ParseException)
 import           Path
 import           Stack.Types.BuildPlan (SnapName)
@@ -34,5 +32,4 @@ data ConfigException
   | FailedToCloneRepo String
   | ManualGHCVariantSettingsAreIncompatibleWithSystemGHC
   | NixRequiresSystemGhc
-  deriving Typeable
 instance Exception ConfigException

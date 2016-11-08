@@ -26,6 +26,7 @@ module Stack.Types.Resolver
   ,readAbstractResolver
   ) where
 
+import           Control.Applicative
 import           Control.Monad.Catch (MonadThrow, throwM)
 import           Data.Aeson.Extended
                  (ToJSON, toJSON, FromJSON, parseJSON, object,
@@ -39,6 +40,7 @@ import           Data.Text.Read (decimal)
 import           Options.Applicative (ReadM)
 import qualified Options.Applicative as OA
 import qualified Options.Applicative.Types as OA
+import           Prelude
 import           Stack.Types.BuildPlan (parseSnapName, renderSnapName, SnapName, SnapshotHash,
                                         trimmedSnapshotHash)
 import           {-# SOURCE #-} Stack.Types.Config (ConfigException(..))
