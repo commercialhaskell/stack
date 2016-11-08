@@ -65,7 +65,7 @@ import           Data.Monoid.Extra
 import qualified Data.Text as T
 import           Data.Text.Encoding (encodeUtf8, decodeUtf8)
 import qualified Data.Yaml as Yaml
-import           Distribution.System (OS (..), Platform (..), buildPlatform)
+import           Distribution.System (Platform (..), buildPlatform)
 import qualified Distribution.Text
 import           Distribution.Version (simplifyVersionRange)
 import           GHC.Conc (getNumProcessors)
@@ -295,15 +295,8 @@ configFromConfigMonoid configStackRoot configUserConfigPath mresolver mproject C
      let configEnvOverride _ = return origEnv
 
      platformOnlyDir <- runReaderT platformOnlyRelDir (configPlatform,configPlatformVariant)
-     configLocalProgramsBase <-
-         case configPlatform of
-             Platform _ Windows -> do
-                 progsDir <- getWindowsProgsDir configStackRoot origEnv
-                 return $ progsDir </> $(mkRelDir stackProgName)
-             _ ->
-                 return $
-                 configStackRoot </> $(mkRelDir "programs")
-     let configLocalPrograms = configLocalProgramsBase </> platformOnlyDir
+     let configLocalProgramsBase = configStackRoot </> $(mkRelDir "programs")
+         configLocalPrograms = configLocalProgramsBase </> platformOnlyDir
 
      configLocalBin <-
          case getFirst configMonoidLocalBinPath of
@@ -351,20 +344,6 @@ configFromConfigMonoid configStackRoot configUserConfigPath mresolver mproject C
      let configMaybeProject = mproject
 
      return Config {..}
-
--- | Get the directory on Windows where we should install extra programs. For
--- more information, see discussion at:
--- https://github.com/fpco/minghc/issues/43#issuecomment-99737383
-getWindowsProgsDir :: MonadThrow m
-                   => Path Abs Dir
-                   -> EnvOverride
-                   -> m (Path Abs Dir)
-getWindowsProgsDir stackRoot m =
-    case Map.lookup "LOCALAPPDATA" $ unEnvOverride m of
-        Just t -> do
-            lad <- parseAbsDir $ T.unpack t
-            return $ lad </> $(mkRelDir "Programs")
-        Nothing -> return $ stackRoot </> $(mkRelDir "Programs")
 
 -- | An environment with a subset of BuildConfig used for setup.
 data MiniConfig = MiniConfig GHCVariant Config
