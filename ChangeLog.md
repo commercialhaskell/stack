@@ -32,6 +32,10 @@ Behavior changes:
 * If a remote package is specified (such as a Git repo) without an explicit
   `extra-dep` setting, a warning is given to the user to provide one
   explicitly.
+* On Windows, `stack setup` will now download and extract additional programs
+  such as GHC to `$STACK_ROOT\programs`, like on other platforms. You may need
+  to remove programs in `$LOCALAPPDATA\Programs\stack` manually.
+  [#1644](https://github.com/commercialhaskell/stack/issues/1644).
 
 Other enhancements:
 
