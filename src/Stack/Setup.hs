@@ -485,7 +485,7 @@ ensureCompiler sopts = do
 
     return (mpaths, compilerBuild)
 
--- | Determine which GHC build to use dependong on which shared libraries are available
+-- | Determine which GHC build to use depending on which shared libraries are available
 -- on the system.
 getGhcBuild
     :: (StackM env m, HasConfig env)

@@ -21,6 +21,11 @@ Major changes:
   installation should now include a `stack setup` line or use the `--install-ghc`
   flag.
   [#2221](https://github.com/commercialhaskell/stack/issues/2221)
+* Stack is now capable of doing binary upgrades instead of always
+  recompiling a new version from source. In order to take advantage of
+  this, you should do a binary installation so that your platform is
+  properly configured, and from then on `stack upgrade` will default
+  to binary upgrades.
 
 Behavior changes:
 

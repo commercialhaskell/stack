@@ -283,16 +283,9 @@ commandLineHandler progName isInterpreter = complicatedOptions
                     updateCmd
                     (pure ())
         addCommand' "upgrade"
-                    "Upgrade to the latest stack (experimental)"
+                    "Upgrade to the latest stack"
                     upgradeCmd
-                    ((,) <$> switch
-                              ( long "git"
-                             <> help "Clone from Git instead of downloading from Hackage (more dangerous)" )
-                         <*> strOption
-                              ( long "git-repo"
-                             <> help "Clone from specified git repository"
-                             <> value "https://github.com/commercialhaskell/stack"
-                             <> showDefault ))
+                    upgradeOpts
         addCommand'
             "upload"
             "Upload a package to Hackage"
@@ -638,16 +631,16 @@ updateCmd :: () -> GlobalOpts -> IO ()
 updateCmd () go = withConfigAndLock go $
     getMinimalEnvOverride >>= Stack.PackageIndex.updateAllIndices
 
-upgradeCmd :: (Bool, String) -> GlobalOpts -> IO ()
-upgradeCmd (fromGit, repo) go = withGlobalConfigAndLock go $
+upgradeCmd :: UpgradeOpts -> GlobalOpts -> IO ()
+upgradeCmd upgradeOpts' go = withGlobalConfigAndLock go $
     upgrade (globalConfigMonoid go)
-            (if fromGit then Just repo else Nothing)
             (globalResolver go)
 #ifdef USE_GIT_INFO
             (find (/= "UNKNOWN") [$gitHash])
 #else
             Nothing
 #endif
+            upgradeOpts'
 
 -- | Upload to Hackage
 uploadCmd :: ([String], Maybe PvpBounds, Bool, Bool, String) -> GlobalOpts -> IO ()
