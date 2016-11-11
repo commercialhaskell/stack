@@ -104,7 +104,9 @@ Bug fixes:
 * Fixed a bug in passing along `--ghc-options` to ghcjs.  They were being
   provided as `--ghc-options` to Cabal, when it needs to be `--ghcjs-options`.
   [#2714](https://github.com/commercialhaskell/stack/issues/2714)
-
+* Launch Docker from the project root regardless of the working
+  directory Stack is invoked from. This means paths relative to the project root
+  (e.g. environment files) can be specified in `stack.yaml`'s docker `run-args`.
 
 ## 1.2.0
 
