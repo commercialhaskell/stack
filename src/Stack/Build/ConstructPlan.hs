@@ -64,6 +64,7 @@ import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageName
 import           Stack.Types.StackT (StackM)
 import           Stack.Types.Version
+import           System.Process.Read (findExecutable)
 
 data PackageInfo
     = PIOnlyInstalled InstallLocation Installed
@@ -664,15 +665,25 @@ packageDepsWithTools p = do
     ctx <- ask
     -- TODO: it would be cool to defer these warnings until there's an
     -- actual issue building the package.
-    -- TODO: check if the tool is on the path before warning?
     let toEither (Cabal.Dependency (Cabal.PackageName name) _) mp =
             case Map.toList mp of
                 [] -> Left (NoToolFound name (packageName p))
                 [_] -> Right mp
                 xs -> Left (AmbiguousToolsFound name (packageName p) (map fst xs))
-        (warnings, toolDeps) =
+        (warnings0, toolDeps) =
              partitionEithers $
              map (\dep -> toEither dep (toolToPackages ctx dep)) (packageTools p)
+    -- Check whether the tool is on the PATH before warning about it.
+    warnings <- fmap catMaybes $ forM warnings0 $ \warning -> do
+        let toolName = case warning of
+                NoToolFound tool _ -> tool
+                AmbiguousToolsFound tool _ _ -> tool
+        config <- asks getConfig
+        menv <- liftIO $ configEnvOverride config minimalEnvSettings { esIncludeLocals = True }
+        mfound <- findExecutable menv toolName
+        case mfound of
+            Nothing -> return (Just warning)
+            Just _ -> return Nothing
     tell mempty { wWarnings = (map toolWarningText warnings ++) }
     when (any isNoToolFound warnings) $ do
         let msg = T.unlines

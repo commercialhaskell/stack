@@ -71,10 +71,12 @@ Other enhancements:
   [#2199](https://github.com/commercialhaskell/stack/issues/2199)
 * `--no-time-in-log` option, to make verbose logs more diffable
   [#2727](https://github.com/commercialhaskell/stack/issues/2727)
-  * `--color` option added to override auto-detection of ANSI support
+* `--color` option added to override auto-detection of ANSI support
   [#2725](https://github.com/commercialhaskell/stack/issues/2725)
-  * Missing extra-deps are now warned about, adding a degree of typo detection
+* Missing extra-deps are now warned about, adding a degree of typo detection
   [#1521](https://github.com/commercialhaskell/stack/issues/1521)
+* No longer warns about missing build-tools if they are on the PATH.
+  [#2235](https://github.com/commercialhaskell/stack/issues/2235)
 
 Bug fixes:
 
