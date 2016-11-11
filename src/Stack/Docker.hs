@@ -321,6 +321,7 @@ runContainerAndExit getCmdArgs
                  (toFilePathNoTrailingSep (sandboxHomeDir </> sshRelDir))))
      containerID <- (trim . decodeUtf8) <$> readDockerProcess
        envOverride
+       (Just projectRoot)
        (concat
          [["create"
           ,"--net=host"
@@ -419,7 +420,7 @@ cleanup opts =
      let docker = configDocker config
      envOverride <- getEnvOverride (configPlatform config)
      checkDockerVersion envOverride docker
-     let runDocker = readDockerProcess envOverride
+     let runDocker = readDockerProcess envOverride Nothing
      imagesOut <- runDocker ["images","--no-trunc","-f","dangling=false"]
      danglingImagesOut <- runDocker ["images","--no-trunc","-f","dangling=true"]
      runningContainersOut <- runDocker ["ps","-a","--no-trunc","-f","status=running"]
@@ -478,7 +479,7 @@ cleanup opts =
                             do $logInfo (concatT ["Removing container: '",v,"'"])
                                return ["rm","-f",v]
                         | otherwise -> throwM (InvalidCleanupCommandException line)
-             e <- try (readDockerProcess envOverride args)
+             e <- try (readDockerProcess envOverride Nothing args)
              case e of
                Left ex@ProcessFailed{} ->
                  $logError (concatT ["Could not remove: '",v,"': ", show ex])
@@ -654,7 +655,7 @@ inspects :: (MonadIO m, MonadLogger m, MonadBaseControl IO m, MonadCatch m)
 inspects _ [] = return Map.empty
 inspects envOverride images =
   do maybeInspectOut <-
-       try (readDockerProcess envOverride ("inspect" : images))
+       try (readDockerProcess envOverride Nothing ("inspect" : images))
      case maybeInspectOut of
        Right inspectOut ->
          -- filtering with 'isAscii' to workaround @docker inspect@ output containing invalid UTF-8
@@ -713,7 +714,7 @@ checkDockerVersion
 checkDockerVersion envOverride docker =
   do dockerExists <- doesExecutableExist envOverride "docker"
      unless dockerExists (throwM DockerNotInstalledException)
-     dockerVersionOut <- readDockerProcess envOverride ["--version"]
+     dockerVersionOut <- readDockerProcess envOverride Nothing ["--version"]
      case words (decodeUtf8 dockerVersionOut) of
        (_:_:v:_) ->
          case parseVersionFromString (stripVersion v) of
@@ -864,8 +865,8 @@ removeDirectoryContents path excludeDirs excludeFiles =
 -- process fails.  Logs process's stderr using @$logError@.
 readDockerProcess
     :: (MonadIO m, MonadLogger m, MonadBaseControl IO m, MonadCatch m)
-    => EnvOverride -> [String] -> m BS.ByteString
-readDockerProcess envOverride = readProcessStdout Nothing envOverride "docker"
+    => EnvOverride -> Maybe (Path Abs Dir) -> [String] -> m BS.ByteString
+readDockerProcess envOverride mpwd = readProcessStdout mpwd envOverride "docker"
 
 -- | Name of home directory within docker sandbox.
 homeDirName :: Path Rel Dir
