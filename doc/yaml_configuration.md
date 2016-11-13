@@ -600,6 +600,15 @@ templates:
     github-username: yourusername
 ```
 
+Additionally, `stack new` can automatically initialize source control repositories
+in the directories it creates.  Source control tools can be specified with the
+`scm-init` option.  At the moment, only `git` is supported.
+
+```yaml
+templates:
+  scm-init: git
+```
+  
 # urls
 
 Customize the URLs where `stack` looks for snapshot build plans.
