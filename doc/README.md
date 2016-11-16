@@ -58,8 +58,8 @@ stack exec my-project-exe
 the needed files to start a project correctly.
 - The `stack setup` will download the compiler if necessary in an isolated
   location (default `~/.stack`) that won't interfere with any system-level
-  installations. (For information on installation paths, please use the `stack
-  path` command.).
+  installations. (For information on installation paths, please use the
+  `stack path` command.).
 - The `stack build` command will build the minimal project.
 - `stack exec my-project-exe` will execute the command.
 - If you just want to install an executable using stack, then all you have to do
