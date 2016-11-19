@@ -40,4 +40,4 @@ ghciOptsParser = GhciOpts
              -- TODO: deprecate this? probably useless.
              <*> switch (long "skip-intermediate-deps" <> help "Skip loading intermediate target dependencies" <> internal)
              <*> boolFlags True "package-hiding" "package hiding" idm
-             <*> switch (long "no-build" <> help "Don't build before launching GHCi (deprecated, should be unneeded)" <> internal)
+             <*> switch (long "no-build" <> help "Don't build before launching GHCi" <> internal)

@@ -38,8 +38,9 @@ data Action = Action
 data ActionContext = ActionContext
     { acRemaining :: !(Set ActionId)
     -- ^ Does not include the current action
+    , acDownstream :: [Action]
+    -- ^ Actions which depend on the current action
     }
-    deriving Show
 
 data ExecuteState = ExecuteState
     { esActions    :: TVar [Action]
@@ -123,6 +124,7 @@ runActions' ExecuteState {..} =
                 return $ mask $ \restore -> do
                     eres <- try $ restore $ actionDo action ActionContext
                         { acRemaining = remaining
+                        , acDownstream = downstreamActions (actionId action) as'
                         }
                     atomically $ do
                         unlock
@@ -134,3 +136,6 @@ runActions' ExecuteState {..} =
                                 let dropDep a = a { actionDeps = Set.delete (actionId action) $ actionDeps a }
                                  in modifyTVar esActions $ map dropDep
                     restore loop
+
+downstreamActions :: ActionId -> [Action] -> [Action]
+downstreamActions aid = filter (\a -> aid `Set.member` actionDeps a)

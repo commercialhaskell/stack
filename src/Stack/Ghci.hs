@@ -292,10 +292,6 @@ getAllLocalTargets GhciOpts{..} targets0 mainIsTargets sourceMap = do
 
 buildDepsAndInitialSteps :: (StackM r m, HasEnvConfig r, MonadBaseUnlift IO m) => GhciOpts -> [Text] -> m ()
 buildDepsAndInitialSteps GhciOpts{..} targets0 = do
-    -- Deprecation notice about --no-build
-    when ghciNoBuild $ $prettyWarn $
-        "The --no-build flag should no longer be needed, and is now deprecated." <> line <>
-        "See this resolved issue: https://github.com/commercialhaskell/stack/issues/1364"
     let targets = targets0 ++ map T.pack ghciAdditionalPackages
     -- If necessary, do the build, for local packagee targets, only do
     -- 'initialBuildSteps'.

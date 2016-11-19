@@ -1181,9 +1181,14 @@ singleBuild runInBase ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} in
             _neededConfig <- ensureConfig cache pkgDir ee (announce ("configure" <> annSuffix)) cabal cabalfp
 
             case ( boptsCLIOnlyConfigure eeBuildOptsCLI
-                 , boptsCLIInitialBuildSteps eeBuildOptsCLI && isTarget) of
-                (True, _) -> return Nothing
-                (_, True) -> do
+                 , boptsCLIInitialBuildSteps eeBuildOptsCLI && isTarget
+                 , acDownstream) of
+                -- A full build is done if there are downstream actions,
+                -- because their configure step will require that this
+                -- package is built. See
+                -- https://github.com/commercialhaskell/stack/issues/2787
+                (True, _, []) -> return Nothing
+                (_, True, []) -> do
                     initialBuildSteps cabal announce
                     return Nothing
                 _ -> liftM Just $ realBuild cache package pkgDir cabal announce

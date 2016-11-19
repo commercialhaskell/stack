@@ -226,7 +226,7 @@ getSDistFileList lp =
                 return (contents, cabalfp)
   where
     package = lpPackage lp
-    ac = ActionContext Set.empty
+    ac = ActionContext Set.empty []
     task = Task
         { taskProvides = PackageIdentifier (packageName package) (packageVersion package)
         , taskType = TTLocal lp
