@@ -9,14 +9,12 @@ import Control.Monad.Logger (LogLevel)
 import Data.Monoid.Extra
 import Data.Text (Text)
 import Lens.Micro
-import Network.HTTP.Client.Conduit (Manager,HasHttpManager(..))
 import Stack.Types.Config
 
 -- | Monadic environment.
 data Env config =
   Env {envConfig :: !config
       ,envReExec :: !Bool
-      ,envManager :: !Manager
       ,envLogOptions :: !LogOptions
       ,envTerminal :: !Bool
       ,envSticky :: !Sticky
@@ -35,9 +33,6 @@ instance HasBuildConfig config => HasBuildConfig (Env config) where
     getBuildConfig = getBuildConfig . envConfig
 instance HasEnvConfig config => HasEnvConfig (Env config) where
     getEnvConfig = getEnvConfig . envConfig
-
-instance HasHttpManager (Env config) where
-  getHttpManager = envManager
 
 class HasTerminal r where
   getTerminal :: r -> Bool

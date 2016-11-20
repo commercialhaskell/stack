@@ -24,8 +24,6 @@ import           Control.Monad.IO.Class
 import           Control.Monad.Trans.Control
 import           Data.IORef
 import           Data.Traversable
-import           Network.HTTP.Client
-import           Network.HTTP.Client.TLS (getGlobalManager)
 import           Path
 import           Path.IO
 import           Stack.Config
@@ -39,12 +37,11 @@ import           System.Environment (getEnvironment)
 import           System.IO
 import           System.FileLock
 
-loadCompilerVersion :: Manager
-                    -> GlobalOpts
+loadCompilerVersion :: GlobalOpts
                     -> LoadConfig (StackT () IO)
                     -> IO CompilerVersion
-loadCompilerVersion manager go lc = do
-    bconfig <- runStackTGlobal manager () go $
+loadCompilerVersion go lc = do
+    bconfig <- runStackTGlobal () go $
       lcLoadBuildConfig lc (globalCompiler go)
     return $ bcWantedCompiler bconfig
 
@@ -93,13 +90,13 @@ withConfigAndLock
     -> StackT Config IO ()
     -> IO ()
 withConfigAndLock go@GlobalOpts{..} inner = do
-    (manager, lc) <- loadConfigWithOpts go
+    lc <- loadConfigWithOpts go
     withUserFileLock go (configStackRoot $ lcConfig lc) $ \lk ->
-        runStackTGlobal manager (lcConfig lc) go $
+        runStackTGlobal (lcConfig lc) go $
             Docker.reexecWithOptionalContainer
                 (lcProjectRoot lc)
                 Nothing
-                (runStackTGlobal manager (lcConfig lc) go inner)
+                (runStackTGlobal (lcConfig lc) go inner)
                 Nothing
                 (Just $ munlockFile lk)
 
@@ -110,11 +107,10 @@ withGlobalConfigAndLock
     -> StackT Config IO ()
     -> IO ()
 withGlobalConfigAndLock go@GlobalOpts{..} inner = do
-    manager <- getGlobalManager
-    lc <- runStackTGlobal manager () go $
+    lc <- runStackTGlobal () go $
         loadConfigMaybeProject globalConfigMonoid Nothing Nothing
     withUserFileLock go (configStackRoot $ lcConfig lc) $ \_lk ->
-        runStackTGlobal manager (lcConfig lc) go inner
+        runStackTGlobal (lcConfig lc) go inner
 
 -- For now the non-locking version just unlocks immediately.
 -- That is, there's still a serialization point.
@@ -150,7 +146,7 @@ withBuildConfigExt
     -- installed on the host OS.
     -> IO ()
 withBuildConfigExt go@GlobalOpts{..} mbefore inner mafter = do
-    (manager, lc) <- loadConfigWithOpts go
+    lc <- loadConfigWithOpts go
 
     withUserFileLock go (configStackRoot $ lcConfig lc) $ \lk0 -> do
       -- A local bit of state for communication between callbacks:
@@ -168,37 +164,35 @@ withBuildConfigExt go@GlobalOpts{..} mbefore inner mafter = do
                  inner lk2
 
       let inner'' lk = do
-              bconfig <- runStackTGlobal manager () go $
+              bconfig <- runStackTGlobal () go $
                   lcLoadBuildConfig lc globalCompiler
               envConfig <-
                  runStackTGlobal
-                     manager bconfig go
+                     bconfig go
                      (setupEnv Nothing)
               runStackTGlobal
-                  manager
                   envConfig
                   go
                   (inner' lk)
 
-      let getCompilerVersion = loadCompilerVersion manager go lc
-      runStackTGlobal manager (lcConfig lc) go $
+      let getCompilerVersion = loadCompilerVersion go lc
+      runStackTGlobal (lcConfig lc) go $
         Docker.reexecWithOptionalContainer
                  (lcProjectRoot lc)
                  mbefore
-                 (runStackTGlobal manager (lcConfig lc) go $
+                 (runStackTGlobal (lcConfig lc) go $
                     Nix.reexecWithOptionalShell (lcProjectRoot lc) getCompilerVersion (inner'' lk0))
                  mafter
                  (Just $ liftIO $
                       do lk' <- readIORef curLk
                          munlockFile lk')
 
--- | Load the configuration with a manager. Convenience function used
+-- | Load the configuration. Convenience function used
 -- throughout this module.
-loadConfigWithOpts :: GlobalOpts -> IO (Manager,LoadConfig (StackT () IO))
+loadConfigWithOpts :: GlobalOpts -> IO (LoadConfig (StackT () IO))
 loadConfigWithOpts go@GlobalOpts{..} = do
-    manager <- getGlobalManager
     mstackYaml <- forM globalStackYaml resolveFile'
-    lc <- runStackTGlobal manager () go $ do
+    runStackTGlobal () go $ do
         lc <- loadConfig globalConfigMonoid globalResolver mstackYaml
         -- If we have been relaunched in a Docker container, perform in-container initialization
         -- (switch UID, etc.).  We do this after first loading the configuration since it must
@@ -207,18 +201,16 @@ loadConfigWithOpts go@GlobalOpts{..} = do
             Just de -> Docker.entrypoint (lcConfig lc) de
             Nothing -> return ()
         return lc
-    return (manager,lc)
 
 withMiniConfigAndLock
     :: GlobalOpts
     -> StackT MiniConfig IO ()
     -> IO ()
 withMiniConfigAndLock go@GlobalOpts{..} inner = do
-    manager <- getGlobalManager
-    miniConfig <- runStackTGlobal manager () go $ do
+    miniConfig <- runStackTGlobal () go $ do
         lc <- loadConfigMaybeProject globalConfigMonoid globalResolver Nothing
-        loadMiniConfig manager (lcConfig lc)
-    runStackTGlobal manager miniConfig go inner
+        loadMiniConfig (lcConfig lc)
+    runStackTGlobal miniConfig go inner
 
 -- | Unlock a lock file, if the value is Just
 munlockFile :: MonadIO m => Maybe FileLock -> m ()

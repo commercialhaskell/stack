@@ -48,8 +48,6 @@ import           Data.Time
 import           GHC.Foreign (withCString, peekCString)
 import           Language.Haskell.TH
 import           Language.Haskell.TH.Syntax (lift)
-import           Network.HTTP.Client.Conduit (HasHttpManager(..))
-import           Network.HTTP.Conduit
 import           Prelude -- Fix AMP warning
 import           Stack.Types.Config (GlobalOpts (..), ColorWhen(..))
 import           Stack.Types.Internal
@@ -66,7 +64,7 @@ import           System.Locale
 #endif
 
 -- | Constraint synonym for all of the common environment instances
-type HasEnv r = (HasHttpManager r, HasLogOptions r, HasTerminal r, HasReExec r, HasSticky r)
+type HasEnv r = (HasLogOptions r, HasTerminal r, HasReExec r, HasSticky r)
 
 -- | Constraint synonym for constraints commonly satisifed by monads used in stack.
 type StackM r m =
@@ -101,13 +99,13 @@ instance MonadIO m => MonadLoggerIO (StackT config m) where
 
 -- | Run a Stack action, using global options.
 runStackTGlobal :: (MonadIO m)
-                => Manager -> config -> GlobalOpts -> StackT config m a -> m a
-runStackTGlobal manager config GlobalOpts{..} =
-   runStackT manager config globalLogLevel globalTimeInLog globalTerminal globalColorWhen (isJust globalReExecVersion)
+                => config -> GlobalOpts -> StackT config m a -> m a
+runStackTGlobal config GlobalOpts{..} =
+   runStackT config globalLogLevel globalTimeInLog globalTerminal globalColorWhen (isJust globalReExecVersion)
 
 runStackT :: (MonadIO m)
-          => Manager -> config -> LogLevel -> Bool -> Bool -> ColorWhen -> Bool -> StackT config m a -> m a
-runStackT manager config logLevel useTime terminal colorWhen reExec m = do
+          => config -> LogLevel -> Bool -> Bool -> ColorWhen -> Bool -> StackT config m a -> m a
+runStackT config logLevel useTime terminal colorWhen reExec m = do
     useColor <- case colorWhen of
         ColorNever -> return False
         ColorAlways -> return True
@@ -116,7 +114,6 @@ runStackT manager config logLevel useTime terminal colorWhen reExec m = do
     withSticky terminal $ \sticky -> runReaderT (unStackT m) Env
         { envConfig = config
         , envReExec = reExec
-        , envManager = manager
         , envLogOptions = LogOptions
             { logUseColor = useColor
             , logUseUnicode = canUseUnicode
@@ -142,14 +139,12 @@ runInnerStackT :: (HasEnv r, MonadReader r m, MonadIO m)
                => config -> StackT config IO a -> m a
 runInnerStackT config inner = do
     reExec <- asks getReExec
-    manager <- asks getHttpManager
     logOptions <- asks getLogOptions
     terminal <- asks getTerminal
     sticky <- asks getSticky
     liftIO $ runReaderT (unStackT inner) Env
         { envConfig = config
         , envReExec = reExec
-        , envManager = manager
         , envLogOptions = logOptions
         , envTerminal = terminal
         , envSticky = sticky

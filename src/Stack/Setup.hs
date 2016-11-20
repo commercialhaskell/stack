@@ -38,7 +38,7 @@ import qualified    Data.ByteString as S
 import qualified    Data.ByteString.Char8 as S8
 import qualified    Data.ByteString.Lazy as LBS
 import              Data.Char (isSpace)
-import              Data.Conduit (Conduit, ($$), (=$), await, yield, awaitForever)
+import              Data.Conduit (Conduit, (=$), await, yield, awaitForever)
 import              Data.Conduit.Lift (evalStateC)
 import qualified    Data.Conduit.List as CL
 import              Data.Either
@@ -65,8 +65,8 @@ import              Distribution.System (OS (Linux), Arch (..), Platform (..))
 import qualified    Distribution.System as Cabal
 import              Distribution.Text (simpleParse)
 import              Lens.Micro (set)
-import              Network.HTTP.Client.Conduit (Manager, getHttpManager, parseUrlThrow,
-                                                 responseBody, withResponse)
+import              Network.HTTP.Client (parseUrlThrow)
+import              Network.HTTP.Simple (getResponseBody, httpLBS)
 import              Network.HTTP.Download.Verified
 import              Path
 import              Path.Extra (toFilePathNoTrailingSep)
@@ -366,7 +366,7 @@ ensureCompiler sopts = do
         isWanted = isWantedCompiler (soptsCompilerCheck sopts) (soptsWantedCompiler sopts)
         needLocal = not (any (uncurry canUseCompiler) msystem)
 
-    getSetupInfo' <- runOnce (getSetupInfo (soptsSetupInfoYaml sopts) =<< asks getHttpManager)
+    getSetupInfo' <- runOnce (getSetupInfo (soptsSetupInfoYaml sopts))
 
     let getMmsys2Tool = do
             platform <- asks getPlatform
@@ -602,7 +602,7 @@ ensureDockerStackExe containerPlatform = do
     unless stackExeExists $
         do
            $logInfo $ mconcat ["Downloading Docker-compatible ", T.pack stackProgName, " executable"]
-           si <- getSetupInfo defaultSetupInfoYaml =<< asks getHttpManager
+           si <- getSetupInfo defaultSetupInfoYaml
            osKey <- getOSKey containerPlatform
            info <-
                case Map.lookup osKey (siStack si) of
@@ -724,8 +724,8 @@ getSystemCompiler menv wc = do
 -- | Download the most recent SetupInfo
 getSetupInfo
     :: (MonadIO m, MonadThrow m, MonadLogger m, MonadReader env m, HasConfig env)
-    => String -> Manager -> m SetupInfo
-getSetupInfo stackSetupYaml manager = do
+    => String -> m SetupInfo
+getSetupInfo stackSetupYaml = do
     config <- asks getConfig
     setupInfos <-
         mapM
@@ -738,14 +738,7 @@ getSetupInfo stackSetupYaml manager = do
     loadSetupInfo (SetupInfoFileOrURL urlOrFile) = do
         bs <-
             case parseUrlThrow urlOrFile of
-                Just req -> do
-                    bss <-
-                        liftIO $
-                        flip runReaderT manager $
-                        withResponse req $
-                        \res ->
-                             responseBody res $$ CL.consume
-                    return $ S8.concat bss
+                Just req -> fmap (LBS.toStrict . getResponseBody) $ httpLBS req
                 Nothing -> liftIO $ S.readFile urlOrFile
         WithJSONWarnings si warnings <- either throwM return (Yaml.decodeEither' bs)
         when (urlOrFile /= defaultSetupInfoYaml) $

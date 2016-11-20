@@ -11,8 +11,6 @@ import Data.Either
 import Data.Maybe
 import Data.Monoid
 import Data.Yaml
-import Network.HTTP.Client.TLS (getGlobalManager)
-import Network.HTTP.Conduit (Manager)
 import Path
 import Path.IO
 import Prelude -- Fix redundant import warnings
@@ -58,24 +56,14 @@ buildOptsConfig =
 stackDotYaml :: Path Rel File
 stackDotYaml = $(mkRelFile "stack.yaml")
 
-data T = T
-  { manager :: Manager
-  }
-
-setup :: IO T
-setup = do
-  manager <- getGlobalManager
-  unsetEnv "STACK_YAML"
-  return T{..}
-
-teardown :: T -> IO ()
-teardown _ = return ()
+setup :: IO ()
+setup = unsetEnv "STACK_YAML"
 
 noException :: Selector SomeException
 noException = const False
 
 spec :: Spec
-spec = beforeAll setup $ afterAll teardown $ do
+spec = beforeAll setup $ do
   let logLevel = LevelDebug
   -- TODO(danburton): not use inTempDir
   let inTempDir action = do
@@ -92,21 +80,21 @@ spec = beforeAll setup $ afterAll teardown $ do
         bracket_ setVar resetVar action
 
   describe "loadConfig" $ do
-    let loadConfig' m = runStackT m () logLevel True False ColorAuto False (loadConfig mempty Nothing Nothing)
-    let loadBuildConfigRest m = runStackT m () logLevel True False ColorAuto False
+    let loadConfig' = runStackT () logLevel True False ColorAuto False (loadConfig mempty Nothing Nothing)
+    let loadBuildConfigRest = runStackT () logLevel True False ColorAuto False
     -- TODO(danburton): make sure parent dirs also don't have config file
-    it "works even if no config file exists" $ \T{..} -> example $ do
-      _config <- loadConfig' manager
+    it "works even if no config file exists" $ example $ do
+      _config <- loadConfig'
       return ()
 
-    it "works with a blank config file" $ \T{..} -> inTempDir $ do
+    it "works with a blank config file" $ inTempDir $ do
       writeFile (toFilePath stackDotYaml) ""
       -- TODO(danburton): more specific test for exception
-      loadConfig' manager `shouldThrow` anyException
+      loadConfig' `shouldThrow` anyException
 
-    it "parses build config options" $ \T{..} -> inTempDir $ do
+    it "parses build config options" $ inTempDir $ do
       writeFile (toFilePath stackDotYaml) buildOptsConfig
-      BuildOpts{..} <- configBuild . lcConfig <$> loadConfig' manager
+      BuildOpts{..} <- configBuild . lcConfig <$> loadConfig'
       boptsLibProfile `shouldBe` True
       boptsExeProfile `shouldBe` True
       boptsHaddock `shouldBe` True
@@ -126,29 +114,29 @@ spec = beforeAll setup $ afterAll teardown $ do
       boptsReconfigure `shouldBe` True
       boptsCabalVerbose `shouldBe` True
 
-    it "finds the config file in a parent directory" $ \T{..} -> inTempDir $ do
+    it "finds the config file in a parent directory" $ inTempDir $ do
       writeFile (toFilePath stackDotYaml) sampleConfig
       parentDir <- getCurrentDirectory >>= parseAbsDir
       let childDir = "child"
       createDirectory childDir
       setCurrentDirectory childDir
-      LoadConfig{..} <- loadConfig' manager
-      bc@BuildConfig{..} <- loadBuildConfigRest manager
+      LoadConfig{..} <- loadConfig'
+      bc@BuildConfig{..} <- loadBuildConfigRest
                             (lcLoadBuildConfig Nothing)
       bcRoot bc `shouldBe` parentDir
 
-    it "respects the STACK_YAML env variable" $ \T{..} -> inTempDir $ do
+    it "respects the STACK_YAML env variable" $ inTempDir $ do
       withSystemTempDir "config-is-here" $ \dir -> do
         let stackYamlFp = toFilePath (dir </> stackDotYaml)
         writeFile stackYamlFp sampleConfig
         withEnvVar "STACK_YAML" stackYamlFp $ do
-          LoadConfig{..} <- loadConfig' manager
-          BuildConfig{..} <- loadBuildConfigRest manager
+          LoadConfig{..} <- loadConfig'
+          BuildConfig{..} <- loadBuildConfigRest
                                 (lcLoadBuildConfig Nothing)
           bcStackYaml `shouldBe` dir </> stackDotYaml
           parent bcStackYaml `shouldBe` dir
 
-    it "STACK_YAML can be relative" $ \T{..} -> inTempDir $ do
+    it "STACK_YAML can be relative" $ inTempDir $ do
         parentDir <- getCurrentDirectory >>= parseAbsDir
         let childRel = $(mkRelDir "child")
             yamlRel = childRel </> $(mkRelFile "some-other-name.config")
@@ -156,8 +144,8 @@ spec = beforeAll setup $ afterAll teardown $ do
         createDirectoryIfMissing True $ toFilePath $ parent yamlAbs
         writeFile (toFilePath yamlAbs) "resolver: ghc-7.8"
         withEnvVar "STACK_YAML" (toFilePath yamlRel) $ do
-            LoadConfig{..} <- loadConfig' manager
-            BuildConfig{..} <- loadBuildConfigRest manager
+            LoadConfig{..} <- loadConfig'
+            BuildConfig{..} <- loadBuildConfigRest
                                 (lcLoadBuildConfig Nothing)
             bcStackYaml `shouldBe` yamlAbs
 

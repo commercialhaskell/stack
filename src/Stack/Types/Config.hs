@@ -191,7 +191,6 @@ import           Distribution.Version (anyVersion)
 import           GHC.Generics (Generic)
 import           Generics.Deriving.Monoid (memptydefault, mappenddefault)
 import           Network.HTTP.Client (parseRequest)
-import           Network.HTTP.Client.Conduit (HasHttpManager)
 import           Options.Applicative (ReadM)
 import qualified Options.Applicative as OA
 import qualified Options.Applicative.Types as OA
@@ -715,7 +714,7 @@ instance HasBuildConfig BuildConfig where
 -- | Constraint synonym for constraints satisfied by a 'MiniConfig'
 -- environment.
 type StackMiniM r m =
-    ( MonadReader r m, MonadIO m, MonadBaseControl IO m, MonadLoggerIO m, MonadMask m, HasHttpManager r
+    ( MonadReader r m, MonadIO m, MonadBaseControl IO m, MonadLoggerIO m, MonadMask m
     )
 
 -- An uninterpreted representation of configuration options.

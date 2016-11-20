@@ -11,8 +11,6 @@ import Control.Monad.Catch (try)
 import Data.Monoid
 import qualified Data.Map as Map
 import qualified Data.Set as Set
-import Network.HTTP.Client.TLS (getGlobalManager)
-import Network.HTTP.Conduit (Manager)
 import Prelude -- Fix redundant import warnings
 import System.Directory
 import System.Environment
@@ -26,41 +24,31 @@ import Stack.Types.Config
 import Stack.Types.Compiler
 import Stack.Types.StackT
 
-data T = T
-  { manager :: Manager
-  }
-
-setup :: IO T
-setup = do
-  manager <- getGlobalManager
-  unsetEnv "STACK_YAML"
-  return T{..}
-
-teardown :: T -> IO ()
-teardown _ = return ()
+setup :: IO ()
+setup = unsetEnv "STACK_YAML"
 
 main :: IO ()
 main = hspec spec
 
 spec :: Spec
-spec = beforeAll setup $ afterAll teardown $ do
+spec = beforeAll setup $ do
     let logLevel = LevelDebug
-    let loadConfig' m = runStackT m () logLevel True False ColorAuto False (loadConfig mempty Nothing Nothing)
-    let loadBuildConfigRest m = runStackT m () logLevel True False ColorAuto False
+    let loadConfig' = runStackT () logLevel True False ColorAuto False (loadConfig mempty Nothing Nothing)
+    let loadBuildConfigRest = runStackT () logLevel True False ColorAuto False
     let inTempDir action = do
             currentDirectory <- getCurrentDirectory
             withSystemTempDirectory "Stack_BuildPlanSpec" $ \tempDir -> do
                 let enterDir = setCurrentDirectory tempDir
                 let exitDir = setCurrentDirectory currentDirectory
                 bracket_ enterDir exitDir action
-    it "finds missing transitive dependencies #159" $ \T{..} -> inTempDir $ do
+    it "finds missing transitive dependencies #159" $ inTempDir $ do
         -- Note: this test is somewhat fragile, depending on packages on
         -- Hackage remaining in a certain state. If it fails, confirm that
         -- github still depends on failure.
         writeFile "stack.yaml" "resolver: lts-2.9"
-        LoadConfig{..} <- loadConfig' manager
-        bconfig <- loadBuildConfigRest manager (lcLoadBuildConfig Nothing)
-        runStackT manager bconfig logLevel True False ColorAuto False $ do
+        LoadConfig{..} <- loadConfig'
+        bconfig <- loadBuildConfigRest (lcLoadBuildConfig Nothing)
+        runStackT bconfig logLevel True False ColorAuto False $ do
             mbp <- loadMiniBuildPlan $ LTS 2 9
             eres <- try $ resolveBuildPlan
                 mbp

@@ -12,7 +12,6 @@ module Stack.Upload
     , UploadSettings
     , defaultUploadSettings
     , setUploadUrl
-    , setGetManager
     , setCredsSource
     , setSaveCreds
       -- * Credentials
@@ -31,7 +30,7 @@ module Stack.Upload
 import           Control.Applicative
 import           Control.Exception                     (bracket)
 import qualified Control.Exception                     as E
-import           Control.Monad                         (when, unless)
+import           Control.Monad                         (when)
 import           Data.Aeson                            (FromJSON (..),
                                                         ToJSON (..),
                                                         eitherDecode', encode,
@@ -39,25 +38,24 @@ import           Data.Aeson                            (FromJSON (..),
                                                         (.:), (.=))
 import qualified Data.ByteString.Char8                 as S
 import qualified Data.ByteString.Lazy                  as L
+import           Data.Conduit                          (ConduitM, runConduit, (.|))
+import qualified Data.Conduit.Binary                   as CB
 import           Data.Text                             (Text)
 import qualified Data.Text                             as T
 import           Data.Text.Encoding                    (encodeUtf8)
 import qualified Data.Text.IO                          as TIO
 import           Data.Typeable                         (Typeable)
-import           Network.HTTP.Client                   (BodyReader, Manager,
-                                                        Response,
-                                                        RequestBody(RequestBodyLBS),
-                                                        brRead,
-                                                        parseRequest,
-                                                        requestHeaders,
-                                                        responseBody,
-                                                        responseStatus,
-                                                        withResponse)
+import           Network.HTTP.Client                   (Response,
+                                                        RequestBody(RequestBodyLBS))
+import           Network.HTTP.Simple                   (withResponse,
+                                                        getResponseStatusCode,
+                                                        getResponseBody,
+                                                        setRequestHeader,
+                                                        parseRequest)
 import           Network.HTTP.Client.MultipartFormData (formDataBody, partFileRequestBody)
 import           Network.HTTP.Client.TLS               (getGlobalManager,
                                                         applyDigestAuth,
                                                         displayDigestAuthException)
-import           Network.HTTP.Types                    (statusCode)
 import           Path                                  (toFilePath)
 import           Prelude -- Fix redundant import warnings
 import           Stack.Types.Config
@@ -193,17 +191,15 @@ nopUploader _ _ = return (Uploader nop)
 -- Since 0.1.0.0
 mkUploader :: Config -> UploadSettings -> IO Uploader
 mkUploader config us = do
-    manager <- usGetManager us
     (creds, fromFile') <- loadCreds $ usCredsSource us config
     when (not fromFile' && usSaveCreds us) $ saveCreds config creds
     req0 <- parseRequest $ usUploadUrl us
-    let req1 = req0
-            { requestHeaders = [("Accept", "text/plain")]
-            }
+    let req1 = setRequestHeader "Accept" ["text/plain"] req0
     return Uploader
         { upload_ = \tarName bytes -> do
             let formData = [partFileRequestBody "package" tarName (RequestBodyLBS bytes)]
             req2 <- formDataBody formData req1
+            manager <- getGlobalManager
             ereq3 <- applyDigestAuth
                     (encodeUtf8 $ hcUsername creds)
                     (encodeUtf8 $ hcPassword creds)
@@ -220,8 +216,8 @@ mkUploader config us = do
                     Right req3 -> return req3
             putStr $ "Uploading " ++ tarName ++ "... "
             hFlush stdout
-            withResponse req3 manager $ \res ->
-                case statusCode $ responseStatus res of
+            withResponse req3 $ \res ->
+                case getResponseStatusCode res of
                     200 -> putStrLn "done!"
                     401 -> do
                         putStrLn "authentication failure"
@@ -244,15 +240,8 @@ mkUploader config us = do
                         error $ "Upload failed on " ++ tarName
         }
 
-printBody :: Response BodyReader -> IO ()
-printBody res =
-    loop
-  where
-    loop = do
-        bs <- brRead $ responseBody res
-        unless (S.null bs) $ do
-            S.hPut stdout bs
-            loop
+printBody :: Response (ConduitM () S.ByteString IO ()) -> IO ()
+printBody res = runConduit $ getResponseBody res .| CB.sinkHandle stdout
 
 -- | The computed value from a @UploadSettings@.
 --
@@ -281,7 +270,6 @@ uploadBytes = upload_
 -- Since 0.1.0.0
 data UploadSettings = UploadSettings
     { usUploadUrl   :: !String
-    , usGetManager  :: !(IO Manager)
     , usCredsSource :: !(Config -> HackageCredsSource)
     , usSaveCreds   :: !Bool
     }
@@ -294,7 +282,6 @@ data UploadSettings = UploadSettings
 defaultUploadSettings :: UploadSettings
 defaultUploadSettings = UploadSettings
     { usUploadUrl = "https://hackage.haskell.org/packages/"
-    , usGetManager = getGlobalManager
     , usCredsSource = fromAnywhere
     , usSaveCreds = True
     }
@@ -306,14 +293,6 @@ defaultUploadSettings = UploadSettings
 -- Since 0.1.0.0
 setUploadUrl :: String -> UploadSettings -> UploadSettings
 setUploadUrl x us = us { usUploadUrl = x }
-
--- | How to get an HTTP connection manager.
---
--- Default: @getGlobalManager@
---
--- Since 0.1.0.0
-setGetManager :: IO Manager -> UploadSettings -> UploadSettings
-setGetManager x us = us { usGetManager = x }
 
 -- | How to get the Hackage credentials.
 --

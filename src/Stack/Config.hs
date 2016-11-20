@@ -69,8 +69,9 @@ import           Distribution.System (OS (..), Platform (..), buildPlatform)
 import qualified Distribution.Text
 import           Distribution.Version (simplifyVersionRange)
 import           GHC.Conc (getNumProcessors)
-import           Network.HTTP.Client.Conduit (HasHttpManager, getHttpManager, Manager, parseUrlThrow)
-import           Network.HTTP.Download (download, downloadJSON)
+import           Network.HTTP.Client (parseUrlThrow)
+import           Network.HTTP.Download (download)
+import           Network.HTTP.Simple (httpJSON, getResponseBody)
 import           Options.Applicative (Parser, strOption, long, help)
 import           Path
 import           Path.Extra (toFilePathNoTrailingSep)
@@ -165,9 +166,9 @@ getSnapshots = do
     latestUrlText <- askLatestSnapshotUrl
     latestUrl <- parseUrlThrow (T.unpack latestUrlText)
     $logDebug $ "Downloading snapshot versions file from " <> latestUrlText
-    result <- downloadJSON latestUrl
+    result <- httpJSON latestUrl
     $logDebug $ "Done downloading and parsing snapshot versions file"
-    return result
+    return $ getResponseBody result
 
 -- | Turn an 'AbstractResolver' into a 'Resolver'.
 makeConcreteResolver
@@ -366,23 +367,21 @@ getWindowsProgsDir stackRoot m =
         Nothing -> return $ stackRoot </> $(mkRelDir "Programs")
 
 -- | An environment with a subset of BuildConfig used for setup.
-data MiniConfig = MiniConfig Manager GHCVariant Config
+data MiniConfig = MiniConfig GHCVariant Config
 instance HasConfig MiniConfig where
-    getConfig (MiniConfig _ _ c) = c
+    getConfig (MiniConfig _ c) = c
 instance HasStackRoot MiniConfig
-instance HasHttpManager MiniConfig where
-    getHttpManager (MiniConfig man _ _) = man
 instance HasPlatform MiniConfig
 instance HasGHCVariant MiniConfig where
-    getGHCVariant (MiniConfig _ v _) = v
+    getGHCVariant (MiniConfig v _) = v
 
 -- | Load the 'MiniConfig'.
 loadMiniConfig
     :: MonadIO m
-    => Manager -> Config -> m MiniConfig
-loadMiniConfig manager config = do
+    => Config -> m MiniConfig
+loadMiniConfig config = do
     let ghcVariant = fromMaybe GHCStandard (configGHCVariant0 config)
-    return (MiniConfig manager ghcVariant config)
+    return (MiniConfig ghcVariant config)
 
 -- Load the configuration, using environment variables, and defaults as
 -- necessary.
@@ -450,8 +449,7 @@ loadBuildConfig :: StackM env m
                 -> m BuildConfig
 loadBuildConfig mproject config mresolver mcompiler = do
     env <- ask
-    manager <- getHttpManager <$> ask
-    miniConfig <- loadMiniConfig manager config
+    miniConfig <- loadMiniConfig config
 
     (project', stackYamlFP) <- case mproject of
       Just (project, fp, _) -> do
