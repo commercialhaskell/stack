@@ -29,11 +29,10 @@ import qualified Data.ByteString.Lazy as BS
 import qualified Data.ByteString.Lazy as L
 import           Data.Monoid ((<>))
 import qualified Data.Text as T
-import           Network.HTTP.Conduit (Response(..), RequestBody(..),
-                                       Request(..), httpLbs)
-import           Network.HTTP.Client (Manager)
+import           Network.HTTP.Client (RequestBody (RequestBodyBS))
 import           Network.HTTP.Download
-import           Network.HTTP.Types (status200, methodPut)
+import           Network.HTTP.Simple
+import           Network.HTTP.Types (methodPut)
 import           Path
 import           Path.IO
 import           Stack.Package
@@ -50,8 +49,8 @@ sign
 #else
     :: (MonadIO m, MonadLogger m, MonadMask m)
 #endif
-    => Manager -> String -> Path Abs File -> m Signature
-sign manager url filePath =
+    => String -> Path Abs File -> m Signature
+sign url filePath =
     withSystemTempDir
         "stack"
         (\tempDir ->
@@ -65,7 +64,7 @@ sign manager url filePath =
                      Nothing -> throwM SigInvalidSDistTarBall
                      Just cabalPath -> do
                          pkg <- cabalFilePackageId (tempDir </> cabalPath)
-                         signPackage manager url pkg filePath)
+                         signPackage url pkg filePath)
   where
     extractCabalFile tempDir (Tar.Next entry entries) =
         case Tar.entryContent entry of
@@ -95,21 +94,21 @@ signTarBytes
 #else
     :: (MonadIO m, MonadLogger m, MonadMask m)
 #endif
-    => Manager -> String -> Path Rel File -> L.ByteString -> m Signature
-signTarBytes manager url tarPath bs =
+    => String -> Path Rel File -> L.ByteString -> m Signature
+signTarBytes url tarPath bs =
     withSystemTempDir
         "stack"
         (\tempDir ->
               do let tempTarBall = tempDir </> tarPath
                  liftIO (L.writeFile (toFilePath tempTarBall) bs)
-                 sign manager url tempTarBall)
+                 sign url tempTarBall)
 
 -- | Sign a haskell package given the url to the signature service, a
 -- @PackageIdentifier@ and a file path to the package on disk.
 signPackage
     :: (MonadIO m, MonadLogger m, MonadThrow m)
-    => Manager -> String -> PackageIdentifier -> Path Abs File -> m Signature
-signPackage manager url pkg filePath = do
+    => String -> PackageIdentifier -> Path Abs File -> m Signature
+signPackage url pkg filePath = do
     sig@(Signature signature) <- gpgSign filePath
     let (PackageIdentifier name version) = pkg
     fingerprint <- gpgVerify sig filePath
@@ -118,14 +117,11 @@ signPackage manager url pkg filePath = do
             "/" <>
             show fingerprint
     req <- parseUrlThrow fullUrl
-    let put =
-            req
-            { method = methodPut
-            , requestBody = RequestBodyBS signature
-            }
-    res <- liftIO (httpLbs put manager)
+    let put = setRequestMethod methodPut
+            $ setRequestBody (RequestBodyBS signature) req
+    res <- liftIO (httpLbs put)
     when
-        (responseStatus res /= status200)
+        (getResponseStatusCode res /= 200)
         (throwM (GPGSignException "unable to sign & upload package"))
     $logInfo ("Signature uploaded to " <> T.pack fullUrl)
     return sig

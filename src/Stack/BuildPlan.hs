@@ -40,7 +40,7 @@ import           Control.Monad (liftM, forM, unless)
 import           Control.Monad.Catch
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
-import           Control.Monad.Reader (asks)
+import           Control.Monad.Reader (MonadReader, asks)
 import           Control.Monad.State.Strict      (State, execState, get, modify,
                                                   put)
 import qualified Crypto.Hash.SHA256 as SHA256
@@ -490,8 +490,7 @@ buildPlanFixes mbp = mbp
 -- if available, otherwise downloading from Github.
 loadBuildPlan :: (StackMiniM env m, HasConfig env) => SnapName -> m BuildPlan
 loadBuildPlan name = do
-    env <- ask
-    let stackage = getStackRoot env
+    stackage <- asks getStackRoot
     file' <- parseRelFile $ T.unpack file
     let fp = buildPlanDir stackage </> file'
     $logDebug $ "Decoding build plan from: " <> T.pack (toFilePath fp)

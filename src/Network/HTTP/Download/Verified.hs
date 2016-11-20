@@ -33,7 +33,6 @@ import              Control.Monad
 import              Control.Monad.Catch
 import              Control.Monad.IO.Class
 import              Control.Monad.Logger (logDebug, MonadLogger)
-import              Control.Monad.Reader
 import              Control.Retry (recovering,limitRetries,RetryPolicy,constantDelay)
 import "cryptohash" Crypto.Hash
 import              Crypto.Hash.Conduit (sinkHash)
@@ -49,7 +48,8 @@ import              Data.Text.Encoding (decodeUtf8With)
 import              Data.Text.Encoding.Error (lenientDecode)
 import              Data.Typeable (Typeable)
 import              GHC.IO.Exception (IOException(..),IOErrorType(..))
-import              Network.HTTP.Client.Conduit
+import              Network.HTTP.Client (getUri, path)
+import              Network.HTTP.Simple (Request, HttpException, httpSink, getResponseHeaders)
 import              Network.HTTP.Types.Header (hContentLength, hContentMD5)
 import              Path
 import              Prelude -- Fix AMP warning
@@ -221,22 +221,20 @@ recoveringHttp retryPolicy =
 -- Throws VerifiedDownloadException.
 -- Throws IOExceptions related to file system operations.
 -- Throws HttpException.
-verifiedDownload :: (MonadReader env m, HasHttpManager env, MonadIO m, MonadLogger m)
+verifiedDownload :: (MonadIO m, MonadLogger m)
          => DownloadRequest
          -> Path Abs File -- ^ destination
-         -> (Maybe Integer -> Sink ByteString (ReaderT env IO) ()) -- ^ custom hook to observe progress
+         -> (Maybe Integer -> Sink ByteString IO ()) -- ^ custom hook to observe progress
          -> m Bool -- ^ Whether a download was performed
 verifiedDownload DownloadRequest{..} destpath progressSink = do
     let req = drRequest
-    env <- ask
     whenM' (liftIO getShouldDownload) $ do
         $logDebug $ "Downloading " <> decodeUtf8With lenientDecode (path req)
         liftIO $ do
             createDirectoryIfMissing True dir
             recoveringHttp drRetryPolicy $
                 withBinaryFile fptmp WriteMode $ \h ->
-                    flip runReaderT env $
-                        withResponse req (go h)
+                    httpSink req (go h)
             renameFile fptmp fp
   where
     whenM' mp m = do
@@ -284,7 +282,7 @@ verifiedDownload DownloadRequest{..} destpath progressSink = do
             _ -> return ()
 
     go h res = do
-        let headers = responseHeaders res
+        let headers = getResponseHeaders res
             mcontentLength = do
               hLength <- List.lookup hContentLength headers
               (i,_) <- readInteger hLength
@@ -300,9 +298,8 @@ verifiedDownload DownloadRequest{..} destpath progressSink = do
                 Nothing -> []
                 ) ++ drHashChecks
 
-        responseBody res
-            $= maybe (awaitForever yield) CB.isolate drLengthCheck
-            $$ getZipSink
+        maybe id (\len -> (CB.isolate len =$=)) drLengthCheck
+            $ getZipSink
                 ( hashChecksToZipSink drRequest hashChecks
                   *> maybe (pure ()) (assertLengthSink drRequest) drLengthCheck
                   *> ZipSink (sinkHandle h)

@@ -6,8 +6,6 @@ module Stack.NixSpec where
 import Control.Exception
 import Control.Monad.Logger
 import Data.Monoid
-import Network.HTTP.Conduit (Manager)
-import Network.HTTP.Client.TLS (getGlobalManager)
 import Path
 import Prelude -- to remove the warning about Data.Monoid being redundant on GHC 7.10
 import Stack.Config
@@ -34,22 +32,12 @@ sampleConfig =
 stackDotYaml :: Path Rel File
 stackDotYaml = $(mkRelFile "stack.yaml")
 
-data T = T
-  { manager :: Manager
-  }
-
-setup :: IO T
-setup = do
-  manager <- getGlobalManager
-  unsetEnv "STACK_YAML"
-  return T{..}
-
-teardown :: T -> IO ()
-teardown _ = return ()
+setup :: IO ()
+setup = unsetEnv "STACK_YAML"
 
 spec :: Spec
-spec = beforeAll setup $ afterAll teardown $ do
-  let loadConfig' m = runStackT m () LevelDebug True False ColorAuto False (loadConfig mempty Nothing Nothing)
+spec = beforeAll setup $ do
+  let loadConfig' = runStackT () LevelDebug True False ColorAuto False (loadConfig mempty Nothing Nothing)
       inTempDir action = do
         currentDirectory <- getCurrentDirectory
         withSystemTempDirectory "Stack_ConfigSpec" $ \tempDir -> do
@@ -57,14 +45,14 @@ spec = beforeAll setup $ afterAll teardown $ do
               exitDir = setCurrentDirectory currentDirectory
           bracket_ enterDir exitDir action
   describe "nix" $ do
-    it "sees that the nix shell is enabled" $ \T{..} -> inTempDir $ do
+    it "sees that the nix shell is enabled" $ inTempDir $ do
       writeFile (toFilePath stackDotYaml) sampleConfig
-      lc <- loadConfig' manager
+      lc <- loadConfig'
       nixEnable (configNix $ lcConfig lc) `shouldBe` True
     it "sees that the only package asked for is glpk and asks for the correct GHC derivation" $
-      \T{..} -> inTempDir $ do
+      inTempDir $ do
         writeFile (toFilePath stackDotYaml) sampleConfig
-        lc <- loadConfig' manager
+        lc <- loadConfig'
         nixPackages (configNix $ lcConfig lc) `shouldBe` ["glpk"]
         v <- parseVersion "7.10.3"
         nixCompiler (GhcVersion v) `shouldBe` "haskell.compiler.ghc7103"

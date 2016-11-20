@@ -1,4 +1,4 @@
-resolver: lts-6.14
+resolver: lts-6.25
 # docker:
 #   enable: true
 #   repo: fpco/stack-full
@@ -18,7 +18,7 @@ extra-deps:
 - th-orphans-0.13.1
 - http-client-0.5.3.3
 - http-client-tls-0.3.3
-- http-conduit-2.2.0
+- http-conduit-2.2.3
 - optparse-applicative-0.13.0.0
 - text-metrics-0.1.0
 - pid1-0.1.0.0

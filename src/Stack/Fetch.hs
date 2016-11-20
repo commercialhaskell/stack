@@ -39,7 +39,7 @@ import              Control.Monad (join, liftM, unless, void, when)
 import              Control.Monad.Catch
 import              Control.Monad.IO.Class
 import              Control.Monad.Logger
-import              Control.Monad.Reader (asks, runReaderT)
+import              Control.Monad.Reader (ask, asks, runReaderT)
 import              Control.Monad.Trans.Control
 import              Control.Monad.Trans.Unlift (MonadBaseUnlift, askRunBase)
 import "cryptohash" Crypto.Hash (SHA512 (..))
@@ -479,7 +479,7 @@ fetchPackages' mdistDir toFetchAll = do
 
     liftIO $ readTVarIO outputVar
   where
-    go :: (MonadIO m,MonadThrow m,MonadLogger m,MonadReader env m,HasHttpManager env)
+    go :: (MonadIO m,MonadThrow m,MonadLogger m)
        => TVar (Map PackageIdentifier (Path Abs Dir))
        -> (m () -> IO ())
        -> (PackageIdentifier, ToFetch)

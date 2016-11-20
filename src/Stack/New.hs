@@ -27,7 +27,6 @@ import           Control.Monad.Trans.Writer.Strict
 import           Data.Aeson
 import           Data.Aeson.Types
 import qualified Data.ByteString.Lazy as LB
-import qualified Data.ByteString.Lazy.Char8 as L8
 import           Data.Conduit
 import           Data.Foldable (asum)
 import qualified Data.HashMap.Strict as HM
@@ -48,9 +47,8 @@ import           Data.Time.Calendar
 import           Data.Time.Clock
 import           Data.Typeable
 import qualified Data.Yaml as Yaml
-import           Network.HTTP.Client.Conduit hiding (path)
 import           Network.HTTP.Download
-import           Network.HTTP.Types.Status
+import           Network.HTTP.Simple
 import           Path
 import           Path.IO
 import           Prelude
@@ -138,8 +136,8 @@ loadTemplate name logIt = do
     case templatePath name of
         AbsPath absFile -> logIt LocalTemp >> loadLocalFile absFile
         UrlPath s -> do
-            let req = parseRequest_ s
-                rel = fromMaybe backupUrlRelPath (parseRelFile s)
+            req <- parseRequest s
+            let rel = fromMaybe backupUrlRelPath (parseRelFile s)
             downloadTemplate req (templateDir </> rel)
         RelPath relFile ->
             catch
@@ -294,13 +292,9 @@ listTemplates = do
 getTemplates :: StackM env m => m (Set TemplateName)
 getTemplates = do
     req <- liftM addHeaders (parseUrlThrow defaultTemplatesList)
-    resp <- catch (httpLbs req) (throwM . FailedToDownloadTemplates)
-    case statusCode (responseStatus resp) of
-        200 ->
-            case eitherDecode (responseBody resp) >>=
-                 parseEither parseTemplateSet of
-                Left err -> throwM (BadTemplatesJSON err (responseBody resp))
-                Right value -> return value
+    resp <- catch (httpJSON req) (throwM . FailedToDownloadTemplates)
+    case getResponseStatusCode resp of
+        200 -> return $ unTemplateSet $ getResponseBody resp
         code -> throwM (BadTemplatesResponse code)
 
 getTemplateInfo :: StackM env m => m (Map Text TemplateInfo)
@@ -312,24 +306,24 @@ getTemplateInfo = do
       liftIO . putStrLn $ err
       return M.empty
     Right resp' ->
-      case Yaml.decodeEither (LB.toStrict $ responseBody resp') :: Either String Object of
+      case Yaml.decodeEither (LB.toStrict $ getResponseBody resp') :: Either String Object of
         Left err ->
           throwM $ BadTemplateInfo err
         Right o ->
           return (M.mapMaybe (Yaml.parseMaybe Yaml.parseJSON) (M.fromList . HM.toList $ o) :: Map Text TemplateInfo)
   where
     is200 resp =
-      if statusCode (responseStatus resp) == 200
-        then return resp
-        else Left $ "Unexpected status code while retrieving templates info: " <> show (statusCode $ responseStatus resp)
+      case getResponseStatusCode resp of
+        200 -> return resp
+        code -> Left $ "Unexpected status code while retrieving templates info: " <> show code
 
 addHeaders :: Request -> Request
-addHeaders req =
-  req
-    { requestHeaders = [ ("User-Agent", "The Haskell Stack")
-                       , ("Accept", "application/vnd.github.v3+json")] <>
-      requestHeaders req
-    }
+addHeaders = setRequestHeader "User-Agent" ["The Haskell Stack"]
+           . setRequestHeader "Accept" ["application/vnd.github.v3+json"]
+
+newtype TemplateSet = TemplateSet { unTemplateSet :: Set TemplateName }
+instance FromJSON TemplateSet where
+  parseJSON = fmap TemplateSet . parseTemplateSet
 
 -- | Parser the set of templates from the JSON.
 parseTemplateSet :: Value -> Parser (Set TemplateName)
@@ -380,7 +374,6 @@ data NewException
                                !DownloadException
     | FailedToDownloadTemplates !HttpException
     | BadTemplatesResponse !Int
-    | BadTemplatesJSON !String !LB.ByteString
     | AlreadyExists !(Path Abs Dir)
     | MissingParameters !PackageName !TemplateName !(Set String) !(Path Abs File)
     | InvalidTemplate !TemplateName !String
@@ -398,25 +391,19 @@ instance Show NewException where
         " from " <>
         path
     show (FailedToDownloadTemplate name (RedownloadFailed _ _ resp)) =
-        case statusCode (responseStatus resp) of
+        case getResponseStatusCode resp of
             404 ->
                 "That template doesn't exist. Run `stack templates' to see a list of available templates."
             code ->
                 "Failed to download template " <> T.unpack (templateName name) <>
                 ": unknown reason, status code was: " <>
                 show code
-    show (FailedToDownloadTemplate name _) =
-        "Failed to download template " <> T.unpack (templateName name) <>
-        ", reason unknown."
     show (AlreadyExists path) =
         "Directory " <> toFilePath path <> " already exists. Aborting."
     show (FailedToDownloadTemplates ex) =
         "Failed to download templates. The HTTP error was: " <> show ex
     show (BadTemplatesResponse code) =
         "Unexpected status code while retrieving templates list: " <> show code
-    show (BadTemplatesJSON err bytes) =
-        "Github returned some JSON that couldn't be parsed: " <> err <> "\n\n" <>
-        L8.unpack bytes
     show (MissingParameters name template missingKeys userConfigPath) =
         intercalate
             "\n"

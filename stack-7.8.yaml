@@ -21,7 +21,7 @@ extra-deps:
 - filelock-0.1.0.1
 - gitrev-1.2.0
 - http-client-0.5.3.3
-- http-conduit-2.2.0
+- http-conduit-2.2.3
 - ignore-0.1.1.0
 - binary-tagged-0.1.3.1
 - fsnotify-0.2.1
@@ -76,6 +76,9 @@ extra-deps:
 - text-metrics-0.1.0
 - pid1-0.1.0.0
 - file-embed-0.0.10
+- conduit-1.2.8
+- conduit-extra-1.1.15
+- streaming-commons-0.1.16
 flags:
   time-locale-compat:
     old-locale: false

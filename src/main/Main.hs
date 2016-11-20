@@ -569,16 +569,16 @@ pathCmd keys go = withBuildConfig go (Stack.Path.path keys)
 
 setupCmd :: SetupCmdOpts -> GlobalOpts -> IO ()
 setupCmd sco@SetupCmdOpts{..} go@GlobalOpts{..} = do
-  (manager,lc) <- loadConfigWithOpts go
+  lc <- loadConfigWithOpts go
   withUserFileLock go (configStackRoot $ lcConfig lc) $ \lk -> do
-    let getCompilerVersion = loadCompilerVersion manager go lc
-    runStackTGlobal manager (lcConfig lc) go $
+    let getCompilerVersion = loadCompilerVersion go lc
+    runStackTGlobal (lcConfig lc) go $
       Docker.reexecWithOptionalContainer
           (lcProjectRoot lc)
           Nothing
-          (runStackTGlobal manager (lcConfig lc) go $
+          (runStackTGlobal (lcConfig lc) go $
            Nix.reexecWithOptionalShell (lcProjectRoot lc) getCompilerVersion $
-           runStackTGlobal manager () go $ do
+           runStackTGlobal () go $ do
               (wantedCompiler, compilerCheck, mstack) <-
                   case scoCompilerVersion of
                       Just v -> return (v, MatchMinor, Nothing)
@@ -588,8 +588,8 @@ setupCmd sco@SetupCmdOpts{..} go@GlobalOpts{..} = do
                                  , configCompilerCheck (lcConfig lc)
                                  , Just $ bcStackYaml bc
                                  )
-              miniConfig <- loadMiniConfig manager (lcConfig lc)
-              runStackTGlobal manager miniConfig go $
+              miniConfig <- loadMiniConfig (lcConfig lc)
+              runStackTGlobal miniConfig go $
                   setup sco wantedCompiler compilerCheck mstack
               )
           Nothing
@@ -666,13 +666,9 @@ uploadCmd (args, mpvpBounds, ignoreCheck, don'tSign, sigServerUrl) go = do
     let getUploader :: (HasConfig config) => StackT config IO Upload.Uploader
         getUploader = do
             config <- asks getConfig
-            manager <- asks envManager
-            let uploadSettings =
-                    Upload.setGetManager (return manager) Upload.defaultUploadSettings
-            liftIO $ Upload.mkUploader config uploadSettings
+            liftIO $ Upload.mkUploader config Upload.defaultUploadSettings
     withBuildConfigAndLock go $ \_ -> do
         uploader <- getUploader
-        manager <- asks envManager
         unless ignoreCheck $
             mapM_ (resolveFile' >=> checkSDistTarball) files
         forM_
@@ -685,7 +681,6 @@ uploadCmd (args, mpvpBounds, ignoreCheck, don'tSign, sigServerUrl) go = do
                          don'tSign
                          (void $
                           Sig.sign
-                              manager
                               sigServerUrl
                               tarFile))
         unless (null dirs) $
@@ -699,7 +694,6 @@ uploadCmd (args, mpvpBounds, ignoreCheck, don'tSign, sigServerUrl) go = do
                     don'tSign
                     (void $
                      Sig.signTarBytes
-                         manager
                          sigServerUrl
                          tarPath
                          tarBytes)
@@ -711,7 +705,6 @@ sdistCmd (dirs, mpvpBounds, ignoreCheck, sign, sigServerUrl) go =
         dirs' <- if null dirs
             then asks (Map.keys . envConfigPackages . getEnvConfig)
             else mapM resolveDir' dirs
-        manager <- asks envManager
         forM_ dirs' $ \dir -> do
             (tarName, tarBytes) <- getSDistTarball mpvpBounds dir
             distDir <- distDirFromDir dir
@@ -720,7 +713,7 @@ sdistCmd (dirs, mpvpBounds, ignoreCheck, sign, sigServerUrl) go =
             liftIO $ L.writeFile (toFilePath tarPath) tarBytes
             unless ignoreCheck (checkSDistTarball tarPath)
             $logInfo $ "Wrote sdist tarball to " <> T.pack (toFilePath tarPath)
-            when sign (void $ Sig.sign manager sigServerUrl tarPath)
+            when sign (void $ Sig.sign sigServerUrl tarPath)
 
 -- | Execute a command.
 execCmd :: ExecOpts -> GlobalOpts -> IO ()
@@ -731,21 +724,21 @@ execCmd ExecOpts {..} go@GlobalOpts{..} =
                  (ExecCmd cmd, args) -> return (cmd, args)
                  (ExecGhc, args) -> return ("ghc", args)
                  (ExecRunGhc, args) -> return ("runghc", args)
-            (manager,lc) <- liftIO $ loadConfigWithOpts go
+            lc <- liftIO $ loadConfigWithOpts go
             withUserFileLock go (configStackRoot $ lcConfig lc) $ \lk -> do
-              let getCompilerVersion = loadCompilerVersion manager go lc
-              runStackTGlobal manager (lcConfig lc) go $
+              let getCompilerVersion = loadCompilerVersion go lc
+              runStackTGlobal (lcConfig lc) go $
                 Docker.reexecWithOptionalContainer
                     (lcProjectRoot lc)
                     -- Unlock before transferring control away, whether using docker or not:
                     (Just $ munlockFile lk)
-                    (runStackTGlobal manager (lcConfig lc) go $ do
+                    (runStackTGlobal (lcConfig lc) go $ do
                         config <- asks getConfig
                         menv <- liftIO $ configEnvOverride config plainEnvSettings
                         Nix.reexecWithOptionalShell
                             (lcProjectRoot lc)
                             getCompilerVersion
-                            (runStackTGlobal manager (lcConfig lc) go $
+                            (runStackTGlobal (lcConfig lc) go $
                                 exec menv cmd args))
                     Nothing
                     Nothing -- Unlocked already above.
@@ -823,28 +816,28 @@ ideTargetsCmd () go =
 -- | Pull the current Docker image.
 dockerPullCmd :: () -> GlobalOpts -> IO ()
 dockerPullCmd _ go@GlobalOpts{..} = do
-    (manager,lc) <- liftIO $ loadConfigWithOpts go
+    lc <- liftIO $ loadConfigWithOpts go
     -- TODO: can we eliminate this lock if it doesn't touch ~/.stack/?
     withUserFileLock go (configStackRoot $ lcConfig lc) $ \_ ->
-     runStackTGlobal manager (lcConfig lc) go $
+     runStackTGlobal (lcConfig lc) go $
        Docker.preventInContainer Docker.pull
 
 -- | Reset the Docker sandbox.
 dockerResetCmd :: Bool -> GlobalOpts -> IO ()
 dockerResetCmd keepHome go@GlobalOpts{..} = do
-    (manager,lc) <- liftIO (loadConfigWithOpts go)
+    lc <- liftIO (loadConfigWithOpts go)
     -- TODO: can we eliminate this lock if it doesn't touch ~/.stack/?
     withUserFileLock go (configStackRoot $ lcConfig lc) $ \_ ->
-      runStackTGlobal manager (lcConfig lc) go $
+      runStackTGlobal (lcConfig lc) go $
         Docker.preventInContainer $ Docker.reset (lcProjectRoot lc) keepHome
 
 -- | Cleanup Docker images and containers.
 dockerCleanupCmd :: Docker.CleanupOpts -> GlobalOpts -> IO ()
 dockerCleanupCmd cleanupOpts go@GlobalOpts{..} = do
-    (manager,lc) <- liftIO $ loadConfigWithOpts go
+    lc <- liftIO $ loadConfigWithOpts go
     -- TODO: can we eliminate this lock if it doesn't touch ~/.stack/?
     withUserFileLock go (configStackRoot $ lcConfig lc) $ \_ ->
-     runStackTGlobal manager (lcConfig lc) go $
+     runStackTGlobal (lcConfig lc) go $
         Docker.preventInContainer $
             Docker.cleanup cleanupOpts
 
@@ -859,7 +852,7 @@ cfgSetCmd co go@GlobalOpts{..} =
 
 imgDockerCmd :: (Bool, [Text]) -> GlobalOpts -> IO ()
 imgDockerCmd (rebuild,images) go@GlobalOpts{..} = do
-    mProjectRoot <- lcProjectRoot . snd <$> loadConfigWithOpts go
+    mProjectRoot <- lcProjectRoot <$> loadConfigWithOpts go
     withBuildConfigExt
         go
         Nothing
