@@ -68,7 +68,6 @@ library
                      Data.Monoid.Extra
                      Data.Store.VersionTagged
                      Data.Text.Extra
-                     Data.Yaml.Extra
                      Distribution.Version.Extra
                      Network.HTTP.Download
                      Network.HTTP.Download.Verified
@@ -257,7 +256,7 @@ library
                    , unordered-containers >= 0.2.5.1
                    , vector >= 0.10.12.3 && < 0.12
                    , vector-binary-instances
-                   , yaml >= 0.8.10.1
+                   , yaml >= 0.8.20
                    , zlib >= 0.5.4.2 && < 0.7
                    , deepseq >= 1.4
                    , hastache
