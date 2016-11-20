@@ -199,7 +199,6 @@ library
                    , cryptohash-conduit
                    , directory >= 1.2.1.0
                    , either
-                   , enclosed-exceptions
                    , errors < 2.2
                    , exceptions >= 0.8.0.2
                    , extra < 1.6
@@ -238,6 +237,7 @@ library
                    , resourcet >= 1.1.4.1
                    , retry >= 0.6 && < 0.8
                    , safe >= 0.3
+                   , safe-exceptions
                    , semigroups >= 0.5 && < 0.19
                    , split
                    , stm >= 2.4.4

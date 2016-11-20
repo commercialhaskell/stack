@@ -34,7 +34,7 @@ import              Control.Concurrent.Async (Concurrently (..))
 import              Control.Concurrent.MVar.Lifted (modifyMVar, newMVar)
 import              Control.Concurrent.STM
 import              Control.Exception (assert)
-import              Control.Exception.Enclosed (tryIO)
+import              Control.Exception.Safe (tryIO)
 import              Control.Monad (join, liftM, unless, void, when)
 import              Control.Monad.Catch
 import              Control.Monad.IO.Class

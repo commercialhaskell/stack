@@ -22,7 +22,7 @@ import           Prelude.Compat
 
 import           Control.Applicative
 import           Control.Exception (assert)
-import           Control.Exception.Enclosed (tryIO)
+import           Control.Exception.Safe (tryIO)
 import           Control.Monad (when,void,join,liftM,unless,mapAndUnzipM, zipWithM_)
 import           Control.Monad.Catch
 import           Control.Monad.IO.Class

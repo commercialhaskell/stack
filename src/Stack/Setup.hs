@@ -24,7 +24,7 @@ module Stack.Setup
 
 import              Control.Applicative
 import              Control.Concurrent.Async.Lifted (Concurrently(..))
-import              Control.Exception.Enclosed (catchIO, tryAny)
+import              Control.Exception.Safe (catchIO, tryAny)
 import              Control.Monad (liftM, when, join, void, unless)
 import              Control.Monad.Catch
 import              Control.Monad.IO.Class (MonadIO, liftIO)

@@ -22,7 +22,7 @@ module Stack.Ghci
 
 import           Control.Applicative
 import           Control.Arrow (second)
-import           Control.Exception.Enclosed (tryAny)
+import           Control.Exception.Safe (tryAny)
 import           Control.Monad hiding (forM)
 import           Control.Monad.Catch
 import           Control.Monad.IO.Class

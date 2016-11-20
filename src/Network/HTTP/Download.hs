@@ -25,7 +25,7 @@ module Network.HTTP.Download
     ) where
 
 import           Control.Exception           (Exception)
-import           Control.Exception.Enclosed  (handleIO)
+import           Control.Exception.Safe      (handleIO)
 import           Control.Monad               (void)
 import           Control.Monad.Catch         (MonadMask, throwM)
 import           Control.Monad.IO.Class      (MonadIO, liftIO)

@@ -23,7 +23,7 @@ import           Control.Arrow ((&&&), second)
 import           Control.Concurrent.Execute
 import           Control.Concurrent.MVar.Lifted
 import           Control.Concurrent.STM
-import           Control.Exception.Enclosed (catchIO)
+import           Control.Exception.Safe (catchIO)
 import           Control.Exception.Lifted
 import           Control.Monad (liftM, when, unless, void)
 import           Control.Monad.Catch (MonadCatch)

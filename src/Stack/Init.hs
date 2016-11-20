@@ -9,7 +9,7 @@ module Stack.Init
     ) where
 
 import           Control.Exception (assert)
-import           Control.Exception.Enclosed (catchAny)
+import           Control.Exception.Safe (catchAny)
 import           Control.Monad
 import           Control.Monad.Catch (throwM)
 import           Control.Monad.IO.Class

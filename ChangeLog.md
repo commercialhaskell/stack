@@ -77,6 +77,8 @@ Other enhancements:
   [#1521](https://github.com/commercialhaskell/stack/issues/1521)
 * No longer warns about missing build-tools if they are on the PATH.
   [#2235](https://github.com/commercialhaskell/stack/issues/2235)
+* Replace enclosed-exceptions with safe-exceptions.
+  [#2768](https://github.com/commercialhaskell/stack/issues/2768)
 
 Bug fixes:
 
