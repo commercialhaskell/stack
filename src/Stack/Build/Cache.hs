@@ -33,7 +33,7 @@ module Stack.Build.Cache
 
 import           Control.Applicative
 import           Control.DeepSeq (NFData)
-import           Control.Exception.Enclosed (handleIO, tryAnyDeep)
+import           Control.Exception.Safe (handleIO, tryAnyDeep)
 import           Control.Monad (liftM)
 import           Control.Monad.Catch (MonadThrow, MonadCatch)
 import           Control.Monad.IO.Class

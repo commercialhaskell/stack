@@ -11,7 +11,7 @@ import Blaze.ByteString.Builder.Char.Utf8 (fromShow)
 import Control.Concurrent.Async (race_)
 import Control.Concurrent.STM
 import Control.Exception (Exception, fromException)
-import Control.Exception.Enclosed (tryAny)
+import Control.Exception.Safe (tryAny)
 import Control.Monad (forever, unless, when)
 import qualified Data.ByteString.Lazy as L
 import qualified Data.Map.Strict as Map

@@ -29,7 +29,7 @@ module Stack.PackageIndex
 
 import qualified Codec.Archive.Tar as Tar
 import           Control.Exception (Exception)
-import           Control.Exception.Enclosed (tryIO)
+import           Control.Exception.Safe (tryIO)
 import           Control.Monad (unless, when, liftM, void)
 import           Control.Monad.Catch (throwM)
 import qualified Control.Monad.Catch as C

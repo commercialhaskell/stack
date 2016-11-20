@@ -17,7 +17,7 @@ module Stack.Coverage
     ) where
 
 import           Control.Applicative
-import           Control.Exception.Enclosed (handleIO)
+import           Control.Exception.Safe (handleIO)
 import           Control.Exception.Lifted
 import           Control.Monad (liftM, when, unless, void, (<=<))
 import           Control.Monad.IO.Class

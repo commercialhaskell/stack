@@ -80,6 +80,7 @@ extra-deps:
 - conduit-1.2.8
 - conduit-extra-1.1.15
 - streaming-commons-0.1.16
+- safe-exceptions-0.1.4.0
 flags:
   time-locale-compat:
     old-locale: false
