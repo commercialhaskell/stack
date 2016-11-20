@@ -23,7 +23,7 @@ import qualified Data.HashMap.Strict as HMap
 import           Data.Monoid
 import           Data.Text (Text)
 import qualified Data.Text as T
-import qualified Data.Yaml.Extra as Yaml
+import qualified Data.Yaml as Yaml
 import qualified Options.Applicative as OA
 import qualified Options.Applicative.Types as OA
 import           Path

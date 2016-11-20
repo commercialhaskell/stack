@@ -54,7 +54,7 @@ import           Data.Text.Extra (stripCR)
 import qualified Data.Text.Lazy as LT
 import           Data.Text.Lazy.Encoding (decodeUtf8With)
 import           Data.Tuple (swap)
-import qualified Data.Yaml.Extra as Yaml
+import qualified Data.Yaml as Yaml
 import qualified Distribution.Package as C
 import qualified Distribution.PackageDescription as C
 import qualified Distribution.Text as C

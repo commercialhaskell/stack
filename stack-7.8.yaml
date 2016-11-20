@@ -76,6 +76,7 @@ extra-deps:
 - text-metrics-0.1.0
 - pid1-0.1.0.0
 - file-embed-0.0.10
+- yaml-0.8.20
 flags:
   time-locale-compat:
     old-locale: false
