@@ -25,6 +25,7 @@ pages:
   - Travis CI: travis_ci.md
   - Custom snapshots: custom_snapshot.md
   - Code Coverage: coverage.md
+  - GHCi: ghci.md
 - Advanced documentation:
   - Architecture: architecture.md
 - Project documentation:
