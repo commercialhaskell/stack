@@ -79,6 +79,9 @@ Other enhancements:
   [#2235](https://github.com/commercialhaskell/stack/issues/2235)
 * Replace enclosed-exceptions with safe-exceptions.
   [#2768](https://github.com/commercialhaskell/stack/issues/2768)
+* `stack build` and related commands now allow the user to disable debug symbol stripping
+  with new `--no-strip`, `--no-library-stripping`, and `--no-executable-shipping` flags, 
+  closing [#877](https://github.com/commercialhaskell/stack/issues/877).
 
 Bug fixes:
 
