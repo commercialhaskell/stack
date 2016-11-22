@@ -26,7 +26,7 @@ modules, you will be asked to select from a list of options.
 There are two ways to speed up the initial startup of ghci:
 
 * `--no-build`, to skip an initial build step.  This only works if the
-  dependnecies have already been built.
+  dependencies have already been built.
 
 * `--no-load`, to skip loading all defined modules into ghci.  You can then
   directly use `:load MyModule` to load a specific module in your project.
