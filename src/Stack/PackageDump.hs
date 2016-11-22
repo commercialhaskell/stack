@@ -276,12 +276,15 @@ hasDebuggingSymbols :: String   -- ^ target compiler
                     -> String   -- ^ name of library
                     -> IO Bool
 hasDebuggingSymbols ver dir lib = case OS.buildOS of
+    OS.OSX     -> liftM (and . fmap ((/= '0') . head) . Prelude.take 30 . lines) $
+        readProcess "dwarfdump" [concat [dir, "/lib", lib, "-ghc", ver, ".a"]] ""
+    OS.Linux   -> liftM ((== "Contents") . head . words . (!! 2) . lines) $
+        readProcess "readelf" ["--debug-dump=info", "--dwarf-depth=1", concat [dir, "/lib", lib, "-ghc", ver, ".a"]] ""
+    OS.FreeBSD -> liftM ((== "Contents") . head . words . (!! 2) . lines) $
+        readProcess "readelf" ["--debug-dump=info", "--dwarf-depth=1", concat [dir, "/lib", lib, "-ghc", ver, ".a"]] ""
     OS.Windows -> return False -- No support, so it can't be there.
     OS.Ghcjs   -> return False
-    OS.OSX -> liftM (and . fmap ((/= '0') . head) . Prelude.take 30 . lines) $
-        readProcess "dwarfdump" [concat [dir, "/lib", lib, "-ghc", ver, ".a"]] ""
-    OS.Linux -> liftM ((== "Contents") . head . words . (!! 2) . lines) $
-        readProcess "readelf" ["--debug-dump=info", "--dwarf-depth=1", concat [dir, "/lib", lib, ".a"]] ""
+    _          -> return False
 
 
 -- | Dump information for a single package
