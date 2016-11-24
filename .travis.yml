@@ -7,7 +7,7 @@
 # sane build environment. In CI, we want to make our life more difficult, so we
 # use cabal without any Stackage snapshots.
 #
-language: c
+language: generic
 sudo: false
 
 cache:
