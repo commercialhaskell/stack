@@ -38,7 +38,7 @@ import           Control.Monad (liftM)
 import           Control.Monad.Catch (MonadThrow, MonadCatch)
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger (MonadLogger, logDebug)
-import           Control.Monad.Reader (MonadReader)
+import           Control.Monad.Reader (MonadReader, runReaderT)
 import           Control.Monad.Trans.Control (MonadBaseControl)
 import qualified Crypto.Hash.SHA256 as SHA256
 import           Data.Binary (Binary (..))
@@ -75,32 +75,48 @@ import           Stack.Types.Version
 import qualified System.FilePath as FilePath
 
 -- | Directory containing files to mark an executable as installed
-exeInstalledDir :: (MonadReader env m, HasEnvConfig env, MonadThrow m)
-                => InstallLocation -> m (Path Abs Dir)
-exeInstalledDir Snap = (</> $(mkRelDir "installed-packages")) `liftM` installationRootDeps
-exeInstalledDir Local = (</> $(mkRelDir "installed-packages")) `liftM` installationRootLocal
+exeInstalledDir :: (MonadReader env m, HasMaybeEnvConfig env, MonadThrow m)
+                => InstallLocation -> m (Maybe (Path Abs Dir))
+exeInstalledDir Snap = (Just . (</> $(mkRelDir "installed-packages"))) `liftM` installationRootDeps
+exeInstalledDir Local = do
+    meconfigl <- view maybeEnvConfigLocalL
+    case meconfigl of
+        Nothing -> return Nothing
+        Just econfigl -> do
+            econfignl <- view envConfigNoLocalL
+            root <- runReaderT
+                installationRootLocal
+                (EnvConfig econfignl econfigl)
+            return $ Just $ root </> $(mkRelDir "installed-packages")
 
 -- | Get all of the installed executables
-getInstalledExes :: (MonadReader env m, HasEnvConfig env, MonadIO m, MonadThrow m)
+getInstalledExes :: (MonadReader env m, HasMaybeEnvConfig env, MonadIO m, MonadThrow m)
                  => InstallLocation -> m [PackageIdentifier]
 getInstalledExes loc = do
-    dir <- exeInstalledDir loc
-    (_, files) <- liftIO $ handleIO (const $ return ([], [])) $ listDir dir
-    return $
-        concat $
-        M.elems $
-        -- If there are multiple install records (from a stack version
-        -- before https://github.com/commercialhaskell/stack/issues/2373
-        -- was fixed), then we don't know which is correct - ignore them.
-        M.fromListWith (\_ _ -> []) $
-        map (\x -> (packageIdentifierName x, [x])) $
-        mapMaybe (parsePackageIdentifierFromString . toFilePath . filename) files
+    mdir <- exeInstalledDir loc
+    case mdir of
+        Nothing -> return []
+        Just dir -> do
+            (_, files) <- liftIO $ handleIO (const $ return ([], [])) $ listDir dir
+            return $
+                concat $
+                M.elems $
+                -- If there are multiple install records (from a stack version
+                -- before https://github.com/commercialhaskell/stack/issues/2373
+                -- was fixed), then we don't know which is correct - ignore them.
+                M.fromListWith (\_ _ -> []) $
+                map (\x -> (packageIdentifierName x, [x])) $
+                mapMaybe (parsePackageIdentifierFromString . toFilePath . filename) files
 
 -- | Mark the given executable as installed
-markExeInstalled :: (MonadReader env m, HasEnvConfig env, MonadIO m, MonadCatch m)
+markExeInstalled :: (MonadReader env m, HasMaybeEnvConfig env, MonadIO m, MonadCatch m)
                  => InstallLocation -> PackageIdentifier -> m ()
 markExeInstalled loc ident = do
-    dir <- exeInstalledDir loc
+    mdir <- exeInstalledDir loc
+    dir <-
+        case mdir of
+            Nothing -> error "markExeInstalled: exeInstalledDir was Nothing"
+            Just dir -> return dir
     ensureDir dir
     ident' <- parseRelFile $ packageIdentifierString ident
     let fp = toFilePath $ dir </> ident'
@@ -115,10 +131,14 @@ markExeInstalled loc ident = do
     liftIO $ writeFile fp "Installed"
 
 -- | Mark the given executable as not installed
-markExeNotInstalled :: (MonadReader env m, HasEnvConfig env, MonadIO m, MonadCatch m)
+markExeNotInstalled :: (MonadReader env m, HasMaybeEnvConfig env, MonadIO m, MonadCatch m)
                     => InstallLocation -> PackageIdentifier -> m ()
 markExeNotInstalled loc ident = do
-    dir <- exeInstalledDir loc
+    mdir <- exeInstalledDir loc
+    dir <-
+        case mdir of
+            Nothing -> error "markExeNotInstalled: exeInstalledDir was Nothing"
+            Just dir -> return dir
     ident' <- parseRelFile $ packageIdentifierString ident
     ignoringAbsence (removeFile $ dir </> ident')
 

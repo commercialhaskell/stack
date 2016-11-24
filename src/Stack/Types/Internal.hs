@@ -40,10 +40,14 @@ instance HasConfig config => HasConfig (Env config) where
     configL = envConfL.configL
 instance HasBuildConfigNoLocal config => HasBuildConfigNoLocal (Env config) where
     buildConfigNoLocalL = envConfL.buildConfigNoLocalL
+instance HasMaybeBuildConfig config => HasMaybeBuildConfig (Env config) where
+    maybeBuildConfigLocalL = envConfL.maybeBuildConfigLocalL
 instance HasBuildConfig config => HasBuildConfig (Env config) where
     buildConfigLocalL = envConfL.buildConfigLocalL
 instance HasEnvConfigNoLocal config => HasEnvConfigNoLocal (Env config) where
     envConfigNoLocalL = envConfL.envConfigNoLocalL
+instance HasMaybeEnvConfig config => HasMaybeEnvConfig (Env config) where
+    maybeEnvConfigLocalL = envConfL.maybeEnvConfigLocalL
 instance HasEnvConfig config => HasEnvConfig (Env config) where
     envConfigL = envConfL.envConfigL
 

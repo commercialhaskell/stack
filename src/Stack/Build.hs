@@ -86,7 +86,7 @@ import qualified Control.Monad.Catch as Catch
 --   If a buildLock is passed there is an important contract here.  That lock must
 --   protect the snapshot, and it must be safe to unlock it if there are no further
 --   modifications to the snapshot to be performed by this build.
-build :: (StackM env m, HasEnvConfig env, MonadBaseUnlift IO m)
+build :: (StackM env m, HasMaybeEnvConfig env, MonadBaseUnlift IO m)
       => (Set (Path Abs File) -> IO ()) -- ^ callback after discovering all local files
       -> Maybe FileLock
       -> BuildOptsCLI
@@ -100,9 +100,9 @@ build setLocalFiles mbuildLk boptsCli = fixCodePage $ do
     (targets, mbp, locals, extraToBuild, extraDeps, sourceMap) <- loadSourceMapFull NeedTargets boptsCli
 
     -- Set local files, necessary for file watching
-    stackYaml <- view stackYamlL
+    mstackYaml <- view $ maybeBuildConfigLocalL.to (fmap bcStackYaml)
     liftIO $ setLocalFiles
-           $ Set.insert stackYaml
+           $ maybe id Set.insert mstackYaml
            $ Set.unions
            $ map lpFiles locals
 
@@ -279,7 +279,7 @@ splitObjsWarning = unwords
      ]
 
 -- | Get the @BaseConfigOpts@ necessary for constructing configure options
-mkBaseConfigOpts :: (MonadIO m, MonadReader env m, HasEnvConfig env, MonadThrow m)
+mkBaseConfigOpts :: (MonadIO m, MonadReader env m, HasMaybeEnvConfig env, MonadThrow m)
                  => BuildOptsCLI -> m BaseConfigOpts
 mkBaseConfigOpts boptsCli = do
     bopts <- view buildOptsL
@@ -304,7 +304,7 @@ withLoadPackage :: (StackM env m, HasEnvConfig env, MonadBaseUnlift IO m)
                 -> ((PackageName -> Version -> Map FlagName Bool -> [Text] -> IO Package) -> m a)
                 -> m a
 withLoadPackage menv inner = do
-    econfig <- view envConfigL
+    econfig <- view envConfigNoLocalL
     withCabalLoader menv $ \cabalLoader ->
         inner $ \name version flags ghcOptions -> do
             bs <- cabalLoader $ PackageIdentifier name version
@@ -316,7 +316,7 @@ withLoadPackage menv inner = do
             return pkg
   where
     -- | Package config to be used for dependencies
-    depPackageConfig :: EnvConfig -> Map FlagName Bool -> [Text] -> PackageConfig
+    depPackageConfig :: EnvConfigNoLocal -> Map FlagName Bool -> [Text] -> PackageConfig
     depPackageConfig econfig flags ghcOptions = PackageConfig
         { packageConfigEnableTests = False
         , packageConfigEnableBenchmarks = False

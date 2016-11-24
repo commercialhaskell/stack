@@ -106,7 +106,7 @@ data StackBuildException
   | UnknownTargets
     (Set PackageName) -- no known version
     (Map PackageName Version) -- not in snapshot, here's the most recent version in the index
-    (Path Abs File) -- stack.yaml
+    (Maybe (Path Abs File)) -- stack.yaml
   | TestSuiteFailure PackageIdentifier (Map Text (Maybe ExitCode)) (Maybe (Path Abs File)) S.ByteString
   | TestSuiteTypeUnsupported TestSuiteInterface
   | ConstructPlanFailed String
@@ -177,7 +177,7 @@ instance Show StackBuildException where
     show (Couldn'tParseTargets targets) = unlines
                 $ "The following targets could not be parsed as package names or directories:"
                 : map T.unpack targets
-    show (UnknownTargets noKnown notInSnapshot stackYaml) =
+    show (UnknownTargets noKnown notInSnapshot mstackYaml) =
         unlines $ noKnown' ++ notInSnapshot'
       where
         noKnown'
@@ -185,9 +185,8 @@ instance Show StackBuildException where
             | otherwise = return $
                 "The following target packages were not found: " ++
                 intercalate ", " (map packageNameString $ Set.toList noKnown)
-        notInSnapshot'
-            | Map.null notInSnapshot = []
-            | otherwise =
+        notInSnapshot' = case (Map.null notInSnapshot, mstackYaml) of
+            (False, Just stackYaml) ->
                   "The following packages are not in your snapshot, but exist"
                 : "in your package index. Recommended action: add them to your"
                 : ("extra-deps in " ++ toFilePath stackYaml)
@@ -198,6 +197,7 @@ instance Show StackBuildException where
                     (\(name, version) -> "- " ++ packageIdentifierString
                         (PackageIdentifier name version))
                     (Map.toList notInSnapshot)
+            _ -> []
     show (TestSuiteFailure ident codes mlogFile bs) = unlines $ concat
         [ ["Test suite failure for package " ++ packageIdentifierString ident]
         , flip map (Map.toList codes) $ \(name, mcode) -> concat
@@ -446,9 +446,9 @@ data Plan = Plan
 -- | Basic information used to calculate what the configure options are
 data BaseConfigOpts = BaseConfigOpts
     { bcoSnapDB :: !(Path Abs Dir)
-    , bcoLocalDB :: !(Path Abs Dir)
+    , bcoLocalDB :: !(Maybe (Path Abs Dir))
     , bcoSnapInstallRoot :: !(Path Abs Dir)
-    , bcoLocalInstallRoot :: !(Path Abs Dir)
+    , bcoLocalInstallRoot :: !(Maybe (Path Abs Dir))
     , bcoBuildOpts :: !BuildOpts
     , bcoBuildOptsCLI :: !BuildOptsCLI
     , bcoExtraDBs :: ![Path Abs Dir]
@@ -456,7 +456,7 @@ data BaseConfigOpts = BaseConfigOpts
     deriving Show
 
 -- | Render a @BaseConfigOpts@ to an actual list of options
-configureOpts :: EnvConfig
+configureOpts :: EnvConfigNoLocal
               -> BaseConfigOpts
               -> Map PackageIdentifier GhcPkgId -- ^ dependencies
               -> Bool -- ^ local non-extra-dep?
@@ -523,7 +523,7 @@ configureOptsDirs bco loc package = concat
                      [pathSeparator])
 
 -- | Same as 'configureOpts', but does not include directory path options
-configureOptsNoDir :: EnvConfig
+configureOptsNoDir :: EnvConfigNoLocal
                    -> BaseConfigOpts
                    -> Map PackageIdentifier GhcPkgId -- ^ dependencies
                    -> Bool -- ^ is this a local, non-extra-dep?

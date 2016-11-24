@@ -122,6 +122,7 @@ instance HasConfig PathInfo
 instance HasBuildConfigNoLocal PathInfo where
     buildConfigNoLocalL = lens piBuildConfig (\x y -> x { piBuildConfig = y })
                         . buildConfigNoLocalL
+instance HasMaybeBuildConfig PathInfo
 instance HasBuildConfig PathInfo where
     buildConfigLocalL = lens piBuildConfig (\x y -> x { piBuildConfig = y })
                       . buildConfigLocalL
@@ -178,7 +179,7 @@ paths =
       , T.pack . toFilePathNoTrailingSep . piGlobalDb )
     , ( "GHC_PACKAGE_PATH environment variable"
       , "ghc-package-path"
-      , \pi' -> mkGhcPackagePath True (piLocalDb pi') (piSnapDb pi') (piExtraDbs pi') (piGlobalDb pi'))
+      , \pi' -> mkGhcPackagePath (Just (piLocalDb pi')) (piSnapDb pi') (piExtraDbs pi') (piGlobalDb pi'))
     , ( "Snapshot installation root"
       , "snapshot-install-root"
       , T.pack . toFilePathNoTrailingSep . piSnapRoot )

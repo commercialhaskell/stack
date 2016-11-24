@@ -38,6 +38,7 @@ module Stack.Types.Config
   ,stackYamlL
   ,projectRootL
   ,HasBuildConfigNoLocal(..)
+  ,HasMaybeBuildConfig(..)
   ,HasBuildConfig(..)
   -- ** GHCVariant & HasGHCVariant
   ,GHCVariant(..)
@@ -53,6 +54,7 @@ module Stack.Types.Config
   ,EnvConfigNoLocal(..)
   ,EnvConfigLocal(..)
   ,HasEnvConfigNoLocal(..)
+  ,HasMaybeEnvConfig(..)
   ,HasEnvConfig(..)
   ,getCompilerPath
   -- * Details
@@ -122,6 +124,7 @@ module Stack.Types.Config
   ,docDirSuffix
   ,flagCacheLocal
   ,extraBinDirs
+  ,extraBinDirsNoLocal
   ,hpcReportDir
   ,installationRootDeps
   ,installationRootLocal
@@ -170,6 +173,7 @@ module Stack.Types.Config
   ,cabalVersionL
   ,whichCompilerL
   ,buildConfigL
+  ,maybeEnvConfigL
   -- * Lens reexport
   ,view
   ,to
@@ -1240,7 +1244,7 @@ snapshotsDir = do
     return $ root </> $(mkRelDir "snapshots") </> platform
 
 -- | Installation root for dependencies
-installationRootDeps :: (MonadThrow m, MonadReader env m, HasEnvConfig env) => m (Path Abs Dir)
+installationRootDeps :: (MonadThrow m, MonadReader env m, HasEnvConfigNoLocal env) => m (Path Abs Dir)
 installationRootDeps = do
     root <- view stackRootL
     -- TODO: also useShaPathOnWindows here, once #1173 is resolved.
@@ -1270,7 +1274,7 @@ hoogleDatabasePath = do
 -- | Path for platform followed by snapshot name followed by compiler
 -- name.
 platformSnapAndCompilerRel
-    :: (MonadReader env m, HasEnvConfig env, MonadThrow m)
+    :: (MonadReader env m, HasEnvConfigNoLocal env, MonadThrow m)
     => m (Path Rel Dir)
 platformSnapAndCompilerRel = do
     resolver' <- view loadedResolverL
@@ -1281,7 +1285,7 @@ platformSnapAndCompilerRel = do
 
 -- | Relative directory for the platform and GHC identifier
 platformGhcRelDir
-    :: (MonadReader env m, HasEnvConfig env, MonadThrow m)
+    :: (MonadReader env m, HasEnvConfigNoLocal env, MonadThrow m)
     => m (Path Rel Dir)
 platformGhcRelDir = do
     ec <- view envConfigNoLocalL
@@ -1321,7 +1325,7 @@ useShaPathOnWindows =
     return
 #endif
 
-compilerVersionDir :: (MonadThrow m, MonadReader env m, HasEnvConfig env) => m (Path Rel Dir)
+compilerVersionDir :: (MonadThrow m, MonadReader env m, HasEnvConfigNoLocal env) => m (Path Rel Dir)
 compilerVersionDir = do
     compilerVersion <- view actualCompilerVersionL
     parseRelDir $ case compilerVersion of
@@ -1329,7 +1333,7 @@ compilerVersionDir = do
         GhcjsVersion {} -> compilerVersionString compilerVersion
 
 -- | Package database for installing dependencies into
-packageDatabaseDeps :: (MonadThrow m, MonadReader env m, HasEnvConfig env) => m (Path Abs Dir)
+packageDatabaseDeps :: (MonadThrow m, MonadReader env m, HasEnvConfigNoLocal env) => m (Path Abs Dir)
 packageDatabaseDeps = do
     root <- installationRootDeps
     return $ root </> $(mkRelDir "pkgdb")
@@ -1341,7 +1345,7 @@ packageDatabaseLocal = do
     return $ root </> $(mkRelDir "pkgdb")
 
 -- | Extra package databases
-packageDatabaseExtra :: (MonadThrow m, MonadReader env m, HasEnvConfig env) => m [Path Abs Dir]
+packageDatabaseExtra :: (MonadThrow m, MonadReader env m, HasBuildConfig env) => m [Path Abs Dir]
 packageDatabaseExtra = do
     bc <- view buildConfigLocalL
     return $ bcExtraPackageDBs bc
@@ -1384,11 +1388,19 @@ hpcReportDir = do
 extraBinDirs :: (MonadThrow m, MonadReader env m, HasEnvConfig env)
              => m (Bool -> [Path Abs Dir])
 extraBinDirs = do
-    deps <- installationRootDeps
+    deps <- extraBinDirsNoLocal
     local <- installationRootLocal
     return $ \locals -> if locals
-        then [local </> bindirSuffix, deps </> bindirSuffix]
-        else [deps </> bindirSuffix]
+        then local </> bindirSuffix : deps
+        else deps
+
+-- | Same as 'extraBinDirs', but for an 'HasEnvConfigNoLocal' context
+extraBinDirsNoLocal
+    :: (MonadThrow m, MonadReader env m, HasEnvConfigNoLocal env)
+    => m [Path Abs Dir]
+extraBinDirsNoLocal = do
+    deps <- installationRootDeps
+    return [deps </> bindirSuffix]
 
 -- | Get the minimal environment override, useful for just calling external
 -- processes like git or ghc
@@ -1814,8 +1826,15 @@ class HasConfig env => HasBuildConfigNoLocal env where
         envConfigBuildConfigNoLocal
         (\x y -> x { envConfigBuildConfigNoLocal = y })
 
+-- | Class for environment values which definitely provide a
+-- 'BuildConfigNoLocal', but only might provide a 'BuildConfigLocal'.
+class HasBuildConfigNoLocal env => HasMaybeBuildConfig env where
+    maybeBuildConfigLocalL :: Getting r env (Maybe BuildConfigLocal)
+    default maybeBuildConfigLocalL :: HasBuildConfig env => Getting r env (Maybe BuildConfigLocal)
+    maybeBuildConfigLocalL = buildConfigLocalL.to Just
+
 -- | Class for environment values that can provide a 'BuildConfig'.
-class HasBuildConfigNoLocal env => HasBuildConfig env where
+class HasMaybeBuildConfig env => HasBuildConfig env where
     buildConfigLocalL :: Lens' env BuildConfigLocal
     default buildConfigLocalL :: HasEnvConfig env => Lens' env BuildConfigLocal
     buildConfigLocalL = envConfigLocalL.lens
@@ -1825,7 +1844,14 @@ class HasBuildConfigNoLocal env => HasBuildConfig env where
 class (HasBuildConfigNoLocal env, HasGHCVariant env) => HasEnvConfigNoLocal env where
     envConfigNoLocalL :: Lens' env EnvConfigNoLocal
 
-class (HasBuildConfig env, HasEnvConfigNoLocal env) => HasEnvConfig env where
+-- | Class for environment values which definitely provide a
+-- 'EnvConfigNoLocal', but only might provide a 'EnvConfigLocal'.
+class (HasEnvConfigNoLocal env, HasMaybeBuildConfig env) => HasMaybeEnvConfig env where
+    maybeEnvConfigLocalL :: Getting r env (Maybe EnvConfigLocal)
+    default maybeEnvConfigLocalL :: HasEnvConfig env => Getting r env (Maybe EnvConfigLocal)
+    maybeEnvConfigLocalL = envConfigLocalL.to Just
+
+class (HasBuildConfig env, HasMaybeEnvConfig env) => HasEnvConfig env where
     envConfigLocalL :: Lens' env EnvConfigLocal
     envConfigLocalL = envConfigL.lens ecLocal (\x y -> x { ecLocal = y })
     {-# INLINE envConfigLocalL #-}
@@ -1874,6 +1900,13 @@ instance HasBuildConfigNoLocal BuildConfig where
 instance HasBuildConfigNoLocal EnvConfigNoLocal
 instance HasBuildConfigNoLocal EnvConfig
 
+instance HasMaybeBuildConfig BuildConfigNoLocal where
+    maybeBuildConfigLocalL = to (const Nothing)
+instance HasMaybeBuildConfig BuildConfig
+instance HasMaybeBuildConfig EnvConfigNoLocal where
+    maybeBuildConfigLocalL = to (const Nothing)
+instance HasMaybeBuildConfig EnvConfig
+
 instance HasBuildConfig BuildConfig where
     buildConfigLocalL = lens bcLocal (\x y -> x { bcLocal = y})
     {-# INLINE buildConfigLocalL #-}
@@ -1885,6 +1918,10 @@ instance HasEnvConfigNoLocal EnvConfigNoLocal where
 instance HasEnvConfigNoLocal EnvConfig where
     envConfigNoLocalL = lens ecNoLocal (\x y -> x { ecNoLocal = y })
     {-# INLINE envConfigNoLocalL #-}
+
+instance HasMaybeEnvConfig EnvConfigNoLocal where
+    maybeEnvConfigLocalL = to (const Nothing)
+instance HasMaybeEnvConfig EnvConfig
 
 instance HasEnvConfig EnvConfig where
     envConfigL = id
@@ -1987,3 +2024,8 @@ buildConfigL :: HasBuildConfig env => Getting r env BuildConfig
 buildConfigL = to $ \env -> BuildConfig
     (view buildConfigNoLocalL env)
     (view buildConfigLocalL env)
+
+maybeEnvConfigL :: HasMaybeEnvConfig env => Getting r env (Maybe EnvConfig)
+maybeEnvConfigL = to $ \env -> fmap
+    (EnvConfig (view envConfigNoLocalL env))
+    (view maybeEnvConfigLocalL env)
