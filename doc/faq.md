@@ -324,11 +324,12 @@ Cf. issue [#425](https://github.com/commercialhaskell/stack/issues/425).
 
 ## Can I change stack's default temporary directory?
 
-Stack downloads and extracts files to `$STACK_ROOT`, which defaults to
-`~/.stack`. If there is not enough free space in this directory, Stack may fail.
+Stack downloads and extracts files to `$STACK_ROOT/programs` on most platforms,
+which defaults to `~/.stack/programs`. On Windows `$LOCALAPPDATA\Programs\stack`
+is used. If there is not enough free space in this directory, Stack may fail.
 For instance, `stack setup` with a GHC installation requires roughly 1GB free.
-If this is an issue, you can change `$STACK_ROOT` to be on a file system with
-more free space.
+If this is an issue, you can set `local-programs-path` in your
+`~/.stack/config.yaml` to a directory on a file system with more free space.
 
 If you use Stack with Nix integration, be aware that Nix uses a `TMPDIR`
 variable, and if it is not set Nix sets it to some subdirectory of `/run`, which
