@@ -783,6 +783,8 @@ data ConfigMonoid =
     -- ^ Additional paths to search for executables in
     ,configMonoidSetupInfoLocations  :: ![SetupInfoLocation]
     -- ^ Additional setup info (inline or remote) to use for installing tools
+    ,configMonoidLocalProgramsBase   :: !(First (Path Abs Dir))
+    -- ^ Override the default local programs dir, where e.g. GHC is installed.
     ,configMonoidPvpBounds           :: !(First PvpBounds)
     -- ^ See 'configPvpBounds'
     ,configMonoidModifyCodePage      :: !(First Bool)
@@ -860,6 +862,7 @@ parseConfigMonoidJSON obj = do
     configMonoidExtraPath <- obj ..:? configMonoidExtraPathName ..!= []
     configMonoidSetupInfoLocations <-
         maybeToList <$> jsonSubWarningsT (obj ..:?  configMonoidSetupInfoLocationsName)
+    configMonoidLocalProgramsBase <- First <$> obj ..:? configMonoidLocalProgramsBaseName
     configMonoidPvpBounds <- First <$> obj ..:? configMonoidPvpBoundsName
     configMonoidModifyCodePage <- First <$> obj ..:? configMonoidModifyCodePageName
     configMonoidExplicitSetupDeps <-
@@ -973,6 +976,9 @@ configMonoidExtraPathName = "extra-path"
 
 configMonoidSetupInfoLocationsName :: Text
 configMonoidSetupInfoLocationsName = "setup-info"
+
+configMonoidLocalProgramsBaseName :: Text
+configMonoidLocalProgramsBaseName = "local-programs-path"
 
 configMonoidPvpBoundsName :: Text
 configMonoidPvpBoundsName = "pvp-bounds"

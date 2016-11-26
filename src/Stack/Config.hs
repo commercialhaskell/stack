@@ -294,7 +294,9 @@ configFromConfigMonoid configStackRoot configUserConfigPath mresolver mproject C
      origEnv <- mkEnvOverride configPlatform pathsEnv
      let configEnvOverride _ = return origEnv
 
-     configLocalProgramsBase <- getDefaultLocalProgramsBase configStackRoot configPlatform origEnv
+     configLocalProgramsBase <- case getFirst configMonoidLocalProgramsBase of
+       Nothing -> getDefaultLocalProgramsBase configStackRoot configPlatform origEnv
+       Just path -> return path
      platformOnlyDir <- runReaderT platformOnlyRelDir (configPlatform, configPlatformVariant)
      let configLocalPrograms = configLocalProgramsBase </> platformOnlyDir
 
