@@ -324,22 +324,19 @@ Cf. issue [#425](https://github.com/commercialhaskell/stack/issues/425).
 
 ## Can I change stack's default temporary directory?
 
-Stack makes use of a temporary directory for some commands (/tmp by default on
-linux). If there is not enough free space in this directory, stack may fail
-(see issue [#429](https://github.com/commercialhaskell/stack/issues/429) ). For
-instance `stack setup` with a GHC installation requires roughly 1GB free.
+Stack downloads and extracts files to `$STACK_ROOT/programs` on most platforms,
+which defaults to `~/.stack/programs`. On Windows `$LOCALAPPDATA\Programs\stack`
+is used. If there is not enough free space in this directory, Stack may fail.
+For instance, `stack setup` with a GHC installation requires roughly 1GB free.
+If this is an issue, you can set `local-programs-path` in your
+`~/.stack/config.yaml` to a directory on a file system with more free space.
 
-A custom temporary directory can be forced:
-
-* on Linux by setting the environment variable TMPDIR (eg `$ TMPDIR=path-to-tmp stack setup`)
-* on Windows by setting one of the environment variable (given in priority order), TMP, TEMP, USERPROFILE
-
-If you use Stack with Nix integration, be aware that Nix _also_ uses that TMPDIR
+If you use Stack with Nix integration, be aware that Nix uses a `TMPDIR`
 variable, and if it is not set Nix sets it to some subdirectory of `/run`, which
-on most Linuxes is a Ramdir. Nix will run the builds in TMPDIR, therefore if you
-don't have enough RAM you will get errors about disk space.  If this happens to
-you, please _manually_ set TMPDIR before launching Stack to some directory on the
-disk.
+on most Linuxes is a Ramdir. Nix will run the builds in `TMPDIR`, therefore if
+you don't have enough RAM you will get errors about disk space. If this happens
+to you, please _manually_ set `TMPDIR` before launching Stack to some directory
+on the disk.
 
 ## Why doesn't stack rebuild my project when I specify `--ghc-options` on the command line?
 

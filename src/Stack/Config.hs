@@ -295,15 +295,10 @@ configFromConfigMonoid configStackRoot configUserConfigPath mresolver mproject C
      origEnv <- mkEnvOverride configPlatform pathsEnv
      let configEnvOverride _ = return origEnv
 
-     platformOnlyDir <- runReaderT platformOnlyRelDir (configPlatform,configPlatformVariant)
-     configLocalProgramsBase <-
-         case configPlatform of
-             Platform _ Windows -> do
-                 progsDir <- getWindowsProgsDir configStackRoot origEnv
-                 return $ progsDir </> $(mkRelDir stackProgName)
-             _ ->
-                 return $
-                 configStackRoot </> $(mkRelDir "programs")
+     configLocalProgramsBase <- case getFirst configMonoidLocalProgramsBase of
+       Nothing -> getDefaultLocalProgramsBase configStackRoot configPlatform origEnv
+       Just path -> return path
+     platformOnlyDir <- runReaderT platformOnlyRelDir (configPlatform, configPlatformVariant)
      let configLocalPrograms = configLocalProgramsBase </> platformOnlyDir
 
      configLocalBin <-
@@ -353,19 +348,28 @@ configFromConfigMonoid configStackRoot configUserConfigPath mresolver mproject C
 
      return Config {..}
 
--- | Get the directory on Windows where we should install extra programs. For
--- more information, see discussion at:
--- https://github.com/fpco/minghc/issues/43#issuecomment-99737383
-getWindowsProgsDir :: MonadThrow m
-                   => Path Abs Dir
-                   -> EnvOverride
-                   -> m (Path Abs Dir)
-getWindowsProgsDir stackRoot m =
-    case Map.lookup "LOCALAPPDATA" $ unEnvOverride m of
-        Just t -> do
+-- | Get the default location of the local programs directory.
+getDefaultLocalProgramsBase :: MonadThrow m
+                            => Path Abs Dir
+                            -> Platform
+                            -> EnvOverride
+                            -> m (Path Abs Dir)
+getDefaultLocalProgramsBase configStackRoot configPlatform override =
+  let
+    defaultBase = configStackRoot </> $(mkRelDir "programs")
+  in
+    case configPlatform of
+      -- For historical reasons, on Windows a subdirectory of LOCALAPPDATA is
+      -- used instead of a subdirectory of STACK_ROOT. Unifying the defaults would
+      -- mean that Windows users would manually have to move data from the old
+      -- location to the new one, which is undesirable.
+      Platform _ Windows ->
+        case Map.lookup "LOCALAPPDATA" $ unEnvOverride override of
+          Just t -> do
             lad <- parseAbsDir $ T.unpack t
-            return $ lad </> $(mkRelDir "Programs")
-        Nothing -> return $ stackRoot </> $(mkRelDir "Programs")
+            return $ lad </> $(mkRelDir "Programs") </> $(mkRelDir stackProgName)
+          Nothing -> return defaultBase
+      _ -> return defaultBase
 
 -- | An environment with a subset of BuildConfig used for setup.
 data MiniConfig = MiniConfig GHCVariant Config

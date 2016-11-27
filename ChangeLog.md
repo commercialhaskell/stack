@@ -79,6 +79,9 @@ Other enhancements:
   [#2235](https://github.com/commercialhaskell/stack/issues/2235)
 * Replace enclosed-exceptions with safe-exceptions.
   [#2768](https://github.com/commercialhaskell/stack/issues/2768)
+* The install location for GHC and other programs can now be configured with the
+  `local-programs-path` option in `config.yaml`.
+  [#1644](https://github.com/commercialhaskell/stack/issues/1644)
 
 Bug fixes:
 
