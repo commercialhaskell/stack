@@ -47,7 +47,7 @@ import           Control.Applicative
 import           Control.Arrow ((***))
 import           Control.Exception (assert)
 import           Control.Monad (liftM, unless, when, filterM)
-import           Control.Monad.Catch (MonadThrow, MonadCatch, catchAll, throwM, catch, handle)
+import           Control.Monad.Catch (MonadThrow, MonadCatch, catchAll, throwM, catch)
 import           Control.Monad.Extra (firstJustM)
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger hiding (Loc)
@@ -618,15 +618,11 @@ resolvePackageLocation
     -> m (Path Abs Dir)
 resolvePackageLocation _ projRoot (PLFilePath fp) = resolveDir projRoot fp
 resolvePackageLocation menv projRoot (PLRemote url remotePackageType) = do
-    -- NOTE: we used to include the commit in the package location. This
-    -- allowed us to quickly check if the dir exists, and use it if it
-    -- does. Now, we instead always do a reset. This is still pretty
-    -- fast - a no-op git reset is around 0.01 seconds on my machine.
     workDir <- getWorkDir
     let nameBeforeHashing = case remotePackageType of
             RPTHttp{} -> url
-            RPTGit{} -> url
-            RPTHg{} -> T.unwords [url, "hg"]
+            RPTGit commit -> T.unwords [url, commit]
+            RPTHg commit -> T.unwords [url, commit, "hg"]
         -- TODO: dedupe with code for snapshot hash?
         name = T.unpack $ decodeUtf8 $ S.take 12 $ B64URL.encode $ SHA256.hash $ encodeUtf8 nameBeforeHashing
         root = projRoot </> workDir </> $(mkRelDir "downloaded")
@@ -641,27 +637,13 @@ resolvePackageLocation menv projRoot (PLRemote url remotePackageType) = do
         dir = root </> dirRel
 
     exists <- doesDirExist dir
-    let cloneAndExtract commandName cloneArgs resetCommand commit = do
-            ensureDir root
-            if exists
-                then handleError (doReset True)
-                else do
-                    doClone
-                    doReset False
-            created <- doesDirExist dir
-            unless created $ throwM $ FailedToCloneRepo commandName
-            return dir
-          where
-            handleError = handle $ \case
-                ProcessFailed{} -> do
-                    $logInfo $ "Failed to reset to commit " <> commit <> ", deleting and re-cloning."
-                    ignoringAbsence (removeDirRecur dir)
-                    doClone
-                    doReset False
-                err -> throwM err
-            doClone =
+    unless exists $ do
+        ignoringAbsence (removeDirRecur dir)
+
+        let cloneAndExtract commandName cloneArgs resetCommand commit = do
+                ensureDir root
                 callProcessInheritStderrStdout Cmd
-                    { cmdDirectoryToRunIn = Just (parent dir)
+                    { cmdDirectoryToRunIn = Just root
                     , cmdCommandToRun = commandName
                     , cmdEnvOverride = menv
                     , cmdCommandLineArguments =
@@ -671,18 +653,18 @@ resolvePackageLocation menv projRoot (PLRemote url remotePackageType) = do
                         , toFilePathNoTrailingSep dir
                         ]
                     }
-            doReset firstTry =
+                created <- doesDirExist dir
+                unless created $ throwM $ FailedToCloneRepo commandName
                 readProcessNull (Just dir) menv commandName
                     (resetCommand ++ [T.unpack commit, "--"])
                     `catch` \case
                         ex@ProcessFailed{} -> do
-                            unless firstTry $ $logInfo $
-                                "Please ensure that commit " <> commit <> " exists within " <> url
+                            $logInfo $ "Please ensure that commit " <> commit <> " exists within " <> url
                             throwM ex
                         ex -> throwM ex
-    case remotePackageType of
-        RPTHttp -> do
-            unless exists $ do
+
+        case remotePackageType of
+            RPTHttp -> do
                 let dirTmp = root </> dirRelTmp
                 ignoringAbsence (removeDirRecur dirTmp)
 
@@ -710,6 +692,15 @@ resolvePackageLocation menv projRoot (PLRemote url remotePackageType) = do
 
                 tryTar `catchAllLog` tryZip `catchAllLog` err
                 renameDir dirTmp dir
+
+            -- Passes in --git-dir to git and --repository to hg, in order
+            -- to avoid the update commands being applied to the user's
+            -- repo.  See https://github.com/commercialhaskell/stack/issues/2748
+            RPTGit commit -> cloneAndExtract "git" ["--recursive"] ["--git-dir=.git", "reset", "--hard"] commit
+            RPTHg  commit -> cloneAndExtract "hg"  []              ["--repository", ".", "update", "-C"] commit
+
+    case remotePackageType of
+        RPTHttp -> do
             x <- listDir dir
             case x of
                 ([dir'], []) -> return dir'
@@ -717,12 +708,8 @@ resolvePackageLocation menv projRoot (PLRemote url remotePackageType) = do
                     ignoringAbsence (removeFile file)
                     ignoringAbsence (removeDirRecur dir)
                     throwM $ UnexpectedArchiveContents dirs files
+        _ -> return dir
 
-        -- Passes in --git-dir to git and --repository to hg, in order
-        -- to avoid the update commands being applied to the user's
-        -- repo.  See https://github.com/commercialhaskell/stack/issues/2748
-        RPTGit commit -> cloneAndExtract "git" ["--recursive"] ["--git-dir=.git", "reset", "--hard"] commit
-        RPTHg  commit -> cloneAndExtract "hg"  []              ["--repository", ".", "update", "-C"] commit
 
 -- | Get the stack root, e.g. @~/.stack@, and determine whether the user owns it.
 --
