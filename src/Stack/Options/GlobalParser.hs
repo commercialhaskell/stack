@@ -36,7 +36,8 @@ globalOptsParser kind defLogLevel =
     optionalFirst (option readColorWhen
         (long "color" <>
          metavar "WHEN" <>
-         help "Specify when to use color in output; WHEN is 'always', 'never', or 'auto'")) <*>
+         help "Specify when to use color in output; WHEN is 'always', 'never', or 'auto'" <>
+         hide)) <*>
     optionalFirst
         (strOption
             (long "stack-yaml" <>
