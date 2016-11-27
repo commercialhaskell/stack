@@ -117,6 +117,8 @@ Bug fixes:
 * Launch Docker from the project root regardless of the working
   directory Stack is invoked from. This means paths relative to the project root
   (e.g. environment files) can be specified in `stack.yaml`'s docker `run-args`.
+* `stack setup --reinstall` now behaves as expected.
+  [#2554](https://github.com/commercialhaskell/stack/issues/2554)
 
 ## 1.2.0
 

@@ -410,9 +410,9 @@ ensureCompiler sopts = do
                             ghcPkgName <- parsePackageNameFromString ("ghc" ++ ghcVariantSuffix ghcVariant ++ compilerBuildSuffix ghcBuild)
                             return (getInstalledTool installed ghcPkgName (isWanted . GhcVersion), ghcBuild)
                         Ghcjs -> return (getInstalledGhcjs installed isWanted, CompilerBuildStandard)
-            compilerTool <- case installedCompiler of
-                Just tool -> return tool
-                Nothing
+            compilerTool <- case (installedCompiler, soptsForceReinstall sopts) of
+                (Just tool, False) -> return tool
+                _
                     | soptsInstallIfMissing sopts -> do
                         si <- getSetupInfo'
                         downloadAndInstallCompiler
