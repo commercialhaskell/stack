@@ -536,6 +536,8 @@ configureOptsNoDir econfig bco deps isLocal package = concat
     , let profFlag = "--enable-" <> concat ["executable-" | not newerCabal] <> "profiling"
       in [ profFlag | boptsExeProfile bopts && isLocal]
     , ["--enable-split-objs" | boptsSplitObjs bopts]
+    , ["--disable-library-stripping" | not $ boptsLibStrip bopts || boptsExeStrip bopts]
+    , ["--disable-executable-stripping" | not (boptsExeStrip bopts) && isLocal]
     , map (\(name,enabled) ->
                        "-f" <>
                        (if enabled

@@ -94,6 +94,7 @@ build :: (StackM env m, HasEnvConfig env, MonadBaseUnlift IO m)
 build setLocalFiles mbuildLk boptsCli = fixCodePage $ do
     bopts <- asks (configBuild . getConfig)
     let profiling = boptsLibProfile bopts || boptsExeProfile bopts
+    let symbols = boptsLibStrip bopts || boptsExeStrip bopts
     menv <- getMinimalEnvOverride
 
     (targets, mbp, locals, extraToBuild, extraDeps, sourceMap) <- loadSourceMapFull NeedTargets boptsCli
@@ -109,7 +110,8 @@ build setLocalFiles mbuildLk boptsCli = fixCodePage $ do
         getInstalled menv
                      GetInstalledOpts
                          { getInstalledProfiling = profiling
-                         , getInstalledHaddock   = shouldHaddockDeps bopts }
+                         , getInstalledHaddock   = shouldHaddockDeps bopts
+                         , getInstalledSymbols   = symbols }
                      sourceMap
 
     warnMissingExtraDeps installedMap extraDeps

@@ -27,9 +27,10 @@ newtype InstalledCacheInner = InstalledCacheInner (Map GhcPkgId InstalledCacheEn
 data InstalledCacheEntry = InstalledCacheEntry
     { installedCacheProfiling :: !Bool
     , installedCacheHaddock :: !Bool
+    , installedCacheSymbols :: !Bool
     , installedCacheIdent :: !PackageIdentifier }
     deriving (Eq, Generic, Show, Data, Typeable)
 instance Store InstalledCacheEntry
 
 installedCacheVC :: VersionConfig InstalledCacheInner
-installedCacheVC = storeVersionConfig "installed-v1" "5yL7Ngpy4YKWDDCTUI6zAJ9UySI="
+installedCacheVC = storeVersionConfig "installed-v1" "GGyaE6qY9FOqeWtozuadKqS7_QM="
