@@ -57,6 +57,7 @@ import           Stack.Build
 import           Stack.Build.Installed
 import           Stack.Build.Source
 import           Stack.Build.Target
+import           Stack.Config (getLocalPackages)
 import           Stack.Constants
 import           Stack.Exec
 import           Stack.Ghci.Script
@@ -256,11 +257,11 @@ getAllLocalTargets GhciOpts{..} targets0 mainIsTargets sourceMap = do
     -- independently in order to handle the case where no targets are
     -- specified.
     let targets = maybe targets0 (unionSimpleTargets targets0) mainIsTargets
-    econfig <- asks getEnvConfig
+    packages <- getLocalPackages
     -- Find all of the packages that are directly demanded by the
     -- targets.
     directlyWanted <-
-        forMaybeM (M.toList (envConfigPackages econfig)) $
+        forMaybeM (M.toList packages) $
         \(dir,treatLikeExtraDep) ->
              do cabalfp <- findOrGenerateCabalFile dir
                 name <- parsePackageNameFromFilePath cabalfp

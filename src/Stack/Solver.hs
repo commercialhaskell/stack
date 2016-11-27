@@ -62,6 +62,7 @@ import           Path
 import           Path.Find (findFiles)
 import           Path.IO hiding (findExecutable, findFiles)
 import           Stack.BuildPlan
+import           Stack.Config (getLocalPackages)
 import           Stack.Constants (stackDotYaml, wiredInPackages)
 import           Stack.Package               (printCabalFileWarning
                                              , hpack
@@ -616,14 +617,14 @@ solveExtraDeps
     => Bool -- ^ modify stack.yaml?
     -> m ()
 solveExtraDeps modStackYaml = do
-    econfig <- asks getEnvConfig
     bconfig <- asks getBuildConfig
 
     let stackYaml = bcStackYaml bconfig
     relStackYaml <- toFilePath <$> makeRelativeToCurrentDir stackYaml
 
     $logInfo $ "Using configuration file: " <> T.pack relStackYaml
-    let cabalDirs = Map.keys $ envConfigPackages econfig
+    packages <- getLocalPackages
+    let cabalDirs = Map.keys packages
         noPkgMsg = "No cabal packages found in " <> relStackYaml <>
                    ". Please add at least one directory containing a .cabal \
                    \file. You can also use 'stack init' to automatically \

@@ -61,6 +61,7 @@ import              Prelude hiding (sequence)
 import              Stack.Build.Cache
 import              Stack.Build.Target
 import              Stack.BuildPlan (shadowMiniBuildPlan)
+import              Stack.Config (getLocalPackages)
 import              Stack.Constants (wiredInPackages)
 import              Stack.Package
 import              Stack.PackageIndex (getPackageVersions)
@@ -295,8 +296,8 @@ getLocalPackageViews :: (StackM env m, HasEnvConfig env)
                      => m (Map PackageName (LocalPackageView, GenericPackageDescription))
 getLocalPackageViews = do
     $logDebug "Parsing the cabal files of the local packages"
-    econfig <- asks getEnvConfig
-    locals <- forM (Map.toList $ envConfigPackages econfig) $ \(dir, treatLikeExtraDep) -> do
+    packages <- getLocalPackages
+    locals <- forM (Map.toList packages) $ \(dir, treatLikeExtraDep) -> do
         cabalfp <- findOrGenerateCabalFile dir
         (warnings,gpkg) <- readPackageUnresolved cabalfp
         mapM_ (printCabalFileWarning cabalfp) warnings

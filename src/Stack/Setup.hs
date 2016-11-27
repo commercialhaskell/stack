@@ -75,7 +75,7 @@ import qualified    Paths_stack as Meta
 import              Prelude hiding (concat, elem, any) -- Fix AMP warning
 import              Safe (headMay, readMay)
 import              Stack.Build (build)
-import              Stack.Config (resolvePackageEntry, loadConfig)
+import              Stack.Config (loadConfig)
 import              Stack.Constants (distRelativeDir, stackProgName)
 import              Stack.Exec (defaultEnvSettings)
 import              Stack.Fetch
@@ -235,15 +235,13 @@ setupEnv mResolveMissingGHC = do
         <*> Concurrently (getGlobalDB menv wc)
 
     $logDebug "Resolving package entries"
-    packages <- mapM
-        (resolvePackageEntry menv (bcRoot bconfig))
-        (bcPackageEntries bconfig)
+    packagesRef <- liftIO $ newIORef Nothing
     let envConfig0 = EnvConfig
             { envConfigBuildConfig = bconfig
             , envConfigCabalVersion = cabalVer
             , envConfigCompilerVersion = compilerVer
             , envConfigCompilerBuild = compilerBuild
-            , envConfigPackages = Map.fromList $ concat packages
+            , envConfigPackagesRef = packagesRef
             }
 
     -- extra installation bin directories
@@ -322,7 +320,7 @@ setupEnv mResolveMissingGHC = do
         , envConfigCabalVersion = cabalVer
         , envConfigCompilerVersion = compilerVer
         , envConfigCompilerBuild = compilerBuild
-        , envConfigPackages = envConfigPackages envConfig0
+        , envConfigPackagesRef = envConfigPackagesRef envConfig0
         }
 
 -- | Add the include and lib paths to the given Config

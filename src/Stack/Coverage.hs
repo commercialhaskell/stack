@@ -16,7 +16,6 @@ module Stack.Coverage
     , generateHpcMarkupIndex
     ) where
 
-import           Control.Applicative
 import           Control.Exception.Safe (handleIO)
 import           Control.Exception.Lifted
 import           Control.Monad (liftM, when, unless, void, (<=<))
@@ -45,6 +44,7 @@ import           Path.IO
 import           Prelude hiding (FilePath, writeFile)
 import           Stack.Build.Source (parseTargetsFromBuildOpts)
 import           Stack.Build.Target
+import           Stack.Config (getLocalPackages)
 import           Stack.Constants
 import           Stack.Package
 import           Stack.PrettyPrint
@@ -174,7 +174,7 @@ generateHpcReportInternal tixSrc reportDir report extraMarkupArgs extraReportArg
             -- Directories for .mix files.
             hpcRelDir <- hpcRelativeDir
             -- Compute arguments used for both "hpc markup" and "hpc report".
-            pkgDirs <- Map.keys . envConfigPackages <$> asks getEnvConfig
+            pkgDirs <- liftM Map.keys getLocalPackages
             let args =
                     -- Use index files from all packages (allows cross-package coverage results).
                     concatMap (\x -> ["--srcdir", toFilePathNoTrailingSep x]) pkgDirs ++

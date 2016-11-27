@@ -17,6 +17,7 @@ import qualified Data.Set as Set
 import qualified Data.Text as T
 import           Stack.Build.Source (getLocalPackageViews)
 import           Stack.Build.Target (LocalPackageView(..))
+import           Stack.Config (getLocalPackages)
 import           Stack.Package (findOrGenerateCabalFile)
 import           Stack.Types.Config
 import           Stack.Types.Package
@@ -29,7 +30,7 @@ listPackages = do
     -- TODO: Instead of setting up an entire EnvConfig only to look up the package directories,
     -- make do with a Config (and the Project inside) and use resolvePackageEntry to get
     -- the directory.
-    packageDirs <- asks (Map.keys . envConfigPackages . getEnvConfig)
+    packageDirs <- liftM Map.keys getLocalPackages
     forM_ packageDirs $ \dir -> do
         cabalfp <- findOrGenerateCabalFile dir
         pkgName <- parsePackageNameFromFilePath cabalfp

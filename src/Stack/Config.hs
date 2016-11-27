@@ -28,6 +28,7 @@ module Stack.Config
   ,loadConfigMaybeProject
   ,loadMiniConfig
   ,packagesParser
+  ,getLocalPackages
   ,resolvePackageEntry
   ,getImplicitGlobalProjectDir
   ,getStackYaml
@@ -57,7 +58,7 @@ import qualified Data.ByteString as S
 import qualified Data.ByteString.Base64.URL as B64URL
 import qualified Data.ByteString.Lazy as L
 import           Data.Foldable (forM_)
-import           Data.IORef (newIORef)
+import           Data.IORef
 import qualified Data.IntMap as IntMap
 import qualified Data.Map as Map
 import           Data.Maybe
@@ -549,6 +550,23 @@ loadBuildConfig mproject config mresolver mcompiler = do
         , bcImplicitGlobal = isNothing mproject
         , bcGHCVariant = getGHCVariant miniConfig
         }
+
+-- | Get packages from EnvConfig, downloading and cloning as necessary.
+-- If the packages have already been downloaded, this uses a cached value (
+getLocalPackages
+    :: (StackMiniM env m, HasEnvConfig env)
+    => m (Map.Map (Path Abs Dir) TreatLikeExtraDep)
+getLocalPackages = do
+    cacheRef <- asks (envConfigPackagesRef . getEnvConfig)
+    mcached <- liftIO $ readIORef cacheRef
+    case mcached of
+        Just cached -> return cached
+        Nothing -> do
+            menv <- getMinimalEnvOverride
+            bconfig <- asks getBuildConfig
+            liftM (Map.fromList . concat) $ mapM
+                (resolvePackageEntry menv (bcRoot bconfig))
+                (bcPackageEntries bconfig)
 
 -- | Resolve a PackageEntry into a list of paths, downloading and cloning as
 -- necessary.

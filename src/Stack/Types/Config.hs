@@ -522,7 +522,10 @@ data EnvConfig = EnvConfig
     -- @stack list-dependencies | grep Cabal@ in the stack project.
     ,envConfigCompilerVersion :: !CompilerVersion
     ,envConfigCompilerBuild :: !CompilerBuild
-    ,envConfigPackages   :: !(Map (Path Abs Dir) TreatLikeExtraDep)}
+    ,envConfigPackagesRef :: !(IORef (Maybe (Map (Path Abs Dir) TreatLikeExtraDep)))
+    -- ^ Cache for 'getLocalPackages'.
+    }
+
 instance HasBuildConfig EnvConfig where
     getBuildConfig = envConfigBuildConfig
 instance HasConfig EnvConfig

@@ -703,7 +703,7 @@ sdistCmd (dirs, mpvpBounds, ignoreCheck, sign, sigServerUrl) go =
     withBuildConfig go $ do -- No locking needed.
         -- If no directories are specified, build all sdist tarballs.
         dirs' <- if null dirs
-            then asks (Map.keys . envConfigPackages . getEnvConfig)
+            then liftM Map.keys getLocalPackages
             else mapM resolveDir' dirs
         forM_ dirs' $ \dir -> do
             (tarName, tarBytes) <- getSDistTarball mpvpBounds dir

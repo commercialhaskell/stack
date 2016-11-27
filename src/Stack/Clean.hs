@@ -11,7 +11,6 @@ module Stack.Clean
 
 import           Control.Exception (Exception)
 import           Control.Monad.Catch (throwM)
-import           Control.Monad.Reader (asks)
 import           Data.Foldable (forM_)
 import           Data.List ((\\),intercalate)
 import qualified Data.Map.Strict as Map
@@ -21,6 +20,7 @@ import           Path (Path, Abs, Dir)
 import           Path.IO (ignoringAbsence, removeDirRecur)
 import           Stack.Build.Source (getLocalPackageViews)
 import           Stack.Build.Target (LocalPackageView(..))
+import           Stack.Config (getLocalPackages)
 import           Stack.Constants (distDirFromDir, workDirFromDir)
 import           Stack.Types.PackageName
 import           Stack.Types.Config
@@ -42,7 +42,8 @@ dirsToDelete
     => CleanOpts
     -> m [Path Abs Dir]
 dirsToDelete cleanOpts = do
-    localPkgDirs <- asks (Map.keys . envConfigPackages . getEnvConfig)
+    packages <- getLocalPackages
+    let localPkgDirs = Map.keys packages
     case cleanOpts of
         CleanShallow [] -> do
             mapM distDirFromDir localPkgDirs
