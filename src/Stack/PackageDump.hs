@@ -271,7 +271,7 @@ addSymbols (InstalledCache ref) ver =
                 liftM or . mapM (\dir -> liftIO $ hasDebuggingSymbols ver' dir lib) $ dpLibDirs dp
         return dp { dpSymbols = s }
 
-hasDebuggingSymbols :: String   -- ^ target compiler 
+hasDebuggingSymbols :: String   -- ^ target compiler
                     -> FilePath -- ^ library directory
                     -> String   -- ^ name of library
                     -> IO Bool
@@ -283,7 +283,6 @@ hasDebuggingSymbols ver dir lib = case OS.buildOS of
     OS.FreeBSD -> liftM ((== "Contents") . head . words . (!! 2) . lines) $
         readProcess "readelf" ["--debug-dump=info", "--dwarf-depth=1", concat [dir, "/lib", lib, "-ghc", ver, ".a"]] ""
     OS.Windows -> return False -- No support, so it can't be there.
-    OS.Ghcjs   -> return False
     _          -> return False
 
 
