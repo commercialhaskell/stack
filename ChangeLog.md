@@ -36,6 +36,9 @@ Behavior changes:
   without an accompanying `-RTS`.
 * When auto-detecting `--ghc-build`, `tinfo6` is now preferred over
   `standard` if both versions of libtinfo are installed
+* Addition of `stack build --copy-compiler-tool`, to allow tools like
+  intero to be installed globally for a particular compiler.
+  [#2643](https://github.com/commercialhaskell/stack/issues/2643)
 
 Other enhancements:
 

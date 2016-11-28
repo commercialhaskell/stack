@@ -57,6 +57,8 @@ data BuildOpts =
             -- @hscolour@. Disable for no sources.
             ,boptsInstallExes :: !Bool
             -- ^ Install executables to user path after building?
+            ,boptsInstallCompilerTool :: !Bool
+            -- ^ Install executables to compiler tools path after building?
             ,boptsPreFetch :: !Bool
             -- ^ Fetch all packages immediately
             -- ^ Watch files for changes and automatically rebuild
@@ -100,6 +102,7 @@ defaultBuildOpts = BuildOpts
     , boptsHaddockInternal = False
     , boptsHaddockHyperlinkSource = True
     , boptsInstallExes = False
+    , boptsInstallCompilerTool = False
     , boptsPreFetch = False
     , boptsKeepGoing = Nothing
     , boptsForceDirty = False
@@ -166,6 +169,7 @@ data BuildOptsMonoid = BuildOptsMonoid
     , buildMonoidHaddockInternal :: !(First Bool)
     , buildMonoidHaddockHyperlinkSource :: !(First Bool)
     , buildMonoidInstallExes :: !(First Bool)
+    , buildMonoidInstallCompilerTool :: !(First Bool)
     , buildMonoidPreFetch :: !(First Bool)
     , buildMonoidKeepGoing :: !(First Bool)
     , buildMonoidForceDirty :: !(First Bool)
@@ -195,6 +199,7 @@ instance FromJSON (WithJSONWarnings BuildOptsMonoid) where
               buildMonoidHaddockInternal <- First <$> o ..:? buildMonoidHaddockInternalArgName
               buildMonoidHaddockHyperlinkSource <- First <$> o ..:? buildMonoidHaddockHyperlinkSourceArgName
               buildMonoidInstallExes <- First <$> o ..:? buildMonoidInstallExesArgName
+              buildMonoidInstallCompilerTool <- First <$> o ..:? buildMonoidInstallCompilerToolArgName
               buildMonoidPreFetch <- First <$> o ..:? buildMonoidPreFetchArgName
               buildMonoidKeepGoing <- First <$> o ..:? buildMonoidKeepGoingArgName
               buildMonoidForceDirty <- First <$> o ..:? buildMonoidForceDirtyArgName
@@ -240,6 +245,9 @@ buildMonoidHaddockHyperlinkSourceArgName = "haddock-hyperlink-source"
 
 buildMonoidInstallExesArgName :: Text
 buildMonoidInstallExesArgName = "copy-bins"
+
+buildMonoidInstallCompilerToolArgName :: Text
+buildMonoidInstallCompilerToolArgName = "copy-compiler-tool"
 
 buildMonoidPreFetchArgName :: Text
 buildMonoidPreFetchArgName = "prefetch"

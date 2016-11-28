@@ -509,7 +509,10 @@ copyExecutables exes | Map.null exes = return ()
 copyExecutables exes = do
     snapBin <- (</> bindirSuffix) `liftM` installationRootDeps
     localBin <- (</> bindirSuffix) `liftM` installationRootLocal
-    destDir <- view $ configL.to configLocalBin
+    compilerSpecific <- boptsInstallCompilerTool <$> view buildOptsL
+    destDir <- if compilerSpecific
+                   then bindirCompilerTools
+                   else view $ configL.to configLocalBin
     ensureDir destDir
 
     destDir' <- liftIO . D.canonicalizePath . toFilePath $ destDir
@@ -560,7 +563,7 @@ copyExecutables exes = do
             , T.pack destDir'
             , ":"]
     forM_ installed $ \exe -> $logInfo ("- " <> exe)
-    warnInstallSearchPathIssues destDir' installed
+    unless compilerSpecific $ warnInstallSearchPathIssues destDir' installed
 
 
 -- | Windows can't write over the current executable. Instead, we rename the
