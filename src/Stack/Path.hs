@@ -50,6 +50,7 @@ path keys =
        global <- GhcPkg.getGlobalDB menv whichCompiler
        snaproot <- installationRootDeps
        localroot <- installationRootLocal
+       toolsDir <- bindirCompilerTools
        distDir <- distRelativeDir
        hpcDir <- hpcReportDir
        compiler <- getCompilerPath whichCompiler
@@ -83,6 +84,7 @@ path keys =
                                global
                                snaproot
                                localroot
+                               toolsDir
                                distDir
                                hpcDir
                                extra
@@ -107,6 +109,7 @@ data PathInfo = PathInfo
     , piGlobalDb     :: Path Abs Dir
     , piSnapRoot     :: Path Abs Dir
     , piLocalRoot    :: Path Abs Dir
+    , piToolsDir     :: Path Abs Dir
     , piDistDir      :: Path Rel Dir
     , piHpcDir       :: Path Abs Dir
     , piExtraDbs     :: [Path Abs Dir]
@@ -155,6 +158,9 @@ paths =
     , ( "Directory containing the compiler binary (e.g. ghc)"
       , "compiler-bin"
       , T.pack . toFilePathNoTrailingSep . parent . piCompiler )
+    , ( "Directory containing binaries specific to a particular compiler (e.g. intero)"
+      , "compiler-tools-bin"
+      , T.pack . toFilePathNoTrailingSep . piToolsDir )
     , ( "Local bin dir where stack installs executables (e.g. ~/.local/bin)"
       , "local-bin"
       , view $ configL.to configLocalBin.to toFilePathNoTrailingSep.to T.pack)

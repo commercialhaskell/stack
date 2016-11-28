@@ -208,7 +208,8 @@ constructPlan ls0 baseConfigOpts0 locals extraToBuild0 localDumpPkgs loadPackage
                 , planFinals = M.fromList finals
                 , planUnregisterLocal = mkUnregisterLocal tasks dirtyReason localDumpPkgs sourceMap initialBuildSteps
                 , planInstallExes =
-                    if boptsInstallExes $ bcoBuildOpts baseConfigOpts0
+                    if boptsInstallExes (bcoBuildOpts baseConfigOpts0) ||
+                       boptsInstallCompilerTool (bcoBuildOpts baseConfigOpts0)
                         then installExes
                         else Map.empty
                 }
