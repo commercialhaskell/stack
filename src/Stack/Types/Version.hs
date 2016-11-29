@@ -38,8 +38,6 @@ import           Data.Attoparsec.Text
 import           Data.Data
 import           Data.Hashable
 import           Data.List
-import           Data.Map (Map)
-import qualified Data.Map as Map
 import           Data.Maybe (listToMaybe)
 import           Data.Monoid
 import           Data.Set (Set)
@@ -95,14 +93,9 @@ instance FromJSON Version where
          Nothing ->
            fail ("Couldn't parse package version: " ++ s)
          Just ver -> return ver
-instance FromJSON a => FromJSON (Map Version a) where
-    parseJSON val = do
-        m <- parseJSON val
-        fmap Map.fromList $ mapM go $ Map.toList m
-      where
-        go (k, v) = do
-            k' <- either (fail . show) return $ parseVersionFromString k
-            return (k', v)
+instance FromJSONKey Version where
+  fromJSONKey = FromJSONKeyTextParser $ \k ->
+    either (fail . show) return $ parseVersion k
 
 newtype IntersectingVersionRange =
     IntersectingVersionRange { getIntersectingVersionRange :: Cabal.VersionRange }

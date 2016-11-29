@@ -8,8 +8,6 @@ module Stack.Types.Compiler where
 import           Control.DeepSeq
 import           Data.Aeson
 import           Data.Data
-import           Data.Map (Map)
-import qualified Data.Map as Map
 import           Data.Monoid ((<>))
 import           Data.Store (Store)
 import qualified Data.Text as T
@@ -43,20 +41,11 @@ instance ToJSON CompilerVersion where
 instance FromJSON CompilerVersion where
     parseJSON (String t) = maybe (fail "Failed to parse compiler version") return (parseCompilerVersion t)
     parseJSON _ = fail "Invalid CompilerVersion, must be String"
-instance FromJSON a => FromJSON (Map CompilerVersion a) where
-    -- TODO: Dedupe with similar code in Stack.Types.Version?
-    --
-    -- Maybe this ought to be abstracted into a 'JSONKey' class, so that a
-    -- fully generic definition for Map can be provided.
-    parseJSON val = do
-        m <- parseJSON val
-        fmap Map.fromList $ mapM go $ Map.toList m
-      where
-        go (k, v) = do
-            let mparsed = parseCompilerVersion (T.pack k)
-            case mparsed of
-                Nothing -> fail $ "Failed to parse CompilerVersion " ++ k
-                Just parsed -> return (parsed, v)
+instance FromJSONKey CompilerVersion where
+    fromJSONKey = FromJSONKeyTextParser $ \k ->
+        case parseCompilerVersion k of
+            Nothing -> fail $ "Failed to parse CompilerVersion " ++ T.unpack k
+            Just parsed -> return parsed
 
 parseCompilerVersion :: T.Text -> Maybe CompilerVersion
 parseCompilerVersion t

@@ -37,7 +37,7 @@ import           Control.Arrow ((&&&))
 import           Control.DeepSeq (NFData)
 import           Control.Exception (Exception)
 import           Control.Monad.Catch (MonadThrow, throwM)
-import           Data.Aeson (FromJSON (..), ToJSON (..), object, withObject, withText, (.!=), (.:), (.:?), (.=))
+import           Data.Aeson (FromJSON (..), FromJSONKey(..), ToJSON (..), ToJSONKey (..), object, withObject, withText, (.!=), (.:), (.:?), (.=))
 import           Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
 import           Data.Data
@@ -281,9 +281,7 @@ newtype Maintainer = Maintainer { unMaintainer :: Text }
 
 -- | Name of an executable.
 newtype ExeName = ExeName { unExeName :: Text }
-    deriving (Show, Eq, Ord, Hashable, IsString, Generic, Store, NFData, Data, Typeable)
-instance ToJSON ExeName where
-    toJSON = toJSON . unExeName
+    deriving (Show, Eq, Ord, Hashable, IsString, Generic, Store, NFData, Data, Typeable, ToJSON, ToJSONKey, FromJSONKey)
 instance FromJSON ExeName where
     parseJSON = withText "ExeName" $ return . ExeName
 
@@ -419,11 +417,6 @@ instance FromJSON Snapshots where
                 Left e -> fail $ show e
                 Right (LTS x y) -> return $ IntMap.singleton x y
                 Right (Nightly _) -> fail "Unexpected nightly value"
-
-instance ToJSON a => ToJSON (Map ExeName a) where
-  toJSON = toJSON . Map.mapKeysWith const unExeName
-instance FromJSON a => FromJSON (Map ExeName a) where
-    parseJSON = fmap (Map.mapKeysWith const ExeName) . parseJSON
 
 -- | A simplified version of the 'BuildPlan' + cabal file.
 data MiniBuildPlan = MiniBuildPlan

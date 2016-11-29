@@ -22,6 +22,10 @@ extra-deps:
 - optparse-applicative-0.13.0.0
 - text-metrics-0.1.0
 - pid1-0.1.0.0
+- aeson-1.0.2.1
+- hpack-0.15.0
+- persistent-2.6
+- persistent-template-2.5.1.6
 flags:
   stack:
     hide-dependency-versions: true
