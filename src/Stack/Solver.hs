@@ -620,7 +620,7 @@ solveExtraDeps modStackYaml = do
     bconfig <- asks getBuildConfig
 
     let stackYaml = bcStackYaml bconfig
-    relStackYaml <- toFilePath <$> makeRelativeToCurrentDir stackYaml
+    relStackYaml <- prettyPath stackYaml
 
     $logInfo $ "Using configuration file: " <> T.pack relStackYaml
     packages <- getLocalPackages
