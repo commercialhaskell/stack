@@ -754,6 +754,7 @@ solveExtraDeps modStackYaml = do
             , "        - Remove any unnecessary packages.\n"
             , "        - Add any missing remote packages.\n"
             , "        - Add extra dependencies to guide solver.\n"
+            , "        - Adjust resolver.\n"
             ]
 
 prettyPath
