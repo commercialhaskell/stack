@@ -3,6 +3,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE GADTs #-}
 
 -- | Make changes to project or global configuration.
 module Stack.ConfigCmd
@@ -30,7 +31,6 @@ import           Path
 import           Prelude -- Silence redundant import warnings
 import           Stack.BuildPlan
 import           Stack.Config (makeConcreteResolver, getStackYaml)
-import           Stack.Types.BuildPlan
 import           Stack.Types.Config
 import           Stack.Types.Resolver
 
@@ -81,12 +81,14 @@ cfgCmdSetValue
     :: (StackMiniM env m, HasConfig env, HasGHCVariant env)
     => ConfigCmdSet -> m Yaml.Value
 cfgCmdSetValue (ConfigCmdSetResolver newResolver) = do
-    -- TODO: custom snapshot support?
-    newResolverText <- fmap resolverName (makeConcreteResolver newResolver)
-    -- We checking here that the snapshot actually exists
-    snap <- parseSnapName newResolverText
-    _ <- loadMiniBuildPlan snap
-    return (Yaml.String newResolverText)
+    concreteResolver <- makeConcreteResolver newResolver
+    case concreteResolver of
+        -- Check that the snapshot actually exists
+        ResolverSnapshot snapName -> void $ loadMiniBuildPlan snapName
+        ResolverCompiler _ -> return ()
+        -- TODO: custom snapshot support?  Would need a way to specify on CLI
+        ResolverCustom _ _ -> error "'stack config set resolver' does not support custom resolvers"
+    return (Yaml.String (resolverName concreteResolver))
 cfgCmdSetValue (ConfigCmdSetSystemGhc _ bool) =
     return (Yaml.Bool bool)
 cfgCmdSetValue (ConfigCmdSetInstallGhc _ bool) =
