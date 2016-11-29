@@ -11,30 +11,16 @@ module Stack.Upgrade
     , upgradeOpts
     ) where
 
-import qualified Codec.Archive.Tar           as Tar
-import           Control.Exception.Safe      (catchAny, throwM)
-import           Control.Monad               (guard, unless, when)
+import           Control.Exception.Safe      (catchAny)
+import           Control.Monad               (unless, when)
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
-import           Control.Monad.Reader        (MonadReader, asks)
-import           Data.Aeson                  (Value (Array, Object, String))
-import qualified Data.ByteString.Lazy        as L
-import           Data.Conduit                ((.|))
-import           Data.Conduit.Lazy           (lazyConsume)
-import           Data.Conduit.Zlib           (ungzip)
-import           Data.Foldable               (fold, forM_)
-import qualified Data.HashMap.Strict         as HashMap
+import           Data.Foldable               (forM_)
 import qualified Data.Map                    as Map
-import           Data.Maybe                  (isNothing, fromMaybe)
+import           Data.Maybe                  (isNothing)
 import           Data.Monoid.Extra
 import qualified Data.Text as T
-import qualified Data.Version
-import           Distribution.System         (Platform (Platform), Arch (..), OS (..))
 import           Lens.Micro                  (set)
-import           Network.HTTP.Client         (parseUrlThrow)
-import           Network.HTTP.Simple         (Request, httpJSON, withResponse,
-                                              setRequestHeader, getResponseBody,
-                                              getResponseStatusCode, parseRequest)
 import           Options.Applicative
 import           Path
 import           Path.IO
@@ -51,16 +37,9 @@ import           Stack.Types.Config
 import           Stack.Types.Internal
 import           Stack.Types.Resolver
 import           Stack.Types.StackT
-import qualified System.Directory            as IO
 import           System.Exit                 (ExitCode (ExitSuccess))
-import qualified System.FilePath             as FP
 import           System.Process              (rawSystem, readProcess)
 import           System.Process.Run
-import           Text.ParserCombinators.ReadP (readP_to_S)
-
-#if !WINDOWS
-import           System.Posix.Files (setFileMode)
-#endif
 
 upgradeOpts :: Parser UpgradeOpts
 upgradeOpts = UpgradeOpts
@@ -145,74 +124,15 @@ upgrade gConfigMonoid mresolver builtHash (UpgradeOpts mbo mso) =
     binary bo = binaryUpgrade bo
     source so = sourceUpgrade gConfigMonoid mresolver builtHash so
 
-newtype StackReleaseInfo = StackReleaseInfo Value
-
-downloadStackReleaseInfo :: MonadIO m
-                         => Maybe String -- Github org
-                         -> Maybe String -- Github repo
-                         -> Maybe String -- ^ optional version
-                         -> m StackReleaseInfo
-downloadStackReleaseInfo morg mrepo mver = liftIO $ do
-    let org = fromMaybe "commercialhaskell" morg
-        repo = fromMaybe "stack" mrepo
-    let url = concat
-            [ "https://api.github.com/repos/"
-            , org
-            , "/"
-            , repo
-            , "/releases/"
-            , case mver of
-                Nothing -> "latest"
-                Just ver -> "tags/v" ++ ver
-            ]
-    req <- parseRequest url
-    res <- httpJSON $ setUserAgent req
-    let code = getResponseStatusCode res
-    if code >= 200 && code < 300
-        then return $ StackReleaseInfo $ getResponseBody res
-        else error $ "Could not get release information for Stack from: " ++ url
-
-setUserAgent :: Request -> Request
-setUserAgent = setRequestHeader "User-Agent" ["Haskell Stack Upgrade"]
-
-getDownloadVersion :: StackReleaseInfo -> Maybe Data.Version.Version
-getDownloadVersion (StackReleaseInfo val) = do
-    Object o <- Just val
-    String rawName <- HashMap.lookup "name" o
-    case filter (null . snd)
-        $ readP_to_S Data.Version.parseVersion
-        $ T.unpack $ T.drop 1 rawName of
-        (v, _):_ -> Just v
-        [] -> Nothing
-
-preferredPlatforms :: (MonadReader env m, HasPlatform env) => m [String]
-preferredPlatforms = do
-    Platform arch' os' <- asks getPlatform
-    os <-
-      case os' of
-        Linux -> return "linux"
-        Windows -> return "windows"
-        OSX -> return "osx"
-        FreeBSD -> return "freebsd"
-        _ -> error $ "Binary upgrade not yet supported on OS: " ++ show os'
-    arch <-
-      case arch' of
-        I386 -> return "i386"
-        X86_64 -> return "x86_64"
-        Arm -> return "arm"
-        _ -> error $ "Binary upgrade not yet supported on arch: " ++ show arch'
-    hasgmp4 <- return False -- FIXME import relevant code from Stack.Setup? checkLib $(mkRelFile "libgmp.so.3")
-    let suffixes
-          | hasgmp4 = ["-static", "-gmp4", ""]
-          | otherwise = ["-static", ""]
-    return $ map (\suffix -> concat [os, "-", arch, suffix]) suffixes
-
 binaryUpgrade
   :: (StackM env m, HasConfig env)
   => BinaryOpts
   -> m ()
 binaryUpgrade (BinaryOpts mplatform force' mver morg mrepo) = do
-    platforms0 <- maybe preferredPlatforms (return . return) mplatform
+    platforms0 <-
+      case mplatform of
+        Nothing -> preferredPlatforms
+        Just p -> return [("windows" `T.isInfixOf` T.pack p, p)]
     archiveInfo <- downloadStackReleaseInfo morg mrepo mver
 
     let mdownloadVersion = getDownloadVersion archiveInfo
@@ -230,11 +150,11 @@ binaryUpgrade (BinaryOpts mplatform force' mver morg mrepo) = do
             Just downloadVersion -> do
                 $logInfo $ T.concat
                     [ "Current Stack version: "
-                    , T.pack $ Data.Version.showVersion Paths.version
+                    , versionText stackVersion
                     , ", available download version: "
-                    , T.pack $ Data.Version.showVersion downloadVersion
+                    , versionText downloadVersion
                     ]
-                return $ downloadVersion > Paths.version
+                return $ downloadVersion > stackVersion
 
     toUpgrade <- case (force, isNewer) of
         (False, False) -> do
@@ -248,104 +168,12 @@ binaryUpgrade (BinaryOpts mplatform force' mver morg mrepo) = do
             return True
     when toUpgrade $ do
         config <- askConfig
-        let destFile = toFilePath (configLocalBin config </> $(mkRelFile "stack"))
-#if WINDOWS
-                            FP.<.> "exe"
-#endif
+        downloadStackExe platforms0 archiveInfo (configLocalBin config) $ \tmpFile -> do
+            -- Sanity check!
+            ec <- rawSystem (toFilePath tmpFile) ["--version"]
 
-        downloadStackExe platforms0 archiveInfo destFile
-
-downloadStackExe
-    :: (MonadIO m, MonadLogger m, MonadReader env m, HasConfig env)
-    => [String] -- ^ acceptable platforms
-    -> StackReleaseInfo
-    -> FilePath -- ^ destination
-    -> m ()
-downloadStackExe platforms0 archiveInfo destFile = do
-    archiveURL <-
-      let loop [] = error $ "Unable to find binary Stack archive for platforms: " ++ unwords platforms0
-          loop (p':ps) = do
-            let p = T.pack p'
-            $logInfo $ "Querying for archive location for platform: " <> p
-            case findArchive archiveInfo p of
-              Just x -> return x
-              Nothing -> loop ps
-       in loop platforms0
-
-    $logInfo $ "Downloading from: " <> archiveURL
-
-    liftIO $ do
-      case () of
-        ()
-          | ".tar.gz" `T.isSuffixOf` archiveURL -> handleTarball archiveURL
-          | ".zip" `T.isSuffixOf` archiveURL -> error "FIXME: Handle zip files"
-          | otherwise -> error $ "Unknown archive format for Stack archive: " ++ T.unpack archiveURL
-
-    $logInfo "Download complete, testing executable"
-
-    liftIO $ do
-      absTmpFile <- IO.canonicalizePath tmpFile
-
-#if !WINDOWS
-      setFileMode absTmpFile 0o755
-#endif
-
-      -- Sanity check!
-      ec <- rawSystem absTmpFile ["--version"]
-
-      unless (ec == ExitSuccess)
-              $ error $ "Non-success exit code from running newly downloaded executable"
-
-      IO.renameFile tmpFile destFile
-
-    $logInfo $ T.pack $ "New stack executable available at " ++ destFile
-  where
-    tmpFile = destFile FP.<.> "tmp"
-
-    findArchive (StackReleaseInfo val) pattern = do
-        Object top <- return val
-        Array assets <- HashMap.lookup "assets" top
-        getFirst $ fold $ fmap (First . findMatch pattern') assets
-      where
-        pattern' = mconcat ["-", pattern, "."]
-
-        findMatch pattern'' (Object o) = do
-            String name <- HashMap.lookup "name" o
-            guard $ not $ ".asc" `T.isSuffixOf` name
-            guard $ pattern'' `T.isInfixOf` name
-            String url <- HashMap.lookup "browser_download_url" o
-            Just url
-        findMatch _ _ = Nothing
-
-    handleTarball :: T.Text -> IO ()
-    handleTarball url = do
-        req <- fmap setUserAgent $ parseUrlThrow $ T.unpack url
-        withResponse req $ \res -> do
-            entries <- fmap (Tar.read . L.fromChunks)
-                     $ lazyConsume
-                     $ getResponseBody res .| ungzip
-            let loop Tar.Done = error $ concat
-                    [ "Stack executable "
-                    , show exeName
-                    , " not found in archive from "
-                    , T.unpack url
-                    ]
-                loop (Tar.Fail e) = throwM e
-                loop (Tar.Next e es)
-                    | Tar.entryPath e == exeName =
-                        case Tar.entryContent e of
-                            Tar.NormalFile lbs _ -> L.writeFile tmpFile lbs
-                            _ -> error $ concat
-                                [ "Invalid file type for tar entry named "
-                                , exeName
-                                , " downloaded from "
-                                , T.unpack url
-                                ]
-                    | otherwise = loop es
-            loop entries
-      where
-        -- The takeBaseName drops the .gz, dropExtension drops the .tar
-        exeName = FP.dropExtension (FP.takeBaseName (T.unpack url)) FP.</> "stack"
+            unless (ec == ExitSuccess)
+                    $ error $ "Non-success exit code from running newly downloaded executable"
 
 sourceUpgrade
   :: (StackM env m, HasConfig env)
