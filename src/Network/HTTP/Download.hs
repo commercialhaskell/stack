@@ -17,6 +17,7 @@ module Network.HTTP.Download
     , httpJSON
     , parseRequest
     , parseUrlThrow
+    , setGithubHeaders
     ) where
 
 import           Control.Exception           (Exception)
@@ -35,10 +36,10 @@ import           Data.Text.Encoding.Error    (lenientDecode)
 import           Data.Text.Encoding          (decodeUtf8With)
 import           Data.Typeable               (Typeable)
 import           Network.HTTP.Client         (Request, Response, path, checkResponse, parseUrlThrow, parseRequest)
-import           Network.HTTP.Client.Conduit (
-                                              requestHeaders)
+import           Network.HTTP.Client.Conduit (requestHeaders)
 import           Network.HTTP.Download.Verified
-import           Network.HTTP.Simple         (httpJSON, withResponse, getResponseBody, getResponseHeaders, getResponseStatusCode)
+import           Network.HTTP.Simple         (httpJSON, withResponse, getResponseBody, getResponseHeaders, getResponseStatusCode,
+                                              setRequestHeader)
 import           Path                        (Abs, File, Path, toFilePath)
 import           System.Directory            (createDirectoryIfMissing,
                                               removeFile)
@@ -113,3 +114,8 @@ redownload req0 dest = do
 data DownloadException = RedownloadFailed Request (Path Abs File) (Response ())
     deriving (Show, Typeable)
 instance Exception DownloadException
+
+-- | Set the user-agent request header
+setGithubHeaders :: Request -> Request
+setGithubHeaders = setRequestHeader "User-Agent" ["The Haskell Stack"]
+                 . setRequestHeader "Accept" ["application/vnd.github.v3+json"]

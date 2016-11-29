@@ -20,12 +20,21 @@ module Stack.Setup
   , SetupOpts (..)
   , defaultSetupInfoYaml
   , removeHaskellEnvVars
+
+  -- * Stack binary download
+  , StackReleaseInfo
+  , getDownloadVersion
+  , stackVersion
+  , preferredPlatforms
+  , downloadStackReleaseInfo
+  , downloadStackExe
   ) where
 
+import qualified    Codec.Archive.Tar as Tar
 import              Control.Applicative
 import              Control.Concurrent.Async.Lifted (Concurrently(..))
 import              Control.Exception.Safe (catchIO, tryAny)
-import              Control.Monad (liftM, when, join, void, unless)
+import              Control.Monad (liftM, when, join, void, unless, guard)
 import              Control.Monad.Catch
 import              Control.Monad.IO.Class (MonadIO, liftIO)
 import              Control.Monad.Logger
@@ -38,11 +47,14 @@ import qualified    Data.ByteString as S
 import qualified    Data.ByteString.Char8 as S8
 import qualified    Data.ByteString.Lazy as LBS
 import              Data.Char (isSpace)
-import              Data.Conduit (Conduit, (=$), await, yield, awaitForever)
+import              Data.Conduit (Conduit, (=$), await, yield, awaitForever, (.|))
+import              Data.Conduit.Lazy (lazyConsume)
 import              Data.Conduit.Lift (evalStateC)
 import qualified    Data.Conduit.List as CL
+import              Data.Conduit.Zlib           (ungzip)
 import              Data.Either
 import              Data.Foldable hiding (concatMap, or, maximum)
+import qualified    Data.HashMap.Strict as HashMap
 import              Data.IORef
 import              Data.IORef.RunOnce (runOnce)
 import              Data.List hiding (concat, elem, maximumBy, any)
@@ -65,9 +77,8 @@ import              Distribution.System (OS (Linux), Arch (..), Platform (..))
 import qualified    Distribution.System as Cabal
 import              Distribution.Text (simpleParse)
 import              Lens.Micro (set)
-import              Network.HTTP.Client (parseUrlThrow)
-import              Network.HTTP.Simple (getResponseBody, httpLBS)
-import              Network.HTTP.Download.Verified
+import              Network.HTTP.Simple (getResponseBody, httpLBS, withResponse, getResponseStatusCode)
+import              Network.HTTP.Download
 import              Path
 import              Path.Extra (toFilePathNoTrailingSep)
 import              Path.IO hiding (findExecutable)
@@ -102,6 +113,10 @@ import              System.Process.Log (withProcessTimeLog)
 import              System.Process.Read
 import              System.Process.Run (runCmd, Cmd(..))
 import              Text.Printf (printf)
+
+#if !WINDOWS
+import           System.Posix.Files (setFileMode)
+#endif
 
 -- | Default location of the stack-setup.yaml file
 defaultSetupInfoYaml :: String
@@ -186,10 +201,10 @@ instance Show SetupException where
         "stack does not yet support using --ghc-variant with GHCJS"
     show GHCJSNotBooted =
         "GHCJS does not yet have its boot packages installed.  Use \"stack setup\" to attempt to run ghcjs-boot."
-    show (DockerStackExeNotFound stackVersion osKey) = concat
+    show (DockerStackExeNotFound stackVersion' osKey) = concat
         [ stackProgName
         , "-"
-        , versionString stackVersion
+        , versionString stackVersion'
         , " executable not found for "
         , T.unpack osKey
         , "\nUse the '"
@@ -593,42 +608,16 @@ ensureDockerStackExe containerPlatform = do
     config <- asks getConfig
     containerPlatformDir <- runReaderT platformOnlyRelDir (containerPlatform,PlatformVariantNone)
     let programsPath = configLocalProgramsBase config </> containerPlatformDir
-        stackVersion = fromCabalVersion Meta.version
         tool = Tool (PackageIdentifier $(mkPackageName "stack") stackVersion)
-    stackExePath <- (</> $(mkRelFile "stack")) <$> installDir programsPath tool
+    stackExeDir <- installDir programsPath tool
+    let stackExePath = stackExeDir </> $(mkRelFile "stack")
     stackExeExists <- doesFileExist stackExePath
-    unless stackExeExists $
-        do
-           $logInfo $ mconcat ["Downloading Docker-compatible ", T.pack stackProgName, " executable"]
-           si <- getSetupInfo defaultSetupInfoYaml
-           osKey <- getOSKey containerPlatform
-           info <-
-               case Map.lookup osKey (siStack si) of
-                   Just versions ->
-                       case Map.lookup stackVersion versions of
-                           Just x -> return x
-                           Nothing ->
-                               case mapMaybe (matchMinor stackVersion) (Map.keys versions) of
-                                   (v:_) ->
-                                       case Map.lookup v versions of
-                                           Just x -> return x
-                                           Nothing ->  throwM (DockerStackExeNotFound v osKey)
-                                   [] -> throwM (DockerStackExeNotFound stackVersion osKey)
-                   Nothing -> throwM (DockerStackExeNotFound stackVersion osKey)
-           _ <-
-               downloadAndInstallTool
-                   programsPath
-                   si
-                   info
-                   tool
-                   installDockerStackExe
-           return ()
+    unless stackExeExists $ do
+        $logInfo $ mconcat ["Downloading Docker-compatible ", T.pack stackProgName, " executable"]
+        sri <- downloadStackReleaseInfo Nothing Nothing (Just (versionString stackVersion))
+        let platforms = preferredPlatforms (containerPlatform, PlatformVariantNone)
+        downloadStackExe platforms sri stackExeDir (const $ return ())
     return stackExePath
-  where
-    matchMinor stackVersion v =
-        if checkVersion MatchMinor stackVersion v
-            then Just v
-            else Nothing
 
 -- | Install the newest version of Cabal globally
 upgradeCabal :: (StackM env m, HasConfig env, HasGHCVariant env)
@@ -1092,30 +1081,6 @@ installGHCJS si archiveFile archiveType _tempDir destDir = do
             ignoringAbsence (removeFile dest)
             copyFile optionsFile dest
     $logStickyDone "Installed GHCJS."
-
--- Install the downloaded stack binary distribution
-installDockerStackExe
-    :: (StackM env m, HasConfig env)
-    => SetupInfo
-    -> Path Abs File
-    -> ArchiveType
-    -> Path Abs Dir
-    -> Path Abs Dir
-    -> m ()
-installDockerStackExe _ archiveFile _ tempDir destDir = do
-    (_,tarTool) <-
-        checkDependencies $
-        (,) <$> checkDependency "gzip" <*> checkDependency "tar"
-    menv <- getMinimalEnvOverride
-    readProcessNull
-        (Just tempDir)
-        menv
-        tarTool
-        ["xf", toFilePath archiveFile, "--strip-components", "1"]
-    ensureDir destDir
-    renameFile
-        (tempDir </> $(mkRelFile stackProgName))
-        (destDir </> $(mkRelFile stackProgName))
 
 ensureGhcjsBooted :: (StackM env m, HasConfig env)
                   => EnvOverride -> CompilerVersion -> Bool -> m ()
@@ -1675,3 +1640,166 @@ getUtf8EnvVars menv compilerVer =
     fallbackPrefixes = ["C.", "en_US.", "en_"]
     -- Suffixes of UTF-8 locales (case-insensitive)
     utf8Suffixes = [".UTF-8", ".utf8"]
+
+-- Binary Stack upgrades
+
+newtype StackReleaseInfo = StackReleaseInfo Value
+
+downloadStackReleaseInfo :: MonadIO m
+                         => Maybe String -- Github org
+                         -> Maybe String -- Github repo
+                         -> Maybe String -- ^ optional version
+                         -> m StackReleaseInfo
+downloadStackReleaseInfo morg mrepo mver = liftIO $ do
+    let org = fromMaybe "commercialhaskell" morg
+        repo = fromMaybe "stack" mrepo
+    let url = concat
+            [ "https://api.github.com/repos/"
+            , org
+            , "/"
+            , repo
+            , "/releases/"
+            , case mver of
+                Nothing -> "latest"
+                Just ver -> "tags/v" ++ ver
+            ]
+    req <- parseRequest url
+    res <- httpJSON $ setGithubHeaders req
+    let code = getResponseStatusCode res
+    if code >= 200 && code < 300
+        then return $ StackReleaseInfo $ getResponseBody res
+        else error $ "Could not get release information for Stack from: " ++ url
+
+preferredPlatforms :: (MonadReader env m, HasPlatform env)
+                   => m [(Bool, String)]
+preferredPlatforms = do
+    Platform arch' os' <- asks getPlatform
+    (isWindows, os) <-
+      case os' of
+        Cabal.Linux -> return (False, "linux")
+        Cabal.Windows -> return (True, "windows")
+        Cabal.OSX -> return (False, "osx")
+        Cabal.FreeBSD -> return (False, "freebsd")
+        _ -> error $ "Binary upgrade not yet supported on OS: " ++ show os'
+    arch <-
+      case arch' of
+        I386 -> return "i386"
+        X86_64 -> return "x86_64"
+        Arm -> return "arm"
+        _ -> error $ "Binary upgrade not yet supported on arch: " ++ show arch'
+    hasgmp4 <- return False -- FIXME import relevant code from Stack.Setup? checkLib $(mkRelFile "libgmp.so.3")
+    let suffixes
+          | hasgmp4 = ["-static", "-gmp4", ""]
+          | otherwise = ["-static", ""]
+    return $ map (\suffix -> (isWindows, concat [os, "-", arch, suffix])) suffixes
+
+downloadStackExe
+    :: (MonadIO m, MonadLogger m, MonadReader env m, HasConfig env)
+    => [(Bool, String)] -- ^ acceptable platforms
+    -> StackReleaseInfo
+    -> Path Abs Dir -- ^ destination directory
+    -> (Path Abs File -> IO ()) -- ^ test the temp exe before renaming
+    -> m ()
+downloadStackExe platforms0 archiveInfo destDir testExe = do
+    (isWindows, archiveURL) <-
+      let loop [] = error $ "Unable to find binary Stack archive for platforms: "
+                         ++ unwords (map snd platforms0)
+          loop ((isWindows, p'):ps) = do
+            let p = T.pack p'
+            $logInfo $ "Querying for archive location for platform: " <> p
+            case findArchive archiveInfo p of
+              Just x -> return (isWindows, x)
+              Nothing -> loop ps
+       in loop platforms0
+
+    let (destFile, tmpFile)
+            | isWindows =
+                ( destDir </> $(mkRelFile "stack.exe")
+                , destDir </> $(mkRelFile "stack.tmp.exe")
+                )
+            | otherwise =
+                ( destDir </> $(mkRelFile "stack")
+                , destDir </> $(mkRelFile "stack.tmp")
+                )
+
+    $logInfo $ "Downloading from: " <> archiveURL
+
+    liftIO $ do
+      case () of
+        ()
+          | ".tar.gz" `T.isSuffixOf` archiveURL -> handleTarball tmpFile isWindows archiveURL
+          | ".zip" `T.isSuffixOf` archiveURL -> error "FIXME: Handle zip files"
+          | otherwise -> error $ "Unknown archive format for Stack archive: " ++ T.unpack archiveURL
+
+    $logInfo "Download complete, testing executable"
+
+    liftIO $ do
+#if !WINDOWS
+      setFileMode (toFilePath tmpFile) 0o755
+#endif
+
+      testExe tmpFile
+
+      renameFile tmpFile destFile
+
+    $logInfo $ T.pack $ "New stack executable available at " ++ toFilePath destFile
+  where
+
+    findArchive (StackReleaseInfo val) pattern = do
+        Object top <- return val
+        Array assets <- HashMap.lookup "assets" top
+        getFirst $ fold $ fmap (First . findMatch pattern') assets
+      where
+        pattern' = mconcat ["-", pattern, "."]
+
+        findMatch pattern'' (Object o) = do
+            String name <- HashMap.lookup "name" o
+            guard $ not $ ".asc" `T.isSuffixOf` name
+            guard $ pattern'' `T.isInfixOf` name
+            String url <- HashMap.lookup "browser_download_url" o
+            Just url
+        findMatch _ _ = Nothing
+
+    handleTarball :: Path Abs File -> Bool -> T.Text -> IO ()
+    handleTarball tmpFile isWindows url = do
+        req <- fmap setGithubHeaders $ parseUrlThrow $ T.unpack url
+        withResponse req $ \res -> do
+            entries <- fmap (Tar.read . LBS.fromChunks)
+                     $ lazyConsume
+                     $ getResponseBody res .| ungzip
+            let loop Tar.Done = error $ concat
+                    [ "Stack executable "
+                    , show exeName
+                    , " not found in archive from "
+                    , T.unpack url
+                    ]
+                loop (Tar.Fail e) = throwM e
+                loop (Tar.Next e es)
+                    | Tar.entryPath e == exeName =
+                        case Tar.entryContent e of
+                            Tar.NormalFile lbs _ -> do
+                              ensureDir destDir
+                              LBS.writeFile (toFilePath tmpFile) lbs
+                            _ -> error $ concat
+                                [ "Invalid file type for tar entry named "
+                                , exeName
+                                , " downloaded from "
+                                , T.unpack url
+                                ]
+                    | otherwise = loop es
+            loop entries
+      where
+        -- The takeBaseName drops the .gz, dropExtension drops the .tar
+        exeName =
+            let base = FP.dropExtension (FP.takeBaseName (T.unpack url)) FP.</> "stack"
+             in if isWindows then base FP.<.> "exe" else base
+
+getDownloadVersion :: StackReleaseInfo -> Maybe Version
+getDownloadVersion (StackReleaseInfo val) = do
+    Object o <- Just val
+    String rawName <- HashMap.lookup "name" o
+    -- drop the "v" at the beginning of the name
+    parseVersion $ T.drop 1 rawName
+
+stackVersion :: Version
+stackVersion = fromCabalVersion Meta.version

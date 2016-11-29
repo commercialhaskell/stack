@@ -291,7 +291,7 @@ listTemplates = do
 -- | Get the set of templates.
 getTemplates :: StackM env m => m (Set TemplateName)
 getTemplates = do
-    req <- liftM addHeaders (parseUrlThrow defaultTemplatesList)
+    req <- liftM setGithubHeaders (parseUrlThrow defaultTemplatesList)
     resp <- catch (httpJSON req) (throwM . FailedToDownloadTemplates)
     case getResponseStatusCode resp of
         200 -> return $ unTemplateSet $ getResponseBody resp
@@ -299,7 +299,7 @@ getTemplates = do
 
 getTemplateInfo :: StackM env m => m (Map Text TemplateInfo)
 getTemplateInfo = do
-  req <- liftM addHeaders (parseUrlThrow defaultTemplateInfoUrl)
+  req <- liftM setGithubHeaders (parseUrlThrow defaultTemplateInfoUrl)
   resp <- catch (liftM Right $ httpLbs req) (\(ex :: HttpException) -> return . Left $ "Failed to download template info. The HTTP error was: " <> show ex)
   case resp >>= is200 of
     Left err -> do
@@ -316,10 +316,6 @@ getTemplateInfo = do
       case getResponseStatusCode resp of
         200 -> return resp
         code -> Left $ "Unexpected status code while retrieving templates info: " <> show code
-
-addHeaders :: Request -> Request
-addHeaders = setRequestHeader "User-Agent" ["The Haskell Stack"]
-           . setRequestHeader "Accept" ["application/vnd.github.v3+json"]
 
 newtype TemplateSet = TemplateSet { unTemplateSet :: Set TemplateName }
 instance FromJSON TemplateSet where
