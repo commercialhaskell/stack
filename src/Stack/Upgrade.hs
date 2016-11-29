@@ -13,7 +13,7 @@ module Stack.Upgrade
 
 import qualified Codec.Archive.Tar           as Tar
 import           Control.Exception.Safe      (catchAny, throwM)
-import           Control.Monad               (guard, liftM, unless, when)
+import           Control.Monad               (guard, unless, when)
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import           Control.Monad.Reader        (MonadReader, asks)
@@ -25,7 +25,7 @@ import           Data.Conduit.Zlib           (ungzip)
 import           Data.Foldable               (fold, forM_)
 import qualified Data.HashMap.Strict         as HashMap
 import qualified Data.Map                    as Map
-import           Data.Maybe                  (isNothing)
+import           Data.Maybe                  (isNothing, fromMaybe)
 import           Data.Monoid.Extra
 import qualified Data.Text as T
 import qualified Data.Version
@@ -33,7 +33,8 @@ import           Distribution.System         (Platform (Platform), Arch (..), OS
 import           Lens.Micro                  (set)
 import           Network.HTTP.Client         (parseUrlThrow)
 import           Network.HTTP.Simple         (Request, httpJSON, withResponse,
-                                              setRequestHeader, getResponseBody)
+                                              setRequestHeader, getResponseBody,
+                                              getResponseStatusCode, parseRequest)
 import           Options.Applicative
 import           Path
 import           Path.IO
@@ -77,6 +78,15 @@ upgradeOpts = UpgradeOpts
         <*> switch
          (long "force-download" <>
           help "Download a stack executable, even if the version number is older than what we have")
+        <*> optional (strOption
+         (long "binary-version" <>
+          help "Download a specific version, even if it's out of date"))
+        <*> optional (strOption
+         (long "github-org" <>
+          help "Github organization name"))
+        <*> optional (strOption
+         (long "github-repo" <>
+          help "Github repository name"))
 
     sourceOpts = SourceOpts
         <$> ((\fromGit repo -> if fromGit then Just repo else Nothing)
@@ -94,6 +104,10 @@ data BinaryOpts = BinaryOpts
     , _boForce :: !Bool
     -- ^ force a download, even if the downloaded version is older
     -- than what we are
+    , _boVersion :: !(Maybe String)
+    -- ^ specific version to download
+    , _boGithubOrg :: !(Maybe String)
+    , _boGithubRepo :: !(Maybe String)
     }
     deriving Show
 data SourceOpts = SourceOpts
@@ -133,11 +147,30 @@ upgrade gConfigMonoid mresolver builtHash (UpgradeOpts mbo mso) =
 
 newtype StackReleaseInfo = StackReleaseInfo Value
 
-downloadStackReleaseInfo :: MonadIO m => m StackReleaseInfo
-downloadStackReleaseInfo = do
-    -- FIXME make the Github repo configurable?
-    let req = setUserAgent "https://api.github.com/repos/commercialhaskell/stack/releases/latest"
-    liftM (StackReleaseInfo . getResponseBody) (httpJSON req)
+downloadStackReleaseInfo :: MonadIO m
+                         => Maybe String -- Github org
+                         -> Maybe String -- Github repo
+                         -> Maybe String -- ^ optional version
+                         -> m StackReleaseInfo
+downloadStackReleaseInfo morg mrepo mver = liftIO $ do
+    let org = fromMaybe "commercialhaskell" morg
+        repo = fromMaybe "stack" mrepo
+    let url = concat
+            [ "https://api.github.com/repos/"
+            , org
+            , "/"
+            , repo
+            , "/releases/"
+            , case mver of
+                Nothing -> "latest"
+                Just ver -> "tags/v" ++ ver
+            ]
+    req <- parseRequest url
+    res <- httpJSON $ setUserAgent req
+    let code = getResponseStatusCode res
+    if code >= 200 && code < 300
+        then return $ StackReleaseInfo $ getResponseBody res
+        else error $ "Could not get release information for Stack from: " ++ url
 
 setUserAgent :: Request -> Request
 setUserAgent = setRequestHeader "User-Agent" ["Haskell Stack Upgrade"]
@@ -178,11 +211,15 @@ binaryUpgrade
   :: (StackM env m, HasConfig env)
   => BinaryOpts
   -> m ()
-binaryUpgrade (BinaryOpts mplatform force) = do
+binaryUpgrade (BinaryOpts mplatform force' mver morg mrepo) = do
     platforms0 <- maybe preferredPlatforms (return . return) mplatform
-    archiveInfo <- downloadStackReleaseInfo
+    archiveInfo <- downloadStackReleaseInfo morg mrepo mver
 
     let mdownloadVersion = getDownloadVersion archiveInfo
+        force =
+          case mver of
+            Nothing -> force'
+            Just _ -> True -- specifying a version implies we're forcing things
     isNewer <-
         case mdownloadVersion of
             Nothing -> do
