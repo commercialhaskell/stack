@@ -173,7 +173,7 @@ binaryUpgrade (BinaryOpts mplatform force' mver morg mrepo) = do
             ec <- rawSystem (toFilePath tmpFile) ["--version"]
 
             unless (ec == ExitSuccess)
-                    $ error $ "Non-success exit code from running newly downloaded executable"
+                    $ error "Non-success exit code from running newly downloaded executable"
 
 sourceUpgrade
   :: (StackM env m, HasConfig env)
