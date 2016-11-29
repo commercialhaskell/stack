@@ -22,10 +22,11 @@ Major changes:
   flag.
   [#2221](https://github.com/commercialhaskell/stack/issues/2221)
 * Stack is now capable of doing binary upgrades instead of always
-  recompiling a new version from source. In order to take advantage of
-  this, you should do a binary installation so that your platform is
-  properly configured, and from then on `stack upgrade` will default
-  to binary upgrades.
+  recompiling a new version from source. Running `stack upgrade` will
+  now default to downloading a binary version of Stack from the most
+  recent release, if one is available. See `stack upgrade --help` for
+  more options.
+  [#1238](https://github.com/commercialhaskell/stack/issues/1238)
 
 Behavior changes:
 
