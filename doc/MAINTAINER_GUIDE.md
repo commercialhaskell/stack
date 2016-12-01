@@ -11,6 +11,7 @@
 ## Pre-release steps
 
 * Ensure `release` and `stable` branches merged to `master`
+* Check compatibility with latest stackage snapshot
 * Ensure integration tests pass on a representative Windows, Mac OS X, and Linux (Linux
   is handled by Jenkins automatically): `stack install --pedantic && stack test
   --pedantic --flag stack:integration-tests` . The actual release script will
@@ -248,13 +249,15 @@ line.
     qemu-img create -f raw armdisk.raw 15G && \
     qemu-system-arm -M vexpress-a9 -cpu cortex-a9 -kernel vmlinuz -initrd initrd.gz -sd armdisk.raw -append "root=/dev/mmcblk0p2" -m 1024M -redir tcp:2223::22 -dtb vexpress-v2p-ca9.dtb -append "console=ttyAMA0,115200" -serial stdio
 
-Now the Debian installer will run.  Add at least 1 GB SWAP during installation.
+Now the Debian installer will run. Don't use LVM for partitioning (it won't
+BOOT), and add at least 2 GB swap during installation.
 
 ### Get boot files after install
 
     hdiutil attach -imagekey diskimage-class=CRawDiskImage -nomount armdisk.raw && \
     mkdir -p /Volumes/armdeb && \
     fuse-ext2 /dev/disk2s1 /Volumes/armdeb/ && \
+    sleep 5 && \
     cp /Volumes/armdeb/vmlinuz-3.16.0-4-armmp . && \
     cp /Volumes/armdeb/initrd.img-3.16.0-4-armmp . && \
     hdiutil detach /dev/disk2
@@ -275,42 +278,48 @@ during Debian installation):
 Now you can SSH to the VM using `ssh -p 2223 <<<USERNAME>>>@localhost` and use `sudo` in
 the shell.
 
-### Install GHC/clang
+### Install clang+llvmGHC/clang
 
 NOTE: the Debian jessie `llvm` packge does not work (executables built with it
 just exit with "schedule: re-entered unsafely.").
 
+The version of LLVM needed depends on the version of GHC you need.
+
+#### GHC 7.10.3 (the standard for building Stack)
+
     sudo apt-get install -y g++ gcc libc6-dev libffi-dev libgmp-dev make xz-utils zlib1g-dev git gnupg && \
     wget http://llvm.org/releases/3.5.2/clang+llvm-3.5.2-armv7a-linux-gnueabihf.tar.xz && \
-    sudo tar xvf clang+llvm-3.5.2-armv7a-linux-gnueabihf.tar.xz -C /opt && \
-    http://downloads.haskell.org/~ghc/7.10.3/ghc-7.10.3-armv7-deb8-linux.tar.xz
+    sudo tar xvf clang+llvm-3.5.2-armv7a-linux-gnueabihf.tar.xz -C /opt
+
+Run this now and add it to the `.profile`:
+
+    export PATH="$HOME/.local/bin:/opt/clang+llvm-3.5.2-armv7a-linux-gnueabihf/bin:$PATH"
+
+#### GHC 8.0.1
+
+    wget http://llvm.org/releases/3.7.1/clang+llvm-3.7.1-armv7a-linux-gnueabihf.tar.xz && \
+    sudo tar xvf clang+llvm-3.7.1-armv7a-linux-gnueabihf.tar.xz -C /opt
+
+Run this now and add it to the `.profile`:
+
+    export PATH="$HOME/.local/bin:/opt/clang+llvm-3.5.2-armv7a-linux-gnueabihf/bin:$PATH"
+
+### Install Stack
+
+#### Binary
+
+Get an [existing `stack` binary](https://github.com/commercialhaskell/stack/releases)
+and put it in `~/.local/bin`.
+
+#### From source (using cabal-install):
+
+    wget http://downloads.haskell.org/~ghc/7.10.3/ghc-7.10.3-armv7-deb8-linux.tar.xz && \
     tar xvf ghc-7.10.3-armv7-deb8-linux.tar.xz && \
     cd ghc-7.10.3 && \
     ./configure --prefix=/opt/ghc-7.10.3 && \
     sudo make install && \
     cd ..
-
-Run this now and add it to the `.profile`:
-
-    export PATH="$HOME/.local/bin:/opt/ghc-7.10.3/bin:/opt/clang+llvm-3.5.2-armv7a-linux-gnueabihf/bin:$PATH"
-
-Note: to install GHC 8.0.1/clang 3.7.1 instead, use:
-
-    wget http://llvm.org/releases/3.7.1/clang+llvm-3.7.1-armv7a-linux-gnueabihf.tar.xz && \
-    sudo tar xvf clang+llvm-3.7.1-armv7a-linux-gnueabihf.tar.xz -C /opt && \
-    wget http://downloads.haskell.org/~ghc/8.0.1/ghc-8.0.1-armv7-deb8-linux.tar.xz && \
-    tar xvf ghc-8.0.1-armv7-deb8-linux.tar.xz && \
-    cd ghc-8.0.1 && \
-    ./configure --prefix=/opt/ghc-8.0.1 && \
-    sudo make install && \
-    cd ..
-
-### Install Stack
-
-Get an [existing `stack` binary](github.com/commercialhaskell/stack/releases)
-and put it in `~/.local/bin`. If that is not possible, bootstrap Stack using
-this process:
-
+    export PATH="/opt/ghc-7.10.3/bin:$PATH"
     wget https://www.haskell.org/cabal/release/cabal-install-1.24.0.0/cabal-install-1.24.0.0.tar.gz &&&&& \
     tar xvf cabal-install-1.24.0.0.tar.gz && \
     cd cabal-install-1.24.0.0 && \
