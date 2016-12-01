@@ -1733,6 +1733,8 @@ downloadStackExe platforms0 archiveInfo destDir testExe = do
 
     $logInfo "Download complete, testing executable"
 
+    platform <- asks getPlatform
+
     liftIO $ do
 #if !WINDOWS
       setFileMode (toFilePath tmpFile) 0o755
@@ -1740,7 +1742,13 @@ downloadStackExe platforms0 archiveInfo destDir testExe = do
 
       testExe tmpFile
 
-      renameFile tmpFile destFile
+      currExe <- getExecutablePath
+      case platform of
+          Platform _ Cabal.Windows | FP.equalFilePath (toFilePath destFile) currExe -> do
+              old <- parseAbsFile (toFilePath destFile ++ ".old")
+              renameFile destFile old
+              renameFile tmpFile destFile
+          _ -> renameFile tmpFile destFile
 
     $logInfo $ T.pack $ "New stack executable available at " ++ toFilePath destFile
   where
