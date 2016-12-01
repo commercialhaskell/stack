@@ -620,7 +620,7 @@ solveExtraDeps modStackYaml = do
     bconfig <- asks getBuildConfig
 
     let stackYaml = bcStackYaml bconfig
-    relStackYaml <- toFilePath <$> makeRelativeToCurrentDir stackYaml
+    relStackYaml <- prettyPath stackYaml
 
     $logInfo $ "Using configuration file: " <> T.pack relStackYaml
     packages <- getLocalPackages
@@ -754,6 +754,7 @@ solveExtraDeps modStackYaml = do
             , "        - Remove any unnecessary packages.\n"
             , "        - Add any missing remote packages.\n"
             , "        - Add extra dependencies to guide solver.\n"
+            , "        - Adjust resolver.\n"
             ]
 
 prettyPath

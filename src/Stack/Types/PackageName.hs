@@ -33,8 +33,6 @@ import           Data.Attoparsec.Text
 import           Data.Data
 import           Data.Hashable
 import           Data.List (intercalate)
-import           Data.Map (Map)
-import qualified Data.Map as Map
 import           Data.Store (Store)
 import           Data.Text (Text)
 import qualified Data.Text as T
@@ -61,7 +59,7 @@ instance Show PackageNameParseFail where
 -- | A package name.
 newtype PackageName =
   PackageName Text
-  deriving (Eq,Ord,Typeable,Data,Generic,Hashable,NFData,Store)
+  deriving (Eq,Ord,Typeable,Data,Generic,Hashable,NFData,Store,ToJSON,ToJSONKey)
 
 instance Lift PackageName where
   lift (PackageName n) =
@@ -71,8 +69,6 @@ instance Lift PackageName where
 instance Show PackageName where
   show (PackageName n) = T.unpack n
 
-instance ToJSON PackageName where
-    toJSON = toJSON . packageNameText
 instance FromJSON PackageName where
   parseJSON j =
     do s <- parseJSON j
@@ -80,6 +76,10 @@ instance FromJSON PackageName where
          Nothing ->
            fail ("Couldn't parse package name: " ++ s)
          Just ver -> return ver
+
+instance FromJSONKey PackageName where
+  fromJSONKey = FromJSONKeyTextParser $ \k ->
+    either (fail . show) return $ parsePackageName k
 
 -- | Attoparsec parser for a package name
 packageNameParser :: Parser PackageName
@@ -140,15 +140,6 @@ parsePackageNameFromFilePath fp = do
   where clean = liftM reverse . strip . reverse
         strip ('l':'a':'b':'a':'c':'.':xs) = return xs
         strip _ = throwM (CabalFileNameParseFail (toFilePath fp))
-
-instance ToJSON a => ToJSON (Map PackageName a) where
-  toJSON = toJSON . Map.mapKeysWith const packageNameText
-instance FromJSON a => FromJSON (Map PackageName a) where
-    parseJSON val = do
-        m <- parseJSON val
-        fmap Map.fromList $ mapM go $ Map.toList m
-      where
-        go (k, v) = fmap (, v) $ either (fail . show) return $ parsePackageNameFromString k
 
 -- | An argument which accepts a template name of the format
 -- @foo.hsfiles@.
