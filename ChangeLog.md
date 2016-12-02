@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.3.1 (unreleased)
+
+Release notes:
+
+Major changes:
+
+Behavior changes:
+
+Other enhancements:
+
+Bug fixes:
+
 ## 1.3.0
 
 Release notes:
