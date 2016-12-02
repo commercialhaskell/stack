@@ -457,7 +457,7 @@ This option is incompatible with `system-ghc: true`.
 
 ### ghc-build
 
-(Since 1.2.1)
+(Since 1.3.0)
 
 Specify a specialized architecture bindist to use.  Normally this is
 determined automatically, but you can override the autodetected value here.
@@ -608,7 +608,7 @@ same name. See the [build command docs](build_command.md) and the
 
 ### dump-logs
 
-(Since UNRELEASED)
+(Since 1.3.0)
 
 Control which log output from local non-dependency packages to print to the
 console. By default, Stack will only do this when building a single target
