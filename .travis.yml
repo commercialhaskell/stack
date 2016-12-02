@@ -89,7 +89,9 @@ install:
 script:
  - set -e; case "$BUILD" in
      style)
-       hlint src/ test/ --cpp-simple --hint=HLint.hs;
+       hlint src/ --hint=HLint.hs;
+       hlint src/ --cpp-define=WINDOWS=1 --hint=HLint.hs;
+       hlint test/ --cpp-simple --hint=HLint.hs;
        stack --no-terminal build --pedantic;;
      stack)
        stack --no-terminal test --haddock --no-haddock-deps --ghc-options="-Werror";;
