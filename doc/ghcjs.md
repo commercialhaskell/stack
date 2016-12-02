@@ -25,39 +25,48 @@ snapshots.
 
 For `ghcjs` based on `ghc-7.10.3` one could try:
 ```yaml
-resolver: lts-6.20
-compiler: ghcjs-0.2.0.9006020_ghc-7.10.3
+resolver: lts-6.25
+compiler: ghcjs-0.2.0.9006025_ghc-7.10.3
 compiler-check: match-exact
 
 setup-info:
   ghcjs:
     source:
-      ghcjs-0.2.0.9006020_ghc-7.10.3:
-         url: http://ghcjs.tolysz.org/lts-6.20-9006020.tar.gz
-         sha1: a6cea90cd8121eee3afb201183c6e9bd6bacd94a
+      ghcjs-0.2.0.9006025_ghc-7.10.3:
+         url: http://ghcjs.tolysz.org/lts-6.25-9006025.tar.gz
+         sha1: 3c87228579b55c05e227a7876682c2a7d4c9c007
 ```
 
 Or for the latest one based on `ghc-8.0.1` (with more features):
 ```yaml
-resolver: lts-7.2
-compiler: ghcjs-0.2.1.9007002_ghc-8.0.1
+resolver: lts-7.8
+compiler: ghcjs-0.2.1.9007008_ghc-8.0.1
 compiler-check: match-exact
 
 setup-info:
   ghcjs:
     source:
-      ghcjs-0.2.1.9007002_ghc-8.0.1:
-          url: http://ghcjs.tolysz.org/ghc-8.0-2016-10-01-lts-7.2-9007002.tar.gz
-          sha1: a41ae415328e2b257d40724d13d1386390c26322
+      ghcjs-0.2.1.9007008_ghc-8.0.1:
+          url: http://ghcjs.tolysz.org/ghc-8.0-2016-11-07-lts-7.8-9007008.tar.gz
+          sha1: 190300a3725cde44b2a08be9ef829f2077bf8825
 ```
 The later can be generated via: https://github.com/tolysz/prepare-ghcjs
-the fromer is a bit more manual. Those bundles are only tested against the latest `node-6.7.0`.
+the fromer is a bit more manual. Those bundles are only tested against the latest `node-6.9.1`.
+
+In order to corrrectly boot and use ghcjs, one might need to install `alex` `happy` `hscolour` `hsc2hs` with the normal ghc.
 
 Older resolvers:
 
 |resolver|url|sha1|
 |---|---|---|
+| lts-7.7 | http://ghcjs.tolysz.org/ghc-8.0-2016-11-03-lts-7.7-9007007.tar.gz | ce169f85f1c49ad613ae77fc494d5565452ff59a |
+| lts-7.5 | http://ghcjs.tolysz.org/ghc-8.0-2016-10-24-lts-7.5-9007005.tar.gz | 450e81028d7f1eb82a16bc4b0809f30730c3e173 |
+| lts-7.4 | http://ghcjs.tolysz.org/ghc-8.0-2016-10-22-lts-7.4-9007004.tar.gz | ed77b3c15fedbadad5ab0e0afe1bd42c0a8695b4 |
+| lts-7.3 | http://ghcjs.tolysz.org/ghc-8.0-2016-10-11-lts-7.3-9007003.tar.gz | 3196fd5eaed670416083cf3678396d02c50096de |
+| lts-7.2 | http://ghcjs.tolysz.org/ghc-8.0-2016-10-01-lts-7.2-9007002.tar.gz | a41ae415328e2b257d40724d13d1386390c26322 | 
 | lts-7.1 | http://ghcjs.tolysz.org/ghc-8.0-2016-09-26-lts-7.1-9007001-mem.tar.gz | e640724883238593e2d2f7f03991cb413ec0347b |
+| lts-6.21 | http://ghcjs.tolysz.org/lts-6.21-9006021.tar.gz | 80b83f85dcec182093418e843979f4cee092fa85 |
+| lts-6.20 | http://ghcjs.tolysz.org/lts-6.20-9006020.tar.gz | a6cea90cd8121eee3afb201183c6e9bd6bacd94a |
 | lts-6.19 | http://ghcjs.tolysz.org/lts-6.19-9006019.tar.gz | ef4264d5a93b269ee4ec8f9d5139da030331d65a |
 | lts-6.18 | http://ghcjs.tolysz.org/lts-6.18-9006018.tar.gz | 3e9f345116c851349a5a551ffd94f7e0b74bfabb |
 
