@@ -16,6 +16,9 @@ Behavior changes:
   as well. If you manually specify a package index with only a Git
   URL, Git will still be used. See
   [#2780](https://github.com/commercialhaskell/stack/issues/2780)
+* Passing `--(no-)nix-*` options now no longer implies `--nix`, except for
+  `--nix-pure`, so that the user preference whether or not to use Nix is
+  honored even in the presence of options that change the Nix behavior.
 
 Other enhancements:
 

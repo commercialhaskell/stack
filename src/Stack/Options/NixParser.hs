@@ -17,7 +17,7 @@ nixOptsParser hide0 = overrideActivation <$>
                      "use of a Nix-shell. Implies 'system-ghc: true'"
                      hide
   <*> firstBoolFlags "nix-pure"
-                     "use of a pure Nix-shell. Implies 'system-ghc: true'"
+                     "use of a pure Nix-shell. Implies '--nix' and 'system-ghc: true'"
                      hide
   <*> optionalFirst
           (textArgsOption
@@ -51,6 +51,7 @@ nixOptsParser hide0 = overrideActivation <$>
   where
     hide = hideMods hide0
     overrideActivation m =
-      if m /= mempty then m { nixMonoidEnable = (First . Just . fromFirst True) (nixMonoidEnable m) }
-      else m
+      if fromFirst False (nixMonoidPureShell m)
+        then m { nixMonoidEnable = (First . Just . fromFirst True) (nixMonoidEnable m) }
+        else m
     textArgsOption = fmap (map T.pack) . argsOption
