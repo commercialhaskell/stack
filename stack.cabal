@@ -354,6 +354,7 @@ test-suite stack-test
                 , http-conduit
                 , monad-logger
                 , neat-interpolation >= 0.3
+                , optparse-applicative >= 0.13 && < 0.14
                 , path >= 0.5.7
                 , path-io >= 1.1.0 && < 2.0.0
                 , resourcet
