@@ -20,14 +20,21 @@ import System.Environment
 import System.IO.Temp (withSystemTempDirectory)
 import Test.Hspec
 
-sampleConfig :: String
-sampleConfig =
+sampleConfigNixEnabled :: String
+sampleConfigNixEnabled =
   "resolver: lts-2.10\n" ++
   "packages: ['.']\n" ++
   "system-ghc: true\n" ++
   "nix:\n" ++
   "   enable: True\n" ++
   "   packages: [glpk]"
+
+sampleConfigNixDisabled :: String
+sampleConfigNixDisabled =
+  "resolver: lts-2.10\n" ++
+  "packages: ['.']\n" ++
+  "nix:\n" ++
+  "   enable: False"
 
 stackDotYaml :: Path Rel File
 stackDotYaml = $(mkRelFile "stack.yaml")
@@ -44,14 +51,21 @@ spec = beforeAll setup $ do
           let enterDir = setCurrentDirectory tempDir
               exitDir = setCurrentDirectory currentDirectory
           bracket_ enterDir exitDir action
-  describe "nix" $ do
-    it "sees that the nix shell is enabled" $ inTempDir $ do
-      writeFile (toFilePath stackDotYaml) sampleConfig
-      lc <- loadConfig'
-      nixEnable (configNix $ lcConfig lc) `shouldBe` True
+      withStackDotYaml config test = inTempDir $ do
+        writeFile (toFilePath stackDotYaml) config
+        test
+  describe "nix disabled in config file" $ do
+    it "sees that the nix shell is not enabled" $
+      withStackDotYaml sampleConfigNixDisabled $ do
+        lc <- loadConfig'
+        nixEnable (configNix $ lcConfig lc) `shouldBe` False
+  describe "nix enabled in config file" $ do
+    it "sees that the nix shell is enabled" $
+      withStackDotYaml sampleConfigNixEnabled $ do
+        lc <- loadConfig'
+        nixEnable (configNix $ lcConfig lc) `shouldBe` True
     it "sees that the only package asked for is glpk and asks for the correct GHC derivation" $
-      inTempDir $ do
-        writeFile (toFilePath stackDotYaml) sampleConfig
+      withStackDotYaml sampleConfigNixEnabled $ do
         lc <- loadConfig'
         nixPackages (configNix $ lcConfig lc) `shouldBe` ["glpk"]
         v <- parseVersion "7.10.3"
