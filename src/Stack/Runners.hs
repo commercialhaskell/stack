@@ -43,7 +43,7 @@ loadCompilerVersion :: GlobalOpts
 loadCompilerVersion go lc = do
     bconfig <- runStackTGlobal () go $
       lcLoadBuildConfig lc (globalCompiler go)
-    return $ bcWantedCompiler bconfig
+    return $ view wantedCompilerVersionL bconfig
 
 -- | Enforce mutual exclusion of every action running via this
 -- function, on this path, on this users account.

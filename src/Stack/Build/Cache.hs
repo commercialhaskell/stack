@@ -38,7 +38,7 @@ import           Control.Monad (liftM)
 import           Control.Monad.Catch (MonadThrow, MonadCatch)
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger (MonadLogger, logDebug)
-import           Control.Monad.Reader (MonadReader, asks)
+import           Control.Monad.Reader (MonadReader)
 import           Control.Monad.Trans.Control (MonadBaseControl)
 import qualified Crypto.Hash.SHA256 as SHA256
 import           Data.Binary (Binary (..))
@@ -251,11 +251,10 @@ precompiledCacheFile :: (MonadThrow m, MonadReader env m, HasEnvConfig env, Mona
                      -> Set GhcPkgId -- ^ dependencies
                      -> m (Path Abs File, m (Path Abs File))
 precompiledCacheFile pkgident copts installedPackageIDs = do
-    ec <- asks getEnvConfig
+    ec <- view envConfigL
 
-    compiler <- parseRelDir $ compilerVersionString $ envConfigCompilerVersion
-                            $ ecLocal ec
-    cabal <- parseRelDir $ versionString $ envConfigCabalVersion $ ecLocal ec
+    compiler <- view actualCompilerVersionL >>= parseRelDir . compilerVersionString
+    cabal <- view cabalVersionL >>= parseRelDir . versionString
     pkg <- parseRelDir $ packageIdentifierString pkgident
     platformRelDir <- platformGhcRelDir
 
@@ -267,12 +266,12 @@ precompiledCacheFile pkgident copts installedPackageIDs = do
     -- supplement it with the installed package IDs directly.
     -- See issue: https://github.com/commercialhaskell/stack/issues/1103
     let oldHash = B16.encode $ SHA256.hash $ LBS.toStrict $
-            if envConfigCabalVersion (ecLocal ec) >= $(mkVersion "1.22")
+            if view cabalVersionL ec >= $(mkVersion "1.22")
                 then Binary.encode (coNoDirs copts)
                 else Binary.encode input
         hashToPath hash = do
             hashPath <- parseRelFile $ S8.unpack hash
-            return $ getStackRoot ec
+            return $ view stackRootL ec
                  </> $(mkRelDir "precompiled")
                  </> platformRelDir
                  </> compiler
@@ -296,8 +295,8 @@ writePrecompiledCache :: (MonadThrow m, MonadReader env m, HasEnvConfig env, Mon
 writePrecompiledCache baseConfigOpts pkgident copts depIDs mghcPkgId exes = do
     (file, _) <- precompiledCacheFile pkgident copts depIDs
     ensureDir (parent file)
-    ec <- asks getEnvConfig
-    let stackRootRelative = makeRelative (getStackRoot ec)
+    ec <- view envConfigL
+    let stackRootRelative = makeRelative (view stackRootL ec)
     mlibpath <-
         case mghcPkgId of
             Executable _ -> return Nothing
@@ -322,11 +321,11 @@ readPrecompiledCache :: (MonadThrow m, MonadReader env m, HasEnvConfig env, Mona
                      -> Set GhcPkgId -- ^ dependencies
                      -> m (Maybe PrecompiledCache)
 readPrecompiledCache pkgident copts depIDs = do
-    ec <- asks getEnvConfig
+    ec <- view envConfigL
     let toAbsPath path = do
           if FilePath.isAbsolute path
               then path -- Only older version store absolute path
-              else toFilePath (getStackRoot ec) FilePath.</> path
+              else toFilePath (view stackRootL ec) FilePath.</> path
     let toAbsPC pc =
             PrecompiledCache
                   { pcLibrary = fmap toAbsPath (pcLibrary pc)

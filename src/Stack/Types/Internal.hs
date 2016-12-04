@@ -2,11 +2,19 @@
 
 -- | Internal types to the library.
 
-module Stack.Types.Internal where
+module Stack.Types.Internal
+    ( Env (..)
+    , HasTerminal (..)
+    , HasReExec (..)
+    , Sticky (..)
+    , HasSticky (..)
+    , LogOptions (..)
+    , HasLogOptions (..)
+    , view
+    ) where
 
 import Control.Concurrent.MVar
 import Control.Monad.Logger (LogLevel)
-import Data.Monoid.Extra
 import Data.Text (Text)
 import Lens.Micro
 import Stack.Types.Config
@@ -20,44 +28,46 @@ data Env config =
       ,envSticky :: !Sticky
       }
 
-instance HasStackRoot config => HasStackRoot (Env config) where
-    getStackRoot = getStackRoot . envConfig
-instance HasPlatform config => HasPlatform (Env config) where
-    getPlatform = getPlatform . envConfig
-    getPlatformVariant = getPlatformVariant . envConfig
-instance HasGHCVariant config => HasGHCVariant (Env config) where
-    getGHCVariant = getGHCVariant . envConfig
-instance HasConfig config => HasConfig (Env config) where
-    getConfig = getConfig . envConfig
-    setConfig cfg ec = ec { envConfig = setConfig cfg (envConfig ec) }
-instance HasBuildConfigNoLocal config => HasBuildConfigNoLocal (Env config) where
-    getBuildConfigNoLocal = getBuildConfigNoLocal . envConfig
-instance HasBuildConfig config => HasBuildConfig (Env config) where
-    getBuildConfig = getBuildConfig . envConfig
-instance HasEnvConfig config => HasEnvConfig (Env config) where
-    getEnvConfig = getEnvConfig . envConfig
+envConfL :: Lens (Env a) (Env b) a b
+envConfL = lens envConfig (\x y -> x { envConfig = y })
 
-class HasTerminal r where
-  getTerminal :: r -> Bool
+instance HasPlatform config => HasPlatform (Env config) where
+    platformL = envConfL.platformL
+    platformVariantL = envConfL.platformVariantL
+instance HasGHCVariant config => HasGHCVariant (Env config) where
+    ghcVariantL = envConfL.ghcVariantL
+instance HasConfig config => HasConfig (Env config) where
+    configL = envConfL.configL
+instance HasBuildConfigNoLocal config => HasBuildConfigNoLocal (Env config) where
+    buildConfigNoLocalL = envConfL.buildConfigNoLocalL
+instance HasBuildConfig config => HasBuildConfig (Env config) where
+    buildConfigLocalL = envConfL.buildConfigLocalL
+instance HasEnvConfigNoLocal config => HasEnvConfigNoLocal (Env config) where
+    envConfigNoLocalL = envConfL.envConfigNoLocalL
+instance HasEnvConfig config => HasEnvConfig (Env config) where
+    envConfigL = envConfL.envConfigL
+
+class HasTerminal env where
+  terminalL :: Lens' env Bool
 
 instance HasTerminal (Env config) where
-  getTerminal = envTerminal
+  terminalL = lens envTerminal (\x y -> x { envTerminal = y })
 
-class HasReExec r where
-  getReExec :: r -> Bool
+class HasReExec env where
+  reExecL :: Lens' env Bool
 
 instance HasReExec (Env config) where
-  getReExec = envReExec
+  reExecL = lens envReExec (\x y -> x { envReExec = y })
 
 newtype Sticky = Sticky
   { unSticky :: Maybe (MVar (Maybe Text))
   }
 
-class HasSticky r where
-  getSticky :: r -> Sticky
+class HasSticky env where
+  stickyL :: Lens' env Sticky
 
 instance HasSticky (Env config) where
-  getSticky = envSticky
+  stickyL = lens envSticky (\x y -> x { envSticky = y })
 
 data LogOptions = LogOptions
   { logUseColor :: Bool
@@ -67,57 +77,8 @@ data LogOptions = LogOptions
   , logVerboseFormat :: Bool
   }
 
-class HasLogOptions r where
-  getLogOptions :: r -> LogOptions
+class HasLogOptions env where
+  logOptionsL :: Lens' env LogOptions
 
 instance HasLogOptions (Env config) where
-  getLogOptions = envLogOptions
-
-envEnvConfig :: Lens' (Env EnvConfig) EnvConfig
-envEnvConfig = lens envConfig
-                    (\s t -> s {envConfig = t})
-
-buildOptsMonoidHaddock :: Lens' BuildOptsMonoid (Maybe Bool)
-buildOptsMonoidHaddock = lens (getFirst . buildMonoidHaddock)
-                            (\buildMonoid t -> buildMonoid {buildMonoidHaddock = First t})
-
-buildOptsMonoidTests :: Lens' BuildOptsMonoid (Maybe Bool)
-buildOptsMonoidTests = lens (getFirst . buildMonoidTests)
-                            (\buildMonoid t -> buildMonoid {buildMonoidTests = First t})
-
-buildOptsMonoidBenchmarks :: Lens' BuildOptsMonoid (Maybe Bool)
-buildOptsMonoidBenchmarks = lens (getFirst . buildMonoidBenchmarks)
-                            (\buildMonoid t -> buildMonoid {buildMonoidBenchmarks = First t})
-
-buildOptsMonoidInstallExes :: Lens' BuildOptsMonoid (Maybe Bool)
-buildOptsMonoidInstallExes =
-  lens (getFirst . buildMonoidInstallExes)
-       (\buildMonoid t -> buildMonoid {buildMonoidInstallExes = First t})
-
-buildOptsInstallExes :: Lens' BuildOpts Bool
-buildOptsInstallExes =
-  lens boptsInstallExes
-       (\bopts t -> bopts {boptsInstallExes = t})
-
-buildOptsHaddock :: Lens' BuildOpts Bool
-buildOptsHaddock =
-  lens boptsHaddock
-       (\bopts t -> bopts {boptsHaddock = t})
-
-envConfigBuildOpts :: Lens' EnvConfig BuildOpts
-envConfigBuildOpts =
-    lens
-        (configBuild . getConfig)
-        (\envCfg bopts ->
-           setConfig (getConfig envCfg) { configBuild = bopts } envCfg)
-
-globalOptsBuildOptsMonoid :: Lens' GlobalOpts BuildOptsMonoid
-globalOptsBuildOptsMonoid =
-    lens
-        (configMonoidBuildOpts . globalConfigMonoid)
-        (\globalOpts boptsMonoid ->
-              globalOpts
-              { globalConfigMonoid = (globalConfigMonoid globalOpts)
-                { configMonoidBuildOpts = boptsMonoid
-                }
-              })
+  logOptionsL = lens envLogOptions (\x y -> x { envLogOptions = y })

@@ -18,7 +18,6 @@ import           Control.Monad
 import           Control.Monad.Catch (throwM)
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
-import           Control.Monad.Reader (asks)
 import qualified Data.ByteString as S
 import qualified Data.HashMap.Strict as HMap
 import           Data.Monoid
@@ -62,7 +61,7 @@ cfgCmdSet cmd = do
             toFilePath
             (case configCmdSetScope cmd of
                  CommandScopeProject -> getStackYaml
-                 CommandScopeGlobal -> asks (configUserConfigPath . getConfig))
+                 CommandScopeGlobal -> view $ configL.to configUserConfigPath)
     -- We don't need to worry about checking for a valid yaml here
     (config :: Yaml.Object) <-
         liftIO (Yaml.decodeFileEither configFilePath) >>= either throwM return

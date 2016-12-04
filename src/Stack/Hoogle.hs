@@ -10,7 +10,6 @@ module Stack.Hoogle
 import           Control.Exception
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
-import           Control.Monad.Reader
 import qualified Data.ByteString.Char8 as S8
 import           Data.List (find)
 import qualified Data.Map.Strict as Map
@@ -23,7 +22,6 @@ import qualified Stack.Build
 import           Stack.Fetch
 import           Stack.Runners
 import           Stack.Types.Config
-import           Stack.Types.Internal
 import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageName
 import           Stack.Types.StackT
@@ -83,7 +81,7 @@ hoogleCmd (args,setup,rebuild) go = withBuildConfig go pathToHaddocks
             (catch
                  (withBuildConfigAndLock
                       (set
-                           (globalOptsBuildOptsMonoid . buildOptsMonoidHaddock)
+                           (globalOptsBuildOptsMonoidL . buildOptsMonoidHaddockL)
                            (Just True)
                            go)
                       (\lk ->
@@ -122,7 +120,7 @@ hoogleCmd (args,setup,rebuild) go = withBuildConfig go pathToHaddocks
                      ". Found acceptable " <>
                      packageIdentifierText ident <>
                      " in your index, installing it.")
-        config <- asks getConfig
+        config <- view configL
         menv <- liftIO $ configEnvOverride config envSettings
         liftIO
             (catch
@@ -145,7 +143,7 @@ hoogleCmd (args,setup,rebuild) go = withBuildConfig go pathToHaddocks
                            _ -> throwIO e))
     runHoogle :: [String] -> StackT EnvConfig IO ()
     runHoogle hoogleArgs = do
-        config <- asks getConfig
+        config <- view configL
         menv <- liftIO $ configEnvOverride config envSettings
         dbpath <- hoogleDatabasePath
         let databaseArg = ["--database=" ++ toFilePath dbpath]
@@ -163,7 +161,7 @@ hoogleCmd (args,setup,rebuild) go = withBuildConfig go pathToHaddocks
         path <- hoogleDatabasePath
         liftIO (doesFileExist path)
     checkHoogleInPath = do
-        config <- asks getConfig
+        config <- view configL
         menv <- liftIO $ configEnvOverride config envSettings
         result <- tryProcessStdout Nothing menv "hoogle" ["--numeric-version"]
         case fmap (reads . S8.unpack) result of

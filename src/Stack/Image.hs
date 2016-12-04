@@ -15,7 +15,6 @@ import           Control.Exception.Lifted hiding (finally)
 import           Control.Monad
 import           Control.Monad.Catch hiding (bracket)
 import           Control.Monad.IO.Class
-import           Control.Monad.Reader
 import           Data.Char (toLower)
 import qualified Data.Map.Strict as Map
 import           Data.Maybe
@@ -37,7 +36,7 @@ stageContainerImageArtifacts
     :: (StackM env m, HasEnvConfig env)
     => Maybe (Path Abs Dir) -> [Text] -> m ()
 stageContainerImageArtifacts mProjectRoot imageNames = do
-    config <- asks getConfig
+    config <- view configL
     forM_
         (zip
              [0 ..]
@@ -60,7 +59,7 @@ createContainerImageFromStage
     :: (StackM env m, HasConfig env)
     => Maybe (Path Abs Dir) -> [Text] -> m ()
 createContainerImageFromStage mProjectRoot imageNames = do
-    config <- asks getConfig
+    config <- view configL
     forM_
         (zip
              [0 ..]
@@ -105,12 +104,12 @@ syncAddContentToDir
     :: (StackM env m, HasEnvConfig env)
     => ImageDockerOpts -> Path Abs Dir -> m ()
 syncAddContentToDir opts dir = do
-    bconfig <- asks getBuildConfig
+    root <- view projectRootL
     let imgAdd = imgDockerAdd opts
     forM_
         (Map.toList imgAdd)
         (\(source,destPath) ->
-              do sourcePath <- resolveDir (bcRoot bconfig) source
+              do sourcePath <- resolveDir root source
                  let destFullPath = dir </> dropRoot destPath
                  ensureDir destFullPath
                  copyDirRecur sourcePath destFullPath)

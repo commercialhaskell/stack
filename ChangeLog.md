@@ -19,6 +19,8 @@ Behavior changes:
 
 Other enhancements:
 
+* Internal cleanup: configuration types are now based much more on lenses
+
 Bug fixes:
 
 ## 1.3.0

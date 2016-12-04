@@ -22,7 +22,6 @@ import           Control.Monad
 import           Control.Monad.Catch
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
-import           Control.Monad.Reader
 import           Control.Monad.Trans.Writer.Strict
 import           Data.Aeson
 import           Data.Aeson.Types
@@ -88,7 +87,7 @@ new opts forceOverwrite = do
                       else do relDir <- parseRelDir (packageNameString project)
                               liftM (pwd </>) (return relDir)
     exists <- doesDirExist absDir
-    configTemplate <- asks (configDefaultTemplate . getConfig)
+    configTemplate <- view $ configL.to configDefaultTemplate
     let template = fromMaybe defaultTemplateName $ asum [ cliOptionTemplate
                                                         , configTemplate
                                                         ]
@@ -132,7 +131,7 @@ loadTemplate
     :: forall env m. (StackM env m, HasConfig env)
     => TemplateName -> (TemplateFrom -> m ()) -> m Text
 loadTemplate name logIt = do
-    templateDir <- asks (templatesDir . getConfig)
+    templateDir <- view $ configL.to templatesDir
     case templatePath name of
         AbsPath absFile -> logIt LocalTemp >> loadLocalFile absFile
         UrlPath s -> do
@@ -181,7 +180,7 @@ applyTemplate
     -> Text
     -> m (Map (Path Abs File) LB.ByteString)
 applyTemplate project template nonceParams dir templateText = do
-    config <- asks getConfig
+    config <- view configL
     currentYear <- do
       now <- liftIO getCurrentTime
       (year, _, _) <- return $ toGregorian . utctDay $ now
@@ -263,7 +262,7 @@ runTemplateInits
     => Path Abs Dir -> m ()
 runTemplateInits dir = do
     menv <- getMinimalEnvOverride
-    config <- asks getConfig
+    config <- view configL
     case configScmInit config of
         Nothing -> return ()
         Just Git ->

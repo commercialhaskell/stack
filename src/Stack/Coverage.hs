@@ -21,7 +21,6 @@ import           Control.Exception.Lifted
 import           Control.Monad (liftM, when, unless, void, (<=<))
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
-import           Control.Monad.Reader (asks)
 import           Control.Monad.Trans.Resource
 import qualified Data.ByteString.Char8 as S8
 import           Data.Foldable (forM_, asum, toList)
@@ -112,7 +111,7 @@ tixFilePath pkgName testName = do
 generateHpcReport :: (StackM env m, HasEnvConfig env)
                   => Path Abs Dir -> Package -> [Text] -> m ()
 generateHpcReport pkgDir package tests = do
-    compilerVersion <- asks (envConfigCompilerVersion . getEnvConfigLocal)
+    compilerVersion <- view actualCompilerVersionL
     -- If we're using > GHC 7.10, the hpc 'include' parameter must specify a ghc package key. See
     -- https://github.com/commercialhaskell/stack/issues/785
     let pkgName = packageNameText (packageName package)
@@ -439,7 +438,7 @@ findPackageFieldForBuiltPackage pkgDir pkgId field = do
             case asum (map (T.stripPrefix (field <> ": ")) (T.lines contents)) of
                 Just result -> return $ Right result
                 Nothing -> notFoundErr
-    cabalVer <- asks (envConfigCabalVersion . getEnvConfigLocal)
+    cabalVer <- view cabalVersionL
     if cabalVer < $(mkVersion "1.24")
         then do
             path <- liftM (inplaceDir </>) $ parseRelFile (pkgIdStr ++ "-inplace.conf")

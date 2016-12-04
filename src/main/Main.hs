@@ -18,7 +18,7 @@ import           Control.Exception
 import           Control.Monad hiding (mapM, forM)
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
-import           Control.Monad.Reader (ask, asks,local,runReaderT)
+import           Control.Monad.Reader (ask,local,runReaderT)
 import           Control.Monad.Trans.Either (EitherT)
 import           Control.Monad.Writer.Lazy (Writer)
 import           Data.Attoparsec.Args (parseArgs, EscapingMode (Escaping))
@@ -94,7 +94,6 @@ import           Stack.Solver (solveExtraDeps)
 import           Stack.Types.Version
 import           Stack.Types.Config
 import           Stack.Types.Compiler
-import           Stack.Types.Internal
 import           Stack.Types.StackT
 import           Stack.Upgrade
 import qualified Stack.Upload as Upload
@@ -577,9 +576,9 @@ setupCmd sco@SetupCmdOpts{..} go@GlobalOpts{..} = do
                       Just v -> return (v, MatchMinor, Nothing)
                       Nothing -> do
                           bc <- lcLoadBuildConfig lc globalCompiler
-                          return ( bcWantedCompiler bc
+                          return ( view wantedCompilerVersionL bc
                                  , configCompilerCheck (lcConfig lc)
-                                 , Just $ bcStackYaml bc
+                                 , Just $ view stackYamlL bc
                                  )
               miniConfig <- loadMiniConfig (lcConfig lc)
               runStackTGlobal miniConfig go $
@@ -608,10 +607,10 @@ buildCmd opts go = do
         Stack.Build.build setLocalFiles lk opts
     -- Read the build command from the CLI and enable it to run
     go' = case boptsCLICommand opts of
-               Test -> set (globalOptsBuildOptsMonoid.buildOptsMonoidTests) (Just True) go
-               Haddock -> set (globalOptsBuildOptsMonoid.buildOptsMonoidHaddock) (Just True) go
-               Bench -> set (globalOptsBuildOptsMonoid.buildOptsMonoidBenchmarks) (Just True) go
-               Install -> set (globalOptsBuildOptsMonoid.buildOptsMonoidInstallExes) (Just True) go
+               Test -> set (globalOptsBuildOptsMonoidL.buildOptsMonoidTestsL) (Just True) go
+               Haddock -> set (globalOptsBuildOptsMonoidL.buildOptsMonoidHaddockL) (Just True) go
+               Bench -> set (globalOptsBuildOptsMonoidL.buildOptsMonoidBenchmarksL) (Just True) go
+               Install -> set (globalOptsBuildOptsMonoidL.buildOptsMonoidInstallExesL) (Just True) go
                Build -> go -- Default case is just Build
 
 uninstallCmd :: [String] -> GlobalOpts -> IO ()
@@ -658,7 +657,7 @@ uploadCmd (args, mpvpBounds, ignoreCheck, don'tSign, sigServerUrl) go = do
         show invalid
     let getUploader :: (HasConfig config) => StackT config IO Upload.Uploader
         getUploader = do
-            config <- asks getConfig
+            config <- view configL
             liftIO $ Upload.mkUploader config Upload.defaultUploadSettings
     withBuildConfigAndLock go $ \_ -> do
         uploader <- getUploader
@@ -726,7 +725,7 @@ execCmd ExecOpts {..} go@GlobalOpts{..} =
                     -- Unlock before transferring control away, whether using docker or not:
                     (Just $ munlockFile lk)
                     (runStackTGlobal (lcConfig lc) go $ do
-                        config <- asks getConfig
+                        config <- view configL
                         menv <- liftIO $ configEnvOverride config plainEnvSettings
                         Nix.reexecWithOptionalShell
                             (lcProjectRoot lc)
@@ -743,7 +742,7 @@ execCmd ExecOpts {..} go@GlobalOpts{..} =
                        { boptsCLITargets = map T.pack targets
                        }
 
-               config <- asks getConfig
+               config <- view configL
                menv <- liftIO $ configEnvOverride config eoEnvSettings
                (cmd, args) <- case (eoCmd, eoArgs) of
                    (ExecCmd cmd, args) -> return (cmd, args)
@@ -768,7 +767,7 @@ execCmd ExecOpts {..} go@GlobalOpts{..} =
           return $ map ("-package-id=" ++) ids
 
       getGhcCmd prefix menv pkgs args = do
-          wc <- getWhichCompiler
+          wc <- view $ actualCompilerVersionL.whichCompilerL
           pkgopts <- getPkgOpts menv wc pkgs
           return (prefix ++ compilerExeName wc, pkgopts ++ args)
 
@@ -787,13 +786,13 @@ ghciCmd :: GhciOpts -> GlobalOpts -> IO ()
 ghciCmd ghciOpts go@GlobalOpts{..} =
   withBuildConfigAndLock go $ \lk -> do
     munlockFile lk -- Don't hold the lock while in the GHCI.
-    bopts <- asks (configBuild . getConfig)
+    bopts <- view buildOptsL
     -- override env so running of tests and benchmarks is disabled
     let boptsLocal = bopts
                { boptsTestOpts = (boptsTestOpts bopts) { toDisableRun = True }
                , boptsBenchmarkOpts = (boptsBenchmarkOpts bopts) { beoDisableRun = True }
                }
-    local (set (envEnvConfig.envConfigBuildOpts) boptsLocal)
+    local (set buildOptsL boptsLocal)
           (ghci ghciOpts)
 
 -- | List packages in the project.
@@ -895,8 +894,8 @@ withBuildConfigDot :: DotOpts -> GlobalOpts -> StackT EnvConfig IO () -> IO ()
 withBuildConfigDot opts go f = withBuildConfig go' f
   where
     go' =
-        (if dotTestTargets opts then set (globalOptsBuildOptsMonoid.buildOptsMonoidTests) (Just True) else id) $
-        (if dotBenchTargets opts then set (globalOptsBuildOptsMonoid.buildOptsMonoidBenchmarks) (Just True) else id)
+        (if dotTestTargets opts then set (globalOptsBuildOptsMonoidL.buildOptsMonoidTestsL) (Just True) else id) $
+        (if dotBenchTargets opts then set (globalOptsBuildOptsMonoidL.buildOptsMonoidBenchmarksL) (Just True) else id)
         go
 
 -- | Query build information

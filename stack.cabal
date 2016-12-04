@@ -217,7 +217,7 @@ library
                        -- https://github.com/basvandijk/lifted-base/issues/31
                    , lifted-base < 0.2.3.7 || > 0.2.3.7
                    , microlens >= 0.3.0.0
-                   , microlens-th
+                   , microlens-mtl
                    , monad-control
                    , monad-logger >= 0.3.13.1
                    , monad-unlift < 0.3
