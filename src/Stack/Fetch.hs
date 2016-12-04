@@ -53,6 +53,7 @@ import qualified    Data.Git as Git
 import qualified    Data.Git.Ref as Git
 import qualified    Data.Git.Storage as Git
 import qualified    Data.Git.Storage.Object as Git
+import qualified    Data.HashMap.Strict as HashMap
 import              Data.List (intercalate)
 import              Data.List.NonEmpty (NonEmpty)
 import qualified    Data.List.NonEmpty as NE
@@ -222,25 +223,40 @@ resolvePackagesAllowMissing
     -> Set PackageName
     -> m (Set PackageName, Set PackageIdentifier, Map PackageIdentifier ResolvedPackage)
 resolvePackagesAllowMissing idents0 names0 = do
-    caches <- getPackageCaches
+    (caches, shaCaches) <- getPackageCaches
     let versions = Map.fromListWith max $ map toTuple $ Map.keys caches
         (missingNames, idents1) = partitionEithers $ map
             (\name -> maybe (Left name ) (Right . PackageIdentifier name)
                 (Map.lookup name versions))
             (Set.toList names0)
-        (missingIdents, resolved) = partitionEithers $ map (goIdent caches)
+    let (missingIdents, resolved) = partitionEithers $ map (goIdent caches shaCaches)
                                   $ Map.toList
                                   $ idents0 <> Map.fromList (map (, Nothing) idents1)
     return (Set.fromList missingNames, Set.fromList missingIdents, Map.fromList resolved)
   where
-    goIdent caches (ident, mgitsha) =
+    goIdent caches shaCaches (ident, mgitsha) =
         case Map.lookup ident caches of
             Nothing -> Left ident
-            Just (index, cache) -> Right (ident, ResolvedPackage
-                { rpCache = cache
-                , rpIndex = index
-                , rpGitSHA1 = mgitsha
-                })
+            Just (index, cache) ->
+                let (index', cache', mgitsha') =
+                      case mgitsha of
+                        Nothing -> (index, cache, mgitsha)
+                        Just gitsha ->
+                            case HashMap.lookup gitsha shaCaches of
+                                Just (index'', offsetSize) ->
+                                        ( index''
+                                        , cache { pcOffsetSize = offsetSize }
+                                        -- we already got the info
+                                        -- about this SHA, don't do
+                                        -- any lookups later
+                                        , Nothing
+                                        )
+                                Nothing -> (index, cache, mgitsha)
+                 in Right (ident, ResolvedPackage
+                    { rpCache = cache'
+                    , rpIndex = index'
+                    , rpGitSHA1 = mgitsha'
+                    })
 
 data ToFetch = ToFetch
     { tfTarball :: !(Path Abs File)
@@ -295,10 +311,24 @@ withCabalFiles name pkgs f = do
                     ]
                 $logDebug (T.pack (show e))
                 goPkg h Nothing (ident, pc, Nothing, tf)
-    goPkg h _mgit (ident, pc, _mgitsha, tf) = liftIO $ do
-        hSeek h AbsoluteSeek $ fromIntegral $ pcOffset pc
-        cabalBS <- S.hGet h $ fromIntegral $ pcSize pc
-        f ident tf cabalBS
+    goPkg h _mgit (ident, pc, mgitsha, tf) = do
+        -- We have a Just as the git SHA, so looking up previously
+        -- failed, and we're not in a Git repo. So warn the user and
+        -- move on.
+        case mgitsha of
+            Nothing -> return ()
+            Just (GitSHA1 sha) -> $logWarn $ mconcat
+                [ "Did not find .cabal file for "
+                , T.pack $ packageIdentifierString ident
+                , " with Git SHA of "
+                , decodeUtf8 sha
+                , " in tarball-based cache"
+                ]
+        let OffsetSize offset size = pcOffsetSize pc
+        liftIO $ do
+            hSeek h AbsoluteSeek $ fromIntegral offset
+            cabalBS <- S.hGet h $ fromIntegral size
+            f ident tf cabalBS
 
 -- | Provide a function which will load up a cabal @ByteString@ from the
 -- package indices.
@@ -325,7 +355,7 @@ withCabalLoader menv inner = do
     let doLookup :: PackageIdentifier
                  -> IO ByteString
         doLookup ident = do
-            caches <- loadCaches
+            (caches, _gitSHACaches) <- loadCaches
             eres <- unlift $ lookupPackageIdentifierExact ident env caches
             case eres of
                 Just bs -> return bs

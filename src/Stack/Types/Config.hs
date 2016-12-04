@@ -168,6 +168,7 @@ import           Data.Attoparsec.Args
 import           Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as S8
 import           Data.Either (partitionEithers)
+import           Data.HashMap.Strict (HashMap)
 import           Data.IORef (IORef)
 import           Data.List (stripPrefix)
 import           Data.List.NonEmpty (NonEmpty)
@@ -196,7 +197,7 @@ import qualified Options.Applicative as OA
 import qualified Options.Applicative.Types as OA
 import           Path
 import qualified Paths_stack as Meta
-import           Stack.Types.BuildPlan (MiniBuildPlan(..), SnapName, renderSnapName)
+import           Stack.Types.BuildPlan (GitSHA1, MiniBuildPlan(..), SnapName, renderSnapName)
 import           Stack.Types.Compiler
 import           Stack.Types.CompilerBuild
 import           Stack.Types.Docker
@@ -333,7 +334,8 @@ data Config =
          ,configAllowDifferentUser  :: !Bool
          -- ^ Allow users other than the stack root owner to use the stack
          -- installation.
-         ,configPackageCaches       :: !(IORef (Maybe (Map PackageIdentifier (PackageIndex, PackageCache))))
+         ,configPackageCaches       :: !(IORef (Maybe (Map PackageIdentifier (PackageIndex, PackageCache),
+                                                       HashMap GitSHA1 (PackageIndex, OffsetSize))))
          -- ^ In memory cache of hackage index.
          ,configDumpLogs            :: !DumpLogs
          -- ^ Dump logs of local non-dependencies when doing a build.
@@ -1207,17 +1209,17 @@ configPackageIndexRepo name = do
                     return $ Just $ suDir </> repoName
         _ -> assert False $ return Nothing
 
--- | Location of the 00-index.cache file
+-- | Location of the 01-index.cache file
 configPackageIndexCache :: (MonadReader env m, HasConfig env, MonadThrow m) => IndexName -> m (Path Abs File)
-configPackageIndexCache = liftM (</> $(mkRelFile "00-index.cache")) . configPackageIndexRoot
+configPackageIndexCache = liftM (</> $(mkRelFile "01-index.cache")) . configPackageIndexRoot
 
--- | Location of the 00-index.tar file
+-- | Location of the 01-index.tar file
 configPackageIndex :: (MonadReader env m, HasConfig env, MonadThrow m) => IndexName -> m (Path Abs File)
-configPackageIndex = liftM (</> $(mkRelFile "00-index.tar")) . configPackageIndexRoot
+configPackageIndex = liftM (</> $(mkRelFile "01-index.tar")) . configPackageIndexRoot
 
--- | Location of the 00-index.tar.gz file
+-- | Location of the 01-index.tar.gz file
 configPackageIndexGz :: (MonadReader env m, HasConfig env, MonadThrow m) => IndexName -> m (Path Abs File)
-configPackageIndexGz = liftM (</> $(mkRelFile "00-index.tar.gz")) . configPackageIndexRoot
+configPackageIndexGz = liftM (</> $(mkRelFile "01-index.tar.gz")) . configPackageIndexRoot
 
 -- | Location of a package tarball
 configPackageTarball :: (MonadReader env m, HasConfig env, MonadThrow m) => IndexName -> PackageIdentifier -> m (Path Abs File)

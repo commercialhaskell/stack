@@ -209,7 +209,7 @@ sourceUpgrade gConfigMonoid mresolver builtHash (SourceOpts gitRepo) =
                 return $ Just $ tmp </> $(mkRelDir "stack")
       Nothing -> do
         updateAllIndices menv
-        caches <- getPackageCaches
+        (caches, _gitShaCaches) <- getPackageCaches
         let latest = Map.fromListWith max
                    $ map toTuple
                    $ Map.keys

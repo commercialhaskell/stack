@@ -348,6 +348,7 @@ test-suite stack-test
                 , exceptions
                 , filepath
                 , hspec >= 2.2 && <2.4
+                , hashable
                 , http-client-tls
                 , http-conduit
                 , monad-logger
@@ -366,6 +367,7 @@ test-suite stack-test
                 , bytestring
                 , store >= 0.2.1.0
                 , vector
+                , unordered-containers
                 , template-haskell
                 , yaml
   default-language:    Haskell2010
