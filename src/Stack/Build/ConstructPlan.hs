@@ -139,7 +139,10 @@ data Ctx = Ctx
 instance HasStackRoot Ctx
 instance HasPlatform Ctx
 instance HasGHCVariant Ctx
-instance HasConfig Ctx
+instance HasConfig Ctx where
+    setConfig cfg ctx = ctx { ctxEnvConfig = setConfig cfg (ctxEnvConfig ctx) }
+instance HasBuildConfigNoLocal Ctx where
+    getBuildConfigNoLocal = bcNoLocal . getBuildConfig
 instance HasBuildConfig Ctx where
     getBuildConfig = getBuildConfig . getEnvConfig
 instance HasEnvConfig Ctx where
@@ -195,7 +198,7 @@ constructPlan mbp0 baseConfigOpts0 locals extraToBuild0 localDumpPkgs loadPackag
                 }
         else do
             planDebug $ show errs
-            $prettyError $ pprintExceptions errs (bcStackYaml (getBuildConfig econfig)) parents (wantedLocalPackages locals)
+            $prettyError $ pprintExceptions errs (bcStackYaml (getBuildConfigLocal econfig)) parents (wantedLocalPackages locals)
             throwM $ ConstructPlanFailed "Plan construction failed."
   where
     ctx econfig getVersions0 lf = Ctx

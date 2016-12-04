@@ -561,7 +561,7 @@ makeGhciPkgInfo sourceMap installedMap locals addPkgs mfileTargets name cabalfp 
             , packageConfigEnableBenchmarks = True
             , packageConfigFlags = getLocalFlags bconfig defaultBuildOptsCLI name
             , packageConfigGhcOptions = getGhcOptions bconfig defaultBuildOptsCLI name True True
-            , packageConfigCompilerVersion = envConfigCompilerVersion econfig
+            , packageConfigCompilerVersion = envConfigCompilerVersion (ecLocal econfig)
             , packageConfigPlatform = configPlatform (getConfig bconfig)
             }
     (warnings,gpkgdesc) <- readPackageUnresolved cabalfp

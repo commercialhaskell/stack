@@ -216,7 +216,7 @@ resolveBuildPlan mbp isShadowed packages
             unknown = flip Map.mapWithKey (rsUnknown rs) $ \ident x ->
                 (Map.lookup ident maxVer, x)
         throwM $ UnknownPackages
-            (bcStackYaml bconfig)
+            (bcStackYaml (bcLocal bconfig))
             unknown
             (rsShadowed rs)
   where

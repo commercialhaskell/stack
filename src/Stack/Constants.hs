@@ -155,7 +155,7 @@ templatesDir config = configStackRoot config </> $(mkRelDir "templates")
 distRelativeDir :: (MonadThrow m, MonadReader env m, HasEnvConfig env)
                 => m (Path Rel Dir)
 distRelativeDir = do
-    cabalPkgVer <- asks (envConfigCabalVersion . getEnvConfig)
+    cabalPkgVer <- asks (envConfigCabalVersion . getEnvConfigLocal)
     platform <- platformGhcRelDir
     wc <- getWhichCompiler
     -- Cabal version, suffixed with "_ghcjs" if we're using GHCJS.

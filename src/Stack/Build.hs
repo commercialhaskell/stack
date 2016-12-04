@@ -100,7 +100,7 @@ build setLocalFiles mbuildLk boptsCli = fixCodePage $ do
     (targets, mbp, locals, extraToBuild, extraDeps, sourceMap) <- loadSourceMapFull NeedTargets boptsCli
 
     -- Set local files, necessary for file watching
-    stackYaml <- asks $ bcStackYaml . getBuildConfig
+    stackYaml <- asks $ bcStackYaml . getBuildConfigLocal
     liftIO $ setLocalFiles
            $ Set.insert stackYaml
            $ Set.unions
@@ -158,7 +158,7 @@ allLocal =
 checkCabalVersion :: (StackM env m, HasEnvConfig env) => m ()
 checkCabalVersion = do
     allowNewer <- asks (configAllowNewer . getConfig)
-    cabalVer <- asks (envConfigCabalVersion . getEnvConfig)
+    cabalVer <- asks (envConfigCabalVersion . getEnvConfigLocal)
     -- https://github.com/haskell/cabal/issues/2023
     when (allowNewer && cabalVer < $(mkVersion "1.22")) $ throwM $
         CabalVersionException $
@@ -322,7 +322,7 @@ withLoadPackage menv inner = do
         , packageConfigEnableBenchmarks = False
         , packageConfigFlags = flags
         , packageConfigGhcOptions = ghcOptions
-        , packageConfigCompilerVersion = envConfigCompilerVersion econfig
+        , packageConfigCompilerVersion = envConfigCompilerVersion (ecLocal econfig)
         , packageConfigPlatform = configPlatform (getConfig econfig)
         }
 

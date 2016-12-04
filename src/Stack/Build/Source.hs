@@ -108,7 +108,7 @@ loadSourceMapFull needTargets boptsCli = do
     -- Extend extra-deps to encompass targets requested on the command line
     -- that are not in the snapshot.
     extraDeps0 <- extendExtraDeps
-        (bcExtraDeps bconfig)
+        (bcExtraDeps (bcLocal bconfig))
         cliExtraDeps
         (Map.keysSet $ Map.filter (== STUnknown) targets)
 
@@ -144,7 +144,7 @@ loadSourceMapFull needTargets boptsCli = do
                 let flags =
                         case ( Map.lookup (Just n) $ boptsCLIFlags boptsCli
                              , Map.lookup Nothing $ boptsCLIFlags boptsCli
-                             , Map.lookup n $ unPackageFlags $ bcFlags bconfig
+                             , Map.lookup n $ unPackageFlags $ bcFlags $ bcLocal bconfig
                              ) of
                             -- Didn't have any flag overrides, fall back to the flags
                             -- defined in the snapshot.
@@ -186,7 +186,7 @@ getLocalFlags
 getLocalFlags bconfig boptsCli name = Map.unions
     [ Map.findWithDefault Map.empty (Just name) cliFlags
     , Map.findWithDefault Map.empty Nothing cliFlags
-    , Map.findWithDefault Map.empty name (unPackageFlags (bcFlags bconfig))
+    , Map.findWithDefault Map.empty name (unPackageFlags (bcFlags (bcLocal bconfig)))
     ]
   where
     cliFlags = boptsCLIFlags boptsCli
@@ -207,7 +207,7 @@ getGhcOptions bconfig boptsCli name isTarget isLocal = concat
     ]
   where
     bopts = configBuild config
-    config = bcConfig bconfig
+    config = getConfig bconfig
     includeExtraOptions =
         case configApplyGhcOptions config of
             AGOTargets -> isTarget
@@ -238,32 +238,32 @@ parseTargetsFromBuildOptsWith rawLocals needTargets boptscli = do
     $logDebug "Parsing the targets"
     bconfig <- asks getBuildConfig
     mbp0 <-
-        case bcResolver bconfig of
+        case bcResolver $ bcNoLocal bconfig of
             ResolverCompiler _ -> do
                 -- We ignore the resolver version, as it might be
                 -- GhcMajorVersion, and we want the exact version
                 -- we're using.
-                version <- asks (envConfigCompilerVersion . getEnvConfig)
+                version <- asks (envConfigCompilerVersion . ecLocal . getEnvConfig)
                 return MiniBuildPlan
                     { mbpCompilerVersion = version
                     , mbpPackages = Map.empty
                     }
-            _ -> return (bcWantedMiniBuildPlan bconfig)
+            _ -> return (bcWantedMiniBuildPlan (bcNoLocal bconfig))
     workingDir <- getCurrentDir
 
     let snapshot = mpiVersion <$> mbpPackages mbp0
     flagExtraDeps <- convertSnapshotToExtra
         snapshot
-        (bcExtraDeps bconfig)
+        (bcExtraDeps (bcLocal bconfig))
         rawLocals
         (catMaybes $ Map.keys $ boptsCLIFlags boptscli)
 
     (cliExtraDeps, targets) <-
         parseTargets
             needTargets
-            (bcImplicitGlobal bconfig)
+            (bcImplicitGlobal (bcLocal bconfig))
             snapshot
-            (flagExtraDeps <> bcExtraDeps bconfig)
+            (flagExtraDeps <> bcExtraDeps (bcLocal bconfig))
             (fst <$> rawLocals)
             workingDir
             (boptsCLITargets boptscli)
@@ -463,7 +463,7 @@ checkFlagsUsed boptsCli lps extraDeps snapshot = do
         -- Check if flags specified in stack.yaml and the command line are
         -- used, see https://github.com/commercialhaskell/stack/issues/617
     let flags = map (, FSCommandLine) [(k, v) | (Just k, v) <- Map.toList $ boptsCLIFlags boptsCli]
-             ++ map (, FSStackYaml) (Map.toList $ unPackageFlags $ bcFlags bconfig)
+             ++ map (, FSStackYaml) (Map.toList $ unPackageFlags $ bcFlags $ bcLocal bconfig)
 
         localNameMap = Map.fromList $ map (packageName . lpPackage &&& lpPackage) lps
         checkFlagUsed ((name, userFlags), source) =
@@ -514,7 +514,7 @@ extendExtraDeps extraDeps0 cliExtraDeps unknowns = do
             throwM $ UnknownTargets
                 (Set.fromList errs)
                 Map.empty -- TODO check the cliExtraDeps for presence in index
-                (bcStackYaml bconfig)
+                (bcStackYaml (bcLocal bconfig))
   where
     extraDeps1 = Map.union extraDeps0 cliExtraDeps
     addUnknown pn = do
@@ -654,7 +654,7 @@ getDefaultPackageConfig = do
     , packageConfigEnableBenchmarks = False
     , packageConfigFlags = M.empty
     , packageConfigGhcOptions = []
-    , packageConfigCompilerVersion = envConfigCompilerVersion econfig
+    , packageConfigCompilerVersion = envConfigCompilerVersion (ecLocal econfig)
     , packageConfigPlatform = configPlatform $ getConfig bconfig
     }
 
@@ -673,6 +673,6 @@ getPackageConfig boptsCli name isTarget isLocal = do
     , packageConfigEnableBenchmarks = False
     , packageConfigFlags = getLocalFlags bconfig boptsCli name
     , packageConfigGhcOptions = getGhcOptions bconfig boptsCli name isTarget isLocal
-    , packageConfigCompilerVersion = envConfigCompilerVersion econfig
+    , packageConfigCompilerVersion = envConfigCompilerVersion (ecLocal econfig)
     , packageConfigPlatform = configPlatform $ getConfig bconfig
     }

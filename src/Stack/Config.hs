@@ -543,16 +543,20 @@ loadBuildConfig mproject config mresolver mcompiler = do
     extraPackageDBs <- mapM resolveDir' (projectExtraPackageDBs project)
 
     return BuildConfig
-        { bcConfig = config
-        , bcResolver = loadedResolver
-        , bcWantedMiniBuildPlan = mbp
-        , bcPackageEntries = projectPackages project
-        , bcExtraDeps = projectExtraDeps project
-        , bcExtraPackageDBs = extraPackageDBs
-        , bcStackYaml = stackYamlFP
-        , bcFlags = projectFlags project
-        , bcImplicitGlobal = isNothing mproject
-        , bcGHCVariant = getGHCVariant miniConfig
+        { bcNoLocal = BuildConfigNoLocal
+            { bcConfig = config
+            , bcResolver = loadedResolver
+            , bcWantedMiniBuildPlan = mbp
+            , bcGHCVariant = getGHCVariant miniConfig
+            }
+        , bcLocal = BuildConfigLocal
+            { bcPackageEntries = projectPackages project
+            , bcExtraDeps = projectExtraDeps project
+            , bcExtraPackageDBs = extraPackageDBs
+            , bcStackYaml = stackYamlFP
+            , bcFlags = projectFlags project
+            , bcImplicitGlobal = isNothing mproject
+            }
         }
 
 -- | Get packages from EnvConfig, downloading and cloning as necessary.
@@ -561,7 +565,7 @@ getLocalPackages
     :: (StackMiniM env m, HasEnvConfig env)
     => m (Map.Map (Path Abs Dir) TreatLikeExtraDep)
 getLocalPackages = do
-    cacheRef <- asks (envConfigPackagesRef . getEnvConfig)
+    cacheRef <- asks (envConfigPackagesRef . ecLocal . getEnvConfig)
     mcached <- liftIO $ readIORef cacheRef
     case mcached of
         Just cached -> return cached
@@ -570,7 +574,7 @@ getLocalPackages = do
             bconfig <- asks getBuildConfig
             liftM (Map.fromList . concat) $ mapM
                 (resolvePackageEntry menv (bcRoot bconfig))
-                (bcPackageEntries bconfig)
+                (bcPackageEntries (bcLocal bconfig))
 
 -- | Resolve a PackageEntry into a list of paths, downloading and cloning as
 -- necessary.

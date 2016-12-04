@@ -112,7 +112,7 @@ tixFilePath pkgName testName = do
 generateHpcReport :: (StackM env m, HasEnvConfig env)
                   => Path Abs Dir -> Package -> [Text] -> m ()
 generateHpcReport pkgDir package tests = do
-    compilerVersion <- asks (envConfigCompilerVersion . getEnvConfig)
+    compilerVersion <- asks (envConfigCompilerVersion . getEnvConfigLocal)
     -- If we're using > GHC 7.10, the hpc 'include' parameter must specify a ghc package key. See
     -- https://github.com/commercialhaskell/stack/issues/785
     let pkgName = packageNameText (packageName package)
@@ -439,7 +439,7 @@ findPackageFieldForBuiltPackage pkgDir pkgId field = do
             case asum (map (T.stripPrefix (field <> ": ")) (T.lines contents)) of
                 Just result -> return $ Right result
                 Nothing -> notFoundErr
-    cabalVer <- asks (envConfigCabalVersion . getEnvConfig)
+    cabalVer <- asks (envConfigCabalVersion . getEnvConfigLocal)
     if cabalVer < $(mkVersion "1.24")
         then do
             path <- liftM (inplaceDir </>) $ parseRelFile (pkgIdStr ++ "-inplace.conf")

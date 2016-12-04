@@ -34,10 +34,14 @@ module Stack.Types.Config
   ,explicitSetupDeps
   ,getMinimalEnvOverride
   -- ** BuildConfig & HasBuildConfig
+  ,BuildConfigNoLocal(..)
+  ,BuildConfigLocal(..)
   ,BuildConfig(..)
+  ,getBuildConfigLocal
   ,bcRoot
   ,bcWorkDir
   ,bcWantedCompiler
+  ,HasBuildConfigNoLocal(..)
   ,HasBuildConfig(..)
   -- ** GHCVariant & HasGHCVariant
   ,GHCVariant(..)
@@ -50,7 +54,11 @@ module Stack.Types.Config
   ,StackMiniM
   -- ** EnvConfig & HasEnvConfig
   ,EnvConfig(..)
+  ,EnvConfigNoLocal(..)
+  ,EnvConfigLocal(..)
+  ,HasEnvConfigNoLocal(..)
   ,HasEnvConfig(..)
+  ,getEnvConfigLocal
   ,getWhichCompiler
   ,getCompilerPath
   -- * Details
@@ -469,14 +477,22 @@ readColorWhen = do
 -- | A superset of 'Config' adding information on how to build code. The reason
 -- for this breakdown is because we will need some of the information from
 -- 'Config' in order to determine the values here.
-data BuildConfig = BuildConfig
+--
+-- These are the components which know nothing about local configuration.
+data BuildConfigNoLocal = BuildConfigNoLocal
     { bcConfig     :: !Config
     , bcResolver   :: !LoadedResolver
       -- ^ How we resolve which dependencies to install given a set of
       -- packages.
     , bcWantedMiniBuildPlan :: !MiniBuildPlan
       -- ^ Compiler version wanted for this build
-    , bcPackageEntries :: ![PackageEntry]
+    , bcGHCVariant :: !GHCVariant
+      -- ^ The variant of GHC used to select a GHC bindist.
+    }
+
+-- | The local parts of 'BuildConfigNoLocal'
+data BuildConfigLocal = BuildConfigLocal
+    { bcPackageEntries :: ![PackageEntry]
       -- ^ Local packages
     , bcExtraDeps  :: !(Map PackageName Version)
       -- ^ Extra dependencies specified in configuration.
@@ -495,13 +511,16 @@ data BuildConfig = BuildConfig
     , bcImplicitGlobal :: !Bool
       -- ^ Are we loading from the implicit global stack.yaml? This is useful
       -- for providing better error messages.
-    , bcGHCVariant :: !GHCVariant
-      -- ^ The variant of GHC used to select a GHC bindist.
+    }
+
+data BuildConfig = BuildConfig
+    { bcNoLocal :: !BuildConfigNoLocal
+    , bcLocal   :: !BuildConfigLocal
     }
 
 -- | Directory containing the project's stack.yaml file
-bcRoot :: BuildConfig -> Path Abs Dir
-bcRoot = parent . bcStackYaml
+bcRoot :: (MonadReader env m, HasBuildConfig env) => m (Path Abs Dir)
+bcRoot = asks $ parent . bcStackYaml . getBuildConfigLocal
 
 -- | @"'bcRoot'/.stack-work"@
 bcWorkDir :: (MonadReader env m, HasConfig env) => BuildConfig -> m (Path Abs Dir)
@@ -509,12 +528,16 @@ bcWorkDir bconfig = do
   workDir <- getWorkDir
   return (bcRoot bconfig </> workDir)
 
-bcWantedCompiler :: BuildConfig -> CompilerVersion
-bcWantedCompiler = mbpCompilerVersion . bcWantedMiniBuildPlan
+bcWantedCompiler :: (MonadReader env m, HasBuildConfigNoLocal env) => m CompilerVersion
+bcWantedCompiler = asks $ mbpCompilerVersion . bcWantedMiniBuildPlan . getBuildConfigNoLocal
 
 -- | Configuration after the environment has been setup.
-data EnvConfig = EnvConfig
-    {envConfigBuildConfig :: !BuildConfig
+data EnvConfigNoLocal = EnvConfigNoLocal
+    {envConfigBuildConfigNoLocal :: !BuildConfigNoLocal
+    }
+
+data EnvConfigLocal = EnvConfigLocal
+    {envConfigBuildConfigLocal :: !BuildConfigLocal
     ,envConfigCabalVersion :: !Version
     -- ^ This is the version of Cabal that stack will use to compile Setup.hs files
     -- in the build process.
@@ -528,16 +551,47 @@ data EnvConfig = EnvConfig
     -- ^ Cache for 'getLocalPackages'.
     }
 
+data EnvConfig = EnvConfig
+    { ecNoLocal :: !EnvConfigNoLocal
+    , ecLocal :: !EnvConfigLocal
+    }
+
+instance HasConfig EnvConfigNoLocal where
+    setConfig cfg ec = ec
+        { envConfigBuildConfigNoLocal = setConfig cfg
+                                        (envConfigBuildConfigNoLocal ec)
+        }
+instance HasPlatform EnvConfigNoLocal
+instance HasGHCVariant EnvConfigNoLocal
+instance HasStackRoot EnvConfigNoLocal
+instance HasBuildConfigNoLocal EnvConfigNoLocal where
+    getBuildConfigNoLocal = envConfigBuildConfigNoLocal
+class (HasBuildConfigNoLocal r, HasGHCVariant r) => HasEnvConfigNoLocal r where
+    getEnvConfigNoLocal :: r -> EnvConfigNoLocal
+instance HasEnvConfigNoLocal EnvConfigNoLocal where
+    getEnvConfigNoLocal = id
+
 instance HasBuildConfig EnvConfig where
-    getBuildConfig = envConfigBuildConfig
-instance HasConfig EnvConfig
+    getBuildConfig ec = BuildConfig
+        { bcNoLocal = getBuildConfigNoLocal ec
+        , bcLocal = envConfigBuildConfigLocal $ ecLocal ec
+        }
+instance HasConfig EnvConfig where
+    setConfig cfg ec = ec
+        { ecNoLocal = setConfig cfg (ecNoLocal ec)
+        }
 instance HasPlatform EnvConfig
 instance HasGHCVariant EnvConfig
 instance HasStackRoot EnvConfig
+instance HasBuildConfigNoLocal EnvConfig where
+    getBuildConfigNoLocal = envConfigBuildConfigNoLocal . ecNoLocal
 class (HasBuildConfig r, HasGHCVariant r) => HasEnvConfig r where
     getEnvConfig :: r -> EnvConfig
 instance HasEnvConfig EnvConfig where
     getEnvConfig = id
+
+getEnvConfigLocal :: (MonadReader env m, HasEnvConfig env) => m EnvConfigLocal
+getEnvConfigLocal = asks $ ecLocal . getEnvConfig
 
 -- | Value returned by 'Stack.Config.loadConfig'.
 data LoadConfig m = LoadConfig
@@ -687,8 +741,8 @@ instance HasPlatform (Platform,PlatformVariant) where
 -- | Class for environment values which have a GHCVariant
 class HasGHCVariant env where
     getGHCVariant :: env -> GHCVariant
-    default getGHCVariant :: HasBuildConfig env => env -> GHCVariant
-    getGHCVariant = bcGHCVariant . getBuildConfig
+    default getGHCVariant :: HasBuildConfigNoLocal env => env -> GHCVariant
+    getGHCVariant = bcGHCVariant . getBuildConfigNoLocal
     {-# INLINE getGHCVariant #-}
 instance HasGHCVariant GHCVariant where
     getGHCVariant = id
@@ -696,25 +750,47 @@ instance HasGHCVariant GHCVariant where
 -- | Class for environment values that can provide a 'Config'.
 class (HasStackRoot env, HasPlatform env) => HasConfig env where
     getConfig :: env -> Config
-    default getConfig :: HasBuildConfig env => env -> Config
-    getConfig = bcConfig . getBuildConfig
+    default getConfig :: HasBuildConfigNoLocal env => env -> Config
+    getConfig = bcConfig . getBuildConfigNoLocal
     {-# INLINE getConfig #-}
+
+    setConfig :: Config -> env -> env
 instance HasStackRoot Config
 instance HasPlatform Config
 instance HasConfig Config where
     getConfig = id
     {-# INLINE getConfig #-}
+    setConfig = const
+    {-# INLINE setConfig #-}
+
+class HasConfig env => HasBuildConfigNoLocal env where
+    getBuildConfigNoLocal :: env -> BuildConfigNoLocal
+
+instance HasStackRoot BuildConfigNoLocal
+instance HasPlatform BuildConfigNoLocal
+instance HasGHCVariant BuildConfigNoLocal
+instance HasConfig BuildConfigNoLocal where
+    setConfig cfg bcfg = bcfg { bcConfig = cfg }
+instance HasBuildConfigNoLocal BuildConfigNoLocal where
+    getBuildConfigNoLocal = id
+    {-# INLINE getBuildConfigNoLocal #-}
 
 -- | Class for environment values that can provide a 'BuildConfig'.
-class HasConfig env => HasBuildConfig env where
+class HasBuildConfigNoLocal env => HasBuildConfig env where
     getBuildConfig :: env -> BuildConfig
 instance HasStackRoot BuildConfig
 instance HasPlatform BuildConfig
 instance HasGHCVariant BuildConfig
-instance HasConfig BuildConfig
+instance HasConfig BuildConfig where
+    setConfig cfg bc = bc { bcNoLocal = setConfig cfg (bcNoLocal bc) }
+instance HasBuildConfigNoLocal BuildConfig where
+    getBuildConfigNoLocal = bcNoLocal
 instance HasBuildConfig BuildConfig where
     getBuildConfig = id
     {-# INLINE getBuildConfig #-}
+
+getBuildConfigLocal :: (MonadReader env m, HasBuildConfig env) => m BuildConfigLocal
+getBuildConfigLocal = asks $ bcLocal . getBuildConfig
 
 -- | Constraint synonym for constraints satisfied by a 'MiniConfig'
 -- environment.
@@ -1297,7 +1373,7 @@ platformSnapAndCompilerRel
 platformSnapAndCompilerRel = do
     bc <- asks getBuildConfig
     platform <- platformGhcRelDir
-    name <- parseRelDir $ T.unpack $ resolverDirName $ bcResolver bc
+    name <- parseRelDir $ T.unpack $ resolverDirName $ bcResolver $ bcNoLocal bc
     ghc <- compilerVersionDir
     useShaPathOnWindows (platform </> name </> ghc)
 
@@ -1309,7 +1385,7 @@ platformGhcRelDir = do
     envConfig <- asks getEnvConfig
     verOnly <- platformGhcVerOnlyRelDirStr
     parseRelDir (mconcat [ verOnly
-                         , compilerBuildSuffix (envConfigCompilerBuild envConfig)])
+                         , compilerBuildSuffix (envConfigCompilerBuild (ecLocal envConfig))])
 
 -- | Relative directory for the platform and GHC identifier without GHC bindist build
 platformGhcVerOnlyRelDir
@@ -1345,7 +1421,7 @@ useShaPathOnWindows =
 
 compilerVersionDir :: (MonadThrow m, MonadReader env m, HasEnvConfig env) => m (Path Rel Dir)
 compilerVersionDir = do
-    compilerVersion <- asks (envConfigCompilerVersion . getEnvConfig)
+    compilerVersion <- asks (envConfigCompilerVersion . getEnvConfigLocal)
     parseRelDir $ case compilerVersion of
         GhcVersion version -> versionString version
         GhcjsVersion {} -> compilerVersionString compilerVersion
@@ -1366,7 +1442,7 @@ packageDatabaseLocal = do
 packageDatabaseExtra :: (MonadThrow m, MonadReader env m, HasEnvConfig env) => m [Path Abs Dir]
 packageDatabaseExtra = do
     bc <- asks getBuildConfig
-    return $ bcExtraPackageDBs bc
+    return $ bcExtraPackageDBs $ bcLocal bc
 
 -- | Directory for holding flag cache information
 flagCacheLocal :: (MonadThrow m, MonadReader env m, HasEnvConfig env) => m (Path Abs Dir)
@@ -1429,7 +1505,7 @@ minimalEnvSettings =
     }
 
 getWhichCompiler :: (MonadReader env m, HasEnvConfig env) => m WhichCompiler
-getWhichCompiler = asks (whichCompiler . envConfigCompilerVersion . getEnvConfig)
+getWhichCompiler = asks (whichCompiler . envConfigCompilerVersion . getEnvConfigLocal)
 
 -- | Get the path for the given compiler ignoring any local binaries.
 --

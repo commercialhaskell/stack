@@ -549,11 +549,11 @@ configureOptsNoDir econfig bco deps isLocal package = concat
     , map (("--extra-include-dirs=" ++) . toFilePathNoTrailingSep) (Set.toList (configExtraIncludeDirs config))
     , map (("--extra-lib-dirs=" ++) . toFilePathNoTrailingSep) (Set.toList (configExtraLibDirs config))
     , maybe [] (\customGcc -> ["--with-gcc=" ++ toFilePath customGcc]) (configOverrideGccPath config)
-    , ["--ghcjs" | whichCompiler (envConfigCompilerVersion econfig) == Ghcjs]
+    , ["--ghcjs" | whichCompiler (envConfigCompilerVersion (ecLocal econfig)) == Ghcjs]
     , ["--exact-configuration" | useExactConf]
     ]
   where
-    wc = whichCompiler (envConfigCompilerVersion econfig)
+    wc = whichCompiler (envConfigCompilerVersion (ecLocal econfig))
     config = getConfig econfig
     bopts = bcoBuildOpts bco
 
@@ -562,7 +562,7 @@ configureOptsNoDir econfig bco deps isLocal package = concat
     -- earlier. Cabal also might do less work then.
     useExactConf = configAllowNewer config
 
-    newerCabal = envConfigCabalVersion econfig >= $(mkVersion "1.22")
+    newerCabal = envConfigCabalVersion (ecLocal econfig) >= $(mkVersion "1.22")
 
     -- Unioning atop defaults is needed so that all flags are specified
     -- with --exact-configuration.

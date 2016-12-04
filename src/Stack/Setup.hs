@@ -216,7 +216,8 @@ setupEnv :: (StackM env m, HasBuildConfig env, HasGHCVariant env)
          => Maybe Text -- ^ Message to give user when necessary GHC is not available
          -> m EnvConfig
 setupEnv mResolveMissingGHC = do
-    bconfig <- asks getBuildConfig
+    bconfig <- asks getBuildConfigNoLocal
+    stackYaml <- asks $ bcStackYaml . getBuildConfigLocal
     let platform = getPlatform bconfig
         wc = whichCompiler (bcWantedCompiler bconfig)
         sopts = SetupOpts
@@ -224,7 +225,7 @@ setupEnv mResolveMissingGHC = do
             , soptsUseSystem = configSystemGHC $ bcConfig bconfig
             , soptsWantedCompiler = bcWantedCompiler bconfig
             , soptsCompilerCheck = configCompilerCheck $ bcConfig bconfig
-            , soptsStackYaml = Just $ bcStackYaml bconfig
+            , soptsStackYaml = Just stackYaml
             , soptsForceReinstall = False
             , soptsSanityCheck = False
             , soptsSkipGhcCheck = configSkipGHCCheck $ bcConfig bconfig
@@ -251,12 +252,18 @@ setupEnv mResolveMissingGHC = do
 
     $logDebug "Resolving package entries"
     packagesRef <- liftIO $ newIORef Nothing
+    bc <- asks getBuildConfig
     let envConfig0 = EnvConfig
-            { envConfigBuildConfig = bconfig
-            , envConfigCabalVersion = cabalVer
-            , envConfigCompilerVersion = compilerVer
-            , envConfigCompilerBuild = compilerBuild
-            , envConfigPackagesRef = packagesRef
+            { ecNoLocal = EnvConfigNoLocal
+                { envConfigBuildConfigNoLocal = bcNoLocal bc
+                }
+            , ecLocal = EnvConfigLocal
+                { envConfigBuildConfigLocal = bcLocal bc
+                , envConfigCabalVersion = cabalVer
+                , envConfigCompilerVersion = compilerVer
+                , envConfigCompilerBuild = compilerBuild
+                , envConfigPackagesRef = packagesRef
+                }
             }
 
     -- extra installation bin directories
@@ -327,15 +334,20 @@ setupEnv mResolveMissingGHC = do
                     return eo
 
     return EnvConfig
-        { envConfigBuildConfig = bconfig
-            { bcConfig = maybe id addIncludeLib mghcBin
-                          (bcConfig bconfig)
-                { configEnvOverride = getEnvOverride' }
+        { ecNoLocal = EnvConfigNoLocal
+            { envConfigBuildConfigNoLocal = (bcNoLocal bconfig)
+                { bcConfig = maybe id addIncludeLib mghcBin
+                            (getConfig bconfig)
+                    { configEnvOverride = getEnvOverride' }
+                }
             }
-        , envConfigCabalVersion = cabalVer
-        , envConfigCompilerVersion = compilerVer
-        , envConfigCompilerBuild = compilerBuild
-        , envConfigPackagesRef = envConfigPackagesRef envConfig0
+        , ecLocal = EnvConfigLocal
+            { envConfigBuildConfigLocal = bcLocal bconfig
+            , envConfigCabalVersion = cabalVer
+            , envConfigCompilerVersion = compilerVer
+            , envConfigCompilerBuild = compilerBuild
+            , envConfigPackagesRef = envConfigPackagesRef $ ecLocal envConfig0
+            }
         }
 
 -- | Add the include and lib paths to the given Config

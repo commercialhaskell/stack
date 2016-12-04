@@ -253,8 +253,9 @@ precompiledCacheFile :: (MonadThrow m, MonadReader env m, HasEnvConfig env, Mona
 precompiledCacheFile pkgident copts installedPackageIDs = do
     ec <- asks getEnvConfig
 
-    compiler <- parseRelDir $ compilerVersionString $ envConfigCompilerVersion ec
-    cabal <- parseRelDir $ versionString $ envConfigCabalVersion ec
+    compiler <- parseRelDir $ compilerVersionString $ envConfigCompilerVersion
+                            $ ecLocal ec
+    cabal <- parseRelDir $ versionString $ envConfigCabalVersion $ ecLocal ec
     pkg <- parseRelDir $ packageIdentifierString pkgident
     platformRelDir <- platformGhcRelDir
 
@@ -266,7 +267,7 @@ precompiledCacheFile pkgident copts installedPackageIDs = do
     -- supplement it with the installed package IDs directly.
     -- See issue: https://github.com/commercialhaskell/stack/issues/1103
     let oldHash = B16.encode $ SHA256.hash $ LBS.toStrict $
-            if envConfigCabalVersion ec >= $(mkVersion "1.22")
+            if envConfigCabalVersion (ecLocal ec) >= $(mkVersion "1.22")
                 then Binary.encode (coNoDirs copts)
                 else Binary.encode input
         hashToPath hash = do
