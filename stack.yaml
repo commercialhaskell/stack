@@ -26,6 +26,7 @@ extra-deps:
 - hpack-0.15.0
 - persistent-2.6
 - persistent-template-2.5.1.6
+- persistent-sqlite-2.6
 flags:
   stack:
     hide-dependency-versions: true
