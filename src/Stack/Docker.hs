@@ -28,6 +28,7 @@ import           Control.Monad.Catch (MonadThrow,throwM,MonadCatch)
 import           Control.Monad.IO.Class (MonadIO,liftIO)
 import           Control.Monad.Logger (MonadLogger,logError,logInfo,logWarn)
 import           Control.Monad.Reader (MonadReader,asks,runReaderT)
+import           Control.Monad.Trans.Control (MonadBaseControl)
 import           Control.Monad.Writer (execWriter,runWriter,tell)
 import qualified "cryptohash" Crypto.Hash as Hash
 import           Data.Aeson.Extended (FromJSON(..),(.:),(.:?),(.!=),eitherDecode)
@@ -79,11 +80,8 @@ import           System.Process.Read
 import           System.Process.Run
 import           Text.Printf (printf)
 
-#ifdef WINDOWS
-import           Control.Monad.Trans.Control (MonadBaseControl)
-#else
+#ifndef WINDOWS
 import           Control.Concurrent (threadDelay)
-import           Control.Monad.Trans.Control (MonadBaseControl)
 import qualified Control.Monad.Trans.Control as Control
 import           System.Posix.Signals
 import qualified System.Posix.User as PosixUser
