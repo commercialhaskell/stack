@@ -83,7 +83,7 @@ import           Text.Printf (printf)
 import           Control.Monad.Trans.Control (MonadBaseControl)
 #else
 import           Control.Concurrent (threadDelay)
-import           Control.Monad.Trans.Control (MonadBaseControl, liftBaseWith)
+import qualified Control.Monad.Trans.Control as Control
 import           System.Posix.Signals
 import qualified System.Posix.User as PosixUser
 #endif
@@ -365,7 +365,7 @@ runContainerAndExit getCmdArgs
          ,args])
      before
 #ifndef WINDOWS
-     runInBase <- liftBaseWith $ \run -> return (void . run)
+     runInBase <- Control.liftBaseWith $ \run -> return (void . run)
      oldHandlers <- forM [sigINT,sigABRT,sigHUP,sigPIPE,sigTERM,sigUSR1,sigUSR2] $ \sig -> do
        let sigHandler = runInBase $ do
              readProcessNull Nothing envOverride "docker"
