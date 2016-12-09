@@ -12,7 +12,7 @@
 
 * Ensure `release` and `stable` branches merged to `master`
 * Check compatibility with latest stackage snapshot
-* Ensure integration tests pass on a representative Windows, Mac OS X, and Linux (Linux
+* Ensure integration tests pass on a representative Windows, macOS, and Linux (Linux
   is handled by Jenkins automatically): `stack install --pedantic && stack test
   --pedantic --flag stack:integration-tests` . The actual release script will
   perform a more thorough test for every platform/variant prior to uploading, so
@@ -85,7 +85,7 @@ for requirements to perform the release, and more details about the tool.
 * On a machine with Vagrant installed:
     * Run `etc/scripts/vagrant-releases.sh`
 
-* On Mac OS X:
+* On macOS:
     * Run `etc/scripts/osx-release.sh`
 
 * On Windows:
@@ -219,7 +219,7 @@ set up.
 
 ## Setting up an ARM VM for releases
 
-These instructions assume the host system is running OS X. Some steps will vary
+These instructions assume the host system is running macOS. Some steps will vary
 with a different host OS.
 
 ### Install qemu on host
@@ -365,7 +365,7 @@ Edit `~/.cabal/config`, and set `executable-stripping: False` and
     [stack-setup-2.yaml](https://github.com/fpco/stackage-content/blob/master/stack/stack-setup-2.yaml)
     for the ones we used in the last GHC release).
 
-    In the case of OS X, repackage the `.xz` bindist as a `.bz2`, since OS X does
+    In the case of macOS, repackage the `.xz` bindist as a `.bz2`, since macOS does
     not include `xz` by default or provide an easy way to install it.
 
   * Build any additional required bindists (see below for instructions)

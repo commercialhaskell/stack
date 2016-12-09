@@ -27,7 +27,7 @@ For detailed instructions and downloads, instructions are available by
 operating system/distribution:
 
 * [Windows](install_and_upgrade.md#windows)
-* [Mac OS X](install_and_upgrade.md#mac-os-x)
+* [macOS](install_and_upgrade.md#mac-os-x)
 * [Ubuntu](install_and_upgrade.md#ubuntu)
 * [Debian](install_and_upgrade.md#debian)
 * [CentOS / Red Hat / Amazon Linux](install_and_upgrade.md#centos)

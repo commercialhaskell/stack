@@ -294,7 +294,7 @@ do_centos_install() {
   fi
 }
 
-# Attempts to install on Mac OS X.
+# Attempts to install on macOS.
 # If 'brew' exists, installs using Homebrew.  Otherwise, installs
 # the generic bindist.
 do_osx_install() {

@@ -60,10 +60,9 @@ NOTE: These executables have been built and tested on a Windows 7, 8.1, and 10
 been tested. If you do test, please edit and update this page to indicate as
 such.
 
-## Mac OS X
+## macOS
 
-
-We generally test on the current version of Mac OS X, but Stack is known to work
+We generally test on the current version of macOS, but Stack is known to work
 on El Capitan, Yosemite and Mavericks as well, and may also work on older
 versions (YMMV).
 
@@ -76,7 +75,7 @@ information.
 ### Manual download
 
 * Download the latest release:
-    * [Mac OS X 64-bit](https://www.stackage.org/stack/osx-x86_64)
+    * [macOS 64-bit](https://www.stackage.org/stack/osx-x86_64)
 * Extract the archive and place `stack` somewhere on your `$PATH` (see
   [Path section below](#path))
 * Now you can run `stack` from the terminal.

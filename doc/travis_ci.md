@@ -13,7 +13,7 @@ ready to be used on your projects:
   is intended for projects that need to support multiple GHC versions
   and multiple OSes, such as open source libraries to be released to
   Hackage. It tests against cabal-install, as well as Stack on Linux
-  and OS X. The configuration is significantly more involved to allow
+  and macOS. The configuration is significantly more involved to allow
   for all of this branching behavior.
 
   __NOTE__: It is likely going to be necessary to modify this configuration to

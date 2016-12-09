@@ -27,9 +27,9 @@ distribution
 a 64-bit kernel. If you do not already have one, we suggest Ubuntu 14.04
 ("trusty") since this is what we test with.
 
-**Mac OS X**: [Docker for Mac](https://docs.docker.com/docker-for-mac/) is the
-supported way to use Docker integration on OS X (the older Docker Machine
-(boot2docker) approach to using Docker on OS X is not supported due to issues
+**macOS**: [Docker for Mac](https://docs.docker.com/docker-for-mac/) is the
+supported way to use Docker integration on macOS (the older Docker Machine
+(boot2docker) approach to using Docker on macOS is not supported due to issues
 with host volume mounting that make Stack nearly unusable for anything but the
 most trivial projects).
 
