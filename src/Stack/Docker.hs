@@ -83,6 +83,7 @@ import           Text.Printf (printf)
 import           Control.Monad.Trans.Control (MonadBaseControl)
 #else
 import           Control.Concurrent (threadDelay)
+import           Control.Monad.Trans.Control (MonadBaseControl)
 import qualified Control.Monad.Trans.Control as Control
 import           System.Posix.Signals
 import qualified System.Posix.User as PosixUser
