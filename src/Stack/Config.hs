@@ -237,7 +237,7 @@ configFromConfigMonoid configStackRoot configUserConfigPath mresolver mproject C
                 { indexName = IndexName "Hackage"
                 , indexLocation = ILGitHttp
                         "https://github.com/commercialhaskell/all-cabal-hashes.git"
-                        "https://s3.amazonaws.com/hackage.fpcomplete.com/00-index.tar.gz"
+                        "https://s3.amazonaws.com/hackage.fpcomplete.com/01-index.tar.gz"
                 , indexDownloadPrefix = "https://s3.amazonaws.com/hackage.fpcomplete.com/package/"
                 , indexGpgVerify = False
                 , indexRequireHashes = False

@@ -249,7 +249,7 @@ getCabalConfig dir constraintType constraints = do
     goIndex index = do
         src <- configPackageIndex $ indexName index
         let dstdir = dir FP.</> T.unpack (indexNameText $ indexName index)
-            dst = dstdir FP.</> "00-index.tar"
+            dst = dstdir FP.</> "01-index.tar"
         liftIO $ void $ tryIO $ do
             D.createDirectoryIfMissing True dstdir
             D.copyFile (toFilePath src) dst

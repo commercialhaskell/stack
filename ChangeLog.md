@@ -8,6 +8,15 @@ Major changes:
 
 Behavior changes:
 
+* The default package metadata backend has been changed from Git to
+  the 01-index.tar.gz file, from the hackage-security project. This is
+  intended to address some download speed issues from Github for
+  people in certain geographic regions. There is now full support for
+  checking out specific cabal file revisions from downloaded tarballs
+  as well. If you manually specify a package index with only a Git
+  URL, Git will still be used. See
+  [#2780](https://github.com/commercialhaskell/stack/issues/2780)
+
 Other enhancements:
 
 Bug fixes:
