@@ -198,9 +198,6 @@ getGhcOptions bconfig boptsCli name isTarget isLocal = concat
     , if boptsLibProfile bopts || boptsExeProfile bopts
          then ["-auto-all","-caf-all"]
          else []
-    , if not $ boptsLibStrip bopts || boptsExeStrip bopts
-         then ["-g"]
-         else []
     , if includeExtraOptions
          then boptsCLIGhcOptions boptsCli
          else []

@@ -13,14 +13,14 @@ import           Stack.Types.Config.Build
 
 buildOptsMonoidParser :: GlobalOptsContext -> Parser BuildOptsMonoid
 buildOptsMonoidParser hide0 =
-    transform <$> trace <*> profile <*> noStrip <*> options
+    transform <$> trace <*> profile <*> options
   where
     hideBool = hide0 /= BuildCmdGlobalOpts
     hide =
         hideMods hideBool
     hideExceptGhci =
         hideMods (hide0 `notElem` [BuildCmdGlobalOpts, GhciCmdGlobalOpts])
-    transform tracing profiling noStripping =
+    transform tracing profiling =
         enable
       where
         enable opts
@@ -36,11 +36,6 @@ buildOptsMonoidParser hide0 =
                 { toMonoidAdditionalArgs = toMonoidAdditionalArgs topts <>
                   additionalArgs
                 }
-              }
-          | noStripping = 
-              opts
-              { buildMonoidLibStrip = First (Just False)
-              , buildMonoidExeStrip = First (Just False)
               }
           | otherwise =
               opts
@@ -80,28 +75,13 @@ buildOptsMonoidParser hide0 =
                     \for all expressions and generate a backtrace on \
                     \exception" <>
             hideExceptGhci)
-
-    noStrip =
-        flag
-            False
-            True
-            (long "no-strip" <>
-             help
-                 "Disable DWARF debugging symbol stripping in libraries, \
-                     \executables, etc. for all expressions, producing \
-                     \larger executables but allowing the use of standard \
-                     \debuggers/profiling tools/other utilities that use \
-                     \debugging symbols." <>
-             hideExceptGhci)
-
     options =
-        BuildOptsMonoid <$> libProfiling <*> exeProfiling <*> libStripping <*>
-        exeStripping <*> haddock <*> haddockOptsParser hideBool <*> 
-        openHaddocks <*> haddockDeps <*> haddockInternal <*> copyBins <*>
-        preFetch <*> keepGoing <*> forceDirty <*> tests <*>
-        testOptsParser hideBool <*> benches <*> benchOptsParser hideBool <*>
-        reconfigure <*> cabalVerbose <*> splitObjs
-
+        BuildOptsMonoid <$> libProfiling <*> exeProfiling <*> haddock <*>
+        haddockOptsParser hideBool <*> openHaddocks <*> haddockDeps <*>
+        haddockInternal <*> copyBins <*> preFetch <*> keepGoing <*>
+        forceDirty <*> tests <*> testOptsParser hideBool <*> benches <*>
+        benchOptsParser hideBool <*> reconfigure <*>
+        cabalVerbose <*> splitObjs
     libProfiling =
         firstBoolFlags
             "library-profiling"
@@ -111,16 +91,6 @@ buildOptsMonoidParser hide0 =
         firstBoolFlags
             "executable-profiling"
             "executable profiling for TARGETs and all its dependencies"
-            hide
-    libStripping =
-        firstBoolFlags
-            "library-stripping"
-            "library stripping for TARGETs and all its dependencies"
-            hide
-    exeStripping =
-        firstBoolFlags
-            "executable-stripping"
-            "executable stripping for TARGETs and all its dependencies"
             hide
     haddock =
         firstBoolFlags

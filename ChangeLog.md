@@ -88,9 +88,6 @@ Other enhancements:
 * The install location for GHC and other programs can now be configured with the
   `local-programs-path` option in `config.yaml`.
   [#1644](https://github.com/commercialhaskell/stack/issues/1644)
-* `stack build` and related commands now allow the user to disable debug symbol stripping
-  with new `--no-strip`, `--no-library-stripping`, and `--no-executable-shipping` flags,
-  closing [#877](https://github.com/commercialhaskell/stack/issues/877).
 
 Bug fixes:
 

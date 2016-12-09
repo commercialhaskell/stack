@@ -122,7 +122,7 @@ createDependencyGraph dotOpts = do
   let graph = Map.fromList (localDependencies dotOpts (filter lpWanted locals))
   menv <- getMinimalEnvOverride
   installedMap <- fmap snd . fst4 <$> getInstalled menv
-                                                   (GetInstalledOpts False False False)
+                                                   (GetInstalledOpts False False)
                                                    sourceMap
   withLoadPackage menv (\loader -> do
     let depLoader =
