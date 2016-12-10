@@ -173,6 +173,9 @@ exeExt = if isWindows then ".exe" else ""
 -- | Is the OS Windows?
 isWindows = os == "mingw32"
 
+-- | Is the OS Alpine Linux?
+getIsAlpine = doesFileExist "/etc/alpine-release"
+
 -- | To avoid problems with GHC version mismatch when a new LTS major
 -- version is released, pass this argument to @stack@ when running in
 -- a global context.  The LTS major version here should match that of
