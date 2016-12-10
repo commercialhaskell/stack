@@ -42,6 +42,7 @@ import qualified Distribution.Text as Cabal
 import qualified Distribution.Version as Cabal
 import           GHC.Generics (Generic)
 import           Generics.Deriving.Monoid (memptydefault, mappenddefault)
+import           Lens.Micro (lens)
 import           Path
 import           Prelude hiding (pi, writeFile)
 import           Stack.Build.Cache
@@ -136,14 +137,15 @@ data Ctx = Ctx
     , logFunc        :: Loc -> LogSource -> LogLevel -> LogStr -> IO ()
     }
 
-instance HasStackRoot Ctx
 instance HasPlatform Ctx
 instance HasGHCVariant Ctx
 instance HasConfig Ctx
-instance HasBuildConfig Ctx where
-    getBuildConfig = getBuildConfig . getEnvConfig
+instance HasBuildConfigNoLocal Ctx
+instance HasBuildConfig Ctx
+instance HasEnvConfigNoLocal Ctx where
+    envConfigNoLocalL = envConfigL.envConfigNoLocalL
 instance HasEnvConfig Ctx where
-    getEnvConfig = ctxEnvConfig
+    envConfigL = lens ctxEnvConfig (\x y -> x { ctxEnvConfig = y })
 
 constructPlan :: forall env m. (StackM env m, HasEnvConfig env)
               => MiniBuildPlan
@@ -160,7 +162,7 @@ constructPlan mbp0 baseConfigOpts0 locals extraToBuild0 localDumpPkgs loadPackag
     let locallyRegistered = Map.fromList $ map (dpGhcPkgId &&& dpPackageIdent) localDumpPkgs
     getVersions0 <- getPackageVersionsIO
 
-    econfig <- asks getEnvConfig
+    econfig <- view envConfigL
     let onWanted = void . addDep False . packageName . lpPackage
     let inner = do
             mapM_ onWanted $ filter lpWanted locals
@@ -195,7 +197,8 @@ constructPlan mbp0 baseConfigOpts0 locals extraToBuild0 localDumpPkgs loadPackag
                 }
         else do
             planDebug $ show errs
-            $prettyError $ pprintExceptions errs (bcStackYaml (getBuildConfig econfig)) parents (wantedLocalPackages locals)
+            stackYaml <- view stackYamlL
+            $prettyError $ pprintExceptions errs stackYaml parents (wantedLocalPackages locals)
             throwM $ ConstructPlanFailed "Plan construction failed."
   where
     ctx econfig getVersions0 lf = Ctx
@@ -259,7 +262,7 @@ addFinal lp package isAllInOne = do
                 , taskConfigOpts = TaskConfigOpts missing $ \missing' ->
                     let allDeps = Map.union present missing'
                      in configureOpts
-                            (getEnvConfig ctx)
+                            (view envConfigL ctx)
                             (baseConfigOpts ctx)
                             allDeps
                             True -- local
@@ -440,7 +443,7 @@ installPackageGivenDeps isAllInOne ps package minstalled (missing, present, minL
                 let allDeps = Map.union present missing'
                     destLoc = piiLocation ps <> minLoc
                  in configureOpts
-                        (getEnvConfig ctx)
+                        (view envConfigL ctx)
                         (baseConfigOpts ctx)
                         allDeps
                         (psLocal ps)
@@ -506,7 +509,7 @@ addPackageDeps treatAsDep package = do
                                     , " requires: "
                                     , versionRangeText range
                                     ]
-                        allowNewer <- asks $ configAllowNewer . getConfig
+                        allowNewer <- view $ configL.to configAllowNewer
                         if allowNewer
                             then do
                                 warn_ " (allow-newer enabled)"
@@ -552,7 +555,7 @@ checkDirtiness ps installed package present wanted = do
     ctx <- ask
     moldOpts <- flip runLoggingT (logFunc ctx) $ tryGetFlagCache installed
     let configOpts = configureOpts
-            (getEnvConfig ctx)
+            (view envConfigL ctx)
             (baseConfigOpts ctx)
             present
             (psLocal ps)
@@ -580,7 +583,7 @@ checkDirtiness ps installed package present wanted = do
                     | Just files <- psDirty ps -> Just $ "local file changes: " <>
                                                          addEllipsis (T.pack $ unwords $ Set.toList files)
                     | otherwise -> Nothing
-        config = getConfig ctx
+        config = view configL ctx
     case mreason of
         Nothing -> return False
         Just reason -> do
@@ -678,7 +681,7 @@ packageDepsWithTools p = do
         let toolName = case warning of
                 NoToolFound tool _ -> tool
                 AmbiguousToolsFound tool _ _ -> tool
-        config <- asks getConfig
+        config <- view configL
         menv <- liftIO $ configEnvOverride config minimalEnvSettings { esIncludeLocals = True }
         mfound <- findExecutable menv toolName
         case mfound of

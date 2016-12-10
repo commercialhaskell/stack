@@ -287,7 +287,7 @@ generatePkgDescOpts
     -> Map NamedComponent (Set DotCabalPath)
     -> m (Map NamedComponent BuildInfoOpts)
 generatePkgDescOpts sourceMap installedMap omitPkgs addPkgs cabalfp pkg componentPaths = do
-    config <- asks getConfig
+    config <- view configL
     distDir <- distDirFromDir cabalDir
     let cabalMacros = autogenDir distDir </> $(mkRelFile "cabal_macros.h")
     exists <- doesFileExist cabalMacros

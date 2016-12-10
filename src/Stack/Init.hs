@@ -14,7 +14,6 @@ import           Control.Monad
 import           Control.Monad.Catch (throwM)
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
-import           Control.Monad.Reader (asks)
 import qualified Data.ByteString.Builder as B
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Lazy as L
@@ -469,7 +468,7 @@ checkBundleResolver whichCmd stackYaml initOpts bundle resolver = do
       -- the list of packages when there is conflict in dependencies among this
       -- set of packages.
       findOneIndependent packages flags = do
-          platform <- asks (configPlatform . getConfig)
+          platform <- view platformL
           (compiler, _) <- getResolverConstraints stackYaml resolver
           let getGpd pkg = snd (fromJust (Map.lookup pkg bundle))
               getFlags pkg = fromJust (Map.lookup pkg flags)

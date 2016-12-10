@@ -35,7 +35,6 @@ import           Control.Monad.Catch (throwM)
 import qualified Control.Monad.Catch as C
 import           Control.Monad.IO.Class (MonadIO, liftIO)
 import           Control.Monad.Logger (logDebug, logInfo, logWarn, logError)
-import           Control.Monad.Reader (asks)
 import           Control.Monad.Trans.Control
 import           Crypto.Hash.SHA1 (hashlazy)
 import           Data.Aeson.Extended
@@ -214,7 +213,7 @@ updateAllIndices :: (StackMiniM env m, HasConfig env)
                  => EnvOverride -> m ()
 updateAllIndices menv = do
     clearPackageCaches
-    asks (configPackageIndices . getConfig) >>= mapM_ (updateIndex menv)
+    view packageIndicesL >>= mapM_ (updateIndex menv)
 
 -- | Update the index tarball
 updateIndex :: (StackMiniM env m, HasConfig env)
@@ -432,7 +431,7 @@ getPackageCaches
          )
 getPackageCaches = do
     menv <- getMinimalEnvOverride
-    config <- askConfig
+    config <- view configL
     mcached <- liftIO $ readIORef (configPackageCaches config)
     case mcached of
         Just cached -> return cached
@@ -452,7 +451,7 @@ getPackageCaches = do
 -- hackage index is updated.
 clearPackageCaches :: (StackMiniM env m, HasConfig env) => m ()
 clearPackageCaches = do
-    cacheRef <- asks (configPackageCaches . getConfig)
+    cacheRef <- view packageCachesL
     liftIO $ writeIORef cacheRef Nothing
 
 --------------- Lifted from cabal-install, Distribution.Client.Tar:

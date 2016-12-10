@@ -15,7 +15,6 @@ import           Control.Applicative
 import           Control.Arrow
 import           Control.Monad
 import           Control.Monad.Logger
-import           Control.Monad.Reader (asks)
 import           Data.Conduit
 import qualified Data.Conduit.List as CL
 import qualified Data.Foldable as F
@@ -72,11 +71,9 @@ getInstalled menv opts sourceMap = do
     localDBPath <- packageDatabaseLocal
     extraDBPaths <- packageDatabaseExtra
 
-    bconfig <- asks getBuildConfig
-
     mcache <-
         if getInstalledProfiling opts || getInstalledHaddock opts
-            then liftM Just $ loadInstalledCache $ configInstalledCache bconfig
+            then configInstalledCache >>= liftM Just . loadInstalledCache
             else return Nothing
 
     let loadDatabase' = loadDatabase menv opts mcache sourceMap
@@ -92,7 +89,9 @@ getInstalled menv opts sourceMap = do
         loadDatabase' (Just (InstalledTo Local, localDBPath)) installedLibs2
     let installedLibs = M.fromList $ map lhPair installedLibs3
 
-    F.forM_ mcache (saveInstalledCache (configInstalledCache bconfig))
+    F.forM_ mcache $ \cache -> do
+        icache <- configInstalledCache
+        saveInstalledCache icache cache
 
     -- Add in the executables that are installed, making sure to only trust a
     -- listed installation under the right circumstances (see below)
@@ -136,8 +135,8 @@ loadDatabase :: (StackM env m, HasEnvConfig env, PackageInstallInfo pii)
              -> [LoadHelper] -- ^ from parent databases
              -> m ([LoadHelper], [DumpPackage () () ()])
 loadDatabase menv opts mcache sourceMap mdb lhs0 = do
-    wc <- getWhichCompiler
-    ver <- asks (bcWantedCompiler . getBuildConfig)
+    wc <- view $ actualCompilerVersionL.to whichCompiler
+    ver <- view wantedCompilerVersionL -- FIXME do we want instead actualCompilerVersionL?
     (lhs1', dps) <- ghcPkgDump menv wc (fmap snd (maybeToList mdb))
                 $ conduitDumpPackage =$ sink ver
     let ghcjsHack = wc == Ghcjs && isNothing mdb

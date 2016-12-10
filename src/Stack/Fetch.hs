@@ -39,7 +39,7 @@ import              Control.Monad (join, liftM, unless, void, when)
 import              Control.Monad.Catch
 import              Control.Monad.IO.Class
 import              Control.Monad.Logger
-import              Control.Monad.Reader (ask, asks, runReaderT)
+import              Control.Monad.Reader (ask, runReaderT)
 import              Control.Monad.Trans.Control
 import              Control.Monad.Trans.Unlift (MonadBaseUnlift, askRunBase)
 import "cryptohash" Crypto.Hash (SHA512 (..))
@@ -498,7 +498,7 @@ fetchPackages' :: (StackMiniM env m, HasConfig env)
                -> Map PackageIdentifier ToFetch
                -> m (Map PackageIdentifier (Path Abs Dir))
 fetchPackages' mdistDir toFetchAll = do
-    connCount <- asks $ configConnectionCount . getConfig
+    connCount <- view $ configL.to configConnectionCount
     outputVar <- liftIO $ newTVarIO Map.empty
 
     runInBase <- liftBaseWith $ \run -> return (void . run)

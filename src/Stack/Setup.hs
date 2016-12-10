@@ -38,7 +38,7 @@ import              Control.Monad (liftM, when, join, void, unless, guard)
 import              Control.Monad.Catch
 import              Control.Monad.IO.Class (MonadIO, liftIO)
 import              Control.Monad.Logger
-import              Control.Monad.Reader (MonadReader, ReaderT (..), asks)
+import              Control.Monad.Reader (MonadReader, ReaderT (..))
 import              Control.Monad.State (get, put, modify)
 import              Control.Monad.Trans.Control
 import "cryptohash" Crypto.Hash (SHA1(SHA1))
@@ -98,7 +98,6 @@ import              Stack.Types.Compiler
 import              Stack.Types.CompilerBuild
 import              Stack.Types.Config
 import              Stack.Types.Docker
-import              Stack.Types.Internal (envConfigBuildOpts, buildOptsInstallExes, buildOptsHaddock)
 import              Stack.Types.PackageIdentifier
 import              Stack.Types.PackageName
 import              Stack.Types.StackT
@@ -216,19 +215,22 @@ setupEnv :: (StackM env m, HasBuildConfig env, HasGHCVariant env)
          => Maybe Text -- ^ Message to give user when necessary GHC is not available
          -> m EnvConfig
 setupEnv mResolveMissingGHC = do
-    bconfig <- asks getBuildConfig
-    let platform = getPlatform bconfig
-        wc = whichCompiler (bcWantedCompiler bconfig)
-        sopts = SetupOpts
-            { soptsInstallIfMissing = configInstallGHC $ bcConfig bconfig
-            , soptsUseSystem = configSystemGHC $ bcConfig bconfig
-            , soptsWantedCompiler = bcWantedCompiler bconfig
-            , soptsCompilerCheck = configCompilerCheck $ bcConfig bconfig
-            , soptsStackYaml = Just $ bcStackYaml bconfig
+    config <- view configL
+    bconfig <- view buildConfigNoLocalL
+    stackYaml <- view $ buildConfigLocalL.to bcStackYaml
+    platform <- view platformL
+    wcVersion <- view wantedCompilerVersionL
+    wc <- view $ wantedCompilerVersionL.whichCompilerL
+    let sopts = SetupOpts
+            { soptsInstallIfMissing = configInstallGHC config
+            , soptsUseSystem = configSystemGHC config
+            , soptsWantedCompiler = wcVersion
+            , soptsCompilerCheck = configCompilerCheck config
+            , soptsStackYaml = Just stackYaml
             , soptsForceReinstall = False
             , soptsSanityCheck = False
-            , soptsSkipGhcCheck = configSkipGHCCheck $ bcConfig bconfig
-            , soptsSkipMsys = configSkipMsys $ bcConfig bconfig
+            , soptsSkipGhcCheck = configSkipGHCCheck config
+            , soptsSkipMsys = configSkipMsys config
             , soptsUpgradeCabal = False
             , soptsResolveMissingGHC = mResolveMissingGHC
             , soptsSetupInfoYaml = defaultSetupInfoYaml
@@ -251,12 +253,19 @@ setupEnv mResolveMissingGHC = do
 
     $logDebug "Resolving package entries"
     packagesRef <- liftIO $ newIORef Nothing
+    bcnl <- view buildConfigNoLocalL
+    bcl <- view buildConfigLocalL
     let envConfig0 = EnvConfig
-            { envConfigBuildConfig = bconfig
-            , envConfigCabalVersion = cabalVer
-            , envConfigCompilerVersion = compilerVer
-            , envConfigCompilerBuild = compilerBuild
-            , envConfigPackagesRef = packagesRef
+            { ecNoLocal = EnvConfigNoLocal
+                { envConfigBuildConfigNoLocal = bcnl
+                , envConfigCabalVersion = cabalVer
+                , envConfigCompilerVersion = compilerVer
+                , envConfigCompilerBuild = compilerBuild
+                }
+            , ecLocal = EnvConfigLocal
+                { envConfigBuildConfigLocal = bcl
+                , envConfigPackagesRef = packagesRef
+                }
             }
 
     -- extra installation bin directories
@@ -326,16 +335,22 @@ setupEnv mResolveMissingGHC = do
                         (Map.insert es eo m', ())
                     return eo
 
+    bconfigl <- view buildConfigLocalL
     return EnvConfig
-        { envConfigBuildConfig = bconfig
-            { bcConfig = maybe id addIncludeLib mghcBin
-                          (bcConfig bconfig)
-                { configEnvOverride = getEnvOverride' }
+        { ecNoLocal = EnvConfigNoLocal
+            { envConfigBuildConfigNoLocal = bconfig
+                { bcConfig = maybe id addIncludeLib mghcBin
+                            (view configL bconfig)
+                    { configEnvOverride = getEnvOverride' }
+                }
+            , envConfigCabalVersion = cabalVer
+            , envConfigCompilerVersion = compilerVer
+            , envConfigCompilerBuild = compilerBuild
             }
-        , envConfigCabalVersion = cabalVer
-        , envConfigCompilerVersion = compilerVer
-        , envConfigCompilerBuild = compilerBuild
-        , envConfigPackagesRef = envConfigPackagesRef envConfig0
+        , ecLocal = EnvConfigLocal
+            { envConfigBuildConfigLocal = bconfigl
+            , envConfigPackagesRef = envConfigPackagesRef $ ecLocal envConfig0
+            }
         }
 
 -- | Add the include and lib paths to the given Config
@@ -371,7 +386,7 @@ ensureCompiler sopts = do
                 getSystemCompiler menv0 wc
             else return Nothing
 
-    Platform expectedArch _ <- asks getPlatform
+    Platform expectedArch _ <- view platformL
 
     let canUseCompiler compilerVersion arch
             | soptsSkipGhcCheck sopts = True
@@ -382,8 +397,8 @@ ensureCompiler sopts = do
     getSetupInfo' <- runOnce (getSetupInfo (soptsSetupInfoYaml sopts))
 
     let getMmsys2Tool = do
-            platform <- asks getPlatform
-            localPrograms <- asks $ configLocalPrograms . getConfig
+            platform <- view platformL
+            localPrograms <- view $ configL.to configLocalPrograms
             installed <- listInstalled localPrograms
 
             case platform of
@@ -394,7 +409,7 @@ ensureCompiler sopts = do
                             | soptsInstallIfMissing sopts -> do
                                 si <- getSetupInfo'
                                 osKey <- getOSKey platform
-                                config <- asks getConfig
+                                config <- view configL
                                 VersionedDownloadInfo version info <-
                                     case Map.lookup osKey $ siMsys2 si of
                                         Just x -> return x
@@ -412,12 +427,12 @@ ensureCompiler sopts = do
     (mtools, compilerBuild) <- if needLocal
         then do
 
-            localPrograms <- asks $ configLocalPrograms . getConfig
+            -- Install GHC
+            ghcVariant <- view ghcVariantL
+            config <- view configL
+            let localPrograms = configLocalPrograms config
             installed <- listInstalled localPrograms
 
-            -- Install GHC
-            ghcVariant <- asks getGHCVariant
-            config <- asks getConfig
             (installedCompiler, compilerBuild) <-
                     case wc of
                         Ghc -> do
@@ -482,7 +497,7 @@ ensureCompiler sopts = do
         case mpaths of
             Nothing -> return menv0
             Just ed -> do
-                config <- asks getConfig
+                config <- view configL
                 m <- augmentPathMap (edBins ed) (unEnvOverride menv0)
                 mkEnvOverride (configPlatform config) (removeHaskellEnvVars m)
 
@@ -507,7 +522,7 @@ getGhcBuild
     => EnvOverride -> m CompilerBuild
 getGhcBuild menv = do
 
-    config <- asks getConfig
+    config <- view configL
     case configGHCBuild config of
         Just ghcBuild -> return ghcBuild
         Nothing -> determineGhcBuild
@@ -531,7 +546,7 @@ getGhcBuild menv = do
         --
         -- Of course, could also try to make a static GHC bindist instead of all this rigamarole.
 
-        platform <- asks getPlatform
+        platform <- view platformL
         case platform of
             Platform _ Linux -> do
                 -- Some systems don't have ldconfig in the PATH, so make sure to look in /sbin and /usr/sbin as well
@@ -605,7 +620,7 @@ ensureDockerStackExe
     :: (StackM env m, HasConfig env)
     => Platform -> m (Path Abs File)
 ensureDockerStackExe containerPlatform = do
-    config <- asks getConfig
+    config <- view configL
     containerPlatformDir <- runReaderT platformOnlyRelDir (containerPlatform,PlatformVariantNone)
     let programsPath = configLocalProgramsBase config </> containerPlatformDir
         tool = Tool (PackageIdentifier $(mkPackageName "stack") stackVersion)
@@ -665,7 +680,7 @@ upgradeCabal menv wc = do
                     Just dir -> return dir
 
             runCmd (Cmd (Just dir) (compilerExeName wc) menv ["Setup.hs"]) Nothing
-            platform <- asks getPlatform
+            platform <- view platformL
             let setupExe = toFilePath $ dir </>
                   (case platform of
                      Platform _ Cabal.Windows -> $(mkRelFile "Setup.exe")
@@ -713,7 +728,7 @@ getSetupInfo
     :: (MonadIO m, MonadThrow m, MonadLogger m, MonadReader env m, HasConfig env)
     => String -> m SetupInfo
 getSetupInfo stackSetupYaml = do
-    config <- asks getConfig
+    config <- view configL
     setupInfos <-
         mapM
             loadSetupInfo
@@ -789,7 +804,7 @@ downloadAndInstallCompiler :: (StackM env m, HasConfig env, HasGHCVariant env)
                            -> Maybe String
                            -> m Tool
 downloadAndInstallCompiler ghcBuild si wanted@GhcVersion{} versionCheck mbindistURL = do
-    ghcVariant <- asks getGHCVariant
+    ghcVariant <- view ghcVariantL
     (selectedVersion, downloadInfo) <- case mbindistURL of
         Just bindistURL -> do
             case ghcVariant of
@@ -805,7 +820,7 @@ downloadAndInstallCompiler ghcBuild si wanted@GhcVersion{} versionCheck mbindist
             case Map.lookup ghcKey $ siGHCs si of
                 Nothing -> throwM $ UnknownOSKey ghcKey
                 Just pairs_ -> getWantedCompilerInfo ghcKey versionCheck wanted GhcVersion pairs_
-    config <- asks getConfig
+    config <- view configL
     let installer =
             case configPlatform config of
                 Platform _ Cabal.Windows -> installGHCWindows selectedVersion
@@ -824,8 +839,8 @@ downloadAndInstallCompiler ghcBuild si wanted@GhcVersion{} versionCheck mbindist
     let tool = Tool $ PackageIdentifier ghcPkgName selectedVersion
     downloadAndInstallTool (configLocalPrograms config) si (gdiDownloadInfo downloadInfo) tool installer
 downloadAndInstallCompiler compilerBuild si wanted versionCheck _mbindistUrl = do
-    config <- asks getConfig
-    ghcVariant <- asks getGHCVariant
+    config <- view configL
+    ghcVariant <- view ghcVariantL
     case (ghcVariant, compilerBuild) of
         (GHCStandard, CompilerBuildStandard) -> return ()
         _ -> throwM GHCJSRequiresStandardVariant
@@ -857,8 +872,8 @@ getWantedCompilerInfo key versionCheck wanted toCV pairs_ =
 getGhcKey :: (MonadReader env m, HasPlatform env, HasGHCVariant env, MonadCatch m)
           => CompilerBuild -> m Text
 getGhcKey ghcBuild = do
-    ghcVariant <- asks getGHCVariant
-    platform <- asks getPlatform
+    ghcVariant <- view ghcVariantL
+    platform <- view platformL
     osKey <- getOSKey platform
     return $ osKey <> T.pack (ghcVariantSuffix ghcVariant) <> T.pack (compilerBuildSuffix ghcBuild)
 
@@ -936,7 +951,7 @@ installGHCPosix :: (StackM env m, HasConfig env)
                 -> Path Abs Dir
                 -> m ()
 installGHCPosix version downloadInfo _ archiveFile archiveType tempDir destDir = do
-    platform <- asks getPlatform
+    platform <- view platformL
     menv0 <- getMinimalEnvOverride
     menv <- mkEnvOverride platform (removeHaskellEnvVars (unEnvOverride menv0))
     $logDebug $ "menv = " <> T.pack (show (unEnvOverride menv))
@@ -1009,7 +1024,7 @@ installGHCJS :: (StackM env m, HasConfig env)
              -> Path Abs Dir
              -> m ()
 installGHCJS si archiveFile archiveType _tempDir destDir = do
-    platform <- asks getPlatform
+    platform <- view platformL
     menv0 <- getMinimalEnvOverride
     -- This ensures that locking is disabled for the invocations of
     -- stack below.
@@ -1070,8 +1085,8 @@ installGHCJS si archiveFile archiveType _tempDir destDir = do
         _ -> return Nothing
 
     $logSticky "Installing GHCJS (this will take a long time) ..."
-    runInnerStackT (set (envConfigBuildOpts.buildOptsInstallExes) True $
-                    set (envConfigBuildOpts.buildOptsHaddock) False envConfig') $
+    runInnerStackT (set (buildOptsL.buildOptsInstallExesL) True $
+                    set (buildOptsL.buildOptsHaddockL) False envConfig') $
         build (\_ -> return ()) Nothing defaultBuildOptsCLI
     -- Copy over *.options files needed on windows.
     forM_ mwindowsInstallDir $ \dir -> do
@@ -1092,7 +1107,7 @@ ensureGhcjsBooted menv cv shouldBoot  = do
             return ()
         Left (ProcessFailed _ _ _ err) | "ghcjs_boot.completed" `S.isInfixOf` LBS.toStrict err ->
             if not shouldBoot then throwM GHCJSNotBooted else do
-                config <- asks getConfig
+                config <- view configL
                 destDir <- installDir (configLocalPrograms config) (ToolGhcjs cv)
                 let stackYaml = destDir </> $(mkRelFile "src/stack.yaml")
                 -- TODO: Remove 'actualStackYaml' and just use
@@ -1121,7 +1136,7 @@ bootGhcjs :: StackM env m
           => Version -> Path Abs File -> Path Abs Dir -> m ()
 bootGhcjs ghcjsVersion stackYaml destDir = do
     envConfig <- loadGhcjsEnvConfig stackYaml (destDir </> $(mkRelDir "bin"))
-    menv <- liftIO $ configEnvOverride (getConfig envConfig) defaultEnvSettings
+    menv <- liftIO $ configEnvOverride (view configL envConfig) defaultEnvSettings
     -- Install cabal-install if missing, or if the installed one is old.
     mcabal <- getCabalInstallVersion menv
     shouldInstallCabal <- case mcabal of
@@ -1152,7 +1167,7 @@ bootGhcjs ghcjsVersion stackYaml destDir = do
                 return True
             | otherwise -> return False
     let envSettings = defaultEnvSettings { esIncludeGhcPackagePath = False }
-    menv' <- liftIO $ configEnvOverride (getConfig envConfig) envSettings
+    menv' <- liftIO $ configEnvOverride (view configL envConfig) envSettings
     when shouldInstallCabal $ do
         $logInfo "Building a local copy of cabal-install from source."
         runInnerStackT envConfig $
@@ -1266,7 +1281,7 @@ installMsys2Windows osKey si archiveFile archiveType _tempDir destDir = do
     -- I couldn't find this officially documented anywhere, but you need to run
     -- the MSYS shell once in order to initialize some pacman stuff. Once that
     -- run happens, you can just run commands as usual.
-    platform <- asks getPlatform
+    platform <- view platformL
     menv0 <- getMinimalEnvOverride
     newEnv0 <- modifyEnvOverride menv0 $ Map.insert "MSYSTEM" "MSYS"
     newEnv <- augmentPathMap [destDir </> $(mkRelDir "usr") </> $(mkRelDir "bin")]
@@ -1335,7 +1350,7 @@ setup7z :: (MonadIO n, MonadLogger n, StackMiniM env m, HasConfig env)
         => SetupInfo
         -> m (Path Abs Dir -> Path Abs File -> n ())
 setup7z si = do
-    dir <- asks $ configLocalPrograms . getConfig
+    dir <- view $ configL.to configLocalPrograms
     ensureDir dir
     let exe = dir </> $(mkRelFile "7z.exe")
         dll = dir </> $(mkRelFile "7z.dll")
@@ -1524,7 +1539,7 @@ getUtf8EnvVars menv compilerVer =
         else legacyLocale
   where
     legacyLocale = do
-        Platform _ os <- asks getPlatform
+        Platform _ os <- view platformL
         if os == Cabal.Windows
             then
                  -- On Windows, locale is controlled by the code page, so we don't set any environment
@@ -1673,7 +1688,7 @@ downloadStackReleaseInfo morg mrepo mver = liftIO $ do
 preferredPlatforms :: (MonadReader env m, HasPlatform env)
                    => m [(Bool, String)]
 preferredPlatforms = do
-    Platform arch' os' <- asks getPlatform
+    Platform arch' os' <- view platformL
     (isWindows, os) <-
       case os' of
         Cabal.Linux -> return (False, "linux")
@@ -1733,7 +1748,7 @@ downloadStackExe platforms0 archiveInfo destDir testExe = do
 
     $logInfo "Download complete, testing executable"
 
-    platform <- asks getPlatform
+    platform <- view platformL
 
     liftIO $ do
 #if !WINDOWS

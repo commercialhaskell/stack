@@ -16,7 +16,6 @@ import           Control.Exception (Exception,throw)
 import           Control.Monad hiding (mapM)
 import           Control.Monad.IO.Class (liftIO)
 import           Control.Monad.Logger (logDebug)
-import           Control.Monad.Reader (asks)
 import           Data.Maybe
 import           Data.Monoid
 import qualified Data.Text as T
@@ -50,10 +49,10 @@ reexecWithOptionalShell
     -> IO ()
     -> m ()
 reexecWithOptionalShell mprojectRoot getCompilerVersion inner =
-  do config <- asks getConfig
+  do config <- view configL
      inShell <- getInNixShell
      inContainer <- getInContainer
-     isReExec <- asks getReExec
+     isReExec <- view reExecL
      let getCmdArgs = do
            origArgs <- liftIO getArgs
            let args | inContainer = origArgs  -- internal-re-exec version already passed
@@ -74,7 +73,7 @@ runShellAndExit
     -> m (String, [String])
     -> m ()
 runShellAndExit mprojectRoot getCompilerVersion getCmdArgs = do
-     config <- asks getConfig
+     config <- view configL
      envOverride <- getEnvOverride (configPlatform config)
      (cmnd,args) <- fmap (escape *** map escape) getCmdArgs
      mshellFile <-

@@ -549,12 +549,12 @@ configureOptsNoDir econfig bco deps isLocal package = concat
     , map (("--extra-include-dirs=" ++) . toFilePathNoTrailingSep) (Set.toList (configExtraIncludeDirs config))
     , map (("--extra-lib-dirs=" ++) . toFilePathNoTrailingSep) (Set.toList (configExtraLibDirs config))
     , maybe [] (\customGcc -> ["--with-gcc=" ++ toFilePath customGcc]) (configOverrideGccPath config)
-    , ["--ghcjs" | whichCompiler (envConfigCompilerVersion econfig) == Ghcjs]
+    , ["--ghcjs" | wc == Ghcjs]
     , ["--exact-configuration" | useExactConf]
     ]
   where
-    wc = whichCompiler (envConfigCompilerVersion econfig)
-    config = getConfig econfig
+    wc = view (actualCompilerVersionL.to whichCompiler) econfig
+    config = view configL econfig
     bopts = bcoBuildOpts bco
 
     -- TODO: instead always enable this when the cabal version is new
@@ -562,7 +562,7 @@ configureOptsNoDir econfig bco deps isLocal package = concat
     -- earlier. Cabal also might do less work then.
     useExactConf = configAllowNewer config
 
-    newerCabal = envConfigCabalVersion econfig >= $(mkVersion "1.22")
+    newerCabal = view cabalVersionL econfig >= $(mkVersion "1.22")
 
     -- Unioning atop defaults is needed so that all flags are specified
     -- with --exact-configuration.
