@@ -60,6 +60,7 @@ extra-deps:
 - http-api-data-0.2.2
 - time-locale-compat-0.1.1.1
 - persistent-2.6
+- persistent-sqlite-2.6
 - store-0.3
 - store-core-0.3
 - th-reify-many-0.1.6
