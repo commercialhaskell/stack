@@ -4,23 +4,37 @@
 
 Release notes:
 
+* For the _next_ stack release after this one, we are planning
+  changes to our Linux releases, including dropping our Ubuntu,
+  Debian, CentOS, and Fedora package repositories and switching to
+  statically linked binaries. See
+  [#2534](https://github.com/commercialhaskell/stack/issues/2534).
+  Note that upgrading without a package manager has gotten easier
+  with new binary upgrade support in `stack upgrade` (see the Major
+  Changes section below for more information). In addition, the
+  get.haskellstack.org script no longer installs from Ubuntu,
+  Debian, CentOS, or Fedora package repositories. Instead it places
+  a generic binary in /usr/local/bin.
+
 Major changes:
 
-* `stack ghci` now defaults to skipping the build of target packages, because
-  support has been added for invoking "initial build steps", which create
-  autogen files and run preprocessors. The `--no-build` flag is now deprecated
-  because it should no longer be necessary. See
-  [#1364](https://github.com/commercialhaskell/stack/issues/1364)
 * Stack will now always use its own GHC installation, even when a suitable GHC
   installation is available on the PATH. To get the old behaviour, use
   the `--system-ghc` flag or run `stack config set system-ghc --global true`.
   Docker- and Nix-enabled projects continue to use the GHC installations
   in their environment by default.
 
-  NB: Scripts that previously used stack in combination with a system GHC
-  installation should now include a `stack setup` line or use the `--install-ghc`
-  flag.
-  [#2221](https://github.com/commercialhaskell/stack/issues/2221)
+    NB: Scripts that previously used stack in combination with a system GHC
+    installation should now include a `stack setup` line or use the `--install-ghc`
+    flag.
+    [#2221](https://github.com/commercialhaskell/stack/issues/2221)
+
+* `stack ghci` now defaults to skipping the build of target packages, because
+  support has been added for invoking "initial build steps", which create
+  autogen files and run preprocessors. The `--no-build` flag is now deprecated
+  because it should no longer be necessary. See
+  [#1364](https://github.com/commercialhaskell/stack/issues/1364)
+
 * Stack is now capable of doing binary upgrades instead of always
   recompiling a new version from source. Running `stack upgrade` will
   now default to downloading a binary version of Stack from the most
@@ -33,8 +47,10 @@ Behavior changes:
 * Passing `--resolver X` with a Stack command which forces creation of a global
   project config, will pass resolver X into the initial config.
   See [#2579](https://github.com/commercialhaskell/stack/issues/2229).
+
 * Switch the "Run from outside project" messages to debug-level, to
   avoid spamming users in the normal case of non-project usage
+
 * If a remote package is specified (such as a Git repo) without an explicit
   `extra-dep` setting, a warning is given to the user to provide one
   explicitly.
@@ -88,6 +104,17 @@ Other enhancements:
 * The install location for GHC and other programs can now be configured with the
   `local-programs-path` option in `config.yaml`.
   [#1644](https://github.com/commercialhaskell/stack/issues/1644)
+* Added option to add nix dependencies as nix GC roots
+* Proper pid 1 (init) process for `stack exec` with Docker
+* Dump build logs if they contain warnings.
+  [#2545](https://github.com/commercialhaskell/stack/issues/2545)
+* Docker: redirect stdout of `docker pull` to stderr so that
+  it will not interfere with output of other commands.
+* Nix & docker can be activated at the same time, in order to run stack in a nix-shell
+  in a container, preferably from an image already containing the nix dependencies
+  in its /nix/store
+* Stack/nix: Dependencies can be added as nix GC roots, so they are not removed
+  when running `nix-collect-garbage`
 
 Bug fixes:
 
@@ -179,9 +206,6 @@ Behavior changes:
 
 Other enhancements:
 
-* Nix & docker can be activated at the same time, in order to run stack in a nix-shell
-  in a container, preferably from an image already containing the nix dependencies
-  in its /nix/store
 * Use the `store` package for binary serialization of most caches.
 * Only require minor version match for Docker stack exe.
   This way, we can make patch releases for version bounds and similar
@@ -191,8 +215,6 @@ Other enhancements:
   See [#2243](https://github.com/commercialhaskell/stack/issues/2243)
 * Stack/Nix: Sets `LD_LIBRARY_PATH` so packages using C libs for Template Haskell can work
   (See _e.g._ [this HaskellR issue](https://github.com/tweag/HaskellR/issues/253))
-* Stack/nix: Dependencies can be added as nix GC roots, so they are not removed
-  when running `nix-collect-garbage`
 * Parse CLI arguments and configuration files into less permissive types,
   improving error messages for bad inputs.
   [#2267](https://github.com/commercialhaskell/stack/issues/2267)
