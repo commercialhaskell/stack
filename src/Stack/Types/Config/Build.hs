@@ -44,8 +44,6 @@ import           Stack.Types.PackageName
 data BuildOpts =
   BuildOpts {boptsLibProfile :: !Bool
             ,boptsExeProfile :: !Bool
-            ,boptsLibStrip :: !Bool
-            ,boptsExeStrip :: !Bool
             ,boptsHaddock :: !Bool
             -- ^ Build haddocks?
             ,boptsHaddockOpts :: !HaddockOpts
@@ -90,8 +88,6 @@ defaultBuildOpts :: BuildOpts
 defaultBuildOpts = BuildOpts
     { boptsLibProfile = False
     , boptsExeProfile = False
-    , boptsLibStrip = True
-    , boptsExeStrip = True
     , boptsHaddock = False
     , boptsHaddockOpts = defaultHaddockOpts
     , boptsOpenHaddocks = False
@@ -151,8 +147,6 @@ data BuildCommand
 data BuildOptsMonoid = BuildOptsMonoid
     { buildMonoidLibProfile :: !(First Bool)
     , buildMonoidExeProfile :: !(First Bool)
-    , buildMonoidLibStrip :: !(First Bool)
-    , buildMonoidExeStrip :: !(First Bool)
     , buildMonoidHaddock :: !(First Bool)
     , buildMonoidHaddockOpts :: !HaddockOptsMonoid
     , buildMonoidOpenHaddocks :: !(First Bool)
@@ -175,8 +169,6 @@ instance FromJSON (WithJSONWarnings BuildOptsMonoid) where
   parseJSON = withObjectWarnings "BuildOptsMonoid"
     (\o -> do buildMonoidLibProfile <- First <$> o ..:? buildMonoidLibProfileArgName
               buildMonoidExeProfile <-First <$>  o ..:? buildMonoidExeProfileArgName
-              buildMonoidLibStrip <- First <$> o ..:? buildMonoidLibStripArgName
-              buildMonoidExeStrip <-First <$>  o ..:? buildMonoidExeStripArgName
               buildMonoidHaddock <- First <$> o ..:? buildMonoidHaddockArgName
               buildMonoidHaddockOpts <- jsonSubWarnings (o ..:? buildMonoidHaddockOptsArgName ..!= mempty)
               buildMonoidOpenHaddocks <- First <$> o ..:? buildMonoidOpenHaddocksArgName
@@ -200,12 +192,6 @@ buildMonoidLibProfileArgName = "library-profiling"
 
 buildMonoidExeProfileArgName :: Text
 buildMonoidExeProfileArgName = "executable-profiling"
-
-buildMonoidLibStripArgName :: Text
-buildMonoidLibStripArgName = "library-stripping"
-
-buildMonoidExeStripArgName :: Text
-buildMonoidExeStripArgName = "executable-stripping"
 
 buildMonoidHaddockArgName :: Text
 buildMonoidHaddockArgName = "haddock"

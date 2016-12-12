@@ -474,7 +474,7 @@ system libraries.
 
 ## How can I make `stack` aware of my custom SSL certificates?
 
-### OS X
+### macOS
 
 In principle, you can use the following command to add a certificate to your system certificate keychain:
 

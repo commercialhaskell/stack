@@ -85,26 +85,11 @@ sudocmd() {
   $(command -v sudo) "$@"
 }
 
-# Adds the FPCo key to the keyring and adds the given repo to the apt sources
-add_apt_repo() {
-  echo "$1" | sudocmd tee /etc/apt/sources.list.d/fpco.list > /dev/null
-  sudocmd apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 575159689BEFB442
-}
-
 # Install dependencies for distros that use Apt
 apt_install_dependencies() {
     info "Installing dependencies..."
     info ""
     apt_get_install_pkgs "$@"
-}
-
-# Install Stack package on for distros that use Apt
-apt_update_and_install() {
-    sudocmd apt-get update ${QUIET:+-qq}
-    apt_get_install_pkgs stack
-    post_install_separator
-    info "Installed 'stack' package."
-    info ""
 }
 
 # Attempts an install on Ubuntu via apt, if possible
@@ -119,46 +104,22 @@ do_ubuntu_install() {
   }
 
   if is_64_bit ; then
-    case "$1" in
-      16.10)
-        add_apt_repo 'deb http://download.fpcomplete.com/ubuntu yakkety main'
-        apt_update_and_install
-        ;;
-      16.04)
-        add_apt_repo 'deb http://download.fpcomplete.com/ubuntu xenial main'
-        apt_update_and_install
-        ;;
-      15.10)
-        add_apt_repo 'deb http://download.fpcomplete.com/ubuntu wily main'
-        apt_update_and_install
-        ;;
-      14.04)
-        add_apt_repo 'deb http://download.fpcomplete.com/ubuntu trusty main'
-        apt_update_and_install
-        ;;
-      12.04)
-        add_apt_repo 'deb http://download.fpcomplete.com/ubuntu precise main'
-        apt_update_and_install
-        ;;
-      *)
-        install_dependencies
-        info ""
-        info "No packages available for Ubuntu $1, using generic bindist..."
-        info ""
-        install_64bit_standard_binary
-        ;;
-    esac
+    install_dependencies
+    info ""
+    info "Using generic bindist..."
+    info ""
+    install_64bit_static_binary
   else
     install_dependencies
     info ""
-    info "No packages available for 32-bit Ubuntu $1, using generic bindist..."
+    info "Using generic bindist..."
     info ""
     install_32bit_standard_binary
   fi
 
 }
 
-# Attempts an install on Debian via apt, if possible
+# Attempts an install on Debian.
 # Expects the single-number version as the first and only argument
 # If the version of Debian is unsupported, it attempts to copy the binary
 # and install the necessary dependencies explicitly.
@@ -168,33 +129,21 @@ do_debian_install() {
   }
 
   if is_64_bit ; then
-    case "$1" in
-      8*)
-        add_apt_repo 'deb http://download.fpcomplete.com/debian jessie main'
-        apt_update_and_install
-        ;;
-      7*)
-        add_apt_repo 'deb http://download.fpcomplete.com/debian wheezy main'
-        apt_update_and_install
-        ;;
-      *)
-        install_dependencies
-        info ""
-        info "No packages available for Debian $1, using generic bindist..."
-        info ""
-        install_64bit_standard_binary
-        ;;
-    esac
+    install_dependencies
+    info ""
+    info "Using generic bindist..."
+    info ""
+    install_64bit_static_binary
   else
     install_dependencies
     info ""
-    info "No packages available for 32-bit Debian $1, using generic bindist..."
+    info "Using generic bindist..."
     info ""
     install_32bit_standard_binary
   fi
 }
 
-# Attempts an install on Fedora via dnf, if possible
+# Attempts an install on Fedora.
 # Expects the single-number version as the first and only argument
 # If the version of Fedora is unsupported, it attempts to copy the binary
 # and install the necessary dependencies explicitly.
@@ -202,46 +151,23 @@ do_fedora_install() {
   install_dependencies() {
     dnf_install_pkgs perl make automake gcc gmp-devel libffi zlib xz tar
   }
-  dnf_install_stack() {
-    dnf_install_pkgs stack
-    post_install_separator
-    info "Installed 'stack' package."
-    info ""
-  }
 
   if is_64_bit ; then
-    check_dl_tools
-    case "$1" in
-      "24"*)
-        dl_to_stdout https://download.fpcomplete.com/fedora/24/fpco.repo | sudocmd tee /etc/yum.repos.d/fpco.repo >/dev/null
-        dnf_install_stack
-        ;;
-      "23"*)
-        dl_to_stdout https://download.fpcomplete.com/fedora/23/fpco.repo | sudocmd tee /etc/yum.repos.d/fpco.repo >/dev/null
-        dnf_install_stack
-        ;;
-      "22"*)
-        dl_to_stdout https://download.fpcomplete.com/fedora/22/fpco.repo | sudocmd tee /etc/yum.repos.d/fpco.repo >/dev/null
-        dnf_install_stack
-        ;;
-      *)
-        install_dependencies "$1"
-        info ""
-        info "No packages available for Fedora $1, using generic bindist..."
-        info ""
-        install_64bit_standard_binary
-        ;;
-    esac
+    install_dependencies "$1"
+    info ""
+    info "Using generic bindist..."
+    info ""
+    install_64bit_static_binary
   else
     install_dependencies "$1"
     info ""
-    info "No packages available for 32-bit Fedora $1, using generic bindist..."
+    info "Using generic bindist..."
     info ""
     install_32bit_standard_binary
   fi
 }
 
-# Attempts an install on CentOS via yum, if possible
+# Attempts an install on CentOS.
 # Expects the single-number version as the first and only argument
 # If the version of CentOS is unsupported, it attempts to copy the binary
 # and install the necessary dependencies explicitly.
@@ -249,44 +175,25 @@ do_centos_install() {
   install_dependencies() {
     yum_install_pkgs perl make automake gcc gmp-devel libffi zlib xz tar
   }
-  install_package() {
-    yum_install_pkgs stack
-    post_install_separator
-    info "Installed 'stack' package."
-    info ""
-  }
 
   if is_64_bit ; then
-    check_dl_tools
-    case "$1" in
-      "7"|"7."*)
-        dl_to_stdout https://download.fpcomplete.com/centos/7/fpco.repo | sudocmd tee /etc/yum.repos.d/fpco.repo >/dev/null
-        install_package
-        ;;
-      "6"|"6."*)
-        dl_to_stdout https://download.fpcomplete.com/centos/6/fpco.repo | sudocmd tee /etc/yum.repos.d/fpco.repo >/dev/null
-        install_package
-        ;;
-      *)
-        install_dependencies
-        info ""
-        info "No packages available for CentOS/RHEL $1, using generic bindist..."
-        info ""
-        install_64bit_standard_binary
-        ;;
-    esac
+    install_dependencies
+    info ""
+    info "Using generic bindist..."
+    info ""
+    install_64bit_static_binary
   else
     install_dependencies
     case "$1" in
       "6")
         info ""
-        info "No packages available for 32-bit CentOS/RHEL $1, using genergic libgmp4 bindist..."
+        info "Using genergic libgmp4 bindist..."
         info ""
         install_32bit_gmp4_linked_binary
         ;;
       *)
         info ""
-        info "No packages available for 32-bit CentOS/RHEL $1, using generic bindist..."
+        info "Using generic bindist..."
         info ""
         install_32bit_standard_binary
         ;;
@@ -294,24 +201,13 @@ do_centos_install() {
   fi
 }
 
-# Attempts to install on Mac OS X.
+# Attempts to install on macOS.
 # If 'brew' exists, installs using Homebrew.  Otherwise, installs
 # the generic bindist.
 do_osx_install() {
-  #if has_brew ; then
-  #  info "Since you have 'brew', installing using Homebrew."
-  #  info ""
-  #  brew update
-  #  brew install haskell-stack
-  #  post_install_separator
-  #  info "Installed Homebrew 'haskell-stack' formula."
-  #  info ""
-  #else
-  #  info "Since you do not have 'brew', using generic bindist..."
-    info "Using generic bindist..."
-    info ""
-    install_64bit_osx_binary
-  #fi
+  info "Using generic bindist..."
+  info ""
+  install_64bit_osx_binary
   info "NOTE: You may need to run 'xcode-select --install' to set"
   info "      up the Xcode command-line tools, which Stack uses."
   info ""
@@ -338,9 +234,9 @@ do_alpine_install() {
   }
   install_dependencies
   if is_64_bit ; then
-      install_64bit_static_binary
+    install_64bit_static_binary
   else
-      install_32bit_standard_binary
+    die "Sorry, there is currently no 32-bit Alpine Linux binary available."
   fi
 }
 
@@ -351,7 +247,7 @@ do_sloppy_install() {
   info "bindist..."
   info ""
   if is_64_bit ; then
-      install_64bit_standard_binary
+      install_64bit_static_binary
   else
       install_32bit_standard_binary
   fi
@@ -542,10 +438,6 @@ install_32bit_standard_binary() {
   install_from_bindist "linux-i386"
 }
 
-install_64bit_standard_binary() {
-  install_from_bindist "linux-x86_64"
-}
-
 install_64bit_static_binary() {
   install_from_bindist "linux-x86_64-static"
 }
@@ -562,7 +454,7 @@ install_64bit_freebsd_binary() {
   install_from_bindist "freebsd-x86_64"
 }
 
-# Attempt to install packages using whichever of apt-get, dnf, or yum is
+# Attempt to install packages using whichever of apt-get, dnf, yum, or apk is
 # available.
 try_install_pkgs() {
   if has_apt_get ; then

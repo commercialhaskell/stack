@@ -91,7 +91,6 @@ spec = do
                 , dpHaddockHtml = Just "/opt/ghc/7.8.4/share/doc/ghc/html/libraries/haskell2010-1.1.2.0"
                 , dpProfiling = ()
                 , dpHaddock = ()
-                , dpSymbols = ()
                 , dpIsExposed = False
                 }
 
@@ -130,7 +129,6 @@ spec = do
                 , dpHasExposedModules = True
                 , dpProfiling = ()
                 , dpHaddock = ()
-                , dpSymbols = ()
                 , dpIsExposed = False
                 }
         it "ghc 7.8.4 (osx)" $ do
@@ -166,7 +164,6 @@ spec = do
                 , dpHasExposedModules = True
                 , dpProfiling = ()
                 , dpHaddock = ()
-                , dpSymbols = ()
                 , dpIsExposed = True
                 }
         it "ghc HEAD" $ do
@@ -196,7 +193,6 @@ spec = do
             , dpHasExposedModules = True
             , dpProfiling = ()
             , dpHaddock = ()
-            , dpSymbols = ()
             , dpIsExposed = True
             }
 
@@ -209,7 +205,6 @@ spec = do
             $  conduitDumpPackage
             =$ addProfiling icache
             =$ addHaddock icache
-            =$ fakeAddSymbols
             =$ CL.sinkNull
 
     it "sinkMatching" $ do
@@ -220,8 +215,7 @@ spec = do
             $  conduitDumpPackage
             =$ addProfiling icache
             =$ addHaddock icache
-            =$ fakeAddSymbols
-            =$ sinkMatching False False False (Map.singleton $(mkPackageName "transformers") $(mkVersion "0.0.0.0.0.0.1"))
+            =$ sinkMatching False False (Map.singleton $(mkPackageName "transformers") $(mkVersion "0.0.0.0.0.0.1"))
         case Map.lookup $(mkPackageName "base") m of
             Nothing -> error "base not present"
             Just _ -> return ()
@@ -268,7 +262,3 @@ checkDepsPresent prunes selected =
         case Map.lookup ident depMap of
             Nothing -> error "checkDepsPresent: missing in depMap"
             Just deps -> Set.null $ Set.difference (Set.fromList deps) allIds
-
--- addSymbols can't be reasonably tested like this
-fakeAddSymbols :: Monad m => Conduit (DumpPackage a b c) m (DumpPackage a b Bool)
-fakeAddSymbols = CL.map (\dp -> dp { dpSymbols = False })

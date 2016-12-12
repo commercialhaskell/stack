@@ -530,7 +530,6 @@ getGhciPkgInfos sourceMap addPkgs mfileTargets localTargets = do
         GetInstalledOpts
             { getInstalledProfiling = False
             , getInstalledHaddock   = False
-            , getInstalledSymbols   = False
             }
         sourceMap
     let localLibs = [name | (name, (_, target)) <- localTargets, hasLocalComp isCLib target]

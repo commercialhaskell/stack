@@ -19,7 +19,6 @@ module Stack.PackageDump
     , saveInstalledCache
     , addProfiling
     , addHaddock
-    , addSymbols
     , sinkMatching
     , pruneDeps
     ) where
@@ -48,7 +47,6 @@ import           Data.Store.VersionTagged
 import           Data.Text (Text)
 import qualified Data.Text as T
 import           Data.Typeable (Typeable)
-import qualified Distribution.System as OS
 import           Path
 import           Path.Extra (toFilePathNoTrailingSep)
 import           Prelude -- Fix AMP warning
@@ -170,16 +168,14 @@ pruneDeps getName getId getDepends chooseBest =
 sinkMatching :: Monad m
              => Bool -- ^ require profiling?
              -> Bool -- ^ require haddock?
-             -> Bool -- ^ require debugging symbols?
              -> Map PackageName Version -- ^ allowed versions
-             -> Consumer (DumpPackage Bool Bool Bool)
+             -> Consumer (DumpPackage Bool Bool)
                          m
-                         (Map PackageName (DumpPackage Bool Bool Bool))
-sinkMatching reqProfiling reqHaddock reqSymbols allowed = do
+                         (Map PackageName (DumpPackage Bool Bool))
+sinkMatching reqProfiling reqHaddock allowed = do
     dps <- CL.filter (\dp -> isAllowed (dpPackageIdent dp) &&
                              (not reqProfiling || dpProfiling dp) &&
-                             (not reqHaddock || dpHaddock dp) &&
-                             (not reqSymbols || dpSymbols dp))
+                             (not reqHaddock || dpHaddock dp))
        =$= CL.consume
     return $ Map.fromList $ map (packageIdentifierName . dpPackageIdent &&& id) $ Map.elems $ pruneDeps
         id
@@ -196,7 +192,7 @@ sinkMatching reqProfiling reqHaddock reqSymbols allowed = do
 -- | Add profiling information to the stream of @DumpPackage@s
 addProfiling :: MonadIO m
              => InstalledCache
-             -> Conduit (DumpPackage a b c) m (DumpPackage Bool b c)
+             -> Conduit (DumpPackage a b) m (DumpPackage Bool b)
 addProfiling (InstalledCache ref) =
     CL.mapM go
   where
@@ -231,7 +227,7 @@ isProfiling content lib =
 -- | Add haddock information to the stream of @DumpPackage@s
 addHaddock :: MonadIO m
            => InstalledCache
-           -> Conduit (DumpPackage a b c) m (DumpPackage a Bool c)
+           -> Conduit (DumpPackage a b) m (DumpPackage a Bool)
 addHaddock (InstalledCache ref) =
     CL.mapM go
   where
@@ -251,43 +247,8 @@ addHaddock (InstalledCache ref) =
                 loop $ dpHaddockInterfaces dp
         return dp { dpHaddock = h }
 
--- | Add debugging symbol information to the stream of @DumpPackage@s
-addSymbols :: MonadIO m
-           => InstalledCache
-           -> CompilerVersion
-           -> Conduit (DumpPackage a b c) m (DumpPackage a b Bool)
-addSymbols (InstalledCache ref) ver =
-    CL.mapM go
-  where
-    ver' = versionString . getGhcVersion $ ver
-    go dp = do
-        InstalledCacheInner m <- liftIO $ readIORef ref
-        let gid = dpGhcPkgId dp
-        s <- case Map.lookup gid m of
-            Just installed -> return (installedCacheSymbols installed)
-            Nothing | null (dpLibraries dp) -> return True
-            Nothing -> do
-                let lib = T.unpack . head $ dpLibraries dp
-                liftM or . mapM (\dir -> liftIO $ hasDebuggingSymbols ver' dir lib) $ dpLibDirs dp
-        return dp { dpSymbols = s }
-
-hasDebuggingSymbols :: String   -- ^ target compiler
-                    -> FilePath -- ^ library directory
-                    -> String   -- ^ name of library
-                    -> IO Bool
-hasDebuggingSymbols ver dir lib = case OS.buildOS of
-    OS.OSX     -> liftM (and . fmap ((/= '0') . head) . Prelude.take 30 . lines) $
-        readProcess "dwarfdump" [concat [dir, "/lib", lib, "-ghc", ver, ".a"]] ""
-    OS.Linux   -> liftM ((== "Contents") . head . words . (!! 2) . lines) $
-        readProcess "readelf" ["--debug-dump=info", "--dwarf-depth=1", concat [dir, "/lib", lib, "-ghc", ver, ".a"]] ""
-    OS.FreeBSD -> liftM ((== "Contents") . head . words . (!! 2) . lines) $
-        readProcess "readelf" ["--debug-dump=info", "--dwarf-depth=1", concat [dir, "/lib", lib, "-ghc", ver, ".a"]] ""
-    OS.Windows -> return False -- No support, so it can't be there.
-    _          -> return False
-
-
 -- | Dump information for a single package
-data DumpPackage profiling haddock symbols = DumpPackage
+data DumpPackage profiling haddock = DumpPackage
     { dpGhcPkgId :: !GhcPkgId
     , dpPackageIdent :: !PackageIdentifier
     , dpLibDirs :: ![FilePath]
@@ -298,7 +259,6 @@ data DumpPackage profiling haddock symbols = DumpPackage
     , dpHaddockHtml :: !(Maybe FilePath)
     , dpProfiling :: !profiling
     , dpHaddock :: !haddock
-    , dpSymbols :: !symbols
     , dpIsExposed :: !Bool
     }
     deriving (Show, Eq, Ord)
@@ -320,7 +280,7 @@ instance Show PackageDumpException where
 
 -- | Convert a stream of bytes into a stream of @DumpPackage@s
 conduitDumpPackage :: MonadThrow m
-                   => Conduit Text m (DumpPackage () () ())
+                   => Conduit Text m (DumpPackage () ())
 conduitDumpPackage = (=$= CL.catMaybes) $ eachSection $ do
     pairs <- eachPair (\k -> (k, ) <$> CL.consume) =$= CL.consume
     let m = Map.fromList pairs
@@ -379,7 +339,6 @@ conduitDumpPackage = (=$= CL.catMaybes) $ eachSection $ do
                 , dpHaddockHtml = listToMaybe haddockHtml
                 , dpProfiling = ()
                 , dpHaddock = ()
-                , dpSymbols = ()
                 , dpIsExposed = exposed == ["True"]
                 }
 

@@ -5,7 +5,7 @@
 # Name for GNU tar.
 TAR=tar
 CHOWN=chown
-# Needed on my OS X install with HomeBrew.
+# Needed on my macOS install with HomeBrew.
 #TAR=gtar
 #CHOWN=gchown
 

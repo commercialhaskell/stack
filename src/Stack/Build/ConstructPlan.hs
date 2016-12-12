@@ -152,7 +152,7 @@ constructPlan :: forall env m. (StackM env m, HasEnvConfig env)
               -> BaseConfigOpts
               -> [LocalPackage]
               -> Set PackageName -- ^ additional packages that must be built
-              -> [DumpPackage () () ()] -- ^ locally registered
+              -> [DumpPackage () ()] -- ^ locally registered
               -> (PackageName -> Version -> Map FlagName Bool -> [Text] -> IO Package) -- ^ load upstream package
               -> SourceMap
               -> InstalledMap

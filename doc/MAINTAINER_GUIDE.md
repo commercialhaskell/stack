@@ -2,17 +2,14 @@
 
 ## Next release:
 
-* Consider moving all the release scripts stuff to a separate repo, or make it
-  easy to run the release tools from a separate repo than the version of Stack
-  being released. This will make it much easier to adjust the release process as
-  we go without ending up with stack binaries build from different git commit
-  IDs.
+* Stop building Linux distro
+  packages [#2534](https://github.com/commercialhaskell/stack/issues/2534)
 
 ## Pre-release steps
 
 * Ensure `release` and `stable` branches merged to `master`
 * Check compatibility with latest stackage snapshot
-* Ensure integration tests pass on a representative Windows, Mac OS X, and Linux (Linux
+* Ensure integration tests pass on a representative Windows, macOS, and Linux (Linux
   is handled by Jenkins automatically): `stack install --pedantic && stack test
   --pedantic --flag stack:integration-tests` . The actual release script will
   perform a more thorough test for every platform/variant prior to uploading, so
@@ -34,12 +31,11 @@
     * stack.yaml: bump to use latest LTS version, and check whether extra-deps
       still needed
 * In RC branch:
-    * Update the ChangeLog
-      ([this comparison](https://github.com/commercialhaskell/stack/compare/stable...master)
-      is handy):
-        * Check for any important changes that missed getting an entry in Changelog
+    * Update the ChangeLog:
+        * Check for any important changes that missed getting an entry in
+          Changelog (`git log origin/stable...HEAD`)
         * Check for any entries that snuck into the previous version's changes
-          due to merges
+          due to merges (`git diff origin/stable HEAD ChangeLog.md`)
     * Review documentation for any changes that need to be made
         * Search for old Stack version, unstable stack version, and the next
           "obvious" version in sequence (if doing a non-obvious jump), and
@@ -69,6 +65,14 @@ See
 [stack-release-script's README](https://github.com/commercialhaskell/stack/blob/master/etc/scripts/README.md#prerequisites)
 for requirements to perform the release, and more details about the tool.
 
+A note about the `etc/scripts/*-releases.sh` scripts: if you run them from a
+different working tree than the scripts themselves (e.g. if you have `stack1`
+and `stack2` trees, and run `cd stack1;
+../stack2/etc/scripts/vagrant-release.sh`) the scripts and Vagrantfiles from the
+tree containing the script will be used to build the stack code in the current
+directory. That allows you to iterate on the release process while building a
+consistent and clean stack version.
+
 * Create a
   [new draft Github release](https://github.com/commercialhaskell/stack/releases/new)
   with tag and name `vX.Y.Z` (where X.Y.Z is the stack package's version), targetting the
@@ -85,7 +89,7 @@ for requirements to perform the release, and more details about the tool.
 * On a machine with Vagrant installed:
     * Run `etc/scripts/vagrant-releases.sh`
 
-* On Mac OS X:
+* On macOS:
     * Run `etc/scripts/osx-release.sh`
 
 * On Windows:
@@ -108,10 +112,6 @@ for requirements to perform the release, and more details about the tool.
 * On a machine with Vagrant installed:
     * Run `etc/scripts/vagrant-distros.sh`
 
-* Edit
-  [stack-setup-2.yaml](https://github.com/fpco/stackage-content/blob/master/stack/stack-setup-2.yaml),
-  and add the new linux64 stack bindist
-
 * (SKIP) Submit a PR for the
   [haskell-stack Homebrew formula](https://github.com/Homebrew/homebrew-core/blob/master/Formula/haskell-stack.rb)
       * Ensure that the formula use the sdist uploaded to the Github release
@@ -120,7 +120,7 @@ for requirements to perform the release, and more details about the tool.
 
 * (SKIP) [Flag the Arch Linux package as out-of-date](https://www.archlinux.org/packages/community/x86_64/stack/flag/)
 
-* Push signed Git tag, matching Github release tag name, e.g.: `git tag -d vX.Y.Z && git tag -u
+* Push signed Git tag, matching Github release tag name, e.g.: `git tag -d vX.Y.Z; git tag -u
   0x575159689BEFB442 vX.Y.Z && git push -f origin vX.Y.Z`
 
 * Reset the `release` branch to the released commit, e.g.: `git checkout release
@@ -131,7 +131,7 @@ for requirements to perform the release, and more details about the tool.
 * Delete the RC branch (locally and on origin)
 
 * Activate version for new release tag on
-  [readthedocs.org](https://readthedocs.org/projects/stack/versions/), and
+  [readthedocs.org](https://readthedocs.org/dashboard/stack/versions/), and
   ensure that stable documentation has updated
 
 * Upload haddocks to Hackage: `etc/scripts/upload-haddocks.sh`
@@ -219,7 +219,7 @@ set up.
 
 ## Setting up an ARM VM for releases
 
-These instructions assume the host system is running OS X. Some steps will vary
+These instructions assume the host system is running macOS. Some steps will vary
 with a different host OS.
 
 ### Install qemu on host
@@ -365,7 +365,7 @@ Edit `~/.cabal/config`, and set `executable-stripping: False` and
     [stack-setup-2.yaml](https://github.com/fpco/stackage-content/blob/master/stack/stack-setup-2.yaml)
     for the ones we used in the last GHC release).
 
-    In the case of OS X, repackage the `.xz` bindist as a `.bz2`, since OS X does
+    In the case of macOS, repackage the `.xz` bindist as a `.bz2`, since macOS does
     not include `xz` by default or provide an easy way to install it.
 
   * Build any additional required bindists (see below for instructions)

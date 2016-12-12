@@ -122,7 +122,7 @@ generateLocalHaddockIndex
     => EnvOverride
     -> WhichCompiler
     -> BaseConfigOpts
-    -> Map GhcPkgId (DumpPackage () () ())  -- ^ Local package dump
+    -> Map GhcPkgId (DumpPackage () ())  -- ^ Local package dump
     -> [LocalPackage]
     -> m ()
 generateLocalHaddockIndex envOverride wc bco localDumpPkgs locals = do
@@ -148,9 +148,9 @@ generateDepsHaddockIndex
     => EnvOverride
     -> WhichCompiler
     -> BaseConfigOpts
-    -> Map GhcPkgId (DumpPackage () () ())  -- ^ Global dump information
-    -> Map GhcPkgId (DumpPackage () () ())  -- ^ Snapshot dump information
-    -> Map GhcPkgId (DumpPackage () () ())  -- ^ Local dump information
+    -> Map GhcPkgId (DumpPackage () ())  -- ^ Global dump information
+    -> Map GhcPkgId (DumpPackage () ())  -- ^ Snapshot dump information
+    -> Map GhcPkgId (DumpPackage () ())  -- ^ Local dump information
     -> [LocalPackage]
     -> m ()
 generateDepsHaddockIndex envOverride wc bco globalDumpPkgs snapshotDumpPkgs localDumpPkgs locals = do
@@ -193,8 +193,8 @@ generateSnapHaddockIndex
     => EnvOverride
     -> WhichCompiler
     -> BaseConfigOpts
-    -> Map GhcPkgId (DumpPackage () () ())  -- ^ Global package dump
-    -> Map GhcPkgId (DumpPackage () () ())  -- ^ Snapshot package dump
+    -> Map GhcPkgId (DumpPackage () ())  -- ^ Global package dump
+    -> Map GhcPkgId (DumpPackage () ())  -- ^ Snapshot package dump
     -> m ()
 generateSnapHaddockIndex envOverride wc bco globalDumpPkgs snapshotDumpPkgs =
     generateHaddockIndex
@@ -213,7 +213,7 @@ generateHaddockIndex
     -> EnvOverride
     -> WhichCompiler
     -> HaddockOpts
-    -> [DumpPackage () () ()]
+    -> [DumpPackage () ()]
     -> FilePath
     -> Path Abs Dir
     -> m ()
@@ -241,7 +241,7 @@ generateHaddockIndex descr envOverride wc hdopts dumpPackages docRelFP destDir =
                  ["--gen-contents", "--gen-index"] ++
                  [x | (xs,_,_,_) <- interfaceOpts, x <- xs])
   where
-    toInterfaceOpt :: DumpPackage a b c -> IO (Maybe ([String], UTCTime, Path Abs File, Path Abs File))
+    toInterfaceOpt :: DumpPackage a b -> IO (Maybe ([String], UTCTime, Path Abs File, Path Abs File))
     toInterfaceOpt DumpPackage {..} =
         case dpHaddockInterfaces of
             [] -> return Nothing
@@ -294,8 +294,8 @@ generateHaddockIndex descr envOverride wc hdopts dumpPackages docRelFP destDir =
 
 -- | Find first DumpPackage matching the GhcPkgId
 lookupDumpPackage :: GhcPkgId
-                  -> [Map GhcPkgId (DumpPackage () () ())]
-                  -> Maybe (DumpPackage () () ())
+                  -> [Map GhcPkgId (DumpPackage () ())]
+                  -> Maybe (DumpPackage () ())
 lookupDumpPackage ghcPkgId dumpPkgs =
     listToMaybe $ mapMaybe (Map.lookup ghcPkgId) dumpPkgs
 
