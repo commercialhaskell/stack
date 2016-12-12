@@ -1,23 +1,31 @@
 Vagrant.configure(2) do |config|
   config.vm.box = "maier/alpine-3.4-x86_64"
+  config.vm.synced_folder ENV['STACK_BUILD_DIR'], "/vagrant-build", type: "rsync", rsync__verbose: true, rsync__exclude: [".stack-work/", "_release/", ".cabal-sandbox/", "cabal.sandbox.config", "dist/", ".#*#"], rsync__args: ["--verbose", "--archive", "--delete", "-z", "--copy-links"], rsync__rsync_path: "/usr/bin/rsync", rsync__chown: false
   config.vm.synced_folder "../../..", "/vagrant", type: "rsync", rsync__verbose: true, rsync__exclude: [".stack-work/", "_release/", ".cabal-sandbox/", "cabal.sandbox.config", "dist/", ".#*#"], rsync__args: ["--verbose", "--archive", "--delete", "-z", "--copy-links"], rsync__rsync_path: "/usr/bin/rsync", rsync__chown: false
   config.vm.provider "virtualbox" do |vb|
     vb.memory = "3072"
   end
   config.ssh.forward_agent = true
   config.vm.provision "shell", inline: <<-SHELL
-    echo "https://s3-us-west-2.amazonaws.com/alpine-ghc/7.10" |sudo tee -a /etc/apk/repositories
-    curl -o /etc/apk/keys/mitch.tishmack@gmail.com-55881c97.rsa.pub https://raw.githubusercontent.com/mitchty/alpine-ghc/master/mitch.tishmack%40gmail.com-55881c97.rsa.pub
+    set -xe
+    if ! grep 's3-us-west-2\.amazonaws\.com/alpine-ghc/7\.10' /etc/apk/repositories; then
+      echo "https://s3-us-west-2.amazonaws.com/alpine-ghc/7.10" |sudo tee -a /etc/apk/repositories
+    fi
+    if ! test -s /etc/apk/keys/mitch.tishmack@gmail.com-55881c97.rsa.pub; then
+      curl -o /etc/apk/keys/mitch.tishmack@gmail.com-55881c97.rsa.pub https://raw.githubusercontent.com/mitchty/alpine-ghc/master/mitch.tishmack%40gmail.com-55881c97.rsa.pub
+    fi
     apk -q update
-    apk add alpine-sdk linux-headers musl-dev gmp-dev zlib-dev ghc git rsync gnupg
+    apk add alpine-sdk linux-headers musl-dev gmp-dev zlib-dev ghc git rsync gnupg xz
     cp /usr/lib/gcc/x86_64-alpine-linux-musl/5.3.0/crtbeginT.o /usr/lib/gcc/x86_64-alpine-linux-musl/5.3.0/crtbeginT.o.orig
     cp /usr/lib/gcc/x86_64-alpine-linux-musl/5.3.0/crtbeginS.o /usr/lib/gcc/x86_64-alpine-linux-musl/5.3.0/crtbeginT.o
     if ! which stack; then
-      curl -sSL https://www.stackage.org/stack/linux-x86_64-linux \
+      curl -sSL https://www.stackage.org/stack/linux-x86_64-static \
         | tar xzvf - --wildcards --strip-components=1 -C /usr/local/bin '*/stack'
       chmod a+x /usr/local/bin/stack
     fi
-    chmod a+x /usr/local/bin/stack
-    chown vagrant:vagrant /vagrant
+    mkdir -p /home/vagrant/.stack
+    echo 'system-ghc: true' >/home/vagrant/.stack/config.yaml
+    mkdir -p /vagrant-build /vagrant
+    chown vagrant:vagrant /vagrant /vagrant-build /home/vagrant/.stack /home/vagrant/.stack/config.yaml
   SHELL
 end
