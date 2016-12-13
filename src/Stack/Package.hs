@@ -1010,7 +1010,7 @@ parseDumpHI dumpHIPath = do
     thDepsResolved <- liftM catMaybes $ forM thDeps $ \x -> do
         mresolved <- forgivingAbsence (resolveFile dir x) >>= rejectMissingFile
         when (isNothing mresolved) $
-            $logWarn $ "Warning: qAddDepedency path listed in " <> T.pack dumpHIPath <>
+            $logWarn $ "Warning: addDependentFile path (Template Haskell) listed in " <> T.pack dumpHIPath <>
                 " does not exist: " <> T.pack x
         return mresolved
     return (moduleDeps, thDepsResolved)
