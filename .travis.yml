@@ -71,7 +71,7 @@ install:
  - echo "$(ghc --version) [$(ghc --print-project-git-commit-id 2> /dev/null || echo '?')]"
  - case "$BUILD" in
      style)
-       stack --no-terminal install hlint;;
+       stack --system-ghc --no-terminal install hlint;;
      stack)
        stack --no-terminal test --only-dependencies;;
      cabal)
@@ -81,8 +81,8 @@ install:
        echo "stack is located at $(which stack)";
        stack --version;
        rm -f $(stack --compiler=ghc-$GHCVER path --dist-dir)/stack-*.tar.gz &&
-       stack --compiler=ghc-$GHCVER sdist --pvp-bounds=both &&
-       tar xf $(stack --compiler=ghc-$GHCVER path --dist-dir)/stack-*.tar.gz --wildcards --strip-components=1 '*/stack.cabal' &&
+       stack --system-ghc --compiler=ghc-$GHCVER sdist --pvp-bounds=both &&
+       tar xf $(stack --system-ghc --compiler=ghc-$GHCVER path --dist-dir)/stack-*.tar.gz --wildcards --strip-components=1 '*/stack.cabal' &&
        cabal install --only-dependencies --enable-tests --enable-benchmarks --force-reinstalls --ghc-options=-O0 --reorder-goals --max-backjumps=-1;;
    esac
 
@@ -92,7 +92,7 @@ script:
        hlint src/ --hint=HLint.hs;
        hlint src/ --cpp-define=WINDOWS=1 --hint=HLint.hs;
        hlint test/ --cpp-simple --hint=HLint.hs;
-       stack --no-terminal build --pedantic;;
+       stack --system-ghc --no-terminal build --pedantic;;
      stack)
        stack --no-terminal test --haddock --no-haddock-deps --ghc-options="-Werror";;
      cabal)
