@@ -1,7 +1,7 @@
 {-# LANGUAGE ConstraintKinds       #-}
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE TemplateHaskell       #-}
 -- Determine which packages are already installed
 module Stack.Build.Installed
@@ -51,6 +51,8 @@ data GetInstalledOpts = GetInstalledOpts
       -- ^ Require profiling libraries?
     , getInstalledHaddock   :: !Bool
       -- ^ Require haddocks?
+    , getInstalledSymbols   :: !Bool
+      -- ^ Require debugging symbols?
     }
 
 -- | Returns the new InstalledMap and all of the locally registered packages.
@@ -59,9 +61,9 @@ getInstalled :: (StackM env m, HasEnvConfig env, PackageInstallInfo pii)
              -> GetInstalledOpts
              -> Map PackageName pii -- ^ does not contain any installed information
              -> m ( InstalledMap
-                  , [DumpPackage () ()] -- globally installed
-                  , [DumpPackage () ()] -- snapshot installed
-                  , [DumpPackage () ()] -- locally installed
+                  , [DumpPackage () () ()] -- globally installed
+                  , [DumpPackage () () ()] -- snapshot installed
+                  , [DumpPackage () () ()] -- locally installed
                   )
 getInstalled menv opts sourceMap = do
     $logDebug "Finding out which packages are already installed"
@@ -131,11 +133,12 @@ loadDatabase :: (StackM env m, HasEnvConfig env, PackageInstallInfo pii)
              -> Map PackageName pii -- ^ to determine which installed things we should include
              -> Maybe (InstalledPackageLocation, Path Abs Dir) -- ^ package database, Nothing for global
              -> [LoadHelper] -- ^ from parent databases
-             -> m ([LoadHelper], [DumpPackage () ()])
+             -> m ([LoadHelper], [DumpPackage () () ()])
 loadDatabase menv opts mcache sourceMap mdb lhs0 = do
     wc <- view $ actualCompilerVersionL.to whichCompiler
+    ver <- view wantedCompilerVersionL -- FIXME do we want instead actualCompilerVersionL?
     (lhs1', dps) <- ghcPkgDump menv wc (fmap snd (maybeToList mdb))
-                $ conduitDumpPackage =$ sink
+                $ conduitDumpPackage =$ sink ver
     let ghcjsHack = wc == Ghcjs && isNothing mdb
     lhs1 <- mapMaybeM (processLoadResult mdb ghcjsHack) lhs1'
     let lhs = pruneDeps
@@ -158,13 +161,20 @@ loadDatabase menv opts mcache sourceMap mdb lhs0 = do
             -- Just an optimization to avoid calculating the haddock
             -- values when they aren't necessary
             _ -> CL.map (\dp -> dp { dpHaddock = False })
+    conduitSymbolsCache ver =
+        case mcache of
+            Just cache | getInstalledSymbols opts -> addSymbols cache ver
+            -- Just an optimization to avoid calculating the debugging
+            -- symbol values when they aren't necessary
+            _ -> CL.map (\dp -> dp { dpSymbols = False })
     mloc = fmap fst mdb
-    sinkDP = conduitProfilingCache
-          =$ conduitHaddockCache
-          =$ CL.map (isAllowed opts mcache sourceMap mloc &&& toLoadHelper mloc)
-          =$ CL.consume
-    sink = getZipSink $ (,)
-        <$> ZipSink sinkDP
+    sinkDP ver = conduitProfilingCache
+               =$ conduitHaddockCache
+               =$ conduitSymbolsCache ver
+               =$ CL.map (isAllowed opts mcache sourceMap mloc &&& toLoadHelper mloc)
+               =$ CL.consume
+    sink ver = getZipSink $ (,)
+        <$> ZipSink (sinkDP ver)
         <*> ZipSink CL.consume
 
 processLoadResult :: MonadLogger m
@@ -197,6 +207,7 @@ processLoadResult mdb _ (reason, lh) = do
             Allowed -> " the impossible?!?!"
             NeedsProfiling -> " it needing profiling."
             NeedsHaddock -> " it needing haddocks."
+            NeedsSymbols -> " it needing debugging symbols."
             UnknownPkg -> " it being unknown to the resolver / extra-deps."
             WrongLocation mloc loc -> " wrong location: " <> T.pack (show (mloc, loc))
             WrongVersion actual wanted -> T.concat
@@ -212,6 +223,7 @@ data Allowed
     = Allowed
     | NeedsProfiling
     | NeedsHaddock
+    | NeedsSymbols
     | UnknownPkg
     | WrongLocation (Maybe InstalledPackageLocation) InstallLocation
     | WrongVersion Version Version
@@ -225,13 +237,15 @@ isAllowed :: PackageInstallInfo pii
           -> Maybe InstalledCache
           -> Map PackageName pii
           -> Maybe InstalledPackageLocation
-          -> DumpPackage Bool Bool
+          -> DumpPackage Bool Bool Bool
           -> Allowed
 isAllowed opts mcache sourceMap mloc dp
     -- Check that it can do profiling if necessary
     | getInstalledProfiling opts && isJust mcache && not (dpProfiling dp) = NeedsProfiling
     -- Check that it has haddocks if necessary
     | getInstalledHaddock opts && isJust mcache && not (dpHaddock dp) = NeedsHaddock
+    -- Check that it has haddocks if necessary
+    | getInstalledSymbols opts && isJust mcache && not (dpSymbols dp) = NeedsSymbols
     | otherwise =
         case Map.lookup name sourceMap of
             Nothing ->
@@ -262,7 +276,7 @@ data LoadHelper = LoadHelper
     }
     deriving Show
 
-toLoadHelper :: Maybe InstalledPackageLocation -> DumpPackage Bool Bool -> LoadHelper
+toLoadHelper :: Maybe InstalledPackageLocation -> DumpPackage Bool Bool Bool -> LoadHelper
 toLoadHelper mloc dp = LoadHelper
     { lhId = gid
     , lhDeps =

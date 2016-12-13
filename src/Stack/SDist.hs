@@ -136,6 +136,7 @@ getCabalLbs pvpBounds fp = do
     (installedMap, _, _, _) <- getInstalled menv GetInstalledOpts
                                 { getInstalledProfiling = False
                                 , getInstalledHaddock = False
+                                , getInstalledSymbols = False
                                 }
                                 sourceMap
     let gpd' = gtraverseT (addBounds sourceMap installedMap) gpd
