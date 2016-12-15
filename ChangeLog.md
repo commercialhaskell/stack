@@ -22,7 +22,8 @@ Other enhancements:
 * Internal cleanup: configuration types are now based much more on lenses
 * `stack build` and related commands now allow the user to disable debug symbol stripping
   with new `--no-strip`, `--no-library-stripping`, and `--no-executable-shipping` flags,
-  closing [#877](https://github.com/commercialhaskell/stack/issues/877).
+  closing [#877](https://github.com/commercialhaskell/stack/issues/877). 
+  Also turned error message for missing targets more readable ([#2384](https://github.com/commercialhaskell/stack/issues/2384))
 * `stack haddock` now shows index.html paths when documentation is alread up to
   date. Resolved [#781](https://github.com/commercialhaskell/stack/issues/781)
 * Respects the `custom-setup` field introduced in Cabal 1.24. This
