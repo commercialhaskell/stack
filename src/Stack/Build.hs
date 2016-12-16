@@ -94,7 +94,7 @@ build :: (StackM env m, HasEnvConfig env, MonadBaseUnlift IO m)
 build setLocalFiles mbuildLk boptsCli = fixCodePage $ do
     bopts <- view buildOptsL
     let profiling = boptsLibProfile bopts || boptsExeProfile bopts
-    let symbols = boptsLibStrip bopts || boptsExeStrip bopts
+    let symbols = not (boptsLibStrip bopts || boptsExeStrip bopts)
     menv <- getMinimalEnvOverride
 
     (targets, mbp, locals, extraToBuild, extraDeps, sourceMap) <- loadSourceMapFull NeedTargets boptsCli

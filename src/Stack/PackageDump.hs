@@ -39,6 +39,7 @@ import qualified Data.Conduit.List as CL
 import qualified Data.Conduit.Text as CT
 import           Data.Either (partitionEithers)
 import           Data.IORef
+import           Data.List (isPrefixOf)
 import           Data.Map (Map)
 import qualified Data.Map as Map
 import           Data.Maybe (catMaybes, listToMaybe)
@@ -254,12 +255,10 @@ addHaddock (InstalledCache ref) =
 -- | Add debugging symbol information to the stream of @DumpPackage@s
 addSymbols :: MonadIO m
            => InstalledCache
-           -> CompilerVersion
            -> Conduit (DumpPackage a b c) m (DumpPackage a b Bool)
-addSymbols (InstalledCache ref) ver =
+addSymbols (InstalledCache ref) =
     CL.mapM go
   where
-    ver' = versionString . getGhcVersion $ ver
     go dp = do
         InstalledCacheInner m <- liftIO $ readIORef ref
         let gid = dpGhcPkgId dp
@@ -268,22 +267,25 @@ addSymbols (InstalledCache ref) ver =
             Nothing | null (dpLibraries dp) -> return True
             Nothing -> do
                 let lib = T.unpack . head $ dpLibraries dp
-                liftM or . mapM (\dir -> liftIO $ hasDebuggingSymbols ver' dir lib) $ dpLibDirs dp
+                liftM or . mapM (\dir -> liftIO $ hasDebuggingSymbols dir lib) $ dpLibDirs dp
         return dp { dpSymbols = s }
 
-hasDebuggingSymbols :: String   -- ^ target compiler
-                    -> FilePath -- ^ library directory
+hasDebuggingSymbols :: FilePath -- ^ library directory
                     -> String   -- ^ name of library
                     -> IO Bool
-hasDebuggingSymbols ver dir lib = case OS.buildOS of
-    OS.OSX     -> liftM (and . fmap ((/= '0') . head) . Prelude.take 30 . lines) $
-        readProcess "dwarfdump" [concat [dir, "/lib", lib, "-ghc", ver, ".a"]] ""
-    OS.Linux   -> liftM ((== "Contents") . head . words . (!! 2) . lines) $
-        readProcess "readelf" ["--debug-dump=info", "--dwarf-depth=1", concat [dir, "/lib", lib, "-ghc", ver, ".a"]] ""
-    OS.FreeBSD -> liftM ((== "Contents") . head . words . (!! 2) . lines) $
-        readProcess "readelf" ["--debug-dump=info", "--dwarf-depth=1", concat [dir, "/lib", lib, "-ghc", ver, ".a"]] ""
-    OS.Windows -> return False -- No support, so it can't be there.
-    _          -> return False
+hasDebuggingSymbols dir lib = do
+    let path = concat [dir, "/lib", lib, ".a"]
+    exists <- doesFileExist path
+    if not exists then return False
+    else case OS.buildOS of
+        OS.OSX     -> liftM (any (isPrefixOf "0x") . lines) $
+            readProcess "dwarfdump" [path] ""
+        OS.Linux   -> liftM (any (isPrefixOf "Contents") . lines) $
+            readProcess "readelf" ["--debug-dump=info", "--dwarf-depth=1", path] ""
+        OS.FreeBSD -> liftM (any (isPrefixOf "Contents") . lines) $
+            readProcess "readelf" ["--debug-dump=info", "--dwarf-depth=1", path] ""
+        OS.Windows -> return False -- No support, so it can't be there.
+        _          -> return False
 
 
 -- | Dump information for a single package
