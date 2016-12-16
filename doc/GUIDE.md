@@ -61,12 +61,8 @@ michael@d30748af6d3d:~$ sudo apt-get install wget
 # Demonstrate that stack really isn't available
 michael@d30748af6d3d:~$ stack
 -bash: stack: command not found
-# Get the signing key for the package repo
-michael@d30748af6d3d:~$ wget -q -O- https://download.fpcomplete.com/ubuntu/fpco.key | sudo apt-key add -
-OK
-michael@d30748af6d3d:~$ echo 'deb http://download.fpcomplete.com/ubuntu/trusty stable main'|sudo tee /etc/apt/sources.list.d/fpco.list
-deb http://download.fpcomplete.com/ubuntu/trusty stable main
-michael@d30748af6d3d:~$ sudo apt-get update && sudo apt-get install stack -y
+# Install stack
+wget -qO- https://get.haskellstack.org/ | sh
 # downloading...
 michael@d30748af6d3d:~$ stack --version
 Version 0.1.3.1, Git revision 908b04205e6f436d4a5f420b1c6c646ed2b804d7
