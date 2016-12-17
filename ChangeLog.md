@@ -26,6 +26,9 @@ Other enhancements:
 
 Bug fixes:
 
+* `stack config set` can now be used without a compiler installed
+  [#2852](https://github.com/commercialhaskell/stack/issues/2852).
+
 ## 1.3.0
 
 Release notes:
