@@ -136,9 +136,8 @@ loadDatabase :: (StackM env m, HasEnvConfig env, PackageInstallInfo pii)
              -> m ([LoadHelper], [DumpPackage () () ()])
 loadDatabase menv opts mcache sourceMap mdb lhs0 = do
     wc <- view $ actualCompilerVersionL.to whichCompiler
-    ver <- view wantedCompilerVersionL -- FIXME do we want instead actualCompilerVersionL?
     (lhs1', dps) <- ghcPkgDump menv wc (fmap snd (maybeToList mdb))
-                $ conduitDumpPackage =$ sink ver
+                $ conduitDumpPackage =$ sink
     let ghcjsHack = wc == Ghcjs && isNothing mdb
     lhs1 <- mapMaybeM (processLoadResult mdb ghcjsHack) lhs1'
     let lhs = pruneDeps
@@ -161,20 +160,20 @@ loadDatabase menv opts mcache sourceMap mdb lhs0 = do
             -- Just an optimization to avoid calculating the haddock
             -- values when they aren't necessary
             _ -> CL.map (\dp -> dp { dpHaddock = False })
-    conduitSymbolsCache ver =
+    conduitSymbolsCache =
         case mcache of
-            Just cache | getInstalledSymbols opts -> addSymbols cache ver
+            Just cache | getInstalledSymbols opts -> addSymbols cache
             -- Just an optimization to avoid calculating the debugging
             -- symbol values when they aren't necessary
             _ -> CL.map (\dp -> dp { dpSymbols = False })
     mloc = fmap fst mdb
-    sinkDP ver = conduitProfilingCache
-               =$ conduitHaddockCache
-               =$ conduitSymbolsCache ver
-               =$ CL.map (isAllowed opts mcache sourceMap mloc &&& toLoadHelper mloc)
-               =$ CL.consume
-    sink ver = getZipSink $ (,)
-        <$> ZipSink (sinkDP ver)
+    sinkDP = conduitProfilingCache
+           =$ conduitHaddockCache
+           =$ conduitSymbolsCache
+           =$ CL.map (isAllowed opts mcache sourceMap mloc &&& toLoadHelper mloc)
+           =$ CL.consume
+    sink = getZipSink $ (,)
+        <$> ZipSink sinkDP
         <*> ZipSink CL.consume
 
 processLoadResult :: MonadLogger m
