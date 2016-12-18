@@ -51,6 +51,21 @@ post_install_separator() {
   info ""
 }
 
+# determines the the CPU's instruction set
+get_isa() {
+  if arch | grep -q arm ; then
+    echo arm
+  else
+    echo x86
+  fi
+}
+
+# exits with code 0 if arm ISA is detected as described above
+is_arm() {
+  test "$(get_isa)" = arm
+}
+
+
 # determines 64- or 32-bit architecture
 # if getconf is available, it will return the arch of the OS, as desired
 # if not, it will use uname to get the arch of the CPU, though the installed
