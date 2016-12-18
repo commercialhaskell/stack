@@ -143,11 +143,14 @@ do_debian_install() {
     apt_install_dependencies g++ gcc libc6-dev libffi-dev libgmp-dev make xz-utils zlib1g-dev
   }
 
-  if is_64_bit ; then
+  if is_arm ; then
     install_dependencies
     info ""
     info "Using generic bindist..."
     info ""
+    install_arm_binary
+  elif is_64_bit ; then
+    install_dependencies
     install_64bit_static_binary
   else
     install_dependencies
@@ -261,7 +264,10 @@ do_sloppy_install() {
   info "This installer doesn't support your Linux distribution, trying generic"
   info "bindist..."
   info ""
-  if is_64_bit ; then
+
+  if is_arm ; then
+      install_arm_binary
+  elif is_64_bit ; then
       install_64bit_static_binary
   else
       install_32bit_standard_binary
@@ -373,7 +379,7 @@ GETDISTRO
     ubuntu)
       do_ubuntu_install "$VERSION"
       ;;
-    debian|kali)
+    debian|kali|raspbian)
       do_debian_install "$VERSION"
       ;;
     fedora)
