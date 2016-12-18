@@ -23,6 +23,8 @@ Other enhancements:
 * `stack build` and related commands now allow the user to disable debug symbol stripping
   with new `--no-strip`, `--no-library-stripping`, and `--no-executable-shipping` flags,
   closing [#877](https://github.com/commercialhaskell/stack/issues/877).
+* `stack haddock` now shows index.html paths when documentation is alread up to
+  date. Resolved [#781](https://github.com/commercialhaskell/stack/issues/781)
 
 Bug fixes:
 

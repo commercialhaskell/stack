@@ -228,18 +228,23 @@ generateHaddockIndex descr envOverride wc hdopts dumpPackages docRelFP destDir =
                     Left _ -> True
                     Right indexModTime ->
                         or [mt > indexModTime | (_,mt,_,_) <- interfaceOpts]
-        when needUpdate $ do
-            $logInfo
-                (T.concat ["Updating Haddock index for ", descr, " in\n",
-                           T.pack (toFilePath destIndexFile)])
-            liftIO (mapM_ copyPkgDocs interfaceOpts)
-            readProcessNull
-                (Just destDir)
-                envOverride
-                (haddockExeName wc)
-                (hoAdditionalArgs hdopts ++
-                 ["--gen-contents", "--gen-index"] ++
-                 [x | (xs,_,_,_) <- interfaceOpts, x <- xs])
+        if needUpdate
+            then do
+                $logInfo
+                    (T.concat ["Updating Haddock index for ", descr, " in\n",
+                               T.pack (toFilePath destIndexFile)])
+                liftIO (mapM_ copyPkgDocs interfaceOpts)
+                readProcessNull
+                    (Just destDir)
+                    envOverride
+                    (haddockExeName wc)
+                    (hoAdditionalArgs hdopts ++
+                     ["--gen-contents", "--gen-index"] ++
+                     [x | (xs,_,_,_) <- interfaceOpts, x <- xs])
+            else
+              $logInfo
+                    (T.concat ["Haddock index for ", descr, " already up to date at:\n",
+                               T.pack (toFilePath destIndexFile)])
   where
     toInterfaceOpt :: DumpPackage a b c -> IO (Maybe ([String], UTCTime, Path Abs File, Path Abs File))
     toInterfaceOpt DumpPackage {..} =
