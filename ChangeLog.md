@@ -28,7 +28,8 @@ Bug fixes:
 
 * `stack config set` can now be used without a compiler installed
   [#2852](https://github.com/commercialhaskell/stack/issues/2852).
-
+* `get-stack.sh` now installs correct binary on ARM for generic linux and raspbian,
+  closing [#2856](https://github.com/commercialhaskell/stack/issues/2856).
 ## 1.3.0
 
 Release notes:

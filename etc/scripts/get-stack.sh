@@ -51,6 +51,21 @@ post_install_separator() {
   info ""
 }
 
+# determines the the CPU's instruction set
+get_isa() {
+  if arch | grep -q arm ; then
+    echo arm
+  else
+    echo x86
+  fi
+}
+
+# exits with code 0 if arm ISA is detected as described above
+is_arm() {
+  test "$(get_isa)" = arm
+}
+
+
 # determines 64- or 32-bit architecture
 # if getconf is available, it will return the arch of the OS, as desired
 # if not, it will use uname to get the arch of the CPU, though the installed
@@ -79,6 +94,19 @@ is_64_bit() {
   test "$(get_arch)" = 64
 }
 
+# prints a generic bindist notice
+print_bindist_notice() {
+  if [ -z "$1" ] ; then
+    info ""
+    info "Using generic bindist..."
+    info ""
+  else
+    info ""
+    info "Using generic $1 bindist..."
+    info ""
+  fi
+}
+
 # Adds a `sudo` prefix if sudo is available to execute the given command
 # If not, the given command is run as is
 sudocmd() {
@@ -105,15 +133,11 @@ do_ubuntu_install() {
 
   if is_64_bit ; then
     install_dependencies
-    info ""
-    info "Using generic bindist..."
-    info ""
+    print_bindist_notice
     install_64bit_static_binary
   else
     install_dependencies
-    info ""
-    info "Using generic bindist..."
-    info ""
+    print_bindist_notice
     install_32bit_standard_binary
   fi
 
@@ -124,21 +148,22 @@ do_ubuntu_install() {
 # If the version of Debian is unsupported, it attempts to copy the binary
 # and install the necessary dependencies explicitly.
 do_debian_install() {
+
   install_dependencies() {
     apt_install_dependencies g++ gcc libc6-dev libffi-dev libgmp-dev make xz-utils zlib1g-dev
   }
 
-  if is_64_bit ; then
+  if is_arm ; then
     install_dependencies
-    info ""
-    info "Using generic bindist..."
-    info ""
+    print_bindist_notice
+    install_arm_binary
+  elif is_64_bit ; then
+    install_dependencies
+    print_bindist_notice
     install_64bit_static_binary
   else
     install_dependencies
-    info ""
-    info "Using generic bindist..."
-    info ""
+    print_bindist_notice
     install_32bit_standard_binary
   fi
 }
@@ -154,15 +179,11 @@ do_fedora_install() {
 
   if is_64_bit ; then
     install_dependencies "$1"
-    info ""
-    info "Using generic bindist..."
-    info ""
+    print_bindist_notice
     install_64bit_static_binary
   else
     install_dependencies "$1"
-    info ""
-    info "Using generic bindist..."
-    info ""
+    print_bindist_notice
     install_32bit_standard_binary
   fi
 }
@@ -178,23 +199,17 @@ do_centos_install() {
 
   if is_64_bit ; then
     install_dependencies
-    info ""
-    info "Using generic bindist..."
-    info ""
+    print_bindist_notice
     install_64bit_static_binary
   else
     install_dependencies
     case "$1" in
       "6")
-        info ""
-        info "Using genergic libgmp4 bindist..."
-        info ""
+        print_bindist_notice "libgmp4"
         install_32bit_gmp4_linked_binary
         ;;
       *)
-        info ""
-        info "Using generic bindist..."
-        info ""
+        print_bindist_notice
         install_32bit_standard_binary
         ;;
     esac
@@ -246,7 +261,10 @@ do_sloppy_install() {
   info "This installer doesn't support your Linux distribution, trying generic"
   info "bindist..."
   info ""
-  if is_64_bit ; then
+
+  if is_arm ; then
+      install_arm_binary
+  elif is_64_bit ; then
       install_64bit_static_binary
   else
       install_32bit_standard_binary
@@ -358,7 +376,7 @@ GETDISTRO
     ubuntu)
       do_ubuntu_install "$VERSION"
       ;;
-    debian|kali)
+    debian|kali|raspbian)
       do_debian_install "$VERSION"
       ;;
     fedora)
@@ -432,6 +450,10 @@ install_from_bindist() {
     info ""
 
     check_usr_local_bin_on_path
+}
+
+install_arm_binary() {
+  install_from_bindist "linux-arm"
 }
 
 install_32bit_standard_binary() {
