@@ -449,6 +449,10 @@ install_from_bindist() {
     check_usr_local_bin_on_path
 }
 
+install_arm_binary() {
+  install_from_bindist "linux-arm"
+}
+
 install_32bit_standard_binary() {
   install_from_bindist "linux-i386"
 }
