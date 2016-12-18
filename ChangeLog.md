@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.3.0.1 (Unreleased)
+
+Bug fixes:
+
+* `get-stack.sh` now installs correct binary on ARM for generic linux and raspbian,
+  closing [#2856](https://github.com/commercialhaskell/stack/issues/2856).
+
 ## 1.3.0
 
 Release notes:
