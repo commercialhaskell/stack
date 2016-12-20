@@ -429,14 +429,6 @@ loadLocalPackage boptsCli targets (name, (lpv, gpkg)) = do
         , lpCabalFile = lpvCabalFP lpv
         , lpDir = lpvRoot lpv
         , lpWanted = isJust mtarget
-                  -- A local package marked as extra-dep should never
-                  -- be treated as a target. Perhaps we should be
-                  -- fixing this upstream of this function, not
-                  -- certain, but this works for now. If in the future
-                  -- we decide to move the extra-dep checking logic
-                  -- upstream, this lpvExtraDep check should be
-                  -- changed to an assertion.
-                  && not (lpvExtraDep lpv)
         , lpComponents = toComponents exes tests benches
         -- TODO: refactor this so that it's easier to be sure that these
         -- components are indeed unbuildable.

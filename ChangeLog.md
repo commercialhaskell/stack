@@ -30,6 +30,12 @@ Bug fixes:
   [#2852](https://github.com/commercialhaskell/stack/issues/2852).
 * `get-stack.sh` now installs correct binary on ARM for generic linux and raspbian,
   closing [#2856](https://github.com/commercialhaskell/stack/issues/2856).
+* Revert a change in the previous release which made it impossible to
+  set local extra-dep packages as targets. This was overkill; we
+  really only wanted to disable their test suites, which was already
+  handled by a later
+  patch. [#2849](https://github.com/commercialhaskell/stack/issues/2849)
+
 ## 1.3.0
 
 Release notes:
