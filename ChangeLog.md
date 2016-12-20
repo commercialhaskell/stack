@@ -30,6 +30,9 @@ Bug fixes:
   [#2852](https://github.com/commercialhaskell/stack/issues/2852).
 * `get-stack.sh` now installs correct binary on ARM for generic linux and raspbian,
   closing [#2856](https://github.com/commercialhaskell/stack/issues/2856).
+* Correct the testing of whether a package database exists by checking
+  for the `package.cache` file itself instead of the containing
+  directory.
 * Revert a change in the previous release which made it impossible to
   set local extra-dep packages as targets. This was overkill; we
   really only wanted to disable their test suites, which was already
