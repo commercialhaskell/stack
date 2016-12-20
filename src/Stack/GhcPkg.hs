@@ -34,7 +34,7 @@ import           Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import           Data.Text.Extra (stripCR)
-import           Path (Path, Abs, Dir, toFilePath, parent)
+import           Path (Path, Abs, Dir, toFilePath, parent, mkRelFile, (</>))
 import           Path.Extra (toFilePathNoTrailingSep)
 import           Path.IO
 import           Prelude hiding (FilePath)
@@ -87,7 +87,7 @@ ghcPkg menv wc pkgDbs args = do
 createDatabase :: (MonadIO m, MonadLogger m, MonadBaseControl IO m, MonadCatch m)
                => EnvOverride -> WhichCompiler -> Path Abs Dir -> m ()
 createDatabase menv wc db = do
-    exists <- doesDirExist db
+    exists <- doesFileExist (db </> $(mkRelFile "package.cache"))
     unless exists $ do
         -- Creating the parent doesn't seem necessary, as ghc-pkg
         -- seems to be sufficiently smart. But I don't feel like
