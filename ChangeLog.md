@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.3.0.1 (Unreleased)
+## 1.3.2 (Unreleased)
 
 Bug fixes:
 
@@ -11,6 +11,11 @@ Bug fixes:
 * Correct the testing of whether a package database exists by checking
   for the `package.cache` file itself instead of the containing
   directory.
+* Revert a change in the previous release which made it impossible to
+  set local extra-dep packages as targets. This was overkill; we
+  really only wanted to disable their test suites, which was already
+  handled by a later
+  patch. [#2849](https://github.com/commercialhaskell/stack/issues/2849)
 
 ## 1.3.0
 
