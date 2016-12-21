@@ -244,6 +244,7 @@ packageFromPackageDescription packageConfig gpkg pkg =
           (not . null . exposedModules)
           (library pkg)
     , packageSimpleType = buildType pkg == Just Simple
+    , packageSetupDeps = msetupDeps
     }
   where
     pkgFiles = GetPackageFiles $
@@ -271,7 +272,17 @@ packageFromPackageDescription packageConfig gpkg pkg =
              return (componentModules, componentFiles, buildFiles <> dataFiles', warnings)
     pkgId = package pkg
     name = fromCabalPackageName (pkgName pkgId)
-    deps = M.filterWithKey (const . (/= name)) (packageDependencies pkg)
+    deps = M.filterWithKey (const . (/= name)) (M.union
+        (packageDependencies pkg)
+        -- We include all custom-setup deps - if present - in the
+        -- package deps themselves. Stack always works with the
+        -- invariant that there will be a single installed package
+        -- relating to a package name, and this applies at the setup
+        -- dependency level as well.
+        (fromMaybe M.empty msetupDeps))
+    msetupDeps = fmap
+        (M.fromList . map (depName &&& depRange) . setupDepends)
+        (setupBuildInfo pkg)
 
 -- | Generate GHC options for the package's components, and a list of
 -- options which apply generally to the package, not one specific
