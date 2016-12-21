@@ -26,6 +26,7 @@ import           Control.Monad.Reader
 import           Control.Monad.Trans.Writer.Strict
 import           Data.Aeson
 import           Data.Aeson.Types
+import qualified Data.ByteString as SB
 import qualified Data.ByteString.Lazy as LB
 import           Data.Conduit
 import           Data.Foldable (asum)
@@ -41,6 +42,7 @@ import qualified Data.Set as S
 import           Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
+import qualified Data.Text.Encoding.Error as T (lenientDecode)
 import qualified Data.Text.IO as T
 import qualified Data.Text.Lazy as LT
 import           Data.Time.Calendar
@@ -157,7 +159,7 @@ loadTemplate name logIt = do
                                                 <> "\"")
         exists <- doesFileExist path
         if exists
-            then liftIO (T.readFile (toFilePath path))
+            then liftIO (fmap (T.decodeUtf8With T.lenientDecode) (SB.readFile (toFilePath path)))
             else throwM (FailedToLoadTemplate name (toFilePath path))
     relRequest :: MonadThrow n => Path Rel File -> n Request
     relRequest rel = parseRequest (defaultTemplateUrl <> "/" <> toFilePath rel)
