@@ -758,11 +758,7 @@ buildOtherSources build =
 
 -- | Get the target's JS sources.
 targetJsSources :: BuildInfo -> [FilePath]
-#if MIN_VERSION_Cabal(1, 22, 0)
 targetJsSources = jsSources
-#else
-targetJsSources = const []
-#endif
 
 -- | Get all dependencies of a package, including library,
 -- executables, tests, benchmarks.
@@ -868,11 +864,7 @@ resolveConditions rc addDeps (CondNode lib deps cs) = basic <> children
                       case (flavor, rcCompilerVersion rc) of
                         (GHC, GhcVersion vghc) -> vghc `withinRange` range
                         (GHC, GhcjsVersion _ vghc) -> vghc `withinRange` range
-#if MIN_VERSION_Cabal(1, 22, 0)
                         (GHCJS, GhcjsVersion vghcjs _) ->
-#else
-                        (OtherCompiler "ghcjs", GhcjsVersion vghcjs _) ->
-#endif
                           vghcjs `withinRange` range
                         _ -> False
 
