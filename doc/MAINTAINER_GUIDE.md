@@ -2,13 +2,12 @@
 
 ## Next release:
 
-* Stop building Linux distro
-  packages [#2534](https://github.com/commercialhaskell/stack/issues/2534)
-
 ## Pre-release steps
 
 * Ensure `release` and `stable` branches merged to `master`
-* Check compatibility with latest stackage snapshot
+* Check compatibility with latest nightly stackage snapshot:
+    * Update `stack-nightly.yaml` with latest nightly and remove extra-deps
+    * Run `stack --stack-yaml=stack-nightly.yaml test`
 * Ensure integration tests pass on a representative Windows, macOS, and Linux (Linux
   is handled by Jenkins automatically): `stack install --pedantic && stack test
   --pedantic --flag stack:integration-tests` . The actual release script will
@@ -43,10 +42,10 @@
         * Look for any links to "latest" documentation, replace with version tag
         * Ensure all documentation pages listed in `mkdocs.yaml`
     * Update the ISSUE_TEMPLATE.md to point at the new version.
-    * Check that any new Linux distribution versions added to
+    * (SKIP) Check that any new Linux distribution versions added to
       `etc/scripts/release.hs` and `etc/scripts/vagrant-releases.sh`
         * [Ubuntu](https://wiki.ubuntu.com/Releases)
-        * [Debian](https://www.debian.org/releases/) (keep at least latest two)
+        * [Debian](https://www.debian.org/releases/)
         * [CentOS](https://wiki.centos.org/Download)
         * [Fedora](https://fedoraproject.org/wiki/Releases)
     * Check for new [FreeBSD release](https://www.freebsd.org/releases/).
@@ -55,9 +54,16 @@
       [install_and_upgrade.md](https://github.com/commercialhaskell/stack/blob/master/doc/install_and_upgrade.md),
       and
       `README.md`
-    * Remove unsupported/obsolete distribution versions from
-      [install_and_upgrade.md](https://github.com/commercialhaskell/stack/blob/master/doc/install_and_upgrade.md),
-      and perhaps from the release process.
+    * Remove unsupported/obsolete distribution versions from the release process.
+        * [Ubuntu](https://wiki.ubuntu.com/Releases)
+            * 12.04 EOL 2017-APR
+            * 16.10 EOL 2017-JUL
+            * 14.04 EOL 2019-APR
+            * 16.04 EOL 2021-APR
+        * [Debian](https://www.debian.org/releases/)
+        * [CentOS](https://wiki.centos.org/Download) 
+            * 6 EOL 2020-NOV-30
+            * 7 EOL 2024-JUN-30
 
 ## Release process
 
