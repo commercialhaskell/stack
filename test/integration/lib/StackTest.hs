@@ -13,7 +13,7 @@ import System.IO
 import System.IO.Error
 import System.Process
 import System.Exit
-import System.Info (os)
+import System.Info (arch, os)
 
 run' :: FilePath -> [String] -> IO ExitCode
 run' cmd args = do
@@ -175,6 +175,9 @@ isWindows = os == "mingw32"
 
 -- | Is the OS Alpine Linux?
 getIsAlpine = doesFileExist "/etc/alpine-release"
+
+-- | Is the architecture ARM?
+isARM = arch == "arm"
 
 -- | To avoid problems with GHC version mismatch when a new LTS major
 -- version is released, pass this argument to @stack@ when running in
