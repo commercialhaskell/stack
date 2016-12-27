@@ -39,19 +39,19 @@ setup-info:
 
 Or for the latest one based on `ghc-8.0.1` (with more features):
 ```yaml
-resolver: lts-7.8
-compiler: ghcjs-0.2.1.9007008_ghc-8.0.1
+resolver: lts-7.14
+compiler: ghcjs-0.2.1.9007014_ghc-8.0.1
 compiler-check: match-exact
 
 setup-info:
   ghcjs:
     source:
-      ghcjs-0.2.1.9007008_ghc-8.0.1:
-          url: http://ghcjs.tolysz.org/ghc-8.0-2016-11-07-lts-7.8-9007008.tar.gz
-          sha1: 190300a3725cde44b2a08be9ef829f2077bf8825
+      ghcjs-0.2.1.9007014_ghc-8.0.1:
+           url: http://ghcjs.tolysz.org/ghc-8.0-2016-12-25-lts-7.14-9007014.tar.gz
+           sha1: 0d2ebe0931b29adca7cb9d9b9f77d60095bfb864
 ```
 The later can be generated via: https://github.com/tolysz/prepare-ghcjs
-the fromer is a bit more manual. Those bundles are only tested against the latest `node-6.9.1`.
+the fromer is a bit more manual. Those bundles are only tested against the latest `node-7.2.1`.
 
 In order to corrrectly boot and use ghcjs, one might need to install `alex` `happy` `hscolour` `hsc2hs` with the normal ghc.
 
@@ -59,6 +59,8 @@ Older resolvers:
 
 |resolver|url|sha1|
 |---|---|---|
+| lts-7.13 | http://ghcjs.tolysz.org/ghc-8.0-2016-12-18-lts-7.13-9007013.tar.gz | 530c4ee5e19e2874e128431c7ad421e336df0303 |
+| lts-7.8 | http://ghcjs.tolysz.org/ghc-8.0-2016-11-07-lts-7.8-9007008.tar.gz | 190300a3725cde44b2a08be9ef829f2077bf8825 |
 | lts-7.7 | http://ghcjs.tolysz.org/ghc-8.0-2016-11-03-lts-7.7-9007007.tar.gz | ce169f85f1c49ad613ae77fc494d5565452ff59a |
 | lts-7.5 | http://ghcjs.tolysz.org/ghc-8.0-2016-10-24-lts-7.5-9007005.tar.gz | 450e81028d7f1eb82a16bc4b0809f30730c3e173 |
 | lts-7.4 | http://ghcjs.tolysz.org/ghc-8.0-2016-10-22-lts-7.4-9007004.tar.gz | ed77b3c15fedbadad5ab0e0afe1bd42c0a8695b4 |
