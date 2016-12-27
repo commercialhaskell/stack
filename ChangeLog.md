@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.3.1 (unreleased)
+## 1.3.3 (unreleased)
 
 Release notes:
 
@@ -23,6 +23,10 @@ Other enhancements:
 * `stack build` and related commands now allow the user to disable debug symbol stripping
   with new `--no-strip`, `--no-library-stripping`, and `--no-executable-shipping` flags,
   closing [#877](https://github.com/commercialhaskell/stack/issues/877).
+
+Bug fixes:
+
+## 1.3.2
 
 Bug fixes:
 
