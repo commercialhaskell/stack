@@ -131,7 +131,11 @@ do_ubuntu_install() {
     apt_install_dependencies g++ gcc libc6-dev libffi-dev libgmp-dev make xz-utils zlib1g-dev git gnupg
   }
 
-  if is_64_bit ; then
+  if is_arm ; then
+    install_dependencies
+    print_bindist_notice
+    install_arm_binary
+  elif is_64_bit ; then
     install_dependencies
     print_bindist_notice
     install_64bit_static_binary
