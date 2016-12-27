@@ -224,6 +224,29 @@ You can also specify `entrypoints`. By default all your executables are placed
 in `/usr/local/bin`, but you can specify a list using `executables` to only add
 some.
 
+When you specify `entrypoints`, multiple containers will be built:  a project
+container, and one container for each entrypoint.
+
+For example the following configuration:
+
+```yaml
+image:
+  containers:
+  - name: myproject
+    base: fpco/stack-run
+    add:
+      production/app-backend/conf/: /etc/app-backend
+    entrypoints:
+    - app-backend
+```
+
+will build one container tagged `myproject:latest` which contains the project 
+including the `/etc/app-backend` configuration data.
+
+Another container tagged `myproject-app-backend:latest` based on the `myproject:latest`
+will additionally contain the logic for starting the `app-backend` entrypoint.
+
+
 ### user-message
 
 A user-message is inserted by `stack init` when it omits packages or adds
