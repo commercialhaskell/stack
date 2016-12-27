@@ -1,5 +1,25 @@
 # Changelog
 
+## 1.3.2
+
+Bug fixes:
+
+* `stack config set` can now be used without a compiler installed
+  [#2852](https://github.com/commercialhaskell/stack/issues/2852).
+* `get-stack.sh` now installs correct binary on ARM for generic linux and raspbian,
+  closing [#2856](https://github.com/commercialhaskell/stack/issues/2856).
+* Correct the testing of whether a package database exists by checking
+  for the `package.cache` file itself instead of the containing
+  directory.
+* Revert a change in the previous release which made it impossible to
+  set local extra-dep packages as targets. This was overkill; we
+  really only wanted to disable their test suites, which was already
+  handled by a later
+  patch. [#2849](https://github.com/commercialhaskell/stack/issues/2849)
+* `stack new` always treats templates as being UTF-8 encoding,
+  ignoring locale settings on a local machine. See
+  [Yesod mailing list discussion](https://groups.google.com/d/msg/yesodweb/ZyWLsJOtY0c/aejf9E7rCAAJ)
+
 ## 1.3.0
 
 Release notes:

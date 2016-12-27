@@ -4,8 +4,8 @@ import System.Directory
 main :: IO ()
 main = do
   isAlpine <- getIsAlpine
-  if isAlpine
-    then logInfo "Disabled on Alpine Linux since it cannot yet install its own GHC."
+  if isAlpine || isARM
+    then logInfo "Disabled on Alpine Linux and ARM since it cannot yet install its own GHC."
     else do
       run "cabal" ["sandbox", "init"]
       stack ["unpack", "acme-dont-1.1"]

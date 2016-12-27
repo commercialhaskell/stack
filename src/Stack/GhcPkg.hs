@@ -34,7 +34,7 @@ import           Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import           Data.Text.Extra (stripCR)
-import           Path (Path, Abs, Dir, toFilePath, parent)
+import           Path (Path, Abs, Dir, toFilePath, parent, mkRelFile, (</>))
 import           Path.Extra (toFilePathNoTrailingSep)
 import           Path.IO
 import           Prelude hiding (FilePath)
@@ -87,14 +87,33 @@ ghcPkg menv wc pkgDbs args = do
 createDatabase :: (MonadIO m, MonadLogger m, MonadBaseControl IO m, MonadCatch m)
                => EnvOverride -> WhichCompiler -> Path Abs Dir -> m ()
 createDatabase menv wc db = do
-    exists <- doesDirExist db
+    exists <- doesFileExist (db </> $(mkRelFile "package.cache"))
     unless exists $ do
-        -- Creating the parent doesn't seem necessary, as ghc-pkg
-        -- seems to be sufficiently smart. But I don't feel like
-        -- finding out it isn't the hard way
-        ensureDir (parent db)
-        _ <- tryProcessStdout Nothing menv (ghcPkgExeName wc) ["init", toFilePath db]
-        return ()
+        -- ghc-pkg requires that the database directory does not exist
+        -- yet. If the directory exists but the package.cache file
+        -- does, we're in a corrupted state. Check for that state.
+        dirExists <- doesDirExist db
+        args <- if dirExists
+            then do
+                $logWarn $ T.pack $ concat
+                    [ "The package database located at "
+                    , toFilePath db
+                    , " is corrupted (missing its package.cache file)."
+                    ]
+                $logWarn "Proceeding with a recache"
+                return ["--package-db", toFilePath db, "recache"]
+            else do
+                -- Creating the parent doesn't seem necessary, as ghc-pkg
+                -- seems to be sufficiently smart. But I don't feel like
+                -- finding out it isn't the hard way
+                ensureDir (parent db)
+                return ["init", toFilePath db]
+        eres <- tryProcessStdout Nothing menv (ghcPkgExeName wc) args
+        case eres of
+            Left e -> do
+                $logError $ T.pack $ "Unable to create package database at " ++ toFilePath db
+                throwM e
+            Right _ -> return ()
 
 -- | Get the name to use for "ghc-pkg", given the compiler version.
 ghcPkgExeName :: WhichCompiler -> String

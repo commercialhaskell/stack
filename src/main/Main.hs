@@ -18,7 +18,7 @@ import           Control.Exception
 import           Control.Monad hiding (mapM, forM)
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
-import           Control.Monad.Reader (ask, asks,local,runReaderT)
+import           Control.Monad.Reader (asks, local)
 import           Control.Monad.Trans.Either (EitherT)
 import           Control.Monad.Writer.Lazy (Writer)
 import           Data.Attoparsec.Args (parseArgs, EscapingMode (Escaping))
@@ -836,12 +836,9 @@ dockerCleanupCmd cleanupOpts go@GlobalOpts{..} = do
 
 cfgSetCmd :: ConfigCmd.ConfigCmdSet -> GlobalOpts -> IO ()
 cfgSetCmd co go@GlobalOpts{..} =
-    withBuildConfigAndLock
+    withMiniConfigAndLock
         go
-        (\_ -> do env <- ask
-                  runReaderT
-                      (cfgCmdSet co)
-                      env)
+        (cfgCmdSet co)
 
 imgDockerCmd :: (Bool, [Text]) -> GlobalOpts -> IO ()
 imgDockerCmd (rebuild,images) go@GlobalOpts{..} = do
