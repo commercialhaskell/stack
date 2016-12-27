@@ -221,7 +221,7 @@ rules global@Global{..} args = do
                 cmd "strip -o"
                     [out, releaseBinDir </> binaryName </> stackExeFileName]
 
-    releaseDir </> binaryPkgSignatureFileName %> \out -> do
+    releaseDir </> "*" <.> ascExt %> \out -> do
         need [out -<.> ""]
         _ <- liftIO $ tryJust (guard . isDoesNotExistError) (removeFile out)
         cmd ("gpg " ++ gpgOptions ++ " --detach-sig --armor")
@@ -390,12 +390,12 @@ rules global@Global{..} args = do
     releaseBinDir = releaseDir </> "bin"
     distroVersionDir DistroVersion{..} = releaseDir </> dvDistro </> dvVersion
 
-    binaryPkgFileNames = [binaryPkgFileName, binaryPkgSignatureFileName]
-    binaryPkgSignatureFileName = binaryPkgFileName <.> ascExt
-    binaryPkgFileName =
+    binaryPkgFileNames = binaryPkgArchiveFileNames ++ binaryPkgSignatureFileNames
+    binaryPkgSignatureFileNames = map (<.> ascExt) binaryPkgArchiveFileNames
+    binaryPkgArchiveFileNames =
         case platformOS of
-            Windows -> binaryPkgZipFileName
-            _ -> binaryPkgTarGzFileName
+            Windows -> [binaryPkgZipFileName, binaryPkgTarGzFileName]
+            _ -> [binaryPkgTarGzFileName]
     binaryPkgZipFileName = binaryName <.> zipExt
     binaryPkgTarGzFileName = binaryName <.> tarGzExt
     binaryExeFileName = binaryName <.> exe
