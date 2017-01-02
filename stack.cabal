@@ -192,7 +192,7 @@ library
                    , bytestring >= 0.10.4.0
                    , clock >= 0.7.2
                    , conduit >= 1.2.8
-                   , conduit-extra >= 1.1.7.1
+                   , conduit-extra >= 1.1.14
                    , containers >= 0.5.5.1
                    , cryptohash >= 0.11.6
                    , cryptohash-conduit
