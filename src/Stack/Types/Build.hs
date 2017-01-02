@@ -68,12 +68,14 @@ import           Data.Text.Encoding (decodeUtf8With)
 import           Data.Text.Encoding.Error (lenientDecode)
 import           Data.Time.Calendar
 import           Data.Time.Clock
+import           Data.Version (showVersion)
 import           Distribution.PackageDescription (TestSuiteInterface)
 import           Distribution.System (Arch)
 import qualified Distribution.Text as C
 import           GHC.Generics (Generic)
 import           Path (Path, Abs, File, Dir, mkRelDir, toFilePath, parseRelDir, (</>))
 import           Path.Extra (toFilePathNoTrailingSep)
+import           Paths_stack as Meta
 import           Prelude
 import           Stack.Constants
 import           Stack.Types.BuildPlan (GitSHA1)
@@ -184,7 +186,10 @@ instance Show StackBuildException where
             | Set.null noKnown = []
             | otherwise = return $
                 "The following target packages were not found: " ++
-                intercalate ", " (map packageNameString $ Set.toList noKnown)
+                intercalate ", " (map packageNameString $ Set.toList noKnown) ++
+                "\nSee https://docs.haskellstack.org/en/v"
+                <> showVersion Meta.version <>
+                "/build_command/#target-syntax for details."
         notInSnapshot'
             | Map.null notInSnapshot = []
             | otherwise =
@@ -195,8 +200,8 @@ instance Show StackBuildException where
                 : "but there's no guarantee that they'll build together)."
                 : ""
                 : map
-                    (\(name, version) -> "- " ++ packageIdentifierString
-                        (PackageIdentifier name version))
+                    (\(name, version') -> "- " ++ packageIdentifierString
+                        (PackageIdentifier name version'))
                     (Map.toList notInSnapshot)
     show (TestSuiteFailure ident codes mlogFile bs) = unlines $ concat
         [ ["Test suite failure for package " ++ packageIdentifierString ident]
@@ -584,10 +589,10 @@ configureOptsNoDir econfig bco deps isLocal package = concat
         [ "--constraint="
         , packageNameString name
         , "=="
-        , versionString version
+        , versionString version'
         ]
       where
-        PackageIdentifier name version = ident
+        PackageIdentifier name version' = ident
 
 -- | Get set of wanted package names from locals.
 wantedLocalPackages :: [LocalPackage] -> Set PackageName
