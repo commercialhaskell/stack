@@ -195,7 +195,7 @@ Registering helloworld-0.1.0.0...
 Looking closely at the output of the previous command, you can see that it built
 both a library called "helloworld" and an executable called "helloworld-exe".
 We'll explain more in the next section, but, for now, just notice that the
-executables are installed in our project's `./stack-work` directory.
+executables are installed in our project's `./.stack-work` directory.
 
 Now, Let's use `stack exec` to run our executable (which just outputs the string
 "someFunc"):
@@ -207,7 +207,7 @@ someFunc
 
 `stack exec` works by providing the same reproducible environment that was used
 to build your project to the command that you are running. Thus, it knew where
-to find `helloworld-exe` even though it is hidden in the `./stack-work`
+to find `helloworld-exe` even though it is hidden in the `./.stack-work`
 directory.
 
 ### stack test
