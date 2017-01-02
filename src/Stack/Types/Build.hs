@@ -45,39 +45,42 @@ module Stack.Types.Build
 
 import           Control.DeepSeq
 import           Control.Exception
-import           Data.Binary (Binary)
-import           Data.Binary.Tagged (HasSemanticVersion, HasStructuralInfo)
-import qualified Data.ByteString as S
-import           Data.Char (isSpace)
+import           Data.Binary                     (Binary)
+import           Data.Binary.Tagged              (HasSemanticVersion,
+                                                  HasStructuralInfo)
+import qualified Data.ByteString                 as S
+import           Data.Char                       (isSpace)
 import           Data.Data
 import           Data.Hashable
 import           Data.List.Extra
-import qualified Data.Map as Map
-import           Data.Map.Strict (Map)
+import qualified Data.Map                        as Map
+import           Data.Map.Strict                 (Map)
 import           Data.Maybe
 import           Data.Monoid
-import           Data.Set (Set)
-import qualified Data.Set as Set
-import           Data.Store.Internal (Store)
+import           Data.Set                        (Set)
+import qualified Data.Set                        as Set
+import           Data.Store.Internal             (Store)
 import           Data.Store.Version
 import           Data.Store.VersionTagged
-import           Data.Text (Text)
-import qualified Data.Text as T
-import           Data.Text.Encoding (decodeUtf8With)
-import           Data.Text.Encoding.Error (lenientDecode)
+import           Data.Text                       (Text)
+import qualified Data.Text                       as T
+import           Data.Text.Encoding              (decodeUtf8With)
+import           Data.Text.Encoding.Error        (lenientDecode)
 import           Data.Time.Calendar
 import           Data.Time.Clock
-import           Data.Version (showVersion)
+import           Data.Version                    (showVersion)
 import           Distribution.PackageDescription (TestSuiteInterface)
-import           Distribution.System (Arch)
-import qualified Distribution.Text as C
-import           GHC.Generics (Generic)
-import           Path (Path, Abs, File, Dir, mkRelDir, toFilePath, parseRelDir, (</>))
-import           Path.Extra (toFilePathNoTrailingSep)
-import           Paths_stack as Meta
+import           Distribution.System             (Arch)
+import qualified Distribution.Text               as C
+import           GHC.Generics                    (Generic)
+import           Path                            (Abs, Dir, File, Path,
+                                                  mkRelDir, parseRelDir,
+                                                  toFilePath, (</>))
+import           Path.Extra                      (toFilePathNoTrailingSep)
+import           Paths_stack                     as Meta
 import           Prelude
 import           Stack.Constants
-import           Stack.Types.BuildPlan (GitSHA1)
+import           Stack.Types.BuildPlan           (GitSHA1)
 import           Stack.Types.Compiler
 import           Stack.Types.CompilerBuild
 import           Stack.Types.Config
@@ -87,9 +90,9 @@ import           Stack.Types.Package
 import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageName
 import           Stack.Types.Version
-import           System.Exit (ExitCode (ExitFailure))
-import           System.FilePath (pathSeparator)
-import           System.Process.Log (showProcessArgDebug)
+import           System.Exit                     (ExitCode (ExitFailure))
+import           System.FilePath                 (pathSeparator)
+import           System.Process.Log              (showProcessArgDebug)
 
 ----------------------------------------------
 -- Exceptions
