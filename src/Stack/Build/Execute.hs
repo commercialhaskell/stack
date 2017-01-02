@@ -946,7 +946,7 @@ withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} md
                 getPackageArgs =
                     case (packageSetupDeps package, mdeps) of
                         -- The package is using the Cabal custom-setup
-                        -- configuraiton introduced in Cabal 1.24. In
+                        -- configuration introduced in Cabal 1.24. In
                         -- this case, the package is providing an
                         -- explicit list of dependencies, and we
                         -- should simply use all of them.
