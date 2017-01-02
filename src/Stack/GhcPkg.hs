@@ -195,10 +195,10 @@ getCabalPkgVer menv wc = do
     maybe (throwM $ Couldn'tFindPkgId cabalPackageName) return mres
 
 -- | Get the value for GHC_PACKAGE_PATH
-mkGhcPackagePath :: Bool -> Path Abs Dir -> Path Abs Dir -> [Path Abs Dir] -> Path Abs Dir -> Text
-mkGhcPackagePath locals localdb deps extras globaldb =
+mkGhcPackagePath :: Maybe (Path Abs Dir) -> Path Abs Dir -> [Path Abs Dir] -> Path Abs Dir -> Text
+mkGhcPackagePath mlocaldb deps extras globaldb =
   T.pack $ intercalate [searchPathSeparator] $ concat
-    [ [toFilePathNoTrailingSep localdb | locals]
+    [ [toFilePathNoTrailingSep localdb | Just localdb <- [mlocaldb]]
     , [toFilePathNoTrailingSep deps]
     , [toFilePathNoTrailingSep db | db <- reverse extras]
     , [toFilePathNoTrailingSep globaldb]

@@ -9,6 +9,7 @@ module Stack.Runners
     , withConfigAndLock
     , withMiniConfigAndLock
     , withBuildConfigAndLock
+    , withBuildConfigNoFileAndLock
     , withBuildConfig
     , withBuildConfigExt
     , loadConfigWithOpts
@@ -187,6 +188,46 @@ withBuildConfigExt go@GlobalOpts{..} mbefore inner mafter = do
                       do lk' <- readIORef curLk
                          munlockFile lk')
 
+withBuildConfigNoFileAndLock
+    :: GlobalOpts
+    -> (Maybe FileLock -> StackT EnvConfigNoFile IO ())
+    -- ^ Action that uses the build config.  If Docker is enabled for builds,
+    -- this will be run in a Docker container.
+    -> IO ()
+withBuildConfigNoFileAndLock go@GlobalOpts{..} inner = do
+    -- Check for correct command line arguments
+    resolver <-
+      case globalResolver of
+        Nothing -> error "When using a config-file-free setup, you must specify --resolver on the command line"
+        Just resolver -> return resolver
+    case globalStackYaml of
+      Nothing -> return ()
+      Just _ -> error "When using a config-file-free setup, specifying a config file on the command line is an error"
+    bconfig <- runStackTGlobal () go $ loadConfigWithoutFiles globalConfigMonoid resolver
+    let config = getConfig bconfig
+    withUserFileLock go (configStackRoot config) $ \lk0 -> do
+      envConfigNoFile <- runStackTGlobal bconfig go setupEnvNoFile
+      runStackTGlobal envConfigNoFile go $ do
+        -- Locking policy:  This is only used for build commands, which
+        -- only need to lock the snapshot, not the global lock.  We
+        -- trade in the lock here.
+        dir <- installationRootDeps
+        -- Hand-over-hand locking:
+        withUserFileLock go dir $ \lk2 -> do
+          liftIO $ munlockFile lk0
+          $logDebug "Starting to execute command inside EnvConfig"
+          inner lk2
+
+        {- FIXME is this correct? No support for Docker and Nix with script command
+      let getCompilerVersion = loadCompilerVersion go lc
+        Docker.reexecWithOptionalContainer
+                 (lcProjectRoot lc)
+                 Nothing
+                 (runStackTGlobal (lcConfig lc) go $
+                    Nix.reexecWithOptionalShell (lcProjectRoot lc) getCompilerVersion (inner'' lk0))
+                 Nothing
+        -}
+
 -- | Load the configuration. Convenience function used
 -- throughout this module.
 loadConfigWithOpts :: GlobalOpts -> IO (LoadConfig (StackT () IO))
@@ -207,9 +248,9 @@ withMiniConfigAndLock
     -> StackT MiniConfig IO ()
     -> IO ()
 withMiniConfigAndLock go@GlobalOpts{..} inner = do
-    miniConfig <- runStackTGlobal () go $ do
-        lc <- loadConfigMaybeProject globalConfigMonoid globalResolver Nothing
-        loadMiniConfig (lcConfig lc)
+    miniConfig <- runStackTGlobal () go
+        $ fmap (loadMiniConfig . lcConfig)
+        $ loadConfigMaybeProject globalConfigMonoid globalResolver Nothing
     runStackTGlobal miniConfig go inner
 
 -- | Unlock a lock file, if the value is Just

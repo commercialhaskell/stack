@@ -25,6 +25,7 @@
 module Stack.Config
   (MiniConfig
   ,loadConfig
+  ,loadConfigNoLocal
   ,loadConfigMaybeProject
   ,loadMiniConfig
   ,packagesParser
@@ -384,12 +385,10 @@ instance HasGHCVariant MiniConfig where
     ghcVariantL = lens mcGHCVariant (\x y -> x { mcGHCVariant = y })
 
 -- | Load the 'MiniConfig'.
-loadMiniConfig
-    :: MonadIO m
-    => Config -> m MiniConfig
-loadMiniConfig config = do
+loadMiniConfig :: Config -> MiniConfig
+loadMiniConfig config =
     let ghcVariant = fromMaybe GHCStandard (configGHCVariant0 config)
-    return (MiniConfig ghcVariant config)
+     in MiniConfig ghcVariant config
 
 -- Load the configuration, using environment variables, and defaults as
 -- necessary.
@@ -447,6 +446,40 @@ loadConfig :: StackM env m
 loadConfig configArgs mresolver mstackYaml =
     loadProjectConfig mstackYaml >>= loadConfigMaybeProject configArgs mresolver
 
+-- | Load up configuration, but do not use any config files.
+loadConfigNoLocal
+    :: StackM env m
+    => ConfigMonoid
+    -- ^ Config monoid from parsed command-line arguments
+    -> AbstractResolver
+    -- ^ resolver
+    -> m BuildConfigNoLocal
+loadConfigNoLocal configArgs resolver = do
+    (stackRoot, userOwnsStackRoot) <- determineStackRootAndOwnership configArgs
+    userConfigPath <- getDefaultUserConfigPath stackRoot
+    config <- configFromConfigMonoid stackRoot userConfigPath (Just resolver) Nothing configArgs
+    unless (configAllowDifferentUser config || userOwnsStackRoot) $
+        throwM (UserDoesn'tOwnDirectory stackRoot)
+    loadBuildConfigNoLocal config resolver
+
+-- | Load up build configuration, but do not use any config files.
+loadBuildConfigNoLocal
+    :: StackM env m
+    => Config
+    -> AbstractResolver -- override resolver
+    -> m BuildConfigNoLocal
+loadBuildConfigNoLocal config aresolver = do
+    let miniConfig = loadMiniConfig config
+    (mbp, loadedResolver) <- runReaderT
+        (makeConcreteResolver aresolver >>= loadResolver Nothing)
+        miniConfig
+    return BuildConfigNoLocal
+        { bcConfig = config
+        , bcResolver = loadedResolver
+        , bcWantedMiniBuildPlan = mbp
+        , bcGHCVariant = mcGHCVariant miniConfig
+        }
+
 -- | Load the build configuration, adds build-specific values to config loaded by @loadConfig@.
 -- values.
 loadBuildConfig :: StackM env m
@@ -457,7 +490,7 @@ loadBuildConfig :: StackM env m
                 -> m BuildConfig
 loadBuildConfig mproject config mresolver mcompiler = do
     env <- ask
-    miniConfig <- loadMiniConfig config
+    let miniConfig = loadMiniConfig config
 
     (project', stackYamlFP) <- case mproject of
       Just (project, fp, _) -> do

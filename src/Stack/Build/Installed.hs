@@ -56,7 +56,7 @@ data GetInstalledOpts = GetInstalledOpts
     }
 
 -- | Returns the new InstalledMap and all of the locally registered packages.
-getInstalled :: (StackM env m, HasEnvConfig env, PackageInstallInfo pii)
+getInstalled :: (StackM env m, HasMaybeEnvConfig env, PackageInstallInfo pii)
              => EnvOverride
              -> GetInstalledOpts
              -> Map PackageName pii -- ^ does not contain any installed information
@@ -68,15 +68,27 @@ getInstalled :: (StackM env m, HasEnvConfig env, PackageInstallInfo pii)
 getInstalled menv opts sourceMap = do
     $logDebug "Finding out which packages are already installed"
     snapDBPath <- packageDatabaseDeps
-    localDBPath <- packageDatabaseLocal
-    extraDBPaths <- packageDatabaseExtra
+
+    meconfig <- view maybeEnvConfigL
+    (mlocalDBPath, extraDBPaths) <-
+        case meconfig of
+            Nothing -> return (Nothing, [])
+            Just econfig -> runInnerStackT econfig $ do
+                localDBPath <- packageDatabaseLocal
+                extraDBPaths <- packageDatabaseExtra
+                return (Just localDBPath, extraDBPaths)
 
     mcache <-
         if getInstalledProfiling opts || getInstalledHaddock opts
-            then configInstalledCache >>= liftM Just . loadInstalledCache
+            then
+                case meconfig of
+                    Nothing -> error "getInstalled: requested profiling or haddocks, but in a no-local run"
+                    Just econfig -> runInnerStackT econfig $ do
+                        cache <- configInstalledCache >>= loadInstalledCache
+                        return $ Just (cache, econfig)
             else return Nothing
 
-    let loadDatabase' = loadDatabase menv opts mcache sourceMap
+    let loadDatabase' = loadDatabase menv opts (fmap fst mcache) sourceMap
 
     (installedLibs0, globalDumpPkgs) <- loadDatabase' Nothing []
     (installedLibs1, _extraInstalled) <-
@@ -86,10 +98,13 @@ getInstalled menv opts sourceMap = do
     (installedLibs2, snapshotDumpPkgs) <-
         loadDatabase' (Just (InstalledTo Snap, snapDBPath)) installedLibs1
     (installedLibs3, localDumpPkgs) <-
-        loadDatabase' (Just (InstalledTo Local, localDBPath)) installedLibs2
+        case mlocalDBPath of
+            Just localDBPath ->
+                loadDatabase' (Just (InstalledTo Local, localDBPath)) installedLibs2
+            Nothing -> return (installedLibs2, [])
     let installedLibs = M.fromList $ map lhPair installedLibs3
 
-    F.forM_ mcache $ \cache -> do
+    F.forM_ mcache $ \(cache, econfig) -> runInnerStackT econfig $ do
         icache <- configInstalledCache
         saveInstalledCache icache cache
 
@@ -126,7 +141,7 @@ getInstalled menv opts sourceMap = do
 -- The goal is to ascertain that the dependencies for a package are present,
 -- that it has profiling if necessary, and that it matches the version and
 -- location needed by the SourceMap
-loadDatabase :: (StackM env m, HasEnvConfig env, PackageInstallInfo pii)
+loadDatabase :: (StackM env m, HasMaybeEnvConfig env, PackageInstallInfo pii)
              => EnvOverride
              -> GetInstalledOpts
              -> Maybe InstalledCache -- ^ if Just, profiling or haddock is required
