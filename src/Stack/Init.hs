@@ -35,6 +35,7 @@ import qualified Distribution.PackageDescription as C
 import qualified Distribution.Text as C
 import qualified Distribution.Version as C
 import           Path
+import           Path.Extra (toFilePathNoTrailingSep)
 import           Path.IO
 import qualified Paths_stack as Meta
 import           Stack.BuildPlan
@@ -104,7 +105,6 @@ initProject whichCmd currDir initOpts mresolver = do
                 \satisfy all dependencies. Some external packages have been \
                 \added as dependencies.\n"
             | otherwise = ""
-
         makeUserMsg msgs =
             let msg = concat msgs
             in if msg /= "" then
@@ -129,8 +129,8 @@ initProject whichCmd currDir initOpts mresolver = do
             case stripDir currDir dir of
                 Nothing
                     | currDir == dir -> "."
-                    | otherwise -> assert False $ toFilePath dir
-                Just rel -> toFilePath rel
+                    | otherwise -> assert False $ toFilePathNoTrailingSep dir
+                Just rel -> toFilePathNoTrailingSep rel
 
         makeRel = fmap toFilePath . makeRelativeToCurrentDir
 
