@@ -328,8 +328,8 @@ stack ghc, stack ghci, stack runghc, or stack exec
 ```
 
 Thankfully, the command is smart enough to know not to perform an installation
-twice. As the command output above indicates, you can use `stack
-path` for quite a bit of path information (which we'll play with more later).
+twice. As the command output above indicates, you can use `stack path`
+for quite a bit of path information (which we'll play with more later).
 For now, we'll just look at where GHC is installed:
 
 ```
@@ -685,8 +685,8 @@ The most up-to-date information can always be found in the
 Alright, enough playing around with simple projects. Let's take an open source
 package and try to build it. We'll be ambitious and use
 [yackage](https://www.stackage.org/package/yackage), a local package server
-using [Yesod](http://www.yesodweb.com/). To get the code, we'll use the `stack
-unpack` command:
+using [Yesod](http://www.yesodweb.com/). To get the code, we'll use the
+`stack unpack` command:
 
 ```
 cueball:~$ stack unpack yackage-0.8.0
@@ -908,8 +908,8 @@ config file and removing it.
 #### Using a specific resolver
 
 Sometimes you may want to use a specific resolver for your project instead of
-`stack init` picking one for you. You can do that by using `stack init
---resolver <resolver>`.
+`stack init` picking one for you. You can do that by using
+`stack init --resolver <resolver>`.
 
 You can also init with a compiler resolver if you do not want to use a
 snapshot. That will result in all of your project's dependencies being put
@@ -1252,8 +1252,8 @@ michael@d30748af6d3d:~/helloworld$ stack path --local-bin-path
 
 That's why the download page recommends adding that directory to your `PATH`
 environment variable. This feature is convenient, because now you can simply
-run `executable-name` in your shell instead of having to run `stack exec
-executable-name` from inside your project directory.
+run `executable-name` in your shell instead of having to run
+`stack exec executable-name` from inside your project directory.
 
 Since it's such a point of confusion, let me list a number of things stack does
 *not* do specially for the install command:
