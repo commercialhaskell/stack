@@ -933,29 +933,58 @@ withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} md
                         ["-package=" ++ packageIdentifierString
                                             (PackageIdentifier cabalPackageName
                                                               eeCabalPkgVer)]
-                packageArgs =
-                    case mdeps of
+                packageDBArgs =
+                    ( "-clear-package-db"
+                    : "-global-package-db"
+                    : map (("-package-db=" ++) . toFilePathNoTrailingSep) (bcoExtraDBs eeBaseConfigOpts)
+                    ) ++
+                    ( ("-package-db=" ++ toFilePathNoTrailingSep (bcoSnapDB eeBaseConfigOpts))
+                    : ("-package-db=" ++ toFilePathNoTrailingSep (bcoLocalDB eeBaseConfigOpts))
+                    : ["-hide-all-packages"]
+                    )
+
+                getPackageArgs =
+                    case (packageSetupDeps package, mdeps) of
+                        -- The package is using the Cabal custom-setup
+                        -- configuration introduced in Cabal 1.24. In
+                        -- this case, the package is providing an
+                        -- explicit list of dependencies, and we
+                        -- should simply use all of them.
+                        (Just customSetupDeps, _) -> do
+                            allDeps <-
+                                case mdeps of
+                                    Just x -> return x
+                                    Nothing -> do
+                                        $logWarn "In getPackageArgs: custom-setup in use, but no dependency map present"
+                                        return Map.empty
+                            depsArgs <- forM (Map.toList customSetupDeps) $ \(name, range) -> do
+                                let matches (PackageIdentifier name' version) =
+                                        name == name' &&
+                                        version `withinRange` range
+                                case map snd (filter (matches . fst) (Map.toList allDeps)) of
+                                    x:xs -> do
+                                        unless (null xs)
+                                            ($logWarn (T.pack ("Found multiple installed packages for custom-setup dep: " ++ packageNameString name)))
+                                        return ("-package-id=" ++ ghcPkgIdString x)
+                                    [] -> do
+                                        $logWarn (T.pack ("Could not find custom-setup dep: " ++ packageNameString name))
+                                        return ("--package=" ++ packageNameString name)
+                            return (packageDBArgs ++ depsArgs)
+
                         -- This branch is taken when
                         -- 'explicit-setup-deps' is requested in your
                         -- stack.yaml file.
-                        Just deps | explicitSetupDeps (packageName package) config ->
+                        (Nothing, Just deps) | explicitSetupDeps (packageName package) config ->
                             -- Stack always builds with the global Cabal for various
                             -- reproducibility issues.
                             let depsMinusCabal
                                  = map ghcPkgIdString
                                  $ Set.toList
                                  $ addGlobalPackages deps (Map.elems eeGlobalDumpPkgs)
-                            in
-                                ( "-clear-package-db"
-                                : "-global-package-db"
-                                : map (("-package-db=" ++) . toFilePathNoTrailingSep) (bcoExtraDBs eeBaseConfigOpts)
-                                ) ++
-                                ( ("-package-db=" ++ toFilePathNoTrailingSep (bcoSnapDB eeBaseConfigOpts))
-                                : ("-package-db=" ++ toFilePathNoTrailingSep (bcoLocalDB eeBaseConfigOpts))
-                                : ["-hide-all-packages"]
-                                ) ++
+                            in return (
+                                packageDBArgs ++
                                 cabalPackageArg ++
-                                map ("-package-id=" ++) depsMinusCabal
+                                map ("-package-id=" ++) depsMinusCabal)
                         -- This branch is usually taken for builds, and
                         -- is always taken for `stack sdist`.
                         --
@@ -973,12 +1002,16 @@ withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} md
                         -- Currently, this branch is only taken via `stack
                         -- sdist` or when explicitly requested in the
                         -- stack.yaml file.
-                        _ ->
+                        (Nothing, _) -> return (
                               cabalPackageArg ++
+                            -- NOTE: This is different from
+                            -- packageDBArgs above inthat it does not
+                            -- include the local database and does not
+                            -- pass in the -hide-all-packages argument
                             ("-clear-package-db"
                             : "-global-package-db"
                             : map (("-package-db=" ++) . toFilePathNoTrailingSep) (bcoExtraDBs eeBaseConfigOpts)
-                           ++ ["-package-db=" ++ toFilePathNoTrailingSep (bcoSnapDB eeBaseConfigOpts)])
+                           ++ ["-package-db=" ++ toFilePathNoTrailingSep (bcoSnapDB eeBaseConfigOpts)]))
 
                 setupArgs = ("--builddir=" ++ toFilePathNoTrailingSep distRelativeDir') : args
                 runExe exeName fullArgs =
@@ -1027,6 +1060,7 @@ withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} md
                         case compiler of
                             Ghc -> getGhcPath
                             Ghcjs -> getGhcjsPath
+                    packageArgs <- getPackageArgs
                     runExe compilerPath $
                         [ "--make"
                         , "-odir", toFilePathNoTrailingSep setupDir

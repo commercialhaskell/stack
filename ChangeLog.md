@@ -25,6 +25,10 @@ Other enhancements:
   closing [#877](https://github.com/commercialhaskell/stack/issues/877).
 * `stack haddock` now shows index.html paths when documentation is alread up to
   date. Resolved [#781](https://github.com/commercialhaskell/stack/issues/781)
+* Respects the `custom-setup` field introduced in Cabal 1.24. This
+  supercedes any `explicit-setup-deps` settings in your `stack.yaml`
+  and trusts the package's `.cabal` file to explicitly state all its
+  dependencies.
 
 Bug fixes:
 

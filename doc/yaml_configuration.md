@@ -563,6 +563,11 @@ explicit-setup-deps:
     entropy: false # override the new default for one package
 ```
 
+NOTE: since 1.4.0, Stack has support for Cabal's `custom-setup` block
+(introduced in Cabal 1.24). If a `custom-setup` block is provided in a `.cabal`
+file, it will override the setting of `explicit-setup-deps`, and instead rely
+on the stated dependencies.
+
 ### allow-newer
 
 (Since 0.1.7)
