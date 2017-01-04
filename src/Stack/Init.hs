@@ -8,36 +8,36 @@ module Stack.Init
     , InitOpts (..)
     ) where
 
-import           Control.Exception (assert)
-import           Control.Exception.Safe (catchAny)
+import           Control.Exception               (assert)
+import           Control.Exception.Safe          (catchAny)
 import           Control.Monad
-import           Control.Monad.Catch (throwM)
+import           Control.Monad.Catch             (throwM)
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
-import qualified Data.ByteString.Builder as B
-import qualified Data.ByteString.Char8 as BC
-import qualified Data.ByteString.Lazy as L
-import qualified Data.Foldable as F
-import           Data.Function (on)
-import qualified Data.HashMap.Strict as HM
-import qualified Data.IntMap as IntMap
-import           Data.List                       ( intercalate, intersect
-                                                 , maximumBy)
-import           Data.List.NonEmpty (NonEmpty(..))
-import qualified Data.List.NonEmpty as NonEmpty
-import           Data.Map (Map)
-import qualified Data.Map as Map
+import qualified Data.ByteString.Builder         as B
+import qualified Data.ByteString.Char8           as BC
+import qualified Data.ByteString.Lazy            as L
+import qualified Data.Foldable                   as F
+import           Data.Function                   (on)
+import qualified Data.HashMap.Strict             as HM
+import qualified Data.IntMap                     as IntMap
+import           Data.List                       (intercalate, intersect,
+                                                  maximumBy)
+import           Data.List.NonEmpty              (NonEmpty (..))
+import qualified Data.List.NonEmpty              as NonEmpty
+import           Data.Map                        (Map)
+import qualified Data.Map                        as Map
 import           Data.Maybe
 import           Data.Monoid
-import qualified Data.Text as T
-import qualified Data.Yaml as Yaml
+import qualified Data.Text                       as T
+import qualified Data.Yaml                       as Yaml
 import qualified Distribution.PackageDescription as C
-import qualified Distribution.Text as C
-import qualified Distribution.Version as C
+import qualified Distribution.Text               as C
+import qualified Distribution.Version            as C
 import           Path
-import           Path.Extra (toFilePathNoTrailingSep)
+import           Path.Extra                      (toFilePathNoTrailingSep)
 import           Path.IO
-import qualified Paths_stack as Meta
+import qualified Paths_stack                     as Meta
 import           Stack.BuildPlan
 import           Stack.Config                    (getSnapshots,
                                                   makeConcreteResolver)
@@ -49,9 +49,9 @@ import           Stack.Types.Config
 import           Stack.Types.FlagName
 import           Stack.Types.PackageName
 import           Stack.Types.Resolver
-import           Stack.Types.StackT (StackM)
+import           Stack.Types.StackT              (StackM)
 import           Stack.Types.Version
-import qualified System.FilePath as FP
+import qualified System.FilePath                 as FP
 
 -- | Generate stack.yaml
 initProject
