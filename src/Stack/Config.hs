@@ -634,11 +634,11 @@ resolvePackageLocation menv projRoot (PLRemote url remotePackageType) = do
         -- TODO: dedupe with code for snapshot hash?
         name = T.unpack $ decodeUtf8 $ S.take 12 $ B64URL.encode $ SHA256.hash $ encodeUtf8 nameBeforeHashing
         root = projRoot </> workDir </> $(mkRelDir "downloaded")
-        fileExtension = case remotePackageType of
+        fileExtension' = case remotePackageType of
             RPTHttp -> ".http-archive"
             _       -> ".unused"
 
-    fileRel <- parseRelFile $ name ++ fileExtension
+    fileRel <- parseRelFile $ name ++ fileExtension'
     dirRel <- parseRelDir name
     dirRelTmp <- parseRelDir $ name ++ ".tmp"
     let file = root </> fileRel
