@@ -248,10 +248,15 @@ getCabalConfig dir constraintType constraints = do
     goIndex index = do
         src <- configPackageIndex $ indexName index
         let dstdir = dir FP.</> T.unpack (indexNameText $ indexName index)
-            dst = dstdir FP.</> "01-index.tar"
+            -- NOTE: see https://github.com/commercialhaskell/stack/issues/2888
+            -- for why we are pretending that a 01-index.tar is actually a
+            -- 00-index.tar file.
+            dst0 = dstdir FP.</> "00-index.tar"
+            dst1 = dstdir FP.</> "01-index.tar"
         liftIO $ void $ tryIO $ do
             D.createDirectoryIfMissing True dstdir
-            D.copyFile (toFilePath src) dst
+            D.copyFile (toFilePath src) dst0
+            D.copyFile (toFilePath src) dst1
         return $ T.concat
             [ "remote-repo: "
             , indexNameText $ indexName index
