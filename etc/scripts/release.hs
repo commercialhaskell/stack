@@ -155,7 +155,7 @@ rules global@Global{..} args = do
         when (not gAllowDirty && not (null (trim dirty))) $
             error ("Working tree is dirty.  Use --" ++ allowDirtyOptName ++ " option to continue anyway.")
         withTempDir $ \tmpDir -> do
-            let cmd0 c = cmd (releaseBinDir </> binaryName </> stackExeFileName)
+            let cmd0 c = cmd (gProjectRoot </> releaseBinDir </> binaryName </> stackExeFileName)
                     (stackArgs global)
                     ["--local-bin-path=" ++ tmpDir]
                     c
