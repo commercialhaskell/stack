@@ -2,7 +2,7 @@ site_name: The Haskell Tool Stack
 site_description: The Haskell Tool Stack
 site_author: Stack contributors
 repo_url: https://github.com/commercialhaskell/stack/tree/master/doc
-copyright: Copyright (c) 2015-2016, Stack contributors
+copyright: Copyright (c) 2015-2017, Stack contributors
 docs_dir: doc
 site_dir: _site
 theme: readthedocs
