@@ -206,8 +206,8 @@ Packages that come from the snapshot global database are not affected.
 
 ### image
 
-The image settings are used for the creation of container images using `stack
-image container`, e.g.
+The image settings are used for the creation of container images using
+`stack image container`, e.g.
 
 ```yaml
 image:
@@ -665,8 +665,8 @@ The 5 parameters are: `author-email`, `author-name`, `category`, `copyright` and
   name of the holder of the copyright on the package and the year(s) from which
   copyright is claimed. For example: `Copyright: (c) 2006-2007 Joe Bloggs`
 * _github-username_ - used to generate `homepage` and `source-repository` in
-  cabal. For instance `github-username: myusername` and `stack new my-project
-  new-template` would result:
+  cabal. For instance `github-username: myusername` and `stack new my-project new-template`
+  would result:
 
 ```yaml
 homepage: http://github.com/myusername/my-project#readme

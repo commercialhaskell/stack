@@ -9,9 +9,9 @@ To use GHCJS with stack, place a GHCJS version in the [`compiler`](yaml_configur
 You can also build existing stack projects which target GHC, and instead build
 them with GHCJS.  For example: `stack build --compiler ghcjs-0.2.0.9006020_ghc-7.10.3`
 
-Sidenote: If you receive a message like `The program 'ghcjs' version >=0.1 is
-required but the version of .../ghcjs could not be determined.`, then you may
-need to install a different version of `node`. See
+Sidenote: If you receive a message like
+`The program 'ghcjs' version >=0.1 is required but the version of .../ghcjs could not be determined.`,
+then you may need to install a different version of `node`. See
 [issue #1496](https://github.com/commercialhaskell/stack/issues/1496).
 
 ## Example Configurations

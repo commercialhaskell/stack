@@ -191,9 +191,8 @@ detailed discussion of stack's behavior when `system-ghc` is enabled.
 
 ## How do I upgrade to GHC 7.10.2 with stack?
 
-If you already have a prior version of GHC use `stack --resolver ghc-7.10 setup
---reinstall`. If you don't have any GHC installed, you can skip the
-`--reinstall`.
+If you already have a prior version of GHC use `stack --resolver ghc-7.10 setup --reinstall`.
+If you don't have any GHC installed, you can skip the `--reinstall`.
 
 ## How do I get extra build tools?
 
@@ -201,8 +200,8 @@ stack will automatically install build tools required by your packages or their
 dependencies, in particular alex and happy.
 
 __NOTE__: This works when using lts or nightly resolvers, not with ghc or
-custom resolvers. You can manually install build tools by running, e.g., `stack
-build alex happy`.
+custom resolvers. You can manually install build tools by running, e.g.,
+`stack build alex happy`.
 
 ## How does stack choose which snapshot to use when creating a new config file?
 
@@ -418,8 +417,8 @@ If you manage to work around this in other distributions, please include instruc
 ## Where does the output from `--ghc-options=-ddump-splices` (and other `-ddump*` options) go?
 
 These are written to `*.dump-*` files inside the package's `.stack-work`
-directory. Specifically, they will be available at `PKG-DIR/$(stack path
---dist-dir)/build/SOURCE-PATH`, where `SOURCE-PATH` is the path to the source
+directory. Specifically, they will be available at
+`PKG-DIR/$(stack path --dist-dir)/build/SOURCE-PATH`, where `SOURCE-PATH` is the path to the source
 file, relative to the location of the `*.cabal` file. When building named
 components such as test-suites, `SOURCE-PATH` will also include
 `COMPONENT/COMPONENT-tmp`, where `COMPONENT` is the name of the component.

@@ -16,8 +16,8 @@ Haskell tooling you need. This guide will follow that stack-centric approach.
 
 ### What makes stack special?
 
-The primary stack design point is __reproducible builds__. If you run `stack
-build` today, you should get the same result running `stack build` tomorrow.
+The primary stack design point is __reproducible builds__. If you run `stack build`
+today, you should get the same result running `stack build` tomorrow.
 There are some cases that can break that rule (changes in your operating system
 configuration, for example), but, overall, stack follows this design philosophy
 closely. To make this a simple process, stack uses curated package sets
@@ -1047,8 +1047,8 @@ project. To do that you can fix those versions by specifying them in the
 extra-deps section and then use `stack solver` to figure out whether it is
 feasible to use those or what other dependencies are needed as a result.
 
-If you want to change the resolver for your project, you can run `stack solver
---resolver <resolver name>` and it will figure out the changes needed for you.
+If you want to change the resolver for your project, you can run
+`stack solver --resolver <resolver name>` and it will figure out the changes needed for you.
 
 Let's see what happens if we change the resolver to lts-2.22:
 
@@ -1626,8 +1626,8 @@ a package as a *dependency package*.
 ## ghc/runghc
 
 You'll sometimes want to just compile (or run) a single Haskell source file,
-instead of creating an entire Cabal package for it. You can use `stack exec
-ghc` or `stack exec runghc` for that. As simple helpers, we also provide the
+instead of creating an entire Cabal package for it. You can use `stack exec ghc`
+or `stack exec runghc` for that. As simple helpers, we also provide the
 `stack ghc` and `stack runghc` commands, for these common cases.
 
 ## script interpreter
@@ -1759,8 +1759,8 @@ algorithm stack uses to find this is:
 The first two provide a convenient method for using an alternate configuration.
 For example: `stack build --stack-yaml stack-7.8.yaml` can be used by your CI
 system to check your code against GHC 7.8. Setting the `STACK_YAML` environment
-variable can be convenient if you're going to be running commands like `stack
-ghc` in other directories, but you want to use the configuration you defined in
+variable can be convenient if you're going to be running commands like `stack ghc`
+in other directories, but you want to use the configuration you defined in
 a specific project.
 
 If stack does not find a `stack.yaml` in any of the three specified locations,
@@ -1839,8 +1839,8 @@ Now the differences:
       packages. So for example, in stack, `stack test` does the same job as
       `cabal install --run-tests`, though the latter *additionally* performs an
       installation that you may not want. The closer command equivalent is
-      `cabal install --enable-tests --only-dependencies && cabal configure
-      --enable-tests && cabal build && cabal test` (newer versions of
+      `cabal install --enable-tests --only-dependencies && cabal configure --enable-tests && cabal build && cabal test`
+      (newer versions of
       cabal-install may make this command shorter).
 * __Isolated by default__.
     * This has been a pain point for new stack users. In cabal, the
