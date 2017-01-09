@@ -17,6 +17,13 @@ Behavior changes:
   URL, Git will still be used. See
   [#2780](https://github.com/commercialhaskell/stack/issues/2780)
 
+  For backwards compatibility with tools relying on the presence of a
+  `00-index.tar`, Stack will copy the `01-index.tar` file to
+  `00-index.tar`. Note, however, that these files are different; most
+  importantly, 00-index contains only the newest revisions of cabal
+  files, while 01-index contains all versions. You may still need to
+  update your tooling.
+
 Other enhancements:
 
 * Internal cleanup: configuration types are now based much more on lenses
