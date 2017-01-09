@@ -128,7 +128,9 @@ apt_install_dependencies() {
 do_ubuntu_install() {
 
   install_dependencies() {
-    apt_install_dependencies g++ gcc libc6-dev libffi-dev libgmp-dev make xz-utils zlib1g-dev git gnupg
+    if ! apt_install_dependencies g++ gcc libc6-dev libffi-dev libgmp-dev make xz-utils zlib1g-dev git gnupg; then
+      die "Dependencies could not be installed. Please run 'apt-get update' and try again."
+    fi
   }
 
   if is_arm ; then
