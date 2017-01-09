@@ -36,8 +36,8 @@ flags:
     manual: true
 ```
 
-It is also possible to pass the same flag to multiple packages, i.e. `stack
-build --flag *:necessary`
+It is also possible to pass the same flag to multiple packages, i.e.
+`stack build --flag *:necessary`
 
 Currently one needs to list all of your modules that interpret flags in the
 `other-modules` section of a cabal file. `cabal-install` has a different
