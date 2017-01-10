@@ -1618,7 +1618,7 @@ command (for "module") followed by the module name.
 
 IMPORTANT NOTE: If you have added upstream packages to your project please make
 sure to mark them as *dependency package*s for faster and reliable usage of
-`stack gchi`. Otherwise GHCi may have trouble due to conflicts of compilation
+`stack ghci`. Otherwise GHCi may have trouble due to conflicts of compilation
 flags or having to unnecessarily interpret too many modules. See
 [stack.yaml documentation](yaml_configuration.md#packages) to learn how to mark
 a package as a *dependency package*.
