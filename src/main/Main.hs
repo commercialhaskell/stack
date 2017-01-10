@@ -97,6 +97,7 @@ import           Stack.Types.Version
 import           Stack.Types.Config
 import           Stack.Types.Compiler
 import           Stack.Types.Resolver
+import           Stack.Types.Nix
 import           Stack.Types.StackT
 import           Stack.Upgrade
 import qualified Stack.Upload as Upload
@@ -566,6 +567,8 @@ pathCmd keys go = withBuildConfig go (Stack.Path.path keys)
 setupCmd :: SetupCmdOpts -> GlobalOpts -> IO ()
 setupCmd sco@SetupCmdOpts{..} go@GlobalOpts{..} = do
   lc <- loadConfigWithOpts go
+  when (scoUpgradeCabal && nixEnable (configNix (lcConfig lc))) $ do
+    throwIO UpgradeCabalUnusable
   withUserFileLock go (configStackRoot $ lcConfig lc) $ \lk -> do
     let getCompilerVersion = loadCompilerVersion go lc
     runStackTGlobal (lcConfig lc) go $
@@ -920,6 +923,7 @@ hpcReportCmd :: HpcReportOpts -> GlobalOpts -> IO ()
 hpcReportCmd hropts go = withBuildConfig go $ generateHpcReportForTargets hropts
 
 data MainException = InvalidReExecVersion String String
+                   | UpgradeCabalUnusable
      deriving (Typeable)
 instance Exception MainException
 instance Show MainException where
@@ -930,3 +934,4 @@ instance Show MainException where
         , expected
         , "; found: "
         , actual]
+    show UpgradeCabalUnusable = "--upgrade-cabal cannot be used when nix is activated"
