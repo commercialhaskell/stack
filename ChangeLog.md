@@ -24,12 +24,15 @@ Other enhancements:
   with new `--no-strip`, `--no-library-stripping`, and `--no-executable-shipping` flags,
   closing [#877](https://github.com/commercialhaskell/stack/issues/877). 
   Also turned error message for missing targets more readable ([#2384](https://github.com/commercialhaskell/stack/issues/2384))
-* `stack haddock` now shows index.html paths when documentation is alread up to
+* `stack haddock` now shows index.html paths when documentation is already up to
   date. Resolved [#781](https://github.com/commercialhaskell/stack/issues/781)
 * Respects the `custom-setup` field introduced in Cabal 1.24. This
   supercedes any `explicit-setup-deps` settings in your `stack.yaml`
   and trusts the package's `.cabal` file to explicitly state all its
   dependencies.
+* If system package installation fails, `stack` won't be installed. Also shows a
+  warning suggesting to run `apt-get update` or similar, depending on the OS.
+  ([#2898](https://github.com/commercialhaskell/stack/issues/2898))
 
 Bug fixes:
 
