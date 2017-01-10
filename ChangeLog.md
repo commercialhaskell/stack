@@ -30,8 +30,9 @@ Other enhancements:
   supercedes any `explicit-setup-deps` settings in your `stack.yaml`
   and trusts the package's `.cabal` file to explicitly state all its
   dependencies.
-* If system package installation fails, `stack` won't be installed. Also shows a
-  warning suggesting to run `apt-get update` or similar, depending on the OS.
+* If system package installation fails, `get-stack.sh` will fail as well. Also
+  shows warning suggesting to run `apt-get update` or similar, depending on the
+  OS.
   ([#2898](https://github.com/commercialhaskell/stack/issues/2898))
 
 Bug fixes:
