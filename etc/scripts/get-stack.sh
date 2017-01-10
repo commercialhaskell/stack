@@ -156,7 +156,9 @@ do_ubuntu_install() {
 do_debian_install() {
 
   install_dependencies() {
-    apt_install_dependencies g++ gcc libc6-dev libffi-dev libgmp-dev make xz-utils zlib1g-dev
+    if ! apt_install_dependencies g++ gcc libc6-dev libffi-dev libgmp-dev make xz-utils zlib1g-dev; then
+      die "Dependencies could not be installed. Please run 'apt-get update' and try again."
+    fi
   }
 
   if is_arm ; then
@@ -180,7 +182,9 @@ do_debian_install() {
 # and install the necessary dependencies explicitly.
 do_fedora_install() {
   install_dependencies() {
-    dnf_install_pkgs perl make automake gcc gmp-devel libffi zlib xz tar
+    if ! dnf_install_pkgs perl make automake gcc gmp-devel libffi zlib xz tar; then
+      die "Dependencies could not be installed. Please run 'dnf check-update' and try again."
+    fi
   }
 
   if is_64_bit ; then
@@ -200,7 +204,9 @@ do_fedora_install() {
 # and install the necessary dependencies explicitly.
 do_centos_install() {
   install_dependencies() {
-    yum_install_pkgs perl make automake gcc gmp-devel libffi zlib xz tar
+    if ! yum_install_pkgs perl make automake gcc gmp-devel libffi zlib xz tar; then
+      die "Dependencies could not be installed. Please run 'yum check-update' and try again."
+    fi
   }
 
   if is_64_bit ; then
@@ -238,7 +244,9 @@ do_osx_install() {
 # 'pkg install' and then downloads bindist.
 do_freebsd_install() {
   install_dependencies() {
-    sudocmd pkg install -y devel/gmake perl5 lang/gcc misc/compat8x misc/compat9x converters/libiconv ca_root_nss
+    if ! sudocmd pkg install -y devel/gmake perl5 lang/gcc misc/compat8x misc/compat9x converters/libiconv ca_root_nss; then
+      die "Dependencies could not be installed. Please run 'pkg update' and try again."
+    fi
   }
   if is_64_bit ; then
     install_dependencies
@@ -251,7 +259,9 @@ do_freebsd_install() {
 # Alpine distro install
 do_alpine_install() {
   install_dependencies() {
-    apk_install_pkgs gmp libgcc xz make
+    if ! apk_install_pkgs gmp libgcc xz make; then
+      die "Dependencies could not be installed. Please run 'apk update' and try again."
+    fi
   }
   install_dependencies
   if is_64_bit ; then
