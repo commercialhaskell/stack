@@ -132,7 +132,7 @@ fetchPackages :: (StackMiniM env m, HasConfig env)
               -> Set PackageIdentifier
               -> m ()
 fetchPackages menv idents' = do
-    resolved <- resolvePackages menv idents Set.empty
+    resolved <- resolvePackages menv Nothing idents Set.empty
     ToFetchResult toFetch alreadyUnpacked <- getToFetch Nothing resolved
     assert (Map.null alreadyUnpacked) (return ())
     nowUnpacked <- fetchPackages' Nothing toFetch
@@ -145,15 +145,16 @@ fetchPackages menv idents' = do
 -- | Intended to work for the command line command.
 unpackPackages :: (StackMiniM env m, HasConfig env)
                => EnvOverride
+               -> Maybe MiniBuildPlan -- ^ when looking up by name, take from this build plan
                -> FilePath -- ^ destination
                -> [String] -- ^ names or identifiers
                -> m ()
-unpackPackages menv dest input = do
+unpackPackages menv mMiniBuildPlan dest input = do
     dest' <- resolveDir' dest
     (names, idents) <- case partitionEithers $ map parse input of
         ([], x) -> return $ partitionEithers x
         (errs, _) -> throwM $ CouldNotParsePackageSelectors errs
-    resolved <- resolvePackages menv
+    resolved <- resolvePackages menv mMiniBuildPlan
         (Map.fromList $ map (, Nothing) idents)
         (Set.fromList names)
     ToFetchResult toFetch alreadyUnpacked <- getToFetch (Just dest') resolved
@@ -186,7 +187,7 @@ unpackPackageIdents
     -> Map PackageIdentifier (Maybe GitSHA1)
     -> m (Map PackageIdentifier (Path Abs Dir))
 unpackPackageIdents menv unpackDir mdistDir idents = do
-    resolved <- resolvePackages menv idents Set.empty
+    resolved <- resolvePackages menv Nothing idents Set.empty
     ToFetchResult toFetch alreadyUnpacked <- getToFetch (Just unpackDir) resolved
     nowUnpacked <- fetchPackages' mdistDir toFetch
     return $ alreadyUnpacked <> nowUnpacked
@@ -200,10 +201,11 @@ data ResolvedPackage = ResolvedPackage
 -- | Resolve a set of package names and identifiers into @FetchPackage@ values.
 resolvePackages :: (StackMiniM env m, HasConfig env)
                 => EnvOverride
+                -> Maybe MiniBuildPlan -- ^ when looking up by name, take from this build plan
                 -> Map PackageIdentifier (Maybe GitSHA1)
                 -> Set PackageName
                 -> m (Map PackageIdentifier ResolvedPackage)
-resolvePackages menv idents0 names0 = do
+resolvePackages menv mMiniBuildPlan idents0 names0 = do
     eres <- go
     case eres of
         Left _ -> do
@@ -211,7 +213,7 @@ resolvePackages menv idents0 names0 = do
             go >>= either throwM return
         Right x -> return x
   where
-    go = r <$> resolvePackagesAllowMissing idents0 names0
+    go = r <$> resolvePackagesAllowMissing mMiniBuildPlan idents0 names0
     r (missingNames, missingIdents, idents)
       | not $ Set.null missingNames  = Left $ UnknownPackageNames       missingNames
       | not $ Set.null missingIdents = Left $ UnknownPackageIdentifiers missingIdents ""
@@ -219,19 +221,34 @@ resolvePackages menv idents0 names0 = do
 
 resolvePackagesAllowMissing
     :: (StackMiniM env m, HasConfig env)
-    => Map PackageIdentifier (Maybe GitSHA1)
+    => Maybe MiniBuildPlan -- ^ when looking up by name, take from this build plan
+    -> Map PackageIdentifier (Maybe GitSHA1)
     -> Set PackageName
     -> m (Set PackageName, Set PackageIdentifier, Map PackageIdentifier ResolvedPackage)
-resolvePackagesAllowMissing idents0 names0 = do
+resolvePackagesAllowMissing mMiniBuildPlan idents0 names0 = do
     (caches, shaCaches) <- getPackageCaches
+
     let versions = Map.fromListWith max $ map toTuple $ Map.keys caches
+
+        getNamed :: PackageName -> Maybe (PackageIdentifier, Maybe GitSHA1)
+        getNamed =
+            case mMiniBuildPlan of
+                Nothing -> getNamedFromIndex
+                Just mbp -> getNamedFromBuildPlan mbp
+
+        getNamedFromBuildPlan mbp name = do
+            mpi <- Map.lookup name $ mbpPackages mbp
+            Just (PackageIdentifier name (mpiVersion mpi), mpiGitSHA1 mpi)
+        getNamedFromIndex name = fmap
+            (\ver -> (PackageIdentifier name ver, Nothing))
+            (Map.lookup name versions)
+
         (missingNames, idents1) = partitionEithers $ map
-            (\name -> maybe (Left name ) (Right . PackageIdentifier name)
-                (Map.lookup name versions))
+            (\name -> maybe (Left name) Right (getNamed name))
             (Set.toList names0)
     let (missingIdents, resolved) = partitionEithers $ map (goIdent caches shaCaches)
                                   $ Map.toList
-                                  $ idents0 <> Map.fromList (map (, Nothing) idents1)
+                                  $ idents0 <> Map.fromList idents1
     return (Set.fromList missingNames, Set.fromList missingIdents, Map.fromList resolved)
   where
     goIdent caches shaCaches (ident, mgitsha) =

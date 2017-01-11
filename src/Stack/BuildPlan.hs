@@ -285,11 +285,11 @@ addDeps allowMissing compilerVersion toCalc = do
         if allowMissing
             then do
                 (missingNames, missingIdents, m) <-
-                    resolvePackagesAllowMissing shaMap Set.empty
+                    resolvePackagesAllowMissing Nothing shaMap Set.empty
                 assert (Set.null missingNames)
                     $ return (m, missingIdents)
             else do
-                m <- resolvePackages menv shaMap Set.empty
+                m <- resolvePackages menv Nothing shaMap Set.empty
                 return (m, Set.empty)
     let byIndex = Map.fromListWith (++) $ flip map (Map.toList resolvedMap)
             $ \(ident, rp) ->

@@ -16,6 +16,17 @@ Behavior changes:
   as well. If you manually specify a package index with only a Git
   URL, Git will still be used. See
   [#2780](https://github.com/commercialhaskell/stack/issues/2780)
+* When you provide the `--resolver` argument to the `stack unpack`
+  command, any packages passed in by name only will be looked up in
+  the given snapshot instead of taking the latest version. For
+  example, `stack --resolver lts-7.14 unpack mtl` will get version
+  2.2.1 of `mtl`, regardless of the latest version available in the
+  package indices. This will also force the same cabal file revision
+  to be used as is specified in the snapshot.
+
+  Unpacking via a package identifier (e.g. `stack --resolver lts-7.14
+  unpack mtl-2.2.1`) will ignore any settings in the snapshot and take
+  the most recent revision.
 
 Other enhancements:
 

@@ -2,6 +2,7 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE GADTs #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell #-}
@@ -54,6 +55,7 @@ import           Path.IO
 import qualified Paths_stack as Meta
 import           Prelude hiding (pi, mapM)
 import           Stack.Build
+import           Stack.BuildPlan
 import           Stack.Clean (CleanOpts, clean)
 import           Stack.Config
 import           Stack.ConfigCmd as ConfigCmd
@@ -94,6 +96,7 @@ import           Stack.Solver (solveExtraDeps)
 import           Stack.Types.Version
 import           Stack.Types.Config
 import           Stack.Types.Compiler
+import           Stack.Types.Resolver
 import           Stack.Types.StackT
 import           Stack.Upgrade
 import qualified Stack.Upload as Upload
@@ -624,7 +627,19 @@ uninstallCmd _ go = withConfigAndLock go $ do
 unpackCmd :: [String] -> GlobalOpts -> IO ()
 unpackCmd names go = withConfigAndLock go $ do
     menv <- getMinimalEnvOverride
-    Stack.Fetch.unpackPackages menv "." names
+    mMiniBuildPlan <-
+        case globalResolver go of
+            Nothing -> return Nothing
+            Just ar -> fmap Just $ do
+                r <- makeConcreteResolver ar
+                case r of
+                    ResolverSnapshot snapName -> do
+                        config <- view configL
+                        miniConfig <- loadMiniConfig config
+                        runInnerStackT miniConfig (loadMiniBuildPlan snapName)
+                    ResolverCompiler _ -> error "unpack does not work with compiler resolvers"
+                    ResolverCustom _ _ -> error "unpack does not work with custom resolvers"
+    Stack.Fetch.unpackPackages menv mMiniBuildPlan "." names
 
 -- | Update the package index
 updateCmd :: () -> GlobalOpts -> IO ()
