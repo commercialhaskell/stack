@@ -285,7 +285,7 @@ addDeps allowMissing compilerVersion toCalc = do
         if allowMissing
             then do
                 (missingNames, missingIdents, m) <-
-                    resolvePackagesAllowMissing Nothing shaMap Set.empty
+                    resolvePackagesAllowMissing menv Nothing shaMap Set.empty
                 assert (Set.null missingNames)
                     $ return (m, missingIdents)
             else do
