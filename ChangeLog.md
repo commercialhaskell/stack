@@ -37,6 +37,9 @@ Other enhancements:
 
 Bug fixes:
 
+* Bump to hpack 0.16.0 to avoid character encoding issues when reading and
+  writing on non-UTF8 systems.
+
 ## 1.3.2
 
 Bug fixes:
