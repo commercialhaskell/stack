@@ -323,8 +323,9 @@ withCabalFiles name pkgs f = do
                 $logWarn $ mconcat
                     [ "Did not find .cabal file for "
                     , T.pack $ packageIdentifierString ident
-                    , " with Git SHA of "
+                    , " with SHA of "
                     , decodeUtf8 sha
+                    , " in the Git repository"
                     ]
                 $logDebug (T.pack (show e))
                 goPkg h Nothing (ident, pc, Nothing, tf)
@@ -337,7 +338,7 @@ withCabalFiles name pkgs f = do
             Just (GitSHA1 sha) -> $logWarn $ mconcat
                 [ "Did not find .cabal file for "
                 , T.pack $ packageIdentifierString ident
-                , " with Git SHA of "
+                , " with SHA of "
                 , decodeUtf8 sha
                 , " in tarball-based cache"
                 ]

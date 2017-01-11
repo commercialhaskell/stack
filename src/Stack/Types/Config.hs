@@ -1175,7 +1175,9 @@ configPackageIndexRepo name = do
                     case indexLocation index of
                         ILGit x -> Just x
                         ILHttp _ -> Nothing
-                        ILGitHttp x _ -> Just x
+                        -- See logic in updateIndex, which prefers
+                        -- HTTP to Git in this case
+                        ILGitHttp _ _ -> Nothing
             case murl of
                 Nothing -> return Nothing
                 Just url -> do
