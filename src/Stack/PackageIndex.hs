@@ -222,11 +222,10 @@ updateIndex menv index =
   do let name = indexName index
          logUpdate mirror = $logSticky $ "Updating package index " <> indexNameText (indexName index) <> " (mirrored at " <> mirror  <> ") ..."
      git <- isGitInstalled menv
-     case (git, indexLocation index) of
-        (True, ILGit url) -> logUpdate url >> updateIndexGit menv name index url
-        (False, ILGit url) -> logUpdate url >> throwM (GitNotAvailable name)
-        (_, ILGitHttp _ url) -> logUpdate url >> updateIndexHTTP name index url
-        (_, ILHttp url) -> logUpdate url >> updateIndexHTTP name index url
+     case (git, simplifyIndexLocation $ indexLocation index) of
+        (True, SILGit url) -> logUpdate url >> updateIndexGit menv name index url
+        (False, SILGit url) -> logUpdate url >> throwM (GitNotAvailable name)
+        (_, SILHttp url) -> logUpdate url >> updateIndexHTTP name index url
 
 -- | Update the index Git repo and the index tarball
 updateIndexGit :: (StackMiniM env m, HasConfig env)

@@ -229,7 +229,7 @@ resolvePackagesAllowMissing
     -> m (Set PackageName, Set PackageIdentifier, Map PackageIdentifier ResolvedPackage)
 resolvePackagesAllowMissing menv mMiniBuildPlan idents0 names0 = do
     res@(_, _, resolved) <- inner
-    if Map.any rpMissingGitSHA resolved
+    if any rpMissingGitSHA $ Map.elems resolved
         then do
             $logInfo "Missing some cabal revision files, updating indices"
             updateAllIndices menv
@@ -281,11 +281,19 @@ resolvePackagesAllowMissing menv mMiniBuildPlan idents0 names0 = do
                                         , False -- not missing, we found the Git SHA
                                         )
                                 Nothing -> (index, cache, mgitsha,
-                                    case indexLocation index of
-                                        ILGit _ -> False -- look it up later
+                                    case simplifyIndexLocation (indexLocation index) of
+                                        -- No surprise that there's
+                                        -- nothing in the cache about
+                                        -- the SHA, since this package
+                                        -- comes from a Git
+                                        -- repo. We'll look it up
+                                        -- later when we've opened up
+                                        -- the Git repo itself for
+                                        -- reading.
+                                        SILGit _ -> False
+
                                         -- Index using HTTP, so we're missing the Git SHA
-                                        ILGitHttp _ _ -> True
-                                        ILHttp _ -> True)
+                                        SILHttp _ -> True)
                  in Right (ident, ResolvedPackage
                     { rpCache = cache'
                     , rpIndex = index'

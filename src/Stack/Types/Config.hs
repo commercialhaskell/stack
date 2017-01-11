@@ -1172,12 +1172,9 @@ configPackageIndexRepo name = do
     case filter (\p -> indexName p == name) indices of
         [index] -> do
             let murl =
-                    case indexLocation index of
-                        ILGit x -> Just x
-                        ILHttp _ -> Nothing
-                        -- See logic in updateIndex, which prefers
-                        -- HTTP to Git in this case
-                        ILGitHttp _ _ -> Nothing
+                    case simplifyIndexLocation $ indexLocation index of
+                        SILGit x -> Just x
+                        SILHttp _ -> Nothing
             case murl of
                 Nothing -> return Nothing
                 Just url -> do
