@@ -24,7 +24,7 @@ extra-deps:
 - text-metrics-0.1.0
 - pid1-0.1.0.0
 - aeson-1.0.2.1
-- hpack-0.15.0
+- hpack-0.16.0
 - persistent-2.6
 - persistent-template-2.5.1.6
 - persistent-sqlite-2.6

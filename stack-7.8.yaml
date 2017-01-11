@@ -35,7 +35,7 @@ extra-deps:
 - process-1.2.1.0
 - time-1.5.0.1
 - base-compat-0.9.1
-- hpack-0.15.0
+- hpack-0.16.0
 - microlens-0.4.1.0
 - microlens-mtl-0.1.10.0
 - open-browser-0.2.1.0
