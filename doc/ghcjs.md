@@ -39,38 +39,39 @@ setup-info:
 
 Or for the latest one based on `ghc-8.0.1` (with more features):
 ```yaml
-resolver: lts-7.14
-compiler: ghcjs-0.2.1.9007014_ghc-8.0.1
+resolver: lts-7.15
+compiler: ghcjs-0.2.1.9007015_ghc-8.0.1
 compiler-check: match-exact
 
 setup-info:
   ghcjs:
     source:
-      ghcjs-0.2.1.9007014_ghc-8.0.1:
-           url: http://ghcjs.tolysz.org/ghc-8.0-2016-12-25-lts-7.14-9007014.tar.gz
-           sha1: 0d2ebe0931b29adca7cb9d9b9f77d60095bfb864
+      ghcjs-0.2.1.9007015_ghc-8.0.1:
+           url: http://ghcjs.tolysz.org/ghc-8.0-2017-01-11-lts-7.15-9007015.tar.gz
+           sha1: 30d34e9d704bdb799066387dfa1ba98b8884d932
 ```
 The later can be generated via: https://github.com/tolysz/prepare-ghcjs
-the fromer is a bit more manual. Those bundles are only tested against the latest `node-7.2.1`.
+the fromer is a bit more manual. Those bundles are only tested against the latest `node-7.4.0`.
 
 In order to corrrectly boot and use ghcjs, one might need to install `alex` `happy` `hscolour` `hsc2hs` with the normal ghc.
 
 Older resolvers:
 
-|resolver|url|sha1|
-|---|---|---|
-| lts-7.13 | http://ghcjs.tolysz.org/ghc-8.0-2016-12-18-lts-7.13-9007013.tar.gz | 530c4ee5e19e2874e128431c7ad421e336df0303 |
-| lts-7.8 | http://ghcjs.tolysz.org/ghc-8.0-2016-11-07-lts-7.8-9007008.tar.gz | 190300a3725cde44b2a08be9ef829f2077bf8825 |
-| lts-7.7 | http://ghcjs.tolysz.org/ghc-8.0-2016-11-03-lts-7.7-9007007.tar.gz | ce169f85f1c49ad613ae77fc494d5565452ff59a |
-| lts-7.5 | http://ghcjs.tolysz.org/ghc-8.0-2016-10-24-lts-7.5-9007005.tar.gz | 450e81028d7f1eb82a16bc4b0809f30730c3e173 |
-| lts-7.4 | http://ghcjs.tolysz.org/ghc-8.0-2016-10-22-lts-7.4-9007004.tar.gz | ed77b3c15fedbadad5ab0e0afe1bd42c0a8695b4 |
-| lts-7.3 | http://ghcjs.tolysz.org/ghc-8.0-2016-10-11-lts-7.3-9007003.tar.gz | 3196fd5eaed670416083cf3678396d02c50096de |
-| lts-7.2 | http://ghcjs.tolysz.org/ghc-8.0-2016-10-01-lts-7.2-9007002.tar.gz | a41ae415328e2b257d40724d13d1386390c26322 | 
-| lts-7.1 | http://ghcjs.tolysz.org/ghc-8.0-2016-09-26-lts-7.1-9007001-mem.tar.gz | e640724883238593e2d2f7f03991cb413ec0347b |
-| lts-6.21 | http://ghcjs.tolysz.org/lts-6.21-9006021.tar.gz | 80b83f85dcec182093418e843979f4cee092fa85 |
-| lts-6.20 | http://ghcjs.tolysz.org/lts-6.20-9006020.tar.gz | a6cea90cd8121eee3afb201183c6e9bd6bacd94a |
-| lts-6.19 | http://ghcjs.tolysz.org/lts-6.19-9006019.tar.gz | ef4264d5a93b269ee4ec8f9d5139da030331d65a |
-| lts-6.18 | http://ghcjs.tolysz.org/lts-6.18-9006018.tar.gz | 3e9f345116c851349a5a551ffd94f7e0b74bfabb |
+|resolver|ghcjs|url|sha1|
+|---|---|---|---|
+| lts-7.14 |0.2.1| http://ghcjs.tolysz.org/ghc-8.0-2016-12-25-lts-7.14-9007014.tar.gz | 530c4ee5e19e2874e128431c7ad421e336df0303 |
+| lts-7.13 |0.2.1| http://ghcjs.tolysz.org/ghc-8.0-2016-12-18-lts-7.13-9007013.tar.gz | 0d2ebe0931b29adca7cb9d9b9f77d60095bfb864 |
+| lts-7.8 || http://ghcjs.tolysz.org/ghc-8.0-2016-11-07-lts-7.8-9007008.tar.gz | 190300a3725cde44b2a08be9ef829f2077bf8825 |
+| lts-7.7 || http://ghcjs.tolysz.org/ghc-8.0-2016-11-03-lts-7.7-9007007.tar.gz | ce169f85f1c49ad613ae77fc494d5565452ff59a |
+| lts-7.5 || http://ghcjs.tolysz.org/ghc-8.0-2016-10-24-lts-7.5-9007005.tar.gz | 450e81028d7f1eb82a16bc4b0809f30730c3e173 |
+| lts-7.4 || http://ghcjs.tolysz.org/ghc-8.0-2016-10-22-lts-7.4-9007004.tar.gz | ed77b3c15fedbadad5ab0e0afe1bd42c0a8695b4 |
+| lts-7.3 || http://ghcjs.tolysz.org/ghc-8.0-2016-10-11-lts-7.3-9007003.tar.gz | 3196fd5eaed670416083cf3678396d02c50096de |
+| lts-7.2 || http://ghcjs.tolysz.org/ghc-8.0-2016-10-01-lts-7.2-9007002.tar.gz | a41ae415328e2b257d40724d13d1386390c26322 | 
+| lts-7.1 || http://ghcjs.tolysz.org/ghc-8.0-2016-09-26-lts-7.1-9007001-mem.tar.gz | e640724883238593e2d2f7f03991cb413ec0347b |
+| lts-6.21 || http://ghcjs.tolysz.org/lts-6.21-9006021.tar.gz | 80b83f85dcec182093418e843979f4cee092fa85 |
+| lts-6.20 || http://ghcjs.tolysz.org/lts-6.20-9006020.tar.gz | a6cea90cd8121eee3afb201183c6e9bd6bacd94a |
+| lts-6.19 || http://ghcjs.tolysz.org/lts-6.19-9006019.tar.gz | ef4264d5a93b269ee4ec8f9d5139da030331d65a |
+| lts-6.18 || http://ghcjs.tolysz.org/lts-6.18-9006018.tar.gz | 3e9f345116c851349a5a551ffd94f7e0b74bfabb |
 
 If you do not use the same resolver, say, an older LTS snapshot, you will get
 some warnings like this:
