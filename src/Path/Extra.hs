@@ -7,6 +7,7 @@ module Path.Extra
   ,dropRoot
   ,parseCollapsedAbsDir
   ,parseCollapsedAbsFile
+  ,concatAndColapseAbsDir
   ,rejectMissingFile
   ,rejectMissingDir
   ,pathToByteString
@@ -42,6 +43,12 @@ parseCollapsedAbsDir = parseAbsDir . collapseFilePath
 -- (probably should be moved to the Path module)
 parseCollapsedAbsFile :: MonadThrow m => FilePath -> m (Path Abs File)
 parseCollapsedAbsFile = parseAbsFile . collapseFilePath
+
+-- | Combine a 'Path Abs Dir' and a relative 'FilePath' into a 'Path Abs Dir'
+-- We can't parse the FilePath first because we need to account for ".."
+-- in the FilePath (#2895)
+concatAndColapseAbsDir :: MonadThrow m => Path Abs Dir -> FilePath -> m (Path Abs Dir)
+concatAndColapseAbsDir base rel = parseCollapsedAbsDir (toFilePath base FP.</> rel)
 
 -- | Collapse intermediate "." and ".." directories from a path.
 --

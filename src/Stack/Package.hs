@@ -420,7 +420,7 @@ generateBuildInfoOpts BioInput {..} =
              | Just makeGenDir <- [fileGenDirFromComponentName biComponentName]]) ++
         ["-stubdir=" ++ toFilePathNoTrailingSep (buildDir biDistDir)]
     toIncludeDir "." = Just biCabalDir
-    toIncludeDir x = fmap (biCabalDir </>) (parseRelDir x)
+    toIncludeDir relDir = concatAndColapseAbsDir biCabalDir relDir
     includeOpts =
         map ("-I" <>) (configExtraIncludeDirs <> pkgIncludeOpts)
     configExtraIncludeDirs =
