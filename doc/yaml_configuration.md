@@ -615,7 +615,10 @@ build:
   # NOTE: global usage of haddock can cause build failures when documentation is
   # incorrectly formatted.  This could also affect scripts which use stack.
   haddock: false
-  haddock-arguments: ""
+  haddock-arguments:
+    haddock-args: []      # Additional arguments passed to haddock
+    # haddock-args:
+    # - "--css=/home/user/my-css"
   open-haddocks: false    # --open
   haddock-deps: false     # if unspecified, defaults to true if haddock is set
   haddock-internal: false
@@ -623,11 +626,22 @@ build:
   # These are inadvisable to use in your global configuration, as they make the
   # stack build CLI behave quite differently.
   test: false
-  test-arguments: ""
+  test-arguments:
+    rerun-tests: true   # Rerun successful tests
+    additional-args: [] # --test-arguments
+    # additional-args:
+    # - "--fail-fast"
+    coverage: false
+    no-run-tests: false
   bench: false
-  benchmark-opts: ""
+  benchmark-opts:
+    benchmark-arguments: ""
+    # benchmark-arguments: "--csv bench.csv"
+    no-run-benchmarks: false
   force-dirty: false
   reconfigure: false
+  cabal-verbose: false
+  split-objs: false
 ```
 
 The meanings of these settings correspond directly with the CLI flags of the
