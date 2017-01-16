@@ -44,7 +44,7 @@ parseCollapsedAbsDir = parseAbsDir . collapseFilePath
 parseCollapsedAbsFile :: MonadThrow m => FilePath -> m (Path Abs File)
 parseCollapsedAbsFile = parseAbsFile . collapseFilePath
 
--- | Combine a 'Path Abs Dir' and a relative 'FilePath' into a 'Path Abs Dir'
+-- | Add a relative FilePath to the end of a Path
 -- We can't parse the FilePath first because we need to account for ".."
 -- in the FilePath (#2895)
 concatAndColapseAbsDir :: MonadThrow m => Path Abs Dir -> FilePath -> m (Path Abs Dir)
