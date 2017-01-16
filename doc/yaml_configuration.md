@@ -616,7 +616,7 @@ build:
   # incorrectly formatted.  This could also affect scripts which use stack.
   haddock: false
   haddock-arguments:
-    haddock-args: []      # Additional arguments passed to haddock
+    haddock-args: []      # Additional arguments passed to haddock, --haddock-arguments
     # haddock-args:
     # - "--css=/home/user/my-css"
   open-haddocks: false    # --open
