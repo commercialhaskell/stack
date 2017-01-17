@@ -29,6 +29,11 @@ extra-source-files:  CONTRIBUTING.md
 
                      stack.yaml
 
+custom-setup
+  setup-depends: base
+               , Cabal
+               , filepath
+
 flag integration-tests
   manual: True
   default: False
