@@ -16,6 +16,8 @@ module Stack.Types.PackageIndex
     , IndexName(..)
     , indexNameText
     , IndexLocation(..)
+    , SimplifiedIndexLocation (..)
+    , simplifyIndexLocation
     ) where
 
 import           Control.DeepSeq (NFData)
@@ -108,6 +110,15 @@ instance FromJSON IndexName where
 data IndexLocation = ILGit !Text | ILHttp !Text | ILGitHttp !Text !Text
     deriving (Show, Eq, Ord)
 
+-- | Simplified 'IndexLocation', which will either be a Git repo or HTTP URL.
+data SimplifiedIndexLocation = SILGit !Text | SILHttp !Text
+    deriving (Show, Eq, Ord)
+
+simplifyIndexLocation :: IndexLocation -> SimplifiedIndexLocation
+simplifyIndexLocation (ILGit t) = SILGit t
+simplifyIndexLocation (ILHttp t) = SILHttp t
+-- Prefer HTTP over Git
+simplifyIndexLocation (ILGitHttp _ t) = SILHttp t
 
 -- | Information on a single package index
 data PackageIndex = PackageIndex

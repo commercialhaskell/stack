@@ -98,8 +98,21 @@ hoogleCmd (args,setup,rebuild) go = withBuildConfig go pathToHaddocks
             hoogleMinIdent =
                 PackageIdentifier hooglePackageName hoogleMinVersion
         hooglePackageIdentifier <-
-            do (_,_,resolved) <-
+            do menv <- getMinimalEnvOverride
+               (_,_,resolved) <-
                    resolvePackagesAllowMissing
+                       menv
+
+                       -- FIXME this Nothing means "do not follow any
+                       -- specific snapshot", which matches old
+                       -- behavior. However, since introducing the
+                       -- logic to pin a name to a package in a
+                       -- snapshot, we may arguably want to ensure
+                       -- that we're grabbing the version of Hoogle
+                       -- present in the snapshot currently being
+                       -- used.
+                       Nothing
+
                        mempty
                        (Set.fromList [hooglePackageName])
                return

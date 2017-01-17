@@ -641,7 +641,7 @@ upgradeCabal :: (StackM env m, HasConfig env, HasGHCVariant env)
              -> m ()
 upgradeCabal menv wc = do
     let name = $(mkPackageName "Cabal")
-    rmap <- resolvePackages menv Map.empty (Set.singleton name)
+    rmap <- resolvePackages menv Nothing Map.empty (Set.singleton name)
     newest <-
         case Map.keys rmap of
             [] -> error "No Cabal library found in index, cannot upgrade"
