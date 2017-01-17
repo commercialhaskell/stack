@@ -41,8 +41,8 @@ import           Data.Aeson.Extended
 import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Char8 as S8
 import qualified Data.ByteString.Lazy as L
-import           Data.Conduit (($$), (=$))
-import           Data.Conduit.Binary (sinkHandle, sourceHandle)
+import           Data.Conduit (($$), (=$), (.|), runConduitRes)
+import           Data.Conduit.Binary (sinkHandle, sourceHandle, sourceFile, sinkFile)
 import           Data.Conduit.Zlib (ungzip)
 import           Data.Foldable (forM_)
 import           Data.IORef
@@ -226,6 +226,11 @@ updateIndex menv index =
         (True, SILGit url) -> logUpdate url >> updateIndexGit menv name index url
         (False, SILGit url) -> logUpdate url >> throwM (GitNotAvailable name)
         (_, SILHttp url) -> logUpdate url >> updateIndexHTTP name index url
+
+     -- Copy to the 00-index.tar filename for backwards compatibility
+     tarFile <- configPackageIndex name
+     oldTarFile <- configPackageIndexOld name
+     runConduitRes $ sourceFile (toFilePath tarFile) .| sinkFile (toFilePath oldTarFile)
 
 -- | Update the index Git repo and the index tarball
 updateIndexGit :: (StackMiniM env m, HasConfig env)

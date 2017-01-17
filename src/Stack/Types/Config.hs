@@ -91,6 +91,7 @@ module Stack.Types.Config
   ,IndexLocation(..)
   -- Config fields
   ,configPackageIndex
+  ,configPackageIndexOld
   ,configPackageIndexCache
   ,configPackageIndexGz
   ,configPackageIndexRoot
@@ -1193,6 +1194,12 @@ configPackageIndexCache = liftM (</> $(mkRelFile "01-index.cache")) . configPack
 -- | Location of the 01-index.tar file
 configPackageIndex :: (MonadReader env m, HasConfig env, MonadThrow m) => IndexName -> m (Path Abs File)
 configPackageIndex = liftM (</> $(mkRelFile "01-index.tar")) . configPackageIndexRoot
+
+-- | Location of the 00-index.tar file. This file is just a copy of
+-- the 01-index.tar file, provided for tools which still look for the
+-- 00-index.tar file.
+configPackageIndexOld :: (MonadReader env m, HasConfig env, MonadThrow m) => IndexName -> m (Path Abs File)
+configPackageIndexOld = liftM (</> $(mkRelFile "00-index.tar")) . configPackageIndexRoot
 
 -- | Location of the 01-index.tar.gz file
 configPackageIndexGz :: (MonadReader env m, HasConfig env, MonadThrow m) => IndexName -> m (Path Abs File)
