@@ -235,7 +235,20 @@ resolvePackagesAllowMissing menv mMiniBuildPlan idents0 names0 = do
         then do
             $logInfo "Missing some cabal revision files, updating indices"
             updateAllIndices menv
-            inner
+            res'@(_, _, resolved') <- inner
+
+            -- Print an error message if any SHAs are still missing.
+            F.forM_ (filter rpMissingGitSHA resolved')
+                $ \rp -> F.forM_ (rpGitSHA1 rp) $ \(GitSHA1 sha) ->
+                $logWarn $ mconcat
+                    [ "Did not find .cabal file for "
+                    , T.pack $ packageIdentifierString $ rpIdent rp
+                    , " with SHA of "
+                    , decodeUtf8 sha
+                    , " in tarball-based cache"
+                    ]
+
+            return res'
         else return res
   where
     inner = do
@@ -358,19 +371,8 @@ withCabalFiles name pkgs f = do
                     ]
                 $logDebug (T.pack (show e))
                 goPkg h Nothing (rp { rpGitSHA1 = Nothing }, tf)
-    goPkg h _mgit (ResolvedPackage ident pc _index mgitsha _missing, tf) = do
-        -- We have a Just as the git SHA, so looking up previously
-        -- failed, and we're not in a Git repo. So warn the user and
-        -- move on.
-        case mgitsha of
-            Nothing -> return ()
-            Just (GitSHA1 sha) -> $logWarn $ mconcat
-                [ "Did not find .cabal file for "
-                , T.pack $ packageIdentifierString ident
-                , " with SHA of "
-                , decodeUtf8 sha
-                , " in tarball-based cache"
-                ]
+    goPkg h _mgit (ResolvedPackage ident pc _index _mgitsha _missing, tf) = do
+        -- Did not find warning for tarballs is handled above
         let OffsetSize offset size = pcOffsetSize pc
         liftIO $ do
             hSeek h AbsoluteSeek $ fromIntegral offset
