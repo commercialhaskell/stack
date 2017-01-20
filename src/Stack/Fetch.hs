@@ -193,11 +193,13 @@ unpackPackageIdents menv unpackDir mdistDir idents = do
     return $ alreadyUnpacked <> nowUnpacked
 
 data ResolvedPackage = ResolvedPackage
-    { rpCache :: !PackageCache
+    { rpIdent :: !PackageIdentifier
+    , rpCache :: !PackageCache
     , rpIndex :: !PackageIndex
     , rpGitSHA1 :: !(Maybe GitSHA1)
     , rpMissingGitSHA :: !Bool
     }
+    deriving Show
 
 -- | Resolve a set of package names and identifiers into @FetchPackage@ values.
 resolvePackages :: (StackMiniM env m, HasConfig env)
@@ -205,7 +207,7 @@ resolvePackages :: (StackMiniM env m, HasConfig env)
                 -> Maybe MiniBuildPlan -- ^ when looking up by name, take from this build plan
                 -> Map PackageIdentifier (Maybe GitSHA1)
                 -> Set PackageName
-                -> m (Map PackageIdentifier ResolvedPackage)
+                -> m [ResolvedPackage]
 resolvePackages menv mMiniBuildPlan idents0 names0 = do
     eres <- go
     case eres of
@@ -226,10 +228,10 @@ resolvePackagesAllowMissing
     -> Maybe MiniBuildPlan -- ^ when looking up by name, take from this build plan
     -> Map PackageIdentifier (Maybe GitSHA1)
     -> Set PackageName
-    -> m (Set PackageName, Set PackageIdentifier, Map PackageIdentifier ResolvedPackage)
+    -> m (Set PackageName, Set PackageIdentifier, [ResolvedPackage])
 resolvePackagesAllowMissing menv mMiniBuildPlan idents0 names0 = do
     res@(_, _, resolved) <- inner
-    if any rpMissingGitSHA $ Map.elems resolved
+    if any rpMissingGitSHA resolved
         then do
             $logInfo "Missing some cabal revision files, updating indices"
             updateAllIndices menv
@@ -260,7 +262,7 @@ resolvePackagesAllowMissing menv mMiniBuildPlan idents0 names0 = do
         let (missingIdents, resolved) = partitionEithers $ map (goIdent caches shaCaches)
                                     $ Map.toList
                                     $ idents0 <> Map.fromList idents1
-        return (Set.fromList missingNames, Set.fromList missingIdents, Map.fromList resolved)
+        return (Set.fromList missingNames, Set.fromList missingIdents, resolved)
 
     goIdent caches shaCaches (ident, mgitsha) =
         case Map.lookup ident caches of
@@ -294,12 +296,13 @@ resolvePackagesAllowMissing menv mMiniBuildPlan idents0 names0 = do
 
                                         -- Index using HTTP, so we're missing the Git SHA
                                         SILHttp _ -> True)
-                 in Right (ident, ResolvedPackage
-                    { rpCache = cache'
+                 in Right ResolvedPackage
+                    { rpIdent = ident
+                    , rpCache = cache'
                     , rpIndex = index'
                     , rpGitSHA1 = mgitsha'
                     , rpMissingGitSHA = missingGitSHA
-                    })
+                    }
 
 data ToFetch = ToFetch
     { tfTarball :: !(Path Abs File)
@@ -320,7 +323,7 @@ data ToFetchResult = ToFetchResult
 withCabalFiles
     :: (StackMiniM env m, HasConfig env)
     => IndexName
-    -> [(PackageIdentifier, PackageCache, Maybe GitSHA1, a)]
+    -> [(ResolvedPackage, a)]
     -> (PackageIdentifier -> a -> ByteString -> IO b)
     -> m [b]
 withCabalFiles name pkgs f = do
@@ -339,7 +342,7 @@ withCabalFiles name pkgs f = do
                         (liftIO . Git.closeRepo)
                         (inner . Just)
   where
-    goPkg h (Just git) (ident, pc, Just (GitSHA1 sha), tf) = do
+    goPkg h (Just git) (rp@(ResolvedPackage ident _pc _index (Just (GitSHA1 sha)) _missing), tf) = do
         let ref = Git.fromHex sha
         mobj <- liftIO $ tryIO $ Git.getObject git ref True
         case mobj of
@@ -354,8 +357,8 @@ withCabalFiles name pkgs f = do
                     , " in the Git repository"
                     ]
                 $logDebug (T.pack (show e))
-                goPkg h Nothing (ident, pc, Nothing, tf)
-    goPkg h _mgit (ident, pc, mgitsha, tf) = do
+                goPkg h Nothing (rp { rpGitSHA1 = Nothing }, tf)
+    goPkg h _mgit (ResolvedPackage ident pc _index mgitsha _missing, tf) = do
         -- We have a Just as the git SHA, so looking up previously
         -- failed, and we're not in a Git repo. So warn the user and
         -- move on.
@@ -444,7 +447,14 @@ lookupPackageIdentifierExact ident env caches =
         Nothing -> return Nothing
         Just (index, cache) -> do
             [bs] <- flip runReaderT env
-                  $ withCabalFiles (indexName index) [(ident, cache, Nothing, ())]
+                  $ withCabalFiles (indexName index)
+                        [(ResolvedPackage
+                            { rpIdent = ident
+                            , rpCache = cache
+                            , rpIndex = index
+                            , rpGitSHA1 = Nothing
+                            , rpMissingGitSHA = False
+                            }, ())]
                   $ \_ _ bs -> return bs
             return $ Just bs
 
@@ -481,17 +491,18 @@ typoCorrectionCandidates ident =
 -- | Figure out where to fetch from.
 getToFetch :: (StackMiniM env m, HasConfig env)
            => Maybe (Path Abs Dir) -- ^ directory to unpack into, @Nothing@ means no unpack
-           -> Map PackageIdentifier ResolvedPackage
+           -> [ResolvedPackage]
            -> m ToFetchResult
 getToFetch mdest resolvedAll = do
-    (toFetch0, unpacked) <- liftM partitionEithers $ mapM checkUnpacked $ Map.toList resolvedAll
+    (toFetch0, unpacked) <- liftM partitionEithers $ mapM checkUnpacked resolvedAll
     toFetch1 <- mapM goIndex $ Map.toList $ Map.fromListWith (++) toFetch0
     return ToFetchResult
         { tfrToFetch = Map.unions toFetch1
         , tfrAlreadyUnpacked = Map.fromList unpacked
         }
   where
-    checkUnpacked (ident, resolved) = do
+    checkUnpacked resolved = do
+        let ident = rpIdent resolved
         dirRel <- parseRelDir $ packageIdentifierString ident
         let mdestDir = (</> dirRel) <$> mdest
         mexists <-
@@ -507,7 +518,7 @@ getToFetch mdest resolvedAll = do
                     d = pcDownload $ rpCache resolved
                     targz = T.pack $ packageIdentifierString ident ++ ".tar.gz"
                 tarball <- configPackageTarball (indexName index) ident
-                return $ Left (indexName index, [(ident, rpCache resolved, rpGitSHA1 resolved, ToFetch
+                return $ Left (indexName index, [(resolved, ToFetch
                     { tfTarball = tarball
                     , tfDestDir = mdestDir
                     , tfUrl = case d of

@@ -12,7 +12,6 @@ import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import qualified Data.ByteString.Char8 as S8
 import           Data.List (find)
-import qualified Data.Map.Strict as Map
 import           Data.Monoid
 import qualified Data.Set as Set
 import           Lens.Micro
@@ -118,7 +117,7 @@ hoogleCmd (args,setup,rebuild) go = withBuildConfig go pathToHaddocks
                return
                    (case find
                              ((== hooglePackageName) . packageIdentifierName)
-                             (Map.keys resolved) of
+                             (map rpIdent resolved) of
                         Just ident@(PackageIdentifier _ ver)
                           | ver >= hoogleMinVersion -> Right ident
                         _ -> Left hoogleMinIdent)

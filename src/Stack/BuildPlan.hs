@@ -291,18 +291,13 @@ addDeps allowMissing compilerVersion toCalc = do
             else do
                 m <- resolvePackages menv Nothing shaMap Set.empty
                 return (m, Set.empty)
-    let byIndex = Map.fromListWith (++) $ flip map (Map.toList resolvedMap)
-            $ \(ident, rp) ->
+    let byIndex = Map.fromListWith (++) $ flip map resolvedMap
+            $ \rp ->
                 let (cache, ghcOptions, sha) =
-                        case Map.lookup (packageIdentifierName ident) toCalc of
+                        case Map.lookup (packageIdentifierName (rpIdent rp)) toCalc of
                             Nothing -> (Map.empty, [], Nothing)
                             Just (_, x, y, z) -> (x, y, z)
-                 in (indexName $ rpIndex rp,
-                    [( ident
-                    , rpCache rp
-                    , sha
-                    , (cache, ghcOptions, sha)
-                    )])
+                 in (indexName $ rpIndex rp, [(rp, (cache, ghcOptions, sha))])
     res <- forM (Map.toList byIndex) $ \(indexName', pkgs) -> withCabalFiles indexName' pkgs
         $ \ident (flags, ghcOptions, mgitSha) cabalBS -> do
             (_warnings,gpd) <- readPackageUnresolvedBS Nothing cabalBS

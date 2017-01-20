@@ -643,7 +643,7 @@ upgradeCabal menv wc = do
     let name = $(mkPackageName "Cabal")
     rmap <- resolvePackages menv Nothing Map.empty (Set.singleton name)
     newest <-
-        case Map.keys rmap of
+        case map rpIdent rmap of
             [] -> error "No Cabal library found in index, cannot upgrade"
             [PackageIdentifier name' version]
                 | name == name' -> return version
