@@ -321,6 +321,11 @@ package-indices:
   # optional fields, both default to false
   gpg-verify: false
   require-hashes: false
+
+  # Starting with stack 1.4, we default to using Hackage Security
+  hackage-security:
+    keyids: ["deadbeef", "12345"] # list of all approved keys
+    key-threshold: 3 # number of keys required
 ```
 
 One thing you should be aware of: if you change the contents of package-version

@@ -1175,7 +1175,7 @@ configPackageIndexRepo name = do
             let murl =
                     case simplifyIndexLocation $ indexLocation index of
                         SILGit x -> Just x
-                        SILHttp _ -> Nothing
+                        SILHttp _ _ -> Nothing
             case murl of
                 Nothing -> return Nothing
                 Just url -> do

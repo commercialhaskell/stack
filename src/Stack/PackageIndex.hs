@@ -60,9 +60,18 @@ import           Data.Streaming.Process (ProcessExitedUnsuccessfully(..))
 import           Data.Text (Text)
 import qualified Data.Text as T
 import           Data.Text.Unsafe (unsafeTail)
+import           Data.Time (getCurrentTime)
 import           Data.Traversable (forM)
 import           Data.Typeable (Typeable)
+import qualified Hackage.Security.Client as HS
+import qualified Hackage.Security.Client.Repository.Cache as HS
+import qualified Hackage.Security.Client.Repository.Remote as HS
+import qualified Hackage.Security.Client.Repository.HttpLib.HttpClient as HS
+import qualified Hackage.Security.Util.Path as HS
+import qualified Hackage.Security.Util.Pretty as HS
+import           Network.HTTP.Client.TLS (getGlobalManager)
 import           Network.HTTP.Download
+import           Network.URI (parseURI)
 import           Path (mkRelDir, mkRelFile, parent, parseRelDir, toFilePath, parseAbsFile, (</>))
 import           Path.IO
 import           Prelude -- Fix AMP warning
@@ -73,6 +82,7 @@ import           Stack.Types.PackageIndex
 import           Stack.Types.PackageName
 import           Stack.Types.StackT
 import           Stack.Types.Version
+import qualified System.Directory as D
 import           System.FilePath (takeBaseName, (<.>))
 import           System.IO (IOMode (ReadMode, WriteMode), withBinaryFile)
 import           System.Process.Read (EnvOverride, ReadProcessException(..), doesExecutableExist, readProcessNull, tryProcessStdout)
@@ -220,12 +230,20 @@ updateIndex :: (StackMiniM env m, HasConfig env)
             => EnvOverride -> PackageIndex -> m ()
 updateIndex menv index =
   do let name = indexName index
-         logUpdate mirror = $logSticky $ "Updating package index " <> indexNameText (indexName index) <> " (mirrored at " <> mirror  <> ") ..."
+         sloc = simplifyIndexLocation $ indexLocation index
+     $logSticky $ "Updating package index "
+               <> indexNameText (indexName index)
+               <> " (mirrored at "
+               <> (case sloc of
+                     SILGit url -> url
+                     SILHttp url _ -> url)
+               <> ") ..."
      git <- isGitInstalled menv
-     case (git, simplifyIndexLocation $ indexLocation index) of
-        (True, SILGit url) -> logUpdate url >> updateIndexGit menv name index url
-        (False, SILGit url) -> logUpdate url >> throwM (GitNotAvailable name)
-        (_, SILHttp url) -> logUpdate url >> updateIndexHTTP name index url
+     case (git, sloc) of
+        (True, SILGit url) -> updateIndexGit menv name index url
+        (False, SILGit _) -> throwM (GitNotAvailable name)
+        (_, SILHttp url HTVanilla) -> updateIndexHTTP name index url
+        (_, SILHttp url (HTHackageSecurity hs)) -> updateIndexHackageSecurity name index url hs
 
      -- Copy to the 00-index.tar filename for backwards compatibility
      tarFile <- configPackageIndex name
@@ -357,6 +375,64 @@ updateIndexHTTP indexName' index url = do
                     $$ ungzip
                     =$ sinkHandle output
             renameFile tmpPath tar
+
+    when (indexGpgVerify index)
+        $ $logWarn
+        $ "You have enabled GPG verification of the package index, " <>
+          "but GPG verification only works with Git downloading"
+
+-- | Update the index tarball via Hackage Security
+updateIndexHackageSecurity
+    :: (StackMiniM env m, HasConfig env)
+    => IndexName
+    -> PackageIndex
+    -> Text -- ^ base URL
+    -> HackageSecurity
+    -> m ()
+updateIndexHackageSecurity indexName' index url (HackageSecurity keyIds threshold) = do
+    baseURI <-
+        case parseURI $ T.unpack url of
+            Nothing -> error $ "Invalid Hackage Security base URL: " ++ T.unpack url
+            Just x -> return x
+    manager <- liftIO getGlobalManager
+    root <- configPackageIndexRoot indexName'
+    logTUF <- embed_ ($logInfo . T.pack . HS.pretty)
+    let withRepo = HS.withRepository
+            (HS.makeHttpLib manager)
+            [baseURI]
+            HS.defaultRepoOpts
+            HS.Cache
+                { HS.cacheRoot = HS.fromAbsoluteFilePath $ toFilePath root
+                , HS.cacheLayout = HS.cabalCacheLayout
+                    -- Have Hackage Security write to a temporary file
+                    -- to avoid invalidating the cache... continued
+                    -- below at case didUpdate
+                    { HS.cacheLayoutIndexTar = HS.rootPath $ HS.fragment "01-index.tar-tmp"
+                    }
+                }
+            HS.hackageRepoLayout
+            HS.hackageIndexLayout
+            logTUF
+    didUpdate <- liftIO $ withRepo $ \repo -> HS.uncheckClientErrors $ do
+        needBootstrap <- HS.requiresBootstrap repo
+        when needBootstrap $ do
+            HS.bootstrap
+                repo
+                (map (HS.KeyId . T.unpack) keyIds)
+                (HS.KeyThreshold (fromIntegral threshold))
+        now <- getCurrentTime
+        HS.checkForUpdates repo (Just now)
+
+    case didUpdate of
+        HS.HasUpdates -> do
+            -- The index actually updated. Delete the old cache, and
+            -- then move the temporary unpacked file to its real
+            -- location
+            tar <- configPackageIndex indexName'
+            deleteCache indexName'
+            liftIO $ D.renameFile (toFilePath tar ++ "-tmp") (toFilePath tar)
+            $logInfo "Updated package list downloaded"
+        HS.NoUpdates -> $logInfo "No updates to your package list were found"
 
     when (indexGpgVerify index)
         $ $logWarn

@@ -18,6 +18,8 @@ module Stack.Types.PackageIndex
     , IndexLocation(..)
     , SimplifiedIndexLocation (..)
     , simplifyIndexLocation
+    , HttpType (..)
+    , HackageSecurity (..)
     ) where
 
 import           Control.DeepSeq (NFData)
@@ -105,20 +107,36 @@ instance FromJSON IndexName where
             Left e -> fail $ "Invalid index name: " ++ show e
             Right _ -> return $ IndexName $ encodeUtf8 t
 
+data HttpType = HTHackageSecurity !HackageSecurity | HTVanilla
+    deriving (Show, Eq, Ord)
+
+data HackageSecurity = HackageSecurity
+    { hsKeyIds :: ![Text]
+    , hsKeyThreshold :: !Int
+    }
+    deriving (Show, Eq, Ord)
+instance FromJSON HackageSecurity where
+    parseJSON = withObject "HackageSecurity" $ \o -> HackageSecurity
+        <$> o .: "keyids"
+        <*> o .: "key-threshold"
+
 -- | Location of the package index. This ensures that at least one of Git or
 -- HTTP is available.
-data IndexLocation = ILGit !Text | ILHttp !Text | ILGitHttp !Text !Text
+data IndexLocation
+    = ILGit !Text
+    | ILHttp !Text !HttpType
+    | ILGitHttp !Text !Text !HttpType
     deriving (Show, Eq, Ord)
 
 -- | Simplified 'IndexLocation', which will either be a Git repo or HTTP URL.
-data SimplifiedIndexLocation = SILGit !Text | SILHttp !Text
+data SimplifiedIndexLocation = SILGit !Text | SILHttp !Text !HttpType
     deriving (Show, Eq, Ord)
 
 simplifyIndexLocation :: IndexLocation -> SimplifiedIndexLocation
 simplifyIndexLocation (ILGit t) = SILGit t
-simplifyIndexLocation (ILHttp t) = SILHttp t
+simplifyIndexLocation (ILHttp t ht) = SILHttp t ht
 -- Prefer HTTP over Git
-simplifyIndexLocation (ILGitHttp _ t) = SILHttp t
+simplifyIndexLocation (ILGitHttp _ t ht) = SILHttp t ht
 
 -- | Information on a single package index
 data PackageIndex = PackageIndex
@@ -139,14 +157,16 @@ instance FromJSON (WithJSONWarnings PackageIndex) where
         prefix <- o ..: "download-prefix"
         mgit <- o ..:? "git"
         mhttp <- o ..:? "http"
+        mhackageSecurity <- o ..:? "hackage-security"
+        let httpType = maybe HTVanilla HTHackageSecurity mhackageSecurity
         loc <-
             case (mgit, mhttp) of
                 (Nothing, Nothing) -> fail $
                     "Must provide either Git or HTTP URL for " ++
                     T.unpack (indexNameText name)
                 (Just git, Nothing) -> return $ ILGit git
-                (Nothing, Just http) -> return $ ILHttp http
-                (Just git, Just http) -> return $ ILGitHttp git http
+                (Nothing, Just http) -> return $ ILHttp http httpType
+                (Just git, Just http) -> return $ ILGitHttp git http httpType
         gpgVerify <- o ..:? "gpg-verify" ..!= False
         reqHashes <- o ..:? "require-hashes" ..!= False
         return PackageIndex

@@ -308,7 +308,7 @@ resolvePackagesAllowMissing menv mMiniBuildPlan idents0 names0 = do
                                         SILGit _ -> False
 
                                         -- Index using HTTP, so we're missing the Git SHA
-                                        SILHttp _ -> True)
+                                        SILHttp _ _ -> True)
                  in Right ResolvedPackage
                     { rpIdent = ident
                     , rpCache = cache'
