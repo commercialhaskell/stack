@@ -186,7 +186,7 @@ library
                    , ansi-terminal >= 0.6.2.3
                    , async >= 2.0.2 && < 2.2
                    , attoparsec >= 0.12.1.5 && < 0.14
-                   , base >= 4.7 && <5
+                   , base >= 4.8 && <5
                    , base-compat >=0.6 && <0.10
                    , base16-bytestring
                    , base64-bytestring
