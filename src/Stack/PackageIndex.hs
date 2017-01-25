@@ -34,7 +34,7 @@ import           Control.Monad (unless, when, liftM, void, guard)
 import           Control.Monad.Catch (throwM)
 import qualified Control.Monad.Catch as C
 import           Control.Monad.IO.Class (MonadIO, liftIO)
-import           Control.Monad.Logger (logDebug, logInfo, logWarn, logError)
+import           Control.Monad.Logger (logDebug, logInfo, logWarn)
 import           Control.Monad.Trans.Control
 import           Crypto.Hash as Hash (hashlazy, Digest, SHA1)
 import           Data.Aeson.Extended
@@ -56,7 +56,6 @@ import           Data.Set (Set)
 import qualified Data.Set as Set
 import           Data.Store.Version
 import           Data.Store.VersionTagged
-import           Data.Streaming.Process (ProcessExitedUnsuccessfully(..))
 import           Data.Text (Text)
 import qualified Data.Text as T
 import           Data.Text.Unsafe (unsafeTail)
@@ -72,7 +71,7 @@ import qualified Hackage.Security.Util.Pretty as HS
 import           Network.HTTP.Client.TLS (getGlobalManager)
 import           Network.HTTP.Download
 import           Network.URI (parseURI)
-import           Path (mkRelDir, mkRelFile, parent, parseRelDir, toFilePath, parseAbsFile, (</>))
+import           Path (toFilePath, parseAbsFile)
 import           Path.IO
 import           Prelude -- Fix AMP warning
 import           Stack.Types.BuildPlan (GitSHA1 (..))
@@ -83,20 +82,16 @@ import           Stack.Types.PackageName
 import           Stack.Types.StackT
 import           Stack.Types.Version
 import qualified System.Directory as D
-import           System.FilePath (takeBaseName, (<.>))
+import           System.FilePath ((<.>))
 import           System.IO (IOMode (ReadMode, WriteMode), withBinaryFile)
-import           System.Process.Read (EnvOverride, ReadProcessException(..), doesExecutableExist, readProcessNull, tryProcessStdout)
-import           System.Process.Run (Cmd(..), callProcessInheritStderrStdout)
-import           System.Exit (exitFailure)
 
 -- | Populate the package index caches and return them.
 populateCache
     :: (StackMiniM env m, HasConfig env)
-    => EnvOverride
-    -> PackageIndex
+    => PackageIndex
     -> m PackageCacheMap
-populateCache menv index = do
-    requireIndex menv index
+populateCache index = do
+    requireIndex index
     -- This uses full on lazy I/O instead of ResourceT to provide some
     -- protections. Caveat emptor
     path <- configPackageIndex (indexName index)
@@ -108,7 +103,7 @@ populateCache menv index = do
         $logWarn $ "Exception encountered when parsing index tarball: "
                 <> T.pack (show (e :: Tar.FormatError))
         $logWarn "Automatically updating index and trying again"
-        updateIndex menv index
+        updateIndex index
         loadPIS
 
     when (indexRequireHashes index) $ forM_ (Map.toList pis) $ \(ident, pc) ->
@@ -231,39 +226,31 @@ instance Show PackageIndexException where
         ]
 
 -- | Require that an index be present, updating if it isn't.
-requireIndex :: (StackMiniM env m, HasConfig env)
-             => EnvOverride -> PackageIndex -> m ()
-requireIndex menv index = do
+requireIndex :: (StackMiniM env m, HasConfig env) => PackageIndex -> m ()
+requireIndex index = do
     tarFile <- configPackageIndex $ indexName index
     exists <- doesFileExist tarFile
-    unless exists $ updateIndex menv index
+    unless exists $ updateIndex index
 
 -- | Update all of the package indices
-updateAllIndices :: (StackMiniM env m, HasConfig env)
-                 => EnvOverride -> m ()
-updateAllIndices menv = do
+updateAllIndices :: (StackMiniM env m, HasConfig env) => m ()
+updateAllIndices = do
     clearPackageCaches
-    view packageIndicesL >>= mapM_ (updateIndex menv)
+    view packageIndicesL >>= mapM_ updateIndex
 
 -- | Update the index tarball
-updateIndex :: (StackMiniM env m, HasConfig env)
-            => EnvOverride -> PackageIndex -> m ()
-updateIndex menv index =
+updateIndex :: (StackMiniM env m, HasConfig env) => PackageIndex -> m ()
+updateIndex index =
   do let name = indexName index
-         sloc = simplifyIndexLocation $ indexLocation index
+         url = indexLocation index
      $logSticky $ "Updating package index "
                <> indexNameText (indexName index)
                <> " (mirrored at "
-               <> (case sloc of
-                     SILGit url -> url
-                     SILHttp url _ -> url)
+               <> url
                <> ") ..."
-     git <- isGitInstalled menv
-     case (git, sloc) of
-        (True, SILGit url) -> updateIndexGit menv name index url
-        (False, SILGit _) -> throwM (GitNotAvailable name)
-        (_, SILHttp url HTVanilla) -> updateIndexHTTP name index url
-        (_, SILHttp url (HTHackageSecurity hs)) -> updateIndexHackageSecurity name index url hs
+     case indexType index of
+       ITVanilla -> updateIndexHTTP name url
+       ITHackageSecurity hs -> updateIndexHackageSecurity name url hs
 
      -- Copy to the 00-index.tar filename for backwards
      -- compatibility. First wipe out the cache file if present.
@@ -273,108 +260,12 @@ updateIndex menv index =
      ignoringAbsence (removeFile oldCacheFile)
      runConduitRes $ sourceFile (toFilePath tarFile) .| sinkFile (toFilePath oldTarFile)
 
--- | Update the index Git repo and the index tarball
-updateIndexGit :: (StackMiniM env m, HasConfig env)
-               => EnvOverride
-               -> IndexName
-               -> PackageIndex
-               -> Text -- ^ Git URL
-               -> m ()
-updateIndexGit menv indexName' index gitUrl = do
-     tarFile <- configPackageIndex indexName'
-     let idxPath = parent tarFile
-     ensureDir idxPath
-     do
-            repoName <- parseRelDir $ takeBaseName $ T.unpack gitUrl
-            let cloneArgs =
-                  ["clone"
-                  ,T.unpack gitUrl
-                  ,toFilePath repoName
-                  ,"-b" --
-                  ,"display"]
-            sDir <- configPackageIndexRoot indexName'
-            let suDir =
-                  sDir </>
-                  $(mkRelDir "git-update")
-                acfDir = suDir </> repoName
-            repoExists <- doesDirExist acfDir
-            let doClone = readProcessNull (Just suDir) menv "git" cloneArgs
-            unless repoExists doClone
-            isShallow <- doesFileExist $ acfDir </> $(mkRelDir ".git") </> $(mkRelFile "shallow")
-            when isShallow $ do
-              $logWarn "Shallow package index repo detected, transitioning to a full clone..."
-              let handleUnshallowError =
-                    C.handle $ \case
-                      ProcessFailed{} -> do
-                        $logInfo $ "Failed to convert to full clone, deleting and re-cloning."
-                        ignoringAbsence (removeDirRecur acfDir)
-                        doClone
-                      err -> throwM err
-              -- See https://github.com/commercialhaskell/stack/issues/2748
-              -- for an explanation of --git-dir=.git
-              handleUnshallowError $
-                  readProcessNull (Just acfDir) menv "git"
-                                  ["--git-dir=.git", "fetch", "--unshallow"]
-            $logSticky "Fetching package index ..."
-            let runFetch = callProcessInheritStderrStdout
-                    (Cmd (Just acfDir) "git" menv ["--git-dir=.git","fetch","--tags"])
-            runFetch `C.catch` \(ex :: ProcessExitedUnsuccessfully) -> do
-                -- we failed, so wipe the directory and try again, see #1418
-                $logWarn (T.pack (show ex))
-                $logStickyDone "Failed to fetch package index, retrying."
-                removeDirRecur acfDir
-                readProcessNull (Just suDir) menv "git" cloneArgs
-                $logSticky "Fetching package index ..."
-                runFetch
-            $logStickyDone "Fetched package index."
-
-            when (indexGpgVerify index) $ do
-                 result <- C.try $ readProcessNull (Just acfDir) menv "git" ["--git-dir=.git","tag","-v","current-hackage"]
-                 case result of
-                     Left ex -> do
-                         $logError (T.pack (show ex))
-                         case ex of
-                             ProcessFailed{} -> $logError $ T.unlines
-                                 ["Signature verification failed. "
-                                 ,"Please ensure you've set up your"
-                                 ,"GPG keychain to accept the D6CF60FD signing key."
-                                 ,"For more information, see:"
-                                 ,"https://github.com/fpco/stackage-update#readme"]
-                             _ -> return ()
-                         liftIO exitFailure
-                     Right () -> return ()
-            -- generate index archive when commit id differs from cloned repo
-            tarId <- getTarCommitId (toFilePath tarFile)
-            cloneId <- getCloneCommitId acfDir
-            unless (tarId `equals` cloneId)
-                (generateArchive acfDir tarFile)
-   where
-     getTarCommitId fp =
-         tryProcessStdout Nothing menv "sh" ["-c","git get-tar-commit-id < "++fp]
-
-     getCloneCommitId dir =
-         tryProcessStdout (Just dir) menv "git" ["rev-parse","current-hackage^{}"]
-
-     equals (Right cid1) (Right cid2) = cid1 == cid2
-     equals _ _ = False
-
-     generateArchive acfDir tarFile = do
-         ignoringAbsence (removeFile tarFile)
-         deleteCache indexName'
-         $logDebug ("Exporting a tarball to " <> (T.pack . toFilePath) tarFile)
-         let tarFileTmp = toFilePath tarFile ++ ".tmp"
-         readProcessNull (Just acfDir) menv
-             "git" ["--git-dir=.git","archive","--format=tar","-o",tarFileTmp,"current-hackage"]
-         tarFileTmpPath <- parseAbsFile tarFileTmp
-         renameFile tarFileTmpPath tarFile
-
 -- | Update the index tarball via HTTP
 updateIndexHTTP :: (StackMiniM env m, HasConfig env)
                 => IndexName
-                -> PackageIndex
                 -> Text -- ^ url
                 -> m ()
-updateIndexHTTP indexName' index url = do
+updateIndexHTTP indexName' url = do
     req <- parseRequest $ T.unpack url
     $logInfo ("Downloading package index from " <> url)
     gz <- configPackageIndexGz indexName'
@@ -399,20 +290,14 @@ updateIndexHTTP indexName' index url = do
                     =$ sinkHandle output
             renameFile tmpPath tar
 
-    when (indexGpgVerify index)
-        $ $logWarn
-        $ "You have enabled GPG verification of the package index, " <>
-          "but GPG verification only works with Git downloading"
-
 -- | Update the index tarball via Hackage Security
 updateIndexHackageSecurity
     :: (StackMiniM env m, HasConfig env)
     => IndexName
-    -> PackageIndex
     -> Text -- ^ base URL
     -> HackageSecurity
     -> m ()
-updateIndexHackageSecurity indexName' index url (HackageSecurity keyIds threshold) = do
+updateIndexHackageSecurity indexName' url (HackageSecurity keyIds threshold) = do
     baseURI <-
         case parseURI $ T.unpack url of
             Nothing -> error $ "Invalid Hackage Security base URL: " ++ T.unpack url
@@ -456,17 +341,6 @@ updateIndexHackageSecurity indexName' index url (HackageSecurity keyIds threshol
             liftIO $ D.renameFile (toFilePath tar ++ "-tmp") (toFilePath tar)
             $logInfo "Updated package list downloaded"
         HS.NoUpdates -> $logInfo "No updates to your package list were found"
-
-    when (indexGpgVerify index)
-        $ $logWarn
-        $ "You have enabled GPG verification of the package index, " <>
-          "but GPG verification only works with Git downloading"
-
--- | Is the git executable installed?
-isGitInstalled :: MonadIO m
-               => EnvOverride
-               -> m Bool
-isGitInstalled = flip doesExecutableExist "git"
 
 -- | Delete the package index cache
 deleteCache
@@ -533,7 +407,6 @@ getPackageCaches
          , HashMap GitSHA1 (PackageIndex, OffsetSize)
          )
 getPackageCaches = do
-    menv <- getMinimalEnvOverride
     config <- view configL
     mcached <- liftIO $ readIORef (configPackageCaches config)
     case mcached of
@@ -545,7 +418,7 @@ getPackageCaches = do
                     $(versionedDecodeOrLoad (storeVersionConfig "pkg-v2" "WlAvAaRXlIMkjSmg5G3dD16UpT8="
                                              :: VersionConfig PackageCacheMap))
                     fp
-                    (populateCache menv index)
+                    (populateCache index)
                 return (fmap (index,) pis', fmap (index,) gitPIs)
             liftIO $ writeIORef (configPackageCaches config) (Just result)
             return result

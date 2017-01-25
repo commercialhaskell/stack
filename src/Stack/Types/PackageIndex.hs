@@ -16,10 +16,7 @@ module Stack.Types.PackageIndex
     , PackageIndex(..)
     , IndexName(..)
     , indexNameText
-    , IndexLocation(..)
-    , SimplifiedIndexLocation (..)
-    , simplifyIndexLocation
-    , HttpType (..)
+    , IndexType (..)
     , HackageSecurity (..)
     ) where
 
@@ -126,7 +123,7 @@ instance FromJSON IndexName where
             Left e -> fail $ "Invalid index name: " ++ show e
             Right _ -> return $ IndexName $ encodeUtf8 t
 
-data HttpType = HTHackageSecurity !HackageSecurity | HTVanilla
+data IndexType = ITHackageSecurity !HackageSecurity | ITVanilla
     deriving (Show, Eq, Ord)
 
 data HackageSecurity = HackageSecurity
@@ -139,33 +136,15 @@ instance FromJSON HackageSecurity where
         <$> o .: "keyids"
         <*> o .: "key-threshold"
 
--- | Location of the package index. This ensures that at least one of Git or
--- HTTP is available.
-data IndexLocation
-    = ILGit !Text
-    | ILHttp !Text !HttpType
-    | ILGitHttp !Text !Text !HttpType
-    deriving (Show, Eq, Ord)
-
--- | Simplified 'IndexLocation', which will either be a Git repo or HTTP URL.
-data SimplifiedIndexLocation = SILGit !Text | SILHttp !Text !HttpType
-    deriving (Show, Eq, Ord)
-
-simplifyIndexLocation :: IndexLocation -> SimplifiedIndexLocation
-simplifyIndexLocation (ILGit t) = SILGit t
-simplifyIndexLocation (ILHttp t ht) = SILHttp t ht
--- Prefer HTTP over Git
-simplifyIndexLocation (ILGitHttp _ t ht) = SILHttp t ht
-
 -- | Information on a single package index
 data PackageIndex = PackageIndex
     { indexName :: !IndexName
-    , indexLocation :: !IndexLocation
+    , indexLocation :: !Text
+    -- ^ URL for the tarball or, in the case of Hackage Security, the
+    -- root of the directory
+    , indexType :: !IndexType
     , indexDownloadPrefix :: !Text
     -- ^ URL prefix for downloading packages
-    , indexGpgVerify :: !Bool
-    -- ^ GPG-verify the package index during download. Only applies to Git
-    -- repositories for now.
     , indexRequireHashes :: !Bool
     -- ^ Require that hashes and package size information be available for packages in this index
     }
@@ -174,24 +153,14 @@ instance FromJSON (WithJSONWarnings PackageIndex) where
     parseJSON = withObjectWarnings "PackageIndex" $ \o -> do
         name <- o ..: "name"
         prefix <- o ..: "download-prefix"
-        mgit <- o ..:? "git"
-        mhttp <- o ..:? "http"
+        http <- o ..: "http"
         mhackageSecurity <- o ..:? "hackage-security"
-        let httpType = maybe HTVanilla HTHackageSecurity mhackageSecurity
-        loc <-
-            case (mgit, mhttp) of
-                (Nothing, Nothing) -> fail $
-                    "Must provide either Git or HTTP URL for " ++
-                    T.unpack (indexNameText name)
-                (Just git, Nothing) -> return $ ILGit git
-                (Nothing, Just http) -> return $ ILHttp http httpType
-                (Just git, Just http) -> return $ ILGitHttp git http httpType
-        gpgVerify <- o ..:? "gpg-verify" ..!= False
+        let indexType' = maybe ITVanilla ITHackageSecurity mhackageSecurity
         reqHashes <- o ..:? "require-hashes" ..!= False
         return PackageIndex
             { indexName = name
-            , indexLocation = loc
+            , indexLocation = http
+            , indexType = indexType'
             , indexDownloadPrefix = prefix
-            , indexGpgVerify = gpgVerify
             , indexRequireHashes = reqHashes
             }

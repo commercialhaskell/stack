@@ -640,7 +640,6 @@ uninstallCmd _ go = withConfigAndLock go $ do
 -- | Unpack packages to the filesystem
 unpackCmd :: [String] -> GlobalOpts -> IO ()
 unpackCmd names go = withConfigAndLock go $ do
-    menv <- getMinimalEnvOverride
     mMiniBuildPlan <-
         case globalResolver go of
             Nothing -> return Nothing
@@ -653,12 +652,11 @@ unpackCmd names go = withConfigAndLock go $ do
                         runInnerStackT miniConfig (loadMiniBuildPlan snapName)
                     ResolverCompiler _ -> error "unpack does not work with compiler resolvers"
                     ResolverCustom _ _ -> error "unpack does not work with custom resolvers"
-    Stack.Fetch.unpackPackages menv mMiniBuildPlan "." names
+    Stack.Fetch.unpackPackages mMiniBuildPlan "." names
 
 -- | Update the package index
 updateCmd :: () -> GlobalOpts -> IO ()
-updateCmd () go = withConfigAndLock go $
-    getMinimalEnvOverride >>= Stack.PackageIndex.updateAllIndices
+updateCmd () go = withConfigAndLock go Stack.PackageIndex.updateAllIndices
 
 upgradeCmd :: UpgradeOpts -> GlobalOpts -> IO ()
 upgradeCmd upgradeOpts' go = withGlobalConfigAndLock go $

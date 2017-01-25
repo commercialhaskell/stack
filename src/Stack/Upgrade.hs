@@ -209,7 +209,7 @@ sourceUpgrade gConfigMonoid mresolver builtHash (SourceOpts gitRepo) =
                 runCmd (Cmd (Just tmp) "git" menv args) Nothing
                 return $ Just $ tmp </> $(mkRelDir "stack")
       Nothing -> do
-        updateAllIndices menv
+        updateAllIndices
         (caches, _gitShaCaches) <- getPackageCaches
         let latest = Map.fromListWith max
                    $ map toTuple
@@ -228,7 +228,7 @@ sourceUpgrade gConfigMonoid mresolver builtHash (SourceOpts gitRepo) =
                 return Nothing
             Just version -> do
                 let ident = PackageIdentifier $(mkPackageName "stack") version
-                paths <- unpackPackageIdents menv tmp Nothing
+                paths <- unpackPackageIdents tmp Nothing
                     -- accept latest cabal revision by not supplying a Git SHA
                     $ Map.singleton ident Nothing
                 case Map.lookup ident paths of

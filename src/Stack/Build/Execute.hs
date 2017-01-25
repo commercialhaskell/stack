@@ -121,8 +121,7 @@ preFetch plan
         $logDebug $ T.pack $
             "Prefetching: " ++
             intercalate ", " (map packageIdentifierString $ Set.toList idents)
-        menv <- getMinimalEnvOverride
-        fetchPackages menv idents
+        fetchPackages idents
   where
     idents = Set.unions $ map toIdent $ Map.toList $ planTasks plan
 
@@ -888,7 +887,7 @@ withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} md
             TTLocal lp -> inner (lpPackage lp) (lpCabalFile lp) (lpDir lp)
             TTUpstream package _ gitSHA1 -> do
                 mdist <- liftM Just distRelativeDir
-                m <- unpackPackageIdents eeEnvOverride eeTempDir mdist
+                m <- unpackPackageIdents eeTempDir mdist
                    $ Map.singleton taskProvides gitSHA1
                 case Map.toList m of
                     [(ident, dir)]

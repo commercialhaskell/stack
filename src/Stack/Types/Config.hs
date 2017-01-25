@@ -87,7 +87,6 @@ module Stack.Types.Config
   ,PackageIndex(..)
   ,IndexName(..)
   ,indexNameText
-  ,IndexLocation(..)
   -- Config fields
   ,configPackageIndex
   ,configPackageIndexOld
@@ -95,7 +94,6 @@ module Stack.Types.Config
   ,configPackageIndexCacheOld
   ,configPackageIndexGz
   ,configPackageIndexRoot
-  ,configPackageIndexRepo
   ,configPackageTarball
   -- ** Project & ProjectAndConfigMonoid
   ,Project(..)
@@ -239,7 +237,6 @@ import           Stack.Types.Resolver
 import           Stack.Types.TemplateName
 import           Stack.Types.Urls
 import           Stack.Types.Version
-import           System.FilePath (takeBaseName)
 import qualified System.FilePath as FilePath
 import           System.PosixCompat.Types (UserID, GroupID, FileMode)
 import           System.Process.Read (EnvOverride, findExecutable)
@@ -1164,28 +1161,6 @@ configPackageIndexRoot (IndexName name) = do
     root <- view stackRootL
     dir <- parseRelDir $ S8.unpack name
     return (root </> $(mkRelDir "indices") </> dir)
-
--- | Git repo directory for a specific package index, returns 'Nothing' if not
--- a Git repo
-configPackageIndexRepo :: (MonadReader env m, HasConfig env, MonadThrow m) => IndexName -> m (Maybe (Path Abs Dir))
-configPackageIndexRepo name = do
-    indices <- view packageIndicesL
-    case filter (\p -> indexName p == name) indices of
-        [index] -> do
-            let murl =
-                    case simplifyIndexLocation $ indexLocation index of
-                        SILGit x -> Just x
-                        SILHttp _ _ -> Nothing
-            case murl of
-                Nothing -> return Nothing
-                Just url -> do
-                    sDir <- configPackageIndexRoot name
-                    repoName <- parseRelDir $ takeBaseName $ T.unpack url
-                    let suDir =
-                          sDir </>
-                          $(mkRelDir "git-update")
-                    return $ Just $ suDir </> repoName
-        _ -> assert False $ return Nothing
 
 -- | Location of the 01-index.cache file
 configPackageIndexCache :: (MonadReader env m, HasConfig env, MonadThrow m) => IndexName -> m (Path Abs File)
