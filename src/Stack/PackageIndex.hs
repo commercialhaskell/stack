@@ -30,7 +30,7 @@ module Stack.PackageIndex
 import qualified Codec.Archive.Tar as Tar
 import           Control.Exception (Exception)
 import           Control.Exception.Safe (tryIO)
-import           Control.Monad (unless, when, liftM, void)
+import           Control.Monad (unless, when, liftM, void, guard)
 import           Control.Monad.Catch (throwM)
 import qualified Control.Monad.Catch as C
 import           Control.Monad.IO.Class (MonadIO, liftIO)
@@ -128,10 +128,13 @@ populateCache menv index = do
     goE blockNo m hm e =
         case Tar.entryContent e of
             Tar.NormalFile lbs size ->
-                case parseNameVersion $ Tar.entryPath e of
+                case parseNameVersionSuffix $ Tar.entryPath e of
                     Just (ident, ".cabal") -> addCabal lbs ident size
-                    Just (ident, ".json") -> (addJSON ident lbs, hm)
-                    _ -> (m, hm)
+                    Just (ident, ".json") -> (addJSON id ident lbs, hm)
+                    _ ->
+                        case parsePackageJSON $ Tar.entryPath e of
+                            Just ident -> (addJSON unHSPackageDownload ident lbs, hm)
+                            Nothing -> (m, hm)
             _ -> (m, hm)
       where
         addCabal lbs ident size =
@@ -160,10 +163,16 @@ populateCache menv index = do
                 : S8.pack (show $ L.length lbs)
                 : "\0"
                 : L.toChunks lbs
-        addJSON ident lbs =
+
+        addJSON :: FromJSON a
+                => (a -> PackageDownload)
+                -> PackageIdentifier
+                -> L.ByteString
+                -> Map PackageIdentifier PackageCache
+        addJSON unwrap ident lbs =
             case decode lbs of
                 Nothing -> m
-                Just !pd -> Map.insertWith
+                Just (unwrap -> pd) -> Map.insertWith
                     (\_ pc -> pc { pcDownload = Just pd })
                     ident
                     PackageCache
@@ -185,10 +194,18 @@ populateCache menv index = do
         p <- parsePackageName p'
         (v', t5) <- breakSlash t3
         v <- parseVersion v'
+        return (p', p, v, t5)
+
+    parseNameVersionSuffix t1 = do
+        (p', p, v, t5) <- parseNameVersion t1
         let (t6, suffix) = T.break (== '.') t5
-        if t6 == p'
-            then return (PackageIdentifier p v, suffix)
-            else Nothing
+        guard $ t6 == p'
+        return (PackageIdentifier p v, suffix)
+
+    parsePackageJSON t1 = do
+        (_, p, v, t5) <- parseNameVersion t1
+        guard $ t5 == "package.json"
+        return $ PackageIdentifier p v
 
 data PackageIndexException
   = GitNotAvailable IndexName
@@ -519,7 +536,7 @@ getPackageCaches = do
             result <- liftM mconcat $ forM (configPackageIndices config) $ \index -> do
                 fp <- configPackageIndexCache (indexName index)
                 PackageCacheMap pis' gitPIs <-
-                    $(versionedDecodeOrLoad (storeVersionConfig "pkg-v2" "65DN-U48aCTqZSM-Dl9uXX86I0U="
+                    $(versionedDecodeOrLoad (storeVersionConfig "pkg-v2" "WlAvAaRXlIMkjSmg5G3dD16UpT8="
                                              :: VersionConfig PackageCacheMap))
                     fp
                     (populateCache menv index)

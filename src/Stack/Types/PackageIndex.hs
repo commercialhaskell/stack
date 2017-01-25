@@ -8,6 +8,7 @@
 
 module Stack.Types.PackageIndex
     ( PackageDownload (..)
+    , HSPackageDownload (..)
     , PackageCache (..)
     , PackageCacheMap (..)
     , OffsetSize (..)
@@ -26,6 +27,7 @@ import           Control.DeepSeq (NFData)
 import           Control.Monad (mzero)
 import           Data.Aeson.Extended
 import           Data.ByteString (ByteString)
+import qualified Data.Foldable as F
 import           Data.Hashable (Hashable)
 import           Data.Data (Data, Typeable)
 import           Data.HashMap.Strict (HashMap)
@@ -70,7 +72,7 @@ instance Store PackageCacheMap
 instance NFData PackageCacheMap
 
 data PackageDownload = PackageDownload
-    { pdSHA512 :: !ByteString
+    { pdSHA256 :: !ByteString
     , pdUrl    :: !ByteString
     , pdSize   :: !Word64
     }
@@ -78,9 +80,9 @@ data PackageDownload = PackageDownload
 instance Store PackageDownload
 instance NFData PackageDownload
 instance FromJSON PackageDownload where
-    parseJSON = withObject "Package" $ \o -> do
+    parseJSON = withObject "PackageDownload" $ \o -> do
         hashes <- o .: "package-hashes"
-        sha512 <- maybe mzero return (Map.lookup ("SHA512" :: Text) hashes)
+        sha256 <- maybe mzero return (Map.lookup ("SHA256" :: Text) hashes)
         locs <- o .: "package-locations"
         url <-
             case reverse locs of
@@ -88,9 +90,26 @@ instance FromJSON PackageDownload where
                 x:_ -> return x
         size <- o .: "package-size"
         return PackageDownload
-            { pdSHA512 = encodeUtf8 sha512
+            { pdSHA256 = encodeUtf8 sha256
             , pdUrl = encodeUtf8 url
             , pdSize = size
+            }
+
+-- | Hackage Security provides a different JSON format, we'll have our
+-- own JSON parser for it.
+newtype HSPackageDownload = HSPackageDownload { unHSPackageDownload :: PackageDownload }
+instance FromJSON HSPackageDownload where
+    parseJSON = withObject "HSPackageDownload" $ \o1 -> do
+        o2 <- o1 .: "signed"
+        Object o3 <- o2 .: "targets"
+        Object o4:_ <- return $ F.toList o3
+        len <- o4 .: "length"
+        hashes <- o4 .: "hashes"
+        sha256 <- hashes .: "sha256"
+        return $ HSPackageDownload PackageDownload
+            { pdSHA256 = encodeUtf8 sha256
+            , pdSize = len
+            , pdUrl = ""
             }
 
 -- | Unique name for a package index

@@ -42,7 +42,7 @@ import              Control.Monad.Logger
 import              Control.Monad.Reader (ask, runReaderT)
 import              Control.Monad.Trans.Control
 import              Control.Monad.Trans.Unlift (MonadBaseUnlift, askRunBase)
-import "cryptohash" Crypto.Hash (SHA512 (..))
+import "cryptohash" Crypto.Hash (SHA256 (..))
 import              Data.ByteString (ByteString)
 import qualified    Data.ByteString as S
 import qualified    Data.ByteString.Lazy as L
@@ -322,7 +322,7 @@ data ToFetch = ToFetch
     , tfDestDir :: !(Maybe (Path Abs Dir))
     , tfUrl     :: !T.Text
     , tfSize    :: !(Maybe Word64)
-    , tfSHA512  :: !(Maybe ByteString)
+    , tfSHA256  :: !(Maybe ByteString)
     , tfCabal   :: !ByteString
     -- ^ Contents of the .cabal file
     }
@@ -523,11 +523,11 @@ getToFetch mdest resolvedAll = do
                 return $ Left (indexName index, [(resolved, ToFetch
                     { tfTarball = tarball
                     , tfDestDir = mdestDir
-                    , tfUrl = case d of
-                        Just d' -> decodeUtf8 $ pdUrl d'
-                        Nothing -> indexDownloadPrefix index <> targz
+                    , tfUrl = case fmap pdUrl d of
+                        Just url | not (S.null url) -> decodeUtf8 url
+                        _ -> indexDownloadPrefix index <> targz
                     , tfSize = fmap pdSize d
-                    , tfSHA512 = fmap pdSHA512 d
+                    , tfSHA256 = fmap pdSHA256 d
                     , tfCabal = S.empty -- filled in by goIndex
                     })])
 
@@ -575,10 +575,10 @@ fetchPackages' mdistDir toFetchAll = do
         req <- parseUrlThrow $ T.unpack $ tfUrl toFetch
         let destpath = tfTarball toFetch
 
-        let toHashCheck bs = HashCheck SHA512 (CheckHexDigestByteString bs)
+        let toHashCheck bs = HashCheck SHA256 (CheckHexDigestByteString bs)
         let downloadReq = DownloadRequest
                 { drRequest = req
-                , drHashChecks = map toHashCheck $ maybeToList (tfSHA512 toFetch)
+                , drHashChecks = map toHashCheck $ maybeToList (tfSHA256 toFetch)
                 , drLengthCheck = fromIntegral <$> tfSize toFetch
                 , drRetryPolicy = drRetryPolicyDefault
                 }
