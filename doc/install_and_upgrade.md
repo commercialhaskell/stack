@@ -182,7 +182,17 @@ it.  To install it:
 
 ## Arch Linux
 
-Use the [generic Linux option](#linux).
+There is an official package in the Arch community repository. So you can
+install it by simply doing:
+
+    sudo pacman -S stack
+
+Note that this version may slightly lag behind, but it should be updated within
+the day. The package is also always rebuilt and updated when one of it's
+dependencies gets an update.
+
+  - [stack](https://www.archlinux.org/packages/community/x86_64/stack/) _latest stable version_
+  - [haskell-stack-git](https://aur.archlinux.org/packages/haskell-stack-git/) _git version_
 
 In order to use `stack setup` with older versions of GHC or on a 32-bit system,
 you may need the
@@ -193,13 +203,6 @@ to install older (< 7.10.3) or 32-bit GHC versions.
 If you use the
 [ArchHaskell repository](https://wiki.archlinux.org/index.php/ArchHaskell), you
 can also get the `haskell-stack-tool` package from there.
-
-There is also an unofficial package in the Arch community repository.  Note that this Stack
-version may lag behind, so we recommend running `stack upgrade` after installing
-it.
-
-  - [stack](https://www.archlinux.org/packages/community/x86_64/stack/) _latest stable version_
-  - [haskell-stack-git](https://aur.archlinux.org/packages/haskell-stack-git/) _git version_
 
 ## NixOS
 
