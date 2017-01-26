@@ -50,7 +50,7 @@ displayWithColor
     :: (HasLogOptions env, MonadReader env m, Display a, HasAnsiAnn (Ann a))
     => a -> m T.Text
 displayWithColor x = do
-    useAnsi <- asks (logUseColor . getLogOptions)
+    useAnsi <- liftM logUseColor $ view logOptionsL
     return $ if useAnsi then displayAnsi x else displayPlain x
 
 -- TODO: switch to using implicit callstacks once 7.8 support is dropped

@@ -138,10 +138,10 @@ getCanUseUnicode = do
 runInnerStackT :: (HasEnv r, MonadReader r m, MonadIO m)
                => config -> StackT config IO a -> m a
 runInnerStackT config inner = do
-    reExec <- asks getReExec
-    logOptions <- asks getLogOptions
-    terminal <- asks getTerminal
-    sticky <- asks getSticky
+    reExec <- view reExecL
+    logOptions <- view logOptionsL
+    terminal <- view terminalL
+    sticky <- view stickyL
     liftIO $ runReaderT (unStackT inner) Env
         { envConfig = config
         , envReExec = reExec
@@ -163,8 +163,8 @@ getStickyLoggerFunc
     :: (HasEnv r, ToLogStr msg, MonadReader r m)
     => m (Loc -> LogSource -> LogLevel -> msg -> IO ())
 getStickyLoggerFunc = do
-    sticky <- asks getSticky
-    lo <- asks getLogOptions
+    sticky <- view stickyL
+    lo <- view logOptionsL
     return $ stickyLoggerFuncImpl sticky lo
 
 stickyLoggerFuncImpl

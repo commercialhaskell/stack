@@ -85,7 +85,7 @@ setup
     -> Maybe (Path Abs File)
     -> m ()
 setup SetupCmdOpts{..} wantedCompiler compilerCheck mstack = do
-    Config{..} <- asks getConfig
+    Config{..} <- view configL
     mpaths <- fst <$> ensureCompiler SetupOpts
         { soptsInstallIfMissing = True
         , soptsUseSystem = configSystemGHC && not scoForceReinstall

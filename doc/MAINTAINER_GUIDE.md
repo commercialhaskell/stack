@@ -372,6 +372,9 @@ Edit `~/.cabal/config`, and set `executable-stripping: False` and
     In the case of macOS, repackage the `.xz` bindist as a `.bz2`, since macOS does
     not include `xz` by default or provide an easy way to install it.
 
+    The script at `etc/scripts/mirror-ghc-bindists-to-github.sh` will help with
+    this. See the comments within the script.
+
   * Build any additional required bindists (see below for instructions)
 
       * tinfo6 (`etc/vagrant/fedora24-x86_64`)
@@ -388,9 +391,10 @@ location.
 
 For GHC >= 7.10.2, set the `GHC_VERSION` environment variable to the version to build:
 
-    * `export GHC_VERSION=8.0.1`
-    * `export GHC_VERSION=7.10.3a`
-    * `export GHC_VERSION=7.10.2`
+  * `export GHC_VERSION=8.0.2`
+  * `export GHC_VERSION=8.0.1`
+  * `export GHC_VERSION=7.10.3a`
+  * `export GHC_VERSION=7.10.2`
 
 then, run (from [here](https://ghc.haskell.org/trac/ghc/wiki/Newcomers)):
 

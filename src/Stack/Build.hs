@@ -24,7 +24,7 @@ import           Control.Exception (Exception)
 import           Control.Monad
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
-import           Control.Monad.Reader (MonadReader, asks)
+import           Control.Monad.Reader (MonadReader)
 import           Control.Monad.Trans.Resource
 import           Control.Monad.Trans.Unlift (MonadBaseUnlift)
 import           Data.Aeson (Value (Object, Array), (.=), object)
@@ -92,14 +92,15 @@ build :: (StackM env m, HasEnvConfig env, MonadBaseUnlift IO m)
       -> BuildOptsCLI
       -> m ()
 build setLocalFiles mbuildLk boptsCli = fixCodePage $ do
-    bopts <- asks (configBuild . getConfig)
+    bopts <- view buildOptsL
     let profiling = boptsLibProfile bopts || boptsExeProfile bopts
+    let symbols = not (boptsLibStrip bopts || boptsExeStrip bopts)
     menv <- getMinimalEnvOverride
 
     (targets, mbp, locals, extraToBuild, extraDeps, sourceMap) <- loadSourceMapFull NeedTargets boptsCli
 
     -- Set local files, necessary for file watching
-    stackYaml <- asks $ bcStackYaml . getBuildConfig
+    stackYaml <- view stackYamlL
     liftIO $ setLocalFiles
            $ Set.insert stackYaml
            $ Set.unions
@@ -109,7 +110,8 @@ build setLocalFiles mbuildLk boptsCli = fixCodePage $ do
         getInstalled menv
                      GetInstalledOpts
                          { getInstalledProfiling = profiling
-                         , getInstalledHaddock   = shouldHaddockDeps bopts }
+                         , getInstalledHaddock   = shouldHaddockDeps bopts
+                         , getInstalledSymbols   = symbols }
                      sourceMap
 
     warnMissingExtraDeps installedMap extraDeps
@@ -155,8 +157,8 @@ allLocal =
 
 checkCabalVersion :: (StackM env m, HasEnvConfig env) => m ()
 checkCabalVersion = do
-    allowNewer <- asks (configAllowNewer . getConfig)
-    cabalVer <- asks (envConfigCabalVersion . getEnvConfig)
+    allowNewer <- view $ configL.to configAllowNewer
+    cabalVer <- view cabalVersionL
     -- https://github.com/haskell/cabal/issues/2023
     when (allowNewer && cabalVer < $(mkVersion "1.22")) $ throwM $
         CabalVersionException $
@@ -280,7 +282,7 @@ splitObjsWarning = unwords
 mkBaseConfigOpts :: (MonadIO m, MonadReader env m, HasEnvConfig env, MonadThrow m)
                  => BuildOptsCLI -> m BaseConfigOpts
 mkBaseConfigOpts boptsCli = do
-    bopts <- asks (configBuild . getConfig)
+    bopts <- view buildOptsL
     snapDBPath <- packageDatabaseDeps
     localDBPath <- packageDatabaseLocal
     snapInstallRoot <- installationRootDeps
@@ -302,7 +304,7 @@ withLoadPackage :: (StackM env m, HasEnvConfig env, MonadBaseUnlift IO m)
                 -> ((PackageName -> Version -> Map FlagName Bool -> [Text] -> IO Package) -> m a)
                 -> m a
 withLoadPackage menv inner = do
-    econfig <- asks getEnvConfig
+    econfig <- view envConfigL
     withCabalLoader menv $ \cabalLoader ->
         inner $ \name version flags ghcOptions -> do
             bs <- cabalLoader $ PackageIdentifier name version
@@ -320,8 +322,8 @@ withLoadPackage menv inner = do
         , packageConfigEnableBenchmarks = False
         , packageConfigFlags = flags
         , packageConfigGhcOptions = ghcOptions
-        , packageConfigCompilerVersion = envConfigCompilerVersion econfig
-        , packageConfigPlatform = configPlatform (getConfig econfig)
+        , packageConfigCompilerVersion = view actualCompilerVersionL econfig
+        , packageConfigPlatform = view platformL econfig
         }
 
 -- | Set the code page for this process as necessary. Only applies to Windows.
@@ -329,9 +331,9 @@ withLoadPackage menv inner = do
 #ifdef WINDOWS
 fixCodePage :: (StackM env m, HasBuildConfig env, HasEnvConfig env) => m a -> m a
 fixCodePage inner = do
-    mcp <- asks $ configModifyCodePage . getConfig
-    ec <- asks getEnvConfig
-    if mcp && getGhcVersion (envConfigCompilerVersion ec) < $(mkVersion "7.10.3")
+    mcp <- view $ configL.to configModifyCodePage
+    ghcVersion <- view $ actualCompilerVersionL.to getGhcVersion
+    if mcp && ghcVersion < $(mkVersion "7.10.3")
         then fixCodePage'
         -- GHC >=7.10.3 doesn't need this code page hack.
         else inner

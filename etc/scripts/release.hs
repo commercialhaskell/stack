@@ -155,14 +155,14 @@ rules global@Global{..} args = do
         when (not gAllowDirty && not (null (trim dirty))) $
             error ("Working tree is dirty.  Use --" ++ allowDirtyOptName ++ " option to continue anyway.")
         withTempDir $ \tmpDir -> do
-            let cmd0 c = cmd (releaseBinDir </> binaryName </> stackExeFileName)
+            let cmd0 c = cmd (gProjectRoot </> releaseBinDir </> binaryName </> stackExeFileName)
                     (stackArgs global)
                     ["--local-bin-path=" ++ tmpDir]
                     c
                     gBuildArgs
             () <- cmd0 "install" $ concat $ concat
                 [["--pedantic --no-haddock-deps"], [" --haddock" | gTestHaddocks]]
-            () <- cmd0 "install" "--resolver=lts-6.0 cabal-install"
+            () <- cmd0 (Cwd "etc/scripts") "install cabal-install"
             let cmd' c = cmd (AddPath [tmpDir] []) stackProgName (stackArgs global) c gBuildArgs
             () <- cmd' "test" "--pedantic --flag stack:integration-tests"
             return ()

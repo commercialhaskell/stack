@@ -102,6 +102,8 @@ data Package =
           ,packageOpts :: !GetPackageOpts                 -- ^ Args to pass to GHC.
           ,packageHasExposedModules :: !Bool              -- ^ Does the package have exposed modules?
           ,packageSimpleType :: !Bool                     -- ^ Does the package of build-type: Simple
+          ,packageSetupDeps :: !(Maybe (Map PackageName VersionRange))
+                                                          -- ^ If present: custom-setup dependencies
           }
  deriving (Show,Typeable)
 

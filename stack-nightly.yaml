@@ -8,3 +8,5 @@ nix:
   enable: false
   packages:
     - zlib
+extra-deps:
+- hpack-0.16.0

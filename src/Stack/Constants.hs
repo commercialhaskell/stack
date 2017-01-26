@@ -31,7 +31,7 @@ module Stack.Constants
     ,implicitGlobalProjectDir
     ,hpcRelativeDir
     ,hpcDirFromDir
-    ,objectInterfaceDir
+    ,objectInterfaceDirL
     ,templatesDir
     ,defaultUserConfigPathDeprecated
     ,defaultUserConfigPath
@@ -48,6 +48,7 @@ import           Data.Char (toUpper)
 import           Data.HashSet (HashSet)
 import qualified Data.HashSet as HashSet
 import           Data.Text (Text)
+import           Lens.Micro (Getting)
 import           Path as FL
 import           Prelude
 import           Stack.Types.Compiler
@@ -68,11 +69,11 @@ haskellPreprocessorExts :: [Text]
 haskellPreprocessorExts = ["gc", "chs", "hsc", "x", "y", "ly", "cpphs"]
 
 -- | Output .o/.hi directory.
-objectInterfaceDir :: (MonadReader env m, HasConfig env)
-  => BuildConfig -> m (Path Abs Dir)
-objectInterfaceDir bconfig = do
-  bcwd <- bcWorkDir bconfig
-  return (bcwd </> $(mkRelDir "odir/"))
+objectInterfaceDirL :: HasBuildConfig env => Getting r env (Path Abs Dir)
+objectInterfaceDirL = to $ \env -> -- FIXME is this idomatic lens code?
+  let workDir = view workDirL env
+      root = view projectRootL env
+   in root </> workDir </> $(mkRelDir "odir/")
 
 -- | The filename used for dirtiness check of source files.
 buildCacheFile :: (MonadThrow m, MonadReader env m, HasEnvConfig env)
@@ -141,11 +142,10 @@ distDirFromDir fp =
     liftM (fp </>) distRelativeDir
 
 -- | Package's working directory.
-workDirFromDir :: (MonadThrow m, MonadReader env m, HasEnvConfig env)
+workDirFromDir :: (MonadReader env m, HasEnvConfig env)
                => Path Abs Dir
                -> m (Path Abs Dir)
-workDirFromDir fp =
-    liftM (fp </>) getWorkDir
+workDirFromDir fp = view $ workDirL.to (fp </>)
 
 -- | Directory for project templates.
 templatesDir :: Config -> Path Abs Dir
@@ -155,9 +155,9 @@ templatesDir config = configStackRoot config </> $(mkRelDir "templates")
 distRelativeDir :: (MonadThrow m, MonadReader env m, HasEnvConfig env)
                 => m (Path Rel Dir)
 distRelativeDir = do
-    cabalPkgVer <- asks (envConfigCabalVersion . getEnvConfig)
+    cabalPkgVer <- view cabalVersionL
     platform <- platformGhcRelDir
-    wc <- getWhichCompiler
+    wc <- view $ actualCompilerVersionL.to whichCompiler
     -- Cabal version, suffixed with "_ghcjs" if we're using GHCJS.
     envDir <-
         parseRelDir $
@@ -165,7 +165,7 @@ distRelativeDir = do
         packageIdentifierString $
         PackageIdentifier cabalPackageName cabalPkgVer
     platformAndCabal <- useShaPathOnWindows (platform </> envDir)
-    workDir <- getWorkDir
+    workDir <- view workDirL
     return $
         workDir </>
         $(mkRelDir "dist") </>
@@ -176,7 +176,7 @@ projectDockerSandboxDir :: (MonadReader env m, HasConfig env)
   => Path Abs Dir      -- ^ Project root
   -> m (Path Abs Dir)  -- ^ Docker sandbox
 projectDockerSandboxDir projectRoot = do
-  workDir <- getWorkDir
+  workDir <- view workDirL
   return $ projectRoot </> workDir </> $(mkRelDir "docker/")
 
 -- | Image staging dir from project root.
@@ -185,7 +185,7 @@ imageStagingDir :: (MonadReader env m, HasConfig env, MonadThrow m)
   -> Int               -- ^ Index of image
   -> m (Path Abs Dir)  -- ^ Docker sandbox
 imageStagingDir projectRoot imageIdx = do
-  workDir <- getWorkDir
+  workDir <- view workDirL
   idxRelDir <- parseRelDir (show imageIdx)
   return $ projectRoot </> workDir </> $(mkRelDir "image") </> idxRelDir
 

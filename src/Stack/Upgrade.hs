@@ -34,7 +34,6 @@ import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageName
 import           Stack.Types.Version
 import           Stack.Types.Config
-import           Stack.Types.Internal
 import           Stack.Types.Resolver
 import           Stack.Types.StackT
 import           System.Exit                 (ExitCode (ExitSuccess))
@@ -167,7 +166,7 @@ binaryUpgrade (BinaryOpts mplatform force' mver morg mrepo) = do
             $logInfo "Newer version detected, downloading"
             return True
     when toUpgrade $ do
-        config <- askConfig
+        config <- view configL
         downloadStackExe platforms0 archiveInfo (configLocalBin config) $ \tmpFile -> do
             -- Sanity check!
             ec <- rawSystem (toFilePath tmpFile) ["--version"]
@@ -209,7 +208,7 @@ sourceUpgrade gConfigMonoid mresolver builtHash (SourceOpts gitRepo) =
                 return $ Just $ tmp </> $(mkRelDir "stack")
       Nothing -> do
         updateAllIndices menv
-        caches <- getPackageCaches
+        (caches, _gitShaCaches) <- getPackageCaches
         let latest = Map.fromListWith max
                    $ map toTuple
                    $ Map.keys
@@ -242,8 +241,8 @@ sourceUpgrade gConfigMonoid mresolver builtHash (SourceOpts gitRepo) =
         bconfig <- lcLoadBuildConfig lc Nothing
         envConfig1 <- runInnerStackT bconfig $ setupEnv $ Just $
             "Try rerunning with --install-ghc to install the correct GHC into " <>
-            T.pack (toFilePath (configLocalPrograms (getConfig bconfig)))
-        runInnerStackT (set (envConfigBuildOpts.buildOptsInstallExes) True envConfig1) $
+            T.pack (toFilePath (configLocalPrograms (view configL bconfig)))
+        runInnerStackT (set (buildOptsL.buildOptsInstallExesL) True envConfig1) $
             build (const $ return ()) Nothing defaultBuildOptsCLI
                 { boptsCLITargets = ["stack"]
                 }

@@ -10,10 +10,8 @@ module Stack.Hoogle
 import           Control.Exception
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
-import           Control.Monad.Reader
 import qualified Data.ByteString.Char8 as S8
 import           Data.List (find)
-import qualified Data.Map.Strict as Map
 import           Data.Monoid
 import qualified Data.Set as Set
 import           Lens.Micro
@@ -23,7 +21,6 @@ import qualified Stack.Build
 import           Stack.Fetch
 import           Stack.Runners
 import           Stack.Types.Config
-import           Stack.Types.Internal
 import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageName
 import           Stack.Types.StackT
@@ -83,7 +80,7 @@ hoogleCmd (args,setup,rebuild) go = withBuildConfig go pathToHaddocks
             (catch
                  (withBuildConfigAndLock
                       (set
-                           (globalOptsBuildOptsMonoid . buildOptsMonoidHaddock)
+                           (globalOptsBuildOptsMonoidL . buildOptsMonoidHaddockL)
                            (Just True)
                            go)
                       (\lk ->
@@ -100,14 +97,27 @@ hoogleCmd (args,setup,rebuild) go = withBuildConfig go pathToHaddocks
             hoogleMinIdent =
                 PackageIdentifier hooglePackageName hoogleMinVersion
         hooglePackageIdentifier <-
-            do (_,_,resolved) <-
+            do menv <- getMinimalEnvOverride
+               (_,_,resolved) <-
                    resolvePackagesAllowMissing
+                       menv
+
+                       -- FIXME this Nothing means "do not follow any
+                       -- specific snapshot", which matches old
+                       -- behavior. However, since introducing the
+                       -- logic to pin a name to a package in a
+                       -- snapshot, we may arguably want to ensure
+                       -- that we're grabbing the version of Hoogle
+                       -- present in the snapshot currently being
+                       -- used.
+                       Nothing
+
                        mempty
                        (Set.fromList [hooglePackageName])
                return
                    (case find
                              ((== hooglePackageName) . packageIdentifierName)
-                             (Map.keys resolved) of
+                             (map rpIdent resolved) of
                         Just ident@(PackageIdentifier _ ver)
                           | ver >= hoogleMinVersion -> Right ident
                         _ -> Left hoogleMinIdent)
@@ -122,7 +132,7 @@ hoogleCmd (args,setup,rebuild) go = withBuildConfig go pathToHaddocks
                      ". Found acceptable " <>
                      packageIdentifierText ident <>
                      " in your index, installing it.")
-        config <- asks getConfig
+        config <- view configL
         menv <- liftIO $ configEnvOverride config envSettings
         liftIO
             (catch
@@ -145,7 +155,7 @@ hoogleCmd (args,setup,rebuild) go = withBuildConfig go pathToHaddocks
                            _ -> throwIO e))
     runHoogle :: [String] -> StackT EnvConfig IO ()
     runHoogle hoogleArgs = do
-        config <- asks getConfig
+        config <- view configL
         menv <- liftIO $ configEnvOverride config envSettings
         dbpath <- hoogleDatabasePath
         let databaseArg = ["--database=" ++ toFilePath dbpath]
@@ -163,7 +173,7 @@ hoogleCmd (args,setup,rebuild) go = withBuildConfig go pathToHaddocks
         path <- hoogleDatabasePath
         liftIO (doesFileExist path)
     checkHoogleInPath = do
-        config <- asks getConfig
+        config <- view configL
         menv <- liftIO $ configEnvOverride config envSettings
         result <- tryProcessStdout Nothing menv "hoogle" ["--numeric-version"]
         case fmap (reads . S8.unpack) result of

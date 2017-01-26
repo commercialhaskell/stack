@@ -40,7 +40,7 @@ import           Control.Monad (liftM, forM, unless)
 import           Control.Monad.Catch
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
-import           Control.Monad.Reader (MonadReader, asks)
+import           Control.Monad.Reader (MonadReader)
 import           Control.Monad.State.Strict      (State, execState, get, modify,
                                                   put)
 import qualified Crypto.Hash.SHA256 as SHA256
@@ -207,8 +207,8 @@ resolveBuildPlan
 resolveBuildPlan mbp isShadowed packages
     | Map.null (rsUnknown rs) && Map.null (rsShadowed rs) = return (rsToInstall rs, rsUsedBy rs)
     | otherwise = do
-        bconfig <- asks getBuildConfig
-        caches <- getPackageCaches
+        bconfig <- view buildConfigLocalL
+        (caches, _gitShaCaches) <- getPackageCaches
         let maxVer =
                 Map.fromListWith max $
                 map toTuple $
@@ -280,29 +280,24 @@ addDeps
     -> m (Map PackageName MiniPackageInfo, Set PackageIdentifier)
 addDeps allowMissing compilerVersion toCalc = do
     menv <- getMinimalEnvOverride
-    platform <- asks $ configPlatform . getConfig
+    platform <- view platformL
     (resolvedMap, missingIdents) <-
         if allowMissing
             then do
                 (missingNames, missingIdents, m) <-
-                    resolvePackagesAllowMissing shaMap Set.empty
+                    resolvePackagesAllowMissing menv Nothing shaMap Set.empty
                 assert (Set.null missingNames)
                     $ return (m, missingIdents)
             else do
-                m <- resolvePackages menv shaMap Set.empty
+                m <- resolvePackages menv Nothing shaMap Set.empty
                 return (m, Set.empty)
-    let byIndex = Map.fromListWith (++) $ flip map (Map.toList resolvedMap)
-            $ \(ident, rp) ->
+    let byIndex = Map.fromListWith (++) $ flip map resolvedMap
+            $ \rp ->
                 let (cache, ghcOptions, sha) =
-                        case Map.lookup (packageIdentifierName ident) toCalc of
+                        case Map.lookup (packageIdentifierName (rpIdent rp)) toCalc of
                             Nothing -> (Map.empty, [], Nothing)
                             Just (_, x, y, z) -> (x, y, z)
-                 in (indexName $ rpIndex rp,
-                    [( ident
-                    , rpCache rp
-                    , sha
-                    , (cache, ghcOptions, sha)
-                    )])
+                 in (indexName $ rpIndex rp, [(rp, (cache, ghcOptions, sha))])
     res <- forM (Map.toList byIndex) $ \(indexName', pkgs) -> withCabalFiles indexName' pkgs
         $ \ident (flags, ghcOptions, mgitSha) cabalBS -> do
             (_warnings,gpd) <- readPackageUnresolvedBS Nothing cabalBS
@@ -490,7 +485,7 @@ buildPlanFixes mbp = mbp
 -- if available, otherwise downloading from Github.
 loadBuildPlan :: (StackMiniM env m, HasConfig env) => SnapName -> m BuildPlan
 loadBuildPlan name = do
-    stackage <- asks getStackRoot
+    stackage <- view stackRootL
     file' <- parseRelFile $ T.unpack file
     let fp = buildPlanDir stackage </> file'
     $logDebug $ "Decoding build plan from: " <> T.pack (toFilePath fp)
@@ -513,7 +508,7 @@ loadBuildPlan name = do
 
 buildBuildPlanUrl :: (MonadReader env m, HasConfig env) => SnapName -> Text -> m Text
 buildBuildPlanUrl name file = do
-    urls <- asks (configUrls . getConfig)
+    urls <- view $ configL.to configUrls
     return $
         case name of
              LTS _ _ -> urlsLtsBuildPlans urls <> "/" <> file
@@ -729,7 +724,7 @@ checkSnapBuildPlan
     -> SnapName
     -> m BuildPlanCheck
 checkSnapBuildPlan gpds flags snap = do
-    platform <- asks (configPlatform . getConfig)
+    platform <- view platformL
     mbp <- loadMiniBuildPlan snap
 
     let
@@ -1064,7 +1059,7 @@ parseCustomMiniBuildPlan mconfigPath0 url0 = do
          , mbpPackages = mempty
          }
     getCustomPlanDir = do
-        root <- asks $ configStackRoot . getConfig
+        root <- view stackRootL
         return $ root </> $(mkRelDir "custom-plan")
     doHash = SnapshotHash . B64URL.encode . SHA256.hash
 

@@ -455,7 +455,7 @@ instance Store MiniPackageInfo
 instance NFData MiniPackageInfo
 
 newtype GitSHA1 = GitSHA1 ByteString
-    deriving (Generic, Show, Eq, NFData, Store, Data, Typeable)
+    deriving (Generic, Show, Eq, NFData, Store, Data, Typeable, Ord, Hashable)
 
 newtype SnapshotHash = SnapshotHash { unShapshotHash :: ByteString }
     deriving (Generic, Show, Eq)

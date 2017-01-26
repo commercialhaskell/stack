@@ -122,7 +122,7 @@ createDependencyGraph dotOpts = do
   let graph = Map.fromList (localDependencies dotOpts (filter lpWanted locals))
   menv <- getMinimalEnvOverride
   installedMap <- fmap snd . fst4 <$> getInstalled menv
-                                                   (GetInstalledOpts False False)
+                                                   (GetInstalledOpts False False False)
                                                    sourceMap
   withLoadPackage menv (\loader -> do
     let depLoader =
@@ -275,7 +275,7 @@ printEdges package deps = F.forM_ deps (printEdge package)
 
 -- | Print an edge between the two package names
 printEdge :: MonadIO m => PackageName -> PackageName -> m ()
-printEdge from to = liftIO $ Text.putStrLn (Text.concat [ nodeName from, " -> ", nodeName to, ";"])
+printEdge from to' = liftIO $ Text.putStrLn (Text.concat [ nodeName from, " -> ", nodeName to', ";"])
 
 -- | Convert a package name to a graph node name.
 nodeName :: PackageName -> Text

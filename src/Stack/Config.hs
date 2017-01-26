@@ -51,7 +51,7 @@ import           Control.Monad.Catch (MonadThrow, MonadCatch, catchAll, throwM, 
 import           Control.Monad.Extra (firstJustM)
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger hiding (Loc)
-import           Control.Monad.Reader (ask, asks, runReaderT)
+import           Control.Monad.Reader (ask, runReaderT)
 import qualified Crypto.Hash.SHA256 as SHA256
 import           Data.Aeson.Extended
 import qualified Data.ByteString as S
@@ -70,6 +70,7 @@ import           Distribution.System (OS (..), Platform (..), buildPlatform)
 import qualified Distribution.Text
 import           Distribution.Version (simplifyVersionRange)
 import           GHC.Conc (getNumProcessors)
+import           Lens.Micro (lens)
 import           Network.HTTP.Client (parseUrlThrow)
 import           Network.HTTP.Download (download)
 import           Network.HTTP.Simple (httpJSON, getResponseBody)
@@ -154,7 +155,7 @@ getStackYaml
     :: (StackMiniM env m, HasConfig env)
     => m (Path Abs File)
 getStackYaml = do
-    config <- asks getConfig
+    config <- view configL
     case configMaybeProject config of
         Just (_project, stackYaml) -> return stackYaml
         Nothing -> liftM (</> stackDotYaml) (getImplicitGlobalProjectDir config)
@@ -183,7 +184,7 @@ makeConcreteResolver ar = do
         case ar of
             ARResolver r -> assert False $ return r
             ARGlobal -> do
-                config <- asks getConfig
+                config <- view configL
                 implicitGlobalDir <- getImplicitGlobalProjectDir config
                 let fp = implicitGlobalDir </> stackDotYaml
                 WithJSONWarnings (ProjectAndConfigMonoid project _) _warnings <-
@@ -237,7 +238,7 @@ configFromConfigMonoid configStackRoot configUserConfigPath mresolver mproject C
                 { indexName = IndexName "Hackage"
                 , indexLocation = ILGitHttp
                         "https://github.com/commercialhaskell/all-cabal-hashes.git"
-                        "https://s3.amazonaws.com/hackage.fpcomplete.com/00-index.tar.gz"
+                        "https://s3.amazonaws.com/hackage.fpcomplete.com/01-index.tar.gz"
                 , indexDownloadPrefix = "https://s3.amazonaws.com/hackage.fpcomplete.com/package/"
                 , indexGpgVerify = False
                 , indexRequireHashes = False
@@ -372,13 +373,15 @@ getDefaultLocalProgramsBase configStackRoot configPlatform override =
       _ -> return defaultBase
 
 -- | An environment with a subset of BuildConfig used for setup.
-data MiniConfig = MiniConfig GHCVariant Config
+data MiniConfig = MiniConfig
+    { mcGHCVariant :: !GHCVariant
+    , mcConfig :: !Config
+    }
 instance HasConfig MiniConfig where
-    getConfig (MiniConfig _ c) = c
-instance HasStackRoot MiniConfig
+    configL = lens mcConfig (\x y -> x { mcConfig = y })
 instance HasPlatform MiniConfig
 instance HasGHCVariant MiniConfig where
-    getGHCVariant (MiniConfig v _) = v
+    ghcVariantL = lens mcGHCVariant (\x y -> x { mcGHCVariant = y })
 
 -- | Load the 'MiniConfig'.
 loadMiniConfig
@@ -472,7 +475,7 @@ loadBuildConfig mproject config mresolver mcompiler = do
             if exists
                then do
                    ProjectAndConfigMonoid project _ <- loadConfigYaml dest
-                   when (getTerminal env) $
+                   when (view terminalL env) $
                        case mresolver of
                            Nothing ->
                                $logDebug ("Using resolver: " <> resolverName (projectResolver project) <>
@@ -543,16 +546,20 @@ loadBuildConfig mproject config mresolver mcompiler = do
     extraPackageDBs <- mapM resolveDir' (projectExtraPackageDBs project)
 
     return BuildConfig
-        { bcConfig = config
-        , bcResolver = loadedResolver
-        , bcWantedMiniBuildPlan = mbp
-        , bcPackageEntries = projectPackages project
-        , bcExtraDeps = projectExtraDeps project
-        , bcExtraPackageDBs = extraPackageDBs
-        , bcStackYaml = stackYamlFP
-        , bcFlags = projectFlags project
-        , bcImplicitGlobal = isNothing mproject
-        , bcGHCVariant = getGHCVariant miniConfig
+        { bcNoLocal = BuildConfigNoLocal
+            { bcConfig = config
+            , bcResolver = loadedResolver
+            , bcWantedMiniBuildPlan = mbp
+            , bcGHCVariant = view ghcVariantL miniConfig
+            }
+        , bcLocal = BuildConfigLocal
+            { bcPackageEntries = projectPackages project
+            , bcExtraDeps = projectExtraDeps project
+            , bcExtraPackageDBs = extraPackageDBs
+            , bcStackYaml = stackYamlFP
+            , bcFlags = projectFlags project
+            , bcImplicitGlobal = isNothing mproject
+            }
         }
 
 -- | Get packages from EnvConfig, downloading and cloning as necessary.
@@ -561,16 +568,17 @@ getLocalPackages
     :: (StackMiniM env m, HasEnvConfig env)
     => m (Map.Map (Path Abs Dir) TreatLikeExtraDep)
 getLocalPackages = do
-    cacheRef <- asks (envConfigPackagesRef . getEnvConfig)
+    cacheRef <- view $ envConfigLocalL.to envConfigPackagesRef
     mcached <- liftIO $ readIORef cacheRef
     case mcached of
         Just cached -> return cached
         Nothing -> do
             menv <- getMinimalEnvOverride
-            bconfig <- asks getBuildConfig
+            root <- view projectRootL
+            entries <- view $ buildConfigLocalL.to bcPackageEntries
             liftM (Map.fromList . concat) $ mapM
-                (resolvePackageEntry menv (bcRoot bconfig))
-                (bcPackageEntries bconfig)
+                (resolvePackageEntry menv root)
+                entries
 
 -- | Resolve a PackageEntry into a list of paths, downloading and cloning as
 -- necessary.
@@ -618,7 +626,7 @@ resolvePackageLocation
     -> m (Path Abs Dir)
 resolvePackageLocation _ projRoot (PLFilePath fp) = resolveDir projRoot fp
 resolvePackageLocation menv projRoot (PLRemote url remotePackageType) = do
-    workDir <- getWorkDir
+    workDir <- view workDirL
     let nameBeforeHashing = case remotePackageType of
             RPTHttp{} -> url
             RPTGit commit -> T.unwords [url, commit]

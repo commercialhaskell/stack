@@ -1,5 +1,63 @@
 # Changelog
 
+## 1.3.3 (unreleased)
+
+Release notes:
+
+Major changes:
+
+Behavior changes:
+
+* The default package metadata backend has been changed from Git to
+  the 01-index.tar.gz file, from the hackage-security project. This is
+  intended to address some download speed issues from Github for
+  people in certain geographic regions. There is now full support for
+  checking out specific cabal file revisions from downloaded tarballs
+  as well. If you manually specify a package index with only a Git
+  URL, Git will still be used. See
+  [#2780](https://github.com/commercialhaskell/stack/issues/2780)
+* When you provide the `--resolver` argument to the `stack unpack`
+  command, any packages passed in by name only will be looked up in
+  the given snapshot instead of taking the latest version. For
+  example, `stack --resolver lts-7.14 unpack mtl` will get version
+  2.2.1 of `mtl`, regardless of the latest version available in the
+  package indices. This will also force the same cabal file revision
+  to be used as is specified in the snapshot.
+
+  Unpacking via a package identifier (e.g. `stack --resolver lts-7.14
+  unpack mtl-2.2.1`) will ignore any settings in the snapshot and take
+  the most recent revision.
+
+  For backwards compatibility with tools relying on the presence of a
+  `00-index.tar`, Stack will copy the `01-index.tar` file to
+  `00-index.tar`. Note, however, that these files are different; most
+  importantly, 00-index contains only the newest revisions of cabal
+  files, while 01-index contains all versions. You may still need to
+  update your tooling.
+
+Other enhancements:
+
+* Internal cleanup: configuration types are now based much more on lenses
+* `stack build` and related commands now allow the user to disable debug symbol stripping
+  with new `--no-strip`, `--no-library-stripping`, and `--no-executable-shipping` flags,
+  closing [#877](https://github.com/commercialhaskell/stack/issues/877). 
+  Also turned error message for missing targets more readable ([#2384](https://github.com/commercialhaskell/stack/issues/2384))
+* `stack haddock` now shows index.html paths when documentation is already up to
+  date. Resolved [#781](https://github.com/commercialhaskell/stack/issues/781)
+* Respects the `custom-setup` field introduced in Cabal 1.24. This
+  supercedes any `explicit-setup-deps` settings in your `stack.yaml`
+  and trusts the package's `.cabal` file to explicitly state all its
+  dependencies.
+* If system package installation fails, `get-stack.sh` will fail as well. Also
+  shows warning suggesting to run `apt-get update` or similar, depending on the
+  OS.
+  ([#2898](https://github.com/commercialhaskell/stack/issues/2898))
+
+Bug fixes:
+
+* Bump to hpack 0.16.0 to avoid character encoding issues when reading and
+  writing on non-UTF8 systems.
+
 ## 1.3.2
 
 Bug fixes:

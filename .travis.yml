@@ -19,10 +19,6 @@ cache:
 matrix:
   fast_finish: true
   include:
-    - env: BUILD=cabal CABALVER=1.24 GHCVER=7.8.4 STACK_YAML=stack-7.8.yaml
-      compiler: ": #GHC 7.8.4"
-      addons: {apt: {packages: [cabal-install-1.24,ghc-7.8.4], sources: [hvr-ghc]}}
-
     - env: BUILD=cabal CABALVER=1.22 GHCVER=7.10.3
       compiler: ": #GHC 7.10.3"
       addons: {apt: {packages: [cabal-install-1.22,ghc-7.10.3], sources: [hvr-ghc]}}
@@ -30,10 +26,6 @@ matrix:
     - env: BUILD=cabal CABALVER=1.24 GHCVER=8.0.1
       compiler: ": #GHC 8.0.1"
       addons: {apt: {packages: [cabal-install-1.24,ghc-8.0.1], sources: [hvr-ghc]}}
-
-    - env: BUILD=stack GHCVER=7.8.4 STACK_YAML=stack-7.8.yaml
-      compiler: ": #stack 7.8.4"
-      addons: {apt: {packages: [ghc-7.8.4], sources: [hvr-ghc]}}
 
     - env: BUILD=stack STACK_YAML=stack.yaml
       compiler: ": #stack 7.10.3 osx"
@@ -89,7 +81,9 @@ install:
 script:
  - set -e; case "$BUILD" in
      style)
-       hlint src/ test/ --cpp-simple --hint=HLint.hs;
+       hlint src/ --hint=HLint.hs;
+       hlint src/ --cpp-define=WINDOWS=1 --hint=HLint.hs;
+       hlint test/ --cpp-simple --hint=HLint.hs;
        stack --system-ghc --no-terminal build --pedantic;;
      stack)
        stack --no-terminal test --haddock --no-haddock-deps --ghc-options="-Werror";;

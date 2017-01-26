@@ -2038,12 +2038,12 @@ users. Here's a quick rundown:
   most users won't use it regularly. It does what you'd expect: downloads a
   tarball and unpacks it.
 * `stack sdist` generates an uploading tarball containing your package code
-* `stack upload` uploads an sdist to Hackage. In the future, it will also
-  perform automatic GPG signing of your packages for additional security, when
-  configured.
-    * `--sign` provides a way to GPG sign your package & submit the result to
-      sig.commercialhaskell.org for storage in the sig-archive git
-      repo. (Signatures will be used later to verify package integrity.)
+* `stack upload` uploads an sdist to Hackage. As of
+  version [1.1.0](https://docs.haskellstack.org/en/latest/ChangeLog/#110) stack
+  will also attempt to GPG sign your packages as
+  per
+  [our blog post](https://www.fpcomplete.com/blog/2016/05/stack-security-gnupg-keys).
+    * `--no-signature` disables signing of packages
 * `stack upgrade` will build a new version of stack from source.
     * `--git` is a convenient way to get the most recent version from master for
       those testing and living on the bleeding edge.
@@ -2101,10 +2101,11 @@ but adds the `+RTS -xc` runtime option.
 
 ### DWARF
 
-`stack` currently doesn't support debugging and profiling with
-[DWARF information](https://ghc.haskell.org/trac/ghc/wiki/DWARF)
-as it strips executables automatically. This may change in the future (see
-[#877](https://github.com/commercialhaskell/stack/issues/877)).
+`stack` now supports debugging and profiling with
+[DWARF information](https://ghc.haskell.org/trac/ghc/wiki/DWARF),
+using the `--no-strip`, `--no-library-stripping`, and `--no-executable-shipping`
+flags to disable the default behavior of removing such information from compiled
+libraries and executables.
 
 ### Further reading
 
