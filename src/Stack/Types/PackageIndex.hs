@@ -8,6 +8,7 @@
 
 module Stack.Types.PackageIndex
     ( PackageDownload (..)
+    , HSPackageDownload (..)
     , PackageCache (..)
     , PackageCacheMap (..)
     , OffsetSize (..)
@@ -18,12 +19,15 @@ module Stack.Types.PackageIndex
     , IndexLocation(..)
     , SimplifiedIndexLocation (..)
     , simplifyIndexLocation
+    , HttpType (..)
+    , HackageSecurity (..)
     ) where
 
 import           Control.DeepSeq (NFData)
 import           Control.Monad (mzero)
 import           Data.Aeson.Extended
 import           Data.ByteString (ByteString)
+import qualified Data.Foldable as F
 import           Data.Hashable (Hashable)
 import           Data.Data (Data, Typeable)
 import           Data.HashMap.Strict (HashMap)
@@ -68,7 +72,7 @@ instance Store PackageCacheMap
 instance NFData PackageCacheMap
 
 data PackageDownload = PackageDownload
-    { pdSHA512 :: !ByteString
+    { pdSHA256 :: !ByteString
     , pdUrl    :: !ByteString
     , pdSize   :: !Word64
     }
@@ -76,9 +80,9 @@ data PackageDownload = PackageDownload
 instance Store PackageDownload
 instance NFData PackageDownload
 instance FromJSON PackageDownload where
-    parseJSON = withObject "Package" $ \o -> do
+    parseJSON = withObject "PackageDownload" $ \o -> do
         hashes <- o .: "package-hashes"
-        sha512 <- maybe mzero return (Map.lookup ("SHA512" :: Text) hashes)
+        sha256 <- maybe mzero return (Map.lookup ("SHA256" :: Text) hashes)
         locs <- o .: "package-locations"
         url <-
             case reverse locs of
@@ -86,9 +90,26 @@ instance FromJSON PackageDownload where
                 x:_ -> return x
         size <- o .: "package-size"
         return PackageDownload
-            { pdSHA512 = encodeUtf8 sha512
+            { pdSHA256 = encodeUtf8 sha256
             , pdUrl = encodeUtf8 url
             , pdSize = size
+            }
+
+-- | Hackage Security provides a different JSON format, we'll have our
+-- own JSON parser for it.
+newtype HSPackageDownload = HSPackageDownload { unHSPackageDownload :: PackageDownload }
+instance FromJSON HSPackageDownload where
+    parseJSON = withObject "HSPackageDownload" $ \o1 -> do
+        o2 <- o1 .: "signed"
+        Object o3 <- o2 .: "targets"
+        Object o4:_ <- return $ F.toList o3
+        len <- o4 .: "length"
+        hashes <- o4 .: "hashes"
+        sha256 <- hashes .: "sha256"
+        return $ HSPackageDownload PackageDownload
+            { pdSHA256 = encodeUtf8 sha256
+            , pdSize = len
+            , pdUrl = ""
             }
 
 -- | Unique name for a package index
@@ -105,20 +126,36 @@ instance FromJSON IndexName where
             Left e -> fail $ "Invalid index name: " ++ show e
             Right _ -> return $ IndexName $ encodeUtf8 t
 
+data HttpType = HTHackageSecurity !HackageSecurity | HTVanilla
+    deriving (Show, Eq, Ord)
+
+data HackageSecurity = HackageSecurity
+    { hsKeyIds :: ![Text]
+    , hsKeyThreshold :: !Int
+    }
+    deriving (Show, Eq, Ord)
+instance FromJSON HackageSecurity where
+    parseJSON = withObject "HackageSecurity" $ \o -> HackageSecurity
+        <$> o .: "keyids"
+        <*> o .: "key-threshold"
+
 -- | Location of the package index. This ensures that at least one of Git or
 -- HTTP is available.
-data IndexLocation = ILGit !Text | ILHttp !Text | ILGitHttp !Text !Text
+data IndexLocation
+    = ILGit !Text
+    | ILHttp !Text !HttpType
+    | ILGitHttp !Text !Text !HttpType
     deriving (Show, Eq, Ord)
 
 -- | Simplified 'IndexLocation', which will either be a Git repo or HTTP URL.
-data SimplifiedIndexLocation = SILGit !Text | SILHttp !Text
+data SimplifiedIndexLocation = SILGit !Text | SILHttp !Text !HttpType
     deriving (Show, Eq, Ord)
 
 simplifyIndexLocation :: IndexLocation -> SimplifiedIndexLocation
 simplifyIndexLocation (ILGit t) = SILGit t
-simplifyIndexLocation (ILHttp t) = SILHttp t
+simplifyIndexLocation (ILHttp t ht) = SILHttp t ht
 -- Prefer HTTP over Git
-simplifyIndexLocation (ILGitHttp _ t) = SILHttp t
+simplifyIndexLocation (ILGitHttp _ t ht) = SILHttp t ht
 
 -- | Information on a single package index
 data PackageIndex = PackageIndex
@@ -139,14 +176,16 @@ instance FromJSON (WithJSONWarnings PackageIndex) where
         prefix <- o ..: "download-prefix"
         mgit <- o ..:? "git"
         mhttp <- o ..:? "http"
+        mhackageSecurity <- o ..:? "hackage-security"
+        let httpType = maybe HTVanilla HTHackageSecurity mhackageSecurity
         loc <-
             case (mgit, mhttp) of
                 (Nothing, Nothing) -> fail $
                     "Must provide either Git or HTTP URL for " ++
                     T.unpack (indexNameText name)
                 (Just git, Nothing) -> return $ ILGit git
-                (Nothing, Just http) -> return $ ILHttp http
-                (Just git, Just http) -> return $ ILGitHttp git http
+                (Nothing, Just http) -> return $ ILHttp http httpType
+                (Just git, Just http) -> return $ ILGitHttp git http httpType
         gpgVerify <- o ..:? "gpg-verify" ..!= False
         reqHashes <- o ..:? "require-hashes" ..!= False
         return PackageIndex
