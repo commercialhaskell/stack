@@ -16,5 +16,5 @@ extra-deps:
 - pid1-0.1.0.0
 - store-0.3
 - store-core-0.3
-- hpack-0.16.0
+- hpack-0.17.0
 - aeson-1.0.2.1

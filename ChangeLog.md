@@ -52,6 +52,7 @@ Other enhancements:
   shows warning suggesting to run `apt-get update` or similar, depending on the
   OS.
   ([#2898](https://github.com/commercialhaskell/stack/issues/2898))
+* Bump to hpack 0.17.0 to allow `custom-setup` and `!include "..."` in `package.yaml`.
 
 Bug fixes:
 
