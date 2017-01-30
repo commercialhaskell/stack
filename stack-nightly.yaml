@@ -9,4 +9,4 @@ nix:
   packages:
     - zlib
 extra-deps:
-- hpack-0.16.0
+- hpack-0.17.0

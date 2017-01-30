@@ -55,6 +55,7 @@ Other enhancements:
 * When `stack ghci` is run with a config with no packages (e.g. global project),
   it will now look for source files in the current work dir.
   ([#2878](https://github.com/commercialhaskell/stack/issues/2878))
+* Bump to hpack 0.17.0 to allow `custom-setup` and `!include "..."` in `package.yaml`.
 
 Bug fixes:
 
