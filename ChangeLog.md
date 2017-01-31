@@ -34,6 +34,9 @@ Behavior changes:
   importantly, 00-index contains only the newest revisions of cabal
   files, while 01-index contains all versions. You may still need to
   update your tooling.
+* Passing `--(no-)nix-*` options now no longer implies `--nix`, except for
+  `--nix-pure`, so that the user preference whether or not to use Nix is
+  honored even in the presence of options that change the Nix behavior.
 
 Other enhancements:
 
