@@ -40,7 +40,7 @@ Other enhancements:
 * Internal cleanup: configuration types are now based much more on lenses
 * `stack build` and related commands now allow the user to disable debug symbol stripping
   with new `--no-strip`, `--no-library-stripping`, and `--no-executable-shipping` flags,
-  closing [#877](https://github.com/commercialhaskell/stack/issues/877). 
+  closing [#877](https://github.com/commercialhaskell/stack/issues/877).
   Also turned error message for missing targets more readable ([#2384](https://github.com/commercialhaskell/stack/issues/2384))
 * `stack haddock` now shows index.html paths when documentation is already up to
   date. Resolved [#781](https://github.com/commercialhaskell/stack/issues/781)
@@ -52,6 +52,9 @@ Other enhancements:
   shows warning suggesting to run `apt-get update` or similar, depending on the
   OS.
   ([#2898](https://github.com/commercialhaskell/stack/issues/2898))
+* When `stack ghci` is run with a config with no packages (e.g. global project),
+  it will now look for source files in the current work dir.
+  ([#2878](https://github.com/commercialhaskell/stack/issues/2878))
 
 Bug fixes:
 

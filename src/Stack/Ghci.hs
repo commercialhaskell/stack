@@ -351,10 +351,11 @@ runGhci GhciOpts{..} targets mainIsTargets pkgs = do
             menv <- liftIO $ configEnvOverride config defaultEnvSettings
             execSpawn menv
                  (fromMaybe (compilerExeName wc) ghciGhcCommand)
-                 ("--interactive" :
-                 -- This initial "-i" resets the include directories to not
-                 -- include CWD.
-                  "-i" :
+                 (("--interactive" : ) $
+                 -- This initial "-i" resets the include directories to
+                 -- not include CWD. If there aren't any packages, CWD
+                 -- is included.
+                  (if null pkgs then id else ("-i" : )) $
                   odir <> pkgopts <> ghciArgs <> extras)
         interrogateExeForRenderFunction = do
             menv <- liftIO $ configEnvOverride config defaultEnvSettings
