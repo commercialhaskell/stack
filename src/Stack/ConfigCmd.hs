@@ -14,7 +14,6 @@ module Stack.ConfigCmd
        ,cfgCmdName) where
 
 import           Control.Applicative
-import           Control.Exception
 import           Control.Monad
 import           Control.Monad.Catch (throwM)
 import           Control.Monad.IO.Class
@@ -24,7 +23,6 @@ import qualified Data.HashMap.Strict as HMap
 import           Data.Monoid
 import           Data.Text (Text)
 import qualified Data.Text as T
-import           Data.Typeable
 import qualified Data.Yaml as Yaml
 import qualified Options.Applicative as OA
 import qualified Options.Applicative.Types as OA
@@ -32,7 +30,8 @@ import           Path
 import           Path.IO
 import           Prelude -- Silence redundant import warnings
 import           Stack.BuildPlan
-import           Stack.Config (makeConcreteResolver, getProjectConfig)
+import           Stack.Config (makeConcreteResolver, getProjectConfig, getImplicitGlobalProjectDir)
+import           Stack.Constants
 import           Stack.Types.Config
 import           Stack.Types.Resolver
 
@@ -49,16 +48,6 @@ data CommandScope
       --   typically at @~/.stack/config.yaml@.
     | CommandScopeProject
       -- ^ Apply changes to the project @stack.yaml@.
-    deriving (Show)
-
-data ConfigCmdError
-    = ExpectedLocalProject
-    deriving (Typeable)
-
-instance Exception ConfigCmdError
-instance Show ConfigCmdError where
-    show ExpectedLocalProject =
-        "Since --global was not used, expected to find a local project configuration.  However, none was found."
 
 configCmdSetScope :: ConfigCmdSet -> CommandScope
 configCmdSetScope (ConfigCmdSetResolver _) = CommandScopeProject
@@ -79,9 +68,8 @@ cfgCmdSet go cmd = do
                      mstackYaml <- getProjectConfig mstackYamlOption
                      case mstackYaml of
                          Just stackYaml -> return stackYaml
-                         Nothing -> throwM ExpectedLocalProject
+                         Nothing -> liftM (</> stackDotYaml) (getImplicitGlobalProjectDir conf)
                  CommandScopeGlobal -> return (configUserConfigPath conf))
-    liftIO $ print (configCmdSetScope cmd, configFilePath)
     -- We don't need to worry about checking for a valid yaml here
     (config :: Yaml.Object) <-
         liftIO (Yaml.decodeFileEither configFilePath) >>= either throwM return
