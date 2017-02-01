@@ -72,6 +72,9 @@ Bug fixes:
   like base. ([#2871](https://github.com/commercialhaskell/stack/issues/2871))
 * `stack setup` now correctly indicates when it uses system ghc
   ([#2963](https://github.com/commercialhaskell/stack/issues/2963))
+* Fix to `stack config set`, in 1.3.2 it always applied to
+  the global project.
+  ([#2709](https://github.com/commercialhaskell/stack/issues/2709))
 
 ## 1.3.2
 

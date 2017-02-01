@@ -857,7 +857,7 @@ cfgSetCmd :: ConfigCmd.ConfigCmdSet -> GlobalOpts -> IO ()
 cfgSetCmd co go@GlobalOpts{..} =
     withMiniConfigAndLock
         go
-        (cfgCmdSet co)
+        (cfgCmdSet go co)
 
 imgDockerCmd :: (Bool, [Text]) -> GlobalOpts -> IO ()
 imgDockerCmd (rebuild,images) go@GlobalOpts{..} = do

@@ -38,6 +38,7 @@ module Stack.Config
   ,getInContainer
   ,getInNixShell
   ,defaultConfigYaml
+  ,getProjectConfig
   ) where
 
 import qualified Codec.Archive.Tar as Tar
