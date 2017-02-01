@@ -75,6 +75,8 @@ Bug fixes:
 * Fix to `stack config set`, in 1.3.2 it always applied to
   the global project.
   ([#2709](https://github.com/commercialhaskell/stack/issues/2709))
+* Previously, cabal files without exe or lib would fail on the "copy" step.
+  ([#2862](https://github.com/commercialhaskell/stack/issues/2862))
 
 ## 1.3.2
 
