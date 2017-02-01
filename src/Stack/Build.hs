@@ -97,7 +97,7 @@ build setLocalFiles mbuildLk boptsCli = fixCodePage $ do
     let symbols = not (boptsLibStrip bopts || boptsExeStrip bopts)
     menv <- getMinimalEnvOverride
 
-    (targets, mbp, locals, extraToBuild, extraDeps, sourceMap) <- loadSourceMapFull NeedTargets boptsCli
+    (targets, mbp, locals, extraToBuild, extraDeps, sourceMap) <- loadSourceMapFull True NeedTargets boptsCli
 
     -- Set local files, necessary for file watching
     stackYaml <- view stackYamlL

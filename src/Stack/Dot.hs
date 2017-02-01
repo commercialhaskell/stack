@@ -115,7 +115,7 @@ createDependencyGraph :: (StackM env m, HasEnvConfig env, MonadBaseUnlift IO m)
                        => DotOpts
                        -> m (Map PackageName (Set PackageName, DotPayload))
 createDependencyGraph dotOpts = do
-  (locals,sourceMap) <- loadSourceMap NeedTargets defaultBuildOptsCLI
+  (_, _, locals, _, _, sourceMap) <- loadSourceMapFull False NeedTargets defaultBuildOptsCLI
       { boptsCLITargets = dotTargets dotOpts
       , boptsCLIFlags = dotFlags dotOpts
       }

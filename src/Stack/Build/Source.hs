@@ -88,11 +88,12 @@ loadSourceMap :: (StackM env m, HasEnvConfig env)
                    , SourceMap
                    )
 loadSourceMap needTargets boptsCli = do
-    (_, _, locals, _, _, sourceMap) <- loadSourceMapFull needTargets boptsCli
+    (_, _, locals, _, _, sourceMap) <- loadSourceMapFull True needTargets boptsCli
     return (locals, sourceMap)
 
 loadSourceMapFull :: (StackM env m, HasEnvConfig env)
-                  => NeedTargets
+                  => Bool
+                  -> NeedTargets
                   -> BuildOptsCLI
                   -> m ( Map PackageName SimpleTarget
                        , MiniBuildPlan
@@ -101,7 +102,7 @@ loadSourceMapFull :: (StackM env m, HasEnvConfig env)
                        , Map PackageName Version -- extra-deps from configuration and cli
                        , SourceMap
                        )
-loadSourceMapFull needTargets boptsCli = do
+loadSourceMapFull omitWiredIn needTargets boptsCli = do
     bconfig <- view buildConfigL
     rawLocals <- getLocalPackageViews
     (mbp0, cliExtraDeps, targets) <- parseTargetsFromBuildOptsWith rawLocals needTargets boptsCli
@@ -173,9 +174,17 @@ loadSourceMapFull needTargets boptsCli = do
             , flip Map.mapWithKey (mbpPackages mbp) $ \n mpi ->
                 let configOpts = getGhcOptions bconfig boptsCli n False False
                  in PSUpstream (mpiVersion mpi) Snap (mpiFlags mpi) (mpiGhcOptions mpi ++ configOpts) (mpiGitSHA1 mpi)
-            ] `Map.difference` Map.fromList (map (, ()) (HashSet.toList wiredInPackages))
+            ]
+        -- TODO: This conditional was introduced in order to fix "stack
+        -- list-dependencies --license" (#2871) for wired-in-packages.
+        -- Not sure why they are omitted for other uses of
+        -- loadSourceMap.  Is it an optimization?
+        sourceMap' =
+            if omitWiredIn
+                then sourceMap `Map.difference` Map.fromList (map (, ()) (HashSet.toList wiredInPackages))
+                else sourceMap
 
-    return (targets, mbp, locals, nonLocalTargets, extraDeps0, sourceMap)
+    return (targets, mbp, locals, nonLocalTargets, extraDeps0, sourceMap')
 
 -- | All flags for a local package
 getLocalFlags
