@@ -175,10 +175,10 @@ loadSourceMapFull omitWiredIn needTargets boptsCli = do
                 let configOpts = getGhcOptions bconfig boptsCli n False False
                  in PSUpstream (mpiVersion mpi) Snap (mpiFlags mpi) (mpiGhcOptions mpi ++ configOpts) (mpiGitSHA1 mpi)
             ]
-        -- TODO: This conditional was introduced in order to fix "stack
+        -- This conditional was introduced in order to fix "stack
         -- list-dependencies --license" (#2871) for wired-in-packages.
-        -- Not sure why they are omitted for other uses of
-        -- loadSourceMap.  Is it an optimization?
+        -- Normally, they are omitted as they shouldn't be considered
+        -- as packages available for installation.
         sourceMap' =
             if omitWiredIn
                 then sourceMap `Map.difference` Map.fromList (map (, ()) (HashSet.toList wiredInPackages))
