@@ -1306,7 +1306,8 @@ singleBuild runInBase ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} in
             cabal False (concat [["haddock", "--html", "--hoogle", "--html-location=../$pkg-$version/"]
                                 ,sourceFlag, ["--internal" | boptsHaddockInternal eeBuildOpts]])
 
-        unless isFinalBuild $ withMVar eeInstallLock $ \() -> do
+        let shouldCopy = not isFinalBuild && (packageHasLibrary package || not (Set.null (packageExes package)))
+        when shouldCopy $ withMVar eeInstallLock $ \() -> do
             announce "copy/register"
             eres <- try $ cabal False ["copy"]
             case eres of
