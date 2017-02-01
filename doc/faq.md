@@ -488,3 +488,7 @@ information.
 
 Use the `SYSTEM_CERTIFICATE_PATH` environment variable to point at the directory
 where you keep your SSL certificates.
+
+## How do I get `verbose` output from GHC when I build with cabal?
+
+Unfortunately `stack build` does not have an obvious equivalent to `cabal build -vN` which shows verbose output from GHC when building. The easiest workaround is to add `ghc-options: -vN` to the .cabal file or pass it via `stack build --ghc-options="-v"`.
