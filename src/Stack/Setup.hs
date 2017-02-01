@@ -237,7 +237,7 @@ setupEnv mResolveMissingGHC = do
             , soptsGHCBindistURL = Nothing
             }
 
-    (mghcBin, compilerBuild) <- ensureCompiler sopts
+    (mghcBin, compilerBuild, _) <- ensureCompiler sopts
 
     -- Modify the initial environment to include the GHC path, if a local GHC
     -- is being used
@@ -367,7 +367,7 @@ addIncludeLib (ExtraDirs _bins includes libs) config = config
 -- | Ensure compiler (ghc or ghcjs) is installed and provide the PATHs to add if necessary
 ensureCompiler :: (StackM env m, HasConfig env, HasGHCVariant env)
                => SetupOpts
-               -> m (Maybe ExtraDirs, CompilerBuild)
+               -> m (Maybe ExtraDirs, CompilerBuild, Bool)
 ensureCompiler sopts = do
     let wc = whichCompiler (soptsWantedCompiler sopts)
     when (getGhcVersion (soptsWantedCompiler sopts) < $(mkVersion "7.8")) $ do
@@ -513,7 +513,7 @@ ensureCompiler sopts = do
 
     when (soptsSanityCheck sopts) $ sanityCheck menv wc
 
-    return (mpaths, compilerBuild)
+    return (mpaths, compilerBuild, needLocal)
 
 -- | Determine which GHC build to use depending on which shared libraries are available
 -- on the system.

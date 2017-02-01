@@ -288,7 +288,7 @@ setupCompiler compiler = do
           , "compiler available on your PATH." ]
 
     config <- view configL
-    fst <$> ensureCompiler SetupOpts
+    (dirs, _, _) <- ensureCompiler SetupOpts
         { soptsInstallIfMissing  = configInstallGHC config
         , soptsUseSystem         = configSystemGHC config
         , soptsWantedCompiler    = compiler
@@ -304,6 +304,7 @@ setupCompiler compiler = do
         , soptsSetupInfoYaml    = defaultSetupInfoYaml
         , soptsGHCBindistURL     = Nothing
         }
+    return dirs
 
 setupCabalEnv
     :: (StackM env m, HasConfig env, HasGHCVariant env)

@@ -70,6 +70,8 @@ Bug fixes:
 * `stack ghci` will no longer ignore hsSourceDirs that contain `..`. ([#2895](https://github.com/commercialhaskell/stack/issues/2895))
 * `stack list-dependencies --license` now works for wired-in-packages,
   like base. ([#2871](https://github.com/commercialhaskell/stack/issues/2871))
+* `stack setup` now correctly indicates when it uses system ghc
+  ([#2871](https://github.com/commercialhaskell/stack/issues/2871))
 
 ## 1.3.2
 

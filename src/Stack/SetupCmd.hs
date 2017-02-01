@@ -86,7 +86,7 @@ setup
     -> m ()
 setup SetupCmdOpts{..} wantedCompiler compilerCheck mstack = do
     Config{..} <- view configL
-    mpaths <- fst <$> ensureCompiler SetupOpts
+    (_, _, sandboxedGhc) <- ensureCompiler SetupOpts
         { soptsInstallIfMissing = True
         , soptsUseSystem = configSystemGHC && not scoForceReinstall
         , soptsWantedCompiler = wantedCompiler
@@ -104,9 +104,9 @@ setup SetupCmdOpts{..} wantedCompiler compilerCheck mstack = do
     let compiler = case wantedCompiler of
             GhcVersion _ -> "GHC"
             GhcjsVersion {} -> "GHCJS"
-    case mpaths of
-        Nothing -> $logInfo $ "stack will use the " <> compiler <> " on your PATH"
-        Just _ -> $logInfo $ "stack will use a sandboxed " <> compiler <> " it installed"
+    if sandboxedGhc
+        then $logInfo $ "stack will use a sandboxed " <> compiler <> " it installed"
+        else $logInfo $ "stack will use the " <> compiler <> " on your PATH"
     $logInfo "For more information on paths, see 'stack path' and 'stack exec env'"
     $logInfo $ "To use this " <> compiler <> " and packages outside of a project, consider using:"
     $logInfo "stack ghc, stack ghci, stack runghc, or stack exec"
