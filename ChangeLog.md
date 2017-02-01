@@ -71,7 +71,7 @@ Bug fixes:
 * `stack list-dependencies --license` now works for wired-in-packages,
   like base. ([#2871](https://github.com/commercialhaskell/stack/issues/2871))
 * `stack setup` now correctly indicates when it uses system ghc
-  ([#2871](https://github.com/commercialhaskell/stack/issues/2871))
+  ([#2963](https://github.com/commercialhaskell/stack/issues/2963))
 
 ## 1.3.2
 
