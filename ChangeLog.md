@@ -59,6 +59,9 @@ Other enhancements:
   it will now look for source files in the current work dir.
   ([#2878](https://github.com/commercialhaskell/stack/issues/2878))
 * Bump to hpack 0.17.0 to allow `custom-setup` and `!include "..."` in `package.yaml`.
+* The script interpreter will now output error logging.  In particular,
+  this means it will output info about plan construction errors.
+  ([#2879](https://github.com/commercialhaskell/stack/issues/2879))
 
 Bug fixes:
 

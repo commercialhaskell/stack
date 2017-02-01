@@ -469,7 +469,8 @@ commandLineHandler progName isInterpreter = complicatedOptions
         extraHelpOption hide progName (Docker.dockerCmdName ++ "*") Docker.dockerHelpOptName <*>
         extraHelpOption hide progName (Nix.nixCmdName ++ "*") Nix.nixHelpOptName <*>
         globalOptsParser kind (if isInterpreter
-                                then Just $ LevelOther "silent"
+                                -- Silent except when errors occur - see #2879
+                                then Just LevelError
                                 else Nothing)
         where hide = kind /= OuterGlobalOpts
 
