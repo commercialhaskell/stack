@@ -13,7 +13,8 @@ module Stack.Types.PackageIdentifier
   , parsePackageIdentifierFromString
   , packageIdentifierParser
   , packageIdentifierString
-  , packageIdentifierText )
+  , packageIdentifierText
+  , toCabalPackageIdentifier )
   where
 
 import           Control.Applicative
@@ -27,6 +28,7 @@ import           Data.Hashable
 import           Data.Store (Store)
 import           Data.Text (Text)
 import qualified Data.Text as T
+import qualified Distribution.Package as C
 import           GHC.Generics
 import           Prelude hiding (FilePath)
 import           Stack.Types.PackageName
@@ -101,3 +103,9 @@ packageIdentifierString (PackageIdentifier n v) = show n ++ "-" ++ show v
 -- | Get a Text representation of the package identifier; name-ver.
 packageIdentifierText :: PackageIdentifier -> Text
 packageIdentifierText = T.pack .  packageIdentifierString
+
+toCabalPackageIdentifier :: PackageIdentifier -> C.PackageIdentifier
+toCabalPackageIdentifier x =
+    C.PackageIdentifier
+        (toCabalPackageName (packageIdentifierName x))
+        (toCabalVersion (packageIdentifierVersion x))

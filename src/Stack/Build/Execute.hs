@@ -64,6 +64,7 @@ import           Data.Time.Clock (getCurrentTime)
 import           Data.Traversable (forM)
 import           Data.Tuple
 import qualified Distribution.PackageDescription as C
+import qualified Distribution.Simple.Build.Macros as C
 import           Distribution.System            (OS (Windows),
                                                  Platform (Platform))
 import qualified Distribution.Text as C
@@ -943,7 +944,7 @@ withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} md
                     : ["-hide-all-packages"]
                     )
 
-                getPackageArgs =
+                getPackageArgs setupDir =
                     case (packageSetupDeps package, mdeps) of
                         -- The package is using the Cabal custom-setup
                         -- configuration introduced in Cabal 1.24. In
@@ -957,19 +958,25 @@ withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} md
                                     Nothing -> do
                                         $logWarn "In getPackageArgs: custom-setup in use, but no dependency map present"
                                         return Map.empty
-                            depsArgs <- forM (Map.toList customSetupDeps) $ \(name, range) -> do
+                            matchedDeps <- forM (Map.toList customSetupDeps) $ \(name, range) -> do
                                 let matches (PackageIdentifier name' version) =
                                         name == name' &&
                                         version `withinRange` range
-                                case map snd (filter (matches . fst) (Map.toList allDeps)) of
+                                case filter (matches . fst) (Map.toList allDeps) of
                                     x:xs -> do
                                         unless (null xs)
                                             ($logWarn (T.pack ("Found multiple installed packages for custom-setup dep: " ++ packageNameString name)))
-                                        return ("-package-id=" ++ ghcPkgIdString x)
+                                        return ("-package-id=" ++ ghcPkgIdString (snd x), Just (toCabalPackageIdentifier (fst x)))
                                     [] -> do
                                         $logWarn (T.pack ("Could not find custom-setup dep: " ++ packageNameString name))
-                                        return ("--package=" ++ packageNameString name)
-                            return (packageDBArgs ++ depsArgs)
+                                        return ("--package=" ++ packageNameString name, Nothing)
+                            let depsArgs = map fst matchedDeps
+                            -- Generate setup_macros.h and provide it to ghc
+                            let macroDeps = mapMaybe snd matchedDeps
+                                cppMacrosFile = toFilePath $ setupDir </> $(mkRelFile "setup_macros.h")
+                                cppArgs = ["-optP-include", "-optP" ++ cppMacrosFile]
+                            liftIO $ S.writeFile cppMacrosFile (encodeUtf8 (T.pack (C.generatePackageVersionMacros macroDeps)))
+                            return (packageDBArgs ++ depsArgs ++ cppArgs)
 
                         -- This branch is taken when
                         -- 'explicit-setup-deps' is requested in your
@@ -1060,7 +1067,7 @@ withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} md
                         case compiler of
                             Ghc -> getGhcPath
                             Ghcjs -> getGhcjsPath
-                    packageArgs <- getPackageArgs
+                    packageArgs <- getPackageArgs setupDir
                     runExe compilerPath $
                         [ "--make"
                         , "-odir", toFilePathNoTrailingSep setupDir
