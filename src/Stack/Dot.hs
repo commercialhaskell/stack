@@ -2,6 +2,7 @@
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 module Stack.Dot (dot
                  ,listDependencies
@@ -30,7 +31,7 @@ import           Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Text.IO as Text
 import qualified Data.Traversable as T
-import           Distribution.License (License)
+import           Distribution.License (License(BSD3))
 import           Prelude -- Fix redundant import warnings
 import           Stack.Build (withLoadPackage)
 import           Stack.Build.Installed (getInstalled, GetInstalledOpts(..))
@@ -125,16 +126,16 @@ createDependencyGraph dotOpts = do
                                                    (GetInstalledOpts False False False)
                                                    sourceMap
   withLoadPackage menv (\loader -> do
-    let depLoader =
-          createDepLoader sourceMap
-                          installedMap
-                          (fmap4 (packageAllDeps &&& makePayload) loader)
+    let depLoader = createDepLoader sourceMap installedMap loadPackageDeps
+        loadPackageDeps name version flags ghcOptions
+            -- Skip packages that can't be loaded - see
+            -- https://github.com/commercialhaskell/stack/issues/2967
+            | name `elem` [$(mkPackageName "rts"), $(mkPackageName "ghc")] =
+                return (Set.empty, DotPayload (Just version) (Just BSD3))
+            | otherwise = fmap (packageAllDeps &&& makePayload)
+                               (loader name version flags ghcOptions)
     liftIO $ resolveDependencies (dotDependencyDepth dotOpts) graph depLoader)
-  where -- fmap a function over the result of a function with 3 arguments
-        fmap4 :: Functor f => (r -> r') -> (a -> b -> c -> d -> f r) -> a -> b -> c -> d -> f r'
-        fmap4 f g a b c d = f <$> g a b c d
-
-        fst4 :: (a,b,c,d) -> a
+  where fst4 :: (a,b,c,d) -> a
         fst4 (x,_,_,_) = x
 
         makePayload pkg = DotPayload (Just $ packageVersion pkg) (Just $ packageLicense pkg)
