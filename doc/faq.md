@@ -492,3 +492,6 @@ where you keep your SSL certificates.
 ## How do I get `verbose` output from GHC when I build with cabal?
 
 Unfortunately `stack build` does not have an obvious equivalent to `cabal build -vN` which shows verbose output from GHC when building. The easiest workaround is to add `ghc-options: -vN` to the .cabal file or pass it via `stack build --ghc-options="-v"`.
+
+## Does Stack support the Hpack specification?
+Yes. You can run `stack init` as usual and Stack will create a matching `stack.yaml`.
