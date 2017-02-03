@@ -113,6 +113,8 @@ upgrade gConfigMonoid mresolver builtHash (UpgradeOpts mbo mso) =
         (Nothing, Nothing) -> error "You must allow either binary or source upgrade paths"
         (Just bo, Nothing) -> binary bo
         (Nothing, Just so) -> source so
+        -- See #2977 - if --git or --git-repo is specified, do source upgrade.
+        (_, Just so@(SourceOpts (Just repo))) -> source so
         (Just bo, Just so) -> binary bo `catchAny` \e -> do
             $logWarn "Exception occured when trying to perform binary upgrade:"
             $logWarn $ T.pack $ show e

@@ -77,6 +77,9 @@ Bug fixes:
   ([#2709](https://github.com/commercialhaskell/stack/issues/2709))
 * Previously, cabal files without exe or lib would fail on the "copy" step.
   ([#2862](https://github.com/commercialhaskell/stack/issues/2862))
+* `stack upgrade --git` now works properly.  Workaround for affected
+  versions (>= 1.3.0) is to instead run `stack upgrade --git --source-only`.
+  ([#2977](https://github.com/commercialhaskell/stack/issues/2977))
 
 ## 1.3.2
 
