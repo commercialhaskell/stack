@@ -5,11 +5,11 @@ the stack.yaml file. Note that this page is likely to be both *incomplete* and
 sometimes *inaccurate*. If you see such cases, please update the page, and if
 you're not sure how, open an issue labeled "question".
 
-The stack.yaml configuration options break down into [project-specific](#project-config) options in:
+The stack.yaml configuration options break down into [project-specific](#project-specific-config) options in:
 
 - `<project dir>/stack.yaml`
 
-and [non-project-specific](#non-project-config) options in:
+and [non-project-specific](#non-project-specific-config) options in:
 
 - `/etc/stack/config.yaml` -- for system global non-project default options
 -  `~/.stack/config.yaml` -- for user non-project default options
