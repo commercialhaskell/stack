@@ -25,16 +25,16 @@ snapshots.
 
 For `ghcjs` based on `ghc-7.10.3` one could try:
 ```yaml
-resolver: lts-6.25
-compiler: ghcjs-0.2.0.9006025_ghc-7.10.3
+resolver: lts-6.30
+compiler: ghcjs-0.2.0.9006030_ghc-7.10.3
 compiler-check: match-exact
 
 setup-info:
   ghcjs:
     source:
-      ghcjs-0.2.0.9006025_ghc-7.10.3:
-         url: http://ghcjs.tolysz.org/lts-6.25-9006025.tar.gz
-         sha1: 3c87228579b55c05e227a7876682c2a7d4c9c007
+      ghcjs-0.2.0.9006030_ghc-7.10.3:
+         url: http://ghcjs.tolysz.org/lts-6.30-9006030.tar.gz
+         sha1: 2371e2ffe9e8781808b7a04313e6a0065b64ee51
 ```
 
 Or for the latest one based on `ghc-8.0.1` (with more features):
@@ -68,6 +68,7 @@ Older resolvers:
 | lts-7.3 || http://ghcjs.tolysz.org/ghc-8.0-2016-10-11-lts-7.3-9007003.tar.gz | 3196fd5eaed670416083cf3678396d02c50096de |
 | lts-7.2 || http://ghcjs.tolysz.org/ghc-8.0-2016-10-01-lts-7.2-9007002.tar.gz | a41ae415328e2b257d40724d13d1386390c26322 | 
 | lts-7.1 || http://ghcjs.tolysz.org/ghc-8.0-2016-09-26-lts-7.1-9007001-mem.tar.gz | e640724883238593e2d2f7f03991cb413ec0347b |
+| lts-6.25 | 0.2.0 | http://ghcjs.tolysz.org/lts-6.25-9006025.tar.gz | 3c87228579b55c05e227a7876682c2a7d4c9c007 |
 | lts-6.21 || http://ghcjs.tolysz.org/lts-6.21-9006021.tar.gz | 80b83f85dcec182093418e843979f4cee092fa85 |
 | lts-6.20 || http://ghcjs.tolysz.org/lts-6.20-9006020.tar.gz | a6cea90cd8121eee3afb201183c6e9bd6bacd94a |
 | lts-6.19 || http://ghcjs.tolysz.org/lts-6.19-9006019.tar.gz | ef4264d5a93b269ee4ec8f9d5139da030331d65a |
