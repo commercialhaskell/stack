@@ -2,6 +2,7 @@ Do you have a question regarding stack's usage that isn't covered by [the docs](
 In that case please ask your question on [Stack Overflow](http://stackoverflow.com) and use [the haskell-stack tag](http://stackoverflow.com/questions/tagged/haskell-stack).
 This way your question will be more easily discoverable by other people with the same question.
 
+Question related to stack project templates? Please report it at the [stack-templates](https://github.com/commercialhaskell/stack-templates) repository instead.
 
 If you're reporting a bug please follow the steps below:
 
