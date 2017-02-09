@@ -135,6 +135,7 @@ data StackBuildException
   | SomeTargetsNotBuildable [(PackageName, NamedComponent)]
   | TestSuiteExeMissing Bool String String String
   | CabalCopyFailed Bool String
+  | LocalPackagesPresent [PackageIdentifier]
   deriving Typeable
 
 data FlagSource = FSCommandLine | FSStackYaml
@@ -338,6 +339,9 @@ instance Show StackBuildException where
             , "\n"
             ]
     show (ConstructPlanFailed msg) = msg
+    show (LocalPackagesPresent locals) = unlines
+      $ "Local packages are not allowed when using the script command. Packages found:"
+      : map (\ident -> "- " ++ packageIdentifierString ident) locals
 
 missingExeError :: Bool -> String -> String
 missingExeError isSimpleBuildType msg =

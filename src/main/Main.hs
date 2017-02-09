@@ -24,11 +24,15 @@ import           Control.Monad.Trans.Either (EitherT)
 import           Control.Monad.Writer.Lazy (Writer)
 import           Data.Attoparsec.Args (parseArgs, EscapingMode (Escaping))
 import           Data.Attoparsec.Interpreter (getInterpreterArgs)
+import qualified Data.ByteString.Char8 as S8
 import qualified Data.ByteString.Lazy as L
+import qualified Data.Conduit.List as CL
 import           Data.List
+import           Data.List.Split (splitWhen)
 import qualified Data.Map as Map
 import           Data.Maybe
 import           Data.Monoid
+import qualified Data.Set as Set
 import           Data.Text (Text)
 import qualified Data.Text as T
 import           Data.Traversable
@@ -64,7 +68,7 @@ import           Stack.Coverage
 import qualified Stack.Docker as Docker
 import           Stack.Dot
 import           Stack.Exec
-import           Stack.GhcPkg (findGhcPkgField)
+import           Stack.GhcPkg (findGhcPkgField, ghcPkgExeName)
 import qualified Stack.Nix as Nix
 import           Stack.Fetch
 import           Stack.FileWatch
@@ -98,6 +102,7 @@ import           Stack.Types.Config
 import           Stack.Types.Compiler
 import           Stack.Types.Resolver
 import           Stack.Types.Nix
+import           Stack.Types.PackageName (parsePackageNameFromString)
 import           Stack.Types.StackT
 import           Stack.Upgrade
 import qualified Stack.Upload as Upload
@@ -357,6 +362,10 @@ commandLineHandler progName isInterpreter = complicatedOptions
                   "Run runghc (alias for 'runghc')"
                   execCmd
                   (execOptsParser $ Just ExecRunGhc)
+      addCommand' "script"
+                  "Run a Stack Script"
+                  scriptCmd
+                  scriptOptsParser
 
       unless isInterpreter (do
         addCommand' "eval"
@@ -790,6 +799,77 @@ execCmd ExecOpts {..} go@GlobalOpts{..} =
           wc <- view $ actualCompilerVersionL.whichCompilerL
           pkgopts <- getPkgOpts menv wc pkgs
           return (prefix ++ compilerExeName wc, pkgopts ++ args)
+
+scriptOptsParser :: Parser ([String], [String])
+scriptOptsParser = (,)
+    <$> many (strOption (long "package" <> help "Additional packages that must be installed"))
+    <*> many (strArgument (metavar "-- ARGS (e.g. stack ghc -- X.hs -o x)"))
+
+-- | Run a Stack Script
+scriptCmd :: ([String], [String]) -> GlobalOpts -> IO ()
+scriptCmd (packages', args') go' = do
+    let go = go'
+            { globalConfigMonoid = (globalConfigMonoid go')
+                { configMonoidInstallGHC = First $ Just True
+                }
+            , globalStackYaml = SYLNoConfig
+            }
+    withBuildConfigAndLock go $ \lk -> do
+        -- Some warnings in case the user somehow tries to set a
+        -- stack.yaml location
+        case globalStackYaml go' of
+          SYLOverride fp -> $logWarn $ T.pack
+            $ "Ignoring override stack.yaml file for script command: " ++ fp
+          SYLDefault -> return ()
+          SYLNoConfig -> assert False (return ())
+
+        config <- view configL
+        menv <- liftIO $ configEnvOverride config defaultEnvSettings
+        wc <- view $ actualCompilerVersionL.whichCompilerL
+
+        let targets = concatMap wordsComma packages'
+            targetsSet = Set.fromList targets
+
+        -- Ensure only package names are provided. We do not allow
+        -- overriding packages in a snapshot.
+        mapM_ parsePackageNameFromString targets
+
+        unless (null targets) $ do
+            -- Optimization: use the relatively cheap ghc-pkg list
+            -- --simple-output to check which packages are installed
+            -- already. If all needed packages are available, we can
+            -- skip the (rather expensive) build call below.
+            bss <- sinkProcessStdout
+                Nothing menv (ghcPkgExeName wc)
+                ["list", "--simple-output"] CL.consume -- FIXME use the package info from envConfigPackages, or is that crazy?
+            let installed = Set.fromList
+                          $ map toPackageName
+                          $ words
+                          $ S8.unpack
+                          $ S8.concat bss
+            if Set.null $ Set.difference targetsSet installed
+                then $logDebug "All packages already installed"
+                else do
+                    $logDebug "Missing packages, performing installation"
+                    Stack.Build.build (const $ return ()) lk defaultBuildOptsCLI
+                        { boptsCLITargets = map T.pack targets
+                        }
+
+        let args = concat
+                [ ["-hide-all-packages"]
+                , map (\x -> "-package" ++ x)
+                    $ Set.toList
+                    $ Set.insert "base" targetsSet
+                , args'
+                ]
+        let cmd = "run" ++ compilerExeName wc
+        munlockFile lk -- Unlock before transferring control away.
+        exec menv cmd args
+  where
+    toPackageName = reverse . drop 1 . dropWhile (/= '-') . reverse
+
+    -- Like words, but splits on both commas and spaces
+    wordsComma = splitWhen (\c -> c == ' ' || c == ',')
 
 -- | Evaluate some haskell code inline.
 evalCmd :: EvalOpts -> GlobalOpts -> IO ()

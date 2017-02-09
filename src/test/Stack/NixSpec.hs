@@ -47,7 +47,7 @@ setup = unsetEnv "STACK_YAML"
 
 spec :: Spec
 spec = beforeAll setup $ do
-  let loadConfig' cmdLineArgs = runStackT () LevelDebug True False ColorAuto False (loadConfig cmdLineArgs Nothing Nothing)
+  let loadConfig' cmdLineArgs = runStackT () LevelDebug True False ColorAuto False (loadConfig cmdLineArgs Nothing SYLDefault)
       inTempDir test = do
         currentDirectory <- getCurrentDirectory
         withSystemTempDirectory "Stack_ConfigSpec" $ \tempDir -> do

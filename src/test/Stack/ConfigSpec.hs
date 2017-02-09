@@ -80,7 +80,7 @@ spec = beforeAll setup $ do
         bracket_ setVar resetVar action
 
   describe "loadConfig" $ do
-    let loadConfig' = runStackT () logLevel True False ColorAuto False (loadConfig mempty Nothing Nothing)
+    let loadConfig' = runStackT () logLevel True False ColorAuto False (loadConfig mempty Nothing SYLDefault)
     let loadBuildConfigRest = runStackT () logLevel True False ColorAuto False
     -- TODO(danburton): make sure parent dirs also don't have config file
     it "works even if no config file exists" $ example $ do

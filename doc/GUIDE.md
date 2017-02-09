@@ -1646,23 +1646,17 @@ running the file.
 An example will be easiest to understand:
 
 ```
-michael@d30748af6d3d:~$ cat turtle.hs
+michael@d30748af6d3d:~$ cat turtle-example.hs
 #!/usr/bin/env stack
--- stack --resolver lts-3.2 --install-ghc runghc --package turtle
+-- stack --resolver lts-6.25 script --package turtle
 {-# LANGUAGE OverloadedStrings #-}
 import Turtle
 main = echo "Hello World!"
-michael@d30748af6d3d:~$ chmod +x turtle.hs
-michael@d30748af6d3d:~$ ./turtle.hs
-Run from outside a project, using implicit global project config
-Using resolver: lts-3.2 specified on command line
-hashable-1.2.3.3: configure
-# installs some more dependencies
-Completed all 22 actions.
+michael@d30748af6d3d:~$ chmod +x turtle-example.hs
+michael@d30748af6d3d:~$ ./turtle-example.hs
+Completed 5 action(s).
 Hello World!
-michael@d30748af6d3d:~$ ./turtle.hs
-Run from outside a project, using implicit global project config
-Using resolver: lts-3.2 specified on command line
+michael@d30748af6d3d:~$ ./turtle-example.hs
 Hello World!
 ```
 
@@ -1680,11 +1674,30 @@ ensure the turtle package is available.
 If you're on Windows: you can run `stack turtle.hs` instead of `./turtle.hs`.
 The shebang line is not required in that case.
 
+### Using multiple packages
+
+You can also specify multiple packages, either with multiple `--package`
+arguments, or by providing a comma or space separated list. For example:
+
+```
+#!/usr/bin/env stack
+{- stack
+  script
+  --resolver lts-6.25
+  --package turtle
+  --package "stm async"
+  --package http-client,http-conduit
+-}
+```
+
 ### Stack configuration for scripts
 
-If the current working directory is inside a project then that project's stack
-configuration is effective when running the script. Otherwise the script uses
-the global project configuration specified in
+With the `script` command, all Stack configuration files are ignored to provide a
+completely reliable script running experience. However, see the example below
+with `runghc` for an approach to scripts which will respect your configuration
+files. When using `runghc`, if the current working directory is inside a
+project then that project's stack configuration is effective when running the
+script. Otherwise the script uses the global project configuration specified in
 `~/.stack/global-project/stack.yaml`.
 
 ### Specifying interpreter options
@@ -1703,49 +1716,60 @@ separating the stack options and ghc options with a `--`. Here is an example of
 a multi line block comment with ghc options:
 
 ```
-  #!/usr/bin/env stack
-  {- stack
-    --resolver lts-3.2
-    --install-ghc
-    runghc
-    --package turtle
-    --
-    -hide-all-packages
-  -}
+#!/usr/bin/env stack
+{- stack
+  script
+  --resolver lts-6.25
+  --package turtle
+  --
+  +RTS -s -RTS
+-}
 ```
 
 ### Writing independent and reliable scripts
 
-Independent means that the script is independent of any prior deployment
-specific configuration. If required, the script will install everything it
-needs automatically on any machine that it runs on. To make a script always
-work irrespective of any specific environment configuration you can do the
-following:
+With the release of Stack 1.2.1, there is a new command, `script`, which will
+automatically:
+
+* Install GHC and libraries if missing
+* Require that all packages used be explicitly stated on the command line
+
+This ensures that your scripts are _independent_ of any prior deployment
+specific configuration, and are _reliable_ by using exactly the same version of
+all packages every time it runs so that the script does not break by
+accidentally using incompatible package versions.
+
+In previous versions of Stack, the `runghc` command was used for scripts
+instead. In order to achieve the same effect with the `runghc` command, you can
+do the following:
 
 1. Use the `--install-ghc` option to install the compiler automatically
 2. Explicitly specify all packages required by the script using the
 `--package` option. Use `-hide-all-packages` ghc option to force
 explicit specification of all packages.
+3. Use the `--resolver` Stack option to ensure a specific GHC version and
+   package set is used.
 
-Reliable means the script will use exactly the same version of all packages
-every time it runs so that the script does not break by accidentally using
-incompatible package versions. To achieve that use an explicit `--resolver`
-stack option.
+Even with this configuration, it is still possible for configuration
+files to impact `stack runghc`, which is why `stack script` is strongly
+recommended in general. For those curious, here is an example with `runghc`:
 
-Here is an interpreter comment for a completely self-contained and reproducible
-version of our toy example:
 ```
-  #!/usr/bin/env stack
-  {- stack
-    --resolver lts-3.2
-    --install-ghc
-    runghc
-    --package base
-    --package turtle
-    --
-    -hide-all-packages
+#!/usr/bin/env stack
+{- stack
+  --resolver lts-6.25
+  --install-ghc
+  runghc
+  --package base
+  --package turtle
+  --
+  -hide-all-packages
   -}
 ```
+
+The `runghc` command is still very useful, especially when you're working on a
+project and want to access the package databases and configurations used by
+that project. See the next section for more information on configuration files.
 
 ## Finding project configs, and the implicit global
 

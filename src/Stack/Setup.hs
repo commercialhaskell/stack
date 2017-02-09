@@ -1199,7 +1199,7 @@ loadGhcjsEnvConfig stackYaml binPath = runInnerStackT () $ do
             , configMonoidLocalBinPath = First (Just (toFilePath binPath))
             })
         Nothing
-        (Just stackYaml)
+        (SYLOverride stackYaml)
     bconfig <- lcLoadBuildConfig lc Nothing
     runInnerStackT bconfig $ setupEnv Nothing
 

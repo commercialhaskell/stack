@@ -61,7 +61,7 @@ globalOptsFromMonoid defaultTerminal GlobalOptsMonoid{..} = GlobalOpts
     , globalCompiler = getFirst globalMonoidCompiler
     , globalTerminal = fromFirst defaultTerminal globalMonoidTerminal
     , globalColorWhen = fromFirst ColorAuto globalMonoidColorWhen
-    , globalStackYaml = getFirst globalMonoidStackYaml }
+    , globalStackYaml = maybe SYLDefault SYLOverride $ getFirst globalMonoidStackYaml }
 
 initOptsParser :: Parser InitOpts
 initOptsParser =

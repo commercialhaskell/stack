@@ -239,7 +239,7 @@ sourceUpgrade gConfigMonoid mresolver builtHash (SourceOpts gitRepo) =
         lc <- loadConfig
             gConfigMonoid
             mresolver
-            (Just $ dir </> $(mkRelFile "stack.yaml"))
+            (SYLOverride $ dir </> $(mkRelFile "stack.yaml"))
         bconfig <- lcLoadBuildConfig lc Nothing
         envConfig1 <- runInnerStackT bconfig $ setupEnv $ Just $
             "Try rerunning with --install-ghc to install the correct GHC into " <>

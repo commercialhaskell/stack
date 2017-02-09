@@ -2,7 +2,10 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE DefaultSignatures #-}
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE DeriveFoldable #-}
+{-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DeriveTraversable #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
@@ -74,6 +77,7 @@ module Stack.Types.Config
   -- ** GlobalOpts & GlobalOptsMonoid
   ,GlobalOpts(..)
   ,GlobalOptsMonoid(..)
+  ,StackYamlLoc(..)
   ,defaultLogLevel
   -- ** LoadConfig
   ,LoadConfig(..)
@@ -370,6 +374,9 @@ data Config =
          ,configMaybeProject        :: !(Maybe (Project, Path Abs File))
          -- ^ 'Just' when a local project can be found, 'Nothing' when stack must
          -- fall back on the implicit global project.
+         ,configAllowLocals         :: !Bool
+         -- ^ Are we allowed to build local packages? The script
+         -- command disallows this.
          }
 
 -- | Which packages do ghc-options on the command line apply to?
@@ -456,8 +463,14 @@ data GlobalOpts = GlobalOpts
     , globalCompiler     :: !(Maybe CompilerVersion) -- ^ Compiler override
     , globalTerminal     :: !Bool -- ^ We're in a terminal?
     , globalColorWhen    :: !ColorWhen -- ^ When to use ansi terminal colors
-    , globalStackYaml    :: !(Maybe FilePath) -- ^ Override project stack.yaml
+    , globalStackYaml    :: !(StackYamlLoc FilePath) -- ^ Override project stack.yaml
     } deriving (Show)
+
+data StackYamlLoc filepath
+    = SYLDefault
+    | SYLOverride !filepath
+    | SYLNoConfig
+    deriving (Show,Functor,Foldable,Traversable)
 
 -- | Parsed global command-line options monoid.
 data GlobalOptsMonoid = GlobalOptsMonoid
@@ -1015,6 +1028,8 @@ data ConfigException
   | FailedToCloneRepo String
   | ManualGHCVariantSettingsAreIncompatibleWithSystemGHC
   | NixRequiresSystemGhc
+  | NoResolverWhenUsingNoLocalConfig
+  | InvalidResolverForNoLocalConfig String
   deriving Typeable
 instance Show ConfigException where
     show (ParseConfigFileException configFile exception) = concat
@@ -1133,6 +1148,8 @@ instance Show ConfigException where
         , configMonoidSystemGHCName
         , "' or disable the Nix integration."
         ]
+    show NoResolverWhenUsingNoLocalConfig = "When using the script command, you must provide a resolver argument"
+    show (InvalidResolverForNoLocalConfig ar) = "The script command requires a specific resolver, you provided " ++ ar
 instance Exception ConfigException
 
 showOptions :: WhichSolverCmd -> SuggestSolver -> String
