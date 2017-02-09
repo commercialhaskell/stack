@@ -840,7 +840,7 @@ getExtraConfigs userConfigPath = do
         $ fromMaybe userConfigPath mstackConfig
         : maybe [] return (mstackGlobalConfig <|> defaultStackGlobalConfigPath)
 
--- | Load and parse YAML from the given conig file. Throws
+-- | Load and parse YAML from the given config file. Throws
 -- 'ParseConfigFileException' when there's a decoding error.
 loadConfigYaml
     :: (FromJSON (WithJSONWarnings a), MonadIO m, MonadLogger m)
