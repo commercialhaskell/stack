@@ -400,12 +400,10 @@ instance HasGHCVariant MiniConfig where
     ghcVariantL = lens mcGHCVariant (\x y -> x { mcGHCVariant = y })
 
 -- | Load the 'MiniConfig'.
-loadMiniConfig
-    :: MonadIO m
-    => Config -> m MiniConfig
-loadMiniConfig config = do
+loadMiniConfig :: Config -> MiniConfig
+loadMiniConfig config =
     let ghcVariant = fromMaybe GHCStandard (configGHCVariant0 config)
-    return (MiniConfig ghcVariant config)
+     in MiniConfig ghcVariant config
 
 -- Load the configuration, using environment variables, and defaults as
 -- necessary.
@@ -473,7 +471,7 @@ loadBuildConfig :: StackM env m
                 -> m BuildConfig
 loadBuildConfig mproject config mresolver mcompiler = do
     env <- ask
-    miniConfig <- loadMiniConfig config
+    let miniConfig = loadMiniConfig config
 
     (project', stackYamlFP) <- case mproject of
       Just (project, fp, _) -> do

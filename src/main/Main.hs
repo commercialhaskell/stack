@@ -588,7 +588,7 @@ setupCmd sco@SetupCmdOpts{..} go@GlobalOpts{..} = do
                                  , configCompilerCheck (lcConfig lc)
                                  , Just $ view stackYamlL bc
                                  )
-              miniConfig <- loadMiniConfig (lcConfig lc)
+              let miniConfig = loadMiniConfig (lcConfig lc)
               runStackTGlobal miniConfig go $
                   setup sco wantedCompiler compilerCheck mstack
               )
@@ -639,7 +639,7 @@ unpackCmd names go = withConfigAndLock go $ do
                 case r of
                     ResolverSnapshot snapName -> do
                         config <- view configL
-                        miniConfig <- loadMiniConfig config
+                        let miniConfig = loadMiniConfig config
                         runInnerStackT miniConfig (loadMiniBuildPlan snapName)
                     ResolverCompiler _ -> error "unpack does not work with compiler resolvers"
                     ResolverCustom _ _ -> error "unpack does not work with custom resolvers"
