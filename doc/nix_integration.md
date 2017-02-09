@@ -115,6 +115,12 @@ With Nix enabled, `stack build` and `stack exec` will automatically
 launch themselves in a local build environment (using `nix-shell`
 behind the scenes).
 
+`stack setup` will start a nix-shell, so it will gather all the required
+packages, but given nix handles GHC installation, instead of stack, this will
+happen when running `stack build` if no setup has been performed
+before. Therefore it is not longer necessary to run `stack setup` unless you
+want to cache a GHC installation before running the build.
+
 If `enable:` is omitted or set to `false`, you can still build in a nix-shell by
 passing the `--nix` flag to stack, for instance `stack --nix build`.  Passing
 any `--nix*` option to the command line will do the same.
@@ -125,13 +131,18 @@ libraries.
 
 ### The Nix shell
 
-By default, stack will run the build in a pure Nix build environment
-(or *shell*), which means the build should fail if you haven't
-specified all the dependencies in the `packages:` section of the
-`stack.yaml` file, even if these dependencies are installed elsewhere
-on your system. This behaviour enforces a complete description of the
-build environment to facilitate reproducibility. To override this
-behaviour, add `pure: false` to your `stack.yaml` or pass the
+By default, stack will run the build in a *pure* Nix build environment (or
+*shell*), which means two important things:
+
+- basically **no environment variable will be forwarded** from your user session
+  to the nix-shell (variables like `HTTP_PROXY` or `PATH` notably will not be
+  available),
+- the build should fail if you haven't specified all the dependencies in the
+  `packages:` section of the `stack.yaml` file, even if these dependencies are
+  installed elsewhere on your system. This behaviour enforces a complete
+  description of the build environment to facilitate reproducibility.
+
+To override this behaviour, add `pure: false` to your `stack.yaml` or pass the
 `--no-nix-pure` option to the command line.
 
 **Note:** On macOS shells are non-pure by default currently. This is

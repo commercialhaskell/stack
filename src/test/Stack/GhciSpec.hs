@@ -221,6 +221,7 @@ packages_singlePackage =
       , packageOpts = GetPackageOpts undefined
       , packageHasExposedModules = True
       , packageSimpleType = True
+      , packageSetupDeps = Nothing
       }
     }
   ]
@@ -255,6 +256,7 @@ packages_multiplePackages =
       , packageOpts = GetPackageOpts undefined
       , packageHasExposedModules = True
       , packageSimpleType = True
+      , packageSetupDeps = Nothing
       }
     }
   , GhciPkgInfo
@@ -285,6 +287,7 @@ packages_multiplePackages =
       , packageOpts = GetPackageOpts undefined
       , packageHasExposedModules = True
       , packageSimpleType = True
+      , packageSetupDeps = Nothing
       }
     }
   ]

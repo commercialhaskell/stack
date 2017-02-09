@@ -12,6 +12,7 @@ nix:
   packages:
     - zlib
 extra-deps:
+- Cabal-1.24.2.0
 - th-utilities-0.2.0.1
 - store-0.3
 - store-core-0.3
@@ -23,10 +24,13 @@ extra-deps:
 - text-metrics-0.1.0
 - pid1-0.1.0.0
 - aeson-1.0.2.1
-- hpack-0.15.0
+- hpack-0.17.0
 - persistent-2.6
 - persistent-template-2.5.1.6
 - persistent-sqlite-2.6
+- cryptohash-sha256-0.11.100.1
+- ed25519-0.0.5.0
+- hackage-security-0.5.2.2
 flags:
   stack:
     hide-dependency-versions: true

@@ -27,7 +27,6 @@ import           Control.Monad hiding (forM)
 import           Control.Monad.Catch
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
-import           Control.Monad.Reader (asks)
 import           Control.Monad.State.Strict (State, execState, get, modify)
 import           Control.Monad.Trans.Unlift (MonadBaseUnlift)
 import qualified Data.ByteString.Char8 as S8
@@ -241,7 +240,7 @@ checkTargets
 checkTargets mp = do
     let filtered = M.filter (== STUnknown) mp
     unless (M.null filtered) $ do
-        bconfig <- asks getBuildConfig
+        bconfig <- view buildConfigLocalL
         throwM $ UnknownTargets (M.keysSet filtered) M.empty (bcStackYaml bconfig)
 
 getAllLocalTargets
@@ -321,9 +320,8 @@ runGhci
     -> [GhciPkgInfo]
     -> m ()
 runGhci GhciOpts{..} targets mainIsTargets pkgs = do
-    config <- asks getConfig
-    bconfig <- asks getBuildConfig
-    wc <- getWhichCompiler
+    config <- view configL
+    wc <- view $ actualCompilerVersionL.whichCompilerL
     let pkgopts = hidePkgOpt ++ genOpts ++ ghcOpts
         hidePkgOpt = if null pkgs || not ghciHidePackages then [] else ["-hide-all-packages"]
         oneWordOpts bio
@@ -342,7 +340,7 @@ runGhci GhciOpts{..} targets mainIsTargets pkgs = do
         $logWarn
             ("The following GHC options are incompatible with GHCi and have not been passed to it: " <>
              T.unwords (map T.pack (nubOrd omittedOpts)))
-    oiDir <- objectInterfaceDir bconfig
+    oiDir <- view objectInterfaceDirL
     let odir =
             [ "-odir=" <> toFilePathNoTrailingSep oiDir
             , "-hidir=" <> toFilePathNoTrailingSep oiDir ]
@@ -353,10 +351,11 @@ runGhci GhciOpts{..} targets mainIsTargets pkgs = do
             menv <- liftIO $ configEnvOverride config defaultEnvSettings
             execSpawn menv
                  (fromMaybe (compilerExeName wc) ghciGhcCommand)
-                 ("--interactive" :
-                 -- This initial "-i" resets the include directories to not
-                 -- include CWD.
-                  "-i" :
+                 (("--interactive" : ) $
+                 -- This initial "-i" resets the include directories to
+                 -- not include CWD. If there aren't any packages, CWD
+                 -- is included.
+                  (if null pkgs then id else ("-i" : )) $
                   odir <> pkgopts <> ghciArgs <> extras)
         interrogateExeForRenderFunction = do
             menv <- liftIO $ configEnvOverride config defaultEnvSettings
@@ -371,7 +370,7 @@ runGhci GhciOpts{..} targets mainIsTargets pkgs = do
             else do
                 checkForDuplicateModules pkgs
                 renderFn <- interrogateExeForRenderFunction
-                bopts <- asks (configBuild . getConfig)
+                bopts <- view buildOptsL
                 mainFile <- figureOutMainFile bopts mainIsTargets targets pkgs
                 scriptPath <- writeGhciScript tmpDirectory (renderFn pkgs mainFile)
                 execGhci (macrosOptions ++ ["-ghci-script=" <> toFilePath scriptPath])
@@ -532,6 +531,7 @@ getGhciPkgInfos sourceMap addPkgs mfileTargets localTargets = do
         GetInstalledOpts
             { getInstalledProfiling = False
             , getInstalledHaddock   = False
+            , getInstalledSymbols   = False
             }
         sourceMap
     let localLibs = [name | (name, (_, target)) <- localTargets, hasLocalComp isCLib target]
@@ -551,17 +551,20 @@ makeGhciPkgInfo
     -> SimpleTarget
     -> m GhciPkgInfo
 makeGhciPkgInfo sourceMap installedMap locals addPkgs mfileTargets name cabalfp target = do
-    bopts <- asks (configBuild . getConfig)
-    econfig <- asks getEnvConfig
-    bconfig <- asks getBuildConfig
+    bopts <- view buildOptsL
+    econfig <- view envConfigL
+    bconfignl <- view buildConfigNoLocalL
+    bconfigl <- view buildConfigLocalL
+    compilerVersion <- view actualCompilerVersionL
+    let bconfig = BuildConfig bconfignl bconfigl
     let config =
             PackageConfig
             { packageConfigEnableTests = True
             , packageConfigEnableBenchmarks = True
             , packageConfigFlags = getLocalFlags bconfig defaultBuildOptsCLI name
             , packageConfigGhcOptions = getGhcOptions bconfig defaultBuildOptsCLI name True True
-            , packageConfigCompilerVersion = envConfigCompilerVersion econfig
-            , packageConfigPlatform = configPlatform (getConfig bconfig)
+            , packageConfigCompilerVersion = compilerVersion
+            , packageConfigPlatform = view platformL econfig
             }
     (warnings,gpkgdesc) <- readPackageUnresolved cabalfp
 

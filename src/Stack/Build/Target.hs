@@ -220,7 +220,7 @@ resolveRawTarget snap extras locals (ri, rt) =
                 (\(name, lpv) -> map (name,) $ Set.toList $ lpvComponents lpv)
                 (Map.toList locals)
          in case filter (isCompNamed cname . snd) allPairs of
-                [] -> Left $ "Could not find a component named " `T.append` cname
+                [] -> Left $ cname `T.append` " doesn't seem to be a local target. Run 'stack ide targets' for a list of available targets"
                 [(name, comp)] ->
                     Right (name, (ri, STLocalComps $ Set.singleton comp))
                 matches -> Left $ T.concat

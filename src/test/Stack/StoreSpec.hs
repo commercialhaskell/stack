@@ -10,6 +10,8 @@ module Stack.StoreSpec where
 import           Control.Applicative
 import qualified Data.ByteString as BS
 import           Data.Containers (mapFromList, setFromList)
+import           Data.Hashable (Hashable)
+import           Data.HashMap.Strict (HashMap)
 import           Data.Int
 import           Data.Map (Map)
 import           Data.Sequences (fromList)
@@ -32,6 +34,9 @@ import           Test.SmallCheck.Series
 -- smallcheck.
 
 instance (Monad m, Serial m k, Serial m a, Ord k) => Serial m (Map k a) where
+    series = fmap mapFromList series
+
+instance (Monad m, Serial m k, Serial m a, Eq k, Hashable k) => Serial m (HashMap k a) where
     series = fmap mapFromList series
 
 instance Monad m => Serial m Text where

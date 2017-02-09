@@ -25,7 +25,7 @@ import           Control.Applicative
 import           Control.Monad.Catch
 import           Control.Monad.IO.Class (MonadIO, liftIO)
 import           Control.Monad.Logger
-import           Control.Monad.Reader (MonadReader, asks)
+import           Control.Monad.Reader (MonadReader)
 import           Control.Monad.Trans.Control
 import qualified Data.ByteString.Char8 as S8
 import           Data.List hiding (concat, elem, maximumBy)
@@ -122,7 +122,7 @@ extraDirs :: (StackM env m, HasConfig env)
           => Tool
           -> m ExtraDirs
 extraDirs tool = do
-    config <- asks getConfig
+    config <- view configL
     dir <- installDir (configLocalPrograms config) tool
     case (configPlatform config, toolNameString tool) of
         (Platform _ Cabal.Windows, isGHC -> True) -> return mempty

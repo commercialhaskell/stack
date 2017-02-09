@@ -27,7 +27,6 @@ import           Control.Monad (when,void,join,liftM,unless,mapAndUnzipM, zipWit
 import           Control.Monad.Catch
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
-import           Control.Monad.Reader (asks)
 import           Data.Aeson.Extended         ( WithJSONWarnings(..), object, (.=), toJSON
                                              , logJSONWarnings)
 import qualified Data.ByteString as S
@@ -241,7 +240,7 @@ getCabalConfig :: (StackM env m, HasConfig env)
                -> Map PackageName Version -- ^ constraints
                -> m [Text]
 getCabalConfig dir constraintType constraints = do
-    indices <- asks $ configPackageIndices . getConfig
+    indices <- view $ configL.to configPackageIndices
     remotes <- mapM goIndex indices
     let cache = T.pack $ "remote-repo-cache: " ++ dir
     return $ cache : remotes ++ map goConstraint (Map.toList constraints)
@@ -249,10 +248,15 @@ getCabalConfig dir constraintType constraints = do
     goIndex index = do
         src <- configPackageIndex $ indexName index
         let dstdir = dir FP.</> T.unpack (indexNameText $ indexName index)
-            dst = dstdir FP.</> "00-index.tar"
+            -- NOTE: see https://github.com/commercialhaskell/stack/issues/2888
+            -- for why we are pretending that a 01-index.tar is actually a
+            -- 00-index.tar file.
+            dst0 = dstdir FP.</> "00-index.tar"
+            dst1 = dstdir FP.</> "01-index.tar"
         liftIO $ void $ tryIO $ do
             D.createDirectoryIfMissing True dstdir
-            D.copyFile (toFilePath src) dst
+            D.copyFile (toFilePath src) dst0
+            D.copyFile (toFilePath src) dst1
         return $ T.concat
             [ "remote-repo: "
             , indexNameText $ indexName index
@@ -283,8 +287,8 @@ setupCompiler compiler = do
           , "install the compiler or '--system-ghc' to use a suitable "
           , "compiler available on your PATH." ]
 
-    config <- asks getConfig
-    fst <$> ensureCompiler SetupOpts
+    config <- view configL
+    (dirs, _, _) <- ensureCompiler SetupOpts
         { soptsInstallIfMissing  = configInstallGHC config
         , soptsUseSystem         = configSystemGHC config
         , soptsWantedCompiler    = compiler
@@ -300,6 +304,7 @@ setupCompiler compiler = do
         , soptsSetupInfoYaml    = defaultSetupInfoYaml
         , soptsGHCBindistURL     = Nothing
         }
+    return dirs
 
 setupCabalEnv
     :: (StackM env m, HasConfig env, HasGHCVariant env)
@@ -311,7 +316,7 @@ setupCabalEnv compiler = do
     envMap <- removeHaskellEnvVars
               <$> augmentPathMap (maybe [] edBins mpaths)
                                  (unEnvOverride menv0)
-    platform <- asks getPlatform
+    platform <- view platformL
     menv <- mkEnvOverride platform envMap
 
     mcabal <- findExecutable menv "cabal"
@@ -617,9 +622,10 @@ solveExtraDeps
     => Bool -- ^ modify stack.yaml?
     -> m ()
 solveExtraDeps modStackYaml = do
-    bconfig <- asks getBuildConfig
+    bconfignl <- view buildConfigNoLocalL
+    bconfigl <- view buildConfigLocalL
 
-    let stackYaml = bcStackYaml bconfig
+    let stackYaml = bcStackYaml bconfigl
     relStackYaml <- prettyPath stackYaml
 
     $logInfo $ "Using configuration file: " <> T.pack relStackYaml
@@ -639,9 +645,9 @@ solveExtraDeps modStackYaml = do
     (bundle, _) <- cabalPackagesCheck cabalfps noPkgMsg (Just dupPkgFooter)
 
     let gpds              = Map.elems $ fmap snd bundle
-        oldFlags          = unPackageFlags (bcFlags bconfig)
-        oldExtraVersions  = bcExtraDeps bconfig
-        resolver          = bcResolver bconfig
+        oldFlags          = unPackageFlags (bcFlags bconfigl)
+        oldExtraVersions  = bcExtraDeps bconfigl
+        resolver          = bcResolver bconfignl
         oldSrcs           = gpdPackages gpds
         oldSrcFlags       = Map.intersection oldFlags oldSrcs
         oldExtraFlags     = Map.intersection oldFlags oldExtraVersions
@@ -667,7 +673,7 @@ solveExtraDeps modStackYaml = do
         Nothing -> throwM (SolverGiveUp giveUpMsg)
         Just x -> return x
 
-    mOldResolver <- asks (fmap (projectResolver . fst) . configMaybeProject . getConfig)
+    mOldResolver <- view $ configL.to (fmap (projectResolver . fst) . configMaybeProject)
 
     let
         flags = removeSrcPkgDefaultFlags gpds (fmap snd (Map.union srcs edeps))

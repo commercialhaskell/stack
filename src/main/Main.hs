@@ -2,6 +2,7 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE GADTs #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell #-}
@@ -18,7 +19,7 @@ import           Control.Exception
 import           Control.Monad hiding (mapM, forM)
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
-import           Control.Monad.Reader (asks, local)
+import           Control.Monad.Reader (local)
 import           Control.Monad.Trans.Either (EitherT)
 import           Control.Monad.Writer.Lazy (Writer)
 import           Data.Attoparsec.Args (parseArgs, EscapingMode (Escaping))
@@ -54,6 +55,7 @@ import           Path.IO
 import qualified Paths_stack as Meta
 import           Prelude hiding (pi, mapM)
 import           Stack.Build
+import           Stack.BuildPlan
 import           Stack.Clean (CleanOpts, clean)
 import           Stack.Config
 import           Stack.ConfigCmd as ConfigCmd
@@ -94,7 +96,8 @@ import           Stack.Solver (solveExtraDeps)
 import           Stack.Types.Version
 import           Stack.Types.Config
 import           Stack.Types.Compiler
-import           Stack.Types.Internal
+import           Stack.Types.Resolver
+import           Stack.Types.Nix
 import           Stack.Types.StackT
 import           Stack.Upgrade
 import qualified Stack.Upload as Upload
@@ -319,13 +322,14 @@ commandLineHandler progName isInterpreter = complicatedOptions
                     execCmd
                     (execOptsParser $ Just ExecGhc)
         addCommand' "hoogle"
-                    "Run hoogle in the context of the current Stack config"
+                    ("Run hoogle, the Haskell API search engine. Use 'stack exec' syntax " ++
+                     "to pass Hoogle arguments, e.g. stack hoogle -- --count=20")
                     hoogleCmd
                     ((,,) <$> many (strArgument (metavar "ARG"))
                           <*> boolFlags
                                   True
                                   "setup"
-                                  "If needed: Install hoogle, build haddocks, generate a hoogle database"
+                                  "If needed: install hoogle, build haddocks and generate a hoogle database"
                                   idm
                           <*> switch
                                   (long "rebuild" <>
@@ -465,7 +469,8 @@ commandLineHandler progName isInterpreter = complicatedOptions
         extraHelpOption hide progName (Docker.dockerCmdName ++ "*") Docker.dockerHelpOptName <*>
         extraHelpOption hide progName (Nix.nixCmdName ++ "*") Nix.nixHelpOptName <*>
         globalOptsParser kind (if isInterpreter
-                                then Just $ LevelOther "silent"
+                                -- Silent except when errors occur - see #2879
+                                then Just LevelError
                                 else Nothing)
         where hide = kind /= OuterGlobalOpts
 
@@ -563,6 +568,8 @@ pathCmd keys go = withBuildConfig go (Stack.Path.path keys)
 setupCmd :: SetupCmdOpts -> GlobalOpts -> IO ()
 setupCmd sco@SetupCmdOpts{..} go@GlobalOpts{..} = do
   lc <- loadConfigWithOpts go
+  when (scoUpgradeCabal && nixEnable (configNix (lcConfig lc))) $ do
+    throwIO UpgradeCabalUnusable
   withUserFileLock go (configStackRoot $ lcConfig lc) $ \lk -> do
     let getCompilerVersion = loadCompilerVersion go lc
     runStackTGlobal (lcConfig lc) go $
@@ -577,9 +584,9 @@ setupCmd sco@SetupCmdOpts{..} go@GlobalOpts{..} = do
                       Just v -> return (v, MatchMinor, Nothing)
                       Nothing -> do
                           bc <- lcLoadBuildConfig lc globalCompiler
-                          return ( bcWantedCompiler bc
+                          return ( view wantedCompilerVersionL bc
                                  , configCompilerCheck (lcConfig lc)
-                                 , Just $ bcStackYaml bc
+                                 , Just $ view stackYamlL bc
                                  )
               miniConfig <- loadMiniConfig (lcConfig lc)
               runStackTGlobal miniConfig go $
@@ -608,10 +615,10 @@ buildCmd opts go = do
         Stack.Build.build setLocalFiles lk opts
     -- Read the build command from the CLI and enable it to run
     go' = case boptsCLICommand opts of
-               Test -> set (globalOptsBuildOptsMonoid.buildOptsMonoidTests) (Just True) go
-               Haddock -> set (globalOptsBuildOptsMonoid.buildOptsMonoidHaddock) (Just True) go
-               Bench -> set (globalOptsBuildOptsMonoid.buildOptsMonoidBenchmarks) (Just True) go
-               Install -> set (globalOptsBuildOptsMonoid.buildOptsMonoidInstallExes) (Just True) go
+               Test -> set (globalOptsBuildOptsMonoidL.buildOptsMonoidTestsL) (Just True) go
+               Haddock -> set (globalOptsBuildOptsMonoidL.buildOptsMonoidHaddockL) (Just True) go
+               Bench -> set (globalOptsBuildOptsMonoidL.buildOptsMonoidBenchmarksL) (Just True) go
+               Install -> set (globalOptsBuildOptsMonoidL.buildOptsMonoidInstallExesL) (Just True) go
                Build -> go -- Default case is just Build
 
 uninstallCmd :: [String] -> GlobalOpts -> IO ()
@@ -624,7 +631,19 @@ uninstallCmd _ go = withConfigAndLock go $ do
 unpackCmd :: [String] -> GlobalOpts -> IO ()
 unpackCmd names go = withConfigAndLock go $ do
     menv <- getMinimalEnvOverride
-    Stack.Fetch.unpackPackages menv "." names
+    mMiniBuildPlan <-
+        case globalResolver go of
+            Nothing -> return Nothing
+            Just ar -> fmap Just $ do
+                r <- makeConcreteResolver ar
+                case r of
+                    ResolverSnapshot snapName -> do
+                        config <- view configL
+                        miniConfig <- loadMiniConfig config
+                        runInnerStackT miniConfig (loadMiniBuildPlan snapName)
+                    ResolverCompiler _ -> error "unpack does not work with compiler resolvers"
+                    ResolverCustom _ _ -> error "unpack does not work with custom resolvers"
+    Stack.Fetch.unpackPackages menv mMiniBuildPlan "." names
 
 -- | Update the package index
 updateCmd :: () -> GlobalOpts -> IO ()
@@ -658,7 +677,7 @@ uploadCmd (args, mpvpBounds, ignoreCheck, don'tSign, sigServerUrl) go = do
         show invalid
     let getUploader :: (HasConfig config) => StackT config IO Upload.Uploader
         getUploader = do
-            config <- asks getConfig
+            config <- view configL
             liftIO $ Upload.mkUploader config Upload.defaultUploadSettings
     withBuildConfigAndLock go $ \_ -> do
         uploader <- getUploader
@@ -726,7 +745,7 @@ execCmd ExecOpts {..} go@GlobalOpts{..} =
                     -- Unlock before transferring control away, whether using docker or not:
                     (Just $ munlockFile lk)
                     (runStackTGlobal (lcConfig lc) go $ do
-                        config <- asks getConfig
+                        config <- view configL
                         menv <- liftIO $ configEnvOverride config plainEnvSettings
                         Nix.reexecWithOptionalShell
                             (lcProjectRoot lc)
@@ -743,7 +762,7 @@ execCmd ExecOpts {..} go@GlobalOpts{..} =
                        { boptsCLITargets = map T.pack targets
                        }
 
-               config <- asks getConfig
+               config <- view configL
                menv <- liftIO $ configEnvOverride config eoEnvSettings
                (cmd, args) <- case (eoCmd, eoArgs) of
                    (ExecCmd cmd, args) -> return (cmd, args)
@@ -768,7 +787,7 @@ execCmd ExecOpts {..} go@GlobalOpts{..} =
           return $ map ("-package-id=" ++) ids
 
       getGhcCmd prefix menv pkgs args = do
-          wc <- getWhichCompiler
+          wc <- view $ actualCompilerVersionL.whichCompilerL
           pkgopts <- getPkgOpts menv wc pkgs
           return (prefix ++ compilerExeName wc, pkgopts ++ args)
 
@@ -787,13 +806,13 @@ ghciCmd :: GhciOpts -> GlobalOpts -> IO ()
 ghciCmd ghciOpts go@GlobalOpts{..} =
   withBuildConfigAndLock go $ \lk -> do
     munlockFile lk -- Don't hold the lock while in the GHCI.
-    bopts <- asks (configBuild . getConfig)
+    bopts <- view buildOptsL
     -- override env so running of tests and benchmarks is disabled
     let boptsLocal = bopts
                { boptsTestOpts = (boptsTestOpts bopts) { toDisableRun = True }
                , boptsBenchmarkOpts = (boptsBenchmarkOpts bopts) { beoDisableRun = True }
                }
-    local (set (envEnvConfig.envConfigBuildOpts) boptsLocal)
+    local (set buildOptsL boptsLocal)
           (ghci ghciOpts)
 
 -- | List packages in the project.
@@ -838,7 +857,7 @@ cfgSetCmd :: ConfigCmd.ConfigCmdSet -> GlobalOpts -> IO ()
 cfgSetCmd co go@GlobalOpts{..} =
     withMiniConfigAndLock
         go
-        (cfgCmdSet co)
+        (cfgCmdSet go co)
 
 imgDockerCmd :: (Bool, [Text]) -> GlobalOpts -> IO ()
 imgDockerCmd (rebuild,images) go@GlobalOpts{..} = do
@@ -892,8 +911,8 @@ withBuildConfigDot :: DotOpts -> GlobalOpts -> StackT EnvConfig IO () -> IO ()
 withBuildConfigDot opts go f = withBuildConfig go' f
   where
     go' =
-        (if dotTestTargets opts then set (globalOptsBuildOptsMonoid.buildOptsMonoidTests) (Just True) else id) $
-        (if dotBenchTargets opts then set (globalOptsBuildOptsMonoid.buildOptsMonoidBenchmarks) (Just True) else id)
+        (if dotTestTargets opts then set (globalOptsBuildOptsMonoidL.buildOptsMonoidTestsL) (Just True) else id) $
+        (if dotBenchTargets opts then set (globalOptsBuildOptsMonoidL.buildOptsMonoidBenchmarksL) (Just True) else id)
         go
 
 -- | Query build information
@@ -905,6 +924,7 @@ hpcReportCmd :: HpcReportOpts -> GlobalOpts -> IO ()
 hpcReportCmd hropts go = withBuildConfig go $ generateHpcReportForTargets hropts
 
 data MainException = InvalidReExecVersion String String
+                   | UpgradeCabalUnusable
      deriving (Typeable)
 instance Exception MainException
 instance Show MainException where
@@ -915,3 +935,4 @@ instance Show MainException where
         , expected
         , "; found: "
         , actual]
+    show UpgradeCabalUnusable = "--upgrade-cabal cannot be used when nix is activated"

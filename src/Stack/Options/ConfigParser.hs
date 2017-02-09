@@ -1,10 +1,12 @@
 module Stack.Options.ConfigParser where
 
 import           Data.Char
+import           Data.Either.Combinators
 import           Data.Monoid.Extra
 import qualified Data.Set                          as Set
 import           Options.Applicative
 import           Options.Applicative.Builder.Extra
+import           Path
 import           Stack.Constants
 import           Stack.Options.BuildMonoidParser
 import           Stack.Options.DockerParser
@@ -46,7 +48,7 @@ configOptsParser hide0 =
                      "(Overrides any STACK_ROOT environment variable)")
             <> hide
             ))
-    <*> optionalFirst (relDirOption
+    <*> optionalFirst (option (eitherReader (mapLeft showWorkDirError . parseRelDir))
             ( long "work-dir"
             <> metavar "WORK-DIR"
             <> help "Override work directory (default: .stack-work)"
@@ -129,3 +131,6 @@ configOptsParser hide0 =
     toDumpLogs (First (Just True)) = First (Just DumpAllLogs)
     toDumpLogs (First (Just False)) = First (Just DumpNoLogs)
     toDumpLogs (First Nothing) = First Nothing
+    showWorkDirError err = show err ++
+        "\nNote that --work-dir must be a relative child directory, because work-dirs outside of the package are not supported by Cabal." ++
+        "\nSee https://github.com/commercialhaskell/stack/issues/2954"

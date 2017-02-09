@@ -38,6 +38,7 @@ module Stack.Config
   ,getInContainer
   ,getInNixShell
   ,defaultConfigYaml
+  ,getProjectConfig
   ) where
 
 import qualified Codec.Archive.Tar as Tar
@@ -51,7 +52,7 @@ import           Control.Monad.Catch (MonadThrow, MonadCatch, catchAll, throwM, 
 import           Control.Monad.Extra (firstJustM)
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger hiding (Loc)
-import           Control.Monad.Reader (ask, asks, runReaderT)
+import           Control.Monad.Reader (ask, runReaderT)
 import qualified Crypto.Hash.SHA256 as SHA256
 import           Data.Aeson.Extended
 import qualified Data.ByteString as S
@@ -70,6 +71,7 @@ import           Distribution.System (OS (..), Platform (..), buildPlatform)
 import qualified Distribution.Text
 import           Distribution.Version (simplifyVersionRange)
 import           GHC.Conc (getNumProcessors)
+import           Lens.Micro (lens)
 import           Network.HTTP.Client (parseUrlThrow)
 import           Network.HTTP.Download (download)
 import           Network.HTTP.Simple (httpJSON, getResponseBody)
@@ -92,6 +94,7 @@ import           Stack.Types.Config
 import           Stack.Types.Docker
 import           Stack.Types.Internal
 import           Stack.Types.Nix
+import           Stack.Types.PackageIndex (HttpType (HTHackageSecurity), HackageSecurity (..))
 import           Stack.Types.Resolver
 import           Stack.Types.StackT
 import           Stack.Types.Urls
@@ -154,7 +157,7 @@ getStackYaml
     :: (StackMiniM env m, HasConfig env)
     => m (Path Abs File)
 getStackYaml = do
-    config <- asks getConfig
+    config <- view configL
     case configMaybeProject config of
         Just (_project, stackYaml) -> return stackYaml
         Nothing -> liftM (</> stackDotYaml) (getImplicitGlobalProjectDir config)
@@ -183,7 +186,7 @@ makeConcreteResolver ar = do
         case ar of
             ARResolver r -> assert False $ return r
             ARGlobal -> do
-                config <- asks getConfig
+                config <- view configL
                 implicitGlobalDir <- getImplicitGlobalProjectDir config
                 let fp = implicitGlobalDir </> stackDotYaml
                 WithJSONWarnings (ProjectAndConfigMonoid project _) _warnings <-
@@ -237,7 +240,21 @@ configFromConfigMonoid configStackRoot configUserConfigPath mresolver mproject C
                 { indexName = IndexName "Hackage"
                 , indexLocation = ILGitHttp
                         "https://github.com/commercialhaskell/all-cabal-hashes.git"
-                        "https://s3.amazonaws.com/hackage.fpcomplete.com/00-index.tar.gz"
+                        "https://s3.amazonaws.com/hackage.fpcomplete.com/"
+                        (HTHackageSecurity HackageSecurity
+                            { hsKeyIds =
+                                [ "0a5c7ea47cd1b15f01f5f51a33adda7e655bc0f0b0615baa8e271f4c3351e21d"
+                                , "1ea9ba32c526d1cc91ab5e5bd364ec5e9e8cb67179a471872f6e26f0ae773d42"
+                                , "280b10153a522681163658cb49f632cde3f38d768b736ddbc901d99a1a772833"
+                                , "2a96b1889dc221c17296fcc2bb34b908ca9734376f0f361660200935916ef201"
+                                , "2c6c3627bd6c982990239487f1abd02e08a02e6cf16edb105a8012d444d870c3"
+                                , "51f0161b906011b52c6613376b1ae937670da69322113a246a09f807c62f6921"
+                                , "772e9f4c7db33d251d5c6e357199c819e569d130857dc225549b40845ff0890d"
+                                , "aa315286e6ad281ad61182235533c41e806e5a787e0b6d1e7eef3f09d137d2e9"
+                                , "fe331502606802feac15e514d9b9ea83fee8b6ffef71335479a2e68d84adc6b0"
+                                ]
+                            , hsKeyThreshold = 3
+                            })
                 , indexDownloadPrefix = "https://s3.amazonaws.com/hackage.fpcomplete.com/package/"
                 , indexGpgVerify = False
                 , indexRequireHashes = False
@@ -372,13 +389,15 @@ getDefaultLocalProgramsBase configStackRoot configPlatform override =
       _ -> return defaultBase
 
 -- | An environment with a subset of BuildConfig used for setup.
-data MiniConfig = MiniConfig GHCVariant Config
+data MiniConfig = MiniConfig
+    { mcGHCVariant :: !GHCVariant
+    , mcConfig :: !Config
+    }
 instance HasConfig MiniConfig where
-    getConfig (MiniConfig _ c) = c
-instance HasStackRoot MiniConfig
+    configL = lens mcConfig (\x y -> x { mcConfig = y })
 instance HasPlatform MiniConfig
 instance HasGHCVariant MiniConfig where
-    getGHCVariant (MiniConfig v _) = v
+    ghcVariantL = lens mcGHCVariant (\x y -> x { mcGHCVariant = y })
 
 -- | Load the 'MiniConfig'.
 loadMiniConfig
@@ -472,7 +491,7 @@ loadBuildConfig mproject config mresolver mcompiler = do
             if exists
                then do
                    ProjectAndConfigMonoid project _ <- loadConfigYaml dest
-                   when (getTerminal env) $
+                   when (view terminalL env) $
                        case mresolver of
                            Nothing ->
                                $logDebug ("Using resolver: " <> resolverName (projectResolver project) <>
@@ -543,16 +562,20 @@ loadBuildConfig mproject config mresolver mcompiler = do
     extraPackageDBs <- mapM resolveDir' (projectExtraPackageDBs project)
 
     return BuildConfig
-        { bcConfig = config
-        , bcResolver = loadedResolver
-        , bcWantedMiniBuildPlan = mbp
-        , bcPackageEntries = projectPackages project
-        , bcExtraDeps = projectExtraDeps project
-        , bcExtraPackageDBs = extraPackageDBs
-        , bcStackYaml = stackYamlFP
-        , bcFlags = projectFlags project
-        , bcImplicitGlobal = isNothing mproject
-        , bcGHCVariant = getGHCVariant miniConfig
+        { bcNoLocal = BuildConfigNoLocal
+            { bcConfig = config
+            , bcResolver = loadedResolver
+            , bcWantedMiniBuildPlan = mbp
+            , bcGHCVariant = view ghcVariantL miniConfig
+            }
+        , bcLocal = BuildConfigLocal
+            { bcPackageEntries = projectPackages project
+            , bcExtraDeps = projectExtraDeps project
+            , bcExtraPackageDBs = extraPackageDBs
+            , bcStackYaml = stackYamlFP
+            , bcFlags = projectFlags project
+            , bcImplicitGlobal = isNothing mproject
+            }
         }
 
 -- | Get packages from EnvConfig, downloading and cloning as necessary.
@@ -561,16 +584,17 @@ getLocalPackages
     :: (StackMiniM env m, HasEnvConfig env)
     => m (Map.Map (Path Abs Dir) TreatLikeExtraDep)
 getLocalPackages = do
-    cacheRef <- asks (envConfigPackagesRef . getEnvConfig)
+    cacheRef <- view $ envConfigLocalL.to envConfigPackagesRef
     mcached <- liftIO $ readIORef cacheRef
     case mcached of
         Just cached -> return cached
         Nothing -> do
             menv <- getMinimalEnvOverride
-            bconfig <- asks getBuildConfig
+            root <- view projectRootL
+            entries <- view $ buildConfigLocalL.to bcPackageEntries
             liftM (Map.fromList . concat) $ mapM
-                (resolvePackageEntry menv (bcRoot bconfig))
-                (bcPackageEntries bconfig)
+                (resolvePackageEntry menv root)
+                entries
 
 -- | Resolve a PackageEntry into a list of paths, downloading and cloning as
 -- necessary.
@@ -618,7 +642,7 @@ resolvePackageLocation
     -> m (Path Abs Dir)
 resolvePackageLocation _ projRoot (PLFilePath fp) = resolveDir projRoot fp
 resolvePackageLocation menv projRoot (PLRemote url remotePackageType) = do
-    workDir <- getWorkDir
+    workDir <- view workDirL
     let nameBeforeHashing = case remotePackageType of
             RPTHttp{} -> url
             RPTGit commit -> T.unwords [url, commit]
