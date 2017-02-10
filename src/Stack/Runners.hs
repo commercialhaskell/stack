@@ -207,9 +207,10 @@ withMiniConfigAndLock
     -> StackT MiniConfig IO ()
     -> IO ()
 withMiniConfigAndLock go@GlobalOpts{..} inner = do
-    miniConfig <- runStackTGlobal () go
-        $ fmap (loadMiniConfig . lcConfig)
-        $ loadConfigMaybeProject globalConfigMonoid globalResolver Nothing
+    miniConfig <-
+        runStackTGlobal () go $
+        (loadMiniConfig . lcConfig) <$>
+        loadConfigMaybeProject globalConfigMonoid globalResolver Nothing
     runStackTGlobal miniConfig go inner
 
 -- | Unlock a lock file, if the value is Just
