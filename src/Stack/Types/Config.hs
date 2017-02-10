@@ -93,6 +93,7 @@ module Stack.Types.Config
   ,configPackageIndex
   ,configPackageIndexOld
   ,configPackageIndexCache
+  ,configPackageIndexCacheOld
   ,configPackageIndexGz
   ,configPackageIndexRoot
   ,configPackageIndexRepo
@@ -1190,6 +1191,10 @@ configPackageIndexRepo name = do
 -- | Location of the 01-index.cache file
 configPackageIndexCache :: (MonadReader env m, HasConfig env, MonadThrow m) => IndexName -> m (Path Abs File)
 configPackageIndexCache = liftM (</> $(mkRelFile "01-index.cache")) . configPackageIndexRoot
+
+-- | Location of the 00-index.cache file
+configPackageIndexCacheOld :: (MonadReader env m, HasConfig env, MonadThrow m) => IndexName -> m (Path Abs File)
+configPackageIndexCacheOld = liftM (</> $(mkRelFile "00-index.cache")) . configPackageIndexRoot
 
 -- | Location of the 01-index.tar file
 configPackageIndex :: (MonadReader env m, HasConfig env, MonadThrow m) => IndexName -> m (Path Abs File)
