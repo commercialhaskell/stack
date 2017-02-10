@@ -262,9 +262,12 @@ updateIndex menv index =
         (_, SILHttp url HTVanilla) -> updateIndexHTTP name index url
         (_, SILHttp url (HTHackageSecurity hs)) -> updateIndexHackageSecurity name index url hs
 
-     -- Copy to the 00-index.tar filename for backwards compatibility
+     -- Copy to the 00-index.tar filename for backwards
+     -- compatibility. First wipe out the cache file if present.
      tarFile <- configPackageIndex name
      oldTarFile <- configPackageIndexOld name
+     oldCacheFile <- configPackageIndexCacheOld name
+     ignoringAbsence (removeFile oldCacheFile)
      runConduitRes $ sourceFile (toFilePath tarFile) .| sinkFile (toFilePath oldTarFile)
 
 -- | Update the index Git repo and the index tarball
