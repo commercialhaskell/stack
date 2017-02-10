@@ -1,4 +1,4 @@
-resolver: lts-7.9
+resolver: lts-7.14
 image:
   containers:
     - base: "fpco/stack-base" # see ./etc/docker/stack-base/Dockerfile
