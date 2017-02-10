@@ -69,6 +69,12 @@ before_install:
      cabal)
        export PATH=$HOME/.cabal/bin:/opt/ghc/$GHCVER/bin:/opt/cabal/$CABALVER/bin:$PATH;;
    esac
+ # Hacky attempted workaround for
+ # https://github.com/commercialhaskell/stack/issues/2964
+ - case "$BUILD" in
+     stack)
+       rm -f ~/.stack/indices/Hackage/0?-index.*;;
+   esac
  - ./.travis-setup.sh
 
 install:
