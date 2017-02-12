@@ -62,6 +62,9 @@ Other enhancements:
 * The script interpreter will now output error logging.  In particular,
   this means it will output info about plan construction errors.
   ([#2879](https://github.com/commercialhaskell/stack/issues/2879))
+* `stack ghci` now takes `--flag` and `--ghc-options` again (inadverently
+  removed in 1.3.0).
+  ([#2986](https://github.com/commercialhaskell/stack/issues/2986))
 
 Bug fixes:
 
