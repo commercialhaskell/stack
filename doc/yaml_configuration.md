@@ -5,11 +5,11 @@ the stack.yaml file. Note that this page is likely to be both *incomplete* and
 sometimes *inaccurate*. If you see such cases, please update the page, and if
 you're not sure how, open an issue labeled "question".
 
-The stack.yaml configuration options break down into [project-specific](#project-config) options in:
+The stack.yaml configuration options break down into [project-specific](#project-specific-config) options in:
 
 - `<project dir>/stack.yaml`
 
-and [non-project-specific](#non-project-config) options in:
+and [non-project-specific](#non-project-specific-config) options in:
 
 - `/etc/stack/config.yaml` -- for system global non-project default options
 -  `~/.stack/config.yaml` -- for user non-project default options
@@ -206,8 +206,8 @@ Packages that come from the snapshot global database are not affected.
 
 ### image
 
-The image settings are used for the creation of container images using `stack
-image container`, e.g.
+The image settings are used for the creation of container images using
+`stack image container`, e.g.
 
 ```yaml
 image:
@@ -689,8 +689,8 @@ The 5 parameters are: `author-email`, `author-name`, `category`, `copyright` and
   name of the holder of the copyright on the package and the year(s) from which
   copyright is claimed. For example: `Copyright: (c) 2006-2007 Joe Bloggs`
 * _github-username_ - used to generate `homepage` and `source-repository` in
-  cabal. For instance `github-username: myusername` and `stack new my-project
-  new-template` would result:
+  cabal. For instance `github-username: myusername` and `stack new my-project new-template`
+  would result:
 
 ```yaml
 homepage: http://github.com/myusername/my-project#readme

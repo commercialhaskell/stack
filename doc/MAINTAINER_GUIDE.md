@@ -9,10 +9,10 @@
     * Update `stack-nightly.yaml` with latest nightly and remove extra-deps
     * Run `stack --stack-yaml=stack-nightly.yaml test`
 * Ensure integration tests pass on a representative Windows, macOS, and Linux (Linux
-  is handled by Jenkins automatically): `stack install --pedantic && stack test
-  --pedantic --flag stack:integration-tests` . The actual release script will
-  perform a more thorough test for every platform/variant prior to uploading, so
-  this is just a pre-check
+  is handled by Jenkins automatically):
+  `stack install --pedantic && stack test --pedantic --flag stack:integration-tests`.
+  The actual release script will perform a more thorough test for every platform/variant
+  prior to uploading, so this is just a pre-check
 * Ensure `stack haddock` works (Travis CI now does this)
 * Stack builds with `stack-7.8.yaml` (Travis CI now does this)
 * stack can build the wai repo
@@ -73,8 +73,8 @@ for requirements to perform the release, and more details about the tool.
 
 A note about the `etc/scripts/*-releases.sh` scripts: if you run them from a
 different working tree than the scripts themselves (e.g. if you have `stack1`
-and `stack2` trees, and run `cd stack1;
-../stack2/etc/scripts/vagrant-release.sh`) the scripts and Vagrantfiles from the
+and `stack2` trees, and run `cd stack1; ../stack2/etc/scripts/vagrant-release.sh`)
+the scripts and Vagrantfiles from the
 tree containing the script will be used to build the stack code in the current
 directory. That allows you to iterate on the release process while building a
 consistent and clean stack version.
@@ -110,8 +110,8 @@ consistent and clean stack version.
 * Build sdist using `stack sdist . --pvp-bounds=both`, and upload it to the
   Github release with a name like `stack-X.Y.Z-sdist-0.tar.gz`.
 
-* Publish Github release. Use e.g. `git shortlog -s v1.1.2..rc/v1.2.0|sed
-  's/^[0-9 ]*/* /'|sort -f` to get the list of contributors.
+* Publish Github release. Use e.g. `git shortlog -s v1.1.2..rc/v1.2.0|sed 's/^[0-9 ]*/* /'|sort -f`
+  to get the list of contributors.
 
 * Upload package to Hackage: `stack upload . --pvp-bounds=both`
 
@@ -126,11 +126,9 @@ consistent and clean stack version.
 
 * (SKIP) [Flag the Arch Linux package as out-of-date](https://www.archlinux.org/packages/community/x86_64/stack/flag/)
 
-* Push signed Git tag, matching Github release tag name, e.g.: `git tag -d vX.Y.Z; git tag -u
-  0x575159689BEFB442 vX.Y.Z && git push -f origin vX.Y.Z`
+* Push signed Git tag, matching Github release tag name, e.g.: `git tag -d vX.Y.Z; git tag -u 0x575159689BEFB442 vX.Y.Z && git push -f origin vX.Y.Z`
 
-* Reset the `release` branch to the released commit, e.g.: `git checkout release
-  && git merge --ff-only vX.Y.Z && git push origin release`
+* Reset the `release` branch to the released commit, e.g.: `git checkout release && git merge --ff-only vX.Y.Z && git push origin release`
 
 * Update the `stable` branch similarly
 

@@ -22,8 +22,8 @@ When your project has these properties, you will get the following:
 2) A unified textual and HTML report, considering the coverage on all local
   libraries, based on all of the tests that were run.
 
-3) An index of all generated HTML reports, at `$(stack path
-   --local-hpc-root)/index.html`.
+3) An index of all generated HTML reports, at
+  `$(stack path --local-hpc-root)/index.html`.
 
 ## "stack hpc report" command
 
@@ -81,8 +81,8 @@ However, advanced users may want to understand exactly how `--coverage` works:
    When switching on this flag, it will usually cause all local packages to be
    rebuilt (see [#1940](https://github.com/commercialhaskell/stack/issues/1940).
 
-2. Before the build runs with `--coverage`, the contents of `stack path
-   --local-hpc-root` gets deleted. This prevents old reports from getting mixed
+2. Before the build runs with `--coverage`, the contents of `stack path --local-hpc-root`
+   gets deleted. This prevents old reports from getting mixed
    with new reports. If you want to preserve report information from multiple
    runs, copy the contents of this path to a new folder.
 
@@ -90,8 +90,8 @@ However, advanced users may want to understand exactly how `--coverage` works:
    it will be deleted.
 
 4. After a test run, it will expect a `test-name.tix` file to exist. This file
-   will then get loaded, modified, and outputted to `$(stack path
-   --local-hpc-root)/pkg-name/test-name/test-name.tix)`.
+   will then get loaded, modified, and outputted to
+   `$(stack path --local-hpc-root)/pkg-name/test-name/test-name.tix)`.
 
    The `.tix` file gets modified to remove coverage file that isn't associated
    with a library. So, this means that you won't get coverage information for
@@ -107,8 +107,8 @@ However, advanced users may want to understand exactly how `--coverage` works:
 
 5. Once we have a `.tix` file for a test, we also generate a textual and HTML
    report for it. The textual report is sent to the terminal. The index of the
-   test-specific HTML report is available at `$(stack path
-   --local-hpc-root)/pkg-name/test-name/index.html`
+   test-specific HTML report is available at
+   `$(stack path --local-hpc-root)/pkg-name/test-name/index.html`
 
 6. After the build completes, if there are multiple output `*.tix` files, they
    get combined into a unified report. The index of this report will be
@@ -116,5 +116,4 @@ However, advanced users may want to understand exactly how `--coverage` works:
 
 7. Finally, an index of the resulting coverage reports is generated. It links to
    the individual coverage reports (one for each test-suite), as well as the
-   unified report. This index is available at `$(stack path
-   --local-hpc-root)/index.html`
+   unified report. This index is available at `$(stack path --local-hpc-root)/index.html`
