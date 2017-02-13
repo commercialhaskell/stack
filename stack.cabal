@@ -360,7 +360,7 @@ test-suite stack-test
                 , temporary
                 , text
                 , transformers >= 0.3.0.0 && < 0.6
-                , mono-traversable
+                , mono-traversable >=0.10.2 && <1.1
                 , th-reify-many
                 , smallcheck
                 , bytestring
