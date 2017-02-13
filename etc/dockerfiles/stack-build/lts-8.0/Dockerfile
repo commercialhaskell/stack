@@ -20,7 +20,6 @@ ENV LANG=C.UTF-8 \
 # tools required to build any Stackage package.
 #
 
-#@@@ TEST documentation location
 RUN apt-get update && \
     apt-get install -y wget && \
     wget -qO- https://raw.githubusercontent.com/fpco/stackage/93738c5865fdd0627508617215d01b78d4e2bf74/debian-bootstrap.sh | bash && \
@@ -51,5 +50,3 @@ RUN wget -O- "https://github.com/fpco/pid1/releases/download/pid1%2F$PID1_VERSIO
 
 ENTRYPOINT ["/usr/local/sbin/pid1"]
 CMD ["bash"]
-
-#@@@: update stack docks to omit run and full images
