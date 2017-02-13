@@ -16,8 +16,8 @@ Haskell tooling you need. This guide will follow that stack-centric approach.
 
 ### What makes stack special?
 
-The primary stack design point is __reproducible builds__. If you run `stack
-build` today, you should get the same result running `stack build` tomorrow.
+The primary stack design point is __reproducible builds__. If you run `stack build`
+today, you should get the same result running `stack build` tomorrow.
 There are some cases that can break that rule (changes in your operating system
 configuration, for example), but, overall, stack follows this design philosophy
 closely. To make this a simple process, stack uses curated package sets
@@ -195,7 +195,7 @@ Registering helloworld-0.1.0.0...
 Looking closely at the output of the previous command, you can see that it built
 both a library called "helloworld" and an executable called "helloworld-exe".
 We'll explain more in the next section, but, for now, just notice that the
-executables are installed in our project's `./stack-work` directory.
+executables are installed in our project's `./.stack-work` directory.
 
 Now, Let's use `stack exec` to run our executable (which just outputs the string
 "someFunc"):
@@ -207,7 +207,7 @@ someFunc
 
 `stack exec` works by providing the same reproducible environment that was used
 to build your project to the command that you are running. Thus, it knew where
-to find `helloworld-exe` even though it is hidden in the `./stack-work`
+to find `helloworld-exe` even though it is hidden in the `./.stack-work`
 directory.
 
 ### stack test
@@ -264,11 +264,11 @@ test/Spec.hs
 
 The `app/Main.hs`, `src/Lib.hs`, and `test/Spec.hs` files are all Haskell source
 files that compose the actual functionality of our project (we won't dwell on
-them here). The LICENSE file has no impact on the build, but is there for
-informational/legal purposes only. The files of interest here are Setup.hs,
-helloworld.cabal, and stack.yaml.
+them here). The `LICENSE` file has no impact on the build, but is there for
+informational/legal purposes only. The files of interest here are `Setup.hs`,
+`helloworld.cabal`, and `stack.yaml`.
 
-The Setup.hs file is a component of the Cabal build system which stack uses.
+The `Setup.hs` file is a component of the Cabal build system which stack uses.
 It's technically not needed by stack, but it is still considered good practice
 in the Haskell world to include it. The file we're using is straight
 boilerplate:
@@ -278,7 +278,7 @@ import Distribution.Simple
 main = defaultMain
 ```
 
-Next, let's look at our stack.yaml file, which gives our project-level settings:
+Next, let's look at our `stack.yaml` file, which gives our project-level settings:
 
 ```yaml
 flags: {}
@@ -296,22 +296,22 @@ our project, located in the same directory, so `'.'` suffices. However, stack
 has powerful support for multi-package projects, which we'll elaborate on as
 this guide progresses.
 
-The final field is resolver. This tells stack *how* to build your package:
+The final field is `resolver`. This tells stack *how* to build your package:
 which GHC version to use, versions of package dependencies, and so on. Our
 value here says to use [LTS Haskell version
 3.2](https://www.stackage.org/lts-3.2), which implies GHC 7.10.2 (which is why
 `stack setup` installs that version of GHC). There are a number of values you
-can use for resolver, which we'll cover later.
+can use for `resolver`, which we'll cover later.
 
-The final file of import is helloworld.cabal. stack is built on top of the
+The final file of import is `helloworld.cabal`. stack is built on top of the
 Cabal build system. In Cabal, we have individual *packages*, each of which
-contains a single .cabal file. The .cabal file can define 1 or more
+contains a single `.cabal` file. The `.cabal` file can define 1 or more
 *components*: a library, executables, test suites, and benchmarks. It also
 specifies additional information such as library dependencies, default language
 pragmas, and so on.
 
 In this guide, we'll discuss the bare minimum necessary to understand how to
-modify a .cabal file. Haskell.org has the definitive [reference for the .cabal
+modify a `.cabal` file. Haskell.org has the definitive [reference for the `.cabal`
 file format](https://www.haskell.org/cabal/users-guide/developing-packages.html).
 
 ### The setup command
@@ -328,8 +328,8 @@ stack ghc, stack ghci, stack runghc, or stack exec
 ```
 
 Thankfully, the command is smart enough to know not to perform an installation
-twice. As the command output above indicates, you can use `stack
-path` for quite a bit of path information (which we'll play with more later).
+twice. As the command output above indicates, you can use `stack path`
+for quite a bit of path information (which we'll play with more later).
 For now, we'll just look at where GHC is installed:
 
 ```
@@ -392,7 +392,7 @@ Preprocessing library helloworld-0.1.0.0...
 
 Notice that it says "Could not find module." This means that the package
 containing the module in question is not available. To tell stack to use text,
-you need to add it to your .cabal file — specifically in your build-depends
+you need to add it to your `.cabal` file — specifically in your build-depends
 section, like this:
 
 ```
@@ -496,7 +496,7 @@ someFunc :: IO ()
 someFunc = launchMissiles
 ```
 
-Again, we add this new dependency to the .cabal file like this:
+Again, we add this new dependency to the `.cabal` file like this:
 
 ```
 library
@@ -538,9 +538,9 @@ defined our build plan and available packages. When we tried using the
 text package, it just worked, because it was part of the lts-3.2 *package set*.
 But acme-missiles is not part of that package set, so building failed.
 
-To add this new dependency, we'll use the `extra-deps` field in stack.yaml to
+To add this new dependency, we'll use the `extra-deps` field in `stack.yaml` to
 define extra dependencies not present in the resolver. With that change, our
-stack.yaml looks like:
+`stack.yaml` looks like:
 
 ```yaml
 flags: {}
@@ -564,7 +564,7 @@ information about it at
 * The ability to perform a Hoogle search on the packages in this snapshot
 * A [list of all modules](https://www.stackage.org/lts-3.2/docs) in a snapshot,
   which can be useful when trying to determine which package to add to your
-  .cabal file
+  `.cabal` file
 
 You can also see a [list of all available
 snapshots](https://www.stackage.org/snapshots). You'll notice two flavors: LTS
@@ -576,7 +576,7 @@ default as well).
 ## Resolvers and changing your compiler version
 
 Let's explore package sets a bit further. Instead of lts-3.2, let's change our
-stack.yaml file to use
+`stack.yaml` file to use
 [nightly-2015-08-26](https://www.stackage.org/nightly-2015-08-26). Rerunning
 `stack build` will produce:
 
@@ -621,7 +621,7 @@ When passed on the command line, you also get some additional "short-cut"
 versions of resolvers: `--resolver nightly` will use the newest Nightly resolver
 available, `--resolver lts` will use the newest LTS, and `--resolver lts-2` will
 use the newest LTS in the 2.X series. The reason these are only available on the
-command line and not in your stack.yaml file is that using them:
+command line and not in your `stack.yaml` file is that using them:
 
 1. Will slow down your build (since stack then needs to download information on
    the latest available LTS each time it builds)
@@ -685,8 +685,8 @@ The most up-to-date information can always be found in the
 Alright, enough playing around with simple projects. Let's take an open source
 package and try to build it. We'll be ambitious and use
 [yackage](https://www.stackage.org/package/yackage), a local package server
-using [Yesod](http://www.yesodweb.com/). To get the code, we'll use the `stack
-unpack` command:
+using [Yesod](http://www.yesodweb.com/). To get the code, we'll use the
+`stack unpack` command:
 
 ```
 cueball:~$ stack unpack yackage-0.8.0
@@ -695,7 +695,7 @@ cueball:~$ cd yackage-0.8.0/
 ```
 
 ### stack init
-This new directory does not have a stack.yaml file, so we need to make one
+This new directory does not have a `stack.yaml` file, so we need to make one
 first. We could do it by hand, but let's be lazy instead with the `stack init`
 command:
 
@@ -717,7 +717,7 @@ All done.
 
 stack init does quite a few things for you behind the scenes:
 
-* Finds all of the .cabal files in your current directory and subdirectories
+* Finds all of the `.cabal` files in your current directory and subdirectories
   (unless you use `--ignore-subdirs`) and determines the packages and versions
   they require
 * Finds the best combination of snapshot and package flags that allows everything to
@@ -725,7 +725,7 @@ stack init does quite a few things for you behind the scenes:
 * It tries to look for the best matching snapshot from latest LTS, latest
   nightly, other LTS versions in that order
 
-Assuming it finds a match, it will write your stack.yaml file, and everything
+Assuming it finds a match, it will write your `stack.yaml` file, and everything
 will work.
 
 #### External Dependencies
@@ -813,7 +813,7 @@ Overwriting existing configuration file: stack.yaml
 All done.
 ```
 
-As you can verify by viewing stack.yaml, three external dependencies were added
+As you can verify by viewing `stack.yaml`, three external dependencies were added
 by stack init:
 
 ```
@@ -825,20 +825,20 @@ extra-deps:
 ```
 
 Of course, you could have added the external dependencies by manually editing
-stack.yaml but stack init does the hard work for you.
+`stack.yaml` but stack init does the hard work for you.
 
 #### Excluded Packages
 
 Sometimes multiple packages in your project may have conflicting requirements.
 In that case `stack init` will fail, so what do you do?
 
-You could manually create stack.yaml by omitting some packages to resolve the
+You could manually create `stack.yaml` by omitting some packages to resolve the
 conflict. Alternatively you can ask `stack init` to do that for you by
 specifying `--omit-packages` flag on the command line. Let's see how that
 works.
 
 To simulate a conflict we will use acme-missiles-0.3 in yackage and we will
-also copy yackage.cabal to another directory and change the name of the file
+also copy `yackage.cabal` to another directory and change the name of the file
 and package to yackage-test. In this new package we will use acme-missiles-0.2
 instead. Let's see what happens when we run solver:
 
@@ -908,8 +908,8 @@ config file and removing it.
 #### Using a specific resolver
 
 Sometimes you may want to use a specific resolver for your project instead of
-`stack init` picking one for you. You can do that by using `stack init
---resolver <resolver>`.
+`stack init` picking one for you. You can do that by using
+`stack init --resolver <resolver>`.
 
 You can also init with a compiler resolver if you do not want to use a
 snapshot. That will result in all of your project's dependencies being put
@@ -930,7 +930,7 @@ _Duplicate package names_: If multiple packages under the directory tree have
 same name, stack init will report those and automatically ignore one of them.
 
 _Ignore subdirectories_: By default stack init searches all the subdirectories
-for .cabal files. If you do not want that then you can use `--ignore-subdirs`
+for `.cabal` files. If you do not want that then you can use `--ignore-subdirs`
 command line switch.
 
 _Cabal warnings_: stack init will show warnings if there were issues in reading
@@ -1039,7 +1039,7 @@ Due to the change that we made, solver suggested some new dependencies.
 By default it does not make changes to the config. As it suggested you can use
 `--update-config` to make changes to the config.
 
-NOTE: You should probably back up your stack.yaml before doing this, such as
+NOTE: You should probably back up your `stack.yaml` before doing this, such as
 committing to Git/Mercurial/Darcs.
 
 Sometimes, you may want to use specific versions of certain packages for your
@@ -1047,8 +1047,8 @@ project. To do that you can fix those versions by specifying them in the
 extra-deps section and then use `stack solver` to figure out whether it is
 feasible to use those or what other dependencies are needed as a result.
 
-If you want to change the resolver for your project, you can run `stack solver
---resolver <resolver name>` and it will figure out the changes needed for you.
+If you want to change the resolver for your project, you can run
+`stack solver --resolver <resolver name>` and it will figure out the changes needed for you.
 
 Let's see what happens if we change the resolver to lts-2.22:
 
@@ -1252,8 +1252,8 @@ michael@d30748af6d3d:~/helloworld$ stack path --local-bin-path
 
 That's why the download page recommends adding that directory to your `PATH`
 environment variable. This feature is convenient, because now you can simply
-run `executable-name` in your shell instead of having to run `stack exec
-executable-name` from inside your project directory.
+run `executable-name` in your shell instead of having to run
+`stack exec executable-name` from inside your project directory.
 
 Since it's such a point of confusion, let me list a number of things stack does
 *not* do specially for the install command:
@@ -1402,7 +1402,7 @@ michael@d30748af6d3d:~/multi$ stack build --haddock --test
 # Goes off to build a whole bunch of packages
 ```
 
-If you look at the stack.yaml, you'll see exactly what you'd expect:
+If you look at the `stack.yaml`, you'll see exactly what you'd expect:
 
 ```yaml
 flags:
@@ -1435,7 +1435,7 @@ and with GHC options.
 
 ### Cabal flag management
 
-In the stack.yaml file above, you can see that `stack init` has detected that —
+In the `stack.yaml` file above, you can see that `stack init` has detected that —
 for the yackage package — the upload flag can be set to true, and for
 wai-app-static, the print flag to false (it's chosen those values because
 they're the default flag values, and their dependencies are compatible with the
@@ -1512,7 +1512,7 @@ of reproducible builds is- in the stack maintainers' views- worth the
 confusion.
 
 Final point: if you have GHC options that you'll be regularly passing to your
-packages, you can add them to your stack.yaml file (starting with
+packages, you can add them to your `stack.yaml` file (starting with
 stack-0.1.4.0). See [the documentation section on
 ghc-options](yaml_configuration.md#ghc-options)
 for more information.
@@ -1618,7 +1618,7 @@ command (for "module") followed by the module name.
 
 IMPORTANT NOTE: If you have added upstream packages to your project please make
 sure to mark them as *dependency package*s for faster and reliable usage of
-`stack gchi`. Otherwise GHCi may have trouble due to conflicts of compilation
+`stack ghci`. Otherwise GHCi may have trouble due to conflicts of compilation
 flags or having to unnecessarily interpret too many modules. See
 [stack.yaml documentation](yaml_configuration.md#packages) to learn how to mark
 a package as a *dependency package*.
@@ -1626,8 +1626,8 @@ a package as a *dependency package*.
 ## ghc/runghc
 
 You'll sometimes want to just compile (or run) a single Haskell source file,
-instead of creating an entire Cabal package for it. You can use `stack exec
-ghc` or `stack exec runghc` for that. As simple helpers, we also provide the
+instead of creating an entire Cabal package for it. You can use `stack exec ghc`
+or `stack exec runghc` for that. As simple helpers, we also provide the
 `stack ghc` and `stack runghc` commands, for these common cases.
 
 ## script interpreter
@@ -1749,7 +1749,7 @@ version of our toy example:
 
 ## Finding project configs, and the implicit global
 
-Whenever you run something with stack, it needs a stack.yaml project file. The
+Whenever you run something with stack, it needs a `stack.yaml` project file. The
 algorithm stack uses to find this is:
 
 1. Check for a `--stack-yaml` option on the command line
@@ -1759,11 +1759,11 @@ algorithm stack uses to find this is:
 The first two provide a convenient method for using an alternate configuration.
 For example: `stack build --stack-yaml stack-7.8.yaml` can be used by your CI
 system to check your code against GHC 7.8. Setting the `STACK_YAML` environment
-variable can be convenient if you're going to be running commands like `stack
-ghc` in other directories, but you want to use the configuration you defined in
+variable can be convenient if you're going to be running commands like `stack ghc`
+in other directories, but you want to use the configuration you defined in
 a specific project.
 
-If stack does not find a stack.yaml in any of the three specified locations,
+If stack does not find a `stack.yaml` in any of the three specified locations,
 the *implicit global* logic kicks in. You've probably noticed that phrase a few
 times in the output from commands above. Implicit global is essentially a hack
 to allow stack to be useful in a non-project setting. When no implicit global
@@ -1778,20 +1778,20 @@ configuration. It has no impact on projects at all. Every package you install
 with it is put into isolated databases just like everywhere else. The only magic
 is that it's the catch-all project whenever you're running stack somewhere else.
 
-## stack.yaml vs .cabal files
+## `stack.yaml` vs `.cabal` files
 
 Now that we've covered a lot of stack use cases, this quick summary of
-stack.yaml vs .cabal files will hopefully make sense and be a good reminder for
+`stack.yaml` vs `.cabal` files will hopefully make sense and be a good reminder for
 future uses of stack:
 
 * A project can have multiple packages.
-* Each project has a stack.yaml.
-* Each package has a .cabal file.
-* The .cabal file specifies which packages are dependencies.
-* The stack.yaml file specifies which packages are available to be used.
-* .cabal specifies the components, modules, and build flags provided by a package
-* stack.yaml can override the flag settings for individual packages
-* stack.yaml specifies which packages to include
+* Each project has a `stack.yaml`.
+* Each package has a `.cabal` file.
+* The `.cabal` file specifies which packages are dependencies.
+* The `stack.yaml` file specifies which packages are available to be used.
+* `.cabal` specifies the components, modules, and build flags provided by a package
+* `stack.yaml` can override the flag settings for individual packages
+* `stack.yaml` specifies which packages to include
 
 ## Comparison to other tools
 
@@ -1810,7 +1810,7 @@ not convincing a tool to do what you want.
 Before jumping into the differences, let me clarify an important similarity:
 
 __Same package format.__ stack, cabal-install, and presumably all other tools
-share the same underlying Cabal package format, consisting of a .cabal file,
+share the same underlying Cabal package format, consisting of a `.cabal` file,
 modules, etc. This is a Good Thing: we can share the same set of upstream
 libraries, and collaboratively work on the same project with stack,
 cabal-install, and NixOS. In that sense, we're sharing the same ecosystem.
@@ -1839,8 +1839,8 @@ Now the differences:
       packages. So for example, in stack, `stack test` does the same job as
       `cabal install --run-tests`, though the latter *additionally* performs an
       installation that you may not want. The closer command equivalent is
-      `cabal install --enable-tests --only-dependencies && cabal configure
-      --enable-tests && cabal build && cabal test` (newer versions of
+      `cabal install --enable-tests --only-dependencies && cabal configure --enable-tests && cabal build && cabal test`
+      (newer versions of
       cabal-install may make this command shorter).
 * __Isolated by default__.
     * This has been a pain point for new stack users. In cabal, the

@@ -137,8 +137,8 @@ behaviour.
 ### reset - Reset the Docker "sandbox"
 
 In order to preserve the contents of the in-container home directory between
-runs, a special "sandbox" directory is volume-mounted into the container. `stack
-docker reset` will reset that sandbox to its defaults.
+runs, a special "sandbox" directory is volume-mounted into the container.
+`stack docker reset` will reset that sandbox to its defaults.
 
 Note: `~/.stack` is separately volume-mounted, and is left alone during reset.
 
@@ -310,8 +310,8 @@ Additional notes
 ### Volume-mounts and ephemeral containers
 
 Since filesystem changes outside of the volume-mounted project directory are not
-persisted across runs, this means that if you `stack exec sudo apt-get install
-some-ubuntu-package`, that package will be installed but then the container it's
+persisted across runs, this means that if you `stack exec sudo apt-get install some-ubuntu-package`,
+that package will be installed but then the container it's
 installed in will disappear, thus causing it to have no effect. If you wish to
 make this kind of change permanent, see later instructions for how to create a
 [derivative Docker image](#derivative-image).
@@ -340,8 +340,8 @@ and publish port 3000.
 
 If you do want to do all your work, including editing, in the container, it
 might be better to use a persistent container in which you can install Ubuntu
-packages. You could get that by running something like `stack
---docker-container-name=NAME --docker-persist exec --plain bash`. This
+packages. You could get that by running something like
+`stack --docker-container-name=NAME --docker-persist exec --plain bash`. This
 means when the container exits, it won't be deleted. You can then restart it
 using `docker start -a -i NAME`. It's also possible to detach from a container
 while it continues running in the background using by pressing Ctrl-P Ctrl-Q,
@@ -406,8 +406,8 @@ Troubleshooting
 ### "No Space Left on Device", but 'df' shows plenty of disk space
 
 This is likely due to the storage driver Docker is using, in combination with
-the large size and number of files in these images. Use `docker info|grep
-'Storage Driver'` to determine the current storage driver.
+the large size and number of files in these images. Use `docker info|grep 'Storage Driver'`
+to determine the current storage driver.
 
 We recommend using either the `overlay` or `aufs` storage driver for stack, as
 they are least likely to give you trouble.  On Ubuntu, `aufs` is the default for
@@ -453,9 +453,8 @@ change to take effect:
 <small>
 The above commands turn off `dnsmasq` usage in NetworkManager
 configuration and restart network manager.  They can be reversed by executing
-`sudo sed 's@#dns=dnsmasq@dns=dnsmasq@' -i
-/etc/NetworkManager/NetworkManager.conf && sudo service network-manager
-restart`.  These instructions are adapted from
+`sudo sed 's@#dns=dnsmasq@dns=dnsmasq@' -i /etc/NetworkManager/NetworkManager.conf && sudo service network-manager restart`.
+These instructions are adapted from
 [the Shipyard Project's QuickStart guide](https://github.com/shipyard/shipyard/wiki/QuickStart#127011-dns-server-problem-on-ubuntu).
 </small>
 
