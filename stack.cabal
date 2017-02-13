@@ -134,6 +134,7 @@ library
                      Stack.Options.NixParser
                      Stack.Options.PackageParser
                      Stack.Options.ResolverParser
+                     Stack.Options.ScriptParser
                      Stack.Options.SolverParser
                      Stack.Options.TestParser
                      Stack.Options.Utils

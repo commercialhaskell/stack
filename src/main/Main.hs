@@ -88,6 +88,7 @@ import           Stack.Options.GlobalParser
 import           Stack.Options.HpcReportParser
 import           Stack.Options.NewParser
 import           Stack.Options.NixParser
+import           Stack.Options.ScriptParser
 import           Stack.Options.SolverParser
 import           Stack.Options.Utils
 import qualified Stack.PackageIndex
@@ -109,7 +110,7 @@ import qualified Stack.Upload as Upload
 import qualified System.Directory as D
 import           System.Environment (getProgName, getArgs, withArgs)
 import           System.Exit
-import           System.FilePath (pathSeparator)
+import           System.FilePath (pathSeparator, replaceExtension, dropExtension)
 import           System.IO (hIsTerminalDevice, stderr, stdin, stdout, hSetBuffering, BufferMode(..), hPutStrLn, Handle, hGetEncoding, hSetEncoding)
 
 -- | Change the character encoding of the given Handle to transliterate
@@ -800,14 +801,10 @@ execCmd ExecOpts {..} go@GlobalOpts{..} =
           pkgopts <- getPkgOpts menv wc pkgs
           return (prefix ++ compilerExeName wc, pkgopts ++ args)
 
-scriptOptsParser :: Parser ([String], [String])
-scriptOptsParser = (,)
-    <$> many (strOption (long "package" <> help "Additional packages that must be installed"))
-    <*> many (strArgument (metavar "-- ARGS (e.g. stack ghc -- X.hs -o x)"))
-
 -- | Run a Stack Script
-scriptCmd :: ([String], [String]) -> GlobalOpts -> IO ()
-scriptCmd (packages', args') go' = do
+scriptCmd :: ScriptOpts -> GlobalOpts -> IO ()
+scriptCmd opts go' = do
+    print opts
     let go = go'
             { globalConfigMonoid = (globalConfigMonoid go')
                 { configMonoidInstallGHC = First $ Just True
@@ -827,7 +824,7 @@ scriptCmd (packages', args') go' = do
         menv <- liftIO $ configEnvOverride config defaultEnvSettings
         wc <- view $ actualCompilerVersionL.whichCompilerL
 
-        let targets = concatMap wordsComma packages'
+        let targets = concatMap wordsComma $ soPackages opts
             targetsSet = Set.fromList targets
 
         -- Ensure only package names are provided. We do not allow
@@ -855,21 +852,45 @@ scriptCmd (packages', args') go' = do
                         { boptsCLITargets = map T.pack targets
                         }
 
-        let args = concat
+        let ghcArgs = concat
                 [ ["-hide-all-packages"]
                 , map (\x -> "-package" ++ x)
                     $ Set.toList
                     $ Set.insert "base" targetsSet
-                , args'
+                , case soCompile opts of
+                    SEInterpret -> []
+                    SECompile -> []
+                    SEOptimize -> ["-O2"]
                 ]
-        let cmd = "run" ++ compilerExeName wc
         munlockFile lk -- Unlock before transferring control away.
-        exec menv cmd args
+        case soCompile opts of
+          SEInterpret -> exec menv ("run" ++ compilerExeName wc)
+                (ghcArgs ++ soFile opts : soArgs opts)
+          _ -> do
+            file <- resolveFile' $ soFile opts
+            let dir = parent file
+            void $ readProcessStderrStdout
+              (Just dir)
+              menv
+              (compilerExeName wc)
+              (ghcArgs ++ [soFile opts])
+            exec menv (toExeName $ toFilePath file) (soArgs opts)
   where
     toPackageName = reverse . drop 1 . dropWhile (/= '-') . reverse
 
     -- Like words, but splits on both commas and spaces
     wordsComma = splitWhen (\c -> c == ' ' || c == ',')
+
+    toExeName fp =
+      if isWindows
+        then replaceExtension fp "exe"
+        else dropExtension fp
+
+#ifdef WINDOWS
+    isWindows = True
+#else
+    isWindows = False
+#endif
 
 -- | Evaluate some haskell code inline.
 evalCmd :: EvalOpts -> GlobalOpts -> IO ()
