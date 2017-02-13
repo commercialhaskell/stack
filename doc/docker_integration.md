@@ -268,19 +268,6 @@ FP Complete provides the following public image repositories on Docker Hub:
 - [fpco/stack-build](https://registry.hub.docker.com/u/fpco/stack-build/) (the
   default) - GHC (patched), tools (stack, cabal-install, happy, alex, etc.), and
   system developer libraries required to build all Stackage packages.
-- [fpco/stack-ghcjs-build](https://registry.hub.docker.com/u/fpco/stack-ghcjs-build/) -
-  Like `stack-build`, but adds GHCJS.
-- [fpco/stack-full](https://registry.hub.docker.com/u/fpco/stack-full/) -
-  Includes all Stackage packages pre-installed in GHC's global package database.
-  These images are over 10 GB!
-- [fpco/stack-ghcjs-full](https://registry.hub.docker.com/u/fpco/stack-ghcjs-full/) -
-  Like `stack-full`, but adds GHCJS.
-- [fpco/stack-run](https://registry.hub.docker.com/u/fpco/stack-run/) -
-  Runtime environment for binaries built with Stackage. Includes system shared
-  libraries required by all Stackage packages. Does not necessarily include all
-  data required for every use (e.g. has texlive-binaries for HaTeX, but does not
-  include LaTeX fonts), as that would be prohibitively large. Based on
-  [phusion/baseimage](https://registry.hub.docker.com/u/phusion/baseimage/).
 
 FP Complete also builds custom variants of these images for their clients.
 
@@ -426,10 +413,9 @@ We recommend using either the `overlay` or `aufs` storage driver for stack, as
 they are least likely to give you trouble.  On Ubuntu, `aufs` is the default for
 new installations, but older installations sometimes used `devicemapper`.
 
-The `devicemapper` storage driver's default configuration limits it to a 10 GB
-file system, which the "full" images exceed. We have experienced other
-instabilities with it as well on Ubuntu, and recommend against its use for this
-purpose.
+The `devicemapper` storage driver's doesn't work well with large filesystems,
+and we have experienced other instabilities with it as well. We recommend
+against its use.
 
 The `btrfs` storage driver has problems running out of metadata space long
 before running out of actual disk space, which requires rebalancing or adding
