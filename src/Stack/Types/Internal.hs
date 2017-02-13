@@ -38,12 +38,8 @@ instance HasGHCVariant config => HasGHCVariant (Env config) where
     ghcVariantL = envConfL.ghcVariantL
 instance HasConfig config => HasConfig (Env config) where
     configL = envConfL.configL
-instance HasBuildConfigNoLocal config => HasBuildConfigNoLocal (Env config) where
-    buildConfigNoLocalL = envConfL.buildConfigNoLocalL
 instance HasBuildConfig config => HasBuildConfig (Env config) where
-    buildConfigLocalL = envConfL.buildConfigLocalL
-instance HasEnvConfigNoLocal config => HasEnvConfigNoLocal (Env config) where
-    envConfigNoLocalL = envConfL.envConfigNoLocalL
+    buildConfigL = envConfL.buildConfigL
 instance HasEnvConfig config => HasEnvConfig (Env config) where
     envConfigL = envConfL.envConfigL
 

@@ -588,24 +588,20 @@ loadBuildConfig mproject config mresolver mcompiler = do
     extraPackageDBs <- mapM resolveDir' (projectExtraPackageDBs project)
 
     return BuildConfig
-        { bcNoLocal = BuildConfigNoLocal
-            { bcConfig = config
-            , bcResolver = loadedResolver
-            , bcWantedMiniBuildPlan = mbp
-            , bcGHCVariant = view ghcVariantL miniConfig
-            }
-        , bcLocal = BuildConfigLocal
-            { bcPackageEntries = projectPackages project
-            , bcExtraDeps = projectExtraDeps project
-            , bcExtraPackageDBs = extraPackageDBs
-            , bcStackYaml = stackYamlFP
-            , bcFlags = projectFlags project
-            , bcImplicitGlobal =
-                case mproject of
-                  LCSNoProject -> True
-                  LCSProject _ -> False
-                  LCSNoConfig  -> False
-            }
+        { bcConfig = config
+        , bcResolver = loadedResolver
+        , bcWantedMiniBuildPlan = mbp
+        , bcGHCVariant = view ghcVariantL miniConfig
+        , bcPackageEntries = projectPackages project
+        , bcExtraDeps = projectExtraDeps project
+        , bcExtraPackageDBs = extraPackageDBs
+        , bcStackYaml = stackYamlFP
+        , bcFlags = projectFlags project
+        , bcImplicitGlobal =
+            case mproject of
+                LCSNoProject -> True
+                LCSProject _ -> False
+                LCSNoConfig  -> False
         }
   where
     miniConfig = loadMiniConfig config
@@ -636,14 +632,14 @@ getLocalPackages
     :: (StackMiniM env m, HasEnvConfig env)
     => m (Map.Map (Path Abs Dir) TreatLikeExtraDep)
 getLocalPackages = do
-    cacheRef <- view $ envConfigLocalL.to envConfigPackagesRef
+    cacheRef <- view $ envConfigL.to envConfigPackagesRef
     mcached <- liftIO $ readIORef cacheRef
     case mcached of
         Just cached -> return cached
         Nothing -> do
             menv <- getMinimalEnvOverride
             root <- view projectRootL
-            entries <- view $ buildConfigLocalL.to bcPackageEntries
+            entries <- view $ buildConfigL.to bcPackageEntries
             liftM (Map.fromList . concat) $ mapM
                 (resolvePackageEntry menv root)
                 entries

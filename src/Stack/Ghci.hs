@@ -246,7 +246,7 @@ checkTargets
 checkTargets mp = do
     let filtered = M.filter (== STUnknown) mp
     unless (M.null filtered) $ do
-        bconfig <- view buildConfigLocalL
+        bconfig <- view buildConfigL
         throwM $ UnknownTargets (M.keysSet filtered) M.empty (bcStackYaml bconfig)
 
 getAllLocalTargets
@@ -563,10 +563,8 @@ makeGhciPkgInfo
 makeGhciPkgInfo buildOptsCLI sourceMap installedMap locals addPkgs mfileTargets name cabalfp target = do
     bopts <- view buildOptsL
     econfig <- view envConfigL
-    bconfignl <- view buildConfigNoLocalL
-    bconfigl <- view buildConfigLocalL
+    bconfig <- view buildConfigL
     compilerVersion <- view actualCompilerVersionL
-    let bconfig = BuildConfig bconfignl bconfigl
     let config =
             PackageConfig
             { packageConfigEnableTests = True

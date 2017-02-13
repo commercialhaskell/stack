@@ -208,7 +208,7 @@ resolveBuildPlan
 resolveBuildPlan mbp isShadowed packages
     | Map.null (rsUnknown rs) && Map.null (rsShadowed rs) = return (rsToInstall rs, rsUsedBy rs)
     | otherwise = do
-        bconfig <- view buildConfigLocalL
+        bconfig <- view buildConfigL
         (caches, _gitShaCaches) <- getPackageCaches
         let maxVer =
                 Map.fromListWith max $

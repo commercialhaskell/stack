@@ -39,8 +39,7 @@ path
 path keys =
     do -- We must use a BuildConfig from an EnvConfig to ensure that it contains the
        -- full environment info including GHC paths etc.
-       bcnl <- view $ envConfigL.buildConfigNoLocalL
-       bcl <- view $ envConfigL.buildConfigLocalL
+       bc <- view $ envConfigL.buildConfigL
        -- This is the modified 'bin-path',
        -- including the local GHC or MSYS if not configured to operate on
        -- global GHC.
@@ -80,7 +79,7 @@ path keys =
                           else key <> ": ") <>
                       path'
                           (PathInfo
-                               (BuildConfig bcnl bcl)
+                               bc
                                menv
                                snap
                                plocal
@@ -119,12 +118,9 @@ data PathInfo = PathInfo
 
 instance HasPlatform PathInfo
 instance HasConfig PathInfo
-instance HasBuildConfigNoLocal PathInfo where
-    buildConfigNoLocalL = lens piBuildConfig (\x y -> x { piBuildConfig = y })
-                        . buildConfigNoLocalL
 instance HasBuildConfig PathInfo where
-    buildConfigLocalL = lens piBuildConfig (\x y -> x { piBuildConfig = y })
-                      . buildConfigLocalL
+    buildConfigL = lens piBuildConfig (\x y -> x { piBuildConfig = y })
+                 . buildConfigL
 
 -- | The paths of interest to a user. The first tuple string is used
 -- for a description that the optparse flag uses, and the second
