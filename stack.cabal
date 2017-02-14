@@ -198,8 +198,8 @@ library
                    , conduit >= 1.2.8
                    , conduit-extra >= 1.1.14
                    , containers >= 0.5.5.1
-                   , cryptonite >= 0.20.0
-                   , cryptonite-conduit >= 0.2.0
+                   , cryptonite
+                   , cryptonite-conduit
                    , directory >= 1.2.1.0 && < 1.4
                    , either
                    , errors < 2.2
