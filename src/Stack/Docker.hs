@@ -30,7 +30,7 @@ import           Control.Monad.Logger (MonadLogger,logError,logInfo,logWarn)
 import           Control.Monad.Reader (MonadReader,runReaderT)
 import           Control.Monad.Trans.Control (MonadBaseControl)
 import           Control.Monad.Writer (execWriter,runWriter,tell)
-import qualified "cryptohash" Crypto.Hash as Hash
+import qualified Crypto.Hash as Hash (Digest, MD5, hash)
 import           Data.Aeson.Extended (FromJSON(..),(.:),(.:?),(.!=),eitherDecode)
 import           Data.ByteString.Builder (stringUtf8,charUtf8,toLazyByteString)
 import qualified Data.ByteString.Char8 as BS
@@ -285,7 +285,7 @@ runContainerAndExit getCmdArgs
      sandboxDir <- projectDockerSandboxDir projectRoot
      let ImageConfig {..} = iiConfig
          imageEnvVars = map (break (== '=')) icEnv
-         platformVariant = BS.unpack $ Hash.digestToHexByteString $ hashRepoName image
+         platformVariant = show $ hashRepoName image
          stackRoot = configStackRoot config
          sandboxHomeDir = sandboxDir </> homeDirName
          isTerm = not (dockerDetach docker) &&

@@ -247,8 +247,8 @@ import           System.Process.Read (EnvOverride, findExecutable)
 import           Stack.Types.Config.Build as X
 
 #ifdef mingw32_HOST_OS
-import qualified Crypto.Hash.SHA1 as SHA1
-import qualified Data.ByteString.Base16 as B16
+import           Crypto.Hash (hashWith, SHA1(..))
+import qualified Data.ByteArray.Encoding as Mem (convertToBase, Base(Base16))
 #endif
 
 -- | The top-level Stackage configuration.
@@ -1327,7 +1327,7 @@ platformGhcVerOnlyRelDirStr = do
 useShaPathOnWindows :: MonadThrow m => Path Rel Dir -> m (Path Rel Dir)
 useShaPathOnWindows =
 #ifdef mingw32_HOST_OS
-    parseRelDir . S8.unpack . S8.take 8 . B16.encode . SHA1.hash . encodeUtf8 . T.pack . toFilePath
+    parseRelDir . S8.unpack . S8.take 8 . Mem.convertToBase Mem.Base16 . hashWith SHA1 . encodeUtf8 . T.pack . toFilePath
 #else
     return
 #endif

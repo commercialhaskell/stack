@@ -41,7 +41,7 @@ import              Control.Monad.Logger
 import              Control.Monad.Reader (MonadReader, ReaderT (..))
 import              Control.Monad.State (get, put, modify)
 import              Control.Monad.Trans.Control
-import "cryptohash" Crypto.Hash (SHA1(SHA1))
+import "cryptonite" Crypto.Hash (SHA1(..))
 import              Data.Aeson.Extended
 import qualified    Data.ByteString as S
 import qualified    Data.ByteString.Char8 as S8

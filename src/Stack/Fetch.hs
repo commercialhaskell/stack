@@ -42,7 +42,7 @@ import              Control.Monad.Logger
 import              Control.Monad.Reader (ask, runReaderT)
 import              Control.Monad.Trans.Control
 import              Control.Monad.Trans.Unlift (MonadBaseUnlift, askRunBase)
-import "cryptohash" Crypto.Hash (SHA256 (..))
+import              Crypto.Hash (SHA256 (..))
 import              Data.ByteString (ByteString)
 import qualified    Data.ByteString as S
 import qualified    Data.ByteString.Lazy as L

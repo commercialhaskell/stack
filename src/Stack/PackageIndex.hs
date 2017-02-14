@@ -36,9 +36,9 @@ import qualified Control.Monad.Catch as C
 import           Control.Monad.IO.Class (MonadIO, liftIO)
 import           Control.Monad.Logger (logDebug, logInfo, logWarn, logError)
 import           Control.Monad.Trans.Control
-import           Crypto.Hash.SHA1 (hashlazy)
+import           Crypto.Hash as Hash (hashlazy, Digest, SHA1)
 import           Data.Aeson.Extended
-import qualified Data.ByteString.Base16 as B16
+import qualified Data.ByteArray.Encoding as Mem (convertToBase, Base(Base16))
 import qualified Data.ByteString.Char8 as S8
 import qualified Data.ByteString.Lazy as L
 import           Data.Conduit (($$), (=$), (.|), runConduitRes)
@@ -158,11 +158,14 @@ populateCache menv index = do
             -- Git algorithm of prepending "blob <size>\0" to the raw
             -- contents. We use this to be able to share the same SHA
             -- information between the Git and tarball backends.
-            gitSHA1 = GitSHA1 $ B16.encode $ hashlazy $ L.fromChunks
+            gitSHA1 = GitSHA1 $ Mem.convertToBase Mem.Base16 $ hashSHA1 $ L.fromChunks
                 $ "blob "
                 : S8.pack (show $ L.length lbs)
                 : "\0"
                 : L.toChunks lbs
+
+        hashSHA1 :: L.ByteString -> Hash.Digest Hash.SHA1
+        hashSHA1 = Hash.hashlazy
 
         addJSON :: FromJSON a
                 => (a -> PackageDownload)

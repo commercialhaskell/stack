@@ -40,12 +40,13 @@ import           Control.Monad.IO.Class
 import           Control.Monad.Logger (MonadLogger, logDebug)
 import           Control.Monad.Reader (MonadReader)
 import           Control.Monad.Trans.Control (MonadBaseControl)
-import qualified Crypto.Hash.SHA256 as SHA256
+import           Crypto.Hash (hashWith, SHA256(..))
 import           Data.Binary (Binary (..))
 import qualified Data.Binary as Binary
 import           Data.Binary.Tagged (HasStructuralInfo, HasSemanticVersion)
 import qualified Data.Binary.Tagged as BinaryTagged
-import qualified Data.ByteString.Base16 as B16
+import qualified Data.ByteArray as Mem (convert)
+import qualified Data.ByteArray.Encoding as Mem (convertToBase, Base(Base16))
 import qualified Data.ByteString.Base64.URL as B64URL
 import qualified Data.ByteString.Char8 as S8
 import qualified Data.ByteString.Lazy as LBS
@@ -265,7 +266,7 @@ precompiledCacheFile pkgident copts installedPackageIDs = do
     -- Unfortunately, earlier Cabals don't have the information, so we must
     -- supplement it with the installed package IDs directly.
     -- See issue: https://github.com/commercialhaskell/stack/issues/1103
-    let oldHash = B16.encode $ SHA256.hash $ LBS.toStrict $
+    let oldHash = Mem.convertToBase Mem.Base16 $ hashWith SHA256 $ LBS.toStrict $
             if view cabalVersionL ec >= $(mkVersion "1.22")
                 then Binary.encode (coNoDirs copts)
                 else Binary.encode input
@@ -280,7 +281,7 @@ precompiledCacheFile pkgident copts installedPackageIDs = do
                  </> hashPath
 
     $logDebug $ "Precompiled cache input = " <> T.pack (show input)
-    newPath <- hashToPath $ B64URL.encode $ SHA256.hash $ Store.encode input
+    newPath <- hashToPath $ B64URL.encode $ Mem.convert $ hashWith SHA256 $ Store.encode input
     return (newPath, hashToPath oldHash)
 
 -- | Write out information about a newly built package

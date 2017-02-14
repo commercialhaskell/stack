@@ -32,8 +32,9 @@ import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import           Control.Monad.Trans.Control (liftBaseWith)
 import           Control.Monad.Trans.Resource
-import qualified Crypto.Hash.SHA256 as SHA256
+import           Crypto.Hash
 import           Data.Attoparsec.Text hiding (try)
+import qualified Data.ByteArray as Mem (convert)
 import qualified Data.ByteString as S
 import qualified Data.ByteString.Base64.URL as B64URL
 import           Data.Char (isSpace)
@@ -255,7 +256,7 @@ simpleSetupCode = "import Distribution.Simple\nmain = defaultMain"
 
 simpleSetupHash :: String
 simpleSetupHash =
-    T.unpack $ decodeUtf8 $ S.take 8 $ B64URL.encode $ SHA256.hash $
+    T.unpack $ decodeUtf8 $ S.take 8 $ B64URL.encode $ Mem.convert $ hashWith SHA256 $
     encodeUtf8 (T.pack (unwords buildSetupArgs)) <> setupGhciShimCode <> simpleSetupCode
 
 -- | Get a compiled Setup exe
