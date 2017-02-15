@@ -144,6 +144,7 @@ library
                      Stack.Path
                      Stack.PrettyPrint
                      Stack.Runners
+                     Stack.Script
                      Stack.SDist
                      Stack.Setup
                      Stack.Setup.Installed
