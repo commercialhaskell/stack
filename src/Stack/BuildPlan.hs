@@ -32,6 +32,7 @@ module Stack.BuildPlan
     , showItems
     , showPackageFlags
     , parseCustomMiniBuildPlan
+    , loadBuildPlan
     ) where
 
 import           Control.Applicative
