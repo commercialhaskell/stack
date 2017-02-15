@@ -34,9 +34,10 @@ import              Control.Monad.Catch
 import              Control.Monad.IO.Class
 import              Control.Monad.Logger (logDebug, MonadLogger)
 import              Control.Retry (recovering,limitRetries,RetryPolicy,constantDelay)
-import "cryptohash" Crypto.Hash
+import              Crypto.Hash
 import              Crypto.Hash.Conduit (sinkHash)
-import              Data.Byteable (toBytes)
+import              Data.ByteArray as Mem (convert)
+import              Data.ByteArray.Encoding as Mem (convertToBase, Base(Base16))
 import              Data.ByteString (ByteString)
 import              Data.ByteString.Char8 (readInteger)
 import              Data.Conduit
@@ -153,8 +154,8 @@ sinkCheckHash :: MonadThrow m
 sinkCheckHash req HashCheck{..} = do
     digest <- sinkHashUsing hashCheckAlgorithm
     let actualDigestString = show digest
-    let actualDigestHexByteString = digestToHexByteString digest
-    let actualDigestBytes = toBytes digest
+    let actualDigestHexByteString = Mem.convertToBase Mem.Base16 digest
+    let actualDigestBytes = Mem.convert digest
 
     let passedCheck = case hashCheckHexDigest of
           CheckHexDigestString s -> s == actualDigestString

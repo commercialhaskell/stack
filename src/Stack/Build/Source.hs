@@ -31,10 +31,10 @@ import              Control.Monad.IO.Class
 import              Control.Monad.Logger
 import              Control.Monad.Reader (MonadReader)
 import              Control.Monad.Trans.Resource
-import "cryptohash" Crypto.Hash (Digest, SHA256)
+import              Crypto.Hash (Digest, SHA256(..))
 import              Crypto.Hash.Conduit (sinkHash)
+import qualified    Data.ByteArray as Mem (convert)
 import qualified    Data.ByteString as S
-import              Data.Byteable (toBytes)
 import              Data.Conduit (($$), ZipSink (..))
 import qualified    Data.Conduit.Binary as CB
 import qualified    Data.Conduit.List as CL
@@ -633,7 +633,7 @@ calcFci modTime' fp = liftIO $
         return FileCacheInfo
             { fciModTime = modTime'
             , fciSize = size
-            , fciHash = toBytes (digest :: Digest SHA256)
+            , fciHash = Mem.convert (digest :: Digest SHA256)
             }
 
 checkComponentsBuildable :: MonadThrow m => [LocalPackage] -> m ()

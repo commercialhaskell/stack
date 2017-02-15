@@ -189,19 +189,17 @@ library
                    , attoparsec >= 0.12.1.5 && < 0.14
                    , base >= 4.8 && <5
                    , base-compat >=0.6 && <0.10
-                   , base16-bytestring
                    , base64-bytestring
                    , binary >= 0.7 && < 0.9
                    , binary-tagged >= 0.1.1
                    , blaze-builder
-                   , byteable
                    , bytestring >= 0.10.4.0
                    , clock >= 0.7.2
                    , conduit >= 1.2.8
                    , conduit-extra >= 1.1.14
                    , containers >= 0.5.5.1
-                   , cryptohash >= 0.11.6
-                   , cryptohash-conduit
+                   , cryptonite
+                   , cryptonite-conduit
                    , directory >= 1.2.1.0 && < 1.4
                    , either
                    , errors < 2.2
@@ -223,6 +221,7 @@ library
                    , lifted-async
                        -- https://github.com/basvandijk/lifted-base/issues/31
                    , lifted-base < 0.2.3.7 || > 0.2.3.7
+                   , memory
                    , microlens >= 0.3.0.0
                    , microlens-mtl
                    , monad-control
@@ -352,7 +351,7 @@ test-suite stack-test
                 , conduit
                 , conduit-extra
                 , containers >= 0.5.5.1
-                , cryptohash
+                , cryptonite
                 , directory >= 1.2.1.0 && < 1.4
                 , exceptions
                 , filepath

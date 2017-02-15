@@ -53,8 +53,9 @@ import           Control.Monad.Extra (firstJustM)
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger hiding (Loc)
 import           Control.Monad.Reader (ask, runReaderT)
-import qualified Crypto.Hash.SHA256 as SHA256
+import           Crypto.Hash (hashWith, SHA256(..))
 import           Data.Aeson.Extended
+import qualified Data.ByteArray as Mem (convert)
 import qualified Data.ByteString as S
 import qualified Data.ByteString.Base64.URL as B64URL
 import qualified Data.ByteString.Lazy as L
@@ -646,7 +647,7 @@ resolvePackageLocation menv projRoot (PLRemote url remotePackageType) = do
             RPTGit commit -> T.unwords [url, commit]
             RPTHg commit -> T.unwords [url, commit, "hg"]
         -- TODO: dedupe with code for snapshot hash?
-        name = T.unpack $ decodeUtf8 $ S.take 12 $ B64URL.encode $ SHA256.hash $ encodeUtf8 nameBeforeHashing
+        name = T.unpack $ decodeUtf8 $ S.take 12 $ B64URL.encode $ Mem.convert $ hashWith SHA256 $ encodeUtf8 nameBeforeHashing
         root = projRoot </> workDir </> $(mkRelDir "downloaded")
         fileExtension' = case remotePackageType of
             RPTHttp -> ".http-archive"
