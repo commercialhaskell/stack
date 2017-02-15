@@ -184,8 +184,7 @@ stickyLoggerFuncImpl (Sticky mref) lo loc src level msg =
                      LevelOther "sticky" -> LevelInfo
                      _ -> level)
                 msg
-        Just ref -> do
-            sticky <- takeMVar ref
+        Just ref -> modifyMVar_ ref $ \sticky -> do
             let backSpaceChar = '\8'
                 repeating = S8.replicate (maybe 0 T.length sticky)
                 clear = S8.hPutStr out
@@ -198,31 +197,29 @@ stickyLoggerFuncImpl (Sticky mref) lo loc src level msg =
                     | logUseUnicode lo = msgTextRaw
                     | otherwise = T.map replaceUnicode msgTextRaw
 
-            newState <-
-                case level of
-                    LevelOther "sticky-done" -> do
+            case level of
+                LevelOther "sticky-done" -> do
+                    clear
+                    T.hPutStrLn out msgText
+                    hFlush out
+                    return Nothing
+                LevelOther "sticky" -> do
+                    clear
+                    T.hPutStr out msgText
+                    hFlush out
+                    return (Just msgText)
+                _
+                    | level >= logMinLevel lo -> do
                         clear
-                        T.hPutStrLn out msgText
-                        hFlush out
-                        return Nothing
-                    LevelOther "sticky" -> do
-                        clear
-                        T.hPutStr out msgText
-                        hFlush out
-                        return (Just msgText)
-                    _
-                      | level >= logMinLevel lo -> do
-                          clear
-                          loggerFunc lo out loc src level $ toLogStr msgText
-                          case sticky of
-                              Nothing ->
-                                  return Nothing
-                              Just line -> do
-                                  T.hPutStr out line >> hFlush out
-                                  return sticky
-                      | otherwise ->
-                          return sticky
-            putMVar ref newState
+                        loggerFunc lo out loc src level $ toLogStr msgText
+                        case sticky of
+                            Nothing ->
+                                return Nothing
+                            Just line -> do
+                                T.hPutStr out line >> hFlush out
+                                return sticky
+                    | otherwise ->
+                        return sticky
   where
     out = stderr
     msgTextRaw = T.decodeUtf8With T.lenientDecode msgBytes
