@@ -51,9 +51,12 @@ scriptCmd opts go' = do
             }
     withBuildConfigAndLock go $ \lk -> do
         -- Some warnings in case the user somehow tries to set a
-        -- stack.yaml location
+        -- stack.yaml location. Note that in this functions we use
+        -- logError instead of logWarn because, when using the
+        -- interpreter mode, only error messages are shown. See:
+        -- https://github.com/commercialhaskell/stack/issues/3007
         case globalStackYaml go' of
-          SYLOverride fp -> $logWarn $ T.pack
+          SYLOverride fp -> $logError $ T.pack
             $ "Ignoring override stack.yaml file for script command: " ++ fp
           SYLDefault -> return ()
           SYLNoConfig -> assert False (return ())
@@ -65,7 +68,7 @@ scriptCmd opts go' = do
         (targetsSet, coresSet) <-
             case soPackages opts of
                 [] -> do
-                    $logWarn "No packages provided, using experimental import parser"
+                    $logError "No packages provided, using experimental import parser"
                     getPackagesFromImports (globalResolver go) (soFile opts)
                 packages -> do
                     let targets = concatMap wordsComma packages
