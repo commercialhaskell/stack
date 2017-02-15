@@ -170,7 +170,7 @@ getPackagesFromImports (Just (ARResolver (ResolverSnapshot name))) scriptFP = do
                                     , " appears in multiple packages: "
                                     , unwords $ map packageNameString pns'
                                     ]
-                        Nothing -> return $ Set.empty
+                        Nothing -> return Set.empty
                 return $ Set.unions pns
     return (Set.union pns1 pns2, modifyForWindows $ miCorePackages mi)
   where
@@ -194,11 +194,10 @@ toModuleInfo bp = ModuleInfo
     { miCorePackages = Map.keysSet $ siCorePackages $ bpSystemInfo bp
     , miModules =
               Map.unionsWith Set.union
-            $ map (\(pn, mns) ->
+            $ map ((\(pn, mns) ->
                     Map.fromList
                   $ map (\mn -> (ModuleName $ encodeUtf8 mn, Set.singleton pn))
-                  $ Set.toList mns)
-            $ map (fmap (sdModules . ppDesc))
+                  $ Set.toList mns) . fmap (sdModules . ppDesc))
             $ filter (\(_, pp) -> not $ pcHide $ ppConstraints pp)
             $ Map.toList (bpPackages bp)
     }
