@@ -32,6 +32,7 @@ execOptsExtraParser = eoPlainParser <|>
                       ExecOptsEmbellished
                          <$> eoEnvSettingsParser
                          <*> eoPackagesParser
+                         <*> eoRtsOptionsParser
   where
     eoEnvSettingsParser :: Parser EnvSettings
     eoEnvSettingsParser = EnvSettings
@@ -48,6 +49,9 @@ execOptsExtraParser = eoPlainParser <|>
 
     eoPackagesParser :: Parser [String]
     eoPackagesParser = many (strOption (long "package" <> help "Additional packages that must be installed"))
+
+    eoRtsOptionsParser :: Parser [String]
+    eoRtsOptionsParser = many (strOption (long "rts" <> help "Explicit RTS options to pass to application"))
 
     eoPlainParser :: Parser ExecOptsExtra
     eoPlainParser = flag' ExecOptsPlain

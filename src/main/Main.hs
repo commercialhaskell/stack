@@ -729,7 +729,8 @@ sdistCmd (dirs, mpvpBounds, ignoreCheck, sign, sigServerUrl) go =
 
 -- | Execute a command.
 execCmd :: ExecOpts -> GlobalOpts -> IO ()
-execCmd ExecOpts {..} go@GlobalOpts{..} =
+execCmd e@ExecOpts {..} go@GlobalOpts{..} =
+    print e >>
     case eoExtra of
         ExecOptsPlain -> do
             (cmd, args) <- case (eoCmd, eoArgs) of
@@ -765,7 +766,13 @@ execCmd ExecOpts {..} go@GlobalOpts{..} =
                config <- view configL
                menv <- liftIO $ configEnvOverride config eoEnvSettings
                (cmd, args) <- case (eoCmd, eoArgs) of
-                   (ExecCmd cmd, args) -> return (cmd, args)
+                   (ExecCmd cmd, args) -> do
+                        -- Add RTS options to arguments
+                        let argsWithRts = if null eoRtsOptions 
+                            then args :: [String]
+                            else args ++ ["+RTS"] ++ eoRtsOptions ++ ["-RTS"]
+                        return (cmd, argsWithRts)
+
                    (ExecGhc, args) -> getGhcCmd "" menv eoPackages args
                     -- NOTE: this won't currently work for GHCJS, because it doesn't have
                     -- a runghcjs binary. It probably will someday, though.
