@@ -7,7 +7,7 @@ module Stack.Script
 
 import           Control.Exception          (assert)
 import           Control.Exception.Safe     (throwM)
-import           Control.Monad              (unless, void, forM)
+import           Control.Monad              (unless, forM)
 import           Control.Monad.IO.Class     (liftIO)
 import           Control.Monad.Logger
 import           Data.ByteString            (ByteString)
@@ -111,11 +111,14 @@ scriptCmd opts go' = do
           _ -> do
             file <- resolveFile' $ soFile opts
             let dir = parent file
-            void $ readProcessStderrStdout
+            -- use sinkProcessStdout to ensure a ProcessFailed
+            -- exception is generated for better error messages
+            sinkProcessStdout
               (Just dir)
               menv
               (compilerExeName wc)
               (ghcArgs ++ [soFile opts])
+              CL.sinkNull
             exec menv (toExeName $ toFilePath file) (soArgs opts)
   where
     toPackageName = reverse . drop 1 . dropWhile (/= '-') . reverse
