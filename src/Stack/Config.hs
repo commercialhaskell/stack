@@ -1,5 +1,8 @@
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE DeriveFoldable #-}
+{-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE DeriveTraversable #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE TemplateHaskell #-}
@@ -39,6 +42,7 @@ module Stack.Config
   ,getInNixShell
   ,defaultConfigYaml
   ,getProjectConfig
+  ,LocalConfigStatus(..)
   ) where
 
 import qualified Codec.Archive.Tar as Tar
@@ -53,8 +57,9 @@ import           Control.Monad.Extra (firstJustM)
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger hiding (Loc)
 import           Control.Monad.Reader (ask, runReaderT)
-import qualified Crypto.Hash.SHA256 as SHA256
+import           Crypto.Hash (hashWith, SHA256(..))
 import           Data.Aeson.Extended
+import qualified Data.ByteArray as Mem (convert)
 import qualified Data.ByteString as S
 import qualified Data.ByteString.Base64.URL as B64URL
 import qualified Data.ByteString.Lazy as L
@@ -216,16 +221,38 @@ getLatestResolver = do
         snap = fromMaybe (Nightly (snapshotsNightly snapshots)) mlts
     return (ResolverSnapshot snap)
 
+-- | Create a 'Config' value when we're not using any local
+-- configuration files (e.g., the script command)
+configNoLocalConfig
+    :: (MonadLogger m, MonadIO m, MonadCatch m)
+    => Path Abs Dir -- ^ stack root
+    -> Maybe AbstractResolver
+    -> ConfigMonoid
+    -> m Config
+configNoLocalConfig _ Nothing _ = throwM NoResolverWhenUsingNoLocalConfig
+configNoLocalConfig stackRoot (Just resolver) configMonoid = do
+    userConfigPath <- getFakeConfigPath stackRoot resolver
+    configFromConfigMonoid
+      stackRoot
+      userConfigPath
+      False
+      (Just resolver)
+      Nothing -- project
+      configMonoid
+
 -- Interprets ConfigMonoid options.
 configFromConfigMonoid
     :: (MonadLogger m, MonadIO m, MonadCatch m)
     => Path Abs Dir -- ^ stack root, e.g. ~/.stack
     -> Path Abs File -- ^ user config file path, e.g. ~/.stack/config.yaml
+    -> Bool -- ^ allow locals?
     -> Maybe AbstractResolver
     -> Maybe (Project, Path Abs File)
     -> ConfigMonoid
     -> m Config
-configFromConfigMonoid configStackRoot configUserConfigPath mresolver mproject ConfigMonoid{..} = do
+configFromConfigMonoid
+    configStackRoot configUserConfigPath configAllowLocals mresolver
+    mproject ConfigMonoid{..} = do
      let configWorkDir = fromFirst $(mkRelDir ".stack-work") configMonoidWorkDir
      -- This code is to handle the deprecation of latest-snapshot-url
      configUrls <- case (getFirst configMonoidLatestSnapshotUrl, getFirst (urlsMonoidLatestSnapshot configMonoidUrls)) of
@@ -413,24 +440,36 @@ loadConfigMaybeProject
     -- ^ Config monoid from parsed command-line arguments
     -> Maybe AbstractResolver
     -- ^ Override resolver
-    -> Maybe (Project, Path Abs File, ConfigMonoid)
+    -> LocalConfigStatus (Project, Path Abs File, ConfigMonoid)
     -- ^ Project config to use, if any
     -> m (LoadConfig m)
 loadConfigMaybeProject configArgs mresolver mproject = do
     (stackRoot, userOwnsStackRoot) <- determineStackRootAndOwnership configArgs
-    userConfigPath <- getDefaultUserConfigPath stackRoot
-    extraConfigs0 <- getExtraConfigs userConfigPath >>= mapM loadConfigYaml
-    let extraConfigs =
-            -- non-project config files' existence of a docker section should never default docker
-            -- to enabled, so make it look like they didn't exist
-            map (\c -> c {configMonoidDockerOpts =
-                              (configMonoidDockerOpts c) {dockerMonoidDefaultEnable = Any False}})
-                extraConfigs0
-    let mproject' = (\(project, stackYaml, _) -> (project, stackYaml)) <$> mproject
-    config <- configFromConfigMonoid stackRoot userConfigPath mresolver mproject' $ mconcat $
+
+    let loadHelper mproject' = do
+          userConfigPath <- getDefaultUserConfigPath stackRoot
+          extraConfigs0 <- getExtraConfigs userConfigPath >>= mapM loadConfigYaml
+          let extraConfigs =
+                -- non-project config files' existence of a docker section should never default docker
+                -- to enabled, so make it look like they didn't exist
+                map (\c -> c {configMonoidDockerOpts =
+                                  (configMonoidDockerOpts c) {dockerMonoidDefaultEnable = Any False}})
+                    extraConfigs0
+
+          configFromConfigMonoid
+            stackRoot
+            userConfigPath
+            True -- allow locals
+            mresolver
+            (fmap (\(x, y, _) -> (x, y)) mproject')
+            $ mconcat $ configArgs
+            : maybe id (\(_, _, projectConfig) -> (projectConfig:)) mproject' extraConfigs
+
+    config <-
         case mproject of
-            Nothing -> configArgs : extraConfigs
-            Just (_, _, projectConfig) -> configArgs : projectConfig : extraConfigs
+          LCSNoConfig -> configNoLocalConfig stackRoot mresolver configArgs
+          LCSProject project -> loadHelper $ Just project
+          LCSNoProject -> loadHelper Nothing
     unless (fromCabalVersion Meta.version `withinRange` configRequireStackVersion config)
         (throwM (BadStackVersionException (configRequireStackVersion config)))
 
@@ -444,7 +483,11 @@ loadConfigMaybeProject configArgs mresolver mproject = do
     return LoadConfig
         { lcConfig          = config
         , lcLoadBuildConfig = loadBuildConfig mproject config mresolver
-        , lcProjectRoot     = mprojectRoot
+        , lcProjectRoot     =
+            case mprojectRoot of
+              LCSProject fp -> Just fp
+              LCSNoProject  -> Nothing
+              LCSNoConfig   -> Nothing
         }
 
 -- | Load the configuration, using current directory, environment variables,
@@ -455,7 +498,7 @@ loadConfig :: StackM env m
            -- ^ Config monoid from parsed command-line arguments
            -> Maybe AbstractResolver
            -- ^ Override resolver
-           -> Maybe (Path Abs File)
+           -> StackYamlLoc (Path Abs File)
            -- ^ Override stack.yaml
            -> m (LoadConfig m)
 loadConfig configArgs mresolver mstackYaml =
@@ -464,20 +507,22 @@ loadConfig configArgs mresolver mstackYaml =
 -- | Load the build configuration, adds build-specific values to config loaded by @loadConfig@.
 -- values.
 loadBuildConfig :: StackM env m
-                => Maybe (Project, Path Abs File, ConfigMonoid)
+                => LocalConfigStatus (Project, Path Abs File, ConfigMonoid)
                 -> Config
                 -> Maybe AbstractResolver -- override resolver
                 -> Maybe CompilerVersion -- override compiler
                 -> m BuildConfig
 loadBuildConfig mproject config mresolver mcompiler = do
     env <- ask
-    let miniConfig = loadMiniConfig config
 
     (project', stackYamlFP) <- case mproject of
-      Just (project, fp, _) -> do
+      LCSProject (project, fp, _) -> do
           forM_ (projectUserMsg project) ($logWarn . T.pack)
           return (project, fp)
-      Nothing -> do
+      LCSNoConfig -> do
+          p <- getEmptyProject
+          return (p, configUserConfigPath config)
+      LCSNoProject -> do
             $logDebug "Run from outside a project, using implicit global project config"
             destDir <- getImplicitGlobalProjectDir config
             let dest :: Path Abs File
@@ -506,26 +551,9 @@ loadBuildConfig mproject config mresolver mcompiler = do
                                          " specified on command line")
                    return (project, dest)
                else do
-                   r <- case mresolver of
-                       Just aresolver -> do
-                           r' <- runReaderT (makeConcreteResolver aresolver) miniConfig
-                           $logInfo ("Using resolver: " <> resolverName r' <> " specified on command line")
-                           return r'
-                       Nothing -> do
-                           r'' <- runReaderT getLatestResolver miniConfig
-                           $logInfo ("Using latest snapshot resolver: " <> resolverName r'')
-                           return r''
                    $logInfo ("Writing implicit global project config file to: " <> T.pack dest')
                    $logInfo "Note: You can change the snapshot via the resolver field there."
-                   let p = Project
-                           { projectUserMsg = Nothing
-                           , projectPackages = mempty
-                           , projectExtraDeps = mempty
-                           , projectFlags = mempty
-                           , projectResolver = r
-                           , projectCompiler = Nothing
-                           , projectExtraPackageDBs = []
-                           }
+                   p <- getEmptyProject
                    liftIO $ do
                        S.writeFile dest' $ S.concat
                            [ "# This is the implicit global project's config file, which is only used when\n"
@@ -560,20 +588,42 @@ loadBuildConfig mproject config mresolver mcompiler = do
     extraPackageDBs <- mapM resolveDir' (projectExtraPackageDBs project)
 
     return BuildConfig
-        { bcNoLocal = BuildConfigNoLocal
-            { bcConfig = config
-            , bcResolver = loadedResolver
-            , bcWantedMiniBuildPlan = mbp
-            , bcGHCVariant = view ghcVariantL miniConfig
-            }
-        , bcLocal = BuildConfigLocal
-            { bcPackageEntries = projectPackages project
-            , bcExtraDeps = projectExtraDeps project
-            , bcExtraPackageDBs = extraPackageDBs
-            , bcStackYaml = stackYamlFP
-            , bcFlags = projectFlags project
-            , bcImplicitGlobal = isNothing mproject
-            }
+        { bcConfig = config
+        , bcResolver = loadedResolver
+        , bcWantedMiniBuildPlan = mbp
+        , bcGHCVariant = view ghcVariantL miniConfig
+        , bcPackageEntries = projectPackages project
+        , bcExtraDeps = projectExtraDeps project
+        , bcExtraPackageDBs = extraPackageDBs
+        , bcStackYaml = stackYamlFP
+        , bcFlags = projectFlags project
+        , bcImplicitGlobal =
+            case mproject of
+                LCSNoProject -> True
+                LCSProject _ -> False
+                LCSNoConfig  -> False
+        }
+  where
+    miniConfig = loadMiniConfig config
+
+    getEmptyProject = do
+      r <- case mresolver of
+            Just aresolver -> do
+                r' <- runReaderT (makeConcreteResolver aresolver) miniConfig
+                $logInfo ("Using resolver: " <> resolverName r' <> " specified on command line")
+                return r'
+            Nothing -> do
+                r'' <- runReaderT getLatestResolver miniConfig
+                $logInfo ("Using latest snapshot resolver: " <> resolverName r'')
+                return r''
+      return Project
+        { projectUserMsg = Nothing
+        , projectPackages = mempty
+        , projectExtraDeps = mempty
+        , projectFlags = mempty
+        , projectResolver = r
+        , projectCompiler = Nothing
+        , projectExtraPackageDBs = []
         }
 
 -- | Get packages from EnvConfig, downloading and cloning as necessary.
@@ -582,14 +632,14 @@ getLocalPackages
     :: (StackMiniM env m, HasEnvConfig env)
     => m (Map.Map (Path Abs Dir) TreatLikeExtraDep)
 getLocalPackages = do
-    cacheRef <- view $ envConfigLocalL.to envConfigPackagesRef
+    cacheRef <- view $ envConfigL.to envConfigPackagesRef
     mcached <- liftIO $ readIORef cacheRef
     case mcached of
         Just cached -> return cached
         Nothing -> do
             menv <- getMinimalEnvOverride
             root <- view projectRootL
-            entries <- view $ buildConfigLocalL.to bcPackageEntries
+            entries <- view $ buildConfigL.to bcPackageEntries
             liftM (Map.fromList . concat) $ mapM
                 (resolvePackageEntry menv root)
                 entries
@@ -646,7 +696,7 @@ resolvePackageLocation menv projRoot (PLRemote url remotePackageType) = do
             RPTGit commit -> T.unwords [url, commit]
             RPTHg commit -> T.unwords [url, commit, "hg"]
         -- TODO: dedupe with code for snapshot hash?
-        name = T.unpack $ decodeUtf8 $ S.take 12 $ B64URL.encode $ SHA256.hash $ encodeUtf8 nameBeforeHashing
+        name = T.unpack $ decodeUtf8 $ S.take 12 $ B64URL.encode $ Mem.convert $ hashWith SHA256 $ encodeUtf8 nameBeforeHashing
         root = projRoot </> workDir </> $(mkRelDir "downloaded")
         fileExtension' = case remotePackageType of
             RPTHttp -> ".http-archive"
@@ -865,19 +915,19 @@ loadYaml path = do
 
 -- | Get the location of the project config file, if it exists.
 getProjectConfig :: (MonadIO m, MonadThrow m, MonadLogger m)
-                 => Maybe (Path Abs File)
+                 => StackYamlLoc (Path Abs File)
                  -- ^ Override stack.yaml
-                 -> m (Maybe (Path Abs File))
-getProjectConfig (Just stackYaml) = return $ Just stackYaml
-getProjectConfig Nothing = do
+                 -> m (LocalConfigStatus (Path Abs File))
+getProjectConfig (SYLOverride stackYaml) = return $ LCSProject stackYaml
+getProjectConfig SYLDefault = do
     env <- liftIO getEnvironment
     case lookup "STACK_YAML" env of
         Just fp -> do
             $logInfo "Getting project config file from STACK_YAML environment"
-            liftM Just $ resolveFile' fp
+            liftM LCSProject $ resolveFile' fp
         Nothing -> do
             currDir <- getCurrentDir
-            findInParents getStackDotYaml currDir
+            maybe LCSNoProject LCSProject <$> findInParents getStackDotYaml currDir
   where
     getStackDotYaml dir = do
         let fp = dir </> stackDotYaml
@@ -887,29 +937,39 @@ getProjectConfig Nothing = do
         if exists
             then return $ Just fp
             else return Nothing
+getProjectConfig SYLNoConfig = return LCSNoConfig
+
+data LocalConfigStatus a
+    = LCSNoProject
+    | LCSProject a
+    | LCSNoConfig
+    deriving (Show,Functor,Foldable,Traversable)
 
 -- | Find the project config file location, respecting environment variables
 -- and otherwise traversing parents. If no config is found, we supply a default
 -- based on current directory.
 loadProjectConfig :: (MonadIO m, MonadThrow m, MonadLogger m)
-                  => Maybe (Path Abs File)
+                  => StackYamlLoc (Path Abs File)
                   -- ^ Override stack.yaml
-                  -> m (Maybe (Project, Path Abs File, ConfigMonoid))
+                  -> m (LocalConfigStatus (Project, Path Abs File, ConfigMonoid))
 loadProjectConfig mstackYaml = do
     mfp <- getProjectConfig mstackYaml
     case mfp of
-        Just fp -> do
+        LCSProject fp -> do
             currDir <- getCurrentDir
             $logDebug $ "Loading project config file " <>
                         T.pack (maybe (toFilePath fp) toFilePath (stripDir currDir fp))
-            load fp
-        Nothing -> do
+            LCSProject <$> load fp
+        LCSNoProject -> do
             $logDebug $ "No project config file found, using defaults."
-            return Nothing
+            return LCSNoProject
+        LCSNoConfig -> do
+            $logDebug "Ignoring config files"
+            return LCSNoConfig
   where
     load fp = do
         ProjectAndConfigMonoid project config <- loadConfigYaml fp
-        return $ Just (project, fp, config)
+        return (project, fp, config)
 
 -- | Get the location of the default stack configuration file.
 -- If a file already exists at the deprecated location, its location is returned.
@@ -945,6 +1005,23 @@ getDefaultUserConfigPath stackRoot = do
         ensureDir (parent path)
         liftIO $ S.writeFile (toFilePath path) defaultConfigYaml
     return path
+
+-- | Get a fake configuration file location, used when doing a "no
+-- config" run (the script command).
+getFakeConfigPath
+    :: (MonadIO m, MonadThrow m)
+    => Path Abs Dir -- ^ stack root
+    -> AbstractResolver
+    -> m (Path Abs File)
+getFakeConfigPath stackRoot ar = do
+  asString <-
+    case ar of
+      ARResolver r -> return $ T.unpack $ resolverName r
+      _ -> throwM $ InvalidResolverForNoLocalConfig $ show ar
+  asDir <- parseRelDir asString
+  let full = stackRoot </> $(mkRelDir "script") </> asDir </> $(mkRelFile "config.yaml")
+  ensureDir (parent full)
+  return full
 
 packagesParser :: Parser [String]
 packagesParser = many (strOption (long "package" <> help "Additional packages that must be installed"))

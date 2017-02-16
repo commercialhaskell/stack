@@ -108,7 +108,10 @@ withGlobalConfigAndLock
     -> IO ()
 withGlobalConfigAndLock go@GlobalOpts{..} inner = do
     lc <- runStackTGlobal () go $
-        loadConfigMaybeProject globalConfigMonoid Nothing Nothing
+        loadConfigMaybeProject
+            globalConfigMonoid
+            Nothing
+            LCSNoProject
     withUserFileLock go (configStackRoot $ lcConfig lc) $ \_lk ->
         runStackTGlobal (lcConfig lc) go inner
 
@@ -210,7 +213,10 @@ withMiniConfigAndLock go@GlobalOpts{..} inner = do
     miniConfig <-
         runStackTGlobal () go $
         (loadMiniConfig . lcConfig) <$>
-        loadConfigMaybeProject globalConfigMonoid globalResolver Nothing
+        loadConfigMaybeProject
+          globalConfigMonoid
+          globalResolver
+          LCSNoProject
     runStackTGlobal miniConfig go inner
 
 -- | Unlock a lock file, if the value is Just

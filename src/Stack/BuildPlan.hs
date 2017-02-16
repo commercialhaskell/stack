@@ -32,6 +32,7 @@ module Stack.BuildPlan
     , showItems
     , showPackageFlags
     , parseCustomMiniBuildPlan
+    , loadBuildPlan
     ) where
 
 import           Control.Applicative
@@ -43,9 +44,10 @@ import           Control.Monad.Logger
 import           Control.Monad.Reader (MonadReader)
 import           Control.Monad.State.Strict      (State, execState, get, modify,
                                                   put)
-import qualified Crypto.Hash.SHA256 as SHA256
+import           Crypto.Hash (hashWith, SHA256(..))
 import           Data.Aeson.Extended (WithJSONWarnings(..), logJSONWarnings)
 import           Data.Store.VersionTagged
+import qualified Data.ByteArray as Mem (convert)
 import qualified Data.ByteString as S
 import qualified Data.ByteString.Base64.URL as B64URL
 import qualified Data.ByteString.Char8 as S8
@@ -207,7 +209,7 @@ resolveBuildPlan
 resolveBuildPlan mbp isShadowed packages
     | Map.null (rsUnknown rs) && Map.null (rsShadowed rs) = return (rsToInstall rs, rsUsedBy rs)
     | otherwise = do
-        bconfig <- view buildConfigLocalL
+        bconfig <- view buildConfigL
         (caches, _gitShaCaches) <- getPackageCaches
         let maxVer =
                 Map.fromListWith max $
@@ -1061,7 +1063,7 @@ parseCustomMiniBuildPlan mconfigPath0 url0 = do
     getCustomPlanDir = do
         root <- view stackRootL
         return $ root </> $(mkRelDir "custom-plan")
-    doHash = SnapshotHash . B64URL.encode . SHA256.hash
+    doHash = SnapshotHash . B64URL.encode . Mem.convert . hashWith SHA256
 
 applyCustomSnapshot
     :: (StackMiniM env m, HasConfig env)

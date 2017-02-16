@@ -31,10 +31,10 @@ import              Control.Monad.IO.Class
 import              Control.Monad.Logger
 import              Control.Monad.Reader (MonadReader)
 import              Control.Monad.Trans.Resource
-import "cryptohash" Crypto.Hash (Digest, SHA256)
+import              Crypto.Hash (Digest, SHA256(..))
 import              Crypto.Hash.Conduit (sinkHash)
+import qualified    Data.ByteArray as Mem (convert)
 import qualified    Data.ByteString as S
-import              Data.Byteable (toBytes)
 import              Data.Conduit (($$), ZipSink (..))
 import qualified    Data.Conduit.Binary as CB
 import qualified    Data.Conduit.List as CL
@@ -109,7 +109,7 @@ loadSourceMapFull omitWiredIn needTargets boptsCli = do
     -- Extend extra-deps to encompass targets requested on the command line
     -- that are not in the snapshot.
     extraDeps0 <- extendExtraDeps
-        (bcExtraDeps $ bcLocal bconfig)
+        (bcExtraDeps bconfig)
         cliExtraDeps
         (Map.keysSet $ Map.filter (== STUnknown) targets)
 
@@ -145,7 +145,7 @@ loadSourceMapFull omitWiredIn needTargets boptsCli = do
                 let flags =
                         case ( Map.lookup (Just n) $ boptsCLIFlags boptsCli
                              , Map.lookup Nothing $ boptsCLIFlags boptsCli
-                             , Map.lookup n $ unPackageFlags $ bcFlags $ bcLocal bconfig
+                             , Map.lookup n $ unPackageFlags $ bcFlags bconfig
                              ) of
                             -- Didn't have any flag overrides, fall back to the flags
                             -- defined in the snapshot.
@@ -195,7 +195,7 @@ getLocalFlags
 getLocalFlags bconfig boptsCli name = Map.unions
     [ Map.findWithDefault Map.empty (Just name) cliFlags
     , Map.findWithDefault Map.empty Nothing cliFlags
-    , Map.findWithDefault Map.empty name (unPackageFlags (bcFlags (bcLocal bconfig)))
+    , Map.findWithDefault Map.empty name (unPackageFlags (bcFlags bconfig))
     ]
   where
     cliFlags = boptsCLIFlags boptsCli
@@ -245,8 +245,7 @@ parseTargetsFromBuildOptsWith
     -> m (MiniBuildPlan, M.Map PackageName Version, M.Map PackageName SimpleTarget)
 parseTargetsFromBuildOptsWith rawLocals needTargets boptscli = do
     $logDebug "Parsing the targets"
-    bconfig <- view buildConfigNoLocalL
-    bconfigl <- view buildConfigLocalL
+    bconfig <- view buildConfigL
     mbp0 <-
         case bcResolver bconfig of
             ResolverCompiler _ -> do
@@ -264,16 +263,16 @@ parseTargetsFromBuildOptsWith rawLocals needTargets boptscli = do
     let snapshot = mpiVersion <$> mbpPackages mbp0
     flagExtraDeps <- convertSnapshotToExtra
         snapshot
-        (bcExtraDeps bconfigl)
+        (bcExtraDeps bconfig)
         rawLocals
         (catMaybes $ Map.keys $ boptsCLIFlags boptscli)
 
     (cliExtraDeps, targets) <-
         parseTargets
             needTargets
-            (bcImplicitGlobal bconfigl)
+            (bcImplicitGlobal bconfig)
             snapshot
-            (flagExtraDeps <> bcExtraDeps bconfigl)
+            (flagExtraDeps <> bcExtraDeps bconfig)
             (fst <$> rawLocals)
             workingDir
             (boptsCLITargets boptscli)
@@ -460,7 +459,7 @@ checkFlagsUsed :: (MonadThrow m, MonadReader env m, HasBuildConfig env)
                -> Map PackageName snapshot -- ^ snapshot, for error messages
                -> m ()
 checkFlagsUsed boptsCli lps extraDeps snapshot = do
-    bconfig <- view buildConfigLocalL
+    bconfig <- view buildConfigL
 
         -- Check if flags specified in stack.yaml and the command line are
         -- used, see https://github.com/commercialhaskell/stack/issues/617
@@ -512,7 +511,7 @@ extendExtraDeps extraDeps0 cliExtraDeps unknowns = do
     case errs of
         [] -> return $ Map.unions $ extraDeps1 : unknowns'
         _ -> do
-            bconfig <- view buildConfigLocalL
+            bconfig <- view buildConfigL
             throwM $ UnknownTargets
                 (Set.fromList errs)
                 Map.empty -- TODO check the cliExtraDeps for presence in index
@@ -633,7 +632,7 @@ calcFci modTime' fp = liftIO $
         return FileCacheInfo
             { fciModTime = modTime'
             , fciSize = size
-            , fciHash = toBytes (digest :: Digest SHA256)
+            , fciHash = Mem.convert (digest :: Digest SHA256)
             }
 
 checkComponentsBuildable :: MonadThrow m => [LocalPackage] -> m ()

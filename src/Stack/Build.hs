@@ -120,6 +120,11 @@ build setLocalFiles mbuildLk boptsCli = fixCodePage $ do
     plan <- withLoadPackage menv $ \loadPackage ->
         constructPlan mbp baseConfigOpts locals extraToBuild localDumpPkgs loadPackage sourceMap installedMap
 
+    allowLocals <- view $ configL.to configAllowLocals
+    unless allowLocals $ case justLocals plan of
+      [] -> return ()
+      localsIdents -> throwM $ LocalPackagesPresent localsIdents
+
     -- If our work to do is all local, let someone else have a turn with the snapshot.
     -- They won't damage what's already in there.
     case (mbuildLk, allLocal plan) of
@@ -152,6 +157,13 @@ allLocal :: Plan -> Bool
 allLocal =
     all (== Local) .
     map taskLocation .
+    Map.elems .
+    planTasks
+
+justLocals :: Plan -> [PackageIdentifier]
+justLocals =
+    map taskProvides .
+    filter ((== Local) . taskLocation) .
     Map.elems .
     planTasks
 

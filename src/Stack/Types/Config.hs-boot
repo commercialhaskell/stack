@@ -32,4 +32,6 @@ data ConfigException
   | FailedToCloneRepo String
   | ManualGHCVariantSettingsAreIncompatibleWithSystemGHC
   | NixRequiresSystemGhc
+  | NoResolverWhenUsingNoLocalConfig
+  | InvalidResolverForNoLocalConfig String
 instance Exception ConfigException

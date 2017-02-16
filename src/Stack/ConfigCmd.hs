@@ -30,7 +30,7 @@ import           Path
 import           Path.IO
 import           Prelude -- Silence redundant import warnings
 import           Stack.BuildPlan
-import           Stack.Config (makeConcreteResolver, getProjectConfig, getImplicitGlobalProjectDir)
+import           Stack.Config (makeConcreteResolver, getProjectConfig, getImplicitGlobalProjectDir, LocalConfigStatus(..))
 import           Stack.Constants
 import           Stack.Types.Config
 import           Stack.Types.Resolver
@@ -67,8 +67,9 @@ cfgCmdSet go cmd = do
                      mstackYamlOption <- forM (globalStackYaml go) resolveFile'
                      mstackYaml <- getProjectConfig mstackYamlOption
                      case mstackYaml of
-                         Just stackYaml -> return stackYaml
-                         Nothing -> liftM (</> stackDotYaml) (getImplicitGlobalProjectDir conf)
+                         LCSProject stackYaml -> return stackYaml
+                         LCSNoProject -> liftM (</> stackDotYaml) (getImplicitGlobalProjectDir conf)
+                         LCSNoConfig -> error "config command used when no local configuration available"
                  CommandScopeGlobal -> return (configUserConfigPath conf))
     -- We don't need to worry about checking for a valid yaml here
     (config :: Yaml.Object) <-

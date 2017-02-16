@@ -2,7 +2,10 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE DefaultSignatures #-}
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE DeriveFoldable #-}
+{-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DeriveTraversable #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
@@ -32,12 +35,9 @@ module Stack.Types.Config
   ,explicitSetupDeps
   ,getMinimalEnvOverride
   -- ** BuildConfig & HasBuildConfig
-  ,BuildConfigNoLocal(..)
-  ,BuildConfigLocal(..)
   ,BuildConfig(..)
   ,stackYamlL
   ,projectRootL
-  ,HasBuildConfigNoLocal(..)
   ,HasBuildConfig(..)
   -- ** GHCVariant & HasGHCVariant
   ,GHCVariant(..)
@@ -50,9 +50,6 @@ module Stack.Types.Config
   ,StackMiniM
   -- ** EnvConfig & HasEnvConfig
   ,EnvConfig(..)
-  ,EnvConfigNoLocal(..)
-  ,EnvConfigLocal(..)
-  ,HasEnvConfigNoLocal(..)
   ,HasEnvConfig(..)
   ,getCompilerPath
   -- * Details
@@ -74,6 +71,7 @@ module Stack.Types.Config
   -- ** GlobalOpts & GlobalOptsMonoid
   ,GlobalOpts(..)
   ,GlobalOptsMonoid(..)
+  ,StackYamlLoc(..)
   ,defaultLogLevel
   -- ** LoadConfig
   ,LoadConfig(..)
@@ -134,6 +132,7 @@ module Stack.Types.Config
   ,packageDatabaseLocal
   ,platformOnlyRelDir
   ,platformGhcRelDir
+  ,platformGhcVerOnlyRelDir
   ,useShaPathOnWindows
   ,workDirL
   -- * Command-specific types
@@ -171,7 +170,6 @@ module Stack.Types.Config
   ,configUrlsL
   ,cabalVersionL
   ,whichCompilerL
-  ,buildConfigL
   -- * Lens reexport
   ,view
   ,to
@@ -247,8 +245,8 @@ import           System.Process.Read (EnvOverride, findExecutable)
 import           Stack.Types.Config.Build as X
 
 #ifdef mingw32_HOST_OS
-import qualified Crypto.Hash.SHA1 as SHA1
-import qualified Data.ByteString.Base16 as B16
+import           Crypto.Hash (hashWith, SHA1(..))
+import qualified Data.ByteArray.Encoding as Mem (convertToBase, Base(Base16))
 #endif
 
 -- | The top-level Stackage configuration.
@@ -370,6 +368,9 @@ data Config =
          ,configMaybeProject        :: !(Maybe (Project, Path Abs File))
          -- ^ 'Just' when a local project can be found, 'Nothing' when stack must
          -- fall back on the implicit global project.
+         ,configAllowLocals         :: !Bool
+         -- ^ Are we allowed to build local packages? The script
+         -- command disallows this.
          }
 
 -- | Which packages do ghc-options on the command line apply to?
@@ -457,8 +458,14 @@ data GlobalOpts = GlobalOpts
     , globalCompiler     :: !(Maybe CompilerVersion) -- ^ Compiler override
     , globalTerminal     :: !Bool -- ^ We're in a terminal?
     , globalColorWhen    :: !ColorWhen -- ^ When to use ansi terminal colors
-    , globalStackYaml    :: !(Maybe FilePath) -- ^ Override project stack.yaml
+    , globalStackYaml    :: !(StackYamlLoc FilePath) -- ^ Override project stack.yaml
     } deriving (Show)
+
+data StackYamlLoc filepath
+    = SYLDefault
+    | SYLOverride !filepath
+    | SYLNoConfig
+    deriving (Show,Functor,Foldable,Traversable)
 
 -- | Parsed global command-line options monoid.
 data GlobalOptsMonoid = GlobalOptsMonoid
@@ -500,7 +507,7 @@ readColorWhen = do
 -- 'Config' in order to determine the values here.
 --
 -- These are the components which know nothing about local configuration.
-data BuildConfigNoLocal = BuildConfigNoLocal
+data BuildConfig = BuildConfig
     { bcConfig     :: !Config
     , bcResolver   :: !LoadedResolver
       -- ^ How we resolve which dependencies to install given a set of
@@ -509,11 +516,7 @@ data BuildConfigNoLocal = BuildConfigNoLocal
       -- ^ Build plan wanted for this build
     , bcGHCVariant :: !GHCVariant
       -- ^ The variant of GHC used to select a GHC bindist.
-    }
-
--- | The local parts of 'BuildConfigNoLocal'
-data BuildConfigLocal = BuildConfigLocal
-    { bcPackageEntries :: ![PackageEntry]
+    , bcPackageEntries :: ![PackageEntry]
       -- ^ Local packages
     , bcExtraDeps  :: !(Map PackageName Version)
       -- ^ Extra dependencies specified in configuration.
@@ -537,21 +540,16 @@ data BuildConfigLocal = BuildConfigLocal
       -- for providing better error messages.
     }
 
-data BuildConfig = BuildConfig
-    { bcNoLocal :: !BuildConfigNoLocal
-    , bcLocal   :: !BuildConfigLocal
-    }
-
 stackYamlL :: HasBuildConfig env => Lens' env (Path Abs File)
-stackYamlL = buildConfigLocalL.lens bcStackYaml (\x y -> x { bcStackYaml = y })
+stackYamlL = buildConfigL.lens bcStackYaml (\x y -> x { bcStackYaml = y })
 
 -- | Directory containing the project's stack.yaml file
 projectRootL :: HasBuildConfig env => Getting r env (Path Abs Dir)
 projectRootL = stackYamlL.to parent
 
 -- | Configuration after the environment has been setup.
-data EnvConfigNoLocal = EnvConfigNoLocal
-    {envConfigBuildConfigNoLocal :: !BuildConfigNoLocal
+data EnvConfig = EnvConfig
+    {envConfigBuildConfig :: !BuildConfig
     ,envConfigCabalVersion :: !Version
     -- ^ This is the version of Cabal that stack will use to compile Setup.hs files
     -- in the build process.
@@ -564,17 +562,8 @@ data EnvConfigNoLocal = EnvConfigNoLocal
     -- 'wantedCompilerL', which provides the version specified by the
     -- build plan.
     ,envConfigCompilerBuild :: !CompilerBuild
-    }
-
-data EnvConfigLocal = EnvConfigLocal
-    {envConfigBuildConfigLocal :: !BuildConfigLocal
     ,envConfigPackagesRef :: !(IORef (Maybe (Map (Path Abs Dir) TreatLikeExtraDep)))
     -- ^ Cache for 'getLocalPackages'.
-    }
-
-data EnvConfig = EnvConfig
-    { ecNoLocal :: !EnvConfigNoLocal
-    , ecLocal :: !EnvConfigLocal
     }
 
 -- | Value returned by 'Stack.Config.loadConfig'.
@@ -1016,6 +1005,8 @@ data ConfigException
   | FailedToCloneRepo String
   | ManualGHCVariantSettingsAreIncompatibleWithSystemGHC
   | NixRequiresSystemGhc
+  | NoResolverWhenUsingNoLocalConfig
+  | InvalidResolverForNoLocalConfig String
   deriving Typeable
 instance Show ConfigException where
     show (ParseConfigFileException configFile exception) = concat
@@ -1134,6 +1125,8 @@ instance Show ConfigException where
         , configMonoidSystemGHCName
         , "' or disable the Nix integration."
         ]
+    show NoResolverWhenUsingNoLocalConfig = "When using the script command, you must provide a resolver argument"
+    show (InvalidResolverForNoLocalConfig ar) = "The script command requires a specific resolver, you provided " ++ ar
 instance Exception ConfigException
 
 showOptions :: WhichSolverCmd -> SuggestSolver -> String
@@ -1296,7 +1289,7 @@ platformGhcRelDir
     :: (MonadReader env m, HasEnvConfig env, MonadThrow m)
     => m (Path Rel Dir)
 platformGhcRelDir = do
-    ec <- view envConfigNoLocalL
+    ec <- view envConfigL
     verOnly <- platformGhcVerOnlyRelDirStr
     parseRelDir (mconcat [ verOnly
                          , compilerBuildSuffix (envConfigCompilerBuild ec)])
@@ -1328,7 +1321,7 @@ platformGhcVerOnlyRelDirStr = do
 useShaPathOnWindows :: MonadThrow m => Path Rel Dir -> m (Path Rel Dir)
 useShaPathOnWindows =
 #ifdef mingw32_HOST_OS
-    parseRelDir . S8.unpack . S8.take 8 . B16.encode . SHA1.hash . encodeUtf8 . T.pack . toFilePath
+    parseRelDir . S8.unpack . S8.take 8 . Mem.convertToBase Mem.Base16 . hashWith SHA1 . encodeUtf8 . T.pack . toFilePath
 #else
     return
 #endif
@@ -1353,10 +1346,8 @@ packageDatabaseLocal = do
     return $ root </> $(mkRelDir "pkgdb")
 
 -- | Extra package databases
-packageDatabaseExtra :: (MonadThrow m, MonadReader env m, HasEnvConfig env) => m [Path Abs Dir]
-packageDatabaseExtra = do
-    bc <- view buildConfigLocalL
-    return $ bcExtraPackageDBs bc
+packageDatabaseExtra :: (MonadReader env m, HasEnvConfig env) => m [Path Abs Dir]
+packageDatabaseExtra = view $ buildConfigL.to bcExtraPackageDBs
 
 -- | Directory for holding flag cache information
 flagCacheLocal :: (MonadThrow m, MonadReader env m, HasEnvConfig env) => m (Path Abs Dir)
@@ -1808,39 +1799,25 @@ class HasPlatform env where
 -- | Class for environment values which have a GHCVariant
 class HasGHCVariant env where
     ghcVariantL :: Lens' env GHCVariant
-    default ghcVariantL :: HasBuildConfigNoLocal env => Lens' env GHCVariant
-    ghcVariantL = buildConfigNoLocalL.ghcVariantL
+    default ghcVariantL :: HasBuildConfig env => Lens' env GHCVariant
+    ghcVariantL = buildConfigL.ghcVariantL
     {-# INLINE ghcVariantL #-}
 
 -- | Class for environment values that can provide a 'Config'.
 class HasPlatform env => HasConfig env where
     configL :: Lens' env Config
-    default configL :: HasBuildConfigNoLocal env => Lens' env Config
-    configL = buildConfigNoLocalL.lens bcConfig (\x y -> x { bcConfig = y })
+    default configL :: HasBuildConfig env => Lens' env Config
+    configL = buildConfigL.lens bcConfig (\x y -> x { bcConfig = y })
     {-# INLINE configL #-}
 
-class HasConfig env => HasBuildConfigNoLocal env where
-    buildConfigNoLocalL :: Lens' env BuildConfigNoLocal
-    default buildConfigNoLocalL :: HasEnvConfigNoLocal env => Lens' env BuildConfigNoLocal
-    buildConfigNoLocalL = envConfigNoLocalL.lens
-        envConfigBuildConfigNoLocal
-        (\x y -> x { envConfigBuildConfigNoLocal = y })
+class HasConfig env => HasBuildConfig env where
+    buildConfigL :: Lens' env BuildConfig
+    default buildConfigL :: HasEnvConfig env => Lens' env BuildConfig
+    buildConfigL = envConfigL.lens
+        envConfigBuildConfig
+        (\x y -> x { envConfigBuildConfig = y })
 
--- | Class for environment values that can provide a 'BuildConfig'.
-class HasBuildConfigNoLocal env => HasBuildConfig env where
-    buildConfigLocalL :: Lens' env BuildConfigLocal
-    default buildConfigLocalL :: HasEnvConfig env => Lens' env BuildConfigLocal
-    buildConfigLocalL = envConfigLocalL.lens
-        envConfigBuildConfigLocal
-        (\x y -> x { envConfigBuildConfigLocal = y })
-
-class (HasBuildConfigNoLocal env, HasGHCVariant env) => HasEnvConfigNoLocal env where
-    envConfigNoLocalL :: Lens' env EnvConfigNoLocal
-
-class (HasBuildConfig env, HasEnvConfigNoLocal env) => HasEnvConfig env where
-    envConfigLocalL :: Lens' env EnvConfigLocal
-    envConfigLocalL = envConfigL.lens ecLocal (\x y -> x { ecLocal = y })
-    {-# INLINE envConfigLocalL #-}
+class (HasBuildConfig env, HasGHCVariant env) => HasEnvConfig env where
     envConfigL :: Lens' env EnvConfig
 
 -----------------------------------
@@ -1853,50 +1830,27 @@ instance HasPlatform (Platform,PlatformVariant) where
 instance HasPlatform Config where
     platformL = lens configPlatform (\x y -> x { configPlatform = y })
     platformVariantL = lens configPlatformVariant (\x y -> x { configPlatformVariant = y })
-instance HasPlatform BuildConfigNoLocal
 instance HasPlatform BuildConfig
-instance HasPlatform EnvConfigNoLocal
 instance HasPlatform EnvConfig
 
 instance HasGHCVariant GHCVariant where
     ghcVariantL = id
     {-# INLINE ghcVariantL #-}
-instance HasGHCVariant BuildConfigNoLocal where
+instance HasGHCVariant BuildConfig where
     ghcVariantL = lens bcGHCVariant (\x y -> x { bcGHCVariant = y })
-instance HasGHCVariant BuildConfig
-instance HasGHCVariant EnvConfigNoLocal
 instance HasGHCVariant EnvConfig
 
 instance HasConfig Config where
     configL = id
     {-# INLINE configL #-}
-instance HasConfig BuildConfigNoLocal where
+instance HasConfig BuildConfig where
     configL = lens bcConfig (\x y -> x { bcConfig = y })
-instance HasConfig BuildConfig
-instance HasConfig EnvConfigNoLocal
 instance HasConfig EnvConfig
 
-instance HasBuildConfigNoLocal BuildConfigNoLocal where
-    buildConfigNoLocalL = id
-    {-# INLINE buildConfigNoLocalL #-}
-instance HasBuildConfigNoLocal BuildConfig where
-    buildConfigNoLocalL = lens
-        bcNoLocal
-        (\x y -> x { bcNoLocal = y })
-instance HasBuildConfigNoLocal EnvConfigNoLocal
-instance HasBuildConfigNoLocal EnvConfig
-
 instance HasBuildConfig BuildConfig where
-    buildConfigLocalL = lens bcLocal (\x y -> x { bcLocal = y})
-    {-# INLINE buildConfigLocalL #-}
+    buildConfigL = id
+    {-# INLINE buildConfigL #-}
 instance HasBuildConfig EnvConfig
-
-instance HasEnvConfigNoLocal EnvConfigNoLocal where
-    envConfigNoLocalL = id
-    {-# INLINE envConfigNoLocalL #-}
-instance HasEnvConfigNoLocal EnvConfig where
-    envConfigNoLocalL = lens ecNoLocal (\x y -> x { ecNoLocal = y })
-    {-# INLINE envConfigNoLocalL #-}
 
 instance HasEnvConfig EnvConfig where
     envConfigL = id
@@ -1911,7 +1865,7 @@ stackRootL = configL.lens configStackRoot (\x y -> x { configStackRoot = y })
 
 -- | The compiler specified by the @MiniBuildPlan@. This may be
 -- different from the actual compiler used!
-wantedCompilerVersionL :: HasBuildConfigNoLocal s => Lens' s CompilerVersion
+wantedCompilerVersionL :: HasBuildConfig s => Lens' s CompilerVersion
 wantedCompilerVersionL = miniBuildPlanL.lens
     mbpCompilerVersion
     (\x y -> x { mbpCompilerVersion = y })
@@ -1919,18 +1873,18 @@ wantedCompilerVersionL = miniBuildPlanL.lens
 -- | The version of the compiler which will actually be used. May be
 -- different than that specified in the 'MiniBuildPlan' and returned
 -- by 'wantedCompilerVersionL'.
-actualCompilerVersionL :: HasEnvConfigNoLocal s => Lens' s CompilerVersion
-actualCompilerVersionL = envConfigNoLocalL.lens
+actualCompilerVersionL :: HasEnvConfig s => Lens' s CompilerVersion
+actualCompilerVersionL = envConfigL.lens
     envConfigCompilerVersion
     (\x y -> x { envConfigCompilerVersion = y })
 
-loadedResolverL :: HasBuildConfigNoLocal s => Lens' s LoadedResolver
-loadedResolverL = buildConfigNoLocalL.lens
+loadedResolverL :: HasBuildConfig s => Lens' s LoadedResolver
+loadedResolverL = buildConfigL.lens
     bcResolver
     (\x y -> x { bcResolver = y })
 
-miniBuildPlanL :: HasBuildConfigNoLocal s => Lens' s MiniBuildPlan
-miniBuildPlanL = buildConfigNoLocalL.lens
+miniBuildPlanL :: HasBuildConfig s => Lens' s MiniBuildPlan
+miniBuildPlanL = buildConfigL.lens
     bcWantedMiniBuildPlan
     (\x y -> x { bcWantedMiniBuildPlan = y })
 
@@ -1987,15 +1941,10 @@ packageCachesL = configL.lens configPackageCaches (\x y -> x { configPackageCach
 configUrlsL :: HasConfig env => Lens' env Urls
 configUrlsL = configL.lens configUrls (\x y -> x { configUrls = y })
 
-cabalVersionL :: HasEnvConfigNoLocal env => Lens' env Version
-cabalVersionL = envConfigNoLocalL.lens
+cabalVersionL :: HasEnvConfig env => Lens' env Version
+cabalVersionL = envConfigL.lens
     envConfigCabalVersion
     (\x y -> x { envConfigCabalVersion = y })
 
 whichCompilerL :: Getting r CompilerVersion WhichCompiler
 whichCompilerL = to whichCompiler
-
-buildConfigL :: HasBuildConfig env => Getting r env BuildConfig
-buildConfigL = to $ \env -> BuildConfig
-    (view buildConfigNoLocalL env)
-    (view buildConfigLocalL env)

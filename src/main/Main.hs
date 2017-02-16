@@ -84,11 +84,13 @@ import           Stack.Options.GlobalParser
 import           Stack.Options.HpcReportParser
 import           Stack.Options.NewParser
 import           Stack.Options.NixParser
+import           Stack.Options.ScriptParser
 import           Stack.Options.SolverParser
 import           Stack.Options.Utils
 import qualified Stack.PackageIndex
 import qualified Stack.Path
 import           Stack.Runners
+import           Stack.Script
 import           Stack.SDist (getSDistTarball, checkSDistTarball, checkSDistTarball')
 import           Stack.SetupCmd
 import qualified Stack.Sig as Sig
@@ -357,6 +359,10 @@ commandLineHandler progName isInterpreter = complicatedOptions
                   "Run runghc (alias for 'runghc')"
                   execCmd
                   (execOptsParser $ Just ExecRunGhc)
+      addCommand' "script"
+                  "Run a Stack Script"
+                  scriptCmd
+                  scriptOptsParser
 
       unless isInterpreter (do
         addCommand' "eval"

@@ -30,6 +30,9 @@ module Stack.Types.BuildPlan
     , parseSnapName
     , SnapshotHash (..)
     , trimmedSnapshotHash
+    , ModuleName (..)
+    , ModuleInfo (..)
+    , moduleInfoVC
     ) where
 
 import           Control.Applicative
@@ -195,6 +198,7 @@ data PackageConstraints = PackageConstraints
     , pcBuildBenchmarks  :: Bool
     , pcFlagOverrides    :: Map FlagName Bool
     , pcEnableLibProfile :: Bool
+    , pcHide             :: Bool
     }
     deriving (Show, Eq)
 instance ToJSON PackageConstraints where
@@ -205,6 +209,7 @@ instance ToJSON PackageConstraints where
         , "build-benchmarks" .= pcBuildBenchmarks
         , "flags" .= pcFlagOverrides
         , "library-profiling" .= pcEnableLibProfile
+        , "hide" .= pcHide
         ]
       where
         addMaintainer = maybe id (\m -> (("maintainer" .= m):)) pcMaintainer
@@ -218,6 +223,7 @@ instance FromJSON PackageConstraints where
         pcFlagOverrides <- o .: "flags"
         pcMaintainer <- o .:? "maintainer"
         pcEnableLibProfile <- fmap (fromMaybe True) (o .:? "library-profiling")
+        pcHide <- o .:? "hide" .!= False
         return PackageConstraints {..}
 
 data TestState = ExpectSuccess
@@ -462,3 +468,17 @@ newtype SnapshotHash = SnapshotHash { unShapshotHash :: ByteString }
 
 trimmedSnapshotHash :: SnapshotHash -> ByteString
 trimmedSnapshotHash = BS.take 12 . unShapshotHash
+
+newtype ModuleName = ModuleName { unModuleName :: ByteString }
+  deriving (Show, Eq, Ord, Generic, Store, NFData, Typeable, Data)
+
+data ModuleInfo = ModuleInfo
+    { miCorePackages :: !(Set PackageName)
+    , miModules      :: !(Map ModuleName (Set PackageName))
+    }
+  deriving (Show, Eq, Ord, Generic, Typeable, Data)
+instance Store ModuleInfo
+instance NFData ModuleInfo
+
+moduleInfoVC :: VersionConfig ModuleInfo
+moduleInfoVC = storeVersionConfig "mi-v1" "zyCpzzGXA8fTeBmKEWLa_6kF2_s="
