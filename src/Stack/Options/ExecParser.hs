@@ -51,7 +51,7 @@ execOptsExtraParser = eoPlainParser <|>
     eoPackagesParser = many (strOption (long "package" <> help "Additional packages that must be installed"))
 
     eoRtsOptionsParser :: Parser [String]
-    eoRtsOptionsParser = many (strOption (long "rts" <> help "Explicit RTS options to pass to application"))
+    eoRtsOptionsParser = many (strOption (long "rts-options" <> help "Explicit RTS options to pass to application"))
 
     eoPlainParser :: Parser ExecOptsExtra
     eoPlainParser = flag' ExecOptsPlain

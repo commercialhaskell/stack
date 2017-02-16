@@ -65,6 +65,9 @@ Other enhancements:
 * `stack ghci` now takes `--flag` and `--ghc-options` again (inadverently
   removed in 1.3.0).
   ([#2986](https://github.com/commercialhaskell/stack/issues/2986))
+* `stack exec` now takes `--rts-options` which passes the given arguments inside of
+  `+RTS ... args .. -RTS` to the executable. This works around stack itself consuming
+  the RTS flags on Windows. ([#2986](https://github.com/commercialhaskell/stack/issues/2640))
 
 Bug fixes:
 
