@@ -18,8 +18,8 @@ import Path
 import Prelude -- Fix redundant import warnings
 
 -- | Image options. Currently only Docker image options.
-data ImageOpts = ImageOpts
-    { imgDockers :: ![ImageDockerOpts]
+newtype ImageOpts = ImageOpts
+    { imgDockers :: [ImageDockerOpts]
       -- ^ One or more stanzas for docker image settings.
     } deriving (Show)
 
@@ -39,8 +39,8 @@ data ImageDockerOpts = ImageDockerOpts
       -- ^ Filenames of executables to add (if Nothing, add them all)
     } deriving (Show)
 
-data ImageOptsMonoid = ImageOptsMonoid
-    { imgMonoidDockers :: ![ImageDockerOpts]
+newtype ImageOptsMonoid = ImageOptsMonoid
+    { imgMonoidDockers :: [ImageDockerOpts]
     } deriving (Show, Generic)
 
 instance FromJSON (WithJSONWarnings ImageOptsMonoid) where

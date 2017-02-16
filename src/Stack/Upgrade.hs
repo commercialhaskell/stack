@@ -88,8 +88,8 @@ data BinaryOpts = BinaryOpts
     , _boGithubRepo :: !(Maybe String)
     }
     deriving Show
-data SourceOpts = SourceOpts
-    { _soRepo :: !(Maybe String)
+newtype SourceOpts = SourceOpts
+    { _soRepo :: Maybe String
     }
     deriving Show
 

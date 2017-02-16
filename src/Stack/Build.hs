@@ -178,7 +178,7 @@ checkCabalVersion = do
             versionString cabalVer ++
             " was found."
 
-data CabalVersionException = CabalVersionException { unCabalVersionException :: String }
+newtype CabalVersionException = CabalVersionException { unCabalVersionException :: String }
     deriving (Typeable)
 
 instance Show CabalVersionException where show = unCabalVersionException
