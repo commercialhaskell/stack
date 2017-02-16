@@ -30,6 +30,9 @@ module Stack.Types.BuildPlan
     , parseSnapName
     , SnapshotHash (..)
     , trimmedSnapshotHash
+    , ModuleName (..)
+    , ModuleInfo (..)
+    , moduleInfoVC
     ) where
 
 import           Control.Applicative
@@ -465,3 +468,17 @@ newtype SnapshotHash = SnapshotHash { unShapshotHash :: ByteString }
 
 trimmedSnapshotHash :: SnapshotHash -> ByteString
 trimmedSnapshotHash = BS.take 12 . unShapshotHash
+
+newtype ModuleName = ModuleName { unModuleName :: ByteString }
+  deriving (Show, Eq, Ord, Generic, Store, NFData, Typeable, Data)
+
+data ModuleInfo = ModuleInfo
+    { miCorePackages :: !(Set PackageName)
+    , miModules      :: !(Map ModuleName (Set PackageName))
+    }
+  deriving (Show, Eq, Ord, Generic, Typeable, Data)
+instance Store ModuleInfo
+instance NFData ModuleInfo
+
+moduleInfoVC :: VersionConfig ModuleInfo
+moduleInfoVC = storeVersionConfig "mi-v1" "zyCpzzGXA8fTeBmKEWLa_6kF2_s="

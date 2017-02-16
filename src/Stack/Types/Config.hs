@@ -132,6 +132,7 @@ module Stack.Types.Config
   ,packageDatabaseLocal
   ,platformOnlyRelDir
   ,platformGhcRelDir
+  ,platformGhcVerOnlyRelDir
   ,useShaPathOnWindows
   ,workDirL
   -- * Command-specific types
