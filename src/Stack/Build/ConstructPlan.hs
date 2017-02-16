@@ -140,10 +140,7 @@ data Ctx = Ctx
 instance HasPlatform Ctx
 instance HasGHCVariant Ctx
 instance HasConfig Ctx
-instance HasBuildConfigNoLocal Ctx
 instance HasBuildConfig Ctx
-instance HasEnvConfigNoLocal Ctx where
-    envConfigNoLocalL = envConfigL.envConfigNoLocalL
 instance HasEnvConfig Ctx where
     envConfigL = lens ctxEnvConfig (\x y -> x { ctxEnvConfig = y })
 

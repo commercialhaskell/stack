@@ -195,6 +195,7 @@ data PackageConstraints = PackageConstraints
     , pcBuildBenchmarks  :: Bool
     , pcFlagOverrides    :: Map FlagName Bool
     , pcEnableLibProfile :: Bool
+    , pcHide             :: Bool
     }
     deriving (Show, Eq)
 instance ToJSON PackageConstraints where
@@ -205,6 +206,7 @@ instance ToJSON PackageConstraints where
         , "build-benchmarks" .= pcBuildBenchmarks
         , "flags" .= pcFlagOverrides
         , "library-profiling" .= pcEnableLibProfile
+        , "hide" .= pcHide
         ]
       where
         addMaintainer = maybe id (\m -> (("maintainer" .= m):)) pcMaintainer
@@ -218,6 +220,7 @@ instance FromJSON PackageConstraints where
         pcFlagOverrides <- o .: "flags"
         pcMaintainer <- o .:? "maintainer"
         pcEnableLibProfile <- fmap (fromMaybe True) (o .:? "library-profiling")
+        pcHide <- o .:? "hide" .!= False
         return PackageConstraints {..}
 
 data TestState = ExpectSuccess

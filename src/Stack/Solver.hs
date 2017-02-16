@@ -622,10 +622,9 @@ solveExtraDeps
     => Bool -- ^ modify stack.yaml?
     -> m ()
 solveExtraDeps modStackYaml = do
-    bconfignl <- view buildConfigNoLocalL
-    bconfigl <- view buildConfigLocalL
+    bconfig <- view buildConfigL
 
-    let stackYaml = bcStackYaml bconfigl
+    let stackYaml = bcStackYaml bconfig
     relStackYaml <- prettyPath stackYaml
 
     $logInfo $ "Using configuration file: " <> T.pack relStackYaml
@@ -645,9 +644,9 @@ solveExtraDeps modStackYaml = do
     (bundle, _) <- cabalPackagesCheck cabalfps noPkgMsg (Just dupPkgFooter)
 
     let gpds              = Map.elems $ fmap snd bundle
-        oldFlags          = unPackageFlags (bcFlags bconfigl)
-        oldExtraVersions  = bcExtraDeps bconfigl
-        resolver          = bcResolver bconfignl
+        oldFlags          = unPackageFlags (bcFlags bconfig)
+        oldExtraVersions  = bcExtraDeps bconfig
+        resolver          = bcResolver bconfig
         oldSrcs           = gpdPackages gpds
         oldSrcFlags       = Map.intersection oldFlags oldSrcs
         oldExtraFlags     = Map.intersection oldFlags oldExtraVersions

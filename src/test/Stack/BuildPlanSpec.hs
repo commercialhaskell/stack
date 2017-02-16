@@ -33,7 +33,7 @@ main = hspec spec
 spec :: Spec
 spec = beforeAll setup $ do
     let logLevel = LevelDebug
-    let loadConfig' = runStackT () logLevel True False ColorAuto False (loadConfig mempty Nothing Nothing)
+    let loadConfig' = runStackT () logLevel True False ColorAuto False (loadConfig mempty Nothing SYLDefault)
     let loadBuildConfigRest = runStackT () logLevel True False ColorAuto False
     let inTempDir action = do
             currentDirectory <- getCurrentDirectory

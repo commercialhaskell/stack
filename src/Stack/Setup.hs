@@ -216,8 +216,8 @@ setupEnv :: (StackM env m, HasBuildConfig env, HasGHCVariant env)
          -> m EnvConfig
 setupEnv mResolveMissingGHC = do
     config <- view configL
-    bconfig <- view buildConfigNoLocalL
-    stackYaml <- view $ buildConfigLocalL.to bcStackYaml
+    bconfig <- view buildConfigL
+    let stackYaml = bcStackYaml bconfig
     platform <- view platformL
     wcVersion <- view wantedCompilerVersionL
     wc <- view $ wantedCompilerVersionL.whichCompilerL
@@ -253,19 +253,13 @@ setupEnv mResolveMissingGHC = do
 
     $logDebug "Resolving package entries"
     packagesRef <- liftIO $ newIORef Nothing
-    bcnl <- view buildConfigNoLocalL
-    bcl <- view buildConfigLocalL
+    bc <- view buildConfigL
     let envConfig0 = EnvConfig
-            { ecNoLocal = EnvConfigNoLocal
-                { envConfigBuildConfigNoLocal = bcnl
-                , envConfigCabalVersion = cabalVer
-                , envConfigCompilerVersion = compilerVer
-                , envConfigCompilerBuild = compilerBuild
-                }
-            , ecLocal = EnvConfigLocal
-                { envConfigBuildConfigLocal = bcl
-                , envConfigPackagesRef = packagesRef
-                }
+            { envConfigBuildConfig = bc
+            , envConfigCabalVersion = cabalVer
+            , envConfigCompilerVersion = compilerVer
+            , envConfigCompilerBuild = compilerBuild
+            , envConfigPackagesRef = packagesRef
             }
 
     -- extra installation bin directories
@@ -335,22 +329,16 @@ setupEnv mResolveMissingGHC = do
                         (Map.insert es eo m', ())
                     return eo
 
-    bconfigl <- view buildConfigLocalL
     return EnvConfig
-        { ecNoLocal = EnvConfigNoLocal
-            { envConfigBuildConfigNoLocal = bconfig
-                { bcConfig = maybe id addIncludeLib mghcBin
-                            (view configL bconfig)
-                    { configEnvOverride = getEnvOverride' }
-                }
-            , envConfigCabalVersion = cabalVer
-            , envConfigCompilerVersion = compilerVer
-            , envConfigCompilerBuild = compilerBuild
+        { envConfigBuildConfig = bconfig
+            { bcConfig = maybe id addIncludeLib mghcBin
+                        (view configL bconfig)
+                { configEnvOverride = getEnvOverride' }
             }
-        , ecLocal = EnvConfigLocal
-            { envConfigBuildConfigLocal = bconfigl
-            , envConfigPackagesRef = envConfigPackagesRef $ ecLocal envConfig0
-            }
+        , envConfigCabalVersion = cabalVer
+        , envConfigCompilerVersion = compilerVer
+        , envConfigCompilerBuild = compilerBuild
+        , envConfigPackagesRef = envConfigPackagesRef envConfig0
         }
 
 -- | Add the include and lib paths to the given Config
@@ -1199,7 +1187,7 @@ loadGhcjsEnvConfig stackYaml binPath = runInnerStackT () $ do
             , configMonoidLocalBinPath = First (Just (toFilePath binPath))
             })
         Nothing
-        (Just stackYaml)
+        (SYLOverride stackYaml)
     bconfig <- lcLoadBuildConfig lc Nothing
     runInnerStackT bconfig $ setupEnv Nothing
 

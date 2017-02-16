@@ -134,6 +134,7 @@ library
                      Stack.Options.NixParser
                      Stack.Options.PackageParser
                      Stack.Options.ResolverParser
+                     Stack.Options.ScriptParser
                      Stack.Options.SolverParser
                      Stack.Options.TestParser
                      Stack.Options.Utils
@@ -143,6 +144,7 @@ library
                      Stack.Path
                      Stack.PrettyPrint
                      Stack.Runners
+                     Stack.Script
                      Stack.SDist
                      Stack.Setup
                      Stack.Setup.Installed
@@ -293,6 +295,7 @@ executable stack
   build-depends:  Cabal >= 1.18.1.5 && < 1.25
                 , base >=4.7 && < 5
                 , bytestring >= 0.10.4.0
+                , conduit
                 , containers >= 0.5.5.1
                 , directory >= 1.2.1.0 && < 1.4
                 , either
@@ -309,6 +312,7 @@ executable stack
                 , optparse-applicative >= 0.13 && < 0.14
                 , path
                 , path-io >= 1.1.0 && < 2.0.0
+                , split
                 , stack
                 , text >= 1.2.0.4
                 , transformers >= 0.3.0.0 && < 0.6
