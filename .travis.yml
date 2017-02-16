@@ -47,25 +47,21 @@ matrix:
       compiler: ": #stack 8.0.1"
       addons: {apt: {packages: [ghc-8.0.1], sources: [hvr-ghc]}}
 
-    ## Temporarily remove 8.0.2, because 'store-0.3' triggers excessive memory use
-    #- env: BUILD=cabal CABALVER=1.24 GHCVER=8.0.2
-    #  compiler: ": #GHC 8.0.2"
-    #  addons: {apt: {packages: [cabal-install-1.24,ghc-8.0.2], sources: [hvr-ghc]}}
+    - env: BUILD=cabal CABALVER=1.24 GHCVER=8.0.2
+      compiler: ": #GHC 8.0.2"
+      addons: {apt: {packages: [cabal-install-1.24,ghc-8.0.2], sources: [hvr-ghc]}}
 
-    ## Temporarily remove 8.0.2, because 'store-0.3' triggers excessive memory use
-    #- env: BUILD=stack GHCVER=8.0.2 STACK_YAML=stack-8.0.yaml
-    #  compiler: ": #stack 8.0.2"
-    #  addons: {apt: {packages: [ghc-8.0.2], sources: [hvr-ghc]}}
+    - env: BUILD=stack GHCVER=8.0.2 STACK_YAML=stack-8.0.yaml
+      compiler: ": #stack 8.0.2"
+      addons: {apt: {packages: [ghc-8.0.2], sources: [hvr-ghc]}}
 
-    ## Temporarily remove 8.0.2, because 'store-0.3' triggers excessive memory use
-    #- env: BUILD=stack GHCVER=8.0.2 STACK_YAML=stack-8.0.yaml
-    #  compiler: ": #stack 8.0.2 osx"
-    #  os: osx
+    - env: BUILD=stack GHCVER=8.0.2 STACK_YAML=stack-8.0.yaml
+      compiler: ": #stack 8.0.2 osx"
+      os: osx
 
-    ## Temporarily remove 8.0.2, because 'store-0.3' triggers excessive memory use
-    #- env: BUILD=style GHCVER=8.0.2 STACK_YAML=stack-8.0.yaml
-    #  compiler: ": #stack 8.0.2"
-    #  addons: {apt: {packages: [ghc-8.0.2], sources: [hvr-ghc]}}
+    - env: BUILD=style GHCVER=8.0.2 STACK_YAML=stack-8.0.yaml
+      compiler: ": #stack 8.0.2"
+      addons: {apt: {packages: [ghc-8.0.2], sources: [hvr-ghc]}}
 
   allow_failures:
     - env: BUILD=stack STACK_YAML=stack.yaml
@@ -74,6 +70,10 @@ matrix:
 
     - env: BUILD=stack GHCVER=8.0.1 STACK_YAML=stack-8.0.1.yaml
       compiler: ": #stack 8.0.1 osx"
+      os: osx
+
+    - env: BUILD=stack GHCVER=8.0.2 STACK_YAML=stack-8.0.yaml
+      compiler: ": #stack 8.0.2 osx"
       os: osx
 
 # Note: the distinction between `before_install` and `install` is not important.
