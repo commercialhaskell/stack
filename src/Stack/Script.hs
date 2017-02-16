@@ -15,12 +15,12 @@ import qualified Data.ByteString.Char8      as S8
 import qualified Data.Conduit.List          as CL
 import           Data.Foldable              (fold)
 import           Data.List.Split            (splitWhen)
-import           Data.Map                   (Map)
 import qualified Data.Map.Strict            as Map
 import           Data.Maybe                 (fromMaybe, mapMaybe)
 import           Data.Monoid
 import           Data.Set                   (Set)
 import qualified Data.Set                   as Set
+import           Data.Store.VersionTagged   (versionedDecodeOrLoad)
 import qualified Data.Text                  as T
 import           Data.Text.Encoding         (encodeUtf8)
 import           Path
@@ -181,14 +181,6 @@ getPackagesFromImports (Just (ARResolver (ResolverSnapshot name))) scriptFP = do
 getPackagesFromImports (Just (ARResolver (ResolverCompiler _))) _ = return (Set.empty, Set.empty)
 getPackagesFromImports (Just aresolver) _ = throwM $ InvalidResolverForNoLocalConfig $ show aresolver
 
-newtype ModuleName = ModuleName { unModuleName :: ByteString }
-  deriving (Show, Eq, Ord)
-
-data ModuleInfo = ModuleInfo
-    { miCorePackages :: !(Set PackageName)
-    , miModules      :: !(Map ModuleName (Set PackageName))
-    }
-
 toModuleInfo :: BuildPlan -> ModuleInfo
 toModuleInfo bp = ModuleInfo
     { miCorePackages = Map.keysSet $ siCorePackages $ bpSystemInfo bp
@@ -202,8 +194,20 @@ toModuleInfo bp = ModuleInfo
             $ Map.toList (bpPackages bp)
     }
 
+-- | Where to store module info caches
+moduleInfoCache :: SnapName -> StackT EnvConfig IO (Path Abs File)
+moduleInfoCache name = do
+    root <- view stackRootL
+    platform <- platformGhcVerOnlyRelDir
+    name' <- parseRelDir $ T.unpack $ renderSnapName name
+    -- These probably can't vary at all based on platform, even in the
+    -- future, so it's safe to call this unnecessarily paranoid.
+    return (root </> $(mkRelDir "script") </> name' </> platform </> $(mkRelFile "module-info.cache"))
+
 loadModuleInfo :: SnapName -> StackT EnvConfig IO ModuleInfo
-loadModuleInfo name = toModuleInfo <$> loadBuildPlan name -- FIXME caching
+loadModuleInfo name = do
+    path <- moduleInfoCache name
+    $(versionedDecodeOrLoad moduleInfoVC) path $ toModuleInfo <$> loadBuildPlan name
 
 parseImports :: ByteString -> (Set PackageName, Set ModuleName)
 parseImports =
