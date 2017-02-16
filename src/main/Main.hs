@@ -735,7 +735,7 @@ sdistCmd (dirs, mpvpBounds, ignoreCheck, sign, sigServerUrl) go =
 
 -- | Execute a command.
 execCmd :: ExecOpts -> GlobalOpts -> IO ()
-execCmd e@ExecOpts {..} go@GlobalOpts{..} =
+execCmd ExecOpts {..} go@GlobalOpts{..} =
     case eoExtra of
         ExecOptsPlain -> do
             (cmd, args) <- case (eoCmd, eoArgs) of
