@@ -35,7 +35,7 @@ import           Stack.Types.PackageName
 import           Stack.Types.Version
 
 -- | A parse fail.
-data PackageIdentifierParseFail
+newtype PackageIdentifierParseFail
   = PackageIdentifierParseFail Text
   deriving (Typeable)
 instance Show PackageIdentifierParseFail where

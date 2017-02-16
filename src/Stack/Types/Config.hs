@@ -1691,8 +1691,8 @@ explicitSetupDeps name = do
                     Nothing -> False -- default value
 
 -- | Data passed into Docker container for the Docker entrypoint's use
-data DockerEntrypoint = DockerEntrypoint
-    { deUser :: !(Maybe DockerUser)
+newtype DockerEntrypoint = DockerEntrypoint
+    { deUser :: Maybe DockerUser
       -- ^ UID/GID/etc of host user, if we wish to perform UID/GID switch in container
     } deriving (Read,Show)
 

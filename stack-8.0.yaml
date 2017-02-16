@@ -9,6 +9,6 @@ nix:
   packages:
     - zlib
 extra-deps:
-- store-0.3
+- store-0.3.1
 - store-core-0.3
 - th-utilities-0.2.0.1

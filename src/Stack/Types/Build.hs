@@ -367,8 +367,8 @@ newtype PkgDepsOracle =
     deriving (Show,Typeable,Eq,Hashable,Store,NFData)
 
 -- | Stored on disk to know whether the files have changed.
-data BuildCache = BuildCache
-    { buildCacheTimes :: !(Map FilePath FileCacheInfo)
+newtype BuildCache = BuildCache
+    { buildCacheTimes :: Map FilePath FileCacheInfo
       -- ^ Modification times of files.
     }
     deriving (Generic, Eq, Show, Data, Typeable)

@@ -57,7 +57,7 @@ import           Prelude -- Fix warning: Word in Prelude from base-4.8.
 import           Text.PrettyPrint (render)
 
 -- | A parse fail.
-data VersionParseFail =
+newtype VersionParseFail =
   VersionParseFail Text
   deriving (Typeable)
 instance Exception VersionParseFail

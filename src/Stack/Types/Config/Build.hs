@@ -319,12 +319,12 @@ instance Monoid TestOptsMonoid where
 
 
 -- | Haddock Options
-data HaddockOpts =
-  HaddockOpts { hoAdditionalArgs :: ![String] -- ^ Arguments passed to haddock program
+newtype HaddockOpts =
+  HaddockOpts { hoAdditionalArgs :: [String] -- ^ Arguments passed to haddock program
               } deriving (Eq,Show)
 
-data HaddockOptsMonoid =
-  HaddockOptsMonoid {hoMonoidAdditionalArgs :: ![String]
+newtype HaddockOptsMonoid =
+  HaddockOptsMonoid {hoMonoidAdditionalArgs :: [String]
                     } deriving (Show, Generic)
 
 defaultHaddockOpts :: HaddockOpts

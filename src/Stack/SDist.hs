@@ -68,7 +68,7 @@ import qualified System.FilePath as FP
 -- | Special exception to throw when you want to fail because of bad results
 -- of package check.
 
-data CheckException
+newtype CheckException
   = CheckException (NonEmpty Check.PackageCheck)
   deriving (Typeable)
 

@@ -248,8 +248,8 @@ printBody res = runConduit $ getResponseBody res .| CB.sinkHandle stdout
 -- Typically, you want to use this with 'upload'.
 --
 -- Since 0.1.0.0
-data Uploader = Uploader
-    { upload_ :: !(String -> L.ByteString -> IO ())
+newtype Uploader = Uploader
+    { upload_ :: String -> L.ByteString -> IO ()
     }
 
 -- | Upload a single tarball with the given @Uploader@.

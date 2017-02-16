@@ -40,7 +40,7 @@ import           Language.Haskell.TH
 import           Language.Haskell.TH.Syntax
 
 -- | A parse fail.
-data FlagNameParseFail
+newtype FlagNameParseFail
   = FlagNameParseFail Text
   deriving (Typeable)
 instance Exception FlagNameParseFail
