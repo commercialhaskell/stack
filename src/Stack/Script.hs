@@ -171,7 +171,7 @@ getPackagesFromImports (Just (ARResolver (ResolverSnapshot name))) scriptFP = do
                                     , unwords $ map packageNameString pns'
                                     ]
                         Nothing -> return Set.empty
-                return $ Set.unions pns
+                return $ Set.unions pns `Set.difference` blacklist
     return (Set.union pns1 pns2, modifyForWindows $ miCorePackages mi)
   where
     modifyForWindows
@@ -180,6 +180,58 @@ getPackagesFromImports (Just (ARResolver (ResolverSnapshot name))) scriptFP = do
 
 getPackagesFromImports (Just (ARResolver (ResolverCompiler _))) _ = return (Set.empty, Set.empty)
 getPackagesFromImports (Just aresolver) _ = throwM $ InvalidResolverForNoLocalConfig $ show aresolver
+
+-- | The Stackage project introduced the concept of hidden packages,
+-- to deal with conflicting module names. However, this is a
+-- relatively recent addition (at time of writing). See:
+-- http://www.snoyman.com/blog/2017/01/conflicting-module-names. To
+-- kick this thing off a bit better, we're included a blacklist of
+-- packages that should never be auto-parsed in.
+blacklist :: Set PackageName
+blacklist = Set.fromList
+    [ $(mkPackageName "async-dejafu")
+    , $(mkPackageName "monads-tf")
+    , $(mkPackageName "crypto-api")
+    , $(mkPackageName "fay-base")
+    , $(mkPackageName "hashmap")
+    , $(mkPackageName "hxt-unicode")
+    , $(mkPackageName "hledger-web")
+    , $(mkPackageName "plot-gtk3")
+    , $(mkPackageName "gtk3")
+    , $(mkPackageName "regex-pcre-builtin")
+    , $(mkPackageName "regex-compat-tdfa")
+    , $(mkPackageName "log")
+    , $(mkPackageName "zip")
+    , $(mkPackageName "monad-extras")
+    , $(mkPackageName "control-monad-free")
+    , $(mkPackageName "prompt")
+    , $(mkPackageName "kawhi")
+    , $(mkPackageName "language-c")
+    , $(mkPackageName "gl")
+    , $(mkPackageName "svg-tree")
+    , $(mkPackageName "Glob")
+    , $(mkPackageName "nanospec")
+    , $(mkPackageName "HTF")
+    , $(mkPackageName "courier")
+    , $(mkPackageName "newtype-generics")
+    , $(mkPackageName "objective")
+    , $(mkPackageName "binary-ieee754")
+    , $(mkPackageName "rerebase")
+    , $(mkPackageName "cipher-aes")
+    , $(mkPackageName "cipher-blowfish")
+    , $(mkPackageName "cipher-camellia")
+    , $(mkPackageName "cipher-des")
+    , $(mkPackageName "cipher-rc4")
+    , $(mkPackageName "crypto-cipher-types")
+    , $(mkPackageName "crypto-numbers")
+    , $(mkPackageName "crypto-pubkey")
+    , $(mkPackageName "crypto-random")
+    , $(mkPackageName "cryptohash")
+    , $(mkPackageName "cryptohash-conduit")
+    , $(mkPackageName "cryptohash-md5")
+    , $(mkPackageName "cryptohash-sha1")
+    , $(mkPackageName "cryptohash-sha256")
+    ]
 
 toModuleInfo :: BuildPlan -> ModuleInfo
 toModuleInfo bp = ModuleInfo
