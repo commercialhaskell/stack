@@ -14,6 +14,7 @@
 HOME_LOCAL_BIN="$HOME/.local/bin"
 USR_LOCAL_BIN="/usr/local/bin"
 QUIET=""
+FORCE=""
 STACK_TEMP_DIR=
 
 # creates a temporary directory, which will be cleaned up automatically
@@ -639,22 +640,34 @@ check_usr_local_bin_on_path() {
 
 # Check whether Stack is already installed, and print an error if it is.
 check_stack_installed() {
-  if has_stack ; then
-    #XXX add a --force flag to reinstall anyway
+  if [ "$FORCE" != "true" ] && has_stack ; then
     die "Stack $(stack_version) already appears to be installed at:
   $(stack_location)
-Use 'stack upgrade' or your OS's package manager to upgrade."
+Use 'stack upgrade' or your OS's package manager to upgrade,
+or pass --force to this script to install anyway."
   fi
 }
 
 trap cleanup_temp_dir EXIT
 
-case "$1" in
-  -q|--quiet)
-    # This tries its best to reduce output by suppressing the script's own
-    # messages and passing "quiet" arguments to tools that support them.
-    QUIET="true"
-esac
+while [ $# -gt 0 ]; do
+  case "$1" in
+    -q|--quiet)
+      # This tries its best to reduce output by suppressing the script's own
+      # messages and passing "quiet" arguments to tools that support them.
+      QUIET="true"
+      shift
+      ;;
+    -f|--force)
+      FORCE="true"
+      shift
+      ;;
+    *)
+      echo "Invalid argument: $1" >&2
+      exit 1
+      ;;
+  esac
+done
 
 check_stack_installed
 do_os
