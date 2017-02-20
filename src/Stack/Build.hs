@@ -363,7 +363,7 @@ fixCodePage inner = do
                     (liftIO $ setConsoleCP origCPI)
                 | otherwise = id
             fixOutput
-                | setInput = Catch.bracket_
+                | setOutput = Catch.bracket_
                     (liftIO $ do
                         setConsoleOutputCP expected)
                     (liftIO $ setConsoleOutputCP origCPO)
