@@ -437,6 +437,7 @@ data ExecOptsExtra
     | ExecOptsEmbellished
         { eoEnvSettings :: !EnvSettings
         , eoPackages :: ![String]
+        , eoRtsOptions :: ![String]
         }
     deriving (Show)
 

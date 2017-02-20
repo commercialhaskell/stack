@@ -739,9 +739,9 @@ execCmd ExecOpts {..} go@GlobalOpts{..} =
     case eoExtra of
         ExecOptsPlain -> do
             (cmd, args) <- case (eoCmd, eoArgs) of
-                 (ExecCmd cmd, args) -> return (cmd, args)
-                 (ExecGhc, args) -> return ("ghc", args)
-                 (ExecRunGhc, args) -> return ("runghc", args)
+                (ExecCmd cmd, args) -> return (cmd, args)
+                (ExecGhc, args) -> return ("ghc", args)
+                (ExecRunGhc, args) -> return ("runghc", args)
             lc <- liftIO $ loadConfigWithOpts go
             withUserFileLock go (configStackRoot $ lcConfig lc) $ \lk -> do
               let getCompilerVersion = loadCompilerVersion go lc
@@ -761,24 +761,28 @@ execCmd ExecOpts {..} go@GlobalOpts{..} =
                     Nothing
                     Nothing -- Unlocked already above.
         ExecOptsEmbellished {..} ->
-           withBuildConfigAndLock go $ \lk -> do
-               let targets = concatMap words eoPackages
-               unless (null targets) $
-                   Stack.Build.build (const $ return ()) lk defaultBuildOptsCLI
-                       { boptsCLITargets = map T.pack targets
-                       }
+            withBuildConfigAndLock go $ \lk -> do
+                let targets = concatMap words eoPackages
+                unless (null targets) $
+                    Stack.Build.build (const $ return ()) lk defaultBuildOptsCLI
+                        { boptsCLITargets = map T.pack targets
+                        }
 
-               config <- view configL
-               menv <- liftIO $ configEnvOverride config eoEnvSettings
-               (cmd, args) <- case (eoCmd, eoArgs) of
-                   (ExecCmd cmd, args) -> return (cmd, args)
-                   (ExecGhc, args) -> getGhcCmd "" menv eoPackages args
+                config <- view configL
+                menv <- liftIO $ configEnvOverride config eoEnvSettings
+                -- Add RTS options to arguments
+                let argsWithRts args = if null eoRtsOptions 
+                            then args :: [String]
+                            else args ++ ["+RTS"] ++ eoRtsOptions ++ ["-RTS"]
+                (cmd, args) <- case (eoCmd, argsWithRts eoArgs) of
+                    (ExecCmd cmd, args) -> return (cmd, args)
+                    (ExecGhc, args) -> getGhcCmd "" menv eoPackages args
                     -- NOTE: this won't currently work for GHCJS, because it doesn't have
                     -- a runghcjs binary. It probably will someday, though.
-                   (ExecRunGhc, args) ->
-                       getGhcCmd "run" menv eoPackages args
-               munlockFile lk -- Unlock before transferring control away.
-               exec menv cmd args
+                    (ExecRunGhc, args) ->
+                        getGhcCmd "run" menv eoPackages args
+                munlockFile lk -- Unlock before transferring control away.
+                exec menv cmd args
   where
       -- return the package-id of the first package in GHC_PACKAGE_PATH
       getPkgId menv wc name = do
@@ -796,6 +800,7 @@ execCmd ExecOpts {..} go@GlobalOpts{..} =
           wc <- view $ actualCompilerVersionL.whichCompilerL
           pkgopts <- getPkgOpts menv wc pkgs
           return (prefix ++ compilerExeName wc, pkgopts ++ args)
+    
 
 -- | Evaluate some haskell code inline.
 evalCmd :: EvalOpts -> GlobalOpts -> IO ()
