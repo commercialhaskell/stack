@@ -3,6 +3,7 @@ module Stack.Options.ExecParser where
 import           Data.Monoid.Extra
 import           Options.Applicative
 import           Options.Applicative.Builder.Extra
+import           Options.Applicative.Args
 import           Stack.Types.Config
 
 -- | Parser for exec command
@@ -51,7 +52,10 @@ execOptsExtraParser = eoPlainParser <|>
     eoPackagesParser = many (strOption (long "package" <> help "Additional packages that must be installed"))
 
     eoRtsOptionsParser :: Parser [String]
-    eoRtsOptionsParser = many (strOption (long "rts-options" <> help "Explicit RTS options to pass to application"))
+    eoRtsOptionsParser = concat <$> many (argsOption 
+        ( long "rts-options"
+        <> help "Explicit RTS options to pass to application"
+        <> metavar "RTSFLAG"))
 
     eoPlainParser :: Parser ExecOptsExtra
     eoPlainParser = flag' ExecOptsPlain

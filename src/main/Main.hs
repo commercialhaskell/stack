@@ -773,7 +773,7 @@ execCmd ExecOpts {..} go@GlobalOpts{..} =
                 -- Add RTS options to arguments
                 let argsWithRts args = if null eoRtsOptions 
                             then args :: [String]
-                            else args ++ ["+RTS"] ++ concatMap words eoRtsOptions ++ ["-RTS"]
+                            else args ++ ["+RTS"] ++ eoRtsOptions ++ ["-RTS"]
                 (cmd, args) <- case (eoCmd, argsWithRts eoArgs) of
                     (ExecCmd cmd, args) -> return (cmd, args)
                     (ExecGhc, args) -> getGhcCmd "" menv eoPackages args
