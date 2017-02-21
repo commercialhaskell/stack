@@ -67,8 +67,8 @@ on El Capitan, Yosemite and Mavericks as well, and may also work on older
 versions (YMMV).
 
 **macOS Sierra warning**: There are new limitations in the dynamic linker that
-are causing problems for GHC when building projects with many
-dependencies. See
+are causing problems for GHC versions earlier than 8.0.2 when building projects with many
+dependencies. GHC 8.0.2 is first used in LTS 8.0. See
 [#2577](https://github.com/commercialhaskell/stack/issues/2577) for more
 information.
 
