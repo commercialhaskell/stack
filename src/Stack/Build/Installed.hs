@@ -196,13 +196,11 @@ processLoadResult _ True (WrongVersion actual wanted, lh)
             ]
         return (Just lh)
 processLoadResult mdb _ (reason, lh) = do
-    let pkgName = packageNameText (fst (lhPair lh))
-    warnIfCabalUpgradeNecessary pkgName reason
     $logDebug $ T.concat $
-        ["Ignoring package ", pkgName]
-        ++
-        maybe [] (\db -> [", from ", T.pack (show db), ","]) mdb
-        ++
+        [ "Ignoring package "
+        , packageNameText (fst (lhPair lh))
+        ] ++
+        maybe [] (\db -> [", from ", T.pack (show db), ","]) mdb ++
         [ " due to"
         , case reason of
             Allowed -> " the impossible?!?!"
@@ -219,14 +217,6 @@ processLoadResult mdb _ (reason, lh) = do
                 ]
         ]
     return Nothing
-
-warnIfCabalUpgradeNecessary :: MonadLogger m => T.Text -> Allowed -> m ()
-warnIfCabalUpgradeNecessary pkg reason = do
-  let msg = "Cabal version mismatch detected. Try running 'stack setup --upgrade-cabal'"
-  case reason of
-    WrongVersion _ _ -> when (pkg == T.pack "Cabal") $ do
-                            $logWarn msg
-    _                -> return ()
 
 data Allowed
     = Allowed

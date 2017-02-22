@@ -970,7 +970,7 @@ withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} md
                                         return ("-package-id=" ++ ghcPkgIdString (snd x), Just (toCabalPackageIdentifier (fst x)))
                                     [] -> do
                                         $logWarn (T.pack ("Could not find custom-setup dep: " ++ packageNameString name))
-                                        return ("--package=" ++ packageNameString name, Nothing)
+                                        return ("-package=" ++ packageNameString name, Nothing)
                             let depsArgs = map fst matchedDeps
                             -- Generate setup_macros.h and provide it to ghc
                             let macroDeps = mapMaybe snd matchedDeps
@@ -982,14 +982,21 @@ withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} md
                         -- This branch is taken when
                         -- 'explicit-setup-deps' is requested in your
                         -- stack.yaml file.
-                        (Nothing, Just deps) | explicitSetupDeps (packageName package) config ->
+                        (Nothing, Just deps) | explicitSetupDeps (packageName package) config -> do
+                            $logWarn $ T.pack $ concat
+                                [ "Package "
+                                , packageNameString $ packageName package
+                                , " uses a custom Cabal build, but does not use a custom-setup stanza"
+                                ]
+                            $logWarn "Using the explicit setup deps approach based on configuration"
+                            $logWarn "Strongly recommend fixing the package's cabal file"
                             -- Stack always builds with the global Cabal for various
                             -- reproducibility issues.
                             let depsMinusCabal
                                  = map ghcPkgIdString
                                  $ Set.toList
                                  $ addGlobalPackages deps (Map.elems eeGlobalDumpPkgs)
-                            in return (
+                            return (
                                 packageDBArgs ++
                                 cabalPackageArg ++
                                 map ("-package-id=" ++) depsMinusCabal)
@@ -1010,16 +1017,23 @@ withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} md
                         -- Currently, this branch is only taken via `stack
                         -- sdist` or when explicitly requested in the
                         -- stack.yaml file.
-                        (Nothing, _) -> return (
-                              cabalPackageArg ++
-                            -- NOTE: This is different from
-                            -- packageDBArgs above inthat it does not
-                            -- include the local database and does not
-                            -- pass in the -hide-all-packages argument
-                            ("-clear-package-db"
-                            : "-global-package-db"
-                            : map (("-package-db=" ++) . toFilePathNoTrailingSep) (bcoExtraDBs eeBaseConfigOpts)
-                           ++ ["-package-db=" ++ toFilePathNoTrailingSep (bcoSnapDB eeBaseConfigOpts)]))
+                        (Nothing, _) -> do
+                            $logWarn $ T.pack $ concat
+                                [ "Package "
+                                , packageNameString $ packageName package
+                                , " uses a custom Cabal build, but does not use a custom-setup stanza"
+                                ]
+                            $logWarn "Not using the explicit setup deps approach based on configuration"
+                            $logWarn "Strongly recommend fixing the package's cabal file"
+                            return $ cabalPackageArg ++
+                                    -- NOTE: This is different from
+                                    -- packageDBArgs above in that it does not
+                                    -- include the local database and does not
+                                    -- pass in the -hide-all-packages argument
+                                    ("-clear-package-db"
+                                    : "-global-package-db"
+                                    : map (("-package-db=" ++) . toFilePathNoTrailingSep) (bcoExtraDBs eeBaseConfigOpts)
+                                ++ ["-package-db=" ++ toFilePathNoTrailingSep (bcoSnapDB eeBaseConfigOpts)])
 
                 setupArgs = ("--builddir=" ++ toFilePathNoTrailingSep distRelativeDir') : args
                 runExe exeName fullArgs =
