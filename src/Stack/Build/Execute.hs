@@ -970,7 +970,7 @@ withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} md
                                         return ("-package-id=" ++ ghcPkgIdString (snd x), Just (toCabalPackageIdentifier (fst x)))
                                     [] -> do
                                         $logWarn (T.pack ("Could not find custom-setup dep: " ++ packageNameString name))
-                                        return ("--package=" ++ packageNameString name, Nothing)
+                                        return ("-package=" ++ packageNameString name, Nothing)
                             let depsArgs = map fst matchedDeps
                             -- Generate setup_macros.h and provide it to ghc
                             let macroDeps = mapMaybe snd matchedDeps
