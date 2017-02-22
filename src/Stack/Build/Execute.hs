@@ -1013,7 +1013,7 @@ withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} md
                         (Nothing, _) -> return (
                               cabalPackageArg ++
                             -- NOTE: This is different from
-                            -- packageDBArgs above inthat it does not
+                            -- packageDBArgs above in that it does not
                             -- include the local database and does not
                             -- pass in the -hide-all-packages argument
                             ("-clear-package-db"
