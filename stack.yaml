@@ -1,4 +1,4 @@
-resolver: lts-6.25
+resolver: lts-6.30
 # docker:
 #   enable: true
 #   repo: fpco/stack-full
