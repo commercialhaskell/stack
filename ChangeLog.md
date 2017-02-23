@@ -1,8 +1,17 @@
 # Changelog
 
-## 1.4.0 (unreleased)
+## 1.4.0
 
 Release notes:
+
+* Docker images:
+  [fpco/stack-full](https://hub.docker.com/r/fpco/stack-full/) and
+  [fpco/stack-run](https://hub.docker.com/r/fpco/stack-run/)
+  are no longer being built for LTS 8.0 and above.
+  [fpco/stack-build](https://hub.docker.com/r/fpco/stack-build/)
+  images continue to be built with a
+  [simplified process](https://github.com/commercialhaskell/stack/tree/master/etc/dockerfiles/stack-build).
+  [#624](https://github.com/commercialhaskell/stack/issues/624)
 
 Major changes:
 
@@ -33,16 +42,16 @@ Behavior changes:
   package indices. This will also force the same cabal file revision
   to be used as is specified in the snapshot.
 
-  Unpacking via a package identifier (e.g. `stack --resolver lts-7.14
-  unpack mtl-2.2.1`) will ignore any settings in the snapshot and take
-  the most recent revision.
+    Unpacking via a package identifier (e.g. `stack --resolver lts-7.14
+    unpack mtl-2.2.1`) will ignore any settings in the snapshot and take
+    the most recent revision.
 
-  For backwards compatibility with tools relying on the presence of a
-  `00-index.tar`, Stack will copy the `01-index.tar` file to
-  `00-index.tar`. Note, however, that these files are different; most
-  importantly, 00-index contains only the newest revisions of cabal
-  files, while 01-index contains all versions. You may still need to
-  update your tooling.
+    For backwards compatibility with tools relying on the presence of a
+    `00-index.tar`, Stack will copy the `01-index.tar` file to
+    `00-index.tar`. Note, however, that these files are different; most
+    importantly, 00-index contains only the newest revisions of cabal
+    files, while 01-index contains all versions. You may still need to
+    update your tooling.
 * Passing `--(no-)nix-*` options now no longer implies `--nix`, except for
   `--nix-pure`, so that the user preference whether or not to use Nix is
   honored even in the presence of options that change the Nix behavior.
