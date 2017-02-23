@@ -14,6 +14,7 @@
 HOME_LOCAL_BIN="$HOME/.local/bin"
 USR_LOCAL_BIN="/usr/local/bin"
 QUIET=""
+FORCE=""
 STACK_TEMP_DIR=
 
 # creates a temporary directory, which will be cleaned up automatically
@@ -128,9 +129,7 @@ apt_install_dependencies() {
 do_ubuntu_install() {
 
   install_dependencies() {
-    if ! apt_install_dependencies g++ gcc libc6-dev libffi-dev libgmp-dev make xz-utils zlib1g-dev git gnupg; then
-      die "Dependencies could not be installed. Please run 'apt-get update' and try again."
-    fi
+    apt_install_dependencies g++ gcc libc6-dev libffi-dev libgmp-dev make xz-utils zlib1g-dev git gnupg
   }
 
   if is_arm ; then
@@ -156,9 +155,7 @@ do_ubuntu_install() {
 do_debian_install() {
 
   install_dependencies() {
-    if ! apt_install_dependencies g++ gcc libc6-dev libffi-dev libgmp-dev make xz-utils zlib1g-dev; then
-      die "Dependencies could not be installed. Please run 'apt-get update' and try again."
-    fi
+    apt_install_dependencies g++ gcc libc6-dev libffi-dev libgmp-dev make xz-utils zlib1g-dev
   }
 
   if is_arm ; then
@@ -182,9 +179,7 @@ do_debian_install() {
 # and install the necessary dependencies explicitly.
 do_fedora_install() {
   install_dependencies() {
-    if ! dnf_install_pkgs perl make automake gcc gmp-devel libffi zlib xz tar; then
-      die "Dependencies could not be installed. Please run 'dnf check-update' and try again."
-    fi
+    dnf_install_pkgs perl make automake gcc gmp-devel libffi zlib xz tar
   }
 
   if is_64_bit ; then
@@ -204,9 +199,7 @@ do_fedora_install() {
 # and install the necessary dependencies explicitly.
 do_centos_install() {
   install_dependencies() {
-    if ! yum_install_pkgs perl make automake gcc gmp-devel libffi zlib xz tar; then
-      die "Dependencies could not be installed. Please run 'yum check-update' and try again."
-    fi
+    yum_install_pkgs perl make automake gcc gmp-devel libffi zlib xz tar
   }
 
   if is_64_bit ; then
@@ -244,9 +237,7 @@ do_osx_install() {
 # 'pkg install' and then downloads bindist.
 do_freebsd_install() {
   install_dependencies() {
-    if ! sudocmd pkg install -y devel/gmake perl5 lang/gcc misc/compat8x misc/compat9x converters/libiconv ca_root_nss; then
-      die "Dependencies could not be installed. Please run 'pkg update' and try again."
-    fi
+    pkg_install_pkgs devel/gmake perl5 lang/gcc misc/compat8x misc/compat9x converters/libiconv ca_root_nss
   }
   if is_64_bit ; then
     install_dependencies
@@ -259,9 +250,7 @@ do_freebsd_install() {
 # Alpine distro install
 do_alpine_install() {
   install_dependencies() {
-    if ! apk_install_pkgs gmp libgcc xz make; then
-      die "Dependencies could not be installed. Please run 'apk update' and try again."
-    fi
+    apk_install_pkgs gmp libgcc xz make
   }
   install_dependencies
   if is_64_bit ; then
@@ -427,13 +416,16 @@ See http://docs.haskellstack.org/en/stable/install_and_upgrade/"
   esac
 }
 
-# Download a URL to stdout, for piping to another process or file,
-# using 'curl' or 'wget'.
-dl_to_stdout() {
+# Download a URL to file using 'curl' or 'wget'.
+dl_to_file() {
   if has_curl ; then
-    curl ${QUIET:+-sS} -L "$@"
+    if ! curl ${QUIET:+-sS} -L -o "$2" "$1"; then
+      die "curl download failed: $1"
+    fi
   elif has_wget ; then
-    wget ${QUIET:+-q} -O- "$@"
+    if ! wget ${QUIET:+-q} "-O$2" "$1"; then
+      die "wget download failed: $1"
+    fi
   else
     # should already have checked for this, otherwise this message will probably
     # not be displayed, since dl_to_stdout will be part of a pipeline
@@ -455,11 +447,16 @@ check_dl_tools() {
 install_from_bindist() {
     IFB_URL="https://www.stackage.org/stack/$1"
     check_dl_tools
-    #TODO: the checksum or GPG signature should be checked.
     make_temp_dir
 
-    dl_to_stdout "$IFB_URL" | tar xzf - -C "$STACK_TEMP_DIR"
-    sudocmd install -c -o 0 -g 0 -m 0755 "$STACK_TEMP_DIR"/*/stack "$USR_LOCAL_BIN/stack"
+    dl_to_file "$IFB_URL" "$STACK_TEMP_DIR/$1.bindist"
+    mkdir -p "$STACK_TEMP_DIR/$1"
+    if ! tar xzf "$STACK_TEMP_DIR/$1.bindist" -C "$STACK_TEMP_DIR/$1"; then
+      die "Extract bindist failed"
+    fi
+    if ! sudocmd install -c -o 0 -g 0 -m 0755 "$STACK_TEMP_DIR/$1"/*/stack "$USR_LOCAL_BIN/stack"; then
+      die "Install to $USR_LOCAL_BIN/stack failed"
+    fi
 
     post_install_separator
     info "Stack has been installed to: $USR_LOCAL_BIN/stack"
@@ -510,22 +507,37 @@ try_install_pkgs() {
 
 # Install packages using apt-get
 apt_get_install_pkgs() {
-  sudocmd apt-get install -y ${QUIET:+-qq} "$@"
+  if ! sudocmd apt-get install -y ${QUIET:+-qq} "$@"; then
+    die "Installing apt packages failed.  Please run 'apt-get update' and try again."
+  fi
 }
 
 # Install packages using dnf
 dnf_install_pkgs() {
-  sudocmd dnf install -y ${QUIET:+-q} "$@"
+  if ! sudocmd dnf install -y ${QUIET:+-q} "$@"; then
+    die "Installing dnf packages failed.  Please run 'dnf check-update' and try again."
+  fi
 }
 
 # Install packages using yum
 yum_install_pkgs() {
-  sudocmd yum install -y ${QUIET:+-q} "$@"
+  if ! sudocmd yum install -y ${QUIET:+-q} "$@"; then
+    die "Installing yum packages failed.  Please run 'yum check-update' and try again."
+  fi
 }
 
 # Install packages using apk
 apk_install_pkgs() {
-  sudocmd apk add --update ${QUIET:+-q} "$@"
+  if ! sudocmd apk add --update ${QUIET:+-q} "$@"; then
+    die "Installing apk packages failed.  Please run 'apk update' and try again."
+  fi
+}
+
+# Install packages using pkg
+pkg_install_pkgs() {
+    if ! sudocmd pkg install -y "$@"; then
+        die "Installing pkg packages failed.  Please run 'pkg update' and try again."
+    fi
 }
 
 # Get installed Stack version, if any
@@ -628,22 +640,34 @@ check_usr_local_bin_on_path() {
 
 # Check whether Stack is already installed, and print an error if it is.
 check_stack_installed() {
-  if has_stack ; then
-    #XXX add a --force flag to reinstall anyway
+  if [ "$FORCE" != "true" ] && has_stack ; then
     die "Stack $(stack_version) already appears to be installed at:
   $(stack_location)
-Use 'stack upgrade' or your OS's package manager to upgrade."
+Use 'stack upgrade' or your OS's package manager to upgrade,
+or pass --force to this script to install anyway."
   fi
 }
 
 trap cleanup_temp_dir EXIT
 
-case "$1" in
-  -q|--quiet)
-    # This tries its best to reduce output by suppressing the script's own
-    # messages and passing "quiet" arguments to tools that support them.
-    QUIET="true"
-esac
+while [ $# -gt 0 ]; do
+  case "$1" in
+    -q|--quiet)
+      # This tries its best to reduce output by suppressing the script's own
+      # messages and passing "quiet" arguments to tools that support them.
+      QUIET="true"
+      shift
+      ;;
+    -f|--force)
+      FORCE="true"
+      shift
+      ;;
+    *)
+      echo "Invalid argument: $1" >&2
+      exit 1
+      ;;
+  esac
+done
 
 check_stack_installed
 do_os
