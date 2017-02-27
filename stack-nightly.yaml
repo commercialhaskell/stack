@@ -8,3 +8,4 @@ nix:
   enable: false
   packages:
     - zlib
+    - http-client-tls-0.3.4

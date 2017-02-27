@@ -12,3 +12,4 @@ extra-deps:
 - store-0.3.1
 - store-core-0.3
 - th-utilities-0.2.0.1
+- http-client-tls-0.3.4
