@@ -18,7 +18,7 @@ extra-deps:
 - store-core-0.3
 - th-orphans-0.13.1
 - http-client-0.5.3.3
-- http-client-tls-0.3.3
+- http-client-tls-0.3.4
 - http-conduit-2.2.3
 - optparse-applicative-0.13.0.0
 - text-metrics-0.1.0
