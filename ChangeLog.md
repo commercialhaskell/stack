@@ -13,7 +13,9 @@ Other enhancements:
 * Upgraded `http-client-tls` version, which now offers support for the
   `socks5://` and `socks5h://` values in the `http_proxy` and `https_proxy`
   environment variables.
-
+* `stack setup` allow to control options passed to ghcjs-boot with 
+  `--ghcjs-boot-options` (one word at a time) and `--[no-]ghcjs-boot-clean`
+  
 Bug fixes:
 
 ## 1.4.0 (unreleased)
