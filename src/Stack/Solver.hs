@@ -301,8 +301,9 @@ setupCompiler compiler = do
         , soptsSkipMsys          = configSkipMsys config
         , soptsUpgradeCabal      = False
         , soptsResolveMissingGHC = msg
-        , soptsSetupInfoYaml    = defaultSetupInfoYaml
+        , soptsSetupInfoYaml     = defaultSetupInfoYaml
         , soptsGHCBindistURL     = Nothing
+        , soptsGHCJSBootOpts     = ["--clean"]
         }
     return dirs
 

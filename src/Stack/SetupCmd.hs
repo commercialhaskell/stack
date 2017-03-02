@@ -33,6 +33,8 @@ data SetupCmdOpts = SetupCmdOpts
     , scoUpgradeCabal    :: !Bool
     , scoSetupInfoYaml   :: !String
     , scoGHCBindistURL   :: !(Maybe String)
+    , scoGHCJSBootOpts   :: ![String]
+    , scoGHCJSBootClean  :: !Bool
     }
 
 setupYamlCompatParser :: OA.Parser String
@@ -67,6 +69,14 @@ setupParser = SetupCmdOpts
             (OA.long "ghc-bindist"
            <> OA.metavar "URL"
            <> OA.help "Alternate GHC binary distribution (requires custom --ghc-variant)"))
+    <*> OA.many (OA.strOption
+            (OA.long "ghcjs-boot-options"
+           <> OA.metavar "GHCJS_BOOT"
+           <> OA.help "Additional ghcjs-boot options"))
+    <*> OA.boolFlags True
+            "ghcjs-boot-clean"
+            "Control if ghcjs-boot should have --clean option present"
+            OA.idm
   where
     readVersion = do
         s <- OA.readerAsk
@@ -100,6 +110,7 @@ setup SetupCmdOpts{..} wantedCompiler compilerCheck mstack = do
         , soptsResolveMissingGHC = Nothing
         , soptsSetupInfoYaml = scoSetupInfoYaml
         , soptsGHCBindistURL = scoGHCBindistURL
+        , soptsGHCJSBootOpts = scoGHCJSBootOpts ++ ["--clean" | scoGHCJSBootClean]
         }
     let compiler = case wantedCompiler of
             GhcVersion _ -> "GHC"
