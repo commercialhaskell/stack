@@ -429,7 +429,8 @@ withExecuteEnv menv bopts boptsCli baseConfigOpts locals globalPackages snapshot
          =$ CL.take 1
       unless (null firstWarning) $ dumpLog " due to warnings" (pkgDir, filepath)
 
-    isWarning t = ": Warning:" `T.isSuffixOf` t
+    isWarning t = ": Warning:" `T.isSuffixOf` t -- prior to GHC 8
+               || ": warning:" `T.isInfixOf` t -- GHC 8 is slightly different
 
     dumpLog msgSuffix (pkgDir, filepath) = do
         $logInfo $ T.pack $ concat ["\n--  Dumping log file", msgSuffix, ": ", toFilePath filepath, "\n"]
