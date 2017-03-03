@@ -107,6 +107,8 @@ Bug fixes:
 * `stack upgrade --git` now works properly.  Workaround for affected
   versions (>= 1.3.0) is to instead run `stack upgrade --git --source-only`.
   ([#2977](https://github.com/commercialhaskell/stack/issues/2977))
+* Added support for GHC 8's slightly different warning format for
+  dumping warnings from logs.
 
 ## 1.3.2
 
