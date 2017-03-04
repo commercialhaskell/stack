@@ -14,8 +14,8 @@ nix:
 extra-deps:
 - Cabal-1.24.2.0
 - th-utilities-0.2.0.1
-- store-0.3
-- store-core-0.3
+- store-0.4.1
+- store-core-0.4
 - th-orphans-0.13.1
 - http-client-0.5.3.3
 - http-client-tls-0.3.4
