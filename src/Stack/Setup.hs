@@ -17,6 +17,7 @@ module Stack.Setup
   , ensureCompiler
   , ensureDockerStackExe
   , getSystemCompiler
+  , getCabalInstallVersion
   , SetupOpts (..)
   , defaultSetupInfoYaml
   , removeHaskellEnvVars

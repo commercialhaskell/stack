@@ -66,6 +66,7 @@ import           Stack.Constants (stackDotYaml, wiredInPackages)
 import           Stack.Package               (printCabalFileWarning
                                              , hpack
                                              , readPackageUnresolved)
+import           Stack.PrettyPrint
 import           Stack.Setup
 import           Stack.Setup.Installed
 import           Stack.Types.Build
@@ -320,10 +321,20 @@ setupCabalEnv compiler = do
     platform <- view platformL
     menv <- mkEnvOverride platform envMap
 
-    mcabal <- findExecutable menv "cabal"
+    mcabal <- getCabalInstallVersion menv
     case mcabal of
         Nothing -> throwM SolverMissingCabalInstall
-        Just _ -> return ()
+        Just version
+            | version < $(mkVersion "1.24") -> $prettyWarn $
+                "Installed version of cabal-install (" <>
+                display version <>
+                ") doesn't support custom-setup clause, and so may not yield correct results." <> line <>
+                "To resolve this, install a newer version via 'stack install cabal-install'." <> line
+            | version >= $(mkVersion "1.25") -> $prettyWarn $
+                "Installed version of cabal-install (" <>
+                display version <>
+                ") is newer than stack has been tested with.  If you run into difficulties, consider downgrading." <> line
+            | otherwise -> return ()
 
     mver <- getSystemCompiler menv (whichCompiler compiler)
     case mver of
@@ -717,7 +728,7 @@ solveExtraDeps modStackYaml = do
         $logInfo $ "No changes needed to " <> T.pack relStackYaml
 
     where
-        indent t = T.unlines $ fmap ("    " <>) (T.lines t)
+        indentLines t = T.unlines $ fmap ("    " <>) (T.lines t)
 
         printResolver mOldRes res = do
             forM_ mOldRes $ \oldRes ->
@@ -732,13 +743,13 @@ solveExtraDeps modStackYaml = do
         printFlags fl msg = do
             unless (Map.null fl) $ do
                 $logInfo $ T.pack msg
-                $logInfo $ indent $ decodeUtf8 $ Yaml.encode
-                                  $ object ["flags" .= fl]
+                $logInfo $ indentLines $ decodeUtf8 $ Yaml.encode
+                                       $ object ["flags" .= fl]
 
         printDeps deps msg = do
             unless (Map.null deps) $ do
                 $logInfo $ T.pack msg
-                $logInfo $ indent $ decodeUtf8 $ Yaml.encode $ object
+                $logInfo $ indentLines $ decodeUtf8 $ Yaml.encode $ object
                         ["extra-deps" .= map fromTuple (Map.toList deps)]
 
         writeStackYaml path res deps fl = do
