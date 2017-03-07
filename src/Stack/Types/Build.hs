@@ -495,10 +495,13 @@ isStackOpt t = any (`T.isPrefixOf` t)
     , "--haddockdir="
     , "--enable-tests"
     , "--enable-benchmarks"
-    , "--enable-library-profiling"
-    , "--enable-executable-profiling"
-    , "--enable-profiling"
     , "--exact-configuration"
+    -- Treat these as causing dirtiness, to resolve
+    -- https://github.com/commercialhaskell/stack/issues/2984
+    --
+    -- , "--enable-library-profiling"
+    -- , "--enable-executable-profiling"
+    -- , "--enable-profiling"
     ] || t == "--user"
 
 configureOptsDirs :: BaseConfigOpts
