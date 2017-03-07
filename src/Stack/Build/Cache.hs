@@ -37,7 +37,7 @@ import           Control.Exception.Safe (handleIO, tryAnyDeep)
 import           Control.Monad (liftM)
 import           Control.Monad.Catch (MonadThrow, MonadCatch)
 import           Control.Monad.IO.Class
-import           Control.Monad.Logger (MonadLogger, logDebug)
+import           Control.Monad.Logger (MonadLogger)
 import           Control.Monad.Reader (MonadReader)
 import           Control.Monad.Trans.Control (MonadBaseControl)
 import           Crypto.Hash (hashWith, SHA256(..))
@@ -54,7 +54,6 @@ import           Data.Foldable (forM_)
 import           Data.Map (Map)
 import qualified Data.Map as M
 import           Data.Maybe (fromMaybe, mapMaybe)
-import           Data.Monoid ((<>))
 import           Data.Set (Set)
 import qualified Data.Set as Set
 import qualified Data.Store as Store
@@ -280,7 +279,6 @@ precompiledCacheFile pkgident copts installedPackageIDs = do
                  </> pkg
                  </> hashPath
 
-    $logDebug $ "Precompiled cache input = " <> T.pack (show input)
     newPath <- hashToPath $ B64URL.encode $ Mem.convert $ hashWith SHA256 $ Store.encode input
     return (newPath, hashToPath oldHash)
 
