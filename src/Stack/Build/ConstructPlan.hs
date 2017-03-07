@@ -221,7 +221,7 @@ constructPlan mbp0 baseConfigOpts0 locals extraToBuild0 localDumpPkgs loadPackag
 -- | State to be maintained during the calculation of local packages
 -- to unregister.
 data UnregisterState = UnregisterState
-    { usToUnregister :: !(Map GhcPkgId (PackageIdentifier, Maybe Text))
+    { usToUnregister :: !(Map GhcPkgId (PackageIdentifier, Text))
     , usKeep :: ![DumpPackage () () ()]
     , usAnyAdded :: !Bool
     }
@@ -235,7 +235,7 @@ mkUnregisterLocal :: Map PackageName Task
                   -> [DumpPackage () () ()]
                   -- ^ Local package database dump
                   -> SourceMap
-                  -> Map GhcPkgId (PackageIdentifier, Maybe Text)
+                  -> Map GhcPkgId (PackageIdentifier, Text)
 mkUnregisterLocal tasks dirtyReason localDumpPkgs sourceMap =
     -- We'll take multiple passes through the local packages. This
     -- will allow us to detect that a package should be unregistered,
@@ -262,20 +262,14 @@ mkUnregisterLocal tasks dirtyReason localDumpPkgs sourceMap =
 
     go dp = do
         us <- get
-        -- Determine the reason for unregistering this package, if we
-        -- will in fact unregister it. We've (unfortunately got two
-        -- layers of Maybe wrapping here: a Nothing means "don't
-        -- unregister." A Just Nothing means "unregister, but we don't
-        -- know why".
-        let mmreason = go' (usToUnregister us) ident deps
-        case mmreason of
+        case go' (usToUnregister us) ident deps of
             -- Not unregistering, add it to the keep list
             Nothing -> put us { usKeep = dp : usKeep us }
             -- Unregistering, add it to the unregister Map and
             -- indicate that a package was in fact added to the
             -- unregister Map so we loop again.
-            Just mreason -> put us
-                { usToUnregister = Map.insert gid (ident, mreason) (usToUnregister us)
+            Just reason -> put us
+                { usToUnregister = Map.insert gid (ident, reason) (usToUnregister us)
                 , usAnyAdded = True
                 }
       where
@@ -287,13 +281,13 @@ mkUnregisterLocal tasks dirtyReason localDumpPkgs sourceMap =
       -- If we're planning on running a task on it, then it must be
       -- unregistered
       | Just _ <- Map.lookup name tasks
-          = Just $ Map.lookup name dirtyReason
+          = Just $ fromMaybe undefined $ Map.lookup name dirtyReason
       -- Check if we're no longer using the local version
       | Just (PSUpstream _ Snap _ _ _) <- Map.lookup name sourceMap
-          = Just $ Just "Switching to snapshot installed package"
+          = Just "Switching to snapshot installed package"
       -- Check if a dependency is going to be unregistered
       | (dep, _):_ <- mapMaybe (`Map.lookup` toUnregister) deps
-          = Just $ Just $ "Dependency being unregistered: " <> packageIdentifierText dep
+          = Just $ "Dependency being unregistered: " <> packageIdentifierText dep
       -- None of the above, keep it!
       | otherwise = Nothing
       where
