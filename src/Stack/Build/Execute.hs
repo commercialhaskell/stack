@@ -994,13 +994,16 @@ withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} md
                         -- 'explicit-setup-deps' is requested in your
                         -- stack.yaml file.
                         (Nothing, Just deps) | explicitSetupDeps (packageName package) config -> do
-                            $logWarn $ T.pack $ concat
-                                [ "Package "
-                                , packageNameString $ packageName package
-                                , " uses a custom Cabal build, but does not use a custom-setup stanza"
-                                ]
-                            $logWarn "Using the explicit setup deps approach based on configuration"
-                            $logWarn "Strongly recommend fixing the package's cabal file"
+                            case taskType of
+                                TTLocal{} -> do
+                                    $logWarn $ T.pack $ concat
+                                        [ "Package "
+                                        , packageNameString $ packageName package
+                                        , " uses a custom Cabal build, but does not use a custom-setup stanza"
+                                        ]
+                                    $logWarn "Using the explicit setup deps approach based on configuration"
+                                    $logWarn "Strongly recommend fixing the package's cabal file"
+                                _ -> return ()
                             -- Stack always builds with the global Cabal for various
                             -- reproducibility issues.
                             let depsMinusCabal
@@ -1029,13 +1032,16 @@ withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} md
                         -- sdist` or when explicitly requested in the
                         -- stack.yaml file.
                         (Nothing, _) -> do
-                            $logWarn $ T.pack $ concat
-                                [ "Package "
-                                , packageNameString $ packageName package
-                                , " uses a custom Cabal build, but does not use a custom-setup stanza"
-                                ]
-                            $logWarn "Not using the explicit setup deps approach based on configuration"
-                            $logWarn "Strongly recommend fixing the package's cabal file"
+                            case taskType of
+                                TTLocal{} -> do
+                                    $logWarn $ T.pack $ concat
+                                        [ "Package "
+                                        , packageNameString $ packageName package
+                                        , " uses a custom Cabal build, but does not use a custom-setup stanza"
+                                        ]
+                                    $logWarn "Not using the explicit setup deps approach based on configuration"
+                                    $logWarn "Strongly recommend fixing the package's cabal file"
+                                _ -> return ()
                             return $ cabalPackageArg ++
                                     -- NOTE: This is different from
                                     -- packageDBArgs above in that it does not
