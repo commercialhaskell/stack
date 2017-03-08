@@ -109,6 +109,10 @@ Bug fixes:
   ([#2977](https://github.com/commercialhaskell/stack/issues/2977))
 * Added support for GHC 8's slightly different warning format for
   dumping warnings from logs.
+* Work around a bug in Cabal/GHC in which package IDs are not unique
+  for different source code, leading to Stack not always rebuilding
+  packages depending on local packages which have
+  changed. ([#2904](https://github.com/commercialhaskell/stack/issues/2904))
 
 ## 1.3.2
 
