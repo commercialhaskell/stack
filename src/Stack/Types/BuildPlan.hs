@@ -434,7 +434,7 @@ instance Store MiniBuildPlan
 instance NFData MiniBuildPlan
 
 miniBuildPlanVC :: VersionConfig MiniBuildPlan
-miniBuildPlanVC = storeVersionConfig "mbp-v1" "C8q73RrYq3plf9hDCapjWpnm_yc="
+miniBuildPlanVC = storeVersionConfig "mbp-v2" "C8q73RrYq3plf9hDCapjWpnm_yc="
 
 -- | Information on a single package for the 'MiniBuildPlan'.
 data MiniPackageInfo = MiniPackageInfo
