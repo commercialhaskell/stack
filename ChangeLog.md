@@ -13,10 +13,20 @@ Other enhancements:
 * Upgraded `http-client-tls` version, which now offers support for the
   `socks5://` and `socks5h://` values in the `http_proxy` and `https_proxy`
   environment variables.
-* `stack setup` allow to control options passed to ghcjs-boot with 
+* `stack setup` allow to control options passed to ghcjs-boot with
   `--ghcjs-boot-options` (one word at a time) and `--[no-]ghcjs-boot-clean`
-  
+* Updates to store-0.4.1, which has improved performance and better error
+  reporting for version tags.  A side-effect of this is that all of
+  stack's binary caches will be invalidated.
+* `stack solver` will now warn about unexpected cabal-install versions.
+  See [#3044](https://github.com/commercialhaskell/stack/issues/3044)
+
+
 Bug fixes:
+
+* Fixes case where `stack build --profile` might not cause executables /
+  tests / benchmarks to be rebuilt.
+  See [#2984](https://github.com/commercialhaskell/stack/issues/2984)
 
 ## 1.4.0 (unreleased)
 
