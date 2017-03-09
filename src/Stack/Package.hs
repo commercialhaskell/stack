@@ -515,11 +515,11 @@ getBuildComponentDir (Just name) = parseRelDir (name FilePath.</> (name ++ "-tmp
 
 -- | Get all dependencies of the package (buildable targets only).
 packageDependencies :: PackageDescription -> Map PackageName VersionRange
-packageDependencies =
-  M.fromListWith intersectVersionRanges .
-  concatMap (fmap (depName &&& depRange) .
-             targetBuildDepends) .
-  allBuildInfo'
+packageDependencies pkg =
+  M.fromListWith intersectVersionRanges $
+  map (depName &&& depRange) $
+  concatMap targetBuildDepends (allBuildInfo' pkg) ++
+  maybe [] setupDepends (setupBuildInfo pkg)
 
 -- | Get all build tool dependencies of the package (buildable targets only).
 packageToolDependencies :: PackageDescription -> Map Text VersionRange

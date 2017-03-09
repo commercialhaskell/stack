@@ -141,11 +141,11 @@ printPlan plan = do
         [] -> $logInfo "No packages would be unregistered."
         xs -> do
             $logInfo "Would unregister locally:"
-            forM_ xs $ \(ident, mreason) -> $logInfo $ T.concat
+            forM_ xs $ \(ident, reason) -> $logInfo $ T.concat
                 [ T.pack $ packageIdentifierString ident
-                , case mreason of
-                    Nothing -> ""
-                    Just reason -> T.concat
+                , if T.null reason
+                    then ""
+                    else T.concat
                         [ " ("
                         , reason
                         , ")"
@@ -442,7 +442,8 @@ withExecuteEnv menv bopts boptsCli baseConfigOpts locals globalPackages snapshot
          =$ CL.take 1
       unless (null firstWarning) $ dumpLog " due to warnings" (pkgDir, filepath)
 
-    isWarning t = ": Warning:" `T.isSuffixOf` t
+    isWarning t = ": Warning:" `T.isSuffixOf` t -- prior to GHC 8
+               || ": warning:" `T.isInfixOf` t -- GHC 8 is slightly different
 
     dumpLog msgSuffix (pkgDir, filepath) = do
         $logInfo $ T.pack $ concat ["\n--  Dumping log file", msgSuffix, ": ", toFilePath filepath, "\n"]
@@ -603,13 +604,13 @@ executePlan' installedMap0 targets plan ee@ExecuteEnv {..} = do
         [] -> return ()
         ids -> do
             localDB <- packageDatabaseLocal
-            forM_ ids $ \(id', (ident, mreason)) -> do
+            forM_ ids $ \(id', (ident, reason)) -> do
                 $logInfo $ T.concat
                     [ T.pack $ packageIdentifierString ident
                     , ": unregistering"
-                    , case mreason of
-                        Nothing -> ""
-                        Just reason -> T.concat
+                    , if T.null reason
+                        then ""
+                        else T.concat
                             [ " ("
                             , reason
                             , ")"

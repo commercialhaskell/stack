@@ -10,9 +10,6 @@ Behavior changes:
 
 Other enhancements:
 
-* Upgraded `http-client-tls` version, which now offers support for the
-  `socks5://` and `socks5h://` values in the `http_proxy` and `https_proxy`
-  environment variables.
 * `stack setup` allow to control options passed to ghcjs-boot with
   `--ghcjs-boot-options` (one word at a time) and `--[no-]ghcjs-boot-clean`
 * Updates to store-0.4.1, which has improved performance and better error
@@ -28,9 +25,18 @@ Bug fixes:
   tests / benchmarks to be rebuilt.
   See [#2984](https://github.com/commercialhaskell/stack/issues/2984)
 
-## 1.4.0 (unreleased)
+## 1.4.0
 
 Release notes:
+
+* Docker images:
+  [fpco/stack-full](https://hub.docker.com/r/fpco/stack-full/) and
+  [fpco/stack-run](https://hub.docker.com/r/fpco/stack-run/)
+  are no longer being built for LTS 8.0 and above.
+  [fpco/stack-build](https://hub.docker.com/r/fpco/stack-build/)
+  images continue to be built with a
+  [simplified process](https://github.com/commercialhaskell/stack/tree/master/etc/dockerfiles/stack-build).
+  [#624](https://github.com/commercialhaskell/stack/issues/624)
 
 Major changes:
 
@@ -61,16 +67,16 @@ Behavior changes:
   package indices. This will also force the same cabal file revision
   to be used as is specified in the snapshot.
 
-  Unpacking via a package identifier (e.g. `stack --resolver lts-7.14
-  unpack mtl-2.2.1`) will ignore any settings in the snapshot and take
-  the most recent revision.
+    Unpacking via a package identifier (e.g. `stack --resolver lts-7.14
+    unpack mtl-2.2.1`) will ignore any settings in the snapshot and take
+    the most recent revision.
 
-  For backwards compatibility with tools relying on the presence of a
-  `00-index.tar`, Stack will copy the `01-index.tar` file to
-  `00-index.tar`. Note, however, that these files are different; most
-  importantly, 00-index contains only the newest revisions of cabal
-  files, while 01-index contains all versions. You may still need to
-  update your tooling.
+    For backwards compatibility with tools relying on the presence of a
+    `00-index.tar`, Stack will copy the `01-index.tar` file to
+    `00-index.tar`. Note, however, that these files are different; most
+    importantly, 00-index contains only the newest revisions of cabal
+    files, while 01-index contains all versions. You may still need to
+    update your tooling.
 * Passing `--(no-)nix-*` options now no longer implies `--nix`, except for
   `--nix-pure`, so that the user preference whether or not to use Nix is
   honored even in the presence of options that change the Nix behavior.
@@ -105,6 +111,9 @@ Other enhancements:
 * `stack exec` now takes `--rts-options` which passes the given arguments inside of
   `+RTS ... args .. -RTS` to the executable. This works around stack itself consuming
   the RTS flags on Windows. ([#2986](https://github.com/commercialhaskell/stack/issues/2640))
+* Upgraded `http-client-tls` version, which now offers support for the
+  `socks5://` and `socks5h://` values in the `http_proxy` and `https_proxy`
+  environment variables.
 
 Bug fixes:
 
@@ -123,6 +132,12 @@ Bug fixes:
 * `stack upgrade --git` now works properly.  Workaround for affected
   versions (>= 1.3.0) is to instead run `stack upgrade --git --source-only`.
   ([#2977](https://github.com/commercialhaskell/stack/issues/2977))
+* Added support for GHC 8's slightly different warning format for
+  dumping warnings from logs.
+* Work around a bug in Cabal/GHC in which package IDs are not unique
+  for different source code, leading to Stack not always rebuilding
+  packages depending on local packages which have
+  changed. ([#2904](https://github.com/commercialhaskell/stack/issues/2904))
 
 ## 1.3.2
 

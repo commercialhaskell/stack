@@ -6,7 +6,7 @@ Question related to stack project templates? Please report it at the [stack-temp
 
 If you're reporting a bug please follow the steps below:
 
-Make sure that you are using the latest release (currently stack-1.3.2).
+Make sure that you are using the latest release (currently stack-1.4.0).
 See the [upgrade instructions](http://docs.haskellstack.org/en/stable/install_and_upgrade/#upgrade) to upgrade.
 
 Please use the following schema for your bug report:
