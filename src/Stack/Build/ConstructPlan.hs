@@ -281,7 +281,7 @@ mkUnregisterLocal tasks dirtyReason localDumpPkgs sourceMap =
       -- If we're planning on running a task on it, then it must be
       -- unregistered
       | Just _ <- Map.lookup name tasks
-          = Just $ fromMaybe undefined $ Map.lookup name dirtyReason
+          = Just $ fromMaybe "" $ Map.lookup name dirtyReason
       -- Check if we're no longer using the local version
       | Just (PSUpstream _ Snap _ _ _) <- Map.lookup name sourceMap
           = Just "Switching to snapshot installed package"
