@@ -17,7 +17,9 @@ Other enhancements:
   stack's binary caches will be invalidated.
 * `stack solver` will now warn about unexpected cabal-install versions.
   See [#3044](https://github.com/commercialhaskell/stack/issues/3044)
-
+* Upstream packages unpacked to a temp dir are now deleted as soon as
+  possible to avoid running out of space in `/tmp`.
+  See [#3018](https://github.com/commercialhaskell/stack/issues/3018)
 
 Bug fixes:
 
