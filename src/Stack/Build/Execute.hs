@@ -1388,6 +1388,15 @@ singleBuild runInBase ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} in
                 mpkgid (packageExes package)
             Local -> return ()
 
+        case taskType of
+            -- For upstream packages, pkgDir is in the tmp directory. We
+            -- eagerly delete it if no other tasks require it, to reduce
+            -- space usage in tmp (#3018).
+            TTUpstream{} -> do
+                let remaining = filter (\(ActionId x _) -> x == taskProvides) (Set.toList acRemaining)
+                when (null remaining) $ removeDirRecur pkgDir
+            _ -> return ()
+
         return mpkgid
 
     loadInstalledPkg menv wc pkgDbs tvar name = do
