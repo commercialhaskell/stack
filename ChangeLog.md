@@ -26,6 +26,8 @@ Bug fixes:
 * Fixes case where `stack build --profile` might not cause executables /
   tests / benchmarks to be rebuilt.
   See [#2984](https://github.com/commercialhaskell/stack/issues/2984)
+* `stack ghci file.hs` now loads the file even if it isn't part of
+  your project.
 
 ## 1.4.0
 

@@ -168,7 +168,7 @@ ghci opts@GhciOpts{..} = do
     pkgs <- getGhciPkgInfos buildOptsCLI sourceMap addPkgs (fmap fst mfileTargets) localTargets
     checkForIssues pkgs
     -- Finally, do the invocation of ghci
-    runGhci opts localTargets mainIsTargets pkgs
+    runGhci opts localTargets mainIsTargets pkgs (fromMaybe [] (fmap snd mfileTargets))
 
 preprocessTargets :: (StackM r m) => [Text] -> m (Either [Path Abs File] [Text])
 preprocessTargets rawTargets = do
@@ -326,8 +326,9 @@ runGhci
     -> [(PackageName, (Path Abs File, SimpleTarget))]
     -> Maybe (Map PackageName SimpleTarget)
     -> [GhciPkgInfo]
+    -> [Path Abs File]
     -> m ()
-runGhci GhciOpts{..} targets mainIsTargets pkgs = do
+runGhci GhciOpts{..} targets mainIsTargets pkgs extraFiles = do
     config <- view configL
     wc <- view $ actualCompilerVersionL.whichCompilerL
     let pkgopts = hidePkgOpt ++ genOpts ++ ghcOpts
@@ -380,7 +381,7 @@ runGhci GhciOpts{..} targets mainIsTargets pkgs = do
                 renderFn <- interrogateExeForRenderFunction
                 bopts <- view buildOptsL
                 mainFile <- figureOutMainFile bopts mainIsTargets targets pkgs
-                scriptPath <- writeGhciScript tmpDirectory (renderFn pkgs mainFile)
+                scriptPath <- writeGhciScript tmpDirectory (renderFn pkgs mainFile extraFiles)
                 execGhci (macrosOptions ++ ["-ghci-script=" <> toFilePath scriptPath])
 
 writeMacrosFile :: (MonadIO m) => Path Abs Dir -> [GhciPkgInfo] -> m [String]
@@ -402,21 +403,21 @@ findOwningPackageForMain :: [GhciPkgInfo] -> Path Abs File -> Maybe GhciPkgInfo
 findOwningPackageForMain pkgs mainFile =
   find (\pkg -> toFilePath (ghciPkgDir pkg) `isPrefixOf` toFilePath mainFile) pkgs
 
-renderScriptGhci :: [GhciPkgInfo] -> Maybe (Path Abs File) -> GhciScript
-renderScriptGhci pkgs mainFile =
+renderScriptGhci :: [GhciPkgInfo] -> Maybe (Path Abs File) -> [Path Abs File] -> GhciScript
+renderScriptGhci pkgs mainFile extraFiles =
   let addPhase    = mconcat $ fmap renderPkg pkgs
       mainPhase   = case mainFile of
                       Just path -> cmdAddFile path
                       Nothing   -> mempty
       modulePhase = cmdModule $ foldl' S.union S.empty (fmap ghciPkgModules pkgs)
-   in case getFileTargets pkgs of
+   in case getFileTargets pkgs <> extraFiles of
           [] -> addPhase <> mainPhase <> modulePhase
           fileTargets -> mconcat $ map cmdAddFile fileTargets
   where
     renderPkg pkg = cmdAdd (ghciPkgModules pkg)
 
-renderScriptIntero :: [GhciPkgInfo] -> Maybe (Path Abs File) -> GhciScript
-renderScriptIntero pkgs mainFile =
+renderScriptIntero :: [GhciPkgInfo] -> Maybe (Path Abs File) -> [Path Abs File] -> GhciScript
+renderScriptIntero pkgs mainFile extraFiles =
   let addPhase    = mconcat $ fmap renderPkg pkgs
       mainPhase   = case mainFile of
                       Just path ->
@@ -425,7 +426,7 @@ renderScriptIntero pkgs mainFile =
                           Nothing      -> cmdAddFile path
                       Nothing   -> mempty
       modulePhase = cmdModule $ foldl' S.union S.empty (fmap ghciPkgModules pkgs)
-   in case getFileTargets pkgs of
+   in case getFileTargets pkgs <> extraFiles of
           [] -> addPhase <> mainPhase <> modulePhase
           fileTargets -> mconcat $ map cmdAddFile fileTargets
   where
