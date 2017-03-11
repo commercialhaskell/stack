@@ -168,7 +168,7 @@ ghci opts@GhciOpts{..} = do
     pkgs <- getGhciPkgInfos buildOptsCLI sourceMap addPkgs (fmap fst mfileTargets) localTargets
     checkForIssues pkgs
     -- Finally, do the invocation of ghci
-    runGhci opts localTargets mainIsTargets pkgs (fromMaybe [] (fmap snd mfileTargets))
+    runGhci opts localTargets mainIsTargets pkgs (maybe [] snd mfileTargets)
 
 preprocessTargets :: (StackM r m) => [Text] -> m (Either [Path Abs File] [Text])
 preprocessTargets rawTargets = do
