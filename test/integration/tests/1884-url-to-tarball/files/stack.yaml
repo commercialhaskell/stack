@@ -1,4 +1,4 @@
 packages:
 - https://hackage.haskell.org/package/half-0.2.2.3/half-0.2.2.3.tar.gz
 extra-deps: []
-resolver: lts-6.0
+resolver: lts-8.0

@@ -1,4 +1,4 @@
-resolver: ghc-7.10
+resolver: ghc-8.0
 packages:
 - stm-2.4.4.1
 - async-2.1.0
