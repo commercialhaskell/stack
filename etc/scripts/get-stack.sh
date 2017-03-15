@@ -20,7 +20,7 @@ STACK_TEMP_DIR=
 # creates a temporary directory, which will be cleaned up automatically
 # when the script finishes
 make_temp_dir() {
-  STACK_TEMP_DIR="$(mktemp -d)"
+  STACK_TEMP_DIR="$(mktemp -d 2>/dev/null || mktemp -d -t stack)"
 }
 
 # cleanup the temporary directory if it's been created.  called automatically
