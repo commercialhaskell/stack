@@ -8,6 +8,8 @@ Vagrant.configure(2) do |config|
   config.ssh.forward_agent = true
   config.vm.provision "shell", inline: <<-SHELL
     set -xe
+    #FIXME: See https://github.com/commercialhaskell/stack/issues/3045, probably use:
+    #FIXME:    apk --no-cache add --repository http://dl-cdn.alpinelinux.org/alpine/edge/testing ghc ghc-dev cabal
     if ! grep 's3-us-west-2\.amazonaws\.com/alpine-ghc/7\.10' /etc/apk/repositories; then
       echo "https://s3-us-west-2.amazonaws.com/alpine-ghc/7.10" |sudo tee -a /etc/apk/repositories
     fi

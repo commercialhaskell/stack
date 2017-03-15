@@ -103,6 +103,7 @@ options =
         "Label to give the uploaded release asset"
     , Option "" [noTestHaddocksOptName] (NoArg $ Right $ \g -> g{gTestHaddocks = False})
         "Disable testing building haddocks."
+      -- FIXME: Use 'static' flag in stack.cabal instead.  See https://github.com/commercialhaskell/stack/issues/3045.
     , Option "" [staticOptName] (NoArg $ Right $ \g -> g{gBuildArgs = gBuildArgs g ++ ["--split-objs", "--ghc-options=-optc-Os -optl-static -fPIC"]})
         "Build a static binary."
     , Option "" [buildArgsOptName]
@@ -159,12 +160,11 @@ rules global@Global{..} args = do
                     (stackArgs global)
                     ["--local-bin-path=" ++ tmpDir]
                     c
-                    gBuildArgs
-            () <- cmd0 "install" $ concat $ concat
+            () <- cmd0 "install" gBuildArgs $ concat $ concat
                 [["--pedantic --no-haddock-deps"], [" --haddock" | gTestHaddocks]]
-            () <- cmd0 (Cwd "etc/scripts") "install cabal-install"
-            let cmd' c = cmd (AddPath [tmpDir] []) stackProgName (stackArgs global) c gBuildArgs
-            () <- cmd' "test" "--pedantic --flag stack:integration-tests"
+            () <- cmd0 (Cwd "etc/scripts") "install" gBuildArgs "cabal-install"
+            let cmd' c = cmd (AddPath [tmpDir] []) stackProgName (stackArgs global) c
+            () <- cmd' "test" gBuildArgs "--pedantic --flag stack:integration-tests"
             return ()
         copyFileChanged (releaseBinDir </> binaryName </> stackExeFileName) out
 
