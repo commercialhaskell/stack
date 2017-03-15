@@ -18,7 +18,6 @@ import           Control.Monad
 import           Control.Monad.Catch (throwM)
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
-import           Control.Monad.Reader (asks)
 import qualified Data.ByteString as S
 import qualified Data.HashMap.Strict as HMap
 import           Data.Monoid
@@ -28,9 +27,11 @@ import qualified Data.Yaml as Yaml
 import qualified Options.Applicative as OA
 import qualified Options.Applicative.Types as OA
 import           Path
+import           Path.IO
 import           Prelude -- Silence redundant import warnings
 import           Stack.BuildPlan
-import           Stack.Config (makeConcreteResolver, getStackYaml)
+import           Stack.Config (makeConcreteResolver, getProjectConfig, getImplicitGlobalProjectDir, LocalConfigStatus(..))
+import           Stack.Constants
 import           Stack.Types.Config
 import           Stack.Types.Resolver
 
@@ -55,14 +56,21 @@ configCmdSetScope (ConfigCmdSetInstallGhc scope _) = scope
 
 cfgCmdSet
     :: (StackMiniM env m, HasConfig env, HasGHCVariant env)
-    => ConfigCmdSet -> m ()
-cfgCmdSet cmd = do
+    => GlobalOpts -> ConfigCmdSet -> m ()
+cfgCmdSet go cmd = do
+    conf <- view configL
     configFilePath <-
         liftM
             toFilePath
             (case configCmdSetScope cmd of
-                 CommandScopeProject -> getStackYaml
-                 CommandScopeGlobal -> asks (configUserConfigPath . getConfig))
+                 CommandScopeProject -> do
+                     mstackYamlOption <- forM (globalStackYaml go) resolveFile'
+                     mstackYaml <- getProjectConfig mstackYamlOption
+                     case mstackYaml of
+                         LCSProject stackYaml -> return stackYaml
+                         LCSNoProject -> liftM (</> stackDotYaml) (getImplicitGlobalProjectDir conf)
+                         LCSNoConfig -> error "config command used when no local configuration available"
+                 CommandScopeGlobal -> return (configUserConfigPath conf))
     -- We don't need to worry about checking for a valid yaml here
     (config :: Yaml.Object) <-
         liftIO (Yaml.decodeFileEither configFilePath) >>= either throwM return

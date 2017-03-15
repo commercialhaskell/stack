@@ -43,7 +43,7 @@ loadCompilerVersion :: GlobalOpts
 loadCompilerVersion go lc = do
     bconfig <- runStackTGlobal () go $
       lcLoadBuildConfig lc (globalCompiler go)
-    return $ bcWantedCompiler bconfig
+    return $ view wantedCompilerVersionL bconfig
 
 -- | Enforce mutual exclusion of every action running via this
 -- function, on this path, on this users account.
@@ -108,7 +108,10 @@ withGlobalConfigAndLock
     -> IO ()
 withGlobalConfigAndLock go@GlobalOpts{..} inner = do
     lc <- runStackTGlobal () go $
-        loadConfigMaybeProject globalConfigMonoid Nothing Nothing
+        loadConfigMaybeProject
+            globalConfigMonoid
+            Nothing
+            LCSNoProject
     withUserFileLock go (configStackRoot $ lcConfig lc) $ \_lk ->
         runStackTGlobal (lcConfig lc) go inner
 
@@ -207,9 +210,13 @@ withMiniConfigAndLock
     -> StackT MiniConfig IO ()
     -> IO ()
 withMiniConfigAndLock go@GlobalOpts{..} inner = do
-    miniConfig <- runStackTGlobal () go $ do
-        lc <- loadConfigMaybeProject globalConfigMonoid globalResolver Nothing
-        loadMiniConfig (lcConfig lc)
+    miniConfig <-
+        runStackTGlobal () go $
+        (loadMiniConfig . lcConfig) <$>
+        loadConfigMaybeProject
+          globalConfigMonoid
+          globalResolver
+          LCSNoProject
     runStackTGlobal miniConfig go inner
 
 -- | Unlock a lock file, if the value is Just

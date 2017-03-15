@@ -1,4 +1,4 @@
-resolver: lts-7.9
+resolver: lts-8.0
 image:
   containers:
     - base: "fpco/stack-base" # see ./etc/docker/stack-base/Dockerfile
@@ -9,12 +9,7 @@ nix:
   packages:
     - zlib
 extra-deps:
-- http-client-0.5.3.3
-- http-conduit-2.2.3
-- http-client-tls-0.3.3
-- optparse-applicative-0.13.0.0
-- pid1-0.1.0.0
-- store-0.3
+- store-0.3.1
 - store-core-0.3
-- hpack-0.15.0
-- aeson-1.0.2.1
+- th-utilities-0.2.0.1
+- http-client-tls-0.3.4

@@ -15,12 +15,12 @@ module Stack.Build.ConstructPlan
     ( constructPlan
     ) where
 
-import           Control.Arrow ((&&&))
 import           Control.Exception.Lifted
 import           Control.Monad
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import           Control.Monad.RWS.Strict
+import           Control.Monad.State.Strict (execState)
 import           Control.Monad.Trans.Resource
 import           Data.Either
 import           Data.Function
@@ -42,6 +42,7 @@ import qualified Distribution.Text as Cabal
 import qualified Distribution.Version as Cabal
 import           GHC.Generics (Generic)
 import           Generics.Deriving.Monoid (memptydefault, mappenddefault)
+import           Lens.Micro (lens)
 import           Path
 import           Prelude hiding (pi, writeFile)
 import           Stack.Build.Cache
@@ -136,31 +137,28 @@ data Ctx = Ctx
     , logFunc        :: Loc -> LogSource -> LogLevel -> LogStr -> IO ()
     }
 
-instance HasStackRoot Ctx
 instance HasPlatform Ctx
 instance HasGHCVariant Ctx
 instance HasConfig Ctx
-instance HasBuildConfig Ctx where
-    getBuildConfig = getBuildConfig . getEnvConfig
+instance HasBuildConfig Ctx
 instance HasEnvConfig Ctx where
-    getEnvConfig = ctxEnvConfig
+    envConfigL = lens ctxEnvConfig (\x y -> x { ctxEnvConfig = y })
 
 constructPlan :: forall env m. (StackM env m, HasEnvConfig env)
               => MiniBuildPlan
               -> BaseConfigOpts
               -> [LocalPackage]
               -> Set PackageName -- ^ additional packages that must be built
-              -> [DumpPackage () ()] -- ^ locally registered
+              -> [DumpPackage () () ()] -- ^ locally registered
               -> (PackageName -> Version -> Map FlagName Bool -> [Text] -> IO Package) -- ^ load upstream package
               -> SourceMap
               -> InstalledMap
               -> m Plan
 constructPlan mbp0 baseConfigOpts0 locals extraToBuild0 localDumpPkgs loadPackage0 sourceMap installedMap = do
     $logDebug "Constructing the build plan"
-    let locallyRegistered = Map.fromList $ map (dpGhcPkgId &&& dpPackageIdent) localDumpPkgs
     getVersions0 <- getPackageVersionsIO
 
-    econfig <- asks getEnvConfig
+    econfig <- view envConfigL
     let onWanted = void . addDep False . packageName . lpPackage
     let inner = do
             mapM_ onWanted $ filter lpWanted locals
@@ -187,7 +185,7 @@ constructPlan mbp0 baseConfigOpts0 locals extraToBuild0 localDumpPkgs loadPackag
             return $ takeSubset Plan
                 { planTasks = tasks
                 , planFinals = M.fromList finals
-                , planUnregisterLocal = mkUnregisterLocal tasks dirtyReason locallyRegistered sourceMap
+                , planUnregisterLocal = mkUnregisterLocal tasks dirtyReason localDumpPkgs sourceMap
                 , planInstallExes =
                     if boptsInstallExes $ bcoBuildOpts baseConfigOpts0
                         then installExes
@@ -195,7 +193,8 @@ constructPlan mbp0 baseConfigOpts0 locals extraToBuild0 localDumpPkgs loadPackag
                 }
         else do
             planDebug $ show errs
-            $prettyError $ pprintExceptions errs (bcStackYaml (getBuildConfig econfig)) parents (wantedLocalPackages locals)
+            stackYaml <- view stackYamlL
+            $prettyError $ pprintExceptions errs stackYaml parents (wantedLocalPackages locals)
             throwM $ ConstructPlanFailed "Plan construction failed."
   where
     ctx econfig getVersions0 lf = Ctx
@@ -219,29 +218,78 @@ constructPlan mbp0 baseConfigOpts0 locals extraToBuild0 localDumpPkgs loadPackag
     -- or local packages.
     toolMap = getToolMap mbp0
 
+-- | State to be maintained during the calculation of local packages
+-- to unregister.
+data UnregisterState = UnregisterState
+    { usToUnregister :: !(Map GhcPkgId (PackageIdentifier, Text))
+    , usKeep :: ![DumpPackage () () ()]
+    , usAnyAdded :: !Bool
+    }
+
 -- | Determine which packages to unregister based on the given tasks and
 -- already registered local packages
 mkUnregisterLocal :: Map PackageName Task
+                  -- ^ Tasks
                   -> Map PackageName Text
-                  -> Map GhcPkgId PackageIdentifier
+                  -- ^ Reasons why packages are dirty and must be rebuilt
+                  -> [DumpPackage () () ()]
+                  -- ^ Local package database dump
                   -> SourceMap
-                  -> Map GhcPkgId (PackageIdentifier, Maybe Text)
-mkUnregisterLocal tasks dirtyReason locallyRegistered sourceMap =
-    Map.unions $ map toUnregisterMap $ Map.toList locallyRegistered
+                  -> Map GhcPkgId (PackageIdentifier, Text)
+mkUnregisterLocal tasks dirtyReason localDumpPkgs sourceMap =
+    -- We'll take multiple passes through the local packages. This
+    -- will allow us to detect that a package should be unregistered,
+    -- as well as all packages directly or transitively depending on
+    -- it.
+    loop Map.empty localDumpPkgs
   where
-    toUnregisterMap (gid, ident) =
-        case M.lookup name tasks of
-            Nothing ->
-                case M.lookup name sourceMap of
-                    Just (PSUpstream _ Snap _ _ _) -> Map.singleton gid
-                        ( ident
-                        , Just "Switching to snapshot installed package"
-                        )
-                    _ -> Map.empty
-            Just _ -> Map.singleton gid
-                ( ident
-                , Map.lookup name dirtyReason
-                )
+    loop toUnregister keep
+        -- If any new packages were added to the unregister Map, we
+        -- need to loop through the remaining packages again to detect
+        -- if a transitive dependency is being unregistered.
+        | usAnyAdded us = loop (usToUnregister us) (usKeep us)
+        -- Nothing added, so we've already caught them all. Return the
+        -- Map we've already calculated.
+        | otherwise = usToUnregister us
+      where
+        -- Run the unregister checking function on all packages we
+        -- currently think we'll be keeping.
+        us = execState (mapM_ go keep) UnregisterState
+            { usToUnregister = toUnregister
+            , usKeep = []
+            , usAnyAdded = False
+            }
+
+    go dp = do
+        us <- get
+        case go' (usToUnregister us) ident deps of
+            -- Not unregistering, add it to the keep list
+            Nothing -> put us { usKeep = dp : usKeep us }
+            -- Unregistering, add it to the unregister Map and
+            -- indicate that a package was in fact added to the
+            -- unregister Map so we loop again.
+            Just reason -> put us
+                { usToUnregister = Map.insert gid (ident, reason) (usToUnregister us)
+                , usAnyAdded = True
+                }
+      where
+        gid = dpGhcPkgId dp
+        ident = dpPackageIdent dp
+        deps = dpDepends dp
+
+    go' toUnregister ident deps
+      -- If we're planning on running a task on it, then it must be
+      -- unregistered
+      | Just _ <- Map.lookup name tasks
+          = Just $ fromMaybe "" $ Map.lookup name dirtyReason
+      -- Check if we're no longer using the local version
+      | Just (PSUpstream _ Snap _ _ _) <- Map.lookup name sourceMap
+          = Just "Switching to snapshot installed package"
+      -- Check if a dependency is going to be unregistered
+      | (dep, _):_ <- mapMaybe (`Map.lookup` toUnregister) deps
+          = Just $ "Dependency being unregistered: " <> packageIdentifierText dep
+      -- None of the above, keep it!
+      | otherwise = Nothing
       where
         name = packageIdentifierName ident
 
@@ -259,7 +307,7 @@ addFinal lp package isAllInOne = do
                 , taskConfigOpts = TaskConfigOpts missing $ \missing' ->
                     let allDeps = Map.union present missing'
                      in configureOpts
-                            (getEnvConfig ctx)
+                            (view envConfigL ctx)
                             (baseConfigOpts ctx)
                             allDeps
                             True -- local
@@ -440,7 +488,7 @@ installPackageGivenDeps isAllInOne ps package minstalled (missing, present, minL
                 let allDeps = Map.union present missing'
                     destLoc = piiLocation ps <> minLoc
                  in configureOpts
-                        (getEnvConfig ctx)
+                        (view envConfigL ctx)
                         (baseConfigOpts ctx)
                         allDeps
                         (psLocal ps)
@@ -506,7 +554,7 @@ addPackageDeps treatAsDep package = do
                                     , " requires: "
                                     , versionRangeText range
                                     ]
-                        allowNewer <- asks $ configAllowNewer . getConfig
+                        allowNewer <- view $ configL.to configAllowNewer
                         if allowNewer
                             then do
                                 warn_ " (allow-newer enabled)"
@@ -552,7 +600,7 @@ checkDirtiness ps installed package present wanted = do
     ctx <- ask
     moldOpts <- flip runLoggingT (logFunc ctx) $ tryGetFlagCache installed
     let configOpts = configureOpts
-            (getEnvConfig ctx)
+            (view envConfigL ctx)
             (baseConfigOpts ctx)
             present
             (psLocal ps)
@@ -580,7 +628,7 @@ checkDirtiness ps installed package present wanted = do
                     | Just files <- psDirty ps -> Just $ "local file changes: " <>
                                                          addEllipsis (T.pack $ unwords $ Set.toList files)
                     | otherwise -> Nothing
-        config = getConfig ctx
+        config = view configL ctx
     case mreason of
         Nothing -> return False
         Just reason -> do
@@ -678,7 +726,7 @@ packageDepsWithTools p = do
         let toolName = case warning of
                 NoToolFound tool _ -> tool
                 AmbiguousToolsFound tool _ _ -> tool
-        config <- asks getConfig
+        config <- view configL
         menv <- liftIO $ configEnvOverride config minimalEnvSettings { esIncludeLocals = True }
         mfound <- findExecutable menv toolName
         case mfound of

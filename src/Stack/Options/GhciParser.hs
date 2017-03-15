@@ -1,13 +1,14 @@
 module Stack.Options.GhciParser where
 
-import Data.Monoid.Extra
-import Data.Version (showVersion)
-import Options.Applicative
-import Options.Applicative.Args
-import Options.Applicative.Builder.Extra
-import Paths_stack as Meta
-import Stack.Config (packagesParser)
-import Stack.Ghci (GhciOpts (..))
+import           Data.Monoid.Extra
+import           Data.Version                      (showVersion)
+import           Options.Applicative
+import           Options.Applicative.Args
+import           Options.Applicative.Builder.Extra
+import           Paths_stack                       as Meta
+import           Stack.Config                      (packagesParser)
+import           Stack.Ghci                        (GhciOpts (..))
+import           Stack.Options.BuildParser         (flagsParser)
 
 -- | Parser for GHCI options
 ghciOptsParser :: Parser GhciOpts
@@ -23,6 +24,12 @@ ghciOptsParser = GhciOpts
              <*> fmap concat (many (argsOption (long "ghci-options" <>
                                     metavar "OPTION" <>
                                     help "Additional options passed to GHCi")))
+             <*> many
+                     (textOption
+                          (long "ghc-options" <>
+                           metavar "OPTION" <>
+                           help "Additional options passed to both GHC and GHCi"))
+             <*> flagsParser
              <*> optional
                      (strOption (long "with-ghc" <>
                                  metavar "GHC" <>

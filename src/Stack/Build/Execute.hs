@@ -30,11 +30,11 @@ import           Control.Monad.Catch (MonadCatch)
 import           Control.Monad.Extra (anyM, (&&^))
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
-import           Control.Monad.Reader (asks)
 import           Control.Monad.Trans.Control (liftBaseWith)
 import           Control.Monad.Trans.Resource
-import qualified Crypto.Hash.SHA256 as SHA256
+import           Crypto.Hash
 import           Data.Attoparsec.Text hiding (try)
+import qualified Data.ByteArray as Mem (convert)
 import qualified Data.ByteString as S
 import qualified Data.ByteString.Base64.URL as B64URL
 import           Data.Char (isSpace)
@@ -65,6 +65,7 @@ import           Data.Time.Clock (getCurrentTime)
 import           Data.Traversable (forM)
 import           Data.Tuple
 import qualified Distribution.PackageDescription as C
+import qualified Distribution.Simple.Build.Macros as C
 import           Distribution.System            (OS (Windows),
                                                  Platform (Platform))
 import qualified Distribution.Text as C
@@ -139,11 +140,11 @@ printPlan plan = do
         [] -> $logInfo "No packages would be unregistered."
         xs -> do
             $logInfo "Would unregister locally:"
-            forM_ xs $ \(ident, mreason) -> $logInfo $ T.concat
+            forM_ xs $ \(ident, reason) -> $logInfo $ T.concat
                 [ T.pack $ packageIdentifierString ident
-                , case mreason of
-                    Nothing -> ""
-                    Just reason -> T.concat
+                , if T.null reason
+                    then ""
+                    else T.concat
                         [ " ("
                         , reason
                         , ")"
@@ -226,9 +227,9 @@ data ExecuteEnv = ExecuteEnv
     , eeWanted         :: !(Set PackageName)
     , eeLocals         :: ![LocalPackage]
     , eeGlobalDB       :: !(Path Abs Dir)
-    , eeGlobalDumpPkgs :: !(Map GhcPkgId (DumpPackage () ()))
-    , eeSnapshotDumpPkgs :: !(TVar (Map GhcPkgId (DumpPackage () ())))
-    , eeLocalDumpPkgs  :: !(TVar (Map GhcPkgId (DumpPackage () ())))
+    , eeGlobalDumpPkgs :: !(Map GhcPkgId (DumpPackage () () ()))
+    , eeSnapshotDumpPkgs :: !(TVar (Map GhcPkgId (DumpPackage () () ())))
+    , eeLocalDumpPkgs  :: !(TVar (Map GhcPkgId (DumpPackage () () ())))
     , eeLogFiles       :: !(TChan (Path Abs Dir, Path Abs File))
     }
 
@@ -255,7 +256,7 @@ simpleSetupCode = "import Distribution.Simple\nmain = defaultMain"
 
 simpleSetupHash :: String
 simpleSetupHash =
-    T.unpack $ decodeUtf8 $ S.take 8 $ B64URL.encode $ SHA256.hash $
+    T.unpack $ decodeUtf8 $ S.take 8 $ B64URL.encode $ Mem.convert $ hashWith SHA256 $
     encodeUtf8 (T.pack (unwords buildSetupArgs)) <> setupGhciShimCode <> simpleSetupCode
 
 -- | Get a compiled Setup exe
@@ -265,20 +266,22 @@ getSetupExe :: (StackM env m, HasEnvConfig env)
             -> Path Abs Dir -- ^ temporary directory
             -> m (Maybe (Path Abs File))
 getSetupExe setupHs setupShimHs tmpdir = do
-    wc <- getWhichCompiler
-    econfig <- asks getEnvConfig
+    wc <- view $ actualCompilerVersionL.whichCompilerL
     platformDir <- platformGhcRelDir
-    let config = getConfig econfig
-        baseNameS = concat
+    config <- view configL
+    cabalVersionString <- view $ cabalVersionL.to versionString
+    actualCompilerVersionString <- view $ actualCompilerVersionL.to compilerVersionString
+    platform <- view platformL
+    let baseNameS = concat
             [ "Cabal-simple_"
             , simpleSetupHash
             , "_"
-            , versionString $ envConfigCabalVersion econfig
+            , cabalVersionString
             , "_"
-            , compilerVersionString $ envConfigCompilerVersion econfig
+            , actualCompilerVersionString
             ]
         exeNameS = baseNameS ++
-            case configPlatform config of
+            case platform of
                 Platform _ Windows -> ".exe"
                 _ -> ""
         outputNameS =
@@ -307,7 +310,7 @@ getSetupExe setupHs setupShimHs tmpdir = do
             menv <- getMinimalEnvOverride
             let args = buildSetupArgs ++
                     [ "-package"
-                    , "Cabal-" ++ versionString (envConfigCabalVersion econfig)
+                    , "Cabal-" ++ cabalVersionString
                     , toFilePath setupHs
                     , toFilePath setupShimHs
                     , "-o"
@@ -326,9 +329,9 @@ withExecuteEnv :: (StackM env m, HasEnvConfig env)
                -> BuildOptsCLI
                -> BaseConfigOpts
                -> [LocalPackage]
-               -> [DumpPackage () ()] -- ^ global packages
-               -> [DumpPackage () ()] -- ^ snapshot packages
-               -> [DumpPackage () ()] -- ^ local packages
+               -> [DumpPackage () () ()] -- ^ global packages
+               -> [DumpPackage () () ()] -- ^ snapshot packages
+               -> [DumpPackage () () ()] -- ^ local packages
                -> (ExecuteEnv -> m a)
                -> m a
 withExecuteEnv menv bopts boptsCli baseConfigOpts locals globalPackages snapshotPackages localPackages inner = do
@@ -336,7 +339,7 @@ withExecuteEnv menv bopts boptsCli baseConfigOpts locals globalPackages snapshot
         configLock <- newMVar ()
         installLock <- newMVar ()
         idMap <- liftIO $ newTVarIO Map.empty
-        config <- asks (getConfig . getEnvConfig)
+        config <- view configL
 
         -- Create files for simple setup and setup shim, if necessary
         let setupSrcDir =
@@ -353,8 +356,8 @@ withExecuteEnv menv bopts boptsCli baseConfigOpts locals globalPackages snapshot
         unless setupShimHsExists $ liftIO $ S.writeFile (toFilePath setupShimHs) setupGhciShimCode
         setupExe <- getSetupExe setupHs setupShimHs tmpdir
 
-        cabalPkgVer <- asks (envConfigCabalVersion . getEnvConfig)
-        globalDB <- getGlobalDB menv =<< getWhichCompiler
+        cabalPkgVer <- view cabalVersionL
+        globalDB <- getGlobalDB menv =<< view (actualCompilerVersionL.whichCompilerL)
         snapshotPackagesTVar <- liftIO $ newTVarIO (toDumpPackagesByGhcPkgId snapshotPackages)
         localPackagesTVar <- liftIO $ newTVarIO (toDumpPackagesByGhcPkgId localPackages)
         logFilesTChan <- liftIO $ atomically newTChan
@@ -394,7 +397,7 @@ withExecuteEnv menv bopts boptsCli baseConfigOpts locals globalPackages snapshot
             -- No log files generated, nothing to dump
             [] -> return ()
             firstLog:_ -> do
-                toDump <- asks (configDumpLogs . getConfig)
+                toDump <- view $ configL.to configDumpLogs
                 case toDump of
                     DumpAllLogs -> mapM_ (dumpLog "") allLogs
                     DumpWarningLogs -> mapM_ dumpLogIfWarning allLogs
@@ -426,7 +429,8 @@ withExecuteEnv menv bopts boptsCli baseConfigOpts locals globalPackages snapshot
          =$ CL.take 1
       unless (null firstWarning) $ dumpLog " due to warnings" (pkgDir, filepath)
 
-    isWarning t = ": Warning:" `T.isSuffixOf` t
+    isWarning t = ": Warning:" `T.isSuffixOf` t -- prior to GHC 8
+               || ": warning:" `T.isInfixOf` t -- GHC 8 is slightly different
 
     dumpLog msgSuffix (pkgDir, filepath) = do
         $logInfo $ T.pack $ concat ["\n--  Dumping log file", msgSuffix, ": ", toFilePath filepath, "\n"]
@@ -443,27 +447,27 @@ executePlan :: (StackM env m, HasEnvConfig env)
             -> BuildOptsCLI
             -> BaseConfigOpts
             -> [LocalPackage]
-            -> [DumpPackage () ()] -- ^ global packages
-            -> [DumpPackage () ()] -- ^ snapshot packages
-            -> [DumpPackage () ()] -- ^ local packages
+            -> [DumpPackage () () ()] -- ^ global packages
+            -> [DumpPackage () () ()] -- ^ snapshot packages
+            -> [DumpPackage () () ()] -- ^ local packages
             -> InstalledMap
             -> Map PackageName SimpleTarget
             -> Plan
             -> m ()
 executePlan menv boptsCli baseConfigOpts locals globalPackages snapshotPackages localPackages installedMap targets plan = do
     $logDebug "Executing the build plan"
-    bopts <- asks (configBuild . getConfig)
+    bopts <- view buildOptsL
     withExecuteEnv menv bopts boptsCli baseConfigOpts locals globalPackages snapshotPackages localPackages (executePlan' installedMap targets plan)
 
     unless (Map.null $ planInstallExes plan) $ do
         snapBin <- (</> bindirSuffix) `liftM` installationRootDeps
         localBin <- (</> bindirSuffix) `liftM` installationRootLocal
-        destDir <- asks $ configLocalBin . getConfig
+        destDir <- view $ configL.to configLocalBin
         ensureDir destDir
 
         destDir' <- liftIO . D.canonicalizePath . toFilePath $ destDir
 
-        platform <- asks getPlatform
+        platform <- view platformL
         let ext =
                 case platform of
                     Platform _ Windows -> ".exe"
@@ -550,7 +554,7 @@ executePlan menv boptsCli baseConfigOpts locals globalPackages snapshotPackages 
                     , " not found on the PATH environment variable"
                     ]
 
-    config <- asks getConfig
+    config <- view configL
     menv' <- liftIO $ configEnvOverride config EnvSettings
                     { esIncludeLocals = True
                     , esIncludeGhcPackagePath = True
@@ -581,19 +585,19 @@ executePlan' :: (StackM env m, HasEnvConfig env)
              -> m ()
 executePlan' installedMap0 targets plan ee@ExecuteEnv {..} = do
     when (toCoverage $ boptsTestOpts eeBuildOpts) deleteHpcReports
-    wc <- getWhichCompiler
-    cv <- asks $ envConfigCompilerVersion . getEnvConfig
+    cv <- view actualCompilerVersionL
+    let wc = view whichCompilerL cv
     case Map.toList $ planUnregisterLocal plan of
         [] -> return ()
         ids -> do
             localDB <- packageDatabaseLocal
-            forM_ ids $ \(id', (ident, mreason)) -> do
+            forM_ ids $ \(id', (ident, reason)) -> do
                 $logInfo $ T.concat
                     [ T.pack $ packageIdentifierString ident
                     , ": unregistering"
-                    , case mreason of
-                        Nothing -> ""
-                        Just reason -> T.concat
+                    , if T.null reason
+                        then ""
+                        else T.concat
                             [ " ("
                             , reason
                             , ")"
@@ -616,8 +620,8 @@ executePlan' installedMap0 targets plan ee@ExecuteEnv {..} = do
             (fmap (\f -> (Nothing, Just f)))
             (planTasks plan)
             (planFinals plan)
-    threads <- asks $ configJobs . getConfig
-    concurrentTests <- asks $ configConcurrentTests . getConfig
+    threads <- view $ configL.to configJobs
+    concurrentTests <- view $ configL.to configConcurrentTests
     let keepGoing =
             fromMaybe (boptsTests eeBuildOpts || boptsBenchmarks eeBuildOpts) (boptsKeepGoing eeBuildOpts)
         concurrentFinal =
@@ -627,7 +631,7 @@ executePlan' installedMap0 targets plan ee@ExecuteEnv {..} = do
             if boptsTests eeBuildOpts
                 then concurrentTests
                 else True
-    terminal <- asks getTerminal
+    terminal <- view terminalL
     errs <- liftIO $ runActions threads keepGoing concurrentFinal actions $ \doneVar -> do
         let total = length actions
             loop prev
@@ -727,7 +731,7 @@ getConfigCache :: (StackM env m, HasEnvConfig env)
                => ExecuteEnv -> Task -> InstalledMap -> Bool -> Bool
                -> m (Map PackageIdentifier GhcPkgId, ConfigCache)
 getConfigCache ExecuteEnv {..} Task {..} installedMap enableTest enableBench = do
-    useExactConf <- asks (configAllowNewer . getConfig)
+    useExactConf <- view $ configL.to configAllowNewer
     let extra =
             -- We enable tests if the test suite dependencies are already
             -- installed, so that we avoid unnecessary recompilation based on
@@ -900,7 +904,7 @@ withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} md
                 $ \h -> inner (Just (logPath, h))
 
     withCabal package pkgDir mlogFile inner = do
-        config <- asks getConfig
+        config <- view configL
 
         unless (configAllowDifferentUser config) $
             checkOwnership (pkgDir </> configWorkDir config)
@@ -932,29 +936,71 @@ withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} md
                         ["-package=" ++ packageIdentifierString
                                             (PackageIdentifier cabalPackageName
                                                               eeCabalPkgVer)]
-                packageArgs =
-                    case mdeps of
+                packageDBArgs =
+                    ( "-clear-package-db"
+                    : "-global-package-db"
+                    : map (("-package-db=" ++) . toFilePathNoTrailingSep) (bcoExtraDBs eeBaseConfigOpts)
+                    ) ++
+                    ( ("-package-db=" ++ toFilePathNoTrailingSep (bcoSnapDB eeBaseConfigOpts))
+                    : ("-package-db=" ++ toFilePathNoTrailingSep (bcoLocalDB eeBaseConfigOpts))
+                    : ["-hide-all-packages"]
+                    )
+
+                getPackageArgs setupDir =
+                    case (packageSetupDeps package, mdeps) of
+                        -- The package is using the Cabal custom-setup
+                        -- configuration introduced in Cabal 1.24. In
+                        -- this case, the package is providing an
+                        -- explicit list of dependencies, and we
+                        -- should simply use all of them.
+                        (Just customSetupDeps, _) -> do
+                            allDeps <-
+                                case mdeps of
+                                    Just x -> return x
+                                    Nothing -> do
+                                        $logWarn "In getPackageArgs: custom-setup in use, but no dependency map present"
+                                        return Map.empty
+                            matchedDeps <- forM (Map.toList customSetupDeps) $ \(name, range) -> do
+                                let matches (PackageIdentifier name' version) =
+                                        name == name' &&
+                                        version `withinRange` range
+                                case filter (matches . fst) (Map.toList allDeps) of
+                                    x:xs -> do
+                                        unless (null xs)
+                                            ($logWarn (T.pack ("Found multiple installed packages for custom-setup dep: " ++ packageNameString name)))
+                                        return ("-package-id=" ++ ghcPkgIdString (snd x), Just (toCabalPackageIdentifier (fst x)))
+                                    [] -> do
+                                        $logWarn (T.pack ("Could not find custom-setup dep: " ++ packageNameString name))
+                                        return ("-package=" ++ packageNameString name, Nothing)
+                            let depsArgs = map fst matchedDeps
+                            -- Generate setup_macros.h and provide it to ghc
+                            let macroDeps = mapMaybe snd matchedDeps
+                                cppMacrosFile = toFilePath $ setupDir </> $(mkRelFile "setup_macros.h")
+                                cppArgs = ["-optP-include", "-optP" ++ cppMacrosFile]
+                            liftIO $ S.writeFile cppMacrosFile (encodeUtf8 (T.pack (C.generatePackageVersionMacros macroDeps)))
+                            return (packageDBArgs ++ depsArgs ++ cppArgs)
+
                         -- This branch is taken when
                         -- 'explicit-setup-deps' is requested in your
                         -- stack.yaml file.
-                        Just deps | explicitSetupDeps (packageName package) config ->
+                        (Nothing, Just deps) | explicitSetupDeps (packageName package) config -> do
+                            $logWarn $ T.pack $ concat
+                                [ "Package "
+                                , packageNameString $ packageName package
+                                , " uses a custom Cabal build, but does not use a custom-setup stanza"
+                                ]
+                            $logWarn "Using the explicit setup deps approach based on configuration"
+                            $logWarn "Strongly recommend fixing the package's cabal file"
                             -- Stack always builds with the global Cabal for various
                             -- reproducibility issues.
                             let depsMinusCabal
                                  = map ghcPkgIdString
                                  $ Set.toList
                                  $ addGlobalPackages deps (Map.elems eeGlobalDumpPkgs)
-                            in
-                                ( "-clear-package-db"
-                                : "-global-package-db"
-                                : map (("-package-db=" ++) . toFilePathNoTrailingSep) (bcoExtraDBs eeBaseConfigOpts)
-                                ) ++
-                                ( ("-package-db=" ++ toFilePathNoTrailingSep (bcoSnapDB eeBaseConfigOpts))
-                                : ("-package-db=" ++ toFilePathNoTrailingSep (bcoLocalDB eeBaseConfigOpts))
-                                : ["-hide-all-packages"]
-                                ) ++
+                            return (
+                                packageDBArgs ++
                                 cabalPackageArg ++
-                                map ("-package-id=" ++) depsMinusCabal
+                                map ("-package-id=" ++) depsMinusCabal)
                         -- This branch is usually taken for builds, and
                         -- is always taken for `stack sdist`.
                         --
@@ -972,12 +1018,23 @@ withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} md
                         -- Currently, this branch is only taken via `stack
                         -- sdist` or when explicitly requested in the
                         -- stack.yaml file.
-                        _ ->
-                              cabalPackageArg ++
-                            ("-clear-package-db"
-                            : "-global-package-db"
-                            : map (("-package-db=" ++) . toFilePathNoTrailingSep) (bcoExtraDBs eeBaseConfigOpts)
-                           ++ ["-package-db=" ++ toFilePathNoTrailingSep (bcoSnapDB eeBaseConfigOpts)])
+                        (Nothing, _) -> do
+                            $logWarn $ T.pack $ concat
+                                [ "Package "
+                                , packageNameString $ packageName package
+                                , " uses a custom Cabal build, but does not use a custom-setup stanza"
+                                ]
+                            $logWarn "Not using the explicit setup deps approach based on configuration"
+                            $logWarn "Strongly recommend fixing the package's cabal file"
+                            return $ cabalPackageArg ++
+                                    -- NOTE: This is different from
+                                    -- packageDBArgs above in that it does not
+                                    -- include the local database and does not
+                                    -- pass in the -hide-all-packages argument
+                                    ("-clear-package-db"
+                                    : "-global-package-db"
+                                    : map (("-package-db=" ++) . toFilePathNoTrailingSep) (bcoExtraDBs eeBaseConfigOpts)
+                                ++ ["-package-db=" ++ toFilePathNoTrailingSep (bcoSnapDB eeBaseConfigOpts)])
 
                 setupArgs = ("--builddir=" ++ toFilePathNoTrailingSep distRelativeDir') : args
                 runExe exeName fullArgs =
@@ -1014,7 +1071,7 @@ withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} md
                     -- If users want control, we should add a config option for this
                     makeAbsolute = stripTHLoading
 
-            wc <- getWhichCompiler
+            wc <- view $ actualCompilerVersionL.whichCompilerL
             (exeName, fullArgs) <- case (esetupexehs, wc) of
                 (Left setupExe, _) -> return (setupExe, setupArgs)
                 (Right setuphs, compiler) -> do
@@ -1026,6 +1083,7 @@ withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} md
                         case compiler of
                             Ghc -> getGhcPath
                             Ghcjs -> getGhcjsPath
+                    packageArgs <- getPackageArgs setupDir
                     runExe compilerPath $
                         [ "--make"
                         , "-odir", toFilePathNoTrailingSep setupDir
@@ -1120,7 +1178,7 @@ singleBuild runInBase ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} in
             _ -> return Nothing
 
     copyPreCompiled (PrecompiledCache mlib exes) = do
-        wc <- getWhichCompiler
+        wc <- view $ actualCompilerVersionL.whichCompilerL
         announceTask task "using precompiled package"
         forM_ mlib $ \libpath -> do
             menv <- getMinimalEnvOverride
@@ -1202,7 +1260,7 @@ singleBuild runInBase ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} in
         cabal False ["repl", "stack-initial-build-steps"]
 
     realBuild cache package pkgDir cabal announce = do
-        wc <- getWhichCompiler
+        wc <- view $ actualCompilerVersionL.whichCompilerL
 
         markExeNotInstalled (taskLocation task) taskProvides
         case taskType of
@@ -1238,7 +1296,7 @@ singleBuild runInBase ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} in
                         "Missing modules in the cabal file are likely to cause undefined reference errors from the linker, along with other problems."
 
         () <- announce ("build" <> annSuffix)
-        config <- asks getConfig
+        config <- view configL
         extraOpts <- extraBuildOptions wc eeBuildOpts
         cabal (configHideTHLoading config) (("build" :) $ (++ extraOpts) $
             case (taskType, taskAllInOne, isFinalBuild) of
@@ -1271,7 +1329,8 @@ singleBuild runInBase ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} in
             cabal False (concat [["haddock", "--html", "--hoogle", "--html-location=../$pkg-$version/"]
                                 ,sourceFlag, ["--internal" | boptsHaddockInternal eeBuildOpts]])
 
-        unless isFinalBuild $ withMVar eeInstallLock $ \() -> do
+        let shouldCopy = not isFinalBuild && (packageHasLibrary package || not (Set.null (packageExes package)))
+        when shouldCopy $ withMVar eeInstallLock $ \() -> do
             announce "copy/register"
             eres <- try $ cabal False ["copy"]
             case eres of
@@ -1355,7 +1414,7 @@ singleTest runInBase topts testsToRun ac ee task installedMap = do
     -- fullblown 'withSingleContext'.
     (allDepsMap, _cache) <- getConfigCache ee task installedMap True False
     withSingleContext runInBase ac ee task (Just allDepsMap) (Just "test") $ \package _cabalfp pkgDir _cabal announce _console mlogFile -> do
-        config <- asks getConfig
+        config <- view configL
         let needHpc = toCoverage topts
 
         toRun <-
@@ -1641,7 +1700,7 @@ taskComponents task =
 --
 -- * https://github.com/commercialhaskell/stack/issues/949
 addGlobalPackages :: Map PackageIdentifier GhcPkgId -- ^ dependencies of the package
-                  -> [DumpPackage () ()] -- ^ global packages
+                  -> [DumpPackage () () ()] -- ^ global packages
                   -> Set GhcPkgId
 addGlobalPackages deps globals0 =
     res

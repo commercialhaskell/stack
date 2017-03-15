@@ -26,7 +26,7 @@ import           GHC.Generics
 import           Prelude -- Fix AMP warning
 
 -- | A parse fail.
-data GhcPkgIdParseFail
+newtype GhcPkgIdParseFail
   = GhcPkgIdParseFail Text
   deriving Typeable
 instance Show GhcPkgIdParseFail where

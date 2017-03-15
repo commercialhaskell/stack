@@ -80,7 +80,7 @@ spec = beforeAll setup $ do
         bracket_ setVar resetVar action
 
   describe "loadConfig" $ do
-    let loadConfig' = runStackT () logLevel True False ColorAuto False (loadConfig mempty Nothing Nothing)
+    let loadConfig' = runStackT () logLevel True False ColorAuto False (loadConfig mempty Nothing SYLDefault)
     let loadBuildConfigRest = runStackT () logLevel True False ColorAuto False
     -- TODO(danburton): make sure parent dirs also don't have config file
     it "works even if no config file exists" $ example $ do
@@ -121,9 +121,8 @@ spec = beforeAll setup $ do
       createDirectory childDir
       setCurrentDirectory childDir
       LoadConfig{..} <- loadConfig'
-      bc@BuildConfig{..} <- loadBuildConfigRest
-                            (lcLoadBuildConfig Nothing)
-      bcRoot bc `shouldBe` parentDir
+      bc <- loadBuildConfigRest (lcLoadBuildConfig Nothing)
+      view projectRootL bc `shouldBe` parentDir
 
     it "respects the STACK_YAML env variable" $ inTempDir $ do
       withSystemTempDir "config-is-here" $ \dir -> do

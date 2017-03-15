@@ -2,10 +2,11 @@ Do you have a question regarding stack's usage that isn't covered by [the docs](
 In that case please ask your question on [Stack Overflow](http://stackoverflow.com) and use [the haskell-stack tag](http://stackoverflow.com/questions/tagged/haskell-stack).
 This way your question will be more easily discoverable by other people with the same question.
 
+Question related to stack project templates? Please report it at the [stack-templates](https://github.com/commercialhaskell/stack-templates) repository instead.
 
 If you're reporting a bug please follow the steps below:
 
-Make sure that you are using the latest release (currently stack-1.3.2).
+Make sure that you are using the latest release (currently stack-1.4.0).
 See the [upgrade instructions](http://docs.haskellstack.org/en/stable/install_and_upgrade/#upgrade) to upgrade.
 
 Please use the following schema for your bug report:

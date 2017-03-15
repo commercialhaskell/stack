@@ -30,6 +30,9 @@ module Stack.Types.BuildPlan
     , parseSnapName
     , SnapshotHash (..)
     , trimmedSnapshotHash
+    , ModuleName (..)
+    , ModuleInfo (..)
+    , moduleInfoVC
     ) where
 
 import           Control.Applicative
@@ -195,6 +198,7 @@ data PackageConstraints = PackageConstraints
     , pcBuildBenchmarks  :: Bool
     , pcFlagOverrides    :: Map FlagName Bool
     , pcEnableLibProfile :: Bool
+    , pcHide             :: Bool
     }
     deriving (Show, Eq)
 instance ToJSON PackageConstraints where
@@ -205,6 +209,7 @@ instance ToJSON PackageConstraints where
         , "build-benchmarks" .= pcBuildBenchmarks
         , "flags" .= pcFlagOverrides
         , "library-profiling" .= pcEnableLibProfile
+        , "hide" .= pcHide
         ]
       where
         addMaintainer = maybe id (\m -> (("maintainer" .= m):)) pcMaintainer
@@ -218,6 +223,7 @@ instance FromJSON PackageConstraints where
         pcFlagOverrides <- o .: "flags"
         pcMaintainer <- o .:? "maintainer"
         pcEnableLibProfile <- fmap (fromMaybe True) (o .:? "library-profiling")
+        pcHide <- o .:? "hide" .!= False
         return PackageConstraints {..}
 
 data TestState = ExpectSuccess
@@ -428,7 +434,7 @@ instance Store MiniBuildPlan
 instance NFData MiniBuildPlan
 
 miniBuildPlanVC :: VersionConfig MiniBuildPlan
-miniBuildPlanVC = storeVersionConfig "mbp-v1" "C8q73RrYq3plf9hDCapjWpnm_yc="
+miniBuildPlanVC = storeVersionConfig "mbp-v2" "C8q73RrYq3plf9hDCapjWpnm_yc="
 
 -- | Information on a single package for the 'MiniBuildPlan'.
 data MiniPackageInfo = MiniPackageInfo
@@ -455,10 +461,24 @@ instance Store MiniPackageInfo
 instance NFData MiniPackageInfo
 
 newtype GitSHA1 = GitSHA1 ByteString
-    deriving (Generic, Show, Eq, NFData, Store, Data, Typeable)
+    deriving (Generic, Show, Eq, NFData, Store, Data, Typeable, Ord, Hashable)
 
 newtype SnapshotHash = SnapshotHash { unShapshotHash :: ByteString }
     deriving (Generic, Show, Eq)
 
 trimmedSnapshotHash :: SnapshotHash -> ByteString
 trimmedSnapshotHash = BS.take 12 . unShapshotHash
+
+newtype ModuleName = ModuleName { unModuleName :: ByteString }
+  deriving (Show, Eq, Ord, Generic, Store, NFData, Typeable, Data)
+
+data ModuleInfo = ModuleInfo
+    { miCorePackages :: !(Set PackageName)
+    , miModules      :: !(Map ModuleName (Set PackageName))
+    }
+  deriving (Show, Eq, Ord, Generic, Typeable, Data)
+instance Store ModuleInfo
+instance NFData ModuleInfo
+
+moduleInfoVC :: VersionConfig ModuleInfo
+moduleInfoVC = storeVersionConfig "mi-v1" "zyCpzzGXA8fTeBmKEWLa_6kF2_s="

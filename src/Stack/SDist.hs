@@ -22,7 +22,6 @@ import           Control.Monad (unless, void, liftM)
 import           Control.Monad.Catch
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
-import           Control.Monad.Reader (asks)
 import           Control.Monad.Trans.Control (liftBaseWith)
 import qualified Data.ByteString as S
 import qualified Data.ByteString.Char8 as S8
@@ -69,7 +68,7 @@ import qualified System.FilePath as FP
 -- | Special exception to throw when you want to fail because of bad results
 -- of package check.
 
-data CheckException
+newtype CheckException
   = CheckException (NonEmpty Check.PackageCheck)
   deriving (Typeable)
 
@@ -92,7 +91,7 @@ getSDistTarball
   -> Path Abs Dir               -- ^ Path to local package
   -> m (FilePath, L.ByteString) -- ^ Filename and tarball contents
 getSDistTarball mpvpBounds pkgDir = do
-    config <- asks getConfig
+    config <- view configL
     let pvpBounds = fromMaybe (configPvpBounds config) mpvpBounds
         tweakCabal = pvpBounds /= PvpBoundsNone
         pkgFp = toFilePath pkgDir
@@ -137,6 +136,7 @@ getCabalLbs pvpBounds fp = do
     (installedMap, _, _, _) <- getInstalled menv GetInstalledOpts
                                 { getInstalledProfiling = False
                                 , getInstalledHaddock = False
+                                , getInstalledSymbols = False
                                 }
                                 sourceMap
     let gpd' = gtraverseT (addBounds sourceMap installedMap) gpd

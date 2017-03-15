@@ -401,7 +401,7 @@ collect2: error: ld returned 1 exit status
 The issue may be related to the use of hardening flags in some cases,
 specifically those related to producing position independent executables (PIE).
 This is tracked upstream in the [following
-ticket](https://ghc.haskell.org/trac/ghc/ticket/9007). Some distributions add
+ticket](https://ghc.haskell.org/trac/ghc/ticket/12759). Some distributions add
 such hardening flags by default which may be the cause of some instances of the
 problem. Therefore, a possible workaround might be to turn off PIE related
 flags.
@@ -487,3 +487,10 @@ information.
 
 Use the `SYSTEM_CERTIFICATE_PATH` environment variable to point at the directory
 where you keep your SSL certificates.
+
+## How do I get `verbose` output from GHC when I build with cabal?
+
+Unfortunately `stack build` does not have an obvious equivalent to `cabal build -vN` which shows verbose output from GHC when building. The easiest workaround is to add `ghc-options: -vN` to the .cabal file or pass it via `stack build --ghc-options="-v"`.
+
+## Does Stack support the Hpack specification?
+Yes. You can run `stack init` as usual and Stack will create a matching `stack.yaml`.

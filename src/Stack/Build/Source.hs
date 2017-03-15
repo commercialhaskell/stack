@@ -29,12 +29,12 @@ import              Control.Exception (assert, catch)
 import              Control.Monad hiding (sequence)
 import              Control.Monad.IO.Class
 import              Control.Monad.Logger
-import              Control.Monad.Reader (MonadReader, asks)
+import              Control.Monad.Reader (MonadReader)
 import              Control.Monad.Trans.Resource
-import "cryptohash" Crypto.Hash (Digest, SHA256)
+import              Crypto.Hash (Digest, SHA256(..))
 import              Crypto.Hash.Conduit (sinkHash)
+import qualified    Data.ByteArray as Mem (convert)
 import qualified    Data.ByteString as S
-import              Data.Byteable (toBytes)
 import              Data.Conduit (($$), ZipSink (..))
 import qualified    Data.Conduit.Binary as CB
 import qualified    Data.Conduit.List as CL
@@ -88,11 +88,12 @@ loadSourceMap :: (StackM env m, HasEnvConfig env)
                    , SourceMap
                    )
 loadSourceMap needTargets boptsCli = do
-    (_, _, locals, _, _, sourceMap) <- loadSourceMapFull needTargets boptsCli
+    (_, _, locals, _, _, sourceMap) <- loadSourceMapFull True needTargets boptsCli
     return (locals, sourceMap)
 
 loadSourceMapFull :: (StackM env m, HasEnvConfig env)
-                  => NeedTargets
+                  => Bool
+                  -> NeedTargets
                   -> BuildOptsCLI
                   -> m ( Map PackageName SimpleTarget
                        , MiniBuildPlan
@@ -101,8 +102,8 @@ loadSourceMapFull :: (StackM env m, HasEnvConfig env)
                        , Map PackageName Version -- extra-deps from configuration and cli
                        , SourceMap
                        )
-loadSourceMapFull needTargets boptsCli = do
-    bconfig <- asks getBuildConfig
+loadSourceMapFull omitWiredIn needTargets boptsCli = do
+    bconfig <- view buildConfigL
     rawLocals <- getLocalPackageViews
     (mbp0, cliExtraDeps, targets) <- parseTargetsFromBuildOptsWith rawLocals needTargets boptsCli
     -- Extend extra-deps to encompass targets requested on the command line
@@ -173,9 +174,17 @@ loadSourceMapFull needTargets boptsCli = do
             , flip Map.mapWithKey (mbpPackages mbp) $ \n mpi ->
                 let configOpts = getGhcOptions bconfig boptsCli n False False
                  in PSUpstream (mpiVersion mpi) Snap (mpiFlags mpi) (mpiGhcOptions mpi ++ configOpts) (mpiGitSHA1 mpi)
-            ] `Map.difference` Map.fromList (map (, ()) (HashSet.toList wiredInPackages))
+            ]
+        -- This conditional was introduced in order to fix "stack
+        -- list-dependencies --license" (#2871) for wired-in-packages.
+        -- Normally, they are omitted as they shouldn't be considered
+        -- as packages available for installation.
+        sourceMap' =
+            if omitWiredIn
+                then sourceMap `Map.difference` Map.fromList (map (, ()) (HashSet.toList wiredInPackages))
+                else sourceMap
 
-    return (targets, mbp, locals, nonLocalTargets, extraDeps0, sourceMap)
+    return (targets, mbp, locals, nonLocalTargets, extraDeps0, sourceMap')
 
 -- | All flags for a local package
 getLocalFlags
@@ -198,13 +207,16 @@ getGhcOptions bconfig boptsCli name isTarget isLocal = concat
     , if boptsLibProfile bopts || boptsExeProfile bopts
          then ["-auto-all","-caf-all"]
          else []
+    , if not $ boptsLibStrip bopts || boptsExeStrip bopts
+         then ["-g"]
+         else []
     , if includeExtraOptions
          then boptsCLIGhcOptions boptsCli
          else []
     ]
   where
     bopts = configBuild config
-    config = bcConfig bconfig
+    config = view configL bconfig
     includeExtraOptions =
         case configApplyGhcOptions config of
             AGOTargets -> isTarget
@@ -233,14 +245,14 @@ parseTargetsFromBuildOptsWith
     -> m (MiniBuildPlan, M.Map PackageName Version, M.Map PackageName SimpleTarget)
 parseTargetsFromBuildOptsWith rawLocals needTargets boptscli = do
     $logDebug "Parsing the targets"
-    bconfig <- asks getBuildConfig
+    bconfig <- view buildConfigL
     mbp0 <-
         case bcResolver bconfig of
             ResolverCompiler _ -> do
                 -- We ignore the resolver version, as it might be
                 -- GhcMajorVersion, and we want the exact version
                 -- we're using.
-                version <- asks (envConfigCompilerVersion . getEnvConfig)
+                version <- view actualCompilerVersionL
                 return MiniBuildPlan
                     { mbpCompilerVersion = version
                     , mbpPackages = Map.empty
@@ -358,7 +370,7 @@ loadLocalPackage
 loadLocalPackage boptsCli targets (name, (lpv, gpkg)) = do
     let mtarget = Map.lookup name targets
     config  <- getPackageConfig boptsCli name (isJust mtarget) True
-    bopts <- asks (configBuild . getConfig)
+    bopts <- view buildOptsL
     let pkg = resolvePackage config gpkg
 
         (exes, tests, benches) =
@@ -447,7 +459,7 @@ checkFlagsUsed :: (MonadThrow m, MonadReader env m, HasBuildConfig env)
                -> Map PackageName snapshot -- ^ snapshot, for error messages
                -> m ()
 checkFlagsUsed boptsCli lps extraDeps snapshot = do
-    bconfig <- asks getBuildConfig
+    bconfig <- view buildConfigL
 
         -- Check if flags specified in stack.yaml and the command line are
         -- used, see https://github.com/commercialhaskell/stack/issues/617
@@ -499,7 +511,7 @@ extendExtraDeps extraDeps0 cliExtraDeps unknowns = do
     case errs of
         [] -> return $ Map.unions $ extraDeps1 : unknowns'
         _ -> do
-            bconfig <- asks getBuildConfig
+            bconfig <- view buildConfigL
             throwM $ UnknownTargets
                 (Set.fromList errs)
                 Map.empty -- TODO check the cliExtraDeps for presence in index
@@ -620,7 +632,7 @@ calcFci modTime' fp = liftIO $
         return FileCacheInfo
             { fciModTime = modTime'
             , fciSize = size
-            , fciHash = toBytes (digest :: Digest SHA256)
+            , fciHash = Mem.convert (digest :: Digest SHA256)
             }
 
 checkComponentsBuildable :: MonadThrow m => [LocalPackage] -> m ()
@@ -636,15 +648,15 @@ checkComponentsBuildable lps =
 getDefaultPackageConfig :: (MonadIO m, MonadReader env m, HasEnvConfig env)
   => m PackageConfig
 getDefaultPackageConfig = do
-  econfig <- asks getEnvConfig
-  bconfig <- asks getBuildConfig
+  platform <- view platformL
+  compilerVersion <- view actualCompilerVersionL
   return PackageConfig
     { packageConfigEnableTests = False
     , packageConfigEnableBenchmarks = False
     , packageConfigFlags = M.empty
     , packageConfigGhcOptions = []
-    , packageConfigCompilerVersion = envConfigCompilerVersion econfig
-    , packageConfigPlatform = configPlatform $ getConfig bconfig
+    , packageConfigCompilerVersion = compilerVersion
+    , packageConfigPlatform = platform
     }
 
 -- | Get 'PackageConfig' for package given its name.
@@ -655,13 +667,14 @@ getPackageConfig :: (MonadIO m, MonadReader env m, HasEnvConfig env)
   -> Bool
   -> m PackageConfig
 getPackageConfig boptsCli name isTarget isLocal = do
-  econfig <- asks getEnvConfig
-  bconfig <- asks getBuildConfig
+  bconfig <- view buildConfigL
+  platform <- view platformL
+  compilerVersion <- view actualCompilerVersionL
   return PackageConfig
     { packageConfigEnableTests = False
     , packageConfigEnableBenchmarks = False
     , packageConfigFlags = getLocalFlags bconfig boptsCli name
     , packageConfigGhcOptions = getGhcOptions bconfig boptsCli name isTarget isLocal
-    , packageConfigCompilerVersion = envConfigCompilerVersion econfig
-    , packageConfigPlatform = configPlatform $ getConfig bconfig
+    , packageConfigCompilerVersion = compilerVersion
+    , packageConfigPlatform = platform
     }

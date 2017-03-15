@@ -1,5 +1,119 @@
 # Changelog
 
+## 1.4.0
+
+Release notes:
+
+* Docker images:
+  [fpco/stack-full](https://hub.docker.com/r/fpco/stack-full/) and
+  [fpco/stack-run](https://hub.docker.com/r/fpco/stack-run/)
+  are no longer being built for LTS 8.0 and above.
+  [fpco/stack-build](https://hub.docker.com/r/fpco/stack-build/)
+  images continue to be built with a
+  [simplified process](https://github.com/commercialhaskell/stack/tree/master/etc/dockerfiles/stack-build).
+  [#624](https://github.com/commercialhaskell/stack/issues/624)
+
+Major changes:
+
+* A new command, `script`, has been added, intended to make the script
+  interpreter workflow more reliable, easier to use, and more
+  efficient. This command forces the user to provide a `--resolver`
+  value, ignores all config files for more reproducible results, and
+  optimizes the existing package check to make the common case of all
+  packages already being present much faster. This mode does require
+  that all packages be present in a snapshot, however.
+  [#2805](https://github.com/commercialhaskell/stack/issues/2805)
+
+Behavior changes:
+
+* The default package metadata backend has been changed from Git to
+  the 01-index.tar.gz file, from the hackage-security project. This is
+  intended to address some download speed issues from Github for
+  people in certain geographic regions. There is now full support for
+  checking out specific cabal file revisions from downloaded tarballs
+  as well. If you manually specify a package index with only a Git
+  URL, Git will still be used. See
+  [#2780](https://github.com/commercialhaskell/stack/issues/2780)
+* When you provide the `--resolver` argument to the `stack unpack`
+  command, any packages passed in by name only will be looked up in
+  the given snapshot instead of taking the latest version. For
+  example, `stack --resolver lts-7.14 unpack mtl` will get version
+  2.2.1 of `mtl`, regardless of the latest version available in the
+  package indices. This will also force the same cabal file revision
+  to be used as is specified in the snapshot.
+
+    Unpacking via a package identifier (e.g. `stack --resolver lts-7.14
+    unpack mtl-2.2.1`) will ignore any settings in the snapshot and take
+    the most recent revision.
+
+    For backwards compatibility with tools relying on the presence of a
+    `00-index.tar`, Stack will copy the `01-index.tar` file to
+    `00-index.tar`. Note, however, that these files are different; most
+    importantly, 00-index contains only the newest revisions of cabal
+    files, while 01-index contains all versions. You may still need to
+    update your tooling.
+* Passing `--(no-)nix-*` options now no longer implies `--nix`, except for
+  `--nix-pure`, so that the user preference whether or not to use Nix is
+  honored even in the presence of options that change the Nix behavior.
+
+Other enhancements:
+
+* Internal cleanup: configuration types are now based much more on lenses
+* `stack build` and related commands now allow the user to disable debug symbol stripping
+  with new `--no-strip`, `--no-library-stripping`, and `--no-executable-shipping` flags,
+  closing [#877](https://github.com/commercialhaskell/stack/issues/877).
+  Also turned error message for missing targets more readable ([#2384](https://github.com/commercialhaskell/stack/issues/2384))
+* `stack haddock` now shows index.html paths when documentation is already up to
+  date. Resolved [#781](https://github.com/commercialhaskell/stack/issues/781)
+* Respects the `custom-setup` field introduced in Cabal 1.24. This
+  supercedes any `explicit-setup-deps` settings in your `stack.yaml`
+  and trusts the package's `.cabal` file to explicitly state all its
+  dependencies.
+* If system package installation fails, `get-stack.sh` will fail as well. Also
+  shows warning suggesting to run `apt-get update` or similar, depending on the
+  OS.
+  ([#2898](https://github.com/commercialhaskell/stack/issues/2898))
+* When `stack ghci` is run with a config with no packages (e.g. global project),
+  it will now look for source files in the current work dir.
+  ([#2878](https://github.com/commercialhaskell/stack/issues/2878))
+* Bump to hpack 0.17.0 to allow `custom-setup` and `!include "..."` in `package.yaml`.
+* The script interpreter will now output error logging.  In particular,
+  this means it will output info about plan construction errors.
+  ([#2879](https://github.com/commercialhaskell/stack/issues/2879))
+* `stack ghci` now takes `--flag` and `--ghc-options` again (inadverently
+  removed in 1.3.0).
+  ([#2986](https://github.com/commercialhaskell/stack/issues/2986))
+* `stack exec` now takes `--rts-options` which passes the given arguments inside of
+  `+RTS ... args .. -RTS` to the executable. This works around stack itself consuming
+  the RTS flags on Windows. ([#2986](https://github.com/commercialhaskell/stack/issues/2640))
+* Upgraded `http-client-tls` version, which now offers support for the
+  `socks5://` and `socks5h://` values in the `http_proxy` and `https_proxy`
+  environment variables.
+
+Bug fixes:
+
+* Bump to hpack 0.16.0 to avoid character encoding issues when reading and
+  writing on non-UTF8 systems.
+* `stack ghci` will no longer ignore hsSourceDirs that contain `..`. ([#2895](https://github.com/commercialhaskell/stack/issues/2895))
+* `stack list-dependencies --license` now works for wired-in-packages,
+  like base. ([#2871](https://github.com/commercialhaskell/stack/issues/2871))
+* `stack setup` now correctly indicates when it uses system ghc
+  ([#2963](https://github.com/commercialhaskell/stack/issues/2963))
+* Fix to `stack config set`, in 1.3.2 it always applied to
+  the global project.
+  ([#2709](https://github.com/commercialhaskell/stack/issues/2709))
+* Previously, cabal files without exe or lib would fail on the "copy" step.
+  ([#2862](https://github.com/commercialhaskell/stack/issues/2862))
+* `stack upgrade --git` now works properly.  Workaround for affected
+  versions (>= 1.3.0) is to instead run `stack upgrade --git --source-only`.
+  ([#2977](https://github.com/commercialhaskell/stack/issues/2977))
+* Added support for GHC 8's slightly different warning format for
+  dumping warnings from logs.
+* Work around a bug in Cabal/GHC in which package IDs are not unique
+  for different source code, leading to Stack not always rebuilding
+  packages depending on local packages which have
+  changed. ([#2904](https://github.com/commercialhaskell/stack/issues/2904))
+
 ## 1.3.2
 
 Bug fixes:

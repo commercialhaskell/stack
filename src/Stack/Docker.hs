@@ -27,10 +27,10 @@ import           Control.Monad
 import           Control.Monad.Catch (MonadThrow,throwM,MonadCatch)
 import           Control.Monad.IO.Class (MonadIO,liftIO)
 import           Control.Monad.Logger (MonadLogger,logError,logInfo,logWarn)
-import           Control.Monad.Reader (MonadReader,asks,runReaderT)
+import           Control.Monad.Reader (MonadReader,runReaderT)
 import           Control.Monad.Trans.Control (MonadBaseControl)
 import           Control.Monad.Writer (execWriter,runWriter,tell)
-import qualified "cryptohash" Crypto.Hash as Hash
+import qualified Crypto.Hash as Hash (Digest, MD5, hash)
 import           Data.Aeson.Extended (FromJSON(..),(.:),(.:?),(.!=),eitherDecode)
 import           Data.ByteString.Builder (stringUtf8,charUtf8,toLazyByteString)
 import qualified Data.ByteString.Char8 as BS
@@ -106,7 +106,7 @@ reexecWithOptionalContainer mprojectRoot =
     execWithOptionalContainer mprojectRoot getCmdArgs
   where
     getCmdArgs docker envOverride imageInfo isRemoteDocker = do
-        config <- asks getConfig
+        config <- view configL
         deUser <-
             if fromMaybe (not isRemoteDocker) (dockerSetUser docker)
                 then liftIO $ do
@@ -206,9 +206,9 @@ execWithOptionalContainer
     -> Maybe (m ())
     -> m ()
 execWithOptionalContainer mprojectRoot getCmdArgs mbefore inner mafter mrelease =
-  do config <- asks getConfig
+  do config <- view configL
      inContainer <- getInContainer
-     isReExec <- asks getReExec
+     isReExec <- view reExecL
      if | inContainer && not isReExec && (isJust mbefore || isJust mafter) ->
             throwM OnlyOnHostException
         | inContainer ->
@@ -249,7 +249,7 @@ runContainerAndExit getCmdArgs
                     mprojectRoot
                     before
                     after =
-  do config <- asks getConfig
+  do config <- view configL
      let docker = configDocker config
      envOverride <- getEnvOverride (configPlatform config)
      checkDockerVersion envOverride docker
@@ -259,7 +259,7 @@ runContainerAndExit getCmdArgs
        <*> hIsTerminalDevice stdin
        <*> hIsTerminalDevice stderr
        <*> (parseAbsDir =<< getHomeDirectory)
-     isStdoutTerminal <- asks getTerminal
+     isStdoutTerminal <- view terminalL
      let dockerHost = lookup "DOCKER_HOST" env
          dockerCertPath = lookup "DOCKER_CERT_PATH" env
          bamboo = lookup "bamboo_buildKey" env
@@ -285,7 +285,7 @@ runContainerAndExit getCmdArgs
      sandboxDir <- projectDockerSandboxDir projectRoot
      let ImageConfig {..} = iiConfig
          imageEnvVars = map (break (== '=')) icEnv
-         platformVariant = BS.unpack $ Hash.digestToHexByteString $ hashRepoName image
+         platformVariant = show $ hashRepoName image
          stackRoot = configStackRoot config
          sandboxHomeDir = sandboxDir </> homeDirName
          isTerm = not (dockerDetach docker) &&
@@ -417,7 +417,7 @@ runContainerAndExit getCmdArgs
 cleanup :: (StackM env m, HasConfig env)
         => CleanupOpts -> m ()
 cleanup opts =
-  do config <- asks getConfig
+  do config <- view configL
      let docker = configDocker config
      envOverride <- getEnvOverride (configPlatform config)
      checkDockerVersion envOverride docker
@@ -670,7 +670,7 @@ inspects envOverride images =
 -- | Pull latest version of configured Docker image from registry.
 pull :: (StackM env m, HasConfig env) => m ()
 pull =
-  do config <- asks getConfig
+  do config <- view configL
      let docker = configDocker config
      envOverride <- getEnvOverride (configPlatform config)
      checkDockerVersion envOverride docker

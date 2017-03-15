@@ -423,7 +423,7 @@ getEnvOverride platform =
           mkEnvOverride platform
         . Map.fromList . map (T.pack *** T.pack)
 
-data PathException = PathsInvalidInPath [FilePath]
+newtype PathException = PathsInvalidInPath [FilePath]
     deriving Typeable
 
 instance Exception PathException
