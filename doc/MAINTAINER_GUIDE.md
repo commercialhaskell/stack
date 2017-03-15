@@ -2,23 +2,23 @@
 
 ## Next release:
 
+* Adjust static binary build on Alpine. See
+  https://github.com/commercialhaskell/stack/issues/3045
+
 ## Pre-release steps
 
 * Ensure `release` and `stable` branches merged to `master`
 * Check compatibility with latest nightly stackage snapshot:
     * Update `stack-nightly.yaml` with latest nightly and remove extra-deps
     * Run `stack --stack-yaml=stack-nightly.yaml test`
-* Ensure integration tests pass on a representative Windows, macOS, and Linux (Linux
-  is handled by Jenkins automatically):
-  `stack install --pedantic && stack test --pedantic --flag stack:integration-tests`.
-  The actual release script will perform a more thorough test for every platform/variant
-  prior to uploading, so this is just a pre-check
-* Ensure `stack haddock` works (Travis CI now does this)
-* Stack builds with `stack-7.8.yaml` (Travis CI now does this)
-* stack can build the wai repo
-* Running `stack build` a second time on either stack or wai is a no-op
-* Build something that depends on `happy` (suggestion: `hlint`), since `happy`
-  has special logic for moving around the `dist` directory
+* Ensure integration tests pass on a Windows, macOS, and Linux (Linux
+  integration tests are run
+  by
+  [Jenkins](https://jenkins-public.fpcomplete.com/job/stack-integration-tests)):
+  `stack install --pedantic && stack test --pedantic --flag
+  stack:integration-tests`. The actual release script will perform a more
+  thorough test for every platform/variant prior to uploading, so this is just a
+  pre-check
 * In master branch:
     * stack.cabal: bump the version number to release (even third
       component)
@@ -41,13 +41,15 @@
           `UNRELEASED` and replace with new version
         * Look for any links to "latest" documentation, replace with version tag
         * Ensure all documentation pages listed in `mkdocs.yaml`
-    * Update the ISSUE_TEMPLATE.md to point at the new version.
-    * (SKIP) Check that any new Linux distribution versions added to
+    * Update `.github/ISSUE_TEMPLATE.md` to point at the new version.
+    * <del>
+      Check that any new Linux distribution versions added to
       `etc/scripts/release.hs` and `etc/scripts/vagrant-releases.sh`
         * [Ubuntu](https://wiki.ubuntu.com/Releases)
         * [Debian](https://www.debian.org/releases/)
         * [CentOS](https://wiki.centos.org/Download)
         * [Fedora](https://fedoraproject.org/wiki/Releases)
+      </del>
     * Check for new [FreeBSD release](https://www.freebsd.org/releases/).
     * Check that no new entries need to be added to
       [releases.yaml](https://github.com/fpco/stackage-content/blob/master/stack/releases.yaml),
@@ -115,17 +117,6 @@ consistent and clean stack version.
 
 * Upload package to Hackage: `stack upload . --pvp-bounds=both`
 
-* On a machine with Vagrant installed:
-    * Run `etc/scripts/vagrant-distros.sh`
-
-* (SKIP) Submit a PR for the
-  [haskell-stack Homebrew formula](https://github.com/Homebrew/homebrew-core/blob/master/Formula/haskell-stack.rb)
-      * Ensure that the formula use the sdist uploaded to the Github release
-      * Be sure to update the SHA sum
-      * The commit message should just be `haskell-stack <VERSION>`
-
-* (SKIP) [Flag the Arch Linux package as out-of-date](https://www.archlinux.org/packages/community/x86_64/stack/flag/)
-
 * Push signed Git tag, matching Github release tag name, e.g.: `git tag -d vX.Y.Z; git tag -u 0x575159689BEFB442 vX.Y.Z && git push -f origin vX.Y.Z`
 
 * Reset the `release` branch to the released commit, e.g.: `git checkout release && git merge --ff-only vX.Y.Z && git push origin release`
@@ -138,9 +129,21 @@ consistent and clean stack version.
   [readthedocs.org](https://readthedocs.org/dashboard/stack/versions/), and
   ensure that stable documentation has updated
 
-* Upload haddocks to Hackage: `etc/scripts/upload-haddocks.sh`
-
 * Merge any changes made in the RC/release/stable branches to master.
+
+* On a machine with Vagrant installed:
+    * Run `etc/scripts/vagrant-distros.sh`
+
+* <del>Submit a PR for the
+  [haskell-stack Homebrew formula](https://github.com/Homebrew/homebrew-core/blob/master/Formula/haskell-stack.rb)
+      * Ensure that the formula use the sdist uploaded to the Github release
+      * Be sure to update the SHA sum
+      * The commit message should just be `haskell-stack <VERSION>`
+  </del>
+
+* <del>[Flag the Arch Linux package as out-of-date](https://www.archlinux.org/packages/community/x86_64/stack/flag/)</del>
+
+* Upload haddocks to Hackage: `etc/scripts/upload-haddocks.sh` (if they weren't auto-built)
 
 * Announce to haskell-cafe@haskell.org, haskell-stack@googlegroups.com,
   commercialhaskell@googlegroups.com mailing lists
