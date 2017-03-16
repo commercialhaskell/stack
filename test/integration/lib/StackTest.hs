@@ -183,4 +183,4 @@ isARM = arch == "arm"
 -- version is released, pass this argument to @stack@ when running in
 -- a global context.  The LTS major version here should match that of
 -- the main @stack.yaml@.
-defaultResolverArg = "--resolver=lts-6.0"
+defaultResolverArg = "--resolver=lts-8.0"

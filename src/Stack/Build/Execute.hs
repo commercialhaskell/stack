@@ -46,6 +46,7 @@ import           Data.Either (isRight)
 import           Data.FileEmbed (embedFile, makeRelativeToProject)
 import           Data.Foldable (forM_, any)
 import           Data.Function
+import           Data.IORef
 import           Data.IORef.RunOnce (runOnce)
 import           Data.List hiding (any)
 import           Data.Map.Strict (Map)
@@ -207,7 +208,7 @@ displayTask task = T.pack $ concat
   where
     missing = tcoMissing $ taskConfigOpts task
 
-data ExecuteEnv = ExecuteEnv
+data ExecuteEnv m = ExecuteEnv
     { eeEnvOverride    :: !EnvOverride
     , eeConfigureLock  :: !(MVar ())
     , eeInstallLock    :: !(MVar ())
@@ -231,6 +232,11 @@ data ExecuteEnv = ExecuteEnv
     , eeSnapshotDumpPkgs :: !(TVar (Map GhcPkgId (DumpPackage () () ())))
     , eeLocalDumpPkgs  :: !(TVar (Map GhcPkgId (DumpPackage () () ())))
     , eeLogFiles       :: !(TChan (Path Abs Dir, Path Abs File))
+    , eeGetGhcPath     :: !(m (Path Abs File))
+    , eeGetGhcjsPath   :: !(m (Path Abs File))
+    , eeCustomBuilt    :: !(IORef (Set PackageName))
+    -- ^ Stores which packages with custom-setup have already had their
+    -- Setup.hs built.
     }
 
 buildSetupArgs :: [String]
@@ -332,7 +338,7 @@ withExecuteEnv :: (StackM env m, HasEnvConfig env)
                -> [DumpPackage () () ()] -- ^ global packages
                -> [DumpPackage () () ()] -- ^ snapshot packages
                -> [DumpPackage () () ()] -- ^ local packages
-               -> (ExecuteEnv -> m a)
+               -> (ExecuteEnv m -> m a)
                -> m a
 withExecuteEnv menv bopts boptsCli baseConfigOpts locals globalPackages snapshotPackages localPackages inner = do
     withSystemTempDir stackProgName $ \tmpdir -> do
@@ -340,6 +346,10 @@ withExecuteEnv menv bopts boptsCli baseConfigOpts locals globalPackages snapshot
         installLock <- newMVar ()
         idMap <- liftIO $ newTVarIO Map.empty
         config <- view configL
+
+        getGhcPath <- runOnce $ getCompilerPath Ghc
+        getGhcjsPath <- runOnce $ getCompilerPath Ghcjs
+        customBuiltRef <- liftIO $ newIORef Set.empty
 
         -- Create files for simple setup and setup shim, if necessary
         let setupSrcDir =
@@ -387,6 +397,9 @@ withExecuteEnv menv bopts boptsCli baseConfigOpts locals globalPackages snapshot
             , eeSnapshotDumpPkgs = snapshotPackagesTVar
             , eeLocalDumpPkgs = localPackagesTVar
             , eeLogFiles = logFilesTChan
+            , eeGetGhcPath = getGhcPath
+            , eeGetGhcjsPath = getGhcjsPath
+            , eeCustomBuilt = customBuiltRef
             } `finally` dumpLogs logFilesTChan totalWanted
   where
     toDumpPackagesByGhcPkgId = Map.fromList . map (\dp -> (dpGhcPkgId dp, dp))
@@ -581,7 +594,7 @@ executePlan' :: (StackM env m, HasEnvConfig env)
              => InstalledMap
              -> Map PackageName SimpleTarget
              -> Plan
-             -> ExecuteEnv
+             -> ExecuteEnv m
              -> m ()
 executePlan' installedMap0 targets plan ee@ExecuteEnv {..} = do
     when (toCoverage $ boptsTestOpts eeBuildOpts) deleteHpcReports
@@ -676,7 +689,7 @@ executePlan' installedMap0 targets plan ee@ExecuteEnv {..} = do
 toActions :: (StackM env m, HasEnvConfig env)
           => InstalledMap
           -> (m () -> IO ())
-          -> ExecuteEnv
+          -> ExecuteEnv m
           -> (Maybe Task, Maybe Task) -- build and final
           -> [Action]
 toActions installedMap runInBase ee (mbuild, mfinal) =
@@ -728,7 +741,7 @@ toActions installedMap runInBase ee (mbuild, mfinal) =
 
 -- | Generate the ConfigCache
 getConfigCache :: (StackM env m, HasEnvConfig env)
-               => ExecuteEnv -> Task -> InstalledMap -> Bool -> Bool
+               => ExecuteEnv m -> Task -> InstalledMap -> Bool -> Bool
                -> m (Map PackageIdentifier GhcPkgId, ConfigCache)
 getConfigCache ExecuteEnv {..} Task {..} installedMap enableTest enableBench = do
     useExactConf <- view $ configL.to configAllowNewer
@@ -775,7 +788,7 @@ getConfigCache ExecuteEnv {..} Task {..} installedMap enableTest enableBench = d
 ensureConfig :: (StackM env m, HasEnvConfig env)
              => ConfigCache -- ^ newConfigCache
              -> Path Abs Dir -- ^ package directory
-             -> ExecuteEnv
+             -> ExecuteEnv m
              -> m () -- ^ announce
              -> (Bool -> [String] -> m ()) -- ^ cabal
              -> Path Abs File -- ^ .cabal file
@@ -836,7 +849,7 @@ announceTask task x = $logInfo $ T.concat
 withSingleContext :: (StackM env m, HasEnvConfig env)
                   => (m () -> IO ())
                   -> ActionContext
-                  -> ExecuteEnv
+                  -> ExecuteEnv m
                   -> Task
                   -> Maybe (Map PackageIdentifier GhcPkgId)
                   -- ^ All dependencies' package ids to provide to Setup.hs. If
@@ -916,8 +929,6 @@ withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} md
                 , esLocaleUtf8 = True
                 }
         menv <- liftIO $ configEnvOverride config envSettings
-        getGhcPath <- runOnce $ getCompilerPath Ghc
-        getGhcjsPath <- runOnce $ getCompilerPath Ghcjs
         distRelativeDir' <- distRelativeDir
         esetupexehs <-
             -- Avoid broken Setup.hs files causing problems for simple build
@@ -984,13 +995,16 @@ withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} md
                         -- 'explicit-setup-deps' is requested in your
                         -- stack.yaml file.
                         (Nothing, Just deps) | explicitSetupDeps (packageName package) config -> do
-                            $logWarn $ T.pack $ concat
-                                [ "Package "
-                                , packageNameString $ packageName package
-                                , " uses a custom Cabal build, but does not use a custom-setup stanza"
-                                ]
-                            $logWarn "Using the explicit setup deps approach based on configuration"
-                            $logWarn "Strongly recommend fixing the package's cabal file"
+                            case taskType of
+                                TTLocal{} -> do
+                                    $logWarn $ T.pack $ concat
+                                        [ "Package "
+                                        , packageNameString $ packageName package
+                                        , " uses a custom Cabal build, but does not use a custom-setup stanza"
+                                        ]
+                                    $logWarn "Using the explicit setup deps approach based on configuration"
+                                    $logWarn "Strongly recommend fixing the package's cabal file"
+                                _ -> return ()
                             -- Stack always builds with the global Cabal for various
                             -- reproducibility issues.
                             let depsMinusCabal
@@ -1019,13 +1033,16 @@ withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} md
                         -- sdist` or when explicitly requested in the
                         -- stack.yaml file.
                         (Nothing, _) -> do
-                            $logWarn $ T.pack $ concat
-                                [ "Package "
-                                , packageNameString $ packageName package
-                                , " uses a custom Cabal build, but does not use a custom-setup stanza"
-                                ]
-                            $logWarn "Not using the explicit setup deps approach based on configuration"
-                            $logWarn "Strongly recommend fixing the package's cabal file"
+                            case taskType of
+                                TTLocal{} -> do
+                                    $logWarn $ T.pack $ concat
+                                        [ "Package "
+                                        , packageNameString $ packageName package
+                                        , " uses a custom Cabal build, but does not use a custom-setup stanza"
+                                        ]
+                                    $logWarn "Not using the explicit setup deps approach based on configuration"
+                                    $logWarn "Strongly recommend fixing the package's cabal file"
+                                _ -> return ()
                             return $ cabalPackageArg ++
                                     -- NOTE: This is different from
                                     -- packageDBArgs above in that it does not
@@ -1072,41 +1089,47 @@ withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} md
                     makeAbsolute = stripTHLoading
 
             wc <- view $ actualCompilerVersionL.whichCompilerL
-            (exeName, fullArgs) <- case (esetupexehs, wc) of
-                (Left setupExe, _) -> return (setupExe, setupArgs)
+            exeName <- case (esetupexehs, wc) of
+                (Left setupExe, _) -> return setupExe
                 (Right setuphs, compiler) -> do
                     distDir <- distDirFromDir pkgDir
                     let setupDir = distDir </> $(mkRelDir "setup")
                         outputFile = setupDir </> $(mkRelFile "setup")
-                    ensureDir setupDir
-                    compilerPath <-
-                        case compiler of
-                            Ghc -> getGhcPath
-                            Ghcjs -> getGhcjsPath
-                    packageArgs <- getPackageArgs setupDir
-                    runExe compilerPath $
-                        [ "--make"
-                        , "-odir", toFilePathNoTrailingSep setupDir
-                        , "-hidir", toFilePathNoTrailingSep setupDir
-                        , "-i", "-i."
-                        ] ++ packageArgs ++
-                        [ toFilePath setuphs
-                        , toFilePath eeSetupShimHs
-                        , "-main-is"
-                        , "StackSetupShim.mainOverride"
-                        , "-o", toFilePath outputFile
-                        , "-threaded"
-                        ] ++
-                        (case compiler of
-                            Ghc -> []
-                            Ghcjs -> ["-build-runner"])
-                    return (outputFile, setupArgs)
-            runExe exeName $ (if boptsCabalVerbose eeBuildOpts then ("--verbose":) else id) fullArgs
+                    customBuilt <- liftIO $ readIORef eeCustomBuilt
+                    if Set.member (packageName package) customBuilt
+                        then return outputFile
+                        else do
+                            ensureDir setupDir
+                            compilerPath <-
+                                case compiler of
+                                    Ghc -> eeGetGhcPath
+                                    Ghcjs -> eeGetGhcjsPath
+                            packageArgs <- getPackageArgs setupDir
+                            runExe compilerPath $
+                                [ "--make"
+                                , "-odir", toFilePathNoTrailingSep setupDir
+                                , "-hidir", toFilePathNoTrailingSep setupDir
+                                , "-i", "-i."
+                                ] ++ packageArgs ++
+                                [ toFilePath setuphs
+                                , toFilePath eeSetupShimHs
+                                , "-main-is"
+                                , "StackSetupShim.mainOverride"
+                                , "-o", toFilePath outputFile
+                                , "-threaded"
+                                ] ++
+                                (case compiler of
+                                    Ghc -> []
+                                    Ghcjs -> ["-build-runner"])
+                            liftIO $ atomicModifyIORef' eeCustomBuilt $
+                                \oldCustomBuilt -> (Set.insert (packageName package) oldCustomBuilt, ())
+                            return outputFile
+            runExe exeName $ (if boptsCabalVerbose eeBuildOpts then ("--verbose":) else id) setupArgs
 
 singleBuild :: (StackM env m, HasEnvConfig env)
             => (m () -> IO ())
             -> ActionContext
-            -> ExecuteEnv
+            -> ExecuteEnv m
             -> Task
             -> InstalledMap
             -> Bool             -- ^ Is this a final build?
@@ -1365,6 +1388,15 @@ singleBuild runInBase ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} in
                 mpkgid (packageExes package)
             Local -> return ()
 
+        case taskType of
+            -- For upstream packages, pkgDir is in the tmp directory. We
+            -- eagerly delete it if no other tasks require it, to reduce
+            -- space usage in tmp (#3018).
+            TTUpstream{} -> do
+                let remaining = filter (\(ActionId x _) -> x == taskProvides) (Set.toList acRemaining)
+                when (null remaining) $ removeDirRecur pkgDir
+            _ -> return ()
+
         return mpkgid
 
     loadInstalledPkg menv wc pkgDbs tvar name = do
@@ -1405,7 +1437,7 @@ singleTest :: (StackM env m, HasEnvConfig env)
            -> TestOpts
            -> [Text]
            -> ActionContext
-           -> ExecuteEnv
+           -> ExecuteEnv m
            -> Task
            -> InstalledMap
            -> m ()
@@ -1548,7 +1580,7 @@ singleBench :: (StackM env m, HasEnvConfig env)
             -> BenchmarkOpts
             -> [Text]
             -> ActionContext
-            -> ExecuteEnv
+            -> ExecuteEnv m
             -> Task
             -> InstalledMap
             -> m ()

@@ -58,40 +58,44 @@ spec = do
     describe "Script rendering" $ do
       describe "should render GHCi scripts" $ do
         it "with one library package" $ do
-          let res = scriptToLazyByteString $ renderScriptGhci packages_singlePackage Nothing
+          let res = scriptToLazyByteString $ renderScriptGhci packages_singlePackage Nothing []
           res `shouldBeLE` ghciScript_projectWithLib
 
         it "with one main package" $ do
           let res = scriptToLazyByteString $ renderScriptGhci []
                                                               (Just absFile)
+                                                              []
           res `shouldBeLE` ghciScript_projectWithMain
 
         it "with one library and main package" $ do
           let res = scriptToLazyByteString $ renderScriptGhci packages_singlePackage
                                                               (Just absFile)
+                                                              []
           res `shouldBeLE` ghciScript_projectWithLibAndMain
 
         it "with multiple library packages" $ do
-          let res = scriptToLazyByteString $ renderScriptGhci packages_multiplePackages Nothing
+          let res = scriptToLazyByteString $ renderScriptGhci packages_multiplePackages Nothing []
           res `shouldBeLE` ghciScript_multipleProjectsWithLib
 
       describe "should render intero scripts" $ do
         it "with one library package" $ do
-          let res = scriptToLazyByteString $ renderScriptIntero packages_singlePackage Nothing
+          let res = scriptToLazyByteString $ renderScriptIntero packages_singlePackage Nothing []
           res `shouldBeLE` interoScript_projectWithLib
 
         it "with one main package" $ do
           let res = scriptToLazyByteString $ renderScriptIntero packages_singlePackage
-                                                              (Just absFile)
+                                                                (Just absFile)
+                                                                []
           res `shouldBeLE` interoScript_projectWithMain
 
         it "with one library and main package" $ do
           let res = scriptToLazyByteString $ renderScriptIntero packages_singlePackage
-                                                              (Just absFile)
+                                                                (Just absFile)
+                                                                []
           res `shouldBeLE` interoScript_projectWithLibAndMain
 
         it "with multiple library packages" $ do
-          let res = scriptToLazyByteString $ renderScriptIntero packages_multiplePackages Nothing
+          let res = scriptToLazyByteString $ renderScriptIntero packages_multiplePackages Nothing []
           res `shouldBeLE` interoScript_multipleProjectsWithLib
 
 -- Exptected Intero scripts

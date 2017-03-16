@@ -1,5 +1,37 @@
 # Changelog
 
+## Unreleased changes
+
+Release notes:
+
+Major changes:
+
+Behavior changes:
+
+Other enhancements:
+
+* `stack setup` allow to control options passed to ghcjs-boot with
+  `--ghcjs-boot-options` (one word at a time) and `--[no-]ghcjs-boot-clean`
+* Updates to store-0.4.1, which has improved performance and better error
+  reporting for version tags.  A side-effect of this is that all of
+  stack's binary caches will be invalidated.
+* `stack solver` will now warn about unexpected cabal-install versions.
+  See [#3044](https://github.com/commercialhaskell/stack/issues/3044)
+* Upstream packages unpacked to a temp dir are now deleted as soon as
+  possible to avoid running out of space in `/tmp`.
+  See [#3018](https://github.com/commercialhaskell/stack/issues/3018)
+* Add short synonyms for `test-arguments` and `benchmark-arguments` options.
+* Adds `STACK_WORK` environment variable, to specify work dir.
+  See [#3063](https://github.com/commercialhaskell/stack/issues/3063)
+
+Bug fixes:
+
+* Fixes case where `stack build --profile` might not cause executables /
+  tests / benchmarks to be rebuilt.
+  See [#2984](https://github.com/commercialhaskell/stack/issues/2984)
+* `stack ghci file.hs` now loads the file even if it isn't part of
+  your project.
+
 ## 1.4.0
 
 Release notes:

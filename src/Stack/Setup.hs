@@ -17,6 +17,7 @@ module Stack.Setup
   , ensureCompiler
   , ensureDockerStackExe
   , getSystemCompiler
+  , getCabalInstallVersion
   , SetupOpts (..)
   , defaultSetupInfoYaml
   , removeHaskellEnvVars
@@ -146,6 +147,8 @@ data SetupOpts = SetupOpts
     -- ^ Location of the main stack-setup.yaml file
     , soptsGHCBindistURL :: !(Maybe String)
     -- ^ Alternate GHC binary distribution (requires custom GHCVariant)
+    , soptsGHCJSBootOpts :: [String]
+    -- ^ Additional ghcjs-boot options, the default is "--clean"
     }
     deriving Show
 data SetupException = UnsupportedSetupCombo OS Arch
@@ -235,6 +238,7 @@ setupEnv mResolveMissingGHC = do
             , soptsResolveMissingGHC = mResolveMissingGHC
             , soptsSetupInfoYaml = defaultSetupInfoYaml
             , soptsGHCBindistURL = Nothing
+            , soptsGHCJSBootOpts = ["--clean"]
             }
 
     (mghcBin, compilerBuild, _) <- ensureCompiler sopts
@@ -496,7 +500,7 @@ ensureCompiler sopts = do
         upgradeCabal menv wc
 
     case mtools of
-        Just (Just (ToolGhcjs cv), _) -> ensureGhcjsBooted menv cv (soptsInstallIfMissing sopts)
+        Just (Just (ToolGhcjs cv), _) -> ensureGhcjsBooted menv cv (soptsInstallIfMissing sopts) (soptsGHCJSBootOpts sopts)
         _ -> return ()
 
     when (soptsSanityCheck sopts) $ sanityCheck menv wc
@@ -1086,8 +1090,8 @@ installGHCJS si archiveFile archiveType _tempDir destDir = do
     $logStickyDone "Installed GHCJS."
 
 ensureGhcjsBooted :: (StackM env m, HasConfig env)
-                  => EnvOverride -> CompilerVersion -> Bool -> m ()
-ensureGhcjsBooted menv cv shouldBoot  = do
+                  => EnvOverride -> CompilerVersion -> Bool -> [String] -> m ()
+ensureGhcjsBooted menv cv shouldBoot bootOpts = do
     eres <- try $ sinkProcessStdout Nothing menv "ghcjs" [] (return ())
     case eres of
         Right () -> return ()
@@ -1117,12 +1121,12 @@ ensureGhcjsBooted menv cv shouldBoot  = do
                 actualStackYamlExists <- doesFileExist actualStackYaml
                 unless actualStackYamlExists $
                     fail "Couldn't find GHCJS stack.yaml in old or new location."
-                bootGhcjs ghcjsVersion actualStackYaml destDir
+                bootGhcjs ghcjsVersion actualStackYaml destDir bootOpts
         Left err -> throwM err
 
 bootGhcjs :: StackM env m
-          => Version -> Path Abs File -> Path Abs Dir -> m ()
-bootGhcjs ghcjsVersion stackYaml destDir = do
+          => Version -> Path Abs File -> Path Abs Dir -> [String] -> m ()
+bootGhcjs ghcjsVersion stackYaml destDir bootOpts = do
     envConfig <- loadGhcjsEnvConfig stackYaml (destDir </> $(mkRelDir "bin"))
     menv <- liftIO $ configEnvOverride (view configL envConfig) defaultEnvSettings
     -- Install cabal-install if missing, or if the installed one is old.
@@ -1175,7 +1179,7 @@ bootGhcjs ghcjsVersion stackYaml destDir = do
                     "This version is specified by the stack.yaml file included in the ghcjs tarball.\n"
             _ -> return ()
     $logSticky "Booting GHCJS (this will take a long time) ..."
-    logProcessStderrStdout Nothing "ghcjs-boot" menv' ["--clean"]
+    logProcessStderrStdout Nothing "ghcjs-boot" menv' bootOpts
     $logStickyDone "GHCJS booted."
 
 loadGhcjsEnvConfig :: StackM env m

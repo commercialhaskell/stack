@@ -1771,6 +1771,22 @@ The `runghc` command is still very useful, especially when you're working on a
 project and want to access the package databases and configurations used by
 that project. See the next section for more information on configuration files.
 
+### Loading script in ghci
+
+There would be instances when you want to load your script in ghci
+REPL to play around with your program. In those cases, you can use
+`exec ghci` option in the script to achieve it. Here is an example:
+
+```
+#!/usr/bin/env stack
+{- stack
+     --resolver lts-8.2
+     --install-ghc
+     exec ghci
+     --package text
+-}
+```
+
 ## Finding project configs, and the implicit global
 
 Whenever you run something with stack, it needs a `stack.yaml` project file. The
