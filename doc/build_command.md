@@ -86,6 +86,7 @@ of different syntaxes supported for this list:
 
     * `packagename:comptype:compname` is the most explicit. The available
       comptypes are `exe`, `test`, and `bench`.
+        * Side note: When any `exe` component is specified, all of the package's executable components will be built.  This is due to limitations in all currently released versions of Cabal.  See [issue#1046](https://github.com/commercialhaskell/stack/issues/1406)
     * `packagename:compname` allows you to leave off the component type, as
       that will (almost?) always be redundant with the component name. For
       example, `stack build mypackage:mytestsuite`.
