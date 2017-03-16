@@ -51,7 +51,8 @@ configOptsParser hide0 =
     <*> optionalFirst (option (eitherReader (mapLeft showWorkDirError . parseRelDir))
             ( long "work-dir"
             <> metavar "WORK-DIR"
-            <> help "Override work directory (default: .stack-work)"
+            <> help ("Relative path of work directory " ++
+                     "(Overrides any STACK_WORK environment variable, default is '.stack-work')")
             <> hide
             ))
     <*> buildOptsMonoidParser hide0

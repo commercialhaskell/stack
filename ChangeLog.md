@@ -21,6 +21,8 @@ Other enhancements:
   possible to avoid running out of space in `/tmp`.
   See [#3018](https://github.com/commercialhaskell/stack/issues/3018)
 * Add short synonyms for `test-arguments` and `benchmark-arguments` options.
+* Adds `STACK_WORK` environment variable, to specify work dir.
+  See [#3063](https://github.com/commercialhaskell/stack/issues/3063)
 
 Bug fixes:
 

@@ -253,7 +253,11 @@ configFromConfigMonoid
 configFromConfigMonoid
     configStackRoot configUserConfigPath configAllowLocals mresolver
     mproject ConfigMonoid{..} = do
-     let configWorkDir = fromFirst $(mkRelDir ".stack-work") configMonoidWorkDir
+     -- If --stack-work is passed, prefer it. Otherwise, if STACK_WORK
+     -- is set, use that. If neither, use the default ".stack-work"
+     mstackWorkEnv <- liftIO $ lookupEnv stackWorkEnvVar
+     configWorkDir0 <- maybe (return $(mkRelDir ".stack-work")) parseRelDir mstackWorkEnv
+     let configWorkDir = fromFirst configWorkDir0 configMonoidWorkDir
      -- This code is to handle the deprecation of latest-snapshot-url
      configUrls <- case (getFirst configMonoidLatestSnapshotUrl, getFirst (urlsMonoidLatestSnapshot configMonoidUrls)) of
          (Just url, Nothing) -> do
