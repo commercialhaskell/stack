@@ -22,6 +22,7 @@ testOptsParser hide0 =
                 (optional
                     (argsOption
                         (long "test-arguments" <>
+                         long "ta" <>
                          metavar "TEST_ARGS" <>
                          help "Arguments passed in to the test suite program" <>
                          hide)))
