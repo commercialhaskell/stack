@@ -1632,7 +1632,7 @@ mungeBuildOutput excludeTHLoading makeAbsolute pkgDir = void $
             if isValidSuffix y
                 then liftM (fmap ((T.takeWhile isSpace x <>) . T.pack . toFilePath)) $
                          forgivingAbsence (resolveFile pkgDir (T.unpack $ T.dropWhile isSpace x)) `catch`
-                             \(ex :: PathParseException) -> return Nothing
+                             \(_ :: PathParseException) -> return Nothing
                 else return Nothing
         case mabs of
             Nothing -> return bs
