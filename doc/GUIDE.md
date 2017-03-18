@@ -1728,7 +1728,7 @@ a multi line block comment with ghc options:
 
 ### Writing independent and reliable scripts
 
-With the release of Stack 1.2.1, there is a new command, `script`, which will
+With the release of Stack 1.4.0, there is a new command, `script`, which will
 automatically:
 
 * Install GHC and libraries if missing
