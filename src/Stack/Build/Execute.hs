@@ -7,6 +7,7 @@
 {-# LANGUAGE TemplateHaskell       #-}
 {-# LANGUAGE LambdaCase            #-}
 {-# LANGUAGE TypeFamilies          #-}
+{-# LANGUAGE ScopedTypeVariables   #-}
 -- | Perform a build
 module Stack.Build.Execute
     ( printPlan
@@ -1604,7 +1605,7 @@ singleBench runInBase beopts benchesToRun ac ee task installedMap = do
           cabal False ("bench" : args)
 
 -- | Strip Template Haskell "Loading package" lines and making paths absolute.
-mungeBuildOutput :: (MonadIO m, MonadCatch m)
+mungeBuildOutput :: (MonadIO m, MonadCatch m, MonadBaseControl IO m)
                  => Bool -- ^ exclude TH loading?
                  -> Bool -- ^ convert paths to absolute?
                  -> Path Abs Dir -- ^ package's root directory
@@ -1630,7 +1631,8 @@ mungeBuildOutput excludeTHLoading makeAbsolute pkgDir = void $
         mabs <-
             if isValidSuffix y
                 then liftM (fmap ((T.takeWhile isSpace x <>) . T.pack . toFilePath)) $
-                        forgivingAbsence (resolveFile pkgDir (T.unpack $ T.dropWhile isSpace x))
+                         forgivingAbsence (resolveFile pkgDir (T.unpack $ T.dropWhile isSpace x)) `catch`
+                             \(ex :: PathParseException) -> return Nothing
                 else return Nothing
         case mabs of
             Nothing -> return bs
