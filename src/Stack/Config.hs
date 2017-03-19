@@ -72,7 +72,7 @@ import           Data.Monoid.Extra
 import qualified Data.Text as T
 import           Data.Text.Encoding (encodeUtf8, decodeUtf8)
 import qualified Data.Yaml as Yaml
-import           Distribution.System (OS (..), Platform (..), buildPlatform)
+import           Distribution.System (OS (..), Platform (..), buildPlatform, Arch(OtherArch))
 import qualified Distribution.Text
 import           Distribution.Version (simplifyVersionRange)
 import           GHC.Conc (getNumProcessors)
@@ -315,6 +315,10 @@ configFromConfigMonoid
          configImage = Image.imgOptsFromMonoid configMonoidImageOpts
 
          configCompilerCheck = fromFirst MatchMinor configMonoidCompilerCheck
+
+     case arch of
+         OtherArch unk -> $logWarn $ "Warning: Unknown value for architecture setting: " <> T.pack (show unk)
+         _ -> return ()
 
      configPlatformVariant <- liftIO $
          maybe PlatformVariantNone PlatformVariant <$> lookupEnv platformVariantEnvVar
