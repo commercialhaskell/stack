@@ -132,11 +132,19 @@ createDependencyGraph dotOpts = do
             -- https://github.com/commercialhaskell/stack/issues/2967
             | name `elem` [$(mkPackageName "rts"), $(mkPackageName "ghc")] =
                 return (Set.empty, DotPayload (Just version) (Just BSD3))
-            | otherwise = fmap (packageAllDeps &&& makePayload)
+            | otherwise = fmap (getAllDeps &&& makePayload)
                                (loader name version flags ghcOptions)
     liftIO $ resolveDependencies (dotDependencyDepth dotOpts) graph depLoader)
   where fst4 :: (a,b,c,d) -> a
         fst4 (x,_,_,_) = x
+
+        -- Leave out bogus dep of base - see
+        -- https://github.com/commercialhaskell/stack/issues/2969
+        getAllDeps pkg
+            | packageName pkg == $(mkPackageName "base")
+                = Set.delete $(mkPackageName "invalid-cabal-flag-settings") (packageAllDeps pkg)
+            | otherwise
+                = packageAllDeps pkg
 
         makePayload pkg = DotPayload (Just $ packageVersion pkg) (Just $ packageLicense pkg)
 
