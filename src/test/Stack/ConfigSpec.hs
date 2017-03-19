@@ -153,5 +153,5 @@ spec = beforeAll setup $ do
         let parsed :: Either String (Either String (WithJSONWarnings ConfigMonoid))
             parsed = parseEither (parseConfigMonoid $(mkAbsDir "/")) <$> decodeEither defaultConfigYaml
         case parsed of
-            Right (Right _) -> (return () :: IO ())
+            Right (Right _) -> return () :: IO ()
             _ -> fail "Failed to parse default config yaml"
