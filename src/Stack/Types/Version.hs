@@ -27,7 +27,8 @@ module Stack.Types.Version
   ,toMajorVersion
   ,latestApplicableVersion
   ,checkVersion
-  ,nextMajorVersion)
+  ,nextMajorVersion
+  ,UpgradeTo(..))
   where
 
 import           Control.Applicative
@@ -63,6 +64,9 @@ newtype VersionParseFail =
 instance Exception VersionParseFail
 instance Show VersionParseFail where
     show (VersionParseFail bs) = "Invalid version: " ++ show bs
+
+-- | A Package upgrade; Latest or a specific version.
+data UpgradeTo = Specific Version | Latest deriving (Show)
 
 -- | A package version.
 newtype Version =
