@@ -31,6 +31,8 @@ Bug fixes:
   See [#2984](https://github.com/commercialhaskell/stack/issues/2984)
 * `stack ghci file.hs` now loads the file even if it isn't part of
   your project.
+* `stack clean --full` now works when docker is enabled.
+  See [#2010](https://github.com/commercialhaskell/stack/issues/2010)
 
 ## 1.4.0
 

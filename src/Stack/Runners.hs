@@ -9,6 +9,7 @@ module Stack.Runners
     , withConfigAndLock
     , withMiniConfigAndLock
     , withBuildConfigAndLock
+    , withBuildConfigAndLockNoDocker
     , withBuildConfig
     , withBuildConfigExt
     , loadConfigWithOpts
@@ -130,10 +131,18 @@ withBuildConfigAndLock
     -> (Maybe FileLock -> StackT EnvConfig IO ())
     -> IO ()
 withBuildConfigAndLock go inner =
-    withBuildConfigExt go Nothing inner Nothing
+    withBuildConfigExt False go Nothing inner Nothing
+
+withBuildConfigAndLockNoDocker
+    :: GlobalOpts
+    -> (Maybe FileLock -> StackT EnvConfig IO ())
+    -> IO ()
+withBuildConfigAndLockNoDocker go inner =
+    withBuildConfigExt True go Nothing inner Nothing
 
 withBuildConfigExt
-    :: GlobalOpts
+    :: Bool
+    -> GlobalOpts
     -> Maybe (StackT Config IO ())
     -- ^ Action to perform before the build.  This will be run on the host
     -- OS even if Docker is enabled for builds.  The build config is not
@@ -148,7 +157,7 @@ withBuildConfigExt
     -- available in this action, since that would require build tools to be
     -- installed on the host OS.
     -> IO ()
-withBuildConfigExt go@GlobalOpts{..} mbefore inner mafter = do
+withBuildConfigExt skipDocker go@GlobalOpts{..} mbefore inner mafter = do
     lc <- loadConfigWithOpts go
 
     withUserFileLock go (configStackRoot $ lcConfig lc) $ \lk0 -> do
@@ -179,16 +188,21 @@ withBuildConfigExt go@GlobalOpts{..} mbefore inner mafter = do
                   (inner' lk)
 
       let getCompilerVersion = loadCompilerVersion go lc
-      runStackTGlobal (lcConfig lc) go $
-        Docker.reexecWithOptionalContainer
-                 (lcProjectRoot lc)
-                 mbefore
-                 (runStackTGlobal (lcConfig lc) go $
-                    Nix.reexecWithOptionalShell (lcProjectRoot lc) getCompilerVersion (inner'' lk0))
-                 mafter
-                 (Just $ liftIO $
-                      do lk' <- readIORef curLk
-                         munlockFile lk')
+      if skipDocker
+          then runStackTGlobal (lcConfig lc) go $ do
+              forM_ mbefore id
+              liftIO $ inner'' lk0
+              forM_ mafter id
+          else runStackTGlobal (lcConfig lc) go $
+              Docker.reexecWithOptionalContainer
+                       (lcProjectRoot lc)
+                       mbefore
+                       (runStackTGlobal (lcConfig lc) go $
+                          Nix.reexecWithOptionalShell (lcProjectRoot lc) getCompilerVersion (inner'' lk0))
+                       mafter
+                       (Just $ liftIO $
+                            do lk' <- readIORef curLk
+                               munlockFile lk')
 
 -- | Load the configuration. Convenience function used
 -- throughout this module.

@@ -602,7 +602,7 @@ setupCmd sco@SetupCmdOpts{..} go@GlobalOpts{..} = do
           (Just $ munlockFile lk)
 
 cleanCmd :: CleanOpts -> GlobalOpts -> IO ()
-cleanCmd opts go = withBuildConfigAndLock go (const (clean opts))
+cleanCmd opts go = withBuildConfigAndLockNoDocker go (const (clean opts))
 
 -- | Helper for build and install commands
 buildCmd :: BuildOptsCLI -> GlobalOpts -> IO ()
@@ -771,7 +771,7 @@ execCmd ExecOpts {..} go@GlobalOpts{..} =
                 config <- view configL
                 menv <- liftIO $ configEnvOverride config eoEnvSettings
                 -- Add RTS options to arguments
-                let argsWithRts args = if null eoRtsOptions 
+                let argsWithRts args = if null eoRtsOptions
                             then args :: [String]
                             else args ++ ["+RTS"] ++ eoRtsOptions ++ ["-RTS"]
                 (cmd, args) <- case (eoCmd, argsWithRts eoArgs) of
@@ -800,7 +800,6 @@ execCmd ExecOpts {..} go@GlobalOpts{..} =
           wc <- view $ actualCompilerVersionL.whichCompilerL
           pkgopts <- getPkgOpts menv wc pkgs
           return (prefix ++ compilerExeName wc, pkgopts ++ args)
-    
 
 -- | Evaluate some haskell code inline.
 evalCmd :: EvalOpts -> GlobalOpts -> IO ()
@@ -874,6 +873,7 @@ imgDockerCmd :: (Bool, [Text]) -> GlobalOpts -> IO ()
 imgDockerCmd (rebuild,images) go@GlobalOpts{..} = do
     mProjectRoot <- lcProjectRoot <$> loadConfigWithOpts go
     withBuildConfigExt
+        False
         go
         Nothing
         (\lk ->
