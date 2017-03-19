@@ -29,15 +29,14 @@ buildOptsMonoidParser hide0 =
               { buildMonoidLibProfile = First (Just True)
               , buildMonoidExeProfile = First (Just True)
               , buildMonoidBenchmarkOpts = bopts
-                { beoMonoidAdditionalArgs = First (getFirst (beoMonoidAdditionalArgs bopts) <>
-                  Just (" " <> unwords additionalArgs))
+                { beoMonoidAdditionalArgs = First (Just (" " <> unwords additionalArgs) <>
+                  getFirst (beoMonoidAdditionalArgs bopts))
                 }
               , buildMonoidTestOpts = topts
-                { toMonoidAdditionalArgs = toMonoidAdditionalArgs topts <>
-                  additionalArgs
+                { toMonoidAdditionalArgs = additionalArgs <> toMonoidAdditionalArgs topts
                 }
               }
-          | noStripping = 
+          | noStripping =
               opts
               { buildMonoidLibStrip = First (Just False)
               , buildMonoidExeStrip = First (Just False)
@@ -96,7 +95,7 @@ buildOptsMonoidParser hide0 =
 
     options =
         BuildOptsMonoid <$> libProfiling <*> exeProfiling <*> libStripping <*>
-        exeStripping <*> haddock <*> haddockOptsParser hideBool <*> 
+        exeStripping <*> haddock <*> haddockOptsParser hideBool <*>
         openHaddocks <*> haddockDeps <*> haddockInternal <*> copyBins <*>
         preFetch <*> keepGoing <*> forceDirty <*> tests <*>
         testOptsParser hideBool <*> benches <*> benchOptsParser hideBool <*>

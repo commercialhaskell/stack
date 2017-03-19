@@ -8,6 +8,10 @@ Major changes:
 
 Behavior changes:
 
+* `stack profile` and `stack trace` now add their extra RTS arguments for
+  benchmarks and tests to the beginning of the args, instead of the end.
+  See [#2399](https://github.com/commercialhaskell/stack/issues/2399)
+
 Other enhancements:
 
 * `stack setup` allow to control options passed to ghcjs-boot with
