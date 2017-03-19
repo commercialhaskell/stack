@@ -4,6 +4,7 @@
 
 * Adjust static binary build on Alpine. See
   https://github.com/commercialhaskell/stack/issues/3045
+* For minor release, ensure https://github.com/commercialhaskell/stack/commit/d3637126b9045b266d2e53387e183915cb4a912d cherry-picked
 
 ## Pre-release steps
 
