@@ -27,6 +27,8 @@ Other enhancements:
 * Add short synonyms for `test-arguments` and `benchmark-arguments` options.
 * Adds `STACK_WORK` environment variable, to specify work dir.
   See [#3063](https://github.com/commercialhaskell/stack/issues/3063)
+* Can now use relative paths for `extra-include-dirs` and `extra-lib-dirs`.
+  See [#2830](https://github.com/commercialhaskell/stack/issues/2830)
 
 Bug fixes:
 
