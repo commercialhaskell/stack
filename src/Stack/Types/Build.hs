@@ -560,8 +560,8 @@ configureOptsNoDir econfig bco deps isLocal package = concat
                        flagNameString name)
                     (Map.toList flags)
     , concatMap (\x -> [compilerOptionsCabalFlag wc, T.unpack x]) (packageGhcOptions package)
-    , map (("--extra-include-dirs=" ++) . toFilePathNoTrailingSep) (Set.toList (configExtraIncludeDirs config))
-    , map (("--extra-lib-dirs=" ++) . toFilePathNoTrailingSep) (Set.toList (configExtraLibDirs config))
+    , map ("--extra-include-dirs=" ++) (Set.toList (configExtraIncludeDirs config))
+    , map ("--extra-lib-dirs=" ++) (Set.toList (configExtraLibDirs config))
     , maybe [] (\customGcc -> ["--with-gcc=" ++ toFilePath customGcc]) (configOverrideGccPath config)
     , ["--ghcjs" | wc == Ghcjs]
     , ["--exact-configuration" | useExactConf]

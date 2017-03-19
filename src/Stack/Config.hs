@@ -30,6 +30,7 @@ module Stack.Config
   ,loadConfig
   ,loadConfigMaybeProject
   ,loadMiniConfig
+  ,loadConfigYaml
   ,packagesParser
   ,getLocalPackages
   ,resolvePackageEntry
@@ -194,9 +195,8 @@ makeConcreteResolver ar = do
                 config <- view configL
                 implicitGlobalDir <- getImplicitGlobalProjectDir config
                 let fp = implicitGlobalDir </> stackDotYaml
-                WithJSONWarnings (ProjectAndConfigMonoid project _) _warnings <-
-                    liftIO (Yaml.decodeFileEither $ toFilePath fp)
-                    >>= either throwM return
+                ProjectAndConfigMonoid project _ <-
+                    loadConfigYaml (parseProjectAndConfigMonoid (parent fp)) fp
                 return $ projectResolver project
             ARLatestNightly -> return $ ResolverSnapshot $ Nightly $ snapshotsNightly snapshots
             ARLatestLTSMajor x ->
@@ -456,7 +456,8 @@ loadConfigMaybeProject configArgs mresolver mproject = do
 
     let loadHelper mproject' = do
           userConfigPath <- getDefaultUserConfigPath stackRoot
-          extraConfigs0 <- getExtraConfigs userConfigPath >>= mapM loadConfigYaml
+          extraConfigs0 <- getExtraConfigs userConfigPath >>=
+              mapM (\file -> loadConfigYaml (parseConfigMonoid (parent file)) file)
           let extraConfigs =
                 -- non-project config files' existence of a docker section should never default docker
                 -- to enabled, so make it look like they didn't exist
@@ -541,7 +542,7 @@ loadBuildConfig mproject config mresolver mcompiler = do
             exists <- doesFileExist dest
             if exists
                then do
-                   ProjectAndConfigMonoid project _ <- loadConfigYaml dest
+                   ProjectAndConfigMonoid project _ <- loadConfigYaml (parseProjectAndConfigMonoid destDir) dest
                    when (view terminalL env) $
                        case mresolver of
                            Nothing ->
@@ -901,25 +902,28 @@ getExtraConfigs userConfigPath = do
 -- | Load and parse YAML from the given config file. Throws
 -- 'ParseConfigFileException' when there's a decoding error.
 loadConfigYaml
-    :: (FromJSON (WithJSONWarnings a), MonadIO m, MonadLogger m)
-    => Path Abs File -> m a
-loadConfigYaml path = do
-    eres <- loadYaml path
+    :: (MonadIO m, MonadLogger m)
+    => (Value -> Yaml.Parser (WithJSONWarnings a)) -> Path Abs File -> m a
+loadConfigYaml parser path = do
+    eres <- loadYaml parser path
     case eres of
         Left err -> liftIO $ throwM (ParseConfigFileException path err)
         Right res -> return res
 
 -- | Load and parse YAML from the given file.
 loadYaml
-    :: (FromJSON (WithJSONWarnings a), MonadIO m, MonadLogger m)
-    => Path Abs File -> m (Either Yaml.ParseException a)
-loadYaml path = do
+    :: (MonadIO m, MonadLogger m)
+    => (Value -> Yaml.Parser (WithJSONWarnings a)) -> Path Abs File -> m (Either Yaml.ParseException a)
+loadYaml parser path = do
     eres <- liftIO $ Yaml.decodeFileEither (toFilePath path)
     case eres  of
         Left err -> return (Left err)
-        Right (WithJSONWarnings res warnings) -> do
-            logJSONWarnings (toFilePath path) warnings
-            return (Right res)
+        Right val ->
+            case Yaml.parseEither parser val of
+                Left err -> return (Left (Yaml.AesonException err))
+                Right (WithJSONWarnings res warnings) -> do
+                    logJSONWarnings (toFilePath path) warnings
+                    return (Right res)
 
 -- | Get the location of the project config file, if it exists.
 getProjectConfig :: (MonadIO m, MonadThrow m, MonadLogger m)
@@ -976,7 +980,7 @@ loadProjectConfig mstackYaml = do
             return LCSNoConfig
   where
     load fp = do
-        ProjectAndConfigMonoid project config <- loadConfigYaml fp
+        ProjectAndConfigMonoid project config <- loadConfigYaml (parseProjectAndConfigMonoid (parent fp)) fp
         return (project, fp, config)
 
 -- | Get the location of the default stack configuration file.

@@ -350,10 +350,10 @@ addIncludeLib :: ExtraDirs -> Config -> Config
 addIncludeLib (ExtraDirs _bins includes libs) config = config
     { configExtraIncludeDirs = Set.union
         (configExtraIncludeDirs config)
-        (Set.fromList includes)
+        (Set.fromList (map toFilePathNoTrailingSep includes))
     , configExtraLibDirs = Set.union
         (configExtraLibDirs config)
-        (Set.fromList libs)
+        (Set.fromList (map toFilePathNoTrailingSep libs))
     }
 
 -- | Ensure compiler (ghc or ghcjs) is installed and provide the PATHs to add if necessary

@@ -16,8 +16,8 @@ import           Stack.Types.Config
 import           Stack.Types.Docker
 
 -- | Parser for global command-line options.
-globalOptsParser :: GlobalOptsContext -> Maybe LogLevel -> Parser GlobalOptsMonoid
-globalOptsParser kind defLogLevel =
+globalOptsParser :: FilePath -> GlobalOptsContext -> Maybe LogLevel -> Parser GlobalOptsMonoid
+globalOptsParser currentDir kind defLogLevel =
     GlobalOptsMonoid <$>
     optionalFirst (strOption (long Docker.reExecArgName <> hidden <> internal)) <*>
     optionalFirst (option auto (long dockerEntrypointArgName <> hidden <> internal)) <*>
@@ -26,7 +26,7 @@ globalOptsParser kind defLogLevel =
         "time-in-log"
         "inclusion of timings in logs, for the purposes of using diff with logs"
         hide <*>
-    configOptsParser kind <*>
+    configOptsParser currentDir kind <*>
     optionalFirst (abstractResolverOptsParser hide0) <*>
     optionalFirst (compilerOptsParser hide0) <*>
     firstBoolFlags

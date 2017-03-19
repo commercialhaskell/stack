@@ -27,8 +27,7 @@ import           Control.Monad (when,void,join,liftM,unless,mapAndUnzipM, zipWit
 import           Control.Monad.Catch
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
-import           Data.Aeson.Extended         ( WithJSONWarnings(..), object, (.=), toJSON
-                                             , logJSONWarnings)
+import           Data.Aeson.Extended         (object, (.=), toJSON)
 import qualified Data.ByteString as S
 import           Data.Char (isSpace)
 import           Data.Either
@@ -61,7 +60,7 @@ import           Path
 import           Path.Find (findFiles)
 import           Path.IO hiding (findExecutable, findFiles)
 import           Stack.BuildPlan
-import           Stack.Config (getLocalPackages)
+import           Stack.Config (getLocalPackages, loadConfigYaml)
 import           Stack.Constants (stackDotYaml, wiredInPackages)
 import           Stack.Package               (printCabalFileWarning
                                              , hpack
@@ -755,9 +754,8 @@ solveExtraDeps modStackYaml = do
         writeStackYaml path res deps fl = do
             let fp = toFilePath path
             obj <- liftIO (Yaml.decodeFileEither fp) >>= either throwM return
-            WithJSONWarnings (ProjectAndConfigMonoid _ _) warnings <-
-                liftIO (Yaml.decodeFileEither fp) >>= either throwM return
-            logJSONWarnings fp warnings
+            -- Check input file and show warnings
+            _ <- loadConfigYaml (parseProjectAndConfigMonoid (parent path)) path
             let obj' =
                     HashMap.insert "extra-deps"
                         (toJSON $ map fromTuple $ Map.toList deps)

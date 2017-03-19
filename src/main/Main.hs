@@ -168,7 +168,8 @@ main = do
                 (nixOptsParser False)
                 ("Only showing --" ++ Nix.nixCmdName ++ "* options.")
 
-  eGlobalRun <- try $ commandLineHandler progName False
+  currentDir <- D.getCurrentDirectory
+  eGlobalRun <- try $ commandLineHandler currentDir progName False
   case eGlobalRun of
     Left (exitCode :: ExitCode) ->
       throwIO exitCode
@@ -197,10 +198,11 @@ vcatErrorHelp (ParserHelp e1 _ _ _ _) (ParserHelp e2 h2 u2 b2 f2) =
   ParserHelp (vcatChunks [e2, e1]) h2 u2 b2 f2
 
 commandLineHandler
-  :: String
+  :: FilePath
+  -> String
   -> Bool
   -> IO (GlobalOptsMonoid, GlobalOpts -> IO ())
-commandLineHandler progName isInterpreter = complicatedOptions
+commandLineHandler currentDir progName isInterpreter = complicatedOptions
   Meta.version
   (Just versionString')
   VERSION_hpack
@@ -216,7 +218,7 @@ commandLineHandler progName isInterpreter = complicatedOptions
           Just _ -> if isInterpreter
                     then parseResultHandler args f
                     else secondaryCommandHandler args f
-                        >>= interpreterHandler args
+                        >>= interpreterHandler currentDir args
           Nothing -> parseResultHandler args f
 
     parseResultHandler args f =
@@ -474,10 +476,11 @@ commandLineHandler progName isInterpreter = complicatedOptions
     globalOpts kind =
         extraHelpOption hide progName (Docker.dockerCmdName ++ "*") Docker.dockerHelpOptName <*>
         extraHelpOption hide progName (Nix.nixCmdName ++ "*") Nix.nixHelpOptName <*>
-        globalOptsParser kind (if isInterpreter
-                                -- Silent except when errors occur - see #2879
-                                then Just LevelError
-                                else Nothing)
+        globalOptsParser currentDir kind
+            (if isInterpreter
+                -- Silent except when errors occur - see #2879
+                then Just LevelError
+                else Nothing)
         where hide = kind /= OuterGlobalOpts
 
     globalFooter = "Run 'stack --help' for global options that apply to all subcommands."
@@ -516,10 +519,11 @@ secondaryCommandHandler args f =
 
 interpreterHandler
   :: Monoid t
-  => [String]
+  => FilePath
+  -> [String]
   -> ParserFailure ParserHelp
   -> IO (GlobalOptsMonoid, (GlobalOpts -> IO (), t))
-interpreterHandler args f = do
+interpreterHandler currentDir args f = do
   -- args can include top-level config such as --extra-lib-dirs=... (set by
   -- nix-shell) - we need to find the first argument which is a file, everything
   -- afterwards is an argument to the script, everything before is an argument
@@ -559,7 +563,7 @@ interpreterHandler args f = do
     runInterpreterCommand path stackArgs fileArgs = do
       progName <- getProgName
       iargs <- getInterpreterArgs path
-      let parseCmdLine = commandLineHandler progName True
+      let parseCmdLine = commandLineHandler currentDir progName True
           separator = if "--" `elem` iargs then [] else ["--"]
           cmdArgs = stackArgs ++ iargs ++ separator ++ path : fileArgs
        -- TODO show the command in verbose mode

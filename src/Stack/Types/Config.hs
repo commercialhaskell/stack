@@ -63,6 +63,7 @@ module Stack.Types.Config
   ,ConfigMonoid(..)
   ,configMonoidInstallGHCName
   ,configMonoidSystemGHCName
+  ,parseConfigMonoid
   -- ** DumpLogs
   ,DumpLogs(..)
   -- ** EnvSettings
@@ -99,6 +100,7 @@ module Stack.Types.Config
   -- ** Project & ProjectAndConfigMonoid
   ,Project(..)
   ,ProjectAndConfigMonoid(..)
+  ,parseProjectAndConfigMonoid
   -- ** PvpBounds
   ,PvpBounds(..)
   ,parsePvpBounds
@@ -238,6 +240,7 @@ import           Stack.Types.TemplateName
 import           Stack.Types.Urls
 import           Stack.Types.Version
 import           System.FilePath (takeBaseName)
+import qualified System.FilePath as FilePath
 import           System.PosixCompat.Types (UserID, GroupID, FileMode)
 import           System.Process.Read (EnvOverride, findExecutable)
 
@@ -325,9 +328,9 @@ data Config =
          -- ^ How many concurrent jobs to run, defaults to number of capabilities
          ,configOverrideGccPath     :: !(Maybe (Path Abs File))
          -- ^ Optional gcc override path
-         ,configExtraIncludeDirs    :: !(Set (Path Abs Dir))
+         ,configExtraIncludeDirs    :: !(Set FilePath)
          -- ^ --extra-include-dirs arguments
-         ,configExtraLibDirs        :: !(Set (Path Abs Dir))
+         ,configExtraLibDirs        :: !(Set FilePath)
          -- ^ --extra-lib-dirs arguments
          ,configConcurrentTests     :: !Bool
          -- ^ Run test suites concurrently
@@ -740,9 +743,9 @@ data ConfigMonoid =
     -- ^ Used for overriding the GHC build
     ,configMonoidJobs                :: !(First Int)
     -- ^ See: 'configJobs'
-    ,configMonoidExtraIncludeDirs    :: !(Set (Path Abs Dir))
+    ,configMonoidExtraIncludeDirs    :: !(Set FilePath)
     -- ^ See: 'configExtraIncludeDirs'
-    ,configMonoidExtraLibDirs        :: !(Set (Path Abs Dir))
+    ,configMonoidExtraLibDirs        :: !(Set FilePath)
     -- ^ See: 'configExtraLibDirs'
     , configMonoidOverrideGccPath    :: !(First (Path Abs File))
     -- ^ Allow users to override the path to gcc
@@ -791,14 +794,14 @@ instance Monoid ConfigMonoid where
     mempty = memptydefault
     mappend = mappenddefault
 
-instance FromJSON (WithJSONWarnings ConfigMonoid) where
-  parseJSON = withObjectWarnings "ConfigMonoid" parseConfigMonoidJSON
+parseConfigMonoid :: Path Abs Dir -> Value -> Yaml.Parser (WithJSONWarnings ConfigMonoid)
+parseConfigMonoid = withObjectWarnings "ConfigMonoid" . parseConfigMonoidObject
 
 -- | Parse a partial configuration.  Used both to parse both a standalone config
 -- file and a project file, so that a sub-parser is not required, which would interfere with
 -- warnings for missing fields.
-parseConfigMonoidJSON :: Object -> WarningParser ConfigMonoid
-parseConfigMonoidJSON obj = do
+parseConfigMonoidObject :: Path Abs Dir -> Object -> WarningParser ConfigMonoid
+parseConfigMonoidObject rootDir obj = do
     -- Parsing 'stackRoot' from 'stackRoot'/config.yaml would be nonsensical
     let configMonoidStackRoot = First Nothing
     configMonoidWorkDir <- First <$> obj ..:? configMonoidWorkDirName
@@ -821,8 +824,10 @@ parseConfigMonoidJSON obj = do
     configMonoidGHCVariant <- First <$> obj ..:? configMonoidGHCVariantName
     configMonoidGHCBuild <- First <$> obj ..:? configMonoidGHCBuildName
     configMonoidJobs <- First <$> obj ..:? configMonoidJobsName
-    configMonoidExtraIncludeDirs <- obj ..:?  configMonoidExtraIncludeDirsName ..!= Set.empty
-    configMonoidExtraLibDirs <- obj ..:?  configMonoidExtraLibDirsName ..!= Set.empty
+    configMonoidExtraIncludeDirs <- fmap (Set.map (toFilePath rootDir FilePath.</>)) $
+        obj ..:?  configMonoidExtraIncludeDirsName ..!= Set.empty
+    configMonoidExtraLibDirs <- fmap (Set.map (toFilePath rootDir FilePath.</>)) $
+        obj ..:?  configMonoidExtraLibDirsName ..!= Set.empty
     configMonoidOverrideGccPath <- First <$> obj ..:? configMonoidOverrideGccPathName
     configMonoidConcurrentTests <- First <$> obj ..:? configMonoidConcurrentTestsName
     configMonoidLocalBinPath <- First <$> obj ..:? configMonoidLocalBinPathName
@@ -1425,8 +1430,9 @@ getCompilerPath wc = do
 data ProjectAndConfigMonoid
   = ProjectAndConfigMonoid !Project !ConfigMonoid
 
-instance FromJSON (WithJSONWarnings ProjectAndConfigMonoid) where
-    parseJSON = withObjectWarnings "ProjectAndConfigMonoid" $ \o -> do
+parseProjectAndConfigMonoid :: Path Abs Dir -> Value -> Yaml.Parser (WithJSONWarnings ProjectAndConfigMonoid)
+parseProjectAndConfigMonoid rootDir =
+    withObjectWarnings "ProjectAndConfigMonoid" $ \o -> do
         dirs <- jsonSubWarningsTT (o ..:? "packages") ..!= [packageEntryCurrDir]
         extraDeps' <- o ..:? "extra-deps" ..!= []
         extraDeps <-
@@ -1438,7 +1444,7 @@ instance FromJSON (WithJSONWarnings ProjectAndConfigMonoid) where
         resolver <- jsonSubWarnings (o ..: "resolver")
         compiler <- o ..:? "compiler"
         msg <- o ..:? "user-message"
-        config <- parseConfigMonoidJSON o
+        config <- parseConfigMonoidObject rootDir o
         extraPackageDBs <- o ..:? "extra-package-dbs" ..!= []
         let project = Project
                 { projectUserMsg = msg
