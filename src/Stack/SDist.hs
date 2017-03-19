@@ -29,6 +29,7 @@ import qualified Data.ByteString.Lazy as L
 import           Data.Data (Data, Typeable, cast, gmapT)
 import           Data.Either (partitionEithers)
 import           Data.List
+import           Data.List.Extra (nubOrd)
 import           Data.List.NonEmpty (NonEmpty)
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Map.Strict as Map
@@ -246,7 +247,7 @@ normalizeTarballPaths fps = do
         $logWarn $ T.concat
             [ "Warning: These files are outside of the package directory, and will be omitted from the tarball: "
             , T.pack (show outsideDir)]
-    return files
+    return (nubOrd files)
   where
     (outsideDir, files) = partitionEithers (map pathToEither fps)
     pathToEither fp = maybe (Left fp) Right (normalizePath fp)
