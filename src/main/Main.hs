@@ -578,7 +578,7 @@ pathCmd keys go = withBuildConfig go (Stack.Path.path keys)
 setupCmd :: SetupCmdOpts -> GlobalOpts -> IO ()
 setupCmd sco@SetupCmdOpts{..} go@GlobalOpts{..} = do
   lc <- loadConfigWithOpts go
-  when (scoUpgradeCabal && nixEnable (configNix (lcConfig lc))) $ do
+  when (isJust scoUpgradeCabal && nixEnable (configNix (lcConfig lc))) $ do
     throwIO UpgradeCabalUnusable
   withUserFileLock go (configStackRoot $ lcConfig lc) $ \lk -> do
     let getCompilerVersion = loadCompilerVersion go lc

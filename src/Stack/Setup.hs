@@ -138,7 +138,7 @@ data SetupOpts = SetupOpts
     -- ^ Don't check for a compatible GHC version/architecture
     , soptsSkipMsys :: !Bool
     -- ^ Do not use a custom msys installation on Windows
-    , soptsUpgradeCabal :: !Bool
+    , soptsUpgradeCabal :: !(Maybe UpgradeTo)
     -- ^ Upgrade the global Cabal library in the database to the newest
     -- version. Only works reliably with a stack-managed installation.
     , soptsResolveMissingGHC :: !(Maybe Text)
@@ -234,7 +234,7 @@ setupEnv mResolveMissingGHC = do
             , soptsSanityCheck = False
             , soptsSkipGhcCheck = configSkipGHCCheck config
             , soptsSkipMsys = configSkipMsys config
-            , soptsUpgradeCabal = False
+            , soptsUpgradeCabal = Nothing
             , soptsResolveMissingGHC = mResolveMissingGHC
             , soptsSetupInfoYaml = defaultSetupInfoYaml
             , soptsGHCBindistURL = Nothing
@@ -493,11 +493,11 @@ ensureCompiler sopts = do
                 m <- augmentPathMap (edBins ed) (unEnvOverride menv0)
                 mkEnvOverride (configPlatform config) (removeHaskellEnvVars m)
 
-    when (soptsUpgradeCabal sopts) $ do
+    forM_ (soptsUpgradeCabal sopts) $ \version -> do
         unless needLocal $ do
-            $logWarn "Trying to upgrade Cabal library on a GHC not installed by stack."
+            $logWarn "Trying to change a Cabal library on a GHC not installed by stack."
             $logWarn "This may fail, caveat emptor!"
-        upgradeCabal menv wc
+        upgradeCabal menv wc version
 
     case mtools of
         Just (Just (ToolGhcjs cv), _) -> ensureGhcjsBooted menv cv (soptsInstallIfMissing sopts) (soptsGHCJSBootOpts sopts)
@@ -626,68 +626,75 @@ ensureDockerStackExe containerPlatform = do
         downloadStackExe platforms sri stackExeDir (const $ return ())
     return stackExePath
 
--- | Install the newest version of Cabal globally
+-- | Install the newest version or a specific version of Cabal globally
 upgradeCabal :: (StackM env m, HasConfig env, HasGHCVariant env)
              => EnvOverride
              -> WhichCompiler
+             -> UpgradeTo
              -> m ()
-upgradeCabal menv wc = do
+upgradeCabal menv wc cabalVersion = do
+    $logInfo "Manipulating the global Cabal is only for debugging purposes"
     let name = $(mkPackageName "Cabal")
     rmap <- resolvePackages menv Nothing Map.empty (Set.singleton name)
-    newest <-
-        case map rpIdent rmap of
-            [] -> error "No Cabal library found in index, cannot upgrade"
-            [PackageIdentifier name' version]
-                | name == name' -> return version
-            x -> error $ "Unexpected results for resolvePackages: " ++ show x
     installed <- getCabalPkgVer menv wc
-    if installed >= newest
-        then $logInfo $ T.concat
-            [ "Currently installed Cabal is "
+    case cabalVersion of
+        Specific version -> do
+            if installed /= version then
+                doCabalInstall menv wc installed version
+            else
+                $logInfo $ T.concat ["No install necessary. Cabal "
+                                    , T.pack $ versionString installed
+                                    , " is already installed"]
+        Latest     -> case map rpIdent rmap of
+            [] -> error "No Cabal library found in index, cannot upgrade"
+            [PackageIdentifier name' version] | name == name' -> do
+                if installed > version then
+                    doCabalInstall menv wc installed version
+                else
+                    $logInfo $ "No upgrade necessary. Latest Cabal already installed"
+            x -> error $ "Unexpected results for resolvePackages: " ++ show x
+
+-- Configure and run the necessary commands for a cabal install
+doCabalInstall :: (StackM env m, HasConfig env, HasGHCVariant env)
+               => EnvOverride
+               -> WhichCompiler
+               -> Version
+               -> Version
+               -> m ()
+doCabalInstall menv wc installed version = do
+    withSystemTempDir "stack-cabal-upgrade" $ \tmpdir -> do
+        $logInfo $ T.concat
+            [ "Installing Cabal-"
+            , T.pack $ versionString version
+            , " to replace "
             , T.pack $ versionString installed
-            , ", newest is "
-            , T.pack $ versionString newest
-            , ". I'm not upgrading Cabal."
             ]
-        else withSystemTempDir "stack-cabal-upgrade" $ \tmpdir -> do
-            $logInfo $ T.concat
-                [ "Installing Cabal-"
-                , T.pack $ versionString newest
-                , " to replace "
-                , T.pack $ versionString installed
-                ]
-            let ident = PackageIdentifier name newest
-            -- Nothing below: use the newest .cabal file revision
-            m <- unpackPackageIdents menv tmpdir Nothing (Map.singleton ident Nothing)
-
-            compilerPath <- join $ findExecutable menv (compilerExeName wc)
-            newestDir <- parseRelDir $ versionString newest
-            let installRoot = toFilePath $ parent (parent compilerPath)
-                                       </> $(mkRelDir "new-cabal")
-                                       </> newestDir
-
-            dir <-
-                case Map.lookup ident m of
-                    Nothing -> error "upgradeCabal: Invariant violated, dir missing"
-                    Just dir -> return dir
-
-            runCmd (Cmd (Just dir) (compilerExeName wc) menv ["Setup.hs"]) Nothing
-            platform <- view platformL
-            let setupExe = toFilePath $ dir </>
-                  (case platform of
-                     Platform _ Cabal.Windows -> $(mkRelFile "Setup.exe")
-                     _ -> $(mkRelFile "Setup"))
-                dirArgument name' = concat
-                    [ "--"
-                    , name'
-                    , "dir="
-                    , installRoot FP.</> name'
-                    ]
-                args = "configure" : map dirArgument (words "lib bin data doc")
-            runCmd (Cmd (Just dir) setupExe menv args) Nothing
-            runCmd (Cmd (Just dir) setupExe menv ["build"]) Nothing
-            runCmd (Cmd (Just dir) setupExe menv ["install"]) Nothing
-            $logInfo "New Cabal library installed"
+        let name = $(mkPackageName "Cabal")
+            ident = PackageIdentifier name version
+        m <- unpackPackageIdents menv tmpdir Nothing (Map.singleton ident Nothing)
+        compilerPath <- join $ findExecutable menv (compilerExeName wc)
+        versionDir <- parseRelDir $ versionString version
+        let installRoot = toFilePath $ parent (parent compilerPath)
+                                    </> $(mkRelDir "new-cabal")
+                                    </> versionDir
+        dir <- case Map.lookup ident m of
+            Nothing -> error "upgradeCabal: Invariant violated, dir missing"
+            Just dir -> return dir
+        runCmd (Cmd (Just dir) (compilerExeName wc) menv ["Setup.hs"]) Nothing
+        platform <- view platformL
+        let setupExe = toFilePath $ dir </> case platform of
+                Platform _ Cabal.Windows -> $(mkRelFile "Setup.exe")
+                _                        -> $(mkRelFile "Setup")
+            dirArgument name' = concat [ "--"
+                                       , name'
+                                       , "dir="
+                                       , installRoot FP.</> name'
+                                       ]
+            args = "configure" : map dirArgument (words "lib bin data doc")
+        runCmd (Cmd (Just dir) setupExe menv args) Nothing
+        runCmd (Cmd (Just dir) setupExe menv ["build"]) Nothing
+        runCmd (Cmd (Just dir) setupExe menv ["install"]) Nothing
+        $logInfo "New Cabal library installed"
 
 -- | Get the version of the system compiler, if available
 getSystemCompiler :: (MonadIO m, MonadLogger m, MonadBaseControl IO m, MonadCatch m) => EnvOverride -> WhichCompiler -> m (Maybe (CompilerVersion, Arch))

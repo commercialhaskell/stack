@@ -30,7 +30,7 @@ import           Stack.Types.Version
 data SetupCmdOpts = SetupCmdOpts
     { scoCompilerVersion :: !(Maybe CompilerVersion)
     , scoForceReinstall  :: !Bool
-    , scoUpgradeCabal    :: !Bool
+    , scoUpgradeCabal    :: !(Maybe UpgradeTo)
     , scoSetupInfoYaml   :: !String
     , scoGHCBindistURL   :: !(Maybe String)
     , scoGHCJSBootOpts   :: ![String]
@@ -50,6 +50,22 @@ setupYamlCompatParser = stackSetupYaml <|> setupInfoYaml
             <> OA.metavar "URL"
             <> OA.value defaultSetupInfoYaml )
 
+cabalUpgradeParser :: OA.Parser UpgradeTo
+cabalUpgradeParser = Specific <$> version' <|> latestParser
+    where
+        versionReader = do
+            s <- OA.readerAsk
+            case parseVersion (T.pack s) of
+                Nothing -> OA.readerError $ "Invalid version: " ++ s
+                Just v  -> return v
+        version' = OA.option versionReader (
+            OA.long "install-cabal"
+         <> OA.metavar "VERSION"
+         <> OA.help "Install a specific version of Cabal" )
+        latestParser = OA.flag' Latest (
+            OA.long "upgrade-cabal"
+         <> OA.help "Install latest version of Cabal globally" )
+
 setupParser :: OA.Parser SetupCmdOpts
 setupParser = SetupCmdOpts
     <$> OA.optional (OA.argument readVersion
@@ -60,10 +76,7 @@ setupParser = SetupCmdOpts
             "reinstall"
             "reinstalling GHC, even if available (incompatible with --system-ghc)"
             OA.idm
-    <*> OA.boolFlags False
-            "upgrade-cabal"
-            "installing the newest version of the Cabal library globally"
-            OA.idm
+    <*> OA.optional cabalUpgradeParser
     <*> setupYamlCompatParser
     <*> OA.optional (OA.strOption
             (OA.long "ghc-bindist"

@@ -293,13 +293,12 @@ setupCompiler compiler = do
         , soptsUseSystem         = configSystemGHC config
         , soptsWantedCompiler    = compiler
         , soptsCompilerCheck     = configCompilerCheck config
-
         , soptsStackYaml         = Nothing
         , soptsForceReinstall    = False
         , soptsSanityCheck       = False
         , soptsSkipGhcCheck      = False
         , soptsSkipMsys          = configSkipMsys config
-        , soptsUpgradeCabal      = False
+        , soptsUpgradeCabal      = Nothing
         , soptsResolveMissingGHC = msg
         , soptsSetupInfoYaml     = defaultSetupInfoYaml
         , soptsGHCBindistURL     = Nothing

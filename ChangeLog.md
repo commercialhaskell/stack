@@ -64,6 +64,9 @@ Major changes:
   that all packages be present in a snapshot, however.
   [#2805](https://github.com/commercialhaskell/stack/issues/2805)
 
+* `stack setup` now accepts a `--install-cabal VERSION` option which
+  will install a specific version of the Cabal library globally.
+
 Behavior changes:
 
 * The default package metadata backend has been changed from Git to
