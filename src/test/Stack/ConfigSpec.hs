@@ -150,8 +150,9 @@ spec = beforeAll setup $ do
 
   describe "defaultConfigYaml" $
     it "is parseable" $ \_ -> do
+        curDir <- getCurrentDir
         let parsed :: Either String (Either String (WithJSONWarnings ConfigMonoid))
-            parsed = parseEither (parseConfigMonoid $(mkAbsDir "/")) <$> decodeEither defaultConfigYaml
+            parsed = parseEither (parseConfigMonoid curDir) <$> decodeEither defaultConfigYaml
         case parsed of
             Right (Right _) -> return () :: IO ()
             _ -> fail "Failed to parse default config yaml"
