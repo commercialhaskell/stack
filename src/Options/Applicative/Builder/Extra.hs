@@ -37,7 +37,7 @@ import Data.Monoid
 import Data.Text (Text)
 import qualified Data.Text as T
 import Options.Applicative
-import Options.Applicative.Types (readerAsk, Completer(..))
+import Options.Applicative.Types (readerAsk)
 import Path hiding ((</>))
 import System.Directory (getCurrentDirectory, getDirectoryContents, doesDirectoryExist)
 import System.Environment (withArgs)
@@ -224,7 +224,7 @@ pathCompleterWith PathCompleterOpts {..} = mkCompleter $ \inputRaw -> do
             | otherwise -> return []
         Just searchDir -> do
             entries <- getDirectoryContents searchDir `catch` \(_ :: IOException) -> return []
-            results <- fmap catMaybes $ forM entries $ \entry ->
+            fmap catMaybes $ forM entries $ \entry ->
                 -- Skip . and .. unless user is typing . or ..
                 if entry `elem` ["..", "."] && searchPrefix `notElem` ["..", "."] then return Nothing else
                     if searchPrefix `isPrefixOf` entry
@@ -238,7 +238,6 @@ pathCompleterWith PathCompleterOpts {..} = mkCompleter $ \inputRaw -> do
                                         then return $ Just (inputSearchDir </> entry)
                                         else return Nothing
                         else return Nothing
-            return results
 
 unescapeBashArg :: String -> String
 unescapeBashArg ('\'' : rest) = rest
