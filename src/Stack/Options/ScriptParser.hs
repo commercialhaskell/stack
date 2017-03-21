@@ -2,6 +2,7 @@ module Stack.Options.ScriptParser where
 
 import           Data.Monoid ((<>))
 import           Options.Applicative
+import           Options.Applicative.Builder.Extra
 
 data ScriptOpts = ScriptOpts
   { soPackages :: ![String]
@@ -20,7 +21,7 @@ data ScriptExecute
 scriptOptsParser :: Parser ScriptOpts
 scriptOptsParser = ScriptOpts
     <$> many (strOption (long "package" <> help "Additional packages that must be installed"))
-    <*> strArgument (metavar "FILE" <> action "file")
+    <*> strArgument (metavar "FILE" <> completer (fileExtCompleter [".hs", ".lhs"]))
     <*> many (strArgument (metavar "-- ARGS (e.g. stack ghc -- X.hs -o x)"))
     <*> (flag' SECompile
             ( long "compile"

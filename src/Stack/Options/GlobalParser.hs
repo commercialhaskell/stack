@@ -43,9 +43,7 @@ globalOptsParser currentDir kind defLogLevel =
         (strOption
             (long "stack-yaml" <>
              metavar "STACK-YAML" <>
-             -- TODO: ideally we'd have a completer that filtered files
-             -- to "*.yaml", but still completed paths
-             action "file" <>
+             completer (fileExtCompleter [".yaml"]) <>
              help ("Override project stack.yaml file " <>
                    "(overrides any STACK_YAML environment variable)") <>
              hide))
@@ -75,8 +73,8 @@ initOptsParser =
   where
     searchDirs =
       many (textArgument
-              (metavar "DIRS" <>
-               action "directory" <>
+              (metavar "DIR" <>
+               completer dirCompleter <>
                help "Directories to include, default is current directory."))
     ignoreSubDirs = switch (long "ignore-subdirs" <>
                            help "Do not search for .cabal files in sub directories")

@@ -15,7 +15,7 @@ hpcReportOptsParser = HpcReportOpts
     <*> switch (long "all" <> help "Use results from all packages and components involved in previous --coverage run")
     <*> optional (strOption (long "destdir" <>
                              metavar "DIR" <>
-                             action "directory" <>
+                             completer dirCompleter <>
                              help "Output directory for HTML report"))
     <*> switch (long "open" <> help "Open the report in the browser")
 

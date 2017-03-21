@@ -30,7 +30,7 @@ nixOptsParser hide0 = overrideActivation <$>
               str
               (long "nix-shell-file" <>
                metavar "FILE" <>
-               action "file" <>
+               completer (fileExtCompleter [".nix"]) <>
                help "Nix file to be used to launch a nix-shell (for regular Nix users)" <>
                hide))
   <*> optionalFirst

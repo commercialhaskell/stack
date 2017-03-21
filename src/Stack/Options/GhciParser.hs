@@ -16,7 +16,7 @@ ghciOptsParser = GhciOpts
              <$> many
                    (textArgument
                         (metavar "TARGET/FILE" <>
-                         action "file" <>
+                         completer (fileExtCompleter [".hs", ".lhs"]) <>
                          help ("If none specified, use all local packages. " <>
                                "See https://docs.haskellstack.org/en/v" <>
                                showVersion Meta.version <>

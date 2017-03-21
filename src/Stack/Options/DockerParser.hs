@@ -65,7 +65,7 @@ dockerOptsParser hide0 =
     <*> many (option auto (long (dockerOptName dockerMountArgName) <>
                            hide <>
                            metavar "(PATH | HOST-PATH:CONTAINER-PATH)" <>
-                           action "directory" <>
+                           completer dirCompleter <>
                            help ("Mount volumes from host in container " ++
                                  "(may specify multiple times)")))
     <*> many (option str (long (dockerOptName dockerEnvArgName) <>
@@ -87,7 +87,7 @@ dockerOptsParser hide0 =
              long(dockerOptName dockerStackExeArgName) <>
              hide <>
              metavar (intercalate "|" (specialOpts ++ ["PATH"])) <>
-             completer (listCompleter specialOpts <> bashCompleter "file") <>
+             completer (listCompleter specialOpts <> fileCompleter) <>
              help (concat [ "Location of "
                           , stackProgName
                           , " executable used in container" ])))

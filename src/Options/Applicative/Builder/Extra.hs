@@ -1,3 +1,6 @@
+{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+
 -- | Extra functions for optparse-applicative.
 
 module Options.Applicative.Builder.Extra
@@ -17,19 +20,28 @@ module Options.Applicative.Builder.Extra
   ,absDirOption
   ,relDirOption
   ,eitherReader'
+  ,fileCompleter
+  ,fileExtCompleter
+  ,dirCompleter
+  ,PathCompleterOpts(..)
+  ,defaultPathCompleterOpts
+  ,pathCompleterWith
   ) where
 
-import Control.Monad (when)
+import Control.Exception (IOException, catch)
+import Control.Monad (when, forM)
 import Data.Either.Combinators
+import Data.List (isPrefixOf)
 import Data.Maybe
 import Data.Monoid
-import Options.Applicative
-import Options.Applicative.Types (readerAsk, Completer(..))
-import Path
-import System.Environment (withArgs)
-import System.FilePath (takeBaseName)
 import Data.Text (Text)
 import qualified Data.Text as T
+import Options.Applicative
+import Options.Applicative.Types (readerAsk, Completer(..))
+import Path hiding ((</>))
+import System.Directory (getCurrentDirectory, getDirectoryContents, doesDirectoryExist)
+import System.Environment (withArgs)
+import System.FilePath (takeBaseName, (</>), splitFileName, isRelative, takeExtension)
 
 -- | Enable/disable flags for a 'Bool'.
 boolFlags :: Bool                 -- ^ Default value
@@ -147,23 +159,98 @@ optionalFirst = fmap First . optional
 
 absFileOption :: Mod OptionFields (Path Abs File) -> Parser (Path Abs File)
 absFileOption mods = option (eitherReader' parseAbsFile) $
-  completer (listCompleter ["/"] <> mapCompleter (filter (isJust . parseAbsFile)) (bashCompleter "file")) <> mods
+  completer (pathCompleterWith defaultPathCompleterOpts { pcoRelative = False }) <> mods
 
 relFileOption :: Mod OptionFields (Path Rel File) -> Parser (Path Rel File)
 relFileOption mods = option (eitherReader' parseRelFile) $
-  completer (mapCompleter (filter (isJust . parseRelFile)) (bashCompleter "file")) <> mods
+  completer (pathCompleterWith defaultPathCompleterOpts { pcoAbsolute = False }) <> mods
 
 absDirOption :: Mod OptionFields (Path Abs Dir) -> Parser (Path Abs Dir)
 absDirOption mods = option (eitherReader' parseAbsDir) $
-  completer (listCompleter ["/"] <> mapCompleter (filter (isJust . parseAbsDir)) (bashCompleter "directory")) <> mods
+  completer (pathCompleterWith defaultPathCompleterOpts { pcoRelative = False, pcoFileFilter = const False }) <> mods
 
 relDirOption :: Mod OptionFields (Path Rel Dir) -> Parser (Path Rel Dir)
 relDirOption mods = option (eitherReader' parseRelDir) $
-  completer (mapCompleter (filter (isJust . parseRelDir)) (bashCompleter "directory")) <> mods
+  completer (pathCompleterWith defaultPathCompleterOpts { pcoAbsolute = False, pcoFileFilter = const False }) <> mods
 
 -- | Like 'eitherReader', but accepting any @'Show' e@ on the 'Left'.
 eitherReader' :: Show e => (String -> Either e a) -> ReadM a
 eitherReader' f = eitherReader (mapLeft show . f)
 
-mapCompleter :: ([String] -> [String]) -> Completer -> Completer
-mapCompleter f (Completer g) = Completer (\x -> fmap f (g x))
+data PathCompleterOpts = PathCompleterOpts
+    { pcoAbsolute :: Bool
+    , pcoRelative :: Bool
+    , pcoRootDir :: Maybe FilePath
+    , pcoFileFilter :: FilePath -> Bool
+    , pcoDirFilter :: FilePath -> Bool
+    }
+
+defaultPathCompleterOpts :: PathCompleterOpts
+defaultPathCompleterOpts = PathCompleterOpts
+    { pcoAbsolute = True
+    , pcoRelative = True
+    , pcoRootDir = Nothing
+    , pcoFileFilter = const True
+    , pcoDirFilter = const True
+    }
+
+fileCompleter :: Completer
+fileCompleter = pathCompleterWith defaultPathCompleterOpts
+
+fileExtCompleter :: [String] -> Completer
+fileExtCompleter exts = pathCompleterWith defaultPathCompleterOpts { pcoFileFilter = (`elem` exts) . takeExtension }
+
+dirCompleter :: Completer
+dirCompleter = pathCompleterWith defaultPathCompleterOpts { pcoFileFilter = const False }
+
+pathCompleterWith :: PathCompleterOpts -> Completer
+pathCompleterWith PathCompleterOpts {..} = mkCompleter $ \inputRaw -> do
+    -- Unescape input, to handle single and double quotes. Note that the
+    -- results do not need to be re-escaped, due to some fiddly bash
+    -- magic.
+    let input = unescapeBashArg inputRaw
+    let (inputSearchDir0, searchPrefix) = splitFileName input
+        inputSearchDir = if inputSearchDir0 == "./" then "" else inputSearchDir0
+    msearchDir <-
+        case (isRelative inputSearchDir, pcoAbsolute, pcoRelative) of
+            (True, _, True) -> do
+                rootDir <- maybe getCurrentDirectory return pcoRootDir
+                return $ Just (rootDir </> inputSearchDir)
+            (False, True, _) -> return $ Just inputSearchDir
+            _ -> return Nothing
+    case msearchDir of
+        Nothing
+            | input == "" && pcoAbsolute -> return ["/"]
+            | otherwise -> return []
+        Just searchDir -> do
+            entries <- getDirectoryContents searchDir `catch` \(_ :: IOException) -> return []
+            results <- fmap catMaybes $ forM entries $ \entry ->
+                -- Skip . and .. unless user is typing . or ..
+                if entry `elem` ["..", "."] && searchPrefix `notElem` ["..", "."] then return Nothing else
+                    if searchPrefix `isPrefixOf` entry
+                        then do
+                            let path = searchDir </> entry
+                            case (pcoFileFilter path, pcoDirFilter path) of
+                                (True, True) -> return $ Just (inputSearchDir </> entry)
+                                (fileAllowed, dirAllowed) -> do
+                                    isDir <- doesDirectoryExist path
+                                    if (if isDir then dirAllowed else fileAllowed)
+                                        then return $ Just (inputSearchDir </> entry)
+                                        else return Nothing
+                        else return Nothing
+            return results
+
+unescapeBashArg :: String -> String
+unescapeBashArg ('\'' : rest) = rest
+unescapeBashArg ('\"' : rest) = go rest
+  where
+    go [] = []
+    go ('\\' : x : xs)
+        | x `elem` "$`\"\\\n" = x : xs
+        | otherwise = '\\' : x : go xs
+    go (x : xs) = x : go xs
+unescapeBashArg input = go input
+  where
+    go [] = []
+    go ('\\' : x : xs) = x : go xs
+    go (x : xs) = x : go xs

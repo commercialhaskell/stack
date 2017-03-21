@@ -297,7 +297,7 @@ commandLineHandler currentDir progName isInterpreter = complicatedOptions
             "upload"
             "Upload a package to Hackage"
             uploadCmd
-            ((,,,,) <$> many (strArgument $ metavar "TARBALL/DIR") <*>
+            ((,,,,) <$> many (strArgument $ metavar "TARBALL/DIR" <> completer fileCompleter) <*>
              optional pvpBoundsOption <*>
              ignoreCheckSwitch <*>
              switch (long "no-signature" <> help "Do not sign & upload signatures") <*>
@@ -309,7 +309,7 @@ commandLineHandler currentDir progName isInterpreter = complicatedOptions
             "sdist"
             "Create source distribution tarballs"
             sdistCmd
-            ((,,,,) <$> many (strArgument $ metavar "DIR") <*>
+            ((,,,,) <$> many (strArgument $ metavar "DIR" <> completer dirCompleter) <*>
              optional pvpBoundsOption <*>
              ignoreCheckSwitch <*>
              switch (long "sign" <> help "Sign & upload signatures") <*>

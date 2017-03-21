@@ -52,6 +52,7 @@ configOptsParser currentDir hide0 =
     <*> optionalFirst (option (eitherReader (mapLeft showWorkDirError . parseRelDir))
             ( long "work-dir"
             <> metavar "WORK-DIR"
+            <> completer (pathCompleterWith (defaultPathCompleterOpts { pcoAbsolute = False, pcoFileFilter = const False }))
             <> help ("Relative path of work directory " ++
                      "(Overrides any STACK_WORK environment variable, default is '.stack-work')")
             <> hide
@@ -85,21 +86,20 @@ configOptsParser currentDir hide0 =
     <*> fmap Set.fromList (many ((currentDir FilePath.</>) <$> strOption
             ( long "extra-include-dirs"
            <> metavar "DIR"
-           <> action "directory"
+           <> completer dirCompleter
            <> help "Extra directories to check for C header files"
            <> hide
             )))
     <*> fmap Set.fromList (many ((currentDir FilePath.</>) <$> strOption
             ( long "extra-lib-dirs"
            <> metavar "DIR"
-           <> action "directory"
+           <> completer dirCompleter
            <> help "Extra directories to check for libraries"
            <> hide
             )))
     <*> optionalFirst (absFileOption
              ( long "with-gcc"
             <> metavar "PATH-TO-GCC"
-            <> action "file"
             <> help "Use gcc found at PATH-TO-GCC"
             <> hide
              ))
@@ -114,7 +114,7 @@ configOptsParser currentDir hide0 =
     <*> optionalFirst (strOption
              ( long "local-bin-path"
             <> metavar "DIR"
-            <> action "directory"
+            <> completer dirCompleter
             <> help "Install binaries to DIR"
             <> hide
              ))
