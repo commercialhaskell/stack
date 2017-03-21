@@ -39,6 +39,8 @@ Bug fixes:
   your project.
 * `stack clean --full` now works when docker is enabled.
   See [#2010](https://github.com/commercialhaskell/stack/issues/2010)
+* Bash completion fixed for `--[no-]*` options.
+  See [#2737](https://github.com/commercialhaskell/stack/issues/2737)
 
 ## 1.4.0
 
