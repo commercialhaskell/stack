@@ -23,7 +23,8 @@ import Control.Monad (when)
 import Data.Either.Combinators
 import Data.Monoid
 import Options.Applicative
-import Options.Applicative.Types (readerAsk)
+import Options.Applicative.Types (OptVisibility(..), OptProperties(propVisibility), readerAsk)
+import Options.Applicative.Builder.Internal (Mod(..), baseProps)
 import Path
 import System.Environment (withArgs)
 import System.FilePath (takeBaseName)
@@ -76,26 +77,28 @@ enableDisableFlagsNoDefault :: a                 -- ^ Enabled value
                             -> Mod FlagFields a
                             -> Parser a
 enableDisableFlagsNoDefault enabledValue disabledValue name helpSuffix mods =
+  (case mods of
+      Mod _ _ f -> case propVisibility (f baseProps) of
+          Internal -> id
+          Hidden -> overrideHelp [(Nothing, displayName, description)]
+          Visible -> overrideHelp [(Just briefName, displayName, description)]
+  ) $
   last <$> some
-      ((flag'
+      (flag'
            enabledValue
            (hidden <>
-            internal <>
             long name <>
             help helpSuffix <>
             mods) <|>
        flag'
            disabledValue
            (hidden <>
-            internal <>
             long ("no-" ++ name) <>
             help helpSuffix <>
-            mods)) <|>
-       flag'
-           disabledValue
-           (long ("[no-]" ++ name) <>
-            help ("Enable/disable " ++ helpSuffix) <>
             mods))
+  where displayName = "--[no-]" ++ name
+        briefName = "[" ++ displayName ++ "]"
+        description = "Enable/disable " ++ helpSuffix
 
 -- | Show an extra help option (e.g. @--docker-help@ shows help for all @--docker*@ args).
 --
