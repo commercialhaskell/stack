@@ -20,7 +20,7 @@ data ScriptExecute
 scriptOptsParser :: Parser ScriptOpts
 scriptOptsParser = ScriptOpts
     <$> many (strOption (long "package" <> help "Additional packages that must be installed"))
-    <*> strArgument (metavar "FILENAME")
+    <*> strArgument (metavar "FILE" <> action "file")
     <*> many (strArgument (metavar "-- ARGS (e.g. stack ghc -- X.hs -o x)"))
     <*> (flag' SECompile
             ( long "compile"

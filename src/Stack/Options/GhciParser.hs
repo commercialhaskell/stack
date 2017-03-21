@@ -8,7 +8,7 @@ import           Options.Applicative.Builder.Extra
 import           Paths_stack                       as Meta
 import           Stack.Config                      (packagesParser)
 import           Stack.Ghci                        (GhciOpts (..))
-import           Stack.Options.BuildParser         (flagsParser)
+import           Stack.Options.BuildParser         (flagsParser, ghcCompleter)
 
 -- | Parser for GHCI options
 ghciOptsParser :: Parser GhciOpts
@@ -16,18 +16,21 @@ ghciOptsParser = GhciOpts
              <$> many
                    (textArgument
                         (metavar "TARGET/FILE" <>
+                         action "file" <>
                          help ("If none specified, use all local packages. " <>
                                "See https://docs.haskellstack.org/en/v" <>
                                showVersion Meta.version <>
                                "/build_command/#target-syntax for details. " <>
                                "If a path to a .hs or .lhs file is specified, it will be loaded.")))
              <*> fmap concat (many (argsOption (long "ghci-options" <>
-                                    metavar "OPTION" <>
+                                    metavar "OPTIONS" <>
+                                    completer ghcCompleter <>
                                     help "Additional options passed to GHCi")))
              <*> many
                      (textOption
                           (long "ghc-options" <>
-                           metavar "OPTION" <>
+                           metavar "OPTIONS" <>
+                           completer ghcCompleter <>
                            help "Additional options passed to both GHC and GHCi"))
              <*> flagsParser
              <*> optional

@@ -1,7 +1,10 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 module Stack.Options.BuildParser where
 
+import           Data.Char (isSpace)
+import           Data.List (isPrefixOf)
 import qualified Data.Map as Map
 import           Data.Monoid.Extra
 import           Data.Text (Text)
@@ -14,6 +17,8 @@ import           Stack.Options.PackageParser (readFlag)
 import           Stack.Types.Config
 import           Stack.Types.FlagName
 import           Stack.Types.PackageName
+import           System.Process (readProcess)
+import           Language.Haskell.TH.Syntax (runIO, lift)
 
 -- | Parser for CLI-only build arguments
 buildOptsParser :: BuildCommand
@@ -39,7 +44,8 @@ buildOptsParser cmd =
      many
          (textOption
               (long "ghc-options" <>
-               metavar "OPTION" <>
+               metavar "OPTIONS" <>
+               completer ghcCompleter <>
                help "Additional options passed to GHC"))) <*>
     flagsParser <*>
     (flag'
@@ -103,3 +109,15 @@ flagsParser =
                help
                    ("Override flags set in stack.yaml " <>
                     "(applies to local packages and extra-deps)")))
+
+ghcCompleter :: Completer
+ghcCompleter = mkCompleter $ \input -> return $
+    let (curArgReversed, otherArgsReversed) = break isSpace (reverse input)
+        curArg = reverse curArgReversed
+        otherArgs = reverse otherArgsReversed
+     in if null curArg then [] else
+         map (otherArgs ++) $
+         filter (curArg `isPrefixOf`)
+                -- Technically, we should be consulting the user's current ghc,
+                -- but that would require loading up a BuildConfig.
+                $(runIO (readProcess "ghc" ["--show-options"] "") >>= lift . lines)

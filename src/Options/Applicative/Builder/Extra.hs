@@ -21,9 +21,10 @@ module Options.Applicative.Builder.Extra
 
 import Control.Monad (when)
 import Data.Either.Combinators
+import Data.Maybe
 import Data.Monoid
 import Options.Applicative
-import Options.Applicative.Types (readerAsk)
+import Options.Applicative.Types (readerAsk, Completer(..))
 import Path
 import System.Environment (withArgs)
 import System.FilePath (takeBaseName)
@@ -145,17 +146,24 @@ optionalFirst :: Alternative f => f a -> f (First a)
 optionalFirst = fmap First . optional
 
 absFileOption :: Mod OptionFields (Path Abs File) -> Parser (Path Abs File)
-absFileOption = option (eitherReader' parseAbsFile)
+absFileOption mods = option (eitherReader' parseAbsFile) $
+  completer (listCompleter ["/"] <> mapCompleter (filter (isJust . parseAbsFile)) (bashCompleter "file")) <> mods
 
 relFileOption :: Mod OptionFields (Path Rel File) -> Parser (Path Rel File)
-relFileOption = option (eitherReader' parseRelFile)
+relFileOption mods = option (eitherReader' parseRelFile) $
+  completer (mapCompleter (filter (isJust . parseRelFile)) (bashCompleter "file")) <> mods
 
 absDirOption :: Mod OptionFields (Path Abs Dir) -> Parser (Path Abs Dir)
-absDirOption = option (eitherReader' parseAbsDir)
+absDirOption mods = option (eitherReader' parseAbsDir) $
+  completer (listCompleter ["/"] <> mapCompleter (filter (isJust . parseAbsDir)) (bashCompleter "directory")) <> mods
 
 relDirOption :: Mod OptionFields (Path Rel Dir) -> Parser (Path Rel Dir)
-relDirOption = option (eitherReader' parseRelDir)
+relDirOption mods = option (eitherReader' parseRelDir) $
+  completer (mapCompleter (filter (isJust . parseRelDir)) (bashCompleter "directory")) <> mods
 
 -- | Like 'eitherReader', but accepting any @'Show' e@ on the 'Left'.
 eitherReader' :: Show e => (String -> Either e a) -> ReadM a
 eitherReader' f = eitherReader (mapLeft show . f)
+
+mapCompleter :: ([String] -> [String]) -> Completer -> Completer
+mapCompleter f (Completer g) = Completer (\x -> fmap f (g x))

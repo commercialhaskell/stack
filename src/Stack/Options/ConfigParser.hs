@@ -85,18 +85,21 @@ configOptsParser currentDir hide0 =
     <*> fmap Set.fromList (many ((currentDir FilePath.</>) <$> strOption
             ( long "extra-include-dirs"
            <> metavar "DIR"
+           <> action "directory"
            <> help "Extra directories to check for C header files"
            <> hide
             )))
     <*> fmap Set.fromList (many ((currentDir FilePath.</>) <$> strOption
             ( long "extra-lib-dirs"
            <> metavar "DIR"
+           <> action "directory"
            <> help "Extra directories to check for libraries"
            <> hide
             )))
     <*> optionalFirst (absFileOption
              ( long "with-gcc"
             <> metavar "PATH-TO-GCC"
+            <> action "file"
             <> help "Use gcc found at PATH-TO-GCC"
             <> hide
              ))
@@ -111,6 +114,7 @@ configOptsParser currentDir hide0 =
     <*> optionalFirst (strOption
              ( long "local-bin-path"
             <> metavar "DIR"
+            <> action "directory"
             <> help "Install binaries to DIR"
             <> hide
              ))

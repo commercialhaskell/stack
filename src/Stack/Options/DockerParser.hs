@@ -65,6 +65,7 @@ dockerOptsParser hide0 =
     <*> many (option auto (long (dockerOptName dockerMountArgName) <>
                            hide <>
                            metavar "(PATH | HOST-PATH:CONTAINER-PATH)" <>
+                           action "directory" <>
                            help ("Mount volumes from host in container " ++
                                  "(may specify multiple times)")))
     <*> many (option str (long (dockerOptName dockerEnvArgName) <>
@@ -78,13 +79,15 @@ dockerOptsParser hide0 =
              metavar "PATH" <>
              help "Location of image usage tracking database"))
     <*> optionalFirst (option (eitherReader' parseDockerStackExe)
-            (long(dockerOptName dockerStackExeArgName) <>
+            (let specialOpts =
+                     [ dockerStackExeDownloadVal
+                     , dockerStackExeHostVal
+                     , dockerStackExeImageVal
+                     ] in
+             long(dockerOptName dockerStackExeArgName) <>
              hide <>
-             metavar (intercalate "|"
-                          [ dockerStackExeDownloadVal
-                          , dockerStackExeHostVal
-                          , dockerStackExeImageVal
-                          , "PATH" ]) <>
+             metavar (intercalate "|" (specialOpts ++ ["PATH"])) <>
+             completer (listCompleter specialOpts <> bashCompleter "file") <>
              help (concat [ "Location of "
                           , stackProgName
                           , " executable used in container" ])))

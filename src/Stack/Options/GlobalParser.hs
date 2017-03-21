@@ -36,12 +36,16 @@ globalOptsParser currentDir kind defLogLevel =
     optionalFirst (option readColorWhen
         (long "color" <>
          metavar "WHEN" <>
+         completeWith ["always", "never", "auto"] <>
          help "Specify when to use color in output; WHEN is 'always', 'never', or 'auto'" <>
          hide)) <*>
     optionalFirst
         (strOption
             (long "stack-yaml" <>
              metavar "STACK-YAML" <>
+             -- TODO: ideally we'd have a completer that filtered files
+             -- to "*.yaml", but still completed paths
+             action "file" <>
              help ("Override project stack.yaml file " <>
                    "(overrides any STACK_YAML environment variable)") <>
              hide))
@@ -72,6 +76,7 @@ initOptsParser =
     searchDirs =
       many (textArgument
               (metavar "DIRS" <>
+               action "directory" <>
                help "Directories to include, default is current directory."))
     ignoreSubDirs = switch (long "ignore-subdirs" <>
                            help "Do not search for .cabal files in sub directories")

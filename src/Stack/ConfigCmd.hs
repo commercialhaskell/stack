@@ -159,4 +159,4 @@ readBool = do
         _ -> OA.readerError ("Invalid value " ++ show s ++ ": Expected \"true\" or \"false\"")
 
 boolArgument :: OA.Parser Bool
-boolArgument = OA.argument readBool (OA.metavar "true/false")
+boolArgument = OA.argument readBool (OA.metavar "true|false" <> OA.completeWith ["true", "false"])
