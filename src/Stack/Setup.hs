@@ -635,7 +635,7 @@ upgradeCabal :: (StackM env m, HasConfig env, HasGHCVariant env)
 upgradeCabal menv wc cabalVersion = do
     $logInfo "Manipulating the global Cabal is only for debugging purposes"
     let name = $(mkPackageName "Cabal")
-    rmap <- resolvePackages menv Nothing Map.empty (Set.singleton name)
+    rmap <- resolvePackages Nothing Map.empty (Set.singleton name)
     installed <- getCabalPkgVer menv wc
     case cabalVersion of
         Specific version -> do
@@ -671,7 +671,7 @@ doCabalInstall menv wc installed version = do
             ]
         let name = $(mkPackageName "Cabal")
             ident = PackageIdentifier name version
-        m <- unpackPackageIdents menv tmpdir Nothing (Map.singleton ident Nothing)
+        m <- unpackPackageIdents tmpdir Nothing (Map.singleton ident Nothing)
         compilerPath <- join $ findExecutable menv (compilerExeName wc)
         versionDir <- parseRelDir $ versionString version
         let installRoot = toFilePath $ parent (parent compilerPath)

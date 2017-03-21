@@ -214,7 +214,6 @@ library
                    , generic-deriving < 1.12
                    , hackage-security
                    , hashable >= 1.2.3.2
-                   , hit
                    , hpc
                    , http-client >= 0.5.3.3
                    , http-client-tls >= 0.3.4

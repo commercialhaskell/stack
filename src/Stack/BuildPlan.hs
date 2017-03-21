@@ -281,17 +281,16 @@ addDeps
     -> Map PackageName (Version, Map FlagName Bool, [Text], Maybe GitSHA1)
     -> m (Map PackageName MiniPackageInfo, Set PackageIdentifier)
 addDeps allowMissing compilerVersion toCalc = do
-    menv <- getMinimalEnvOverride
     platform <- view platformL
     (resolvedMap, missingIdents) <-
         if allowMissing
             then do
                 (missingNames, missingIdents, m) <-
-                    resolvePackagesAllowMissing menv Nothing shaMap Set.empty
+                    resolvePackagesAllowMissing Nothing shaMap Set.empty
                 assert (Set.null missingNames)
                     $ return (m, missingIdents)
             else do
-                m <- resolvePackages menv Nothing shaMap Set.empty
+                m <- resolvePackages Nothing shaMap Set.empty
                 return (m, Set.empty)
     let byIndex = Map.fromListWith (++) $ flip map resolvedMap
             $ \rp ->

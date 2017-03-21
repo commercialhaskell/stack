@@ -11,6 +11,7 @@ Behavior changes:
 * `stack profile` and `stack trace` now add their extra RTS arguments for
   benchmarks and tests to the beginning of the args, instead of the end.
   See [#2399](https://github.com/commercialhaskell/stack/issues/2399)
+* Support for Git-based indices has been removed.
 
 Other enhancements:
 

@@ -125,7 +125,7 @@ createDependencyGraph dotOpts = do
   installedMap <- fmap snd . fst4 <$> getInstalled menv
                                                    (GetInstalledOpts False False False)
                                                    sourceMap
-  withLoadPackage menv (\loader -> do
+  withLoadPackage (\loader -> do
     let depLoader = createDepLoader sourceMap installedMap loadPackageDeps
         loadPackageDeps name version flags ghcOptions
             -- Skip packages that can't be loaded - see

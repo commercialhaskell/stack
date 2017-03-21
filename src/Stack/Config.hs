@@ -100,7 +100,7 @@ import           Stack.Types.Config
 import           Stack.Types.Docker
 import           Stack.Types.Internal
 import           Stack.Types.Nix
-import           Stack.Types.PackageIndex (HttpType (HTHackageSecurity), HackageSecurity (..))
+import           Stack.Types.PackageIndex (IndexType (ITHackageSecurity), HackageSecurity (..))
 import           Stack.Types.Resolver
 import           Stack.Types.StackT
 import           Stack.Types.Urls
@@ -269,10 +269,8 @@ configFromConfigMonoid
          configPackageIndices = fromFirst
             [PackageIndex
                 { indexName = IndexName "Hackage"
-                , indexLocation = ILGitHttp
-                        "https://github.com/commercialhaskell/all-cabal-hashes.git"
-                        "https://s3.amazonaws.com/hackage.fpcomplete.com/"
-                        (HTHackageSecurity HackageSecurity
+                , indexLocation = "https://s3.amazonaws.com/hackage.fpcomplete.com/"
+                , indexType = ITHackageSecurity HackageSecurity
                             { hsKeyIds =
                                 [ "0a5c7ea47cd1b15f01f5f51a33adda7e655bc0f0b0615baa8e271f4c3351e21d"
                                 , "1ea9ba32c526d1cc91ab5e5bd364ec5e9e8cb67179a471872f6e26f0ae773d42"
@@ -285,9 +283,8 @@ configFromConfigMonoid
                                 , "fe331502606802feac15e514d9b9ea83fee8b6ffef71335479a2e68d84adc6b0"
                                 ]
                             , hsKeyThreshold = 3
-                            })
+                            }
                 , indexDownloadPrefix = "https://s3.amazonaws.com/hackage.fpcomplete.com/package/"
-                , indexGpgVerify = False
                 , indexRequireHashes = False
                 }]
             configMonoidPackageIndices

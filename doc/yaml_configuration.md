@@ -314,12 +314,13 @@ package-indices:
 - name: Hackage
   download-prefix: https://s3.amazonaws.com/hackage.fpcomplete.com/package/
 
-  # at least one of the following must be present
-  git: https://github.com/commercialhaskell/all-cabal-hashes.git
+  # HTTP location of the package index
   http: https://s3.amazonaws.com/hackage.fpcomplete.com/00-index.tar.gz
 
+  # Or, if using Hackage Security below, give the root URL:
+  http: https://s3.amazonaws.com/hackage.fpcomplete.com/
+
   # optional fields, both default to false
-  gpg-verify: false
   require-hashes: false
 
   # Starting with stack 1.4, we default to using Hackage Security
@@ -331,6 +332,15 @@ package-indices:
 One thing you should be aware of: if you change the contents of package-version
 combination by setting a different package index, this *can* have an effect on
 other projects by installing into your shared snapshot database.
+
+Note that older versions of Stack supported Git-based indices. This feature has since been removed. A line such as:
+
+```yaml
+git: https://github.com/commercialhaskell/all-cabal-hashes.git
+gpg-verify: false
+```
+
+Will now be ignored.
 
 ### system-ghc
 

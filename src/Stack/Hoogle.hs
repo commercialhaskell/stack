@@ -97,10 +97,8 @@ hoogleCmd (args,setup,rebuild) go = withBuildConfig go pathToHaddocks
             hoogleMinIdent =
                 PackageIdentifier hooglePackageName hoogleMinVersion
         hooglePackageIdentifier <-
-            do menv <- getMinimalEnvOverride
-               (_,_,resolved) <-
+            do (_,_,resolved) <-
                    resolvePackagesAllowMissing
-                       menv
 
                        -- FIXME this Nothing means "do not follow any
                        -- specific snapshot", which matches old
