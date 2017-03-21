@@ -26,6 +26,7 @@ module Options.Applicative.Builder.Extra
   ,PathCompleterOpts(..)
   ,defaultPathCompleterOpts
   ,pathCompleterWith
+  ,unescapeBashArg
   ) where
 
 import Control.Exception (IOException, catch)

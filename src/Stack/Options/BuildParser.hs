@@ -111,8 +111,9 @@ flagsParser =
                     "(applies to local packages and extra-deps)")))
 
 ghcCompleter :: Completer
-ghcCompleter = mkCompleter $ \input -> return $
-    let (curArgReversed, otherArgsReversed) = break isSpace (reverse input)
+ghcCompleter = mkCompleter $ \inputRaw -> return $
+    let input = unescapeBashArg inputRaw
+        (curArgReversed, otherArgsReversed) = break isSpace (reverse input)
         curArg = reverse curArgReversed
         otherArgs = reverse otherArgsReversed
      in if null curArg then [] else
