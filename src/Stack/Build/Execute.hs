@@ -713,13 +713,16 @@ toActions installedMap runInBase ee (mbuild, mfinal) =
                 (if taskAllInOne then [] else
                     [Action
                         { actionId = ActionId taskProvides ATBuildFinal
-                        , actionDeps = addBuild ATBuild
+                        , actionDeps = addBuild
                             (Set.map (\ident -> ActionId ident ATBuild) (tcoMissing taskConfigOpts))
                         , actionDo = \ac -> runInBase $ singleBuild runInBase ac ee task installedMap True
                         }]) ++
                 [ Action
                     { actionId = ActionId taskProvides ATFinal
-                    , actionDeps = addBuild (if taskAllInOne then ATBuild else ATBuildFinal) Set.empty
+                    , actionDeps =
+                        if taskAllInOne
+                            then addBuild mempty
+                            else Set.singleton (ActionId taskProvides ATBuildFinal)
                     , actionDo = \ac -> runInBase $ do
                         let comps = taskComponents task
                             tests = testComponents comps
@@ -731,10 +734,10 @@ toActions installedMap runInBase ee (mbuild, mfinal) =
                     }
                 ]
               where
-                addBuild aty =
+                addBuild =
                     case mbuild of
                         Nothing -> id
-                        Just _ -> Set.insert $ ActionId taskProvides aty
+                        Just _ -> Set.insert $ ActionId taskProvides ATBuild
     bopts = eeBuildOpts ee
     topts = boptsTestOpts bopts
     beopts = boptsBenchmarkOpts bopts

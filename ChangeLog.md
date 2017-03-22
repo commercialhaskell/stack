@@ -42,6 +42,9 @@ Bug fixes:
   your project.
 * `stack clean --full` now works when docker is enabled.
   See [#2010](https://github.com/commercialhaskell/stack/issues/2010)
+* Fixes an issue where cyclic deps can cause benchmarks or tests to be run
+  before they are built.
+  See [#2153](https://github.com/commercialhaskell/stack/issues/2153)
 
 ## 1.4.0
 
