@@ -1,6 +1,5 @@
 module Stack.Options.BuildMonoidParser where
 
-import           Data.Maybe                        (catMaybes)
 import           Data.Monoid.Extra
 import           Options.Applicative
 import           Options.Applicative.Builder.Extra
@@ -13,94 +12,46 @@ import           Stack.Types.Config.Build
 
 buildOptsMonoidParser :: GlobalOptsContext -> Parser BuildOptsMonoid
 buildOptsMonoidParser hide0 =
-    transform <$> trace <*> profile <*> noStrip <*> options
+    BuildOptsMonoid <$> trace <*> profile <*> noStrip <*>
+    libProfiling <*> exeProfiling <*> libStripping <*>
+    exeStripping <*> haddock <*> haddockOptsParser hideBool <*>
+    openHaddocks <*> haddockDeps <*> haddockInternal <*> copyBins <*>
+    preFetch <*> keepGoing <*> forceDirty <*> tests <*>
+    testOptsParser hideBool <*> benches <*> benchOptsParser hideBool <*>
+    reconfigure <*> cabalVerbose <*> splitObjs
   where
     hideBool = hide0 /= BuildCmdGlobalOpts
     hide =
         hideMods hideBool
     hideExceptGhci =
         hideMods (hide0 `notElem` [BuildCmdGlobalOpts, GhciCmdGlobalOpts])
-    transform tracing profiling noStripping =
-        enable
-      where
-        enable opts
-          | tracing || profiling =
-              opts
-              { buildMonoidLibProfile = First (Just True)
-              , buildMonoidExeProfile = First (Just True)
-              , buildMonoidBenchmarkOpts = bopts
-                { beoMonoidAdditionalArgs = First (Just (" " <> unwords additionalArgs) <>
-                  getFirst (beoMonoidAdditionalArgs bopts))
-                }
-              , buildMonoidTestOpts = topts
-                { toMonoidAdditionalArgs = additionalArgs <> toMonoidAdditionalArgs topts
-                }
-              }
-          | noStripping =
-              opts
-              { buildMonoidLibStrip = First (Just False)
-              , buildMonoidExeStrip = First (Just False)
-              }
-          | otherwise =
-              opts
-          where
-            bopts =
-                buildMonoidBenchmarkOpts opts
-            topts =
-                buildMonoidTestOpts opts
-            additionalArgs =
-                "+RTS" : catMaybes [trac, prof, Just "-RTS"]
-            trac =
-                if tracing
-                    then Just "-xc"
-                    else Nothing
-            prof =
-                if profiling
-                    then Just "-p"
-                    else Nothing
-    profile =
-        flag
-            False
-            True
-            (long "profile" <>
-             help
-                 "Enable profiling in libraries, executables, etc. \
-                    \for all expressions and generate a profiling report\
-                    \ in tests or benchmarks" <>
-            hideExceptGhci)
 
     trace =
+        firstBoolFlags
+            "trace"
+            "Enable profiling in libraries, executables, etc. \
+                \for all expressions and generate a backtrace on \
+                \exception"
+            hideExceptGhci
+    profile =
+        firstBoolFlags
+            "profile"
+            "profiling in libraries, executables, etc. \
+                \for all expressions and generate a profiling report\
+                \ in tests or benchmarks"
+            hideExceptGhci
+    noStrip = fmap Any $
         flag
-            False
-            True
-            (long "trace" <>
-             help
-                 "Enable profiling in libraries, executables, etc. \
-                    \for all expressions and generate a backtrace on \
-                    \exception" <>
-            hideExceptGhci)
-
-    noStrip =
-        flag
-            False
-            True
-            (long "no-strip" <>
-             help
-                 "Disable DWARF debugging symbol stripping in libraries, \
-                     \executables, etc. for all expressions, producing \
-                     \larger executables but allowing the use of standard \
-                     \debuggers/profiling tools/other utilities that use \
-                     \debugging symbols." <>
+             False
+             True
+             (long "no-strip" <>
+              help
+                  "Disable DWARF debugging symbol stripping in libraries, \
+                      \executables, etc. for all expressions, producing \
+                      \larger executables but allowing the use of standard \
+                      \debuggers/profiling tools/other utilities that use \
+                      \debugging symbols." <>
              hideExceptGhci)
-
-    options =
-        BuildOptsMonoid <$> libProfiling <*> exeProfiling <*> libStripping <*>
-        exeStripping <*> haddock <*> haddockOptsParser hideBool <*>
-        openHaddocks <*> haddockDeps <*> haddockInternal <*> copyBins <*>
-        preFetch <*> keepGoing <*> forceDirty <*> tests <*>
-        testOptsParser hideBool <*> benches <*> benchOptsParser hideBool <*>
-        reconfigure <*> cabalVerbose <*> splitObjs
-
     libProfiling =
         firstBoolFlags
             "library-profiling"
