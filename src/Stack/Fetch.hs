@@ -427,9 +427,11 @@ typoCorrectionCandidates ident =
   let getName = packageNameText . packageIdentifierName
       name    = getName ident
   in  NE.nonEmpty
-    . Map.keys
-    . Map.filterWithKey (const . (== 1) . damerauLevenshtein name)
-    . Map.mapKeys getName
+    . take 10
+    . map snd
+    . filter (\(distance, _) -> distance < 4)
+    . map (\(k, _) -> (damerauLevenshtein name (getName k), getName k))
+    . Map.toList
 
 -- | Figure out where to fetch from.
 getToFetch :: (StackMiniM env m, HasConfig env)
