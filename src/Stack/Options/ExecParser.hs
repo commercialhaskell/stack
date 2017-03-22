@@ -4,6 +4,7 @@ import           Data.Monoid.Extra
 import           Options.Applicative
 import           Options.Applicative.Builder.Extra
 import           Options.Applicative.Args
+import           Stack.Options.Completion
 import           Stack.Types.Config
 
 -- | Parser for exec command
@@ -14,7 +15,7 @@ execOptsParser mcmd =
         <*> eoArgsParser
         <*> execOptsExtraParser
   where
-    eoCmdParser = ExecCmd <$> strArgument (metavar "CMD")
+    eoCmdParser = ExecCmd <$> strArgument (metavar "CMD" <> completer projectExeCompleter)
     eoArgsParser = many (strArgument (metavar "-- ARGS (e.g. stack ghc -- X.hs -o x)"))
 
 evalOptsParser :: String -- ^ metavar
@@ -52,7 +53,7 @@ execOptsExtraParser = eoPlainParser <|>
     eoPackagesParser = many (strOption (long "package" <> help "Additional packages that must be installed"))
 
     eoRtsOptionsParser :: Parser [String]
-    eoRtsOptionsParser = concat <$> many (argsOption 
+    eoRtsOptionsParser = concat <$> many (argsOption
         ( long "rts-options"
         <> help "Explicit RTS options to pass to application"
         <> metavar "RTSFLAG"))
@@ -61,4 +62,3 @@ execOptsExtraParser = eoPlainParser <|>
     eoPlainParser = flag' ExecOptsPlain
                           (long "plain" <>
                            help "Use an unmodified environment (only useful with Docker)")
-

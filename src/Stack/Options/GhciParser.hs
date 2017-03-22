@@ -8,7 +8,8 @@ import           Options.Applicative.Builder.Extra
 import           Paths_stack                       as Meta
 import           Stack.Config                      (packagesParser)
 import           Stack.Ghci                        (GhciOpts (..))
-import           Stack.Options.BuildParser         (flagsParser, ghcCompleter)
+import           Stack.Options.BuildParser         (flagsParser)
+import           Stack.Options.Completion
 
 -- | Parser for GHCI options
 ghciOptsParser :: Parser GhciOpts
@@ -16,7 +17,7 @@ ghciOptsParser = GhciOpts
              <$> many
                    (textArgument
                         (metavar "TARGET/FILE" <>
-                         completer (fileExtCompleter [".hs", ".lhs"]) <>
+                         completer (targetCompleter <> fileExtCompleter [".hs", ".lhs"]) <>
                          help ("If none specified, use all local packages. " <>
                                "See https://docs.haskellstack.org/en/v" <>
                                showVersion Meta.version <>
@@ -24,13 +25,13 @@ ghciOptsParser = GhciOpts
                                "If a path to a .hs or .lhs file is specified, it will be loaded.")))
              <*> fmap concat (many (argsOption (long "ghci-options" <>
                                     metavar "OPTIONS" <>
-                                    completer ghcCompleter <>
+                                    completer ghcOptsCompleter <>
                                     help "Additional options passed to GHCi")))
              <*> many
                      (textOption
                           (long "ghc-options" <>
                            metavar "OPTIONS" <>
-                           completer ghcCompleter <>
+                           completer ghcOptsCompleter <>
                            help "Additional options passed to both GHC and GHCi"))
              <*> flagsParser
              <*> optional
@@ -43,6 +44,7 @@ ghciOptsParser = GhciOpts
                      (textOption
                            (long "main-is" <>
                             metavar "TARGET" <>
+                            completer targetCompleter <>
                             help "Specify which target should contain the main \
                                  \module to load, such as for an executable for \
                                  \test suite or benchmark."))

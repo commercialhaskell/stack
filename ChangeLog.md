@@ -30,7 +30,8 @@ Other enhancements:
   See [#3063](https://github.com/commercialhaskell/stack/issues/3063)
 * Can now use relative paths for `extra-include-dirs` and `extra-lib-dirs`.
   See [#2830](https://github.com/commercialhaskell/stack/issues/2830)
-* Improved bash completion for many options, including `--ghc-options`.
+* Improved bash completion for many options, including `--ghc-options`,
+  --flag`, targets, and project executables for `exec`.
 
 Bug fixes:
 

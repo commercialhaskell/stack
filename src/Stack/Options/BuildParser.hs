@@ -1,10 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TemplateHaskell #-}
 
 module Stack.Options.BuildParser where
 
-import           Data.Char (isSpace)
-import           Data.List (isPrefixOf)
 import qualified Data.Map as Map
 import           Data.Monoid.Extra
 import           Data.Text (Text)
@@ -13,12 +10,11 @@ import           Options.Applicative
 import           Options.Applicative.Args
 import           Options.Applicative.Builder.Extra
 import           Paths_stack as Meta
+import           Stack.Options.Completion
 import           Stack.Options.PackageParser (readFlag)
 import           Stack.Types.Config
 import           Stack.Types.FlagName
 import           Stack.Types.PackageName
-import           System.Process (readProcess)
-import           Language.Haskell.TH.Syntax (runIO, lift)
 
 -- | Parser for CLI-only build arguments
 buildOptsParser :: BuildCommand
@@ -45,7 +41,7 @@ buildOptsParser cmd =
          (textOption
               (long "ghc-options" <>
                metavar "OPTIONS" <>
-               completer ghcCompleter <>
+               completer ghcOptsCompleter <>
                help "Additional options passed to GHC"))) <*>
     flagsParser <*>
     (flag'
@@ -93,6 +89,7 @@ targetsParser =
     many
         (textArgument
              (metavar "TARGET" <>
+              completer targetCompleter <>
               help ("If none specified, use all local packages. " <>
                     "See https://docs.haskellstack.org/en/v" <>
                     showVersion Meta.version <>
@@ -105,20 +102,8 @@ flagsParser =
          (option
               readFlag
               (long "flag" <>
+               completer flagCompleter <>
                metavar "PACKAGE:[-]FLAG" <>
                help
                    ("Override flags set in stack.yaml " <>
                     "(applies to local packages and extra-deps)")))
-
-ghcCompleter :: Completer
-ghcCompleter = mkCompleter $ \inputRaw -> return $
-    let input = unescapeBashArg inputRaw
-        (curArgReversed, otherArgsReversed) = break isSpace (reverse input)
-        curArg = reverse curArgReversed
-        otherArgs = reverse otherArgsReversed
-     in if null curArg then [] else
-         map (otherArgs ++) $
-         filter (curArg `isPrefixOf`)
-                -- Technically, we should be consulting the user's current ghc,
-                -- but that would require loading up a BuildConfig.
-                $(runIO (readProcess "ghc" ["--show-options"] "") >>= lift . lines)

@@ -120,6 +120,7 @@ library
                      Stack.Options.BuildParser
                      Stack.Options.CleanParser
                      Stack.Options.ConfigParser
+                     Stack.Options.Completion
                      Stack.Options.DockerParser
                      Stack.Options.DotParser
                      Stack.Options.ExecParser

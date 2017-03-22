@@ -6,12 +6,14 @@ import           Options.Applicative
 import           Options.Applicative.Builder.Extra
 import           Options.Applicative.Types         (readerAsk)
 import           Stack.Coverage                    (HpcReportOpts (..))
+import           Stack.Options.Completion          (targetCompleter)
 import           Stack.Types.Config
 
 -- | Parser for @stack hpc report@.
 hpcReportOptsParser :: Parser HpcReportOpts
 hpcReportOptsParser = HpcReportOpts
-    <$> many (textArgument $ metavar "TARGET_OR_TIX")
+    <$> many (textArgument $ metavar "TARGET_OR_TIX" <>
+                             completer (targetCompleter <> fileExtCompleter [".tix"]))
     <*> switch (long "all" <> help "Use results from all packages and components involved in previous --coverage run")
     <*> optional (strOption (long "destdir" <>
                              metavar "DIR" <>
