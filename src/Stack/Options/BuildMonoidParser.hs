@@ -40,7 +40,7 @@ buildOptsMonoidParser hide0 =
                 \for all expressions and generate a profiling report\
                 \ in tests or benchmarks"
             hideExceptGhci
-    noStrip = fmap Any $
+    noStrip = Any <$>
         flag
              False
              True
