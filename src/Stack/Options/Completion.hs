@@ -75,7 +75,6 @@ targetCompleter = buildConfigCompleter $ \input -> do
         concatMap allComponentNames (Map.toList lpvs)
   where
     allComponentNames (name, (lpv, _)) =
-        packageNameString name :
         map (T.unpack . renderPkgComponent . (name,)) (Set.toList (lpvComponents lpv))
 
 flagCompleter :: Completer
