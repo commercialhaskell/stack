@@ -4,13 +4,20 @@
 
 * Adjust static binary build on Alpine. See
   https://github.com/commercialhaskell/stack/issues/3045
+* For minor release, ensure https://github.com/commercialhaskell/stack/commit/d3637126b9045b266d2e53387e183915cb4a912d cherry-picked
 
 ## Pre-release steps
 
 * Ensure `release` and `stable` branches merged to `master`
 * Check compatibility with latest nightly stackage snapshot:
     * Update `stack-nightly.yaml` with latest nightly and remove extra-deps
-    * Run `stack --stack-yaml=stack-nightly.yaml test`
+    * Run `stack --stack-yaml=stack-nightly.yaml test --pedantic`
+* Check pvp-bounds compatibility with Stackage snapshots:
+    * Create an sdist using `stack sdist --pvp-bounds=both`
+    * Temporarily replace `stack.cabal` with the `stack.cabal` in that sdist
+    * Run `stack --stack-yaml=stack-SNAPSHOT.yaml test --pedantic` for each
+      `stack-*.yaml` and adjust upper bounds in original `stack.cabal` until it
+      works with pvp-bounds.
 * Ensure integration tests pass on a Windows, macOS, and Linux (Linux
   integration tests are run
   by
