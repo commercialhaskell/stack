@@ -68,8 +68,8 @@ buildOptsFromMonoid BuildOptsMonoid{..} = BuildOpts
   where
     -- These options are not directly used in bopts, instead they
     -- transform other options.
-    tracing = fromFirst False buildMonoidTrace
-    profiling = fromFirst False buildMonoidProfile
+    tracing = getAny buildMonoidTrace
+    profiling = getAny buildMonoidProfile
     noStripping = getAny buildMonoidNoStrip
     -- Additional args for tracing / profiling
     additionalArgs =

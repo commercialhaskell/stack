@@ -26,20 +26,28 @@ buildOptsMonoidParser hide0 =
     hideExceptGhci =
         hideMods (hide0 `notElem` [BuildCmdGlobalOpts, GhciCmdGlobalOpts])
 
-    trace =
-        firstBoolFlags
-            "trace"
-            "Enable profiling in libraries, executables, etc. \
-                \for all expressions and generate a backtrace on \
-                \exception"
-            hideExceptGhci
-    profile =
-        firstBoolFlags
-            "profile"
-            "profiling in libraries, executables, etc. \
-                \for all expressions and generate a profiling report\
-                \ in tests or benchmarks"
-            hideExceptGhci
+    -- These use 'Any' because they are not settable in stack.yaml, so
+    -- there is no need for options like --no-profile.
+    trace = Any <$>
+        flag
+            False
+            True
+            (long "trace" <>
+             help
+                 "Enable profiling in libraries, executables, etc. \
+                     \for all expressions and generate a backtrace on \
+                     \exception" <>
+             hideExceptGhci)
+    profile = Any <$>
+        flag
+            False
+            True
+            (long "profile" <>
+             help
+                 "profiling in libraries, executables, etc. \
+                     \for all expressions and generate a profiling report\
+                     \ in tests or benchmarks" <>
+             hideExceptGhci)
     noStrip = Any <$>
         flag
              False
@@ -52,6 +60,7 @@ buildOptsMonoidParser hide0 =
                       \debuggers/profiling tools/other utilities that use \
                       \debugging symbols." <>
              hideExceptGhci)
+
     libProfiling =
         firstBoolFlags
             "library-profiling"

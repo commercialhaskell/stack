@@ -149,8 +149,8 @@ data BuildCommand
 
 -- | Build options that may be specified in the stack.yaml or from the CLI
 data BuildOptsMonoid = BuildOptsMonoid
-    { buildMonoidTrace :: !(First Bool)
-    , buildMonoidProfile :: !(First Bool)
+    { buildMonoidTrace :: !Any
+    , buildMonoidProfile :: !Any
     , buildMonoidNoStrip :: !Any
     , buildMonoidLibProfile :: !(First Bool)
     , buildMonoidExeProfile :: !(First Bool)
@@ -176,8 +176,8 @@ data BuildOptsMonoid = BuildOptsMonoid
 
 instance FromJSON (WithJSONWarnings BuildOptsMonoid) where
   parseJSON = withObjectWarnings "BuildOptsMonoid"
-    (\o -> do let buildMonoidTrace = First Nothing
-                  buildMonoidProfile = First Nothing
+    (\o -> do let buildMonoidTrace = Any False
+                  buildMonoidProfile = Any False
                   buildMonoidNoStrip = Any False
               buildMonoidLibProfile <- First <$> o ..:? buildMonoidLibProfileArgName
               buildMonoidExeProfile <-First <$>  o ..:? buildMonoidExeProfileArgName
