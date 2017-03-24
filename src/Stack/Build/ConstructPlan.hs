@@ -868,9 +868,9 @@ pprintExceptions exceptions stackYaml parentMap wanted =
                 pprintFlags (packageFlags pkg) <> ":" <> line <>
                 indent 4 (vsep depErrors) <>
                 case getShortestDepsPath parentMap wanted (packageName pkg) of
-                    [] -> mempty
-                    [target,_] -> line <> "needed since" <+> displayTargetPkgId target <+> "is a build target."
-                    (target:path) -> line <> "needed due to " <> encloseSep "" "" " -> " pathElems
+                    Nothing -> line <> "needed for unknown reason - stack invariant violated."
+                    Just [] -> line <> "needed since" <+> pkgIdent <+> "is a build target."
+                    Just (target:path) -> line <> "needed due to " <> encloseSep "" "" " -> " pathElems
                       where
                         pathElems =
                             [displayTargetPkgId target] ++
@@ -921,13 +921,15 @@ getShortestDepsPath
     :: ParentMap
     -> Set PackageName
     -> PackageName
-    -> [PackageIdentifier]
+    -> Maybe [PackageIdentifier]
 getShortestDepsPath (MonoidMap parentsMap) wanted name =
-    case M.lookup name parentsMap of
-        Nothing -> []
-        Just (_, parents) -> findShortest 256 paths0
-          where
-            paths0 = M.fromList $ map (\(ident, _) -> (packageIdentifierName ident, startDepsPath ident)) parents
+    if Set.member name wanted
+        then Just []
+        else case M.lookup name parentsMap of
+            Nothing -> Nothing
+            Just (_, parents) -> Just $ findShortest 256 paths0
+              where
+                paths0 = M.fromList $ map (\(ident, _) -> (packageIdentifierName ident, startDepsPath ident)) parents
   where
     -- The 'paths' map is a map from PackageName to the shortest path
     -- found to get there. It is the frontier of our breadth-first
