@@ -201,8 +201,8 @@ library
                    , conduit >= 1.2.8
                    , conduit-extra >= 1.1.14
                    , containers >= 0.5.5.1
-                   , cryptonite
-                   , cryptonite-conduit
+                   , cryptonite >= 0.19 && < 0.22
+                   , cryptonite-conduit >= 0.1 && < 0.3
                    , directory >= 1.2.1.0 && < 1.4
                    , either
                    , errors < 2.2
@@ -223,7 +223,7 @@ library
                    , lifted-async
                        -- https://github.com/basvandijk/lifted-base/issues/31
                    , lifted-base < 0.2.3.7 || > 0.2.3.7
-                   , memory
+                   , memory >= 0.13 && < 0.15
                    , microlens >= 0.3.0.0
                    , microlens-mtl
                    , monad-control
@@ -356,7 +356,7 @@ test-suite stack-test
                 , conduit
                 , conduit-extra
                 , containers >= 0.5.5.1
-                , cryptonite
+                , cryptonite >= 0.19 && < 0.22
                 , directory >= 1.2.1.0 && < 1.4
                 , exceptions
                 , filepath
@@ -382,7 +382,7 @@ test-suite stack-test
                 , store >= 0.4.1 && < 0.5
                 , vector >= 0.10.12.3 && < 0.13
                 , unordered-containers
-                , template-haskell
+                , template-haskell >= 2.9.0.0 && < 2.12
                 , yaml
   default-language:    Haskell2010
   if os(windows)
