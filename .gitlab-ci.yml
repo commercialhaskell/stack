@@ -1,0 +1,22 @@
+image: registry.gitlab.fpcomplete.com/fpco/default-build-image:17
+
+cache:
+  key: "$CI_BUILD_NAME"
+  paths:
+    - .stack-work/
+    - .stack-root/
+
+stages:
+  - build
+
+variables:
+    STACK_ROOT: "${CI_PROJECT_DIR}/.stack-root"
+
+build:
+  stage: build
+  only:
+    - master
+  script:
+    - export PATH=$HOME/.local/bin:$PATH
+    - (cd etc/scripts && stack --install-ghc install --pedantic)
+    - stack-release-script check
