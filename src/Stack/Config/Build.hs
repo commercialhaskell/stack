@@ -103,7 +103,7 @@ benchmarkOptsFromMonoid :: BenchmarkOptsMonoid -> Maybe [String] -> BenchmarkOpt
 benchmarkOptsFromMonoid BenchmarkOptsMonoid{..} madditional =
     defaultBenchmarkOpts
     { beoAdditionalArgs =
-          (fmap (\args -> unwords args <> " ") madditional) <>
+          fmap (\args -> unwords args <> " ") madditional <>
           getFirst beoMonoidAdditionalArgs
     , beoDisableRun = fromFirst
           (beoDisableRun defaultBenchmarkOpts)
