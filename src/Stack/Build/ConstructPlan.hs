@@ -209,7 +209,7 @@ constructPlan mbp0 baseConfigOpts0 locals extraToBuild0 localDumpPkgs loadPackag
         , callStack = []
         , extraToBuild = extraToBuild0
         , getVersions = getVersions0
-        , wanted = wantedLocalPackages locals
+        , wanted = wantedLocalPackages locals <> extraToBuild0
         , localNames = Set.fromList $ map (packageName . lpPackage) locals
         , logFunc = lf
         }
