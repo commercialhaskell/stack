@@ -68,8 +68,17 @@ import           Stack.Types.Version
 import           System.Process.Read (findExecutable)
 
 data PackageInfo
-    = PIOnlyInstalled InstallLocation Installed
+    =
+      -- | This indicates that the package is already installed, and
+      -- that we shouldn't build it from source. This is always the case
+      -- for snapshot packages.
+      PIOnlyInstalled InstallLocation Installed
+      -- | This indicates that the package isn't installed, and we know
+      -- where to find its source (either a hackage package or a local
+      -- directory).
     | PIOnlySource PackageSource
+      -- | This indicates that the package is installed and we know
+      -- where to find its source. We may want to reinstall from source.
     | PIBoth PackageSource Installed
     deriving (Show)
 
@@ -144,6 +153,22 @@ instance HasBuildConfig Ctx
 instance HasEnvConfig Ctx where
     envConfigL = lens ctxEnvConfig (\x y -> x { ctxEnvConfig = y })
 
+-- | Computes a build plan. This means figuring out which build 'Task's
+-- to take, and the interdependencies among the build 'Task's. In
+-- particular:
+--
+-- 1) It determines which packages need to be built, based on the
+-- transitive deps of the current targets. For local packages, this is
+-- indicated by the 'lpWanted' boolean. For extra packages to build,
+-- this comes from the @extraToBuild0@ argument of type @Set
+-- PackageName@. These are usually packages that have been specified on
+-- the commandline.
+--
+-- 2) It will only rebuild an upstream package if it isn't present in
+-- the 'InstalledMap', or if some of its dependencies have changed.
+--
+-- 3) It will only rebuild a local package if its files are dirty or
+-- some of its dependencies have changed.
 constructPlan :: forall env m. (StackM env m, HasEnvConfig env)
               => MiniBuildPlan
               -> BaseConfigOpts
@@ -293,6 +318,17 @@ mkUnregisterLocal tasks dirtyReason localDumpPkgs sourceMap =
       where
         name = packageIdentifierName ident
 
+-- | Given a 'LocalPackage' and its 'lpTestBench', adds a 'Task' for
+-- running its tests and benchmarks.
+--
+-- If @isAllInOne@ is 'True', then this means that the build step will
+-- also build the tests. Otherwise, this indicates that there's a cyclic
+-- dependency and an additional build step needs to be done.
+--
+-- This will also add all the deps needed to build the tests /
+-- benchmarks. If @isAllInOne@ is 'True' (the common case), then all of
+-- these should have already been taken care of as part of the build
+-- step.
 addFinal :: LocalPackage -> Package -> Bool -> M ()
 addFinal lp package isAllInOne = do
     depsRes <- addPackageDeps package
@@ -319,6 +355,16 @@ addFinal lp package isAllInOne = do
                 }
     tell mempty { wFinals = Map.singleton (packageName package) res }
 
+-- | Given a 'PackageName', adds all of the build tasks to build the
+-- package, if needed.
+--
+-- 'constructPlan' invokes this on all the target packages, setting
+-- @treatAsDep'@ to False, because those packages are direct build
+-- targets. 'addPackageDeps' invokes this while recursing into the
+-- dependencies of a package. As such, it sets @treatAsDep'@ to True,
+-- forcing this package to be marked as a dependency, even if it is
+-- directly wanted. This makes sense - if we left out packages that are
+-- deps, it would break the --only-dependencies build plan.
 addDep :: Bool -- ^ is this being used by a dependency?
        -> PackageName
        -> M (Either ConstructPlanException AddDepRes)
@@ -394,10 +440,13 @@ tellExecutablesPackage loc p = do
         | Set.null myComps = x
         | otherwise = Set.intersection x myComps
 
-installPackage :: PackageName
-               -> PackageSource
-               -> Maybe Installed
-               -> M (Either ConstructPlanException AddDepRes)
+-- | Given a 'PackageSource' and perhaps an 'Installed' value, adds
+-- build 'Task's for the package and its dependencies.
+installPackage
+    :: PackageName
+    -> PackageSource
+    -> Maybe Installed
+    -> M (Either ConstructPlanException AddDepRes)
 installPackage name ps minstalled = do
     ctx <- ask
     case ps of
@@ -456,6 +505,9 @@ resolveDepsAndInstall isAllInOne ps package minstalled = do
         Left err -> return $ Left err
         Right deps -> liftM Right $ installPackageGivenDeps isAllInOne ps package minstalled deps
 
+-- | Checks if we need to install the given 'Package', given the results
+-- of 'addPackageDeps'. If dependencies are missing, the package is
+-- dirty, or it's not installed, then it needs to be installed.
 installPackageGivenDeps :: Bool
                         -> PackageSource
                         -> Package
@@ -515,6 +567,16 @@ addEllipsis t
     | T.length t < 100 = t
     | otherwise = T.take 97 t <> "..."
 
+-- | Given a package, recurses into all of its dependencies. The results
+-- indicate which packages are missing, meaning that their 'GhcPkgId's
+-- will be figured out during the build, after they've been built. The
+-- 2nd part of the tuple result indicates the packages that are already
+-- installed which will be used.
+--
+-- The 3rd part of the tuple is an 'InstallLocation'. If it is 'Local',
+-- then the parent package must be installed locally. Otherwise, if it
+-- is 'Snap', then it can either be installed locally or in the
+-- snapshot.
 addPackageDeps :: Package -> M (Either ConstructPlanException (Set PackageIdentifier, Map PackageIdentifier GhcPkgId, InstallLocation))
 addPackageDeps package = do
     ctx <- ask
@@ -576,6 +638,11 @@ addPackageDeps package = do
                         mlatestApplicable <- getLatestApplicable
                         return $ Left (depname, (range, mlatestApplicable, DependencyMismatch $ adrVersion adr))
     case partitionEithers deps of
+        -- Note that the Monoid for 'InstallLocation' means that if any
+        -- is 'Local', the result is 'Local', indicating that the parent
+        -- package must be installed locally. Otherwise the result is
+        -- 'Snap', indicating that the parent can either be installed
+        -- locally or in the snapshot.
         ([], pairs) -> return $ Right $ mconcat pairs
         (errs, _) -> return $ Left $ DependencyPlanFailures
             package
@@ -583,6 +650,8 @@ addPackageDeps package = do
   where
     adrVersion (ADRToInstall task) = packageIdentifierVersion $ taskProvides task
     adrVersion (ADRFound _ installed) = installedVersion installed
+    -- Update the parents map, for later use in plan construction errors
+    -- - see 'getShortestDepsPath'.
     addParent depname range mversion = tell mempty { wParents = MonoidMap $ M.singleton depname val }
       where
         val = (First mversion, [(packageIdentifier package, range)])

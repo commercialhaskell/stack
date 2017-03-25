@@ -68,9 +68,9 @@ initProject whichCmd currDir initOpts mresolver = do
 
     exists <- doesFileExist dest
     when (not (forceOverwrite initOpts) && exists) $ do
-        error ("Stack configuration file " <> reldest <>
-               " exists, use 'stack solver' to fix the existing config file or \
-               \'--force' to overwrite it.")
+        fail ("Stack configuration file " <> reldest <>
+              " exists, use 'stack solver' to fix the existing config file or \
+              \'--force' to overwrite it.")
 
     dirs <- mapM (resolveDir' . T.unpack) (searchDirs initOpts)
     let noPkgMsg =  "In order to init, you should have an existing .cabal \

@@ -196,21 +196,23 @@ checkCabalFileName name cabalfp = do
     when (expected /= toFilePath (filename cabalfp))
         $ throwM $ MismatchedCabalName cabalfp name
 
--- | Resolve a parsed cabal file into a 'Package'.
+-- | Resolve a parsed cabal file into a 'Package', which contains all of
+-- the info needed for stack to build the 'Package' given the current
+-- configuration.
 resolvePackage :: PackageConfig
                -> GenericPackageDescription
                -> Package
 resolvePackage packageConfig gpkg =
     packageFromPackageDescription
         packageConfig
-        gpkg
+        (genPackageFlags gpkg)
         (resolvePackageDescription packageConfig gpkg)
 
 packageFromPackageDescription :: PackageConfig
-                              -> GenericPackageDescription
+                              -> [D.Flag]
                               -> PackageDescription
                               -> Package
-packageFromPackageDescription packageConfig gpkg pkg =
+packageFromPackageDescription packageConfig pkgFlags pkg =
     Package
     { packageName = name
     , packageVersion = fromCabalVersion (pkgVersion pkgId)
@@ -221,7 +223,7 @@ packageFromPackageDescription packageConfig gpkg pkg =
     , packageGhcOptions = packageConfigGhcOptions packageConfig
     , packageFlags = packageConfigFlags packageConfig
     , packageDefaultFlags = M.fromList
-      [(fromCabalFlagName (flagName flag), flagDefault flag) | flag <- genPackageFlags gpkg]
+      [(fromCabalFlagName (flagName flag), flagDefault flag) | flag <- pkgFlags]
     , packageAllDeps = S.fromList (M.keys deps)
     , packageHasLibrary = maybe False (buildable . libBuildInfo) (library pkg)
     , packageTests = M.fromList
@@ -233,6 +235,8 @@ packageFromPackageDescription packageConfig gpkg pkg =
     , packageExes = S.fromList
       [T.pack (exeName biBuildInfo) | biBuildInfo <- executables pkg
                                     , buildable (buildInfo biBuildInfo)]
+    -- This is an action used to collect info needed for "stack ghci".
+    -- This info isn't usually needed, so computation of it is deferred.
     , packageOpts = GetPackageOpts $
       \sourceMap installedMap omitPkgs addPkgs cabalfp ->
            do (componentsModules,componentFiles,_,_) <- getPackageFiles pkgFiles cabalfp
@@ -247,6 +251,9 @@ packageFromPackageDescription packageConfig gpkg pkg =
     , packageSetupDeps = msetupDeps
     }
   where
+    -- Gets all of the modules, files, build files, and data files that
+    -- constitute the package. This is primarily used for dirtiness
+    -- checking during build, as well as use by "stack ghci"
     pkgFiles = GetPackageFiles $
         \cabalfp -> $debugBracket ("getPackageFiles" <+> display cabalfp) $ do
              let pkgDir = parent cabalfp
@@ -351,6 +358,7 @@ generatePkgDescOpts sourceMap installedMap omitPkgs addPkgs cabalfp pkg componen
   where
     cabalDir = parent cabalfp
 
+-- | Input to 'generateBuildInfoOpts'
 data BioInput = BioInput
     { biSourceMap :: !SourceMap
     , biInstalledMap :: !InstalledMap
@@ -366,7 +374,9 @@ data BioInput = BioInput
     , biComponentName :: !NamedComponent
     }
 
--- | Generate GHC options for the target.
+-- | Generate GHC options for the target. Since Cabal also figures out
+-- these options, currently this is only used for invoking GHCI (via
+-- stack ghci).
 generateBuildInfoOpts :: BioInput -> BuildInfoOpts
 generateBuildInfoOpts BioInput {..} =
     BuildInfoOpts
@@ -769,8 +779,8 @@ buildOtherSources build =
 targetJsSources :: BuildInfo -> [FilePath]
 targetJsSources = jsSources
 
--- | Get all dependencies of a package, including library,
--- executables, tests, benchmarks.
+-- | Evaluates the conditions of a 'GenericPackageDescription', yielding
+-- a resolved 'PackageDescription'.
 resolvePackageDescription :: PackageConfig
                           -> GenericPackageDescription
                           -> PackageDescription

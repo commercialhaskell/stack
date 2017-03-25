@@ -91,6 +91,17 @@ loadSourceMap needTargets boptsCli = do
     (_, _, locals, _, _, sourceMap) <- loadSourceMapFull True needTargets boptsCli
     return (locals, sourceMap)
 
+-- | Given the build commandline options, does the following:
+--
+-- * Parses the build targets.
+--
+-- * Loads the 'MiniBuildPlan' from the resolver, with extra-deps
+--   shadowing any packages that should be built locally.
+--
+-- * Loads up the 'LocalPackage' info.
+--
+-- * Builds a 'SourceMap', which contains info for all the packages that
+--   will be involved in the build.
 loadSourceMapFull :: (StackM env m, HasEnvConfig env)
                   => Bool
                   -> NeedTargets
@@ -106,6 +117,7 @@ loadSourceMapFull omitWiredIn needTargets boptsCli = do
     bconfig <- view buildConfigL
     rawLocals <- getLocalPackageViews
     (mbp0, cliExtraDeps, targets) <- parseTargetsFromBuildOptsWith rawLocals needTargets boptsCli
+
     -- Extend extra-deps to encompass targets requested on the command line
     -- that are not in the snapshot.
     extraDeps0 <- extendExtraDeps
@@ -131,10 +143,14 @@ loadSourceMapFull omitWiredIn needTargets boptsCli = do
             isLocal STNonLocal = False
 
         shadowed = Map.keysSet rawLocals <> Map.keysSet extraDeps0
+
+        -- Ignores all packages in the MiniBuildPlan that depend on any
+        -- local packages or extra-deps. All packages that have
+        -- transitive dependenceis on these packages are treated as
+        -- extra-deps (extraDeps1).
         (mbp, extraDeps1) = shadowMiniBuildPlan mbp0 shadowed
 
-        -- Add the extra deps from the stack.yaml file to the deps grabbed from
-        -- the snapshot
+        -- Combine the extra-deps with the ones implicitly shadowed.
         extraDeps2 = Map.union
             (Map.map (\v -> (v, Map.empty, [])) extraDeps0)
             (Map.map (\mpi -> (mpiVersion mpi, mpiFlags mpi, mpiGhcOptions mpi)) extraDeps1)
@@ -166,6 +182,8 @@ loadSourceMapFull omitWiredIn needTargets boptsCli = do
                 in PSUpstream v Local flags ghcOptions Nothing)
             extraDeps2
 
+    -- Combine the local packages, extra-deps, and MiniBuildPlan into
+    -- one unified source map.
     let sourceMap = Map.unions
             [ Map.fromList $ flip map locals $ \lp ->
                 let p = lpPackage lp
@@ -186,7 +204,7 @@ loadSourceMapFull omitWiredIn needTargets boptsCli = do
 
     return (targets, mbp, locals, nonLocalTargets, extraDeps0, sourceMap')
 
--- | All flags for a local package
+-- | All flags for a local package.
 getLocalFlags
     :: BuildConfig
     -> BuildOptsCLI
@@ -200,6 +218,8 @@ getLocalFlags bconfig boptsCli name = Map.unions
   where
     cliFlags = boptsCLIFlags boptsCli
 
+-- | Get the configured options to pass from GHC, based on the build
+-- configuration and commandline.
 getGhcOptions :: BuildConfig -> BuildOptsCLI -> PackageName -> Bool -> Bool -> [Text]
 getGhcOptions bconfig boptsCli name isTarget isLocal = concat
     [ ghcOptionsFor name (configGhcOptions config)
@@ -227,6 +247,12 @@ getGhcOptions bconfig boptsCli name isTarget isLocal = concat
 --
 -- If the local packages views are already known, use 'parseTargetsFromBuildOptsWith'
 -- instead.
+--
+-- Along with the 'Map' of targets, this yields the loaded
+-- 'MiniBuildPlan' for the resolver, as well as a Map of extra-deps
+-- derived from the commandline. These extra-deps targets come from when
+-- the user specifies a particular package version on the commonadline,
+-- or when a flag is specified for a snapshot package.
 parseTargetsFromBuildOpts
     :: (StackM env m, HasEnvConfig env)
     => NeedTargets
@@ -371,9 +397,7 @@ loadLocalPackage boptsCli targets (name, (lpv, gpkg)) = do
     let mtarget = Map.lookup name targets
     config  <- getPackageConfig boptsCli name (isJust mtarget) True
     bopts <- view buildOptsL
-    let pkg = resolvePackage config gpkg
-
-        (exes, tests, benches) =
+    let (exes, tests, benches) =
             case mtarget of
                 Just (STLocalComps comps) -> splitComponents $ Set.toList comps
                 Just STLocalAll ->
@@ -408,11 +432,28 @@ loadLocalPackage boptsCli targets (name, (lpv, gpkg)) = do
             , packageConfigEnableBenchmarks = True
             }
 
+        -- We resolve the package in 4 different configurations:
+        --
+        -- - pkg doesn't have tests or benchmarks enabled.
+        --
+        -- - btpkg has them enabled if they are present.
+        --
+        -- - testpkg has tests enabled, but not benchmarks.
+        --
+        -- - benchpkg has benchmarks enablde, but not tests.
+        --
+        -- The latter two configurations are used to compute the deps
+        -- when --enable-benchmarks or --enable-tests are configured.
+        -- This allows us to do an optimization where these are passed
+        -- if the deps are present. This can avoid doing later
+        -- unnecessary reconfigures.
+        pkg = resolvePackage config gpkg
         btpkg
             | Set.null tests && Set.null benches = Nothing
             | otherwise = Just (resolvePackage btconfig gpkg)
         testpkg = resolvePackage testconfig gpkg
         benchpkg = resolvePackage benchconfig gpkg
+
     mbuildCache <- tryGetBuildCache $ lpvRoot lpv
     (files,_) <- getPackageFilesSimple pkg (lpvCabalFP lpv)
 

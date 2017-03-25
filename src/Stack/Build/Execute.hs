@@ -328,7 +328,7 @@ getSetupExe setupHs setupShimHs tmpdir = do
             renameFile tmpExePath exePath
             return $ Just exePath
 
--- | Execute a callback that takes an 'ExecuteEnv'.
+-- | Execute a function that takes an 'ExecuteEnv'.
 withExecuteEnv :: (StackM env m, HasEnvConfig env)
                => EnvOverride
                -> BuildOpts
@@ -472,100 +472,7 @@ executePlan menv boptsCli baseConfigOpts locals globalPackages snapshotPackages 
     bopts <- view buildOptsL
     withExecuteEnv menv bopts boptsCli baseConfigOpts locals globalPackages snapshotPackages localPackages (executePlan' installedMap targets plan)
 
-    unless (Map.null $ planInstallExes plan) $ do
-        snapBin <- (</> bindirSuffix) `liftM` installationRootDeps
-        localBin <- (</> bindirSuffix) `liftM` installationRootLocal
-        destDir <- view $ configL.to configLocalBin
-        ensureDir destDir
-
-        destDir' <- liftIO . D.canonicalizePath . toFilePath $ destDir
-
-        platform <- view platformL
-        let ext =
-                case platform of
-                    Platform _ Windows -> ".exe"
-                    _ -> ""
-
-        currExe <- liftIO getExecutablePath -- needed for windows, see below
-
-        installed <- forMaybeM (Map.toList $ planInstallExes plan) $ \(name, loc) -> do
-            let bindir =
-                    case loc of
-                        Snap -> snapBin
-                        Local -> localBin
-            mfp <- forgivingAbsence (resolveFile bindir $ T.unpack name ++ ext)
-              >>= rejectMissingFile
-            case mfp of
-                Nothing -> do
-                    $logWarn $ T.concat
-                        [ "Couldn't find executable "
-                        , name
-                        , " in directory "
-                        , T.pack $ toFilePath bindir
-                        ]
-                    return Nothing
-                Just file -> do
-                    let destFile = destDir' FP.</> T.unpack name ++ ext
-                    $logInfo $ T.concat
-                        [ "Copying from "
-                        , T.pack $ toFilePath file
-                        , " to "
-                        , T.pack destFile
-                        ]
-
-                    liftIO $ case platform of
-                        Platform _ Windows | FP.equalFilePath destFile currExe ->
-                            windowsRenameCopy (toFilePath file) destFile
-                        _ -> D.copyFile (toFilePath file) destFile
-                    return $ Just (name <> T.pack ext)
-
-        unless (null installed) $ do
-            $logInfo ""
-            $logInfo $ T.concat
-                [ "Copied executables to "
-                , T.pack destDir'
-                , ":"]
-        forM_ installed $ \exe -> $logInfo ("- " <> exe)
-
-        searchPath <- liftIO FP.getSearchPath
-        destDirIsInPATH <- liftIO $
-            anyM (\dir -> D.doesDirectoryExist dir &&^ fmap (FP.equalFilePath destDir') (D.canonicalizePath dir)) searchPath
-        if destDirIsInPATH
-            then forM_ installed $ \exe -> do
-                mexePath <- (liftIO . D.findExecutable . T.unpack) exe
-                case mexePath of
-                    Just exePath -> do
-                        exeDir <- (liftIO . fmap FP.takeDirectory . D.canonicalizePath) exePath
-                        unless (exeDir `FP.equalFilePath` destDir') $ do
-                            $logWarn ""
-                            $logWarn $ T.concat
-                                [ "WARNING: The \""
-                                , exe
-                                , "\" executable found on the PATH environment variable is "
-                                , T.pack exePath
-                                , ", and not the version that was just installed."
-                                ]
-                            $logWarn $ T.concat
-                                [ "This means that \""
-                                , exe
-                                , "\" calls on the command line will not use this version."
-                                ]
-                    Nothing -> do
-                        $logWarn ""
-                        $logWarn $ T.concat
-                            [ "WARNING: Installation path "
-                            , T.pack destDir'
-                            , " is on the PATH but the \""
-                            , exe
-                            , "\" executable that was just installed could not be found on the PATH."
-                            ]
-            else do
-                $logWarn ""
-                $logWarn $ T.concat
-                    [ "WARNING: Installation path "
-                    , T.pack destDir'
-                    , " not found on the PATH environment variable"
-                    ]
+    copyExecutables (planInstallExes plan)
 
     config <- view configL
     menv' <- liftIO $ configEnvOverride config EnvSettings
@@ -577,6 +484,106 @@ executePlan menv boptsCli baseConfigOpts locals globalPackages snapshotPackages 
     forM_ (boptsCLIExec boptsCli) $ \(cmd, args) ->
         $withProcessTimeLog cmd args $
             callProcess (Cmd Nothing cmd menv' args)
+
+copyExecutables
+    :: (StackM env m, HasEnvConfig env)
+    => Map Text InstallLocation
+    -> m ()
+copyExecutables exes | Map.null exes = return ()
+copyExecutables exes = do
+    snapBin <- (</> bindirSuffix) `liftM` installationRootDeps
+    localBin <- (</> bindirSuffix) `liftM` installationRootLocal
+    destDir <- view $ configL.to configLocalBin
+    ensureDir destDir
+
+    destDir' <- liftIO . D.canonicalizePath . toFilePath $ destDir
+
+    platform <- view platformL
+    let ext =
+            case platform of
+                Platform _ Windows -> ".exe"
+                _ -> ""
+
+    currExe <- liftIO getExecutablePath -- needed for windows, see below
+
+    installed <- forMaybeM (Map.toList exes) $ \(name, loc) -> do
+        let bindir =
+                case loc of
+                    Snap -> snapBin
+                    Local -> localBin
+        mfp <- forgivingAbsence (resolveFile bindir $ T.unpack name ++ ext)
+          >>= rejectMissingFile
+        case mfp of
+            Nothing -> do
+                $logWarn $ T.concat
+                    [ "Couldn't find executable "
+                    , name
+                    , " in directory "
+                    , T.pack $ toFilePath bindir
+                    ]
+                return Nothing
+            Just file -> do
+                let destFile = destDir' FP.</> T.unpack name ++ ext
+                $logInfo $ T.concat
+                    [ "Copying from "
+                    , T.pack $ toFilePath file
+                    , " to "
+                    , T.pack destFile
+                    ]
+
+                liftIO $ case platform of
+                    Platform _ Windows | FP.equalFilePath destFile currExe ->
+                        windowsRenameCopy (toFilePath file) destFile
+                    _ -> D.copyFile (toFilePath file) destFile
+                return $ Just (name <> T.pack ext)
+
+    unless (null installed) $ do
+        $logInfo ""
+        $logInfo $ T.concat
+            [ "Copied executables to "
+            , T.pack destDir'
+            , ":"]
+    forM_ installed $ \exe -> $logInfo ("- " <> exe)
+
+    searchPath <- liftIO FP.getSearchPath
+    destDirIsInPATH <- liftIO $
+        anyM (\dir -> D.doesDirectoryExist dir &&^ fmap (FP.equalFilePath destDir') (D.canonicalizePath dir)) searchPath
+    if destDirIsInPATH
+        then forM_ installed $ \exe -> do
+            mexePath <- (liftIO . D.findExecutable . T.unpack) exe
+            case mexePath of
+                Just exePath -> do
+                    exeDir <- (liftIO . fmap FP.takeDirectory . D.canonicalizePath) exePath
+                    unless (exeDir `FP.equalFilePath` destDir') $ do
+                        $logWarn ""
+                        $logWarn $ T.concat
+                            [ "WARNING: The \""
+                            , exe
+                            , "\" executable found on the PATH environment variable is "
+                            , T.pack exePath
+                            , ", and not the version that was just installed."
+                            ]
+                        $logWarn $ T.concat
+                            [ "This means that \""
+                            , exe
+                            , "\" calls on the command line will not use this version."
+                            ]
+                Nothing -> do
+                    $logWarn ""
+                    $logWarn $ T.concat
+                        [ "WARNING: Installation path "
+                        , T.pack destDir'
+                        , " is on the PATH but the \""
+                        , exe
+                        , "\" executable that was just installed could not be found on the PATH."
+                        ]
+        else do
+            $logWarn ""
+            $logWarn $ T.concat
+                [ "WARNING: Installation path "
+                , T.pack destDir'
+                , " not found on the PATH environment variable"
+                ]
 
 -- | Windows can't write over the current executable. Instead, we rename the
 -- current executable to something else and then do the copy.
@@ -849,6 +856,17 @@ announceTask task x = $logInfo $ T.concat
     , x
     ]
 
+-- | This sets up a context for executing build steps which need to run
+-- Cabal (via a compiled Setup.hs).  In particular it does the following:
+--
+-- * Ensures the package exists in the file system, downloading if necessary.
+--
+-- * Opens a log file if the built output shouldn't go to stderr.
+--
+-- * Ensures that either a simple Setup.hs is built, or the package's
+--   custom setup is built.
+--
+-- * Provides the user a function with which run the Cabal process.
 withSingleContext :: (StackM env m, HasEnvConfig env)
                   => (m () -> IO ())
                   -> ActionContext
@@ -859,13 +877,14 @@ withSingleContext :: (StackM env m, HasEnvConfig env)
                   -- Nothing, just provide global and snapshot package
                   -- databases.
                   -> Maybe String
-                  -> (  Package
-                     -> Path Abs File
-                     -> Path Abs Dir
-                     -> (Bool -> [String] -> m ())
-                     -> (Text -> m ())
-                     -> Bool
-                     -> Maybe (Path Abs File, Handle)
+                  -> (  Package                       -- Package info
+                     -> Path Abs File                 -- Cabal file path
+                     -> Path Abs Dir                  -- Package root directory file path
+                     -> (Bool -> [String] -> m ())    -- Function to run Cabal with args
+                                                      -- The Bool indicates if it's a build step, so strip TH stuff
+                     -> (Text -> m ())                -- An 'announce' function, for different build phases
+                     -> Bool                          -- Whether output should be directed to the console
+                     -> Maybe (Path Abs File, Handle) -- Log file
                      -> m a)
                   -> m a
 withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} mdeps msuffix inner0 =
@@ -1129,6 +1148,22 @@ withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} md
                             return outputFile
             runExe exeName $ (if boptsCabalVerbose eeBuildOpts then ("--verbose":) else id) setupArgs
 
+-- Implements running a package's build, used to implement 'ATBuild' and
+-- 'ATBuildFinal' tasks.  In particular this does the following:
+--
+-- * Checks if the package exists in the precompiled cache, and if so,
+--   add it to the database instead of performing the build.
+--
+-- * Runs the configure step if needed ('ensureConfig')
+--
+-- * Runs the build step
+--
+-- * Generates haddocks
+--
+-- * Registers the library and copiesthe built executables into the
+--   local install directory. Note that this is literally invoking Cabal
+--   with @copy@, and not the copying done by @stack install@ - that is
+--   handled by 'copyExecutables'.
 singleBuild :: (StackM env m, HasEnvConfig env)
             => (m () -> IO ())
             -> ActionContext
@@ -1435,6 +1470,8 @@ depsPresent installedMap deps = all
             Nothing -> False)
     (Map.toList deps)
 
+-- | Implements running a package's tests. Also handles producing
+-- coverage reports if coverage is enabled.
 singleTest :: (StackM env m, HasEnvConfig env)
            => (m () -> IO ())
            -> TestOpts
@@ -1578,6 +1615,7 @@ singleTest runInBase topts testsToRun ac ee task installedMap = do
                 (fmap fst mlogFile)
                 bs
 
+-- | Implements running a package's benchmarks.
 singleBench :: (StackM env m, HasEnvConfig env)
             => (m () -> IO ())
             -> BenchmarkOpts

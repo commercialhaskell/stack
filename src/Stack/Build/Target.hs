@@ -296,8 +296,12 @@ parseTargets needTargets implicitGlobal snap extras locals currDir textTargets' 
     erawTargets <- mapM (parseRawTargetDirs currDir locals) textTargets
 
     let (errs1, rawTargets) = partitionEithers erawTargets
+        -- When specific package identifiers are provided, treat these
+        -- as extra-deps.
         (errs2, unzip -> (rawTargets', newExtras)) = partitionEithers $
             map (resolveIdents snap extras locals) $ concat rawTargets
+        -- Find targets that specify components in the local packages,
+        -- otherwise find package targets in snap and extra-deps.
         (errs3, targetTypes) = partitionEithers $
             map (resolveRawTarget snap extras locals) rawTargets'
         (errs4, targets) = simplifyTargets targetTypes

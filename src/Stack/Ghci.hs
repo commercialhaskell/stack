@@ -586,7 +586,7 @@ makeGhciPkgInfo buildOptsCLI sourceMap installedMap locals addPkgs mfileTargets 
           | otherwise = Nothing
     mbuildinfo <- forM mbuildinfofp readDotBuildinfo
     let pkg =
-            packageFromPackageDescription config gpkgdesc $
+            packageFromPackageDescription config (C.genPackageFlags gpkgdesc) $
             maybe id C.updatePackageDescription mbuildinfo $
             resolvePackageDescription config gpkgdesc
 

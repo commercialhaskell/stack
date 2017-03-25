@@ -868,6 +868,10 @@ showDepErrors flags errs =
         userPkgs = Map.keys $ Map.unions (Map.elems (fmap deNeededBy errs))
         showFlags pkg = maybe "" (showPackageFlags pkg) (Map.lookup pkg flags)
 
+-- | Given a set of packages to shadow, this removes them, and any
+-- packages that transitively depend on them, from the 'MiniBuildPlan'.
+-- The 'Map' result yields all of the packages that were downstream of
+-- the shadowed packages. It does not include the shadowed packages.
 shadowMiniBuildPlan :: MiniBuildPlan
                     -> Set PackageName
                     -> (MiniBuildPlan, Map PackageName MiniPackageInfo)
