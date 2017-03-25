@@ -55,6 +55,7 @@ import           GHC.Generics
 import           Language.Haskell.TH
 import           Language.Haskell.TH.Syntax
 import           Prelude -- Fix warning: Word in Prelude from base-4.8.
+import           Stack.Types.StringError
 import           Text.PrettyPrint (render)
 
 -- | A parse fail.
@@ -161,7 +162,7 @@ fromCabalVersion (Cabal.Version vs _) =
 mkVersion :: String -> Q Exp
 mkVersion s =
   case parseVersionFromString s of
-    Nothing -> error ("Invalid package version: " ++ show s)
+    Nothing -> stringError ("Invalid package version: " ++ show s)
     Just pn -> [|pn|]
 
 -- | Display a version range

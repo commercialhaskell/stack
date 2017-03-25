@@ -102,6 +102,7 @@ import              Stack.Types.Docker
 import              Stack.Types.PackageIdentifier
 import              Stack.Types.PackageName
 import              Stack.Types.StackT
+import              Stack.Types.StringError
 import              Stack.Types.Version
 import qualified    System.Directory as D
 import              System.Environment (getExecutablePath)
@@ -405,7 +406,7 @@ ensureCompiler sopts = do
                                 VersionedDownloadInfo version info <-
                                     case Map.lookup osKey $ siMsys2 si of
                                         Just x -> return x
-                                        Nothing -> error $ "MSYS2 not found for " ++ T.unpack osKey
+                                        Nothing -> throwString $ "MSYS2 not found for " ++ T.unpack osKey
                                 let tool = Tool (PackageIdentifier $(mkPackageName "msys2") version)
                                 Just <$> downloadAndInstallTool (configLocalPrograms config) si info tool (installMsys2Windows osKey)
                             | otherwise -> do
@@ -646,7 +647,7 @@ upgradeCabal menv wc cabalVersion = do
                                     , T.pack $ versionString installed
                                     , " is already installed"]
         Latest     -> case map rpIdent rmap of
-            [] -> error "No Cabal library found in index, cannot upgrade"
+            [] -> throwString "No Cabal library found in index, cannot upgrade"
             [PackageIdentifier name' version] | name == name' -> do
                 if installed > version then
                     doCabalInstall menv wc installed version
@@ -903,7 +904,7 @@ downloadFromInfo programsDir downloadInfo tool = do
             ".tar.bz2" -> return TarBz2
             ".tar.gz" -> return TarGz
             ".7z.exe" -> return SevenZ
-            _ -> fail $ "Unknown extension for url: " ++ url
+            _ -> throwString $ "Error: Unknown extension for url: " ++ url
     relfile <- parseRelFile $ toolString tool ++ extension
     path <- case url of
         (parseUrlThrow -> Just _) -> do
@@ -922,7 +923,7 @@ downloadFromInfo programsDir downloadInfo tool = do
                           "should not be specified when `url` is a file path")
             return path
         _ ->
-            fail $ "`url` must be either an HTTP URL or absolute file path: " ++ url
+            throwString $ "Error: `url` must be either an HTTP URL or absolute file path: " ++ url
     return (path, at)
   where
     url = T.unpack $ downloadInfoUrl downloadInfo
@@ -959,7 +960,7 @@ installGHCPosix version downloadInfo _ archiveFile archiveType tempDir destDir =
             TarXz -> return ("xz", 'J')
             TarBz2 -> return ("bzip2", 'j')
             TarGz -> return ("gzip", 'z')
-            SevenZ -> error "Don't know how to deal with .7z files on non-Windows"
+            SevenZ -> throwString "Don't know how to deal with .7z files on non-Windows"
     -- Slight hack: OpenBSD's tar doesn't support xz.
     -- https://github.com/commercialhaskell/stack/issues/2283#issuecomment-237980986
     let tarDep =
@@ -1052,7 +1053,7 @@ installGHCJS si archiveFile archiveType _tempDir destDir = do
                     TarXz -> return "xz"
                     TarBz2 -> return "bzip2"
                     TarGz -> return "gzip"
-                    SevenZ -> error "Don't know how to deal with .7z files on non-Windows"
+                    SevenZ -> throwString "Don't know how to deal with .7z files on non-Windows"
             (zipTool, tarTool) <- checkDependencies $ (,)
                 <$> checkDependency zipTool'
                 <*> checkDependency "tar"
@@ -1120,14 +1121,14 @@ ensureGhcjsBooted menv cv shouldBoot bootOpts = do
                 stackYamlExists <- doesFileExist stackYaml
                 ghcjsVersion <- case cv of
                         GhcjsVersion version _ -> return version
-                        _ -> fail "ensureGhcjsBooted invoked on non GhcjsVersion"
+                        _ -> error "ensureGhcjsBooted invoked on non GhcjsVersion"
                 actualStackYaml <- if stackYamlExists then return stackYaml
                     else
                         liftM ((destDir </> $(mkRelDir "src")) </>) $
                         parseRelFile $ "ghcjs-" ++ versionString ghcjsVersion ++ "/stack.yaml"
                 actualStackYamlExists <- doesFileExist actualStackYaml
                 unless actualStackYamlExists $
-                    fail "Couldn't find GHCJS stack.yaml in old or new location."
+                    throwString "Error: Couldn't find GHCJS stack.yaml in old or new location."
                 bootGhcjs ghcjsVersion actualStackYaml destDir bootOpts
         Left err -> throwM err
 
@@ -1311,10 +1312,10 @@ withUnpackedTarball7z name si archiveFile archiveType msrcDir destDir = do
             TarXz -> return ".xz"
             TarBz2 -> return ".bz2"
             TarGz -> return ".gz"
-            _ -> error $ name ++ " must be a tarball file"
+            _ -> throwString $ name ++ " must be a tarball file"
     tarFile <-
         case T.stripSuffix suffix $ T.pack $ toFilePath archiveFile of
-            Nothing -> error $ "Invalid " ++ name ++ " filename: " ++ show archiveFile
+            Nothing -> throwString $ "Invalid " ++ name ++ " filename: " ++ show archiveFile
             Just x -> parseAbsFile $ T.unpack x
     run7z <- setup7z si
     let tmpName = toFilePathNoTrailingSep (dirname destDir) ++ "-tmp"
@@ -1340,7 +1341,7 @@ expectSingleUnpackedDir archiveFile destDir = do
     contents <- listDir destDir
     case contents of
         ([dir], []) -> return dir
-        _ -> error $ "Expected a single directory within unpacked " ++ toFilePath archiveFile
+        _ -> throwString $ "Expected a single directory within unpacked " ++ toFilePath archiveFile
 
 -- | Download 7z as necessary, and get a function for unpacking things.
 --
@@ -1659,7 +1660,7 @@ getUtf8EnvVars menv compilerVer =
 
 newtype StackReleaseInfo = StackReleaseInfo Value
 
-downloadStackReleaseInfo :: MonadIO m
+downloadStackReleaseInfo :: (MonadIO m, MonadThrow m)
                          => Maybe String -- Github org
                          -> Maybe String -- Github repo
                          -> Maybe String -- ^ optional version
@@ -1682,7 +1683,7 @@ downloadStackReleaseInfo morg mrepo mver = liftIO $ do
     let code = getResponseStatusCode res
     if code >= 200 && code < 300
         then return $ StackReleaseInfo $ getResponseBody res
-        else error $ "Could not get release information for Stack from: " ++ url
+        else throwString $ "Could not get release information for Stack from: " ++ url
 
 preferredPlatforms :: (MonadReader env m, HasPlatform env)
                    => m [(Bool, String)]
@@ -1694,13 +1695,13 @@ preferredPlatforms = do
         Cabal.Windows -> return (True, "windows")
         Cabal.OSX -> return (False, "osx")
         Cabal.FreeBSD -> return (False, "freebsd")
-        _ -> error $ "Binary upgrade not yet supported on OS: " ++ show os'
+        _ -> stringError $ "Binary upgrade not yet supported on OS: " ++ show os'
     arch <-
       case arch' of
         I386 -> return "i386"
         X86_64 -> return "x86_64"
         Arm -> return "arm"
-        _ -> error $ "Binary upgrade not yet supported on arch: " ++ show arch'
+        _ -> stringError $ "Binary upgrade not yet supported on arch: " ++ show arch'
     hasgmp4 <- return False -- FIXME import relevant code from Stack.Setup? checkLib $(mkRelFile "libgmp.so.3")
     let suffixes
           | hasgmp4 = ["-static", "-gmp4", ""]
@@ -1708,7 +1709,7 @@ preferredPlatforms = do
     return $ map (\suffix -> (isWindows, concat [os, "-", arch, suffix])) suffixes
 
 downloadStackExe
-    :: (MonadIO m, MonadLogger m, MonadReader env m, HasConfig env)
+    :: (MonadIO m, MonadLogger m, MonadThrow m, MonadReader env m, HasConfig env)
     => [(Bool, String)] -- ^ acceptable platforms
     -> StackReleaseInfo
     -> Path Abs Dir -- ^ destination directory
@@ -1716,8 +1717,8 @@ downloadStackExe
     -> m ()
 downloadStackExe platforms0 archiveInfo destDir testExe = do
     (isWindows, archiveURL) <-
-      let loop [] = error $ "Unable to find binary Stack archive for platforms: "
-                         ++ unwords (map snd platforms0)
+      let loop [] = throwString $ "Unable to find binary Stack archive for platforms: "
+                                ++ unwords (map snd platforms0)
           loop ((isWindows, p'):ps) = do
             let p = T.pack p'
             $logInfo $ "Querying for archive location for platform: " <> p

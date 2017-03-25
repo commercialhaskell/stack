@@ -62,6 +62,7 @@ import           Stack.Types.Package
 import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageName
 import           Stack.Types.StackT
+import           Stack.Types.StringError
 import           Stack.Types.Version
 import           System.Directory (getModificationTime, getPermissions)
 import qualified System.FilePath as FP
@@ -105,20 +106,21 @@ getSDistTarball mpvpBounds pkgDir = do
     -- for upload (both GZip.compress and Tar.write are lazy).
     -- However, it seems less error prone and more predictable to read
     -- everything in at once, so that's what we're doing for now:
-    let tarPath isDir fp = either error id
+    let tarPath isDir fp = either throwString return
             (Tar.toTarPath isDir (forceUtf8Enc (pkgId FP.</> fp)))
         -- convert a String of proper characters to a String of bytes
         -- in UTF8 encoding masquerading as characters. This is
         -- necessary for tricking the tar package into proper
         -- character encoding.
         forceUtf8Enc = S8.unpack . T.encodeUtf8 . T.pack
-        packWith f isDir fp = liftIO $ f (pkgFp FP.</> fp) (tarPath isDir fp)
+        packWith f isDir fp = liftIO $ f (pkgFp FP.</> fp) =<< tarPath isDir fp
         packDir = packWith Tar.packDirectoryEntry True
         packFile fp
             | tweakCabal && isCabalFp fp = do
                 lbs <- getCabalLbs pvpBounds $ toFilePath cabalfp
                 currTime <- liftIO getPOSIXTime -- Seconds from UNIX epoch
-                return $ (Tar.fileEntry (tarPath False fp) lbs) { Tar.entryTime = floor currTime }
+                tp <- liftIO $ tarPath False fp
+                return $ (Tar.fileEntry tp lbs) { Tar.entryTime = floor currTime }
             | otherwise = packWith packFileEntry False fp
         isCabalFp fp = toFilePath pkgDir FP.</> fp == toFilePath cabalfp
         tarName = pkgId FP.<.> "tar.gz"

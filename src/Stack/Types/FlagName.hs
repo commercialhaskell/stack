@@ -38,6 +38,7 @@ import qualified Distribution.PackageDescription as Cabal
 import           GHC.Generics
 import           Language.Haskell.TH
 import           Language.Haskell.TH.Syntax
+import           Stack.Types.StringError
 
 -- | A parse fail.
 newtype FlagNameParseFail
@@ -93,7 +94,7 @@ flagNameParser =
 mkFlagName :: String -> Q Exp
 mkFlagName s =
   case parseFlagNameFromString s of
-    Nothing -> error ("Invalid flag name: " ++ show s)
+    Nothing -> stringError ("Invalid flag name: " ++ show s)
     Just pn -> [|pn|]
 
 -- | Convenient way to parse a flag name from a 'Text'.

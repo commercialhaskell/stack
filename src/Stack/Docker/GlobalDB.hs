@@ -32,6 +32,7 @@ import           Path (toFilePath, parent)
 import           Path.IO (ensureDir)
 import           Stack.Types.Config
 import           Stack.Types.Docker
+import           Stack.Types.StringError
 
 share [mkPersist sqlSettings, mkMigrate "migrateTables"] [persistLowerCase|
 DockerImageProject
@@ -109,7 +110,7 @@ withGlobalDB config action =
                  str' = fromMaybe str $ stripPrefix "user error (" $
                         fromMaybe str $ stripSuffix ")" str
              if "ErrorReadOnly" `isInfixOf` str
-                 then fail $ str' ++
+                 then throwString $ str' ++
                      " This likely indicates that your DB file, " ++
                      toFilePath db ++ ", has incorrect permissions or ownership."
                  else throwIO (ex :: IOException)

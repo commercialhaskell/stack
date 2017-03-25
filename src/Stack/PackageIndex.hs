@@ -80,6 +80,7 @@ import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageIndex
 import           Stack.Types.PackageName
 import           Stack.Types.StackT
+import           Stack.Types.StringError
 import           Stack.Types.Version
 import qualified System.Directory as D
 import           System.FilePath ((<.>))
@@ -300,7 +301,7 @@ updateIndexHackageSecurity
 updateIndexHackageSecurity indexName' url (HackageSecurity keyIds threshold) = do
     baseURI <-
         case parseURI $ T.unpack url of
-            Nothing -> error $ "Invalid Hackage Security base URL: " ++ T.unpack url
+            Nothing -> stringError $ "Invalid Hackage Security base URL: " ++ T.unpack url
             Just x -> return x
     manager <- liftIO getGlobalManager
     root <- configPackageIndexRoot indexName'

@@ -43,6 +43,7 @@ import           Language.Haskell.TH
 import           Language.Haskell.TH.Syntax
 import qualified Options.Applicative as O
 import           Path
+import           Stack.Types.StringError
 
 -- | A parse fail.
 data PackageNameParseFail
@@ -95,7 +96,7 @@ packageNameParser =
 mkPackageName :: String -> Q Exp
 mkPackageName s =
   case parsePackageNameFromString s of
-    Nothing -> error ("Invalid package name: " ++ show s)
+    Nothing -> stringError ("Invalid package name: " ++ show s)
     Just pn -> [|pn|]
 
 -- | Parse a package name from a 'Text'.

@@ -68,6 +68,7 @@ import           Stack.Types.Package
 import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageName
 import           Stack.Types.StackT
+import           Stack.Types.StringError
 import           Stack.Types.Version
 
 #ifdef WINDOWS
@@ -410,7 +411,7 @@ queryBuildInfo selectors0 =
             _ -> err $ "Cannot apply selector to " ++ show value
       where
         cont = select (front . (sel:)) sels
-        err msg = error $ msg ++ ": " ++ show (front [sel])
+        err msg = stringError $ msg ++ ": " ++ show (front [sel])
 
 -- | Get the raw build information object
 rawBuildInfo :: (StackM env m, HasEnvConfig env) => m Value

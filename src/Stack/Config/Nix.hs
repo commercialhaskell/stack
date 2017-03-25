@@ -16,6 +16,7 @@ import Distribution.System (OS (..))
 import Stack.Types.Version
 import Stack.Types.Nix
 import Stack.Types.Compiler
+import Stack.Types.StringError
 import Control.Exception.Lifted
 import Control.Monad.Catch (throwM,MonadCatch)
 import Prelude
@@ -60,7 +61,7 @@ nixCompiler compilerVersion =
                                              (fixMinor (versionText v)))
   in case compilerVersion of
        GhcVersion v -> nixCompilerFromVersion v
-       _ -> error "Only GHC is supported by now by stack --nix"
+       _ -> stringError "Only GHC is supported by stack --nix"
 
 -- Exceptions thown specifically by Stack.Nix
 data StackNixException

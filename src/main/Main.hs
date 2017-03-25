@@ -101,6 +101,7 @@ import           Stack.Types.Compiler
 import           Stack.Types.Resolver
 import           Stack.Types.Nix
 import           Stack.Types.StackT
+import           Stack.Types.StringError
 import           Stack.Upgrade
 import qualified Stack.Upload as Upload
 import qualified System.Directory as D
@@ -612,10 +613,10 @@ cleanCmd opts go = withBuildConfigAndLockNoDocker go (const (clean opts))
 buildCmd :: BuildOptsCLI -> GlobalOpts -> IO ()
 buildCmd opts go = do
   when (any (("-prof" `elem`) . either (const []) id . parseArgs Escaping) (boptsCLIGhcOptions opts)) $ do
-    hPutStrLn stderr "When building with stack, you should not use the -prof GHC option"
+    hPutStrLn stderr "Error: When building with stack, you should not use the -prof GHC option"
     hPutStrLn stderr "Instead, please use --library-profiling and --executable-profiling"
     hPutStrLn stderr "See: https://github.com/commercialhaskell/stack/issues/1015"
-    error "-prof GHC option submitted"
+    exitFailure
   case boptsCLIFileWatch opts of
     FileWatchPoll -> fileWatchPoll stderr inner
     FileWatch -> fileWatch stderr inner
@@ -650,8 +651,8 @@ unpackCmd names go = withConfigAndLock go $ do
                         config <- view configL
                         let miniConfig = loadMiniConfig config
                         runInnerStackT miniConfig (loadMiniBuildPlan snapName)
-                    ResolverCompiler _ -> error "unpack does not work with compiler resolvers"
-                    ResolverCustom _ _ -> error "unpack does not work with custom resolvers"
+                    ResolverCompiler _ -> throwString "Error: unpack does not work with compiler resolvers"
+                    ResolverCustom _ _ -> throwString "Error: unpack does not work with custom resolvers"
     Stack.Fetch.unpackPackages mMiniBuildPlan "." names
 
 -- | Update the package index
@@ -671,7 +672,7 @@ upgradeCmd upgradeOpts' go = withGlobalConfigAndLock go $
 
 -- | Upload to Hackage
 uploadCmd :: ([String], Maybe PvpBounds, Bool, Bool, String) -> GlobalOpts -> IO ()
-uploadCmd ([], _, _, _, _) _ = error "To upload the current package, please run 'stack upload .'"
+uploadCmd ([], _, _, _, _) _ = throwString "Error: To upload the current package, please run 'stack upload .'"
 uploadCmd (args, mpvpBounds, ignoreCheck, don'tSign, sigServerUrl) go = do
     let partitionM _ [] = return ([], [])
         partitionM f (x:xs) = do
@@ -680,9 +681,11 @@ uploadCmd (args, mpvpBounds, ignoreCheck, don'tSign, sigServerUrl) go = do
             return $ if r then (x:as, bs) else (as, x:bs)
     (files, nonFiles) <- partitionM D.doesFileExist args
     (dirs, invalid) <- partitionM D.doesDirectoryExist nonFiles
-    unless (null invalid) $ error $
-        "stack upload expects a list sdist tarballs or cabal directories.  Can't find " ++
-        show invalid
+    unless (null invalid) $ do
+        hPutStrLn stderr $
+            "Error: stack upload expects a list sdist tarballs or cabal directories.  Can't find " ++
+            show invalid
+        exitFailure
     let getUploader :: (HasConfig config) => StackT config IO Upload.Uploader
         getUploader = do
             config <- view configL
@@ -792,7 +795,9 @@ execCmd ExecOpts {..} go@GlobalOpts{..} =
           case mId of
               Just i -> return (head $ words (T.unpack i))
               -- should never happen as we have already installed the packages
-              _      -> error ("Could not find package id of package " ++ name)
+              _      -> liftIO $ do
+                  hPutStrLn stderr ("Could not find package id of package " ++ name)
+                  exitFailure
 
       getPkgOpts menv wc pkgs = do
           ids <- mapM (getPkgId menv wc) pkgs

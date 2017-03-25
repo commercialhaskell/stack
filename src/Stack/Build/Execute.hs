@@ -1361,7 +1361,7 @@ singleBuild runInBase ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} in
         extraOpts <- extraBuildOptions wc eeBuildOpts
         cabal (configHideTHLoading config) (("build" :) $ (++ extraOpts) $
             case (taskType, taskAllInOne, isFinalBuild) of
-                (_, True, True) -> fail "Invariant violated: cannot have an all-in-one build that also has a final build step."
+                (_, True, True) -> error "Invariant violated: cannot have an all-in-one build that also has a final build step."
                 (TTLocal lp, False, False) -> primaryComponentOptions lp
                 (TTLocal lp, False, True) -> finalComponentOptions lp
                 (TTLocal lp, True, False) -> primaryComponentOptions lp ++ finalComponentOptions lp

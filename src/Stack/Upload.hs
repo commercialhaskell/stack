@@ -59,6 +59,7 @@ import           Network.HTTP.Client.TLS               (getGlobalManager,
 import           Path                                  (toFilePath)
 import           Prelude -- Fix redundant import warnings
 import           Stack.Types.Config
+import           Stack.Types.StringError
 import           System.Directory                      (createDirectoryIfMissing,
                                                         removeFile)
 import           System.FilePath                       ((</>), takeFileName)
@@ -223,7 +224,7 @@ mkUploader config us = do
                         putStrLn "authentication failure"
                         cfp <- credsFile config
                         handleIO (const $ return ()) (removeFile cfp)
-                        error "Authentication failure uploading to server"
+                        throwString "Authentication failure uploading to server"
                     403 -> do
                         putStrLn "forbidden upload"
                         putStrLn "Usually means: you've already uploaded this package/version combination"
@@ -237,7 +238,7 @@ mkUploader config us = do
                     code -> do
                         putStrLn $ "unhandled status code: " ++ show code
                         printBody res
-                        error $ "Upload failed on " ++ tarName
+                        throwString $ "Upload failed on " ++ tarName
         }
 
 printBody :: Response (ConduitM () S.ByteString IO ()) -> IO ()

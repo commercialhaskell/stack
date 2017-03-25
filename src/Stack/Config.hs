@@ -103,6 +103,7 @@ import           Stack.Types.Nix
 import           Stack.Types.PackageIndex (IndexType (ITHackageSecurity), HackageSecurity (..))
 import           Stack.Types.Resolver
 import           Stack.Types.StackT
+import           Stack.Types.StringError
 import           Stack.Types.Urls
 import           Stack.Types.Version
 import           System.Environment
@@ -201,10 +202,10 @@ makeConcreteResolver ar = do
             ARLatestNightly -> return $ ResolverSnapshot $ Nightly $ snapshotsNightly snapshots
             ARLatestLTSMajor x ->
                 case IntMap.lookup x $ snapshotsLts snapshots of
-                    Nothing -> error $ "No LTS release found with major version " ++ show x
+                    Nothing -> stringError $ "No LTS release found with major version " ++ show x
                     Just y -> return $ ResolverSnapshot $ LTS x y
             ARLatestLTS
-                | IntMap.null $ snapshotsLts snapshots -> error "No LTS releases found"
+                | IntMap.null $ snapshotsLts snapshots -> stringError "No LTS releases found"
                 | otherwise ->
                     let (x, y) = IntMap.findMax $ snapshotsLts snapshots
                      in return $ ResolverSnapshot $ LTS x y

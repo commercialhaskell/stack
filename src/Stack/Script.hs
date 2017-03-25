@@ -37,6 +37,7 @@ import           Stack.Types.Config
 import           Stack.Types.PackageName
 import           Stack.Types.Resolver
 import           Stack.Types.StackT
+import           Stack.Types.StringError
 import           System.FilePath            (dropExtension, replaceExtension)
 import           System.Process.Read
 
@@ -164,7 +165,7 @@ getPackagesFromImports (Just (ARResolver (ResolverSnapshot name))) scriptFP = do
                             case Set.toList pns of
                                 [] -> assert False $ return Set.empty
                                 [pn] -> return $ Set.singleton pn
-                                pns' -> error $ concat
+                                pns' -> throwString $ concat
                                     [ "Module "
                                     , S8.unpack $ unModuleName mn
                                     , " appears in multiple packages: "

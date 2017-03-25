@@ -232,7 +232,7 @@ displayDecoratedWrap
 displayDecoratedWrap f doc = do
     (mafter, result) <- go doc
     case mafter of
-      Just _ -> fail "Invariant violated by input to displayDecoratedWrap: no matching SAnnotStart for SAnnotStop."
+      Just _ -> error "Invariant violated by input to displayDecoratedWrap: no matching SAnnotStart for SAnnotStop."
       Nothing -> return result
   where
     spaces n = LTB.fromText (T.replicate n " ")
