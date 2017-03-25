@@ -295,7 +295,7 @@ mkUnregisterLocal tasks dirtyReason localDumpPkgs sourceMap =
 
 addFinal :: LocalPackage -> Package -> Bool -> M ()
 addFinal lp package isAllInOne = do
-    depsRes <- addPackageDeps False package
+    depsRes <- addPackageDeps package
     res <- case depsRes of
         Left e -> return $ Left e
         Right (missing, present, _minLoc) -> do
@@ -349,10 +349,10 @@ addDep treatAsDep' name = do
                             return $ Right $ ADRFound loc installed
                         Just (PIOnlySource ps) -> do
                             tellExecutables name ps
-                            installPackage treatAsDep name ps Nothing
+                            installPackage name ps Nothing
                         Just (PIBoth ps installed) -> do
                             tellExecutables name ps
-                            installPackage treatAsDep name ps (Just installed)
+                            installPackage name ps (Just installed)
             updateLibMap name res
             return res
 
@@ -394,30 +394,29 @@ tellExecutablesPackage loc p = do
         | Set.null myComps = x
         | otherwise = Set.intersection x myComps
 
-installPackage :: Bool -- ^ is this being used by a dependency?
-               -> PackageName
+installPackage :: PackageName
                -> PackageSource
                -> Maybe Installed
                -> M (Either ConstructPlanException AddDepRes)
-installPackage treatAsDep name ps minstalled = do
+installPackage name ps minstalled = do
     ctx <- ask
     case ps of
         PSUpstream version _ flags ghcOptions _ -> do
             planDebug $ "installPackage: Doing all-in-one build for upstream package " ++ show name
             package <- liftIO $ loadPackage ctx name version flags ghcOptions
-            resolveDepsAndInstall True treatAsDep ps package minstalled
+            resolveDepsAndInstall True ps package minstalled
         PSLocal lp ->
             case lpTestBench lp of
                 Nothing -> do
                     planDebug $ "installPackage: No test / bench component for " ++ show name ++ " so doing an all-in-one build."
-                    resolveDepsAndInstall True treatAsDep ps (lpPackage lp) minstalled
+                    resolveDepsAndInstall True ps (lpPackage lp) minstalled
                 Just tb -> do
                     -- Attempt to find a plan which performs an all-in-one
                     -- build.  Ignore the writer action + reset the state if
                     -- it fails.
                     s <- get
                     res <- pass $ do
-                        res <- addPackageDeps treatAsDep tb
+                        res <- addPackageDeps tb
                         let writerFunc w = case res of
                                 Left _ -> mempty
                                 _ -> w
@@ -438,7 +437,7 @@ installPackage treatAsDep name ps minstalled = do
                             put s
                             -- Otherwise, fall back on building the
                             -- tests / benchmarks in a separate step.
-                            res' <- resolveDepsAndInstall False treatAsDep ps (lpPackage lp) minstalled
+                            res' <- resolveDepsAndInstall False ps (lpPackage lp) minstalled
                             when (isRight res') $ do
                                 -- Insert it into the map so that it's
                                 -- available for addFinal.
@@ -447,13 +446,12 @@ installPackage treatAsDep name ps minstalled = do
                             return res'
 
 resolveDepsAndInstall :: Bool
-                      -> Bool
                       -> PackageSource
                       -> Package
                       -> Maybe Installed
                       -> M (Either ConstructPlanException AddDepRes)
-resolveDepsAndInstall isAllInOne treatAsDep ps package minstalled = do
-    res <- addPackageDeps treatAsDep package
+resolveDepsAndInstall isAllInOne ps package minstalled = do
+    res <- addPackageDeps package
     case res of
         Left err -> return $ Left err
         Right deps -> liftM Right $ installPackageGivenDeps isAllInOne ps package minstalled deps
@@ -517,13 +515,12 @@ addEllipsis t
     | T.length t < 100 = t
     | otherwise = T.take 97 t <> "..."
 
-addPackageDeps :: Bool -- ^ is this being used by a dependency?
-               -> Package -> M (Either ConstructPlanException (Set PackageIdentifier, Map PackageIdentifier GhcPkgId, InstallLocation))
-addPackageDeps treatAsDep package = do
+addPackageDeps :: Package -> M (Either ConstructPlanException (Set PackageIdentifier, Map PackageIdentifier GhcPkgId, InstallLocation))
+addPackageDeps package = do
     ctx <- ask
     deps' <- packageDepsWithTools package
     deps <- forM (Map.toList deps') $ \(depname, range) -> do
-        eres <- addDep treatAsDep depname
+        eres <- addDep True depname
         let getLatestApplicable = do
                 vs <- liftIO $ getVersions ctx depname
                 return (latestApplicableVersion range vs)
