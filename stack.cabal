@@ -273,7 +273,7 @@ library
                    , project-template >= 0.2
                    , zip-archive < 0.4
                    , hpack >= 0.17.0 && < 0.18
-                   , store >= 0.2.1.0 && < 0.5
+                   , store >= 0.2.1.0 && < 0.4
                    , annotated-wl-pprint
                    , file-embed >= 0.0.10
   if os(windows)
@@ -378,7 +378,7 @@ test-suite stack-test
                 , th-reify-many
                 , smallcheck
                 , bytestring
-                , store >= 0.2.1.0 && < 0.5
+                , store >= 0.2.1.0 && < 0.4
                 , vector >= 0.10.12.3 && < 0.13
                 , unordered-containers
                 , template-haskell >= 2.9.0.0 && < 2.12
