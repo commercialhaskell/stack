@@ -34,8 +34,8 @@
 * In master branch:
     * stack.cabal: bump version number to unstable (odd third component)
     * Changelog: add new "unreleased changes" section
-    * stack.yaml: bump to use latest LTS version, and check whether extra-deps
-      still needed
+    * stack-*.yaml: bump to use latest LTS minor version or nightly, and check
+      whether extra-deps still needed
 * In RC branch:
     * Update the ChangeLog:
         * Check for any important changes that missed getting an entry in
