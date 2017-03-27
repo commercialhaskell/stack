@@ -10,7 +10,7 @@ import Blaze.ByteString.Builder (toLazyByteString, copyByteString)
 import Blaze.ByteString.Builder.Char.Utf8 (fromShow)
 import Control.Concurrent.Async (race_)
 import Control.Concurrent.STM
-import Control.Exception (Exception, fromException)
+import Control.Exception (Exception, fromException, catch, throwIO)
 import Control.Exception.Safe (tryAny)
 import Control.Monad (forever, unless, when)
 import qualified Data.ByteString.Lazy as L
@@ -20,6 +20,7 @@ import Data.Set (Set)
 import qualified Data.Set as Set
 import Data.String (fromString)
 import Data.Traversable (forM)
+import GHC.IO.Exception
 import GHC.IO.Handle (hIsTerminalDevice)
 import Path
 import System.Console.ANSI
@@ -93,13 +94,17 @@ fileWatchConf cfg out inner = withManagerConf cfg $ \manager -> do
 
             keepListening _dir listen () = Just $ return $ Just listen
             stopListening = Map.map $ \f -> do
-                () <- f
+                () <- f `catch` \ioe ->
+                    -- Ignore invalid argument error - it can happen if
+                    -- the directory is removed.
+                    case ioe_type ioe of
+                        InvalidArgument -> return ()
+                        _ -> throwIO ioe
                 return Nothing
             startListening = Map.mapWithKey $ \dir () -> do
                 let dir' = fromString $ toFilePath dir
                 listen <- watchDir manager dir' (const True) onChange
                 return $ Just listen
-
 
     let watchInput = do
             line <- getLine
