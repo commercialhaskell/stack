@@ -20,3 +20,10 @@ build:
     - export PATH=$HOME/.local/bin:$PATH
     - (cd etc/scripts && stack --install-ghc install --pedantic)
     - stack-release-script check
+
+docker_image_lts-8:
+  stage: build
+  when: manual
+  script:
+    - docker login -u "$PROD_DOCKER_USERNAME" -p "$PROD_DOCKER_PASSWORD"
+    - etc/dockerfiles/stack-build/build.sh --push lts-8
