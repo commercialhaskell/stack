@@ -24,7 +24,6 @@ import GHC.IO.Exception
 import GHC.IO.Handle (hIsTerminalDevice)
 import Path
 import System.Console.ANSI
-import System.Exit
 import System.FSNotify
 import System.IO (Handle, stdout, stderr, hPutStrLn)
 
