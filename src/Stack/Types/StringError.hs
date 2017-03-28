@@ -16,6 +16,5 @@ instance Show StringError where show (StringError str) = str
 throwString :: MonadThrow m => String -> m a
 throwString = throwM . StringError
 
--- FIXME: actually need this?
-stringError :: String -> a
-stringError = raise# . toException . StringError
+errorString :: String -> a
+errorString = raise# . toException . StringError
