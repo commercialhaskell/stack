@@ -94,7 +94,7 @@ flagNameParser =
 mkFlagName :: String -> Q Exp
 mkFlagName s =
   case parseFlagNameFromString s of
-    Nothing -> stringError ("Invalid flag name: " ++ show s)
+    Nothing -> errorString ("Invalid flag name: " ++ show s)
     Just pn -> [|pn|]
 
 -- | Convenient way to parse a flag name from a 'Text'.

@@ -95,7 +95,7 @@ parseTemplateNameFromString fname =
 mkTemplateName :: String -> Q Exp
 mkTemplateName s =
     case parseTemplateNameFromString s of
-        Left{} -> stringError ("Invalid template name: " ++ show s)
+        Left{} -> errorString ("Invalid template name: " ++ show s)
         Right (TemplateName (T.unpack -> prefix) p) ->
             [|TemplateName (T.pack prefix) $(pn)|]
             where pn =

@@ -202,10 +202,10 @@ makeConcreteResolver ar = do
             ARLatestNightly -> return $ ResolverSnapshot $ Nightly $ snapshotsNightly snapshots
             ARLatestLTSMajor x ->
                 case IntMap.lookup x $ snapshotsLts snapshots of
-                    Nothing -> stringError $ "No LTS release found with major version " ++ show x
+                    Nothing -> errorString $ "No LTS release found with major version " ++ show x
                     Just y -> return $ ResolverSnapshot $ LTS x y
             ARLatestLTS
-                | IntMap.null $ snapshotsLts snapshots -> stringError "No LTS releases found"
+                | IntMap.null $ snapshotsLts snapshots -> errorString "No LTS releases found"
                 | otherwise ->
                     let (x, y) = IntMap.findMax $ snapshotsLts snapshots
                      in return $ ResolverSnapshot $ LTS x y

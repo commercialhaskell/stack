@@ -162,7 +162,7 @@ fromCabalVersion (Cabal.Version vs _) =
 mkVersion :: String -> Q Exp
 mkVersion s =
   case parseVersionFromString s of
-    Nothing -> stringError ("Invalid package version: " ++ show s)
+    Nothing -> errorString ("Invalid package version: " ++ show s)
     Just pn -> [|pn|]
 
 -- | Display a version range

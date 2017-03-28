@@ -301,7 +301,7 @@ updateIndexHackageSecurity
 updateIndexHackageSecurity indexName' url (HackageSecurity keyIds threshold) = do
     baseURI <-
         case parseURI $ T.unpack url of
-            Nothing -> stringError $ "Invalid Hackage Security base URL: " ++ T.unpack url
+            Nothing -> errorString $ "Invalid Hackage Security base URL: " ++ T.unpack url
             Just x -> return x
     manager <- liftIO getGlobalManager
     root <- configPackageIndexRoot indexName'

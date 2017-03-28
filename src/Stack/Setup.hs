@@ -1695,13 +1695,13 @@ preferredPlatforms = do
         Cabal.Windows -> return (True, "windows")
         Cabal.OSX -> return (False, "osx")
         Cabal.FreeBSD -> return (False, "freebsd")
-        _ -> stringError $ "Binary upgrade not yet supported on OS: " ++ show os'
+        _ -> errorString $ "Binary upgrade not yet supported on OS: " ++ show os'
     arch <-
       case arch' of
         I386 -> return "i386"
         X86_64 -> return "x86_64"
         Arm -> return "arm"
-        _ -> stringError $ "Binary upgrade not yet supported on arch: " ++ show arch'
+        _ -> errorString $ "Binary upgrade not yet supported on arch: " ++ show arch'
     hasgmp4 <- return False -- FIXME import relevant code from Stack.Setup? checkLib $(mkRelFile "libgmp.so.3")
     let suffixes
           | hasgmp4 = ["-static", "-gmp4", ""]

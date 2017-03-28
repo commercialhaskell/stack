@@ -328,7 +328,7 @@ getSnapshots' = do
         $logError "    http://docs.haskellstack.org/en/stable/yaml_configuration/"
         $logError ""
         $logError $ "Exception was: " <> T.pack (show e)
-        stringError ""
+        errorString ""
 
 -- | Get the default resolver value
 getDefaultResolver

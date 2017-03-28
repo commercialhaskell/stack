@@ -411,7 +411,7 @@ queryBuildInfo selectors0 =
             _ -> err $ "Cannot apply selector to " ++ show value
       where
         cont = select (front . (sel:)) sels
-        err msg = stringError $ msg ++ ": " ++ show (front [sel])
+        err msg = errorString $ msg ++ ": " ++ show (front [sel])
 
 -- | Get the raw build information object
 rawBuildInfo :: (StackM env m, HasEnvConfig env) => m Value

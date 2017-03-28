@@ -70,7 +70,7 @@ cfgCmdSet go cmd = do
                      case mstackYaml of
                          LCSProject stackYaml -> return stackYaml
                          LCSNoProject -> liftM (</> stackDotYaml) (getImplicitGlobalProjectDir conf)
-                         LCSNoConfig -> stringError "config command used when no local configuration available"
+                         LCSNoConfig -> errorString "config command used when no local configuration available"
                  CommandScopeGlobal -> return (configUserConfigPath conf))
     -- We don't need to worry about checking for a valid yaml here
     (config :: Yaml.Object) <-
@@ -96,7 +96,7 @@ cfgCmdSetValue (ConfigCmdSetResolver newResolver) = do
         ResolverSnapshot snapName -> void $ loadMiniBuildPlan snapName
         ResolverCompiler _ -> return ()
         -- TODO: custom snapshot support?  Would need a way to specify on CLI
-        ResolverCustom _ _ -> stringError "'stack config set resolver' does not support custom resolvers"
+        ResolverCustom _ _ -> errorString "'stack config set resolver' does not support custom resolvers"
     return (Yaml.String (resolverName concreteResolver))
 cfgCmdSetValue (ConfigCmdSetSystemGhc _ bool) =
     return (Yaml.Bool bool)

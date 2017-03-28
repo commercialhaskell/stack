@@ -96,7 +96,7 @@ packageNameParser =
 mkPackageName :: String -> Q Exp
 mkPackageName s =
   case parsePackageNameFromString s of
-    Nothing -> stringError ("Invalid package name: " ++ show s)
+    Nothing -> errorString ("Invalid package name: " ++ show s)
     Just pn -> [|pn|]
 
 -- | Parse a package name from a 'Text'.

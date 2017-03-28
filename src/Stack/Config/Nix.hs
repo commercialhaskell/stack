@@ -61,7 +61,7 @@ nixCompiler compilerVersion =
                                              (fixMinor (versionText v)))
   in case compilerVersion of
        GhcVersion v -> nixCompilerFromVersion v
-       _ -> stringError "Only GHC is supported by stack --nix"
+       _ -> errorString "Only GHC is supported by stack --nix"
 
 -- Exceptions thown specifically by Stack.Nix
 data StackNixException
