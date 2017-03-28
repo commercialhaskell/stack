@@ -37,8 +37,8 @@ import qualified Data.ByteString.Char8 as BS
 import qualified Data.ByteString.Lazy.Char8 as LBS
 import           Data.Char (isSpace,toUpper,isAscii,isDigit)
 import           Data.Conduit.List (sinkNull)
-import           Data.List (dropWhileEnd,intercalate,isPrefixOf,isInfixOf,foldl',nub)
-import           Data.List.Extra (trim)
+import           Data.List (dropWhileEnd,intercalate,isPrefixOf,isInfixOf,foldl')
+import           Data.List.Extra (trim, nubOrd)
 import           Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import           Data.Maybe
@@ -112,7 +112,7 @@ reexecWithOptionalContainer mprojectRoot =
                 then liftIO $ do
                   duUid <- User.getEffectiveUserID
                   duGid <- User.getEffectiveGroupID
-                  duGroups <- nub <$> User.getGroups
+                  duGroups <- nubOrd <$> User.getGroups
                   duUmask <- Files.setFileCreationMask 0o022
                   -- Only way to get old umask seems to be to change it, so set it back afterward
                   _ <- Files.setFileCreationMask duUmask
