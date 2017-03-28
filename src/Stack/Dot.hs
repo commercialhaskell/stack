@@ -39,10 +39,13 @@ import           Stack.Build.Source
 import           Stack.Build.Target
 import           Stack.Constants
 import           Stack.Package
+import           Stack.PackageDump (DumpPackage(..))
 import           Stack.Types.Build
 import           Stack.Types.Config
 import           Stack.Types.FlagName
+import           Stack.Types.GhcPkgId
 import           Stack.Types.Package
+import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageName
 import           Stack.Types.StackT
 import           Stack.Types.Version
@@ -122,31 +125,24 @@ createDependencyGraph dotOpts = do
       }
   let graph = Map.fromList (localDependencies dotOpts (filter lpWanted locals))
   menv <- getMinimalEnvOverride
-  installedMap <- fmap snd . fst4 <$> getInstalled menv
+  (installedMap, globalDump, _, _) <- getInstalled menv
                                                    (GetInstalledOpts False False False)
                                                    sourceMap
+  -- TODO: Can there be multiple entries for wired-in-packages? If so,
+  -- this will choose one arbitrarily..
+  let globalDependsMap = Map.fromList $ map (\dp -> (packageIdentifierName (dpPackageIdent dp), dpDepends dp)) globalDump
+      globalIdMap = Map.fromList $ map (\dp -> (dpGhcPkgId dp, dpPackageIdent dp)) globalDump
   withLoadPackage (\loader -> do
-    let depLoader = createDepLoader sourceMap installedMap loadPackageDeps
+    let depLoader = createDepLoader sourceMap installedMap globalDependsMap globalIdMap loadPackageDeps
         loadPackageDeps name version flags ghcOptions
             -- Skip packages that can't be loaded - see
             -- https://github.com/commercialhaskell/stack/issues/2967
             | name `elem` [$(mkPackageName "rts"), $(mkPackageName "ghc")] =
                 return (Set.empty, DotPayload (Just version) (Just BSD3))
-            | otherwise = fmap (getAllDeps &&& makePayload)
+            | otherwise = fmap (packageAllDeps &&& makePayload)
                                (loader name version flags ghcOptions)
     liftIO $ resolveDependencies (dotDependencyDepth dotOpts) graph depLoader)
-  where fst4 :: (a,b,c,d) -> a
-        fst4 (x,_,_,_) = x
-
-        -- Leave out bogus dep of base - see
-        -- https://github.com/commercialhaskell/stack/issues/2969
-        getAllDeps pkg
-            | packageName pkg == $(mkPackageName "base")
-                = Set.delete $(mkPackageName "invalid-cabal-flag-settings") (packageAllDeps pkg)
-            | otherwise
-                = packageAllDeps pkg
-
-        makePayload pkg = DotPayload (Just $ packageVersion pkg) (Just $ packageLicense pkg)
+  where makePayload pkg = DotPayload (Just $ packageVersion pkg) (Just $ packageLicense pkg)
 
 listDependencies :: (StackM env m, HasEnvConfig env, MonadBaseUnlift IO m)
                   => ListDepsOpts
@@ -216,20 +212,37 @@ resolveDependencies limit graph loadPackageDeps = do
 -- | Given a SourceMap and a dependency loader, load the set of dependencies for a package
 createDepLoader :: Applicative m
                 => Map PackageName PackageSource
-                -> Map PackageName Installed
+                -> Map PackageName (InstallLocation, Installed)
+                -> Map PackageName [GhcPkgId]
+                -> Map GhcPkgId PackageIdentifier
                 -> (PackageName -> Version -> Map FlagName Bool -> [Text] -> m (Set PackageName, DotPayload))
                 -> PackageName
                 -> m (Set PackageName, DotPayload)
-createDepLoader sourceMap installed loadPackageDeps pkgName =
-  case Map.lookup pkgName sourceMap of
-    Just (PSLocal lp) -> pure (packageAllDeps pkg, payloadFromLocal pkg)
-      where
-        pkg = localPackageToPackage lp
-    Just (PSUpstream version _ flags ghcOptions _) -> loadPackageDeps pkgName version flags ghcOptions
-    Nothing -> pure (Set.empty, payloadFromInstalled (Map.lookup pkgName installed))
+createDepLoader sourceMap installed globalDependsMap globalIdMap loadPackageDeps pkgName =
+  if not (pkgName `HashSet.member` wiredInPackages)
+      then case Map.lookup pkgName sourceMap of
+          Just (PSLocal lp) -> pure (packageAllDeps pkg, payloadFromLocal pkg)
+            where
+              pkg = localPackageToPackage lp
+          Just (PSUpstream version _ flags ghcOptions _) ->
+              loadPackageDeps pkgName version flags ghcOptions
+          Nothing -> pure (Set.empty, payloadFromInstalled (Map.lookup pkgName installed))
+      -- For wired-in-packages, use information from ghc-pkg (see #3084)
+      else case Map.lookup pkgName globalDependsMap of
+          Nothing -> error ("Invariant violated: Expected to find wired-in-package " ++ packageNameString pkgName ++ " in global DB")
+          Just depIds -> (Set.fromList deps, ) <$> payload
+            where
+              deps = map (\depId -> maybe (error ("Invariant violated: Expected to find " ++ ghcPkgIdString depId ++ " in global DB"))
+                                          packageIdentifierName
+                                          (Map.lookup depId globalIdMap))
+                         depIds
+              payload = case Map.lookup pkgName sourceMap of
+                  Just (PSUpstream version _ flags ghcOptions _) ->
+                      fmap snd (loadPackageDeps pkgName version flags ghcOptions)
+                  _ -> pure (payloadFromInstalled (Map.lookup pkgName installed))
   where
     payloadFromLocal pkg = DotPayload (Just $ packageVersion pkg) (Just $ packageLicense pkg)
-    payloadFromInstalled maybePkg = DotPayload (fmap installedVersion maybePkg) Nothing
+    payloadFromInstalled maybePkg = DotPayload (fmap (installedVersion . snd) maybePkg) Nothing
 
 -- | Resolve the direct (depth 0) external dependencies of the given local packages
 localDependencies :: DotOpts -> [LocalPackage] -> [(PackageName, (Set PackageName, DotPayload))]
