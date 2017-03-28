@@ -50,6 +50,8 @@ Bug fixes:
 * Fixes `stack dot` and `stack list-dependencies` to use info from the
   package database for wired-in-packages (ghc, base, etc).
   See [#3084](https://github.com/commercialhaskell/stack/issues/3084)
+* Fixes `stack --docker build` when user is part of libvirt/libvirtd
+  groups on Ubuntu Yakkety (16.10). See [#3092]
 
 ## 1.4.0
 
