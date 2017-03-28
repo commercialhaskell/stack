@@ -45,6 +45,11 @@ Bug fixes:
 * Fixes an issue where cyclic deps can cause benchmarks or tests to be run
   before they are built.
   See [#2153](https://github.com/commercialhaskell/stack/issues/2153)
+* Fixes `stack build --file-watch` in cases where a directory is removed
+  See [#1838](https://github.com/commercialhaskell/stack/issues/1838)
+* Fixes `stack dot` and `stack list-dependencies` to use info from the
+  package database for wired-in-packages (ghc, base, etc).
+  See [#3084](https://github.com/commercialhaskell/stack/issues/3084)
 
 ## 1.4.0
 
