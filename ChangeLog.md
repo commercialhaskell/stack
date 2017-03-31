@@ -31,7 +31,9 @@ Other enhancements:
 * Can now use relative paths for `extra-include-dirs` and `extra-lib-dirs`.
   See [#2830](https://github.com/commercialhaskell/stack/issues/2830)
 * Improved bash completion for many options, including `--ghc-options`,
-  --flag`, targets, and project executables for `exec`.
+  `--flag`, targets, and project executables for `exec`.
+* `--haddock-arguments` is actually used now when `haddock` is invoked
+  during documentation generation.
 
 Bug fixes:
 
