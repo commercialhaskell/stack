@@ -1387,8 +1387,12 @@ singleBuild runInBase ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} in
                             ("Warning: haddock not generating hyperlinked sources because 'HsColour' not\n" <>
                              "found on PATH (use 'stack install hscolour' to install).")
                         return ["--hyperlink-source" | hscolourExists]
-            cabal False (concat [["haddock", "--html", "--hoogle", "--html-location=../$pkg-$version/"]
-                                ,sourceFlag, ["--internal" | boptsHaddockInternal eeBuildOpts]])
+            cabal False (concat [ ["haddock", "--html", "--html-location=../$pkg-$version/"]
+                                , sourceFlag
+                                , ["--internal" | boptsHaddockInternal eeBuildOpts]
+                                , [ "--haddock-option=" <> opt
+                                  | opt <- hoAdditionalArgs (boptsHaddockOpts eeBuildOpts) ]
+                                ])
 
         let shouldCopy = not isFinalBuild && (packageHasLibrary package || not (Set.null (packageExes package)))
         when shouldCopy $ withMVar eeInstallLock $ \() -> do
