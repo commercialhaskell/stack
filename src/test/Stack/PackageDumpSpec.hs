@@ -14,6 +14,7 @@ import           Data.Map                      (Map)
 import qualified Data.Map                      as Map
 import qualified Data.Set                      as Set
 import           Distribution.System           (buildPlatform)
+import           Distribution.License          (License(..))
 import           Prelude -- Fix redundant imports warnings
 import           Stack.PackageDump
 import           Stack.Types.Compiler
@@ -83,6 +84,7 @@ spec = do
             haskell2010 `shouldBe` DumpPackage
                 { dpGhcPkgId = ghcPkgId
                 , dpPackageIdent = packageIdent
+                , dpLicense = Just BSD3
                 , dpLibDirs = ["/opt/ghc/7.8.4/lib/ghc-7.8.4/haskell2010-1.1.2.0"]
                 , dpDepends = depends
                 , dpLibraries = ["HShaskell2010-1.1.2.0"]
@@ -122,6 +124,7 @@ spec = do
             haskell2010 `shouldBe` DumpPackage
                 { dpGhcPkgId = ghcPkgId
                 , dpPackageIdent = pkgIdent
+                , dpLicense = Just BSD3
                 , dpLibDirs = ["/opt/ghc/7.10.1/lib/ghc-7.10.1/ghc_EMlWrQ42XY0BNVbSrKixqY"]
                 , dpHaddockInterfaces = ["/opt/ghc/7.10.1/share/doc/ghc/html/libraries/ghc-7.10.1/ghc.haddock"]
                 , dpHaddockHtml = Just "/opt/ghc/7.10.1/share/doc/ghc/html/libraries/ghc-7.10.1"
@@ -154,6 +157,7 @@ spec = do
             hmatrix `shouldBe` DumpPackage
                 { dpGhcPkgId = ghcPkgId
                 , dpPackageIdent = pkgId
+                , dpLicense = Just BSD3
                 , dpLibDirs =
                       [ "/Users/alexbiehl/.stack/snapshots/x86_64-osx/lts-2.13/7.8.4/lib/x86_64-osx-ghc-7.8.4/hmatrix-0.16.1.5"
                       , "/opt/local/lib/"
@@ -187,6 +191,7 @@ spec = do
           ghcBoot `shouldBe` DumpPackage
             { dpGhcPkgId = ghcPkgId
             , dpPackageIdent = pkgId
+            , dpLicense = Just BSD3
             , dpLibDirs =
                   ["/opt/ghc/head/lib/ghc-7.11.20151213/ghc-boot-0.0.0.0"]
             , dpHaddockInterfaces = ["/opt/ghc/head/share/doc/ghc/html/libraries/ghc-boot-0.0.0.0/ghc-boot.haddock"]
