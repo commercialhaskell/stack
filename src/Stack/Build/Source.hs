@@ -88,7 +88,7 @@ loadSourceMap :: (StackM env m, HasEnvConfig env)
                    , SourceMap
                    )
 loadSourceMap needTargets boptsCli = do
-    (_, _, locals, _, _, sourceMap) <- loadSourceMapFull True needTargets boptsCli
+    (_, _, locals, _, _, sourceMap) <- loadSourceMapFull needTargets boptsCli
     return (locals, sourceMap)
 
 -- | Given the build commandline options, does the following:
@@ -103,8 +103,7 @@ loadSourceMap needTargets boptsCli = do
 -- * Builds a 'SourceMap', which contains info for all the packages that
 --   will be involved in the build.
 loadSourceMapFull :: (StackM env m, HasEnvConfig env)
-                  => Bool
-                  -> NeedTargets
+                  => NeedTargets
                   -> BuildOptsCLI
                   -> m ( Map PackageName SimpleTarget
                        , MiniBuildPlan
@@ -113,7 +112,7 @@ loadSourceMapFull :: (StackM env m, HasEnvConfig env)
                        , Map PackageName Version -- extra-deps from configuration and cli
                        , SourceMap
                        )
-loadSourceMapFull omitWiredIn needTargets boptsCli = do
+loadSourceMapFull needTargets boptsCli = do
     bconfig <- view buildConfigL
     rawLocals <- getLocalPackageViews
     (mbp0, cliExtraDeps, targets) <- parseTargetsFromBuildOptsWith rawLocals needTargets boptsCli
@@ -193,16 +192,9 @@ loadSourceMapFull omitWiredIn needTargets boptsCli = do
                 let configOpts = getGhcOptions bconfig boptsCli n False False
                  in PSUpstream (mpiVersion mpi) Snap (mpiFlags mpi) (mpiGhcOptions mpi ++ configOpts) (mpiGitSHA1 mpi)
             ]
-        -- This conditional was introduced in order to fix "stack
-        -- list-dependencies --license" (#2871) for wired-in-packages.
-        -- Normally, they are omitted as they shouldn't be considered
-        -- as packages available for installation.
-        sourceMap' =
-            if omitWiredIn
-                then sourceMap `Map.difference` Map.fromList (map (, ()) (HashSet.toList wiredInPackages))
-                else sourceMap
+            `Map.difference` Map.fromList (map (, ()) (HashSet.toList wiredInPackages))
 
-    return (targets, mbp, locals, nonLocalTargets, extraDeps0, sourceMap')
+    return (targets, mbp, locals, nonLocalTargets, extraDeps0, sourceMap)
 
 -- | All flags for a local package.
 getLocalFlags

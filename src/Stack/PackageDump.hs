@@ -49,7 +49,9 @@ import           Data.Store.VersionTagged
 import           Data.Text (Text)
 import qualified Data.Text as T
 import           Data.Typeable (Typeable)
+import qualified Distribution.License as C
 import qualified Distribution.System as OS
+import qualified Distribution.Text as C
 import           Path
 import           Path.Extra (toFilePathNoTrailingSep)
 import           Prelude -- Fix AMP warning
@@ -292,6 +294,7 @@ hasDebuggingSymbols dir lib = do
 data DumpPackage profiling haddock symbols = DumpPackage
     { dpGhcPkgId :: !GhcPkgId
     , dpPackageIdent :: !PackageIdentifier
+    , dpLicense :: !(Maybe C.License)
     , dpLibDirs :: ![FilePath]
     , dpLibraries :: ![Text]
     , dpHasExposedModules :: !Bool
@@ -303,7 +306,7 @@ data DumpPackage profiling haddock symbols = DumpPackage
     , dpSymbols :: !symbols
     , dpIsExposed :: !Bool
     }
-    deriving (Show, Eq, Ord)
+    deriving (Show, Eq)
 
 data PackageDumpException
     = MissingSingleField Text (Map Text [Line])
@@ -358,6 +361,10 @@ conduitDumpPackage = (=$= CL.catMaybes) $ eachSection $ do
                 libraries = parseM "hs-libraries"
                 exposedModules = parseM "exposed-modules"
                 exposed = parseM "exposed"
+                license =
+                    case parseM "license" of
+                        [licenseText] -> C.simpleParse (T.unpack licenseText)
+                        _ -> Nothing
             depends <- mapMaybeM parseDepend $ concatMap T.words $ parseM "depends"
 
             let parseQuoted key =
@@ -373,6 +380,7 @@ conduitDumpPackage = (=$= CL.catMaybes) $ eachSection $ do
             return $ Just DumpPackage
                 { dpGhcPkgId = ghcPkgId
                 , dpPackageIdent = PackageIdentifier name version
+                , dpLicense = license
                 , dpLibDirs = libDirPaths
                 , dpLibraries = T.words $ T.unwords libraries
                 , dpHasExposedModules = not (null libraries || null exposedModules)

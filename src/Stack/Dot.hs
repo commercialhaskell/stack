@@ -119,7 +119,7 @@ createDependencyGraph :: (StackM env m, HasEnvConfig env, MonadBaseUnlift IO m)
                        => DotOpts
                        -> m (Map PackageName (Set PackageName, DotPayload))
 createDependencyGraph dotOpts = do
-  (_, _, locals, _, _, sourceMap) <- loadSourceMapFull False NeedTargets defaultBuildOptsCLI
+  (_, _, locals, _, _, sourceMap) <- loadSourceMapFull NeedTargets defaultBuildOptsCLI
       { boptsCLITargets = dotTargets dotOpts
       , boptsCLIFlags = dotFlags dotOpts
       }
@@ -130,10 +130,10 @@ createDependencyGraph dotOpts = do
                                                    sourceMap
   -- TODO: Can there be multiple entries for wired-in-packages? If so,
   -- this will choose one arbitrarily..
-  let globalDependsMap = Map.fromList $ map (\dp -> (packageIdentifierName (dpPackageIdent dp), dpDepends dp)) globalDump
+  let globalDumpMap = Map.fromList $ map (\dp -> (packageIdentifierName (dpPackageIdent dp), dp)) globalDump
       globalIdMap = Map.fromList $ map (\dp -> (dpGhcPkgId dp, dpPackageIdent dp)) globalDump
   withLoadPackage (\loader -> do
-    let depLoader = createDepLoader sourceMap installedMap globalDependsMap globalIdMap loadPackageDeps
+    let depLoader = createDepLoader sourceMap installedMap globalDumpMap globalIdMap loadPackageDeps
         loadPackageDeps name version flags ghcOptions
             -- Skip packages that can't be loaded - see
             -- https://github.com/commercialhaskell/stack/issues/2967
@@ -213,12 +213,12 @@ resolveDependencies limit graph loadPackageDeps = do
 createDepLoader :: Applicative m
                 => Map PackageName PackageSource
                 -> Map PackageName (InstallLocation, Installed)
-                -> Map PackageName [GhcPkgId]
+                -> Map PackageName (DumpPackage () () ())
                 -> Map GhcPkgId PackageIdentifier
                 -> (PackageName -> Version -> Map FlagName Bool -> [Text] -> m (Set PackageName, DotPayload))
                 -> PackageName
                 -> m (Set PackageName, DotPayload)
-createDepLoader sourceMap installed globalDependsMap globalIdMap loadPackageDeps pkgName =
+createDepLoader sourceMap installed globalDumpMap globalIdMap loadPackageDeps pkgName =
   if not (pkgName `HashSet.member` wiredInPackages)
       then case Map.lookup pkgName sourceMap of
           Just (PSLocal lp) -> pure (packageAllDeps pkg, payloadFromLocal pkg)
@@ -228,21 +228,18 @@ createDepLoader sourceMap installed globalDependsMap globalIdMap loadPackageDeps
               loadPackageDeps pkgName version flags ghcOptions
           Nothing -> pure (Set.empty, payloadFromInstalled (Map.lookup pkgName installed))
       -- For wired-in-packages, use information from ghc-pkg (see #3084)
-      else case Map.lookup pkgName globalDependsMap of
+      else case Map.lookup pkgName globalDumpMap of
           Nothing -> error ("Invariant violated: Expected to find wired-in-package " ++ packageNameString pkgName ++ " in global DB")
-          Just depIds -> (Set.fromList deps, ) <$> payload
+          Just dp -> pure (Set.fromList deps, payloadFromDump dp)
             where
               deps = map (\depId -> maybe (error ("Invariant violated: Expected to find " ++ ghcPkgIdString depId ++ " in global DB"))
                                           packageIdentifierName
                                           (Map.lookup depId globalIdMap))
-                         depIds
-              payload = case Map.lookup pkgName sourceMap of
-                  Just (PSUpstream version _ flags ghcOptions _) ->
-                      fmap snd (loadPackageDeps pkgName version flags ghcOptions)
-                  _ -> pure (payloadFromInstalled (Map.lookup pkgName installed))
+                         (dpDepends dp)
   where
     payloadFromLocal pkg = DotPayload (Just $ packageVersion pkg) (Just $ packageLicense pkg)
     payloadFromInstalled maybePkg = DotPayload (fmap (installedVersion . snd) maybePkg) Nothing
+    payloadFromDump dp = DotPayload (Just $ packageIdentifierVersion $ dpPackageIdent dp) (dpLicense dp)
 
 -- | Resolve the direct (depth 0) external dependencies of the given local packages
 localDependencies :: DotOpts -> [LocalPackage] -> [(PackageName, (Set PackageName, DotPayload))]
