@@ -34,6 +34,9 @@ Other enhancements:
   `--flag`, targets, and project executables for `exec`.
 * `--haddock-arguments` is actually used now when `haddock` is invoked
   during documentation generation.
+* `--[no-]haddock-hyperlink-source` flag added which allows toggling
+  of sources being included in Haddock output.
+  See [#3099](https://github.com/commercialhaskell/stack/issues/3099)
 
 Bug fixes:
 

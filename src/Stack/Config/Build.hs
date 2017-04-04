@@ -37,6 +37,9 @@ buildOptsFromMonoid BuildOptsMonoid{..} = BuildOpts
     , boptsHaddockInternal = fromFirst
           (boptsHaddockInternal defaultBuildOpts)
           buildMonoidHaddockInternal
+    , boptsHaddockHyperlinkSource = fromFirst
+          (boptsHaddockHyperlinkSource defaultBuildOpts)
+          buildMonoidHaddockHyperlinkSource
     , boptsInstallExes = fromFirst
           (boptsInstallExes defaultBuildOpts)
           buildMonoidInstallExes
