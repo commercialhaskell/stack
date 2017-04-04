@@ -1373,7 +1373,7 @@ singleBuild runInBase ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} in
 
         when (doHaddock package) $ do
             announce "haddock"
-            sourceFlag <- do
+            sourceFlag <- if not (boptsHaddockHyperlinkSource eeBuildOpts) then return [] else do
                 -- See #2429 for why the temp dir is used
                 hyped <- tryProcessStdout (Just eeTempDir) eeEnvOverride "haddock" ["--hyperlinked-source"]
                 case hyped of

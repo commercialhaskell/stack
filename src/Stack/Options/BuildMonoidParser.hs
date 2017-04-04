@@ -15,10 +15,10 @@ buildOptsMonoidParser hide0 =
     BuildOptsMonoid <$> trace <*> profile <*> noStrip <*>
     libProfiling <*> exeProfiling <*> libStripping <*>
     exeStripping <*> haddock <*> haddockOptsParser hideBool <*>
-    openHaddocks <*> haddockDeps <*> haddockInternal <*> copyBins <*>
-    preFetch <*> keepGoing <*> forceDirty <*> tests <*>
-    testOptsParser hideBool <*> benches <*> benchOptsParser hideBool <*>
-    reconfigure <*> cabalVerbose <*> splitObjs
+    openHaddocks <*> haddockDeps <*> haddockInternal <*>
+    haddockHyperlinkSource <*> copyBins <*> preFetch <*> keepGoing <*>
+    forceDirty <*> tests <*> testOptsParser hideBool <*> benches <*>
+    benchOptsParser hideBool <*> reconfigure <*> cabalVerbose <*> splitObjs
   where
     hideBool = hide0 /= BuildCmdGlobalOpts
     hide =
@@ -97,6 +97,11 @@ buildOptsMonoidParser hide0 =
         firstBoolFlags
             "haddock-internal"
             "building Haddocks for internal modules (like cabal haddock --internal)"
+            hide
+    haddockHyperlinkSource =
+        firstBoolFlags
+            "haddock-hyperlink-source"
+            "building hyperlinked source for Haddock (like haddock --hyperlinked-source)"
             hide
     copyBins =
         firstBoolFlags
