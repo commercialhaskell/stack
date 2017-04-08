@@ -415,9 +415,10 @@ getDefaultLocalProgramsBase configStackRoot configPlatform override =
       -- location to the new one, which is undesirable.
       Platform _ Windows ->
         case Map.lookup "LOCALAPPDATA" $ unEnvOverride override of
-          Just t -> do
-            lad <- parseAbsDir $ T.unpack t
-            return $ lad </> $(mkRelDir "Programs") </> $(mkRelDir stackProgName)
+          Just t ->
+            case parseAbsDir $ T.unpack t of
+              Nothing -> throwString ("Failed to parse LOCALAPPDATA environment variable (expected absolute directory): " ++ show t)
+              Just lad -> return $ lad </> $(mkRelDir "Programs") </> $(mkRelDir stackProgName)
           Nothing -> return defaultBase
       _ -> return defaultBase
 
@@ -806,7 +807,9 @@ determineStackRootAndOwnership clArgs = do
                 mstackRoot <- liftIO $ lookupEnv stackRootEnvVar
                 case mstackRoot of
                     Nothing -> getAppUserDataDir stackProgName
-                    Just x -> parseAbsDir x
+                    Just x -> case parseAbsDir x of
+                        Nothing -> throwString ("Failed to parse STACK_ROOT environment variable (expected absolute directory): " ++ show x)
+                        Just parsed -> return parsed
 
     (existingStackRootOrParentDir, userOwnsIt) <- do
         mdirAndOwnership <- findInParents getDirAndOwnership stackRoot

@@ -247,7 +247,7 @@ packageFromPackageDescription packageConfig pkgFlags pkg =
           False
           (not . null . exposedModules)
           (library pkg)
-    , packageSimpleType = buildType pkg == Just Simple
+    , packageBuildType = buildType pkg
     , packageSetupDeps = msetupDeps
     }
   where

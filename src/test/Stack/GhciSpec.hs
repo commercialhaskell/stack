@@ -13,6 +13,7 @@ import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import           Distribution.License (License (BSD3))
 import qualified Distribution.ModuleName as ModuleName
+import           Distribution.PackageDescription (BuildType(..))
 import           Stack.Types.Package
 import           Stack.Types.PackageName
 import           Stack.Types.Version
@@ -224,7 +225,7 @@ packages_singlePackage =
       , packageExes = S.empty
       , packageOpts = GetPackageOpts undefined
       , packageHasExposedModules = True
-      , packageSimpleType = True
+      , packageBuildType = Just Simple
       , packageSetupDeps = Nothing
       }
     }
@@ -259,7 +260,7 @@ packages_multiplePackages =
       , packageExes = S.empty
       , packageOpts = GetPackageOpts undefined
       , packageHasExposedModules = True
-      , packageSimpleType = True
+      , packageBuildType = Just Simple
       , packageSetupDeps = Nothing
       }
     }
@@ -290,7 +291,7 @@ packages_multiplePackages =
       , packageExes = S.empty
       , packageOpts = GetPackageOpts undefined
       , packageHasExposedModules = True
-      , packageSimpleType = True
+      , packageBuildType = Just Simple
       , packageSetupDeps = Nothing
       }
     }

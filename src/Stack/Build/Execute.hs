@@ -956,8 +956,8 @@ withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} md
             -- Avoid broken Setup.hs files causing problems for simple build
             -- types, see:
             -- https://github.com/commercialhaskell/stack/issues/370
-            case (packageSimpleType package, eeSetupExe) of
-                (True, Just setupExe) -> return $ Left setupExe
+            case (packageBuildType package, eeSetupExe) of
+                (Just C.Simple, Just setupExe) -> return $ Left setupExe
                 _ -> liftIO $ Right <$> getSetupHs pkgDir
         inner $ \stripTHLoading args -> do
             let cabalPackageArg
@@ -978,6 +978,18 @@ withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} md
                     : ("-package-db=" ++ toFilePathNoTrailingSep (bcoLocalDB eeBaseConfigOpts))
                     : ["-hide-all-packages"]
                     )
+
+                warnCustomNoDeps =
+                    case (taskType, packageBuildType package) of
+                        (TTLocal{}, Just C.Custom) -> do
+                            $logWarn $ T.pack $ concat
+                                [ "Package "
+                                , packageNameString $ packageName package
+                                , " uses a custom Cabal build, but does not use a custom-setup stanza"
+                                ]
+                            $logWarn "Using the explicit setup deps approach based on configuration"
+                            $logWarn "Strongly recommend fixing the package's cabal file"
+                        _ -> return ()
 
                 getPackageArgs setupDir =
                     case (packageSetupDeps package, mdeps) of
@@ -1017,16 +1029,7 @@ withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} md
                         -- 'explicit-setup-deps' is requested in your
                         -- stack.yaml file.
                         (Nothing, Just deps) | explicitSetupDeps (packageName package) config -> do
-                            case taskType of
-                                TTLocal{} -> do
-                                    $logWarn $ T.pack $ concat
-                                        [ "Package "
-                                        , packageNameString $ packageName package
-                                        , " uses a custom Cabal build, but does not use a custom-setup stanza"
-                                        ]
-                                    $logWarn "Using the explicit setup deps approach based on configuration"
-                                    $logWarn "Strongly recommend fixing the package's cabal file"
-                                _ -> return ()
+                            warnCustomNoDeps
                             -- Stack always builds with the global Cabal for various
                             -- reproducibility issues.
                             let depsMinusCabal
@@ -1055,16 +1058,7 @@ withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} md
                         -- sdist` or when explicitly requested in the
                         -- stack.yaml file.
                         (Nothing, _) -> do
-                            case taskType of
-                                TTLocal{} -> do
-                                    $logWarn $ T.pack $ concat
-                                        [ "Package "
-                                        , packageNameString $ packageName package
-                                        , " uses a custom Cabal build, but does not use a custom-setup stanza"
-                                        ]
-                                    $logWarn "Not using the explicit setup deps approach based on configuration"
-                                    $logWarn "Strongly recommend fixing the package's cabal file"
-                                _ -> return ()
+                            warnCustomNoDeps
                             return $ cabalPackageArg ++
                                     -- NOTE: This is different from
                                     -- packageDBArgs above in that it does not
@@ -1400,7 +1394,7 @@ singleBuild runInBase ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} in
             eres <- try $ cabal False ["copy"]
             case eres of
                 Left err@CabalExitedUnsuccessfully{} ->
-                    throwM $ CabalCopyFailed (packageSimpleType package) (show err)
+                    throwM $ CabalCopyFailed (packageBuildType package == Just C.Simple) (show err)
                 _ -> return ()
             when (packageHasLibrary package) $ cabal False ["register"]
 
@@ -1592,7 +1586,7 @@ singleTest runInBase topts testsToRun ac ee task installedMap = do
                             _ -> Map.singleton testName $ Just ec
                     else do
                         $logError $ T.pack $ show $ TestSuiteExeMissing
-                            (packageSimpleType package)
+                            (packageBuildType package == Just C.Simple)
                             exeName
                             (packageNameString (packageName package))
                             (T.unpack testName)
