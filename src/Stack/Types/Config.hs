@@ -324,8 +324,58 @@ data Config =
          -- ^ Require a version of stack within this range.
          ,configJobs                :: !Int
          -- ^ How many concurrent jobs to run, defaults to number of capabilities
-         ,configOverrideGccPath     :: !(Maybe (Path Abs File))
-         -- ^ Optional gcc override path
+         ,configProgAlexPath            :: !(Maybe (Path Abs File))
+         ,configProgArPath              :: !(Maybe (Path Abs File))
+         ,configProgC2hsPath            :: !(Maybe (Path Abs File))
+         ,configProgCpphsPath           :: !(Maybe (Path Abs File))
+         ,configProgGccPath             :: !(Maybe (Path Abs File))
+         ,configProgGhcPath             :: !(Maybe (Path Abs File))
+         ,configProgGhcPkgPath          :: !(Maybe (Path Abs File))
+         ,configProgGhcjsPath           :: !(Maybe (Path Abs File))
+         ,configProgGhcjsPkgPath        :: !(Maybe (Path Abs File))
+         ,configProgGreencardPath       :: !(Maybe (Path Abs File))
+         ,configProgHaddockPath         :: !(Maybe (Path Abs File))
+         ,configProgHappyPath           :: !(Maybe (Path Abs File))
+         ,configProgHaskellSuitePath    :: !(Maybe (Path Abs File))
+         ,configProgHaskellSuitePkgPath :: !(Maybe (Path Abs File))
+         ,configProgHmakePath           :: !(Maybe (Path Abs File))
+         ,configProgHpcPath             :: !(Maybe (Path Abs File))
+         ,configProgHsc2hsPath          :: !(Maybe (Path Abs File))
+         ,configProgHscolourPath        :: !(Maybe (Path Abs File))
+         ,configProgJhcPath             :: !(Maybe (Path Abs File))
+         ,configProgLdPath              :: !(Maybe (Path Abs File))
+         ,configProgLhcPath             :: !(Maybe (Path Abs File))
+         ,configProgLhcPkgPath          :: !(Maybe (Path Abs File))
+         ,configProgPkgConfigPath       :: !(Maybe (Path Abs File))
+         ,configProgStripPath           :: !(Maybe (Path Abs File))
+         ,configProgTarPath             :: !(Maybe (Path Abs File))
+         ,configProgUhcPath             :: !(Maybe (Path Abs File))
+         ,configProgAlexOptions            :: ![Text]
+         ,configProgArOptions              :: ![Text]
+         ,configProgC2hsOptions            :: ![Text]
+         ,configProgCpphsOptions           :: ![Text]
+         ,configProgGccOptions             :: ![Text]
+         ,configProgGhcOptions             :: ![Text]
+         ,configProgGhcPkgOptions          :: ![Text]
+         ,configProgGhcjsOptions           :: ![Text]
+         ,configProgGhcjsPkgOptions        :: ![Text]
+         ,configProgGreencardOptions       :: ![Text]
+         ,configProgHaddockOptions         :: ![Text]
+         ,configProgHappyOptions           :: ![Text]
+         ,configProgHaskellSuiteOptions    :: ![Text]
+         ,configProgHaskellSuitePkgOptions :: ![Text]
+         ,configProgHmakeOptions           :: ![Text]
+         ,configProgHpcOptions             :: ![Text]
+         ,configProgHsc2hsOptions          :: ![Text]
+         ,configProgHscolourOptions        :: ![Text]
+         ,configProgJhcOptions             :: ![Text]
+         ,configProgLdOptions              :: ![Text]
+         ,configProgLhcOptions             :: ![Text]
+         ,configProgLhcPkgOptions          :: ![Text]
+         ,configProgPkgConfigOptions       :: ![Text]
+         ,configProgStripOptions           :: ![Text]
+         ,configProgTarOptions             :: ![Text]
+         ,configProgUhcOptions             :: ![Text]
          ,configExtraIncludeDirs    :: !(Set FilePath)
          -- ^ --extra-include-dirs arguments
          ,configExtraLibDirs        :: !(Set FilePath)
@@ -747,8 +797,58 @@ data ConfigMonoid =
     -- ^ See: 'configExtraIncludeDirs'
     ,configMonoidExtraLibDirs        :: !(Set FilePath)
     -- ^ See: 'configExtraLibDirs'
-    , configMonoidOverrideGccPath    :: !(First (Path Abs File))
-    -- ^ Allow users to override the path to gcc
+    ,configMonoidProgAlexPath            :: !(First (Path Abs File))
+    ,configMonoidProgArPath              :: !(First (Path Abs File))
+    ,configMonoidProgC2hsPath            :: !(First (Path Abs File))
+    ,configMonoidProgCpphsPath           :: !(First (Path Abs File))
+    ,configMonoidProgGccPath             :: !(First (Path Abs File))
+    ,configMonoidProgGhcPath             :: !(First (Path Abs File))
+    ,configMonoidProgGhcPkgPath          :: !(First (Path Abs File))
+    ,configMonoidProgGhcjsPath           :: !(First (Path Abs File))
+    ,configMonoidProgGhcjsPkgPath        :: !(First (Path Abs File))
+    ,configMonoidProgGreencardPath       :: !(First (Path Abs File))
+    ,configMonoidProgHaddockPath         :: !(First (Path Abs File))
+    ,configMonoidProgHappyPath           :: !(First (Path Abs File))
+    ,configMonoidProgHaskellSuitePath    :: !(First (Path Abs File))
+    ,configMonoidProgHaskellSuitePkgPath :: !(First (Path Abs File))
+    ,configMonoidProgHmakePath           :: !(First (Path Abs File))
+    ,configMonoidProgHpcPath             :: !(First (Path Abs File))
+    ,configMonoidProgHsc2hsPath          :: !(First (Path Abs File))
+    ,configMonoidProgHscolourPath        :: !(First (Path Abs File))
+    ,configMonoidProgJhcPath             :: !(First (Path Abs File))
+    ,configMonoidProgLdPath              :: !(First (Path Abs File))
+    ,configMonoidProgLhcPath             :: !(First (Path Abs File))
+    ,configMonoidProgLhcPkgPath          :: !(First (Path Abs File))
+    ,configMonoidProgPkgConfigPath       :: !(First (Path Abs File))
+    ,configMonoidProgStripPath           :: !(First (Path Abs File))
+    ,configMonoidProgTarPath             :: !(First (Path Abs File))
+    ,configMonoidProgUhcPath             :: !(First (Path Abs File))
+    ,configMonoidProgAlexOptions            :: ![Text]
+    ,configMonoidProgArOptions              :: ![Text]
+    ,configMonoidProgC2hsOptions            :: ![Text]
+    ,configMonoidProgCpphsOptions           :: ![Text]
+    ,configMonoidProgGccOptions             :: ![Text]
+    ,configMonoidProgGhcOptions             :: ![Text]
+    ,configMonoidProgGhcPkgOptions          :: ![Text]
+    ,configMonoidProgGhcjsOptions           :: ![Text]
+    ,configMonoidProgGhcjsPkgOptions        :: ![Text]
+    ,configMonoidProgGreencardOptions       :: ![Text]
+    ,configMonoidProgHaddockOptions         :: ![Text]
+    ,configMonoidProgHappyOptions           :: ![Text]
+    ,configMonoidProgHaskellSuiteOptions    :: ![Text]
+    ,configMonoidProgHaskellSuitePkgOptions :: ![Text]
+    ,configMonoidProgHmakeOptions           :: ![Text]
+    ,configMonoidProgHpcOptions             :: ![Text]
+    ,configMonoidProgHsc2hsOptions          :: ![Text]
+    ,configMonoidProgHscolourOptions        :: ![Text]
+    ,configMonoidProgJhcOptions             :: ![Text]
+    ,configMonoidProgLdOptions              :: ![Text]
+    ,configMonoidProgLhcOptions             :: ![Text]
+    ,configMonoidProgLhcPkgOptions          :: ![Text]
+    ,configMonoidProgPkgConfigOptions       :: ![Text]
+    ,configMonoidProgStripOptions           :: ![Text]
+    ,configMonoidProgTarOptions             :: ![Text]
+    ,configMonoidProgUhcOptions             :: ![Text]
     ,configMonoidConcurrentTests     :: !(First Bool)
     -- ^ See: 'configConcurrentTests'
     ,configMonoidLocalBinPath        :: !(First FilePath)
@@ -830,7 +930,58 @@ parseConfigMonoidObject rootDir obj = do
         obj ..:?  configMonoidExtraIncludeDirsName ..!= Set.empty
     configMonoidExtraLibDirs <- fmap (Set.map (toFilePath rootDir FilePath.</>)) $
         obj ..:?  configMonoidExtraLibDirsName ..!= Set.empty
-    configMonoidOverrideGccPath <- First <$> obj ..:? configMonoidOverrideGccPathName
+    configMonoidProgAlexPath            <- First <$> obj ..:? configMonoidProgAlexPathName
+    configMonoidProgArPath              <- First <$> obj ..:? configMonoidProgArPathName
+    configMonoidProgC2hsPath            <- First <$> obj ..:? configMonoidProgC2hsPathName
+    configMonoidProgCpphsPath           <- First <$> obj ..:? configMonoidProgCpphsPathName
+    configMonoidProgGccPath             <- First <$> obj ..:? configMonoidProgGccPathName
+    configMonoidProgGhcPath             <- First <$> obj ..:? configMonoidProgGhcPathName
+    configMonoidProgGhcPkgPath          <- First <$> obj ..:? configMonoidProgGhcPkgPathName
+    configMonoidProgGhcjsPath           <- First <$> obj ..:? configMonoidProgGhcjsPathName
+    configMonoidProgGhcjsPkgPath        <- First <$> obj ..:? configMonoidProgGhcjsPkgPathName
+    configMonoidProgGreencardPath       <- First <$> obj ..:? configMonoidProgGreencardPathName
+    configMonoidProgHaddockPath         <- First <$> obj ..:? configMonoidProgHaddockPathName
+    configMonoidProgHappyPath           <- First <$> obj ..:? configMonoidProgHappyPathName
+    configMonoidProgHaskellSuitePath    <- First <$> obj ..:? configMonoidProgHaskellSuitePathName
+    configMonoidProgHaskellSuitePkgPath <- First <$> obj ..:? configMonoidProgHaskellSuitePkgPathName
+    configMonoidProgHmakePath           <- First <$> obj ..:? configMonoidProgHmakePathName
+    configMonoidProgHpcPath             <- First <$> obj ..:? configMonoidProgHpcPathName
+    configMonoidProgHsc2hsPath          <- First <$> obj ..:? configMonoidProgHsc2hsPathName
+    configMonoidProgHscolourPath        <- First <$> obj ..:? configMonoidProgHscolourPathName
+    configMonoidProgJhcPath             <- First <$> obj ..:? configMonoidProgJhcPathName
+    configMonoidProgLdPath              <- First <$> obj ..:? configMonoidProgLdPathName
+    configMonoidProgLhcPath             <- First <$> obj ..:? configMonoidProgLhcPathName
+    configMonoidProgLhcPkgPath          <- First <$> obj ..:? configMonoidProgLhcPkgPathName
+    configMonoidProgPkgConfigPath       <- First <$> obj ..:? configMonoidProgPkgConfigPathName
+    configMonoidProgStripPath           <- First <$> obj ..:? configMonoidProgStripPathName
+    configMonoidProgTarPath             <- First <$> obj ..:? configMonoidProgTarPathName
+    configMonoidProgUhcPath             <- First <$> obj ..:? configMonoidProgUhcPathName
+    configMonoidProgAlexOptions            <- fromMaybe [] <$> obj ..:? configMonoidProgAlexOptionsName
+    configMonoidProgArOptions              <- fromMaybe [] <$> obj ..:? configMonoidProgArOptionsName
+    configMonoidProgC2hsOptions            <- fromMaybe [] <$> obj ..:? configMonoidProgC2hsOptionsName
+    configMonoidProgCpphsOptions           <- fromMaybe [] <$> obj ..:? configMonoidProgCpphsOptionsName
+    configMonoidProgGccOptions             <- fromMaybe [] <$> obj ..:? configMonoidProgGccOptionsName
+    configMonoidProgGhcOptions             <- fromMaybe [] <$> obj ..:? configMonoidProgGhcOptionsName
+    configMonoidProgGhcPkgOptions          <- fromMaybe [] <$> obj ..:? configMonoidProgGhcPkgOptionsName
+    configMonoidProgGhcjsOptions           <- fromMaybe [] <$> obj ..:? configMonoidProgGhcjsOptionsName
+    configMonoidProgGhcjsPkgOptions        <- fromMaybe [] <$> obj ..:? configMonoidProgGhcjsPkgOptionsName
+    configMonoidProgGreencardOptions       <- fromMaybe [] <$> obj ..:? configMonoidProgGreencardOptionsName
+    configMonoidProgHaddockOptions         <- fromMaybe [] <$> obj ..:? configMonoidProgHaddockOptionsName
+    configMonoidProgHappyOptions           <- fromMaybe [] <$> obj ..:? configMonoidProgHappyOptionsName
+    configMonoidProgHaskellSuiteOptions    <- fromMaybe [] <$> obj ..:? configMonoidProgHaskellSuiteOptionsName
+    configMonoidProgHaskellSuitePkgOptions <- fromMaybe [] <$> obj ..:? configMonoidProgHaskellSuitePkgOptionsName
+    configMonoidProgHmakeOptions           <- fromMaybe [] <$> obj ..:? configMonoidProgHmakeOptionsName
+    configMonoidProgHpcOptions             <- fromMaybe [] <$> obj ..:? configMonoidProgHpcOptionsName
+    configMonoidProgHsc2hsOptions          <- fromMaybe [] <$> obj ..:? configMonoidProgHsc2hsOptionsName
+    configMonoidProgHscolourOptions        <- fromMaybe [] <$> obj ..:? configMonoidProgHscolourOptionsName
+    configMonoidProgJhcOptions             <- fromMaybe [] <$> obj ..:? configMonoidProgJhcOptionsName
+    configMonoidProgLdOptions              <- fromMaybe [] <$> obj ..:? configMonoidProgLdOptionsName
+    configMonoidProgLhcOptions             <- fromMaybe [] <$> obj ..:? configMonoidProgLhcOptionsName
+    configMonoidProgLhcPkgOptions          <- fromMaybe [] <$> obj ..:? configMonoidProgLhcPkgOptionsName
+    configMonoidProgPkgConfigOptions       <- fromMaybe [] <$> obj ..:? configMonoidProgPkgConfigOptionsName
+    configMonoidProgStripOptions           <- fromMaybe [] <$> obj ..:? configMonoidProgStripOptionsName
+    configMonoidProgTarOptions             <- fromMaybe [] <$> obj ..:? configMonoidProgTarOptionsName
+    configMonoidProgUhcOptions             <- fromMaybe [] <$> obj ..:? configMonoidProgUhcOptionsName
     configMonoidConcurrentTests <- First <$> obj ..:? configMonoidConcurrentTestsName
     configMonoidLocalBinPath <- First <$> obj ..:? configMonoidLocalBinPathName
     configMonoidImageOpts <- jsonSubWarnings (obj ..:?  configMonoidImageOptsName ..!= mempty)
@@ -934,8 +1085,161 @@ configMonoidExtraIncludeDirsName = "extra-include-dirs"
 configMonoidExtraLibDirsName :: Text
 configMonoidExtraLibDirsName = "extra-lib-dirs"
 
-configMonoidOverrideGccPathName :: Text
-configMonoidOverrideGccPathName = "with-gcc"
+configMonoidProgAlexPathName :: Text
+configMonoidProgAlexPathName = "with-alex"
+
+configMonoidProgAlexOptionsName :: Text
+configMonoidProgAlexOptionsName = "alex-options"
+
+configMonoidProgArPathName :: Text
+configMonoidProgArPathName = "with-ar"
+
+configMonoidProgArOptionsName :: Text
+configMonoidProgArOptionsName = "ar-options"
+
+configMonoidProgC2hsPathName :: Text
+configMonoidProgC2hsPathName = "with-c2hs"
+
+configMonoidProgC2hsOptionsName :: Text
+configMonoidProgC2hsOptionsName = "c2hs-options"
+
+configMonoidProgCpphsPathName :: Text
+configMonoidProgCpphsPathName = "with-cpphs"
+
+configMonoidProgCpphsOptionsName :: Text
+configMonoidProgCpphsOptionsName = "cpphs-options"
+
+configMonoidProgGccPathName :: Text
+configMonoidProgGccPathName = "with-gcc"
+
+configMonoidProgGccOptionsName :: Text
+configMonoidProgGccOptionsName = "gcc-options"
+
+configMonoidProgGhcPathName :: Text
+configMonoidProgGhcPathName = "with-ghc"
+
+configMonoidProgGhcOptionsName :: Text
+configMonoidProgGhcOptionsName = "ghc-options"
+
+configMonoidProgGhcPkgPathName :: Text
+configMonoidProgGhcPkgPathName = "ghc-with-pkg"
+
+configMonoidProgGhcPkgOptionsName :: Text
+configMonoidProgGhcPkgOptionsName = "ghc-pkg-options"
+
+configMonoidProgGhcjsPathName :: Text
+configMonoidProgGhcjsPathName = "with-ghcjs"
+
+configMonoidProgGhcjsOptionsName :: Text
+configMonoidProgGhcjsOptionsName = "ghcjs-options"
+
+configMonoidProgGhcjsPkgPathName :: Text
+configMonoidProgGhcjsPkgPathName = "ghcjs-with-pkg"
+
+configMonoidProgGhcjsPkgOptionsName :: Text
+configMonoidProgGhcjsPkgOptionsName = "ghcjs-pkg-options"
+
+configMonoidProgGreencardPathName :: Text
+configMonoidProgGreencardPathName = "with-greencard"
+
+configMonoidProgGreencardOptionsName :: Text
+configMonoidProgGreencardOptionsName = "greencard-options"
+
+configMonoidProgHaddockPathName :: Text
+configMonoidProgHaddockPathName = "with-haddock"
+
+configMonoidProgHaddockOptionsName :: Text
+configMonoidProgHaddockOptionsName = "haddock-options"
+
+configMonoidProgHappyPathName :: Text
+configMonoidProgHappyPathName = "with-happy"
+
+configMonoidProgHappyOptionsName :: Text
+configMonoidProgHappyOptionsName = "happy-options"
+
+configMonoidProgHaskellSuitePathName :: Text
+configMonoidProgHaskellSuitePathName = "haskell-with-suite"
+
+configMonoidProgHaskellSuiteOptionsName :: Text
+configMonoidProgHaskellSuiteOptionsName = "haskell-suite-options"
+
+configMonoidProgHaskellSuitePkgPathName :: Text
+configMonoidProgHaskellSuitePkgPathName = "haskell-suite-with-pkg"
+
+configMonoidProgHaskellSuitePkgOptionsName :: Text
+configMonoidProgHaskellSuitePkgOptionsName = "haskell-suite-pkg-options"
+
+configMonoidProgHmakePathName :: Text
+configMonoidProgHmakePathName = "with-hmake"
+
+configMonoidProgHmakeOptionsName :: Text
+configMonoidProgHmakeOptionsName = "hmake-options"
+
+configMonoidProgHpcPathName :: Text
+configMonoidProgHpcPathName = "with-hpc"
+
+configMonoidProgHpcOptionsName :: Text
+configMonoidProgHpcOptionsName = "hpc-options"
+
+configMonoidProgHsc2hsPathName :: Text
+configMonoidProgHsc2hsPathName = "with-hsc2hs"
+
+configMonoidProgHsc2hsOptionsName :: Text
+configMonoidProgHsc2hsOptionsName = "hsc2hs-options"
+
+configMonoidProgHscolourPathName :: Text
+configMonoidProgHscolourPathName = "with-hscolour"
+
+configMonoidProgHscolourOptionsName :: Text
+configMonoidProgHscolourOptionsName = "hscolour-options"
+
+configMonoidProgJhcPathName :: Text
+configMonoidProgJhcPathName = "with-jhc"
+
+configMonoidProgJhcOptionsName :: Text
+configMonoidProgJhcOptionsName = "jhc-options"
+
+configMonoidProgLdPathName :: Text
+configMonoidProgLdPathName = "with-ld"
+
+configMonoidProgLdOptionsName :: Text
+configMonoidProgLdOptionsName = "ld-options"
+
+configMonoidProgLhcPathName :: Text
+configMonoidProgLhcPathName = "with-lhc"
+
+configMonoidProgLhcOptionsName :: Text
+configMonoidProgLhcOptionsName = "lhc-options"
+
+configMonoidProgLhcPkgPathName :: Text
+configMonoidProgLhcPkgPathName = "lhc-with-pkg"
+
+configMonoidProgLhcPkgOptionsName :: Text
+configMonoidProgLhcPkgOptionsName = "lhc-pkg-options"
+
+configMonoidProgPkgConfigPathName :: Text
+configMonoidProgPkgConfigPathName = "pkg-with-config"
+
+configMonoidProgPkgConfigOptionsName :: Text
+configMonoidProgPkgConfigOptionsName = "pkg-config-options"
+
+configMonoidProgStripPathName :: Text
+configMonoidProgStripPathName = "with-strip"
+
+configMonoidProgStripOptionsName :: Text
+configMonoidProgStripOptionsName = "strip-options"
+
+configMonoidProgTarPathName :: Text
+configMonoidProgTarPathName = "with-tar"
+
+configMonoidProgTarOptionsName :: Text
+configMonoidProgTarOptionsName = "tar-options"
+
+configMonoidProgUhcPathName :: Text
+configMonoidProgUhcPathName = "with-uhc"
+
+configMonoidProgUhcOptionsName :: Text
+configMonoidProgUhcOptionsName = "uhc-options"
 
 configMonoidConcurrentTestsName :: Text
 configMonoidConcurrentTestsName = "concurrent-tests"

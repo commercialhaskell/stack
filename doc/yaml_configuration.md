@@ -392,12 +392,14 @@ extra-lib-dirs:
 - /opt/foo/lib
 ```
 
-### with-gcc
+### with-gcc/with-ld/with-strip
 
-Specify a path to gcc explicitly, rather than relying on the normal path resolution.
+Specify a path to gcc, ld, or strip explicitly, rather than relying on the normal path resolution.
 
 ```yaml
 with-gcc: /usr/local/bin/gcc-5
+with-ld: /usr/local/bin/ld
+with-strip: /usr/local/bin/gstrip
 ```
 
 ### compiler-check

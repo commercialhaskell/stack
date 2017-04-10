@@ -49,6 +49,8 @@ Other enhancements:
   a method to ensure PVP compliance without having to proactively fix
   bounds issues for Stackage maintenance.
 * Expose a `save-hackage-creds` configuration option
+* Add the ability to explictly specify path and options to executables.
+  See [#2369](https://github.com/commercialhaskell/stack/issues/2369).
 
 Bug fixes:
 
