@@ -63,6 +63,7 @@ import           Data.Maybe (fromMaybe, mapMaybe, isNothing)
 import           Data.Monoid
 import           Data.Set (Set)
 import qualified Data.Set as Set
+import           Data.Store.Internal (toStaticSizeEx)
 import           Data.Text (Text)
 import qualified Data.Text as T
 import           Data.Text.Encoding (encodeUtf8)
@@ -461,7 +462,7 @@ loadMiniBuildPlan name = do
          -- TODO: store ghc options in BuildPlan?
         , []
         , ppCabalFileInfo pp
-            >>= fmap (GitSHA1 . encodeUtf8)
+            >>= fmap (GitSHA1 . toStaticSizeEx . encodeUtf8)
               . Map.lookup "GitSHA1"
               . cfiHashes
         )

@@ -45,7 +45,7 @@ import           Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
 import           Data.Data
 import qualified Data.HashMap.Strict as HashMap
-import           Data.Hashable (Hashable)
+import           Data.Hashable (Hashable, hashWithSalt)
 import           Data.IntMap (IntMap)
 import qualified Data.IntMap as IntMap
 import           Data.Map (Map)
@@ -54,6 +54,8 @@ import           Data.Maybe (fromMaybe)
 import           Data.Monoid
 import           Data.Set (Set)
 import           Data.Store (Store)
+import           Data.Store.Core
+import           Data.Store.Internal (Size (..), StaticSize (..), size)
 import           Data.Store.Version
 import           Data.Store.VersionTagged
 import           Data.String (IsString, fromString)
@@ -434,7 +436,7 @@ instance Store MiniBuildPlan
 instance NFData MiniBuildPlan
 
 miniBuildPlanVC :: VersionConfig MiniBuildPlan
-miniBuildPlanVC = storeVersionConfig "mbp-v2" "C8q73RrYq3plf9hDCapjWpnm_yc="
+miniBuildPlanVC = storeVersionConfig "mbp-v2" "OO15KiEs7GWoClHuLxvseu36VVo="
 
 -- | Information on a single package for the 'MiniBuildPlan'.
 data MiniPackageInfo = MiniPackageInfo
@@ -460,8 +462,24 @@ data MiniPackageInfo = MiniPackageInfo
 instance Store MiniPackageInfo
 instance NFData MiniPackageInfo
 
-newtype GitSHA1 = GitSHA1 ByteString
-    deriving (Generic, Show, Eq, NFData, Store, Data, Typeable, Ord, Hashable)
+newtype GitSHA1 = GitSHA1 (StaticSize 40 ByteString)
+    deriving (Generic, Show, Eq, NFData, Data, Typeable, Ord)
+
+instance Store GitSHA1 where
+    size = ConstSize 40
+    -- poke (GitSHA1 x) = do
+    --   let (sourceFp, sourceOffset, sourceLength) = BSI.toForeignPtr (unStaticSize x)
+    --   pokeFromForeignPtr sourceFp sourceOffset sourceLength
+    -- peek = do
+    --     let len = 20
+    --     fp <- peekToPlainForeignPtr ("StaticSize " ++ show len ++ " Data.ByteString.ByteString") len
+    --     return (GitSHA1 $ StaticSize (BSI.PS fp 0 len))
+    -- {-# INLINE size #-}
+    -- {-# INLINE peek #-}
+    -- {-# INLINE poke #-}
+
+instance Hashable GitSHA1 where
+  hashWithSalt s (GitSHA1 x) = hashWithSalt s (unStaticSize x)
 
 newtype SnapshotHash = SnapshotHash { unShapshotHash :: ByteString }
     deriving (Generic, Show, Eq)

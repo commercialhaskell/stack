@@ -16,10 +16,12 @@ import           Data.Int
 import           Data.Map (Map)
 import           Data.Sequences (fromList)
 import           Data.Set (Set)
+import           Data.Store.Internal (StaticSize (..), toStaticSizeEx)
 import           Data.Store.TH
 import           Data.Text (Text)
 import qualified Data.Vector.Unboxed as UV
 import           Data.Word
+import           GHC.TypeLits (KnownNat)
 import           Language.Haskell.TH
 import           Language.Haskell.TH.ReifyMany
 import           Prelude
@@ -50,6 +52,8 @@ instance Monad m => Serial m BS.ByteString where
 
 instance (Monad m, Serial m a, Ord a) => Serial m (Set a) where
     series = fmap setFromList series
+
+instance (Monad m, KnownNat n) => Serial m (StaticSize n BS.ByteString)
 
 addMinAndMaxBounds :: forall a. (Bounded a, Eq a) => [a] -> [a]
 addMinAndMaxBounds xs =

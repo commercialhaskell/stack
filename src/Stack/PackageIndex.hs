@@ -54,6 +54,7 @@ import qualified Data.Map.Strict as Map
 import           Data.Monoid
 import           Data.Set (Set)
 import qualified Data.Set as Set
+import           Data.Store.Internal (toStaticSizeEx)
 import           Data.Store.Version
 import           Data.Store.VersionTagged
 import           Data.Text (Text)
@@ -154,7 +155,7 @@ populateCache index = do
             -- Git algorithm of prepending "blob <size>\0" to the raw
             -- contents. We use this to be able to share the same SHA
             -- information between the Git and tarball backends.
-            gitSHA1 = GitSHA1 $ Mem.convertToBase Mem.Base16 $ hashSHA1 $ L.fromChunks
+            gitSHA1 = GitSHA1 $ toStaticSizeEx $ Mem.convertToBase Mem.Base16 $ hashSHA1 $ L.fromChunks
                 $ "blob "
                 : S8.pack (show $ L.length lbs)
                 : "\0"
@@ -416,7 +417,7 @@ getPackageCaches = do
             result <- liftM mconcat $ forM (configPackageIndices config) $ \index -> do
                 fp <- configPackageIndexCache (indexName index)
                 PackageCacheMap pis' gitPIs <-
-                    $(versionedDecodeOrLoad (storeVersionConfig "pkg-v2" "WlAvAaRXlIMkjSmg5G3dD16UpT8="
+                    $(versionedDecodeOrLoad (storeVersionConfig "pkg-v2" "kxDQIobj5y8zdLDbIP27jdnbbGw="
                                              :: VersionConfig PackageCacheMap))
                     fp
                     (populateCache index)

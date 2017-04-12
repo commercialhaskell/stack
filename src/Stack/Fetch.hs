@@ -58,6 +58,7 @@ import              Data.Maybe (maybeToList, catMaybes, isJust)
 import              Data.Monoid
 import              Data.Set (Set)
 import qualified    Data.Set as Set
+import              Data.Store.Internal (unStaticSize)
 import qualified    Data.Text as T
 import              Data.Text.Encoding (decodeUtf8)
 import              Data.Text.Metrics
@@ -229,7 +230,7 @@ resolvePackagesAllowMissing mMiniBuildPlan idents0 names0 = do
                     [ "Did not find .cabal file for "
                     , T.pack $ packageIdentifierString $ rpIdent rp
                     , " with SHA of "
-                    , decodeUtf8 sha
+                    , decodeUtf8 $ unStaticSize sha
                     , " in tarball-based cache"
                     ]
 
