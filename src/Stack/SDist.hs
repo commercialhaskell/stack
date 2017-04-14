@@ -266,7 +266,7 @@ getSDistFileList lp =
             $ \ee ->
             withSingleContext runInBase ac ee task Nothing (Just "sdist") $ \_package cabalfp _pkgDir cabal _announce _console _mlogFile -> do
                 let outFile = toFilePath tmpdir FP.</> "source-files-list"
-                cabal False ["sdist", "--list-sources", outFile]
+                cabal KeepTHLoading ["sdist", "--list-sources", outFile]
                 contents <- liftIO (readFile outFile)
                 return (contents, cabalfp)
   where

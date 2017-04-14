@@ -17,6 +17,7 @@ module Stack.Build.Execute
     , ExecuteEnv
     , withExecuteEnv
     , withSingleContext
+    , ExcludeTHLoading(..)
     ) where
 
 import           Control.Applicative
@@ -450,7 +451,7 @@ withExecuteEnv menv bopts boptsCli baseConfigOpts locals globalPackages snapshot
         runResourceT
             $ CB.sourceFile (toFilePath filepath)
            $$ CT.decodeUtf8Lenient
-           =$ mungeBuildOutput True True pkgDir
+           =$ mungeBuildOutput ExcludeTHLoading ConvertPathsToAbsolute pkgDir
            =$ CL.mapM_ $logInfo
         $logInfo $ T.pack $ "\n--  End of log file: " ++ toFilePath filepath ++ "\n"
 
@@ -808,7 +809,7 @@ ensureConfig :: (StackM env m, HasEnvConfig env)
              -> Path Abs Dir -- ^ package directory
              -> ExecuteEnv m
              -> m () -- ^ announce
-             -> (Bool -> [String] -> m ()) -- ^ cabal
+             -> (ExcludeTHLoading -> [String] -> m ()) -- ^ cabal
              -> Path Abs File -- ^ .cabal file
              -> m Bool
 ensureConfig newConfigCache pkgDir ExecuteEnv {..} announce cabal cabalfp = do
@@ -847,7 +848,7 @@ ensureConfig newConfigCache pkgDir ExecuteEnv {..} announce cabal cabalfp = do
                 Just x -> return $ concat ["--with-", name, "=", toFilePath x]
         -- Configure cabal with arguments determined by
         -- Stack.Types.Build.configureOpts
-        cabal False $ "configure" : concat
+        cabal KeepTHLoading $ "configure" : concat
             [ concat exes
             , dirs
             , nodirs
@@ -875,7 +876,7 @@ announceTask task x = $logInfo $ T.concat
 --   custom setup is built.
 --
 -- * Provides the user a function with which run the Cabal process.
-withSingleContext :: (StackM env m, HasEnvConfig env)
+withSingleContext :: forall env m a. (StackM env m, HasEnvConfig env)
                   => (m () -> IO ())
                   -> ActionContext
                   -> ExecuteEnv m
@@ -885,14 +886,13 @@ withSingleContext :: (StackM env m, HasEnvConfig env)
                   -- Nothing, just provide global and snapshot package
                   -- databases.
                   -> Maybe String
-                  -> (  Package                       -- Package info
-                     -> Path Abs File                 -- Cabal file path
-                     -> Path Abs Dir                  -- Package root directory file path
-                     -> (Bool -> [String] -> m ())    -- Function to run Cabal with args
-                                                      -- The Bool indicates if it's a build step, so strip TH stuff
-                     -> (Text -> m ())                -- An 'announce' function, for different build phases
-                     -> Bool                          -- Whether output should be directed to the console
-                     -> Maybe (Path Abs File, Handle) -- Log file
+                  -> (  Package                                -- Package info
+                     -> Path Abs File                          -- Cabal file path
+                     -> Path Abs Dir                           -- Package root directory file path
+                     -> (ExcludeTHLoading -> [String] -> m ()) -- Function to run Cabal with args
+                     -> (Text -> m ())                         -- An 'announce' function, for different build phases
+                     -> Bool                                   -- Whether output should be directed to the console
+                     -> Maybe (Path Abs File, Handle)          -- Log file
                      -> m a)
                   -> m a
 withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} mdeps msuffix inner0 =
@@ -946,6 +946,12 @@ withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} md
                 (liftIO . hClose)
                 $ \h -> inner (Just (logPath, h))
 
+    withCabal
+        :: Package
+        -> Path Abs Dir
+        -> Maybe (Path Abs File, Handle)
+        -> ((ExcludeTHLoading -> [String] -> m ()) -> m a)
+        -> m a
     withCabal package pkgDir mlogFile inner = do
         config <- view configL
 
@@ -1103,14 +1109,18 @@ withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} md
                             sinkProcessStderrStdoutHandle (Just pkgDir) menv (toFilePath exeName) fullArgs h h
                         Nothing ->
                             void $ sinkProcessStderrStdout (Just pkgDir) menv (toFilePath exeName) fullArgs
-                                (outputSink False LevelWarn)
+                                (outputSink KeepTHLoading LevelWarn)
                                 (outputSink stripTHLoading LevelInfo)
+                    outputSink :: ExcludeTHLoading -> LogLevel -> Sink S.ByteString IO ()
                     outputSink excludeTH level =
                         CT.decodeUtf8Lenient
                         =$ mungeBuildOutput excludeTH makeAbsolute pkgDir
                         =$ CL.mapM_ (runInBase . monadLoggerLog $(TH.location >>= liftLoc) "" level)
                     -- If users want control, we should add a config option for this
-                    makeAbsolute = stripTHLoading
+                    makeAbsolute :: ConvertPathsToAbsolute
+                    makeAbsolute = case stripTHLoading of
+                        ExcludeTHLoading -> ConvertPathsToAbsolute
+                        KeepTHLoading    -> KeepPathsAsIs
 
             wc <- view $ actualCompilerVersionL.whichCompilerL
             exeName <- case (esetupexehs, wc) of
@@ -1166,7 +1176,7 @@ withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} md
 --   local install directory. Note that this is literally invoking Cabal
 --   with @copy@, and not the copying done by @stack install@ - that is
 --   handled by 'copyExecutables'.
-singleBuild :: (StackM env m, HasEnvConfig env)
+singleBuild :: forall env m. (StackM env m, HasEnvConfig env)
             => (m () -> IO ())
             -> ActionContext
             -> ExecuteEnv m
@@ -1322,8 +1332,15 @@ singleBuild runInBase ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} in
 
     initialBuildSteps cabal announce = do
         () <- announce ("initial-build-steps" <> annSuffix)
-        cabal False ["repl", "stack-initial-build-steps"]
+        cabal KeepTHLoading ["repl", "stack-initial-build-steps"]
 
+    realBuild
+        :: ConfigCache
+        -> Package
+        -> Path Abs Dir
+        -> (ExcludeTHLoading -> [String] -> m ())
+        -> (Text -> m ())
+        -> m Installed
     realBuild cache package pkgDir cabal announce = do
         wc <- view $ actualCompilerVersionL.whichCompilerL
 
@@ -1363,7 +1380,10 @@ singleBuild runInBase ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} in
         () <- announce ("build" <> annSuffix)
         config <- view configL
         extraOpts <- extraBuildOptions wc eeBuildOpts
-        cabal (configHideTHLoading config) (("build" :) $ (++ extraOpts) $
+        let stripTHLoading
+                | configHideTHLoading config = ExcludeTHLoading
+                | otherwise                  = KeepTHLoading
+        cabal stripTHLoading (("build" :) $ (++ extraOpts) $
             case (taskType, taskAllInOne, isFinalBuild) of
                 (_, True, True) -> error "Invariant violated: cannot have an all-in-one build that also has a final build step."
                 (TTLocal lp, False, False) -> primaryComponentOptions lp
@@ -1391,22 +1411,23 @@ singleBuild runInBase ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} in
                             ("Warning: haddock not generating hyperlinked sources because 'HsColour' not\n" <>
                              "found on PATH (use 'stack install hscolour' to install).")
                         return ["--hyperlink-source" | hscolourExists]
-            cabal False (concat [ ["haddock", "--html", "--html-location=../$pkg-$version/"]
-                                , sourceFlag
-                                , ["--internal" | boptsHaddockInternal eeBuildOpts]
-                                , [ "--haddock-option=" <> opt
-                                  | opt <- hoAdditionalArgs (boptsHaddockOpts eeBuildOpts) ]
-                                ])
+            cabal KeepTHLoading $ concat
+                [ ["haddock", "--html", "--html-location=../$pkg-$version/"]
+                , sourceFlag
+                , ["--internal" | boptsHaddockInternal eeBuildOpts]
+                , [ "--haddock-option=" <> opt
+                  | opt <- hoAdditionalArgs (boptsHaddockOpts eeBuildOpts) ]
+                ]
 
         let shouldCopy = not isFinalBuild && (packageHasLibrary package || not (Set.null (packageExes package)))
         when shouldCopy $ withMVar eeInstallLock $ \() -> do
             announce "copy/register"
-            eres <- try $ cabal False ["copy"]
+            eres <- try $ cabal KeepTHLoading ["copy"]
             case eres of
                 Left err@CabalExitedUnsuccessfully{} ->
                     throwM $ CabalCopyFailed (packageBuildType package == Just C.Simple) (show err)
                 _ -> return ()
-            when (packageHasLibrary package) $ cabal False ["register"]
+            when (packageHasLibrary package) $ cabal KeepTHLoading ["register"]
 
         let (installedPkgDb, installedDumpPkgsTVar) =
                 case taskLocation task of
@@ -1649,31 +1670,40 @@ singleBench runInBase beopts benchesToRun ac ee task installedMap = do
                   return True
 
         when toRun $ do
-          announce "benchmarks"
-          cabal False ("bench" : args)
+            announce "benchmarks"
+            cabal KeepTHLoading ("bench" : args)
+
+data ExcludeTHLoading = ExcludeTHLoading | KeepTHLoading
+data ConvertPathsToAbsolute = ConvertPathsToAbsolute | KeepPathsAsIs
 
 -- | Strip Template Haskell "Loading package" lines and making paths absolute.
-mungeBuildOutput :: (MonadIO m, MonadCatch m, MonadBaseControl IO m)
-                 => Bool -- ^ exclude TH loading?
-                 -> Bool -- ^ convert paths to absolute?
-                 -> Path Abs Dir -- ^ package's root directory
+mungeBuildOutput :: forall m. (MonadIO m, MonadCatch m, MonadBaseControl IO m)
+                 => ExcludeTHLoading       -- ^ exclude TH loading?
+                 -> ConvertPathsToAbsolute -- ^ convert paths to absolute?
+                 -> Path Abs Dir           -- ^ package's root directory
                  -> ConduitM Text Text m ()
 mungeBuildOutput excludeTHLoading makeAbsolute pkgDir = void $
     CT.lines
     =$ CL.map stripCR
     =$ CL.filter (not . isTHLoading)
-    =$ CL.mapM toAbsolutePath
+    =$ toAbsolute
   where
     -- | Is this line a Template Haskell "Loading package" line
     -- ByteString
     isTHLoading :: Text -> Bool
-    isTHLoading _ | not excludeTHLoading = False
-    isTHLoading bs =
-        "Loading package " `T.isPrefixOf` bs &&
-        ("done." `T.isSuffixOf` bs || "done.\r" `T.isSuffixOf` bs)
+    isTHLoading = case excludeTHLoading of
+        KeepTHLoading    -> const False
+        ExcludeTHLoading -> \bs ->
+            "Loading package " `T.isPrefixOf` bs &&
+            ("done." `T.isSuffixOf` bs || "done.\r" `T.isSuffixOf` bs)
 
     -- | Convert GHC error lines with file paths to have absolute file paths
-    toAbsolutePath bs | not makeAbsolute = return bs
+    toAbsolute :: ConduitM Text Text m ()
+    toAbsolute = case makeAbsolute of
+        KeepPathsAsIs          -> awaitForever yield
+        ConvertPathsToAbsolute -> CL.mapM toAbsolutePath
+
+    toAbsolutePath :: Text -> m Text
     toAbsolutePath bs = do
         let (x, y) = T.break (== ':') bs
         mabs <-
