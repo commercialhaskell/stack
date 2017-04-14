@@ -1686,6 +1686,7 @@ mungeBuildOutput excludeTHLoading makeAbsolute pkgDir = void $
     CT.lines
     =$ CL.map stripCR
     =$ CL.filter (not . isTHLoading)
+    =$ CL.filter (not . isLinkerWarning)
     =$ toAbsolute
   where
     -- | Is this line a Template Haskell "Loading package" line
@@ -1696,6 +1697,11 @@ mungeBuildOutput excludeTHLoading makeAbsolute pkgDir = void $
         ExcludeTHLoading -> \bs ->
             "Loading package " `T.isPrefixOf` bs &&
             ("done." `T.isSuffixOf` bs || "done.\r" `T.isSuffixOf` bs)
+
+    isLinkerWarning :: Text -> Bool
+    isLinkerWarning str =
+      ("ghc.exe: warning:" `T.isPrefixOf` str || "ghc.EXE: warning:" `T.isPrefixOf` str) &&
+      "is linked instead of __imp_" `T.isInfixOf` str
 
     -- | Convert GHC error lines with file paths to have absolute file paths
     toAbsolute :: ConduitM Text Text m ()
