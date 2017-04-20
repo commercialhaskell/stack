@@ -56,7 +56,12 @@ Bug fixes:
   package database for wired-in-packages (ghc, base, etc).
   See [#3084](https://github.com/commercialhaskell/stack/issues/3084)
 * Fixes `stack --docker build` when user is part of libvirt/libvirtd
-  groups on Ubuntu Yakkety (16.10). See [#3092]
+  groups on Ubuntu Yakkety (16.10).
+  See [#3092](https://github.com/commercialhaskell/stack/issues/3092)
+* Switching a package between extra-dep and local package now forces
+  rebuild (previously it wouldn't if versions were the same).
+  See [#2147](https://github.com/commercialhaskell/stack/issues/2147)
+
 
 ## 1.4.0
 
