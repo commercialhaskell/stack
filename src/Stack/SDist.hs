@@ -239,7 +239,7 @@ getSDistFileList lp =
             }
         , taskPresent = Map.empty
         , taskAllInOne = True
-        , taskCachePkgSrc = CacheSrcLocal
+        , taskCachePkgSrc = CacheSrcLocal (toFilePath (lpDir lp))
         }
 
 normalizeTarballPaths :: (StackM env m) => [FilePath] -> m [FilePath]

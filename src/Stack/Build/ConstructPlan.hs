@@ -359,7 +359,7 @@ addFinal lp package isAllInOne = do
                 , taskPresent = present
                 , taskType = TTLocal lp
                 , taskAllInOne = isAllInOne
-                , taskCachePkgSrc = CacheSrcLocal
+                , taskCachePkgSrc = CacheSrcLocal (toFilePath (lpDir lp))
                 }
     tell mempty { wFinals = Map.singleton (packageName package) res }
 
@@ -774,7 +774,7 @@ describeConfigDiff config old new
 
     newComponents = configCacheComponents new `Set.difference` configCacheComponents old
 
-    pkgSrcName CacheSrcLocal = "local source"
+    pkgSrcName (CacheSrcLocal fp) = T.pack fp
     pkgSrcName CacheSrcUpstream = "upstream source"
 
 psForceDirty :: PackageSource -> Bool

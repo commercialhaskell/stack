@@ -402,17 +402,17 @@ data ConfigCache = ConfigCache
 instance Store ConfigCache
 instance NFData ConfigCache
 
-data CachePkgSrc = CacheSrcUpstream | CacheSrcLocal
+data CachePkgSrc = CacheSrcUpstream | CacheSrcLocal FilePath
     deriving (Generic, Eq, Show, Data, Typeable)
 instance Store CachePkgSrc
 instance NFData CachePkgSrc
 
 toCachePkgSrc :: PackageSource -> CachePkgSrc
-toCachePkgSrc PSLocal{} = CacheSrcLocal
+toCachePkgSrc (PSLocal lp) = CacheSrcLocal (toFilePath (lpDir lp))
 toCachePkgSrc PSUpstream{} = CacheSrcUpstream
 
 configCacheVC :: VersionConfig ConfigCache
-configCacheVC = storeVersionConfig "config-v2" "IU16Mr9HCSnOm0APqrPUvCW0adw="
+configCacheVC = storeVersionConfig "config-v3" "z7N_NxX7Gbz41Gi9AGEa1zoLE-4="
 
 -- | A task to perform when building
 data Task = Task
