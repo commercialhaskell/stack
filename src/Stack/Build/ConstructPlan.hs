@@ -178,8 +178,9 @@ constructPlan :: forall env m. (StackM env m, HasEnvConfig env)
               -> (PackageName -> Version -> Map FlagName Bool -> [Text] -> IO Package) -- ^ load upstream package
               -> SourceMap
               -> InstalledMap
+              -> Bool
               -> m Plan
-constructPlan mbp0 baseConfigOpts0 locals extraToBuild0 localDumpPkgs loadPackage0 sourceMap installedMap = do
+constructPlan mbp0 baseConfigOpts0 locals extraToBuild0 localDumpPkgs loadPackage0 sourceMap installedMap initialBuildSteps = do
     $logDebug "Constructing the build plan"
     getVersions0 <- getPackageVersionsIO
 
@@ -210,7 +211,7 @@ constructPlan mbp0 baseConfigOpts0 locals extraToBuild0 localDumpPkgs loadPackag
             return $ takeSubset Plan
                 { planTasks = tasks
                 , planFinals = M.fromList finals
-                , planUnregisterLocal = mkUnregisterLocal tasks dirtyReason localDumpPkgs sourceMap
+                , planUnregisterLocal = mkUnregisterLocal tasks dirtyReason localDumpPkgs sourceMap initialBuildSteps
                 , planInstallExes =
                     if boptsInstallExes $ bcoBuildOpts baseConfigOpts0
                         then installExes
@@ -260,8 +261,11 @@ mkUnregisterLocal :: Map PackageName Task
                   -> [DumpPackage () () ()]
                   -- ^ Local package database dump
                   -> SourceMap
+                  -> Bool
+                  -- ^ If true, we're doing a special initialBuildSteps
+                  -- build - don't unregister target packages.
                   -> Map GhcPkgId (PackageIdentifier, Text)
-mkUnregisterLocal tasks dirtyReason localDumpPkgs sourceMap =
+mkUnregisterLocal tasks dirtyReason localDumpPkgs sourceMap initialBuildSteps =
     -- We'll take multiple passes through the local packages. This
     -- will allow us to detect that a package should be unregistered,
     -- as well as all packages directly or transitively depending on
@@ -304,9 +308,12 @@ mkUnregisterLocal tasks dirtyReason localDumpPkgs sourceMap =
 
     go' toUnregister ident deps
       -- If we're planning on running a task on it, then it must be
-      -- unregistered
-      | Just _ <- Map.lookup name tasks
-          = Just $ fromMaybe "" $ Map.lookup name dirtyReason
+      -- unregistered, unless it's a target and an initial-build-steps
+      -- build is being done.
+      | Just task <- Map.lookup name tasks
+          = if initialBuildSteps && taskIsTarget task && taskProvides task == ident
+              then Nothing
+              else Just $ fromMaybe "" $ Map.lookup name dirtyReason
       -- Check if we're no longer using the local version
       | Just (PSUpstream _ Snap _ _ _) <- Map.lookup name sourceMap
           = Just "Switching to snapshot installed package"

@@ -18,6 +18,7 @@ module Stack.Types.Build
     ,Installed(..)
     ,PackageInstallInfo(..)
     ,Task(..)
+    ,taskIsTarget
     ,taskLocation
     ,LocalPackage(..)
     ,BaseConfigOpts(..)
@@ -448,6 +449,12 @@ instance Show TaskConfigOpts where
 data TaskType = TTLocal LocalPackage
               | TTUpstream Package InstallLocation (Maybe GitSHA1)
     deriving Show
+
+taskIsTarget :: Task -> Bool
+taskIsTarget t =
+    case taskType t of
+        TTLocal lp -> lpWanted lp
+        _ -> False
 
 taskLocation :: Task -> InstallLocation
 taskLocation task =

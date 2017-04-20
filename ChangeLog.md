@@ -37,6 +37,8 @@ Other enhancements:
 * `--[no-]haddock-hyperlink-source` flag added which allows toggling
   of sources being included in Haddock output.
   See [#3099](https://github.com/commercialhaskell/stack/issues/3099)
+* `stack ghci` will now skip building all local targets, even if they have
+  downstream deps, as long as it's registered in the DB.
 
 Bug fixes:
 

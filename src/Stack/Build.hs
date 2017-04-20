@@ -118,7 +118,7 @@ build setLocalFiles mbuildLk boptsCli = fixCodePage $ do
 
     baseConfigOpts <- mkBaseConfigOpts boptsCli
     plan <- withLoadPackage $ \loadPackage ->
-        constructPlan mbp baseConfigOpts locals extraToBuild localDumpPkgs loadPackage sourceMap installedMap
+        constructPlan mbp baseConfigOpts locals extraToBuild localDumpPkgs loadPackage sourceMap installedMap (boptsCLIInitialBuildSteps boptsCli)
 
     allowLocals <- view $ configL.to configAllowLocals
     unless allowLocals $ case justLocals plan of

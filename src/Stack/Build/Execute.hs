@@ -753,7 +753,7 @@ toActions installedMap runInBase ee (mbuild, mfinal) =
 getConfigCache :: (StackM env m, HasEnvConfig env)
                => ExecuteEnv m -> Task -> InstalledMap -> Bool -> Bool
                -> m (Map PackageIdentifier GhcPkgId, ConfigCache)
-getConfigCache ExecuteEnv {..} Task {..} installedMap enableTest enableBench = do
+getConfigCache ExecuteEnv {..} task@Task {..} installedMap enableTest enableBench = do
     useExactConf <- view $ configL.to configAllowNewer
     let extra =
             -- We enable tests if the test suite dependencies are already
@@ -772,9 +772,16 @@ getConfigCache ExecuteEnv {..} Task {..} installedMap enableTest enableBench = d
     idMap <- liftIO $ readTVarIO eeGhcPkgIds
     let getMissing ident =
             case Map.lookup ident idMap of
-                Nothing -> error "singleBuild: invariant violated, missing package ID missing"
-                Just (Library ident' x) -> assert (ident == ident') $ Just (ident, x)
-                Just (Executable _) -> Nothing
+                Nothing
+                    -- Expect to instead find it in installedMap if it's
+                    -- an initialBuildSteps target.
+                    | boptsCLIInitialBuildSteps eeBuildOptsCLI && taskIsTarget task,
+                      Just (_, installed) <- Map.lookup (packageIdentifierName ident) installedMap
+                        -> installedToGhcPkgId ident installed
+                Just installed -> installedToGhcPkgId ident installed
+                _ -> error "singleBuild: invariant violated, missing package ID missing"
+        installedToGhcPkgId ident (Library ident' x) = assert (ident == ident') $ Just (ident, x)
+        installedToGhcPkgId _ (Executable _) = Nothing
         missing' = Map.fromList $ mapMaybe getMissing $ Set.toList missing
         TaskConfigOpts missing mkOpts = taskConfigOpts
         opts = mkOpts missing'
@@ -1294,22 +1301,24 @@ singleBuild runInBase ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} in
         $ \package cabalfp pkgDir cabal announce _console _mlogFile -> do
             _neededConfig <- ensureConfig cache pkgDir ee (announce ("configure" <> annSuffix)) cabal cabalfp
 
+            let installedMapHasThisPkg :: Bool
+                installedMapHasThisPkg =
+                    case Map.lookup (packageName package) installedMap of
+                        Just (_, Library ident _) -> ident == taskProvides
+                        Just (_, Executable _) -> True
+                        _ -> False
+
             case ( boptsCLIOnlyConfigure eeBuildOptsCLI
-                 , boptsCLIInitialBuildSteps eeBuildOptsCLI && isTarget
-                 , acDownstream) of
+                 , boptsCLIInitialBuildSteps eeBuildOptsCLI && taskIsTarget task) of
                 -- A full build is done if there are downstream actions,
                 -- because their configure step will require that this
                 -- package is built. See
                 -- https://github.com/commercialhaskell/stack/issues/2787
-                (True, _, []) -> return Nothing
-                (_, True, []) -> do
+                (True, _) | null acDownstream -> return Nothing
+                (_, True) | null acDownstream || installedMapHasThisPkg -> do
                     initialBuildSteps cabal announce
                     return Nothing
                 _ -> liftM Just $ realBuild cache package pkgDir cabal announce
-
-    isTarget = case taskType of
-        TTLocal lp -> lpWanted lp
-        _ -> False
 
     initialBuildSteps cabal announce = do
         () <- announce ("initial-build-steps" <> annSuffix)
