@@ -35,6 +35,8 @@ module Stack.Types.Build
     ,ConfigCache(..)
     ,configCacheVC
     ,configureOpts
+    ,CachePkgSrc (..)
+    ,toCachePkgSrc
     ,isStackOpt
     ,wantedLocalPackages
     ,FileCacheInfo (..)
@@ -393,13 +395,23 @@ data ConfigCache = ConfigCache
       -- is a convenient way to force compilation when the components change.
     , configCacheHaddock :: !Bool
       -- ^ Are haddocks to be built?
+    , configCachePkgSrc :: !CachePkgSrc
     }
     deriving (Generic, Eq, Show, Data, Typeable)
 instance Store ConfigCache
 instance NFData ConfigCache
 
+data CachePkgSrc = CacheSrcUpstream | CacheSrcLocal
+    deriving (Generic, Eq, Show, Data, Typeable)
+instance Store CachePkgSrc
+instance NFData CachePkgSrc
+
+toCachePkgSrc :: PackageSource -> CachePkgSrc
+toCachePkgSrc PSLocal{} = CacheSrcLocal
+toCachePkgSrc PSUpstream{} = CacheSrcUpstream
+
 configCacheVC :: VersionConfig ConfigCache
-configCacheVC = storeVersionConfig "config-v1" "NMEzMXpksE1h7STRzlQ2f6Glkjo="
+configCacheVC = storeVersionConfig "config-v2" "IU16Mr9HCSnOm0APqrPUvCW0adw="
 
 -- | A task to perform when building
 data Task = Task
@@ -412,6 +424,7 @@ data Task = Task
     -- ^ GhcPkgIds of already-installed dependencies
     , taskAllInOne        :: !Bool
     -- ^ indicates that the package can be built in one step
+    , taskCachePkgSrc     :: !CachePkgSrc
     }
     deriving Show
 

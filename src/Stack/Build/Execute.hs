@@ -790,6 +790,7 @@ getConfigCache ExecuteEnv {..} Task {..} installedMap enableTest enableBench = d
                     TTUpstream{} -> Set.empty
             , configCacheHaddock =
                 shouldHaddockPackage eeBuildOpts eeWanted (packageIdentifierName taskProvides)
+            , configCachePkgSrc = taskCachePkgSrc
             }
         allDepsMap = Map.union missing' taskPresent
     return (allDepsMap, cache)

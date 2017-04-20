@@ -352,6 +352,7 @@ addFinal lp package isAllInOne = do
                 , taskPresent = present
                 , taskType = TTLocal lp
                 , taskAllInOne = isAllInOne
+                , taskCachePkgSrc = CacheSrcLocal
                 }
     tell mempty { wFinals = Map.singleton (packageName package) res }
 
@@ -552,6 +553,7 @@ installPackageGivenDeps isAllInOne ps package minstalled (missing, present, minL
                     PSLocal lp -> TTLocal lp
                     PSUpstream _ loc _ _ sha -> TTUpstream package (loc <> minLoc) sha
             , taskAllInOne = isAllInOne
+            , taskCachePkgSrc = toCachePkgSrc ps
             }
 
 -- Update response in the lib map. If it is an error, and there's
@@ -684,6 +686,7 @@ checkDirtiness ps installed package present wanted = do
                 shouldHaddockPackage buildOpts wanted (packageName package) ||
                 -- Disabling haddocks when old config had haddocks doesn't make dirty.
                 maybe False configCacheHaddock moldOpts
+            , configCachePkgSrc = toCachePkgSrc ps
             }
     let mreason =
             case moldOpts of
@@ -703,6 +706,10 @@ checkDirtiness ps installed package present wanted = do
 
 describeConfigDiff :: Config -> ConfigCache -> ConfigCache -> Maybe Text
 describeConfigDiff config old new
+    | configCachePkgSrc old /= configCachePkgSrc new = Just $
+        "switching from " <>
+        pkgSrcName (configCachePkgSrc old) <> " to " <>
+        pkgSrcName (configCachePkgSrc new)
     | not (configCacheDeps new `Set.isSubsetOf` configCacheDeps old) = Just "dependencies changed"
     | not $ Set.null newComponents =
         Just $ "components added: " `T.append` T.intercalate ", "
@@ -759,6 +766,9 @@ describeConfigDiff config old new
     removeMatching xs ys = (xs, ys)
 
     newComponents = configCacheComponents new `Set.difference` configCacheComponents old
+
+    pkgSrcName CacheSrcLocal = "local source"
+    pkgSrcName CacheSrcUpstream = "upstream source"
 
 psForceDirty :: PackageSource -> Bool
 psForceDirty (PSLocal lp) = lpForceDirty lp
