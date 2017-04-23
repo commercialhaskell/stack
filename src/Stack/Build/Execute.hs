@@ -330,7 +330,7 @@ getSetupExe setupHs setupShimHs tmpdir = do
             return $ Just exePath
 
 -- | Execute a function that takes an 'ExecuteEnv'.
-withExecuteEnv :: (StackM env m, HasEnvConfig env)
+withExecuteEnv :: forall env m a. (StackM env m, HasEnvConfig env)
                => EnvOverride
                -> BuildOpts
                -> BuildOptsCLI
@@ -405,6 +405,7 @@ withExecuteEnv menv bopts boptsCli baseConfigOpts locals globalPackages snapshot
   where
     toDumpPackagesByGhcPkgId = Map.fromList . map (\dp -> (dpGhcPkgId dp, dp))
 
+    dumpLogs :: TChan (Path Abs Dir, Path Abs File) -> Int -> m ()
     dumpLogs chan totalWanted = do
         allLogs <- fmap reverse $ liftIO $ atomically drainChan
         case allLogs of
@@ -425,6 +426,7 @@ withExecuteEnv menv bopts boptsCli baseConfigOpts locals globalPackages snapshot
                 $logInfo $ T.pack $ "Log files have been written to: "
                         ++ toFilePath (parent (snd firstLog))
       where
+        drainChan :: STM [(Path Abs Dir, Path Abs File)]
         drainChan = do
             mx <- tryReadTChan chan
             case mx of
@@ -433,6 +435,7 @@ withExecuteEnv menv bopts boptsCli baseConfigOpts locals globalPackages snapshot
                     xs <- drainChan
                     return $ x:xs
 
+    dumpLogIfWarning :: (Path Abs Dir, Path Abs File) -> m ()
     dumpLogIfWarning (pkgDir, filepath) = do
       firstWarning <- runResourceT
           $ CB.sourceFile (toFilePath filepath)
@@ -443,9 +446,11 @@ withExecuteEnv menv bopts boptsCli baseConfigOpts locals globalPackages snapshot
          =$ CL.take 1
       unless (null firstWarning) $ dumpLog " due to warnings" (pkgDir, filepath)
 
+    isWarning :: Text -> Bool
     isWarning t = ": Warning:" `T.isSuffixOf` t -- prior to GHC 8
                || ": warning:" `T.isInfixOf` t -- GHC 8 is slightly different
 
+    dumpLog :: String -> (Path Abs Dir, Path Abs File) -> m ()
     dumpLog msgSuffix (pkgDir, filepath) = do
         $logInfo $ T.pack $ concat ["\n--  Dumping log file", msgSuffix, ": ", toFilePath filepath, "\n"]
         runResourceT
@@ -993,6 +998,7 @@ withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} md
                     : ["-hide-all-packages"]
                     )
 
+                warnCustomNoDeps :: m ()
                 warnCustomNoDeps =
                     case (taskType, packageBuildType package) of
                         (TTLocal{}, Just C.Custom) -> do
@@ -1005,6 +1011,7 @@ withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} md
                             $logWarn "Strongly recommend fixing the package's cabal file"
                         _ -> return ()
 
+                getPackageArgs :: Path Abs Dir -> m [String]
                 getPackageArgs setupDir =
                     case (packageSetupDeps package, mdeps) of
                         -- The package is using the Cabal custom-setup
@@ -1084,6 +1091,8 @@ withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} md
                                 ++ ["-package-db=" ++ toFilePathNoTrailingSep (bcoSnapDB eeBaseConfigOpts)])
 
                 setupArgs = ("--builddir=" ++ toFilePathNoTrailingSep distRelativeDir') : args
+
+                runExe :: Path Abs File -> [String] -> m ()
                 runExe exeName fullArgs =
                     runAndOutput `catch` \(ProcessExitedUnsuccessfully _ ec) -> do
                         bss <-
@@ -1104,6 +1113,7 @@ withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} md
                             (fmap fst mlogFile)
                             bss
                   where
+                    runAndOutput :: m ()
                     runAndOutput = case mlogFile of
                         Just (_, h) ->
                             sinkProcessStderrStdoutHandle (Just pkgDir) menv (toFilePath exeName) fullArgs h h
