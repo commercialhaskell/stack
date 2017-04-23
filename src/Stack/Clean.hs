@@ -43,10 +43,10 @@ dirsToDelete
     -> m [Path Abs Dir]
 dirsToDelete cleanOpts = do
     packages <- getLocalPackages
-    let localPkgDirs = Map.keys packages
     case cleanOpts of
-        CleanShallow [] -> do
-            mapM distDirFromDir localPkgDirs
+        CleanShallow [] ->
+            -- Filter out packages listed as extra-deps
+            mapM distDirFromDir . Map.keys . Map.filter (== False) $ packages
         CleanShallow targets -> do
             localPkgViews <- getLocalPackageViews
             let localPkgNames = Map.keys localPkgViews
@@ -55,7 +55,7 @@ dirsToDelete cleanOpts = do
                 [] -> mapM distDirFromDir (mapMaybe getPkgDir targets)
                 xs -> throwM (NonLocalPackages xs)
         CleanFull -> do
-            pkgWorkDirs <- mapM workDirFromDir localPkgDirs
+            pkgWorkDirs <- mapM workDirFromDir (Map.keys packages)
             projectWorkDir <- getProjectWorkDir
             return (projectWorkDir : pkgWorkDirs)
 
