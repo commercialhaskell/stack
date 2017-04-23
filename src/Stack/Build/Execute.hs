@@ -453,10 +453,11 @@ withExecuteEnv menv bopts boptsCli baseConfigOpts locals globalPackages snapshot
     dumpLog :: String -> (Path Abs Dir, Path Abs File) -> m ()
     dumpLog msgSuffix (pkgDir, filepath) = do
         $logInfo $ T.pack $ concat ["\n--  Dumping log file", msgSuffix, ": ", toFilePath filepath, "\n"]
+        compilerVer <- view actualCompilerVersionL
         runResourceT
             $ CB.sourceFile (toFilePath filepath)
            $$ CT.decodeUtf8Lenient
-           =$ mungeBuildOutput ExcludeTHLoading ConvertPathsToAbsolute pkgDir
+           =$ mungeBuildOutput ExcludeTHLoading ConvertPathsToAbsolute pkgDir compilerVer
            =$ CL.mapM_ $logInfo
         $logInfo $ T.pack $ "\n--  End of log file: " ++ toFilePath filepath ++ "\n"
 
@@ -1093,8 +1094,9 @@ withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} md
                 setupArgs = ("--builddir=" ++ toFilePathNoTrailingSep distRelativeDir') : args
 
                 runExe :: Path Abs File -> [String] -> m ()
-                runExe exeName fullArgs =
-                    runAndOutput `catch` \(ProcessExitedUnsuccessfully _ ec) -> do
+                runExe exeName fullArgs = do
+                    compilerVer <- view actualCompilerVersionL
+                    runAndOutput compilerVer `catch` \(ProcessExitedUnsuccessfully _ ec) -> do
                         bss <-
                             case mlogFile of
                                 Nothing -> return []
@@ -1103,7 +1105,7 @@ withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} md
                                     runResourceT
                                         $ CB.sourceFile (toFilePath logFile)
                                         =$= CT.decodeUtf8Lenient
-                                        $$ mungeBuildOutput stripTHLoading makeAbsolute pkgDir
+                                        $$ mungeBuildOutput stripTHLoading makeAbsolute pkgDir compilerVer
                                         =$ CL.consume
                         throwM $ CabalExitedUnsuccessfully
                             ec
@@ -1113,18 +1115,22 @@ withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} md
                             (fmap fst mlogFile)
                             bss
                   where
-                    runAndOutput :: m ()
-                    runAndOutput = case mlogFile of
+                    runAndOutput :: CompilerVersion -> m ()
+                    runAndOutput compilerVer = case mlogFile of
                         Just (_, h) ->
                             sinkProcessStderrStdoutHandle (Just pkgDir) menv (toFilePath exeName) fullArgs h h
                         Nothing ->
                             void $ sinkProcessStderrStdout (Just pkgDir) menv (toFilePath exeName) fullArgs
-                                (outputSink KeepTHLoading LevelWarn)
-                                (outputSink stripTHLoading LevelInfo)
-                    outputSink :: ExcludeTHLoading -> LogLevel -> Sink S.ByteString IO ()
-                    outputSink excludeTH level =
+                                (outputSink KeepTHLoading LevelWarn compilerVer)
+                                (outputSink stripTHLoading LevelInfo compilerVer)
+                    outputSink
+                        :: ExcludeTHLoading
+                        -> LogLevel
+                        -> CompilerVersion
+                        -> Sink S.ByteString IO ()
+                    outputSink excludeTH level compilerVer =
                         CT.decodeUtf8Lenient
-                        =$ mungeBuildOutput excludeTH makeAbsolute pkgDir
+                        =$ mungeBuildOutput excludeTH makeAbsolute pkgDir compilerVer
                         =$ CL.mapM_ (runInBase . monadLoggerLog $(TH.location >>= liftLoc) "" level)
                     -- If users want control, we should add a config option for this
                     makeAbsolute :: ConvertPathsToAbsolute
@@ -1691,12 +1697,13 @@ mungeBuildOutput :: forall m. (MonadIO m, MonadCatch m, MonadBaseControl IO m)
                  => ExcludeTHLoading       -- ^ exclude TH loading?
                  -> ConvertPathsToAbsolute -- ^ convert paths to absolute?
                  -> Path Abs Dir           -- ^ package's root directory
+                 -> CompilerVersion        -- ^ compiler we're building with
                  -> ConduitM Text Text m ()
-mungeBuildOutput excludeTHLoading makeAbsolute pkgDir = void $
+mungeBuildOutput excludeTHLoading makeAbsolute pkgDir compilerVer = void $
     CT.lines
     =$ CL.map stripCR
     =$ CL.filter (not . isTHLoading)
-    =$ CL.filter (not . isLinkerWarning)
+    =$ filterLinkerWarnings
     =$ toAbsolute
   where
     -- | Is this line a Template Haskell "Loading package" line
@@ -1708,15 +1715,22 @@ mungeBuildOutput excludeTHLoading makeAbsolute pkgDir = void $
             "Loading package " `T.isPrefixOf` bs &&
             ("done." `T.isSuffixOf` bs || "done.\r" `T.isSuffixOf` bs)
 
+    filterLinkerWarnings :: ConduitM Text Text m ()
+    filterLinkerWarnings
+        -- Check for ghc 7.8 since it's the only one prone to producing
+        -- linker warnings on Windows x64
+        | getGhcVersion compilerVer >= $(mkVersion "7.8") = doNothing
+        | otherwise = CL.filter (not . isLinkerWarning)
+
     isLinkerWarning :: Text -> Bool
     isLinkerWarning str =
-      ("ghc.exe: warning:" `T.isPrefixOf` str || "ghc.EXE: warning:" `T.isPrefixOf` str) &&
-      "is linked instead of __imp_" `T.isInfixOf` str
+        ("ghc.exe: warning:" `T.isPrefixOf` str || "ghc.EXE: warning:" `T.isPrefixOf` str) &&
+        "is linked instead of __imp_" `T.isInfixOf` str
 
     -- | Convert GHC error lines with file paths to have absolute file paths
     toAbsolute :: ConduitM Text Text m ()
     toAbsolute = case makeAbsolute of
-        KeepPathsAsIs          -> awaitForever yield
+        KeepPathsAsIs          -> doNothing
         ConvertPathsToAbsolute -> CL.mapM toAbsolutePath
 
     toAbsolutePath :: Text -> m Text
@@ -1731,6 +1745,9 @@ mungeBuildOutput excludeTHLoading makeAbsolute pkgDir = void $
         case mabs of
             Nothing -> return bs
             Just fp -> return $ fp `T.append` y
+
+    doNothing :: ConduitM Text Text m ()
+    doNothing = awaitForever yield
 
     -- | Match the error location format at the end of lines
     isValidSuffix = isRight . parseOnly lineCol
