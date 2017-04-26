@@ -28,7 +28,6 @@ module Stack.Upload
     ) where
 
 import           Control.Applicative
-import           Control.Exception                     (bracket)
 import qualified Control.Exception                     as E
 import           Control.Monad                         (when)
 import           Data.Aeson                            (FromJSON (..),
@@ -63,8 +62,8 @@ import           Stack.Types.StringError
 import           System.Directory                      (createDirectoryIfMissing,
                                                         removeFile)
 import           System.FilePath                       ((</>), takeFileName)
-import           System.IO                             (hFlush, hGetEcho, hSetEcho,
-                                                        stdin, stdout)
+import           System.IO                             (hFlush, stdout)
+import           System.IO.Echo                        (withoutInputEcho)
 
 -- | Username and password to log into Hackage.
 --
@@ -175,10 +174,8 @@ promptPassword :: IO Text
 promptPassword = do
   putStr "Hackage password: "
   hFlush stdout
-  -- save/restore the terminal echoing status
-  passwd <- bracket (hGetEcho stdin) (hSetEcho stdin) $ \_ -> do
-    hSetEcho stdin False  -- no echoing for entering the password
-    fmap T.pack getLine
+  -- save/restore the terminal echoing status (no echoing for entering the password)
+  passwd <- withoutInputEcho $ fmap T.pack getLine
   putStrLn ""
   return passwd
 
