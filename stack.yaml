@@ -17,5 +17,5 @@ flags:
   mintty:
     win32-2-5: false
 extra-deps:
-- mintty-0.1
+- mintty-0.1.1
 - store-0.4.1
