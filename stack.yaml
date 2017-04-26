@@ -15,4 +15,5 @@ flags:
   stack:
     hide-dependency-versions: true
 extra-deps:
+- mintty-0.1
 - store-0.4.1
