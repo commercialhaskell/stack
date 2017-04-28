@@ -177,6 +177,7 @@ data BuildOptsMonoid = BuildOptsMonoid
     , buildMonoidReconfigure :: !(First Bool)
     , buildMonoidCabalVerbose :: !(First Bool)
     , buildMonoidSplitObjs :: !(First Bool)
+    , buildMonoidSkipComponents :: ![Text]
     } deriving (Show, Generic)
 
 instance FromJSON (WithJSONWarnings BuildOptsMonoid) where
@@ -205,6 +206,7 @@ instance FromJSON (WithJSONWarnings BuildOptsMonoid) where
               buildMonoidReconfigure <- First <$> o ..:? buildMonoidReconfigureArgName
               buildMonoidCabalVerbose <- First <$> o ..:? buildMonoidCabalVerboseArgName
               buildMonoidSplitObjs <- First <$> o ..:? buildMonoidSplitObjsName
+              buildMonoidSkipComponents <- o ..:? buildMonoidSkipComponentsName ..!= mempty
               return BuildOptsMonoid{..})
 
 buildMonoidLibProfileArgName :: Text
@@ -269,6 +271,9 @@ buildMonoidCabalVerboseArgName = "cabal-verbose"
 
 buildMonoidSplitObjsName :: Text
 buildMonoidSplitObjsName = "split-objs"
+
+buildMonoidSkipComponentsName :: Text
+buildMonoidSkipComponentsName = "skip-components"
 
 instance Monoid BuildOptsMonoid where
     mempty = memptydefault
