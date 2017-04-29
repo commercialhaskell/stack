@@ -188,15 +188,17 @@ loadLocalPackage boptsCli targets (name, lpv) = do
             case mtarget of
                 Just (TargetComps comps) -> splitComponents $ Set.toList comps
                 Just (TargetAll packageType) -> assert (packageType == ProjectPackage)
-                    ( packageExes pkg
+                    ( filterSkippedComponents (packageExes pkg)
                     , if boptsTests bopts
                         then Map.keysSet (packageTests pkg)
                         else Set.empty
                     , if boptsBenchmarks bopts
-                        then packageBenchmarks pkg
+                        then filterSkippedComponents (packageBenchmarks pkg)
                         else Set.empty
                     )
                 Nothing -> mempty
+
+        filterSkippedComponents = Set.filter (not . (`elem` boptsSkipComponents bopts))
 
         toComponents e t b = Set.unions
             [ Set.map CExe e

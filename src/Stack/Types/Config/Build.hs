@@ -86,6 +86,8 @@ data BuildOpts =
             -- ^ Ask Cabal to be verbose in its builds
             ,boptsSplitObjs :: !Bool
             -- ^ Whether to enable split-objs.
+            ,boptsSkipComponents :: ![Text]
+            -- ^ Which components to skip when building
             }
   deriving (Show)
 
@@ -112,6 +114,7 @@ defaultBuildOpts = BuildOpts
     , boptsReconfigure = False
     , boptsCabalVerbose = False
     , boptsSplitObjs = False
+    , boptsSkipComponents = []
     }
 
 defaultBuildOptsCLI ::BuildOptsCLI
