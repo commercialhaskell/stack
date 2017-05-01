@@ -9,6 +9,7 @@ module Stack.Upload
     , Uploader
     , upload
     , uploadBytes
+    , uploadRevision
     , UploadSettings
     , defaultUploadSettings
     , setUploadUrl
@@ -30,7 +31,7 @@ module Stack.Upload
 import           Control.Applicative
 import           Control.Exception                     (bracket)
 import qualified Control.Exception                     as E
-import           Control.Monad                         (when)
+import           Control.Monad                         (when, void)
 import           Data.Aeson                            (FromJSON (..),
                                                         ToJSON (..),
                                                         eitherDecode', encode,
@@ -46,19 +47,25 @@ import           Data.Text.Encoding                    (encodeUtf8)
 import qualified Data.Text.IO                          as TIO
 import           Data.Typeable                         (Typeable)
 import           Network.HTTP.Client                   (Response,
-                                                        RequestBody(RequestBodyLBS))
+                                                        RequestBody(RequestBodyLBS),
+                                                        Request)
 import           Network.HTTP.Simple                   (withResponse,
                                                         getResponseStatusCode,
                                                         getResponseBody,
                                                         setRequestHeader,
-                                                        parseRequest)
-import           Network.HTTP.Client.MultipartFormData (formDataBody, partFileRequestBody)
+                                                        parseRequest,
+                                                        httpNoBody)
+import           Network.HTTP.Client.MultipartFormData (formDataBody, partFileRequestBody,
+                                                        partBS, partLBS)
 import           Network.HTTP.Client.TLS               (getGlobalManager,
                                                         applyDigestAuth,
                                                         displayDigestAuthException)
 import           Path                                  (toFilePath)
 import           Prelude -- Fix redundant import warnings
 import           Stack.Types.Config
+import           Stack.Types.PackageIdentifier         (PackageIdentifier, packageIdentifierString,
+                                                        packageIdentifierName)
+import           Stack.Types.PackageName               (packageNameString)
 import           Stack.Types.StringError
 import           System.Directory                      (createDirectoryIfMissing,
                                                         removeFile)
@@ -184,8 +191,25 @@ promptPassword = do
 
 nopUploader :: Config -> UploadSettings -> IO Uploader
 nopUploader _ _ = return (Uploader nop)
-  where nop :: String -> L.ByteString -> IO ()
-        nop _ _ = return ()
+  where nop :: String -> L.ByteString -> IO HackageCreds
+        nop _ _ = return (HackageCreds "nopUploader" "")
+
+applyCreds :: HackageCreds -> Request -> IO Request
+applyCreds creds req0 = do
+  manager <- getGlobalManager
+  ereq <- applyDigestAuth
+    (encodeUtf8 $ hcUsername creds)
+    (encodeUtf8 $ hcPassword creds)
+    req0
+    manager
+  case ereq of
+      Left e -> do
+          putStrLn "WARNING: No HTTP digest prompt found, this will probably fail"
+          case E.fromException e of
+              Just e' -> putStrLn $ displayDigestAuthException e'
+              Nothing -> print e
+          return req0
+      Right req -> return req
 
 -- | Turn the given settings into an @Uploader@.
 --
@@ -200,21 +224,7 @@ mkUploader config us = do
         { upload_ = \tarName bytes -> do
             let formData = [partFileRequestBody "package" tarName (RequestBodyLBS bytes)]
             req2 <- formDataBody formData req1
-            manager <- getGlobalManager
-            ereq3 <- applyDigestAuth
-                    (encodeUtf8 $ hcUsername creds)
-                    (encodeUtf8 $ hcPassword creds)
-                    req2
-                    manager
-            req3 <-
-                case ereq3 of
-                    Left e -> do
-                        putStrLn "WARNING: No HTTP digest prompt found, this will probably fail"
-                        case E.fromException e of
-                            Just e' -> putStrLn $ displayDigestAuthException e'
-                            Nothing -> print e
-                        return req2
-                    Right req3 -> return req3
+            req3 <- applyCreds creds req2
             putStr $ "Uploading " ++ tarName ++ "... "
             hFlush stdout
             withResponse req3 $ \res ->
@@ -239,6 +249,7 @@ mkUploader config us = do
                         putStrLn $ "unhandled status code: " ++ show code
                         printBody res
                         throwString $ "Upload failed on " ++ tarName
+            return creds
         }
 
 printBody :: Response (ConduitM () S.ByteString IO ()) -> IO ()
@@ -250,21 +261,41 @@ printBody res = runConduit $ getResponseBody res .| CB.sinkHandle stdout
 --
 -- Since 0.1.0.0
 newtype Uploader = Uploader
-    { upload_ :: String -> L.ByteString -> IO ()
+    { upload_ :: String -> L.ByteString -> IO HackageCreds
     }
 
 -- | Upload a single tarball with the given @Uploader@.
 --
 -- Since 0.1.0.0
-upload :: Uploader -> FilePath -> IO ()
+upload :: Uploader -> FilePath -> IO HackageCreds
 upload uploader fp = upload_ uploader (takeFileName fp) =<< L.readFile fp
 
 -- | Upload a single tarball with the given @Uploader@.  Instead of
 -- sending a file like 'upload', this sends a lazy bytestring.
 --
 -- Since 0.1.2.1
-uploadBytes :: Uploader -> String -> L.ByteString -> IO ()
+uploadBytes :: Uploader -> String -> L.ByteString -> IO HackageCreds
 uploadBytes = upload_
+
+uploadRevision :: HackageCreds
+               -> PackageIdentifier
+               -> L.ByteString
+               -> IO ()
+uploadRevision creds ident cabalFile = do
+  req0 <- parseRequest $ concat
+    [ "https://hackage.haskell.org/package/"
+    , packageIdentifierString ident
+    , "/"
+    , packageNameString $ packageIdentifierName ident
+    , ".cabal/edit"
+    ]
+  req1 <- formDataBody
+    [ partLBS "cabalfile" cabalFile
+    , partBS "publish" "on"
+    ]
+    req0
+  req2 <- applyCreds creds req1
+  void $ httpNoBody req2
 
 -- | Settings for creating an @Uploader@.
 --

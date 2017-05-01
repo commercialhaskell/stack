@@ -101,6 +101,7 @@ module Stack.Types.Config
   ,parseProjectAndConfigMonoid
   -- ** PvpBounds
   ,PvpBounds(..)
+  ,PvpBoundsType(..)
   ,parsePvpBounds
   -- ** ColorWhen
   ,ColorWhen(..)
@@ -1632,29 +1633,44 @@ instance FromJSON (WithJSONWarnings SetupInfoLocation) where
             return $ WithJSONWarnings (SetupInfoInline si) w
 
 -- | How PVP bounds should be added to .cabal files
-data PvpBounds
+data PvpBoundsType
   = PvpBoundsNone
   | PvpBoundsUpper
   | PvpBoundsLower
   | PvpBoundsBoth
   deriving (Show, Read, Eq, Typeable, Ord, Enum, Bounded)
 
-pvpBoundsText :: PvpBounds -> Text
+data PvpBounds = PvpBounds
+  { pbType :: !PvpBoundsType
+  , pbAsRevision :: !Bool
+  }
+  deriving (Show, Read, Eq, Typeable, Ord)
+
+pvpBoundsText :: PvpBoundsType -> Text
 pvpBoundsText PvpBoundsNone = "none"
 pvpBoundsText PvpBoundsUpper = "upper"
 pvpBoundsText PvpBoundsLower = "lower"
 pvpBoundsText PvpBoundsBoth = "both"
 
 parsePvpBounds :: Text -> Either String PvpBounds
-parsePvpBounds t =
-    case Map.lookup t m of
-        Nothing -> Left $ "Invalid PVP bounds: " ++ T.unpack t
-        Just x -> Right x
+parsePvpBounds t = maybe err Right $ do
+    (t', asRevision) <-
+      case T.break (== '-') t of
+        (x, "") -> Just (x, False)
+        (x, "-revision") -> Just (x, True)
+        _ -> Nothing
+    x <- Map.lookup t' m
+    Just PvpBounds
+      { pbType = x
+      , pbAsRevision = asRevision
+      }
   where
     m = Map.fromList $ map (pvpBoundsText &&& id) [minBound..maxBound]
+    err = Left $ "Invalid PVP bounds: " ++ T.unpack t
 
 instance ToJSON PvpBounds where
-  toJSON = toJSON . pvpBoundsText
+  toJSON (PvpBounds typ asRevision) =
+    toJSON (pvpBoundsText typ <> (if asRevision then "-revision" else ""))
 instance FromJSON PvpBounds where
   parseJSON = withText "PvpBounds" (either fail return . parsePvpBounds)
 

@@ -699,7 +699,7 @@ uploadCmd (args, mpvpBounds, ignoreCheck, don'tSign, sigServerUrl) go = do
             (\file ->
                   do tarFile <- resolveFile' file
                      liftIO
-                         (Upload.upload uploader (toFilePath tarFile))
+                         (void (Upload.upload uploader (toFilePath tarFile)))
                      unless
                          don'tSign
                          (void $
@@ -709,9 +709,11 @@ uploadCmd (args, mpvpBounds, ignoreCheck, don'tSign, sigServerUrl) go = do
         unless (null dirs) $
             forM_ dirs $ \dir -> do
                 pkgDir <- resolveDir' dir
-                (tarName, tarBytes) <- getSDistTarball mpvpBounds pkgDir
+                (tarName, tarBytes, mcabalRevision) <- getSDistTarball mpvpBounds pkgDir
                 unless ignoreCheck $ checkSDistTarball' tarName tarBytes
-                liftIO $ Upload.uploadBytes uploader tarName tarBytes
+                liftIO $ do
+                  creds <- Upload.uploadBytes uploader tarName tarBytes
+                  forM_ mcabalRevision $ uncurry $ Upload.uploadRevision creds
                 tarPath <- parseRelFile tarName
                 unless
                     don'tSign
@@ -729,7 +731,7 @@ sdistCmd (dirs, mpvpBounds, ignoreCheck, sign, sigServerUrl) go =
             then liftM Map.keys getLocalPackages
             else mapM resolveDir' dirs
         forM_ dirs' $ \dir -> do
-            (tarName, tarBytes) <- getSDistTarball mpvpBounds dir
+            (tarName, tarBytes, _mcabalRevision) <- getSDistTarball mpvpBounds dir
             distDir <- distDirFromDir dir
             tarPath <- (distDir </>) <$> parseRelFile tarName
             ensureDir (parent tarPath)
