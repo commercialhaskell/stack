@@ -17,7 +17,7 @@ module Stack.Upload
 import           Control.Applicative
 import           Control.Exception.Safe                (bracket, handleIO)
 import qualified Control.Exception                     as E
-import           Control.Monad                         (void)
+import           Control.Monad                         (void, when)
 import           Data.Aeson                            (FromJSON (..),
                                                         ToJSON (..),
                                                         eitherDecode', encode,
@@ -99,6 +99,9 @@ loadCreds config = do
         (eitherDecode' lbs)
 
     fromPrompt fp = do
+      when (configSaveHackageCreds config) $ do
+        putStrLn "NOTE: Username and password will be saved in a local file"
+        putStrLn "You can modify this behavior with the save-hackage-creds config option"
       putStr "Hackage username: "
       hFlush stdout
       username <- TIO.getLine

@@ -386,6 +386,7 @@ configFromConfigMonoid
          configAllowNewer = fromFirst False configMonoidAllowNewer
          configDefaultTemplate = getFirst configMonoidDefaultTemplate
          configDumpLogs = fromFirst DumpWarningLogs configMonoidDumpLogs
+         configSaveHackageCreds = fromFirst True configMonoidSaveHackageCreds
 
      configAllowDifferentUser <-
         case getFirst configMonoidAllowDifferentUser of
