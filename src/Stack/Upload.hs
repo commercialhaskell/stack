@@ -1,37 +1,23 @@
 {-# LANGUAGE DeriveDataTypeable  #-}
+{-# LANGUAGE FlexibleContexts    #-}
+{-# LANGUAGE FlexibleInstances   #-}
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 -- | Provide ability to upload tarballs to Hackage.
 module Stack.Upload
     ( -- * Upload
-      nopUploader
-    , mkUploader
-    , Uploader
-    , upload
+      upload
     , uploadBytes
     , uploadRevision
-    , UploadSettings
-    , defaultUploadSettings
-    , setUploadUrl
-    , setCredsSource
-    , setSaveCreds
       -- * Credentials
     , HackageCreds
     , loadCreds
-    , saveCreds
-    , FromFile
-      -- ** Credentials source
-    , HackageCredsSource
-    , fromAnywhere
-    , fromPrompt
-    , fromFile
-    , fromMemory
     ) where
 
 import           Control.Applicative
-import           Control.Exception                     (bracket)
+import           Control.Exception.Safe                (bracket, handleIO)
 import qualified Control.Exception                     as E
-import           Control.Monad                         (when, void)
+import           Control.Monad                         (void)
 import           Data.Aeson                            (FromJSON (..),
                                                         ToJSON (..),
                                                         eitherDecode', encode,
@@ -79,62 +65,51 @@ import           System.IO                             (hFlush, hGetEcho, hSetEc
 data HackageCreds = HackageCreds
     { hcUsername :: !Text
     , hcPassword :: !Text
+    , hcCredsFile :: !FilePath
     }
     deriving Show
 
 instance ToJSON HackageCreds where
-    toJSON (HackageCreds u p) = object
+    toJSON (HackageCreds u p _) = object
         [ "username" .= u
         , "password" .= p
         ]
-instance FromJSON HackageCreds where
+instance FromJSON (FilePath -> HackageCreds) where
     parseJSON = withObject "HackageCreds" $ \o -> HackageCreds
         <$> o .: "username"
         <*> o .: "password"
 
--- | A source for getting Hackage credentials.
+-- | Load Hackage credentials, either from a save file or the command
+-- line.
 --
 -- Since 0.1.0.0
-newtype HackageCredsSource = HackageCredsSource
-    { getCreds :: IO (HackageCreds, FromFile)
-    }
+loadCreds :: Config -> IO HackageCreds
+loadCreds config = do
+  fp <- credsFile config
+  fromFile fp `E.catches`
+    [ E.Handler $ \(_ :: E.IOException) -> fromPrompt fp
+    , E.Handler $ \(_ :: HackageCredsExceptions) -> fromPrompt fp
+    ]
+  where
+    fromFile fp = do
+      lbs <- L.readFile fp
+      either
+        (E.throwIO . Couldn'tParseJSON fp)
+        (return . ($ fp))
+        (eitherDecode' lbs)
 
--- | Whether the Hackage credentials were loaded from a file.
---
--- This information is useful since, typically, you only want to save the
--- credentials to a file if it wasn't already loaded from there.
---
--- Since 0.1.0.0
-type FromFile = Bool
-
--- | Load Hackage credentials from the given source.
---
--- Since 0.1.0.0
-loadCreds :: HackageCredsSource -> IO (HackageCreds, FromFile)
-loadCreds = getCreds
-
--- | Save the given credentials to the credentials file.
---
--- Since 0.1.0.0
-saveCreds :: Config -> HackageCreds -> IO ()
-saveCreds config creds = do
-    fp <- credsFile config
-    L.writeFile fp $ encode creds
-
--- | Load the Hackage credentials from the prompt, asking the user to type them
--- in.
---
--- Since 0.1.0.0
-fromPrompt :: HackageCredsSource
-fromPrompt = HackageCredsSource $ do
-    putStr "Hackage username: "
-    hFlush stdout
-    username <- TIO.getLine
-    password <- promptPassword
-    return (HackageCreds
-        { hcUsername = username
-        , hcPassword = password
-        }, False)
+    fromPrompt fp = do
+      putStr "Hackage username: "
+      hFlush stdout
+      username <- TIO.getLine
+      password <- promptPassword
+      let hc = HackageCreds
+            { hcUsername = username
+            , hcPassword = password
+            , hcCredsFile = fp
+            }
+      L.writeFile fp (encode hc)
+      return hc
 
 credsFile :: Config -> IO FilePath
 credsFile config = do
@@ -142,40 +117,9 @@ credsFile config = do
     createDirectoryIfMissing True dir
     return $ dir </> "credentials.json"
 
--- | Load the Hackage credentials from the JSON config file.
---
--- Since 0.1.0.0
-fromFile :: Config -> HackageCredsSource
-fromFile config = HackageCredsSource $ do
-    fp <- credsFile config
-    lbs <- L.readFile fp
-    case eitherDecode' lbs of
-        Left e -> E.throwIO $ Couldn'tParseJSON fp e
-        Right creds -> return (creds, True)
-
--- | Load the Hackage credentials from the given arguments.
---
--- Since 0.1.0.0
-fromMemory :: Text -> Text -> HackageCredsSource
-fromMemory u p = HackageCredsSource $ return (HackageCreds
-    { hcUsername = u
-    , hcPassword = p
-    }, False)
-
 data HackageCredsExceptions = Couldn'tParseJSON FilePath String
     deriving (Show, Typeable)
 instance E.Exception HackageCredsExceptions
-
--- | Try to load the credentials from the config file. If that fails, ask the
--- user to enter them.
---
--- Since 0.1.0.0
-fromAnywhere :: Config -> HackageCredsSource
-fromAnywhere config = HackageCredsSource $
-    getCreds (fromFile config) `E.catches`
-        [ E.Handler $ \(_ :: E.IOException) -> getCreds fromPrompt
-        , E.Handler $ \(_ :: HackageCredsExceptions) -> getCreds fromPrompt
-        ]
 
 -- | Lifted from cabal-install, Distribution.Client.Upload
 promptPassword :: IO Text
@@ -188,11 +132,6 @@ promptPassword = do
     fmap T.pack getLine
   putStrLn ""
   return passwd
-
-nopUploader :: Config -> UploadSettings -> IO Uploader
-nopUploader _ _ = return (Uploader nop)
-  where nop :: String -> L.ByteString -> IO HackageCreds
-        nop _ _ = return (HackageCreds "nopUploader" "")
 
 applyCreds :: HackageCreds -> Request -> IO Request
 applyCreds creds req0 = do
@@ -211,71 +150,52 @@ applyCreds creds req0 = do
           return req0
       Right req -> return req
 
--- | Turn the given settings into an @Uploader@.
---
--- Since 0.1.0.0
-mkUploader :: Config -> UploadSettings -> IO Uploader
-mkUploader config us = do
-    (creds, fromFile') <- loadCreds $ usCredsSource us config
-    when (not fromFile' && usSaveCreds us) $ saveCreds config creds
-    req0 <- parseRequest $ usUploadUrl us
-    let req1 = setRequestHeader "Accept" ["text/plain"] req0
-    return Uploader
-        { upload_ = \tarName bytes -> do
-            let formData = [partFileRequestBody "package" tarName (RequestBodyLBS bytes)]
-            req2 <- formDataBody formData req1
-            req3 <- applyCreds creds req2
-            putStr $ "Uploading " ++ tarName ++ "... "
-            hFlush stdout
-            withResponse req3 $ \res ->
-                case getResponseStatusCode res of
-                    200 -> putStrLn "done!"
-                    401 -> do
-                        putStrLn "authentication failure"
-                        cfp <- credsFile config
-                        handleIO (const $ return ()) (removeFile cfp)
-                        throwString "Authentication failure uploading to server"
-                    403 -> do
-                        putStrLn "forbidden upload"
-                        putStrLn "Usually means: you've already uploaded this package/version combination"
-                        putStrLn "Ignoring error and continuing, full message from Hackage below:\n"
-                        printBody res
-                    503 -> do
-                        putStrLn "service unavailable"
-                        putStrLn "This error some times gets sent even though the upload succeeded"
-                        putStrLn "Check on Hackage to see if your pacakge is present"
-                        printBody res
-                    code -> do
-                        putStrLn $ "unhandled status code: " ++ show code
-                        printBody res
-                        throwString $ "Upload failed on " ++ tarName
-            return creds
-        }
-
-printBody :: Response (ConduitM () S.ByteString IO ()) -> IO ()
-printBody res = runConduit $ getResponseBody res .| CB.sinkHandle stdout
-
--- | The computed value from a @UploadSettings@.
---
--- Typically, you want to use this with 'upload'.
---
--- Since 0.1.0.0
-newtype Uploader = Uploader
-    { upload_ :: String -> L.ByteString -> IO HackageCreds
-    }
-
--- | Upload a single tarball with the given @Uploader@.
---
--- Since 0.1.0.0
-upload :: Uploader -> FilePath -> IO HackageCreds
-upload uploader fp = upload_ uploader (takeFileName fp) =<< L.readFile fp
-
 -- | Upload a single tarball with the given @Uploader@.  Instead of
 -- sending a file like 'upload', this sends a lazy bytestring.
 --
 -- Since 0.1.2.1
-uploadBytes :: Uploader -> String -> L.ByteString -> IO HackageCreds
-uploadBytes = upload_
+uploadBytes :: HackageCreds
+            -> String -- ^ tar file name
+            -> L.ByteString -- ^ tar file contents
+            -> IO ()
+uploadBytes creds tarName bytes = do
+    let req1 = setRequestHeader "Accept" ["text/plain"]
+               "https://hackage.haskell.org/packages/"
+        formData = [partFileRequestBody "package" tarName (RequestBodyLBS bytes)]
+    req2 <- formDataBody formData req1
+    req3 <- applyCreds creds req2
+    putStr $ "Uploading " ++ tarName ++ "... "
+    hFlush stdout
+    withResponse req3 $ \res ->
+        case getResponseStatusCode res of
+            200 -> putStrLn "done!"
+            401 -> do
+                putStrLn "authentication failure"
+                handleIO (const $ return ()) (removeFile (hcCredsFile creds))
+                throwString "Authentication failure uploading to server"
+            403 -> do
+                putStrLn "forbidden upload"
+                putStrLn "Usually means: you've already uploaded this package/version combination"
+                putStrLn "Ignoring error and continuing, full message from Hackage below:\n"
+                printBody res
+            503 -> do
+                putStrLn "service unavailable"
+                putStrLn "This error some times gets sent even though the upload succeeded"
+                putStrLn "Check on Hackage to see if your pacakge is present"
+                printBody res
+            code -> do
+                putStrLn $ "unhandled status code: " ++ show code
+                printBody res
+                throwString $ "Upload failed on " ++ tarName
+
+printBody :: Response (ConduitM () S.ByteString IO ()) -> IO ()
+printBody res = runConduit $ getResponseBody res .| CB.sinkHandle stdout
+
+-- | Upload a single tarball with the given @Uploader@.
+--
+-- Since 0.1.0.0
+upload :: HackageCreds -> FilePath -> IO ()
+upload creds fp = uploadBytes creds (takeFileName fp) =<< L.readFile fp
 
 uploadRevision :: HackageCreds
                -> PackageIdentifier
@@ -296,51 +216,3 @@ uploadRevision creds ident cabalFile = do
     req0
   req2 <- applyCreds creds req1
   void $ httpNoBody req2
-
--- | Settings for creating an @Uploader@.
---
--- Since 0.1.0.0
-data UploadSettings = UploadSettings
-    { usUploadUrl   :: !String
-    , usCredsSource :: !(Config -> HackageCredsSource)
-    , usSaveCreds   :: !Bool
-    }
-
--- | Default value for @UploadSettings@.
---
--- Use setter functions to change defaults.
---
--- Since 0.1.0.0
-defaultUploadSettings :: UploadSettings
-defaultUploadSettings = UploadSettings
-    { usUploadUrl = "https://hackage.haskell.org/packages/"
-    , usCredsSource = fromAnywhere
-    , usSaveCreds = True
-    }
-
--- | Change the upload URL.
---
--- Default: "https://hackage.haskell.org/packages/"
---
--- Since 0.1.0.0
-setUploadUrl :: String -> UploadSettings -> UploadSettings
-setUploadUrl x us = us { usUploadUrl = x }
-
--- | How to get the Hackage credentials.
---
--- Default: @fromAnywhere@
---
--- Since 0.1.0.0
-setCredsSource :: (Config -> HackageCredsSource) -> UploadSettings -> UploadSettings
-setCredsSource x us = us { usCredsSource = x }
-
--- | Save new credentials to the config file.
---
--- Default: @True@
---
--- Since 0.1.0.0
-setSaveCreds :: Bool -> UploadSettings -> UploadSettings
-setSaveCreds x us = us { usSaveCreds = x }
-
-handleIO :: (E.IOException -> IO a) -> IO a -> IO a
-handleIO = E.handle
