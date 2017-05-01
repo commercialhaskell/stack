@@ -378,7 +378,7 @@ configFromConfigMonoid
          configScmInit = getFirst configMonoidScmInit
          configGhcOptions = configMonoidGhcOptions
          configSetupInfoLocations = configMonoidSetupInfoLocations
-         configPvpBounds = fromFirst PvpBoundsNone configMonoidPvpBounds
+         configPvpBounds = fromFirst (PvpBounds PvpBoundsNone False) configMonoidPvpBounds
          configModifyCodePage = fromFirst True configMonoidModifyCodePage
          configExplicitSetupDeps = configMonoidExplicitSetupDeps
          configRebuildGhcOptions = fromFirst False configMonoidRebuildGhcOptions
