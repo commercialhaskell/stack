@@ -1,4 +1,3 @@
-{-# LANGUAGE DeriveDataTypeable  #-}
 {-# LANGUAGE FlexibleContexts    #-}
 {-# LANGUAGE FlexibleInstances   #-}
 {-# LANGUAGE OverloadedStrings   #-}
@@ -15,12 +14,12 @@ module Stack.Upload
     ) where
 
 import           Control.Applicative
-import           Control.Exception.Safe                (bracket, handleIO)
+import           Control.Exception.Safe                (bracket, handleIO, tryIO)
 import qualified Control.Exception                     as E
-import           Control.Monad                         (void, when)
+import           Control.Monad                         (void, when, unless)
 import           Data.Aeson                            (FromJSON (..),
                                                         ToJSON (..),
-                                                        eitherDecode', encode,
+                                                        decode', encode,
                                                         object, withObject,
                                                         (.:), (.=))
 import qualified Data.ByteString.Char8                 as S
@@ -31,7 +30,6 @@ import           Data.Text                             (Text)
 import qualified Data.Text                             as T
 import           Data.Text.Encoding                    (encodeUtf8)
 import qualified Data.Text.IO                          as TIO
-import           Data.Typeable                         (Typeable)
 import           Network.HTTP.Client                   (Response,
                                                         RequestBody(RequestBodyLBS),
                                                         Request)
@@ -86,18 +84,16 @@ instance FromJSON (FilePath -> HackageCreds) where
 loadCreds :: Config -> IO HackageCreds
 loadCreds config = do
   fp <- credsFile config
-  fromFile fp `E.catches`
-    [ E.Handler $ \(_ :: E.IOException) -> fromPrompt fp
-    , E.Handler $ \(_ :: HackageCredsExceptions) -> fromPrompt fp
-    ]
+  elbs <- tryIO $ L.readFile fp
+  case either (const Nothing) Just elbs >>= decode' of
+    Nothing -> fromPrompt fp
+    Just mkCreds -> do
+      unless (configSaveHackageCreds config) $ do
+        putStrLn "WARNING: You've set save-hackage-creds to false"
+        putStrLn "However, credentials were found at:"
+        putStrLn $ "  " ++ fp
+      return $ mkCreds fp
   where
-    fromFile fp = do
-      lbs <- L.readFile fp
-      either
-        (E.throwIO . Couldn'tParseJSON fp)
-        (return . ($ fp))
-        (eitherDecode' lbs)
-
     fromPrompt fp = do
       when (configSaveHackageCreds config) $ do
         putStrLn "NOTE: Username and password will be saved in a local file"
@@ -119,10 +115,6 @@ credsFile config = do
     let dir = toFilePath (configStackRoot config) </> "upload"
     createDirectoryIfMissing True dir
     return $ dir </> "credentials.json"
-
-data HackageCredsExceptions = Couldn'tParseJSON FilePath String
-    deriving (Show, Typeable)
-instance E.Exception HackageCredsExceptions
 
 -- | Lifted from cabal-install, Distribution.Client.Upload
 promptPassword :: IO Text
