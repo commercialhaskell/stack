@@ -43,6 +43,7 @@ RUN stack --system-ghc --resolver=$LTS_SLUG --local-bin-path=/usr/local/bin inst
 #
 
 RUN wget -O- "https://github.com/fpco/pid1/releases/download/pid1%2F$PID1_VERSION/pid1-$PID1_VERSION-linux-x86_64.tar.gz" |tar xzf - -C /usr/local
+RUN chown -R root:root /usr/local/sbin
 
 #
 # Set up pid1 entrypoint and default command
