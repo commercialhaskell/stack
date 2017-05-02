@@ -48,6 +48,7 @@ Other enhancements:
   [Stackage no-revisions feature](http://www.snoyman.com/blog/2017/04/stackages-no-revisions-field)&mdash;as
   a method to ensure PVP compliance without having to proactively fix
   bounds issues for Stackage maintenance.
+* Expose a `save-hackage-creds` configuration option
 
 Bug fixes:
 

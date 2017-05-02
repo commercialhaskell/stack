@@ -25,6 +25,7 @@ import           Control.Monad.Writer.Lazy (Writer)
 import           Data.Attoparsec.Args (parseArgs, EscapingMode (Escaping))
 import           Data.Attoparsec.Interpreter (getInterpreterArgs)
 import qualified Data.ByteString.Lazy as L
+import           Data.IORef.RunOnce (runOnce)
 import           Data.List
 import qualified Data.Map as Map
 import           Data.Maybe
@@ -686,20 +687,18 @@ uploadCmd (args, mpvpBounds, ignoreCheck, don'tSign, sigServerUrl) go = do
             "Error: stack upload expects a list sdist tarballs or cabal directories.  Can't find " ++
             show invalid
         exitFailure
-    let getUploader :: (HasConfig config) => StackT config IO Upload.Uploader
-        getUploader = do
-            config <- view configL
-            liftIO $ Upload.mkUploader config Upload.defaultUploadSettings
     withBuildConfigAndLock go $ \_ -> do
-        uploader <- getUploader
+        config <- view configL
+        getCreds <- liftIO (runOnce (Upload.loadCreds config))
         unless ignoreCheck $
             mapM_ (resolveFile' >=> checkSDistTarball) files
         forM_
             files
             (\file ->
                   do tarFile <- resolveFile' file
-                     liftIO
-                         (void (Upload.upload uploader (toFilePath tarFile)))
+                     liftIO $ do
+                       creds <- getCreds
+                       Upload.upload creds (toFilePath tarFile)
                      unless
                          don'tSign
                          (void $
@@ -712,7 +711,8 @@ uploadCmd (args, mpvpBounds, ignoreCheck, don'tSign, sigServerUrl) go = do
                 (tarName, tarBytes, mcabalRevision) <- getSDistTarball mpvpBounds pkgDir
                 unless ignoreCheck $ checkSDistTarball' tarName tarBytes
                 liftIO $ do
-                  creds <- Upload.uploadBytes uploader tarName tarBytes
+                  creds <- getCreds
+                  Upload.uploadBytes creds tarName tarBytes
                   forM_ mcabalRevision $ uncurry $ Upload.uploadRevision creds
                 tarPath <- parseRelFile tarName
                 unless

@@ -739,6 +739,17 @@ in the directories it creates.  Source control tools can be specified with the
 templates:
   scm-init: git
 ```
+
+### save-hackage-creds
+
+Controls whether, when using `stack upload`, the user's Hackage
+username and password are stored in a local file. Default: true.
+
+```yaml
+save-hackage-creds: true
+```
+
+Since 1.5.0
   
 # urls
 

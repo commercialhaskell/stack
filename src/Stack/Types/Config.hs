@@ -372,6 +372,8 @@ data Config =
          ,configAllowLocals         :: !Bool
          -- ^ Are we allowed to build local packages? The script
          -- command disallows this.
+         ,configSaveHackageCreds    :: !Bool
+         -- ^ Should we save Hackage credentials to a file?
          }
 
 -- | Which packages do ghc-options on the command line apply to?
@@ -785,6 +787,8 @@ data ConfigMonoid =
     -- installation.
     , configMonoidDumpLogs           :: !(First DumpLogs)
     -- ^ See 'configDumpLogs'
+    , configMonoidSaveHackageCreds   :: !(First Bool)
+    -- ^ See 'configSaveHackageCreds'
     }
   deriving (Show, Generic)
 
@@ -856,6 +860,7 @@ parseConfigMonoidObject rootDir obj = do
     configMonoidDefaultTemplate <- First <$> obj ..:? configMonoidDefaultTemplateName
     configMonoidAllowDifferentUser <- First <$> obj ..:? configMonoidAllowDifferentUserName
     configMonoidDumpLogs <- First <$> obj ..:? configMonoidDumpLogsName
+    configMonoidSaveHackageCreds <- First <$> obj ..:? configMonoidSaveHackageCredsName
 
     return ConfigMonoid {..}
   where
@@ -988,6 +993,9 @@ configMonoidAllowDifferentUserName = "allow-different-user"
 
 configMonoidDumpLogsName :: Text
 configMonoidDumpLogsName = "dump-logs"
+
+configMonoidSaveHackageCredsName :: Text
+configMonoidSaveHackageCredsName = "save-hackage-creds"
 
 data ConfigException
   = ParseConfigFileException (Path Abs File) ParseException
