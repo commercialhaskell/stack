@@ -160,7 +160,7 @@ binaryUpgrade (BinaryOpts mplatform force' mver morg mrepo) = do
 
     toUpgrade <- case (force, isNewer) of
         (False, False) -> do
-            $logInfo "Skipping binary upgrade, your version is already more recent"
+            $logInfo "Skipping binary upgrade, you are already running the most recent version"
             return False
         (True, False) -> do
             $logInfo "Forcing binary upgrade"
