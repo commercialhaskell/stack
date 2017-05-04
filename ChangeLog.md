@@ -49,6 +49,7 @@ Other enhancements:
   a method to ensure PVP compliance without having to proactively fix
   bounds issues for Stackage maintenance.
 * Expose a `save-hackage-creds` configuration option
+* MinGW bin folder now is searched for dynamic libraries. See [#3126]
 
 Bug fixes:
 
