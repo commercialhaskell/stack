@@ -142,6 +142,7 @@ extraDirs tool = do
                 ]
             , edLib =
                 [ dir </> $(mkRelDir "mingw32") </> $(mkRelDir "lib")
+                , dir </> $(mkRelDir "mingw32") </> $(mkRelDir "bin")
                 ]
             }
         (Platform Cabal.X86_64 Cabal.Windows, "msys2") -> return mempty
@@ -155,6 +156,7 @@ extraDirs tool = do
                 ]
             , edLib =
                 [ dir </> $(mkRelDir "mingw64") </> $(mkRelDir "lib")
+                , dir </> $(mkRelDir "mingw64") </> $(mkRelDir "bin")
                 ]
             }
         (_, isGHC -> True) -> return mempty
