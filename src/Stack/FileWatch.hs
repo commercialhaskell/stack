@@ -112,7 +112,7 @@ fileWatchConf cfg out inner opts = withManagerConf cfg $ \manager -> do
     let watchInput = do
             line <- getLine
             unless (line == "quit") $ do
-              if (boptsCLIExternal opts)
+              if boptsCLIExternal opts
               then case line of
                      "build" -> atomically $ writeTVar dirtyVar True
                      "" -> atomically $ writeTVar dirtyVar True
@@ -162,6 +162,6 @@ fileWatchConf cfg out inner opts = withManagerConf cfg $ \manager -> do
             _ -> withColor Green $
                 putLn "Success! Waiting for next file change."
 
-        if (boptsCLIExternal opts)
+        if boptsCLIExternal opts
         then putLn "Type quit for quiting. Press enter to force a rebuild."
         else putLn "Type help for available commands. Press enter to force a rebuild."
