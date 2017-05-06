@@ -18,11 +18,13 @@ import qualified Codec.Archive.Tar.Entry as Tar
 import qualified Codec.Compression.GZip as GZip
 import           Control.Applicative
 import           Control.Concurrent.Execute (ActionContext(..))
-import           Control.Monad (unless, void, liftM)
+import           Control.Monad (unless, void, liftM, forM)
 import           Control.Monad.Catch
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
+import           Control.Monad.Reader.Class (local)
 import           Control.Monad.Trans.Control (liftBaseWith)
+import           Control.Monad.Trans.Unlift (MonadBaseUnlift)
 import qualified Data.ByteString as S
 import qualified Data.ByteString.Char8 as S8
 import qualified Data.ByteString.Lazy as L
@@ -50,10 +52,11 @@ import           Distribution.PackageDescription.PrettyPrint (showGenericPackage
 import           Distribution.Text (display)
 import           Distribution.Version (simplifyVersionRange, orLaterVersion, earlierVersion)
 import           Distribution.Version.Extra
+import           Lens.Micro (set)
 import           Path
 import           Path.IO hiding (getModificationTime, getPermissions)
 import           Prelude -- Fix redundant import warnings
-import           Stack.Build (mkBaseConfigOpts)
+import           Stack.Build (mkBaseConfigOpts, build)
 import           Stack.Build.Execute
 import           Stack.Build.Installed
 import           Stack.Build.Source (loadSourceMap, getDefaultPackageConfig)
@@ -317,7 +320,7 @@ dirsFromFiles dirs = Set.toAscList (Set.delete "." results)
 -- and will throw an exception in case of critical errors.
 --
 -- Note that we temporarily decompress the archive to analyze it.
-checkSDistTarball :: (StackM env m, HasEnvConfig env)
+checkSDistTarball :: (StackM env m, HasEnvConfig env, MonadBaseUnlift IO m)
   => Path Abs File -- ^ Absolute path to tarball
   -> m ()
 checkSDistTarball tarball = withTempTarGzContents tarball $ \pkgDir' -> do
@@ -344,10 +347,34 @@ checkSDistTarball tarball = withTempTarGzContents tarball $ \pkgDir' -> do
     case NE.nonEmpty errors of
         Nothing -> return ()
         Just ne -> throwM $ CheckException ne
+    buildExtractedTarball pkgDir
+
+buildExtractedTarball :: (StackM env m, HasEnvConfig env, MonadBaseUnlift IO m) => Path Abs Dir -> m ()
+buildExtractedTarball pkgDir = do
+  newPackagesRef <- liftIO (newIORef Nothing)
+  projectRoot <- view projectRootL
+  envConfig <- view envConfigL
+  updatedPackageEntries <- forM (bcPackageEntries (envConfigBuildConfig (envConfig))) $ \packageEntry -> do
+    case peLocation packageEntry of
+      PLRemote _ _ -> return packageEntry
+      PLFilePath fp -> do
+        resolvedPackagePath <- resolveDir projectRoot fp
+        if resolvedPackagePath == projectRoot
+          then return packageEntry { peLocation = PLFilePath (toFilePath pkgDir) }
+          else return packageEntry
+  let adjustEnvForBuild env =
+        let updatedEnvConfig = envConfig
+              {envConfigPackagesRef = newPackagesRef
+              ,envConfigBuildConfig = updatePackageInBuildConfig (envConfigBuildConfig envConfig)
+              }
+        in set envConfigL updatedEnvConfig env
+      updatePackageInBuildConfig buildConfig = buildConfig { bcPackageEntries = updatedPackageEntries }
+  local adjustEnvForBuild $
+    build (const (return ())) Nothing defaultBuildOptsCLI
 
 -- | Version of 'checkSDistTarball' that first saves lazy bytestring to
 -- temporary directory and then calls 'checkSDistTarball' on it.
-checkSDistTarball' :: (StackM env m, HasEnvConfig env)
+checkSDistTarball' :: (StackM env m, HasEnvConfig env, MonadBaseUnlift IO m)
   => String       -- ^ Tarball name
   -> L.ByteString -- ^ Tarball contents as a byte string
   -> m ()
