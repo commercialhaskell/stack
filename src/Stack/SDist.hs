@@ -368,7 +368,14 @@ buildExtractedTarball pkgDir = do
               ,envConfigBuildConfig = updatePackageInBuildConfig (envConfigBuildConfig envConfig)
               }
         in set envConfigL updatedEnvConfig env
-      updatePackageInBuildConfig buildConfig = buildConfig { bcPackageEntries = updatedPackageEntries }
+      updatePackageInBuildConfig buildConfig = buildConfig
+        { bcPackageEntries = updatedPackageEntries
+        , bcConfig = (bcConfig buildConfig)
+                     { configBuild = defaultBuildOpts
+                       { boptsTests = True
+                       }
+                     }
+        }
   local adjustEnvForBuild $
     build (const (return ())) Nothing defaultBuildOptsCLI
 
