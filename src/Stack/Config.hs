@@ -316,14 +316,10 @@ configFromConfigMonoid
          configProgHpcPath             = getFirst configMonoidProgHpcPath
          configProgHsc2hsPath          = getFirst configMonoidProgHsc2hsPath
          configProgHscolourPath        = getFirst configMonoidProgHscolourPath
-         configProgJhcPath             = getFirst configMonoidProgJhcPath
          configProgLdPath              = getFirst configMonoidProgLdPath
-         configProgLhcPath             = getFirst configMonoidProgLhcPath
-         configProgLhcPkgPath          = getFirst configMonoidProgLhcPkgPath
          configProgPkgConfigPath       = getFirst configMonoidProgPkgConfigPath
          configProgStripPath           = getFirst configMonoidProgStripPath
          configProgTarPath             = getFirst configMonoidProgTarPath
-         configProgUhcPath             = getFirst configMonoidProgUhcPath
          configProgAlexOptions            = configMonoidProgAlexOptions
          configProgArOptions              = configMonoidProgArOptions
          configProgC2hsOptions            = configMonoidProgC2hsOptions
@@ -342,14 +338,10 @@ configFromConfigMonoid
          configProgHpcOptions             = configMonoidProgHpcOptions
          configProgHsc2hsOptions          = configMonoidProgHsc2hsOptions
          configProgHscolourOptions        = configMonoidProgHscolourOptions
-         configProgJhcOptions             = configMonoidProgJhcOptions
          configProgLdOptions              = configMonoidProgLdOptions
-         configProgLhcOptions             = configMonoidProgLhcOptions
-         configProgLhcPkgOptions          = configMonoidProgLhcPkgOptions
          configProgPkgConfigOptions       = configMonoidProgPkgConfigOptions
          configProgStripOptions           = configMonoidProgStripOptions
          configProgTarOptions             = configMonoidProgTarOptions
-         configProgUhcOptions             = configMonoidProgUhcOptions
 
          -- Only place in the codebase where platform is hard-coded. In theory
          -- in the future, allow it to be configured.

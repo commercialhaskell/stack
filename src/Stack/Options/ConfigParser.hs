@@ -21,8 +21,8 @@ import qualified System.FilePath as FilePath
 configOptsParser :: FilePath -> GlobalOptsContext -> Parser ConfigMonoid
 configOptsParser currentDir hide0 =
     (\stackRoot workDir buildOpts dockerOpts nixOpts systemGHC installGHC arch ghcVariant ghcBuild jobs includes libs
-    progAlexPath progArPath progC2hsPath progCpphsPath progGccPath progGhcPath progGhcPkgPath progGhcjsPath progGhcjsPkgPath progGreencardPath progHaddockPath progHappyPath progHaskellSuitePath progHaskellSuitePkgPath progHmakePath progHpcPath progHsc2hsPath progHscolourPath progJhcPath progLdPath progLhcPath progLhcPkgPath progPkgConfigPath progStripPath progTarPath progUhcPath
-    progAlexOptions progArOptions progC2hsOptions progCpphsOptions progGccOptions progGhcOptions progGhcPkgOptions progGhcjsOptions progGhcjsPkgOptions progGreencardOptions progHaddockOptions progHappyOptions progHaskellSuiteOptions progHaskellSuitePkgOptions progHmakeOptions progHpcOptions progHsc2hsOptions progHscolourOptions progJhcOptions progLdOptions progLhcOptions progLhcPkgOptions progPkgConfigOptions progStripOptions progTarOptions progUhcOptions
+    progAlexPath progArPath progC2hsPath progCpphsPath progGccPath progGhcPath progGhcPkgPath progGhcjsPath progGhcjsPkgPath progGreencardPath progHaddockPath progHappyPath progHaskellSuitePath progHaskellSuitePkgPath progHmakePath progHpcPath progHsc2hsPath progHscolourPath progLdPath progPkgConfigPath progStripPath progTarPath
+    progAlexOptions progArOptions progC2hsOptions progCpphsOptions progGccOptions progGhcOptions progGhcPkgOptions progGhcjsOptions progGhcjsPkgOptions progGreencardOptions progHaddockOptions progHappyOptions progHaskellSuiteOptions progHaskellSuitePkgOptions progHmakeOptions progHpcOptions progHsc2hsOptions progHscolourOptions progLdOptions progPkgConfigOptions progStripOptions progTarOptions
     skipGHCCheck skipMsys localBin modifyCodePage allowDifferentUser dumpLogs -> mempty
         { configMonoidStackRoot = stackRoot
         , configMonoidWorkDir = workDir
@@ -56,14 +56,10 @@ configOptsParser currentDir hide0 =
         , configMonoidProgHpcPath             = progHpcPath
         , configMonoidProgHsc2hsPath          = progHsc2hsPath
         , configMonoidProgHscolourPath        = progHscolourPath
-        , configMonoidProgJhcPath             = progJhcPath
         , configMonoidProgLdPath              = progLdPath
-        , configMonoidProgLhcPath             = progLhcPath
-        , configMonoidProgLhcPkgPath          = progLhcPkgPath
         , configMonoidProgPkgConfigPath       = progPkgConfigPath
         , configMonoidProgStripPath           = progStripPath
         , configMonoidProgTarPath             = progTarPath
-        , configMonoidProgUhcPath             = progUhcPath
         , configMonoidProgAlexOptions            = progAlexOptions
         , configMonoidProgArOptions              = progArOptions
         , configMonoidProgC2hsOptions            = progC2hsOptions
@@ -82,14 +78,10 @@ configOptsParser currentDir hide0 =
         , configMonoidProgHpcOptions             = progHpcOptions
         , configMonoidProgHsc2hsOptions          = progHsc2hsOptions
         , configMonoidProgHscolourOptions        = progHscolourOptions
-        , configMonoidProgJhcOptions             = progJhcOptions
         , configMonoidProgLdOptions              = progLdOptions
-        , configMonoidProgLhcOptions             = progLhcOptions
-        , configMonoidProgLhcPkgOptions          = progLhcPkgOptions
         , configMonoidProgPkgConfigOptions       = progPkgConfigOptions
         , configMonoidProgStripOptions           = progStripOptions
         , configMonoidProgTarOptions             = progTarOptions
-        , configMonoidProgUhcOptions             = progUhcOptions
         , configMonoidSkipMsys = skipMsys
         , configMonoidLocalBinPath = localBin
         , configMonoidModifyCodePage = modifyCodePage
@@ -260,27 +252,9 @@ configOptsParser currentDir hide0 =
                <> hide
                 ))
     <*> optionalFirst (absFileOption
-                ( long "with-jhc"
-               <> metavar "PATH-TO-JHC"
-               <> help "Use jhc found at PATH-TO-JHC"
-               <> hide
-                ))
-    <*> optionalFirst (absFileOption
                 ( long "with-ld"
                <> metavar "PATH-TO-LD"
                <> help "Use ld found at PATH-TO-LD"
-               <> hide
-                ))
-    <*> optionalFirst (absFileOption
-                ( long "with-lhc"
-               <> metavar "PATH-TO-LHC"
-               <> help "Use lhc found at PATH-TO-LHC"
-               <> hide
-                ))
-    <*> optionalFirst (absFileOption
-                ( long "with-lhc-pkg"
-               <> metavar "PATH-TO-LHC-PKG"
-               <> help "Use lhc-pkg found at PATH-TO-LHC-PKG"
                <> hide
                 ))
     <*> optionalFirst (absFileOption
@@ -299,12 +273,6 @@ configOptsParser currentDir hide0 =
                 ( long "with-tar"
                <> metavar "PATH-TO-TAR"
                <> help "Use tar found at PATH-TO-TAR"
-               <> hide
-                ))
-    <*> optionalFirst (absFileOption
-                ( long "with-uhc"
-               <> metavar "PATH-TO-UHC"
-               <> help "Use uhc found at PATH-TO-UHC"
                <> hide
                 ))
     <*> many (textOption
@@ -416,27 +384,9 @@ configOptsParser currentDir hide0 =
                <> hide
                 ))
     <*> many (textOption
-                ( long "jhc-option"
-               <> metavar "JHC-OPTIONS"
-               <> help "Pass JHC-OPTIONS to the jhc"
-               <> hide
-                ))
-    <*> many (textOption
                 ( long "ld-option"
                <> metavar "LD-OPTIONS"
                <> help "Pass LD-OPTIONS to the ld"
-               <> hide
-                ))
-    <*> many (textOption
-                ( long "lhc-option"
-               <> metavar "LHC-OPTIONS"
-               <> help "Pass LHC-OPTIONS to the lhc"
-               <> hide
-                ))
-    <*> many (textOption
-                ( long "lhc-pkg-option"
-               <> metavar "LHC-PKG-OPTIONS"
-               <> help "Pass LHC-PKG-OPTIONS to the lhc-pkg"
                <> hide
                 ))
     <*> many (textOption
@@ -455,12 +405,6 @@ configOptsParser currentDir hide0 =
                 ( long "tar-option"
                <> metavar "TAR-OPTIONS"
                <> help "Pass TAR-OPTIONS to the tar"
-               <> hide
-                ))
-    <*> many (textOption
-                ( long "uhc-option"
-               <> metavar "UHC-OPTIONS"
-               <> help "Pass UHC-OPTIONS to the uhc"
                <> hide
                 ))
     <*> firstBoolFlags
