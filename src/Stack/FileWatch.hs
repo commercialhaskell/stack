@@ -26,6 +26,7 @@ import Path
 import System.Console.ANSI
 import System.FSNotify
 import System.IO (Handle, stdout, stderr, hPutStrLn)
+import Stack.Types.Config (BuildOptsCLI(..))
 
 -- | Print an exception to stderr
 printExceptionStderr :: Exception e => e -> IO ()
@@ -34,11 +35,13 @@ printExceptionStderr e =
 
 fileWatch :: Handle
           -> ((Set (Path Abs File) -> IO ()) -> IO ())
+          -> BuildOptsCLI
           -> IO ()
 fileWatch = fileWatchConf defaultConfig
 
 fileWatchPoll :: Handle
               -> ((Set (Path Abs File) -> IO ()) -> IO ())
+              -> BuildOptsCLI
               -> IO ()
 fileWatchPoll = fileWatchConf $ defaultConfig { confUsePolling = True }
 
@@ -49,8 +52,9 @@ fileWatchPoll = fileWatchConf $ defaultConfig { confUsePolling = True }
 fileWatchConf :: WatchConfig
               -> Handle
               -> ((Set (Path Abs File) -> IO ()) -> IO ())
+              -> BuildOptsCLI
               -> IO ()
-fileWatchConf cfg out inner = withManagerConf cfg $ \manager -> do
+fileWatchConf cfg out inner opts = withManagerConf cfg $ \manager -> do
     let putLn = hPutStrLn out
     let withColor color action = do
             outputIsTerminal <- hIsTerminalDevice stdout
@@ -108,7 +112,13 @@ fileWatchConf cfg out inner = withManagerConf cfg $ \manager -> do
     let watchInput = do
             line <- getLine
             unless (line == "quit") $ do
-                case line of
+              if (boptsCLIExternal opts)
+              then case line of
+                     "build" -> atomically $ writeTVar dirtyVar True
+                     "" -> atomically $ writeTVar dirtyVar True
+                     _ -> return ()
+              else
+                  case line of
                     "help" -> do
                         putLn ""
                         putLn "help: display this help"
@@ -126,7 +136,7 @@ fileWatchConf cfg out inner = withManagerConf cfg $ \manager -> do
                         , ". Try 'help'"
                         ]
 
-                watchInput
+              watchInput
 
     race_ watchInput $ forever $ do
         atomically $ do
@@ -152,4 +162,6 @@ fileWatchConf cfg out inner = withManagerConf cfg $ \manager -> do
             _ -> withColor Green $
                 putLn "Success! Waiting for next file change."
 
-        putLn "Type help for available commands. Press enter to force a rebuild."
+        if (boptsCLIExternal opts)
+        then putLn "Type quit for quiting. Press enter to force a rebuild."
+        else putLn "Type help for available commands. Press enter to force a rebuild."
