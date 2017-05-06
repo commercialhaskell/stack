@@ -49,6 +49,10 @@ Other enhancements:
   a method to ensure PVP compliance without having to proactively fix
   bounds issues for Stackage maintenance.
 * Expose a `save-hackage-creds` configuration option
+* Add a build option named `--external` which when coupled with
+  the `file-watch` flags will change the interactivity behavior of
+  the tool. This option is specifically being developed for yesod
+  development server.
 
 Bug fixes:
 
