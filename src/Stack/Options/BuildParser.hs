@@ -70,6 +70,10 @@ buildOptsParser cmd =
           help
               "Like --file-watch, but polling the filesystem instead of using events") <|>
      pure NoFileWatch) <*>
+    switch
+        (long "external" <>
+         help
+             "Used alongside with file-watch related option to stop interactivity. Useful for external backends like yesod.") <*>
     many (cmdOption
              (long "exec" <>
               metavar "CMD [ARGS]" <>
