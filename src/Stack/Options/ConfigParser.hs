@@ -21,8 +21,8 @@ import qualified System.FilePath as FilePath
 configOptsParser :: FilePath -> GlobalOptsContext -> Parser ConfigMonoid
 configOptsParser currentDir hide0 =
     (\stackRoot workDir buildOpts dockerOpts nixOpts systemGHC installGHC arch ghcVariant ghcBuild jobs includes libs
-    progAlexPath progArPath progC2hsPath progCpphsPath progGccPath progGhcPath progGhcPkgPath progGhcjsPath progGhcjsPkgPath progGreencardPath progHaddockPath progHappyPath progHaskellSuitePath progHaskellSuitePkgPath progHmakePath progHpcPath progHsc2hsPath progHscolourPath progLdPath progPkgConfigPath progStripPath progTarPath
-    progAlexOptions progArOptions progC2hsOptions progCpphsOptions progGccOptions progGhcOptions progGhcPkgOptions progGhcjsOptions progGhcjsPkgOptions progGreencardOptions progHaddockOptions progHappyOptions progHaskellSuiteOptions progHaskellSuitePkgOptions progHmakeOptions progHpcOptions progHsc2hsOptions progHscolourOptions progLdOptions progPkgConfigOptions progStripOptions progTarOptions
+    _progDummyPath progAlexPath progArPath progC2hsPath progCpphsPath progGccPath progGhcPath progGhcPkgPath progGhcjsPath progGhcjsPkgPath progGreencardPath progHaddockPath progHappyPath progHaskellSuitePath progHaskellSuitePkgPath progHmakePath progHpcPath progHsc2hsPath progHscolourPath progLdPath progPkgConfigPath progStripPath progTarPath
+    _progDummyOptions progAlexOptions progArOptions progC2hsOptions progCpphsOptions progGccOptions progGhcOptions progGhcPkgOptions progGhcjsOptions progGhcjsPkgOptions progGreencardOptions progHaddockOptions progHappyOptions progHaskellSuiteOptions progHaskellSuitePkgOptions progHmakeOptions progHpcOptions progHsc2hsOptions progHscolourOptions progLdOptions progPkgConfigOptions progStripOptions progTarOptions
     skipGHCCheck skipMsys localBin modifyCodePage allowDifferentUser dumpLogs -> mempty
         { configMonoidStackRoot = stackRoot
         , configMonoidWorkDir = workDir
@@ -144,268 +144,280 @@ configOptsParser currentDir hide0 =
            <> hide
             )))
     <*> optionalFirst (absFileOption
+                ( long "with-PROG"
+               <> metavar "PATH-TO-PROG"
+               <> help "Give path to PROG"
+               <> hide
+                ))
+    <*> optionalFirst (absFileOption
                 ( long "with-alex"
                <> metavar "PATH-TO-ALEX"
                <> help "Use alex found at PATH-TO-ALEX"
-               <> hide
+               <> internal
                 ))
     <*> optionalFirst (absFileOption
                 ( long "with-ar"
                <> metavar "PATH-TO-AR"
                <> help "Use ar found at PATH-TO-AR"
-               <> hide
+               <> internal
                 ))
     <*> optionalFirst (absFileOption
                 ( long "with-c2hs"
                <> metavar "PATH-TO-C2HS"
                <> help "Use c2hs found at PATH-TO-C2HS"
-               <> hide
+               <> internal
                 ))
     <*> optionalFirst (absFileOption
                 ( long "with-cpphs"
                <> metavar "PATH-TO-CPPHS"
                <> help "Use cpphs found at PATH-TO-CPPHS"
-               <> hide
+               <> internal
                 ))
     <*> optionalFirst (absFileOption
                 ( long "with-gcc"
                <> metavar "PATH-TO-GCC"
                <> help "Use gcc found at PATH-TO-GCC"
-               <> hide
+               <> internal
                 ))
     <*> optionalFirst (absFileOption
                 ( long "with-ghc"
                <> metavar "PATH-TO-GHC"
                <> help "Use ghc found at PATH-TO-GHC"
-               <> hide
+               <> internal
                 ))
     <*> optionalFirst (absFileOption
                 ( long "with-ghc-pkg"
                <> metavar "PATH-TO-GHC-PKG"
                <> help "Use ghc-pkg found at PATH-TO-GHC-PKG"
-               <> hide
+               <> internal
                 ))
     <*> optionalFirst (absFileOption
                 ( long "with-ghcjs"
                <> metavar "PATH-TO-GHCJS"
                <> help "Use ghcjs found at PATH-TO-GHCJS"
-               <> hide
+               <> internal
                 ))
     <*> optionalFirst (absFileOption
                 ( long "with-ghcjs-pkg"
                <> metavar "PATH-TO-GHCJS-PKG"
                <> help "Use ghcjs-pkg found at PATH-TO-GHCJS-PKG"
-               <> hide
+               <> internal
                 ))
     <*> optionalFirst (absFileOption
                 ( long "with-greencard"
                <> metavar "PATH-TO-GREENCARD"
                <> help "Use greencard found at PATH-TO-GREENCARD"
-               <> hide
+               <> internal
                 ))
     <*> optionalFirst (absFileOption
                 ( long "with-haddock"
                <> metavar "PATH-TO-HADDOCK"
                <> help "Use haddock found at PATH-TO-HADDOCK"
-               <> hide
+               <> internal
                 ))
     <*> optionalFirst (absFileOption
                 ( long "with-happy"
                <> metavar "PATH-TO-HAPPY"
                <> help "Use happy found at PATH-TO-HAPPY"
-               <> hide
+               <> internal
                 ))
     <*> optionalFirst (absFileOption
                 ( long "with-haskell-suite"
                <> metavar "PATH-TO-HASKELL-SUITE"
                <> help "Use haskell-suite found at PATH-TO-HASKELL-SUITE"
-               <> hide
+               <> internal
                 ))
     <*> optionalFirst (absFileOption
                 ( long "with-haskell-suite-pkg"
                <> metavar "PATH-TO-HASKELL-SUITE-PKG"
                <> help "Use haskell-suite-pkg found at PATH-TO-HASKELL-SUITE-PKG"
-               <> hide
+               <> internal
                 ))
     <*> optionalFirst (absFileOption
                 ( long "with-hmake"
                <> metavar "PATH-TO-HMAKE"
                <> help "Use hmake found at PATH-TO-HMAKE"
-               <> hide
+               <> internal
                 ))
     <*> optionalFirst (absFileOption
                 ( long "with-hpc"
                <> metavar "PATH-TO-HPC"
                <> help "Use hpc found at PATH-TO-HPC"
-               <> hide
+               <> internal
                 ))
     <*> optionalFirst (absFileOption
                 ( long "with-hsc2hs"
                <> metavar "PATH-TO-HSC2HS"
                <> help "Use hsc2hs found at PATH-TO-HSC2HS"
-               <> hide
+               <> internal
                 ))
     <*> optionalFirst (absFileOption
                 ( long "with-hscolour"
                <> metavar "PATH-TO-HSCOLOUR"
                <> help "Use hscolour found at PATH-TO-HSCOLOUR"
-               <> hide
+               <> internal
                 ))
     <*> optionalFirst (absFileOption
                 ( long "with-ld"
                <> metavar "PATH-TO-LD"
                <> help "Use ld found at PATH-TO-LD"
-               <> hide
+               <> internal
                 ))
     <*> optionalFirst (absFileOption
                 ( long "with-pkg-config"
                <> metavar "PATH-TO-PKG-CONFIG"
                <> help "Use pkg-config found at PATH-TO-PKG-CONFIG"
-               <> hide
+               <> internal
                 ))
     <*> optionalFirst (absFileOption
                 ( long "with-strip"
                <> metavar "PATH-TO-STRIP"
                <> help "Use strip found at PATH-TO-STRIP"
-               <> hide
+               <> internal
                 ))
     <*> optionalFirst (absFileOption
                 ( long "with-tar"
                <> metavar "PATH-TO-TAR"
                <> help "Use tar found at PATH-TO-TAR"
+               <> internal
+                ))
+    <*> many (textOption
+                ( long "PROG-option"
+               <> metavar "PROG-OPTIONS"
+               <> help "Give an extra option to PROG"
                <> hide
                 ))
     <*> many (textOption
                 ( long "alex-option"
                <> metavar "ALEX-OPTIONS"
                <> help "Pass ALEX-OPTIONS to the alex"
-               <> hide
+               <> internal
                 ))
     <*> many (textOption
                 ( long "ar-option"
                <> metavar "AR-OPTIONS"
                <> help "Pass AR-OPTIONS to the ar"
-               <> hide
+               <> internal
                 ))
     <*> many (textOption
                 ( long "c2hs-option"
                <> metavar "C2HS-OPTIONS"
                <> help "Pass C2HS-OPTIONS to the c2hs"
-               <> hide
+               <> internal
                 ))
     <*> many (textOption
                 ( long "cpphs-option"
                <> metavar "CPPHS-OPTIONS"
                <> help "Pass CPPHS-OPTIONS to the cpphs"
-               <> hide
+               <> internal
                 ))
     <*> many (textOption
                 ( long "gcc-option"
                <> metavar "GCC-OPTIONS"
                <> help "Pass GCC-OPTIONS to the gcc"
-               <> hide
+               <> internal
                 ))
     <*> many (textOption
                 ( long "ghc-option"
                <> metavar "GHC-OPTIONS"
                <> help "Pass GHC-OPTIONS to the ghc"
-               <> hide
+               <> internal
                 ))
     <*> many (textOption
                 ( long "ghc-pkg-option"
                <> metavar "GHC-PKG-OPTIONS"
                <> help "Pass GHC-PKG-OPTIONS to the ghc-pkg"
-               <> hide
+               <> internal
                 ))
     <*> many (textOption
                 ( long "ghcjs-option"
                <> metavar "GHCJS-OPTIONS"
                <> help "Pass GHCJS-OPTIONS to the ghcjs"
-               <> hide
+               <> internal
                 ))
     <*> many (textOption
                 ( long "ghcjs-pkg-option"
                <> metavar "GHCJS-PKG-OPTIONS"
                <> help "Pass GHCJS-PKG-OPTIONS to the ghcjs-pkg"
-               <> hide
+               <> internal
                 ))
     <*> many (textOption
                 ( long "greencard-option"
                <> metavar "GREENCARD-OPTIONS"
                <> help "Pass GREENCARD-OPTIONS to the greencard"
-               <> hide
+               <> internal
                 ))
     <*> many (textOption
                 ( long "haddock-option"
                <> metavar "HADDOCK-OPTIONS"
                <> help "Pass HADDOCK-OPTIONS to the haddock"
-               <> hide
+               <> internal
                 ))
     <*> many (textOption
                 ( long "happy-option"
                <> metavar "HAPPY-OPTIONS"
                <> help "Pass HAPPY-OPTIONS to the happy"
-               <> hide
+               <> internal
                 ))
     <*> many (textOption
                 ( long "haskell-suite-option"
                <> metavar "HASKELL-SUITE-OPTIONS"
                <> help "Pass HASKELL-SUITE-OPTIONS to the haskell-suite"
-               <> hide
+               <> internal
                 ))
     <*> many (textOption
                 ( long "haskell-suite-pkg-option"
                <> metavar "HASKELL-SUITE-PKG-OPTIONS"
                <> help "Pass HASKELL-SUITE-PKG-OPTIONS to the haskell-suite-pkg"
-               <> hide
+               <> internal
                 ))
     <*> many (textOption
                 ( long "hmake-option"
                <> metavar "HMAKE-OPTIONS"
                <> help "Pass HMAKE-OPTIONS to the hmake"
-               <> hide
+               <> internal
                 ))
     <*> many (textOption
                 ( long "hpc-option"
                <> metavar "HPC-OPTIONS"
                <> help "Pass HPC-OPTIONS to the hpc"
-               <> hide
+               <> internal
                 ))
     <*> many (textOption
                 ( long "hsc2hs-option"
                <> metavar "HSC2HS-OPTIONS"
                <> help "Pass HSC2HS-OPTIONS to the hsc2hs"
-               <> hide
+               <> internal
                 ))
     <*> many (textOption
                 ( long "hscolour-option"
                <> metavar "HSCOLOUR-OPTIONS"
                <> help "Pass HSCOLOUR-OPTIONS to the hscolour"
-               <> hide
+               <> internal
                 ))
     <*> many (textOption
                 ( long "ld-option"
                <> metavar "LD-OPTIONS"
                <> help "Pass LD-OPTIONS to the ld"
-               <> hide
+               <> internal
                 ))
     <*> many (textOption
                 ( long "pkg-config-option"
                <> metavar "PKG-CONFIG-OPTIONS"
                <> help "Pass PKG-CONFIG-OPTIONS to the pkg-config"
-               <> hide
+               <> internal
                 ))
     <*> many (textOption
                 ( long "strip-option"
                <> metavar "STRIP-OPTIONS"
                <> help "Pass STRIP-OPTIONS to the strip"
-               <> hide
+               <> internal
                 ))
     <*> many (textOption
                 ( long "tar-option"
                <> metavar "TAR-OPTIONS"
                <> help "Pass TAR-OPTIONS to the tar"
-               <> hide
+               <> internal
                 ))
     <*> firstBoolFlags
             "skip-ghc-check"
