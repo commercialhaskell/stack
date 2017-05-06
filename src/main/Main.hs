@@ -619,8 +619,8 @@ buildCmd opts go = do
     hPutStrLn stderr "See: https://github.com/commercialhaskell/stack/issues/1015"
     exitFailure
   case boptsCLIFileWatch opts of
-    FileWatchPoll -> fileWatchPoll stderr inner
-    FileWatch -> fileWatch stderr inner
+    FileWatchPoll -> fileWatchPoll stderr inner opts
+    FileWatch -> fileWatch stderr inner opts
     NoFileWatch -> inner $ const $ return ()
   where
     inner setLocalFiles = withBuildConfigAndLock go' $ \lk ->
