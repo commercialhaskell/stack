@@ -26,8 +26,10 @@ import           Control.Monad.Trans.Control (liftBaseWith)
 import qualified Data.ByteString as S
 import qualified Data.ByteString.Char8 as S8
 import qualified Data.ByteString.Lazy as L
+import           Data.Char (toLower)
 import           Data.Data (Data, Typeable, cast, gmapT)
 import           Data.Either (partitionEithers)
+import           Data.IORef (newIORef, readIORef, writeIORef)
 import           Data.List
 import           Data.List.Extra (nubOrd)
 import           Data.List.NonEmpty (NonEmpty)
@@ -42,8 +44,10 @@ import qualified Data.Text.Lazy as TL
 import qualified Data.Text.Lazy.Encoding as TLE
 import           Data.Time.Clock.POSIX
 import           Distribution.Package (Dependency (..))
+import qualified Distribution.PackageDescription as Cabal
 import qualified Distribution.PackageDescription.Check as Check
 import           Distribution.PackageDescription.PrettyPrint (showGenericPackageDescription)
+import           Distribution.Text (display)
 import           Distribution.Version (simplifyVersionRange, orLaterVersion, earlierVersion)
 import           Distribution.Version.Extra
 import           Path
@@ -91,10 +95,11 @@ getSDistTarball
   :: (StackM env m, HasEnvConfig env)
   => Maybe PvpBounds            -- ^ Override Config value
   -> Path Abs Dir               -- ^ Path to local package
-  -> m (FilePath, L.ByteString) -- ^ Filename and tarball contents
+  -> m (FilePath, L.ByteString, Maybe (PackageIdentifier, L.ByteString))
+  -- ^ Filename, tarball contents, and option cabal file revision to upload
 getSDistTarball mpvpBounds pkgDir = do
     config <- view configL
-    let pvpBounds = fromMaybe (configPvpBounds config) mpvpBounds
+    let PvpBounds pvpBounds asRevision = fromMaybe (configPvpBounds config) mpvpBounds
         tweakCabal = pvpBounds /= PvpBoundsNone
         pkgFp = toFilePath pkgDir
     lp <- readLocalPackage pkgDir
@@ -102,6 +107,13 @@ getSDistTarball mpvpBounds pkgDir = do
     (fileList, cabalfp) <-  getSDistFileList lp
     $logInfo $ "Building sdist tarball for " <> T.pack pkgFp
     files <- normalizeTarballPaths (lines fileList)
+
+    -- We're going to loop below and eventually find the cabal
+    -- file. When we do, we'll upload this reference, if the
+    -- mpvpBounds value indicates that we should be uploading a cabal
+    -- file revision.
+    cabalFileRevisionRef <- liftIO (newIORef Nothing)
+
     -- NOTE: Could make this use lazy I/O to only read files as needed
     -- for upload (both GZip.compress and Tar.write are lazy).
     -- However, it seems less error prone and more predictable to read
@@ -116,8 +128,16 @@ getSDistTarball mpvpBounds pkgDir = do
         packWith f isDir fp = liftIO $ f (pkgFp FP.</> fp) =<< tarPath isDir fp
         packDir = packWith Tar.packDirectoryEntry True
         packFile fp
+            -- This is a cabal file, we're going to tweak it, but only
+            -- tweak it as a revision.
+            | tweakCabal && isCabalFp fp && asRevision = do
+                lbsIdent <- getCabalLbs pvpBounds (Just 1) $ toFilePath cabalfp
+                liftIO (writeIORef cabalFileRevisionRef (Just lbsIdent))
+                packWith packFileEntry False fp
+            -- Same, except we'll include the cabal file in the
+            -- original tarball upload.
             | tweakCabal && isCabalFp fp = do
-                lbs <- getCabalLbs pvpBounds $ toFilePath cabalfp
+                (_ident, lbs) <- getCabalLbs pvpBounds Nothing $ toFilePath cabalfp
                 currTime <- liftIO getPOSIXTime -- Seconds from UNIX epoch
                 tp <- liftIO $ tarPath False fp
                 return $ (Tar.fileEntry tp lbs) { Tar.entryTime = floor currTime }
@@ -127,11 +147,16 @@ getSDistTarball mpvpBounds pkgDir = do
         pkgId = packageIdentifierString (packageIdentifier (lpPackage lp))
     dirEntries <- mapM packDir (dirsFromFiles files)
     fileEntries <- mapM packFile files
-    return (tarName, GZip.compress (Tar.write (dirEntries ++ fileEntries)))
+    mcabalFileRevision <- liftIO (readIORef cabalFileRevisionRef)
+    return (tarName, GZip.compress (Tar.write (dirEntries ++ fileEntries)), mcabalFileRevision)
 
 -- | Get the PVP bounds-enabled version of the given cabal file
-getCabalLbs :: (StackM env m, HasEnvConfig env) => PvpBounds -> FilePath -> m L.ByteString
-getCabalLbs pvpBounds fp = do
+getCabalLbs :: (StackM env m, HasEnvConfig env)
+            => PvpBoundsType
+            -> Maybe Int -- ^ optional revision
+            -> FilePath
+            -> m (PackageIdentifier, L.ByteString)
+getCabalLbs pvpBounds mrev fp = do
     bs <- liftIO $ S.readFile fp
     (_warnings, gpd) <- readPackageUnresolvedBS Nothing bs
     (_, sourceMap) <- loadSourceMap AllowNoTargets defaultBuildOptsCLI
@@ -143,7 +168,24 @@ getCabalLbs pvpBounds fp = do
                                 }
                                 sourceMap
     let gpd' = gtraverseT (addBounds sourceMap installedMap) gpd
-    return $ TLE.encodeUtf8 $ TL.pack $ showGenericPackageDescription gpd'
+        gpd'' =
+          case mrev of
+            Nothing -> gpd'
+            Just rev -> gpd'
+              { Cabal.packageDescription
+               = (Cabal.packageDescription gpd')
+                  { Cabal.customFieldsPD
+                  = (("x-revision", show rev):)
+                  $ filter (\(x, _) -> map toLower x /= "x-revision")
+                  $ Cabal.customFieldsPD
+                  $ Cabal.packageDescription gpd'
+                  }
+              }
+    ident <- parsePackageIdentifierFromString $ display $ Cabal.package $ Cabal.packageDescription gpd''
+    return
+      ( ident
+      , TLE.encodeUtf8 $ TL.pack $ showGenericPackageDescription gpd''
+      )
   where
     addBounds :: SourceMap -> InstalledMap -> Dependency -> Dependency
     addBounds sourceMap installedMap dep@(Dependency cname range) =

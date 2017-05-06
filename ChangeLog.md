@@ -39,6 +39,16 @@ Other enhancements:
   See [#3099](https://github.com/commercialhaskell/stack/issues/3099)
 * `stack ghci` will now skip building all local targets, even if they have
   downstream deps, as long as it's registered in the DB.
+* The pvp-bounds feature now supports adding `-revision` to the end of
+  each value, e.g. `pvp-bounds: both-revision`. This means that, when
+  uploading to Hackage, Stack will first upload your tarball with an
+  unmodified `.cabal` file, and then upload a cabal file revision with
+  the PVP bounds added. This can be useful&mdash;especially combined
+  with the
+  [Stackage no-revisions feature](http://www.snoyman.com/blog/2017/04/stackages-no-revisions-field)&mdash;as
+  a method to ensure PVP compliance without having to proactively fix
+  bounds issues for Stackage maintenance.
+* Expose a `save-hackage-creds` configuration option
 
 Bug fixes:
 

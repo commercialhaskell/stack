@@ -547,6 +547,16 @@ pvp-bounds: none
 
 For more information, see [the announcement blog post](https://www.fpcomplete.com/blog/2015/09/stack-pvp).
 
+__NOTE__ Since Stack 1.5.0, each of the values listed above supports
+adding `-revision` to the end of each value, e.g. `pvp-bounds:
+both-revision`. This means that, when uploading to Hackage, Stack will
+first upload your tarball with an unmodified `.cabal` file, and then
+upload a cabal file revision with the PVP bounds added. This can be
+useful&mdash;especially combined with the
+[Stackage no-revisions feature](http://www.snoyman.com/blog/2017/04/stackages-no-revisions-field)&mdash;as
+a method to ensure PVP compliance without having to proactively fix
+bounds issues for Stackage maintenance.
+
 ### modify-code-page
 
 (Since 0.1.6)
@@ -729,6 +739,17 @@ in the directories it creates.  Source control tools can be specified with the
 templates:
   scm-init: git
 ```
+
+### save-hackage-creds
+
+Controls whether, when using `stack upload`, the user's Hackage
+username and password are stored in a local file. Default: true.
+
+```yaml
+save-hackage-creds: true
+```
+
+Since 1.5.0
   
 # urls
 
