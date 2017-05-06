@@ -335,6 +335,7 @@ checkSDistTarball tarball = withTempTarGzContents tarball $ \pkgDir' -> do
         "Checking package '" <> packageNameText name <> "' for common mistakes"
     let pkgChecks = Check.checkPackage gdesc (Just pkgDesc)
     fileChecks <- liftIO $ Check.checkPackageFiles pkgDesc (toFilePath pkgDir)
+    buildExtractedTarball pkgDir
     let checks = pkgChecks ++ fileChecks
         (errors, warnings) =
           let criticalIssue (Check.PackageBuildImpossible _) = True
@@ -347,7 +348,6 @@ checkSDistTarball tarball = withTempTarGzContents tarball $ \pkgDir' -> do
     case NE.nonEmpty errors of
         Nothing -> return ()
         Just ne -> throwM $ CheckException ne
-    buildExtractedTarball pkgDir
 
 buildExtractedTarball :: (StackM env m, HasEnvConfig env, MonadBaseUnlift IO m) => Path Abs Dir -> m ()
 buildExtractedTarball pkgDir = do
