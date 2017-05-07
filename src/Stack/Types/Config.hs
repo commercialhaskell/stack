@@ -29,7 +29,52 @@ module Stack.Types.Config
    HasPlatform(..)
   ,PlatformVariant(..)
   -- ** Config & HasConfig
+  ,ProgName(..)
   ,Config(..)
+  ,configProgAlexPath
+  ,configProgArPath
+  ,configProgC2hsPath
+  ,configProgCpphsPath
+  ,configProgGccPath
+  ,configProgGhcPath
+  ,configProgGhcPkgPath
+  ,configProgGhcjsPath
+  ,configProgGhcjsPkgPath
+  ,configProgGreencardPath
+  ,configProgHaddockPath
+  ,configProgHappyPath
+  ,configProgHaskellSuitePath
+  ,configProgHaskellSuitePkgPath
+  ,configProgHmakePath
+  ,configProgHpcPath
+  ,configProgHsc2hsPath
+  ,configProgHscolourPath
+  ,configProgLdPath
+  ,configProgPkgConfigPath
+  ,configProgStripPath
+  ,configProgTarPath
+  ,configProgAlexOptions
+  ,configProgArOptions
+  ,configProgC2hsOptions
+  ,configProgCpphsOptions
+  ,configProgGccOptions
+  ,configProgGhcOptions
+  ,configProgGhcPkgOptions
+  ,configProgGhcjsOptions
+  ,configProgGhcjsPkgOptions
+  ,configProgGreencardOptions
+  ,configProgHaddockOptions
+  ,configProgHappyOptions
+  ,configProgHaskellSuiteOptions
+  ,configProgHaskellSuitePkgOptions
+  ,configProgHmakeOptions
+  ,configProgHpcOptions
+  ,configProgHsc2hsOptions
+  ,configProgHscolourOptions
+  ,configProgLdOptions
+  ,configProgPkgConfigOptions
+  ,configProgStripOptions
+  ,configProgTarOptions
   ,HasConfig(..)
   ,askLatestSnapshotUrl
   ,explicitSetupDeps
@@ -324,50 +369,8 @@ data Config =
          -- ^ Require a version of stack within this range.
          ,configJobs                :: !Int
          -- ^ How many concurrent jobs to run, defaults to number of capabilities
-         ,configProgAlexPath            :: !(Maybe (Path Abs File))
-         ,configProgArPath              :: !(Maybe (Path Abs File))
-         ,configProgC2hsPath            :: !(Maybe (Path Abs File))
-         ,configProgCpphsPath           :: !(Maybe (Path Abs File))
-         ,configProgGccPath             :: !(Maybe (Path Abs File))
-         ,configProgGhcPath             :: !(Maybe (Path Abs File))
-         ,configProgGhcPkgPath          :: !(Maybe (Path Abs File))
-         ,configProgGhcjsPath           :: !(Maybe (Path Abs File))
-         ,configProgGhcjsPkgPath        :: !(Maybe (Path Abs File))
-         ,configProgGreencardPath       :: !(Maybe (Path Abs File))
-         ,configProgHaddockPath         :: !(Maybe (Path Abs File))
-         ,configProgHappyPath           :: !(Maybe (Path Abs File))
-         ,configProgHaskellSuitePath    :: !(Maybe (Path Abs File))
-         ,configProgHaskellSuitePkgPath :: !(Maybe (Path Abs File))
-         ,configProgHmakePath           :: !(Maybe (Path Abs File))
-         ,configProgHpcPath             :: !(Maybe (Path Abs File))
-         ,configProgHsc2hsPath          :: !(Maybe (Path Abs File))
-         ,configProgHscolourPath        :: !(Maybe (Path Abs File))
-         ,configProgLdPath              :: !(Maybe (Path Abs File))
-         ,configProgPkgConfigPath       :: !(Maybe (Path Abs File))
-         ,configProgStripPath           :: !(Maybe (Path Abs File))
-         ,configProgTarPath             :: !(Maybe (Path Abs File))
-         ,configProgAlexOptions            :: ![Text]
-         ,configProgArOptions              :: ![Text]
-         ,configProgC2hsOptions            :: ![Text]
-         ,configProgCpphsOptions           :: ![Text]
-         ,configProgGccOptions             :: ![Text]
-         ,configProgGhcOptions             :: ![Text]
-         ,configProgGhcPkgOptions          :: ![Text]
-         ,configProgGhcjsOptions           :: ![Text]
-         ,configProgGhcjsPkgOptions        :: ![Text]
-         ,configProgGreencardOptions       :: ![Text]
-         ,configProgHaddockOptions         :: ![Text]
-         ,configProgHappyOptions           :: ![Text]
-         ,configProgHaskellSuiteOptions    :: ![Text]
-         ,configProgHaskellSuitePkgOptions :: ![Text]
-         ,configProgHmakeOptions           :: ![Text]
-         ,configProgHpcOptions             :: ![Text]
-         ,configProgHsc2hsOptions          :: ![Text]
-         ,configProgHscolourOptions        :: ![Text]
-         ,configProgLdOptions              :: ![Text]
-         ,configProgPkgConfigOptions       :: ![Text]
-         ,configProgStripOptions           :: ![Text]
-         ,configProgTarOptions             :: ![Text]
+         ,configProgPath            :: !(Map ProgName (Path Abs File))
+         ,configProgOptions         :: !(Map ProgName [Text])
          ,configExtraIncludeDirs    :: !(Set FilePath)
          -- ^ --extra-include-dirs arguments
          ,configExtraLibDirs        :: !(Set FilePath)
@@ -417,6 +420,140 @@ data Config =
          ,configSaveHackageCreds    :: !Bool
          -- ^ Should we save Hackage credentials to a file?
          }
+
+configProgAlexPath :: Config -> Maybe (Path Abs File)
+configProgAlexPath = Map.lookup ProgAlex . configProgPath
+
+configProgArPath :: Config -> Maybe (Path Abs File)
+configProgArPath = Map.lookup ProgAr . configProgPath
+
+configProgC2hsPath :: Config -> Maybe (Path Abs File)
+configProgC2hsPath = Map.lookup ProgC2hs . configProgPath
+
+configProgCpphsPath :: Config -> Maybe (Path Abs File)
+configProgCpphsPath = Map.lookup ProgCpphs . configProgPath
+
+configProgGccPath :: Config -> Maybe (Path Abs File)
+configProgGccPath = Map.lookup ProgGcc . configProgPath
+
+configProgGhcPath :: Config -> Maybe (Path Abs File)
+configProgGhcPath = Map.lookup ProgGhc . configProgPath
+
+configProgGhcPkgPath :: Config -> Maybe (Path Abs File)
+configProgGhcPkgPath = Map.lookup ProgGhcPkg . configProgPath
+
+configProgGhcjsPath :: Config -> Maybe (Path Abs File)
+configProgGhcjsPath = Map.lookup ProgGhcjs . configProgPath
+
+configProgGhcjsPkgPath :: Config -> Maybe (Path Abs File)
+configProgGhcjsPkgPath = Map.lookup ProgGhcjsPkg . configProgPath
+
+configProgGreencardPath :: Config -> Maybe (Path Abs File)
+configProgGreencardPath = Map.lookup ProgGreencard . configProgPath
+
+configProgHaddockPath :: Config -> Maybe (Path Abs File)
+configProgHaddockPath = Map.lookup ProgHaddock . configProgPath
+
+configProgHappyPath :: Config -> Maybe (Path Abs File)
+configProgHappyPath = Map.lookup ProgHappy . configProgPath
+
+configProgHaskellSuitePath :: Config -> Maybe (Path Abs File)
+configProgHaskellSuitePath = Map.lookup ProgHaskellSuite . configProgPath
+
+configProgHaskellSuitePkgPath :: Config -> Maybe (Path Abs File)
+configProgHaskellSuitePkgPath = Map.lookup ProgHaskellSuitePkg . configProgPath
+
+configProgHmakePath :: Config -> Maybe (Path Abs File)
+configProgHmakePath = Map.lookup ProgHmake . configProgPath
+
+configProgHpcPath :: Config -> Maybe (Path Abs File)
+configProgHpcPath = Map.lookup ProgHpc . configProgPath
+
+configProgHsc2hsPath :: Config -> Maybe (Path Abs File)
+configProgHsc2hsPath = Map.lookup ProgHsc2hs . configProgPath
+
+configProgHscolourPath :: Config -> Maybe (Path Abs File)
+configProgHscolourPath = Map.lookup ProgHscolour . configProgPath
+
+configProgLdPath :: Config -> Maybe (Path Abs File)
+configProgLdPath = Map.lookup ProgLd . configProgPath
+
+configProgPkgConfigPath :: Config -> Maybe (Path Abs File)
+configProgPkgConfigPath = Map.lookup ProgPkgConfig . configProgPath
+
+configProgStripPath :: Config -> Maybe (Path Abs File)
+configProgStripPath = Map.lookup ProgStrip . configProgPath
+
+configProgTarPath :: Config -> Maybe (Path Abs File)
+configProgTarPath = Map.lookup ProgTar . configProgPath
+
+configProgAlexOptions :: Config -> [Text]
+configProgAlexOptions = Map.findWithDefault [] ProgAlex . configProgOptions
+
+configProgArOptions :: Config -> [Text]
+configProgArOptions = Map.findWithDefault [] ProgAr . configProgOptions
+
+configProgC2hsOptions :: Config -> [Text]
+configProgC2hsOptions = Map.findWithDefault [] ProgC2hs . configProgOptions
+
+configProgCpphsOptions :: Config -> [Text]
+configProgCpphsOptions = Map.findWithDefault [] ProgCpphs . configProgOptions
+
+configProgGccOptions :: Config -> [Text]
+configProgGccOptions = Map.findWithDefault [] ProgGcc . configProgOptions
+
+configProgGhcOptions :: Config -> [Text]
+configProgGhcOptions = Map.findWithDefault [] ProgGhc . configProgOptions
+
+configProgGhcPkgOptions :: Config -> [Text]
+configProgGhcPkgOptions = Map.findWithDefault [] ProgGhcPkg . configProgOptions
+
+configProgGhcjsOptions :: Config -> [Text]
+configProgGhcjsOptions = Map.findWithDefault [] ProgGhcjs . configProgOptions
+
+configProgGhcjsPkgOptions :: Config -> [Text]
+configProgGhcjsPkgOptions = Map.findWithDefault [] ProgGhcjsPkg . configProgOptions
+
+configProgGreencardOptions :: Config -> [Text]
+configProgGreencardOptions = Map.findWithDefault [] ProgGreencard . configProgOptions
+
+configProgHaddockOptions :: Config -> [Text]
+configProgHaddockOptions = Map.findWithDefault [] ProgHaddock . configProgOptions
+
+configProgHappyOptions :: Config -> [Text]
+configProgHappyOptions = Map.findWithDefault [] ProgHappy . configProgOptions
+
+configProgHaskellSuiteOptions :: Config -> [Text]
+configProgHaskellSuiteOptions = Map.findWithDefault [] ProgHaskellSuite . configProgOptions
+
+configProgHaskellSuitePkgOptions :: Config -> [Text]
+configProgHaskellSuitePkgOptions = Map.findWithDefault [] ProgHaskellSuitePkg . configProgOptions
+
+configProgHmakeOptions :: Config -> [Text]
+configProgHmakeOptions = Map.findWithDefault [] ProgHmake . configProgOptions
+
+configProgHpcOptions :: Config -> [Text]
+configProgHpcOptions = Map.findWithDefault [] ProgHpc . configProgOptions
+
+configProgHsc2hsOptions :: Config -> [Text]
+configProgHsc2hsOptions = Map.findWithDefault [] ProgHsc2hs . configProgOptions
+
+configProgHscolourOptions :: Config -> [Text]
+configProgHscolourOptions = Map.findWithDefault [] ProgHscolour . configProgOptions
+
+configProgLdOptions :: Config -> [Text]
+configProgLdOptions = Map.findWithDefault [] ProgLd . configProgOptions
+
+configProgPkgConfigOptions :: Config -> [Text]
+configProgPkgConfigOptions = Map.findWithDefault [] ProgPkgConfig . configProgOptions
+
+configProgStripOptions :: Config -> [Text]
+configProgStripOptions = Map.findWithDefault [] ProgStrip . configProgOptions
+
+configProgTarOptions :: Config -> [Text]
+configProgTarOptions = Map.findWithDefault [] ProgTar . configProgOptions
+
+
 
 -- | Which packages do ghc-options on the command line apply to?
 data ApplyGhcOptions = AGOTargets -- ^ all local targets
@@ -741,6 +878,30 @@ type StackMiniM r m =
     ( MonadReader r m, MonadIO m, MonadBaseControl IO m, MonadLoggerIO m, MonadMask m
     )
 
+data ProgName = ProgAlex
+              | ProgAr
+              | ProgC2hs
+              | ProgCpphs
+              | ProgGcc
+              | ProgGhc
+              | ProgGhcPkg
+              | ProgGhcjs
+              | ProgGhcjsPkg
+              | ProgGreencard
+              | ProgHaddock
+              | ProgHappy
+              | ProgHaskellSuite
+              | ProgHaskellSuitePkg
+              | ProgHmake
+              | ProgHpc
+              | ProgHsc2hs
+              | ProgHscolour
+              | ProgLd
+              | ProgPkgConfig
+              | ProgStrip
+              | ProgTar
+              deriving (Show,Eq,Ord)
+
 -- An uninterpreted representation of configuration options.
 -- Configurations may be "cascaded" using mappend (left-biased).
 data ConfigMonoid =
@@ -789,50 +950,8 @@ data ConfigMonoid =
     -- ^ See: 'configExtraIncludeDirs'
     ,configMonoidExtraLibDirs        :: !(Set FilePath)
     -- ^ See: 'configExtraLibDirs'
-    ,configMonoidProgAlexPath            :: !(First (Path Abs File))
-    ,configMonoidProgArPath              :: !(First (Path Abs File))
-    ,configMonoidProgC2hsPath            :: !(First (Path Abs File))
-    ,configMonoidProgCpphsPath           :: !(First (Path Abs File))
-    ,configMonoidProgGccPath             :: !(First (Path Abs File))
-    ,configMonoidProgGhcPath             :: !(First (Path Abs File))
-    ,configMonoidProgGhcPkgPath          :: !(First (Path Abs File))
-    ,configMonoidProgGhcjsPath           :: !(First (Path Abs File))
-    ,configMonoidProgGhcjsPkgPath        :: !(First (Path Abs File))
-    ,configMonoidProgGreencardPath       :: !(First (Path Abs File))
-    ,configMonoidProgHaddockPath         :: !(First (Path Abs File))
-    ,configMonoidProgHappyPath           :: !(First (Path Abs File))
-    ,configMonoidProgHaskellSuitePath    :: !(First (Path Abs File))
-    ,configMonoidProgHaskellSuitePkgPath :: !(First (Path Abs File))
-    ,configMonoidProgHmakePath           :: !(First (Path Abs File))
-    ,configMonoidProgHpcPath             :: !(First (Path Abs File))
-    ,configMonoidProgHsc2hsPath          :: !(First (Path Abs File))
-    ,configMonoidProgHscolourPath        :: !(First (Path Abs File))
-    ,configMonoidProgLdPath              :: !(First (Path Abs File))
-    ,configMonoidProgPkgConfigPath       :: !(First (Path Abs File))
-    ,configMonoidProgStripPath           :: !(First (Path Abs File))
-    ,configMonoidProgTarPath             :: !(First (Path Abs File))
-    ,configMonoidProgAlexOptions            :: ![Text]
-    ,configMonoidProgArOptions              :: ![Text]
-    ,configMonoidProgC2hsOptions            :: ![Text]
-    ,configMonoidProgCpphsOptions           :: ![Text]
-    ,configMonoidProgGccOptions             :: ![Text]
-    ,configMonoidProgGhcOptions             :: ![Text]
-    ,configMonoidProgGhcPkgOptions          :: ![Text]
-    ,configMonoidProgGhcjsOptions           :: ![Text]
-    ,configMonoidProgGhcjsPkgOptions        :: ![Text]
-    ,configMonoidProgGreencardOptions       :: ![Text]
-    ,configMonoidProgHaddockOptions         :: ![Text]
-    ,configMonoidProgHappyOptions           :: ![Text]
-    ,configMonoidProgHaskellSuiteOptions    :: ![Text]
-    ,configMonoidProgHaskellSuitePkgOptions :: ![Text]
-    ,configMonoidProgHmakeOptions           :: ![Text]
-    ,configMonoidProgHpcOptions             :: ![Text]
-    ,configMonoidProgHsc2hsOptions          :: ![Text]
-    ,configMonoidProgHscolourOptions        :: ![Text]
-    ,configMonoidProgLdOptions              :: ![Text]
-    ,configMonoidProgPkgConfigOptions       :: ![Text]
-    ,configMonoidProgStripOptions           :: ![Text]
-    ,configMonoidProgTarOptions             :: ![Text]
+    ,configMonoidProgPath            :: !(Map ProgName (First (Path Abs File)))
+    ,configMonoidProgOptions         :: !(Map ProgName [Text])
     ,configMonoidConcurrentTests     :: !(First Bool)
     -- ^ See: 'configConcurrentTests'
     ,configMonoidLocalBinPath        :: !(First FilePath)
@@ -936,6 +1055,29 @@ parseConfigMonoidObject rootDir obj = do
     configMonoidProgPkgConfigPath       <- First <$> obj ..:? configMonoidProgPkgConfigPathName
     configMonoidProgStripPath           <- First <$> obj ..:? configMonoidProgStripPathName
     configMonoidProgTarPath             <- First <$> obj ..:? configMonoidProgTarPathName
+    let configMonoidProgPath = Map.fromList [ (ProgAlex,            configMonoidProgAlexPath)
+                                            , (ProgAr,              configMonoidProgArPath)
+                                            , (ProgC2hs,            configMonoidProgC2hsPath)
+                                            , (ProgCpphs,           configMonoidProgCpphsPath)
+                                            , (ProgGcc,             configMonoidProgGccPath)
+                                            , (ProgGhc,             configMonoidProgGhcPath)
+                                            , (ProgGhcPkg,          configMonoidProgGhcPkgPath)
+                                            , (ProgGhcjs,           configMonoidProgGhcjsPath)
+                                            , (ProgGhcjsPkg,        configMonoidProgGhcjsPkgPath)
+                                            , (ProgGreencard,       configMonoidProgGreencardPath)
+                                            , (ProgHaddock,         configMonoidProgHaddockPath)
+                                            , (ProgHappy,           configMonoidProgHappyPath)
+                                            , (ProgHaskellSuite,    configMonoidProgHaskellSuitePath)
+                                            , (ProgHaskellSuitePkg, configMonoidProgHaskellSuitePkgPath)
+                                            , (ProgHmake,           configMonoidProgHmakePath)
+                                            , (ProgHpc,             configMonoidProgHpcPath)
+                                            , (ProgHsc2hs,          configMonoidProgHsc2hsPath)
+                                            , (ProgHscolour,        configMonoidProgHscolourPath)
+                                            , (ProgLd,              configMonoidProgLdPath)
+                                            , (ProgPkgConfig,       configMonoidProgPkgConfigPath)
+                                            , (ProgStrip,           configMonoidProgStripPath)
+                                            , (ProgTar,             configMonoidProgTarPath)
+                                            ]
     configMonoidProgAlexOptions            <- fromMaybe [] <$> obj ..:? configMonoidProgAlexOptionsName
     configMonoidProgArOptions              <- fromMaybe [] <$> obj ..:? configMonoidProgArOptionsName
     configMonoidProgC2hsOptions            <- fromMaybe [] <$> obj ..:? configMonoidProgC2hsOptionsName
@@ -958,6 +1100,29 @@ parseConfigMonoidObject rootDir obj = do
     configMonoidProgPkgConfigOptions       <- fromMaybe [] <$> obj ..:? configMonoidProgPkgConfigOptionsName
     configMonoidProgStripOptions           <- fromMaybe [] <$> obj ..:? configMonoidProgStripOptionsName
     configMonoidProgTarOptions             <- fromMaybe [] <$> obj ..:? configMonoidProgTarOptionsName
+    let configMonoidProgOptions = Map.fromList [ (ProgAlex,            configMonoidProgAlexOptions)
+                                               , (ProgAr,              configMonoidProgArOptions)
+                                               , (ProgC2hs,            configMonoidProgC2hsOptions)
+                                               , (ProgCpphs,           configMonoidProgCpphsOptions)
+                                               , (ProgGcc,             configMonoidProgGccOptions)
+                                               , (ProgGhc,             configMonoidProgGhcOptions)
+                                               , (ProgGhcPkg,          configMonoidProgGhcPkgOptions)
+                                               , (ProgGhcjs,           configMonoidProgGhcjsOptions)
+                                               , (ProgGhcjsPkg,        configMonoidProgGhcjsPkgOptions)
+                                               , (ProgGreencard,       configMonoidProgGreencardOptions)
+                                               , (ProgHaddock,         configMonoidProgHaddockOptions)
+                                               , (ProgHappy,           configMonoidProgHappyOptions)
+                                               , (ProgHaskellSuite,    configMonoidProgHaskellSuiteOptions)
+                                               , (ProgHaskellSuitePkg, configMonoidProgHaskellSuitePkgOptions)
+                                               , (ProgHmake,           configMonoidProgHmakeOptions)
+                                               , (ProgHpc,             configMonoidProgHpcOptions)
+                                               , (ProgHsc2hs,          configMonoidProgHsc2hsOptions)
+                                               , (ProgHscolour,        configMonoidProgHscolourOptions)
+                                               , (ProgLd,              configMonoidProgLdOptions)
+                                               , (ProgPkgConfig,       configMonoidProgPkgConfigOptions)
+                                               , (ProgStrip,           configMonoidProgStripOptions)
+                                               , (ProgTar,             configMonoidProgTarOptions)
+                                               ]
     configMonoidConcurrentTests <- First <$> obj ..:? configMonoidConcurrentTestsName
     configMonoidLocalBinPath <- First <$> obj ..:? configMonoidLocalBinPathName
     configMonoidImageOpts <- jsonSubWarnings (obj ..:?  configMonoidImageOptsName ..!= mempty)

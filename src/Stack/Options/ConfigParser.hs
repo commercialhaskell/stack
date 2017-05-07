@@ -3,6 +3,7 @@ module Stack.Options.ConfigParser where
 import           Data.Char
 import           Data.Either.Combinators
 import           Data.Monoid.Extra
+import qualified Data.Map as Map
 import qualified Data.Set                          as Set
 import           Options.Applicative
 import           Options.Applicative.Builder.Extra
@@ -38,50 +39,54 @@ configOptsParser currentDir hide0 =
         , configMonoidJobs = jobs
         , configMonoidExtraIncludeDirs = includes
         , configMonoidExtraLibDirs = libs
-        , configMonoidProgAlexPath            = progAlexPath
-        , configMonoidProgArPath              = progArPath
-        , configMonoidProgC2hsPath            = progC2hsPath
-        , configMonoidProgCpphsPath           = progCpphsPath
-        , configMonoidProgGccPath             = progGccPath
-        , configMonoidProgGhcPath             = progGhcPath
-        , configMonoidProgGhcPkgPath          = progGhcPkgPath
-        , configMonoidProgGhcjsPath           = progGhcjsPath
-        , configMonoidProgGhcjsPkgPath        = progGhcjsPkgPath
-        , configMonoidProgGreencardPath       = progGreencardPath
-        , configMonoidProgHaddockPath         = progHaddockPath
-        , configMonoidProgHappyPath           = progHappyPath
-        , configMonoidProgHaskellSuitePath    = progHaskellSuitePath
-        , configMonoidProgHaskellSuitePkgPath = progHaskellSuitePkgPath
-        , configMonoidProgHmakePath           = progHmakePath
-        , configMonoidProgHpcPath             = progHpcPath
-        , configMonoidProgHsc2hsPath          = progHsc2hsPath
-        , configMonoidProgHscolourPath        = progHscolourPath
-        , configMonoidProgLdPath              = progLdPath
-        , configMonoidProgPkgConfigPath       = progPkgConfigPath
-        , configMonoidProgStripPath           = progStripPath
-        , configMonoidProgTarPath             = progTarPath
-        , configMonoidProgAlexOptions            = progAlexOptions
-        , configMonoidProgArOptions              = progArOptions
-        , configMonoidProgC2hsOptions            = progC2hsOptions
-        , configMonoidProgCpphsOptions           = progCpphsOptions
-        , configMonoidProgGccOptions             = progGccOptions
-        , configMonoidProgGhcOptions             = progGhcOptions
-        , configMonoidProgGhcPkgOptions          = progGhcPkgOptions
-        , configMonoidProgGhcjsOptions           = progGhcjsOptions
-        , configMonoidProgGhcjsPkgOptions        = progGhcjsPkgOptions
-        , configMonoidProgGreencardOptions       = progGreencardOptions
-        , configMonoidProgHaddockOptions         = progHaddockOptions
-        , configMonoidProgHappyOptions           = progHappyOptions
-        , configMonoidProgHaskellSuiteOptions    = progHaskellSuiteOptions
-        , configMonoidProgHaskellSuitePkgOptions = progHaskellSuitePkgOptions
-        , configMonoidProgHmakeOptions           = progHmakeOptions
-        , configMonoidProgHpcOptions             = progHpcOptions
-        , configMonoidProgHsc2hsOptions          = progHsc2hsOptions
-        , configMonoidProgHscolourOptions        = progHscolourOptions
-        , configMonoidProgLdOptions              = progLdOptions
-        , configMonoidProgPkgConfigOptions       = progPkgConfigOptions
-        , configMonoidProgStripOptions           = progStripOptions
-        , configMonoidProgTarOptions             = progTarOptions
+        , configMonoidProgPath = Map.fromList
+            [ (ProgAlex,            progAlexPath)
+            , (ProgAr,              progArPath)
+            , (ProgC2hs,            progC2hsPath)
+            , (ProgCpphs,           progCpphsPath)
+            , (ProgGcc,             progGccPath)
+            , (ProgGhc,             progGhcPath)
+            , (ProgGhcPkg,          progGhcPkgPath)
+            , (ProgGhcjs,           progGhcjsPath)
+            , (ProgGhcjsPkg,        progGhcjsPkgPath)
+            , (ProgGreencard,       progGreencardPath)
+            , (ProgHaddock,         progHaddockPath)
+            , (ProgHappy,           progHappyPath)
+            , (ProgHaskellSuite,    progHaskellSuitePath)
+            , (ProgHaskellSuitePkg, progHaskellSuitePkgPath)
+            , (ProgHmake,           progHmakePath)
+            , (ProgHpc,             progHpcPath)
+            , (ProgHsc2hs,          progHsc2hsPath)
+            , (ProgHscolour,        progHscolourPath)
+            , (ProgLd,              progLdPath)
+            , (ProgPkgConfig,       progPkgConfigPath)
+            , (ProgStrip,           progStripPath)
+            , (ProgTar,             progTarPath)
+            ]
+        , configMonoidProgOptions = Map.fromList
+            [ (ProgAlex,            progAlexOptions)
+            , (ProgAr,              progArOptions)
+            , (ProgC2hs,            progC2hsOptions)
+            , (ProgCpphs,           progCpphsOptions)
+            , (ProgGcc,             progGccOptions)
+            , (ProgGhc,             progGhcOptions)
+            , (ProgGhcPkg,          progGhcPkgOptions)
+            , (ProgGhcjs,           progGhcjsOptions)
+            , (ProgGhcjsPkg,        progGhcjsPkgOptions)
+            , (ProgGreencard,       progGreencardOptions)
+            , (ProgHaddock,         progHaddockOptions)
+            , (ProgHappy,           progHappyOptions)
+            , (ProgHaskellSuite,    progHaskellSuiteOptions)
+            , (ProgHaskellSuitePkg, progHaskellSuitePkgOptions)
+            , (ProgHmake,           progHmakeOptions)
+            , (ProgHpc,             progHpcOptions)
+            , (ProgHsc2hs,          progHsc2hsOptions)
+            , (ProgHscolour,        progHscolourOptions)
+            , (ProgLd,              progLdOptions)
+            , (ProgPkgConfig,       progPkgConfigOptions)
+            , (ProgStrip,           progStripOptions)
+            , (ProgTar,             progTarOptions)
+            ]
         , configMonoidSkipMsys = skipMsys
         , configMonoidLocalBinPath = localBin
         , configMonoidModifyCodePage = modifyCodePage
