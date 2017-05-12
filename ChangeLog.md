@@ -73,6 +73,8 @@ Bug fixes:
 * Switching a package between extra-dep and local package now forces
   rebuild (previously it wouldn't if versions were the same).
   See [#2147](https://github.com/commercialhaskell/stack/issues/2147)
+* Fixed an issue where Stack wouldn't detect missing Docker images properly
+  with newer Docker versions.
 
 
 ## 1.4.0

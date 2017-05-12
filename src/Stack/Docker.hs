@@ -664,8 +664,9 @@ inspects envOverride images =
            Left msg -> throwM (InvalidInspectOutputException msg)
            Right results -> return (Map.fromList (map (\r -> (iiId r,r)) results))
        Left (ProcessFailed _ _ _ err)
-         | "Error: No such image" `LBS.isPrefixOf` err -> return Map.empty
+         |  any (`LBS.isPrefixOf` err) missingImagePrefixes -> return Map.empty
        Left e -> throwM e
+  where missingImagePrefixes = ["Error: No such image", "Error: No such object:"]
 
 -- | Pull latest version of configured Docker image from registry.
 pull :: (StackM env m, HasConfig env) => m ()
