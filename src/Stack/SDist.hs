@@ -354,12 +354,14 @@ buildExtractedTarball pkgDir = do
   newPackagesRef <- liftIO (newIORef Nothing)
   projectRoot <- view projectRootL
   envConfig <- view envConfigL
+  localPackage <- readLocalPackage pkgDir
   updatedPackageEntries <- forM (bcPackageEntries (envConfigBuildConfig (envConfig))) $ \packageEntry -> do
     case peLocation packageEntry of
       PLRemote _ _ -> return packageEntry
       PLFilePath fp -> do
         resolvedPackagePath <- resolveDir projectRoot fp
-        if resolvedPackagePath == projectRoot
+        entryLocalPackage <- readLocalPackage resolvedPackagePath
+        if packageName (lpPackage localPackage) == packageName (lpPackage entryLocalPackage)
           then return packageEntry { peLocation = PLFilePath (toFilePath pkgDir) }
           else return packageEntry
   let adjustEnvForBuild env =
