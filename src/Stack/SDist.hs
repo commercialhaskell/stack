@@ -18,7 +18,7 @@ import qualified Codec.Archive.Tar.Entry as Tar
 import qualified Codec.Compression.GZip as GZip
 import           Control.Applicative
 import           Control.Concurrent.Execute (ActionContext(..))
-import           Control.Monad (unless, void, liftM, forM)
+import           Control.Monad (unless, void, liftM, filterM, foldM)
 import           Control.Monad.Catch
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
@@ -37,7 +37,7 @@ import           Data.List.Extra (nubOrd)
 import           Data.List.NonEmpty (NonEmpty)
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Map.Strict as Map
-import           Data.Maybe (fromMaybe)
+import           Data.Maybe (fromMaybe, catMaybes)
 import           Data.Monoid ((<>))
 import qualified Data.Set as Set
 import qualified Data.Text as T
@@ -61,6 +61,7 @@ import           Stack.Build.Execute
 import           Stack.Build.Installed
 import           Stack.Build.Source (loadSourceMap, getDefaultPackageConfig)
 import           Stack.Build.Target
+import           Stack.Config (resolvePackageEntry, removePathFromPackageEntry)
 import           Stack.Constants
 import           Stack.Package
 import           Stack.Types.Build
@@ -354,16 +355,22 @@ buildExtractedTarball pkgDir = do
   newPackagesRef <- liftIO (newIORef Nothing)
   projectRoot <- view projectRootL
   envConfig <- view envConfigL
-  localPackage <- readLocalPackage pkgDir
-  updatedPackageEntries <- forM (bcPackageEntries (envConfigBuildConfig (envConfig))) $ \packageEntry -> do
-    case peLocation packageEntry of
-      PLRemote _ _ -> return packageEntry
-      PLFilePath fp -> do
-        resolvedPackagePath <- resolveDir projectRoot fp
-        entryLocalPackage <- readLocalPackage resolvedPackagePath
-        if packageName (lpPackage localPackage) == packageName (lpPackage entryLocalPackage)
-          then return packageEntry { peLocation = PLFilePath (toFilePath pkgDir) }
-          else return packageEntry
+  menv <- getMinimalEnvOverride
+  localPackageToBuild <- readLocalPackage pkgDir
+  let packageEntries = (bcPackageEntries (envConfigBuildConfig envConfig))
+      getPaths entry = do
+        resolvedEntry <- resolvePackageEntry menv projectRoot entry
+        return $ fmap fst resolvedEntry
+  allPackagePaths <- fmap mconcat (mapM getPaths packageEntries)
+  let isPathToRemove path = do
+        localPackage <- readLocalPackage path
+        return $ packageName (lpPackage localPackage) == packageName (lpPackage localPackageToBuild)
+  pathsToRemove <- filterM isPathToRemove allPackagePaths
+  let adjustPackageEntries entries path = do
+        adjustedPackageEntries <- mapM (removePathFromPackageEntry menv projectRoot path) entries
+        return (catMaybes adjustedPackageEntries)
+  entriesWithoutBuiltPackage <- foldM adjustPackageEntries packageEntries pathsToRemove
+  let newEntry = PackageEntry Nothing (PLFilePath (toFilePath pkgDir)) []
   let adjustEnvForBuild env =
         let updatedEnvConfig = envConfig
               {envConfigPackagesRef = newPackagesRef
@@ -371,7 +378,7 @@ buildExtractedTarball pkgDir = do
               }
         in set envConfigL updatedEnvConfig env
       updatePackageInBuildConfig buildConfig = buildConfig
-        { bcPackageEntries = updatedPackageEntries
+        { bcPackageEntries = newEntry : entriesWithoutBuiltPackage
         , bcConfig = (bcConfig buildConfig)
                      { configBuild = defaultBuildOpts
                        { boptsTests = True

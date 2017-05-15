@@ -44,6 +44,7 @@ module Stack.Config
   ,defaultConfigYaml
   ,getProjectConfig
   ,LocalConfigStatus(..)
+  ,removePathFromPackageEntry
   ) where
 
 import qualified Codec.Archive.Tar as Tar
@@ -790,6 +791,25 @@ resolvePackageLocation menv projRoot (PLRemote url remotePackageType) = do
                     ignoringAbsence (removeDirRecur dir)
                     throwM $ UnexpectedArchiveContents dirs files
         _ -> return dir
+
+removePathFromPackageEntry
+    :: (StackMiniM env m, HasConfig env)
+    => EnvOverride
+    -> Path Abs Dir -- ^ project root
+    -> Path Abs Dir -- ^ path to remove
+    -> PackageEntry
+    -> m (Maybe PackageEntry)
+removePathFromPackageEntry menv projectRoot pathToRemove packageEntry = do
+  locationPath <- resolvePackageLocation menv projectRoot (peLocation packageEntry)
+  case peSubdirs packageEntry of
+    [] -> if locationPath == pathToRemove then return Nothing else return (Just packageEntry)
+    subdirPaths -> do
+      let shouldKeepSubdir path = do
+            resolvedPath <- resolveDir locationPath path
+            return (pathToRemove /= resolvedPath)
+      filteredSubdirs <- filterM shouldKeepSubdir subdirPaths
+      if null filteredSubdirs then return Nothing else return (Just packageEntry {peSubdirs = filteredSubdirs})
+
 
 
 -- | Get the stack root, e.g. @~/.stack@, and determine whether the user owns it.
