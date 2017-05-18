@@ -195,6 +195,7 @@ library
                    , base >= 4.8 && <5
                    , base64-bytestring
                    , binary >= 0.7 && < 0.9
+                   , bindings-uname >= 0.1
                    , binary-tagged >= 0.1.1
                    , blaze-builder
                    , bytestring >= 0.10.4.0
