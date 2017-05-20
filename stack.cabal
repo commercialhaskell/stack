@@ -137,6 +137,7 @@ library
                      Stack.Options.PackageParser
                      Stack.Options.ResolverParser
                      Stack.Options.ScriptParser
+                     Stack.Options.SDistParser
                      Stack.Options.SolverParser
                      Stack.Options.TestParser
                      Stack.Options.Utils

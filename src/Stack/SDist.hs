@@ -11,6 +11,7 @@ module Stack.SDist
     ( getSDistTarball
     , checkSDistTarball
     , checkSDistTarball'
+    , SDistOpts (..)
     ) where
 
 import qualified Codec.Archive.Tar as Tar
@@ -77,6 +78,19 @@ import qualified System.FilePath as FP
 
 -- | Special exception to throw when you want to fail because of bad results
 -- of package check.
+
+data SDistOpts = SDistOpts
+  { sdoptsDirsToWorkWith :: [String]
+  -- ^ Directories to package
+  , sdoptsPvpBounds :: Maybe PvpBounds
+  -- ^ PVP Bounds overrides
+  , sdoptsIgnoreCheck :: Bool
+  -- ^ Whether to ignore check of the package for common errors
+  , sdoptsSign :: Bool
+  -- ^ Whether to sign the package
+  , sdoptsSignServerUrl :: String
+  -- ^ The URL of the signature server
+  }
 
 newtype CheckException
   = CheckException (NonEmpty Check.PackageCheck)

@@ -82,17 +82,19 @@ import           Stack.Options.DotParser
 import           Stack.Options.ExecParser
 import           Stack.Options.GhciParser
 import           Stack.Options.GlobalParser
+
 import           Stack.Options.HpcReportParser
 import           Stack.Options.NewParser
 import           Stack.Options.NixParser
 import           Stack.Options.ScriptParser
+import           Stack.Options.SDistParser
 import           Stack.Options.SolverParser
 import           Stack.Options.Utils
 import qualified Stack.PackageIndex
 import qualified Stack.Path
 import           Stack.Runners
 import           Stack.Script
-import           Stack.SDist (getSDistTarball, checkSDistTarball, checkSDistTarball')
+import           Stack.SDist (getSDistTarball, checkSDistTarball, checkSDistTarball', SDistOpts(..))
 import           Stack.SetupCmd
 import qualified Stack.Sig as Sig
 import           Stack.Solver (solveExtraDeps)
@@ -299,26 +301,12 @@ commandLineHandler currentDir progName isInterpreter = complicatedOptions
             "upload"
             "Upload a package to Hackage"
             uploadCmd
-            ((,,,,) <$> many (strArgument $ metavar "TARBALL/DIR" <> completer fileCompleter) <*>
-             optional pvpBoundsOption <*>
-             ignoreCheckSwitch <*>
-             switch (long "no-signature" <> help "Do not sign & upload signatures") <*>
-             strOption
-             (long "sig-server" <> metavar "URL" <> showDefault <>
-              value "https://sig.commercialhaskell.org" <>
-              help "URL"))
+            (sdistOptsParser True)
         addCommand'
             "sdist"
             "Create source distribution tarballs"
             sdistCmd
-            ((,,,,) <$> many (strArgument $ metavar "DIR" <> completer dirCompleter) <*>
-             optional pvpBoundsOption <*>
-             ignoreCheckSwitch <*>
-             switch (long "sign" <> help "Sign & upload signatures") <*>
-             strOption
-             (long "sig-server" <> metavar "URL" <> showDefault <>
-              value "https://sig.commercialhaskell.org" <>
-              help "URL"))
+            (sdistOptsParser False)
         addCommand' "dot"
                     "Visualize your project's dependency graph using Graphviz dot"
                     dotCmd
@@ -447,10 +435,6 @@ commandLineHandler currentDir progName isInterpreter = complicatedOptions
                         hpcReportOptsParser)
         )
       where
-        ignoreCheckSwitch =
-            switch (long "ignore-check"
-                    <> help "Do not check package for common mistakes")
-
         -- addCommand hiding global options
         addCommand' :: String -> String -> (a -> GlobalOpts -> IO ()) -> Parser a
                     -> AddCommand
@@ -672,15 +656,15 @@ upgradeCmd upgradeOpts' go = withGlobalConfigAndLock go $
             upgradeOpts'
 
 -- | Upload to Hackage
-uploadCmd :: ([String], Maybe PvpBounds, Bool, Bool, String) -> GlobalOpts -> IO ()
-uploadCmd ([], _, _, _, _) _ = throwString "Error: To upload the current package, please run 'stack upload .'"
-uploadCmd (args, mpvpBounds, ignoreCheck, don'tSign, sigServerUrl) go = do
+uploadCmd :: SDistOpts -> GlobalOpts -> IO ()
+uploadCmd (SDistOpts [] _ _ _ _) _ = throwString "Error: To upload the current package, please run 'stack upload .'"
+uploadCmd sdistOpts go = do
     let partitionM _ [] = return ([], [])
         partitionM f (x:xs) = do
             r <- f x
             (as, bs) <- partitionM f xs
             return $ if r then (x:as, bs) else (as, x:bs)
-    (files, nonFiles) <- partitionM D.doesFileExist args
+    (files, nonFiles) <- partitionM D.doesFileExist (sdoptsDirsToWorkWith sdistOpts)
     (dirs, invalid) <- partitionM D.doesDirectoryExist nonFiles
     unless (null invalid) $ do
         hPutStrLn stderr $
@@ -690,7 +674,7 @@ uploadCmd (args, mpvpBounds, ignoreCheck, don'tSign, sigServerUrl) go = do
     withBuildConfigAndLock go $ \_ -> do
         config <- view configL
         getCreds <- liftIO (runOnce (Upload.loadCreds config))
-        unless ignoreCheck $
+        unless (sdoptsIgnoreCheck sdistOpts) $
             mapM_ (resolveFile' >=> checkSDistTarball) files
         forM_
             files
@@ -699,46 +683,46 @@ uploadCmd (args, mpvpBounds, ignoreCheck, don'tSign, sigServerUrl) go = do
                      liftIO $ do
                        creds <- getCreds
                        Upload.upload creds (toFilePath tarFile)
-                     unless
-                         don'tSign
+                     when
+                         (sdoptsSign sdistOpts)
                          (void $
                           Sig.sign
-                              sigServerUrl
+                              (sdoptsSignServerUrl sdistOpts)
                               tarFile))
         unless (null dirs) $
             forM_ dirs $ \dir -> do
                 pkgDir <- resolveDir' dir
-                (tarName, tarBytes, mcabalRevision) <- getSDistTarball mpvpBounds pkgDir
-                unless ignoreCheck $ checkSDistTarball' tarName tarBytes
+                (tarName, tarBytes, mcabalRevision) <- getSDistTarball (sdoptsPvpBounds sdistOpts) pkgDir
+                unless (sdoptsIgnoreCheck sdistOpts) $ checkSDistTarball' tarName tarBytes
                 liftIO $ do
                   creds <- getCreds
                   Upload.uploadBytes creds tarName tarBytes
                   forM_ mcabalRevision $ uncurry $ Upload.uploadRevision creds
                 tarPath <- parseRelFile tarName
-                unless
-                    don'tSign
+                when
+                    (sdoptsSign sdistOpts)
                     (void $
                      Sig.signTarBytes
-                         sigServerUrl
+                         (sdoptsSignServerUrl sdistOpts)
                          tarPath
                          tarBytes)
 
-sdistCmd :: ([String], Maybe PvpBounds, Bool, Bool, String) -> GlobalOpts -> IO ()
-sdistCmd (dirs, mpvpBounds, ignoreCheck, sign, sigServerUrl) go =
+sdistCmd :: SDistOpts -> GlobalOpts -> IO ()
+sdistCmd sdistOpts go =
     withBuildConfig go $ do -- No locking needed.
         -- If no directories are specified, build all sdist tarballs.
-        dirs' <- if null dirs
+        dirs' <- if null (sdoptsDirsToWorkWith sdistOpts)
             then liftM Map.keys getLocalPackages
-            else mapM resolveDir' dirs
+            else mapM resolveDir' (sdoptsDirsToWorkWith sdistOpts)
         forM_ dirs' $ \dir -> do
-            (tarName, tarBytes, _mcabalRevision) <- getSDistTarball mpvpBounds dir
+            (tarName, tarBytes, _mcabalRevision) <- getSDistTarball (sdoptsPvpBounds sdistOpts) dir
             distDir <- distDirFromDir dir
             tarPath <- (distDir </>) <$> parseRelFile tarName
             ensureDir (parent tarPath)
             liftIO $ L.writeFile (toFilePath tarPath) tarBytes
-            unless ignoreCheck (checkSDistTarball tarPath)
+            unless (sdoptsIgnoreCheck sdistOpts) (checkSDistTarball tarPath)
             $logInfo $ "Wrote sdist tarball to " <> T.pack (toFilePath tarPath)
-            when sign (void $ Sig.sign sigServerUrl tarPath)
+            when (sdoptsSign sdistOpts) (void $ Sig.sign (sdoptsSignServerUrl sdistOpts) tarPath)
 
 -- | Execute a command.
 execCmd :: ExecOpts -> GlobalOpts -> IO ()
