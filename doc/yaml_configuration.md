@@ -16,8 +16,9 @@ and [non-project-specific](#non-project-specific-config) options in:
 - The project file itself may also contain non-project specific options
 
 *Note:* When stack is invoked outside a stack project it will source project
-specific options from `~/.stack/global-project/stack.yaml`.  Options in this file will
-be ignored for a project with its own `<project dir>/stack.yaml`.
+specific options from `~/.stack/global-project/stack.yaml`. When stack is
+invoked inside a stack project, only options from `<project dir>/stack.yaml` are
+used, and `~/.stack/global-project/stack.yaml` is ignored.
 
 ## Project-specific config
 
