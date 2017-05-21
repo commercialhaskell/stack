@@ -101,6 +101,7 @@ module Stack.Types.Config
   ,parseProjectAndConfigMonoid
   -- ** PvpBounds
   ,PvpBounds(..)
+  ,PvpBoundsType(..)
   ,parsePvpBounds
   -- ** ColorWhen
   ,ColorWhen(..)
@@ -371,6 +372,8 @@ data Config =
          ,configAllowLocals         :: !Bool
          -- ^ Are we allowed to build local packages? The script
          -- command disallows this.
+         ,configSaveHackageCreds    :: !Bool
+         -- ^ Should we save Hackage credentials to a file?
          }
 
 -- | Which packages do ghc-options on the command line apply to?
@@ -784,6 +787,8 @@ data ConfigMonoid =
     -- installation.
     , configMonoidDumpLogs           :: !(First DumpLogs)
     -- ^ See 'configDumpLogs'
+    , configMonoidSaveHackageCreds   :: !(First Bool)
+    -- ^ See 'configSaveHackageCreds'
     }
   deriving (Show, Generic)
 
@@ -855,6 +860,7 @@ parseConfigMonoidObject rootDir obj = do
     configMonoidDefaultTemplate <- First <$> obj ..:? configMonoidDefaultTemplateName
     configMonoidAllowDifferentUser <- First <$> obj ..:? configMonoidAllowDifferentUserName
     configMonoidDumpLogs <- First <$> obj ..:? configMonoidDumpLogsName
+    configMonoidSaveHackageCreds <- First <$> obj ..:? configMonoidSaveHackageCredsName
 
     return ConfigMonoid {..}
   where
@@ -987,6 +993,9 @@ configMonoidAllowDifferentUserName = "allow-different-user"
 
 configMonoidDumpLogsName :: Text
 configMonoidDumpLogsName = "dump-logs"
+
+configMonoidSaveHackageCredsName :: Text
+configMonoidSaveHackageCredsName = "save-hackage-creds"
 
 data ConfigException
   = ParseConfigFileException (Path Abs File) ParseException
@@ -1632,29 +1641,44 @@ instance FromJSON (WithJSONWarnings SetupInfoLocation) where
             return $ WithJSONWarnings (SetupInfoInline si) w
 
 -- | How PVP bounds should be added to .cabal files
-data PvpBounds
+data PvpBoundsType
   = PvpBoundsNone
   | PvpBoundsUpper
   | PvpBoundsLower
   | PvpBoundsBoth
   deriving (Show, Read, Eq, Typeable, Ord, Enum, Bounded)
 
-pvpBoundsText :: PvpBounds -> Text
+data PvpBounds = PvpBounds
+  { pbType :: !PvpBoundsType
+  , pbAsRevision :: !Bool
+  }
+  deriving (Show, Read, Eq, Typeable, Ord)
+
+pvpBoundsText :: PvpBoundsType -> Text
 pvpBoundsText PvpBoundsNone = "none"
 pvpBoundsText PvpBoundsUpper = "upper"
 pvpBoundsText PvpBoundsLower = "lower"
 pvpBoundsText PvpBoundsBoth = "both"
 
 parsePvpBounds :: Text -> Either String PvpBounds
-parsePvpBounds t =
-    case Map.lookup t m of
-        Nothing -> Left $ "Invalid PVP bounds: " ++ T.unpack t
-        Just x -> Right x
+parsePvpBounds t = maybe err Right $ do
+    (t', asRevision) <-
+      case T.break (== '-') t of
+        (x, "") -> Just (x, False)
+        (x, "-revision") -> Just (x, True)
+        _ -> Nothing
+    x <- Map.lookup t' m
+    Just PvpBounds
+      { pbType = x
+      , pbAsRevision = asRevision
+      }
   where
     m = Map.fromList $ map (pvpBoundsText &&& id) [minBound..maxBound]
+    err = Left $ "Invalid PVP bounds: " ++ T.unpack t
 
 instance ToJSON PvpBounds where
-  toJSON = toJSON . pvpBoundsText
+  toJSON (PvpBounds typ asRevision) =
+    toJSON (pvpBoundsText typ <> (if asRevision then "-revision" else ""))
 instance FromJSON PvpBounds where
   parseJSON = withText "PvpBounds" (either fail return . parsePvpBounds)
 
