@@ -674,8 +674,7 @@ uploadCmd sdistOpts go = do
     withBuildConfigAndLock go $ \_ -> do
         config <- view configL
         getCreds <- liftIO (runOnce (Upload.loadCreds config))
-        unless (sdoptsIgnoreCheck sdistOpts) $
-            mapM_ (resolveFile' >=> checkSDistTarball) files
+        mapM_ (resolveFile' >=> checkSDistTarball sdistOpts) files
         forM_
             files
             (\file ->
@@ -693,7 +692,7 @@ uploadCmd sdistOpts go = do
             forM_ dirs $ \dir -> do
                 pkgDir <- resolveDir' dir
                 (tarName, tarBytes, mcabalRevision) <- getSDistTarball (sdoptsPvpBounds sdistOpts) pkgDir
-                unless (sdoptsIgnoreCheck sdistOpts) $ checkSDistTarball' tarName tarBytes
+                checkSDistTarball' sdistOpts tarName tarBytes
                 liftIO $ do
                   creds <- getCreds
                   Upload.uploadBytes creds tarName tarBytes
@@ -720,7 +719,7 @@ sdistCmd sdistOpts go =
             tarPath <- (distDir </>) <$> parseRelFile tarName
             ensureDir (parent tarPath)
             liftIO $ L.writeFile (toFilePath tarPath) tarBytes
-            unless (sdoptsIgnoreCheck sdistOpts) (checkSDistTarball tarPath)
+            checkSDistTarball sdistOpts tarPath
             $logInfo $ "Wrote sdist tarball to " <> T.pack (toFilePath tarPath)
             when (sdoptsSign sdistOpts) (void $ Sig.sign (sdoptsSignServerUrl sdistOpts) tarPath)
 

@@ -336,12 +336,20 @@ dirsFromFiles dirs = Set.toAscList (Set.delete "." results)
 --
 -- Note that we temporarily decompress the archive to analyze it.
 checkSDistTarball :: (StackM env m, HasEnvConfig env, MonadBaseUnlift IO m)
-  => Path Abs File -- ^ Absolute path to tarball
+  => SDistOpts -- ^ The configuration of what to check
+  -> Path Abs File -- ^ Absolute path to tarball
   -> m ()
-checkSDistTarball tarball = withTempTarGzContents tarball $ \pkgDir' -> do
+checkSDistTarball opts tarball = withTempTarGzContents tarball $ \pkgDir' -> do
     pkgDir  <- (pkgDir' </>) `liftM`
         (parseRelDir . FP.takeBaseName . FP.takeBaseName . toFilePath $ tarball)
     --               ^ drop ".tar"     ^ drop ".gz"
+    buildExtractedTarball pkgDir
+    unless (sdoptsIgnoreCheck opts) (checkPackageInExtractedTarball pkgDir)
+
+checkPackageInExtractedTarball :: (StackM env m, HasEnvConfig env, MonadBaseUnlift IO m)
+  => Path Abs Dir -- ^ Absolute path to tarball
+  -> m ()
+checkPackageInExtractedTarball pkgDir = do
     cabalfp <- findOrGenerateCabalFile pkgDir
     name    <- parsePackageNameFromFilePath cabalfp
     config  <- getDefaultPackageConfig
@@ -405,13 +413,14 @@ buildExtractedTarball pkgDir = do
 -- | Version of 'checkSDistTarball' that first saves lazy bytestring to
 -- temporary directory and then calls 'checkSDistTarball' on it.
 checkSDistTarball' :: (StackM env m, HasEnvConfig env, MonadBaseUnlift IO m)
-  => String       -- ^ Tarball name
+  => SDistOpts
+  -> String       -- ^ Tarball name
   -> L.ByteString -- ^ Tarball contents as a byte string
   -> m ()
-checkSDistTarball' name bytes = withSystemTempDir "stack" $ \tpath -> do
+checkSDistTarball' opts name bytes = withSystemTempDir "stack" $ \tpath -> do
     npath   <- (tpath </>) `liftM` parseRelFile name
     liftIO $ L.writeFile (toFilePath npath) bytes
-    checkSDistTarball npath
+    checkSDistTarball opts npath
 
 withTempTarGzContents :: (MonadIO m, MonadMask m)
   => Path Abs File         -- ^ Location of tarball
