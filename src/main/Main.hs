@@ -631,7 +631,7 @@ uninstallCmd :: [String] -> GlobalOpts -> IO ()
 uninstallCmd _ go = withConfigAndLock go $ do
     $logError "stack does not manage installations in global locations"
     $logError "The only global mutation stack performs is executable copying"
-    $logError "For the default executable destination, please run 'stack path --local-bin-path'"
+    $logError "For the default executable destination, please run 'stack path --local-bin'"
 
 -- | Unpack packages to the filesystem
 unpackCmd :: [String] -> GlobalOpts -> IO ()
