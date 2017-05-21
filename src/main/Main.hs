@@ -657,7 +657,7 @@ upgradeCmd upgradeOpts' go = withGlobalConfigAndLock go $
 
 -- | Upload to Hackage
 uploadCmd :: SDistOpts -> GlobalOpts -> IO ()
-uploadCmd (SDistOpts [] _ _ _ _) _ = throwString "Error: To upload the current package, please run 'stack upload .'"
+uploadCmd (SDistOpts [] _ _ _ _ _) _ = throwString "Error: To upload the current package, please run 'stack upload .'"
 uploadCmd sdistOpts go = do
     let partitionM _ [] = return ([], [])
         partitionM f (x:xs) = do

@@ -19,8 +19,11 @@ sdistOptsParser signDefault = SDistOpts <$>
   strOption
   (long "sig-server" <> metavar "URL" <> showDefault <>
     value "https://sig.commercialhaskell.org" <>
-    help "URL")
+    help "URL") <*>
+  buildPackageOption
   where
     ignoreCheckSwitch =
       switch (long "ignore-check"
                <> help "Do not check package for common mistakes")
+    buildPackageOption =
+      boolFlags False "build-package" "building of the resulting package" idm

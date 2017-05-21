@@ -19,7 +19,7 @@ import qualified Codec.Archive.Tar.Entry as Tar
 import qualified Codec.Compression.GZip as GZip
 import           Control.Applicative
 import           Control.Concurrent.Execute (ActionContext(..))
-import           Control.Monad (unless, void, liftM, filterM, foldM)
+import           Control.Monad (unless, void, liftM, filterM, foldM, when)
 import           Control.Monad.Catch
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
@@ -90,6 +90,8 @@ data SDistOpts = SDistOpts
   -- ^ Whether to sign the package
   , sdoptsSignServerUrl :: String
   -- ^ The URL of the signature server
+  , sdoptsBuildTarball :: Bool
+  -- ^ Whether to build the tarball
   }
 
 newtype CheckException
@@ -343,7 +345,7 @@ checkSDistTarball opts tarball = withTempTarGzContents tarball $ \pkgDir' -> do
     pkgDir  <- (pkgDir' </>) `liftM`
         (parseRelDir . FP.takeBaseName . FP.takeBaseName . toFilePath $ tarball)
     --               ^ drop ".tar"     ^ drop ".gz"
-    buildExtractedTarball pkgDir
+    when (sdoptsBuildTarball opts) (buildExtractedTarball pkgDir)
     unless (sdoptsIgnoreCheck opts) (checkPackageInExtractedTarball pkgDir)
 
 checkPackageInExtractedTarball :: (StackM env m, HasEnvConfig env, MonadBaseUnlift IO m)
