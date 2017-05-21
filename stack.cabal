@@ -233,7 +233,7 @@ library
                    , network-uri
                    , open-browser >= 0.2.1
                    , optparse-applicative >= 0.13 && < 0.14
-                   , path >= 0.5.8
+                   , path >= 0.5.8 && <= 0.5.12
                    , path-io >= 1.1.0 && < 2.0.0
                    , persistent >= 2.1.2 && < 2.7
                        -- persistent-sqlite-2.5.0.1 has a bug
