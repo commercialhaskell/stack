@@ -229,6 +229,7 @@ library
                    , memory >= 0.13 && < 0.15
                    , microlens >= 0.3.0.0
                    , microlens-mtl
+                   , mintty >= 0.1.1
                    , monad-control
                    , monad-logger >= 0.3.13.1
                    , monad-unlift < 0.3
