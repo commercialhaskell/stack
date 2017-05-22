@@ -73,6 +73,9 @@ Bug fixes:
 * Switching a package between extra-dep and local package now forces
   rebuild (previously it wouldn't if versions were the same).
   See [#2147](https://github.com/commercialhaskell/stack/issues/2147)
+* `stack upload` no longer reveals your password when you type it on
+  MinTTY-based Windows shells, such as Cygwin and MSYS2.
+  See [#3142](https://github.com/commercialhaskell/stack/issues/3142)
 
 
 ## 1.4.0
