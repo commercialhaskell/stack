@@ -14,7 +14,7 @@ module Stack.Upload
     ) where
 
 import           Control.Applicative
-import           Control.Exception.Safe                (bracket, handleIO, tryIO)
+import           Control.Exception.Safe                (handleIO, tryIO)
 import qualified Control.Exception                     as E
 import           Control.Monad                         (void, when, unless)
 import           Data.Aeson                            (FromJSON (..),
