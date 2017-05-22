@@ -245,7 +245,7 @@ renderStackYaml p ignoredPackages dupPackages =
         , ""
         , "Some commonly used options have been documented as comments in this file."
         , "For advanced use and comprehensive documentation of the format, please see:"
-        , "http://docs.haskellstack.org/en/stable/yaml_configuration/"
+        , "https://docs.haskellstack.org/en/stable/yaml_configuration/"
         ]
 
     resolverHelp = commentHelp
