@@ -61,7 +61,7 @@ import qualified    Data.Text.Encoding as T
 import qualified    Data.Text.Encoding.Error as T
 import              Data.Time.Clock (NominalDiffTime, diffUTCTime, getCurrentTime)
 import qualified    Data.Yaml as Yaml
-import              Distribution.System (OS (Linux, OpenBSD), Arch (..), Platform (..))
+import              Distribution.System (OS, Arch (..), Platform (..))
 import qualified    Distribution.System as Cabal
 import              Distribution.Text (simpleParse)
 import              Foreign.C (throwErrnoIfMinus1_, peekCString)
@@ -546,7 +546,7 @@ getGhcBuild menv = do
 
         platform <- view platformL
         case platform of
-            Platform _ Linux -> do
+            Platform _ Cabal.Linux -> do
                 -- Some systems don't have ldconfig in the PATH, so make sure to look in /sbin and /usr/sbin as well
                 sbinEnv <- modifyEnvOverride menv $
                     Map.insert "PATH" $
