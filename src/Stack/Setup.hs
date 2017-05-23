@@ -629,10 +629,17 @@ mungeRelease = intercalate "-" . prefixMaj . splitOn "."
     prefixMaj = prefixFst "maj" prefixMin
     prefixMin = prefixFst "min" (map ('r':))
 
-sysRelease :: MonadIO m => m String
-sysRelease = liftIO $ alloca $ \ ptr ->
-           do throwErrnoIfMinus1_ "uname" $ uname ptr
-              peekCString $ release ptr
+sysRelease :: (MonadUnliftIO m, MonadLogger m) => m String
+sysRelease =
+  handleIO (\e -> do
+               $logWarn $ T.concat [ T.pack "Could not query OS version"
+                                   , T.pack $ show e
+                                   ]
+               return "") .
+  liftIO .
+  alloca $ \ ptr ->
+             do throwErrnoIfMinus1_ "uname" $ uname ptr
+                peekCString $ release ptr
 
 -- | Ensure Docker container-compatible 'stack' executable is downloaded
 ensureDockerStackExe :: HasConfig env => Platform -> RIO env (Path Abs File)
