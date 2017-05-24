@@ -26,4 +26,4 @@ sdistOptsParser signDefault = SDistOpts <$>
       switch (long "ignore-check"
                <> help "Do not check package for common mistakes")
     buildPackageOption =
-      boolFlags False "build-package" "building of the resulting package" idm
+      boolFlags False "test-tarball" "building of the resulting tarball" idm
