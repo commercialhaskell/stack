@@ -1,4 +1,3 @@
-{-# LANGUAGE TemplateHaskell #-}
 module LibD
     ( someFunc
     ) where

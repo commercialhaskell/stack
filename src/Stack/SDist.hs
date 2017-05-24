@@ -379,7 +379,7 @@ buildExtractedTarball pkgDir = do
   envConfig <- view envConfigL
   menv <- getMinimalEnvOverride
   localPackageToBuild <- readLocalPackage pkgDir
-  let packageEntries = (bcPackageEntries (envConfigBuildConfig envConfig))
+  let packageEntries = bcPackageEntries (envConfigBuildConfig envConfig)
       getPaths entry = do
         resolvedEntry <- resolvePackageEntry menv projectRoot entry
         return $ fmap fst resolvedEntry

@@ -1,4 +1,3 @@
-{-# LANGUAGE TemplateHaskell #-}
 module TH (thFunc) where
 
 import Language.Haskell.TH

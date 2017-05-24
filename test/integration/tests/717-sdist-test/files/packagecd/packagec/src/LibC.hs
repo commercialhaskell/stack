@@ -7,4 +7,4 @@ import THC
 import Language.Haskell.TH
 
 someFuncC :: IO ()
-someFuncC = putStrLn (show $(thFuncC))
+someFuncC = print $(thFuncC)

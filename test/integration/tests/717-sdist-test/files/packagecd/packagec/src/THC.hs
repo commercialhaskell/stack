@@ -1,4 +1,3 @@
-{-# LANGUAGE TemplateHaskell #-}
 module THC (thFuncC) where
 
 import Language.Haskell.TH
