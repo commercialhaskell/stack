@@ -298,7 +298,54 @@ configFromConfigMonoid
 
          configExtraIncludeDirs = configMonoidExtraIncludeDirs
          configExtraLibDirs = configMonoidExtraLibDirs
-         configOverrideGccPath = getFirst configMonoidOverrideGccPath
+         configProgPath = Map.fromList . catTupleMaybes $ 
+             [ (ProgAlex,            getFirst . Map.findWithDefault (First Nothing) ProgAlex            $ configMonoidProgPath)
+             , (ProgAr,              getFirst . Map.findWithDefault (First Nothing) ProgAr              $ configMonoidProgPath)
+             , (ProgC2hs,            getFirst . Map.findWithDefault (First Nothing) ProgC2hs            $ configMonoidProgPath)
+             , (ProgCpphs,           getFirst . Map.findWithDefault (First Nothing) ProgCpphs           $ configMonoidProgPath)
+             , (ProgGcc,             getFirst . Map.findWithDefault (First Nothing) ProgGcc             $ configMonoidProgPath)
+             , (ProgGhc,             getFirst . Map.findWithDefault (First Nothing) ProgGhc             $ configMonoidProgPath)
+             , (ProgGhcPkg,          getFirst . Map.findWithDefault (First Nothing) ProgGhcPkg          $ configMonoidProgPath)
+             , (ProgGhcjs,           getFirst . Map.findWithDefault (First Nothing) ProgGhcjs           $ configMonoidProgPath)
+             , (ProgGhcjsPkg,        getFirst . Map.findWithDefault (First Nothing) ProgGhcjsPkg        $ configMonoidProgPath)
+             , (ProgGreencard,       getFirst . Map.findWithDefault (First Nothing) ProgGreencard       $ configMonoidProgPath)
+             , (ProgHaddock,         getFirst . Map.findWithDefault (First Nothing) ProgHaddock         $ configMonoidProgPath)
+             , (ProgHappy,           getFirst . Map.findWithDefault (First Nothing) ProgHappy           $ configMonoidProgPath)
+             , (ProgHaskellSuite,    getFirst . Map.findWithDefault (First Nothing) ProgHaskellSuite    $ configMonoidProgPath)
+             , (ProgHaskellSuitePkg, getFirst . Map.findWithDefault (First Nothing) ProgHaskellSuitePkg $ configMonoidProgPath)
+             , (ProgHmake,           getFirst . Map.findWithDefault (First Nothing) ProgHmake           $ configMonoidProgPath)
+             , (ProgHpc,             getFirst . Map.findWithDefault (First Nothing) ProgHpc             $ configMonoidProgPath)
+             , (ProgHsc2hs,          getFirst . Map.findWithDefault (First Nothing) ProgHsc2hs          $ configMonoidProgPath)
+             , (ProgHscolour,        getFirst . Map.findWithDefault (First Nothing) ProgHscolour        $ configMonoidProgPath)
+             , (ProgLd,              getFirst . Map.findWithDefault (First Nothing) ProgLd              $ configMonoidProgPath)
+             , (ProgPkgConfig,       getFirst . Map.findWithDefault (First Nothing) ProgPkgConfig       $ configMonoidProgPath)
+             , (ProgStrip,           getFirst . Map.findWithDefault (First Nothing) ProgStrip           $ configMonoidProgPath)
+             , (ProgTar,             getFirst . Map.findWithDefault (First Nothing) ProgTar             $ configMonoidProgPath)
+             ]
+         configProgOptions = Map.fromList . catTupleMaybes $ 
+             [ (ProgAlex,            Map.lookup ProgAlex            configMonoidProgOptions)
+             , (ProgAr,              Map.lookup ProgAr              configMonoidProgOptions)
+             , (ProgC2hs,            Map.lookup ProgC2hs            configMonoidProgOptions)
+             , (ProgCpphs,           Map.lookup ProgCpphs           configMonoidProgOptions)
+             , (ProgGcc,             Map.lookup ProgGcc             configMonoidProgOptions)
+             , (ProgGhc,             Map.lookup ProgGhc             configMonoidProgOptions)
+             , (ProgGhcPkg,          Map.lookup ProgGhcPkg          configMonoidProgOptions)
+             , (ProgGhcjs,           Map.lookup ProgGhcjs           configMonoidProgOptions)
+             , (ProgGhcjsPkg,        Map.lookup ProgGhcjsPkg        configMonoidProgOptions)
+             , (ProgGreencard,       Map.lookup ProgGreencard       configMonoidProgOptions)
+             , (ProgHaddock,         Map.lookup ProgHaddock         configMonoidProgOptions)
+             , (ProgHappy,           Map.lookup ProgHappy           configMonoidProgOptions)
+             , (ProgHaskellSuite,    Map.lookup ProgHaskellSuite    configMonoidProgOptions)
+             , (ProgHaskellSuitePkg, Map.lookup ProgHaskellSuitePkg configMonoidProgOptions)
+             , (ProgHmake,           Map.lookup ProgHmake           configMonoidProgOptions)
+             , (ProgHpc,             Map.lookup ProgHpc             configMonoidProgOptions)
+             , (ProgHsc2hs,          Map.lookup ProgHsc2hs          configMonoidProgOptions)
+             , (ProgHscolour,        Map.lookup ProgHscolour        configMonoidProgOptions)
+             , (ProgLd,              Map.lookup ProgLd              configMonoidProgOptions)
+             , (ProgPkgConfig,       Map.lookup ProgPkgConfig       configMonoidProgOptions)
+             , (ProgStrip,           Map.lookup ProgStrip           configMonoidProgOptions)
+             , (ProgTar,             Map.lookup ProgTar             configMonoidProgOptions)
+             ]
 
          -- Only place in the codebase where platform is hard-coded. In theory
          -- in the future, allow it to be configured.
@@ -398,6 +445,9 @@ configFromConfigMonoid
      let configMaybeProject = mproject
 
      return Config {..}
+  where
+    catTupleMaybes :: [(a, Maybe b)] -> [(a,b)]
+    catTupleMaybes xs = [(a,b) | (a, Just b) <- xs]
 
 -- | Get the default location of the local programs directory.
 getDefaultLocalProgramsBase :: MonadThrow m
