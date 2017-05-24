@@ -360,7 +360,6 @@ checkPackageInExtractedTarball pkgDir = do
         "Checking package '" <> packageNameText name <> "' for common mistakes"
     let pkgChecks = Check.checkPackage gdesc (Just pkgDesc)
     fileChecks <- liftIO $ Check.checkPackageFiles pkgDesc (toFilePath pkgDir)
-    buildExtractedTarball pkgDir
     let checks = pkgChecks ++ fileChecks
         (errors, warnings) =
           let criticalIssue (Check.PackageBuildImpossible _) = True
