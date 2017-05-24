@@ -76,6 +76,8 @@ Bug fixes:
 * `stack upload` no longer reveals your password when you type it on
   MinTTY-based Windows shells, such as Cygwin and MSYS2.
   See [#3142](https://github.com/commercialhaskell/stack/issues/3142)
+* `stack script`'s import parser will now properly parse files that
+  have Windows-style line endings (CRLF)
 
 
 ## 1.4.0
