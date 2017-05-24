@@ -68,8 +68,8 @@ scriptCmd opts go' = do
 
         (targetsSet, coresSet) <-
             case soPackages opts of
-                [] -> do
-                    $logError "No packages provided, using experimental import parser"
+                [] ->
+                    -- Using the import parser
                     getPackagesFromImports (globalResolver go) (soFile opts)
                 packages -> do
                     let targets = concatMap wordsComma packages
