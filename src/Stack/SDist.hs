@@ -375,7 +375,6 @@ checkPackageInExtractedTarball pkgDir = do
 
 buildExtractedTarball :: (StackM env m, HasEnvConfig env, MonadBaseUnlift IO m) => Path Abs Dir -> m ()
 buildExtractedTarball pkgDir = do
-  newPackagesRef <- liftIO (newIORef Nothing)
   projectRoot <- view projectRootL
   envConfig <- view envConfigL
   menv <- getMinimalEnvOverride
@@ -385,6 +384,7 @@ buildExtractedTarball pkgDir = do
         resolvedEntry <- resolvePackageEntry menv projectRoot entry
         return $ fmap fst resolvedEntry
   allPackagePaths <- fmap mconcat (mapM getPaths packageEntries)
+  -- We remove the path based on the name of the package
   let isPathToRemove path = do
         localPackage <- readLocalPackage path
         return $ packageName (lpPackage localPackage) == packageName (lpPackage localPackageToBuild)
@@ -394,6 +394,7 @@ buildExtractedTarball pkgDir = do
         return (catMaybes adjustedPackageEntries)
   entriesWithoutBuiltPackage <- foldM adjustPackageEntries packageEntries pathsToRemove
   let newEntry = PackageEntry Nothing (PLFilePath (toFilePath pkgDir)) []
+  newPackagesRef <- liftIO (newIORef Nothing)
   let adjustEnvForBuild env =
         let updatedEnvConfig = envConfig
               {envConfigPackagesRef = newPackagesRef
