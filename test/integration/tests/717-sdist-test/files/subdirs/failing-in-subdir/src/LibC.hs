@@ -3,7 +3,7 @@ module LibC
     ( someFuncC
     ) where
 
-import THC
+import THInSubdir
 import Language.Haskell.TH
 
 someFuncC :: IO ()

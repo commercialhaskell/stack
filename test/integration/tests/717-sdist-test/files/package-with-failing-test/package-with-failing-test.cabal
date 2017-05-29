@@ -1,4 +1,4 @@
-name:                packaged
+name:                package-with-failing-test
 version:             0.1.0.0
 synopsis:            Some package
 description:         Some package
@@ -15,9 +15,13 @@ cabal-version:       >=1.10
 
 library
   hs-source-dirs:      src
-  exposed-modules:     LibD
+  exposed-modules:     Lib
   build-depends:       base >= 4.7 && < 5,
-                       template-haskell,
-                       packagea,
-                       packagec
+                       template-haskell
   default-language:    Haskell2010
+
+test-suite tests
+  type:                exitcode-stdio-1.0
+  hs-source-dirs:      test
+  main-is:             Test.hs
+  build-depends:       base >= 4.7 && < 5

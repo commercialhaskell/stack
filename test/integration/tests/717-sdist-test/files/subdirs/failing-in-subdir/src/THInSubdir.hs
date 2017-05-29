@@ -1,4 +1,4 @@
-module THC (thFuncC) where
+module THInSubdir (thFuncC) where
 
 import Language.Haskell.TH
 
