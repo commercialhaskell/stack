@@ -2,7 +2,7 @@ name:                packagee
 version:             0.1.0.0
 synopsis:            Some package
 description:         Some package
-homepage:            https://github.com/githubuser/thtest#readme
+homepage:            https://invalid
 license:             BSD3
 license-file:        LICENSE
 author:              Author name here
@@ -25,7 +25,3 @@ test-suite tests
   hs-source-dirs:      test
   main-is:             Test.hs
   build-depends:       base >= 4.7 && < 5
-                       
-source-repository head
-  type:     git
-  location: https://github.com/githubuser/thtest
