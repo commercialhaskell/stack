@@ -73,7 +73,7 @@ Other enhancements:
   foo-1.2.3@gitsha1:deadbeef`. Note that this should be considered
   _experimental_, Stack will likely move towards a different hash
   format in the future.
-* It's now possible to skip tests and benchmarks using `--skip-component`
+* It's now possible to skip tests and benchmarks using `--skip`
   flag
 
 Bug fixes:

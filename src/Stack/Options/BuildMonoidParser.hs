@@ -153,6 +153,6 @@ buildOptsMonoidParser hide0 =
         (fmap
             T.pack
             (strOption
-                (long "skip-component" <>
+                (long "skip" <>
                  help "Skip given component, can be specified multiple times" <>
                  hide)))
