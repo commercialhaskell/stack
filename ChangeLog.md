@@ -174,6 +174,8 @@ Other enhancements:
 * Upgraded `http-client-tls` version, which now offers support for the
   `socks5://` and `socks5h://` values in the `http_proxy` and `https_proxy`
   environment variables.
+* Binary "stack upgrade" will now warn if the installed executable is not
+  on the PATH or shadowed by another entry.
 
 Bug fixes:
 
