@@ -49,6 +49,8 @@ Other enhancements:
   a method to ensure PVP compliance without having to proactively fix
   bounds issues for Stackage maintenance.
 * Expose a `save-hackage-creds` configuration option
+* On GHC <= 7.8, filters out spurious linker warnings on windows
+  See [#3127](https://github.com/commercialhaskell/stack/pull/3127)
 
 Bug fixes:
 
