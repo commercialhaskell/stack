@@ -79,6 +79,7 @@ library
                      Options.Applicative.Args
                      Options.Applicative.Builder.Extra
                      Options.Applicative.Complicated
+                     Path.CheckInstall
                      Path.Extra
                      Path.Find
                      Paths_stack
