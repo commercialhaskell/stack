@@ -19,6 +19,29 @@ then you may need to install a different version of `node`. See
 
 ## Example Configurations
 
+### Nightly builds
+
+http://ghcjs.luite.com/ has nightly builds of both master (ghc7) branch ghc-8.0 (ghc8).  To get them to work, it *should* be enough to add this to your stack.yaml (but keep reading to the end of the paragraph before you start!):
+
+```yaml
+compiler: ghcjs-0.2.1.20170411_ghc-8.0.2
+compiler-check: match-exact
+
+setup-info:
+  ghcjs:
+    source:
+      ghcjs-0.2.1.20170411_ghc-8.0.2:
+        url: "http://ghcjs.luite.com/ghc-8.0-20170411.tar.gz"
+        sha1: bc590645f6575276ea4d2aaa206c6d96ba71efed
+```
+
+Several important notes:
+
+- It does not work, but there is a work-around: https://github.com/ghcjs/ghcjs/issues/579.
+- The sha1 is not available from the url.  You can either leave it out entirely or download the tarball once, compute the sha1 yourself, and at least know that nobody gave you a corrupted archive under the assumption that you got it right once.  Better than nothing.
+- You may want to update the timestamps to the most recently available.
+- The version of ghc (not ghcjs) in the compiler name needs to match the stack.yaml file in the archive.  For lts-8.9, it would be ghc-8.0.2.
+
 ### Recent versions of GHCJS, repacked for stack
 
 These versions of GHCJS were created by
