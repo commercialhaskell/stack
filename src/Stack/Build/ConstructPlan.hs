@@ -26,6 +26,7 @@ import           Control.Monad.State.Strict (execState)
 import           Control.Monad.Trans.Resource
 import           Data.Either
 import           Data.Function
+import qualified Data.HashSet as HashSet
 import           Data.List
 import           Data.List.Extra (nubOrd)
 import           Data.Map.Strict (Map)
@@ -974,6 +975,8 @@ pprintExceptions exceptions stackYaml parentMap wanted =
     -- Skip these when they are redundant with 'NotInBuildPlan' info.
     pprintException (UnknownPackage name)
         | name `Set.member` allNotInBuildPlan = Nothing
+        | name `HashSet.member` wiredInPackages =
+            Just $ "Can't build a package with same name as a wired-in-package:" <+> displayCurrentPkgName name
         | otherwise = Just $ "Unknown package:" <+> displayCurrentPkgName name
 
     pprintFlags flags
