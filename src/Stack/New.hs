@@ -84,6 +84,8 @@ new
     :: (StackM env m, HasConfig env)
     => NewOpts -> Bool -> m (Path Abs Dir)
 new opts forceOverwrite = do
+    when (newOptsProjectName opts `elem` wiredInPackages) $
+      throwM $ Can'tUseWiredInName (newOptsProjectName opts)
     pwd <- getCurrentDir
     absDir <- if bare then return pwd
                       else do relDir <- parseRelDir (packageNameString project)
@@ -378,6 +380,7 @@ data NewException
     | FailedToDownloadTemplateInfo !HttpException
     | BadTemplateInfo !String
     | BadTemplateInfoResponse !Int
+    | Can'tUseWiredInName !PackageName
     deriving (Typeable)
 
 instance Exception NewException
@@ -440,3 +443,5 @@ instance Show NewException where
         "Template info couldn't be parsed: " <> err
     show (BadTemplateInfoResponse code) =
         "Unexpected status code while retrieving templates info: " <> show code
+    show (Can'tUseWiredInName name) =
+        "The name \"" <> packageNameString name <> "\" is used by GHC wired-in packages, and so shouldn't be used as a package name"
