@@ -147,6 +147,8 @@ Behavior changes:
 
 Other enhancements:
 
+* When using Nix, nix-shell now depends always on git to prevent runtime errors
+  while fetching metadata
 * Internal cleanup: configuration types are now based much more on lenses
 * `stack build` and related commands now allow the user to disable debug symbol stripping
   with new `--no-strip`, `--no-library-stripping`, and `--no-executable-shipping` flags,
