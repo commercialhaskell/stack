@@ -190,13 +190,13 @@ installDir :: (MonadReader env m, MonadThrow m)
            -> Tool
            -> m (Path Abs Dir)
 installDir programsDir tool = do
-    reldir <- parseRelDir $ toolString tool
-    return $ programsDir </> reldir
+    relativeDir <- parseRelDir $ toolString tool
+    return $ programsDir </> relativeDir
 
 tempInstallDir :: (MonadReader env m, MonadThrow m)
            => Path Abs Dir
            -> Tool
            -> m (Path Abs Dir)
 tempInstallDir programsDir tool = do
-    reldir <- parseRelDir $ toolString tool ++ ".temp"
-    return $ programsDir </> reldir
+    relativeDir <- parseRelDir $ toolString tool ++ ".temp"
+    return $ programsDir </> relativeDir

@@ -81,6 +81,7 @@ import              Lens.Micro (set)
 import              Network.HTTP.Simple (getResponseBody, httpLBS, withResponse, getResponseStatusCode)
 import              Network.HTTP.Download
 import              Path
+import              Path.CheckInstall (warnInstallSearchPathIssues)
 import              Path.Extra (toFilePathNoTrailingSep)
 import              Path.IO hiding (findExecutable)
 import qualified    Paths_stack as Meta
@@ -1764,6 +1765,9 @@ downloadStackExe platforms0 archiveInfo destDir testExe = do
               renameFile destFile old
               renameFile tmpFile destFile
           _ -> renameFile tmpFile destFile
+
+    destDir' <- liftIO . D.canonicalizePath . toFilePath $ destDir
+    warnInstallSearchPathIssues destDir' ["stack"]
 
     $logInfo $ T.pack $ "New stack executable available at " ++ toFilePath destFile
   where

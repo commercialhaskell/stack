@@ -49,6 +49,11 @@ Other enhancements:
   a method to ensure PVP compliance without having to proactively fix
   bounds issues for Stackage maintenance.
 * Expose a `save-hackage-creds` configuration option
+* On GHC <= 7.8, filters out spurious linker warnings on windows
+  See [#3127](https://github.com/commercialhaskell/stack/pull/3127)
+* Better error messages when creating or building packages which alias
+  wired-in packages. See
+  [#3172](https://github.com/commercialhaskell/stack/issues/3172).
 * MinGW bin folder now is searched for dynamic libraries. See [#3126](https://github.com/commercialhaskell/stack/issues/3126)
 
 Bug fixes:
@@ -74,6 +79,11 @@ Bug fixes:
 * Switching a package between extra-dep and local package now forces
   rebuild (previously it wouldn't if versions were the same).
   See [#2147](https://github.com/commercialhaskell/stack/issues/2147)
+* `stack upload` no longer reveals your password when you type it on
+  MinTTY-based Windows shells, such as Cygwin and MSYS2.
+  See [#3142](https://github.com/commercialhaskell/stack/issues/3142)
+* `stack script`'s import parser will now properly parse files that
+  have Windows-style line endings (CRLF)
 
 
 ## 1.4.0
@@ -168,6 +178,8 @@ Other enhancements:
 * Upgraded `http-client-tls` version, which now offers support for the
   `socks5://` and `socks5h://` values in the `http_proxy` and `https_proxy`
   environment variables.
+* Binary "stack upgrade" will now warn if the installed executable is not
+  on the PATH or shadowed by another entry.
 
 Bug fixes:
 

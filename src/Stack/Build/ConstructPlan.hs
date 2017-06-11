@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveGeneric #-}
@@ -10,6 +11,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE StandaloneDeriving #-}
 -- | Construct a @Plan@ for how to build
 module Stack.Build.ConstructPlan
     ( constructPlan
@@ -24,7 +26,9 @@ import           Control.Monad.State.Strict (execState)
 import           Control.Monad.Trans.Resource
 import           Data.Either
 import           Data.Function
+import qualified Data.HashSet as HashSet
 import           Data.List
+import           Data.List.Extra (nubOrd)
 import           Data.Map.Strict (Map)
 import qualified Data.Map.Strict as M
 import qualified Data.Map.Strict as Map
@@ -892,7 +896,9 @@ data ConstructPlanException
     | DependencyPlanFailures Package (Map PackageName (VersionRange, LatestApplicableVersion, BadDependency))
     | UnknownPackage PackageName -- TODO perhaps this constructor will be removed, and BadDependency will handle it all
     -- ^ Recommend adding to extra-deps, give a helpful version number?
-    deriving (Typeable, Eq, Show)
+    deriving (Typeable, Eq, Ord, Show)
+
+deriving instance Ord VersionRange
 
 -- | For display purposes only, Nothing if package not found
 type LatestApplicableVersion = Maybe Version
@@ -902,7 +908,7 @@ data BadDependency
     = NotInBuildPlan
     | Couldn'tResolveItsDependencies Version
     | DependencyMismatch Version
-    deriving (Typeable, Eq, Show)
+    deriving (Typeable, Eq, Ord, Show)
 
 -- TODO: Consider intersecting version ranges for multiple deps on a
 -- package.  This is why VersionRange is in the parent map.
@@ -926,7 +932,7 @@ pprintExceptions exceptions stackYaml parentMap wanted =
         line <>
         "You may also want to try the 'stack solver' command"
   where
-    exceptions' = nub exceptions
+    exceptions' = nubOrd exceptions
 
     extras = Map.unions $ map getExtras exceptions'
     getExtras (DependencyCycleDetected _) = Map.empty
@@ -940,11 +946,16 @@ pprintExceptions exceptions stackYaml parentMap wanted =
     pprintExtra (name, version) =
       fromString (concat ["- ", packageNameString name, "-", versionString version])
 
+    allNotInBuildPlan = Set.fromList $ concatMap toNotInBuildPlan exceptions'
+    toNotInBuildPlan (DependencyPlanFailures _ pDeps) =
+      map fst $ filter (\(_, (_, _, badDep)) -> badDep == NotInBuildPlan) $ Map.toList pDeps
+    toNotInBuildPlan _ = []
+
     pprintException (DependencyCycleDetected pNames) = Just $
         "Dependency cycle detected in packages:" <> line <>
         indent 4 (encloseSep "[" "]" "," (map (errorRed . fromString . packageNameString) pNames))
-    pprintException (DependencyPlanFailures pkg (Map.toList -> pDeps)) =
-        case mapMaybe pprintDep pDeps of
+    pprintException (DependencyPlanFailures pkg pDeps) =
+        case mapMaybe pprintDep (Map.toList pDeps) of
             [] -> Nothing
             depErrors -> Just $
                 "In the dependencies for" <+> pkgIdent <>
@@ -961,9 +972,12 @@ pprintExceptions exceptions stackYaml parentMap wanted =
                             [pkgIdent]
               where
                 pkgIdent = displayCurrentPkgId (packageIdentifier pkg)
-        -- TODO: optionally show these?
-    -- Skip these because they are redundant with 'NotInBuildPlan' info.
-    pprintException (UnknownPackage _) = Nothing
+    -- Skip these when they are redundant with 'NotInBuildPlan' info.
+    pprintException (UnknownPackage name)
+        | name `Set.member` allNotInBuildPlan = Nothing
+        | name `HashSet.member` wiredInPackages =
+            Just $ "Can't build a package with same name as a wired-in-package:" <+> displayCurrentPkgName name
+        | otherwise = Just $ "Unknown package:" <+> displayCurrentPkgName name
 
     pprintFlags flags
         | Map.null flags = ""

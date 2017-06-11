@@ -68,8 +68,8 @@ scriptCmd opts go' = do
 
         (targetsSet, coresSet) <-
             case soPackages opts of
-                [] -> do
-                    $logError "No packages provided, using experimental import parser"
+                [] ->
+                    -- Using the import parser
                     getPackagesFromImports (globalResolver go) (soFile opts)
                 packages -> do
                     let targets = concatMap wordsComma packages
@@ -266,8 +266,15 @@ loadModuleInfo name = do
 
 parseImports :: ByteString -> (Set PackageName, Set ModuleName)
 parseImports =
-    fold . mapMaybe parseLine . S8.lines
+    fold . mapMaybe (parseLine . stripCR) . S8.lines
   where
+    -- Remove any carriage return character present at the end, to
+    -- support Windows-style line endings (CRLF)
+    stripCR bs
+      | S8.null bs = bs
+      | S8.last bs == '\r' = S8.init bs
+      | otherwise = bs
+
     stripPrefix x y
       | x `S8.isPrefixOf` y = Just $ S8.drop (S8.length x) y
       | otherwise = Nothing
