@@ -1425,7 +1425,7 @@ modified version of a dependency that hasn't yet been released upstream.
 
 Please note that when adding upstream packages directly to your project it is
 important to distinguish _local packages_ from the upstream _dependency
-packages_. Otherwise you may have trouble running `stack GHCi`. See
+packages_. Otherwise you may have trouble running `stack ghci`. See
 [stack.yaml documentation](yaml_configuration.md#packages) for more details.
 
 ## Flags and GHC options
