@@ -54,6 +54,7 @@ Other enhancements:
 * Better error messages when creating or building packages which alias
   wired-in packages. See
   [#3172](https://github.com/commercialhaskell/stack/issues/3172).
+* MinGW bin folder now is searched for dynamic libraries. See [#3126](https://github.com/commercialhaskell/stack/issues/3126)
 
 Bug fixes:
 
