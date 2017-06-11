@@ -1369,26 +1369,19 @@ withUnpackedTarball7z name si archiveFile archiveType msrcDir destDir = do
             TarGz -> return ".gz"
             _ -> throwString $ name ++ " must be a tarball file"
     tarFile <-
-        case T.stripSuffix suffix $ T.pack $ toFilePath archiveFile of
+        case T.stripSuffix suffix $ T.pack $ toFilePath (filename archiveFile) of
             Nothing -> throwString $ "Invalid " ++ name ++ " filename: " ++ show archiveFile
-            Just x -> parseAbsFile $ T.unpack x
+            Just x -> parseRelFile $ T.unpack x
     run7z <- setup7z si
     let tmpName = toFilePathNoTrailingSep (dirname destDir) ++ "-tmp"
     ensureDir (parent destDir)
     withRunInIO $ \run -> withTempDir (parent destDir) tmpName $ \tmpDir -> run $ do
         liftIO $ ignoringAbsence (removeDirRecur destDir)
-        run7z (parent archiveFile) archiveFile
-        run7z tmpDir tarFile
+        run7z tmpDir archiveFile
+        run7z tmpDir (tmpDir </> tarFile)
         absSrcDir <- case msrcDir of
             Just srcDir -> return $ tmpDir </> srcDir
             Nothing -> expectSingleUnpackedDir archiveFile tmpDir
-        removeFile tarFile `catchIO` \e ->
-            logWarn (T.concat
-                [ "Exception when removing "
-                , T.pack $ toFilePath tarFile
-                , ": "
-                , T.pack $ show e
-                ])
         renameDir absSrcDir destDir
 
 expectSingleUnpackedDir :: (MonadIO m, MonadThrow m) => Path Abs File -> Path Abs Dir -> m (Path Abs Dir)

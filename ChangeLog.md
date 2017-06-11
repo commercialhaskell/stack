@@ -215,6 +215,9 @@ Other enhancements:
   on the PATH or shadowed by another entry.
 * Allow running tests on tarball created by sdist and upload
   [#717](https://github.com/commercialhaskell/stack/issues/717).
+* For filesystem setup-info paths, it's no longer assumed that the
+  directory is writable, instead a temp dir is used.  See
+  [#3188](https://github.com/commercialhaskell/stack/issues/3188).
 
 Bug fixes:
 
