@@ -31,7 +31,7 @@ import           Distribution.InstalledPackageInfo (PError)
 import           Distribution.License (License)
 import           Distribution.ModuleName (ModuleName)
 import           Distribution.Package hiding (Package,PackageName,packageName,packageVersion,PackageIdentifier)
-import           Distribution.PackageDescription (TestSuiteInterface)
+import           Distribution.PackageDescription (TestSuiteInterface, BuildType)
 import           Distribution.System (Platform (..))
 import           GHC.Generics (Generic)
 import           Path as FL
@@ -101,7 +101,7 @@ data Package =
           ,packageExes :: !(Set Text)                     -- ^ names of executables
           ,packageOpts :: !GetPackageOpts                 -- ^ Args to pass to GHC.
           ,packageHasExposedModules :: !Bool              -- ^ Does the package have exposed modules?
-          ,packageSimpleType :: !Bool                     -- ^ Does the package of build-type: Simple
+          ,packageBuildType :: !(Maybe BuildType)         -- ^ Package build-type.
           ,packageSetupDeps :: !(Maybe (Map PackageName VersionRange))
                                                           -- ^ If present: custom-setup dependencies
           }

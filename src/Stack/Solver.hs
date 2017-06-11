@@ -27,8 +27,7 @@ import           Control.Monad (when,void,join,liftM,unless,mapAndUnzipM, zipWit
 import           Control.Monad.Catch
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
-import           Data.Aeson.Extended         ( WithJSONWarnings(..), object, (.=), toJSON
-                                             , logJSONWarnings)
+import           Data.Aeson.Extended         (object, (.=), toJSON)
 import qualified Data.ByteString as S
 import           Data.Char (isSpace)
 import           Data.Either
@@ -61,11 +60,12 @@ import           Path
 import           Path.Find (findFiles)
 import           Path.IO hiding (findExecutable, findFiles)
 import           Stack.BuildPlan
-import           Stack.Config (getLocalPackages)
+import           Stack.Config (getLocalPackages, loadConfigYaml)
 import           Stack.Constants (stackDotYaml, wiredInPackages)
 import           Stack.Package               (printCabalFileWarning
                                              , hpack
                                              , readPackageUnresolved)
+import           Stack.PrettyPrint
 import           Stack.Setup
 import           Stack.Setup.Installed
 import           Stack.Types.Build
@@ -293,16 +293,16 @@ setupCompiler compiler = do
         , soptsUseSystem         = configSystemGHC config
         , soptsWantedCompiler    = compiler
         , soptsCompilerCheck     = configCompilerCheck config
-
         , soptsStackYaml         = Nothing
         , soptsForceReinstall    = False
         , soptsSanityCheck       = False
         , soptsSkipGhcCheck      = False
         , soptsSkipMsys          = configSkipMsys config
-        , soptsUpgradeCabal      = False
+        , soptsUpgradeCabal      = Nothing
         , soptsResolveMissingGHC = msg
-        , soptsSetupInfoYaml    = defaultSetupInfoYaml
+        , soptsSetupInfoYaml     = defaultSetupInfoYaml
         , soptsGHCBindistURL     = Nothing
+        , soptsGHCJSBootOpts     = ["--clean"]
         }
     return dirs
 
@@ -319,10 +319,20 @@ setupCabalEnv compiler = do
     platform <- view platformL
     menv <- mkEnvOverride platform envMap
 
-    mcabal <- findExecutable menv "cabal"
+    mcabal <- getCabalInstallVersion menv
     case mcabal of
         Nothing -> throwM SolverMissingCabalInstall
-        Just _ -> return ()
+        Just version
+            | version < $(mkVersion "1.24") -> $prettyWarn $
+                "Installed version of cabal-install (" <>
+                display version <>
+                ") doesn't support custom-setup clause, and so may not yield correct results." <> line <>
+                "To resolve this, install a newer version via 'stack install cabal-install'." <> line
+            | version >= $(mkVersion "1.25") -> $prettyWarn $
+                "Installed version of cabal-install (" <>
+                display version <>
+                ") is newer than stack has been tested with.  If you run into difficulties, consider downgrading." <> line
+            | otherwise -> return ()
 
     mver <- getSystemCompiler menv (whichCompiler compiler)
     case mver of
@@ -716,7 +726,7 @@ solveExtraDeps modStackYaml = do
         $logInfo $ "No changes needed to " <> T.pack relStackYaml
 
     where
-        indent t = T.unlines $ fmap ("    " <>) (T.lines t)
+        indentLines t = T.unlines $ fmap ("    " <>) (T.lines t)
 
         printResolver mOldRes res = do
             forM_ mOldRes $ \oldRes ->
@@ -731,21 +741,20 @@ solveExtraDeps modStackYaml = do
         printFlags fl msg = do
             unless (Map.null fl) $ do
                 $logInfo $ T.pack msg
-                $logInfo $ indent $ decodeUtf8 $ Yaml.encode
-                                  $ object ["flags" .= fl]
+                $logInfo $ indentLines $ decodeUtf8 $ Yaml.encode
+                                       $ object ["flags" .= fl]
 
         printDeps deps msg = do
             unless (Map.null deps) $ do
                 $logInfo $ T.pack msg
-                $logInfo $ indent $ decodeUtf8 $ Yaml.encode $ object
+                $logInfo $ indentLines $ decodeUtf8 $ Yaml.encode $ object
                         ["extra-deps" .= map fromTuple (Map.toList deps)]
 
         writeStackYaml path res deps fl = do
             let fp = toFilePath path
             obj <- liftIO (Yaml.decodeFileEither fp) >>= either throwM return
-            WithJSONWarnings (ProjectAndConfigMonoid _ _) warnings <-
-                liftIO (Yaml.decodeFileEither fp) >>= either throwM return
-            logJSONWarnings fp warnings
+            -- Check input file and show warnings
+            _ <- loadConfigYaml (parseProjectAndConfigMonoid (parent path)) path
             let obj' =
                     HashMap.insert "extra-deps"
                         (toJSON $ map fromTuple $ Map.toList deps)

@@ -1425,7 +1425,7 @@ modified version of a dependency that hasn't yet been released upstream.
 
 Please note that when adding upstream packages directly to your project it is
 important to distinguish _local packages_ from the upstream _dependency
-packages_. Otherwise you may have trouble running `stack GHCi`. See
+packages_. Otherwise you may have trouble running `stack ghci`. See
 [stack.yaml documentation](yaml_configuration.md#packages) for more details.
 
 ## Flags and GHC options
@@ -1728,7 +1728,7 @@ a multi line block comment with ghc options:
 
 ### Writing independent and reliable scripts
 
-With the release of Stack 1.2.1, there is a new command, `script`, which will
+With the release of Stack 1.4.0, there is a new command, `script`, which will
 automatically:
 
 * Install GHC and libraries if missing

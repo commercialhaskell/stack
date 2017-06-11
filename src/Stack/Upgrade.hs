@@ -36,6 +36,7 @@ import           Stack.Types.Version
 import           Stack.Types.Config
 import           Stack.Types.Resolver
 import           Stack.Types.StackT
+import           Stack.Types.StringError
 import           System.Exit                 (ExitCode (ExitSuccess))
 import           System.Process              (rawSystem, readProcess)
 import           System.Process.Run
@@ -110,7 +111,7 @@ upgrade gConfigMonoid mresolver builtHash (UpgradeOpts mbo mso) =
         -- FIXME It would be far nicer to capture this case in the
         -- options parser itself so we get better error messages, but
         -- I can't think of a way to make it happen.
-        (Nothing, Nothing) -> error "You must allow either binary or source upgrade paths"
+        (Nothing, Nothing) -> throwString "You must allow either binary or source upgrade paths"
         (Just bo, Nothing) -> binary bo
         (Nothing, Just so) -> source so
         -- See #2977 - if --git or --git-repo is specified, do source upgrade.
@@ -159,7 +160,7 @@ binaryUpgrade (BinaryOpts mplatform force' mver morg mrepo) = do
 
     toUpgrade <- case (force, isNewer) of
         (False, False) -> do
-            $logInfo "Skipping binary upgrade, your version is already more recent"
+            $logInfo "Skipping binary upgrade, you are already running the most recent version"
             return False
         (True, False) -> do
             $logInfo "Forcing binary upgrade"
@@ -174,7 +175,7 @@ binaryUpgrade (BinaryOpts mplatform force' mver morg mrepo) = do
             ec <- rawSystem (toFilePath tmpFile) ["--version"]
 
             unless (ec == ExitSuccess)
-                    $ error "Non-success exit code from running newly downloaded executable"
+                    $ throwString "Non-success exit code from running newly downloaded executable"
 
 sourceUpgrade
   :: (StackM env m, HasConfig env)
@@ -209,7 +210,7 @@ sourceUpgrade gConfigMonoid mresolver builtHash (SourceOpts gitRepo) =
                 runCmd (Cmd (Just tmp) "git" menv args) Nothing
                 return $ Just $ tmp </> $(mkRelDir "stack")
       Nothing -> do
-        updateAllIndices menv
+        updateAllIndices
         (caches, _gitShaCaches) <- getPackageCaches
         let latest = Map.fromListWith max
                    $ map toTuple
@@ -222,13 +223,13 @@ sourceUpgrade gConfigMonoid mresolver builtHash (SourceOpts gitRepo) =
 
                      caches
         case Map.lookup $(mkPackageName "stack") latest of
-            Nothing -> error "No stack found in package indices"
+            Nothing -> throwString "No stack found in package indices"
             Just version | version <= fromCabalVersion Paths.version -> do
                 $logInfo "Already at latest version, no upgrade required"
                 return Nothing
             Just version -> do
                 let ident = PackageIdentifier $(mkPackageName "stack") version
-                paths <- unpackPackageIdents menv tmp Nothing
+                paths <- unpackPackageIdents tmp Nothing
                     -- accept latest cabal revision by not supplying a Git SHA
                     $ Map.singleton ident Nothing
                 case Map.lookup ident paths of

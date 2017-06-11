@@ -68,8 +68,17 @@ import           Stack.Types.Version
 import           System.Process.Read (findExecutable)
 
 data PackageInfo
-    = PIOnlyInstalled InstallLocation Installed
+    =
+      -- | This indicates that the package is already installed, and
+      -- that we shouldn't build it from source. This is always the case
+      -- for snapshot packages.
+      PIOnlyInstalled InstallLocation Installed
+      -- | This indicates that the package isn't installed, and we know
+      -- where to find its source (either a hackage package or a local
+      -- directory).
     | PIOnlySource PackageSource
+      -- | This indicates that the package is installed and we know
+      -- where to find its source. We may want to reinstall from source.
     | PIBoth PackageSource Installed
     deriving (Show)
 
@@ -144,6 +153,22 @@ instance HasBuildConfig Ctx
 instance HasEnvConfig Ctx where
     envConfigL = lens ctxEnvConfig (\x y -> x { ctxEnvConfig = y })
 
+-- | Computes a build plan. This means figuring out which build 'Task's
+-- to take, and the interdependencies among the build 'Task's. In
+-- particular:
+--
+-- 1) It determines which packages need to be built, based on the
+-- transitive deps of the current targets. For local packages, this is
+-- indicated by the 'lpWanted' boolean. For extra packages to build,
+-- this comes from the @extraToBuild0@ argument of type @Set
+-- PackageName@. These are usually packages that have been specified on
+-- the commandline.
+--
+-- 2) It will only rebuild an upstream package if it isn't present in
+-- the 'InstalledMap', or if some of its dependencies have changed.
+--
+-- 3) It will only rebuild a local package if its files are dirty or
+-- some of its dependencies have changed.
 constructPlan :: forall env m. (StackM env m, HasEnvConfig env)
               => MiniBuildPlan
               -> BaseConfigOpts
@@ -153,8 +178,9 @@ constructPlan :: forall env m. (StackM env m, HasEnvConfig env)
               -> (PackageName -> Version -> Map FlagName Bool -> [Text] -> IO Package) -- ^ load upstream package
               -> SourceMap
               -> InstalledMap
+              -> Bool
               -> m Plan
-constructPlan mbp0 baseConfigOpts0 locals extraToBuild0 localDumpPkgs loadPackage0 sourceMap installedMap = do
+constructPlan mbp0 baseConfigOpts0 locals extraToBuild0 localDumpPkgs loadPackage0 sourceMap installedMap initialBuildSteps = do
     $logDebug "Constructing the build plan"
     getVersions0 <- getPackageVersionsIO
 
@@ -185,7 +211,7 @@ constructPlan mbp0 baseConfigOpts0 locals extraToBuild0 localDumpPkgs loadPackag
             return $ takeSubset Plan
                 { planTasks = tasks
                 , planFinals = M.fromList finals
-                , planUnregisterLocal = mkUnregisterLocal tasks dirtyReason localDumpPkgs sourceMap
+                , planUnregisterLocal = mkUnregisterLocal tasks dirtyReason localDumpPkgs sourceMap initialBuildSteps
                 , planInstallExes =
                     if boptsInstallExes $ bcoBuildOpts baseConfigOpts0
                         then installExes
@@ -209,7 +235,7 @@ constructPlan mbp0 baseConfigOpts0 locals extraToBuild0 localDumpPkgs loadPackag
         , callStack = []
         , extraToBuild = extraToBuild0
         , getVersions = getVersions0
-        , wanted = wantedLocalPackages locals
+        , wanted = wantedLocalPackages locals <> extraToBuild0
         , localNames = Set.fromList $ map (packageName . lpPackage) locals
         , logFunc = lf
         }
@@ -235,8 +261,11 @@ mkUnregisterLocal :: Map PackageName Task
                   -> [DumpPackage () () ()]
                   -- ^ Local package database dump
                   -> SourceMap
+                  -> Bool
+                  -- ^ If true, we're doing a special initialBuildSteps
+                  -- build - don't unregister target packages.
                   -> Map GhcPkgId (PackageIdentifier, Text)
-mkUnregisterLocal tasks dirtyReason localDumpPkgs sourceMap =
+mkUnregisterLocal tasks dirtyReason localDumpPkgs sourceMap initialBuildSteps =
     -- We'll take multiple passes through the local packages. This
     -- will allow us to detect that a package should be unregistered,
     -- as well as all packages directly or transitively depending on
@@ -279,9 +308,12 @@ mkUnregisterLocal tasks dirtyReason localDumpPkgs sourceMap =
 
     go' toUnregister ident deps
       -- If we're planning on running a task on it, then it must be
-      -- unregistered
-      | Just _ <- Map.lookup name tasks
-          = Just $ fromMaybe "" $ Map.lookup name dirtyReason
+      -- unregistered, unless it's a target and an initial-build-steps
+      -- build is being done.
+      | Just task <- Map.lookup name tasks
+          = if initialBuildSteps && taskIsTarget task && taskProvides task == ident
+              then Nothing
+              else Just $ fromMaybe "" $ Map.lookup name dirtyReason
       -- Check if we're no longer using the local version
       | Just (PSUpstream _ Snap _ _ _) <- Map.lookup name sourceMap
           = Just "Switching to snapshot installed package"
@@ -293,9 +325,20 @@ mkUnregisterLocal tasks dirtyReason localDumpPkgs sourceMap =
       where
         name = packageIdentifierName ident
 
+-- | Given a 'LocalPackage' and its 'lpTestBench', adds a 'Task' for
+-- running its tests and benchmarks.
+--
+-- If @isAllInOne@ is 'True', then this means that the build step will
+-- also build the tests. Otherwise, this indicates that there's a cyclic
+-- dependency and an additional build step needs to be done.
+--
+-- This will also add all the deps needed to build the tests /
+-- benchmarks. If @isAllInOne@ is 'True' (the common case), then all of
+-- these should have already been taken care of as part of the build
+-- step.
 addFinal :: LocalPackage -> Package -> Bool -> M ()
 addFinal lp package isAllInOne = do
-    depsRes <- addPackageDeps False package
+    depsRes <- addPackageDeps package
     res <- case depsRes of
         Left e -> return $ Left e
         Right (missing, present, _minLoc) -> do
@@ -316,9 +359,20 @@ addFinal lp package isAllInOne = do
                 , taskPresent = present
                 , taskType = TTLocal lp
                 , taskAllInOne = isAllInOne
+                , taskCachePkgSrc = CacheSrcLocal (toFilePath (lpDir lp))
                 }
     tell mempty { wFinals = Map.singleton (packageName package) res }
 
+-- | Given a 'PackageName', adds all of the build tasks to build the
+-- package, if needed.
+--
+-- 'constructPlan' invokes this on all the target packages, setting
+-- @treatAsDep'@ to False, because those packages are direct build
+-- targets. 'addPackageDeps' invokes this while recursing into the
+-- dependencies of a package. As such, it sets @treatAsDep'@ to True,
+-- forcing this package to be marked as a dependency, even if it is
+-- directly wanted. This makes sense - if we left out packages that are
+-- deps, it would break the --only-dependencies build plan.
 addDep :: Bool -- ^ is this being used by a dependency?
        -> PackageName
        -> M (Either ConstructPlanException AddDepRes)
@@ -349,10 +403,10 @@ addDep treatAsDep' name = do
                             return $ Right $ ADRFound loc installed
                         Just (PIOnlySource ps) -> do
                             tellExecutables name ps
-                            installPackage treatAsDep name ps Nothing
+                            installPackage name ps Nothing
                         Just (PIBoth ps installed) -> do
                             tellExecutables name ps
-                            installPackage treatAsDep name ps (Just installed)
+                            installPackage name ps (Just installed)
             updateLibMap name res
             return res
 
@@ -394,30 +448,32 @@ tellExecutablesPackage loc p = do
         | Set.null myComps = x
         | otherwise = Set.intersection x myComps
 
-installPackage :: Bool -- ^ is this being used by a dependency?
-               -> PackageName
-               -> PackageSource
-               -> Maybe Installed
-               -> M (Either ConstructPlanException AddDepRes)
-installPackage treatAsDep name ps minstalled = do
+-- | Given a 'PackageSource' and perhaps an 'Installed' value, adds
+-- build 'Task's for the package and its dependencies.
+installPackage
+    :: PackageName
+    -> PackageSource
+    -> Maybe Installed
+    -> M (Either ConstructPlanException AddDepRes)
+installPackage name ps minstalled = do
     ctx <- ask
     case ps of
         PSUpstream version _ flags ghcOptions _ -> do
             planDebug $ "installPackage: Doing all-in-one build for upstream package " ++ show name
             package <- liftIO $ loadPackage ctx name version flags ghcOptions
-            resolveDepsAndInstall True treatAsDep ps package minstalled
+            resolveDepsAndInstall True ps package minstalled
         PSLocal lp ->
             case lpTestBench lp of
                 Nothing -> do
                     planDebug $ "installPackage: No test / bench component for " ++ show name ++ " so doing an all-in-one build."
-                    resolveDepsAndInstall True treatAsDep ps (lpPackage lp) minstalled
+                    resolveDepsAndInstall True ps (lpPackage lp) minstalled
                 Just tb -> do
                     -- Attempt to find a plan which performs an all-in-one
                     -- build.  Ignore the writer action + reset the state if
                     -- it fails.
                     s <- get
                     res <- pass $ do
-                        res <- addPackageDeps treatAsDep tb
+                        res <- addPackageDeps tb
                         let writerFunc w = case res of
                                 Left _ -> mempty
                                 _ -> w
@@ -438,7 +494,7 @@ installPackage treatAsDep name ps minstalled = do
                             put s
                             -- Otherwise, fall back on building the
                             -- tests / benchmarks in a separate step.
-                            res' <- resolveDepsAndInstall False treatAsDep ps (lpPackage lp) minstalled
+                            res' <- resolveDepsAndInstall False ps (lpPackage lp) minstalled
                             when (isRight res') $ do
                                 -- Insert it into the map so that it's
                                 -- available for addFinal.
@@ -447,17 +503,19 @@ installPackage treatAsDep name ps minstalled = do
                             return res'
 
 resolveDepsAndInstall :: Bool
-                      -> Bool
                       -> PackageSource
                       -> Package
                       -> Maybe Installed
                       -> M (Either ConstructPlanException AddDepRes)
-resolveDepsAndInstall isAllInOne treatAsDep ps package minstalled = do
-    res <- addPackageDeps treatAsDep package
+resolveDepsAndInstall isAllInOne ps package minstalled = do
+    res <- addPackageDeps package
     case res of
         Left err -> return $ Left err
         Right deps -> liftM Right $ installPackageGivenDeps isAllInOne ps package minstalled deps
 
+-- | Checks if we need to install the given 'Package', given the results
+-- of 'addPackageDeps'. If dependencies are missing, the package is
+-- dirty, or it's not installed, then it needs to be installed.
 installPackageGivenDeps :: Bool
                         -> PackageSource
                         -> Package
@@ -502,6 +560,7 @@ installPackageGivenDeps isAllInOne ps package minstalled (missing, present, minL
                     PSLocal lp -> TTLocal lp
                     PSUpstream _ loc _ _ sha -> TTUpstream package (loc <> minLoc) sha
             , taskAllInOne = isAllInOne
+            , taskCachePkgSrc = toCachePkgSrc ps
             }
 
 -- Update response in the lib map. If it is an error, and there's
@@ -517,13 +576,22 @@ addEllipsis t
     | T.length t < 100 = t
     | otherwise = T.take 97 t <> "..."
 
-addPackageDeps :: Bool -- ^ is this being used by a dependency?
-               -> Package -> M (Either ConstructPlanException (Set PackageIdentifier, Map PackageIdentifier GhcPkgId, InstallLocation))
-addPackageDeps treatAsDep package = do
+-- | Given a package, recurses into all of its dependencies. The results
+-- indicate which packages are missing, meaning that their 'GhcPkgId's
+-- will be figured out during the build, after they've been built. The
+-- 2nd part of the tuple result indicates the packages that are already
+-- installed which will be used.
+--
+-- The 3rd part of the tuple is an 'InstallLocation'. If it is 'Local',
+-- then the parent package must be installed locally. Otherwise, if it
+-- is 'Snap', then it can either be installed locally or in the
+-- snapshot.
+addPackageDeps :: Package -> M (Either ConstructPlanException (Set PackageIdentifier, Map PackageIdentifier GhcPkgId, InstallLocation))
+addPackageDeps package = do
     ctx <- ask
     deps' <- packageDepsWithTools package
     deps <- forM (Map.toList deps') $ \(depname, range) -> do
-        eres <- addDep treatAsDep depname
+        eres <- addDep True depname
         let getLatestApplicable = do
                 vs <- liftIO $ getVersions ctx depname
                 return (latestApplicableVersion range vs)
@@ -579,6 +647,11 @@ addPackageDeps treatAsDep package = do
                         mlatestApplicable <- getLatestApplicable
                         return $ Left (depname, (range, mlatestApplicable, DependencyMismatch $ adrVersion adr))
     case partitionEithers deps of
+        -- Note that the Monoid for 'InstallLocation' means that if any
+        -- is 'Local', the result is 'Local', indicating that the parent
+        -- package must be installed locally. Otherwise the result is
+        -- 'Snap', indicating that the parent can either be installed
+        -- locally or in the snapshot.
         ([], pairs) -> return $ Right $ mconcat pairs
         (errs, _) -> return $ Left $ DependencyPlanFailures
             package
@@ -586,6 +659,8 @@ addPackageDeps treatAsDep package = do
   where
     adrVersion (ADRToInstall task) = packageIdentifierVersion $ taskProvides task
     adrVersion (ADRFound _ installed) = installedVersion installed
+    -- Update the parents map, for later use in plan construction errors
+    -- - see 'getShortestDepsPath'.
     addParent depname range mversion = tell mempty { wParents = MonoidMap $ M.singleton depname val }
       where
         val = (First mversion, [(packageIdentifier package, range)])
@@ -618,6 +693,7 @@ checkDirtiness ps installed package present wanted = do
                 shouldHaddockPackage buildOpts wanted (packageName package) ||
                 -- Disabling haddocks when old config had haddocks doesn't make dirty.
                 maybe False configCacheHaddock moldOpts
+            , configCachePkgSrc = toCachePkgSrc ps
             }
     let mreason =
             case moldOpts of
@@ -637,6 +713,10 @@ checkDirtiness ps installed package present wanted = do
 
 describeConfigDiff :: Config -> ConfigCache -> ConfigCache -> Maybe Text
 describeConfigDiff config old new
+    | configCachePkgSrc old /= configCachePkgSrc new = Just $
+        "switching from " <>
+        pkgSrcName (configCachePkgSrc old) <> " to " <>
+        pkgSrcName (configCachePkgSrc new)
     | not (configCacheDeps new `Set.isSubsetOf` configCacheDeps old) = Just "dependencies changed"
     | not $ Set.null newComponents =
         Just $ "components added: " `T.append` T.intercalate ", "
@@ -693,6 +773,9 @@ describeConfigDiff config old new
     removeMatching xs ys = (xs, ys)
 
     newComponents = configCacheComponents new `Set.difference` configCacheComponents old
+
+    pkgSrcName (CacheSrcLocal fp) = T.pack fp
+    pkgSrcName CacheSrcUpstream = "upstream source"
 
 psForceDirty :: PackageSource -> Bool
 psForceDirty (PSLocal lp) = lpForceDirty lp
@@ -868,9 +951,9 @@ pprintExceptions exceptions stackYaml parentMap wanted =
                 pprintFlags (packageFlags pkg) <> ":" <> line <>
                 indent 4 (vsep depErrors) <>
                 case getShortestDepsPath parentMap wanted (packageName pkg) of
-                    [] -> mempty
-                    [target,_] -> line <> "needed since" <+> displayTargetPkgId target <+> "is a build target."
-                    (target:path) -> line <> "needed due to " <> encloseSep "" "" " -> " pathElems
+                    Nothing -> line <> "needed for unknown reason - stack invariant violated."
+                    Just [] -> line <> "needed since" <+> pkgIdent <+> "is a build target."
+                    Just (target:path) -> line <> "needed due to " <> encloseSep "" "" " -> " pathElems
                       where
                         pathElems =
                             [displayTargetPkgId target] ++
@@ -921,13 +1004,15 @@ getShortestDepsPath
     :: ParentMap
     -> Set PackageName
     -> PackageName
-    -> [PackageIdentifier]
+    -> Maybe [PackageIdentifier]
 getShortestDepsPath (MonoidMap parentsMap) wanted name =
-    case M.lookup name parentsMap of
-        Nothing -> []
-        Just (_, parents) -> findShortest 256 paths0
-          where
-            paths0 = M.fromList $ map (\(ident, _) -> (packageIdentifierName ident, startDepsPath ident)) parents
+    if Set.member name wanted
+        then Just []
+        else case M.lookup name parentsMap of
+            Nothing -> Nothing
+            Just (_, parents) -> Just $ findShortest 256 paths0
+              where
+                paths0 = M.fromList $ map (\(ident, _) -> (packageIdentifierName ident, startDepsPath ident)) parents
   where
     -- The 'paths' map is a map from PackageName to the shortest path
     -- found to get there. It is the frontier of our breadth-first

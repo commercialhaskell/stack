@@ -37,6 +37,7 @@ import           Stack.Types.Config
 import           Stack.Types.PackageName
 import           Stack.Types.Resolver
 import           Stack.Types.StackT
+import           Stack.Types.StringError
 import           System.FilePath            (dropExtension, replaceExtension)
 import           System.Process.Read
 
@@ -67,8 +68,8 @@ scriptCmd opts go' = do
 
         (targetsSet, coresSet) <-
             case soPackages opts of
-                [] -> do
-                    $logError "No packages provided, using experimental import parser"
+                [] ->
+                    -- Using the import parser
                     getPackagesFromImports (globalResolver go) (soFile opts)
                 packages -> do
                     let targets = concatMap wordsComma packages
@@ -164,7 +165,7 @@ getPackagesFromImports (Just (ARResolver (ResolverSnapshot name))) scriptFP = do
                             case Set.toList pns of
                                 [] -> assert False $ return Set.empty
                                 [pn] -> return $ Set.singleton pn
-                                pns' -> error $ concat
+                                pns' -> throwString $ concat
                                     [ "Module "
                                     , S8.unpack $ unModuleName mn
                                     , " appears in multiple packages: "
@@ -265,8 +266,15 @@ loadModuleInfo name = do
 
 parseImports :: ByteString -> (Set PackageName, Set ModuleName)
 parseImports =
-    fold . mapMaybe parseLine . S8.lines
+    fold . mapMaybe (parseLine . stripCR) . S8.lines
   where
+    -- Remove any carriage return character present at the end, to
+    -- support Windows-style line endings (CRLF)
+    stripCR bs
+      | S8.null bs = bs
+      | S8.last bs == '\r' = S8.init bs
+      | otherwise = bs
+
     stripPrefix x y
       | x `S8.isPrefixOf` y = Just $ S8.drop (S8.length x) y
       | otherwise = Nothing

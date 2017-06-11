@@ -505,7 +505,7 @@ uploadToGithubRelease global@Global{..} file mUploadLabel = do
 -- | Make a request to the Github API and return the response.
 callGithubApi :: Global -> RequestHeaders -> Maybe FilePath -> String -> IO L8.ByteString
 callGithubApi Global{..} headers mpostFile url = do
-    req0 <- parseUrl url
+    req0 <- parseUrlThrow url
     let authToken =
             fromMaybe
                 (error $
@@ -515,8 +515,7 @@ callGithubApi Global{..} headers mpostFile url = do
                 gGithubAuthToken
         req1 =
             req0
-                { checkStatus = \_ _ _ -> Nothing
-                , requestHeaders =
+                { requestHeaders =
                     [ (CI.mk $ S8.pack "Authorization", S8.pack $ "token " ++ authToken)
                     , (CI.mk $ S8.pack "User-Agent", S8.pack "commercialhaskell/stack") ] ++
                     headers }

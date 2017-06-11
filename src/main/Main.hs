@@ -25,6 +25,7 @@ import           Control.Monad.Writer.Lazy (Writer)
 import           Data.Attoparsec.Args (parseArgs, EscapingMode (Escaping))
 import           Data.Attoparsec.Interpreter (getInterpreterArgs)
 import qualified Data.ByteString.Lazy as L
+import           Data.IORef.RunOnce (runOnce)
 import           Data.List
 import qualified Data.Map as Map
 import           Data.Maybe
@@ -101,6 +102,7 @@ import           Stack.Types.Compiler
 import           Stack.Types.Resolver
 import           Stack.Types.Nix
 import           Stack.Types.StackT
+import           Stack.Types.StringError
 import           Stack.Upgrade
 import qualified Stack.Upload as Upload
 import qualified System.Directory as D
@@ -168,7 +170,8 @@ main = do
                 (nixOptsParser False)
                 ("Only showing --" ++ Nix.nixCmdName ++ "* options.")
 
-  eGlobalRun <- try $ commandLineHandler progName False
+  currentDir <- D.getCurrentDirectory
+  eGlobalRun <- try $ commandLineHandler currentDir progName False
   case eGlobalRun of
     Left (exitCode :: ExitCode) ->
       throwIO exitCode
@@ -197,10 +200,11 @@ vcatErrorHelp (ParserHelp e1 _ _ _ _) (ParserHelp e2 h2 u2 b2 f2) =
   ParserHelp (vcatChunks [e2, e1]) h2 u2 b2 f2
 
 commandLineHandler
-  :: String
+  :: FilePath
+  -> String
   -> Bool
   -> IO (GlobalOptsMonoid, GlobalOpts -> IO ())
-commandLineHandler progName isInterpreter = complicatedOptions
+commandLineHandler currentDir progName isInterpreter = complicatedOptions
   Meta.version
   (Just versionString')
   VERSION_hpack
@@ -216,7 +220,7 @@ commandLineHandler progName isInterpreter = complicatedOptions
           Just _ -> if isInterpreter
                     then parseResultHandler args f
                     else secondaryCommandHandler args f
-                        >>= interpreterHandler args
+                        >>= interpreterHandler currentDir args
           Nothing -> parseResultHandler args f
 
     parseResultHandler args f =
@@ -295,7 +299,7 @@ commandLineHandler progName isInterpreter = complicatedOptions
             "upload"
             "Upload a package to Hackage"
             uploadCmd
-            ((,,,,) <$> many (strArgument $ metavar "TARBALL/DIR") <*>
+            ((,,,,) <$> many (strArgument $ metavar "TARBALL/DIR" <> completer fileCompleter) <*>
              optional pvpBoundsOption <*>
              ignoreCheckSwitch <*>
              switch (long "no-signature" <> help "Do not sign & upload signatures") <*>
@@ -307,7 +311,7 @@ commandLineHandler progName isInterpreter = complicatedOptions
             "sdist"
             "Create source distribution tarballs"
             sdistCmd
-            ((,,,,) <$> many (strArgument $ metavar "DIR") <*>
+            ((,,,,) <$> many (strArgument $ metavar "DIR" <> completer dirCompleter) <*>
              optional pvpBoundsOption <*>
              ignoreCheckSwitch <*>
              switch (long "sign" <> help "Sign & upload signatures") <*>
@@ -474,10 +478,11 @@ commandLineHandler progName isInterpreter = complicatedOptions
     globalOpts kind =
         extraHelpOption hide progName (Docker.dockerCmdName ++ "*") Docker.dockerHelpOptName <*>
         extraHelpOption hide progName (Nix.nixCmdName ++ "*") Nix.nixHelpOptName <*>
-        globalOptsParser kind (if isInterpreter
-                                -- Silent except when errors occur - see #2879
-                                then Just LevelError
-                                else Nothing)
+        globalOptsParser currentDir kind
+            (if isInterpreter
+                -- Silent except when errors occur - see #2879
+                then Just LevelError
+                else Nothing)
         where hide = kind /= OuterGlobalOpts
 
     globalFooter = "Run 'stack --help' for global options that apply to all subcommands."
@@ -516,10 +521,11 @@ secondaryCommandHandler args f =
 
 interpreterHandler
   :: Monoid t
-  => [String]
+  => FilePath
+  -> [String]
   -> ParserFailure ParserHelp
   -> IO (GlobalOptsMonoid, (GlobalOpts -> IO (), t))
-interpreterHandler args f = do
+interpreterHandler currentDir args f = do
   -- args can include top-level config such as --extra-lib-dirs=... (set by
   -- nix-shell) - we need to find the first argument which is a file, everything
   -- afterwards is an argument to the script, everything before is an argument
@@ -559,7 +565,7 @@ interpreterHandler args f = do
     runInterpreterCommand path stackArgs fileArgs = do
       progName <- getProgName
       iargs <- getInterpreterArgs path
-      let parseCmdLine = commandLineHandler progName True
+      let parseCmdLine = commandLineHandler currentDir progName True
           separator = if "--" `elem` iargs then [] else ["--"]
           cmdArgs = stackArgs ++ iargs ++ separator ++ path : fileArgs
        -- TODO show the command in verbose mode
@@ -574,7 +580,7 @@ pathCmd keys go = withBuildConfig go (Stack.Path.path keys)
 setupCmd :: SetupCmdOpts -> GlobalOpts -> IO ()
 setupCmd sco@SetupCmdOpts{..} go@GlobalOpts{..} = do
   lc <- loadConfigWithOpts go
-  when (scoUpgradeCabal && nixEnable (configNix (lcConfig lc))) $ do
+  when (isJust scoUpgradeCabal && nixEnable (configNix (lcConfig lc))) $ do
     throwIO UpgradeCabalUnusable
   withUserFileLock go (configStackRoot $ lcConfig lc) $ \lk -> do
     let getCompilerVersion = loadCompilerVersion go lc
@@ -602,16 +608,16 @@ setupCmd sco@SetupCmdOpts{..} go@GlobalOpts{..} = do
           (Just $ munlockFile lk)
 
 cleanCmd :: CleanOpts -> GlobalOpts -> IO ()
-cleanCmd opts go = withBuildConfigAndLock go (const (clean opts))
+cleanCmd opts go = withBuildConfigAndLockNoDocker go (const (clean opts))
 
 -- | Helper for build and install commands
 buildCmd :: BuildOptsCLI -> GlobalOpts -> IO ()
 buildCmd opts go = do
   when (any (("-prof" `elem`) . either (const []) id . parseArgs Escaping) (boptsCLIGhcOptions opts)) $ do
-    hPutStrLn stderr "When building with stack, you should not use the -prof GHC option"
+    hPutStrLn stderr "Error: When building with stack, you should not use the -prof GHC option"
     hPutStrLn stderr "Instead, please use --library-profiling and --executable-profiling"
     hPutStrLn stderr "See: https://github.com/commercialhaskell/stack/issues/1015"
-    error "-prof GHC option submitted"
+    exitFailure
   case boptsCLIFileWatch opts of
     FileWatchPoll -> fileWatchPoll stderr inner
     FileWatch -> fileWatch stderr inner
@@ -636,7 +642,6 @@ uninstallCmd _ go = withConfigAndLock go $ do
 -- | Unpack packages to the filesystem
 unpackCmd :: [String] -> GlobalOpts -> IO ()
 unpackCmd names go = withConfigAndLock go $ do
-    menv <- getMinimalEnvOverride
     mMiniBuildPlan <-
         case globalResolver go of
             Nothing -> return Nothing
@@ -647,14 +652,13 @@ unpackCmd names go = withConfigAndLock go $ do
                         config <- view configL
                         let miniConfig = loadMiniConfig config
                         runInnerStackT miniConfig (loadMiniBuildPlan snapName)
-                    ResolverCompiler _ -> error "unpack does not work with compiler resolvers"
-                    ResolverCustom _ _ -> error "unpack does not work with custom resolvers"
-    Stack.Fetch.unpackPackages menv mMiniBuildPlan "." names
+                    ResolverCompiler _ -> throwString "Error: unpack does not work with compiler resolvers"
+                    ResolverCustom _ _ -> throwString "Error: unpack does not work with custom resolvers"
+    Stack.Fetch.unpackPackages mMiniBuildPlan "." names
 
 -- | Update the package index
 updateCmd :: () -> GlobalOpts -> IO ()
-updateCmd () go = withConfigAndLock go $
-    getMinimalEnvOverride >>= Stack.PackageIndex.updateAllIndices
+updateCmd () go = withConfigAndLock go Stack.PackageIndex.updateAllIndices
 
 upgradeCmd :: UpgradeOpts -> GlobalOpts -> IO ()
 upgradeCmd upgradeOpts' go = withGlobalConfigAndLock go $
@@ -669,7 +673,7 @@ upgradeCmd upgradeOpts' go = withGlobalConfigAndLock go $
 
 -- | Upload to Hackage
 uploadCmd :: ([String], Maybe PvpBounds, Bool, Bool, String) -> GlobalOpts -> IO ()
-uploadCmd ([], _, _, _, _) _ = error "To upload the current package, please run 'stack upload .'"
+uploadCmd ([], _, _, _, _) _ = throwString "Error: To upload the current package, please run 'stack upload .'"
 uploadCmd (args, mpvpBounds, ignoreCheck, don'tSign, sigServerUrl) go = do
     let partitionM _ [] = return ([], [])
         partitionM f (x:xs) = do
@@ -678,23 +682,23 @@ uploadCmd (args, mpvpBounds, ignoreCheck, don'tSign, sigServerUrl) go = do
             return $ if r then (x:as, bs) else (as, x:bs)
     (files, nonFiles) <- partitionM D.doesFileExist args
     (dirs, invalid) <- partitionM D.doesDirectoryExist nonFiles
-    unless (null invalid) $ error $
-        "stack upload expects a list sdist tarballs or cabal directories.  Can't find " ++
-        show invalid
-    let getUploader :: (HasConfig config) => StackT config IO Upload.Uploader
-        getUploader = do
-            config <- view configL
-            liftIO $ Upload.mkUploader config Upload.defaultUploadSettings
+    unless (null invalid) $ do
+        hPutStrLn stderr $
+            "Error: stack upload expects a list sdist tarballs or cabal directories.  Can't find " ++
+            show invalid
+        exitFailure
     withBuildConfigAndLock go $ \_ -> do
-        uploader <- getUploader
+        config <- view configL
+        getCreds <- liftIO (runOnce (Upload.loadCreds config))
         unless ignoreCheck $
             mapM_ (resolveFile' >=> checkSDistTarball) files
         forM_
             files
             (\file ->
                   do tarFile <- resolveFile' file
-                     liftIO
-                         (Upload.upload uploader (toFilePath tarFile))
+                     liftIO $ do
+                       creds <- getCreds
+                       Upload.upload creds (toFilePath tarFile)
                      unless
                          don'tSign
                          (void $
@@ -704,9 +708,12 @@ uploadCmd (args, mpvpBounds, ignoreCheck, don'tSign, sigServerUrl) go = do
         unless (null dirs) $
             forM_ dirs $ \dir -> do
                 pkgDir <- resolveDir' dir
-                (tarName, tarBytes) <- getSDistTarball mpvpBounds pkgDir
+                (tarName, tarBytes, mcabalRevision) <- getSDistTarball mpvpBounds pkgDir
                 unless ignoreCheck $ checkSDistTarball' tarName tarBytes
-                liftIO $ Upload.uploadBytes uploader tarName tarBytes
+                liftIO $ do
+                  creds <- getCreds
+                  Upload.uploadBytes creds tarName tarBytes
+                  forM_ mcabalRevision $ uncurry $ Upload.uploadRevision creds
                 tarPath <- parseRelFile tarName
                 unless
                     don'tSign
@@ -724,7 +731,7 @@ sdistCmd (dirs, mpvpBounds, ignoreCheck, sign, sigServerUrl) go =
             then liftM Map.keys getLocalPackages
             else mapM resolveDir' dirs
         forM_ dirs' $ \dir -> do
-            (tarName, tarBytes) <- getSDistTarball mpvpBounds dir
+            (tarName, tarBytes, _mcabalRevision) <- getSDistTarball mpvpBounds dir
             distDir <- distDirFromDir dir
             tarPath <- (distDir </>) <$> parseRelFile tarName
             ensureDir (parent tarPath)
@@ -771,7 +778,7 @@ execCmd ExecOpts {..} go@GlobalOpts{..} =
                 config <- view configL
                 menv <- liftIO $ configEnvOverride config eoEnvSettings
                 -- Add RTS options to arguments
-                let argsWithRts args = if null eoRtsOptions 
+                let argsWithRts args = if null eoRtsOptions
                             then args :: [String]
                             else args ++ ["+RTS"] ++ eoRtsOptions ++ ["-RTS"]
                 (cmd, args) <- case (eoCmd, argsWithRts eoArgs) of
@@ -790,7 +797,9 @@ execCmd ExecOpts {..} go@GlobalOpts{..} =
           case mId of
               Just i -> return (head $ words (T.unpack i))
               -- should never happen as we have already installed the packages
-              _      -> error ("Could not find package id of package " ++ name)
+              _      -> liftIO $ do
+                  hPutStrLn stderr ("Could not find package id of package " ++ name)
+                  exitFailure
 
       getPkgOpts menv wc pkgs = do
           ids <- mapM (getPkgId menv wc) pkgs
@@ -800,7 +809,6 @@ execCmd ExecOpts {..} go@GlobalOpts{..} =
           wc <- view $ actualCompilerVersionL.whichCompilerL
           pkgopts <- getPkgOpts menv wc pkgs
           return (prefix ++ compilerExeName wc, pkgopts ++ args)
-    
 
 -- | Evaluate some haskell code inline.
 evalCmd :: EvalOpts -> GlobalOpts -> IO ()
@@ -874,6 +882,7 @@ imgDockerCmd :: (Bool, [Text]) -> GlobalOpts -> IO ()
 imgDockerCmd (rebuild,images) go@GlobalOpts{..} = do
     mProjectRoot <- lcProjectRoot <$> loadConfigWithOpts go
     withBuildConfigExt
+        False
         go
         Nothing
         (\lk ->

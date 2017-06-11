@@ -56,6 +56,9 @@ data BuildOpts =
             -- ^ Build haddocks for dependencies?
             ,boptsHaddockInternal :: !Bool
             -- ^ Build haddocks for all symbols and packages, like @cabal haddock --internal@
+            ,boptsHaddockHyperlinkSource  :: !Bool
+            -- ^ Build hyperlinked source if possible. Fallback to
+            -- @hscolour@. Disable for no sources.
             ,boptsInstallExes :: !Bool
             -- ^ Install executables to user path after building?
             ,boptsPreFetch :: !Bool
@@ -97,6 +100,7 @@ defaultBuildOpts = BuildOpts
     , boptsOpenHaddocks = False
     , boptsHaddockDeps = Nothing
     , boptsHaddockInternal = False
+    , boptsHaddockHyperlinkSource = True
     , boptsInstallExes = False
     , boptsPreFetch = False
     , boptsKeepGoing = Nothing
@@ -149,7 +153,10 @@ data BuildCommand
 
 -- | Build options that may be specified in the stack.yaml or from the CLI
 data BuildOptsMonoid = BuildOptsMonoid
-    { buildMonoidLibProfile :: !(First Bool)
+    { buildMonoidTrace :: !Any
+    , buildMonoidProfile :: !Any
+    , buildMonoidNoStrip :: !Any
+    , buildMonoidLibProfile :: !(First Bool)
     , buildMonoidExeProfile :: !(First Bool)
     , buildMonoidLibStrip :: !(First Bool)
     , buildMonoidExeStrip :: !(First Bool)
@@ -158,6 +165,7 @@ data BuildOptsMonoid = BuildOptsMonoid
     , buildMonoidOpenHaddocks :: !(First Bool)
     , buildMonoidHaddockDeps :: !(First Bool)
     , buildMonoidHaddockInternal :: !(First Bool)
+    , buildMonoidHaddockHyperlinkSource :: !(First Bool)
     , buildMonoidInstallExes :: !(First Bool)
     , buildMonoidPreFetch :: !(First Bool)
     , buildMonoidKeepGoing :: !(First Bool)
@@ -173,7 +181,10 @@ data BuildOptsMonoid = BuildOptsMonoid
 
 instance FromJSON (WithJSONWarnings BuildOptsMonoid) where
   parseJSON = withObjectWarnings "BuildOptsMonoid"
-    (\o -> do buildMonoidLibProfile <- First <$> o ..:? buildMonoidLibProfileArgName
+    (\o -> do let buildMonoidTrace = Any False
+                  buildMonoidProfile = Any False
+                  buildMonoidNoStrip = Any False
+              buildMonoidLibProfile <- First <$> o ..:? buildMonoidLibProfileArgName
               buildMonoidExeProfile <-First <$>  o ..:? buildMonoidExeProfileArgName
               buildMonoidLibStrip <- First <$> o ..:? buildMonoidLibStripArgName
               buildMonoidExeStrip <-First <$>  o ..:? buildMonoidExeStripArgName
@@ -182,6 +193,7 @@ instance FromJSON (WithJSONWarnings BuildOptsMonoid) where
               buildMonoidOpenHaddocks <- First <$> o ..:? buildMonoidOpenHaddocksArgName
               buildMonoidHaddockDeps <- First <$> o ..:? buildMonoidHaddockDepsArgName
               buildMonoidHaddockInternal <- First <$> o ..:? buildMonoidHaddockInternalArgName
+              buildMonoidHaddockHyperlinkSource <- First <$> o ..:? buildMonoidHaddockHyperlinkSourceArgName
               buildMonoidInstallExes <- First <$> o ..:? buildMonoidInstallExesArgName
               buildMonoidPreFetch <- First <$> o ..:? buildMonoidPreFetchArgName
               buildMonoidKeepGoing <- First <$> o ..:? buildMonoidKeepGoingArgName
@@ -221,6 +233,9 @@ buildMonoidHaddockDepsArgName = "haddock-deps"
 
 buildMonoidHaddockInternalArgName :: Text
 buildMonoidHaddockInternalArgName = "haddock-internal"
+
+buildMonoidHaddockHyperlinkSourceArgName :: Text
+buildMonoidHaddockHyperlinkSourceArgName = "haddock-hyperlink-source"
 
 buildMonoidInstallExesArgName :: Text
 buildMonoidInstallExesArgName = "copy-bins"

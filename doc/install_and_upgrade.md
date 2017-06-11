@@ -63,14 +63,8 @@ such.
 ## macOS
 
 We generally test on the current version of macOS, but Stack is known to work
-on El Capitan, Yosemite and Mavericks as well, and may also work on older
+on Sierra, El Capitan, Yosemite and Mavericks as well, and may also work on older
 versions (YMMV).
-
-**macOS Sierra warning**: There are new limitations in the dynamic linker that
-are causing problems for GHC versions earlier than 8.0.2 when building projects with many
-dependencies. GHC 8.0.2 is first used in LTS 8.0. See
-[#2577](https://github.com/commercialhaskell/stack/issues/2577) for more
-information.
 
 ### Installer script
 
@@ -87,9 +81,6 @@ Run:
 * Now you can run `stack` from the terminal.
 
 ### Using Homebrew
-
-**macOS Sierra warning**: Homebrew's haskell-stack formula may not currently
-work on Sierra, so we suggest using the manual method above for now.
 
 If you have a popular [brew](http://brew.sh/) tool installed, you can just do:
 
@@ -113,6 +104,9 @@ problems, see the linked FAQ entries:
 
   * [GHC 7.8.4 fails with `/usr/bin/ar: permission denied`](faq.md#usr-bin-ar-permission-denied)
   * [DYLD_LIBRARY_PATH is ignored](faq.md#dyld-library-path-ignored)
+  
+
+If you are on OS X 10.12 ("Sierra") and encounter [GHC panic while building, see this issue](https://github.com/commercialhaskell/stack/issues/2577)
 
 ## Ubuntu
 

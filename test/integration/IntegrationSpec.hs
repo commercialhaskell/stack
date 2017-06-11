@@ -17,6 +17,7 @@ import qualified Data.Conduit.List            as CL
 import           Data.Conduit.Process
 import           Data.List                    (isSuffixOf, stripPrefix, sort)
 import qualified Data.Map                     as Map
+import           Data.Maybe                   (fromMaybe)
 import           Data.Text.Encoding.Error     (lenientDecode)
 import qualified Data.Text.Lazy               as TL
 import qualified Data.Text.Lazy.Encoding      as TL
@@ -53,12 +54,14 @@ main = do
                  $ Map.insert "HOME" newHome
                  $ Map.insert "APPDATA" newHome
                  $ Map.delete "GHC_PACKAGE_PATH"
+                 $ Map.delete "STACK_ROOT"
                  $ Map.fromList
                  $ map (first (map toUpper)) envOrig
 
-        origStackRoot <- getAppUserDataDirectory "stack"
+        defaultStackRoot <- getAppUserDataDirectory "stack"
+        let origStackRoot = fromMaybe defaultStackRoot (lookup "STACK_ROOT" envOrig)
 
-        hspec $ mapM_ (test runghc env' currDir origStackRoot newHome) tests
+        hspec $ mapM_ (test runghc env' currDir defaultStackRoot origStackRoot newHome) tests
 
 hasTest :: FilePath -> FilePath -> IO Bool
 hasTest root dir = doesFileExist $ root </> dir </> "Main.hs"
@@ -66,14 +69,15 @@ hasTest root dir = doesFileExist $ root </> dir </> "Main.hs"
 test :: FilePath -- ^ runghc
      -> [(String, String)] -- ^ env
      -> FilePath -- ^ currdir
+     -> FilePath -- ^ defaultStackRoot
      -> FilePath -- ^ origStackRoot
      -> FilePath -- ^ newHome
      -> String
      -> Spec
-test runghc env' currDir origStackRoot newHome name = it name $ withDir $ \dir -> do
+test runghc env' currDir defaultStackRoot origStackRoot newHome name = it name $ withDir $ \dir -> do
     newHomeExists <- doesDirectoryExist newHome
     when newHomeExists (removeDirectoryRecursive newHome)
-    let newStackRoot = newHome </> takeFileName origStackRoot
+    let newStackRoot = newHome </> takeFileName defaultStackRoot
     copyTree toCopyRoot origStackRoot newStackRoot
     writeFile (newStackRoot </> "config.yaml") "system-ghc: true"
     let testDir = currDir </> "tests" </> name

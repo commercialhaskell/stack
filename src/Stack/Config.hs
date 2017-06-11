@@ -30,6 +30,7 @@ module Stack.Config
   ,loadConfig
   ,loadConfigMaybeProject
   ,loadMiniConfig
+  ,loadConfigYaml
   ,packagesParser
   ,getLocalPackages
   ,resolvePackageEntry
@@ -72,7 +73,7 @@ import           Data.Monoid.Extra
 import qualified Data.Text as T
 import           Data.Text.Encoding (encodeUtf8, decodeUtf8)
 import qualified Data.Yaml as Yaml
-import           Distribution.System (OS (..), Platform (..), buildPlatform)
+import           Distribution.System (OS (..), Platform (..), buildPlatform, Arch(OtherArch))
 import qualified Distribution.Text
 import           Distribution.Version (simplifyVersionRange)
 import           GHC.Conc (getNumProcessors)
@@ -99,9 +100,10 @@ import           Stack.Types.Config
 import           Stack.Types.Docker
 import           Stack.Types.Internal
 import           Stack.Types.Nix
-import           Stack.Types.PackageIndex (HttpType (HTHackageSecurity), HackageSecurity (..))
+import           Stack.Types.PackageIndex (IndexType (ITHackageSecurity), HackageSecurity (..))
 import           Stack.Types.Resolver
 import           Stack.Types.StackT
+import           Stack.Types.StringError
 import           Stack.Types.Urls
 import           Stack.Types.Version
 import           System.Environment
@@ -194,17 +196,16 @@ makeConcreteResolver ar = do
                 config <- view configL
                 implicitGlobalDir <- getImplicitGlobalProjectDir config
                 let fp = implicitGlobalDir </> stackDotYaml
-                WithJSONWarnings (ProjectAndConfigMonoid project _) _warnings <-
-                    liftIO (Yaml.decodeFileEither $ toFilePath fp)
-                    >>= either throwM return
+                ProjectAndConfigMonoid project _ <-
+                    loadConfigYaml (parseProjectAndConfigMonoid (parent fp)) fp
                 return $ projectResolver project
             ARLatestNightly -> return $ ResolverSnapshot $ Nightly $ snapshotsNightly snapshots
             ARLatestLTSMajor x ->
                 case IntMap.lookup x $ snapshotsLts snapshots of
-                    Nothing -> error $ "No LTS release found with major version " ++ show x
+                    Nothing -> errorString $ "No LTS release found with major version " ++ show x
                     Just y -> return $ ResolverSnapshot $ LTS x y
             ARLatestLTS
-                | IntMap.null $ snapshotsLts snapshots -> error "No LTS releases found"
+                | IntMap.null $ snapshotsLts snapshots -> errorString "No LTS releases found"
                 | otherwise ->
                     let (x, y) = IntMap.findMax $ snapshotsLts snapshots
                      in return $ ResolverSnapshot $ LTS x y
@@ -253,7 +254,11 @@ configFromConfigMonoid
 configFromConfigMonoid
     configStackRoot configUserConfigPath configAllowLocals mresolver
     mproject ConfigMonoid{..} = do
-     let configWorkDir = fromFirst $(mkRelDir ".stack-work") configMonoidWorkDir
+     -- If --stack-work is passed, prefer it. Otherwise, if STACK_WORK
+     -- is set, use that. If neither, use the default ".stack-work"
+     mstackWorkEnv <- liftIO $ lookupEnv stackWorkEnvVar
+     configWorkDir0 <- maybe (return $(mkRelDir ".stack-work")) parseRelDir mstackWorkEnv
+     let configWorkDir = fromFirst configWorkDir0 configMonoidWorkDir
      -- This code is to handle the deprecation of latest-snapshot-url
      configUrls <- case (getFirst configMonoidLatestSnapshotUrl, getFirst (urlsMonoidLatestSnapshot configMonoidUrls)) of
          (Just url, Nothing) -> do
@@ -265,10 +270,8 @@ configFromConfigMonoid
          configPackageIndices = fromFirst
             [PackageIndex
                 { indexName = IndexName "Hackage"
-                , indexLocation = ILGitHttp
-                        "https://github.com/commercialhaskell/all-cabal-hashes.git"
-                        "https://s3.amazonaws.com/hackage.fpcomplete.com/"
-                        (HTHackageSecurity HackageSecurity
+                , indexLocation = "https://s3.amazonaws.com/hackage.fpcomplete.com/"
+                , indexType = ITHackageSecurity HackageSecurity
                             { hsKeyIds =
                                 [ "0a5c7ea47cd1b15f01f5f51a33adda7e655bc0f0b0615baa8e271f4c3351e21d"
                                 , "1ea9ba32c526d1cc91ab5e5bd364ec5e9e8cb67179a471872f6e26f0ae773d42"
@@ -281,9 +284,8 @@ configFromConfigMonoid
                                 , "fe331502606802feac15e514d9b9ea83fee8b6ffef71335479a2e68d84adc6b0"
                                 ]
                             , hsKeyThreshold = 3
-                            })
+                            }
                 , indexDownloadPrefix = "https://s3.amazonaws.com/hackage.fpcomplete.com/package/"
-                , indexGpgVerify = False
                 , indexRequireHashes = False
                 }]
             configMonoidPackageIndices
@@ -311,6 +313,10 @@ configFromConfigMonoid
          configImage = Image.imgOptsFromMonoid configMonoidImageOpts
 
          configCompilerCheck = fromFirst MatchMinor configMonoidCompilerCheck
+
+     case arch of
+         OtherArch unk -> $logWarn $ "Warning: Unknown value for architecture setting: " <> T.pack (show unk)
+         _ -> return ()
 
      configPlatformVariant <- liftIO $
          maybe PlatformVariantNone PlatformVariant <$> lookupEnv platformVariantEnvVar
@@ -372,7 +378,7 @@ configFromConfigMonoid
          configScmInit = getFirst configMonoidScmInit
          configGhcOptions = configMonoidGhcOptions
          configSetupInfoLocations = configMonoidSetupInfoLocations
-         configPvpBounds = fromFirst PvpBoundsNone configMonoidPvpBounds
+         configPvpBounds = fromFirst (PvpBounds PvpBoundsNone False) configMonoidPvpBounds
          configModifyCodePage = fromFirst True configMonoidModifyCodePage
          configExplicitSetupDeps = configMonoidExplicitSetupDeps
          configRebuildGhcOptions = fromFirst False configMonoidRebuildGhcOptions
@@ -380,6 +386,7 @@ configFromConfigMonoid
          configAllowNewer = fromFirst False configMonoidAllowNewer
          configDefaultTemplate = getFirst configMonoidDefaultTemplate
          configDumpLogs = fromFirst DumpWarningLogs configMonoidDumpLogs
+         configSaveHackageCreds = fromFirst True configMonoidSaveHackageCreds
 
      configAllowDifferentUser <-
         case getFirst configMonoidAllowDifferentUser of
@@ -409,9 +416,10 @@ getDefaultLocalProgramsBase configStackRoot configPlatform override =
       -- location to the new one, which is undesirable.
       Platform _ Windows ->
         case Map.lookup "LOCALAPPDATA" $ unEnvOverride override of
-          Just t -> do
-            lad <- parseAbsDir $ T.unpack t
-            return $ lad </> $(mkRelDir "Programs") </> $(mkRelDir stackProgName)
+          Just t ->
+            case parseAbsDir $ T.unpack t of
+              Nothing -> throwString ("Failed to parse LOCALAPPDATA environment variable (expected absolute directory): " ++ show t)
+              Just lad -> return $ lad </> $(mkRelDir "Programs") </> $(mkRelDir stackProgName)
           Nothing -> return defaultBase
       _ -> return defaultBase
 
@@ -448,7 +456,8 @@ loadConfigMaybeProject configArgs mresolver mproject = do
 
     let loadHelper mproject' = do
           userConfigPath <- getDefaultUserConfigPath stackRoot
-          extraConfigs0 <- getExtraConfigs userConfigPath >>= mapM loadConfigYaml
+          extraConfigs0 <- getExtraConfigs userConfigPath >>=
+              mapM (\file -> loadConfigYaml (parseConfigMonoid (parent file)) file)
           let extraConfigs =
                 -- non-project config files' existence of a docker section should never default docker
                 -- to enabled, so make it look like they didn't exist
@@ -533,7 +542,7 @@ loadBuildConfig mproject config mresolver mcompiler = do
             exists <- doesFileExist dest
             if exists
                then do
-                   ProjectAndConfigMonoid project _ <- loadConfigYaml dest
+                   ProjectAndConfigMonoid project _ <- loadConfigYaml (parseProjectAndConfigMonoid destDir) dest
                    when (view terminalL env) $
                        case mresolver of
                            Nothing ->
@@ -799,7 +808,9 @@ determineStackRootAndOwnership clArgs = do
                 mstackRoot <- liftIO $ lookupEnv stackRootEnvVar
                 case mstackRoot of
                     Nothing -> getAppUserDataDir stackProgName
-                    Just x -> parseAbsDir x
+                    Just x -> case parseAbsDir x of
+                        Nothing -> throwString ("Failed to parse STACK_ROOT environment variable (expected absolute directory): " ++ show x)
+                        Just parsed -> return parsed
 
     (existingStackRootOrParentDir, userOwnsIt) <- do
         mdirAndOwnership <- findInParents getDirAndOwnership stackRoot
@@ -893,25 +904,28 @@ getExtraConfigs userConfigPath = do
 -- | Load and parse YAML from the given config file. Throws
 -- 'ParseConfigFileException' when there's a decoding error.
 loadConfigYaml
-    :: (FromJSON (WithJSONWarnings a), MonadIO m, MonadLogger m)
-    => Path Abs File -> m a
-loadConfigYaml path = do
-    eres <- loadYaml path
+    :: (MonadIO m, MonadLogger m)
+    => (Value -> Yaml.Parser (WithJSONWarnings a)) -> Path Abs File -> m a
+loadConfigYaml parser path = do
+    eres <- loadYaml parser path
     case eres of
         Left err -> liftIO $ throwM (ParseConfigFileException path err)
         Right res -> return res
 
 -- | Load and parse YAML from the given file.
 loadYaml
-    :: (FromJSON (WithJSONWarnings a), MonadIO m, MonadLogger m)
-    => Path Abs File -> m (Either Yaml.ParseException a)
-loadYaml path = do
+    :: (MonadIO m, MonadLogger m)
+    => (Value -> Yaml.Parser (WithJSONWarnings a)) -> Path Abs File -> m (Either Yaml.ParseException a)
+loadYaml parser path = do
     eres <- liftIO $ Yaml.decodeFileEither (toFilePath path)
     case eres  of
         Left err -> return (Left err)
-        Right (WithJSONWarnings res warnings) -> do
-            logJSONWarnings (toFilePath path) warnings
-            return (Right res)
+        Right val ->
+            case Yaml.parseEither parser val of
+                Left err -> return (Left (Yaml.AesonException err))
+                Right (WithJSONWarnings res warnings) -> do
+                    logJSONWarnings (toFilePath path) warnings
+                    return (Right res)
 
 -- | Get the location of the project config file, if it exists.
 getProjectConfig :: (MonadIO m, MonadThrow m, MonadLogger m)
@@ -968,7 +982,7 @@ loadProjectConfig mstackYaml = do
             return LCSNoConfig
   where
     load fp = do
-        ProjectAndConfigMonoid project config <- loadConfigYaml fp
+        ProjectAndConfigMonoid project config <- loadConfigYaml (parseProjectAndConfigMonoid (parent fp)) fp
         return (project, fp, config)
 
 -- | Get the location of the default stack configuration file.

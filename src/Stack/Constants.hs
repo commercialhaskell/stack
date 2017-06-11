@@ -12,6 +12,7 @@ module Stack.Constants
     ,imageStagingDir
     ,projectDockerSandboxDir
     ,stackDotYaml
+    ,stackWorkEnvVar
     ,stackRootEnvVar
     ,stackRootOptionName
     ,deprecatedStackRootOptionName
@@ -200,6 +201,10 @@ stackProgName = "stack"
 -- | The filename used for the stack config file.
 stackDotYaml :: Path Rel File
 stackDotYaml = $(mkRelFile "stack.yaml")
+
+-- | Environment variable used to override the '.stack-work' relative dir.
+stackWorkEnvVar :: String
+stackWorkEnvVar = "STACK_WORK"
 
 -- | Environment variable used to override the '~/.stack' location.
 stackRootEnvVar :: String

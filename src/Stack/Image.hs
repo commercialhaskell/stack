@@ -15,6 +15,7 @@ import           Control.Exception.Lifted hiding (finally)
 import           Control.Monad
 import           Control.Monad.Catch hiding (bracket)
 import           Control.Monad.IO.Class
+import           Control.Monad.Logger
 import           Data.Char (toLower)
 import qualified Data.Map.Strict as Map
 import           Data.Maybe
@@ -25,6 +26,7 @@ import           Path
 import           Path.Extra
 import           Path.IO
 import           Stack.Constants
+import           Stack.PrettyPrint
 import           Stack.Types.Config
 import           Stack.Types.Image
 import           Stack.Types.StackT
@@ -89,7 +91,16 @@ stageExesInDir opts dir = do
     let destBinPath = dir </> $(mkRelDir "usr/local/bin")
     ensureDir destBinPath
     case imgDockerExecutables opts of
-        Nothing -> copyDirRecur srcBinPath destBinPath
+        Nothing -> do
+            $logInfo ""
+            $logInfo "Note: 'executables' not specified for a image container, so every executable in the project's local bin dir will be used."
+            mcontents <- forgivingAbsence $ listDir srcBinPath
+            case mcontents of
+                Just (files, dirs)
+                    | not (null files) || not (null dirs) -> copyDirRecur srcBinPath destBinPath
+                _ -> $prettyWarn "The project's local bin dir contains no files, so no executables will be added to the docker image."
+            $logInfo ""
+
         Just exes ->
             forM_
                 exes

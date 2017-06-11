@@ -1,0 +1,9 @@
+flags: {}
+packages:
+- '.'
+extra-deps: []
+resolver: lts-8.0
+build:
+  haddock-arguments:
+    haddock-args:
+      - --optghc=-DFOO

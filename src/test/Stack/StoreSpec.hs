@@ -80,12 +80,12 @@ spec = do
     describe "Roundtrips binary formats" $ do
         $(smallcheckManyStore False 6
             [ [t| InstalledCacheInner |]
-            , [t| PackageCacheMap |]
             , [t| BuildCache |]
             ])
         -- Blows up with > 5
         $(smallcheckManyStore False 5
-            [ [t| MiniBuildPlan |]
+            [ [t| PackageCacheMap |]
+            , [t| MiniBuildPlan |]
             ])
         -- Blows up with > 4
         $(smallcheckManyStore False 4

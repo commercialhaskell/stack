@@ -13,6 +13,7 @@ import           Stack.Types.Config
 benchOptsParser :: Bool -> Parser BenchmarkOptsMonoid
 benchOptsParser hide0 = BenchmarkOptsMonoid
         <$> optionalFirst (strOption (long "benchmark-arguments" <>
+                                      long "ba" <>
                                  metavar "BENCH_ARGS" <>
                                  help ("Forward BENCH_ARGS to the benchmark suite. " <>
                                        "Supports templates from `cabal bench`") <>

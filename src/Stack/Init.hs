@@ -50,6 +50,7 @@ import           Stack.Types.FlagName
 import           Stack.Types.PackageName
 import           Stack.Types.Resolver
 import           Stack.Types.StackT              (StackM)
+import           Stack.Types.StringError
 import           Stack.Types.Version
 import qualified System.FilePath                 as FP
 
@@ -67,10 +68,11 @@ initProject whichCmd currDir initOpts mresolver = do
     reldest <- toFilePath `liftM` makeRelativeToCurrentDir dest
 
     exists <- doesFileExist dest
-    when (not (forceOverwrite initOpts) && exists) $ do
-        error ("Stack configuration file " <> reldest <>
-               " exists, use 'stack solver' to fix the existing config file or \
-               \'--force' to overwrite it.")
+    when (not (forceOverwrite initOpts) && exists) $
+        throwString
+            ("Error: Stack configuration file " <> reldest <>
+             " exists, use 'stack solver' to fix the existing config file or \
+             \'--force' to overwrite it.")
 
     dirs <- mapM (resolveDir' . T.unpack) (searchDirs initOpts)
     let noPkgMsg =  "In order to init, you should have an existing .cabal \
@@ -243,7 +245,7 @@ renderStackYaml p ignoredPackages dupPackages =
         , ""
         , "Some commonly used options have been documented as comments in this file."
         , "For advanced use and comprehensive documentation of the format, please see:"
-        , "http://docs.haskellstack.org/en/stable/yaml_configuration/"
+        , "https://docs.haskellstack.org/en/stable/yaml_configuration/"
         ]
 
     resolverHelp = commentHelp
@@ -310,7 +312,7 @@ renderStackYaml p ignoredPackages dupPackages =
 
 getSnapshots' :: (StackM env m, HasConfig env)
               => m Snapshots
-getSnapshots' =
+getSnapshots' = do
     getSnapshots `catchAny` \e -> do
         $logError $
             "Unable to download snapshot list, and therefore could " <>
@@ -326,7 +328,7 @@ getSnapshots' =
         $logError "    http://docs.haskellstack.org/en/stable/yaml_configuration/"
         $logError ""
         $logError $ "Exception was: " <> T.pack (show e)
-        error ""
+        errorString ""
 
 -- | Get the default resolver value
 getDefaultResolver

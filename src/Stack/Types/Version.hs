@@ -27,7 +27,8 @@ module Stack.Types.Version
   ,toMajorVersion
   ,latestApplicableVersion
   ,checkVersion
-  ,nextMajorVersion)
+  ,nextMajorVersion
+  ,UpgradeTo(..))
   where
 
 import           Control.Applicative
@@ -54,6 +55,7 @@ import           GHC.Generics
 import           Language.Haskell.TH
 import           Language.Haskell.TH.Syntax
 import           Prelude -- Fix warning: Word in Prelude from base-4.8.
+import           Stack.Types.StringError
 import           Text.PrettyPrint (render)
 
 -- | A parse fail.
@@ -63,6 +65,9 @@ newtype VersionParseFail =
 instance Exception VersionParseFail
 instance Show VersionParseFail where
     show (VersionParseFail bs) = "Invalid version: " ++ show bs
+
+-- | A Package upgrade; Latest or a specific version.
+data UpgradeTo = Specific Version | Latest deriving (Show)
 
 -- | A package version.
 newtype Version =
@@ -157,7 +162,7 @@ fromCabalVersion (Cabal.Version vs _) =
 mkVersion :: String -> Q Exp
 mkVersion s =
   case parseVersionFromString s of
-    Nothing -> error ("Invalid package version: " ++ show s)
+    Nothing -> errorString ("Invalid package version: " ++ show s)
     Just pn -> [|pn|]
 
 -- | Display a version range
