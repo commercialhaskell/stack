@@ -51,6 +51,9 @@ Other enhancements:
 * Expose a `save-hackage-creds` configuration option
 * On GHC <= 7.8, filters out spurious linker warnings on windows
   See [#3127](https://github.com/commercialhaskell/stack/pull/3127)
+* Better error messages when creating or building packages which alias
+  wired-in packages. See
+  [#3172](https://github.com/commercialhaskell/stack/issues/3172).
 
 Bug fixes:
 
