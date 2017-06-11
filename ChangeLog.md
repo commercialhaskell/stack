@@ -1088,6 +1088,8 @@ Other enhancements:
 * `stack build --fast` turns off optimizations
 * Show progress while downloading package index
   [#1223](https://github.com/commercialhaskell/stack/issues/1223).
+* Allow running tests on tarball created by sdist and upload
+  [#717](https://github.com/commercialhaskell/stack/issues/717).
 
 Bug fixes:
 
