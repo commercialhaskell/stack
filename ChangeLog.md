@@ -84,6 +84,8 @@ Bug fixes:
   See [#3142](https://github.com/commercialhaskell/stack/issues/3142)
 * `stack script`'s import parser will now properly parse files that
   have Windows-style line endings (CRLF)
+* `stack haddock` now includes package names for all modules in the
+   Haddock index page.
 
 
 ## 1.4.0
