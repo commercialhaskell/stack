@@ -445,7 +445,7 @@ data MiniPackageInfo = MiniPackageInfo
     , mpiToolDeps :: !(Set Text)
     -- ^ Due to ambiguity in Cabal, it is unclear whether this refers to the
     -- executable name, the package name, or something else. We have to guess
-    -- based on what's available, which is why we store this is an unwrapped
+    -- based on what's available, which is why we store this in an unwrapped
     -- 'Text'.
     , mpiExes :: !(Set ExeName)
     -- ^ Executables provided by this package
@@ -454,12 +454,15 @@ data MiniPackageInfo = MiniPackageInfo
     , mpiGitSHA1 :: !(Maybe GitSHA1)
     -- ^ An optional SHA1 representation in hex format of the blob containing
     -- the cabal file contents. Useful for grabbing the correct cabal file
-    -- revision directly from a Git repo
+    -- revision directly from a Git repo or the 01-index.tar file
     }
     deriving (Generic, Show, Eq, Data, Typeable)
 instance Store MiniPackageInfo
 instance NFData MiniPackageInfo
 
+-- | A SHA1 hash, but in Git format. This means that the contents are
+-- prefixed with @blob@ and the size of the payload before hashing, as
+-- Git itself does.
 newtype GitSHA1 = GitSHA1 ByteString
     deriving (Generic, Show, Eq, NFData, Store, Data, Typeable, Ord, Hashable)
 

@@ -65,7 +65,7 @@ data ResolverThat's (l :: IsLoaded) where
     -- dependency solver.
     ResolverCompiler :: !CompilerVersion -> ResolverThat's l
     -- A custom resolver based on the given name and URL. When a URL is
-    -- provided, it file is to be completely immutable. Filepaths are
+    -- provided, its contents must be completely immutable. Filepaths are
     -- always loaded. This constructor is used before the build-plan has
     -- been loaded, as we do not yet know the custom snapshot's hash.
     ResolverCustom :: !Text -> !Text -> ResolverThat's 'NotLoaded
