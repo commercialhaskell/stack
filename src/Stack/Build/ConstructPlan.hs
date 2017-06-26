@@ -137,7 +137,7 @@ type M = RWST
     IO
 
 data Ctx = Ctx
-    { rs             :: !ResolvedSnapshot
+    { ls             :: !LoadedSnapshot
     , baseConfigOpts :: !BaseConfigOpts
     , loadPackage    :: !(PackageName -> Version -> Map FlagName Bool -> [Text] -> IO Package)
     , combinedMap    :: !CombinedMap
@@ -175,7 +175,7 @@ instance HasEnvConfig Ctx where
 -- 3) It will only rebuild a local package if its files are dirty or
 -- some of its dependencies have changed.
 constructPlan :: forall env m. (StackM env m, HasEnvConfig env)
-              => ResolvedSnapshot
+              => LoadedSnapshot
               -> BaseConfigOpts
               -> [LocalPackage]
               -> Set PackageName -- ^ additional packages that must be built
@@ -185,7 +185,7 @@ constructPlan :: forall env m. (StackM env m, HasEnvConfig env)
               -> InstalledMap
               -> Bool
               -> m Plan
-constructPlan rs0 baseConfigOpts0 locals extraToBuild0 localDumpPkgs loadPackage0 sourceMap installedMap initialBuildSteps = do
+constructPlan ls0 baseConfigOpts0 locals extraToBuild0 localDumpPkgs loadPackage0 sourceMap installedMap initialBuildSteps = do
     $logDebug "Constructing the build plan"
     getVersions0 <- getPackageVersionsIO
 
@@ -229,7 +229,7 @@ constructPlan rs0 baseConfigOpts0 locals extraToBuild0 localDumpPkgs loadPackage
             throwM $ ConstructPlanFailed "Plan construction failed."
   where
     ctx econfig getVersions0 lf = Ctx
-        { rs = rs0
+        { ls = ls0
         , baseConfigOpts = baseConfigOpts0
         , loadPackage = loadPackage0
         , combinedMap = combineMap sourceMap installedMap
@@ -247,7 +247,7 @@ constructPlan rs0 baseConfigOpts0 locals extraToBuild0 localDumpPkgs loadPackage
     -- TODO Currently, this will only consider and install tools from the
     -- snapshot. It will not automatically install build tools from extra-deps
     -- or local packages.
-    toolMap = getToolMap rs0
+    toolMap = getToolMap ls0
 
 -- | State to be maintained during the calculation of local packages
 -- to unregister.
@@ -885,12 +885,12 @@ markAsDep name = tell mempty { wDeps = Set.singleton name }
 -- | Is the given package/version combo defined in the snapshot?
 inSnapshot :: PackageName -> Version -> M Bool
 inSnapshot name version = do
-    p <- asks rs
+    p <- asks ls
     ls <- asks localNames
     return $ fromMaybe False $ do
         guard $ not $ name `Set.member` ls
-        rpi <- Map.lookup name (rsPackages p)
-        return $ rpiVersion rpi == version
+        lpi <- Map.lookup name (lsPackages p)
+        return $ lpiVersion lpi == version
 
 data ConstructPlanException
     = DependencyCycleDetected [PackageName]

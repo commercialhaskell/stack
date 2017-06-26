@@ -17,16 +17,10 @@ module Stack.Types.BuildPlan
     , StackageSnapshotDef (..)
     , StackagePackageDef (..)
     , ExeName (..)
-    , Snapshots (..)
-    , SnapName (..)
-    , ResolvedSnapshot (..)
-    , resolvedSnapshotVC
-    , ResolvedPackageInfo (..)
+    , LoadedSnapshot (..)
+    , loadedSnapshotVC
+    , LoadedPackageInfo (..)
     , GitSHA1 (..)
-    , renderSnapName
-    , parseSnapName
-    , SnapshotHash (..)
-    , trimmedSnapshotHash
     , ModuleName (..)
     , ModuleInfo (..)
     , moduleInfoVC
@@ -34,17 +28,12 @@ module Stack.Types.BuildPlan
 
 import           Control.Applicative
 import           Control.DeepSeq (NFData)
-import           Control.Exception (Exception)
-import           Control.Monad.Catch (MonadThrow, throwM)
 import           Data.Aeson (ToJSON (..), FromJSON (..), withObject, withText, (.!=), (.:), (.:?), Value (Object), object, (.=))
 import           Data.Aeson.Extended (WithJSONWarnings (..), (..:), (..:?), withObjectWarnings, noJSONWarnings)
 import           Data.ByteString (ByteString)
-import qualified Data.ByteString as BS
 import           Data.Data
 import qualified Data.HashMap.Strict as HashMap
 import           Data.Hashable (Hashable)
-import           Data.IntMap (IntMap)
-import qualified Data.IntMap as IntMap
 import           Data.Map (Map)
 import qualified Data.Map as Map
 import           Data.Monoid
@@ -57,27 +46,18 @@ import           Data.String (IsString)
 import           Data.Text (Text)
 import qualified Data.Text as T
 import           Data.Text.Encoding (encodeUtf8, decodeUtf8)
-import           Data.Text.Read (decimal)
-import           Data.Time (Day)
 import           Data.Traversable (forM)
-import qualified Distribution.Text as DT
 import qualified Distribution.Version as C
 import           GHC.Generics (Generic)
 import           Network.HTTP.Client (parseRequest)
 import           Prelude -- Fix AMP warning
-import           Safe (readMay)
 import           Stack.Types.Compiler
 import           Stack.Types.FlagName
 import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageName
+import           Stack.Types.Resolver
 import           Stack.Types.Version
 import           Stack.Types.VersionIntervals
-
--- | The name of an LTS Haskell or Stackage Nightly snapshot.
-data SnapName
-    = LTS !Int !Int
-    | Nightly !Day
-    deriving (Show, Eq, Ord)
 
 -- | A definition of a snapshot. This could be a Stackage snapshot or
 -- something custom. It does not include information on the global
@@ -87,6 +67,8 @@ data SnapshotDef = SnapshotDef
     -- ^ The compiler version used for this snapshot.
     , sdPackages        :: !(Map PackageName PackageDef)
     -- ^ Packages included in this snapshot.
+    , sdResolver        :: !LoadedResolver
+    -- ^ The resolver that provides this definition.
     }
     deriving (Show, Eq)
 
@@ -181,7 +163,7 @@ instance NFData RemotePackageType
 
 -- | Newtype wrapper to help parse a 'SnapshotDef' from the Stackage
 -- YAML files.
-newtype StackageSnapshotDef = StackageSnapshotDef SnapshotDef
+newtype StackageSnapshotDef = StackageSnapshotDef (SnapName -> SnapshotDef)
 
 -- | Newtype wrapper to help parse a 'PackageDef' from the Stackage
 -- YAML files.
@@ -201,7 +183,9 @@ instance FromJSON StackageSnapshotDef where
 
         sdPackages <- Map.map unStackagePackageDef <$> o .: "packages"
 
-        return $ StackageSnapshotDef SnapshotDef {..}
+        return $ StackageSnapshotDef $ \snapName ->
+          let sdResolver = ResolverSnapshot snapName
+           in SnapshotDef {..}
 
 instance FromJSON StackagePackageDef where
     parseJSON = withObject "StackagePackageDef" $ \o -> do
@@ -236,117 +220,50 @@ data CabalFileInfo = CabalFileInfo
 instance Store CabalFileInfo
 instance NFData CabalFileInfo
 
-data BuildPlanTypesException
-    = ParseSnapNameException Text
-    | ParseFailedException TypeRep Text
-    deriving Typeable
-instance Exception BuildPlanTypesException
-instance Show BuildPlanTypesException where
-    show (ParseSnapNameException t) = "Invalid snapshot name: " ++ T.unpack t
-    show (ParseFailedException rep t) =
-        "Unable to parse " ++ show t ++ " as " ++ show rep
-
 -- | Name of an executable.
 newtype ExeName = ExeName { unExeName :: Text }
     deriving (Show, Eq, Ord, Hashable, IsString, Generic, Store, NFData, Data, Typeable)
 
--- | Convert a 'SnapName' into its short representation, e.g. @lts-2.8@,
--- @nightly-2015-03-05@.
-renderSnapName :: SnapName -> Text
-renderSnapName (LTS x y) = T.pack $ concat ["lts-", show x, ".", show y]
-renderSnapName (Nightly d) = T.pack $ "nightly-" ++ show d
-
--- | Parse the short representation of a 'SnapName'.
-parseSnapName :: MonadThrow m => Text -> m SnapName
-parseSnapName t0 =
-    case lts <|> nightly of
-        Nothing -> throwM $ ParseSnapNameException t0
-        Just sn -> return sn
-  where
-    lts = do
-        t1 <- T.stripPrefix "lts-" t0
-        Right (x, t2) <- Just $ decimal t1
-        t3 <- T.stripPrefix "." t2
-        Right (y, "") <- Just $ decimal t3
-        return $ LTS x y
-    nightly = do
-        t1 <- T.stripPrefix "nightly-" t0
-        Nightly <$> readMay (T.unpack t1)
-
--- | Most recent Nightly and newest LTS version per major release.
-data Snapshots = Snapshots
-    { snapshotsNightly :: !Day
-    , snapshotsLts     :: !(IntMap Int)
-    }
-    deriving Show
-instance FromJSON Snapshots where
-    parseJSON = withObject "Snapshots" $ \o -> Snapshots
-        <$> (o .: "nightly" >>= parseNightly)
-        <*> fmap IntMap.unions (mapM (parseLTS . snd)
-                $ filter (isLTS . fst)
-                $ HashMap.toList o)
-      where
-        parseNightly t =
-            case parseSnapName t of
-                Left e -> fail $ show e
-                Right (LTS _ _) -> fail "Unexpected LTS value"
-                Right (Nightly d) -> return d
-
-        isLTS = ("lts-" `T.isPrefixOf`)
-
-        parseLTS = withText "LTS" $ \t ->
-            case parseSnapName t of
-                Left e -> fail $ show e
-                Right (LTS x y) -> return $ IntMap.singleton x y
-                Right (Nightly _) -> fail "Unexpected nightly value"
-
--- | A fully resolved snapshot, including information gleaned from the
+-- | A fully loaded snapshot, including information gleaned from the
 -- global database and parsing cabal files.
-data ResolvedSnapshot = ResolvedSnapshot
-  { rsCompilerVersion :: !CompilerVersion
-  , rsPackages        :: !(Map PackageName ResolvedPackageInfo)
-  , rsUniqueName      :: !Text
-  -- ^ A unique name for this resolved snapshot. Could be based on a
-  -- unique upstream name (like a Stackage snapshot), the compiler
-  -- name, or a hash of the custom snapshot definition.
-  --
-  -- This name must not contain any characters which would be
-  -- unsuitable for a file path segment (such as forward or back
-  -- slashes).
+data LoadedSnapshot = LoadedSnapshot
+  { lsCompilerVersion :: !CompilerVersion
+  , lsResolver        :: !LoadedResolver
+  , lsPackages        :: !(Map PackageName LoadedPackageInfo)
   }
-    deriving (Generic, Show, Eq, Data, Typeable)
-instance Store ResolvedSnapshot
-instance NFData ResolvedSnapshot
+    deriving (Generic, Show, Data, Eq, Typeable)
+instance Store LoadedSnapshot
+instance NFData LoadedSnapshot
 
-resolvedSnapshotVC :: VersionConfig ResolvedSnapshot
-resolvedSnapshotVC = storeVersionConfig "rs-v1" "LcNoSPO2J7r0ndDudqJy44QePhE="
+loadedSnapshotVC :: VersionConfig LoadedSnapshot
+loadedSnapshotVC = storeVersionConfig "ls-v1" "008JT34ImjzaL-brqnMwfPDWrBI="
 
--- | Information on a single package for the 'ResolvedSnapshot' which
+-- | Information on a single package for the 'LoadedSnapshot' which
 -- can be installed.
-data ResolvedPackageInfo = ResolvedPackageInfo
-    { rpiVersion :: !Version
+data LoadedPackageInfo = LoadedPackageInfo
+    { lpiVersion :: !Version
     -- ^ This /must/ match the version specified within 'rpiDef'.
-    , rpiDef :: !(Maybe PackageDef)
+    , lpiDef :: !(Maybe PackageDef)
     -- ^ The definition for this package. If the package is in the
     -- global database and not in the snapshot, this will be
     -- @Nothing@.
-    , rpiPackageDeps :: !(Set PackageName)
+    , lpiPackageDeps :: !(Set PackageName)
     -- ^ All packages which must be built/copied/registered before
     -- this package.
-    , rpiProvidedExes :: !(Set ExeName)
+    , lpiProvidedExes :: !(Set ExeName)
     -- ^ The names of executables provided by this package, for
     -- performing build tool lookups.
-    , rpiNeededExes :: !(Map ExeName DepInfo)
+    , lpiNeededExes :: !(Map ExeName DepInfo)
     -- ^ Executables needed by this package's various components.
-    , rpiExposedModules :: !(Set ModuleName)
+    , lpiExposedModules :: !(Set ModuleName)
     -- ^ Modules exposed by this package's library
-    , rpiHide :: !Bool
+    , lpiHide :: !Bool
     -- ^ Should this package be hidden in the database. Affects the
     -- script interpreter's module name import parser.
     }
     deriving (Generic, Show, Eq, Data, Typeable)
-instance Store ResolvedPackageInfo
-instance NFData ResolvedPackageInfo
+instance Store LoadedPackageInfo
+instance NFData LoadedPackageInfo
 
 data DepInfo = DepInfo
     { diComponents :: !(Set Component)
@@ -381,12 +298,6 @@ compToText CompBenchmark = "benchmark"
 -- Git itself does.
 newtype GitSHA1 = GitSHA1 ByteString
     deriving (Generic, Show, Eq, NFData, Store, Data, Typeable, Ord, Hashable)
-
-newtype SnapshotHash = SnapshotHash { unShapshotHash :: ByteString }
-    deriving (Generic, Show, Eq)
-
-trimmedSnapshotHash :: SnapshotHash -> ByteString
-trimmedSnapshotHash = BS.take 12 . unShapshotHash
 
 newtype ModuleName = ModuleName { unModuleName :: ByteString }
   deriving (Show, Eq, Ord, Generic, Store, NFData, Typeable, Data)

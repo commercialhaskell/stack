@@ -485,11 +485,11 @@ getResolverConstraints
     -> m (CompilerVersion,
           Map PackageName (Version, Map FlagName Bool))
 getResolverConstraints stackYaml resolver = do
-    (rs, _loadedResolver) <- loadResolver (Just stackYaml) resolver
-    return (rsCompilerVersion rs, rsConstraints rs)
+    rs <- loadResolver (Just stackYaml) resolver
+    return (lsCompilerVersion rs, lsConstraints rs)
   where
-    rpiConstraints rpi = (rpiVersion rpi, maybe Map.empty pdFlags $ rpiDef rpi)
-    rsConstraints = fmap rpiConstraints . rsPackages
+    lpiConstraints lpi = (lpiVersion lpi, maybe Map.empty pdFlags $ lpiDef lpi)
+    lsConstraints = fmap lpiConstraints . lsPackages
 
 -- | Given a bundle of user packages, flag constraints on those packages and a
 -- resolver, determine if the resolver fully, partially or fails to satisfy the

@@ -22,11 +22,10 @@ import           Data.Set                   (Set)
 import qualified Data.Set                   as Set
 import           Data.Store.VersionTagged   (versionedDecodeOrLoad)
 import qualified Data.Text                  as T
-import           Data.Text.Encoding         (encodeUtf8)
 import           Path
 import           Path.IO
 import qualified Stack.Build
-import           Stack.BuildPlan            (loadResolvedSnapshot, loadResolver)
+import           Stack.BuildPlan            (loadResolver)
 import           Stack.Exec
 import           Stack.GhcPkg               (ghcPkgExeName)
 import           Stack.Options.ScriptParser
@@ -240,20 +239,20 @@ blacklist = Set.fromList
     , $(mkPackageName "cryptohash-sha256")
     ]
 
-toModuleInfo :: ResolvedSnapshot -> ModuleInfo
+toModuleInfo :: LoadedSnapshot -> ModuleInfo
 toModuleInfo =
       mconcat
-    . map (\(pn, rpi) ->
+    . map (\(pn, lpi) ->
             ModuleInfo
             $ Map.fromList
             $ map (\mn -> (mn, Set.singleton pn))
             $ Set.toList
-            $ rpiExposedModules rpi)
-    . filter (\(pn, rpi) ->
-            not (rpiHide rpi) &&
+            $ lpiExposedModules lpi)
+    . filter (\(pn, lpi) ->
+            not (lpiHide lpi) &&
             pn `Set.notMember` blacklist)
     . Map.toList
-    . rsPackages
+    . lsPackages
 
 -- | Where to store module info caches
 moduleInfoCache :: SnapName -> StackT EnvConfig IO (Path Abs File)
@@ -268,9 +267,8 @@ moduleInfoCache name = do
 loadModuleInfo :: SnapName -> StackT EnvConfig IO ModuleInfo
 loadModuleInfo name = do
     path <- moduleInfoCache name
-    $(versionedDecodeOrLoad moduleInfoVC) path $ do
-      (rs, _) <- loadResolver Nothing $ ResolverSnapshot name
-      return $ toModuleInfo rs
+    $(versionedDecodeOrLoad moduleInfoVC) path $
+      fmap toModuleInfo $ loadResolver Nothing $ ResolverSnapshot name
 
 parseImports :: ByteString -> (Set PackageName, Set ModuleName)
 parseImports =

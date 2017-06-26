@@ -118,7 +118,7 @@ module Stack.Types.Config
   -- * Paths
   ,bindirSuffix
   ,configInstalledCache
-  ,configResolvedSnapshotCache
+  ,configLoadedSnapshotCache
   ,getProjectWorkDir
   ,docDirSuffix
   ,flagCacheLocal
@@ -563,7 +563,7 @@ data EnvConfig = EnvConfig
     ,envConfigCompilerBuild :: !CompilerBuild
     ,envConfigPackagesRef :: !(IORef (Maybe (Map (Path Abs Dir) TreatLikeExtraDep)))
     -- ^ Cache for 'getLocalPackages'.
-    ,envConfigResolvedSnapshot :: !ResolvedSnapshot
+    ,envConfigLoadedSnapshot :: !LoadedSnapshot
     -- ^ The fully resolved snapshot information.
     }
 
@@ -959,13 +959,12 @@ configMonoidSaveHackageCredsName = "save-hackage-creds"
 data ConfigException
   = ParseConfigFileException (Path Abs File) ParseException
   | ParseCustomSnapshotException Text ParseException
-  | ParseResolverException Text
   | NoProjectConfigFound (Path Abs Dir) (Maybe Text)
   | UnexpectedArchiveContents [Path Abs Dir] [Path Abs File]
   | UnableToExtractArchive Text (Path Abs File)
   | BadStackVersionException VersionRange
   | NoMatchingSnapshot WhichSolverCmd (NonEmpty SnapName)
-  | forall l. ResolverMismatch WhichSolverCmd (ResolverThat's l) String
+  | forall h. ResolverMismatch WhichSolverCmd (ResolverWith h) String
   | ResolverPartial WhichSolverCmd Resolver String
   | NoSuchDirectory FilePath
   | ParseGHCVariantException String
@@ -993,12 +992,6 @@ instance Show ConfigException where
         , Yaml.prettyPrintParseException exception
         -- FIXME: Link to docs about custom snapshots
         -- , "\nSee http://docs.haskellstack.org/en/stable/yaml_configuration/"
-        ]
-    show (ParseResolverException t) = concat
-        [ "Invalid resolver value: "
-        , T.unpack t
-        , ". Possible valid values include lts-2.12, nightly-YYYY-MM-DD, ghc-7.10.2, and ghcjs-0.1.0_ghc-7.10.2. "
-        , "See https://www.stackage.org/snapshots for a complete list."
         ]
     show (NoProjectConfigFound dir mcmd) = concat
         [ "Unable to find a stack.yaml file in the current directory ("
@@ -1226,9 +1219,9 @@ platformSnapAndCompilerRel
     :: (MonadReader env m, HasEnvConfig env, MonadThrow m)
     => m (Path Rel Dir)
 platformSnapAndCompilerRel = do
-    resolver' <- view resolvedSnapshotL
+    ls' <- view loadedSnapshotL
     platform <- platformGhcRelDir
-    name <- parseRelDir $ T.unpack $ rsUniqueName resolver'
+    name <- parseRelDir $ T.unpack $ resolverDirName $ lsResolver ls'
     ghc <- compilerVersionDir
     useShaPathOnWindows (platform </> name </> ghc)
 
@@ -1304,11 +1297,11 @@ flagCacheLocal = do
     return $ root </> $(mkRelDir "flag-cache")
 
 -- | Where to store mini build plan caches
-configResolvedSnapshotCache
+configLoadedSnapshotCache
   :: (MonadThrow m, MonadReader env m, HasConfig env, HasGHCVariant env)
   => SnapName -- FIXME generalize?
   -> m (Path Abs File)
-configResolvedSnapshotCache name = do
+configLoadedSnapshotCache name = do
     root <- view stackRootL
     platform <- platformGhcVerOnlyRelDir
     file <- parseRelFile $ T.unpack (renderSnapName name) ++ ".cache"
@@ -1906,10 +1899,10 @@ cabalVersionL = envConfigL.lens
     envConfigCabalVersion
     (\x y -> x { envConfigCabalVersion = y })
 
-resolvedSnapshotL :: HasEnvConfig env => Lens' env ResolvedSnapshot
-resolvedSnapshotL = envConfigL.lens
-    envConfigResolvedSnapshot
-    (\x y -> x { envConfigResolvedSnapshot = y })
+loadedSnapshotL :: HasEnvConfig env => Lens' env LoadedSnapshot
+loadedSnapshotL = envConfigL.lens
+    envConfigLoadedSnapshot
+    (\x y -> x { envConfigLoadedSnapshot = y })
 
 whichCompilerL :: Getting r CompilerVersion WhichCompiler
 whichCompilerL = to whichCompiler
