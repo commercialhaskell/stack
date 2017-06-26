@@ -1,4 +1,5 @@
 {-# LANGUAGE ConstraintKinds       #-}
+{-# LANGUAGE DataKinds             #-}
 {-# LANGUAGE DeriveDataTypeable    #-}
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE MultiParamTypeClasses #-}

@@ -22,6 +22,7 @@ module Stack.PackageDump
     , addSymbols
     , sinkMatching
     , pruneDeps
+    , getGlobalModuleInfo
     ) where
 
 import           Control.Applicative
@@ -48,6 +49,7 @@ import qualified Data.Set as Set
 import           Data.Store.VersionTagged
 import           Data.Text (Text)
 import qualified Data.Text as T
+import           Data.Text.Encoding (encodeUtf8)
 import           Data.Typeable (Typeable)
 import qualified Distribution.License as C
 import qualified Distribution.System as OS
@@ -56,6 +58,7 @@ import           Path
 import           Path.Extra (toFilePathNoTrailingSep)
 import           Prelude -- Fix AMP warning
 import           Stack.GhcPkg
+import           Stack.Types.BuildPlan (ModuleInfo (..), ModuleName (..))
 import           Stack.Types.Compiler
 import           Stack.Types.GhcPkgId
 import           Stack.Types.PackageDump
@@ -298,6 +301,7 @@ data DumpPackage profiling haddock symbols = DumpPackage
     , dpLibDirs :: ![FilePath]
     , dpLibraries :: ![Text]
     , dpHasExposedModules :: !Bool
+    , dpExposedModules :: ![Text]
     , dpDepends :: ![GhcPkgId]
     , dpHaddockInterfaces :: ![FilePath]
     , dpHaddockHtml :: !(Maybe FilePath)
@@ -384,6 +388,7 @@ conduitDumpPackage = (=$= CL.catMaybes) $ eachSection $ do
                 , dpLibDirs = libDirPaths
                 , dpLibraries = T.words $ T.unwords libraries
                 , dpHasExposedModules = not (null libraries || null exposedModules)
+                , dpExposedModules = T.words $ T.unwords exposedModules
                 , dpDepends = depends
                 , dpHaddockInterfaces = haddockInterfaces
                 , dpHaddockHtml = listToMaybe haddockHtml
@@ -481,3 +486,24 @@ takeWhileC f =
     go x
         | f x = yield x >> loop
         | otherwise = leftover x
+
+-- | Get the module information from the global package database
+--
+-- Maps from module name to packages they appear in, ignoring any hidden packages.
+getGlobalModuleInfo
+  :: (MonadIO m, MonadCatch m, MonadLogger m, MonadBaseControl IO m)
+  => EnvOverride -> WhichCompiler
+  -> m ModuleInfo
+getGlobalModuleInfo menv wc =
+    ghcPkgDump menv wc [] sinkModuleInfo
+  where
+    sinkModuleInfo = conduitDumpPackage =$= CL.foldMap toMI
+
+    toMI :: DumpPackage () () () -> ModuleInfo
+    toMI dp
+      | dpIsExposed dp = ModuleInfo $ Map.fromList $ map
+            ((, Set.singleton name) . ModuleName . encodeUtf8)
+            (dpExposedModules dp)
+      | otherwise = mempty
+      where
+        name = packageIdentifierName $ dpPackageIdent dp

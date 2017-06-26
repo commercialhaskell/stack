@@ -84,6 +84,7 @@ import           Path.IO
 import           Prelude -- Fix AMP warning
 import           Stack.Constants
 import           Stack.Fetch
+import           Stack.GhcPkg (getGlobalPackages)
 import           Stack.Package
 import           Stack.PackageIndex
 import           Stack.Types.BuildPlan
@@ -450,9 +451,11 @@ loadMiniBuildPlan name = do
     path <- configMiniBuildPlanCache name
     $(versionedDecodeOrLoad miniBuildPlanVC) path $ liftM buildPlanFixes $ do
         bp <- loadBuildPlan name
+        menv <- getMinimalEnvOverride
+        corePackages <- getGlobalPackages menv (whichCompiler (bpCompilerVersion bp))
         toMiniBuildPlan
-            (siCompilerVersion $ bpSystemInfo bp)
-            (siCorePackages $ bpSystemInfo bp)
+            (bpCompilerVersion bp)
+            corePackages
             (goPP <$> bpPackages bp)
   where
     goPP pp =

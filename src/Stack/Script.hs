@@ -30,6 +30,7 @@ import           Stack.BuildPlan            (loadBuildPlan)
 import           Stack.Exec
 import           Stack.GhcPkg               (ghcPkgExeName)
 import           Stack.Options.ScriptParser
+import           Stack.PackageDump          (getGlobalModuleInfo)
 import           Stack.Runners
 import           Stack.Types.BuildPlan
 import           Stack.Types.Compiler
@@ -66,7 +67,7 @@ scriptCmd opts go' = do
         menv <- liftIO $ configEnvOverride config defaultEnvSettings
         wc <- view $ actualCompilerVersionL.whichCompilerL
 
-        (targetsSet, coresSet) <-
+        targetsSet <-
             case soPackages opts of
                 [] ->
                     -- Using the import parser
@@ -74,7 +75,7 @@ scriptCmd opts go' = do
                 packages -> do
                     let targets = concatMap wordsComma packages
                     targets' <- mapM parsePackageNameFromString targets
-                    return (Set.fromList targets', Set.empty)
+                    return $ Set.fromList targets'
 
         unless (Set.null targetsSet) $ do
             -- Optimization: use the relatively cheap ghc-pkg list
@@ -102,7 +103,7 @@ scriptCmd opts go' = do
                 , map (\x -> "-package" ++ x)
                     $ Set.toList
                     $ Set.insert "base"
-                    $ Set.map packageNameString (Set.union targetsSet coresSet)
+                    $ Set.map packageNameString targetsSet
                 , case soCompile opts of
                     SEInterpret -> []
                     SECompile -> []
@@ -150,11 +151,23 @@ isWindows = False
 -- list the modules available at runtime, but that gets tricky with when we install GHC. Instead, we'll just list all core packages
 getPackagesFromImports :: Maybe AbstractResolver
                        -> FilePath
-                       -> StackT EnvConfig IO (Set PackageName, Set PackageName)
+                       -> StackT EnvConfig IO (Set PackageName)
 getPackagesFromImports Nothing _ = throwM NoResolverWhenUsingNoLocalConfig
 getPackagesFromImports (Just (ARResolver (ResolverSnapshot name))) scriptFP = do
-    (pns1, mns) <- liftIO $ parseImports <$> S8.readFile scriptFP
     mi <- loadModuleInfo name
+    getPackagesFromModuleInfo mi scriptFP
+getPackagesFromImports (Just (ARResolver (ResolverCompiler compiler))) scriptFP = do
+  menv <- getMinimalEnvOverride
+  mi <- getGlobalModuleInfo menv $ whichCompiler compiler
+  getPackagesFromModuleInfo mi scriptFP
+getPackagesFromImports (Just aresolver) _ = throwM $ InvalidResolverForNoLocalConfig $ show aresolver
+
+getPackagesFromModuleInfo
+  :: ModuleInfo
+  -> FilePath -- ^ script filename
+  -> StackT EnvConfig IO (Set PackageName)
+getPackagesFromModuleInfo mi scriptFP = do
+    (pns1, mns) <- liftIO $ parseImports <$> S8.readFile scriptFP
     pns2 <-
         if Set.null mns
             then return Set.empty
@@ -173,14 +186,7 @@ getPackagesFromImports (Just (ARResolver (ResolverSnapshot name))) scriptFP = do
                                     ]
                         Nothing -> return Set.empty
                 return $ Set.unions pns `Set.difference` blacklist
-    return (Set.union pns1 pns2, modifyForWindows $ miCorePackages mi)
-  where
-    modifyForWindows
-        | isWindows = Set.insert $(mkPackageName "Win32") . Set.delete $(mkPackageName "unix")
-        | otherwise = id
-
-getPackagesFromImports (Just (ARResolver (ResolverCompiler _))) _ = return (Set.empty, Set.empty)
-getPackagesFromImports (Just aresolver) _ = throwM $ InvalidResolverForNoLocalConfig $ show aresolver
+    return $ Set.union pns1 pns2
 
 -- | The Stackage project introduced the concept of hidden packages,
 -- to deal with conflicting module names. However, this is a
@@ -234,20 +240,21 @@ blacklist = Set.fromList
     , $(mkPackageName "cryptohash-sha256")
     ]
 
-toModuleInfo :: BuildPlan -> ModuleInfo
-toModuleInfo bp = ModuleInfo
-    { miCorePackages = Map.keysSet $ siCorePackages $ bpSystemInfo bp
-    , miModules =
-              Map.unionsWith Set.union
-            $ map ((\(pn, mns) ->
-                    Map.fromList
-                  $ map (\mn -> (ModuleName $ encodeUtf8 mn, Set.singleton pn))
-                  $ Set.toList mns) . fmap (sdModules . ppDesc))
-            $ filter (\(pn, pp) ->
-                    not (pcHide $ ppConstraints pp) &&
-                    pn `Set.notMember` blacklist)
-            $ Map.toList (bpPackages bp)
-    }
+toModuleInfo :: ModuleInfo -- ^ global packages
+             -> BuildPlan -> ModuleInfo
+toModuleInfo global =
+      mappend global
+    . mconcat
+    . map ((\(pn, mns) ->
+            ModuleInfo
+            $ Map.fromList
+            $ map (\mn -> (ModuleName $ encodeUtf8 mn, Set.singleton pn))
+            $ Set.toList mns) . fmap (sdModules . ppDesc))
+    . filter (\(pn, pp) ->
+            not (pcHide $ ppConstraints pp) &&
+            pn `Set.notMember` blacklist)
+    . Map.toList
+    . bpPackages
 
 -- | Where to store module info caches
 moduleInfoCache :: SnapName -> StackT EnvConfig IO (Path Abs File)
@@ -262,7 +269,12 @@ moduleInfoCache name = do
 loadModuleInfo :: SnapName -> StackT EnvConfig IO ModuleInfo
 loadModuleInfo name = do
     path <- moduleInfoCache name
-    $(versionedDecodeOrLoad moduleInfoVC) path $ toModuleInfo <$> loadBuildPlan name
+    $(versionedDecodeOrLoad moduleInfoVC) path $ do
+      bp <- loadBuildPlan name
+      menv <- getMinimalEnvOverride
+      let wc = whichCompiler $ bpCompilerVersion bp
+      global <- getGlobalModuleInfo menv wc
+      return $ toModuleInfo global bp
 
 parseImports :: ByteString -> (Set PackageName, Set ModuleName)
 parseImports =

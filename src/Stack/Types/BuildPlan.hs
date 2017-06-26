@@ -12,7 +12,6 @@ module Stack.Types.BuildPlan
       BuildPlan (..)
     , PackagePlan (..)
     , PackageConstraints (..)
-    , SystemInfo (..)
     , ExeName (..)
     , SimpleDesc (..)
     , Snapshots (..)
@@ -38,7 +37,7 @@ import           Control.Arrow ((&&&))
 import           Control.DeepSeq (NFData)
 import           Control.Exception (Exception)
 import           Control.Monad.Catch (MonadThrow, throwM)
-import           Data.Aeson (FromJSON (..), FromJSONKey(..), ToJSON (..), ToJSONKey (..), withObject, withText, (.!=), (.:), (.:?))
+import           Data.Aeson (FromJSON (..), FromJSONKey(..), ToJSON (..), ToJSONKey (..), withObject, withText, (.!=), (.:), (.:?), Value (Object))
 import           Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
 import           Data.Data
@@ -50,6 +49,7 @@ import           Data.Map (Map)
 import qualified Data.Map as Map
 import           Data.Monoid
 import           Data.Set (Set)
+import qualified Data.Set as Set
 import           Data.Store (Store)
 import           Data.Store.Version
 import           Data.Store.VersionTagged
@@ -78,7 +78,7 @@ data SnapName
     deriving (Show, Eq, Ord)
 
 data BuildPlan = BuildPlan
-    { bpSystemInfo  :: SystemInfo
+    { bpCompilerVersion :: CompilerVersion
     , bpTools       :: Vector (PackageName, Version)
     , bpPackages    :: Map PackageName PackagePlan
     }
@@ -86,7 +86,15 @@ data BuildPlan = BuildPlan
 
 instance FromJSON BuildPlan where
     parseJSON = withObject "BuildPlan" $ \o -> do
-        bpSystemInfo <- o .: "system-info"
+        Object si <- o .: "system-info"
+        ghcVersion <- si .:? "ghc-version"
+        compilerVersion <- si .:? "compiler-version"
+        bpCompilerVersion <-
+            case (ghcVersion, compilerVersion) of
+                (Just _, Just _) -> fail "can't have both compiler-version and ghc-version fields"
+                (Just ghc, _) -> return (GhcVersion ghc)
+                (_, Just compiler) -> return compiler
+                _ -> fail "expected field \"ghc-version\" or \"compiler-version\" not present"
         bpTools <- o .: "tools" >>= T.mapM goTool
         bpPackages <- o .: "packages"
         return BuildPlan {..}
@@ -170,24 +178,6 @@ instance FromJSON PackageConstraints where
         pcFlagOverrides <- o .: "flags"
         pcHide <- o .:? "hide" .!= False
         return PackageConstraints {..}
-
-data SystemInfo = SystemInfo
-    { siCompilerVersion :: CompilerVersion
-    , siCorePackages    :: Map PackageName Version
-    }
-    deriving (Show, Eq, Ord)
-instance FromJSON SystemInfo where
-    parseJSON = withObject "SystemInfo" $ \o -> do
-        ghcVersion <- o .:? "ghc-version"
-        compilerVersion <- o .:? "compiler-version"
-        siCompilerVersion <-
-            case (ghcVersion, compilerVersion) of
-                (Just _, Just _) -> fail "can't have both compiler-version and ghc-version fields"
-                (Just ghc, _) -> return (GhcVersion ghc)
-                (_, Just compiler) -> return compiler
-                _ -> fail "expected field \"ghc-version\" or \"compiler-version\" not present"
-        siCorePackages <- o .: "core-packages"
-        return SystemInfo {..}
 
 -- | Name of an executable.
 newtype ExeName = ExeName { unExeName :: Text }
@@ -365,13 +355,17 @@ trimmedSnapshotHash = BS.take 12 . unShapshotHash
 newtype ModuleName = ModuleName { unModuleName :: ByteString }
   deriving (Show, Eq, Ord, Generic, Store, NFData, Typeable, Data)
 
-data ModuleInfo = ModuleInfo
-    { miCorePackages :: !(Set PackageName)
-    , miModules      :: !(Map ModuleName (Set PackageName))
+newtype ModuleInfo = ModuleInfo
+    { miModules      :: Map ModuleName (Set PackageName)
     }
   deriving (Show, Eq, Ord, Generic, Typeable, Data)
 instance Store ModuleInfo
 instance NFData ModuleInfo
 
+instance Monoid ModuleInfo where
+  mempty = ModuleInfo mempty
+  mappend (ModuleInfo x) (ModuleInfo y) =
+    ModuleInfo (Map.unionWith Set.union x y)
+
 moduleInfoVC :: VersionConfig ModuleInfo
-moduleInfoVC = storeVersionConfig "mi-v1" "zyCpzzGXA8fTeBmKEWLa_6kF2_s="
+moduleInfoVC = storeVersionConfig "mi-v2" "8ImAfrwMVmqoSoEpt85pLvFeV3s="
