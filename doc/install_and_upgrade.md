@@ -82,7 +82,7 @@ Run:
 
 ### Using Homebrew
 
-If you have a popular [brew](http://brew.sh/) tool installed, you can just do:
+If you have the popular [brew](https://brew.sh/) tool installed, you can just do:
 
     brew install haskell-stack
 
@@ -91,7 +91,7 @@ but tend to be updated within a day or two.
 * Normally, Homebrew will install from a pre-built binary (aka "pour from a
 bottle"), but if `brew` starts trying to build everything from source (which
 will take hours), see
-[their FAQ on the topic](https://github.com/Homebrew/homebrew/blob/master/share/doc/homebrew/FAQ.md#why-do-you-compile-everything).
+[their FAQ on the topic](https://github.com/Homebrew/brew/blob/master/docs/FAQ.md#why-do-you-compile-everything).
 
 ### Notes
 
