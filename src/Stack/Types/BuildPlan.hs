@@ -12,9 +12,7 @@ module Stack.Types.BuildPlan
       BuildPlan (..)
     , PackagePlan (..)
     , PackageConstraints (..)
-    , TestState (..)
     , SystemInfo (..)
-    , Maintainer (..)
     , ExeName (..)
     , SimpleDesc (..)
     , Snapshots (..)
@@ -40,7 +38,7 @@ import           Control.Arrow ((&&&))
 import           Control.DeepSeq (NFData)
 import           Control.Exception (Exception)
 import           Control.Monad.Catch (MonadThrow, throwM)
-import           Data.Aeson (FromJSON (..), FromJSONKey(..), ToJSON (..), ToJSONKey (..), object, withObject, withText, (.!=), (.:), (.:?), (.=))
+import           Data.Aeson (FromJSON (..), FromJSONKey(..), ToJSON (..), ToJSONKey (..), withObject, withText, (.!=), (.:), (.:?))
 import           Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
 import           Data.Data
@@ -50,20 +48,19 @@ import           Data.IntMap (IntMap)
 import qualified Data.IntMap as IntMap
 import           Data.Map (Map)
 import qualified Data.Map as Map
-import           Data.Maybe (fromMaybe)
 import           Data.Monoid
 import           Data.Set (Set)
 import           Data.Store (Store)
 import           Data.Store.Version
 import           Data.Store.VersionTagged
-import           Data.String (IsString, fromString)
+import           Data.String (IsString)
 import           Data.Text (Text, pack, unpack)
 import qualified Data.Text as T
+import           Data.Text.Encoding (encodeUtf8)
 import           Data.Text.Read (decimal)
 import           Data.Time (Day)
 import qualified Data.Traversable as T
 import           Data.Vector (Vector)
-import           Distribution.System (Arch, OS (..))
 import qualified Distribution.Text as DT
 import qualified Distribution.Version as C
 import           GHC.Generics (Generic)
@@ -84,28 +81,14 @@ data BuildPlan = BuildPlan
     { bpSystemInfo  :: SystemInfo
     , bpTools       :: Vector (PackageName, Version)
     , bpPackages    :: Map PackageName PackagePlan
-    , bpGithubUsers :: Map Text (Set Text)
     }
     deriving (Show, Eq)
 
-instance ToJSON BuildPlan where
-    toJSON BuildPlan {..} = object
-        [ "system-info" .= bpSystemInfo
-        , "tools" .= fmap goTool bpTools
-        , "packages" .= bpPackages
-        , "github-users" .= bpGithubUsers
-        ]
-      where
-        goTool (k, v) = object
-            [ "name" .= k
-            , "version" .= v
-            ]
 instance FromJSON BuildPlan where
     parseJSON = withObject "BuildPlan" $ \o -> do
         bpSystemInfo <- o .: "system-info"
         bpTools <- o .: "tools" >>= T.mapM goTool
         bpPackages <- o .: "packages"
-        bpGithubUsers <- o .:? "github-users" .!= mempty
         return BuildPlan {..}
       where
         goTool = withObject "Tool" $ \o -> (,)
@@ -115,28 +98,15 @@ instance FromJSON BuildPlan where
 data PackagePlan = PackagePlan
     { ppVersion     :: Version
     , ppCabalFileInfo :: Maybe CabalFileInfo
-    , ppGithubPings :: Set Text
-    , ppUsers       :: Set PackageName
     , ppConstraints :: PackageConstraints
     , ppDesc        :: SimpleDesc
     }
     deriving (Show, Eq)
 
-instance ToJSON PackagePlan where
-    toJSON PackagePlan {..} = object
-        $ maybe id (\cfi -> (("cabal-file-info" .= cfi):)) ppCabalFileInfo
-        [ "version"      .= ppVersion
-        , "github-pings" .= ppGithubPings
-        , "users"        .= ppUsers
-        , "constraints"  .= ppConstraints
-        , "description"  .= ppDesc
-        ]
 instance FromJSON PackagePlan where
     parseJSON = withObject "PackageBuild" $ \o -> do
         ppVersion <- o .: "version"
         ppCabalFileInfo <- o .:? "cabal-file-info"
-        ppGithubPings <- o .:? "github-pings" .!= mempty
-        ppUsers <- o .:? "users" .!= mempty
         ppConstraints <- o .: "constraints"
         ppDesc <- o .: "description"
         return PackagePlan {..}
@@ -145,23 +115,20 @@ instance FromJSON PackagePlan where
 data CabalFileInfo = CabalFileInfo
     { cfiSize :: !Int
     -- ^ File size in bytes
-    , cfiHashes :: !(Map.Map Text Text)
-    -- ^ Various hashes of the file contents
+    , cfiGitSHA1 :: !GitSHA1
+    -- ^ 'GitSHA1' of the cabal file contents
     }
     deriving (Show, Eq, Generic)
-instance ToJSON CabalFileInfo where
-    toJSON CabalFileInfo {..} = object
-        [ "size" .= cfiSize
-        , "hashes" .= cfiHashes
-        ]
 instance FromJSON CabalFileInfo where
     parseJSON = withObject "CabalFileInfo" $ \o -> do
         cfiSize <- o .: "size"
         cfiHashes <- o .: "hashes"
+        cfiGitSHA1 <- fmap (GitSHA1 . encodeUtf8)
+                    $ maybe
+                        (fail "Could not find GitSHA1")
+                        return
+                    $ HashMap.lookup ("GitSHA1" :: Text) cfiHashes
         return CabalFileInfo {..}
-
-display :: DT.Text a => a -> Text
-display = fromString . DT.display
 
 simpleParse :: (MonadThrow m, DT.Text a, Typeable a) => Text -> m a
 simpleParse orig = withTypeRep $ \rep ->
@@ -192,82 +159,25 @@ instance Show BuildPlanTypesException where
 
 data PackageConstraints = PackageConstraints
     { pcVersionRange     :: VersionRange
-    , pcMaintainer       :: Maybe Maintainer
-    , pcTests            :: TestState
-    , pcHaddocks         :: TestState
-    , pcBuildBenchmarks  :: Bool
     , pcFlagOverrides    :: Map FlagName Bool
-    , pcEnableLibProfile :: Bool
     , pcHide             :: Bool
     }
     deriving (Show, Eq)
-instance ToJSON PackageConstraints where
-    toJSON PackageConstraints {..} = object $ addMaintainer
-        [ "version-range" .= display pcVersionRange
-        , "tests" .= pcTests
-        , "haddocks" .= pcHaddocks
-        , "build-benchmarks" .= pcBuildBenchmarks
-        , "flags" .= pcFlagOverrides
-        , "library-profiling" .= pcEnableLibProfile
-        , "hide" .= pcHide
-        ]
-      where
-        addMaintainer = maybe id (\m -> (("maintainer" .= m):)) pcMaintainer
 instance FromJSON PackageConstraints where
     parseJSON = withObject "PackageConstraints" $ \o -> do
         pcVersionRange <- (o .: "version-range")
                       >>= either (fail . show) return . simpleParse
-        pcTests <- o .: "tests"
-        pcHaddocks <- o .: "haddocks"
-        pcBuildBenchmarks <- o .: "build-benchmarks"
         pcFlagOverrides <- o .: "flags"
-        pcMaintainer <- o .:? "maintainer"
-        pcEnableLibProfile <- fmap (fromMaybe True) (o .:? "library-profiling")
         pcHide <- o .:? "hide" .!= False
         return PackageConstraints {..}
 
-data TestState = ExpectSuccess
-               | ExpectFailure
-               | Don'tBuild -- ^ when the test suite will pull in things we don't want
-    deriving (Show, Eq, Ord, Bounded, Enum)
-
-testStateToText :: TestState -> Text
-testStateToText ExpectSuccess = "expect-success"
-testStateToText ExpectFailure = "expect-failure"
-testStateToText Don'tBuild    = "do-not-build"
-
-instance ToJSON TestState where
-    toJSON = toJSON . testStateToText
-instance FromJSON TestState where
-    parseJSON = withText "TestState" $ \t ->
-        case HashMap.lookup t states of
-            Nothing -> fail $ "Invalid state: " ++ unpack t
-            Just v -> return v
-      where
-        states = HashMap.fromList
-               $ map (\x -> (testStateToText x, x)) [minBound..maxBound]
-
 data SystemInfo = SystemInfo
     { siCompilerVersion :: CompilerVersion
-    , siOS              :: OS
-    , siArch            :: Arch
     , siCorePackages    :: Map PackageName Version
-    , siCoreExecutables :: Set ExeName
     }
     deriving (Show, Eq, Ord)
-instance ToJSON SystemInfo where
-    toJSON SystemInfo {..} = object $
-        (case siCompilerVersion of
-            GhcVersion version -> "ghc-version" .= version
-            _ -> "compiler-version" .= siCompilerVersion) :
-        [ "os" .= display siOS
-        , "arch" .= display siArch
-        , "core-packages" .= siCorePackages
-        , "core-executables" .= siCoreExecutables
-        ]
 instance FromJSON SystemInfo where
     parseJSON = withObject "SystemInfo" $ \o -> do
-        let helper name = (o .: name) >>= either (fail . show) return . simpleParse
         ghcVersion <- o .:? "ghc-version"
         compilerVersion <- o .:? "compiler-version"
         siCompilerVersion <-
@@ -276,14 +186,8 @@ instance FromJSON SystemInfo where
                 (Just ghc, _) -> return (GhcVersion ghc)
                 (_, Just compiler) -> return compiler
                 _ -> fail "expected field \"ghc-version\" or \"compiler-version\" not present"
-        siOS <- helper "os"
-        siArch <- helper "arch"
         siCorePackages <- o .: "core-packages"
-        siCoreExecutables <- o .: "core-executables"
         return SystemInfo {..}
-
-newtype Maintainer = Maintainer { unMaintainer :: Text }
-    deriving (Show, Eq, Ord, Hashable, ToJSON, FromJSON, IsString)
 
 -- | Name of an executable.
 newtype ExeName = ExeName { unExeName :: Text }
@@ -315,13 +219,6 @@ instance Monoid SimpleDesc where
         (Map.unionWith (<>) b x)
         (c <> y)
         (d <> z)
-instance ToJSON SimpleDesc where
-    toJSON SimpleDesc {..} = object
-        [ "packages" .= sdPackages
-        , "tools" .= sdTools
-        , "provided-exes" .= sdProvidedExes
-        , "modules" .= sdModules
-        ]
 instance FromJSON SimpleDesc where
     parseJSON = withObject "SimpleDesc" $ \o -> do
         sdPackages <- o .: "packages"
@@ -341,11 +238,6 @@ instance Monoid DepInfo where
     DepInfo a x `mappend` DepInfo b y = DepInfo
         (mappend a b)
         (C.intersectVersionRanges x y)
-instance ToJSON DepInfo where
-    toJSON DepInfo {..} = object
-        [ "components" .= diComponents
-        , "range" .= display diRange
-        ]
 instance FromJSON DepInfo where
     parseJSON = withObject "DepInfo" $ \o -> do
         diComponents <- o .: "components"
@@ -364,8 +256,6 @@ compToText CompExecutable = "executable"
 compToText CompTestSuite = "test-suite"
 compToText CompBenchmark = "benchmark"
 
-instance ToJSON Component where
-    toJSON = toJSON . compToText
 instance FromJSON Component where
     parseJSON = withText "Component" $ \t -> maybe
         (fail $ "Invalid component: " ++ unpack t)

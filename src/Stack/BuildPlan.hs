@@ -460,10 +460,7 @@ loadMiniBuildPlan name = do
         , pcFlagOverrides $ ppConstraints pp
          -- TODO: store ghc options in BuildPlan?
         , []
-        , ppCabalFileInfo pp
-            >>= fmap (GitSHA1 . encodeUtf8)
-              . Map.lookup "GitSHA1"
-              . cfiHashes
+        , fmap cfiGitSHA1 $ ppCabalFileInfo pp
         )
 
 -- | Some hard-coded fixes for build plans, hopefully to be irrelevant over
