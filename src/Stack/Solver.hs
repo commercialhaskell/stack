@@ -69,6 +69,7 @@ import           Stack.PrettyPrint
 import           Stack.Setup
 import           Stack.Setup.Installed
 import           Stack.Types.Build
+import           Stack.Types.BuildPlan
 import           Stack.Types.Compiler
 import           Stack.Types.Config
 import           Stack.Types.FlagName
@@ -484,11 +485,11 @@ getResolverConstraints
     -> m (CompilerVersion,
           Map PackageName (Version, Map FlagName Bool))
 getResolverConstraints stackYaml resolver = do
-    (mbp, _loadedResolver) <- loadResolver (Just stackYaml) resolver
-    return (mbpCompilerVersion mbp, mbpConstraints mbp)
+    (rs, _loadedResolver) <- loadResolver (Just stackYaml) resolver
+    return (rsCompilerVersion rs, rsConstraints rs)
   where
-    mpiConstraints mpi = (mpiVersion mpi, mpiFlags mpi)
-    mbpConstraints mbp = fmap mpiConstraints (mbpPackages mbp)
+    rpiConstraints rpi = (rpiVersion rpi, maybe Map.empty pdFlags $ rpiDef rpi)
+    rsConstraints = fmap rpiConstraints . rsPackages
 
 -- | Given a bundle of user packages, flag constraints on those packages and a
 -- resolver, determine if the resolver fully, partially or fails to satisfy the
@@ -656,7 +657,7 @@ solveExtraDeps modStackYaml = do
     let gpds              = Map.elems $ fmap snd bundle
         oldFlags          = unPackageFlags (bcFlags bconfig)
         oldExtraVersions  = bcExtraDeps bconfig
-        resolver          = bcResolver bconfig
+        resolver          = error "bcResolver" -- FIXME bcResolver bconfig
         oldSrcs           = gpdPackages gpds
         oldSrcFlags       = Map.intersection oldFlags oldSrcs
         oldExtraFlags     = Map.intersection oldFlags oldExtraVersions

@@ -101,6 +101,7 @@ import           Stack.Types.Config
 import           Stack.Types.Docker
 import           Stack.Types.Internal
 import           Stack.Types.Nix
+import           Stack.Types.PackageIdentifier (packageIdentifierText)
 import           Stack.Types.PackageIndex (IndexType (ITHackageSecurity), HackageSecurity (..))
 import           Stack.Types.Resolver
 import           Stack.Types.StackT
@@ -589,18 +590,19 @@ loadBuildConfig mproject config mresolver mcompiler = do
             , projectCompiler = mcompiler <|> projectCompiler project'
             }
 
-    (mbp0, loadedResolver) <- flip runReaderT miniConfig $
+    {- FIXME
+    (rs0, loadedResolver) <- flip runReaderT miniConfig $
         loadResolver (Just stackYamlFP) (projectResolver project)
-    let mbp = case projectCompiler project of
-            Just compiler -> mbp0 { mbpCompilerVersion = compiler }
-            Nothing -> mbp0
+    let rs = case projectCompiler project of
+            Just compiler -> rs0 { rsCompilerVersion = compiler }
+            Nothing -> rs0
+    -}
 
     extraPackageDBs <- mapM resolveDir' (projectExtraPackageDBs project)
 
     return BuildConfig
         { bcConfig = config
-        , bcResolver = loadedResolver
-        , bcWantedMiniBuildPlan = mbp
+        , bcSnapshotDef = error "bcSnapshotDef"
         , bcGHCVariant = view ghcVariantL miniConfig
         , bcPackageEntries = projectPackages project
         , bcExtraDeps = projectExtraDeps project
@@ -682,6 +684,16 @@ resolvePackageEntry menv projRoot pe = do
                         $logWarn $ mconcat
                             [ "No extra-dep setting found for package at URL:\n\n"
                             , url
+                            , "\n\n"
+                            , "This is usually a mistake, external packages "
+                            , "should typically\nbe treated as extra-deps to avoid "
+                            , "spurious test case failures."
+                            ]
+                        return False
+                    PLIndex ident _ -> do
+                        $logWarn $ mconcat
+                            [ "No extra-dep setting found for package :\n\n"
+                            , packageIdentifierText ident
                             , "\n\n"
                             , "This is usually a mistake, external packages "
                             , "should typically\nbe treated as extra-deps to avoid "

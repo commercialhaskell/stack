@@ -26,7 +26,7 @@ import           Data.Text.Encoding         (encodeUtf8)
 import           Path
 import           Path.IO
 import qualified Stack.Build
-import           Stack.BuildPlan            (loadBuildPlan)
+import           Stack.BuildPlan            (loadResolvedSnapshot, loadResolver)
 import           Stack.Exec
 import           Stack.GhcPkg               (ghcPkgExeName)
 import           Stack.Options.ScriptParser
@@ -240,21 +240,20 @@ blacklist = Set.fromList
     , $(mkPackageName "cryptohash-sha256")
     ]
 
-toModuleInfo :: ModuleInfo -- ^ global packages
-             -> BuildPlan -> ModuleInfo
-toModuleInfo global =
-      mappend global
-    . mconcat
-    . map ((\(pn, mns) ->
+toModuleInfo :: ResolvedSnapshot -> ModuleInfo
+toModuleInfo =
+      mconcat
+    . map (\(pn, rpi) ->
             ModuleInfo
             $ Map.fromList
-            $ map (\mn -> (ModuleName $ encodeUtf8 mn, Set.singleton pn))
-            $ Set.toList mns) . fmap (sdModules . ppDesc))
-    . filter (\(pn, pp) ->
-            not (ppHide pp) &&
+            $ map (\mn -> (mn, Set.singleton pn))
+            $ Set.toList
+            $ rpiExposedModules rpi)
+    . filter (\(pn, rpi) ->
+            not (rpiHide rpi) &&
             pn `Set.notMember` blacklist)
     . Map.toList
-    . bpPackages
+    . rsPackages
 
 -- | Where to store module info caches
 moduleInfoCache :: SnapName -> StackT EnvConfig IO (Path Abs File)
@@ -270,11 +269,8 @@ loadModuleInfo :: SnapName -> StackT EnvConfig IO ModuleInfo
 loadModuleInfo name = do
     path <- moduleInfoCache name
     $(versionedDecodeOrLoad moduleInfoVC) path $ do
-      bp <- loadBuildPlan name
-      menv <- getMinimalEnvOverride
-      let wc = whichCompiler $ bpCompilerVersion bp
-      global <- getGlobalModuleInfo menv wc
-      return $ toModuleInfo global bp
+      (rs, _) <- loadResolver Nothing $ ResolverSnapshot name
+      return $ toModuleInfo rs
 
 parseImports :: ByteString -> (Set PackageName, Set ModuleName)
 parseImports =

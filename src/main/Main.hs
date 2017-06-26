@@ -626,7 +626,7 @@ uninstallCmd _ go = withConfigAndLock go $ do
 -- | Unpack packages to the filesystem
 unpackCmd :: [String] -> GlobalOpts -> IO ()
 unpackCmd names go = withConfigAndLock go $ do
-    mMiniBuildPlan <-
+    mSnapshotDef <-
         case globalResolver go of
             Nothing -> return Nothing
             Just ar -> fmap Just $ do
@@ -635,10 +635,10 @@ unpackCmd names go = withConfigAndLock go $ do
                     ResolverSnapshot snapName -> do
                         config <- view configL
                         let miniConfig = loadMiniConfig config
-                        runInnerStackT miniConfig (loadMiniBuildPlan snapName)
+                        runInnerStackT miniConfig (loadSnapshotDef snapName)
                     ResolverCompiler _ -> throwString "Error: unpack does not work with compiler resolvers"
                     ResolverCustom _ _ -> throwString "Error: unpack does not work with custom resolvers"
-    Stack.Fetch.unpackPackages mMiniBuildPlan "." names
+    Stack.Fetch.unpackPackages mSnapshotDef "." names
 
 -- | Update the package index
 updateCmd :: () -> GlobalOpts -> IO ()

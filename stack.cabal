@@ -180,6 +180,7 @@ library
                      Stack.Types.StringError
                      Stack.Types.TemplateName
                      Stack.Types.Version
+                     Stack.Types.VersionIntervals
                      Stack.Upgrade
                      Stack.Upload
                      Text.PrettyPrint.Leijen.Extended

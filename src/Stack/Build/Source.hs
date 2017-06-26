@@ -60,7 +60,7 @@ import              Path.IO
 import              Prelude hiding (sequence)
 import              Stack.Build.Cache
 import              Stack.Build.Target
-import              Stack.BuildPlan (shadowMiniBuildPlan)
+import              Stack.BuildPlan (shadowResolvedSnapshot)
 import              Stack.Config (getLocalPackages)
 import              Stack.Constants (wiredInPackages)
 import              Stack.Package
@@ -95,7 +95,7 @@ loadSourceMap needTargets boptsCli = do
 --
 -- * Parses the build targets.
 --
--- * Loads the 'MiniBuildPlan' from the resolver, with extra-deps
+-- * Loads the 'ResolvedSnapshot' from the resolver, with extra-deps
 --   shadowing any packages that should be built locally.
 --
 -- * Loads up the 'LocalPackage' info.
@@ -106,7 +106,7 @@ loadSourceMapFull :: (StackM env m, HasEnvConfig env)
                   => NeedTargets
                   -> BuildOptsCLI
                   -> m ( Map PackageName SimpleTarget
-                       , MiniBuildPlan
+                       , ResolvedSnapshot
                        , [LocalPackage]
                        , Set PackageName -- non-local targets
                        , Map PackageName Version -- extra-deps from configuration and cli
@@ -115,7 +115,7 @@ loadSourceMapFull :: (StackM env m, HasEnvConfig env)
 loadSourceMapFull needTargets boptsCli = do
     bconfig <- view buildConfigL
     rawLocals <- getLocalPackageViews
-    (mbp0, cliExtraDeps, targets) <- parseTargetsFromBuildOptsWith rawLocals needTargets boptsCli
+    (rs0, cliExtraDeps, targets) <- parseTargetsFromBuildOptsWith rawLocals needTargets boptsCli
 
     -- Extend extra-deps to encompass targets requested on the command line
     -- that are not in the snapshot.
@@ -125,7 +125,7 @@ loadSourceMapFull needTargets boptsCli = do
         (Map.keysSet $ Map.filter (== STUnknown) targets)
 
     locals <- mapM (loadLocalPackage boptsCli targets) $ Map.toList rawLocals
-    checkFlagsUsed boptsCli locals extraDeps0 (mbpPackages mbp0)
+    checkFlagsUsed boptsCli locals extraDeps0 (rsPackages rs0)
     checkComponentsBuildable locals
 
     let
@@ -143,16 +143,23 @@ loadSourceMapFull needTargets boptsCli = do
 
         shadowed = Map.keysSet rawLocals <> Map.keysSet extraDeps0
 
-        -- Ignores all packages in the MiniBuildPlan that depend on any
+        -- Ignores all packages in the ResolvedSnapshot that depend on any
         -- local packages or extra-deps. All packages that have
         -- transitive dependenceis on these packages are treated as
         -- extra-deps (extraDeps1).
-        (mbp, extraDeps1) = shadowMiniBuildPlan mbp0 shadowed
+        (rs, extraDeps1) = shadowResolvedSnapshot rs0 shadowed
 
         -- Combine the extra-deps with the ones implicitly shadowed.
         extraDeps2 = Map.union
             (Map.map (\v -> (v, Map.empty, [])) extraDeps0)
-            (Map.map (\mpi -> (mpiVersion mpi, mpiFlags mpi, mpiGhcOptions mpi)) extraDeps1)
+            (Map.map (\rpi ->
+                        let mpd = rpiDef rpi
+                            triple =
+                              ( rpiVersion rpi
+                              , maybe Map.empty pdFlags mpd
+                              , maybe [] pdGhcOptions mpd
+                              )
+                         in triple) extraDeps1)
 
         -- Add flag and ghc-option settings from the config file / cli
         extraDeps3 = Map.mapWithKey
@@ -181,20 +188,20 @@ loadSourceMapFull needTargets boptsCli = do
                 in PSUpstream v Local flags ghcOptions Nothing)
             extraDeps2
 
-    -- Combine the local packages, extra-deps, and MiniBuildPlan into
+    -- Combine the local packages, extra-deps, and ResolvedSnapshot into
     -- one unified source map.
     let sourceMap = Map.unions
             [ Map.fromList $ flip map locals $ \lp ->
                 let p = lpPackage lp
                  in (packageName p, PSLocal lp)
             , extraDeps3
-            , flip Map.mapWithKey (mbpPackages mbp) $ \n mpi ->
+            , flip Map.mapWithKey (rsPackages rs) $ \n rpi ->
                 let configOpts = getGhcOptions bconfig boptsCli n False False
-                 in PSUpstream (mpiVersion mpi) Snap (mpiFlags mpi) (mpiGhcOptions mpi ++ configOpts) (mpiGitSHA1 mpi)
+                 in error "loadSourceMapFull PSUpstream" -- FIXME PSUpstream (rpiVersion rpi) Snap (rpiFlags rpi) (rpiGhcOptions rpi ++ configOpts) (rpiGitSHA1 rpi)
             ]
             `Map.difference` Map.fromList (map (, ()) (HashSet.toList wiredInPackages))
 
-    return (targets, mbp, locals, nonLocalTargets, extraDeps0, sourceMap)
+    return (targets, rs, locals, nonLocalTargets, extraDeps0, sourceMap)
 
 -- | All flags for a local package.
 getLocalFlags
@@ -241,7 +248,7 @@ getGhcOptions bconfig boptsCli name isTarget isLocal = concat
 -- instead.
 --
 -- Along with the 'Map' of targets, this yields the loaded
--- 'MiniBuildPlan' for the resolver, as well as a Map of extra-deps
+-- 'ResolvedSnapshot' for the resolver, as well as a Map of extra-deps
 -- derived from the commandline. These extra-deps targets come from when
 -- the user specifies a particular package version on the commonadline,
 -- or when a flag is specified for a snapshot package.
@@ -249,7 +256,7 @@ parseTargetsFromBuildOpts
     :: (StackM env m, HasEnvConfig env)
     => NeedTargets
     -> BuildOptsCLI
-    -> m (MiniBuildPlan, M.Map PackageName Version, M.Map PackageName SimpleTarget)
+    -> m (ResolvedSnapshot, M.Map PackageName Version, M.Map PackageName SimpleTarget)
 parseTargetsFromBuildOpts needTargets boptscli = do
     rawLocals <- getLocalPackageViews
     parseTargetsFromBuildOptsWith rawLocals needTargets boptscli
@@ -260,25 +267,27 @@ parseTargetsFromBuildOptsWith
        -- ^ Local package views
     -> NeedTargets
     -> BuildOptsCLI
-    -> m (MiniBuildPlan, M.Map PackageName Version, M.Map PackageName SimpleTarget)
+    -> m (ResolvedSnapshot, M.Map PackageName Version, M.Map PackageName SimpleTarget)
 parseTargetsFromBuildOptsWith rawLocals needTargets boptscli = do
     $logDebug "Parsing the targets"
     bconfig <- view buildConfigL
-    mbp0 <-
+    rs0 <- error "parseTargetsFromBuildOptsWith" {- FIXME
         case bcResolver bconfig of
             ResolverCompiler _ -> do
                 -- We ignore the resolver version, as it might be
                 -- GhcMajorVersion, and we want the exact version
                 -- we're using.
                 version <- view actualCompilerVersionL
-                return MiniBuildPlan
-                    { mbpCompilerVersion = version
-                    , mbpPackages = Map.empty
+                return ResolvedSnapshot
+                    { rsCompilerVersion = version
+                    , rsPackages = Map.empty
+                    , rsUniqueName = error "parseTargetsFromBuildOptsWith.rsUniqueName"
                     }
-            _ -> return (bcWantedMiniBuildPlan bconfig)
+            _ -> error "parseTargetsFromBuildOptsWith" -- FIXME return (bcWantedMiniBuildPlan bconfig)
+    -}
     workingDir <- getCurrentDir
 
-    let snapshot = mpiVersion <$> mbpPackages mbp0
+    let snapshot = rpiVersion <$> rsPackages rs0
     flagExtraDeps <- convertSnapshotToExtra
         snapshot
         (bcExtraDeps bconfig)
@@ -294,7 +303,7 @@ parseTargetsFromBuildOptsWith rawLocals needTargets boptscli = do
             (fst <$> rawLocals)
             workingDir
             (boptsCLITargets boptscli)
-    return (mbp0, cliExtraDeps <> flagExtraDeps, targets)
+    return (rs0, cliExtraDeps <> flagExtraDeps, targets)
 
 -- | For every package in the snapshot which is referenced by a flag, give the
 -- user a warning and then add it to extra-deps.

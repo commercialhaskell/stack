@@ -137,16 +137,16 @@ fetchPackages idents' = do
 
 -- | Intended to work for the command line command.
 unpackPackages :: (StackMiniM env m, HasConfig env)
-               => Maybe MiniBuildPlan -- ^ when looking up by name, take from this build plan
+               => Maybe SnapshotDef -- ^ when looking up by name, take from this build plan
                -> FilePath -- ^ destination
                -> [String] -- ^ names or identifiers
                -> m ()
-unpackPackages mMiniBuildPlan dest input = do
+unpackPackages mSnapshotDef dest input = do
     dest' <- resolveDir' dest
     (names, idents) <- case partitionEithers $ map parse input of
         ([], x) -> return $ partitionEithers x
         (errs, _) -> throwM $ CouldNotParsePackageSelectors errs
-    resolved <- resolvePackages mMiniBuildPlan
+    resolved <- resolvePackages mSnapshotDef
         (Map.fromList idents)
         (Set.fromList names)
     ToFetchResult toFetch alreadyUnpacked <- getToFetch (Just dest') resolved
@@ -196,11 +196,11 @@ data ResolvedPackage = ResolvedPackage
 
 -- | Resolve a set of package names and identifiers into @FetchPackage@ values.
 resolvePackages :: (StackMiniM env m, HasConfig env)
-                => Maybe MiniBuildPlan -- ^ when looking up by name, take from this build plan
+                => Maybe SnapshotDef -- ^ when looking up by name, take from this build plan
                 -> Map PackageIdentifier (Maybe GitSHA1)
                 -> Set PackageName
                 -> m [ResolvedPackage]
-resolvePackages mMiniBuildPlan idents0 names0 = do
+resolvePackages mSnapshotDef idents0 names0 = do
     eres <- go
     case eres of
         Left _ -> do
@@ -208,7 +208,7 @@ resolvePackages mMiniBuildPlan idents0 names0 = do
             go >>= either throwM return
         Right x -> return x
   where
-    go = r <$> resolvePackagesAllowMissing mMiniBuildPlan idents0 names0
+    go = r <$> resolvePackagesAllowMissing mSnapshotDef idents0 names0
     r (missingNames, missingIdents, idents)
       | not $ Set.null missingNames  = Left $ UnknownPackageNames       missingNames
       | not $ Set.null missingIdents = Left $ UnknownPackageIdentifiers missingIdents ""
@@ -216,11 +216,11 @@ resolvePackages mMiniBuildPlan idents0 names0 = do
 
 resolvePackagesAllowMissing
     :: (StackMiniM env m, HasConfig env)
-    => Maybe MiniBuildPlan -- ^ when looking up by name, take from this build plan
+    => Maybe SnapshotDef -- ^ when looking up by name, take from this build plan
     -> Map PackageIdentifier (Maybe GitSHA1)
     -> Set PackageName
     -> m (Set PackageName, Set PackageIdentifier, [ResolvedPackage])
-resolvePackagesAllowMissing mMiniBuildPlan idents0 names0 = do
+resolvePackagesAllowMissing mSnapshotDef idents0 names0 = do
     (res1, res2, resolved) <- inner
     if any (isJust . snd) resolved
         then do
@@ -248,13 +248,17 @@ resolvePackagesAllowMissing mMiniBuildPlan idents0 names0 = do
 
             getNamed :: PackageName -> Maybe (PackageIdentifier, Maybe GitSHA1)
             getNamed =
-                case mMiniBuildPlan of
+                case mSnapshotDef of
                     Nothing -> getNamedFromIndex
-                    Just mbp -> getNamedFromBuildPlan mbp
+                    Just sd -> getNamedFromSnapshotDef sd
 
-            getNamedFromBuildPlan mbp name = do
-                mpi <- Map.lookup name $ mbpPackages mbp
-                Just (PackageIdentifier name (mpiVersion mpi), mpiGitSHA1 mpi)
+            getNamedFromSnapshotDef sd name = do
+                pd <- Map.lookup name $ sdPackages sd
+                case pdLocation pd of
+                  PLIndex ident mcfi -> Just (ident, cfiGitSHA1 <$> mcfi)
+                  -- TODO we could consider different unpack behavior
+                  -- for the other constructors in PackageLocation
+                  _ -> Nothing
             getNamedFromIndex name = fmap
                 (\ver -> (PackageIdentifier name ver, Nothing))
                 (Map.lookup name versions)

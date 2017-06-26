@@ -266,6 +266,7 @@ setupEnv mResolveMissingGHC = do
             , envConfigCompilerVersion = compilerVer
             , envConfigCompilerBuild = compilerBuild
             , envConfigPackagesRef = packagesRef
+            , envConfigResolvedSnapshot = error "envResolvedSnapshot2"
             }
 
     -- extra installation bin directories
@@ -345,6 +346,7 @@ setupEnv mResolveMissingGHC = do
         , envConfigCompilerVersion = compilerVer
         , envConfigCompilerBuild = compilerBuild
         , envConfigPackagesRef = envConfigPackagesRef envConfig0
+        , envConfigResolvedSnapshot = error "envResolvedSnapshot1"
         }
 
 -- | Add the include and lib paths to the given Config

@@ -118,7 +118,7 @@ module Stack.Types.Config
   -- * Paths
   ,bindirSuffix
   ,configInstalledCache
-  ,configMiniBuildPlanCache
+  ,configResolvedSnapshotCache
   ,getProjectWorkDir
   ,docDirSuffix
   ,flagCacheLocal
@@ -179,7 +179,7 @@ module Stack.Types.Config
 import           Control.Applicative
 import           Control.Arrow ((&&&))
 import           Control.Exception
-import           Control.Monad (liftM, mzero, join)
+import           Control.Monad (liftM, join)
 import           Control.Monad.Catch (MonadThrow, MonadMask)
 import           Control.Monad.Logger (LogLevel(..), MonadLoggerIO)
 import           Control.Monad.Reader (MonadReader, MonadIO, liftIO)
@@ -218,13 +218,12 @@ import           GHC.Generics (Generic)
 import           Generics.Deriving.Monoid (memptydefault, mappenddefault)
 import           Lens.Micro (Lens', lens, _1, _2, to, Getting)
 import           Lens.Micro.Mtl (view)
-import           Network.HTTP.Client (parseRequest)
 import           Options.Applicative (ReadM)
 import qualified Options.Applicative as OA
 import qualified Options.Applicative.Types as OA
 import           Path
 import qualified Paths_stack as Meta
-import           Stack.Types.BuildPlan (GitSHA1, MiniBuildPlan(..), SnapName, renderSnapName)
+import           Stack.Types.BuildPlan
 import           Stack.Types.Compiler
 import           Stack.Types.CompilerBuild
 import           Stack.Types.Docker
@@ -512,10 +511,7 @@ readColorWhen = do
 -- These are the components which know nothing about local configuration.
 data BuildConfig = BuildConfig
     { bcConfig     :: !Config
-    , bcResolver   :: !LoadedResolver
-      -- ^ How we resolve which dependencies to install given a set of
-      -- packages.
-    , bcWantedMiniBuildPlan :: !MiniBuildPlan
+    , bcSnapshotDef :: !SnapshotDef
       -- ^ Build plan wanted for this build
     , bcGHCVariant :: !GHCVariant
       -- ^ The variant of GHC used to select a GHC bindist.
@@ -567,6 +563,8 @@ data EnvConfig = EnvConfig
     ,envConfigCompilerBuild :: !CompilerBuild
     ,envConfigPackagesRef :: !(IORef (Maybe (Map (Path Abs Dir) TreatLikeExtraDep)))
     -- ^ Cache for 'getLocalPackages'.
+    ,envConfigResolvedSnapshot :: !ResolvedSnapshot
+    -- ^ The fully resolved snapshot information.
     }
 
 -- | Value returned by 'Stack.Config.loadConfig'.
@@ -621,45 +619,6 @@ instance FromJSON (WithJSONWarnings PackageEntry) where
         <$> o ..:? "extra-dep"
         <*> jsonSubWarnings (o ..: "location")
         <*> o ..:? "subdirs" ..!= []) v
-
-data PackageLocation
-    = PLFilePath FilePath
-    -- ^ Note that we use @FilePath@ and not @Path@s. The goal is: first parse
-    -- the value raw, and then use @canonicalizePath@ and @parseAbsDir@.
-    | PLRemote Text RemotePackageType
-     -- ^ URL and further details
-    deriving Show
-
-data RemotePackageType
-    = RPTHttp
-    | RPTGit Text -- ^ Commit
-    | RPTHg  Text -- ^ Commit
-    deriving Show
-
-instance ToJSON PackageLocation where
-    toJSON (PLFilePath fp) = toJSON fp
-    toJSON (PLRemote t RPTHttp) = toJSON t
-    toJSON (PLRemote x (RPTGit y)) = object [("git", toJSON x), ("commit", toJSON y)]
-    toJSON (PLRemote x (RPTHg  y)) = object [( "hg", toJSON x), ("commit", toJSON y)]
-
-instance FromJSON (WithJSONWarnings PackageLocation) where
-    parseJSON v
-        = (noJSONWarnings <$> withText "PackageLocation" (\t -> http t <|> file t) v)
-        <|> git v
-        <|> hg  v
-      where
-        file t = pure $ PLFilePath $ T.unpack t
-        http t =
-            case parseRequest $ T.unpack t of
-                Left  _ -> mzero
-                Right _ -> return $ PLRemote t RPTHttp
-
-        git = withObjectWarnings "PackageGitLocation" $ \o -> PLRemote
-            <$> o ..: "git"
-            <*> (RPTGit <$> o ..: "commit")
-        hg  = withObjectWarnings "PackageHgLocation"  $ \o -> PLRemote
-            <$> o ..: "hg"
-            <*> (RPTHg  <$> o ..: "commit")
 
 -- | A project is a collection of packages. We can have multiple stack.yaml
 -- files, but only one of them may contain project information.
@@ -1267,9 +1226,9 @@ platformSnapAndCompilerRel
     :: (MonadReader env m, HasEnvConfig env, MonadThrow m)
     => m (Path Rel Dir)
 platformSnapAndCompilerRel = do
-    resolver' <- view loadedResolverL
+    resolver' <- view resolvedSnapshotL
     platform <- platformGhcRelDir
-    name <- parseRelDir $ T.unpack $ resolverDirName resolver'
+    name <- parseRelDir $ T.unpack $ rsUniqueName resolver'
     ghc <- compilerVersionDir
     useShaPathOnWindows (platform </> name </> ghc)
 
@@ -1345,10 +1304,11 @@ flagCacheLocal = do
     return $ root </> $(mkRelDir "flag-cache")
 
 -- | Where to store mini build plan caches
-configMiniBuildPlanCache :: (MonadThrow m, MonadReader env m, HasConfig env, HasGHCVariant env)
-                         => SnapName
-                         -> m (Path Abs File)
-configMiniBuildPlanCache name = do
+configResolvedSnapshotCache
+  :: (MonadThrow m, MonadReader env m, HasConfig env, HasGHCVariant env)
+  => SnapName -- FIXME generalize?
+  -> m (Path Abs File)
+configResolvedSnapshotCache name = do
     root <- view stackRootL
     platform <- platformGhcVerOnlyRelDir
     file <- parseRelFile $ T.unpack (renderSnapName name) ++ ".cache"
@@ -1871,9 +1831,9 @@ stackRootL = configL.lens configStackRoot (\x y -> x { configStackRoot = y })
 -- | The compiler specified by the @MiniBuildPlan@. This may be
 -- different from the actual compiler used!
 wantedCompilerVersionL :: HasBuildConfig s => Lens' s CompilerVersion
-wantedCompilerVersionL = miniBuildPlanL.lens
-    mbpCompilerVersion
-    (\x y -> x { mbpCompilerVersion = y })
+wantedCompilerVersionL = snapshotDefL.lens
+    sdCompilerVersion
+    (\x y -> x { sdCompilerVersion = y })
 
 -- | The version of the compiler which will actually be used. May be
 -- different than that specified in the 'MiniBuildPlan' and returned
@@ -1883,15 +1843,10 @@ actualCompilerVersionL = envConfigL.lens
     envConfigCompilerVersion
     (\x y -> x { envConfigCompilerVersion = y })
 
-loadedResolverL :: HasBuildConfig s => Lens' s LoadedResolver
-loadedResolverL = buildConfigL.lens
-    bcResolver
-    (\x y -> x { bcResolver = y })
-
-miniBuildPlanL :: HasBuildConfig s => Lens' s MiniBuildPlan
-miniBuildPlanL = buildConfigL.lens
-    bcWantedMiniBuildPlan
-    (\x y -> x { bcWantedMiniBuildPlan = y })
+snapshotDefL :: HasBuildConfig s => Lens' s SnapshotDef
+snapshotDefL = buildConfigL.lens
+    bcSnapshotDef
+    (\x y -> x { bcSnapshotDef = y })
 
 packageIndicesL :: HasConfig s => Lens' s [PackageIndex]
 packageIndicesL = configL.lens
@@ -1950,6 +1905,11 @@ cabalVersionL :: HasEnvConfig env => Lens' env Version
 cabalVersionL = envConfigL.lens
     envConfigCabalVersion
     (\x y -> x { envConfigCabalVersion = y })
+
+resolvedSnapshotL :: HasEnvConfig env => Lens' env ResolvedSnapshot
+resolvedSnapshotL = envConfigL.lens
+    envConfigResolvedSnapshot
+    (\x y -> x { envConfigResolvedSnapshot = y })
 
 whichCompilerL :: Getting r CompilerVersion WhichCompiler
 whichCompilerL = to whichCompiler

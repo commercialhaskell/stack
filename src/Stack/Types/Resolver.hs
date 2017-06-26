@@ -46,6 +46,8 @@ import           Stack.Types.BuildPlan (parseSnapName, renderSnapName, SnapName,
 import           {-# SOURCE #-} Stack.Types.Config (ConfigException(..))
 import           Stack.Types.Compiler
 
+-- FIXME massive refactoring to match up with BuildPlan
+
 data IsLoaded = Loaded | NotLoaded
 
 type LoadedResolver = ResolverThat's 'Loaded

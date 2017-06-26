@@ -20,19 +20,17 @@ module Stack.BuildPlan
     , gpdPackageDeps
     , gpdPackages
     , gpdPackageName
-    , MiniBuildPlan(..)
-    , MiniPackageInfo(..)
     , loadResolver
-    , loadMiniBuildPlan
+    , loadResolvedSnapshot
     , removeSrcPkgDefaultFlags
     , resolveBuildPlan
     , selectBestSnapshot
     , getToolMap
-    , shadowMiniBuildPlan
+    , shadowResolvedSnapshot
     , showItems
     , showPackageFlags
-    , parseCustomMiniBuildPlan
-    , loadBuildPlan
+    , parseCustomResolvedSnapshot
+    , loadSnapshotDef
     ) where
 
 import           Control.Applicative
@@ -201,13 +199,13 @@ instance Show BuildPlanException where
 -- This may fail if a target package is not present in the @BuildPlan@.
 resolveBuildPlan
     :: (StackMiniM env m, HasBuildConfig env)
-    => MiniBuildPlan
+    => ResolvedSnapshot
     -> (PackageName -> Bool) -- ^ is it shadowed by a local package?
     -> Map PackageName (Set PackageName) -- ^ required packages, and users of it
     -> m ( Map PackageName (Version, Map FlagName Bool)
          , Map PackageName (Set PackageName)
          )
-resolveBuildPlan mbp isShadowed packages
+resolveBuildPlan rbp isShadowed packages
     | Map.null (rsUnknown rs) && Map.null (rsShadowed rs) = return (rsToInstall rs, rsUsedBy rs)
     | otherwise = do
         bconfig <- view buildConfigL
@@ -223,7 +221,7 @@ resolveBuildPlan mbp isShadowed packages
             unknown
             (rsShadowed rs)
   where
-    rs = getDeps mbp isShadowed packages
+    rs = getDeps rbp isShadowed packages
 
 data ResolveState = ResolveState
     { rsVisited   :: Map PackageName (Set PackageName) -- ^ set of shadowed dependencies
@@ -233,55 +231,65 @@ data ResolveState = ResolveState
     , rsUsedBy    :: Map PackageName (Set PackageName)
     }
 
-toMiniBuildPlan
+toResolvedSnapshot
     :: (StackMiniM env m, HasConfig env)
     => CompilerVersion -- ^ Compiler version
     -> Map PackageName Version -- ^ cores
-    -> Map PackageName (Version, Map FlagName Bool, [Text], Maybe GitSHA1) -- ^ non-core packages
-    -> m MiniBuildPlan
-toMiniBuildPlan compilerVersion corePackages packages = do
+    -> Map PackageName (PackageDef, Version) -- ^ 'sdPackages' plus resolved version info
+    -> m ResolvedSnapshot
+toResolvedSnapshot compilerVersion corePackages packages = do
     -- Determine the dependencies of all of the packages in the build plan. We
     -- handle core packages specially, because some of them will not be in the
     -- package index. For those, we allow missing packages to exist, and then
     -- remove those from the list of dependencies, since there's no way we'll
     -- ever reinstall them anyway.
     (cores, missingCores) <- addDeps True compilerVersion
-        $ fmap (, Map.empty, [], Nothing) corePackages
+        $ fmap (, Nothing) corePackages
 
-    (extras, missing) <- addDeps False compilerVersion packages
+    (extras, missing) <- addDeps False compilerVersion
+        $ fmap (\(pd, v) -> (v, Just pd)) packages
 
-    assert (Set.null missing) $ return MiniBuildPlan
-        { mbpCompilerVersion = compilerVersion
-        , mbpPackages = Map.unions
+    unless (Set.null missing) $ error $ "Missing packages in snapshot: " ++ show missing -- FIXME proper exception
+
+    error "FIXME toResolvedSnapshot"
+    {-
+    return ResolvedSnapshot
+        { rsCompilerVersion = compilerVersion
+        , rsPackages = Map.unions
             [ fmap (removeMissingDeps (Map.keysSet cores)) cores
             , extras
             , Map.fromList $ map goCore $ Set.toList missingCores
             ]
+        , rsUniqueName = error "toResolvedSnapshot.rsUniqueName"
         }
+    -}
   where
-    goCore (PackageIdentifier name version) = (name, MiniPackageInfo
-                { mpiVersion = version
-                , mpiFlags = Map.empty
-                , mpiGhcOptions = []
-                , mpiPackageDeps = Set.empty
-                , mpiToolDeps = Set.empty
-                , mpiExes = Set.empty
-                , mpiHasLibrary = True
-                , mpiGitSHA1 = Nothing
-                })
+    goCore (PackageIdentifier name version) = (name, ResolvedPackageInfo
+        { rpiVersion = version
+        , rpiDef = Nothing
+        , rpiPackageDeps = error "goCore.rpiPackageDeps"
+        , rpiProvidedExes = Set.empty
+        , rpiNeededExes = Map.empty
+        , rpiExposedModules = error "goCore.rpiExposedModules"
+        , rpiHide = error "goCore.rpiHide"
+        })
 
-    removeMissingDeps cores mpi = mpi
-        { mpiPackageDeps = Set.intersection cores (mpiPackageDeps mpi)
+    {- FIXME
+    removeMissingDeps cores rpi = rpi
+        { rpiPackageDeps = Set.intersection cores (rpiPackageDeps mpi)
         }
+    -}
 
 -- | Add in the resolved dependencies from the package index
 addDeps
     :: (StackMiniM env m, HasConfig env)
     => Bool -- ^ allow missing
     -> CompilerVersion -- ^ Compiler version
-    -> Map PackageName (Version, Map FlagName Bool, [Text], Maybe GitSHA1)
-    -> m (Map PackageName MiniPackageInfo, Set PackageIdentifier)
+    -> Map PackageName (Version, Maybe PackageDef)
+    -> m (Map PackageName ResolvedPackageInfo, Set PackageIdentifier)
 addDeps allowMissing compilerVersion toCalc = do
+    error "addDeps"
+    {-
     platform <- view platformL
     (resolvedMap, missingIdents) <-
         if allowMissing
@@ -315,31 +323,30 @@ addDeps allowMissing compilerVersion toCalc = do
                 pd = resolvePackageDescription packageConfig gpd
                 exes = Set.fromList $ map (ExeName . T.pack . exeName) $ executables pd
                 notMe = Set.filter (/= name) . Map.keysSet
-            return (name, MiniPackageInfo
-                { mpiVersion = packageIdentifierVersion ident
-                , mpiFlags = flags
-                , mpiGhcOptions = ghcOptions
-                , mpiPackageDeps = notMe $ packageDependencies pd
-                , mpiToolDeps = Map.keysSet $ packageToolDependencies pd
-                , mpiExes = exes
-                , mpiHasLibrary = maybe
-                    False
-                    (buildable . libBuildInfo)
-                    (library pd)
-                , mpiGitSHA1 = mgitSha
+            return (name, ResolvedPackageInfo
+                { rpiVersion = packageIdentifierVersion ident
+                , rpiDef = PackageDef
+                    { pdFlags = flags
+                    , pdGhcOptions = ghcOptions
+                    }
+                , rpiPackageDeps = notMe $ packageDependencies pd
+                -- FIXME , rpiGitSHA1 = mgitSha
                 })
     return (Map.fromList $ concat res, missingIdents)
   where
     shaMap = Map.fromList
         $ map (\(n, (v, _f, _ghcOptions, gitsha)) -> (PackageIdentifier n v, gitsha))
         $ Map.toList toCalc
+    -}
 
 -- | Resolve all packages necessary to install for the needed packages.
-getDeps :: MiniBuildPlan
+getDeps :: ResolvedSnapshot
         -> (PackageName -> Bool) -- ^ is it shadowed by a local package?
         -> Map PackageName (Set PackageName)
         -> ResolveState
-getDeps mbp isShadowed packages =
+getDeps rbp isShadowed packages =
+    error "getDeps"
+    {-
     execState (mapM_ (uncurry goName) $ Map.toList packages) ResolveState
         { rsVisited = Map.empty
         , rsUnknown = Map.empty
@@ -348,19 +355,19 @@ getDeps mbp isShadowed packages =
         , rsUsedBy = Map.empty
         }
   where
-    toolMap = getToolMap mbp
+    toolMap = getToolMap rbp
 
     -- | Returns a set of shadowed packages we depend on.
     goName :: PackageName -> Set PackageName -> State ResolveState (Set PackageName)
     goName name users = do
         -- Even though we could check rsVisited first and short-circuit things
-        -- earlier, lookup in mbpPackages first so that we can produce more
+        -- earlier, lookup in rbpPackages first so that we can produce more
         -- usable error information on missing dependencies
         rs <- get
         put rs
             { rsUsedBy = Map.insertWith Set.union name users $ rsUsedBy rs
             }
-        case Map.lookup name $ mbpPackages mbp of
+        case Map.lookup name $ rbpPackages rbp of
             Nothing -> do
                 modify $ \rs' -> rs'
                     { rsUnknown = Map.insertWith Set.union name users $ rsUnknown rs'
@@ -395,10 +402,13 @@ getDeps mbp isShadowed packages =
                     , rsVisited = Map.insert name shadowed $ rsVisited rs'
                     }
                 return shadowed
+    -}
 
 -- | Map from tool name to package providing it
-getToolMap :: MiniBuildPlan -> Map Text (Set PackageName)
-getToolMap mbp =
+getToolMap :: ResolvedSnapshot -> Map Text (Set PackageName)
+getToolMap =
+    error "getToolMap"
+    {- FIXME
       Map.unionsWith Set.union
 
     {- We no longer do this, following discussion at:
@@ -413,88 +423,92 @@ getToolMap mbp =
     -- And then get all of the explicit executable names
     $ concatMap goPair (Map.toList ps)
   where
-    ps = mbpPackages mbp
+    ps = rbpPackages rbp
 
     goPair (pname, mpi) =
         map (flip Map.singleton (Set.singleton pname) . unExeName)
       $ Set.toList
       $ mpiExes mpi
+    -}
 
 loadResolver
     :: (StackMiniM env m, HasConfig env, HasGHCVariant env)
     => Maybe (Path Abs File)
     -> Resolver
-    -> m (MiniBuildPlan, LoadedResolver)
+    -> m (ResolvedSnapshot, LoadedResolver)
 loadResolver mconfigPath resolver =
     case resolver of
         ResolverSnapshot snap ->
-            liftM (, ResolverSnapshot snap) $ loadMiniBuildPlan snap
+            liftM (, ResolverSnapshot snap) $ loadResolvedSnapshot snap
         -- TODO(mgsloan): Not sure what this FIXME means
         -- FIXME instead of passing the stackYaml dir we should maintain
         -- the file URL in the custom resolver always relative to stackYaml.
         ResolverCustom name url -> do
-            (mbp, hash) <- parseCustomMiniBuildPlan mconfigPath url
-            return (mbp, ResolverCustomLoaded name url hash)
+            (rbp, hash) <- parseCustomResolvedSnapshot mconfigPath url
+            return (rbp, ResolverCustomLoaded name url hash)
         ResolverCompiler compiler -> return
-            ( MiniBuildPlan
-                { mbpCompilerVersion = compiler
-                , mbpPackages = mempty
+            ( ResolvedSnapshot
+                { rsCompilerVersion = compiler
+                , rsPackages = mempty
+                , rsUniqueName = error "loadResolver.rsUniqueName" -- FIXME
                 }
             , ResolverCompiler compiler
             )
 
--- | Load up a 'MiniBuildPlan', preferably from cache
-loadMiniBuildPlan
+-- | Load up a 'ResolvedSnapshot', preferably from cache
+loadResolvedSnapshot
     :: (StackMiniM env m, HasConfig env, HasGHCVariant env)
-    => SnapName -> m MiniBuildPlan
-loadMiniBuildPlan name = do
-    path <- configMiniBuildPlanCache name
-    $(versionedDecodeOrLoad miniBuildPlanVC) path $ liftM buildPlanFixes $ do
-        bp <- loadBuildPlan name
+    => SnapName -> m ResolvedSnapshot
+loadResolvedSnapshot name = do
+    path <- configResolvedSnapshotCache name -- FIXME probably not just a SnapName now
+    $(versionedDecodeOrLoad resolvedSnapshotVC) path $ do
+        sd <- liftM snapshotDefFixes $ loadSnapshotDef name
         menv <- getMinimalEnvOverride
-        corePackages <- getGlobalPackages menv (whichCompiler (bpCompilerVersion bp))
-        toMiniBuildPlan
-            (bpCompilerVersion bp)
+        corePackages <- getGlobalPackages menv (whichCompiler (sdCompilerVersion sd))
+        toResolvedSnapshot
+            (sdCompilerVersion sd)
             corePackages
-            (goPP <$> bpPackages bp)
+            (goPP <$> sdPackages sd)
   where
-    goPP pp =
+    goPP pp = error "goPP" {- FIXME
         ( ppVersion pp
         , ppFlagOverrides pp
          -- TODO: store ghc options in BuildPlan?
         , []
         , fmap cfiGitSHA1 $ ppCabalFileInfo pp
         )
+    -}
 
 -- | Some hard-coded fixes for build plans, hopefully to be irrelevant over
 -- time.
-buildPlanFixes :: MiniBuildPlan -> MiniBuildPlan
-buildPlanFixes mbp = mbp
-    { mbpPackages = Map.fromList $ map go $ Map.toList $ mbpPackages mbp
+snapshotDefFixes :: SnapshotDef -> SnapshotDef
+snapshotDefFixes sd = sd
+    { sdPackages = Map.fromList $ map go $ Map.toList $ sdPackages sd
     }
   where
-    go (name, mpi) =
-        (name, mpi
-            { mpiFlags = goF (packageNameString name) (mpiFlags mpi)
+    go (name, pd) =
+        (name, pd
+            { pdFlags = goF (packageNameString name) (pdFlags pd)
             })
 
     goF "persistent-sqlite" = Map.insert $(mkFlagName "systemlib") False
     goF "yaml" = Map.insert $(mkFlagName "system-libyaml") False
     goF _ = id
 
+
 -- | Load the 'BuildPlan' for the given snapshot. Will load from a local copy
 -- if available, otherwise downloading from Github.
-loadBuildPlan :: (StackMiniM env m, HasConfig env) => SnapName -> m BuildPlan
-loadBuildPlan name = do
+loadSnapshotDef :: (StackMiniM env m, HasConfig env) => SnapName -> m SnapshotDef
+loadSnapshotDef name = do
     stackage <- view stackRootL
     file' <- parseRelFile $ T.unpack file
     let fp = buildPlanDir stackage </> file'
     $logDebug $ "Decoding build plan from: " <> T.pack (toFilePath fp)
     eres <- liftIO $ decodeFileEither $ toFilePath fp
     case eres of
-        Right bp -> return bp
+        Right (StackageSnapshotDef sd) -> return sd
         Left e -> do
-            $logDebug $ "Decoding build plan from file failed: " <> T.pack (show e)
+            $logDebug $ "Decoding Stackage snapshot definition from file failed: " <> T.pack (show e)
             ensureDir (parent fp)
             url <- buildBuildPlanUrl name file
             req <- parseRequest $ T.unpack url
@@ -502,7 +516,9 @@ loadBuildPlan name = do
             $logDebug $ "Downloading build plan from: " <> url
             _ <- redownload req fp
             $logStickyDone $ "Downloaded " <> renderSnapName name <> " build plan."
-            liftIO (decodeFileEither $ toFilePath fp) >>= either throwM return
+            StackageSnapshotDef sd <- liftIO (decodeFileEither $ toFilePath fp)
+                                  >>= either throwM return
+            return sd
 
   where
     file = renderSnapName name <> ".yaml"
@@ -726,11 +742,11 @@ checkSnapBuildPlan
     -> m BuildPlanCheck
 checkSnapBuildPlan gpds flags snap = do
     platform <- view platformL
-    mbp <- loadMiniBuildPlan snap
+    rs <- loadResolvedSnapshot snap
 
     let
-        compiler = mbpCompilerVersion mbp
-        snapPkgs = mpiVersion <$> mbpPackages mbp
+        compiler = rsCompilerVersion rs
+        snapPkgs = rpiVersion <$> rsPackages rs
         (f, errs) = checkBundleBuildPlan platform compiler snapPkgs flags gpds
         cerrs = compilerErrors compiler errs
 
@@ -869,14 +885,14 @@ showDepErrors flags errs =
         showFlags pkg = maybe "" (showPackageFlags pkg) (Map.lookup pkg flags)
 
 -- | Given a set of packages to shadow, this removes them, and any
--- packages that transitively depend on them, from the 'MiniBuildPlan'.
+-- packages that transitively depend on them, from the 'ResolvedSnapshot'.
 -- The 'Map' result yields all of the packages that were downstream of
 -- the shadowed packages. It does not include the shadowed packages.
-shadowMiniBuildPlan :: MiniBuildPlan
+shadowResolvedSnapshot :: ResolvedSnapshot
                     -> Set PackageName
-                    -> (MiniBuildPlan, Map PackageName MiniPackageInfo)
-shadowMiniBuildPlan (MiniBuildPlan cv pkgs0) shadowed =
-    (MiniBuildPlan cv (Map.fromList met), Map.fromList unmet)
+                    -> (ResolvedSnapshot, Map PackageName ResolvedPackageInfo)
+shadowResolvedSnapshot (ResolvedSnapshot cv pkgs0 uniqueName) shadowed =
+    (ResolvedSnapshot cv (Map.fromList met) uniqueName, Map.fromList unmet)
   where
     pkgs1 = Map.difference pkgs0 $ Map.fromSet (const ()) shadowed
 
@@ -884,7 +900,7 @@ shadowMiniBuildPlan (MiniBuildPlan cv pkgs0) shadowed =
 
     check visited name
         | name `Set.member` visited =
-            error $ "shadowMiniBuildPlan: cycle detected, your MiniBuildPlan is broken: " ++ show (visited, name)
+            error $ "shadowResolvedSnapshot: cycle detected, your ResolvedSnapshot is broken: " ++ show (visited, name)
         | otherwise = do
             m <- get
             case Map.lookup name m of
@@ -900,9 +916,9 @@ shadowMiniBuildPlan (MiniBuildPlan cv pkgs0) shadowed =
                             -- are being chosen. The common example of this is
                             -- the Win32 package.
                             | otherwise -> return True
-                        Just mpi -> do
+                        Just rpi -> do
                             let visited' = Set.insert name visited
-                            ress <- mapM (check visited') (Set.toList $ mpiPackageDeps mpi)
+                            ress <- mapM (check visited') (Set.toList $ rpiPackageDeps rpi)
                             let res = and ress
                             modify $ \m' -> Map.insert name res m'
                             return res
@@ -924,10 +940,10 @@ shadowMiniBuildPlan (MiniBuildPlan cv pkgs0) shadowed =
 -- 1) If downloading the snapshot from a URL, assume the fetched data is
 -- immutable. Hash the URL in order to determine the location of the
 -- cached download. The file contents of the snapshot determines the
--- hash for looking up cached MBP.
+-- hash for looking up cached RBP.
 --
 -- 2) If loading the snapshot from a file, load all of the involved
--- snapshot files. The hash used to determine the cached MBP is the hash
+-- snapshot files. The hash used to determine the cached RBP is the hash
 -- of the concatenation of the parent's hash with the snapshot contents.
 --
 -- Why this difference? We want to make it easy to simply edit snapshots
@@ -936,7 +952,7 @@ shadowMiniBuildPlan (MiniBuildPlan cv pkgs0) shadowed =
 -- need a different hash system.
 
 -- TODO: This could probably be more efficient if it first merged the
--- custom snapshots, and then applied them to the MBP. It is nice to
+-- custom snapshots, and then applied them to the RBP. It is nice to
 -- apply directly, because then we have the guarantee that it's
 -- semantically identical to snapshot extension. If this optimization is
 -- implemented, note that the direct Monoid for CustomSnapshot is not
@@ -950,12 +966,12 @@ shadowMiniBuildPlan (MiniBuildPlan cv pkgs0) shadowed =
 
 -- TODO: Allow custom plan to specify a name.
 
-parseCustomMiniBuildPlan
+parseCustomResolvedSnapshot
     :: (StackMiniM env m, HasConfig env, HasGHCVariant env)
     => Maybe (Path Abs File) -- ^ Root directory for when url is a filepath
     -> T.Text
-    -> m (MiniBuildPlan, SnapshotHash)
-parseCustomMiniBuildPlan mconfigPath0 url0 = do
+    -> m (ResolvedSnapshot, SnapshotHash)
+parseCustomResolvedSnapshot mconfigPath0 url0 = do
     $logDebug $ "Loading " <> url0 <> " build plan"
     case parseUrlThrow $ T.unpack url0 of
         Just req -> downloadCustom url0 req
@@ -963,18 +979,18 @@ parseCustomMiniBuildPlan mconfigPath0 url0 = do
            case mconfigPath0 of
                Nothing -> throwM $ FilepathInDownloadedSnapshot url0
                Just configPath -> do
-                   (getMbp, hash) <- readCustom configPath url0
-                   mbp <- getMbp
+                   (getRbp, hash) <- readCustom configPath url0
+                   rbp <- getRbp
                    -- NOTE: We make the choice of only writing a cache
-                   -- file for the full MBP, not the intermediate ones.
+                   -- file for the full RBP, not the intermediate ones.
                    -- This isn't necessarily the best choice if we want
                    -- to share work extended snapshots. I think only
                    -- writing this one is more efficient for common
                    -- cases.
                    binaryPath <- getBinaryPath hash
                    alreadyCached <- doesFileExist binaryPath
-                   unless alreadyCached $ $(versionedEncodeFile miniBuildPlanVC) binaryPath mbp
-                   return (mbp, hash)
+                   unless alreadyCached $ $(versionedEncodeFile resolvedSnapshotVC) binaryPath rbp
+                   return (rbp, hash)
   where
     downloadCustom url req = do
         let urlHash = S8.unpack $ trimmedSnapshotHash $ doHash $ encodeUtf8 url
@@ -985,36 +1001,36 @@ parseCustomMiniBuildPlan mconfigPath0 url0 = do
         yamlBS <- liftIO $ S.readFile $ toFilePath cacheFP
         let yamlHash = doHash yamlBS
         binaryPath <- getBinaryPath yamlHash
-        liftM (, yamlHash) $ $(versionedDecodeOrLoad miniBuildPlanVC) binaryPath $ do
+        liftM (, yamlHash) $ $(versionedDecodeOrLoad resolvedSnapshotVC) binaryPath $ do
             (cs, mresolver) <- decodeYaml yamlBS
-            parentMbp <- case (csCompilerVersion cs, mresolver) of
+            parentRbp <- case (csCompilerVersion cs, mresolver) of
                 (Nothing, Nothing) -> throwM (NeitherCompilerOrResolverSpecified url)
                 (Just cv, Nothing) -> return (compilerBuildPlan cv)
                 -- NOTE: ignoring the parent's hash, even though
                 -- there could be one. URL snapshot's hash are
                 -- determined just from their contents.
                 (_, Just resolver) -> liftM fst (loadResolver Nothing resolver)
-            applyCustomSnapshot cs parentMbp
+            applyCustomSnapshot cs parentRbp
     readCustom configPath path = do
         yamlFP <- resolveFile (parent configPath) (T.unpack $ fromMaybe path $
             T.stripPrefix "file://" path <|> T.stripPrefix "file:" path)
         yamlBS <- liftIO $ S.readFile $ toFilePath yamlFP
         (cs, mresolver) <- decodeYaml yamlBS
-        (getMbp, hash) <- case mresolver of
+        (getRbp, hash) <- case mresolver of
             Just (ResolverCustom _ url ) ->
                 case parseUrlThrow $ T.unpack url of
                     Just req -> do
-                        let getMbp = do
+                        let getRbp = do
                                 -- Ignore custom hash, under the
                                 -- assumption that the URL is sufficient
                                 -- for identity.
-                                (mbp, _) <- downloadCustom url req
-                                return mbp
-                        return (getMbp, doHash yamlBS)
+                                (rbp, _) <- downloadCustom url req
+                                return rbp
+                        return (getRbp, doHash yamlBS)
                     Nothing -> do
-                        (getMbp0, SnapshotHash hash0) <- readCustom yamlFP url
+                        (getRbp0, SnapshotHash hash0) <- readCustom yamlFP url
                         let hash = doHash (hash0 <> yamlBS)
-                            getMbp = do
+                            getRbp = do
                                 binaryPath <- getBinaryPath hash
                                 -- Idea here is to not waste time
                                 -- writing out intermediate cache files,
@@ -1022,33 +1038,33 @@ parseCustomMiniBuildPlan mconfigPath0 url0 = do
                                 exists <- doesFileExist binaryPath
                                 if exists
                                     then do
-                                        eres <- $(versionedDecodeFile miniBuildPlanVC) binaryPath
+                                        eres <- $(versionedDecodeFile resolvedSnapshotVC) binaryPath
                                         case eres of
-                                            Just mbp -> return mbp
+                                            Just rbp -> return rbp
                                             -- Invalid format cache file, remove.
                                             Nothing -> do
                                                 removeFile binaryPath
-                                                getMbp0
-                                    else getMbp0
-                        return (getMbp, hash)
+                                                getRbp0
+                                    else getRbp0
+                        return (getRbp, hash)
             Just resolver -> do
                 -- NOTE: in the cases where we don't have a hash, the
                 -- normal resolver name is enough. Since this name is
                 -- part of the yaml file, it ends up in our hash.
                 let hash = doHash yamlBS
-                    getMbp = do
-                        (mbp, resolver') <- loadResolver (Just configPath) resolver
+                    getRbp = do
+                        (rbp, resolver') <- loadResolver (Just configPath) resolver
                         let mhash = customResolverHash resolver'
-                        assert (isNothing mhash) (return mbp)
-                return (getMbp, hash)
+                        assert (isNothing mhash) (return rbp)
+                return (getRbp, hash)
             Nothing -> do
                 case csCompilerVersion cs of
                     Nothing -> throwM (NeitherCompilerOrResolverSpecified path)
                     Just cv -> do
                         let hash = doHash yamlBS
-                            getMbp = return (compilerBuildPlan cv)
-                        return (getMbp, hash)
-        return (applyCustomSnapshot cs =<< getMbp, hash)
+                            getRbp = return (compilerBuildPlan cv)
+                        return (getRbp, hash)
+        return (applyCustomSnapshot cs =<< getRbp, hash)
     getBinaryPath hash = do
         binaryFilename <- parseRelFile $ S8.unpack (trimmedSnapshotHash hash) ++ ".bin"
         customPlanDir <- getCustomPlanDir
@@ -1059,9 +1075,10 @@ parseCustomMiniBuildPlan mconfigPath0 url0 = do
              decodeEither' yamlBS
         logJSONWarnings (T.unpack url0) warnings
         return res
-    compilerBuildPlan cv = MiniBuildPlan
-         { mbpCompilerVersion = cv
-         , mbpPackages = mempty
+    compilerBuildPlan cv = ResolvedSnapshot
+         { rsCompilerVersion = cv
+         , rsPackages = mempty
+         , rsUniqueName = error "compilerBuildPlan.rsUniqueName"
          }
     getCustomPlanDir = do
         root <- view stackRootL
@@ -1071,32 +1088,37 @@ parseCustomMiniBuildPlan mconfigPath0 url0 = do
 applyCustomSnapshot
     :: (StackMiniM env m, HasConfig env)
     => CustomSnapshot
-    -> MiniBuildPlan
-    -> m MiniBuildPlan
-applyCustomSnapshot cs mbp0 = do
+    -> ResolvedSnapshot
+    -> m ResolvedSnapshot
+applyCustomSnapshot cs rbp0 = do
     let CustomSnapshot mcompilerVersion
                        packages
                        dropPackages
                        (PackageFlags flags)
                        ghcOptions
             = cs
-        addFlagsAndOpts :: PackageIdentifier -> (PackageName, (Version, Map FlagName Bool, [Text], Maybe GitSHA1))
-        addFlagsAndOpts (PackageIdentifier name ver) =
-            ( name
-            , ( ver
-              , Map.findWithDefault Map.empty name flags
+        addFlagsAndOpts :: PackageIdentifier -> (PackageName, (PackageDef, Version))
+        addFlagsAndOpts ident@(PackageIdentifier name ver) =
+            (name, (def, ver))
+          where
+            def = PackageDef
+              { pdFlags = Map.findWithDefault Map.empty name flags
+
               -- NOTE: similar to 'allGhcOptions' in Stack.Types.Build
-              , ghcOptionsFor name ghcOptions
+              , pdGhcOptions = ghcOptionsFor name ghcOptions
+
+              , pdHide = False -- TODO let custom snapshots override this
+
               -- we add a Nothing since we don't yet collect Git SHAs for custom snapshots
-              , Nothing
-              )
-            )
+              , pdLocation = PLIndex ident Nothing -- TODO add a lot more flexibility here
+              }
         packageMap = Map.fromList $ map addFlagsAndOpts $ Set.toList packages
-        cv = fromMaybe (mbpCompilerVersion mbp0) mcompilerVersion
+        cv = fromMaybe (rsCompilerVersion rbp0) mcompilerVersion
         packages0 =
-             mbpPackages mbp0 `Map.difference` Map.fromSet (const ()) dropPackages
-    mbp1 <- toMiniBuildPlan cv mempty packageMap
-    return MiniBuildPlan
-        { mbpCompilerVersion = cv
-        , mbpPackages = Map.union (mbpPackages mbp1) packages0
+             rsPackages rbp0 `Map.difference` Map.fromSet (const ()) dropPackages
+    rbp1 <- toResolvedSnapshot cv mempty packageMap
+    return ResolvedSnapshot
+        { rsCompilerVersion = cv
+        , rsPackages = Map.union (rsPackages rbp1) packages0
+        , rsUniqueName = error "applyCustomSnapshot.rsUniqueName"
         }
