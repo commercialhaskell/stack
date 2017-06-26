@@ -176,15 +176,12 @@ withBuildConfigExt skipDocker go@GlobalOpts{..} mbefore inner mafter = do
                  inner lk2
 
       let inner'' lk = do
-              putStrLn "calling lcLoadBuildConfig"
               bconfig <- runStackTGlobal () go $
                   lcLoadBuildConfig lc globalCompiler
-              putStrLn "calling setupEnv"
               envConfig <-
                  runStackTGlobal
                      bconfig go
                      (setupEnv Nothing)
-              putStrLn "done with setupEnv"
               runStackTGlobal
                   envConfig
                   go
