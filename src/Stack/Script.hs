@@ -251,7 +251,7 @@ toModuleInfo global =
             $ map (\mn -> (ModuleName $ encodeUtf8 mn, Set.singleton pn))
             $ Set.toList mns) . fmap (sdModules . ppDesc))
     . filter (\(pn, pp) ->
-            not (pcHide $ ppConstraints pp) &&
+            not (ppHide pp) &&
             pn `Set.notMember` blacklist)
     . Map.toList
     . bpPackages

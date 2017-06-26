@@ -11,7 +11,6 @@ module Stack.Types.BuildPlan
     ( -- * Types
       BuildPlan (..)
     , PackagePlan (..)
-    , PackageConstraints (..)
     , ExeName (..)
     , SimpleDesc (..)
     , Snapshots (..)
@@ -59,8 +58,6 @@ import qualified Data.Text as T
 import           Data.Text.Encoding (encodeUtf8)
 import           Data.Text.Read (decimal)
 import           Data.Time (Day)
-import qualified Data.Traversable as T
-import           Data.Vector (Vector)
 import qualified Distribution.Text as DT
 import qualified Distribution.Version as C
 import           GHC.Generics (Generic)
@@ -79,7 +76,6 @@ data SnapName
 
 data BuildPlan = BuildPlan
     { bpCompilerVersion :: CompilerVersion
-    , bpTools       :: Vector (PackageName, Version)
     , bpPackages    :: Map PackageName PackagePlan
     }
     deriving (Show, Eq)
@@ -95,18 +91,14 @@ instance FromJSON BuildPlan where
                 (Just ghc, _) -> return (GhcVersion ghc)
                 (_, Just compiler) -> return compiler
                 _ -> fail "expected field \"ghc-version\" or \"compiler-version\" not present"
-        bpTools <- o .: "tools" >>= T.mapM goTool
         bpPackages <- o .: "packages"
         return BuildPlan {..}
-      where
-        goTool = withObject "Tool" $ \o -> (,)
-            <$> o .: "name"
-            <*> o .: "version"
 
 data PackagePlan = PackagePlan
     { ppVersion     :: Version
     , ppCabalFileInfo :: Maybe CabalFileInfo
-    , ppConstraints :: PackageConstraints
+    , ppFlagOverrides    :: Map FlagName Bool
+    , ppHide             :: Bool
     , ppDesc        :: SimpleDesc
     }
     deriving (Show, Eq)
@@ -115,7 +107,11 @@ instance FromJSON PackagePlan where
     parseJSON = withObject "PackageBuild" $ \o -> do
         ppVersion <- o .: "version"
         ppCabalFileInfo <- o .:? "cabal-file-info"
-        ppConstraints <- o .: "constraints"
+
+        Object constraints <- o .: "constraints"
+        ppFlagOverrides <- constraints .: "flags"
+        ppHide <- constraints .:? "hide" .!= False
+
         ppDesc <- o .: "description"
         return PackagePlan {..}
 
@@ -164,20 +160,6 @@ instance Show BuildPlanTypesException where
     show (ParseSnapNameException t) = "Invalid snapshot name: " ++ T.unpack t
     show (ParseFailedException rep t) =
         "Unable to parse " ++ show t ++ " as " ++ show rep
-
-data PackageConstraints = PackageConstraints
-    { pcVersionRange     :: VersionRange
-    , pcFlagOverrides    :: Map FlagName Bool
-    , pcHide             :: Bool
-    }
-    deriving (Show, Eq)
-instance FromJSON PackageConstraints where
-    parseJSON = withObject "PackageConstraints" $ \o -> do
-        pcVersionRange <- (o .: "version-range")
-                      >>= either (fail . show) return . simpleParse
-        pcFlagOverrides <- o .: "flags"
-        pcHide <- o .:? "hide" .!= False
-        return PackageConstraints {..}
 
 -- | Name of an executable.
 newtype ExeName = ExeName { unExeName :: Text }

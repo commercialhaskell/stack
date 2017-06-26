@@ -460,7 +460,7 @@ loadMiniBuildPlan name = do
   where
     goPP pp =
         ( ppVersion pp
-        , pcFlagOverrides $ ppConstraints pp
+        , ppFlagOverrides pp
          -- TODO: store ghc options in BuildPlan?
         , []
         , fmap cfiGitSHA1 $ ppCabalFileInfo pp
