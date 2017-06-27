@@ -57,6 +57,9 @@ Other enhancements:
 * MinGW bin folder now is searched for dynamic libraries. See [#3126](https://github.com/commercialhaskell/stack/issues/3126)
 * When using Nix, nix-shell now depends always on git to prevent runtime errors
   while fetching metadata
+* The `stack unpack` command now accepts a form where an explicit
+  Hackage revision hash is specified, e.g. `stack unpack
+  foo-1.2.3@gitsha1:deadbeef`.
 
 Bug fixes:
 
