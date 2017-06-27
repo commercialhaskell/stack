@@ -55,6 +55,8 @@ Other enhancements:
   wired-in packages. See
   [#3172](https://github.com/commercialhaskell/stack/issues/3172).
 * MinGW bin folder now is searched for dynamic libraries. See [#3126](https://github.com/commercialhaskell/stack/issues/3126)
+* When using Nix, nix-shell now depends always on git to prevent runtime errors
+  while fetching metadata
 
 Bug fixes:
 
@@ -147,8 +149,6 @@ Behavior changes:
 
 Other enhancements:
 
-* When using Nix, nix-shell now depends always on git to prevent runtime errors
-  while fetching metadata
 * Internal cleanup: configuration types are now based much more on lenses
 * `stack build` and related commands now allow the user to disable debug symbol stripping
   with new `--no-strip`, `--no-library-stripping`, and `--no-executable-shipping` flags,
