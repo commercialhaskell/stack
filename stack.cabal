@@ -209,7 +209,7 @@ library
                    , directory >= 1.2.1.0 && < 1.4
                    , echo >= 0.1.3 && < 0.2
                    , either
-                   , errors < 2.2
+                   , errors < 2.3
                    , exceptions >= 0.8.0.2
                    , extra < 1.6
                    , fast-logger >= 2.3.1
