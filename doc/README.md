@@ -23,22 +23,12 @@ or:
 
     wget -qO- https://get.haskellstack.org/ | sh
 
-For detailed instructions and downloads, instructions are available by
-operating system/distribution:
+On Windows, you can download and install the
+[Windows 64-bit Installer](https://www.stackage.org/stack/windows-x86_64-installer).
 
-* [Windows](install_and_upgrade.md#windows)
-* [macOS](install_and_upgrade.md#macos)
-* [Ubuntu](install_and_upgrade.md#ubuntu)
-* [Debian](install_and_upgrade.md#debian)
-* [CentOS / Red Hat / Amazon Linux](install_and_upgrade.md#centos)
-* [Fedora](install_and_upgrade.md#fedora)
-* [openSUSE / SUSE Linux Enterprise](install_and_upgrade.md#suse)
-* [Arch Linux](install_and_upgrade.md#arch-linux)
-* [NixOS](install_and_upgrade.md#nixos)
-* [Linux (general)](install_and_upgrade.md#linux)
-* [FreeBSD](install_and_upgrade.md#freebsd)
-
-[Upgrade instructions](install_and_upgrade.md#upgrade)
+For detailed instructions and downloads, including many additional
+operating systems, check out the
+[install and upgrade page](install_and_upgrade.md).
 
 #### Quick Start Guide
 
