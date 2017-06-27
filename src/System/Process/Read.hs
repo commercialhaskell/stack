@@ -423,11 +423,11 @@ getEnvOverride platform =
           mkEnvOverride platform
         . Map.fromList . map (T.pack *** T.pack)
 
-newtype PathException = PathsInvalidInPath [FilePath]
+newtype InvalidPathException = PathsInvalidInPath [FilePath]
     deriving Typeable
 
-instance Exception PathException
-instance Show PathException where
+instance Exception InvalidPathException
+instance Show InvalidPathException where
     show (PathsInvalidInPath paths) = unlines $
         [ "Would need to add some paths to the PATH environment variable \
           \to continue, but they would be invalid because they contain a "
