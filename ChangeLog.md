@@ -59,7 +59,9 @@ Other enhancements:
   while fetching metadata
 * The `stack unpack` command now accepts a form where an explicit
   Hackage revision hash is specified, e.g. `stack unpack
-  foo-1.2.3@gitsha1:deadbeef`.
+  foo-1.2.3@gitsha1:deadbeef`. Note that this should be considered
+  _experimental_, Stack will likely move towards a different hash
+  format in the future.
 
 Bug fixes:
 
