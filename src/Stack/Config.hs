@@ -293,7 +293,7 @@ configFromConfigMonoid
 
          configGHCVariant0 = getFirst configMonoidGHCVariant
          configGHCBuild = getFirst configMonoidGHCBuild
-         configInstallGHC = fromFirst False configMonoidInstallGHC
+         configInstallGHC = fromFirst True configMonoidInstallGHC
          configSkipGHCCheck = fromFirst False configMonoidSkipGHCCheck
          configSkipMsys = fromFirst False configMonoidSkipMsys
 
