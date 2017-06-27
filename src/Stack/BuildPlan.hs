@@ -5,6 +5,7 @@
 {-# LANGUAGE FlexibleContexts   #-}
 {-# LANGUAGE GADTs              #-}
 {-# LANGUAGE OverloadedStrings  #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell    #-}
 {-# LANGUAGE TupleSections      #-}
 
@@ -20,8 +21,6 @@ module Stack.BuildPlan
     , gpdPackageDeps
     , gpdPackages
     , gpdPackageName
-    , loadResolver
-    , loadLoadedSnapshot
     , removeSrcPkgDefaultFlags
     , resolveBuildPlan
     , selectBestSnapshot
@@ -29,8 +28,8 @@ module Stack.BuildPlan
     , shadowLoadedSnapshot
     , showItems
     , showPackageFlags
-    , parseCustomLoadedSnapshot
-    , loadSnapshotDef
+    , loadResolver
+    , loadSnapshot
     ) where
 
 import           Control.Applicative
@@ -76,6 +75,7 @@ import qualified Distribution.PackageDescription as C
 import           Distribution.System (Platform)
 import           Distribution.Text (display)
 import qualified Distribution.Version as C
+import           Network.HTTP.Client (Request)
 import           Network.HTTP.Download
 import           Path
 import           Path.IO
@@ -96,6 +96,7 @@ import           Stack.Types.Urls
 import           Stack.Types.Compiler
 import           Stack.Types.Resolver
 import           Stack.Types.StackT
+import           System.FilePath (takeDirectory)
 
 data BuildPlanException
     = UnknownPackages
@@ -103,7 +104,6 @@ data BuildPlanException
         (Map PackageName (Maybe Version, Set PackageName)) -- truly unknown
         (Map PackageName (Set PackageIdentifier)) -- shadowed
     | SnapshotNotFound SnapName
-    | FilepathInDownloadedSnapshot T.Text
     | NeitherCompilerOrResolverSpecified T.Text
     deriving (Typeable)
 instance Exception BuildPlanException
@@ -181,11 +181,6 @@ instance Show BuildPlanException where
                       $ Set.toList
                       $ Set.unions
                       $ Map.elems shadowed
-    show (FilepathInDownloadedSnapshot url) = unlines
-        [ "Downloaded snapshot specified a 'resolver: { location: filepath }' "
-        , "field, but filepaths are not allowed in downloaded snapshots.\n"
-        , "Filepath specified: " ++ T.unpack url
-        ]
     show (NeitherCompilerOrResolverSpecified url) =
         "Failed to load custom snapshot at " ++
         T.unpack url ++
@@ -233,11 +228,12 @@ data ResolveState = ResolveState
 
 toLoadedSnapshot
     :: (StackMiniM env m, HasConfig env)
-    => CompilerVersion -- ^ Compiler version
+    => LoadedResolver
+    -> CompilerVersion -- ^ Compiler version
     -> Map PackageName Version -- ^ cores
     -> Map PackageName (PackageDef, Version) -- ^ 'sdPackages' plus resolved version info
     -> m LoadedSnapshot
-toLoadedSnapshot compilerVersion corePackages packages = do
+toLoadedSnapshot loadedResolver compilerVersion corePackages packages = do
     -- Determine the dependencies of all of the packages in the build plan. We
     -- handle core packages specially, because some of them will not be in the
     -- package index. For those, we allow missing packages to exist, and then
@@ -251,17 +247,15 @@ toLoadedSnapshot compilerVersion corePackages packages = do
 
     unless (Set.null missing) $ error $ "Missing packages in snapshot: " ++ show missing -- FIXME proper exception
 
-    error "FIXME toLoadedSnapshot"
-    {-
     return LoadedSnapshot
         { lsCompilerVersion = compilerVersion
+        , lsResolver = loadedResolver
         , lsPackages = Map.unions
             [ fmap (removeMissingDeps (Map.keysSet cores)) cores
             , extras
             , Map.fromList $ map goCore $ Set.toList missingCores
             ]
         }
-    -}
   where
     goCore (PackageIdentifier name version) = (name, LoadedPackageInfo
         { lpiVersion = version
@@ -273,13 +267,13 @@ toLoadedSnapshot compilerVersion corePackages packages = do
         , lpiHide = error "goCore.lpiHide"
         })
 
-    {- FIXME
-    removeMissingDeps cores rpi = rpi
-        { rpiPackageDeps = Set.intersection cores (rpiPackageDeps mpi)
+    removeMissingDeps cores lpi = lpi
+        { lpiPackageDeps = Set.intersection cores (lpiPackageDeps lpi)
         }
-    -}
 
 -- | Add in the resolved dependencies from the package index
+--
+-- Returns the set of missing identifiers.
 addDeps
     :: (StackMiniM env m, HasConfig env)
     => Bool -- ^ allow missing
@@ -287,8 +281,6 @@ addDeps
     -> Map PackageName (Version, Maybe PackageDef)
     -> m (Map PackageName LoadedPackageInfo, Set PackageIdentifier)
 addDeps allowMissing compilerVersion toCalc = do
-    error "addDeps"
-    {-
     platform <- view platformL
     (resolvedMap, missingIdents) <-
         if allowMissing
@@ -302,19 +294,18 @@ addDeps allowMissing compilerVersion toCalc = do
                 return (m, Set.empty)
     let byIndex = Map.fromListWith (++) $ flip map resolvedMap
             $ \rp ->
-                let (cache, ghcOptions, sha) =
-                        case Map.lookup (packageIdentifierName (rpIdent rp)) toCalc of
-                            Nothing -> (Map.empty, [], Nothing)
-                            Just (_, x, y, z) -> (x, y, z)
-                 in (indexName $ rpIndex rp, [(rp, (cache, ghcOptions, sha))])
+                 let pair = fromMaybe
+                        (packageIdentifierVersion (rpIdent rp), Nothing)
+                        (Map.lookup (packageIdentifierName (rpIdent rp)) toCalc)
+                  in (indexName $ rpIndex rp, [(rp, pair)])
     res <- forM (Map.toList byIndex) $ \(indexName', pkgs) -> withCabalFiles indexName' pkgs
-        $ \ident (flags, ghcOptions, mgitSha) cabalBS -> do
+        $ \ident (version, mpackageDef) cabalBS -> do
             (_warnings,gpd) <- readPackageUnresolvedBS Nothing cabalBS
             let packageConfig = PackageConfig
                     { packageConfigEnableTests = False
                     , packageConfigEnableBenchmarks = False
-                    , packageConfigFlags = flags
-                    , packageConfigGhcOptions = ghcOptions
+                    , packageConfigFlags = maybe Map.empty pdFlags mpackageDef
+                    , packageConfigGhcOptions = maybe [] pdGhcOptions mpackageDef
                     , packageConfigCompilerVersion = compilerVersion
                     , packageConfigPlatform = platform
                     }
@@ -323,20 +314,24 @@ addDeps allowMissing compilerVersion toCalc = do
                 exes = Set.fromList $ map (ExeName . T.pack . exeName) $ executables pd
                 notMe = Set.filter (/= name) . Map.keysSet
             return (name, LoadedPackageInfo
-                { rpiVersion = packageIdentifierVersion ident
-                , rpiDef = PackageDef
-                    { pdFlags = flags
-                    , pdGhcOptions = ghcOptions
-                    }
-                , rpiPackageDeps = notMe $ packageDependencies pd
-                -- FIXME , rpiGitSHA1 = mgitSha
+                { lpiVersion = packageIdentifierVersion ident
+                , lpiDef = mpackageDef
+                , lpiPackageDeps = notMe $ packageDependencies pd
+                , lpiProvidedExes = exes
+                , lpiExposedModules = Set.empty -- FIXME?
+                , lpiHide = False -- FIXME?
+                , lpiNeededExes = Map.empty -- FIXME
                 })
     return (Map.fromList $ concat res, missingIdents)
   where
     shaMap = Map.fromList
-        $ map (\(n, (v, _f, _ghcOptions, gitsha)) -> (PackageIdentifier n v, gitsha))
+        $ map (\(n, (v, mpackageDef)) -> (PackageIdentifier n v, mpackageDef >>= getGitSHA))
         $ Map.toList toCalc
-    -}
+
+    getGitSHA pd = -- FIXME do we still need the SHA map like this?
+      case pdLocation pd of
+        PLIndex _ (Just cfi) -> Just $ cfiGitSHA1 cfi
+        _ -> Nothing
 
 -- | Resolve all packages necessary to install for the needed packages.
 getDeps :: LoadedSnapshot
@@ -430,52 +425,10 @@ getToolMap =
       $ mpiExes mpi
     -}
 
-loadResolver -- FIXME explicit two-step LoadedResolver -> SnapshotDef -> LoadedSnapshot
-    :: (StackMiniM env m, HasConfig env, HasGHCVariant env)
-    => Maybe (Path Abs File)
-    -> Resolver
-    -> m LoadedSnapshot
-loadResolver mconfigPath resolver =
-    case resolver of
-        ResolverSnapshot snap -> loadLoadedSnapshot snap
-        -- TODO(mgsloan): Not sure what this FIXME means
-        -- FIXME instead of passing the stackYaml dir we should maintain
-        -- the file URL in the custom resolver always relative to stackYaml.
-        ResolverCustom name url () -> parseCustomLoadedSnapshot mconfigPath url
-        ResolverCompiler compiler -> return LoadedSnapshot
-            { lsCompilerVersion = compiler
-            , lsPackages = mempty
-            , lsResolver = ResolverCompiler compiler
-            }
-
--- | Load up a 'LoadedSnapshot', preferably from cache
-loadLoadedSnapshot
-    :: (StackMiniM env m, HasConfig env, HasGHCVariant env)
-    => SnapName -> m LoadedSnapshot
-loadLoadedSnapshot name = do
-    path <- configLoadedSnapshotCache name -- FIXME probably not just a SnapName now
-    $(versionedDecodeOrLoad loadedSnapshotVC) path $ do
-        sd <- liftM snapshotDefFixes $ loadSnapshotDef name
-        menv <- getMinimalEnvOverride
-        corePackages <- getGlobalPackages menv (whichCompiler (sdCompilerVersion sd))
-        toLoadedSnapshot
-            (sdCompilerVersion sd)
-            corePackages
-            (goPP <$> sdPackages sd)
-  where
-    goPP pp = error "goPP" {- FIXME
-        ( ppVersion pp
-        , ppFlagOverrides pp
-         -- TODO: store ghc options in BuildPlan?
-        , []
-        , fmap cfiGitSHA1 $ ppCabalFileInfo pp
-        )
-    -}
-
 -- | Some hard-coded fixes for build plans, hopefully to be irrelevant over
 -- time.
 snapshotDefFixes :: SnapshotDef -> SnapshotDef
-snapshotDefFixes sd = sd
+snapshotDefFixes sd | isStackage (sdResolver sd) = sd
     { sdPackages = Map.fromList $ map go $ Map.toList $ sdPackages sd
     }
   where
@@ -488,33 +441,9 @@ snapshotDefFixes sd = sd
     goF "yaml" = Map.insert $(mkFlagName "system-libyaml") False
     goF _ = id
 
-
--- | Load the 'BuildPlan' for the given snapshot. Will load from a local copy
--- if available, otherwise downloading from Github.
-loadSnapshotDef :: (StackMiniM env m, HasConfig env) => SnapName -> m SnapshotDef
-loadSnapshotDef name = do
-    stackage <- view stackRootL
-    file' <- parseRelFile $ T.unpack file
-    let fp = buildPlanDir stackage </> file'
-    $logDebug $ "Decoding build plan from: " <> T.pack (toFilePath fp)
-    eres <- liftIO $ decodeFileEither $ toFilePath fp
-    case eres of
-        Right (StackageSnapshotDef sd) -> return $ sd name
-        Left e -> do
-            $logDebug $ "Decoding Stackage snapshot definition from file failed: " <> T.pack (show e)
-            ensureDir (parent fp)
-            url <- buildBuildPlanUrl name file
-            req <- parseRequest $ T.unpack url
-            $logSticky $ "Downloading " <> renderSnapName name <> " build plan ..."
-            $logDebug $ "Downloading build plan from: " <> url
-            _ <- redownload req fp
-            $logStickyDone $ "Downloaded " <> renderSnapName name <> " build plan."
-            StackageSnapshotDef sd <- liftIO (decodeFileEither $ toFilePath fp)
-                                  >>= either throwM return
-            return $ sd name
-
-  where
-    file = renderSnapName name <> ".yaml"
+    isStackage (ResolverSnapshot _) = True
+    isStackage _ = False
+snapshotDefFixes sd = sd
 
 buildBuildPlanUrl :: (MonadReader env m, HasConfig env) => SnapName -> Text -> m Text
 buildBuildPlanUrl name file = do
@@ -735,7 +664,7 @@ checkSnapBuildPlan
     -> m BuildPlanCheck
 checkSnapBuildPlan gpds flags snap = do
     platform <- view platformL
-    rs <- loadLoadedSnapshot snap
+    rs <- loadResolver (ResolverSnapshot snap) >>= loadSnapshot
 
     let
         compiler = lsCompilerVersion rs
@@ -927,6 +856,82 @@ shadowLoadedSnapshot (LoadedSnapshot cv resolver pkgs0) shadowed =
                 Just False -> Right
                 Nothing -> assert False Right
 
+applyCustomSnapshot
+    :: (StackMiniM env m, HasConfig env)
+    => CustomSnapshot
+    -> SnapshotDef
+    -> m SnapshotDef
+applyCustomSnapshot cs sd0 = do
+    let CustomSnapshot mcompilerVersion
+                       packages
+                       dropPackages
+                       (PackageFlags flags)
+                       ghcOptions
+            = cs
+        addFlagsAndOpts :: PackageIdentifier -> (PackageName, (PackageDef, Version))
+        addFlagsAndOpts ident@(PackageIdentifier name ver) =
+            (name, (def, ver))
+          where
+            def = PackageDef
+              { pdFlags = Map.findWithDefault Map.empty name flags
+
+              -- NOTE: similar to 'allGhcOptions' in Stack.Types.Build
+              , pdGhcOptions = ghcOptionsFor name ghcOptions
+
+              , pdHide = False -- TODO let custom snapshots override this
+
+              -- we add a Nothing since we don't yet collect Git SHAs for custom snapshots
+              , pdLocation = PLIndex ident Nothing -- TODO add a lot more flexibility here
+              }
+        packageMap = Map.fromList $ map addFlagsAndOpts $ Set.toList packages
+        cv = fromMaybe (sdCompilerVersion sd0) mcompilerVersion
+        packages0 =
+             sdPackages sd0 `Map.difference` Map.fromSet (const ()) dropPackages
+    rbp1 <- error "FIXME applyCustomSnapshot" -- toLoadedSnapshot cv mempty packageMap
+    return SnapshotDef
+        { sdCompilerVersion = cv
+        , sdPackages = error "sdPackages FIXME" -- Map.union (lsPackages rbp1) packages0
+        , sdResolver = sdResolver sd0
+        }
+
+-- | Convert a 'Resolver' into a 'SnapshotDef'
+loadResolver :: forall env m.
+                (StackMiniM env m, HasConfig env)
+             => Resolver
+             -> m SnapshotDef
+loadResolver (ResolverSnapshot name) = do
+    stackage <- view stackRootL
+    file' <- parseRelFile $ T.unpack file
+    let fp = buildPlanDir stackage </> file'
+    $logDebug $ "Decoding build plan from: " <> T.pack (toFilePath fp)
+    eres <- liftIO $ decodeFileEither $ toFilePath fp
+    case eres of
+        Right (StackageSnapshotDef sd) -> return $ sd name
+        Left e -> do
+            $logDebug $ "Decoding Stackage snapshot definition from file failed: " <> T.pack (show e)
+            ensureDir (parent fp)
+            url <- buildBuildPlanUrl name file
+            req <- parseRequest $ T.unpack url
+            $logSticky $ "Downloading " <> renderSnapName name <> " build plan ..."
+            $logDebug $ "Downloading build plan from: " <> url
+            _ <- redownload req fp
+            $logStickyDone $ "Downloaded " <> renderSnapName name <> " build plan."
+            StackageSnapshotDef sd <- liftIO (decodeFileEither $ toFilePath fp)
+                                  >>= either throwM return
+            return $ sd name
+
+  where
+    file = renderSnapName name <> ".yaml"
+loadResolver (ResolverCompiler compiler) = return SnapshotDef
+    { sdCompilerVersion = compiler
+    , sdPackages = Map.empty
+    , sdResolver = ResolverCompiler compiler
+    }
+
+-- TODO(mgsloan): Not sure what this FIXME means
+-- FIXME instead of passing the stackYaml dir we should maintain
+-- the file URL in the custom resolver always relative to stackYaml.
+
 -- This works differently for snapshots fetched from URL and those
 -- fetched from file:
 --
@@ -958,33 +963,28 @@ shadowLoadedSnapshot (LoadedSnapshot cv resolver pkgs0) shadowed =
 -- right custom snapshot.
 
 -- TODO: Allow custom plan to specify a name.
-
-parseCustomLoadedSnapshot
-    :: (StackMiniM env m, HasConfig env, HasGHCVariant env)
-    => Maybe (Path Abs File) -- ^ Root directory for when url is a filepath
-    -> T.Text
-    -> m LoadedSnapshot
-parseCustomLoadedSnapshot mconfigPath0 url0 = do
+loadResolver (ResolverCustom name (loc0, url0)) = do
     $logDebug $ "Loading " <> url0 <> " build plan"
-    case parseUrlThrow $ T.unpack url0 of
-        Just req -> downloadCustom url0 req
-        Nothing ->
-           case mconfigPath0 of
-               Nothing -> throwM $ FilepathInDownloadedSnapshot url0
-               Just configPath -> do
-                   (getRbp, hash) <- readCustom configPath url0
-                   rbp <- getRbp
-                   -- NOTE: We make the choice of only writing a cache
-                   -- file for the full RBP, not the intermediate ones.
-                   -- This isn't necessarily the best choice if we want
-                   -- to share work extended snapshots. I think only
-                   -- writing this one is more efficient for common
-                   -- cases.
-                   binaryPath <- getBinaryPath hash
-                   alreadyCached <- doesFileExist binaryPath
-                   unless alreadyCached $ $(versionedEncodeFile loadedSnapshotVC) binaryPath rbp
-                   return rbp
+    (sd, hash) <- case loc0 of
+        Left req -> downloadCustom url0 req
+        Right path -> do
+            (getRbp, hash) <- readCustom path
+            rbp <- getRbp
+            -- NOTE: We make the choice of only writing a cache
+            -- file for the full RBP, not the intermediate ones.
+            -- This isn't necessarily the best choice if we want
+            -- to share work extended snapshots. I think only
+            -- writing this one is more efficient for common
+            -- cases.
+            {- FIXME
+            binaryPath <- getBinaryPath hash
+            alreadyCached <- doesFileExist binaryPath
+            unless alreadyCached $ $(versionedEncodeFile loadedSnapshotVC) binaryPath rbp
+            -}
+            return (rbp, hash)
+    return sd { sdResolver = ResolverCustom name hash }
   where
+    downloadCustom :: Text -> Request -> m (SnapshotDef, SnapshotHash)
     downloadCustom url req = do
         let urlHash = S8.unpack $ trimmedSnapshotHash $ doHash $ encodeUtf8 url
         hashFP <- parseRelFile $ urlHash ++ ".yaml"
@@ -994,7 +994,8 @@ parseCustomLoadedSnapshot mconfigPath0 url0 = do
         yamlBS <- liftIO $ S.readFile $ toFilePath cacheFP
         let yamlHash = doHash yamlBS
         binaryPath <- getBinaryPath yamlHash
-        $(versionedDecodeOrLoad loadedSnapshotVC) binaryPath $ do
+        -- FIXME $(versionedDecodeOrLoad loadedSnapshotVC) binaryPath $ do
+        sd <- do
             (cs, mresolver) <- decodeYaml yamlBS
             parentRbp <- case (csCompilerVersion cs, mresolver) of
                 (Nothing, Nothing) -> throwM (NeitherCompilerOrResolverSpecified url)
@@ -1002,19 +1003,24 @@ parseCustomLoadedSnapshot mconfigPath0 url0 = do
                 -- NOTE: ignoring the parent's hash, even though
                 -- there could be one. URL snapshot's hash are
                 -- determined just from their contents.
-                (_, Just resolver) -> loadResolver Nothing resolver
+                (_, Just resolver) -> do
+                  resolver' <- mapM (parseCustomLocation Nothing) resolver
+                  loadResolver resolver'
             applyCustomSnapshot cs parentRbp
-    readCustom configPath path = do
-        yamlFP <- resolveFile (parent configPath) (T.unpack $ fromMaybe path $
-            T.stripPrefix "file://" path <|> T.stripPrefix "file:" path)
-        yamlBS <- liftIO $ S.readFile $ toFilePath yamlFP
+        return (sd, yamlHash)
+
+    readCustom :: FilePath -> m (m SnapshotDef, SnapshotHash)
+    readCustom yamlFP = do
+        yamlBS <- liftIO $ S.readFile yamlFP
         (cs, mresolver) <- decodeYaml yamlBS
         (getRbp, hash) <- case mresolver of
-            Just (ResolverCustom _ url ()) ->
-                case parseUrlThrow $ T.unpack url of
-                    Just req -> return (downloadCustom url req, doHash yamlBS)
-                    Nothing -> do
-                        (getRbp0, SnapshotHash hash0) <- readCustom yamlFP url
+            {- FIXME is this simplification OK?
+            Just (ResolverCustom _ url) -> do
+                (loc, _) <- parseCustomLocation (takeDirectory yamlFP) url
+                case loc of
+                    Left req -> return (fmap fst $ downloadCustom url req, doHash yamlBS)
+                    Right yamlFP' -> do
+                        (getRbp0, SnapshotHash hash0) <- readCustom yamlFP'
                         let hash = doHash (hash0 <> yamlBS)
                             getRbp = do
                                 binaryPath <- getBinaryPath hash
@@ -1033,78 +1039,74 @@ parseCustomLoadedSnapshot mconfigPath0 url0 = do
                                                 getRbp0
                                     else getRbp0
                         return (getRbp, hash)
+            -}
             Just resolver -> do
                 -- NOTE: in the cases where we don't have a hash, the
                 -- normal resolver name is enough. Since this name is
                 -- part of the yaml file, it ends up in our hash.
                 let hash = doHash yamlBS
+                    {-
                     getRbp = do
-                        ls <- loadResolver (Just configPath) resolver
+                        ls <- loadResolver resolver
                         let mhash = customResolverHash $ lsResolver ls
                         assert (isNothing mhash) (return ls)
-                return (getRbp, hash)
+                    -}
+                resolver' <- mapM (parseCustomLocation (Just (takeDirectory yamlFP))) resolver
+                return (loadResolver resolver', hash)
             Nothing -> do
                 case csCompilerVersion cs of
-                    Nothing -> throwM (NeitherCompilerOrResolverSpecified path)
-                    Just cv -> do
-                        let hash = doHash yamlBS
-                            getRbp = return (compilerBuildPlan cv)
-                        return (getRbp, hash)
+                    Nothing -> throwM (NeitherCompilerOrResolverSpecified (T.pack yamlFP))
+                    Just cv ->
+                        return (loadResolver $ ResolverCompiler cv, doHash yamlBS)
         return (applyCustomSnapshot cs =<< getRbp, hash)
     getBinaryPath hash = do
         binaryFilename <- parseRelFile $ S8.unpack (trimmedSnapshotHash hash) ++ ".bin"
         customPlanDir <- getCustomPlanDir
         return $ customPlanDir </> $(mkRelDir "bin") </> binaryFilename
+    decodeYaml :: S8.ByteString -> m (CustomSnapshot, Maybe (ResolverWith Text))
     decodeYaml yamlBS = do
         WithJSONWarnings res warnings <-
              either (throwM . ParseCustomSnapshotException url0) return $
              decodeEither' yamlBS
         logJSONWarnings (T.unpack url0) warnings
         return res
-    compilerBuildPlan cv = LoadedSnapshot
-         { lsCompilerVersion = cv
-         , lsPackages = mempty
-         , lsResolver = ResolverCompiler cv
+    compilerBuildPlan cv = SnapshotDef
+         { sdCompilerVersion = cv
+         , sdPackages = mempty
+         , sdResolver = ResolverCompiler cv
          }
     getCustomPlanDir = do
         root <- view stackRootL
         return $ root </> $(mkRelDir "custom-plan")
     doHash = SnapshotHash . B64URL.encode . Mem.convert . hashWith SHA256
 
-applyCustomSnapshot
-    :: (StackMiniM env m, HasConfig env)
-    => CustomSnapshot
-    -> LoadedSnapshot
-    -> m LoadedSnapshot
-applyCustomSnapshot cs rbp0 = do
-    let CustomSnapshot mcompilerVersion
-                       packages
-                       dropPackages
-                       (PackageFlags flags)
-                       ghcOptions
-            = cs
-        addFlagsAndOpts :: PackageIdentifier -> (PackageName, (PackageDef, Version))
-        addFlagsAndOpts ident@(PackageIdentifier name ver) =
-            (name, (def, ver))
-          where
-            def = PackageDef
-              { pdFlags = Map.findWithDefault Map.empty name flags
+-- | Fully load up a 'SnapshotDef' into a 'LoadedSnapshot'
+loadSnapshot
+  :: (StackMiniM env m, HasConfig env, HasGHCVariant env)
+  => SnapshotDef
+  -> m LoadedSnapshot
+loadSnapshot sd = do
+    path <- configLoadedSnapshotCache $ sdResolver sd
+    $(versionedDecodeOrLoad loadedSnapshotVC) path $ do
+        let sd' = snapshotDefFixes sd
+        menv <- getMinimalEnvOverride
+        corePackages <- getGlobalPackages menv (whichCompiler (sdCompilerVersion sd'))
+        packages <- getVersions $ sdPackages sd'
+        toLoadedSnapshot
+            (sdResolver sd)
+            (sdCompilerVersion sd')
+            corePackages
+            packages
 
-              -- NOTE: similar to 'allGhcOptions' in Stack.Types.Build
-              , pdGhcOptions = ghcOptionsFor name ghcOptions
-
-              , pdHide = False -- TODO let custom snapshots override this
-
-              -- we add a Nothing since we don't yet collect Git SHAs for custom snapshots
-              , pdLocation = PLIndex ident Nothing -- TODO add a lot more flexibility here
-              }
-        packageMap = Map.fromList $ map addFlagsAndOpts $ Set.toList packages
-        cv = fromMaybe (lsCompilerVersion rbp0) mcompilerVersion
-        packages0 =
-             lsPackages rbp0 `Map.difference` Map.fromSet (const ()) dropPackages
-    rbp1 <- toLoadedSnapshot cv mempty packageMap
-    return LoadedSnapshot
-        { lsCompilerVersion = cv
-        , lsPackages = Map.union (lsPackages rbp1) packages0
-        , lsResolver = lsResolver rbp0
-        }
+getVersions :: Monad m
+            => Map PackageName PackageDef
+            -> m (Map PackageName (PackageDef, Version))
+getVersions =
+    return . fmap go
+  where
+    go pd =
+        (pd, v)
+      where
+        v =
+          case pdLocation pd of
+            PLIndex (PackageIdentifier _ v) _ -> v

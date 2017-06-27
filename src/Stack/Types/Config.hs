@@ -171,6 +171,7 @@ module Stack.Types.Config
   ,configUrlsL
   ,cabalVersionL
   ,whichCompilerL
+  ,envOverrideL
   -- * Lens reexport
   ,view
   ,to
@@ -1296,15 +1297,15 @@ flagCacheLocal = do
     root <- installationRootLocal
     return $ root </> $(mkRelDir "flag-cache")
 
--- | Where to store mini build plan caches
+-- | Where to store 'LoadedSnapshot' caches
 configLoadedSnapshotCache
   :: (MonadThrow m, MonadReader env m, HasConfig env, HasGHCVariant env)
-  => SnapName -- FIXME generalize?
+  => LoadedResolver
   -> m (Path Abs File)
-configLoadedSnapshotCache name = do
+configLoadedSnapshotCache resolver = do
     root <- view stackRootL
     platform <- platformGhcVerOnlyRelDir
-    file <- parseRelFile $ T.unpack (renderSnapName name) ++ ".cache"
+    file <- parseRelFile $ T.unpack (resolverName resolver) ++ ".cache"
     -- Yes, cached plans differ based on platform
     return (root </> $(mkRelDir "build-plan-cache") </> platform </> file)
 
@@ -1379,6 +1380,8 @@ parseProjectAndConfigMonoid rootDir =
 
         flags <- o ..:? "flags" ..!= mempty
         resolver <- jsonSubWarnings (o ..: "resolver")
+                >>= either (fail . show) return
+                  . mapM (parseCustomLocation (Just (toFilePath rootDir)))
         compiler <- o ..:? "compiler"
         msg <- o ..:? "user-message"
         config <- parseConfigMonoidObject rootDir o
@@ -1676,7 +1679,7 @@ data CustomSnapshot = CustomSnapshot
     , csGhcOptions :: !GhcOptions
     }
 
-instance FromJSON (WithJSONWarnings (CustomSnapshot, Maybe Resolver)) where
+instance (a ~ Maybe (ResolverWith Text)) => FromJSON (WithJSONWarnings (CustomSnapshot, a)) where
     parseJSON = withObjectWarnings "CustomSnapshot" $ \o -> (,)
         <$> (CustomSnapshot
             <$> o ..:? "compiler"
@@ -1906,3 +1909,8 @@ loadedSnapshotL = envConfigL.lens
 
 whichCompilerL :: Getting r CompilerVersion WhichCompiler
 whichCompilerL = to whichCompiler
+
+envOverrideL :: HasConfig env => Lens' env (EnvSettings -> IO EnvOverride)
+envOverrideL = configL.lens
+    configEnvOverride
+    (\x y -> x { configEnvOverride = y })

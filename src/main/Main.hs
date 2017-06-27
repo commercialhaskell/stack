@@ -635,9 +635,9 @@ unpackCmd names go = withConfigAndLock go $ do
                     ResolverSnapshot snapName -> do
                         config <- view configL
                         let miniConfig = loadMiniConfig config
-                        runInnerStackT miniConfig (loadSnapshotDef snapName)
+                        runInnerStackT miniConfig (loadResolver (ResolverSnapshot snapName))
                     ResolverCompiler _ -> throwString "Error: unpack does not work with compiler resolvers"
-                    ResolverCustom _ _ _ -> throwString "Error: unpack does not work with custom resolvers"
+                    ResolverCustom _ _ -> throwString "Error: unpack does not work with custom resolvers"
     Stack.Fetch.unpackPackages mSnapshotDef "." names
 
 -- | Update the package index

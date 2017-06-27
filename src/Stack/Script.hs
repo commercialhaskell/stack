@@ -25,7 +25,7 @@ import qualified Data.Text                  as T
 import           Path
 import           Path.IO
 import qualified Stack.Build
-import           Stack.BuildPlan            (loadResolver)
+import           Stack.BuildPlan            (loadResolver, loadSnapshot)
 import           Stack.Exec
 import           Stack.GhcPkg               (ghcPkgExeName)
 import           Stack.Options.ScriptParser
@@ -268,7 +268,7 @@ loadModuleInfo :: SnapName -> StackT EnvConfig IO ModuleInfo
 loadModuleInfo name = do
     path <- moduleInfoCache name
     $(versionedDecodeOrLoad moduleInfoVC) path $
-      fmap toModuleInfo $ loadResolver Nothing $ ResolverSnapshot name
+      fmap toModuleInfo $ loadResolver (ResolverSnapshot name) >>= loadSnapshot
 
 parseImports :: ByteString -> (Set PackageName, Set ModuleName)
 parseImports =

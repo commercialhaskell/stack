@@ -188,12 +188,13 @@ makeConcreteResolver
     :: (StackMiniM env m, HasConfig env)
     => AbstractResolver
     -> m Resolver
-makeConcreteResolver (ARResolver r) = return r
+makeConcreteResolver (ARResolver r) = do
+  mapM (parseCustomLocation (error "FIXME makeConcreteResolver")) r
 makeConcreteResolver ar = do
     snapshots <- getSnapshots
     r <-
         case ar of
-            ARResolver r -> assert False $ return r
+            ARResolver r -> assert False $ makeConcreteResolver $ ARResolver r
             ARGlobal -> do
                 config <- view configL
                 implicitGlobalDir <- getImplicitGlobalProjectDir config
@@ -590,19 +591,16 @@ loadBuildConfig mproject config mresolver mcompiler = do
             , projectCompiler = mcompiler <|> projectCompiler project'
             }
 
-    {- FIXME
-    (rs0, loadedResolver) <- flip runReaderT miniConfig $
-        loadResolver (Just stackYamlFP) (projectResolver project)
-    let rs = case projectCompiler project of
-            Just compiler -> rs0 { rsCompilerVersion = compiler }
-            Nothing -> rs0
-    -}
+    sd0 <- flip runReaderT miniConfig $ loadResolver resolver
+    let sd = case projectCompiler project of
+            Just compiler -> sd0 { sdCompilerVersion = compiler }
+            Nothing -> sd0
 
     extraPackageDBs <- mapM resolveDir' (projectExtraPackageDBs project)
 
     return BuildConfig
         { bcConfig = config
-        , bcSnapshotDef = error "bcSnapshotDef"
+        , bcSnapshotDef = sd
         , bcGHCVariant = view ghcVariantL miniConfig
         , bcPackageEntries = projectPackages project
         , bcExtraDeps = projectExtraDeps project

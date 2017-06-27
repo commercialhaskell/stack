@@ -88,6 +88,7 @@ import qualified    Paths_stack as Meta
 import              Prelude hiding (concat, elem, any) -- Fix AMP warning
 import              Safe (headMay, readMay)
 import              Stack.Build (build)
+import              Stack.BuildPlan (loadSnapshot)
 import              Stack.Config (loadConfig)
 import              Stack.Constants (distRelativeDir, stackProgName)
 import              Stack.Exec (defaultEnvSettings)
@@ -260,13 +261,21 @@ setupEnv mResolveMissingGHC = do
     $logDebug "Resolving package entries"
     packagesRef <- liftIO $ newIORef Nothing
     bc <- view buildConfigL
+
+    -- Set up a modified environment which includes the modified PATH
+    -- that GHC can be found on. This is needed for looking up global
+    -- package information in loadSnapshot.
+    let bcPath :: BuildConfig
+        bcPath = set envOverrideL (const (return menv)) bc
+
+    ls <- runInnerStackT bcPath $ loadSnapshot $ bcSnapshotDef bc
     let envConfig0 = EnvConfig
             { envConfigBuildConfig = bc
             , envConfigCabalVersion = cabalVer
             , envConfigCompilerVersion = compilerVer
             , envConfigCompilerBuild = compilerBuild
             , envConfigPackagesRef = packagesRef
-            , envConfigLoadedSnapshot = error "envLoadedSnapshot2"
+            , envConfigLoadedSnapshot = ls
             }
 
     -- extra installation bin directories

@@ -485,8 +485,8 @@ getResolverConstraints
     -> m (CompilerVersion,
           Map PackageName (Version, Map FlagName Bool))
 getResolverConstraints stackYaml resolver = do
-    rs <- loadResolver (Just stackYaml) resolver
-    return (lsCompilerVersion rs, lsConstraints rs)
+    ls <- loadResolver resolver >>= loadSnapshot
+    return (lsCompilerVersion ls, lsConstraints ls)
   where
     lpiConstraints lpi = (lpiVersion lpi, maybe Map.empty pdFlags $ lpiDef lpi)
     lsConstraints = fmap lpiConstraints . lsPackages
@@ -657,7 +657,7 @@ solveExtraDeps modStackYaml = do
     let gpds              = Map.elems $ fmap snd bundle
         oldFlags          = unPackageFlags (bcFlags bconfig)
         oldExtraVersions  = bcExtraDeps bconfig
-        resolver          = error "bcResolver" -- FIXME bcResolver bconfig
+        resolver          = sdResolver $ bcSnapshotDef bconfig
         oldSrcs           = gpdPackages gpds
         oldSrcFlags       = Map.intersection oldFlags oldSrcs
         oldExtraFlags     = Map.intersection oldFlags oldExtraVersions
@@ -665,7 +665,7 @@ solveExtraDeps modStackYaml = do
         srcConstraints    = mergeConstraints oldSrcs oldSrcFlags
         extraConstraints  = mergeConstraints oldExtraVersions oldExtraFlags
 
-    let resolver' = toResolverNotLoaded resolver
+    let resolver' = fmap (const (error "Solver FIXME")) resolver
     resolverResult <- checkResolverSpec gpds (Just oldSrcFlags) resolver'
     resultSpecs <- case resolverResult of
         BuildPlanCheckOk flags ->
@@ -701,14 +701,14 @@ solveExtraDeps modStackYaml = do
 
         changed =    any (not . Map.null) [newVersions, goneVersions]
                   || any (not . Map.null) [newFlags, goneFlags]
-                  || any (/= resolver') mOldResolver
+                  || any (/= (fmap snd resolver')) (fmap (fmap snd) mOldResolver)
 
     if changed then do
         $logInfo ""
         $logInfo $ "The following changes will be made to "
                    <> T.pack relStackYaml <> ":"
 
-        printResolver mOldResolver resolver'
+        printResolver (fmap (fmap snd) mOldResolver) (fmap snd resolver')
 
         printFlags newFlags  "* Flags to be added"
         printDeps  newVersions   "* Dependencies to be added"

@@ -167,7 +167,7 @@ newtype StackageSnapshotDef = StackageSnapshotDef (SnapName -> SnapshotDef)
 
 -- | Newtype wrapper to help parse a 'PackageDef' from the Stackage
 -- YAML files.
-newtype StackagePackageDef = StackagePackageDef { unStackagePackageDef :: PackageDef }
+newtype StackagePackageDef = StackagePackageDef { unStackagePackageDef :: PackageName -> PackageDef }
 
 instance FromJSON StackageSnapshotDef where
     parseJSON = withObject "StackageSnapshotDef" $ \o -> do
@@ -181,7 +181,7 @@ instance FromJSON StackageSnapshotDef where
                 (_, Just compiler) -> return compiler
                 _ -> fail "expected field \"ghc-version\" or \"compiler-version\" not present"
 
-        sdPackages <- Map.map unStackagePackageDef <$> o .: "packages"
+        sdPackages <- Map.mapWithKey (\k v -> unStackagePackageDef v k) <$> o .: "packages"
 
         return $ StackageSnapshotDef $ \snapName ->
           let sdResolver = ResolverSnapshot snapName
@@ -200,14 +200,15 @@ instance FromJSON StackagePackageDef where
                             return
                         $ HashMap.lookup ("GitSHA1" :: Text) cfiHashes
             return CabalFileInfo {..}
-        let pdLocation = PLIndex version mcabalFileInfo'
 
         Object constraints <- o .: "constraints"
         pdFlags <- constraints .: "flags"
         pdHide <- constraints .:? "hide" .!= False
         let pdGhcOptions = [] -- Stackage snapshots do not allow setting GHC options
 
-        return $ StackagePackageDef PackageDef {..}
+        return $ StackagePackageDef $ \name ->
+          let pdLocation = PLIndex (PackageIdentifier name version) mcabalFileInfo'
+           in PackageDef {..}
 
 -- | Information on the contents of a cabal file
 data CabalFileInfo = CabalFileInfo
@@ -236,7 +237,7 @@ instance Store LoadedSnapshot
 instance NFData LoadedSnapshot
 
 loadedSnapshotVC :: VersionConfig LoadedSnapshot
-loadedSnapshotVC = storeVersionConfig "ls-v1" "008JT34ImjzaL-brqnMwfPDWrBI="
+loadedSnapshotVC = storeVersionConfig "ls-v1" "-jKxkhdmu5EYSA5qaxw-r9ZzX7k="
 
 -- | Information on a single package for the 'LoadedSnapshot' which
 -- can be installed.

@@ -1,7 +1,10 @@
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE DeriveFoldable #-}
+{-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DeriveTraversable #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
@@ -24,7 +27,6 @@ module Stack.Types.Resolver
   ,resolverDirName
   ,resolverName
   ,customResolverHash
-  ,toResolverNotLoaded
   ,AbstractResolver(..)
   ,readAbstractResolver
   ,SnapName(..)
@@ -33,6 +35,7 @@ module Stack.Types.Resolver
   ,parseSnapName
   ,SnapshotHash (..)
   ,trimmedSnapshotHash
+  ,parseCustomLocation
   ) where
 
 import           Control.Applicative
@@ -49,6 +52,7 @@ import           Data.Data (Data)
 import qualified Data.HashMap.Strict as HashMap
 import           Data.IntMap.Strict (IntMap)
 import qualified Data.IntMap.Strict as IntMap
+import           Data.Maybe (fromMaybe)
 import           Data.Monoid.Extra
 import           Data.Store (Store)
 import           Data.Text (Text)
@@ -58,24 +62,26 @@ import           Data.Text.Read (decimal)
 import           Data.Time (Day)
 import           Data.Typeable (Typeable)
 import           GHC.Generics (Generic)
+import           Network.HTTP.Client (Request, parseUrlThrow)
 import           Options.Applicative (ReadM)
 import qualified Options.Applicative as OA
 import qualified Options.Applicative.Types as OA
 import           Prelude
 import           Safe (readMay)
 import           Stack.Types.Compiler
+import           System.FilePath ((</>))
 
 data IsLoaded = Loaded | NotLoaded
 
 type LoadedResolver = ResolverWith SnapshotHash
-type Resolver = ResolverWith ()
+type Resolver = ResolverWith (Either Request FilePath, Text)
 
 -- TODO: once GHC 8.0 is the lowest version we support, make these into
 -- actual haddock comments...
 
 -- | How we resolve which dependencies to install given a set of packages.
-data ResolverWith hash
-    = ResolverSnapshot !SnapName
+data ResolverWith customContents
+    = ResolverSnapshot !SnapName -- FIXME rename to ResolverStackage
     -- ^ Use an official snapshot from the Stackage project, either an
     -- LTS Haskell or Stackage Nightly.
 
@@ -85,17 +91,13 @@ data ResolverWith hash
     -- specify all upstream dependencies manually, such as using a
     -- dependency solver.
 
-    | ResolverCustom !Text !Text !hash
-    -- ^ A custom resolver based on the given name and URL. When a URL is
-    -- provided, its contents must be completely immutable. Filepaths are
-    -- always loaded. This constructor is used before the build-plan has
-    -- been loaded, as we do not yet know the custom snapshot's hash.
-    --
-    -- If @p@ is @SnapshotHash@, then we have fully loaded this resolver
-    -- and know its hash (which is used for file paths to store
-    -- generated data). If @p@ is @()@, then we do not have a hash
-    -- yet.
-    deriving (Generic, Typeable, Show, Data, Eq)
+    | ResolverCustom !Text !customContents
+    -- ^ A custom resolver based on the given name. If
+    -- @customContents@ is a @Text@, it represents either a URL or a
+    -- filepath. Once it has been loaded from disk, it will be
+    -- replaced with a @SnapshotHash@ value, which is used to store
+    -- cached files.
+    deriving (Generic, Typeable, Show, Data, Eq, Functor, Foldable, Traversable)
 instance Store LoadedResolver
 instance NFData LoadedResolver
 
@@ -103,18 +105,15 @@ instance ToJSON Resolver where
     toJSON x = case x of
         ResolverSnapshot{} -> toJSON $ resolverName x
         ResolverCompiler{} -> toJSON $ resolverName x
-        ResolverCustom n l _ -> handleCustom n l
-      where
-        handleCustom n l = object
+        ResolverCustom n (_, l) -> object
              [ "name" .= n
              , "location" .= l
              ]
-instance FromJSON (WithJSONWarnings Resolver) where
+instance a ~ Text => FromJSON (WithJSONWarnings (ResolverWith a)) where
     -- Strange structuring is to give consistent error messages
     parseJSON v@(Object _) = withObjectWarnings "Resolver" (\o -> ResolverCustom
         <$> o ..: "name"
-        <*> o ..: "location"
-        <*> pure ()) v
+        <*> o ..: "location") v
 
     parseJSON (String t) = either (fail . show) return (noJSONWarnings <$> parseResolverText t)
 
@@ -125,31 +124,45 @@ instance FromJSON (WithJSONWarnings Resolver) where
 resolverDirName :: LoadedResolver -> Text
 resolverDirName (ResolverSnapshot name) = renderSnapName name
 resolverDirName (ResolverCompiler v) = compilerVersionText v
-resolverDirName (ResolverCustom name _ hash) = "custom-" <> name <> "-" <> decodeUtf8 (trimmedSnapshotHash hash)
+resolverDirName (ResolverCustom name hash) = "custom-" <> name <> "-" <> decodeUtf8 (trimmedSnapshotHash hash)
 
 -- | Convert a Resolver into its @Text@ representation for human
 -- presentation.
 resolverName :: ResolverWith p -> Text
 resolverName (ResolverSnapshot name) = renderSnapName name
 resolverName (ResolverCompiler v) = compilerVersionText v
-resolverName (ResolverCustom name _ _) = "custom-" <> name
+resolverName (ResolverCustom name _) = "custom-" <> name
 
 customResolverHash :: LoadedResolver -> Maybe SnapshotHash
-customResolverHash (ResolverCustom _ _ hash) = Just hash
+customResolverHash (ResolverCustom _ hash) = Just hash
 customResolverHash _ = Nothing
 
+parseCustomLocation
+  :: MonadThrow m
+  => Maybe FilePath -- ^ directory config value was read from
+  -> Text
+  -> m (Either Request FilePath, Text)
+parseCustomLocation mdir t = do
+      x <- case parseUrlThrow $ T.unpack t of
+        Nothing -> do
+          dir <-
+            case mdir of
+              Nothing -> throwM $ FilepathInDownloadedSnapshot t
+              Just x -> return x
+          let suffix =
+                  T.unpack
+                $ fromMaybe t
+                $ T.stripPrefix "file://" t <|> T.stripPrefix "file:" t
+          return $ Right $ dir </> suffix
+        Just req -> return $ Left req
+      return (x, t)
+
 -- | Try to parse a @Resolver@ from a @Text@. Won't work for complex resolvers (like custom).
-parseResolverText :: MonadThrow m => Text -> m Resolver
+parseResolverText :: MonadThrow m => Text -> m (ResolverWith Text)
 parseResolverText t
     | Right x <- parseSnapName t = return $ ResolverSnapshot x
     | Just v <- parseCompilerVersion t = return $ ResolverCompiler v
     | otherwise = throwM $ ParseResolverException t
-
-toResolverNotLoaded :: LoadedResolver -> Resolver
-toResolverNotLoaded r = case r of
-    ResolverSnapshot s -> ResolverSnapshot s
-    ResolverCompiler v -> ResolverCompiler v
-    ResolverCustom n l _ -> ResolverCustom n l ()
 
 -- | Either an actual resolver value, or an abstract description of one (e.g.,
 -- latest nightly).
@@ -157,7 +170,7 @@ data AbstractResolver
     = ARLatestNightly
     | ARLatestLTS
     | ARLatestLTSMajor !Int
-    | ARResolver !Resolver
+    | ARResolver !(ResolverWith Text)
     | ARGlobal
     deriving Show
 
@@ -186,6 +199,7 @@ instance NFData SnapName
 data BuildPlanTypesException
     = ParseSnapNameException !Text
     | ParseResolverException !Text
+    | FilepathInDownloadedSnapshot !Text
     deriving Typeable
 instance Exception BuildPlanTypesException
 instance Show BuildPlanTypesException where
@@ -195,6 +209,11 @@ instance Show BuildPlanTypesException where
         , T.unpack t
         , ". Possible valid values include lts-2.12, nightly-YYYY-MM-DD, ghc-7.10.2, and ghcjs-0.1.0_ghc-7.10.2. "
         , "See https://www.stackage.org/snapshots for a complete list."
+        ]
+    show (FilepathInDownloadedSnapshot url) = unlines
+        [ "Downloaded snapshot specified a 'resolver: { location: filepath }' "
+        , "field, but filepaths are not allowed in downloaded snapshots.\n"
+        , "Filepath specified: " ++ T.unpack url
         ]
 
 -- | Convert a 'SnapName' into its short representation, e.g. @lts-2.8@,

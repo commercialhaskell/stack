@@ -38,7 +38,7 @@ dockerOptsFromMonoid mproject stackRoot maresolver DockerOptsMonoid{..} = do
                                 (ResolverNotSupportedException $
                                  show aresolver)
                         Nothing ->
-                            fmap projectResolver mproject
+                            fmap ((fmap.fmap) snd projectResolver) mproject
                 defaultTag =
                     case mresolver of
                         Nothing -> ""

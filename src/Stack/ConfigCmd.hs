@@ -93,10 +93,10 @@ cfgCmdSetValue (ConfigCmdSetResolver newResolver) = do
     concreteResolver <- makeConcreteResolver newResolver
     case concreteResolver of
         -- Check that the snapshot actually exists
-        ResolverSnapshot snapName -> void $ loadSnapshotDef snapName
+        ResolverSnapshot snapName -> void $ loadResolver $ ResolverSnapshot snapName
         ResolverCompiler _ -> return ()
         -- TODO: custom snapshot support?  Would need a way to specify on CLI
-        ResolverCustom _ _ () -> errorString "'stack config set resolver' does not support custom resolvers"
+        ResolverCustom _ _ -> errorString "'stack config set resolver' does not support custom resolvers"
     return (Yaml.String (resolverName concreteResolver))
 cfgCmdSetValue (ConfigCmdSetSystemGhc _ bool) =
     return (Yaml.Bool bool)
