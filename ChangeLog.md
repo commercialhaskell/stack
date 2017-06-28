@@ -65,6 +65,10 @@ Other enhancements:
 
 Bug fixes:
 
+* Building all executables only happens once instead of every
+  time. See
+  [#3229](https://github.com/commercialhaskell/stack/issues/3229) for
+  more info.
 * Fixes case where `stack build --profile` might not cause executables /
   tests / benchmarks to be rebuilt.
   See [#2984](https://github.com/commercialhaskell/stack/issues/2984)
