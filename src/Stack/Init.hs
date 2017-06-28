@@ -20,6 +20,7 @@ import qualified Data.ByteString.Lazy            as L
 import qualified Data.Foldable                   as F
 import           Data.Function                   (on)
 import qualified Data.HashMap.Strict             as HM
+import qualified Data.HashSet                    as HashSet
 import qualified Data.IntMap                     as IntMap
 import           Data.List                       (intercalate, intersect,
                                                   maximumBy)
@@ -47,6 +48,7 @@ import           Stack.Types.Build
 import           Stack.Types.BuildPlan
 import           Stack.Types.Config
 import           Stack.Types.FlagName
+import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageName
 import           Stack.Types.Resolver
 import           Stack.Types.StackT              (StackM)
@@ -120,7 +122,9 @@ initProject whichCmd currDir initOpts mresolver = do
         p = Project
             { projectUserMsg = if userMsg == "" then Nothing else Just userMsg
             , projectPackages = pkgs
-            , projectExtraDeps = extraDeps
+            , projectExtraDeps = HashSet.fromList $ map
+                (\(n, v) -> PackageIdentifierRevision (PackageIdentifier n v) Nothing)
+                (Map.toList extraDeps)
             , projectFlags = PackageFlags (removeSrcPkgDefaultFlags gpds flags)
             , projectResolver = r
             , projectCompiler = Nothing

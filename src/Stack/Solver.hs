@@ -660,10 +660,10 @@ solveExtraDeps modStackYaml = do
         resolver          = sdResolver $ bcSnapshotDef bconfig
         oldSrcs           = gpdPackages gpds
         oldSrcFlags       = Map.intersection oldFlags oldSrcs
-        oldExtraFlags     = Map.intersection oldFlags oldExtraVersions
+        oldExtraFlags     = error "oldExtraFlags FIXME" -- Map.intersection oldFlags oldExtraVersions
 
         srcConstraints    = mergeConstraints oldSrcs oldSrcFlags
-        extraConstraints  = mergeConstraints oldExtraVersions oldExtraFlags
+        extraConstraints  = error "extraConstraints FIXME" -- mergeConstraints oldExtraVersions oldExtraFlags
 
     let resolver' = fmap (const (error "Solver FIXME")) resolver
     resolverResult <- checkResolverSpec gpds (Just oldSrcFlags) resolver'
@@ -690,9 +690,9 @@ solveExtraDeps modStackYaml = do
         versions = fmap fst edeps
 
         vDiff v v' = if v == v' then Nothing else Just v
-        versionsDiff = Map.differenceWith vDiff
-        newVersions  = versionsDiff versions oldExtraVersions
-        goneVersions = versionsDiff oldExtraVersions versions
+        -- FIXME versionsDiff = Map.differenceWith vDiff
+        newVersions  = error "newVersions FIXME" -- versionsDiff versions oldExtraVersions
+        goneVersions = error "goneVersions FIXME" -- versionsDiff oldExtraVersions versions
 
         fDiff f f' = if f == f' then Nothing else Just f
         flagsDiff  = Map.differenceWith fDiff

@@ -36,7 +36,6 @@ import           Distribution.System (Platform (..))
 import           GHC.Generics (Generic)
 import           Path as FL
 import           Prelude
-import           Stack.Types.BuildPlan (GitSHA1)
 import           Stack.Types.Compiler
 import           Stack.Types.Config
 import           Stack.Types.FlagName
@@ -195,7 +194,7 @@ type SourceMap = Map PackageName PackageSource
 -- | Where the package's source is located: local directory or package index
 data PackageSource
     = PSLocal LocalPackage
-    | PSUpstream Version InstallLocation (Map FlagName Bool) [Text] (Maybe GitSHA1)
+    | PSUpstream Version InstallLocation (Map FlagName Bool) [Text] (Maybe CabalFileInfo) -- FIXME share with PackageDef
     -- ^ Upstream packages could be installed in either local or snapshot
     -- databases; this is what 'InstallLocation' specifies.
     deriving Show

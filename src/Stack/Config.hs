@@ -101,7 +101,7 @@ import           Stack.Types.Config
 import           Stack.Types.Docker
 import           Stack.Types.Internal
 import           Stack.Types.Nix
-import           Stack.Types.PackageIdentifier (packageIdentifierText)
+import           Stack.Types.PackageIdentifier (packageIdentifierRevisionString)
 import           Stack.Types.PackageIndex (IndexType (ITHackageSecurity), HackageSecurity (..))
 import           Stack.Types.Resolver
 import           Stack.Types.StackT
@@ -688,10 +688,10 @@ resolvePackageEntry menv projRoot pe = do
                             , "spurious test case failures."
                             ]
                         return False
-                    PLIndex ident _ -> do
+                    PLIndex ident -> do
                         $logWarn $ mconcat
                             [ "No extra-dep setting found for package :\n\n"
-                            , packageIdentifierText ident
+                            , T.pack $ packageIdentifierRevisionString ident
                             , "\n\n"
                             , "This is usually a mistake, external packages "
                             , "should typically\nbe treated as extra-deps to avoid "

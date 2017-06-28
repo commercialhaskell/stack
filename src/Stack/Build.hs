@@ -30,6 +30,8 @@ import           Control.Monad.Trans.Unlift (MonadBaseUnlift)
 import           Data.Aeson (Value (Object, Array), (.=), object)
 import           Data.Function
 import qualified Data.HashMap.Strict as HM
+import           Data.HashSet (HashSet)
+import qualified Data.HashSet as HashSet
 import           Data.List ((\\))
 import           Data.List.Extra (groupSort)
 import           Data.List.NonEmpty (NonEmpty(..))
@@ -186,10 +188,11 @@ instance Exception CabalVersionException
 
 warnMissingExtraDeps
     :: (StackM env m, HasConfig env)
-    => InstalledMap -> Map PackageName Version -> m ()
+    => InstalledMap -> HashSet PackageIdentifierRevision -> m ()
 warnMissingExtraDeps installed extraDeps = do
     missingExtraDeps <-
-        fmap catMaybes $ forM (Map.toList extraDeps) $ \(n, v) ->
+        fmap catMaybes $ forM (HashSet.toList extraDeps) $
+          \(PackageIdentifierRevision (PackageIdentifier n v) _) ->
             if Map.member n installed
                 then return Nothing
                 else do

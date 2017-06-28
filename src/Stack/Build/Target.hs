@@ -25,6 +25,8 @@ import           Control.Monad.Catch (MonadCatch, throwM)
 import           Control.Monad.IO.Class
 import           Data.Either (partitionEithers)
 import           Data.Foldable
+import           Data.HashSet (HashSet)
+import qualified Data.HashSet as HashSet
 import           Data.List.Extra (groupSort)
 import           Data.List.NonEmpty (NonEmpty((:|)))
 import qualified Data.List.NonEmpty as NonEmpty
@@ -64,11 +66,10 @@ data RawTarget (a :: RawTargetType) where
     RTPackageComponent :: !PackageName -> !UnresolvedComponent -> RawTarget a
     RTComponent :: !ComponentName -> RawTarget a
     RTPackage :: !PackageName -> RawTarget a
-    RTPackageIdentifier :: !PackageIdentifier -> RawTarget 'HasIdents
+    RTPackageIdentifierRevision :: !PackageIdentifierRevision -> RawTarget 'HasIdents
 
 deriving instance Show (RawTarget a)
 deriving instance Eq (RawTarget a)
-deriving instance Ord (RawTarget a)
 
 data RawTargetType = HasIdents | NoIdents
 
@@ -76,7 +77,7 @@ data RawTargetType = HasIdents | NoIdents
 -- directory.
 parseRawTarget :: Text -> Maybe (RawTarget 'HasIdents)
 parseRawTarget t =
-        (RTPackageIdentifier <$> parsePackageIdentifierFromString s)
+        (RTPackageIdentifierRevision <$> parsePackageIdentifierRevision t)
     <|> (RTPackage <$> parsePackageNameFromString s)
     <|> (RTComponent <$> T.stripPrefix ":" t)
     <|> parsePackageComponent
@@ -149,14 +150,14 @@ data SimpleTarget
     deriving (Show, Eq, Ord)
 
 resolveIdents :: Map PackageName Version -- ^ snapshot
-              -> Map PackageName Version -- ^ extra deps
+              -> HashSet PackageIdentifierRevision -- ^ extra deps
               -> Map PackageName LocalPackageView
               -> (RawInput, RawTarget 'HasIdents)
-              -> Either Text ((RawInput, RawTarget 'NoIdents), Map PackageName Version)
-resolveIdents _ _ _ (ri, RTPackageComponent x y) = Right ((ri, RTPackageComponent x y), Map.empty)
-resolveIdents _ _ _ (ri, RTComponent x) = Right ((ri, RTComponent x), Map.empty)
-resolveIdents _ _ _ (ri, RTPackage x) = Right ((ri, RTPackage x), Map.empty)
-resolveIdents snap extras locals (ri, RTPackageIdentifier (PackageIdentifier name version)) =
+              -> Either Text ((RawInput, RawTarget 'NoIdents), HashSet PackageIdentifierRevision)
+resolveIdents _ _ _ (ri, RTPackageComponent x y) = Right ((ri, RTPackageComponent x y), HashSet.empty)
+resolveIdents _ _ _ (ri, RTComponent x) = Right ((ri, RTComponent x), HashSet.empty)
+resolveIdents _ _ _ (ri, RTPackage x) = Right ((ri, RTPackage x), HashSet.empty)
+resolveIdents snap extras locals (ri, RTPackageIdentifierRevision pir@(PackageIdentifierRevision (PackageIdentifier name version) _)) =
     fmap ((ri, RTPackage name), ) newExtras
   where
     newExtras =
@@ -169,15 +170,20 @@ resolveIdents snap extras locals (ri, RTPackageIdentifier (PackageIdentifier nam
                 , "\nTo avoid confusion, we will not install the specified version or build the local one."
                 , "\nTo build the local package, specify the target without an explicit version."
                 ]
-            -- If the found version matches, no need for an extra-dep.
-            (_, Just foundVersion) | foundVersion == version -> Right Map.empty
+            -- If the found version matches, no need for an extra-dep. FIXME deal with mismatched hashes
+            (_, Just (foundVersion, _foundCFI')) | foundVersion == version -> Right HashSet.empty
             -- Otherwise, if there is no specified version or a
             -- mismatch, add an extra-dep.
-            _ -> Right $ Map.singleton name version
-    mfound = asum (map (Map.lookup name) [extras, snap])
+            _ -> Right $ HashSet.singleton pir
+    mfound = asum (map (Map.lookup name) [extras', snap'])
+
+    extras' = Map.fromList $ map
+      (\(PackageIdentifierRevision (PackageIdentifier name version) mcfi) -> (name, (version, mcfi)))
+      (HashSet.toList extras)
+    snap' = Map.map (, Nothing) snap -- FIXME fix the data
 
 resolveRawTarget :: Map PackageName Version -- ^ snapshot
-                 -> Map PackageName Version -- ^ extra deps
+                 -> HashSet PackageIdentifierRevision -- ^ extra deps
                  -> Map PackageName LocalPackageView
                  -> (RawInput, RawTarget 'NoIdents)
                  -> Either Text (PackageName, (RawInput, SimpleTarget))
@@ -234,12 +240,14 @@ resolveRawTarget snap extras locals (ri, rt) =
         case Map.lookup name locals of
             Just _lpv -> Right (name, (ri, STLocalAll))
             Nothing ->
-                case Map.lookup name extras of
-                    Just _ -> Right (name, (ri, STNonLocal))
-                    Nothing ->
+                if HashSet.member name extrasNames
+                    then Right (name, (ri, STNonLocal))
+                    else
                         case Map.lookup name snap of
                             Just _ -> Right (name, (ri, STNonLocal))
                             Nothing -> Right (name, (ri, STUnknown))
+
+    extrasNames = HashSet.map (\(PackageIdentifierRevision (PackageIdentifier name _) _) -> name) extras
 
 isCompNamed :: Text -> NamedComponent -> Bool
 isCompNamed _ CLib = False
@@ -282,11 +290,11 @@ parseTargets :: (MonadCatch m, MonadIO m)
              => NeedTargets -- ^ need at least one target
              -> Bool -- ^ using implicit global project?
              -> Map PackageName Version -- ^ snapshot
-             -> Map PackageName Version -- ^ extra deps
+             -> HashSet PackageIdentifierRevision -- ^ extra deps
              -> Map PackageName LocalPackageView
              -> Path Abs Dir -- ^ current directory
              -> [Text] -- ^ command line targets
-             -> m (Map PackageName Version, Map PackageName SimpleTarget)
+             -> m (HashSet PackageIdentifierRevision, Map PackageName SimpleTarget)
 parseTargets needTargets implicitGlobal snap extras locals currDir textTargets' = do
     let nonExtraDeps = Map.keys $ Map.filter (not . lpvExtraDep) locals
         textTargets =
@@ -311,7 +319,7 @@ parseTargets needTargets implicitGlobal snap extras locals currDir textTargets' 
         then if Map.null targets
                  then case needTargets of
                         AllowNoTargets ->
-                            return (Map.empty, Map.empty)
+                            return (HashSet.empty, Map.empty)
                         NeedTargets
                             | null textTargets' && implicitGlobal -> throwM $ TargetParseException
                                 ["The specified targets matched no packages.\nPerhaps you need to run 'stack init'?"]
@@ -319,5 +327,5 @@ parseTargets needTargets implicitGlobal snap extras locals currDir textTargets' 
                                 ["The project contains no local packages (packages not marked with 'extra-dep')"]
                             | otherwise -> throwM $ TargetParseException
                                 ["The specified targets matched no packages"]
-                 else return (Map.unions newExtras, targets)
+                 else return (HashSet.unions newExtras, targets)
         else throwM $ TargetParseException errs

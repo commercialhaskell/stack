@@ -286,11 +286,11 @@ addDeps allowMissing compilerVersion toCalc = do
         if allowMissing
             then do
                 (missingNames, missingIdents, m) <-
-                    resolvePackagesAllowMissing Nothing shaMap Set.empty
+                    resolvePackagesAllowMissing Nothing pirs Set.empty
                 assert (Set.null missingNames)
                     $ return (m, missingIdents)
             else do
-                m <- resolvePackages Nothing shaMap Set.empty
+                m <- resolvePackages Nothing pirs Set.empty
                 return (m, Set.empty)
     let byIndex = Map.fromListWith (++) $ flip map resolvedMap
             $ \rp ->
@@ -324,14 +324,13 @@ addDeps allowMissing compilerVersion toCalc = do
                 })
     return (Map.fromList $ concat res, missingIdents)
   where
-    shaMap = Map.fromList
-        $ map (\(n, (v, mpackageDef)) -> (PackageIdentifier n v, mpackageDef >>= getGitSHA))
+    pirs =
+          map (\(n, (v, mpackageDef)) ->
+                 case mpackageDef of
+                   Just pd ->
+                     case pdLocation pd of
+                       PLIndex pir -> pir) -- FIXME entre pir matches n v
         $ Map.toList toCalc
-
-    getGitSHA pd = -- FIXME do we still need the SHA map like this?
-      case pdLocation pd of
-        PLIndex _ (Just cfi) -> Just $ cfiGitSHA1 cfi
-        _ -> Nothing
 
 -- | Resolve all packages necessary to install for the needed packages.
 getDeps :: LoadedSnapshot
@@ -868,8 +867,8 @@ applyCustomSnapshot cs sd0 = do
                        (PackageFlags flags)
                        ghcOptions
             = cs
-        addFlagsAndOpts :: PackageIdentifier -> (PackageName, (PackageDef, Version))
-        addFlagsAndOpts ident@(PackageIdentifier name ver) =
+        addFlagsAndOpts :: PackageIdentifierRevision -> (PackageName, (PackageDef, Version))
+        addFlagsAndOpts ident@(PackageIdentifierRevision (PackageIdentifier name ver) _) =
             (name, (def, ver))
           where
             def = PackageDef
@@ -881,9 +880,9 @@ applyCustomSnapshot cs sd0 = do
               , pdHide = False -- TODO let custom snapshots override this
 
               -- we add a Nothing since we don't yet collect Git SHAs for custom snapshots
-              , pdLocation = PLIndex ident Nothing -- TODO add a lot more flexibility here
+              , pdLocation = PLIndex ident -- TODO add a lot more flexibility here
               }
-        packageMap = Map.fromList $ map addFlagsAndOpts $ Set.toList packages
+        packageMap = Map.fromList $ map addFlagsAndOpts $ HashSet.toList packages
         cv = fromMaybe (sdCompilerVersion sd0) mcompilerVersion
         packages0 =
              sdPackages sd0 `Map.difference` Map.fromSet (const ()) dropPackages
@@ -1109,4 +1108,4 @@ getVersions =
       where
         v =
           case pdLocation pd of
-            PLIndex (PackageIdentifier _ v) _ -> v
+            PLIndex (PackageIdentifierRevision (PackageIdentifier _ v) _) -> v

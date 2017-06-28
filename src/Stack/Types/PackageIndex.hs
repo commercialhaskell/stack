@@ -38,7 +38,6 @@ import           Data.Text.Encoding (encodeUtf8, decodeUtf8)
 import           Data.Word (Word64)
 import           GHC.Generics (Generic)
 import           Path
-import           Stack.Types.BuildPlan (GitSHA1)
 import           Stack.Types.PackageIdentifier
 
 data PackageCache = PackageCache

@@ -12,7 +12,6 @@ module Stack.Types.BuildPlan
       SnapshotDef (..)
     , PackageDef (..)
     , PackageLocation (..)
-    , CabalFileInfo (..)
     , RemotePackageType (..)
     , StackageSnapshotDef (..)
     , StackagePackageDef (..)
@@ -20,7 +19,6 @@ module Stack.Types.BuildPlan
     , LoadedSnapshot (..)
     , loadedSnapshotVC
     , LoadedPackageInfo (..)
-    , GitSHA1 (..)
     , ModuleName (..)
     , ModuleInfo (..)
     , moduleInfoVC
@@ -29,7 +27,7 @@ module Stack.Types.BuildPlan
 import           Control.Applicative
 import           Control.DeepSeq (NFData)
 import           Data.Aeson (ToJSON (..), FromJSON (..), withObject, withText, (.!=), (.:), (.:?), Value (Object), object, (.=))
-import           Data.Aeson.Extended (WithJSONWarnings (..), (..:), (..:?), withObjectWarnings, noJSONWarnings)
+import           Data.Aeson.Extended (WithJSONWarnings (..), (..:), withObjectWarnings, noJSONWarnings)
 import           Data.ByteString (ByteString)
 import           Data.Data
 import qualified Data.HashMap.Strict as HashMap
@@ -45,7 +43,7 @@ import           Data.Store.VersionTagged
 import           Data.String (IsString)
 import           Data.Text (Text)
 import qualified Data.Text as T
-import           Data.Text.Encoding (encodeUtf8, decodeUtf8)
+import           Data.Text.Encoding (encodeUtf8)
 import           Data.Traversable (forM)
 import qualified Distribution.Version as C
 import           GHC.Generics (Generic)
@@ -93,7 +91,7 @@ instance NFData PackageDef
 -- | Where to get the contents of a package (including cabal file
 -- revisions) from.
 data PackageLocation
-  = PLIndex !PackageIdentifier !(Maybe CabalFileInfo)
+  = PLIndex !PackageIdentifierRevision
     -- ^ Grab the package from the package index with the given
     -- version and (optional) cabal file info to specify the correct
     -- revision.
@@ -107,15 +105,14 @@ instance Store PackageLocation
 instance NFData PackageLocation
 
 instance ToJSON PackageLocation where
-    toJSON (PLIndex ident mcfi) =
-        object $ addCFI mcfi ["ident" .= ident]
-      where
-        addCFI Nothing x = x
-        addCFI (Just (CabalFileInfo size (GitSHA1 gitsha1))) x =
-          ("cabal-file" .= object
-            [ "size" .= size
-            , "gitsha1" .= decodeUtf8 gitsha1
-            ]) : x
+    -- FIXME consider changing this instances to just a Text
+    -- representation. Downside: if someone currently has a location:
+    -- name-1.2.3 instead of ./name-1.2.3 for a local package, their
+    -- stack.yaml will need to be updated. But it's an overall nicer
+    -- UI.
+    --
+    -- If the change is made, modify the FromJSON instance as well.
+    toJSON (PLIndex ident) = object ["ident" .= ident]
     toJSON (PLFilePath fp) = toJSON fp
     toJSON (PLRemote t RPTHttp) = toJSON t
     toJSON (PLRemote x (RPTGit y)) = object [("git", toJSON x), ("commit", toJSON y)]
@@ -142,15 +139,6 @@ instance FromJSON (WithJSONWarnings PackageLocation) where
             <*> (RPTHg  <$> o ..: "commit")
         index = withObjectWarnings "PackageIndexLocation" $ \o -> PLIndex
             <$> o ..: "ident"
-            <*> (do
-                    mcfi <- o ..:? "cabal-file"
-                    case mcfi of
-                      Nothing -> return Nothing
-                      Just (Object cfi) -> Just <$> cabalFile cfi
-                      Just _ -> fail "Invalid cabal-file, requires an object")
-        cabalFile o = CabalFileInfo
-            <$> o ..: "size"
-            <*> ((GitSHA1 . encodeUtf8) <$> o ..: "gitsha1")
 
 -- | What kind of remote package location we're dealing with.
 data RemotePackageType
@@ -192,7 +180,7 @@ instance FromJSON StackagePackageDef where
         version <- o .: "version"
         mcabalFileInfo <- o .:? "cabal-file-info"
         mcabalFileInfo' <- forM mcabalFileInfo $ \o' -> do
-            cfiSize <- o' .: "size"
+            cfiSize <- Just <$> o' .: "size"
             cfiHashes <- o' .: "hashes"
             cfiGitSHA1 <- fmap (GitSHA1 . encodeUtf8)
                         $ maybe
@@ -207,19 +195,8 @@ instance FromJSON StackagePackageDef where
         let pdGhcOptions = [] -- Stackage snapshots do not allow setting GHC options
 
         return $ StackagePackageDef $ \name ->
-          let pdLocation = PLIndex (PackageIdentifier name version) mcabalFileInfo'
+          let pdLocation = PLIndex (PackageIdentifierRevision (PackageIdentifier name version) mcabalFileInfo')
            in PackageDef {..}
-
--- | Information on the contents of a cabal file
-data CabalFileInfo = CabalFileInfo
-    { cfiSize :: !Int
-    -- ^ File size in bytes
-    , cfiGitSHA1 :: !GitSHA1
-    -- ^ 'GitSHA1' of the cabal file contents
-    }
-    deriving (Generic, Show, Eq, Data, Typeable)
-instance Store CabalFileInfo
-instance NFData CabalFileInfo
 
 -- | Name of an executable.
 newtype ExeName = ExeName { unExeName :: Text }
@@ -237,7 +214,7 @@ instance Store LoadedSnapshot
 instance NFData LoadedSnapshot
 
 loadedSnapshotVC :: VersionConfig LoadedSnapshot
-loadedSnapshotVC = storeVersionConfig "ls-v1" "-jKxkhdmu5EYSA5qaxw-r9ZzX7k="
+loadedSnapshotVC = storeVersionConfig "ls-v1" "aLgFzCAl4NuJrWjF4Ttk30WWRiU="
 
 -- | Information on a single package for the 'LoadedSnapshot' which
 -- can be installed.
@@ -267,8 +244,8 @@ instance Store LoadedPackageInfo
 instance NFData LoadedPackageInfo
 
 data DepInfo = DepInfo
-    { diComponents :: !(Set Component)
-    , diRange      :: !VersionIntervals
+    { _diComponents :: !(Set Component)
+    , _diRange      :: !VersionIntervals
     }
     deriving (Generic, Show, Eq, Data, Typeable)
 instance Store DepInfo
@@ -287,18 +264,6 @@ data Component = CompLibrary
     deriving (Generic, Show, Eq, Ord, Data, Typeable, Enum, Bounded)
 instance Store Component
 instance NFData Component
-
-compToText :: Component -> Text
-compToText CompLibrary = "library"
-compToText CompExecutable = "executable"
-compToText CompTestSuite = "test-suite"
-compToText CompBenchmark = "benchmark"
-
--- | A SHA1 hash, but in Git format. This means that the contents are
--- prefixed with @blob@ and the size of the payload before hashing, as
--- Git itself does.
-newtype GitSHA1 = GitSHA1 ByteString
-    deriving (Generic, Show, Eq, NFData, Store, Data, Typeable, Ord, Hashable)
 
 newtype ModuleName = ModuleName { unModuleName :: ByteString }
   deriving (Show, Eq, Ord, Generic, Store, NFData, Typeable, Data)

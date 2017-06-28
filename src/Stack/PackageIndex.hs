@@ -74,7 +74,6 @@ import           Network.URI (parseURI)
 import           Path (toFilePath, parseAbsFile)
 import           Path.IO
 import           Prelude -- Fix AMP warning
-import           Stack.Types.BuildPlan (GitSHA1 (..))
 import           Stack.Types.Config
 import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageIndex
@@ -416,7 +415,7 @@ getPackageCaches = do
             result <- liftM mconcat $ forM (configPackageIndices config) $ \index -> do
                 fp <- configPackageIndexCache (indexName index)
                 PackageCacheMap pis' gitPIs <-
-                    $(versionedDecodeOrLoad (storeVersionConfig "pkg-v2" "WlAvAaRXlIMkjSmg5G3dD16UpT8="
+                    $(versionedDecodeOrLoad (storeVersionConfig "pkg-v3" "a6ziitxQfgKNQRuOCjmGTQ2lmco="
                                              :: VersionConfig PackageCacheMap))
                     fp
                     (populateCache index)

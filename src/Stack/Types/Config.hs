@@ -195,6 +195,8 @@ import           Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as S8
 import           Data.Either (partitionEithers)
 import           Data.HashMap.Strict (HashMap)
+import           Data.HashSet (HashSet)
+import qualified Data.HashSet as HashSet
 import           Data.IORef (IORef)
 import           Data.List (stripPrefix)
 import           Data.List.NonEmpty (NonEmpty)
@@ -518,7 +520,7 @@ data BuildConfig = BuildConfig
       -- ^ The variant of GHC used to select a GHC bindist.
     , bcPackageEntries :: ![PackageEntry]
       -- ^ Local packages
-    , bcExtraDeps  :: !(Map PackageName Version)
+    , bcExtraDeps  :: !(HashSet PackageIdentifierRevision)
       -- ^ Extra dependencies specified in configuration.
       --
       -- These dependencies will not be installed to a shared location, and
@@ -629,7 +631,7 @@ data Project = Project
     -- config may have issues.
     , projectPackages :: ![PackageEntry]
     -- ^ Components of the package list
-    , projectExtraDeps :: !(Map PackageName Version)
+    , projectExtraDeps :: !(HashSet PackageIdentifierRevision) -- TODO allow any PackageLocation, may require modified ToJSON instance as mentioned over there
     -- ^ Components of the package list referring to package/version combos,
     -- see: https://github.com/fpco/stack/issues/41
     , projectFlags :: !PackageFlags
@@ -647,7 +649,7 @@ instance ToJSON Project where
         maybe id (\cv -> (("compiler" .= cv) :)) (projectCompiler p) $
         maybe id (\msg -> (("user-message" .= msg) :)) (projectUserMsg p)
         [ "packages"          .= projectPackages p
-        , "extra-deps"        .= map fromTuple (Map.toList $ projectExtraDeps p)
+        , "extra-deps"        .= projectExtraDeps p
         , "flags"             .= projectFlags p
         , "resolver"          .= projectResolver p
         , "extra-package-dbs" .= projectExtraPackageDBs p
@@ -1375,7 +1377,7 @@ parseProjectAndConfigMonoid rootDir =
         extraDeps' <- o ..:? "extra-deps" ..!= []
         extraDeps <-
             case partitionEithers $ goDeps extraDeps' of
-                ([], x) -> return $ Map.fromList x
+                ([], x) -> return $ HashSet.fromList x
                 (errs, _) -> fail $ unlines errs
 
         flags <- o ..:? "flags" ..!= mempty
@@ -1398,20 +1400,20 @@ parseProjectAndConfigMonoid rootDir =
         return $ ProjectAndConfigMonoid project config
       where
         goDeps =
-            map toSingle . Map.toList . Map.unionsWith Set.union . map toMap
+            map toSingle . Map.toList . Map.unionsWith (.) . map toMap
           where
-            toMap i = Map.singleton
-                (packageIdentifierName i)
-                (Set.singleton (packageIdentifierVersion i))
+            toMap i@(PackageIdentifierRevision i' _) = Map.singleton
+                (packageIdentifierName i')
+                (i:)
 
         toSingle (k, s) =
-            case Set.toList s of
-                [x] -> Right (k, x)
+            case s [] of
+                [x] -> Right x
                 xs -> Left $ concat
                     [ "Multiple versions for package "
                     , packageNameString k
                     , ": "
-                    , unwords $ map versionString xs
+                    , unwords $ map packageIdentifierRevisionString xs
                     ]
 
 -- | A PackageEntry for the current directory, used as a default
@@ -1673,7 +1675,7 @@ data DockerUser = DockerUser
 -- unpleasant that it has overlap with both 'Project' and 'Config'.
 data CustomSnapshot = CustomSnapshot
     { csCompilerVersion :: !(Maybe CompilerVersion)
-    , csPackages :: !(Set PackageIdentifier)
+    , csPackages :: !(HashSet PackageIdentifierRevision)
     , csDropPackages :: !(Set PackageName)
     , csFlags :: !PackageFlags
     , csGhcOptions :: !GhcOptions

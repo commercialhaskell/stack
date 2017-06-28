@@ -40,6 +40,7 @@ import qualified    Data.Conduit.Binary as CB
 import qualified    Data.Conduit.List as CL
 import              Data.Either
 import              Data.Function
+import              Data.HashSet (HashSet)
 import qualified    Data.HashSet as HashSet
 import              Data.List
 import qualified    Data.Map as Map
@@ -70,6 +71,7 @@ import              Stack.Types.BuildPlan
 import              Stack.Types.Config
 import              Stack.Types.FlagName
 import              Stack.Types.Package
+import              Stack.Types.PackageIdentifier
 import              Stack.Types.PackageName
 import              Stack.Types.StackT
 import              Stack.Types.Version
@@ -108,7 +110,7 @@ loadSourceMapFull :: (StackM env m, HasEnvConfig env)
                        , LoadedSnapshot
                        , [LocalPackage]
                        , Set PackageName -- non-local targets
-                       , Map PackageName Version -- extra-deps from configuration and cli
+                       , HashSet PackageIdentifierRevision -- extra-deps from configuration and cli
                        , SourceMap
                        )
 loadSourceMapFull needTargets boptsCli = do
@@ -140,7 +142,8 @@ loadSourceMapFull needTargets boptsCli = do
             isLocal STUnknown = False
             isLocal STNonLocal = False
 
-        shadowed = Map.keysSet rawLocals <> Map.keysSet extraDeps0
+        shadowed = Map.keysSet rawLocals <>
+                   Set.fromList (map pirName (HashSet.toList extraDeps0))
 
         -- Ignores all packages in the LoadedSnapshot that depend on any
         -- local packages or extra-deps. All packages that have
@@ -150,7 +153,7 @@ loadSourceMapFull needTargets boptsCli = do
 
         -- Combine the extra-deps with the ones implicitly shadowed.
         extraDeps2 = Map.union
-            (Map.map (\v -> (v, Map.empty, [])) extraDeps0)
+            (Map.fromList (map ((\pir -> (pirName pir, (pirVersion pir, Map.empty, [])))) (HashSet.toList extraDeps0)))
             (Map.map (\lpi ->
                         let mpd = lpiDef lpi
                             triple =
@@ -255,7 +258,7 @@ parseTargetsFromBuildOpts
     :: (StackM env m, HasEnvConfig env)
     => NeedTargets
     -> BuildOptsCLI
-    -> m (LoadedSnapshot, M.Map PackageName Version, M.Map PackageName SimpleTarget)
+    -> m (LoadedSnapshot, HashSet PackageIdentifierRevision, M.Map PackageName SimpleTarget)
 parseTargetsFromBuildOpts needTargets boptscli = do
     rawLocals <- getLocalPackageViews
     parseTargetsFromBuildOptsWith rawLocals needTargets boptscli
@@ -266,7 +269,7 @@ parseTargetsFromBuildOptsWith
        -- ^ Local package views
     -> NeedTargets
     -> BuildOptsCLI
-    -> m (LoadedSnapshot, M.Map PackageName Version, M.Map PackageName SimpleTarget)
+    -> m (LoadedSnapshot, HashSet PackageIdentifierRevision, M.Map PackageName SimpleTarget)
 parseTargetsFromBuildOptsWith rawLocals needTargets boptscli = do
     $logDebug "Parsing the targets"
     bconfig <- view buildConfigL
@@ -308,16 +311,18 @@ parseTargetsFromBuildOptsWith rawLocals needTargets boptscli = do
 -- user a warning and then add it to extra-deps.
 convertSnapshotToExtra
     :: MonadLogger m
-    => Map PackageName Version -- ^ snapshot
-    -> Map PackageName Version -- ^ extra-deps
+    => Map PackageName Version -- ^ snapshot FIXME
+    -> HashSet PackageIdentifierRevision -- ^ extra-deps
     -> Map PackageName a -- ^ locals
     -> [PackageName] -- ^ packages referenced by a flag
-    -> m (Map PackageName Version)
-convertSnapshotToExtra snapshot extra0 locals = go Map.empty
+    -> m (HashSet PackageIdentifierRevision)
+convertSnapshotToExtra snapshot extra0 locals = go HashSet.empty
   where
+    extra0Names = HashSet.map pirName extra0
+
     go !extra [] = return extra
     go extra (flag:flags)
-        | Just _ <- Map.lookup flag extra0 = go extra flags
+        | HashSet.member flag extra0Names = go extra flags
         | flag `Map.member` locals = go extra flags
         | otherwise = case Map.lookup flag snapshot of
             Nothing -> go extra flags
@@ -327,7 +332,8 @@ convertSnapshotToExtra snapshot extra0 locals = go Map.empty
                     , T.pack $ packageNameString flag
                     , " to extra-deps based on command line flag"
                     ]
-                go (Map.insert flag version extra) flags
+                let pir = PackageIdentifierRevision (PackageIdentifier flag version) Nothing
+                go (HashSet.insert pir extra) flags
 
 -- | Parse out the local package views for the current project
 getLocalPackageViews :: (StackM env m, HasEnvConfig env)
@@ -496,7 +502,7 @@ loadLocalPackage boptsCli targets (name, (lpv, gpkg)) = do
 checkFlagsUsed :: (MonadThrow m, MonadReader env m, HasBuildConfig env)
                => BuildOptsCLI
                -> [LocalPackage]
-               -> Map PackageName extraDeps -- ^ extra deps
+               -> HashSet PackageIdentifierRevision -- ^ extra deps
                -> Map PackageName snapshot -- ^ snapshot, for error messages
                -> m ()
 checkFlagsUsed boptsCli lps extraDeps snapshot = do
@@ -512,14 +518,14 @@ checkFlagsUsed boptsCli lps extraDeps snapshot = do
             case Map.lookup name localNameMap of
                 -- Package is not available locally
                 Nothing ->
-                    case Map.lookup name extraDeps of
+                    if HashSet.member name $ HashSet.map pirName extraDeps
+                        -- We don't check for flag presence for extra deps
+                        then Nothing
                         -- Also not in extra-deps, it's an error
-                        Nothing ->
+                        else
                             case Map.lookup name snapshot of
                                 Nothing -> Just $ UFNoPackage source name
                                 Just _ -> Just $ UFSnapshot name
-                        -- We don't check for flag presence for extra deps
-                        Just _ -> Nothing
                 -- Package exists locally, let's check if the flags are defined
                 Just pkg ->
                     let unused = Set.difference (Map.keysSet userFlags) (packageDefinedFlags pkg)
@@ -536,6 +542,12 @@ checkFlagsUsed boptsCli lps extraDeps snapshot = do
         $ InvalidFlagSpecification
         $ Set.fromList unusedFlags
 
+pirName :: PackageIdentifierRevision -> PackageName
+pirName (PackageIdentifierRevision (PackageIdentifier name _) _) = name
+
+pirVersion :: PackageIdentifierRevision -> Version
+pirVersion (PackageIdentifierRevision (PackageIdentifier _ version) _) = version
+
 -- | Add in necessary packages to extra dependencies
 --
 -- Originally part of https://github.com/commercialhaskell/stack/issues/272,
@@ -543,14 +555,14 @@ checkFlagsUsed boptsCli lps extraDeps snapshot = do
 -- https://github.com/commercialhaskell/stack/issues/651
 extendExtraDeps
     :: (StackM env m, HasBuildConfig env)
-    => Map PackageName Version -- ^ original extra deps
-    -> Map PackageName Version -- ^ package identifiers from the command line
+    => HashSet PackageIdentifierRevision -- ^ original extra deps
+    -> HashSet PackageIdentifierRevision -- ^ package identifiers from the command line
     -> Set PackageName -- ^ all packages added on the command line
-    -> m (Map PackageName Version) -- ^ new extradeps
+    -> m (HashSet PackageIdentifierRevision) -- ^ new extradeps
 extendExtraDeps extraDeps0 cliExtraDeps unknowns = do
     (errs, unknowns') <- fmap partitionEithers $ mapM addUnknown $ Set.toList unknowns
     case errs of
-        [] -> return $ Map.unions $ extraDeps1 : unknowns'
+        [] -> return $ HashSet.unions $ extraDeps1 : unknowns'
         _ -> do
             bconfig <- view buildConfigL
             throwM $ UnknownTargets
@@ -558,15 +570,17 @@ extendExtraDeps extraDeps0 cliExtraDeps unknowns = do
                 Map.empty -- TODO check the cliExtraDeps for presence in index
                 (bcStackYaml bconfig)
   where
-    extraDeps1 = Map.union extraDeps0 cliExtraDeps
+    extraDeps1 = HashSet.union extraDeps0 cliExtraDeps
+    extraDeps1Names = HashSet.map pirName extraDeps1
     addUnknown pn = do
-        case Map.lookup pn extraDeps1 of
-            Just _ -> return (Right Map.empty)
-            Nothing -> do
+        if HashSet.member pn extraDeps1Names
+            then do
                 mlatestVersion <- getLatestVersion pn
                 case mlatestVersion of
-                    Just v -> return (Right $ Map.singleton pn v)
+                    Just v -> return (Right $ HashSet.singleton
+                                    $ PackageIdentifierRevision (PackageIdentifier pn v) Nothing)
                     Nothing -> return (Left pn)
+            else return (Right HashSet.empty)
     getLatestVersion pn = do
         vs <- getPackageVersions pn
         return (fmap fst (Set.maxView vs))

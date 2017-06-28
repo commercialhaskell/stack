@@ -231,7 +231,7 @@ sourceUpgrade gConfigMonoid mresolver builtHash (SourceOpts gitRepo) =
                 let ident = PackageIdentifier $(mkPackageName "stack") version
                 paths <- unpackPackageIdents tmp Nothing
                     -- accept latest cabal revision by not supplying a Git SHA
-                    $ Map.singleton ident Nothing
+                    [PackageIdentifierRevision ident Nothing]
                 case Map.lookup ident paths of
                     Nothing -> error "Stack.Upgrade.upgrade: invariant violated, unpacked directory not found"
                     Just path -> return $ Just path
