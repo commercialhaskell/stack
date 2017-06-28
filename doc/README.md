@@ -23,22 +23,12 @@ or:
 
     wget -qO- https://get.haskellstack.org/ | sh
 
-For detailed instructions and downloads, instructions are available by
-operating system/distribution:
+On Windows, you can download and install the
+[Windows 64-bit Installer](https://www.stackage.org/stack/windows-x86_64-installer).
 
-* [Windows](install_and_upgrade.md#windows)
-* [macOS](install_and_upgrade.md#macos)
-* [Ubuntu](install_and_upgrade.md#ubuntu)
-* [Debian](install_and_upgrade.md#debian)
-* [CentOS / Red Hat / Amazon Linux](install_and_upgrade.md#centos)
-* [Fedora](install_and_upgrade.md#fedora)
-* [openSUSE / SUSE Linux Enterprise](install_and_upgrade.md#suse)
-* [Arch Linux](install_and_upgrade.md#arch-linux)
-* [NixOS](install_and_upgrade.md#nixos)
-* [Linux (general)](install_and_upgrade.md#linux)
-* [FreeBSD](install_and_upgrade.md#freebsd)
-
-[Upgrade instructions](install_and_upgrade.md#upgrade)
+For detailed instructions and downloads, including many additional
+operating systems, check out the
+[install and upgrade page](install_and_upgrade.md).
 
 #### Quick Start Guide
 
@@ -154,23 +144,33 @@ This repository also contains a complete [user guide to using stack
 * When using Stack Overflow, please use [the haskell-stack
   tag](http://stackoverflow.com/questions/tagged/haskell-stack).
 
-#### Why stack?
+#### Why Stack?
 
-stack is a project of the [Commercial Haskell](http://commercialhaskell.com/)
-group, spearheaded by [FP Complete](https://www.fpcomplete.com/). It is
-designed to answer the needs of commercial Haskell users, hobbyist Haskellers,
-and individuals and companies thinking about starting to use Haskell. It is
-intended to be easy to use for newcomers, while providing the customizability
-and power experienced developers need.
+Stack is a build tool for Haskell designed to answer the needs of
+Haskell users new and experienced alike. It has a strong focus on
+reproducible build plans, multi-package projects, and a consistent,
+easy-to-learn interface, while providing the customizability and
+power experienced developers need.  As a build tool, Stack does not
+stand alone. It is built on the great work provided by:
 
-While stack itself has been around since June of 2015, it is based on codebases
-used by FP Complete for its corporate customers and internally for years prior.
-stack is a refresh of that codebase combined with other open source efforts
-like [stackage-cli](https://github.com/fpco/stackage-cli) to meet the needs of
-users everywhere.
+* The __Glasgow Haskell Compiler__ (GHC), the premiere Haskell
+  compiler. Stack will manage your GHC installations and automatically
+  select the appropriate compiler version for your project.
+* The __Cabal build system__, a specification for defining Haskell
+  packages, together with a library for performing builds.
+* The __Hackage package repository__, providing more than ten thousand
+  open source libraries and applications to help you get your work
+  done.
+* The __Stackage package collection__, a curated set of packages from
+  Hackage which are regularly tested for compatibility. Stack defaults
+  to using Stackage package sets to avoid dependency problems.
 
-A large impetus for the work on stack was a [large survey of people interested
-in
-Haskell](https://www.fpcomplete.com/blog/2015/05/thousand-user-haskell-survey),
-which rated build issues as a major concern. The stack team hopes that stack
-can address these concerns.
+Stack is provided by a team of volunteers and companies under the
+auspices of the [Commercial Haskell](http://commercialhaskell.com/)
+group. The project was spearheaded by
+[FP Complete](https://www.fpcomplete.com/) to answer the needs of
+commercial Haskell users, and has since become a thriving open source
+project meeting the needs of Haskell users of all stripes.
+
+If you'd like to get involved with Stack, check out the
+[newcomers label on the Github issue tracker](https://github.com/commercialhaskell/stack/issues?q=is%3Aopen+is%3Aissue+label%3Anewcomer).
