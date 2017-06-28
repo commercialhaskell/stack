@@ -1296,7 +1296,10 @@ singleBuild runInBase ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} in
         $ \package cabalfp pkgDir cabal announce _console _mlogFile -> do
             executableBuildStatuses <- getExecutableBuildStatuses package pkgDir
             when (not (cabalIsSatisfied executableBuildStatuses) && taskIsTarget task)
-                 ($logInfo "Building all executables once. After a successful build of all of them, only specified executables will be rebuilt.")
+                 ($logInfo
+                      ("Building all executables for `" <> packageNameText (packageName package) <>
+                       "' once. After a successful build of all of them, only specified executables will be rebuilt."))
+
             _neededConfig <- ensureConfig cache pkgDir ee (announce ("configure" <> annSuffix executableBuildStatuses)) cabal cabalfp
 
             let installedMapHasThisPkg :: Bool
