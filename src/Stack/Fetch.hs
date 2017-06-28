@@ -59,7 +59,7 @@ import              Data.Monoid
 import              Data.Set (Set)
 import qualified    Data.Set as Set
 import qualified    Data.Text as T
-import              Data.Text.Encoding (decodeUtf8)
+import              Data.Text.Encoding (encodeUtf8, decodeUtf8)
 import              Data.Text.Metrics
 import              Data.Typeable (Typeable)
 import              Data.Word (Word64)
@@ -146,7 +146,7 @@ unpackPackages mMiniBuildPlan dest input = do
         ([], x) -> return $ partitionEithers x
         (errs, _) -> throwM $ CouldNotParsePackageSelectors errs
     resolved <- resolvePackages mMiniBuildPlan
-        (Map.fromList $ map (, Nothing) idents)
+        (Map.fromList idents)
         (Set.fromList names)
     ToFetchResult toFetch alreadyUnpacked <- getToFetch (Just dest') resolved
     unless (Map.null alreadyUnpacked) $
@@ -165,8 +165,12 @@ unpackPackages mMiniBuildPlan dest input = do
             Right x -> Right $ Left x
             Left _ ->
                 case parsePackageIdentifierFromString s of
-                    Left _ -> Left s
-                    Right x -> Right $ Right x
+                    Right x -> Right $ Right (x, Nothing)
+                    Left _ -> maybe (Left s) (Right . Right) $ do
+                      (identS, '@':revisionS) <- return $ break (== '@') s
+                      Right ident <- return $ parsePackageIdentifierFromString identS
+                      hash <- T.stripPrefix "gitsha1:" $ T.pack revisionS
+                      Just (ident, Just $ GitSHA1 $ encodeUtf8 hash)
 
 -- | Ensure that all of the given package idents are unpacked into the build
 -- unpack directory, and return the paths to all of the subdirectories.
