@@ -60,8 +60,8 @@ instance NFData OffsetSize
 data PackageCacheMap = PackageCacheMap
     { pcmIdent :: !(Map PackageIdentifier PackageCache)
     -- ^ most recent revision of the package
-    , pcmSHA :: !(HashMap GitSHA1 OffsetSize)
-    -- ^ lookup via the GitSHA1 of the cabal file contents
+    , pcmSHA :: !(HashMap CabalHash OffsetSize)
+    -- ^ lookup via the cabal hash of the cabal file contents
     }
     deriving (Generic, Eq, Show, Data, Typeable)
 instance Store PackageCacheMap

@@ -229,8 +229,8 @@ resolvePackagesAllowMissing mSnapshotDef idents0 names0 = do
                 $logWarn $ mconcat
                     [ "Did not find .cabal file for "
                     , T.pack $ packageIdentifierString $ rpIdent rp
-                    , " with SHA of "
-                    , decodeUtf8 $ unGitSHA1 $ cfiGitSHA1 cfi
+                    , " with hash of "
+                    , showCabalHash $ cfiHash cfi
                     , " in tarball-based cache"
                     ]
 
@@ -274,7 +274,7 @@ resolvePackagesAllowMissing mSnapshotDef idents0 names0 = do
                       case mcfi of
                         Nothing -> (index, cache, mcfi)
                         Just cfi ->
-                            case HashMap.lookup (cfiGitSHA1 cfi) shaCaches of -- TODO check size?
+                            case HashMap.lookup (cfiHash cfi) shaCaches of -- TODO check size?
                                 Just (index'', offsetSize) ->
                                         ( index''
                                         , cache { pcOffsetSize = offsetSize }

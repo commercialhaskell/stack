@@ -364,7 +364,7 @@ data Config =
          -- ^ Allow users other than the stack root owner to use the stack
          -- installation.
          ,configPackageCaches       :: !(IORef (Maybe (Map PackageIdentifier (PackageIndex, PackageCache),
-                                                       HashMap GitSHA1 (PackageIndex, OffsetSize))))
+                                                       HashMap CabalHash (PackageIndex, OffsetSize))))
          -- ^ In memory cache of hackage index.
          ,configDumpLogs            :: !DumpLogs
          -- ^ Dump logs of local non-dependencies when doing a build.
@@ -1893,7 +1893,7 @@ globalOptsBuildOptsMonoidL = globalOptsL.lens
 
 packageCachesL :: HasConfig env => Lens' env
     (IORef (Maybe (Map PackageIdentifier (PackageIndex, PackageCache)
-                  ,HashMap GitSHA1 (PackageIndex, OffsetSize))))
+                  ,HashMap CabalHash (PackageIndex, OffsetSize))))
 packageCachesL = configL.lens configPackageCaches (\x y -> x { configPackageCaches = y })
 
 configUrlsL :: HasConfig env => Lens' env Urls

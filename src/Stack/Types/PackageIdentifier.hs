@@ -9,7 +9,10 @@
 module Stack.Types.PackageIdentifier
   ( PackageIdentifier(..)
   , PackageIdentifierRevision(..)
-  , GitSHA1(..) -- FIXME don't expose constructor, replace with a better hash/name
+  , CabalHash
+  , mkCabalHashFromSHA256
+  , computeCabalHash
+  , showCabalHash
   , CabalFileInfo(..)
   , toTuple
   , fromTuple
@@ -27,16 +30,17 @@ import           Control.Applicative
 import           Control.DeepSeq
 import           Control.Exception (Exception)
 import           Control.Monad.Catch (MonadThrow, throwM)
+import           Crypto.Hash as Hash (hashlazy, Digest, SHA256)
 import           Data.Aeson.Extended
 import           Data.Attoparsec.Text as A
-import           Data.ByteString (ByteString)
-import qualified Data.ByteString.Char8 as S8
+import qualified Data.ByteArray.Encoding as Mem (convertToBase, Base(Base16))
+import qualified Data.ByteString.Lazy as L
 import           Data.Data
 import           Data.Hashable
 import           Data.Store (Store)
 import           Data.Text (Text)
 import qualified Data.Text as T
-import           Data.Text.Encoding (encodeUtf8)
+import           Data.Text.Encoding (decodeUtf8)
 import qualified Distribution.Package as C
 import           GHC.Generics
 import           Prelude hiding (FilePath)
@@ -104,18 +108,33 @@ instance FromJSON PackageIdentifierRevision where
       Left e -> fail $ show (e, t)
       Right x -> return x
 
--- | A SHA1 hash, but in Git format. This means that the contents are
--- prefixed with @blob@ and the size of the payload before hashing, as
--- Git itself does.
-newtype GitSHA1 = GitSHA1 { unGitSHA1 :: ByteString } -- FIXME replace with Text? Or a digest value?
+-- | A cryptographic hash of a Cabal file.
+--
+-- Internal @Text@ value is in base-16 format, and represents a SHA256
+-- hash.
+newtype CabalHash = CabalHash { unCabalHash :: Text }
     deriving (Generic, Show, Eq, NFData, Store, Data, Typeable, Ord, Hashable)
+
+-- | Generate a 'CabalHash' value from a base16-encoded SHA256 hash.
+mkCabalHashFromSHA256 :: Text -> CabalHash
+mkCabalHashFromSHA256 = CabalHash
+
+-- | Compute a 'CabalHash' value from a cabal file's contents.
+computeCabalHash :: L.ByteString -> CabalHash
+computeCabalHash = CabalHash . decodeUtf8 . Mem.convertToBase Mem.Base16 . hashSHA256
+
+hashSHA256 :: L.ByteString -> Hash.Digest Hash.SHA256
+hashSHA256 = Hash.hashlazy
+
+showCabalHash :: CabalHash -> Text
+showCabalHash (CabalHash t) = T.append (T.pack "sha256:") t
 
 -- | Information on the contents of a cabal file
 data CabalFileInfo = CabalFileInfo
     { cfiSize :: !(Maybe Int)
     -- ^ File size in bytes
-    , cfiGitSHA1 :: !GitSHA1
-    -- ^ 'GitSHA1' of the cabal file contents
+    , cfiHash :: !CabalHash
+    -- ^ Hash of the cabal file contents
     }
     deriving (Generic, Show, Eq, Data, Typeable)
 instance Store CabalFileInfo
@@ -163,14 +182,14 @@ parsePackageIdentifierRevision x = go x
         <*> optional cabalFileInfo
 
     cabalFileInfo = do
-      _ <- string $ T.pack "@gitsha1:"
-      hash <- A.takeWhile (/= ',')
+      _ <- string $ T.pack "@sha256:"
+      hash' <- A.takeWhile (/= ',')
       msize <- optional $ do
         _ <- A.char ','
         A.decimal
       return CabalFileInfo
         { cfiSize = msize
-        , cfiGitSHA1 = GitSHA1 $ encodeUtf8 hash
+        , cfiHash = CabalHash hash'
         }
 
 -- | Get a string representation of the package identifier; name-ver.
@@ -186,8 +205,8 @@ packageIdentifierRevisionString (PackageIdentifierRevision ident mcfi) =
       case mcfi of
         Nothing -> []
         Just cfi ->
-            "@gitsha1:"
-          : S8.unpack (unGitSHA1 $ cfiGitSHA1 cfi)
+            "@sha256:"
+          : T.unpack (unCabalHash $ cfiHash cfi)
           : showSize (cfiSize cfi)
 
     showSize Nothing = []

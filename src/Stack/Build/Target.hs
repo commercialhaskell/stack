@@ -178,7 +178,7 @@ resolveIdents snap extras locals (ri, RTPackageIdentifierRevision pir@(PackageId
     mfound = asum (map (Map.lookup name) [extras', snap'])
 
     extras' = Map.fromList $ map
-      (\(PackageIdentifierRevision (PackageIdentifier name version) mcfi) -> (name, (version, mcfi)))
+      (\(PackageIdentifierRevision (PackageIdentifier name' version') mcfi) -> (name', (version', mcfi)))
       (HashSet.toList extras)
     snap' = Map.map (, Nothing) snap -- FIXME fix the data
 

@@ -43,7 +43,6 @@ import           Data.Store.VersionTagged
 import           Data.String (IsString)
 import           Data.Text (Text)
 import qualified Data.Text as T
-import           Data.Text.Encoding (encodeUtf8)
 import           Data.Traversable (forM)
 import qualified Distribution.Version as C
 import           GHC.Generics (Generic)
@@ -182,11 +181,10 @@ instance FromJSON StackagePackageDef where
         mcabalFileInfo' <- forM mcabalFileInfo $ \o' -> do
             cfiSize <- Just <$> o' .: "size"
             cfiHashes <- o' .: "hashes"
-            cfiGitSHA1 <- fmap (GitSHA1 . encodeUtf8)
-                        $ maybe
-                            (fail "Could not find GitSHA1")
-                            return
-                        $ HashMap.lookup ("GitSHA1" :: Text) cfiHashes
+            cfiHash <- maybe
+                         (fail "Could not find SHA256")
+                         (return . mkCabalHashFromSHA256)
+                     $ HashMap.lookup ("SHA256" :: Text) cfiHashes
             return CabalFileInfo {..}
 
         Object constraints <- o .: "constraints"
@@ -214,7 +212,7 @@ instance Store LoadedSnapshot
 instance NFData LoadedSnapshot
 
 loadedSnapshotVC :: VersionConfig LoadedSnapshot
-loadedSnapshotVC = storeVersionConfig "ls-v1" "aLgFzCAl4NuJrWjF4Ttk30WWRiU="
+loadedSnapshotVC = storeVersionConfig "ls-v1" "rwFDBWG4S0E1qrA2ijMq_9cPFvc="
 
 -- | Information on a single package for the 'LoadedSnapshot' which
 -- can be installed.

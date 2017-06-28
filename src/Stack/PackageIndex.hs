@@ -36,10 +36,7 @@ import qualified Control.Monad.Catch as C
 import           Control.Monad.IO.Class (MonadIO, liftIO)
 import           Control.Monad.Logger (logDebug, logInfo, logWarn)
 import           Control.Monad.Trans.Control
-import           Crypto.Hash as Hash (hashlazy, Digest, SHA1)
 import           Data.Aeson.Extended
-import qualified Data.ByteArray.Encoding as Mem (convertToBase, Base(Base16))
-import qualified Data.ByteString.Char8 as S8
 import qualified Data.ByteString.Lazy as L
 import           Data.Conduit (($$), (=$), (.|), runConduitRes)
 import           Data.Conduit.Binary (sinkHandle, sourceHandle, sourceFile, sinkFile)
@@ -138,7 +135,7 @@ populateCache index = do
                 ident
                 pcNew
                 m
-            , HashMap.insert gitSHA1 offsetSize hm
+            , HashMap.insert cabalHash offsetSize hm
             )
           where
             pcNew = PackageCache
@@ -149,18 +146,7 @@ populateCache index = do
                     ((blockNo + 1) * 512)
                     size
 
-            -- Calculate the Git SHA1 of the contents. This uses the
-            -- Git algorithm of prepending "blob <size>\0" to the raw
-            -- contents. We use this to be able to share the same SHA
-            -- information between the Git and tarball backends.
-            gitSHA1 = GitSHA1 $ Mem.convertToBase Mem.Base16 $ hashSHA1 $ L.fromChunks
-                $ "blob "
-                : S8.pack (show $ L.length lbs)
-                : "\0"
-                : L.toChunks lbs
-
-        hashSHA1 :: L.ByteString -> Hash.Digest Hash.SHA1
-        hashSHA1 = Hash.hashlazy
+            cabalHash = computeCabalHash lbs
 
         addJSON :: FromJSON a
                 => (a -> PackageDownload)
@@ -384,7 +370,7 @@ lookupPackageVersions pkgName pkgCaches =
 getPackageCachesIO
     :: (StackMiniM env m, HasConfig env)
     => m (IO ( Map PackageIdentifier (PackageIndex, PackageCache)
-             , HashMap GitSHA1 (PackageIndex, OffsetSize)))
+             , HashMap CabalHash (PackageIndex, OffsetSize)))
 getPackageCachesIO = toIO getPackageCaches
   where
     toIO :: (MonadIO m, MonadBaseControl IO m) => m a -> m (IO a)
@@ -404,7 +390,7 @@ getPackageCachesIO = toIO getPackageCaches
 getPackageCaches
     :: (StackMiniM env m, HasConfig env)
     => m ( Map PackageIdentifier (PackageIndex, PackageCache)
-         , HashMap GitSHA1 (PackageIndex, OffsetSize)
+         , HashMap CabalHash (PackageIndex, OffsetSize)
          )
 getPackageCaches = do
     config <- view configL
@@ -415,7 +401,7 @@ getPackageCaches = do
             result <- liftM mconcat $ forM (configPackageIndices config) $ \index -> do
                 fp <- configPackageIndexCache (indexName index)
                 PackageCacheMap pis' gitPIs <-
-                    $(versionedDecodeOrLoad (storeVersionConfig "pkg-v3" "a6ziitxQfgKNQRuOCjmGTQ2lmco="
+                    $(versionedDecodeOrLoad (storeVersionConfig "pkg-v3" "QAJ-RTivqCIR5uF09Km2FYW1Lnw="
                                              :: VersionConfig PackageCacheMap))
                     fp
                     (populateCache index)
