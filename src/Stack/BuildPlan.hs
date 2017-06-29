@@ -85,6 +85,7 @@ import           Stack.Fetch
 import           Stack.GhcPkg (getGlobalPackages)
 import           Stack.Package
 import           Stack.PackageIndex
+import           Stack.Snapshot
 import           Stack.Types.BuildPlan
 import           Stack.Types.FlagName
 import           Stack.Types.PackageIdentifier
@@ -423,34 +424,6 @@ getToolMap =
       $ Set.toList
       $ mpiExes mpi
     -}
-
--- | Some hard-coded fixes for build plans, hopefully to be irrelevant over
--- time.
-snapshotDefFixes :: SnapshotDef -> SnapshotDef
-snapshotDefFixes sd | isStackage (sdResolver sd) = sd
-    { sdPackages = Map.fromList $ map go $ Map.toList $ sdPackages sd
-    }
-  where
-    go (name, pd) =
-        (name, pd
-            { pdFlags = goF (packageNameString name) (pdFlags pd)
-            })
-
-    goF "persistent-sqlite" = Map.insert $(mkFlagName "systemlib") False
-    goF "yaml" = Map.insert $(mkFlagName "system-libyaml") False
-    goF _ = id
-
-    isStackage (ResolverSnapshot _) = True
-    isStackage _ = False
-snapshotDefFixes sd = sd
-
-buildBuildPlanUrl :: (MonadReader env m, HasConfig env) => SnapName -> Text -> m Text
-buildBuildPlanUrl name file = do
-    urls <- view $ configL.to configUrls
-    return $
-        case name of
-             LTS _ _ -> urlsLtsBuildPlans urls <> "/" <> file
-             Nightly _ -> urlsNightlyBuildPlans urls <> "/" <> file
 
 gpdPackages :: [GenericPackageDescription] -> Map PackageName Version
 gpdPackages gpds = Map.fromList $
@@ -898,34 +871,6 @@ loadResolver :: forall env m.
                 (StackMiniM env m, HasConfig env)
              => Resolver
              -> m SnapshotDef
-loadResolver (ResolverSnapshot name) = do
-    stackage <- view stackRootL
-    file' <- parseRelFile $ T.unpack file
-    let fp = buildPlanDir stackage </> file'
-    $logDebug $ "Decoding build plan from: " <> T.pack (toFilePath fp)
-    eres <- liftIO $ decodeFileEither $ toFilePath fp
-    case eres of
-        Right (StackageSnapshotDef sd) -> return $ sd name
-        Left e -> do
-            $logDebug $ "Decoding Stackage snapshot definition from file failed: " <> T.pack (show e)
-            ensureDir (parent fp)
-            url <- buildBuildPlanUrl name file
-            req <- parseRequest $ T.unpack url
-            $logSticky $ "Downloading " <> renderSnapName name <> " build plan ..."
-            $logDebug $ "Downloading build plan from: " <> url
-            _ <- redownload req fp
-            $logStickyDone $ "Downloaded " <> renderSnapName name <> " build plan."
-            StackageSnapshotDef sd <- liftIO (decodeFileEither $ toFilePath fp)
-                                  >>= either throwM return
-            return $ sd name
-
-  where
-    file = renderSnapName name <> ".yaml"
-loadResolver (ResolverCompiler compiler) = return SnapshotDef
-    { sdCompilerVersion = compiler
-    , sdPackages = Map.empty
-    , sdResolver = ResolverCompiler compiler
-    }
 
 -- TODO(mgsloan): Not sure what this FIXME means
 -- FIXME instead of passing the stackYaml dir we should maintain

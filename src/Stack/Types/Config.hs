@@ -76,11 +76,6 @@ module Stack.Types.Config
   ,defaultLogLevel
   -- ** LoadConfig
   ,LoadConfig(..)
-  -- ** PackageEntry & PackageLocation
-  ,PackageEntry(..)
-  ,TreatLikeExtraDep
-  ,PackageLocation(..)
-  ,RemotePackageType(..)
   -- ** PackageIndex, IndexName & IndexLocation
 
   -- Re-exports
@@ -108,8 +103,6 @@ module Stack.Types.Config
   ,readColorWhen
   -- ** SCM
   ,SCM(..)
-  -- ** CustomSnapshot
-  ,CustomSnapshot(..)
   -- ** GhcOptions
   ,GhcOptions(..)
   ,ghcOptionsFor
@@ -196,7 +189,6 @@ import qualified Data.ByteString.Char8 as S8
 import           Data.Either (partitionEithers)
 import           Data.HashMap.Strict (HashMap)
 import           Data.HashSet (HashSet)
-import qualified Data.HashSet as HashSet
 import           Data.IORef (IORef)
 import           Data.List (stripPrefix)
 import           Data.List.NonEmpty (NonEmpty)
@@ -629,15 +621,21 @@ data Project = Project
     { projectUserMsg :: !(Maybe String)
     -- ^ A warning message to display to the user when the auto generated
     -- config may have issues.
-    , projectPackages :: ![PackageEntry]
-    -- ^ Components of the package list
-    , projectExtraDeps :: !(HashSet PackageIdentifierRevision) -- TODO allow any PackageLocation, may require modified ToJSON instance as mentioned over there
-    -- ^ Components of the package list referring to package/version combos,
-    -- see: https://github.com/fpco/stack/issues/41
-    , projectFlags :: !PackageFlags
-    -- ^ Per-package flag overrides
+    , projectPackages :: ![PackageLocation]
+    -- ^ Packages which are actually part of the project (as opposed
+    -- to dependencies).
+    --
+    -- FIXME Stack has always allowed these packages to be any kind of
+    -- package location, but in reality only @PLFilePath@ really makes
+    -- sense. We could consider replacing @[PackageLocation]@ with
+    -- @[FilePath]@ to properly enforce this idea.
+    , projectDependencies :: ![PackageLocation]
+    -- ^ Dependencies defined within the stack.yaml file, to be
+    -- applied on top of the snapshot.
+    , projectFlags :: !(Map PackageName (Map FlagName Bool))
+    -- ^ Flags to be applied on top of the snapshot flags.
     , projectResolver :: !Resolver
-    -- ^ How we resolve which dependencies to use
+    -- ^ How we resolve which @SnapshotDef@ to use
     , projectCompiler :: !(Maybe CompilerVersion)
     -- ^ When specified, overrides which compiler to use
     , projectExtraPackageDBs :: ![FilePath]
@@ -645,14 +643,15 @@ data Project = Project
   deriving Show
 
 instance ToJSON Project where
-    toJSON p = object $
-        maybe id (\cv -> (("compiler" .= cv) :)) (projectCompiler p) $
-        maybe id (\msg -> (("user-message" .= msg) :)) (projectUserMsg p)
-        [ "packages"          .= projectPackages p
-        , "extra-deps"        .= projectExtraDeps p
-        , "flags"             .= projectFlags p
-        , "resolver"          .= projectResolver p
-        , "extra-package-dbs" .= projectExtraPackageDBs p
+    -- Expanding the constructor fully to ensure we don't miss any fields.
+    toJSON (Project userMsg packages extraDeps flags resolver compiler extraPackageDBs) = object $
+        maybe id (\cv -> (("compiler" .= cv) :)) compiler $
+        maybe id (\msg -> (("user-message" .= msg) :)) userMsg $
+        (if null extraPackageDBs then id else (("extra-package-dbs" .= extraPackageDBs):)) $
+        (if null extraDeps then id else (("extra-deps" .= extraDeps):)) $
+        (if Map.null flags then id else (("flags" .= flags):)) $
+        [ "packages"          .= packages
+        , "resolver"          .= resolver
         ]
 
 -- | Constraint synonym for constraints satisfied by a 'MiniConfig'
@@ -1374,13 +1373,13 @@ parseProjectAndConfigMonoid :: Path Abs Dir -> Value -> Yaml.Parser (WithJSONWar
 parseProjectAndConfigMonoid rootDir =
     withObjectWarnings "ProjectAndConfigMonoid" $ \o -> do
         dirs <- jsonSubWarningsTT (o ..:? "packages") ..!= [packageEntryCurrDir]
-        extraDeps' <- o ..:? "extra-deps" ..!= []
-        extraDeps <-
-            case partitionEithers $ goDeps extraDeps' of
-                ([], x) -> return $ HashSet.fromList x
-                (errs, _) -> fail $ unlines errs
+        extraDeps <- jsonSubWarningsTT (o ..:? "extra-deps") ..!= []
+        PackageFlags flags <- o ..:? "flags" ..!= mempty
 
-        flags <- o ..:? "flags" ..!= mempty
+        -- Convert the packages/extra-deps/flags approach we use in
+        -- the stack.yaml into the internal representation.
+        (packages, deps) <- convert dirs extraDeps
+
         resolver <- jsonSubWarnings (o ..: "resolver")
                 >>= either (fail . show) return
                   . mapM (parseCustomLocation (Just (toFilePath rootDir)))
@@ -1390,31 +1389,43 @@ parseProjectAndConfigMonoid rootDir =
         extraPackageDBs <- o ..:? "extra-package-dbs" ..!= []
         let project = Project
                 { projectUserMsg = msg
-                , projectPackages = dirs
-                , projectExtraDeps = extraDeps
-                , projectFlags = flags
                 , projectResolver = resolver
                 , projectCompiler = compiler
                 , projectExtraPackageDBs = extraPackageDBs
+                , projectPackages = packages
+                , projectDependencies = deps
+                , projectFlags = flags
                 }
         return $ ProjectAndConfigMonoid project config
       where
-        goDeps =
-            map toSingle . Map.toList . Map.unionsWith (.) . map toMap
+        convert :: Monad m
+                => [PackageEntry]
+                -> [PackageLocation]
+                -> m ( [PackageLocation] -- project
+                     , [PackageLocation] -- dependencies
+                     )
+        convert entries extraDeps = do
+            (proj, deps) <- fmap partitionEithers $ mapM goEntry allEntries
+            return (proj, deps)
           where
-            toMap i@(PackageIdentifierRevision i' _) = Map.singleton
-                (packageIdentifierName i')
-                (i:)
+            allEntries = entries ++ map (\pl -> PackageEntry (Just True) pl []) extraDeps
 
-        toSingle (k, s) =
-            case s [] of
-                [x] -> Right x
-                xs -> Left $ concat
-                    [ "Multiple versions for package "
-                    , packageNameString k
-                    , ": "
-                    , unwords $ map packageIdentifierRevisionString xs
-                    ]
+            goEntry (PackageEntry Nothing pl@(PLFilePath _) subdirs) = goEntry' False pl subdirs
+            goEntry (PackageEntry Nothing pl _) = fail $ concat
+              [ "Refusing to implicitly treat package location as an extra-dep:\n"
+              , show pl
+              , "\nRecommendation: either move to 'extra-deps' or set 'extra-dep: true'."
+              ]
+            goEntry (PackageEntry (Just extraDep) pl subdirs) = goEntry' extraDep pl subdirs
+
+            goEntry' extraDep pl subdirs = do
+              pl' <- addSubdirs pl subdirs
+              return $ (if extraDep then Right else Left) pl'
+
+            addSubdirs pl [] = return pl
+            addSubdirs (PLRepo repo) subdirs = return $ PLRepo repo { repoSubdirs = subdirs ++ repoSubdirs repo }
+            addSubdirs pl (_:_) = fail $
+                "Cannot set subdirs on package location: " ++ show pl
 
 -- | A PackageEntry for the current directory, used as a default
 packageEntryCurrDir :: PackageEntry
@@ -1668,29 +1679,6 @@ data DockerUser = DockerUser
     , duUmask :: FileMode -- ^ File creation mask }
     } deriving (Read,Show)
 
--- TODO: See section of
--- https://github.com/commercialhaskell/stack/issues/1265 about
--- rationalizing the config. It would also be nice to share more code.
--- For now it's more convenient just to extend this type. However, it's
--- unpleasant that it has overlap with both 'Project' and 'Config'.
-data CustomSnapshot = CustomSnapshot
-    { csCompilerVersion :: !(Maybe CompilerVersion)
-    , csPackages :: !(HashSet PackageIdentifierRevision)
-    , csDropPackages :: !(Set PackageName)
-    , csFlags :: !PackageFlags
-    , csGhcOptions :: !GhcOptions
-    }
-
-instance (a ~ Maybe (ResolverWith Text)) => FromJSON (WithJSONWarnings (CustomSnapshot, a)) where
-    parseJSON = withObjectWarnings "CustomSnapshot" $ \o -> (,)
-        <$> (CustomSnapshot
-            <$> o ..:? "compiler"
-            <*> o ..:? "packages" ..!= mempty
-            <*> o ..:? "drop-packages" ..!= mempty
-            <*> o ..:? "flags" ..!= mempty
-            <*> o ..:? configMonoidGhcOptionsName ..!= mempty)
-        <*> jsonSubWarningsT (o ..:? "resolver")
-
 newtype GhcOptions = GhcOptions
     { unGhcOptions :: Map (Maybe PackageName) [Text] }
     deriving Show
@@ -1828,10 +1816,12 @@ stackRootL = configL.lens configStackRoot (\x y -> x { configStackRoot = y })
 
 -- | The compiler specified by the @MiniBuildPlan@. This may be
 -- different from the actual compiler used!
-wantedCompilerVersionL :: HasBuildConfig s => Lens' s CompilerVersion
-wantedCompilerVersionL = snapshotDefL.lens
-    sdCompilerVersion
-    (\x y -> x { sdCompilerVersion = y })
+wantedCompilerVersionL :: HasBuildConfig s => Getting r s CompilerVersion
+wantedCompilerVersionL =
+    snapshotDefL.to go
+  where
+    go :: SnapshotDef -> CompilerVersion
+    go = either id go . sdParent
 
 -- | The version of the compiler which will actually be used. May be
 -- different than that specified in the 'MiniBuildPlan' and returned

@@ -4,17 +4,17 @@
 {-# LANGUAGE OverloadedStrings          #-}
 {-# LANGUAGE RecordWildCards            #-}
 {-# LANGUAGE FlexibleInstances          #-}
+{-# LANGUAGE TupleSections              #-}
 
 {-# LANGUAGE DataKinds                  #-}
 -- | Shared types for various stackage packages.
 module Stack.Types.BuildPlan
     ( -- * Types
       SnapshotDef (..)
-    , PackageDef (..)
     , PackageLocation (..)
+    , RepoType (..)
+    , Repo (..)
     , RemotePackageType (..)
-    , StackageSnapshotDef (..)
-    , StackagePackageDef (..)
     , ExeName (..)
     , LoadedSnapshot (..)
     , loadedSnapshotVC
@@ -26,11 +26,10 @@ module Stack.Types.BuildPlan
 
 import           Control.Applicative
 import           Control.DeepSeq (NFData)
-import           Data.Aeson (ToJSON (..), FromJSON (..), withObject, withText, (.!=), (.:), (.:?), Value (Object), object, (.=))
-import           Data.Aeson.Extended (WithJSONWarnings (..), (..:), withObjectWarnings, noJSONWarnings)
+import           Data.Aeson (ToJSON (..), FromJSON (..), withText, object, (.=))
+import           Data.Aeson.Extended (WithJSONWarnings (..), (..:), withObjectWarnings, noJSONWarnings, (..!=))
 import           Data.ByteString (ByteString)
 import           Data.Data
-import qualified Data.HashMap.Strict as HashMap
 import           Data.Hashable (Hashable)
 import           Data.Map (Map)
 import qualified Data.Map as Map
@@ -43,13 +42,13 @@ import           Data.Store.VersionTagged
 import           Data.String (IsString)
 import           Data.Text (Text)
 import qualified Data.Text as T
-import           Data.Traversable (forM)
 import qualified Distribution.Version as C
 import           GHC.Generics (Generic)
 import           Network.HTTP.Client (parseRequest)
 import           Prelude -- Fix AMP warning
 import           Stack.Types.Compiler
 import           Stack.Types.FlagName
+import           Stack.Types.GhcPkgId
 import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageName
 import           Stack.Types.Resolver
@@ -59,33 +58,36 @@ import           Stack.Types.VersionIntervals
 -- | A definition of a snapshot. This could be a Stackage snapshot or
 -- something custom. It does not include information on the global
 -- package database, this is added later.
+--
+-- It may seem more logic to attach flags, options, etc, directly with
+-- the desired package. However, this isn't possible yet: our
+-- definition may contain tarballs or Git repos, and we don't actually
+-- know the package names contained there. Therefore, we capture all
+-- of this additional information by package name, and later in the
+-- snapshot load step we will resolve the contents of tarballs and
+-- repos, figure out package names, and assigned values appropriately.
 data SnapshotDef = SnapshotDef
-    { sdCompilerVersion :: !CompilerVersion
-    -- ^ The compiler version used for this snapshot.
-    , sdPackages        :: !(Map PackageName PackageDef)
-    -- ^ Packages included in this snapshot.
+    { sdParent :: !(Either CompilerVersion SnapshotDef)
+    -- ^ The snapshot to extend from. This is either a specific
+    -- compiler, or a @SnapshotDef@ which gives us more information
+    -- (like packages). Ultimately, we'll end up with a
+    -- @CompilerVersion@.
     , sdResolver        :: !LoadedResolver
     -- ^ The resolver that provides this definition.
+    , sdLocations :: ![PackageLocation]
+    -- ^ Where to grab all of the packages from.
+    , sdDropPackages :: !(Set PackageName)
+    -- ^ Packages present in the parent which should not be included
+    -- here.
+    , sdFlags :: !(Map PackageName (Map FlagName Bool))
+    -- ^ Flag values to override from the defaults
+    , sdHide :: !(Set PackageName)
+    -- ^ Packages which should be hidden when registering. This will
+    -- affect, for example, the import parser in the script command.
+    , sdGhcOptions :: !(Map PackageName [Text])
+    -- ^ GHC options per package
     }
     deriving (Show, Eq)
-
--- | A definition for how to install a single package within a
--- snapshot.
-data PackageDef = PackageDef
-    { pdLocation :: !PackageLocation
-    -- ^ Where to get the package contents from
-    , pdFlags    :: !(Map FlagName Bool)
-    -- ^ Flag values to override from the defaults
-    , pdHide             :: !Bool
-    -- ^ Should this package be registered hidden in the package
-    -- database? For example, affects parser importer in script
-    -- command.
-    , pdGhcOptions :: ![Text]
-    -- ^ GHC options to be passed to this package
-    }
-    deriving (Generic, Show, Eq, Data, Typeable)
-instance Store PackageDef
-instance NFData PackageDef
 
 -- | Where to get the contents of a package (including cabal file
 -- revisions) from.
@@ -97,47 +99,70 @@ data PackageLocation
   | PLFilePath !FilePath
     -- ^ Note that we use @FilePath@ and not @Path@s. The goal is: first parse
     -- the value raw, and then use @canonicalizePath@ and @parseAbsDir@.
-  | PLRemote !Text !RemotePackageType
-    -- ^ URL and further details
+  | PLHttp !Text
+  -- ^ URL
+  | PLRepo !Repo
+  -- ^ Stored in a source control repository
     deriving (Generic, Show, Eq, Data, Typeable)
 instance Store PackageLocation
 instance NFData PackageLocation
 
+-- | The type of a source control repository.
+data RepoType = RepoGit | RepoHg
+    deriving (Generic, Show, Eq, Data, Typeable)
+instance Store RepoType
+instance NFData RepoType
+
+-- | Information on packages stored in a source control repository.
+data Repo = Repo
+    { repoUrl :: !Text
+    , repoCommit :: !Text
+    , repoType :: !RepoType
+    , repoSubdirs :: ![FilePath]
+    }
+    deriving (Generic, Show, Eq, Data, Typeable)
+instance Store Repo
+instance NFData Repo
+
 instance ToJSON PackageLocation where
-    -- FIXME consider changing this instances to just a Text
-    -- representation. Downside: if someone currently has a location:
-    -- name-1.2.3 instead of ./name-1.2.3 for a local package, their
-    -- stack.yaml will need to be updated. But it's an overall nicer
-    -- UI.
-    --
-    -- If the change is made, modify the FromJSON instance as well.
-    toJSON (PLIndex ident) = object ["ident" .= ident]
+    -- Note that the PLIndex and PLFilePath constructors both turn
+    -- into plain text.  Downside: if someone currently has a
+    -- location: name-1.2.3 instead of ./name-1.2.3 for a local
+    -- package, their stack.yaml will need to be updated. But it's an
+    -- overall nicer UI.
+    toJSON (PLIndex ident) = toJSON ident
     toJSON (PLFilePath fp) = toJSON fp
-    toJSON (PLRemote t RPTHttp) = toJSON t
-    toJSON (PLRemote x (RPTGit y)) = object [("git", toJSON x), ("commit", toJSON y)]
-    toJSON (PLRemote x (RPTHg  y)) = object [( "hg", toJSON x), ("commit", toJSON y)]
+    toJSON (PLHttp t) = toJSON t
+    toJSON (PLRepo (Repo url commit typ subdirs)) = object $
+        (if null subdirs then id else (("subdirs" .= subdirs):))
+        [ urlKey .= url
+        , "commit" .= commit
+        ]
+      where
+        urlKey =
+          case typ of
+            RepoGit -> "git"
+            RepoHg  -> "hg"
 
 instance FromJSON (WithJSONWarnings PackageLocation) where
     parseJSON v
-        = (noJSONWarnings <$> withText "PackageLocation" (\t -> http t <|> file t) v)
-        <|> git v
-        <|> hg  v
-        <|> index v
+        = (noJSONWarnings <$> withText "PackageLocation" (\t -> index <|> http t <|> file t) v)
+        <|> repo v
       where
         file t = pure $ PLFilePath $ T.unpack t
         http t =
             case parseRequest $ T.unpack t of
                 Left  _ -> fail $ "Could not parse URL: " ++ T.unpack t
-                Right _ -> return $ PLRemote t RPTHttp
+                Right _ -> return $ PLHttp t
+        index = PLIndex <$> parseJSON v
 
-        git = withObjectWarnings "PackageGitLocation" $ \o -> PLRemote
-            <$> o ..: "git"
-            <*> (RPTGit <$> o ..: "commit")
-        hg  = withObjectWarnings "PackageHgLocation"  $ \o -> PLRemote
-            <$> o ..: "hg"
-            <*> (RPTHg  <$> o ..: "commit")
-        index = withObjectWarnings "PackageIndexLocation" $ \o -> PLIndex
-            <$> o ..: "ident"
+        repo = withObjectWarnings "PLRepo" $ \o -> do
+          (repoType, repoUrl) <-
+            ((RepoGit, ) <$> o ..: "git") <|>
+            ((RepoHg, ) <$> o ..: "hg")
+          repoCommit <- o ..: "commit"
+          repoSubdirs <- o ..: "subdirs" ..!= []
+          return $ PLRepo Repo {..}
 
 -- | What kind of remote package location we're dealing with.
 data RemotePackageType
@@ -148,81 +173,54 @@ data RemotePackageType
 instance Store RemotePackageType
 instance NFData RemotePackageType
 
--- | Newtype wrapper to help parse a 'SnapshotDef' from the Stackage
--- YAML files.
-newtype StackageSnapshotDef = StackageSnapshotDef (SnapName -> SnapshotDef)
-
--- | Newtype wrapper to help parse a 'PackageDef' from the Stackage
--- YAML files.
-newtype StackagePackageDef = StackagePackageDef { unStackagePackageDef :: PackageName -> PackageDef }
-
-instance FromJSON StackageSnapshotDef where
-    parseJSON = withObject "StackageSnapshotDef" $ \o -> do
-        Object si <- o .: "system-info"
-        ghcVersion <- si .:? "ghc-version"
-        compilerVersion <- si .:? "compiler-version"
-        sdCompilerVersion <-
-            case (ghcVersion, compilerVersion) of
-                (Just _, Just _) -> fail "can't have both compiler-version and ghc-version fields"
-                (Just ghc, _) -> return (GhcVersion ghc)
-                (_, Just compiler) -> return compiler
-                _ -> fail "expected field \"ghc-version\" or \"compiler-version\" not present"
-
-        sdPackages <- Map.mapWithKey (\k v -> unStackagePackageDef v k) <$> o .: "packages"
-
-        return $ StackageSnapshotDef $ \snapName ->
-          let sdResolver = ResolverSnapshot snapName
-           in SnapshotDef {..}
-
-instance FromJSON StackagePackageDef where
-    parseJSON = withObject "StackagePackageDef" $ \o -> do
-        version <- o .: "version"
-        mcabalFileInfo <- o .:? "cabal-file-info"
-        mcabalFileInfo' <- forM mcabalFileInfo $ \o' -> do
-            cfiSize <- Just <$> o' .: "size"
-            cfiHashes <- o' .: "hashes"
-            cfiHash <- maybe
-                         (fail "Could not find SHA256")
-                         (return . mkCabalHashFromSHA256)
-                     $ HashMap.lookup ("SHA256" :: Text) cfiHashes
-            return CabalFileInfo {..}
-
-        Object constraints <- o .: "constraints"
-        pdFlags <- constraints .: "flags"
-        pdHide <- constraints .:? "hide" .!= False
-        let pdGhcOptions = [] -- Stackage snapshots do not allow setting GHC options
-
-        return $ StackagePackageDef $ \name ->
-          let pdLocation = PLIndex (PackageIdentifierRevision (PackageIdentifier name version) mcabalFileInfo')
-           in PackageDef {..}
-
 -- | Name of an executable.
 newtype ExeName = ExeName { unExeName :: Text }
     deriving (Show, Eq, Ord, Hashable, IsString, Generic, Store, NFData, Data, Typeable)
 
--- | A fully loaded snapshot, including information gleaned from the
+-- | A fully loaded snapshot combined , including information gleaned from the
 -- global database and parsing cabal files.
+--
+-- Invariant: a global package may not depend upon a snapshot package,
+-- a snapshot may not depend upon a local or project, and all
+-- dependencies must be satisfied.
 data LoadedSnapshot = LoadedSnapshot
   { lsCompilerVersion :: !CompilerVersion
   , lsResolver        :: !LoadedResolver
-  , lsPackages        :: !(Map PackageName LoadedPackageInfo)
+  , lsGlobals         :: !(Map PackageName (LoadedPackageInfo GhcPkgId)) -- FIXME this may be a terrible design
+  , lsPackages        :: !(Map PackageName (LoadedPackageInfo PackageLocation))
   }
     deriving (Generic, Show, Data, Eq, Typeable)
 instance Store LoadedSnapshot
 instance NFData LoadedSnapshot
 
 loadedSnapshotVC :: VersionConfig LoadedSnapshot
-loadedSnapshotVC = storeVersionConfig "ls-v1" "rwFDBWG4S0E1qrA2ijMq_9cPFvc="
+loadedSnapshotVC = storeVersionConfig "ls-v1" "Urk66HyO_yvx8blMEfuFErGGpj0="
 
 -- | Information on a single package for the 'LoadedSnapshot' which
 -- can be installed.
-data LoadedPackageInfo = LoadedPackageInfo
+--
+-- Note that much of the information below (such as the package
+-- dependencies or exposed modules) can be conditional in the cabal
+-- file, which means it will vary based on flags, arch, and OS.
+data LoadedPackageInfo loc = LoadedPackageInfo
     { lpiVersion :: !Version
     -- ^ This /must/ match the version specified within 'rpiDef'.
-    , lpiDef :: !(Maybe PackageDef)
-    -- ^ The definition for this package. If the package is in the
-    -- global database and not in the snapshot, this will be
-    -- @Nothing@.
+    , lpiLocation :: !loc
+    -- ^ Where to get the package from. This could be a few different
+    -- things:
+    --
+    -- * For a global package, it will be the @GhcPkgId@. (If we end
+    -- up needing to rebuild this because we've changed a
+    -- dependency, we will take it from the package index with no
+    -- @CabalFileInfo@.
+    --
+    -- * For a dependency, it will be a @PackageLocation@.
+    --
+    -- * For a project package, it will be a @Path Abs Dir@.
+    , lpiFlags :: !(Map FlagName Bool)
+    -- ^ Flags to build this package with.
+    , lpiGhcOptions :: ![Text]
+    -- ^ GHC options to use when building this package.
     , lpiPackageDeps :: !(Set PackageName)
     -- ^ All packages which must be built/copied/registered before
     -- this package.
@@ -238,8 +236,8 @@ data LoadedPackageInfo = LoadedPackageInfo
     -- script interpreter's module name import parser.
     }
     deriving (Generic, Show, Eq, Data, Typeable)
-instance Store LoadedPackageInfo
-instance NFData LoadedPackageInfo
+instance Store a => Store (LoadedPackageInfo a)
+instance NFData a => NFData (LoadedPackageInfo a)
 
 data DepInfo = DepInfo
     { _diComponents :: !(Set Component)

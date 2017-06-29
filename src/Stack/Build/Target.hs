@@ -44,7 +44,6 @@ import           Prelude hiding (concat, concatMap) -- Fix redundant import warn
 import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageName
 import           Stack.Types.Version
-import           Stack.Types.Config
 import           Stack.Types.Build
 import           Stack.Types.Package
 
@@ -111,7 +110,7 @@ data LocalPackageView = LocalPackageView
     , lpvRoot       :: !(Path Abs Dir)
     , lpvCabalFP    :: !(Path Abs File)
     , lpvComponents :: !(Set NamedComponent)
-    , lpvExtraDep   :: !TreatLikeExtraDep
+    , lpvExtraDep   :: !Bool
     }
 
 -- | Same as @parseRawTarget@, but also takes directories into account.

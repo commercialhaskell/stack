@@ -249,12 +249,14 @@ resolvePackagesAllowMissing mSnapshotDef idents0 names0 = do
                     Just sd -> getNamedFromSnapshotDef sd
 
             getNamedFromSnapshotDef sd name = do
-                pd <- Map.lookup name $ sdPackages sd
-                case pdLocation pd of
-                  PLIndex ident -> Just ident
-                  -- TODO we could consider different unpack behavior
-                  -- for the other constructors in PackageLocation
-                  _ -> Nothing
+                loop $ sdLocations sd
+              where
+                loop [] = Nothing
+                loop ((PLIndex ident@(PackageIdentifierRevision (PackageIdentifier name' _) _)):rest)
+                  | name == name' = Just ident
+                  | otherwise = loop rest
+                loop (_:rest) = loop rest
+
             getNamedFromIndex name = fmap
                 (\ver -> (PackageIdentifierRevision (PackageIdentifier name ver) Nothing))
                 (Map.lookup name versions)
