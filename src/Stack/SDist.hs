@@ -382,7 +382,7 @@ buildExtractedTarball pkgDir = do
   localPackageToBuild <- readLocalPackage pkgDir
   let packageEntries = bcPackages (envConfigBuildConfig envConfig)
       getPaths = resolvePackageLocation menv projectRoot
-  allPackagePaths <- fmap mconcat (mapM getPaths packageEntries)
+  allPackagePaths <- fmap (map fst . mconcat) (mapM getPaths packageEntries)
   -- We remove the path based on the name of the package
   let isPathToRemove path = do
         localPackage <- readLocalPackage path

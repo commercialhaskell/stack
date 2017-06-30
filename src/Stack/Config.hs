@@ -61,7 +61,6 @@ import           Crypto.Hash (hashWith, SHA256(..))
 import           Data.Aeson.Extended
 import qualified Data.ByteArray as Mem (convert)
 import qualified Data.ByteString as S
-import qualified Data.ByteString.Base64.URL as B64URL
 import qualified Data.ByteString.Lazy as L
 import           Data.Foldable (forM_)
 import           Data.IORef
@@ -650,7 +649,7 @@ getLocalPackages = do
         Nothing -> do
             menv <- getMinimalEnvOverride
             root <- view projectRootL
-            let helper f = fmap (Set.fromList . concat)
+            let helper f = fmap (Set.fromList . map fst . concat)
                          $ view (buildConfigL.to f)
                        >>= mapM (resolvePackageLocation menv root)
             packages <- helper bcPackages
