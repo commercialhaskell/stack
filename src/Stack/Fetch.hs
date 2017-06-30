@@ -49,7 +49,10 @@ import qualified    Data.ByteString.Lazy as L
 import              Data.Either (partitionEithers)
 import qualified    Data.Foldable as F
 import              Data.Function (fix)
+import              Data.HashMap.Strict (HashMap)
 import qualified    Data.HashMap.Strict as HashMap
+import              Data.HashSet (HashSet)
+import qualified    Data.HashSet as HashSet
 import              Data.List (intercalate)
 import              Data.List.NonEmpty (NonEmpty)
 import qualified    Data.List.NonEmpty as NE
@@ -89,7 +92,7 @@ data FetchException
     | UnpackDirectoryAlreadyExists (Set FilePath)
     | CouldNotParsePackageSelectors [String]
     | UnknownPackageNames (Set PackageName)
-    | UnknownPackageIdentifiers (Set PackageIdentifier) String
+    | UnknownPackageIdentifiers (HashSet PackageIdentifierRevision) String
     deriving Typeable
 instance Exception FetchException
 
@@ -117,7 +120,7 @@ instance Show FetchException where
         intercalate ", " (map packageNameString $ Set.toList names)
     show (UnknownPackageIdentifiers idents suggestions) =
         "The following package identifiers were not found in your indices: " ++
-        intercalate ", " (map packageIdentifierString $ Set.toList idents) ++
+        intercalate ", " (map packageIdentifierRevisionString $ HashSet.toList idents) ++
         (if null suggestions then "" else "\n" ++ suggestions)
 
 -- | Fetch packages into the cache without unpacking
@@ -207,7 +210,7 @@ resolvePackages mSnapshotDef idents0 names0 = do
     go = r <$> resolvePackagesAllowMissing mSnapshotDef idents0 names0
     r (missingNames, missingIdents, idents)
       | not $ Set.null missingNames  = Left $ UnknownPackageNames       missingNames
-      | not $ Set.null missingIdents = Left $ UnknownPackageIdentifiers missingIdents ""
+      | not $ HashSet.null missingIdents = Left $ UnknownPackageIdentifiers missingIdents ""
       | otherwise                    = Right idents
 
 resolvePackagesAllowMissing
@@ -215,7 +218,7 @@ resolvePackagesAllowMissing
     => Maybe SnapshotDef -- ^ when looking up by name, take from this build plan
     -> [PackageIdentifierRevision]
     -> Set PackageName
-    -> m (Set PackageName, Set PackageIdentifier, [ResolvedPackage])
+    -> m (Set PackageName, HashSet PackageIdentifierRevision, [ResolvedPackage])
 resolvePackagesAllowMissing mSnapshotDef idents0 names0 = do
     (res1, res2, resolved) <- inner
     if any (isJust . snd) resolved
@@ -266,11 +269,11 @@ resolvePackagesAllowMissing mSnapshotDef idents0 names0 = do
                 (Set.toList names0)
         let (missingIdents, resolved) = partitionEithers $ map (goIdent caches shaCaches)
                                     $ idents0 <> idents1
-        return (Set.fromList missingNames, Set.fromList missingIdents, resolved)
+        return (Set.fromList missingNames, HashSet.fromList missingIdents, resolved)
 
-    goIdent caches shaCaches (PackageIdentifierRevision ident mcfi) =
+    goIdent caches shaCaches identRev@(PackageIdentifierRevision ident mcfi) =
         case Map.lookup ident caches of
-            Nothing -> Left ident
+            Nothing -> Left identRev
             Just (index, cache) ->
                 let (index', cache', missingCFI) =
                       case mcfi of
@@ -333,7 +336,7 @@ withCabalFiles name pkgs f = do
 -- package indices.
 withCabalLoader
     :: (StackMiniM env m, HasConfig env, MonadBaseUnlift IO m)
-    => ((PackageIdentifier -> IO ByteString) -> m a)
+    => ((PackageIdentifierRevision -> IO ByteString) -> m a)
     -> m a
 withCabalLoader inner = do
     env <- ask
@@ -350,11 +353,11 @@ withCabalLoader inner = do
     unlift <- askRunBase
 
     -- TODO in the future, keep all of the necessary @Handle@s open
-    let doLookup :: PackageIdentifier
+    let doLookup :: PackageIdentifierRevision
                  -> IO ByteString
         doLookup ident = do
-            (caches, _gitSHACaches) <- loadCaches
-            eres <- unlift $ lookupPackageIdentifierExact ident env caches
+            (caches, cachesRev) <- loadCaches
+            eres <- unlift $ lookupPackageIdentifierExact ident env caches cachesRev
             case eres of
                 Just bs -> return bs
                 -- Update the cache and try again
@@ -374,7 +377,7 @@ withCabalLoader inner = do
                             runInBase $ do
                                 $logInfo $ T.concat
                                     [ "Didn't see "
-                                    , T.pack $ packageIdentifierString ident
+                                    , T.pack $ packageIdentifierRevisionString ident
                                     , " in your package indices.\n"
                                     , "Updating and trying again."
                                     ]
@@ -384,17 +387,24 @@ withCabalLoader inner = do
                             return (False, doLookup ident)
                         else return (toUpdate,
                                      throwM $ UnknownPackageIdentifiers
-                                       (Set.singleton ident) (T.unpack suggestions))
+                                       (HashSet.singleton ident) (T.unpack suggestions))
     inner doLookup
 
 lookupPackageIdentifierExact
   :: (StackMiniM env m, HasConfig env)
-  => PackageIdentifier
+  => PackageIdentifierRevision
   -> env
   -> PackageCaches
+  -> HashMap CabalHash (PackageIndex, OffsetSize)
   -> m (Maybe ByteString)
-lookupPackageIdentifierExact ident env caches =
-    case Map.lookup ident caches of
+lookupPackageIdentifierExact (PackageIdentifierRevision ident mcfi) env caches cachesRev = do
+    let mpair =
+          case mcfi of
+            Nothing -> Map.lookup ident caches
+            Just cfi -> fmap
+              (\(index, size) -> (index, PackageCache size Nothing))
+              (HashMap.lookup (cfiHash cfi) cachesRev)
+    case mpair of
         Nothing -> return Nothing
         Just (index, cache) -> do
             [bs] <- flip runReaderT env
@@ -411,10 +421,10 @@ lookupPackageIdentifierExact ident env caches =
 -- with the same name and the same two first version number components found
 -- in the caches.
 fuzzyLookupCandidates
-  :: PackageIdentifier
+  :: PackageIdentifierRevision
   -> PackageCaches
   -> Maybe (NonEmpty PackageIdentifier)
-fuzzyLookupCandidates (PackageIdentifier name ver) caches =
+fuzzyLookupCandidates (PackageIdentifierRevision (PackageIdentifier name ver) _rev) caches =
   let (_, zero, bigger) = Map.splitLookup zeroIdent caches
       zeroIdent         = PackageIdentifier name $(mkVersion "0.0")
       sameName  (PackageIdentifier n _) = n == name
@@ -426,10 +436,10 @@ fuzzyLookupCandidates (PackageIdentifier name ver) caches =
 -- package caches. This should be called before giving up, i.e. when
 -- 'fuzzyLookupCandidates' cannot return anything.
 typoCorrectionCandidates
-  :: PackageIdentifier
+  :: PackageIdentifierRevision
   -> PackageCaches
   -> Maybe (NonEmpty T.Text)
-typoCorrectionCandidates ident =
+typoCorrectionCandidates (PackageIdentifierRevision ident _mcfi) =
   let getName = packageNameText . packageIdentifierName
       name    = getName ident
   in  NE.nonEmpty
