@@ -18,8 +18,7 @@ module Stack.GhcPkg
   ,unregisterGhcPkgId
   ,getCabalPkgVer
   ,ghcPkgExeName
-  ,mkGhcPackagePath
-  ,getGlobalPackages)
+  ,mkGhcPackagePath)
   where
 
 import           Control.Monad
@@ -30,13 +29,10 @@ import           Control.Monad.Trans.Control
 import qualified Data.ByteString.Char8 as S8
 import           Data.Either
 import           Data.List
-import           Data.Map (Map)
-import qualified Data.Map.Strict as Map
 import           Data.Maybe
 import           Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
-import qualified Data.Text.Encoding.Error as T
 import           Data.Text.Extra (stripCR)
 import           Path (Path, Abs, Dir, toFilePath, parent, mkRelFile, (</>))
 import           Path.Extra (toFilePathNoTrailingSep)
@@ -207,15 +203,3 @@ mkGhcPackagePath locals localdb deps extras globaldb =
     , [toFilePathNoTrailingSep db | db <- reverse extras]
     , [toFilePathNoTrailingSep globaldb]
     ]
-
--- | Get all of the globally available packages
-getGlobalPackages :: (MonadIO m, MonadCatch m, MonadLogger m, MonadBaseControl IO m)
-                  => EnvOverride -> WhichCompiler -> m (Map PackageName Version)
-getGlobalPackages menv wc = do
-    $logDebug "Getting packages in the global database"
-    bs <- ghcPkg menv wc [] ["list", "--global", "--simple-output"]
-          >>= either throwM return
-    idents <- mapM parsePackageIdentifier
-            $ T.words
-            $ T.decodeUtf8With T.lenientDecode bs
-    return $ Map.fromList $ map (\(PackageIdentifier n v) -> (n, v)) idents

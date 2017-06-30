@@ -80,7 +80,6 @@ import           Path.IO
 import           Prelude -- Fix AMP warning
 import           Stack.Constants
 import           Stack.Fetch
-import           Stack.GhcPkg (getGlobalPackages)
 import           Stack.Package
 import           Stack.PackageIndex
 import           Stack.Snapshot

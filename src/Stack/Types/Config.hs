@@ -165,6 +165,7 @@ module Stack.Types.Config
   ,cabalVersionL
   ,whichCompilerL
   ,envOverrideL
+  ,loadedSnapshotL
   -- * Lens reexport
   ,view
   ,to

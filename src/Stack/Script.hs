@@ -7,7 +7,7 @@ module Stack.Script
 
 import           Control.Exception          (assert)
 import           Control.Exception.Safe     (throwM)
-import           Control.Monad              (unless, forM)
+import           Control.Monad              (unless, forM, void)
 import           Control.Monad.IO.Class     (liftIO)
 import           Control.Monad.Logger
 import           Data.ByteString            (ByteString)
@@ -28,7 +28,6 @@ import qualified Stack.Build
 import           Stack.Exec
 import           Stack.GhcPkg               (ghcPkgExeName)
 import           Stack.Options.ScriptParser
-import           Stack.PackageDump          (getGlobalModuleInfo)
 import           Stack.Runners
 import           Stack.Snapshot             (loadResolver, loadSnapshot)
 import           Stack.Types.BuildPlan
@@ -68,9 +67,10 @@ scriptCmd opts go' = do
 
         targetsSet <-
             case soPackages opts of
-                [] ->
+                [] -> do
                     -- Using the import parser
-                    getPackagesFromImports (globalResolver go) (soFile opts)
+                    moduleInfo <- view $ loadedSnapshotL.to toModuleInfo
+                    getPackagesFromModuleInfo moduleInfo (soFile opts)
                 packages -> do
                     let targets = concatMap wordsComma packages
                     targets' <- mapM parsePackageNameFromString targets
@@ -141,25 +141,6 @@ isWindows = True
 #else
 isWindows = False
 #endif
-
--- | Returns packages that need to be installed, and all of the core
--- packages. Reason for the core packages:
-
--- Ideally we'd have the list of modules per core package listed in
--- the build plan, but that doesn't exist yet. Next best would be to
--- list the modules available at runtime, but that gets tricky with when we install GHC. Instead, we'll just list all core packages
-getPackagesFromImports :: Maybe AbstractResolver
-                       -> FilePath
-                       -> StackT EnvConfig IO (Set PackageName)
-getPackagesFromImports Nothing _ = throwM NoResolverWhenUsingNoLocalConfig
-getPackagesFromImports (Just (ARResolver (ResolverSnapshot name))) scriptFP = do
-    mi <- loadModuleInfo name
-    getPackagesFromModuleInfo mi scriptFP
-getPackagesFromImports (Just (ARResolver (ResolverCompiler compiler))) scriptFP = do
-  menv <- getMinimalEnvOverride
-  mi <- getGlobalModuleInfo menv $ whichCompiler compiler -- FIXME use loadResolver/loadSnapshot? Or just take it all from the already present LoadedSnapshot?
-  getPackagesFromModuleInfo mi scriptFP
-getPackagesFromImports (Just aresolver) _ = throwM $ InvalidResolverForNoLocalConfig $ show aresolver
 
 getPackagesFromModuleInfo
   :: ModuleInfo
@@ -240,35 +221,19 @@ blacklist = Set.fromList
     ]
 
 toModuleInfo :: LoadedSnapshot -> ModuleInfo
-toModuleInfo =
+toModuleInfo ls =
       mconcat
-    . map (\(pn, lpi) ->
+    $ map (\(pn, lpi) ->
             ModuleInfo
             $ Map.fromList
             $ map (\mn -> (mn, Set.singleton pn))
             $ Set.toList
             $ lpiExposedModules lpi)
-    . filter (\(pn, lpi) ->
+    $ filter (\(pn, lpi) ->
             not (lpiHide lpi) &&
             pn `Set.notMember` blacklist)
-    . Map.toList
-    . lsPackages
-
--- | Where to store module info caches
-moduleInfoCache :: SnapName -> StackT EnvConfig IO (Path Abs File)
-moduleInfoCache name = do
-    root <- view stackRootL
-    platform <- platformGhcVerOnlyRelDir
-    name' <- parseRelDir $ T.unpack $ renderSnapName name
-    -- These probably can't vary at all based on platform, even in the
-    -- future, so it's safe to call this unnecessarily paranoid.
-    return (root </> $(mkRelDir "script") </> name' </> platform </> $(mkRelFile "module-info.cache"))
-
-loadModuleInfo :: SnapName -> StackT EnvConfig IO ModuleInfo
-loadModuleInfo name = do
-    path <- moduleInfoCache name
-    $(versionedDecodeOrLoad moduleInfoVC) path $
-      fmap toModuleInfo $ loadResolver (ResolverSnapshot name) >>= loadSnapshot
+    $ Map.toList
+    $ Map.union (void <$> lsPackages ls) (void <$> lsGlobals ls)
 
 parseImports :: ByteString -> (Set PackageName, Set ModuleName)
 parseImports =

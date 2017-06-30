@@ -1,4 +1,5 @@
 {-# LANGUAGE DeriveDataTypeable         #-}
+{-# LANGUAGE DeriveFunctor              #-}
 {-# LANGUAGE DeriveGeneric              #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE OverloadedStrings          #-}
@@ -249,7 +250,7 @@ data LoadedPackageInfo loc = LoadedPackageInfo
     -- ^ Should this package be hidden in the database. Affects the
     -- script interpreter's module name import parser.
     }
-    deriving (Generic, Show, Eq, Data, Typeable)
+    deriving (Generic, Show, Eq, Data, Typeable, Functor)
 instance Store a => Store (LoadedPackageInfo a)
 instance NFData a => NFData (LoadedPackageInfo a)
 
