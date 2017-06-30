@@ -355,7 +355,7 @@ setupEnv mResolveMissingGHC = do
         , envConfigCompilerVersion = compilerVer
         , envConfigCompilerBuild = compilerBuild
         , envConfigPackagesRef = envConfigPackagesRef envConfig0
-        , envConfigLoadedSnapshot = error "envLoadedSnapshot1"
+        , envConfigLoadedSnapshot = ls
         }
 
 -- | Add the include and lib paths to the given Config

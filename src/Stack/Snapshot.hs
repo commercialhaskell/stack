@@ -81,6 +81,7 @@ import           System.FilePath (takeDirectory)
 data SnapshotException
   = InvalidCabalFileInSnapshot !PackageLocation !PError !ByteString
   | PackageDefinedTwice !PackageName !PackageLocation !PackageLocation
+  | UnmetDeps !(Map PackageName (Map PackageName (VersionIntervals, Maybe Version)))
   deriving (Show, Typeable) -- FIXME custom Show instance
 instance Exception SnapshotException
 
@@ -332,7 +333,7 @@ loadSnapshot' loadFromIndex (snapshotDefFixes -> sd) = do
             (lpiVersion <$> globals3)
             (lpiVersion <$> packages2)
 
-      mapM_ (checkDepsMet allAvailable) (Map.toList packages2)
+      checkDepsMet allAvailable packages2
 
       return LoadedSnapshot
         { lsCompilerVersion = compilerVersion
@@ -362,12 +363,34 @@ loadSnapshot' loadFromIndex (snapshotDefFixes -> sd) = do
           unless (name == name' && lpiVersion lpi0 == lpiVersion lpi) $ error "recalculate invariant violated"
           return res
 
-    -- | Ensure that all of the dependencies needed by this package
-    -- are available in the given Map of packages.
-    checkDepsMet :: Map PackageName Version -- ^ all available packages
-                 -> (PackageName, LoadedPackageInfo PackageLocation)
-                 -> m ()
-    checkDepsMet = error "checkDepsMet"
+-- | Ensure that all of the dependencies needed by this package
+-- are available in the given Map of packages.
+checkDepsMet :: MonadThrow m
+             => Map PackageName Version -- ^ all available packages
+             -> Map PackageName (LoadedPackageInfo PackageLocation)
+             -> m ()
+checkDepsMet available m
+  | Map.null errs = return ()
+  | otherwise = throwM $ UnmetDeps errs
+  where
+    errs = foldMap (uncurry go) (Map.toList m)
+
+    go :: PackageName
+       -> LoadedPackageInfo loc
+       -> Map PackageName (Map PackageName (VersionIntervals, Maybe Version))
+    go name lpi
+      | Map.null errs' = Map.empty
+      | otherwise = Map.singleton name errs'
+      where
+        errs' = foldMap (uncurry goDep) (Map.toList (lpiPackageDeps lpi))
+
+    goDep :: PackageName -> VersionIntervals -> Map PackageName (VersionIntervals, Maybe Version)
+    goDep name intervals =
+      case Map.lookup name available of
+        Nothing -> Map.singleton name (intervals, Nothing)
+        Just version
+          | version `withinIntervals` intervals -> Map.empty
+          | otherwise -> Map.singleton name (intervals, Just version)
 
 -- | Load a snapshot from the given compiler version, using just the
 -- information in the global package database.
