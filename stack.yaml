@@ -21,3 +21,4 @@ extra-deps:
 - text-metrics-0.3.0
 - unliftio-core-0.1.0.0
 - unliftio-0.1.0.0
+- hpack-0.18.1
