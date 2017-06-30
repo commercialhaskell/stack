@@ -34,6 +34,7 @@ import           Data.Store.VersionTagged
 import qualified Data.ByteArray as Mem (convert)
 import           Data.ByteString (ByteString)
 import qualified Data.ByteString.Base64.URL as B64URL
+import qualified Data.ByteString as S
 import qualified Data.ByteString.Char8 as S8
 import           Data.Conduit ((.|))
 import qualified Data.Conduit.List as CL
@@ -77,6 +78,7 @@ import           Stack.Types.Compiler
 import           Stack.Types.Resolver
 import           Stack.Types.StackT
 import           System.FilePath (takeDirectory)
+import           System.Process.Read (EnvOverride)
 
 data SnapshotException
   = InvalidCabalFileInSnapshot !PackageLocation !PError !ByteString
@@ -268,37 +270,44 @@ loadResolver (ResolverCustom name (loc, url)) = do
     snapNameToHash :: SnapName -> SnapshotHash
     snapNameToHash = doHash . encodeUtf8 . renderSnapName
 
-    doHash :: S8.ByteString -> SnapshotHash
+    doHash :: ByteString -> SnapshotHash
     doHash = fromDigest . hash
 
 -- | Fully load up a 'SnapshotDef' into a 'LoadedSnapshot'
 loadSnapshot
   :: forall env m.
      (StackMiniM env m, HasConfig env, HasGHCVariant env)
-  => SnapshotDef
+  => EnvOverride
+  -> Path Abs Dir -- ^ project root, used for checking out necessary files
+  -> SnapshotDef
   -> m LoadedSnapshot
-loadSnapshot sd = withCabalLoader $ \loader -> loadSnapshot' loader sd
+loadSnapshot menv root sd = withCabalLoader $ \loader -> loadSnapshot' loader menv root sd
 
 -- | Fully load up a 'SnapshotDef' into a 'LoadedSnapshot'
 loadSnapshot'
   :: forall env m.
      (StackMiniM env m, HasConfig env, HasGHCVariant env)
   => (PackageIdentifierRevision -> IO ByteString)
+  -> EnvOverride
+  -> Path Abs Dir -- ^ project root, used for checking out necessary files
   -> SnapshotDef
   -> m LoadedSnapshot
-loadSnapshot' loadFromIndex (snapshotDefFixes -> sd) = do
-    path <- configLoadedSnapshotCache $ sdResolver sd -- FIXME confirm the path is by platform
-    $(versionedDecodeOrLoad loadedSnapshotVC) path inner
+loadSnapshot' loadFromIndex menv root =
+    start
   where
-    inner :: m LoadedSnapshot
-    inner = do
+    start (snapshotDefFixes -> sd) = do
+      path <- configLoadedSnapshotCache $ sdResolver sd -- FIXME confirm the path is by platform
+      $(versionedDecodeOrLoad loadedSnapshotVC) path (inner sd)
+
+    inner :: SnapshotDef -> m LoadedSnapshot
+    inner sd = do
       LoadedSnapshot compilerVersion _ globals0 parentPackages0 <-
-        either loadCompiler (loadSnapshot' loadFromIndex) $ sdParent sd
+        either loadCompiler start $ sdParent sd
 
       platform <- view platformL
 
       (packages1, flags, hide, ghcOptions) <- execStateT
-        (mapM_ (findPackage loadFromIndex platform compilerVersion) (sdLocations sd))
+        (mapM_ (findPackage loadFromIndex menv root platform compilerVersion) (sdLocations sd))
         (Map.empty, sdFlags sd, sdHide sd, sdGhcOptions sd)
 
       let toDrop = Map.union (const () <$> packages1) (Map.fromSet (const ()) (sdDropPackages sd))
@@ -356,7 +365,7 @@ loadSnapshot' loadFromIndex (snapshotDefFixes -> sd) = do
       case Map.lookup name allFlags of
         Nothing -> return (name, lpi0 { lpiHide = hide, lpiGhcOptions = options }) -- optimization
         Just flags -> do
-          [(gpd, loc)] <- loadGenericPackageDescriptions loadFromIndex $ lpiLocation lpi0
+          [(gpd, loc)] <- loadGenericPackageDescriptions loadFromIndex menv root $ lpiLocation lpi0
           unless (loc == lpiLocation lpi0) $ error "recalculate location mismatch"
           platform <- view platformL
           let res@(name', lpi) = calculate gpd platform compilerVersion loc flags hide options
@@ -454,14 +463,16 @@ type FindPackageS =
 -- the 'StateT'), and add the newly found package to the contained
 -- 'Map'.
 findPackage :: forall m env.
-               StackMiniM env m
+               (StackMiniM env m, HasConfig env)
             => (PackageIdentifierRevision -> IO ByteString)
+            -> EnvOverride
+            -> Path Abs Dir -- ^ project root, used for checking out necessary files
             -> Platform
             -> CompilerVersion
             -> PackageLocation
             -> StateT FindPackageS m ()
-findPackage loadFromIndex platform compilerVersion loc0 =
-    loadGenericPackageDescriptions loadFromIndex loc0 >>= mapM_ (uncurry go)
+findPackage loadFromIndex menv root platform compilerVersion loc0 =
+    loadGenericPackageDescriptions loadFromIndex menv root loc0 >>= mapM_ (uncurry go)
   where
     go :: GenericPackageDescription -> PackageLocation -> StateT FindPackageS m ()
     go gpd loc = do
@@ -544,15 +555,31 @@ splitUnmetDeps =
 -- 'PackageLocation' will have just the relevant subdirectory
 -- selected.
 loadGenericPackageDescriptions
-  :: forall m.
-     (MonadIO m, MonadThrow m)
+  :: forall m env.
+     (StackMiniM env m, HasConfig env)
   => (PackageIdentifierRevision -> IO ByteString) -- ^ lookup in index
+  -> EnvOverride
+  -> Path Abs Dir -- ^ project root, used for checking out necessary files
   -> PackageLocation
-  -> m [(GenericPackageDescription, PackageLocation)] -- FIXME consider heavy overlap with Stack.Package
-loadGenericPackageDescriptions loadFromIndex loc@(PLIndex pir) = do
+  -> m [(GenericPackageDescription, PackageLocation)]
+-- Need special handling of PLIndex for efficiency (just read from the
+-- index tarball) and correctness (get the cabal file from the index,
+-- not the package tarball itself, yay Hackage revisions).
+loadGenericPackageDescriptions loadFromIndex _ _ loc@(PLIndex pir) = do
   bs <- liftIO $ loadFromIndex pir
   gpd <- parseGPD loc bs
   return [(gpd, loc)]
+loadGenericPackageDescriptions _ menv root loc = do
+  resolvePackageLocation menv root loc >>= mapM go
+  where
+    go (dir, loc') = do
+      gpd <- getGPD loc' dir
+      return (gpd, loc')
+
+    getGPD loc' dir = do
+      cabalFile <- findOrGenerateCabalFile dir
+      bs <- liftIO $ S.readFile $ toFilePath cabalFile
+      parseGPD loc' bs
 
 parseGPD :: MonadThrow m
          => PackageLocation -- ^ for error reporting

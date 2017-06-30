@@ -95,6 +95,7 @@ import           Stack.Types.Compiler
 import           Stack.Types.Resolver
 import           Stack.Types.StackT
 import           System.FilePath (takeDirectory)
+import           System.Process.Read (EnvOverride)
 
 data BuildPlanException
     = UnknownPackages
@@ -416,13 +417,15 @@ instance Show BuildPlanCheck where
 -- the packages.
 checkSnapBuildPlan
     :: (StackM env m, HasConfig env, HasGHCVariant env)
-    => [GenericPackageDescription]
+    => EnvOverride
+    -> Path Abs Dir -- ^ project root, used for checking out necessary files
+    -> [GenericPackageDescription]
     -> Maybe (Map PackageName (Map FlagName Bool))
     -> SnapName
     -> m BuildPlanCheck
-checkSnapBuildPlan gpds flags snap = do
+checkSnapBuildPlan menv root gpds flags snap = do
     platform <- view platformL
-    rs <- loadResolver (ResolverSnapshot snap) >>= loadSnapshot
+    rs <- loadResolver (ResolverSnapshot snap) >>= loadSnapshot menv root
 
     let
         compiler = lsCompilerVersion rs
@@ -449,10 +452,12 @@ checkSnapBuildPlan gpds flags snap = do
 -- best as possible with the given 'GenericPackageDescription's.
 selectBestSnapshot
     :: (StackM env m, HasConfig env, HasGHCVariant env)
-    => [GenericPackageDescription]
+    => EnvOverride
+    -> Path Abs Dir -- ^ project root, used for checking out necessary files
+    -> [GenericPackageDescription]
     -> NonEmpty SnapName
     -> m (SnapName, BuildPlanCheck)
-selectBestSnapshot gpds snaps = do
+selectBestSnapshot menv root gpds snaps = do
     $logInfo $ "Selecting the best among "
                <> T.pack (show (NonEmpty.length snaps))
                <> " snapshots...\n"
@@ -465,7 +470,7 @@ selectBestSnapshot gpds snaps = do
                 _ -> fmap (betterSnap old) mnew
 
         getResult snap = do
-            result <- checkSnapBuildPlan gpds Nothing snap
+            result <- checkSnapBuildPlan menv root gpds Nothing snap
             reportResult result snap
             return (snap, result)
 
