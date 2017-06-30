@@ -68,6 +68,7 @@ import           Stack.Package               (printCabalFileWarning
 import           Stack.PrettyPrint
 import           Stack.Setup
 import           Stack.Setup.Installed
+import           Stack.Snapshot (loadResolver, loadSnapshot)
 import           Stack.Types.Build
 import           Stack.Types.BuildPlan
 import           Stack.Types.Compiler
@@ -488,7 +489,7 @@ getResolverConstraints stackYaml resolver = do
     ls <- loadResolver resolver >>= loadSnapshot
     return (lsCompilerVersion ls, lsConstraints ls)
   where
-    lpiConstraints lpi = (lpiVersion lpi, maybe Map.empty pdFlags $ lpiDef lpi)
+    lpiConstraints lpi = (lpiVersion lpi, lpiFlags lpi)
     lsConstraints = fmap lpiConstraints . lsPackages
 
 -- | Given a bundle of user packages, flag constraints on those packages and a
@@ -639,8 +640,8 @@ solveExtraDeps modStackYaml = do
     relStackYaml <- prettyPath stackYaml
 
     $logInfo $ "Using configuration file: " <> T.pack relStackYaml
-    packages <- getLocalPackages
-    let cabalDirs = Map.keys packages
+    packages <- lpAllLocal <$> getLocalPackages -- FIXME probably just lpProject?
+    let cabalDirs = Set.toList packages
         noPkgMsg = "No cabal packages found in " <> relStackYaml <>
                    ". Please add at least one directory containing a .cabal \
                    \file. You can also use 'stack init' to automatically \
@@ -655,8 +656,8 @@ solveExtraDeps modStackYaml = do
     (bundle, _) <- cabalPackagesCheck cabalfps noPkgMsg (Just dupPkgFooter)
 
     let gpds              = Map.elems $ fmap snd bundle
-        oldFlags          = unPackageFlags (bcFlags bconfig)
-        oldExtraVersions  = bcExtraDeps bconfig
+        oldFlags          = bcFlags bconfig
+        oldExtraVersions  = bcDependencies bconfig
         resolver          = sdResolver $ bcSnapshotDef bconfig
         oldSrcs           = gpdPackages gpds
         oldSrcFlags       = Map.intersection oldFlags oldSrcs

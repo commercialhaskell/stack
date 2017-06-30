@@ -23,6 +23,7 @@ module Stack.Types.BuildPlan
     , fromCabalModuleName
     , ModuleInfo (..)
     , moduleInfoVC
+    , setCompilerVersion
     ) where
 
 import           Control.Applicative
@@ -91,6 +92,16 @@ data SnapshotDef = SnapshotDef
     -- ^ GHC options per package
     }
     deriving (Show, Eq)
+
+-- | FIXME should this entail modifying the hash?
+setCompilerVersion :: CompilerVersion -> SnapshotDef -> SnapshotDef
+setCompilerVersion cv =
+    go
+  where
+    go sd =
+      case sdParent sd of
+        Left _ -> sd { sdParent = Left cv }
+        Right sd' -> sd { sdParent = Right $ go sd' }
 
 -- | Where to get the contents of a package (including cabal file
 -- revisions) from.

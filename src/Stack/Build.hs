@@ -315,13 +315,15 @@ mkBaseConfigOpts boptsCli = do
 
 -- | Provide a function for loading package information from the package index
 withLoadPackage :: (StackM env m, HasEnvConfig env, MonadBaseUnlift IO m)
-                => ((PackageName -> Version -> Map FlagName Bool -> [Text] -> IO Package) -> m a)
+                => ((PackageIdentifierRevision -> Map FlagName Bool -> [Text] -> IO Package) -> m a)
                 -> m a
 withLoadPackage inner = do
     econfig <- view envConfigL
     withCabalLoader $ \cabalLoader ->
-        inner $ \name version flags ghcOptions -> do
-            bs <- cabalLoader $ PackageIdentifier name version
+        inner $ \pir flags ghcOptions -> do
+            -- FIXME this looks very similar to code in
+            -- Stack.Snapshot, try to merge it together
+            bs <- cabalLoader pir
 
             -- Intentionally ignore warnings, as it's not really
             -- appropriate to print a bunch of warnings out while

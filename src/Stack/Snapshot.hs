@@ -63,6 +63,7 @@ import           Stack.Constants
 import           Stack.Fetch
 import           Stack.Package
 import           Stack.PackageDump
+import           Stack.PackageLocation
 import           Stack.Types.BuildPlan
 import           Stack.Types.FlagName
 import           Stack.Types.GhcPkgId

@@ -20,7 +20,6 @@ import qualified Data.ByteString.Lazy            as L
 import qualified Data.Foldable                   as F
 import           Data.Function                   (on)
 import qualified Data.HashMap.Strict             as HM
-import qualified Data.HashSet                    as HashSet
 import qualified Data.IntMap                     as IntMap
 import           Data.List                       (intercalate, intersect,
                                                   maximumBy)
@@ -122,10 +121,10 @@ initProject whichCmd currDir initOpts mresolver = do
         p = Project
             { projectUserMsg = if userMsg == "" then Nothing else Just userMsg
             , projectPackages = pkgs
-            , projectExtraDeps = HashSet.fromList $ map
-                (\(n, v) -> PackageIdentifierRevision (PackageIdentifier n v) Nothing)
+            , projectDependencies = map
+                (\(n, v) -> PLIndex $ PackageIdentifierRevision (PackageIdentifier n v) Nothing)
                 (Map.toList extraDeps)
-            , projectFlags = PackageFlags (removeSrcPkgDefaultFlags gpds flags)
+            , projectFlags = removeSrcPkgDefaultFlags gpds flags
             , projectResolver = r
             , projectCompiler = Nothing
             , projectExtraPackageDBs = []
@@ -141,11 +140,7 @@ initProject whichCmd currDir initOpts mresolver = do
         makeRel = fmap toFilePath . makeRelativeToCurrentDir
 
         pkgs = map toPkg $ Map.elems (fmap (parent . fst) rbundle)
-        toPkg dir = PackageEntry
-            { peExtraDepMaybe = Nothing
-            , peLocation = PLFilePath $ makeRelDir dir
-            , peSubdirs = []
-            }
+        toPkg dir = PLFilePath $ makeRelDir dir
         indent t = T.unlines $ fmap ("    " <>) (T.lines t)
 
     $logInfo $ "Initialising configuration using resolver: " <> resolverName r

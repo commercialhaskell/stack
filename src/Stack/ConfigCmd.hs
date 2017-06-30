@@ -29,9 +29,9 @@ import qualified Options.Applicative.Types as OA
 import           Path
 import           Path.IO
 import           Prelude -- Silence redundant import warnings
-import           Stack.BuildPlan
 import           Stack.Config (makeConcreteResolver, getProjectConfig, getImplicitGlobalProjectDir, LocalConfigStatus(..))
 import           Stack.Constants
+import           Stack.Snapshot (loadResolver)
 import           Stack.Types.Config
 import           Stack.Types.Resolver
 import           Stack.Types.StringError

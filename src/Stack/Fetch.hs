@@ -40,8 +40,8 @@ import              Control.Monad (join, liftM, unless, void, when)
 import              Control.Monad.Catch
 import              Control.Monad.IO.Class
 import              Control.Monad.Logger
+import              Control.Monad.Reader (MonadReader, ask, runReaderT)
 import              Control.Monad.Trans.Control
-import              Control.Monad.Trans.Unlift (MonadBaseUnlift, askRunBase)
 import              Crypto.Hash (SHA256 (..))
 import              Data.ByteString (ByteString)
 import qualified    Data.ByteString as S
@@ -313,7 +313,7 @@ data ToFetchResult = ToFetchResult
 
 -- | Add the cabal files to a list of idents with their caches.
 withCabalFiles
-    :: (StackMiniM env m, HasConfig env)
+    :: (MonadReader env m, MonadIO m, HasConfig env, MonadMask m)
     => IndexName
     -> [(ResolvedPackage, a)]
     -> (PackageIdentifier -> a -> ByteString -> IO b)
@@ -335,7 +335,7 @@ withCabalFiles name pkgs f = do
 -- | Provide a function which will load up a cabal @ByteString@ from the
 -- package indices.
 withCabalLoader
-    :: (StackMiniM env m, HasConfig env, MonadBaseUnlift IO m)
+    :: (StackMiniM env m, HasConfig env, MonadBaseControl IO m)
     => ((PackageIdentifierRevision -> IO ByteString) -> m a)
     -> m a
 withCabalLoader inner = do
@@ -348,14 +348,15 @@ withCabalLoader inner = do
 
     loadCaches <- getPackageCachesIO
     runInBase <- askRunBase
-    unlift <- askRunBase
+
+    env <- ask
 
     -- TODO in the future, keep all of the necessary @Handle@s open
     let doLookup :: PackageIdentifierRevision
                  -> IO ByteString
         doLookup ident = do
             (caches, cachesRev) <- loadCaches
-            eres <- unlift $ lookupPackageIdentifierExact ident caches cachesRev
+            eres <- runReaderT (lookupPackageIdentifierExact ident caches cachesRev) env
             case eres of
                 Just bs -> return bs
                 -- Update the cache and try again
@@ -389,7 +390,7 @@ withCabalLoader inner = do
     inner doLookup
 
 lookupPackageIdentifierExact
-  :: (StackMiniM env m, HasConfig env)
+  :: (MonadReader env m, MonadIO m, HasConfig env, MonadMask m)
   => PackageIdentifierRevision
   -> PackageCaches
   -> HashMap CabalHash (PackageIndex, OffsetSize)
@@ -672,3 +673,10 @@ orSeparated xs
 
 commaSeparated :: NonEmpty T.Text -> T.Text
 commaSeparated = F.fold . NE.intersperse ", "
+
+-- | Hacky version of @askRunBase@ that unsafely discards state, since
+-- @MonadBaseUnlift@ constraints make GHC sad for some reason.
+--
+-- TODO: Replace with monad-unlift
+askRunBase :: forall m b. MonadBaseControl b m => m (m () -> b ())
+askRunBase = liftBaseWith $ \run -> return $ void . run

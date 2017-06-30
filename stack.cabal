@@ -144,6 +144,7 @@ library
                      Stack.Package
                      Stack.PackageDump
                      Stack.PackageIndex
+                     Stack.PackageLocation
                      Stack.Path
                      Stack.PrettyPrint
                      Stack.Runners

@@ -139,7 +139,7 @@ type M = RWST
 data Ctx = Ctx
     { ls             :: !LoadedSnapshot
     , baseConfigOpts :: !BaseConfigOpts
-    , loadPackage    :: !(PackageName -> Version -> Map FlagName Bool -> [Text] -> IO Package)
+    , loadPackage    :: !(PackageIdentifierRevision -> Map FlagName Bool -> [Text] -> IO Package)
     , combinedMap    :: !CombinedMap
     , toolToPackages :: !(Cabal.Dependency -> Map PackageName VersionRange)
     , ctxEnvConfig   :: !EnvConfig
@@ -180,7 +180,7 @@ constructPlan :: forall env m. (StackM env m, HasEnvConfig env)
               -> [LocalPackage]
               -> Set PackageName -- ^ additional packages that must be built
               -> [DumpPackage () () ()] -- ^ locally registered
-              -> (PackageName -> Version -> Map FlagName Bool -> [Text] -> IO Package) -- ^ load upstream package
+              -> (PackageIdentifierRevision -> Map FlagName Bool -> [Text] -> IO Package) -- ^ load upstream package
               -> SourceMap
               -> InstalledMap
               -> Bool
@@ -428,7 +428,8 @@ tellExecutablesUpstream :: PackageName -> Version -> InstallLocation -> Map Flag
 tellExecutablesUpstream name version loc flags = do
     ctx <- ask
     when (name `Set.member` extraToBuild ctx) $ do
-        p <- liftIO $ loadPackage ctx name version flags []
+        let pir = PackageIdentifierRevision (PackageIdentifier name version) Nothing -- FIXME get the real CabalFileInfo
+        p <- liftIO $ loadPackage ctx pir flags []
         tellExecutablesPackage loc p
 
 tellExecutablesPackage :: InstallLocation -> Package -> M ()
@@ -463,9 +464,10 @@ installPackage
 installPackage name ps minstalled = do
     ctx <- ask
     case ps of
-        PSUpstream version _ flags ghcOptions _ -> do
+        PSUpstream version _ flags ghcOptions mcfi -> do
             planDebug $ "installPackage: Doing all-in-one build for upstream package " ++ show name
-            package <- liftIO $ loadPackage ctx name version flags ghcOptions
+            let pir = PackageIdentifierRevision (PackageIdentifier name version) mcfi
+            package <- liftIO $ loadPackage ctx pir flags ghcOptions
             resolveDepsAndInstall True ps package minstalled
         PSLocal lp ->
             case lpTestBench lp of

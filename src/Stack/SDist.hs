@@ -62,10 +62,11 @@ import           Stack.Build.Execute
 import           Stack.Build.Installed
 import           Stack.Build.Source (loadSourceMap, getDefaultPackageConfig)
 import           Stack.Build.Target
-import           Stack.Config (resolvePackageEntry, removePathFromPackageEntry)
+import           Stack.PackageLocation (resolvePackageLocation)
 import           Stack.Constants
 import           Stack.Package
 import           Stack.Types.Build
+import           Stack.Types.BuildPlan
 import           Stack.Types.Config
 import           Stack.Types.Package
 import           Stack.Types.PackageIdentifier
@@ -379,10 +380,8 @@ buildExtractedTarball pkgDir = do
   envConfig <- view envConfigL
   menv <- getMinimalEnvOverride
   localPackageToBuild <- readLocalPackage pkgDir
-  let packageEntries = bcPackageEntries (envConfigBuildConfig envConfig)
-      getPaths entry = do
-        resolvedEntry <- resolvePackageEntry menv projectRoot entry
-        return $ fmap fst resolvedEntry
+  let packageEntries = bcPackages (envConfigBuildConfig envConfig)
+      getPaths = resolvePackageLocation menv projectRoot
   allPackagePaths <- fmap mconcat (mapM getPaths packageEntries)
   -- We remove the path based on the name of the package
   let isPathToRemove path = do
@@ -392,8 +391,9 @@ buildExtractedTarball pkgDir = do
   let adjustPackageEntries entries path = do
         adjustedPackageEntries <- mapM (removePathFromPackageEntry menv projectRoot path) entries
         return (catMaybes adjustedPackageEntries)
+      removePathFromPackageEntry = error "Stack.SDist.removePathFromPackageEntry"
   entriesWithoutBuiltPackage <- foldM adjustPackageEntries packageEntries pathsToRemove
-  let newEntry = PackageEntry Nothing (PLFilePath (toFilePath pkgDir)) []
+  let newEntry = PLFilePath (toFilePath pkgDir)
   newPackagesRef <- liftIO (newIORef Nothing)
   let adjustEnvForBuild env =
         let updatedEnvConfig = envConfig
@@ -402,7 +402,7 @@ buildExtractedTarball pkgDir = do
               }
         in set envConfigL updatedEnvConfig env
       updatePackageInBuildConfig buildConfig = buildConfig
-        { bcPackageEntries = newEntry : entriesWithoutBuiltPackage
+        { bcPackages = newEntry : entriesWithoutBuiltPackage
         , bcConfig = (bcConfig buildConfig)
                      { configBuild = defaultBuildOpts
                        { boptsTests = True

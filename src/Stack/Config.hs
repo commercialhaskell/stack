@@ -33,7 +33,6 @@ module Stack.Config
   ,loadConfigYaml
   ,packagesParser
   ,getLocalPackages
-  ,resolvePackageEntry
   ,getImplicitGlobalProjectDir
   ,getStackYaml
   ,getSnapshots
@@ -44,7 +43,6 @@ module Stack.Config
   ,defaultConfigYaml
   ,getProjectConfig
   ,LocalConfigStatus(..)
-  ,removePathFromPackageEntry
   ) where
 
 import qualified Codec.Archive.Tar as Tar
@@ -71,6 +69,7 @@ import qualified Data.IntMap as IntMap
 import qualified Data.Map as Map
 import           Data.Maybe
 import           Data.Monoid.Extra
+import qualified Data.Set as Set
 import qualified Data.Text as T
 import           Data.Text.Encoding (encodeUtf8, decodeUtf8)
 import qualified Data.Yaml as Yaml
@@ -95,6 +94,8 @@ import           Stack.Config.Nix
 import           Stack.Config.Urls
 import           Stack.Constants
 import qualified Stack.Image as Image
+import           Stack.PackageLocation
+import           Stack.Snapshot
 import           Stack.Types.BuildPlan
 import           Stack.Types.Compiler
 import           Stack.Types.Config
@@ -518,7 +519,8 @@ loadConfig configArgs mresolver mstackYaml =
 
 -- | Load the build configuration, adds build-specific values to config loaded by @loadConfig@.
 -- values.
-loadBuildConfig :: StackM env m
+loadBuildConfig :: forall env m.
+                   StackM env m
                 => LocalConfigStatus (Project, Path Abs File, ConfigMonoid)
                 -> Config
                 -> Maybe AbstractResolver -- override resolver
@@ -592,9 +594,7 @@ loadBuildConfig mproject config mresolver mcompiler = do
             }
 
     sd0 <- flip runReaderT miniConfig $ loadResolver resolver
-    let sd = case projectCompiler project of
-            Just compiler -> sd0 { sdCompilerVersion = compiler }
-            Nothing -> sd0
+    let sd = maybe id setCompilerVersion (projectCompiler project) sd0
 
     extraPackageDBs <- mapM resolveDir' (projectExtraPackageDBs project)
 
@@ -602,8 +602,8 @@ loadBuildConfig mproject config mresolver mcompiler = do
         { bcConfig = config
         , bcSnapshotDef = sd
         , bcGHCVariant = view ghcVariantL miniConfig
-        , bcPackageEntries = projectPackages project
-        , bcExtraDeps = projectExtraDeps project
+        , bcPackages = projectPackages project
+        , bcDependencies = projectDependencies project
         , bcExtraPackageDBs = extraPackageDBs
         , bcStackYaml = stackYamlFP
         , bcFlags = projectFlags project
@@ -616,6 +616,7 @@ loadBuildConfig mproject config mresolver mcompiler = do
   where
     miniConfig = loadMiniConfig config
 
+    getEmptyProject :: m Project
     getEmptyProject = do
       r <- case mresolver of
             Just aresolver -> do
@@ -628,8 +629,8 @@ loadBuildConfig mproject config mresolver mcompiler = do
                 return r''
       return Project
         { projectUserMsg = Nothing
-        , projectPackages = mempty
-        , projectExtraDeps = mempty
+        , projectPackages = []
+        , projectDependencies = []
         , projectFlags = mempty
         , projectResolver = r
         , projectCompiler = Nothing
@@ -640,7 +641,7 @@ loadBuildConfig mproject config mresolver mcompiler = do
 -- If the packages have already been downloaded, this uses a cached value (
 getLocalPackages
     :: (StackMiniM env m, HasEnvConfig env)
-    => m (Map.Map (Path Abs Dir) TreatLikeExtraDep)
+    => m LocalPackages
 getLocalPackages = do
     cacheRef <- view $ envConfigL.to envConfigPackagesRef
     mcached <- liftIO $ readIORef cacheRef
@@ -649,182 +650,15 @@ getLocalPackages = do
         Nothing -> do
             menv <- getMinimalEnvOverride
             root <- view projectRootL
-            entries <- view $ buildConfigL.to bcPackageEntries
-            liftM (Map.fromList . concat) $ mapM
-                (resolvePackageEntry menv root)
-                entries
-
--- | Resolve a PackageEntry into a list of paths, downloading and cloning as
--- necessary.
-resolvePackageEntry
-    :: (StackMiniM env m, HasConfig env)
-    => EnvOverride
-    -> Path Abs Dir -- ^ project root
-    -> PackageEntry
-    -> m [(Path Abs Dir, TreatLikeExtraDep)]
-resolvePackageEntry menv projRoot pe = do
-    entryRoot <- resolvePackageLocation menv projRoot (peLocation pe)
-    paths <-
-        case peSubdirs pe of
-            [] -> return [entryRoot]
-            subs -> mapM (resolveDir entryRoot) subs
-    extraDep <-
-        case peExtraDepMaybe pe of
-            Just e -> return e
-            Nothing ->
-                case peLocation pe of
-                    PLFilePath _ ->
-                        -- we don't give a warning on missing explicit
-                        -- value here, user intent is almost always
-                        -- the default for a local directory
-                        return False
-                    PLRemote url _ -> do
-                        $logWarn $ mconcat
-                            [ "No extra-dep setting found for package at URL:\n\n"
-                            , url
-                            , "\n\n"
-                            , "This is usually a mistake, external packages "
-                            , "should typically\nbe treated as extra-deps to avoid "
-                            , "spurious test case failures."
-                            ]
-                        return False
-                    PLIndex ident -> do
-                        $logWarn $ mconcat
-                            [ "No extra-dep setting found for package :\n\n"
-                            , T.pack $ packageIdentifierRevisionString ident
-                            , "\n\n"
-                            , "This is usually a mistake, external packages "
-                            , "should typically\nbe treated as extra-deps to avoid "
-                            , "spurious test case failures."
-                            ]
-                        return False
-    return $ map (, extraDep) paths
-
--- | Resolve a PackageLocation into a path, downloading and cloning as
--- necessary.
-resolvePackageLocation
-    :: (StackMiniM env m, HasConfig env)
-    => EnvOverride
-    -> Path Abs Dir -- ^ project root
-    -> PackageLocation
-    -> m (Path Abs Dir)
-resolvePackageLocation _ projRoot (PLFilePath fp) = resolveDir projRoot fp
-resolvePackageLocation menv projRoot (PLRemote url remotePackageType) = do
-    workDir <- view workDirL
-    let nameBeforeHashing = case remotePackageType of
-            RPTHttp{} -> url
-            RPTGit commit -> T.unwords [url, commit]
-            RPTHg commit -> T.unwords [url, commit, "hg"]
-        -- TODO: dedupe with code for snapshot hash?
-        name = T.unpack $ decodeUtf8 $ S.take 12 $ B64URL.encode $ Mem.convert $ hashWith SHA256 $ encodeUtf8 nameBeforeHashing
-        root = projRoot </> workDir </> $(mkRelDir "downloaded")
-        fileExtension' = case remotePackageType of
-            RPTHttp -> ".http-archive"
-            _       -> ".unused"
-
-    fileRel <- parseRelFile $ name ++ fileExtension'
-    dirRel <- parseRelDir name
-    dirRelTmp <- parseRelDir $ name ++ ".tmp"
-    let file = root </> fileRel
-        dir = root </> dirRel
-
-    exists <- doesDirExist dir
-    unless exists $ do
-        ignoringAbsence (removeDirRecur dir)
-
-        let cloneAndExtract commandName cloneArgs resetCommand commit = do
-                ensureDir root
-                callProcessInheritStderrStdout Cmd
-                    { cmdDirectoryToRunIn = Just root
-                    , cmdCommandToRun = commandName
-                    , cmdEnvOverride = menv
-                    , cmdCommandLineArguments =
-                        "clone" :
-                        cloneArgs ++
-                        [ T.unpack url
-                        , toFilePathNoTrailingSep dir
-                        ]
-                    }
-                created <- doesDirExist dir
-                unless created $ throwM $ FailedToCloneRepo commandName
-                readProcessNull (Just dir) menv commandName
-                    (resetCommand ++ [T.unpack commit, "--"])
-                    `catch` \case
-                        ex@ProcessFailed{} -> do
-                            $logInfo $ "Please ensure that commit " <> commit <> " exists within " <> url
-                            throwM ex
-                        ex -> throwM ex
-
-        case remotePackageType of
-            RPTHttp -> do
-                let dirTmp = root </> dirRelTmp
-                ignoringAbsence (removeDirRecur dirTmp)
-
-                let fp = toFilePath file
-                req <- parseUrlThrow $ T.unpack url
-                _ <- download req file
-
-                let tryTar = do
-                        $logDebug $ "Trying to untar " <> T.pack fp
-                        liftIO $ withBinaryFile fp ReadMode $ \h -> do
-                            lbs <- L.hGetContents h
-                            let entries = Tar.read $ GZip.decompress lbs
-                            Tar.unpack (toFilePath dirTmp) entries
-                    tryZip = do
-                        $logDebug $ "Trying to unzip " <> T.pack fp
-                        archive <- fmap Zip.toArchive $ liftIO $ L.readFile fp
-                        liftIO $  Zip.extractFilesFromArchive [Zip.OptDestination
-                                                               (toFilePath dirTmp)] archive
-                    err = throwM $ UnableToExtractArchive url file
-
-                    catchAllLog goodpath handler =
-                        catchAll goodpath $ \e -> do
-                            $logDebug $ "Got exception: " <> T.pack (show e)
-                            handler
-
-                tryTar `catchAllLog` tryZip `catchAllLog` err
-                renameDir dirTmp dir
-
-            -- Passes in --git-dir to git and --repository to hg, in order
-            -- to avoid the update commands being applied to the user's
-            -- repo.  See https://github.com/commercialhaskell/stack/issues/2748
-            RPTGit commit -> cloneAndExtract "git" ["--recursive"] ["--git-dir=.git", "reset", "--hard"] commit
-            RPTHg  commit -> cloneAndExtract "hg"  []              ["--repository", ".", "update", "-C"] commit
-
-    case remotePackageType of
-        RPTHttp -> do
-            x <- listDir dir
-            case x of
-                ([dir'], []) -> return dir'
-                (dirs, files) -> do
-                    ignoringAbsence (removeFile file)
-                    ignoringAbsence (removeDirRecur dir)
-                    throwM $ UnexpectedArchiveContents dirs files
-        _ -> return dir
-
--- | Remove path from package entry. If the package entry contains subdirs, then it removes
--- the subdir. If the package entry points to the path to remove, this function returns
--- Nothing. If the package entry doesn't mention the path to remove, it is returned unchanged
-removePathFromPackageEntry
-    :: (StackMiniM env m, HasConfig env)
-    => EnvOverride
-    -> Path Abs Dir -- ^ project root
-    -> Path Abs Dir -- ^ path to remove
-    -> PackageEntry
-    -> m (Maybe PackageEntry)
-    -- ^ Nothing if the whole package entry should be removed, otherwise
-    -- it returns the updated PackageEntry
-removePathFromPackageEntry menv projectRoot pathToRemove packageEntry = do
-  locationPath <- resolvePackageLocation menv projectRoot (peLocation packageEntry)
-  case peSubdirs packageEntry of
-    [] -> if locationPath == pathToRemove then return Nothing else return (Just packageEntry)
-    subdirPaths -> do
-      let shouldKeepSubdir path = do
-            resolvedPath <- resolveDir locationPath path
-            return (pathToRemove /= resolvedPath)
-      filteredSubdirs <- filterM shouldKeepSubdir subdirPaths
-      if null filteredSubdirs then return Nothing else return (Just packageEntry {peSubdirs = filteredSubdirs})
-
+            let helper f = fmap (Set.fromList . concat)
+                         $ view (buildConfigL.to f)
+                       >>= mapM (resolvePackageLocation menv root)
+            packages <- helper bcPackages
+            deps <- helper bcDependencies
+            return LocalPackages
+              { lpProject = packages
+              , lpDependencies = deps
+              }
 
 
 -- | Get the stack root, e.g. @~/.stack@, and determine whether the user owns it.

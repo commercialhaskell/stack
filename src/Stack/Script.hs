@@ -25,12 +25,12 @@ import qualified Data.Text                  as T
 import           Path
 import           Path.IO
 import qualified Stack.Build
-import           Stack.BuildPlan            (loadResolver, loadSnapshot)
 import           Stack.Exec
 import           Stack.GhcPkg               (ghcPkgExeName)
 import           Stack.Options.ScriptParser
 import           Stack.PackageDump          (getGlobalModuleInfo)
 import           Stack.Runners
+import           Stack.Snapshot             (loadResolver, loadSnapshot)
 import           Stack.Types.BuildPlan
 import           Stack.Types.Compiler
 import           Stack.Types.Config
@@ -157,7 +157,7 @@ getPackagesFromImports (Just (ARResolver (ResolverSnapshot name))) scriptFP = do
     getPackagesFromModuleInfo mi scriptFP
 getPackagesFromImports (Just (ARResolver (ResolverCompiler compiler))) scriptFP = do
   menv <- getMinimalEnvOverride
-  mi <- getGlobalModuleInfo menv $ whichCompiler compiler
+  mi <- getGlobalModuleInfo menv $ whichCompiler compiler -- FIXME use loadResolver/loadSnapshot? Or just take it all from the already present LoadedSnapshot?
   getPackagesFromModuleInfo mi scriptFP
 getPackagesFromImports (Just aresolver) _ = throwM $ InvalidResolverForNoLocalConfig $ show aresolver
 

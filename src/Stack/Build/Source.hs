@@ -61,7 +61,6 @@ import              Path.IO
 import              Prelude hiding (sequence)
 import              Stack.Build.Cache
 import              Stack.Build.Target
-import              Stack.BuildPlan (shadowLoadedSnapshot)
 import              Stack.Config (getLocalPackages)
 import              Stack.Constants (wiredInPackages)
 import              Stack.Package
@@ -117,6 +116,9 @@ loadSourceMapFull needTargets boptsCli = do
     bconfig <- view buildConfigL
     rawLocals <- getLocalPackageViews
     (ls0, cliExtraDeps, targets) <- parseTargetsFromBuildOptsWith rawLocals needTargets boptsCli
+
+    error "loadSourceMapFull"
+    {- FIXME
 
     -- Extend extra-deps to encompass targets requested on the command line
     -- that are not in the snapshot.
@@ -205,19 +207,22 @@ loadSourceMapFull needTargets boptsCli = do
 
     return (targets, ls, locals, nonLocalTargets, extraDeps0, sourceMap)
 
+-}
+
 -- | All flags for a local package.
 getLocalFlags
     :: BuildConfig
     -> BuildOptsCLI
     -> PackageName
     -> Map FlagName Bool
-getLocalFlags bconfig boptsCli name = Map.unions
+getLocalFlags bconfig boptsCli name = error "getLocalFlags" {- Map.unions
     [ Map.findWithDefault Map.empty (Just name) cliFlags
     , Map.findWithDefault Map.empty Nothing cliFlags
     , Map.findWithDefault Map.empty name (unPackageFlags (bcFlags bconfig))
     ]
   where
     cliFlags = boptsCLIFlags boptsCli
+    -}
 
 -- | Get the configured options to pass from GHC, based on the build
 -- configuration and commandline.
@@ -271,6 +276,8 @@ parseTargetsFromBuildOptsWith
     -> BuildOptsCLI
     -> m (LoadedSnapshot, HashSet PackageIdentifierRevision, M.Map PackageName SimpleTarget)
 parseTargetsFromBuildOptsWith rawLocals needTargets boptscli = do
+    error "parseTargetsFromBuildOptsWith"
+    {-
     $logDebug "Parsing the targets"
     bconfig <- view buildConfigL
     ls0 <- error "parseTargetsFromBuildOptsWith" {- FIXME
@@ -306,6 +313,7 @@ parseTargetsFromBuildOptsWith rawLocals needTargets boptscli = do
             workingDir
             (boptsCLITargets boptscli)
     return (ls0, cliExtraDeps <> flagExtraDeps, targets)
+    -}
 
 -- | For every package in the snapshot which is referenced by a flag, give the
 -- user a warning and then add it to extra-deps.
@@ -339,6 +347,8 @@ convertSnapshotToExtra snapshot extra0 locals = go HashSet.empty
 getLocalPackageViews :: (StackM env m, HasEnvConfig env)
                      => m (Map PackageName (LocalPackageView, GenericPackageDescription))
 getLocalPackageViews = do
+    error "getLocalPackageViews"
+    {-
     $logDebug "Parsing the cabal files of the local packages"
     packages <- getLocalPackages
     locals <- forM (Map.toList packages) $ \(dir, treatLikeExtraDep) -> do
@@ -367,6 +377,7 @@ getLocalPackageViews = do
         ]
       where
         go wrapper f = map (wrapper . T.pack . fst) $ f gpkg
+    -}
 
 -- | Check if there are any duplicate package names and, if so, throw an
 -- exception.
@@ -511,7 +522,7 @@ checkFlagsUsed boptsCli lps extraDeps snapshot = do
         -- Check if flags specified in stack.yaml and the command line are
         -- used, see https://github.com/commercialhaskell/stack/issues/617
     let flags = map (, FSCommandLine) [(k, v) | (Just k, v) <- Map.toList $ boptsCLIFlags boptsCli]
-             ++ map (, FSStackYaml) (Map.toList $ unPackageFlags $ bcFlags bconfig)
+             ++ map (, FSStackYaml) (Map.toList $ bcFlags bconfig)
 
         localNameMap = Map.fromList $ map (packageName . lpPackage &&& lpPackage) lps
         checkFlagUsed ((name, userFlags), source) =

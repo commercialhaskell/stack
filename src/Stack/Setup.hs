@@ -88,7 +88,6 @@ import qualified    Paths_stack as Meta
 import              Prelude hiding (concat, elem, any) -- Fix AMP warning
 import              Safe (headMay, readMay)
 import              Stack.Build (build)
-import              Stack.BuildPlan (loadSnapshot)
 import              Stack.Config (loadConfig)
 import              Stack.Constants (distRelativeDir, stackProgName)
 import              Stack.Exec (defaultEnvSettings)
@@ -96,6 +95,7 @@ import              Stack.Fetch
 import              Stack.GhcPkg (createDatabase, getCabalPkgVer, getGlobalDB, mkGhcPackagePath)
 import              Stack.PrettyPrint
 import              Stack.Setup.Installed
+import              Stack.Snapshot (loadSnapshot)
 import              Stack.Types.Build
 import              Stack.Types.Compiler
 import              Stack.Types.CompilerBuild

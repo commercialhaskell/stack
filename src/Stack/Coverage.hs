@@ -30,6 +30,7 @@ import qualified Data.Map.Strict as Map
 import           Data.Maybe
 import           Data.Maybe.Extra (mapMaybeM)
 import           Data.Monoid ((<>))
+import qualified Data.Set as Set
 import           Data.String
 import           Data.Text (Text)
 import qualified Data.Text as T
@@ -174,7 +175,7 @@ generateHpcReportInternal tixSrc reportDir report extraMarkupArgs extraReportArg
             -- Directories for .mix files.
             hpcRelDir <- hpcRelativeDir
             -- Compute arguments used for both "hpc markup" and "hpc report".
-            pkgDirs <- liftM Map.keys getLocalPackages
+            pkgDirs <- liftM (Set.toList . lpAllLocal) getLocalPackages -- FIXME intentional to take dependencies too?
             let args =
                     -- Use index files from all packages (allows cross-package coverage results).
                     concatMap (\x -> ["--srcdir", toFilePathNoTrailingSep x]) pkgDirs ++

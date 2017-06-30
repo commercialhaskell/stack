@@ -139,8 +139,10 @@ createDependencyGraph dotOpts = do
             -- https://github.com/commercialhaskell/stack/issues/2967
             | name `elem` [$(mkPackageName "rts"), $(mkPackageName "ghc")] =
                 return (Set.empty, DotPayload (Just version) (Just BSD3))
-            | otherwise = fmap (packageAllDeps &&& makePayload)
-                               (loader name version flags ghcOptions)
+            | otherwise =
+                let pir = PackageIdentifierRevision (PackageIdentifier name version) Nothing -- FIXME get the CabalFileInfo
+                 in       fmap (packageAllDeps &&& makePayload)
+                               (loader pir flags ghcOptions)
     liftIO $ resolveDependencies (dotDependencyDepth dotOpts) graph depLoader)
   where makePayload pkg = DotPayload (Just $ packageVersion pkg) (Just $ packageLicense pkg)
 

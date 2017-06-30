@@ -36,6 +36,8 @@ module Stack.Types.Config
   ,getMinimalEnvOverride
   -- ** BuildConfig & HasBuildConfig
   ,BuildConfig(..)
+  ,LocalPackages(..)
+  ,lpAllLocal
   ,stackYamlL
   ,projectRootL
   ,HasBuildConfig(..)
@@ -106,8 +108,6 @@ module Stack.Types.Config
   -- ** GhcOptions
   ,GhcOptions(..)
   ,ghcOptionsFor
-  -- ** PackageFlags
-  ,PackageFlags(..)
   -- * Paths
   ,bindirSuffix
   ,configInstalledCache
@@ -177,7 +177,7 @@ import           Control.Monad (liftM, join)
 import           Control.Monad.Catch (MonadThrow, MonadMask)
 import           Control.Monad.Logger (LogLevel(..), MonadLoggerIO)
 import           Control.Monad.Reader (MonadReader, MonadIO, liftIO)
-import           Control.Monad.Trans.Unlift (MonadBaseUnlift)
+import           Control.Monad.Trans.Control (MonadBaseControl)
 import           Data.Aeson.Extended
                  (ToJSON, toJSON, FromJSON, parseJSON, withText, object,
                   (.=), (..:), (..:?), (..!=), Value(Bool, String),
@@ -188,7 +188,6 @@ import           Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as S8
 import           Data.Either (partitionEithers)
 import           Data.HashMap.Strict (HashMap)
-import           Data.HashSet (HashSet)
 import           Data.IORef (IORef)
 import           Data.List (stripPrefix)
 import           Data.List.NonEmpty (NonEmpty)
@@ -510,9 +509,9 @@ data BuildConfig = BuildConfig
       -- ^ Build plan wanted for this build
     , bcGHCVariant :: !GHCVariant
       -- ^ The variant of GHC used to select a GHC bindist.
-    , bcPackageEntries :: ![PackageEntry]
+    , bcPackages :: ![PackageLocation]
       -- ^ Local packages
-    , bcExtraDeps  :: !(HashSet PackageIdentifierRevision)
+    , bcDependencies :: ![PackageLocation]
       -- ^ Extra dependencies specified in configuration.
       --
       -- These dependencies will not be installed to a shared location, and
@@ -527,7 +526,7 @@ data BuildConfig = BuildConfig
       --
       -- FIXME MSS 2016-12-08: is the above comment still true? projectRootL
       -- is defined in terms of bcStackYaml
-    , bcFlags      :: !PackageFlags
+    , bcFlags      :: !(Map PackageName (Map FlagName Bool))
       -- ^ Per-package flag overrides
     , bcImplicitGlobal :: !Bool
       -- ^ Are we loading from the implicit global stack.yaml? This is useful
@@ -556,11 +555,20 @@ data EnvConfig = EnvConfig
     -- 'wantedCompilerL', which provides the version specified by the
     -- build plan.
     ,envConfigCompilerBuild :: !CompilerBuild
-    ,envConfigPackagesRef :: !(IORef (Maybe (Map (Path Abs Dir) TreatLikeExtraDep)))
+    ,envConfigPackagesRef :: !(IORef (Maybe LocalPackages))
     -- ^ Cache for 'getLocalPackages'.
     ,envConfigLoadedSnapshot :: !LoadedSnapshot
     -- ^ The fully resolved snapshot information.
     }
+
+data LocalPackages = LocalPackages
+  { lpProject :: !(Set (Path Abs Dir))
+  , lpDependencies :: !(Set (Path Abs Dir))
+  }
+
+-- | Get both project and dependency filepaths. FIXME do we really need this?
+lpAllLocal :: LocalPackages -> Set (Path Abs Dir)
+lpAllLocal (LocalPackages x y) = x <> y
 
 -- | Value returned by 'Stack.Config.loadConfig'.
 data LoadConfig m = LoadConfig
@@ -657,7 +665,7 @@ instance ToJSON Project where
 -- | Constraint synonym for constraints satisfied by a 'MiniConfig'
 -- environment.
 type StackMiniM r m =
-    ( MonadReader r m, MonadIO m, MonadBaseUnlift IO m, MonadLoggerIO m, MonadMask m
+    ( MonadReader r m, MonadIO m, MonadBaseControl IO m, MonadLoggerIO m, MonadMask m
     )
 
 -- An uninterpreted representation of configuration options.
@@ -1374,7 +1382,7 @@ parseProjectAndConfigMonoid rootDir =
     withObjectWarnings "ProjectAndConfigMonoid" $ \o -> do
         dirs <- jsonSubWarningsTT (o ..:? "packages") ..!= [packageEntryCurrDir]
         extraDeps <- jsonSubWarningsTT (o ..:? "extra-deps") ..!= []
-        PackageFlags flags <- o ..:? "flags" ..!= mempty
+        flags <- o ..:? "flags" ..!= mempty
 
         -- Convert the packages/extra-deps/flags approach we use in
         -- the stack.yaml into the internal representation.
@@ -1716,21 +1724,6 @@ ghcOptionsFor :: PackageName -> GhcOptions -> [Text]
 ghcOptionsFor name (GhcOptions mp) =
     M.findWithDefault [] Nothing mp ++
     M.findWithDefault [] (Just name) mp
-
-newtype PackageFlags = PackageFlags
-    { unPackageFlags :: Map PackageName (Map FlagName Bool) }
-    deriving Show
-
-instance FromJSON PackageFlags where
-    parseJSON val = PackageFlags <$> parseJSON val
-
-instance ToJSON PackageFlags where
-    toJSON = toJSON . unPackageFlags
-
-instance Monoid PackageFlags where
-    mempty = PackageFlags mempty
-    mappend (PackageFlags l) (PackageFlags r) =
-        PackageFlags (Map.unionWith Map.union l r)
 
 -----------------------------------
 -- Lens classes
