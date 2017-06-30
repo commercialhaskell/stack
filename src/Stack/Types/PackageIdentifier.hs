@@ -23,7 +23,8 @@ module Stack.Types.PackageIdentifier
   , packageIdentifierString
   , packageIdentifierRevisionString
   , packageIdentifierText
-  , toCabalPackageIdentifier )
+  , toCabalPackageIdentifier
+  , fromCabalPackageIdentifier )
   where
 
 import           Control.Applicative
@@ -221,3 +222,9 @@ toCabalPackageIdentifier x =
     C.PackageIdentifier
         (toCabalPackageName (packageIdentifierName x))
         (toCabalVersion (packageIdentifierVersion x))
+
+fromCabalPackageIdentifier :: C.PackageIdentifier -> PackageIdentifier
+fromCabalPackageIdentifier (C.PackageIdentifier name version) =
+    PackageIdentifier
+        (fromCabalPackageName name)
+        (fromCabalVersion version)

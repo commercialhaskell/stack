@@ -177,7 +177,7 @@ import           Control.Monad (liftM, join)
 import           Control.Monad.Catch (MonadThrow, MonadMask)
 import           Control.Monad.Logger (LogLevel(..), MonadLoggerIO)
 import           Control.Monad.Reader (MonadReader, MonadIO, liftIO)
-import           Control.Monad.Trans.Control
+import           Control.Monad.Trans.Unlift (MonadBaseUnlift)
 import           Data.Aeson.Extended
                  (ToJSON, toJSON, FromJSON, parseJSON, withText, object,
                   (.=), (..:), (..:?), (..!=), Value(Bool, String),
@@ -657,7 +657,7 @@ instance ToJSON Project where
 -- | Constraint synonym for constraints satisfied by a 'MiniConfig'
 -- environment.
 type StackMiniM r m =
-    ( MonadReader r m, MonadIO m, MonadBaseControl IO m, MonadLoggerIO m, MonadMask m
+    ( MonadReader r m, MonadIO m, MonadBaseUnlift IO m, MonadLoggerIO m, MonadMask m
     )
 
 -- An uninterpreted representation of configuration options.

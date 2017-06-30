@@ -490,7 +490,7 @@ takeWhileC f =
 -- | Get the module information from the global package database
 --
 -- Maps from module name to packages they appear in, ignoring any hidden packages.
-getGlobalModuleInfo
+getGlobalModuleInfo -- FIXME we can probably delete this and just use info in the snapshot
   :: (MonadIO m, MonadCatch m, MonadLogger m, MonadBaseControl IO m)
   => EnvOverride -> WhichCompiler
   -> m ModuleInfo

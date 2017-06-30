@@ -9,6 +9,7 @@
 {-# LANGUAGE ScopedTypeVariables   #-}
 {-# LANGUAGE TemplateHaskell       #-}
 {-# LANGUAGE TupleSections         #-}
+{-# LANGUAGE TypeFamilies          #-}
 {-# LANGUAGE PackageImports        #-}
 {-# LANGUAGE ViewPatterns          #-}
 
@@ -39,7 +40,6 @@ import              Control.Monad (join, liftM, unless, void, when)
 import              Control.Monad.Catch
 import              Control.Monad.IO.Class
 import              Control.Monad.Logger
-import              Control.Monad.Reader (ask, runReaderT)
 import              Control.Monad.Trans.Control
 import              Control.Monad.Trans.Unlift (MonadBaseUnlift, askRunBase)
 import              Crypto.Hash (SHA256 (..))
@@ -339,8 +339,6 @@ withCabalLoader
     => ((PackageIdentifierRevision -> IO ByteString) -> m a)
     -> m a
 withCabalLoader inner = do
-    env <- ask
-
     -- Want to try updating the index once during a single run for missing
     -- package identifiers. We also want to ensure we only update once at a
     -- time
@@ -349,7 +347,7 @@ withCabalLoader inner = do
     updateRef <- liftIO $ newMVar True
 
     loadCaches <- getPackageCachesIO
-    runInBase <- liftBaseWith $ \run -> return (void . run)
+    runInBase <- askRunBase
     unlift <- askRunBase
 
     -- TODO in the future, keep all of the necessary @Handle@s open
@@ -357,7 +355,7 @@ withCabalLoader inner = do
                  -> IO ByteString
         doLookup ident = do
             (caches, cachesRev) <- loadCaches
-            eres <- unlift $ lookupPackageIdentifierExact ident env caches cachesRev
+            eres <- unlift $ lookupPackageIdentifierExact ident caches cachesRev
             case eres of
                 Just bs -> return bs
                 -- Update the cache and try again
@@ -393,11 +391,10 @@ withCabalLoader inner = do
 lookupPackageIdentifierExact
   :: (StackMiniM env m, HasConfig env)
   => PackageIdentifierRevision
-  -> env
   -> PackageCaches
   -> HashMap CabalHash (PackageIndex, OffsetSize)
   -> m (Maybe ByteString)
-lookupPackageIdentifierExact (PackageIdentifierRevision ident mcfi) env caches cachesRev = do
+lookupPackageIdentifierExact (PackageIdentifierRevision ident mcfi) caches cachesRev = do
     let mpair =
           case mcfi of
             Nothing -> Map.lookup ident caches
@@ -407,8 +404,7 @@ lookupPackageIdentifierExact (PackageIdentifierRevision ident mcfi) env caches c
     case mpair of
         Nothing -> return Nothing
         Just (index, cache) -> do
-            [bs] <- flip runReaderT env
-                  $ withCabalFiles (indexName index)
+            [bs] <- withCabalFiles (indexName index)
                         [(ResolvedPackage
                             { rpIdent = ident
                             , rpCache = cache
@@ -517,7 +513,7 @@ fetchPackages' mdistDir toFetchAll = do
     connCount <- view $ configL.to configConnectionCount
     outputVar <- liftIO $ newTVarIO Map.empty
 
-    runInBase <- liftBaseWith $ \run -> return (void . run)
+    runInBase <- askRunBase
     parMapM_
         connCount
         (go outputVar runInBase)

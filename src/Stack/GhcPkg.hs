@@ -1,4 +1,4 @@
--- FIXME See how much of this module can be deleted.
+-- FIXME See how much of this module can be deleted, even more functionality is now in PackageDump.
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE OverloadedStrings #-}

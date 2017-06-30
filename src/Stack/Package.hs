@@ -37,7 +37,8 @@ module Stack.Package
   ,autogenDir
   ,checkCabalFileName
   ,printCabalFileWarning
-  ,cabalFilePackageId)
+  ,cabalFilePackageId
+  ,rawParseGPD)
   where
 
 import           Prelude ()
@@ -118,10 +119,19 @@ readPackageUnresolvedBS :: (MonadThrow m)
                         -> BS.ByteString
                         -> m ([PWarning],GenericPackageDescription)
 readPackageUnresolvedBS mcabalfp bs =
-    case parsePackageDescription chars of
-       ParseFailed per ->
+    case rawParseGPD bs of
+       Left per ->
          throwM (PackageInvalidCabalFile mcabalfp per)
-       ParseOk warnings gpkg -> return (warnings,gpkg)
+       Right x -> return x
+
+-- | A helper function that performs the basic character encoding
+-- necessary.
+rawParseGPD :: BS.ByteString
+            -> Either PError ([PWarning], GenericPackageDescription)
+rawParseGPD bs =
+    case parsePackageDescription chars of
+       ParseFailed per -> Left per
+       ParseOk warnings gpkg -> Right (warnings,gpkg)
   where
     chars = T.unpack (dropBOM (decodeUtf8With lenientDecode bs))
 

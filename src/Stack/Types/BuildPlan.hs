@@ -20,6 +20,7 @@ module Stack.Types.BuildPlan
     , loadedSnapshotVC
     , LoadedPackageInfo (..)
     , ModuleName (..)
+    , fromCabalModuleName
     , ModuleInfo (..)
     , moduleInfoVC
     ) where
@@ -42,6 +43,8 @@ import           Data.Store.VersionTagged
 import           Data.String (IsString)
 import           Data.Text (Text)
 import qualified Data.Text as T
+import           Data.Text.Encoding (encodeUtf8)
+import qualified Distribution.ModuleName as C
 import qualified Distribution.Version as C
 import           GHC.Generics (Generic)
 import           Network.HTTP.Client (parseRequest)
@@ -194,7 +197,7 @@ instance Store LoadedSnapshot
 instance NFData LoadedSnapshot
 
 loadedSnapshotVC :: VersionConfig LoadedSnapshot
-loadedSnapshotVC = storeVersionConfig "ls-v1" "Urk66HyO_yvx8blMEfuFErGGpj0="
+loadedSnapshotVC = storeVersionConfig "ls-v1" "_PgwTtH6gYwg-A72iUR6KwpJYho="
 
 -- | Information on a single package for the 'LoadedSnapshot' which
 -- can be installed.
@@ -221,14 +224,14 @@ data LoadedPackageInfo loc = LoadedPackageInfo
     -- ^ Flags to build this package with.
     , lpiGhcOptions :: ![Text]
     -- ^ GHC options to use when building this package.
-    , lpiPackageDeps :: !(Set PackageName)
+    , lpiPackageDeps :: !(Map PackageName VersionIntervals)
     -- ^ All packages which must be built/copied/registered before
     -- this package.
     , lpiProvidedExes :: !(Set ExeName)
     -- ^ The names of executables provided by this package, for
     -- performing build tool lookups.
-    , lpiNeededExes :: !(Map ExeName DepInfo)
-    -- ^ Executables needed by this package's various components.
+    , lpiNeededExes :: !(Map ExeName VersionIntervals)
+    -- ^ Executables needed by this package.
     , lpiExposedModules :: !(Set ModuleName)
     -- ^ Modules exposed by this package's library
     , lpiHide :: !Bool
@@ -263,6 +266,9 @@ instance NFData Component
 
 newtype ModuleName = ModuleName { unModuleName :: ByteString }
   deriving (Show, Eq, Ord, Generic, Store, NFData, Typeable, Data)
+
+fromCabalModuleName :: C.ModuleName -> ModuleName
+fromCabalModuleName = ModuleName . encodeUtf8 . T.intercalate "." . map T.pack . C.components
 
 newtype ModuleInfo = ModuleInfo
     { miModules      :: Map ModuleName (Set PackageName)

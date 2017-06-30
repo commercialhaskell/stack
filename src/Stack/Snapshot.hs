@@ -19,51 +19,40 @@ module Stack.Snapshot
   ) where
 
 import           Control.Applicative
-import           Control.Exception (assert)
-import           Control.Monad (liftM, forM, unless, void)
+import           Control.Monad (forM, unless, void)
 import           Control.Monad.Catch
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import           Control.Monad.Reader (MonadReader)
-import           Control.Monad.State.Strict      (State, execState, get, modify,
-                                                  put, StateT, execStateT)
+import           Control.Monad.State.Strict      (get, put, StateT, execStateT)
 import           Crypto.Hash (hash, SHA256(..), Digest)
 import           Crypto.Hash.Conduit (hashFile)
-import           Data.Aeson (ToJSON (..), FromJSON (..), withObject, withText, (.!=), (.:), (.:?), Value (Object), object, (.=))
+import           Data.Aeson (withObject, (.!=), (.:), (.:?), Value (Object))
 import           Data.Aeson.Extended (WithJSONWarnings(..), logJSONWarnings, (..!=), (..:?), jsonSubWarningsT, withObjectWarnings, (..:))
 import           Data.Aeson.Types (Parser, parseEither)
 import           Data.Store.VersionTagged
 import qualified Data.ByteArray as Mem (convert)
-import qualified Data.ByteString as S
+import           Data.ByteString (ByteString)
 import qualified Data.ByteString.Base64.URL as B64URL
 import qualified Data.ByteString.Char8 as S8
-import           Data.Either (partitionEithers)
-import qualified Data.Foldable as F
+import           Data.Conduit ((.|))
+import qualified Data.Conduit.List as CL
 import qualified Data.HashMap.Strict as HashMap
-import qualified Data.HashSet as HashSet
-import           Data.List (intercalate)
-import           Data.List.NonEmpty (NonEmpty(..))
-import qualified Data.List.NonEmpty as NonEmpty
 import           Data.Map (Map)
 import qualified Data.Map as Map
-import           Data.Maybe (fromMaybe, mapMaybe, isNothing)
+import           Data.Maybe (fromMaybe)
 import           Data.Monoid
 import           Data.Set (Set)
 import qualified Data.Set as Set
 import           Data.Text (Text)
 import qualified Data.Text as T
 import           Data.Text.Encoding (encodeUtf8)
-import qualified Data.Traversable as Tr
 import           Data.Typeable (Typeable)
-import           Data.Yaml (decodeEither', decodeFileEither, ParseException (AesonException))
-import qualified Distribution.Package as C
-import           Distribution.PackageDescription (GenericPackageDescription,
-                                                  flagDefault, flagManual,
-                                                  flagName, genPackageFlags,
-                                                  executables, exeName, library, libBuildInfo, buildable)
+import           Data.Yaml (decodeFileEither, ParseException (AesonException))
+import           Distribution.InstalledPackageInfo (PError)
+import           Distribution.PackageDescription (GenericPackageDescription)
 import qualified Distribution.PackageDescription as C
 import           Distribution.System (Platform)
-import           Distribution.Text (display)
 import qualified Distribution.Version as C
 import           Network.HTTP.Client (Request)
 import           Network.HTTP.Download
@@ -72,22 +61,27 @@ import           Path.IO
 import           Prelude -- Fix AMP warning
 import           Stack.Constants
 import           Stack.Fetch
-import           Stack.GhcPkg (getGlobalPackages)
 import           Stack.Package
-import           Stack.PackageIndex
+import           Stack.PackageDump
 import           Stack.Types.BuildPlan
 import           Stack.Types.FlagName
 import           Stack.Types.GhcPkgId
 import           Stack.Types.PackageIdentifier
-import           Stack.Types.PackageIndex
 import           Stack.Types.PackageName
 import           Stack.Types.Version
+import           Stack.Types.VersionIntervals
 import           Stack.Types.Config
 import           Stack.Types.Urls
 import           Stack.Types.Compiler
 import           Stack.Types.Resolver
 import           Stack.Types.StackT
 import           System.FilePath (takeDirectory)
+
+data SnapshotException
+  = InvalidCabalFileInSnapshot !PackageLocation !PError !ByteString
+  | PackageDefinedTwice !PackageName !PackageLocation !PackageLocation
+  deriving (Show, Typeable) -- FIXME custom Show instance
+instance Exception SnapshotException
 
 -- | Convert a 'Resolver' into a 'SnapshotDef'
 loadResolver
@@ -127,12 +121,12 @@ loadResolver (ResolverSnapshot name) = do
     file = renderSnapName name <> ".yaml"
 
     buildBuildPlanUrl :: (MonadReader env m, HasConfig env) => SnapName -> Text -> m Text
-    buildBuildPlanUrl name file = do
+    buildBuildPlanUrl snapName file' = do
         urls <- view $ configL.to configUrls
         return $
-            case name of
-                LTS _ _ -> urlsLtsBuildPlans urls <> "/" <> file
-                Nightly _ -> urlsNightlyBuildPlans urls <> "/" <> file
+            case snapName of
+                LTS _ _ -> urlsLtsBuildPlans urls <> "/" <> file'
+                Nightly _ -> urlsNightlyBuildPlans urls <> "/" <> file'
 
     parseStackageSnapshot = withObject "StackageSnapshotDef" $ \o -> do
         Object si <- o .: "system-info"
@@ -159,7 +153,7 @@ loadResolver (ResolverSnapshot name) = do
 
         return SnapshotDef {..}
       where
-        goPkg name = withObject "StackagePackageDef" $ \o -> do
+        goPkg name' = withObject "StackagePackageDef" $ \o -> do
             version <- o .: "version"
             mcabalFileInfo <- o .:? "cabal-file-info"
             mcabalFileInfo' <- forM mcabalFileInfo $ \o' -> do
@@ -174,12 +168,12 @@ loadResolver (ResolverSnapshot name) = do
             Object constraints <- o .: "constraints"
 
             flags <- constraints .: "flags"
-            let flags' = Map.singleton name flags
+            let flags' = Map.singleton name' flags
 
             hide <- constraints .:? "hide" .!= False
-            let hide' = if hide then Set.singleton name else Set.empty
+            let hide' = if hide then Set.singleton name' else Set.empty
 
-            let location = PLIndex $ PackageIdentifierRevision (PackageIdentifier name version) mcabalFileInfo'
+            let location = PLIndex $ PackageIdentifierRevision (PackageIdentifier name' version) mcabalFileInfo'
 
             return (Endo (location:), flags', hide')
 loadResolver (ResolverCompiler compiler) = return SnapshotDef
@@ -194,16 +188,16 @@ loadResolver (ResolverCompiler compiler) = return SnapshotDef
 loadResolver (ResolverCustom name (loc, url)) = do
   $logDebug $ "Loading " <> url <> " build plan"
   case loc of
-    Left req -> download req >>= load
+    Left req -> download' req >>= load
     Right fp -> load fp
   where
-    download :: Request -> m FilePath
-    download req = do
+    download' :: Request -> m FilePath
+    download' req = do
       let urlHash = S8.unpack $ trimmedSnapshotHash $ doHash $ encodeUtf8 url
       hashFP <- parseRelFile $ urlHash ++ ".yaml"
       customPlanDir <- getCustomPlanDir
       let cacheFP = customPlanDir </> $(mkRelDir "yaml") </> hashFP
-      void (Network.HTTP.Download.download req cacheFP :: m Bool)
+      void (download req cacheFP :: m Bool)
       return $ toFilePath cacheFP
 
     getCustomPlanDir = do
@@ -232,21 +226,21 @@ loadResolver (ResolverCustom name (loc, url)) = do
       -- with parent hashes if necessary below.
       rawHash :: SnapshotHash <- fromDigest <$> hashFile fp :: m SnapshotHash
 
-      (parent, hash) <-
+      (parent', hash') <-
         case parentResolver' of
           ResolverCompiler cv -> return (Left cv, rawHash) -- just a small optimization
           _ -> do
-            parent :: SnapshotDef <- loadResolver (parentResolver' :: Resolver) :: m SnapshotDef
-            let hash :: SnapshotHash
-                hash = combineHash rawHash $
-                  case sdResolver parent of
+            parent' :: SnapshotDef <- loadResolver (parentResolver' :: Resolver) :: m SnapshotDef
+            let hash' :: SnapshotHash
+                hash' = combineHash rawHash $
+                  case sdResolver parent' of
                     ResolverSnapshot snapName -> snapNameToHash snapName
                     ResolverCustom _ parentHash -> parentHash
                     ResolverCompiler _ -> error "loadResolver: Receieved ResolverCompiler in impossible location"
-            return (Right parent, hash)
+            return (Right parent', hash')
       return sd0
-        { sdParent = parent
-        , sdResolver = ResolverCustom name hash
+        { sdParent = parent'
+        , sdResolver = ResolverCustom name hash'
         }
 
     -- | Note that the 'sdParent' and 'sdResolver' fields returned
@@ -281,17 +275,28 @@ loadSnapshot
      (StackMiniM env m, HasConfig env, HasGHCVariant env)
   => SnapshotDef
   -> m LoadedSnapshot
-loadSnapshot (snapshotDefFixes -> sd) = do
-    path <- configLoadedSnapshotCache $ sdResolver sd
+loadSnapshot sd = withCabalLoader $ \loader -> loadSnapshot' loader sd
+
+-- | Fully load up a 'SnapshotDef' into a 'LoadedSnapshot'
+loadSnapshot'
+  :: forall env m.
+     (StackMiniM env m, HasConfig env, HasGHCVariant env)
+  => (PackageIdentifierRevision -> IO ByteString)
+  -> SnapshotDef
+  -> m LoadedSnapshot
+loadSnapshot' loadFromIndex (snapshotDefFixes -> sd) = do
+    path <- configLoadedSnapshotCache $ sdResolver sd -- FIXME confirm the path is by platform
     $(versionedDecodeOrLoad loadedSnapshotVC) path inner
   where
     inner :: m LoadedSnapshot
     inner = do
       LoadedSnapshot compilerVersion _ globals0 parentPackages0 <-
-        either loadCompiler loadSnapshot $ sdParent sd
+        either loadCompiler (loadSnapshot' loadFromIndex) $ sdParent sd
+
+      platform <- view platformL
 
       (packages1, flags, hide, ghcOptions) <- execStateT
-        (mapM_ findPackage (sdLocations sd))
+        (mapM_ (findPackage loadFromIndex platform compilerVersion) (sdLocations sd))
         (Map.empty, sdFlags sd, sdHide sd, sdGhcOptions sd)
 
       let toDrop = Map.union (const () <$> packages1) (Map.fromSet (const ()) (sdDropPackages sd))
@@ -317,7 +322,9 @@ loadSnapshot (snapshotDefFixes -> sd) = do
 
           allToUpgrade = Map.union noLongerGlobals3 noLongerParent
 
-      upgraded <- fmap Map.fromList $ mapM (recalculate flags hide ghcOptions) $ Map.toList allToUpgrade
+      upgraded <- fmap Map.fromList
+                $ mapM (recalculate compilerVersion flags hide ghcOptions)
+                $ Map.toList allToUpgrade
 
       let packages2 = Map.unions [upgraded, packages1, parentPackages2]
           allAvailable = Map.union
@@ -335,21 +342,22 @@ loadSnapshot (snapshotDefFixes -> sd) = do
 
     -- | Recalculate a 'LoadedPackageInfo' based on updates to flags,
     -- hide values, and GHC options.
-    recalculate :: Map PackageName (Map FlagName Bool)
+    recalculate :: CompilerVersion
+                -> Map PackageName (Map FlagName Bool)
                 -> Set PackageName -- ^ hide?
                 -> Map PackageName [Text] -- ^ GHC options
                 -> (PackageName, LoadedPackageInfo PackageLocation)
                 -> m (PackageName, LoadedPackageInfo PackageLocation)
-    recalculate allFlags allHide allOptions (name, lpi0) = do
-      let flags = fromMaybe (lpiFlags lpi0) (Map.lookup name allFlags)
-          hide = lpiHide lpi0 || Set.member name allHide -- FIXME allow child snapshot to unhide?
+    recalculate compilerVersion allFlags allHide allOptions (name, lpi0) = do
+      let hide = lpiHide lpi0 || Set.member name allHide -- FIXME allow child snapshot to unhide?
           options = fromMaybe (lpiGhcOptions lpi0) (Map.lookup name allOptions)
       case Map.lookup name allFlags of
         Nothing -> return (name, lpi0 { lpiHide = hide, lpiGhcOptions = options }) -- optimization
         Just flags -> do
-          [(gpd, loc)] <- loadGenericPackageDescriptions $ lpiLocation lpi0
+          [(gpd, loc)] <- loadGenericPackageDescriptions loadFromIndex $ lpiLocation lpi0
           unless (loc == lpiLocation lpi0) $ error "recalculate location mismatch"
-          let res@(name', lpi) = calculate gpd loc flags hide options
+          platform <- view platformL
+          let res@(name', lpi) = calculate gpd platform compilerVersion loc flags hide options
           unless (name == name' && lpiVersion lpi0 == lpiVersion lpi) $ error "recalculate invariant violated"
           return res
 
@@ -358,32 +366,102 @@ loadSnapshot (snapshotDefFixes -> sd) = do
     checkDepsMet :: Map PackageName Version -- ^ all available packages
                  -> (PackageName, LoadedPackageInfo PackageLocation)
                  -> m ()
-    checkDepsMet = _
+    checkDepsMet = error "checkDepsMet"
 
-    globalToSnapshot :: PackageName -> LoadedPackageInfo GhcPkgId -> LoadedPackageInfo PackageLocation
-    globalToSnapshot name lpi = lpi
-      { lpiLocation = PLIndex (PackageIdentifierRevision (PackageIdentifier name (lpiVersion lpi)) Nothing)
-      }
+-- | Load a snapshot from the given compiler version, using just the
+-- information in the global package database.
+loadCompiler :: forall env m.
+                (StackMiniM env m, HasConfig env)
+             => CompilerVersion
+             -> m LoadedSnapshot
+loadCompiler cv = do
+  menv <- getMinimalEnvOverride
+  -- FIXME do we need to ensure that the correct GHC is available, or
+  -- can we trust the setup code to do that for us?
+  m <- ghcPkgDump menv (whichCompiler cv) []
+    (conduitDumpPackage .| CL.foldMap (\dp -> Map.singleton (dpGhcPkgId dp) dp))
+  return LoadedSnapshot
+    { lsCompilerVersion = cv
+    , lsResolver = ResolverCompiler cv
+    , lsGlobals = toGlobals m
+    , lsPackages = Map.empty
+    }
+  where
+    toGlobals :: Map GhcPkgId (DumpPackage () () ())
+              -> Map PackageName (LoadedPackageInfo GhcPkgId)
+    toGlobals m =
+        Map.fromList $ map go $ Map.elems m
+      where
+        identMap = Map.map dpPackageIdent m
 
-    splitUnmetDeps :: Map PackageName (LoadedPackageInfo GhcPkgId)
-                   -> ( Map PackageName (LoadedPackageInfo GhcPkgId)
-                      , Map PackageName (LoadedPackageInfo PackageLocation)
-                      )
-    splitUnmetDeps = _
+        go :: DumpPackage () () () -> (PackageName, LoadedPackageInfo GhcPkgId)
+        go dp =
+            (name, lpi)
+          where
+            PackageIdentifier name version = dpPackageIdent dp
 
-    loadCompiler :: CompilerVersion -> m LoadedSnapshot
-    loadCompiler = _
+            goDep ghcPkgId =
+              case Map.lookup ghcPkgId identMap of
+                Nothing -> Map.empty
+                Just (PackageIdentifier name' _) -> Map.singleton name' (fromVersionRange C.anyVersion)
 
-    findPackage :: PackageLocation
-                -> StateT
-                    ( Map PackageName (LoadedPackageInfo PackageLocation)
-                    , Map PackageName (Map FlagName Bool)
-                    , Set PackageName
-                    , Map PackageName [Text]
-                    )
-                    m
-                    ()
-    findPackage = _
+            lpi :: LoadedPackageInfo GhcPkgId
+            lpi = LoadedPackageInfo
+                { lpiVersion = version
+                , lpiLocation = dpGhcPkgId dp
+                , lpiFlags = Map.empty
+                , lpiGhcOptions = []
+                , lpiPackageDeps = Map.unions $ map goDep $ dpDepends dp
+                , lpiProvidedExes = Set.empty
+                , lpiNeededExes = Map.empty
+                , lpiExposedModules = Set.fromList $ map (ModuleName . encodeUtf8) $ dpExposedModules dp
+                , lpiHide = not $ dpIsExposed dp
+                }
+
+type FindPackageS =
+    ( Map PackageName (LoadedPackageInfo PackageLocation)
+    , Map PackageName (Map FlagName Bool)
+    , Set PackageName
+    , Map PackageName [Text]
+    )
+
+-- | Find the package at the given 'PackageLocation', grab any flags,
+-- hidden state, and GHC options from the 'StateT' (removing them from
+-- the 'StateT'), and add the newly found package to the contained
+-- 'Map'.
+findPackage :: forall m env.
+               StackMiniM env m
+            => (PackageIdentifierRevision -> IO ByteString)
+            -> Platform
+            -> CompilerVersion
+            -> PackageLocation
+            -> StateT FindPackageS m ()
+findPackage loadFromIndex platform compilerVersion loc0 =
+    loadGenericPackageDescriptions loadFromIndex loc0 >>= mapM_ (uncurry go)
+  where
+    go :: GenericPackageDescription -> PackageLocation -> StateT FindPackageS m ()
+    go gpd loc = do
+        (m, allFlags, allHide, allOptions) <- get
+
+        case Map.lookup name m of
+          Nothing -> return ()
+          Just lpi -> throwM $ PackageDefinedTwice name loc (lpiLocation lpi)
+
+        let flags = fromMaybe Map.empty $ Map.lookup name allFlags
+            allFlags' = Map.delete name allFlags
+
+            hide = Set.member name allHide
+            allHide' = Set.delete name allHide
+
+            options = fromMaybe [] $ Map.lookup name allOptions
+            allOptions' = Map.delete name allOptions
+
+            (_name, lpi) = calculate gpd platform compilerVersion loc flags hide options
+            m' = Map.insert name lpi m
+
+        put (m', allFlags', allHide', allOptions')
+      where
+        PackageIdentifier name _version = fromCabalPackageIdentifier $ C.package $ C.packageDescription gpd
 
 -- | Some hard-coded fixes for build plans, hopefully to be irrelevant over
 -- time.
@@ -401,20 +479,103 @@ snapshotDefFixes sd | isStackage (sdResolver sd) = sd
     isStackage _ = False
 snapshotDefFixes sd = sd
 
+-- | Convert a global 'LoadedPackageInfo' to a snapshot one by
+-- creating a 'PackageLocation'.
+globalToSnapshot :: PackageName -> LoadedPackageInfo GhcPkgId -> LoadedPackageInfo PackageLocation
+globalToSnapshot name lpi = lpi
+    { lpiLocation = PLIndex (PackageIdentifierRevision (PackageIdentifier name (lpiVersion lpi)) Nothing)
+    }
+
+-- | Split the globals into those which have their dependencies met,
+-- and those that don't. This deals with promotion of globals to
+-- snapshot when another global has been upgraded already.
+splitUnmetDeps :: Map PackageName (LoadedPackageInfo GhcPkgId)
+               -> ( Map PackageName (LoadedPackageInfo GhcPkgId)
+                   , Map PackageName (LoadedPackageInfo PackageLocation)
+                   )
+splitUnmetDeps =
+    start Map.empty . Map.toList
+  where
+    start newGlobals0 toProcess0
+      | anyAdded = start newGlobals1 toProcess1
+      | otherwise = (newGlobals1, Map.mapWithKey globalToSnapshot $ Map.fromList toProcess1)
+      where
+        (newGlobals1, toProcess1, anyAdded) = loop False newGlobals0 id toProcess0
+
+    loop anyAdded newGlobals front [] = (newGlobals, front [], anyAdded)
+    loop anyAdded newGlobals front (x@(k, v):xs)
+      | depsMet newGlobals v = loop True (Map.insert k v newGlobals) front xs
+      | otherwise = loop anyAdded newGlobals (front . (x:)) xs
+
+    depsMet globals = all (depsMet' globals) . Map.toList . lpiPackageDeps
+
+    depsMet' globals (name, intervals) =
+      case Map.lookup name globals of
+        Nothing -> False
+        Just lpi -> lpiVersion lpi `withinIntervals` intervals
+
 -- | Load the cabal files present in the given
 -- 'PackageLocation'. There may be multiple results if dealing with a
 -- repository with subdirs, in which case the returned
 -- 'PackageLocation' will have just the relevant subdirectory
 -- selected.
-loadGenericPackageDescriptions :: PackageLocation -> m [(C.GenericPackageDescription, PackageLocation)] -- FIXME consider heavy overlap with Stack.Package
-loadGenericPackageDescriptions (PLIndex pir) = _
+loadGenericPackageDescriptions
+  :: forall m.
+     (MonadIO m, MonadThrow m)
+  => (PackageIdentifierRevision -> IO ByteString) -- ^ lookup in index
+  -> PackageLocation
+  -> m [(GenericPackageDescription, PackageLocation)] -- FIXME consider heavy overlap with Stack.Package
+loadGenericPackageDescriptions loadFromIndex loc@(PLIndex pir) = do
+  bs <- liftIO $ loadFromIndex pir
+  gpd <- parseGPD loc bs
+  return [(gpd, loc)]
 
--- | Calculate a 'LoadedPackageInfo' from the given 'C.GenericPackageDescription'
-calculate :: C.GenericPackageDescription
+parseGPD :: MonadThrow m
+         => PackageLocation -- ^ for error reporting
+         -> ByteString -- raw contents
+         -> m GenericPackageDescription
+parseGPD loc bs =
+  case rawParseGPD bs of
+    Left e -> throwM $ InvalidCabalFileInSnapshot loc e bs
+    Right (_warnings, gpd) -> return gpd
+
+-- | Calculate a 'LoadedPackageInfo' from the given 'GenericPackageDescription'
+calculate :: GenericPackageDescription
           -> Platform
+          -> CompilerVersion
           -> PackageLocation
           -> Map FlagName Bool
           -> Bool -- ^ hidden?
           -> [Text] -- ^ GHC options
           -> (PackageName, LoadedPackageInfo PackageLocation)
-calculate gpd = _
+calculate gpd platform compilerVersion loc flags hide options =
+    (name, lpi)
+  where
+    pconfig = PackageConfig
+      { packageConfigEnableTests = False
+      , packageConfigEnableBenchmarks = False
+      , packageConfigFlags = flags -- FIXME check unused flags
+      , packageConfigGhcOptions = options -- FIXME refactor Stack.Package, we probably don't need GHC options passed in
+      , packageConfigCompilerVersion = compilerVersion
+      , packageConfigPlatform = platform
+      }
+    pd = resolvePackageDescription pconfig gpd
+    PackageIdentifier name version = fromCabalPackageIdentifier $ C.package pd
+    lpi = LoadedPackageInfo
+      { lpiVersion = version
+      , lpiLocation = loc
+      , lpiFlags = flags
+      , lpiGhcOptions = options
+      , lpiPackageDeps = Map.map fromVersionRange
+                       $ Map.filterWithKey (const . (/= name))
+                       $ packageDependencies pd
+      , lpiProvidedExes = Set.fromList $ map (ExeName . T.pack . C.exeName) $ C.executables pd
+      , lpiNeededExes = Map.mapKeys ExeName
+                      $ Map.map fromVersionRange
+                      $ packageToolDependencies pd
+      , lpiExposedModules = maybe
+          Set.empty
+          (Set.fromList . map fromCabalModuleName . C.exposedModules)
+          (C.library pd)
+      , lpiHide = hide
+      }
