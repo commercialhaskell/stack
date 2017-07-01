@@ -91,7 +91,7 @@ import qualified System.Posix.User as PosixUser
 -- Otherwise, runs the inner action.
 --
 -- This takes an optional release action which should be taken IFF control is
--- transfering away from the current process to the intra-container one.  The main use
+-- transferring away from the current process to the intra-container one.  The main use
 -- for this is releasing a lock.  After launching reexecution, the host process becomes
 -- nothing but an manager for the call into docker and thus may not hold the lock.
 reexecWithOptionalContainer
