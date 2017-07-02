@@ -85,8 +85,8 @@ import           System.FilePath (takeDirectory)
 import           System.Process.Read (EnvOverride)
 
 data SnapshotException
-  = InvalidCabalFileInSnapshot !PackageLocation !PError !ByteString
-  | PackageDefinedTwice !PackageName !PackageLocation !PackageLocation
+  = InvalidCabalFileInSnapshot !SinglePackageLocation !PError !ByteString
+  | PackageDefinedTwice !PackageName !SinglePackageLocation !SinglePackageLocation
   | UnmetDeps !(Map PackageName (Map PackageName (VersionIntervals, Maybe Version)))
   deriving (Show, Typeable) -- FIXME custom Show instance
 instance Exception SnapshotException
@@ -356,14 +356,14 @@ calculatePackagePromotion
   -> EnvOverride
   -> Path Abs Dir -- ^ project root
   -> LoadedSnapshot
-  -> [(GenericPackageDescription, PackageLocation, localLocation)] -- ^ packages we want to add on top of this snapshot
+  -> [(GenericPackageDescription, SinglePackageLocation, localLocation)] -- ^ packages we want to add on top of this snapshot
   -> Map PackageName (Map FlagName Bool) -- ^ flags
   -> Set PackageName -- ^ packages that should be registered hidden
   -> Map PackageName [Text] -- ^ GHC options
   -> Set PackageName -- ^ packages in the snapshot to drop
   -> m ( Map PackageName (LoadedPackageInfo GhcPkgId) -- new globals
-       , Map PackageName (LoadedPackageInfo PackageLocation) -- new snapshot
-       , Map PackageName (LoadedPackageInfo (PackageLocation, Maybe localLocation)) -- new locals
+       , Map PackageName (LoadedPackageInfo SinglePackageLocation) -- new snapshot
+       , Map PackageName (LoadedPackageInfo (SinglePackageLocation, Maybe localLocation)) -- new locals
        )
 calculatePackagePromotion
   loadFromIndex menv root (LoadedSnapshot compilerVersion _ globals0 parentPackages0)
@@ -390,6 +390,8 @@ calculatePackagePromotion
             (\name _ -> name `Set.member` extraToUpgrade)
             globals1
           (globals3, noLongerGlobals2) = splitUnmetDeps globals2
+
+          noLongerGlobals3 :: Map PackageName (LoadedPackageInfo SinglePackageLocation)
           noLongerGlobals3 = Map.union (Map.mapWithKey globalToSnapshot noLongerGlobals1) noLongerGlobals2
 
           (noLongerParent, parentPackages2) = Map.partitionWithKey
@@ -428,15 +430,15 @@ recalculate :: forall env m.
             -> Map PackageName (Map FlagName Bool)
             -> Set PackageName -- ^ hide?
             -> Map PackageName [Text] -- ^ GHC options
-            -> (PackageName, LoadedPackageInfo PackageLocation)
-            -> m (PackageName, LoadedPackageInfo PackageLocation)
+            -> (PackageName, LoadedPackageInfo SinglePackageLocation)
+            -> m (PackageName, LoadedPackageInfo SinglePackageLocation)
 recalculate loadFromIndex menv root compilerVersion allFlags allHide allOptions (name, lpi0) = do
   let hide = lpiHide lpi0 || Set.member name allHide -- FIXME allow child snapshot to unhide?
       options = fromMaybe (lpiGhcOptions lpi0) (Map.lookup name allOptions)
   case Map.lookup name allFlags of
     Nothing -> return (name, lpi0 { lpiHide = hide, lpiGhcOptions = options }) -- optimization
     Just flags -> do
-      [(gpd, loc)] <- loadGenericPackageDescriptions loadFromIndex menv root $ lpiLocation lpi0
+      [(gpd, loc)] <- loadGenericPackageDescriptions loadFromIndex menv root $ fmap return $ lpiLocation lpi0 -- FIXME could be more type-safe
       unless (loc == lpiLocation lpi0) $ error "recalculate location mismatch"
       platform <- view platformL
       let res@(name', lpi) = calculate gpd platform compilerVersion loc flags hide options
@@ -546,7 +548,7 @@ loadCompiler cv = do
                 }
 
 type FindPackageS localLocation =
-    ( Map PackageName (LoadedPackageInfo (PackageLocation, localLocation))
+    ( Map PackageName (LoadedPackageInfo (SinglePackageLocation, localLocation))
     , Map PackageName (Map FlagName Bool)
     , Set PackageName
     , Map PackageName [Text]
@@ -560,7 +562,7 @@ findPackage :: forall m localLocation.
                MonadThrow m
             => Platform
             -> CompilerVersion
-            -> (GenericPackageDescription, PackageLocation, localLocation)
+            -> (GenericPackageDescription, SinglePackageLocation, localLocation)
             -> StateT (FindPackageS localLocation) m ()
 findPackage platform compilerVersion (gpd, loc, localLoc) = do
     (m, allFlags, allHide, allOptions) <- get
@@ -603,7 +605,7 @@ snapshotDefFixes sd = sd
 
 -- | Convert a global 'LoadedPackageInfo' to a snapshot one by
 -- creating a 'PackageLocation'.
-globalToSnapshot :: PackageName -> LoadedPackageInfo GhcPkgId -> LoadedPackageInfo PackageLocation
+globalToSnapshot :: PackageName -> LoadedPackageInfo GhcPkgId -> LoadedPackageInfo (PackageLocationWith a)
 globalToSnapshot name lpi = lpi
     { lpiLocation = PLIndex (PackageIdentifierRevision (PackageIdentifier name (lpiVersion lpi)) Nothing)
     }
@@ -613,8 +615,8 @@ globalToSnapshot name lpi = lpi
 -- snapshot when another global has been upgraded already.
 splitUnmetDeps :: Map PackageName (LoadedPackageInfo GhcPkgId)
                -> ( Map PackageName (LoadedPackageInfo GhcPkgId)
-                   , Map PackageName (LoadedPackageInfo PackageLocation)
-                   )
+                  , Map PackageName (LoadedPackageInfo (PackageLocationWith a))
+                  )
 splitUnmetDeps =
     start Map.empty . Map.toList
   where
@@ -648,13 +650,13 @@ loadGenericPackageDescriptions
   -> EnvOverride
   -> Path Abs Dir -- ^ project root, used for checking out necessary files
   -> PackageLocation
-  -> m [(GenericPackageDescription, PackageLocation)]
+  -> m [(GenericPackageDescription, SinglePackageLocation)]
 loadGenericPackageDescriptions loadFromIndex menv root loc = do
   loadRawCabalFiles loadFromIndex menv root loc >>= mapM go
   where
     go (bs, loc') = do
       gpd <- parseGPD loc' bs
-      return (gpd, loc)
+      return (gpd, loc')
 
 -- | Load the raw bytes in the cabal files present in the given
 -- 'PackageLocation'. There may be multiple results if dealing with a
@@ -668,13 +670,13 @@ loadRawCabalFiles
   -> EnvOverride
   -> Path Abs Dir -- ^ project root, used for checking out necessary files
   -> PackageLocation
-  -> m [(ByteString, PackageLocation)]
+  -> m [(ByteString, SinglePackageLocation)]
 -- Need special handling of PLIndex for efficiency (just read from the
 -- index tarball) and correctness (get the cabal file from the index,
 -- not the package tarball itself, yay Hackage revisions).
-loadRawCabalFiles loadFromIndex _ _ loc@(PLIndex pir) = do
+loadRawCabalFiles loadFromIndex _ _ (PLIndex pir) = do
   bs <- liftIO $ loadFromIndex pir
-  return [(bs, loc)]
+  return [(bs, PLIndex pir)]
 loadRawCabalFiles _ menv root loc = do
   resolvePackageLocation menv root loc >>= mapM go
   where
@@ -684,7 +686,7 @@ loadRawCabalFiles _ menv root loc = do
       return (bs, loc')
 
 parseGPD :: MonadThrow m
-         => PackageLocation -- ^ for error reporting
+         => SinglePackageLocation -- ^ for error reporting
          -> ByteString -- raw contents
          -> m GenericPackageDescription
 parseGPD loc bs =

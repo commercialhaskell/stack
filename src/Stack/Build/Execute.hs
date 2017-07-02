@@ -897,10 +897,8 @@ withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} md
                             | ident == taskProvides -> return dir
                         _ -> error $ "withPackage: invariant (1) violated: " ++ show m
                   _ -> do
-                    l <- resolvePackageLocation menv root pkgLoc
-                    case l of
-                      [(dir, _loc)] -> return dir
-                      _ -> error $ "withPackage: invariant (2) violated: " ++ show l
+                    [(dir, _loc)] <- resolvePackageLocation menv root $ fmap return pkgLoc -- FIXME better type safety
+                    return dir
 
                 let name = packageIdentifierName taskProvides
                 cabalfpRel <- parseRelFile $ packageNameString name ++ ".cabal"

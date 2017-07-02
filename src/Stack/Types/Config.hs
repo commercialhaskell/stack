@@ -207,6 +207,7 @@ import           Data.Text.Encoding (encodeUtf8)
 import           Data.Typeable
 import           Data.Yaml (ParseException)
 import qualified Data.Yaml as Yaml
+import           Distribution.PackageDescription (GenericPackageDescription)
 import           Distribution.System (Platform)
 import qualified Distribution.Text
 import           Distribution.Version (anyVersion)
@@ -564,12 +565,17 @@ data EnvConfig = EnvConfig
     }
 
 data LocalPackages = LocalPackages
-  { lpProject :: !(Map (Path Abs Dir) PackageLocation)
-  , lpDependencies :: !(Map (Path Abs Dir) PackageLocation)
+  { lpProject :: !(Map (Path Abs Dir) SinglePackageLocation)
+  , lpDependencies :: !(Map (Path Abs Dir) SinglePackageLocation)
+    {- FIXME future improvement
+  , lpDependencies :: !(Map PackageName (PackageLocation, GenericPackageDescription))
+  -- ^ Use just the GenericPackageDescription here to avoid needing to
+  -- unpack PLIndex packages, which are by far the most common case.
+    -}
   }
 
 -- | Get both project and dependency filepaths. FIXME do we really need this?
-lpAllLocal :: LocalPackages -> Map (Path Abs Dir) PackageLocation
+lpAllLocal :: LocalPackages -> Map (Path Abs Dir) SinglePackageLocation
 lpAllLocal (LocalPackages x y) = x <> y
 
 -- | Value returned by 'Stack.Config.loadConfig'.

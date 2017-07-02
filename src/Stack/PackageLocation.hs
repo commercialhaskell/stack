@@ -49,13 +49,16 @@ resolvePackageLocation
     => EnvOverride
     -> Path Abs Dir -- ^ project root
     -> PackageLocation
-    -> m [(Path Abs Dir, PackageLocation)]
-resolvePackageLocation _ projRoot loc@(PLFilePath fp) = do
+    -> m [(Path Abs Dir, SinglePackageLocation)]
+resolvePackageLocation _ projRoot (PLFilePath fp) = do
   path <- resolveDir projRoot fp
-  return [(path, loc)]
-resolvePackageLocation _ projRoot loc@(PLHttp url) = do
+  return [(path, PLFilePath fp)]
+resolvePackageLocation menv projRoot (PLIndex pir) = do
+    $logError "resolvePackageLocation on PLIndex called, this isn't a good idea" -- FIXME maybe we'll be OK with this after all?
+    error "FIXME"
+    {-
     workDir <- view workDirL
-    let nameBeforeHashing = url
+    let nameBeforeHashing = T.pack $ show pir
         -- TODO: dedupe with code for snapshot hash?
         name = T.unpack $ decodeUtf8 $ S.take 12 $ B64URL.encode $ Mem.convert $ hashWith SHA256 $ encodeUtf8 nameBeforeHashing
         root = projRoot </> workDir </> $(mkRelDir "downloaded")
@@ -106,6 +109,60 @@ resolvePackageLocation _ projRoot loc@(PLHttp url) = do
             ignoringAbsence (removeFile file)
             ignoringAbsence (removeDirRecur dir)
             throwM $ UnexpectedArchiveContents dirs files
+    -}
+resolvePackageLocation _ projRoot (PLHttp url) = do
+    workDir <- view workDirL
+    let nameBeforeHashing = url
+        -- TODO: dedupe with code for snapshot hash?
+        name = T.unpack $ decodeUtf8 $ S.take 12 $ B64URL.encode $ Mem.convert $ hashWith SHA256 $ encodeUtf8 nameBeforeHashing
+        root = projRoot </> workDir </> $(mkRelDir "downloaded")
+        fileExtension' = ".http-archive"
+
+    fileRel <- parseRelFile $ name ++ fileExtension'
+    dirRel <- parseRelDir name
+    dirRelTmp <- parseRelDir $ name ++ ".tmp"
+    let file = root </> fileRel
+        dir = root </> dirRel
+
+    exists <- doesDirExist dir
+    unless exists $ do
+        ignoringAbsence (removeDirRecur dir)
+
+        let dirTmp = root </> dirRelTmp
+        ignoringAbsence (removeDirRecur dirTmp)
+
+        let fp = toFilePath file
+        req <- parseUrlThrow $ T.unpack url
+        _ <- download req file
+
+        let tryTar = do
+                $logDebug $ "Trying to untar " <> T.pack fp
+                liftIO $ withBinaryFile fp ReadMode $ \h -> do
+                    lbs <- L.hGetContents h
+                    let entries = Tar.read $ GZip.decompress lbs
+                    Tar.unpack (toFilePath dirTmp) entries
+            tryZip = do
+                $logDebug $ "Trying to unzip " <> T.pack fp
+                archive <- fmap Zip.toArchive $ liftIO $ L.readFile fp
+                liftIO $  Zip.extractFilesFromArchive [Zip.OptDestination
+                                                       (toFilePath dirTmp)] archive
+            err = throwM $ UnableToExtractArchive url file
+
+            catchAnyLog goodpath handler =
+                catchAny goodpath $ \e -> do
+                    $logDebug $ "Got exception: " <> T.pack (show e)
+                    handler
+
+        tryTar `catchAnyLog` tryZip `catchAnyLog` err
+        renameDir dirTmp dir
+
+    x <- listDir dir
+    case x of
+        ([dir'], []) -> return [(dir', PLHttp url)]
+        (dirs, files) -> do
+            ignoringAbsence (removeFile file)
+            ignoringAbsence (removeDirRecur dir)
+            throwM $ UnexpectedArchiveContents dirs files
 resolvePackageLocation menv projRoot (PLRepo (Repo url commit repoType' subdirs)) = do
     workDir <- view workDirL
     let nameBeforeHashing = case repoType' of
@@ -151,4 +208,4 @@ resolvePackageLocation menv projRoot (PLRepo (Repo url commit repoType' subdirs)
 
     forM subdirs $ \subdir -> do
       dir' <- resolveDir dir subdir
-      return (dir', PLRepo $ Repo url commit repoType' [subdir])
+      return (dir', PLRepo $ Repo url commit repoType' subdir)

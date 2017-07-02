@@ -12,7 +12,9 @@
 module Stack.Types.BuildPlan
     ( -- * Types
       SnapshotDef (..)
-    , PackageLocation (..)
+    , PackageLocationWith (..)
+    , PackageLocation
+    , SinglePackageLocation
     , RepoType (..)
     , Repo (..)
     , RemotePackageType (..)
@@ -112,9 +114,12 @@ setCompilerVersion cv =
         Left _ -> sd { sdParent = Left cv }
         Right sd' -> sd { sdParent = Right $ go sd' }
 
+type PackageLocation = PackageLocationWith [FilePath]
+type SinglePackageLocation = PackageLocationWith FilePath
+
 -- | Where to get the contents of a package (including cabal file
 -- revisions) from.
-data PackageLocation
+data PackageLocationWith subdirs
   = PLIndex !PackageIdentifierRevision
     -- ^ Grab the package from the package index with the given
     -- version and (optional) cabal file info to specify the correct
@@ -124,11 +129,11 @@ data PackageLocation
     -- the value raw, and then use @canonicalizePath@ and @parseAbsDir@.
   | PLHttp !Text
   -- ^ URL
-  | PLRepo !Repo
+  | PLRepo !(Repo subdirs)
   -- ^ Stored in a source control repository
-    deriving (Generic, Show, Eq, Data, Typeable)
-instance Store PackageLocation
-instance NFData PackageLocation
+    deriving (Generic, Show, Eq, Data, Typeable, Functor)
+instance Store a => Store (PackageLocationWith a)
+instance NFData a => NFData (PackageLocationWith a)
 
 -- | The type of a source control repository.
 data RepoType = RepoGit | RepoHg
@@ -137,15 +142,15 @@ instance Store RepoType
 instance NFData RepoType
 
 -- | Information on packages stored in a source control repository.
-data Repo = Repo
+data Repo subdirs = Repo
     { repoUrl :: !Text
     , repoCommit :: !Text
     , repoType :: !RepoType
-    , repoSubdirs :: ![FilePath]
+    , repoSubdirs :: !subdirs
     }
-    deriving (Generic, Show, Eq, Data, Typeable)
-instance Store Repo
-instance NFData Repo
+    deriving (Generic, Show, Eq, Data, Typeable, Functor)
+instance Store a => Store (Repo a)
+instance NFData a => NFData (Repo a)
 
 instance ToJSON PackageLocation where
     -- Note that the PLIndex and PLFilePath constructors both turn
@@ -210,14 +215,14 @@ data LoadedSnapshot = LoadedSnapshot
   { lsCompilerVersion :: !CompilerVersion
   , lsResolver        :: !LoadedResolver
   , lsGlobals         :: !(Map PackageName (LoadedPackageInfo GhcPkgId)) -- FIXME this may be a terrible design
-  , lsPackages        :: !(Map PackageName (LoadedPackageInfo PackageLocation))
+  , lsPackages        :: !(Map PackageName (LoadedPackageInfo SinglePackageLocation))
   }
     deriving (Generic, Show, Data, Eq, Typeable)
 instance Store LoadedSnapshot
 instance NFData LoadedSnapshot
 
 loadedSnapshotVC :: VersionConfig LoadedSnapshot
-loadedSnapshotVC = storeVersionConfig "ls-v1" "DeqDAikx2iAWITRFSzcOaQNuNQo="
+loadedSnapshotVC = storeVersionConfig "ls-v1" "LPK22sH6xuTCk1V8ewI1IUM3PSo="
 
 -- | Information on a single package for the 'LoadedSnapshot' which
 -- can be installed.

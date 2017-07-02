@@ -111,7 +111,7 @@ loadSourceMapFull :: (StackM env m, HasEnvConfig env)
                        , LoadedSnapshot
                        , [LocalPackage]
                        , Set PackageName -- non-local targets
-                       , Map PackageName PackageLocation -- local deps from configuration and cli
+                       , Map PackageName SinglePackageLocation -- local deps from configuration and cli
                        , SourceMap
                        )
 loadSourceMapFull needTargets boptsCli = do
@@ -265,7 +265,7 @@ parseTargetsFromBuildOpts
     => NeedTargets
     -> BuildOptsCLI
     -> m ( LoadedSnapshot
-         , Map PackageName PackageLocation -- additional local dependencies
+         , Map PackageName SinglePackageLocation -- additional local dependencies
          , Map PackageName SimpleTarget
          )
 parseTargetsFromBuildOpts needTargets boptscli = do
@@ -280,7 +280,7 @@ parseTargetsFromBuildOptsWith
     -> NeedTargets
     -> BuildOptsCLI
     -> m ( LoadedSnapshot
-         , Map PackageName PackageLocation -- additional local dependencies
+         , Map PackageName SinglePackageLocation -- additional local dependencies
          , Map PackageName SimpleTarget
          )
 parseTargetsFromBuildOptsWith rawLocals needTargets boptscli = do
@@ -295,8 +295,8 @@ parseTargetsFromBuildOptsWith rawLocals needTargets boptscli = do
     let gpdHelper isDep =
             mapM go . Map.toList
           where
-            go :: (Path Abs Dir, PackageLocation)
-               -> m (GenericPackageDescription, PackageLocation, (Path Abs Dir, Bool))
+            go :: (Path Abs Dir, SinglePackageLocation)
+               -> m (GenericPackageDescription, SinglePackageLocation, (Path Abs Dir, Bool))
             go (dir, loc) = do
               cabalfp <- findOrGenerateCabalFile dir
               (_, gpd) <- readPackageUnresolved cabalfp
@@ -326,7 +326,7 @@ parseTargetsFromBuildOptsWith rawLocals needTargets boptscli = do
             (boptsCLITargets boptscli)
 
     -- FIXME add in cliDeps
-    let gpds :: [(GenericPackageDescription, PackageLocation, (Path Abs Dir, Bool))]
+    let gpds :: [(GenericPackageDescription, SinglePackageLocation, (Path Abs Dir, Bool))]
         gpds = gpdsProject ++ gpdsDeps
 
     (globals, snapshots, locals) <- withCabalLoader $ \loadFromIndex ->
@@ -345,8 +345,8 @@ parseTargetsFromBuildOptsWith rawLocals needTargets boptscli = do
     let localDeps =
           Map.unions $ map go $ Map.toList locals
           where
-            go :: (PackageName, LoadedPackageInfo (PackageLocation, Maybe (Path Abs Dir, Bool)))
-               -> Map PackageName PackageLocation
+            go :: (PackageName, LoadedPackageInfo (SinglePackageLocation, Maybe (Path Abs Dir, Bool)))
+               -> Map PackageName SinglePackageLocation
             go (name, lpi) =
               case lpiLocation lpi of
                 (_, Just (_, False)) -> Map.empty -- project package, ignore it
@@ -534,7 +534,7 @@ loadLocalPackage boptsCli targets (name, (lpv, gpkg)) = do
 checkFlagsUsed :: (MonadThrow m, MonadReader env m, HasBuildConfig env)
                => BuildOptsCLI
                -> [LocalPackage]
-               -> Map PackageName PackageLocation -- ^ extra deps
+               -> Map PackageName SinglePackageLocation -- ^ extra deps
                -> Map PackageName snapshot -- ^ snapshot, for error messages
                -> m ()
 checkFlagsUsed boptsCli lps extraDeps snapshot = do
@@ -588,9 +588,9 @@ pirVersion (PackageIdentifierRevision (PackageIdentifier _ version) _) = version
 extendExtraDeps
     :: (StackM env m, HasBuildConfig env)
     => [PackageLocation] -- ^ original extra deps
-    -> Map PackageName PackageLocation -- ^ package identifiers from the command line
+    -> Map PackageName SinglePackageLocation -- ^ package identifiers from the command line
     -> Set PackageName -- ^ all packages added on the command line
-    -> m (Map PackageName PackageLocation) -- ^ new extradeps
+    -> m (Map PackageName SinglePackageLocation) -- ^ new extradeps
 extendExtraDeps extraDeps0 cliExtraDeps unknowns = do
     return Map.empty {- FIXME
     (errs, unknowns') <- fmap partitionEithers $ mapM addUnknown $ Set.toList unknowns

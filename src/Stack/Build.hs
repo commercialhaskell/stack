@@ -30,15 +30,12 @@ import           Control.Monad.Trans.Unlift (MonadBaseUnlift, askRunBase)
 import           Data.Aeson (Value (Object, Array), (.=), object)
 import           Data.Function
 import qualified Data.HashMap.Strict as HM
-import           Data.HashSet (HashSet)
-import qualified Data.HashSet as HashSet
 import           Data.List ((\\))
 import           Data.List.Extra (groupSort)
 import           Data.List.NonEmpty (NonEmpty(..))
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Map as Map
 import           Data.Map.Strict (Map)
-import           Data.Maybe (catMaybes)
 import           Data.Monoid
 import           Data.Set (Set)
 import qualified Data.Set as Set
@@ -61,8 +58,6 @@ import           Stack.Build.Source
 import           Stack.Build.Target
 import           Stack.Fetch as Fetch
 import           Stack.Package
-import           Stack.PackageIndex
-import           Stack.PrettyPrint
 import           Stack.Snapshot (loadRawCabalFiles)
 import           Stack.Types.Build
 import           Stack.Types.BuildPlan
@@ -295,7 +290,7 @@ mkBaseConfigOpts boptsCli = do
 
 -- | Provide a function for loading package information from the package index
 withLoadPackage :: (StackM env m, HasEnvConfig env, MonadBaseUnlift IO m)
-                => ((PackageLocation -> Map FlagName Bool -> [Text] -> IO Package) -> m a)
+                => ((SinglePackageLocation -> Map FlagName Bool -> [Text] -> IO Package) -> m a)
                 -> m a
 withLoadPackage inner = do
     econfig <- view envConfigL
@@ -306,11 +301,7 @@ withLoadPackage inner = do
         inner $ \loc flags ghcOptions -> do
             -- FIXME this looks very similar to code in
             -- Stack.Snapshot, try to merge it together
-            list <- run $ loadRawCabalFiles loadFromIndex menv root loc
-
-            bs <- case list of
-              [(bs, _loc)] -> return bs
-              _ -> error "withLoadPackage: invariant violated"
+            [(bs, _loc)] <- run $ loadRawCabalFiles loadFromIndex menv root $ fmap return loc -- FIXME better type safety
 
             (_warnings,pkg) <- readPackageBS (depPackageConfig econfig flags ghcOptions) bs
             return pkg

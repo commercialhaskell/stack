@@ -139,7 +139,7 @@ type M = RWST
 data Ctx = Ctx
     { ls             :: !LoadedSnapshot
     , baseConfigOpts :: !BaseConfigOpts
-    , loadPackage    :: !(PackageLocation -> Map FlagName Bool -> [Text] -> IO Package)
+    , loadPackage    :: !(SinglePackageLocation -> Map FlagName Bool -> [Text] -> IO Package)
     , combinedMap    :: !CombinedMap
     , toolToPackages :: !(Cabal.Dependency -> Map PackageName VersionRange)
     , ctxEnvConfig   :: !EnvConfig
@@ -180,7 +180,7 @@ constructPlan :: forall env m. (StackM env m, HasEnvConfig env)
               -> [LocalPackage]
               -> Set PackageName -- ^ additional packages that must be built
               -> [DumpPackage () () ()] -- ^ locally registered
-              -> (PackageLocation -> Map FlagName Bool -> [Text] -> IO Package) -- ^ load upstream package
+              -> (SinglePackageLocation -> Map FlagName Bool -> [Text] -> IO Package) -- ^ load upstream package
               -> SourceMap
               -> InstalledMap
               -> Bool
