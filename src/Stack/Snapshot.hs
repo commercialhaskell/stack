@@ -352,7 +352,7 @@ loadSnapshot' loadFromIndex menv mcompiler root =
           allToUpgrade = Map.union noLongerGlobals3 noLongerParent
 
       upgraded <- fmap Map.fromList
-                $ mapM (recalculate compilerVersion flags hide ghcOptions)
+                $ mapM (recalculate loadFromIndex menv root compilerVersion flags hide ghcOptions)
                 $ Map.toList allToUpgrade
 
       let packages2 = Map.unions [upgraded, packages1, parentPackages2]
@@ -369,49 +369,54 @@ loadSnapshot' loadFromIndex menv mcompiler root =
         , lsPackages = packages2
         }
 
-    -- | Recalculate a 'LoadedPackageInfo' based on updates to flags,
-    -- hide values, and GHC options.
-    recalculate :: CompilerVersion
-                -> Map PackageName (Map FlagName Bool)
-                -> Set PackageName -- ^ hide?
-                -> Map PackageName [Text] -- ^ GHC options
-                -> (PackageName, LoadedPackageInfo PackageLocation)
-                -> m (PackageName, LoadedPackageInfo PackageLocation)
-    recalculate compilerVersion allFlags allHide allOptions (name, lpi0) = do
-      let hide = lpiHide lpi0 || Set.member name allHide -- FIXME allow child snapshot to unhide?
-          options = fromMaybe (lpiGhcOptions lpi0) (Map.lookup name allOptions)
-      case Map.lookup name allFlags of
-        Nothing -> return (name, lpi0 { lpiHide = hide, lpiGhcOptions = options }) -- optimization
-        Just flags -> do
-          [(gpd, loc)] <- loadGenericPackageDescriptions loadFromIndex menv root $ lpiLocation lpi0
-          unless (loc == lpiLocation lpi0) $ error "recalculate location mismatch"
-          platform <- view platformL
-          let res@(name', lpi) = calculate gpd platform compilerVersion loc flags hide options
-          unless (name == name' && lpiVersion lpi0 == lpiVersion lpi) $ error "recalculate invariant violated"
-          return res
+-- | Recalculate a 'LoadedPackageInfo' based on updates to flags,
+-- hide values, and GHC options.
+recalculate :: forall env m.
+               (StackMiniM env m, HasConfig env, HasGHCVariant env)
+            => (PackageIdentifierRevision -> IO ByteString)
+            -> EnvOverride
+            -> Path Abs Dir -- ^ root
+            -> CompilerVersion
+            -> Map PackageName (Map FlagName Bool)
+            -> Set PackageName -- ^ hide?
+            -> Map PackageName [Text] -- ^ GHC options
+            -> (PackageName, LoadedPackageInfo PackageLocation)
+            -> m (PackageName, LoadedPackageInfo PackageLocation)
+recalculate loadFromIndex menv root compilerVersion allFlags allHide allOptions (name, lpi0) = do
+  let hide = lpiHide lpi0 || Set.member name allHide -- FIXME allow child snapshot to unhide?
+      options = fromMaybe (lpiGhcOptions lpi0) (Map.lookup name allOptions)
+  case Map.lookup name allFlags of
+    Nothing -> return (name, lpi0 { lpiHide = hide, lpiGhcOptions = options }) -- optimization
+    Just flags -> do
+      [(gpd, loc)] <- loadGenericPackageDescriptions loadFromIndex menv root $ lpiLocation lpi0
+      unless (loc == lpiLocation lpi0) $ error "recalculate location mismatch"
+      platform <- view platformL
+      let res@(name', lpi) = calculate gpd platform compilerVersion loc flags hide options
+      unless (name == name' && lpiVersion lpi0 == lpiVersion lpi) $ error "recalculate invariant violated"
+      return res
 
-    fromGlobalHints :: Map PackageName (Maybe Version) -> Map PackageName (LoadedPackageInfo GhcPkgId)
-    fromGlobalHints =
-        Map.unions . map go . Map.toList
-      where
-        go (_, Nothing) = Map.empty
-        go (name, Just ver) = Map.singleton name LoadedPackageInfo
-          { lpiVersion = ver
-          -- For global hint purposes, we only care about the
-          -- version. All other fields are ignored when checking
-          -- project compatibility.
-          , lpiLocation = either impureThrow id
-                        $ parseGhcPkgId
-                        $ packageIdentifierText
-                        $ PackageIdentifier name ver
-          , lpiFlags = Map.empty
-          , lpiGhcOptions = []
-          , lpiPackageDeps = Map.empty
-          , lpiProvidedExes = Set.empty
-          , lpiNeededExes = Map.empty
-          , lpiExposedModules = Set.empty
-          , lpiHide = False
-          }
+fromGlobalHints :: Map PackageName (Maybe Version) -> Map PackageName (LoadedPackageInfo GhcPkgId)
+fromGlobalHints =
+    Map.unions . map go . Map.toList
+  where
+    go (_, Nothing) = Map.empty
+    go (name, Just ver) = Map.singleton name LoadedPackageInfo
+      { lpiVersion = ver
+      -- For global hint purposes, we only care about the
+      -- version. All other fields are ignored when checking
+      -- project compatibility.
+      , lpiLocation = either impureThrow id
+                    $ parseGhcPkgId
+                    $ packageIdentifierText
+                    $ PackageIdentifier name ver
+      , lpiFlags = Map.empty
+      , lpiGhcOptions = []
+      , lpiPackageDeps = Map.empty
+      , lpiProvidedExes = Set.empty
+      , lpiNeededExes = Map.empty
+      , lpiExposedModules = Set.empty
+      , lpiHide = False
+      }
 
 -- | Ensure that all of the dependencies needed by this package
 -- are available in the given Map of packages.
