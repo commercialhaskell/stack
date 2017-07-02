@@ -25,6 +25,7 @@ module Stack.Types.BuildPlan
     , ModuleInfo (..)
     , moduleInfoVC
     , setCompilerVersion
+    , sdWantedCompilerVersion
     ) where
 
 import           Control.Applicative
@@ -91,6 +92,13 @@ data SnapshotDef = SnapshotDef
     -- affect, for example, the import parser in the script command.
     , sdGhcOptions :: !(Map PackageName [Text])
     -- ^ GHC options per package
+    , sdGlobalHints :: !(Map PackageName (Maybe Version))
+    -- ^ Hints about which packages are available globally. When
+    -- actually building code, we trust the package database provided
+    -- by GHC itself, since it may be different based on platform or
+    -- GHC install. However, when we want to check the compatibility
+    -- of a snapshot with some codebase without installing GHC (e.g.,
+    -- during stack init), we would use this field.
     }
     deriving (Show, Eq)
 
@@ -209,7 +217,7 @@ instance Store LoadedSnapshot
 instance NFData LoadedSnapshot
 
 loadedSnapshotVC :: VersionConfig LoadedSnapshot
-loadedSnapshotVC = storeVersionConfig "ls-v1" "_PgwTtH6gYwg-A72iUR6KwpJYho="
+loadedSnapshotVC = storeVersionConfig "ls-v1" "DeqDAikx2iAWITRFSzcOaQNuNQo="
 
 -- | Information on a single package for the 'LoadedSnapshot' which
 -- can be installed.
@@ -296,3 +304,7 @@ instance Monoid ModuleInfo where
 
 moduleInfoVC :: VersionConfig ModuleInfo
 moduleInfoVC = storeVersionConfig "mi-v2" "8ImAfrwMVmqoSoEpt85pLvFeV3s="
+
+-- | Determined the desired compiler version for this 'SnapshotDef'.
+sdWantedCompilerVersion :: SnapshotDef -> CompilerVersion
+sdWantedCompilerVersion = either id sdWantedCompilerVersion . sdParent

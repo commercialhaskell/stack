@@ -4,6 +4,7 @@
 module Stack.Config.Docker where
 
 import           Control.Exception.Lifted
+import           Control.Monad (void)
 import           Control.Monad.Catch (MonadThrow)
 import           Data.List (find)
 import           Data.Maybe
@@ -38,7 +39,7 @@ dockerOptsFromMonoid mproject stackRoot maresolver DockerOptsMonoid{..} = do
                                 (ResolverNotSupportedException $
                                  show aresolver)
                         Nothing ->
-                            fmap ((fmap.fmap) snd projectResolver) mproject
+                            fmap (void . projectResolver) mproject
                 defaultTag =
                     case mresolver of
                         Nothing -> ""

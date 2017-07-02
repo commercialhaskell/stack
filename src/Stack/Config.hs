@@ -186,15 +186,15 @@ getSnapshots = do
 -- | Turn an 'AbstractResolver' into a 'Resolver'.
 makeConcreteResolver
     :: (StackMiniM env m, HasConfig env)
-    => AbstractResolver
+    => Maybe FilePath -- ^ root of project for resolving custom relative paths
+    -> AbstractResolver
     -> m Resolver
-makeConcreteResolver (ARResolver r) = do
-  mapM (parseCustomLocation (error "FIXME makeConcreteResolver")) r
-makeConcreteResolver ar = do
+makeConcreteResolver root (ARResolver r) = parseCustomLocation root r
+makeConcreteResolver root ar = do
     snapshots <- getSnapshots
     r <-
         case ar of
-            ARResolver r -> assert False $ makeConcreteResolver $ ARResolver r
+            ARResolver r -> assert False $ makeConcreteResolver root $ ARResolver r
             ARGlobal -> do
                 config <- view configL
                 implicitGlobalDir <- getImplicitGlobalProjectDir config
@@ -586,7 +586,7 @@ loadBuildConfig mproject config mresolver mcompiler = do
         case mresolver of
             Nothing -> return $ projectResolver project'
             Just aresolver ->
-                runReaderT (makeConcreteResolver aresolver) miniConfig
+                runReaderT (makeConcreteResolver (Just (toFilePath (parent stackYamlFP))) aresolver) miniConfig
     let project = project'
             { projectResolver = resolver
             , projectCompiler = mcompiler <|> projectCompiler project'
@@ -619,7 +619,7 @@ loadBuildConfig mproject config mresolver mcompiler = do
     getEmptyProject = do
       r <- case mresolver of
             Just aresolver -> do
-                r' <- runReaderT (makeConcreteResolver aresolver) miniConfig
+                r' <- runReaderT (makeConcreteResolver Nothing aresolver) miniConfig
                 $logInfo ("Using resolver: " <> resolverName r' <> " specified on command line")
                 return r'
             Nothing -> do

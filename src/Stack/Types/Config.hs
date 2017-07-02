@@ -112,6 +112,7 @@ module Stack.Types.Config
   ,bindirSuffix
   ,configInstalledCache
   ,configLoadedSnapshotCache
+  ,GlobalInfoSource(..)
   ,getProjectWorkDir
   ,docDirSuffix
   ,flagCacheLocal
@@ -976,7 +977,7 @@ data ConfigException
   | BadStackVersionException VersionRange
   | NoMatchingSnapshot WhichSolverCmd (NonEmpty SnapName)
   | forall h. ResolverMismatch WhichSolverCmd (ResolverWith h) String
-  | ResolverPartial WhichSolverCmd Resolver String
+  | ResolverPartial WhichSolverCmd (ResolverWith ()) String
   | NoSuchDirectory FilePath
   | ParseGHCVariantException String
   | BadStackRoot (Path Abs Dir)
@@ -1311,13 +1312,26 @@ flagCacheLocal = do
 configLoadedSnapshotCache
   :: (MonadThrow m, MonadReader env m, HasConfig env, HasGHCVariant env)
   => LoadedResolver
+  -> GlobalInfoSource
   -> m (Path Abs File)
-configLoadedSnapshotCache resolver = do
+configLoadedSnapshotCache resolver gis = do
     root <- view stackRootL
     platform <- platformGhcVerOnlyRelDir
     file <- parseRelFile $ T.unpack (resolverName resolver) ++ ".cache"
+    gis' <- parseRelDir $
+          case gis of
+            GISSnapshotHints -> "__snapshot_hints__"
+            GISCompiler cv -> compilerVersionString cv
     -- Yes, cached plans differ based on platform
-    return (root </> $(mkRelDir "build-plan-cache") </> platform </> file)
+    return (root </> $(mkRelDir "loaded-snapshot-cache") </> platform </> gis' </> file)
+
+-- | Where do we get information on global packages for loading up a
+-- 'LoadedSnapshot'?
+data GlobalInfoSource
+  = GISSnapshotHints
+  -- ^ Accept the hints in the snapshot definition
+  | GISCompiler CompilerVersion
+  -- ^ Look up the actual information in the installed compiler
 
 -- | Suffix applied to an installation root to get the bin dir
 bindirSuffix :: Path Rel Dir
@@ -1391,7 +1405,7 @@ parseProjectAndConfigMonoid rootDir =
 
         resolver <- jsonSubWarnings (o ..: "resolver")
                 >>= either (fail . show) return
-                  . mapM (parseCustomLocation (Just (toFilePath rootDir)))
+                  . parseCustomLocation (Just (toFilePath rootDir))
         compiler <- o ..:? "compiler"
         msg <- o ..:? "user-message"
         config <- parseConfigMonoidObject rootDir o

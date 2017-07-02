@@ -19,6 +19,7 @@ module Stack.Snapshot
   ) where
 
 import           Control.Applicative
+import           Control.Exception.Safe (impureThrow)
 import           Control.Monad (forM, unless, void)
 import           Control.Monad.Catch
 import           Control.Monad.IO.Class
@@ -143,6 +144,7 @@ loadResolver (ResolverSnapshot name) = do
                 (_, Just compiler) -> return compiler
                 _ -> fail "expected field \"ghc-version\" or \"compiler-version\" not present"
         let sdParent = Left compilerVersion'
+        sdGlobalHints <- si .: "core-packages"
 
         packages <- o .: "packages"
         (Endo mkLocs, sdFlags, sdHide) <- fmap mconcat $ mapM (uncurry goPkg) $ Map.toList packages
@@ -188,8 +190,9 @@ loadResolver (ResolverCompiler compiler) = return SnapshotDef
     , sdFlags = Map.empty
     , sdHide = Set.empty
     , sdGhcOptions = Map.empty
+    , sdGlobalHints = Map.empty
     }
-loadResolver (ResolverCustom name (loc, url)) = do
+loadResolver (ResolverCustom name url loc) = do
   $logDebug $ "Loading " <> url <> " build plan"
   case loc of
     Left req -> download' req >>= load
@@ -224,7 +227,7 @@ loadResolver (ResolverCustom name (loc, url)) = do
             case loc of
               Left _ -> Nothing
               Right fp' -> Just $ takeDirectory fp'
-      parentResolver' <- mapM (parseCustomLocation mdir) parentResolver
+      parentResolver' <- parseCustomLocation mdir parentResolver
 
       -- Calculate the hash of the current file, and then combine it
       -- with parent hashes if necessary below.
@@ -239,26 +242,27 @@ loadResolver (ResolverCustom name (loc, url)) = do
                 hash' = combineHash rawHash $
                   case sdResolver parent' of
                     ResolverSnapshot snapName -> snapNameToHash snapName
-                    ResolverCustom _ parentHash -> parentHash
+                    ResolverCustom _ _ parentHash -> parentHash
                     ResolverCompiler _ -> error "loadResolver: Receieved ResolverCompiler in impossible location"
             return (Right parent', hash')
       return sd0
         { sdParent = parent'
-        , sdResolver = ResolverCustom name hash'
+        , sdResolver = ResolverCustom name url hash'
         }
 
     -- | Note that the 'sdParent' and 'sdResolver' fields returned
     -- here are bogus, and need to be replaced with information only
     -- available after further processing.
     parseCustom :: Value
-                -> Parser (WithJSONWarnings (SnapshotDef, WithJSONWarnings (ResolverWith Text))) -- FIXME there should only be one WithJSONWarnings
+                -> Parser (WithJSONWarnings (SnapshotDef, WithJSONWarnings (ResolverWith ()))) -- FIXME there should only be one WithJSONWarnings
     parseCustom = withObjectWarnings "CustomSnapshot" $ \o -> (,)
         <$> (SnapshotDef (Left (error "loadResolver")) (ResolverSnapshot (LTS 0 0))
             <$> jsonSubWarningsT (o ..:? "packages" ..!= [])
             <*> o ..:? "drop-packages" ..!= Set.empty
             <*> o ..:? "flags" ..!= Map.empty
             <*> o ..:? "hide" ..!= Set.empty
-            <*> o ..:? "ghc-options" ..!= Map.empty)
+            <*> o ..:? "ghc-options" ..!= Map.empty
+            <*> o ..:? "global-hints" ..!= Map.empty)
         <*> o ..: "resolver"
 
     fromDigest :: Digest SHA256 -> SnapshotHash
@@ -277,32 +281,46 @@ loadResolver (ResolverCustom name (loc, url)) = do
 loadSnapshot
   :: forall env m.
      (StackMiniM env m, HasConfig env, HasGHCVariant env)
-  => EnvOverride
+  => EnvOverride -- ^ used for running Git/Hg, and if relevant, getting global package info
+  -> Maybe CompilerVersion -- ^ installed GHC we should query; if none provided, use the global hints
   -> Path Abs Dir -- ^ project root, used for checking out necessary files
   -> SnapshotDef
   -> m LoadedSnapshot
-loadSnapshot menv root sd = withCabalLoader $ \loader -> loadSnapshot' loader menv root sd
+loadSnapshot menv mcompiler root sd = withCabalLoader $ \loader -> loadSnapshot' loader menv mcompiler root sd
 
 -- | Fully load up a 'SnapshotDef' into a 'LoadedSnapshot'
 loadSnapshot'
   :: forall env m.
      (StackMiniM env m, HasConfig env, HasGHCVariant env)
-  => (PackageIdentifierRevision -> IO ByteString)
-  -> EnvOverride
+  => (PackageIdentifierRevision -> IO ByteString) -- ^ load a cabal file's contents from the index
+  -> EnvOverride -- ^ used for running Git/Hg, and if relevant, getting global package info
+  -> Maybe CompilerVersion -- ^ installed GHC we should query; if none provided, use the global hints
   -> Path Abs Dir -- ^ project root, used for checking out necessary files
   -> SnapshotDef
   -> m LoadedSnapshot
-loadSnapshot' loadFromIndex menv root =
+loadSnapshot' loadFromIndex menv mcompiler root =
     start
   where
     start (snapshotDefFixes -> sd) = do
-      path <- configLoadedSnapshotCache $ sdResolver sd -- FIXME confirm the path is by platform
+      path <- configLoadedSnapshotCache
+        (sdResolver sd)
+        (maybe GISSnapshotHints GISCompiler mcompiler)
       $(versionedDecodeOrLoad loadedSnapshotVC) path (inner sd)
 
     inner :: SnapshotDef -> m LoadedSnapshot
     inner sd = do
       LoadedSnapshot compilerVersion _ globals0 parentPackages0 <-
-        either loadCompiler start $ sdParent sd
+        case sdParent sd of
+          Left cv ->
+            case mcompiler of
+              Nothing -> return LoadedSnapshot
+                { lsCompilerVersion = cv
+                , lsResolver = ResolverCompiler cv
+                , lsGlobals = fromGlobalHints $ sdGlobalHints sd
+                , lsPackages = Map.empty
+                }
+              Just cv' -> loadCompiler cv'
+          Right sd' -> start sd'
 
       platform <- view platformL
 
@@ -371,6 +389,29 @@ loadSnapshot' loadFromIndex menv root =
           let res@(name', lpi) = calculate gpd platform compilerVersion loc flags hide options
           unless (name == name' && lpiVersion lpi0 == lpiVersion lpi) $ error "recalculate invariant violated"
           return res
+
+    fromGlobalHints :: Map PackageName (Maybe Version) -> Map PackageName (LoadedPackageInfo GhcPkgId)
+    fromGlobalHints =
+        Map.unions . map go . Map.toList
+      where
+        go (_, Nothing) = Map.empty
+        go (name, Just ver) = Map.singleton name LoadedPackageInfo
+          { lpiVersion = ver
+          -- For global hint purposes, we only care about the
+          -- version. All other fields are ignored when checking
+          -- project compatibility.
+          , lpiLocation = either impureThrow id
+                        $ parseGhcPkgId
+                        $ packageIdentifierText
+                        $ PackageIdentifier name ver
+          , lpiFlags = Map.empty
+          , lpiGhcOptions = []
+          , lpiPackageDeps = Map.empty
+          , lpiProvidedExes = Set.empty
+          , lpiNeededExes = Map.empty
+          , lpiExposedModules = Set.empty
+          , lpiHide = False
+          }
 
 -- | Ensure that all of the dependencies needed by this package
 -- are available in the given Map of packages.

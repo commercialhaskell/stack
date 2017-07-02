@@ -268,7 +268,11 @@ setupEnv mResolveMissingGHC = do
     let bcPath :: BuildConfig
         bcPath = set envOverrideL (const (return menv)) bc
 
-    ls <- runInnerStackT bcPath $ loadSnapshot menv (view projectRootL bc) (bcSnapshotDef bc)
+    ls <- runInnerStackT bcPath $ loadSnapshot
+      menv
+      (Just compilerVer)
+      (view projectRootL bc)
+      (bcSnapshotDef bc)
     let envConfig0 = EnvConfig
             { envConfigBuildConfig = bc
             , envConfigCabalVersion = cabalVer

@@ -74,7 +74,7 @@ import           System.FilePath ((</>))
 data IsLoaded = Loaded | NotLoaded
 
 type LoadedResolver = ResolverWith SnapshotHash
-type Resolver = ResolverWith (Either Request FilePath, Text)
+type Resolver = ResolverWith (Either Request FilePath)
 
 -- TODO: once GHC 8.0 is the lowest version we support, make these into
 -- actual haddock comments...
@@ -91,29 +91,31 @@ data ResolverWith customContents
     -- specify all upstream dependencies manually, such as using a
     -- dependency solver.
 
-    | ResolverCustom !Text !customContents
-    -- ^ A custom resolver based on the given name. If
-    -- @customContents@ is a @Text@, it represents either a URL or a
-    -- filepath. Once it has been loaded from disk, it will be
-    -- replaced with a @SnapshotHash@ value, which is used to store
-    -- cached files.
+    | ResolverCustom !Text !Text !customContents
+    -- ^ A custom resolver based on the given name. First two @Text@s
+    -- are the name and the raw URL, respectively. If @customContents@
+    -- is a @Either Request FilePath@, it represents either an HTTP
+    -- URL or a resolved filepath. Once it has been loaded from disk,
+    -- it will be replaced with a @SnapshotHash@ value, which is used
+    -- to store cached files.
     deriving (Generic, Typeable, Show, Data, Eq, Functor, Foldable, Traversable)
 instance Store LoadedResolver
 instance NFData LoadedResolver
 
-instance ToJSON Resolver where
+instance ToJSON (ResolverWith a) where
     toJSON x = case x of
         ResolverSnapshot{} -> toJSON $ resolverName x
         ResolverCompiler{} -> toJSON $ resolverName x
-        ResolverCustom n (_, l) -> object
+        ResolverCustom n loc _ -> object
              [ "name" .= n
-             , "location" .= l
+             , "location" .= loc
              ]
-instance a ~ Text => FromJSON (WithJSONWarnings (ResolverWith a)) where
+instance a ~ () => FromJSON (WithJSONWarnings (ResolverWith a)) where
     -- Strange structuring is to give consistent error messages
     parseJSON v@(Object _) = withObjectWarnings "Resolver" (\o -> ResolverCustom
         <$> o ..: "name"
-        <*> o ..: "location") v
+        <*> o ..: "location"
+        <*> pure ()) v
 
     parseJSON (String t) = either (fail . show) return (noJSONWarnings <$> parseResolverText t)
 
@@ -124,25 +126,25 @@ instance a ~ Text => FromJSON (WithJSONWarnings (ResolverWith a)) where
 resolverDirName :: LoadedResolver -> Text
 resolverDirName (ResolverSnapshot name) = renderSnapName name
 resolverDirName (ResolverCompiler v) = compilerVersionText v
-resolverDirName (ResolverCustom name hash) = "custom-" <> name <> "-" <> decodeUtf8 (trimmedSnapshotHash hash)
+resolverDirName (ResolverCustom name _ hash) = "custom-" <> name <> "-" <> decodeUtf8 (trimmedSnapshotHash hash)
 
 -- | Convert a Resolver into its @Text@ representation for human
 -- presentation.
 resolverName :: ResolverWith p -> Text
 resolverName (ResolverSnapshot name) = renderSnapName name
 resolverName (ResolverCompiler v) = compilerVersionText v
-resolverName (ResolverCustom name _) = "custom-" <> name
+resolverName (ResolverCustom name _ _) = "custom-" <> name
 
 customResolverHash :: LoadedResolver -> Maybe SnapshotHash
-customResolverHash (ResolverCustom _ hash) = Just hash
+customResolverHash (ResolverCustom _ _ hash) = Just hash
 customResolverHash _ = Nothing
 
 parseCustomLocation
   :: MonadThrow m
   => Maybe FilePath -- ^ directory config value was read from
-  -> Text
-  -> m (Either Request FilePath, Text)
-parseCustomLocation mdir t = do
+  -> ResolverWith () -- could technically be any type parameter, restricting to help with type safety
+  -> m Resolver
+parseCustomLocation mdir (ResolverCustom name t ()) = do
       x <- case parseUrlThrow $ T.unpack t of
         Nothing -> do
           dir <-
@@ -155,10 +157,12 @@ parseCustomLocation mdir t = do
                 $ T.stripPrefix "file://" t <|> T.stripPrefix "file:" t
           return $ Right $ dir </> suffix
         Just req -> return $ Left req
-      return (x, t)
+      return $ ResolverCustom name t x
+parseCustomLocation _ (ResolverSnapshot name) = return $ ResolverSnapshot name
+parseCustomLocation _ (ResolverCompiler cv) = return $ ResolverCompiler cv
 
 -- | Try to parse a @Resolver@ from a @Text@. Won't work for complex resolvers (like custom).
-parseResolverText :: MonadThrow m => Text -> m (ResolverWith Text)
+parseResolverText :: MonadThrow m => Text -> m (ResolverWith ())
 parseResolverText t
     | Right x <- parseSnapName t = return $ ResolverSnapshot x
     | Just v <- parseCompilerVersion t = return $ ResolverCompiler v
@@ -170,7 +174,7 @@ data AbstractResolver
     = ARLatestNightly
     | ARLatestLTS
     | ARLatestLTSMajor !Int
-    | ARResolver !(ResolverWith Text)
+    | ARResolver !(ResolverWith ())
     | ARGlobal
     deriving Show
 

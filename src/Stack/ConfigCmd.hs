@@ -35,6 +35,7 @@ import           Stack.Snapshot (loadResolver)
 import           Stack.Types.Config
 import           Stack.Types.Resolver
 import           Stack.Types.StringError
+import           System.FilePath (takeDirectory)
 
 data ConfigCmdSet
     = ConfigCmdSetResolver AbstractResolver
@@ -75,7 +76,7 @@ cfgCmdSet go cmd = do
     -- We don't need to worry about checking for a valid yaml here
     (config :: Yaml.Object) <-
         liftIO (Yaml.decodeFileEither configFilePath) >>= either throwM return
-    newValue <- cfgCmdSetValue cmd
+    newValue <- cfgCmdSetValue (takeDirectory configFilePath) cmd
     let cmdKey = cfgCmdSetOptionName cmd
         config' = HMap.insert cmdKey newValue config
     if config' == config
@@ -88,19 +89,20 @@ cfgCmdSet go cmd = do
 
 cfgCmdSetValue
     :: (StackMiniM env m, HasConfig env, HasGHCVariant env)
-    => ConfigCmdSet -> m Yaml.Value
-cfgCmdSetValue (ConfigCmdSetResolver newResolver) = do
-    concreteResolver <- makeConcreteResolver newResolver
+    => FilePath -- ^ root directory of project
+    -> ConfigCmdSet -> m Yaml.Value
+cfgCmdSetValue root (ConfigCmdSetResolver newResolver) = do
+    concreteResolver <- makeConcreteResolver (Just root) newResolver
     case concreteResolver of
         -- Check that the snapshot actually exists
         ResolverSnapshot snapName -> void $ loadResolver $ ResolverSnapshot snapName
         ResolverCompiler _ -> return ()
         -- TODO: custom snapshot support?  Would need a way to specify on CLI
-        ResolverCustom _ _ -> errorString "'stack config set resolver' does not support custom resolvers"
+        ResolverCustom _ _ _ -> errorString "'stack config set resolver' does not support custom resolvers"
     return (Yaml.String (resolverName concreteResolver))
-cfgCmdSetValue (ConfigCmdSetSystemGhc _ bool) =
+cfgCmdSetValue _ (ConfigCmdSetSystemGhc _ bool) =
     return (Yaml.Bool bool)
-cfgCmdSetValue (ConfigCmdSetInstallGhc _ bool) =
+cfgCmdSetValue _ (ConfigCmdSetInstallGhc _ bool) =
     return (Yaml.Bool bool)
 
 cfgCmdSetOptionName :: ConfigCmdSet -> Text

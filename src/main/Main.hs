@@ -101,7 +101,6 @@ import           Stack.Solver (solveExtraDeps)
 import           Stack.Types.Version
 import           Stack.Types.Config
 import           Stack.Types.Compiler
-import           Stack.Types.Resolver
 import           Stack.Types.Nix
 import           Stack.Types.StackT
 import           Stack.Types.StringError
@@ -626,18 +625,7 @@ uninstallCmd _ go = withConfigAndLock go $ do
 -- | Unpack packages to the filesystem
 unpackCmd :: [String] -> GlobalOpts -> IO ()
 unpackCmd names go = withConfigAndLock go $ do
-    mSnapshotDef <-
-        case globalResolver go of
-            Nothing -> return Nothing
-            Just ar -> fmap Just $ do
-                r <- makeConcreteResolver ar
-                case r of
-                    ResolverSnapshot snapName -> do
-                        config <- view configL
-                        let miniConfig = loadMiniConfig config
-                        runInnerStackT miniConfig (loadResolver (ResolverSnapshot snapName))
-                    ResolverCompiler _ -> throwString "Error: unpack does not work with compiler resolvers"
-                    ResolverCustom _ _ -> throwString "Error: unpack does not work with custom resolvers"
+    mSnapshotDef <- mapM (makeConcreteResolver Nothing >=> loadResolver) (globalResolver go)
     Stack.Fetch.unpackPackages mSnapshotDef "." names
 
 -- | Update the package index

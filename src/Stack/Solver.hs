@@ -6,8 +6,7 @@
 {-# LANGUAGE ScopedTypeVariables   #-}
 {-# LANGUAGE TypeFamilies          #-}
 module Stack.Solver
-    ( checkResolverSpec
-    , cabalPackagesCheck
+    ( cabalPackagesCheck
     , findCabalFiles
     , getResolverConstraints
     , mergeConstraints
@@ -68,7 +67,7 @@ import           Stack.Package               (printCabalFileWarning
 import           Stack.PrettyPrint
 import           Stack.Setup
 import           Stack.Setup.Installed
-import           Stack.Snapshot (loadResolver, loadSnapshot)
+import           Stack.Snapshot (loadSnapshot)
 import           Stack.Types.Build
 import           Stack.Types.BuildPlan
 import           Stack.Types.Compiler
@@ -311,7 +310,7 @@ setupCompiler compiler = do
 setupCabalEnv
     :: (StackM env m, HasConfig env, HasGHCVariant env)
     => CompilerVersion
-    -> m EnvOverride
+    -> m (EnvOverride, CompilerVersion)
 setupCabalEnv compiler = do
     mpaths <- setupCompiler compiler
     menv0 <- getMinimalEnvOverride
@@ -337,12 +336,13 @@ setupCabalEnv compiler = do
             | otherwise -> return ()
 
     mver <- getSystemCompiler menv (whichCompiler compiler)
-    case mver of
-        Just (version, _) ->
+    version <- case mver of
+        Just (version, _) -> do
             $logInfo $ "Using compiler: " <> compilerVersionText version
+            return version
         Nothing -> error "Failed to determine compiler version. \
                          \This is most likely a bug."
-    return menv
+    return (menv, version)
 
 -- | Merge two separate maps, one defining constraints on package versions and
 -- the other defining package flagmap, into a single map of version and flagmap
@@ -376,7 +376,7 @@ solveResolverSpec
     :: (StackM env m, HasConfig env, HasGHCVariant env)
     => Path Abs File  -- ^ stack.yaml file location
     -> [Path Abs Dir] -- ^ package dirs containing cabal files
-    -> ( Resolver
+    -> ( SnapshotDef
        , ConstraintSpec
        , ConstraintSpec) -- ^ ( resolver
                          --   , src package constraints
@@ -386,10 +386,11 @@ solveResolverSpec
        --    (resulting src package specs, external dependency specs))
 
 solveResolverSpec stackYaml cabalDirs
-                  (resolver, srcConstraints, extraConstraints) = do
-    $logInfo $ "Using resolver: " <> resolverName resolver
-    (compilerVer, snapConstraints) <- getResolverConstraints stackYaml resolver
-    menv <- setupCabalEnv compilerVer
+                  (sd, srcConstraints, extraConstraints) = do
+    $logInfo $ "Using resolver: " <> resolverName (sdResolver sd)
+    let wantedCompilerVersion = sdWantedCompilerVersion sd
+    (menv, compilerVersion) <- setupCabalEnv wantedCompilerVersion
+    (compilerVer, snapConstraints) <- getResolverConstraints menv (Just compilerVersion) stackYaml sd
 
     let -- Note - The order in Map.union below is important.
         -- We want to override snapshot with extra deps
@@ -404,7 +405,7 @@ solveResolverSpec stackYaml cabalDirs
                      ["--ghcjs" | whichCompiler compilerVer == Ghcjs]
 
     let srcNames = T.intercalate " and " $
-          ["packages from " <> resolverName resolver
+          ["packages from " <> resolverName (sdResolver sd)
               | not (Map.null snapConstraints)] ++
           [T.pack (show (Map.size extraConstraints) <> " external packages")
               | not (Map.null extraConstraints)]
@@ -481,35 +482,18 @@ solveResolverSpec stackYaml cabalDirs
 -- for that resolver.
 getResolverConstraints
     :: (StackM env m, HasConfig env, HasGHCVariant env)
-    => Path Abs File
-    -> Resolver
+    => EnvOverride -- ^ for running Git/Hg clone commands
+    -> Maybe CompilerVersion -- ^ actually installed compiler
+    -> Path Abs File
+    -> SnapshotDef
     -> m (CompilerVersion,
           Map PackageName (Version, Map FlagName Bool))
-getResolverConstraints stackYaml resolver = do
-    ls <- loadResolver resolver >>= loadSnapshot
+getResolverConstraints menv mcompilerVersion stackYaml sd = do
+    ls <- loadSnapshot menv mcompilerVersion (parent stackYaml) sd
     return (lsCompilerVersion ls, lsConstraints ls)
   where
     lpiConstraints lpi = (lpiVersion lpi, lpiFlags lpi)
-    lsConstraints = fmap lpiConstraints . lsPackages
-
--- | Given a bundle of user packages, flag constraints on those packages and a
--- resolver, determine if the resolver fully, partially or fails to satisfy the
--- dependencies of the user packages.
---
--- If the package flags are passed as 'Nothing' then flags are chosen
--- automatically.
-checkResolverSpec
-    :: (StackM env m, HasConfig env, HasGHCVariant env)
-    => [C.GenericPackageDescription]
-    -> Maybe (Map PackageName (Map FlagName Bool))
-    -> Resolver
-    -> m BuildPlanCheck
-checkResolverSpec gpds flags resolver = do
-    case resolver of
-      ResolverSnapshot name -> checkSnapBuildPlan gpds flags name
-      ResolverCompiler {} -> return $ BuildPlanCheckPartial Map.empty Map.empty
-      -- TODO support custom resolver for stack init
-      ResolverCustom {} -> return $ BuildPlanCheckPartial Map.empty Map.empty
+    lsConstraints = fmap lpiConstraints . lsPackages -- FIXME need globals, right?
 
 -- | Finds all files with a .cabal extension under a given directory. If
 -- a `hpack` `package.yaml` file exists, this will be used to generate a cabal
@@ -658,7 +642,8 @@ solveExtraDeps modStackYaml = do
     let gpds              = Map.elems $ fmap snd bundle
         oldFlags          = bcFlags bconfig
         oldExtraVersions  = bcDependencies bconfig
-        resolver          = sdResolver $ bcSnapshotDef bconfig
+        sd                = bcSnapshotDef bconfig
+        resolver          = sdResolver sd
         oldSrcs           = gpdPackages gpds
         oldSrcFlags       = Map.intersection oldFlags oldSrcs
         oldExtraFlags     = error "oldExtraFlags FIXME" -- Map.intersection oldFlags oldExtraVersions
@@ -666,14 +651,13 @@ solveExtraDeps modStackYaml = do
         srcConstraints    = mergeConstraints oldSrcs oldSrcFlags
         extraConstraints  = error "extraConstraints FIXME" -- mergeConstraints oldExtraVersions oldExtraFlags
 
-    let resolver' = fmap (const (error "Solver FIXME")) resolver
-    resolverResult <- checkResolverSpec gpds (Just oldSrcFlags) resolver'
+    resolverResult <- checkSnapBuildPlan (parent stackYaml) gpds (Just oldSrcFlags) sd
     resultSpecs <- case resolverResult of
         BuildPlanCheckOk flags ->
             return $ Just (mergeConstraints oldSrcs flags, Map.empty)
         BuildPlanCheckPartial {} -> do
             eres <- solveResolverSpec stackYaml cabalDirs
-                              (resolver', srcConstraints, extraConstraints)
+                              (sd, srcConstraints, extraConstraints)
             -- TODO Solver should also use the init code to ignore incompatible
             -- packages
             return $ either (const Nothing) Just eres
@@ -702,14 +686,14 @@ solveExtraDeps modStackYaml = do
 
         changed =    any (not . Map.null) [newVersions, goneVersions]
                   || any (not . Map.null) [newFlags, goneFlags]
-                  || any (/= (fmap snd resolver')) (fmap (fmap snd) mOldResolver)
+                  || any (/= (void resolver)) (fmap void mOldResolver)
 
     if changed then do
         $logInfo ""
         $logInfo $ "The following changes will be made to "
                    <> T.pack relStackYaml <> ":"
 
-        printResolver (fmap (fmap snd) mOldResolver) (fmap snd resolver')
+        printResolver (fmap void mOldResolver) (void resolver)
 
         printFlags newFlags  "* Flags to be added"
         printDeps  newVersions   "* Dependencies to be added"
