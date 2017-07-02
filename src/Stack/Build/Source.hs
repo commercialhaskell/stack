@@ -62,9 +62,10 @@ import              Prelude hiding (sequence)
 import              Stack.Build.Cache
 import              Stack.Build.Target
 import              Stack.Config (getLocalPackages)
-import              Stack.Constants (wiredInPackages)
+import              Stack.Fetch (withCabalLoader)
 import              Stack.Package
 import              Stack.PackageIndex (getPackageVersions)
+import              Stack.Snapshot (calculatePackagePromotion)
 import              Stack.Types.Build
 import              Stack.Types.BuildPlan
 import              Stack.Types.Config
@@ -263,95 +264,117 @@ parseTargetsFromBuildOpts
     :: (StackM env m, HasEnvConfig env)
     => NeedTargets
     -> BuildOptsCLI
-    -> m (LoadedSnapshot, HashSet PackageIdentifierRevision, M.Map PackageName SimpleTarget)
+    -> m ( LoadedSnapshot
+         , Map PackageName PackageLocation -- additional local dependencies
+         , Map PackageName SimpleTarget
+         )
 parseTargetsFromBuildOpts needTargets boptscli = do
     rawLocals <- getLocalPackageViews
     parseTargetsFromBuildOptsWith rawLocals needTargets boptscli
 
 parseTargetsFromBuildOptsWith
-    :: (StackM env m, HasEnvConfig env)
+    :: forall env m.
+       (StackM env m, HasEnvConfig env)
     => Map PackageName (LocalPackageView, GenericPackageDescription)
        -- ^ Local package views
     -> NeedTargets
     -> BuildOptsCLI
-    -> m (LoadedSnapshot, HashSet PackageIdentifierRevision, M.Map PackageName SimpleTarget)
+    -> m ( LoadedSnapshot
+         , Map PackageName PackageLocation -- additional local dependencies
+         , Map PackageName SimpleTarget
+         )
 parseTargetsFromBuildOptsWith rawLocals needTargets boptscli = do
-    error "parseTargetsFromBuildOptsWith"
-    {-
     $logDebug "Parsing the targets"
     bconfig <- view buildConfigL
-    ls0 <- error "parseTargetsFromBuildOptsWith" {- FIXME
-        case bcResolver bconfig of
-            ResolverCompiler _ -> do
-                -- We ignore the resolver version, as it might be
-                -- GhcMajorVersion, and we want the exact version
-                -- we're using.
-                version <- view actualCompilerVersionL
-                return LoadedSnapshot
-                    { rsCompilerVersion = version
-                    , rsPackages = Map.empty
-                    , rsUniqueName = error "parseTargetsFromBuildOptsWith.rsUniqueName"
-                    }
-            _ -> error "parseTargetsFromBuildOptsWith" -- FIXME return (bcWantedMiniBuildPlan bconfig)
-    -}
+    ls0 <- view loadedSnapshotL
     workingDir <- getCurrentDir
 
-    let snapshot = lpiVersion <$> lsPackages ls0
-    flagExtraDeps <- convertSnapshotToExtra
-        snapshot
-        (bcExtraDeps bconfig)
-        rawLocals
-        (catMaybes $ Map.keys $ boptsCLIFlags boptscli)
+    root <- view projectRootL
+    menv <- getMinimalEnvOverride
 
-    (cliExtraDeps, targets) <-
+    let gpdHelper isDep =
+            mapM go . Map.toList
+          where
+            go :: (Path Abs Dir, PackageLocation)
+               -> m (GenericPackageDescription, PackageLocation, (Path Abs Dir, Bool))
+            go (dir, loc) = do
+              cabalfp <- findOrGenerateCabalFile dir
+              (_, gpd) <- readPackageUnresolved cabalfp
+              return (gpd, loc, (dir, isDep))
+    lp <- getLocalPackages
+    gpdsProject <- gpdHelper False (lpProject lp)
+    gpdsDeps <- gpdHelper True (lpDependencies lp)
+
+    let dropMaybeKey (Nothing, _) = Map.empty
+        dropMaybeKey (Just key, value) = Map.singleton key value
+        flags = Map.unionWith Map.union
+          (Map.unions (map dropMaybeKey (Map.toList (boptsCLIFlags boptscli))))
+          (bcFlags bconfig)
+        hides = Set.empty -- not supported to add hidden packages
+        options = Map.empty -- FIXME not convinced that this is the right behavior, but consistent with older logic. Should we instead promote packages when stack.yaml or command line gives alternative GHC options?
+        drops = Set.empty -- not supported to add drops
+
+    (cliDeps, targets) <-
         parseTargets
             needTargets
             (bcImplicitGlobal bconfig)
-            snapshot
-            (flagExtraDeps <> bcExtraDeps bconfig)
+            (lsGlobals ls0)
+            (lsPackages ls0)
+            Map.empty -- (error "FIXME _deps") -- FIXME need to add in flagExtraDeps here somehow
             (fst <$> rawLocals)
             workingDir
             (boptsCLITargets boptscli)
-    return (ls0, cliExtraDeps <> flagExtraDeps, targets)
-    -}
 
--- | For every package in the snapshot which is referenced by a flag, give the
--- user a warning and then add it to extra-deps.
-convertSnapshotToExtra
-    :: MonadLogger m
-    => Map PackageName Version -- ^ snapshot FIXME
-    -> HashSet PackageIdentifierRevision -- ^ extra-deps
-    -> Map PackageName a -- ^ locals
-    -> [PackageName] -- ^ packages referenced by a flag
-    -> m (HashSet PackageIdentifierRevision)
-convertSnapshotToExtra snapshot extra0 locals = go HashSet.empty
-  where
-    extra0Names = HashSet.map pirName extra0
+    -- FIXME add in cliDeps
+    let gpds :: [(GenericPackageDescription, PackageLocation, (Path Abs Dir, Bool))]
+        gpds = gpdsProject ++ gpdsDeps
 
-    go !extra [] = return extra
-    go extra (flag:flags)
-        | HashSet.member flag extra0Names = go extra flags
-        | flag `Map.member` locals = go extra flags
-        | otherwise = case Map.lookup flag snapshot of
-            Nothing -> go extra flags
-            Just version -> do
+    (globals, snapshots, locals) <- withCabalLoader $ \loadFromIndex ->
+      calculatePackagePromotion loadFromIndex menv root ls0 gpds flags hides options drops
+
+    let ls = LoadedSnapshot
+          { lsCompilerVersion = lsCompilerVersion ls0
+          , lsResolver = lsResolver ls0
+          , lsGlobals = globals
+          , lsPackages = snapshots
+          }
+
+    -- FIXME we're throwing away the calculated flag info here, but I
+    -- think that's OK since the build step itself will just look it
+    -- up again
+    let localDeps =
+          Map.unions $ map go $ Map.toList locals
+          where
+            go :: (PackageName, LoadedPackageInfo (PackageLocation, Maybe (Path Abs Dir, Bool)))
+               -> Map PackageName PackageLocation
+            go (name, lpi) =
+              case lpiLocation lpi of
+                (_, Just (_, False)) -> Map.empty -- project package, ignore it
+                (loc, _) -> Map.singleton name loc -- either a promoted snapshot or local package
+
+        cliDeps' =
+          Map.mapWithKey go cliDeps
+          where
+            go name version = PLIndex $ PackageIdentifierRevision (PackageIdentifier name version) Nothing
+
+    return (ls, cliDeps' <> localDeps, targets)
+
+    {- FIXME refacotring lost this warning, do we care?
                 $logWarn $ T.concat
                     [ "- Implicitly adding "
                     , T.pack $ packageNameString flag
                     , " to extra-deps based on command line flag"
                     ]
-                let pir = PackageIdentifierRevision (PackageIdentifier flag version) Nothing
-                go (HashSet.insert pir extra) flags
+    -}
 
--- | Parse out the local package views for the current project
+-- | Parse out the local project packages for the current project
+-- (ignores dependencies).
 getLocalPackageViews :: (StackM env m, HasEnvConfig env)
                      => m (Map PackageName (LocalPackageView, GenericPackageDescription))
 getLocalPackageViews = do
-    error "getLocalPackageViews"
-    {-
     $logDebug "Parsing the cabal files of the local packages"
-    packages <- getLocalPackages
-    locals <- forM (Map.toList packages) $ \(dir, treatLikeExtraDep) -> do
+    lp <- getLocalPackages
+    locals <- forM (Map.toList (lpProject lp)) $ \(dir, _loc) -> do
         cabalfp <- findOrGenerateCabalFile dir
         (warnings,gpkg) <- readPackageUnresolved cabalfp
         mapM_ (printCabalFileWarning cabalfp) warnings
@@ -362,7 +385,6 @@ getLocalPackageViews = do
                 { lpvVersion = fromCabalVersion $ pkgVersion cabalID
                 , lpvRoot = dir
                 , lpvCabalFP = cabalfp
-                , lpvExtraDep = treatLikeExtraDep
                 , lpvComponents = getNamedComponents gpkg
                 }
         return (name, (lpv, gpkg))
@@ -377,7 +399,6 @@ getLocalPackageViews = do
         ]
       where
         go wrapper f = map (wrapper . T.pack . fst) $ f gpkg
-    -}
 
 -- | Check if there are any duplicate package names and, if so, throw an
 -- exception.
@@ -419,10 +440,10 @@ loadLocalPackage boptsCli targets (name, (lpv, gpkg)) = do
                 Just (STLocalComps comps) -> splitComponents $ Set.toList comps
                 Just STLocalAll ->
                     ( packageExes pkg
-                    , if boptsTests bopts && not (lpvExtraDep lpv)
+                    , if boptsTests bopts
                         then Map.keysSet (packageTests pkg)
                         else Set.empty
-                    , if boptsBenchmarks bopts && not (lpvExtraDep lpv)
+                    , if boptsBenchmarks bopts
                         then packageBenchmarks pkg
                         else Set.empty
                     )

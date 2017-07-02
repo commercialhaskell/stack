@@ -16,10 +16,12 @@
 module Stack.Snapshot
   ( loadResolver
   , loadSnapshot
+  , calculatePackagePromotion
   ) where
 
 import           Control.Applicative
-import           Control.Exception.Safe (impureThrow)
+import           Control.Arrow (second)
+import           Control.Exception.Safe (assert, impureThrow)
 import           Control.Monad (forM, unless, void)
 import           Control.Monad.Catch
 import           Control.Monad.IO.Class
@@ -309,7 +311,7 @@ loadSnapshot' loadFromIndex menv mcompiler root =
 
     inner :: SnapshotDef -> m LoadedSnapshot
     inner sd = do
-      LoadedSnapshot compilerVersion _ globals0 parentPackages0 <-
+      ls0 <-
         case sdParent sd of
           Left cv ->
             case mcompiler of
@@ -322,13 +324,57 @@ loadSnapshot' loadFromIndex menv mcompiler root =
               Just cv' -> loadCompiler cv'
           Right sd' -> start sd'
 
+      gpds <- fmap concat $ mapM
+        (loadGenericPackageDescriptions loadFromIndex menv root)
+        (sdLocations sd)
+
+      (globals, snapshot, locals) <-
+        calculatePackagePromotion loadFromIndex menv root ls0
+        (map (\(x, y) -> (x, y, ())) gpds)
+        (sdFlags sd) (sdHide sd) (sdGhcOptions sd) (sdDropPackages sd)
+
+      return LoadedSnapshot
+        { lsCompilerVersion = lsCompilerVersion ls0
+        , lsResolver = sdResolver sd
+        , lsGlobals = globals
+        -- When applying a snapshot on top of another one, we merge
+        -- the two snapshots' packages together.
+        , lsPackages = Map.union snapshot (Map.map (fmap fst) locals)
+        }
+
+-- | Given information on a 'LoadedSnapshot' and a given set of
+-- additional packages and configuration values, calculates the new
+-- global and snapshot packages, as well as the new local packages.
+--
+-- The new globals and snapshots must be a subset of the initial
+-- values.
+calculatePackagePromotion
+  :: forall env m localLocation.
+     (StackMiniM env m, HasConfig env, HasGHCVariant env)
+  => (PackageIdentifierRevision -> IO ByteString) -- ^ load from index
+  -> EnvOverride
+  -> Path Abs Dir -- ^ project root
+  -> LoadedSnapshot
+  -> [(GenericPackageDescription, PackageLocation, localLocation)] -- ^ packages we want to add on top of this snapshot
+  -> Map PackageName (Map FlagName Bool) -- ^ flags
+  -> Set PackageName -- ^ packages that should be registered hidden
+  -> Map PackageName [Text] -- ^ GHC options
+  -> Set PackageName -- ^ packages in the snapshot to drop
+  -> m ( Map PackageName (LoadedPackageInfo GhcPkgId) -- new globals
+       , Map PackageName (LoadedPackageInfo PackageLocation) -- new snapshot
+       , Map PackageName (LoadedPackageInfo (PackageLocation, Maybe localLocation)) -- new locals
+       )
+calculatePackagePromotion
+  loadFromIndex menv root (LoadedSnapshot compilerVersion _ globals0 parentPackages0)
+  gpds flags0 hides0 options0 drops0 = do
+
       platform <- view platformL
 
       (packages1, flags, hide, ghcOptions) <- execStateT
-        (mapM_ (findPackage loadFromIndex menv root platform compilerVersion) (sdLocations sd))
-        (Map.empty, sdFlags sd, sdHide sd, sdGhcOptions sd)
+        (mapM_ (findPackage platform compilerVersion) gpds)
+        (Map.empty, flags0, hides0, options0)
 
-      let toDrop = Map.union (const () <$> packages1) (Map.fromSet (const ()) (sdDropPackages sd))
+      let toDrop = Map.union (const () <$> packages1) (Map.fromSet (const ()) drops0)
           globals1 = Map.difference globals0 toDrop
           parentPackages1 = Map.difference parentPackages0 toDrop
 
@@ -355,19 +401,20 @@ loadSnapshot' loadFromIndex menv mcompiler root =
                 $ mapM (recalculate loadFromIndex menv root compilerVersion flags hide ghcOptions)
                 $ Map.toList allToUpgrade
 
-      let packages2 = Map.unions [upgraded, packages1, parentPackages2]
+      let packages2 = Map.unions [Map.map void upgraded, Map.map void packages1, Map.map void parentPackages2]
           allAvailable = Map.union
             (lpiVersion <$> globals3)
             (lpiVersion <$> packages2)
 
       checkDepsMet allAvailable packages2
 
-      return LoadedSnapshot
-        { lsCompilerVersion = compilerVersion
-        , lsResolver = sdResolver sd
-        , lsGlobals = globals3
-        , lsPackages = packages2
-        }
+      -- FIXME check the subset requirement
+
+      return
+        ( globals3
+        , parentPackages2
+        , Map.union (Map.map (fmap (, Nothing)) upgraded) (Map.map (fmap (second Just)) packages1)
+        )
 
 -- | Recalculate a 'LoadedPackageInfo' based on updates to flags,
 -- hide values, and GHC options.
@@ -422,7 +469,7 @@ fromGlobalHints =
 -- are available in the given Map of packages.
 checkDepsMet :: MonadThrow m
              => Map PackageName Version -- ^ all available packages
-             -> Map PackageName (LoadedPackageInfo PackageLocation)
+             -> Map PackageName (LoadedPackageInfo localLocation)
              -> m ()
 checkDepsMet available m
   | Map.null errs = return ()
@@ -497,8 +544,8 @@ loadCompiler cv = do
                 , lpiHide = not $ dpIsExposed dp
                 }
 
-type FindPackageS =
-    ( Map PackageName (LoadedPackageInfo PackageLocation)
+type FindPackageS localLocation =
+    ( Map PackageName (LoadedPackageInfo (PackageLocation, localLocation))
     , Map PackageName (Map FlagName Bool)
     , Set PackageName
     , Map PackageName [Text]
@@ -508,41 +555,34 @@ type FindPackageS =
 -- hidden state, and GHC options from the 'StateT' (removing them from
 -- the 'StateT'), and add the newly found package to the contained
 -- 'Map'.
-findPackage :: forall m env.
-               (StackMiniM env m, HasConfig env)
-            => (PackageIdentifierRevision -> IO ByteString)
-            -> EnvOverride
-            -> Path Abs Dir -- ^ project root, used for checking out necessary files
-            -> Platform
+findPackage :: forall m localLocation.
+               MonadThrow m
+            => Platform
             -> CompilerVersion
-            -> PackageLocation
-            -> StateT FindPackageS m ()
-findPackage loadFromIndex menv root platform compilerVersion loc0 =
-    loadGenericPackageDescriptions loadFromIndex menv root loc0 >>= mapM_ (uncurry go)
+            -> (GenericPackageDescription, PackageLocation, localLocation)
+            -> StateT (FindPackageS localLocation) m ()
+findPackage platform compilerVersion (gpd, loc, localLoc) = do
+    (m, allFlags, allHide, allOptions) <- get
+
+    case Map.lookup name m of
+      Nothing -> return ()
+      Just lpi -> throwM $ PackageDefinedTwice name loc (fst (lpiLocation lpi))
+
+    let flags = fromMaybe Map.empty $ Map.lookup name allFlags
+        allFlags' = Map.delete name allFlags
+
+        hide = Set.member name allHide
+        allHide' = Set.delete name allHide
+
+        options = fromMaybe [] $ Map.lookup name allOptions
+        allOptions' = Map.delete name allOptions
+
+        (name', lpi) = calculate gpd platform compilerVersion (loc, localLoc) flags hide options
+        m' = Map.insert name lpi m
+
+    assert (name == name') $ put (m', allFlags', allHide', allOptions')
   where
-    go :: GenericPackageDescription -> PackageLocation -> StateT FindPackageS m ()
-    go gpd loc = do
-        (m, allFlags, allHide, allOptions) <- get
-
-        case Map.lookup name m of
-          Nothing -> return ()
-          Just lpi -> throwM $ PackageDefinedTwice name loc (lpiLocation lpi)
-
-        let flags = fromMaybe Map.empty $ Map.lookup name allFlags
-            allFlags' = Map.delete name allFlags
-
-            hide = Set.member name allHide
-            allHide' = Set.delete name allHide
-
-            options = fromMaybe [] $ Map.lookup name allOptions
-            allOptions' = Map.delete name allOptions
-
-            (_name, lpi) = calculate gpd platform compilerVersion loc flags hide options
-            m' = Map.insert name lpi m
-
-        put (m', allFlags', allHide', allOptions')
-      where
-        PackageIdentifier name _version = fromCabalPackageIdentifier $ C.package $ C.packageDescription gpd
+    PackageIdentifier name _version = fromCabalPackageIdentifier $ C.package $ C.packageDescription gpd
 
 -- | Some hard-coded fixes for build plans, hopefully to be irrelevant over
 -- time.
@@ -640,11 +680,11 @@ parseGPD loc bs =
 calculate :: GenericPackageDescription
           -> Platform
           -> CompilerVersion
-          -> PackageLocation
+          -> loc
           -> Map FlagName Bool
           -> Bool -- ^ hidden?
           -> [Text] -- ^ GHC options
-          -> (PackageName, LoadedPackageInfo PackageLocation)
+          -> (PackageName, LoadedPackageInfo loc)
 calculate gpd platform compilerVersion loc flags hide options =
     (name, lpi)
   where

@@ -564,12 +564,12 @@ data EnvConfig = EnvConfig
     }
 
 data LocalPackages = LocalPackages
-  { lpProject :: !(Set (Path Abs Dir))
-  , lpDependencies :: !(Set (Path Abs Dir))
+  { lpProject :: !(Map (Path Abs Dir) PackageLocation)
+  , lpDependencies :: !(Map (Path Abs Dir) PackageLocation)
   }
 
 -- | Get both project and dependency filepaths. FIXME do we really need this?
-lpAllLocal :: LocalPackages -> Set (Path Abs Dir)
+lpAllLocal :: LocalPackages -> Map (Path Abs Dir) PackageLocation
 lpAllLocal (LocalPackages x y) = x <> y
 
 -- | Value returned by 'Stack.Config.loadConfig'.

@@ -625,7 +625,7 @@ solveExtraDeps modStackYaml = do
 
     $logInfo $ "Using configuration file: " <> T.pack relStackYaml
     packages <- lpAllLocal <$> getLocalPackages -- FIXME probably just lpProject?
-    let cabalDirs = Set.toList packages
+    let cabalDirs = Map.keys packages
         noPkgMsg = "No cabal packages found in " <> relStackYaml <>
                    ". Please add at least one directory containing a .cabal \
                    \file. You can also use 'stack init' to automatically \

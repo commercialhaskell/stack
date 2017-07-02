@@ -25,8 +25,6 @@ import           Control.Monad.Catch (MonadCatch, throwM)
 import           Control.Monad.IO.Class
 import           Data.Either (partitionEithers)
 import           Data.Foldable
-import           Data.HashSet (HashSet)
-import qualified Data.HashSet as HashSet
 import           Data.List.Extra (groupSort)
 import           Data.List.NonEmpty (NonEmpty((:|)))
 import qualified Data.List.NonEmpty as NonEmpty
@@ -45,6 +43,8 @@ import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageName
 import           Stack.Types.Version
 import           Stack.Types.Build
+import           Stack.Types.BuildPlan
+import           Stack.Types.GhcPkgId
 import           Stack.Types.Package
 
 -- | The name of a component, which applies to executables, test suites, and benchmarks
@@ -110,7 +110,6 @@ data LocalPackageView = LocalPackageView
     , lpvRoot       :: !(Path Abs Dir)
     , lpvCabalFP    :: !(Path Abs File)
     , lpvComponents :: !(Set NamedComponent)
-    , lpvExtraDep   :: !Bool
     }
 
 -- | Same as @parseRawTarget@, but also takes directories into account.
@@ -137,7 +136,7 @@ parseRawTargetDirs root locals t =
     ri = RawInput t
 
     childOf dir (name, lpv) =
-        if (dir == lpvRoot lpv || isParentOf dir (lpvRoot lpv)) && not (lpvExtraDep lpv)
+        if dir == lpvRoot lpv || isParentOf dir (lpvRoot lpv)
             then Just name
             else Nothing
 
@@ -148,45 +147,52 @@ data SimpleTarget
     | STLocalAll
     deriving (Show, Eq, Ord)
 
-resolveIdents :: Map PackageName Version -- ^ snapshot
-              -> HashSet PackageIdentifierRevision -- ^ extra deps
-              -> Map PackageName LocalPackageView
+-- | Given the snapshot information and the local packages (both
+-- project and dependencies), figure out the appropriate 'RawTarget'
+-- and any added local dependencies based on specified package
+-- identifiers.
+resolveIdents :: Map PackageName (LoadedPackageInfo GhcPkgId) -- ^ globals
+              -> Map PackageName (LoadedPackageInfo PackageLocation) -- ^ snapshot
+              -> Map PackageName Version -- ^ local dependencies
+              -> Map PackageName LocalPackageView -- ^ names and locations of project packages
               -> (RawInput, RawTarget 'HasIdents)
-              -> Either Text ((RawInput, RawTarget 'NoIdents), HashSet PackageIdentifierRevision)
-resolveIdents _ _ _ (ri, RTPackageComponent x y) = Right ((ri, RTPackageComponent x y), HashSet.empty)
-resolveIdents _ _ _ (ri, RTComponent x) = Right ((ri, RTComponent x), HashSet.empty)
-resolveIdents _ _ _ (ri, RTPackage x) = Right ((ri, RTPackage x), HashSet.empty)
-resolveIdents snap extras locals (ri, RTPackageIdentifierRevision pir@(PackageIdentifierRevision (PackageIdentifier name version) _)) =
-    fmap ((ri, RTPackage name), ) newExtras
+              -> Either Text ((RawInput, RawTarget 'NoIdents), Map PackageName Version)
+resolveIdents _ _ _ _ (ri, RTPackageComponent x y) = Right ((ri, RTPackageComponent x y), Map.empty)
+resolveIdents _ _ _ _ (ri, RTComponent x) = Right ((ri, RTComponent x), Map.empty)
+resolveIdents _ _ _ _ (ri, RTPackage x) = Right ((ri, RTPackage x), Map.empty)
+resolveIdents _ _ _ _ (_ri, RTPackageIdentifierRevision (PackageIdentifierRevision _ (Just _cfi))) =
+    Left "Cabal file revision information should not be passed on the command line,\nplease add in your snapshot or stack.yaml configuration instead"
+resolveIdents globals snap deps locals (ri, RTPackageIdentifierRevision (PackageIdentifierRevision (PackageIdentifier name version) Nothing)) =
+    fmap ((ri, RTPackage name), ) newDeps
   where
-    newExtras =
-        case (Map.lookup name locals, mfound) of
+    newDeps =
+        case (Map.member name locals, mfound) of
             -- Error if it matches a local package, pkg idents not
             -- supported for local.
-            (Just _, _) -> Left $ T.concat
+            (True, _) -> Left $ T.concat
                 [ packageNameText name
                 , " target has a specific version number, but it is a local package."
                 , "\nTo avoid confusion, we will not install the specified version or build the local one."
                 , "\nTo build the local package, specify the target without an explicit version."
                 ]
-            -- If the found version matches, no need for an extra-dep. FIXME deal with mismatched hashes
-            (_, Just (foundVersion, _foundCFI')) | foundVersion == version -> Right HashSet.empty
+            -- Specified the same package identifier as we already
+            -- have, so nothing to add.
+            (_, Just foundVersion) | foundVersion == version -> Right Map.empty
             -- Otherwise, if there is no specified version or a
-            -- mismatch, add an extra-dep.
-            _ -> Right $ HashSet.singleton pir
-    mfound = asum (map (Map.lookup name) [extras', snap'])
+            -- mismatch, add an extra dep.
+            _ -> Right $ Map.singleton name version
+    mfound = asum (map (Map.lookup name) [deps, lpiVersion <$> snap, lpiVersion <$> globals])
 
-    extras' = Map.fromList $ map
-      (\(PackageIdentifierRevision (PackageIdentifier name' version') mcfi) -> (name', (version', mcfi)))
-      (HashSet.toList extras)
-    snap' = Map.map (, Nothing) snap -- FIXME fix the data
-
-resolveRawTarget :: Map PackageName Version -- ^ snapshot
-                 -> HashSet PackageIdentifierRevision -- ^ extra deps
-                 -> Map PackageName LocalPackageView
+-- | Convert a 'RawTarget' without any package identifiers into a
+-- 'SimpleTarget', if possible. This will deal with things like
+-- checking for correct components.
+resolveRawTarget :: Map PackageName (LoadedPackageInfo GhcPkgId) -- ^ globals
+                 -> Map PackageName (LoadedPackageInfo PackageLocation) -- ^ snapshot
+                 -> Map PackageName Version -- ^ local extras
+                 -> Map PackageName LocalPackageView -- ^ locals
                  -> (RawInput, RawTarget 'NoIdents)
                  -> Either Text (PackageName, (RawInput, SimpleTarget))
-resolveRawTarget snap extras locals (ri, rt) =
+resolveRawTarget globals snap deps locals (ri, rt) =
     go rt
   where
     go (RTPackageComponent name ucomp) =
@@ -238,15 +244,11 @@ resolveRawTarget snap extras locals (ri, rt) =
     go (RTPackage name) =
         case Map.lookup name locals of
             Just _lpv -> Right (name, (ri, STLocalAll))
-            Nothing ->
-                if HashSet.member name extrasNames
-                    then Right (name, (ri, STNonLocal))
-                    else
-                        case Map.lookup name snap of
-                            Just _ -> Right (name, (ri, STNonLocal))
-                            Nothing -> Right (name, (ri, STUnknown))
-
-    extrasNames = HashSet.map (\(PackageIdentifierRevision (PackageIdentifier name _) _) -> name) extras
+            Nothing
+              | Map.member name deps ||
+                Map.member name snap ||
+                Map.member name globals -> Right (name, (ri, STNonLocal))
+              | otherwise -> Right (name, (ri, STUnknown))
 
 isCompNamed :: Text -> NamedComponent -> Bool
 isCompNamed _ CLib = False
@@ -285,46 +287,49 @@ data NeedTargets
     = NeedTargets
     | AllowNoTargets
 
+-- | Given the snapshot and local package information from the config
+-- files and a list of command line targets, calculate additional
+-- local dependencies needed and the simplified view of targets that
+-- we actually want to build.
 parseTargets :: (MonadCatch m, MonadIO m)
-             => NeedTargets -- ^ need at least one target
-             -> Bool -- ^ using implicit global project?
-             -> Map PackageName Version -- ^ snapshot
-             -> HashSet PackageIdentifierRevision -- ^ extra deps
-             -> Map PackageName LocalPackageView
+             => NeedTargets -- ^ need at least one target?
+             -> Bool -- ^ using implicit global project? used for better error reporting
+             -> Map PackageName (LoadedPackageInfo GhcPkgId) -- ^ globals
+             -> Map PackageName (LoadedPackageInfo PackageLocation) -- ^ snapshot
+             -> Map PackageName Version -- ^ local dependencies
+             -> Map PackageName LocalPackageView -- ^ names and locations of project packages
              -> Path Abs Dir -- ^ current directory
              -> [Text] -- ^ command line targets
-             -> m (HashSet PackageIdentifierRevision, Map PackageName SimpleTarget)
-parseTargets needTargets implicitGlobal snap extras locals currDir textTargets' = do
-    let nonExtraDeps = Map.keys $ Map.filter (not . lpvExtraDep) locals
-        textTargets =
+             -> m (Map PackageName Version, Map PackageName SimpleTarget)
+parseTargets needTargets implicitGlobal globals snap deps locals currDir textTargets' = do
+    let textTargets =
             if null textTargets'
-                then map (T.pack . packageNameString) nonExtraDeps
+                then map (T.pack . packageNameString) (Map.keys locals)
                 else textTargets'
     erawTargets <- mapM (parseRawTargetDirs currDir locals) textTargets
 
     let (errs1, rawTargets) = partitionEithers erawTargets
         -- When specific package identifiers are provided, treat these
         -- as extra-deps.
-        (errs2, unzip -> (rawTargets', newExtras)) = partitionEithers $
-            map (resolveIdents snap extras locals) $ concat rawTargets
+        (errs2, unzip -> (rawTargets', newDeps)) = partitionEithers $
+            map (resolveIdents globals snap deps locals) $ concat rawTargets
         -- Find targets that specify components in the local packages,
         -- otherwise find package targets in snap and extra-deps.
         (errs3, targetTypes) = partitionEithers $
-            map (resolveRawTarget snap extras locals) rawTargets'
+            map (resolveRawTarget globals snap deps locals) rawTargets'
         (errs4, targets) = simplifyTargets targetTypes
         errs = concat [errs1, errs2, errs3, errs4]
 
     if null errs
         then if Map.null targets
                  then case needTargets of
-                        AllowNoTargets ->
-                            return (HashSet.empty, Map.empty)
+                        AllowNoTargets -> return (Map.empty, Map.empty)
                         NeedTargets
                             | null textTargets' && implicitGlobal -> throwM $ TargetParseException
                                 ["The specified targets matched no packages.\nPerhaps you need to run 'stack init'?"]
-                            | null textTargets' && null nonExtraDeps -> throwM $ TargetParseException
+                            | null textTargets' && Map.null locals -> throwM $ TargetParseException
                                 ["The project contains no local packages (packages not marked with 'extra-dep')"]
                             | otherwise -> throwM $ TargetParseException
                                 ["The specified targets matched no packages"]
-                 else return (HashSet.unions newExtras, targets)
+                 else return (Map.unions newDeps, targets)
         else throwM $ TargetParseException errs

@@ -266,7 +266,7 @@ getAllLocalTargets GhciOpts{..} targets0 mainIsTargets sourceMap = do
     -- Find all of the packages that are directly demanded by the
     -- targets.
     directlyWanted <-
-        forMaybeM (S.toList packages) $
+        forMaybeM (M.keys packages) $
         \dir ->
              do cabalfp <- findOrGenerateCabalFile dir
                 name <- parsePackageNameFromFilePath cabalfp

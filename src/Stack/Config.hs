@@ -649,7 +649,7 @@ getLocalPackages = do
         Nothing -> do
             menv <- getMinimalEnvOverride
             root <- view projectRootL
-            let helper f = fmap (Set.fromList . map fst . concat)
+            let helper f = fmap (Map.fromList . concat)
                          $ view (buildConfigL.to f)
                        >>= mapM (resolvePackageLocation menv root)
             packages <- helper bcPackages

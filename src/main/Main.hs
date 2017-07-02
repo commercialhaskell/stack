@@ -27,9 +27,9 @@ import           Data.Attoparsec.Interpreter (getInterpreterArgs)
 import qualified Data.ByteString.Lazy as L
 import           Data.IORef.RunOnce (runOnce)
 import           Data.List
+import qualified Data.Map.Strict as Map
 import           Data.Maybe
 import           Data.Monoid
-import qualified Data.Set as Set
 import           Data.Text (Text)
 import qualified Data.Text as T
 import           Data.Traversable
@@ -699,7 +699,7 @@ sdistCmd sdistOpts go =
     withBuildConfig go $ do -- No locking needed.
         -- If no directories are specified, build all sdist tarballs.
         dirs' <- if null (sdoptsDirsToWorkWith sdistOpts)
-            then liftM (Set.toList . lpAllLocal) getLocalPackages -- FIXME just lpProject, right?
+            then liftM (Map.keys . lpAllLocal) getLocalPackages -- FIXME just lpProject, right?
             else mapM resolveDir' (sdoptsDirsToWorkWith sdistOpts)
         forM_ dirs' $ \dir -> do
             (tarName, tarBytes, _mcabalRevision) <- getSDistTarball (sdoptsPvpBounds sdistOpts) dir

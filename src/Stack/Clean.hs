@@ -15,7 +15,6 @@ import           Data.Foldable (forM_)
 import           Data.List ((\\),intercalate)
 import qualified Data.Map.Strict as Map
 import           Data.Maybe (mapMaybe)
-import qualified Data.Set as Set
 import           Data.Typeable (Typeable)
 import           Path (Path, Abs, Dir)
 import           Path.IO (ignoringAbsence, removeDirRecur)
@@ -47,7 +46,7 @@ dirsToDelete cleanOpts = do
     case cleanOpts of
         CleanShallow [] ->
             -- Filter out packages listed as extra-deps
-            mapM distDirFromDir $ Set.toList $ lpProject packages
+            mapM distDirFromDir $ Map.keys $ lpProject packages
         CleanShallow targets -> do
             localPkgViews <- getLocalPackageViews
             let localPkgNames = Map.keys localPkgViews
@@ -56,7 +55,7 @@ dirsToDelete cleanOpts = do
                 [] -> mapM distDirFromDir (mapMaybe getPkgDir targets)
                 xs -> throwM (NonLocalPackages xs)
         CleanFull -> do
-            pkgWorkDirs <- mapM workDirFromDir $ Set.toList $ lpProject packages
+            pkgWorkDirs <- mapM workDirFromDir $ Map.keys $ lpProject packages
             projectWorkDir <- getProjectWorkDir
             return (projectWorkDir : pkgWorkDirs)
 
