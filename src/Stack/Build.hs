@@ -26,7 +26,7 @@ import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import           Control.Monad.Reader (MonadReader)
 import           Control.Monad.Trans.Resource
-import           Control.Monad.Trans.Unlift (MonadBaseUnlift)
+import           Control.Monad.Trans.Unlift (MonadBaseUnlift, askRunBase)
 import           Data.Aeson (Value (Object, Array), (.=), object)
 import           Data.Function
 import qualified Data.HashMap.Strict as HM
@@ -63,7 +63,9 @@ import           Stack.Fetch as Fetch
 import           Stack.Package
 import           Stack.PackageIndex
 import           Stack.PrettyPrint
+import           Stack.Snapshot (loadRawCabalFiles)
 import           Stack.Types.Build
+import           Stack.Types.BuildPlan
 import           Stack.Types.Config
 import           Stack.Types.FlagName
 import           Stack.Types.Package
@@ -115,8 +117,6 @@ build setLocalFiles mbuildLk boptsCli = fixCodePage $ do
                          , getInstalledHaddock   = shouldHaddockDeps bopts
                          , getInstalledSymbols   = symbols }
                      sourceMap
-
-    warnMissingExtraDeps installedMap extraDeps
 
     baseConfigOpts <- mkBaseConfigOpts boptsCli
     plan <- withLoadPackage $ \loadPackage ->
@@ -185,26 +185,6 @@ newtype CabalVersionException = CabalVersionException { unCabalVersionException 
 
 instance Show CabalVersionException where show = unCabalVersionException
 instance Exception CabalVersionException
-
-warnMissingExtraDeps
-    :: (StackM env m, HasConfig env)
-    => InstalledMap -> HashSet PackageIdentifierRevision -> m ()
-warnMissingExtraDeps installed extraDeps = do
-    missingExtraDeps <-
-        fmap catMaybes $ forM (HashSet.toList extraDeps) $
-          \(PackageIdentifierRevision (PackageIdentifier n v) _) ->
-            if Map.member n installed
-                then return Nothing
-                else do
-                    vs <- getPackageVersions n
-                    if Set.null vs
-                        then return $ Just $
-                            fromString (packageNameString n ++ "-" ++ versionString v)
-                        else return Nothing
-    unless (null missingExtraDeps) $
-        $prettyWarn $
-            "Some extra-deps are neither installed nor in the index:" <> line <>
-            indent 4 (bulletedList missingExtraDeps)
 
 -- | See https://github.com/commercialhaskell/stack/issues/1198.
 warnIfExecutablesWithSameNameCouldBeOverwritten
@@ -315,19 +295,23 @@ mkBaseConfigOpts boptsCli = do
 
 -- | Provide a function for loading package information from the package index
 withLoadPackage :: (StackM env m, HasEnvConfig env, MonadBaseUnlift IO m)
-                => ((PackageIdentifierRevision -> Map FlagName Bool -> [Text] -> IO Package) -> m a)
+                => ((PackageLocation -> Map FlagName Bool -> [Text] -> IO Package) -> m a)
                 -> m a
 withLoadPackage inner = do
     econfig <- view envConfigL
-    withCabalLoader $ \cabalLoader ->
-        inner $ \pir flags ghcOptions -> do
+    menv <- getMinimalEnvOverride
+    root <- view projectRootL
+    run <- askRunBase
+    withCabalLoader $ \loadFromIndex ->
+        inner $ \loc flags ghcOptions -> do
             -- FIXME this looks very similar to code in
             -- Stack.Snapshot, try to merge it together
-            bs <- cabalLoader pir
+            list <- run $ loadRawCabalFiles loadFromIndex menv root loc
 
-            -- Intentionally ignore warnings, as it's not really
-            -- appropriate to print a bunch of warnings out while
-            -- resolving the package index.
+            bs <- case list of
+              [(bs, _loc)] -> return bs
+              _ -> error "withLoadPackage: invariant violated"
+
             (_warnings,pkg) <- readPackageBS (depPackageConfig econfig flags ghcOptions) bs
             return pkg
   where

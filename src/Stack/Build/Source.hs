@@ -62,6 +62,7 @@ import              Prelude hiding (sequence)
 import              Stack.Build.Cache
 import              Stack.Build.Target
 import              Stack.Config (getLocalPackages)
+import              Stack.Constants (wiredInPackages)
 import              Stack.Fetch (withCabalLoader)
 import              Stack.Package
 import              Stack.PackageIndex (getPackageVersions)
@@ -110,7 +111,7 @@ loadSourceMapFull :: (StackM env m, HasEnvConfig env)
                        , LoadedSnapshot
                        , [LocalPackage]
                        , Set PackageName -- non-local targets
-                       , HashSet PackageIdentifierRevision -- extra-deps from configuration and cli
+                       , Map PackageName PackageLocation -- local deps from configuration and cli
                        , SourceMap
                        )
 loadSourceMapFull needTargets boptsCli = do
@@ -118,13 +119,10 @@ loadSourceMapFull needTargets boptsCli = do
     rawLocals <- getLocalPackageViews
     (ls0, cliExtraDeps, targets) <- parseTargetsFromBuildOptsWith rawLocals needTargets boptsCli
 
-    error "loadSourceMapFull"
-    {- FIXME
-
     -- Extend extra-deps to encompass targets requested on the command line
     -- that are not in the snapshot.
     extraDeps0 <- extendExtraDeps
-        (bcExtraDeps bconfig)
+        (bcDependencies bconfig)
         cliExtraDeps
         (Map.keysSet $ Map.filter (== STUnknown) targets)
 
@@ -145,16 +143,16 @@ loadSourceMapFull needTargets boptsCli = do
             isLocal STUnknown = False
             isLocal STNonLocal = False
 
-        shadowed = Map.keysSet rawLocals <>
-                   Set.fromList (map pirName (HashSet.toList extraDeps0))
+        shadowed = Map.keysSet rawLocals <> Map.keysSet extraDeps0
 
         -- Ignores all packages in the LoadedSnapshot that depend on any
         -- local packages or extra-deps. All packages that have
         -- transitive dependenceis on these packages are treated as
         -- extra-deps (extraDeps1).
-        (ls, extraDeps1) = shadowLoadedSnapshot ls0 shadowed
+        (ls, extraDeps1) = (ls0, Map.empty) -- FIXME confirm that shadowing is already handled before this step. shadowLoadedSnapshot ls0 shadowed
 
         -- Combine the extra-deps with the ones implicitly shadowed.
+        extraDeps2 = extraDeps0 {- FIXME
         extraDeps2 = Map.union
             (Map.fromList (map ((\pir -> (pirName pir, (pirVersion pir, Map.empty, [])))) (HashSet.toList extraDeps0)))
             (Map.map (\lpi ->
@@ -165,14 +163,17 @@ loadSourceMapFull needTargets boptsCli = do
                               , maybe [] pdGhcOptions mpd
                               )
                          in triple) extraDeps1)
+            -}
 
         -- Add flag and ghc-option settings from the config file / cli
         extraDeps3 = Map.mapWithKey
+            (error "extraDeps3")
+            {-
             (\n (v, flags0, ghcOptions0) ->
                 let flags =
                         case ( Map.lookup (Just n) $ boptsCLIFlags boptsCli
                              , Map.lookup Nothing $ boptsCLIFlags boptsCli
-                             , Map.lookup n $ unPackageFlags $ bcFlags bconfig
+                             , Map.lookup n $ bcFlags bconfig
                              ) of
                             -- Didn't have any flag overrides, fall back to the flags
                             -- defined in the snapshot.
@@ -191,6 +192,7 @@ loadSourceMapFull needTargets boptsCli = do
                  -- currently have no ability for extra-deps to specify their
                  -- cabal file hashes
                 in PSUpstream v Local flags ghcOptions Nothing)
+            -}
             extraDeps2
 
     -- Combine the local packages, extra-deps, and LoadedSnapshot into
@@ -202,13 +204,11 @@ loadSourceMapFull needTargets boptsCli = do
             , extraDeps3
             , flip Map.mapWithKey (lsPackages ls) $ \n lpi ->
                 let configOpts = getGhcOptions bconfig boptsCli n False False
-                 in error "loadSourceMapFull PSUpstream" -- FIXME PSUpstream (rpiVersion rpi) Snap (rpiFlags rpi) (rpiGhcOptions rpi ++ configOpts) (rpiGitSHA1 rpi)
+                 in PSUpstream (lpiVersion lpi) Snap (lpiFlags lpi) (lpiGhcOptions lpi ++ configOpts) (lpiLocation lpi)
             ]
             `Map.difference` Map.fromList (map (, ()) (HashSet.toList wiredInPackages))
 
     return (targets, ls, locals, nonLocalTargets, extraDeps0, sourceMap)
-
--}
 
 -- | All flags for a local package.
 getLocalFlags
@@ -534,7 +534,7 @@ loadLocalPackage boptsCli targets (name, (lpv, gpkg)) = do
 checkFlagsUsed :: (MonadThrow m, MonadReader env m, HasBuildConfig env)
                => BuildOptsCLI
                -> [LocalPackage]
-               -> HashSet PackageIdentifierRevision -- ^ extra deps
+               -> Map PackageName PackageLocation -- ^ extra deps
                -> Map PackageName snapshot -- ^ snapshot, for error messages
                -> m ()
 checkFlagsUsed boptsCli lps extraDeps snapshot = do
@@ -550,7 +550,7 @@ checkFlagsUsed boptsCli lps extraDeps snapshot = do
             case Map.lookup name localNameMap of
                 -- Package is not available locally
                 Nothing ->
-                    if HashSet.member name $ HashSet.map pirName extraDeps
+                    if Map.member name extraDeps
                         -- We don't check for flag presence for extra deps
                         then Nothing
                         -- Also not in extra-deps, it's an error
@@ -587,14 +587,15 @@ pirVersion (PackageIdentifierRevision (PackageIdentifier _ version) _) = version
 -- https://github.com/commercialhaskell/stack/issues/651
 extendExtraDeps
     :: (StackM env m, HasBuildConfig env)
-    => HashSet PackageIdentifierRevision -- ^ original extra deps
-    -> HashSet PackageIdentifierRevision -- ^ package identifiers from the command line
+    => [PackageLocation] -- ^ original extra deps
+    -> Map PackageName PackageLocation -- ^ package identifiers from the command line
     -> Set PackageName -- ^ all packages added on the command line
-    -> m (HashSet PackageIdentifierRevision) -- ^ new extradeps
+    -> m (Map PackageName PackageLocation) -- ^ new extradeps
 extendExtraDeps extraDeps0 cliExtraDeps unknowns = do
+    return Map.empty {- FIXME
     (errs, unknowns') <- fmap partitionEithers $ mapM addUnknown $ Set.toList unknowns
     case errs of
-        [] -> return $ HashSet.unions $ extraDeps1 : unknowns'
+        [] -> return $ Map.unions $ extraDeps1 : unknowns'
         _ -> do
             bconfig <- view buildConfigL
             throwM $ UnknownTargets
@@ -602,7 +603,7 @@ extendExtraDeps extraDeps0 cliExtraDeps unknowns = do
                 Map.empty -- TODO check the cliExtraDeps for presence in index
                 (bcStackYaml bconfig)
   where
-    extraDeps1 = HashSet.union extraDeps0 cliExtraDeps
+    extraDeps1 = Map.union extraDeps0 cliExtraDeps
     extraDeps1Names = HashSet.map pirName extraDeps1
     addUnknown pn = do
         if HashSet.member pn extraDeps1Names
@@ -616,6 +617,7 @@ extendExtraDeps extraDeps0 cliExtraDeps unknowns = do
     getLatestVersion pn = do
         vs <- getPackageVersions pn
         return (fmap fst (Set.maxView vs))
+    -}
 
 -- | Compare the current filesystem state to the cached information, and
 -- determine (1) if the files are dirty, and (2) the new cache values.

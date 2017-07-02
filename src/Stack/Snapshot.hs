@@ -17,6 +17,7 @@ module Stack.Snapshot
   ( loadResolver
   , loadSnapshot
   , calculatePackagePromotion
+  , loadRawCabalFiles
   ) where
 
 import           Control.Applicative
@@ -648,24 +649,39 @@ loadGenericPackageDescriptions
   -> Path Abs Dir -- ^ project root, used for checking out necessary files
   -> PackageLocation
   -> m [(GenericPackageDescription, PackageLocation)]
+loadGenericPackageDescriptions loadFromIndex menv root loc = do
+  loadRawCabalFiles loadFromIndex menv root loc >>= mapM go
+  where
+    go (bs, loc') = do
+      gpd <- parseGPD loc' bs
+      return (gpd, loc)
+
+-- | Load the raw bytes in the cabal files present in the given
+-- 'PackageLocation'. There may be multiple results if dealing with a
+-- repository with subdirs, in which case the returned
+-- 'PackageLocation' will have just the relevant subdirectory
+-- selected.
+loadRawCabalFiles
+  :: forall m env.
+     (StackMiniM env m, HasConfig env)
+  => (PackageIdentifierRevision -> IO ByteString) -- ^ lookup in index
+  -> EnvOverride
+  -> Path Abs Dir -- ^ project root, used for checking out necessary files
+  -> PackageLocation
+  -> m [(ByteString, PackageLocation)]
 -- Need special handling of PLIndex for efficiency (just read from the
 -- index tarball) and correctness (get the cabal file from the index,
 -- not the package tarball itself, yay Hackage revisions).
-loadGenericPackageDescriptions loadFromIndex _ _ loc@(PLIndex pir) = do
+loadRawCabalFiles loadFromIndex _ _ loc@(PLIndex pir) = do
   bs <- liftIO $ loadFromIndex pir
-  gpd <- parseGPD loc bs
-  return [(gpd, loc)]
-loadGenericPackageDescriptions _ menv root loc = do
+  return [(bs, loc)]
+loadRawCabalFiles _ menv root loc = do
   resolvePackageLocation menv root loc >>= mapM go
   where
     go (dir, loc') = do
-      gpd <- getGPD loc' dir
-      return (gpd, loc')
-
-    getGPD loc' dir = do
       cabalFile <- findOrGenerateCabalFile dir
       bs <- liftIO $ S.readFile $ toFilePath cabalFile
-      parseGPD loc' bs
+      return (bs, loc')
 
 parseGPD :: MonadThrow m
          => PackageLocation -- ^ for error reporting

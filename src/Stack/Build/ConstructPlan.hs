@@ -139,7 +139,7 @@ type M = RWST
 data Ctx = Ctx
     { ls             :: !LoadedSnapshot
     , baseConfigOpts :: !BaseConfigOpts
-    , loadPackage    :: !(PackageIdentifierRevision -> Map FlagName Bool -> [Text] -> IO Package)
+    , loadPackage    :: !(PackageLocation -> Map FlagName Bool -> [Text] -> IO Package)
     , combinedMap    :: !CombinedMap
     , toolToPackages :: !(Cabal.Dependency -> Map PackageName VersionRange)
     , ctxEnvConfig   :: !EnvConfig
@@ -180,7 +180,7 @@ constructPlan :: forall env m. (StackM env m, HasEnvConfig env)
               -> [LocalPackage]
               -> Set PackageName -- ^ additional packages that must be built
               -> [DumpPackage () () ()] -- ^ locally registered
-              -> (PackageIdentifierRevision -> Map FlagName Bool -> [Text] -> IO Package) -- ^ load upstream package
+              -> (PackageLocation -> Map FlagName Bool -> [Text] -> IO Package) -- ^ load upstream package
               -> SourceMap
               -> InstalledMap
               -> Bool
@@ -429,8 +429,9 @@ tellExecutablesUpstream name version loc flags = do
     ctx <- ask
     when (name `Set.member` extraToBuild ctx) $ do
         let pir = PackageIdentifierRevision (PackageIdentifier name version) Nothing -- FIXME get the real CabalFileInfo
-        p <- liftIO $ loadPackage ctx pir flags []
-        tellExecutablesPackage loc p
+        return ()
+        -- FIXME p <- liftIO $ error "tellExecutablesUpstream" -- FIXME loadPackage ctx pir flags []
+        -- tellExecutablesPackage loc p
 
 tellExecutablesPackage :: InstallLocation -> Package -> M ()
 tellExecutablesPackage loc p = do
@@ -464,10 +465,9 @@ installPackage
 installPackage name ps minstalled = do
     ctx <- ask
     case ps of
-        PSUpstream version _ flags ghcOptions mcfi -> do
+        PSUpstream version _ flags ghcOptions pkgLoc -> do
             planDebug $ "installPackage: Doing all-in-one build for upstream package " ++ show name
-            let pir = PackageIdentifierRevision (PackageIdentifier name version) mcfi
-            package <- liftIO $ loadPackage ctx pir flags ghcOptions
+            package <- liftIO $ loadPackage ctx pkgLoc flags ghcOptions
             resolveDepsAndInstall True ps package minstalled
         PSLocal lp ->
             case lpTestBench lp of
@@ -565,7 +565,7 @@ installPackageGivenDeps isAllInOne ps package minstalled (missing, present, minL
             , taskType =
                 case ps of
                     PSLocal lp -> TTLocal lp
-                    PSUpstream _ loc _ _ sha -> TTUpstream package (loc <> minLoc) sha
+                    PSUpstream _ loc _ _ pkgLoc -> TTUpstream package (loc <> minLoc) pkgLoc
             , taskAllInOne = isAllInOne
             , taskCachePkgSrc = toCachePkgSrc ps
             }

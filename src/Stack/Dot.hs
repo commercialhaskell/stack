@@ -41,6 +41,7 @@ import           Stack.Constants
 import           Stack.Package
 import           Stack.PackageDump (DumpPackage(..))
 import           Stack.Types.Build
+import           Stack.Types.BuildPlan
 import           Stack.Types.Config
 import           Stack.Types.FlagName
 import           Stack.Types.GhcPkgId
@@ -140,9 +141,9 @@ createDependencyGraph dotOpts = do
             | name `elem` [$(mkPackageName "rts"), $(mkPackageName "ghc")] =
                 return (Set.empty, DotPayload (Just version) (Just BSD3))
             | otherwise =
-                let pir = PackageIdentifierRevision (PackageIdentifier name version) Nothing -- FIXME get the CabalFileInfo
+                let loc = PLIndex $ PackageIdentifierRevision (PackageIdentifier name version) Nothing -- FIXME get the CabalFileInfo
                  in       fmap (packageAllDeps &&& makePayload)
-                               (loader pir flags ghcOptions)
+                               (loader loc flags ghcOptions)
     liftIO $ resolveDependencies (dotDependencyDepth dotOpts) graph depLoader)
   where makePayload pkg = DotPayload (Just $ packageVersion pkg) (Just $ packageLicense pkg)
 

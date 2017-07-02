@@ -89,8 +89,10 @@ import           Stack.Fetch as Fetch
 import           Stack.GhcPkg
 import           Stack.Package
 import           Stack.PackageDump
+import           Stack.PackageLocation
 import           Stack.PrettyPrint
 import           Stack.Types.Build
+import           Stack.Types.BuildPlan
 import           Stack.Types.Compiler
 import           Stack.Types.Config
 import           Stack.Types.GhcPkgId
@@ -883,17 +885,27 @@ withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} md
     withPackage inner =
         case taskType of
             TTLocal lp -> inner (lpPackage lp) (lpCabalFile lp) (lpDir lp)
-            TTUpstream package _ cfi -> do
+            TTUpstream package _ pkgLoc -> do
                 mdist <- liftM Just distRelativeDir
-                m <- unpackPackageIdents eeTempDir mdist [PackageIdentifierRevision taskProvides cfi]
-                case Map.toList m of
-                    [(ident, dir)]
-                        | ident == taskProvides -> do
-                            let name = packageIdentifierName taskProvides
-                            cabalfpRel <- parseRelFile $ packageNameString name ++ ".cabal"
-                            let cabalfp = dir </> cabalfpRel
-                            inner package cabalfp dir
-                    _ -> error $ "withPackage: invariant violated: " ++ show m
+                menv <- getMinimalEnvOverride
+                root <- view projectRootL
+                dir <- case pkgLoc of
+                  PLIndex pir -> do
+                    m <- unpackPackageIdents eeTempDir mdist [pir]
+                    case Map.toList m of
+                        [(ident, dir)]
+                            | ident == taskProvides -> return dir
+                        _ -> error $ "withPackage: invariant (1) violated: " ++ show m
+                  _ -> do
+                    l <- resolvePackageLocation menv root pkgLoc
+                    case l of
+                      [(dir, _loc)] -> return dir
+                      _ -> error $ "withPackage: invariant (2) violated: " ++ show l
+
+                let name = packageIdentifierName taskProvides
+                cabalfpRel <- parseRelFile $ packageNameString name ++ ".cabal"
+                let cabalfp = dir </> cabalfpRel
+                inner package cabalfp dir
 
     withLogFile pkgDir package inner
         | console = inner Nothing
