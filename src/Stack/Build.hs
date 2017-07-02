@@ -20,7 +20,7 @@ module Stack.Build
   ,CabalVersionException(..))
   where
 
-import           Control.Exception (Exception)
+import           Control.Exception.Safe (Exception, assert)
 import           Control.Monad
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
@@ -58,7 +58,7 @@ import           Stack.Build.Source
 import           Stack.Build.Target
 import           Stack.Fetch as Fetch
 import           Stack.Package
-import           Stack.Snapshot (loadRawCabalFiles)
+import           Stack.PackageLocation (loadSingleRawCabalFile)
 import           Stack.Types.Build
 import           Stack.Types.BuildPlan
 import           Stack.Types.Config
@@ -301,9 +301,9 @@ withLoadPackage inner = do
         inner $ \loc flags ghcOptions -> do
             -- FIXME this looks very similar to code in
             -- Stack.Snapshot, try to merge it together
-            [(bs, _loc)] <- run $ loadRawCabalFiles loadFromIndex menv root $ fmap return loc -- FIXME better type safety
+            (bs, loc') <- run $ loadSingleRawCabalFile loadFromIndex menv root loc
 
-            (_warnings,pkg) <- readPackageBS (depPackageConfig econfig flags ghcOptions) bs
+            (_warnings,pkg) <- assert (loc == loc') $ readPackageBS (depPackageConfig econfig flags ghcOptions) bs
             return pkg
   where
     -- | Package config to be used for dependencies

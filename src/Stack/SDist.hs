@@ -62,7 +62,7 @@ import           Stack.Build.Execute
 import           Stack.Build.Installed
 import           Stack.Build.Source (loadSourceMap, getDefaultPackageConfig)
 import           Stack.Build.Target
-import           Stack.PackageLocation (resolvePackageLocation)
+import           Stack.PackageLocation (resolveMultiPackageLocation)
 import           Stack.Constants
 import           Stack.Package
 import           Stack.Types.Build
@@ -381,7 +381,7 @@ buildExtractedTarball pkgDir = do
   menv <- getMinimalEnvOverride
   localPackageToBuild <- readLocalPackage pkgDir
   let packageEntries = bcPackages (envConfigBuildConfig envConfig)
-      getPaths = resolvePackageLocation menv projectRoot
+      getPaths = resolveMultiPackageLocation menv projectRoot
   allPackagePaths <- fmap (map fst . mconcat) (mapM getPaths packageEntries)
   -- We remove the path based on the name of the package
   let isPathToRemove path = do

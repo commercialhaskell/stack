@@ -652,7 +652,7 @@ getLocalPackages = do
             root <- view projectRootL
             let helper f = fmap (Map.fromList . concat)
                          $ view (buildConfigL.to f)
-                       >>= mapM (resolvePackageLocation menv root)
+                       >>= mapM (resolveMultiPackageLocation menv root)
             packages <- helper bcPackages
             deps <- helper bcDependencies
             return LocalPackages

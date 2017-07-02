@@ -18,13 +18,12 @@ module Stack.Snapshot
   ( loadResolver
   , loadSnapshot
   , calculatePackagePromotion
-  , loadRawCabalFiles
   ) where
 
 import           Control.Applicative
 import           Control.Arrow (second)
 import           Control.Exception.Safe (assert, impureThrow)
-import           Control.Monad (forM, unless, void)
+import           Control.Monad (forM, unless, void, (>=>))
 import           Control.Monad.Catch
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
@@ -327,7 +326,7 @@ loadSnapshot' loadFromIndex menv mcompiler root =
           Right sd' -> start sd'
 
       gpds <- fmap concat $ mapM
-        (loadGenericPackageDescriptions loadFromIndex menv root)
+        (loadMultiRawCabalFiles loadFromIndex menv root >=> mapM parseGPD)
         (sdLocations sd)
 
       (globals, snapshot, locals) <-
@@ -439,9 +438,8 @@ recalculate loadFromIndex menv root compilerVersion allFlags allHide allOptions 
   case Map.lookup name allFlags of
     Nothing -> return (name, lpi0 { lpiHide = hide, lpiGhcOptions = options }) -- optimization
     Just flags -> do
-      [(gpd, loc)] <- loadGenericPackageDescriptions loadFromIndex menv root $ fmap return $ lpiLocation lpi0 -- FIXME could be more type-safe
-      unless (loc == lpiLocation lpi0) $ error "recalculate location mismatch"
-      platform <- view platformL
+      (gpd, loc) <- loadSingleRawCabalFile loadFromIndex menv root (lpiLocation lpi0) >>= parseGPD
+      platform <- assert (loc == lpiLocation lpi0) (view platformL)
       let res@(name', lpi) = calculate gpd platform compilerVersion loc flags hide options
       unless (name == name' && lpiVersion lpi0 == lpiVersion lpi) $ error "recalculate invariant violated"
       return res
@@ -639,61 +637,15 @@ splitUnmetDeps =
         Nothing -> False
         Just lpi -> lpiVersion lpi `withinIntervals` intervals
 
--- | Load the cabal files present in the given
--- 'PackageLocation'. There may be multiple results if dealing with a
--- repository with subdirs, in which case the returned
--- 'PackageLocation' will have just the relevant subdirectory
--- selected.
-loadGenericPackageDescriptions
-  :: forall m env.
-     (StackMiniM env m, HasConfig env)
-  => (PackageIdentifierRevision -> IO ByteString) -- ^ lookup in index
-  -> EnvOverride
-  -> Path Abs Dir -- ^ project root, used for checking out necessary files
-  -> PackageLocation
-  -> m [(GenericPackageDescription, SinglePackageLocation)]
-loadGenericPackageDescriptions loadFromIndex menv root loc = do
-  loadRawCabalFiles loadFromIndex menv root loc >>= mapM go
-  where
-    go (bs, loc') = do
-      gpd <- parseGPD loc' bs
-      return (gpd, loc')
-
--- | Load the raw bytes in the cabal files present in the given
--- 'PackageLocation'. There may be multiple results if dealing with a
--- repository with subdirs, in which case the returned
--- 'PackageLocation' will have just the relevant subdirectory
--- selected.
-loadRawCabalFiles
-  :: forall m env.
-     (StackMiniM env m, HasConfig env)
-  => (PackageIdentifierRevision -> IO ByteString) -- ^ lookup in index
-  -> EnvOverride
-  -> Path Abs Dir -- ^ project root, used for checking out necessary files
-  -> PackageLocation
-  -> m [(ByteString, SinglePackageLocation)]
--- Need special handling of PLIndex for efficiency (just read from the
--- index tarball) and correctness (get the cabal file from the index,
--- not the package tarball itself, yay Hackage revisions).
-loadRawCabalFiles loadFromIndex _ _ (PLIndex pir) = do
-  bs <- liftIO $ loadFromIndex pir
-  return [(bs, PLIndex pir)]
-loadRawCabalFiles _ menv root loc = do
-  resolvePackageLocation menv root loc >>= mapM go
-  where
-    go (dir, loc') = do
-      cabalFile <- findOrGenerateCabalFile dir
-      bs <- liftIO $ S.readFile $ toFilePath cabalFile
-      return (bs, loc')
-
 parseGPD :: MonadThrow m
-         => SinglePackageLocation -- ^ for error reporting
-         -> ByteString -- raw contents
-         -> m GenericPackageDescription
-parseGPD loc bs =
+         => ( ByteString -- raw contents
+            , SinglePackageLocation -- ^ for error reporting
+            )
+         -> m (GenericPackageDescription, SinglePackageLocation)
+parseGPD (bs, loc) = do
   case rawParseGPD bs of
     Left e -> throwM $ InvalidCabalFileInSnapshot loc e bs
-    Right (_warnings, gpd) -> return gpd
+    Right (_warnings, gpd) -> return (gpd, loc)
 
 -- | Calculate a 'LoadedPackageInfo' from the given 'GenericPackageDescription'
 calculate :: GenericPackageDescription

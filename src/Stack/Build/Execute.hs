@@ -898,7 +898,7 @@ withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} md
                             | ident == taskProvides -> return dir
                         _ -> error $ "withPackage: invariant (1) violated: " ++ show m
                   _ -> do
-                    [(dir, _loc)] <- resolvePackageLocation menv root $ fmap return pkgLoc -- FIXME better type safety
+                    (dir, _loc) <- resolveSinglePackageLocation menv root pkgLoc
                     return dir
 
                 let name = packageIdentifierName taskProvides
