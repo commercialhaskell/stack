@@ -454,7 +454,7 @@ data GlobalOpts = GlobalOpts
     , globalTimeInLog    :: !Bool -- ^ Whether to include timings in logs.
     , globalConfigMonoid :: !ConfigMonoid -- ^ Config monoid, for passing into 'loadConfig'
     , globalResolver     :: !(Maybe AbstractResolver) -- ^ Resolver override
-    , globalCompiler     :: !(Maybe CompilerVersion) -- ^ Compiler override
+    , globalCompiler     :: !(Maybe (CompilerVersion 'CVWanted)) -- ^ Compiler override
     , globalTerminal     :: !Bool -- ^ We're in a terminal?
     , globalColorWhen    :: !ColorWhen -- ^ When to use ansi terminal colors
     , globalStackYaml    :: !(StackYamlLoc FilePath) -- ^ Override project stack.yaml
@@ -475,7 +475,7 @@ data GlobalOptsMonoid = GlobalOptsMonoid
     , globalMonoidTimeInLog    :: !(First Bool) -- ^ Whether to include timings in logs.
     , globalMonoidConfigMonoid :: !ConfigMonoid -- ^ Config monoid, for passing into 'loadConfig'
     , globalMonoidResolver     :: !(First AbstractResolver) -- ^ Resolver override
-    , globalMonoidCompiler     :: !(First CompilerVersion) -- ^ Compiler override
+    , globalMonoidCompiler     :: !(First (CompilerVersion 'CVWanted)) -- ^ Compiler override
     , globalMonoidTerminal     :: !(First Bool) -- ^ We're in a terminal?
     , globalMonoidColorWhen    :: !(First ColorWhen) -- ^ When to use ansi colors
     , globalMonoidStackYaml    :: !(First FilePath) -- ^ Override project stack.yaml
@@ -553,7 +553,7 @@ data EnvConfig = EnvConfig
     -- Note that this is not necessarily the same version as the one that stack
     -- depends on as a library and which is displayed when running
     -- @stack list-dependencies | grep Cabal@ in the stack project.
-    ,envConfigCompilerVersion :: !CompilerVersion
+    ,envConfigCompilerVersion :: !(CompilerVersion 'CVActual)
     -- ^ The actual version of the compiler to be used, as opposed to
     -- 'wantedCompilerL', which provides the version specified by the
     -- build plan.
@@ -582,7 +582,7 @@ lpAllLocal (LocalPackages x y) = x <> y
 data LoadConfig m = LoadConfig
     { lcConfig          :: !Config
       -- ^ Top-level Stack configuration.
-    , lcLoadBuildConfig :: !(Maybe CompilerVersion -> m BuildConfig)
+    , lcLoadBuildConfig :: !(Maybe (CompilerVersion 'CVWanted) -> m BuildConfig)
         -- ^ Action to load the remaining 'BuildConfig'.
     , lcProjectRoot     :: !(Maybe (Path Abs Dir))
         -- ^ The project root directory, if in a project.
@@ -652,7 +652,7 @@ data Project = Project
     -- ^ Flags to be applied on top of the snapshot flags.
     , projectResolver :: !Resolver
     -- ^ How we resolve which @SnapshotDef@ to use
-    , projectCompiler :: !(Maybe CompilerVersion)
+    , projectCompiler :: !(Maybe (CompilerVersion 'CVWanted))
     -- ^ When specified, overrides which compiler to use
     , projectExtraPackageDBs :: ![FilePath]
     }
@@ -1336,7 +1336,7 @@ configLoadedSnapshotCache resolver gis = do
 data GlobalInfoSource
   = GISSnapshotHints
   -- ^ Accept the hints in the snapshot definition
-  | GISCompiler CompilerVersion
+  | GISCompiler (CompilerVersion 'CVActual)
   -- ^ Look up the actual information in the installed compiler
 
 -- | Suffix applied to an installation root to get the bin dir
@@ -1586,7 +1586,7 @@ data SetupInfo = SetupInfo
     , siSevenzDll :: Maybe DownloadInfo
     , siMsys2 :: Map Text VersionedDownloadInfo
     , siGHCs :: Map Text (Map Version GHCDownloadInfo)
-    , siGHCJSs :: Map Text (Map CompilerVersion DownloadInfo)
+    , siGHCJSs :: Map Text (Map (CompilerVersion 'CVActual) DownloadInfo)
     , siStack :: Map Text (Map Version DownloadInfo)
     }
     deriving Show
@@ -1830,17 +1830,17 @@ stackRootL = configL.lens configStackRoot (\x y -> x { configStackRoot = y })
 
 -- | The compiler specified by the @MiniBuildPlan@. This may be
 -- different from the actual compiler used!
-wantedCompilerVersionL :: HasBuildConfig s => Getting r s CompilerVersion
+wantedCompilerVersionL :: HasBuildConfig s => Getting r s (CompilerVersion 'CVWanted)
 wantedCompilerVersionL =
     snapshotDefL.to go
   where
-    go :: SnapshotDef -> CompilerVersion
+    go :: SnapshotDef -> CompilerVersion 'CVWanted
     go = either id go . sdParent
 
 -- | The version of the compiler which will actually be used. May be
 -- different than that specified in the 'MiniBuildPlan' and returned
 -- by 'wantedCompilerVersionL'.
-actualCompilerVersionL :: HasEnvConfig s => Lens' s CompilerVersion
+actualCompilerVersionL :: HasEnvConfig s => Lens' s (CompilerVersion 'CVActual)
 actualCompilerVersionL = envConfigL.lens
     envConfigCompilerVersion
     (\x y -> x { envConfigCompilerVersion = y })
@@ -1913,7 +1913,7 @@ loadedSnapshotL = envConfigL.lens
     envConfigLoadedSnapshot
     (\x y -> x { envConfigLoadedSnapshot = y })
 
-whichCompilerL :: Getting r CompilerVersion WhichCompiler
+whichCompilerL :: Getting r (CompilerVersion a) WhichCompiler
 whichCompilerL = to whichCompiler
 
 envOverrideL :: HasConfig env => Lens' env (EnvSettings -> IO EnvOverride)

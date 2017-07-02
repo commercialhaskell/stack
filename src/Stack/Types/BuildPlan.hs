@@ -75,7 +75,7 @@ import           Stack.Types.VersionIntervals
 -- snapshot load step we will resolve the contents of tarballs and
 -- repos, figure out package names, and assigned values appropriately.
 data SnapshotDef = SnapshotDef
-    { sdParent :: !(Either CompilerVersion SnapshotDef)
+    { sdParent :: !(Either (CompilerVersion 'CVWanted) SnapshotDef)
     -- ^ The snapshot to extend from. This is either a specific
     -- compiler, or a @SnapshotDef@ which gives us more information
     -- (like packages). Ultimately, we'll end up with a
@@ -105,7 +105,7 @@ data SnapshotDef = SnapshotDef
     deriving (Show, Eq)
 
 -- | FIXME should this entail modifying the hash?
-setCompilerVersion :: CompilerVersion -> SnapshotDef -> SnapshotDef
+setCompilerVersion :: CompilerVersion 'CVWanted -> SnapshotDef -> SnapshotDef
 setCompilerVersion cv =
     go
   where
@@ -212,7 +212,7 @@ newtype ExeName = ExeName { unExeName :: Text }
 -- a snapshot may not depend upon a local or project, and all
 -- dependencies must be satisfied.
 data LoadedSnapshot = LoadedSnapshot
-  { lsCompilerVersion :: !CompilerVersion
+  { lsCompilerVersion :: !(CompilerVersion 'CVActual)
   , lsResolver        :: !LoadedResolver
   , lsGlobals         :: !(Map PackageName (LoadedPackageInfo GhcPkgId)) -- FIXME this may be a terrible design
   , lsPackages        :: !(Map PackageName (LoadedPackageInfo SinglePackageLocation))
@@ -222,7 +222,7 @@ instance Store LoadedSnapshot
 instance NFData LoadedSnapshot
 
 loadedSnapshotVC :: VersionConfig LoadedSnapshot
-loadedSnapshotVC = storeVersionConfig "ls-v1" "LPK22sH6xuTCk1V8ewI1IUM3PSo="
+loadedSnapshotVC = storeVersionConfig "ls-v1" "TFNG4Inh6rj_ukXc2hN6GjGg76o="
 
 -- | Information on a single package for the 'LoadedSnapshot' which
 -- can be installed.
@@ -311,5 +311,5 @@ moduleInfoVC :: VersionConfig ModuleInfo
 moduleInfoVC = storeVersionConfig "mi-v2" "8ImAfrwMVmqoSoEpt85pLvFeV3s="
 
 -- | Determined the desired compiler version for this 'SnapshotDef'.
-sdWantedCompilerVersion :: SnapshotDef -> CompilerVersion
+sdWantedCompilerVersion :: SnapshotDef -> CompilerVersion 'CVWanted
 sdWantedCompilerVersion = either id sdWantedCompilerVersion . sdParent

@@ -1,4 +1,5 @@
 {-# LANGUAGE ConstraintKinds     #-}
+{-# LANGUAGE DataKinds           #-}
 {-# LANGUAGE DeriveDataTypeable  #-}
 {-# LANGUAGE DeriveGeneric       #-}
 {-# LANGUAGE EmptyDataDecls      #-}
@@ -285,7 +286,7 @@ loadSnapshot
   :: forall env m.
      (StackMiniM env m, HasConfig env, HasGHCVariant env)
   => EnvOverride -- ^ used for running Git/Hg, and if relevant, getting global package info
-  -> Maybe CompilerVersion -- ^ installed GHC we should query; if none provided, use the global hints
+  -> Maybe (CompilerVersion 'CVActual) -- ^ installed GHC we should query; if none provided, use the global hints
   -> Path Abs Dir -- ^ project root, used for checking out necessary files
   -> SnapshotDef
   -> m LoadedSnapshot
@@ -297,7 +298,7 @@ loadSnapshot'
      (StackMiniM env m, HasConfig env, HasGHCVariant env)
   => (PackageIdentifierRevision -> IO ByteString) -- ^ load a cabal file's contents from the index
   -> EnvOverride -- ^ used for running Git/Hg, and if relevant, getting global package info
-  -> Maybe CompilerVersion -- ^ installed GHC we should query; if none provided, use the global hints
+  -> Maybe (CompilerVersion 'CVActual) -- ^ installed GHC we should query; if none provided, use the global hints
   -> Path Abs Dir -- ^ project root, used for checking out necessary files
   -> SnapshotDef
   -> m LoadedSnapshot
@@ -317,7 +318,7 @@ loadSnapshot' loadFromIndex menv mcompiler root =
           Left cv ->
             case mcompiler of
               Nothing -> return LoadedSnapshot
-                { lsCompilerVersion = cv
+                { lsCompilerVersion = wantedToActual cv
                 , lsResolver = ResolverCompiler cv
                 , lsGlobals = fromGlobalHints $ sdGlobalHints sd
                 , lsPackages = Map.empty
@@ -426,7 +427,7 @@ recalculate :: forall env m.
             => (PackageIdentifierRevision -> IO ByteString)
             -> EnvOverride
             -> Path Abs Dir -- ^ root
-            -> CompilerVersion
+            -> CompilerVersion 'CVActual
             -> Map PackageName (Map FlagName Bool)
             -> Set PackageName -- ^ hide?
             -> Map PackageName [Text] -- ^ GHC options
@@ -501,7 +502,7 @@ checkDepsMet available m
 -- information in the global package database.
 loadCompiler :: forall env m.
                 (StackMiniM env m, HasConfig env)
-             => CompilerVersion
+             => CompilerVersion 'CVActual
              -> m LoadedSnapshot
 loadCompiler cv = do
   menv <- getMinimalEnvOverride
@@ -511,7 +512,7 @@ loadCompiler cv = do
     (conduitDumpPackage .| CL.foldMap (\dp -> Map.singleton (dpGhcPkgId dp) dp))
   return LoadedSnapshot
     { lsCompilerVersion = cv
-    , lsResolver = ResolverCompiler cv
+    , lsResolver = ResolverCompiler (actualToWanted cv)
     , lsGlobals = toGlobals m
     , lsPackages = Map.empty
     }
@@ -561,7 +562,7 @@ type FindPackageS localLocation =
 findPackage :: forall m localLocation.
                MonadThrow m
             => Platform
-            -> CompilerVersion
+            -> CompilerVersion 'CVActual
             -> (GenericPackageDescription, SinglePackageLocation, localLocation)
             -> StateT (FindPackageS localLocation) m ()
 findPackage platform compilerVersion (gpd, loc, localLoc) = do
@@ -697,7 +698,7 @@ parseGPD loc bs =
 -- | Calculate a 'LoadedPackageInfo' from the given 'GenericPackageDescription'
 calculate :: GenericPackageDescription
           -> Platform
-          -> CompilerVersion
+          -> CompilerVersion 'CVActual
           -> loc
           -> Map FlagName Bool
           -> Bool -- ^ hidden?

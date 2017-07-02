@@ -177,7 +177,8 @@ data PackageConfig =
                 ,packageConfigEnableBenchmarks :: !Bool           -- ^ Are benchmarks enabled?
                 ,packageConfigFlags :: !(Map FlagName Bool)       -- ^ Configured flags.
                 ,packageConfigGhcOptions :: ![Text]               -- ^ Configured ghc options.
-                ,packageConfigCompilerVersion :: !CompilerVersion -- ^ GHC version
+                ,packageConfigCompilerVersion
+                                  :: !(CompilerVersion 'CVActual) -- ^ GHC version
                 ,packageConfigPlatform :: !Platform               -- ^ host platform
                 }
  deriving (Show,Typeable)

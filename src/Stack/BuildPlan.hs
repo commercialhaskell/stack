@@ -1,4 +1,5 @@
 {-# LANGUAGE ConstraintKinds    #-}
+{-# LANGUAGE DataKinds          #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveGeneric      #-}
 {-# LANGUAGE EmptyDataDecls     #-}
@@ -227,7 +228,7 @@ gpdPackageName = fromCabalPackageName
 
 gpdPackageDeps
     :: GenericPackageDescription
-    -> CompilerVersion
+    -> CompilerVersion 'CVActual
     -> Platform
     -> Map FlagName Bool
     -> Map PackageName VersionRange
@@ -274,7 +275,7 @@ removeSrcPkgDefaultFlags gpds flags =
 -- Returns the plan which produces least number of dep errors
 selectPackageBuildPlan
     :: Platform
-    -> CompilerVersion
+    -> CompilerVersion 'CVActual
     -> Map PackageName Version
     -> GenericPackageDescription
     -> (Map PackageName (Map FlagName Bool), DepErrors)
@@ -313,7 +314,7 @@ selectPackageBuildPlan platform compiler pool gpd =
 -- constraints can be satisfied against a given build plan or pool of packages.
 checkPackageBuildPlan
     :: Platform
-    -> CompilerVersion
+    -> CompilerVersion 'CVActual
     -> Map PackageName Version
     -> Map FlagName Bool
     -> GenericPackageDescription
@@ -367,7 +368,7 @@ combineDepError (DepError a x) (DepError b y) =
 -- will be chosen automatically.
 checkBundleBuildPlan
     :: Platform
-    -> CompilerVersion
+    -> CompilerVersion 'CVActual
     -> Map PackageName Version
     -> Maybe (Map PackageName (Map FlagName Bool))
     -> [GenericPackageDescription]
@@ -391,7 +392,7 @@ data BuildPlanCheck =
       BuildPlanCheckOk      (Map PackageName (Map FlagName Bool))
     | BuildPlanCheckPartial (Map PackageName (Map FlagName Bool)) DepErrors
     | BuildPlanCheckFail    (Map PackageName (Map FlagName Bool)) DepErrors
-                            CompilerVersion
+                            (CompilerVersion 'CVActual)
 
 -- | Compare 'BuildPlanCheck', where GT means a better plan.
 compareBuildPlanCheck :: BuildPlanCheck -> BuildPlanCheck -> Ordering
@@ -521,7 +522,7 @@ showMapPackages mp = showItems $ Map.keys mp
 showCompilerErrors
     :: Map PackageName (Map FlagName Bool)
     -> DepErrors
-    -> CompilerVersion
+    -> CompilerVersion 'CVActual
     -> Text
 showCompilerErrors flags errs compiler =
     T.concat

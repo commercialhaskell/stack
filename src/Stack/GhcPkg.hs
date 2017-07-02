@@ -1,4 +1,5 @@
 -- FIXME See how much of this module can be deleted, even more functionality is now in PackageDump.
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -164,7 +165,7 @@ findGhcPkgVersion menv wc pkgDbs name = do
 unregisterGhcPkgId :: (MonadIO m, MonadLogger m, MonadCatch m, MonadBaseControl IO m)
                     => EnvOverride
                     -> WhichCompiler
-                    -> CompilerVersion
+                    -> CompilerVersion 'CVActual
                     -> Path Abs Dir -- ^ package database
                     -> GhcPkgId
                     -> PackageIdentifier

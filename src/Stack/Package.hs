@@ -840,13 +840,13 @@ flagMap = M.fromList . map pair
 
 data ResolveConditions = ResolveConditions
     { rcFlags :: Map FlagName Bool
-    , rcCompilerVersion :: CompilerVersion
+    , rcCompilerVersion :: CompilerVersion 'CVActual
     , rcOS :: OS
     , rcArch :: Arch
     }
 
 -- | Generic a @ResolveConditions@ using sensible defaults.
-mkResolveConditions :: CompilerVersion -- ^ Compiler version
+mkResolveConditions :: CompilerVersion 'CVActual -- ^ Compiler version
                     -> Platform -- ^ installation target platform
                     -> Map FlagName Bool -- ^ enabled flags
                     -> ResolveConditions

@@ -102,8 +102,8 @@ import           System.Process.Log              (showProcessArgDebug)
 data StackBuildException
   = Couldn'tFindPkgId PackageName
   | CompilerVersionMismatch
-        (Maybe (CompilerVersion, Arch)) -- found
-        (CompilerVersion, Arch) -- expected
+        (Maybe (CompilerVersion 'CVActual, Arch)) -- found
+        (CompilerVersion 'CVWanted, Arch) -- expected
         GHCVariant -- expected
         CompilerBuild -- expected
         VersionCheck

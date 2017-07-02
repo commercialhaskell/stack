@@ -1,4 +1,5 @@
 {-# LANGUAGE ConstraintKinds       #-}
+{-# LANGUAGE DataKinds             #-}
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings     #-}
@@ -278,7 +279,7 @@ getCabalConfig dir constraintType constraints = do
 
 setupCompiler
     :: (StackM env m, HasConfig env, HasGHCVariant env)
-    => CompilerVersion
+    => CompilerVersion 'CVWanted
     -> m (Maybe ExtraDirs)
 setupCompiler compiler = do
     let msg = Just $ T.concat
@@ -309,8 +310,8 @@ setupCompiler compiler = do
 
 setupCabalEnv
     :: (StackM env m, HasConfig env, HasGHCVariant env)
-    => CompilerVersion
-    -> m (EnvOverride, CompilerVersion)
+    => CompilerVersion 'CVWanted
+    -> m (EnvOverride, CompilerVersion 'CVActual)
 setupCabalEnv compiler = do
     mpaths <- setupCompiler compiler
     menv0 <- getMinimalEnvOverride
@@ -483,10 +484,10 @@ solveResolverSpec stackYaml cabalDirs
 getResolverConstraints
     :: (StackM env m, HasConfig env, HasGHCVariant env)
     => EnvOverride -- ^ for running Git/Hg clone commands
-    -> Maybe CompilerVersion -- ^ actually installed compiler
+    -> Maybe (CompilerVersion 'CVActual) -- ^ actually installed compiler
     -> Path Abs File
     -> SnapshotDef
-    -> m (CompilerVersion,
+    -> m (CompilerVersion 'CVActual,
           Map PackageName (Version, Map FlagName Bool))
 getResolverConstraints menv mcompilerVersion stackYaml sd = do
     ls <- loadSnapshot menv mcompilerVersion (parent stackYaml) sd

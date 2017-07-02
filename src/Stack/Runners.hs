@@ -1,3 +1,4 @@
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
@@ -31,7 +32,7 @@ import           Stack.Config
 import qualified Stack.Docker as Docker
 import qualified Stack.Nix as Nix
 import           Stack.Setup
-import           Stack.Types.Compiler (CompilerVersion)
+import           Stack.Types.Compiler (CompilerVersion, CVType (..))
 import           Stack.Types.Config
 import           Stack.Types.StackT
 import           System.Environment (getEnvironment)
@@ -40,7 +41,7 @@ import           System.FileLock
 
 loadCompilerVersion :: GlobalOpts
                     -> LoadConfig (StackT () IO)
-                    -> IO CompilerVersion
+                    -> IO (CompilerVersion 'CVWanted)
 loadCompilerVersion go lc = do
     bconfig <- runStackTGlobal () go $
       lcLoadBuildConfig lc (globalCompiler go)

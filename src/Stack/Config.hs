@@ -1,5 +1,6 @@
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveFoldable #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DeriveTraversable #-}
@@ -523,7 +524,7 @@ loadBuildConfig :: forall env m.
                 => LocalConfigStatus (Project, Path Abs File, ConfigMonoid)
                 -> Config
                 -> Maybe AbstractResolver -- override resolver
-                -> Maybe CompilerVersion -- override compiler
+                -> Maybe (CompilerVersion 'CVWanted) -- override compiler
                 -> m BuildConfig
 loadBuildConfig mproject config mresolver mcompiler = do
     env <- ask

@@ -85,7 +85,7 @@ data ResolverWith customContents
     -- ^ Use an official snapshot from the Stackage project, either an
     -- LTS Haskell or Stackage Nightly.
 
-    | ResolverCompiler !CompilerVersion
+    | ResolverCompiler !(CompilerVersion 'CVWanted)
     -- ^ Require a specific compiler version, but otherwise provide no
     -- build plan. Intended for use cases where end user wishes to
     -- specify all upstream dependencies manually, such as using a

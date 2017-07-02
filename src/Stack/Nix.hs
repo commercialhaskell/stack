@@ -1,4 +1,5 @@
 {-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -45,7 +46,7 @@ import           System.Process.Read (getEnvOverride)
 reexecWithOptionalShell
     :: (StackM env m, HasConfig env)
     => Maybe (Path Abs Dir)
-    -> IO CompilerVersion
+    -> IO (CompilerVersion 'CVWanted)
     -> IO ()
     -> m ()
 reexecWithOptionalShell mprojectRoot getCompilerVersion inner =
@@ -69,7 +70,7 @@ reexecWithOptionalShell mprojectRoot getCompilerVersion inner =
 runShellAndExit
     :: (StackM env m, HasConfig env)
     => Maybe (Path Abs Dir)
-    -> IO CompilerVersion
+    -> IO (CompilerVersion 'CVWanted)
     -> m (String, [String])
     -> m ()
 runShellAndExit mprojectRoot getCompilerVersion getCmdArgs = do

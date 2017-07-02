@@ -1,5 +1,6 @@
 {-# LANGUAGE CPP                   #-}
 {-# LANGUAGE ConstraintKinds       #-}
+{-# LANGUAGE DataKinds             #-}
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings     #-}
@@ -1086,7 +1087,7 @@ withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} md
                             (fmap fst mlogFile)
                             bss
                   where
-                    runAndOutput :: CompilerVersion -> m ()
+                    runAndOutput :: CompilerVersion 'CVActual -> m ()
                     runAndOutput compilerVer = case mlogFile of
                         Just (_, h) ->
                             sinkProcessStderrStdoutHandle (Just pkgDir) menv (toFilePath exeName) fullArgs h h
@@ -1097,7 +1098,7 @@ withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} md
                     outputSink
                         :: ExcludeTHLoading
                         -> LogLevel
-                        -> CompilerVersion
+                        -> CompilerVersion 'CVActual
                         -> Sink S.ByteString IO ()
                     outputSink excludeTH level compilerVer =
                         CT.decodeUtf8Lenient
@@ -1668,7 +1669,7 @@ mungeBuildOutput :: forall m. (MonadIO m, MonadCatch m, MonadBaseControl IO m)
                  => ExcludeTHLoading       -- ^ exclude TH loading?
                  -> ConvertPathsToAbsolute -- ^ convert paths to absolute?
                  -> Path Abs Dir           -- ^ package's root directory
-                 -> CompilerVersion        -- ^ compiler we're building with
+                 -> CompilerVersion 'CVActual -- ^ compiler we're building with
                  -> ConduitM Text Text m ()
 mungeBuildOutput excludeTHLoading makeAbsolute pkgDir compilerVer = void $
     CT.lines

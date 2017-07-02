@@ -44,7 +44,7 @@ nixOptsFromMonoid NixOptsMonoid{..} os = do
   where prefixAll p (x:xs) = p : x : prefixAll p xs
         prefixAll _ _      = []
 
-nixCompiler :: CompilerVersion -> T.Text
+nixCompiler :: CompilerVersion a -> T.Text
 nixCompiler compilerVersion =
   let -- These are the latest minor versions for each respective major version available in nixpkgs
       fixMinor "8.0" = "8.0.1"

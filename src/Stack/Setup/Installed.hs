@@ -1,4 +1,5 @@
 {-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -51,7 +52,7 @@ import           System.Process.Read
 
 data Tool
     = Tool PackageIdentifier -- ^ e.g. ghc-7.8.4, msys2-20150512
-    | ToolGhcjs CompilerVersion -- ^ e.g. ghcjs-0.1.0_ghc-7.10.2
+    | ToolGhcjs (CompilerVersion 'CVActual) -- ^ e.g. ghcjs-0.1.0_ghc-7.10.2
 
 toolString :: Tool -> String
 toolString (Tool ident) = packageIdentifierString ident
@@ -96,7 +97,7 @@ listInstalled programsPath = do
         parseToolText x
 
 getCompilerVersion :: (MonadLogger m, MonadCatch m, MonadBaseControl IO m, MonadIO m)
-              => EnvOverride -> WhichCompiler -> m CompilerVersion
+              => EnvOverride -> WhichCompiler -> m (CompilerVersion 'CVActual)
 getCompilerVersion menv wc =
     case wc of
         Ghc -> do

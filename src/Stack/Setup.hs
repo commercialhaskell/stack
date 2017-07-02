@@ -1,4 +1,5 @@
 {-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveDataTypeable #-} -- ghc < 7.10
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE FlexibleContexts #-}
@@ -130,7 +131,7 @@ data SetupOpts = SetupOpts
     { soptsInstallIfMissing :: !Bool
     , soptsUseSystem :: !Bool
     -- ^ Should we use a system compiler installation, if available?
-    , soptsWantedCompiler :: !CompilerVersion
+    , soptsWantedCompiler :: !(CompilerVersion 'CVWanted)
     , soptsCompilerCheck :: !VersionCheck
     , soptsStackYaml :: !(Maybe (Path Abs File))
     -- ^ If we got the desired GHC version from that file
@@ -156,7 +157,7 @@ data SetupOpts = SetupOpts
     deriving Show
 data SetupException = UnsupportedSetupCombo OS Arch
                     | MissingDependencies [String]
-                    | UnknownCompilerVersion Text CompilerVersion [CompilerVersion]
+                    | UnknownCompilerVersion Text (CompilerVersion 'CVWanted) [CompilerVersion 'CVActual]
                     | UnknownOSKey Text
                     | GHCSanityCheckCompileFailed ReadProcessException (Path Abs File)
                     | WantedMustBeGHC
@@ -714,7 +715,8 @@ doCabalInstall menv wc installed version = do
         $logInfo "New Cabal library installed"
 
 -- | Get the version of the system compiler, if available
-getSystemCompiler :: (MonadIO m, MonadLogger m, MonadBaseControl IO m, MonadCatch m) => EnvOverride -> WhichCompiler -> m (Maybe (CompilerVersion, Arch))
+getSystemCompiler :: (MonadIO m, MonadLogger m, MonadBaseControl IO m, MonadCatch m)
+                  => EnvOverride -> WhichCompiler -> m (Maybe (CompilerVersion 'CVActual, Arch))
 getSystemCompiler menv wc = do
     let exeName = case wc of
             Ghc -> "ghc"
@@ -781,7 +783,7 @@ getInstalledTool installed name goodVersion =
     goodPackage _ = Nothing
 
 getInstalledGhcjs :: [Tool]
-                  -> (CompilerVersion -> Bool)
+                  -> (CompilerVersion 'CVActual -> Bool)
                   -> Maybe Tool
 getInstalledGhcjs installed goodVersion =
     if null available
@@ -815,7 +817,7 @@ downloadAndInstallTool programsDir si downloadInfo tool installer = do
 downloadAndInstallCompiler :: (StackM env m, HasConfig env, HasGHCVariant env)
                            => CompilerBuild
                            -> SetupInfo
-                           -> CompilerVersion
+                           -> CompilerVersion 'CVWanted
                            -> VersionCheck
                            -> Maybe String
                            -> m Tool
@@ -871,8 +873,8 @@ downloadAndInstallCompiler compilerBuild si wanted versionCheck _mbindistUrl = d
 getWantedCompilerInfo :: (Ord k, MonadThrow m)
                       => Text
                       -> VersionCheck
-                      -> CompilerVersion
-                      -> (k -> CompilerVersion)
+                      -> CompilerVersion 'CVWanted
+                      -> (k -> CompilerVersion 'CVActual)
                       -> Map k a
                       -> m (k, a)
 getWantedCompilerInfo key versionCheck wanted toCV pairs_ =
@@ -1114,7 +1116,7 @@ installGHCJS si archiveFile archiveType _tempDir destDir = do
     $logStickyDone "Installed GHCJS."
 
 ensureGhcjsBooted :: (StackM env m, HasConfig env)
-                  => EnvOverride -> CompilerVersion -> Bool -> [String] -> m ()
+                  => EnvOverride -> CompilerVersion 'CVActual -> Bool -> [String] -> m ()
 ensureGhcjsBooted menv cv shouldBoot bootOpts = do
     eres <- try $ sinkProcessStdout Nothing menv "ghcjs" [] (return ())
     case eres of
@@ -1547,7 +1549,7 @@ removeHaskellEnvVars =
 getUtf8EnvVars
     :: forall m env.
        (MonadReader env m, HasPlatform env, MonadLogger m, MonadCatch m, MonadBaseControl IO m, MonadIO m)
-    => EnvOverride -> CompilerVersion -> m (Map Text Text)
+    => EnvOverride -> CompilerVersion 'CVActual -> m (Map Text Text)
 getUtf8EnvVars menv compilerVer =
     if getGhcVersion compilerVer >= $(mkVersion "7.10.3")
         -- GHC_CHARENC supported by GHC >=7.10.3
