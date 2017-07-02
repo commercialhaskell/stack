@@ -5,8 +5,7 @@ module Stack.Script
     ( scriptCmd
     ) where
 
-import           Control.Exception          (assert)
-import           Control.Exception.Safe     (throwM)
+import           Control.Exception.Safe     (assert)
 import           Control.Monad              (unless, forM, void)
 import           Control.Monad.IO.Class     (liftIO)
 import           Control.Monad.Logger
@@ -20,7 +19,6 @@ import           Data.Maybe                 (fromMaybe, mapMaybe)
 import           Data.Monoid
 import           Data.Set                   (Set)
 import qualified Data.Set                   as Set
-import           Data.Store.VersionTagged   (versionedDecodeOrLoad)
 import qualified Data.Text                  as T
 import           Path
 import           Path.IO
@@ -29,12 +27,10 @@ import           Stack.Exec
 import           Stack.GhcPkg               (ghcPkgExeName)
 import           Stack.Options.ScriptParser
 import           Stack.Runners
-import           Stack.Snapshot             (loadResolver, loadSnapshot)
 import           Stack.Types.BuildPlan
 import           Stack.Types.Compiler
 import           Stack.Types.Config
 import           Stack.Types.PackageName
-import           Stack.Types.Resolver
 import           Stack.Types.StackT
 import           Stack.Types.StringError
 import           System.FilePath            (dropExtension, replaceExtension)

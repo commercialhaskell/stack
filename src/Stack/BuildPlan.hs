@@ -421,11 +421,11 @@ checkSnapBuildPlan
     -> Path Abs Dir -- ^ project root, used for checking out necessary files
     -> [GenericPackageDescription]
     -> Maybe (Map PackageName (Map FlagName Bool))
-    -> SnapName
+    -> SnapshotDef
     -> m BuildPlanCheck
-checkSnapBuildPlan menv root gpds flags snap = do
+checkSnapBuildPlan menv root gpds flags snapshotDef = do
     platform <- view platformL
-    rs <- loadResolver (ResolverSnapshot snap) >>= loadSnapshot menv root
+    rs <- loadSnapshot menv root snapshotDef
 
     let
         compiler = lsCompilerVersion rs
@@ -455,8 +455,8 @@ selectBestSnapshot
     => EnvOverride
     -> Path Abs Dir -- ^ project root, used for checking out necessary files
     -> [GenericPackageDescription]
-    -> NonEmpty SnapName
-    -> m (SnapName, BuildPlanCheck)
+    -> NonEmpty SnapshotDef
+    -> m (SnapshotDef, BuildPlanCheck)
 selectBestSnapshot menv root gpds snaps = do
     $logInfo $ "Selecting the best among "
                <> T.pack (show (NonEmpty.length snaps))
@@ -479,15 +479,15 @@ selectBestSnapshot menv root gpds snaps = do
           | otherwise = (s2, r2)
 
         reportResult BuildPlanCheckOk {} snap = do
-            $logInfo $ "* Matches " <> renderSnapName snap
+            $logInfo $ "* Matches " <> resolverName (sdResolver snap)
             $logInfo ""
 
         reportResult r@BuildPlanCheckPartial {} snap = do
-            $logWarn $ "* Partially matches " <> renderSnapName snap
+            $logWarn $ "* Partially matches " <> resolverName (sdResolver snap)
             $logWarn $ indent $ T.pack $ show r
 
         reportResult r@BuildPlanCheckFail {} snap = do
-            $logWarn $ "* Rejected " <> renderSnapName snap
+            $logWarn $ "* Rejected " <> resolverName (sdResolver snap)
             $logWarn $ indent $ T.pack $ show r
 
         indent t = T.unlines $ fmap ("    " <>) (T.lines t)
