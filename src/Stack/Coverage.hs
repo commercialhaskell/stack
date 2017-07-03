@@ -171,7 +171,7 @@ generateHpcReportInternal tixSrc reportDir report extraMarkupArgs extraReportArg
             -- Directories for .mix files.
             hpcRelDir <- hpcRelativeDir
             -- Compute arguments used for both "hpc markup" and "hpc report".
-            pkgDirs <- liftM (Map.keys . lpAllLocal) getLocalPackages -- FIXME intentional to take dependencies too?
+            pkgDirs <- liftM (map lpvRoot . Map.elems . lpProject) getLocalPackages
             let args =
                     -- Use index files from all packages (allows cross-package coverage results).
                     concatMap (\x -> ["--srcdir", toFilePathNoTrailingSep x]) pkgDirs ++

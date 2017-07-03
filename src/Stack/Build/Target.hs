@@ -38,13 +38,13 @@ import           Path
 import           Path.Extra (rejectMissingDir)
 import           Path.IO
 import           Prelude hiding (concat, concatMap) -- Fix redundant import warnings
+import           Stack.Types.Config
 import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageName
 import           Stack.Types.Version
 import           Stack.Types.Build
 import           Stack.Types.BuildPlan
 import           Stack.Types.GhcPkgId
-import           Stack.Types.Package
 
 -- | The name of a component, which applies to executables, test suites, and benchmarks
 type ComponentName = Text
@@ -102,14 +102,6 @@ parseRawTarget t =
             "test" -> Just CTest
             "bench" -> Just CBench
             _ -> Nothing
-
--- | A view of a local package needed for resolving components
-data LocalPackageView = LocalPackageView
-    { lpvVersion    :: !Version
-    , lpvRoot       :: !(Path Abs Dir)
-    , lpvCabalFP    :: !(Path Abs File)
-    , lpvComponents :: !(Set NamedComponent)
-    }
 
 -- | Same as @parseRawTarget@, but also takes directories into account.
 parseRawTargetDirs :: MonadIO m

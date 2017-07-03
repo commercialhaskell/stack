@@ -15,9 +15,7 @@ module Stack.Build.Source
     , PackageSource (..)
     , getLocalFlags
     , getGhcOptions
-    , getLocalPackageViews
     , parseTargetsFromBuildOpts
-    , parseTargetsFromBuildOptsWith
     , addUnlistedToBuildCache
     , getDefaultPackageConfig
     , getPackageConfig
@@ -36,9 +34,7 @@ import qualified    Data.ByteString as S
 import              Data.Conduit (($$), ZipSink (..))
 import qualified    Data.Conduit.Binary as CB
 import qualified    Data.Conduit.List as CL
-import              Data.Either
 import              Data.Function
-import              Data.HashSet (HashSet)
 import qualified    Data.HashSet as HashSet
 import              Data.List
 import qualified    Data.Map as Map
@@ -49,7 +45,6 @@ import              Data.Monoid
 import              Data.Set (Set)
 import qualified    Data.Set as Set
 import              Data.Text (Text)
-import qualified    Data.Text as T
 import              Data.Traversable (sequence)
 import              Distribution.Package (pkgName, pkgVersion)
 import              Distribution.PackageDescription (GenericPackageDescription, package, packageDescription)
@@ -114,8 +109,7 @@ loadSourceMapFull :: (StackM env m, HasEnvConfig env)
                        )
 loadSourceMapFull needTargets boptsCli = do
     bconfig <- view buildConfigL
-    rawLocals <- getLocalPackageViews
-    (ls0, cliExtraDeps, targets) <- parseTargetsFromBuildOptsWith rawLocals needTargets boptsCli
+    (ls0, cliExtraDeps, targets) <- parseTargetsFromBuildOpts needTargets boptsCli
 
     -- Extend extra-deps to encompass targets requested on the command line
     -- that are not in the snapshot.
@@ -124,7 +118,8 @@ loadSourceMapFull needTargets boptsCli = do
         cliExtraDeps
         (Map.keysSet $ Map.filter (== STUnknown) targets)
 
-    locals <- mapM (loadLocalPackage boptsCli targets) $ Map.toList rawLocals
+    lp <- getLocalPackages
+    locals <- mapM (loadLocalPackage boptsCli targets) $ Map.toList $ lpProject lp
     checkFlagsUsed boptsCli locals extraDeps0 (lsPackages ls0)
     checkComponentsBuildable locals
 
@@ -141,7 +136,7 @@ loadSourceMapFull needTargets boptsCli = do
             isLocal STUnknown = False
             isLocal STNonLocal = False
 
-        shadowed = Map.keysSet rawLocals <> Map.keysSet extraDeps0
+        shadowed = Map.keysSet (lpProject lp) <> Map.keysSet extraDeps0 -- FIXME just project?
 
         -- Ignores all packages in the LoadedSnapshot that depend on any
         -- local packages or extra-deps. All packages that have
@@ -250,9 +245,6 @@ getGhcOptions bconfig boptsCli name isTarget isLocal = concat
 
 -- | Use the build options and environment to parse targets.
 --
--- If the local packages views are already known, use 'parseTargetsFromBuildOptsWith'
--- instead.
---
 -- Along with the 'Map' of targets, this yields the loaded
 -- 'LoadedSnapshot' for the resolver, as well as a Map of extra-deps
 -- derived from the commandline. These extra-deps targets come from when
@@ -267,41 +259,14 @@ parseTargetsFromBuildOpts
          , Map PackageName SimpleTarget
          )
 parseTargetsFromBuildOpts needTargets boptscli = do
-    rawLocals <- getLocalPackageViews
-    parseTargetsFromBuildOptsWith rawLocals needTargets boptscli
-
-parseTargetsFromBuildOptsWith
-    :: forall env m.
-       (StackM env m, HasEnvConfig env)
-    => Map PackageName (LocalPackageView, GenericPackageDescription)
-       -- ^ Local package views
-    -> NeedTargets
-    -> BuildOptsCLI
-    -> m ( LoadedSnapshot
-         , Map PackageName SinglePackageLocation -- additional local dependencies
-         , Map PackageName SimpleTarget
-         )
-parseTargetsFromBuildOptsWith rawLocals needTargets boptscli = do
     $logDebug "Parsing the targets"
     bconfig <- view buildConfigL
     ls0 <- view loadedSnapshotL
     workingDir <- getCurrentDir
+    lp <- getLocalPackages
 
     root <- view projectRootL
     menv <- getMinimalEnvOverride
-
-    let gpdHelper isDep =
-            mapM go . Map.toList
-          where
-            go :: (Path Abs Dir, SinglePackageLocation)
-               -> m (GenericPackageDescription, SinglePackageLocation, (Path Abs Dir, Bool))
-            go (dir, loc) = do
-              cabalfp <- findOrGenerateCabalFile dir
-              (_, gpd) <- readPackageUnresolved cabalfp
-              return (gpd, loc, (dir, isDep))
-    lp <- getLocalPackages
-    gpdsProject <- gpdHelper False (lpProject lp)
-    gpdsDeps <- gpdHelper True (lpDependencies lp)
 
     let dropMaybeKey (Nothing, _) = Map.empty
         dropMaybeKey (Just key, value) = Map.singleton key value
@@ -319,13 +284,18 @@ parseTargetsFromBuildOptsWith rawLocals needTargets boptscli = do
             (lsGlobals ls0)
             (lsPackages ls0)
             Map.empty -- (error "FIXME _deps") -- FIXME need to add in flagExtraDeps here somehow
-            (fst <$> rawLocals)
+            (lpProject lp)
             workingDir
             (boptsCLITargets boptscli)
 
     -- FIXME add in cliDeps
-    let gpds :: [(GenericPackageDescription, SinglePackageLocation, (Path Abs Dir, Bool))]
-        gpds = gpdsProject ++ gpdsDeps
+    let gpds :: [(GenericPackageDescription, SinglePackageLocation, Maybe LocalPackageView)]
+        gpds = map
+                 (\lpv -> (lpvGPD lpv, lpvLoc lpv, Just lpv))
+                 (Map.elems (lpProject lp)) ++
+               map
+                 (\(gpd, loc) -> (gpd, loc, Nothing))
+                 (Map.elems (lpDependencies lp))
 
     (globals, snapshots, locals) <- withCabalLoader $ \loadFromIndex ->
       calculatePackagePromotion loadFromIndex menv root ls0 gpds flags hides options drops
@@ -343,11 +313,11 @@ parseTargetsFromBuildOptsWith rawLocals needTargets boptscli = do
     let localDeps =
           Map.unions $ map go $ Map.toList locals
           where
-            go :: (PackageName, LoadedPackageInfo (SinglePackageLocation, Maybe (Path Abs Dir, Bool)))
+            go :: (PackageName, LoadedPackageInfo (SinglePackageLocation, Maybe (Maybe LocalPackageView)))
                -> Map PackageName SinglePackageLocation
             go (name, lpi) =
               case lpiLocation lpi of
-                (_, Just (_, False)) -> Map.empty -- project package, ignore it
+                (_, Just (Just _)) -> Map.empty -- project package, ignore it
                 (loc, _) -> Map.singleton name loc -- either a promoted snapshot or local package
 
         cliDeps' =
@@ -364,51 +334,6 @@ parseTargetsFromBuildOptsWith rawLocals needTargets boptscli = do
                     , " to extra-deps based on command line flag"
                     ]
     -}
-
--- | Parse out the local project packages for the current project
--- (ignores dependencies).
-getLocalPackageViews :: (StackM env m, HasEnvConfig env)
-                     => m (Map PackageName (LocalPackageView, GenericPackageDescription))
-getLocalPackageViews = do
-    $logDebug "Parsing the cabal files of the local packages"
-    lp <- getLocalPackages
-    locals <- forM (Map.toList (lpProject lp)) $ \(dir, _loc) -> do
-        cabalfp <- findOrGenerateCabalFile dir
-        (warnings,gpkg) <- readPackageUnresolved cabalfp
-        mapM_ (printCabalFileWarning cabalfp) warnings
-        let cabalID = package $ packageDescription gpkg
-            name = fromCabalPackageName $ pkgName cabalID
-        checkCabalFileName name cabalfp
-        let lpv = LocalPackageView
-                { lpvVersion = fromCabalVersion $ pkgVersion cabalID
-                , lpvRoot = dir
-                , lpvCabalFP = cabalfp
-                , lpvComponents = getNamedComponents gpkg
-                }
-        return (name, (lpv, gpkg))
-    checkDuplicateNames locals
-    return $ Map.fromList locals
-  where
-    getNamedComponents gpkg = Set.fromList $ concat
-        [ maybe [] (const [CLib]) (C.condLibrary gpkg)
-        , go CExe  C.condExecutables
-        , go CTest C.condTestSuites
-        , go CBench C.condBenchmarks
-        ]
-      where
-        go wrapper f = map (wrapper . T.pack . fst) $ f gpkg
-
--- | Check if there are any duplicate package names and, if so, throw an
--- exception.
-checkDuplicateNames :: MonadThrow m => [(PackageName, (LocalPackageView, gpd))] -> m ()
-checkDuplicateNames locals =
-    case filter hasMultiples $ Map.toList $ Map.fromListWith (++) $ map toPair locals of
-        [] -> return ()
-        x -> throwM $ DuplicateLocalPackageNames x
-  where
-    toPair (pn, (lpv, _)) = (pn, [lpvRoot lpv])
-    hasMultiples (_, _:_:_) = True
-    hasMultiples _ = False
 
 splitComponents :: [NamedComponent]
                 -> (Set Text, Set Text, Set Text)
@@ -427,9 +352,9 @@ loadLocalPackage
     :: forall m env. (StackM env m, HasEnvConfig env)
     => BuildOptsCLI
     -> Map PackageName SimpleTarget
-    -> (PackageName, (LocalPackageView, GenericPackageDescription))
+    -> (PackageName, LocalPackageView)
     -> m LocalPackage
-loadLocalPackage boptsCli targets (name, (lpv, gpkg)) = do
+loadLocalPackage boptsCli targets (name, lpv) = do
     let mtarget = Map.lookup name targets
     config  <- getPackageConfig boptsCli name (isJust mtarget) True
     bopts <- view buildOptsL
@@ -483,6 +408,7 @@ loadLocalPackage boptsCli targets (name, (lpv, gpkg)) = do
         -- This allows us to do an optimization where these are passed
         -- if the deps are present. This can avoid doing later
         -- unnecessary reconfigures.
+        gpkg = lpvGPD lpv
         pkg = resolvePackage config gpkg
         btpkg
             | Set.null tests && Set.null benches = Nothing

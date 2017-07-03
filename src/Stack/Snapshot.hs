@@ -36,7 +36,6 @@ import           Data.Store.VersionTagged
 import qualified Data.ByteArray as Mem (convert)
 import           Data.ByteString (ByteString)
 import qualified Data.ByteString.Base64.URL as B64URL
-import qualified Data.ByteString as S
 import qualified Data.ByteString.Char8 as S8
 import           Data.Conduit ((.|))
 import qualified Data.Conduit.List as CL
@@ -436,8 +435,9 @@ recalculate loadFromIndex menv root compilerVersion allFlags allHide allOptions 
   case Map.lookup name allFlags of
     Nothing -> return (name, lpi0 { lpiHide = hide, lpiGhcOptions = options }) -- optimization
     Just flags -> do
-      (gpd, loc) <- loadSingleRawCabalFile loadFromIndex menv root (lpiLocation lpi0) >>= parseGPD
-      platform <- assert (loc == lpiLocation lpi0) (view platformL)
+      let loc = lpiLocation lpi0
+      gpd <- loadSingleRawCabalFile loadFromIndex menv root loc >>= parseGPDSingle loc
+      platform <- view platformL
       let res@(name', lpi) = calculate gpd platform compilerVersion loc flags hide options
       unless (name == name' && lpiVersion lpi0 == lpiVersion lpi) $ error "recalculate invariant violated"
       return res
@@ -634,6 +634,11 @@ splitUnmetDeps =
       case Map.lookup name globals of
         Nothing -> False
         Just lpi -> lpiVersion lpi `withinIntervals` intervals
+
+parseGPDSingle :: MonadThrow m => SinglePackageLocation -> ByteString -> m GenericPackageDescription
+parseGPDSingle loc bs =
+  either (\e -> throwM $ InvalidCabalFileInSnapshot loc e bs) (return . snd)
+  $ rawParseGPD bs
 
 parseGPD :: MonadThrow m
          => ( ByteString -- raw contents

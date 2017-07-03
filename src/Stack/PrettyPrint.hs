@@ -38,6 +38,7 @@ import           Data.String (fromString)
 import qualified Data.Text as T
 import           Language.Haskell.TH
 import           Path
+import           Stack.Types.Config
 import           Stack.Types.Internal
 import           Stack.Types.Package
 import           Stack.Types.PackageIdentifier

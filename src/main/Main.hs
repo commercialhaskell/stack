@@ -698,7 +698,7 @@ sdistCmd sdistOpts go =
     withBuildConfig go $ do -- No locking needed.
         -- If no directories are specified, build all sdist tarballs.
         dirs' <- if null (sdoptsDirsToWorkWith sdistOpts)
-            then liftM (Map.keys . lpAllLocal) getLocalPackages -- FIXME just lpProject, right?
+            then liftM (map lpvRoot . Map.elems . lpProject) getLocalPackages
             else mapM resolveDir' (sdoptsDirsToWorkWith sdistOpts)
         forM_ dirs' $ \dir -> do
             (tarName, tarBytes, _mcabalRevision) <- getSDistTarball (sdoptsPvpBounds sdistOpts) dir

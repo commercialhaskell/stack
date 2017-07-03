@@ -21,7 +21,7 @@ import qualified Distribution.PackageDescription as C
 import           Options.Applicative
 import           Options.Applicative.Builder.Extra
 import           Stack.Build.Target (LocalPackageView(..))
-import           Stack.Build.Source (getLocalPackageViews)
+import           Stack.Config (getLocalPackages)
 import           Stack.Options.GlobalParser (globalOptsFromMonoid)
 import           Stack.Runners (loadConfigWithOpts)
 import           Stack.Setup
@@ -69,27 +69,27 @@ buildConfigCompleter inner = mkCompleter $ \inputRaw -> do
 
 targetCompleter :: Completer
 targetCompleter = buildConfigCompleter $ \input -> do
-    lpvs <- getLocalPackageViews
+    lpvs <- fmap lpProject getLocalPackages
     return $
         filter (input `isPrefixOf`) $
         concatMap allComponentNames (Map.toList lpvs)
   where
-    allComponentNames (name, (lpv, _)) =
+    allComponentNames (name, lpv) =
         map (T.unpack . renderPkgComponent . (name,)) (Set.toList (lpvComponents lpv))
 
 flagCompleter :: Completer
 flagCompleter = buildConfigCompleter $ \input -> do
-    lpvs <- getLocalPackageViews
+    lpvs <- fmap lpProject getLocalPackages
     bconfig <- view buildConfigL
     let wildcardFlags
             = nubOrd
-            $ concatMap (\(name, (_, gpd)) ->
-                map (\fl -> "*:" ++ flagString name fl) (C.genPackageFlags gpd))
+            $ concatMap (\(name, lpv) ->
+                map (\fl -> "*:" ++ flagString name fl) (C.genPackageFlags (lpvGPD lpv)))
             $ Map.toList lpvs
         normalFlags
-            = concatMap (\(name, (_, gpd)) ->
+            = concatMap (\(name, lpv) ->
                 map (\fl -> packageNameString name ++ ":" ++ flagString name fl)
-                    (C.genPackageFlags gpd))
+                    (C.genPackageFlags (lpvGPD lpv)))
             $ Map.toList lpvs
         flagString name fl =
             case C.flagName fl of
@@ -106,9 +106,9 @@ flagCompleter = buildConfigCompleter $ \input -> do
 
 projectExeCompleter :: Completer
 projectExeCompleter = buildConfigCompleter $ \input -> do
-    lpvs <- getLocalPackageViews
+    lpvs <- fmap lpProject getLocalPackages
     return $
         filter (input `isPrefixOf`) $
         nubOrd $
-        concatMap (\(_, (_, gpd)) -> map fst (C.condExecutables gpd)) $
+        concatMap (\(_, lpv) -> map fst (C.condExecutables (lpvGPD lpv))) $
         Map.toList lpvs

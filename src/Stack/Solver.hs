@@ -622,16 +622,16 @@ solveExtraDeps modStackYaml = do
     relStackYaml <- prettyPath stackYaml
 
     $logInfo $ "Using configuration file: " <> T.pack relStackYaml
-    packages <- lpAllLocal <$> getLocalPackages -- FIXME probably just lpProject?
-    let cabalDirs = Map.keys packages
-        noPkgMsg = "No cabal packages found in " <> relStackYaml <>
+    packages <- lpProject <$> getLocalPackages -- FIXME probably just lpProject?
+    let noPkgMsg = "No cabal packages found in " <> relStackYaml <>
                    ". Please add at least one directory containing a .cabal \
                    \file. You can also use 'stack init' to automatically \
                    \generate the config file."
         dupPkgFooter = "Please remove the directories containing duplicate \
                        \entries from '" <> relStackYaml <> "'."
 
-    cabalfps  <- liftM concat (mapM (findCabalFiles False) cabalDirs)
+        cabalDirs = map lpvRoot    $ Map.elems packages
+        cabalfps  = map lpvCabalFP $ Map.elems packages
     -- TODO when solver supports --ignore-subdirs option pass that as the
     -- second argument here.
     reportMissingCabalFiles cabalfps True

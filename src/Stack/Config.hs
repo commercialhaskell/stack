@@ -46,21 +46,15 @@ module Stack.Config
   ,LocalConfigStatus(..)
   ) where
 
-import qualified Codec.Archive.Tar as Tar
-import qualified Codec.Archive.Zip as Zip
-import qualified Codec.Compression.GZip as GZip
 import           Control.Applicative
-import           Control.Arrow ((***))
+import           Control.Arrow ((***), second)
 import           Control.Monad (liftM, unless, when, filterM)
 import           Control.Monad.Extra (firstJustM)
 import           Control.Monad.IO.Unlift
 import           Control.Monad.Logger hiding (Loc)
 import           Control.Monad.Reader (ask, runReaderT)
-import           Crypto.Hash (hashWith, SHA256(..))
 import           Data.Aeson.Extended
-import qualified Data.ByteArray as Mem (convert)
 import qualified Data.ByteString as S
-import qualified Data.ByteString.Lazy as L
 import           Data.Foldable (forM_)
 import           Data.IORef
 import qualified Data.IntMap as IntMap
@@ -69,15 +63,16 @@ import           Data.Maybe
 import           Data.Monoid.Extra
 import qualified Data.Set as Set
 import qualified Data.Text as T
-import           Data.Text.Encoding (encodeUtf8, decodeUtf8)
+import           Data.Text.Encoding (encodeUtf8)
 import qualified Data.Yaml as Yaml
+import qualified Distribution.PackageDescription as C
+import           Distribution.ParseUtils (PWarning)
 import           Distribution.System (OS (..), Platform (..), buildPlatform, Arch(OtherArch))
 import qualified Distribution.Text
 import           Distribution.Version (simplifyVersionRange)
 import           GHC.Conc (getNumProcessors)
 import           Lens.Micro (lens)
 import           Network.HTTP.Client (parseUrlThrow)
-import           Network.HTTP.Download (download)
 import           Network.HTTP.Simple (httpJSON, getResponseBody)
 import           Options.Applicative (Parser, strOption, long, help)
 import           Path
@@ -85,13 +80,14 @@ import           Path.Extra (toFilePathNoTrailingSep)
 import           Path.Find (findInParents)
 import           Path.IO
 import qualified Paths_stack as Meta
-import           Stack.BuildPlan
 import           Stack.Config.Build
 import           Stack.Config.Docker
 import           Stack.Config.Nix
 import           Stack.Config.Urls
 import           Stack.Constants
+import           Stack.Fetch
 import qualified Stack.Image as Image
+import           Stack.Package
 import           Stack.PackageLocation
 import           Stack.Snapshot
 import           Stack.Types.BuildPlan
@@ -100,7 +96,8 @@ import           Stack.Types.Config
 import           Stack.Types.Docker
 import           Stack.Types.Internal
 import           Stack.Types.Nix
-import           Stack.Types.PackageIdentifier (packageIdentifierRevisionString)
+import           Stack.Types.PackageName (PackageName)
+import           Stack.Types.PackageIdentifier (PackageIdentifier (..), fromCabalPackageIdentifier)
 import           Stack.Types.PackageIndex (IndexType (ITHackageSecurity), HackageSecurity (..))
 import           Stack.Types.Resolver
 import           Stack.Types.StackT
@@ -108,11 +105,9 @@ import           Stack.Types.StringError
 import           Stack.Types.Urls
 import           Stack.Types.Version
 import           System.Environment
-import           System.IO
 import           System.PosixCompat.Files (fileOwner, getFileStatus)
 import           System.PosixCompat.User (getEffectiveUserID)
 import           System.Process.Read
-import           System.Process.Run
 
 -- | If deprecated path exists, use it and print a warning.
 -- Otherwise, return the new path.
@@ -638,25 +633,79 @@ loadBuildConfig mproject config mresolver mcompiler = do
 -- | Get packages from EnvConfig, downloading and cloning as necessary.
 -- If the packages have already been downloaded, this uses a cached value (
 getLocalPackages
-    :: (StackMiniM env m, HasEnvConfig env)
+    :: forall env m.
+       (StackMiniM env m, HasEnvConfig env)
     => m LocalPackages
 getLocalPackages = do
     cacheRef <- view $ envConfigL.to envConfigPackagesRef
     mcached <- liftIO $ readIORef cacheRef
     case mcached of
         Just cached -> return cached
-        Nothing -> do
+        Nothing -> withCabalLoader $ \loadFromIndex -> do -- FIXME remove withCabalLoader, make it part of Config
             menv <- getMinimalEnvOverride
             root <- view projectRootL
-            let helper f = fmap (Map.fromList . concat)
-                         $ view (buildConfigL.to f)
-                       >>= mapM (resolveMultiPackageLocation menv root)
-            packages <- helper bcPackages
-            deps <- helper bcDependencies
+            let helper :: (BuildConfig -> [PackageLocation])
+                       -> ([PWarning] -> C.GenericPackageDescription -> SinglePackageLocation ->
+                           PackageName -> Version -> m a)
+                       -> m [(PackageName, a)]
+                helper f andThen
+                         = view (buildConfigL.to f)
+                       >>= mapM (loadMultiRawCabalFiles loadFromIndex menv root)
+                       >>= mapM (perPair andThen) . concat
+                perPair andThen (bs, loc) = do
+                  (warnings, gpd) <-
+                    case rawParseGPD bs of
+                      Left e -> throwM $ InvalidCabalFileInLocal loc e bs
+                      Right x -> return x
+                  let PackageIdentifier name version = fromCabalPackageIdentifier $ C.package $ C.packageDescription gpd
+                  (name, ) <$> andThen warnings gpd loc name version
+                getLocalDir warnings gpd loc name version = do
+                  dir <- resolveSinglePackageLocation menv root loc
+                  cabalfp <- findOrGenerateCabalFile dir
+                  mapM_ (printCabalFileWarning cabalfp) warnings
+                  checkCabalFileName name cabalfp
+                  return LocalPackageView
+                    { lpvVersion = version
+                    , lpvRoot = dir
+                    , lpvCabalFP = cabalfp
+                    , lpvComponents = getNamedComponents gpd
+                    , lpvGPD = gpd
+                    , lpvLoc = loc
+                    }
+            packages <- helper bcPackages getLocalDir
+            deps <- helper bcDependencies $ \_warnings gpd loc _name _version -> return (gpd, loc)
+
+            checkDuplicateNames $
+              map (second lpvLoc) packages ++
+              map (second snd) deps
+            -- FIXME check overlapping names
             return LocalPackages
-              { lpProject = packages
-              , lpDependencies = deps
+              { lpProject = Map.fromList packages
+              , lpDependencies = Map.fromList deps
               }
+  where
+    getNamedComponents gpkg = Set.fromList $ concat
+        [ maybe []  (const [CLib]) (C.condLibrary gpkg)
+        , go CExe   (map fst . C.condExecutables)
+        , go CTest  (map fst . C.condTestSuites)
+        , go CBench (map fst . C.condBenchmarks)
+        ]
+      where
+        go :: (T.Text -> NamedComponent)
+           -> (C.GenericPackageDescription -> [String])
+           -> [NamedComponent]
+        go wrapper f = map (wrapper . T.pack) $ f gpkg
+
+-- | Check if there are any duplicate package names and, if so, throw an
+-- exception.
+checkDuplicateNames :: MonadThrow m => [(PackageName, SinglePackageLocation)] -> m ()
+checkDuplicateNames locals =
+    case filter hasMultiples $ Map.toList $ Map.fromListWith (++) $ map (second return) locals of
+        [] -> return ()
+        x -> throwM $ DuplicateLocalPackageNames x
+  where
+    hasMultiples (_, _:_:_) = True
+    hasMultiples _ = False
 
 
 -- | Get the stack root, e.g. @~/.stack@, and determine whether the user owns it.

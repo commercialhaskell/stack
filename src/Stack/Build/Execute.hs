@@ -883,14 +883,12 @@ withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} md
                 root <- view projectRootL
                 dir <- case pkgLoc of
                   PLIndex pir -> do
-                    m <- unpackPackageIdents eeTempDir mdist [pir]
+                    m <- unpackPackageIdents eeTempDir mdist [pir] -- FIXME add total function to Stack.Fetch
                     case Map.toList m of
                         [(ident, dir)]
                             | ident == taskProvides -> return dir
                         _ -> error $ "withPackage: invariant (1) violated: " ++ show m
-                  _ -> do
-                    (dir, _loc) <- resolveSinglePackageLocation menv root pkgLoc
-                    return dir
+                  _ -> resolveSinglePackageLocation menv root pkgLoc
 
                 let name = packageIdentifierName taskProvides
                 cabalfpRel <- parseRelFile $ packageNameString name ++ ".cabal"

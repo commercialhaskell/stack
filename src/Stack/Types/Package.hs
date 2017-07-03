@@ -250,14 +250,6 @@ data LocalPackage = LocalPackage
     }
     deriving Show
 
--- | A single, fully resolved component of a package
-data NamedComponent
-    = CLib
-    | CExe !Text
-    | CTest !Text
-    | CBench !Text
-    deriving (Show, Eq, Ord)
-
 renderComponent :: NamedComponent -> S.ByteString
 renderComponent CLib = "lib"
 renderComponent (CExe x) = "exe:" <> encodeUtf8 x

@@ -49,10 +49,10 @@ resolveSinglePackageLocation
     => EnvOverride
     -> Path Abs Dir -- ^ project root
     -> SinglePackageLocation
-    -> m (Path Abs Dir, SinglePackageLocation)
+    -> m (Path Abs Dir)
 resolveSinglePackageLocation _ projRoot (PLFilePath fp) = do
   path <- resolveDir projRoot fp
-  return (path, PLFilePath fp)
+  return path
 resolveSinglePackageLocation menv projRoot (PLIndex pir) = do
     $logError "resolvePackageLocation on PLIndex called, this isn't a good idea" -- FIXME maybe we'll be OK with this after all?
     error "FIXME"
@@ -158,15 +158,13 @@ resolveSinglePackageLocation _ projRoot (PLHttp url) = do
 
     x <- listDir dir
     case x of
-        ([dir'], []) -> return (dir', PLHttp url)
+        ([dir'], []) -> return dir'
         (dirs, files) -> liftIO $ do
             ignoringAbsence (removeFile file)
             ignoringAbsence (removeDirRecur dir)
             throwIO $ UnexpectedArchiveContents dirs files
-resolveSinglePackageLocation menv projRoot (PLRepo (Repo url commit repoType' subdir)) = do
-    dir <- cloneRepo menv projRoot url commit repoType'
-    dir' <- resolveDir dir subdir
-    return (dir', PLRepo $ Repo url commit repoType' subdir)
+resolveSinglePackageLocation menv projRoot (PLRepo (Repo url commit repoType' subdir)) =
+    cloneRepo menv projRoot url commit repoType' >>= flip resolveDir subdir
 
 -- | Resolve a PackageLocation into a path, downloading and cloning as
 -- necessary.
@@ -182,9 +180,15 @@ resolveMultiPackageLocation
     -> Path Abs Dir -- ^ project root
     -> PackageLocation
     -> m [(Path Abs Dir, SinglePackageLocation)]
-resolveMultiPackageLocation x y (PLFilePath fp) = fmap return $ resolveSinglePackageLocation x y (PLFilePath fp)
-resolveMultiPackageLocation x y (PLIndex pir) = fmap return $ resolveSinglePackageLocation x y (PLIndex pir)
-resolveMultiPackageLocation x y (PLHttp url) = fmap return $ resolveSinglePackageLocation x y (PLHttp url)
+resolveMultiPackageLocation x y (PLFilePath fp) = do
+  dir <- resolveSinglePackageLocation x y (PLFilePath fp)
+  return [(dir, PLFilePath fp)]
+resolveMultiPackageLocation x y (PLIndex pir) = do
+  dir <- resolveSinglePackageLocation x y (PLIndex pir)
+  return [(dir, PLIndex pir)]
+resolveMultiPackageLocation x y (PLHttp url) = do
+  dir <- resolveSinglePackageLocation x y (PLHttp url)
+  return [(dir, PLHttp url)]
 resolveMultiPackageLocation menv projRoot (PLRepo (Repo url commit repoType' subdirs)) = do
     dir <- cloneRepo menv projRoot url commit repoType'
 
@@ -254,20 +258,15 @@ loadSingleRawCabalFile
   -> EnvOverride
   -> Path Abs Dir -- ^ project root, used for checking out necessary files
   -> SinglePackageLocation
-  -> m (ByteString, SinglePackageLocation)
+  -> m ByteString
 -- Need special handling of PLIndex for efficiency (just read from the
 -- index tarball) and correctness (get the cabal file from the index,
 -- not the package tarball itself, yay Hackage revisions).
-loadSingleRawCabalFile loadFromIndex _ _ (PLIndex pir) = do
-  bs <- liftIO $ loadFromIndex pir
-  return (bs, PLIndex pir)
-loadSingleRawCabalFile _ menv root loc = do
-  resolveSinglePackageLocation menv root loc >>= go
-  where
-    go (dir, loc') = do
-      cabalFile <- findOrGenerateCabalFile dir
-      bs <- liftIO $ S.readFile $ toFilePath cabalFile
-      return (bs, loc')
+loadSingleRawCabalFile loadFromIndex _ _ (PLIndex pir) = liftIO $ loadFromIndex pir
+loadSingleRawCabalFile _ menv root loc =
+  resolveSinglePackageLocation menv root loc >>=
+  findOrGenerateCabalFile >>=
+  liftIO . S.readFile . toFilePath
 
 -- | Same as 'loadSingleRawCabalFile', but for 'PackageLocation' There
 -- may be multiple results if dealing with a repository with subdirs,
@@ -284,7 +283,9 @@ loadMultiRawCabalFiles
 -- Need special handling of PLIndex for efficiency (just read from the
 -- index tarball) and correctness (get the cabal file from the index,
 -- not the package tarball itself, yay Hackage revisions).
-loadMultiRawCabalFiles x y z (PLIndex pir) = fmap return $ loadSingleRawCabalFile x y z (PLIndex pir)
+loadMultiRawCabalFiles x y z (PLIndex pir) = do
+  bs <- loadSingleRawCabalFile x y z (PLIndex pir)
+  return [(bs, PLIndex pir)]
 loadMultiRawCabalFiles _ menv root loc = do
   resolveMultiPackageLocation menv root loc >>= mapM go
   where

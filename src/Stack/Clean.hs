@@ -17,7 +17,6 @@ import           Data.Maybe (mapMaybe)
 import           Data.Typeable (Typeable)
 import           Path (Path, Abs, Dir)
 import           Path.IO (ignoringAbsence, removeDirRecur)
-import           Stack.Build.Source (getLocalPackageViews)
 import           Stack.Build.Target (LocalPackageView(..))
 import           Stack.Config (getLocalPackages)
 import           Stack.Constants (distDirFromDir, workDirFromDir)
@@ -45,16 +44,16 @@ dirsToDelete cleanOpts = do
     case cleanOpts of
         CleanShallow [] ->
             -- Filter out packages listed as extra-deps
-            mapM distDirFromDir $ Map.keys $ lpProject packages
+            mapM (distDirFromDir . lpvRoot) $ Map.elems $ lpProject packages
         CleanShallow targets -> do
-            localPkgViews <- getLocalPackageViews
-            let localPkgNames = Map.keys localPkgViews
-                getPkgDir pkgName = fmap (lpvRoot . fst) (Map.lookup pkgName localPkgViews)
+            let localPkgViews = lpProject packages
+                localPkgNames = Map.keys localPkgViews
+                getPkgDir pkgName = fmap lpvRoot (Map.lookup pkgName localPkgViews)
             case targets \\ localPkgNames of
                 [] -> mapM distDirFromDir (mapMaybe getPkgDir targets)
                 xs -> throwM (NonLocalPackages xs)
         CleanFull -> do
-            pkgWorkDirs <- mapM workDirFromDir $ Map.keys $ lpProject packages
+            pkgWorkDirs <- mapM (workDirFromDir . lpvRoot) $ Map.elems $ lpProject packages
             projectWorkDir <- getProjectWorkDir
             return (projectWorkDir : pkgWorkDirs)
 

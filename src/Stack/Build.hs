@@ -297,9 +297,9 @@ withLoadPackage inner = do
         inner $ \loc flags ghcOptions -> do
             -- FIXME this looks very similar to code in
             -- Stack.Snapshot, try to merge it together
-            (bs, loc') <- run $ loadSingleRawCabalFile loadFromIndex menv root loc
+            bs <- run $ loadSingleRawCabalFile loadFromIndex menv root loc
 
-            (_warnings,pkg) <- assert (loc == loc') $ readPackageBS (depPackageConfig econfig flags ghcOptions) bs
+            (_warnings,pkg) <- readPackageBS (depPackageConfig econfig flags ghcOptions) bs
             return pkg
   where
     -- | Package config to be used for dependencies

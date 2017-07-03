@@ -263,12 +263,10 @@ getAllLocalTargets GhciOpts{..} targets0 mainIsTargets sourceMap = do
     -- Find all of the packages that are directly demanded by the
     -- targets.
     directlyWanted <-
-        forMaybeM (M.keys packages) $
-        \dir ->
-             do cabalfp <- findOrGenerateCabalFile dir
-                name <- parsePackageNameFromFilePath cabalfp
+        forMaybeM (M.toList packages) $
+        \(name, lpv) ->
                 case M.lookup name targets of
-                  Just simpleTargets -> return (Just (name, (cabalfp, simpleTargets)))
+                  Just simpleTargets -> return (Just (name, (lpvCabalFP lpv, simpleTargets)))
                   Nothing -> return Nothing
     -- Figure out
     let extraLoadDeps = getExtraLoadDeps ghciLoadLocalDeps sourceMap directlyWanted

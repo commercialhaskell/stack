@@ -37,6 +37,8 @@ module Stack.Types.Config
   -- ** BuildConfig & HasBuildConfig
   ,BuildConfig(..)
   ,LocalPackages(..)
+  ,LocalPackageView(..)
+  ,NamedComponent(..)
   ,lpAllLocal
   ,stackYamlL
   ,projectRootL
@@ -206,6 +208,7 @@ import           Data.Typeable
 import           Data.Yaml (ParseException)
 import qualified Data.Yaml as Yaml
 import           Distribution.PackageDescription (GenericPackageDescription)
+import           Distribution.ParseUtils (PError)
 import           Distribution.System (Platform)
 import qualified Distribution.Text
 import           Distribution.Version (anyVersion)
@@ -563,18 +566,31 @@ data EnvConfig = EnvConfig
     }
 
 data LocalPackages = LocalPackages
-  { lpProject :: !(Map (Path Abs Dir) SinglePackageLocation)
-  , lpDependencies :: !(Map (Path Abs Dir) SinglePackageLocation)
-    {- FIXME future improvement
-  , lpDependencies :: !(Map PackageName (PackageLocation, GenericPackageDescription))
-  -- ^ Use just the GenericPackageDescription here to avoid needing to
-  -- unpack PLIndex packages, which are by far the most common case.
-    -}
+  { lpProject :: !(Map PackageName LocalPackageView)
+  , lpDependencies :: !(Map PackageName (GenericPackageDescription, SinglePackageLocation))
   }
 
+-- | A view of a local package needed for resolving components
+data LocalPackageView = LocalPackageView
+    { lpvVersion    :: !Version
+    , lpvRoot       :: !(Path Abs Dir)
+    , lpvCabalFP    :: !(Path Abs File)
+    , lpvComponents :: !(Set NamedComponent)
+    , lpvGPD        :: !GenericPackageDescription
+    , lpvLoc        :: !SinglePackageLocation
+    }
+
+-- | A single, fully resolved component of a package
+data NamedComponent
+    = CLib
+    | CExe !Text
+    | CTest !Text
+    | CBench !Text
+    deriving (Show, Eq, Ord)
+
 -- | Get both project and dependency filepaths. FIXME do we really need this?
-lpAllLocal :: LocalPackages -> Map (Path Abs Dir) SinglePackageLocation
-lpAllLocal (LocalPackages x y) = x <> y
+lpAllLocal :: LocalPackages -> Map PackageName (GenericPackageDescription, SinglePackageLocation)
+lpAllLocal (LocalPackages x y) = (Map.map (\lpv -> (lpvGPD lpv, lpvLoc lpv)) x) <> y
 
 -- | Value returned by 'Stack.Config.loadConfig'.
 data LoadConfig m = LoadConfig
@@ -992,6 +1008,8 @@ data ConfigException
   | NixRequiresSystemGhc
   | NoResolverWhenUsingNoLocalConfig
   | InvalidResolverForNoLocalConfig String
+  | InvalidCabalFileInLocal !SinglePackageLocation !PError !ByteString
+  | DuplicateLocalPackageNames ![(PackageName, [SinglePackageLocation])]
   deriving Typeable
 instance Show ConfigException where
     show (ParseConfigFileException configFile exception) = concat
@@ -1106,6 +1124,21 @@ instance Show ConfigException where
         ]
     show NoResolverWhenUsingNoLocalConfig = "When using the script command, you must provide a resolver argument"
     show (InvalidResolverForNoLocalConfig ar) = "The script command requires a specific resolver, you provided " ++ ar
+    show (InvalidCabalFileInLocal loc err _) = concat
+      [ "Unable to parse cabal file from "
+      , show loc
+      , ": "
+      , show err
+      ]
+    show (DuplicateLocalPackageNames pairs) = concat
+        $ "The same package name is used in multiple local packages\n"
+        : map go pairs
+      where
+        go (name, dirs) = unlines
+            $ ""
+            : (packageNameString name ++ " used in:")
+            : map goLoc dirs
+        goLoc loc = "- " ++ show loc
 instance Exception ConfigException
 
 showOptions :: WhichSolverCmd -> SuggestSolver -> String
