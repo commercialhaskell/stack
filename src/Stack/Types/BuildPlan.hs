@@ -17,7 +17,6 @@ module Stack.Types.BuildPlan
     , SinglePackageLocation
     , RepoType (..)
     , Repo (..)
-    , RemotePackageType (..)
     , ExeName (..)
     , LoadedSnapshot (..)
     , loadedSnapshotVC
@@ -191,15 +190,6 @@ instance FromJSON (WithJSONWarnings PackageLocation) where
           repoCommit <- o ..: "commit"
           repoSubdirs <- o ..: "subdirs" ..!= []
           return $ PLRepo Repo {..}
-
--- | What kind of remote package location we're dealing with.
-data RemotePackageType
-    = RPTHttp
-    | RPTGit !Text -- ^ Commit
-    | RPTHg  !Text -- ^ Commit
-    deriving (Generic, Show, Eq, Data, Typeable)
-instance Store RemotePackageType
-instance NFData RemotePackageType
 
 -- | Name of an executable.
 newtype ExeName = ExeName { unExeName :: Text }
