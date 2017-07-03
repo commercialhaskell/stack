@@ -26,14 +26,11 @@ module Stack.Types.StackT
   where
 
 import           Control.Applicative
-import           Control.Concurrent.MVar
 import           Control.Monad
 import           Control.Monad.Base
-import           Control.Monad.Catch
-import           Control.Monad.IO.Class
+import           Control.Monad.IO.Unlift
 import           Control.Monad.Logger
 import           Control.Monad.Reader hiding (lift)
-import           Control.Monad.Trans.Control
 import qualified Data.ByteString.Char8 as S8
 import           Data.Char
 import           Data.List (stripPrefix)
@@ -68,7 +65,7 @@ type HasEnv r = (HasLogOptions r, HasTerminal r, HasReExec r, HasSticky r)
 
 -- | Constraint synonym for constraints commonly satisifed by monads used in stack.
 type StackM r m =
-    (MonadReader r m, MonadIO m, MonadBaseControl IO m, MonadLoggerIO m, MonadMask m, HasEnv r)
+    (MonadReader r m, MonadUnliftIO m, MonadLoggerIO m, MonadThrow m, HasEnv r) -- FIXME perhaps remove MonadThrow, switch to MonadLogger
 
 --------------------------------------------------------------------------------
 -- Main StackT monad transformer
@@ -76,10 +73,11 @@ type StackM r m =
 -- | The monad used for the executable @stack@.
 newtype StackT config m a =
   StackT {unStackT :: ReaderT (Env config) m a}
-  deriving (Functor,Applicative,Monad,MonadIO,MonadReader (Env config),MonadThrow,MonadCatch,MonadMask,MonadTrans)
+  deriving (Functor,Applicative,Monad,MonadIO,MonadReader (Env config),MonadThrow,MonadTrans) -- FIXME maybe add back MonadCatch and MonadMask?
 
 deriving instance (MonadBase b m) => MonadBase b (StackT config m)
 
+{- FIXME we'll probably still want this
 instance MonadBaseControl b m => MonadBaseControl b (StackT config m) where
     type StM (StackT config m) a = ComposeSt (StackT config) m a
     liftBaseWith     = defaultLiftBaseWith
@@ -89,6 +87,7 @@ instance MonadTransControl (StackT config) where
     type StT (StackT config) a = StT (ReaderT (Env config)) a
     liftWith = defaultLiftWith StackT unStackT
     restoreT = defaultRestoreT StackT
+-}
 
 -- | Takes the configured log level into account.
 instance MonadIO m => MonadLogger (StackT config m) where
@@ -96,6 +95,11 @@ instance MonadIO m => MonadLogger (StackT config m) where
 
 instance MonadIO m => MonadLoggerIO (StackT config m) where
     askLoggerIO = getStickyLoggerFunc
+
+instance MonadUnliftIO m => MonadUnliftIO (StackT config m) where
+    askUnliftIO = StackT $ ReaderT $ \r ->
+                  withUnliftIO $ \u ->
+                  return (UnliftIO (unliftIO u . flip runReaderT r . unStackT))
 
 -- | Run a Stack action, using global options.
 runStackTGlobal :: (MonadIO m)
@@ -133,7 +137,7 @@ getCanUseUnicode = do
         test = withCString enc str $ \cstr -> do
             str' <- peekCString enc cstr
             return (str == str')
-    test `catchIOError` \_ -> return False
+    test `catchIO` \_ -> return False
 
 runInnerStackT :: (HasEnv r, MonadReader r m, MonadIO m)
                => config -> StackT config IO a -> m a

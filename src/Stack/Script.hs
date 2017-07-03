@@ -5,9 +5,8 @@ module Stack.Script
     ( scriptCmd
     ) where
 
-import           Control.Exception.Safe     (assert)
 import           Control.Monad              (unless, forM, void)
-import           Control.Monad.IO.Class     (liftIO)
+import           Control.Monad.IO.Unlift
 import           Control.Monad.Logger
 import           Data.ByteString            (ByteString)
 import qualified Data.ByteString.Char8      as S8

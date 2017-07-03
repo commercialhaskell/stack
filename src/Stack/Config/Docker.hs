@@ -3,9 +3,8 @@
 -- | Docker configuration
 module Stack.Config.Docker where
 
-import           Control.Exception.Lifted
 import           Control.Monad (void)
-import           Control.Monad.Catch (MonadThrow)
+import           Control.Monad.IO.Unlift
 import           Data.List (find)
 import           Data.Maybe
 import           Data.Monoid.Extra
@@ -29,37 +28,38 @@ dockerOptsFromMonoid
 dockerOptsFromMonoid mproject stackRoot maresolver DockerOptsMonoid{..} = do
     let dockerEnable =
             fromFirst (getAny dockerMonoidDefaultEnable) dockerMonoidEnable
-        dockerImage =
+        dockerImageM =
             let mresolver =
                     case maresolver of
                         Just (ARResolver resolver) ->
-                            Just resolver
+                            return $ Just resolver
                         Just aresolver ->
-                            throw
+                            throwM
                                 (ResolverNotSupportedException $
                                  show aresolver)
                         Nothing ->
-                            fmap (void . projectResolver) mproject
-                defaultTag =
-                    case mresolver of
-                        Nothing -> ""
+                            return $ fmap (void . projectResolver) mproject
+                defaultTag = do
+                    mresolver' <- mresolver
+                    case mresolver' of
+                        Nothing -> return ""
                         Just resolver ->
                             case resolver of
                                 ResolverSnapshot n@(LTS _ _) ->
-                                    ":" ++ T.unpack (renderSnapName n)
+                                    return $ ":" ++ T.unpack (renderSnapName n)
                                 _ ->
-                                    throw
+                                    throwM
                                         (ResolverNotSupportedException $
                                          show resolver)
             in case getFirst dockerMonoidRepoOrImage of
-                   Nothing -> "fpco/stack-build" ++ defaultTag
-                   Just (DockerMonoidImage image) -> image
+                   Nothing -> fmap ("fpco/stack-build" ++) defaultTag
+                   Just (DockerMonoidImage image) -> return image
                    Just (DockerMonoidRepo repo) ->
                        case find (`elem` (":@" :: String)) repo of
                            Just _    -- Repo already specified a tag or digest, so don't append default
                             ->
-                               repo
-                           Nothing -> repo ++ defaultTag
+                               return repo
+                           Nothing -> fmap (repo ++) defaultTag
         dockerRegistryLogin =
             fromFirst
                 (isJust (emptyToNothing (getFirst dockerMonoidRegistryUsername)))
@@ -78,6 +78,8 @@ dockerOptsFromMonoid mproject stackRoot maresolver DockerOptsMonoid{..} = do
             simplifyVersionRange (getIntersectingVersionRange dockerMonoidRequireDockerVersion)
         dockerDatabasePath = fromFirst (stackRoot </> $(mkRelFile "docker.db")) dockerMonoidDatabasePath
         dockerStackExe = getFirst dockerMonoidStackExe
+
+    dockerImage <- dockerImageM
     return DockerOpts{..}
   where emptyToNothing Nothing = Nothing
         emptyToNothing (Just s) | null s = Nothing

@@ -22,10 +22,8 @@ module Stack.Snapshot
 
 import           Control.Applicative
 import           Control.Arrow (second)
-import           Control.Exception.Safe (assert, impureThrow)
 import           Control.Monad (forM, unless, void, (>=>))
-import           Control.Monad.Catch
-import           Control.Monad.IO.Class
+import           Control.Monad.IO.Unlift
 import           Control.Monad.Logger
 import           Control.Monad.Reader (MonadReader)
 import           Control.Monad.State.Strict      (get, put, StateT, execStateT)

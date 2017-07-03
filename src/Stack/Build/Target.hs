@@ -21,8 +21,7 @@ module Stack.Build.Target
 
 import           Control.Applicative
 import           Control.Arrow (second)
-import           Control.Monad.Catch (MonadCatch, throwM)
-import           Control.Monad.IO.Class
+import           Control.Monad.IO.Unlift
 import           Data.Either (partitionEithers)
 import           Data.Foldable
 import           Data.List.Extra (groupSort)
@@ -113,7 +112,7 @@ data LocalPackageView = LocalPackageView
     }
 
 -- | Same as @parseRawTarget@, but also takes directories into account.
-parseRawTargetDirs :: (MonadIO m, MonadCatch m)
+parseRawTargetDirs :: MonadIO m
                    => Path Abs Dir -- ^ current directory
                    -> Map PackageName LocalPackageView
                    -> Text
@@ -122,7 +121,7 @@ parseRawTargetDirs root locals t =
     case parseRawTarget t of
         Just rt -> return $ Right [(ri, rt)]
         Nothing -> do
-            mdir <- forgivingAbsence (resolveDir root (T.unpack t))
+            mdir <- liftIO $ forgivingAbsence (resolveDir root (T.unpack t))
               >>= rejectMissingDir
             case mdir of
                 Nothing -> return $ Left $ "Directory not found: " `T.append` t
@@ -291,7 +290,7 @@ data NeedTargets
 -- files and a list of command line targets, calculate additional
 -- local dependencies needed and the simplified view of targets that
 -- we actually want to build.
-parseTargets :: (MonadCatch m, MonadIO m)
+parseTargets :: MonadIO m
              => NeedTargets -- ^ need at least one target?
              -> Bool -- ^ using implicit global project? used for better error reporting
              -> Map PackageName (LoadedPackageInfo GhcPkgId) -- ^ globals
@@ -325,11 +324,11 @@ parseTargets needTargets implicitGlobal globals snap deps locals currDir textTar
                  then case needTargets of
                         AllowNoTargets -> return (Map.empty, Map.empty)
                         NeedTargets
-                            | null textTargets' && implicitGlobal -> throwM $ TargetParseException
+                            | null textTargets' && implicitGlobal -> throwIO $ TargetParseException
                                 ["The specified targets matched no packages.\nPerhaps you need to run 'stack init'?"]
-                            | null textTargets' && Map.null locals -> throwM $ TargetParseException
+                            | null textTargets' && Map.null locals -> throwIO $ TargetParseException
                                 ["The project contains no local packages (packages not marked with 'extra-dep')"]
-                            | otherwise -> throwM $ TargetParseException
+                            | otherwise -> throwIO $ TargetParseException
                                 ["The specified targets matched no packages"]
                  else return (Map.unions newDeps, targets)
-        else throwM $ TargetParseException errs
+        else throwIO $ TargetParseException errs

@@ -26,7 +26,7 @@ module Stack.Types.PackageName
 import           Control.Applicative
 import           Control.DeepSeq
 import           Control.Monad
-import           Control.Monad.Catch
+import           Control.Monad.IO.Unlift
 import           Data.Aeson.Extended
 import           Data.Attoparsec.Combinators
 import           Data.Attoparsec.Text

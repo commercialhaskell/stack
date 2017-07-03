@@ -29,8 +29,7 @@ module Stack.Types.PackageIdentifier
 
 import           Control.Applicative
 import           Control.DeepSeq
-import           Control.Exception (Exception)
-import           Control.Monad.Catch (MonadThrow, throwM)
+import           Control.Monad.IO.Unlift
 import           Crypto.Hash as Hash (hashlazy, Digest, SHA256)
 import           Data.Aeson.Extended
 import           Data.Attoparsec.Text as A

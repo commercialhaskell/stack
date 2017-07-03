@@ -18,7 +18,6 @@ import           Control.Applicative
 import           Control.Arrow ((&&&))
 import           Control.Monad (liftM, void)
 import           Control.Monad.IO.Class
-import           Control.Monad.Trans.Unlift (MonadBaseUnlift)
 import qualified Data.Foldable as F
 import qualified Data.HashSet as HashSet
 import           Data.Map (Map)
@@ -81,7 +80,7 @@ data ListDepsOpts = ListDepsOpts
     }
 
 -- | Visualize the project's dependencies as a graphviz graph
-dot :: (StackM env m, HasEnvConfig env, MonadBaseUnlift IO m)
+dot :: (StackM env m, HasEnvConfig env)
     => DotOpts
     -> m ()
 dot dotOpts = do
@@ -99,7 +98,7 @@ data DotPayload = DotPayload
 -- | Create the dependency graph and also prune it as specified in the dot
 -- options. Returns a set of local names and and a map from package names to
 -- dependencies.
-createPrunedDependencyGraph :: (StackM env m, HasEnvConfig env, MonadBaseUnlift IO m)
+createPrunedDependencyGraph :: (StackM env m, HasEnvConfig env)
                             => DotOpts
                             -> m (Set PackageName,
                                   Map PackageName (Set PackageName, DotPayload))
@@ -116,7 +115,7 @@ createPrunedDependencyGraph dotOpts = do
 -- name to a tuple of dependencies and payload if available. This
 -- function mainly gathers the required arguments for
 -- @resolveDependencies@.
-createDependencyGraph :: (StackM env m, HasEnvConfig env, MonadBaseUnlift IO m)
+createDependencyGraph :: (StackM env m, HasEnvConfig env)
                        => DotOpts
                        -> m (Map PackageName (Set PackageName, DotPayload))
 createDependencyGraph dotOpts = do
@@ -147,7 +146,7 @@ createDependencyGraph dotOpts = do
     liftIO $ resolveDependencies (dotDependencyDepth dotOpts) graph depLoader)
   where makePayload pkg = DotPayload (Just $ packageVersion pkg) (Just $ packageLicense pkg)
 
-listDependencies :: (StackM env m, HasEnvConfig env, MonadBaseUnlift IO m)
+listDependencies :: (StackM env m, HasEnvConfig env)
                   => ListDepsOpts
                   -> m ()
 listDependencies opts = do

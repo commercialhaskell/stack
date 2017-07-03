@@ -33,15 +33,11 @@ import qualified    Codec.Archive.Tar.Entry as Tar
 import              Codec.Compression.GZip (decompress)
 import              Control.Applicative
 import              Control.Concurrent.Async (Concurrently (..))
-import              Control.Concurrent.MVar.Lifted (modifyMVar, newMVar)
 import              Control.Concurrent.STM
-import              Control.Exception (assert)
-import              Control.Monad (join, liftM, unless, void, when)
-import              Control.Monad.Catch
-import              Control.Monad.IO.Class
+import              Control.Monad (join, liftM, unless, when)
+import              Control.Monad.IO.Unlift
 import              Control.Monad.Logger
 import              Control.Monad.Reader (MonadReader, ask, runReaderT)
-import              Control.Monad.Trans.Control
 import              Crypto.Hash (SHA256 (..))
 import              Data.ByteString (ByteString)
 import qualified    Data.ByteString as S
@@ -313,7 +309,7 @@ data ToFetchResult = ToFetchResult
 
 -- | Add the cabal files to a list of idents with their caches.
 withCabalFiles
-    :: (MonadReader env m, MonadIO m, HasConfig env, MonadMask m)
+    :: (MonadReader env m, MonadUnliftIO m, HasConfig env, MonadThrow m)
     => IndexName
     -> [(ResolvedPackage, a)]
     -> (PackageIdentifier -> a -> ByteString -> IO b)
@@ -335,7 +331,7 @@ withCabalFiles name pkgs f = do
 -- | Provide a function which will load up a cabal @ByteString@ from the
 -- package indices.
 withCabalLoader
-    :: (StackMiniM env m, HasConfig env, MonadBaseControl IO m)
+    :: (StackMiniM env m, HasConfig env)
     => ((PackageIdentifierRevision -> IO ByteString) -> m a)
     -> m a
 withCabalLoader inner = do
@@ -347,7 +343,7 @@ withCabalLoader inner = do
     updateRef <- liftIO $ newMVar True
 
     loadCaches <- getPackageCachesIO
-    runInBase <- askRunBase
+    runInBase <- askRunIO
 
     env <- ask
 
@@ -390,7 +386,7 @@ withCabalLoader inner = do
     inner doLookup
 
 lookupPackageIdentifierExact
-  :: (MonadReader env m, MonadIO m, HasConfig env, MonadMask m)
+  :: (MonadReader env m, MonadUnliftIO m, HasConfig env, MonadThrow m)
   => PackageIdentifierRevision
   -> PackageCaches
   -> HashMap CabalHash (PackageIndex, OffsetSize)
@@ -514,7 +510,7 @@ fetchPackages' mdistDir toFetchAll = do
     connCount <- view $ configL.to configConnectionCount
     outputVar <- liftIO $ newTVarIO Map.empty
 
-    runInBase <- askRunBase
+    runInBase <- askRunIO
     parMapM_
         connCount
         (go outputVar runInBase)
@@ -640,7 +636,7 @@ untar tarPath expectedTarFolder destDirParent = do
                     perm) filePerms
                 return unexpectedEntries
 
-parMapM_ :: (F.Foldable f,MonadIO m,MonadBaseControl IO m)
+parMapM_ :: (F.Foldable f,MonadUnliftIO m)
          => Int
          -> (a -> m ())
          -> f a
@@ -649,8 +645,7 @@ parMapM_ (max 1 -> 1) f xs = F.mapM_ f xs
 parMapM_ cnt f xs0 = do
     var <- liftIO (newTVarIO $ F.toList xs0)
 
-    -- See comment on similar line in Stack.Build
-    runInBase <- liftBaseWith $ \run -> return (void . run)
+    runInBase <- askRunIO
 
     let worker = fix $ \loop -> join $ atomically $ do
             xs <- readTVar var
@@ -673,10 +668,3 @@ orSeparated xs
 
 commaSeparated :: NonEmpty T.Text -> T.Text
 commaSeparated = F.fold . NE.intersperse ", "
-
--- | Hacky version of @askRunBase@ that unsafely discards state, since
--- @MonadBaseUnlift@ constraints make GHC sad for some reason.
---
--- TODO: Replace with monad-unlift
-askRunBase :: forall m b. MonadBaseControl b m => m (m () -> b ())
-askRunBase = liftBaseWith $ \run -> return $ void . run

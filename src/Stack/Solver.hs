@@ -21,11 +21,8 @@ import           Prelude ()
 import           Prelude.Compat
 
 import           Control.Applicative
-import           Control.Exception (assert)
-import           Control.Exception.Safe (tryIO)
 import           Control.Monad (when,void,join,liftM,unless,mapAndUnzipM, zipWithM_)
-import           Control.Monad.Catch
-import           Control.Monad.IO.Class
+import           Control.Monad.IO.Unlift
 import           Control.Monad.Logger
 import           Data.Aeson.Extended         (object, (.=), toJSON)
 import qualified Data.ByteString as S
@@ -99,7 +96,7 @@ cabalSolver :: (StackM env m, HasConfig env)
             -> m (Either [PackageName] ConstraintSpec)
 cabalSolver menv cabalfps constraintType
             srcConstraints depConstraints cabalArgs =
-  withSystemTempDir "cabal-solver" $ \dir' -> do
+  withRunIO $ \run -> withSystemTempDir "cabal-solver" $ \dir' -> run $ do
 
     let versionConstraints = fmap fst depConstraints
         dir = toFilePath dir'

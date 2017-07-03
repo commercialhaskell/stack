@@ -20,13 +20,10 @@ module Stack.Build
   ,CabalVersionException(..))
   where
 
-import           Control.Exception.Safe (Exception, assert)
 import           Control.Monad
-import           Control.Monad.IO.Class
+import           Control.Monad.IO.Unlift
 import           Control.Monad.Logger
 import           Control.Monad.Reader (MonadReader)
-import           Control.Monad.Trans.Resource
-import           Control.Monad.Trans.Unlift (MonadBaseUnlift, askRunBase)
 import           Data.Aeson (Value (Object, Array), (.=), object)
 import           Data.Function
 import qualified Data.HashMap.Strict as HM
@@ -77,7 +74,6 @@ import           System.FileLock (FileLock, unlockFile)
 
 #ifdef WINDOWS
 import           System.Win32.Console (setConsoleCP, setConsoleOutputCP, getConsoleCP, getConsoleOutputCP)
-import qualified Control.Monad.Catch as Catch
 #endif
 
 -- | Build.
@@ -85,7 +81,7 @@ import qualified Control.Monad.Catch as Catch
 --   If a buildLock is passed there is an important contract here.  That lock must
 --   protect the snapshot, and it must be safe to unlock it if there are no further
 --   modifications to the snapshot to be performed by this build.
-build :: (StackM env m, HasEnvConfig env, MonadBaseUnlift IO m)
+build :: (StackM env m, HasEnvConfig env)
       => (Set (Path Abs File) -> IO ()) -- ^ callback after discovering all local files
       -> Maybe FileLock
       -> BuildOptsCLI
@@ -289,14 +285,14 @@ mkBaseConfigOpts boptsCli = do
         }
 
 -- | Provide a function for loading package information from the package index
-withLoadPackage :: (StackM env m, HasEnvConfig env, MonadBaseUnlift IO m)
+withLoadPackage :: (StackM env m, HasEnvConfig env)
                 => ((SinglePackageLocation -> Map FlagName Bool -> [Text] -> IO Package) -> m a)
                 -> m a
 withLoadPackage inner = do
     econfig <- view envConfigL
     menv <- getMinimalEnvOverride
     root <- view projectRootL
-    run <- askRunBase
+    run <- askRunIO
     withCabalLoader $ \loadFromIndex ->
         inner $ \loc flags ghcOptions -> do
             -- FIXME this looks very similar to code in
@@ -336,13 +332,13 @@ fixCodePage inner = do
         let setInput = origCPI /= expected
             setOutput = origCPO /= expected
             fixInput
-                | setInput = Catch.bracket_
+                | setInput = bracket_
                     (liftIO $ do
                         setConsoleCP expected)
                     (liftIO $ setConsoleCP origCPI)
                 | otherwise = id
             fixOutput
-                | setOutput = Catch.bracket_
+                | setOutput = bracket_
                     (liftIO $ do
                         setConsoleOutputCP expected)
                     (liftIO $ setConsoleOutputCP origCPO)

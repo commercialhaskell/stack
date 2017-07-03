@@ -34,15 +34,12 @@ module Stack.Setup
 
 import qualified    Codec.Archive.Tar as Tar
 import              Control.Applicative
-import              Control.Concurrent.Async.Lifted (Concurrently(..))
-import              Control.Exception.Safe (catchIO, tryAny)
-import              Control.Monad (liftM, when, join, void, unless, guard)
-import              Control.Monad.Catch
-import              Control.Monad.IO.Class (MonadIO, liftIO)
+import              Control.Concurrent.Async (Concurrently(..))
+import              Control.Monad (liftM, when, join, unless, guard)
+import              Control.Monad.IO.Unlift
 import              Control.Monad.Logger
 import              Control.Monad.Reader (MonadReader, ReaderT (..))
 import              Control.Monad.State (get, put, modify)
-import              Control.Monad.Trans.Control
 import "cryptonite" Crypto.Hash (SHA1(..))
 import              Data.Aeson.Extended
 import qualified    Data.ByteString as S
@@ -254,10 +251,10 @@ setupEnv mResolveMissingGHC = do
              <$> augmentPathMap (maybe [] edBins mghcBin) (unEnvOverride menv0)
     menv <- mkEnvOverride platform env
 
-    (compilerVer, cabalVer, globaldb) <- runConcurrently $ (,,)
-        <$> Concurrently (getCompilerVersion menv wc)
-        <*> Concurrently (getCabalPkgVer menv wc)
-        <*> Concurrently (getGlobalDB menv wc)
+    (compilerVer, cabalVer, globaldb) <- withUnliftIO $ \u -> runConcurrently $ (,,)
+        <$> Concurrently (unliftIO u $ getCompilerVersion menv wc)
+        <*> Concurrently (unliftIO u $ getCabalPkgVer menv wc)
+        <*> Concurrently (unliftIO u $ getGlobalDB menv wc)
 
     $logDebug "Resolving package entries"
     packagesRef <- liftIO $ newIORef Nothing
@@ -680,7 +677,7 @@ doCabalInstall :: (StackM env m, HasConfig env, HasGHCVariant env)
                -> Version
                -> m ()
 doCabalInstall menv wc installed version = do
-    withSystemTempDir "stack-cabal-upgrade" $ \tmpdir -> do
+    withRunIO $ \run -> withSystemTempDir "stack-cabal-upgrade" $ \tmpdir -> run $ do
         $logInfo $ T.concat
             [ "Installing Cabal-"
             , T.pack $ versionString version
@@ -715,7 +712,7 @@ doCabalInstall menv wc installed version = do
         $logInfo "New Cabal library installed"
 
 -- | Get the version of the system compiler, if available
-getSystemCompiler :: (MonadIO m, MonadLogger m, MonadBaseControl IO m, MonadCatch m)
+getSystemCompiler :: (MonadUnliftIO m, MonadLogger m, MonadThrow m)
                   => EnvOverride -> WhichCompiler -> m (Maybe (CompilerVersion 'CVActual, Arch))
 getSystemCompiler menv wc = do
     let exeName = case wc of
@@ -806,12 +803,12 @@ downloadAndInstallTool programsDir si downloadInfo tool installer = do
     (file, at) <- downloadFromInfo programsDir downloadInfo tool
     dir <- installDir programsDir tool
     tempDir <- tempInstallDir programsDir tool
-    ignoringAbsence (removeDirRecur tempDir)
+    liftIO $ ignoringAbsence (removeDirRecur tempDir)
     ensureDir tempDir
     unmarkInstalled programsDir tool
     installer si file at tempDir dir
     markInstalled programsDir tool
-    ignoringAbsence (removeDirRecur tempDir)
+    liftIO $ ignoringAbsence (removeDirRecur tempDir)
     return tool
 
 downloadAndInstallCompiler :: (StackM env m, HasConfig env, HasGHCVariant env)
@@ -887,7 +884,7 @@ getWantedCompilerInfo key versionCheck wanted toCV pairs_ =
         sortBy (flip (comparing fst)) $
         filter (isWantedCompiler versionCheck wanted . toCV . fst) (Map.toList pairs_)
 
-getGhcKey :: (MonadReader env m, HasPlatform env, HasGHCVariant env, MonadCatch m)
+getGhcKey :: (MonadReader env m, HasPlatform env, HasGHCVariant env, MonadThrow m)
           => CompilerBuild -> m Text
 getGhcKey ghcBuild = do
     ghcVariant <- view ghcVariantL
@@ -1078,8 +1075,8 @@ installGHCJS si archiveFile archiveType _tempDir destDir = do
             $logDebug $ "ziptool: " <> T.pack zipTool
             $logDebug $ "tar: " <> T.pack tarTool
             return $ do
-                ignoringAbsence (removeDirRecur destDir)
-                ignoringAbsence (removeDirRecur unpackDir)
+                liftIO $ ignoringAbsence (removeDirRecur destDir)
+                liftIO $ ignoringAbsence (removeDirRecur unpackDir)
                 readProcessNull (Just destDir) menv tarTool ["xf", toFilePath archiveFile]
                 innerDir <- expectSingleUnpackedDir archiveFile destDir
                 renameDir innerDir unpackDir
@@ -1111,7 +1108,7 @@ installGHCJS si archiveFile archiveType _tempDir destDir = do
         (_, files) <- listDir (dir </> $(mkRelDir "bin"))
         forM_ (filter ((".options" `isSuffixOf`). toFilePath) files) $ \optionsFile -> do
             let dest = destDir </> $(mkRelDir "bin") </> filename optionsFile
-            ignoringAbsence (removeFile dest)
+            liftIO $ ignoringAbsence (removeFile dest)
             copyFile optionsFile dest
     $logStickyDone "Installed GHCJS."
 
@@ -1221,11 +1218,11 @@ loadGhcjsEnvConfig stackYaml binPath = runInnerStackT () $ do
     bconfig <- lcLoadBuildConfig lc Nothing
     runInnerStackT bconfig $ setupEnv Nothing
 
-getCabalInstallVersion :: (MonadIO m, MonadBaseControl IO m, MonadLogger m, MonadCatch m)
+getCabalInstallVersion :: (MonadUnliftIO m, MonadLogger m)
                        => EnvOverride -> m (Maybe Version)
 getCabalInstallVersion menv = do
     ebs <- tryProcessStdout Nothing menv "cabal" ["--numeric-version"]
-    case ebs of
+    liftIO $ case ebs of
         Left _ -> return Nothing
         Right bs -> Just <$> parseVersion (T.dropWhileEnd isSpace (T.decodeUtf8 bs))
 
@@ -1338,8 +1335,8 @@ withUnpackedTarball7z name si archiveFile archiveType msrcDir destDir = do
     run7z <- setup7z si
     let tmpName = toFilePathNoTrailingSep (dirname destDir) ++ "-tmp"
     ensureDir (parent destDir)
-    withTempDir (parent destDir) tmpName $ \tmpDir -> do
-        ignoringAbsence (removeDirRecur destDir)
+    withRunIO $ \run -> withTempDir (parent destDir) tmpName $ \tmpDir -> run $ do
+        liftIO $ ignoringAbsence (removeDirRecur destDir)
         run7z (parent archiveFile) archiveFile
         run7z tmpDir tarFile
         absSrcDir <- case msrcDir of
@@ -1430,7 +1427,7 @@ chattyDownload label downloadInfo path = do
             , drLengthCheck = mtotalSize
             , drRetryPolicy = drRetryPolicyDefault
             }
-    runInBase <- liftBaseWith $ \run -> return (void . run)
+    runInBase <- askRunIO
     x <- verifiedDownload dReq path (chattyDownloadProgress runInBase)
     if x
         then $logStickyDone ("Downloaded " <> label <> ".")
@@ -1513,25 +1510,25 @@ chunksOverTime diff = do
         go
 
 -- | Perform a basic sanity check of GHC
-sanityCheck :: (MonadIO m, MonadMask m, MonadLogger m, MonadBaseControl IO m)
+sanityCheck :: (MonadUnliftIO m, MonadLogger m)
             => EnvOverride
             -> WhichCompiler
             -> m ()
-sanityCheck menv wc = withSystemTempDir "stack-sanity-check" $ \dir -> do
+sanityCheck menv wc = withRunIO $ \run -> withSystemTempDir "stack-sanity-check" $ \dir -> run $ do
     let fp = toFilePath $ dir </> $(mkRelFile "Main.hs")
     liftIO $ writeFile fp $ unlines
         [ "import Distribution.Simple" -- ensure Cabal library is present
         , "main = putStrLn \"Hello World\""
         ]
     let exeName = compilerExeName wc
-    ghc <- join $ findExecutable menv exeName
+    ghc <- liftIO $ join $ findExecutable menv exeName
     $logDebug $ "Performing a sanity check on: " <> T.pack (toFilePath ghc)
     eres <- tryProcessStdout (Just dir) menv exeName
         [ fp
         , "-no-user-package-db"
         ]
     case eres of
-        Left e -> throwM $ GHCSanityCheckCompileFailed e ghc
+        Left e -> throwIO $ GHCSanityCheckCompileFailed e ghc
         Right _ -> return () -- TODO check that the output of running the command is correct
 
 -- Remove potentially confusing environment variables
@@ -1548,7 +1545,7 @@ removeHaskellEnvVars =
 -- | Get map of environment variables to set to change the GHC's encoding to UTF-8
 getUtf8EnvVars
     :: forall m env.
-       (MonadReader env m, HasPlatform env, MonadLogger m, MonadCatch m, MonadBaseControl IO m, MonadIO m)
+       (MonadReader env m, HasPlatform env, MonadLogger m, MonadUnliftIO m)
     => EnvOverride -> CompilerVersion 'CVActual -> m (Map Text Text)
 getUtf8EnvVars menv compilerVer =
     if getGhcVersion compilerVer >= $(mkVersion "7.10.3")

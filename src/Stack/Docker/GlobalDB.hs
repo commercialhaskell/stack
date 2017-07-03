@@ -15,9 +15,9 @@ module Stack.Docker.GlobalDB
   ,DockerImageExeId)
   where
 
-import           Control.Exception (IOException,catch,throwIO)
 import           Control.Monad (forM_, when)
 import           Control.Monad.Logger (NoLoggingT)
+import           Control.Monad.IO.Unlift
 import           Control.Monad.Trans.Resource (ResourceT)
 import           Data.List (sortBy, isInfixOf, stripPrefix)
 import           Data.List.Extra (stripSuffix)

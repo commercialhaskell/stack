@@ -29,7 +29,7 @@ module Stack.PrettyPrint
     , enclose, squotes, dquotes, parens, angles, braces, brackets
     ) where
 
-import           Control.Exception.Lifted
+import           Control.Monad.IO.Unlift
 import           Control.Monad.Logger
 import           Control.Monad.Reader
 import           Data.List (intersperse)
@@ -88,7 +88,7 @@ debugBracket = do
                 output $ "Finished with exception in" <+> displayMilliseconds diff <> ":" <+>
                     msg <> line <>
                     "Exception thrown: " <> fromString (show ex)
-                throw (ex :: SomeException)
+                throwIO (ex :: SomeException)
             end <- liftIO $ Clock.getTime Clock.Monotonic
             let diff = Clock.diffTimeSpec start end
             output $ "Finished in" <+> displayMilliseconds diff <> ":" <+> msg

@@ -16,12 +16,9 @@ module Stack.Coverage
     , generateHpcMarkupIndex
     ) where
 
-import           Control.Exception.Safe (handleIO)
-import           Control.Exception.Lifted
 import           Control.Monad (liftM, when, unless, void, (<=<))
-import           Control.Monad.IO.Class
+import           Control.Monad.IO.Unlift
 import           Control.Monad.Logger
-import           Control.Monad.Trans.Resource
 import qualified Data.ByteString.Char8 as S8
 import           Data.Foldable (forM_, asum, toList)
 import           Data.Function
@@ -66,7 +63,7 @@ deleteHpcReports :: (StackM env m, HasEnvConfig env)
                  => m ()
 deleteHpcReports = do
     hpcDir <- hpcReportDir
-    ignoringAbsence (removeDirRecur hpcDir)
+    liftIO $ ignoringAbsence (removeDirRecur hpcDir)
 
 -- | Move a tix file into a sub-directory of the hpc report directory. Deletes the old one if one is
 -- present.
@@ -76,7 +73,7 @@ updateTixFile pkgName tixSrc testName = do
     exists <- doesFileExist tixSrc
     when exists $ do
         tixDest <- tixFilePath pkgName testName
-        ignoringAbsence (removeFile tixDest)
+        liftIO $ ignoringAbsence (removeFile tixDest)
         ensureDir (parent tixDest)
         -- Remove exe modules because they are problematic. This could be revisited if there's a GHC
         -- version that fixes https://ghc.haskell.org/trac/ghc/ticket/1853
@@ -89,7 +86,7 @@ updateTixFile pkgName tixSrc testName = do
                 -- have problems. Something about moving between drives
                 -- on windows?
                 copyFile tixSrc =<< parseAbsFile (toFilePath tixDest ++ ".premunging")
-                ignoringAbsence (removeFile tixSrc)
+                liftIO $ ignoringAbsence (removeFile tixSrc)
 
 -- | Get the directory used for hpc reports for the given pkgId.
 hpcPkgPath :: (StackM env m, HasEnvConfig env)
@@ -327,7 +324,7 @@ generateUnionReport report reportDir tixFiles = do
     liftIO $ writeTix (toFilePath tixDest) tix
     generateHpcReportInternal tixDest reportDir report [] []
 
-readTixOrLog :: (MonadLogger m, MonadIO m, MonadBaseControl IO m) => Path b File -> m (Maybe Tix)
+readTixOrLog :: (MonadLogger m, MonadUnliftIO m) => Path b File -> m (Maybe Tix)
 readTixOrLog path = do
     mtix <- liftIO (readTix (toFilePath path)) `catch` \errorCall -> do
         $logError $ "Error while reading tix: " <> T.pack (show (errorCall :: ErrorCall))

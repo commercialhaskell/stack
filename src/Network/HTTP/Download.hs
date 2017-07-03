@@ -20,14 +20,11 @@ module Network.HTTP.Download
     , setGithubHeaders
     ) where
 
-import           Control.Exception           (Exception)
-import           Control.Exception.Safe      (handleIO)
 import           Control.Monad               (void)
-import           Control.Monad.Catch         (throwM)
-import           Control.Monad.IO.Class      (MonadIO, liftIO)
+import           Control.Monad.IO.Unlift
 import           Control.Monad.Logger        (MonadLogger, logDebug)
 import qualified Data.ByteString.Lazy        as L
-import           Data.Conduit                (runConduit, runConduitRes, (.|), yield)
+import           Data.Conduit                (runConduit, (.|), yield)
 import           Data.Conduit.Binary         (sourceHandle)
 import qualified Data.Conduit.Binary         as CB
 import           Data.Foldable               (forM_)

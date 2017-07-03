@@ -15,10 +15,8 @@ module Data.Store.VersionTagged
     ) where
 
 import Control.Applicative
-import Control.Exception.Lifted (catch, IOException, assert)
-import Control.Monad.IO.Class (MonadIO, liftIO)
+import Control.Monad.IO.Unlift
 import Control.Monad.Logger
-import Control.Monad.Trans.Control (MonadBaseControl)
 import qualified Data.ByteString as BS
 import Data.Data (Data)
 import qualified Data.Map as M
@@ -61,7 +59,7 @@ storeEncodeFile pokeFunc peekFunc fp x = do
 -- | Read from the given file. If the read fails, run the given action and
 -- write that back to the file. Always starts the file off with the
 -- version tag.
-versionedDecodeOrLoadImpl :: (Store a, Eq a, MonadIO m, MonadLogger m, MonadBaseControl IO m)
+versionedDecodeOrLoadImpl :: (Store a, Eq a, MonadUnliftIO m, MonadLogger m)
                           => (a -> (Int, Poke ()))
                           -> Peek a
                           -> Path Abs File
@@ -81,7 +79,7 @@ versionedDecodeOrLoadImpl pokeFunc peekFunc fp mx = do
             storeEncodeFile pokeFunc peekFunc fp x
             return x
 
-versionedDecodeFileImpl :: (Store a, MonadIO m, MonadLogger m, MonadBaseControl IO m)
+versionedDecodeFileImpl :: (Store a, MonadUnliftIO m, MonadLogger m)
                         => Peek a
                         -> Path loc File
                         -> m (Maybe a)

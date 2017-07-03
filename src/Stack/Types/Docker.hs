@@ -9,7 +9,7 @@
 module Stack.Types.Docker where
 
 import Control.Applicative
-import Control.Monad.Catch
+import Control.Monad.IO.Unlift
 import Data.Aeson.Extended
 import Data.List (intercalate)
 import Data.Monoid

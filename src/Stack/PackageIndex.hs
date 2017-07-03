@@ -28,17 +28,12 @@ module Stack.PackageIndex
     ) where
 
 import qualified Codec.Archive.Tar as Tar
-import           Control.Exception (Exception)
-import           Control.Exception.Safe (tryIO)
-import           Control.Monad (unless, when, liftM, void, guard)
-import           Control.Monad.Catch (throwM)
-import qualified Control.Monad.Catch as C
-import           Control.Monad.IO.Class (MonadIO, liftIO)
+import           Control.Monad (unless, when, liftM, guard)
+import           Control.Monad.IO.Unlift
 import           Control.Monad.Logger (logDebug, logInfo, logWarn)
-import           Control.Monad.Trans.Control
 import           Data.Aeson.Extended
 import qualified Data.ByteString.Lazy as L
-import           Data.Conduit (($$), (=$), (.|), runConduitRes)
+import           Data.Conduit (($$), (=$), (.|))
 import           Data.Conduit.Binary (sinkHandle, sourceHandle, sourceFile, sinkFile)
 import           Data.Conduit.Zlib (ungzip)
 import           Data.Foldable (forM_)
@@ -96,7 +91,7 @@ populateCache index = do
             $logSticky "Populating index cache ..."
             lbs <- liftIO $ L.readFile $ Path.toFilePath path
             loop 0 (Map.empty, HashMap.empty) (Tar.read lbs)
-    (pis, gitPIs) <- loadPIS `C.catch` \e -> do
+    (pis, gitPIs) <- loadPIS `catch` \e -> do
         $logWarn $ "Exception encountered when parsing index tarball: "
                 <> T.pack (show (e :: Tar.FormatError))
         $logWarn "Automatically updating index and trying again"
@@ -243,8 +238,8 @@ updateIndex index =
      tarFile <- configPackageIndex name
      oldTarFile <- configPackageIndexOld name
      oldCacheFile <- configPackageIndexCacheOld name
-     ignoringAbsence (removeFile oldCacheFile)
-     runConduitRes $ sourceFile (toFilePath tarFile) .| sinkFile (toFilePath oldTarFile)
+     liftIO $ ignoringAbsence (removeFile oldCacheFile)
+     liftIO $ runConduitRes $ sourceFile (toFilePath tarFile) .| sinkFile (toFilePath oldTarFile)
 
 -- | Update the index tarball via HTTP
 updateIndexHTTP :: (StackMiniM env m, HasConfig env)
@@ -290,8 +285,9 @@ updateIndexHackageSecurity indexName' url (HackageSecurity keyIds threshold) = d
             Just x -> return x
     manager <- liftIO getGlobalManager
     root <- configPackageIndexRoot indexName'
-    logTUF <- embed_ ($logInfo . T.pack . HS.pretty)
-    let withRepo = HS.withRepository
+    run <- askRunIO
+    let logTUF = run . $logInfo . T.pack . HS.pretty
+        withRepo = HS.withRepository
             (HS.makeHttpLib manager)
             [baseURI]
             HS.defaultRepoOpts
@@ -371,11 +367,12 @@ getPackageCachesIO
     :: (StackMiniM env m, HasConfig env)
     => m (IO ( Map PackageIdentifier (PackageIndex, PackageCache)
              , HashMap CabalHash (PackageIndex, OffsetSize)))
-getPackageCachesIO = toIO getPackageCaches
+getPackageCachesIO = toIO' getPackageCaches
   where
-    toIO :: (MonadIO m, MonadBaseControl IO m) => m a -> m (IO a)
-    toIO m = do
-        runInBase <- liftBaseWith $ \run -> return (void . run)
+    toIO' m = do
+        -- FIXME what's the purpose of this function and the IORef
+        -- work? Can we replace with Control.Monad.IO.Unlift.toIO
+        runInBase <- askRunIO
         return $ do
             i <- newIORef (error "Impossible evaluation in toIO")
             runInBase $ do

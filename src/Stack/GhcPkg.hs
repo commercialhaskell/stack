@@ -23,10 +23,8 @@ module Stack.GhcPkg
   where
 
 import           Control.Monad
-import           Control.Monad.Catch
-import           Control.Monad.IO.Class
+import           Control.Monad.IO.Unlift
 import           Control.Monad.Logger
-import           Control.Monad.Trans.Control
 import qualified Data.ByteString.Char8 as S8
 import           Data.Either
 import           Data.List
@@ -50,15 +48,15 @@ import           System.FilePath (searchPathSeparator)
 import           System.Process.Read
 
 -- | Get the global package database
-getGlobalDB :: (MonadIO m, MonadLogger m, MonadBaseControl IO m, MonadCatch m)
+getGlobalDB :: (MonadUnliftIO m, MonadLogger m)
             => EnvOverride -> WhichCompiler -> m (Path Abs Dir)
 getGlobalDB menv wc = do
     $logDebug "Getting global package database location"
     -- This seems like a strange way to get the global package database
     -- location, but I don't know of a better one
-    bs <- ghcPkg menv wc [] ["list", "--global"] >>= either throwM return
+    bs <- ghcPkg menv wc [] ["list", "--global"] >>= either throwIO return
     let fp = S8.unpack $ stripTrailingColon $ firstLine bs
-    resolveDir' fp
+    liftIO $ resolveDir' fp
   where
     stripTrailingColon bs
         | S8.null bs = bs
@@ -67,7 +65,7 @@ getGlobalDB menv wc = do
     firstLine = S8.takeWhile (\c -> c /= '\r' && c /= '\n')
 
 -- | Run the ghc-pkg executable
-ghcPkg :: (MonadIO m, MonadLogger m, MonadBaseControl IO m, MonadCatch m)
+ghcPkg :: (MonadUnliftIO m, MonadLogger m)
        => EnvOverride
        -> WhichCompiler
        -> [Path Abs Dir]
@@ -85,7 +83,7 @@ ghcPkg menv wc pkgDbs args = do
     args' = packageDbFlags pkgDbs ++ args
 
 -- | Create a package database in the given directory, if it doesn't exist.
-createDatabase :: (MonadIO m, MonadLogger m, MonadBaseControl IO m, MonadCatch m)
+createDatabase :: (MonadUnliftIO m, MonadLogger m)
                => EnvOverride -> WhichCompiler -> Path Abs Dir -> m ()
 createDatabase menv wc db = do
     exists <- doesFileExist (db </> $(mkRelFile "package.cache"))
@@ -113,7 +111,7 @@ createDatabase menv wc db = do
         case eres of
             Left e -> do
                 $logError $ T.pack $ "Unable to create package database at " ++ toFilePath db
-                throwM e
+                throwIO e
             Right _ -> return ()
 
 -- | Get the name to use for "ghc-pkg", given the compiler version.
@@ -129,7 +127,7 @@ packageDbFlags pkgDbs =
 
 -- | Get the value of a field of the package.
 findGhcPkgField
-    :: (MonadIO m, MonadLogger m, MonadBaseControl IO m, MonadCatch m)
+    :: (MonadUnliftIO m, MonadLogger m)
     => EnvOverride
     -> WhichCompiler
     -> [Path Abs Dir] -- ^ package databases
@@ -150,7 +148,7 @@ findGhcPkgField menv wc pkgDbs name field = do
                 fmap (stripCR . T.decodeUtf8) $ listToMaybe $ S8.lines lbs
 
 -- | Get the version of the package
-findGhcPkgVersion :: (MonadIO m, MonadLogger m, MonadBaseControl IO m, MonadCatch m)
+findGhcPkgVersion :: (MonadUnliftIO m, MonadLogger m)
                   => EnvOverride
                   -> WhichCompiler
                   -> [Path Abs Dir] -- ^ package databases
@@ -162,7 +160,7 @@ findGhcPkgVersion menv wc pkgDbs name = do
         Just !v -> return (parseVersion v)
         _ -> return Nothing
 
-unregisterGhcPkgId :: (MonadIO m, MonadLogger m, MonadCatch m, MonadBaseControl IO m)
+unregisterGhcPkgId :: (MonadUnliftIO m, MonadLogger m)
                     => EnvOverride
                     -> WhichCompiler
                     -> CompilerVersion 'CVActual
@@ -184,7 +182,7 @@ unregisterGhcPkgId menv wc cv pkgDb gid ident = do
             _ -> ["--ipid", ghcPkgIdString gid])
 
 -- | Get the version of Cabal from the global package database.
-getCabalPkgVer :: (MonadThrow m, MonadIO m, MonadLogger m, MonadBaseControl IO m, MonadCatch m)
+getCabalPkgVer :: (MonadUnliftIO m, MonadLogger m)
                => EnvOverride -> WhichCompiler -> m Version
 getCabalPkgVer menv wc = do
     $logDebug "Getting Cabal package version"
@@ -193,7 +191,7 @@ getCabalPkgVer menv wc = do
         wc
         [] -- global DB
         cabalPackageName
-    maybe (throwM $ Couldn'tFindPkgId cabalPackageName) return mres
+    maybe (throwIO $ Couldn'tFindPkgId cabalPackageName) return mres
 
 -- | Get the value for GHC_PACKAGE_PATH
 mkGhcPackagePath :: Bool -> Path Abs Dir -> Path Abs Dir -> [Path Abs Dir] -> Path Abs Dir -> Text

@@ -13,9 +13,8 @@ module Stack.Nix
   ) where
 
 import           Control.Arrow ((***))
-import           Control.Exception (Exception,throw)
 import           Control.Monad hiding (mapM)
-import           Control.Monad.IO.Class (liftIO)
+import           Control.Monad.IO.Unlift
 import           Control.Monad.Logger (logDebug)
 import           Data.Maybe
 import           Data.Monoid
@@ -140,7 +139,7 @@ escape str = "'" ++ foldr (\c -> if c == '\'' then
 
 -- | Fail with friendly error if project root not set.
 fromMaybeProjectRoot :: Maybe (Path Abs Dir) -> Path Abs Dir
-fromMaybeProjectRoot = fromMaybe (throw CannotDetermineProjectRoot)
+fromMaybeProjectRoot = fromMaybe (impureThrow CannotDetermineProjectRoot)
 
 -- | Command-line argument for "nix"
 nixCmdName :: String

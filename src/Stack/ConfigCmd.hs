@@ -15,8 +15,7 @@ module Stack.ConfigCmd
 
 import           Control.Applicative
 import           Control.Monad
-import           Control.Monad.Catch (throwM)
-import           Control.Monad.IO.Class
+import           Control.Monad.IO.Unlift
 import           Control.Monad.Logger
 import qualified Data.ByteString as S
 import qualified Data.HashMap.Strict as HMap

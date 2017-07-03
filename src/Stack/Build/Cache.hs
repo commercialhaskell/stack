@@ -33,13 +33,10 @@ module Stack.Build.Cache
 
 import           Control.Applicative
 import           Control.DeepSeq (NFData)
-import           Control.Exception.Safe (handleIO, tryAnyDeep)
 import           Control.Monad (liftM)
-import           Control.Monad.Catch (MonadThrow, MonadCatch)
-import           Control.Monad.IO.Class
+import           Control.Monad.IO.Unlift
 import           Control.Monad.Logger (MonadLogger)
 import           Control.Monad.Reader (MonadReader)
-import           Control.Monad.Trans.Control (MonadBaseControl)
 import           Crypto.Hash (hashWith, SHA256(..))
 import           Data.Binary (Binary (..))
 import qualified Data.Binary as Binary
@@ -97,7 +94,7 @@ getInstalledExes loc = do
         mapMaybe (parsePackageIdentifierFromString . toFilePath . filename) files
 
 -- | Mark the given executable as installed
-markExeInstalled :: (MonadReader env m, HasEnvConfig env, MonadIO m, MonadCatch m)
+markExeInstalled :: (MonadReader env m, HasEnvConfig env, MonadIO m, MonadThrow m)
                  => InstallLocation -> PackageIdentifier -> m ()
 markExeInstalled loc ident = do
     dir <- exeInstalledDir loc
@@ -115,25 +112,25 @@ markExeInstalled loc ident = do
     liftIO $ writeFile fp "Installed"
 
 -- | Mark the given executable as not installed
-markExeNotInstalled :: (MonadReader env m, HasEnvConfig env, MonadIO m, MonadCatch m)
+markExeNotInstalled :: (MonadReader env m, HasEnvConfig env, MonadIO m, MonadThrow m)
                     => InstallLocation -> PackageIdentifier -> m ()
 markExeNotInstalled loc ident = do
     dir <- exeInstalledDir loc
     ident' <- parseRelFile $ packageIdentifierString ident
-    ignoringAbsence (removeFile $ dir </> ident')
+    liftIO $ ignoringAbsence (removeFile $ dir </> ident')
 
 -- | Try to read the dirtiness cache for the given package directory.
-tryGetBuildCache :: (MonadIO m, MonadReader env m, MonadThrow m, MonadLogger m, HasEnvConfig env, MonadBaseControl IO m)
+tryGetBuildCache :: (MonadUnliftIO m, MonadReader env m, MonadThrow m, MonadLogger m, HasEnvConfig env)
                  => Path Abs Dir -> m (Maybe (Map FilePath FileCacheInfo))
 tryGetBuildCache dir = liftM (fmap buildCacheTimes) . $(versionedDecodeFile buildCacheVC) =<< buildCacheFile dir
 
 -- | Try to read the dirtiness cache for the given package directory.
-tryGetConfigCache :: (MonadIO m, MonadReader env m, MonadThrow m, HasEnvConfig env, MonadBaseControl IO m, MonadLogger m)
+tryGetConfigCache :: (MonadUnliftIO m, MonadReader env m, MonadThrow m, HasEnvConfig env, MonadLogger m)
                   => Path Abs Dir -> m (Maybe ConfigCache)
 tryGetConfigCache dir = $(versionedDecodeFile configCacheVC) =<< configCacheFile dir
 
 -- | Try to read the mod time of the cabal file from the last build
-tryGetCabalMod :: (MonadIO m, MonadReader env m, MonadThrow m, HasEnvConfig env, MonadBaseControl IO m, MonadLogger m)
+tryGetCabalMod :: (MonadUnliftIO m, MonadReader env m, MonadThrow m, HasEnvConfig env, MonadLogger m)
                => Path Abs Dir -> m (Maybe ModTime)
 tryGetCabalMod dir = $(versionedDecodeFile modTimeVC) =<< configCabalMod dir
 
@@ -165,7 +162,7 @@ writeCabalMod dir x = do
     $(versionedEncodeFile modTimeVC) fp x
 
 -- | Delete the caches for the project.
-deleteCaches :: (MonadIO m, MonadReader env m, MonadCatch m, HasEnvConfig env)
+deleteCaches :: (MonadIO m, MonadReader env m, HasEnvConfig env, MonadThrow m)
              => Path Abs Dir -> m ()
 deleteCaches dir = do
     {- FIXME confirm that this is acceptable to remove
@@ -173,7 +170,7 @@ deleteCaches dir = do
     removeFileIfExists bfp
     -}
     cfp <- configCacheFile dir
-    ignoringAbsence (removeFile cfp)
+    liftIO $ ignoringAbsence (removeFile cfp)
 
 flagCacheFile :: (MonadIO m, MonadThrow m, MonadReader env m, HasEnvConfig env)
               => Installed
@@ -187,7 +184,7 @@ flagCacheFile installed = do
     return $ dir </> rel
 
 -- | Loads the flag cache for the given installed extra-deps
-tryGetFlagCache :: (MonadIO m, MonadThrow m, MonadReader env m, HasEnvConfig env, MonadBaseControl IO m, MonadLogger m)
+tryGetFlagCache :: (MonadUnliftIO m, MonadThrow m, MonadReader env m, HasEnvConfig env, MonadLogger m)
                 => Installed
                 -> m (Maybe ConfigCache)
 tryGetFlagCache gid = do
@@ -220,7 +217,7 @@ unsetTestSuccess dir = do
     $(versionedEncodeFile testSuccessVC) fp False
 
 -- | Check if the test suite already passed
-checkTestSuccess :: (MonadIO m, MonadThrow m, MonadReader env m, HasEnvConfig env, MonadBaseControl IO m, MonadLogger m)
+checkTestSuccess :: (MonadUnliftIO m, MonadThrow m, MonadReader env m, HasEnvConfig env, MonadLogger m)
                  => Path Abs Dir
                  -> m Bool
 checkTestSuccess dir =
@@ -314,7 +311,7 @@ writePrecompiledCache baseConfigOpts pkgident copts depIDs mghcPkgId exes = do
 
 -- | Check the cache for a precompiled package matching the given
 -- configuration.
-readPrecompiledCache :: (MonadThrow m, MonadReader env m, HasEnvConfig env, MonadIO m, MonadLogger m, MonadBaseControl IO m)
+readPrecompiledCache :: (MonadThrow m, MonadReader env m, HasEnvConfig env, MonadUnliftIO m, MonadLogger m)
                      => PackageIdentifier -- ^ target package
                      -> ConfigureOpts
                      -> Set GhcPkgId -- ^ dependencies

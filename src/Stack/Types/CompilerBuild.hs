@@ -5,7 +5,7 @@ module Stack.Types.CompilerBuild
   ,parseCompilerBuild
   ) where
 
-import           Control.Monad.Catch (MonadThrow)
+import           Control.Monad.IO.Unlift
 import           Data.Aeson.Extended (FromJSON, parseJSON, withText)
 import           Data.Text as T
 

@@ -16,9 +16,8 @@ module Stack.PackageLocation
 import qualified Codec.Archive.Tar as Tar
 import qualified Codec.Archive.Zip as Zip
 import qualified Codec.Compression.GZip as GZip
-import Control.Exception.Safe
 import Control.Monad
-import Control.Monad.IO.Class
+import Control.Monad.IO.Unlift
 import Control.Monad.Logger
 import           Crypto.Hash (hashWith, SHA256(..))
 import qualified Data.ByteArray as Mem (convert)
@@ -127,10 +126,10 @@ resolveSinglePackageLocation _ projRoot (PLHttp url) = do
 
     exists <- doesDirExist dir
     unless exists $ do
-        ignoringAbsence (removeDirRecur dir)
+        liftIO $ ignoringAbsence (removeDirRecur dir)
 
         let dirTmp = root </> dirRelTmp
-        ignoringAbsence (removeDirRecur dirTmp)
+        liftIO $ ignoringAbsence (removeDirRecur dirTmp)
 
         let fp = toFilePath file
         req <- parseUrlThrow $ T.unpack url
@@ -160,10 +159,10 @@ resolveSinglePackageLocation _ projRoot (PLHttp url) = do
     x <- listDir dir
     case x of
         ([dir'], []) -> return (dir', PLHttp url)
-        (dirs, files) -> do
+        (dirs, files) -> liftIO $ do
             ignoringAbsence (removeFile file)
             ignoringAbsence (removeDirRecur dir)
-            throwM $ UnexpectedArchiveContents dirs files
+            throwIO $ UnexpectedArchiveContents dirs files
 resolveSinglePackageLocation menv projRoot (PLRepo (Repo url commit repoType' subdir)) = do
     dir <- cloneRepo menv projRoot url commit repoType'
     dir' <- resolveDir dir subdir
@@ -215,7 +214,7 @@ cloneRepo menv projRoot url commit repoType' = do
 
     exists <- doesDirExist dir
     unless exists $ do
-        ignoringAbsence (removeDirRecur dir)
+        liftIO $ ignoringAbsence (removeDirRecur dir)
 
         let cloneAndExtract commandName cloneArgs resetCommand = do
                 ensureDir root

@@ -22,13 +22,10 @@ module Stack.Ghci
 
 import           Control.Applicative
 import           Control.Arrow (second)
-import           Control.Exception.Safe (tryAny)
 import           Control.Monad hiding (forM)
-import           Control.Monad.Catch
-import           Control.Monad.IO.Class
+import           Control.Monad.IO.Unlift
 import           Control.Monad.Logger
 import           Control.Monad.State.Strict (State, execState, get, modify)
-import           Control.Monad.Trans.Unlift (MonadBaseUnlift)
 import qualified Data.ByteString.Char8 as S8
 import           Data.Either
 import           Data.Function
@@ -132,7 +129,7 @@ instance Show GhciException where
 -- | Launch a GHCi session for the given local package targets with the
 -- given options and configure it with the load paths and extensions
 -- of those targets.
-ghci :: (StackM r m, HasEnvConfig r, MonadBaseUnlift IO m) => GhciOpts -> m ()
+ghci :: (StackM r m, HasEnvConfig r) => GhciOpts -> m ()
 ghci opts@GhciOpts{..} = do
     let buildOptsCLI = defaultBuildOptsCLI
             { boptsCLITargets = []
@@ -177,7 +174,7 @@ preprocessTargets rawTargets = do
                       rawTargets
     fileTargets <- forM fileTargetsRaw $ \fp0 -> do
         let fp = T.unpack fp0
-        mpath <- forgivingAbsence (resolveFile' fp)
+        mpath <- liftIO $ forgivingAbsence (resolveFile' fp)
         case mpath of
             Nothing -> throwM (MissingFileTarget fp)
             Just path -> return path
@@ -293,7 +290,7 @@ getAllLocalTargets GhciOpts{..} targets0 mainIsTargets sourceMap = do
                     ]
             return (directlyWanted ++ extraLoadDeps)
 
-buildDepsAndInitialSteps :: (StackM r m, HasEnvConfig r, MonadBaseUnlift IO m) => GhciOpts -> [Text] -> m ()
+buildDepsAndInitialSteps :: (StackM r m, HasEnvConfig r) => GhciOpts -> [Text] -> m ()
 buildDepsAndInitialSteps GhciOpts{..} targets0 = do
     let targets = targets0 ++ map T.pack ghciAdditionalPackages
     -- If necessary, do the build, for local packagee targets, only do
@@ -369,7 +366,7 @@ runGhci GhciOpts{..} targets mainIsTargets pkgs extraFiles = do
             if "Intero" `isPrefixOf` output
                 then return renderScriptIntero
                 else return renderScriptGhci
-    withSystemTempDir "ghci" $ \tmpDirectory -> do
+    withRunIO $ \run -> withSystemTempDir "ghci" $ \tmpDirectory -> run $ do
         macrosOptions <- writeMacrosFile tmpDirectory pkgs
         if ghciNoLoadModules
             then execGhci macrosOptions

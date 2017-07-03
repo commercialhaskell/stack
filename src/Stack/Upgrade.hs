@@ -11,9 +11,8 @@ module Stack.Upgrade
     , upgradeOpts
     ) where
 
-import           Control.Exception.Safe      (catchAny)
 import           Control.Monad               (unless, when)
-import           Control.Monad.IO.Class
+import           Control.Monad.IO.Unlift
 import           Control.Monad.Logger
 import           Data.Foldable               (forM_)
 import qualified Data.Map                    as Map
@@ -185,7 +184,7 @@ sourceUpgrade
   -> SourceOpts
   -> m ()
 sourceUpgrade gConfigMonoid mresolver builtHash (SourceOpts gitRepo) =
-  withSystemTempDir "stack-upgrade" $ \tmp -> do
+  withRunIO $ \run -> withSystemTempDir "stack-upgrade" $ \tmp -> run $ do
     menv <- getMinimalEnvOverride
     mdir <- case gitRepo of
       Just repo -> do

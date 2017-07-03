@@ -21,9 +21,7 @@ module Stack.Runners
 
 import           Control.Monad hiding (forM)
 import           Control.Monad.Logger
-import           Control.Exception.Lifted as EL
-import           Control.Monad.IO.Class
-import           Control.Monad.Trans.Control
+import           Control.Monad.IO.Unlift
 import           Data.IORef
 import           Data.Traversable
 import           Path
@@ -54,7 +52,7 @@ loadCompilerVersion go lc = do
 -- stack uses locks per-snapshot.  In the future, stack may refine
 -- this to an even more fine-grain locking approach.
 --
-withUserFileLock :: (MonadBaseControl IO m, MonadIO m)
+withUserFileLock :: MonadUnliftIO m
                  => GlobalOpts
                  -> Path Abs Dir
                  -> (Maybe FileLock -> m a)
@@ -69,19 +67,19 @@ withUserFileLock go@GlobalOpts{} dir act = do
             ensureDir dir
             -- Just in case of asynchronous exceptions, we need to be careful
             -- when using tryLockFile here:
-            EL.bracket (liftIO $ tryLockFile (toFilePath pth) Exclusive)
-                       (maybe (return ()) (liftIO . unlockFile))
-                       (\fstTry ->
+            bracket (liftIO $ tryLockFile (toFilePath pth) Exclusive)
+                    (maybe (return ()) (liftIO . unlockFile))
+                    (\fstTry ->
                         case fstTry of
-                          Just lk -> EL.finally (act $ Just lk) (liftIO $ unlockFile lk)
+                          Just lk -> finally (act $ Just lk) (liftIO $ unlockFile lk)
                           Nothing ->
                             do let chatter = globalLogLevel go /= LevelOther "silent"
                                when chatter $
                                  liftIO $ hPutStrLn stderr $ "Failed to grab lock ("++show pth++
                                                      "); other stack instance running.  Waiting..."
-                               EL.bracket (liftIO $ lockFile (toFilePath pth) Exclusive)
-                                          (liftIO . unlockFile)
-                                          (\lk -> do
+                               bracket (liftIO $ lockFile (toFilePath pth) Exclusive)
+                                       (liftIO . unlockFile)
+                                       (\lk -> do
                                             when chatter $
                                               liftIO $ hPutStrLn stderr "Lock acquired, proceeding."
                                             act $ Just lk))

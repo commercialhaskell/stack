@@ -29,8 +29,8 @@ module Options.Applicative.Builder.Extra
   ,unescapeBashArg
   ) where
 
-import Control.Exception (IOException, catch)
 import Control.Monad (when, forM)
+import Control.Monad.IO.Unlift
 import Data.Either.Combinators
 import Data.List (isPrefixOf)
 import Data.Maybe

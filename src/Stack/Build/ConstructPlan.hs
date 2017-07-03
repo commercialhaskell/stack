@@ -17,13 +17,12 @@ module Stack.Build.ConstructPlan
     ( constructPlan
     ) where
 
-import           Control.Exception.Lifted
 import           Control.Monad
-import           Control.Monad.IO.Class
+import           Control.Monad.IO.Unlift
 import           Control.Monad.Logger
+import           Control.Monad.Reader (runReaderT)
 import           Control.Monad.RWS.Strict
 import           Control.Monad.State.Strict (execState)
-import           Control.Monad.Trans.Resource
 import           Data.Either
 import           Data.Function
 import qualified Data.HashSet as HashSet
@@ -680,7 +679,7 @@ checkDirtiness :: PackageSource
                -> M Bool
 checkDirtiness ps installed package present wanted = do
     ctx <- ask
-    moldOpts <- flip runLoggingT (logFunc ctx) $ tryGetFlagCache installed
+    moldOpts <- liftIO $ flip runLoggingT (logFunc ctx) $ flip runReaderT ctx $ tryGetFlagCache installed
     let configOpts = configureOpts
             (view envConfigL ctx)
             (baseConfigOpts ctx)

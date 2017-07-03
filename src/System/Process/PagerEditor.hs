@@ -18,7 +18,7 @@ module System.Process.PagerEditor
   ,EditorException(..))
   where
 
-import Control.Exception (try,IOException,throwIO,Exception)
+import Control.Monad.IO.Unlift
 import Data.ByteString.Lazy (ByteString,hPut,readFile)
 import Data.ByteString.Builder (Builder,stringUtf8,hPutBuilder)
 import Data.Typeable (Typeable)

@@ -51,11 +51,9 @@ import qualified Codec.Archive.Zip as Zip
 import qualified Codec.Compression.GZip as GZip
 import           Control.Applicative
 import           Control.Arrow ((***))
-import           Control.Exception (assert)
 import           Control.Monad (liftM, unless, when, filterM)
-import           Control.Monad.Catch (MonadThrow, MonadCatch, catchAll, throwM, catch)
 import           Control.Monad.Extra (firstJustM)
-import           Control.Monad.IO.Class
+import           Control.Monad.IO.Unlift
 import           Control.Monad.Logger hiding (Loc)
 import           Control.Monad.Reader (ask, runReaderT)
 import           Crypto.Hash (hashWith, SHA256(..))
@@ -229,14 +227,14 @@ getLatestResolver = do
 -- | Create a 'Config' value when we're not using any local
 -- configuration files (e.g., the script command)
 configNoLocalConfig
-    :: (MonadLogger m, MonadIO m, MonadCatch m)
+    :: (MonadLogger m, MonadUnliftIO m, MonadThrow m)
     => Path Abs Dir -- ^ stack root
     -> Maybe AbstractResolver
     -> ConfigMonoid
     -> m Config
-configNoLocalConfig _ Nothing _ = throwM NoResolverWhenUsingNoLocalConfig
+configNoLocalConfig _ Nothing _ = throwIO NoResolverWhenUsingNoLocalConfig
 configNoLocalConfig stackRoot (Just resolver) configMonoid = do
-    userConfigPath <- getFakeConfigPath stackRoot resolver
+    userConfigPath <- liftIO $ getFakeConfigPath stackRoot resolver
     configFromConfigMonoid
       stackRoot
       userConfigPath
@@ -247,7 +245,7 @@ configNoLocalConfig stackRoot (Just resolver) configMonoid = do
 
 -- Interprets ConfigMonoid options.
 configFromConfigMonoid
-    :: (MonadLogger m, MonadIO m, MonadCatch m)
+    :: (MonadLogger m, MonadUnliftIO m, MonadThrow m)
     => Path Abs Dir -- ^ stack root, e.g. ~/.stack
     -> Path Abs File -- ^ user config file path, e.g. ~/.stack/config.yaml
     -> Bool -- ^ allow locals?
@@ -261,7 +259,7 @@ configFromConfigMonoid
      -- If --stack-work is passed, prefer it. Otherwise, if STACK_WORK
      -- is set, use that. If neither, use the default ".stack-work"
      mstackWorkEnv <- liftIO $ lookupEnv stackWorkEnvVar
-     configWorkDir0 <- maybe (return $(mkRelDir ".stack-work")) parseRelDir mstackWorkEnv
+     configWorkDir0 <- maybe (return $(mkRelDir ".stack-work")) (liftIO . parseRelDir) mstackWorkEnv
      let configWorkDir = fromFirst configWorkDir0 configMonoidWorkDir
      -- This code is to handle the deprecation of latest-snapshot-url
      configUrls <- case (getFirst configMonoidLatestSnapshotUrl, getFirst (urlsMonoidLatestSnapshot configMonoidUrls)) of
@@ -369,8 +367,8 @@ configFromConfigMonoid
                  -- TODO: Either catch specific exceptions or add a
                  -- parseRelAsAbsDirMaybe utility and use it along with
                  -- resolveDirMaybe.
-                 `catchAll`
-                 const (throwM (NoSuchDirectory userPath))
+                 `catchAny`
+                 const (throwIO (NoSuchDirectory userPath))
 
      configJobs <-
         case getFirst configMonoidJobs of
@@ -665,16 +663,16 @@ getLocalPackages = do
 --
 -- On Windows, the second value is always 'True'.
 determineStackRootAndOwnership
-    :: (MonadIO m, MonadCatch m)
+    :: (MonadIO m)
     => ConfigMonoid
     -- ^ Parsed command-line arguments
     -> m (Path Abs Dir, Bool)
-determineStackRootAndOwnership clArgs = do
+determineStackRootAndOwnership clArgs = liftIO $ do
     stackRoot <- do
         case getFirst (configMonoidStackRoot clArgs) of
             Just x -> return x
             Nothing -> do
-                mstackRoot <- liftIO $ lookupEnv stackRootEnvVar
+                mstackRoot <- lookupEnv stackRootEnvVar
                 case mstackRoot of
                     Nothing -> getAppUserDataDir stackProgName
                     Just x -> case parseAbsDir x of
@@ -685,12 +683,12 @@ determineStackRootAndOwnership clArgs = do
         mdirAndOwnership <- findInParents getDirAndOwnership stackRoot
         case mdirAndOwnership of
             Just x -> return x
-            Nothing -> throwM (BadStackRoot stackRoot)
+            Nothing -> throwIO (BadStackRoot stackRoot)
 
     when (existingStackRootOrParentDir /= stackRoot) $
         if userOwnsIt
-            then liftIO $ ensureDir stackRoot
-            else throwM $
+            then ensureDir stackRoot
+            else throwIO $
                 Won'tCreateStackRootInDirectoryOwnedByDifferentUser
                     stackRoot
                     existingStackRootOrParentDir
@@ -704,22 +702,22 @@ determineStackRootAndOwnership clArgs = do
 -- If @dir@ doesn't exist, its parent directory is checked instead.
 -- If the parent directory doesn't exist either, @'NoSuchDirectory' ('parent' dir)@
 -- is thrown.
-checkOwnership :: (MonadIO m, MonadCatch m) => Path Abs Dir -> m ()
+checkOwnership :: (MonadIO m) => Path Abs Dir -> m ()
 checkOwnership dir = do
     mdirAndOwnership <- firstJustM getDirAndOwnership [dir, parent dir]
     case mdirAndOwnership of
         Just (_, True) -> return ()
-        Just (dir', False) -> throwM (UserDoesn'tOwnDirectory dir')
+        Just (dir', False) -> throwIO (UserDoesn'tOwnDirectory dir')
         Nothing ->
-            (throwM . NoSuchDirectory) $ (toFilePathNoTrailingSep . parent) dir
+            (throwIO . NoSuchDirectory) $ (toFilePathNoTrailingSep . parent) dir
 
 -- | @'getDirAndOwnership' dir@ returns @'Just' (dir, 'True')@ when @dir@
 -- exists and the current user owns it in the sense of 'isOwnedByUser'.
 getDirAndOwnership
-    :: (MonadIO m, MonadCatch m)
+    :: (MonadIO m)
     => Path Abs Dir
     -> m (Maybe (Path Abs Dir, Bool))
-getDirAndOwnership dir = forgivingAbsence $ do
+getDirAndOwnership dir = liftIO $ forgivingAbsence $ do
     ownership <- isOwnedByUser dir
     return (dir, ownership)
 

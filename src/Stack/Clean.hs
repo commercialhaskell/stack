@@ -9,8 +9,7 @@ module Stack.Clean
     ,StackCleanException(..)
     ) where
 
-import           Control.Exception (Exception)
-import           Control.Monad.Catch (throwM)
+import           Control.Monad.IO.Unlift
 import           Data.Foldable (forM_)
 import           Data.List ((\\),intercalate)
 import qualified Data.Map.Strict as Map
@@ -35,7 +34,7 @@ clean
     -> m ()
 clean cleanOpts = do
     dirs <- dirsToDelete cleanOpts
-    forM_ dirs (ignoringAbsence . removeDirRecur)
+    liftIO $ forM_ dirs (ignoringAbsence . removeDirRecur)
 
 dirsToDelete
     :: (StackM env m, HasEnvConfig env)

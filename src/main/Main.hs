@@ -15,9 +15,8 @@ module Main (main) where
 #ifndef HIDE_DEP_VERSIONS
 import qualified Build_stack
 #endif
-import           Control.Exception
 import           Control.Monad hiding (mapM, forM)
-import           Control.Monad.IO.Class
+import           Control.Monad.IO.Unlift
 import           Control.Monad.Logger
 import           Control.Monad.Reader (local)
 import           Control.Monad.Trans.Either (EitherT)

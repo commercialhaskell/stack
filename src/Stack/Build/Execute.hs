@@ -24,16 +24,10 @@ module Stack.Build.Execute
 import           Control.Applicative
 import           Control.Arrow ((&&&), second)
 import           Control.Concurrent.Execute
-import           Control.Concurrent.MVar.Lifted
 import           Control.Concurrent.STM
-import           Control.Exception.Safe (catchIO)
-import           Control.Exception.Lifted
 import           Control.Monad (liftM, when, unless, void)
-import           Control.Monad.Catch (MonadCatch)
-import           Control.Monad.IO.Class
+import           Control.Monad.IO.Unlift
 import           Control.Monad.Logger
-import           Control.Monad.Trans.Control (liftBaseWith)
-import           Control.Monad.Trans.Resource
 import           Crypto.Hash
 import           Data.Attoparsec.Text hiding (try)
 import qualified Data.ByteArray as Mem (convert)
@@ -344,10 +338,11 @@ withExecuteEnv :: forall env m a. (StackM env m, HasEnvConfig env)
                -> [DumpPackage () () ()] -- ^ local packages
                -> (ExecuteEnv m -> m a)
                -> m a
-withExecuteEnv menv bopts boptsCli baseConfigOpts locals globalPackages snapshotPackages localPackages inner = do
-    withSystemTempDir stackProgName $ \tmpdir -> do
-        configLock <- newMVar ()
-        installLock <- newMVar ()
+withExecuteEnv menv bopts boptsCli baseConfigOpts locals globalPackages snapshotPackages localPackages inner =
+    withRunIO $ \run ->
+    withSystemTempDir stackProgName $ \tmpdir -> run $ do
+        configLock <- liftIO $ newMVar ()
+        installLock <- liftIO $ newMVar ()
         idMap <- liftIO $ newTVarIO Map.empty
         config <- view configL
 
@@ -441,7 +436,7 @@ withExecuteEnv menv bopts boptsCli baseConfigOpts locals globalPackages snapshot
     dumpLogIfWarning :: (Path Abs Dir, Path Abs File) -> m ()
     dumpLogIfWarning (pkgDir, filepath) = do
       firstWarning <- runResourceT
-          $ CB.sourceFile (toFilePath filepath)
+          $ transPipe liftResourceT (CB.sourceFile (toFilePath filepath))
          $$ CT.decodeUtf8Lenient
          =$ CT.lines
          =$ CL.map stripCR
@@ -458,7 +453,7 @@ withExecuteEnv menv bopts boptsCli baseConfigOpts locals globalPackages snapshot
         $logInfo $ T.pack $ concat ["\n--  Dumping log file", msgSuffix, ": ", toFilePath filepath, "\n"]
         compilerVer <- view actualCompilerVersionL
         runResourceT
-            $ CB.sourceFile (toFilePath filepath)
+            $ transPipe liftResourceT (CB.sourceFile (toFilePath filepath))
            $$ CT.decodeUtf8Lenient
            =$ mungeBuildOutput ExcludeTHLoading ConvertPathsToAbsolute pkgDir compilerVer
            =$ CL.mapM_ $logInfo
@@ -521,7 +516,7 @@ copyExecutables exes = do
                 case loc of
                     Snap -> snapBin
                     Local -> localBin
-        mfp <- forgivingAbsence (resolveFile bindir $ T.unpack name ++ ext)
+        mfp <- liftIO $ forgivingAbsence (resolveFile bindir $ T.unpack name ++ ext)
           >>= rejectMissingFile
         case mfp of
             Nothing -> do
@@ -600,11 +595,7 @@ executePlan' installedMap0 targets plan ee@ExecuteEnv {..} = do
     liftIO $ atomically $ modifyTVar' eeLocalDumpPkgs $ \initMap ->
         foldl' (flip Map.delete) initMap $ Map.keys (planUnregisterLocal plan)
 
-    -- Yes, we're explicitly discarding result values, which in general would
-    -- be bad. monad-unlift does this all properly at the type system level,
-    -- but I don't want to pull it in for this one use case, when we know that
-    -- stack always using transformer stacks that are safe for this use case.
-    runInBase <- liftBaseWith $ \run -> return (void . run)
+    runInBase <- askRunIO
 
     let actions = concatMap (toActions installedMap' runInBase ee) $ Map.elems $ Map.mergeWithKey
             (\_ b f -> Just (Just b, Just f))
@@ -1075,7 +1066,7 @@ withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} md
                                 Just (logFile, h) -> do
                                     liftIO $ hClose h
                                     runResourceT
-                                        $ CB.sourceFile (toFilePath logFile)
+                                        $ transPipe liftResourceT (CB.sourceFile (toFilePath logFile))
                                         =$= CT.decodeUtf8Lenient
                                         $$ mungeBuildOutput stripTHLoading makeAbsolute pkgDir compilerVer
                                         =$ CL.consume
@@ -1561,7 +1552,7 @@ singleTest runInBase topts testsToRun ac ee task installedMap = do
                             tixexists <- doesFileExist tixPath
                             when tixexists $
                                 $logWarn ("Removing HPC file " <> T.pack (toFilePath tixPath))
-                            ignoringAbsence (removeFile tixPath)
+                            liftIO $ ignoringAbsence (removeFile tixPath)
 
                         let args = toAdditionalArgs topts
                             argsDisplay = case args of
@@ -1665,7 +1656,7 @@ data ExcludeTHLoading = ExcludeTHLoading | KeepTHLoading
 data ConvertPathsToAbsolute = ConvertPathsToAbsolute | KeepPathsAsIs
 
 -- | Strip Template Haskell "Loading package" lines and making paths absolute.
-mungeBuildOutput :: forall m. (MonadIO m, MonadCatch m, MonadBaseControl IO m)
+mungeBuildOutput :: forall m. (MonadUnliftIO m, MonadThrow m)
                  => ExcludeTHLoading       -- ^ exclude TH loading?
                  -> ConvertPathsToAbsolute -- ^ convert paths to absolute?
                  -> Path Abs Dir           -- ^ package's root directory
@@ -1710,7 +1701,7 @@ mungeBuildOutput excludeTHLoading makeAbsolute pkgDir compilerVer = void $
         let (x, y) = T.break (== ':') bs
         mabs <-
             if isValidSuffix y
-                then liftM (fmap ((T.takeWhile isSpace x <>) . T.pack . toFilePath)) $
+                then liftIO $ liftM (fmap ((T.takeWhile isSpace x <>) . T.pack . toFilePath)) $
                          forgivingAbsence (resolveFile pkgDir (T.unpack $ T.dropWhile isSpace x)) `catch`
                              \(_ :: PathParseException) -> return Nothing
                 else return Nothing

@@ -32,10 +32,8 @@ module Stack.BuildPlan
     ) where
 
 import           Control.Applicative
-import           Control.Exception (assert)
 import           Control.Monad (liftM, forM, unless)
-import           Control.Monad.Catch
-import           Control.Monad.IO.Class
+import           Control.Monad.IO.Unlift
 import           Control.Monad.Logger
 import           Control.Monad.Reader (MonadReader)
 import           Control.Monad.State.Strict      (State, execState, get, modify,

@@ -40,7 +40,7 @@ module Stack.Types.Resolver
 
 import           Control.Applicative
 import           Control.DeepSeq (NFData)
-import           Control.Monad.Catch (MonadThrow, throwM, Exception)
+import           Control.Monad.IO.Unlift
 import           Data.Aeson.Extended
                  (ToJSON, toJSON, FromJSON, parseJSON, object,
                   WithJSONWarnings(..), Value(String, Object), (.=),

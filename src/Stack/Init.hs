@@ -8,11 +8,8 @@ module Stack.Init
     , InitOpts (..)
     ) where
 
-import           Control.Exception               (assert)
-import           Control.Exception.Safe          (catchAny)
 import           Control.Monad
-import           Control.Monad.Catch             (throwM)
-import           Control.Monad.IO.Class
+import           Control.Monad.IO.Unlift
 import           Control.Monad.Logger
 import qualified Data.ByteString.Builder         as B
 import qualified Data.ByteString.Char8           as BC

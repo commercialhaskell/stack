@@ -8,6 +8,7 @@ module Stack.Config.Nix
        ) where
 
 import Control.Monad (when)
+import Control.Monad.IO.Unlift
 import Data.Maybe
 import Data.Monoid.Extra
 import qualified Data.Text as T
@@ -17,13 +18,11 @@ import Stack.Types.Version
 import Stack.Types.Nix
 import Stack.Types.Compiler
 import Stack.Types.StringError
-import Control.Exception.Lifted
-import Control.Monad.Catch (throwM,MonadCatch)
 import Prelude
 
 -- | Interprets NixOptsMonoid options.
 nixOptsFromMonoid
-    :: (Monad m, MonadCatch m)
+    :: MonadUnliftIO m
     => NixOptsMonoid
     -> OS
     -> m NixOpts
@@ -39,7 +38,7 @@ nixOptsFromMonoid NixOptsMonoid{..} os = do
                           ++ prefixAll (T.pack "-I") (fromFirst [] nixMonoidPath)
         nixAddGCRoots   = fromFirst False nixMonoidAddGCRoots
     when (not (null nixPackages) && isJust nixInitFile) $
-       throwM NixCannotUseShellFileAndPackagesException
+       throwIO NixCannotUseShellFileAndPackagesException
     return NixOpts{..}
   where prefixAll p (x:xs) = p : x : prefixAll p xs
         prefixAll _ _      = []

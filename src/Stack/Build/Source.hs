@@ -25,12 +25,10 @@ module Stack.Build.Source
 
 import              Control.Applicative
 import              Control.Arrow ((&&&))
-import              Control.Exception (assert, catch)
 import              Control.Monad hiding (sequence)
-import              Control.Monad.IO.Class
+import              Control.Monad.IO.Unlift
 import              Control.Monad.Logger
 import              Control.Monad.Reader (MonadReader)
-import              Control.Monad.Trans.Resource
 import              Crypto.Hash (Digest, SHA256(..))
 import              Crypto.Hash.Conduit (sinkHash)
 import qualified    Data.ByteArray as Mem (convert)
