@@ -209,14 +209,13 @@ getLocalFlags
     -> BuildOptsCLI
     -> PackageName
     -> Map FlagName Bool
-getLocalFlags bconfig boptsCli name = error "getLocalFlags" {- Map.unions
+getLocalFlags bconfig boptsCli name = Map.unions
     [ Map.findWithDefault Map.empty (Just name) cliFlags
     , Map.findWithDefault Map.empty Nothing cliFlags
-    , Map.findWithDefault Map.empty name (unPackageFlags (bcFlags bconfig))
+    , Map.findWithDefault Map.empty name (bcFlags bconfig)
     ]
   where
     cliFlags = boptsCLIFlags boptsCli
-    -}
 
 -- | Get the configured options to pass from GHC, based on the build
 -- configuration and commandline.
