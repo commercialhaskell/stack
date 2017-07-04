@@ -12,19 +12,16 @@ module Stack.Build.Source
     ( loadSourceMap
     , loadSourceMapFull
     , SourceMap
-    , PackageSource (..)
     , getLocalFlags
     , getGhcOptions
     , addUnlistedToBuildCache
     , getDefaultPackageConfig
-    , getPackageConfig
     ) where
 
 import              Control.Applicative
 import              Control.Arrow ((&&&))
 import              Control.Monad hiding (sequence)
 import              Control.Monad.IO.Unlift
-import              Control.Monad.Logger
 import              Control.Monad.Reader (MonadReader)
 import              Crypto.Hash (Digest, SHA256(..))
 import              Crypto.Hash.Conduit (sinkHash)
@@ -33,7 +30,6 @@ import qualified    Data.ByteString as S
 import              Data.Conduit (($$), ZipSink (..))
 import qualified    Data.Conduit.Binary as CB
 import qualified    Data.Conduit.List as CL
-import              Data.Either (partitionEithers)
 import              Data.Function
 import qualified    Data.HashSet as HashSet
 import              Data.List
@@ -46,19 +42,13 @@ import              Data.Set (Set)
 import qualified    Data.Set as Set
 import              Data.Text (Text)
 import              Data.Traversable (sequence)
-import              Distribution.Package (pkgName, pkgVersion)
-import              Distribution.PackageDescription (GenericPackageDescription, package, packageDescription)
-import qualified    Distribution.PackageDescription as C
 import              Path
-import              Path.IO
 import              Prelude hiding (sequence)
 import              Stack.Build.Cache
 import              Stack.Build.Target
 import              Stack.Config (getLocalPackages)
 import              Stack.Constants (wiredInPackages)
-import              Stack.Fetch (withCabalLoader)
 import              Stack.Package
-import              Stack.PackageIndex (getPackageVersions)
 import              Stack.Types.Build
 import              Stack.Types.BuildPlan
 import              Stack.Types.Config
@@ -110,7 +100,7 @@ loadSourceMapFull needTargets boptsCli = do
     (ls, localDeps, targets) <- parseTargets needTargets boptsCli
     lp <- getLocalPackages
     locals <- mapM (loadLocalPackage boptsCli targets) $ Map.toList $ lpProject lp
-    -- FIXME checkFlagsUsed boptsCli locals extraDeps0 (lsPackages ls0)
+    checkFlagsUsed boptsCli locals localDeps (lsPackages ls)
     checkComponentsBuildable locals
 
     -- TODO for extra sanity, confirm that the targets we threw away are all TargetAll
@@ -119,7 +109,7 @@ loadSourceMapFull needTargets boptsCli = do
     -- Combine the local packages, extra-deps, and LoadedSnapshot into
     -- one unified source map.
     let sourceMap = Map.unions
-            [ Map.fromList $ map (\lp -> (packageName $ lpPackage lp, PSLocal lp)) locals
+            [ Map.fromList $ map (\lp' -> (packageName $ lpPackage lp', PSLocal lp')) locals
             , flip Map.mapWithKey localDeps $ \n lpi ->
                 let configOpts = getGhcOptions bconfig boptsCli n False False
                  in PSUpstream (lpiVersion lpi) Local (lpiFlags lpi) (lpiGhcOptions lpi ++ configOpts) (lpiLocation lpi)
@@ -137,60 +127,7 @@ loadSourceMapFull needTargets boptsCli = do
       , sourceMap
       )
 
-    {- FIXME
-    let
-        shadowed = Map.keysSet (lpProject lp) <> Map.keysSet extraDeps0
-
-        -- Ignores all packages in the LoadedSnapshot that depend on any
-        -- local packages or extra-deps. All packages that have
-        -- transitive dependenceis on these packages are treated as
-        -- extra-deps (extraDeps1).
-        (ls, extraDeps1) = (ls0, Map.empty) -- FIXME confirm that shadowing is already handled before this step. shadowLoadedSnapshot ls0 shadowed
-
-        -- Combine the extra-deps with the ones implicitly shadowed.
-        extraDeps2 = extraDeps0 {- FIXME
-        extraDeps2 = Map.union
-            (Map.fromList (map ((\pir -> (pirName pir, (pirVersion pir, Map.empty, [])))) (HashSet.toList extraDeps0)))
-            (Map.map (\lpi ->
-                        let mpd = lpiDef lpi
-                            triple =
-                              ( lpiVersion lpi
-                              , maybe Map.empty pdFlags mpd
-                              , maybe [] pdGhcOptions mpd
-                              )
-                         in triple) extraDeps1)
-            -}
-
-        -- Add flag and ghc-option settings from the config file / cli
-        extraDeps3 = Map.mapWithKey
-            (error "extraDeps3")
-            {-
-            (\n (v, flags0, ghcOptions0) ->
-                let flags =
-                        case ( Map.lookup (Just n) $ boptsCLIFlags boptsCli
-                             , Map.lookup Nothing $ boptsCLIFlags boptsCli
-                             , Map.lookup n $ bcFlags bconfig
-                             ) of
-                            -- Didn't have any flag overrides, fall back to the flags
-                            -- defined in the snapshot.
-                            (Nothing, Nothing, Nothing) -> flags0
-                            -- Either command line flag for this package, general
-                            -- command line flag, or flag in stack.yaml is defined.
-                            -- Take all of those and ignore the snapshot flags.
-                            (x, y, z) -> Map.unions
-                                [ fromMaybe Map.empty x
-                                , fromMaybe Map.empty y
-                                , fromMaybe Map.empty z
-                                ]
-                    ghcOptions =
-                        ghcOptions0 ++
-                        getGhcOptions bconfig boptsCli n False False
-                 -- currently have no ability for extra-deps to specify their
-                 -- cabal file hashes
-                in PSUpstream v Local flags ghcOptions Nothing)
-            -}
-            extraDeps2
-    -}
+    -- FIXME handle this for all locals: Map.lookup Nothing $ boptsCLIFlags boptsCli
 
 -- | All flags for a local package.
 getLocalFlags
@@ -352,7 +289,7 @@ loadLocalPackage boptsCli targets (name, lpv) = do
 checkFlagsUsed :: (MonadThrow m, MonadReader env m, HasBuildConfig env)
                => BuildOptsCLI
                -> [LocalPackage]
-               -> Map PackageName (PackageLocationIndex FilePath) -- ^ extra deps
+               -> Map PackageName (LoadedPackageInfo (PackageLocationIndex FilePath)) -- ^ local deps
                -> Map PackageName snapshot -- ^ snapshot, for error messages
                -> m ()
 checkFlagsUsed boptsCli lps extraDeps snapshot = do
@@ -391,53 +328,6 @@ checkFlagsUsed boptsCli lps extraDeps snapshot = do
         $ throwM
         $ InvalidFlagSpecification
         $ Set.fromList unusedFlags
-
-pirName :: PackageIdentifierRevision -> PackageName
-pirName (PackageIdentifierRevision (PackageIdentifier name _) _) = name
-
-pirVersion :: PackageIdentifierRevision -> Version
-pirVersion (PackageIdentifierRevision (PackageIdentifier _ version) _) = version
-
--- | Add in necessary packages to extra dependencies
---
--- Originally part of https://github.com/commercialhaskell/stack/issues/272,
--- this was then superseded by
--- https://github.com/commercialhaskell/stack/issues/651
-extendExtraDeps
-    :: forall env m. (StackM env m, HasBuildConfig env)
-    => Map PackageName (GenericPackageDescription, PackageLocationIndex FilePath) -- ^ original extra deps
-    -> Map PackageName Version -- ^ package identifiers from the command line
-    -> Set PackageName -- ^ package names (without versions) added on the command line
-    -> m (Map PackageName (PackageLocationIndex FilePath)) -- ^ new extradeps
-extendExtraDeps extraDeps0 cliWithVersion cliNoVersion = do
-    error "extendExtraDeps" {- FIXME
-    (errs, unknowns') <- fmap partitionEithers $ mapM addNoVersion $ Set.toList cliNoVersion
-    case errs of
-        [] -> return $ Map.unions $ extraDeps1 : unknowns'
-        _ -> do
-            bconfig <- view buildConfigL
-            throwM $ UnknownTargets
-                (Set.fromList errs)
-                Map.empty -- TODO check the cliExtraDeps for presence in index
-                (bcStackYaml bconfig)
-  where
-    extraDeps1 = Map.union (Map.map (gpdVersion . fst) extraDeps0) cliWithVersion
-
-    -- Try adding a package name specified on the command line that does not have an associated version. We need to check if we already have this
-    addNoVersion :: PackageName -> m (Either PackageName (Map PackageName PackageIdentifierRevision))
-    addNoVersion pn = do
-        if Map.member pn extraDeps1
-            -- added by package name, and we already have it, nothing new
-            then return (Right Map.empty)
-            -- 
-            else do
-                mlatestVersion <- getLatestVersion pn
-                case mlatestVersion of
-                    Just v -> return (Right $ Map.singleton pn
-                                    $ PackageIdentifierRevision (PackageIdentifier pn v) Nothing)
-                    Nothing -> return (Left pn)
-
-    -}
 
 -- | Compare the current filesystem state to the cached information, and
 -- determine (1) if the files are dirty, and (2) the new cache values.

@@ -428,9 +428,8 @@ tellExecutablesUpstream name version loc flags = do
     ctx <- ask
     when (name `Set.member` extraToBuild ctx) $ do
         let pir = PackageIdentifierRevision (PackageIdentifier name version) Nothing -- FIXME get the real CabalFileInfo
-        return ()
-        -- FIXME p <- liftIO $ error "tellExecutablesUpstream" -- FIXME loadPackage ctx pir flags []
-        -- tellExecutablesPackage loc p
+        p <- liftIO $ loadPackage ctx (PLIndex pir) flags []
+        tellExecutablesPackage loc p
 
 tellExecutablesPackage :: InstallLocation -> Package -> M ()
 tellExecutablesPackage loc p = do
