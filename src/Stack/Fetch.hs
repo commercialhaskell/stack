@@ -17,6 +17,7 @@
 
 module Stack.Fetch
     ( unpackPackages
+    , unpackPackageIdent
     , unpackPackageIdents
     , fetchPackages
     , untar
@@ -167,6 +168,23 @@ unpackPackages mSnapshotDef dest input = do
                     Left _ -> Left s
       where
         t = T.pack s
+
+-- | Same as 'unpackPackageIdents', but for a single package.
+unpackPackageIdent
+    :: (StackMiniM env m, HasConfig env)
+    => Path Abs Dir -- ^ unpack directory
+    -> Path Rel Dir -- ^ the dist rename directory, see: https://github.com/fpco/stack/issues/157
+    -> PackageIdentifierRevision
+    -> m (Path Abs Dir)
+unpackPackageIdent unpackDir distDir (PackageIdentifierRevision ident mcfi) = do
+  -- FIXME make this more direct in the future
+  m <- unpackPackageIdents unpackDir (Just distDir) [PackageIdentifierRevision ident mcfi]
+  case Map.toList m of
+    [(ident', dir)]
+      | ident /= ident' -> error "unpackPackageIdent: ident mismatch"
+      | otherwise       -> return dir
+    [] -> error "unpackPackageIdent: empty list"
+    _  -> error "unpackPackageIdent: multiple results"
 
 -- | Ensure that all of the given package idents are unpacked into the build
 -- unpack directory, and return the paths to all of the subdirectories.

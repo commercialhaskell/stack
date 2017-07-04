@@ -878,16 +878,11 @@ withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} md
         case taskType of
             TTLocal lp -> inner (lpPackage lp) (lpCabalFile lp) (lpDir lp)
             TTUpstream package _ pkgLoc -> do
-                mdist <- liftM Just distRelativeDir
+                mdist <- distRelativeDir
                 menv <- getMinimalEnvOverride
                 root <- view projectRootL
                 dir <- case pkgLoc of
-                  PLIndex pir -> do
-                    m <- unpackPackageIdents eeTempDir mdist [pir] -- FIXME add total function to Stack.Fetch
-                    case Map.toList m of
-                        [(ident, dir)]
-                            | ident == taskProvides -> return dir
-                        _ -> error $ "withPackage: invariant (1) violated: " ++ show m
+                  PLIndex pir -> unpackPackageIdent eeTempDir mdist pir
                   PLOther pkgLoc' -> resolveSinglePackageLocation menv root pkgLoc'
 
                 let name = packageIdentifierName taskProvides
