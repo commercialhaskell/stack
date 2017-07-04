@@ -54,10 +54,8 @@ import              Stack.Types.BuildPlan
 import              Stack.Types.Config
 import              Stack.Types.FlagName
 import              Stack.Types.Package
-import              Stack.Types.PackageIdentifier
 import              Stack.Types.PackageName
 import              Stack.Types.StackT
-import              Stack.Types.Version
 import qualified    System.Directory as D
 import              System.FilePath (takeFileName)
 import              System.IO (withBinaryFile, IOMode (ReadMode))

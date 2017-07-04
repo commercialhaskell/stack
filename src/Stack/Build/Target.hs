@@ -60,20 +60,16 @@
 -- calculatePackagePromotion.
 module Stack.Build.Target
     ( -- * Types
-    {- FIXME figure out what the test suites need
-      ComponentName
-    , UnresolvedComponent (..)
-    , RawTarget (..)
-    , -}Target (..)
+      Target (..)
     , NeedTargets (..)
     , PackageType (..)
-    {-
-      -- * Parsers
-    , parseRawTarget -- only needed by test suite
-    -}
     , parseTargets
       -- * Convenience helpers
     , gpdVersion
+      -- * Test suite exports
+    , parseRawTarget
+    , RawTarget (..)
+    , UnresolvedComponent (..)
     ) where
 
 import           Control.Applicative
@@ -166,7 +162,7 @@ parseRawTargetDirs :: MonadIO m
                    -> RawInput -- ^ raw target information from the commandline
                    -> m (Either Text [(RawInput, RawTarget)])
 parseRawTargetDirs root locals ri =
-    case parseRawTarget of
+    case parseRawTarget t of
         Just rt -> return $ Right [(ri, rt)]
         Nothing -> do
             mdir <- liftIO $ forgivingAbsence (resolveDir root (T.unpack t))
@@ -187,37 +183,37 @@ parseRawTargetDirs root locals ri =
 
     RawInput t = ri
 
-    -- | If this function returns @Nothing@, the input should be treated as a
-    -- directory.
-    parseRawTarget :: Maybe RawTarget
-    parseRawTarget =
-            (RTPackageIdentifier <$> parsePackageIdentifier t)
-        <|> (RTPackage <$> parsePackageNameFromString s)
-        <|> (RTComponent <$> T.stripPrefix ":" t)
-        <|> parsePackageComponent
-      where
-        s = T.unpack t
+-- | If this function returns @Nothing@, the input should be treated as a
+-- directory.
+parseRawTarget :: Text -> Maybe RawTarget
+parseRawTarget t =
+        (RTPackageIdentifier <$> parsePackageIdentifier t)
+    <|> (RTPackage <$> parsePackageNameFromString s)
+    <|> (RTComponent <$> T.stripPrefix ":" t)
+    <|> parsePackageComponent
+  where
+    s = T.unpack t
 
-        parsePackageComponent =
-            case T.splitOn ":" t of
-                [pname, "lib"]
-                    | Just pname' <- parsePackageNameFromString (T.unpack pname) ->
-                        Just $ RTPackageComponent pname' $ ResolvedComponent CLib
-                [pname, cname]
-                    | Just pname' <- parsePackageNameFromString (T.unpack pname) ->
-                        Just $ RTPackageComponent pname' $ UnresolvedComponent cname
-                [pname, typ, cname]
-                    | Just pname' <- parsePackageNameFromString (T.unpack pname)
-                    , Just wrapper <- parseCompType typ ->
-                        Just $ RTPackageComponent pname' $ ResolvedComponent $ wrapper cname
-                _ -> Nothing
+    parsePackageComponent =
+        case T.splitOn ":" t of
+            [pname, "lib"]
+                | Just pname' <- parsePackageNameFromString (T.unpack pname) ->
+                    Just $ RTPackageComponent pname' $ ResolvedComponent CLib
+            [pname, cname]
+                | Just pname' <- parsePackageNameFromString (T.unpack pname) ->
+                    Just $ RTPackageComponent pname' $ UnresolvedComponent cname
+            [pname, typ, cname]
+                | Just pname' <- parsePackageNameFromString (T.unpack pname)
+                , Just wrapper <- parseCompType typ ->
+                    Just $ RTPackageComponent pname' $ ResolvedComponent $ wrapper cname
+            _ -> Nothing
 
-        parseCompType t' =
-            case t' of
-                "exe" -> Just CExe
-                "test" -> Just CTest
-                "bench" -> Just CBench
-                _ -> Nothing
+    parseCompType t' =
+        case t' of
+            "exe" -> Just CExe
+            "test" -> Just CTest
+            "bench" -> Just CBench
+            _ -> Nothing
 
 ---------------------------------------------------------------------------------
 -- Resolve the raw targets
@@ -540,7 +536,7 @@ parseTargets needTargets boptscli = do
     addedDeps' <- fmap Map.fromList $ forM (Map.toList addedDeps) $ \(name, loc) -> do
       bs <- loadSingleRawCabalFile loadFromIndex menv root loc
       case rawParseGPD bs of
-        Left e -> error $ show (loc, e) -- FIXME nicer exception type
+        Left e -> throwIO $ InvalidCabalFileInLocal loc e bs
         Right (_warnings, gpd) -> return (name, (gpd, loc, Nothing))
 
     -- Calculate a list of all of the locals, based on the project

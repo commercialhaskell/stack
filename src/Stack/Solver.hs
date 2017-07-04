@@ -56,6 +56,7 @@ import qualified Distribution.Text as C
 import           Path
 import           Path.Find (findFiles)
 import           Path.IO hiding (findExecutable, findFiles)
+import           Stack.Build.Target (gpdVersion)
 import           Stack.BuildPlan
 import           Stack.Config (getLocalPackages, loadConfigYaml)
 import           Stack.Constants (stackDotYaml, wiredInPackages)
@@ -622,7 +623,8 @@ solveExtraDeps modStackYaml = do
     relStackYaml <- prettyPath stackYaml
 
     $logInfo $ "Using configuration file: " <> T.pack relStackYaml
-    packages <- lpProject <$> getLocalPackages -- FIXME probably just lpProject?
+    lp <- getLocalPackages
+    let packages = lpProject lp
     let noPkgMsg = "No cabal packages found in " <> relStackYaml <>
                    ". Please add at least one directory containing a .cabal \
                    \file. You can also use 'stack init' to automatically \
@@ -639,15 +641,15 @@ solveExtraDeps modStackYaml = do
 
     let gpds              = Map.elems $ fmap snd bundle
         oldFlags          = bcFlags bconfig
-        oldExtraVersions  = bcDependencies bconfig
+        oldExtraVersions  = Map.map (gpdVersion . fst) (lpDependencies lp)
         sd                = bcSnapshotDef bconfig
         resolver          = sdResolver sd
         oldSrcs           = gpdPackages gpds
         oldSrcFlags       = Map.intersection oldFlags oldSrcs
-        oldExtraFlags     = error "oldExtraFlags FIXME" -- Map.intersection oldFlags oldExtraVersions
+        oldExtraFlags     = Map.intersection oldFlags oldExtraVersions
 
         srcConstraints    = mergeConstraints oldSrcs oldSrcFlags
-        extraConstraints  = error "extraConstraints FIXME" -- mergeConstraints oldExtraVersions oldExtraFlags
+        extraConstraints  = mergeConstraints oldExtraVersions oldExtraFlags
 
     resolverResult <- checkSnapBuildPlan (parent stackYaml) gpds (Just oldSrcFlags) sd
     resultSpecs <- case resolverResult of
@@ -673,9 +675,9 @@ solveExtraDeps modStackYaml = do
         versions = fmap fst edeps
 
         vDiff v v' = if v == v' then Nothing else Just v
-        -- FIXME versionsDiff = Map.differenceWith vDiff
-        newVersions  = error "newVersions FIXME" -- versionsDiff versions oldExtraVersions
-        goneVersions = error "goneVersions FIXME" -- versionsDiff oldExtraVersions versions
+        versionsDiff = Map.differenceWith vDiff
+        newVersions  = versionsDiff versions oldExtraVersions
+        goneVersions = versionsDiff oldExtraVersions versions
 
         fDiff f f' = if f == f' then Nothing else Just f
         flagsDiff  = Map.differenceWith fDiff

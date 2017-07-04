@@ -463,7 +463,7 @@ installPackage
 installPackage name ps minstalled = do
     ctx <- ask
     case ps of
-        PSUpstream version _ flags ghcOptions pkgLoc -> do
+        PSUpstream _ _ flags ghcOptions pkgLoc -> do
             planDebug $ "installPackage: Doing all-in-one build for upstream package " ++ show name
             package <- liftIO $ loadPackage ctx pkgLoc flags ghcOptions
             resolveDepsAndInstall True ps package minstalled
