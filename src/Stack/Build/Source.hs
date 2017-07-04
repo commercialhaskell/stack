@@ -125,8 +125,6 @@ loadSourceMapFull needTargets boptsCli = do
       , sourceMap
       )
 
-    -- FIXME handle this for all locals: Map.lookup Nothing $ boptsCLIFlags boptsCli
-
 -- | All flags for a local package.
 getLocalFlags
     :: BuildConfig

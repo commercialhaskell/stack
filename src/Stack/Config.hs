@@ -66,7 +66,6 @@ import qualified Data.Text as T
 import           Data.Text.Encoding (encodeUtf8)
 import qualified Data.Yaml as Yaml
 import qualified Distribution.PackageDescription as C
-import           Distribution.ParseUtils (PWarning)
 import           Distribution.System (OS (..), Platform (..), buildPlatform, Arch(OtherArch))
 import qualified Distribution.Text
 import           Distribution.Version (simplifyVersionRange)
@@ -677,7 +676,7 @@ getLocalPackages = do
                        case rawParseGPD bs of
                          Left e -> throwM $ InvalidCabalFileInLocal loc e bs
                          Right x -> return x
-                     let PackageIdentifier name version =
+                     let PackageIdentifier name _version =
                                 fromCabalPackageIdentifier
                               $ C.package
                               $ C.packageDescription gpd

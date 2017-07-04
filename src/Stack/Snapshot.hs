@@ -22,7 +22,7 @@ module Stack.Snapshot
 
 import           Control.Applicative
 import           Control.Arrow (second)
-import           Control.Monad (forM, unless, void, (>=>))
+import           Control.Monad (forM, unless, void, (>=>), when)
 import           Control.Monad.IO.Unlift
 import           Control.Monad.Logger
 import           Control.Monad.Reader (MonadReader)
@@ -30,7 +30,7 @@ import           Control.Monad.State.Strict      (get, put, StateT, execStateT)
 import           Crypto.Hash (hash, SHA256(..), Digest)
 import           Crypto.Hash.Conduit (hashFile)
 import           Data.Aeson (withObject, (.!=), (.:), (.:?), Value (Object))
-import           Data.Aeson.Extended (WithJSONWarnings(..), logJSONWarnings, (..!=), (..:?), jsonSubWarningsT, withObjectWarnings, (..:))
+import           Data.Aeson.Extended (WithJSONWarnings(..), logJSONWarnings, (..!=), (..:?), jsonSubWarnings, jsonSubWarningsT, withObjectWarnings, (..:))
 import           Data.Aeson.Types (Parser, parseEither)
 import           Data.Store.VersionTagged
 import qualified Data.ByteArray as Mem (convert)
@@ -105,7 +105,6 @@ instance Show SnapshotException where
     , " and "
     , show loc2
     ]
-  -- FIXME can we reuse the existing logic we have for displaying unmet deps?
   show (UnmetDeps m) =
       concat $ "Some dependencies in the snapshot are unmet.\n" : map go (Map.toList m)
     where
@@ -123,7 +122,7 @@ instance Show SnapshotException where
         , ", "
         , case mversion of
             Nothing -> "none present"
-            Just version -> versionString version ++ "found"
+            Just version -> versionString version ++ " found"
         , "\n"
         ]
 
@@ -252,12 +251,11 @@ loadResolver (ResolverCustom name url loc) = do
 
     load :: FilePath -> m SnapshotDef
     load fp = do
-      WithJSONWarnings (sd0, WithJSONWarnings parentResolver warnings2) warnings <-
+      WithJSONWarnings (sd0, parentResolver) warnings <-
         liftIO (decodeFileEither fp) >>= either
           throwM
           (either (throwM . AesonException) return . parseEither parseCustom)
       logJSONWarnings (T.unpack url) warnings
-      logJSONWarnings (T.unpack url) warnings2
 
       -- The fp above may just be the download location for a URL,
       -- which we don't want to use. Instead, look back at loc from
@@ -293,7 +291,7 @@ loadResolver (ResolverCustom name url loc) = do
     -- here are bogus, and need to be replaced with information only
     -- available after further processing.
     parseCustom :: Value
-                -> Parser (WithJSONWarnings (SnapshotDef, WithJSONWarnings (ResolverWith ()))) -- FIXME there should only be one WithJSONWarnings
+                -> Parser (WithJSONWarnings (SnapshotDef, ResolverWith ()))
     parseCustom = withObjectWarnings "CustomSnapshot" $ \o -> (,)
         <$> (SnapshotDef (Left (error "loadResolver")) (ResolverSnapshot (LTS 0 0))
             <$> jsonSubWarningsT (o ..:? "packages" ..!= [])
@@ -302,7 +300,7 @@ loadResolver (ResolverCustom name url loc) = do
             <*> o ..:? "hide" ..!= Set.empty
             <*> o ..:? "ghc-options" ..!= Map.empty
             <*> o ..:? "global-hints" ..!= Map.empty)
-        <*> o ..: "resolver"
+        <*> jsonSubWarnings (o ..: "resolver")
 
     fromDigest :: Digest SHA256 -> SnapshotHash
     fromDigest = SnapshotHash . B64URL.encode . Mem.convert
@@ -407,47 +405,76 @@ calculatePackagePromotion
 
       platform <- view platformL
 
+      -- Hand out flags, hide, and GHC options to the newly added
+      -- packages
       (packages1, flags, hide, ghcOptions) <- execStateT
         (mapM_ (findPackage platform compilerVersion) gpds)
         (Map.empty, flags0, hides0, options0)
 
-      let toDrop = Map.union (const () <$> packages1) (Map.fromSet (const ()) drops0)
+      let
+          -- We need to drop all packages from globals and parent
+          -- packages that are either marked to be dropped, or
+          -- included in the new packages.
+          toDrop = Map.union (const () <$> packages1) (Map.fromSet (const ()) drops0)
           globals1 = Map.difference globals0 toDrop
           parentPackages1 = Map.difference parentPackages0 toDrop
 
+          -- The set of all packages that need to be upgraded based on
+          -- newly set flags, hide values, or GHC options
           toUpgrade = Set.unions [Map.keysSet flags, hide, Map.keysSet ghcOptions]
+
+          -- Perform a sanity check: ensure that all of the packages
+          -- that need to be upgraded actually exist in the global or
+          -- parent packages
           oldNames = Set.union (Map.keysSet globals1) (Map.keysSet parentPackages1)
           extraToUpgrade = Set.difference toUpgrade oldNames
-
       unless (Set.null extraToUpgrade) $
         error $ "Invalid snapshot definition, the following packages are not found: " ++ show (Set.toList extraToUpgrade)
 
-      let (noLongerGlobals1, globals2) = Map.partitionWithKey
+      let
+          -- Split up the globals into those that are to be upgraded
+          -- (no longer globals) and those that remain globals, based
+          -- solely on the toUpgrade value
+          (noLongerGlobals1, globals2) = Map.partitionWithKey
             (\name _ -> name `Set.member` toUpgrade)
             globals1
+          -- Further: now that we've removed a bunch of packages from
+          -- globals, split out any packages whose dependencies are no
+          -- longer met
           (globals3, noLongerGlobals2) = splitUnmetDeps globals2
 
+          -- Put together the two split out groups of packages
           noLongerGlobals3 :: Map PackageName (LoadedPackageInfo SinglePackageLocation)
           noLongerGlobals3 = Map.union (Map.mapWithKey globalToSnapshot noLongerGlobals1) noLongerGlobals2
 
+          -- Split out packages from parent that need to be
+          -- upgraded. We needn't perform the splitUnmetDeps step here
+          -- though, since both parent and current packages end up in
+          -- the same snapshot database.
           (noLongerParent, parentPackages2) = Map.partitionWithKey
             (\name _ -> name `Set.member` toUpgrade)
             parentPackages1
 
+          -- Everything split off from globals and parents will be upgraded...
           allToUpgrade = Map.union noLongerGlobals3 noLongerParent
 
+      -- ... so recalculate based on new values
       upgraded <- fmap Map.fromList
                 $ mapM (recalculate loadFromIndex menv root compilerVersion flags hide ghcOptions)
                 $ Map.toList allToUpgrade
 
+      -- Could be nice to check snapshot early... but disabling
+      -- because ConstructPlan gives much nicer error messages
       let packages2 = Map.unions [Map.map void upgraded, Map.map void packages1, Map.map void parentPackages2]
           allAvailable = Map.union
             (lpiVersion <$> globals3)
             (lpiVersion <$> packages2)
+      when False $ checkDepsMet allAvailable packages2
 
-      checkDepsMet allAvailable packages2
-
-      -- FIXME check the subset requirement
+      unless (Map.null (globals3 `Map.difference` globals0))
+        (error "calculatePackagePromotion: subset invariant violated for globals")
+      unless (Map.null (parentPackages2 `Map.difference` parentPackages0))
+        (error "calculatePackagePromotion: subset invariant violated for parents")
 
       return
         ( globals3
@@ -469,7 +496,7 @@ recalculate :: forall env m.
             -> (PackageName, LoadedPackageInfo SinglePackageLocation)
             -> m (PackageName, LoadedPackageInfo SinglePackageLocation)
 recalculate loadFromIndex menv root compilerVersion allFlags allHide allOptions (name, lpi0) = do
-  let hide = lpiHide lpi0 || Set.member name allHide -- FIXME allow child snapshot to unhide?
+  let hide = lpiHide lpi0 || Set.member name allHide -- TODO future enhancement: allow child snapshot to unhide?
       options = fromMaybe (lpiGhcOptions lpi0) (Map.lookup name allOptions)
   case Map.lookup name allFlags of
     Nothing -> return (name, lpi0 { lpiHide = hide, lpiGhcOptions = options }) -- optimization
@@ -541,8 +568,6 @@ loadCompiler :: forall env m.
              -> m LoadedSnapshot
 loadCompiler cv = do
   menv <- getMinimalEnvOverride
-  -- FIXME do we need to ensure that the correct GHC is available, or
-  -- can we trust the setup code to do that for us?
   m <- ghcPkgDump menv (whichCompiler cv) []
     (conduitDumpPackage .| CL.foldMap (\dp -> Map.singleton (dpGhcPkgId dp) dp))
   return LoadedSnapshot
@@ -704,8 +729,8 @@ calculate gpd platform compilerVersion loc flags hide options =
     pconfig = PackageConfig
       { packageConfigEnableTests = False
       , packageConfigEnableBenchmarks = False
-      , packageConfigFlags = flags -- FIXME check unused flags
-      , packageConfigGhcOptions = options -- FIXME refactor Stack.Package, we probably don't need GHC options passed in
+      , packageConfigFlags = flags
+      , packageConfigGhcOptions = options
       , packageConfigCompilerVersion = compilerVersion
       , packageConfigPlatform = platform
       }

@@ -494,6 +494,10 @@ parseTargets needTargets boptscli = do
 
   (errs3, targets, addedDeps) <- combineResolveResults resolveResults
 
+  case concat [errs1, errs2, errs3] of
+    [] -> return ()
+    errs -> throwIO $ TargetParseException errs
+
   case (Map.null targets, needTargets) of
     (False, _) -> return ()
     (True, AllowNoTargets) -> return ()
@@ -504,10 +508,6 @@ parseTargets needTargets boptscli = do
           ["The project contains no local packages (packages not marked with 'extra-dep')"]
       | otherwise -> throwIO $ TargetParseException
           ["The specified targets matched no packages"]
-
-  case concat [errs1, errs2, errs3] of
-    [] -> return ()
-    errs -> throwIO $ TargetParseException errs
 
   root <- view projectRootL
   menv <- getMinimalEnvOverride
