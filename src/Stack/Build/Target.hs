@@ -143,7 +143,7 @@ data SimpleTarget
 -- and any added local dependencies based on specified package
 -- identifiers.
 resolveIdents :: Map PackageName (LoadedPackageInfo GhcPkgId) -- ^ globals
-              -> Map PackageName (LoadedPackageInfo SinglePackageLocation) -- ^ snapshot
+              -> Map PackageName (LoadedPackageInfo (PackageLocationIndex FilePath)) -- ^ snapshot
               -> Map PackageName Version -- ^ local dependencies
               -> Map PackageName LocalPackageView -- ^ names and locations of project packages
               -> (RawInput, RawTarget 'HasIdents)
@@ -178,7 +178,7 @@ resolveIdents globals snap deps locals (ri, RTPackageIdentifierRevision (Package
 -- 'SimpleTarget', if possible. This will deal with things like
 -- checking for correct components.
 resolveRawTarget :: Map PackageName (LoadedPackageInfo GhcPkgId) -- ^ globals
-                 -> Map PackageName (LoadedPackageInfo SinglePackageLocation) -- ^ snapshot
+                 -> Map PackageName (LoadedPackageInfo (PackageLocationIndex FilePath)) -- ^ snapshot
                  -> Map PackageName Version -- ^ local extras
                  -> Map PackageName LocalPackageView -- ^ locals
                  -> (RawInput, RawTarget 'NoIdents)
@@ -286,7 +286,7 @@ parseTargets :: MonadIO m
              => NeedTargets -- ^ need at least one target?
              -> Bool -- ^ using implicit global project? used for better error reporting
              -> Map PackageName (LoadedPackageInfo GhcPkgId) -- ^ globals
-             -> Map PackageName (LoadedPackageInfo SinglePackageLocation) -- ^ snapshot
+             -> Map PackageName (LoadedPackageInfo (PackageLocationIndex FilePath)) -- ^ snapshot
              -> Map PackageName Version -- ^ local dependencies
              -> Map PackageName LocalPackageView -- ^ names and locations of project packages
              -> Path Abs Dir -- ^ current directory

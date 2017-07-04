@@ -39,7 +39,6 @@ module Stack.Types.Config
   ,LocalPackages(..)
   ,LocalPackageView(..)
   ,NamedComponent(..)
-  ,lpAllLocal
   ,stackYamlL
   ,projectRootL
   ,HasBuildConfig(..)
@@ -513,9 +512,9 @@ data BuildConfig = BuildConfig
       -- ^ Build plan wanted for this build
     , bcGHCVariant :: !GHCVariant
       -- ^ The variant of GHC used to select a GHC bindist.
-    , bcPackages :: ![PackageLocation]
+    , bcPackages :: ![PackageLocation [FilePath]]
       -- ^ Local packages
-    , bcDependencies :: ![PackageLocation]
+    , bcDependencies :: ![PackageLocationIndex [FilePath]]
       -- ^ Extra dependencies specified in configuration.
       --
       -- These dependencies will not be installed to a shared location, and
@@ -567,7 +566,7 @@ data EnvConfig = EnvConfig
 
 data LocalPackages = LocalPackages
   { lpProject :: !(Map PackageName LocalPackageView)
-  , lpDependencies :: !(Map PackageName (GenericPackageDescription, SinglePackageLocation))
+  , lpDependencies :: !(Map PackageName (GenericPackageDescription, PackageLocationIndex FilePath))
   }
 
 -- | A view of a local package needed for resolving components
@@ -577,7 +576,7 @@ data LocalPackageView = LocalPackageView
     , lpvCabalFP    :: !(Path Abs File)
     , lpvComponents :: !(Set NamedComponent)
     , lpvGPD        :: !GenericPackageDescription
-    , lpvLoc        :: !SinglePackageLocation
+    , lpvLoc        :: !(PackageLocation FilePath)
     }
 
 -- | A single, fully resolved component of a package
@@ -587,10 +586,6 @@ data NamedComponent
     | CTest !Text
     | CBench !Text
     deriving (Show, Eq, Ord)
-
--- | Get both project and dependency filepaths. FIXME do we really need this?
-lpAllLocal :: LocalPackages -> Map PackageName (GenericPackageDescription, SinglePackageLocation)
-lpAllLocal (LocalPackages x y) = (Map.map (\lpv -> (lpvGPD lpv, lpvLoc lpv)) x) <> y
 
 -- | Value returned by 'Stack.Config.loadConfig'.
 data LoadConfig m = LoadConfig
@@ -604,7 +599,7 @@ data LoadConfig m = LoadConfig
 
 data PackageEntry = PackageEntry
     { peExtraDepMaybe :: !(Maybe TreatLikeExtraDep)
-    , peLocation :: !PackageLocation
+    , peLocation :: !(PackageLocation [FilePath])
     , peSubdirs :: ![FilePath]
     }
     deriving Show
@@ -651,7 +646,7 @@ data Project = Project
     { projectUserMsg :: !(Maybe String)
     -- ^ A warning message to display to the user when the auto generated
     -- config may have issues.
-    , projectPackages :: ![PackageLocation]
+    , projectPackages :: ![PackageLocation [FilePath]]
     -- ^ Packages which are actually part of the project (as opposed
     -- to dependencies).
     --
@@ -659,7 +654,7 @@ data Project = Project
     -- package location, but in reality only @PLFilePath@ really makes
     -- sense. We could consider replacing @[PackageLocation]@ with
     -- @[FilePath]@ to properly enforce this idea.
-    , projectDependencies :: ![PackageLocation]
+    , projectDependencies :: ![PackageLocationIndex [FilePath]]
     -- ^ Dependencies defined within the stack.yaml file, to be
     -- applied on top of the snapshot.
     , projectFlags :: !(Map PackageName (Map FlagName Bool))
@@ -1008,8 +1003,8 @@ data ConfigException
   | NixRequiresSystemGhc
   | NoResolverWhenUsingNoLocalConfig
   | InvalidResolverForNoLocalConfig String
-  | InvalidCabalFileInLocal !SinglePackageLocation !PError !ByteString
-  | DuplicateLocalPackageNames ![(PackageName, [SinglePackageLocation])]
+  | InvalidCabalFileInLocal !(PackageLocationIndex FilePath) !PError !ByteString
+  | DuplicateLocalPackageNames ![(PackageName, [PackageLocationIndex FilePath])]
   deriving Typeable
 instance Show ConfigException where
     show (ParseConfigFileException configFile exception) = concat
@@ -1460,16 +1455,14 @@ parseProjectAndConfigMonoid rootDir =
       where
         convert :: Monad m
                 => [PackageEntry]
-                -> [PackageLocation]
-                -> m ( [PackageLocation] -- project
-                     , [PackageLocation] -- dependencies
+                -> [PackageLocationIndex [FilePath]] -- extra-deps
+                -> m ( [PackageLocation [FilePath]] -- project
+                     , [PackageLocationIndex [FilePath]] -- dependencies
                      )
         convert entries extraDeps = do
-            (proj, deps) <- fmap partitionEithers $ mapM goEntry allEntries
-            return (proj, deps)
+            projLocs <- mapM goEntry entries
+            return $ partitionEithers $ projLocs ++ map Right extraDeps
           where
-            allEntries = entries ++ map (\pl -> PackageEntry (Just True) pl []) extraDeps
-
             goEntry (PackageEntry Nothing pl@(PLFilePath _) subdirs) = goEntry' False pl subdirs
             goEntry (PackageEntry Nothing pl _) = fail $ concat
               [ "Refusing to implicitly treat package location as an extra-dep:\n"
@@ -1480,7 +1473,7 @@ parseProjectAndConfigMonoid rootDir =
 
             goEntry' extraDep pl subdirs = do
               pl' <- addSubdirs pl subdirs
-              return $ (if extraDep then Right else Left) pl'
+              return $ (if extraDep then (Right . PLOther) else Left) pl'
 
             addSubdirs pl [] = return pl
             addSubdirs (PLRepo repo) subdirs = return $ PLRepo repo { repoSubdirs = subdirs ++ repoSubdirs repo }

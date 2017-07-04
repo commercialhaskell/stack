@@ -48,7 +48,7 @@ module Stack.Config
 
 import           Control.Applicative
 import           Control.Arrow ((***), second)
-import           Control.Monad (liftM, unless, when, filterM)
+import           Control.Monad (liftM, unless, when, filterM, forM)
 import           Control.Monad.Extra (firstJustM)
 import           Control.Monad.IO.Unlift
 import           Control.Monad.Logger hiding (Loc)
@@ -97,7 +97,7 @@ import           Stack.Types.Docker
 import           Stack.Types.Internal
 import           Stack.Types.Nix
 import           Stack.Types.PackageName (PackageName)
-import           Stack.Types.PackageIdentifier (PackageIdentifier (..), fromCabalPackageIdentifier)
+import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageIndex (IndexType (ITHackageSecurity), HackageSecurity (..))
 import           Stack.Types.Resolver
 import           Stack.Types.StackT
@@ -644,39 +644,47 @@ getLocalPackages = do
         Nothing -> withCabalLoader $ \loadFromIndex -> do -- FIXME remove withCabalLoader, make it part of Config
             menv <- getMinimalEnvOverride
             root <- view projectRootL
-            let helper :: (BuildConfig -> [PackageLocation])
-                       -> ([PWarning] -> C.GenericPackageDescription -> SinglePackageLocation ->
-                           PackageName -> Version -> m a)
-                       -> m [(PackageName, a)]
-                helper f andThen
-                         = view (buildConfigL.to f)
-                       >>= mapM (loadMultiRawCabalFiles loadFromIndex menv root)
-                       >>= mapM (perPair andThen) . concat
-                perPair andThen (bs, loc) = do
-                  (warnings, gpd) <-
-                    case rawParseGPD bs of
-                      Left e -> throwM $ InvalidCabalFileInLocal loc e bs
-                      Right x -> return x
-                  let PackageIdentifier name version = fromCabalPackageIdentifier $ C.package $ C.packageDescription gpd
-                  (name, ) <$> andThen warnings gpd loc name version
-                getLocalDir warnings gpd loc name version = do
-                  dir <- resolveSinglePackageLocation menv root loc
-                  cabalfp <- findOrGenerateCabalFile dir
-                  mapM_ (printCabalFileWarning cabalfp) warnings
-                  checkCabalFileName name cabalfp
-                  return LocalPackageView
-                    { lpvVersion = version
-                    , lpvRoot = dir
-                    , lpvCabalFP = cabalfp
-                    , lpvComponents = getNamedComponents gpd
-                    , lpvGPD = gpd
-                    , lpvLoc = loc
-                    }
-            packages <- helper bcPackages getLocalDir
-            deps <- helper bcDependencies $ \_warnings gpd loc _name _version -> return (gpd, loc)
+            bc <- view buildConfigL
+
+            packages <- do
+              bss <- fmap concat $ mapM (loadMultiRawCabalFiles menv root) (bcPackages bc)
+              forM bss $ \(bs, loc) -> do
+                (warnings, gpd) <-
+                  case rawParseGPD bs of
+                    Left e -> throwM $ InvalidCabalFileInLocal (PLOther loc) e bs
+                    Right x -> return x
+                let PackageIdentifier name version =
+                           fromCabalPackageIdentifier
+                         $ C.package
+                         $ C.packageDescription gpd
+                dir <- resolveSinglePackageLocation menv root loc
+                cabalfp <- findOrGenerateCabalFile dir
+                mapM_ (printCabalFileWarning cabalfp) warnings
+                checkCabalFileName name cabalfp
+                let lpv = LocalPackageView
+                      { lpvVersion = version
+                      , lpvRoot = dir
+                      , lpvCabalFP = cabalfp
+                      , lpvComponents = getNamedComponents gpd
+                      , lpvGPD = gpd
+                      , lpvLoc = loc
+                      }
+                return (name, lpv)
+
+            deps <- mapM (loadMultiRawCabalFilesIndex loadFromIndex menv root) (bcDependencies bc)
+                >>= mapM (\(bs, loc :: PackageLocationIndex FilePath) -> do
+                     (_warnings, gpd) <- do
+                       case rawParseGPD bs of
+                         Left e -> throwM $ InvalidCabalFileInLocal loc e bs
+                         Right x -> return x
+                     let PackageIdentifier name version =
+                                fromCabalPackageIdentifier
+                              $ C.package
+                              $ C.packageDescription gpd
+                     return (name, (gpd, loc))) . concat
 
             checkDuplicateNames $
-              map (second lpvLoc) packages ++
+              map (second (PLOther . lpvLoc)) packages ++
               map (second snd) deps
             -- FIXME check overlapping names
             return LocalPackages
@@ -698,7 +706,7 @@ getLocalPackages = do
 
 -- | Check if there are any duplicate package names and, if so, throw an
 -- exception.
-checkDuplicateNames :: MonadThrow m => [(PackageName, SinglePackageLocation)] -> m ()
+checkDuplicateNames :: MonadThrow m => [(PackageName, PackageLocationIndex FilePath)] -> m ()
 checkDuplicateNames locals =
     case filter hasMultiples $ Map.toList $ Map.fromListWith (++) $ map (second return) locals of
         [] -> return ()

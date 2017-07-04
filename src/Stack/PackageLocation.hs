@@ -11,10 +11,12 @@ module Stack.PackageLocation
   , resolveMultiPackageLocation
   , loadSingleRawCabalFile
   , loadMultiRawCabalFiles
+  , loadMultiRawCabalFilesIndex
   ) where
 
 import qualified Codec.Archive.Tar as Tar
 import qualified Codec.Archive.Zip as Zip
+import Control.Arrow (second)
 import qualified Codec.Compression.GZip as GZip
 import Control.Monad
 import Control.Monad.IO.Unlift
@@ -48,68 +50,11 @@ resolveSinglePackageLocation
     :: (StackMiniM env m, HasConfig env)
     => EnvOverride
     -> Path Abs Dir -- ^ project root
-    -> SinglePackageLocation
+    -> PackageLocation FilePath
     -> m (Path Abs Dir)
 resolveSinglePackageLocation _ projRoot (PLFilePath fp) = do
   path <- resolveDir projRoot fp
   return path
-resolveSinglePackageLocation menv projRoot (PLIndex pir) = do
-    $logError "resolvePackageLocation on PLIndex called, this isn't a good idea" -- FIXME maybe we'll be OK with this after all?
-    error "FIXME"
-    {-
-    workDir <- view workDirL
-    let nameBeforeHashing = T.pack $ show pir
-        -- TODO: dedupe with code for snapshot hash?
-        name = T.unpack $ decodeUtf8 $ S.take 12 $ B64URL.encode $ Mem.convert $ hashWith SHA256 $ encodeUtf8 nameBeforeHashing
-        root = projRoot </> workDir </> $(mkRelDir "downloaded")
-        fileExtension' = ".http-archive"
-
-    fileRel <- parseRelFile $ name ++ fileExtension'
-    dirRel <- parseRelDir name
-    dirRelTmp <- parseRelDir $ name ++ ".tmp"
-    let file = root </> fileRel
-        dir = root </> dirRel
-
-    exists <- doesDirExist dir
-    unless exists $ do
-        ignoringAbsence (removeDirRecur dir)
-
-        let dirTmp = root </> dirRelTmp
-        ignoringAbsence (removeDirRecur dirTmp)
-
-        let fp = toFilePath file
-        req <- parseUrlThrow $ T.unpack url
-        _ <- download req file
-
-        let tryTar = do
-                $logDebug $ "Trying to untar " <> T.pack fp
-                liftIO $ withBinaryFile fp ReadMode $ \h -> do
-                    lbs <- L.hGetContents h
-                    let entries = Tar.read $ GZip.decompress lbs
-                    Tar.unpack (toFilePath dirTmp) entries
-            tryZip = do
-                $logDebug $ "Trying to unzip " <> T.pack fp
-                archive <- fmap Zip.toArchive $ liftIO $ L.readFile fp
-                liftIO $  Zip.extractFilesFromArchive [Zip.OptDestination
-                                                       (toFilePath dirTmp)] archive
-            err = throwM $ UnableToExtractArchive url file
-
-            catchAnyLog goodpath handler =
-                catchAny goodpath $ \e -> do
-                    $logDebug $ "Got exception: " <> T.pack (show e)
-                    handler
-
-        tryTar `catchAnyLog` tryZip `catchAnyLog` err
-        renameDir dirTmp dir
-
-    x <- listDir dir
-    case x of
-        ([dir'], []) -> return [(dir', loc)]
-        (dirs, files) -> do
-            ignoringAbsence (removeFile file)
-            ignoringAbsence (removeDirRecur dir)
-            throwM $ UnexpectedArchiveContents dirs files
-    -}
 resolveSinglePackageLocation _ projRoot (PLHttp url) = do
     workDir <- view workDirL
 
@@ -178,14 +123,11 @@ resolveMultiPackageLocation
     :: (StackMiniM env m, HasConfig env)
     => EnvOverride
     -> Path Abs Dir -- ^ project root
-    -> PackageLocation
-    -> m [(Path Abs Dir, SinglePackageLocation)]
+    -> PackageLocation [FilePath]
+    -> m [(Path Abs Dir, PackageLocation FilePath)]
 resolveMultiPackageLocation x y (PLFilePath fp) = do
   dir <- resolveSinglePackageLocation x y (PLFilePath fp)
   return [(dir, PLFilePath fp)]
-resolveMultiPackageLocation x y (PLIndex pir) = do
-  dir <- resolveSinglePackageLocation x y (PLIndex pir)
-  return [(dir, PLIndex pir)]
 resolveMultiPackageLocation x y (PLHttp url) = do
   dir <- resolveSinglePackageLocation x y (PLHttp url)
   return [(dir, PLHttp url)]
@@ -257,16 +199,34 @@ loadSingleRawCabalFile
   => (PackageIdentifierRevision -> IO ByteString) -- ^ lookup in index
   -> EnvOverride
   -> Path Abs Dir -- ^ project root, used for checking out necessary files
-  -> SinglePackageLocation
+  -> PackageLocationIndex FilePath
   -> m ByteString
 -- Need special handling of PLIndex for efficiency (just read from the
 -- index tarball) and correctness (get the cabal file from the index,
 -- not the package tarball itself, yay Hackage revisions).
 loadSingleRawCabalFile loadFromIndex _ _ (PLIndex pir) = liftIO $ loadFromIndex pir
-loadSingleRawCabalFile _ menv root loc =
+loadSingleRawCabalFile _ menv root (PLOther loc) =
   resolveSinglePackageLocation menv root loc >>=
   findOrGenerateCabalFile >>=
   liftIO . S.readFile . toFilePath
+
+-- | Same as 'loadMultiRawCabalFiles' but for 'PackageLocationIndex'.
+loadMultiRawCabalFilesIndex
+  :: forall m env.
+     (StackMiniM env m, HasConfig env)
+  => (PackageIdentifierRevision -> IO ByteString) -- ^ lookup in index
+  -> EnvOverride
+  -> Path Abs Dir -- ^ project root, used for checking out necessary files
+  -> PackageLocationIndex [FilePath]
+  -> m [(ByteString, PackageLocationIndex FilePath)]
+-- Need special handling of PLIndex for efficiency (just read from the
+-- index tarball) and correctness (get the cabal file from the index,
+-- not the package tarball itself, yay Hackage revisions).
+loadMultiRawCabalFilesIndex loadFromIndex _ _ (PLIndex pir) = do
+  bs <- liftIO $ loadFromIndex pir
+  return [(bs, PLIndex pir)]
+loadMultiRawCabalFilesIndex _ x y (PLOther z) =
+  map (second PLOther) <$> loadMultiRawCabalFiles x y z
 
 -- | Same as 'loadSingleRawCabalFile', but for 'PackageLocation' There
 -- may be multiple results if dealing with a repository with subdirs,
@@ -275,19 +235,12 @@ loadSingleRawCabalFile _ menv root loc =
 loadMultiRawCabalFiles
   :: forall m env.
      (StackMiniM env m, HasConfig env)
-  => (PackageIdentifierRevision -> IO ByteString) -- ^ lookup in index
-  -> EnvOverride
+  => EnvOverride
   -> Path Abs Dir -- ^ project root, used for checking out necessary files
-  -> PackageLocation
-  -> m [(ByteString, SinglePackageLocation)]
--- Need special handling of PLIndex for efficiency (just read from the
--- index tarball) and correctness (get the cabal file from the index,
--- not the package tarball itself, yay Hackage revisions).
-loadMultiRawCabalFiles x y z (PLIndex pir) = do
-  bs <- loadSingleRawCabalFile x y z (PLIndex pir)
-  return [(bs, PLIndex pir)]
-loadMultiRawCabalFiles _ menv root loc = do
-  resolveMultiPackageLocation menv root loc >>= mapM go
+  -> PackageLocation [FilePath]
+  -> m [(ByteString, PackageLocation FilePath)]
+loadMultiRawCabalFiles menv root loc =
+    resolveMultiPackageLocation menv root loc >>= mapM go
   where
     go (dir, loc') = do
       cabalFile <- findOrGenerateCabalFile dir

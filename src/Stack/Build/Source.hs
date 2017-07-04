@@ -104,7 +104,7 @@ loadSourceMapFull :: (StackM env m, HasEnvConfig env)
                        , LoadedSnapshot
                        , [LocalPackage]
                        , Set PackageName -- non-local targets
-                       , Map PackageName SinglePackageLocation -- local deps from configuration and cli
+                       , Map PackageName (PackageLocationIndex FilePath) -- local deps from configuration and cli
                        , SourceMap
                        )
 loadSourceMapFull needTargets boptsCli = do
@@ -254,7 +254,7 @@ parseTargetsFromBuildOpts
     => NeedTargets
     -> BuildOptsCLI
     -> m ( LoadedSnapshot
-         , Map PackageName SinglePackageLocation -- additional local dependencies
+         , Map PackageName (PackageLocationIndex FilePath) -- additional local dependencies
          , Map PackageName SimpleTarget
          )
 parseTargetsFromBuildOpts needTargets boptscli = do
@@ -288,9 +288,9 @@ parseTargetsFromBuildOpts needTargets boptscli = do
             (boptsCLITargets boptscli)
 
     -- FIXME add in cliDeps
-    let gpds :: [(GenericPackageDescription, SinglePackageLocation, Maybe LocalPackageView)]
+    let gpds :: [(GenericPackageDescription, PackageLocationIndex FilePath, Maybe LocalPackageView)]
         gpds = map
-                 (\lpv -> (lpvGPD lpv, lpvLoc lpv, Just lpv))
+                 (\lpv -> (lpvGPD lpv, PLOther $ lpvLoc lpv, Just lpv))
                  (Map.elems (lpProject lp)) ++
                map
                  (\(gpd, loc) -> (gpd, loc, Nothing))
@@ -312,8 +312,8 @@ parseTargetsFromBuildOpts needTargets boptscli = do
     let localDeps =
           Map.unions $ map go $ Map.toList locals
           where
-            go :: (PackageName, LoadedPackageInfo (SinglePackageLocation, Maybe (Maybe LocalPackageView)))
-               -> Map PackageName SinglePackageLocation
+            go :: (PackageName, LoadedPackageInfo (PackageLocationIndex FilePath, Maybe (Maybe LocalPackageView)))
+               -> Map PackageName (PackageLocationIndex FilePath)
             go (name, lpi) =
               case lpiLocation lpi of
                 (_, Just (Just _)) -> Map.empty -- project package, ignore it
@@ -457,7 +457,7 @@ loadLocalPackage boptsCli targets (name, lpv) = do
 checkFlagsUsed :: (MonadThrow m, MonadReader env m, HasBuildConfig env)
                => BuildOptsCLI
                -> [LocalPackage]
-               -> Map PackageName SinglePackageLocation -- ^ extra deps
+               -> Map PackageName (PackageLocationIndex FilePath) -- ^ extra deps
                -> Map PackageName snapshot -- ^ snapshot, for error messages
                -> m ()
 checkFlagsUsed boptsCli lps extraDeps snapshot = do
@@ -510,10 +510,10 @@ pirVersion (PackageIdentifierRevision (PackageIdentifier _ version) _) = version
 -- https://github.com/commercialhaskell/stack/issues/651
 extendExtraDeps
     :: (StackM env m, HasBuildConfig env)
-    => [PackageLocation] -- ^ original extra deps
-    -> Map PackageName SinglePackageLocation -- ^ package identifiers from the command line
+    => [PackageLocationIndex [FilePath]] -- ^ original extra deps
+    -> Map PackageName (PackageLocationIndex FilePath) -- ^ package identifiers from the command line
     -> Set PackageName -- ^ all packages added on the command line
-    -> m (Map PackageName SinglePackageLocation) -- ^ new extradeps
+    -> m (Map PackageName (PackageLocationIndex FilePath)) -- ^ new extradeps
 extendExtraDeps extraDeps0 cliExtraDeps unknowns = do
     return Map.empty {- FIXME
     (errs, unknowns') <- fmap partitionEithers $ mapM addUnknown $ Set.toList unknowns

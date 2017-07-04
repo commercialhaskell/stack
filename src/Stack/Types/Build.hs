@@ -83,7 +83,7 @@ import           Path.Extra                      (toFilePathNoTrailingSep)
 import           Paths_stack                     as Meta
 import           Prelude
 import           Stack.Constants
-import           Stack.Types.BuildPlan           (SinglePackageLocation)
+import           Stack.Types.BuildPlan           (PackageLocationIndex)
 import           Stack.Types.Compiler
 import           Stack.Types.CompilerBuild
 import           Stack.Types.Config
@@ -437,7 +437,7 @@ instance Show TaskConfigOpts where
 -- | The type of a task, either building local code or something from the
 -- package index (upstream)
 data TaskType = TTLocal LocalPackage
-              | TTUpstream Package InstallLocation SinglePackageLocation -- FIXME major overhaul for PackageLocation?
+              | TTUpstream Package InstallLocation (PackageLocationIndex FilePath) -- FIXME major overhaul for PackageLocation?
     deriving Show
 
 taskIsTarget :: Task -> Bool

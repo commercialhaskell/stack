@@ -82,6 +82,8 @@ import           Stack.Types.StackT
 import           System.FilePath (takeDirectory)
 import           System.Process.Read (EnvOverride)
 
+type SinglePackageLocation = PackageLocationIndex FilePath
+
 data SnapshotException
   = InvalidCabalFileInSnapshot !SinglePackageLocation !PError !ByteString
   | PackageDefinedTwice !PackageName !SinglePackageLocation !SinglePackageLocation
@@ -360,7 +362,7 @@ loadSnapshot' loadFromIndex menv mcompiler root =
           Right sd' -> start sd'
 
       gpds <- fmap concat $ mapM
-        (loadMultiRawCabalFiles loadFromIndex menv root >=> mapM parseGPD)
+        (loadMultiRawCabalFilesIndex loadFromIndex menv root >=> mapM parseGPD)
         (sdLocations sd)
 
       (globals, snapshot, locals) <-
@@ -639,7 +641,7 @@ snapshotDefFixes sd = sd
 
 -- | Convert a global 'LoadedPackageInfo' to a snapshot one by
 -- creating a 'PackageLocation'.
-globalToSnapshot :: PackageName -> LoadedPackageInfo GhcPkgId -> LoadedPackageInfo (PackageLocationWith a)
+globalToSnapshot :: PackageName -> LoadedPackageInfo GhcPkgId -> LoadedPackageInfo (PackageLocationIndex a)
 globalToSnapshot name lpi = lpi
     { lpiLocation = PLIndex (PackageIdentifierRevision (PackageIdentifier name (lpiVersion lpi)) Nothing)
     }
@@ -649,7 +651,7 @@ globalToSnapshot name lpi = lpi
 -- snapshot when another global has been upgraded already.
 splitUnmetDeps :: Map PackageName (LoadedPackageInfo GhcPkgId)
                -> ( Map PackageName (LoadedPackageInfo GhcPkgId)
-                  , Map PackageName (LoadedPackageInfo (PackageLocationWith a))
+                  , Map PackageName (LoadedPackageInfo (PackageLocationIndex a))
                   )
 splitUnmetDeps =
     start Map.empty . Map.toList

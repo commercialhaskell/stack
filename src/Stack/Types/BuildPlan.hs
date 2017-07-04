@@ -1,3 +1,4 @@
+{-# LANGUAGE DataKinds                  #-}
 {-# LANGUAGE DeriveDataTypeable         #-}
 {-# LANGUAGE DeriveFunctor              #-}
 {-# LANGUAGE DeriveGeneric              #-}
@@ -5,16 +6,15 @@
 {-# LANGUAGE OverloadedStrings          #-}
 {-# LANGUAGE RecordWildCards            #-}
 {-# LANGUAGE FlexibleInstances          #-}
+{-# LANGUAGE StandaloneDeriving         #-}
 {-# LANGUAGE TupleSections              #-}
-
-{-# LANGUAGE DataKinds                  #-}
+{-# LANGUAGE TypeFamilies               #-}
 -- | Shared types for various stackage packages.
 module Stack.Types.BuildPlan
     ( -- * Types
       SnapshotDef (..)
-    , PackageLocationWith (..)
-    , PackageLocation
-    , SinglePackageLocation
+    , PackageLocation (..)
+    , PackageLocationIndex (..)
     , RepoType (..)
     , Repo (..)
     , ExeName (..)
@@ -81,7 +81,7 @@ data SnapshotDef = SnapshotDef
     -- @CompilerVersion@.
     , sdResolver        :: !LoadedResolver
     -- ^ The resolver that provides this definition.
-    , sdLocations :: ![PackageLocation]
+    , sdLocations :: ![PackageLocationIndex [FilePath]]
     -- ^ Where to grab all of the packages from.
     , sdDropPackages :: !(Set PackageName)
     -- ^ Packages present in the parent which should not be included
@@ -113,17 +113,13 @@ setCompilerVersion cv =
         Left _ -> sd { sdParent = Left cv }
         Right sd' -> sd { sdParent = Right $ go sd' }
 
-type PackageLocation = PackageLocationWith [FilePath]
-type SinglePackageLocation = PackageLocationWith FilePath
-
 -- | Where to get the contents of a package (including cabal file
 -- revisions) from.
-data PackageLocationWith subdirs
-  = PLIndex !PackageIdentifierRevision
-    -- ^ Grab the package from the package index with the given
-    -- version and (optional) cabal file info to specify the correct
-    -- revision.
-  | PLFilePath !FilePath
+--
+-- A GADT may be more logical than the index parameter, but this plays
+-- more nicely with Generic deriving.
+data PackageLocation subdirs
+  = PLFilePath !FilePath
     -- ^ Note that we use @FilePath@ and not @Path@s. The goal is: first parse
     -- the value raw, and then use @canonicalizePath@ and @parseAbsDir@.
   | PLHttp !Text
@@ -131,8 +127,22 @@ data PackageLocationWith subdirs
   | PLRepo !(Repo subdirs)
   -- ^ Stored in a source control repository
     deriving (Generic, Show, Eq, Data, Typeable, Functor)
-instance Store a => Store (PackageLocationWith a)
-instance NFData a => NFData (PackageLocationWith a)
+instance (Store a) => Store (PackageLocation a)
+instance (NFData a) => NFData (PackageLocation a)
+
+-- | Add in the possibility of getting packages from the index
+-- (including cabal file revisions). We have special handling of this
+-- case in many places in the codebase, and therefore represent it
+-- with a separate data type from 'PackageLocation'.
+data PackageLocationIndex subdirs
+  = PLIndex !PackageIdentifierRevision
+    -- ^ Grab the package from the package index with the given
+    -- version and (optional) cabal file info to specify the correct
+    -- revision.
+  | PLOther !(PackageLocation subdirs)
+    deriving (Generic, Show, Eq, Data, Typeable, Functor)
+instance (Store a) => Store (PackageLocationIndex a)
+instance (NFData a) => NFData (PackageLocationIndex a)
 
 -- | The type of a source control repository.
 data RepoType = RepoGit | RepoHg
@@ -151,13 +161,11 @@ data Repo subdirs = Repo
 instance Store a => Store (Repo a)
 instance NFData a => NFData (Repo a)
 
-instance ToJSON PackageLocation where
-    -- Note that the PLIndex and PLFilePath constructors both turn
-    -- into plain text.  Downside: if someone currently has a
-    -- location: name-1.2.3 instead of ./name-1.2.3 for a local
-    -- package, their stack.yaml will need to be updated. But it's an
-    -- overall nicer UI.
+instance subdirs ~ [FilePath] => ToJSON (PackageLocationIndex subdirs) where
     toJSON (PLIndex ident) = toJSON ident
+    toJSON (PLOther loc) = toJSON loc
+
+instance subdirs ~ [FilePath] => ToJSON (PackageLocation subdirs) where
     toJSON (PLFilePath fp) = toJSON fp
     toJSON (PLHttp t) = toJSON t
     toJSON (PLRepo (Repo url commit typ subdirs)) = object $
@@ -171,9 +179,14 @@ instance ToJSON PackageLocation where
             RepoGit -> "git"
             RepoHg  -> "hg"
 
-instance FromJSON (WithJSONWarnings PackageLocation) where
+instance subdirs ~ [FilePath] => FromJSON (WithJSONWarnings (PackageLocationIndex subdirs)) where
     parseJSON v
-        = (noJSONWarnings <$> withText "PackageLocation" (\t -> index <|> http t <|> file t) v)
+        = ((noJSONWarnings . PLIndex) <$> parseJSON v)
+      <|> (fmap PLOther <$> parseJSON v)
+
+instance subdirs ~ [FilePath] => FromJSON (WithJSONWarnings (PackageLocation subdirs)) where
+    parseJSON v
+        = (noJSONWarnings <$> withText "PackageLocation" (\t -> http t <|> file t) v)
         <|> repo v
       where
         file t = pure $ PLFilePath $ T.unpack t
@@ -181,7 +194,6 @@ instance FromJSON (WithJSONWarnings PackageLocation) where
             case parseRequest $ T.unpack t of
                 Left  _ -> fail $ "Could not parse URL: " ++ T.unpack t
                 Right _ -> return $ PLHttp t
-        index = PLIndex <$> parseJSON v
 
         repo = withObjectWarnings "PLRepo" $ \o -> do
           (repoType, repoUrl) <-
@@ -205,14 +217,14 @@ data LoadedSnapshot = LoadedSnapshot
   { lsCompilerVersion :: !(CompilerVersion 'CVActual)
   , lsResolver        :: !LoadedResolver
   , lsGlobals         :: !(Map PackageName (LoadedPackageInfo GhcPkgId)) -- FIXME this may be a terrible design
-  , lsPackages        :: !(Map PackageName (LoadedPackageInfo SinglePackageLocation))
+  , lsPackages        :: !(Map PackageName (LoadedPackageInfo (PackageLocationIndex FilePath)))
   }
     deriving (Generic, Show, Data, Eq, Typeable)
 instance Store LoadedSnapshot
 instance NFData LoadedSnapshot
 
 loadedSnapshotVC :: VersionConfig LoadedSnapshot
-loadedSnapshotVC = storeVersionConfig "ls-v1" "TFNG4Inh6rj_ukXc2hN6GjGg76o="
+loadedSnapshotVC = storeVersionConfig "ls-v1" "iJmu95AqDvBkVLHwoo90BD0K7TY="
 
 -- | Information on a single package for the 'LoadedSnapshot' which
 -- can be installed.

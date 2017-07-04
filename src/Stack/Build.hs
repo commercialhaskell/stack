@@ -46,7 +46,7 @@ import           Data.Typeable (Typeable)
 import qualified Data.Vector as V
 import qualified Data.Yaml as Yaml
 import           Path
-import           Prelude hiding (FilePath, writeFile)
+import           Prelude hiding (writeFile)
 import           Stack.Build.ConstructPlan
 import           Stack.Build.Execute
 import           Stack.Build.Haddock
@@ -286,7 +286,7 @@ mkBaseConfigOpts boptsCli = do
 
 -- | Provide a function for loading package information from the package index
 withLoadPackage :: (StackM env m, HasEnvConfig env)
-                => ((SinglePackageLocation -> Map FlagName Bool -> [Text] -> IO Package) -> m a)
+                => ((PackageLocationIndex FilePath -> Map FlagName Bool -> [Text] -> IO Package) -> m a)
                 -> m a
 withLoadPackage inner = do
     econfig <- view envConfigL
