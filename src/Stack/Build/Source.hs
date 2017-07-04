@@ -136,7 +136,7 @@ loadSourceMapFull needTargets boptsCli = do
             isLocal STUnknown = False
             isLocal STNonLocal = False
 
-        shadowed = Map.keysSet (lpProject lp) <> Map.keysSet extraDeps0 -- FIXME just project?
+        shadowed = Map.keysSet (lpProject lp) <> Map.keysSet extraDeps0
 
         -- Ignores all packages in the LoadedSnapshot that depend on any
         -- local packages or extra-deps. All packages that have

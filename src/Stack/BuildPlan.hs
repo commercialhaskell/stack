@@ -12,8 +12,6 @@
 
 -- | Resolving a build plan for a set of packages in a given Stackage
 -- snapshot.
---
--- FIXME how much of this module can be deleted?
 
 module Stack.BuildPlan
     ( BuildPlanException (..)
@@ -28,24 +26,11 @@ module Stack.BuildPlan
     , selectBestSnapshot
     , getToolMap
     , showItems
-    , showPackageFlags
     ) where
 
 import           Control.Applicative
-import           Control.Monad (liftM, forM, unless)
 import           Control.Monad.IO.Unlift
 import           Control.Monad.Logger
-import           Control.Monad.Reader (MonadReader)
-import           Control.Monad.State.Strict      (State, execState, get, modify,
-                                                  put)
-import           Crypto.Hash (hashWith, SHA256(..))
-import           Data.Aeson.Extended (WithJSONWarnings(..), logJSONWarnings)
-import           Data.Store.VersionTagged
-import qualified Data.ByteArray as Mem (convert)
-import qualified Data.ByteString as S
-import qualified Data.ByteString.Base64.URL as B64URL
-import qualified Data.ByteString.Char8 as S8
-import           Data.Either (partitionEithers)
 import qualified Data.Foldable as F
 import qualified Data.HashSet as HashSet
 import           Data.List (intercalate)
@@ -53,48 +38,35 @@ import           Data.List.NonEmpty (NonEmpty(..))
 import qualified Data.List.NonEmpty as NonEmpty
 import           Data.Map (Map)
 import qualified Data.Map as Map
-import           Data.Maybe (fromMaybe, mapMaybe, isNothing)
+import           Data.Maybe (fromMaybe, mapMaybe)
 import           Data.Monoid
 import           Data.Set (Set)
 import qualified Data.Set as Set
 import           Data.Text (Text)
 import qualified Data.Text as T
-import           Data.Text.Encoding (encodeUtf8)
-import qualified Data.Traversable as Tr
 import           Data.Typeable (Typeable)
-import           Data.Yaml (decodeEither', decodeFileEither)
 import qualified Distribution.Package as C
 import           Distribution.PackageDescription (GenericPackageDescription,
                                                   flagDefault, flagManual,
-                                                  flagName, genPackageFlags,
-                                                  executables, exeName, library, libBuildInfo, buildable)
+                                                  flagName, genPackageFlags)
 import qualified Distribution.PackageDescription as C
 import           Distribution.System (Platform)
 import           Distribution.Text (display)
 import qualified Distribution.Version as C
-import           Network.HTTP.Client (Request)
-import           Network.HTTP.Download
 import           Path
-import           Path.IO
 import           Prelude -- Fix AMP warning
 import           Stack.Constants
-import           Stack.Fetch
 import           Stack.Package
-import           Stack.PackageIndex
 import           Stack.Snapshot
 import           Stack.Types.BuildPlan
 import           Stack.Types.FlagName
 import           Stack.Types.PackageIdentifier
-import           Stack.Types.PackageIndex
 import           Stack.Types.PackageName
 import           Stack.Types.Version
 import           Stack.Types.Config
-import           Stack.Types.Urls
 import           Stack.Types.Compiler
 import           Stack.Types.Resolver
 import           Stack.Types.StackT
-import           System.FilePath (takeDirectory)
-import           System.Process.Read (EnvOverride)
 
 data BuildPlanException
     = UnknownPackages
