@@ -469,7 +469,7 @@ executePlan :: (StackM env m, HasEnvConfig env)
             -> [DumpPackage () () ()] -- ^ snapshot packages
             -> [DumpPackage () () ()] -- ^ local packages
             -> InstalledMap
-            -> Map PackageName SimpleTarget
+            -> Map PackageName Target
             -> Plan
             -> m ()
 executePlan menv boptsCli baseConfigOpts locals globalPackages snapshotPackages localPackages installedMap targets plan = do
@@ -566,7 +566,7 @@ windowsRenameCopy src dest = do
 -- | Perform the actual plan (internal)
 executePlan' :: (StackM env m, HasEnvConfig env)
              => InstalledMap
-             -> Map PackageName SimpleTarget
+             -> Map PackageName Target
              -> Plan
              -> ExecuteEnv m
              -> m ()

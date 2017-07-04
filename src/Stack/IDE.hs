@@ -15,7 +15,6 @@ import           Control.Monad.Reader
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import qualified Data.Text as T
-import           Stack.Build.Target (LocalPackageView(..))
 import           Stack.Config (getLocalPackages)
 import           Stack.Package (findOrGenerateCabalFile)
 import           Stack.Types.Config

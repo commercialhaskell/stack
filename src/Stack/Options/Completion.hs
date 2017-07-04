@@ -20,7 +20,6 @@ import qualified Data.Text as T
 import qualified Distribution.PackageDescription as C
 import           Options.Applicative
 import           Options.Applicative.Builder.Extra
-import           Stack.Build.Target (LocalPackageView(..))
 import           Stack.Config (getLocalPackages)
 import           Stack.Options.GlobalParser (globalOptsFromMonoid)
 import           Stack.Runners (loadConfigWithOpts)

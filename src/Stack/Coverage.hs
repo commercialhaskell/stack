@@ -38,7 +38,6 @@ import           Path
 import           Path.Extra (toFilePathNoTrailingSep)
 import           Path.IO
 import           Prelude hiding (FilePath, writeFile)
-import           Stack.Build.Source (parseTargetsFromBuildOpts)
 import           Stack.Build.Target
 import           Stack.Config (getLocalPackages)
 import           Stack.Constants
@@ -234,19 +233,17 @@ generateHpcReportForTargets opts = do
          else do
              when (hroptsAll opts && not (null targetNames)) $
                  $logWarn $ "Since --all is used, it is redundant to specify these targets: " <> T.pack (show targetNames)
-             (_,_,targets) <- parseTargetsFromBuildOpts
+             (_,_,targets) <- parseTargets
                  AllowNoTargets
                  defaultBuildOptsCLI
                     { boptsCLITargets = if hroptsAll opts then [] else targetNames }
              liftM concat $ forM (Map.toList targets) $ \(name, target) ->
                  case target of
-                     STUnknown -> throwString $
-                         "Error: " ++ packageNameString name ++ " isn't a known local page"
-                     STNonLocal -> throwString $
+                     TargetAll Dependency -> throwString $
                          "Error: Expected a local package, but " ++
                          packageNameString name ++
                          " is either an extra-dep or in the snapshot."
-                     STLocalComps comps -> do
+                     TargetComps comps -> do
                          pkgPath <- hpcPkgPath name
                          forM (toList comps) $ \nc ->
                              case nc of
@@ -256,7 +253,7 @@ generateHpcReportForTargets opts = do
                                      "Can't specify anything except test-suites as hpc report targets (" ++
                                      packageNameString name ++
                                      " is used with a non test-suite target)"
-                     STLocalAll -> do
+                     TargetAll ProjectPackage -> do
                          pkgPath <- hpcPkgPath name
                          exists <- doesDirExist pkgPath
                          if exists

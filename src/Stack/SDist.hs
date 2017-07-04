@@ -58,7 +58,7 @@ import           Stack.Build (mkBaseConfigOpts, build)
 import           Stack.Build.Execute
 import           Stack.Build.Installed
 import           Stack.Build.Source (loadSourceMap, getDefaultPackageConfig)
-import           Stack.Build.Target
+import           Stack.Build.Target hiding (PackageType (..))
 import           Stack.PackageLocation (resolveMultiPackageLocation)
 import           Stack.Constants
 import           Stack.Package

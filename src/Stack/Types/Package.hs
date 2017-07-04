@@ -196,7 +196,7 @@ type SourceMap = Map PackageName PackageSource
 -- | Where the package's source is located: local directory or package index
 data PackageSource
     = PSLocal LocalPackage
-    | PSUpstream Version InstallLocation (Map FlagName Bool) [Text] (PackageLocationIndex FilePath) -- FIXME still seems like we could do better...
+    | PSUpstream Version InstallLocation (Map FlagName Bool) [Text] (PackageLocationIndex FilePath) -- FIXME still seems like we could do better... Minimum: rename from Upstream to Dependency and Local to Project
     -- ^ Upstream packages could be installed in either local or snapshot
     -- databases; this is what 'InstallLocation' specifies.
     deriving Show

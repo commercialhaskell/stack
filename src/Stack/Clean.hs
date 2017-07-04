@@ -17,7 +17,6 @@ import           Data.Maybe (mapMaybe)
 import           Data.Typeable (Typeable)
 import           Path (Path, Abs, Dir)
 import           Path.IO (ignoringAbsence, removeDirRecur)
-import           Stack.Build.Target (LocalPackageView(..))
 import           Stack.Config (getLocalPackages)
 import           Stack.Constants (distDirFromDir, workDirFromDir)
 import           Stack.Types.PackageName

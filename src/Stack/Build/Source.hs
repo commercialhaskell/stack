@@ -15,7 +15,6 @@ module Stack.Build.Source
     , PackageSource (..)
     , getLocalFlags
     , getGhcOptions
-    , parseTargetsFromBuildOpts
     , addUnlistedToBuildCache
     , getDefaultPackageConfig
     , getPackageConfig
@@ -34,6 +33,7 @@ import qualified    Data.ByteString as S
 import              Data.Conduit (($$), ZipSink (..))
 import qualified    Data.Conduit.Binary as CB
 import qualified    Data.Conduit.List as CL
+import              Data.Either (partitionEithers)
 import              Data.Function
 import qualified    Data.HashSet as HashSet
 import              Data.List
@@ -59,7 +59,6 @@ import              Stack.Constants (wiredInPackages)
 import              Stack.Fetch (withCabalLoader)
 import              Stack.Package
 import              Stack.PackageIndex (getPackageVersions)
-import              Stack.Snapshot (calculatePackagePromotion)
 import              Stack.Types.Build
 import              Stack.Types.BuildPlan
 import              Stack.Types.Config
@@ -83,7 +82,7 @@ loadSourceMap :: (StackM env m, HasEnvConfig env)
                    , SourceMap
                    )
 loadSourceMap needTargets boptsCli = do
-    (_, _, locals, _, _, sourceMap) <- loadSourceMapFull needTargets boptsCli
+    (_, _, locals, _, sourceMap) <- loadSourceMapFull needTargets boptsCli
     return (locals, sourceMap)
 
 -- | Given the build commandline options, does the following:
@@ -100,42 +99,46 @@ loadSourceMap needTargets boptsCli = do
 loadSourceMapFull :: (StackM env m, HasEnvConfig env)
                   => NeedTargets
                   -> BuildOptsCLI
-                  -> m ( Map PackageName SimpleTarget
+                  -> m ( Map PackageName Target
                        , LoadedSnapshot
                        , [LocalPackage]
-                       , Set PackageName -- non-local targets
-                       , Map PackageName (PackageLocationIndex FilePath) -- local deps from configuration and cli
+                       , Set PackageName -- non-project targets
                        , SourceMap
                        )
 loadSourceMapFull needTargets boptsCli = do
     bconfig <- view buildConfigL
-    (ls0, cliExtraDeps, targets) <- parseTargetsFromBuildOpts needTargets boptsCli
-
-    -- Extend extra-deps to encompass targets requested on the command line
-    -- that are not in the snapshot.
-    extraDeps0 <- extendExtraDeps
-        (bcDependencies bconfig)
-        cliExtraDeps
-        (Map.keysSet $ Map.filter (== STUnknown) targets)
-
+    (ls, localDeps, targets) <- parseTargets needTargets boptsCli
     lp <- getLocalPackages
     locals <- mapM (loadLocalPackage boptsCli targets) $ Map.toList $ lpProject lp
-    checkFlagsUsed boptsCli locals extraDeps0 (lsPackages ls0)
+    -- FIXME checkFlagsUsed boptsCli locals extraDeps0 (lsPackages ls0)
     checkComponentsBuildable locals
 
-    let
-        -- loadLocals returns PackageName (foo) and PackageIdentifier (bar-1.2.3) targets separately;
-        -- here we combine them into nonLocalTargets. This is one of the
-        -- return values of this function.
-        nonLocalTargets :: Set PackageName
-        nonLocalTargets =
-            Map.keysSet $ Map.filter (not . isLocal) targets
-          where
-            isLocal (STLocalComps _) = True
-            isLocal STLocalAll = True
-            isLocal STUnknown = False
-            isLocal STNonLocal = False
+    -- TODO for extra sanity, confirm that the targets we threw away are all TargetAll
+    let nonProjectTargets = Map.keysSet targets `Set.difference` Map.keysSet (lpProject lp)
 
+    -- Combine the local packages, extra-deps, and LoadedSnapshot into
+    -- one unified source map.
+    let sourceMap = Map.unions
+            [ Map.fromList $ map (\lp -> (packageName $ lpPackage lp, PSLocal lp)) locals
+            , flip Map.mapWithKey localDeps $ \n lpi ->
+                let configOpts = getGhcOptions bconfig boptsCli n False False
+                 in PSUpstream (lpiVersion lpi) Local (lpiFlags lpi) (lpiGhcOptions lpi ++ configOpts) (lpiLocation lpi)
+            , flip Map.mapWithKey (lsPackages ls) $ \n lpi ->
+                let configOpts = getGhcOptions bconfig boptsCli n False False
+                 in PSUpstream (lpiVersion lpi) Snap (lpiFlags lpi) (lpiGhcOptions lpi ++ configOpts) (lpiLocation lpi)
+            ]
+            `Map.difference` Map.fromList (map (, ()) (HashSet.toList wiredInPackages))
+
+    return
+      ( targets
+      , ls
+      , locals
+      , nonProjectTargets
+      , sourceMap
+      )
+
+    {- FIXME
+    let
         shadowed = Map.keysSet (lpProject lp) <> Map.keysSet extraDeps0
 
         -- Ignores all packages in the LoadedSnapshot that depend on any
@@ -187,21 +190,7 @@ loadSourceMapFull needTargets boptsCli = do
                 in PSUpstream v Local flags ghcOptions Nothing)
             -}
             extraDeps2
-
-    -- Combine the local packages, extra-deps, and LoadedSnapshot into
-    -- one unified source map.
-    let sourceMap = Map.unions
-            [ Map.fromList $ flip map locals $ \lp ->
-                let p = lpPackage lp
-                 in (packageName p, PSLocal lp)
-            , extraDeps3
-            , flip Map.mapWithKey (lsPackages ls) $ \n lpi ->
-                let configOpts = getGhcOptions bconfig boptsCli n False False
-                 in PSUpstream (lpiVersion lpi) Snap (lpiFlags lpi) (lpiGhcOptions lpi ++ configOpts) (lpiLocation lpi)
-            ]
-            `Map.difference` Map.fromList (map (, ()) (HashSet.toList wiredInPackages))
-
-    return (targets, ls, locals, nonLocalTargets, extraDeps0, sourceMap)
+    -}
 
 -- | All flags for a local package.
 getLocalFlags
@@ -242,98 +231,6 @@ getGhcOptions bconfig boptsCli name isTarget isLocal = concat
             AGOLocals -> isLocal
             AGOEverything -> True
 
--- | Use the build options and environment to parse targets.
---
--- Along with the 'Map' of targets, this yields the loaded
--- 'LoadedSnapshot' for the resolver, as well as a Map of extra-deps
--- derived from the commandline. These extra-deps targets come from when
--- the user specifies a particular package version on the commonadline,
--- or when a flag is specified for a snapshot package.
-parseTargetsFromBuildOpts
-    :: (StackM env m, HasEnvConfig env)
-    => NeedTargets
-    -> BuildOptsCLI
-    -> m ( LoadedSnapshot
-         , Map PackageName (PackageLocationIndex FilePath) -- additional local dependencies
-         , Map PackageName SimpleTarget
-         )
-parseTargetsFromBuildOpts needTargets boptscli = do
-    $logDebug "Parsing the targets"
-    bconfig <- view buildConfigL
-    ls0 <- view loadedSnapshotL
-    workingDir <- getCurrentDir
-    lp <- getLocalPackages
-
-    root <- view projectRootL
-    menv <- getMinimalEnvOverride
-
-    let dropMaybeKey (Nothing, _) = Map.empty
-        dropMaybeKey (Just key, value) = Map.singleton key value
-        flags = Map.unionWith Map.union
-          (Map.unions (map dropMaybeKey (Map.toList (boptsCLIFlags boptscli))))
-          (bcFlags bconfig)
-        hides = Set.empty -- not supported to add hidden packages
-        options = Map.empty -- FIXME not convinced that this is the right behavior, but consistent with older logic. Should we instead promote packages when stack.yaml or command line gives alternative GHC options?
-        drops = Set.empty -- not supported to add drops
-
-    (cliDeps, targets) <-
-        parseTargets
-            needTargets
-            (bcImplicitGlobal bconfig)
-            (lsGlobals ls0)
-            (lsPackages ls0)
-            Map.empty -- (error "FIXME _deps") -- FIXME need to add in flagExtraDeps here somehow
-            (lpProject lp)
-            workingDir
-            (boptsCLITargets boptscli)
-
-    -- FIXME add in cliDeps
-    let gpds :: [(GenericPackageDescription, PackageLocationIndex FilePath, Maybe LocalPackageView)]
-        gpds = map
-                 (\lpv -> (lpvGPD lpv, PLOther $ lpvLoc lpv, Just lpv))
-                 (Map.elems (lpProject lp)) ++
-               map
-                 (\(gpd, loc) -> (gpd, loc, Nothing))
-                 (Map.elems (lpDependencies lp))
-
-    (globals, snapshots, locals) <- withCabalLoader $ \loadFromIndex ->
-      calculatePackagePromotion loadFromIndex menv root ls0 gpds flags hides options drops
-
-    let ls = LoadedSnapshot
-          { lsCompilerVersion = lsCompilerVersion ls0
-          , lsResolver = lsResolver ls0
-          , lsGlobals = globals
-          , lsPackages = snapshots
-          }
-
-    -- FIXME we're throwing away the calculated flag info here, but I
-    -- think that's OK since the build step itself will just look it
-    -- up again
-    let localDeps =
-          Map.unions $ map go $ Map.toList locals
-          where
-            go :: (PackageName, LoadedPackageInfo (PackageLocationIndex FilePath, Maybe (Maybe LocalPackageView)))
-               -> Map PackageName (PackageLocationIndex FilePath)
-            go (name, lpi) =
-              case lpiLocation lpi of
-                (_, Just (Just _)) -> Map.empty -- project package, ignore it
-                (loc, _) -> Map.singleton name loc -- either a promoted snapshot or local package
-
-        cliDeps' =
-          Map.mapWithKey go cliDeps
-          where
-            go name version = PLIndex $ PackageIdentifierRevision (PackageIdentifier name version) Nothing
-
-    return (ls, cliDeps' <> localDeps, targets)
-
-    {- FIXME refacotring lost this warning, do we care?
-                $logWarn $ T.concat
-                    [ "- Implicitly adding "
-                    , T.pack $ packageNameString flag
-                    , " to extra-deps based on command line flag"
-                    ]
-    -}
-
 splitComponents :: [NamedComponent]
                 -> (Set Text, Set Text, Set Text)
 splitComponents =
@@ -350,7 +247,7 @@ splitComponents =
 loadLocalPackage
     :: forall m env. (StackM env m, HasEnvConfig env)
     => BuildOptsCLI
-    -> Map PackageName SimpleTarget
+    -> Map PackageName Target
     -> (PackageName, LocalPackageView)
     -> m LocalPackage
 loadLocalPackage boptsCli targets (name, lpv) = do
@@ -359,8 +256,8 @@ loadLocalPackage boptsCli targets (name, lpv) = do
     bopts <- view buildOptsL
     let (exes, tests, benches) =
             case mtarget of
-                Just (STLocalComps comps) -> splitComponents $ Set.toList comps
-                Just STLocalAll ->
+                Just (TargetComps comps) -> splitComponents $ Set.toList comps
+                Just (TargetAll packageType) -> assert (packageType == ProjectPackage)
                     ( packageExes pkg
                     , if boptsTests bopts
                         then Map.keysSet (packageTests pkg)
@@ -369,8 +266,6 @@ loadLocalPackage boptsCli targets (name, lpv) = do
                         then packageBenchmarks pkg
                         else Set.empty
                     )
-                Just STNonLocal -> assert False mempty
-                Just STUnknown -> assert False mempty
                 Nothing -> mempty
 
         toComponents e t b = Set.unions
@@ -509,14 +404,14 @@ pirVersion (PackageIdentifierRevision (PackageIdentifier _ version) _) = version
 -- this was then superseded by
 -- https://github.com/commercialhaskell/stack/issues/651
 extendExtraDeps
-    :: (StackM env m, HasBuildConfig env)
-    => [PackageLocationIndex [FilePath]] -- ^ original extra deps
-    -> Map PackageName (PackageLocationIndex FilePath) -- ^ package identifiers from the command line
-    -> Set PackageName -- ^ all packages added on the command line
+    :: forall env m. (StackM env m, HasBuildConfig env)
+    => Map PackageName (GenericPackageDescription, PackageLocationIndex FilePath) -- ^ original extra deps
+    -> Map PackageName Version -- ^ package identifiers from the command line
+    -> Set PackageName -- ^ package names (without versions) added on the command line
     -> m (Map PackageName (PackageLocationIndex FilePath)) -- ^ new extradeps
-extendExtraDeps extraDeps0 cliExtraDeps unknowns = do
-    return Map.empty {- FIXME
-    (errs, unknowns') <- fmap partitionEithers $ mapM addUnknown $ Set.toList unknowns
+extendExtraDeps extraDeps0 cliWithVersion cliNoVersion = do
+    error "extendExtraDeps" {- FIXME
+    (errs, unknowns') <- fmap partitionEithers $ mapM addNoVersion $ Set.toList cliNoVersion
     case errs of
         [] -> return $ Map.unions $ extraDeps1 : unknowns'
         _ -> do
@@ -526,20 +421,22 @@ extendExtraDeps extraDeps0 cliExtraDeps unknowns = do
                 Map.empty -- TODO check the cliExtraDeps for presence in index
                 (bcStackYaml bconfig)
   where
-    extraDeps1 = Map.union extraDeps0 cliExtraDeps
-    extraDeps1Names = HashSet.map pirName extraDeps1
-    addUnknown pn = do
-        if HashSet.member pn extraDeps1Names
-            then do
+    extraDeps1 = Map.union (Map.map (gpdVersion . fst) extraDeps0) cliWithVersion
+
+    -- Try adding a package name specified on the command line that does not have an associated version. We need to check if we already have this
+    addNoVersion :: PackageName -> m (Either PackageName (Map PackageName PackageIdentifierRevision))
+    addNoVersion pn = do
+        if Map.member pn extraDeps1
+            -- added by package name, and we already have it, nothing new
+            then return (Right Map.empty)
+            -- 
+            else do
                 mlatestVersion <- getLatestVersion pn
                 case mlatestVersion of
-                    Just v -> return (Right $ HashSet.singleton
+                    Just v -> return (Right $ Map.singleton pn
                                     $ PackageIdentifierRevision (PackageIdentifier pn v) Nothing)
                     Nothing -> return (Left pn)
-            else return (Right HashSet.empty)
-    getLatestVersion pn = do
-        vs <- getPackageVersions pn
-        return (fmap fst (Set.maxView vs))
+
     -}
 
 -- | Compare the current filesystem state to the cached information, and
