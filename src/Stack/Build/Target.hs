@@ -81,7 +81,6 @@ import           Data.Foldable
 import           Data.Map (Map)
 import qualified Data.Map as Map
 import           Data.Maybe (mapMaybe, isJust, catMaybes)
-import           Data.Monoid
 import           Data.Set (Set)
 import qualified Data.Set as Set
 import           Data.Text (Text)
@@ -250,7 +249,7 @@ resolveRawTarget
   -> Map PackageName (GenericPackageDescription, PackageLocationIndex FilePath) -- ^ local deps
   -> Map PackageName LocalPackageView -- ^ project packages
   -> (RawInput, RawTarget)
-  -> m (Either Text ResolveResult) -- FIXME replace Text with exception type?
+  -> m (Either Text ResolveResult)
 resolveRawTarget globals snap deps locals (ri, rt) =
     go rt
   where
@@ -346,7 +345,19 @@ resolveRawTarget globals snap deps locals (ri, rt) =
       | otherwise = do
           mversion <- getLatestVersion name
           return $ case mversion of
-            Nothing -> Left $ "Unknown package name: " <> packageNameText name -- FIXME do fuzzy lookup?
+            -- This is actually an error case. We _could_ return a
+            -- Left value here, but it turns out to be better to defer
+            -- this until the ConstructPlan phase, and let it complain
+            -- about the missing package so that we get more errors
+            -- together, plus the fancy colored output from that
+            -- module.
+            Nothing -> Right ResolveResult
+              { rrName = name
+              , rrRaw = ri
+              , rrComponent = Nothing
+              , rrAddedDep = Nothing
+              , rrPackageType = Dependency
+              }
             Just version -> Right ResolveResult
               { rrName = name
               , rrRaw = ri
