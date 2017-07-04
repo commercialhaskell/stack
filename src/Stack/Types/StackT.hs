@@ -73,21 +73,9 @@ type StackM r m =
 -- | The monad used for the executable @stack@.
 newtype StackT config m a =
   StackT {unStackT :: ReaderT (Env config) m a}
-  deriving (Functor,Applicative,Monad,MonadIO,MonadReader (Env config),MonadThrow,MonadTrans) -- FIXME maybe add back MonadCatch and MonadMask?
+  deriving (Functor,Applicative,Monad,MonadIO,MonadReader (Env config),MonadThrow,MonadTrans)
 
 deriving instance (MonadBase b m) => MonadBase b (StackT config m)
-
-{- FIXME we'll probably still want this
-instance MonadBaseControl b m => MonadBaseControl b (StackT config m) where
-    type StM (StackT config m) a = ComposeSt (StackT config) m a
-    liftBaseWith     = defaultLiftBaseWith
-    restoreM         = defaultRestoreM
-
-instance MonadTransControl (StackT config) where
-    type StT (StackT config) a = StT (ReaderT (Env config)) a
-    liftWith = defaultLiftWith StackT unStackT
-    restoreT = defaultRestoreT StackT
--}
 
 -- | Takes the configured log level into account.
 instance MonadIO m => MonadLogger (StackT config m) where

@@ -135,15 +135,12 @@ createDependencyGraph dotOpts = do
       globalIdMap = Map.fromList $ map (\dp -> (dpGhcPkgId dp, dpPackageIdent dp)) globalDump
   withLoadPackage (\loader -> do
     let depLoader = createDepLoader sourceMap installedMap globalDumpMap globalIdMap loadPackageDeps
-        loadPackageDeps name version flags ghcOptions
+        loadPackageDeps name version loc flags ghcOptions
             -- Skip packages that can't be loaded - see
             -- https://github.com/commercialhaskell/stack/issues/2967
             | name `elem` [$(mkPackageName "rts"), $(mkPackageName "ghc")] =
                 return (Set.empty, DotPayload (Just version) (Just BSD3))
-            | otherwise =
-                let loc = PLIndex $ PackageIdentifierRevision (PackageIdentifier name version) Nothing -- FIXME get the CabalFileInfo
-                 in       fmap (packageAllDeps &&& makePayload)
-                               (loader loc flags ghcOptions)
+            | otherwise = fmap (packageAllDeps &&& makePayload) (loader loc flags ghcOptions)
     liftIO $ resolveDependencies (dotDependencyDepth dotOpts) graph depLoader)
   where makePayload pkg = DotPayload (Just $ packageVersion pkg) (Just $ packageLicense pkg)
 
@@ -218,7 +215,8 @@ createDepLoader :: Applicative m
                 -> Map PackageName (InstallLocation, Installed)
                 -> Map PackageName (DumpPackage () () ())
                 -> Map GhcPkgId PackageIdentifier
-                -> (PackageName -> Version -> Map FlagName Bool -> [Text] -> m (Set PackageName, DotPayload))
+                -> (PackageName -> Version -> PackageLocationIndex FilePath ->
+                    Map FlagName Bool -> [Text] -> m (Set PackageName, DotPayload))
                 -> PackageName
                 -> m (Set PackageName, DotPayload)
 createDepLoader sourceMap installed globalDumpMap globalIdMap loadPackageDeps pkgName =
@@ -227,8 +225,8 @@ createDepLoader sourceMap installed globalDumpMap globalIdMap loadPackageDeps pk
           Just (PSLocal lp) -> pure (packageAllDeps pkg, payloadFromLocal pkg)
             where
               pkg = localPackageToPackage lp
-          Just (PSUpstream version _ flags ghcOptions _) ->
-              loadPackageDeps pkgName version flags ghcOptions
+          Just (PSUpstream version _ flags ghcOptions loc) ->
+              loadPackageDeps pkgName version loc flags ghcOptions
           Nothing -> pure (Set.empty, payloadFromInstalled (Map.lookup pkgName installed))
       -- For wired-in-packages, use information from ghc-pkg (see #3084)
       else case Map.lookup pkgName globalDumpMap of

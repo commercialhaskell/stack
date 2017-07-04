@@ -492,7 +492,9 @@ getResolverConstraints menv mcompilerVersion stackYaml sd = do
     return (lsCompilerVersion ls, lsConstraints ls)
   where
     lpiConstraints lpi = (lpiVersion lpi, lpiFlags lpi)
-    lsConstraints = fmap lpiConstraints . lsPackages -- FIXME need globals, right?
+    lsConstraints ls = Map.union
+      (Map.map lpiConstraints (lsPackages ls))
+      (Map.map lpiConstraints (lsGlobals ls))
 
 -- | Finds all files with a .cabal extension under a given directory. If
 -- a `hpack` `package.yaml` file exists, this will be used to generate a cabal

@@ -116,9 +116,6 @@ resolveSinglePackageLocation menv projRoot (PLRepo (Repo url commit repoType' su
 --
 -- Returns the updated PackageLocation value with just a single subdir
 -- (if relevant).
---
--- FIXME should probably have the option to just return an archive
--- location.
 resolveMultiPackageLocation
     :: (StackMiniM env m, HasConfig env)
     => EnvOverride

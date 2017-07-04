@@ -216,7 +216,7 @@ newtype ExeName = ExeName { unExeName :: Text }
 data LoadedSnapshot = LoadedSnapshot
   { lsCompilerVersion :: !(CompilerVersion 'CVActual)
   , lsResolver        :: !LoadedResolver
-  , lsGlobals         :: !(Map PackageName (LoadedPackageInfo GhcPkgId)) -- FIXME this may be a terrible design
+  , lsGlobals         :: !(Map PackageName (LoadedPackageInfo GhcPkgId))
   , lsPackages        :: !(Map PackageName (LoadedPackageInfo (PackageLocationIndex FilePath)))
   }
     deriving (Generic, Show, Data, Eq, Typeable)
