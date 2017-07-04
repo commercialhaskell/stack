@@ -685,7 +685,7 @@ getLocalPackages = do
             checkDuplicateNames $
               map (second (PLOther . lpvLoc)) packages ++
               map (second snd) deps
-            -- FIXME check overlapping names
+
             return LocalPackages
               { lpProject = Map.fromList packages
               , lpDependencies = Map.fromList deps

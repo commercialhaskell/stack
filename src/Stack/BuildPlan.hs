@@ -157,7 +157,8 @@ instance Show BuildPlanException where
         T.unpack url ++
         ", because no 'compiler' or 'resolver' is specified."
 
--- | Map from tool name to package providing it FIXME unsure that we include local packages
+-- | Map from tool name to package providing it. This accounts for
+-- both snapshot and local packages (deps and project packages).
 getToolMap :: LoadedSnapshot
            -> LocalPackages
            -> Map Text (Set PackageName)
