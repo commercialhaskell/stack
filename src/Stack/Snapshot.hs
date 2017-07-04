@@ -55,6 +55,7 @@ import           Distribution.InstalledPackageInfo (PError)
 import           Distribution.PackageDescription (GenericPackageDescription)
 import qualified Distribution.PackageDescription as C
 import           Distribution.System (Platform)
+import           Distribution.Text (display)
 import qualified Distribution.Version as C
 import           Network.HTTP.Client (Request)
 import           Network.HTTP.Download
@@ -85,8 +86,44 @@ data SnapshotException
   = InvalidCabalFileInSnapshot !SinglePackageLocation !PError !ByteString
   | PackageDefinedTwice !PackageName !SinglePackageLocation !SinglePackageLocation
   | UnmetDeps !(Map PackageName (Map PackageName (VersionIntervals, Maybe Version)))
-  deriving (Show, Typeable) -- FIXME custom Show instance
+  deriving Typeable
 instance Exception SnapshotException
+instance Show SnapshotException where
+  show (InvalidCabalFileInSnapshot loc err _bs) = concat
+    [ "Invalid cabal file at "
+    , show loc
+    , ": "
+    , show err
+    ]
+  show (PackageDefinedTwice name loc1 loc2) = concat
+    [ "Package "
+    , packageNameString name
+    , " is defined twice, at "
+    , show loc1
+    , " and "
+    , show loc2
+    ]
+  -- FIXME can we reuse the existing logic we have for displaying unmet deps?
+  show (UnmetDeps m) =
+      concat $ "Some dependencies in the snapshot are unmet.\n" : map go (Map.toList m)
+    where
+      go (name, deps) = concat
+        $ "\n"
+        : packageNameString name
+        : " is missing:\n"
+        : map goDep (Map.toList deps)
+
+      goDep (dep, (intervals, mversion)) = concat
+        [ "- "
+        , packageNameString dep
+        , ". Requires: "
+        , display $ toVersionRange intervals
+        , ", "
+        , case mversion of
+            Nothing -> "none present"
+            Just version -> versionString version ++ "found"
+        , "\n"
+        ]
 
 -- | Convert a 'Resolver' into a 'SnapshotDef'
 loadResolver
