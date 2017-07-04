@@ -48,7 +48,8 @@ import           Data.Typeable (Typeable)
 import qualified Distribution.Package as C
 import           Distribution.PackageDescription (GenericPackageDescription,
                                                   flagDefault, flagManual,
-                                                  flagName, genPackageFlags)
+                                                  flagName, genPackageFlags,
+                                                  condExecutables)
 import qualified Distribution.PackageDescription as C
 import           Distribution.System (Platform)
 import           Distribution.Text (display)
@@ -157,11 +158,10 @@ instance Show BuildPlanException where
         ", because no 'compiler' or 'resolver' is specified."
 
 -- | Map from tool name to package providing it FIXME unsure that we include local packages
-getToolMap :: LoadedSnapshot -> Map Text (Set PackageName)
-getToolMap =
-    error "getToolMap"
-    {- FIXME
-      Map.unionsWith Set.union
+getToolMap :: LoadedSnapshot
+           -> LocalPackages
+           -> Map Text (Set PackageName)
+getToolMap ls locals =
 
     {- We no longer do this, following discussion at:
 
@@ -172,16 +172,30 @@ getToolMap =
     $ Map.fromList (map (packageNameByteString &&& Set.singleton) (Map.keys ps))
     -}
 
-    -- And then get all of the explicit executable names
-    $ concatMap goPair (Map.toList ps)
+    Map.unionsWith Set.union $ concat
+        [ concatMap goSnap      $ Map.toList $ lsPackages ls
+        , concatMap goLocalProj $ Map.toList $ lpProject locals
+        , concatMap goLocalDep  $ Map.toList $ lpDependencies locals
+        ]
   where
-    ps = rbpPackages rbp
-
-    goPair (pname, mpi) =
+    goSnap (pname, lpi) =
         map (flip Map.singleton (Set.singleton pname) . unExeName)
       $ Set.toList
-      $ mpiExes mpi
-    -}
+      $ lpiProvidedExes lpi
+
+    goLocalProj (pname, lpv) =
+        map (flip Map.singleton (Set.singleton pname))
+        [t | CExe t <- Set.toList (lpvComponents lpv)]
+
+    goLocalDep (pname, (gpd, _loc)) =
+        map (flip Map.singleton (Set.singleton pname))
+      $ gpdExes gpd
+
+    -- TODO consider doing buildable checking. Not a big deal though:
+    -- worse case scenario is we build an extra package that wasn't
+    -- strictly needed.
+    gpdExes :: GenericPackageDescription -> [Text]
+    gpdExes = map (T.pack . fst) . condExecutables
 
 gpdPackages :: [GenericPackageDescription] -> Map PackageName Version
 gpdPackages gpds = Map.fromList $

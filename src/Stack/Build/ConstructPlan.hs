@@ -53,6 +53,7 @@ import           Stack.Build.Haddock
 import           Stack.Build.Installed
 import           Stack.Build.Source
 import           Stack.BuildPlan
+import           Stack.Config (getLocalPackages)
 import           Stack.Constants
 import           Stack.Package
 import           Stack.PackageDump
@@ -194,8 +195,9 @@ constructPlan ls0 baseConfigOpts0 locals extraToBuild0 localDumpPkgs loadPackage
             mapM_ onWanted $ filter lpWanted locals
             mapM_ (addDep False) $ Set.toList extraToBuild0
     lf <- askLoggerIO
+    lp <- getLocalPackages
     ((), m, W efinals installExes dirtyReason deps warnings parents) <-
-        liftIO $ runRWST inner (ctx econfig getVersions0 lf) M.empty
+        liftIO $ runRWST inner (ctx econfig getVersions0 lf lp) M.empty
     mapM_ $logWarn (warnings [])
     let toEither (_, Left e)  = Left e
         toEither (k, Right v) = Right (k, v)
@@ -227,14 +229,14 @@ constructPlan ls0 baseConfigOpts0 locals extraToBuild0 localDumpPkgs loadPackage
             $prettyError $ pprintExceptions errs stackYaml parents (wantedLocalPackages locals)
             throwM $ ConstructPlanFailed "Plan construction failed."
   where
-    ctx econfig getVersions0 lf = Ctx
+    ctx econfig getVersions0 lf lp = Ctx
         { ls = ls0
         , baseConfigOpts = baseConfigOpts0
         , loadPackage = loadPackage0
         , combinedMap = combineMap sourceMap installedMap
         , toolToPackages = \(Cabal.Dependency name _) ->
           maybe Map.empty (Map.fromSet (const Cabal.anyVersion)) $
-          Map.lookup (T.pack . packageNameString . fromCabalPackageName $ name) toolMap
+          Map.lookup (T.pack . packageNameString . fromCabalPackageName $ name) (toolMap lp)
         , ctxEnvConfig = econfig
         , callStack = []
         , extraToBuild = extraToBuild0
@@ -243,9 +245,7 @@ constructPlan ls0 baseConfigOpts0 locals extraToBuild0 localDumpPkgs loadPackage
         , localNames = Set.fromList $ map (packageName . lpPackage) locals
         , logFunc = lf
         }
-    -- TODO Currently, this will only consider and install tools from the
-    -- snapshot. It will not automatically install build tools from extra-deps
-    -- or local packages.
+
     toolMap = getToolMap ls0
 
 -- | State to be maintained during the calculation of local packages
