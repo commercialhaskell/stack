@@ -423,7 +423,7 @@ calculatePackagePromotion
         error $ "Invalid snapshot definition, the following packages are not found: " ++ show (Set.toList extraToUpgrade)
 
       let (noLongerGlobals1, globals2) = Map.partitionWithKey
-            (\name _ -> name `Set.member` extraToUpgrade)
+            (\name _ -> name `Set.member` toUpgrade)
             globals1
           (globals3, noLongerGlobals2) = splitUnmetDeps globals2
 
@@ -431,7 +431,7 @@ calculatePackagePromotion
           noLongerGlobals3 = Map.union (Map.mapWithKey globalToSnapshot noLongerGlobals1) noLongerGlobals2
 
           (noLongerParent, parentPackages2) = Map.partitionWithKey
-            (\name _ -> name `Set.member` extraToUpgrade)
+            (\name _ -> name `Set.member` toUpgrade)
             parentPackages1
 
           allToUpgrade = Map.union noLongerGlobals3 noLongerParent
@@ -641,7 +641,7 @@ snapshotDefFixes sd = sd
 
 -- | Convert a global 'LoadedPackageInfo' to a snapshot one by
 -- creating a 'PackageLocation'.
-globalToSnapshot :: PackageName -> LoadedPackageInfo GhcPkgId -> LoadedPackageInfo (PackageLocationIndex a)
+globalToSnapshot :: PackageName -> LoadedPackageInfo GhcPkgId -> LoadedPackageInfo (PackageLocationIndex FilePath)
 globalToSnapshot name lpi = lpi
     { lpiLocation = PLIndex (PackageIdentifierRevision (PackageIdentifier name (lpiVersion lpi)) Nothing)
     }
@@ -651,7 +651,7 @@ globalToSnapshot name lpi = lpi
 -- snapshot when another global has been upgraded already.
 splitUnmetDeps :: Map PackageName (LoadedPackageInfo GhcPkgId)
                -> ( Map PackageName (LoadedPackageInfo GhcPkgId)
-                  , Map PackageName (LoadedPackageInfo (PackageLocationIndex a))
+                  , Map PackageName (LoadedPackageInfo (PackageLocationIndex FilePath))
                   )
 splitUnmetDeps =
     start Map.empty . Map.toList
