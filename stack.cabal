@@ -335,7 +335,6 @@ test-suite stack-test
   hs-source-dirs: src/test
   main-is:        Test.hs
   other-modules:  Spec
-                , Stack.BuildPlanSpec
                 , Stack.Build.ExecuteSpec
                 , Stack.Build.TargetSpec
                 , Stack.ConfigSpec
