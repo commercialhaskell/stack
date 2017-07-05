@@ -442,22 +442,25 @@ calculatePackagePromotion
           -- Further: now that we've removed a bunch of packages from
           -- globals, split out any packages whose dependencies are no
           -- longer met
-          (globals3, noLongerGlobals2) = splitUnmetDeps globals2
+          (globals3, noLongerGlobals2) = splitUnmetDeps Map.empty globals2
 
           -- Put together the two split out groups of packages
           noLongerGlobals3 :: Map PackageName (LoadedPackageInfo SinglePackageLocation)
           noLongerGlobals3 = Map.union (Map.mapWithKey globalToSnapshot noLongerGlobals1) noLongerGlobals2
 
-          -- Split out packages from parent that need to be
-          -- upgraded. We needn't perform the splitUnmetDeps step here
-          -- though, since both parent and current packages end up in
-          -- the same snapshot database.
-          (noLongerParent, parentPackages2) = Map.partitionWithKey
+          -- Now do the same thing with parent packages: take out the
+          -- packages to be upgraded and then split out unmet
+          -- dependencies.
+          (noLongerParent1, parentPackages2) = Map.partitionWithKey
             (\name _ -> name `Set.member` toUpgrade)
             parentPackages1
+          (parentPackages3, noLongerParent2) = splitUnmetDeps
+            (Map.map lpiVersion globals3)
+            parentPackages2
+          noLongerParent3 = Map.union noLongerParent1 noLongerParent2
 
           -- Everything split off from globals and parents will be upgraded...
-          allToUpgrade = Map.union noLongerGlobals3 noLongerParent
+          allToUpgrade = Map.union noLongerGlobals3 noLongerParent3
 
       -- ... so recalculate based on new values
       upgraded <- fmap Map.fromList
@@ -466,7 +469,7 @@ calculatePackagePromotion
 
       -- Could be nice to check snapshot early... but disabling
       -- because ConstructPlan gives much nicer error messages
-      let packages2 = Map.unions [Map.map void upgraded, Map.map void packages1, Map.map void parentPackages2]
+      let packages2 = Map.unions [Map.map void upgraded, Map.map void packages1, Map.map void parentPackages3]
           allAvailable = Map.union
             (lpiVersion <$> globals3)
             (lpiVersion <$> packages2)
@@ -474,12 +477,12 @@ calculatePackagePromotion
 
       unless (Map.null (globals3 `Map.difference` globals0))
         (error "calculatePackagePromotion: subset invariant violated for globals")
-      unless (Map.null (parentPackages2 `Map.difference` parentPackages0))
+      unless (Map.null (parentPackages3 `Map.difference` parentPackages0))
         (error "calculatePackagePromotion: subset invariant violated for parents")
 
       return
         ( globals3
-        , parentPackages2
+        , parentPackages3
         , Map.union (Map.map (fmap (, Nothing)) upgraded) (Map.map (fmap (second Just)) packages1)
         )
 
@@ -667,7 +670,7 @@ snapshotDefFixes sd = sd
 
 -- | Convert a global 'LoadedPackageInfo' to a snapshot one by
 -- creating a 'PackageLocation'.
-globalToSnapshot :: PackageName -> LoadedPackageInfo GhcPkgId -> LoadedPackageInfo (PackageLocationIndex FilePath)
+globalToSnapshot :: PackageName -> LoadedPackageInfo loc -> LoadedPackageInfo (PackageLocationIndex FilePath)
 globalToSnapshot name lpi = lpi
     { lpiLocation = PLIndex (PackageIdentifierRevision (PackageIdentifier name (lpiVersion lpi)) Nothing)
     }
@@ -675,11 +678,12 @@ globalToSnapshot name lpi = lpi
 -- | Split the globals into those which have their dependencies met,
 -- and those that don't. This deals with promotion of globals to
 -- snapshot when another global has been upgraded already.
-splitUnmetDeps :: Map PackageName (LoadedPackageInfo GhcPkgId)
-               -> ( Map PackageName (LoadedPackageInfo GhcPkgId)
+splitUnmetDeps :: Map PackageName Version -- ^ extra dependencies available
+               -> Map PackageName (LoadedPackageInfo loc)
+               -> ( Map PackageName (LoadedPackageInfo loc)
                   , Map PackageName (LoadedPackageInfo (PackageLocationIndex FilePath))
                   )
-splitUnmetDeps =
+splitUnmetDeps extra =
     start Map.empty . Map.toList
   where
     start newGlobals0 toProcess0
@@ -696,9 +700,9 @@ splitUnmetDeps =
     depsMet globals = all (depsMet' globals) . Map.toList . lpiPackageDeps
 
     depsMet' globals (name, intervals) =
-      case Map.lookup name globals of
+      case (lpiVersion <$> Map.lookup name globals) <|> Map.lookup name extra of
         Nothing -> False
-        Just lpi -> lpiVersion lpi `withinIntervals` intervals
+        Just version -> version `withinIntervals` intervals
 
 parseGPDSingle :: MonadThrow m => SinglePackageLocation -> ByteString -> m GenericPackageDescription
 parseGPDSingle loc bs =
