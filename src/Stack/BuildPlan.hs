@@ -415,7 +415,9 @@ checkSnapBuildPlan root gpds flags snapshotDef = do
 
     let
         compiler = lsCompilerVersion rs
-        snapPkgs = lpiVersion <$> lsPackages rs
+        snapPkgs = Map.union
+          (lpiVersion <$> lsGlobals rs)
+          (lpiVersion <$> lsPackages rs)
         (f, errs) = checkBundleBuildPlan platform compiler snapPkgs flags gpds
         cerrs = compilerErrors compiler errs
 

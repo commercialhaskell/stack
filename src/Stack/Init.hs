@@ -8,6 +8,7 @@ module Stack.Init
     , InitOpts (..)
     ) where
 
+import           Control.Applicative
 import           Control.Monad
 import           Control.Monad.IO.Unlift
 import           Control.Monad.Logger
@@ -194,14 +195,24 @@ renderStackYaml p ignoredPackages dupPackages =
         <> B.byteString footerHelp
 
     goComment o (name, comment) =
-        case HM.lookup name o of
+        case (convert <$> HM.lookup name o) <|> nonPresentValue name of
             Nothing -> assert (name == "user-message") mempty
             Just v ->
                 B.byteString comment <>
                 B.byteString "\n" <>
-                B.byteString (Yaml.encode $ Yaml.object [(name, v)]) <>
+                v <>
                 if name == "packages" then commentedPackages else "" <>
                 B.byteString "\n"
+      where
+        convert v = B.byteString (Yaml.encode $ Yaml.object [(name, v)])
+
+        -- Some fields in stack.yaml are optional and may not be
+        -- generated. For these, we provided commented out dummy
+        -- values to go along with the comments.
+        nonPresentValue "extra-deps" = Just "# extra-deps: []\n"
+        nonPresentValue "flags" = Just "# flags: {}\n"
+        nonPresentValue "extra-package-dbs" = Just "# extra-package-dbs: []\n"
+        nonPresentValue _ = Nothing
 
     commentLine l | null l = "#"
                   | otherwise = "# " ++ l
