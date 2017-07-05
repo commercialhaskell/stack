@@ -1461,7 +1461,7 @@ parseProjectAndConfigMonoid rootDir =
                      )
         convert entries extraDeps = do
             projLocs <- mapM goEntry entries
-            return $ partitionEithers $ projLocs ++ map Right extraDeps
+            return $ partitionEithers $ concat projLocs ++ map Right extraDeps
           where
             goEntry (PackageEntry Nothing pl@(PLFilePath _) subdirs) = goEntry' False pl subdirs
             goEntry (PackageEntry Nothing pl _) = fail $ concat
@@ -1473,10 +1473,11 @@ parseProjectAndConfigMonoid rootDir =
 
             goEntry' extraDep pl subdirs = do
               pl' <- addSubdirs pl subdirs
-              return $ (if extraDep then Right . PLOther else Left) pl'
+              return $ map (if extraDep then Right . PLOther else Left) pl'
 
-            addSubdirs pl [] = return pl
-            addSubdirs (PLRepo repo) subdirs = return $ PLRepo repo { repoSubdirs = subdirs ++ repoSubdirs repo }
+            addSubdirs pl [] = return [pl]
+            addSubdirs (PLRepo repo) subdirs = return [PLRepo repo { repoSubdirs = subdirs ++ repoSubdirs repo }]
+            addSubdirs (PLFilePath fp) subdirs = return $ map (\subdir -> PLFilePath $ fp FilePath.</> subdir) subdirs
             addSubdirs pl (_:_) = fail $
                 "Cannot set subdirs on package location: " ++ show pl
 
