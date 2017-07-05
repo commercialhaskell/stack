@@ -19,7 +19,7 @@ import qualified Codec.Archive.Tar.Entry as Tar
 import qualified Codec.Compression.GZip as GZip
 import           Control.Applicative
 import           Control.Concurrent.Execute (ActionContext(..))
-import           Control.Monad (unless, liftM, filterM, foldM, when)
+import           Control.Monad (unless, liftM, filterM, when)
 import           Control.Monad.IO.Unlift
 import           Control.Monad.Logger
 import           Control.Monad.Reader.Class (local)
@@ -35,7 +35,7 @@ import           Data.List.Extra (nubOrd)
 import           Data.List.NonEmpty (NonEmpty)
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Map.Strict as Map
-import           Data.Maybe (fromMaybe, catMaybes)
+import           Data.Maybe (fromMaybe)
 import           Data.Monoid ((<>))
 import qualified Data.Set as Set
 import qualified Data.Text as T
@@ -384,13 +384,7 @@ buildExtractedTarball pkgDir = do
   let isPathToRemove path = do
         localPackage <- readLocalPackage path
         return $ packageName (lpPackage localPackage) == packageName (lpPackage localPackageToBuild)
-  pathsToRemove <- filterM isPathToRemove allPackagePaths
-  let adjustPackageEntries entries path = do
-        adjustedPackageEntries <- mapM (removePathFromPackageEntry menv projectRoot path) entries
-        return (catMaybes adjustedPackageEntries)
-      removePathFromPackageEntry = error "Stack.SDist.removePathFromPackageEntry"
-  entriesWithoutBuiltPackage <- foldM adjustPackageEntries packageEntries pathsToRemove
-  let newEntry = PLFilePath (toFilePath pkgDir)
+  pathsToKeep <- filterM (fmap not . isPathToRemove) allPackagePaths
   newPackagesRef <- liftIO (newIORef Nothing)
   let adjustEnvForBuild env =
         let updatedEnvConfig = envConfig
@@ -399,7 +393,7 @@ buildExtractedTarball pkgDir = do
               }
         in set envConfigL updatedEnvConfig env
       updatePackageInBuildConfig buildConfig = buildConfig
-        { bcPackages = newEntry : entriesWithoutBuiltPackage
+        { bcPackages = map (PLFilePath . toFilePath) $ pkgDir : pathsToKeep
         , bcConfig = (bcConfig buildConfig)
                      { configBuild = defaultBuildOpts
                        { boptsTests = True
