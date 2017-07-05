@@ -178,7 +178,7 @@ import           Control.Arrow ((&&&))
 import           Control.Monad (liftM, join)
 import           Control.Monad.IO.Unlift
 import           Control.Monad.Logger (LogLevel(..), MonadLoggerIO)
-import           Control.Monad.Reader (MonadReader, MonadIO, liftIO)
+import           Control.Monad.Reader (MonadReader)
 import           Data.Aeson.Extended
                  (ToJSON, toJSON, FromJSON, parseJSON, withText, object,
                   (.=), (..:), (..:?), (..!=), Value(Bool, String),
