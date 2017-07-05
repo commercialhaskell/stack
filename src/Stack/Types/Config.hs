@@ -1349,7 +1349,7 @@ configLoadedSnapshotCache
 configLoadedSnapshotCache resolver gis = do
     root <- view stackRootL
     platform <- platformGhcVerOnlyRelDir
-    file <- parseRelFile $ T.unpack (resolverName resolver) ++ ".cache"
+    file <- parseRelFile $ T.unpack (resolverDirName resolver) ++ ".cache"
     gis' <- parseRelDir $
           case gis of
             GISSnapshotHints -> "__snapshot_hints__"
