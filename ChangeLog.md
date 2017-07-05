@@ -6,6 +6,8 @@ Release notes:
 
 Major changes:
 
+* FIXME: Link to the blog post explaining extensible snapshots
+
 Behavior changes:
 
 * `stack profile` and `stack trace` now add their extra RTS arguments for
