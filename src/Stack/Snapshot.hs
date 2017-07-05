@@ -259,7 +259,7 @@ loadResolver (ResolverCustom name url loc) = do
 
       forM_ (sdLocations sd0) $ \loc ->
         case loc of
-          PLFilePath _ -> error "Custom snapshots do not support filepaths, as the contents may change over time"
+          PLOther (PLFilePath _) -> error "Custom snapshots do not support filepaths, as the contents may change over time"
           _ -> return ()
 
       -- The fp above may just be the download location for a URL,

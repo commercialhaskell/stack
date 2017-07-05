@@ -18,7 +18,6 @@ module Stack.Docker.GlobalDB
 import           Control.Monad (forM_, when)
 import           Control.Monad.Logger (NoLoggingT)
 import           Control.Monad.IO.Unlift
-import           Control.Monad.Trans.Resource (ResourceT)
 import           Data.List (sortBy, isInfixOf, stripPrefix)
 import           Data.List.Extra (stripSuffix)
 import qualified Data.Map.Strict as Map

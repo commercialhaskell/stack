@@ -102,5 +102,12 @@ storeVersionConfig name hash = (namedVersionConfig name hash)
         , "Data.ByteString.Internal.ByteString"
         ]
     , vcRenames = M.fromList
-        [ ( "Data.Maybe.Maybe", "GHC.Base.Maybe") ]
+        [ ( "Data.Maybe.Maybe", "GHC.Base.Maybe")
+        , ( "Stack.Types.Compiler.CVActual"
+          , "Stack.Types.Compiler.'CVActual"
+          )
+        , ( "Stack.Types.Compiler.CVWanted"
+          , "Stack.Types.Compiler.'CVWanted"
+          )
+        ]
     }
