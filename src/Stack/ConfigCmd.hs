@@ -97,7 +97,7 @@ cfgCmdSetValue root (ConfigCmdSetResolver newResolver) = do
         ResolverSnapshot snapName -> void $ loadResolver $ ResolverSnapshot snapName
         ResolverCompiler _ -> return ()
         -- TODO: custom snapshot support?  Would need a way to specify on CLI
-        ResolverCustom _ _ _ -> errorString "'stack config set resolver' does not support custom resolvers"
+        ResolverCustom {} -> errorString "'stack config set resolver' does not support custom resolvers"
     return (Yaml.String (resolverName concreteResolver))
 cfgCmdSetValue _ (ConfigCmdSetSystemGhc _ bool) =
     return (Yaml.Bool bool)

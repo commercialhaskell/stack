@@ -567,7 +567,7 @@ parseTargets needTargets boptscli = do
               (lpDependencies lp)
           ]
 
-    fmap (allLocals,) $
+    (allLocals,) <$>
       calculatePackagePromotion
         loadFromIndex menv root ls0 (Map.elems allLocals)
         flags hides options drops

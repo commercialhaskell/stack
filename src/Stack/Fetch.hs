@@ -269,13 +269,13 @@ resolvePackagesAllowMissing mSnapshotDef idents0 names0 = do
                 loop $ sdLocations sd
               where
                 loop [] = Nothing
-                loop ((PLIndex ident@(PackageIdentifierRevision (PackageIdentifier name' _) _)):rest)
+                loop (PLIndex ident@(PackageIdentifierRevision (PackageIdentifier name' _) _):rest)
                   | name == name' = Just ident
                   | otherwise = loop rest
                 loop (_:rest) = loop rest
 
             getNamedFromIndex name = fmap
-                (\ver -> (PackageIdentifierRevision (PackageIdentifier name ver) Nothing))
+                (\ver -> PackageIdentifierRevision (PackageIdentifier name ver) Nothing)
                 (Map.lookup name versions)
 
             (missingNames, idents1) = partitionEithers $ map

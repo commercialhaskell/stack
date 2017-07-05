@@ -36,7 +36,7 @@ module Control.Monad.IO.Unlift
   , ES.SomeException (..)
   , E.ErrorCall
   , ES.IOException
-  , ES.assert
+  , E.assert
   , ES.MonadThrow -- FIXME perhaps completely ditch MonadThrow?
   , throwIO
   , ES.throwM
@@ -65,7 +65,7 @@ import Control.Monad.Logger (LoggingT (..), NoLoggingT (..))
 import Control.Monad.Trans.Reader (ReaderT (..))
 import qualified Control.Monad.Trans.Resource as Res
 import qualified Control.Monad.Trans.Resource.Internal as Res
-import qualified Control.Exception as E (ErrorCall, evaluate)
+import qualified Control.Exception as E (ErrorCall, evaluate, assert)
 import qualified Control.Exception.Safe as ES
 import qualified Data.Conduit as Con
 import Data.Void (Void)

@@ -646,7 +646,7 @@ getLocalPackages = do
             bc <- view buildConfigL
 
             packages <- do
-              bss <- fmap concat $ mapM (loadMultiRawCabalFiles menv root) (bcPackages bc)
+              bss <- concat <$> mapM (loadMultiRawCabalFiles menv root) (bcPackages bc)
               forM bss $ \(bs, loc) -> do
                 (warnings, gpd) <-
                   case rawParseGPD bs of

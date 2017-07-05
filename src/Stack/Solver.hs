@@ -688,7 +688,7 @@ solveExtraDeps modStackYaml = do
 
         changed =    any (not . Map.null) [newVersions, goneVersions]
                   || any (not . Map.null) [newFlags, goneFlags]
-                  || any (/= (void resolver)) (fmap void mOldResolver)
+                  || any (/= void resolver) (fmap void mOldResolver)
 
     if changed then do
         $logInfo ""

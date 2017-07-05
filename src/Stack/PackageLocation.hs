@@ -52,9 +52,7 @@ resolveSinglePackageLocation
     -> Path Abs Dir -- ^ project root
     -> PackageLocation FilePath
     -> m (Path Abs Dir)
-resolveSinglePackageLocation _ projRoot (PLFilePath fp) = do
-  path <- resolveDir projRoot fp
-  return path
+resolveSinglePackageLocation _ projRoot (PLFilePath fp) = resolveDir projRoot fp
 resolveSinglePackageLocation _ projRoot (PLHttp url) = do
     workDir <- view workDirL
 

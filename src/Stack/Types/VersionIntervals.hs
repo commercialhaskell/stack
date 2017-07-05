@@ -12,6 +12,7 @@ module Stack.Types.VersionIntervals
 import Stack.Types.Version
 import qualified Distribution.Version as C
 import Control.DeepSeq (NFData)
+import Data.Maybe (fromMaybe)
 import Data.Store (Store)
 import GHC.Generics (Generic)
 import Data.Data (Data)
@@ -56,10 +57,9 @@ intersectVersionIntervals x y = fromCabal $ C.intersectVersionIntervals
     (toCabal y)
 
 toCabal :: VersionIntervals -> C.VersionIntervals
-toCabal (VersionIntervals vi) =
-    case C.mkVersionIntervals $ map go vi of
-      Nothing -> error "Stack.Types.VersionIntervals.toCabal: invariant violated"
-      Just x -> x
+toCabal (VersionIntervals vi) = fromMaybe
+  (error "Stack.Types.VersionIntervals.toCabal: invariant violated")
+  (C.mkVersionIntervals $ map go vi)
   where
     go (VersionInterval lowerV lowerB mupper) =
         ( C.LowerBound (toCabalVersion lowerV) (toCabalBound lowerB)

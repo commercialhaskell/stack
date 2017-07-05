@@ -674,7 +674,7 @@ instance ToJSON Project where
         maybe id (\msg -> (("user-message" .= msg) :)) userMsg $
         (if null extraPackageDBs then id else (("extra-package-dbs" .= extraPackageDBs):)) $
         (if null extraDeps then id else (("extra-deps" .= extraDeps):)) $
-        (if Map.null flags then id else (("flags" .= flags):)) $
+        (if Map.null flags then id else (("flags" .= flags):))
         [ "packages"          .= packages
         , "resolver"          .= resolver
         ]
@@ -1473,7 +1473,7 @@ parseProjectAndConfigMonoid rootDir =
 
             goEntry' extraDep pl subdirs = do
               pl' <- addSubdirs pl subdirs
-              return $ (if extraDep then (Right . PLOther) else Left) pl'
+              return $ (if extraDep then Right . PLOther else Left) pl'
 
             addSubdirs pl [] = return pl
             addSubdirs (PLRepo repo) subdirs = return $ PLRepo repo { repoSubdirs = subdirs ++ repoSubdirs repo }

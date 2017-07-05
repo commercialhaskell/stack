@@ -359,7 +359,7 @@ loadSnapshot' loadFromIndex menv mcompiler root =
               Just cv' -> loadCompiler cv'
           Right sd' -> start sd'
 
-      gpds <- fmap concat $ mapM
+      gpds <- concat <$> mapM
         (loadMultiRawCabalFilesIndex loadFromIndex menv root >=> mapM parseGPD)
         (sdLocations sd)
 
@@ -415,7 +415,7 @@ calculatePackagePromotion
           -- We need to drop all packages from globals and parent
           -- packages that are either marked to be dropped, or
           -- included in the new packages.
-          toDrop = Map.union (const () <$> packages1) (Map.fromSet (const ()) drops0)
+          toDrop = Map.union (void packages1) (Map.fromSet (const ()) drops0)
           globals1 = Map.difference globals0 toDrop
           parentPackages1 = Map.difference parentPackages0 toDrop
 
