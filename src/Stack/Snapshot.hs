@@ -300,7 +300,8 @@ loadResolver (ResolverCustom name url loc) = do
             <*> o ..:? "hide" ..!= Set.empty
             <*> o ..:? "ghc-options" ..!= Map.empty
             <*> o ..:? "global-hints" ..!= Map.empty)
-        <*> jsonSubWarnings (o ..: "resolver")
+        <*> ((ResolverCompiler <$> (o ..: "compiler")) <|>
+             jsonSubWarnings (o ..: "resolver"))
 
     fromDigest :: Digest SHA256 -> SnapshotHash
     fromDigest = SnapshotHash . B64URL.encode . Mem.convert
