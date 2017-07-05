@@ -22,7 +22,7 @@ module Stack.Snapshot
 
 import           Control.Applicative
 import           Control.Arrow (second)
-import           Control.Monad (forM, unless, void, (>=>), when)
+import           Control.Monad (forM, unless, void, (>=>), when, forM_)
 import           Control.Monad.IO.Unlift
 import           Control.Monad.Logger
 import           Control.Monad.Reader (MonadReader)
@@ -256,6 +256,11 @@ loadResolver (ResolverCustom name url loc) = do
           throwM
           (either (throwM . AesonException) return . parseEither parseCustom)
       logJSONWarnings (T.unpack url) warnings
+
+      forM_ (sdLocations sd0) $ \loc ->
+        case loc of
+          PLFilePath _ -> error "Custom snapshots do not support filepaths, as the contents may change over time"
+          _ -> return ()
 
       -- The fp above may just be the download location for a URL,
       -- which we don't want to use. Instead, look back at loc from
