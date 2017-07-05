@@ -257,8 +257,8 @@ loadResolver (ResolverCustom name url loc) = do
           (either (throwM . AesonException) return . parseEither parseCustom)
       logJSONWarnings (T.unpack url) warnings
 
-      forM_ (sdLocations sd0) $ \loc ->
-        case loc of
+      forM_ (sdLocations sd0) $ \loc' ->
+        case loc' of
           PLOther (PLFilePath _) -> error "Custom snapshots do not support filepaths, as the contents may change over time"
           _ -> return ()
 
