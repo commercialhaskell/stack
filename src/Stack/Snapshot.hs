@@ -364,7 +364,7 @@ loadSnapshot' loadFromIndex menv mcompiler root =
         (loadMultiRawCabalFilesIndex loadFromIndex menv root >=> mapM parseGPD)
         (sdLocations sd)
 
-      (globals, snapshot, locals) <-
+      (globals, snapshot, locals, _upgraded) <-
         calculatePackagePromotion loadFromIndex menv root ls0
         (map (\(x, y) -> (x, y, ())) gpds)
         (sdFlags sd) (sdHide sd) (sdGhcOptions sd) (sdDropPackages sd)
@@ -399,6 +399,7 @@ calculatePackagePromotion
   -> m ( Map PackageName (LoadedPackageInfo GhcPkgId) -- new globals
        , Map PackageName (LoadedPackageInfo SinglePackageLocation) -- new snapshot
        , Map PackageName (LoadedPackageInfo (SinglePackageLocation, Maybe localLocation)) -- new locals
+       , Set PackageName -- packages explicitly upgraded via flags/options/hide values
        )
 calculatePackagePromotion
   loadFromIndex menv root (LoadedSnapshot compilerVersion _ globals0 parentPackages0)
@@ -484,6 +485,7 @@ calculatePackagePromotion
         ( globals3
         , parentPackages3
         , Map.union (Map.map (fmap (, Nothing)) upgraded) (Map.map (fmap (second Just)) packages1)
+        , toUpgrade
         )
 
 -- | Recalculate a 'LoadedPackageInfo' based on updates to flags,

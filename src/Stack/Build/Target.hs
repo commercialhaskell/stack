@@ -543,7 +543,7 @@ parseTargets needTargets boptscli = do
 
       drops = Set.empty -- not supported to add drops
 
-  (allLocals, (globals', snapshots, locals')) <- withCabalLoader $ \loadFromIndex -> do
+  (globals', snapshots, locals', upgraded) <- withCabalLoader $ \loadFromIndex -> do
     addedDeps' <- fmap Map.fromList $ forM (Map.toList addedDeps) $ \(name, loc) -> do
       bs <- loadSingleRawCabalFile loadFromIndex menv root loc
       case rawParseGPD bs of
@@ -567,13 +567,12 @@ parseTargets needTargets boptscli = do
               (lpDependencies lp)
           ]
 
-    (allLocals,) <$>
-      calculatePackagePromotion
-        loadFromIndex menv root ls0 (Map.elems allLocals)
-        flags hides options drops
+    calculatePackagePromotion
+      loadFromIndex menv root ls0 (Map.elems allLocals)
+      flags hides options drops
 
   -- Warn about packages upgraded based on flags
-  forM_ (Map.keysSet locals' `Set.difference` Map.keysSet allLocals) $ \name -> $logWarn $ T.concat
+  forM_ upgraded $ \name -> $logWarn $ T.concat
     [ "- Implicitly adding "
     , packageNameText name
     , " to extra-deps based on command line flag"
