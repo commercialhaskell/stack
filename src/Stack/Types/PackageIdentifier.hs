@@ -199,7 +199,7 @@ packageIdentifierString (PackageIdentifier n v) = show n ++ "-" ++ show v
 -- | Get a string representation of the package identifier with revision; name-ver[@hashtype:hash[,size]].
 packageIdentifierRevisionString :: PackageIdentifierRevision -> String
 packageIdentifierRevisionString (PackageIdentifierRevision ident mcfi) =
-  concat $ show ident : rest
+  concat $ packageIdentifierString ident : rest
   where
     rest =
       case mcfi of
