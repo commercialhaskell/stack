@@ -31,7 +31,7 @@ module Stack.Types.BuildPlan
 import           Control.Applicative
 import           Control.DeepSeq (NFData)
 import           Data.Aeson (ToJSON (..), FromJSON (..), withText, object, (.=))
-import           Data.Aeson.Extended (WithJSONWarnings (..), (..:), withObjectWarnings, noJSONWarnings, (..!=))
+import           Data.Aeson.Extended (WithJSONWarnings (..), (..:), (..:?), withObjectWarnings, noJSONWarnings, (..!=))
 import           Data.ByteString (ByteString)
 import           Data.Data
 import           Data.Hashable (Hashable)
@@ -199,7 +199,7 @@ instance subdirs ~ [FilePath] => FromJSON (WithJSONWarnings (PackageLocation sub
             ((RepoGit, ) <$> o ..: "git") <|>
             ((RepoHg, ) <$> o ..: "hg")
           repoCommit <- o ..: "commit"
-          repoSubdirs <- o ..: "subdirs" ..!= []
+          repoSubdirs <- o ..:? "subdirs" ..!= []
           return $ PLRepo Repo {..}
 
 -- | Name of an executable.
