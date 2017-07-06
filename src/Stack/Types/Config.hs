@@ -1856,11 +1856,7 @@ stackRootL = configL.lens configStackRoot (\x y -> x { configStackRoot = y })
 -- | The compiler specified by the @MiniBuildPlan@. This may be
 -- different from the actual compiler used!
 wantedCompilerVersionL :: HasBuildConfig s => Getting r s (CompilerVersion 'CVWanted)
-wantedCompilerVersionL =
-    snapshotDefL.to go
-  where
-    go :: SnapshotDef -> CompilerVersion 'CVWanted
-    go = either id go . sdParent
+wantedCompilerVersionL = snapshotDefL.to sdWantedCompilerVersion
 
 -- | The version of the compiler which will actually be used. May be
 -- different than that specified in the 'MiniBuildPlan' and returned

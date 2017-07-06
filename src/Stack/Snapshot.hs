@@ -252,7 +252,7 @@ loadResolver (ResolverCustom url loc) = do
 
     load :: Path Abs File -> m SnapshotDef
     load fp = do
-      WithJSONWarnings (sd0, parentResolver) warnings <-
+      WithJSONWarnings (sd0, mparentResolver, mcompiler) warnings <-
         liftIO (decodeFileEither (toFilePath fp)) >>= either
           throwM
           (either (throwM . AesonException) return . parseEither parseCustom)
@@ -270,6 +270,22 @@ loadResolver (ResolverCustom url loc) = do
             case loc of
               Left _ -> Nothing
               Right fp' -> Just $ parent fp'
+
+      -- Deal with the dual nature of the compiler key, which either
+      -- means "use this compiler" or "override the compiler in the
+      -- resolver"
+      (parentResolver, overrideCompiler) <-
+        case (mparentResolver, mcompiler) of
+          (Nothing, Nothing) -> error $
+            "You must specify either a resolver or compiler value in " ++
+            T.unpack url
+          (Just parentResolver, Nothing) -> return (parentResolver, id)
+          (Nothing, Just compiler) -> return (ResolverCompiler compiler, id)
+          (Just parentResolver, Just compiler) -> return
+            ( parentResolver
+            , setCompilerVersion compiler
+            )
+
       parentResolver' <- parseCustomLocation mdir parentResolver
 
       -- Calculate the hash of the current file, and then combine it
@@ -288,7 +304,7 @@ loadResolver (ResolverCustom url loc) = do
                     ResolverCustom _ parentHash -> parentHash
                     ResolverCompiler _ -> error "loadResolver: Receieved ResolverCompiler in impossible location"
             return (Right parent', hash')
-      return sd0
+      return $ overrideCompiler sd0
         { sdParent = parent'
         , sdResolver = ResolverCustom url hash'
         }
@@ -297,8 +313,8 @@ loadResolver (ResolverCustom url loc) = do
     -- here are bogus, and need to be replaced with information only
     -- available after further processing.
     parseCustom :: Value
-                -> Parser (WithJSONWarnings (SnapshotDef, ResolverWith ()))
-    parseCustom = withObjectWarnings "CustomSnapshot" $ \o -> (,)
+                -> Parser (WithJSONWarnings (SnapshotDef, Maybe (ResolverWith ()), Maybe (CompilerVersion 'CVWanted)))
+    parseCustom = withObjectWarnings "CustomSnapshot" $ \o -> (,,)
         <$> (SnapshotDef (Left (error "loadResolver")) (ResolverSnapshot (LTS 0 0))
             <$> (o ..: "name")
             <*> jsonSubWarningsT (o ..:? "packages" ..!= [])
@@ -307,8 +323,8 @@ loadResolver (ResolverCustom url loc) = do
             <*> o ..:? "hide" ..!= Set.empty
             <*> o ..:? "ghc-options" ..!= Map.empty
             <*> o ..:? "global-hints" ..!= Map.empty)
-        <*> ((ResolverCompiler <$> (o ..: "compiler")) <|>
-             (o ..: "resolver"))
+        <*> (o ..:? "resolver")
+        <*> (o ..:? "compiler")
 
     fromDigest :: Digest SHA256 -> SnapshotHash
     fromDigest = SnapshotHash . B64URL.encode . Mem.convert
