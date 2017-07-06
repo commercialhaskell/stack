@@ -227,7 +227,6 @@ newtype ExeName = ExeName { unExeName :: Text }
 -- dependencies must be satisfied.
 data LoadedSnapshot = LoadedSnapshot
   { lsCompilerVersion :: !(CompilerVersion 'CVActual)
-  , lsResolver        :: !LoadedResolver
   , lsGlobals         :: !(Map PackageName (LoadedPackageInfo GhcPkgId))
   , lsPackages        :: !(Map PackageName (LoadedPackageInfo (PackageLocationIndex FilePath)))
   }
@@ -236,7 +235,7 @@ instance Store LoadedSnapshot
 instance NFData LoadedSnapshot
 
 loadedSnapshotVC :: VersionConfig LoadedSnapshot
-loadedSnapshotVC = storeVersionConfig "ls-v1" "YwIoK-ozdgge78kWH3XyOzsjxCA="
+loadedSnapshotVC = storeVersionConfig "ls-v1" "vJxpC6RphW-79GI8ZuoiDHvAi8g="
 
 -- | Information on a single package for the 'LoadedSnapshot' which
 -- can be installed.

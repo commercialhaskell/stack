@@ -580,7 +580,6 @@ parseTargets needTargets boptscli = do
 
   let ls = LoadedSnapshot
         { lsCompilerVersion = lsCompilerVersion ls0
-        , lsResolver = lsResolver ls0
         , lsGlobals = globals'
         , lsPackages = snapshots
         }

@@ -360,7 +360,6 @@ loadSnapshot' loadFromIndex menv mcompiler root =
             case mcompiler of
               Nothing -> return LoadedSnapshot
                 { lsCompilerVersion = wantedToActual cv
-                , lsResolver = ResolverCompiler cv
                 , lsGlobals = fromGlobalHints $ sdGlobalHints sd
                 , lsPackages = Map.empty
                 }
@@ -378,7 +377,6 @@ loadSnapshot' loadFromIndex menv mcompiler root =
 
       return LoadedSnapshot
         { lsCompilerVersion = lsCompilerVersion ls0
-        , lsResolver = sdResolver sd
         , lsGlobals = globals
         -- When applying a snapshot on top of another one, we merge
         -- the two snapshots' packages together.
@@ -409,7 +407,7 @@ calculatePackagePromotion
        , Set PackageName -- packages explicitly upgraded via flags/options/hide values
        )
 calculatePackagePromotion
-  loadFromIndex menv root (LoadedSnapshot compilerVersion _ globals0 parentPackages0)
+  loadFromIndex menv root (LoadedSnapshot compilerVersion globals0 parentPackages0)
   gpds flags0 hides0 options0 drops0 = do
 
       platform <- view platformL
@@ -585,7 +583,6 @@ loadCompiler cv = do
     (conduitDumpPackage .| CL.foldMap (\dp -> Map.singleton (dpGhcPkgId dp) dp))
   return LoadedSnapshot
     { lsCompilerVersion = cv
-    , lsResolver = ResolverCompiler (actualToWanted cv)
     , lsGlobals = toGlobals m
     , lsPackages = Map.empty
     }
