@@ -12,6 +12,7 @@
 module Stack.Types.BuildPlan
     ( -- * Types
       SnapshotDef (..)
+    , sdRawPathName
     , PackageLocation (..)
     , PackageLocationIndex (..)
     , RepoType (..)
@@ -46,7 +47,7 @@ import           Data.Store.VersionTagged
 import           Data.String (IsString)
 import           Data.Text (Text)
 import qualified Data.Text as T
-import           Data.Text.Encoding (encodeUtf8)
+import           Data.Text.Encoding (decodeUtf8, encodeUtf8)
 import qualified Distribution.ModuleName as C
 import qualified Distribution.Version as C
 import           GHC.Generics (Generic)
@@ -80,6 +81,8 @@ data SnapshotDef = SnapshotDef
     -- @CompilerVersion@.
     , sdResolver        :: !LoadedResolver
     -- ^ The resolver that provides this definition.
+    , sdResolverName    :: !Text
+    -- ^ A user-friendly way of referring to this resolver.
     , sdLocations :: ![PackageLocationIndex [FilePath]]
     -- ^ Where to grab all of the packages from.
     , sdDropPackages :: !(Set PackageName)
@@ -101,6 +104,16 @@ data SnapshotDef = SnapshotDef
     -- during stack init), we would use this field.
     }
     deriving (Show, Eq)
+
+-- | A relative file path including a unique string for the given
+-- snapshot.
+sdRawPathName :: SnapshotDef -> String
+sdRawPathName sd =
+    T.unpack $ go $ sdResolver sd
+  where
+    go (ResolverSnapshot name) = renderSnapName name
+    go (ResolverCompiler version) = compilerVersionText version
+    go (ResolverCustom _ hash) = "custom-" <> sdResolverName sd <> "-" <> decodeUtf8 (trimmedSnapshotHash hash)
 
 -- | FIXME should this entail modifying the hash?
 setCompilerVersion :: CompilerVersion 'CVWanted -> SnapshotDef -> SnapshotDef
@@ -223,7 +236,7 @@ instance Store LoadedSnapshot
 instance NFData LoadedSnapshot
 
 loadedSnapshotVC :: VersionConfig LoadedSnapshot
-loadedSnapshotVC = storeVersionConfig "ls-v1" "iJmu95AqDvBkVLHwoo90BD0K7TY="
+loadedSnapshotVC = storeVersionConfig "ls-v1" "YwIoK-ozdgge78kWH3XyOzsjxCA="
 
 -- | Information on a single package for the 'LoadedSnapshot' which
 -- can be installed.

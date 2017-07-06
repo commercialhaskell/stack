@@ -32,7 +32,7 @@ dockerOptsFromMonoid mproject stackRoot maresolver DockerOptsMonoid{..} = do
             let mresolver =
                     case maresolver of
                         Just (ARResolver resolver) ->
-                            Just resolver
+                            Just (void resolver)
                         Just aresolver ->
                             impureThrow
                                 (ResolverNotSupportedException $

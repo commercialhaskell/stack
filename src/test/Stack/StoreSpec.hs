@@ -24,7 +24,6 @@ import           Language.Haskell.TH
 import           Language.Haskell.TH.ReifyMany
 import           Prelude
 import           Stack.Types.Build
-import           Stack.Types.BuildPlan
 import           Stack.Types.PackageDump
 import           Stack.Types.PackageIndex
 import           Test.Hspec

@@ -34,7 +34,6 @@ import           Stack.Snapshot (loadResolver)
 import           Stack.Types.Config
 import           Stack.Types.Resolver
 import           Stack.Types.StringError
-import           System.FilePath (takeDirectory)
 
 data ConfigCmdSet
     = ConfigCmdSetResolver AbstractResolver
@@ -61,9 +60,7 @@ cfgCmdSet
 cfgCmdSet go cmd = do
     conf <- view configL
     configFilePath <-
-        liftM
-            toFilePath
-            (case configCmdSetScope cmd of
+             case configCmdSetScope cmd of
                  CommandScopeProject -> do
                      mstackYamlOption <- forM (globalStackYaml go) resolveFile'
                      mstackYaml <- getProjectConfig mstackYamlOption
@@ -71,34 +68,30 @@ cfgCmdSet go cmd = do
                          LCSProject stackYaml -> return stackYaml
                          LCSNoProject -> liftM (</> stackDotYaml) (getImplicitGlobalProjectDir conf)
                          LCSNoConfig -> errorString "config command used when no local configuration available"
-                 CommandScopeGlobal -> return (configUserConfigPath conf))
+                 CommandScopeGlobal -> return (configUserConfigPath conf)
     -- We don't need to worry about checking for a valid yaml here
     (config :: Yaml.Object) <-
-        liftIO (Yaml.decodeFileEither configFilePath) >>= either throwM return
-    newValue <- cfgCmdSetValue (takeDirectory configFilePath) cmd
+        liftIO (Yaml.decodeFileEither (toFilePath configFilePath)) >>= either throwM return
+    newValue <- cfgCmdSetValue (parent configFilePath) cmd
     let cmdKey = cfgCmdSetOptionName cmd
         config' = HMap.insert cmdKey newValue config
     if config' == config
         then $logInfo
-                 (T.pack configFilePath <>
+                 (T.pack (toFilePath configFilePath) <>
                   " already contained the intended configuration and remains unchanged.")
         else do
-            liftIO (S.writeFile configFilePath (Yaml.encode config'))
-            $logInfo (T.pack configFilePath <> " has been updated.")
+            liftIO (S.writeFile (toFilePath configFilePath) (Yaml.encode config'))
+            $logInfo (T.pack (toFilePath configFilePath) <> " has been updated.")
 
 cfgCmdSetValue
     :: (StackMiniM env m, HasConfig env, HasGHCVariant env)
-    => FilePath -- ^ root directory of project
+    => Path Abs Dir -- ^ root directory of project
     -> ConfigCmdSet -> m Yaml.Value
 cfgCmdSetValue root (ConfigCmdSetResolver newResolver) = do
     concreteResolver <- makeConcreteResolver (Just root) newResolver
-    case concreteResolver of
-        -- Check that the snapshot actually exists
-        ResolverSnapshot snapName -> void $ loadResolver $ ResolverSnapshot snapName
-        ResolverCompiler _ -> return ()
-        -- TODO: custom snapshot support?  Would need a way to specify on CLI
-        ResolverCustom {} -> errorString "'stack config set resolver' does not support custom resolvers"
-    return (Yaml.String (resolverName concreteResolver))
+    -- Check that the snapshot actually exists
+    void $ loadResolver concreteResolver
+    return (Yaml.toJSON concreteResolver)
 cfgCmdSetValue _ (ConfigCmdSetSystemGhc _ bool) =
     return (Yaml.Bool bool)
 cfgCmdSetValue _ (ConfigCmdSetInstallGhc _ bool) =

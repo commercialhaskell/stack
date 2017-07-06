@@ -23,11 +23,9 @@ module Stack.Types.Resolver
   ,LoadedResolver
   ,ResolverWith(..)
   ,parseResolverText
-  ,resolverDirName
-  ,resolverName
-  ,customResolverHash
   ,AbstractResolver(..)
   ,readAbstractResolver
+  ,resolverRawName
   ,SnapName(..)
   ,Snapshots (..)
   ,renderSnapName
@@ -41,10 +39,8 @@ import           Control.Applicative
 import           Control.DeepSeq (NFData)
 import           Control.Monad.IO.Unlift
 import           Data.Aeson.Extended
-                 (ToJSON, toJSON, FromJSON, parseJSON, object,
-                  WithJSONWarnings(..), Value(String, Object), (.=),
-                  noJSONWarnings, (..:), withObjectWarnings, withObject, (.:),
-                  withText)
+                 (ToJSON, toJSON, FromJSON, parseJSON,
+                  withObject, (.:), withText)
 import           Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
 import           Data.Data (Data)
@@ -52,28 +48,27 @@ import qualified Data.HashMap.Strict as HashMap
 import           Data.IntMap.Strict (IntMap)
 import qualified Data.IntMap.Strict as IntMap
 import           Data.Maybe (fromMaybe)
-import           Data.Monoid.Extra
+import           Data.Monoid
 import           Data.Store (Store)
 import           Data.Text (Text)
 import qualified Data.Text as T
-import           Data.Text.Encoding (decodeUtf8)
 import           Data.Text.Read (decimal)
 import           Data.Time (Day)
 import           Data.Typeable (Typeable)
 import           GHC.Generics (Generic)
 import           Network.HTTP.Client (Request, parseUrlThrow)
 import           Options.Applicative (ReadM)
-import qualified Options.Applicative as OA
 import qualified Options.Applicative.Types as OA
+import           Path
 import           Prelude
 import           Safe (readMay)
 import           Stack.Types.Compiler
-import           System.FilePath ((</>))
+import qualified System.FilePath as FP
 
 data IsLoaded = Loaded | NotLoaded
 
 type LoadedResolver = ResolverWith SnapshotHash
-type Resolver = ResolverWith (Either Request FilePath)
+type Resolver = ResolverWith (Either Request (Path Abs File))
 
 -- TODO: once GHC 8.0 is the lowest version we support, make these into
 -- actual haddock comments...
@@ -90,82 +85,61 @@ data ResolverWith customContents
     -- specify all upstream dependencies manually, such as using a
     -- dependency solver.
 
-    | ResolverCustom !Text !Text !customContents
-    -- ^ A custom resolver based on the given name. First two @Text@s
-    -- are the name and the raw URL, respectively. If @customContents@
-    -- is a @Either Request FilePath@, it represents either an HTTP
-    -- URL or a resolved filepath. Once it has been loaded from disk,
-    -- it will be replaced with a @SnapshotHash@ value, which is used
-    -- to store cached files.
+    | ResolverCustom !Text !customContents
+    -- ^ A custom resolver based on the given location (as a raw URL
+    -- or filepath). If @customContents@ is a @Either Request
+    -- FilePath@, it represents the parsed location value (with
+    -- filepaths resolved relative to the directory containing the
+    -- file referring to the custom snapshot). Once it has been loaded
+    -- from disk, it will be replaced with a @SnapshotHash@ value,
+    -- which is used to store cached files.
     deriving (Generic, Typeable, Show, Data, Eq, Functor, Foldable, Traversable)
 instance Store LoadedResolver
 instance NFData LoadedResolver
 
 instance ToJSON (ResolverWith a) where
     toJSON x = case x of
-        ResolverSnapshot{} -> toJSON $ resolverName x
-        ResolverCompiler{} -> toJSON $ resolverName x
-        ResolverCustom n loc _ -> object
-             [ "name" .= n
-             , "location" .= loc
-             ]
-instance a ~ () => FromJSON (WithJSONWarnings (ResolverWith a)) where
-    -- Strange structuring is to give consistent error messages
-    parseJSON v@(Object _) = withObjectWarnings "Resolver" (\o -> ResolverCustom
-        <$> o ..: "name"
-        <*> o ..: "location"
-        <*> pure ()) v
-
-    parseJSON (String t) = either (fail . show) return (noJSONWarnings <$> parseResolverText t)
-
-    parseJSON _ = fail "Invalid Resolver, must be Object or String"
-
--- | Convert a Resolver into its @Text@ representation, as will be used by
--- directory names
-resolverDirName :: LoadedResolver -> Text
-resolverDirName (ResolverSnapshot name) = renderSnapName name
-resolverDirName (ResolverCompiler v) = compilerVersionText v
-resolverDirName (ResolverCustom name _ hash) = "custom-" <> name <> "-" <> decodeUtf8 (trimmedSnapshotHash hash)
+        ResolverSnapshot name -> toJSON $ renderSnapName name
+        ResolverCompiler version -> toJSON $ compilerVersionText version
+        ResolverCustom loc _ -> toJSON loc
+instance a ~ () => FromJSON (ResolverWith a) where
+    parseJSON = withText "ResolverWith ()" $ return . parseResolverText
 
 -- | Convert a Resolver into its @Text@ representation for human
--- presentation.
-resolverName :: ResolverWith p -> Text
-resolverName (ResolverSnapshot name) = renderSnapName name
-resolverName (ResolverCompiler v) = compilerVersionText v
-resolverName (ResolverCustom name _ _) = "custom-" <> name
-
-customResolverHash :: LoadedResolver -> Maybe SnapshotHash
-customResolverHash (ResolverCustom _ _ hash) = Just hash
-customResolverHash _ = Nothing
+-- presentation. When possible, you should prefer @sdResolverName@, as
+-- it will handle the human-friendly name inside a custom snapshot.
+resolverRawName :: ResolverWith a -> Text
+resolverRawName (ResolverSnapshot name) = renderSnapName name
+resolverRawName (ResolverCompiler v) = compilerVersionText v
+resolverRawName (ResolverCustom loc _ ) = "custom: " <> loc
 
 parseCustomLocation
   :: MonadThrow m
-  => Maybe FilePath -- ^ directory config value was read from
+  => Maybe (Path Abs Dir) -- ^ directory config value was read from
   -> ResolverWith () -- could technically be any type parameter, restricting to help with type safety
   -> m Resolver
-parseCustomLocation mdir (ResolverCustom name t ()) = do
-      x <- case parseUrlThrow $ T.unpack t of
-        Nothing -> do
-          dir <-
-            case mdir of
-              Nothing -> throwM $ FilepathInDownloadedSnapshot t
-              Just x -> return x
-          let suffix =
-                  T.unpack
-                $ fromMaybe t
-                $ T.stripPrefix "file://" t <|> T.stripPrefix "file:" t
-          return $ Right $ dir </> suffix
-        Just req -> return $ Left req
-      return $ ResolverCustom name t x
+parseCustomLocation mdir (ResolverCustom t ()) =
+  ResolverCustom t <$> case parseUrlThrow $ T.unpack t of
+    Nothing -> Right <$> do
+      dir <-
+        case mdir of
+          Nothing -> throwM $ FilepathInDownloadedSnapshot t
+          Just x -> return x
+      let rel =
+              T.unpack
+            $ fromMaybe t
+            $ T.stripPrefix "file://" t <|> T.stripPrefix "file:" t
+      parseAbsFile $ toFilePath dir FP.</> rel
+    Just req -> return $ Left req
 parseCustomLocation _ (ResolverSnapshot name) = return $ ResolverSnapshot name
 parseCustomLocation _ (ResolverCompiler cv) = return $ ResolverCompiler cv
 
--- | Try to parse a @Resolver@ from a @Text@. Won't work for complex resolvers (like custom).
-parseResolverText :: MonadThrow m => Text -> m (ResolverWith ())
+-- | Parse a @Resolver@ from a @Text@
+parseResolverText :: Text -> ResolverWith ()
 parseResolverText t
-    | Right x <- parseSnapName t = return $ ResolverSnapshot x
-    | Just v <- parseCompilerVersion t = return $ ResolverCompiler v
-    | otherwise = throwM $ ParseResolverException t
+    | Right x <- parseSnapName t = ResolverSnapshot x
+    | Just v <- parseCompilerVersion t = ResolverCompiler v
+    | otherwise = ResolverCustom t ()
 
 -- | Either an actual resolver value, or an abstract description of one (e.g.,
 -- latest nightly).
@@ -186,10 +160,7 @@ readAbstractResolver = do
         "lts" -> return ARLatestLTS
         'l':'t':'s':'-':x | Right (x', "") <- decimal $ T.pack x ->
             return $ ARLatestLTSMajor x'
-        _ ->
-            case parseResolverText $ T.pack s of
-                Left e -> OA.readerError $ show e
-                Right x -> return $ ARResolver x
+        _ -> return $ ARResolver $ parseResolverText $ T.pack s
 
 -- | The name of an LTS Haskell or Stackage Nightly snapshot.
 data SnapName

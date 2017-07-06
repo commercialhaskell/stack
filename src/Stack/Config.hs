@@ -179,7 +179,7 @@ getSnapshots = do
 -- | Turn an 'AbstractResolver' into a 'Resolver'.
 makeConcreteResolver
     :: (StackMiniM env m, HasConfig env)
-    => Maybe FilePath -- ^ root of project for resolving custom relative paths
+    => Maybe (Path Abs Dir) -- ^ root of project for resolving custom relative paths
     -> AbstractResolver
     -> m Resolver
 makeConcreteResolver root (ARResolver r) = parseCustomLocation root r
@@ -205,11 +205,11 @@ makeConcreteResolver root ar = do
                 | otherwise ->
                     let (x, y) = IntMap.findMax $ snapshotsLts snapshots
                      in return $ ResolverSnapshot $ LTS x y
-    $logInfo $ "Selected resolver: " <> resolverName r
+    $logInfo $ "Selected resolver: " <> resolverRawName r
     return r
 
 -- | Get the latest snapshot resolver available.
-getLatestResolver :: (StackMiniM env m, HasConfig env) => m Resolver
+getLatestResolver :: (StackMiniM env m, HasConfig env) => m (ResolverWith a)
 getLatestResolver = do
     snapshots <- getSnapshots
     let mlts = do
@@ -543,12 +543,12 @@ loadBuildConfig mproject config mresolver mcompiler = do
                    when (view terminalL env) $
                        case mresolver of
                            Nothing ->
-                               $logDebug ("Using resolver: " <> resolverName (projectResolver project) <>
+                               $logDebug ("Using resolver: " <> resolverRawName (projectResolver project) <>
                                          " from implicit global project's config file: " <> T.pack dest')
                            Just aresolver -> do
                                let name =
                                         case aresolver of
-                                            ARResolver resolver -> resolverName resolver
+                                            ARResolver resolver -> resolverRawName resolver
                                             ARLatestNightly -> "nightly"
                                             ARLatestLTS -> "lts"
                                             ARLatestLTSMajor x -> T.pack $ "lts-" ++ show x
@@ -579,7 +579,7 @@ loadBuildConfig mproject config mresolver mcompiler = do
         case mresolver of
             Nothing -> return $ projectResolver project'
             Just aresolver ->
-                runReaderT (makeConcreteResolver (Just (toFilePath (parent stackYamlFP))) aresolver) miniConfig
+                runReaderT (makeConcreteResolver (Just (parent stackYamlFP)) aresolver) miniConfig
     let project = project'
             { projectResolver = resolver
             , projectCompiler = mcompiler <|> projectCompiler project'
@@ -613,11 +613,11 @@ loadBuildConfig mproject config mresolver mcompiler = do
       r <- case mresolver of
             Just aresolver -> do
                 r' <- runReaderT (makeConcreteResolver Nothing aresolver) miniConfig
-                $logInfo ("Using resolver: " <> resolverName r' <> " specified on command line")
+                $logInfo ("Using resolver: " <> resolverRawName r' <> " specified on command line")
                 return r'
             Nothing -> do
                 r'' <- runReaderT getLatestResolver miniConfig
-                $logInfo ("Using latest snapshot resolver: " <> resolverName r'')
+                $logInfo ("Using latest snapshot resolver: " <> resolverRawName r'')
                 return r''
       return Project
         { projectUserMsg = Nothing
@@ -953,7 +953,7 @@ getFakeConfigPath
 getFakeConfigPath stackRoot ar = do
   asString <-
     case ar of
-      ARResolver r -> return $ T.unpack $ resolverName r
+      ARResolver r -> return $ T.unpack $ resolverRawName r
       _ -> throwM $ InvalidResolverForNoLocalConfig $ show ar
   asDir <- parseRelDir asString
   let full = stackRoot </> $(mkRelDir "script") </> asDir </> $(mkRelFile "config.yaml")

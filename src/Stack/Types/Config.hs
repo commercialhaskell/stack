@@ -991,8 +991,8 @@ data ConfigException
   | UnableToExtractArchive Text (Path Abs File)
   | BadStackVersionException VersionRange
   | NoMatchingSnapshot WhichSolverCmd (NonEmpty SnapName)
-  | forall h. ResolverMismatch WhichSolverCmd (ResolverWith h) String
-  | ResolverPartial WhichSolverCmd (ResolverWith ()) String
+  | ResolverMismatch WhichSolverCmd !Text String -- Text == resolver name, sdName
+  | ResolverPartial WhichSolverCmd !Text String -- Text == resolver name, sdName
   | NoSuchDirectory FilePath
   | ParseGHCVariantException String
   | BadStackRoot (Path Abs Dir)
@@ -1057,7 +1057,7 @@ instance Show ConfigException where
         ]
     show (ResolverMismatch whichCmd resolver errDesc) = concat
         [ "Resolver '"
-        , T.unpack (resolverName resolver)
+        , T.unpack resolver
         , "' does not have a matching compiler to build some or all of your "
         , "package(s).\n"
         , errDesc
@@ -1065,7 +1065,7 @@ instance Show ConfigException where
         ]
     show (ResolverPartial whichCmd resolver errDesc) = concat
         [ "Resolver '"
-        , T.unpack (resolverName resolver)
+        , T.unpack resolver
         , "' does not have all the packages to match your requirements.\n"
         , unlines $ fmap ("    " <>) (lines errDesc)
         , showOptions whichCmd
@@ -1263,9 +1263,9 @@ platformSnapAndCompilerRel
     :: (MonadReader env m, HasEnvConfig env, MonadThrow m)
     => m (Path Rel Dir)
 platformSnapAndCompilerRel = do
-    ls' <- view loadedSnapshotL
+    sd <- view snapshotDefL
     platform <- platformGhcRelDir
-    name <- parseRelDir $ T.unpack $ resolverDirName $ lsResolver ls'
+    name <- parseRelDir $ sdRawPathName sd
     ghc <- compilerVersionDir
     useShaPathOnWindows (platform </> name </> ghc)
 
@@ -1343,13 +1343,13 @@ flagCacheLocal = do
 -- | Where to store 'LoadedSnapshot' caches
 configLoadedSnapshotCache
   :: (MonadThrow m, MonadReader env m, HasConfig env, HasGHCVariant env)
-  => LoadedResolver
+  => SnapshotDef
   -> GlobalInfoSource
   -> m (Path Abs File)
-configLoadedSnapshotCache resolver gis = do
+configLoadedSnapshotCache sd gis = do
     root <- view stackRootL
     platform <- platformGhcVerOnlyRelDir
-    file <- parseRelFile $ T.unpack (resolverDirName resolver) ++ ".cache"
+    file <- parseRelFile $ sdRawPathName sd ++ ".cache"
     gis' <- parseRelDir $
           case gis of
             GISSnapshotHints -> "__snapshot_hints__"
@@ -1435,9 +1435,9 @@ parseProjectAndConfigMonoid rootDir =
         -- the stack.yaml into the internal representation.
         (packages, deps) <- convert dirs extraDeps
 
-        resolver <- jsonSubWarnings (o ..: "resolver")
+        resolver <- (o ..: "resolver")
                 >>= either (fail . show) return
-                  . parseCustomLocation (Just (toFilePath rootDir))
+                  . parseCustomLocation (Just rootDir)
         compiler <- o ..:? "compiler"
         msg <- o ..:? "user-message"
         config <- parseConfigMonoidObject rootDir o

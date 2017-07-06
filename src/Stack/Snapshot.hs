@@ -30,7 +30,7 @@ import           Control.Monad.State.Strict      (get, put, StateT, execStateT)
 import           Crypto.Hash (hash, SHA256(..), Digest)
 import           Crypto.Hash.Conduit (hashFile)
 import           Data.Aeson (withObject, (.!=), (.:), (.:?), Value (Object))
-import           Data.Aeson.Extended (WithJSONWarnings(..), logJSONWarnings, (..!=), (..:?), jsonSubWarnings, jsonSubWarningsT, withObjectWarnings, (..:))
+import           Data.Aeson.Extended (WithJSONWarnings(..), logJSONWarnings, (..!=), (..:?), jsonSubWarningsT, withObjectWarnings, (..:))
 import           Data.Aeson.Types (Parser, parseEither)
 import           Data.Store.VersionTagged
 import qualified Data.ByteArray as Mem (convert)
@@ -79,7 +79,6 @@ import           Stack.Types.Urls
 import           Stack.Types.Compiler
 import           Stack.Types.Resolver
 import           Stack.Types.StackT
-import           System.FilePath (takeDirectory)
 import           System.Process.Read (EnvOverride)
 
 type SinglePackageLocation = PackageLocationIndex FilePath
@@ -194,6 +193,7 @@ loadResolver (ResolverSnapshot name) = do
         let sdDropPackages = Set.empty
 
         let sdResolver = ResolverSnapshot name
+            sdResolverName = renderSnapName name
 
         return SnapshotDef {..}
       where
@@ -223,6 +223,7 @@ loadResolver (ResolverSnapshot name) = do
 loadResolver (ResolverCompiler compiler) = return SnapshotDef
     { sdParent = Left compiler
     , sdResolver = ResolverCompiler compiler
+    , sdResolverName = compilerVersionText compiler
     , sdLocations = []
     , sdDropPackages = Set.empty
     , sdFlags = Map.empty
@@ -230,29 +231,29 @@ loadResolver (ResolverCompiler compiler) = return SnapshotDef
     , sdGhcOptions = Map.empty
     , sdGlobalHints = Map.empty
     }
-loadResolver (ResolverCustom name url loc) = do
+loadResolver (ResolverCustom url loc) = do
   $logDebug $ "Loading " <> url <> " build plan"
   case loc of
     Left req -> download' req >>= load
     Right fp -> load fp
   where
-    download' :: Request -> m FilePath
+    download' :: Request -> m (Path Abs File)
     download' req = do
       let urlHash = S8.unpack $ trimmedSnapshotHash $ doHash $ encodeUtf8 url
       hashFP <- parseRelFile $ urlHash ++ ".yaml"
       customPlanDir <- getCustomPlanDir
       let cacheFP = customPlanDir </> $(mkRelDir "yaml") </> hashFP
       void (download req cacheFP :: m Bool)
-      return $ toFilePath cacheFP
+      return cacheFP
 
     getCustomPlanDir = do
         root <- view stackRootL
         return $ root </> $(mkRelDir "custom-plan")
 
-    load :: FilePath -> m SnapshotDef
+    load :: Path Abs File -> m SnapshotDef
     load fp = do
       WithJSONWarnings (sd0, parentResolver) warnings <-
-        liftIO (decodeFileEither fp) >>= either
+        liftIO (decodeFileEither (toFilePath fp)) >>= either
           throwM
           (either (throwM . AesonException) return . parseEither parseCustom)
       logJSONWarnings (T.unpack url) warnings
@@ -268,12 +269,12 @@ loadResolver (ResolverCustom name url loc) = do
       let mdir =
             case loc of
               Left _ -> Nothing
-              Right fp' -> Just $ takeDirectory fp'
+              Right fp' -> Just $ parent fp'
       parentResolver' <- parseCustomLocation mdir parentResolver
 
       -- Calculate the hash of the current file, and then combine it
       -- with parent hashes if necessary below.
-      rawHash :: SnapshotHash <- fromDigest <$> hashFile fp :: m SnapshotHash
+      rawHash :: SnapshotHash <- fromDigest <$> hashFile (toFilePath fp) :: m SnapshotHash
 
       (parent', hash') <-
         case parentResolver' of
@@ -284,12 +285,12 @@ loadResolver (ResolverCustom name url loc) = do
                 hash' = combineHash rawHash $
                   case sdResolver parent' of
                     ResolverSnapshot snapName -> snapNameToHash snapName
-                    ResolverCustom _ _ parentHash -> parentHash
+                    ResolverCustom _ parentHash -> parentHash
                     ResolverCompiler _ -> error "loadResolver: Receieved ResolverCompiler in impossible location"
             return (Right parent', hash')
       return sd0
         { sdParent = parent'
-        , sdResolver = ResolverCustom name url hash'
+        , sdResolver = ResolverCustom url hash'
         }
 
     -- | Note that the 'sdParent' and 'sdResolver' fields returned
@@ -299,14 +300,15 @@ loadResolver (ResolverCustom name url loc) = do
                 -> Parser (WithJSONWarnings (SnapshotDef, ResolverWith ()))
     parseCustom = withObjectWarnings "CustomSnapshot" $ \o -> (,)
         <$> (SnapshotDef (Left (error "loadResolver")) (ResolverSnapshot (LTS 0 0))
-            <$> jsonSubWarningsT (o ..:? "packages" ..!= [])
+            <$> (o ..: "name")
+            <*> jsonSubWarningsT (o ..:? "packages" ..!= [])
             <*> o ..:? "drop-packages" ..!= Set.empty
             <*> o ..:? "flags" ..!= Map.empty
             <*> o ..:? "hide" ..!= Set.empty
             <*> o ..:? "ghc-options" ..!= Map.empty
             <*> o ..:? "global-hints" ..!= Map.empty)
         <*> ((ResolverCompiler <$> (o ..: "compiler")) <|>
-             jsonSubWarnings (o ..: "resolver"))
+             (o ..: "resolver"))
 
     fromDigest :: Digest SHA256 -> SnapshotHash
     fromDigest = SnapshotHash . B64URL.encode . Mem.convert
@@ -346,7 +348,7 @@ loadSnapshot' loadFromIndex menv mcompiler root =
   where
     start (snapshotDefFixes -> sd) = do
       path <- configLoadedSnapshotCache
-        (sdResolver sd)
+        sd
         (maybe GISSnapshotHints GISCompiler mcompiler)
       $(versionedDecodeOrLoad loadedSnapshotVC) path (inner sd)
 

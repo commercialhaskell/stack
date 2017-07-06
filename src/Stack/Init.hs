@@ -89,7 +89,7 @@ initProject whichCmd currDir initOpts mresolver = do
     -- FIXME shouldn't really need to recalculate this, perhaps modify
     -- definition of LoadedResolver to keep the `Either Request
     -- FilePath`?
-    resolver <- parseCustomLocation (Just (toFilePath (parent dest))) (void (sdResolver sd))
+    resolver <- parseCustomLocation (Just (parent dest)) (void (sdResolver sd))
 
     let ignored = Map.difference bundle rbundle
         dupPkgMsg
@@ -147,7 +147,7 @@ initProject whichCmd currDir initOpts mresolver = do
         toPkg dir = PLFilePath $ makeRelDir dir
         indent t = T.unlines $ fmap ("    " <>) (T.lines t)
 
-    $logInfo $ "Initialising configuration using resolver: " <> resolverName (sdResolver sd)
+    $logInfo $ "Initialising configuration using resolver: " <> sdResolverName sd
     $logInfo $ "Total number of user packages considered: "
                <> T.pack (show (Map.size bundle + length dupPkgs))
 
@@ -364,7 +364,7 @@ getDefaultResolver whichCmd stackYaml initOpts mresolver bundle = do
     sd <- maybe selectSnapResolver (makeConcreteResolver (Just root) >=> loadResolver) mresolver
     getWorkingResolverPlan whichCmd stackYaml initOpts bundle sd
     where
-        root = toFilePath $ parent stackYaml
+        root = parent stackYaml
         -- TODO support selecting best across regular and custom snapshots
         selectSnapResolver = do
             let gpds = Map.elems (fmap snd bundle)
@@ -393,7 +393,7 @@ getWorkingResolverPlan
        --   , Extra dependencies
        --   , Src packages actually considered)
 getWorkingResolverPlan whichCmd stackYaml initOpts bundle sd = do
-    $logInfo $ "Selected resolver: " <> resolverName (sdResolver sd)
+    $logInfo $ "Selected resolver: " <> sdResolverName sd
     go bundle
     where
         go info = do
@@ -446,19 +446,19 @@ checkBundleResolver whichCmd stackYaml initOpts bundle sd = do
                 warnPartial result
                 $logWarn "*** Omitting packages with unsatisfied dependencies"
                 return $ Left $ failedUserPkgs e
-            | otherwise -> throwM $ ResolverPartial whichCmd (void resolver) (show result)
+            | otherwise -> throwM $ ResolverPartial whichCmd (sdResolverName sd) (show result)
         BuildPlanCheckFail _ e _
             | omitPackages initOpts -> do
                 $logWarn $ "*** Resolver compiler mismatch: "
-                           <> resolverName resolver
+                           <> sdResolverName sd
                 $logWarn $ indent $ T.pack $ show result
                 return $ Left $ failedUserPkgs e
-            | otherwise -> throwM $ ResolverMismatch whichCmd resolver (show result)
+            | otherwise -> throwM $ ResolverMismatch whichCmd (sdResolverName sd) (show result)
     where
       resolver = sdResolver sd
       indent t  = T.unlines $ fmap ("    " <>) (T.lines t)
       warnPartial res = do
-          $logWarn $ "*** Resolver " <> resolverName resolver
+          $logWarn $ "*** Resolver " <> sdResolverName sd
                       <> " will need external packages: "
           $logWarn $ indent $ T.pack $ show res
 

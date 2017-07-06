@@ -386,7 +386,7 @@ solveResolverSpec
 
 solveResolverSpec stackYaml cabalDirs
                   (sd, srcConstraints, extraConstraints) = do
-    $logInfo $ "Using resolver: " <> resolverName (sdResolver sd)
+    $logInfo $ "Using resolver: " <> sdResolverName sd
     let wantedCompilerVersion = sdWantedCompilerVersion sd
     (menv, compilerVersion) <- setupCabalEnv wantedCompilerVersion
     (compilerVer, snapConstraints) <- getResolverConstraints menv (Just compilerVersion) stackYaml sd
@@ -404,7 +404,7 @@ solveResolverSpec stackYaml cabalDirs
                      ["--ghcjs" | whichCompiler compilerVer == Ghcjs]
 
     let srcNames = T.intercalate " and " $
-          ["packages from " <> resolverName (sdResolver sd)
+          ["packages from " <> sdResolverName sd
               | not (Map.null snapConstraints)] ++
           [T.pack (show (Map.size extraConstraints) <> " external packages")
               | not (Map.null extraConstraints)]
@@ -664,7 +664,7 @@ solveExtraDeps modStackYaml = do
             -- packages
             return $ either (const Nothing) Just eres
         BuildPlanCheckFail {} ->
-            throwM $ ResolverMismatch IsSolverCmd resolver (show resolverResult)
+            throwM $ ResolverMismatch IsSolverCmd (sdResolverName sd) (show resolverResult)
 
     (srcs, edeps) <- case resultSpecs of
         Nothing -> throwM (SolverGiveUp giveUpMsg)
@@ -721,9 +721,9 @@ solveExtraDeps modStackYaml = do
                 when (res /= oldRes) $ do
                     $logInfo $ T.concat
                         [ "* Resolver changes from "
-                        , resolverName oldRes
+                        , resolverRawName oldRes
                         , " to "
-                        , resolverName res
+                        , resolverRawName res
                         ]
 
         printFlags fl msg = do
@@ -747,7 +747,7 @@ solveExtraDeps modStackYaml = do
                     HashMap.insert "extra-deps"
                         (toJSON $ map fromTuple $ Map.toList deps)
                   $ HashMap.insert ("flags" :: Text) (toJSON fl)
-                  $ HashMap.insert ("resolver" :: Text) (toJSON (resolverName res)) obj
+                  $ HashMap.insert ("resolver" :: Text) (toJSON res) obj
             liftIO $ Yaml.encodeFile fp obj'
 
         giveUpMsg = concat

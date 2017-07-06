@@ -466,15 +466,15 @@ selectBestSnapshot root gpds snaps = do
           | otherwise = (s2, r2)
 
         reportResult BuildPlanCheckOk {} snap = do
-            $logInfo $ "* Matches " <> resolverName (sdResolver snap)
+            $logInfo $ "* Matches " <> sdResolverName snap
             $logInfo ""
 
         reportResult r@BuildPlanCheckPartial {} snap = do
-            $logWarn $ "* Partially matches " <> resolverName (sdResolver snap)
+            $logWarn $ "* Partially matches " <> sdResolverName snap
             $logWarn $ indent $ T.pack $ show r
 
         reportResult r@BuildPlanCheckFail {} snap = do
-            $logWarn $ "* Rejected " <> resolverName (sdResolver snap)
+            $logWarn $ "* Rejected " <> sdResolverName snap
             $logWarn $ indent $ T.pack $ show r
 
         indent t = T.unlines $ fmap ("    " <>) (T.lines t)
