@@ -718,7 +718,7 @@ parseGPDSingle loc bs =
 
 parseGPD :: MonadThrow m
          => ( ByteString -- raw contents
-            , SinglePackageLocation -- ^ for error reporting
+            , SinglePackageLocation -- for error reporting
             )
          -> m (GenericPackageDescription, SinglePackageLocation)
 parseGPD (bs, loc) = do
