@@ -1,7 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
-module Stack.Ls where
+module Stack.Ls (lsCmd, lsParser) where
 
 import Control.Exception (Exception)
 import Control.Exception.Safe (impureThrow)
