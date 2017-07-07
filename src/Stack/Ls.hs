@@ -163,16 +163,17 @@ lsParser :: OA.Parser LsCmdOpts
 lsParser =
     LsCmdOpts <$> (OA.hsubparser (lsViewLocalCmd <> lsViewRemoteCmd)) <*>
     (OA.switch
-         ((OA.long "lts") <> (OA.short 'l') <> OA.help ("Just show lts view"))) <*>
+         ((OA.long "lts") <> (OA.short 'l') <>
+          OA.help ("Only show lts snapshots"))) <*>
     (OA.switch
          ((OA.long "nightly") <> (OA.short 'n') <>
-          OA.help ("Just show nightly view")))
+          OA.help ("Only show nightly snapshots")))
 
 lsViewLocalCmd :: OA.Mod OA.CommandFields LsView
 lsViewLocalCmd =
     OA.command
         "local"
-        (OA.info (pure Local) (OA.progDesc "View it in your local system"))
+        (OA.info (pure Local) (OA.progDesc "View local snapshot"))
 
 lsViewRemoteCmd :: OA.Mod OA.CommandFields LsView
 lsViewRemoteCmd =
