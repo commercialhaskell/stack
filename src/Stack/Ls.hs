@@ -23,6 +23,7 @@ import qualified Options.Applicative as OA
 import Path
 import Stack.Runners (withBuildConfig)
 import Stack.Types.Config
+import System.Console.ANSI
 import System.Directory (listDirectory)
 
 data LsView
@@ -82,11 +83,12 @@ displaySnap snapshot = do
     T.putStrLn $ "Resolver name: " <> snapId snapshot
     T.putStrLn $ snapTitle snapshot
     putStrLn ""
-    putStrLn ""
 
 displayTime :: Snapshot -> IO ()
 displayTime snapshot = do
+    setSGR [SetColor Foreground Dull Green]
     T.putStrLn $ snapTime snapshot
+    setSGR [Reset]
     putStrLn ""
 
 displaySingleSnap :: [Snapshot] -> IO ()
@@ -129,7 +131,8 @@ handleLocal ::
 handleLocal lsOpts = do
     (instRoot :: Path Abs Dir) <- installationRootDeps
     let snapRootDir = parent $ parent $ instRoot
-    snapData <- liftIO $ listDirectory $ toFilePath snapRootDir
+    snapData' <- liftIO $ listDirectory $ toFilePath snapRootDir
+    let snapData = L.sort snapData'
     case (lsLtsSnapView lsOpts, lsNightlySnapView lsOpts) of
         (True, False) ->
             liftIO $
