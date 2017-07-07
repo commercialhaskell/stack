@@ -15,6 +15,8 @@ Behavior changes:
 
 Other enhancements:
 
+* A new sub command `ls` has been introduced to stack to view
+  local and remote snapshots present in the system.
 * `stack setup` allow to control options passed to ghcjs-boot with
   `--ghcjs-boot-options` (one word at a time) and `--[no-]ghcjs-boot-clean`
 * Updates to store-0.4.1, which has improved performance and better error
