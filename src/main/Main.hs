@@ -71,6 +71,7 @@ import           Stack.Fetch
 import           Stack.FileWatch
 import           Stack.Ghci
 import           Stack.Hoogle
+import           Stack.Ls
 import qualified Stack.IDE as IDE
 import qualified Stack.Image as Image
 import           Stack.Init
@@ -285,6 +286,10 @@ commandLineHandler currentDir progName isInterpreter = complicatedOptions
                     "Print out handy path information"
                     pathCmd
                     Stack.Path.pathParser
+        addCommand' "ls"
+                    "List latest Stackage snapshots"
+                    lsCmd
+                    lsParser
         addCommand' "unpack"
                     "Unpack one or more packages locally"
                     unpackCmd
