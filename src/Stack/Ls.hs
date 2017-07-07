@@ -9,7 +9,6 @@ import Control.Monad.IO.Class (MonadIO, liftIO)
 import Control.Monad.Reader (MonadReader)
 import Data.Aeson
 import qualified Data.Aeson.Types as A
-import qualified Data.ByteString.Lazy as BL
 import qualified Data.List as L
 import Data.Monoid
 import Data.Text
@@ -18,7 +17,7 @@ import Data.Typeable (Typeable)
 import qualified Data.Vector as V
 import Network.HTTP.Simple
        (Request, Response, addRequestHeader, getResponseBody, httpJSON,
-        httpJSONEither, httpLbs, parseRequest)
+        parseRequest)
 import Network.HTTP.Types.Header (hAccept)
 import qualified Options.Applicative as OA
 import Path
@@ -32,8 +31,7 @@ data LsView
     deriving (Show, Eq, Ord)
 
 data SnapshotType
-    = LtsAndNightly
-    | Lts
+    = Lts
     | Nightly
     deriving (Show, Eq, Ord)
 
