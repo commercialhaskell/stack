@@ -146,7 +146,7 @@ lsCmd lsOpts go =
     case (lsView lsOpts) of
         Local -> withBuildConfig go (handleLocal lsOpts)
         Remote -> do
-            req <- parseRequest "http://localhost:3000/snapshots"
+            req <- parseRequest "https://www.stackage.org/snapshots"
             let req' = addRequestHeader hAccept "application/json" req
             result <- httpJSON req'
             let snapData = getResponseBody result
