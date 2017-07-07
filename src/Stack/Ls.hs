@@ -4,6 +4,7 @@
 module Stack.Ls where
 
 import Control.Exception (Exception)
+import Control.Exception.Safe (impureThrow)
 import Control.Monad.Catch (MonadThrow)
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import Control.Monad.Reader (MonadReader)
@@ -16,8 +17,7 @@ import qualified Data.Text.IO as T
 import Data.Typeable (Typeable)
 import qualified Data.Vector as V
 import Network.HTTP.Simple
-       (Request, Response, addRequestHeader, getResponseBody, httpJSON,
-        parseRequest)
+       (addRequestHeader, getResponseBody, httpJSON, parseRequest)
 import Network.HTTP.Types.Header (hAccept)
 import qualified Options.Applicative as OA
 import Path
@@ -56,11 +56,10 @@ data SnapshotData = SnapshotData
 toSnapshot :: [Value] -> Snapshot
 toSnapshot ((String sid):(String stitle):(String stime):[]) =
     Snapshot {snapId = sid, snapTitle = stitle, snapTime = stime}
-toSnapshot _ = undefined
+toSnapshot val = impureThrow $ ParseFailure val
 
 data LsException =
-    ParseFailure Request
-                 (Response ())
+    ParseFailure [Value]
     deriving (Show, Typeable)
 
 instance Exception LsException
