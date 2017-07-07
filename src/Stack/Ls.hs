@@ -58,7 +58,7 @@ toSnapshot [String sid, String stitle, String stime] =
     Snapshot {snapId = sid, snapTitle = stitle, snapTime = stime}
 toSnapshot val = impureThrow $ ParseFailure val
 
-data LsException =
+newtype LsException =
     ParseFailure [Value]
     deriving (Show, Typeable)
 
