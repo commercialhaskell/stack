@@ -54,7 +54,7 @@ data SnapshotData = SnapshotData
     } deriving (Show, Eq, Ord)
 
 toSnapshot :: [Value] -> Snapshot
-toSnapshot ((String sid):(String stitle):(String stime):[]) =
+toSnapshot [String sid, String stitle, String stime] =
     Snapshot {snapId = sid, snapTitle = stitle, snapTime = stime}
 toSnapshot val = impureThrow $ ParseFailure val
 
@@ -101,7 +101,7 @@ displaySingleSnap snapshots =
 
 displaySnapshotData :: SnapshotData -> IO ()
 displaySnapshotData sdata =
-    case (L.reverse $ snaps sdata) of
+    case L.reverse $ snaps sdata of
         [] -> return ()
         xs -> mapM_ displaySingleSnap xs
 
@@ -113,11 +113,11 @@ filterSnapshotData sdata stype = sdata {snaps = filterSnapData}
         case stype of
             Lts ->
                 L.map
-                    (\s -> L.filter (\x -> isPrefixOf "lts" (snapId x)) s)
+                    (\s -> L.filter (\x -> "lts" `isPrefixOf` snapId x) s)
                     snapdata
             Nightly ->
                 L.map
-                    (\s -> L.filter (\x -> isPrefixOf "nightly" (snapId x)) s)
+                    (\s -> L.filter (\x -> "nightly" `isPrefixOf` snapId x) s)
                     snapdata
 
 displayLocalSnapshot :: [String] -> IO ()
@@ -129,7 +129,7 @@ handleLocal ::
     -> m ()
 handleLocal lsOpts = do
     (instRoot :: Path Abs Dir) <- installationRootDeps
-    let snapRootDir = parent $ parent $ instRoot
+    let snapRootDir = parent $ parent instRoot
     snapData' <- liftIO $ listDirectory $ toFilePath snapRootDir
     let snapData = L.sort snapData'
     case (lsLtsSnapView lsOpts, lsNightlySnapView lsOpts) of
@@ -143,7 +143,7 @@ handleLocal lsOpts = do
 
 lsCmd :: LsCmdOpts -> GlobalOpts -> IO ()
 lsCmd lsOpts go =
-    case (lsView lsOpts) of
+    case lsView lsOpts of
         Local -> withBuildConfig go (handleLocal lsOpts)
         Remote -> do
             req <- parseRequest "https://www.stackage.org/snapshots"
@@ -161,13 +161,13 @@ lsCmd lsOpts go =
 
 lsParser :: OA.Parser LsCmdOpts
 lsParser =
-    LsCmdOpts <$> (OA.hsubparser (lsViewLocalCmd <> lsViewRemoteCmd)) <*>
-    (OA.switch
-         ((OA.long "lts") <> (OA.short 'l') <>
-          OA.help ("Only show lts snapshots"))) <*>
-    (OA.switch
-         ((OA.long "nightly") <> (OA.short 'n') <>
-          OA.help ("Only show nightly snapshots")))
+    LsCmdOpts <$> OA.hsubparser (lsViewLocalCmd <> lsViewRemoteCmd) <*>
+    OA.switch
+         (OA.long "lts" <> OA.short 'l' <>
+          OA.help "Only show lts snapshots") <*>
+    OA.switch
+         (OA.long "nightly" <> OA.short 'n' <>
+          OA.help "Only show nightly snapshots")
 
 lsViewLocalCmd :: OA.Mod OA.CommandFields LsView
 lsViewLocalCmd =
