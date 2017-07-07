@@ -1,4 +1,3 @@
-{-# OPTIONS_GHC -fno-warn-unused-top-binds #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
@@ -50,7 +49,7 @@ data Snapshot = Snapshot
     } deriving (Show, Eq, Ord)
 
 data SnapshotData = SnapshotData
-    { snapTotalCounts :: Integer
+    { _snapTotalCounts :: Integer
     , snaps :: [[Snapshot]]
     } deriving (Show, Eq, Ord)
 
