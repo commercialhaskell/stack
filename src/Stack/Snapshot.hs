@@ -87,6 +87,9 @@ data SnapshotException
   = InvalidCabalFileInSnapshot !SinglePackageLocation !PError !ByteString
   | PackageDefinedTwice !PackageName !SinglePackageLocation !SinglePackageLocation
   | UnmetDeps !(Map PackageName (Map PackageName (VersionIntervals, Maybe Version)))
+  | FilepathInCustomSnapshot !Text
+  | NeedResolverOrCompiler !Text
+  | MissingPackages !(Set PackageName)
   deriving Typeable
 instance Exception SnapshotException
 instance Show SnapshotException where
@@ -124,6 +127,15 @@ instance Show SnapshotException where
             Just version -> versionString version ++ " found"
         , "\n"
         ]
+  show (FilepathInCustomSnapshot url) =
+    "Custom snapshots do not support filepaths, as the contents may change over time. Found in: " ++
+    T.unpack url
+  show (NeedResolverOrCompiler url) =
+    "You must specify either a resolver or compiler value in " ++
+    T.unpack url
+  show (MissingPackages names) =
+    "The following packages specified by flags or options are not found: " ++
+    unwords (map packageNameString (Set.toList names))
 
 -- | Convert a 'Resolver' into a 'SnapshotDef'
 loadResolver
@@ -260,7 +272,7 @@ loadResolver (ResolverCustom url loc) = do
 
       forM_ (sdLocations sd0) $ \loc' ->
         case loc' of
-          PLOther (PLFilePath _) -> error "Custom snapshots do not support filepaths, as the contents may change over time"
+          PLOther (PLFilePath _) -> throwM $ FilepathInCustomSnapshot url
           _ -> return ()
 
       -- The fp above may just be the download location for a URL,
@@ -276,9 +288,7 @@ loadResolver (ResolverCustom url loc) = do
       -- resolver"
       (parentResolver, overrideCompiler) <-
         case (mparentResolver, mcompiler) of
-          (Nothing, Nothing) -> error $
-            "You must specify either a resolver or compiler value in " ++
-            T.unpack url
+          (Nothing, Nothing) -> throwM $ NeedResolverOrCompiler url
           (Just parentResolver, Nothing) -> return (parentResolver, id)
           (Nothing, Just compiler) -> return (ResolverCompiler compiler, id)
           (Just parentResolver, Just compiler) -> return
@@ -451,8 +461,7 @@ calculatePackagePromotion
           -- parent packages
           oldNames = Set.union (Map.keysSet globals1) (Map.keysSet parentPackages1)
           extraToUpgrade = Set.difference toUpgrade oldNames
-      unless (Set.null extraToUpgrade) $
-        error $ "Invalid snapshot definition, the following packages are not found: " ++ show (Set.toList extraToUpgrade)
+      unless (Set.null extraToUpgrade) $ throwM $ MissingPackages extraToUpgrade
 
       let
           -- Split up the globals into those that are to be upgraded
