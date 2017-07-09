@@ -53,7 +53,7 @@ resolveSinglePackageLocation
     -> PackageLocation FilePath
     -> m (Path Abs Dir)
 resolveSinglePackageLocation _ projRoot (PLFilePath fp) = resolveDir projRoot fp
-resolveSinglePackageLocation _ projRoot (PLHttp url) = do
+resolveSinglePackageLocation _ projRoot (PLHttp url subdir) = do
     workDir <- view workDirL
 
         -- TODO: dedupe with code for snapshot hash?
@@ -101,7 +101,7 @@ resolveSinglePackageLocation _ projRoot (PLHttp url) = do
 
     x <- listDir dir
     case x of
-        ([dir'], []) -> return dir'
+        ([dir'], []) -> resolveDir dir' subdir
         (dirs, files) -> liftIO $ do
             ignoringAbsence (removeFile file)
             ignoringAbsence (removeDirRecur dir)
@@ -123,9 +123,11 @@ resolveMultiPackageLocation
 resolveMultiPackageLocation x y (PLFilePath fp) = do
   dir <- resolveSinglePackageLocation x y (PLFilePath fp)
   return [(dir, PLFilePath fp)]
-resolveMultiPackageLocation x y (PLHttp url) = do
-  dir <- resolveSinglePackageLocation x y (PLHttp url)
-  return [(dir, PLHttp url)]
+resolveMultiPackageLocation x y (PLHttp url subdirs) = do
+  dir <- resolveSinglePackageLocation x y (PLHttp url ".")
+  forM subdirs $ \subdir -> do
+    dir' <- resolveDir dir subdir
+    return (dir', PLHttp url subdir)
 resolveMultiPackageLocation menv projRoot (PLRepo (Repo url commit repoType' subdirs)) = do
     dir <- cloneRepo menv projRoot url commit repoType'
 

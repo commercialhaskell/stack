@@ -174,20 +174,6 @@ extra-deps:
 - ./foo-1.2.3
 ```
 
-#### HTTP(S) URLs
-
-This one's pretty straightforward: you can use HTTP and HTTPS URLs
-referring to either tarballs or ZIP files.
-
-__NOTE__ Stack assumes that these files never change after downloading
-to avoid needing to make an HTTP request on each build.
-
-```yaml
-extra-deps:
-- location: https://example.com/foo/bar/baz-0.0.2.tar.gz
-- location: http://github.com/yesodweb/wai/archive/2f8a8e1b771829f4a8a77c0111352ce45a14c30f.zip
-```
-
 #### Git and Mercurial repos
 
 You can give a Git or Mercurial repo at a specific commit, and Stack
@@ -223,6 +209,27 @@ extra-deps:
 
 If unspecified, `subdirs` defaults to `subdirs: [.]`, or looking for a
 package in the root of the repo.
+
+#### HTTP(S) URLs
+
+This one's pretty straightforward: you can use HTTP and HTTPS URLs
+referring to either tarballs or ZIP files.
+
+__NOTE__ Stack assumes that these files never change after downloading
+to avoid needing to make an HTTP request on each build.
+
+```yaml
+extra-deps:
+- https://example.com/foo/bar/baz-0.0.2.tar.gz
+- location: http://github.com/yesodweb/wai/archive/2f8a8e1b771829f4a8a77c0111352ce45a14c30f.zip
+  subdirs:
+  - wai
+  - warp
+```
+
+Note that HTTP(S) URLs also support `subdirs` like repos to allow for
+archives of megarepos. In order to leverage this, use `location:
+http://...`.
 
 ### flags
 

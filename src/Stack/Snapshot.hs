@@ -196,7 +196,7 @@ loadResolver (ResolverSnapshot name) = do
         sdGlobalHints <- si .: "core-packages"
 
         packages <- o .: "packages"
-        (Endo mkLocs, sdFlags, sdHide) <- fmap mconcat $ mapM (uncurry goPkg) $ Map.toList packages
+        (Endo mkLocs, sdFlags, sdHidden) <- fmap mconcat $ mapM (uncurry goPkg) $ Map.toList packages
         let sdLocations = mkLocs []
 
         let sdGhcOptions = Map.empty -- Stackage snapshots do not allow setting GHC options
@@ -227,7 +227,7 @@ loadResolver (ResolverSnapshot name) = do
             let flags' = Map.singleton name' flags
 
             hide <- constraints .:? "hide" .!= False
-            let hide' = if hide then Set.singleton name' else Set.empty
+            let hide' = if hide then Map.singleton name' True else Map.empty
 
             let location = PLIndex $ PackageIdentifierRevision (PackageIdentifier name' version) mcabalFileInfo'
 
@@ -239,7 +239,7 @@ loadResolver (ResolverCompiler compiler) = return SnapshotDef
     , sdLocations = []
     , sdDropPackages = Set.empty
     , sdFlags = Map.empty
-    , sdHide = Set.empty
+    , sdHidden = Map.empty
     , sdGhcOptions = Map.empty
     , sdGlobalHints = Map.empty
     }
@@ -330,7 +330,7 @@ loadResolver (ResolverCustom url loc) = do
             <*> jsonSubWarningsT (o ..:? "packages" ..!= [])
             <*> o ..:? "drop-packages" ..!= Set.empty
             <*> o ..:? "flags" ..!= Map.empty
-            <*> o ..:? "hide" ..!= Set.empty
+            <*> o ..:? "hidden" ..!= Map.empty
             <*> o ..:? "ghc-options" ..!= Map.empty
             <*> o ..:? "global-hints" ..!= Map.empty)
         <*> (o ..:? "resolver")
@@ -399,7 +399,7 @@ loadSnapshot' loadFromIndex menv mcompiler root =
       (globals, snapshot, locals, _upgraded) <-
         calculatePackagePromotion loadFromIndex menv root ls0
         (map (\(x, y) -> (x, y, ())) gpds)
-        (sdFlags sd) (sdHide sd) (sdGhcOptions sd) (sdDropPackages sd)
+        (sdFlags sd) (sdHidden sd) (sdGhcOptions sd) (sdDropPackages sd)
 
       return LoadedSnapshot
         { lsCompilerVersion = lsCompilerVersion ls0
@@ -424,7 +424,7 @@ calculatePackagePromotion
   -> LoadedSnapshot
   -> [(GenericPackageDescription, SinglePackageLocation, localLocation)] -- ^ packages we want to add on top of this snapshot
   -> Map PackageName (Map FlagName Bool) -- ^ flags
-  -> Set PackageName -- ^ packages that should be registered hidden
+  -> Map PackageName Bool -- ^ overrides whether a package should be registered hidden
   -> Map PackageName [Text] -- ^ GHC options
   -> Set PackageName -- ^ packages in the snapshot to drop
   -> m ( Map PackageName (LoadedPackageInfo GhcPkgId) -- new globals
@@ -454,7 +454,7 @@ calculatePackagePromotion
 
           -- The set of all packages that need to be upgraded based on
           -- newly set flags, hide values, or GHC options
-          toUpgrade = Set.unions [Map.keysSet flags, hide, Map.keysSet ghcOptions]
+          toUpgrade = Set.unions [Map.keysSet flags, Map.keysSet hide, Map.keysSet ghcOptions]
 
           -- Perform a sanity check: ensure that all of the packages
           -- that need to be upgraded actually exist in the global or
@@ -527,12 +527,12 @@ recalculate :: forall env m.
             -> Path Abs Dir -- ^ root
             -> CompilerVersion 'CVActual
             -> Map PackageName (Map FlagName Bool)
-            -> Set PackageName -- ^ hide?
+            -> Map PackageName Bool -- ^ hide?
             -> Map PackageName [Text] -- ^ GHC options
             -> (PackageName, LoadedPackageInfo SinglePackageLocation)
             -> m (PackageName, LoadedPackageInfo SinglePackageLocation)
 recalculate loadFromIndex menv root compilerVersion allFlags allHide allOptions (name, lpi0) = do
-  let hide = lpiHide lpi0 || Set.member name allHide -- TODO future enhancement: allow child snapshot to unhide?
+  let hide = fromMaybe (lpiHide lpi0) (Map.lookup name allHide)
       options = fromMaybe (lpiGhcOptions lpi0) (Map.lookup name allOptions)
   case Map.lookup name allFlags of
     Nothing -> return (name, lpi0 { lpiHide = hide, lpiGhcOptions = options }) -- optimization
@@ -645,9 +645,9 @@ loadCompiler cv = do
 
 type FindPackageS localLocation =
     ( Map PackageName (LoadedPackageInfo (SinglePackageLocation, localLocation))
-    , Map PackageName (Map FlagName Bool)
-    , Set PackageName
-    , Map PackageName [Text]
+    , Map PackageName (Map FlagName Bool) -- flags
+    , Map PackageName Bool -- hide
+    , Map PackageName [Text] -- ghc options
     )
 
 -- | Find the package at the given 'PackageLocation', grab any flags,
@@ -670,8 +670,8 @@ findPackage platform compilerVersion (gpd, loc, localLoc) = do
     let flags = fromMaybe Map.empty $ Map.lookup name allFlags
         allFlags' = Map.delete name allFlags
 
-        hide = Set.member name allHide
-        allHide' = Set.delete name allHide
+        hide = fromMaybe False $ Map.lookup name allHide
+        allHide' = Map.delete name allHide
 
         options = fromMaybe [] $ Map.lookup name allOptions
         allOptions' = Map.delete name allOptions

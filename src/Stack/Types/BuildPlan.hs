@@ -90,9 +90,11 @@ data SnapshotDef = SnapshotDef
     -- here.
     , sdFlags :: !(Map PackageName (Map FlagName Bool))
     -- ^ Flag values to override from the defaults
-    , sdHide :: !(Set PackageName)
+    , sdHidden :: !(Map PackageName Bool)
     -- ^ Packages which should be hidden when registering. This will
-    -- affect, for example, the import parser in the script command.
+    -- affect, for example, the import parser in the script
+    -- command. We use a 'Map' instead of just a 'Set' to allow
+    -- overriding the hidden settings in a parent snapshot.
     , sdGhcOptions :: !(Map PackageName [Text])
     -- ^ GHC options per package
     , sdGlobalHints :: !(Map PackageName (Maybe Version))
@@ -140,7 +142,7 @@ data PackageLocation subdirs
   = PLFilePath !FilePath
     -- ^ Note that we use @FilePath@ and not @Path@s. The goal is: first parse
     -- the value raw, and then use @canonicalizePath@ and @parseAbsDir@.
-  | PLHttp !Text
+  | PLHttp !Text !subdirs
   -- ^ URL
   | PLRepo !(Repo subdirs)
   -- ^ Stored in a source control repository
@@ -185,7 +187,11 @@ instance subdirs ~ [FilePath] => ToJSON (PackageLocationIndex subdirs) where
 
 instance subdirs ~ [FilePath] => ToJSON (PackageLocation subdirs) where
     toJSON (PLFilePath fp) = toJSON fp
-    toJSON (PLHttp t) = toJSON t
+    toJSON (PLHttp t ["."]) = toJSON t
+    toJSON (PLHttp t subdirs) = object
+        [ "location" .= t
+        , "subdirs"  .= subdirs
+        ]
     toJSON (PLRepo (Repo url commit typ subdirs)) = object $
         (if null subdirs then id else (("subdirs" .= subdirs):))
         [ urlKey .= url
@@ -206,12 +212,13 @@ instance subdirs ~ [FilePath] => FromJSON (WithJSONWarnings (PackageLocation sub
     parseJSON v
         = (noJSONWarnings <$> withText "PackageLocation" (\t -> http t <|> file t) v)
         <|> repo v
+        <|> httpSubdirs v
       where
         file t = pure $ PLFilePath $ T.unpack t
         http t =
             case parseRequest $ T.unpack t of
                 Left  _ -> fail $ "Could not parse URL: " ++ T.unpack t
-                Right _ -> return $ PLHttp t
+                Right _ -> return $ PLHttp t ["."]
 
         repo = withObjectWarnings "PLRepo" $ \o -> do
           (repoType, repoUrl) <-
@@ -220,6 +227,13 @@ instance subdirs ~ [FilePath] => FromJSON (WithJSONWarnings (PackageLocation sub
           repoCommit <- o ..: "commit"
           repoSubdirs <- o ..:? "subdirs" ..!= []
           return $ PLRepo Repo {..}
+
+        httpSubdirs = withObjectWarnings "PLHttp" $ \o -> do
+          url <- o ..: "location"
+          subdirs <- o ..: "subdirs"
+          case parseRequest $ T.unpack url of
+            Left _ -> fail $ "Could not parse URL: " ++ T.unpack url
+            Right _ -> return $ PLHttp url subdirs
 
 -- | Name of an executable.
 newtype ExeName = ExeName { unExeName :: Text }
@@ -241,7 +255,7 @@ instance Store LoadedSnapshot
 instance NFData LoadedSnapshot
 
 loadedSnapshotVC :: VersionConfig LoadedSnapshot
-loadedSnapshotVC = storeVersionConfig "ls-v1" "vJxpC6RphW-79GI8ZuoiDHvAi8g="
+loadedSnapshotVC = storeVersionConfig "ls-v1" "pH4Le2OpvbgouOui4sjXODTEkZA="
 
 -- | Information on a single package for the 'LoadedSnapshot' which
 -- can be installed.

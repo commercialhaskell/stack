@@ -39,8 +39,9 @@ drop-packages:
 
 # Packages which should be hidden (affects script command's import
 # parser
-hide:
-- wai
+hidden:
+  wai: true
+  warp: false
 
 # Set GHC options for specific packages
 ghc-options:

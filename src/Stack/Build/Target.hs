@@ -528,7 +528,7 @@ parseTargets needTargets boptscli = do
       flags = Map.unionWith Map.union
         (Map.unions (map dropMaybeKey (Map.toList (boptsCLIFlags boptscli))))
         (bcFlags bconfig)
-      hides = Set.empty -- not supported to add hidden packages
+      hides = Map.empty -- not supported to add hidden packages
 
       -- We set this to empty here, which will prevent the call to
       -- calculatePackagePromotion from promoting packages based on
