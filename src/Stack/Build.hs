@@ -295,8 +295,6 @@ withLoadPackage inner = do
     run <- askRunIO
     withCabalLoader $ \loadFromIndex ->
         inner $ \loc flags ghcOptions -> do
-            -- FIXME this looks very similar to code in
-            -- Stack.Snapshot, try to merge it together
             bs <- run $ loadSingleRawCabalFile loadFromIndex menv root loc
 
             (_warnings,pkg) <- readPackageBS (depPackageConfig econfig flags ghcOptions) bs

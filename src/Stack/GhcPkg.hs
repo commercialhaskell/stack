@@ -1,4 +1,3 @@
--- FIXME See how much of this module can be deleted, even more functionality is now in PackageDump.
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE BangPatterns #-}
@@ -12,8 +11,6 @@
 
 module Stack.GhcPkg
   (getGlobalDB
-  ,EnvOverride
-  ,envHelper
   ,findGhcPkgField
   ,createDatabase
   ,unregisterGhcPkgId

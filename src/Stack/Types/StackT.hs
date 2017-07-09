@@ -65,7 +65,7 @@ type HasEnv r = (HasLogOptions r, HasTerminal r, HasReExec r, HasSticky r)
 
 -- | Constraint synonym for constraints commonly satisifed by monads used in stack.
 type StackM r m =
-    (MonadReader r m, MonadUnliftIO m, MonadLoggerIO m, MonadThrow m, HasEnv r) -- FIXME perhaps remove MonadThrow, switch to MonadLogger
+    (MonadReader r m, MonadUnliftIO m, MonadLoggerIO m, MonadThrow m, HasEnv r)
 
 --------------------------------------------------------------------------------
 -- Main StackT monad transformer

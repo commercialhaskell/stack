@@ -650,10 +650,12 @@ data Project = Project
     -- ^ Packages which are actually part of the project (as opposed
     -- to dependencies).
     --
-    -- FIXME Stack has always allowed these packages to be any kind of
-    -- package location, but in reality only @PLFilePath@ really makes
-    -- sense. We could consider replacing @[PackageLocation]@ with
-    -- @[FilePath]@ to properly enforce this idea.
+    -- /NOTE/ Stack has always allowed these packages to be any kind
+    -- of package location, but in reality only @PLFilePath@ really
+    -- makes sense. We could consider replacing @[PackageLocation]@
+    -- with @[FilePath]@ to properly enforce this idea, though it will
+    -- slightly break backwards compatibility if someone really did
+    -- want to treat such things as non-deps.
     , projectDependencies :: ![PackageLocationIndex [FilePath]]
     -- ^ Dependencies defined within the stack.yaml file, to be
     -- applied on top of the snapshot.
@@ -682,7 +684,7 @@ instance ToJSON Project where
 -- | Constraint synonym for constraints satisfied by a 'MiniConfig'
 -- environment.
 type StackMiniM r m =
-    ( MonadReader r m, MonadUnliftIO m, MonadLoggerIO m, MonadThrow m -- FIXME maybe remove MonadThrow?
+    ( MonadReader r m, MonadUnliftIO m, MonadLoggerIO m, MonadThrow m
     )
 
 -- An uninterpreted representation of configuration options.

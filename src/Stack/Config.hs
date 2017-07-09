@@ -640,7 +640,7 @@ getLocalPackages = do
     mcached <- liftIO $ readIORef cacheRef
     case mcached of
         Just cached -> return cached
-        Nothing -> withCabalLoader $ \loadFromIndex -> do -- FIXME remove withCabalLoader, make it part of Config
+        Nothing -> withCabalLoader $ \loadFromIndex -> do
             menv <- getMinimalEnvOverride
             root <- view projectRootL
             bc <- view buildConfigL

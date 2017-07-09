@@ -21,9 +21,7 @@
 module Stack.PackageIndex
     ( updateAllIndices
     , getPackageCaches
-    , getPackageCachesIO
     , getPackageVersions
-    , getPackageVersionsIO
     , lookupPackageVersions
     ) where
 
@@ -335,15 +333,6 @@ deleteCache indexName' = do
         Left e -> $logDebug $ "Could not delete cache: " <> T.pack (show e)
         Right () -> $logDebug $ "Deleted index cache at " <> T.pack (toFilePath fp)
 
--- | Lookup a package's versions from 'IO'.
-getPackageVersionsIO
-    :: (StackMiniM env m, HasConfig env)
-    => m (PackageName -> IO (Set Version))
-getPackageVersionsIO = do
-    getCaches <- getPackageCachesIO
-    return $ \name ->
-        fmap (lookupPackageVersions name . fst) getCaches
-
 -- | Get the known versions for a given package from the package caches.
 --
 -- See 'getPackageCaches' for performance notes.
@@ -357,28 +346,6 @@ getPackageVersions pkgName =
 lookupPackageVersions :: PackageName -> Map PackageIdentifier a -> Set Version
 lookupPackageVersions pkgName pkgCaches =
     Set.fromList [v | PackageIdentifier n v <- Map.keys pkgCaches, n == pkgName]
-
--- | Access the package caches from 'IO'.
---
--- FIXME: This is a temporary solution until a better solution
--- to access the package caches from Stack.Build.ConstructPlan
--- has been found.
-getPackageCachesIO
-    :: (StackMiniM env m, HasConfig env)
-    => m (IO ( Map PackageIdentifier (PackageIndex, PackageCache)
-             , HashMap CabalHash (PackageIndex, OffsetSize)))
-getPackageCachesIO = toIO' getPackageCaches
-  where
-    toIO' m = do
-        -- FIXME what's the purpose of this function and the IORef
-        -- work? Can we replace with Control.Monad.IO.Unlift.toIO
-        runInBase <- askRunIO
-        return $ do
-            i <- newIORef (error "Impossible evaluation in toIO")
-            runInBase $ do
-                x <- m
-                liftIO $ writeIORef i x
-            readIORef i
 
 -- | Load the package caches, or create the caches if necessary.
 --

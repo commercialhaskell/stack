@@ -6,7 +6,11 @@ Release notes:
 
 Major changes:
 
-* FIXME: Link to the blog post explaining extensible snapshots
+* Complete overhaul of how snapshots are defined, the `packages` and
+  `extra-deps` fields, and a number of related items. For full
+  details, please see
+  [the writeup on these changes](https://www.fpcomplete.com/blog/2017/07/stacks-new-extensible-snapshots). [PR #3249](https://github.com/commercialhaskell/stack/pull/3249),
+  see the PR description for a number of related issues.
 
 Behavior changes:
 

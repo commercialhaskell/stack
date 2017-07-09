@@ -360,8 +360,7 @@ withCabalLoader inner = do
     -- TODO: probably makes sense to move this concern into getPackageCaches
     updateRef <- liftIO $ newMVar True
 
-    loadCaches <- getPackageCachesIO
-    runInBase <- askRunIO
+    u <- askUnliftIO
 
     env <- ask
 
@@ -369,7 +368,7 @@ withCabalLoader inner = do
     let doLookup :: PackageIdentifierRevision
                  -> IO ByteString
         doLookup ident = do
-            (caches, cachesRev) <- loadCaches
+            (caches, cachesRev) <- unliftIO u getPackageCaches
             eres <- runReaderT (lookupPackageIdentifierExact ident caches cachesRev) env
             case eres of
                 Just bs -> return bs
@@ -387,7 +386,7 @@ withCabalLoader inner = do
                               <> "."
                     join $ modifyMVar updateRef $ \toUpdate ->
                         if toUpdate then do
-                            runInBase $ do
+                            unliftIO u $ do
                                 $logInfo $ T.concat
                                     [ "Didn't see "
                                     , T.pack $ packageIdentifierRevisionString ident

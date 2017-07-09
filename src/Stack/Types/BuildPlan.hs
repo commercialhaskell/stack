@@ -115,7 +115,13 @@ sdRawPathName sd =
     go (ResolverCompiler version) = compilerVersionText version
     go (ResolverCustom _ hash) = "custom-" <> sdResolverName sd <> "-" <> decodeUtf8 (trimmedSnapshotHash hash)
 
--- | FIXME should this entail modifying the hash?
+-- | Modify the wanted compiler version in this snapshot. This is used
+-- when overriding via the `compiler` value in a custom snapshot or
+-- stack.yaml file. We do _not_ need to modify the snapshot's hash for
+-- this: all binary caches of a snapshot are stored in a filepath that
+-- encodes the actual compiler version in addition to the
+-- hash. Therefore, modifications here will not lead to any invalid
+-- data.
 setCompilerVersion :: CompilerVersion 'CVWanted -> SnapshotDef -> SnapshotDef
 setCompilerVersion cv =
     go

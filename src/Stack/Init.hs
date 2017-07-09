@@ -86,9 +86,9 @@ initProject whichCmd currDir initOpts mresolver = do
     (sd, flags, extraDeps, rbundle) <- getDefaultResolver whichCmd dest initOpts
                                                           mresolver bundle
 
-    -- FIXME shouldn't really need to recalculate this, perhaps modify
-    -- definition of LoadedResolver to keep the `Either Request
-    -- FilePath`?
+    -- Kind of inefficient, since we've already parsed this value. But
+    -- better to reparse in this one case than carry the unneeded data
+    -- around everywhere in the codebase.
     resolver <- parseCustomLocation (Just (parent dest)) (void (sdResolver sd))
 
     let ignored = Map.difference bundle rbundle

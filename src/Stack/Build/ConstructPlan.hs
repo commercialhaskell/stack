@@ -187,7 +187,7 @@ constructPlan :: forall env m. (StackM env m, HasEnvConfig env)
               -> m Plan
 constructPlan ls0 baseConfigOpts0 locals extraToBuild0 localDumpPkgs loadPackage0 sourceMap installedMap initialBuildSteps = do
     $logDebug "Constructing the build plan"
-    getVersions0 <- getPackageVersionsIO
+    u <- askUnliftIO
 
     econfig <- view envConfigL
     let onWanted = void . addDep False . packageName . lpPackage
@@ -197,7 +197,7 @@ constructPlan ls0 baseConfigOpts0 locals extraToBuild0 localDumpPkgs loadPackage
     lf <- askLoggerIO
     lp <- getLocalPackages
     ((), m, W efinals installExes dirtyReason deps warnings parents) <-
-        liftIO $ runRWST inner (ctx econfig getVersions0 lf lp) M.empty
+        liftIO $ runRWST inner (ctx econfig (unliftIO u . getPackageVersions) lf lp) M.empty
     mapM_ $logWarn (warnings [])
     let toEither (_, Left e)  = Left e
         toEither (k, Right v) = Right (k, v)
