@@ -41,145 +41,13 @@ it will be used even if you're using a snapshot that specifies a particular
 version. Similarly, `extra-deps` will shadow the version specified in the
 resolver.
 
-### packages
-
-The `packages` section lists all local (project) packages. The term  _local
-package_ should be differentiated from a _dependency package_. A local package
-is something that you are developing as part of the project. Whereas a
-dependency package is an external package that your project depends on.
-
-In its simplest usage, it will be a list of directories or HTTP(S) URLs to a
-tarball or a zip. For example:
-
-```yaml
-packages:
-  - .
-  - dir1/dir2
-  - https://example.com/foo/bar/baz-0.0.2.tar.gz
-```
-
-Each package directory or location specified must have a valid cabal file
-present. Note that the subdirectories of the directory are not searched for
-cabal files. Subdirectories will have to be specified as independent items in
-the list of packages.
-
-When the `packages` field is not present, it defaults to looking for a package
-in the project's root directory:
-
-```yaml
-packages:
-  - .
-```
-#### Complex package locations (`location`)
-
-More complex package locations can be specified in a key-value format with
-`location` as a mandatory key.  In addition to `location` some optional
-key-value pairs can be specified to include specific subdirectories or to
-specify package attributes as descibed later in this section.
-
-In its simplest form a `location` key can have a single value in the same way
-as described above for single value items. Alternativel it can have key-value
-pairs as subfields to describe a git or mercurial repository location. For
-example:
-
-```yaml
-packages:
-- location: .
-- location: dir1/dir2
-- location: https://example.com/foo/bar/baz-0.0.2.tar.gz
-- location: http://github.com/yesodweb/wai/archive/2f8a8e1b771829f4a8a77c0111352ce45a14c30f.zip
-- location:
-    git: git@github.com:commercialhaskell/stack.git
-    commit: 6a86ee32e5b869a877151f74064572225e1a0398
-- location:
-    hg: https://example.com/hg/repo
-    commit: da39a3ee5e6b4b0d3255bfef95601890afd80709
-```
-
-Note: it is highly recommended that you only use SHA1 values for a Git or
-Mercurial commit. Other values may work, but they are not officially supported,
-and may result in unexpected behavior (namely, stack will not automatically
-pull to update to new versions).
-
-A `location` key can be accompanied by a `subdirs` key to look for cabal files
-in a list of subdirectories as well in addition to the top level directory.
-
-This could be useful for mega-repos like
-[wai](https://github.com/yesodweb/wai/) or
-[digestive-functors](https://github.com/jaspervdj/digestive-functors).
-
-The `subdirs` key can have multiple nested series items specifying a list of
-subdirectories.  For example:
-```yaml
-packages:
-- location: .
-  subdirs:
-  - subdir1
-  - subdir2
-- location:
-    git: git@github.com:yesodweb/wai
-    commit: 2f8a8e1b771829f4a8a77c0111352ce45a14c30f
-  subdirs:
-  - auto-update
-  - wai
-- location: http://github.com/yesodweb/wai/archive/2f8a8e1b771829f4a8a77c0111352ce45a14c30f.zip
-  subdirs:
-  - auto-update
-  - wai
-```
-
-#### Local dependency packages (`extra-dep`)
-A `location` key can be accompanied by an `extra-dep` key.  When the
-`extra-dep` key is set to `true` it indicates that the package should be
-treated in the same way as a dependency package and not as part of the project.
-This means the following:
-* A _dependency package_ is built only if a user package or its dependencies
-  depend on it. Note that a regular _project package_ is built anyway even if
-  no other package depends on it.
-* Its test suites and benchmarks will not be run.
-* It will not be directly loaded in ghci when `stack ghci` is run. This is
-  important because if you specify huge dependencies as project packages then
-  ghci will have a nightmare loading everything.
-
-This is especially useful when you are tweaking upstream packages or want to
-use latest versions of the upstream packages which are not yet on Hackage or
-Stackage.
-
-For example:
-```yaml
-packages:
-- location: .
-- location: vendor/binary
-  extra-dep: true
-- location:
-    git: git@github.com:yesodweb/wai
-    commit: 2f8a8e1b771829f4a8a77c0111352ce45a14c30f
-  subdirs:
-  - auto-update
-  - wai
-  extra-dep: true
-```
-
-### extra-deps
-
-This is a list of package identifiers for additional packages from upstream to
-be included. This is usually used to augment an LTS Haskell or Stackage Nightly
-snapshot with a package that is not present or is at an different version than you
-wish to use.
-
-```yaml
-extra-deps:
-- acme-missiles-0.3
-```
-
-Note that the `extra-dep` attribute in the `packages` section as described in
-an earlier section is used for non-index local or remote packages while the
-`extra-deps` section is for packages to be automatically pulled from an index
-like Hackage.
-
 ### resolver
 
-Specifies how dependencies are resolved. There are currently four resolver types:
+Specifies which snapshot is to be used for this project. A snapshot
+defines a GHC version, a number of packages available for
+installation, and various settings like build flags. It is called a
+resolver since a snapshot states how dependencies are resolved. There
+are currently four resolver types:
 
 * LTS Haskell snapshots, e.g. `resolver: lts-2.14`
 * Stackage Nightly snapshot, e.g. `resolver: nightly-2015-06-16`
@@ -191,6 +59,170 @@ Specifies how dependencies are resolved. There are currently four resolver types
 Each of these resolvers will also determine what constraints are placed on the
 compiler version. See the [compiler-check](#compiler-check) option for some
 additional control over compiler version.
+
+### packages and extra-deps
+
+_NOTE_ The contents of this section have changed significantly since
+extensible snapshots were implemented (see:
+[writeup](https://www.fpcomplete.com/blog/2017/07/stacks-new-extensible-snapshots)
+and
+[PR #3249](https://github.com/commercialhaskell/stack/pull/3249)). Most
+old syntax is still supported with newer versions of Stack, but will
+not be documented here. Instead, this section contains the recommended
+syntax as of Stack v1.6.0.
+
+There are two types of packages that can be defined in your
+`stack.yaml` file:
+
+* __Project packages__, those which you are actually working on in
+  your current project. These are local file paths in your project
+  directory.
+* __Extra dependencies__, which are packages provided locally on top
+  of the snapshot definition of available packages. These can come
+  from Hackage (or an alternative package index you've defined, see
+  [package-indices](#package-indices)), an HTTP(S) tarball, a Git or
+  Mercurial repository, or a local file path.
+
+These two sets of packages are both installed into your local package database within your project. However, beyond that, they are completely different:
+
+* Project packages will be built by default with a `stack build`
+  without specific targets. Extra dependencies will only be built if
+  they are depended upon.
+* Test suites and benchmarks may be run for project packages. They are
+  never run for extra dependencies.
+
+The `packages` key is a simple list of file paths, which will be
+treated as relative to the directory containing your `stack.yaml`
+file. For example:
+
+```yaml
+packages:
+- .
+- dir1/dir2
+```
+
+Each package directory or location specified must have a valid cabal
+file or hpack `package.yaml` file present. Note that the
+subdirectories of the directory are not searched for cabal
+files. Subdirectories will have to be specified as independent items
+in the list of packages.
+
+When the `packages` field is not present, it defaults to looking for a package
+in the project's root directory:
+
+```yaml
+packages:
+- .
+```
+
+The `extra-deps` key is given a list of all extra dependencies. If
+omitted, it is taken as the empty list, e.g.:
+
+```yaml
+extra-deps: []
+```
+
+It supports four different styles of values:
+
+#### Package index
+
+Packages can be stated by a name/version combination, which will be
+looked up in the package index (by default, Hackage). The basic syntax
+for this is:
+
+```yaml
+extra-deps:
+- acme-missiles-0.3
+```
+
+Using this syntax, the most recent Cabal file revision available will
+be used. For more reproducibility of builds, it is recommended to
+state the SHA256 hash of the cabal file contents as well, like this:
+
+```yaml
+extra-deps:
+- acme-missiles-0.3@sha256:2ba66a092a32593880a87fb00f3213762d7bca65a687d45965778deb8694c5d1
+```
+
+__NOTE__ Future versions of Stack may support specifying revisions by
+the revision number, providing more convenient than a hash with
+slightly less guarantees of reproducibility.
+
+#### Local file path
+
+Like `packages`, local file paths can be used in `extra-deps`, and
+will be relative to the directory containing the `stack.yaml` file.
+
+```yaml
+extra-deps:
+- vendor/somelib
+```
+
+Note that if a local directory can be parsed as a package identifier,
+Stack will treat it as a package identifier. In other words, if you
+have a local directory named `foo-1.2.3`, instead of:
+
+```yaml
+extra-deps:
+- foo-1.2.3
+```
+
+You should use the following to be explicit:
+
+```yaml
+extra-deps:
+- ./foo-1.2.3
+```
+
+#### HTTP(S) URLs
+
+This one's pretty straightforward: you can use HTTP and HTTPS URLs
+referring to either tarballs or ZIP files.
+
+__NOTE__ Stack assumes that these files never change after downloading
+to avoid needing to make an HTTP request on each build.
+
+```yaml
+extra-deps:
+- location: https://example.com/foo/bar/baz-0.0.2.tar.gz
+- location: http://github.com/yesodweb/wai/archive/2f8a8e1b771829f4a8a77c0111352ce45a14c30f.zip
+```
+
+#### Git and Mercurial repos
+
+You can give a Git or Mercurial repo at a specific commit, and Stack
+will clone that repo.
+
+```yaml
+extra-deps:
+- git: git@github.com:commercialhaskell/stack.git
+  commit: 6a86ee32e5b869a877151f74064572225e1a0398
+- hg: https://example.com/hg/repo
+  commit: da39a3ee5e6b4b0d3255bfef95601890afd80709
+```
+
+__NOTE__ It is highly recommended that you only use SHA1 values for a
+Git or Mercurial commit. Other values may work, but they are not
+officially supported, and may result in unexpected behavior (namely,
+Stack will not automatically pull to update to new versions).
+
+A common practice in the Haskell world is to use "megarepos", or
+repositories with multiple packages in various subdirectories. Some
+common examples include [wai](https://github.com/yesodweb/wai/) and
+[digestive-functors](https://github.com/jaspervdj/digestive-functors). To
+support this, you may also specify `subdirs` for repositories, e.g.:
+
+```yaml
+extra-deps:
+- git: git@github.com:yesodweb/wai
+  commit: 2f8a8e1b771829f4a8a77c0111352ce45a14c30f
+  subdirs:
+  - auto-update
+  - wai
+```
+
+If unspecified, `subdirs` defaults to `subdirs: [.]`, or looking for a
+package in the root of the repo.
 
 ### flags
 
