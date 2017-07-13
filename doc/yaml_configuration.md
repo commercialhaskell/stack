@@ -396,8 +396,9 @@ system-ghc: true
 
 ### install-ghc
 
-Whether or not to automatically install GHC when necessary. Default is `false`,
-which means stack will prompt you to run `stack setup` as needed.
+Whether or not to automatically install GHC when necessary. Since
+Stack 1.5.0, the default is `true`, which means Stack will not ask you
+before downloading and installing GHC.
 
 ### skip-ghc-check
 

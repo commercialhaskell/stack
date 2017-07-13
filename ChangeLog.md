@@ -18,6 +18,11 @@ Behavior changes:
   benchmarks and tests to the beginning of the args, instead of the end.
   See [#2399](https://github.com/commercialhaskell/stack/issues/2399)
 * Support for Git-based indices has been removed.
+* The `--install-ghc` flag is now on by default. For example, if you
+  run `stack build` in a directory requiring a GHC that you do not
+  currently have, Stack will automatically download and install that
+  GHC. You can explicitly set `install-ghc: false` or pass the flag
+  `--no-install-ghc` to regain the previous behavior.
 
 Other enhancements:
 
