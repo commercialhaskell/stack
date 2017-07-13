@@ -161,7 +161,7 @@ handleJust f = flip (catchJust f)
 try :: (MonadUnliftIO m, ES.Exception e) => m a -> m (Either e a)
 try m = withRunIO $ \run -> ES.try (run m)
 
-tryIO :: MonadUnliftIO m => m a -> m (Either ES.SomeException a)
+tryIO :: MonadUnliftIO m => m a -> m (Either ES.IOException a)
 tryIO = try
 
 tryAny :: MonadUnliftIO m => m a -> m (Either ES.SomeException a)
