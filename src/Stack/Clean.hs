@@ -18,7 +18,7 @@ import           Data.Typeable (Typeable)
 import           Path (Path, Abs, Dir)
 import           Path.IO (ignoringAbsence, removeDirRecur)
 import           Stack.Config (getLocalPackages)
-import           Stack.Constants (distDirFromDir, workDirFromDir)
+import           Stack.Constants.Config (distDirFromDir, workDirFromDir)
 import           Stack.Types.PackageName
 import           Stack.Types.Config
 import           Stack.Types.StackT

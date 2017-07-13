@@ -53,6 +53,7 @@ import qualified Paths_stack as Meta
 import           Prelude -- Fix redundant import warnings
 import           Stack.Config (getInContainer)
 import           Stack.Constants
+import           Stack.Constants.Config
 import           Stack.Docker.GlobalDB
 import           Stack.Types.PackageIndex
 import           Stack.Types.Version

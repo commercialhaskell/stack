@@ -54,7 +54,7 @@ import           Stack.Build.Installed
 import           Stack.Build.Source
 import           Stack.Build.Target
 import           Stack.Config (getLocalPackages)
-import           Stack.Constants
+import           Stack.Constants.Config
 import           Stack.Exec
 import           Stack.Ghci.Script
 import           Stack.Package

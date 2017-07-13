@@ -40,7 +40,7 @@ import           Path.IO
 import           Prelude hiding (FilePath, writeFile)
 import           Stack.Build.Target
 import           Stack.Config (getLocalPackages)
-import           Stack.Constants
+import           Stack.Constants.Config
 import           Stack.Package
 import           Stack.PrettyPrint
 import           Stack.Types.Compiler

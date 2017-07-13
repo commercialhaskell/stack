@@ -101,6 +101,7 @@ library
                      Stack.Config.Nix
                      Stack.ConfigCmd
                      Stack.Constants
+                     Stack.Constants.Config
                      Stack.Coverage
                      Stack.Docker
                      Stack.Docker.GlobalDB

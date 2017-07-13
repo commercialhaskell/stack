@@ -87,7 +87,8 @@ import              Prelude hiding (concat, elem, any) -- Fix AMP warning
 import              Safe (headMay, readMay)
 import              Stack.Build (build)
 import              Stack.Config (loadConfig)
-import              Stack.Constants (distRelativeDir, stackProgName)
+import              Stack.Constants (stackProgName)
+import              Stack.Constants.Config (distRelativeDir)
 import              Stack.Exec (defaultEnvSettings)
 import              Stack.Fetch
 import              Stack.GhcPkg (createDatabase, getCabalPkgVer, getGlobalDB, mkGhcPackagePath)
