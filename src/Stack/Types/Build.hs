@@ -47,7 +47,7 @@ module Stack.Types.Build
     where
 
 import           Control.DeepSeq
-import           Control.Exception
+import           Control.Monad.IO.Unlift
 import           Data.Binary                     (Binary)
 import           Data.Binary.Tagged              (HasSemanticVersion,
                                                   HasStructuralInfo)
@@ -83,7 +83,7 @@ import           Path.Extra                      (toFilePathNoTrailingSep)
 import           Paths_stack                     as Meta
 import           Prelude
 import           Stack.Constants
-import           Stack.Types.BuildPlan           (GitSHA1)
+import           Stack.Types.BuildPlan           (PackageLocationIndex)
 import           Stack.Types.Compiler
 import           Stack.Types.CompilerBuild
 import           Stack.Types.Config
@@ -102,8 +102,8 @@ import           System.Process.Log              (showProcessArgDebug)
 data StackBuildException
   = Couldn'tFindPkgId PackageName
   | CompilerVersionMismatch
-        (Maybe (CompilerVersion, Arch)) -- found
-        (CompilerVersion, Arch) -- expected
+        (Maybe (CompilerVersion 'CVActual, Arch)) -- found
+        (CompilerVersion 'CVWanted, Arch) -- expected
         GHCVariant -- expected
         CompilerBuild -- expected
         VersionCheck
@@ -132,7 +132,6 @@ data StackBuildException
   | NoSetupHsFound (Path Abs Dir)
   | InvalidFlagSpecification (Set UnusedFlags)
   | TargetParseException [Text]
-  | DuplicateLocalPackageNames [(PackageName, [Path Abs Dir])]
   | SolverGiveUp String
   | SolverMissingCabalInstall
   | SomeTargetsNotBuildable [(PackageName, NamedComponent)]
@@ -304,15 +303,6 @@ instance Show StackBuildException where
         $ "The following errors occurred while parsing the build targets:"
         : map (("- " ++) . T.unpack) errs
 
-    show (DuplicateLocalPackageNames pairs) = concat
-        $ "The same package name is used in multiple local packages\n"
-        : map go pairs
-      where
-        go (name, dirs) = unlines
-            $ ""
-            : (packageNameString name ++ " used in:")
-            : map goDir dirs
-        goDir dir = "- " ++ toFilePath dir
     show (SolverGiveUp msg) = concat
         [ "\nSolver could not resolve package dependencies.\n"
         , "You can try the following:\n"
@@ -447,7 +437,7 @@ instance Show TaskConfigOpts where
 -- | The type of a task, either building local code or something from the
 -- package index (upstream)
 data TaskType = TTLocal LocalPackage
-              | TTUpstream Package InstallLocation (Maybe GitSHA1)
+              | TTUpstream Package InstallLocation (PackageLocationIndex FilePath) -- FIXME major overhaul for PackageLocation?
     deriving Show
 
 taskIsTarget :: Task -> Bool

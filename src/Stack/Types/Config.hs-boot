@@ -2,7 +2,7 @@
 
 module Stack.Types.Config where
 
-import           Control.Exception
+import           Control.Monad.IO.Unlift
 import           Data.List.NonEmpty (NonEmpty)
 import           Distribution.Version
 import           Data.Text (Text)

@@ -9,7 +9,7 @@
 module Stack.Types.Package where
 
 import           Control.DeepSeq
-import           Control.Exception hiding (try,catch)
+import           Control.Monad.IO.Unlift
 import qualified Data.ByteString as S
 import           Data.Data
 import           Data.Function
@@ -36,7 +36,7 @@ import           Distribution.System (Platform (..))
 import           GHC.Generics (Generic)
 import           Path as FL
 import           Prelude
-import           Stack.Types.BuildPlan (GitSHA1)
+import           Stack.Types.BuildPlan (PackageLocationIndex)
 import           Stack.Types.Compiler
 import           Stack.Types.Config
 import           Stack.Types.FlagName
@@ -177,7 +177,8 @@ data PackageConfig =
                 ,packageConfigEnableBenchmarks :: !Bool           -- ^ Are benchmarks enabled?
                 ,packageConfigFlags :: !(Map FlagName Bool)       -- ^ Configured flags.
                 ,packageConfigGhcOptions :: ![Text]               -- ^ Configured ghc options.
-                ,packageConfigCompilerVersion :: !CompilerVersion -- ^ GHC version
+                ,packageConfigCompilerVersion
+                                  :: !(CompilerVersion 'CVActual) -- ^ GHC version
                 ,packageConfigPlatform :: !Platform               -- ^ host platform
                 }
  deriving (Show,Typeable)
@@ -195,7 +196,7 @@ type SourceMap = Map PackageName PackageSource
 -- | Where the package's source is located: local directory or package index
 data PackageSource
     = PSLocal LocalPackage
-    | PSUpstream Version InstallLocation (Map FlagName Bool) [Text] (Maybe GitSHA1)
+    | PSUpstream Version InstallLocation (Map FlagName Bool) [Text] (PackageLocationIndex FilePath) -- FIXME still seems like we could do better... Minimum: rename from Upstream to Dependency and Local to Project
     -- ^ Upstream packages could be installed in either local or snapshot
     -- databases; this is what 'InstallLocation' specifies.
     deriving Show
@@ -248,14 +249,6 @@ data LocalPackage = LocalPackage
     -- ^ all files used by this package
     }
     deriving Show
-
--- | A single, fully resolved component of a package
-data NamedComponent
-    = CLib
-    | CExe !Text
-    | CTest !Text
-    | CBench !Text
-    deriving (Show, Eq, Ord)
 
 renderComponent :: NamedComponent -> S.ByteString
 renderComponent CLib = "lib"

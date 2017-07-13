@@ -15,9 +15,8 @@ module Main (main) where
 #ifndef HIDE_DEP_VERSIONS
 import qualified Build_stack
 #endif
-import           Control.Exception
 import           Control.Monad hiding (mapM, forM)
-import           Control.Monad.IO.Class
+import           Control.Monad.IO.Unlift
 import           Control.Monad.Logger
 import           Control.Monad.Reader (local)
 import           Control.Monad.Trans.Either (EitherT)
@@ -27,7 +26,7 @@ import           Data.Attoparsec.Interpreter (getInterpreterArgs)
 import qualified Data.ByteString.Lazy as L
 import           Data.IORef.RunOnce (runOnce)
 import           Data.List
-import qualified Data.Map as Map
+import qualified Data.Map.Strict as Map
 import           Data.Maybe
 import           Data.Monoid
 import           Data.Text (Text)
@@ -56,7 +55,6 @@ import           Path.IO
 import qualified Paths_stack as Meta
 import           Prelude hiding (pi, mapM)
 import           Stack.Build
-import           Stack.BuildPlan
 import           Stack.Clean (CleanOpts, clean)
 import           Stack.Config
 import           Stack.ConfigCmd as ConfigCmd
@@ -97,11 +95,11 @@ import           Stack.Script
 import           Stack.SDist (getSDistTarball, checkSDistTarball, checkSDistTarball', SDistOpts(..))
 import           Stack.SetupCmd
 import qualified Stack.Sig as Sig
+import           Stack.Snapshot (loadResolver)
 import           Stack.Solver (solveExtraDeps)
 import           Stack.Types.Version
 import           Stack.Types.Config
 import           Stack.Types.Compiler
-import           Stack.Types.Resolver
 import           Stack.Types.Nix
 import           Stack.Types.StackT
 import           Stack.Types.StringError
@@ -626,19 +624,8 @@ uninstallCmd _ go = withConfigAndLock go $ do
 -- | Unpack packages to the filesystem
 unpackCmd :: [String] -> GlobalOpts -> IO ()
 unpackCmd names go = withConfigAndLock go $ do
-    mMiniBuildPlan <-
-        case globalResolver go of
-            Nothing -> return Nothing
-            Just ar -> fmap Just $ do
-                r <- makeConcreteResolver ar
-                case r of
-                    ResolverSnapshot snapName -> do
-                        config <- view configL
-                        let miniConfig = loadMiniConfig config
-                        runInnerStackT miniConfig (loadMiniBuildPlan snapName)
-                    ResolverCompiler _ -> throwString "Error: unpack does not work with compiler resolvers"
-                    ResolverCustom _ _ -> throwString "Error: unpack does not work with custom resolvers"
-    Stack.Fetch.unpackPackages mMiniBuildPlan "." names
+    mSnapshotDef <- mapM (makeConcreteResolver Nothing >=> loadResolver) (globalResolver go)
+    Stack.Fetch.unpackPackages mSnapshotDef "." names
 
 -- | Update the package index
 updateCmd :: () -> GlobalOpts -> IO ()
@@ -711,7 +698,7 @@ sdistCmd sdistOpts go =
     withBuildConfig go $ do -- No locking needed.
         -- If no directories are specified, build all sdist tarballs.
         dirs' <- if null (sdoptsDirsToWorkWith sdistOpts)
-            then liftM Map.keys getLocalPackages
+            then liftM (map lpvRoot . Map.elems . lpProject) getLocalPackages
             else mapM resolveDir' (sdoptsDirsToWorkWith sdistOpts)
         forM_ dirs' $ \dir -> do
             (tarName, tarBytes, _mcabalRevision) <- getSDistTarball (sdoptsPvpBounds sdistOpts) dir

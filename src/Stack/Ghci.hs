@@ -22,13 +22,10 @@ module Stack.Ghci
 
 import           Control.Applicative
 import           Control.Arrow (second)
-import           Control.Exception.Safe (tryAny)
 import           Control.Monad hiding (forM)
-import           Control.Monad.Catch
-import           Control.Monad.IO.Class
+import           Control.Monad.IO.Unlift
 import           Control.Monad.Logger
 import           Control.Monad.State.Strict (State, execState, get, modify)
-import           Control.Monad.Trans.Unlift (MonadBaseUnlift)
 import qualified Data.ByteString.Char8 as S8
 import           Data.Either
 import           Data.Function
@@ -132,7 +129,7 @@ instance Show GhciException where
 -- | Launch a GHCi session for the given local package targets with the
 -- given options and configure it with the load paths and extensions
 -- of those targets.
-ghci :: (StackM r m, HasEnvConfig r, MonadBaseUnlift IO m) => GhciOpts -> m ()
+ghci :: (StackM r m, HasEnvConfig r) => GhciOpts -> m ()
 ghci opts@GhciOpts{..} = do
     let buildOptsCLI = defaultBuildOptsCLI
             { boptsCLITargets = []
@@ -153,11 +150,9 @@ ghci opts@GhciOpts{..} = do
             (targetMap, fileInfo, extraFiles) <- findFileTargets locals rawFileTargets
             return (targetMap, Just (fileInfo, extraFiles))
         Right rawTargets -> do
-            (_,_,normalTargets) <- parseTargetsFromBuildOpts AllowNoTargets buildOptsCLI
+            (_,_,normalTargets) <- parseTargets AllowNoTargets buildOptsCLI
                 { boptsCLITargets = rawTargets }
             return (normalTargets, Nothing)
-    -- Make sure the targets are known.
-    checkTargets inputTargets
     -- Get a list of all the local target packages.
     localTargets <- getAllLocalTargets opts inputTargets mainIsTargets sourceMap
     -- Check if additional package arguments are sensible.
@@ -177,7 +172,7 @@ preprocessTargets rawTargets = do
                       rawTargets
     fileTargets <- forM fileTargetsRaw $ \fp0 -> do
         let fp = T.unpack fp0
-        mpath <- forgivingAbsence (resolveFile' fp)
+        mpath <- liftIO $ forgivingAbsence (resolveFile' fp)
         case mpath of
             Nothing -> throwM (MissingFileTarget fp)
             Just path -> return path
@@ -186,9 +181,9 @@ preprocessTargets rawTargets = do
         (False, _) -> return (Left fileTargets)
         _ -> return (Right normalTargets)
 
-parseMainIsTargets :: (StackM r m, HasEnvConfig r) => BuildOptsCLI -> Maybe Text -> m (Maybe (Map PackageName SimpleTarget))
+parseMainIsTargets :: (StackM r m, HasEnvConfig r) => BuildOptsCLI -> Maybe Text -> m (Maybe (Map PackageName Target))
 parseMainIsTargets buildOptsCLI mtarget = forM mtarget $ \target -> do
-     (_,_,targets) <- parseTargetsFromBuildOpts AllowNoTargets buildOptsCLI
+     (_,_,targets) <- parseTargets AllowNoTargets buildOptsCLI
          { boptsCLITargets = [target] }
      return targets
 
@@ -196,7 +191,7 @@ findFileTargets
     :: (StackM r m, HasEnvConfig r)
     => [LocalPackage]
     -> [Path Abs File]
-    -> m (Map PackageName SimpleTarget, Map PackageName (Set (Path Abs File)), [Path Abs File])
+    -> m (Map PackageName Target, Map PackageName (Set (Path Abs File)), [Path Abs File])
 findFileTargets locals fileTargets = do
     filePackages <- forM locals $ \lp -> do
         (_,compFiles,_,_) <- getPackageFiles (packageFiles (lpPackage lp)) (lpCabalFile lp)
@@ -230,8 +225,8 @@ findFileTargets locals fileTargets = do
                 return $ Right (fp, x)
     let (extraFiles, associatedFiles) = partitionEithers results
         targetMap =
-            foldl unionSimpleTargets M.empty $
-            map (\(_, (name, comp)) -> M.singleton name (STLocalComps (S.singleton comp)))
+            foldl unionTargets M.empty $
+            map (\(_, (name, comp)) -> M.singleton name (TargetComps (S.singleton comp)))
                 associatedFiles
         infoMap =
             foldl (M.unionWith S.union) M.empty $
@@ -239,43 +234,28 @@ findFileTargets locals fileTargets = do
                 associatedFiles
     return (targetMap, infoMap, extraFiles)
 
-checkTargets
-    :: (StackM r m, HasEnvConfig r)
-    => Map PackageName SimpleTarget
-    -> m ()
-checkTargets mp = do
-    let filtered = M.filter (== STUnknown) mp
-    unless (M.null filtered) $ do
-        bconfig <- view buildConfigL
-        throwM $ UnknownTargets (M.keysSet filtered) M.empty (bcStackYaml bconfig)
-
 getAllLocalTargets
     :: (StackM r m, HasEnvConfig r)
     => GhciOpts
-    -> Map PackageName SimpleTarget
-    -> Maybe (Map PackageName SimpleTarget)
+    -> Map PackageName Target
+    -> Maybe (Map PackageName Target)
     -> SourceMap
-    -> m [(PackageName, (Path Abs File, SimpleTarget))]
+    -> m [(PackageName, (Path Abs File, Target))]
 getAllLocalTargets GhciOpts{..} targets0 mainIsTargets sourceMap = do
     -- Use the 'mainIsTargets' as normal targets, for CLI concision. See
     -- #1845. This is a little subtle - we need to do the target parsing
     -- independently in order to handle the case where no targets are
     -- specified.
-    let targets = maybe targets0 (unionSimpleTargets targets0) mainIsTargets
-    packages <- getLocalPackages
+    let targets = maybe targets0 (unionTargets targets0) mainIsTargets
+    packages <- lpProject <$> getLocalPackages
     -- Find all of the packages that are directly demanded by the
     -- targets.
     directlyWanted <-
         forMaybeM (M.toList packages) $
-        \(dir,treatLikeExtraDep) ->
-             do cabalfp <- findOrGenerateCabalFile dir
-                name <- parsePackageNameFromFilePath cabalfp
-                if treatLikeExtraDep
-                    then return Nothing
-                    else case M.lookup name targets of
-                             Just simpleTargets ->
-                                 return (Just (name, (cabalfp, simpleTargets)))
-                             Nothing -> return Nothing
+        \(name, lpv) ->
+                case M.lookup name targets of
+                  Just simpleTargets -> return (Just (name, (lpvCabalFP lpv, simpleTargets)))
+                  Nothing -> return Nothing
     -- Figure out
     let extraLoadDeps = getExtraLoadDeps ghciLoadLocalDeps sourceMap directlyWanted
     if (ghciSkipIntermediate && not ghciLoadLocalDeps) || null extraLoadDeps
@@ -296,7 +276,7 @@ getAllLocalTargets GhciOpts{..} targets0 mainIsTargets sourceMap = do
                     ]
             return (directlyWanted ++ extraLoadDeps)
 
-buildDepsAndInitialSteps :: (StackM r m, HasEnvConfig r, MonadBaseUnlift IO m) => GhciOpts -> [Text] -> m ()
+buildDepsAndInitialSteps :: (StackM r m, HasEnvConfig r) => GhciOpts -> [Text] -> m ()
 buildDepsAndInitialSteps GhciOpts{..} targets0 = do
     let targets = targets0 ++ map T.pack ghciAdditionalPackages
     -- If necessary, do the build, for local packagee targets, only do
@@ -323,8 +303,8 @@ checkAdditionalPackages pkgs = forM pkgs $ \name -> do
 runGhci
     :: (StackM r m, HasEnvConfig r)
     => GhciOpts
-    -> [(PackageName, (Path Abs File, SimpleTarget))]
-    -> Maybe (Map PackageName SimpleTarget)
+    -> [(PackageName, (Path Abs File, Target))]
+    -> Maybe (Map PackageName Target)
     -> [GhciPkgInfo]
     -> [Path Abs File]
     -> m ()
@@ -372,7 +352,7 @@ runGhci GhciOpts{..} targets mainIsTargets pkgs extraFiles = do
             if "Intero" `isPrefixOf` output
                 then return renderScriptIntero
                 else return renderScriptGhci
-    withSystemTempDir "ghci" $ \tmpDirectory -> do
+    withRunIO $ \run -> withSystemTempDir "ghci" $ \tmpDirectory -> run $ do
         macrosOptions <- writeMacrosFile tmpDirectory pkgs
         if ghciNoLoadModules
             then execGhci macrosOptions
@@ -444,8 +424,8 @@ getFileTargets = concatMap (concatMap S.toList . maybeToList . ghciPkgTargetFile
 figureOutMainFile
     :: (StackM r m)
     => BuildOpts
-    -> Maybe (Map PackageName SimpleTarget)
-    -> [(PackageName, (Path Abs File, SimpleTarget))]
+    -> Maybe (Map PackageName Target)
+    -> [(PackageName, (Path Abs File, Target))]
     -> [GhciPkgInfo]
     -> m (Maybe (Path Abs File))
 figureOutMainFile bopts mainIsTargets targets0 packages = do
@@ -532,7 +512,7 @@ getGhciPkgInfos
     -> SourceMap
     -> [PackageName]
     -> Maybe (Map PackageName (Set (Path Abs File)))
-    -> [(PackageName, (Path Abs File, SimpleTarget))]
+    -> [(PackageName, (Path Abs File, Target))]
     -> m [GhciPkgInfo]
 getGhciPkgInfos buildOptsCLI sourceMap addPkgs mfileTargets localTargets = do
     menv <- getMinimalEnvOverride
@@ -559,7 +539,7 @@ makeGhciPkgInfo
     -> Maybe (Map PackageName (Set (Path Abs File)))
     -> PackageName
     -> Path Abs File
-    -> SimpleTarget
+    -> Target
     -> m GhciPkgInfo
 makeGhciPkgInfo buildOptsCLI sourceMap installedMap locals addPkgs mfileTargets name cabalfp target = do
     bopts <- view buildOptsL
@@ -612,9 +592,9 @@ makeGhciPkgInfo buildOptsCLI sourceMap installedMap locals addPkgs mfileTargets 
 -- NOTE: this should make the same choices as the components code in
 -- 'loadLocalPackage'. Unfortunately for now we reiterate this logic
 -- (differently).
-wantedPackageComponents :: BuildOpts -> SimpleTarget -> Package -> Set NamedComponent
-wantedPackageComponents _ (STLocalComps cs) _ = cs
-wantedPackageComponents bopts STLocalAll pkg = S.fromList $
+wantedPackageComponents :: BuildOpts -> Target -> Package -> Set NamedComponent
+wantedPackageComponents _ (TargetComps cs) _ = cs
+wantedPackageComponents bopts (TargetAll ProjectPackage) pkg = S.fromList $
     (if packageHasLibrary pkg then [CLib] else []) ++
     map CExe (S.toList (packageExes pkg)) <>
     (if boptsTests bopts then map CTest (M.keys (packageTests pkg)) else []) <>
@@ -718,8 +698,8 @@ checkForDuplicateModules pkgs = do
 getExtraLoadDeps
     :: Bool
     -> SourceMap
-    -> [(PackageName, (Path Abs File, SimpleTarget))]
-    -> [(PackageName, (Path Abs File, SimpleTarget))]
+    -> [(PackageName, (Path Abs File, Target))]
+    -> [(PackageName, (Path Abs File, Target))]
 getExtraLoadDeps loadAllDeps sourceMap targets =
     M.toList $
     (\mp -> foldl' (flip M.delete) mp (map fst targets)) $
@@ -732,7 +712,7 @@ getExtraLoadDeps loadAllDeps sourceMap targets =
         case M.lookup name sourceMap of
             Just (PSLocal lp) -> M.keys (packageDeps (lpPackage lp))
             _ -> []
-    go :: PackageName -> State (Map PackageName (Maybe (Path Abs File, SimpleTarget))) Bool
+    go :: PackageName -> State (Map PackageName (Maybe (Path Abs File, Target))) Bool
     go name = do
         cache <- get
         case (M.lookup name cache, M.lookup name sourceMap) of
@@ -743,7 +723,7 @@ getExtraLoadDeps loadAllDeps sourceMap targets =
                 shouldLoad <- liftM or $ mapM go deps
                 if shouldLoad
                     then do
-                        modify (M.insert name (Just (lpCabalFile lp, STLocalComps (S.singleton CLib))))
+                        modify (M.insert name (Just (lpCabalFile lp, TargetComps (S.singleton CLib))))
                         return True
                     else do
                         modify (M.insert name Nothing)
@@ -773,21 +753,20 @@ setScriptPerms fp = do
         ]
 #endif
 
-unionSimpleTargets :: Ord k => Map k SimpleTarget -> Map k SimpleTarget -> Map k SimpleTarget
-unionSimpleTargets = M.unionWith $ \l r ->
+unionTargets :: Ord k => Map k Target -> Map k Target -> Map k Target
+unionTargets = M.unionWith $ \l r ->
     case (l, r) of
-        (STUnknown, _) -> r
-        (STNonLocal, _) -> r
-        (STLocalComps sl, STLocalComps sr) -> STLocalComps (S.union sl sr)
-        (STLocalComps _, STLocalAll) -> STLocalAll
-        (STLocalComps _, _) -> l
-        (STLocalAll, _) -> STLocalAll
+        (TargetAll Dependency, _) -> r
+        (TargetComps sl, TargetComps sr) -> TargetComps (S.union sl sr)
+        (TargetComps _, TargetAll ProjectPackage) -> TargetAll ProjectPackage
+        (TargetComps _, _) -> l
+        (TargetAll ProjectPackage, _) -> TargetAll ProjectPackage
 
-hasLocalComp :: (NamedComponent -> Bool) -> SimpleTarget -> Bool
+hasLocalComp :: (NamedComponent -> Bool) -> Target -> Bool
 hasLocalComp p t =
     case t of
-        STLocalComps s -> any p (S.toList s)
-        STLocalAll -> True
+        TargetComps s -> any p (S.toList s)
+        TargetAll ProjectPackage -> True
         _ -> False
 
 

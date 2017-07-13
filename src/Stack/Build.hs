@@ -20,13 +20,10 @@ module Stack.Build
   ,CabalVersionException(..))
   where
 
-import           Control.Exception (Exception)
 import           Control.Monad
-import           Control.Monad.IO.Class
+import           Control.Monad.IO.Unlift
 import           Control.Monad.Logger
 import           Control.Monad.Reader (MonadReader)
-import           Control.Monad.Trans.Resource
-import           Control.Monad.Trans.Unlift (MonadBaseUnlift)
 import           Data.Aeson (Value (Object, Array), (.=), object)
 import           Data.Function
 import qualified Data.HashMap.Strict as HM
@@ -36,7 +33,6 @@ import           Data.List.NonEmpty (NonEmpty(..))
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Map as Map
 import           Data.Map.Strict (Map)
-import           Data.Maybe (catMaybes)
 import           Data.Monoid
 import           Data.Set (Set)
 import qualified Data.Set as Set
@@ -50,7 +46,7 @@ import           Data.Typeable (Typeable)
 import qualified Data.Vector as V
 import qualified Data.Yaml as Yaml
 import           Path
-import           Prelude hiding (FilePath, writeFile)
+import           Prelude hiding (writeFile)
 import           Stack.Build.ConstructPlan
 import           Stack.Build.Execute
 import           Stack.Build.Haddock
@@ -59,9 +55,9 @@ import           Stack.Build.Source
 import           Stack.Build.Target
 import           Stack.Fetch as Fetch
 import           Stack.Package
-import           Stack.PackageIndex
-import           Stack.PrettyPrint
+import           Stack.PackageLocation (loadSingleRawCabalFile)
 import           Stack.Types.Build
+import           Stack.Types.BuildPlan
 import           Stack.Types.Config
 import           Stack.Types.FlagName
 import           Stack.Types.Package
@@ -78,7 +74,6 @@ import           System.FileLock (FileLock, unlockFile)
 
 #ifdef WINDOWS
 import           System.Win32.Console (setConsoleCP, setConsoleOutputCP, getConsoleCP, getConsoleOutputCP)
-import qualified Control.Monad.Catch as Catch
 #endif
 
 -- | Build.
@@ -86,7 +81,7 @@ import qualified Control.Monad.Catch as Catch
 --   If a buildLock is passed there is an important contract here.  That lock must
 --   protect the snapshot, and it must be safe to unlock it if there are no further
 --   modifications to the snapshot to be performed by this build.
-build :: (StackM env m, HasEnvConfig env, MonadBaseUnlift IO m)
+build :: (StackM env m, HasEnvConfig env)
       => (Set (Path Abs File) -> IO ()) -- ^ callback after discovering all local files
       -> Maybe FileLock
       -> BuildOptsCLI
@@ -97,7 +92,7 @@ build setLocalFiles mbuildLk boptsCli = fixCodePage $ do
     let symbols = not (boptsLibStrip bopts || boptsExeStrip bopts)
     menv <- getMinimalEnvOverride
 
-    (targets, mbp, locals, extraToBuild, extraDeps, sourceMap) <- loadSourceMapFull NeedTargets boptsCli
+    (targets, mbp, locals, extraToBuild, sourceMap) <- loadSourceMapFull NeedTargets boptsCli
 
     -- Set local files, necessary for file watching
     stackYaml <- view stackYamlL
@@ -113,8 +108,6 @@ build setLocalFiles mbuildLk boptsCli = fixCodePage $ do
                          , getInstalledHaddock   = shouldHaddockDeps bopts
                          , getInstalledSymbols   = symbols }
                      sourceMap
-
-    warnMissingExtraDeps installedMap extraDeps
 
     baseConfigOpts <- mkBaseConfigOpts boptsCli
     plan <- withLoadPackage $ \loadPackage ->
@@ -183,25 +176,6 @@ newtype CabalVersionException = CabalVersionException { unCabalVersionException 
 
 instance Show CabalVersionException where show = unCabalVersionException
 instance Exception CabalVersionException
-
-warnMissingExtraDeps
-    :: (StackM env m, HasConfig env)
-    => InstalledMap -> Map PackageName Version -> m ()
-warnMissingExtraDeps installed extraDeps = do
-    missingExtraDeps <-
-        fmap catMaybes $ forM (Map.toList extraDeps) $ \(n, v) ->
-            if Map.member n installed
-                then return Nothing
-                else do
-                    vs <- getPackageVersions n
-                    if Set.null vs
-                        then return $ Just $
-                            fromString (packageNameString n ++ "-" ++ versionString v)
-                        else return Nothing
-    unless (null missingExtraDeps) $
-        $prettyWarn $
-            "Some extra-deps are neither installed nor in the index:" <> line <>
-            indent 4 (bulletedList missingExtraDeps)
 
 -- | See https://github.com/commercialhaskell/stack/issues/1198.
 warnIfExecutablesWithSameNameCouldBeOverwritten
@@ -311,18 +285,18 @@ mkBaseConfigOpts boptsCli = do
         }
 
 -- | Provide a function for loading package information from the package index
-withLoadPackage :: (StackM env m, HasEnvConfig env, MonadBaseUnlift IO m)
-                => ((PackageName -> Version -> Map FlagName Bool -> [Text] -> IO Package) -> m a)
+withLoadPackage :: (StackM env m, HasEnvConfig env)
+                => ((PackageLocationIndex FilePath -> Map FlagName Bool -> [Text] -> IO Package) -> m a)
                 -> m a
 withLoadPackage inner = do
     econfig <- view envConfigL
-    withCabalLoader $ \cabalLoader ->
-        inner $ \name version flags ghcOptions -> do
-            bs <- cabalLoader $ PackageIdentifier name version
+    menv <- getMinimalEnvOverride
+    root <- view projectRootL
+    run <- askRunIO
+    withCabalLoader $ \loadFromIndex ->
+        inner $ \loc flags ghcOptions -> do
+            bs <- run $ loadSingleRawCabalFile loadFromIndex menv root loc
 
-            -- Intentionally ignore warnings, as it's not really
-            -- appropriate to print a bunch of warnings out while
-            -- resolving the package index.
             (_warnings,pkg) <- readPackageBS (depPackageConfig econfig flags ghcOptions) bs
             return pkg
   where
@@ -356,13 +330,13 @@ fixCodePage inner = do
         let setInput = origCPI /= expected
             setOutput = origCPO /= expected
             fixInput
-                | setInput = Catch.bracket_
+                | setInput = bracket_
                     (liftIO $ do
                         setConsoleCP expected)
                     (liftIO $ setConsoleCP origCPI)
                 | otherwise = id
             fixOutput
-                | setOutput = Catch.bracket_
+                | setOutput = bracket_
                     (liftIO $ do
                         setConsoleOutputCP expected)
                     (liftIO $ setConsoleOutputCP origCPO)

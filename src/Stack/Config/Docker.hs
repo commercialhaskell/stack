@@ -3,8 +3,8 @@
 -- | Docker configuration
 module Stack.Config.Docker where
 
-import           Control.Exception.Lifted
-import           Control.Monad.Catch (MonadThrow)
+import           Control.Monad (void)
+import           Control.Monad.IO.Unlift
 import           Data.List (find)
 import           Data.Maybe
 import           Data.Monoid.Extra
@@ -12,7 +12,6 @@ import qualified Data.Text as T
 import           Data.Typeable (Typeable)
 import           Distribution.Version (simplifyVersionRange)
 import           Path
-import           Stack.Types.BuildPlan
 import           Stack.Types.Version
 import           Stack.Types.Config
 import           Stack.Types.Docker
@@ -33,13 +32,13 @@ dockerOptsFromMonoid mproject stackRoot maresolver DockerOptsMonoid{..} = do
             let mresolver =
                     case maresolver of
                         Just (ARResolver resolver) ->
-                            Just resolver
+                            Just (void resolver)
                         Just aresolver ->
-                            throw
+                            impureThrow
                                 (ResolverNotSupportedException $
                                  show aresolver)
                         Nothing ->
-                            fmap projectResolver mproject
+                            fmap (void . projectResolver) mproject
                 defaultTag =
                     case mresolver of
                         Nothing -> ""
@@ -48,7 +47,7 @@ dockerOptsFromMonoid mproject stackRoot maresolver DockerOptsMonoid{..} = do
                                 ResolverSnapshot n@(LTS _ _) ->
                                     ":" ++ T.unpack (renderSnapName n)
                                 _ ->
-                                    throw
+                                    impureThrow
                                         (ResolverNotSupportedException $
                                          show resolver)
             in case getFirst dockerMonoidRepoOrImage of
@@ -78,6 +77,7 @@ dockerOptsFromMonoid mproject stackRoot maresolver DockerOptsMonoid{..} = do
             simplifyVersionRange (getIntersectingVersionRange dockerMonoidRequireDockerVersion)
         dockerDatabasePath = fromFirst (stackRoot </> $(mkRelFile "docker.db")) dockerMonoidDatabasePath
         dockerStackExe = getFirst dockerMonoidStackExe
+
     return DockerOpts{..}
   where emptyToNothing Nothing = Nothing
         emptyToNothing (Just s) | null s = Nothing

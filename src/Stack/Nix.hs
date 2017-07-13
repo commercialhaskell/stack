@@ -1,4 +1,5 @@
 {-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -12,9 +13,8 @@ module Stack.Nix
   ) where
 
 import           Control.Arrow ((***))
-import           Control.Exception (Exception,throw)
 import           Control.Monad hiding (mapM)
-import           Control.Monad.IO.Class (liftIO)
+import           Control.Monad.IO.Unlift
 import           Control.Monad.Logger (logDebug)
 import           Data.Maybe
 import           Data.Monoid
@@ -45,7 +45,7 @@ import           System.Process.Read (getEnvOverride)
 reexecWithOptionalShell
     :: (StackM env m, HasConfig env)
     => Maybe (Path Abs Dir)
-    -> IO CompilerVersion
+    -> IO (CompilerVersion 'CVWanted)
     -> IO ()
     -> m ()
 reexecWithOptionalShell mprojectRoot getCompilerVersion inner =
@@ -69,7 +69,7 @@ reexecWithOptionalShell mprojectRoot getCompilerVersion inner =
 runShellAndExit
     :: (StackM env m, HasConfig env)
     => Maybe (Path Abs Dir)
-    -> IO CompilerVersion
+    -> IO (CompilerVersion 'CVWanted)
     -> m (String, [String])
     -> m ()
 runShellAndExit mprojectRoot getCompilerVersion getCmdArgs = do
@@ -139,7 +139,7 @@ escape str = "'" ++ foldr (\c -> if c == '\'' then
 
 -- | Fail with friendly error if project root not set.
 fromMaybeProjectRoot :: Maybe (Path Abs Dir) -> Path Abs Dir
-fromMaybeProjectRoot = fromMaybe (throw CannotDetermineProjectRoot)
+fromMaybeProjectRoot = fromMaybe (impureThrow CannotDetermineProjectRoot)
 
 -- | Command-line argument for "nix"
 nixCmdName :: String

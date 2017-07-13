@@ -21,27 +21,17 @@
 module Stack.PackageIndex
     ( updateAllIndices
     , getPackageCaches
-    , getPackageCachesIO
     , getPackageVersions
-    , getPackageVersionsIO
     , lookupPackageVersions
     ) where
 
 import qualified Codec.Archive.Tar as Tar
-import           Control.Exception (Exception)
-import           Control.Exception.Safe (tryIO)
-import           Control.Monad (unless, when, liftM, void, guard)
-import           Control.Monad.Catch (throwM)
-import qualified Control.Monad.Catch as C
-import           Control.Monad.IO.Class (MonadIO, liftIO)
+import           Control.Monad (unless, when, liftM, guard)
+import           Control.Monad.IO.Unlift
 import           Control.Monad.Logger (logDebug, logInfo, logWarn)
-import           Control.Monad.Trans.Control
-import           Crypto.Hash as Hash (hashlazy, Digest, SHA1)
 import           Data.Aeson.Extended
-import qualified Data.ByteArray.Encoding as Mem (convertToBase, Base(Base16))
-import qualified Data.ByteString.Char8 as S8
 import qualified Data.ByteString.Lazy as L
-import           Data.Conduit (($$), (=$), (.|), runConduitRes)
+import           Data.Conduit (($$), (=$), (.|))
 import           Data.Conduit.Binary (sinkHandle, sourceHandle, sourceFile, sinkFile)
 import           Data.Conduit.Zlib (ungzip)
 import           Data.Foldable (forM_)
@@ -74,7 +64,6 @@ import           Network.URI (parseURI)
 import           Path (toFilePath, parseAbsFile)
 import           Path.IO
 import           Prelude -- Fix AMP warning
-import           Stack.Types.BuildPlan (GitSHA1 (..))
 import           Stack.Types.Config
 import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageIndex
@@ -100,7 +89,7 @@ populateCache index = do
             $logSticky "Populating index cache ..."
             lbs <- liftIO $ L.readFile $ Path.toFilePath path
             loop 0 (Map.empty, HashMap.empty) (Tar.read lbs)
-    (pis, gitPIs) <- loadPIS `C.catch` \e -> do
+    (pis, gitPIs) <- loadPIS `catch` \e -> do
         $logWarn $ "Exception encountered when parsing index tarball: "
                 <> T.pack (show (e :: Tar.FormatError))
         $logWarn "Automatically updating index and trying again"
@@ -139,7 +128,7 @@ populateCache index = do
                 ident
                 pcNew
                 m
-            , HashMap.insert gitSHA1 offsetSize hm
+            , HashMap.insert cabalHash offsetSize hm
             )
           where
             pcNew = PackageCache
@@ -150,18 +139,7 @@ populateCache index = do
                     ((blockNo + 1) * 512)
                     size
 
-            -- Calculate the Git SHA1 of the contents. This uses the
-            -- Git algorithm of prepending "blob <size>\0" to the raw
-            -- contents. We use this to be able to share the same SHA
-            -- information between the Git and tarball backends.
-            gitSHA1 = GitSHA1 $ Mem.convertToBase Mem.Base16 $ hashSHA1 $ L.fromChunks
-                $ "blob "
-                : S8.pack (show $ L.length lbs)
-                : "\0"
-                : L.toChunks lbs
-
-        hashSHA1 :: L.ByteString -> Hash.Digest Hash.SHA1
-        hashSHA1 = Hash.hashlazy
+            cabalHash = computeCabalHash lbs
 
         addJSON :: FromJSON a
                 => (a -> PackageDownload)
@@ -258,8 +236,8 @@ updateIndex index =
      tarFile <- configPackageIndex name
      oldTarFile <- configPackageIndexOld name
      oldCacheFile <- configPackageIndexCacheOld name
-     ignoringAbsence (removeFile oldCacheFile)
-     runConduitRes $ sourceFile (toFilePath tarFile) .| sinkFile (toFilePath oldTarFile)
+     liftIO $ ignoringAbsence (removeFile oldCacheFile)
+     liftIO $ runConduitRes $ sourceFile (toFilePath tarFile) .| sinkFile (toFilePath oldTarFile)
 
 -- | Update the index tarball via HTTP
 updateIndexHTTP :: (StackMiniM env m, HasConfig env)
@@ -305,8 +283,9 @@ updateIndexHackageSecurity indexName' url (HackageSecurity keyIds threshold) = d
             Just x -> return x
     manager <- liftIO getGlobalManager
     root <- configPackageIndexRoot indexName'
-    logTUF <- embed_ ($logInfo . T.pack . HS.pretty)
-    let withRepo = HS.withRepository
+    run <- askRunIO
+    let logTUF = run . $logInfo . T.pack . HS.pretty
+        withRepo = HS.withRepository
             (HS.makeHttpLib manager)
             [baseURI]
             HS.defaultRepoOpts
@@ -354,15 +333,6 @@ deleteCache indexName' = do
         Left e -> $logDebug $ "Could not delete cache: " <> T.pack (show e)
         Right () -> $logDebug $ "Deleted index cache at " <> T.pack (toFilePath fp)
 
--- | Lookup a package's versions from 'IO'.
-getPackageVersionsIO
-    :: (StackMiniM env m, HasConfig env)
-    => m (PackageName -> IO (Set Version))
-getPackageVersionsIO = do
-    getCaches <- getPackageCachesIO
-    return $ \name ->
-        fmap (lookupPackageVersions name . fst) getCaches
-
 -- | Get the known versions for a given package from the package caches.
 --
 -- See 'getPackageCaches' for performance notes.
@@ -377,27 +347,6 @@ lookupPackageVersions :: PackageName -> Map PackageIdentifier a -> Set Version
 lookupPackageVersions pkgName pkgCaches =
     Set.fromList [v | PackageIdentifier n v <- Map.keys pkgCaches, n == pkgName]
 
--- | Access the package caches from 'IO'.
---
--- FIXME: This is a temporary solution until a better solution
--- to access the package caches from Stack.Build.ConstructPlan
--- has been found.
-getPackageCachesIO
-    :: (StackMiniM env m, HasConfig env)
-    => m (IO ( Map PackageIdentifier (PackageIndex, PackageCache)
-             , HashMap GitSHA1 (PackageIndex, OffsetSize)))
-getPackageCachesIO = toIO getPackageCaches
-  where
-    toIO :: (MonadIO m, MonadBaseControl IO m) => m a -> m (IO a)
-    toIO m = do
-        runInBase <- liftBaseWith $ \run -> return (void . run)
-        return $ do
-            i <- newIORef (error "Impossible evaluation in toIO")
-            runInBase $ do
-                x <- m
-                liftIO $ writeIORef i x
-            readIORef i
-
 -- | Load the package caches, or create the caches if necessary.
 --
 -- This has two levels of caching: in memory, and the on-disk cache. So,
@@ -405,7 +354,7 @@ getPackageCachesIO = toIO getPackageCaches
 getPackageCaches
     :: (StackMiniM env m, HasConfig env)
     => m ( Map PackageIdentifier (PackageIndex, PackageCache)
-         , HashMap GitSHA1 (PackageIndex, OffsetSize)
+         , HashMap CabalHash (PackageIndex, OffsetSize)
          )
 getPackageCaches = do
     config <- view configL
@@ -416,7 +365,7 @@ getPackageCaches = do
             result <- liftM mconcat $ forM (configPackageIndices config) $ \index -> do
                 fp <- configPackageIndexCache (indexName index)
                 PackageCacheMap pis' gitPIs <-
-                    $(versionedDecodeOrLoad (storeVersionConfig "pkg-v2" "WlAvAaRXlIMkjSmg5G3dD16UpT8="
+                    $(versionedDecodeOrLoad (storeVersionConfig "pkg-v3" "QAJ-RTivqCIR5uF09Km2FYW1Lnw="
                                              :: VersionConfig PackageCacheMap))
                     fp
                     (populateCache index)

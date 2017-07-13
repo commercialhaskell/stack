@@ -30,8 +30,8 @@ import qualified    Data.Text.Encoding as Text
 
 import              Control.Applicative
 import              Control.Monad
-import              Control.Monad.Catch
-import              Control.Monad.IO.Class
+import              Control.Monad.Catch (Handler (..))
+import              Control.Monad.IO.Unlift hiding (Handler (..)) -- FIXME when safe-exceptions uses exceptions's Handler, we can get rid of this and the dependency on exceptions
 import              Control.Monad.Logger (logDebug, MonadLogger)
 import              Control.Retry (recovering,limitRetries,RetryPolicy,constantDelay)
 import              Crypto.Hash
@@ -188,15 +188,17 @@ hashChecksToZipSink :: MonadThrow m => Request -> [HashCheck] -> ZipSink ByteStr
 hashChecksToZipSink req = traverse_ (ZipSink . sinkCheckHash req)
 
 -- 'Control.Retry.recovering' customized for HTTP failures
-recoveringHttp :: (MonadMask m, MonadIO m)
+recoveringHttp :: MonadUnliftIO m
                => RetryPolicy -> m a -> m a
 recoveringHttp retryPolicy =
 #if MIN_VERSION_retry(0,7,0)
-    recovering retryPolicy handlers . const
+    helper $ recovering retryPolicy handlers . const
 #else
-    recovering retryPolicy handlers
+    helper $ recovering retryPolicy handlers
 #endif
   where
+    helper wrapper action = withRunIO $ \run -> wrapper (run action)
+
     handlers = [const $ Handler alwaysRetryHttp,const $ Handler retrySomeIO]
 
     alwaysRetryHttp :: Monad m => HttpException -> m Bool

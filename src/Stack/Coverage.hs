@@ -16,12 +16,9 @@ module Stack.Coverage
     , generateHpcMarkupIndex
     ) where
 
-import           Control.Exception.Safe (handleIO)
-import           Control.Exception.Lifted
 import           Control.Monad (liftM, when, unless, void, (<=<))
-import           Control.Monad.IO.Class
+import           Control.Monad.IO.Unlift
 import           Control.Monad.Logger
-import           Control.Monad.Trans.Resource
 import qualified Data.ByteString.Char8 as S8
 import           Data.Foldable (forM_, asum, toList)
 import           Data.Function
@@ -41,7 +38,6 @@ import           Path
 import           Path.Extra (toFilePathNoTrailingSep)
 import           Path.IO
 import           Prelude hiding (FilePath, writeFile)
-import           Stack.Build.Source (parseTargetsFromBuildOpts)
 import           Stack.Build.Target
 import           Stack.Config (getLocalPackages)
 import           Stack.Constants
@@ -66,7 +62,7 @@ deleteHpcReports :: (StackM env m, HasEnvConfig env)
                  => m ()
 deleteHpcReports = do
     hpcDir <- hpcReportDir
-    ignoringAbsence (removeDirRecur hpcDir)
+    liftIO $ ignoringAbsence (removeDirRecur hpcDir)
 
 -- | Move a tix file into a sub-directory of the hpc report directory. Deletes the old one if one is
 -- present.
@@ -76,7 +72,7 @@ updateTixFile pkgName tixSrc testName = do
     exists <- doesFileExist tixSrc
     when exists $ do
         tixDest <- tixFilePath pkgName testName
-        ignoringAbsence (removeFile tixDest)
+        liftIO $ ignoringAbsence (removeFile tixDest)
         ensureDir (parent tixDest)
         -- Remove exe modules because they are problematic. This could be revisited if there's a GHC
         -- version that fixes https://ghc.haskell.org/trac/ghc/ticket/1853
@@ -89,7 +85,7 @@ updateTixFile pkgName tixSrc testName = do
                 -- have problems. Something about moving between drives
                 -- on windows?
                 copyFile tixSrc =<< parseAbsFile (toFilePath tixDest ++ ".premunging")
-                ignoringAbsence (removeFile tixSrc)
+                liftIO $ ignoringAbsence (removeFile tixSrc)
 
 -- | Get the directory used for hpc reports for the given pkgId.
 hpcPkgPath :: (StackM env m, HasEnvConfig env)
@@ -174,7 +170,7 @@ generateHpcReportInternal tixSrc reportDir report extraMarkupArgs extraReportArg
             -- Directories for .mix files.
             hpcRelDir <- hpcRelativeDir
             -- Compute arguments used for both "hpc markup" and "hpc report".
-            pkgDirs <- liftM Map.keys getLocalPackages
+            pkgDirs <- liftM (map lpvRoot . Map.elems . lpProject) getLocalPackages
             let args =
                     -- Use index files from all packages (allows cross-package coverage results).
                     concatMap (\x -> ["--srcdir", toFilePathNoTrailingSep x]) pkgDirs ++
@@ -237,19 +233,17 @@ generateHpcReportForTargets opts = do
          else do
              when (hroptsAll opts && not (null targetNames)) $
                  $logWarn $ "Since --all is used, it is redundant to specify these targets: " <> T.pack (show targetNames)
-             (_,_,targets) <- parseTargetsFromBuildOpts
+             (_,_,targets) <- parseTargets
                  AllowNoTargets
                  defaultBuildOptsCLI
                     { boptsCLITargets = if hroptsAll opts then [] else targetNames }
              liftM concat $ forM (Map.toList targets) $ \(name, target) ->
                  case target of
-                     STUnknown -> throwString $
-                         "Error: " ++ packageNameString name ++ " isn't a known local page"
-                     STNonLocal -> throwString $
+                     TargetAll Dependency -> throwString $
                          "Error: Expected a local package, but " ++
                          packageNameString name ++
                          " is either an extra-dep or in the snapshot."
-                     STLocalComps comps -> do
+                     TargetComps comps -> do
                          pkgPath <- hpcPkgPath name
                          forM (toList comps) $ \nc ->
                              case nc of
@@ -259,7 +253,7 @@ generateHpcReportForTargets opts = do
                                      "Can't specify anything except test-suites as hpc report targets (" ++
                                      packageNameString name ++
                                      " is used with a non test-suite target)"
-                     STLocalAll -> do
+                     TargetAll ProjectPackage -> do
                          pkgPath <- hpcPkgPath name
                          exists <- doesDirExist pkgPath
                          if exists
@@ -327,7 +321,7 @@ generateUnionReport report reportDir tixFiles = do
     liftIO $ writeTix (toFilePath tixDest) tix
     generateHpcReportInternal tixDest reportDir report [] []
 
-readTixOrLog :: (MonadLogger m, MonadIO m, MonadBaseControl IO m) => Path b File -> m (Maybe Tix)
+readTixOrLog :: (MonadLogger m, MonadUnliftIO m) => Path b File -> m (Maybe Tix)
 readTixOrLog path = do
     mtix <- liftIO (readTix (toFilePath path)) `catch` \errorCall -> do
         $logError $ "Error while reading tix: " <> T.pack (show (errorCall :: ErrorCall))

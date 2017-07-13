@@ -7,10 +7,9 @@ module Stack.Path
     , pathParser
     ) where
 
-import           Control.Monad.Catch
+import           Control.Monad.IO.Unlift
 import           Control.Monad.Logger
 import           Control.Monad.Reader
-import           Control.Monad.Trans.Control
 import           Data.List (intercalate)
 import           Data.Maybe.Extra
 import           Data.Monoid
@@ -32,8 +31,8 @@ import           System.Process.Read (EnvOverride(eoPath))
 -- | Print out useful path information in a human-readable format (and
 -- support others later).
 path
-    :: (MonadIO m, MonadBaseControl IO m, MonadReader env m, HasEnvConfig env,
-        MonadCatch m, MonadLogger m)
+    :: (MonadUnliftIO m, MonadReader env m, HasEnvConfig env, MonadThrow m,
+        MonadLogger m)
     => [Text]
     -> m ()
 path keys =

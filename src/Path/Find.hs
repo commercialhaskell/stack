@@ -9,11 +9,9 @@ module Path.Find
   ,findInParents)
   where
 
-import Control.Exception (evaluate)
 import Control.DeepSeq (force)
 import Control.Monad
-import Control.Monad.Catch
-import Control.Monad.IO.Class
+import Control.Monad.IO.Unlift
 import System.IO.Error (isPermissionError)
 import Data.List
 import Path

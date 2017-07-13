@@ -11,10 +11,8 @@ module Stack.Image
         imgCmdName, imgDockerCmdName, imgOptsFromMonoid)
        where
 
-import           Control.Exception.Lifted hiding (finally)
 import           Control.Monad
-import           Control.Monad.Catch hiding (bracket)
-import           Control.Monad.IO.Class
+import           Control.Monad.IO.Unlift
 import           Control.Monad.Logger
 import           Data.Char (toLower)
 import qualified Data.Map.Strict as Map
@@ -48,7 +46,7 @@ stageContainerImageArtifacts mProjectRoot imageNames = do
         (\(idx,opts) ->
               do imageDir <-
                      imageStagingDir (fromMaybeProjectRoot mProjectRoot) idx
-                 ignoringAbsence (removeDirRecur imageDir)
+                 liftIO (ignoringAbsence (removeDirRecur imageDir))
                  ensureDir imageDir
                  stageExesInDir opts imageDir
                  syncAddContentToDir opts imageDir)
@@ -94,10 +92,10 @@ stageExesInDir opts dir = do
         Nothing -> do
             $logInfo ""
             $logInfo "Note: 'executables' not specified for a image container, so every executable in the project's local bin dir will be used."
-            mcontents <- forgivingAbsence $ listDir srcBinPath
+            mcontents <- liftIO $ forgivingAbsence $ listDir srcBinPath
             case mcontents of
                 Just (files, dirs)
-                    | not (null files) || not (null dirs) -> copyDirRecur srcBinPath destBinPath
+                    | not (null files) || not (null dirs) -> liftIO $ copyDirRecur srcBinPath destBinPath
                 _ -> $prettyWarn "The project's local bin dir contains no files, so no executables will be added to the docker image."
             $logInfo ""
 
@@ -123,7 +121,7 @@ syncAddContentToDir opts dir = do
               do sourcePath <- resolveDir root source
                  let destFullPath = dir </> dropRoot destPath
                  ensureDir destFullPath
-                 copyDirRecur sourcePath destFullPath)
+                 liftIO $ copyDirRecur sourcePath destFullPath)
 
 -- | Derive an image name from the project directory.
 imageName
@@ -192,7 +190,7 @@ extendDockerImageWithEntrypoint dockerConfig dir = do
 -- | Fail with friendly error if project root not set.
 fromMaybeProjectRoot :: Maybe (Path Abs Dir) -> Path Abs Dir
 fromMaybeProjectRoot =
-    fromMaybe (throw StackImageCannotDetermineProjectRootException)
+    fromMaybe (impureThrow StackImageCannotDetermineProjectRootException)
 
 -- | The command name for dealing with images.
 imgCmdName

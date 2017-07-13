@@ -43,7 +43,7 @@ module Stack.Constants
     )
     where
 
-import           Control.Monad.Catch (MonadThrow)
+import           Control.Monad.IO.Unlift
 import           Control.Monad.Reader
 import           Data.Char (toUpper)
 import           Data.HashSet (HashSet)

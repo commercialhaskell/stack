@@ -1,4 +1,5 @@
 {-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
@@ -28,7 +29,7 @@ import           Stack.Types.StackT
 import           Stack.Types.Version
 
 data SetupCmdOpts = SetupCmdOpts
-    { scoCompilerVersion :: !(Maybe CompilerVersion)
+    { scoCompilerVersion :: !(Maybe (CompilerVersion 'CVWanted))
     , scoForceReinstall  :: !Bool
     , scoUpgradeCabal    :: !(Maybe UpgradeTo)
     , scoSetupInfoYaml   :: !String
@@ -103,7 +104,7 @@ setupParser = SetupCmdOpts
 setup
     :: (StackM env m, HasConfig env, HasGHCVariant env)
     => SetupCmdOpts
-    -> CompilerVersion
+    -> CompilerVersion 'CVWanted
     -> VersionCheck
     -> Maybe (Path Abs File)
     -> m ()

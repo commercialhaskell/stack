@@ -12,7 +12,7 @@ module Stack.Types.GhcPkgId
 
 import           Control.Applicative
 import           Control.DeepSeq
-import           Control.Monad.Catch
+import           Control.Monad.IO.Unlift
 import           Data.Aeson.Extended
 import           Data.Attoparsec.Text
 import           Data.Binary (Binary(..), putWord8, getWord8)

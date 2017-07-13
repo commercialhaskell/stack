@@ -22,8 +22,7 @@ import Prelude.Compat
 import qualified Codec.Archive.Tar as Tar
 import qualified Codec.Compression.GZip as GZip
 import           Control.Monad (when)
-import           Control.Monad.Catch
-import           Control.Monad.IO.Class
+import           Control.Monad.IO.Unlift
 import           Control.Monad.Logger
 import qualified Data.ByteString.Lazy as BS
 import qualified Data.ByteString.Lazy as L
@@ -45,12 +44,13 @@ import qualified System.FilePath as FP
 -- service and a path to a tarball.
 sign
 #if __GLASGOW_HASKELL__ < 710
-    :: (Applicative m, MonadIO m, MonadLogger m, MonadMask m)
+    :: (Applicative m, MonadUnliftIO m, MonadLogger m, MonadThrow m)
 #else
-    :: (MonadIO m, MonadLogger m, MonadMask m)
+    :: (MonadUnliftIO m, MonadLogger m, MonadThrow m)
 #endif
     => String -> Path Abs File -> m Signature
 sign url filePath =
+    withRunIO $ \run ->
     withSystemTempDir
         "stack"
         (\tempDir ->
@@ -64,7 +64,7 @@ sign url filePath =
                      Nothing -> throwM SigInvalidSDistTarBall
                      Just cabalPath -> do
                          pkg <- cabalFilePackageId (tempDir </> cabalPath)
-                         signPackage url pkg filePath)
+                         run (signPackage url pkg filePath))
   where
     extractCabalFile tempDir (Tar.Next entry entries) =
         case Tar.entryContent entry of
@@ -90,18 +90,19 @@ sign url filePath =
 -- the tarball with GPG.
 signTarBytes
 #if __GLASGOW_HASKELL__ < 710
-    :: (Applicative m, MonadIO m, MonadLogger m, MonadMask m)
+    :: (Applicative m, MonadUnliftIO m, MonadLogger m, MonadThrow m)
 #else
-    :: (MonadIO m, MonadLogger m, MonadMask m)
+    :: (MonadUnliftIO m, MonadLogger m, MonadThrow m)
 #endif
     => String -> Path Rel File -> L.ByteString -> m Signature
 signTarBytes url tarPath bs =
+    withRunIO $ \run ->
     withSystemTempDir
         "stack"
         (\tempDir ->
               do let tempTarBall = tempDir </> tarPath
                  liftIO (L.writeFile (toFilePath tempTarBall) bs)
-                 sign url tempTarBall)
+                 run (sign url tempTarBall))
 
 -- | Sign a haskell package given the url to the signature service, a
 -- @PackageIdentifier@ and a file path to the package on disk.

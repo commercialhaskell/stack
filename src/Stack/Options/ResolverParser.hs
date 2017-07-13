@@ -1,3 +1,4 @@
+{-# LANGUAGE DataKinds #-}
 module Stack.Options.ResolverParser where
 
 import           Data.Monoid.Extra
@@ -17,7 +18,7 @@ abstractResolverOptsParser hide =
          help "Override resolver in project file" <>
          hideMods hide)
 
-compilerOptsParser :: Bool -> Parser CompilerVersion
+compilerOptsParser :: Bool -> Parser (CompilerVersion 'CVWanted)
 compilerOptsParser hide =
     option readCompilerVersion
         (long "compiler" <>
@@ -25,7 +26,7 @@ compilerOptsParser hide =
          help "Use the specified compiler" <>
          hideMods hide)
 
-readCompilerVersion :: ReadM CompilerVersion
+readCompilerVersion :: ReadM (CompilerVersion 'CVWanted)
 readCompilerVersion = do
     s <- readerAsk
     case parseCompilerVersion (T.pack s) of

@@ -2,8 +2,7 @@
 
 module Stack.Types.StringError where
 
-import Control.Exception
-import Control.Monad.Catch
+import Control.Monad.IO.Unlift
 import Data.Typeable
 import GHC.Prim
 

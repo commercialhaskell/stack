@@ -23,7 +23,7 @@ module Stack.Types.FlagName
 
 import           Control.Applicative
 import           Control.DeepSeq (NFData)
-import           Control.Monad.Catch
+import           Control.Monad.IO.Unlift
 import           Data.Aeson.Extended
 import           Data.Attoparsec.Combinators
 import           Data.Attoparsec.Text

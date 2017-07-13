@@ -14,9 +14,8 @@ module Stack.Upload
     ) where
 
 import           Control.Applicative
-import           Control.Exception.Safe                (handleIO, tryIO)
-import qualified Control.Exception                     as E
 import           Control.Monad                         (void, when, unless)
+import           Control.Monad.IO.Unlift
 import           Data.Aeson                            (FromJSON (..),
                                                         ToJSON (..),
                                                         decode', encode,
@@ -137,7 +136,7 @@ applyCreds creds req0 = do
   case ereq of
       Left e -> do
           putStrLn "WARNING: No HTTP digest prompt found, this will probably fail"
-          case E.fromException e of
+          case fromException e of
               Just e' -> putStrLn $ displayDigestAuthException e'
               Nothing -> print e
           return req0

@@ -19,13 +19,10 @@ import qualified Codec.Archive.Tar.Entry as Tar
 import qualified Codec.Compression.GZip as GZip
 import           Control.Applicative
 import           Control.Concurrent.Execute (ActionContext(..))
-import           Control.Monad (unless, void, liftM, filterM, foldM, when)
-import           Control.Monad.Catch
-import           Control.Monad.IO.Class
+import           Control.Monad (unless, liftM, filterM, when)
+import           Control.Monad.IO.Unlift
 import           Control.Monad.Logger
 import           Control.Monad.Reader.Class (local)
-import           Control.Monad.Trans.Control (liftBaseWith)
-import           Control.Monad.Trans.Unlift (MonadBaseUnlift)
 import qualified Data.ByteString as S
 import qualified Data.ByteString.Char8 as S8
 import qualified Data.ByteString.Lazy as L
@@ -38,7 +35,7 @@ import           Data.List.Extra (nubOrd)
 import           Data.List.NonEmpty (NonEmpty)
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Map.Strict as Map
-import           Data.Maybe (fromMaybe, catMaybes)
+import           Data.Maybe (fromMaybe)
 import           Data.Monoid ((<>))
 import qualified Data.Set as Set
 import qualified Data.Text as T
@@ -61,11 +58,12 @@ import           Stack.Build (mkBaseConfigOpts, build)
 import           Stack.Build.Execute
 import           Stack.Build.Installed
 import           Stack.Build.Source (loadSourceMap, getDefaultPackageConfig)
-import           Stack.Build.Target
-import           Stack.Config (resolvePackageEntry, removePathFromPackageEntry)
+import           Stack.Build.Target hiding (PackageType (..))
+import           Stack.PackageLocation (resolveMultiPackageLocation)
 import           Stack.Constants
 import           Stack.Package
 import           Stack.Types.Build
+import           Stack.Types.BuildPlan
 import           Stack.Types.Config
 import           Stack.Types.Package
 import           Stack.Types.PackageIdentifier
@@ -274,13 +272,13 @@ readLocalPackage pkgDir = do
 -- | Returns a newline-separate list of paths, and the absolute path to the .cabal file.
 getSDistFileList :: (StackM env m, HasEnvConfig env) => LocalPackage -> m (String, Path Abs File)
 getSDistFileList lp =
-    withSystemTempDir (stackProgName <> "-sdist") $ \tmpdir -> do
+    withRunIO $ \run -> withSystemTempDir (stackProgName <> "-sdist") $ \tmpdir -> run $ do
         menv <- getMinimalEnvOverride
         let bopts = defaultBuildOpts
         let boptsCli = defaultBuildOptsCLI
         baseConfigOpts <- mkBaseConfigOpts boptsCli
         (locals, _) <- loadSourceMap NeedTargets boptsCli
-        runInBase <- liftBaseWith $ \run -> return (void . run)
+        runInBase <- askRunIO
         withExecuteEnv menv bopts boptsCli baseConfigOpts locals
             [] [] [] -- provide empty list of globals. This is a hack around custom Setup.hs files
             $ \ee ->
@@ -337,7 +335,7 @@ dirsFromFiles dirs = Set.toAscList (Set.delete "." results)
 -- and will throw an exception in case of critical errors.
 --
 -- Note that we temporarily decompress the archive to analyze it.
-checkSDistTarball :: (StackM env m, HasEnvConfig env, MonadBaseUnlift IO m)
+checkSDistTarball :: (StackM env m, HasEnvConfig env)
   => SDistOpts -- ^ The configuration of what to check
   -> Path Abs File -- ^ Absolute path to tarball
   -> m ()
@@ -348,7 +346,7 @@ checkSDistTarball opts tarball = withTempTarGzContents tarball $ \pkgDir' -> do
     when (sdoptsBuildTarball opts) (buildExtractedTarball pkgDir)
     unless (sdoptsIgnoreCheck opts) (checkPackageInExtractedTarball pkgDir)
 
-checkPackageInExtractedTarball :: (StackM env m, HasEnvConfig env, MonadBaseUnlift IO m)
+checkPackageInExtractedTarball :: (StackM env m, HasEnvConfig env)
   => Path Abs Dir -- ^ Absolute path to tarball
   -> m ()
 checkPackageInExtractedTarball pkgDir = do
@@ -373,27 +371,20 @@ checkPackageInExtractedTarball pkgDir = do
         Nothing -> return ()
         Just ne -> throwM $ CheckException ne
 
-buildExtractedTarball :: (StackM env m, HasEnvConfig env, MonadBaseUnlift IO m) => Path Abs Dir -> m ()
+buildExtractedTarball :: (StackM env m, HasEnvConfig env) => Path Abs Dir -> m ()
 buildExtractedTarball pkgDir = do
   projectRoot <- view projectRootL
   envConfig <- view envConfigL
   menv <- getMinimalEnvOverride
   localPackageToBuild <- readLocalPackage pkgDir
-  let packageEntries = bcPackageEntries (envConfigBuildConfig envConfig)
-      getPaths entry = do
-        resolvedEntry <- resolvePackageEntry menv projectRoot entry
-        return $ fmap fst resolvedEntry
-  allPackagePaths <- fmap mconcat (mapM getPaths packageEntries)
+  let packageEntries = bcPackages (envConfigBuildConfig envConfig)
+      getPaths = resolveMultiPackageLocation menv projectRoot
+  allPackagePaths <- fmap (map fst . mconcat) (mapM getPaths packageEntries)
   -- We remove the path based on the name of the package
   let isPathToRemove path = do
         localPackage <- readLocalPackage path
         return $ packageName (lpPackage localPackage) == packageName (lpPackage localPackageToBuild)
-  pathsToRemove <- filterM isPathToRemove allPackagePaths
-  let adjustPackageEntries entries path = do
-        adjustedPackageEntries <- mapM (removePathFromPackageEntry menv projectRoot path) entries
-        return (catMaybes adjustedPackageEntries)
-  entriesWithoutBuiltPackage <- foldM adjustPackageEntries packageEntries pathsToRemove
-  let newEntry = PackageEntry Nothing (PLFilePath (toFilePath pkgDir)) []
+  pathsToKeep <- filterM (fmap not . isPathToRemove) allPackagePaths
   newPackagesRef <- liftIO (newIORef Nothing)
   let adjustEnvForBuild env =
         let updatedEnvConfig = envConfig
@@ -402,7 +393,7 @@ buildExtractedTarball pkgDir = do
               }
         in set envConfigL updatedEnvConfig env
       updatePackageInBuildConfig buildConfig = buildConfig
-        { bcPackageEntries = newEntry : entriesWithoutBuiltPackage
+        { bcPackages = map (PLFilePath . toFilePath) $ pkgDir : pathsToKeep
         , bcConfig = (bcConfig buildConfig)
                      { configBuild = defaultBuildOpts
                        { boptsTests = True
@@ -414,21 +405,21 @@ buildExtractedTarball pkgDir = do
 
 -- | Version of 'checkSDistTarball' that first saves lazy bytestring to
 -- temporary directory and then calls 'checkSDistTarball' on it.
-checkSDistTarball' :: (StackM env m, HasEnvConfig env, MonadBaseUnlift IO m)
+checkSDistTarball' :: (StackM env m, HasEnvConfig env)
   => SDistOpts
   -> String       -- ^ Tarball name
   -> L.ByteString -- ^ Tarball contents as a byte string
   -> m ()
-checkSDistTarball' opts name bytes = withSystemTempDir "stack" $ \tpath -> do
+checkSDistTarball' opts name bytes = withRunIO $ \run -> withSystemTempDir "stack" $ \tpath -> run $ do
     npath   <- (tpath </>) `liftM` parseRelFile name
     liftIO $ L.writeFile (toFilePath npath) bytes
     checkSDistTarball opts npath
 
-withTempTarGzContents :: (MonadIO m, MonadMask m)
+withTempTarGzContents :: (MonadUnliftIO m)
   => Path Abs File         -- ^ Location of tarball
   -> (Path Abs Dir -> m a) -- ^ Perform actions given dir with tarball contents
   -> m a
-withTempTarGzContents apath f = withSystemTempDir "stack" $ \tpath -> do
+withTempTarGzContents apath f = withRunIO $ \run -> withSystemTempDir "stack" $ \tpath -> run $ do
     archive <- liftIO $ L.readFile (toFilePath apath)
     liftIO . Tar.unpack (toFilePath tpath) . Tar.read . GZip.decompress $ archive
     f tpath

@@ -18,7 +18,7 @@ module Stack.Types.Sig
 import Prelude ()
 import Prelude.Compat
 
-import           Control.Exception (Exception)
+import           Control.Monad.IO.Unlift
 import           Data.Aeson (Value(..), ToJSON(..), FromJSON(..))
 import           Data.ByteString (ByteString)
 import qualified Data.ByteString as SB

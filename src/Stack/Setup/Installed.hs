@@ -1,4 +1,5 @@
 {-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -22,11 +23,9 @@ module Stack.Setup.Installed
     ) where
 
 import           Control.Applicative
-import           Control.Monad.Catch
-import           Control.Monad.IO.Class (MonadIO, liftIO)
+import           Control.Monad.IO.Unlift
 import           Control.Monad.Logger
 import           Control.Monad.Reader (MonadReader)
-import           Control.Monad.Trans.Control
 import qualified Data.ByteString.Char8 as S8
 import           Data.List hiding (concat, elem, maximumBy)
 import           Data.Maybe
@@ -51,7 +50,7 @@ import           System.Process.Read
 
 data Tool
     = Tool PackageIdentifier -- ^ e.g. ghc-7.8.4, msys2-20150512
-    | ToolGhcjs CompilerVersion -- ^ e.g. ghcjs-0.1.0_ghc-7.10.2
+    | ToolGhcjs (CompilerVersion 'CVActual) -- ^ e.g. ghcjs-0.1.0_ghc-7.10.2
 
 toolString :: Tool -> String
 toolString (Tool ident) = packageIdentifierString ident
@@ -74,11 +73,11 @@ markInstalled programsPath tool = do
     fpRel <- parseRelFile $ toolString tool ++ ".installed"
     liftIO $ writeFile (toFilePath $ programsPath </> fpRel) "installed"
 
-unmarkInstalled :: (MonadIO m, MonadCatch m)
+unmarkInstalled :: MonadIO m
                 => Path Abs Dir
                 -> Tool
                 -> m ()
-unmarkInstalled programsPath tool = do
+unmarkInstalled programsPath tool = liftIO $ do
     fpRel <- parseRelFile $ toolString tool ++ ".installed"
     ignoringAbsence (removeFile $ programsPath </> fpRel)
 
@@ -95,8 +94,8 @@ listInstalled programsPath = do
         x <- T.stripSuffix ".installed" $ T.pack $ toFilePath $ filename fp
         parseToolText x
 
-getCompilerVersion :: (MonadLogger m, MonadCatch m, MonadBaseControl IO m, MonadIO m)
-              => EnvOverride -> WhichCompiler -> m CompilerVersion
+getCompilerVersion :: (MonadLogger m, MonadUnliftIO m, MonadThrow m)
+              => EnvOverride -> WhichCompiler -> m (CompilerVersion 'CVActual)
 getCompilerVersion menv wc =
     case wc of
         Ghc -> do

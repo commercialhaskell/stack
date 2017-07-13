@@ -21,14 +21,10 @@ module Stack.Docker
   ) where
 
 import           Control.Applicative
-import           Control.Concurrent.MVar.Lifted (MVar,modifyMVar_,newMVar)
-import           Control.Exception.Lifted
 import           Control.Monad
-import           Control.Monad.Catch (MonadThrow,throwM,MonadCatch)
-import           Control.Monad.IO.Class (MonadIO,liftIO)
+import           Control.Monad.IO.Unlift
 import           Control.Monad.Logger (MonadLogger,logError,logInfo,logWarn)
 import           Control.Monad.Reader (MonadReader,runReaderT)
-import           Control.Monad.Trans.Control (MonadBaseControl)
 import           Control.Monad.Writer (execWriter,runWriter,tell)
 import qualified Crypto.Hash as Hash (Digest, MD5, hash)
 import           Data.Aeson.Extended (FromJSON(..),(.:),(.:?),(.!=),eitherDecode)
@@ -82,7 +78,6 @@ import           Text.Printf (printf)
 
 #ifndef WINDOWS
 import           Control.Concurrent (threadDelay)
-import qualified Control.Monad.Trans.Control as Control
 import           System.Posix.Signals
 import qualified System.Posix.User as PosixUser
 #endif
@@ -129,7 +124,7 @@ reexecWithOptionalContainer mprojectRoot =
               | configPlatform config == dockerContainerPlatform -> do
                   exePath <- liftIO getExecutablePath
                   cmdArgs args exePath
-              | otherwise -> throwM UnsupportedStackExeHostPlatformException
+              | otherwise -> throwIO UnsupportedStackExeHostPlatformException
             Just DockerStackExeImage -> do
                 progName <- liftIO getProgName
                 return (FP.takeBaseName progName, args, [], [])
@@ -210,7 +205,7 @@ execWithOptionalContainer mprojectRoot getCmdArgs mbefore inner mafter mrelease 
      inContainer <- getInContainer
      isReExec <- view reExecL
      if | inContainer && not isReExec && (isJust mbefore || isJust mafter) ->
-            throwM OnlyOnHostException
+            throwIO OnlyOnHostException
         | inContainer ->
             liftIO (do inner
                        exitSuccess)
@@ -231,11 +226,11 @@ execWithOptionalContainer mprojectRoot getCmdArgs mbefore inner mafter mrelease 
     fromMaybeAction (Just hook) = hook
 
 -- | Error if running in a container.
-preventInContainer :: (MonadIO m,MonadThrow m) => m () -> m ()
+preventInContainer :: MonadIO m => m () -> m ()
 preventInContainer inner =
   do inContainer <- getInContainer
      if inContainer
-        then throwM OnlyOnHostException
+        then throwIO OnlyOnHostException
         else inner
 
 -- | Run a command in a new Docker container, then exit the process.
@@ -364,7 +359,7 @@ runContainerAndExit getCmdArgs
          ,args])
      before
 #ifndef WINDOWS
-     runInBase <- Control.liftBaseWith $ \run -> return (void . run)
+     runInBase <- askRunIO
      oldHandlers <- forM [sigINT,sigABRT,sigHUP,sigPIPE,sigTERM,sigUSR1,sigUSR2] $ \sig -> do
        let sigHandler = runInBase $ do
              readProcessNull Nothing envOverride "docker"
@@ -495,12 +490,12 @@ cleanup opts =
                   | repo == "<none>" -> (hash,[])
                   | tag == "<none>" -> (hash,[repo])
                   | otherwise -> (hash,[repo ++ ":" ++ tag])
-                _ -> throw (InvalidImagesOutputException line)
+                _ -> impureThrow (InvalidImagesOutputException line)
     parseContainersOut = map parseContainer . drop 1 . lines . decodeUtf8
       where parseContainer line =
               case words line of
                 hash:image:rest -> (hash,(image,last rest))
-                _ -> throw (InvalidPSOutputException line)
+                _ -> impureThrow (InvalidPSOutputException line)
     buildPlan curTime
               imagesLastUsed
               imageRepos
@@ -641,17 +636,17 @@ cleanup opts =
     containerStr = "container"
 
 -- | Inspect Docker image or container.
-inspect :: (MonadIO m,MonadLogger m,MonadBaseControl IO m,MonadCatch m)
+inspect :: (MonadUnliftIO m,MonadLogger m)
         => EnvOverride -> String -> m (Maybe Inspect)
 inspect envOverride image =
   do results <- inspects envOverride [image]
      case Map.toList results of
        [] -> return Nothing
        [(_,i)] -> return (Just i)
-       _ -> throwM (InvalidInspectOutputException "expect a single result")
+       _ -> throwIO (InvalidInspectOutputException "expect a single result")
 
 -- | Inspect multiple Docker images and/or containers.
-inspects :: (MonadIO m, MonadLogger m, MonadBaseControl IO m, MonadCatch m)
+inspects :: (MonadUnliftIO m, MonadLogger m)
          => EnvOverride -> [String] -> m (Map String Inspect)
 inspects _ [] = return Map.empty
 inspects envOverride images =
@@ -661,11 +656,11 @@ inspects envOverride images =
        Right inspectOut ->
          -- filtering with 'isAscii' to workaround @docker inspect@ output containing invalid UTF-8
          case eitherDecode (LBS.pack (filter isAscii (decodeUtf8 inspectOut))) of
-           Left msg -> throwM (InvalidInspectOutputException msg)
+           Left msg -> throwIO (InvalidInspectOutputException msg)
            Right results -> return (Map.fromList (map (\r -> (iiId r,r)) results))
        Left (ProcessFailed _ _ _ err)
          | "Error: No such image" `LBS.isPrefixOf` err -> return Map.empty
-       Left e -> throwM e
+       Left e -> throwIO e
 
 -- | Pull latest version of configured Docker image from registry.
 pull :: (StackM env m, HasConfig env) => m ()
@@ -706,30 +701,30 @@ pullImage envOverride docker image =
      ec <- liftIO (waitForProcess ph)
      case ec of
        ExitSuccess -> return ()
-       ExitFailure _ -> throwM (PullFailedException image)
+       ExitFailure _ -> throwIO (PullFailedException image)
 
 -- | Check docker version (throws exception if incorrect)
 checkDockerVersion
-    :: (MonadIO m, MonadLogger m, MonadBaseControl IO m, MonadCatch m)
+    :: (MonadUnliftIO m, MonadLogger m)
     => EnvOverride -> DockerOpts -> m ()
 checkDockerVersion envOverride docker =
   do dockerExists <- doesExecutableExist envOverride "docker"
-     unless dockerExists (throwM DockerNotInstalledException)
+     unless dockerExists (throwIO DockerNotInstalledException)
      dockerVersionOut <- readDockerProcess envOverride Nothing ["--version"]
      case words (decodeUtf8 dockerVersionOut) of
        (_:_:v:_) ->
          case parseVersionFromString (stripVersion v) of
            Just v'
              | v' < minimumDockerVersion ->
-               throwM (DockerTooOldException minimumDockerVersion v')
+               throwIO (DockerTooOldException minimumDockerVersion v')
              | v' `elem` prohibitedDockerVersions ->
-               throwM (DockerVersionProhibitedException prohibitedDockerVersions v')
+               throwIO (DockerVersionProhibitedException prohibitedDockerVersions v')
              | not (v' `withinRange` dockerRequireDockerVersion docker) ->
-               throwM (BadDockerVersionException (dockerRequireDockerVersion docker) v')
+               throwIO (BadDockerVersionException (dockerRequireDockerVersion docker) v')
              | otherwise ->
                return ()
-           _ -> throwM InvalidVersionOutputException
-       _ -> throwM InvalidVersionOutputException
+           _ -> throwIO InvalidVersionOutputException
+       _ -> throwIO InvalidVersionOutputException
   where minimumDockerVersion = $(mkVersion "1.6.0")
         prohibitedDockerVersions = []
         stripVersion v = takeWhile (/= '-') (dropWhileEnd (not . isDigit) v)
@@ -747,14 +742,14 @@ reset maybeProjectRoot keepHome = do
 
 -- | The Docker container "entrypoint": special actions performed when first entering
 -- a container, such as switching the UID/GID to the "outside-Docker" user's.
-entrypoint :: (MonadIO m, MonadBaseControl IO m, MonadCatch m, MonadLogger m)
+entrypoint :: (MonadUnliftIO m, MonadLogger m, MonadThrow m)
            => Config -> DockerEntrypoint -> m ()
 entrypoint config@Config{..} DockerEntrypoint{..} =
   modifyMVar_ entrypointMVar $ \alreadyRan -> do
     -- Only run the entrypoint once
     unless alreadyRan $ do
       envOverride <- getEnvOverride configPlatform
-      homeDir <- parseAbsDir =<< liftIO (getEnv "HOME")
+      homeDir <- liftIO $ parseAbsDir =<< getEnv "HOME"
       -- Get the UserEntry for the 'stack' user in the image, if it exists
       estackUserEntry0 <- liftIO $ tryJust (guard . isDoesNotExistError) $
         User.getUserEntryForName stackUserName
@@ -768,7 +763,7 @@ entrypoint config@Config{..} DockerEntrypoint{..} =
         Right ue -> do
           -- If the 'stack' user exists in the image, copy any build plans and package indices from
           -- its original home directory to the host's stack root, to avoid needing to download them
-          origStackHomeDir <- parseAbsDir (User.homeDirectory ue)
+          origStackHomeDir <- liftIO $ parseAbsDir (User.homeDirectory ue)
           let origStackRoot = origStackHomeDir </> $(mkRelDir ("." ++ stackProgName))
           buildPlanDirExists <- doesDirExist (buildPlanDir origStackRoot)
           when buildPlanDirExists $ do
@@ -865,7 +860,7 @@ removeDirectoryContents path excludeDirs excludeFiles =
 -- process. Throws a 'ReadProcessException' exception if the
 -- process fails.  Logs process's stderr using @$logError@.
 readDockerProcess
-    :: (MonadIO m, MonadLogger m, MonadBaseControl IO m, MonadCatch m)
+    :: (MonadUnliftIO m, MonadLogger m)
     => EnvOverride -> Maybe (Path Abs Dir) -> [String] -> m BS.ByteString
 readDockerProcess envOverride mpwd = readProcessStdout mpwd envOverride "docker"
 
@@ -887,7 +882,7 @@ concatT = T.pack . concat
 
 -- | Fail with friendly error if project root not set.
 fromMaybeProjectRoot :: Maybe (Path Abs Dir) -> Path Abs Dir
-fromMaybeProjectRoot = fromMaybe (throw CannotDetermineProjectRootException)
+fromMaybeProjectRoot = fromMaybe (impureThrow CannotDetermineProjectRootException)
 
 -- | Environment variable that contained the old sandbox ID.
 -- | Use of this variable is deprecated, and only used to detect old images.

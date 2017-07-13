@@ -16,12 +16,9 @@ module Stack.Build.Haddock
     , shouldHaddockDeps
     ) where
 
-import           Control.Exception (tryJust, onException)
 import           Control.Monad
-import           Control.Monad.Catch (MonadCatch)
-import           Control.Monad.IO.Class
+import           Control.Monad.IO.Unlift
 import           Control.Monad.Logger
-import           Control.Monad.Trans.Resource
 import qualified Data.Foldable as F
 import           Data.Function
 import qualified Data.HashSet as HS
@@ -119,7 +116,7 @@ shouldHaddockDeps bopts = fromMaybe (boptsHaddock bopts) (boptsHaddockDeps bopts
 
 -- | Generate Haddock index and contents for local packages.
 generateLocalHaddockIndex
-    :: (MonadIO m, MonadCatch m, MonadLogger m, MonadBaseControl IO m)
+    :: (MonadUnliftIO m, MonadLogger m)
     => EnvOverride
     -> WhichCompiler
     -> BaseConfigOpts
@@ -145,7 +142,7 @@ generateLocalHaddockIndex envOverride wc bco localDumpPkgs locals = do
 
 -- | Generate Haddock index and contents for local packages and their dependencies.
 generateDepsHaddockIndex
-    :: (MonadIO m, MonadCatch m, MonadLogger m, MonadBaseControl IO m)
+    :: (MonadUnliftIO m, MonadLogger m)
     => EnvOverride
     -> WhichCompiler
     -> BaseConfigOpts
@@ -190,7 +187,7 @@ generateDepsHaddockIndex envOverride wc bco globalDumpPkgs snapshotDumpPkgs loca
 
 -- | Generate Haddock index and contents for all snapshot packages.
 generateSnapHaddockIndex
-    :: (MonadIO m, MonadCatch m, MonadLogger m, MonadBaseControl IO m)
+    :: (MonadUnliftIO m, MonadLogger m)
     => EnvOverride
     -> WhichCompiler
     -> BaseConfigOpts
@@ -209,7 +206,7 @@ generateSnapHaddockIndex envOverride wc bco globalDumpPkgs snapshotDumpPkgs =
 
 -- | Generate Haddock index and contents for specified packages.
 generateHaddockIndex
-    :: (MonadIO m, MonadCatch m, MonadLogger m, MonadBaseControl IO m)
+    :: (MonadUnliftIO m, MonadLogger m)
     => Text
     -> EnvOverride
     -> WhichCompiler

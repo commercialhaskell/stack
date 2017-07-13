@@ -15,8 +15,6 @@ import           Control.Monad.Reader
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import qualified Data.Text as T
-import           Stack.Build.Source (getLocalPackageViews)
-import           Stack.Build.Target (LocalPackageView(..))
 import           Stack.Config (getLocalPackages)
 import           Stack.Package (findOrGenerateCabalFile)
 import           Stack.Types.Config
@@ -30,7 +28,7 @@ listPackages = do
     -- TODO: Instead of setting up an entire EnvConfig only to look up the package directories,
     -- make do with a Config (and the Project inside) and use resolvePackageEntry to get
     -- the directory.
-    packageDirs <- liftM Map.keys getLocalPackages
+    packageDirs <- liftM (map lpvRoot . Map.elems . lpProject) getLocalPackages
     forM_ packageDirs $ \dir -> do
         cabalfp <- findOrGenerateCabalFile dir
         pkgName <- parsePackageNameFromFilePath cabalfp
@@ -39,7 +37,7 @@ listPackages = do
 -- | List the targets in the current project.
 listTargets :: (StackM env m, HasEnvConfig env) => m ()
 listTargets =
-    do rawLocals <- getLocalPackageViews
+    do rawLocals <- lpProject <$> getLocalPackages
        $logInfo
            (T.intercalate
                 "\n"
@@ -47,7 +45,7 @@ listTargets =
                      renderPkgComponent
                      (concatMap
                           toNameAndComponent
-                          (Map.toList (Map.map fst rawLocals)))))
+                          (Map.toList rawLocals))))
   where
     toNameAndComponent (pkgName,view') =
         map (pkgName, ) (Set.toList (lpvComponents view'))

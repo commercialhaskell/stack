@@ -26,12 +26,9 @@ module Stack.PackageDump
 
 import           Control.Applicative
 import           Control.Arrow ((&&&))
-import           Control.Exception.Safe (tryIO)
 import           Control.Monad (liftM)
-import           Control.Monad.Catch
-import           Control.Monad.IO.Class
+import           Control.Monad.IO.Unlift
 import           Control.Monad.Logger (MonadLogger)
-import           Control.Monad.Trans.Control
 import           Data.Attoparsec.Args
 import           Data.Attoparsec.Text as P
 import           Data.Conduit
@@ -67,7 +64,7 @@ import           System.Process.Read
 
 -- | Call ghc-pkg dump with appropriate flags and stream to the given @Sink@, for a single database
 ghcPkgDump
-    :: (MonadIO m, MonadLogger m, MonadBaseControl IO m, MonadCatch m)
+    :: (MonadUnliftIO m, MonadLogger m)
     => EnvOverride
     -> WhichCompiler
     -> [Path Abs Dir] -- ^ if empty, use global
@@ -77,7 +74,7 @@ ghcPkgDump = ghcPkgCmdArgs ["dump"]
 
 -- | Call ghc-pkg describe with appropriate flags and stream to the given @Sink@, for a single database
 ghcPkgDescribe
-    :: (MonadIO m, MonadLogger m, MonadBaseControl IO m, MonadCatch m)
+    :: (MonadUnliftIO m, MonadLogger m)
     => PackageName
     -> EnvOverride
     -> WhichCompiler
@@ -88,7 +85,7 @@ ghcPkgDescribe pkgName = ghcPkgCmdArgs ["describe", "--simple-output", packageNa
 
 -- | Call ghc-pkg and stream to the given @Sink@, for a single database
 ghcPkgCmdArgs
-    :: (MonadIO m, MonadLogger m, MonadBaseControl IO m, MonadCatch m)
+    :: (MonadUnliftIO m, MonadLogger m)
     => [String]
     -> EnvOverride
     -> WhichCompiler
@@ -117,7 +114,7 @@ newInstalledCache = liftIO $ InstalledCache <$> newIORef (InstalledCacheInner Ma
 
 -- | Load a @InstalledCache@ from disk, swallowing any errors and returning an
 -- empty cache.
-loadInstalledCache :: (MonadLogger m, MonadIO m, MonadBaseControl IO m)
+loadInstalledCache :: (MonadLogger m, MonadUnliftIO m)
                    => Path Abs File -> m InstalledCache
 loadInstalledCache path = do
     m <- $(versionedDecodeOrLoad installedCacheVC) path (return $ InstalledCacheInner Map.empty)
@@ -298,6 +295,7 @@ data DumpPackage profiling haddock symbols = DumpPackage
     , dpLibDirs :: ![FilePath]
     , dpLibraries :: ![Text]
     , dpHasExposedModules :: !Bool
+    , dpExposedModules :: ![Text]
     , dpDepends :: ![GhcPkgId]
     , dpHaddockInterfaces :: ![FilePath]
     , dpHaddockHtml :: !(Maybe FilePath)
@@ -384,6 +382,7 @@ conduitDumpPackage = (=$= CL.catMaybes) $ eachSection $ do
                 , dpLibDirs = libDirPaths
                 , dpLibraries = T.words $ T.unwords libraries
                 , dpHasExposedModules = not (null libraries || null exposedModules)
+                , dpExposedModules = T.words $ T.unwords exposedModules
                 , dpDepends = depends
                 , dpHaddockInterfaces = haddockInterfaces
                 , dpHaddockHtml = listToMaybe haddockHtml

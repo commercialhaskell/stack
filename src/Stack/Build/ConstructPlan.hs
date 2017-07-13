@@ -17,13 +17,12 @@ module Stack.Build.ConstructPlan
     ( constructPlan
     ) where
 
-import           Control.Exception.Lifted
 import           Control.Monad
-import           Control.Monad.IO.Class
+import           Control.Monad.IO.Unlift
 import           Control.Monad.Logger
+import           Control.Monad.Reader (runReaderT)
 import           Control.Monad.RWS.Strict
 import           Control.Monad.State.Strict (execState)
-import           Control.Monad.Trans.Resource
 import           Data.Either
 import           Data.Function
 import qualified Data.HashSet as HashSet
@@ -54,12 +53,14 @@ import           Stack.Build.Haddock
 import           Stack.Build.Installed
 import           Stack.Build.Source
 import           Stack.BuildPlan
+import           Stack.Config (getLocalPackages)
 import           Stack.Constants
 import           Stack.Package
 import           Stack.PackageDump
 import           Stack.PackageIndex
 import           Stack.PrettyPrint
 import           Stack.Types.Build
+import           Stack.Types.BuildPlan
 import           Stack.Types.Compiler
 import           Stack.Types.Config
 import           Stack.Types.FlagName
@@ -136,9 +137,9 @@ type M = RWST
     IO
 
 data Ctx = Ctx
-    { mbp            :: !MiniBuildPlan
+    { ls             :: !LoadedSnapshot
     , baseConfigOpts :: !BaseConfigOpts
-    , loadPackage    :: !(PackageName -> Version -> Map FlagName Bool -> [Text] -> IO Package)
+    , loadPackage    :: !(PackageLocationIndex FilePath -> Map FlagName Bool -> [Text] -> IO Package)
     , combinedMap    :: !CombinedMap
     , toolToPackages :: !(Cabal.Dependency -> Map PackageName VersionRange)
     , ctxEnvConfig   :: !EnvConfig
@@ -174,19 +175,19 @@ instance HasEnvConfig Ctx where
 -- 3) It will only rebuild a local package if its files are dirty or
 -- some of its dependencies have changed.
 constructPlan :: forall env m. (StackM env m, HasEnvConfig env)
-              => MiniBuildPlan
+              => LoadedSnapshot
               -> BaseConfigOpts
               -> [LocalPackage]
               -> Set PackageName -- ^ additional packages that must be built
               -> [DumpPackage () () ()] -- ^ locally registered
-              -> (PackageName -> Version -> Map FlagName Bool -> [Text] -> IO Package) -- ^ load upstream package
+              -> (PackageLocationIndex FilePath -> Map FlagName Bool -> [Text] -> IO Package) -- ^ load upstream package
               -> SourceMap
               -> InstalledMap
               -> Bool
               -> m Plan
-constructPlan mbp0 baseConfigOpts0 locals extraToBuild0 localDumpPkgs loadPackage0 sourceMap installedMap initialBuildSteps = do
+constructPlan ls0 baseConfigOpts0 locals extraToBuild0 localDumpPkgs loadPackage0 sourceMap installedMap initialBuildSteps = do
     $logDebug "Constructing the build plan"
-    getVersions0 <- getPackageVersionsIO
+    u <- askUnliftIO
 
     econfig <- view envConfigL
     let onWanted = void . addDep False . packageName . lpPackage
@@ -194,8 +195,9 @@ constructPlan mbp0 baseConfigOpts0 locals extraToBuild0 localDumpPkgs loadPackag
             mapM_ onWanted $ filter lpWanted locals
             mapM_ (addDep False) $ Set.toList extraToBuild0
     lf <- askLoggerIO
+    lp <- getLocalPackages
     ((), m, W efinals installExes dirtyReason deps warnings parents) <-
-        liftIO $ runRWST inner (ctx econfig getVersions0 lf) M.empty
+        liftIO $ runRWST inner (ctx econfig (unliftIO u . getPackageVersions) lf lp) M.empty
     mapM_ $logWarn (warnings [])
     let toEither (_, Left e)  = Left e
         toEither (k, Right v) = Right (k, v)
@@ -227,14 +229,14 @@ constructPlan mbp0 baseConfigOpts0 locals extraToBuild0 localDumpPkgs loadPackag
             $prettyError $ pprintExceptions errs stackYaml parents (wantedLocalPackages locals)
             throwM $ ConstructPlanFailed "Plan construction failed."
   where
-    ctx econfig getVersions0 lf = Ctx
-        { mbp = mbp0
+    ctx econfig getVersions0 lf lp = Ctx
+        { ls = ls0
         , baseConfigOpts = baseConfigOpts0
         , loadPackage = loadPackage0
         , combinedMap = combineMap sourceMap installedMap
         , toolToPackages = \(Cabal.Dependency name _) ->
           maybe Map.empty (Map.fromSet (const Cabal.anyVersion)) $
-          Map.lookup (T.pack . packageNameString . fromCabalPackageName $ name) toolMap
+          Map.lookup (T.pack . packageNameString . fromCabalPackageName $ name) (toolMap lp)
         , ctxEnvConfig = econfig
         , callStack = []
         , extraToBuild = extraToBuild0
@@ -243,10 +245,8 @@ constructPlan mbp0 baseConfigOpts0 locals extraToBuild0 localDumpPkgs loadPackag
         , localNames = Set.fromList $ map (packageName . lpPackage) locals
         , logFunc = lf
         }
-    -- TODO Currently, this will only consider and install tools from the
-    -- snapshot. It will not automatically install build tools from extra-deps
-    -- or local packages.
-    toolMap = getToolMap mbp0
+
+    toolMap = getToolMap ls0
 
 -- | State to be maintained during the calculation of local packages
 -- to unregister.
@@ -427,7 +427,8 @@ tellExecutablesUpstream :: PackageName -> Version -> InstallLocation -> Map Flag
 tellExecutablesUpstream name version loc flags = do
     ctx <- ask
     when (name `Set.member` extraToBuild ctx) $ do
-        p <- liftIO $ loadPackage ctx name version flags []
+        let pir = PackageIdentifierRevision (PackageIdentifier name version) Nothing -- FIXME get the real CabalFileInfo
+        p <- liftIO $ loadPackage ctx (PLIndex pir) flags []
         tellExecutablesPackage loc p
 
 tellExecutablesPackage :: InstallLocation -> Package -> M ()
@@ -462,9 +463,9 @@ installPackage
 installPackage name ps minstalled = do
     ctx <- ask
     case ps of
-        PSUpstream version _ flags ghcOptions _ -> do
+        PSUpstream _ _ flags ghcOptions pkgLoc -> do
             planDebug $ "installPackage: Doing all-in-one build for upstream package " ++ show name
-            package <- liftIO $ loadPackage ctx name version flags ghcOptions
+            package <- liftIO $ loadPackage ctx pkgLoc flags ghcOptions
             resolveDepsAndInstall True ps package minstalled
         PSLocal lp ->
             case lpTestBench lp of
@@ -562,7 +563,7 @@ installPackageGivenDeps isAllInOne ps package minstalled (missing, present, minL
             , taskType =
                 case ps of
                     PSLocal lp -> TTLocal lp
-                    PSUpstream _ loc _ _ sha -> TTUpstream package (loc <> minLoc) sha
+                    PSUpstream _ loc _ _ pkgLoc -> TTUpstream package (loc <> minLoc) pkgLoc
             , taskAllInOne = isAllInOne
             , taskCachePkgSrc = toCachePkgSrc ps
             }
@@ -677,7 +678,7 @@ checkDirtiness :: PackageSource
                -> M Bool
 checkDirtiness ps installed package present wanted = do
     ctx <- ask
-    moldOpts <- flip runLoggingT (logFunc ctx) $ tryGetFlagCache installed
+    moldOpts <- liftIO $ flip runLoggingT (logFunc ctx) $ flip runReaderT ctx $ tryGetFlagCache installed
     let configOpts = configureOpts
             (view envConfigL ctx)
             (baseConfigOpts ctx)
@@ -884,12 +885,12 @@ markAsDep name = tell mempty { wDeps = Set.singleton name }
 -- | Is the given package/version combo defined in the snapshot?
 inSnapshot :: PackageName -> Version -> M Bool
 inSnapshot name version = do
-    p <- asks mbp
+    p <- asks ls
     ls <- asks localNames
     return $ fromMaybe False $ do
         guard $ not $ name `Set.member` ls
-        mpi <- Map.lookup name (mbpPackages p)
-        return $ mpiVersion mpi == version
+        lpi <- Map.lookup name (lsPackages p)
+        return $ lpiVersion lpi == version
 
 data ConstructPlanException
     = DependencyCycleDetected [PackageName]

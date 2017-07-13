@@ -33,7 +33,7 @@ module Stack.Types.Version
 
 import           Control.Applicative
 import           Control.DeepSeq
-import           Control.Monad.Catch
+import           Control.Monad.IO.Unlift
 import           Data.Aeson.Extended
 import           Data.Attoparsec.Text
 import           Data.Data
