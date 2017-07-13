@@ -135,7 +135,7 @@ generateLocalHaddockIndex envOverride wc bco localDumpPkgs locals = do
         "local packages"
         envOverride
         wc
-        (boptsHaddockOpts (bcoBuildOpts bco))
+        bco
         dumpPackages
         "."
         (localDocDir bco)
@@ -158,7 +158,7 @@ generateDepsHaddockIndex envOverride wc bco globalDumpPkgs snapshotDumpPkgs loca
         "local packages and dependencies"
         envOverride
         wc
-        (boptsHaddockOpts (bcoBuildOpts bco))
+        bco
         deps
         ".."
         depDocDir
@@ -199,7 +199,7 @@ generateSnapHaddockIndex envOverride wc bco globalDumpPkgs snapshotDumpPkgs =
         "snapshot packages"
         envOverride
         wc
-        (boptsHaddockOpts (bcoBuildOpts bco))
+        bco
         (Map.elems snapshotDumpPkgs ++ Map.elems globalDumpPkgs)
         "."
         (snapDocDir bco)
@@ -210,12 +210,12 @@ generateHaddockIndex
     => Text
     -> EnvOverride
     -> WhichCompiler
-    -> HaddockOpts
+    -> BaseConfigOpts
     -> [DumpPackage () () ()]
     -> FilePath
     -> Path Abs Dir
     -> m ()
-generateHaddockIndex descr envOverride wc hdopts dumpPackages docRelFP destDir = do
+generateHaddockIndex descr envOverride wc bco dumpPackages docRelFP destDir = do
     ensureDir destDir
     interfaceOpts <- (liftIO . fmap nubOrd . mapMaybeM toInterfaceOpt) dumpPackages
     unless (null interfaceOpts) $ do
@@ -236,7 +236,9 @@ generateHaddockIndex descr envOverride wc hdopts dumpPackages docRelFP destDir =
                     (Just destDir)
                     envOverride
                     (haddockExeName wc)
-                    (hoAdditionalArgs hdopts ++
+                    (map (("--optghc=-package-db=" ++ ) . toFilePathNoTrailingSep)
+                        [bcoSnapDB bco, bcoLocalDB bco] ++
+                     hoAdditionalArgs (boptsHaddockOpts (bcoBuildOpts bco)) ++
                      ["--gen-contents", "--gen-index"] ++
                      [x | (xs,_,_,_) <- interfaceOpts, x <- xs])
             else

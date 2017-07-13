@@ -109,6 +109,9 @@ Bug fixes:
 * Fixed an issue where Stack wouldn't detect missing Docker images
   properly with newer Docker versions.
   [#3171](https://github.com/commercialhaskell/stack/pull/3171)
+* `stack haddock` now includes package names for all modules in the
+   Haddock index page. See:
+  [#2886](https://github.com/commercialhaskell/stack/issues/2886)
 
 
 ## 1.4.0
