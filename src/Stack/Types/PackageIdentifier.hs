@@ -1,4 +1,5 @@
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
@@ -34,13 +35,16 @@ import           Crypto.Hash as Hash (hashlazy, Digest, SHA256)
 import           Data.Aeson.Extended
 import           Data.Attoparsec.Text as A
 import qualified Data.ByteArray.Encoding as Mem (convertToBase, Base(Base16))
+import           Data.ByteString (ByteString)
 import qualified Data.ByteString.Lazy as L
 import           Data.Data
 import           Data.Hashable
 import           Data.Store (Store)
+import           Data.Store.Internal (Size (..), StaticSize (..), size,
+                                      toStaticSize, toStaticSizeEx, unStaticSize)
 import           Data.Text (Text)
 import qualified Data.Text as T
-import           Data.Text.Encoding (decodeUtf8)
+import           Data.Text.Encoding (decodeUtf8, encodeUtf8)
 import qualified Distribution.Package as C
 import           GHC.Generics
 import           Prelude hiding (FilePath)
@@ -110,24 +114,44 @@ instance FromJSON PackageIdentifierRevision where
 
 -- | A cryptographic hash of a Cabal file.
 --
--- Internal @Text@ value is in base-16 format, and represents a SHA256
--- hash.
-newtype CabalHash = CabalHash { unCabalHash :: Text }
-    deriving (Generic, Show, Eq, NFData, Store, Data, Typeable, Ord, Hashable)
+-- TODO: Currently keeps data base16 encoded. Replace with more
+-- compact representation?
+newtype CabalHash = CabalHash { unCabalHash :: StaticSize 64 ByteString }
+    deriving (Generic, Show, Eq, NFData, Data, Typeable, Ord)
+
+instance Store CabalHash where
+    size = ConstSize 64
+    -- poke (GitSHA1 x) = do
+    --   let (sourceFp, sourceOffset, sourceLength) = BSI.toForeignPtr (unStaticSize x)
+    --   pokeFromForeignPtr sourceFp sourceOffset sourceLength
+    -- peek = do
+    --     let len = 20
+    --     fp <- peekToPlainForeignPtr ("StaticSize " ++ show len ++ " Data.ByteString.ByteString") len
+    --     return (GitSHA1 $ StaticSize (BSI.PS fp 0 len))
+    -- {-# INLINE size #-}
+    -- {-# INLINE peek #-}
+    -- {-# INLINE poke #-}
+
+instance Hashable CabalHash where
+  hashWithSalt s (CabalHash x) = hashWithSalt s (unStaticSize x)
 
 -- | Generate a 'CabalHash' value from a base16-encoded SHA256 hash.
-mkCabalHashFromSHA256 :: Text -> CabalHash
-mkCabalHashFromSHA256 = CabalHash
+mkCabalHashFromSHA256 :: Text -> Maybe CabalHash
+mkCabalHashFromSHA256 = fmap CabalHash . toStaticSize . encodeUtf8
+
+-- | Convert a 'CabalHash' into a base16-encoded SHA256 hash.
+cabalHashToText :: CabalHash -> Text
+cabalHashToText = decodeUtf8 . unStaticSize . unCabalHash
 
 -- | Compute a 'CabalHash' value from a cabal file's contents.
 computeCabalHash :: L.ByteString -> CabalHash
-computeCabalHash = CabalHash . decodeUtf8 . Mem.convertToBase Mem.Base16 . hashSHA256
+computeCabalHash = CabalHash . toStaticSizeEx . Mem.convertToBase Mem.Base16 . hashSHA256
 
 hashSHA256 :: L.ByteString -> Hash.Digest Hash.SHA256
 hashSHA256 = Hash.hashlazy
 
 showCabalHash :: CabalHash -> Text
-showCabalHash (CabalHash t) = T.append (T.pack "sha256:") t
+showCabalHash = T.append (T.pack "sha256:") . cabalHashToText
 
 -- | Information on the contents of a cabal file
 data CabalFileInfo = CabalFileInfo
@@ -184,12 +208,14 @@ parsePackageIdentifierRevision x = go x
     cabalFileInfo = do
       _ <- string $ T.pack "@sha256:"
       hash' <- A.takeWhile (/= ',')
+      hash'' <- maybe (fail "Invalid SHA256") return
+              $ mkCabalHashFromSHA256 hash'
       msize <- optional $ do
         _ <- A.char ','
         A.decimal
       return CabalFileInfo
         { cfiSize = msize
-        , cfiHash = CabalHash hash'
+        , cfiHash = hash''
         }
 
 -- | Get a string representation of the package identifier; name-ver.
@@ -206,7 +232,7 @@ packageIdentifierRevisionString (PackageIdentifierRevision ident mcfi) =
         Nothing -> []
         Just cfi ->
             "@sha256:"
-          : T.unpack (unCabalHash $ cfiHash cfi)
+          : T.unpack (cabalHashToText (cfiHash cfi))
           : showSize (cfiSize cfi)
 
     showSize Nothing = []
