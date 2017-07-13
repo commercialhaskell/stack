@@ -46,6 +46,7 @@ import           Data.IORef
 import           Data.IORef.RunOnce (runOnce)
 import           Data.List hiding (any)
 import           Data.Map.Strict (Map)
+import qualified Data.Map.Strict as M
 import qualified Data.Map.Strict as Map
 import           Data.Maybe
 import           Data.Maybe.Extra (forMaybeM)
@@ -110,6 +111,12 @@ import           System.Process.Run
 #if !MIN_VERSION_process(1,2,1)
 import           System.Process.Internals (createProcess_)
 #endif
+
+-- | Has an executable been built or not?
+data ExecutableBuildStatus
+    = ExecutableBuilt
+    | ExecutableNotBuilt
+  deriving (Show, Eq, Ord)
 
 -- | Fetch the packages necessary for a build, for example in combination with a dry run.
 preFetch :: (StackM env m, HasEnvConfig env) => Plan -> m ()
@@ -1181,7 +1188,7 @@ singleBuild runInBase ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} in
     enableTests = buildingFinals && any isCTest (taskComponents task)
     enableBenchmarks = buildingFinals && any isCBench (taskComponents task)
 
-    annSuffix = if result == "" then "" else " (" <> result <> ")"
+    annSuffix executableBuildStatuses = if result == "" then "" else " (" <> result <> ")"
       where
         result = T.intercalate " + " $ concat
             [ ["lib" | taskAllInOne && hasLib]
@@ -1190,7 +1197,7 @@ singleBuild runInBase ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} in
             , ["bench" | enableBenchmarks]
             ]
         (hasLib, hasExe) = case taskType of
-            TTLocal lp -> (packageHasLibrary (lpPackage lp), not (Set.null (exesToBuild lp)))
+            TTLocal lp -> (packageHasLibrary (lpPackage lp), not (Set.null (exesToBuild executableBuildStatuses lp)))
             -- This isn't true, but we don't want to have this info for
             -- upstream deps.
             TTUpstream{} -> (False, False)
@@ -1281,7 +1288,13 @@ singleBuild runInBase ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} in
 
     realConfigAndBuild cache allDepsMap = withSingleContext runInBase ac ee task (Just allDepsMap) Nothing
         $ \package cabalfp pkgDir cabal announce _console _mlogFile -> do
-            _neededConfig <- ensureConfig cache pkgDir ee (announce ("configure" <> annSuffix)) cabal cabalfp
+            executableBuildStatuses <- getExecutableBuildStatuses package pkgDir
+            when (not (cabalIsSatisfied executableBuildStatuses) && taskIsTarget task)
+                 ($logInfo
+                      ("Building all executables for `" <> packageNameText (packageName package) <>
+                       "' once. After a successful build of all of them, only specified executables will be rebuilt."))
+
+            _neededConfig <- ensureConfig cache pkgDir ee (announce ("configure" <> annSuffix executableBuildStatuses)) cabal cabalfp
 
             let installedMapHasThisPkg :: Bool
                 installedMapHasThisPkg =
@@ -1298,12 +1311,12 @@ singleBuild runInBase ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} in
                 -- https://github.com/commercialhaskell/stack/issues/2787
                 (True, _) | null acDownstream -> return Nothing
                 (_, True) | null acDownstream || installedMapHasThisPkg -> do
-                    initialBuildSteps cabal announce
+                    initialBuildSteps executableBuildStatuses cabal announce
                     return Nothing
-                _ -> liftM Just $ realBuild cache package pkgDir cabal announce
+                _ -> liftM Just $ realBuild cache package pkgDir cabal announce executableBuildStatuses
 
-    initialBuildSteps cabal announce = do
-        () <- announce ("initial-build-steps" <> annSuffix)
+    initialBuildSteps executableBuildStatuses cabal announce = do
+        () <- announce ("initial-build-steps" <> annSuffix executableBuildStatuses)
         cabal KeepTHLoading ["repl", "stack-initial-build-steps"]
 
     realBuild
@@ -1312,8 +1325,9 @@ singleBuild runInBase ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} in
         -> Path Abs Dir
         -> (ExcludeTHLoading -> [String] -> m ())
         -> (Text -> m ())
+        -> Map Text ExecutableBuildStatus
         -> m Installed
-    realBuild cache package pkgDir cabal announce = do
+    realBuild cache package pkgDir cabal announce executableBuildStatuses = do
         wc <- view $ actualCompilerVersionL.whichCompilerL
 
         markExeNotInstalled (taskLocation task) taskProvides
@@ -1349,7 +1363,7 @@ singleBuild runInBase ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} in
                         line <> line <>
                         "Missing modules in the cabal file are likely to cause undefined reference errors from the linker, along with other problems."
 
-        () <- announce ("build" <> annSuffix)
+        () <- announce ("build" <> annSuffix executableBuildStatuses)
         config <- view configL
         extraOpts <- extraBuildOptions wc eeBuildOpts
         let stripTHLoading
@@ -1358,9 +1372,9 @@ singleBuild runInBase ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} in
         cabal stripTHLoading (("build" :) $ (++ extraOpts) $
             case (taskType, taskAllInOne, isFinalBuild) of
                 (_, True, True) -> error "Invariant violated: cannot have an all-in-one build that also has a final build step."
-                (TTLocal lp, False, False) -> primaryComponentOptions lp
+                (TTLocal lp, False, False) -> primaryComponentOptions executableBuildStatuses lp
                 (TTLocal lp, False, True) -> finalComponentOptions lp
-                (TTLocal lp, True, False) -> primaryComponentOptions lp ++ finalComponentOptions lp
+                (TTLocal lp, True, False) -> primaryComponentOptions executableBuildStatuses lp ++ finalComponentOptions lp
                 (TTUpstream{}, _, _) -> [])
           `catch` \ex -> case ex of
               CabalExitedUnsuccessfully{} -> postBuildCheck False >> throwM ex
@@ -1449,6 +1463,56 @@ singleBuild runInBase ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} in
                 liftIO $ atomically $ modifyTVar' tvar (Map.insert (dpGhcPkgId dp) dp)
                 return $ Just (dpGhcPkgId dp)
             _ -> error "singleBuild: invariant violated: multiple results when describing installed package"
+
+-- | Get the build status of all the package executables. Do so by
+-- testing whether their expected output file exists, e.g.
+--
+-- .stack-work/dist/x86_64-osx/Cabal-1.22.4.0/build/alpha/alpha
+-- .stack-work/dist/x86_64-osx/Cabal-1.22.4.0/build/alpha/alpha.exe
+-- .stack-work/dist/x86_64-osx/Cabal-1.22.4.0/build/alpha/alpha.jsexe/ (NOTE: a dir)
+getExecutableBuildStatuses
+    :: (StackM env m, HasEnvConfig env)
+    => Package -> Path Abs Dir -> m (Map Text ExecutableBuildStatus)
+getExecutableBuildStatuses package pkgDir = do
+    compiler <- view $ actualCompilerVersionL.whichCompilerL
+    distDir <- distDirFromDir pkgDir
+    platform <- view platformL
+    fmap
+        M.fromList
+        (mapM (checkExeStatus compiler platform distDir) (Set.toList (packageExes package)))
+
+-- | Check whether the given executable is defined in the given dist directory.
+checkExeStatus
+    :: (MonadLogger m, MonadIO m, MonadThrow m)
+    => WhichCompiler
+    -> Platform
+    -> Path b Dir
+    -> Text
+    -> m (Text, ExecutableBuildStatus)
+checkExeStatus compiler platform distDir name = do
+    exename <- parseRelDir (T.unpack name)
+    exists <- checkPath (distDir </> $(mkRelDir "build") </> exename)
+    pure
+        ( name
+        , if exists
+              then ExecutableBuilt
+              else ExecutableNotBuilt)
+  where
+    checkPath base =
+        case compiler of
+            Ghcjs -> do
+                dir <- parseRelDir (file ++ ".jsexe")
+                doesDirExist (base </> dir)
+            _ ->
+                case platform of
+                    Platform _ Windows -> do
+                        fileandext <- parseRelFile (file ++ ".exe")
+                        doesFileExist (base </> fileandext)
+                    _ -> do
+                        fileandext <- parseRelFile file
+                        doesFileExist (base </> fileandext)
+      where
+        file = T.unpack name
 
 -- | Check if any unlisted files have been found, and add them to the build cache.
 checkForUnlistedFiles :: (StackM env m, HasEnvConfig env) => TaskType -> ModTime -> Path Abs Dir -> m [PackageWarning]
@@ -1751,27 +1815,36 @@ extraBuildOptions wc bopts = do
         return [optsFlag, ddumpOpts]
 
 -- Library and executable build components.
-primaryComponentOptions :: LocalPackage -> [String]
-primaryComponentOptions lp = ["lib:" ++ packageNameString (packageName (lpPackage lp))
+primaryComponentOptions :: Map Text ExecutableBuildStatus -> LocalPackage -> [String]
+primaryComponentOptions executableBuildStatuses lp = ["lib:" ++ packageNameString (packageName (lpPackage lp))
       -- TODO: get this information from target parsing instead,
       -- which will allow users to turn off library building if
       -- desired
       | packageHasLibrary (lpPackage lp)] ++
-      map (T.unpack . T.append "exe:") (Set.toList $ exesToBuild lp)
+      map (T.unpack . T.append "exe:") (Set.toList $ exesToBuild executableBuildStatuses lp)
 
-exesToBuild :: LocalPackage -> Set Text
-exesToBuild lp = packageExes (lpPackage lp)
-    -- NOTE: Ideally we'd do something like the following code, allowing
-    -- the user to control which executables get built. However, due to
-    -- https://github.com/haskell/cabal/issues/2780 we must build all
-    -- exes...
-    --
-    -- if lpWanted lp
-    --     then exeComponents (lpComponents lp)
-    --     -- Build all executables in the event that no
-    --     -- specific list is provided (as happens with
-    --     -- extra-deps).
-    --     else packageExes (lpPackage lp)
+-- | History of this function:
+--
+-- * Normally it would do either all executables or if the user
+--   specified requested components, just build them. Afterwards, due
+--   to this Cabal bug <https://github.com/haskell/cabal/issues/2780>,
+--   we had to make Stack build all executables every time.
+--
+-- * In <https://github.com/commercialhaskell/stack/issues/3229> this
+--   was flagged up as very undesirable behavior on a large project,
+--   hence the behavior below that we build all executables once
+--   (modulo success), and thereafter pay attention to user-wanted
+--   components.
+--
+exesToBuild :: Map Text ExecutableBuildStatus -> LocalPackage -> Set Text
+exesToBuild executableBuildStatuses lp =
+    if cabalIsSatisfied executableBuildStatuses && lpWanted lp
+        then exeComponents (lpComponents lp)
+        else packageExes (lpPackage lp)
+
+-- | Do the current executables satisfy Cabal's bugged out requirements?
+cabalIsSatisfied :: Map k ExecutableBuildStatus -> Bool
+cabalIsSatisfied = all (== ExecutableBuilt) . M.elems
 
 -- Test-suite and benchmark build components.
 finalComponentOptions :: LocalPackage -> [String]
