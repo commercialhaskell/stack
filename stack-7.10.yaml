@@ -26,7 +26,7 @@ extra-deps:
 - http-client-tls-0.3.4
 - http-conduit-2.2.3
 - optparse-applicative-0.13.0.0
-- text-metrics-0.1.0
+- text-metrics-0.3.0
 - pid1-0.1.0.0
 - aeson-1.0.2.1
 - hpack-0.17.0

@@ -19,3 +19,4 @@ flags:
 extra-deps:
 - mintty-0.1.1
 - store-0.4.1
+- text-metrics-0.3.0
