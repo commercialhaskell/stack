@@ -32,7 +32,6 @@ import           Data.Int (Int64)
 import           Data.Map (Map)
 import qualified Data.Map.Strict as Map
 import           Data.Store (Store)
-import           Data.Store.Internal (StaticSize, toStaticSizeEx)
 import           Data.Text (Text)
 import qualified Data.Text as T
 import           Data.Text.Encoding (encodeUtf8, decodeUtf8)
@@ -69,7 +68,7 @@ instance Store PackageCacheMap
 instance NFData PackageCacheMap
 
 data PackageDownload = PackageDownload
-    { pdSHA256 :: !(StaticSize 64 ByteString)
+    { pdSHA256 :: !StaticSHA256
     , pdUrl    :: !ByteString
     , pdSize   :: !Word64
     }
@@ -80,7 +79,11 @@ instance NFData PackageDownload
 instance FromJSON PackageDownload where
     parseJSON = withObject "PackageDownload" $ \o -> do
         hashes <- o .: "package-hashes"
-        sha256 <- maybe mzero return (Map.lookup ("SHA256" :: Text) hashes)
+        sha256' <- maybe mzero return (Map.lookup ("SHA256" :: Text) hashes)
+        sha256 <-
+          case mkStaticSHA256FromText sha256' of
+            Nothing -> fail "Invalid sha256"
+            Just x -> return x
         locs <- o .: "package-locations"
         url <-
             case reverse locs of
@@ -88,7 +91,7 @@ instance FromJSON PackageDownload where
                 x:_ -> return x
         size <- o .: "package-size"
         return PackageDownload
-            { pdSHA256 = toStaticSizeEx $ encodeUtf8 sha256
+            { pdSHA256 = sha256
             , pdUrl = encodeUtf8 url
             , pdSize = size
             }
@@ -103,9 +106,13 @@ instance FromJSON HSPackageDownload where
         Object o4:_ <- return $ F.toList o3
         len <- o4 .: "length"
         hashes <- o4 .: "hashes"
-        sha256 <- hashes .: "sha256"
+        sha256' <- hashes .: "sha256"
+        sha256 <-
+          case mkStaticSHA256FromText sha256' of
+            Nothing -> fail "Invalid sha256"
+            Just x -> return x
         return $ HSPackageDownload PackageDownload
-            { pdSHA256 = toStaticSizeEx $ encodeUtf8 sha256
+            { pdSHA256 = sha256
             , pdSize = len
             , pdUrl = ""
             }

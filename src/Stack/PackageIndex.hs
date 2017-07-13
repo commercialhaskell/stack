@@ -365,7 +365,7 @@ getPackageCaches = do
             result <- liftM mconcat $ forM (configPackageIndices config) $ \index -> do
                 fp <- configPackageIndexCache (indexName index)
                 PackageCacheMap pis' gitPIs <-
-                    $(versionedDecodeOrLoad (storeVersionConfig "pkg-v4" "ZFFv9wLN5ilE-f4p73Wld3hM-RQ="
+                    $(versionedDecodeOrLoad (storeVersionConfig "pkg-v4" "YZ4KNwqz-WdTZMaiU0UvfLWSSBw="
                                              :: VersionConfig PackageCacheMap))
                     fp
                     (populateCache index)

@@ -25,7 +25,12 @@ module Stack.Types.PackageIdentifier
   , packageIdentifierRevisionString
   , packageIdentifierText
   , toCabalPackageIdentifier
-  , fromCabalPackageIdentifier )
+  , fromCabalPackageIdentifier
+  , StaticSHA256
+  , mkStaticSHA256FromText
+  , staticSHA256ToText
+  , staticSHA256ToBase16
+  )
   where
 
 import           Control.Applicative
@@ -113,13 +118,15 @@ instance FromJSON PackageIdentifierRevision where
       Right x -> return x
 
 -- | A cryptographic hash of a Cabal file.
---
--- TODO: Currently keeps data base16 encoded. Replace with more
--- compact representation?
-newtype CabalHash = CabalHash { unCabalHash :: StaticSize 64 ByteString }
+newtype CabalHash = CabalHash { unCabalHash :: StaticSHA256 }
+    deriving (Generic, Show, Eq, NFData, Data, Typeable, Ord, Store, Hashable)
+
+-- | A SHA256 hash, stored in a static size for more efficient
+-- serialization with store.
+newtype StaticSHA256 = StaticSHA256 (StaticSize 64 ByteString)
     deriving (Generic, Show, Eq, NFData, Data, Typeable, Ord)
 
-instance Store CabalHash where
+instance Store StaticSHA256 where
     size = ConstSize 64
     -- poke (GitSHA1 x) = do
     --   let (sourceFp, sourceOffset, sourceLength) = BSI.toForeignPtr (unStaticSize x)
@@ -132,20 +139,32 @@ instance Store CabalHash where
     -- {-# INLINE peek #-}
     -- {-# INLINE poke #-}
 
-instance Hashable CabalHash where
-  hashWithSalt s (CabalHash x) = hashWithSalt s (unStaticSize x)
+instance Hashable StaticSHA256 where
+  hashWithSalt s (StaticSHA256 x) = hashWithSalt s (unStaticSize x)
+
+-- | Generate a 'StaticSHA256' value from a base16-encoded SHA256 hash.
+mkStaticSHA256FromText :: Text -> Maybe StaticSHA256
+mkStaticSHA256FromText = fmap StaticSHA256 . toStaticSize . encodeUtf8
+
+-- | Convert a 'StaticSHA256' into a base16-encoded SHA256 hash.
+staticSHA256ToText :: StaticSHA256 -> Text
+staticSHA256ToText = decodeUtf8 . staticSHA256ToBase16
+
+-- | Convert a 'StaticSHA256' into a base16-encoded SHA256 hash.
+staticSHA256ToBase16 :: StaticSHA256 -> ByteString
+staticSHA256ToBase16 (StaticSHA256 x) = unStaticSize x
 
 -- | Generate a 'CabalHash' value from a base16-encoded SHA256 hash.
 mkCabalHashFromSHA256 :: Text -> Maybe CabalHash
-mkCabalHashFromSHA256 = fmap CabalHash . toStaticSize . encodeUtf8
+mkCabalHashFromSHA256 = fmap CabalHash . mkStaticSHA256FromText
 
 -- | Convert a 'CabalHash' into a base16-encoded SHA256 hash.
 cabalHashToText :: CabalHash -> Text
-cabalHashToText = decodeUtf8 . unStaticSize . unCabalHash
+cabalHashToText = staticSHA256ToText . unCabalHash
 
 -- | Compute a 'CabalHash' value from a cabal file's contents.
 computeCabalHash :: L.ByteString -> CabalHash
-computeCabalHash = CabalHash . toStaticSizeEx . Mem.convertToBase Mem.Base16 . hashSHA256
+computeCabalHash = CabalHash . StaticSHA256 . toStaticSizeEx . Mem.convertToBase Mem.Base16 . hashSHA256
 
 hashSHA256 :: L.ByteString -> Hash.Digest Hash.SHA256
 hashSHA256 = Hash.hashlazy

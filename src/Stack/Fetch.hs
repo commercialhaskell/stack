@@ -59,7 +59,6 @@ import              Data.Maybe (maybeToList, catMaybes, isJust)
 import              Data.Monoid
 import              Data.Set (Set)
 import qualified    Data.Set as Set
-import              Data.Store.Internal (StaticSize, unStaticSize)
 import qualified    Data.Text as T
 import              Data.Text.Encoding (decodeUtf8)
 import              Data.Text.Metrics
@@ -315,7 +314,7 @@ data ToFetch = ToFetch
     , tfDestDir :: !(Maybe (Path Abs Dir))
     , tfUrl     :: !T.Text
     , tfSize    :: !(Maybe Word64)
-    , tfSHA256  :: !(Maybe (StaticSize 64 ByteString))
+    , tfSHA256  :: !(Maybe StaticSHA256)
     , tfCabal   :: !ByteString
     -- ^ Contents of the .cabal file
     }
@@ -547,7 +546,7 @@ fetchPackages' mdistDir toFetchAll = do
         let toHashCheck bs = HashCheck SHA256 (CheckHexDigestByteString bs)
         let downloadReq = DownloadRequest
                 { drRequest = req
-                , drHashChecks = map (toHashCheck . unStaticSize) $ maybeToList (tfSHA256 toFetch)
+                , drHashChecks = map (toHashCheck . staticSHA256ToBase16) $ maybeToList (tfSHA256 toFetch)
                 , drLengthCheck = fromIntegral <$> tfSize toFetch
                 , drRetryPolicy = drRetryPolicyDefault
                 }
