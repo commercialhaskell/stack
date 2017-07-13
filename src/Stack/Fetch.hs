@@ -76,7 +76,6 @@ import              Stack.Types.PackageIdentifier
 import              Stack.Types.PackageIndex
 import              Stack.Types.PackageName
 import              Stack.Types.Version
-import              System.FilePath ((<.>))
 import qualified    System.FilePath as FP
 import              System.IO
 import              System.PosixCompat (setFileMode)
@@ -583,7 +582,7 @@ fetchPackages' mdistDir toFetchAll = do
                 let cabalFP =
                         innerDest FP.</>
                         packageNameString (packageIdentifierName ident)
-                        <.> "cabal"
+                        FP.<.> "cabal"
                 S.writeFile cabalFP $ tfCabal toFetch
 
                 atomically $ modifyTVar outputVar $ Map.insert ident destDir

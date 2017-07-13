@@ -55,7 +55,7 @@ import              Network.HTTP.Types.Header (hContentLength, hContentMD5)
 import              Path
 import              Prelude -- Fix AMP warning
 import              System.Directory
-import              System.FilePath ((<.>))
+import qualified    System.FilePath as FP ((<.>))
 import              System.IO
 
 -- | A request together with some checks to perform.
@@ -245,7 +245,7 @@ verifiedDownload DownloadRequest{..} destpath progressSink = do
         if p then m >> return True else return False
 
     fp = toFilePath destpath
-    fptmp = fp <.> "tmp"
+    fptmp = fp FP.<.> "tmp"
     dir = toFilePath $ parent destpath
 
     getShouldDownload = do
