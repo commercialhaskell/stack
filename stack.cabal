@@ -74,7 +74,6 @@ library
                      Data.Monoid.Extra
                      Data.Store.VersionTagged
                      Data.Text.Extra
-                     Distribution.Version.Extra
                      Network.HTTP.Download
                      Network.HTTP.Download.Verified
                      Options.Applicative.Args
