@@ -13,6 +13,7 @@ import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import           Distribution.License (License (BSD3))
 import qualified Distribution.ModuleName as ModuleName
+import           Distribution.PackageDescription (BuildType(..))
 import           Stack.Types.Package
 import           Stack.Types.PackageName
 import           Stack.Types.Version
@@ -58,40 +59,44 @@ spec = do
     describe "Script rendering" $ do
       describe "should render GHCi scripts" $ do
         it "with one library package" $ do
-          let res = scriptToLazyByteString $ renderScriptGhci packages_singlePackage Nothing
+          let res = scriptToLazyByteString $ renderScriptGhci packages_singlePackage Nothing []
           res `shouldBeLE` ghciScript_projectWithLib
 
         it "with one main package" $ do
           let res = scriptToLazyByteString $ renderScriptGhci []
                                                               (Just absFile)
+                                                              []
           res `shouldBeLE` ghciScript_projectWithMain
 
         it "with one library and main package" $ do
           let res = scriptToLazyByteString $ renderScriptGhci packages_singlePackage
                                                               (Just absFile)
+                                                              []
           res `shouldBeLE` ghciScript_projectWithLibAndMain
 
         it "with multiple library packages" $ do
-          let res = scriptToLazyByteString $ renderScriptGhci packages_multiplePackages Nothing
+          let res = scriptToLazyByteString $ renderScriptGhci packages_multiplePackages Nothing []
           res `shouldBeLE` ghciScript_multipleProjectsWithLib
 
       describe "should render intero scripts" $ do
         it "with one library package" $ do
-          let res = scriptToLazyByteString $ renderScriptIntero packages_singlePackage Nothing
+          let res = scriptToLazyByteString $ renderScriptIntero packages_singlePackage Nothing []
           res `shouldBeLE` interoScript_projectWithLib
 
         it "with one main package" $ do
           let res = scriptToLazyByteString $ renderScriptIntero packages_singlePackage
-                                                              (Just absFile)
+                                                                (Just absFile)
+                                                                []
           res `shouldBeLE` interoScript_projectWithMain
 
         it "with one library and main package" $ do
           let res = scriptToLazyByteString $ renderScriptIntero packages_singlePackage
-                                                              (Just absFile)
+                                                                (Just absFile)
+                                                                []
           res `shouldBeLE` interoScript_projectWithLibAndMain
 
         it "with multiple library packages" $ do
-          let res = scriptToLazyByteString $ renderScriptIntero packages_multiplePackages Nothing
+          let res = scriptToLazyByteString $ renderScriptIntero packages_multiplePackages Nothing []
           res `shouldBeLE` interoScript_multipleProjectsWithLib
 
 -- Exptected Intero scripts
@@ -220,7 +225,7 @@ packages_singlePackage =
       , packageExes = S.empty
       , packageOpts = GetPackageOpts undefined
       , packageHasExposedModules = True
-      , packageSimpleType = True
+      , packageBuildType = Just Simple
       , packageSetupDeps = Nothing
       }
     }
@@ -255,7 +260,7 @@ packages_multiplePackages =
       , packageExes = S.empty
       , packageOpts = GetPackageOpts undefined
       , packageHasExposedModules = True
-      , packageSimpleType = True
+      , packageBuildType = Just Simple
       , packageSetupDeps = Nothing
       }
     }
@@ -286,7 +291,7 @@ packages_multiplePackages =
       , packageExes = S.empty
       , packageOpts = GetPackageOpts undefined
       , packageHasExposedModules = True
-      , packageSimpleType = True
+      , packageBuildType = Just Simple
       , packageSetupDeps = Nothing
       }
     }

@@ -159,10 +159,10 @@ paths =
       , view $ configL.to configLocalBin.to toFilePathNoTrailingSep.to T.pack)
     , ( "Extra include directories"
       , "extra-include-dirs"
-      , T.intercalate ", " . map (T.pack . toFilePathNoTrailingSep) . Set.elems . configExtraIncludeDirs . view configL )
+      , T.intercalate ", " . map T.pack . Set.elems . configExtraIncludeDirs . view configL )
     , ( "Extra library directories"
       , "extra-library-dirs"
-      , T.intercalate ", " . map (T.pack . toFilePathNoTrailingSep) . Set.elems . configExtraLibDirs . view configL )
+      , T.intercalate ", " . map T.pack . Set.elems . configExtraLibDirs . view configL )
     , ( "Snapshot package database"
       , "snapshot-pkg-db"
       , T.pack . toFilePathNoTrailingSep . piSnapDb )

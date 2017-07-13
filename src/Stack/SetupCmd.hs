@@ -30,9 +30,11 @@ import           Stack.Types.Version
 data SetupCmdOpts = SetupCmdOpts
     { scoCompilerVersion :: !(Maybe CompilerVersion)
     , scoForceReinstall  :: !Bool
-    , scoUpgradeCabal    :: !Bool
+    , scoUpgradeCabal    :: !(Maybe UpgradeTo)
     , scoSetupInfoYaml   :: !String
     , scoGHCBindistURL   :: !(Maybe String)
+    , scoGHCJSBootOpts   :: ![String]
+    , scoGHCJSBootClean  :: !Bool
     }
 
 setupYamlCompatParser :: OA.Parser String
@@ -48,6 +50,22 @@ setupYamlCompatParser = stackSetupYaml <|> setupInfoYaml
             <> OA.metavar "URL"
             <> OA.value defaultSetupInfoYaml )
 
+cabalUpgradeParser :: OA.Parser UpgradeTo
+cabalUpgradeParser = Specific <$> version' <|> latestParser
+    where
+        versionReader = do
+            s <- OA.readerAsk
+            case parseVersion (T.pack s) of
+                Nothing -> OA.readerError $ "Invalid version: " ++ s
+                Just v  -> return v
+        version' = OA.option versionReader (
+            OA.long "install-cabal"
+         <> OA.metavar "VERSION"
+         <> OA.help "Install a specific version of Cabal" )
+        latestParser = OA.flag' Latest (
+            OA.long "upgrade-cabal"
+         <> OA.help "Install latest version of Cabal globally" )
+
 setupParser :: OA.Parser SetupCmdOpts
 setupParser = SetupCmdOpts
     <$> OA.optional (OA.argument readVersion
@@ -58,15 +76,20 @@ setupParser = SetupCmdOpts
             "reinstall"
             "reinstalling GHC, even if available (incompatible with --system-ghc)"
             OA.idm
-    <*> OA.boolFlags False
-            "upgrade-cabal"
-            "installing the newest version of the Cabal library globally"
-            OA.idm
+    <*> OA.optional cabalUpgradeParser
     <*> setupYamlCompatParser
     <*> OA.optional (OA.strOption
             (OA.long "ghc-bindist"
            <> OA.metavar "URL"
            <> OA.help "Alternate GHC binary distribution (requires custom --ghc-variant)"))
+    <*> OA.many (OA.strOption
+            (OA.long "ghcjs-boot-options"
+           <> OA.metavar "GHCJS_BOOT"
+           <> OA.help "Additional ghcjs-boot options"))
+    <*> OA.boolFlags True
+            "ghcjs-boot-clean"
+            "Control if ghcjs-boot should have --clean option present"
+            OA.idm
   where
     readVersion = do
         s <- OA.readerAsk
@@ -100,6 +123,7 @@ setup SetupCmdOpts{..} wantedCompiler compilerCheck mstack = do
         , soptsResolveMissingGHC = Nothing
         , soptsSetupInfoYaml = scoSetupInfoYaml
         , soptsGHCBindistURL = scoGHCBindistURL
+        , soptsGHCJSBootOpts = scoGHCJSBootOpts ++ ["--clean" | scoGHCJSBootClean]
         }
     let compiler = case wantedCompiler of
             GhcVersion _ -> "GHC"

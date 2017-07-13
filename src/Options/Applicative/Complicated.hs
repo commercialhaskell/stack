@@ -53,7 +53,7 @@ complicatedOptions numericVersion versionString numericHpackVersion h pd footerS
        Failure f | Just onFailure <- mOnFailure -> onFailure f args
        parseResult -> handleParseResult parseResult
      return (mappend c a,b)
-  where parser = info (helpOption <*> versionOptions <*> complicatedParser commonParser commandParser) desc
+  where parser = info (helpOption <*> versionOptions <*> complicatedParser "COMMAND|FILE" commonParser commandParser) desc
         desc = fullDesc <> header h <> progDesc pd <> footer footerStr
         versionOptions =
           case versionString of
@@ -106,7 +106,7 @@ addSubCommands cmd title footerStr commonParser commandParser =
               footerStr
               (\(c1,(a,c2)) c3 -> (a,mconcat [c3, c2, c1]))
               commonParser
-              (complicatedParser commonParser commandParser)
+              (complicatedParser "COMMAND" commonParser commandParser)
 
 -- | Add a command to the options dispatcher.
 addCommand' :: String   -- ^ command string
@@ -124,24 +124,26 @@ addCommand' cmd title footerStr constr commonParser inner =
 -- | Generate a complicated options parser.
 complicatedParser
   :: Monoid a
-  => Parser a
+  => String
+  -- ^ metavar for the sub-command
+  -> Parser a
   -- ^ common settings
   -> EitherT b (Writer (Mod CommandFields (b,a))) ()
   -- ^ commands (use 'addCommand')
   -> Parser (a,(b,a))
-complicatedParser commonParser commandParser =
+complicatedParser commandMetavar commonParser commandParser =
    (,) <$>
    commonParser <*>
    case runWriter (runEitherT commandParser) of
-     (Right (),d) -> hsubparser' d
+     (Right (),d) -> hsubparser' commandMetavar d
      (Left b,_) -> pure (b,mempty)
 
--- way to do in 'addCommand' | Subparser with @--help@ argument. Borrowed with slight modification
+-- | Subparser with @--help@ argument. Borrowed with slight modification
 -- from Options.Applicative.Extra.
-hsubparser' :: Mod CommandFields a -> Parser a
-hsubparser' m = mkParser d g rdr
+hsubparser' :: String -> Mod CommandFields a -> Parser a
+hsubparser' commandMetavar m = mkParser d g rdr
   where
-    Mod _ d g = metavar "COMMAND|FILE" `mappend` m
+    Mod _ d g = metavar commandMetavar `mappend` m
     (groupName, cmds, subs) = mkCommand m
     rdr = CmdReader groupName cmds (fmap add_helper . subs)
     add_helper pinfo = pinfo

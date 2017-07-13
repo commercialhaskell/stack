@@ -15,7 +15,7 @@ module Stack.PrettyPrint
       -- | These are preferred to colors directly, so that we can
       -- encourage consistency of color meanings.
     , errorRed, goodGreen, shellMagenta
-    , displayTargetPkgId, displayCurrentPkgId, displayErrorPkgId
+    , displayTargetPkgId, displayCurrentPkgId, displayCurrentPkgName, displayErrorPkgId
     , displayMilliseconds
       -- * Formatting utils
     , bulletedList
@@ -112,6 +112,9 @@ displayTargetPkgId = cyan . display
 
 displayCurrentPkgId :: PackageIdentifier -> AnsiDoc
 displayCurrentPkgId = yellow . display
+
+displayCurrentPkgName :: PackageName -> AnsiDoc
+displayCurrentPkgName = yellow . display
 
 displayErrorPkgId :: PackageIdentifier -> AnsiDoc
 displayErrorPkgId = errorRed . display

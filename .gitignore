@@ -6,6 +6,7 @@
 *_flymake.hs
 .hsenv
 .stack-work/
+.stack-root/
 /.cabal-sandbox/
 TAGS
 cabal-dev/

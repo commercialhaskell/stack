@@ -1728,7 +1728,7 @@ a multi line block comment with ghc options:
 
 ### Writing independent and reliable scripts
 
-With the release of Stack 1.2.1, there is a new command, `script`, which will
+With the release of Stack 1.4.0, there is a new command, `script`, which will
 automatically:
 
 * Install GHC and libraries if missing
@@ -2029,6 +2029,23 @@ image:
 
 and then run `stack image container` and then `docker images` to list
 the images.
+
+Note that the executable will be built in the development environment 
+and copied to the container, so the dev OS must match that of the 
+container OS. This is easily accomplished using [Docker integration](docker_integration.md),
+under which the exe emitted by `stack build` will be built on the 
+Docker container, not the local OS. 
+
+The executable will be stored under `/usr/local/bin/<your-project>-exe`
+in the running container.
+
+If you want the container to run the executable immediately on startup
+then set an entrypoint as follows:
+
+```yaml
+entrypoints:
+    - <your-project>-exe
+```
 
 ### Nix
 

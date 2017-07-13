@@ -281,17 +281,16 @@ addDeps
     -> Map PackageName (Version, Map FlagName Bool, [Text], Maybe GitSHA1)
     -> m (Map PackageName MiniPackageInfo, Set PackageIdentifier)
 addDeps allowMissing compilerVersion toCalc = do
-    menv <- getMinimalEnvOverride
     platform <- view platformL
     (resolvedMap, missingIdents) <-
         if allowMissing
             then do
                 (missingNames, missingIdents, m) <-
-                    resolvePackagesAllowMissing menv Nothing shaMap Set.empty
+                    resolvePackagesAllowMissing Nothing shaMap Set.empty
                 assert (Set.null missingNames)
                     $ return (m, missingIdents)
             else do
-                m <- resolvePackages menv Nothing shaMap Set.empty
+                m <- resolvePackages Nothing shaMap Set.empty
                 return (m, Set.empty)
     let byIndex = Map.fromListWith (++) $ flip map resolvedMap
             $ \rp ->
@@ -869,6 +868,10 @@ showDepErrors flags errs =
         userPkgs = Map.keys $ Map.unions (Map.elems (fmap deNeededBy errs))
         showFlags pkg = maybe "" (showPackageFlags pkg) (Map.lookup pkg flags)
 
+-- | Given a set of packages to shadow, this removes them, and any
+-- packages that transitively depend on them, from the 'MiniBuildPlan'.
+-- The 'Map' result yields all of the packages that were downstream of
+-- the shadowed packages. It does not include the shadowed packages.
 shadowMiniBuildPlan :: MiniBuildPlan
                     -> Set PackageName
                     -> (MiniBuildPlan, Map PackageName MiniPackageInfo)

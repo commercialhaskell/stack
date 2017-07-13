@@ -38,7 +38,7 @@ import qualified Data.ByteString.Lazy.Char8 as LBS
 import           Data.Char (isSpace,toUpper,isAscii,isDigit)
 import           Data.Conduit.List (sinkNull)
 import           Data.List (dropWhileEnd,intercalate,isPrefixOf,isInfixOf,foldl')
-import           Data.List.Extra (trim)
+import           Data.List.Extra (trim, nubOrd)
 import           Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import           Data.Maybe
@@ -91,7 +91,7 @@ import qualified System.Posix.User as PosixUser
 -- Otherwise, runs the inner action.
 --
 -- This takes an optional release action which should be taken IFF control is
--- transfering away from the current process to the intra-container one.  The main use
+-- transferring away from the current process to the intra-container one.  The main use
 -- for this is releasing a lock.  After launching reexecution, the host process becomes
 -- nothing but an manager for the call into docker and thus may not hold the lock.
 reexecWithOptionalContainer
@@ -112,7 +112,7 @@ reexecWithOptionalContainer mprojectRoot =
                 then liftIO $ do
                   duUid <- User.getEffectiveUserID
                   duGid <- User.getEffectiveGroupID
-                  duGroups <- User.getGroups
+                  duGroups <- nubOrd <$> User.getGroups
                   duUmask <- Files.setFileCreationMask 0o022
                   -- Only way to get old umask seems to be to change it, so set it back afterward
                   _ <- Files.setFileCreationMask duUmask

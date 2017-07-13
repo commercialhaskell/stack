@@ -11,6 +11,7 @@ module Stack.SDist
     ( getSDistTarball
     , checkSDistTarball
     , checkSDistTarball'
+    , SDistOpts (..)
     ) where
 
 import qualified Codec.Archive.Tar as Tar
@@ -18,21 +19,26 @@ import qualified Codec.Archive.Tar.Entry as Tar
 import qualified Codec.Compression.GZip as GZip
 import           Control.Applicative
 import           Control.Concurrent.Execute (ActionContext(..))
-import           Control.Monad (unless, void, liftM)
+import           Control.Monad (unless, void, liftM, filterM, foldM, when)
 import           Control.Monad.Catch
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
+import           Control.Monad.Reader.Class (local)
 import           Control.Monad.Trans.Control (liftBaseWith)
+import           Control.Monad.Trans.Unlift (MonadBaseUnlift)
 import qualified Data.ByteString as S
 import qualified Data.ByteString.Char8 as S8
 import qualified Data.ByteString.Lazy as L
+import           Data.Char (toLower)
 import           Data.Data (Data, Typeable, cast, gmapT)
 import           Data.Either (partitionEithers)
+import           Data.IORef (newIORef, readIORef, writeIORef)
 import           Data.List
+import           Data.List.Extra (nubOrd)
 import           Data.List.NonEmpty (NonEmpty)
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Map.Strict as Map
-import           Data.Maybe (fromMaybe)
+import           Data.Maybe (fromMaybe, catMaybes)
 import           Data.Monoid ((<>))
 import qualified Data.Set as Set
 import qualified Data.Text as T
@@ -41,18 +47,22 @@ import qualified Data.Text.Lazy as TL
 import qualified Data.Text.Lazy.Encoding as TLE
 import           Data.Time.Clock.POSIX
 import           Distribution.Package (Dependency (..))
+import qualified Distribution.PackageDescription as Cabal
 import qualified Distribution.PackageDescription.Check as Check
 import           Distribution.PackageDescription.PrettyPrint (showGenericPackageDescription)
+import           Distribution.Text (display)
 import           Distribution.Version (simplifyVersionRange, orLaterVersion, earlierVersion)
 import           Distribution.Version.Extra
+import           Lens.Micro (set)
 import           Path
 import           Path.IO hiding (getModificationTime, getPermissions)
 import           Prelude -- Fix redundant import warnings
-import           Stack.Build (mkBaseConfigOpts)
+import           Stack.Build (mkBaseConfigOpts, build)
 import           Stack.Build.Execute
 import           Stack.Build.Installed
 import           Stack.Build.Source (loadSourceMap, getDefaultPackageConfig)
 import           Stack.Build.Target
+import           Stack.Config (resolvePackageEntry, removePathFromPackageEntry)
 import           Stack.Constants
 import           Stack.Package
 import           Stack.Types.Build
@@ -61,12 +71,28 @@ import           Stack.Types.Package
 import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageName
 import           Stack.Types.StackT
+import           Stack.Types.StringError
 import           Stack.Types.Version
 import           System.Directory (getModificationTime, getPermissions)
 import qualified System.FilePath as FP
 
 -- | Special exception to throw when you want to fail because of bad results
 -- of package check.
+
+data SDistOpts = SDistOpts
+  { sdoptsDirsToWorkWith :: [String]
+  -- ^ Directories to package
+  , sdoptsPvpBounds :: Maybe PvpBounds
+  -- ^ PVP Bounds overrides
+  , sdoptsIgnoreCheck :: Bool
+  -- ^ Whether to ignore check of the package for common errors
+  , sdoptsSign :: Bool
+  -- ^ Whether to sign the package
+  , sdoptsSignServerUrl :: String
+  -- ^ The URL of the signature server
+  , sdoptsBuildTarball :: Bool
+  -- ^ Whether to build the tarball
+  }
 
 newtype CheckException
   = CheckException (NonEmpty Check.PackageCheck)
@@ -89,10 +115,11 @@ getSDistTarball
   :: (StackM env m, HasEnvConfig env)
   => Maybe PvpBounds            -- ^ Override Config value
   -> Path Abs Dir               -- ^ Path to local package
-  -> m (FilePath, L.ByteString) -- ^ Filename and tarball contents
+  -> m (FilePath, L.ByteString, Maybe (PackageIdentifier, L.ByteString))
+  -- ^ Filename, tarball contents, and option cabal file revision to upload
 getSDistTarball mpvpBounds pkgDir = do
     config <- view configL
-    let pvpBounds = fromMaybe (configPvpBounds config) mpvpBounds
+    let PvpBounds pvpBounds asRevision = fromMaybe (configPvpBounds config) mpvpBounds
         tweakCabal = pvpBounds /= PvpBoundsNone
         pkgFp = toFilePath pkgDir
     lp <- readLocalPackage pkgDir
@@ -100,35 +127,56 @@ getSDistTarball mpvpBounds pkgDir = do
     (fileList, cabalfp) <-  getSDistFileList lp
     $logInfo $ "Building sdist tarball for " <> T.pack pkgFp
     files <- normalizeTarballPaths (lines fileList)
+
+    -- We're going to loop below and eventually find the cabal
+    -- file. When we do, we'll upload this reference, if the
+    -- mpvpBounds value indicates that we should be uploading a cabal
+    -- file revision.
+    cabalFileRevisionRef <- liftIO (newIORef Nothing)
+
     -- NOTE: Could make this use lazy I/O to only read files as needed
     -- for upload (both GZip.compress and Tar.write are lazy).
     -- However, it seems less error prone and more predictable to read
     -- everything in at once, so that's what we're doing for now:
-    let tarPath isDir fp = either error id
+    let tarPath isDir fp = either throwString return
             (Tar.toTarPath isDir (forceUtf8Enc (pkgId FP.</> fp)))
         -- convert a String of proper characters to a String of bytes
         -- in UTF8 encoding masquerading as characters. This is
         -- necessary for tricking the tar package into proper
         -- character encoding.
         forceUtf8Enc = S8.unpack . T.encodeUtf8 . T.pack
-        packWith f isDir fp = liftIO $ f (pkgFp FP.</> fp) (tarPath isDir fp)
+        packWith f isDir fp = liftIO $ f (pkgFp FP.</> fp) =<< tarPath isDir fp
         packDir = packWith Tar.packDirectoryEntry True
         packFile fp
+            -- This is a cabal file, we're going to tweak it, but only
+            -- tweak it as a revision.
+            | tweakCabal && isCabalFp fp && asRevision = do
+                lbsIdent <- getCabalLbs pvpBounds (Just 1) $ toFilePath cabalfp
+                liftIO (writeIORef cabalFileRevisionRef (Just lbsIdent))
+                packWith packFileEntry False fp
+            -- Same, except we'll include the cabal file in the
+            -- original tarball upload.
             | tweakCabal && isCabalFp fp = do
-                lbs <- getCabalLbs pvpBounds $ toFilePath cabalfp
+                (_ident, lbs) <- getCabalLbs pvpBounds Nothing $ toFilePath cabalfp
                 currTime <- liftIO getPOSIXTime -- Seconds from UNIX epoch
-                return $ (Tar.fileEntry (tarPath False fp) lbs) { Tar.entryTime = floor currTime }
+                tp <- liftIO $ tarPath False fp
+                return $ (Tar.fileEntry tp lbs) { Tar.entryTime = floor currTime }
             | otherwise = packWith packFileEntry False fp
         isCabalFp fp = toFilePath pkgDir FP.</> fp == toFilePath cabalfp
         tarName = pkgId FP.<.> "tar.gz"
         pkgId = packageIdentifierString (packageIdentifier (lpPackage lp))
     dirEntries <- mapM packDir (dirsFromFiles files)
     fileEntries <- mapM packFile files
-    return (tarName, GZip.compress (Tar.write (dirEntries ++ fileEntries)))
+    mcabalFileRevision <- liftIO (readIORef cabalFileRevisionRef)
+    return (tarName, GZip.compress (Tar.write (dirEntries ++ fileEntries)), mcabalFileRevision)
 
 -- | Get the PVP bounds-enabled version of the given cabal file
-getCabalLbs :: (StackM env m, HasEnvConfig env) => PvpBounds -> FilePath -> m L.ByteString
-getCabalLbs pvpBounds fp = do
+getCabalLbs :: (StackM env m, HasEnvConfig env)
+            => PvpBoundsType
+            -> Maybe Int -- ^ optional revision
+            -> FilePath
+            -> m (PackageIdentifier, L.ByteString)
+getCabalLbs pvpBounds mrev fp = do
     bs <- liftIO $ S.readFile fp
     (_warnings, gpd) <- readPackageUnresolvedBS Nothing bs
     (_, sourceMap) <- loadSourceMap AllowNoTargets defaultBuildOptsCLI
@@ -140,7 +188,24 @@ getCabalLbs pvpBounds fp = do
                                 }
                                 sourceMap
     let gpd' = gtraverseT (addBounds sourceMap installedMap) gpd
-    return $ TLE.encodeUtf8 $ TL.pack $ showGenericPackageDescription gpd'
+        gpd'' =
+          case mrev of
+            Nothing -> gpd'
+            Just rev -> gpd'
+              { Cabal.packageDescription
+               = (Cabal.packageDescription gpd')
+                  { Cabal.customFieldsPD
+                  = (("x-revision", show rev):)
+                  $ filter (\(x, _) -> map toLower x /= "x-revision")
+                  $ Cabal.customFieldsPD
+                  $ Cabal.packageDescription gpd'
+                  }
+              }
+    ident <- parsePackageIdentifierFromString $ display $ Cabal.package $ Cabal.packageDescription gpd''
+    return
+      ( ident
+      , TLE.encodeUtf8 $ TL.pack $ showGenericPackageDescription gpd''
+      )
   where
     addBounds :: SourceMap -> InstalledMap -> Dependency -> Dependency
     addBounds sourceMap installedMap dep@(Dependency cname range) =
@@ -221,7 +286,7 @@ getSDistFileList lp =
             $ \ee ->
             withSingleContext runInBase ac ee task Nothing (Just "sdist") $ \_package cabalfp _pkgDir cabal _announce _console _mlogFile -> do
                 let outFile = toFilePath tmpdir FP.</> "source-files-list"
-                cabal False ["sdist", "--list-sources", outFile]
+                cabal KeepTHLoading ["sdist", "--list-sources", outFile]
                 contents <- liftIO (readFile outFile)
                 return (contents, cabalfp)
   where
@@ -236,6 +301,7 @@ getSDistFileList lp =
             }
         , taskPresent = Map.empty
         , taskAllInOne = True
+        , taskCachePkgSrc = CacheSrcLocal (toFilePath (lpDir lp))
         }
 
 normalizeTarballPaths :: (StackM env m) => [FilePath] -> m [FilePath]
@@ -246,7 +312,7 @@ normalizeTarballPaths fps = do
         $logWarn $ T.concat
             [ "Warning: These files are outside of the package directory, and will be omitted from the tarball: "
             , T.pack (show outsideDir)]
-    return files
+    return (nubOrd files)
   where
     (outsideDir, files) = partitionEithers (map pathToEither fps)
     pathToEither fp = maybe (Left fp) Right (normalizePath fp)
@@ -271,13 +337,21 @@ dirsFromFiles dirs = Set.toAscList (Set.delete "." results)
 -- and will throw an exception in case of critical errors.
 --
 -- Note that we temporarily decompress the archive to analyze it.
-checkSDistTarball :: (StackM env m, HasEnvConfig env)
-  => Path Abs File -- ^ Absolute path to tarball
+checkSDistTarball :: (StackM env m, HasEnvConfig env, MonadBaseUnlift IO m)
+  => SDistOpts -- ^ The configuration of what to check
+  -> Path Abs File -- ^ Absolute path to tarball
   -> m ()
-checkSDistTarball tarball = withTempTarGzContents tarball $ \pkgDir' -> do
+checkSDistTarball opts tarball = withTempTarGzContents tarball $ \pkgDir' -> do
     pkgDir  <- (pkgDir' </>) `liftM`
         (parseRelDir . FP.takeBaseName . FP.takeBaseName . toFilePath $ tarball)
     --               ^ drop ".tar"     ^ drop ".gz"
+    when (sdoptsBuildTarball opts) (buildExtractedTarball pkgDir)
+    unless (sdoptsIgnoreCheck opts) (checkPackageInExtractedTarball pkgDir)
+
+checkPackageInExtractedTarball :: (StackM env m, HasEnvConfig env, MonadBaseUnlift IO m)
+  => Path Abs Dir -- ^ Absolute path to tarball
+  -> m ()
+checkPackageInExtractedTarball pkgDir = do
     cabalfp <- findOrGenerateCabalFile pkgDir
     name    <- parsePackageNameFromFilePath cabalfp
     config  <- getDefaultPackageConfig
@@ -299,16 +373,56 @@ checkSDistTarball tarball = withTempTarGzContents tarball $ \pkgDir' -> do
         Nothing -> return ()
         Just ne -> throwM $ CheckException ne
 
+buildExtractedTarball :: (StackM env m, HasEnvConfig env, MonadBaseUnlift IO m) => Path Abs Dir -> m ()
+buildExtractedTarball pkgDir = do
+  projectRoot <- view projectRootL
+  envConfig <- view envConfigL
+  menv <- getMinimalEnvOverride
+  localPackageToBuild <- readLocalPackage pkgDir
+  let packageEntries = bcPackageEntries (envConfigBuildConfig envConfig)
+      getPaths entry = do
+        resolvedEntry <- resolvePackageEntry menv projectRoot entry
+        return $ fmap fst resolvedEntry
+  allPackagePaths <- fmap mconcat (mapM getPaths packageEntries)
+  -- We remove the path based on the name of the package
+  let isPathToRemove path = do
+        localPackage <- readLocalPackage path
+        return $ packageName (lpPackage localPackage) == packageName (lpPackage localPackageToBuild)
+  pathsToRemove <- filterM isPathToRemove allPackagePaths
+  let adjustPackageEntries entries path = do
+        adjustedPackageEntries <- mapM (removePathFromPackageEntry menv projectRoot path) entries
+        return (catMaybes adjustedPackageEntries)
+  entriesWithoutBuiltPackage <- foldM adjustPackageEntries packageEntries pathsToRemove
+  let newEntry = PackageEntry Nothing (PLFilePath (toFilePath pkgDir)) []
+  newPackagesRef <- liftIO (newIORef Nothing)
+  let adjustEnvForBuild env =
+        let updatedEnvConfig = envConfig
+              {envConfigPackagesRef = newPackagesRef
+              ,envConfigBuildConfig = updatePackageInBuildConfig (envConfigBuildConfig envConfig)
+              }
+        in set envConfigL updatedEnvConfig env
+      updatePackageInBuildConfig buildConfig = buildConfig
+        { bcPackageEntries = newEntry : entriesWithoutBuiltPackage
+        , bcConfig = (bcConfig buildConfig)
+                     { configBuild = defaultBuildOpts
+                       { boptsTests = True
+                       }
+                     }
+        }
+  local adjustEnvForBuild $
+    build (const (return ())) Nothing defaultBuildOptsCLI
+
 -- | Version of 'checkSDistTarball' that first saves lazy bytestring to
 -- temporary directory and then calls 'checkSDistTarball' on it.
-checkSDistTarball' :: (StackM env m, HasEnvConfig env)
-  => String       -- ^ Tarball name
+checkSDistTarball' :: (StackM env m, HasEnvConfig env, MonadBaseUnlift IO m)
+  => SDistOpts
+  -> String       -- ^ Tarball name
   -> L.ByteString -- ^ Tarball contents as a byte string
   -> m ()
-checkSDistTarball' name bytes = withSystemTempDir "stack" $ \tpath -> do
+checkSDistTarball' opts name bytes = withSystemTempDir "stack" $ \tpath -> do
     npath   <- (tpath </>) `liftM` parseRelFile name
     liftIO $ L.writeFile (toFilePath npath) bytes
-    checkSDistTarball npath
+    checkSDistTarball opts npath
 
 withTempTarGzContents :: (MonadIO m, MonadMask m)
   => Path Abs File         -- ^ Location of tarball

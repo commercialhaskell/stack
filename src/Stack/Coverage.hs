@@ -53,6 +53,7 @@ import           Stack.Types.Package
 import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageName
 import           Stack.Types.StackT (StackM)
+import           Stack.Types.StringError
 import           Stack.Types.Version
 import           System.FilePath (isPathSeparator)
 import           System.Process.Read
@@ -242,10 +243,10 @@ generateHpcReportForTargets opts = do
                     { boptsCLITargets = if hroptsAll opts then [] else targetNames }
              liftM concat $ forM (Map.toList targets) $ \(name, target) ->
                  case target of
-                     STUnknown -> fail $
-                         packageNameString name ++ " isn't a known local page"
-                     STNonLocal -> fail $
-                         "Expected a local package, but " ++
+                     STUnknown -> throwString $
+                         "Error: " ++ packageNameString name ++ " isn't a known local page"
+                     STNonLocal -> throwString $
+                         "Error: Expected a local package, but " ++
                          packageNameString name ++
                          " is either an extra-dep or in the snapshot."
                      STLocalComps comps -> do
@@ -270,7 +271,7 @@ generateHpcReportForTargets opts = do
                              else return []
     tixPaths <- liftM (\xs -> xs ++ targetTixFiles) $ mapM (resolveFile' . T.unpack) tixFiles
     when (null tixPaths) $
-        fail "Not generating combined report, because no targets or tix files are specified."
+        throwString "Not generating combined report, because no targets or tix files are specified."
     outputDir <- hpcReportDir
     reportDir <- case hroptsDestDir opts of
         Nothing -> return (outputDir </> $(mkRelDir "combined/custom"))

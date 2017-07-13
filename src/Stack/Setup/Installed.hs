@@ -142,6 +142,7 @@ extraDirs tool = do
                 ]
             , edLib =
                 [ dir </> $(mkRelDir "mingw32") </> $(mkRelDir "lib")
+                , dir </> $(mkRelDir "mingw32") </> $(mkRelDir "bin")
                 ]
             }
         (Platform Cabal.X86_64 Cabal.Windows, "msys2") -> return mempty
@@ -155,6 +156,7 @@ extraDirs tool = do
                 ]
             , edLib =
                 [ dir </> $(mkRelDir "mingw64") </> $(mkRelDir "lib")
+                , dir </> $(mkRelDir "mingw64") </> $(mkRelDir "bin")
                 ]
             }
         (_, isGHC -> True) -> return mempty
@@ -188,13 +190,13 @@ installDir :: (MonadReader env m, MonadThrow m)
            -> Tool
            -> m (Path Abs Dir)
 installDir programsDir tool = do
-    reldir <- parseRelDir $ toolString tool
-    return $ programsDir </> reldir
+    relativeDir <- parseRelDir $ toolString tool
+    return $ programsDir </> relativeDir
 
 tempInstallDir :: (MonadReader env m, MonadThrow m)
            => Path Abs Dir
            -> Tool
            -> m (Path Abs Dir)
 tempInstallDir programsDir tool = do
-    reldir <- parseRelDir $ toolString tool ++ ".temp"
-    return $ programsDir </> reldir
+    relativeDir <- parseRelDir $ toolString tool ++ ".temp"
+    return $ programsDir </> relativeDir

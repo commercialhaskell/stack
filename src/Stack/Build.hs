@@ -58,7 +58,6 @@ import           Stack.Build.Installed
 import           Stack.Build.Source
 import           Stack.Build.Target
 import           Stack.Fetch as Fetch
-import           Stack.GhcPkg
 import           Stack.Package
 import           Stack.PackageIndex
 import           Stack.PrettyPrint
@@ -69,6 +68,7 @@ import           Stack.Types.Package
 import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageName
 import           Stack.Types.StackT
+import           Stack.Types.StringError
 import           Stack.Types.Version
 
 #ifdef WINDOWS
@@ -97,7 +97,7 @@ build setLocalFiles mbuildLk boptsCli = fixCodePage $ do
     let symbols = not (boptsLibStrip bopts || boptsExeStrip bopts)
     menv <- getMinimalEnvOverride
 
-    (targets, mbp, locals, extraToBuild, extraDeps, sourceMap) <- loadSourceMapFull True NeedTargets boptsCli
+    (targets, mbp, locals, extraToBuild, extraDeps, sourceMap) <- loadSourceMapFull NeedTargets boptsCli
 
     -- Set local files, necessary for file watching
     stackYaml <- view stackYamlL
@@ -117,8 +117,8 @@ build setLocalFiles mbuildLk boptsCli = fixCodePage $ do
     warnMissingExtraDeps installedMap extraDeps
 
     baseConfigOpts <- mkBaseConfigOpts boptsCli
-    plan <- withLoadPackage menv $ \loadPackage ->
-        constructPlan mbp baseConfigOpts locals extraToBuild localDumpPkgs loadPackage sourceMap installedMap
+    plan <- withLoadPackage $ \loadPackage ->
+        constructPlan mbp baseConfigOpts locals extraToBuild localDumpPkgs loadPackage sourceMap installedMap (boptsCLIInitialBuildSteps boptsCli)
 
     allowLocals <- view $ configL.to configAllowLocals
     unless allowLocals $ case justLocals plan of
@@ -312,12 +312,11 @@ mkBaseConfigOpts boptsCli = do
 
 -- | Provide a function for loading package information from the package index
 withLoadPackage :: (StackM env m, HasEnvConfig env, MonadBaseUnlift IO m)
-                => EnvOverride
-                -> ((PackageName -> Version -> Map FlagName Bool -> [Text] -> IO Package) -> m a)
+                => ((PackageName -> Version -> Map FlagName Bool -> [Text] -> IO Package) -> m a)
                 -> m a
-withLoadPackage menv inner = do
+withLoadPackage inner = do
     econfig <- view envConfigL
-    withCabalLoader menv $ \cabalLoader ->
+    withCabalLoader $ \cabalLoader ->
         inner $ \name version flags ghcOptions -> do
             bs <- cabalLoader $ PackageIdentifier name version
 
@@ -412,7 +411,7 @@ queryBuildInfo selectors0 =
             _ -> err $ "Cannot apply selector to " ++ show value
       where
         cont = select (front . (sel:)) sels
-        err msg = error $ msg ++ ": " ++ show (front [sel])
+        err msg = errorString $ msg ++ ": " ++ show (front [sel])
 
 -- | Get the raw build information object
 rawBuildInfo :: (StackM env m, HasEnvConfig env) => m Value

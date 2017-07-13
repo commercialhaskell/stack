@@ -18,6 +18,7 @@ module Stack.Types.Build
     ,Installed(..)
     ,PackageInstallInfo(..)
     ,Task(..)
+    ,taskIsTarget
     ,taskLocation
     ,LocalPackage(..)
     ,BaseConfigOpts(..)
@@ -35,6 +36,8 @@ module Stack.Types.Build
     ,ConfigCache(..)
     ,configCacheVC
     ,configureOpts
+    ,CachePkgSrc (..)
+    ,toCachePkgSrc
     ,isStackOpt
     ,wantedLocalPackages
     ,FileCacheInfo (..)
@@ -393,13 +396,23 @@ data ConfigCache = ConfigCache
       -- is a convenient way to force compilation when the components change.
     , configCacheHaddock :: !Bool
       -- ^ Are haddocks to be built?
+    , configCachePkgSrc :: !CachePkgSrc
     }
     deriving (Generic, Eq, Show, Data, Typeable)
 instance Store ConfigCache
 instance NFData ConfigCache
 
+data CachePkgSrc = CacheSrcUpstream | CacheSrcLocal FilePath
+    deriving (Generic, Eq, Show, Data, Typeable)
+instance Store CachePkgSrc
+instance NFData CachePkgSrc
+
+toCachePkgSrc :: PackageSource -> CachePkgSrc
+toCachePkgSrc (PSLocal lp) = CacheSrcLocal (toFilePath (lpDir lp))
+toCachePkgSrc PSUpstream{} = CacheSrcUpstream
+
 configCacheVC :: VersionConfig ConfigCache
-configCacheVC = storeVersionConfig "config-v1" "NMEzMXpksE1h7STRzlQ2f6Glkjo="
+configCacheVC = storeVersionConfig "config-v3" "z7N_NxX7Gbz41Gi9AGEa1zoLE-4="
 
 -- | A task to perform when building
 data Task = Task
@@ -412,6 +425,7 @@ data Task = Task
     -- ^ GhcPkgIds of already-installed dependencies
     , taskAllInOne        :: !Bool
     -- ^ indicates that the package can be built in one step
+    , taskCachePkgSrc     :: !CachePkgSrc
     }
     deriving Show
 
@@ -435,6 +449,12 @@ instance Show TaskConfigOpts where
 data TaskType = TTLocal LocalPackage
               | TTUpstream Package InstallLocation (Maybe GitSHA1)
     deriving Show
+
+taskIsTarget :: Task -> Bool
+taskIsTarget t =
+    case taskType t of
+        TTLocal lp -> lpWanted lp
+        _ -> False
 
 taskLocation :: Task -> InstallLocation
 taskLocation task =
@@ -495,10 +515,13 @@ isStackOpt t = any (`T.isPrefixOf` t)
     , "--haddockdir="
     , "--enable-tests"
     , "--enable-benchmarks"
-    , "--enable-library-profiling"
-    , "--enable-executable-profiling"
-    , "--enable-profiling"
     , "--exact-configuration"
+    -- Treat these as causing dirtiness, to resolve
+    -- https://github.com/commercialhaskell/stack/issues/2984
+    --
+    -- , "--enable-library-profiling"
+    -- , "--enable-executable-profiling"
+    -- , "--enable-profiling"
     ] || t == "--user"
 
 configureOptsDirs :: BaseConfigOpts
@@ -557,8 +580,8 @@ configureOptsNoDir econfig bco deps isLocal package = concat
                        flagNameString name)
                     (Map.toList flags)
     , concatMap (\x -> [compilerOptionsCabalFlag wc, T.unpack x]) (packageGhcOptions package)
-    , map (("--extra-include-dirs=" ++) . toFilePathNoTrailingSep) (Set.toList (configExtraIncludeDirs config))
-    , map (("--extra-lib-dirs=" ++) . toFilePathNoTrailingSep) (Set.toList (configExtraLibDirs config))
+    , map ("--extra-include-dirs=" ++) (Set.toList (configExtraIncludeDirs config))
+    , map ("--extra-lib-dirs=" ++) (Set.toList (configExtraLibDirs config))
     , maybe [] (\customGcc -> ["--with-gcc=" ++ toFilePath customGcc]) (configOverrideGccPath config)
     , ["--ghcjs" | wc == Ghcjs]
     , ["--exact-configuration" | useExactConf]

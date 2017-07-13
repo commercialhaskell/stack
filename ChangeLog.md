@@ -1,5 +1,98 @@
 # Changelog
 
+## Unreleased changes
+
+Release notes:
+
+Major changes:
+
+Behavior changes:
+
+* `stack profile` and `stack trace` now add their extra RTS arguments for
+  benchmarks and tests to the beginning of the args, instead of the end.
+  See [#2399](https://github.com/commercialhaskell/stack/issues/2399)
+* Support for Git-based indices has been removed.
+
+Other enhancements:
+
+* `stack setup` allow to control options passed to ghcjs-boot with
+  `--ghcjs-boot-options` (one word at a time) and `--[no-]ghcjs-boot-clean`
+* Updates to store-0.4.1, which has improved performance and better error
+  reporting for version tags.  A side-effect of this is that all of
+  stack's binary caches will be invalidated.
+* `stack solver` will now warn about unexpected cabal-install versions.
+  See [#3044](https://github.com/commercialhaskell/stack/issues/3044)
+* Upstream packages unpacked to a temp dir are now deleted as soon as
+  possible to avoid running out of space in `/tmp`.
+  See [#3018](https://github.com/commercialhaskell/stack/issues/3018)
+* Add short synonyms for `test-arguments` and `benchmark-arguments` options.
+* Adds `STACK_WORK` environment variable, to specify work dir.
+  See [#3063](https://github.com/commercialhaskell/stack/issues/3063)
+* Can now use relative paths for `extra-include-dirs` and `extra-lib-dirs`.
+  See [#2830](https://github.com/commercialhaskell/stack/issues/2830)
+* Improved bash completion for many options, including `--ghc-options`,
+  `--flag`, targets, and project executables for `exec`.
+* `--haddock-arguments` is actually used now when `haddock` is invoked
+  during documentation generation.
+* `--[no-]haddock-hyperlink-source` flag added which allows toggling
+  of sources being included in Haddock output.
+  See [#3099](https://github.com/commercialhaskell/stack/issues/3099)
+* `stack ghci` will now skip building all local targets, even if they have
+  downstream deps, as long as it's registered in the DB.
+* The pvp-bounds feature now supports adding `-revision` to the end of
+  each value, e.g. `pvp-bounds: both-revision`. This means that, when
+  uploading to Hackage, Stack will first upload your tarball with an
+  unmodified `.cabal` file, and then upload a cabal file revision with
+  the PVP bounds added. This can be useful&mdash;especially combined
+  with the
+  [Stackage no-revisions feature](http://www.snoyman.com/blog/2017/04/stackages-no-revisions-field)&mdash;as
+  a method to ensure PVP compliance without having to proactively fix
+  bounds issues for Stackage maintenance.
+* Expose a `save-hackage-creds` configuration option
+* On GHC <= 7.8, filters out spurious linker warnings on windows
+  See [#3127](https://github.com/commercialhaskell/stack/pull/3127)
+* Better error messages when creating or building packages which alias
+  wired-in packages. See
+  [#3172](https://github.com/commercialhaskell/stack/issues/3172).
+* MinGW bin folder now is searched for dynamic libraries. See [#3126](https://github.com/commercialhaskell/stack/issues/3126)
+* When using Nix, nix-shell now depends always on git to prevent runtime errors
+  while fetching metadata
+* The `stack unpack` command now accepts a form where an explicit
+  Hackage revision hash is specified, e.g. `stack unpack
+  foo-1.2.3@gitsha1:deadbeef`. Note that this should be considered
+  _experimental_, Stack will likely move towards a different hash
+  format in the future.
+
+Bug fixes:
+
+* Fixes case where `stack build --profile` might not cause executables /
+  tests / benchmarks to be rebuilt.
+  See [#2984](https://github.com/commercialhaskell/stack/issues/2984)
+* `stack ghci file.hs` now loads the file even if it isn't part of
+  your project.
+* `stack clean --full` now works when docker is enabled.
+  See [#2010](https://github.com/commercialhaskell/stack/issues/2010)
+* Fixes an issue where cyclic deps can cause benchmarks or tests to be run
+  before they are built.
+  See [#2153](https://github.com/commercialhaskell/stack/issues/2153)
+* Fixes `stack build --file-watch` in cases where a directory is removed
+  See [#1838](https://github.com/commercialhaskell/stack/issues/1838)
+* Fixes `stack dot` and `stack list-dependencies` to use info from the
+  package database for wired-in-packages (ghc, base, etc).
+  See [#3084](https://github.com/commercialhaskell/stack/issues/3084)
+* Fixes `stack --docker build` when user is part of libvirt/libvirtd
+  groups on Ubuntu Yakkety (16.10).
+  See [#3092](https://github.com/commercialhaskell/stack/issues/3092)
+* Switching a package between extra-dep and local package now forces
+  rebuild (previously it wouldn't if versions were the same).
+  See [#2147](https://github.com/commercialhaskell/stack/issues/2147)
+* `stack upload` no longer reveals your password when you type it on
+  MinTTY-based Windows shells, such as Cygwin and MSYS2.
+  See [#3142](https://github.com/commercialhaskell/stack/issues/3142)
+* `stack script`'s import parser will now properly parse files that
+  have Windows-style line endings (CRLF)
+
+
 ## 1.4.0
 
 Release notes:
@@ -23,6 +116,9 @@ Major changes:
   packages already being present much faster. This mode does require
   that all packages be present in a snapshot, however.
   [#2805](https://github.com/commercialhaskell/stack/issues/2805)
+
+* `stack setup` now accepts a `--install-cabal VERSION` option which
+  will install a specific version of the Cabal library globally.
 
 Behavior changes:
 
@@ -89,6 +185,8 @@ Other enhancements:
 * Upgraded `http-client-tls` version, which now offers support for the
   `socks5://` and `socks5h://` values in the `http_proxy` and `https_proxy`
   environment variables.
+* Binary "stack upgrade" will now warn if the installed executable is not
+  on the PATH or shadowed by another entry.
 
 Bug fixes:
 
@@ -997,6 +1095,8 @@ Other enhancements:
 * `stack build --fast` turns off optimizations
 * Show progress while downloading package index
   [#1223](https://github.com/commercialhaskell/stack/issues/1223).
+* Allow running tests on tarball created by sdist and upload
+  [#717](https://github.com/commercialhaskell/stack/issues/717).
 
 Bug fixes:
 

@@ -17,6 +17,7 @@ module Stack.Setup
   , ensureCompiler
   , ensureDockerStackExe
   , getSystemCompiler
+  , getCabalInstallVersion
   , SetupOpts (..)
   , defaultSetupInfoYaml
   , removeHaskellEnvVars
@@ -80,6 +81,7 @@ import              Lens.Micro (set)
 import              Network.HTTP.Simple (getResponseBody, httpLBS, withResponse, getResponseStatusCode)
 import              Network.HTTP.Download
 import              Path
+import              Path.CheckInstall (warnInstallSearchPathIssues)
 import              Path.Extra (toFilePathNoTrailingSep)
 import              Path.IO hiding (findExecutable)
 import qualified    Paths_stack as Meta
@@ -101,6 +103,7 @@ import              Stack.Types.Docker
 import              Stack.Types.PackageIdentifier
 import              Stack.Types.PackageName
 import              Stack.Types.StackT
+import              Stack.Types.StringError
 import              Stack.Types.Version
 import qualified    System.Directory as D
 import              System.Environment (getExecutablePath)
@@ -137,7 +140,7 @@ data SetupOpts = SetupOpts
     -- ^ Don't check for a compatible GHC version/architecture
     , soptsSkipMsys :: !Bool
     -- ^ Do not use a custom msys installation on Windows
-    , soptsUpgradeCabal :: !Bool
+    , soptsUpgradeCabal :: !(Maybe UpgradeTo)
     -- ^ Upgrade the global Cabal library in the database to the newest
     -- version. Only works reliably with a stack-managed installation.
     , soptsResolveMissingGHC :: !(Maybe Text)
@@ -146,6 +149,8 @@ data SetupOpts = SetupOpts
     -- ^ Location of the main stack-setup.yaml file
     , soptsGHCBindistURL :: !(Maybe String)
     -- ^ Alternate GHC binary distribution (requires custom GHCVariant)
+    , soptsGHCJSBootOpts :: [String]
+    -- ^ Additional ghcjs-boot options, the default is "--clean"
     }
     deriving Show
 data SetupException = UnsupportedSetupCombo OS Arch
@@ -231,10 +236,11 @@ setupEnv mResolveMissingGHC = do
             , soptsSanityCheck = False
             , soptsSkipGhcCheck = configSkipGHCCheck config
             , soptsSkipMsys = configSkipMsys config
-            , soptsUpgradeCabal = False
+            , soptsUpgradeCabal = Nothing
             , soptsResolveMissingGHC = mResolveMissingGHC
             , soptsSetupInfoYaml = defaultSetupInfoYaml
             , soptsGHCBindistURL = Nothing
+            , soptsGHCJSBootOpts = ["--clean"]
             }
 
     (mghcBin, compilerBuild, _) <- ensureCompiler sopts
@@ -346,10 +352,10 @@ addIncludeLib :: ExtraDirs -> Config -> Config
 addIncludeLib (ExtraDirs _bins includes libs) config = config
     { configExtraIncludeDirs = Set.union
         (configExtraIncludeDirs config)
-        (Set.fromList includes)
+        (Set.fromList (map toFilePathNoTrailingSep includes))
     , configExtraLibDirs = Set.union
         (configExtraLibDirs config)
-        (Set.fromList libs)
+        (Set.fromList (map toFilePathNoTrailingSep libs))
     }
 
 -- | Ensure compiler (ghc or ghcjs) is installed and provide the PATHs to add if necessary
@@ -401,7 +407,7 @@ ensureCompiler sopts = do
                                 VersionedDownloadInfo version info <-
                                     case Map.lookup osKey $ siMsys2 si of
                                         Just x -> return x
-                                        Nothing -> error $ "MSYS2 not found for " ++ T.unpack osKey
+                                        Nothing -> throwString $ "MSYS2 not found for " ++ T.unpack osKey
                                 let tool = Tool (PackageIdentifier $(mkPackageName "msys2") version)
                                 Just <$> downloadAndInstallTool (configLocalPrograms config) si info tool (installMsys2Windows osKey)
                             | otherwise -> do
@@ -489,14 +495,14 @@ ensureCompiler sopts = do
                 m <- augmentPathMap (edBins ed) (unEnvOverride menv0)
                 mkEnvOverride (configPlatform config) (removeHaskellEnvVars m)
 
-    when (soptsUpgradeCabal sopts) $ do
+    forM_ (soptsUpgradeCabal sopts) $ \version -> do
         unless needLocal $ do
-            $logWarn "Trying to upgrade Cabal library on a GHC not installed by stack."
+            $logWarn "Trying to change a Cabal library on a GHC not installed by stack."
             $logWarn "This may fail, caveat emptor!"
-        upgradeCabal menv wc
+        upgradeCabal menv wc version
 
     case mtools of
-        Just (Just (ToolGhcjs cv), _) -> ensureGhcjsBooted menv cv (soptsInstallIfMissing sopts)
+        Just (Just (ToolGhcjs cv), _) -> ensureGhcjsBooted menv cv (soptsInstallIfMissing sopts) (soptsGHCJSBootOpts sopts)
         _ -> return ()
 
     when (soptsSanityCheck sopts) $ sanityCheck menv wc
@@ -622,68 +628,75 @@ ensureDockerStackExe containerPlatform = do
         downloadStackExe platforms sri stackExeDir (const $ return ())
     return stackExePath
 
--- | Install the newest version of Cabal globally
+-- | Install the newest version or a specific version of Cabal globally
 upgradeCabal :: (StackM env m, HasConfig env, HasGHCVariant env)
              => EnvOverride
              -> WhichCompiler
+             -> UpgradeTo
              -> m ()
-upgradeCabal menv wc = do
+upgradeCabal menv wc cabalVersion = do
+    $logInfo "Manipulating the global Cabal is only for debugging purposes"
     let name = $(mkPackageName "Cabal")
-    rmap <- resolvePackages menv Nothing Map.empty (Set.singleton name)
-    newest <-
-        case map rpIdent rmap of
-            [] -> error "No Cabal library found in index, cannot upgrade"
-            [PackageIdentifier name' version]
-                | name == name' -> return version
-            x -> error $ "Unexpected results for resolvePackages: " ++ show x
+    rmap <- resolvePackages Nothing Map.empty (Set.singleton name)
     installed <- getCabalPkgVer menv wc
-    if installed >= newest
-        then $logInfo $ T.concat
-            [ "Currently installed Cabal is "
+    case cabalVersion of
+        Specific version -> do
+            if installed /= version then
+                doCabalInstall menv wc installed version
+            else
+                $logInfo $ T.concat ["No install necessary. Cabal "
+                                    , T.pack $ versionString installed
+                                    , " is already installed"]
+        Latest     -> case map rpIdent rmap of
+            [] -> throwString "No Cabal library found in index, cannot upgrade"
+            [PackageIdentifier name' version] | name == name' -> do
+                if installed > version then
+                    doCabalInstall menv wc installed version
+                else
+                    $logInfo $ "No upgrade necessary. Latest Cabal already installed"
+            x -> error $ "Unexpected results for resolvePackages: " ++ show x
+
+-- Configure and run the necessary commands for a cabal install
+doCabalInstall :: (StackM env m, HasConfig env, HasGHCVariant env)
+               => EnvOverride
+               -> WhichCompiler
+               -> Version
+               -> Version
+               -> m ()
+doCabalInstall menv wc installed version = do
+    withSystemTempDir "stack-cabal-upgrade" $ \tmpdir -> do
+        $logInfo $ T.concat
+            [ "Installing Cabal-"
+            , T.pack $ versionString version
+            , " to replace "
             , T.pack $ versionString installed
-            , ", newest is "
-            , T.pack $ versionString newest
-            , ". I'm not upgrading Cabal."
             ]
-        else withSystemTempDir "stack-cabal-upgrade" $ \tmpdir -> do
-            $logInfo $ T.concat
-                [ "Installing Cabal-"
-                , T.pack $ versionString newest
-                , " to replace "
-                , T.pack $ versionString installed
-                ]
-            let ident = PackageIdentifier name newest
-            -- Nothing below: use the newest .cabal file revision
-            m <- unpackPackageIdents menv tmpdir Nothing (Map.singleton ident Nothing)
-
-            compilerPath <- join $ findExecutable menv (compilerExeName wc)
-            newestDir <- parseRelDir $ versionString newest
-            let installRoot = toFilePath $ parent (parent compilerPath)
-                                       </> $(mkRelDir "new-cabal")
-                                       </> newestDir
-
-            dir <-
-                case Map.lookup ident m of
-                    Nothing -> error "upgradeCabal: Invariant violated, dir missing"
-                    Just dir -> return dir
-
-            runCmd (Cmd (Just dir) (compilerExeName wc) menv ["Setup.hs"]) Nothing
-            platform <- view platformL
-            let setupExe = toFilePath $ dir </>
-                  (case platform of
-                     Platform _ Cabal.Windows -> $(mkRelFile "Setup.exe")
-                     _ -> $(mkRelFile "Setup"))
-                dirArgument name' = concat
-                    [ "--"
-                    , name'
-                    , "dir="
-                    , installRoot FP.</> name'
-                    ]
-                args = "configure" : map dirArgument (words "lib bin data doc")
-            runCmd (Cmd (Just dir) setupExe menv args) Nothing
-            runCmd (Cmd (Just dir) setupExe menv ["build"]) Nothing
-            runCmd (Cmd (Just dir) setupExe menv ["install"]) Nothing
-            $logInfo "New Cabal library installed"
+        let name = $(mkPackageName "Cabal")
+            ident = PackageIdentifier name version
+        m <- unpackPackageIdents tmpdir Nothing (Map.singleton ident Nothing)
+        compilerPath <- join $ findExecutable menv (compilerExeName wc)
+        versionDir <- parseRelDir $ versionString version
+        let installRoot = toFilePath $ parent (parent compilerPath)
+                                    </> $(mkRelDir "new-cabal")
+                                    </> versionDir
+        dir <- case Map.lookup ident m of
+            Nothing -> error "upgradeCabal: Invariant violated, dir missing"
+            Just dir -> return dir
+        runCmd (Cmd (Just dir) (compilerExeName wc) menv ["Setup.hs"]) Nothing
+        platform <- view platformL
+        let setupExe = toFilePath $ dir </> case platform of
+                Platform _ Cabal.Windows -> $(mkRelFile "Setup.exe")
+                _                        -> $(mkRelFile "Setup")
+            dirArgument name' = concat [ "--"
+                                       , name'
+                                       , "dir="
+                                       , installRoot FP.</> name'
+                                       ]
+            args = "configure" : map dirArgument (words "lib bin data doc")
+        runCmd (Cmd (Just dir) setupExe menv args) Nothing
+        runCmd (Cmd (Just dir) setupExe menv ["build"]) Nothing
+        runCmd (Cmd (Just dir) setupExe menv ["install"]) Nothing
+        $logInfo "New Cabal library installed"
 
 -- | Get the version of the system compiler, if available
 getSystemCompiler :: (MonadIO m, MonadLogger m, MonadBaseControl IO m, MonadCatch m) => EnvOverride -> WhichCompiler -> m (Maybe (CompilerVersion, Arch))
@@ -892,7 +905,7 @@ downloadFromInfo programsDir downloadInfo tool = do
             ".tar.bz2" -> return TarBz2
             ".tar.gz" -> return TarGz
             ".7z.exe" -> return SevenZ
-            _ -> fail $ "Unknown extension for url: " ++ url
+            _ -> throwString $ "Error: Unknown extension for url: " ++ url
     relfile <- parseRelFile $ toolString tool ++ extension
     path <- case url of
         (parseUrlThrow -> Just _) -> do
@@ -911,7 +924,7 @@ downloadFromInfo programsDir downloadInfo tool = do
                           "should not be specified when `url` is a file path")
             return path
         _ ->
-            fail $ "`url` must be either an HTTP URL or absolute file path: " ++ url
+            throwString $ "Error: `url` must be either an HTTP URL or absolute file path: " ++ url
     return (path, at)
   where
     url = T.unpack $ downloadInfoUrl downloadInfo
@@ -948,7 +961,7 @@ installGHCPosix version downloadInfo _ archiveFile archiveType tempDir destDir =
             TarXz -> return ("xz", 'J')
             TarBz2 -> return ("bzip2", 'j')
             TarGz -> return ("gzip", 'z')
-            SevenZ -> error "Don't know how to deal with .7z files on non-Windows"
+            SevenZ -> throwString "Don't know how to deal with .7z files on non-Windows"
     -- Slight hack: OpenBSD's tar doesn't support xz.
     -- https://github.com/commercialhaskell/stack/issues/2283#issuecomment-237980986
     let tarDep =
@@ -1041,7 +1054,7 @@ installGHCJS si archiveFile archiveType _tempDir destDir = do
                     TarXz -> return "xz"
                     TarBz2 -> return "bzip2"
                     TarGz -> return "gzip"
-                    SevenZ -> error "Don't know how to deal with .7z files on non-Windows"
+                    SevenZ -> throwString "Don't know how to deal with .7z files on non-Windows"
             (zipTool, tarTool) <- checkDependencies $ (,)
                 <$> checkDependency zipTool'
                 <*> checkDependency "tar"
@@ -1086,8 +1099,8 @@ installGHCJS si archiveFile archiveType _tempDir destDir = do
     $logStickyDone "Installed GHCJS."
 
 ensureGhcjsBooted :: (StackM env m, HasConfig env)
-                  => EnvOverride -> CompilerVersion -> Bool -> m ()
-ensureGhcjsBooted menv cv shouldBoot  = do
+                  => EnvOverride -> CompilerVersion -> Bool -> [String] -> m ()
+ensureGhcjsBooted menv cv shouldBoot bootOpts = do
     eres <- try $ sinkProcessStdout Nothing menv "ghcjs" [] (return ())
     case eres of
         Right () -> return ()
@@ -1109,20 +1122,20 @@ ensureGhcjsBooted menv cv shouldBoot  = do
                 stackYamlExists <- doesFileExist stackYaml
                 ghcjsVersion <- case cv of
                         GhcjsVersion version _ -> return version
-                        _ -> fail "ensureGhcjsBooted invoked on non GhcjsVersion"
+                        _ -> error "ensureGhcjsBooted invoked on non GhcjsVersion"
                 actualStackYaml <- if stackYamlExists then return stackYaml
                     else
                         liftM ((destDir </> $(mkRelDir "src")) </>) $
                         parseRelFile $ "ghcjs-" ++ versionString ghcjsVersion ++ "/stack.yaml"
                 actualStackYamlExists <- doesFileExist actualStackYaml
                 unless actualStackYamlExists $
-                    fail "Couldn't find GHCJS stack.yaml in old or new location."
-                bootGhcjs ghcjsVersion actualStackYaml destDir
+                    throwString "Error: Couldn't find GHCJS stack.yaml in old or new location."
+                bootGhcjs ghcjsVersion actualStackYaml destDir bootOpts
         Left err -> throwM err
 
 bootGhcjs :: StackM env m
-          => Version -> Path Abs File -> Path Abs Dir -> m ()
-bootGhcjs ghcjsVersion stackYaml destDir = do
+          => Version -> Path Abs File -> Path Abs Dir -> [String] -> m ()
+bootGhcjs ghcjsVersion stackYaml destDir bootOpts = do
     envConfig <- loadGhcjsEnvConfig stackYaml (destDir </> $(mkRelDir "bin"))
     menv <- liftIO $ configEnvOverride (view configL envConfig) defaultEnvSettings
     -- Install cabal-install if missing, or if the installed one is old.
@@ -1175,7 +1188,7 @@ bootGhcjs ghcjsVersion stackYaml destDir = do
                     "This version is specified by the stack.yaml file included in the ghcjs tarball.\n"
             _ -> return ()
     $logSticky "Booting GHCJS (this will take a long time) ..."
-    logProcessStderrStdout Nothing "ghcjs-boot" menv' ["--clean"]
+    logProcessStderrStdout Nothing "ghcjs-boot" menv' bootOpts
     $logStickyDone "GHCJS booted."
 
 loadGhcjsEnvConfig :: StackM env m
@@ -1300,10 +1313,10 @@ withUnpackedTarball7z name si archiveFile archiveType msrcDir destDir = do
             TarXz -> return ".xz"
             TarBz2 -> return ".bz2"
             TarGz -> return ".gz"
-            _ -> error $ name ++ " must be a tarball file"
+            _ -> throwString $ name ++ " must be a tarball file"
     tarFile <-
         case T.stripSuffix suffix $ T.pack $ toFilePath archiveFile of
-            Nothing -> error $ "Invalid " ++ name ++ " filename: " ++ show archiveFile
+            Nothing -> throwString $ "Invalid " ++ name ++ " filename: " ++ show archiveFile
             Just x -> parseAbsFile $ T.unpack x
     run7z <- setup7z si
     let tmpName = toFilePathNoTrailingSep (dirname destDir) ++ "-tmp"
@@ -1329,7 +1342,7 @@ expectSingleUnpackedDir archiveFile destDir = do
     contents <- listDir destDir
     case contents of
         ([dir], []) -> return dir
-        _ -> error $ "Expected a single directory within unpacked " ++ toFilePath archiveFile
+        _ -> throwString $ "Expected a single directory within unpacked " ++ toFilePath archiveFile
 
 -- | Download 7z as necessary, and get a function for unpacking things.
 --
@@ -1648,7 +1661,7 @@ getUtf8EnvVars menv compilerVer =
 
 newtype StackReleaseInfo = StackReleaseInfo Value
 
-downloadStackReleaseInfo :: MonadIO m
+downloadStackReleaseInfo :: (MonadIO m, MonadThrow m)
                          => Maybe String -- Github org
                          -> Maybe String -- Github repo
                          -> Maybe String -- ^ optional version
@@ -1671,7 +1684,7 @@ downloadStackReleaseInfo morg mrepo mver = liftIO $ do
     let code = getResponseStatusCode res
     if code >= 200 && code < 300
         then return $ StackReleaseInfo $ getResponseBody res
-        else error $ "Could not get release information for Stack from: " ++ url
+        else throwString $ "Could not get release information for Stack from: " ++ url
 
 preferredPlatforms :: (MonadReader env m, HasPlatform env)
                    => m [(Bool, String)]
@@ -1683,13 +1696,13 @@ preferredPlatforms = do
         Cabal.Windows -> return (True, "windows")
         Cabal.OSX -> return (False, "osx")
         Cabal.FreeBSD -> return (False, "freebsd")
-        _ -> error $ "Binary upgrade not yet supported on OS: " ++ show os'
+        _ -> errorString $ "Binary upgrade not yet supported on OS: " ++ show os'
     arch <-
       case arch' of
         I386 -> return "i386"
         X86_64 -> return "x86_64"
         Arm -> return "arm"
-        _ -> error $ "Binary upgrade not yet supported on arch: " ++ show arch'
+        _ -> errorString $ "Binary upgrade not yet supported on arch: " ++ show arch'
     hasgmp4 <- return False -- FIXME import relevant code from Stack.Setup? checkLib $(mkRelFile "libgmp.so.3")
     let suffixes
           | hasgmp4 = ["-static", "-gmp4", ""]
@@ -1697,7 +1710,7 @@ preferredPlatforms = do
     return $ map (\suffix -> (isWindows, concat [os, "-", arch, suffix])) suffixes
 
 downloadStackExe
-    :: (MonadIO m, MonadLogger m, MonadReader env m, HasConfig env)
+    :: (MonadIO m, MonadLogger m, MonadThrow m, MonadReader env m, HasConfig env)
     => [(Bool, String)] -- ^ acceptable platforms
     -> StackReleaseInfo
     -> Path Abs Dir -- ^ destination directory
@@ -1705,8 +1718,8 @@ downloadStackExe
     -> m ()
 downloadStackExe platforms0 archiveInfo destDir testExe = do
     (isWindows, archiveURL) <-
-      let loop [] = error $ "Unable to find binary Stack archive for platforms: "
-                         ++ unwords (map snd platforms0)
+      let loop [] = throwString $ "Unable to find binary Stack archive for platforms: "
+                                ++ unwords (map snd platforms0)
           loop ((isWindows, p'):ps) = do
             let p = T.pack p'
             $logInfo $ "Querying for archive location for platform: " <> p
@@ -1752,6 +1765,9 @@ downloadStackExe platforms0 archiveInfo destDir testExe = do
               renameFile destFile old
               renameFile tmpFile destFile
           _ -> renameFile tmpFile destFile
+
+    destDir' <- liftIO . D.canonicalizePath . toFilePath $ destDir
+    warnInstallSearchPathIssues destDir' ["stack"]
 
     $logInfo $ T.pack $ "New stack executable available at " ++ toFilePath destFile
   where

@@ -16,8 +16,9 @@ and [non-project-specific](#non-project-specific-config) options in:
 - The project file itself may also contain non-project specific options
 
 *Note:* When stack is invoked outside a stack project it will source project
-specific options from `~/.stack/global/stack.yaml`.  Options in this file will
-be ignored for a project with its own `<project dir>/stack.yaml`.
+specific options from `~/.stack/global-project/stack.yaml`. When stack is
+invoked inside a stack project, only options from `<project dir>/stack.yaml` are
+used, and `~/.stack/global-project/stack.yaml` is ignored.
 
 ## Project-specific config
 
@@ -319,12 +320,13 @@ package-indices:
 - name: Hackage
   download-prefix: https://s3.amazonaws.com/hackage.fpcomplete.com/package/
 
-  # at least one of the following must be present
-  git: https://github.com/commercialhaskell/all-cabal-hashes.git
+  # HTTP location of the package index
   http: https://s3.amazonaws.com/hackage.fpcomplete.com/00-index.tar.gz
 
+  # Or, if using Hackage Security below, give the root URL:
+  http: https://s3.amazonaws.com/hackage.fpcomplete.com/
+
   # optional fields, both default to false
-  gpg-verify: false
   require-hashes: false
 
   # Starting with stack 1.4, we default to using Hackage Security
@@ -336,6 +338,15 @@ package-indices:
 One thing you should be aware of: if you change the contents of package-version
 combination by setting a different package index, this *can* have an effect on
 other projects by installing into your shared snapshot database.
+
+Note that older versions of Stack supported Git-based indices. This feature has since been removed. A line such as:
+
+```yaml
+git: https://github.com/commercialhaskell/all-cabal-hashes.git
+gpg-verify: false
+```
+
+Will now be ignored.
 
 ### system-ghc
 
@@ -542,6 +553,16 @@ pvp-bounds: none
 
 For more information, see [the announcement blog post](https://www.fpcomplete.com/blog/2015/09/stack-pvp).
 
+__NOTE__ Since Stack 1.5.0, each of the values listed above supports
+adding `-revision` to the end of each value, e.g. `pvp-bounds:
+both-revision`. This means that, when uploading to Hackage, Stack will
+first upload your tarball with an unmodified `.cabal` file, and then
+upload a cabal file revision with the PVP bounds added. This can be
+useful&mdash;especially combined with the
+[Stackage no-revisions feature](http://www.snoyman.com/blog/2017/04/stackages-no-revisions-field)&mdash;as
+a method to ensure PVP compliance without having to proactively fix
+bounds issues for Stackage maintenance.
+
 ### modify-code-page
 
 (Since 0.1.6)
@@ -724,6 +745,17 @@ in the directories it creates.  Source control tools can be specified with the
 templates:
   scm-init: git
 ```
+
+### save-hackage-creds
+
+Controls whether, when using `stack upload`, the user's Hackage
+username and password are stored in a local file. Default: true.
+
+```yaml
+save-hackage-creds: true
+```
+
+Since 1.5.0
   
 # urls
 

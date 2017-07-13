@@ -63,6 +63,7 @@ module Stack.Types.Config
   ,ConfigMonoid(..)
   ,configMonoidInstallGHCName
   ,configMonoidSystemGHCName
+  ,parseConfigMonoid
   -- ** DumpLogs
   ,DumpLogs(..)
   -- ** EnvSettings
@@ -86,7 +87,6 @@ module Stack.Types.Config
   ,PackageIndex(..)
   ,IndexName(..)
   ,indexNameText
-  ,IndexLocation(..)
   -- Config fields
   ,configPackageIndex
   ,configPackageIndexOld
@@ -94,13 +94,14 @@ module Stack.Types.Config
   ,configPackageIndexCacheOld
   ,configPackageIndexGz
   ,configPackageIndexRoot
-  ,configPackageIndexRepo
   ,configPackageTarball
   -- ** Project & ProjectAndConfigMonoid
   ,Project(..)
   ,ProjectAndConfigMonoid(..)
+  ,parseProjectAndConfigMonoid
   -- ** PvpBounds
   ,PvpBounds(..)
+  ,PvpBoundsType(..)
   ,parsePvpBounds
   -- ** ColorWhen
   ,ColorWhen(..)
@@ -237,7 +238,7 @@ import           Stack.Types.Resolver
 import           Stack.Types.TemplateName
 import           Stack.Types.Urls
 import           Stack.Types.Version
-import           System.FilePath (takeBaseName)
+import qualified System.FilePath as FilePath
 import           System.PosixCompat.Types (UserID, GroupID, FileMode)
 import           System.Process.Read (EnvOverride, findExecutable)
 
@@ -325,9 +326,9 @@ data Config =
          -- ^ How many concurrent jobs to run, defaults to number of capabilities
          ,configOverrideGccPath     :: !(Maybe (Path Abs File))
          -- ^ Optional gcc override path
-         ,configExtraIncludeDirs    :: !(Set (Path Abs Dir))
+         ,configExtraIncludeDirs    :: !(Set FilePath)
          -- ^ --extra-include-dirs arguments
-         ,configExtraLibDirs        :: !(Set (Path Abs Dir))
+         ,configExtraLibDirs        :: !(Set FilePath)
          -- ^ --extra-lib-dirs arguments
          ,configConcurrentTests     :: !Bool
          -- ^ Run test suites concurrently
@@ -371,6 +372,8 @@ data Config =
          ,configAllowLocals         :: !Bool
          -- ^ Are we allowed to build local packages? The script
          -- command disallows this.
+         ,configSaveHackageCreds    :: !Bool
+         -- ^ Should we save Hackage credentials to a file?
          }
 
 -- | Which packages do ghc-options on the command line apply to?
@@ -740,9 +743,9 @@ data ConfigMonoid =
     -- ^ Used for overriding the GHC build
     ,configMonoidJobs                :: !(First Int)
     -- ^ See: 'configJobs'
-    ,configMonoidExtraIncludeDirs    :: !(Set (Path Abs Dir))
+    ,configMonoidExtraIncludeDirs    :: !(Set FilePath)
     -- ^ See: 'configExtraIncludeDirs'
-    ,configMonoidExtraLibDirs        :: !(Set (Path Abs Dir))
+    ,configMonoidExtraLibDirs        :: !(Set FilePath)
     -- ^ See: 'configExtraLibDirs'
     , configMonoidOverrideGccPath    :: !(First (Path Abs File))
     -- ^ Allow users to override the path to gcc
@@ -784,6 +787,8 @@ data ConfigMonoid =
     -- installation.
     , configMonoidDumpLogs           :: !(First DumpLogs)
     -- ^ See 'configDumpLogs'
+    , configMonoidSaveHackageCreds   :: !(First Bool)
+    -- ^ See 'configSaveHackageCreds'
     }
   deriving (Show, Generic)
 
@@ -791,14 +796,14 @@ instance Monoid ConfigMonoid where
     mempty = memptydefault
     mappend = mappenddefault
 
-instance FromJSON (WithJSONWarnings ConfigMonoid) where
-  parseJSON = withObjectWarnings "ConfigMonoid" parseConfigMonoidJSON
+parseConfigMonoid :: Path Abs Dir -> Value -> Yaml.Parser (WithJSONWarnings ConfigMonoid)
+parseConfigMonoid = withObjectWarnings "ConfigMonoid" . parseConfigMonoidObject
 
 -- | Parse a partial configuration.  Used both to parse both a standalone config
 -- file and a project file, so that a sub-parser is not required, which would interfere with
 -- warnings for missing fields.
-parseConfigMonoidJSON :: Object -> WarningParser ConfigMonoid
-parseConfigMonoidJSON obj = do
+parseConfigMonoidObject :: Path Abs Dir -> Object -> WarningParser ConfigMonoid
+parseConfigMonoidObject rootDir obj = do
     -- Parsing 'stackRoot' from 'stackRoot'/config.yaml would be nonsensical
     let configMonoidStackRoot = First Nothing
     configMonoidWorkDir <- First <$> obj ..:? configMonoidWorkDirName
@@ -821,8 +826,10 @@ parseConfigMonoidJSON obj = do
     configMonoidGHCVariant <- First <$> obj ..:? configMonoidGHCVariantName
     configMonoidGHCBuild <- First <$> obj ..:? configMonoidGHCBuildName
     configMonoidJobs <- First <$> obj ..:? configMonoidJobsName
-    configMonoidExtraIncludeDirs <- obj ..:?  configMonoidExtraIncludeDirsName ..!= Set.empty
-    configMonoidExtraLibDirs <- obj ..:?  configMonoidExtraLibDirsName ..!= Set.empty
+    configMonoidExtraIncludeDirs <- fmap (Set.map (toFilePath rootDir FilePath.</>)) $
+        obj ..:?  configMonoidExtraIncludeDirsName ..!= Set.empty
+    configMonoidExtraLibDirs <- fmap (Set.map (toFilePath rootDir FilePath.</>)) $
+        obj ..:?  configMonoidExtraLibDirsName ..!= Set.empty
     configMonoidOverrideGccPath <- First <$> obj ..:? configMonoidOverrideGccPathName
     configMonoidConcurrentTests <- First <$> obj ..:? configMonoidConcurrentTestsName
     configMonoidLocalBinPath <- First <$> obj ..:? configMonoidLocalBinPathName
@@ -853,6 +860,7 @@ parseConfigMonoidJSON obj = do
     configMonoidDefaultTemplate <- First <$> obj ..:? configMonoidDefaultTemplateName
     configMonoidAllowDifferentUser <- First <$> obj ..:? configMonoidAllowDifferentUserName
     configMonoidDumpLogs <- First <$> obj ..:? configMonoidDumpLogsName
+    configMonoidSaveHackageCreds <- First <$> obj ..:? configMonoidSaveHackageCredsName
 
     return ConfigMonoid {..}
   where
@@ -985,6 +993,9 @@ configMonoidAllowDifferentUserName = "allow-different-user"
 
 configMonoidDumpLogsName :: Text
 configMonoidDumpLogsName = "dump-logs"
+
+configMonoidSaveHackageCredsName :: Text
+configMonoidSaveHackageCredsName = "save-hackage-creds"
 
 data ConfigException
   = ParseConfigFileException (Path Abs File) ParseException
@@ -1159,28 +1170,6 @@ configPackageIndexRoot (IndexName name) = do
     root <- view stackRootL
     dir <- parseRelDir $ S8.unpack name
     return (root </> $(mkRelDir "indices") </> dir)
-
--- | Git repo directory for a specific package index, returns 'Nothing' if not
--- a Git repo
-configPackageIndexRepo :: (MonadReader env m, HasConfig env, MonadThrow m) => IndexName -> m (Maybe (Path Abs Dir))
-configPackageIndexRepo name = do
-    indices <- view packageIndicesL
-    case filter (\p -> indexName p == name) indices of
-        [index] -> do
-            let murl =
-                    case simplifyIndexLocation $ indexLocation index of
-                        SILGit x -> Just x
-                        SILHttp _ _ -> Nothing
-            case murl of
-                Nothing -> return Nothing
-                Just url -> do
-                    sDir <- configPackageIndexRoot name
-                    repoName <- parseRelDir $ takeBaseName $ T.unpack url
-                    let suDir =
-                          sDir </>
-                          $(mkRelDir "git-update")
-                    return $ Just $ suDir </> repoName
-        _ -> assert False $ return Nothing
 
 -- | Location of the 01-index.cache file
 configPackageIndexCache :: (MonadReader env m, HasConfig env, MonadThrow m) => IndexName -> m (Path Abs File)
@@ -1425,8 +1414,9 @@ getCompilerPath wc = do
 data ProjectAndConfigMonoid
   = ProjectAndConfigMonoid !Project !ConfigMonoid
 
-instance FromJSON (WithJSONWarnings ProjectAndConfigMonoid) where
-    parseJSON = withObjectWarnings "ProjectAndConfigMonoid" $ \o -> do
+parseProjectAndConfigMonoid :: Path Abs Dir -> Value -> Yaml.Parser (WithJSONWarnings ProjectAndConfigMonoid)
+parseProjectAndConfigMonoid rootDir =
+    withObjectWarnings "ProjectAndConfigMonoid" $ \o -> do
         dirs <- jsonSubWarningsTT (o ..:? "packages") ..!= [packageEntryCurrDir]
         extraDeps' <- o ..:? "extra-deps" ..!= []
         extraDeps <-
@@ -1438,7 +1428,7 @@ instance FromJSON (WithJSONWarnings ProjectAndConfigMonoid) where
         resolver <- jsonSubWarnings (o ..: "resolver")
         compiler <- o ..:? "compiler"
         msg <- o ..:? "user-message"
-        config <- parseConfigMonoidJSON o
+        config <- parseConfigMonoidObject rootDir o
         extraPackageDBs <- o ..:? "extra-package-dbs" ..!= []
         let project = Project
                 { projectUserMsg = msg
@@ -1651,29 +1641,44 @@ instance FromJSON (WithJSONWarnings SetupInfoLocation) where
             return $ WithJSONWarnings (SetupInfoInline si) w
 
 -- | How PVP bounds should be added to .cabal files
-data PvpBounds
+data PvpBoundsType
   = PvpBoundsNone
   | PvpBoundsUpper
   | PvpBoundsLower
   | PvpBoundsBoth
   deriving (Show, Read, Eq, Typeable, Ord, Enum, Bounded)
 
-pvpBoundsText :: PvpBounds -> Text
+data PvpBounds = PvpBounds
+  { pbType :: !PvpBoundsType
+  , pbAsRevision :: !Bool
+  }
+  deriving (Show, Read, Eq, Typeable, Ord)
+
+pvpBoundsText :: PvpBoundsType -> Text
 pvpBoundsText PvpBoundsNone = "none"
 pvpBoundsText PvpBoundsUpper = "upper"
 pvpBoundsText PvpBoundsLower = "lower"
 pvpBoundsText PvpBoundsBoth = "both"
 
 parsePvpBounds :: Text -> Either String PvpBounds
-parsePvpBounds t =
-    case Map.lookup t m of
-        Nothing -> Left $ "Invalid PVP bounds: " ++ T.unpack t
-        Just x -> Right x
+parsePvpBounds t = maybe err Right $ do
+    (t', asRevision) <-
+      case T.break (== '-') t of
+        (x, "") -> Just (x, False)
+        (x, "-revision") -> Just (x, True)
+        _ -> Nothing
+    x <- Map.lookup t' m
+    Just PvpBounds
+      { pbType = x
+      , pbAsRevision = asRevision
+      }
   where
     m = Map.fromList $ map (pvpBoundsText &&& id) [minBound..maxBound]
+    err = Left $ "Invalid PVP bounds: " ++ T.unpack t
 
 instance ToJSON PvpBounds where
-  toJSON = toJSON . pvpBoundsText
+  toJSON (PvpBounds typ asRevision) =
+    toJSON (pvpBoundsText typ <> (if asRevision then "-revision" else ""))
 instance FromJSON PvpBounds where
   parseJSON = withText "PvpBounds" (either fail return . parsePvpBounds)
 

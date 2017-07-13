@@ -1,0 +1,12 @@
+resolver: lts-8.15
+packages:
+- package-with-th
+- package-with-working-th
+- package-with-failing-test
+- location: subdirs
+  subdirs:
+  - dependent-on-failing-packages
+  - failing-in-subdir
+extra-deps: []
+flags: {}
+extra-package-dbs: []
