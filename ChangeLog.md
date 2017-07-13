@@ -101,6 +101,9 @@ Bug fixes:
   See [#3142](https://github.com/commercialhaskell/stack/issues/3142)
 * `stack script`'s import parser will now properly parse files that
   have Windows-style line endings (CRLF)
+* Fixed an issue where Stack wouldn't detect missing Docker images
+  properly with newer Docker versions.
+  [#3171](https://github.com/commercialhaskell/stack/pull/3171)
 
 
 ## 1.4.0
