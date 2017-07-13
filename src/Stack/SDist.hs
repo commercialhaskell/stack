@@ -48,8 +48,7 @@ import qualified Distribution.PackageDescription as Cabal
 import qualified Distribution.PackageDescription.Check as Check
 import           Distribution.PackageDescription.PrettyPrint (showGenericPackageDescription)
 import           Distribution.Text (display)
-import           Distribution.Version (simplifyVersionRange, orLaterVersion, earlierVersion)
-import           Distribution.Version.Extra
+import           Distribution.Version (simplifyVersionRange, orLaterVersion, earlierVersion, hasUpperBound, hasLowerBound)
 import           Lens.Micro (set)
 import           Path
 import           Path.IO hiding (getModificationTime, getPermissions)
@@ -210,8 +209,8 @@ getCabalLbs pvpBounds mrev fp = do
       case lookupVersion (fromCabalPackageName cname) of
         Nothing -> dep
         Just version -> Dependency cname $ simplifyVersionRange
-          $ (if toAddUpper && not (hasUpper range) then addUpper version else id)
-          $ (if toAddLower && not (hasLower range) then addLower version else id)
+          $ (if toAddUpper && not (hasUpperBound range) then addUpper version else id)
+          $ (if toAddLower && not (hasLowerBound range) then addLower version else id)
             range
       where
         lookupVersion name =
