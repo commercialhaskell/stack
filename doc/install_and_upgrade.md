@@ -164,7 +164,7 @@ it.  To install it:
 
       * openSUSE Leap
 
-            sudo zypper ar http://download.opensuse.org/repositories/devel:/languages:/haskell/openSUSE_Leap_42.1/devel:languages:haskell.repo
+            sudo zypper ar http://download.opensuse.org/repositories/devel:/languages:/haskell/openSUSE_Leap_42.2/devel:languages:haskell.repo
 
       * SUSE Linux Enterprise 12
 
