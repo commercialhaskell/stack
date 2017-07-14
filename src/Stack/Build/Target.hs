@@ -495,7 +495,7 @@ parseTargets needTargets boptscli = do
       deps = lpDependencies lp
       globals = lsGlobals ls0
       snap = lsPackages ls0
-  let (textTargets', rawInput) = getRawInput boptscli locals
+      (textTargets', rawInput) = getRawInput boptscli locals
 
   (errs1, concat -> rawTargets) <- fmap partitionEithers $ forM rawInput $
     parseRawTargetDirs workingDir (lpProject lp)

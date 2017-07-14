@@ -638,7 +638,7 @@ instance FromJSON (WithJSONWarnings PackageEntry) where
     parseJSON v = withObjectWarnings "PackageEntry" (\o -> PackageEntry
         <$> o ..:? "extra-dep"
         <*> jsonSubWarnings (o ..: "location")
-        <*> o ..:? "subdirs" ..!= []) v
+        <*> o ..:? "subdirs" ..!= ["."]) v
 
 -- | A project is a collection of packages. We can have multiple stack.yaml
 -- files, but only one of them may contain project information.
