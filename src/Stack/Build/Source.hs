@@ -200,9 +200,6 @@ loadLocalPackage boptsCli targets (name, lpv) = do
 
         filterSkippedComponents = Set.filter (not . (`elem` boptsSkipComponents bopts))
 
-        -- the part for executables currently does nothing as Stack.Build.Execute.exesToBuild
-        -- ignores lpComponents (until https://github.com/haskell/cabal/issues/2780 is fixed),
-        -- but once that is changed it should also make this work with executables
         (exes, tests, benches) = (filterSkippedComponents exeCandidates,
                                   filterSkippedComponents testCandidates,
                                   filterSkippedComponents benchCandidates)

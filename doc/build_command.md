@@ -143,8 +143,9 @@ following flags:
 * `--skip`, to skip building components of a local package. It allows
   you to skip test suites and benchmark without specifying other components
   (e.g. `stack test --skip long-test-suite` will run the tests without the
-  `long-test-suite` test suite). Skipping executables is not supported due to
-  an [issue in cabal](https://github.com/haskell/cabal/issues/2780).
+  `long-test-suite` test suite). Be aware that skipping executables won't work
+  the first time the package is built due to 
+  [an issue in cabal](https://github.com/commercialhaskell/stack/issues/3229).
   This option can be specified multiple times to skip multiple components. 
 
 ## Flags
