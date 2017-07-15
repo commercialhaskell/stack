@@ -201,6 +201,7 @@ script:
         cd "$PKGVER"
         cabal configure --enable-tests
         cabal build
+        cabal test
         cd $ORIGDIR
       done
       ;;
