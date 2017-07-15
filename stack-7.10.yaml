@@ -1,4 +1,4 @@
-resolver: lts-6.30
+resolver: lts-6.35
 # docker:
 #   enable: true
 #   repo: fpco/stack-full
@@ -12,8 +12,6 @@ nix:
   packages:
     - zlib
 flags:
-  stack:
-    hide-dependency-versions: true
   mintty:
     win32-2-5: false
 extra-deps:

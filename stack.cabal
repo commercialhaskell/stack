@@ -204,44 +204,44 @@ library
                    , conduit >= 1.2.8
                    , conduit-extra >= 1.1.14
                    , containers >= 0.5.5.1
-                   , cryptonite >= 0.19 && < 0.22
+                   , cryptonite >= 0.19 && < 0.24
                    , cryptonite-conduit >= 0.1 && < 0.3
                    , directory >= 1.2.1.0 && < 1.4
                    , echo >= 0.1.3 && < 0.2
                    , either
-                   , errors < 2.2
+                   , errors < 2.3
                    , exceptions >= 0.8.0.2
-                   , extra < 1.6
+                   , extra >= 1.4.10 && < 1.6
                    , fast-logger >= 2.3.1
                    , filelock >= 0.1.0.1
                    , filepath >= 1.3.0.2
                    , fsnotify >= 0.2.1
-                   , generic-deriving < 1.12
-                   , ghc-prim
+                   , generic-deriving >= 1.10.5 && < 1.12
+                   , ghc-prim >= 0.4.0.0
                    , hackage-security
                    , hashable >= 1.2.3.2
-                   , hpc
+                   , hpc >= 0.6.0.2
                    , http-client >= 0.5.3.3
                    , http-client-tls >= 0.3.4
                    , http-conduit >= 2.2.3
                    , http-types >= 0.8.6 && < 0.10
-                   , lifted-async
+                   , lifted-async >= 0.9.1.1
                        -- https://github.com/basvandijk/lifted-base/issues/31
                    , lifted-base < 0.2.3.7 || > 0.2.3.7
                    , memory >= 0.13 && < 0.15
                    , microlens >= 0.3.0.0
-                   , microlens-mtl
+                   , microlens-mtl >= 0.1.10.0
                    , mintty >= 0.1.1
-                   , monad-control
+                   , monad-control >= 1.0.1.0
                    , monad-logger >= 0.3.13.1
                    , monad-unlift < 0.3
                    , mtl >= 2.1.3.1
                    , network-uri
                    , open-browser >= 0.2.1
                    , optparse-applicative >= 0.13 && < 0.14
-                   , path >= 0.5.8 && <= 0.5.12
+                   , path >= 0.5.8 && < 0.6
                    , path-io >= 1.1.0 && < 2.0.0
-                   , persistent >= 2.1.2 && < 2.7
+                   , persistent >= 2.1.2 && < 2.8
                        -- persistent-sqlite-2.5.0.1 has a bug
                        -- (see https://github.com/yesodweb/persistent/pull/561#issuecomment-222329087)
                    , persistent-sqlite (>= 2.1.4 && < 2.5.0.1) || (> 2.5.0.1 && < 2.7)
@@ -252,7 +252,7 @@ library
                    , resourcet >= 1.1.4.1
                    , retry >= 0.6 && < 0.8
                    , safe >= 0.3
-                   , safe-exceptions
+                   , safe-exceptions >= 0.1.5.0
                    , semigroups >= 0.5 && < 0.19
                    , split
                    , stm >= 2.4.4
@@ -262,13 +262,13 @@ library
                    , temporary >= 1.2.0.3
                    , text >= 1.2.0.4
                    , text-binary
-                   , text-metrics >= 0.1 && < 0.3
+                   , text-metrics >= 0.1 && < 0.4
                    , time >= 1.4.2 && < 1.7
                    , tls >= 1.3.8
                    , transformers >= 0.3.0.0 && < 0.6
                    , transformers-base >= 0.4.4
                    , unicode-transforms >= 0.1 && <0.4
-                   , unix-compat
+                   , unix-compat >= 0.4.1.4
                    , unordered-containers >= 0.2.5.1
                    , vector >= 0.10.12.3 && < 0.13
                    , vector-binary-instances
@@ -277,8 +277,8 @@ library
                    , deepseq >= 1.4
                    , hastache
                    , project-template >= 0.2
-                   , zip-archive < 0.4
-                   , hpack >= 0.17.0 && < 0.18
+                   , zip-archive >= 0.2.3.7 && < 0.4
+                   , hpack >= 0.17.0 && < 0.19
                    , store >= 0.4.1 && < 0.5
                    , store-core >= 0.4 && < 0.5
                    , annotated-wl-pprint
@@ -302,22 +302,22 @@ executable stack
   build-depends:  Cabal >= 1.18.1.5 && < 1.25
                 , base >=4.7 && < 5
                 , bytestring >= 0.10.4.0
-                , conduit
+                , conduit >= 1.2.8
                 , containers >= 0.5.5.1
                 , directory >= 1.2.1.0 && < 1.4
                 , either
                 , filelock >= 0.1.0.1
                 , filepath >= 1.3.0.2
-                , hpack >= 0.17.0 && < 0.18
+                , hpack >= 0.17.0 && < 0.19
                 , http-client >= 0.5.3.3
                   -- https://github.com/basvandijk/lifted-base/issues/31
                 , lifted-base < 0.2.3.7 || > 0.2.3.7
                 , microlens >= 0.3.0.0
-                , monad-control
+                , monad-control >= 1.0.1.0
                 , monad-logger >= 0.3.13.1
                 , mtl >= 2.1.3.1
                 , optparse-applicative >= 0.13 && < 0.14
-                , path >= 0.5.8
+                , path >= 0.5.8 && < 0.6
                 , path-io >= 1.1.0 && < 2.0.0
                 , split
                 , stack
@@ -329,7 +329,7 @@ executable stack
     cpp-options:     -DWINDOWS
   if !flag(disable-git-info)
     cpp-options:     -DUSE_GIT_INFO
-    build-depends:   gitrev >= 1.1 && < 1.3
+    build-depends:   gitrev >= 1.1 && < 1.4
                    , optparse-simple >= 0.0.3
   if flag(hide-dependency-versions)
     cpp-options:     -DHIDE_DEP_VERSIONS
@@ -356,40 +356,40 @@ test-suite stack-test
                 , Stack.Untar.UntarSpec
   ghc-options:    -threaded -Wall -fwarn-tabs -fwarn-incomplete-uni-patterns -fwarn-incomplete-record-updates
   build-depends:  Cabal >= 1.18.1.5 && < 1.25
-                , QuickCheck < 2.10
+                , QuickCheck >= 2.8.2 && < 2.10
                 , attoparsec < 0.14
                 , base >=4.7 && <5
-                , conduit
+                , conduit >= 1.2.8
                 , conduit-extra
                 , containers >= 0.5.5.1
-                , cryptonite >= 0.19 && < 0.22
+                , cryptonite >= 0.19 && < 0.24
                 , directory >= 1.2.1.0 && < 1.4
                 , exceptions
-                , filepath
+                , filepath >= 1.3.0.2
                 , hspec >= 2.2 && <2.5
-                , hashable
-                , http-client-tls
-                , http-conduit
+                , hashable >= 1.2.3.2
+                , http-client-tls >= 0.3.4
+                , http-conduit >= 2.2.3
                 , monad-logger
                 , neat-interpolation >= 0.3
                 , optparse-applicative >= 0.13 && < 0.14
-                , path >= 0.5.8
+                , path >= 0.5.8 && < 0.6
                 , path-io >= 1.1.0 && < 2.0.0
                 , resourcet
                 , retry >= 0.6 && < 0.8
                 , stack
-                , temporary
+                , temporary >= 1.2.0.3
                 , text
                 , transformers >= 0.3.0.0 && < 0.6
-                , mono-traversable >=0.10.2 && <1.1
-                , th-reify-many
+                , mono-traversable >= 0.10.2 && <1.1
+                , th-reify-many >= 0.1.6
                 , smallcheck
-                , bytestring
+                , bytestring >= 0.10.4.0
                 , store >= 0.4.1 && < 0.5
                 , vector >= 0.10.12.3 && < 0.13
                 , unordered-containers
                 , template-haskell >= 2.9.0.0 && < 2.12
-                , yaml
+                , yaml >= 0.8.20
   default-language:    Haskell2010
   if os(windows)
     cpp-options:     -DWINDOWS
@@ -414,10 +414,10 @@ test-suite stack-integration-test
                 , hspec >= 2.2 && < 2.5
                 , process >= 1.2.0.0 && < 1.5
                 , resourcet
-                , temporary
+                , temporary >= 1.2.0.3
                 , text
                 , transformers >= 0.3.0.0 && < 0.6
-                , unix-compat
+                , unix-compat >= 0.4.1.4
   default-language:    Haskell2010
 
   -- This isn't actually needed to build stack-integration-test, but it makes it

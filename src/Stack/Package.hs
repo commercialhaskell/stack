@@ -1190,7 +1190,11 @@ hpack pkgDir = do
     when exists $ do
         let fpt = T.pack (toFilePath hpackFile)
         $logDebug $ "Running hpack on " <> fpt
+#if MIN_VERSION_hpack(0,18,0)
+        r <- liftIO $ Hpack.hpackResult (Just $ toFilePath pkgDir)
+#else
         r <- liftIO $ Hpack.hpackResult (toFilePath pkgDir)
+#endif
         forM_ (Hpack.resultWarnings r) $ \w -> $logWarn ("WARNING: " <> T.pack w)
         let cabalFile = T.pack (Hpack.resultCabalFile r)
         case Hpack.resultStatus r of
