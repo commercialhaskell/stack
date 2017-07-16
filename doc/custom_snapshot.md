@@ -113,7 +113,7 @@ it enables the `developer` cabal flag:
 resolver: lts-7.1
 packages:
   - text-1.2.2.1
-ghc-options:
+flags:
   text:
     developer: true
 ```

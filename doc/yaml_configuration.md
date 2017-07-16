@@ -128,6 +128,11 @@ packages:
   - wai
 ```
 
+If unspecified, `subdirs` defaults to `['.']` (i.e. look only in the top-level
+directory).  Note that if you specify a value of `subdirs`, then `'.'` is _not_
+included by default and needs to be explicitly specified if a required package
+is found in the top-level directory of the repository.
+
 #### Local dependency packages (`extra-dep`)
 A `location` key can be accompanied by an `extra-dep` key.  When the
 `extra-dep` key is set to `true` it indicates that the package should be
