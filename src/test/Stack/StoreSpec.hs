@@ -27,7 +27,6 @@ import           Language.Haskell.TH.ReifyMany
 import           Prelude
 import           Stack.Types.Build
 import           Stack.Types.PackageDump
-import           Stack.Types.PackageIndex
 import           Test.Hspec
 import           Test.SmallCheck.Series
 
@@ -66,7 +65,7 @@ $(do let ns = [ ''Int64, ''Word64, ''Word, ''Word8
      concat <$> mapM f ns)
 
 $(do let tys = [ ''InstalledCacheInner
-               , ''PackageCacheMap
+               -- FIXME , ''PackageCache
                -- FIXME , ''LoadedSnapshot
                , ''BuildCache
                , ''ConfigCache
@@ -86,10 +85,12 @@ spec = do
             , [t| BuildCache |]
             ])
         -- Blows up with > 5
+        {-
         $(smallcheckManyStore False 5
-            [ [t| PackageCacheMap |]
+            [ -- FIXME [t| PackageCache |]
             -- FIXME , [t| LoadedSnapshot |]
             ])
+        -}
         -- Blows up with > 4
         $(smallcheckManyStore False 4
             [ [t| ConfigCache |]

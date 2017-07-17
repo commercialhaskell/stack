@@ -126,7 +126,7 @@ initProject whichCmd currDir initOpts mresolver = do
             { projectUserMsg = if userMsg == "" then Nothing else Just userMsg
             , projectPackages = pkgs
             , projectDependencies = map
-                (\(n, v) -> PLIndex $ PackageIdentifierRevision (PackageIdentifier n v) Nothing)
+                (\(n, v) -> PLIndex $ PackageIdentifierRevision (PackageIdentifier n v) CFILatest)
                 (Map.toList extraDeps)
             , projectFlags = removeSrcPkgDefaultFlags gpds flags
             , projectResolver = resolver

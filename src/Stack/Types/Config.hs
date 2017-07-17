@@ -161,7 +161,6 @@ module Stack.Types.Config
   ,buildOptsHaddockL
   ,globalOptsBuildOptsMonoidL
   ,packageIndicesL
-  ,packageCachesL
   ,stackRootL
   ,configUrlsL
   ,cabalVersionL
@@ -188,7 +187,6 @@ import           Data.Attoparsec.Args
 import           Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as S8
 import           Data.Either (partitionEithers)
-import           Data.HashMap.Strict (HashMap)
 import           Data.IORef (IORef)
 import           Data.List (stripPrefix)
 import           Data.List.NonEmpty (NonEmpty)
@@ -357,8 +355,7 @@ data Config =
          ,configAllowDifferentUser  :: !Bool
          -- ^ Allow users other than the stack root owner to use the stack
          -- installation.
-         ,configPackageCaches       :: !(IORef (Maybe (Map PackageIdentifier (PackageIndex, PackageCache),
-                                                       HashMap CabalHash (PackageIndex, OffsetSize))))
+         ,configPackageCache        :: !(IORef (Maybe (PackageCache PackageIndex)))
          -- ^ In memory cache of hackage index.
          ,configDumpLogs            :: !DumpLogs
          -- ^ Dump logs of local non-dependencies when doing a build.
@@ -1921,11 +1918,6 @@ globalOptsBuildOptsMonoidL :: Lens' GlobalOpts BuildOptsMonoid
 globalOptsBuildOptsMonoidL = globalOptsL.lens
     configMonoidBuildOpts
     (\x y -> x { configMonoidBuildOpts = y })
-
-packageCachesL :: HasConfig env => Lens' env
-    (IORef (Maybe (Map PackageIdentifier (PackageIndex, PackageCache)
-                  ,HashMap CabalHash (PackageIndex, OffsetSize))))
-packageCachesL = configL.lens configPackageCaches (\x y -> x { configPackageCaches = y })
 
 configUrlsL :: HasConfig env => Lens' env Urls
 configUrlsL = configL.lens configUrls (\x y -> x { configUrls = y })
