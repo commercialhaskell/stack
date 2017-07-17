@@ -67,7 +67,7 @@ upgradeOpts = UpgradeOpts
           help "Github repository name"))
 
     sourceOpts = SourceOpts
-        <$> ((\fromGit repo -> if fromGit then Just repo else Nothing)
+        <$> ((\fromGit repo branch -> if fromGit then Just (repo, branch) else Nothing)
                 <$> switch
                     ( long "git"
                     <> help "Clone from Git instead of downloading from Hackage (more dangerous)" )
@@ -75,7 +75,12 @@ upgradeOpts = UpgradeOpts
                     ( long "git-repo"
                     <> help "Clone from specified git repository"
                     <> value "https://github.com/commercialhaskell/stack"
-                    <> showDefault ))
+                    <> showDefault )
+                <*> strOption
+                    ( long "git-branch"
+                   <> help "Clone from this git branch"
+                   <> value "master"
+                   <> showDefault ))
 
 data BinaryOpts = BinaryOpts
     { _boPlatform :: !(Maybe String)
@@ -88,9 +93,7 @@ data BinaryOpts = BinaryOpts
     , _boGithubRepo :: !(Maybe String)
     }
     deriving Show
-newtype SourceOpts = SourceOpts
-    { _soRepo :: Maybe String
-    }
+newtype SourceOpts = SourceOpts (Maybe (String, String)) -- repo and branch
     deriving Show
 
 data UpgradeOpts = UpgradeOpts
@@ -187,9 +190,12 @@ sourceUpgrade gConfigMonoid mresolver builtHash (SourceOpts gitRepo) =
   withRunIO $ \run -> withSystemTempDir "stack-upgrade" $ \tmp -> run $ do
     menv <- getMinimalEnvOverride
     mdir <- case gitRepo of
-      Just repo -> do
-        remote <- liftIO $ readProcess "git" ["ls-remote", repo, "master"] []
-        let latestCommit = head . words $ remote
+      Just (repo, branch) -> do
+        remote <- liftIO $ readProcess "git" ["ls-remote", repo, branch] []
+        latestCommit <-
+          case words remote of
+            [] -> throwString $ "No commits found for branch " ++ branch ++ " on repo " ++ repo
+            x:_ -> return x
         when (isNothing builtHash) $
             $logWarn $ "Information about the commit this version of stack was "
                     <> "built from is not available due to how it was built. "
@@ -205,7 +211,7 @@ sourceUpgrade gConfigMonoid mresolver builtHash (SourceOpts gitRepo) =
                 -- next release).  This means that we can't use submodules in
                 -- the stack repo until we're comfortable with "stack upgrade
                 -- --git" not working for earlier versions.
-                let args = [ "clone", repo , "stack", "--depth", "1", "--recursive"]
+                let args = [ "clone", repo , "stack", "--depth", "1", "--recursive", "--branch", branch]
                 runCmd (Cmd (Just tmp) "git" menv args) Nothing
                 return $ Just $ tmp </> $(mkRelDir "stack")
       Nothing -> do
