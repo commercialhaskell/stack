@@ -153,22 +153,30 @@ resolveMultiPackageLocation
     :: (StackMiniM env m, HasConfig env)
     => EnvOverride
     -> Path Abs Dir -- ^ project root
-    -> PackageLocation [FilePath]
+    -> PackageLocation Subdirs
     -> m [(Path Abs Dir, PackageLocation FilePath)]
 resolveMultiPackageLocation x y (PLFilePath fp) = do
   dir <- resolveSinglePackageLocation x y (PLFilePath fp)
   return [(dir, PLFilePath fp)]
 resolveMultiPackageLocation x y (PLArchive (Archive url subdirs msha)) = do
   dir <- resolveSinglePackageLocation x y (PLArchive (Archive url "." msha))
-  forM subdirs $ \subdir -> do
+  let subdirs' =
+        case subdirs of
+          DefaultSubdirs -> ["."]
+          ExplicitSubdirs subs -> subs
+  forM subdirs' $ \subdir -> do
     dir' <- resolveDir dir subdir
     return (dir', PLArchive (Archive url subdir msha))
 resolveMultiPackageLocation menv projRoot (PLRepo (Repo url commit repoType' subdirs)) = do
-    dir <- cloneRepo menv projRoot url commit repoType'
+  dir <- cloneRepo menv projRoot url commit repoType'
 
-    forM subdirs $ \subdir -> do
-      dir' <- resolveDir dir subdir
-      return (dir', PLRepo $ Repo url commit repoType' subdir)
+  let subdirs' =
+        case subdirs of
+          DefaultSubdirs -> ["."]
+          ExplicitSubdirs subs -> subs
+  forM subdirs' $ \subdir -> do
+    dir' <- resolveDir dir subdir
+    return (dir', PLRepo $ Repo url commit repoType' subdir)
 
 cloneRepo
     :: (StackMiniM env m, HasConfig env)
@@ -249,7 +257,7 @@ loadMultiRawCabalFilesIndex
   => (PackageIdentifierRevision -> IO ByteString) -- ^ lookup in index
   -> EnvOverride
   -> Path Abs Dir -- ^ project root, used for checking out necessary files
-  -> PackageLocationIndex [FilePath]
+  -> PackageLocationIndex Subdirs
   -> m [(ByteString, PackageLocationIndex FilePath)]
 -- Need special handling of PLIndex for efficiency (just read from the
 -- index tarball) and correctness (get the cabal file from the index,
@@ -269,7 +277,7 @@ loadMultiRawCabalFiles
      (StackMiniM env m, HasConfig env)
   => EnvOverride
   -> Path Abs Dir -- ^ project root, used for checking out necessary files
-  -> PackageLocation [FilePath]
+  -> PackageLocation Subdirs
   -> m [(ByteString, PackageLocation FilePath)]
 loadMultiRawCabalFiles menv root loc =
     resolveMultiPackageLocation menv root loc >>= mapM go
