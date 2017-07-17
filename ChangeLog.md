@@ -81,6 +81,7 @@ Other enhancements:
   local file path archives, as well as to support setting a
   cryptographic hash (SHA256) of the contents for better
   reproducibility.
+* Allow specifying `--git-branch` when upgrading
 
 Bug fixes:
 
