@@ -184,7 +184,7 @@ loadLocalPackage boptsCli targets (name, lpv) = do
     let mtarget = Map.lookup name targets
     config  <- getPackageConfig boptsCli name (isJust mtarget) True
     bopts <- view buildOptsL
-    let (exes, tests, benches) =
+    let (exeCandidates, testCandidates, benchCandidates) =
             case mtarget of
                 Just (TargetComps comps) -> splitComponents $ Set.toList comps
                 Just (TargetAll packageType) -> assert (packageType == ProjectPackage)
@@ -197,6 +197,12 @@ loadLocalPackage boptsCli targets (name, lpv) = do
                         else Set.empty
                     )
                 Nothing -> mempty
+
+        filterSkippedComponents = Set.filter (not . (`elem` boptsSkipComponents bopts))
+
+        (exes, tests, benches) = (filterSkippedComponents exeCandidates,
+                                  filterSkippedComponents testCandidates,
+                                  filterSkippedComponents benchCandidates)
 
         toComponents e t b = Set.unions
             [ Set.map CExe e

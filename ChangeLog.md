@@ -73,6 +73,8 @@ Other enhancements:
   foo-1.2.3@gitsha1:deadbeef`. Note that this should be considered
   _experimental_, Stack will likely move towards a different hash
   format in the future.
+* It's now possible to skip tests and benchmarks using `--skip`
+  flag
 * `GitSHA1` is now `StaticSHA256` and is implemented using the `StaticSize 64 ByteString` for improved performance.
   See [#3006](https://github.com/commercialhaskell/stack/issues/3006)
 * Dependencies via HTTP(S) archives have been generalized to allow
