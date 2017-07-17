@@ -32,7 +32,7 @@ import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Text.Encoding (encodeUtf8, decodeUtf8)
 import Network.HTTP.Client (parseUrlThrow)
-import Network.HTTP.Download (download)
+import Network.HTTP.Download.Verified
 import Path
 import Path.Extra
 import Path.IO
@@ -40,6 +40,7 @@ import Stack.Package
 import Stack.Types.BuildPlan
 import Stack.Types.Config
 import Stack.Types.PackageIdentifier
+import qualified System.Directory as Dir
 import System.IO (withBinaryFile, IOMode (ReadMode))
 import System.Process.Read
 import System.Process.Run
@@ -53,7 +54,7 @@ resolveSinglePackageLocation
     -> PackageLocation FilePath
     -> m (Path Abs Dir)
 resolveSinglePackageLocation _ projRoot (PLFilePath fp) = resolveDir projRoot fp
-resolveSinglePackageLocation _ projRoot (PLHttp url subdir) = do
+resolveSinglePackageLocation _ projRoot (PLArchive (Archive url subdir msha)) = do
     workDir <- view workDirL
 
         -- TODO: dedupe with code for snapshot hash?
@@ -64,7 +65,7 @@ resolveSinglePackageLocation _ projRoot (PLHttp url subdir) = do
     fileRel <- parseRelFile $ name ++ fileExtension'
     dirRel <- parseRelDir name
     dirRelTmp <- parseRelDir $ name ++ ".tmp"
-    let file = root </> fileRel
+    let fileDownload = root </> fileRel
         dir = root </> dirRel
 
     exists <- doesDirExist dir
@@ -74,9 +75,43 @@ resolveSinglePackageLocation _ projRoot (PLHttp url subdir) = do
         let dirTmp = root </> dirRelTmp
         liftIO $ ignoringAbsence (removeDirRecur dirTmp)
 
+        urlExists <- liftIO $ Dir.doesFileExist $ T.unpack url
+        file <-
+          if urlExists
+            then do
+              file <- liftIO $ Dir.canonicalizePath (T.unpack url) >>= parseAbsFile
+              case msha of
+                Nothing -> return ()
+                Just sha -> do
+                  actualSha <- mkStaticSHA256FromFile file
+                  when (sha /= actualSha) $ error $ concat
+                    [ "Invalid SHA256 found for local archive "
+                    , show file
+                    , "\nExpected: "
+                    , T.unpack $ staticSHA256ToText sha
+                    , "\nActual:   "
+                    , T.unpack $ staticSHA256ToText actualSha
+                    ]
+              return file
+            else do
+              req <- parseUrlThrow $ T.unpack url
+              let dreq = DownloadRequest
+                    { drRequest = req
+                    , drHashChecks =
+                        case msha of
+                          Nothing -> []
+                          Just sha ->
+                            [HashCheck
+                              { hashCheckAlgorithm = SHA256
+                              , hashCheckHexDigest = CheckHexDigestByteString $ staticSHA256ToBase16 sha
+                              }]
+                    , drLengthCheck = Nothing -- TODO add length info?
+                    , drRetryPolicy = drRetryPolicyDefault
+                    }
+              _ <- verifiedDownload dreq fileDownload (const $ return ())
+              return fileDownload
+
         let fp = toFilePath file
-        req <- parseUrlThrow $ T.unpack url
-        _ <- download req file
 
         let tryTar = do
                 $logDebug $ "Trying to untar " <> T.pack fp
@@ -103,7 +138,7 @@ resolveSinglePackageLocation _ projRoot (PLHttp url subdir) = do
     case x of
         ([dir'], []) -> resolveDir dir' subdir
         (dirs, files) -> liftIO $ do
-            ignoringAbsence (removeFile file)
+            ignoringAbsence (removeFile fileDownload)
             ignoringAbsence (removeDirRecur dir)
             throwIO $ UnexpectedArchiveContents dirs files
 resolveSinglePackageLocation menv projRoot (PLRepo (Repo url commit repoType' subdir)) =
@@ -123,11 +158,11 @@ resolveMultiPackageLocation
 resolveMultiPackageLocation x y (PLFilePath fp) = do
   dir <- resolveSinglePackageLocation x y (PLFilePath fp)
   return [(dir, PLFilePath fp)]
-resolveMultiPackageLocation x y (PLHttp url subdirs) = do
-  dir <- resolveSinglePackageLocation x y (PLHttp url ".")
+resolveMultiPackageLocation x y (PLArchive (Archive url subdirs msha)) = do
+  dir <- resolveSinglePackageLocation x y (PLArchive (Archive url "." msha))
   forM subdirs $ \subdir -> do
     dir' <- resolveDir dir subdir
-    return (dir', PLHttp url subdir)
+    return (dir', PLArchive (Archive url subdir msha))
 resolveMultiPackageLocation menv projRoot (PLRepo (Repo url commit repoType' subdirs)) = do
     dir <- cloneRepo menv projRoot url commit repoType'
 

@@ -3,6 +3,7 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# OPTIONS -fno-warn-unused-do-bind #-}
 
 -- | Package identifier (name-version).
@@ -28,6 +29,7 @@ module Stack.Types.PackageIdentifier
   , fromCabalPackageIdentifier
   , StaticSHA256
   , mkStaticSHA256FromText
+  , mkStaticSHA256FromFile
   , staticSHA256ToText
   , staticSHA256ToBase16
   )
@@ -36,6 +38,7 @@ module Stack.Types.PackageIdentifier
 import           Control.Applicative
 import           Control.DeepSeq
 import           Control.Monad.IO.Unlift
+import           Crypto.Hash.Conduit (hashFile)
 import           Crypto.Hash as Hash (hashlazy, Digest, SHA256)
 import           Data.Aeson.Extended
 import           Data.Attoparsec.Text as A
@@ -52,6 +55,7 @@ import qualified Data.Text as T
 import           Data.Text.Encoding (decodeUtf8, encodeUtf8)
 import qualified Distribution.Package as C
 import           GHC.Generics
+import           Path
 import           Prelude hiding (FilePath)
 import           Stack.Types.PackageName
 import           Stack.Types.Version
@@ -146,6 +150,13 @@ instance Hashable StaticSHA256 where
 mkStaticSHA256FromText :: Text -> Maybe StaticSHA256
 mkStaticSHA256FromText = fmap StaticSHA256 . toStaticSize . encodeUtf8
 
+-- | Generate a 'StaticSHA256' value from the contents of a file.
+mkStaticSHA256FromFile :: MonadIO m => Path Abs File -> m StaticSHA256
+mkStaticSHA256FromFile fp = liftIO $ fromDigest <$> hashFile (toFilePath fp)
+
+fromDigest :: Hash.Digest Hash.SHA256 -> StaticSHA256
+fromDigest = StaticSHA256 . toStaticSizeEx . Mem.convertToBase Mem.Base16
+
 -- | Convert a 'StaticSHA256' into a base16-encoded SHA256 hash.
 staticSHA256ToText :: StaticSHA256 -> Text
 staticSHA256ToText = decodeUtf8 . staticSHA256ToBase16
@@ -164,10 +175,7 @@ cabalHashToText = staticSHA256ToText . unCabalHash
 
 -- | Compute a 'CabalHash' value from a cabal file's contents.
 computeCabalHash :: L.ByteString -> CabalHash
-computeCabalHash = CabalHash . StaticSHA256 . toStaticSizeEx . Mem.convertToBase Mem.Base16 . hashSHA256
-
-hashSHA256 :: L.ByteString -> Hash.Digest Hash.SHA256
-hashSHA256 = Hash.hashlazy
+computeCabalHash = CabalHash . fromDigest . Hash.hashlazy
 
 showCabalHash :: CabalHash -> Text
 showCabalHash = T.append (T.pack "sha256:") . cabalHashToText
