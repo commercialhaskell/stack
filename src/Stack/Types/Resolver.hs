@@ -68,7 +68,7 @@ import qualified System.FilePath as FP
 data IsLoaded = Loaded | NotLoaded
 
 type LoadedResolver = ResolverWith SnapshotHash
-type Resolver = ResolverWith (Either Request (Path Abs File))
+type Resolver = ResolverWith (Either Request FilePath)
 
 -- TODO: once GHC 8.0 is the lowest version we support, make these into
 -- actual haddock comments...
@@ -129,7 +129,7 @@ parseCustomLocation mdir (ResolverCustom t ()) =
               T.unpack
             $ fromMaybe t
             $ T.stripPrefix "file://" t <|> T.stripPrefix "file:" t
-      parseAbsFile $ toFilePath dir FP.</> rel
+      return $ toFilePath dir FP.</> rel
     Just req -> return $ Left req
 parseCustomLocation _ (ResolverSnapshot name) = return $ ResolverSnapshot name
 parseCustomLocation _ (ResolverCompiler cv) = return $ ResolverCompiler cv
