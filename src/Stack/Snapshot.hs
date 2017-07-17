@@ -215,10 +215,13 @@ loadResolver (ResolverSnapshot name) = do
             mcabalFileInfo' <- forM mcabalFileInfo $ \o' -> do
                 cfiSize <- Just <$> o' .: "size"
                 cfiHashes <- o' .: "hashes"
-                cfiHash <- maybe
-                                (fail "Could not find SHA256")
-                                (return . mkCabalHashFromSHA256)
-                            $ HashMap.lookup ("SHA256" :: Text) cfiHashes
+                cfiHash <-
+                  case HashMap.lookup ("SHA256" :: Text) cfiHashes of
+                    Nothing -> fail "Could not find SHA256"
+                    Just shaText ->
+                      case mkCabalHashFromSHA256 shaText of
+                        Nothing -> fail "Invalid SHA256"
+                        Just x -> return x
                 return CabalFileInfo {..}
 
             Object constraints <- o .: "constraints"
