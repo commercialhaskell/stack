@@ -80,6 +80,7 @@ import           Stack.Build.Source
 import           Stack.Build.Target
 import           Stack.Config
 import           Stack.Constants
+import           Stack.Constants.Config
 import           Stack.Coverage
 import           Stack.Fetch as Fetch
 import           Stack.GhcPkg

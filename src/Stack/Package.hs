@@ -88,6 +88,7 @@ import           Path.IO hiding (findFiles)
 import           Safe (headDef, tailSafe)
 import           Stack.Build.Installed
 import           Stack.Constants
+import           Stack.Constants.Config
 import           Stack.PrettyPrint
 import           Stack.Types.Build
 import           Stack.Types.Compiler

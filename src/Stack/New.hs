@@ -53,6 +53,7 @@ import           Path
 import           Path.IO
 import           Prelude
 import           Stack.Constants
+import           Stack.Constants.Config
 import           Stack.Types.Config
 import           Stack.Types.PackageName
 import           Stack.Types.StackT

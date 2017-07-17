@@ -22,7 +22,7 @@ import Distribution.Version (anyVersion)
 import GHC.Generics (Generic)
 import Generics.Deriving.Monoid (mappenddefault, memptydefault)
 import Path
-import {-# SOURCE #-} Stack.Constants
+import Stack.Constants
 import Stack.Types.Version
 
 -- | Docker configuration.
