@@ -276,10 +276,6 @@ Run:
 
 * Now you can run `stack` from the terminal.
 
-An unofficial package repository for FreeBSD 10 (amd64 only) and install
-instructions are available at [http://stack-pkg.applicative.tech](http://stack-pkg.applicative.tech/).  The
-repository is not official and as such might lag behind new releases.
-
 ## Path
 
 You can install stack by copying it anywhere on your PATH environment variable. We recommend installing in the same directory where stack itself will install executables (that way stack is able to upgrade itself!). On Windows, that directory is `%APPDATA%\local\bin`, e.g. "c:\Users\Michael\AppData\Roaming\local\bin". For other systems, use `$HOME/.local/bin`.

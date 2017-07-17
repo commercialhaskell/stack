@@ -1,10 +1,7 @@
 # Changelog
 
-## Unreleased changes
 
-Release notes:
-
-Major changes:
+## 1.5.0
 
 Behavior changes:
 
@@ -17,6 +14,8 @@ Other enhancements:
 
 * `stack setup` allow to control options passed to ghcjs-boot with
   `--ghcjs-boot-options` (one word at a time) and `--[no-]ghcjs-boot-clean`
+* `stack setup` now accepts a `--install-cabal VERSION` option which
+  will install a specific version of the Cabal library globally.
 * Updates to store-0.4.1, which has improved performance and better error
   reporting for version tags.  A side-effect of this is that all of
   stack's binary caches will be invalidated.
@@ -62,6 +61,10 @@ Other enhancements:
   foo-1.2.3@gitsha1:deadbeef`. Note that this should be considered
   _experimental_, Stack will likely move towards a different hash
   format in the future.
+* Binary "stack upgrade" will now warn if the installed executable is not
+  on the PATH or shadowed by another entry.
+* Allow running tests on tarball created by sdist and upload
+  [#717](https://github.com/commercialhaskell/stack/issues/717).
 
 Bug fixes:
 
@@ -116,9 +119,6 @@ Major changes:
   packages already being present much faster. This mode does require
   that all packages be present in a snapshot, however.
   [#2805](https://github.com/commercialhaskell/stack/issues/2805)
-
-* `stack setup` now accepts a `--install-cabal VERSION` option which
-  will install a specific version of the Cabal library globally.
 
 Behavior changes:
 
@@ -185,8 +185,6 @@ Other enhancements:
 * Upgraded `http-client-tls` version, which now offers support for the
   `socks5://` and `socks5h://` values in the `http_proxy` and `https_proxy`
   environment variables.
-* Binary "stack upgrade" will now warn if the installed executable is not
-  on the PATH or shadowed by another entry.
 
 Bug fixes:
 
@@ -1095,8 +1093,6 @@ Other enhancements:
 * `stack build --fast` turns off optimizations
 * Show progress while downloading package index
   [#1223](https://github.com/commercialhaskell/stack/issues/1223).
-* Allow running tests on tarball created by sdist and upload
-  [#717](https://github.com/commercialhaskell/stack/issues/717).
 
 Bug fixes:
 

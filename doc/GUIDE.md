@@ -2096,7 +2096,7 @@ users. Here's a quick rundown:
   tarball and unpacks it.
 * `stack sdist` generates an uploading tarball containing your package code
 * `stack upload` uploads an sdist to Hackage. As of
-  version [1.1.0](https://docs.haskellstack.org/en/latest/ChangeLog/#110) stack
+  version [1.1.0](https://docs.haskellstack.org/en/v1.1.0/ChangeLog/) stack
   will also attempt to GPG sign your packages as
   per
   [our blog post](https://www.fpcomplete.com/blog/2016/05/stack-security-gnupg-keys).
