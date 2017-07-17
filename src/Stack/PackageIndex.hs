@@ -165,9 +165,17 @@ populateCache index = do
                   HashMap.insert ident
                   (case HashMap.lookup ident m of
                     Nothing -> ((), Just pd, mempty)
-                    -- Not sure about this assertion, see: https://github.com/haskell/hackage-security/issues/189
-                    Just ((), Just oldPD, files) -> assert (oldPD == pd) ((), Just pd, files)
-                    Just ((), Nothing, files) -> ((), Just pd, files))
+                    Just ((), Just oldPD, _)
+                      | oldPD /= pd -> error $ concat
+                        [ "Conflicting package hash information discovered for "
+                        , packageIdentifierString ident
+                        , "\nFound both: \n- "
+                        , show oldPD
+                        , "\n- "
+                        , show pd
+                        , "\n\nThis should not happen. See: https://github.com/haskell/hackage-security/issues/189"
+                        ]
+                    Just ((), _, files) -> ((), Just pd, files))
                   m
 
     breakSlash x
