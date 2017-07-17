@@ -15,6 +15,7 @@ import           Control.Monad               (unless, when)
 import           Control.Monad.IO.Unlift
 import           Control.Monad.Logger
 import           Data.Foldable               (forM_)
+import qualified Data.HashMap.Strict         as HashMap
 import qualified Data.Map                    as Map
 import           Data.Maybe                  (isNothing)
 import           Data.Monoid.Extra
@@ -30,6 +31,7 @@ import           Stack.Fetch
 import           Stack.PackageIndex
 import           Stack.Setup
 import           Stack.Types.PackageIdentifier
+import           Stack.Types.PackageIndex
 import           Stack.Types.PackageName
 import           Stack.Types.Version
 import           Stack.Types.Config
@@ -210,27 +212,24 @@ sourceUpgrade gConfigMonoid mresolver builtHash (SourceOpts gitRepo) =
                 return $ Just $ tmp </> $(mkRelDir "stack")
       Nothing -> do
         updateAllIndices
-        (caches, _gitShaCaches) <- getPackageCaches
-        let latest = Map.fromListWith max
-                   $ map toTuple
-                   $ Map.keys
+        PackageCache caches <- getPackageCaches
+        let versions
+                = filter (/= $(mkVersion "9.9.9")) -- Mistaken upload to Hackage, just ignore it
+                $ maybe [] HashMap.keys
+                $ HashMap.lookup $(mkPackageName "stack") caches
 
-                   -- Mistaken upload to Hackage, just ignore it
-                   $ Map.delete (PackageIdentifier
-                        $(mkPackageName "stack")
-                        $(mkVersion "9.9.9"))
+        when (null versions) (throwString "No stack found in package indices")
 
-                     caches
-        case Map.lookup $(mkPackageName "stack") latest of
-            Nothing -> throwString "No stack found in package indices"
-            Just version | version <= fromCabalVersion Paths.version -> do
+        let version = maximum versions
+        if version <= fromCabalVersion Paths.version
+            then do
                 $logInfo "Already at latest version, no upgrade required"
                 return Nothing
-            Just version -> do
+            else do
                 let ident = PackageIdentifier $(mkPackageName "stack") version
                 paths <- unpackPackageIdents tmp Nothing
-                    -- accept latest cabal revision by not supplying a Git SHA
-                    [PackageIdentifierRevision ident Nothing]
+                    -- accept latest cabal revision
+                    [PackageIdentifierRevision ident CFILatest]
                 case Map.lookup ident paths of
                     Nothing -> error "Stack.Upgrade.upgrade: invariant violated, unpacked directory not found"
                     Just path -> return $ Just path

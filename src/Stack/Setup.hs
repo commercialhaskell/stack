@@ -687,7 +687,7 @@ doCabalInstall menv wc installed version = do
             ]
         let name = $(mkPackageName "Cabal")
             ident = PackageIdentifier name version
-        m <- unpackPackageIdents tmpdir Nothing [PackageIdentifierRevision ident Nothing]
+        m <- unpackPackageIdents tmpdir Nothing [PackageIdentifierRevision ident CFILatest]
         compilerPath <- join $ findExecutable menv (compilerExeName wc)
         versionDir <- parseRelDir $ versionString version
         let installRoot = toFilePath $ parent (parent compilerPath)

@@ -100,7 +100,7 @@ instance FromJSON PackageIdentifier where
 -- cabal file revision.
 data PackageIdentifierRevision = PackageIdentifierRevision
   { pirIdent :: !PackageIdentifier
-  , pirRevision :: !(Maybe CabalFileInfo)
+  , pirRevision :: !CabalFileInfo
   } deriving (Eq,Generic,Data,Typeable)
 
 instance NFData PackageIdentifierRevision where
@@ -181,12 +181,19 @@ showCabalHash :: CabalHash -> Text
 showCabalHash = T.append (T.pack "sha256:") . cabalHashToText
 
 -- | Information on the contents of a cabal file
-data CabalFileInfo = CabalFileInfo
-    { cfiSize :: !(Maybe Int)
-    -- ^ File size in bytes
-    , cfiHash :: !CabalHash
-    -- ^ Hash of the cabal file contents
-    }
+data CabalFileInfo
+  = CFILatest
+  -- ^ Take the latest revision of the cabal file available. This
+  -- isn't reproducible at all, but the running assumption (not
+  -- necessarily true) is that cabal file revisions do not change
+  -- semantics of the build.
+  | CFIHash
+      !(Maybe Int) -- file size in bytes
+      !CabalHash
+  -- ^ Identify by contents of the cabal file itself
+  | CFIRevision !Word
+  -- ^ Identify by revision number, with 0 being the original and
+  -- counting upward.
     deriving (Generic, Show, Eq, Data, Typeable)
 instance Store CabalFileInfo
 instance NFData CabalFileInfo
@@ -230,9 +237,9 @@ parsePackageIdentifierRevision x = go x
 
     parser = PackageIdentifierRevision
         <$> packageIdentifierParser
-        <*> optional cabalFileInfo
+        <*> (cfiHash <|> cfiRevision <|> pure CFILatest)
 
-    cabalFileInfo = do
+    cfiHash = do
       _ <- string $ T.pack "@sha256:"
       hash' <- A.takeWhile (/= ',')
       hash'' <- maybe (fail "Invalid SHA256") return
@@ -240,27 +247,31 @@ parsePackageIdentifierRevision x = go x
       msize <- optional $ do
         _ <- A.char ','
         A.decimal
-      return CabalFileInfo
-        { cfiSize = msize
-        , cfiHash = hash''
-        }
+      A.endOfInput
+      return $ CFIHash msize hash''
 
+    cfiRevision = do
+      _ <- string $ T.pack "@rev:"
+      y <- A.decimal
+      A.endOfInput
+      return $ CFIRevision y
 -- | Get a string representation of the package identifier; name-ver.
 packageIdentifierString :: PackageIdentifier -> String
 packageIdentifierString (PackageIdentifier n v) = show n ++ "-" ++ show v
 
 -- | Get a string representation of the package identifier with revision; name-ver[@hashtype:hash[,size]].
 packageIdentifierRevisionString :: PackageIdentifierRevision -> String
-packageIdentifierRevisionString (PackageIdentifierRevision ident mcfi) =
+packageIdentifierRevisionString (PackageIdentifierRevision ident cfi) =
   concat $ packageIdentifierString ident : rest
   where
     rest =
-      case mcfi of
-        Nothing -> []
-        Just cfi ->
+      case cfi of
+        CFILatest -> []
+        CFIHash msize hash' ->
             "@sha256:"
-          : T.unpack (cabalHashToText (cfiHash cfi))
-          : showSize (cfiSize cfi)
+          : T.unpack (cabalHashToText hash')
+          : showSize msize
+        CFIRevision rev -> ["@rev:", show rev]
 
     showSize Nothing = []
     showSize (Just int) = [',' : show int]

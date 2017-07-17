@@ -146,9 +146,17 @@ extra-deps:
 - acme-missiles-0.3@sha256:2ba66a092a32593880a87fb00f3213762d7bca65a687d45965778deb8694c5d1
 ```
 
-__NOTE__ Future versions of Stack may support specifying revisions by
-the revision number, providing more convenient than a hash with
-slightly less guarantees of reproducibility.
+Or a specific revision number, with `0` being the original file:
+
+```yaml
+extra-deps:
+- acme-missiles-0.3@rev:0
+```
+
+Note that specifying via SHA256 is slightly more resilient in that it
+does not rely on correct ordering in the package index, while revision
+number is likely simpler to use. In practice, both should guarantee
+equally reproducible build plans.
 
 #### Local file path
 

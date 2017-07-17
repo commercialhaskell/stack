@@ -37,10 +37,9 @@ import           Data.Conduit.Zlib (ungzip)
 import           Data.Foldable (forM_)
 import           Data.IORef
 import           Data.Int (Int64)
+import qualified Data.List.NonEmpty as NE
 import           Data.HashMap.Strict (HashMap)
 import qualified Data.HashMap.Strict as HashMap
-import           Data.Map (Map)
-import qualified Data.Map.Strict as Map
 import           Data.Monoid
 import           Data.Set (Set)
 import qualified Data.Set as Set
@@ -76,10 +75,7 @@ import           System.FilePath ((<.>))
 import           System.IO (IOMode (ReadMode, WriteMode), withBinaryFile)
 
 -- | Populate the package index caches and return them.
-populateCache
-    :: (StackMiniM env m, HasConfig env)
-    => PackageIndex
-    -> m PackageCacheMap
+populateCache :: (StackMiniM env m, HasConfig env) => PackageIndex -> m (PackageCache ())
 populateCache index = do
     requireIndex index
     -- This uses full on lazy I/O instead of ResourceT to provide some
@@ -88,75 +84,91 @@ populateCache index = do
     let loadPIS = do
             $logSticky "Populating index cache ..."
             lbs <- liftIO $ L.readFile $ Path.toFilePath path
-            loop 0 (Map.empty, HashMap.empty) (Tar.read lbs)
-    (pis, gitPIs) <- loadPIS `catch` \e -> do
+            loop 0 HashMap.empty (Tar.read lbs)
+    pis0 <- loadPIS `catch` \e -> do
         $logWarn $ "Exception encountered when parsing index tarball: "
                 <> T.pack (show (e :: Tar.FormatError))
         $logWarn "Automatically updating index and trying again"
         updateIndex index
         loadPIS
 
-    when (indexRequireHashes index) $ forM_ (Map.toList pis) $ \(ident, pc) ->
-        case pcDownload pc of
+    when (indexRequireHashes index) $ forM_ (HashMap.toList pis0) $ \(ident, (_, mpd, _)) ->
+        case mpd :: Maybe PackageDownload of
             Just _ -> return ()
             Nothing -> throwM $ MissingRequiredHashes (indexName index) ident
 
+    cache <- fmap mconcat $ mapM convertPI $ HashMap.toList pis0
+
     $logStickyDone "Populated index cache."
 
-    return $ PackageCacheMap pis gitPIs
+    return cache
   where
-    loop !blockNo (!m, !hm) (Tar.Next e es) =
-        loop (blockNo + entrySizeInBlocks e) (goE blockNo m hm e) es
-    loop _ (m, hm) Tar.Done = return (m, hm)
+    convertPI :: MonadThrow m
+              => (PackageIdentifier, ((), Maybe PackageDownload, Endo [(CabalHash, OffsetSize)]))
+              -> m (PackageCache ())
+    convertPI (ident@(PackageIdentifier name version), ((), mpd, Endo front)) =
+      case NE.nonEmpty $ front [] of
+        Nothing -> throwString $ "Missing cabal file info for: " ++ show ident
+        Just files -> return
+                    $ PackageCache
+                    $ HashMap.singleton name
+                    $ HashMap.singleton version
+                      ((), mpd, files)
+
+    loop :: MonadThrow m
+         => Int64
+         -> HashMap PackageIdentifier ((), Maybe PackageDownload, Endo [(CabalHash, OffsetSize)])
+         -> Tar.Entries Tar.FormatError
+         -> m (HashMap PackageIdentifier ((), Maybe PackageDownload, Endo [(CabalHash, OffsetSize)]))
+    loop !blockNo !m (Tar.Next e es) =
+        loop (blockNo + entrySizeInBlocks e) (goE blockNo m e) es
+    loop _ m Tar.Done = return m
     loop _ _ (Tar.Fail e) = throwM e
 
-    goE blockNo m hm e =
+    goE :: Int64
+        -> HashMap PackageIdentifier ((), Maybe PackageDownload, Endo [(CabalHash, OffsetSize)])
+        -> Tar.Entry
+        -> HashMap PackageIdentifier ((), Maybe PackageDownload, Endo [(CabalHash, OffsetSize)])
+    goE blockNo m e =
         case Tar.entryContent e of
             Tar.NormalFile lbs size ->
                 case parseNameVersionSuffix $ Tar.entryPath e of
                     Just (ident, ".cabal") -> addCabal lbs ident size
-                    Just (ident, ".json") -> (addJSON id ident lbs, hm)
+                    Just (ident, ".json") -> addJSON id ident lbs
                     _ ->
                         case parsePackageJSON $ Tar.entryPath e of
-                            Just ident -> (addJSON unHSPackageDownload ident lbs, hm)
-                            Nothing -> (m, hm)
-            _ -> (m, hm)
+                            Just ident -> addJSON unHSPackageDownload ident lbs
+                            Nothing -> m
+            _ -> m
       where
         addCabal lbs ident size =
-            ( Map.insertWith
-                (\_ pcOld -> pcNew { pcDownload = pcDownload pcOld })
-                ident
-                pcNew
-                m
-            , HashMap.insert cabalHash offsetSize hm
-            )
+            HashMap.insert ident
+            (case HashMap.lookup ident m of
+              Nothing -> ((), Nothing, newEndo)
+              Just ((), mpd, oldEndo) -> ((), mpd, oldEndo <> newEndo))
+            m
           where
-            pcNew = PackageCache
-                { pcOffsetSize = offsetSize
-                , pcDownload = Nothing
-                }
-            offsetSize = OffsetSize
-                    ((blockNo + 1) * 512)
-                    size
-
             cabalHash = computeCabalHash lbs
+            offsetSize = OffsetSize ((blockNo + 1) * 512) size
+            newPair = (cabalHash, offsetSize)
+            newEndo = Endo (newPair:)
 
         addJSON :: FromJSON a
                 => (a -> PackageDownload)
                 -> PackageIdentifier
                 -> L.ByteString
-                -> Map PackageIdentifier PackageCache
+                -> HashMap PackageIdentifier ((), Maybe PackageDownload, Endo [(CabalHash, OffsetSize)])
         addJSON unwrap ident lbs =
             case decode lbs of
                 Nothing -> m
-                Just (unwrap -> pd) -> Map.insertWith
-                    (\_ pc -> pc { pcDownload = Just pd })
-                    ident
-                    PackageCache
-                        { pcOffsetSize = OffsetSize 0 0
-                        , pcDownload = Just pd
-                        }
-                    m
+                Just (unwrap -> pd) ->
+                  HashMap.insert ident
+                  (case HashMap.lookup ident m of
+                    Nothing -> ((), Just pd, mempty)
+                    -- Not sure about this assertion, see: https://github.com/haskell/hackage-security/issues/189
+                    Just ((), Just oldPD, files) -> assert (oldPD == pd) ((), Just pd, files)
+                    Just ((), Nothing, files) -> ((), Just pd, files))
+                  m
 
     breakSlash x
         | T.null z = Nothing
@@ -340,44 +352,39 @@ getPackageVersions
     :: (StackMiniM env m, HasConfig env)
     => PackageName
     -> m (Set Version)
-getPackageVersions pkgName =
-    fmap (lookupPackageVersions pkgName . fst) getPackageCaches
+getPackageVersions pkgName = fmap (lookupPackageVersions pkgName) getPackageCaches
 
-lookupPackageVersions :: PackageName -> Map PackageIdentifier a -> Set Version
-lookupPackageVersions pkgName pkgCaches =
-    Set.fromList [v | PackageIdentifier n v <- Map.keys pkgCaches, n == pkgName]
+lookupPackageVersions :: PackageName -> PackageCache index -> Set Version
+lookupPackageVersions pkgName (PackageCache m) =
+    maybe Set.empty (Set.fromList . HashMap.keys) $ HashMap.lookup pkgName m
 
 -- | Load the package caches, or create the caches if necessary.
 --
 -- This has two levels of caching: in memory, and the on-disk cache. So,
 -- feel free to call this function multiple times.
-getPackageCaches
-    :: (StackMiniM env m, HasConfig env)
-    => m ( Map PackageIdentifier (PackageIndex, PackageCache)
-         , HashMap CabalHash (PackageIndex, OffsetSize)
-         )
+getPackageCaches :: (StackMiniM env m, HasConfig env) => m (PackageCache PackageIndex)
 getPackageCaches = do
     config <- view configL
-    mcached <- liftIO $ readIORef (configPackageCaches config)
+    mcached <- liftIO $ readIORef (configPackageCache config)
     case mcached of
         Just cached -> return cached
         Nothing -> do
             result <- liftM mconcat $ forM (configPackageIndices config) $ \index -> do
                 fp <- configPackageIndexCache (indexName index)
-                PackageCacheMap pis' gitPIs <-
-                    $(versionedDecodeOrLoad (storeVersionConfig "pkg-v4" "YZ4KNwqz-WdTZMaiU0UvfLWSSBw="
-                                             :: VersionConfig PackageCacheMap))
+                PackageCache pis <-
+                    $(versionedDecodeOrLoad (storeVersionConfig "pkg-v5" "p0nBN2U7Y3RmJII0WaFJtTC1cDc="
+                                             :: VersionConfig (PackageCache ())))
                     fp
                     (populateCache index)
-                return (fmap (index,) pis', fmap (index,) gitPIs)
-            liftIO $ writeIORef (configPackageCaches config) (Just result)
+                return $ PackageCache ((fmap.fmap) (\((), mpd, files) -> (index, mpd, files)) pis)
+            liftIO $ writeIORef (configPackageCache config) (Just result)
             return result
 
 -- | Clear the in-memory hackage index cache. This is needed when the
 -- hackage index is updated.
 clearPackageCaches :: (StackMiniM env m, HasConfig env) => m ()
 clearPackageCaches = do
-    cacheRef <- view packageCachesL
+    cacheRef <- view $ configL.to configPackageCache
     liftIO $ writeIORef cacheRef Nothing
 
 --------------- Lifted from cabal-install, Distribution.Client.Tar:

@@ -389,7 +389,7 @@ configFromConfigMonoid
             Just True -> return True
             _ -> getInContainer
 
-     configPackageCaches <- liftIO $ newIORef Nothing
+     configPackageCache <- liftIO $ newIORef Nothing
 
      let configMaybeProject = mproject
 

@@ -213,16 +213,16 @@ loadResolver (ResolverSnapshot name) = do
             version <- o .: "version"
             mcabalFileInfo <- o .:? "cabal-file-info"
             mcabalFileInfo' <- forM mcabalFileInfo $ \o' -> do
-                cfiSize <- Just <$> o' .: "size"
+                msize <- Just <$> o' .: "size"
                 cfiHashes <- o' .: "hashes"
-                cfiHash <-
+                hash' <-
                   case HashMap.lookup ("SHA256" :: Text) cfiHashes of
                     Nothing -> fail "Could not find SHA256"
                     Just shaText ->
                       case mkCabalHashFromSHA256 shaText of
                         Nothing -> fail "Invalid SHA256"
                         Just x -> return x
-                return CabalFileInfo {..}
+                return $ CFIHash msize hash'
 
             Object constraints <- o .: "constraints"
 
@@ -232,7 +232,7 @@ loadResolver (ResolverSnapshot name) = do
             hide <- constraints .:? "hide" .!= False
             let hide' = if hide then Map.singleton name' True else Map.empty
 
-            let location = PLIndex $ PackageIdentifierRevision (PackageIdentifier name' version) mcabalFileInfo'
+            let location = PLIndex $ PackageIdentifierRevision (PackageIdentifier name' version) (fromMaybe CFILatest mcabalFileInfo')
 
             return (Endo (location:), flags', hide')
 loadResolver (ResolverCompiler compiler) = return SnapshotDef
@@ -706,7 +706,7 @@ snapshotDefFixes sd = sd
 -- creating a 'PackageLocation'.
 globalToSnapshot :: PackageName -> LoadedPackageInfo loc -> LoadedPackageInfo (PackageLocationIndex FilePath)
 globalToSnapshot name lpi = lpi
-    { lpiLocation = PLIndex (PackageIdentifierRevision (PackageIdentifier name (lpiVersion lpi)) Nothing)
+    { lpiLocation = PLIndex (PackageIdentifierRevision (PackageIdentifier name (lpiVersion lpi)) CFILatest)
     }
 
 -- | Split the globals into those which have their dependencies met,
