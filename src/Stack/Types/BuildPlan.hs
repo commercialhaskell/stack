@@ -268,7 +268,7 @@ instance subdirs ~ Subdirs => FromJSON (WithJSONWarnings (PackageLocation subdir
                 case mkStaticSHA256FromText t of
                   Nothing -> fail $ "Invalid SHA256: " ++ T.unpack t
                   Just x -> return $ Just x
-          return $ PLArchive $ Archive
+          return $ PLArchive Archive
             { archiveUrl = url
             , archiveSubdirs = subdirs :: Subdirs
             , archiveHash = msha'
