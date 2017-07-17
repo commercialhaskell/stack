@@ -314,7 +314,7 @@ data ToFetch = ToFetch
     , tfDestDir :: !(Maybe (Path Abs Dir))
     , tfUrl     :: !T.Text
     , tfSize    :: !(Maybe Word64)
-    , tfSHA256  :: !(Maybe ByteString)
+    , tfSHA256  :: !(Maybe StaticSHA256)
     , tfCabal   :: !ByteString
     -- ^ Contents of the .cabal file
     }
@@ -546,7 +546,7 @@ fetchPackages' mdistDir toFetchAll = do
         let toHashCheck bs = HashCheck SHA256 (CheckHexDigestByteString bs)
         let downloadReq = DownloadRequest
                 { drRequest = req
-                , drHashChecks = map toHashCheck $ maybeToList (tfSHA256 toFetch)
+                , drHashChecks = map (toHashCheck . staticSHA256ToBase16) $ maybeToList (tfSHA256 toFetch)
                 , drLengthCheck = fromIntegral <$> tfSize toFetch
                 , drRetryPolicy = drRetryPolicyDefault
                 }

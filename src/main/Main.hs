@@ -59,6 +59,7 @@ import           Stack.Clean (CleanOpts, clean)
 import           Stack.Config
 import           Stack.ConfigCmd as ConfigCmd
 import           Stack.Constants
+import           Stack.Constants.Config
 import           Stack.Coverage
 import qualified Stack.Docker as Docker
 import           Stack.Dot

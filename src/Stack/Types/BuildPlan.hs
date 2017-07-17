@@ -17,6 +17,7 @@ module Stack.Types.BuildPlan
     , PackageLocationIndex (..)
     , RepoType (..)
     , Repo (..)
+    , Archive (..)
     , ExeName (..)
     , LoadedSnapshot (..)
     , loadedSnapshotVC
@@ -142,8 +143,7 @@ data PackageLocation subdirs
   = PLFilePath !FilePath
     -- ^ Note that we use @FilePath@ and not @Path@s. The goal is: first parse
     -- the value raw, and then use @canonicalizePath@ and @parseAbsDir@.
-  | PLHttp !Text !subdirs
-  -- ^ URL
+  | PLArchive !(Archive subdirs)
   | PLRepo !(Repo subdirs)
   -- ^ Stored in a source control repository
     deriving (Generic, Show, Eq, Data, Typeable, Functor)
@@ -163,6 +163,18 @@ data PackageLocationIndex subdirs
     deriving (Generic, Show, Eq, Data, Typeable, Functor)
 instance (Store a) => Store (PackageLocationIndex a)
 instance (NFData a) => NFData (PackageLocationIndex a)
+
+-- | A package archive, could be from a URL or a local file
+-- path. Local file path archives are assumed to be unchanging
+-- over time, and so are allowed in custom snapshots.
+data Archive subdirs = Archive
+  { archiveUrl :: !Text
+  , archiveSubdirs :: !subdirs
+  , archiveHash :: !(Maybe StaticSHA256)
+  }
+    deriving (Generic, Show, Eq, Data, Typeable, Functor)
+instance Store a => Store (Archive a)
+instance NFData a => NFData (Archive a)
 
 -- | The type of a source control repository.
 data RepoType = RepoGit | RepoHg
@@ -187,10 +199,15 @@ instance subdirs ~ [FilePath] => ToJSON (PackageLocationIndex subdirs) where
 
 instance subdirs ~ [FilePath] => ToJSON (PackageLocation subdirs) where
     toJSON (PLFilePath fp) = toJSON fp
-    toJSON (PLHttp t ["."]) = toJSON t
-    toJSON (PLHttp t subdirs) = object
-        [ "location" .= t
-        , "subdirs"  .= subdirs
+    toJSON (PLArchive (Archive t ["."] Nothing)) = toJSON t
+    toJSON (PLArchive (Archive t subdirs msha)) = object $ concat
+        [ ["location" .= t]
+        , case subdirs of
+            ["."] -> []
+            _     -> ["subdirs" .= subdirs]
+        , case msha of
+            Nothing -> []
+            Just sha -> ["sha256" .= staticSHA256ToText sha]
         ]
     toJSON (PLRepo (Repo url commit typ subdirs)) = object $
         (if null subdirs then id else (("subdirs" .= subdirs):))
@@ -218,22 +235,28 @@ instance subdirs ~ [FilePath] => FromJSON (WithJSONWarnings (PackageLocation sub
         http t =
             case parseRequest $ T.unpack t of
                 Left  _ -> fail $ "Could not parse URL: " ++ T.unpack t
-                Right _ -> return $ PLHttp t ["."]
+                Right _ -> return $ PLArchive $ Archive t ["."] Nothing
 
         repo = withObjectWarnings "PLRepo" $ \o -> do
           (repoType, repoUrl) <-
             ((RepoGit, ) <$> o ..: "git") <|>
             ((RepoHg, ) <$> o ..: "hg")
           repoCommit <- o ..: "commit"
-          repoSubdirs <- o ..:? "subdirs" ..!= []
+          repoSubdirs <- o ..:? "subdirs" ..!= ["."]
           return $ PLRepo Repo {..}
 
         httpSubdirs = withObjectWarnings "PLHttp" $ \o -> do
-          url <- o ..: "location"
-          subdirs <- o ..: "subdirs"
-          case parseRequest $ T.unpack url of
-            Left _ -> fail $ "Could not parse URL: " ++ T.unpack url
-            Right _ -> return $ PLHttp url subdirs
+          url <- o ..: "archive"
+          subdirs <- o ..:? "subdirs" ..!= ["."]
+          msha <- o ..:? "sha256"
+          msha' <-
+            case msha of
+              Nothing -> return Nothing
+              Just t ->
+                case mkStaticSHA256FromText t of
+                  Nothing -> fail $ "Invalid SHA256: " ++ T.unpack t
+                  Just x -> return $ Just x
+          return $ PLArchive $ Archive url subdirs msha'
 
 -- | Name of an executable.
 newtype ExeName = ExeName { unExeName :: Text }
@@ -255,7 +278,7 @@ instance Store LoadedSnapshot
 instance NFData LoadedSnapshot
 
 loadedSnapshotVC :: VersionConfig LoadedSnapshot
-loadedSnapshotVC = storeVersionConfig "ls-v1" "pH4Le2OpvbgouOui4sjXODTEkZA="
+loadedSnapshotVC = storeVersionConfig "ls-v3" "8mR6zrGi2ZQosRgcKQRkT2dS-ac="
 
 -- | Information on a single package for the 'LoadedSnapshot' which
 -- can be installed.

@@ -75,6 +75,12 @@ Other enhancements:
   format in the future.
 * It's now possible to skip tests and benchmarks using `--skip`
   flag
+* `GitSHA1` is now `StaticSHA256` and is implemented using the `StaticSize 64 ByteString` for improved performance.
+  See [#3006](https://github.com/commercialhaskell/stack/issues/3006)
+* Dependencies via HTTP(S) archives have been generalized to allow
+  local file path archives, as well as to support setting a
+  cryptographic hash (SHA256) of the contents for better
+  reproducibility.
 
 Bug fixes:
 
