@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE TupleSections #-}
@@ -41,25 +42,12 @@ module Stack.Package
   ,rawParseGPD)
   where
 
-import           Prelude ()
-import           Prelude.Compat
-
-import           Control.Arrow ((&&&))
-import           Control.Monad (liftM, liftM2, (<=<), when, forM, forM_)
-import           Control.Monad.Logger
-import           Control.Monad.Reader (MonadReader,runReaderT,ask,asks)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Char8 as C8
-import           Data.List.Compat
+import           Data.List (isSuffixOf, partition, isPrefixOf)
 import           Data.List.Extra (nubOrd)
-import           Data.Map.Strict (Map)
 import qualified Data.Map.Strict as M
-import           Data.Maybe
-import           Data.Maybe.Extra
-import           Data.Monoid
-import           Data.Set (Set)
 import qualified Data.Set as S
-import           Data.Text (Text)
 import qualified Data.Text as T
 import           Data.Text.Encoding (decodeUtf8, decodeUtf8With)
 import           Data.Text.Encoding.Error (lenientDecode)

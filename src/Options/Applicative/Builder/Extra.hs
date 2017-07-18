@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
@@ -109,6 +110,11 @@ enableDisableFlagsNoDefault enabledValue disabledValue name helpSuffix mods =
            (long ("[no-]" ++ name) <>
             help ("Enable/disable " ++ helpSuffix) <>
             mods))
+  where
+    last xs =
+      case reverse xs of
+        [] -> impureThrow $ stringException "enableDisableFlagsNoDefault.last"
+        x:_ -> x
 
 -- | Show an extra help option (e.g. @--docker-help@ shows help for all @--docker*@ args).
 --

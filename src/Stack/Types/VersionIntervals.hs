@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 module Stack.Types.VersionIntervals
@@ -11,12 +12,7 @@ module Stack.Types.VersionIntervals
 
 import Stack.Types.Version
 import qualified Distribution.Version as C
-import Control.DeepSeq (NFData)
-import Data.Maybe (fromMaybe)
-import Data.Store (Store)
-import GHC.Generics (Generic)
-import Data.Data (Data)
-import Data.Typeable (Typeable)
+import Stack.Prelude
 
 newtype VersionIntervals = VersionIntervals [VersionInterval]
     deriving (Generic, Show, Eq, Data, Typeable)

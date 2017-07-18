@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE DataKinds #-}
@@ -46,18 +47,12 @@ module Stack.Config
   ,LocalConfigStatus(..)
   ) where
 
-import           Control.Applicative
-import           Control.Arrow ((***), second)
-import           Control.Monad (liftM, unless, when, filterM, forM)
 import           Control.Monad.Extra (firstJustM)
 import           Stack.Prelude
 import           Data.Aeson.Extended
 import qualified Data.ByteString as S
-import           Data.Foldable (forM_)
 import qualified Data.IntMap as IntMap
 import qualified Data.Map as Map
-import           Data.Maybe
-import           Data.Monoid.Extra
 import qualified Data.Set as Set
 import qualified Data.Text as T
 import           Data.Text.Encoding (encodeUtf8)

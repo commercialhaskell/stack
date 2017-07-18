@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
@@ -37,13 +38,12 @@ import qualified Data.HashMap.Strict as HashMap
 import Data.Monoid
 import Data.Set (Set)
 import qualified Data.Set as Set
-import Data.Text (unpack, Text)
+import Data.Text (unpack)
 import qualified Data.Text as T
 import Data.Traversable
 import qualified Data.Traversable as Traversable
-import GHC.Generics (Generic)
 import Generics.Deriving.Monoid (mappenddefault, memptydefault)
-import Prelude -- Fix redundant import warnings
+import Stack.Prelude
 
 -- | Extends @.:@ warning to include field name.
 (.:) :: FromJSON a => Object -> Text -> Parser a

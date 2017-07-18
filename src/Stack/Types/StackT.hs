@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE UndecidableInstances #-}
@@ -23,15 +24,10 @@ module Stack.Types.StackT
   ,logStickyDone)
   where
 
-import           Control.Monad
 import           Stack.Prelude hiding (lift)
-import           Control.Monad.Logger
 import qualified Data.ByteString.Char8 as S8
 import           Data.Char
 import           Data.List (stripPrefix)
-import           Data.Maybe
-import           Data.Monoid
-import           Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import qualified Data.Text.Encoding.Error as T
@@ -41,7 +37,6 @@ import           GHC.Foreign (withCString, peekCString)
 import           Language.Haskell.TH
 import           Language.Haskell.TH.Syntax (lift)
 import           Lens.Micro (to)
-import           Prelude -- Fix AMP warning
 import           Stack.Types.Config (GlobalOpts (..), ColorWhen(..))
 import           Stack.Types.Internal
 import           System.Console.ANSI
@@ -256,7 +251,7 @@ loggerFunc lo outputChannel loc _src level msg =
            file = loc_filename loc
            line = show . fst . loc_start
            char = show . snd . loc_start
-       dirRoot = $(lift . T.unpack . fromJust . T.stripSuffix (T.pack $ "Stack" </> "Types" </> "StackT.hs") . T.pack . loc_filename =<< location)
+       dirRoot = $(lift . T.unpack . fromMaybe undefined . T.stripSuffix (T.pack $ "Stack" </> "Types" </> "StackT.hs") . T.pack . loc_filename =<< location)
 
 -- | The length of a timestamp in the format "YYYY-MM-DD hh:mm:ss.μμμμμμ".
 -- This definition is top-level in order to avoid multiple reevaluation at runtime.

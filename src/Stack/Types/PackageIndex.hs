@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
@@ -37,6 +38,7 @@ import           Data.Text.Encoding (encodeUtf8, decodeUtf8)
 import           Data.Word (Word64)
 import           GHC.Generics (Generic)
 import           Path
+import           Stack.Prelude
 import           Stack.Types.PackageName
 import           Stack.Types.PackageIdentifier
 import           Stack.Types.Version

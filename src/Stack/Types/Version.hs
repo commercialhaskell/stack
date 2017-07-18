@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -31,30 +32,19 @@ module Stack.Types.Version
   ,UpgradeTo(..))
   where
 
-import           Control.Applicative
-import           Control.DeepSeq
-import           Stack.Prelude
+import           Stack.Prelude hiding (Vector)
 import           Data.Aeson.Extended
 import           Data.Attoparsec.Text
-import           Data.Data
-import           Data.Hashable
+import           Data.Hashable (Hashable (..))
 import           Data.List
-import           Data.Maybe (listToMaybe)
-import           Data.Monoid
-import           Data.Set (Set)
 import qualified Data.Set as Set
-import           Data.Store (Store)
-import           Data.Text (Text)
 import qualified Data.Text as T
 import           Data.Vector.Unboxed (Vector)
 import qualified Data.Vector.Unboxed as V
-import           Data.Word
 import           Distribution.Text (disp)
 import qualified Distribution.Version as Cabal
-import           GHC.Generics
 import           Language.Haskell.TH
 import           Language.Haskell.TH.Syntax
-import           Prelude -- Fix warning: Word in Prelude from base-4.8.
 import           Text.PrettyPrint (render)
 
 -- | A parse fail.

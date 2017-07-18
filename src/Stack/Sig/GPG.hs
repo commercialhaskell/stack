@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE TupleSections #-}
@@ -15,22 +16,15 @@ Portability : POSIX
 
 module Stack.Sig.GPG (gpgSign, gpgVerify) where
 
-import Prelude ()
-import Prelude.Compat
-
-import           Control.Monad (unless, when)
 import           Stack.Prelude
-import           Control.Monad.Logger (MonadLogger, logWarn)
 import qualified Data.ByteString.Char8 as C
 import           Data.List (find, isPrefixOf)
-import           Data.Monoid ((<>))
 import qualified Data.Text as T
-import           Path
 import           Stack.Types.Sig
 import           System.Directory (findExecutable)
 import           System.Environment (lookupEnv)
 import           System.Exit (ExitCode(..))
-import           System.IO (Handle, hGetContents, hPutStrLn)
+import           System.IO (hGetContents, hPutStrLn)
 import           System.Info (os)
 import           System.Process (ProcessHandle, runInteractiveProcess,
                                  waitForProcess)

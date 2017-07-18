@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE ConstraintKinds       #-}
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
@@ -11,28 +12,19 @@ module Stack.Build.Installed
     , getInstalled
     ) where
 
-import           Control.Applicative
-import           Control.Arrow
-import           Control.Monad
-import           Control.Monad.Logger
 import           Data.Conduit
 import qualified Data.Conduit.List as CL
 import qualified Data.Foldable as F
-import           Data.Function
 import qualified Data.HashSet as HashSet
 import           Data.List
-import           Data.Map.Strict (Map)
 import qualified Data.Map.Strict as M
 import qualified Data.Map.Strict as Map
-import           Data.Maybe
-import           Data.Maybe.Extra (mapMaybeM)
-import           Data.Monoid
 import qualified Data.Text as T
 import           Path
-import           Prelude hiding (FilePath, writeFile)
 import           Stack.Build.Cache
 import           Stack.Constants
 import           Stack.PackageDump
+import           Stack.Prelude
 import           Stack.Types.Build
 import           Stack.Types.Compiler
 import           Stack.Types.Config

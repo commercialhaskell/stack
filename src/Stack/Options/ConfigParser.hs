@@ -1,7 +1,7 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 module Stack.Options.ConfigParser where
 
 import           Data.Char
-import           Data.Monoid.Extra
 import qualified Data.Set                          as Set
 import           Options.Applicative
 import           Options.Applicative.Builder.Extra

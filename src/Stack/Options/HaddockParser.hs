@@ -1,10 +1,10 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 module Stack.Options.HaddockParser where
 
-import           Data.Maybe
-import           Data.Monoid.Extra
 import           Options.Applicative
 import           Options.Applicative.Args
 import           Stack.Options.Utils
+import           Stack.Prelude
 import           Stack.Types.Config
 
 -- | Parser for haddock arguments.

@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# OPTIONS_GHC -fno-warn-orphans -Wwarn #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
@@ -24,7 +25,7 @@ import           Data.Word
 import           GHC.TypeLits (KnownNat)
 import           Language.Haskell.TH
 import           Language.Haskell.TH.ReifyMany
-import           Prelude
+import           Stack.Prelude
 import           Stack.Types.Build
 import           Stack.Types.PackageDump
 import           Test.Hspec

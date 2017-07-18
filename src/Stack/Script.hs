@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE CPP               #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell   #-}
@@ -5,16 +6,11 @@ module Stack.Script
     ( scriptCmd
     ) where
 
-import           Control.Monad              (unless, forM, void)
 import           Stack.Prelude
-import           Data.ByteString            (ByteString)
 import qualified Data.ByteString.Char8      as S8
 import qualified Data.Conduit.List          as CL
-import           Data.Foldable              (fold)
 import           Data.List.Split            (splitWhen)
 import qualified Data.Map.Strict            as Map
-import           Data.Maybe                 (fromMaybe, mapMaybe)
-import           Data.Monoid
 import           Data.Set                   (Set)
 import qualified Data.Set                   as Set
 import qualified Data.Text                  as T
@@ -230,11 +226,11 @@ toModuleInfo ls =
 
 parseImports :: ByteString -> (Set PackageName, Set ModuleName)
 parseImports =
-    fold . mapMaybe (parseLine . stripCR) . S8.lines
+    fold . mapMaybe (parseLine . stripCR') . S8.lines
   where
     -- Remove any carriage return character present at the end, to
     -- support Windows-style line endings (CRLF)
-    stripCR bs
+    stripCR' bs
       | S8.null bs = bs
       | S8.last bs == '\r' = S8.init bs
       | otherwise = bs

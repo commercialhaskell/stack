@@ -1,18 +1,15 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE RecordWildCards  #-}
 {-# LANGUAGE TemplateHaskell, OverloadedStrings #-}
 module Stack.NixSpec where
 
-import Control.Exception
-import Control.Monad.Logger
-import Data.Maybe
-import Data.Monoid
 import Options.Applicative
 import Path
-import Prelude -- to remove the warning about Data.Monoid being redundant on GHC 7.10
 import Stack.Config
 import Stack.Options.NixParser
 import Stack.Config.Nix
+import Stack.Prelude
 import Stack.Types.Compiler
 import Stack.Types.Config
 import Stack.Types.Nix
@@ -20,8 +17,9 @@ import Stack.Types.StackT
 import Stack.Types.Version
 import System.Directory
 import System.Environment
-import System.IO.Temp (withSystemTempDirectory)
 import Test.Hspec
+import Prelude (writeFile)
+import Data.Maybe (fromJust)
 
 sampleConfigNixEnabled :: String
 sampleConfigNixEnabled =

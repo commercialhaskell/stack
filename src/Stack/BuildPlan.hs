@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE ConstraintKinds    #-}
 {-# LANGUAGE DataKinds          #-}
 {-# LANGUAGE DeriveDataTypeable #-}
@@ -28,22 +29,15 @@ module Stack.BuildPlan
     , showItems
     ) where
 
-import           Control.Applicative
 import           Stack.Prelude
 import qualified Data.Foldable as F
 import qualified Data.HashSet as HashSet
 import           Data.List (intercalate)
 import           Data.List.NonEmpty (NonEmpty(..))
 import qualified Data.List.NonEmpty as NonEmpty
-import           Data.Map (Map)
 import qualified Data.Map as Map
-import           Data.Maybe (fromMaybe, mapMaybe)
-import           Data.Monoid
-import           Data.Set (Set)
 import qualified Data.Set as Set
-import           Data.Text (Text)
 import qualified Data.Text as T
-import           Data.Typeable (Typeable)
 import qualified Distribution.Package as C
 import           Distribution.PackageDescription (GenericPackageDescription,
                                                   flagDefault, flagManual,
@@ -53,8 +47,6 @@ import qualified Distribution.PackageDescription as C
 import           Distribution.System (Platform)
 import           Distribution.Text (display)
 import qualified Distribution.Version as C
-import           Path
-import           Prelude -- Fix AMP warning
 import           Stack.Constants
 import           Stack.Package
 import           Stack.Snapshot

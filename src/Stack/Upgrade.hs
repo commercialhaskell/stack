@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE CPP                   #-}
 {-# LANGUAGE ConstraintKinds       #-}
 {-# LANGUAGE FlexibleContexts      #-}
@@ -11,13 +12,10 @@ module Stack.Upgrade
     , upgradeOpts
     ) where
 
-import           Control.Monad               (unless, when)
-import           Stack.Prelude
-import           Data.Foldable               (forM_)
+import           Stack.Prelude               hiding (force)
 import qualified Data.HashMap.Strict         as HashMap
+import qualified Data.List
 import qualified Data.Map                    as Map
-import           Data.Maybe                  (isNothing)
-import           Data.Monoid.Extra
 import qualified Data.Text as T
 import           Lens.Micro                  (set)
 import           Options.Applicative
@@ -223,7 +221,7 @@ sourceUpgrade gConfigMonoid mresolver builtHash (SourceOpts gitRepo) =
 
         when (null versions) (throwString "No stack found in package indices")
 
-        let version = maximum versions
+        let version = Data.List.maximum versions
         if version <= fromCabalVersion Paths.version
             then do
                 $logInfo "Already at latest version, no upgrade required"

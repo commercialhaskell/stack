@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 module Stack.Types.CompilerBuild
   (CompilerBuild(..)
   ,compilerBuildName

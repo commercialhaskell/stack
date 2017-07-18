@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE CPP                   #-}
 {-# LANGUAGE DeriveDataTypeable    #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
@@ -43,8 +44,6 @@ import              Data.ByteString.Char8 (readInteger)
 import              Data.Conduit
 import              Data.Conduit.Binary (sourceHandle, sinkHandle)
 import              Data.Foldable (traverse_,for_)
-import              Data.Monoid
-import              Data.String
 import              Data.Text.Encoding (decodeUtf8With)
 import              Data.Text.Encoding.Error (lenientDecode)
 import              Data.Typeable (Typeable)
@@ -53,7 +52,6 @@ import              Network.HTTP.Client (getUri, path)
 import              Network.HTTP.Simple (Request, HttpException, httpSink, getResponseHeaders)
 import              Network.HTTP.Types.Header (hContentLength, hContentMD5)
 import              Path
-import              Prelude -- Fix AMP warning
 import              System.Directory
 import qualified    System.FilePath as FP ((<.>))
 import              System.IO (hFileSize)

@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE DeriveDataTypeable #-}
@@ -37,11 +38,7 @@ module System.Process.Read
   )
   where
 
-import           Control.Applicative
-import           Control.Arrow ((***), first)
-import           Control.Monad (join, liftM, unless)
 import           Stack.Prelude
-import           Control.Monad.Logger
 import qualified Data.ByteString as S
 import           Data.ByteString.Builder
 import qualified Data.ByteString.Lazy as L
@@ -49,29 +46,22 @@ import           Data.Conduit
 import qualified Data.Conduit.Binary as CB
 import qualified Data.Conduit.List as CL
 import           Data.Conduit.Process hiding (callProcess)
-import           Data.Map (Map)
 import qualified Data.Map as Map
-import           Data.Maybe (isJust, maybeToList, fromMaybe)
-import           Data.Monoid
-import           Data.Text (Text)
 import qualified Data.Text as T
 import           Data.Text.Encoding.Error (lenientDecode)
 import qualified Data.Text.Lazy as LT
 import qualified Data.Text.Lazy.Encoding as LT
-import           Data.Typeable (Typeable)
 import           Distribution.System (OS (Windows), Platform (Platform))
 import           Language.Haskell.TH as TH (location)
 import           Path
 import           Path.Extra
 import           Path.IO hiding (findExecutable)
-import           Prelude -- Fix AMP warning
 import qualified System.Directory as D
 import           System.Environment (getEnvironment)
 import           System.Exit
 import qualified System.FilePath as FP
-import           System.IO (Handle, hClose)
+import           System.IO (hClose)
 import           System.Process.Log
-import           Prelude () -- Hide post-AMP warnings
 
 -- | Override the environment received by a child process.
 data EnvOverride = EnvOverride

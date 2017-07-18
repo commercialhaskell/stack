@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE ViewPatterns #-}
 
 -- | Extra Path utilities.
@@ -61,7 +62,7 @@ concatAndColapseAbsDir base rel = parseCollapsedAbsDir (toFilePath base FP.</> r
 --
 -- (adapted from @Text.Pandoc.Shared@)
 collapseFilePath :: FilePath -> FilePath
-collapseFilePath = FP.joinPath . reverse . foldl go [] . FP.splitDirectories
+collapseFilePath = FP.joinPath . reverse . foldl' go [] . FP.splitDirectories
   where
     go rs "." = rs
     go r@(p:rs) ".." = case p of

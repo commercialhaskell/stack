@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -7,12 +8,8 @@
 
 module Stack.Types.TemplateName where
 
-import           Control.Applicative
 import           Data.Aeson.Extended (FromJSON, withText, parseJSON)
 import           Data.Aeson.Types (typeMismatch)
-import           Data.Foldable (asum)
-import           Data.Monoid
-import           Data.Text (Text)
 import qualified Data.Text as T
 import           Data.Yaml (Value(Object), (.:?))
 import           Language.Haskell.TH
@@ -20,7 +17,6 @@ import           Network.HTTP.Client (parseRequest)
 import qualified Options.Applicative as O
 import           Path
 import           Path.Internal
-import           Prelude
 import           Stack.Prelude
 
 -- | A template name.

@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE FlexibleContexts    #-}
 {-# LANGUAGE FlexibleInstances   #-}
 {-# LANGUAGE OverloadedStrings   #-}
@@ -13,8 +14,6 @@ module Stack.Upload
     , loadCreds
     ) where
 
-import           Control.Applicative
-import           Control.Monad                         (void, when, unless)
 import           Stack.Prelude
 import           Data.Aeson                            (FromJSON (..),
                                                         ToJSON (..),
@@ -23,9 +22,7 @@ import           Data.Aeson                            (FromJSON (..),
                                                         (.:), (.=))
 import qualified Data.ByteString.Char8                 as S
 import qualified Data.ByteString.Lazy                  as L
-import           Data.Conduit                          (ConduitM, runConduit, (.|))
 import qualified Data.Conduit.Binary                   as CB
-import           Data.Text                             (Text)
 import qualified Data.Text                             as T
 import           Data.Text.Encoding                    (encodeUtf8)
 import qualified Data.Text.IO                          as TIO
@@ -44,7 +41,6 @@ import           Network.HTTP.Client.TLS               (getGlobalManager,
                                                         applyDigestAuth,
                                                         displayDigestAuthException)
 import           Path                                  (toFilePath)
-import           Prelude -- Fix redundant import warnings
 import           Stack.Types.Config
 import           Stack.Types.PackageIdentifier         (PackageIdentifier, packageIdentifierString,
                                                         packageIdentifierName)
@@ -52,7 +48,7 @@ import           Stack.Types.PackageName               (packageNameString)
 import           System.Directory                      (createDirectoryIfMissing,
                                                         removeFile)
 import           System.FilePath                       ((</>), takeFileName)
-import           System.IO                             (hFlush, stdout)
+import           System.IO                             (hFlush, stdout, putStrLn, putStr, getLine, print) -- TODO remove putStrLn, use logInfo
 import           System.IO.Echo                        (withoutInputEcho)
 
 -- | Username and password to log into Hackage.

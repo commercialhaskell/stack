@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE QuasiQuotes, TemplateHaskell, TypeFamilies, OverloadedStrings,
              GADTs, FlexibleContexts, MultiParamTypeClasses, GeneralizedNewtypeDeriving,
              RankNTypes, NamedFieldPuns #-}

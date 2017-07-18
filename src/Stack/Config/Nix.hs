@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE RecordWildCards, DeriveDataTypeable, OverloadedStrings #-}
 
 -- | Nix configuration
@@ -7,16 +8,12 @@ module Stack.Config.Nix
        ,StackNixException(..)
        ) where
 
-import Control.Monad (when)
 import Stack.Prelude
-import Data.Maybe
-import Data.Monoid.Extra
 import qualified Data.Text as T
 import Distribution.System (OS (..))
 import Stack.Types.Version
 import Stack.Types.Nix
 import Stack.Types.Compiler
-import Prelude
 
 -- | Interprets NixOptsMonoid options.
 nixOptsFromMonoid

@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 module Data.IORef.RunOnce (runOnce) where
 
 import Stack.Prelude

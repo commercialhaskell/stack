@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE ConstraintKinds       #-}
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
@@ -16,27 +17,18 @@ module Stack.Coverage
     , generateHpcMarkupIndex
     ) where
 
-import           Control.Monad (liftM, when, unless, void, (<=<))
 import           Stack.Prelude
 import qualified Data.ByteString.Char8 as S8
-import           Data.Foldable (forM_, asum, toList)
-import           Data.Function
+import           Data.Foldable (toList)
 import           Data.List
 import qualified Data.Map.Strict as Map
-import           Data.Maybe
-import           Data.Maybe.Extra (mapMaybeM)
-import           Data.Monoid ((<>))
-import           Data.String
-import           Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import qualified Data.Text.IO as T
 import qualified Data.Text.Lazy as LT
-import           Data.Traversable (forM)
 import           Path
 import           Path.Extra (toFilePathNoTrailingSep)
 import           Path.IO
-import           Prelude hiding (FilePath, writeFile)
 import           Stack.Build.Target
 import           Stack.Config (getLocalPackages)
 import           Stack.Constants.Config

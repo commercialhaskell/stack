@@ -1,12 +1,13 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 module Stack.Options.NixParser where
 
-import           Data.Monoid.Extra
 import qualified Data.Text                         as T
 import           Options.Applicative
 import           Options.Applicative.Args
 import           Options.Applicative.Builder.Extra
 import           Stack.Nix
 import           Stack.Options.Utils
+import           Stack.Prelude
 import           Stack.Types.Nix
 
 nixOptsParser :: Bool -> Parser NixOptsMonoid

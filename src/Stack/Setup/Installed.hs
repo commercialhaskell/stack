@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveGeneric #-}
@@ -22,22 +23,17 @@ module Stack.Setup.Installed
     , tempInstallDir
     ) where
 
-import           Control.Applicative
 import           Stack.Prelude
+import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as S8
 import           Data.List hiding (concat, elem, maximumBy)
-import           Data.Maybe
-import           Data.Monoid
-import           Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import           Distribution.System (Platform (..))
 import qualified Distribution.System as Cabal
-import           GHC.Generics (Generic)
 import           Generics.Deriving.Monoid (mappenddefault, memptydefault)
 import           Path
 import           Path.IO
-import           Prelude hiding (concat, elem) -- Fix AMP warning
 import           Stack.Types.Compiler
 import           Stack.Types.Config
 import           Stack.Types.PackageIdentifier
@@ -69,7 +65,7 @@ markInstalled :: (MonadIO m, MonadThrow m)
               -> m ()
 markInstalled programsPath tool = do
     fpRel <- parseRelFile $ toolString tool ++ ".installed"
-    liftIO $ writeFile (toFilePath $ programsPath </> fpRel) "installed"
+    liftIO $ B.writeFile (toFilePath $ programsPath </> fpRel) "installed"
 
 unmarkInstalled :: MonadIO m
                 => Path Abs Dir

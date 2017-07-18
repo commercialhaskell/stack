@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE BangPatterns               #-}
 {-# LANGUAGE ConstraintKinds            #-}
 {-# LANGUAGE DataKinds                  #-}
@@ -26,30 +27,21 @@ module Stack.PackageIndex
     ) where
 
 import qualified Codec.Archive.Tar as Tar
-import           Control.Monad (unless, when, liftM, guard)
 import           Stack.Prelude
-import           Control.Monad.Logger (logDebug, logInfo, logWarn)
 import           Data.Aeson.Extended
 import qualified Data.ByteString.Lazy as L
 import           Data.Conduit (($$), (=$), (.|))
 import           Data.Conduit.Binary (sinkHandle, sourceHandle, sourceFile, sinkFile)
 import           Data.Conduit.Zlib (ungzip)
-import           Data.Foldable (forM_)
-import           Data.Int (Int64)
 import qualified Data.List.NonEmpty as NE
 import           Data.HashMap.Strict (HashMap)
 import qualified Data.HashMap.Strict as HashMap
-import           Data.Monoid
-import           Data.Set (Set)
 import qualified Data.Set as Set
 import           Data.Store.Version
 import           Data.Store.VersionTagged
-import           Data.Text (Text)
 import qualified Data.Text as T
 import           Data.Text.Unsafe (unsafeTail)
 import           Data.Time (getCurrentTime)
-import           Data.Traversable (forM)
-import           Data.Typeable (Typeable)
 import qualified Hackage.Security.Client as HS
 import qualified Hackage.Security.Client.Repository.Cache as HS
 import qualified Hackage.Security.Client.Repository.Remote as HS
@@ -61,7 +53,6 @@ import           Network.HTTP.Download
 import           Network.URI (parseURI)
 import           Path (toFilePath, parseAbsFile)
 import           Path.IO
-import           Prelude -- Fix AMP warning
 import           Stack.Types.Config
 import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageIndex

@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE ConstraintKinds       #-}
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE OverloadedStrings     #-}
@@ -38,6 +39,7 @@ import           Data.Monoid ((<>))
 import qualified Data.Set as Set
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
+import qualified Data.Text.Encoding.Error as T
 import qualified Data.Text.Lazy as TL
 import qualified Data.Text.Lazy.Encoding as TLE
 import           Data.Time.Clock.POSIX
@@ -50,7 +52,6 @@ import           Distribution.Version (simplifyVersionRange, orLaterVersion, ear
 import           Lens.Micro (set)
 import           Path
 import           Path.IO hiding (getModificationTime, getPermissions, withSystemTempDir)
-import           Prelude -- Fix redundant import warnings
 import           Stack.Build (mkBaseConfigOpts, build)
 import           Stack.Build.Execute
 import           Stack.Build.Installed
@@ -281,8 +282,8 @@ getSDistFileList lp =
             withSingleContext run ac ee task Nothing (Just "sdist") $ \_package cabalfp _pkgDir cabal _announce _console _mlogFile -> do
                 let outFile = toFilePath tmpdir FP.</> "source-files-list"
                 cabal KeepTHLoading ["sdist", "--list-sources", outFile]
-                contents <- liftIO (readFile outFile)
-                return (contents, cabalfp)
+                contents <- liftIO (S.readFile outFile)
+                return (T.unpack $ T.decodeUtf8With T.lenientDecode contents, cabalfp)
   where
     package = lpPackage lp
     ac = ActionContext Set.empty []

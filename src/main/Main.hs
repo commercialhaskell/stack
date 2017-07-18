@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveDataTypeable #-}
@@ -15,9 +16,8 @@ module Main (main) where
 #ifndef HIDE_DEP_VERSIONS
 import qualified Build_stack
 #endif
-import           Control.Monad hiding (mapM, forM)
 import           Stack.Prelude
-import           Control.Monad.Logger
+import           Control.Monad.Logger (runNoLoggingT)
 import           Control.Monad.Reader (local)
 import           Control.Monad.Trans.Except (ExceptT)
 import           Control.Monad.Writer.Lazy (Writer)
@@ -27,12 +27,7 @@ import qualified Data.ByteString.Lazy as L
 import           Data.IORef.RunOnce (runOnce)
 import           Data.List
 import qualified Data.Map.Strict as Map
-import           Data.Maybe
-import           Data.Monoid
-import           Data.Text (Text)
 import qualified Data.Text as T
-import           Data.Traversable
-import           Data.Typeable (Typeable)
 import           Data.Version (showVersion)
 import           System.Process.Read
 #ifdef USE_GIT_INFO
@@ -53,7 +48,6 @@ import           Options.Applicative.Types (ParserHelp(..))
 import           Path
 import           Path.IO
 import qualified Paths_stack as Meta
-import           Prelude hiding (pi, mapM)
 import           Stack.Build
 import           Stack.Clean (CleanOpts, clean)
 import           Stack.Config

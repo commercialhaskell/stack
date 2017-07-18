@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell #-}
@@ -10,10 +11,8 @@ module Stack.Hoogle
 import           Stack.Prelude
 import qualified Data.ByteString.Char8 as S8
 import           Data.List (find)
-import           Data.Monoid
 import qualified Data.Set as Set
 import           Lens.Micro
-import           Path
 import           Path.IO
 import qualified Stack.Build
 import           Stack.Fetch
@@ -172,8 +171,8 @@ hoogleCmd (args,setup,rebuild) go = withBuildConfig go pathToHaddocks
         config <- view configL
         menv <- liftIO $ configEnvOverride config envSettings
         result <- tryProcessStdout Nothing menv "hoogle" ["--numeric-version"]
-        case fmap (reads . S8.unpack) result of
-            Right [(ver :: Double,_)] -> return (ver >= 5.0)
+        case fmap (readMaybe . S8.unpack) result of
+            Right (Just (ver :: Double)) -> return (ver >= 5.0)
             _ -> return False
     envSettings =
         EnvSettings

@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE ScopedTypeVariables, RankNTypes, DeriveDataTypeable #-}
 
 -- | Run external pagers (@$PAGER@, @less@, @more@) and editors (@$VISUAL@,
@@ -18,7 +19,7 @@ module System.Process.PagerEditor
   ,EditorException(..))
   where
 
-import Stack.Prelude
+import Stack.Prelude hiding (ByteString)
 import Data.ByteString.Lazy (ByteString,hPut,readFile)
 import Data.ByteString.Builder (Builder,stringUtf8,hPutBuilder)
 import Data.Typeable (Typeable)

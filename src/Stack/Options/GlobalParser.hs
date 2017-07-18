@@ -1,13 +1,13 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE RecordWildCards #-}
 
 module Stack.Options.GlobalParser where
 
-import           Control.Monad.Logger              (LogLevel (..))
-import           Data.Monoid.Extra
 import           Options.Applicative
 import           Options.Applicative.Builder.Extra
 import qualified Stack.Docker                      as Docker
 import           Stack.Init
+import           Stack.Prelude
 import           Stack.Options.ConfigParser
 import           Stack.Options.LogLevelParser
 import           Stack.Options.ResolverParser

@@ -1,9 +1,10 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module Stack.Config.Urls (urlsFromMonoid) where
 
 import           Stack.Types.Urls
-import           Data.Monoid.Extra
+import           Stack.Prelude
 
 urlsFromMonoid :: UrlsMonoid -> Urls
 urlsFromMonoid monoid =

@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE DeriveGeneric #-}
@@ -23,22 +24,13 @@ module Stack.Types.PackageName
   ,packageNameArgument)
   where
 
-import           Control.Applicative
-import           Control.DeepSeq
-import           Control.Monad
 import           Stack.Prelude
 import           Data.Aeson.Extended
 import           Data.Attoparsec.Combinators
 import           Data.Attoparsec.Text
-import           Data.Data
-import           Data.Hashable
 import           Data.List (intercalate)
-import           Data.Store (Store)
-import           Data.Text (Text)
 import qualified Data.Text as T
-import           Data.Text.Binary ()
 import qualified Distribution.Package as Cabal
-import           GHC.Generics
 import           Language.Haskell.TH
 import           Language.Haskell.TH.Syntax
 import qualified Options.Applicative as O

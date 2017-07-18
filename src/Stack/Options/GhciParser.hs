@@ -1,6 +1,6 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 module Stack.Options.GhciParser where
 
-import           Data.Monoid.Extra
 import           Data.Version                      (showVersion)
 import           Options.Applicative
 import           Options.Applicative.Args
@@ -10,6 +10,7 @@ import           Stack.Config                      (packagesParser)
 import           Stack.Ghci                        (GhciOpts (..))
 import           Stack.Options.BuildParser         (flagsParser)
 import           Stack.Options.Completion
+import           Stack.Prelude
 
 -- | Parser for GHCI options
 ghciOptsParser :: Parser GhciOpts

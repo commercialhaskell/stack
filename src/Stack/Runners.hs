@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -19,10 +20,7 @@ module Stack.Runners
     , munlockFile
     ) where
 
-import           Control.Monad hiding (forM)
-import           Control.Monad.Logger
 import           Stack.Prelude
-import           Data.Traversable
 import           Path
 import           Path.IO
 import           Stack.Config

@@ -1,16 +1,13 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module Stack.Types.Urls where
 
-import Control.Applicative
 import Data.Aeson.Extended
-import Data.Text (Text)
-import Data.Monoid
-import GHC.Generics (Generic)
 import Generics.Deriving.Monoid (memptydefault, mappenddefault)
-import Prelude
+import Stack.Prelude
 
 data Urls = Urls
     { urlsLatestSnapshot :: !Text

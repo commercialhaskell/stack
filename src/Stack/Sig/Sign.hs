@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleContexts  #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -15,9 +16,6 @@ Portability : POSIX
 -}
 
 module Stack.Sig.Sign (sign, signPackage, signTarBytes) where
-
-import Prelude ()
-import Prelude.Compat
 
 import qualified Codec.Archive.Tar as Tar
 import qualified Codec.Compression.GZip as GZip

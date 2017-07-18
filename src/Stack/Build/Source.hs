@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings     #-}
@@ -15,11 +16,7 @@ module Stack.Build.Source
     , getDefaultPackageConfig
     ) where
 
-import              Control.Applicative
-import              Control.Arrow ((&&&))
-import              Control.Monad hiding (sequence)
 import              Stack.Prelude
-import              Control.Monad.Reader (MonadReader)
 import              Crypto.Hash (Digest, SHA256(..))
 import              Crypto.Hash.Conduit (sinkHash)
 import qualified    Data.ByteArray as Mem (convert)
@@ -27,20 +24,11 @@ import qualified    Data.ByteString as S
 import              Data.Conduit (($$), ZipSink (..))
 import qualified    Data.Conduit.Binary as CB
 import qualified    Data.Conduit.List as CL
-import              Data.Function
 import qualified    Data.HashSet as HashSet
 import              Data.List
 import qualified    Data.Map as Map
-import              Data.Map.Strict (Map)
 import qualified    Data.Map.Strict as M
-import              Data.Maybe
-import              Data.Monoid
-import              Data.Set (Set)
 import qualified    Data.Set as Set
-import              Data.Text (Text)
-import              Data.Traversable (sequence)
-import              Path
-import              Prelude hiding (sequence)
 import              Stack.Build.Cache
 import              Stack.Build.Target
 import              Stack.Config (getLocalPackages)

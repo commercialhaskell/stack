@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 -- | Simple interface to complicated program arguments.
 --
 -- This is a "fork" of the @optparse-simple@ package that has some workarounds for
@@ -12,14 +13,13 @@ module Options.Applicative.Complicated
   , complicatedParser
   ) where
 
-import           Control.Monad.Trans.Class (lift)
 import           Control.Monad.Trans.Except
 import           Control.Monad.Trans.Writer
-import           Data.Monoid
 import           Data.Version
 import           Options.Applicative
 import           Options.Applicative.Types
 import           Options.Applicative.Builder.Internal
+import           Stack.Prelude
 import           System.Environment
 
 -- | Generate and execute a complicated options parser.

@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveDataTypeable #-}
@@ -35,28 +36,20 @@ module Stack.Types.PackageIdentifier
   )
   where
 
-import           Control.Applicative
-import           Control.DeepSeq
 import           Stack.Prelude
 import           Crypto.Hash.Conduit (hashFile)
 import           Crypto.Hash as Hash (hashlazy, Digest, SHA256)
 import           Data.Aeson.Extended
 import           Data.Attoparsec.Text as A
 import qualified Data.ByteArray.Encoding as Mem (convertToBase, Base(Base16))
-import           Data.ByteString (ByteString)
 import qualified Data.ByteString.Lazy as L
-import           Data.Data
 import           Data.Hashable
 import           Data.Store (Store)
 import           Data.Store.Internal (Size (..), StaticSize (..), size,
                                       toStaticSize, toStaticSizeEx, unStaticSize)
-import           Data.Text (Text)
 import qualified Data.Text as T
 import           Data.Text.Encoding (decodeUtf8, encodeUtf8)
 import qualified Distribution.Package as C
-import           GHC.Generics
-import           Path
-import           Prelude hiding (FilePath)
 import           Stack.Types.PackageName
 import           Stack.Types.Version
 

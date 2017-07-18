@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveDataTypeable #-} -- ghc < 7.10
@@ -80,7 +81,7 @@ import              Path.CheckInstall (warnInstallSearchPathIssues)
 import              Path.Extra (toFilePathNoTrailingSep)
 import              Path.IO hiding (findExecutable, withSystemTempDir)
 import qualified    Paths_stack as Meta
-import              Prelude hiding (concat, elem, any) -- Fix AMP warning
+import              Prelude (until)
 import              Stack.Build (build)
 import              Stack.Config (loadConfig)
 import              Stack.Constants (stackProgName)
@@ -1513,7 +1514,7 @@ sanityCheck :: (MonadUnliftIO m, MonadLogger m)
             -> m ()
 sanityCheck menv wc = withSystemTempDir "stack-sanity-check" $ \dir -> do
     let fp = toFilePath $ dir </> $(mkRelFile "Main.hs")
-    liftIO $ writeFile fp $ unlines
+    liftIO $ S.writeFile fp $ T.encodeUtf8 $ T.pack $ unlines
         [ "import Distribution.Simple" -- ensure Cabal library is present
         , "main = putStrLn \"Hello World\""
         ]

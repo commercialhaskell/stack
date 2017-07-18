@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE BangPatterns #-}
@@ -19,20 +20,14 @@ module Stack.GhcPkg
   ,mkGhcPackagePath)
   where
 
-import           Control.Monad
 import           Stack.Prelude
 import qualified Data.ByteString.Char8 as S8
-import           Data.Either
 import           Data.List
-import           Data.Maybe
-import           Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
-import           Data.Text.Extra (stripCR)
 import           Path (Path, Abs, Dir, toFilePath, parent, mkRelFile, (</>))
 import           Path.Extra (toFilePathNoTrailingSep)
 import           Path.IO
-import           Prelude hiding (FilePath)
 import           Stack.Constants
 import           Stack.Types.Build
 import           Stack.Types.GhcPkgId

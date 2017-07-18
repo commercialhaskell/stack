@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TupleSections #-}
 module Stack.FileWatch
@@ -23,7 +24,7 @@ import GHC.IO.Handle (hIsTerminalDevice)
 import Path
 import System.Console.ANSI
 import System.FSNotify
-import System.IO (Handle, stdout, stderr, hPutStrLn)
+import System.IO (Handle, stdout, stderr, hPutStrLn, getLine)
 
 -- | Print an exception to stderr
 printExceptionStderr :: Exception e => e -> IO ()

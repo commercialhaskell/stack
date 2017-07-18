@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
@@ -20,34 +21,19 @@ module Stack.Ghci
     , renderScriptIntero
     ) where
 
-import           Control.Applicative
-import           Control.Arrow (second)
-import           Control.Monad hiding (forM)
 import           Stack.Prelude
 import           Control.Monad.State.Strict (State, execState, get, modify)
 import qualified Data.ByteString.Char8 as S8
-import           Data.Either
-import           Data.Function
 import           Data.List
 import           Data.List.Extra (nubOrd)
-import           Data.Map.Strict (Map)
 import qualified Data.Map.Strict as M
-import           Data.Maybe
-import           Data.Maybe.Extra (forMaybeM)
-import           Data.Monoid
-import           Data.Set (Set)
 import qualified Data.Set as S
-import           Data.String
-import           Data.Text (Text)
 import qualified Data.Text as T
-import           Data.Traversable (forM)
-import           Data.Typeable (Typeable)
 import qualified Distribution.PackageDescription as C
 import qualified Distribution.Text as C
 import           Path
 import           Path.Extra (toFilePathNoTrailingSep)
 import           Path.IO hiding (withSystemTempDir)
-import           Prelude
 import           Stack.Build
 import           Stack.Build.Installed
 import           Stack.Build.Source
@@ -66,6 +52,7 @@ import           Stack.Types.Package
 import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageName
 import           Stack.Types.StackT
+import           System.IO (putStrLn, putStr, getLine)
 import           Text.Read (readMaybe)
 
 #ifndef WINDOWS

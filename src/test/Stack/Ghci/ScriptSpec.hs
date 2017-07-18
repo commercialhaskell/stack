@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE OverloadedLists #-}
 {-# LANGUAGE TemplateHaskell #-}
@@ -11,6 +12,7 @@ import           Distribution.ModuleName
 import           Test.Hspec
 import qualified System.FilePath as FP
 import           Stack.Ghci.PortableFakePaths
+import           Stack.Prelude hiding (fromString)
 import           Path
 import           Path.Extra (pathToLazyByteString)
 

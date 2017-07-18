@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE CPP, ConstraintKinds, DeriveDataTypeable, FlexibleContexts, MultiWayIf, NamedFieldPuns,
              OverloadedStrings, PackageImports, RankNTypes, RecordWildCards, ScopedTypeVariables,
              TemplateHaskell, TupleSections #-}
@@ -20,11 +21,7 @@ module Stack.Docker
   ,StackDockerException(..)
   ) where
 
-import           Control.Applicative
-import           Control.Monad
 import           Stack.Prelude
-import           Control.Monad.Logger (MonadLogger,logError,logInfo,logWarn)
-import           Control.Monad.Reader (MonadReader,runReaderT)
 import           Control.Monad.Writer (execWriter,runWriter,tell)
 import qualified Crypto.Hash as Hash (Digest, MD5, hash)
 import           Data.Aeson.Extended (FromJSON(..),(.:),(.:?),(.!=),eitherDecode)
@@ -35,12 +32,9 @@ import           Data.Char (isSpace,toUpper,isAscii,isDigit)
 import           Data.Conduit.List (sinkNull)
 import           Data.List (dropWhileEnd,intercalate,isPrefixOf,isInfixOf,foldl')
 import           Data.List.Extra (trim, nubOrd)
-import           Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
-import           Data.Maybe
 import           Data.Ord (Down(..))
 import           Data.Streaming.Process (ProcessExitedUnsuccessfully(..))
-import           Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import           Data.Time (UTCTime,LocalTime(..),diffDays,utcToLocalTime,getZonedTime,ZonedTime(..))
@@ -50,7 +44,6 @@ import           Path
 import           Path.Extra (toFilePathNoTrailingSep)
 import           Path.IO hiding (canonicalizePath)
 import qualified Paths_stack as Meta
-import           Prelude -- Fix redundant import warnings
 import           Stack.Config (getInContainer)
 import           Stack.Constants
 import           Stack.Constants.Config
@@ -495,7 +488,7 @@ cleanup opts =
     parseContainersOut = map parseContainer . drop 1 . lines . decodeUtf8
       where parseContainer line =
               case words line of
-                hash:image:rest -> (hash,(image,last rest))
+                hash:image:rest | last:_ <- reverse rest -> (hash,(image,last))
                 _ -> impureThrow (InvalidPSOutputException line)
     buildPlan curTime
               imagesLastUsed

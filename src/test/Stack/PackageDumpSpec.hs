@@ -1,11 +1,10 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell   #-}
 {-# LANGUAGE TupleSections     #-}
 module Stack.PackageDumpSpec where
 
-import           Control.Applicative
 import           Control.Monad.Logger
-import           Control.Monad.Trans.Resource  (runResourceT)
 import           Data.Conduit
 import qualified Data.Conduit.Binary           as CB
 import qualified Data.Conduit.List             as CL
@@ -15,8 +14,8 @@ import qualified Data.Map                      as Map
 import qualified Data.Set                      as Set
 import           Distribution.System           (buildPlatform)
 import           Distribution.License          (License(..))
-import           Prelude -- Fix redundant imports warnings
 import           Stack.PackageDump
+import           Stack.Prelude
 import           Stack.Types.Compiler
 import           Stack.Types.GhcPkgId
 import           Stack.Types.PackageIdentifier

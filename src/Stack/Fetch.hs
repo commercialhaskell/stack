@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE ConstraintKinds       #-}
 {-# LANGUAGE DataKinds             #-}
 {-# LANGUAGE DeriveDataTypeable    #-}
@@ -32,40 +33,26 @@ import qualified    Codec.Archive.Tar as Tar
 import qualified    Codec.Archive.Tar.Check as Tar
 import qualified    Codec.Archive.Tar.Entry as Tar
 import              Codec.Compression.GZip (decompress)
-import              Control.Applicative
 import              Control.Concurrent.STM
-import              Control.Monad (join, liftM, unless, when)
 import              Stack.Prelude
 import              Crypto.Hash (SHA256 (..))
-import              Data.ByteString (ByteString)
 import qualified    Data.ByteString as S
 import qualified    Data.ByteString.Lazy as L
-import              Data.Either (partitionEithers)
 import qualified    Data.Foldable as F
-import              Data.Function (fix)
 import qualified    Data.HashMap.Strict as HashMap
-import              Data.HashSet (HashSet)
 import qualified    Data.HashSet as HashSet
-import              Data.List (intercalate)
+import              Data.List (intercalate, maximum)
 import              Data.List.NonEmpty (NonEmpty)
 import qualified    Data.List.NonEmpty as NE
-import              Data.Map (Map)
 import qualified    Data.Map as Map
-import              Data.Maybe (maybeToList, catMaybes, listToMaybe)
-import              Data.Monoid
-import              Data.Set (Set)
 import qualified    Data.Set as Set
 import qualified    Data.Text as T
 import              Data.Text.Encoding (decodeUtf8)
 import              Data.Text.Metrics
-import              Data.Traversable (forM)
-import              Data.Typeable (Typeable)
-import              Data.Word (Word64)
 import              Network.HTTP.Download
 import              Path
 import              Path.Extra (toFilePathNoTrailingSep)
 import              Path.IO
-import              Prelude -- Fix AMP warning
 import              Stack.PackageIndex
 import              Stack.Types.BuildPlan
 import              Stack.Types.Config

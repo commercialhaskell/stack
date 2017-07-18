@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE ConstraintKinds    #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE FlexibleContexts   #-}
@@ -11,12 +12,11 @@ module Stack.Image
         imgCmdName, imgDockerCmdName, imgOptsFromMonoid)
        where
 
-import           Control.Monad
 import           Stack.Prelude
+import qualified Data.ByteString as B
 import           Data.Char (toLower)
 import qualified Data.Map.Strict as Map
-import           Data.Maybe
-import           Data.Text (Text)
+import           Data.Text.Encoding (encodeUtf8)
 import qualified Data.Text as T
 import           Path
 import           Path.Extra
@@ -137,9 +137,9 @@ createDockerImage dockerConfig dir = do
         Nothing -> throwM StackImageDockerBaseUnspecifiedException
         Just base -> do
             liftIO
-                (writeFile
+                (B.writeFile
                      (toFilePath (dir </> $(mkRelFile "Dockerfile")))
-                     (unlines ["FROM " ++ base, "ADD ./ /"]))
+                     (encodeUtf8 (T.pack (unlines ["FROM " ++ base, "ADD ./ /"]))))
             let args =
                     [ "build"
                     , "-t"
@@ -167,14 +167,14 @@ extendDockerImageWithEntrypoint dockerConfig dir = do
                 eps
                 (\ep ->
                       do liftIO
-                             (writeFile
+                             (B.writeFile
                                   (toFilePath
                                        (dir </> $(mkRelFile "Dockerfile")))
-                                  (unlines
+                                  (encodeUtf8 (T.pack (unlines
                                        [ "FROM " ++ dockerImageName
                                        , "ENTRYPOINT [\"/usr/local/bin/" ++
                                          ep ++ "\"]"
-                                       , "CMD []"]))
+                                       , "CMD []"]))))
                          callProcess
                              (Cmd
                                   Nothing

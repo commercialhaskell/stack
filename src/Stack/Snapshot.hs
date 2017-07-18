@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE ConstraintKinds     #-}
 {-# LANGUAGE DataKinds           #-}
 {-# LANGUAGE DeriveDataTypeable  #-}
@@ -20,9 +21,6 @@ module Stack.Snapshot
   , calculatePackagePromotion
   ) where
 
-import           Control.Applicative
-import           Control.Arrow (second)
-import           Control.Monad (forM, unless, void, (>=>), when, forM_)
 import           Stack.Prelude
 import           Control.Monad.State.Strict      (get, put, StateT, execStateT)
 import           Crypto.Hash (hash, SHA256(..), Digest)
@@ -32,22 +30,14 @@ import           Data.Aeson.Extended (WithJSONWarnings(..), logJSONWarnings, (..
 import           Data.Aeson.Types (Parser, parseEither)
 import           Data.Store.VersionTagged
 import qualified Data.ByteArray as Mem (convert)
-import           Data.ByteString (ByteString)
 import qualified Data.ByteString.Base64.URL as B64URL
 import qualified Data.ByteString.Char8 as S8
-import           Data.Conduit ((.|))
 import qualified Data.Conduit.List as CL
 import qualified Data.HashMap.Strict as HashMap
-import           Data.Map (Map)
 import qualified Data.Map as Map
-import           Data.Maybe (fromMaybe)
-import           Data.Monoid
-import           Data.Set (Set)
 import qualified Data.Set as Set
-import           Data.Text (Text)
 import qualified Data.Text as T
 import           Data.Text.Encoding (encodeUtf8)
-import           Data.Typeable (Typeable)
 import           Data.Yaml (decodeFileEither, ParseException (AesonException))
 import           Distribution.InstalledPackageInfo (PError)
 import           Distribution.PackageDescription (GenericPackageDescription)
@@ -59,7 +49,6 @@ import           Network.HTTP.Client (Request)
 import           Network.HTTP.Download
 import           Path
 import           Path.IO
-import           Prelude -- Fix AMP warning
 import           Stack.Constants
 import           Stack.Fetch
 import           Stack.Package

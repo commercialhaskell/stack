@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -10,13 +11,12 @@ module Stack.IDE
     , listTargets
     ) where
 
-import           Control.Monad.Logger
-import           Control.Monad.Reader
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import qualified Data.Text as T
 import           Stack.Config (getLocalPackages)
 import           Stack.Package (findOrGenerateCabalFile)
+import           Stack.Prelude
 import           Stack.Types.Config
 import           Stack.Types.Package
 import           Stack.Types.PackageName

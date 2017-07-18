@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 -- | Args parser test suite.
 
 module Stack.ArgsSpec where
@@ -10,7 +11,9 @@ import qualified Data.Attoparsec.Text as P
 import Data.Text (pack)
 import Options.Applicative.Args
 import Stack.Constants (stackProgName)
+import Stack.Prelude
 import Test.Hspec
+import Prelude (head)
 
 -- | Test spec.
 spec :: Spec

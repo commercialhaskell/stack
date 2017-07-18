@@ -1,10 +1,9 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module Stack.Options.BuildParser where
 
 import qualified Data.Map as Map
-import           Data.Monoid.Extra
-import           Data.Text (Text)
 import           Data.Version (showVersion)
 import           Options.Applicative
 import           Options.Applicative.Args
@@ -12,6 +11,7 @@ import           Options.Applicative.Builder.Extra
 import           Paths_stack as Meta
 import           Stack.Options.Completion
 import           Stack.Options.PackageParser (readFlag)
+import           Stack.Prelude
 import           Stack.Types.Config
 import           Stack.Types.FlagName
 import           Stack.Types.PackageName

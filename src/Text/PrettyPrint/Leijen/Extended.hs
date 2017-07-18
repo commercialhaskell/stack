@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -127,6 +128,7 @@ import qualified Data.Text as T
 import qualified Data.Text.IO as T
 import qualified Data.Text.Lazy as LT
 import qualified Data.Text.Lazy.Builder as LTB
+import Stack.Prelude
 import System.Console.ANSI (Color(..), ColorIntensity(..), ConsoleLayer(..), ConsoleIntensity(..), SGR(..), setSGRCode, hSupportsANSI)
 import System.IO (Handle)
 import qualified Text.PrettyPrint.Annotated.Leijen as P
@@ -207,7 +209,7 @@ displayAnsiSimple doc =
         let sgrs' = mapMaybe (\sgr -> if sgr == Reset then Nothing else Just (getSGRTag sgr, sgr)) sgrs
             new = if Reset `elem` sgrs
                       then M.fromList sgrs'
-                      else foldl (\mp (tag, sgr) -> M.insert tag sgr mp) old sgrs'
+                      else foldl' (\mp (tag, sgr) -> M.insert tag sgr mp) old sgrs'
         (extra, contents) <- local (const new) inner
         return (extra, transitionCodes old new <> contents <> transitionCodes new old)
     transitionCodes old new =

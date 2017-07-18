@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -28,7 +29,6 @@ import qualified Data.Text as T
 import Language.Haskell.TH
 import Path
 import Path.IO (ensureDir)
-import Prelude
 
 versionedEncodeFile :: Data a => VersionConfig a -> Q Exp
 versionedEncodeFile vc = [e| storeEncodeFile $(encodeWithVersionQ vc) $(decodeWithVersionQ vc) |]
