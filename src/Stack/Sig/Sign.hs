@@ -23,7 +23,6 @@ import qualified Codec.Archive.Tar as Tar
 import qualified Codec.Compression.GZip as GZip
 import           Control.Monad (when)
 import           Stack.Prelude
-import           Control.Monad.Logger
 import qualified Data.ByteString.Lazy as BS
 import qualified Data.ByteString.Lazy as L
 import           Data.Monoid ((<>))

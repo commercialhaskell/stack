@@ -22,8 +22,6 @@ module Stack.Build
 
 import           Control.Monad
 import           Stack.Prelude
-import           Control.Monad.Logger
-import           Control.Monad.Reader (MonadReader)
 import           Data.Aeson (Value (Object, Array), (.=), object)
 import           Data.Function
 import qualified Data.HashMap.Strict as HM

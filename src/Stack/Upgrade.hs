@@ -13,7 +13,6 @@ module Stack.Upgrade
 
 import           Control.Monad               (unless, when)
 import           Stack.Prelude
-import           Control.Monad.Logger
 import           Data.Foldable               (forM_)
 import qualified Data.HashMap.Strict         as HashMap
 import qualified Data.Map                    as Map

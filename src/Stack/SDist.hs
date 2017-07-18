@@ -21,7 +21,6 @@ import           Control.Applicative
 import           Control.Concurrent.Execute (ActionContext(..))
 import           Control.Monad (unless, liftM, filterM, when)
 import           Stack.Prelude
-import           Control.Monad.Logger
 import           Control.Monad.Reader.Class (local)
 import qualified Data.ByteString as S
 import qualified Data.ByteString.Char8 as S8

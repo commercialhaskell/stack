@@ -7,7 +7,6 @@ module Stack.Script
 
 import           Control.Monad              (unless, forM, void)
 import           Stack.Prelude
-import           Control.Monad.Logger
 import           Data.ByteString            (ByteString)
 import qualified Data.ByteString.Char8      as S8
 import qualified Data.Conduit.List          as CL
@@ -29,8 +28,8 @@ import           Stack.Runners
 import           Stack.Types.BuildPlan
 import           Stack.Types.Compiler
 import           Stack.Types.Config
+import           Stack.Types.Internal       (Env)
 import           Stack.Types.PackageName
-import           Stack.Types.StackT
 import           System.FilePath            (dropExtension, replaceExtension)
 import           System.Process.Read
 
@@ -139,7 +138,7 @@ isWindows = False
 getPackagesFromModuleInfo
   :: ModuleInfo
   -> FilePath -- ^ script filename
-  -> StackT EnvConfig IO (Set PackageName)
+  -> StackT (Env EnvConfig) IO (Set PackageName)
 getPackagesFromModuleInfo mi scriptFP = do
     (pns1, mns) <- liftIO $ parseImports <$> S8.readFile scriptFP
     pns2 <-

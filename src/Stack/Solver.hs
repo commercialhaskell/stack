@@ -23,7 +23,6 @@ import           Prelude.Compat
 import           Control.Applicative
 import           Control.Monad (when,void,join,liftM,unless,mapAndUnzipM, zipWithM_)
 import           Stack.Prelude
-import           Control.Monad.Logger
 import           Data.Aeson.Extended         (object, (.=), toJSON)
 import qualified Data.ByteString as S
 import           Data.Char (isSpace)

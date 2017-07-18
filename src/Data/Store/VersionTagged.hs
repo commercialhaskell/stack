@@ -16,7 +16,6 @@ module Data.Store.VersionTagged
 
 import Control.Applicative
 import Stack.Prelude
-import Control.Monad.Logger
 import qualified Data.ByteString as BS
 import Data.Data (Data)
 import qualified Data.Map as M

@@ -13,7 +13,6 @@ module Stack.Image
 
 import           Control.Monad
 import           Stack.Prelude
-import           Control.Monad.Logger
 import           Data.Char (toLower)
 import qualified Data.Map.Strict as Map
 import           Data.Maybe

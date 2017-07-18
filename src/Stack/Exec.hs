@@ -13,7 +13,6 @@
 module Stack.Exec where
 
 import           Stack.Prelude
-import           Control.Monad.Logger
 import           Stack.Types.Config
 import           System.Process.Log
 

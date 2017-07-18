@@ -18,7 +18,6 @@ module Stack.Coverage
 
 import           Control.Monad (liftM, when, unless, void, (<=<))
 import           Stack.Prelude
-import           Control.Monad.Logger
 import qualified Data.ByteString.Char8 as S8
 import           Data.Foldable (forM_, asum, toList)
 import           Data.Function

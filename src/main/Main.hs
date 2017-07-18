@@ -98,6 +98,7 @@ import           Stack.SetupCmd
 import qualified Stack.Sig as Sig
 import           Stack.Snapshot (loadResolver)
 import           Stack.Solver (solveExtraDeps)
+import           Stack.Types.Internal (Env)
 import           Stack.Types.Version
 import           Stack.Types.Config
 import           Stack.Types.Compiler
@@ -897,7 +898,7 @@ listDependenciesCmd :: ListDepsOpts -> GlobalOpts -> IO ()
 listDependenciesCmd opts go = withBuildConfigDot (listDepsDotOpts opts) go $ listDependencies opts
 
 -- Plumbing for --test and --bench flags
-withBuildConfigDot :: DotOpts -> GlobalOpts -> StackT EnvConfig IO () -> IO ()
+withBuildConfigDot :: DotOpts -> GlobalOpts -> StackT (Env EnvConfig) IO () -> IO ()
 withBuildConfigDot opts go f = withBuildConfig go' f
   where
     go' =

@@ -24,8 +24,6 @@ module Stack.Setup.Installed
 
 import           Control.Applicative
 import           Stack.Prelude
-import           Control.Monad.Logger
-import           Control.Monad.Reader (MonadReader)
 import qualified Data.ByteString.Char8 as S8
 import           Data.List hiding (concat, elem, maximumBy)
 import           Data.Maybe

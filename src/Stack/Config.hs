@@ -51,8 +51,6 @@ import           Control.Arrow ((***), second)
 import           Control.Monad (liftM, unless, when, filterM, forM)
 import           Control.Monad.Extra (firstJustM)
 import           Stack.Prelude
-import           Control.Monad.Logger hiding (Loc)
-import           Control.Monad.Reader (ask, runReaderT)
 import           Data.Aeson.Extended
 import qualified Data.ByteString as S
 import           Data.Foldable (forM_)

@@ -31,13 +31,14 @@ import qualified Stack.Nix as Nix
 import           Stack.Setup
 import           Stack.Types.Compiler (CompilerVersion, CVType (..))
 import           Stack.Types.Config
+import           Stack.Types.Internal
 import           Stack.Types.StackT
 import           System.Environment (getEnvironment)
 import           System.IO
 import           System.FileLock
 
 loadCompilerVersion :: GlobalOpts
-                    -> LoadConfig (StackT () IO)
+                    -> LoadConfig (StackT (Env ()) IO)
                     -> IO (CompilerVersion 'CVWanted)
 loadCompilerVersion go lc = do
     bconfig <- runStackTGlobal () go $
@@ -86,7 +87,7 @@ withUserFileLock go@GlobalOpts{} dir act = do
 
 withConfigAndLock
     :: GlobalOpts
-    -> StackT Config IO ()
+    -> StackT (Env Config) IO ()
     -> IO ()
 withConfigAndLock go@GlobalOpts{..} inner = do
     lc <- loadConfigWithOpts go
@@ -103,7 +104,7 @@ withConfigAndLock go@GlobalOpts{..} inner = do
 -- loaded due to $PWD.
 withGlobalConfigAndLock
     :: GlobalOpts
-    -> StackT Config IO ()
+    -> StackT (Env Config) IO ()
     -> IO ()
 withGlobalConfigAndLock go@GlobalOpts{..} inner = do
     lc <- runStackTGlobal () go $
@@ -118,7 +119,7 @@ withGlobalConfigAndLock go@GlobalOpts{..} inner = do
 -- That is, there's still a serialization point.
 withBuildConfig
     :: GlobalOpts
-    -> StackT EnvConfig IO ()
+    -> StackT (Env EnvConfig) IO ()
     -> IO ()
 withBuildConfig go inner =
     withBuildConfigAndLock go (\lk -> do munlockFile lk
@@ -126,14 +127,14 @@ withBuildConfig go inner =
 
 withBuildConfigAndLock
     :: GlobalOpts
-    -> (Maybe FileLock -> StackT EnvConfig IO ())
+    -> (Maybe FileLock -> StackT (Env EnvConfig) IO ())
     -> IO ()
 withBuildConfigAndLock go inner =
     withBuildConfigExt False go Nothing inner Nothing
 
 withBuildConfigAndLockNoDocker
     :: GlobalOpts
-    -> (Maybe FileLock -> StackT EnvConfig IO ())
+    -> (Maybe FileLock -> StackT (Env EnvConfig) IO ())
     -> IO ()
 withBuildConfigAndLockNoDocker go inner =
     withBuildConfigExt True go Nothing inner Nothing
@@ -141,15 +142,15 @@ withBuildConfigAndLockNoDocker go inner =
 withBuildConfigExt
     :: Bool
     -> GlobalOpts
-    -> Maybe (StackT Config IO ())
+    -> Maybe (StackT (Env Config) IO ())
     -- ^ Action to perform before the build.  This will be run on the host
     -- OS even if Docker is enabled for builds.  The build config is not
     -- available in this action, since that would require build tools to be
     -- installed on the host OS.
-    -> (Maybe FileLock -> StackT EnvConfig IO ())
+    -> (Maybe FileLock -> StackT (Env EnvConfig) IO ())
     -- ^ Action that uses the build config.  If Docker is enabled for builds,
     -- this will be run in a Docker container.
-    -> Maybe (StackT Config IO ())
+    -> Maybe (StackT (Env Config) IO ())
     -- ^ Action to perform after the build.  This will be run on the host
     -- OS even if Docker is enabled for builds.  The build config is not
     -- available in this action, since that would require build tools to be
@@ -204,7 +205,7 @@ withBuildConfigExt skipDocker go@GlobalOpts{..} mbefore inner mafter = do
 
 -- | Load the configuration. Convenience function used
 -- throughout this module.
-loadConfigWithOpts :: GlobalOpts -> IO (LoadConfig (StackT () IO))
+loadConfigWithOpts :: GlobalOpts -> IO (LoadConfig (StackT (Env ()) IO))
 loadConfigWithOpts go@GlobalOpts{..} = do
     mstackYaml <- forM globalStackYaml resolveFile'
     runStackTGlobal () go $ do
@@ -219,7 +220,7 @@ loadConfigWithOpts go@GlobalOpts{..} = do
 
 withMiniConfigAndLock
     :: GlobalOpts
-    -> StackT MiniConfig IO ()
+    -> StackT (Env MiniConfig) IO ()
     -> IO ()
 withMiniConfigAndLock go@GlobalOpts{..} inner = do
     miniConfig <-

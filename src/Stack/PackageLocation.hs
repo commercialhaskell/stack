@@ -20,7 +20,6 @@ import Control.Arrow (second)
 import qualified Codec.Compression.GZip as GZip
 import Control.Monad
 import Stack.Prelude
-import Control.Monad.Logger
 import           Crypto.Hash (hashWith, SHA256(..))
 import qualified Data.ByteArray as Mem (convert)
 import Data.ByteString (ByteString)

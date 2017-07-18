@@ -15,9 +15,7 @@
 -- | The monad used for the command-line executable @stack@.
 
 module Stack.Types.StackT
-  (StackT
-  ,HasEnv
-  ,StackM
+  (StackM
   ,runStackT
   ,runStackTGlobal
   ,runInnerStackT
@@ -25,11 +23,9 @@ module Stack.Types.StackT
   ,logStickyDone)
   where
 
-import           Control.Applicative
 import           Control.Monad
-import           Stack.Prelude
+import           Stack.Prelude hiding (lift)
 import           Control.Monad.Logger
-import           Control.Monad.Reader hiding (lift)
 import qualified Data.ByteString.Char8 as S8
 import           Data.Char
 import           Data.List (stripPrefix)
@@ -44,6 +40,7 @@ import           Data.Time
 import           GHC.Foreign (withCString, peekCString)
 import           Language.Haskell.TH
 import           Language.Haskell.TH.Syntax (lift)
+import           Lens.Micro (to)
 import           Prelude -- Fix AMP warning
 import           Stack.Types.Config (GlobalOpts (..), ColorWhen(..))
 import           Stack.Types.Internal
@@ -66,34 +63,23 @@ type HasEnv r = (HasLogOptions r, HasTerminal r, HasReExec r, HasSticky r)
 type StackM r m =
     (MonadReader r m, MonadUnliftIO m, MonadLoggerIO m, MonadThrow m, HasEnv r)
 
---------------------------------------------------------------------------------
--- Main StackT monad transformer
-
--- | The monad used for the executable @stack@.
-newtype StackT config m a =
-  StackT {unStackT :: ReaderT (Env config) m a}
-  deriving (Functor,Applicative,Monad,MonadIO,MonadReader (Env config),MonadThrow,MonadTrans)
-
+    {- FIXME
 -- | Takes the configured log level into account.
 instance MonadIO m => MonadLogger (StackT config m) where
     monadLoggerLog = stickyLoggerFunc
 
 instance MonadIO m => MonadLoggerIO (StackT config m) where
     askLoggerIO = getStickyLoggerFunc
-
-instance MonadUnliftIO m => MonadUnliftIO (StackT config m) where
-    askUnliftIO = StackT $ ReaderT $ \r ->
-                  withUnliftIO $ \u ->
-                  return (UnliftIO (unliftIO u . flip runReaderT r . unStackT))
+    -}
 
 -- | Run a Stack action, using global options.
 runStackTGlobal :: (MonadIO m)
-                => config -> GlobalOpts -> StackT config m a -> m a
+                => config -> GlobalOpts -> StackT (Env config) m a -> m a
 runStackTGlobal config GlobalOpts{..} =
    runStackT config globalLogLevel globalTimeInLog globalTerminal globalColorWhen (isJust globalReExecVersion)
 
 runStackT :: (MonadIO m)
-          => config -> LogLevel -> Bool -> Bool -> ColorWhen -> Bool -> StackT config m a -> m a
+          => config -> LogLevel -> Bool -> Bool -> ColorWhen -> Bool -> StackT (Env config) m a -> m a
 runStackT config logLevel useTime terminal colorWhen reExec m = do
     useColor <- case colorWhen of
         ColorNever -> return False
@@ -125,7 +111,7 @@ getCanUseUnicode = do
     test `catchIO` \_ -> return False
 
 runInnerStackT :: (HasEnv r, MonadReader r m, MonadIO m)
-               => config -> StackT config IO a -> m a
+               => config -> StackT (Env config) IO a -> m a
 runInnerStackT config inner = do
     reExec <- view reExecL
     logOptions <- view logOptionsL
@@ -141,20 +127,9 @@ runInnerStackT config inner = do
 
 --------------------------------------------------------------------------------
 -- Logging functionality
-stickyLoggerFunc
-    :: (HasEnv r, ToLogStr msg, MonadReader r m, MonadIO m)
-    => Loc -> LogSource -> LogLevel -> msg -> m ()
-stickyLoggerFunc loc src level msg = do
-    func <- getStickyLoggerFunc
-    liftIO $ func loc src level msg
 
-getStickyLoggerFunc
-    :: (HasEnv r, ToLogStr msg, MonadReader r m)
-    => m (Loc -> LogSource -> LogLevel -> msg -> IO ())
-getStickyLoggerFunc = do
-    sticky <- view stickyL
-    lo <- view logOptionsL
-    return $ stickyLoggerFuncImpl sticky lo
+instance HasLogFunc (Env config) where
+  logFuncL = to $ \env -> stickyLoggerFuncImpl (view stickyL env) (view logOptionsL env)
 
 stickyLoggerFuncImpl
     :: ToLogStr msg

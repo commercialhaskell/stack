@@ -30,7 +30,6 @@ module Stack.BuildPlan
 
 import           Control.Applicative
 import           Stack.Prelude
-import           Control.Monad.Logger
 import qualified Data.Foldable as F
 import qualified Data.HashSet as HashSet
 import           Data.List (intercalate)

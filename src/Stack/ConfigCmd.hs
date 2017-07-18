@@ -16,7 +16,6 @@ module Stack.ConfigCmd
 import           Control.Applicative
 import           Control.Monad
 import           Stack.Prelude
-import           Control.Monad.Logger
 import qualified Data.ByteString as S
 import qualified Data.HashMap.Strict as HMap
 import           Data.Monoid

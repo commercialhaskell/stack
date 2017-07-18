@@ -8,8 +8,7 @@ module Stack.Path
     ) where
 
 import           Stack.Prelude
-import           Control.Monad.Logger
-import           Control.Monad.Reader
+import           Data.Foldable (forM_)
 import           Data.List (intercalate)
 import           Data.Maybe.Extra
 import           Data.Monoid

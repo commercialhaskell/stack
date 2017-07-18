@@ -20,7 +20,6 @@ module Stack.New
 
 import           Control.Monad
 import           Stack.Prelude
-import           Control.Monad.Logger
 import           Control.Monad.Trans.Writer.Strict
 import           Data.Aeson
 import           Data.Aeson.Types

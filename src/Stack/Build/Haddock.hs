@@ -18,7 +18,6 @@ module Stack.Build.Haddock
 
 import           Control.Monad
 import           Stack.Prelude
-import           Control.Monad.Logger
 import qualified Data.Foldable as F
 import           Data.Function
 import qualified Data.HashSet as HS

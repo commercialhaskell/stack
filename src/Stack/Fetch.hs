@@ -36,8 +36,6 @@ import              Control.Applicative
 import              Control.Concurrent.STM
 import              Control.Monad (join, liftM, unless, when)
 import              Stack.Prelude
-import              Control.Monad.Logger
-import              Control.Monad.Reader (MonadReader, ask, runReaderT)
 import              Crypto.Hash (SHA256 (..))
 import              Data.ByteString (ByteString)
 import qualified    Data.ByteString as S

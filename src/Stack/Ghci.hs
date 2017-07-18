@@ -24,7 +24,6 @@ import           Control.Applicative
 import           Control.Arrow (second)
 import           Control.Monad hiding (forM)
 import           Stack.Prelude
-import           Control.Monad.Logger
 import           Control.Monad.State.Strict (State, execState, get, modify)
 import qualified Data.ByteString.Char8 as S8
 import           Data.Either
