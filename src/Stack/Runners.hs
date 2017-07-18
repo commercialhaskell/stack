@@ -21,8 +21,7 @@ module Stack.Runners
 
 import           Control.Monad hiding (forM)
 import           Control.Monad.Logger
-import           Control.Monad.IO.Unlift
-import           Data.IORef
+import           Stack.Prelude
 import           Data.Traversable
 import           Path
 import           Path.IO

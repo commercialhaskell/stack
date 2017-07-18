@@ -17,7 +17,7 @@ module Stack.Build.Haddock
     ) where
 
 import           Control.Monad
-import           Control.Monad.IO.Unlift
+import           Stack.Prelude
 import           Control.Monad.Logger
 import qualified Data.Foldable as F
 import           Data.Function
@@ -48,7 +48,6 @@ import           Stack.Types.Package
 import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageName
 import           Stack.Types.StackT (StackM)
-import           Stack.Types.StringError
 import qualified System.FilePath as FP
 import           System.IO.Error (isDoesNotExistError)
 import           System.Process.Read

@@ -23,7 +23,7 @@ module Stack.Setup.Installed
     ) where
 
 import           Control.Applicative
-import           Control.Monad.IO.Unlift
+import           Stack.Prelude
 import           Control.Monad.Logger
 import           Control.Monad.Reader (MonadReader)
 import qualified Data.ByteString.Char8 as S8

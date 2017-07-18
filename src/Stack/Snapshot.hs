@@ -23,7 +23,7 @@ module Stack.Snapshot
 import           Control.Applicative
 import           Control.Arrow (second)
 import           Control.Monad (forM, unless, void, (>=>), when, forM_)
-import           Control.Monad.IO.Unlift
+import           Stack.Prelude
 import           Control.Monad.Logger
 import           Control.Monad.Reader (MonadReader)
 import           Control.Monad.State.Strict      (get, put, StateT, execStateT)

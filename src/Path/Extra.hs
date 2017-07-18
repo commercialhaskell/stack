@@ -20,7 +20,7 @@ import qualified Data.ByteString.Char8 as BS
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import           Control.Monad (liftM)
-import           Control.Monad.IO.Unlift
+import           Stack.Prelude
 import           Data.Bool (bool)
 import           Path
 import           Path.IO

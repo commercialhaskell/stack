@@ -18,7 +18,7 @@ module System.Process.PagerEditor
   ,EditorException(..))
   where
 
-import Control.Monad.IO.Unlift
+import Stack.Prelude
 import Data.ByteString.Lazy (ByteString,hPut,readFile)
 import Data.ByteString.Builder (Builder,stringUtf8,hPutBuilder)
 import Data.Typeable (Typeable)
@@ -28,8 +28,7 @@ import System.Exit (ExitCode(..))
 import System.FilePath ((</>))
 import System.Process (createProcess,shell,proc,waitForProcess,StdStream (CreatePipe)
                       ,CreateProcess(std_in, close_fds, delegate_ctlc))
-import System.IO (hClose,Handle,hPutStr,readFile,withFile,IOMode(WriteMode),stdout)
-import System.IO.Temp (withSystemTempDirectory)
+import System.IO (hClose,hPutStr,readFile,stdout)
 
 -- | Run pager, providing a function that writes to the pager's input.
 pageWriter :: (Handle -> IO ()) -> IO ()

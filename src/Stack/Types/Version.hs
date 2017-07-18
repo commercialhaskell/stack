@@ -33,7 +33,7 @@ module Stack.Types.Version
 
 import           Control.Applicative
 import           Control.DeepSeq
-import           Control.Monad.IO.Unlift
+import           Stack.Prelude
 import           Data.Aeson.Extended
 import           Data.Attoparsec.Text
 import           Data.Data
@@ -55,7 +55,6 @@ import           GHC.Generics
 import           Language.Haskell.TH
 import           Language.Haskell.TH.Syntax
 import           Prelude -- Fix warning: Word in Prelude from base-4.8.
-import           Stack.Types.StringError
 import           Text.PrettyPrint (render)
 
 -- | A parse fail.
@@ -162,7 +161,7 @@ fromCabalVersion (Cabal.Version vs _) =
 mkVersion :: String -> Q Exp
 mkVersion s =
   case parseVersionFromString s of
-    Nothing -> errorString ("Invalid package version: " ++ show s)
+    Nothing -> qRunIO $ throwString ("Invalid package version: " ++ show s)
     Just pn -> [|pn|]
 
 -- | Display a version range

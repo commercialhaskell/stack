@@ -8,10 +8,9 @@ module Stack.FileWatch
 
 import Blaze.ByteString.Builder (toLazyByteString, copyByteString)
 import Blaze.ByteString.Builder.Char.Utf8 (fromShow)
-import Control.Concurrent.Async (race_)
 import Control.Concurrent.STM
 import Control.Monad (forever, unless, when)
-import Control.Monad.IO.Unlift
+import Stack.Prelude
 import qualified Data.ByteString.Lazy as L
 import qualified Data.Map.Strict as Map
 import Data.Monoid ((<>))

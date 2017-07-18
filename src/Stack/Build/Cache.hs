@@ -34,7 +34,7 @@ module Stack.Build.Cache
 import           Control.Applicative
 import           Control.DeepSeq (NFData)
 import           Control.Monad (liftM)
-import           Control.Monad.IO.Unlift
+import           Stack.Prelude
 import           Control.Monad.Logger (MonadLogger)
 import           Control.Monad.Reader (MonadReader)
 import           Crypto.Hash (hashWith, SHA256(..))

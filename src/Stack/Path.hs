@@ -7,7 +7,7 @@ module Stack.Path
     , pathParser
     ) where
 
-import           Control.Monad.IO.Unlift
+import           Stack.Prelude
 import           Control.Monad.Logger
 import           Control.Monad.Reader
 import           Data.List (intercalate)

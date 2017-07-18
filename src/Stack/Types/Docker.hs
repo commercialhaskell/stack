@@ -9,13 +9,12 @@
 module Stack.Types.Docker where
 
 import Control.Applicative
-import Control.Monad.IO.Unlift
+import Stack.Prelude
 import Data.Aeson.Extended
 import Data.List (intercalate)
 import Data.Monoid
 import Data.Text (Text)
 import qualified Data.Text as T
-import Data.Typeable
 import Distribution.System (Platform(..), OS(..), Arch(..))
 import Distribution.Text (simpleParse, display)
 import Distribution.Version (anyVersion)

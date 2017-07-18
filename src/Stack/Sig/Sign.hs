@@ -22,7 +22,7 @@ import Prelude.Compat
 import qualified Codec.Archive.Tar as Tar
 import qualified Codec.Compression.GZip as GZip
 import           Control.Monad (when)
-import           Control.Monad.IO.Unlift
+import           Stack.Prelude
 import           Control.Monad.Logger
 import qualified Data.ByteString.Lazy as BS
 import qualified Data.ByteString.Lazy as L
@@ -33,7 +33,6 @@ import           Network.HTTP.Download
 import           Network.HTTP.Simple
 import           Network.HTTP.Types (methodPut)
 import           Path
-import           Path.IO
 import           Stack.Package
 import           Stack.Sig.GPG
 import           Stack.Types.PackageIdentifier
@@ -50,7 +49,7 @@ sign
 #endif
     => String -> Path Abs File -> m Signature
 sign url filePath =
-    withRunIO $ \run ->
+    withRunInIO $ \run ->
     withSystemTempDir
         "stack"
         (\tempDir ->
@@ -96,13 +95,12 @@ signTarBytes
 #endif
     => String -> Path Rel File -> L.ByteString -> m Signature
 signTarBytes url tarPath bs =
-    withRunIO $ \run ->
     withSystemTempDir
         "stack"
         (\tempDir ->
               do let tempTarBall = tempDir </> tarPath
                  liftIO (L.writeFile (toFilePath tempTarBall) bs)
-                 run (sign url tempTarBall))
+                 sign url tempTarBall)
 
 -- | Sign a haskell package given the url to the signature service, a
 -- @PackageIdentifier@ and a file path to the package on disk.

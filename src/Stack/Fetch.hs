@@ -33,10 +33,9 @@ import qualified    Codec.Archive.Tar.Check as Tar
 import qualified    Codec.Archive.Tar.Entry as Tar
 import              Codec.Compression.GZip (decompress)
 import              Control.Applicative
-import              Control.Concurrent.Async (Concurrently (..))
 import              Control.Concurrent.STM
 import              Control.Monad (join, liftM, unless, when)
-import              Control.Monad.IO.Unlift
+import              Stack.Prelude
 import              Control.Monad.Logger
 import              Control.Monad.Reader (MonadReader, ask, runReaderT)
 import              Crypto.Hash (SHA256 (..))
@@ -77,7 +76,7 @@ import              Stack.Types.PackageIndex
 import              Stack.Types.PackageName
 import              Stack.Types.Version
 import qualified    System.FilePath as FP
-import              System.IO
+import              System.IO (hSeek, SeekMode (AbsoluteSeek))
 import              System.PosixCompat (setFileMode)
 
 data FetchException
@@ -319,9 +318,8 @@ withCabalFiles
     -> m [b]
 withCabalFiles name pkgs f = do
     indexPath <- configPackageIndex name
-    bracket
-        (liftIO $ openBinaryFile (toFilePath indexPath) ReadMode)
-        (liftIO . hClose) $ \h -> mapM (goPkg h) pkgs
+    withBinaryFile (toFilePath indexPath) ReadMode
+      $ \h -> mapM (goPkg h) pkgs
   where
     goPkg h (ResolvedPackage { rpIdent = ident, rpOffsetSize = OffsetSize offset size }, tf) = do
         -- Did not find warning for tarballs is handled above
@@ -493,10 +491,10 @@ fetchPackages' mdistDir toFetchAll = do
     connCount <- view $ configL.to configConnectionCount
     outputVar <- liftIO $ newTVarIO Map.empty
 
-    runInBase <- askRunIO
+    run <- askRunInIO
     parMapM_
         connCount
-        (go outputVar runInBase)
+        (go outputVar run)
         (Map.toList toFetchAll)
 
     liftIO $ readTVarIO outputVar
@@ -506,7 +504,7 @@ fetchPackages' mdistDir toFetchAll = do
        -> (m () -> IO ())
        -> (PackageIdentifier, ToFetch)
        -> m ()
-    go outputVar runInBase (ident, toFetch) = do
+    go outputVar run (ident, toFetch) = do
         req <- parseUrlThrow $ T.unpack $ tfUrl toFetch
         let destpath = tfTarball toFetch
 
@@ -518,7 +516,7 @@ fetchPackages' mdistDir toFetchAll = do
                 , drRetryPolicy = drRetryPolicyDefault
                 }
         let progressSink _ =
-                liftIO $ runInBase $ $logInfo $ packageIdentifierText ident <> ": download"
+                liftIO $ run $ $logInfo $ packageIdentifierText ident <> ": download"
         _ <- verifiedDownload downloadReq destpath progressSink
 
         identStrP <- parseRelDir $ packageIdentifierString ident
@@ -625,23 +623,18 @@ parMapM_ :: (F.Foldable f,MonadUnliftIO m)
          -> f a
          -> m ()
 parMapM_ (max 1 -> 1) f xs = F.mapM_ f xs
-parMapM_ cnt f xs0 = do
-    var <- liftIO (newTVarIO $ F.toList xs0)
+parMapM_ cnt f xs0 = withRunInIO $ \run -> do
+    var <- newTVarIO $ F.toList xs0
 
-    runInBase <- askRunIO
-
-    let worker = fix $ \loop -> join $ atomically $ do
-            xs <- readTVar var
-            case xs of
-                [] -> return $ return ()
-                x:xs' -> do
-                    writeTVar var xs'
-                    return $ do
-                        runInBase $ f x
-                        loop
-        workers 1 = Concurrently worker
-        workers i = Concurrently worker *> workers (i - 1)
-    liftIO $ runConcurrently $ workers cnt
+    replicateConcurrently_ cnt $ fix $ \loop -> join $ atomically $ do
+      xs <- readTVar var
+      case xs of
+          [] -> return $ return ()
+          x:xs' -> do
+              writeTVar var xs'
+              return $ do
+                  run $ f x
+                  loop
 
 orSeparated :: NonEmpty T.Text -> T.Text
 orSeparated xs

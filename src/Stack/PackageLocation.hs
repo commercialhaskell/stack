@@ -19,7 +19,7 @@ import qualified Codec.Archive.Zip as Zip
 import Control.Arrow (second)
 import qualified Codec.Compression.GZip as GZip
 import Control.Monad
-import Control.Monad.IO.Unlift
+import Stack.Prelude
 import Control.Monad.Logger
 import           Crypto.Hash (hashWith, SHA256(..))
 import qualified Data.ByteArray as Mem (convert)
@@ -41,7 +41,6 @@ import Stack.Types.BuildPlan
 import Stack.Types.Config
 import Stack.Types.PackageIdentifier
 import qualified System.Directory as Dir
-import System.IO (withBinaryFile, IOMode (ReadMode))
 import System.Process.Read
 import System.Process.Run
 

@@ -29,7 +29,7 @@ module Stack.BuildPlan
     ) where
 
 import           Control.Applicative
-import           Control.Monad.IO.Unlift
+import           Stack.Prelude
 import           Control.Monad.Logger
 import qualified Data.Foldable as F
 import qualified Data.HashSet as HashSet

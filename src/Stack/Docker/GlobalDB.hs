@@ -17,7 +17,7 @@ module Stack.Docker.GlobalDB
 
 import           Control.Monad (forM_, when)
 import           Control.Monad.Logger (NoLoggingT)
-import           Control.Monad.IO.Unlift
+import           Stack.Prelude
 import           Data.List (sortBy, isInfixOf, stripPrefix)
 import           Data.List.Extra (stripSuffix)
 import qualified Data.Map.Strict as Map
@@ -31,7 +31,6 @@ import           Path (toFilePath, parent)
 import           Path.IO (ensureDir)
 import           Stack.Types.Config
 import           Stack.Types.Docker
-import           Stack.Types.StringError
 
 share [mkPersist sqlSettings, mkMigrate "migrateTables"] [persistLowerCase|
 DockerImageProject

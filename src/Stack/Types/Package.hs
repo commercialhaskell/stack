@@ -9,7 +9,7 @@
 module Stack.Types.Package where
 
 import           Control.DeepSeq
-import           Control.Monad.IO.Unlift
+import           Stack.Prelude
 import qualified Data.ByteString as S
 import           Data.Data
 import           Data.Function

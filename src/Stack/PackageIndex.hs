@@ -27,7 +27,7 @@ module Stack.PackageIndex
 
 import qualified Codec.Archive.Tar as Tar
 import           Control.Monad (unless, when, liftM, guard)
-import           Control.Monad.IO.Unlift
+import           Stack.Prelude
 import           Control.Monad.Logger (logDebug, logInfo, logWarn)
 import           Data.Aeson.Extended
 import qualified Data.ByteString.Lazy as L
@@ -35,7 +35,6 @@ import           Data.Conduit (($$), (=$), (.|))
 import           Data.Conduit.Binary (sinkHandle, sourceHandle, sourceFile, sinkFile)
 import           Data.Conduit.Zlib (ungzip)
 import           Data.Foldable (forM_)
-import           Data.IORef
 import           Data.Int (Int64)
 import qualified Data.List.NonEmpty as NE
 import           Data.HashMap.Strict (HashMap)
@@ -68,11 +67,9 @@ import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageIndex
 import           Stack.Types.PackageName
 import           Stack.Types.StackT
-import           Stack.Types.StringError
 import           Stack.Types.Version
 import qualified System.Directory as D
 import           System.FilePath ((<.>))
-import           System.IO (IOMode (ReadMode, WriteMode), withBinaryFile)
 
 -- | Populate the package index caches and return them.
 populateCache :: (StackMiniM env m, HasConfig env) => PackageIndex -> m (PackageCache ())
@@ -103,7 +100,7 @@ populateCache index = do
 
     return cache
   where
-    convertPI :: MonadThrow m
+    convertPI :: MonadIO m
               => (PackageIdentifier, ((), Maybe PackageDownload, Endo [(CabalHash, OffsetSize)]))
               -> m (PackageCache ())
     convertPI (ident@(PackageIdentifier name version), ((), mpd, Endo front)) =
@@ -299,11 +296,11 @@ updateIndexHackageSecurity
 updateIndexHackageSecurity indexName' url (HackageSecurity keyIds threshold) = do
     baseURI <-
         case parseURI $ T.unpack url of
-            Nothing -> errorString $ "Invalid Hackage Security base URL: " ++ T.unpack url
+            Nothing -> throwString $ "Invalid Hackage Security base URL: " ++ T.unpack url
             Just x -> return x
     manager <- liftIO getGlobalManager
     root <- configPackageIndexRoot indexName'
-    run <- askRunIO
+    run <- askRunInIO
     let logTUF = run . $logInfo . T.pack . HS.pretty
         withRepo = HS.withRepository
             (HS.makeHttpLib manager)

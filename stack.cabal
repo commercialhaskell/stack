@@ -64,7 +64,6 @@ library
   hs-source-dirs:    src/
   ghc-options:       -Wall -fwarn-tabs -fwarn-incomplete-uni-patterns -fwarn-incomplete-record-updates -fwarn-identities
   exposed-modules:   Control.Concurrent.Execute
-                     Control.Monad.IO.Unlift
                      Data.Aeson.Extended
                      Data.Attoparsec.Args
                      Data.Attoparsec.Combinators
@@ -181,7 +180,6 @@ library
                      Stack.Types.Resolver
                      Stack.Types.Sig
                      Stack.Types.StackT
-                     Stack.Types.StringError
                      Stack.Types.TemplateName
                      Stack.Types.Version
                      Stack.Types.VersionIntervals
@@ -196,7 +194,6 @@ library
   build-depends:     Cabal >= 1.24 && < 1.25
                    , aeson (>= 1.0 && < 1.2)
                    , ansi-terminal >= 0.6.2.3
-                   , async >= 2.0.2 && < 2.2
                    , attoparsec >= 0.12.1.5 && < 0.14
                    , base >= 4.8 && <5
                    , base-compat >=0.6 && <0.10
@@ -236,7 +233,7 @@ library
                    , network-uri
                    , open-browser >= 0.2.1
                    , optparse-applicative >= 0.13 && < 0.14
-                   , path >= 0.5.8 && <= 0.5.12
+                   , path >= 0.5.8 && <= 0.5.13
                    , path-io >= 1.1.0 && < 2.0.0
                    , persistent >= 2.1.2 && < 2.7
                        -- persistent-sqlite-2.5.0.1 has a bug
@@ -248,14 +245,12 @@ library
                    , regex-applicative-text >=0.1.0.1 && <0.2
                    , resourcet >= 1.1.4.1
                    , retry >= 0.6 && < 0.8
-                   , safe-exceptions
                    , semigroups >= 0.5 && < 0.19
                    , split
                    , stm >= 2.4.4
                    , streaming-commons >= 0.1.10.0
                    , tar >= 0.5.0.3 && < 0.6
                    , template-haskell >= 2.9.0.0 && < 2.12
-                   , temporary >= 1.2.0.3
                    , text >= 1.2.0.4
                    , text-binary
                    , text-metrics >= 0.3 && < 0.4
@@ -264,6 +259,7 @@ library
                    , transformers >= 0.3.0.0 && < 0.6
                    , unicode-transforms >= 0.1 && <0.4
                    , unix-compat
+                   , unliftio
                    , unordered-containers >= 0.2.5.1
                    , vector >= 0.10.12.3 && < 0.13
                    , yaml >= 0.8.20

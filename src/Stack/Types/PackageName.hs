@@ -26,7 +26,7 @@ module Stack.Types.PackageName
 import           Control.Applicative
 import           Control.DeepSeq
 import           Control.Monad
-import           Control.Monad.IO.Unlift
+import           Stack.Prelude
 import           Data.Aeson.Extended
 import           Data.Attoparsec.Combinators
 import           Data.Attoparsec.Text
@@ -43,7 +43,6 @@ import           Language.Haskell.TH
 import           Language.Haskell.TH.Syntax
 import qualified Options.Applicative as O
 import           Path
-import           Stack.Types.StringError
 
 -- | A parse fail.
 data PackageNameParseFail
@@ -96,7 +95,7 @@ packageNameParser =
 mkPackageName :: String -> Q Exp
 mkPackageName s =
   case parsePackageNameFromString s of
-    Nothing -> errorString ("Invalid package name: " ++ show s)
+    Nothing -> qRunIO $ throwString ("Invalid package name: " ++ show s)
     Just pn -> [|pn|]
 
 -- | Parse a package name from a 'Text'.

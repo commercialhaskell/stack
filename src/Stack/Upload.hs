@@ -15,7 +15,7 @@ module Stack.Upload
 
 import           Control.Applicative
 import           Control.Monad                         (void, when, unless)
-import           Control.Monad.IO.Unlift
+import           Stack.Prelude
 import           Data.Aeson                            (FromJSON (..),
                                                         ToJSON (..),
                                                         decode', encode,
@@ -49,7 +49,6 @@ import           Stack.Types.Config
 import           Stack.Types.PackageIdentifier         (PackageIdentifier, packageIdentifierString,
                                                         packageIdentifierName)
 import           Stack.Types.PackageName               (packageNameString)
-import           Stack.Types.StringError
 import           System.Directory                      (createDirectoryIfMissing,
                                                         removeFile)
 import           System.FilePath                       ((</>), takeFileName)

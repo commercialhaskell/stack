@@ -21,7 +21,7 @@ import qualified Options.Applicative as O
 import           Path
 import           Path.Internal
 import           Prelude
-import           Stack.Types.StringError
+import           Stack.Prelude
 
 -- | A template name.
 data TemplateName = TemplateName !Text !TemplatePath
@@ -94,7 +94,7 @@ parseTemplateNameFromString fname =
 mkTemplateName :: String -> Q Exp
 mkTemplateName s =
     case parseTemplateNameFromString s of
-        Left{} -> errorString ("Invalid template name: " ++ show s)
+        Left{} -> runIO $ throwString ("Invalid template name: " ++ show s)
         Right (TemplateName (T.unpack -> prefix) p) ->
             [|TemplateName (T.pack prefix) $(pn)|]
             where pn =

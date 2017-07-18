@@ -21,7 +21,7 @@ module Network.HTTP.Download
     ) where
 
 import           Control.Monad               (void)
-import           Control.Monad.IO.Unlift
+import           Stack.Prelude
 import           Control.Monad.Logger        (MonadLogger, logDebug)
 import qualified Data.ByteString.Lazy        as L
 import           Data.Conduit                (runConduit, (.|), yield)
@@ -41,8 +41,6 @@ import           Path                        (Abs, File, Path, toFilePath)
 import           System.Directory            (createDirectoryIfMissing,
                                               removeFile)
 import           System.FilePath             (takeDirectory, (<.>))
-import           System.IO                   (IOMode (ReadMode),
-                                              withBinaryFile)
 
 -- | Download the given URL to the given location. If the file already exists,
 -- no download is performed. Otherwise, creates the parent directory, downloads

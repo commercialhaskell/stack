@@ -21,7 +21,7 @@ module Stack.Build
   where
 
 import           Control.Monad
-import           Control.Monad.IO.Unlift
+import           Stack.Prelude
 import           Control.Monad.Logger
 import           Control.Monad.Reader (MonadReader)
 import           Data.Aeson (Value (Object, Array), (.=), object)
@@ -64,7 +64,6 @@ import           Stack.Types.Package
 import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageName
 import           Stack.Types.StackT
-import           Stack.Types.StringError
 import           Stack.Types.Version
 
 #ifdef WINDOWS
@@ -292,7 +291,7 @@ withLoadPackage inner = do
     econfig <- view envConfigL
     menv <- getMinimalEnvOverride
     root <- view projectRootL
-    run <- askRunIO
+    run <- askRunInIO
     withCabalLoader $ \loadFromIndex ->
         inner $ \loc flags ghcOptions -> do
             bs <- run $ loadSingleRawCabalFile loadFromIndex menv root loc
@@ -385,7 +384,7 @@ queryBuildInfo selectors0 =
             _ -> err $ "Cannot apply selector to " ++ show value
       where
         cont = select (front . (sel:)) sels
-        err msg = errorString $ msg ++ ": " ++ show (front [sel])
+        err msg = throwString $ msg ++ ": " ++ show (front [sel])
 
 -- | Get the raw build information object
 rawBuildInfo :: (StackM env m, HasEnvConfig env) => m Value

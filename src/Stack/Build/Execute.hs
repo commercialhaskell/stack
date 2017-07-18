@@ -26,7 +26,7 @@ import           Control.Arrow ((&&&), second)
 import           Control.Concurrent.Execute
 import           Control.Concurrent.STM
 import           Control.Monad (liftM, when, unless, void)
-import           Control.Monad.IO.Unlift
+import           Stack.Prelude
 import           Control.Monad.Logger
 import           Crypto.Hash
 import           Data.Attoparsec.Text hiding (try)
@@ -42,7 +42,6 @@ import           Data.Either (isRight)
 import           Data.FileEmbed (embedFile, makeRelativeToProject)
 import           Data.Foldable (forM_, any)
 import           Data.Function
-import           Data.IORef
 import           Data.IORef.RunOnce (runOnce)
 import           Data.List hiding (any)
 import           Data.Map.Strict (Map)
@@ -71,7 +70,7 @@ import           Language.Haskell.TH as TH (location)
 import           Path
 import           Path.CheckInstall
 import           Path.Extra (toFilePathNoTrailingSep, rejectMissingFile)
-import           Path.IO hiding (findExecutable, makeAbsolute)
+import           Path.IO hiding (findExecutable, makeAbsolute, withSystemTempDir)
 import           Prelude hiding (FilePath, writeFile, any)
 import           Stack.Build.Cache
 import           Stack.Build.Haddock
@@ -347,8 +346,7 @@ withExecuteEnv :: forall env m a. (StackM env m, HasEnvConfig env)
                -> (ExecuteEnv m -> m a)
                -> m a
 withExecuteEnv menv bopts boptsCli baseConfigOpts locals globalPackages snapshotPackages localPackages inner =
-    withRunIO $ \run ->
-    withSystemTempDir stackProgName $ \tmpdir -> run $ do
+    withSystemTempDir stackProgName $ \tmpdir -> do
         configLock <- liftIO $ newMVar ()
         installLock <- liftIO $ newMVar ()
         idMap <- liftIO $ newTVarIO Map.empty
@@ -603,9 +601,9 @@ executePlan' installedMap0 targets plan ee@ExecuteEnv {..} = do
     liftIO $ atomically $ modifyTVar' eeLocalDumpPkgs $ \initMap ->
         foldl' (flip Map.delete) initMap $ Map.keys (planUnregisterLocal plan)
 
-    runInBase <- askRunIO
+    run <- askRunInIO
 
-    let actions = concatMap (toActions installedMap' runInBase ee) $ Map.elems $ Map.mergeWithKey
+    let actions = concatMap (toActions installedMap' run ee) $ Map.elems $ Map.mergeWithKey
             (\_ b f -> Just (Just b, Just f))
             (fmap (\b -> (Just b, Nothing)))
             (fmap (\f -> (Nothing, Just f)))
@@ -627,9 +625,9 @@ executePlan' installedMap0 targets plan ee@ExecuteEnv {..} = do
         let total = length actions
             loop prev
                 | prev == total =
-                    runInBase $ $logStickyDone ("Completed " <> T.pack (show total) <> " action(s).")
+                    run $ $logStickyDone ("Completed " <> T.pack (show total) <> " action(s).")
                 | otherwise = do
-                    when terminal $ runInBase $
+                    when terminal $ run $
                         $logSticky ("Progress: " <> T.pack (show prev) <> "/" <> T.pack (show total))
                     done <- atomically $ do
                         done <- readTVar doneVar

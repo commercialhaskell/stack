@@ -37,7 +37,7 @@ module Stack.Types.PackageIdentifier
 
 import           Control.Applicative
 import           Control.DeepSeq
-import           Control.Monad.IO.Unlift
+import           Stack.Prelude
 import           Crypto.Hash.Conduit (hashFile)
 import           Crypto.Hash as Hash (hashlazy, Digest, SHA256)
 import           Data.Aeson.Extended

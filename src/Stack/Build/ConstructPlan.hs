@@ -18,7 +18,7 @@ module Stack.Build.ConstructPlan
     ) where
 
 import           Control.Monad
-import           Control.Monad.IO.Unlift
+import           Stack.Prelude
 import           Control.Monad.Logger
 import           Control.Monad.Reader (runReaderT)
 import           Control.Monad.RWS.Strict
@@ -39,7 +39,6 @@ import           Data.Text (Text)
 import qualified Data.Text as T
 import           Data.Text.Encoding (decodeUtf8With)
 import           Data.Text.Encoding.Error (lenientDecode)
-import           Data.Typeable
 import qualified Distribution.Package as Cabal
 import qualified Distribution.Text as Cabal
 import qualified Distribution.Version as Cabal

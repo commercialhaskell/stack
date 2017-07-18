@@ -19,7 +19,7 @@ import Prelude ()
 import Prelude.Compat
 
 import           Control.Monad (unless, when)
-import           Control.Monad.IO.Unlift
+import           Stack.Prelude
 import           Control.Monad.Logger (MonadLogger, logWarn)
 import qualified Data.ByteString.Char8 as C
 import           Data.List (find, isPrefixOf)

@@ -23,7 +23,7 @@ module Stack.Ghci
 import           Control.Applicative
 import           Control.Arrow (second)
 import           Control.Monad hiding (forM)
-import           Control.Monad.IO.Unlift
+import           Stack.Prelude
 import           Control.Monad.Logger
 import           Control.Monad.State.Strict (State, execState, get, modify)
 import qualified Data.ByteString.Char8 as S8
@@ -47,7 +47,7 @@ import qualified Distribution.PackageDescription as C
 import qualified Distribution.Text as C
 import           Path
 import           Path.Extra (toFilePathNoTrailingSep)
-import           Path.IO
+import           Path.IO hiding (withSystemTempDir)
 import           Prelude
 import           Stack.Build
 import           Stack.Build.Installed
@@ -352,7 +352,7 @@ runGhci GhciOpts{..} targets mainIsTargets pkgs extraFiles = do
             if "Intero" `isPrefixOf` output
                 then return renderScriptIntero
                 else return renderScriptGhci
-    withRunIO $ \run -> withSystemTempDir "ghci" $ \tmpDirectory -> run $ do
+    withSystemTempDir "ghci" $ \tmpDirectory -> do
         macrosOptions <- writeMacrosFile tmpDirectory pkgs
         if ghciNoLoadModules
             then execGhci macrosOptions

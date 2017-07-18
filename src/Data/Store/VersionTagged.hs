@@ -15,7 +15,7 @@ module Data.Store.VersionTagged
     ) where
 
 import Control.Applicative
-import Control.Monad.IO.Unlift
+import Stack.Prelude
 import Control.Monad.Logger
 import qualified Data.ByteString as BS
 import Data.Data (Data)

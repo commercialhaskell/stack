@@ -47,7 +47,7 @@ module Stack.Types.Build
     where
 
 import           Control.DeepSeq
-import           Control.Monad.IO.Unlift
+import           Stack.Prelude
 import           Data.Binary                     (Binary)
 import           Data.Binary.Tagged              (HasSemanticVersion,
                                                   HasStructuralInfo)

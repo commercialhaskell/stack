@@ -27,7 +27,7 @@ module Stack.Types.StackT
 
 import           Control.Applicative
 import           Control.Monad
-import           Control.Monad.IO.Unlift
+import           Stack.Prelude
 import           Control.Monad.Logger
 import           Control.Monad.Reader hiding (lift)
 import qualified Data.ByteString.Char8 as S8

@@ -11,7 +11,7 @@ module Path.Find
 
 import Control.DeepSeq (force)
 import Control.Monad
-import Control.Monad.IO.Unlift
+import Stack.Prelude
 import System.IO.Error (isPermissionError)
 import Data.List
 import Path

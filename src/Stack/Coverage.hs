@@ -17,7 +17,7 @@ module Stack.Coverage
     ) where
 
 import           Control.Monad (liftM, when, unless, void, (<=<))
-import           Control.Monad.IO.Unlift
+import           Stack.Prelude
 import           Control.Monad.Logger
 import qualified Data.ByteString.Char8 as S8
 import           Data.Foldable (forM_, asum, toList)
@@ -49,7 +49,6 @@ import           Stack.Types.Package
 import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageName
 import           Stack.Types.StackT (StackM)
-import           Stack.Types.StringError
 import           Stack.Types.Version
 import           System.FilePath (isPathSeparator)
 import           System.Process.Read
@@ -323,8 +322,8 @@ generateUnionReport report reportDir tixFiles = do
 
 readTixOrLog :: (MonadLogger m, MonadUnliftIO m) => Path b File -> m (Maybe Tix)
 readTixOrLog path = do
-    mtix <- liftIO (readTix (toFilePath path)) `catch` \errorCall -> do
-        $logError $ "Error while reading tix: " <> T.pack (show (errorCall :: ErrorCall))
+    mtix <- liftIO (readTix (toFilePath path)) `catchAny` \errorCall -> do
+        $logError $ "Error while reading tix: " <> T.pack (show errorCall)
         return Nothing
     when (isNothing mtix) $
         $logError $ "Failed to read tix file " <> T.pack (toFilePath path)

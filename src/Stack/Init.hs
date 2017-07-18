@@ -10,7 +10,7 @@ module Stack.Init
 
 import           Control.Applicative
 import           Control.Monad
-import           Control.Monad.IO.Unlift
+import           Stack.Prelude
 import           Control.Monad.Logger
 import qualified Data.ByteString.Builder         as B
 import qualified Data.ByteString.Char8           as BC
@@ -50,7 +50,6 @@ import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageName
 import           Stack.Types.Resolver
 import           Stack.Types.StackT              (StackM)
-import           Stack.Types.StringError
 import           Stack.Types.Version
 import qualified System.FilePath                 as FP
 
@@ -341,7 +340,7 @@ getSnapshots' = do
         $logError "    http://docs.haskellstack.org/en/stable/yaml_configuration/"
         $logError ""
         $logError $ "Exception was: " <> T.pack (show e)
-        errorString ""
+        throwString ""
 
 -- | Get the default resolver value
 getDefaultResolver

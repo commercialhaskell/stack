@@ -74,7 +74,7 @@ module Stack.Build.Target
 
 import           Control.Applicative
 import           Control.Monad (forM)
-import           Control.Monad.IO.Unlift
+import           Stack.Prelude
 import           Control.Monad.Logger
 import           Data.Either (partitionEithers)
 import           Data.Foldable

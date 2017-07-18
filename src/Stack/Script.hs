@@ -6,7 +6,7 @@ module Stack.Script
     ) where
 
 import           Control.Monad              (unless, forM, void)
-import           Control.Monad.IO.Unlift
+import           Stack.Prelude
 import           Control.Monad.Logger
 import           Data.ByteString            (ByteString)
 import qualified Data.ByteString.Char8      as S8
@@ -31,7 +31,6 @@ import           Stack.Types.Compiler
 import           Stack.Types.Config
 import           Stack.Types.PackageName
 import           Stack.Types.StackT
-import           Stack.Types.StringError
 import           System.FilePath            (dropExtension, replaceExtension)
 import           System.Process.Read
 

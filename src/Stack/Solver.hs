@@ -22,7 +22,7 @@ import           Prelude.Compat
 
 import           Control.Applicative
 import           Control.Monad (when,void,join,liftM,unless,mapAndUnzipM, zipWithM_)
-import           Control.Monad.IO.Unlift
+import           Stack.Prelude
 import           Control.Monad.Logger
 import           Data.Aeson.Extended         (object, (.=), toJSON)
 import qualified Data.ByteString as S
@@ -55,7 +55,7 @@ import qualified Distribution.PackageDescription as C
 import qualified Distribution.Text as C
 import           Path
 import           Path.Find (findFiles)
-import           Path.IO hiding (findExecutable, findFiles)
+import           Path.IO hiding (findExecutable, findFiles, withSystemTempDir)
 import           Stack.Build.Target (gpdVersion)
 import           Stack.BuildPlan
 import           Stack.Config (getLocalPackages, loadConfigYaml)
@@ -97,7 +97,7 @@ cabalSolver :: (StackM env m, HasConfig env)
             -> m (Either [PackageName] ConstraintSpec)
 cabalSolver menv cabalfps constraintType
             srcConstraints depConstraints cabalArgs =
-  withRunIO $ \run -> withSystemTempDir "cabal-solver" $ \dir' -> run $ do
+  withSystemTempDir "cabal-solver" $ \dir' -> do
 
     let versionConstraints = fmap fst depConstraints
         dir = toFilePath dir'

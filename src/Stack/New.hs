@@ -19,7 +19,7 @@ module Stack.New
     where
 
 import           Control.Monad
-import           Control.Monad.IO.Unlift
+import           Stack.Prelude
 import           Control.Monad.Logger
 import           Control.Monad.Trans.Writer.Strict
 import           Data.Aeson
@@ -45,7 +45,6 @@ import qualified Data.Text.IO as T
 import qualified Data.Text.Lazy as LT
 import           Data.Time.Calendar
 import           Data.Time.Clock
-import           Data.Typeable
 import qualified Data.Yaml as Yaml
 import           Network.HTTP.Download
 import           Network.HTTP.Simple

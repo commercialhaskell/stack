@@ -15,7 +15,7 @@ module Stack.ConfigCmd
 
 import           Control.Applicative
 import           Control.Monad
-import           Control.Monad.IO.Unlift
+import           Stack.Prelude
 import           Control.Monad.Logger
 import qualified Data.ByteString as S
 import qualified Data.HashMap.Strict as HMap
@@ -33,7 +33,6 @@ import           Stack.Constants
 import           Stack.Snapshot (loadResolver)
 import           Stack.Types.Config
 import           Stack.Types.Resolver
-import           Stack.Types.StringError
 
 data ConfigCmdSet
     = ConfigCmdSetResolver AbstractResolver
@@ -67,7 +66,7 @@ cfgCmdSet go cmd = do
                      case mstackYaml of
                          LCSProject stackYaml -> return stackYaml
                          LCSNoProject -> liftM (</> stackDotYaml) (getImplicitGlobalProjectDir conf)
-                         LCSNoConfig -> errorString "config command used when no local configuration available"
+                         LCSNoConfig -> throwString "config command used when no local configuration available"
                  CommandScopeGlobal -> return (configUserConfigPath conf)
     -- We don't need to worry about checking for a valid yaml here
     (config :: Yaml.Object) <-

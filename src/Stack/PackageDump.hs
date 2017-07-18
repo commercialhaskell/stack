@@ -27,7 +27,7 @@ module Stack.PackageDump
 import           Control.Applicative
 import           Control.Arrow ((&&&))
 import           Control.Monad (liftM)
-import           Control.Monad.IO.Unlift
+import           Stack.Prelude
 import           Control.Monad.Logger (MonadLogger)
 import           Data.Attoparsec.Args
 import           Data.Attoparsec.Text as P
@@ -35,7 +35,6 @@ import           Data.Conduit
 import qualified Data.Conduit.List as CL
 import qualified Data.Conduit.Text as CT
 import           Data.Either (partitionEithers)
-import           Data.IORef
 import           Data.List (isPrefixOf)
 import           Data.Map (Map)
 import qualified Data.Map as Map
@@ -49,7 +48,6 @@ import           Data.Typeable (Typeable)
 import qualified Distribution.License as C
 import qualified Distribution.System as OS
 import qualified Distribution.Text as C
-import           Path
 import           Path.Extra (toFilePathNoTrailingSep)
 import           Prelude -- Fix AMP warning
 import           Stack.GhcPkg

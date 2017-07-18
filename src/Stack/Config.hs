@@ -50,13 +50,12 @@ import           Control.Applicative
 import           Control.Arrow ((***), second)
 import           Control.Monad (liftM, unless, when, filterM, forM)
 import           Control.Monad.Extra (firstJustM)
-import           Control.Monad.IO.Unlift
+import           Stack.Prelude
 import           Control.Monad.Logger hiding (Loc)
 import           Control.Monad.Reader (ask, runReaderT)
 import           Data.Aeson.Extended
 import qualified Data.ByteString as S
 import           Data.Foldable (forM_)
-import           Data.IORef
 import qualified Data.IntMap as IntMap
 import qualified Data.Map as Map
 import           Data.Maybe
@@ -100,7 +99,6 @@ import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageIndex (IndexType (ITHackageSecurity), HackageSecurity (..))
 import           Stack.Types.Resolver
 import           Stack.Types.StackT
-import           Stack.Types.StringError
 import           Stack.Types.Urls
 import           Stack.Types.Version
 import           System.Environment
@@ -198,10 +196,10 @@ makeConcreteResolver root ar = do
             ARLatestNightly -> return $ ResolverSnapshot $ Nightly $ snapshotsNightly snapshots
             ARLatestLTSMajor x ->
                 case IntMap.lookup x $ snapshotsLts snapshots of
-                    Nothing -> errorString $ "No LTS release found with major version " ++ show x
+                    Nothing -> throwString $ "No LTS release found with major version " ++ show x
                     Just y -> return $ ResolverSnapshot $ LTS x y
             ARLatestLTS
-                | IntMap.null $ snapshotsLts snapshots -> errorString "No LTS releases found"
+                | IntMap.null $ snapshotsLts snapshots -> throwString "No LTS releases found"
                 | otherwise ->
                     let (x, y) = IntMap.findMax $ snapshotsLts snapshots
                      in return $ ResolverSnapshot $ LTS x y
@@ -414,7 +412,7 @@ getDefaultLocalProgramsBase configStackRoot configPlatform override =
         case Map.lookup "LOCALAPPDATA" $ unEnvOverride override of
           Just t ->
             case parseAbsDir $ T.unpack t of
-              Nothing -> throwString ("Failed to parse LOCALAPPDATA environment variable (expected absolute directory): " ++ show t)
+              Nothing -> throwM $ stringException ("Failed to parse LOCALAPPDATA environment variable (expected absolute directory): " ++ show t)
               Just lad -> return $ lad </> $(mkRelDir "Programs") </> $(mkRelDir stackProgName)
           Nothing -> return defaultBase
       _ -> return defaultBase

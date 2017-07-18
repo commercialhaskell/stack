@@ -18,7 +18,7 @@ module Stack.Build.Source
 import              Control.Applicative
 import              Control.Arrow ((&&&))
 import              Control.Monad hiding (sequence)
-import              Control.Monad.IO.Unlift
+import              Stack.Prelude
 import              Control.Monad.Reader (MonadReader)
 import              Crypto.Hash (Digest, SHA256(..))
 import              Crypto.Hash.Conduit (sinkHash)
@@ -55,7 +55,6 @@ import              Stack.Types.PackageName
 import              Stack.Types.StackT
 import qualified    System.Directory as D
 import              System.FilePath (takeFileName)
-import              System.IO (withBinaryFile, IOMode (ReadMode))
 import              System.IO.Error (isDoesNotExistError)
 
 -- | Like 'loadSourceMapFull', but doesn't return values that aren't as

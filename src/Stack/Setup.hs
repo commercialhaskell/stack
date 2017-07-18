@@ -34,7 +34,6 @@ module Stack.Setup
 
 import qualified    Codec.Archive.Tar as Tar
 import              Control.Applicative
-import              Control.Concurrent.Async (Concurrently(..))
 import              Control.Monad (liftM, when, join, unless, guard)
 import              Control.Monad.Logger
 import              Control.Monad.Reader (MonadReader, ReaderT (..))
@@ -53,7 +52,6 @@ import              Data.Conduit.Zlib           (ungzip)
 import              Data.Either
 import              Data.Foldable hiding (concatMap, or, maximum)
 import qualified    Data.HashMap.Strict as HashMap
-import              Data.IORef
 import              Data.IORef.RunOnce (runOnce)
 import              Data.List hiding (concat, elem, maximumBy, any)
 import              Data.Map (Map)
@@ -77,10 +75,10 @@ import              Distribution.Text (simpleParse)
 import              Lens.Micro (set)
 import              Network.HTTP.Simple (getResponseBody, httpLBS, withResponse, getResponseStatusCode)
 import              Network.HTTP.Download
-import              Path
+import              Path hiding (relfile)
 import              Path.CheckInstall (warnInstallSearchPathIssues)
 import              Path.Extra (toFilePathNoTrailingSep)
-import              Path.IO hiding (findExecutable)
+import              Path.IO hiding (findExecutable, withSystemTempDir)
 import qualified    Paths_stack as Meta
 import              Prelude hiding (concat, elem, any) -- Fix AMP warning
 import              Stack.Build (build)
@@ -102,7 +100,6 @@ import              Stack.Types.Docker
 import              Stack.Types.PackageIdentifier
 import              Stack.Types.PackageName
 import              Stack.Types.StackT
-import              Stack.Types.StringError
 import              Stack.Types.Version
 import qualified    System.Directory as D
 import              System.Environment (getExecutablePath)
@@ -637,7 +634,7 @@ ensureDockerStackExe containerPlatform = do
     unless stackExeExists $ do
         $logInfo $ mconcat ["Downloading Docker-compatible ", T.pack stackProgName, " executable"]
         sri <- downloadStackReleaseInfo Nothing Nothing (Just (versionString stackVersion))
-        let platforms = preferredPlatforms (containerPlatform, PlatformVariantNone)
+        platforms <- runReaderT preferredPlatforms (containerPlatform, PlatformVariantNone)
         downloadStackExe platforms sri stackExeDir (const $ return ())
     return stackExePath
 
@@ -677,7 +674,7 @@ doCabalInstall :: (StackM env m, HasConfig env, HasGHCVariant env)
                -> Version
                -> m ()
 doCabalInstall menv wc installed version = do
-    withRunIO $ \run -> withSystemTempDir "stack-cabal-upgrade" $ \tmpdir -> run $ do
+    withSystemTempDir "stack-cabal-upgrade" $ \tmpdir -> do
         $logInfo $ T.concat
             [ "Installing Cabal-"
             , T.pack $ versionString version
@@ -1335,7 +1332,7 @@ withUnpackedTarball7z name si archiveFile archiveType msrcDir destDir = do
     run7z <- setup7z si
     let tmpName = toFilePathNoTrailingSep (dirname destDir) ++ "-tmp"
     ensureDir (parent destDir)
-    withRunIO $ \run -> withTempDir (parent destDir) tmpName $ \tmpDir -> run $ do
+    withRunInIO $ \run -> withTempDir (parent destDir) tmpName $ \tmpDir -> run $ do
         liftIO $ ignoringAbsence (removeDirRecur destDir)
         run7z (parent archiveFile) archiveFile
         run7z tmpDir tarFile
@@ -1427,8 +1424,8 @@ chattyDownload label downloadInfo path = do
             , drLengthCheck = mtotalSize
             , drRetryPolicy = drRetryPolicyDefault
             }
-    runInBase <- askRunIO
-    x <- verifiedDownload dReq path (chattyDownloadProgress runInBase)
+    run <- askRunInIO
+    x <- verifiedDownload dReq path (chattyDownloadProgress run)
     if x
         then $logStickyDone ("Downloaded " <> label <> ".")
         else $logStickyDone "Already downloaded."
@@ -1514,7 +1511,7 @@ sanityCheck :: (MonadUnliftIO m, MonadLogger m)
             => EnvOverride
             -> WhichCompiler
             -> m ()
-sanityCheck menv wc = withRunIO $ \run -> withSystemTempDir "stack-sanity-check" $ \dir -> run $ do
+sanityCheck menv wc = withSystemTempDir "stack-sanity-check" $ \dir -> do
     let fp = toFilePath $ dir </> $(mkRelFile "Main.hs")
     liftIO $ writeFile fp $ unlines
         [ "import Distribution.Simple" -- ensure Cabal library is present
@@ -1700,7 +1697,7 @@ downloadStackReleaseInfo morg mrepo mver = liftIO $ do
         then return $ StackReleaseInfo $ getResponseBody res
         else throwString $ "Could not get release information for Stack from: " ++ url
 
-preferredPlatforms :: (MonadReader env m, HasPlatform env)
+preferredPlatforms :: (MonadReader env m, HasPlatform env, MonadThrow m)
                    => m [(Bool, String)]
 preferredPlatforms = do
     Platform arch' os' <- view platformL
@@ -1710,13 +1707,13 @@ preferredPlatforms = do
         Cabal.Windows -> return (True, "windows")
         Cabal.OSX -> return (False, "osx")
         Cabal.FreeBSD -> return (False, "freebsd")
-        _ -> errorString $ "Binary upgrade not yet supported on OS: " ++ show os'
+        _ -> throwM $ stringException $ "Binary upgrade not yet supported on OS: " ++ show os'
     arch <-
       case arch' of
         I386 -> return "i386"
         X86_64 -> return "x86_64"
         Arm -> return "arm"
-        _ -> errorString $ "Binary upgrade not yet supported on arch: " ++ show arch'
+        _ -> throwM $ stringException $ "Binary upgrade not yet supported on arch: " ++ show arch'
     hasgmp4 <- return False -- FIXME import relevant code from Stack.Setup? checkLib $(mkRelFile "libgmp.so.3")
     let suffixes
           | hasgmp4 = ["-static", "-gmp4", ""]

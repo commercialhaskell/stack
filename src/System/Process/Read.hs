@@ -39,9 +39,8 @@ module System.Process.Read
 
 import           Control.Applicative
 import           Control.Arrow ((***), first)
-import           Control.Concurrent.Async (concurrently)
 import           Control.Monad (join, liftM, unless)
-import           Control.Monad.IO.Unlift
+import           Stack.Prelude
 import           Control.Monad.Logger
 import qualified Data.ByteString as S
 import           Data.ByteString.Builder
@@ -50,7 +49,6 @@ import           Data.Conduit
 import qualified Data.Conduit.Binary as CB
 import qualified Data.Conduit.List as CL
 import           Data.Conduit.Process hiding (callProcess)
-import           Data.IORef
 import           Data.Map (Map)
 import qualified Data.Map as Map
 import           Data.Maybe (isJust, maybeToList, fromMaybe)

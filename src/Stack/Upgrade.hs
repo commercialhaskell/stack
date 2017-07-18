@@ -12,7 +12,7 @@ module Stack.Upgrade
     ) where
 
 import           Control.Monad               (unless, when)
-import           Control.Monad.IO.Unlift
+import           Stack.Prelude
 import           Control.Monad.Logger
 import           Data.Foldable               (forM_)
 import qualified Data.HashMap.Strict         as HashMap
@@ -23,7 +23,6 @@ import qualified Data.Text as T
 import           Lens.Micro                  (set)
 import           Options.Applicative
 import           Path
-import           Path.IO
 import qualified Paths_stack as Paths
 import           Stack.Build
 import           Stack.Config
@@ -37,7 +36,6 @@ import           Stack.Types.Version
 import           Stack.Types.Config
 import           Stack.Types.Resolver
 import           Stack.Types.StackT
-import           Stack.Types.StringError
 import           System.Exit                 (ExitCode (ExitSuccess))
 import           System.Process              (rawSystem, readProcess)
 import           System.Process.Run
@@ -189,7 +187,7 @@ sourceUpgrade
   -> SourceOpts
   -> m ()
 sourceUpgrade gConfigMonoid mresolver builtHash (SourceOpts gitRepo) =
-  withRunIO $ \run -> withSystemTempDir "stack-upgrade" $ \tmp -> run $ do
+  withSystemTempDir "stack-upgrade" $ \tmp -> do
     menv <- getMinimalEnvOverride
     mdir <- case gitRepo of
       Just (repo, branch) -> do

@@ -14,7 +14,7 @@ module Stack.Nix
 
 import           Control.Arrow ((***))
 import           Control.Monad hiding (mapM)
-import           Control.Monad.IO.Unlift
+import           Stack.Prelude
 import           Control.Monad.Logger (logDebug)
 import           Data.Maybe
 import           Data.Monoid
@@ -81,8 +81,8 @@ runShellAndExit mprojectRoot getCompilerVersion getCmdArgs = do
          nixInitFile (configNix config)
      compilerVersion <- liftIO getCompilerVersion
      inContainer <- getInContainer
+     ghc <- either throwIO return $ nixCompiler compilerVersion
      let pkgsInConfig = nixPackages (configNix config)
-         ghc = nixCompiler compilerVersion
          pkgs = pkgsInConfig ++ [ghc, "git"]
          pkgsStr = "[" <> T.intercalate " " pkgs <> "]"
          pureShell = nixPureShell (configNix config)

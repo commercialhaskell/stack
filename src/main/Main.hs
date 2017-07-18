@@ -16,7 +16,7 @@ module Main (main) where
 import qualified Build_stack
 #endif
 import           Control.Monad hiding (mapM, forM)
-import           Control.Monad.IO.Unlift
+import           Stack.Prelude
 import           Control.Monad.Logger
 import           Control.Monad.Reader (local)
 import           Control.Monad.Trans.Except (ExceptT)
@@ -103,7 +103,6 @@ import           Stack.Types.Config
 import           Stack.Types.Compiler
 import           Stack.Types.Nix
 import           Stack.Types.StackT
-import           Stack.Types.StringError
 import           Stack.Upgrade
 import qualified Stack.Upload as Upload
 import qualified System.Directory as D

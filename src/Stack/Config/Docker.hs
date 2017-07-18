@@ -4,7 +4,7 @@
 module Stack.Config.Docker where
 
 import           Control.Monad (void)
-import           Control.Monad.IO.Unlift
+import           Stack.Prelude
 import           Data.List (find)
 import           Data.Maybe
 import           Data.Monoid.Extra

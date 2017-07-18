@@ -7,7 +7,7 @@ module Stack.Hoogle
     ( hoogleCmd
     ) where
 
-import           Control.Monad.IO.Unlift
+import           Stack.Prelude
 import           Control.Monad.Logger
 import qualified Data.ByteString.Char8 as S8
 import           Data.List (find)

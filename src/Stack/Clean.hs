@@ -9,7 +9,7 @@ module Stack.Clean
     ,StackCleanException(..)
     ) where
 
-import           Control.Monad.IO.Unlift
+import           Stack.Prelude
 import           Data.Foldable (forM_)
 import           Data.List ((\\),intercalate)
 import qualified Data.Map.Strict as Map

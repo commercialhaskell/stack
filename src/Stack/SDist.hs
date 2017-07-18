@@ -20,7 +20,7 @@ import qualified Codec.Compression.GZip as GZip
 import           Control.Applicative
 import           Control.Concurrent.Execute (ActionContext(..))
 import           Control.Monad (unless, liftM, filterM, when)
-import           Control.Monad.IO.Unlift
+import           Stack.Prelude
 import           Control.Monad.Logger
 import           Control.Monad.Reader.Class (local)
 import qualified Data.ByteString as S
@@ -29,7 +29,6 @@ import qualified Data.ByteString.Lazy as L
 import           Data.Char (toLower)
 import           Data.Data (Data, Typeable, cast, gmapT)
 import           Data.Either (partitionEithers)
-import           Data.IORef (newIORef, readIORef, writeIORef)
 import           Data.List
 import           Data.List.Extra (nubOrd)
 import           Data.List.NonEmpty (NonEmpty)
@@ -51,7 +50,7 @@ import           Distribution.Text (display)
 import           Distribution.Version (simplifyVersionRange, orLaterVersion, earlierVersion, hasUpperBound, hasLowerBound)
 import           Lens.Micro (set)
 import           Path
-import           Path.IO hiding (getModificationTime, getPermissions)
+import           Path.IO hiding (getModificationTime, getPermissions, withSystemTempDir)
 import           Prelude -- Fix redundant import warnings
 import           Stack.Build (mkBaseConfigOpts, build)
 import           Stack.Build.Execute
@@ -68,7 +67,6 @@ import           Stack.Types.Package
 import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageName
 import           Stack.Types.StackT
-import           Stack.Types.StringError
 import           Stack.Types.Version
 import           System.Directory (getModificationTime, getPermissions)
 import qualified System.FilePath as FP
@@ -271,17 +269,17 @@ readLocalPackage pkgDir = do
 -- | Returns a newline-separate list of paths, and the absolute path to the .cabal file.
 getSDistFileList :: (StackM env m, HasEnvConfig env) => LocalPackage -> m (String, Path Abs File)
 getSDistFileList lp =
-    withRunIO $ \run -> withSystemTempDir (stackProgName <> "-sdist") $ \tmpdir -> run $ do
+    withSystemTempDir (stackProgName <> "-sdist") $ \tmpdir -> do
         menv <- getMinimalEnvOverride
         let bopts = defaultBuildOpts
         let boptsCli = defaultBuildOptsCLI
         baseConfigOpts <- mkBaseConfigOpts boptsCli
         (locals, _) <- loadSourceMap NeedTargets boptsCli
-        runInBase <- askRunIO
+        run <- askRunInIO
         withExecuteEnv menv bopts boptsCli baseConfigOpts locals
             [] [] [] -- provide empty list of globals. This is a hack around custom Setup.hs files
             $ \ee ->
-            withSingleContext runInBase ac ee task Nothing (Just "sdist") $ \_package cabalfp _pkgDir cabal _announce _console _mlogFile -> do
+            withSingleContext run ac ee task Nothing (Just "sdist") $ \_package cabalfp _pkgDir cabal _announce _console _mlogFile -> do
                 let outFile = toFilePath tmpdir FP.</> "source-files-list"
                 cabal KeepTHLoading ["sdist", "--list-sources", outFile]
                 contents <- liftIO (readFile outFile)
@@ -409,7 +407,7 @@ checkSDistTarball' :: (StackM env m, HasEnvConfig env)
   -> String       -- ^ Tarball name
   -> L.ByteString -- ^ Tarball contents as a byte string
   -> m ()
-checkSDistTarball' opts name bytes = withRunIO $ \run -> withSystemTempDir "stack" $ \tpath -> run $ do
+checkSDistTarball' opts name bytes = withSystemTempDir "stack" $ \tpath -> do
     npath   <- (tpath </>) `liftM` parseRelFile name
     liftIO $ L.writeFile (toFilePath npath) bytes
     checkSDistTarball opts npath
@@ -418,7 +416,7 @@ withTempTarGzContents :: (MonadUnliftIO m)
   => Path Abs File         -- ^ Location of tarball
   -> (Path Abs Dir -> m a) -- ^ Perform actions given dir with tarball contents
   -> m a
-withTempTarGzContents apath f = withRunIO $ \run -> withSystemTempDir "stack" $ \tpath -> run $ do
+withTempTarGzContents apath f = withSystemTempDir "stack" $ \tpath -> do
     archive <- liftIO $ L.readFile (toFilePath apath)
     liftIO . Tar.unpack (toFilePath tpath) . Tar.read . GZip.decompress $ archive
     f tpath

@@ -18,7 +18,7 @@ module Stack.Constants.Config
   ) where
 
 import Control.Monad (liftM)
-import Control.Monad.IO.Unlift
+import Stack.Prelude
 import Control.Monad.Reader (MonadReader)
 import Lens.Micro (Getting)
 import Stack.Constants

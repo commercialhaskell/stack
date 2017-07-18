@@ -104,4 +104,5 @@ spec = beforeAll setup $ do
         lc <- loadConfig' mempty
         nixPackages (configNix $ lcConfig lc) `shouldBe` ["glpk"]
         v <- parseVersion "7.10.3"
-        nixCompiler (GhcVersion v) `shouldBe` "haskell.compiler.ghc7103"
+        ghc <- either throwIO return $ nixCompiler (GhcVersion v)
+        ghc `shouldBe` "haskell.compiler.ghc7103"

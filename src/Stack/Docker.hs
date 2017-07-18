@@ -22,7 +22,7 @@ module Stack.Docker
 
 import           Control.Applicative
 import           Control.Monad
-import           Control.Monad.IO.Unlift
+import           Stack.Prelude
 import           Control.Monad.Logger (MonadLogger,logError,logInfo,logWarn)
 import           Control.Monad.Reader (MonadReader,runReaderT)
 import           Control.Monad.Writer (execWriter,runWriter,tell)
@@ -360,9 +360,9 @@ runContainerAndExit getCmdArgs
          ,args])
      before
 #ifndef WINDOWS
-     runInBase <- askRunIO
+     run <- askRunInIO
      oldHandlers <- forM [sigINT,sigABRT,sigHUP,sigPIPE,sigTERM,sigUSR1,sigUSR2] $ \sig -> do
-       let sigHandler = runInBase $ do
+       let sigHandler = run $ do
              readProcessNull Nothing envOverride "docker"
                              ["kill","--signal=" ++ show sig,containerID]
              when (sig `elem` [sigTERM,sigABRT]) $ do

@@ -22,7 +22,7 @@ module System.Process.Run
     where
 
 import           Control.Monad (liftM)
-import           Control.Monad.IO.Unlift
+import           Stack.Prelude
 import           Control.Monad.Logger (MonadLogger, logError)
 import           Data.Conduit.Process hiding (callProcess)
 import           Data.Foldable (forM_)

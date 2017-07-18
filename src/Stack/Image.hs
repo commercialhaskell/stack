@@ -12,12 +12,11 @@ module Stack.Image
        where
 
 import           Control.Monad
-import           Control.Monad.IO.Unlift
+import           Stack.Prelude
 import           Control.Monad.Logger
 import           Data.Char (toLower)
 import qualified Data.Map.Strict as Map
 import           Data.Maybe
-import           Data.Typeable
 import           Data.Text (Text)
 import qualified Data.Text as T
 import           Path
