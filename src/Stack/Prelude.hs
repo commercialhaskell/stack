@@ -1,6 +1,6 @@
-{-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE NoImplicitPrelude          #-}
+{-# LANGUAGE OverloadedStrings          #-}
 module Stack.Prelude
   ( mapLeft
   , runConduitRes
@@ -16,58 +16,91 @@ module Stack.Prelude
   , module X
   ) where
 
-import Text.Read as X (Read, readMaybe)
-import UnliftIO as X
-import Control.Monad.Catch as X (MonadThrow (..)) -- future consideration: move to explicit Either
-import Data.Conduit as X (runConduit, (.|), ConduitM)
-import Data.Void as X (Void, absurd)
-import Path as X (Path, Abs, Rel, Dir, File, toFilePath)
-import Control.Monad.Logger as X
-       (MonadLogger(..), MonadLoggerIO(..), logDebug, logInfo, logWarn, logOther,
-        logError, toLogStr, Loc, LogSource, LogLevel (..), LogStr, liftLoc)
-import Control.Monad.Reader as X (MonadReader, ask, asks, ReaderT (..), MonadTrans (..))
-import Lens.Micro as X (Getting)
-import Lens.Micro.Mtl as X (view)
-import Data.Char as X (Char)
-import Data.Bool as X (Bool (..), (&&), (||), not, otherwise)
-import Prelude as X (String, IO, Show, show, Num (..), fst, snd, curry, uncurry, Enum, Bounded (..), Integer, Float, Double, Rational, Real (..), Integral (..), Fractional (..), Floating (..), RealFrac (..), RealFloat (..), subtract, even, odd, gcd, lcm, (^), (^^), fromIntegral, realToFrac, asTypeOf, error, undefined, seq, ($!), FilePath)
-import Data.List as X ((++), map, reverse, filter, words, unwords, lines, unlines, lookup, break, span, take, drop, takeWhile, dropWhile, zip, replicate)
-import Data.Data as X (Data (..))
-import Data.Eq as X (Eq (..))
-import Data.Functor as X (Functor (..), (<$), ($>), (<$>), void)
-import Data.Either as X (Either (..), partitionEithers, either, lefts, rights, isLeft, isRight)
-import Data.Maybe as X (Maybe (..), maybe, isJust, isNothing, fromMaybe, listToMaybe, maybeToList, catMaybes, mapMaybe)
-import Data.Monoid as X (Monoid (..), (<>), Endo (..), All (..), Any (..), Sum (..), Product (..), First (..), Last (..))
-import Data.Ord as X (Ord (..), Ordering (..), comparing)
-import Data.Traversable as X (Traversable (..), for, forM)
-import Data.String as X (IsString (..))
-import Data.Text as X (Text)
-import Data.ByteString as X (ByteString)
-import Control.Applicative as X (Applicative (..), Alternative, many, some, (<|>), optional, liftA, liftA2, liftA3)
-import Control.Arrow as X (first, second, (***), (&&&))
-import Control.Monad as X (Monad (..), join, MonadPlus (..), (=<<), (>=>), (<=<), forever, filterM, zipWithM, zipWithM_, foldM, foldM_, replicateM_, guard, when, unless, liftM, liftM2, (<$!>))
-import Data.Int as X
-import Data.Word as X
-import Data.Foldable as X
-       (Foldable, fold, foldMap, foldr, foldl', toList, null, length,
-        elem, sum, product, traverse_, for_, sequenceA_, asum, mapM_,
-        forM_, sequence_, msum, concat, concatMap, and, or, any, all,
-        notElem)
-import Data.Function as X (id, const, (.), flip, ($), (&), fix, on)
-import Data.Map.Strict as X (Map)
-import Data.Set as X (Set)
-import Data.HashMap.Strict as X (HashMap)
-import Data.HashSet as X (HashSet)
-import Data.IntMap.Strict as X (IntMap)
-import Data.IntSet as X (IntSet)
-import GHC.Generics as X (Generic)
-import Control.DeepSeq as X (NFData (..), ($!!), force)
-import Data.Hashable as X (Hashable)
-import Data.Vector as X (Vector)
-import Data.Store as X (Store)
+import           Control.Applicative  as X (Alternative, Applicative (..),
+                                            liftA, liftA2, liftA3, many,
+                                            optional, some, (<|>))
+import           Control.Arrow        as X (first, second, (&&&), (***))
+import           Control.DeepSeq      as X (NFData (..), force, ($!!))
+import           Control.Monad        as X (Monad (..), MonadPlus (..), filterM,
+                                            foldM, foldM_, forever, guard, join,
+                                            liftM, liftM2, replicateM_, unless,
+                                            when, zipWithM, zipWithM_, (<$!>),
+                                            (<=<), (=<<), (>=>))
+import           Control.Monad.Catch  as X (MonadThrow (..))
+import           Control.Monad.Logger as X (Loc, LogLevel (..), LogSource,
+                                            LogStr, MonadLogger (..),
+                                            MonadLoggerIO (..), liftLoc,
+                                            logDebug, logError, logInfo,
+                                            logOther, logWarn, toLogStr)
+import           Control.Monad.Reader as X (MonadReader, MonadTrans (..),
+                                            ReaderT (..), ask, asks)
+import           Data.Bool            as X (Bool (..), not, otherwise, (&&),
+                                            (||))
+import           Data.ByteString      as X (ByteString)
+import           Data.Char            as X (Char)
+import           Data.Conduit         as X (ConduitM, runConduit, (.|))
+import           Data.Data            as X (Data (..))
+import           Data.Either          as X (Either (..), either, isLeft,
+                                            isRight, lefts, partitionEithers,
+                                            rights)
+import           Data.Eq              as X (Eq (..))
+import           Data.Foldable        as X (Foldable, all, and, any, asum,
+                                            concat, concatMap, elem, fold,
+                                            foldMap, foldl', foldr, forM_, for_,
+                                            length, mapM_, msum, notElem, null,
+                                            or, product, sequenceA_, sequence_,
+                                            sum, toList, traverse_)
+import           Data.Function        as X (const, fix, flip, id, on, ($), (&),
+                                            (.))
+import           Data.Functor         as X (Functor (..), void, ($>), (<$),
+                                            (<$>))
+import           Data.Hashable        as X (Hashable)
+import           Data.HashMap.Strict  as X (HashMap)
+import           Data.HashSet         as X (HashSet)
+import           Data.Int             as X
+import           Data.IntMap.Strict   as X (IntMap)
+import           Data.IntSet          as X (IntSet)
+import           Data.List            as X (break, drop, dropWhile, filter,
+                                            lines, lookup, map, replicate,
+                                            reverse, span, take, takeWhile,
+                                            unlines, unwords, words, zip, (++))
+import           Data.Map.Strict      as X (Map)
+import           Data.Maybe           as X (Maybe (..), catMaybes, fromMaybe,
+                                            isJust, isNothing, listToMaybe,
+                                            mapMaybe, maybe, maybeToList)
+import           Data.Monoid          as X (All (..), Any (..), Endo (..),
+                                            First (..), Last (..), Monoid (..),
+                                            Product (..), Sum (..), (<>))
+import           Data.Ord             as X (Ord (..), Ordering (..), comparing)
+import           Data.Set             as X (Set)
+import           Data.Store           as X (Store)
+import           Data.String          as X (IsString (..))
+import           Data.Text            as X (Text)
+import           Data.Traversable     as X (Traversable (..), for, forM)
+import           Data.Vector          as X (Vector)
+import           Data.Void            as X (Void, absurd)
+import           Data.Word            as X
+import           GHC.Generics         as X (Generic)
+import           Lens.Micro           as X (Getting)
+import           Lens.Micro.Mtl       as X (view)
+import           Path                 as X (Abs, Dir, File, Path, Rel,
+                                            toFilePath)
+import           Prelude              as X (Bounded (..), Double, Enum,
+                                            FilePath, Float, Floating (..),
+                                            Fractional (..), IO, Integer,
+                                            Integral (..), Num (..), Rational,
+                                            Real (..), RealFloat (..),
+                                            RealFrac (..), Show, String,
+                                            asTypeOf, curry, error, even,
+                                            fromIntegral, fst, gcd, lcm, odd,
+                                            realToFrac, seq, show, snd,
+                                            subtract, uncurry, undefined, ($!),
+                                            (^), (^^))
+import           Text.Read            as X (Read, readMaybe)
+import           UnliftIO             as X
 
+import qualified Data.Text            as T
 import qualified Path.IO
-import qualified Data.Text as T
 
 mapLeft :: (a1 -> a2) -> Either a1 b -> Either a2 b
 mapLeft f (Left a1) = Left (f a1)
