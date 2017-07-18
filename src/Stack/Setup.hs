@@ -34,6 +34,7 @@ module Stack.Setup
   ) where
 
 import qualified    Codec.Archive.Tar as Tar
+import              Control.Applicative (empty)
 import              Control.Monad.Logger
 import              Control.Monad.State (get, put, modify)
 import "cryptonite" Crypto.Hash (SHA1(..))
