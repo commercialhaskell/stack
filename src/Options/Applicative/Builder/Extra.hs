@@ -30,8 +30,6 @@ module Options.Applicative.Builder.Extra
   ) where
 
 import Control.Monad (when, forM)
-import Control.Monad.IO.Unlift
-import Data.Either.Combinators
 import Data.List (isPrefixOf)
 import Data.Maybe
 import Data.Monoid
@@ -40,6 +38,7 @@ import qualified Data.Text as T
 import Options.Applicative
 import Options.Applicative.Types (readerAsk)
 import Path hiding ((</>))
+import Stack.Prelude
 import System.Directory (getCurrentDirectory, getDirectoryContents, doesDirectoryExist)
 import System.Environment (withArgs)
 import System.FilePath (takeBaseName, (</>), splitFileName, isRelative, takeExtension)

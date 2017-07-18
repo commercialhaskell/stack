@@ -46,7 +46,6 @@ import           Prelude.Compat
 
 import           Control.Arrow ((&&&))
 import           Control.Monad (liftM, liftM2, (<=<), when, forM, forM_)
-import           Control.Monad.IO.Unlift
 import           Control.Monad.Logger
 import           Control.Monad.Reader (MonadReader,runReaderT,ask,asks)
 import qualified Data.ByteString as BS
@@ -85,10 +84,10 @@ import           Path as FL
 import           Path.Extra
 import           Path.Find
 import           Path.IO hiding (findFiles)
-import           Safe (headDef, tailSafe)
 import           Stack.Build.Installed
 import           Stack.Constants
 import           Stack.Constants.Config
+import           Stack.Prelude
 import           Stack.PrettyPrint
 import           Stack.Types.Build
 import           Stack.Types.Compiler
@@ -1017,8 +1016,8 @@ parseDumpHI dumpHIPath = do
             mapMaybe (D.simpleParse . T.unpack . decodeUtf8) $
             C8.words $
             C8.concat $
-            C8.dropWhile (/= ' ') (headDef "" startModuleDeps) :
-            takeWhile (" " `C8.isPrefixOf`) (tailSafe startModuleDeps)
+            C8.dropWhile (/= ' ') (fromMaybe "" $ listToMaybe startModuleDeps) :
+            takeWhile (" " `C8.isPrefixOf`) (drop 1 startModuleDeps)
         thDeps =
             -- The dependent file path is surrounded by quotes but is not escaped.
             -- It can be an absolute or relative path.

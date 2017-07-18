@@ -27,7 +27,6 @@ module Stack.Types.StackT
 
 import           Control.Applicative
 import           Control.Monad
-import           Control.Monad.Base
 import           Control.Monad.IO.Unlift
 import           Control.Monad.Logger
 import           Control.Monad.Reader hiding (lift)
@@ -74,8 +73,6 @@ type StackM r m =
 newtype StackT config m a =
   StackT {unStackT :: ReaderT (Env config) m a}
   deriving (Functor,Applicative,Monad,MonadIO,MonadReader (Env config),MonadThrow,MonadTrans)
-
-deriving instance (MonadBase b m) => MonadBase b (StackT config m)
 
 -- | Takes the configured log level into account.
 instance MonadIO m => MonadLogger (StackT config m) where

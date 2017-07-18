@@ -36,7 +36,6 @@ import qualified    Codec.Archive.Tar as Tar
 import              Control.Applicative
 import              Control.Concurrent.Async (Concurrently(..))
 import              Control.Monad (liftM, when, join, unless, guard)
-import              Control.Monad.IO.Unlift
 import              Control.Monad.Logger
 import              Control.Monad.Reader (MonadReader, ReaderT (..))
 import              Control.Monad.State (get, put, modify)
@@ -84,7 +83,6 @@ import              Path.Extra (toFilePathNoTrailingSep)
 import              Path.IO hiding (findExecutable)
 import qualified    Paths_stack as Meta
 import              Prelude hiding (concat, elem, any) -- Fix AMP warning
-import              Safe (headMay, readMay)
 import              Stack.Build (build)
 import              Stack.Config (loadConfig)
 import              Stack.Constants (stackProgName)
@@ -92,6 +90,7 @@ import              Stack.Constants.Config (distRelativeDir)
 import              Stack.Exec (defaultEnvSettings)
 import              Stack.Fetch
 import              Stack.GhcPkg (createDatabase, getCabalPkgVer, getGlobalDB, mkGhcPackagePath)
+import              Stack.Prelude
 import              Stack.PrettyPrint
 import              Stack.Setup.Installed
 import              Stack.Snapshot (loadSnapshot)
@@ -565,7 +564,7 @@ getGhcBuild menv = do
                 eldconfigOut <- tryProcessStdout Nothing sbinEnv "ldconfig" ["-p"]
                 egccErrOut <- tryProcessStderrStdout Nothing menv "gcc" ["-v"]
                 let firstWords = case eldconfigOut of
-                        Right ldconfigOut -> mapMaybe (headMay . T.words) $
+                        Right ldconfigOut -> mapMaybe (listToMaybe . T.words) $
                             T.lines $ T.decodeUtf8With T.lenientDecode ldconfigOut
                         Left _ -> []
                     checkLib lib
@@ -725,7 +724,7 @@ getSystemCompiler menv wc = do
             eres <- tryProcessStdout Nothing menv exeName ["--info"]
             let minfo = do
                     Right bs <- Just eres
-                    pairs_ <- readMay $ S8.unpack bs :: Maybe [(String, String)]
+                    pairs_ <- readMaybe $ S8.unpack bs :: Maybe [(String, String)]
                     version <- lookup "Project version" pairs_ >>= parseVersionFromString
                     arch <- lookup "Target platform" pairs_ >>= simpleParse . takeWhile (/= '-')
                     return (version, arch)

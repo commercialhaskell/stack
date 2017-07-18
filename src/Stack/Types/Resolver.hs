@@ -37,7 +37,6 @@ module Stack.Types.Resolver
 
 import           Control.Applicative
 import           Control.DeepSeq (NFData)
-import           Control.Monad.IO.Unlift
 import           Data.Aeson.Extended
                  (ToJSON, toJSON, FromJSON, parseJSON,
                   withObject, (.:), withText)
@@ -61,7 +60,7 @@ import           Options.Applicative (ReadM)
 import qualified Options.Applicative.Types as OA
 import           Path
 import           Prelude
-import           Safe (readMay)
+import           Stack.Prelude
 import           Stack.Types.Compiler
 import qualified System.FilePath as FP
 
@@ -211,7 +210,7 @@ parseSnapName t0 =
         return $ LTS x y
     nightly = do
         t1 <- T.stripPrefix "nightly-" t0
-        Nightly <$> readMay (T.unpack t1)
+        Nightly <$> readMaybe (T.unpack t1)
 
 -- | Most recent Nightly and newest LTS version per major release.
 data Snapshots = Snapshots

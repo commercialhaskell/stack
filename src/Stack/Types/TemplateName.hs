@@ -7,7 +7,6 @@
 
 module Stack.Types.TemplateName where
 
-import           Control.Error.Safe (justErr)
 import           Control.Applicative
 import           Data.Aeson.Extended (FromJSON, withText, parseJSON)
 import           Data.Aeson.Types (typeMismatch)
@@ -80,7 +79,7 @@ parseTemplateNameFromString fname =
         Nothing -> parseValidFile (T.pack fname) (fname <> ".hsfiles") fname
         Just prefix -> parseValidFile prefix fname fname
   where
-    parseValidFile prefix hsf orig = justErr expected
+    parseValidFile prefix hsf orig = maybe (Left expected) Right
                                            $ asum (validParses prefix hsf orig)
     validParses prefix hsf orig =
         -- NOTE: order is important
