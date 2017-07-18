@@ -36,15 +36,12 @@ module Stack.Types.Resolver
   ,parseCustomLocation
   ) where
 
-import           Control.DeepSeq (NFData)
 import           Data.Aeson.Extended
                  (ToJSON, toJSON, FromJSON, parseJSON,
                   withObject, (.:), withText)
 import qualified Data.ByteString as BS
-import           Data.Data (Data)
 import qualified Data.HashMap.Strict as HashMap
 import qualified Data.IntMap.Strict as IntMap
-import           Data.Store (Store)
 import qualified Data.Text as T
 import           Data.Text.Read (decimal)
 import           Data.Time (Day)

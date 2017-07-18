@@ -21,7 +21,6 @@ import qualified Codec.Compression.GZip as GZip
 import Stack.Prelude
 import           Crypto.Hash (hashWith, SHA256(..))
 import qualified Data.ByteArray as Mem (convert)
-import Data.ByteString (ByteString)
 import qualified Data.ByteString as S
 import qualified Data.ByteString.Base64.URL as B64URL
 import qualified Data.ByteString.Lazy as L

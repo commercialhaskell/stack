@@ -27,8 +27,6 @@ import           Data.Aeson.Extended
 import           Data.Attoparsec.Combinators
 import           Data.Attoparsec.Text
 import           Data.Char (isLetter, isDigit, toLower)
-import           Data.Store (Store)
-import           Data.Text (Text)
 import qualified Data.Text as T
 import qualified Distribution.PackageDescription as Cabal
 import           Language.Haskell.TH

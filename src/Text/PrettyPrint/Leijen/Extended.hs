@@ -118,19 +118,14 @@ module Text.PrettyPrint.Leijen.Extended
   -- @
   ) where
 
-import Control.Monad.Reader
-import Data.Either (partitionEithers)
+import Control.Monad.Reader (runReader, local)
 import qualified Data.Map.Strict as M
-import Data.Maybe (mapMaybe)
-import Data.Monoid
-import Data.String
 import qualified Data.Text as T
 import qualified Data.Text.IO as T
 import qualified Data.Text.Lazy as LT
 import qualified Data.Text.Lazy.Builder as LTB
 import Stack.Prelude
 import System.Console.ANSI (Color(..), ColorIntensity(..), ConsoleLayer(..), ConsoleIntensity(..), SGR(..), setSGRCode, hSupportsANSI)
-import System.IO (Handle)
 import qualified Text.PrettyPrint.Annotated.Leijen as P
 import Text.PrettyPrint.Annotated.Leijen hiding ((<>), display)
 

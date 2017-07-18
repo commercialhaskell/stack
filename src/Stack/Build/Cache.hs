@@ -32,12 +32,7 @@ module Stack.Build.Cache
     , BuildCache(..)
     ) where
 
-import           Control.Applicative
-import           Control.DeepSeq (NFData)
-import           Control.Monad (liftM)
 import           Stack.Prelude
-import           Control.Monad.Logger (MonadLogger)
-import           Control.Monad.Reader (MonadReader)
 import           Crypto.Hash (hashWith, SHA256(..))
 import           Data.Binary (Binary (..))
 import qualified Data.Binary as Binary
@@ -49,17 +44,11 @@ import qualified Data.ByteString.Base64.URL as B64URL
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as S8
 import qualified Data.ByteString.Lazy as LBS
-import           Data.Foldable (forM_)
-import           Data.Map (Map)
 import qualified Data.Map as M
-import           Data.Maybe (fromMaybe, mapMaybe)
-import           Data.Set (Set)
 import qualified Data.Set as Set
 import qualified Data.Store as Store
 import           Data.Store.VersionTagged
-import           Data.Text (Text)
 import qualified Data.Text as T
-import           Data.Traversable (forM)
 import           Path
 import           Path.IO
 import           Stack.Constants.Config

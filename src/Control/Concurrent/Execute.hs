@@ -11,14 +11,9 @@ module Control.Concurrent.Execute
     , runActions
     ) where
 
-import           Control.Applicative
 import           Control.Concurrent.STM
-import           Control.Monad            (join, unless)
 import           Stack.Prelude
-import           Data.Foldable            (sequenceA_)
-import           Data.Set                 (Set)
 import qualified Data.Set                 as Set
-import           Data.Typeable            (Typeable)
 import           Stack.Types.PackageIdentifier
 
 data ActionType

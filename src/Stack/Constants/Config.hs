@@ -18,10 +18,7 @@ module Stack.Constants.Config
   , templatesDir
   ) where
 
-import Control.Monad (liftM)
 import Stack.Prelude
-import Control.Monad.Reader (MonadReader)
-import Lens.Micro (Getting)
 import Stack.Constants
 import Stack.Types.Compiler
 import Stack.Types.Config

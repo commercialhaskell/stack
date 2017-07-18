@@ -19,11 +19,9 @@ module Stack.Sig.Sign (sign, signPackage, signTarBytes) where
 
 import qualified Codec.Archive.Tar as Tar
 import qualified Codec.Compression.GZip as GZip
-import           Control.Monad (when)
 import           Stack.Prelude
 import qualified Data.ByteString.Lazy as BS
 import qualified Data.ByteString.Lazy as L
-import           Data.Monoid ((<>))
 import qualified Data.Text as T
 import           Network.HTTP.Client (RequestBody (RequestBodyBS))
 import           Network.HTTP.Download

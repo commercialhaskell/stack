@@ -67,9 +67,7 @@ import           Data.Version                    (showVersion)
 import           Distribution.PackageDescription (TestSuiteInterface)
 import           Distribution.System             (Arch)
 import qualified Distribution.Text               as C
-import           Path                            (Abs, Dir, File, Path,
-                                                  mkRelDir, parseRelDir,
-                                                  toFilePath, (</>))
+import           Path                            (mkRelDir, parseRelDir, (</>))
 import           Path.Extra                      (toFilePathNoTrailingSep)
 import           Paths_stack                     as Meta
 import           Stack.Constants

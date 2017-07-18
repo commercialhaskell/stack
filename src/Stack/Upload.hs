@@ -40,7 +40,6 @@ import           Network.HTTP.Client.MultipartFormData (formDataBody, partFileRe
 import           Network.HTTP.Client.TLS               (getGlobalManager,
                                                         applyDigestAuth,
                                                         displayDigestAuthException)
-import           Path                                  (toFilePath)
 import           Stack.Types.Config
 import           Stack.Types.PackageIdentifier         (PackageIdentifier, packageIdentifierString,
                                                         packageIdentifierName)

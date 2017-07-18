@@ -10,8 +10,6 @@ module Path.Find
   ,findInParents)
   where
 
-import Control.DeepSeq (force)
-import Control.Monad
 import Stack.Prelude
 import System.IO.Error (isPermissionError)
 import Data.List

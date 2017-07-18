@@ -7,7 +7,6 @@ module Stack.Config.Docker where
 import           Stack.Prelude
 import           Data.List (find)
 import qualified Data.Text as T
-import           Data.Typeable (Typeable)
 import           Distribution.Version (simplifyVersionRange)
 import           Path
 import           Stack.Types.Version

@@ -11,7 +11,6 @@ import qualified Data.ByteString.Char8      as S8
 import qualified Data.Conduit.List          as CL
 import           Data.List.Split            (splitWhen)
 import qualified Data.Map.Strict            as Map
-import           Data.Set                   (Set)
 import qualified Data.Set                   as Set
 import qualified Data.Text                  as T
 import           Path

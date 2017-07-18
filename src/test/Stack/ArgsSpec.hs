@@ -3,8 +3,6 @@
 
 module Stack.ArgsSpec where
 
-import Control.Applicative
-import Control.Exception.Base (assert)
 import Control.Monad
 import Data.Attoparsec.Interpreter (interpreterArgsParser)
 import qualified Data.Attoparsec.Text as P

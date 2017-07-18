@@ -28,20 +28,14 @@ module Data.Aeson.Extended (
   , (..!=)
   ) where
 
-import Control.Monad.Logger (MonadLogger, logWarn)
-import Control.Monad.Trans (lift)
 import Control.Monad.Trans.Writer.Strict (WriterT, mapWriterT, runWriterT, tell)
 import Data.Aeson as Export hiding ((.:), (.:?))
 import qualified Data.Aeson as A
 import Data.Aeson.Types hiding ((.:), (.:?))
 import qualified Data.HashMap.Strict as HashMap
-import Data.Monoid
-import Data.Set (Set)
 import qualified Data.Set as Set
 import Data.Text (unpack)
 import qualified Data.Text as T
-import Data.Traversable
-import qualified Data.Traversable as Traversable
 import Generics.Deriving.Monoid (mappenddefault, memptydefault)
 import Stack.Prelude
 
@@ -128,7 +122,7 @@ jsonSubWarningsT
     :: Traversable t
     => WarningParser (t (WithJSONWarnings a)) -> WarningParser (t a)
 jsonSubWarningsT f =
-    Traversable.mapM (jsonSubWarnings . return) =<< f
+    mapM (jsonSubWarnings . return) =<< f
 
 -- | Handle warnings in a @Maybe Traversable@ of sub-objects.
 jsonSubWarningsTT
@@ -136,7 +130,7 @@ jsonSubWarningsTT
     => WarningParser (u (t (WithJSONWarnings a)))
     -> WarningParser (u (t a))
 jsonSubWarningsTT f =
-    Traversable.mapM (jsonSubWarningsT . return) =<< f
+    mapM (jsonSubWarningsT . return) =<< f
 
 -- Parsed JSON value without any warnings
 noJSONWarnings :: a -> WithJSONWarnings a

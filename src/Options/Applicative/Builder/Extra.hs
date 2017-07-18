@@ -30,11 +30,9 @@ module Options.Applicative.Builder.Extra
   ,unescapeBashArg
   ) where
 
-import Control.Monad (when, forM)
 import Data.List (isPrefixOf)
 import Data.Maybe
 import Data.Monoid
-import Data.Text (Text)
 import qualified Data.Text as T
 import Options.Applicative
 import Options.Applicative.Types (readerAsk)

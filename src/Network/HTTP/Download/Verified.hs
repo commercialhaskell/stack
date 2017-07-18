@@ -29,24 +29,19 @@ import qualified    Data.Conduit.List as CL
 import qualified    Data.Text as Text
 import qualified    Data.Text.Encoding as Text
 
-import              Control.Applicative
 import              Control.Monad
 import              Control.Monad.Catch (Handler (..)) -- would be nice if retry exported this itself
 import              Stack.Prelude hiding (Handler (..))
-import              Control.Monad.Logger (logDebug, MonadLogger)
 import              Control.Retry (recovering,limitRetries,RetryPolicy,constantDelay)
 import              Crypto.Hash
 import              Crypto.Hash.Conduit (sinkHash)
 import              Data.ByteArray as Mem (convert)
 import              Data.ByteArray.Encoding as Mem (convertToBase, Base(Base16))
-import              Data.ByteString (ByteString)
 import              Data.ByteString.Char8 (readInteger)
 import              Data.Conduit
 import              Data.Conduit.Binary (sourceHandle, sinkHandle)
-import              Data.Foldable (traverse_,for_)
 import              Data.Text.Encoding (decodeUtf8With)
 import              Data.Text.Encoding.Error (lenientDecode)
-import              Data.Typeable (Typeable)
 import              GHC.IO.Exception (IOException(..),IOErrorType(..))
 import              Network.HTTP.Client (getUri, path)
 import              Network.HTTP.Simple (Request, HttpException, httpSink, getResponseHeaders)

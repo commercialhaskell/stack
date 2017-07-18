@@ -15,12 +15,9 @@ module Data.Store.VersionTagged
     , storeVersionConfig
     ) where
 
-import Control.Applicative
 import Stack.Prelude
 import qualified Data.ByteString as BS
-import Data.Data (Data)
 import qualified Data.Map as M
-import Data.Monoid ((<>))
 import qualified Data.Set as S
 import Data.Store
 import Data.Store.Core (unsafeEncodeWith)

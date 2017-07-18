@@ -30,7 +30,7 @@ import qualified Data.ByteString.Char8 as BS
 import qualified Data.ByteString.Lazy.Char8 as LBS
 import           Data.Char (isSpace,toUpper,isAscii,isDigit)
 import           Data.Conduit.List (sinkNull)
-import           Data.List (dropWhileEnd,intercalate,isPrefixOf,isInfixOf,foldl')
+import           Data.List (dropWhileEnd,intercalate,isPrefixOf,isInfixOf)
 import           Data.List.Extra (trim, nubOrd)
 import qualified Data.Map.Strict as Map
 import           Data.Ord (Down(..))

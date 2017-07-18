@@ -34,10 +34,7 @@ module Stack.Setup
   ) where
 
 import qualified    Codec.Archive.Tar as Tar
-import              Control.Applicative
-import              Control.Monad (liftM, when, join, unless, guard)
 import              Control.Monad.Logger
-import              Control.Monad.Reader (MonadReader, ReaderT (..))
 import              Control.Monad.State (get, put, modify)
 import "cryptonite" Crypto.Hash (SHA1(..))
 import              Data.Aeson.Extended
@@ -45,30 +42,21 @@ import qualified    Data.ByteString as S
 import qualified    Data.ByteString.Char8 as S8
 import qualified    Data.ByteString.Lazy as LBS
 import              Data.Char (isSpace)
-import              Data.Conduit (Conduit, (=$), await, yield, awaitForever, (.|))
+import              Data.Conduit (Conduit, (=$), await, yield, awaitForever)
 import              Data.Conduit.Lazy (lazyConsume)
 import              Data.Conduit.Lift (evalStateC)
 import qualified    Data.Conduit.List as CL
 import              Data.Conduit.Zlib           (ungzip)
-import              Data.Either
-import              Data.Foldable hiding (concatMap, or, maximum)
+import              Data.Foldable (maximumBy)
 import qualified    Data.HashMap.Strict as HashMap
 import              Data.IORef.RunOnce (runOnce)
 import              Data.List hiding (concat, elem, maximumBy, any)
-import              Data.Map (Map)
 import qualified    Data.Map as Map
-import              Data.Maybe
-import              Data.Monoid
-import              Data.Ord (comparing)
-import              Data.Set (Set)
 import qualified    Data.Set as Set
-import              Data.String
-import              Data.Text (Text)
 import qualified    Data.Text as T
 import qualified    Data.Text.Encoding as T
 import qualified    Data.Text.Encoding.Error as T
 import              Data.Time.Clock (NominalDiffTime, diffUTCTime, getCurrentTime)
-import              Data.Typeable (Typeable)
 import qualified    Data.Yaml as Yaml
 import              Distribution.System (OS (Linux), Arch (..), Platform (..))
 import qualified    Distribution.System as Cabal
@@ -76,7 +64,7 @@ import              Distribution.Text (simpleParse)
 import              Lens.Micro (set)
 import              Network.HTTP.Simple (getResponseBody, httpLBS, withResponse, getResponseStatusCode)
 import              Network.HTTP.Download
-import              Path hiding (relfile)
+import              Path
 import              Path.CheckInstall (warnInstallSearchPathIssues)
 import              Path.Extra (toFilePathNoTrailingSep)
 import              Path.IO hiding (findExecutable, withSystemTempDir)
@@ -918,10 +906,10 @@ downloadFromInfo programsDir downloadInfo tool = do
             ".tar.gz" -> return TarGz
             ".7z.exe" -> return SevenZ
             _ -> throwString $ "Error: Unknown extension for url: " ++ url
-    relfile <- parseRelFile $ toolString tool ++ extension
+    relfile' <- parseRelFile $ toolString tool ++ extension
     path <- case url of
         (parseUrlThrow -> Just _) -> do
-            let path = programsDir </> relfile
+            let path = programsDir </> relfile'
             ensureDir programsDir
             chattyDownload (T.pack (toolString tool)) downloadInfo path
             return path

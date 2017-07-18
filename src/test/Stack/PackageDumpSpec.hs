@@ -9,7 +9,6 @@ import           Data.Conduit
 import qualified Data.Conduit.Binary           as CB
 import qualified Data.Conduit.List             as CL
 import           Data.Conduit.Text             (decodeUtf8)
-import           Data.Map                      (Map)
 import qualified Data.Map                      as Map
 import qualified Data.Set                      as Set
 import           Distribution.System           (buildPlatform)

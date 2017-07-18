@@ -20,7 +20,6 @@ import qualified Data.ByteString.Lazy.Char8 as BSL
 import qualified Data.ByteString.Char8 as BS
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
-import           Control.Monad (liftM)
 import           Stack.Prelude
 import           Data.Bool (bool)
 import           Path

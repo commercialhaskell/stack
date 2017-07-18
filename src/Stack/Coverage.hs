@@ -19,7 +19,6 @@ module Stack.Coverage
 
 import           Stack.Prelude
 import qualified Data.ByteString.Char8 as S8
-import           Data.Foldable (toList)
 import           Data.List
 import qualified Data.Map.Strict as Map
 import qualified Data.Text as T

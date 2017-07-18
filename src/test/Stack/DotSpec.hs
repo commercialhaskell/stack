@@ -5,13 +5,10 @@
 -- | Test suite for Stack.Dot
 module Stack.DotSpec where
 
-import           Control.Monad (filterM)
 import           Data.Functor.Identity
 import           Data.List ((\\))
 import qualified Data.Map as Map
-import           Data.Set (Set)
 import qualified Data.Set as Set
-import           Data.Text (Text)
 import           Distribution.License (License (BSD3))
 import           Stack.Prelude
 import           Stack.Types.PackageName

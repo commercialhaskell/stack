@@ -22,7 +22,6 @@ module System.Process.PagerEditor
 import Stack.Prelude hiding (ByteString)
 import Data.ByteString.Lazy (ByteString,hPut,readFile)
 import Data.ByteString.Builder (Builder,stringUtf8,hPutBuilder)
-import Data.Typeable (Typeable)
 import System.Directory (findExecutable)
 import System.Environment (lookupEnv)
 import System.Exit (ExitCode(..))

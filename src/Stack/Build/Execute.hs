@@ -42,7 +42,6 @@ import qualified Data.Map.Strict as M
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import           Data.Streaming.Process hiding (callProcess, env)
-import           Data.Text (Text)
 import qualified Data.Text as T
 import           Data.Text.Encoding (decodeUtf8, encodeUtf8)
 import           Data.Time.Clock (getCurrentTime)

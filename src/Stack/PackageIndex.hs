@@ -30,11 +30,9 @@ import qualified Codec.Archive.Tar as Tar
 import           Stack.Prelude
 import           Data.Aeson.Extended
 import qualified Data.ByteString.Lazy as L
-import           Data.Conduit (($$), (=$), (.|))
 import           Data.Conduit.Binary (sinkHandle, sourceHandle, sourceFile, sinkFile)
 import           Data.Conduit.Zlib (ungzip)
 import qualified Data.List.NonEmpty as NE
-import           Data.HashMap.Strict (HashMap)
 import qualified Data.HashMap.Strict as HashMap
 import qualified Data.Set as Set
 import           Data.Store.Version
@@ -271,10 +269,10 @@ updateIndexHTTP indexName' url = do
 
         liftIO $ do
             withBinaryFile (toFilePath gz) ReadMode $ \input ->
-                withBinaryFile tmp WriteMode $ \output ->
-                    sourceHandle input
-                    $$ ungzip
-                    =$ sinkHandle output
+                withBinaryFile tmp WriteMode $ \output -> runConduit
+                  $ sourceHandle input
+                 .| ungzip
+                 .| sinkHandle output
             renameFile tmpPath tar
 
 -- | Update the index tarball via Hackage Security

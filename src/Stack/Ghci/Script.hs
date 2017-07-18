@@ -15,14 +15,10 @@ module Stack.Ghci.Script
   , scriptToFile
   ) where
 
-import           Control.Applicative
 import           Data.ByteString.Lazy (ByteString)
 import           Data.ByteString.Builder
-import           Data.Monoid
 import           Data.List
-import           Data.Set (Set)
 import qualified Data.Set as S
-import           Data.Text (Text)
 import           Data.Text.Encoding (encodeUtf8Builder)
 import           Path
 import           Stack.Prelude hiding (ByteString)

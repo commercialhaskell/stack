@@ -44,7 +44,6 @@ import           Data.Attoparsec.Text as A
 import qualified Data.ByteArray.Encoding as Mem (convertToBase, Base(Base16))
 import qualified Data.ByteString.Lazy as L
 import           Data.Hashable
-import           Data.Store (Store)
 import           Data.Store.Internal (Size (..), StaticSize (..), size,
                                       toStaticSize, toStaticSizeEx, unStaticSize)
 import qualified Data.Text as T

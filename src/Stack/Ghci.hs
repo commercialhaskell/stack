@@ -53,7 +53,6 @@ import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageName
 import           Stack.Types.StackT
 import           System.IO (putStrLn, putStr, getLine)
-import           Text.Read (readMaybe)
 
 #ifndef WINDOWS
 import qualified System.Posix.Files as Posix

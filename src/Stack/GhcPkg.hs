@@ -25,7 +25,7 @@ import qualified Data.ByteString.Char8 as S8
 import           Data.List
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
-import           Path (Path, Abs, Dir, toFilePath, parent, mkRelFile, (</>))
+import           Path (parent, mkRelFile, (</>))
 import           Path.Extra (toFilePathNoTrailingSep)
 import           Path.IO
 import           Stack.Constants

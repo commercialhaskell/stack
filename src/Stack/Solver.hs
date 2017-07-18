@@ -30,7 +30,6 @@ import           Data.List                   ( (\\), isSuffixOf, intercalate
 import           Data.List.Extra (groupSortOn)
 import qualified Data.Map as Map
 import qualified Data.Set as Set
-import           Data.Text (Text)
 import qualified Data.Text as T
 import           Data.Text.Encoding (decodeUtf8, encodeUtf8)
 import           Data.Text.Encoding.Error (lenientDecode)

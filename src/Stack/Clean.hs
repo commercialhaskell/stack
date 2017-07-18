@@ -11,12 +11,8 @@ module Stack.Clean
     ) where
 
 import           Stack.Prelude
-import           Data.Foldable (forM_)
 import           Data.List ((\\),intercalate)
 import qualified Data.Map.Strict as Map
-import           Data.Maybe (mapMaybe)
-import           Data.Typeable (Typeable)
-import           Path (Path, Abs, Dir)
 import           Path.IO (ignoringAbsence, removeDirRecur)
 import           Stack.Config (getLocalPackages)
 import           Stack.Constants.Config (distDirFromDir, workDirFromDir)

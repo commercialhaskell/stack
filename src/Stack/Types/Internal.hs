@@ -14,9 +14,6 @@ module Stack.Types.Internal
     , view
     ) where
 
-import Control.Concurrent.MVar
-import Control.Monad.Logger (LogLevel)
-import Data.Text (Text)
 import Lens.Micro
 import Stack.Prelude
 import Stack.Types.Config

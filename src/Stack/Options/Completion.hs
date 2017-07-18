@@ -10,7 +10,6 @@ module Stack.Options.Completion
     , projectExeCompleter
     ) where
 
-import           Control.Monad.Logger (LogLevel (LevelOther))
 import           Data.Char (isSpace)
 import           Data.List (isPrefixOf)
 import           Data.List.Extra (nubOrd)

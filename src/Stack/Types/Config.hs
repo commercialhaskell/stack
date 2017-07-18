@@ -181,7 +181,6 @@ import           Data.Aeson.Extended
                   jsonSubWarningsT, jsonSubWarningsTT, WithJSONWarnings(..), noJSONWarnings)
 import           Data.Attoparsec.Args
 import qualified Data.ByteString.Char8 as S8
-import           Data.Either (partitionEithers)
 import           Data.List (stripPrefix)
 import           Data.List.NonEmpty (NonEmpty)
 import qualified Data.List.NonEmpty as NonEmpty
@@ -198,8 +197,7 @@ import           Distribution.System (Platform)
 import qualified Distribution.Text
 import           Distribution.Version (anyVersion)
 import           Generics.Deriving.Monoid (memptydefault, mappenddefault)
-import           Lens.Micro (Lens', lens, _1, _2, to, Getting)
-import           Lens.Micro.Mtl (view)
+import           Lens.Micro (Lens', lens, _1, _2, to)
 import           Options.Applicative (ReadM)
 import qualified Options.Applicative as OA
 import qualified Options.Applicative.Types as OA
