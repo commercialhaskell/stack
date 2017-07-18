@@ -1,10 +1,7 @@
-{-# LANGUAGE MagicHash #-}
-
 module Stack.Types.StringError where
 
 import Control.Monad.IO.Unlift
 import Data.Typeable
-import GHC.Prim
 
 newtype StringError = StringError String
     deriving (Typeable)
@@ -16,4 +13,4 @@ throwString :: MonadThrow m => String -> m a
 throwString = throwM . StringError
 
 errorString :: String -> a
-errorString = raise# . toException . StringError
+errorString = impureThrow . StringError
