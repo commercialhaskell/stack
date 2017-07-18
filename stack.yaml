@@ -17,6 +17,7 @@ flags:
   mintty:
     win32-2-5: false
 extra-deps:
+- mintty-0.1.1
 - text-metrics-0.3.0
 - unliftio-core-0.1.0.0
 - unliftio-0.1.0.0
