@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -14,13 +15,9 @@ module Data.Store.VersionTagged
     , storeVersionConfig
     ) where
 
-import Control.Applicative
-import Control.Monad.IO.Unlift
-import Control.Monad.Logger
+import Stack.Prelude
 import qualified Data.ByteString as BS
-import Data.Data (Data)
 import qualified Data.Map as M
-import Data.Monoid ((<>))
 import qualified Data.Set as S
 import Data.Store
 import Data.Store.Core (unsafeEncodeWith)
@@ -29,7 +26,6 @@ import qualified Data.Text as T
 import Language.Haskell.TH
 import Path
 import Path.IO (ensureDir)
-import Prelude
 
 versionedEncodeFile :: Data a => VersionConfig a -> Q Exp
 versionedEncodeFile vc = [e| storeEncodeFile $(encodeWithVersionQ vc) $(decodeWithVersionQ vc) |]

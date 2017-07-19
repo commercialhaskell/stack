@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
@@ -19,24 +20,14 @@ module Stack.Types.PackageIndex
     , HackageSecurity (..)
     ) where
 
-import           Control.DeepSeq (NFData)
-import           Control.Monad (mzero)
 import           Data.Aeson.Extended
-import           Data.ByteString (ByteString)
 import qualified Data.Foldable as F
-import           Data.Hashable (Hashable)
-import           Data.Data (Data, Typeable)
-import           Data.HashMap.Strict (HashMap)
 import qualified Data.HashMap.Strict as HashMap
-import           Data.Int (Int64)
 import qualified Data.Map.Strict as Map
-import           Data.Store (Store)
-import           Data.Text (Text)
 import qualified Data.Text as T
 import           Data.Text.Encoding (encodeUtf8, decodeUtf8)
-import           Data.Word (Word64)
-import           GHC.Generics (Generic)
 import           Path
+import           Stack.Prelude
 import           Stack.Types.PackageName
 import           Stack.Types.PackageIdentifier
 import           Stack.Types.Version

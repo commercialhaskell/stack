@@ -1,9 +1,10 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 module Stack.Options.GhcBuildParser where
 
-import           Data.Monoid.Extra
 import           Options.Applicative
 import           Options.Applicative.Types
 import           Stack.Options.Utils
+import           Stack.Prelude
 import           Stack.Types.CompilerBuild
 
 -- | GHC build parser

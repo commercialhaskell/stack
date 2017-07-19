@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveDataTypeable #-}
@@ -35,33 +36,20 @@ module Stack.Types.Resolver
   ,parseCustomLocation
   ) where
 
-import           Control.Applicative
-import           Control.DeepSeq (NFData)
-import           Control.Monad.IO.Unlift
 import           Data.Aeson.Extended
                  (ToJSON, toJSON, FromJSON, parseJSON,
                   withObject, (.:), withText)
-import           Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
-import           Data.Data (Data)
 import qualified Data.HashMap.Strict as HashMap
-import           Data.IntMap.Strict (IntMap)
 import qualified Data.IntMap.Strict as IntMap
-import           Data.Maybe (fromMaybe)
-import           Data.Monoid
-import           Data.Store (Store)
-import           Data.Text (Text)
 import qualified Data.Text as T
 import           Data.Text.Read (decimal)
 import           Data.Time (Day)
-import           Data.Typeable (Typeable)
-import           GHC.Generics (Generic)
 import           Network.HTTP.Client (Request, parseUrlThrow)
 import           Options.Applicative (ReadM)
 import qualified Options.Applicative.Types as OA
 import           Path
-import           Prelude
-import           Safe (readMay)
+import           Stack.Prelude
 import           Stack.Types.Compiler
 import qualified System.FilePath as FP
 
@@ -211,7 +199,7 @@ parseSnapName t0 =
         return $ LTS x y
     nightly = do
         t1 <- T.stripPrefix "nightly-" t0
-        Nightly <$> readMay (T.unpack t1)
+        Nightly <$> readMaybe (T.unpack t1)
 
 -- | Most recent Nightly and newest LTS version per major release.
 data Snapshots = Snapshots

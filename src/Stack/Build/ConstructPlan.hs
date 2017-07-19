@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE DeriveDataTypeable #-}
@@ -17,37 +18,24 @@ module Stack.Build.ConstructPlan
     ( constructPlan
     ) where
 
-import           Control.Monad
-import           Control.Monad.IO.Unlift
-import           Control.Monad.Logger
-import           Control.Monad.Reader (runReaderT)
+import           Stack.Prelude
+import           Control.Monad.Logger (runLoggingT)
 import           Control.Monad.RWS.Strict
 import           Control.Monad.State.Strict (execState)
-import           Data.Either
-import           Data.Function
 import qualified Data.HashSet as HashSet
 import           Data.List
 import           Data.List.Extra (nubOrd)
-import           Data.Map.Strict (Map)
 import qualified Data.Map.Strict as M
 import qualified Data.Map.Strict as Map
-import           Data.Maybe
-import           Data.Set (Set)
 import qualified Data.Set as Set
-import           Data.String (fromString)
-import           Data.Text (Text)
 import qualified Data.Text as T
 import           Data.Text.Encoding (decodeUtf8With)
 import           Data.Text.Encoding.Error (lenientDecode)
-import           Data.Typeable
 import qualified Distribution.Package as Cabal
 import qualified Distribution.Text as Cabal
 import qualified Distribution.Version as Cabal
-import           GHC.Generics (Generic)
 import           Generics.Deriving.Monoid (memptydefault, mappenddefault)
 import           Lens.Micro (lens)
-import           Path
-import           Prelude hiding (pi, writeFile)
 import           Stack.Build.Cache
 import           Stack.Build.Haddock
 import           Stack.Build.Installed
@@ -70,6 +58,7 @@ import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageName
 import           Stack.Types.StackT (StackM)
 import           Stack.Types.Version
+import           System.IO (putStrLn)
 import           System.Process.Read (findExecutable)
 
 data PackageInfo

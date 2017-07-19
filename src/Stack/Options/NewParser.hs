@@ -1,11 +1,12 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 module Stack.Options.NewParser where
 
 import qualified Data.Map.Strict                   as M
-import           Data.Monoid.Extra
 import           Options.Applicative
 import           Stack.Init
 import           Stack.New
 import           Stack.Options.GlobalParser
+import           Stack.Prelude
 import           Stack.Types.PackageName
 import           Stack.Types.TemplateName
 

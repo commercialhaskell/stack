@@ -36,3 +36,6 @@ extra-deps:
 - hackage-security-0.5.2.2
 - echo-0.1.3
 - mintty-0.1.1
+- unliftio-core-0.1.0.0
+- unliftio-0.1.0.0
+- async-2.1.1.1

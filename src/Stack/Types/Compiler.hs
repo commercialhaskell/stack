@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE DeriveDataTypeable #-}
@@ -8,13 +9,10 @@
 
 module Stack.Types.Compiler where
 
-import           Control.DeepSeq
 import           Data.Aeson
 import           Data.Data
-import           Data.Monoid ((<>))
-import           Data.Store (Store)
 import qualified Data.Text as T
-import           GHC.Generics (Generic)
+import           Stack.Prelude
 import           Stack.Types.Version
 
 -- | Variety of compiler to use.

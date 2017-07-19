@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# OPTIONS_GHC -fno-warn-orphans -Wwarn #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
@@ -7,24 +8,16 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Stack.StoreSpec where
 
-import           Control.Applicative
 import qualified Data.ByteString as BS
 import           Data.Containers (mapFromList, setFromList)
-import           Data.Hashable (Hashable)
-import           Data.HashMap.Strict (HashMap)
-import           Data.Int
-import           Data.Map (Map)
 import           Data.Sequences (fromList)
-import           Data.Set (Set)
 import           Data.Store.Internal (StaticSize (..))
 import           Data.Store.TH
-import           Data.Text (Text)
 import qualified Data.Vector.Unboxed as UV
-import           Data.Word
 import           GHC.TypeLits (KnownNat)
 import           Language.Haskell.TH
 import           Language.Haskell.TH.ReifyMany
-import           Prelude
+import           Stack.Prelude
 import           Stack.Types.Build
 import           Stack.Types.PackageDump
 import           Test.Hspec

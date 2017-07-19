@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE RecordWildCards, DeriveDataTypeable, OverloadedStrings #-}
 
 -- | Nix configuration
@@ -7,18 +8,12 @@ module Stack.Config.Nix
        ,StackNixException(..)
        ) where
 
-import Control.Monad (when)
-import Control.Monad.IO.Unlift
-import Data.Maybe
-import Data.Monoid.Extra
+import Stack.Prelude
 import qualified Data.Text as T
-import Data.Typeable
 import Distribution.System (OS (..))
 import Stack.Types.Version
 import Stack.Types.Nix
 import Stack.Types.Compiler
-import Stack.Types.StringError
-import Prelude
 
 -- | Interprets NixOptsMonoid options.
 nixOptsFromMonoid
@@ -43,7 +38,7 @@ nixOptsFromMonoid NixOptsMonoid{..} os = do
   where prefixAll p (x:xs) = p : x : prefixAll p xs
         prefixAll _ _      = []
 
-nixCompiler :: CompilerVersion a -> T.Text
+nixCompiler :: CompilerVersion a -> Either StringException T.Text
 nixCompiler compilerVersion =
   let -- These are the latest minor versions for each respective major version available in nixpkgs
       fixMinor "8.0" = "8.0.1"
@@ -59,8 +54,8 @@ nixCompiler compilerVersion =
                                           (T.filter (/= '.')
                                              (fixMinor (versionText v)))
   in case compilerVersion of
-       GhcVersion v -> nixCompilerFromVersion v
-       _ -> errorString "Only GHC is supported by stack --nix"
+       GhcVersion v -> Right $ nixCompilerFromVersion v
+       _ -> Left $ stringException "Only GHC is supported by stack --nix"
 
 -- Exceptions thown specifically by Stack.Nix
 data StackNixException

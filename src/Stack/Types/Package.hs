@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DeriveDataTypeable #-}
@@ -8,34 +9,22 @@
 {-# LANGUAGE ConstraintKinds #-}
 module Stack.Types.Package where
 
-import           Control.DeepSeq
-import           Control.Monad.IO.Unlift
+import           Stack.Prelude
 import qualified Data.ByteString as S
-import           Data.Data
-import           Data.Function
 import           Data.List
 import qualified Data.Map as M
-import           Data.Map.Strict (Map)
-import           Data.Maybe
-import           Data.Monoid
-import           Data.Set (Set)
 import qualified Data.Set as Set
-import           Data.Store (Store)
 import           Data.Store.Version (VersionConfig)
 import           Data.Store.VersionTagged (storeVersionConfig)
-import           Data.Text (Text)
 import qualified Data.Text as T
 import           Data.Text.Encoding (encodeUtf8, decodeUtf8)
-import           Data.Word (Word64)
 import           Distribution.InstalledPackageInfo (PError)
 import           Distribution.License (License)
 import           Distribution.ModuleName (ModuleName)
 import           Distribution.Package hiding (Package,PackageName,packageName,packageVersion,PackageIdentifier)
 import           Distribution.PackageDescription (TestSuiteInterface, BuildType)
 import           Distribution.System (Platform (..))
-import           GHC.Generics (Generic)
 import           Path as FL
-import           Prelude
 import           Stack.Types.BuildPlan (PackageLocationIndex)
 import           Stack.Types.Compiler
 import           Stack.Types.Config

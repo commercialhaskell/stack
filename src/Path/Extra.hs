@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE ViewPatterns #-}
 
 -- | Extra Path utilities.
@@ -19,8 +20,7 @@ import qualified Data.ByteString.Lazy.Char8 as BSL
 import qualified Data.ByteString.Char8 as BS
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
-import           Control.Monad (liftM)
-import           Control.Monad.IO.Unlift
+import           Stack.Prelude
 import           Data.Bool (bool)
 import           Path
 import           Path.IO
@@ -61,7 +61,7 @@ concatAndColapseAbsDir base rel = parseCollapsedAbsDir (toFilePath base FP.</> r
 --
 -- (adapted from @Text.Pandoc.Shared@)
 collapseFilePath :: FilePath -> FilePath
-collapseFilePath = FP.joinPath . reverse . foldl go [] . FP.splitDirectories
+collapseFilePath = FP.joinPath . reverse . foldl' go [] . FP.splitDirectories
   where
     go rs "." = rs
     go r@(p:rs) ".." = case p of

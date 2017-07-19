@@ -1,10 +1,11 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 module Stack.Options.BuildMonoidParser where
 
-import           Data.Monoid.Extra
 import qualified Data.Text as T
 import           Options.Applicative
 import           Options.Applicative.Builder.Extra
 import           Stack.Build                       (splitObjsWarning)
+import           Stack.Prelude
 import           Stack.Options.BenchParser
 import           Stack.Options.TestParser
 import           Stack.Options.HaddockParser

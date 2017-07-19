@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 -- | Parsing of stack command line arguments
 
@@ -7,10 +8,9 @@ module Data.Attoparsec.Args
     , parseArgs
     ) where
 
-import           Control.Applicative
 import           Data.Attoparsec.Text ((<?>))
 import qualified Data.Attoparsec.Text as P
-import           Data.Text (Text)
+import           Stack.Prelude
 
 -- | Mode for parsing escape characters.
 data EscapingMode

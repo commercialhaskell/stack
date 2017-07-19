@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 {- |  This module implements parsing of additional arguments embedded in a
       comment when stack is invoked as a script interpreter
@@ -52,7 +53,6 @@ module Data.Attoparsec.Interpreter
     , getInterpreterArgs
     ) where
 
-import           Control.Applicative
 import           Data.Attoparsec.Args
 import           Data.Attoparsec.Text ((<?>))
 import qualified Data.Attoparsec.Text as P
@@ -64,8 +64,9 @@ import           Data.Conduit.Text (decodeUtf8)
 import           Data.List (intercalate)
 import           Data.Text (pack)
 import           Stack.Constants
+import           Stack.Prelude
 import           System.FilePath (takeExtension)
-import           System.IO (IOMode (ReadMode), withBinaryFile, stderr, hPutStrLn)
+import           System.IO (stderr, hPutStrLn)
 
 -- | Parser to extract the stack command line embedded inside a comment
 -- after validating the placement and formatting rules for a valid

@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
@@ -8,13 +9,10 @@ module Stack.Types.PackageDump
     , installedCacheVC
     ) where
 
-import Data.Data
-import Data.IORef
-import Data.Map (Map)
 import Data.Store
 import Data.Store.Version
 import Data.Store.VersionTagged
-import GHC.Generics (Generic)
+import Stack.Prelude
 import Stack.Types.GhcPkgId
 import Stack.Types.PackageIdentifier
 

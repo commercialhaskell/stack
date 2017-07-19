@@ -1,9 +1,11 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell   #-}
 module Stack.Build.TargetSpec (main, spec) where
 
 import qualified Data.Text           as T
 import           Stack.Build.Target
+import           Stack.Prelude
 import           Stack.Types.Config
 import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageName

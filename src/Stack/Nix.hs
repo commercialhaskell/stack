@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveDataTypeable #-}
@@ -12,20 +13,11 @@ module Stack.Nix
   ,nixHelpOptName
   ) where
 
-import           Control.Arrow ((***))
-import           Control.Monad hiding (mapM)
-import           Control.Monad.IO.Unlift
-import           Control.Monad.Logger (logDebug)
-import           Data.Maybe
-import           Data.Monoid
+import           Stack.Prelude
 import qualified Data.Text as T
-import           Data.Traversable
-import           Data.Typeable (Typeable)
 import           Data.Version (showVersion)
-import           Path
 import           Path.IO
 import qualified Paths_stack as Meta
-import           Prelude hiding (mapM) -- Fix redundant import warnings
 import           Stack.Config (getInNixShell, getInContainer)
 import           Stack.Config.Nix (nixCompiler)
 import           Stack.Constants (platformVariantEnvVar,inNixShellEnvVar,inContainerEnvVar)
@@ -81,8 +73,8 @@ runShellAndExit mprojectRoot getCompilerVersion getCmdArgs = do
          nixInitFile (configNix config)
      compilerVersion <- liftIO getCompilerVersion
      inContainer <- getInContainer
+     ghc <- either throwIO return $ nixCompiler compilerVersion
      let pkgsInConfig = nixPackages (configNix config)
-         ghc = nixCompiler compilerVersion
          pkgs = pkgsInConfig ++ [ghc, "git"]
          pkgsStr = "[" <> T.intercalate " " pkgs <> "]"
          pureShell = nixPureShell (configNix config)

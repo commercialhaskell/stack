@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE FlexibleContexts #-}
@@ -9,13 +10,9 @@ module Stack.Clean
     ,StackCleanException(..)
     ) where
 
-import           Control.Monad.IO.Unlift
-import           Data.Foldable (forM_)
+import           Stack.Prelude
 import           Data.List ((\\),intercalate)
 import qualified Data.Map.Strict as Map
-import           Data.Maybe (mapMaybe)
-import           Data.Typeable (Typeable)
-import           Path (Path, Abs, Dir)
 import           Path.IO (ignoringAbsence, removeDirRecur)
 import           Stack.Config (getLocalPackages)
 import           Stack.Constants.Config (distDirFromDir, workDirFromDir)

@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE RankNTypes #-}
@@ -24,34 +25,21 @@ module Stack.PackageDump
     , pruneDeps
     ) where
 
-import           Control.Applicative
-import           Control.Arrow ((&&&))
-import           Control.Monad (liftM)
-import           Control.Monad.IO.Unlift
-import           Control.Monad.Logger (MonadLogger)
+import           Stack.Prelude
 import           Data.Attoparsec.Args
 import           Data.Attoparsec.Text as P
 import           Data.Conduit
 import qualified Data.Conduit.List as CL
 import qualified Data.Conduit.Text as CT
-import           Data.Either (partitionEithers)
-import           Data.IORef
 import           Data.List (isPrefixOf)
-import           Data.Map (Map)
 import qualified Data.Map as Map
-import           Data.Maybe (catMaybes, listToMaybe)
-import           Data.Maybe.Extra (mapMaybeM)
 import qualified Data.Set as Set
 import           Data.Store.VersionTagged
-import           Data.Text (Text)
 import qualified Data.Text as T
-import           Data.Typeable (Typeable)
 import qualified Distribution.License as C
 import qualified Distribution.System as OS
 import qualified Distribution.Text as C
-import           Path
 import           Path.Extra (toFilePathNoTrailingSep)
-import           Prelude -- Fix AMP warning
 import           Stack.GhcPkg
 import           Stack.Types.Compiler
 import           Stack.Types.GhcPkgId
@@ -264,9 +252,11 @@ addSymbols (InstalledCache ref) =
         s <- case Map.lookup gid m of
             Just installed -> return (installedCacheSymbols installed)
             Nothing | null (dpLibraries dp) -> return True
-            Nothing -> do
-                let lib = T.unpack . head $ dpLibraries dp
-                liftM or . mapM (\dir -> liftIO $ hasDebuggingSymbols dir lib) $ dpLibDirs dp
+            Nothing ->
+              case dpLibraries dp of
+                [] -> return True
+                lib:_ ->
+                  liftM or . mapM (\dir -> liftIO $ hasDebuggingSymbols dir (T.unpack lib)) $ dpLibDirs dp
         return dp { dpSymbols = s }
 
 hasDebuggingSymbols :: FilePath -- ^ library directory

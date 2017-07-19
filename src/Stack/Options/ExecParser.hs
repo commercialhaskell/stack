@@ -1,10 +1,11 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 module Stack.Options.ExecParser where
 
-import           Data.Monoid.Extra
 import           Options.Applicative
 import           Options.Applicative.Builder.Extra
 import           Options.Applicative.Args
 import           Stack.Options.Completion
+import           Stack.Prelude
 import           Stack.Types.Config
 
 -- | Parser for exec command

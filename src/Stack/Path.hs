@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
 
@@ -7,14 +8,9 @@ module Stack.Path
     , pathParser
     ) where
 
-import           Control.Monad.IO.Unlift
-import           Control.Monad.Logger
-import           Control.Monad.Reader
+import           Stack.Prelude
 import           Data.List (intercalate)
-import           Data.Maybe.Extra
-import           Data.Monoid
 import qualified Data.Set as Set
-import           Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.IO as T
 import           Lens.Micro (lens)

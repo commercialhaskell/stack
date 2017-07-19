@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TemplateHaskell #-}
@@ -12,8 +13,7 @@
 
 module Stack.Exec where
 
-import           Control.Monad.IO.Unlift
-import           Control.Monad.Logger
+import           Stack.Prelude
 import           Stack.Types.Config
 import           System.Process.Log
 

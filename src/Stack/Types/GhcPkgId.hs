@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 
@@ -10,20 +11,12 @@ module Stack.Types.GhcPkgId
   ,ghcPkgIdString)
   where
 
-import           Control.Applicative
-import           Control.DeepSeq
-import           Control.Monad.IO.Unlift
+import           Stack.Prelude
 import           Data.Aeson.Extended
 import           Data.Attoparsec.Text
 import           Data.Binary (Binary(..), putWord8, getWord8)
 import           Data.Binary.Tagged
-import           Data.Data
-import           Data.Hashable
-import           Data.Store
-import           Data.Text (Text)
 import qualified Data.Text as T
-import           GHC.Generics
-import           Prelude -- Fix AMP warning
 
 -- | A parse fail.
 newtype GhcPkgIdParseFail

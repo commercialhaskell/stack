@@ -1,11 +1,12 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE DataKinds #-}
 module Stack.Options.ResolverParser where
 
-import           Data.Monoid.Extra
 import qualified Data.Text                         as T
 import           Options.Applicative
 import           Options.Applicative.Types         (readerAsk)
 import           Stack.Options.Utils
+import           Stack.Prelude
 import           Stack.Types.Compiler
 import           Stack.Types.Resolver
 

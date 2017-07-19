@@ -1,8 +1,9 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 module Stack.Options.ScriptParser where
 
-import           Data.Monoid ((<>))
 import           Options.Applicative
 import           Options.Applicative.Builder.Extra
+import           Stack.Prelude
 
 data ScriptOpts = ScriptOpts
   { soPackages :: ![String]

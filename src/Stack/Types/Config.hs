@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE DefaultSignatures #-}
@@ -172,36 +173,22 @@ module Stack.Types.Config
   ,to
   ) where
 
-import           Control.Applicative
-import           Control.Arrow ((&&&))
-import           Control.Monad (liftM, join)
-import           Control.Monad.IO.Unlift
-import           Control.Monad.Logger (LogLevel(..), MonadLoggerIO)
-import           Control.Monad.Reader (MonadReader)
+import           Stack.Prelude
 import           Data.Aeson.Extended
                  (ToJSON, toJSON, FromJSON, parseJSON, withText, object,
                   (.=), (..:), (..:?), (..!=), Value(Bool, String),
                   withObjectWarnings, WarningParser, Object, jsonSubWarnings,
                   jsonSubWarningsT, jsonSubWarningsTT, WithJSONWarnings(..), noJSONWarnings)
 import           Data.Attoparsec.Args
-import           Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as S8
-import           Data.Either (partitionEithers)
-import           Data.IORef (IORef)
 import           Data.List (stripPrefix)
 import           Data.List.NonEmpty (NonEmpty)
 import qualified Data.List.NonEmpty as NonEmpty
-import           Data.Map (Map)
 import qualified Data.Map as Map
 import qualified Data.Map.Strict as M
-import           Data.Maybe
-import           Data.Monoid.Extra
-import           Data.Set (Set)
 import qualified Data.Set as Set
-import           Data.Text (Text)
 import qualified Data.Text as T
 import           Data.Text.Encoding (encodeUtf8)
-import           Data.Typeable
 import           Data.Yaml (ParseException)
 import qualified Data.Yaml as Yaml
 import           Distribution.PackageDescription (GenericPackageDescription)
@@ -209,10 +196,8 @@ import           Distribution.ParseUtils (PError)
 import           Distribution.System (Platform)
 import qualified Distribution.Text
 import           Distribution.Version (anyVersion)
-import           GHC.Generics (Generic)
 import           Generics.Deriving.Monoid (memptydefault, mappenddefault)
-import           Lens.Micro (Lens', lens, _1, _2, to, Getting)
-import           Lens.Micro.Mtl (view)
+import           Lens.Micro (Lens', lens, _1, _2, to)
 import           Options.Applicative (ReadM)
 import qualified Options.Applicative as OA
 import qualified Options.Applicative.Types as OA

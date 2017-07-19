@@ -1,12 +1,13 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 module Stack.Options.HpcReportParser where
 
-import           Data.Monoid.Extra
 import qualified Data.Text                         as T
 import           Options.Applicative
 import           Options.Applicative.Builder.Extra
 import           Options.Applicative.Types         (readerAsk)
 import           Stack.Coverage                    (HpcReportOpts (..))
 import           Stack.Options.Completion          (targetCompleter)
+import           Stack.Prelude
 import           Stack.Types.Config
 
 -- | Parser for @stack hpc report@.

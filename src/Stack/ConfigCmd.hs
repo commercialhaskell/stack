@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -13,27 +14,20 @@ module Stack.ConfigCmd
        ,cfgCmdSetName
        ,cfgCmdName) where
 
-import           Control.Applicative
-import           Control.Monad
-import           Control.Monad.IO.Unlift
-import           Control.Monad.Logger
+import           Stack.Prelude
 import qualified Data.ByteString as S
 import qualified Data.HashMap.Strict as HMap
-import           Data.Monoid
-import           Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Yaml as Yaml
 import qualified Options.Applicative as OA
 import qualified Options.Applicative.Types as OA
 import           Path
 import           Path.IO
-import           Prelude -- Silence redundant import warnings
 import           Stack.Config (makeConcreteResolver, getProjectConfig, getImplicitGlobalProjectDir, LocalConfigStatus(..))
 import           Stack.Constants
 import           Stack.Snapshot (loadResolver)
 import           Stack.Types.Config
 import           Stack.Types.Resolver
-import           Stack.Types.StringError
 
 data ConfigCmdSet
     = ConfigCmdSetResolver AbstractResolver
@@ -67,7 +61,7 @@ cfgCmdSet go cmd = do
                      case mstackYaml of
                          LCSProject stackYaml -> return stackYaml
                          LCSNoProject -> liftM (</> stackDotYaml) (getImplicitGlobalProjectDir conf)
-                         LCSNoConfig -> errorString "config command used when no local configuration available"
+                         LCSNoConfig -> throwString "config command used when no local configuration available"
                  CommandScopeGlobal -> return (configUserConfigPath conf)
     -- We don't need to worry about checking for a valid yaml here
     (config :: Yaml.Object) <-

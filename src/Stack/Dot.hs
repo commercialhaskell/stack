@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE FlexibleContexts #-}
@@ -14,24 +15,14 @@ module Stack.Dot (dot
                  ,pruneGraph
                  ) where
 
-import           Control.Applicative
-import           Control.Arrow ((&&&))
-import           Control.Monad (liftM, void)
-import           Control.Monad.IO.Class
 import qualified Data.Foldable as F
 import qualified Data.HashSet as HashSet
-import           Data.Map (Map)
 import qualified Data.Map as Map
-import           Data.Maybe
-import           Data.Monoid ((<>))
-import           Data.Set (Set)
 import qualified Data.Set as Set
-import           Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Text.IO as Text
 import qualified Data.Traversable as T
 import           Distribution.License (License(BSD3))
-import           Prelude -- Fix redundant import warnings
 import           Stack.Build (withLoadPackage)
 import           Stack.Build.Installed (getInstalled, GetInstalledOpts(..))
 import           Stack.Build.Source
@@ -40,6 +31,7 @@ import           Stack.Config (getLocalPackages)
 import           Stack.Constants
 import           Stack.Package
 import           Stack.PackageDump (DumpPackage(..))
+import           Stack.Prelude
 import           Stack.Types.Build
 import           Stack.Types.BuildPlan
 import           Stack.Types.Config

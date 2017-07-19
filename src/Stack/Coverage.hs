@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE ConstraintKinds       #-}
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
@@ -16,28 +17,17 @@ module Stack.Coverage
     , generateHpcMarkupIndex
     ) where
 
-import           Control.Monad (liftM, when, unless, void, (<=<))
-import           Control.Monad.IO.Unlift
-import           Control.Monad.Logger
+import           Stack.Prelude
 import qualified Data.ByteString.Char8 as S8
-import           Data.Foldable (forM_, asum, toList)
-import           Data.Function
 import           Data.List
 import qualified Data.Map.Strict as Map
-import           Data.Maybe
-import           Data.Maybe.Extra (mapMaybeM)
-import           Data.Monoid ((<>))
-import           Data.String
-import           Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import qualified Data.Text.IO as T
 import qualified Data.Text.Lazy as LT
-import           Data.Traversable (forM)
 import           Path
 import           Path.Extra (toFilePathNoTrailingSep)
 import           Path.IO
-import           Prelude hiding (FilePath, writeFile)
 import           Stack.Build.Target
 import           Stack.Config (getLocalPackages)
 import           Stack.Constants.Config
@@ -49,7 +39,6 @@ import           Stack.Types.Package
 import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageName
 import           Stack.Types.StackT (StackM)
-import           Stack.Types.StringError
 import           Stack.Types.Version
 import           System.FilePath (isPathSeparator)
 import           System.Process.Read
@@ -323,8 +312,8 @@ generateUnionReport report reportDir tixFiles = do
 
 readTixOrLog :: (MonadLogger m, MonadUnliftIO m) => Path b File -> m (Maybe Tix)
 readTixOrLog path = do
-    mtix <- liftIO (readTix (toFilePath path)) `catch` \errorCall -> do
-        $logError $ "Error while reading tix: " <> T.pack (show (errorCall :: ErrorCall))
+    mtix <- liftIO (readTix (toFilePath path)) `catchAny` \errorCall -> do
+        $logError $ "Error while reading tix: " <> T.pack (show errorCall)
         return Nothing
     when (isNothing mtix) $
         $logError $ "Failed to read tix file " <> T.pack (toFilePath path)

@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE DeriveGeneric #-}
@@ -21,24 +22,15 @@ module Stack.Types.FlagName
   ,mkFlagName)
   where
 
-import           Control.Applicative
-import           Control.DeepSeq (NFData)
-import           Control.Monad.IO.Unlift
+import           Stack.Prelude
 import           Data.Aeson.Extended
 import           Data.Attoparsec.Combinators
 import           Data.Attoparsec.Text
 import           Data.Char (isLetter, isDigit, toLower)
-import           Data.Data
-import           Data.Hashable
-import           Data.Store (Store)
-import           Data.Text (Text)
 import qualified Data.Text as T
-import           Data.Text.Binary ()
 import qualified Distribution.PackageDescription as Cabal
-import           GHC.Generics
 import           Language.Haskell.TH
 import           Language.Haskell.TH.Syntax
-import           Stack.Types.StringError
 
 -- | A parse fail.
 newtype FlagNameParseFail
@@ -94,7 +86,7 @@ flagNameParser =
 mkFlagName :: String -> Q Exp
 mkFlagName s =
   case parseFlagNameFromString s of
-    Nothing -> errorString ("Invalid flag name: " ++ show s)
+    Nothing -> qRunIO $ throwString ("Invalid flag name: " ++ show s)
     Just pn -> [|pn|]
 
 -- | Convenient way to parse a flag name from a 'Text'.
