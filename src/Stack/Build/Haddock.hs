@@ -37,19 +37,20 @@ import           Stack.Types.GhcPkgId
 import           Stack.Types.Package
 import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageName
+import           Stack.Types.Runner
 import qualified System.FilePath as FP
 import           System.IO.Error (isDoesNotExistError)
 import           System.Process.Read
 import           Web.Browser (openBrowser)
 
 openHaddocksInBrowser
-    :: StackM env m
+    :: HasRunner env
     => BaseConfigOpts
     -> Map PackageName (PackageIdentifier, InstallLocation)
     -- ^ Available packages and their locations for the current project
     -> Set PackageName
     -- ^ Build targets as determined by 'Stack.Build.Source.loadSourceMap'
-    -> m ()
+    -> StackT env IO ()
 openHaddocksInBrowser bco pkgLocations buildTargets = do
     let cliTargets = (boptsCLITargets . bcoBuildOptsCLI) bco
         getDocIndex = do

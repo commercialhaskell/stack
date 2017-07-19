@@ -46,12 +46,10 @@ import              System.IO.Error (isDoesNotExistError)
 
 -- | Like 'loadSourceMapFull', but doesn't return values that aren't as
 -- commonly needed.
-loadSourceMap :: (StackM env m, HasEnvConfig env)
+loadSourceMap :: HasEnvConfig env
               => NeedTargets
               -> BuildOptsCLI
-              -> m ( [LocalPackage]
-                   , SourceMap
-                   )
+              -> StackT env IO ([LocalPackage], SourceMap)
 loadSourceMap needTargets boptsCli = do
     (_, _, locals, _, sourceMap) <- loadSourceMapFull needTargets boptsCli
     return (locals, sourceMap)
@@ -67,10 +65,11 @@ loadSourceMap needTargets boptsCli = do
 --
 -- * Builds a 'SourceMap', which contains info for all the packages that
 --   will be involved in the build.
-loadSourceMapFull :: (StackM env m, HasEnvConfig env)
+loadSourceMapFull :: HasEnvConfig env
                   => NeedTargets
                   -> BuildOptsCLI
-                  -> m ( Map PackageName Target
+                  -> StackT env IO
+                       ( Map PackageName Target
                        , LoadedSnapshot
                        , [LocalPackage]
                        , Set PackageName -- non-project targets
@@ -161,11 +160,11 @@ splitComponents =
 -- | Upgrade the initial local package info to a full-blown @LocalPackage@
 -- based on the selected components
 loadLocalPackage
-    :: forall m env. (StackM env m, HasEnvConfig env)
+    :: forall env. HasEnvConfig env
     => BuildOptsCLI
     -> Map PackageName Target
     -> (PackageName, LocalPackageView)
-    -> m LocalPackage
+    -> StackT env IO LocalPackage
 loadLocalPackage boptsCli targets (name, lpv) = do
     let mtarget = Map.lookup name targets
     config  <- getPackageConfig boptsCli name (isJust mtarget) True
@@ -354,12 +353,12 @@ checkBuildCache oldCache files = do
 
 -- | Returns entries to add to the build cache for any newly found unlisted modules
 addUnlistedToBuildCache
-    :: (StackM env m, HasEnvConfig env)
+    :: HasEnvConfig env
     => ModTime
     -> Package
     -> Path Abs File
     -> Map FilePath a
-    -> m ([Map FilePath FileCacheInfo], [PackageWarning])
+    -> StackT env IO ([Map FilePath FileCacheInfo], [PackageWarning])
 addUnlistedToBuildCache preBuildTime pkg cabalFP buildCache = do
     (files,warnings) <- getPackageFilesSimple pkg cabalFP
     let newFiles =
@@ -381,8 +380,8 @@ addUnlistedToBuildCache preBuildTime pkg cabalFP buildCache = do
 
 -- | Gets list of Paths for files in a package
 getPackageFilesSimple
-    :: (StackM env m, HasEnvConfig env)
-    => Package -> Path Abs File -> m (Set (Path Abs File), [PackageWarning])
+    :: HasEnvConfig env
+    => Package -> Path Abs File -> StackT env IO (Set (Path Abs File), [PackageWarning])
 getPackageFilesSimple pkg cabalFP = do
     (_,compFiles,cabalFiles,warnings) <-
         getPackageFiles (packageFiles pkg) cabalFP

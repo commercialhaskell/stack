@@ -98,12 +98,12 @@ data UpgradeOpts = UpgradeOpts
     }
     deriving Show
 
-upgrade :: (StackM env m, HasConfig env)
+upgrade :: HasConfig env
         => ConfigMonoid
         -> Maybe AbstractResolver
         -> Maybe String -- ^ git hash at time of building, if known
         -> UpgradeOpts
-        -> m ()
+        -> StackT env IO ()
 upgrade gConfigMonoid mresolver builtHash (UpgradeOpts mbo mso) =
     case (mbo, mso) of
         -- FIXME It would be far nicer to capture this case in the
@@ -124,10 +124,7 @@ upgrade gConfigMonoid mresolver builtHash (UpgradeOpts mbo mso) =
     binary bo = binaryUpgrade bo
     source so = sourceUpgrade gConfigMonoid mresolver builtHash so
 
-binaryUpgrade
-  :: (StackM env m, HasConfig env)
-  => BinaryOpts
-  -> m ()
+binaryUpgrade :: HasConfig env => BinaryOpts -> StackT env IO ()
 binaryUpgrade (BinaryOpts mplatform force' mver morg mrepo) = do
     platforms0 <-
       case mplatform of
@@ -176,12 +173,12 @@ binaryUpgrade (BinaryOpts mplatform force' mver morg mrepo) = do
                     $ throwString "Non-success exit code from running newly downloaded executable"
 
 sourceUpgrade
-  :: (StackM env m, HasConfig env)
+  :: HasConfig env
   => ConfigMonoid
   -> Maybe AbstractResolver
   -> Maybe String
   -> SourceOpts
-  -> m ()
+  -> StackT env IO ()
 sourceUpgrade gConfigMonoid mresolver builtHash (SourceOpts gitRepo) =
   withSystemTempDir "stack-upgrade" $ \tmp -> do
     menv <- getMinimalEnvOverride

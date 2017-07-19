@@ -204,9 +204,9 @@ instance Show SetupException where
         , "' option to specify a location"]
 
 -- | Modify the environment variables (like PATH) appropriately, possibly doing installation too
-setupEnv :: (StackM env m, HasBuildConfig env, HasGHCVariant env)
+setupEnv :: (HasBuildConfig env, HasGHCVariant env)
          => Maybe Text -- ^ Message to give user when necessary GHC is not available
-         -> m EnvConfig
+         -> StackT env IO EnvConfig
 setupEnv mResolveMissingGHC = do
     config <- view configL
     bconfig <- view buildConfigL
@@ -361,9 +361,9 @@ addIncludeLib (ExtraDirs _bins includes libs) config = config
     }
 
 -- | Ensure compiler (ghc or ghcjs) is installed and provide the PATHs to add if necessary
-ensureCompiler :: (StackM env m, HasConfig env, HasGHCVariant env)
+ensureCompiler :: (HasConfig env, HasGHCVariant env)
                => SetupOpts
-               -> m (Maybe ExtraDirs, CompilerBuild, Bool)
+               -> StackT env IO (Maybe ExtraDirs, CompilerBuild, Bool)
 ensureCompiler sopts = do
     let wc = whichCompiler (soptsWantedCompiler sopts)
     when (getGhcVersion (soptsWantedCompiler sopts) < $(mkVersion "7.8")) $ do
@@ -513,9 +513,7 @@ ensureCompiler sopts = do
 
 -- | Determine which GHC build to use depending on which shared libraries are available
 -- on the system.
-getGhcBuild
-    :: (StackM env m, HasConfig env)
-    => EnvOverride -> m CompilerBuild
+getGhcBuild :: HasConfig env => EnvOverride -> StackT env IO CompilerBuild
 getGhcBuild menv = do
 
     config <- view configL
@@ -612,9 +610,7 @@ getGhcBuild menv = do
         return (CompilerBuildSpecialized s)
 
 -- | Ensure Docker container-compatible 'stack' executable is downloaded
-ensureDockerStackExe
-    :: (StackM env m, HasConfig env)
-    => Platform -> m (Path Abs File)
+ensureDockerStackExe :: HasConfig env => Platform -> StackT env IO (Path Abs File)
 ensureDockerStackExe containerPlatform = do
     config <- view configL
     containerPlatformDir <- runReaderT platformOnlyRelDir (containerPlatform,PlatformVariantNone)
@@ -631,11 +627,11 @@ ensureDockerStackExe containerPlatform = do
     return stackExePath
 
 -- | Install the newest version or a specific version of Cabal globally
-upgradeCabal :: (StackM env m, HasConfig env, HasGHCVariant env)
+upgradeCabal :: (HasConfig env, HasGHCVariant env)
              => EnvOverride
              -> WhichCompiler
              -> UpgradeTo
-             -> m ()
+             -> StackT env IO ()
 upgradeCabal menv wc cabalVersion = do
     $logInfo "Manipulating the global Cabal is only for debugging purposes"
     let name = $(mkPackageName "Cabal")
@@ -659,12 +655,12 @@ upgradeCabal menv wc cabalVersion = do
             x -> error $ "Unexpected results for resolvePackages: " ++ show x
 
 -- Configure and run the necessary commands for a cabal install
-doCabalInstall :: (StackM env m, HasConfig env, HasGHCVariant env)
+doCabalInstall :: (HasConfig env, HasGHCVariant env)
                => EnvOverride
                -> WhichCompiler
                -> Version
                -> Version
-               -> m ()
+               -> StackT env IO ()
 doCabalInstall menv wc installed version = do
     withSystemTempDir "stack-cabal-upgrade" $ \tmpdir -> do
         $logInfo $ T.concat
@@ -780,13 +776,13 @@ getInstalledGhcjs installed goodVersion =
     goodPackage (ToolGhcjs cv) = if goodVersion cv then Just cv else Nothing
     goodPackage _ = Nothing
 
-downloadAndInstallTool :: StackM env m
+downloadAndInstallTool :: HasRunner env
                        => Path Abs Dir
                        -> SetupInfo
                        -> DownloadInfo
                        -> Tool
-                       -> (SetupInfo -> Path Abs File -> ArchiveType -> Path Abs Dir -> Path Abs Dir -> m ())
-                       -> m Tool
+                       -> (SetupInfo -> Path Abs File -> ArchiveType -> Path Abs Dir -> Path Abs Dir -> StackT env IO ())
+                       -> StackT env IO Tool
 downloadAndInstallTool programsDir si downloadInfo tool installer = do
     ensureDir programsDir
     (file, at) <- downloadFromInfo programsDir downloadInfo tool
@@ -800,13 +796,13 @@ downloadAndInstallTool programsDir si downloadInfo tool installer = do
     liftIO $ ignoringAbsence (removeDirRecur tempDir)
     return tool
 
-downloadAndInstallCompiler :: (StackM env m, HasConfig env, HasGHCVariant env)
+downloadAndInstallCompiler :: (HasConfig env, HasGHCVariant env)
                            => CompilerBuild
                            -> SetupInfo
                            -> CompilerVersion 'CVWanted
                            -> VersionCheck
                            -> Maybe String
-                           -> m Tool
+                           -> StackT env IO Tool
 downloadAndInstallCompiler ghcBuild si wanted@GhcVersion{} versionCheck mbindistURL = do
     ghcVariant <- view ghcVariantL
     (selectedVersion, downloadInfo) <- case mbindistURL of
@@ -899,8 +895,8 @@ getOSKey platform =
         Platform arch os -> throwM $ UnsupportedSetupCombo os arch
 
 downloadFromInfo
-    :: StackM env m
-    => Path Abs Dir -> DownloadInfo -> Tool -> m (Path Abs File, ArchiveType)
+    :: HasRunner env
+    => Path Abs Dir -> DownloadInfo -> Tool -> StackT env IO (Path Abs File, ArchiveType)
 downloadFromInfo programsDir downloadInfo tool = do
     at <-
         case extension of
@@ -945,7 +941,7 @@ data ArchiveType
     | TarGz
     | SevenZ
 
-installGHCPosix :: (StackM env m, HasConfig env)
+installGHCPosix :: HasConfig env
                 => Version
                 -> GHCDownloadInfo
                 -> SetupInfo
@@ -953,7 +949,7 @@ installGHCPosix :: (StackM env m, HasConfig env)
                 -> ArchiveType
                 -> Path Abs Dir
                 -> Path Abs Dir
-                -> m ()
+                -> StackT env IO ()
 installGHCPosix version downloadInfo _ archiveFile archiveType tempDir destDir = do
     platform <- view platformL
     menv0 <- getMinimalEnvOverride
@@ -1020,13 +1016,13 @@ installGHCPosix version downloadInfo _ archiveFile archiveType tempDir destDir =
     $logStickyDone $ "Installed GHC."
     $logDebug $ "GHC installed to " <> T.pack (toFilePath destDir)
 
-installGHCJS :: (StackM env m, HasConfig env)
+installGHCJS :: HasConfig env
              => SetupInfo
              -> Path Abs File
              -> ArchiveType
              -> Path Abs Dir
              -> Path Abs Dir
-             -> m ()
+             -> StackT env IO ()
 installGHCJS si archiveFile archiveType _tempDir destDir = do
     platform <- view platformL
     menv0 <- getMinimalEnvOverride
@@ -1101,8 +1097,9 @@ installGHCJS si archiveFile archiveType _tempDir destDir = do
             copyFile optionsFile dest
     $logStickyDone "Installed GHCJS."
 
-ensureGhcjsBooted :: (StackM env m, HasConfig env)
-                  => EnvOverride -> CompilerVersion 'CVActual -> Bool -> [String] -> m ()
+ensureGhcjsBooted :: HasConfig env
+                  => EnvOverride -> CompilerVersion 'CVActual -> Bool -> [String]
+                  -> StackT env IO ()
 ensureGhcjsBooted menv cv shouldBoot bootOpts = do
     eres <- try $ sinkProcessStdout Nothing menv "ghcjs" [] (return ())
     case eres of
@@ -1136,8 +1133,8 @@ ensureGhcjsBooted menv cv shouldBoot bootOpts = do
                 bootGhcjs ghcjsVersion actualStackYaml destDir bootOpts
         Left err -> throwM err
 
-bootGhcjs :: StackM env m
-          => Version -> Path Abs File -> Path Abs Dir -> [String] -> m ()
+bootGhcjs :: HasRunner env
+          => Version -> Path Abs File -> Path Abs Dir -> [String] -> StackT env IO ()
 bootGhcjs ghcjsVersion stackYaml destDir bootOpts = do
     envConfig <- loadGhcjsEnvConfig stackYaml (destDir </> $(mkRelDir "bin"))
     menv <- liftIO $ configEnvOverride (view configL envConfig) defaultEnvSettings
@@ -1194,11 +1191,9 @@ bootGhcjs ghcjsVersion stackYaml destDir bootOpts = do
     logProcessStderrStdout Nothing "ghcjs-boot" menv' bootOpts
     $logStickyDone "GHCJS booted."
 
-loadGhcjsEnvConfig :: StackM env m
-                   => Path Abs File -> Path b t -> m EnvConfig
+loadGhcjsEnvConfig :: HasRunner env
+                   => Path Abs File -> Path b t -> StackT env IO EnvConfig
 loadGhcjsEnvConfig stackYaml binPath = do
-  runner <- view runnerL
-  runStackT runner $ do
     lc <- loadConfig
         (mempty
             { configMonoidInstallGHC = First (Just True)
@@ -1251,27 +1246,27 @@ instance Alternative CheckDependency where
             Left _ -> y menv
             Right x' -> return $ Right x'
 
-installGHCWindows :: (StackM env m, HasConfig env)
+installGHCWindows :: HasConfig env
                   => Version
                   -> SetupInfo
                   -> Path Abs File
                   -> ArchiveType
                   -> Path Abs Dir
                   -> Path Abs Dir
-                  -> m ()
+                  -> StackT env IO ()
 installGHCWindows version si archiveFile archiveType _tempDir destDir = do
     tarComponent <- parseRelDir $ "ghc-" ++ versionString version
     withUnpackedTarball7z "GHC" si archiveFile archiveType (Just tarComponent) destDir
     $logInfo $ "GHC installed to " <> T.pack (toFilePath destDir)
 
-installMsys2Windows :: (StackM env m, HasConfig env)
+installMsys2Windows :: HasConfig env
                   => Text -- ^ OS Key
                   -> SetupInfo
                   -> Path Abs File
                   -> ArchiveType
                   -> Path Abs Dir
                   -> Path Abs Dir
-                  -> m ()
+                  -> StackT env IO ()
 installMsys2Windows osKey si archiveFile archiveType _tempDir destDir = do
     exists <- liftIO $ D.doesDirectoryExist $ toFilePath destDir
     when exists $ liftIO (D.removeDirectoryRecursive $ toFilePath destDir) `catchIO` \e -> do
@@ -1304,14 +1299,14 @@ installMsys2Windows osKey si archiveFile archiveType _tempDir destDir = do
 
 -- | Unpack a compressed tarball using 7zip.  Expects a single directory in
 -- the unpacked results, which is renamed to the destination directory.
-withUnpackedTarball7z :: (StackM env m, HasConfig env)
+withUnpackedTarball7z :: HasConfig env
                       => String -- ^ Name of tool, used in error messages
                       -> SetupInfo
                       -> Path Abs File -- ^ Path to archive file
                       -> ArchiveType
                       -> Maybe (Path Rel Dir) -- ^ Name of directory expected in archive.  If Nothing, expects a single folder.
                       -> Path Abs Dir -- ^ Destination directory.
-                      -> m ()
+                      -> StackT env IO ()
 withUnpackedTarball7z name si archiveFile archiveType msrcDir destDir = do
     suffix <-
         case archiveType of
@@ -1352,9 +1347,9 @@ expectSingleUnpackedDir archiveFile destDir = do
 -- | Download 7z as necessary, and get a function for unpacking things.
 --
 -- Returned function takes an unpack directory and archive.
-setup7z :: (MonadIO n, MonadLogger n, StackM env m, HasConfig env)
+setup7z :: (MonadIO n, MonadLogger n, HasConfig env)
         => SetupInfo
-        -> m (Path Abs Dir -> Path Abs File -> n ())
+        -> StackT env IO (Path Abs Dir -> Path Abs File -> n ())
 setup7z si = do
     dir <- view $ configL.to configLocalPrograms
     ensureDir dir
@@ -1378,11 +1373,11 @@ setup7z si = do
                     $ liftIO $ throwM (ProblemWhileDecompressing archive)
         _ -> throwM SetupInfoMissingSevenz
 
-chattyDownload :: StackM env m
+chattyDownload :: HasRunner env
                => Text          -- ^ label
                -> DownloadInfo  -- ^ URL, content-length, and sha1
                -> Path Abs File -- ^ destination
-               -> m ()
+               -> StackT env IO ()
 chattyDownload label downloadInfo path = do
     let url = downloadInfoUrl downloadInfo
     req <- parseUrlThrow $ T.unpack url

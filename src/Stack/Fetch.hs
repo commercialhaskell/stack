@@ -102,9 +102,7 @@ instance Show FetchException where
         (if null suggestions then "" else "\n" ++ suggestions)
 
 -- | Fetch packages into the cache without unpacking
-fetchPackages :: (StackM env m, HasConfig env)
-              => Set PackageIdentifier
-              -> m ()
+fetchPackages :: HasConfig env => Set PackageIdentifier -> StackT env IO ()
 fetchPackages idents' = do
     resolved <- resolvePackages Nothing idents Set.empty
     ToFetchResult toFetch alreadyUnpacked <- getToFetch Nothing resolved
@@ -117,11 +115,11 @@ fetchPackages idents' = do
     idents = map (flip PackageIdentifierRevision CFILatest) $ Set.toList idents'
 
 -- | Intended to work for the command line command.
-unpackPackages :: (StackM env m, HasConfig env)
+unpackPackages :: HasConfig env
                => Maybe SnapshotDef -- ^ when looking up by name, take from this build plan
                -> FilePath -- ^ destination
                -> [String] -- ^ names or identifiers
-               -> m ()
+               -> StackT env IO ()
 unpackPackages mSnapshotDef dest input = do
     dest' <- resolveDir' dest
     (names, idents) <- case partitionEithers $ map parse input of
@@ -152,11 +150,11 @@ unpackPackages mSnapshotDef dest input = do
 
 -- | Same as 'unpackPackageIdents', but for a single package.
 unpackPackageIdent
-    :: (StackM env m, HasConfig env)
+    :: HasConfig env
     => Path Abs Dir -- ^ unpack directory
     -> Path Rel Dir -- ^ the dist rename directory, see: https://github.com/fpco/stack/issues/157
     -> PackageIdentifierRevision
-    -> m (Path Abs Dir)
+    -> StackT env IO (Path Abs Dir)
 unpackPackageIdent unpackDir distDir (PackageIdentifierRevision ident mcfi) = do
   -- FIXME make this more direct in the future
   m <- unpackPackageIdents unpackDir (Just distDir) [PackageIdentifierRevision ident mcfi]
@@ -170,11 +168,11 @@ unpackPackageIdent unpackDir distDir (PackageIdentifierRevision ident mcfi) = do
 -- | Ensure that all of the given package idents are unpacked into the build
 -- unpack directory, and return the paths to all of the subdirectories.
 unpackPackageIdents
-    :: (StackM env m, HasConfig env)
+    :: HasConfig env
     => Path Abs Dir -- ^ unpack directory
     -> Maybe (Path Rel Dir) -- ^ the dist rename directory, see: https://github.com/fpco/stack/issues/157
     -> [PackageIdentifierRevision]
-    -> m (Map PackageIdentifier (Path Abs Dir))
+    -> StackT env IO (Map PackageIdentifier (Path Abs Dir))
 unpackPackageIdents unpackDir mdistDir idents = do
     resolved <- resolvePackages Nothing idents Set.empty
     ToFetchResult toFetch alreadyUnpacked <- getToFetch (Just unpackDir) resolved
@@ -190,11 +188,11 @@ data ResolvedPackage = ResolvedPackage
     deriving Show
 
 -- | Resolve a set of package names and identifiers into @FetchPackage@ values.
-resolvePackages :: (StackM env m, HasConfig env)
+resolvePackages :: HasConfig env
                 => Maybe SnapshotDef -- ^ when looking up by name, take from this build plan
                 -> [PackageIdentifierRevision]
                 -> Set PackageName
-                -> m [ResolvedPackage]
+                -> StackT env IO [ResolvedPackage]
 resolvePackages mSnapshotDef idents0 names0 = do
     eres <- go
     case eres of
@@ -217,12 +215,11 @@ resolvePackages mSnapshotDef idents0 names0 = do
 -- a warning, that's no longer necessary or desirable since all info
 -- should be present and checked).
 resolvePackagesAllowMissing
-    :: forall env m.
-       (StackM env m, HasConfig env)
+    :: forall env. HasConfig env
     => Maybe SnapshotDef -- ^ when looking up by name, take from this build plan
     -> [PackageIdentifierRevision]
     -> Set PackageName
-    -> m (Set PackageName, HashSet PackageIdentifierRevision, [ResolvedPackage])
+    -> StackT env IO (Set PackageName, HashSet PackageIdentifierRevision, [ResolvedPackage])
 resolvePackagesAllowMissing mSnapshotDef idents0 names0 = do
   cache@(PackageCache cache') <- getPackageCaches
 
@@ -316,9 +313,9 @@ withCabalFiles name pkgs f = do
 -- | Provide a function which will load up a cabal @ByteString@ from the
 -- package indices.
 withCabalLoader
-    :: (StackM env m, HasConfig env)
-    => ((PackageIdentifierRevision -> IO ByteString) -> m a)
-    -> m a
+    :: HasConfig env
+    => ((PackageIdentifierRevision -> IO ByteString) -> StackT env IO a)
+    -> StackT env IO a
 withCabalLoader inner = do
     -- Want to try updating the index once during a single run for missing
     -- package identifiers. We also want to ensure we only update once at a
@@ -409,10 +406,10 @@ typoCorrectionCandidates (PackageIdentifierRevision ident _mcfi) (PackageCache c
     $ cache
 
 -- | Figure out where to fetch from.
-getToFetch :: (StackM env m, HasConfig env)
+getToFetch :: HasConfig env
            => Maybe (Path Abs Dir) -- ^ directory to unpack into, @Nothing@ means no unpack
            -> [ResolvedPackage]
-           -> m ToFetchResult
+           -> StackT env IO ToFetchResult
 getToFetch mdest resolvedAll = do
     (toFetch0, unpacked) <- liftM partitionEithers $ mapM checkUnpacked resolvedAll
     toFetch1 <- mapM goIndex $ Map.toList $ Map.fromListWith (++) toFetch0
@@ -468,10 +465,10 @@ getToFetch mdest resolvedAll = do
 -- @
 --
 -- Since 0.1.0.0
-fetchPackages' :: (StackM env m, HasConfig env)
+fetchPackages' :: HasConfig env
                => Maybe (Path Rel Dir) -- ^ the dist rename directory, see: https://github.com/fpco/stack/issues/157
                -> Map PackageIdentifier ToFetch
-               -> m (Map PackageIdentifier (Path Abs Dir))
+               -> StackT env IO (Map PackageIdentifier (Path Abs Dir))
 fetchPackages' mdistDir toFetchAll = do
     connCount <- view $ configL.to configConnectionCount
     outputVar <- liftIO $ newTVarIO Map.empty

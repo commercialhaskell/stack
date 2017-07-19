@@ -48,12 +48,12 @@ import qualified System.FilePath                 as FP
 
 -- | Generate stack.yaml
 initProject
-    :: (StackM env m, HasConfig env, HasGHCVariant env)
+    :: (HasConfig env, HasGHCVariant env)
     => WhichSolverCmd
     -> Path Abs Dir
     -> InitOpts
     -> Maybe AbstractResolver
-    -> m ()
+    -> StackT env IO ()
 initProject whichCmd currDir initOpts mresolver = do
     let dest = currDir </> stackDotYaml
 
@@ -315,8 +315,7 @@ renderStackYaml p ignoredPackages dupPackages =
         , "compiler-check: newer-minor"
         ]
 
-getSnapshots' :: (StackM env m, HasConfig env)
-              => m Snapshots
+getSnapshots' :: HasConfig env => StackT env IO Snapshots
 getSnapshots' = do
     getSnapshots `catchAny` \e -> do
         $logError $
@@ -337,14 +336,15 @@ getSnapshots' = do
 
 -- | Get the default resolver value
 getDefaultResolver
-    :: (StackM env m, HasConfig env, HasGHCVariant env)
+    :: (HasConfig env, HasGHCVariant env)
     => WhichSolverCmd
     -> Path Abs File   -- ^ stack.yaml
     -> InitOpts
     -> Maybe AbstractResolver
     -> Map PackageName (Path Abs File, C.GenericPackageDescription)
        -- ^ Src package name: cabal dir, cabal package description
-    -> m ( SnapshotDef
+    -> StackT env IO
+         ( SnapshotDef
          , Map PackageName (Map FlagName Bool)
          , Map PackageName Version
          , Map PackageName (Path Abs File, C.GenericPackageDescription))
@@ -369,14 +369,15 @@ getDefaultResolver whichCmd stackYaml initOpts mresolver bundle = do
                 _ -> return s
 
 getWorkingResolverPlan
-    :: (StackM env m, HasConfig env, HasGHCVariant env)
+    :: (HasConfig env, HasGHCVariant env)
     => WhichSolverCmd
     -> Path Abs File   -- ^ stack.yaml
     -> InitOpts
     -> Map PackageName (Path Abs File, C.GenericPackageDescription)
        -- ^ Src package name: cabal dir, cabal package description
     -> SnapshotDef
-    -> m ( SnapshotDef
+    -> StackT env IO
+         ( SnapshotDef
          , Map PackageName (Map FlagName Bool)
          , Map PackageName Version
          , Map PackageName (Path Abs File, C.GenericPackageDescription))
@@ -420,14 +421,15 @@ getWorkingResolverPlan whichCmd stackYaml initOpts bundle sd = do
                       available       = Map.filterWithKey isAvailable info
 
 checkBundleResolver
-    :: (StackM env m, HasConfig env, HasGHCVariant env)
+    :: (HasConfig env, HasGHCVariant env)
     => WhichSolverCmd
     -> Path Abs File   -- ^ stack.yaml
     -> InitOpts
     -> Map PackageName (Path Abs File, C.GenericPackageDescription)
        -- ^ Src package name: cabal dir, cabal package description
     -> SnapshotDef
-    -> m (Either [PackageName] ( Map PackageName (Map FlagName Bool)
+    -> StackT env IO
+         (Either [PackageName] ( Map PackageName (Map FlagName Bool)
                                , Map PackageName Version))
 checkBundleResolver whichCmd stackYaml initOpts bundle sd = do
     result <- checkSnapBuildPlan (parent stackYaml) gpds Nothing sd

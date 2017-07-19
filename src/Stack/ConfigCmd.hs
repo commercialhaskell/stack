@@ -49,8 +49,8 @@ configCmdSetScope (ConfigCmdSetSystemGhc scope _) = scope
 configCmdSetScope (ConfigCmdSetInstallGhc scope _) = scope
 
 cfgCmdSet
-    :: (StackM env m, HasConfig env, HasGHCVariant env)
-    => GlobalOpts -> ConfigCmdSet -> m ()
+    :: (HasConfig env, HasGHCVariant env)
+    => GlobalOpts -> ConfigCmdSet -> StackT env IO ()
 cfgCmdSet go cmd = do
     conf <- view configL
     configFilePath <-
@@ -78,9 +78,9 @@ cfgCmdSet go cmd = do
             $logInfo (T.pack (toFilePath configFilePath) <> " has been updated.")
 
 cfgCmdSetValue
-    :: (StackM env m, HasConfig env, HasGHCVariant env)
+    :: (HasConfig env, HasGHCVariant env)
     => Path Abs Dir -- ^ root directory of project
-    -> ConfigCmdSet -> m Yaml.Value
+    -> ConfigCmdSet -> StackT env IO Yaml.Value
 cfgCmdSetValue root (ConfigCmdSetResolver newResolver) = do
     concreteResolver <- makeConcreteResolver (Just root) newResolver
     -- Check that the snapshot actually exists

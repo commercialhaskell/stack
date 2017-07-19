@@ -34,11 +34,11 @@ import           System.Process.Read (getEnvOverride)
 -- | If Nix is enabled, re-runs the currently running OS command in a Nix container.
 -- Otherwise, runs the inner action.
 reexecWithOptionalShell
-    :: (StackM env m, HasConfig env)
+    :: HasConfig env
     => Maybe (Path Abs Dir)
     -> IO (CompilerVersion 'CVWanted)
     -> IO ()
-    -> m ()
+    -> StackT env IO ()
 reexecWithOptionalShell mprojectRoot getCompilerVersion inner =
   do config <- view configL
      inShell <- getInNixShell
@@ -58,11 +58,11 @@ reexecWithOptionalShell mprojectRoot getCompilerVersion inner =
 
 
 runShellAndExit
-    :: (StackM env m, HasConfig env)
+    :: HasConfig env
     => Maybe (Path Abs Dir)
     -> IO (CompilerVersion 'CVWanted)
-    -> m (String, [String])
-    -> m ()
+    -> StackT env IO (String, [String])
+    -> StackT env IO ()
 runShellAndExit mprojectRoot getCompilerVersion getCmdArgs = do
      config <- view configL
      envOverride <- getEnvOverride (configPlatform config)

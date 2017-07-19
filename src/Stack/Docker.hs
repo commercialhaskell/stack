@@ -83,13 +83,13 @@ import qualified System.Posix.User as PosixUser
 -- for this is releasing a lock.  After launching reexecution, the host process becomes
 -- nothing but an manager for the call into docker and thus may not hold the lock.
 reexecWithOptionalContainer
-    :: (StackM env m, HasConfig env)
+    :: HasConfig env
     => Maybe (Path Abs Dir)
-    -> Maybe (m ())
+    -> Maybe (StackT env IO ())
     -> IO ()
-    -> Maybe (m ())
-    -> Maybe (m ())
-    -> m ()
+    -> Maybe (StackT env IO ())
+    -> Maybe (StackT env IO ())
+    -> StackT env IO ()
 reexecWithOptionalContainer mprojectRoot =
     execWithOptionalContainer mprojectRoot getCmdArgs
   where
@@ -185,14 +185,14 @@ reexecWithOptionalContainer mprojectRoot =
 --
 -- This takes an optional release action just like `reexecWithOptionalContainer`.
 execWithOptionalContainer
-    :: (StackM env m, HasConfig env)
+    :: HasConfig env
     => Maybe (Path Abs Dir)
-    -> GetCmdArgs env m
-    -> Maybe (m ())
+    -> GetCmdArgs env
+    -> Maybe (StackT env IO ())
     -> IO ()
-    -> Maybe (m ())
-    -> Maybe (m ())
-    -> m ()
+    -> Maybe (StackT env IO ())
+    -> Maybe (StackT env IO ())
+    -> StackT env IO ()
 execWithOptionalContainer mprojectRoot getCmdArgs mbefore inner mafter mrelease =
   do config <- view configL
      inContainer <- getInContainer
@@ -227,12 +227,13 @@ preventInContainer inner =
         else inner
 
 -- | Run a command in a new Docker container, then exit the process.
-runContainerAndExit :: (StackM env m, HasConfig env)
-  => GetCmdArgs env m
+runContainerAndExit
+  :: HasConfig env
+  => GetCmdArgs env
   -> Maybe (Path Abs Dir) -- ^ Project root (maybe)
-  -> m ()              -- ^ Action to run before
-  -> m ()              -- ^ Action to run after
-  -> m ()
+  -> StackT env IO ()  -- ^ Action to run before
+  -> StackT env IO ()  -- ^ Action to run after
+  -> StackT env IO ()
 runContainerAndExit getCmdArgs
                     mprojectRoot
                     before
@@ -402,8 +403,7 @@ runContainerAndExit getCmdArgs
     sshRelDir = $(mkRelDir ".ssh/")
 
 -- | Clean-up old docker images and containers.
-cleanup :: (StackM env m, HasConfig env)
-        => CleanupOpts -> m ()
+cleanup :: HasConfig env => CleanupOpts -> StackT env IO ()
 cleanup opts =
   do config <- view configL
      let docker = configDocker config
@@ -657,7 +657,7 @@ inspects envOverride images =
   where missingImagePrefixes = ["Error: No such image", "Error: No such object:"]
 
 -- | Pull latest version of configured Docker image from registry.
-pull :: (StackM env m, HasConfig env) => m ()
+pull :: HasConfig env => StackT env IO ()
 pull =
   do config <- view configL
      let docker = configDocker config
@@ -931,10 +931,9 @@ instance FromJSON ImageConfig where
          <*> fmap join (o .:? "Entrypoint") .!= []
 
 -- | Function to get command and arguments to run in Docker container
-type GetCmdArgs env m
-   = (StackM env m, HasConfig env)
-  => DockerOpts
+type GetCmdArgs env
+   = DockerOpts
   -> EnvOverride
   -> Inspect
   -> Bool
-  -> m (FilePath,[String],[(String,String)],[Mount])
+  -> StackT env IO (FilePath,[String],[(String,String)],[Mount])

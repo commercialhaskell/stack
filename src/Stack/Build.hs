@@ -68,11 +68,11 @@ import           System.Win32.Console (setConsoleCP, setConsoleOutputCP, getCons
 --   If a buildLock is passed there is an important contract here.  That lock must
 --   protect the snapshot, and it must be safe to unlock it if there are no further
 --   modifications to the snapshot to be performed by this build.
-build :: (StackM env m, HasEnvConfig env)
+build :: HasEnvConfig env
       => (Set (Path Abs File) -> IO ()) -- ^ callback after discovering all local files
       -> Maybe FileLock
       -> BuildOptsCLI
-      -> m ()
+      -> StackT env IO ()
 build setLocalFiles mbuildLk boptsCli = fixCodePage $ do
     bopts <- view buildOptsL
     let profiling = boptsLibProfile bopts || boptsExeProfile bopts
@@ -147,7 +147,7 @@ justLocals =
     Map.elems .
     planTasks
 
-checkCabalVersion :: (StackM env m, HasEnvConfig env) => m ()
+checkCabalVersion :: HasEnvConfig env => StackT env IO ()
 checkCabalVersion = do
     allowNewer <- view $ configL.to configAllowNewer
     cabalVer <- view cabalVersionL
@@ -272,9 +272,9 @@ mkBaseConfigOpts boptsCli = do
         }
 
 -- | Provide a function for loading package information from the package index
-withLoadPackage :: (StackM env m, HasEnvConfig env)
-                => ((PackageLocationIndex FilePath -> Map FlagName Bool -> [Text] -> IO Package) -> m a)
-                -> m a
+withLoadPackage :: HasEnvConfig env
+                => ((PackageLocationIndex FilePath -> Map FlagName Bool -> [Text] -> IO Package) -> StackT env IO a)
+                -> StackT env IO a
 withLoadPackage inner = do
     econfig <- view envConfigL
     menv <- getMinimalEnvOverride
@@ -300,8 +300,8 @@ withLoadPackage inner = do
 
 -- | Set the code page for this process as necessary. Only applies to Windows.
 -- See: https://github.com/commercialhaskell/stack/issues/738
+fixCodePage :: HasEnvConfig env => StackT env IO a -> StackT env IO a
 #ifdef WINDOWS
-fixCodePage :: (StackM env m, HasBuildConfig env, HasEnvConfig env) => m a -> m a
 fixCodePage inner = do
     mcp <- view $ configL.to configModifyCodePage
     ghcVersion <- view $ actualCompilerVersionL.to getGhcVersion
@@ -343,14 +343,13 @@ fixCodePage inner = do
         , " codepage to UTF-8 (65001) to ensure correct output from GHC"
         ]
 #else
-fixCodePage :: a -> a
 fixCodePage = id
 #endif
 
 -- | Query information about the build and print the result to stdout in YAML format.
-queryBuildInfo :: (StackM env m, HasEnvConfig env)
+queryBuildInfo :: HasEnvConfig env
                => [Text] -- ^ selectors
-               -> m ()
+               -> StackT env IO ()
 queryBuildInfo selectors0 =
         rawBuildInfo
     >>= select id selectors0
@@ -375,7 +374,7 @@ queryBuildInfo selectors0 =
         err msg = throwString $ msg ++ ": " ++ show (front [sel])
 
 -- | Get the raw build information object
-rawBuildInfo :: (StackM env m, HasEnvConfig env) => m Value
+rawBuildInfo :: HasEnvConfig env => StackT env IO Value
 rawBuildInfo = do
     (locals, _sourceMap) <- loadSourceMap NeedTargets defaultBuildOptsCLI
     return $ object

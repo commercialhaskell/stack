@@ -19,7 +19,6 @@ module Stack.Build.ConstructPlan
     ) where
 
 import           Stack.Prelude
-import           Control.Monad.Logger (runLoggingT)
 import           Control.Monad.RWS.Strict
 import           Control.Monad.State.Strict (execState)
 import qualified Data.HashSet as HashSet
@@ -56,6 +55,7 @@ import           Stack.Types.GhcPkgId
 import           Stack.Types.Package
 import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageName
+import           Stack.Types.Runner
 import           Stack.Types.Version
 import           System.IO (putStrLn)
 import           System.Process.Read (findExecutable)
@@ -118,7 +118,7 @@ instance Monoid W where
     mempty = memptydefault
     mappend = mappenddefault
 
-type M = RWST
+type M = RWST -- TODO replace with more efficient WS stack on top of StackT
     Ctx
     W
     (Map PackageName (Either ConstructPlanException AddDepRes))
@@ -136,11 +136,14 @@ data Ctx = Ctx
     , getVersions    :: !(PackageName -> IO (Set Version))
     , wanted         :: !(Set PackageName)
     , localNames     :: !(Set PackageName)
-    , logFunc        :: Loc -> LogSource -> LogLevel -> LogStr -> IO ()
     }
 
 instance HasPlatform Ctx
 instance HasGHCVariant Ctx
+instance HasLogFunc Ctx where
+    logFuncL = configL.logFuncL
+instance HasRunner Ctx where
+    runnerL = configL.runnerL
 instance HasConfig Ctx
 instance HasBuildConfig Ctx
 instance HasEnvConfig Ctx where
@@ -162,7 +165,7 @@ instance HasEnvConfig Ctx where
 --
 -- 3) It will only rebuild a local package if its files are dirty or
 -- some of its dependencies have changed.
-constructPlan :: forall env m. (StackM env m, HasEnvConfig env)
+constructPlan :: forall env. HasEnvConfig env
               => LoadedSnapshot
               -> BaseConfigOpts
               -> [LocalPackage]
@@ -172,7 +175,7 @@ constructPlan :: forall env m. (StackM env m, HasEnvConfig env)
               -> SourceMap
               -> InstalledMap
               -> Bool
-              -> m Plan
+              -> StackT env IO Plan
 constructPlan ls0 baseConfigOpts0 locals extraToBuild0 localDumpPkgs loadPackage0 sourceMap installedMap initialBuildSteps = do
     $logDebug "Constructing the build plan"
     u <- askUnliftIO
@@ -182,10 +185,9 @@ constructPlan ls0 baseConfigOpts0 locals extraToBuild0 localDumpPkgs loadPackage
     let inner = do
             mapM_ onWanted $ filter lpWanted locals
             mapM_ (addDep False) $ Set.toList extraToBuild0
-    lf <- askLoggerIO
     lp <- getLocalPackages
     ((), m, W efinals installExes dirtyReason deps warnings parents) <-
-        liftIO $ runRWST inner (ctx econfig (unliftIO u . getPackageVersions) lf lp) M.empty
+        liftIO $ runRWST inner (ctx econfig (unliftIO u . getPackageVersions) lp) M.empty
     mapM_ $logWarn (warnings [])
     let toEither (_, Left e)  = Left e
         toEither (k, Right v) = Right (k, v)
@@ -217,7 +219,7 @@ constructPlan ls0 baseConfigOpts0 locals extraToBuild0 localDumpPkgs loadPackage
             $prettyError $ pprintExceptions errs stackYaml parents (wantedLocalPackages locals)
             throwM $ ConstructPlanFailed "Plan construction failed."
   where
-    ctx econfig getVersions0 lf lp = Ctx
+    ctx econfig getVersions0 lp = Ctx
         { ls = ls0
         , baseConfigOpts = baseConfigOpts0
         , loadPackage = loadPackage0
@@ -231,7 +233,6 @@ constructPlan ls0 baseConfigOpts0 locals extraToBuild0 localDumpPkgs loadPackage
         , getVersions = getVersions0
         , wanted = wantedLocalPackages locals <> extraToBuild0
         , localNames = Set.fromList $ map (packageName . lpPackage) locals
-        , logFunc = lf
         }
 
     toolMap = getToolMap ls0
@@ -666,7 +667,7 @@ checkDirtiness :: PackageSource
                -> M Bool
 checkDirtiness ps installed package present wanted = do
     ctx <- ask
-    moldOpts <- liftIO $ flip runLoggingT (logFunc ctx) $ flip runReaderT ctx $ tryGetFlagCache installed
+    moldOpts <- runStackT ctx $ tryGetFlagCache installed
     let configOpts = configureOpts
             (view envConfigL ctx)
             (baseConfigOpts ctx)
