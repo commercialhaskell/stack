@@ -4,6 +4,34 @@ So that this doesn't become repetitive: for the reasons behind the answers
 below, see the [Architecture](architecture.md) page. The goal of the answers
 here is to be as helpful and concise as possible.
 
+## What version of GHC is used when I run something like `stack ghci`?
+
+The version of GHC, as well as which packages can be installed, are
+specified by the _resolver_. This may be something like `lts-8.12`,
+which is from the
+[Long Term Support (LTS) Haskell](https://github.com/fpco/lts-haskell/)
+project. The [user guide](GUIDE.md) discusses resolvers in more
+detail.
+
+Which resolver is used is determined by finding the relevant
+`stack.yaml` configuration file for the directory you're running the
+command from. This essentially works by:
+
+1. Check for a `STACK_YAML` environment variable or the `--stack-yaml`
+   command line argument
+2. If none present, check for a `stack.yaml` file in the current
+   directory or any parents
+3. If no `stack.yaml` was found, use the _implicit global_
+
+The implicit global is a shared project used whenever you're outside
+of another project. It's a sort of "mutable shared state" that you
+should be aware of when working with Stack. The most recent request
+when working with the implicit global is how to move to a more recent
+LTS snapshot. You can do this by running the following from outside of
+a project:
+
+    stack config set resolver lts
+
 ## Where is stack installed and will it interfere with `ghc` (etc) I already have installed?
 
 Stack itself is installed in normal system locations based on the mechanism you
