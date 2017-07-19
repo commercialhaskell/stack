@@ -136,9 +136,7 @@ rules global@Global{..} args = do
         mapM_ (\f -> need [releaseDir </> f]) binaryPkgFileNames
 
     distroPhonies ubuntuDistro ubuntuVersions debPackageFileName
-    distroPhonies debianDistro debianVersions debPackageFileName
     distroPhonies centosDistro centosVersions rpmPackageFileName
-    distroPhonies fedoraDistro fedoraVersions rpmPackageFileName
 
     releaseDir </> "*" <.> uploadExt %> \out -> do
         let srcFile = dropExtension out
@@ -239,9 +237,7 @@ rules global@Global{..} args = do
             (removeFile out)
 
     debDistroRules ubuntuDistro ubuntuVersions
-    debDistroRules debianDistro debianVersions
     rpmDistroRules centosDistro centosVersions
-    rpmDistroRules fedoraDistro fedoraVersions
 
   where
 
@@ -428,28 +424,14 @@ rules global@Global{..} args = do
     rpmPackageVersionStr _ = stackVersionStr global
 
     ubuntuVersions =
-        [ ("12.04", "precise")
-        , ("14.04", "trusty")
-        , ("14.10", "utopic")
-        , ("15.04", "vivid")
-        , ("15.10", "wily")
-        , ("16.04", "xenial")
-        , ("16.10", "yakkety") ]
-    debianVersions =
-        [ ("7", "wheezy")
-        , ("8", "jessie") ]
+        [ ("14.04", "trusty")
+        , ("16.04", "xenial") ]
     centosVersions =
         [ ("7", "el7")
         , ("6", "el6") ]
-    fedoraVersions =
-        [ ("22", "fc22")
-        , ("23", "fc23")
-        , ("24", "fc24") ]
 
     ubuntuDistro = "ubuntu"
-    debianDistro = "debian"
     centosDistro = "centos"
-    fedoraDistro = "fedora"
 
     anyDistroVersion distro = DistroVersion distro "*" "*"
 
