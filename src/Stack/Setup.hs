@@ -94,6 +94,8 @@ import              Stack.Types.Version
 import qualified    System.Directory as D
 import              System.Environment (getExecutablePath)
 import              System.Exit (ExitCode (..), exitFailure)
+import              System.IO (hFlush, stdout)
+import              System.IO.Error (isPermissionError)
 import              System.FilePath (searchPathSeparator)
 import qualified    System.FilePath as FP
 import              System.Process (rawSystem)
@@ -625,7 +627,7 @@ ensureDockerStackExe containerPlatform = do
         $logInfo $ mconcat ["Downloading Docker-compatible ", T.pack stackProgName, " executable"]
         sri <- downloadStackReleaseInfo Nothing Nothing (Just (versionString stackVersion))
         platforms <- runReaderT preferredPlatforms (containerPlatform, PlatformVariantNone)
-        downloadStackExe platforms sri stackExeDir (const $ return ())
+        downloadStackExe platforms sri stackExeDir False (const $ return ())
     return stackExePath
 
 -- | Install the newest version or a specific version of Cabal globally
@@ -1711,13 +1713,14 @@ preferredPlatforms = do
     return $ map (\suffix -> (isWindows, concat [os, "-", arch, suffix])) suffixes
 
 downloadStackExe
-    :: (MonadIO m, MonadLogger m, MonadThrow m, MonadReader env m, HasConfig env)
+    :: (MonadUnliftIO m, MonadLogger m, MonadThrow m, MonadReader env m, HasConfig env)
     => [(Bool, String)] -- ^ acceptable platforms
     -> StackReleaseInfo
     -> Path Abs Dir -- ^ destination directory
+    -> Bool -- ^ perform PATH-aware checking, see #3232
     -> (Path Abs File -> IO ()) -- ^ test the temp exe before renaming
     -> m ()
-downloadStackExe platforms0 archiveInfo destDir testExe = do
+downloadStackExe platforms0 archiveInfo destDir checkPath testExe = do
     (isWindows, archiveURL) <-
       let loop [] = throwString $ "Unable to find binary Stack archive for platforms: "
                                 ++ unwords (map snd platforms0)
@@ -1771,6 +1774,9 @@ downloadStackExe platforms0 archiveInfo destDir testExe = do
     warnInstallSearchPathIssues destDir' ["stack"]
 
     $logInfo $ T.pack $ "New stack executable available at " ++ toFilePath destFile
+
+    when checkPath $ performPathChecking destFile
+      `catchAny` \e -> $logError (T.pack (show e))
   where
 
     findArchive (StackReleaseInfo val) pattern = do
@@ -1821,6 +1827,77 @@ downloadStackExe platforms0 archiveInfo destDir testExe = do
         exeName =
             let base = FP.dropExtension (FP.takeBaseName (T.unpack url)) FP.</> "stack"
              in if isWindows then base FP.<.> "exe" else base
+
+-- | Ensure that the Stack executable download is in the same location
+-- as the currently running executable. See:
+-- https://github.com/commercialhaskell/stack/issues/3232
+performPathChecking
+    :: (MonadUnliftIO m, MonadLogger m, MonadThrow m, MonadReader env m, HasConfig env)
+    => Path Abs File -- ^ location of the newly downloaded file
+    -> m ()
+performPathChecking newFile = do
+  executablePath <- liftIO getExecutablePath
+  executablePath' <- parseAbsFile executablePath
+  unless (toFilePath newFile == executablePath) $ do
+    $logInfo $ T.pack $ "Also copying stack executable to " ++ executablePath
+    tmpFile <- parseAbsFile $ executablePath ++ ".tmp"
+    eres <- tryIO $ do
+      liftIO $ copyFile newFile tmpFile
+#if !WINDOWS
+      liftIO $ setFileMode (toFilePath tmpFile) 0o755
+#endif
+      liftIO $ renameFile tmpFile executablePath'
+      $logInfo "Stack executable copied successfully!"
+    case eres of
+      Right () -> return ()
+      Left e
+        | isPermissionError e -> do
+            $logWarn $ T.pack $ "Permission error when trying to copy: " ++ show e
+            $logWarn "Should I try to perform the file copy using sudo? This may fail"
+            toSudo <- prompt "Try using sudo? (y/n) "
+            when toSudo $ do
+              let run cmd args = do
+                    ec <- $withProcessTimeLog cmd args $
+                        liftIO $ rawSystem cmd args
+                    when (ec /= ExitSuccess) $ error $ concat
+                          [ "Process exited with "
+                          , show ec
+                          , ": "
+                          , unwords (cmd:args)
+                          ]
+                  commands =
+                    [ ("sudo",
+                        [ "cp"
+                        , toFilePath newFile
+                        , toFilePath tmpFile
+                        ])
+                    , ("sudo",
+                        [ "mv"
+                        , toFilePath tmpFile
+                        , executablePath
+                        ])
+                    ]
+              $logInfo "Going to run the following commands:"
+              $logInfo ""
+              forM_ commands $ \(cmd, args) ->
+                $logInfo $ "-  " `T.append` T.unwords (map T.pack (cmd:args))
+              mapM_ (uncurry run) commands
+              $logInfo ""
+              $logInfo "sudo file copy worked!"
+        | otherwise -> throwM e
+
+prompt :: MonadIO m => String -> m Bool
+prompt str =
+    liftIO go
+  where
+    go = do
+      putStr str
+      hFlush stdout
+      l <- getLine
+      case l of
+        'y':_ -> return True
+        'n':_ -> return False
+        _ -> putStrLn "Invalid entry, try again" >> go
 
 getDownloadVersion :: StackReleaseInfo -> Maybe Version
 getDownloadVersion (StackReleaseInfo val) = do

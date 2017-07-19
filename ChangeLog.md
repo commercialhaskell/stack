@@ -31,6 +31,15 @@ Other enhancements:
   cryptographic hash (SHA256) of the contents for better
   reproducibility.
 * Allow specifying `--git-branch` when upgrading
+* When running `stack upgrade` from a file which is different from the
+  default executable path (e.g., on POSIX systems,
+  `~/.local/bin/stack`), it will now additionally copy the new
+  executable over the currently running `stack` executable. If
+  permission is denied (such as in `/usr/local/bin/stack`), the user
+  will be prompted to try again using `sudo`. This is intended to
+  assist with the user experience when the `PATH` environment variable
+  has not been properly configured, see
+  [#3232](https://github.com/commercialhaskell/stack/issues/3232).
 
 Bug fixes:
 

@@ -169,7 +169,7 @@ binaryUpgrade (BinaryOpts mplatform force' mver morg mrepo) = do
             return True
     when toUpgrade $ do
         config <- view configL
-        downloadStackExe platforms0 archiveInfo (configLocalBin config) $ \tmpFile -> do
+        downloadStackExe platforms0 archiveInfo (configLocalBin config) True $ \tmpFile -> do
             -- Sanity check!
             ec <- rawSystem (toFilePath tmpFile) ["--version"]
 
