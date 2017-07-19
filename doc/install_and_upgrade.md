@@ -295,10 +295,18 @@ For more information and other shells, see [the shell auto-completion page](shel
 
 ## Upgrade
 
-There are essentially three different approaches to upgrade:
+There are essentially four different approaches to upgrade:
 
-* The `stack` tool itself ships with an `upgrade` command, which will build `stack` from source and install it to the default install path (see the previous section). You can use `stack upgrade` to get the latest official release, and `stack upgrade --git` to install from Git and live on the bleeding edge. If you follow this, make sure that this directory is on your `PATH` and takes precedence over the system installed `stack`. For more information, see [this discussion](https://github.com/commercialhaskell/stack/issues/237#issuecomment-126793301).
+* The `stack` tool itself ships with an `upgrade` command, which download a `stack` binary or build it from source and install it to the default install path (e.g. `~/.local/bin` or `%APPDATA%\local\bin`; see the [Path](#Path) section above). You can use `stack upgrade` to get the latest official release, and `stack upgrade --git` to install from Git and live on the bleeding edge. Make sure the default install directory is on your `PATH` and takes precedence over the system installed `stack`, or copy `stack` from that directory to the system location afterward. For more information, see [this discussion](https://github.com/commercialhaskell/stack/issues/237#issuecomment-126793301).
 
-* If you're using a package manager (e.g., the Ubuntu debs listed above) and are happy with sticking with the officially released binaries, simply follow your normal package manager strategies for upgrading (e.g. `apt-get update && apt-get upgrade`).
+* If you're using a package manager and are happy with sticking with the officially released binaries from the distribution (which may the lag behind latest version of Stack significantly), simply follow your normal package manager strategies for upgrading (e.g. `apt-get update && apt-get upgrade`).
 
-* If you're not using a package manager but want to stick with the official binaries (such as on Windows or Mac), you'll need to manually follow the steps above to download the newest binaries from the release page and replace the old binary.
+* The get.haskellstack.org script supports the `-f` argument to over-write the current stack executable.  For example:
+
+      curl -sSL https://get.haskellstack.org/ | sh -s - -f
+
+  or:
+
+      wget -qO- https://get.haskellstack.org/ | sh -s - -f
+
+* Manually follow the steps above to download the newest binaries from the release page and replace the old binary.
