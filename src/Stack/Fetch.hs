@@ -102,7 +102,7 @@ instance Show FetchException where
         (if null suggestions then "" else "\n" ++ suggestions)
 
 -- | Fetch packages into the cache without unpacking
-fetchPackages :: (StackMiniM env m, HasConfig env)
+fetchPackages :: (StackM env m, HasConfig env)
               => Set PackageIdentifier
               -> m ()
 fetchPackages idents' = do
@@ -117,7 +117,7 @@ fetchPackages idents' = do
     idents = map (flip PackageIdentifierRevision CFILatest) $ Set.toList idents'
 
 -- | Intended to work for the command line command.
-unpackPackages :: (StackMiniM env m, HasConfig env)
+unpackPackages :: (StackM env m, HasConfig env)
                => Maybe SnapshotDef -- ^ when looking up by name, take from this build plan
                -> FilePath -- ^ destination
                -> [String] -- ^ names or identifiers
@@ -152,7 +152,7 @@ unpackPackages mSnapshotDef dest input = do
 
 -- | Same as 'unpackPackageIdents', but for a single package.
 unpackPackageIdent
-    :: (StackMiniM env m, HasConfig env)
+    :: (StackM env m, HasConfig env)
     => Path Abs Dir -- ^ unpack directory
     -> Path Rel Dir -- ^ the dist rename directory, see: https://github.com/fpco/stack/issues/157
     -> PackageIdentifierRevision
@@ -170,7 +170,7 @@ unpackPackageIdent unpackDir distDir (PackageIdentifierRevision ident mcfi) = do
 -- | Ensure that all of the given package idents are unpacked into the build
 -- unpack directory, and return the paths to all of the subdirectories.
 unpackPackageIdents
-    :: (StackMiniM env m, HasConfig env)
+    :: (StackM env m, HasConfig env)
     => Path Abs Dir -- ^ unpack directory
     -> Maybe (Path Rel Dir) -- ^ the dist rename directory, see: https://github.com/fpco/stack/issues/157
     -> [PackageIdentifierRevision]
@@ -190,7 +190,7 @@ data ResolvedPackage = ResolvedPackage
     deriving Show
 
 -- | Resolve a set of package names and identifiers into @FetchPackage@ values.
-resolvePackages :: (StackMiniM env m, HasConfig env)
+resolvePackages :: (StackM env m, HasConfig env)
                 => Maybe SnapshotDef -- ^ when looking up by name, take from this build plan
                 -> [PackageIdentifierRevision]
                 -> Set PackageName
@@ -218,7 +218,7 @@ resolvePackages mSnapshotDef idents0 names0 = do
 -- should be present and checked).
 resolvePackagesAllowMissing
     :: forall env m.
-       (StackMiniM env m, HasConfig env)
+       (StackM env m, HasConfig env)
     => Maybe SnapshotDef -- ^ when looking up by name, take from this build plan
     -> [PackageIdentifierRevision]
     -> Set PackageName
@@ -316,7 +316,7 @@ withCabalFiles name pkgs f = do
 -- | Provide a function which will load up a cabal @ByteString@ from the
 -- package indices.
 withCabalLoader
-    :: (StackMiniM env m, HasConfig env)
+    :: (StackM env m, HasConfig env)
     => ((PackageIdentifierRevision -> IO ByteString) -> m a)
     -> m a
 withCabalLoader inner = do
@@ -409,7 +409,7 @@ typoCorrectionCandidates (PackageIdentifierRevision ident _mcfi) (PackageCache c
     $ cache
 
 -- | Figure out where to fetch from.
-getToFetch :: (StackMiniM env m, HasConfig env)
+getToFetch :: (StackM env m, HasConfig env)
            => Maybe (Path Abs Dir) -- ^ directory to unpack into, @Nothing@ means no unpack
            -> [ResolvedPackage]
            -> m ToFetchResult
@@ -468,7 +468,7 @@ getToFetch mdest resolvedAll = do
 -- @
 --
 -- Since 0.1.0.0
-fetchPackages' :: (StackMiniM env m, HasConfig env)
+fetchPackages' :: (StackM env m, HasConfig env)
                => Maybe (Path Rel Dir) -- ^ the dist rename directory, see: https://github.com/fpco/stack/issues/157
                -> Map PackageIdentifier ToFetch
                -> m (Map PackageIdentifier (Path Abs Dir))

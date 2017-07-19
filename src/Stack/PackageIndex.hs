@@ -60,7 +60,7 @@ import qualified System.Directory as D
 import           System.FilePath ((<.>))
 
 -- | Populate the package index caches and return them.
-populateCache :: (StackMiniM env m, HasConfig env) => PackageIndex -> m (PackageCache ())
+populateCache :: (StackM env m, HasConfig env) => PackageIndex -> m (PackageCache ())
 populateCache index = do
     requireIndex index
     -- This uses full on lazy I/O instead of ResourceT to provide some
@@ -210,20 +210,20 @@ instance Show PackageIndexException where
         ]
 
 -- | Require that an index be present, updating if it isn't.
-requireIndex :: (StackMiniM env m, HasConfig env) => PackageIndex -> m ()
+requireIndex :: (StackM env m, HasConfig env) => PackageIndex -> m ()
 requireIndex index = do
     tarFile <- configPackageIndex $ indexName index
     exists <- doesFileExist tarFile
     unless exists $ updateIndex index
 
 -- | Update all of the package indices
-updateAllIndices :: (StackMiniM env m, HasConfig env) => m ()
+updateAllIndices :: (StackM env m, HasConfig env) => m ()
 updateAllIndices = do
     clearPackageCaches
     view packageIndicesL >>= mapM_ updateIndex
 
 -- | Update the index tarball
-updateIndex :: (StackMiniM env m, HasConfig env) => PackageIndex -> m ()
+updateIndex :: (StackM env m, HasConfig env) => PackageIndex -> m ()
 updateIndex index =
   do let name = indexName index
          url = indexLocation index
@@ -245,7 +245,7 @@ updateIndex index =
      liftIO $ runConduitRes $ sourceFile (toFilePath tarFile) .| sinkFile (toFilePath oldTarFile)
 
 -- | Update the index tarball via HTTP
-updateIndexHTTP :: (StackMiniM env m, HasConfig env)
+updateIndexHTTP :: (StackM env m, HasConfig env)
                 => IndexName
                 -> Text -- ^ url
                 -> m ()
@@ -276,7 +276,7 @@ updateIndexHTTP indexName' url = do
 
 -- | Update the index tarball via Hackage Security
 updateIndexHackageSecurity
-    :: (StackMiniM env m, HasConfig env)
+    :: (StackM env m, HasConfig env)
     => IndexName
     -> Text -- ^ base URL
     -> HackageSecurity
@@ -329,7 +329,7 @@ updateIndexHackageSecurity indexName' url (HackageSecurity keyIds threshold) = d
 
 -- | Delete the package index cache
 deleteCache
-    :: (StackMiniM env m, HasConfig env)
+    :: (StackM env m, HasConfig env)
     => IndexName -> m ()
 deleteCache indexName' = do
     fp <- configPackageIndexCache indexName'
@@ -342,7 +342,7 @@ deleteCache indexName' = do
 --
 -- See 'getPackageCaches' for performance notes.
 getPackageVersions
-    :: (StackMiniM env m, HasConfig env)
+    :: (StackM env m, HasConfig env)
     => PackageName
     -> m (Set Version)
 getPackageVersions pkgName = fmap (lookupPackageVersions pkgName) getPackageCaches
@@ -355,7 +355,7 @@ lookupPackageVersions pkgName (PackageCache m) =
 --
 -- This has two levels of caching: in memory, and the on-disk cache. So,
 -- feel free to call this function multiple times.
-getPackageCaches :: (StackMiniM env m, HasConfig env) => m (PackageCache PackageIndex)
+getPackageCaches :: (StackM env m, HasConfig env) => m (PackageCache PackageIndex)
 getPackageCaches = do
     config <- view configL
     mcached <- liftIO $ readIORef (configPackageCache config)
@@ -375,7 +375,7 @@ getPackageCaches = do
 
 -- | Clear the in-memory hackage index cache. This is needed when the
 -- hackage index is updated.
-clearPackageCaches :: (StackMiniM env m, HasConfig env) => m ()
+clearPackageCaches :: (StackM env m, HasConfig env) => m ()
 clearPackageCaches = do
     cacheRef <- view $ configL.to configPackageCache
     liftIO $ writeIORef cacheRef Nothing

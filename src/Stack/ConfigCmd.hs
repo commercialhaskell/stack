@@ -49,7 +49,7 @@ configCmdSetScope (ConfigCmdSetSystemGhc scope _) = scope
 configCmdSetScope (ConfigCmdSetInstallGhc scope _) = scope
 
 cfgCmdSet
-    :: (StackMiniM env m, HasConfig env, HasGHCVariant env)
+    :: (StackM env m, HasConfig env, HasGHCVariant env)
     => GlobalOpts -> ConfigCmdSet -> m ()
 cfgCmdSet go cmd = do
     conf <- view configL
@@ -78,7 +78,7 @@ cfgCmdSet go cmd = do
             $logInfo (T.pack (toFilePath configFilePath) <> " has been updated.")
 
 cfgCmdSetValue
-    :: (StackMiniM env m, HasConfig env, HasGHCVariant env)
+    :: (StackM env m, HasConfig env, HasGHCVariant env)
     => Path Abs Dir -- ^ root directory of project
     -> ConfigCmdSet -> m Yaml.Value
 cfgCmdSetValue root (ConfigCmdSetResolver newResolver) = do

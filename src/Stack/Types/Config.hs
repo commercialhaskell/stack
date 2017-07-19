@@ -51,7 +51,6 @@ module Stack.Types.Config
   ,HasGHCVariant(..)
   ,snapshotsDir
   -- ** Constraint synonym for use with StackMini
-  ,StackMiniM
   ,StackM
   -- ** EnvConfig & HasEnvConfig
   ,EnvConfig(..)
@@ -650,14 +649,10 @@ instance ToJSON Project where
       , ["resolver" .= resolver]
       ]
 
--- | Constraint synonym for constraints satisfied by a 'MiniConfig'
--- environment.
-type StackMiniM r m =
-    ( MonadReader r m, MonadUnliftIO m, MonadLoggerIO m, MonadThrow m
-    )
-
 -- | Constraint synonym for constraints commonly satisifed by monads used in stack.
-type StackM r m = (StackMiniM r m, HasRunner r)
+type StackM r m =
+    ( MonadReader r m, MonadUnliftIO m, MonadLoggerIO m, MonadThrow m, HasRunner r
+    )
 
 -- An uninterpreted representation of configuration options.
 -- Configurations may be "cascaded" using mappend (left-biased).

@@ -146,7 +146,7 @@ getImplicitGlobalProjectDir config =
 -- | This is slightly more expensive than @'asks' ('bcStackYaml' '.' 'getBuildConfig')@
 -- and should only be used when no 'BuildConfig' is at hand.
 getStackYaml
-    :: (StackMiniM env m, HasConfig env)
+    :: (StackM env m, HasConfig env)
     => m (Path Abs File)
 getStackYaml = do
     config <- view configL
@@ -156,7 +156,7 @@ getStackYaml = do
 
 -- | Download the 'Snapshots' value from stackage.org.
 getSnapshots
-    :: (StackMiniM env m, HasConfig env)
+    :: (StackM env m, HasConfig env)
     => m Snapshots
 getSnapshots = do
     latestUrlText <- askLatestSnapshotUrl
@@ -168,7 +168,7 @@ getSnapshots = do
 
 -- | Turn an 'AbstractResolver' into a 'Resolver'.
 makeConcreteResolver
-    :: (StackMiniM env m, HasConfig env)
+    :: (StackM env m, HasConfig env)
     => Maybe (Path Abs Dir) -- ^ root of project for resolving custom relative paths
     -> AbstractResolver
     -> m Resolver
@@ -199,7 +199,7 @@ makeConcreteResolver root ar = do
     return r
 
 -- | Get the latest snapshot resolver available.
-getLatestResolver :: (StackMiniM env m, HasConfig env) => m (ResolverWith a)
+getLatestResolver :: (StackM env m, HasConfig env) => m (ResolverWith a)
 getLatestResolver = do
     snapshots <- getSnapshots
     let mlts = do
@@ -633,7 +633,7 @@ loadBuildConfig mproject config mresolver mcompiler = do
 -- If the packages have already been downloaded, this uses a cached value (
 getLocalPackages
     :: forall env m.
-       (StackMiniM env m, HasEnvConfig env)
+       (StackM env m, HasEnvConfig env)
     => m LocalPackages
 getLocalPackages = do
     cacheRef <- view $ envConfigL.to envConfigPackagesRef

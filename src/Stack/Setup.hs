@@ -780,7 +780,7 @@ getInstalledGhcjs installed goodVersion =
     goodPackage (ToolGhcjs cv) = if goodVersion cv then Just cv else Nothing
     goodPackage _ = Nothing
 
-downloadAndInstallTool :: StackMiniM env m
+downloadAndInstallTool :: StackM env m
                        => Path Abs Dir
                        -> SetupInfo
                        -> DownloadInfo
@@ -899,7 +899,7 @@ getOSKey platform =
         Platform arch os -> throwM $ UnsupportedSetupCombo os arch
 
 downloadFromInfo
-    :: StackMiniM env m
+    :: StackM env m
     => Path Abs Dir -> DownloadInfo -> Tool -> m (Path Abs File, ArchiveType)
 downloadFromInfo programsDir downloadInfo tool = do
     at <-
@@ -1251,7 +1251,7 @@ instance Alternative CheckDependency where
             Left _ -> y menv
             Right x' -> return $ Right x'
 
-installGHCWindows :: (StackMiniM env m, HasConfig env)
+installGHCWindows :: (StackM env m, HasConfig env)
                   => Version
                   -> SetupInfo
                   -> Path Abs File
@@ -1264,7 +1264,7 @@ installGHCWindows version si archiveFile archiveType _tempDir destDir = do
     withUnpackedTarball7z "GHC" si archiveFile archiveType (Just tarComponent) destDir
     $logInfo $ "GHC installed to " <> T.pack (toFilePath destDir)
 
-installMsys2Windows :: (StackMiniM env m, HasConfig env)
+installMsys2Windows :: (StackM env m, HasConfig env)
                   => Text -- ^ OS Key
                   -> SetupInfo
                   -> Path Abs File
@@ -1304,7 +1304,7 @@ installMsys2Windows osKey si archiveFile archiveType _tempDir destDir = do
 
 -- | Unpack a compressed tarball using 7zip.  Expects a single directory in
 -- the unpacked results, which is renamed to the destination directory.
-withUnpackedTarball7z :: (StackMiniM env m, HasConfig env)
+withUnpackedTarball7z :: (StackM env m, HasConfig env)
                       => String -- ^ Name of tool, used in error messages
                       -> SetupInfo
                       -> Path Abs File -- ^ Path to archive file
@@ -1352,7 +1352,7 @@ expectSingleUnpackedDir archiveFile destDir = do
 -- | Download 7z as necessary, and get a function for unpacking things.
 --
 -- Returned function takes an unpack directory and archive.
-setup7z :: (MonadIO n, MonadLogger n, StackMiniM env m, HasConfig env)
+setup7z :: (MonadIO n, MonadLogger n, StackM env m, HasConfig env)
         => SetupInfo
         -> m (Path Abs Dir -> Path Abs File -> n ())
 setup7z si = do
@@ -1378,7 +1378,7 @@ setup7z si = do
                     $ liftIO $ throwM (ProblemWhileDecompressing archive)
         _ -> throwM SetupInfoMissingSevenz
 
-chattyDownload :: StackMiniM env m
+chattyDownload :: StackM env m
                => Text          -- ^ label
                -> DownloadInfo  -- ^ URL, content-length, and sha1
                -> Path Abs File -- ^ destination

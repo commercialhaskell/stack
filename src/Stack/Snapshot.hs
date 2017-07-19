@@ -127,7 +127,7 @@ instance Show SnapshotException where
 -- | Convert a 'Resolver' into a 'SnapshotDef'
 loadResolver
   :: forall env m.
-     (StackMiniM env m, HasConfig env)
+     (StackM env m, HasConfig env)
   => Resolver
   -> m SnapshotDef
 loadResolver (ResolverSnapshot name) = do
@@ -341,7 +341,7 @@ loadResolver (ResolverCustom url loc) = do
 -- | Fully load up a 'SnapshotDef' into a 'LoadedSnapshot'
 loadSnapshot
   :: forall env m.
-     (StackMiniM env m, HasConfig env, HasGHCVariant env)
+     (StackM env m, HasConfig env, HasGHCVariant env)
   => EnvOverride -- ^ used for running Git/Hg, and if relevant, getting global package info
   -> Maybe (CompilerVersion 'CVActual) -- ^ installed GHC we should query; if none provided, use the global hints
   -> Path Abs Dir -- ^ project root, used for checking out necessary files
@@ -352,7 +352,7 @@ loadSnapshot menv mcompiler root sd = withCabalLoader $ \loader -> loadSnapshot'
 -- | Fully load up a 'SnapshotDef' into a 'LoadedSnapshot'
 loadSnapshot'
   :: forall env m.
-     (StackMiniM env m, HasConfig env, HasGHCVariant env)
+     (StackM env m, HasConfig env, HasGHCVariant env)
   => (PackageIdentifierRevision -> IO ByteString) -- ^ load a cabal file's contents from the index
   -> EnvOverride -- ^ used for running Git/Hg, and if relevant, getting global package info
   -> Maybe (CompilerVersion 'CVActual) -- ^ installed GHC we should query; if none provided, use the global hints
@@ -407,7 +407,7 @@ loadSnapshot' loadFromIndex menv mcompiler root =
 -- values.
 calculatePackagePromotion
   :: forall env m localLocation.
-     (StackMiniM env m, HasConfig env, HasGHCVariant env)
+     (StackM env m, HasConfig env, HasGHCVariant env)
   => (PackageIdentifierRevision -> IO ByteString) -- ^ load from index
   -> EnvOverride
   -> Path Abs Dir -- ^ project root
@@ -511,7 +511,7 @@ calculatePackagePromotion
 -- | Recalculate a 'LoadedPackageInfo' based on updates to flags,
 -- hide values, and GHC options.
 recalculate :: forall env m.
-               (StackMiniM env m, HasConfig env, HasGHCVariant env)
+               (StackM env m, HasConfig env, HasGHCVariant env)
             => (PackageIdentifierRevision -> IO ByteString)
             -> EnvOverride
             -> Path Abs Dir -- ^ root
@@ -589,7 +589,7 @@ checkDepsMet available m
 -- | Load a snapshot from the given compiler version, using just the
 -- information in the global package database.
 loadCompiler :: forall env m.
-                (StackMiniM env m, HasConfig env)
+                (StackM env m, HasConfig env)
              => CompilerVersion 'CVActual
              -> m LoadedSnapshot
 loadCompiler cv = do

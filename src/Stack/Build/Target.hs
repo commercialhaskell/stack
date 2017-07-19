@@ -233,7 +233,7 @@ data ResolveResult = ResolveResult
 -- | Convert a 'RawTarget' into a 'ResolveResult' (see description on
 -- the module).
 resolveRawTarget
-  :: forall env m. (StackMiniM env m, HasConfig env)
+  :: forall env m. (StackM env m, HasConfig env)
   => Map PackageName (LoadedPackageInfo GhcPkgId) -- ^ globals
   -> Map PackageName (LoadedPackageInfo (PackageLocationIndex FilePath)) -- ^ snapshot
   -> Map PackageName (GenericPackageDescription, PackageLocationIndex FilePath) -- ^ local deps

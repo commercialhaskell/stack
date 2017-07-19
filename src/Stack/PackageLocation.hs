@@ -42,7 +42,7 @@ import System.Process.Run
 -- | Same as 'resolveMultiPackageLocation', but works on a
 -- 'SinglePackageLocation'.
 resolveSinglePackageLocation
-    :: (StackMiniM env m, HasConfig env)
+    :: (StackM env m, HasConfig env)
     => EnvOverride
     -> Path Abs Dir -- ^ project root
     -> PackageLocation FilePath
@@ -144,7 +144,7 @@ resolveSinglePackageLocation menv projRoot (PLRepo (Repo url commit repoType' su
 -- Returns the updated PackageLocation value with just a single subdir
 -- (if relevant).
 resolveMultiPackageLocation
-    :: (StackMiniM env m, HasConfig env)
+    :: (StackM env m, HasConfig env)
     => EnvOverride
     -> Path Abs Dir -- ^ project root
     -> PackageLocation Subdirs
@@ -173,7 +173,7 @@ resolveMultiPackageLocation menv projRoot (PLRepo (Repo url commit repoType' sub
     return (dir', PLRepo $ Repo url commit repoType' subdir)
 
 cloneRepo
-    :: (StackMiniM env m, HasConfig env)
+    :: (StackM env m, HasConfig env)
     => EnvOverride
     -> Path Abs Dir -- ^ project root
     -> Text -- ^ URL
@@ -229,7 +229,7 @@ cloneRepo menv projRoot url commit repoType' = do
 -- 'SinglePackageLocation'.
 loadSingleRawCabalFile
   :: forall m env.
-     (StackMiniM env m, HasConfig env)
+     (StackM env m, HasConfig env)
   => (PackageIdentifierRevision -> IO ByteString) -- ^ lookup in index
   -> EnvOverride
   -> Path Abs Dir -- ^ project root, used for checking out necessary files
@@ -247,7 +247,7 @@ loadSingleRawCabalFile _ menv root (PLOther loc) =
 -- | Same as 'loadMultiRawCabalFiles' but for 'PackageLocationIndex'.
 loadMultiRawCabalFilesIndex
   :: forall m env.
-     (StackMiniM env m, HasConfig env)
+     (StackM env m, HasConfig env)
   => (PackageIdentifierRevision -> IO ByteString) -- ^ lookup in index
   -> EnvOverride
   -> Path Abs Dir -- ^ project root, used for checking out necessary files
@@ -268,7 +268,7 @@ loadMultiRawCabalFilesIndex _ x y (PLOther z) =
 -- relevant subdirectory selected.
 loadMultiRawCabalFiles
   :: forall m env.
-     (StackMiniM env m, HasConfig env)
+     (StackM env m, HasConfig env)
   => EnvOverride
   -> Path Abs Dir -- ^ project root, used for checking out necessary files
   -> PackageLocation Subdirs
