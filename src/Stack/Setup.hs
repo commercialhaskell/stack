@@ -70,7 +70,7 @@ import              Path.CheckInstall (warnInstallSearchPathIssues)
 import              Path.Extra (toFilePathNoTrailingSep)
 import              Path.IO hiding (findExecutable, withSystemTempDir)
 import qualified    Paths_stack as Meta
-import              Prelude (until)
+import              Prelude (getLine, putStr, putStrLn, until)
 import              Stack.Build (build)
 import              Stack.Config (loadConfig)
 import              Stack.Constants (stackProgName)
