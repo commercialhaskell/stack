@@ -907,10 +907,10 @@ downloadFromInfo programsDir downloadInfo tool = do
             ".tar.gz" -> return TarGz
             ".7z.exe" -> return SevenZ
             _ -> throwString $ "Error: Unknown extension for url: " ++ url
-    relfile' <- parseRelFile $ toolString tool ++ extension
+    relativeFile <- parseRelFile $ toolString tool ++ extension
     path <- case url of
         (parseUrlThrow -> Just _) -> do
-            let path = programsDir </> relfile'
+            let path = programsDir </> relativeFile
             ensureDir programsDir
             chattyDownload (T.pack (toolString tool)) downloadInfo path
             return path

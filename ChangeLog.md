@@ -14,10 +14,6 @@ Major changes:
 
 Behavior changes:
 
-* `stack profile` and `stack trace` now add their extra RTS arguments for
-  benchmarks and tests to the beginning of the args, instead of the end.
-  See [#2399](https://github.com/commercialhaskell/stack/issues/2399)
-* Support for Git-based indices has been removed.
 * The `--install-ghc` flag is now on by default. For example, if you
   run `stack build` in a directory requiring a GHC that you do not
   currently have, Stack will automatically download and install that
@@ -26,8 +22,41 @@ Behavior changes:
 
 Other enhancements:
 
+* It's now possible to skip tests and benchmarks using `--skip`
+  flag
+* `GitSHA1` is now `StaticSHA256` and is implemented using the `StaticSize 64 ByteString` for improved performance.
+  See [#3006](https://github.com/commercialhaskell/stack/issues/3006)
+* Dependencies via HTTP(S) archives have been generalized to allow
+  local file path archives, as well as to support setting a
+  cryptographic hash (SHA256) of the contents for better
+  reproducibility.
+* Allow specifying `--git-branch` when upgrading
+
+Bug fixes:
+
+* `stack haddock` now includes package names for all modules in the
+   Haddock index page. See:
+  [#2886](https://github.com/commercialhaskell/stack/issues/2886)
+* Fixed an issue where Stack wouldn't detect missing Docker images
+  properly with newer Docker versions.
+  [#3171](https://github.com/commercialhaskell/stack/pull/3171)
+
+
+## 1.5.0
+
+Behavior changes:
+
+* `stack profile` and `stack trace` now add their extra RTS arguments for
+  benchmarks and tests to the beginning of the args, instead of the end.
+  See [#2399](https://github.com/commercialhaskell/stack/issues/2399)
+* Support for Git-based indices has been removed.
+
+Other enhancements:
+
 * `stack setup` allow to control options passed to ghcjs-boot with
   `--ghcjs-boot-options` (one word at a time) and `--[no-]ghcjs-boot-clean`
+* `stack setup` now accepts a `--install-cabal VERSION` option which
+  will install a specific version of the Cabal library globally.
 * Updates to store-0.4.1, which has improved performance and better error
   reporting for version tags.  A side-effect of this is that all of
   stack's binary caches will be invalidated.
@@ -73,15 +102,10 @@ Other enhancements:
   foo-1.2.3@gitsha1:deadbeef`. Note that this should be considered
   _experimental_, Stack will likely move towards a different hash
   format in the future.
-* It's now possible to skip tests and benchmarks using `--skip`
-  flag
-* `GitSHA1` is now `StaticSHA256` and is implemented using the `StaticSize 64 ByteString` for improved performance.
-  See [#3006](https://github.com/commercialhaskell/stack/issues/3006)
-* Dependencies via HTTP(S) archives have been generalized to allow
-  local file path archives, as well as to support setting a
-  cryptographic hash (SHA256) of the contents for better
-  reproducibility.
-* Allow specifying `--git-branch` when upgrading
+* Binary "stack upgrade" will now warn if the installed executable is not
+  on the PATH or shadowed by another entry.
+* Allow running tests on tarball created by sdist and upload
+  [#717](https://github.com/commercialhaskell/stack/issues/717).
 
 Bug fixes:
 
@@ -115,12 +139,6 @@ Bug fixes:
   See [#3142](https://github.com/commercialhaskell/stack/issues/3142)
 * `stack script`'s import parser will now properly parse files that
   have Windows-style line endings (CRLF)
-* Fixed an issue where Stack wouldn't detect missing Docker images
-  properly with newer Docker versions.
-  [#3171](https://github.com/commercialhaskell/stack/pull/3171)
-* `stack haddock` now includes package names for all modules in the
-   Haddock index page. See:
-  [#2886](https://github.com/commercialhaskell/stack/issues/2886)
 
 
 ## 1.4.0
@@ -146,9 +164,6 @@ Major changes:
   packages already being present much faster. This mode does require
   that all packages be present in a snapshot, however.
   [#2805](https://github.com/commercialhaskell/stack/issues/2805)
-
-* `stack setup` now accepts a `--install-cabal VERSION` option which
-  will install a specific version of the Cabal library globally.
 
 Behavior changes:
 
@@ -215,8 +230,6 @@ Other enhancements:
 * Upgraded `http-client-tls` version, which now offers support for the
   `socks5://` and `socks5h://` values in the `http_proxy` and `https_proxy`
   environment variables.
-* Binary "stack upgrade" will now warn if the installed executable is not
-  on the PATH or shadowed by another entry.
 
 Bug fixes:
 
@@ -1125,8 +1138,6 @@ Other enhancements:
 * `stack build --fast` turns off optimizations
 * Show progress while downloading package index
   [#1223](https://github.com/commercialhaskell/stack/issues/1223).
-* Allow running tests on tarball created by sdist and upload
-  [#717](https://github.com/commercialhaskell/stack/issues/717).
 
 Bug fixes:
 
