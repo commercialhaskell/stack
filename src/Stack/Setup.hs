@@ -89,7 +89,7 @@ import              Stack.Types.Config
 import              Stack.Types.Docker
 import              Stack.Types.PackageIdentifier
 import              Stack.Types.PackageName
-import              Stack.Types.StackT
+import              Stack.Types.Runner
 import              Stack.Types.Version
 import qualified    System.Directory as D
 import              System.Environment (getExecutablePath)
@@ -253,7 +253,7 @@ setupEnv mResolveMissingGHC = do
     let bcPath :: BuildConfig
         bcPath = set envOverrideL (const (return menv)) bc
 
-    ls <- runInnerStackT bcPath $ loadSnapshot
+    ls <- runStackT bcPath $ loadSnapshot
       menv
       (Just compilerVer)
       (view projectRootL bc)
@@ -1083,12 +1083,12 @@ installGHCJS si archiveFile archiveType _tempDir destDir = do
     -- earlier.
     mwindowsInstallDir <- case platform of
         Platform _ Cabal.Windows ->
-            liftM Just $ runInnerStackT envConfig' installationRootLocal
+            liftM Just $ runStackT envConfig' installationRootLocal
         _ -> return Nothing
 
     $logSticky "Installing GHCJS (this will take a long time) ..."
-    runInnerStackT (set (buildOptsL.buildOptsInstallExesL) True $
-                    set (buildOptsL.buildOptsHaddockL) False envConfig') $
+    runStackT (set (buildOptsL.buildOptsInstallExesL) True $
+               set (buildOptsL.buildOptsHaddockL) False envConfig') $
         build (\_ -> return ()) Nothing defaultBuildOptsCLI
     -- Copy over *.options files needed on windows.
     forM_ mwindowsInstallDir $ \dir -> do
@@ -1172,7 +1172,7 @@ bootGhcjs ghcjsVersion stackYaml destDir bootOpts = do
     menv' <- liftIO $ configEnvOverride (view configL envConfig) envSettings
     when shouldInstallCabal $ do
         $logInfo "Building a local copy of cabal-install from source."
-        runInnerStackT envConfig $
+        runStackT envConfig $
             build (\_ -> return ())
                   Nothing
                   defaultBuildOptsCLI { boptsCLITargets = ["cabal-install"] }
@@ -1194,7 +1194,9 @@ bootGhcjs ghcjsVersion stackYaml destDir bootOpts = do
 
 loadGhcjsEnvConfig :: StackM env m
                    => Path Abs File -> Path b t -> m EnvConfig
-loadGhcjsEnvConfig stackYaml binPath = runInnerStackT () $ do
+loadGhcjsEnvConfig stackYaml binPath = do
+  runner <- view runnerL
+  runStackT runner $ do
     lc <- loadConfig
         (mempty
             { configMonoidInstallGHC = First (Just True)
@@ -1202,8 +1204,8 @@ loadGhcjsEnvConfig stackYaml binPath = runInnerStackT () $ do
             })
         Nothing
         (SYLOverride stackYaml)
-    bconfig <- lcLoadBuildConfig lc Nothing
-    runInnerStackT bconfig $ setupEnv Nothing
+    bconfig <- liftIO $ lcLoadBuildConfig lc Nothing
+    runStackT bconfig $ setupEnv Nothing
 
 getCabalInstallVersion :: (MonadUnliftIO m, MonadLogger m)
                        => EnvOverride -> m (Maybe Version)

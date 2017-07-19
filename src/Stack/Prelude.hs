@@ -11,7 +11,10 @@ module Stack.Prelude
   , forMaybeA
   , forMaybeM
   , stripCR
+  , logSticky
+  , logStickyDone
   , StackT (..)
+  , runStackT
   , HasLogFunc (..)
   , module X
   ) where
@@ -101,6 +104,7 @@ import           UnliftIO             as X
 
 import qualified Data.Text            as T
 import qualified Path.IO
+import Language.Haskell.TH            (Q, Exp)
 
 mapLeft :: (a1 -> a2) -> Either a1 b -> Either a2 b
 mapLeft f (Left a1) = Left (f a1)
@@ -136,6 +140,27 @@ runConduitRes = runResourceT . runConduit
 withSystemTempDir :: MonadUnliftIO m => String -> (Path Abs Dir -> m a) -> m a
 withSystemTempDir str inner = withRunInIO $ \run -> Path.IO.withSystemTempDir str $ run . inner
 
+-- | Write a "sticky" line to the terminal. Any subsequent lines will
+-- overwrite this one, and that same line will be repeated below
+-- again. In other words, the line sticks at the bottom of the output
+-- forever. Running this function again will replace the sticky line
+-- with a new sticky line. When you want to get rid of the sticky
+-- line, run 'logStickyDone'.
+--
+logSticky :: Q Exp
+logSticky =
+    logOther "sticky"
+
+-- | This will print out the given message with a newline and disable
+-- any further stickiness of the line until a new call to 'logSticky'
+-- happens.
+--
+-- It might be better at some point to have a 'runSticky' function
+-- that encompasses the logSticky->logStickyDone pairing.
+logStickyDone :: Q Exp
+logStickyDone =
+    logOther "sticky-done"
+
 --------------------------------------------------------------------------------
 -- Main StackT monad transformer
 
@@ -143,6 +168,9 @@ withSystemTempDir str inner = withRunInIO $ \run -> Path.IO.withSystemTempDir st
 newtype StackT env m a =
   StackT {unStackT :: ReaderT env m a}
   deriving (Functor,Applicative,Monad,MonadIO,MonadReader env,MonadThrow,MonadTrans)
+
+runStackT :: MonadIO m => env -> StackT env IO a -> m a
+runStackT env (StackT (ReaderT f)) = liftIO (f env)
 
 class HasLogFunc env where
   logFuncL :: Getting r env (Loc -> LogSource -> LogLevel -> LogStr -> IO ())

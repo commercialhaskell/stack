@@ -92,12 +92,10 @@ import           Stack.SetupCmd
 import qualified Stack.Sig as Sig
 import           Stack.Snapshot (loadResolver)
 import           Stack.Solver (solveExtraDeps)
-import           Stack.Types.Internal (Env)
 import           Stack.Types.Version
 import           Stack.Types.Config
 import           Stack.Types.Compiler
 import           Stack.Types.Nix
-import           Stack.Types.StackT
 import           Stack.Upgrade
 import qualified Stack.Upload as Upload
 import qualified System.Directory as D
@@ -555,32 +553,28 @@ pathCmd :: [Text] -> GlobalOpts -> IO ()
 pathCmd keys go = withBuildConfig go (Stack.Path.path keys)
 
 setupCmd :: SetupCmdOpts -> GlobalOpts -> IO ()
-setupCmd sco@SetupCmdOpts{..} go@GlobalOpts{..} = do
-  lc <- loadConfigWithOpts go
+setupCmd sco@SetupCmdOpts{..} go@GlobalOpts{..} = loadConfigWithOpts go $ \lc -> do
   when (isJust scoUpgradeCabal && nixEnable (configNix (lcConfig lc))) $ do
     throwIO UpgradeCabalUnusable
   withUserFileLock go (configStackRoot $ lcConfig lc) $ \lk -> do
     let getCompilerVersion = loadCompilerVersion go lc
-    runStackTGlobal (lcConfig lc) go $
+    runStackT (lcConfig lc) $
       Docker.reexecWithOptionalContainer
           (lcProjectRoot lc)
           Nothing
-          (runStackTGlobal (lcConfig lc) go $
-           Nix.reexecWithOptionalShell (lcProjectRoot lc) getCompilerVersion $
-           runStackTGlobal () go $ do
-              (wantedCompiler, compilerCheck, mstack) <-
-                  case scoCompilerVersion of
-                      Just v -> return (v, MatchMinor, Nothing)
-                      Nothing -> do
-                          bc <- lcLoadBuildConfig lc globalCompiler
-                          return ( view wantedCompilerVersionL bc
-                                 , configCompilerCheck (lcConfig lc)
-                                 , Just $ view stackYamlL bc
-                                 )
-              let miniConfig = loadMiniConfig (lcConfig lc)
-              runStackTGlobal miniConfig go $
-                  setup sco wantedCompiler compilerCheck mstack
-              )
+          (runStackT (lcConfig lc) $
+           Nix.reexecWithOptionalShell (lcProjectRoot lc) getCompilerVersion $ do
+           (wantedCompiler, compilerCheck, mstack) <-
+               case scoCompilerVersion of
+                   Just v -> return (v, MatchMinor, Nothing)
+                   Nothing -> do
+                       bc <- liftIO $ lcLoadBuildConfig lc globalCompiler
+                       return ( view wantedCompilerVersionL bc
+                              , configCompilerCheck (lcConfig lc)
+                              , Just $ view stackYamlL bc
+                              )
+           runStackT (loadMiniConfig (lcConfig lc)) $ setup sco wantedCompiler compilerCheck mstack
+           )
           Nothing
           (Just $ munlockFile lk)
 
@@ -710,25 +704,25 @@ execCmd :: ExecOpts -> GlobalOpts -> IO ()
 execCmd ExecOpts {..} go@GlobalOpts{..} =
     case eoExtra of
         ExecOptsPlain -> do
-            (cmd, args) <- case (eoCmd, eoArgs) of
+          (cmd, args) <- case (eoCmd, eoArgs) of
                 (ExecCmd cmd, args) -> return (cmd, args)
                 (ExecGhc, args) -> return ("ghc", args)
                 (ExecRunGhc, args) -> return ("runghc", args)
-            lc <- liftIO $ loadConfigWithOpts go
+          loadConfigWithOpts go $ \lc ->
             withUserFileLock go (configStackRoot $ lcConfig lc) $ \lk -> do
               let getCompilerVersion = loadCompilerVersion go lc
-              runStackTGlobal (lcConfig lc) go $
+              runStackT (lcConfig lc) $
                 Docker.reexecWithOptionalContainer
                     (lcProjectRoot lc)
                     -- Unlock before transferring control away, whether using docker or not:
                     (Just $ munlockFile lk)
-                    (runStackTGlobal (lcConfig lc) go $ do
+                    (runStackT (lcConfig lc) $ do
                         config <- view configL
                         menv <- liftIO $ configEnvOverride config plainEnvSettings
                         Nix.reexecWithOptionalShell
                             (lcProjectRoot lc)
                             getCompilerVersion
-                            (runStackTGlobal (lcConfig lc) go $
+                            (runStackT (lcConfig lc) $
                                 exec menv cmd args))
                     Nothing
                     Nothing -- Unlocked already above.
@@ -811,29 +805,29 @@ ideTargetsCmd () go =
 
 -- | Pull the current Docker image.
 dockerPullCmd :: () -> GlobalOpts -> IO ()
-dockerPullCmd _ go@GlobalOpts{..} = do
-    lc <- liftIO $ loadConfigWithOpts go
+dockerPullCmd _ go@GlobalOpts{..} =
+    loadConfigWithOpts go $ \lc ->
     -- TODO: can we eliminate this lock if it doesn't touch ~/.stack/?
     withUserFileLock go (configStackRoot $ lcConfig lc) $ \_ ->
-     runStackTGlobal (lcConfig lc) go $
+     runStackT (lcConfig lc) $
        Docker.preventInContainer Docker.pull
 
 -- | Reset the Docker sandbox.
 dockerResetCmd :: Bool -> GlobalOpts -> IO ()
-dockerResetCmd keepHome go@GlobalOpts{..} = do
-    lc <- liftIO (loadConfigWithOpts go)
+dockerResetCmd keepHome go@GlobalOpts{..} =
+    loadConfigWithOpts go $ \lc ->
     -- TODO: can we eliminate this lock if it doesn't touch ~/.stack/?
     withUserFileLock go (configStackRoot $ lcConfig lc) $ \_ ->
-      runStackTGlobal (lcConfig lc) go $
+      runStackT (lcConfig lc) $
         Docker.preventInContainer $ Docker.reset (lcProjectRoot lc) keepHome
 
 -- | Cleanup Docker images and containers.
 dockerCleanupCmd :: Docker.CleanupOpts -> GlobalOpts -> IO ()
-dockerCleanupCmd cleanupOpts go@GlobalOpts{..} = do
-    lc <- liftIO $ loadConfigWithOpts go
+dockerCleanupCmd cleanupOpts go@GlobalOpts{..} =
+    loadConfigWithOpts go $ \lc ->
     -- TODO: can we eliminate this lock if it doesn't touch ~/.stack/?
     withUserFileLock go (configStackRoot $ lcConfig lc) $ \_ ->
-     runStackTGlobal (lcConfig lc) go $
+     runStackT (lcConfig lc) $
         Docker.preventInContainer $
             Docker.cleanup cleanupOpts
 
@@ -844,8 +838,8 @@ cfgSetCmd co go@GlobalOpts{..} =
         (cfgCmdSet go co)
 
 imgDockerCmd :: (Bool, [Text]) -> GlobalOpts -> IO ()
-imgDockerCmd (rebuild,images) go@GlobalOpts{..} = do
-    mProjectRoot <- lcProjectRoot <$> loadConfigWithOpts go
+imgDockerCmd (rebuild,images) go@GlobalOpts{..} = loadConfigWithOpts go $ \lc -> do
+    let mProjectRoot = lcProjectRoot lc
     withBuildConfigExt
         False
         go
@@ -892,7 +886,7 @@ listDependenciesCmd :: ListDepsOpts -> GlobalOpts -> IO ()
 listDependenciesCmd opts go = withBuildConfigDot (listDepsDotOpts opts) go $ listDependencies opts
 
 -- Plumbing for --test and --bench flags
-withBuildConfigDot :: DotOpts -> GlobalOpts -> StackT (Env EnvConfig) IO () -> IO ()
+withBuildConfigDot :: DotOpts -> GlobalOpts -> StackT EnvConfig IO () -> IO ()
 withBuildConfigDot opts go f = withBuildConfig go' f
   where
     go' =

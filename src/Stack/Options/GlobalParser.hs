@@ -14,6 +14,7 @@ import           Stack.Options.ResolverParser
 import           Stack.Options.Utils
 import           Stack.Types.Config
 import           Stack.Types.Docker
+import           Stack.Types.Runner
 
 -- | Parser for global command-line options.
 globalOptsParser :: FilePath -> GlobalOptsContext -> Maybe LogLevel -> Parser GlobalOptsMonoid

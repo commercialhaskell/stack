@@ -25,7 +25,6 @@ import           Stack.Prelude
 import           Stack.Setup
 import           Stack.Types.Compiler
 import           Stack.Types.Config
-import           Stack.Types.StackT
 import           Stack.Types.Version
 
 data SetupCmdOpts = SetupCmdOpts

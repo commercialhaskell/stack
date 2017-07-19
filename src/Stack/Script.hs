@@ -23,7 +23,6 @@ import           Stack.Runners
 import           Stack.Types.BuildPlan
 import           Stack.Types.Compiler
 import           Stack.Types.Config
-import           Stack.Types.Internal       (Env)
 import           Stack.Types.PackageName
 import           System.FilePath            (dropExtension, replaceExtension)
 import           System.Process.Read
@@ -133,7 +132,7 @@ isWindows = False
 getPackagesFromModuleInfo
   :: ModuleInfo
   -> FilePath -- ^ script filename
-  -> StackT (Env EnvConfig) IO (Set PackageName)
+  -> StackT EnvConfig IO (Set PackageName)
 getPackagesFromModuleInfo mi scriptFP = do
     (pns1, mns) <- liftIO $ parseImports <$> S8.readFile scriptFP
     pns2 <-

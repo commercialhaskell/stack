@@ -13,7 +13,7 @@ import Stack.Prelude
 import Stack.Types.Compiler
 import Stack.Types.Config
 import Stack.Types.Nix
-import Stack.Types.StackT
+import Stack.Types.Runner
 import Stack.Types.Version
 import System.Directory
 import System.Environment
@@ -45,7 +45,9 @@ setup = unsetEnv "STACK_YAML"
 
 spec :: Spec
 spec = beforeAll setup $ do
-  let loadConfig' cmdLineArgs = runStackT () LevelDebug True False ColorAuto False (loadConfig cmdLineArgs Nothing SYLDefault)
+  let loadConfig' cmdLineArgs =
+        withRunner LevelDebug True False ColorAuto False $ \runner ->
+        runStackT runner $ loadConfig cmdLineArgs Nothing SYLDefault
       inTempDir test = do
         currentDirectory <- getCurrentDirectory
         withSystemTempDirectory "Stack_ConfigSpec" $ \tempDir -> do

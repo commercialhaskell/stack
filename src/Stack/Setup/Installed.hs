@@ -38,7 +38,6 @@ import           Stack.Types.Compiler
 import           Stack.Types.Config
 import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageName
-import           Stack.Types.StackT
 import           Stack.Types.Version
 import           System.Process.Read
 

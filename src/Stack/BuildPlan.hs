@@ -58,7 +58,6 @@ import           Stack.Types.Version
 import           Stack.Types.Config
 import           Stack.Types.Compiler
 import           Stack.Types.Resolver
-import           Stack.Types.StackT
 
 data BuildPlanException
     = UnknownPackages

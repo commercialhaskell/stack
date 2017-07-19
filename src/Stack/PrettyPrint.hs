@@ -35,16 +35,16 @@ import           Data.List (intersperse)
 import qualified Data.Text as T
 import           Language.Haskell.TH
 import           Stack.Types.Config
-import           Stack.Types.Internal
 import           Stack.Types.Package
 import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageName
+import           Stack.Types.Runner
 import           Stack.Types.Version
 import qualified System.Clock as Clock
 import           Text.PrettyPrint.Leijen.Extended
 
 displayWithColor
-    :: (HasLogOptions env, MonadReader env m, Display a, HasAnsiAnn (Ann a))
+    :: (HasRunner env, MonadReader env m, Display a, HasAnsiAnn (Ann a))
     => a -> m T.Text
 displayWithColor x = do
     useAnsi <- liftM logUseColor $ view logOptionsL

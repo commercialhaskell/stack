@@ -18,7 +18,6 @@ import           Stack.Config (getLocalPackages)
 import           Stack.Constants.Config (distDirFromDir, workDirFromDir)
 import           Stack.Types.PackageName
 import           Stack.Types.Config
-import           Stack.Types.StackT
 
 -- | Deletes build artifacts in the current project.
 --

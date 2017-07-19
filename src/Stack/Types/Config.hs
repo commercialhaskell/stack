@@ -52,6 +52,7 @@ module Stack.Types.Config
   ,snapshotsDir
   -- ** Constraint synonym for use with StackMini
   ,StackMiniM
+  ,StackM
   -- ** EnvConfig & HasEnvConfig
   ,EnvConfig(..)
   ,HasEnvConfig(..)
@@ -103,7 +104,6 @@ module Stack.Types.Config
   ,PvpBoundsType(..)
   ,parsePvpBounds
   -- ** ColorWhen
-  ,ColorWhen(..)
   ,readColorWhen
   -- ** SCM
   ,SCM(..)
@@ -214,6 +214,7 @@ import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageIndex
 import           Stack.Types.PackageName
 import           Stack.Types.Resolver
+import           Stack.Types.Runner
 import           Stack.Types.TemplateName
 import           Stack.Types.Urls
 import           Stack.Types.Version
@@ -352,6 +353,7 @@ data Config =
          -- command disallows this.
          ,configSaveHackageCreds    :: !Bool
          -- ^ Should we save Hackage credentials to a file?
+         ,configRunner              :: !Runner
          }
 
 -- | Which packages do ghc-options on the command line apply to?
@@ -471,9 +473,6 @@ instance Monoid GlobalOptsMonoid where
 defaultLogLevel :: LogLevel
 defaultLogLevel = LevelInfo
 
-data ColorWhen = ColorNever | ColorAlways | ColorAuto
-    deriving (Show, Generic)
-
 readColorWhen :: ReadM ColorWhen
 readColorWhen = do
     s <- OA.readerAsk
@@ -570,10 +569,10 @@ data NamedComponent
     deriving (Show, Eq, Ord)
 
 -- | Value returned by 'Stack.Config.loadConfig'.
-data LoadConfig m = LoadConfig
+data LoadConfig = LoadConfig
     { lcConfig          :: !Config
       -- ^ Top-level Stack configuration.
-    , lcLoadBuildConfig :: !(Maybe (CompilerVersion 'CVWanted) -> m BuildConfig)
+    , lcLoadBuildConfig :: !(Maybe (CompilerVersion 'CVWanted) -> IO BuildConfig)
         -- ^ Action to load the remaining 'BuildConfig'.
     , lcProjectRoot     :: !(Maybe (Path Abs Dir))
         -- ^ The project root directory, if in a project.
@@ -656,6 +655,9 @@ instance ToJSON Project where
 type StackMiniM r m =
     ( MonadReader r m, MonadUnliftIO m, MonadLoggerIO m, MonadThrow m
     )
+
+-- | Constraint synonym for constraints commonly satisifed by monads used in stack.
+type StackM r m = (StackMiniM r m, HasRunner r)
 
 -- An uninterpreted representation of configuration options.
 -- Configurations may be "cascaded" using mappend (left-biased).
@@ -1808,6 +1810,7 @@ instance HasPlatform (Platform,PlatformVariant) where
 instance HasPlatform Config where
     platformL = lens configPlatform (\x y -> x { configPlatform = y })
     platformVariantL = lens configPlatformVariant (\x y -> x { configPlatformVariant = y })
+instance HasPlatform LoadConfig
 instance HasPlatform BuildConfig
 instance HasPlatform EnvConfig
 
@@ -1821,6 +1824,8 @@ instance HasGHCVariant EnvConfig
 instance HasConfig Config where
     configL = id
     {-# INLINE configL #-}
+instance HasConfig LoadConfig where
+    configL = lens lcConfig (\x y -> x { lcConfig = y })
 instance HasConfig BuildConfig where
     configL = lens bcConfig (\x y -> x { bcConfig = y })
 instance HasConfig EnvConfig
@@ -1833,6 +1838,24 @@ instance HasBuildConfig EnvConfig
 instance HasEnvConfig EnvConfig where
     envConfigL = id
     {-# INLINE envConfigL #-}
+
+instance HasRunner Config where
+  runnerL = lens configRunner (\x y -> x { configRunner = y })
+instance HasRunner LoadConfig where
+  runnerL = configL.runnerL
+instance HasRunner BuildConfig where
+  runnerL = configL.runnerL
+instance HasRunner EnvConfig where
+  runnerL = configL.runnerL
+
+instance HasLogFunc Config where
+  logFuncL = runnerL.logFuncL
+instance HasLogFunc LoadConfig where
+  logFuncL = runnerL.logFuncL
+instance HasLogFunc BuildConfig where
+  logFuncL = runnerL.logFuncL
+instance HasLogFunc EnvConfig where
+  logFuncL = runnerL.logFuncL
 
 -----------------------------------
 -- Helper lenses

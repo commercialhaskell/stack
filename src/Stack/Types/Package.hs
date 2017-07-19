@@ -32,7 +32,6 @@ import           Stack.Types.FlagName
 import           Stack.Types.GhcPkgId
 import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageName
-import           Stack.Types.StackT (StackM)
 import           Stack.Types.Version
 
 -- | All exceptions thrown by the library.

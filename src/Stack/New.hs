@@ -46,7 +46,6 @@ import           Stack.Constants
 import           Stack.Constants.Config
 import           Stack.Types.Config
 import           Stack.Types.PackageName
-import           Stack.Types.StackT
 import           Stack.Types.TemplateName
 import           System.Process.Run
 import           Text.Hastache

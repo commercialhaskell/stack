@@ -94,7 +94,6 @@ import           Stack.Types.Version
 import           Stack.Types.Build
 import           Stack.Types.BuildPlan
 import           Stack.Types.GhcPkgId
-import           Stack.Types.StackT
 
 -- | Do we need any targets? For example, `stack build` will fail if
 -- no targets are provided.

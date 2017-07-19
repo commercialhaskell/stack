@@ -40,7 +40,6 @@ import           Stack.Types.GhcPkgId
 import           Stack.Types.Package
 import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageName
-import           Stack.Types.StackT
 import           Stack.Types.Version
 
 -- | Options record for @stack dot@

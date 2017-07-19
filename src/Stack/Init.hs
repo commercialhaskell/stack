@@ -43,7 +43,6 @@ import           Stack.Types.FlagName
 import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageName
 import           Stack.Types.Resolver
-import           Stack.Types.StackT              (StackM)
 import           Stack.Types.Version
 import qualified System.FilePath                 as FP
 
