@@ -418,7 +418,7 @@ resolveRawTarget globals snap deps locals (ri, rt) =
           [ Map.mapWithKey
               (\name' lpi -> PLIndex $ PackageIdentifierRevision
                   (PackageIdentifier name' (lpiVersion lpi))
-                  Nothing)
+                  CFILatest)
               globals
           , Map.map lpiLocation snap
           , Map.map snd deps
@@ -453,7 +453,7 @@ combineResolveResults results = do
               , packageIdentifierText ident
               , " to extra-deps based on command line target"
               ]
-          return $ Map.singleton (rrName result) $ PLIndex $ PackageIdentifierRevision ident Nothing
+          return $ Map.singleton (rrName result) $ PLIndex $ PackageIdentifierRevision ident CFILatest
 
     let m0 = Map.unionsWith (++) $ map (\rr -> Map.singleton (rrName rr) [rr]) results
         (errs, ms) = partitionEithers $ flip map (Map.toList m0) $ \(name, rrs) ->
@@ -495,7 +495,7 @@ parseTargets needTargets boptscli = do
       deps = lpDependencies lp
       globals = lsGlobals ls0
       snap = lsPackages ls0
-  let (textTargets', rawInput) = getRawInput boptscli locals
+      (textTargets', rawInput) = getRawInput boptscli locals
 
   (errs1, concat -> rawTargets) <- fmap partitionEithers $ forM rawInput $
     parseRawTargetDirs workingDir (lpProject lp)

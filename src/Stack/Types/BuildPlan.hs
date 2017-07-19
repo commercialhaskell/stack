@@ -16,7 +16,9 @@ module Stack.Types.BuildPlan
     , PackageLocation (..)
     , PackageLocationIndex (..)
     , RepoType (..)
+    , Subdirs (..)
     , Repo (..)
+    , Archive (..)
     , ExeName (..)
     , LoadedSnapshot (..)
     , loadedSnapshotVC
@@ -83,7 +85,7 @@ data SnapshotDef = SnapshotDef
     -- ^ The resolver that provides this definition.
     , sdResolverName    :: !Text
     -- ^ A user-friendly way of referring to this resolver.
-    , sdLocations :: ![PackageLocationIndex [FilePath]]
+    , sdLocations :: ![PackageLocationIndex Subdirs]
     -- ^ Where to grab all of the packages from.
     , sdDropPackages :: !(Set PackageName)
     -- ^ Packages present in the parent which should not be included
@@ -142,8 +144,7 @@ data PackageLocation subdirs
   = PLFilePath !FilePath
     -- ^ Note that we use @FilePath@ and not @Path@s. The goal is: first parse
     -- the value raw, and then use @canonicalizePath@ and @parseAbsDir@.
-  | PLHttp !Text !subdirs
-  -- ^ URL
+  | PLArchive !(Archive subdirs)
   | PLRepo !(Repo subdirs)
   -- ^ Stored in a source control repository
     deriving (Generic, Show, Eq, Data, Typeable, Functor)
@@ -164,11 +165,32 @@ data PackageLocationIndex subdirs
 instance (Store a) => Store (PackageLocationIndex a)
 instance (NFData a) => NFData (PackageLocationIndex a)
 
+-- | A package archive, could be from a URL or a local file
+-- path. Local file path archives are assumed to be unchanging
+-- over time, and so are allowed in custom snapshots.
+data Archive subdirs = Archive
+  { archiveUrl :: !Text
+  , archiveSubdirs :: !subdirs
+  , archiveHash :: !(Maybe StaticSHA256)
+  }
+    deriving (Generic, Show, Eq, Data, Typeable, Functor)
+instance Store a => Store (Archive a)
+instance NFData a => NFData (Archive a)
+
 -- | The type of a source control repository.
 data RepoType = RepoGit | RepoHg
     deriving (Generic, Show, Eq, Data, Typeable)
 instance Store RepoType
 instance NFData RepoType
+
+data Subdirs
+  = DefaultSubdirs
+  | ExplicitSubdirs ![FilePath]
+    deriving (Generic, Show, Eq, Data, Typeable)
+instance Store Subdirs
+instance NFData Subdirs
+instance FromJSON Subdirs where
+  parseJSON = fmap ExplicitSubdirs . parseJSON
 
 -- | Information on packages stored in a source control repository.
 data Repo subdirs = Repo
@@ -181,21 +203,28 @@ data Repo subdirs = Repo
 instance Store a => Store (Repo a)
 instance NFData a => NFData (Repo a)
 
-instance subdirs ~ [FilePath] => ToJSON (PackageLocationIndex subdirs) where
+instance subdirs ~ Subdirs => ToJSON (PackageLocationIndex subdirs) where
     toJSON (PLIndex ident) = toJSON ident
     toJSON (PLOther loc) = toJSON loc
 
-instance subdirs ~ [FilePath] => ToJSON (PackageLocation subdirs) where
+instance subdirs ~ Subdirs => ToJSON (PackageLocation subdirs) where
     toJSON (PLFilePath fp) = toJSON fp
-    toJSON (PLHttp t ["."]) = toJSON t
-    toJSON (PLHttp t subdirs) = object
-        [ "location" .= t
-        , "subdirs"  .= subdirs
+    toJSON (PLArchive (Archive t DefaultSubdirs Nothing)) = toJSON t
+    toJSON (PLArchive (Archive t subdirs msha)) = object $ concat
+        [ ["location" .= t]
+        , case subdirs of
+            DefaultSubdirs    -> []
+            ExplicitSubdirs x -> ["subdirs" .= x]
+        , case msha of
+            Nothing -> []
+            Just sha -> ["sha256" .= staticSHA256ToText sha]
         ]
-    toJSON (PLRepo (Repo url commit typ subdirs)) = object $
-        (if null subdirs then id else (("subdirs" .= subdirs):))
-        [ urlKey .= url
-        , "commit" .= commit
+    toJSON (PLRepo (Repo url commit typ subdirs)) = object $ concat
+        [ case subdirs of
+            DefaultSubdirs -> []
+            ExplicitSubdirs x -> ["subdirs" .= x]
+        , [urlKey .= url]
+        , ["commit" .= commit]
         ]
       where
         urlKey =
@@ -203,37 +232,47 @@ instance subdirs ~ [FilePath] => ToJSON (PackageLocation subdirs) where
             RepoGit -> "git"
             RepoHg  -> "hg"
 
-instance subdirs ~ [FilePath] => FromJSON (WithJSONWarnings (PackageLocationIndex subdirs)) where
+instance subdirs ~ Subdirs => FromJSON (WithJSONWarnings (PackageLocationIndex subdirs)) where
     parseJSON v
         = ((noJSONWarnings . PLIndex) <$> parseJSON v)
       <|> (fmap PLOther <$> parseJSON v)
 
-instance subdirs ~ [FilePath] => FromJSON (WithJSONWarnings (PackageLocation subdirs)) where
+instance subdirs ~ Subdirs => FromJSON (WithJSONWarnings (PackageLocation subdirs)) where
     parseJSON v
         = (noJSONWarnings <$> withText "PackageLocation" (\t -> http t <|> file t) v)
         <|> repo v
-        <|> httpSubdirs v
+        <|> archiveObject v
       where
         file t = pure $ PLFilePath $ T.unpack t
         http t =
             case parseRequest $ T.unpack t of
                 Left  _ -> fail $ "Could not parse URL: " ++ T.unpack t
-                Right _ -> return $ PLHttp t ["."]
+                Right _ -> return $ PLArchive $ Archive t DefaultSubdirs Nothing
 
         repo = withObjectWarnings "PLRepo" $ \o -> do
           (repoType, repoUrl) <-
             ((RepoGit, ) <$> o ..: "git") <|>
             ((RepoHg, ) <$> o ..: "hg")
           repoCommit <- o ..: "commit"
-          repoSubdirs <- o ..:? "subdirs" ..!= []
+          repoSubdirs <- o ..:? "subdirs" ..!= DefaultSubdirs
           return $ PLRepo Repo {..}
 
-        httpSubdirs = withObjectWarnings "PLHttp" $ \o -> do
-          url <- o ..: "location"
-          subdirs <- o ..: "subdirs"
-          case parseRequest $ T.unpack url of
-            Left _ -> fail $ "Could not parse URL: " ++ T.unpack url
-            Right _ -> return $ PLHttp url subdirs
+        archiveObject = withObjectWarnings "PLArchive" $ \o -> do
+          url <- o ..: "archive"
+          subdirs <- o ..:? "subdirs" ..!= DefaultSubdirs
+          msha <- o ..:? "sha256"
+          msha' <-
+            case msha of
+              Nothing -> return Nothing
+              Just t ->
+                case mkStaticSHA256FromText t of
+                  Nothing -> fail $ "Invalid SHA256: " ++ T.unpack t
+                  Just x -> return $ Just x
+          return $ PLArchive Archive
+            { archiveUrl = url
+            , archiveSubdirs = subdirs :: Subdirs
+            , archiveHash = msha'
+            }
 
 -- | Name of an executable.
 newtype ExeName = ExeName { unExeName :: Text }
@@ -255,7 +294,7 @@ instance Store LoadedSnapshot
 instance NFData LoadedSnapshot
 
 loadedSnapshotVC :: VersionConfig LoadedSnapshot
-loadedSnapshotVC = storeVersionConfig "ls-v1" "pH4Le2OpvbgouOui4sjXODTEkZA="
+loadedSnapshotVC = storeVersionConfig "ls-v4" "UQQmEqSZneE0IrDjeIy_uvDkhvM="
 
 -- | Information on a single package for the 'LoadedSnapshot' which
 -- can be installed.

@@ -61,7 +61,7 @@ import           Data.Traversable (forM)
 import           Path
 import           Path.IO
 import           Prelude -- Fix redundant import warnings
-import           Stack.Constants
+import           Stack.Constants.Config
 import           Stack.Types.Build
 import           Stack.Types.Compiler
 import           Stack.Types.Config

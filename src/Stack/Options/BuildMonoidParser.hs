@@ -1,6 +1,7 @@
 module Stack.Options.BuildMonoidParser where
 
 import           Data.Monoid.Extra
+import qualified Data.Text as T
 import           Options.Applicative
 import           Options.Applicative.Builder.Extra
 import           Stack.Build                       (splitObjsWarning)
@@ -18,7 +19,7 @@ buildOptsMonoidParser hide0 =
     openHaddocks <*> haddockDeps <*> haddockInternal <*>
     haddockHyperlinkSource <*> copyBins <*> preFetch <*> keepGoing <*>
     forceDirty <*> tests <*> testOptsParser hideBool <*> benches <*>
-    benchOptsParser hideBool <*> reconfigure <*> cabalVerbose <*> splitObjs
+    benchOptsParser hideBool <*> reconfigure <*> cabalVerbose <*> splitObjs <*> skipComponents
   where
     hideBool = hide0 /= BuildCmdGlobalOpts
     hide =
@@ -148,3 +149,10 @@ buildOptsMonoidParser hide0 =
             "split-objs"
             ("Enable split-objs, to reduce output size (at the cost of build time). " ++ splitObjsWarning)
             hide
+    skipComponents = many
+        (fmap
+            T.pack
+            (strOption
+                (long "skip" <>
+                 help "Skip given component, can be specified multiple times" <>
+                 hide)))

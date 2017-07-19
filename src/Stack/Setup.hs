@@ -87,7 +87,8 @@ import              Prelude hiding (concat, elem, any) -- Fix AMP warning
 import              Safe (headMay, readMay)
 import              Stack.Build (build)
 import              Stack.Config (loadConfig)
-import              Stack.Constants (distRelativeDir, stackProgName)
+import              Stack.Constants (stackProgName)
+import              Stack.Constants.Config (distRelativeDir)
 import              Stack.Exec (defaultEnvSettings)
 import              Stack.Fetch
 import              Stack.GhcPkg (createDatabase, getCabalPkgVer, getGlobalDB, mkGhcPackagePath)
@@ -688,7 +689,7 @@ doCabalInstall menv wc installed version = do
             ]
         let name = $(mkPackageName "Cabal")
             ident = PackageIdentifier name version
-        m <- unpackPackageIdents tmpdir Nothing [PackageIdentifierRevision ident Nothing]
+        m <- unpackPackageIdents tmpdir Nothing [PackageIdentifierRevision ident CFILatest]
         compilerPath <- join $ findExecutable menv (compilerExeName wc)
         versionDir <- parseRelDir $ versionString version
         let installRoot = toFilePath $ parent (parent compilerPath)
@@ -922,10 +923,10 @@ downloadFromInfo programsDir downloadInfo tool = do
             ".tar.gz" -> return TarGz
             ".7z.exe" -> return SevenZ
             _ -> throwString $ "Error: Unknown extension for url: " ++ url
-    relfile <- parseRelFile $ toolString tool ++ extension
+    relativeFile <- parseRelFile $ toolString tool ++ extension
     path <- case url of
         (parseUrlThrow -> Just _) -> do
-            let path = programsDir </> relfile
+            let path = programsDir </> relativeFile
             ensureDir programsDir
             chattyDownload (T.pack (toolString tool)) downloadInfo path
             return path

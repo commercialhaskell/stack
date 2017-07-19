@@ -1,7 +1,9 @@
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# OPTIONS -fno-warn-unused-do-bind #-}
 
 -- | Package identifier (name-version).
@@ -24,25 +26,36 @@ module Stack.Types.PackageIdentifier
   , packageIdentifierRevisionString
   , packageIdentifierText
   , toCabalPackageIdentifier
-  , fromCabalPackageIdentifier )
+  , fromCabalPackageIdentifier
+  , StaticSHA256
+  , mkStaticSHA256FromText
+  , mkStaticSHA256FromFile
+  , staticSHA256ToText
+  , staticSHA256ToBase16
+  )
   where
 
 import           Control.Applicative
 import           Control.DeepSeq
 import           Control.Monad.IO.Unlift
+import           Crypto.Hash.Conduit (hashFile)
 import           Crypto.Hash as Hash (hashlazy, Digest, SHA256)
 import           Data.Aeson.Extended
 import           Data.Attoparsec.Text as A
 import qualified Data.ByteArray.Encoding as Mem (convertToBase, Base(Base16))
+import           Data.ByteString (ByteString)
 import qualified Data.ByteString.Lazy as L
 import           Data.Data
 import           Data.Hashable
 import           Data.Store (Store)
+import           Data.Store.Internal (Size (..), StaticSize (..), size,
+                                      toStaticSize, toStaticSizeEx, unStaticSize)
 import           Data.Text (Text)
 import qualified Data.Text as T
-import           Data.Text.Encoding (decodeUtf8)
+import           Data.Text.Encoding (decodeUtf8, encodeUtf8)
 import qualified Distribution.Package as C
 import           GHC.Generics
+import           Path
 import           Prelude hiding (FilePath)
 import           Stack.Types.PackageName
 import           Stack.Types.Version
@@ -87,7 +100,7 @@ instance FromJSON PackageIdentifier where
 -- cabal file revision.
 data PackageIdentifierRevision = PackageIdentifierRevision
   { pirIdent :: !PackageIdentifier
-  , pirRevision :: !(Maybe CabalFileInfo)
+  , pirRevision :: !CabalFileInfo
   } deriving (Eq,Generic,Data,Typeable)
 
 instance NFData PackageIdentifierRevision where
@@ -109,33 +122,78 @@ instance FromJSON PackageIdentifierRevision where
       Right x -> return x
 
 -- | A cryptographic hash of a Cabal file.
---
--- Internal @Text@ value is in base-16 format, and represents a SHA256
--- hash.
-newtype CabalHash = CabalHash { unCabalHash :: Text }
-    deriving (Generic, Show, Eq, NFData, Store, Data, Typeable, Ord, Hashable)
+newtype CabalHash = CabalHash { unCabalHash :: StaticSHA256 }
+    deriving (Generic, Show, Eq, NFData, Data, Typeable, Ord, Store, Hashable)
+
+-- | A SHA256 hash, stored in a static size for more efficient
+-- serialization with store.
+newtype StaticSHA256 = StaticSHA256 (StaticSize 64 ByteString)
+    deriving (Generic, Show, Eq, NFData, Data, Typeable, Ord)
+
+instance Store StaticSHA256 where
+    size = ConstSize 64
+    -- poke (GitSHA1 x) = do
+    --   let (sourceFp, sourceOffset, sourceLength) = BSI.toForeignPtr (unStaticSize x)
+    --   pokeFromForeignPtr sourceFp sourceOffset sourceLength
+    -- peek = do
+    --     let len = 20
+    --     fp <- peekToPlainForeignPtr ("StaticSize " ++ show len ++ " Data.ByteString.ByteString") len
+    --     return (GitSHA1 $ StaticSize (BSI.PS fp 0 len))
+    -- {-# INLINE size #-}
+    -- {-# INLINE peek #-}
+    -- {-# INLINE poke #-}
+
+instance Hashable StaticSHA256 where
+  hashWithSalt s (StaticSHA256 x) = hashWithSalt s (unStaticSize x)
+
+-- | Generate a 'StaticSHA256' value from a base16-encoded SHA256 hash.
+mkStaticSHA256FromText :: Text -> Maybe StaticSHA256
+mkStaticSHA256FromText = fmap StaticSHA256 . toStaticSize . encodeUtf8
+
+-- | Generate a 'StaticSHA256' value from the contents of a file.
+mkStaticSHA256FromFile :: MonadIO m => Path Abs File -> m StaticSHA256
+mkStaticSHA256FromFile fp = liftIO $ fromDigest <$> hashFile (toFilePath fp)
+
+fromDigest :: Hash.Digest Hash.SHA256 -> StaticSHA256
+fromDigest = StaticSHA256 . toStaticSizeEx . Mem.convertToBase Mem.Base16
+
+-- | Convert a 'StaticSHA256' into a base16-encoded SHA256 hash.
+staticSHA256ToText :: StaticSHA256 -> Text
+staticSHA256ToText = decodeUtf8 . staticSHA256ToBase16
+
+-- | Convert a 'StaticSHA256' into a base16-encoded SHA256 hash.
+staticSHA256ToBase16 :: StaticSHA256 -> ByteString
+staticSHA256ToBase16 (StaticSHA256 x) = unStaticSize x
 
 -- | Generate a 'CabalHash' value from a base16-encoded SHA256 hash.
-mkCabalHashFromSHA256 :: Text -> CabalHash
-mkCabalHashFromSHA256 = CabalHash
+mkCabalHashFromSHA256 :: Text -> Maybe CabalHash
+mkCabalHashFromSHA256 = fmap CabalHash . mkStaticSHA256FromText
+
+-- | Convert a 'CabalHash' into a base16-encoded SHA256 hash.
+cabalHashToText :: CabalHash -> Text
+cabalHashToText = staticSHA256ToText . unCabalHash
 
 -- | Compute a 'CabalHash' value from a cabal file's contents.
 computeCabalHash :: L.ByteString -> CabalHash
-computeCabalHash = CabalHash . decodeUtf8 . Mem.convertToBase Mem.Base16 . hashSHA256
-
-hashSHA256 :: L.ByteString -> Hash.Digest Hash.SHA256
-hashSHA256 = Hash.hashlazy
+computeCabalHash = CabalHash . fromDigest . Hash.hashlazy
 
 showCabalHash :: CabalHash -> Text
-showCabalHash (CabalHash t) = T.append (T.pack "sha256:") t
+showCabalHash = T.append (T.pack "sha256:") . cabalHashToText
 
 -- | Information on the contents of a cabal file
-data CabalFileInfo = CabalFileInfo
-    { cfiSize :: !(Maybe Int)
-    -- ^ File size in bytes
-    , cfiHash :: !CabalHash
-    -- ^ Hash of the cabal file contents
-    }
+data CabalFileInfo
+  = CFILatest
+  -- ^ Take the latest revision of the cabal file available. This
+  -- isn't reproducible at all, but the running assumption (not
+  -- necessarily true) is that cabal file revisions do not change
+  -- semantics of the build.
+  | CFIHash
+      !(Maybe Int) -- file size in bytes
+      !CabalHash
+  -- ^ Identify by contents of the cabal file itself
+  | CFIRevision !Word
+  -- ^ Identify by revision number, with 0 being the original and
+  -- counting upward.
     deriving (Generic, Show, Eq, Data, Typeable)
 instance Store CabalFileInfo
 instance NFData CabalFileInfo
@@ -179,35 +237,41 @@ parsePackageIdentifierRevision x = go x
 
     parser = PackageIdentifierRevision
         <$> packageIdentifierParser
-        <*> optional cabalFileInfo
+        <*> (cfiHash <|> cfiRevision <|> pure CFILatest)
 
-    cabalFileInfo = do
+    cfiHash = do
       _ <- string $ T.pack "@sha256:"
       hash' <- A.takeWhile (/= ',')
+      hash'' <- maybe (fail "Invalid SHA256") return
+              $ mkCabalHashFromSHA256 hash'
       msize <- optional $ do
         _ <- A.char ','
         A.decimal
-      return CabalFileInfo
-        { cfiSize = msize
-        , cfiHash = CabalHash hash'
-        }
+      A.endOfInput
+      return $ CFIHash msize hash''
 
+    cfiRevision = do
+      _ <- string $ T.pack "@rev:"
+      y <- A.decimal
+      A.endOfInput
+      return $ CFIRevision y
 -- | Get a string representation of the package identifier; name-ver.
 packageIdentifierString :: PackageIdentifier -> String
 packageIdentifierString (PackageIdentifier n v) = show n ++ "-" ++ show v
 
 -- | Get a string representation of the package identifier with revision; name-ver[@hashtype:hash[,size]].
 packageIdentifierRevisionString :: PackageIdentifierRevision -> String
-packageIdentifierRevisionString (PackageIdentifierRevision ident mcfi) =
+packageIdentifierRevisionString (PackageIdentifierRevision ident cfi) =
   concat $ packageIdentifierString ident : rest
   where
     rest =
-      case mcfi of
-        Nothing -> []
-        Just cfi ->
+      case cfi of
+        CFILatest -> []
+        CFIHash msize hash' ->
             "@sha256:"
-          : T.unpack (unCabalHash $ cfiHash cfi)
-          : showSize (cfiSize cfi)
+          : T.unpack (cabalHashToText hash')
+          : showSize msize
+        CFIRevision rev -> ["@rev:", show rev]
 
     showSize Nothing = []
     showSize (Just int) = [',' : show int]

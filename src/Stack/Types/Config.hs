@@ -161,7 +161,6 @@ module Stack.Types.Config
   ,buildOptsHaddockL
   ,globalOptsBuildOptsMonoidL
   ,packageIndicesL
-  ,packageCachesL
   ,stackRootL
   ,configUrlsL
   ,cabalVersionL
@@ -188,7 +187,6 @@ import           Data.Attoparsec.Args
 import           Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as S8
 import           Data.Either (partitionEithers)
-import           Data.HashMap.Strict (HashMap)
 import           Data.IORef (IORef)
 import           Data.List (stripPrefix)
 import           Data.List.NonEmpty (NonEmpty)
@@ -357,8 +355,7 @@ data Config =
          ,configAllowDifferentUser  :: !Bool
          -- ^ Allow users other than the stack root owner to use the stack
          -- installation.
-         ,configPackageCaches       :: !(IORef (Maybe (Map PackageIdentifier (PackageIndex, PackageCache),
-                                                       HashMap CabalHash (PackageIndex, OffsetSize))))
+         ,configPackageCache        :: !(IORef (Maybe (PackageCache PackageIndex)))
          -- ^ In memory cache of hackage index.
          ,configDumpLogs            :: !DumpLogs
          -- ^ Dump logs of local non-dependencies when doing a build.
@@ -512,9 +509,9 @@ data BuildConfig = BuildConfig
       -- ^ Build plan wanted for this build
     , bcGHCVariant :: !GHCVariant
       -- ^ The variant of GHC used to select a GHC bindist.
-    , bcPackages :: ![PackageLocation [FilePath]]
+    , bcPackages :: ![PackageLocation Subdirs]
       -- ^ Local packages
-    , bcDependencies :: ![PackageLocationIndex [FilePath]]
+    , bcDependencies :: ![PackageLocationIndex Subdirs]
       -- ^ Extra dependencies specified in configuration.
       --
       -- These dependencies will not be installed to a shared location, and
@@ -599,14 +596,10 @@ data LoadConfig m = LoadConfig
 
 data PackageEntry = PackageEntry
     { peExtraDepMaybe :: !(Maybe TreatLikeExtraDep)
-    , peLocation :: !(PackageLocation [FilePath])
-    , peSubdirs :: ![FilePath]
+    , peLocation :: !(PackageLocation Subdirs)
+    , peSubdirs :: !Subdirs
     }
     deriving Show
-
--- | Perform defaulting of peExtraDepMaybe
-peExtraDepDef :: PackageEntry -> TreatLikeExtraDep
-peExtraDepDef = fromMaybe False . peExtraDepMaybe
 
 -- | Should a package be treated just like an extra-dep?
 --
@@ -618,14 +611,6 @@ peExtraDepDef = fromMaybe False . peExtraDepMaybe
 -- https://github.com/commercialhaskell/stack/issues/386
 type TreatLikeExtraDep = Bool
 
-instance ToJSON PackageEntry where
-    toJSON pe | not (peExtraDepDef pe) && null (peSubdirs pe) =
-        toJSON $ peLocation pe
-    toJSON pe = object $
-        maybe id (\e -> (("extra-dep" .= e):)) (peExtraDepMaybe pe)
-        [ "location" .= peLocation pe
-        , "subdirs" .= peSubdirs pe
-        ]
 instance FromJSON (WithJSONWarnings PackageEntry) where
     parseJSON (String t) = do
         WithJSONWarnings loc _ <- parseJSON $ String t
@@ -633,12 +618,12 @@ instance FromJSON (WithJSONWarnings PackageEntry) where
             PackageEntry
                 { peExtraDepMaybe = Nothing
                 , peLocation = loc
-                , peSubdirs = []
+                , peSubdirs = DefaultSubdirs
                 }
     parseJSON v = withObjectWarnings "PackageEntry" (\o -> PackageEntry
         <$> o ..:? "extra-dep"
         <*> jsonSubWarnings (o ..: "location")
-        <*> o ..:? "subdirs" ..!= []) v
+        <*> o ..:? "subdirs" ..!= DefaultSubdirs) v
 
 -- | A project is a collection of packages. We can have multiple stack.yaml
 -- files, but only one of them may contain project information.
@@ -646,7 +631,7 @@ data Project = Project
     { projectUserMsg :: !(Maybe String)
     -- ^ A warning message to display to the user when the auto generated
     -- config may have issues.
-    , projectPackages :: ![PackageLocation [FilePath]]
+    , projectPackages :: ![PackageLocation Subdirs]
     -- ^ Packages which are actually part of the project (as opposed
     -- to dependencies).
     --
@@ -656,7 +641,7 @@ data Project = Project
     -- with @[FilePath]@ to properly enforce this idea, though it will
     -- slightly break backwards compatibility if someone really did
     -- want to treat such things as non-deps.
-    , projectDependencies :: ![PackageLocationIndex [FilePath]]
+    , projectDependencies :: ![PackageLocationIndex Subdirs]
     -- ^ Dependencies defined within the stack.yaml file, to be
     -- applied on top of the snapshot.
     , projectFlags :: !(Map PackageName (Map FlagName Bool))
@@ -671,15 +656,15 @@ data Project = Project
 
 instance ToJSON Project where
     -- Expanding the constructor fully to ensure we don't miss any fields.
-    toJSON (Project userMsg packages extraDeps flags resolver compiler extraPackageDBs) = object $
-        maybe id (\cv -> (("compiler" .= cv) :)) compiler $
-        maybe id (\msg -> (("user-message" .= msg) :)) userMsg $
-        (if null extraPackageDBs then id else (("extra-package-dbs" .= extraPackageDBs):)) $
-        (if null extraDeps then id else (("extra-deps" .= extraDeps):)) $
-        (if Map.null flags then id else (("flags" .= flags):))
-        [ "packages"          .= packages
-        , "resolver"          .= resolver
-        ]
+    toJSON (Project userMsg packages extraDeps flags resolver compiler extraPackageDBs) = object $ concat
+      [ maybe [] (\cv -> ["compiler" .= cv]) compiler
+      , maybe [] (\msg -> ["user-message" .= msg]) userMsg
+      , if null extraPackageDBs then [] else ["extra-package-dbs" .= extraPackageDBs]
+      , if null extraDeps then [] else ["extra-deps" .= extraDeps]
+      , if Map.null flags then [] else ["flags" .= flags]
+      , ["packages" .= packages]
+      , ["resolver" .= resolver]
+      ]
 
 -- | Constraint synonym for constraints satisfied by a 'MiniConfig'
 -- environment.
@@ -1435,7 +1420,7 @@ parseProjectAndConfigMonoid rootDir =
 
         -- Convert the packages/extra-deps/flags approach we use in
         -- the stack.yaml into the internal representation.
-        (packages, deps) <- convert dirs extraDeps
+        let (packages, deps) = convert dirs extraDeps
 
         resolver <- (o ..: "resolver")
                 >>= either (fail . show) return
@@ -1455,16 +1440,15 @@ parseProjectAndConfigMonoid rootDir =
                 }
         return $ ProjectAndConfigMonoid project config
       where
-        convert :: Monad m
-                => [PackageEntry]
-                -> [PackageLocationIndex [FilePath]] -- extra-deps
-                -> m ( [PackageLocation [FilePath]] -- project
-                     , [PackageLocationIndex [FilePath]] -- dependencies
-                     )
-        convert entries extraDeps = do
-            projLocs <- mapM goEntry entries
-            return $ partitionEithers $ concat projLocs ++ map Right extraDeps
+        convert :: [PackageEntry]
+                -> [PackageLocationIndex Subdirs] -- extra-deps
+                -> ( [PackageLocation Subdirs] -- project
+                   , [PackageLocationIndex Subdirs] -- dependencies
+                   )
+        convert entries extraDeps =
+            partitionEithers $ concatMap goEntry entries ++ map Right extraDeps
           where
+            goEntry :: PackageEntry -> [Either (PackageLocation Subdirs) (PackageLocationIndex Subdirs)]
             goEntry (PackageEntry Nothing pl@(PLFilePath _) subdirs) = goEntry' False pl subdirs
             goEntry (PackageEntry Nothing pl _) = fail $ concat
               [ "Refusing to implicitly treat package location as an extra-dep:\n"
@@ -1473,22 +1457,39 @@ parseProjectAndConfigMonoid rootDir =
               ]
             goEntry (PackageEntry (Just extraDep) pl subdirs) = goEntry' extraDep pl subdirs
 
-            goEntry' extraDep pl subdirs = do
-              pl' <- addSubdirs pl subdirs
-              return $ map (if extraDep then Right . PLOther else Left) pl'
+            goEntry' :: Bool -- ^ extra dep?
+                     -> PackageLocation Subdirs
+                     -> Subdirs
+                     -> [Either (PackageLocation Subdirs) (PackageLocationIndex Subdirs)]
+            goEntry' extraDep pl subdirs =
+              map (if extraDep then Right . PLOther else Left) (addSubdirs pl subdirs)
 
-            addSubdirs pl [] = return [pl]
-            addSubdirs (PLRepo repo) subdirs = return [PLRepo repo { repoSubdirs = subdirs ++ repoSubdirs repo }]
-            addSubdirs (PLFilePath fp) subdirs = return $ map (\subdir -> PLFilePath $ fp FilePath.</> subdir) subdirs
-            addSubdirs pl (_:_) = fail $
-                "Cannot set subdirs on package location: " ++ show pl
+            combineSubdirs :: [FilePath] -> Subdirs -> Subdirs
+            combineSubdirs paths DefaultSubdirs = ExplicitSubdirs paths
+            -- this could be considered an error condition, but we'll
+            -- just try and make it work
+            combineSubdirs paths (ExplicitSubdirs paths') = ExplicitSubdirs (paths ++ paths')
+
+            -- We do the toList/fromList bit as an efficient nub, and
+            -- to avoid having duplicate subdir names (especially for
+            -- the "." case, where parsing gets wonky).
+            addSubdirs :: PackageLocation Subdirs
+                       -> Subdirs
+                       -> [PackageLocation Subdirs]
+            addSubdirs pl DefaultSubdirs = [pl]
+            addSubdirs (PLRepo repo) (ExplicitSubdirs subdirs) =
+              [PLRepo repo { repoSubdirs = combineSubdirs subdirs $ repoSubdirs repo }]
+            addSubdirs (PLArchive arch) (ExplicitSubdirs subdirs) =
+              [PLArchive arch { archiveSubdirs = combineSubdirs subdirs $ archiveSubdirs arch }]
+            addSubdirs (PLFilePath fp) (ExplicitSubdirs subdirs) =
+              map (\subdir -> PLFilePath $ fp FilePath.</> subdir) subdirs
 
 -- | A PackageEntry for the current directory, used as a default
 packageEntryCurrDir :: PackageEntry
 packageEntryCurrDir = PackageEntry
     { peExtraDepMaybe = Nothing
     , peLocation = PLFilePath "."
-    , peSubdirs = []
+    , peSubdirs = DefaultSubdirs
     }
 
 -- | A software control system.
@@ -1917,11 +1918,6 @@ globalOptsBuildOptsMonoidL :: Lens' GlobalOpts BuildOptsMonoid
 globalOptsBuildOptsMonoidL = globalOptsL.lens
     configMonoidBuildOpts
     (\x y -> x { configMonoidBuildOpts = y })
-
-packageCachesL :: HasConfig env => Lens' env
-    (IORef (Maybe (Map PackageIdentifier (PackageIndex, PackageCache)
-                  ,HashMap CabalHash (PackageIndex, OffsetSize))))
-packageCachesL = configL.lens configPackageCaches (\x y -> x { configPackageCaches = y })
 
 configUrlsL :: HasConfig env => Lens' env Urls
 configUrlsL = configL.lens configUrls (\x y -> x { configUrls = y })

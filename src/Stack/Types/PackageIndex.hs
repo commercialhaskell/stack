@@ -10,7 +10,6 @@ module Stack.Types.PackageIndex
     ( PackageDownload (..)
     , HSPackageDownload (..)
     , PackageCache (..)
-    , PackageCacheMap (..)
     , OffsetSize (..)
     -- ** PackageIndex, IndexName & IndexLocation
     , PackageIndex(..)
@@ -28,8 +27,8 @@ import qualified Data.Foldable as F
 import           Data.Hashable (Hashable)
 import           Data.Data (Data, Typeable)
 import           Data.HashMap.Strict (HashMap)
+import qualified Data.HashMap.Strict as HashMap
 import           Data.Int (Int64)
-import           Data.Map (Map)
 import qualified Data.Map.Strict as Map
 import           Data.Store (Store)
 import           Data.Text (Text)
@@ -38,16 +37,31 @@ import           Data.Text.Encoding (encodeUtf8, decodeUtf8)
 import           Data.Word (Word64)
 import           GHC.Generics (Generic)
 import           Path
+import           Stack.Types.PackageName
 import           Stack.Types.PackageIdentifier
+import           Stack.Types.Version
+import           Data.List.NonEmpty (NonEmpty)
 
-data PackageCache = PackageCache
-    { pcOffsetSize :: {-# UNPACK #-}!OffsetSize
-    , pcDownload :: !(Maybe PackageDownload)
-    }
-    deriving (Generic, Eq, Show, Data, Typeable)
+-- | Cached information about packages in an index. We have a mapping
+-- from package name to a version map. Within the version map, we map
+-- from the version to information on an individual version. Each
+-- version has optional download information (about the package's
+-- tarball itself), and cabal file information. The cabal file
+-- information is a non-empty list of all cabal file revisions. Each
+-- file revision indicates the hash of the contents of the cabal file,
+-- and the offset into the index tarball.
+--
+-- It's assumed that cabal files appear in the index tarball in the
+-- correct revision order.
+newtype PackageCache index = PackageCache
+  (HashMap PackageName
+  (HashMap Version
+   (index, Maybe PackageDownload, NonEmpty (CabalHash, OffsetSize))))
+  deriving (Generic, Eq, Show, Data, Typeable, Store, NFData)
 
-instance Store PackageCache
-instance NFData PackageCache
+instance Monoid (PackageCache index) where
+  mempty = PackageCache HashMap.empty
+  mappend (PackageCache x) (PackageCache y) = PackageCache (HashMap.unionWith HashMap.union x y)
 
 -- | offset in bytes into the 01-index.tar file for the .cabal file
 -- contents, and size in bytes of the .cabal file
@@ -57,28 +71,23 @@ data OffsetSize = OffsetSize !Int64 !Int64
 instance Store OffsetSize
 instance NFData OffsetSize
 
-data PackageCacheMap = PackageCacheMap
-    { pcmIdent :: !(Map PackageIdentifier PackageCache)
-    -- ^ most recent revision of the package
-    , pcmSHA :: !(HashMap CabalHash OffsetSize)
-    -- ^ lookup via the cabal hash of the cabal file contents
-    }
-    deriving (Generic, Eq, Show, Data, Typeable)
-instance Store PackageCacheMap
-instance NFData PackageCacheMap
-
 data PackageDownload = PackageDownload
-    { pdSHA256 :: !ByteString
+    { pdSHA256 :: !StaticSHA256
     , pdUrl    :: !ByteString
     , pdSize   :: !Word64
     }
     deriving (Show, Generic, Eq, Data, Typeable)
+
 instance Store PackageDownload
 instance NFData PackageDownload
 instance FromJSON PackageDownload where
     parseJSON = withObject "PackageDownload" $ \o -> do
         hashes <- o .: "package-hashes"
-        sha256 <- maybe mzero return (Map.lookup ("SHA256" :: Text) hashes)
+        sha256' <- maybe mzero return (Map.lookup ("SHA256" :: Text) hashes)
+        sha256 <-
+          case mkStaticSHA256FromText sha256' of
+            Nothing -> fail "Invalid sha256"
+            Just x -> return x
         locs <- o .: "package-locations"
         url <-
             case reverse locs of
@@ -86,7 +95,7 @@ instance FromJSON PackageDownload where
                 x:_ -> return x
         size <- o .: "package-size"
         return PackageDownload
-            { pdSHA256 = encodeUtf8 sha256
+            { pdSHA256 = sha256
             , pdUrl = encodeUtf8 url
             , pdSize = size
             }
@@ -101,9 +110,13 @@ instance FromJSON HSPackageDownload where
         Object o4:_ <- return $ F.toList o3
         len <- o4 .: "length"
         hashes <- o4 .: "hashes"
-        sha256 <- hashes .: "sha256"
+        sha256' <- hashes .: "sha256"
+        sha256 <-
+          case mkStaticSHA256FromText sha256' of
+            Nothing -> fail "Invalid sha256"
+            Just x -> return x
         return $ HSPackageDownload PackageDownload
-            { pdSHA256 = encodeUtf8 sha256
+            { pdSHA256 = sha256
             , pdSize = len
             , pdUrl = ""
             }

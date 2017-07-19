@@ -80,10 +80,12 @@ There are two types of packages that can be defined in your
 * __Extra dependencies__, which are packages provided locally on top
   of the snapshot definition of available packages. These can come
   from Hackage (or an alternative package index you've defined, see
-  [package-indices](#package-indices)), an HTTP(S) tarball, a Git or
-  Mercurial repository, or a local file path.
+  [package-indices](#package-indices)), an HTTP(S) or local archive, a
+  Git or Mercurial repository, or a local file path.
 
-These two sets of packages are both installed into your local package database within your project. However, beyond that, they are completely different:
+These two sets of packages are both installed into your local package
+database within your project. However, beyond that, they are
+completely different:
 
 * Project packages will be built by default with a `stack build`
   without specific targets. Extra dependencies will only be built if
@@ -144,9 +146,22 @@ extra-deps:
 - acme-missiles-0.3@sha256:2ba66a092a32593880a87fb00f3213762d7bca65a687d45965778deb8694c5d1
 ```
 
-__NOTE__ Future versions of Stack may support specifying revisions by
-the revision number, providing more convenient than a hash with
-slightly less guarantees of reproducibility.
+Or a specific revision number, with `0` being the original file:
+
+```yaml
+extra-deps:
+- acme-missiles-0.3@rev:0
+```
+
+Note that specifying via SHA256 is slightly more resilient in that it
+does not rely on correct ordering in the package index, while revision
+number is likely simpler to use. In practice, both should guarantee
+equally reproducible build plans.
+
+If unspecified, `subdirs` defaults to `['.']` (i.e. look only in the top-level
+directory).  Note that if you specify a value of `subdirs`, then `'.'` is _not_
+included by default and needs to be explicitly specified if a required package
+is found in the top-level directory of the repository.
 
 #### Local file path
 
@@ -210,10 +225,10 @@ extra-deps:
 If unspecified, `subdirs` defaults to `subdirs: [.]`, or looking for a
 package in the root of the repo.
 
-#### HTTP(S) URLs
+#### Archives (HTTP(S) or local filepath)
 
-This one's pretty straightforward: you can use HTTP and HTTPS URLs
-referring to either tarballs or ZIP files.
+This one's pretty straightforward: you can use HTTP and HTTPS URLs and
+local filepaths referring to either tarballs or ZIP files.
 
 __NOTE__ Stack assumes that these files never change after downloading
 to avoid needing to make an HTTP request on each build.
@@ -221,10 +236,12 @@ to avoid needing to make an HTTP request on each build.
 ```yaml
 extra-deps:
 - https://example.com/foo/bar/baz-0.0.2.tar.gz
-- location: http://github.com/yesodweb/wai/archive/2f8a8e1b771829f4a8a77c0111352ce45a14c30f.zip
+- archive: http://github.com/yesodweb/wai/archive/2f8a8e1b771829f4a8a77c0111352ce45a14c30f.zip
   subdirs:
   - wai
   - warp
+- archive: ../acme-missiles-0.3.tar.gz
+  sha256: e563d8b524017a06b32768c4db8eff1f822f3fb22a90320b7e414402647b735b
 ```
 
 Note that HTTP(S) URLs also support `subdirs` like repos to allow for

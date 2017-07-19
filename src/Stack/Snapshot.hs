@@ -79,6 +79,7 @@ import           Stack.Types.Urls
 import           Stack.Types.Compiler
 import           Stack.Types.Resolver
 import           Stack.Types.StackT
+import qualified System.Directory as Dir
 import           System.Process.Read (EnvOverride)
 
 type SinglePackageLocation = PackageLocationIndex FilePath
@@ -213,13 +214,16 @@ loadResolver (ResolverSnapshot name) = do
             version <- o .: "version"
             mcabalFileInfo <- o .:? "cabal-file-info"
             mcabalFileInfo' <- forM mcabalFileInfo $ \o' -> do
-                cfiSize <- Just <$> o' .: "size"
+                msize <- Just <$> o' .: "size"
                 cfiHashes <- o' .: "hashes"
-                cfiHash <- maybe
-                                (fail "Could not find SHA256")
-                                (return . mkCabalHashFromSHA256)
-                            $ HashMap.lookup ("SHA256" :: Text) cfiHashes
-                return CabalFileInfo {..}
+                hash' <-
+                  case HashMap.lookup ("SHA256" :: Text) cfiHashes of
+                    Nothing -> fail "Could not find SHA256"
+                    Just shaText ->
+                      case mkCabalHashFromSHA256 shaText of
+                        Nothing -> fail "Invalid SHA256"
+                        Just x -> return x
+                return $ CFIHash msize hash'
 
             Object constraints <- o .: "constraints"
 
@@ -229,7 +233,7 @@ loadResolver (ResolverSnapshot name) = do
             hide <- constraints .:? "hide" .!= False
             let hide' = if hide then Map.singleton name' True else Map.empty
 
-            let location = PLIndex $ PackageIdentifierRevision (PackageIdentifier name' version) mcabalFileInfo'
+            let location = PLIndex $ PackageIdentifierRevision (PackageIdentifier name' version) (fromMaybe CFILatest mcabalFileInfo')
 
             return (Endo (location:), flags', hide')
 loadResolver (ResolverCompiler compiler) = return SnapshotDef
@@ -246,7 +250,7 @@ loadResolver (ResolverCompiler compiler) = return SnapshotDef
 loadResolver (ResolverCustom url loc) = do
   $logDebug $ "Loading " <> url <> " build plan"
   case loc of
-    Left req -> download' req >>= load
+    Left req -> download' req >>= load . toFilePath
     Right fp -> load fp
   where
     download' :: Request -> m (Path Abs File)
@@ -262,10 +266,10 @@ loadResolver (ResolverCustom url loc) = do
         root <- view stackRootL
         return $ root </> $(mkRelDir "custom-plan")
 
-    load :: Path Abs File -> m SnapshotDef
+    load :: FilePath -> m SnapshotDef
     load fp = do
       WithJSONWarnings (sd0, mparentResolver, mcompiler) warnings <-
-        liftIO (decodeFileEither (toFilePath fp)) >>= either
+        liftIO (decodeFileEither fp) >>= either
           throwM
           (either (throwM . AesonException) return . parseEither parseCustom)
       logJSONWarnings (T.unpack url) warnings
@@ -278,10 +282,10 @@ loadResolver (ResolverCustom url loc) = do
       -- The fp above may just be the download location for a URL,
       -- which we don't want to use. Instead, look back at loc from
       -- above.
-      let mdir =
-            case loc of
-              Left _ -> Nothing
-              Right fp' -> Just $ parent fp'
+      mdir <-
+        case loc of
+          Left _ -> return Nothing
+          Right fp' -> (Just . parent) <$> liftIO (Dir.canonicalizePath fp' >>= parseAbsFile)
 
       -- Deal with the dual nature of the compiler key, which either
       -- means "use this compiler" or "override the compiler in the
@@ -300,7 +304,7 @@ loadResolver (ResolverCustom url loc) = do
 
       -- Calculate the hash of the current file, and then combine it
       -- with parent hashes if necessary below.
-      rawHash :: SnapshotHash <- fromDigest <$> hashFile (toFilePath fp) :: m SnapshotHash
+      rawHash :: SnapshotHash <- fromDigest <$> hashFile fp :: m SnapshotHash
 
       (parent', hash') <-
         case parentResolver' of
@@ -703,7 +707,7 @@ snapshotDefFixes sd = sd
 -- creating a 'PackageLocation'.
 globalToSnapshot :: PackageName -> LoadedPackageInfo loc -> LoadedPackageInfo (PackageLocationIndex FilePath)
 globalToSnapshot name lpi = lpi
-    { lpiLocation = PLIndex (PackageIdentifierRevision (PackageIdentifier name (lpiVersion lpi)) Nothing)
+    { lpiLocation = PLIndex (PackageIdentifierRevision (PackageIdentifier name (lpiVersion lpi)) CFILatest)
     }
 
 -- | Split the globals into those which have their dependencies met,

@@ -1,6 +1,10 @@
 Docker integration
 ===============================================================================
 
+**Note:** This page is mainly about building Haskell packages inside docker containers.
+If you want to deploy your built Haskell programs into a docker container,
+look [here](GUIDE.md#docker) instead.
+
 `stack` has support for automatically performing builds inside a Docker
 container, using volume mounts and user ID switching to make it mostly seamless.
 FP Complete provides images for use with stack that include GHC, tools, and

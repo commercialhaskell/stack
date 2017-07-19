@@ -1,4 +1,4 @@
-resolver: lts-8.5
+resolver: lts-8.22
 # docker:
 #   enable: true
 #   repo: fpco/stack-full
@@ -18,5 +18,4 @@ flags:
     win32-2-5: false
 extra-deps:
 - mintty-0.1.1
-- store-0.4.1
 - text-metrics-0.3.0

@@ -46,7 +46,6 @@ import qualified    Data.ByteString.Lazy as L
 import              Data.Either (partitionEithers)
 import qualified    Data.Foldable as F
 import              Data.Function (fix)
-import              Data.HashMap.Strict (HashMap)
 import qualified    Data.HashMap.Strict as HashMap
 import              Data.HashSet (HashSet)
 import qualified    Data.HashSet as HashSet
@@ -55,13 +54,14 @@ import              Data.List.NonEmpty (NonEmpty)
 import qualified    Data.List.NonEmpty as NE
 import              Data.Map (Map)
 import qualified    Data.Map as Map
-import              Data.Maybe (maybeToList, catMaybes, isJust)
+import              Data.Maybe (maybeToList, catMaybes, listToMaybe)
 import              Data.Monoid
 import              Data.Set (Set)
 import qualified    Data.Set as Set
 import qualified    Data.Text as T
 import              Data.Text.Encoding (decodeUtf8)
 import              Data.Text.Metrics
+import              Data.Traversable (forM)
 import              Data.Typeable (Typeable)
 import              Data.Word (Word64)
 import              Network.HTTP.Download
@@ -79,8 +79,6 @@ import              Stack.Types.Version
 import qualified    System.FilePath as FP
 import              System.IO
 import              System.PosixCompat (setFileMode)
-
-type PackageCaches = Map PackageIdentifier (PackageIndex, PackageCache)
 
 data FetchException
     = Couldn'tReadIndexTarball FilePath Tar.FormatError
@@ -131,8 +129,8 @@ fetchPackages idents' = do
     assert (Map.null nowUnpacked) (return ())
   where
     -- Since we're just fetching tarballs and not unpacking cabal files, we can
-    -- always provide a Nothing cabal file info
-    idents = map (flip PackageIdentifierRevision Nothing) $ Set.toList idents'
+    -- always provide a CFILatest cabal file info
+    idents = map (flip PackageIdentifierRevision CFILatest) $ Set.toList idents'
 
 -- | Intended to work for the command line command.
 unpackPackages :: (StackMiniM env m, HasConfig env)
@@ -201,7 +199,8 @@ unpackPackageIdents unpackDir mdistDir idents = do
 
 data ResolvedPackage = ResolvedPackage
     { rpIdent :: !PackageIdentifier
-    , rpCache :: !PackageCache
+    , rpDownload :: !(Maybe PackageDownload)
+    , rpOffsetSize :: !OffsetSize
     , rpIndex :: !PackageIndex
     }
     deriving Show
@@ -226,95 +225,82 @@ resolvePackages mSnapshotDef idents0 names0 = do
       | not $ HashSet.null missingIdents = Left $ UnknownPackageIdentifiers missingIdents ""
       | otherwise                    = Right idents
 
+-- | Turn package identifiers and package names into a list of
+-- @ResolvedPackage@s. Returns any unresolved names and
+-- identifier. These are considered unresolved even if the only
+-- mismatch is in the cabal file info (MSS 2017-07-17: old versions of
+-- this code had special handling to treat missing cabal file info as
+-- a warning, that's no longer necessary or desirable since all info
+-- should be present and checked).
 resolvePackagesAllowMissing
-    :: (StackMiniM env m, HasConfig env)
+    :: forall env m.
+       (StackMiniM env m, HasConfig env)
     => Maybe SnapshotDef -- ^ when looking up by name, take from this build plan
     -> [PackageIdentifierRevision]
     -> Set PackageName
     -> m (Set PackageName, HashSet PackageIdentifierRevision, [ResolvedPackage])
 resolvePackagesAllowMissing mSnapshotDef idents0 names0 = do
-    (res1, res2, resolved) <- inner
-    if any (isJust . snd) resolved
-        then do
-            $logInfo "Missing some cabal revision files, updating indices"
-            updateAllIndices
-            (res1', res2', resolved') <- inner
+  cache@(PackageCache cache') <- getPackageCaches
 
-            -- Print an error message if any SHAs are still missing.
-            F.forM_ resolved' $ \(rp, missing) -> F.forM_ missing $ \cfi ->
-                $logWarn $ mconcat
-                    [ "Did not find .cabal file for "
-                    , T.pack $ packageIdentifierString $ rpIdent rp
-                    , " with hash of "
-                    , showCabalHash $ cfiHash cfi
-                    , " in tarball-based cache"
-                    ]
+      -- Find out the latest versions of all packages in the cache
+  let versions = fmap (maximum . HashMap.keys) cache'
 
-            return (res1', res2', map fst resolved')
-        else return (res1, res2, map fst resolved)
-  where
-    inner = do
-        (caches, shaCaches) <- getPackageCaches
+      -- Determines the identifier for a given name, either from
+      -- snapshot information or by taking the latest version
+      -- available
+      getNamed :: PackageName -> Maybe PackageIdentifierRevision
+      getNamed =
+          case mSnapshotDef of
+              Nothing -> getNamedFromIndex
+              Just sd -> getNamedFromSnapshotDef sd
 
-        let versions = Map.fromListWith max $ map toTuple $ Map.keys caches
+      -- Use whatever is specified in the snapshot. TODO this does not
+      -- handle the case where a snapshot defines a package outside of
+      -- the index, we'd need a LoadedSnapshot for that.
+      getNamedFromSnapshotDef sd name = do
+          loop $ sdLocations sd
+        where
+          loop [] = Nothing
+          loop (PLIndex ident@(PackageIdentifierRevision (PackageIdentifier name' _) _):rest)
+            | name == name' = Just ident
+            | otherwise = loop rest
+          loop (_:rest) = loop rest
 
-            getNamed :: PackageName -> Maybe PackageIdentifierRevision
-            getNamed =
-                case mSnapshotDef of
-                    Nothing -> getNamedFromIndex
-                    Just sd -> getNamedFromSnapshotDef sd
+      -- Take latest version available, including latest cabal file information
+      getNamedFromIndex name = fmap
+          (\ver -> PackageIdentifierRevision (PackageIdentifier name ver) CFILatest)
+          (HashMap.lookup name versions)
 
-            getNamedFromSnapshotDef sd name = do
-                loop $ sdLocations sd
-              where
-                loop [] = Nothing
-                loop (PLIndex ident@(PackageIdentifierRevision (PackageIdentifier name' _) _):rest)
-                  | name == name' = Just ident
-                  | otherwise = loop rest
-                loop (_:rest) = loop rest
+      (missingNames, idents1) = partitionEithers $ map
+          (\name -> maybe (Left name) Right (getNamed name))
+          (Set.toList names0)
+  let (missingIdents, resolved) =
+        partitionEithers
+          $ map (\pir -> maybe (Left pir) Right (lookupResolvedPackage pir cache))
+          $ idents0 <> idents1
+  return (Set.fromList missingNames, HashSet.fromList missingIdents, resolved)
 
-            getNamedFromIndex name = fmap
-                (\ver -> PackageIdentifierRevision (PackageIdentifier name ver) Nothing)
-                (Map.lookup name versions)
-
-            (missingNames, idents1) = partitionEithers $ map
-                (\name -> maybe (Left name) Right (getNamed name))
-                (Set.toList names0)
-        let (missingIdents, resolved) = partitionEithers $ map (goIdent caches shaCaches)
-                                    $ idents0 <> idents1
-        return (Set.fromList missingNames, HashSet.fromList missingIdents, resolved)
-
-    goIdent caches shaCaches identRev@(PackageIdentifierRevision ident mcfi) =
-        case Map.lookup ident caches of
-            Nothing -> Left identRev
-            Just (index, cache) ->
-                let (index', cache', missingCFI) =
-                      case mcfi of
-                        Nothing -> (index, cache, mcfi)
-                        Just cfi ->
-                            case HashMap.lookup (cfiHash cfi) shaCaches of -- TODO check size?
-                                Just (index'', offsetSize) ->
-                                        ( index''
-                                        , cache { pcOffsetSize = offsetSize }
-                                        -- we already got the info
-                                        -- about this cabal file, don't do
-                                        -- any lookups later
-                                        , Nothing
-                                        )
-                                -- Index using HTTP, so we're missing the cabal file
-                                Nothing -> (index, cache, mcfi)
-                 in Right (ResolvedPackage
-                        { rpIdent = ident
-                        , rpCache = cache'
-                        , rpIndex = index'
-                        }, missingCFI)
+lookupResolvedPackage :: PackageIdentifierRevision -> PackageCache PackageIndex -> Maybe ResolvedPackage
+lookupResolvedPackage (PackageIdentifierRevision ident@(PackageIdentifier name version) cfi) (PackageCache cache) = do
+  (index, mdownload, files) <- HashMap.lookup name cache >>= HashMap.lookup version
+  offsetSize <-
+    case cfi of
+      CFILatest -> Just $ snd $ NE.last files
+      CFIHash _msize hash' -> lookup hash' $ NE.toList files -- TODO check size?
+      CFIRevision rev -> fmap snd $ listToMaybe $ drop (fromIntegral rev) $ NE.toList files
+  Just ResolvedPackage
+    { rpIdent = ident
+    , rpDownload = mdownload
+    , rpOffsetSize = offsetSize
+    , rpIndex = index
+    }
 
 data ToFetch = ToFetch
     { tfTarball :: !(Path Abs File)
     , tfDestDir :: !(Maybe (Path Abs Dir))
     , tfUrl     :: !T.Text
     , tfSize    :: !(Maybe Word64)
-    , tfSHA256  :: !(Maybe ByteString)
+    , tfSHA256  :: !(Maybe StaticSHA256)
     , tfCabal   :: !ByteString
     -- ^ Contents of the .cabal file
     }
@@ -337,9 +323,8 @@ withCabalFiles name pkgs f = do
         (liftIO $ openBinaryFile (toFilePath indexPath) ReadMode)
         (liftIO . hClose) $ \h -> mapM (goPkg h) pkgs
   where
-    goPkg h (ResolvedPackage ident pc _index, tf) = do
+    goPkg h (ResolvedPackage { rpIdent = ident, rpOffsetSize = OffsetSize offset size }, tf) = do
         -- Did not find warning for tarballs is handled above
-        let OffsetSize offset size = pcOffsetSize pc
         liftIO $ do
             hSeek h AbsoluteSeek $ fromIntegral offset
             cabalBS <- S.hGet h $ fromIntegral size
@@ -367,16 +352,16 @@ withCabalLoader inner = do
     let doLookup :: PackageIdentifierRevision
                  -> IO ByteString
         doLookup ident = do
-            (caches, cachesRev) <- unliftIO u getPackageCaches
-            eres <- runReaderT (lookupPackageIdentifierExact ident caches cachesRev) env
+            bothCaches <- unliftIO u getPackageCaches
+            eres <- runReaderT (lookupPackageIdentifierExact ident bothCaches) env
             case eres of
                 Just bs -> return bs
                 -- Update the cache and try again
                 Nothing -> do
-                    let fuzzy = fuzzyLookupCandidates ident caches
+                    let fuzzy = fuzzyLookupCandidates ident bothCaches
                         suggestions = case fuzzy of
                             Nothing ->
-                              case typoCorrectionCandidates ident caches of
+                              case typoCorrectionCandidates ident bothCaches of
                                   Nothing -> ""
                                   Just cs -> "Perhaps you meant " <>
                                     orSeparated cs <> "?"
@@ -404,59 +389,41 @@ withCabalLoader inner = do
 lookupPackageIdentifierExact
   :: (MonadReader env m, MonadUnliftIO m, HasConfig env, MonadThrow m)
   => PackageIdentifierRevision
-  -> PackageCaches
-  -> HashMap CabalHash (PackageIndex, OffsetSize)
+  -> PackageCache PackageIndex
   -> m (Maybe ByteString)
-lookupPackageIdentifierExact (PackageIdentifierRevision ident mcfi) caches cachesRev = do
-    let mpair =
-          case mcfi of
-            Nothing -> Map.lookup ident caches
-            Just cfi -> fmap
-              (\(index, size) -> (index, PackageCache size Nothing))
-              (HashMap.lookup (cfiHash cfi) cachesRev)
-    case mpair of
-        Nothing -> return Nothing
-        Just (index, cache) -> do
-            [bs] <- withCabalFiles (indexName index)
-                        [(ResolvedPackage
-                            { rpIdent = ident
-                            , rpCache = cache
-                            , rpIndex = index
-                            }, ())]
-                  $ \_ _ bs -> return bs
-            return $ Just bs
+lookupPackageIdentifierExact identRev cache = do
+  forM (lookupResolvedPackage identRev cache) $ \rp -> do
+    [bs] <- withCabalFiles (indexName (rpIndex rp)) [(rp, ())] $ \_ _ bs -> return bs
+    return bs
 
 -- | Given package identifier and package caches, return list of packages
 -- with the same name and the same two first version number components found
 -- in the caches.
 fuzzyLookupCandidates
   :: PackageIdentifierRevision
-  -> PackageCaches
+  -> PackageCache index
   -> Maybe (NonEmpty PackageIdentifier)
-fuzzyLookupCandidates (PackageIdentifierRevision (PackageIdentifier name ver) _rev) caches =
-  let (_, zero, bigger) = Map.splitLookup zeroIdent caches
-      zeroIdent         = PackageIdentifier name $(mkVersion "0.0")
-      sameName  (PackageIdentifier n _) = n == name
-      sameMajor (PackageIdentifier _ v) = toMajorVersion v == toMajorVersion ver
-  in NE.nonEmpty . filter sameMajor $ maybe [] (pure . const zeroIdent) zero
-         <> takeWhile sameName (Map.keys bigger)
+fuzzyLookupCandidates (PackageIdentifierRevision (PackageIdentifier name ver) _rev) (PackageCache caches) =
+    NE.nonEmpty $ map (PackageIdentifier name) $ filter sameMajor $ maybe [] HashMap.keys $ HashMap.lookup name caches
+  where
+    sameMajor v = toMajorVersion v == toMajorVersion ver
 
 -- | Try to come up with typo corrections for given package identifier using
 -- package caches. This should be called before giving up, i.e. when
 -- 'fuzzyLookupCandidates' cannot return anything.
 typoCorrectionCandidates
   :: PackageIdentifierRevision
-  -> PackageCaches
+  -> PackageCache index
   -> Maybe (NonEmpty T.Text)
-typoCorrectionCandidates (PackageIdentifierRevision ident _mcfi) =
-  let getName = packageNameText . packageIdentifierName
-      name    = getName ident
+typoCorrectionCandidates (PackageIdentifierRevision ident _mcfi) (PackageCache cache) =
+  let name = packageNameText (packageIdentifierName ident)
   in  NE.nonEmpty
     . take 10
     . map snd
     . filter (\(distance, _) -> distance < 4)
-    . map (\(k, _) -> (damerauLevenshtein name (getName k), getName k))
-    . Map.toList
+    . map (\k -> (damerauLevenshtein name (packageNameText k), packageNameText k))
+    . HashMap.keys
+    $ cache
 
 -- | Figure out where to fetch from.
 getToFetch :: (StackMiniM env m, HasConfig env)
@@ -485,7 +452,7 @@ getToFetch mdest resolvedAll = do
             Just destDir -> return $ Right (ident, destDir)
             Nothing -> do
                 let index = rpIndex resolved
-                    d = pcDownload $ rpCache resolved
+                    d = rpDownload resolved
                     targz = T.pack $ packageIdentifierString ident ++ ".tar.gz"
                 tarball <- configPackageTarball (indexName index) ident
                 return $ Left (indexName index, [(resolved, ToFetch
@@ -546,7 +513,7 @@ fetchPackages' mdistDir toFetchAll = do
         let toHashCheck bs = HashCheck SHA256 (CheckHexDigestByteString bs)
         let downloadReq = DownloadRequest
                 { drRequest = req
-                , drHashChecks = map toHashCheck $ maybeToList (tfSHA256 toFetch)
+                , drHashChecks = map (toHashCheck . staticSHA256ToBase16) $ maybeToList (tfSHA256 toFetch)
                 , drLengthCheck = fromIntegral <$> tfSize toFetch
                 , drRetryPolicy = drRetryPolicyDefault
                 }

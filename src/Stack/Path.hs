@@ -22,6 +22,7 @@ import qualified Options.Applicative as OA
 import           Path
 import           Path.Extra
 import           Stack.Constants
+import           Stack.Constants.Config
 import           Stack.GhcPkg as GhcPkg
 import           Stack.Types.Config
 import qualified System.FilePath as FP
