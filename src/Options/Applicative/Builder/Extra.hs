@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
@@ -29,17 +30,14 @@ module Options.Applicative.Builder.Extra
   ,unescapeBashArg
   ) where
 
-import Control.Monad (when, forM)
-import Control.Monad.IO.Unlift
-import Data.Either.Combinators
 import Data.List (isPrefixOf)
 import Data.Maybe
 import Data.Monoid
-import Data.Text (Text)
 import qualified Data.Text as T
 import Options.Applicative
 import Options.Applicative.Types (readerAsk)
 import Path hiding ((</>))
+import Stack.Prelude
 import System.Directory (getCurrentDirectory, getDirectoryContents, doesDirectoryExist)
 import System.Environment (withArgs)
 import System.FilePath (takeBaseName, (</>), splitFileName, isRelative, takeExtension)
@@ -110,6 +108,11 @@ enableDisableFlagsNoDefault enabledValue disabledValue name helpSuffix mods =
            (long ("[no-]" ++ name) <>
             help ("Enable/disable " ++ helpSuffix) <>
             mods))
+  where
+    last xs =
+      case reverse xs of
+        [] -> impureThrow $ stringException "enableDisableFlagsNoDefault.last"
+        x:_ -> x
 
 -- | Show an extra help option (e.g. @--docker-help@ shows help for all @--docker*@ args).
 --

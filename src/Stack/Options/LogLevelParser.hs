@@ -1,12 +1,12 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module Stack.Options.LogLevelParser where
 
-import           Control.Monad.Logger              (LogLevel (..))
-import           Data.Monoid.Extra
 import qualified Data.Text                         as T
 import           Options.Applicative
 import           Stack.Options.Utils
+import           Stack.Prelude
 
 -- | Parser for a logging level.
 logLevelOptsParser :: Bool -> Maybe LogLevel -> Parser (Maybe LogLevel)

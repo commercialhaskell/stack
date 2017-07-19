@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE ConstraintKinds       #-}
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
@@ -16,28 +17,17 @@ module Stack.Build.Haddock
     , shouldHaddockDeps
     ) where
 
-import           Control.Monad
-import           Control.Monad.IO.Unlift
-import           Control.Monad.Logger
+import           Stack.Prelude
 import qualified Data.Foldable as F
-import           Data.Function
 import qualified Data.HashSet as HS
-import           Data.List
 import           Data.List.Extra (nubOrd)
-import           Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
-import           Data.Maybe
-import           Data.Maybe.Extra (mapMaybeM)
-import           Data.Monoid ((<>))
-import           Data.Set (Set)
 import qualified Data.Set as Set
-import           Data.Text (Text)
 import qualified Data.Text as T
 import           Data.Time (UTCTime)
 import           Path
 import           Path.Extra
 import           Path.IO
-import           Prelude
 import           Stack.PackageDump
 import           Stack.PrettyPrint
 import           Stack.Types.Build
@@ -48,7 +38,6 @@ import           Stack.Types.Package
 import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageName
 import           Stack.Types.StackT (StackM)
-import           Stack.Types.StringError
 import qualified System.FilePath as FP
 import           System.IO.Error (isDoesNotExistError)
 import           System.Process.Read

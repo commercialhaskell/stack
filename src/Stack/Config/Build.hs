@@ -1,10 +1,10 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE RecordWildCards #-}
 
 -- | Build configuration
 module Stack.Config.Build where
 
-import           Data.Maybe
-import           Data.Monoid.Extra
+import           Stack.Prelude
 import           Stack.Types.Config
 
 -- | Interprets BuildOptsMonoid options.

@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE DeriveDataTypeable #-}
@@ -20,33 +21,21 @@ module Stack.Build
   ,CabalVersionException(..))
   where
 
-import           Control.Monad
-import           Control.Monad.IO.Unlift
-import           Control.Monad.Logger
-import           Control.Monad.Reader (MonadReader)
+import           Stack.Prelude
 import           Data.Aeson (Value (Object, Array), (.=), object)
-import           Data.Function
 import qualified Data.HashMap.Strict as HM
 import           Data.List ((\\))
 import           Data.List.Extra (groupSort)
 import           Data.List.NonEmpty (NonEmpty(..))
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Map as Map
-import           Data.Map.Strict (Map)
-import           Data.Monoid
-import           Data.Set (Set)
 import qualified Data.Set as Set
-import           Data.String
-import           Data.Text (Text)
 import qualified Data.Text as T
 import           Data.Text.Encoding (decodeUtf8)
 import qualified Data.Text.IO as TIO
 import           Data.Text.Read (decimal)
-import           Data.Typeable (Typeable)
 import qualified Data.Vector as V
 import qualified Data.Yaml as Yaml
-import           Path
-import           Prelude hiding (writeFile)
 import           Stack.Build.ConstructPlan
 import           Stack.Build.Execute
 import           Stack.Build.Haddock
@@ -64,7 +53,6 @@ import           Stack.Types.Package
 import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageName
 import           Stack.Types.StackT
-import           Stack.Types.StringError
 import           Stack.Types.Version
 
 #ifdef WINDOWS
@@ -292,7 +280,7 @@ withLoadPackage inner = do
     econfig <- view envConfigL
     menv <- getMinimalEnvOverride
     root <- view projectRootL
-    run <- askRunIO
+    run <- askRunInIO
     withCabalLoader $ \loadFromIndex ->
         inner $ \loc flags ghcOptions -> do
             bs <- run $ loadSingleRawCabalFile loadFromIndex menv root loc
@@ -385,7 +373,7 @@ queryBuildInfo selectors0 =
             _ -> err $ "Cannot apply selector to " ++ show value
       where
         cont = select (front . (sel:)) sels
-        err msg = errorString $ msg ++ ": " ++ show (front [sel])
+        err msg = throwString $ msg ++ ": " ++ show (front [sel])
 
 -- | Get the raw build information object
 rawBuildInfo :: (StackM env m, HasEnvConfig env) => m Value

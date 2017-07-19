@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE ConstraintKinds       #-}
 {-# LANGUAGE DataKinds             #-}
 {-# LANGUAGE FlexibleContexts      #-}
@@ -17,35 +18,21 @@ module Stack.Solver
     , parseCabalOutputLine
     ) where
 
-import           Prelude ()
-import           Prelude.Compat
-
-import           Control.Applicative
-import           Control.Monad (when,void,join,liftM,unless,mapAndUnzipM, zipWithM_)
-import           Control.Monad.IO.Unlift
-import           Control.Monad.Logger
+import           Control.Monad (mapAndUnzipM)
+import           Stack.Prelude
 import           Data.Aeson.Extended         (object, (.=), toJSON)
 import qualified Data.ByteString as S
 import           Data.Char (isSpace)
-import           Data.Either
-import           Data.Foldable (forM_)
-import           Data.Function (on)
 import qualified Data.HashMap.Strict as HashMap
 import qualified Data.HashSet as HashSet
 import           Data.List                   ( (\\), isSuffixOf, intercalate
                                              , minimumBy, isPrefixOf)
 import           Data.List.Extra (groupSortOn)
-import           Data.Map (Map)
 import qualified Data.Map as Map
-import           Data.Maybe (catMaybes, isNothing, mapMaybe)
-import           Data.Monoid
-import           Data.Set (Set)
 import qualified Data.Set as Set
-import           Data.Text (Text)
 import qualified Data.Text as T
 import           Data.Text.Encoding (decodeUtf8, encodeUtf8)
 import           Data.Text.Encoding.Error (lenientDecode)
-import           Data.Text.Extra (stripCR)
 import qualified Data.Text.Lazy as LT
 import           Data.Text.Lazy.Encoding (decodeUtf8With)
 import           Data.Tuple (swap)
@@ -55,7 +42,7 @@ import qualified Distribution.PackageDescription as C
 import qualified Distribution.Text as C
 import           Path
 import           Path.Find (findFiles)
-import           Path.IO hiding (findExecutable, findFiles)
+import           Path.IO hiding (findExecutable, findFiles, withSystemTempDir)
 import           Stack.Build.Target (gpdVersion)
 import           Stack.BuildPlan
 import           Stack.Config (getLocalPackages, loadConfigYaml)
@@ -97,7 +84,7 @@ cabalSolver :: (StackM env m, HasConfig env)
             -> m (Either [PackageName] ConstraintSpec)
 cabalSolver menv cabalfps constraintType
             srcConstraints depConstraints cabalArgs =
-  withRunIO $ \run -> withSystemTempDir "cabal-solver" $ \dir' -> run $ do
+  withSystemTempDir "cabal-solver" $ \dir' -> do
 
     let versionConstraints = fmap fst depConstraints
         dir = toFilePath dir'

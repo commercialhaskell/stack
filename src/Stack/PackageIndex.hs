@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE BangPatterns               #-}
 {-# LANGUAGE ConstraintKinds            #-}
 {-# LANGUAGE DataKinds                  #-}
@@ -26,31 +27,19 @@ module Stack.PackageIndex
     ) where
 
 import qualified Codec.Archive.Tar as Tar
-import           Control.Monad (unless, when, liftM, guard)
-import           Control.Monad.IO.Unlift
-import           Control.Monad.Logger (logDebug, logInfo, logWarn)
+import           Stack.Prelude
 import           Data.Aeson.Extended
 import qualified Data.ByteString.Lazy as L
-import           Data.Conduit (($$), (=$), (.|))
 import           Data.Conduit.Binary (sinkHandle, sourceHandle, sourceFile, sinkFile)
 import           Data.Conduit.Zlib (ungzip)
-import           Data.Foldable (forM_)
-import           Data.IORef
-import           Data.Int (Int64)
 import qualified Data.List.NonEmpty as NE
-import           Data.HashMap.Strict (HashMap)
 import qualified Data.HashMap.Strict as HashMap
-import           Data.Monoid
-import           Data.Set (Set)
 import qualified Data.Set as Set
 import           Data.Store.Version
 import           Data.Store.VersionTagged
-import           Data.Text (Text)
 import qualified Data.Text as T
 import           Data.Text.Unsafe (unsafeTail)
 import           Data.Time (getCurrentTime)
-import           Data.Traversable (forM)
-import           Data.Typeable (Typeable)
 import qualified Hackage.Security.Client as HS
 import qualified Hackage.Security.Client.Repository.Cache as HS
 import qualified Hackage.Security.Client.Repository.Remote as HS
@@ -62,17 +51,14 @@ import           Network.HTTP.Download
 import           Network.URI (parseURI)
 import           Path (toFilePath, parseAbsFile)
 import           Path.IO
-import           Prelude -- Fix AMP warning
 import           Stack.Types.Config
 import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageIndex
 import           Stack.Types.PackageName
 import           Stack.Types.StackT
-import           Stack.Types.StringError
 import           Stack.Types.Version
 import qualified System.Directory as D
 import           System.FilePath ((<.>))
-import           System.IO (IOMode (ReadMode, WriteMode), withBinaryFile)
 
 -- | Populate the package index caches and return them.
 populateCache :: (StackMiniM env m, HasConfig env) => PackageIndex -> m (PackageCache ())
@@ -103,7 +89,7 @@ populateCache index = do
 
     return cache
   where
-    convertPI :: MonadThrow m
+    convertPI :: MonadIO m
               => (PackageIdentifier, ((), Maybe PackageDownload, Endo [(CabalHash, OffsetSize)]))
               -> m (PackageCache ())
     convertPI (ident@(PackageIdentifier name version), ((), mpd, Endo front)) =
@@ -283,10 +269,10 @@ updateIndexHTTP indexName' url = do
 
         liftIO $ do
             withBinaryFile (toFilePath gz) ReadMode $ \input ->
-                withBinaryFile tmp WriteMode $ \output ->
-                    sourceHandle input
-                    $$ ungzip
-                    =$ sinkHandle output
+                withBinaryFile tmp WriteMode $ \output -> runConduit
+                  $ sourceHandle input
+                 .| ungzip
+                 .| sinkHandle output
             renameFile tmpPath tar
 
 -- | Update the index tarball via Hackage Security
@@ -299,11 +285,11 @@ updateIndexHackageSecurity
 updateIndexHackageSecurity indexName' url (HackageSecurity keyIds threshold) = do
     baseURI <-
         case parseURI $ T.unpack url of
-            Nothing -> errorString $ "Invalid Hackage Security base URL: " ++ T.unpack url
+            Nothing -> throwString $ "Invalid Hackage Security base URL: " ++ T.unpack url
             Just x -> return x
     manager <- liftIO getGlobalManager
     root <- configPackageIndexRoot indexName'
-    run <- askRunIO
+    run <- askRunInIO
     let logTUF = run . $logInfo . T.pack . HS.pretty
         withRepo = HS.withRepository
             (HS.makeHttpLib manager)

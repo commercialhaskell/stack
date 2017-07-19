@@ -1,9 +1,10 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 module Stack.Options.PackageParser where
 
 import qualified Data.Map                          as Map
-import           Data.Map.Strict                   (Map)
 import           Options.Applicative
 import           Options.Applicative.Types         (readerAsk)
+import           Stack.Prelude
 import           Stack.Types.FlagName
 import           Stack.Types.PackageName
 

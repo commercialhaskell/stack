@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE DataKinds          #-}
 {-# LANGUAGE GADTs              #-}
 {-# LANGUAGE KindSignatures     #-}
@@ -72,24 +73,14 @@ module Stack.Build.Target
     , UnresolvedComponent (..)
     ) where
 
-import           Control.Applicative
-import           Control.Monad (forM)
-import           Control.Monad.IO.Unlift
-import           Control.Monad.Logger
-import           Data.Either (partitionEithers)
-import           Data.Foldable
-import           Data.Map (Map)
+import           Stack.Prelude
 import qualified Data.Map as Map
-import           Data.Maybe (mapMaybe, isJust, catMaybes)
-import           Data.Set (Set)
 import qualified Data.Set as Set
-import           Data.Text (Text)
 import qualified Data.Text as T
 import           Distribution.PackageDescription (GenericPackageDescription, package, packageDescription)
 import           Path
 import           Path.Extra (rejectMissingDir)
 import           Path.IO
-import           Prelude hiding (concat, concatMap) -- Fix redundant import warnings
 import           Stack.Config (getLocalPackages)
 import           Stack.Fetch (withCabalLoader)
 import           Stack.Package
@@ -457,12 +448,13 @@ combineResolveResults results = do
 
     let m0 = Map.unionsWith (++) $ map (\rr -> Map.singleton (rrName rr) [rr]) results
         (errs, ms) = partitionEithers $ flip map (Map.toList m0) $ \(name, rrs) ->
+            let mcomps = map rrComponent rrs in
             -- Confirm that there is either exactly 1 with no component, or
             -- that all rrs are components
-            case map rrComponent rrs of
+            case rrs of
                 [] -> assert False $ Left "Somehow got no rrComponent values, that can't happen"
-                [Nothing] -> Right $ Map.singleton name $ TargetAll $ rrPackageType $ head rrs
-                mcomps
+                [rr] | isNothing (rrComponent rr) -> Right $ Map.singleton name $ TargetAll $ rrPackageType rr
+                _
                   | all isJust mcomps -> Right $ Map.singleton name $ TargetComps $ Set.fromList $ catMaybes mcomps
                   | otherwise -> Left $ T.concat
                       [ "The package "

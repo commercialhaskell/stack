@@ -1,16 +1,13 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module Path.CheckInstall where
 
-import           Control.Monad (unless)
 import           Control.Monad.Extra (anyM, (&&^))
-import           Control.Monad.IO.Class
-import           Control.Monad.Logger
-import           Data.Foldable (forM_)
-import           Data.Text (Text)
 import qualified Data.Text as T
+import           Stack.Prelude
 import qualified System.Directory as D
 import qualified System.FilePath as FP
 

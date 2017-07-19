@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveDataTypeable #-} -- ghc < 7.10
@@ -33,12 +34,8 @@ module Stack.Setup
   ) where
 
 import qualified    Codec.Archive.Tar as Tar
-import              Control.Applicative
-import              Control.Concurrent.Async (Concurrently(..))
-import              Control.Monad (liftM, when, join, unless, guard)
-import              Control.Monad.IO.Unlift
+import              Control.Applicative (empty)
 import              Control.Monad.Logger
-import              Control.Monad.Reader (MonadReader, ReaderT (..))
 import              Control.Monad.State (get, put, modify)
 import "cryptonite" Crypto.Hash (SHA1(..))
 import              Data.Aeson.Extended
@@ -46,31 +43,21 @@ import qualified    Data.ByteString as S
 import qualified    Data.ByteString.Char8 as S8
 import qualified    Data.ByteString.Lazy as LBS
 import              Data.Char (isSpace)
-import              Data.Conduit (Conduit, (=$), await, yield, awaitForever, (.|))
+import              Data.Conduit (Conduit, (=$), await, yield, awaitForever)
 import              Data.Conduit.Lazy (lazyConsume)
 import              Data.Conduit.Lift (evalStateC)
 import qualified    Data.Conduit.List as CL
 import              Data.Conduit.Zlib           (ungzip)
-import              Data.Either
-import              Data.Foldable hiding (concatMap, or, maximum)
+import              Data.Foldable (maximumBy)
 import qualified    Data.HashMap.Strict as HashMap
-import              Data.IORef
 import              Data.IORef.RunOnce (runOnce)
 import              Data.List hiding (concat, elem, maximumBy, any)
-import              Data.Map (Map)
 import qualified    Data.Map as Map
-import              Data.Maybe
-import              Data.Monoid
-import              Data.Ord (comparing)
-import              Data.Set (Set)
 import qualified    Data.Set as Set
-import              Data.String
-import              Data.Text (Text)
 import qualified    Data.Text as T
 import qualified    Data.Text.Encoding as T
 import qualified    Data.Text.Encoding.Error as T
 import              Data.Time.Clock (NominalDiffTime, diffUTCTime, getCurrentTime)
-import              Data.Typeable (Typeable)
 import qualified    Data.Yaml as Yaml
 import              Distribution.System (OS (Linux), Arch (..), Platform (..))
 import qualified    Distribution.System as Cabal
@@ -81,10 +68,9 @@ import              Network.HTTP.Download
 import              Path
 import              Path.CheckInstall (warnInstallSearchPathIssues)
 import              Path.Extra (toFilePathNoTrailingSep)
-import              Path.IO hiding (findExecutable)
+import              Path.IO hiding (findExecutable, withSystemTempDir)
 import qualified    Paths_stack as Meta
-import              Prelude hiding (concat, elem, any) -- Fix AMP warning
-import              Safe (headMay, readMay)
+import              Prelude (until)
 import              Stack.Build (build)
 import              Stack.Config (loadConfig)
 import              Stack.Constants (stackProgName)
@@ -92,6 +78,7 @@ import              Stack.Constants.Config (distRelativeDir)
 import              Stack.Exec (defaultEnvSettings)
 import              Stack.Fetch
 import              Stack.GhcPkg (createDatabase, getCabalPkgVer, getGlobalDB, mkGhcPackagePath)
+import              Stack.Prelude
 import              Stack.PrettyPrint
 import              Stack.Setup.Installed
 import              Stack.Snapshot (loadSnapshot)
@@ -103,7 +90,6 @@ import              Stack.Types.Docker
 import              Stack.Types.PackageIdentifier
 import              Stack.Types.PackageName
 import              Stack.Types.StackT
-import              Stack.Types.StringError
 import              Stack.Types.Version
 import qualified    System.Directory as D
 import              System.Environment (getExecutablePath)
@@ -567,7 +553,7 @@ getGhcBuild menv = do
                 eldconfigOut <- tryProcessStdout Nothing sbinEnv "ldconfig" ["-p"]
                 egccErrOut <- tryProcessStderrStdout Nothing menv "gcc" ["-v"]
                 let firstWords = case eldconfigOut of
-                        Right ldconfigOut -> mapMaybe (headMay . T.words) $
+                        Right ldconfigOut -> mapMaybe (listToMaybe . T.words) $
                             T.lines $ T.decodeUtf8With T.lenientDecode ldconfigOut
                         Left _ -> []
                     checkLib lib
@@ -640,7 +626,7 @@ ensureDockerStackExe containerPlatform = do
     unless stackExeExists $ do
         $logInfo $ mconcat ["Downloading Docker-compatible ", T.pack stackProgName, " executable"]
         sri <- downloadStackReleaseInfo Nothing Nothing (Just (versionString stackVersion))
-        let platforms = preferredPlatforms (containerPlatform, PlatformVariantNone)
+        platforms <- runReaderT preferredPlatforms (containerPlatform, PlatformVariantNone)
         downloadStackExe platforms sri stackExeDir False (const $ return ())
     return stackExePath
 
@@ -680,7 +666,7 @@ doCabalInstall :: (StackM env m, HasConfig env, HasGHCVariant env)
                -> Version
                -> m ()
 doCabalInstall menv wc installed version = do
-    withRunIO $ \run -> withSystemTempDir "stack-cabal-upgrade" $ \tmpdir -> run $ do
+    withSystemTempDir "stack-cabal-upgrade" $ \tmpdir -> do
         $logInfo $ T.concat
             [ "Installing Cabal-"
             , T.pack $ versionString version
@@ -727,7 +713,7 @@ getSystemCompiler menv wc = do
             eres <- tryProcessStdout Nothing menv exeName ["--info"]
             let minfo = do
                     Right bs <- Just eres
-                    pairs_ <- readMay $ S8.unpack bs :: Maybe [(String, String)]
+                    pairs_ <- readMaybe $ S8.unpack bs :: Maybe [(String, String)]
                     version <- lookup "Project version" pairs_ >>= parseVersionFromString
                     arch <- lookup "Target platform" pairs_ >>= simpleParse . takeWhile (/= '-')
                     return (version, arch)
@@ -1338,7 +1324,7 @@ withUnpackedTarball7z name si archiveFile archiveType msrcDir destDir = do
     run7z <- setup7z si
     let tmpName = toFilePathNoTrailingSep (dirname destDir) ++ "-tmp"
     ensureDir (parent destDir)
-    withRunIO $ \run -> withTempDir (parent destDir) tmpName $ \tmpDir -> run $ do
+    withRunInIO $ \run -> withTempDir (parent destDir) tmpName $ \tmpDir -> run $ do
         liftIO $ ignoringAbsence (removeDirRecur destDir)
         run7z (parent archiveFile) archiveFile
         run7z tmpDir tarFile
@@ -1430,8 +1416,8 @@ chattyDownload label downloadInfo path = do
             , drLengthCheck = mtotalSize
             , drRetryPolicy = drRetryPolicyDefault
             }
-    runInBase <- askRunIO
-    x <- verifiedDownload dReq path (chattyDownloadProgress runInBase)
+    run <- askRunInIO
+    x <- verifiedDownload dReq path (chattyDownloadProgress run)
     if x
         then $logStickyDone ("Downloaded " <> label <> ".")
         else $logStickyDone "Already downloaded."
@@ -1517,9 +1503,9 @@ sanityCheck :: (MonadUnliftIO m, MonadLogger m)
             => EnvOverride
             -> WhichCompiler
             -> m ()
-sanityCheck menv wc = withRunIO $ \run -> withSystemTempDir "stack-sanity-check" $ \dir -> run $ do
+sanityCheck menv wc = withSystemTempDir "stack-sanity-check" $ \dir -> do
     let fp = toFilePath $ dir </> $(mkRelFile "Main.hs")
-    liftIO $ writeFile fp $ unlines
+    liftIO $ S.writeFile fp $ T.encodeUtf8 $ T.pack $ unlines
         [ "import Distribution.Simple" -- ensure Cabal library is present
         , "main = putStrLn \"Hello World\""
         ]
@@ -1703,7 +1689,7 @@ downloadStackReleaseInfo morg mrepo mver = liftIO $ do
         then return $ StackReleaseInfo $ getResponseBody res
         else throwString $ "Could not get release information for Stack from: " ++ url
 
-preferredPlatforms :: (MonadReader env m, HasPlatform env)
+preferredPlatforms :: (MonadReader env m, HasPlatform env, MonadThrow m)
                    => m [(Bool, String)]
 preferredPlatforms = do
     Platform arch' os' <- view platformL
@@ -1713,13 +1699,13 @@ preferredPlatforms = do
         Cabal.Windows -> return (True, "windows")
         Cabal.OSX -> return (False, "osx")
         Cabal.FreeBSD -> return (False, "freebsd")
-        _ -> errorString $ "Binary upgrade not yet supported on OS: " ++ show os'
+        _ -> throwM $ stringException $ "Binary upgrade not yet supported on OS: " ++ show os'
     arch <-
       case arch' of
         I386 -> return "i386"
         X86_64 -> return "x86_64"
         Arm -> return "arm"
-        _ -> errorString $ "Binary upgrade not yet supported on arch: " ++ show arch'
+        _ -> throwM $ stringException $ "Binary upgrade not yet supported on arch: " ++ show arch'
     hasgmp4 <- return False -- FIXME import relevant code from Stack.Setup? checkLib $(mkRelFile "libgmp.so.3")
     let suffixes
           | hasgmp4 = ["-static", "-gmp4", ""]

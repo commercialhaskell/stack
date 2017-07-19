@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TemplateHaskell #-}
@@ -29,15 +30,10 @@ module Stack.PrettyPrint
     , enclose, squotes, dquotes, parens, angles, braces, brackets
     ) where
 
-import           Control.Monad.IO.Unlift
-import           Control.Monad.Logger
-import           Control.Monad.Reader
+import           Stack.Prelude
 import           Data.List (intersperse)
-import           Data.Monoid
-import           Data.String (fromString)
 import qualified Data.Text as T
 import           Language.Haskell.TH
-import           Path
 import           Stack.Types.Config
 import           Stack.Types.Internal
 import           Stack.Types.Package

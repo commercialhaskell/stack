@@ -1,9 +1,11 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE OverloadedStrings #-}
 -- | Test suite for "Stack.Solver"
 module Stack.SolverSpec where
 
 import           Data.Text (unpack)
+import           Stack.Prelude
 import           Stack.Types.FlagName
 import           Stack.Types.PackageName
 import           Stack.Types.Version

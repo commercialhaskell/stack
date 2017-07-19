@@ -1,15 +1,12 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE CPP, DeriveDataTypeable, RecordWildCards, TemplateHaskell #-}
 
 -- | Docker configuration
 module Stack.Config.Docker where
 
-import           Control.Monad (void)
-import           Control.Monad.IO.Unlift
+import           Stack.Prelude
 import           Data.List (find)
-import           Data.Maybe
-import           Data.Monoid.Extra
 import qualified Data.Text as T
-import           Data.Typeable (Typeable)
 import           Distribution.Version (simplifyVersionRange)
 import           Path
 import           Stack.Types.Version

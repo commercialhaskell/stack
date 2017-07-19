@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE CPP                   #-}
 {-# LANGUAGE ConstraintKinds       #-}
 {-# LANGUAGE FlexibleContexts      #-}
@@ -11,19 +12,14 @@ module Stack.Upgrade
     , upgradeOpts
     ) where
 
-import           Control.Monad               (unless, when)
-import           Control.Monad.IO.Unlift
-import           Control.Monad.Logger
-import           Data.Foldable               (forM_)
+import           Stack.Prelude               hiding (force)
 import qualified Data.HashMap.Strict         as HashMap
+import qualified Data.List
 import qualified Data.Map                    as Map
-import           Data.Maybe                  (isNothing)
-import           Data.Monoid.Extra
 import qualified Data.Text as T
 import           Lens.Micro                  (set)
 import           Options.Applicative
 import           Path
-import           Path.IO
 import qualified Paths_stack as Paths
 import           Stack.Build
 import           Stack.Config
@@ -37,7 +33,6 @@ import           Stack.Types.Version
 import           Stack.Types.Config
 import           Stack.Types.Resolver
 import           Stack.Types.StackT
-import           Stack.Types.StringError
 import           System.Exit                 (ExitCode (ExitSuccess))
 import           System.Process              (rawSystem, readProcess)
 import           System.Process.Run
@@ -189,7 +184,7 @@ sourceUpgrade
   -> SourceOpts
   -> m ()
 sourceUpgrade gConfigMonoid mresolver builtHash (SourceOpts gitRepo) =
-  withRunIO $ \run -> withSystemTempDir "stack-upgrade" $ \tmp -> run $ do
+  withSystemTempDir "stack-upgrade" $ \tmp -> do
     menv <- getMinimalEnvOverride
     mdir <- case gitRepo of
       Just (repo, branch) -> do
@@ -226,7 +221,7 @@ sourceUpgrade gConfigMonoid mresolver builtHash (SourceOpts gitRepo) =
 
         when (null versions) (throwString "No stack found in package indices")
 
-        let version = maximum versions
+        let version = Data.List.maximum versions
         if version <= fromCabalVersion Paths.version
             then do
                 $logInfo "Already at latest version, no upgrade required"

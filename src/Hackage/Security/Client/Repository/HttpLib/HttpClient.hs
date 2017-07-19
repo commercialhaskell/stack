@@ -1,3 +1,4 @@
+-- Explicitly disabling due to external code {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE FlexibleContexts    #-}
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE RankNTypes          #-}

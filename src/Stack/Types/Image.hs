@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -7,15 +8,10 @@
 module Stack.Types.Image where
 
 import Data.Aeson.Extended
-import Data.Monoid
-import Data.Map (Map)
 import qualified Data.Map as Map
-import Data.Maybe (maybeToList)
-import Data.Text (Text)
-import GHC.Generics (Generic)
 import Generics.Deriving.Monoid (mappenddefault, memptydefault)
 import Path
-import Prelude -- Fix redundant import warnings
+import Stack.Prelude
 
 -- | Image options. Currently only Docker image options.
 newtype ImageOpts = ImageOpts

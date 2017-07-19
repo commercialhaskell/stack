@@ -1,25 +1,20 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE RecordWildCards  #-}
 {-# LANGUAGE TemplateHaskell  #-}
 module Stack.ConfigSpec where
 
-import Control.Applicative
-import Control.Exception
-import Control.Monad.Logger
 import Data.Aeson.Extended
-import Data.Either
-import Data.Maybe
-import Data.Monoid
 import Data.Yaml
 import Path
-import Path.IO
-import Prelude -- Fix redundant import warnings
+import Path.IO hiding (withSystemTempDir)
 import Stack.Config
+import Stack.Prelude
 import Stack.Types.Config
 import Stack.Types.StackT
 import System.Directory
 import System.Environment
-import System.IO.Temp (withSystemTempDirectory)
+import System.IO (writeFile)
 import Test.Hspec
 
 sampleConfig :: String

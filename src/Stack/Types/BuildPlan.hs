@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE DataKinds                  #-}
 {-# LANGUAGE DeriveDataTypeable         #-}
 {-# LANGUAGE DeriveFunctor              #-}
@@ -31,30 +32,18 @@ module Stack.Types.BuildPlan
     , sdWantedCompilerVersion
     ) where
 
-import           Control.Applicative
-import           Control.DeepSeq (NFData)
 import           Data.Aeson (ToJSON (..), FromJSON (..), withText, object, (.=))
 import           Data.Aeson.Extended (WithJSONWarnings (..), (..:), (..:?), withObjectWarnings, noJSONWarnings, (..!=))
-import           Data.ByteString (ByteString)
-import           Data.Data
-import           Data.Hashable (Hashable)
-import           Data.Map (Map)
 import qualified Data.Map as Map
-import           Data.Monoid
-import           Data.Set (Set)
 import qualified Data.Set as Set
-import           Data.Store (Store)
 import           Data.Store.Version
 import           Data.Store.VersionTagged
-import           Data.String (IsString)
-import           Data.Text (Text)
 import qualified Data.Text as T
 import           Data.Text.Encoding (decodeUtf8, encodeUtf8)
 import qualified Distribution.ModuleName as C
 import qualified Distribution.Version as C
-import           GHC.Generics (Generic)
 import           Network.HTTP.Client (parseRequest)
-import           Prelude -- Fix AMP warning
+import           Stack.Prelude
 import           Stack.Types.Compiler
 import           Stack.Types.FlagName
 import           Stack.Types.GhcPkgId

@@ -1,16 +1,17 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module Stack.Options.DotParser where
 
 import           Data.Char (isSpace)
 import           Data.List.Split (splitOn)
-import           Data.Monoid.Extra
 import qualified Data.Set as Set
 import qualified Data.Text as T
 import           Options.Applicative
 import           Options.Applicative.Builder.Extra
 import           Stack.Dot
 import           Stack.Options.BuildParser
+import           Stack.Prelude
 
 -- | Parser for arguments to `stack dot`
 dotOptsParser :: Bool -> Parser DotOpts

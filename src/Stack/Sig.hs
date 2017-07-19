@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-|
 Module      : Stack.Sig
 Description : GPG Signatures for Stack

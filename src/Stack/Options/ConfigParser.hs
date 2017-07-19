@@ -1,8 +1,7 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 module Stack.Options.ConfigParser where
 
 import           Data.Char
-import           Data.Either.Combinators
-import           Data.Monoid.Extra
 import qualified Data.Set                          as Set
 import           Options.Applicative
 import           Options.Applicative.Builder.Extra
@@ -14,6 +13,7 @@ import           Stack.Options.GhcBuildParser
 import           Stack.Options.GhcVariantParser
 import           Stack.Options.NixParser
 import           Stack.Options.Utils
+import           Stack.Prelude
 import           Stack.Types.Config
 import qualified System.FilePath as FilePath
 

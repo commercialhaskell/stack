@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE ConstraintKinds       #-}
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
@@ -8,25 +9,18 @@ module Stack.Init
     , InitOpts (..)
     ) where
 
-import           Control.Applicative
-import           Control.Monad
-import           Control.Monad.IO.Unlift
-import           Control.Monad.Logger
+import           Stack.Prelude
 import qualified Data.ByteString.Builder         as B
 import qualified Data.ByteString.Char8           as BC
 import qualified Data.ByteString.Lazy            as L
 import qualified Data.Foldable                   as F
-import           Data.Function                   (on)
 import qualified Data.HashMap.Strict             as HM
 import qualified Data.IntMap                     as IntMap
 import           Data.List                       (intercalate, intersect,
                                                   maximumBy)
 import           Data.List.NonEmpty              (NonEmpty (..))
 import qualified Data.List.NonEmpty              as NonEmpty
-import           Data.Map                        (Map)
 import qualified Data.Map                        as Map
-import           Data.Maybe
-import           Data.Monoid
 import qualified Data.Text                       as T
 import qualified Data.Yaml                       as Yaml
 import qualified Distribution.PackageDescription as C
@@ -50,7 +44,6 @@ import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageName
 import           Stack.Types.Resolver
 import           Stack.Types.StackT              (StackM)
-import           Stack.Types.StringError
 import           Stack.Types.Version
 import qualified System.FilePath                 as FP
 
@@ -341,7 +334,7 @@ getSnapshots' = do
         $logError "    http://docs.haskellstack.org/en/stable/yaml_configuration/"
         $logError ""
         $logError $ "Exception was: " <> T.pack (show e)
-        errorString ""
+        throwString ""
 
 -- | Get the default resolver value
 getDefaultResolver
@@ -416,7 +409,10 @@ getWorkingResolverPlan whichCmd stackYaml initOpts bundle sd = do
                           $logWarn $ indent $ showItems ignored
                         else
                           $logWarn $ "*** Ignoring package: "
-                                 <> T.pack (packageNameString (head ignored))
+                                 <> T.pack (packageNameString
+                                                (case ignored of
+                                                    [] -> error "getWorkingResolverPlan.head"
+                                                    x:_ -> x))
 
                         go available
                     where
@@ -489,15 +485,15 @@ checkBundleResolver whichCmd stackYaml initOpts bundle sd = do
           platform <- view platformL
           menv <- getMinimalEnvOverride
           (compiler, _) <- getResolverConstraints menv Nothing stackYaml sd
-          let getGpd pkg = snd (fromJust (Map.lookup pkg bundle))
-              getFlags pkg = fromJust (Map.lookup pkg flags)
+          let getGpd pkg = snd (fromMaybe (error "findOneIndependent: getGpd") (Map.lookup pkg bundle))
+              getFlags pkg = fromMaybe (error "fromOneIndependent: getFlags") (Map.lookup pkg flags)
               deps pkg = gpdPackageDeps (getGpd pkg) compiler platform
                                         (getFlags pkg)
               allDeps = concatMap (Map.keys . deps) packages
               isIndependent pkg = pkg `notElem` allDeps
 
               -- prefer to reject packages in deeper directories
-              path pkg = fst (fromJust (Map.lookup pkg bundle))
+              path pkg = fst (fromMaybe (error "findOneIndependent: path") (Map.lookup pkg bundle))
               pathlen = length . FP.splitPath . toFilePath . path
               maxPathlen = maximumBy (compare `on` pathlen)
 

@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE OverloadedStrings #-}
 module Stack.Constants.Config
@@ -17,10 +18,7 @@ module Stack.Constants.Config
   , templatesDir
   ) where
 
-import Control.Monad (liftM)
-import Control.Monad.IO.Unlift
-import Control.Monad.Reader (MonadReader)
-import Lens.Micro (Getting)
+import Stack.Prelude
 import Stack.Constants
 import Stack.Types.Compiler
 import Stack.Types.Config

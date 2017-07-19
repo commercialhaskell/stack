@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE DeriveGeneric         #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TemplateHaskell       #-}
@@ -31,12 +32,7 @@ module Stack.Build.Cache
     , BuildCache(..)
     ) where
 
-import           Control.Applicative
-import           Control.DeepSeq (NFData)
-import           Control.Monad (liftM)
-import           Control.Monad.IO.Unlift
-import           Control.Monad.Logger (MonadLogger)
-import           Control.Monad.Reader (MonadReader)
+import           Stack.Prelude
 import           Crypto.Hash (hashWith, SHA256(..))
 import           Data.Binary (Binary (..))
 import qualified Data.Binary as Binary
@@ -45,22 +41,16 @@ import qualified Data.Binary.Tagged as BinaryTagged
 import qualified Data.ByteArray as Mem (convert)
 import qualified Data.ByteArray.Encoding as Mem (convertToBase, Base(Base16))
 import qualified Data.ByteString.Base64.URL as B64URL
+import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as S8
 import qualified Data.ByteString.Lazy as LBS
-import           Data.Foldable (forM_)
-import           Data.Map (Map)
 import qualified Data.Map as M
-import           Data.Maybe (fromMaybe, mapMaybe)
-import           Data.Set (Set)
 import qualified Data.Set as Set
 import qualified Data.Store as Store
 import           Data.Store.VersionTagged
-import           Data.Text (Text)
 import qualified Data.Text as T
-import           Data.Traversable (forM)
 import           Path
 import           Path.IO
-import           Prelude -- Fix redundant import warnings
 import           Stack.Constants.Config
 import           Stack.Types.Build
 import           Stack.Types.Compiler
@@ -109,7 +99,7 @@ markExeInstalled loc ident = do
     -- TODO consideration for the future: list all of the executables
     -- installed, and invalidate this file in getInstalledExes if they no
     -- longer exist
-    liftIO $ writeFile fp "Installed"
+    liftIO $ B.writeFile fp "Installed"
 
 -- | Mark the given executable as not installed
 markExeNotInstalled :: (MonadReader env m, HasEnvConfig env, MonadIO m, MonadThrow m)

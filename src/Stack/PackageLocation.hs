@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -16,19 +17,13 @@ module Stack.PackageLocation
 
 import qualified Codec.Archive.Tar as Tar
 import qualified Codec.Archive.Zip as Zip
-import Control.Arrow (second)
 import qualified Codec.Compression.GZip as GZip
-import Control.Monad
-import Control.Monad.IO.Unlift
-import Control.Monad.Logger
+import Stack.Prelude
 import           Crypto.Hash (hashWith, SHA256(..))
 import qualified Data.ByteArray as Mem (convert)
-import Data.ByteString (ByteString)
 import qualified Data.ByteString as S
 import qualified Data.ByteString.Base64.URL as B64URL
 import qualified Data.ByteString.Lazy as L
-import           Data.Monoid
-import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Text.Encoding (encodeUtf8, decodeUtf8)
 import Network.HTTP.Client (parseUrlThrow)
@@ -41,7 +36,6 @@ import Stack.Types.BuildPlan
 import Stack.Types.Config
 import Stack.Types.PackageIdentifier
 import qualified System.Directory as Dir
-import System.IO (withBinaryFile, IOMode (ReadMode))
 import System.Process.Read
 import System.Process.Run
 

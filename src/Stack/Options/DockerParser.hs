@@ -1,8 +1,8 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 module Stack.Options.DockerParser where
 
 import           Data.Char
 import           Data.List                         (intercalate)
-import           Data.Monoid.Extra
 import qualified Data.Text                         as T
 import           Distribution.Version              (anyVersion)
 import           Options.Applicative
@@ -11,6 +11,7 @@ import           Options.Applicative.Builder.Extra
 import           Stack.Constants
 import           Stack.Docker
 import qualified Stack.Docker                      as Docker
+import           Stack.Prelude
 import           Stack.Options.Utils
 import           Stack.Types.Version
 import           Stack.Types.Docker

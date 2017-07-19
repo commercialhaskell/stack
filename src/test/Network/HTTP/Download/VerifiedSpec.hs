@@ -1,15 +1,15 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 module Network.HTTP.Download.VerifiedSpec where
 
-import           Control.Applicative
 import           Control.Monad.Logger           (runStdoutLoggingT)
 import           Control.Retry                  (limitRetries)
 import           Crypto.Hash
-import           Data.Maybe
 import           Network.HTTP.Client.Conduit
 import           Network.HTTP.Download.Verified
 import           Path
-import           Path.IO
-import           Prelude -- Fix redundant imports warnings
+import           Path.IO hiding (withSystemTempDir)
+import           Stack.Prelude
+import           System.IO (writeFile, readFile)
 import           Test.Hspec
 
 -- TODO: share across test files

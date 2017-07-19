@@ -1,10 +1,11 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module Stack.Options.BenchParser where
 
-import           Data.Monoid.Extra
 import           Options.Applicative
 import           Options.Applicative.Builder.Extra
+import           Stack.Prelude
 import           Stack.Options.Utils
 import           Stack.Types.Config
 

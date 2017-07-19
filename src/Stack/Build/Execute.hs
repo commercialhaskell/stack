@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE CPP                   #-}
 {-# LANGUAGE ConstraintKinds       #-}
 {-# LANGUAGE DataKinds             #-}
@@ -21,13 +22,9 @@ module Stack.Build.Execute
     , ExcludeTHLoading(..)
     ) where
 
-import           Control.Applicative
-import           Control.Arrow ((&&&), second)
 import           Control.Concurrent.Execute
 import           Control.Concurrent.STM
-import           Control.Monad (liftM, when, unless, void)
-import           Control.Monad.IO.Unlift
-import           Control.Monad.Logger
+import           Stack.Prelude
 import           Crypto.Hash
 import           Data.Attoparsec.Text hiding (try)
 import qualified Data.ByteArray as Mem (convert)
@@ -38,29 +35,16 @@ import           Data.Conduit
 import qualified Data.Conduit.Binary as CB
 import qualified Data.Conduit.List as CL
 import qualified Data.Conduit.Text as CT
-import           Data.Either (isRight)
 import           Data.FileEmbed (embedFile, makeRelativeToProject)
-import           Data.Foldable (forM_, any)
-import           Data.Function
-import           Data.IORef
 import           Data.IORef.RunOnce (runOnce)
 import           Data.List hiding (any)
-import           Data.Map.Strict (Map)
 import qualified Data.Map.Strict as M
 import qualified Data.Map.Strict as Map
-import           Data.Maybe
-import           Data.Maybe.Extra (forMaybeM)
-import           Data.Monoid
-import           Data.Set (Set)
 import qualified Data.Set as Set
 import           Data.Streaming.Process hiding (callProcess, env)
-import           Data.String
-import           Data.Text (Text)
 import qualified Data.Text as T
 import           Data.Text.Encoding (decodeUtf8, encodeUtf8)
-import           Data.Text.Extra (stripCR)
 import           Data.Time.Clock (getCurrentTime)
-import           Data.Traversable (forM)
 import           Data.Tuple
 import qualified Distribution.PackageDescription as C
 import qualified Distribution.Simple.Build.Macros as C
@@ -71,8 +55,7 @@ import           Language.Haskell.TH as TH (location)
 import           Path
 import           Path.CheckInstall
 import           Path.Extra (toFilePathNoTrailingSep, rejectMissingFile)
-import           Path.IO hiding (findExecutable, makeAbsolute)
-import           Prelude hiding (FilePath, writeFile, any)
+import           Path.IO hiding (findExecutable, makeAbsolute, withSystemTempDir)
 import           Stack.Build.Cache
 import           Stack.Build.Haddock
 import           Stack.Build.Installed
@@ -347,8 +330,7 @@ withExecuteEnv :: forall env m a. (StackM env m, HasEnvConfig env)
                -> (ExecuteEnv m -> m a)
                -> m a
 withExecuteEnv menv bopts boptsCli baseConfigOpts locals globalPackages snapshotPackages localPackages inner =
-    withRunIO $ \run ->
-    withSystemTempDir stackProgName $ \tmpdir -> run $ do
+    withSystemTempDir stackProgName $ \tmpdir -> do
         configLock <- liftIO $ newMVar ()
         installLock <- liftIO $ newMVar ()
         idMap <- liftIO $ newTVarIO Map.empty
@@ -603,9 +585,9 @@ executePlan' installedMap0 targets plan ee@ExecuteEnv {..} = do
     liftIO $ atomically $ modifyTVar' eeLocalDumpPkgs $ \initMap ->
         foldl' (flip Map.delete) initMap $ Map.keys (planUnregisterLocal plan)
 
-    runInBase <- askRunIO
+    run <- askRunInIO
 
-    let actions = concatMap (toActions installedMap' runInBase ee) $ Map.elems $ Map.mergeWithKey
+    let actions = concatMap (toActions installedMap' run ee) $ Map.elems $ Map.mergeWithKey
             (\_ b f -> Just (Just b, Just f))
             (fmap (\b -> (Just b, Nothing)))
             (fmap (\f -> (Nothing, Just f)))
@@ -627,9 +609,9 @@ executePlan' installedMap0 targets plan ee@ExecuteEnv {..} = do
         let total = length actions
             loop prev
                 | prev == total =
-                    runInBase $ $logStickyDone ("Completed " <> T.pack (show total) <> " action(s).")
+                    run $ $logStickyDone ("Completed " <> T.pack (show total) <> " action(s).")
                 | otherwise = do
-                    when terminal $ runInBase $
+                    when terminal $ run $
                         $logSticky ("Progress: " <> T.pack (show prev) <> "/" <> T.pack (show total))
                     done <- atomically $ do
                         done <- readTVar doneVar

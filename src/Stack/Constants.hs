@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE OverloadedStrings #-}
 
@@ -29,13 +30,10 @@ module Stack.Constants
     )
     where
 
-import           Control.Monad.Reader
 import           Data.Char (toUpper)
-import           Data.HashSet (HashSet)
 import qualified Data.HashSet as HashSet
-import           Data.Text (Text)
 import           Path as FL
-import           Prelude
+import           Stack.Prelude
 import           Stack.Types.Compiler
 import           Stack.Types.PackageName
 

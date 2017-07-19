@@ -1,8 +1,9 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 module Stack.Options.CleanParser where
 
-import           Data.Monoid.Extra
 import           Options.Applicative
 import           Stack.Clean                       (CleanOpts (..))
+import           Stack.Prelude
 import           Stack.Types.PackageName
 
 -- | Command-line parser for the clean command.

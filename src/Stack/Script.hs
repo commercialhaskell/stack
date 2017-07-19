@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE CPP               #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell   #-}
@@ -5,18 +6,11 @@ module Stack.Script
     ( scriptCmd
     ) where
 
-import           Control.Monad              (unless, forM, void)
-import           Control.Monad.IO.Unlift
-import           Control.Monad.Logger
-import           Data.ByteString            (ByteString)
+import           Stack.Prelude
 import qualified Data.ByteString.Char8      as S8
 import qualified Data.Conduit.List          as CL
-import           Data.Foldable              (fold)
 import           Data.List.Split            (splitWhen)
 import qualified Data.Map.Strict            as Map
-import           Data.Maybe                 (fromMaybe, mapMaybe)
-import           Data.Monoid
-import           Data.Set                   (Set)
 import qualified Data.Set                   as Set
 import qualified Data.Text                  as T
 import           Path
@@ -29,9 +23,8 @@ import           Stack.Runners
 import           Stack.Types.BuildPlan
 import           Stack.Types.Compiler
 import           Stack.Types.Config
+import           Stack.Types.Internal       (Env)
 import           Stack.Types.PackageName
-import           Stack.Types.StackT
-import           Stack.Types.StringError
 import           System.FilePath            (dropExtension, replaceExtension)
 import           System.Process.Read
 
@@ -140,7 +133,7 @@ isWindows = False
 getPackagesFromModuleInfo
   :: ModuleInfo
   -> FilePath -- ^ script filename
-  -> StackT EnvConfig IO (Set PackageName)
+  -> StackT (Env EnvConfig) IO (Set PackageName)
 getPackagesFromModuleInfo mi scriptFP = do
     (pns1, mns) <- liftIO $ parseImports <$> S8.readFile scriptFP
     pns2 <-
@@ -232,11 +225,11 @@ toModuleInfo ls =
 
 parseImports :: ByteString -> (Set PackageName, Set ModuleName)
 parseImports =
-    fold . mapMaybe (parseLine . stripCR) . S8.lines
+    fold . mapMaybe (parseLine . stripCR') . S8.lines
   where
     -- Remove any carriage return character present at the end, to
     -- support Windows-style line endings (CRLF)
-    stripCR bs
+    stripCR' bs
       | S8.null bs = bs
       | S8.last bs == '\r' = S8.init bs
       | otherwise = bs

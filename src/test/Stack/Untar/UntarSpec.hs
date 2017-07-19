@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
@@ -10,6 +11,7 @@ import Path
 import Path.IO (removeDirRecur)
 import qualified System.FilePath as FP
 import Stack.Fetch (untar)
+import Stack.Prelude
 import Test.Hspec
 
 spec :: Spec

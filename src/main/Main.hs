@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveDataTypeable #-}
@@ -15,11 +16,10 @@ module Main (main) where
 #ifndef HIDE_DEP_VERSIONS
 import qualified Build_stack
 #endif
-import           Control.Monad hiding (mapM, forM)
-import           Control.Monad.IO.Unlift
-import           Control.Monad.Logger
+import           Stack.Prelude
+import           Control.Monad.Logger (runNoLoggingT)
 import           Control.Monad.Reader (local)
-import           Control.Monad.Trans.Either (EitherT)
+import           Control.Monad.Trans.Except (ExceptT)
 import           Control.Monad.Writer.Lazy (Writer)
 import           Data.Attoparsec.Args (parseArgs, EscapingMode (Escaping))
 import           Data.Attoparsec.Interpreter (getInterpreterArgs)
@@ -27,12 +27,7 @@ import qualified Data.ByteString.Lazy as L
 import           Data.IORef.RunOnce (runOnce)
 import           Data.List
 import qualified Data.Map.Strict as Map
-import           Data.Maybe
-import           Data.Monoid
-import           Data.Text (Text)
 import qualified Data.Text as T
-import           Data.Traversable
-import           Data.Typeable (Typeable)
 import           Data.Version (showVersion)
 import           System.Process.Read
 #ifdef USE_GIT_INFO
@@ -53,7 +48,6 @@ import           Options.Applicative.Types (ParserHelp(..))
 import           Path
 import           Path.IO
 import qualified Paths_stack as Meta
-import           Prelude hiding (pi, mapM)
 import           Stack.Build
 import           Stack.Clean (CleanOpts, clean)
 import           Stack.Config
@@ -98,19 +92,19 @@ import           Stack.SetupCmd
 import qualified Stack.Sig as Sig
 import           Stack.Snapshot (loadResolver)
 import           Stack.Solver (solveExtraDeps)
+import           Stack.Types.Internal (Env)
 import           Stack.Types.Version
 import           Stack.Types.Config
 import           Stack.Types.Compiler
 import           Stack.Types.Nix
 import           Stack.Types.StackT
-import           Stack.Types.StringError
 import           Stack.Upgrade
 import qualified Stack.Upload as Upload
 import qualified System.Directory as D
 import           System.Environment (getProgName, getArgs, withArgs)
 import           System.Exit
 import           System.FilePath (pathSeparator)
-import           System.IO (hIsTerminalDevice, stderr, stdin, stdout, hSetBuffering, BufferMode(..), hPutStrLn, Handle, hGetEncoding, hSetEncoding)
+import           System.IO (hIsTerminalDevice, stderr, stdin, stdout, hSetBuffering, BufferMode(..), hPutStrLn, hGetEncoding, hSetEncoding)
 
 -- | Change the character encoding of the given Handle to transliterate
 -- on unsupported characters instead of throwing an exception
@@ -471,7 +465,7 @@ commandLineHandler currentDir progName isInterpreter = complicatedOptions
     globalFooter = "Run 'stack --help' for global options that apply to all subcommands."
 
 type AddCommand =
-    EitherT (GlobalOpts -> IO ()) (Writer (Mod CommandFields (GlobalOpts -> IO (), GlobalOptsMonoid))) ()
+    ExceptT (GlobalOpts -> IO ()) (Writer (Mod CommandFields (GlobalOpts -> IO (), GlobalOptsMonoid))) ()
 
 -- | fall-through to external executables in `git` style if they exist
 -- (i.e. `stack something` looks for `stack-something` before
@@ -898,7 +892,7 @@ listDependenciesCmd :: ListDepsOpts -> GlobalOpts -> IO ()
 listDependenciesCmd opts go = withBuildConfigDot (listDepsDotOpts opts) go $ listDependencies opts
 
 -- Plumbing for --test and --bench flags
-withBuildConfigDot :: DotOpts -> GlobalOpts -> StackT EnvConfig IO () -> IO ()
+withBuildConfigDot :: DotOpts -> GlobalOpts -> StackT (Env EnvConfig) IO () -> IO ()
 withBuildConfigDot opts go f = withBuildConfig go' f
   where
     go' =

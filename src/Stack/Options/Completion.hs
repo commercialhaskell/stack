@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TupleSections #-}
@@ -9,7 +10,6 @@ module Stack.Options.Completion
     , projectExeCompleter
     ) where
 
-import           Control.Monad.Logger (LogLevel (LevelOther))
 import           Data.Char (isSpace)
 import           Data.List (isPrefixOf)
 import           Data.List.Extra (nubOrd)
@@ -23,9 +23,11 @@ import           Options.Applicative.Builder.Extra
 import           Stack.Config (getLocalPackages)
 import           Stack.Options.GlobalParser (globalOptsFromMonoid)
 import           Stack.Runners (loadConfigWithOpts)
+import           Stack.Prelude hiding (lift)
 import           Stack.Setup
 import           Stack.Types.Config
 import           Stack.Types.FlagName
+import           Stack.Types.Internal (Env)
 import           Stack.Types.Package
 import           Stack.Types.PackageName
 import           Stack.Types.StackT
@@ -49,7 +51,7 @@ ghcOptsCompleter = mkCompleter $ \inputRaw -> return $
 -- changes to optparse-applicative.
 
 buildConfigCompleter
-    :: (String -> StackT EnvConfig IO [String])
+    :: (String -> StackT (Env EnvConfig) IO [String])
     -> Completer
 buildConfigCompleter inner = mkCompleter $ \inputRaw -> do
     let input = unescapeBashArg inputRaw

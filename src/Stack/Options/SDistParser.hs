@@ -1,8 +1,9 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 module Stack.Options.SDistParser where
 
-import           Data.Monoid
 import           Options.Applicative
 import           Options.Applicative.Builder.Extra
+import           Stack.Prelude
 import           Stack.SDist
 import           Stack.Options.HpcReportParser (pvpBoundsOption)
 

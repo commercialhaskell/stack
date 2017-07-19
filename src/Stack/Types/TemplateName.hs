@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -7,13 +8,8 @@
 
 module Stack.Types.TemplateName where
 
-import           Control.Error.Safe (justErr)
-import           Control.Applicative
 import           Data.Aeson.Extended (FromJSON, withText, parseJSON)
 import           Data.Aeson.Types (typeMismatch)
-import           Data.Foldable (asum)
-import           Data.Monoid
-import           Data.Text (Text)
 import qualified Data.Text as T
 import           Data.Yaml (Value(Object), (.:?))
 import           Language.Haskell.TH
@@ -21,8 +17,7 @@ import           Network.HTTP.Client (parseRequest)
 import qualified Options.Applicative as O
 import           Path
 import           Path.Internal
-import           Prelude
-import           Stack.Types.StringError
+import           Stack.Prelude
 
 -- | A template name.
 data TemplateName = TemplateName !Text !TemplatePath
@@ -80,7 +75,7 @@ parseTemplateNameFromString fname =
         Nothing -> parseValidFile (T.pack fname) (fname <> ".hsfiles") fname
         Just prefix -> parseValidFile prefix fname fname
   where
-    parseValidFile prefix hsf orig = justErr expected
+    parseValidFile prefix hsf orig = maybe (Left expected) Right
                                            $ asum (validParses prefix hsf orig)
     validParses prefix hsf orig =
         -- NOTE: order is important
@@ -95,7 +90,7 @@ parseTemplateNameFromString fname =
 mkTemplateName :: String -> Q Exp
 mkTemplateName s =
     case parseTemplateNameFromString s of
-        Left{} -> errorString ("Invalid template name: " ++ show s)
+        Left{} -> runIO $ throwString ("Invalid template name: " ++ show s)
         Right (TemplateName (T.unpack -> prefix) p) ->
             [|TemplateName (T.pack prefix) $(pn)|]
             where pn =

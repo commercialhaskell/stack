@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 -- | Simple interface to complicated program arguments.
 --
 -- This is a "fork" of the @optparse-simple@ package that has some workarounds for
@@ -12,14 +13,13 @@ module Options.Applicative.Complicated
   , complicatedParser
   ) where
 
-import           Control.Monad.Trans.Class (lift)
-import           Control.Monad.Trans.Either
+import           Control.Monad.Trans.Except
 import           Control.Monad.Trans.Writer
-import           Data.Monoid
 import           Data.Version
 import           Options.Applicative
 import           Options.Applicative.Types
 import           Options.Applicative.Builder.Internal
+import           Stack.Prelude
 import           System.Environment
 
 -- | Generate and execute a complicated options parser.
@@ -42,7 +42,7 @@ complicatedOptions
   -> Maybe (ParserFailure ParserHelp -> [String] -> IO (a,(b,a)))
   -- ^ optional handler for parser failure; 'handleParseResult' is called by
   -- default
-  -> EitherT b (Writer (Mod CommandFields (b,a))) ()
+  -> ExceptT b (Writer (Mod CommandFields (b,a))) ()
   -- ^ commands (use 'addCommand')
   -> IO (a,b)
 complicatedOptions numericVersion versionString numericHpackVersion h pd footerStr commonParser mOnFailure commandParser =
@@ -82,7 +82,7 @@ addCommand :: String   -- ^ command string
            -> (a -> b) -- ^ constructor to wrap up command in common data type
            -> Parser c -- ^ common parser
            -> Parser a -- ^ command parser
-           -> EitherT b (Writer (Mod CommandFields (b,c))) ()
+           -> ExceptT b (Writer (Mod CommandFields (b,c))) ()
 addCommand cmd title footerStr constr =
   addCommand' cmd title footerStr (\a c -> (constr a,c))
 
@@ -97,9 +97,9 @@ addSubCommands
   -- ^ footer of command help
   -> Parser c
   -- ^ common parser
-  -> EitherT b (Writer (Mod CommandFields (b,c))) ()
+  -> ExceptT b (Writer (Mod CommandFields (b,c))) ()
   -- ^ sub-commands (use 'addCommand')
-  -> EitherT b (Writer (Mod CommandFields (b,c))) ()
+  -> ExceptT b (Writer (Mod CommandFields (b,c))) ()
 addSubCommands cmd title footerStr commonParser commandParser =
   addCommand' cmd
               title
@@ -115,7 +115,7 @@ addCommand' :: String   -- ^ command string
             -> (a -> c -> (b,c)) -- ^ constructor to wrap up command in common data type
             -> Parser c -- ^ common parser
             -> Parser a -- ^ command parser
-            -> EitherT b (Writer (Mod CommandFields (b,c))) ()
+            -> ExceptT b (Writer (Mod CommandFields (b,c))) ()
 addCommand' cmd title footerStr constr commonParser inner =
   lift (tell (command cmd
                       (info (constr <$> inner <*> commonParser)
@@ -128,13 +128,13 @@ complicatedParser
   -- ^ metavar for the sub-command
   -> Parser a
   -- ^ common settings
-  -> EitherT b (Writer (Mod CommandFields (b,a))) ()
+  -> ExceptT b (Writer (Mod CommandFields (b,a))) ()
   -- ^ commands (use 'addCommand')
   -> Parser (a,(b,a))
 complicatedParser commandMetavar commonParser commandParser =
    (,) <$>
    commonParser <*>
-   case runWriter (runEitherT commandParser) of
+   case runWriter (runExceptT commandParser) of
      (Right (),d) -> hsubparser' commandMetavar d
      (Left b,_) -> pure (b,mempty)
 

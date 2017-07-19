@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE KindSignatures #-}
@@ -21,15 +22,9 @@ module System.Process.Run
     )
     where
 
-import           Control.Monad (liftM)
-import           Control.Monad.IO.Unlift
-import           Control.Monad.Logger (MonadLogger, logError)
+import           Stack.Prelude
 import           Data.Conduit.Process hiding (callProcess)
-import           Data.Foldable (forM_)
-import           Data.Text (Text)
 import qualified Data.Text as T
-import           Path (Dir, Abs, Path, toFilePath)
-import           Prelude -- Fix AMP warning
 import           System.Exit (exitWith, ExitCode (..))
 import           System.IO
 import qualified System.Process

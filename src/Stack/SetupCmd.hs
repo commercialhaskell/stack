@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
@@ -15,13 +16,12 @@ module Stack.SetupCmd
 import           Control.Applicative
 import           Control.Monad.Logger
 import           Control.Monad.Reader
-import           Data.Monoid
 import qualified Data.Text as T
 import qualified Options.Applicative as OA
 import qualified Options.Applicative.Builder.Extra as OA
 import qualified Options.Applicative.Types as OA
 import           Path
-import           Prelude -- silence redundant import warnings
+import           Stack.Prelude
 import           Stack.Setup
 import           Stack.Types.Compiler
 import           Stack.Types.Config

@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE DeriveDataTypeable #-}
@@ -18,26 +19,17 @@ module Stack.New
     , listTemplates)
     where
 
-import           Control.Monad
-import           Control.Monad.IO.Unlift
-import           Control.Monad.Logger
+import           Stack.Prelude
 import           Control.Monad.Trans.Writer.Strict
 import           Data.Aeson
 import           Data.Aeson.Types
 import qualified Data.ByteString as SB
 import qualified Data.ByteString.Lazy as LB
 import           Data.Conduit
-import           Data.Foldable (asum)
 import qualified Data.HashMap.Strict as HM
 import           Data.List
-import           Data.Map.Strict (Map)
 import qualified Data.Map.Strict as M
-import           Data.Maybe (fromMaybe)
-import           Data.Maybe.Extra (mapMaybeM)
-import           Data.Monoid
-import           Data.Set (Set)
 import qualified Data.Set as S
-import           Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import qualified Data.Text.Encoding.Error as T (lenientDecode)
@@ -45,13 +37,11 @@ import qualified Data.Text.IO as T
 import qualified Data.Text.Lazy as LT
 import           Data.Time.Calendar
 import           Data.Time.Clock
-import           Data.Typeable
 import qualified Data.Yaml as Yaml
 import           Network.HTTP.Download
 import           Network.HTTP.Simple
 import           Path
 import           Path.IO
-import           Prelude
 import           Stack.Constants
 import           Stack.Constants.Config
 import           Stack.Types.Config
@@ -306,7 +296,7 @@ getTemplateInfo = do
   resp <- catch (liftM Right $ httpLbs req) (\(ex :: HttpException) -> return . Left $ "Failed to download template info. The HTTP error was: " <> show ex)
   case resp >>= is200 of
     Left err -> do
-      liftIO . putStrLn $ err
+      $logInfo $ T.pack err
       return M.empty
     Right resp' ->
       case Yaml.decodeEither (LB.toStrict $ getResponseBody resp') :: Either String Object of

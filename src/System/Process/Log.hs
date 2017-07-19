@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE OverloadedStrings #-}
 
@@ -9,12 +10,9 @@ module System.Process.Log
     ,showProcessArgDebug)
     where
 
-import           Control.Monad.IO.Class
-import           Control.Monad.Logger
-import           Data.Monoid
-import           Data.Text (Text)
 import qualified Data.Text as T
 import           Language.Haskell.TH
+import           Stack.Prelude
 import qualified System.Clock as Clock
 import           System.Process (CreateProcess(..), CmdSpec(..))
 

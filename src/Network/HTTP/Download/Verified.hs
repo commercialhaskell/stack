@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE CPP                   #-}
 {-# LANGUAGE DeriveDataTypeable    #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
@@ -28,35 +29,27 @@ import qualified    Data.Conduit.List as CL
 import qualified    Data.Text as Text
 import qualified    Data.Text.Encoding as Text
 
-import              Control.Applicative
 import              Control.Monad
-import              Control.Monad.Catch (Handler (..))
-import              Control.Monad.IO.Unlift hiding (Handler (..)) -- FIXME when safe-exceptions uses exceptions's Handler, we can get rid of this and the dependency on exceptions
-import              Control.Monad.Logger (logDebug, MonadLogger)
+import              Control.Monad.Catch (Handler (..)) -- would be nice if retry exported this itself
+import              Stack.Prelude hiding (Handler (..))
 import              Control.Retry (recovering,limitRetries,RetryPolicy,constantDelay)
 import              Crypto.Hash
 import              Crypto.Hash.Conduit (sinkHash)
 import              Data.ByteArray as Mem (convert)
 import              Data.ByteArray.Encoding as Mem (convertToBase, Base(Base16))
-import              Data.ByteString (ByteString)
 import              Data.ByteString.Char8 (readInteger)
 import              Data.Conduit
 import              Data.Conduit.Binary (sourceHandle, sinkHandle)
-import              Data.Foldable (traverse_,for_)
-import              Data.Monoid
-import              Data.String
 import              Data.Text.Encoding (decodeUtf8With)
 import              Data.Text.Encoding.Error (lenientDecode)
-import              Data.Typeable (Typeable)
 import              GHC.IO.Exception (IOException(..),IOErrorType(..))
 import              Network.HTTP.Client (getUri, path)
 import              Network.HTTP.Simple (Request, HttpException, httpSink, getResponseHeaders)
 import              Network.HTTP.Types.Header (hContentLength, hContentMD5)
 import              Path
-import              Prelude -- Fix AMP warning
 import              System.Directory
 import qualified    System.FilePath as FP ((<.>))
-import              System.IO
+import              System.IO (hFileSize)
 
 -- | A request together with some checks to perform.
 data DownloadRequest = DownloadRequest
@@ -197,7 +190,7 @@ recoveringHttp retryPolicy =
     helper $ recovering retryPolicy handlers
 #endif
   where
-    helper wrapper action = withRunIO $ \run -> wrapper (run action)
+    helper wrapper action = withRunInIO $ \run -> wrapper (run action)
 
     handlers = [const $ Handler alwaysRetryHttp,const $ Handler retrySomeIO]
 
@@ -263,7 +256,7 @@ verifiedDownload DownloadRequest{..} destpath progressSink = do
           `catch` \(_ :: VerifyFileException) -> return False)
           `catch` \(_ :: VerifiedDownloadException) -> return False
 
-    checkExpectations = bracket (openFile fp ReadMode) hClose $ \h -> do
+    checkExpectations = withBinaryFile fp ReadMode $ \h -> do
         for_ drLengthCheck $ checkFileSizeExpectations h
         sourceHandle h $$ getZipSink (hashChecksToZipSink drRequest drHashChecks)
 
