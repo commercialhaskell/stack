@@ -76,11 +76,10 @@ import           Stack.Types.BuildPlan
 import           Stack.Types.Compiler
 import           Stack.Types.Config
 import           Stack.Types.GhcPkgId
-import           Stack.Types.Internal
 import           Stack.Types.Package
 import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageName
-import           Stack.Types.StackT
+import           Stack.Types.Runner
 import           Stack.Types.Version
 import qualified System.Directory as D
 import           System.Environment (getExecutablePath)

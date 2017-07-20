@@ -25,7 +25,6 @@ import           Stack.Constants.Config
 import           Stack.PrettyPrint
 import           Stack.Types.Config
 import           Stack.Types.Image
-import           Stack.Types.StackT
 import           System.Process.Run
 
 -- | Stages the executables & additional content in a staging

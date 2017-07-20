@@ -27,10 +27,8 @@ import           Stack.Prelude hiding (lift)
 import           Stack.Setup
 import           Stack.Types.Config
 import           Stack.Types.FlagName
-import           Stack.Types.Internal (Env)
 import           Stack.Types.Package
 import           Stack.Types.PackageName
-import           Stack.Types.StackT
 import           System.Process (readProcess)
 import           Language.Haskell.TH.Syntax (runIO, lift)
 
@@ -51,7 +49,7 @@ ghcOptsCompleter = mkCompleter $ \inputRaw -> return $
 -- changes to optparse-applicative.
 
 buildConfigCompleter
-    :: (String -> StackT (Env EnvConfig) IO [String])
+    :: (String -> StackT EnvConfig IO [String])
     -> Completer
 buildConfigCompleter inner = mkCompleter $ \inputRaw -> do
     let input = unescapeBashArg inputRaw
@@ -61,12 +59,10 @@ buildConfigCompleter inner = mkCompleter $ \inputRaw -> do
         _ -> do
             let go = (globalOptsFromMonoid False mempty)
                     { globalLogLevel = LevelOther "silent" }
-            lc <- loadConfigWithOpts go
-            bconfig <- runStackTGlobal () go $
-                lcLoadBuildConfig lc (globalCompiler go)
-            envConfig <-
-                runStackTGlobal bconfig go (setupEnv Nothing)
-            runStackTGlobal envConfig go (inner input)
+            loadConfigWithOpts go $ \lc -> do
+              bconfig <- liftIO $ lcLoadBuildConfig lc (globalCompiler go)
+              envConfig <- runStackT bconfig (setupEnv Nothing)
+              runStackT envConfig (inner input)
 
 targetCompleter :: Completer
 targetCompleter = buildConfigCompleter $ \input -> do

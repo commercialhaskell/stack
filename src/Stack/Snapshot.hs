@@ -65,7 +65,6 @@ import           Stack.Types.Config
 import           Stack.Types.Urls
 import           Stack.Types.Compiler
 import           Stack.Types.Resolver
-import           Stack.Types.StackT
 import qualified System.Directory as Dir
 import           System.Process.Read (EnvOverride)
 

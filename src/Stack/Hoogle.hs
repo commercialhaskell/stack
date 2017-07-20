@@ -18,7 +18,6 @@ import qualified Stack.Build
 import           Stack.Fetch
 import           Stack.Runners
 import           Stack.Types.Config
-import           Stack.Types.Internal (Env)
 import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageName
 import           Stack.Types.Version
@@ -30,7 +29,7 @@ import           System.Process.Run
 hoogleCmd :: ([String],Bool,Bool) -> GlobalOpts -> IO ()
 hoogleCmd (args,setup,rebuild) go = withBuildConfig go pathToHaddocks
   where
-    pathToHaddocks :: StackT (Env EnvConfig) IO ()
+    pathToHaddocks :: StackT EnvConfig IO ()
     pathToHaddocks = do
         hoogleIsInPath <- checkHoogleInPath
         if hoogleIsInPath
@@ -46,7 +45,7 @@ hoogleCmd (args,setup,rebuild) go = withBuildConfig go pathToHaddocks
                         $logError
                             "Hoogle isn't installed or is too old. Not installing it due to --no-setup."
                         bail
-    haddocksToDb :: StackT (Env EnvConfig) IO ()
+    haddocksToDb :: StackT EnvConfig IO ()
     haddocksToDb = do
         databaseExists <- checkDatabaseExists
         if databaseExists && not rebuild
@@ -66,12 +65,12 @@ hoogleCmd (args,setup,rebuild) go = withBuildConfig go pathToHaddocks
                          $logError
                              "No Hoogle database. Not building one due to --no-setup"
                          bail
-    generateDb :: StackT (Env EnvConfig) IO ()
+    generateDb :: StackT EnvConfig IO ()
     generateDb = do
         do dir <- hoogleRoot
            createDirIfMissing True dir
            runHoogle ["generate", "--local"]
-    buildHaddocks :: StackT (Env EnvConfig) IO ()
+    buildHaddocks :: StackT EnvConfig IO ()
     buildHaddocks =
         liftIO
             (catch
@@ -87,7 +86,7 @@ hoogleCmd (args,setup,rebuild) go = withBuildConfig go pathToHaddocks
                                 defaultBuildOptsCLI))
                  (\(_ :: ExitCode) ->
                        return ()))
-    installHoogle :: StackT (Env EnvConfig) IO ()
+    installHoogle :: StackT EnvConfig IO ()
     installHoogle = do
         let hooglePackageName = $(mkPackageName "hoogle")
             hoogleMinVersion = $(mkVersion "5.0")
@@ -148,7 +147,7 @@ hoogleCmd (args,setup,rebuild) go = withBuildConfig go pathToHaddocks
                        case e of
                            ExitSuccess -> resetExeCache menv
                            _ -> throwIO e))
-    runHoogle :: [String] -> StackT (Env EnvConfig) IO ()
+    runHoogle :: [String] -> StackT EnvConfig IO ()
     runHoogle hoogleArgs = do
         config <- view configL
         menv <- liftIO $ configEnvOverride config envSettings
@@ -162,7 +161,7 @@ hoogleCmd (args,setup,rebuild) go = withBuildConfig go pathToHaddocks
              , cmdCommandLineArguments = hoogleArgs ++ databaseArg
              }
             Nothing
-    bail :: StackT (Env EnvConfig) IO ()
+    bail :: StackT EnvConfig IO ()
     bail = liftIO (exitWith (ExitFailure (-1)))
     checkDatabaseExists = do
         path <- hoogleDatabasePath

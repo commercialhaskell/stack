@@ -32,7 +32,6 @@ import           Stack.Types.PackageName
 import           Stack.Types.Version
 import           Stack.Types.Config
 import           Stack.Types.Resolver
-import           Stack.Types.StackT
 import           System.Exit                 (ExitCode (ExitSuccess))
 import           System.Process              (rawSystem, readProcess)
 import           System.Process.Run
@@ -240,11 +239,11 @@ sourceUpgrade gConfigMonoid mresolver builtHash (SourceOpts gitRepo) =
             gConfigMonoid
             mresolver
             (SYLOverride $ dir </> $(mkRelFile "stack.yaml"))
-        bconfig <- lcLoadBuildConfig lc Nothing
-        envConfig1 <- runInnerStackT bconfig $ setupEnv $ Just $
+        bconfig <- liftIO $ lcLoadBuildConfig lc Nothing
+        envConfig1 <- runStackT bconfig $ setupEnv $ Just $
             "Try rerunning with --install-ghc to install the correct GHC into " <>
             T.pack (toFilePath (configLocalPrograms (view configL bconfig)))
-        runInnerStackT (set (buildOptsL.buildOptsInstallExesL) True envConfig1) $
+        runStackT (set (buildOptsL.buildOptsInstallExesL) True envConfig1) $
             build (const $ return ()) Nothing defaultBuildOptsCLI
                 { boptsCLITargets = ["stack"]
                 }

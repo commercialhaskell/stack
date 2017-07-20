@@ -29,18 +29,17 @@ import qualified Stack.Nix as Nix
 import           Stack.Setup
 import           Stack.Types.Compiler (CompilerVersion, CVType (..))
 import           Stack.Types.Config
-import           Stack.Types.Internal
-import           Stack.Types.StackT
+import           Stack.Types.Runner
 import           System.Environment (getEnvironment)
 import           System.IO
 import           System.FileLock
 
+-- FIXME it seems wrong that we call lcLoadBuildConfig multiple times
 loadCompilerVersion :: GlobalOpts
-                    -> LoadConfig (StackT (Env ()) IO)
+                    -> LoadConfig
                     -> IO (CompilerVersion 'CVWanted)
 loadCompilerVersion go lc = do
-    bconfig <- runStackTGlobal () go $
-      lcLoadBuildConfig lc (globalCompiler go)
+    bconfig <- lcLoadBuildConfig lc (globalCompiler go)
     return $ view wantedCompilerVersionL bconfig
 
 -- | Enforce mutual exclusion of every action running via this
@@ -85,16 +84,15 @@ withUserFileLock go@GlobalOpts{} dir act = do
 
 withConfigAndLock
     :: GlobalOpts
-    -> StackT (Env Config) IO ()
+    -> StackT Config IO ()
     -> IO ()
-withConfigAndLock go@GlobalOpts{..} inner = do
-    lc <- loadConfigWithOpts go
+withConfigAndLock go@GlobalOpts{..} inner = loadConfigWithOpts go $ \lc -> do
     withUserFileLock go (configStackRoot $ lcConfig lc) $ \lk ->
-        runStackTGlobal (lcConfig lc) go $
+        runStackT (lcConfig lc) $
             Docker.reexecWithOptionalContainer
                 (lcProjectRoot lc)
                 Nothing
-                (runStackTGlobal (lcConfig lc) go inner)
+                (runStackT (lcConfig lc) inner)
                 Nothing
                 (Just $ munlockFile lk)
 
@@ -102,22 +100,22 @@ withConfigAndLock go@GlobalOpts{..} inner = do
 -- loaded due to $PWD.
 withGlobalConfigAndLock
     :: GlobalOpts
-    -> StackT (Env Config) IO ()
+    -> StackT Config IO ()
     -> IO ()
-withGlobalConfigAndLock go@GlobalOpts{..} inner = do
-    lc <- runStackTGlobal () go $
+withGlobalConfigAndLock go@GlobalOpts{..} inner = withRunnerGlobal go $ \runner -> do
+    lc <- runStackT runner $
         loadConfigMaybeProject
             globalConfigMonoid
             Nothing
             LCSNoProject
     withUserFileLock go (configStackRoot $ lcConfig lc) $ \_lk ->
-        runStackTGlobal (lcConfig lc) go inner
+        runStackT (lcConfig lc) inner
 
 -- For now the non-locking version just unlocks immediately.
 -- That is, there's still a serialization point.
 withBuildConfig
     :: GlobalOpts
-    -> StackT (Env EnvConfig) IO ()
+    -> StackT EnvConfig IO ()
     -> IO ()
 withBuildConfig go inner =
     withBuildConfigAndLock go (\lk -> do munlockFile lk
@@ -125,14 +123,14 @@ withBuildConfig go inner =
 
 withBuildConfigAndLock
     :: GlobalOpts
-    -> (Maybe FileLock -> StackT (Env EnvConfig) IO ())
+    -> (Maybe FileLock -> StackT EnvConfig IO ())
     -> IO ()
 withBuildConfigAndLock go inner =
     withBuildConfigExt False go Nothing inner Nothing
 
 withBuildConfigAndLockNoDocker
     :: GlobalOpts
-    -> (Maybe FileLock -> StackT (Env EnvConfig) IO ())
+    -> (Maybe FileLock -> StackT EnvConfig IO ())
     -> IO ()
 withBuildConfigAndLockNoDocker go inner =
     withBuildConfigExt True go Nothing inner Nothing
@@ -140,23 +138,21 @@ withBuildConfigAndLockNoDocker go inner =
 withBuildConfigExt
     :: Bool
     -> GlobalOpts
-    -> Maybe (StackT (Env Config) IO ())
+    -> Maybe (StackT Config IO ())
     -- ^ Action to perform before the build.  This will be run on the host
     -- OS even if Docker is enabled for builds.  The build config is not
     -- available in this action, since that would require build tools to be
     -- installed on the host OS.
-    -> (Maybe FileLock -> StackT (Env EnvConfig) IO ())
+    -> (Maybe FileLock -> StackT EnvConfig IO ())
     -- ^ Action that uses the build config.  If Docker is enabled for builds,
     -- this will be run in a Docker container.
-    -> Maybe (StackT (Env Config) IO ())
+    -> Maybe (StackT Config IO ())
     -- ^ Action to perform after the build.  This will be run on the host
     -- OS even if Docker is enabled for builds.  The build config is not
     -- available in this action, since that would require build tools to be
     -- installed on the host OS.
     -> IO ()
-withBuildConfigExt skipDocker go@GlobalOpts{..} mbefore inner mafter = do
-    lc <- loadConfigWithOpts go
-
+withBuildConfigExt skipDocker go@GlobalOpts{..} mbefore inner mafter = loadConfigWithOpts go $ \lc -> do
     withUserFileLock go (configStackRoot $ lcConfig lc) $ \lk0 -> do
       -- A local bit of state for communication between callbacks:
       curLk <- newIORef lk0
@@ -173,28 +169,21 @@ withBuildConfigExt skipDocker go@GlobalOpts{..} mbefore inner mafter = do
                  inner lk2
 
       let inner'' lk = do
-              bconfig <- runStackTGlobal () go $
-                  lcLoadBuildConfig lc globalCompiler
-              envConfig <-
-                 runStackTGlobal
-                     bconfig go
-                     (setupEnv Nothing)
-              runStackTGlobal
-                  envConfig
-                  go
-                  (inner' lk)
+              bconfig <- lcLoadBuildConfig lc globalCompiler
+              envConfig <- runStackT bconfig (setupEnv Nothing)
+              runStackT envConfig (inner' lk)
 
       let getCompilerVersion = loadCompilerVersion go lc
       if skipDocker
-          then runStackTGlobal (lcConfig lc) go $ do
+          then runStackT (lcConfig lc) $ do
               forM_ mbefore id
               liftIO $ inner'' lk0
               forM_ mafter id
-          else runStackTGlobal (lcConfig lc) go $
+          else runStackT (lcConfig lc) $
               Docker.reexecWithOptionalContainer
                        (lcProjectRoot lc)
                        mbefore
-                       (runStackTGlobal (lcConfig lc) go $
+                       (runStackT (lcConfig lc) $
                           Nix.reexecWithOptionalShell (lcProjectRoot lc) getCompilerVersion (inner'' lk0))
                        mafter
                        (Just $ liftIO $
@@ -203,10 +192,13 @@ withBuildConfigExt skipDocker go@GlobalOpts{..} mbefore inner mafter = do
 
 -- | Load the configuration. Convenience function used
 -- throughout this module.
-loadConfigWithOpts :: GlobalOpts -> IO (LoadConfig (StackT (Env ()) IO))
-loadConfigWithOpts go@GlobalOpts{..} = do
+loadConfigWithOpts
+  :: GlobalOpts
+  -> (LoadConfig -> IO a)
+  -> IO a
+loadConfigWithOpts go@GlobalOpts{..} inner = withRunnerGlobal go $ \runner -> do
     mstackYaml <- forM globalStackYaml resolveFile'
-    runStackTGlobal () go $ do
+    runStackT runner $ do
         lc <- loadConfig globalConfigMonoid globalResolver mstackYaml
         -- If we have been relaunched in a Docker container, perform in-container initialization
         -- (switch UID, etc.).  We do this after first loading the configuration since it must
@@ -214,21 +206,29 @@ loadConfigWithOpts go@GlobalOpts{..} = do
         case globalDockerEntrypoint of
             Just de -> Docker.entrypoint (lcConfig lc) de
             Nothing -> return ()
-        return lc
+        liftIO $ inner lc
+
+withRunnerGlobal :: GlobalOpts -> (Runner -> IO a) -> IO a
+withRunnerGlobal GlobalOpts{..} = withRunner
+  globalLogLevel
+  globalTimeInLog
+  globalTerminal
+  globalColorWhen
+  (isJust globalReExecVersion)
 
 withMiniConfigAndLock
     :: GlobalOpts
-    -> StackT (Env MiniConfig) IO ()
+    -> StackT MiniConfig IO ()
     -> IO ()
-withMiniConfigAndLock go@GlobalOpts{..} inner = do
+withMiniConfigAndLock go@GlobalOpts{..} inner = withRunnerGlobal go $ \runner -> do
     miniConfig <-
-        runStackTGlobal () go $
+        runStackT runner $
         (loadMiniConfig . lcConfig) <$>
         loadConfigMaybeProject
           globalConfigMonoid
           globalResolver
           LCSNoProject
-    runStackTGlobal miniConfig go inner
+    runStackT miniConfig inner
 
 -- | Unlock a lock file, if the value is Just
 munlockFile :: MonadIO m => Maybe FileLock -> m ()

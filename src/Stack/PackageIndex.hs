@@ -55,7 +55,6 @@ import           Stack.Types.Config
 import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageIndex
 import           Stack.Types.PackageName
-import           Stack.Types.StackT
 import           Stack.Types.Version
 import qualified System.Directory as D
 import           System.FilePath ((<.>))

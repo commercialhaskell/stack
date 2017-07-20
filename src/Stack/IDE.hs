@@ -20,7 +20,6 @@ import           Stack.Prelude
 import           Stack.Types.Config
 import           Stack.Types.Package
 import           Stack.Types.PackageName
-import           Stack.Types.StackT
 
 -- | List the packages inside the current project.
 listPackages :: (StackM env m, HasEnvConfig env) => m ()

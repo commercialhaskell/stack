@@ -40,7 +40,6 @@ import              Stack.Types.Config
 import              Stack.Types.FlagName
 import              Stack.Types.Package
 import              Stack.Types.PackageName
-import              Stack.Types.StackT
 import qualified    System.Directory as D
 import              System.FilePath (takeFileName)
 import              System.IO.Error (isDoesNotExistError)

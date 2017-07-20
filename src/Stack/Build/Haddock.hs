@@ -37,7 +37,6 @@ import           Stack.Types.GhcPkgId
 import           Stack.Types.Package
 import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageName
-import           Stack.Types.StackT (StackM)
 import qualified System.FilePath as FP
 import           System.IO.Error (isDoesNotExistError)
 import           System.Process.Read

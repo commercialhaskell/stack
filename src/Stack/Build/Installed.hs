@@ -33,7 +33,6 @@ import           Stack.Types.Package
 import           Stack.Types.PackageDump
 import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageName
-import           Stack.Types.StackT
 import           Stack.Types.Version
 import           System.Process.Read (EnvOverride)
 

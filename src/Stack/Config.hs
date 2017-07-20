@@ -85,13 +85,12 @@ import           Stack.Types.BuildPlan
 import           Stack.Types.Compiler
 import           Stack.Types.Config
 import           Stack.Types.Docker
-import           Stack.Types.Internal
 import           Stack.Types.Nix
 import           Stack.Types.PackageName (PackageName)
 import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageIndex (IndexType (ITHackageSecurity), HackageSecurity (..))
 import           Stack.Types.Resolver
-import           Stack.Types.StackT
+import           Stack.Types.Runner
 import           Stack.Types.Urls
 import           Stack.Types.Version
 import           System.Environment
@@ -212,7 +211,7 @@ getLatestResolver = do
 -- | Create a 'Config' value when we're not using any local
 -- configuration files (e.g., the script command)
 configNoLocalConfig
-    :: (MonadLogger m, MonadUnliftIO m, MonadThrow m)
+    :: (MonadLogger m, MonadUnliftIO m, MonadThrow m, MonadReader env m, HasRunner env)
     => Path Abs Dir -- ^ stack root
     -> Maybe AbstractResolver
     -> ConfigMonoid
@@ -230,7 +229,7 @@ configNoLocalConfig stackRoot (Just resolver) configMonoid = do
 
 -- Interprets ConfigMonoid options.
 configFromConfigMonoid
-    :: (MonadLogger m, MonadUnliftIO m, MonadThrow m)
+    :: (MonadLogger m, MonadUnliftIO m, MonadThrow m, MonadReader env m, HasRunner env)
     => Path Abs Dir -- ^ stack root, e.g. ~/.stack
     -> Path Abs File -- ^ user config file path, e.g. ~/.stack/config.yaml
     -> Bool -- ^ allow locals?
@@ -384,6 +383,8 @@ configFromConfigMonoid
 
      let configMaybeProject = mproject
 
+     configRunner <- view runnerL
+
      return Config {..}
 
 -- | Get the default location of the local programs directory.
@@ -411,7 +412,7 @@ getDefaultLocalProgramsBase configStackRoot configPlatform override =
       _ -> return defaultBase
 
 -- | An environment with a subset of BuildConfig used for setup.
-data MiniConfig = MiniConfig
+data MiniConfig = MiniConfig -- TODO do we really need a whole extra data type?
     { mcGHCVariant :: !GHCVariant
     , mcConfig :: !Config
     }
@@ -420,12 +421,20 @@ instance HasConfig MiniConfig where
 instance HasPlatform MiniConfig
 instance HasGHCVariant MiniConfig where
     ghcVariantL = lens mcGHCVariant (\x y -> x { mcGHCVariant = y })
+instance HasRunner MiniConfig where
+    runnerL = configL.runnerL
+instance HasLogFunc MiniConfig where
+    logFuncL = configL.logFuncL
 
 -- | Load the 'MiniConfig'.
 loadMiniConfig :: Config -> MiniConfig
-loadMiniConfig config =
-    let ghcVariant = fromMaybe GHCStandard (configGHCVariant0 config)
-     in MiniConfig ghcVariant config
+loadMiniConfig config = MiniConfig
+  { mcGHCVariant = configGHCVariantDefault config
+  , mcConfig = config
+  }
+
+configGHCVariantDefault :: Config -> GHCVariant -- FIXME why not just use this as the HasGHCVariant instance for Config?
+configGHCVariantDefault = fromMaybe GHCStandard . configGHCVariant0
 
 -- Load the configuration, using environment variables, and defaults as
 -- necessary.
@@ -437,7 +446,7 @@ loadConfigMaybeProject
     -- ^ Override resolver
     -> LocalConfigStatus (Project, Path Abs File, ConfigMonoid)
     -- ^ Project config to use, if any
-    -> m (LoadConfig m)
+    -> m LoadConfig
 loadConfigMaybeProject configArgs mresolver mproject = do
     (stackRoot, userOwnsStackRoot) <- determineStackRootAndOwnership configArgs
 
@@ -476,9 +485,11 @@ loadConfigMaybeProject configArgs mresolver mproject = do
         forM_ mprojectRoot $ \dir ->
             checkOwnership (dir </> configWorkDir config)
 
+    run <- askRunInIO
+
     return LoadConfig
         { lcConfig          = config
-        , lcLoadBuildConfig = loadBuildConfig mproject config mresolver
+        , lcLoadBuildConfig = run . loadBuildConfig mproject config mresolver
         , lcProjectRoot     =
             case mprojectRoot of
               LCSProject fp -> Just fp
@@ -496,7 +507,7 @@ loadConfig :: StackM env m
            -- ^ Override resolver
            -> StackYamlLoc (Path Abs File)
            -- ^ Override stack.yaml
-           -> m (LoadConfig m)
+           -> m LoadConfig
 loadConfig configArgs mresolver mstackYaml =
     loadProjectConfig mstackYaml >>= loadConfigMaybeProject configArgs mresolver
 
@@ -570,13 +581,13 @@ loadBuildConfig mproject config mresolver mcompiler = do
         case mresolver of
             Nothing -> return $ projectResolver project'
             Just aresolver ->
-                runReaderT (makeConcreteResolver (Just (parent stackYamlFP)) aresolver) miniConfig
+                runReaderT (makeConcreteResolver (Just (parent stackYamlFP)) aresolver) config
     let project = project'
             { projectResolver = resolver
             , projectCompiler = mcompiler <|> projectCompiler project'
             }
 
-    sd0 <- flip runReaderT miniConfig $ loadResolver resolver
+    sd0 <- flip runReaderT config $ loadResolver resolver
     let sd = maybe id setCompilerVersion (projectCompiler project) sd0
 
     extraPackageDBs <- mapM resolveDir' (projectExtraPackageDBs project)
@@ -584,7 +595,7 @@ loadBuildConfig mproject config mresolver mcompiler = do
     return BuildConfig
         { bcConfig = config
         , bcSnapshotDef = sd
-        , bcGHCVariant = view ghcVariantL miniConfig
+        , bcGHCVariant = configGHCVariantDefault config
         , bcPackages = projectPackages project
         , bcDependencies = projectDependencies project
         , bcExtraPackageDBs = extraPackageDBs
@@ -597,17 +608,15 @@ loadBuildConfig mproject config mresolver mcompiler = do
                 LCSNoConfig  -> False
         }
   where
-    miniConfig = loadMiniConfig config
-
     getEmptyProject :: m Project
     getEmptyProject = do
       r <- case mresolver of
             Just aresolver -> do
-                r' <- runReaderT (makeConcreteResolver Nothing aresolver) miniConfig
+                r' <- runReaderT (makeConcreteResolver Nothing aresolver) config
                 $logInfo ("Using resolver: " <> resolverRawName r' <> " specified on command line")
                 return r'
             Nothing -> do
-                r'' <- runReaderT getLatestResolver miniConfig
+                r'' <- runReaderT getLatestResolver config
                 $logInfo ("Using latest snapshot resolver: " <> resolverRawName r'')
                 return r''
       return Project

@@ -49,11 +49,10 @@ import           Stack.Constants
 import           Stack.Constants.Config
 import           Stack.Docker.GlobalDB
 import           Stack.Types.PackageIndex
+import           Stack.Types.Runner
 import           Stack.Types.Version
 import           Stack.Types.Config
 import           Stack.Types.Docker
-import           Stack.Types.Internal
-import           Stack.Types.StackT
 import           Stack.Setup (ensureDockerStackExe)
 import           System.Directory (canonicalizePath,getHomeDirectory)
 import           System.Environment (getEnv,getEnvironment,getProgName,getArgs,getExecutablePath)

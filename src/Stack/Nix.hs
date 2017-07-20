@@ -25,9 +25,8 @@ import           Stack.Exec (exec)
 import           Stack.Types.Config
 import           Stack.Types.Docker
 import           Stack.Types.Nix
+import           Stack.Types.Runner
 import           Stack.Types.Compiler
-import           Stack.Types.Internal
-import           Stack.Types.StackT
 import           System.Environment (getArgs,getExecutablePath,lookupEnv)
 import qualified System.FilePath  as F
 import           System.Process.Read (getEnvOverride)
