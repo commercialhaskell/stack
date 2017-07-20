@@ -73,10 +73,12 @@ before_install:
 
 install:
  - echo "$(ghc --version) [$(ghc --print-project-git-commit-id 2> /dev/null || echo '?')]"
+ # Note: we build store by itself below due to high memory usage
  - case "$BUILD" in
      style)
        stack --system-ghc --no-terminal install hlint;;
      stack)
+       stack --no-terminal build store;
        stack --no-terminal test --only-dependencies;;
      cabal)
        cabal --version;
