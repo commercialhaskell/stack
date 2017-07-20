@@ -114,7 +114,7 @@ instance Show GhciException where
 -- | Launch a GHCi session for the given local package targets with the
 -- given options and configure it with the load paths and extensions
 -- of those targets.
-ghci :: HasEnvConfig env => GhciOpts -> StackT env IO ()
+ghci :: HasEnvConfig env => GhciOpts -> RIO env ()
 ghci opts@GhciOpts{..} = do
     let buildOptsCLI = defaultBuildOptsCLI
             { boptsCLITargets = []
@@ -150,7 +150,7 @@ ghci opts@GhciOpts{..} = do
     -- Finally, do the invocation of ghci
     runGhci opts localTargets mainIsTargets pkgs (maybe [] snd mfileTargets)
 
-preprocessTargets :: HasRunner env => [Text] -> StackT env IO (Either [Path Abs File] [Text])
+preprocessTargets :: HasRunner env => [Text] -> RIO env (Either [Path Abs File] [Text])
 preprocessTargets rawTargets = do
     let (fileTargetsRaw, normalTargets) =
             partition (\t -> ".hs" `T.isSuffixOf` t || ".lhs" `T.isSuffixOf` t)
@@ -166,7 +166,7 @@ preprocessTargets rawTargets = do
         (False, _) -> return (Left fileTargets)
         _ -> return (Right normalTargets)
 
-parseMainIsTargets :: HasEnvConfig env => BuildOptsCLI -> Maybe Text -> StackT env IO (Maybe (Map PackageName Target))
+parseMainIsTargets :: HasEnvConfig env => BuildOptsCLI -> Maybe Text -> RIO env (Maybe (Map PackageName Target))
 parseMainIsTargets buildOptsCLI mtarget = forM mtarget $ \target -> do
      (_,_,targets) <- parseTargets AllowNoTargets buildOptsCLI
          { boptsCLITargets = [target] }
@@ -176,7 +176,7 @@ findFileTargets
     :: HasEnvConfig env
     => [LocalPackage]
     -> [Path Abs File]
-    -> StackT env IO (Map PackageName Target, Map PackageName (Set (Path Abs File)), [Path Abs File])
+    -> RIO env (Map PackageName Target, Map PackageName (Set (Path Abs File)), [Path Abs File])
 findFileTargets locals fileTargets = do
     filePackages <- forM locals $ \lp -> do
         (_,compFiles,_,_) <- getPackageFiles (packageFiles (lpPackage lp)) (lpCabalFile lp)
@@ -225,7 +225,7 @@ getAllLocalTargets
     -> Map PackageName Target
     -> Maybe (Map PackageName Target)
     -> SourceMap
-    -> StackT env IO [(PackageName, (Path Abs File, Target))]
+    -> RIO env [(PackageName, (Path Abs File, Target))]
 getAllLocalTargets GhciOpts{..} targets0 mainIsTargets sourceMap = do
     -- Use the 'mainIsTargets' as normal targets, for CLI concision. See
     -- #1845. This is a little subtle - we need to do the target parsing
@@ -261,7 +261,7 @@ getAllLocalTargets GhciOpts{..} targets0 mainIsTargets sourceMap = do
                     ]
             return (directlyWanted ++ extraLoadDeps)
 
-buildDepsAndInitialSteps :: HasEnvConfig env => GhciOpts -> [Text] -> StackT env IO ()
+buildDepsAndInitialSteps :: HasEnvConfig env => GhciOpts -> [Text] -> RIO env ()
 buildDepsAndInitialSteps GhciOpts{..} targets0 = do
     let targets = targets0 ++ map T.pack ghciAdditionalPackages
     -- If necessary, do the build, for local packagee targets, only do
@@ -292,7 +292,7 @@ runGhci
     -> Maybe (Map PackageName Target)
     -> [GhciPkgInfo]
     -> [Path Abs File]
-    -> StackT env IO ()
+    -> RIO env ()
 runGhci GhciOpts{..} targets mainIsTargets pkgs extraFiles = do
     config <- view configL
     wc <- view $ actualCompilerVersionL.whichCompilerL
@@ -412,7 +412,7 @@ figureOutMainFile
     -> Maybe (Map PackageName Target)
     -> [(PackageName, (Path Abs File, Target))]
     -> [GhciPkgInfo]
-    -> StackT env IO (Maybe (Path Abs File))
+    -> RIO env (Maybe (Path Abs File))
 figureOutMainFile bopts mainIsTargets targets0 packages = do
     case candidates of
         [] -> return Nothing
@@ -498,7 +498,7 @@ getGhciPkgInfos
     -> [PackageName]
     -> Maybe (Map PackageName (Set (Path Abs File)))
     -> [(PackageName, (Path Abs File, Target))]
-    -> StackT env IO [GhciPkgInfo]
+    -> RIO env [GhciPkgInfo]
 getGhciPkgInfos buildOptsCLI sourceMap addPkgs mfileTargets localTargets = do
     menv <- getMinimalEnvOverride
     (installedMap, _, _, _) <- getInstalled
@@ -525,7 +525,7 @@ makeGhciPkgInfo
     -> PackageName
     -> Path Abs File
     -> Target
-    -> StackT env IO GhciPkgInfo
+    -> RIO env GhciPkgInfo
 makeGhciPkgInfo buildOptsCLI sourceMap installedMap locals addPkgs mfileTargets name cabalfp target = do
     bopts <- view buildOptsL
     econfig <- view envConfigL

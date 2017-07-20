@@ -49,7 +49,7 @@ import              System.IO.Error (isDoesNotExistError)
 loadSourceMap :: HasEnvConfig env
               => NeedTargets
               -> BuildOptsCLI
-              -> StackT env IO ([LocalPackage], SourceMap)
+              -> RIO env ([LocalPackage], SourceMap)
 loadSourceMap needTargets boptsCli = do
     (_, _, locals, _, sourceMap) <- loadSourceMapFull needTargets boptsCli
     return (locals, sourceMap)
@@ -68,7 +68,7 @@ loadSourceMap needTargets boptsCli = do
 loadSourceMapFull :: HasEnvConfig env
                   => NeedTargets
                   -> BuildOptsCLI
-                  -> StackT env IO
+                  -> RIO env
                        ( Map PackageName Target
                        , LoadedSnapshot
                        , [LocalPackage]
@@ -164,7 +164,7 @@ loadLocalPackage
     => BuildOptsCLI
     -> Map PackageName Target
     -> (PackageName, LocalPackageView)
-    -> StackT env IO LocalPackage
+    -> RIO env LocalPackage
 loadLocalPackage boptsCli targets (name, lpv) = do
     let mtarget = Map.lookup name targets
     config  <- getPackageConfig boptsCli name (isJust mtarget) True
@@ -358,7 +358,7 @@ addUnlistedToBuildCache
     -> Package
     -> Path Abs File
     -> Map FilePath a
-    -> StackT env IO ([Map FilePath FileCacheInfo], [PackageWarning])
+    -> RIO env ([Map FilePath FileCacheInfo], [PackageWarning])
 addUnlistedToBuildCache preBuildTime pkg cabalFP buildCache = do
     (files,warnings) <- getPackageFilesSimple pkg cabalFP
     let newFiles =
@@ -381,7 +381,7 @@ addUnlistedToBuildCache preBuildTime pkg cabalFP buildCache = do
 -- | Gets list of Paths for files in a package
 getPackageFilesSimple
     :: HasEnvConfig env
-    => Package -> Path Abs File -> StackT env IO (Set (Path Abs File), [PackageWarning])
+    => Package -> Path Abs File -> RIO env (Set (Path Abs File), [PackageWarning])
 getPackageFilesSimple pkg cabalFP = do
     (_,compFiles,cabalFiles,warnings) <-
         getPackageFiles (packageFiles pkg) cabalFP

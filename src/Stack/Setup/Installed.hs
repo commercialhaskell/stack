@@ -110,7 +110,7 @@ getCompilerVersion menv wc =
     isValid c = c == '.' || ('0' <= c && c <= '9')
 
 -- | Binary directories for the given installed package
-extraDirs :: HasConfig env => Tool -> StackT env IO ExtraDirs
+extraDirs :: HasConfig env => Tool -> RIO env ExtraDirs
 extraDirs tool = do
     config <- view configL
     dir <- installDir (configLocalPrograms config) tool

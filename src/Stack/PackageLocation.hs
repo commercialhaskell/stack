@@ -46,7 +46,7 @@ resolveSinglePackageLocation
     => EnvOverride
     -> Path Abs Dir -- ^ project root
     -> PackageLocation FilePath
-    -> StackT env IO (Path Abs Dir)
+    -> RIO env (Path Abs Dir)
 resolveSinglePackageLocation _ projRoot (PLFilePath fp) = resolveDir projRoot fp
 resolveSinglePackageLocation _ projRoot (PLArchive (Archive url subdir msha)) = do
     workDir <- view workDirL
@@ -148,7 +148,7 @@ resolveMultiPackageLocation
     => EnvOverride
     -> Path Abs Dir -- ^ project root
     -> PackageLocation Subdirs
-    -> StackT env IO [(Path Abs Dir, PackageLocation FilePath)]
+    -> RIO env [(Path Abs Dir, PackageLocation FilePath)]
 resolveMultiPackageLocation x y (PLFilePath fp) = do
   dir <- resolveSinglePackageLocation x y (PLFilePath fp)
   return [(dir, PLFilePath fp)]
@@ -179,7 +179,7 @@ cloneRepo
     -> Text -- ^ URL
     -> Text -- ^ commit
     -> RepoType
-    -> StackT env IO (Path Abs Dir)
+    -> RIO env (Path Abs Dir)
 cloneRepo menv projRoot url commit repoType' = do
     workDir <- view workDirL
     let nameBeforeHashing = case repoType' of
@@ -234,7 +234,7 @@ loadSingleRawCabalFile
   -> EnvOverride
   -> Path Abs Dir -- ^ project root, used for checking out necessary files
   -> PackageLocationIndex FilePath
-  -> StackT env IO ByteString
+  -> RIO env ByteString
 -- Need special handling of PLIndex for efficiency (just read from the
 -- index tarball) and correctness (get the cabal file from the index,
 -- not the package tarball itself, yay Hackage revisions).
@@ -252,7 +252,7 @@ loadMultiRawCabalFilesIndex
   -> EnvOverride
   -> Path Abs Dir -- ^ project root, used for checking out necessary files
   -> PackageLocationIndex Subdirs
-  -> StackT env IO [(ByteString, PackageLocationIndex FilePath)]
+  -> RIO env [(ByteString, PackageLocationIndex FilePath)]
 -- Need special handling of PLIndex for efficiency (just read from the
 -- index tarball) and correctness (get the cabal file from the index,
 -- not the package tarball itself, yay Hackage revisions).
@@ -272,7 +272,7 @@ loadMultiRawCabalFiles
   => EnvOverride
   -> Path Abs Dir -- ^ project root, used for checking out necessary files
   -> PackageLocation Subdirs
-  -> StackT env IO [(ByteString, PackageLocation FilePath)]
+  -> RIO env [(ByteString, PackageLocation FilePath)]
 loadMultiRawCabalFiles menv root loc =
     resolveMultiPackageLocation menv root loc >>= mapM go
   where

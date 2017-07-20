@@ -72,7 +72,7 @@ build :: HasEnvConfig env
       => (Set (Path Abs File) -> IO ()) -- ^ callback after discovering all local files
       -> Maybe FileLock
       -> BuildOptsCLI
-      -> StackT env IO ()
+      -> RIO env ()
 build setLocalFiles mbuildLk boptsCli = fixCodePage $ do
     bopts <- view buildOptsL
     let profiling = boptsLibProfile bopts || boptsExeProfile bopts
@@ -147,7 +147,7 @@ justLocals =
     Map.elems .
     planTasks
 
-checkCabalVersion :: HasEnvConfig env => StackT env IO ()
+checkCabalVersion :: HasEnvConfig env => RIO env ()
 checkCabalVersion = do
     allowNewer <- view $ configL.to configAllowNewer
     cabalVer <- view cabalVersionL
@@ -273,8 +273,8 @@ mkBaseConfigOpts boptsCli = do
 
 -- | Provide a function for loading package information from the package index
 withLoadPackage :: HasEnvConfig env
-                => ((PackageLocationIndex FilePath -> Map FlagName Bool -> [Text] -> IO Package) -> StackT env IO a)
-                -> StackT env IO a
+                => ((PackageLocationIndex FilePath -> Map FlagName Bool -> [Text] -> IO Package) -> RIO env a)
+                -> RIO env a
 withLoadPackage inner = do
     econfig <- view envConfigL
     menv <- getMinimalEnvOverride
@@ -300,7 +300,7 @@ withLoadPackage inner = do
 
 -- | Set the code page for this process as necessary. Only applies to Windows.
 -- See: https://github.com/commercialhaskell/stack/issues/738
-fixCodePage :: HasEnvConfig env => StackT env IO a -> StackT env IO a
+fixCodePage :: HasEnvConfig env => RIO env a -> RIO env a
 #ifdef WINDOWS
 fixCodePage inner = do
     mcp <- view $ configL.to configModifyCodePage
@@ -349,7 +349,7 @@ fixCodePage = id
 -- | Query information about the build and print the result to stdout in YAML format.
 queryBuildInfo :: HasEnvConfig env
                => [Text] -- ^ selectors
-               -> StackT env IO ()
+               -> RIO env ()
 queryBuildInfo selectors0 =
         rawBuildInfo
     >>= select id selectors0
@@ -374,7 +374,7 @@ queryBuildInfo selectors0 =
         err msg = throwString $ msg ++ ": " ++ show (front [sel])
 
 -- | Get the raw build information object
-rawBuildInfo :: HasEnvConfig env => StackT env IO Value
+rawBuildInfo :: HasEnvConfig env => RIO env Value
 rawBuildInfo = do
     (locals, _sourceMap) <- loadSourceMap NeedTargets defaultBuildOptsCLI
     return $ object

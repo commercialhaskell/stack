@@ -206,7 +206,7 @@ instance Show SetupException where
 -- | Modify the environment variables (like PATH) appropriately, possibly doing installation too
 setupEnv :: (HasBuildConfig env, HasGHCVariant env)
          => Maybe Text -- ^ Message to give user when necessary GHC is not available
-         -> StackT env IO EnvConfig
+         -> RIO env EnvConfig
 setupEnv mResolveMissingGHC = do
     config <- view configL
     bconfig <- view buildConfigL
@@ -255,7 +255,7 @@ setupEnv mResolveMissingGHC = do
     let bcPath :: BuildConfig
         bcPath = set envOverrideL (const (return menv)) bc
 
-    ls <- runStackT bcPath $ loadSnapshot
+    ls <- runRIO bcPath $ loadSnapshot
       menv
       (Just compilerVer)
       (view projectRootL bc)
@@ -363,7 +363,7 @@ addIncludeLib (ExtraDirs _bins includes libs) config = config
 -- | Ensure compiler (ghc or ghcjs) is installed and provide the PATHs to add if necessary
 ensureCompiler :: (HasConfig env, HasGHCVariant env)
                => SetupOpts
-               -> StackT env IO (Maybe ExtraDirs, CompilerBuild, Bool)
+               -> RIO env (Maybe ExtraDirs, CompilerBuild, Bool)
 ensureCompiler sopts = do
     let wc = whichCompiler (soptsWantedCompiler sopts)
     when (getGhcVersion (soptsWantedCompiler sopts) < $(mkVersion "7.8")) $ do
@@ -513,7 +513,7 @@ ensureCompiler sopts = do
 
 -- | Determine which GHC build to use depending on which shared libraries are available
 -- on the system.
-getGhcBuild :: HasConfig env => EnvOverride -> StackT env IO CompilerBuild
+getGhcBuild :: HasConfig env => EnvOverride -> RIO env CompilerBuild
 getGhcBuild menv = do
 
     config <- view configL
@@ -610,7 +610,7 @@ getGhcBuild menv = do
         return (CompilerBuildSpecialized s)
 
 -- | Ensure Docker container-compatible 'stack' executable is downloaded
-ensureDockerStackExe :: HasConfig env => Platform -> StackT env IO (Path Abs File)
+ensureDockerStackExe :: HasConfig env => Platform -> RIO env (Path Abs File)
 ensureDockerStackExe containerPlatform = do
     config <- view configL
     containerPlatformDir <- runReaderT platformOnlyRelDir (containerPlatform,PlatformVariantNone)
@@ -631,7 +631,7 @@ upgradeCabal :: (HasConfig env, HasGHCVariant env)
              => EnvOverride
              -> WhichCompiler
              -> UpgradeTo
-             -> StackT env IO ()
+             -> RIO env ()
 upgradeCabal menv wc cabalVersion = do
     $logInfo "Manipulating the global Cabal is only for debugging purposes"
     let name = $(mkPackageName "Cabal")
@@ -660,7 +660,7 @@ doCabalInstall :: (HasConfig env, HasGHCVariant env)
                -> WhichCompiler
                -> Version
                -> Version
-               -> StackT env IO ()
+               -> RIO env ()
 doCabalInstall menv wc installed version = do
     withSystemTempDir "stack-cabal-upgrade" $ \tmpdir -> do
         $logInfo $ T.concat
@@ -781,8 +781,8 @@ downloadAndInstallTool :: HasRunner env
                        -> SetupInfo
                        -> DownloadInfo
                        -> Tool
-                       -> (SetupInfo -> Path Abs File -> ArchiveType -> Path Abs Dir -> Path Abs Dir -> StackT env IO ())
-                       -> StackT env IO Tool
+                       -> (SetupInfo -> Path Abs File -> ArchiveType -> Path Abs Dir -> Path Abs Dir -> RIO env ())
+                       -> RIO env Tool
 downloadAndInstallTool programsDir si downloadInfo tool installer = do
     ensureDir programsDir
     (file, at) <- downloadFromInfo programsDir downloadInfo tool
@@ -802,7 +802,7 @@ downloadAndInstallCompiler :: (HasConfig env, HasGHCVariant env)
                            -> CompilerVersion 'CVWanted
                            -> VersionCheck
                            -> Maybe String
-                           -> StackT env IO Tool
+                           -> RIO env Tool
 downloadAndInstallCompiler ghcBuild si wanted@GhcVersion{} versionCheck mbindistURL = do
     ghcVariant <- view ghcVariantL
     (selectedVersion, downloadInfo) <- case mbindistURL of
@@ -896,7 +896,7 @@ getOSKey platform =
 
 downloadFromInfo
     :: HasRunner env
-    => Path Abs Dir -> DownloadInfo -> Tool -> StackT env IO (Path Abs File, ArchiveType)
+    => Path Abs Dir -> DownloadInfo -> Tool -> RIO env (Path Abs File, ArchiveType)
 downloadFromInfo programsDir downloadInfo tool = do
     at <-
         case extension of
@@ -949,7 +949,7 @@ installGHCPosix :: HasConfig env
                 -> ArchiveType
                 -> Path Abs Dir
                 -> Path Abs Dir
-                -> StackT env IO ()
+                -> RIO env ()
 installGHCPosix version downloadInfo _ archiveFile archiveType tempDir destDir = do
     platform <- view platformL
     menv0 <- getMinimalEnvOverride
@@ -1022,7 +1022,7 @@ installGHCJS :: HasConfig env
              -> ArchiveType
              -> Path Abs Dir
              -> Path Abs Dir
-             -> StackT env IO ()
+             -> RIO env ()
 installGHCJS si archiveFile archiveType _tempDir destDir = do
     platform <- view platformL
     menv0 <- getMinimalEnvOverride
@@ -1081,11 +1081,11 @@ installGHCJS si archiveFile archiveType _tempDir destDir = do
     -- earlier.
     mwindowsInstallDir <- case platform of
         Platform _ Cabal.Windows ->
-            liftM Just $ runStackT envConfig' installationRootLocal
+            liftM Just $ runRIO envConfig' installationRootLocal
         _ -> return Nothing
 
     $logSticky "Installing GHCJS (this will take a long time) ..."
-    runStackT (set (buildOptsL.buildOptsInstallExesL) True $
+    runRIO (set (buildOptsL.buildOptsInstallExesL) True $
                set (buildOptsL.buildOptsHaddockL) False envConfig') $
         build (\_ -> return ()) Nothing defaultBuildOptsCLI
     -- Copy over *.options files needed on windows.
@@ -1099,7 +1099,7 @@ installGHCJS si archiveFile archiveType _tempDir destDir = do
 
 ensureGhcjsBooted :: HasConfig env
                   => EnvOverride -> CompilerVersion 'CVActual -> Bool -> [String]
-                  -> StackT env IO ()
+                  -> RIO env ()
 ensureGhcjsBooted menv cv shouldBoot bootOpts = do
     eres <- try $ sinkProcessStdout Nothing menv "ghcjs" [] (return ())
     case eres of
@@ -1134,7 +1134,7 @@ ensureGhcjsBooted menv cv shouldBoot bootOpts = do
         Left err -> throwM err
 
 bootGhcjs :: HasRunner env
-          => Version -> Path Abs File -> Path Abs Dir -> [String] -> StackT env IO ()
+          => Version -> Path Abs File -> Path Abs Dir -> [String] -> RIO env ()
 bootGhcjs ghcjsVersion stackYaml destDir bootOpts = do
     envConfig <- loadGhcjsEnvConfig stackYaml (destDir </> $(mkRelDir "bin"))
     menv <- liftIO $ configEnvOverride (view configL envConfig) defaultEnvSettings
@@ -1171,7 +1171,7 @@ bootGhcjs ghcjsVersion stackYaml destDir bootOpts = do
     menv' <- liftIO $ configEnvOverride (view configL envConfig) envSettings
     when shouldInstallCabal $ do
         $logInfo "Building a local copy of cabal-install from source."
-        runStackT envConfig $
+        runRIO envConfig $
             build (\_ -> return ())
                   Nothing
                   defaultBuildOptsCLI { boptsCLITargets = ["cabal-install"] }
@@ -1192,7 +1192,7 @@ bootGhcjs ghcjsVersion stackYaml destDir bootOpts = do
     $logStickyDone "GHCJS booted."
 
 loadGhcjsEnvConfig :: HasRunner env
-                   => Path Abs File -> Path b t -> StackT env IO EnvConfig
+                   => Path Abs File -> Path b t -> RIO env EnvConfig
 loadGhcjsEnvConfig stackYaml binPath = do
     lc <- loadConfig
         (mempty
@@ -1202,7 +1202,7 @@ loadGhcjsEnvConfig stackYaml binPath = do
         Nothing
         (SYLOverride stackYaml)
     bconfig <- liftIO $ lcLoadBuildConfig lc Nothing
-    runStackT bconfig $ setupEnv Nothing
+    runRIO bconfig $ setupEnv Nothing
 
 getCabalInstallVersion :: (MonadUnliftIO m, MonadLogger m)
                        => EnvOverride -> m (Maybe Version)
@@ -1253,7 +1253,7 @@ installGHCWindows :: HasConfig env
                   -> ArchiveType
                   -> Path Abs Dir
                   -> Path Abs Dir
-                  -> StackT env IO ()
+                  -> RIO env ()
 installGHCWindows version si archiveFile archiveType _tempDir destDir = do
     tarComponent <- parseRelDir $ "ghc-" ++ versionString version
     withUnpackedTarball7z "GHC" si archiveFile archiveType (Just tarComponent) destDir
@@ -1266,7 +1266,7 @@ installMsys2Windows :: HasConfig env
                   -> ArchiveType
                   -> Path Abs Dir
                   -> Path Abs Dir
-                  -> StackT env IO ()
+                  -> RIO env ()
 installMsys2Windows osKey si archiveFile archiveType _tempDir destDir = do
     exists <- liftIO $ D.doesDirectoryExist $ toFilePath destDir
     when exists $ liftIO (D.removeDirectoryRecursive $ toFilePath destDir) `catchIO` \e -> do
@@ -1306,7 +1306,7 @@ withUnpackedTarball7z :: HasConfig env
                       -> ArchiveType
                       -> Maybe (Path Rel Dir) -- ^ Name of directory expected in archive.  If Nothing, expects a single folder.
                       -> Path Abs Dir -- ^ Destination directory.
-                      -> StackT env IO ()
+                      -> RIO env ()
 withUnpackedTarball7z name si archiveFile archiveType msrcDir destDir = do
     suffix <-
         case archiveType of
@@ -1349,7 +1349,7 @@ expectSingleUnpackedDir archiveFile destDir = do
 -- Returned function takes an unpack directory and archive.
 setup7z :: (MonadIO n, MonadLogger n, HasConfig env)
         => SetupInfo
-        -> StackT env IO (Path Abs Dir -> Path Abs File -> n ())
+        -> RIO env (Path Abs Dir -> Path Abs File -> n ())
 setup7z si = do
     dir <- view $ configL.to configLocalPrograms
     ensureDir dir
@@ -1377,7 +1377,7 @@ chattyDownload :: HasRunner env
                => Text          -- ^ label
                -> DownloadInfo  -- ^ URL, content-length, and sha1
                -> Path Abs File -- ^ destination
-               -> StackT env IO ()
+               -> RIO env ()
 chattyDownload label downloadInfo path = do
     let url = downloadInfoUrl downloadInfo
     req <- parseUrlThrow $ T.unpack url

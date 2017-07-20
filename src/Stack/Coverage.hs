@@ -47,14 +47,14 @@ import           Trace.Hpc.Tix
 import           Web.Browser (openBrowser)
 
 -- | Invoked at the beginning of running with "--coverage"
-deleteHpcReports :: HasEnvConfig env => StackT env IO ()
+deleteHpcReports :: HasEnvConfig env => RIO env ()
 deleteHpcReports = do
     hpcDir <- hpcReportDir
     liftIO $ ignoringAbsence (removeDirRecur hpcDir)
 
 -- | Move a tix file into a sub-directory of the hpc report directory. Deletes the old one if one is
 -- present.
-updateTixFile :: HasEnvConfig env => PackageName -> Path Abs File -> String -> StackT env IO ()
+updateTixFile :: HasEnvConfig env => PackageName -> Path Abs File -> String -> RIO env ()
 updateTixFile pkgName tixSrc testName = do
     exists <- doesFileExist tixSrc
     when exists $ do
@@ -75,7 +75,7 @@ updateTixFile pkgName tixSrc testName = do
                 liftIO $ ignoringAbsence (removeFile tixSrc)
 
 -- | Get the directory used for hpc reports for the given pkgId.
-hpcPkgPath :: HasEnvConfig env => PackageName -> StackT env IO (Path Abs Dir)
+hpcPkgPath :: HasEnvConfig env => PackageName -> RIO env (Path Abs Dir)
 hpcPkgPath pkgName = do
     outputDir <- hpcReportDir
     pkgNameRel <- parseRelDir (packageNameString pkgName)
@@ -84,7 +84,7 @@ hpcPkgPath pkgName = do
 -- | Get the tix file location, given the name of the file (without extension), and the package
 -- identifier string.
 tixFilePath :: HasEnvConfig env
-            => PackageName -> String -> StackT env IO (Path Abs File)
+            => PackageName -> String -> RIO env (Path Abs File)
 tixFilePath pkgName testName = do
     pkgPath <- hpcPkgPath pkgName
     tixRel <- parseRelFile (testName ++ "/" ++ testName ++ ".tix")
@@ -92,7 +92,7 @@ tixFilePath pkgName testName = do
 
 -- | Generates the HTML coverage report and shows a textual coverage summary for a package.
 generateHpcReport :: HasEnvConfig env
-                  => Path Abs Dir -> Package -> [Text] -> StackT env IO ()
+                  => Path Abs Dir -> Package -> [Text] -> RIO env ()
 generateHpcReport pkgDir package tests = do
     compilerVersion <- view actualCompilerVersionL
     -- If we're using > GHC 7.10, the hpc 'include' parameter must specify a ghc package key. See
@@ -134,7 +134,7 @@ generateHpcReport pkgDir package tests = do
 
 generateHpcReportInternal :: HasEnvConfig env
                           => Path Abs File -> Path Abs Dir -> Text -> [String] -> [String]
-                          -> StackT env IO (Maybe (Path Abs File))
+                          -> RIO env (Maybe (Path Abs File))
 generateHpcReportInternal tixSrc reportDir report extraMarkupArgs extraReportArgs = do
     -- If a .tix file exists, move it to the HPC output directory and generate a report for it.
     tixFileExists <- doesFileExist tixSrc
@@ -209,7 +209,7 @@ data HpcReportOpts = HpcReportOpts
     } deriving (Show)
 
 generateHpcReportForTargets :: HasEnvConfig env
-                            => HpcReportOpts -> StackT env IO ()
+                            => HpcReportOpts -> RIO env ()
 generateHpcReportForTargets opts = do
     let (tixFiles, targetNames) = partition (".tix" `T.isSuffixOf`) (hroptsInputs opts)
     targetTixFiles <-
@@ -269,7 +269,7 @@ generateHpcReportForTargets opts = do
                 void $ liftIO $ openBrowser (toFilePath reportPath)
             else displayReportPath report reportPath
 
-generateHpcUnifiedReport :: HasEnvConfig env => StackT env IO ()
+generateHpcUnifiedReport :: HasEnvConfig env => RIO env ()
 generateHpcUnifiedReport = do
     outputDir <- hpcReportDir
     ensureDir outputDir
@@ -296,7 +296,7 @@ generateHpcUnifiedReport = do
 
 generateUnionReport :: HasEnvConfig env
                     => Text -> Path Abs Dir -> [Path Abs File]
-                    -> StackT env IO (Maybe (Path Abs File))
+                    -> RIO env (Maybe (Path Abs File))
 generateUnionReport report reportDir tixFiles = do
     (errs, tix) <- fmap (unionTixes . map removeExeModules) (mapMaybeM readTixOrLog tixFiles)
     $logDebug $ "Using the following tix files: " <> T.pack (show tixFiles)
@@ -332,7 +332,7 @@ unionTixes tixes = (Map.keys errs, Tix (Map.elems outputs))
         | hash1 == hash2 && len1 == len2 = Right (TixModule k hash1 len1 (zipWith (+) tix1 tix2))
     merge _ _ = Left ()
 
-generateHpcMarkupIndex :: HasEnvConfig env => StackT env IO ()
+generateHpcMarkupIndex :: HasEnvConfig env => RIO env ()
 generateHpcMarkupIndex = do
     outputDir <- hpcReportDir
     let outputFile = outputDir </> $(mkRelFile "index.html")
@@ -409,7 +409,7 @@ dirnameString = dropWhileEnd isPathSeparator . toFilePath . dirname
 findPackageFieldForBuiltPackage
     :: HasEnvConfig env
     => Path Abs Dir -> PackageIdentifier -> Text
-    -> StackT env IO (Either Text Text)
+    -> RIO env (Either Text Text)
 findPackageFieldForBuiltPackage pkgDir pkgId field = do
     distDir <- distDirFromDir pkgDir
     let inplaceDir = distDir </> $(mkRelDir "package.conf.inplace")
@@ -440,11 +440,11 @@ findPackageFieldForBuiltPackage pkgDir pkgId field = do
                     T.pack (toFilePath inplaceDir) <> ". Maybe try 'stack clean' on this package?"
 
 displayReportPath :: (HasAnsiAnn (Ann a), Display a, HasRunner env)
-                  => Text -> a -> StackT env IO ()
+                  => Text -> a -> RIO env ()
 displayReportPath report reportPath =
      $prettyInfo $ "The" <+> fromString (T.unpack report) <+> "is available at" <+> display reportPath
 
-findExtraTixFiles :: HasEnvConfig env => StackT env IO [Path Abs File]
+findExtraTixFiles :: HasEnvConfig env => RIO env [Path Abs File]
 findExtraTixFiles = do
     outputDir <- hpcReportDir
     let dir = outputDir </> $(mkRelDir "extra-tix-files")

@@ -111,7 +111,7 @@ newtype GetPackageOpts = GetPackageOpts
                      -> [PackageName]
                      -> [PackageName]
                      -> Path Abs File
-                     -> StackT env IO
+                     -> RIO env
                           (Map NamedComponent (Set ModuleName)
                           ,Map NamedComponent (Set DotCabalPath)
                           ,Map NamedComponent BuildInfoOpts)
@@ -140,7 +140,7 @@ data CabalFileType
 newtype GetPackageFiles = GetPackageFiles
     { getPackageFiles :: forall env. HasEnvConfig env
                       => Path Abs File
-                      -> StackT env IO
+                      -> RIO env
                            (Map NamedComponent (Set ModuleName)
                            ,Map NamedComponent (Set DotCabalPath)
                            ,Set (Path Abs File)

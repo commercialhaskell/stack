@@ -106,7 +106,7 @@ getSDistTarball
   :: HasEnvConfig env
   => Maybe PvpBounds            -- ^ Override Config value
   -> Path Abs Dir               -- ^ Path to local package
-  -> StackT env IO (FilePath, L.ByteString, Maybe (PackageIdentifier, L.ByteString))
+  -> RIO env (FilePath, L.ByteString, Maybe (PackageIdentifier, L.ByteString))
   -- ^ Filename, tarball contents, and option cabal file revision to upload
 getSDistTarball mpvpBounds pkgDir = do
     config <- view configL
@@ -166,7 +166,7 @@ getCabalLbs :: HasEnvConfig env
             => PvpBoundsType
             -> Maybe Int -- ^ optional revision
             -> FilePath
-            -> StackT env IO (PackageIdentifier, L.ByteString)
+            -> RIO env (PackageIdentifier, L.ByteString)
 getCabalLbs pvpBounds mrev fp = do
     bs <- liftIO $ S.readFile fp
     (_warnings, gpd) <- readPackageUnresolvedBS Nothing bs
@@ -238,7 +238,7 @@ gtraverseT f =
 -- | Read in a 'LocalPackage' config.  This makes some default decisions
 -- about 'LocalPackage' fields that might not be appropriate for other
 -- use-cases.
-readLocalPackage :: HasEnvConfig env => Path Abs Dir -> StackT env IO LocalPackage
+readLocalPackage :: HasEnvConfig env => Path Abs Dir -> RIO env LocalPackage
 readLocalPackage pkgDir = do
     cabalfp <- findOrGenerateCabalFile pkgDir
     config  <- getDefaultPackageConfig
@@ -263,7 +263,7 @@ readLocalPackage pkgDir = do
         }
 
 -- | Returns a newline-separate list of paths, and the absolute path to the .cabal file.
-getSDistFileList :: HasEnvConfig env => LocalPackage -> StackT env IO (String, Path Abs File)
+getSDistFileList :: HasEnvConfig env => LocalPackage -> RIO env (String, Path Abs File)
 getSDistFileList lp =
     withSystemTempDir (stackProgName <> "-sdist") $ \tmpdir -> do
         menv <- getMinimalEnvOverride
@@ -295,7 +295,7 @@ getSDistFileList lp =
         , taskCachePkgSrc = CacheSrcLocal (toFilePath (lpDir lp))
         }
 
-normalizeTarballPaths :: HasRunner env => [FilePath] -> StackT env IO [FilePath]
+normalizeTarballPaths :: HasRunner env => [FilePath] -> RIO env [FilePath]
 normalizeTarballPaths fps = do
     -- TODO: consider whether erroring out is better - otherwise the
     -- user might upload an incomplete tar?
@@ -332,7 +332,7 @@ checkSDistTarball
   :: HasEnvConfig env
   => SDistOpts -- ^ The configuration of what to check
   -> Path Abs File -- ^ Absolute path to tarball
-  -> StackT env IO ()
+  -> RIO env ()
 checkSDistTarball opts tarball = withTempTarGzContents tarball $ \pkgDir' -> do
     pkgDir  <- (pkgDir' </>) `liftM`
         (parseRelDir . FP.takeBaseName . FP.takeBaseName . toFilePath $ tarball)
@@ -343,7 +343,7 @@ checkSDistTarball opts tarball = withTempTarGzContents tarball $ \pkgDir' -> do
 checkPackageInExtractedTarball
   :: HasEnvConfig env
   => Path Abs Dir -- ^ Absolute path to tarball
-  -> StackT env IO ()
+  -> RIO env ()
 checkPackageInExtractedTarball pkgDir = do
     cabalfp <- findOrGenerateCabalFile pkgDir
     name    <- parsePackageNameFromFilePath cabalfp
@@ -366,7 +366,7 @@ checkPackageInExtractedTarball pkgDir = do
         Nothing -> return ()
         Just ne -> throwM $ CheckException ne
 
-buildExtractedTarball :: HasEnvConfig env => Path Abs Dir -> StackT env IO ()
+buildExtractedTarball :: HasEnvConfig env => Path Abs Dir -> RIO env ()
 buildExtractedTarball pkgDir = do
   projectRoot <- view projectRootL
   envConfig <- view envConfigL
@@ -405,7 +405,7 @@ checkSDistTarball'
   => SDistOpts
   -> String       -- ^ Tarball name
   -> L.ByteString -- ^ Tarball contents as a byte string
-  -> StackT env IO ()
+  -> RIO env ()
 checkSDistTarball' opts name bytes = withSystemTempDir "stack" $ \tpath -> do
     npath   <- (tpath </>) `liftM` parseRelFile name
     liftIO $ L.writeFile (toFilePath npath) bytes
@@ -413,8 +413,8 @@ checkSDistTarball' opts name bytes = withSystemTempDir "stack" $ \tpath -> do
 
 withTempTarGzContents
   :: Path Abs File                     -- ^ Location of tarball
-  -> (Path Abs Dir -> StackT env IO a) -- ^ Perform actions given dir with tarball contents
-  -> StackT env IO a
+  -> (Path Abs Dir -> RIO env a) -- ^ Perform actions given dir with tarball contents
+  -> RIO env a
 withTempTarGzContents apath f = withSystemTempDir "stack" $ \tpath -> do
     archive <- liftIO $ L.readFile (toFilePath apath)
     liftIO . Tar.unpack (toFilePath tpath) . Tar.read . GZip.decompress $ archive

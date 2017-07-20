@@ -50,7 +50,7 @@ openHaddocksInBrowser
     -- ^ Available packages and their locations for the current project
     -> Set PackageName
     -- ^ Build targets as determined by 'Stack.Build.Source.loadSourceMap'
-    -> StackT env IO ()
+    -> RIO env ()
 openHaddocksInBrowser bco pkgLocations buildTargets = do
     let cliTargets = (boptsCLITargets . bcoBuildOptsCLI) bco
         getDocIndex = do

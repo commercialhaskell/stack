@@ -13,8 +13,8 @@ module Stack.Prelude
   , stripCR
   , logSticky
   , logStickyDone
-  , StackT (..)
-  , runStackT
+  , RIO (..)
+  , runRIO
   , HasLogFunc (..)
   , module X
   ) where
@@ -161,29 +161,32 @@ logStickyDone :: Q Exp
 logStickyDone =
     logOther "sticky-done"
 
---------------------------------------------------------------------------------
--- Main StackT monad transformer
+-- | The Reader+IO monad. This is different from a 'ReaderT' because:
+--
+-- * It's not a transformer, it hardcodes IO for simpler usage and
+-- error messages.
+--
+-- * Instances of typeclasses like 'MonadLogger' are implemented using
+-- classes defined on the environment, instead of using an
+-- underlying monad.
+newtype RIO env a = RIO { unRIO :: ReaderT env IO a }
+  deriving (Functor,Applicative,Monad,MonadIO,MonadReader env,MonadThrow)
 
--- | The monad used for the executable @stack@.
-newtype StackT env m a =
-  StackT {unStackT :: ReaderT env m a}
-  deriving (Functor,Applicative,Monad,MonadIO,MonadReader env,MonadThrow,MonadTrans)
-
-runStackT :: MonadIO m => env -> StackT env IO a -> m a
-runStackT env (StackT (ReaderT f)) = liftIO (f env)
+runRIO :: MonadIO m => env -> RIO env a -> m a
+runRIO env (RIO (ReaderT f)) = liftIO (f env)
 
 class HasLogFunc env where
   logFuncL :: Getting r env (Loc -> LogSource -> LogLevel -> LogStr -> IO ())
 
-instance (MonadIO m, HasLogFunc env) => MonadLogger (StackT env m) where
+instance HasLogFunc env => MonadLogger (RIO env) where
   monadLoggerLog a b c d = do
     f <- view logFuncL
     liftIO $ f a b c $ toLogStr d
 
-instance (MonadIO m, HasLogFunc env) => MonadLoggerIO (StackT env m) where
+instance HasLogFunc env => MonadLoggerIO (RIO env) where
   askLoggerIO = view logFuncL
 
-instance MonadUnliftIO m => MonadUnliftIO (StackT config m) where
-    askUnliftIO = StackT $ ReaderT $ \r ->
+instance MonadUnliftIO (RIO env) where
+    askUnliftIO = RIO $ ReaderT $ \r ->
                   withUnliftIO $ \u ->
-                  return (UnliftIO (unliftIO u . flip runReaderT r . unStackT))
+                  return (UnliftIO (unliftIO u . flip runReaderT r . unRIO))

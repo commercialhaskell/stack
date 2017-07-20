@@ -49,7 +49,7 @@ ghcOptsCompleter = mkCompleter $ \inputRaw -> return $
 -- changes to optparse-applicative.
 
 buildConfigCompleter
-    :: (String -> StackT EnvConfig IO [String])
+    :: (String -> RIO EnvConfig [String])
     -> Completer
 buildConfigCompleter inner = mkCompleter $ \inputRaw -> do
     let input = unescapeBashArg inputRaw
@@ -61,8 +61,8 @@ buildConfigCompleter inner = mkCompleter $ \inputRaw -> do
                     { globalLogLevel = LevelOther "silent" }
             loadConfigWithOpts go $ \lc -> do
               bconfig <- liftIO $ lcLoadBuildConfig lc (globalCompiler go)
-              envConfig <- runStackT bconfig (setupEnv Nothing)
-              runStackT envConfig (inner input)
+              envConfig <- runRIO bconfig (setupEnv Nothing)
+              runRIO envConfig (inner input)
 
 targetCompleter :: Completer
 targetCompleter = buildConfigCompleter $ \input -> do

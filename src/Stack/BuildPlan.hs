@@ -397,7 +397,7 @@ checkSnapBuildPlan
     -> [GenericPackageDescription]
     -> Maybe (Map PackageName (Map FlagName Bool))
     -> SnapshotDef
-    -> StackT env IO BuildPlanCheck
+    -> RIO env BuildPlanCheck
 checkSnapBuildPlan root gpds flags snapshotDef = do
     platform <- view platformL
     menv <- getMinimalEnvOverride
@@ -433,7 +433,7 @@ selectBestSnapshot
     => Path Abs Dir -- ^ project root, used for checking out necessary files
     -> [GenericPackageDescription]
     -> NonEmpty SnapshotDef
-    -> StackT env IO (SnapshotDef, BuildPlanCheck)
+    -> RIO env (SnapshotDef, BuildPlanCheck)
 selectBestSnapshot root gpds snaps = do
     $logInfo $ "Selecting the best among "
                <> T.pack (show (NonEmpty.length snaps))

@@ -80,7 +80,7 @@ cabalSolver :: HasConfig env
             -> ConstraintSpec -- ^ src constraints
             -> ConstraintSpec -- ^ dep constraints
             -> [String] -- ^ additional arguments
-            -> StackT env IO (Either [PackageName] ConstraintSpec)
+            -> RIO env (Either [PackageName] ConstraintSpec)
 cabalSolver menv cabalfps constraintType
             srcConstraints depConstraints cabalArgs =
   withSystemTempDir "cabal-solver" $ \dir' -> do
@@ -224,7 +224,7 @@ getCabalConfig :: HasConfig env
                => FilePath -- ^ temp dir
                -> ConstraintType
                -> Map PackageName Version -- ^ constraints
-               -> StackT env IO [Text]
+               -> RIO env [Text]
 getCabalConfig dir constraintType constraints = do
     indices <- view $ configL.to configPackageIndices
     remotes <- mapM goIndex indices
@@ -264,7 +264,7 @@ getCabalConfig dir constraintType constraints = do
 setupCompiler
     :: (HasConfig env, HasGHCVariant env)
     => CompilerVersion 'CVWanted
-    -> StackT env IO (Maybe ExtraDirs)
+    -> RIO env (Maybe ExtraDirs)
 setupCompiler compiler = do
     let msg = Just $ T.concat
           [ "Compiler version (" <> compilerVersionText compiler <> ") "
@@ -295,7 +295,7 @@ setupCompiler compiler = do
 setupCabalEnv
     :: (HasConfig env, HasGHCVariant env)
     => CompilerVersion 'CVWanted
-    -> StackT env IO (EnvOverride, CompilerVersion 'CVActual)
+    -> RIO env (EnvOverride, CompilerVersion 'CVActual)
 setupCabalEnv compiler = do
     mpaths <- setupCompiler compiler
     menv0 <- getMinimalEnvOverride
@@ -366,7 +366,7 @@ solveResolverSpec
        , ConstraintSpec) -- ^ ( resolver
                          --   , src package constraints
                          --   , extra dependency constraints )
-    -> StackT env IO
+    -> RIO env
          (Either [PackageName] (ConstraintSpec , ConstraintSpec))
        -- ^ (Conflicting packages
        --    (resulting src package specs, external dependency specs))
@@ -472,7 +472,7 @@ getResolverConstraints
     -> Maybe (CompilerVersion 'CVActual) -- ^ actually installed compiler
     -> Path Abs File
     -> SnapshotDef
-    -> StackT env IO
+    -> RIO env
          (CompilerVersion 'CVActual,
           Map PackageName (Version, Map FlagName Bool))
 getResolverConstraints menv mcompilerVersion stackYaml sd = do
@@ -519,7 +519,7 @@ cabalPackagesCheck
      => [Path Abs File]
      -> String
      -> Maybe String
-     -> StackT env IO
+     -> RIO env
           ( Map PackageName (Path Abs File, C.GenericPackageDescription)
           , [Path Abs File])
 cabalPackagesCheck cabalfps noPkgMsg dupErrMsg = do
@@ -606,7 +606,7 @@ reportMissingCabalFiles cabalfps includeSubdirs = do
 solveExtraDeps
     :: HasEnvConfig env
     => Bool -- ^ modify stack.yaml?
-    -> StackT env IO ()
+    -> RIO env ()
 solveExtraDeps modStackYaml = do
     bconfig <- view buildConfigL
 

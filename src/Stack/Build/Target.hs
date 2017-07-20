@@ -239,7 +239,7 @@ resolveRawTarget
   -> Map PackageName (GenericPackageDescription, PackageLocationIndex FilePath) -- ^ local deps
   -> Map PackageName LocalPackageView -- ^ project packages
   -> (RawInput, RawTarget)
-  -> StackT env IO (Either Text ResolveResult)
+  -> RIO env (Either Text ResolveResult)
 resolveRawTarget globals snap deps locals (ri, rt) =
     go rt
   where
@@ -472,7 +472,7 @@ parseTargets
     :: HasEnvConfig env
     => NeedTargets
     -> BuildOptsCLI
-    -> StackT env IO
+    -> RIO env
          ( LoadedSnapshot -- upgraded snapshot, with some packages possibly moved to local
          , Map PackageName (LoadedPackageInfo (PackageLocationIndex FilePath)) -- all local deps
          , Map PackageName Target

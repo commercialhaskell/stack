@@ -132,7 +132,7 @@ isWindows = False
 getPackagesFromModuleInfo
   :: ModuleInfo
   -> FilePath -- ^ script filename
-  -> StackT EnvConfig IO (Set PackageName)
+  -> RIO EnvConfig (Set PackageName)
 getPackagesFromModuleInfo mi scriptFP = do
     (pns1, mns) <- liftIO $ parseImports <$> S8.readFile scriptFP
     pns2 <-

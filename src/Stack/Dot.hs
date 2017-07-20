@@ -72,7 +72,7 @@ data ListDepsOpts = ListDepsOpts
     }
 
 -- | Visualize the project's dependencies as a graphviz graph
-dot :: HasEnvConfig env => DotOpts -> StackT env IO ()
+dot :: HasEnvConfig env => DotOpts -> RIO env ()
 dot dotOpts = do
   (localNames, prunedGraph) <- createPrunedDependencyGraph dotOpts
   printGraph dotOpts localNames prunedGraph
@@ -90,7 +90,7 @@ data DotPayload = DotPayload
 -- dependencies.
 createPrunedDependencyGraph :: HasEnvConfig env
                             => DotOpts
-                            -> StackT env IO
+                            -> RIO env
                                  (Set PackageName,
                                   Map PackageName (Set PackageName, DotPayload))
 createPrunedDependencyGraph dotOpts = do
@@ -108,7 +108,7 @@ createPrunedDependencyGraph dotOpts = do
 -- @resolveDependencies@.
 createDependencyGraph :: HasEnvConfig env
                        => DotOpts
-                       -> StackT env IO (Map PackageName (Set PackageName, DotPayload))
+                       -> RIO env (Map PackageName (Set PackageName, DotPayload))
 createDependencyGraph dotOpts = do
   (locals, sourceMap) <- loadSourceMap NeedTargets defaultBuildOptsCLI
       { boptsCLITargets = dotTargets dotOpts
@@ -136,7 +136,7 @@ createDependencyGraph dotOpts = do
 
 listDependencies :: HasEnvConfig env
                   => ListDepsOpts
-                  -> StackT env IO ()
+                  -> RIO env ()
 listDependencies opts = do
   let dotOpts = listDepsDotOpts opts
   (_, resultGraph) <- createPrunedDependencyGraph dotOpts

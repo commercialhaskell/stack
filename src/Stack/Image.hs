@@ -31,7 +31,7 @@ import           System.Process.Run
 -- directory under '.stack-work'
 stageContainerImageArtifacts
     :: HasEnvConfig env
-    => Maybe (Path Abs Dir) -> [Text] -> StackT env IO ()
+    => Maybe (Path Abs Dir) -> [Text] -> RIO env ()
 stageContainerImageArtifacts mProjectRoot imageNames = do
     config <- view configL
     forM_
@@ -54,7 +54,7 @@ stageContainerImageArtifacts mProjectRoot imageNames = do
 -- in the config file.
 createContainerImageFromStage
     :: HasConfig env
-    => Maybe (Path Abs Dir) -> [Text] -> StackT env IO ()
+    => Maybe (Path Abs Dir) -> [Text] -> RIO env ()
 createContainerImageFromStage mProjectRoot imageNames = do
     config <- view configL
     forM_
@@ -80,7 +80,7 @@ filterImages names = filter (imageNameFound . imgDockerImageName)
 -- subdirectory of a temp directory.
 stageExesInDir
     :: HasEnvConfig env
-    => ImageDockerOpts -> Path Abs Dir -> StackT env IO ()
+    => ImageDockerOpts -> Path Abs Dir -> RIO env ()
 stageExesInDir opts dir = do
     srcBinPath <- fmap (</> $(mkRelDir "bin")) installationRootLocal
     let destBinPath = dir </> $(mkRelDir "usr/local/bin")
@@ -108,7 +108,7 @@ stageExesInDir opts dir = do
 -- (Source, Destination) mapping.
 syncAddContentToDir
     :: HasEnvConfig env
-    => ImageDockerOpts -> Path Abs Dir -> StackT env IO ()
+    => ImageDockerOpts -> Path Abs Dir -> RIO env ()
 syncAddContentToDir opts dir = do
     root <- view projectRootL
     let imgAdd = imgDockerAdd opts
@@ -129,7 +129,7 @@ imageName = map toLower . toFilePathNoTrailingSep . dirname
 -- directory of executables & static content.
 createDockerImage
     :: HasConfig env
-    => ImageDockerOpts -> Path Abs Dir -> StackT env IO ()
+    => ImageDockerOpts -> Path Abs Dir -> RIO env ()
 createDockerImage dockerConfig dir = do
     menv <- getMinimalEnvOverride
     case imgDockerBase dockerConfig of
@@ -151,7 +151,7 @@ createDockerImage dockerConfig dir = do
 -- | Extend the general purpose docker image with entrypoints (if specified).
 extendDockerImageWithEntrypoint
     :: HasConfig env
-    => ImageDockerOpts -> Path Abs Dir -> StackT env IO ()
+    => ImageDockerOpts -> Path Abs Dir -> RIO env ()
 extendDockerImageWithEntrypoint dockerConfig dir = do
     menv <- getMinimalEnvOverride
     let dockerImageName =

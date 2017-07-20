@@ -102,7 +102,7 @@ instance Show FetchException where
         (if null suggestions then "" else "\n" ++ suggestions)
 
 -- | Fetch packages into the cache without unpacking
-fetchPackages :: HasConfig env => Set PackageIdentifier -> StackT env IO ()
+fetchPackages :: HasConfig env => Set PackageIdentifier -> RIO env ()
 fetchPackages idents' = do
     resolved <- resolvePackages Nothing idents Set.empty
     ToFetchResult toFetch alreadyUnpacked <- getToFetch Nothing resolved
@@ -119,7 +119,7 @@ unpackPackages :: HasConfig env
                => Maybe SnapshotDef -- ^ when looking up by name, take from this build plan
                -> FilePath -- ^ destination
                -> [String] -- ^ names or identifiers
-               -> StackT env IO ()
+               -> RIO env ()
 unpackPackages mSnapshotDef dest input = do
     dest' <- resolveDir' dest
     (names, idents) <- case partitionEithers $ map parse input of
@@ -154,7 +154,7 @@ unpackPackageIdent
     => Path Abs Dir -- ^ unpack directory
     -> Path Rel Dir -- ^ the dist rename directory, see: https://github.com/fpco/stack/issues/157
     -> PackageIdentifierRevision
-    -> StackT env IO (Path Abs Dir)
+    -> RIO env (Path Abs Dir)
 unpackPackageIdent unpackDir distDir (PackageIdentifierRevision ident mcfi) = do
   -- FIXME make this more direct in the future
   m <- unpackPackageIdents unpackDir (Just distDir) [PackageIdentifierRevision ident mcfi]
@@ -172,7 +172,7 @@ unpackPackageIdents
     => Path Abs Dir -- ^ unpack directory
     -> Maybe (Path Rel Dir) -- ^ the dist rename directory, see: https://github.com/fpco/stack/issues/157
     -> [PackageIdentifierRevision]
-    -> StackT env IO (Map PackageIdentifier (Path Abs Dir))
+    -> RIO env (Map PackageIdentifier (Path Abs Dir))
 unpackPackageIdents unpackDir mdistDir idents = do
     resolved <- resolvePackages Nothing idents Set.empty
     ToFetchResult toFetch alreadyUnpacked <- getToFetch (Just unpackDir) resolved
@@ -192,7 +192,7 @@ resolvePackages :: HasConfig env
                 => Maybe SnapshotDef -- ^ when looking up by name, take from this build plan
                 -> [PackageIdentifierRevision]
                 -> Set PackageName
-                -> StackT env IO [ResolvedPackage]
+                -> RIO env [ResolvedPackage]
 resolvePackages mSnapshotDef idents0 names0 = do
     eres <- go
     case eres of
@@ -219,7 +219,7 @@ resolvePackagesAllowMissing
     => Maybe SnapshotDef -- ^ when looking up by name, take from this build plan
     -> [PackageIdentifierRevision]
     -> Set PackageName
-    -> StackT env IO (Set PackageName, HashSet PackageIdentifierRevision, [ResolvedPackage])
+    -> RIO env (Set PackageName, HashSet PackageIdentifierRevision, [ResolvedPackage])
 resolvePackagesAllowMissing mSnapshotDef idents0 names0 = do
   cache@(PackageCache cache') <- getPackageCaches
 
@@ -314,8 +314,8 @@ withCabalFiles name pkgs f = do
 -- package indices.
 withCabalLoader
     :: HasConfig env
-    => ((PackageIdentifierRevision -> IO ByteString) -> StackT env IO a)
-    -> StackT env IO a
+    => ((PackageIdentifierRevision -> IO ByteString) -> RIO env a)
+    -> RIO env a
 withCabalLoader inner = do
     -- Want to try updating the index once during a single run for missing
     -- package identifiers. We also want to ensure we only update once at a
@@ -409,7 +409,7 @@ typoCorrectionCandidates (PackageIdentifierRevision ident _mcfi) (PackageCache c
 getToFetch :: HasConfig env
            => Maybe (Path Abs Dir) -- ^ directory to unpack into, @Nothing@ means no unpack
            -> [ResolvedPackage]
-           -> StackT env IO ToFetchResult
+           -> RIO env ToFetchResult
 getToFetch mdest resolvedAll = do
     (toFetch0, unpacked) <- liftM partitionEithers $ mapM checkUnpacked resolvedAll
     toFetch1 <- mapM goIndex $ Map.toList $ Map.fromListWith (++) toFetch0
@@ -468,7 +468,7 @@ getToFetch mdest resolvedAll = do
 fetchPackages' :: HasConfig env
                => Maybe (Path Rel Dir) -- ^ the dist rename directory, see: https://github.com/fpco/stack/issues/157
                -> Map PackageIdentifier ToFetch
-               -> StackT env IO (Map PackageIdentifier (Path Abs Dir))
+               -> RIO env (Map PackageIdentifier (Path Abs Dir))
 fetchPackages' mdistDir toFetchAll = do
     connCount <- view $ configL.to configConnectionCount
     outputVar <- liftIO $ newTVarIO Map.empty

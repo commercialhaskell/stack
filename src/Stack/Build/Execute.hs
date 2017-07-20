@@ -103,7 +103,7 @@ data ExecutableBuildStatus
   deriving (Show, Eq, Ord)
 
 -- | Fetch the packages necessary for a build, for example in combination with a dry run.
-preFetch :: HasEnvConfig env => Plan -> StackT env IO ()
+preFetch :: HasEnvConfig env => Plan -> RIO env ()
 preFetch plan
     | Set.null idents = $logDebug "Nothing to fetch"
     | otherwise = do
@@ -122,7 +122,7 @@ preFetch plan
                 (packageVersion package)
 
 -- | Print a description of build plan for human consumption.
-printPlan :: HasRunner env => Plan -> StackT env IO ()
+printPlan :: HasRunner env => Plan -> RIO env ()
 printPlan plan = do
     case Map.elems $ planUnregisterLocal plan of
         [] -> $logInfo "No packages would be unregistered."
@@ -257,7 +257,7 @@ getSetupExe :: HasEnvConfig env
             => Path Abs File -- ^ Setup.hs input file
             -> Path Abs File -- ^ SetupShim.hs input file
             -> Path Abs Dir -- ^ temporary directory
-            -> StackT env IO (Maybe (Path Abs File))
+            -> RIO env (Maybe (Path Abs File))
 getSetupExe setupHs setupShimHs tmpdir = do
     wc <- view $ actualCompilerVersionL.whichCompilerL
     platformDir <- platformGhcRelDir
@@ -325,8 +325,8 @@ withExecuteEnv :: forall env a. HasEnvConfig env
                -> [DumpPackage () () ()] -- ^ global packages
                -> [DumpPackage () () ()] -- ^ snapshot packages
                -> [DumpPackage () () ()] -- ^ local packages
-               -> (ExecuteEnv -> StackT env IO a)
-               -> StackT env IO a
+               -> (ExecuteEnv -> RIO env a)
+               -> RIO env a
 withExecuteEnv menv bopts boptsCli baseConfigOpts locals globalPackages snapshotPackages localPackages inner =
     withSystemTempDir stackProgName $ \tmpdir -> do
         configLock <- liftIO $ newMVar ()
@@ -385,14 +385,14 @@ withExecuteEnv menv bopts boptsCli baseConfigOpts locals globalPackages snapshot
             , eeSnapshotDumpPkgs = snapshotPackagesTVar
             , eeLocalDumpPkgs = localPackagesTVar
             , eeLogFiles = logFilesTChan
-            , eeGetGhcPath = runStackT env getGhcPath
-            , eeGetGhcjsPath = runStackT env getGhcjsPath
+            , eeGetGhcPath = runRIO env getGhcPath
+            , eeGetGhcjsPath = runRIO env getGhcjsPath
             , eeCustomBuilt = customBuiltRef
             } `finally` dumpLogs logFilesTChan totalWanted
   where
     toDumpPackagesByGhcPkgId = Map.fromList . map (\dp -> (dpGhcPkgId dp, dp))
 
-    dumpLogs :: TChan (Path Abs Dir, Path Abs File) -> Int -> StackT env IO ()
+    dumpLogs :: TChan (Path Abs Dir, Path Abs File) -> Int -> RIO env ()
     dumpLogs chan totalWanted = do
         allLogs <- fmap reverse $ liftIO $ atomically drainChan
         case allLogs of
@@ -422,7 +422,7 @@ withExecuteEnv menv bopts boptsCli baseConfigOpts locals globalPackages snapshot
                     xs <- drainChan
                     return $ x:xs
 
-    dumpLogIfWarning :: (Path Abs Dir, Path Abs File) -> StackT env IO ()
+    dumpLogIfWarning :: (Path Abs Dir, Path Abs File) -> RIO env ()
     dumpLogIfWarning (pkgDir, filepath) = do
       firstWarning <- runResourceT
           $ transPipe liftResourceT (CB.sourceFile (toFilePath filepath))
@@ -437,7 +437,7 @@ withExecuteEnv menv bopts boptsCli baseConfigOpts locals globalPackages snapshot
     isWarning t = ": Warning:" `T.isSuffixOf` t -- prior to GHC 8
                || ": warning:" `T.isInfixOf` t -- GHC 8 is slightly different
 
-    dumpLog :: String -> (Path Abs Dir, Path Abs File) -> StackT env IO ()
+    dumpLog :: String -> (Path Abs Dir, Path Abs File) -> RIO env ()
     dumpLog msgSuffix (pkgDir, filepath) = do
         $logInfo $ T.pack $ concat ["\n--  Dumping log file", msgSuffix, ": ", toFilePath filepath, "\n"]
         compilerVer <- view actualCompilerVersionL
@@ -460,7 +460,7 @@ executePlan :: HasEnvConfig env
             -> InstalledMap
             -> Map PackageName Target
             -> Plan
-            -> StackT env IO ()
+            -> RIO env ()
 executePlan menv boptsCli baseConfigOpts locals globalPackages snapshotPackages localPackages installedMap targets plan = do
     $logDebug "Executing the build plan"
     bopts <- view buildOptsL
@@ -482,7 +482,7 @@ executePlan menv boptsCli baseConfigOpts locals globalPackages snapshotPackages 
 copyExecutables
     :: HasEnvConfig env
     => Map Text InstallLocation
-    -> StackT env IO ()
+    -> RIO env ()
 copyExecutables exes | Map.null exes = return ()
 copyExecutables exes = do
     snapBin <- (</> bindirSuffix) `liftM` installationRootDeps
@@ -558,7 +558,7 @@ executePlan' :: HasEnvConfig env
              -> Map PackageName Target
              -> Plan
              -> ExecuteEnv
-             -> StackT env IO ()
+             -> RIO env ()
 executePlan' installedMap0 targets plan ee@ExecuteEnv {..} = do
     when (toCoverage $ boptsTestOpts eeBuildOpts) deleteHpcReports
     cv <- view actualCompilerVersionL
@@ -647,7 +647,7 @@ executePlan' installedMap0 targets plan ee@ExecuteEnv {..} = do
 
 toActions :: HasEnvConfig env
           => InstalledMap
-          -> (StackT env IO () -> IO ())
+          -> (RIO env () -> IO ())
           -> ExecuteEnv
           -> (Maybe Task, Maybe Task) -- build and final
           -> [Action]
@@ -704,7 +704,7 @@ toActions installedMap runInBase ee (mbuild, mfinal) =
 -- | Generate the ConfigCache
 getConfigCache :: HasEnvConfig env
                => ExecuteEnv -> Task -> InstalledMap -> Bool -> Bool
-               -> StackT env IO (Map PackageIdentifier GhcPkgId, ConfigCache)
+               -> RIO env (Map PackageIdentifier GhcPkgId, ConfigCache)
 getConfigCache ExecuteEnv {..} task@Task {..} installedMap enableTest enableBench = do
     useExactConf <- view $ configL.to configAllowNewer
     let extra =
@@ -759,10 +759,10 @@ ensureConfig :: HasEnvConfig env
              => ConfigCache -- ^ newConfigCache
              -> Path Abs Dir -- ^ package directory
              -> ExecuteEnv
-             -> StackT env IO () -- ^ announce
-             -> (ExcludeTHLoading -> [String] -> StackT env IO ()) -- ^ cabal
+             -> RIO env () -- ^ announce
+             -> (ExcludeTHLoading -> [String] -> RIO env ()) -- ^ cabal
              -> Path Abs File -- ^ .cabal file
-             -> StackT env IO Bool
+             -> RIO env Bool
 ensureConfig newConfigCache pkgDir ExecuteEnv {..} announce cabal cabalfp = do
     newCabalMod <- liftIO (fmap modTime (D.getModificationTime (toFilePath cabalfp)))
     needConfig <-
@@ -828,7 +828,7 @@ announceTask task x = $logInfo $ T.concat
 --
 -- * Provides the user a function with which run the Cabal process.
 withSingleContext :: forall env a. HasEnvConfig env
-                  => (StackT env IO () -> IO ())
+                  => (RIO env () -> IO ())
                   -> ActionContext
                   -> ExecuteEnv
                   -> Task
@@ -840,13 +840,13 @@ withSingleContext :: forall env a. HasEnvConfig env
                   -> (  Package                                -- Package info
                      -> Path Abs File                          -- Cabal file path
                      -> Path Abs Dir                           -- Package root directory file path
-                     -> (ExcludeTHLoading -> [String] -> StackT env IO ())
+                     -> (ExcludeTHLoading -> [String] -> RIO env ())
                                                                -- Function to run Cabal with args
-                     -> (Text -> StackT env IO ())             -- An 'announce' function, for different build phases
+                     -> (Text -> RIO env ())             -- An 'announce' function, for different build phases
                      -> Bool                                   -- Whether output should be directed to the console
                      -> Maybe (Path Abs File, Handle)          -- Log file
-                     -> StackT env IO a)
-                  -> StackT env IO a
+                     -> RIO env a)
+                  -> RIO env a
 withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} mdeps msuffix inner0 =
     withPackage $ \package cabalfp pkgDir ->
     withLogFile pkgDir package $ \mlogFile ->
@@ -902,8 +902,8 @@ withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} md
         :: Package
         -> Path Abs Dir
         -> Maybe (Path Abs File, Handle)
-        -> ((ExcludeTHLoading -> [String] -> StackT env IO ()) -> StackT env IO a)
-        -> StackT env IO a
+        -> ((ExcludeTHLoading -> [String] -> RIO env ()) -> RIO env a)
+        -> RIO env a
     withCabal package pkgDir mlogFile inner = do
         config <- view configL
 
@@ -945,7 +945,7 @@ withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} md
                     : ["-hide-all-packages"]
                     )
 
-                warnCustomNoDeps :: StackT env IO ()
+                warnCustomNoDeps :: RIO env ()
                 warnCustomNoDeps =
                     case (taskType, packageBuildType package) of
                         (TTLocal{}, Just C.Custom) -> do
@@ -958,7 +958,7 @@ withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} md
                             $logWarn "Strongly recommend fixing the package's cabal file"
                         _ -> return ()
 
-                getPackageArgs :: Path Abs Dir -> StackT env IO [String]
+                getPackageArgs :: Path Abs Dir -> RIO env [String]
                 getPackageArgs setupDir =
                     case (packageSetupDeps package, mdeps) of
                         -- The package is using the Cabal custom-setup
@@ -1039,7 +1039,7 @@ withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} md
 
                 setupArgs = ("--builddir=" ++ toFilePathNoTrailingSep distRelativeDir') : args
 
-                runExe :: Path Abs File -> [String] -> StackT env IO ()
+                runExe :: Path Abs File -> [String] -> RIO env ()
                 runExe exeName fullArgs = do
                     compilerVer <- view actualCompilerVersionL
                     runAndOutput compilerVer `catch` \(ProcessExitedUnsuccessfully _ ec) -> do
@@ -1061,7 +1061,7 @@ withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} md
                             (fmap fst mlogFile)
                             bss
                   where
-                    runAndOutput :: CompilerVersion 'CVActual -> StackT env IO ()
+                    runAndOutput :: CompilerVersion 'CVActual -> RIO env ()
                     runAndOutput compilerVer = case mlogFile of
                         Just (_, h) ->
                             sinkProcessStderrStdoutHandle (Just pkgDir) menv (toFilePath exeName) fullArgs h h
@@ -1139,13 +1139,13 @@ withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} md
 --   with @copy@, and not the copying done by @stack install@ - that is
 --   handled by 'copyExecutables'.
 singleBuild :: forall env. HasEnvConfig env
-            => (StackT env IO () -> IO ())
+            => (RIO env () -> IO ())
             -> ActionContext
             -> ExecuteEnv
             -> Task
             -> InstalledMap
             -> Bool             -- ^ Is this a final build?
-            -> StackT env IO ()
+            -> RIO env ()
 singleBuild runInBase ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap isFinalBuild = do
     (allDepsMap, cache) <- getConfigCache ee task installedMap enableTests enableBenchmarks
     mprecompiled <- getPrecompiled cache
@@ -1306,10 +1306,10 @@ singleBuild runInBase ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} in
         :: ConfigCache
         -> Package
         -> Path Abs Dir
-        -> (ExcludeTHLoading -> [String] -> StackT env IO ())
-        -> (Text -> StackT env IO ())
+        -> (ExcludeTHLoading -> [String] -> RIO env ())
+        -> (Text -> RIO env ())
         -> Map Text ExecutableBuildStatus
-        -> StackT env IO Installed
+        -> RIO env Installed
     realBuild cache package pkgDir cabal announce executableBuildStatuses = do
         wc <- view $ actualCompilerVersionL.whichCompilerL
 
@@ -1455,7 +1455,7 @@ singleBuild runInBase ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} in
 -- .stack-work/dist/x86_64-osx/Cabal-1.22.4.0/build/alpha/alpha.jsexe/ (NOTE: a dir)
 getExecutableBuildStatuses
     :: HasEnvConfig env
-    => Package -> Path Abs Dir -> StackT env IO (Map Text ExecutableBuildStatus)
+    => Package -> Path Abs Dir -> RIO env (Map Text ExecutableBuildStatus)
 getExecutableBuildStatuses package pkgDir = do
     compiler <- view $ actualCompilerVersionL.whichCompilerL
     distDir <- distDirFromDir pkgDir
@@ -1498,7 +1498,7 @@ checkExeStatus compiler platform distDir name = do
         file = T.unpack name
 
 -- | Check if any unlisted files have been found, and add them to the build cache.
-checkForUnlistedFiles :: HasEnvConfig env => TaskType -> ModTime -> Path Abs Dir -> StackT env IO [PackageWarning]
+checkForUnlistedFiles :: HasEnvConfig env => TaskType -> ModTime -> Path Abs Dir -> RIO env [PackageWarning]
 checkForUnlistedFiles (TTLocal lp) preBuildTime pkgDir = do
     (addBuildCache,warnings) <-
         addUnlistedToBuildCache
@@ -1524,14 +1524,14 @@ depsPresent installedMap deps = all
 -- | Implements running a package's tests. Also handles producing
 -- coverage reports if coverage is enabled.
 singleTest :: HasEnvConfig env
-           => (StackT env IO () -> IO ())
+           => (RIO env () -> IO ())
            -> TestOpts
            -> [Text]
            -> ActionContext
            -> ExecuteEnv
            -> Task
            -> InstalledMap
-           -> StackT env IO ()
+           -> RIO env ()
 singleTest runInBase topts testsToRun ac ee task installedMap = do
     -- FIXME: Since this doesn't use cabal, we should be able to avoid using a
     -- fullblown 'withSingleContext'.
@@ -1668,14 +1668,14 @@ singleTest runInBase topts testsToRun ac ee task installedMap = do
 
 -- | Implements running a package's benchmarks.
 singleBench :: HasEnvConfig env
-            => (StackT env IO () -> IO ())
+            => (RIO env () -> IO ())
             -> BenchmarkOpts
             -> [Text]
             -> ActionContext
             -> ExecuteEnv
             -> Task
             -> InstalledMap
-            -> StackT env IO ()
+            -> RIO env ()
 singleBench runInBase beopts benchesToRun ac ee task installedMap = do
     (allDepsMap, _cache) <- getConfigCache ee task installedMap False True
     withSingleContext runInBase ac ee task (Just allDepsMap) (Just "bench") $ \_package _cabalfp _pkgDir cabal announce _console _mlogFile -> do
@@ -1786,7 +1786,7 @@ getSetupHs dir = do
 -- Do not pass `-hpcdir` as GHC option if the coverage is not enabled.
 -- This helps running stack-compiled programs with dynamic interpreters like `hint`.
 -- Cfr: https://github.com/commercialhaskell/stack/issues/997
-extraBuildOptions :: HasEnvConfig env => WhichCompiler -> BuildOpts -> StackT env IO [String]
+extraBuildOptions :: HasEnvConfig env => WhichCompiler -> BuildOpts -> RIO env [String]
 extraBuildOptions wc bopts = do
     let ddumpOpts = " -ddump-hi -ddump-to-file"
         optsFlag = compilerOptionsCabalFlag wc

@@ -53,7 +53,7 @@ initProject
     -> Path Abs Dir
     -> InitOpts
     -> Maybe AbstractResolver
-    -> StackT env IO ()
+    -> RIO env ()
 initProject whichCmd currDir initOpts mresolver = do
     let dest = currDir </> stackDotYaml
 
@@ -315,7 +315,7 @@ renderStackYaml p ignoredPackages dupPackages =
         , "compiler-check: newer-minor"
         ]
 
-getSnapshots' :: HasConfig env => StackT env IO Snapshots
+getSnapshots' :: HasConfig env => RIO env Snapshots
 getSnapshots' = do
     getSnapshots `catchAny` \e -> do
         $logError $
@@ -343,7 +343,7 @@ getDefaultResolver
     -> Maybe AbstractResolver
     -> Map PackageName (Path Abs File, C.GenericPackageDescription)
        -- ^ Src package name: cabal dir, cabal package description
-    -> StackT env IO
+    -> RIO env
          ( SnapshotDef
          , Map PackageName (Map FlagName Bool)
          , Map PackageName Version
@@ -376,7 +376,7 @@ getWorkingResolverPlan
     -> Map PackageName (Path Abs File, C.GenericPackageDescription)
        -- ^ Src package name: cabal dir, cabal package description
     -> SnapshotDef
-    -> StackT env IO
+    -> RIO env
          ( SnapshotDef
          , Map PackageName (Map FlagName Bool)
          , Map PackageName Version
@@ -428,7 +428,7 @@ checkBundleResolver
     -> Map PackageName (Path Abs File, C.GenericPackageDescription)
        -- ^ Src package name: cabal dir, cabal package description
     -> SnapshotDef
-    -> StackT env IO
+    -> RIO env
          (Either [PackageName] ( Map PackageName (Map FlagName Bool)
                                , Map PackageName Version))
 checkBundleResolver whichCmd stackYaml initOpts bundle sd = do

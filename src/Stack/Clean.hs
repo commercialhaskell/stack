@@ -22,12 +22,12 @@ import           Stack.Types.Config
 -- | Deletes build artifacts in the current project.
 --
 -- Throws 'StackCleanException'.
-clean :: HasEnvConfig env => CleanOpts -> StackT env IO ()
+clean :: HasEnvConfig env => CleanOpts -> RIO env ()
 clean cleanOpts = do
     dirs <- dirsToDelete cleanOpts
     liftIO $ forM_ dirs (ignoringAbsence . removeDirRecur)
 
-dirsToDelete :: HasEnvConfig env => CleanOpts -> StackT env IO [Path Abs Dir]
+dirsToDelete :: HasEnvConfig env => CleanOpts -> RIO env [Path Abs Dir]
 dirsToDelete cleanOpts = do
     packages <- getLocalPackages
     case cleanOpts of

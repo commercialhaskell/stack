@@ -175,7 +175,7 @@ constructPlan :: forall env. HasEnvConfig env
               -> SourceMap
               -> InstalledMap
               -> Bool
-              -> StackT env IO Plan
+              -> RIO env Plan
 constructPlan ls0 baseConfigOpts0 locals extraToBuild0 localDumpPkgs loadPackage0 sourceMap installedMap initialBuildSteps = do
     $logDebug "Constructing the build plan"
     u <- askUnliftIO
@@ -667,7 +667,7 @@ checkDirtiness :: PackageSource
                -> M Bool
 checkDirtiness ps installed package present wanted = do
     ctx <- ask
-    moldOpts <- runStackT ctx $ tryGetFlagCache installed
+    moldOpts <- runRIO ctx $ tryGetFlagCache installed
     let configOpts = configureOpts
             (view envConfigL ctx)
             (baseConfigOpts ctx)

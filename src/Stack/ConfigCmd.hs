@@ -50,7 +50,7 @@ configCmdSetScope (ConfigCmdSetInstallGhc scope _) = scope
 
 cfgCmdSet
     :: (HasConfig env, HasGHCVariant env)
-    => GlobalOpts -> ConfigCmdSet -> StackT env IO ()
+    => GlobalOpts -> ConfigCmdSet -> RIO env ()
 cfgCmdSet go cmd = do
     conf <- view configL
     configFilePath <-
@@ -80,7 +80,7 @@ cfgCmdSet go cmd = do
 cfgCmdSetValue
     :: (HasConfig env, HasGHCVariant env)
     => Path Abs Dir -- ^ root directory of project
-    -> ConfigCmdSet -> StackT env IO Yaml.Value
+    -> ConfigCmdSet -> RIO env Yaml.Value
 cfgCmdSetValue root (ConfigCmdSetResolver newResolver) = do
     concreteResolver <- makeConcreteResolver (Just root) newResolver
     -- Check that the snapshot actually exists

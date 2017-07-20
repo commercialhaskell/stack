@@ -85,11 +85,11 @@ import qualified System.Posix.User as PosixUser
 reexecWithOptionalContainer
     :: HasConfig env
     => Maybe (Path Abs Dir)
-    -> Maybe (StackT env IO ())
+    -> Maybe (RIO env ())
     -> IO ()
-    -> Maybe (StackT env IO ())
-    -> Maybe (StackT env IO ())
-    -> StackT env IO ()
+    -> Maybe (RIO env ())
+    -> Maybe (RIO env ())
+    -> RIO env ()
 reexecWithOptionalContainer mprojectRoot =
     execWithOptionalContainer mprojectRoot getCmdArgs
   where
@@ -188,11 +188,11 @@ execWithOptionalContainer
     :: HasConfig env
     => Maybe (Path Abs Dir)
     -> GetCmdArgs env
-    -> Maybe (StackT env IO ())
+    -> Maybe (RIO env ())
     -> IO ()
-    -> Maybe (StackT env IO ())
-    -> Maybe (StackT env IO ())
-    -> StackT env IO ()
+    -> Maybe (RIO env ())
+    -> Maybe (RIO env ())
+    -> RIO env ()
 execWithOptionalContainer mprojectRoot getCmdArgs mbefore inner mafter mrelease =
   do config <- view configL
      inContainer <- getInContainer
@@ -231,9 +231,9 @@ runContainerAndExit
   :: HasConfig env
   => GetCmdArgs env
   -> Maybe (Path Abs Dir) -- ^ Project root (maybe)
-  -> StackT env IO ()  -- ^ Action to run before
-  -> StackT env IO ()  -- ^ Action to run after
-  -> StackT env IO ()
+  -> RIO env ()  -- ^ Action to run before
+  -> RIO env ()  -- ^ Action to run after
+  -> RIO env ()
 runContainerAndExit getCmdArgs
                     mprojectRoot
                     before
@@ -403,7 +403,7 @@ runContainerAndExit getCmdArgs
     sshRelDir = $(mkRelDir ".ssh/")
 
 -- | Clean-up old docker images and containers.
-cleanup :: HasConfig env => CleanupOpts -> StackT env IO ()
+cleanup :: HasConfig env => CleanupOpts -> RIO env ()
 cleanup opts =
   do config <- view configL
      let docker = configDocker config
@@ -657,7 +657,7 @@ inspects envOverride images =
   where missingImagePrefixes = ["Error: No such image", "Error: No such object:"]
 
 -- | Pull latest version of configured Docker image from registry.
-pull :: HasConfig env => StackT env IO ()
+pull :: HasConfig env => RIO env ()
 pull =
   do config <- view configL
      let docker = configDocker config
@@ -936,4 +936,4 @@ type GetCmdArgs env
   -> EnvOverride
   -> Inspect
   -> Bool
-  -> StackT env IO (FilePath,[String],[(String,String)],[Mount])
+  -> RIO env (FilePath,[String],[(String,String)],[Mount])

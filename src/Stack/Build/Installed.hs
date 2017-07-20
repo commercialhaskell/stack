@@ -51,7 +51,7 @@ getInstalled :: (HasEnvConfig env, PackageInstallInfo pii)
              => EnvOverride
              -> GetInstalledOpts
              -> Map PackageName pii -- ^ does not contain any installed information
-             -> StackT env IO
+             -> RIO env
                   ( InstalledMap
                   , [DumpPackage () () ()] -- globally installed
                   , [DumpPackage () () ()] -- snapshot installed
@@ -125,7 +125,7 @@ loadDatabase :: (HasEnvConfig env, PackageInstallInfo pii)
              -> Map PackageName pii -- ^ to determine which installed things we should include
              -> Maybe (InstalledPackageLocation, Path Abs Dir) -- ^ package database, Nothing for global
              -> [LoadHelper] -- ^ from parent databases
-             -> StackT env IO ([LoadHelper], [DumpPackage () () ()])
+             -> RIO env ([LoadHelper], [DumpPackage () () ()])
 loadDatabase menv opts mcache sourceMap mdb lhs0 = do
     wc <- view $ actualCompilerVersionL.to whichCompiler
     (lhs1', dps) <- ghcPkgDump menv wc (fmap snd (maybeToList mdb))

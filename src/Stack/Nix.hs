@@ -38,7 +38,7 @@ reexecWithOptionalShell
     => Maybe (Path Abs Dir)
     -> IO (CompilerVersion 'CVWanted)
     -> IO ()
-    -> StackT env IO ()
+    -> RIO env ()
 reexecWithOptionalShell mprojectRoot getCompilerVersion inner =
   do config <- view configL
      inShell <- getInNixShell
@@ -61,8 +61,8 @@ runShellAndExit
     :: HasConfig env
     => Maybe (Path Abs Dir)
     -> IO (CompilerVersion 'CVWanted)
-    -> StackT env IO (String, [String])
-    -> StackT env IO ()
+    -> RIO env (String, [String])
+    -> RIO env ()
 runShellAndExit mprojectRoot getCompilerVersion getCmdArgs = do
      config <- view configL
      envOverride <- getEnvOverride (configPlatform config)

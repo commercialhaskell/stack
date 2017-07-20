@@ -106,7 +106,7 @@ setup
     -> CompilerVersion 'CVWanted
     -> VersionCheck
     -> Maybe (Path Abs File)
-    -> StackT env IO ()
+    -> RIO env ()
 setup SetupCmdOpts{..} wantedCompiler compilerCheck mstack = do
     Config{..} <- view configL
     (_, _, sandboxedGhc) <- ensureCompiler SetupOpts

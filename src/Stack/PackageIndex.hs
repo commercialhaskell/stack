@@ -60,7 +60,7 @@ import qualified System.Directory as D
 import           System.FilePath ((<.>))
 
 -- | Populate the package index caches and return them.
-populateCache :: HasConfig env => PackageIndex -> StackT env IO (PackageCache ())
+populateCache :: HasConfig env => PackageIndex -> RIO env (PackageCache ())
 populateCache index = do
     requireIndex index
     -- This uses full on lazy I/O instead of ResourceT to provide some
@@ -210,20 +210,20 @@ instance Show PackageIndexException where
         ]
 
 -- | Require that an index be present, updating if it isn't.
-requireIndex :: HasConfig env => PackageIndex -> StackT env IO ()
+requireIndex :: HasConfig env => PackageIndex -> RIO env ()
 requireIndex index = do
     tarFile <- configPackageIndex $ indexName index
     exists <- doesFileExist tarFile
     unless exists $ updateIndex index
 
 -- | Update all of the package indices
-updateAllIndices :: HasConfig env => StackT env IO ()
+updateAllIndices :: HasConfig env => RIO env ()
 updateAllIndices = do
     clearPackageCaches
     view packageIndicesL >>= mapM_ updateIndex
 
 -- | Update the index tarball
-updateIndex :: HasConfig env => PackageIndex -> StackT env IO ()
+updateIndex :: HasConfig env => PackageIndex -> RIO env ()
 updateIndex index =
   do let name = indexName index
          url = indexLocation index
@@ -248,7 +248,7 @@ updateIndex index =
 updateIndexHTTP :: HasConfig env
                 => IndexName
                 -> Text -- ^ url
-                -> StackT env IO ()
+                -> RIO env ()
 updateIndexHTTP indexName' url = do
     req <- parseRequest $ T.unpack url
     $logInfo ("Downloading package index from " <> url)
@@ -280,7 +280,7 @@ updateIndexHackageSecurity
     => IndexName
     -> Text -- ^ base URL
     -> HackageSecurity
-    -> StackT env IO ()
+    -> RIO env ()
 updateIndexHackageSecurity indexName' url (HackageSecurity keyIds threshold) = do
     baseURI <-
         case parseURI $ T.unpack url of
@@ -328,7 +328,7 @@ updateIndexHackageSecurity indexName' url (HackageSecurity keyIds threshold) = d
         HS.NoUpdates -> $logInfo "No updates to your package list were found"
 
 -- | Delete the package index cache
-deleteCache :: HasConfig env => IndexName -> StackT env IO ()
+deleteCache :: HasConfig env => IndexName -> RIO env ()
 deleteCache indexName' = do
     fp <- configPackageIndexCache indexName'
     eres <- liftIO $ tryIO $ removeFile fp
@@ -339,7 +339,7 @@ deleteCache indexName' = do
 -- | Get the known versions for a given package from the package caches.
 --
 -- See 'getPackageCaches' for performance notes.
-getPackageVersions :: HasConfig env => PackageName -> StackT env IO (Set Version)
+getPackageVersions :: HasConfig env => PackageName -> RIO env (Set Version)
 getPackageVersions pkgName = fmap (lookupPackageVersions pkgName) getPackageCaches
 
 lookupPackageVersions :: PackageName -> PackageCache index -> Set Version
@@ -350,7 +350,7 @@ lookupPackageVersions pkgName (PackageCache m) =
 --
 -- This has two levels of caching: in memory, and the on-disk cache. So,
 -- feel free to call this function multiple times.
-getPackageCaches :: HasConfig env => StackT env IO (PackageCache PackageIndex)
+getPackageCaches :: HasConfig env => RIO env (PackageCache PackageIndex)
 getPackageCaches = do
     config <- view configL
     mcached <- liftIO $ readIORef (configPackageCache config)
@@ -370,7 +370,7 @@ getPackageCaches = do
 
 -- | Clear the in-memory hackage index cache. This is needed when the
 -- hackage index is updated.
-clearPackageCaches :: HasConfig env => StackT env IO ()
+clearPackageCaches :: HasConfig env => RIO env ()
 clearPackageCaches = do
     cacheRef <- view $ configL.to configPackageCache
     liftIO $ writeIORef cacheRef Nothing
