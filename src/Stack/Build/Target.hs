@@ -233,13 +233,13 @@ data ResolveResult = ResolveResult
 -- | Convert a 'RawTarget' into a 'ResolveResult' (see description on
 -- the module).
 resolveRawTarget
-  :: forall env m. (StackMiniM env m, HasConfig env)
+  :: forall env. HasConfig env
   => Map PackageName (LoadedPackageInfo GhcPkgId) -- ^ globals
   -> Map PackageName (LoadedPackageInfo (PackageLocationIndex FilePath)) -- ^ snapshot
   -> Map PackageName (GenericPackageDescription, PackageLocationIndex FilePath) -- ^ local deps
   -> Map PackageName LocalPackageView -- ^ project packages
   -> (RawInput, RawTarget)
-  -> m (Either Text ResolveResult)
+  -> RIO env (Either Text ResolveResult)
 resolveRawTarget globals snap deps locals (ri, rt) =
     go rt
   where
@@ -469,10 +469,11 @@ combineResolveResults results = do
 ---------------------------------------------------------------------------------
 
 parseTargets
-    :: (StackM env m, HasEnvConfig env)
+    :: HasEnvConfig env
     => NeedTargets
     -> BuildOptsCLI
-    -> m ( LoadedSnapshot -- upgraded snapshot, with some packages possibly moved to local
+    -> RIO env
+         ( LoadedSnapshot -- upgraded snapshot, with some packages possibly moved to local
          , Map PackageName (LoadedPackageInfo (PackageLocationIndex FilePath)) -- all local deps
          , Map PackageName Target
          )

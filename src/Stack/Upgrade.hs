@@ -98,12 +98,12 @@ data UpgradeOpts = UpgradeOpts
     }
     deriving Show
 
-upgrade :: (StackM env m, HasConfig env)
+upgrade :: HasConfig env
         => ConfigMonoid
         -> Maybe AbstractResolver
         -> Maybe String -- ^ git hash at time of building, if known
         -> UpgradeOpts
-        -> m ()
+        -> RIO env ()
 upgrade gConfigMonoid mresolver builtHash (UpgradeOpts mbo mso) =
     case (mbo, mso) of
         -- FIXME It would be far nicer to capture this case in the
@@ -124,10 +124,7 @@ upgrade gConfigMonoid mresolver builtHash (UpgradeOpts mbo mso) =
     binary bo = binaryUpgrade bo
     source so = sourceUpgrade gConfigMonoid mresolver builtHash so
 
-binaryUpgrade
-  :: (StackM env m, HasConfig env)
-  => BinaryOpts
-  -> m ()
+binaryUpgrade :: HasConfig env => BinaryOpts -> RIO env ()
 binaryUpgrade (BinaryOpts mplatform force' mver morg mrepo) = do
     platforms0 <-
       case mplatform of
@@ -176,12 +173,12 @@ binaryUpgrade (BinaryOpts mplatform force' mver morg mrepo) = do
                     $ throwString "Non-success exit code from running newly downloaded executable"
 
 sourceUpgrade
-  :: (StackM env m, HasConfig env)
+  :: HasConfig env
   => ConfigMonoid
   -> Maybe AbstractResolver
   -> Maybe String
   -> SourceOpts
-  -> m ()
+  -> RIO env ()
 sourceUpgrade gConfigMonoid mresolver builtHash (SourceOpts gitRepo) =
   withSystemTempDir "stack-upgrade" $ \tmp -> do
     menv <- getMinimalEnvOverride
@@ -240,10 +237,10 @@ sourceUpgrade gConfigMonoid mresolver builtHash (SourceOpts gitRepo) =
             mresolver
             (SYLOverride $ dir </> $(mkRelFile "stack.yaml"))
         bconfig <- liftIO $ lcLoadBuildConfig lc Nothing
-        envConfig1 <- runStackT bconfig $ setupEnv $ Just $
+        envConfig1 <- runRIO bconfig $ setupEnv $ Just $
             "Try rerunning with --install-ghc to install the correct GHC into " <>
             T.pack (toFilePath (configLocalPrograms (view configL bconfig)))
-        runStackT (set (buildOptsL.buildOptsInstallExesL) True envConfig1) $
+        runRIO (set (buildOptsL.buildOptsInstallExesL) True envConfig1) $
             build (const $ return ()) Nothing defaultBuildOptsCLI
                 { boptsCLITargets = ["stack"]
                 }

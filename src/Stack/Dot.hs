@@ -72,9 +72,7 @@ data ListDepsOpts = ListDepsOpts
     }
 
 -- | Visualize the project's dependencies as a graphviz graph
-dot :: (StackM env m, HasEnvConfig env)
-    => DotOpts
-    -> m ()
+dot :: HasEnvConfig env => DotOpts -> RIO env ()
 dot dotOpts = do
   (localNames, prunedGraph) <- createPrunedDependencyGraph dotOpts
   printGraph dotOpts localNames prunedGraph
@@ -90,9 +88,10 @@ data DotPayload = DotPayload
 -- | Create the dependency graph and also prune it as specified in the dot
 -- options. Returns a set of local names and and a map from package names to
 -- dependencies.
-createPrunedDependencyGraph :: (StackM env m, HasEnvConfig env)
+createPrunedDependencyGraph :: HasEnvConfig env
                             => DotOpts
-                            -> m (Set PackageName,
+                            -> RIO env
+                                 (Set PackageName,
                                   Map PackageName (Set PackageName, DotPayload))
 createPrunedDependencyGraph dotOpts = do
   localNames <- liftM (Map.keysSet . lpProject) getLocalPackages
@@ -107,9 +106,9 @@ createPrunedDependencyGraph dotOpts = do
 -- name to a tuple of dependencies and payload if available. This
 -- function mainly gathers the required arguments for
 -- @resolveDependencies@.
-createDependencyGraph :: (StackM env m, HasEnvConfig env)
+createDependencyGraph :: HasEnvConfig env
                        => DotOpts
-                       -> m (Map PackageName (Set PackageName, DotPayload))
+                       -> RIO env (Map PackageName (Set PackageName, DotPayload))
 createDependencyGraph dotOpts = do
   (locals, sourceMap) <- loadSourceMap NeedTargets defaultBuildOptsCLI
       { boptsCLITargets = dotTargets dotOpts
@@ -135,9 +134,9 @@ createDependencyGraph dotOpts = do
     liftIO $ resolveDependencies (dotDependencyDepth dotOpts) graph depLoader)
   where makePayload pkg = DotPayload (Just $ packageVersion pkg) (Just $ packageLicense pkg)
 
-listDependencies :: (StackM env m, HasEnvConfig env)
+listDependencies :: HasEnvConfig env
                   => ListDepsOpts
-                  -> m ()
+                  -> RIO env ()
 listDependencies opts = do
   let dotOpts = listDepsDotOpts opts
   (_, resultGraph) <- createPrunedDependencyGraph dotOpts

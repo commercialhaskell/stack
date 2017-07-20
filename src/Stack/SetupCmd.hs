@@ -101,12 +101,12 @@ setupParser = SetupCmdOpts
             Just x -> return x
 
 setup
-    :: (StackM env m, HasConfig env, HasGHCVariant env)
+    :: (HasConfig env, HasGHCVariant env)
     => SetupCmdOpts
     -> CompilerVersion 'CVWanted
     -> VersionCheck
     -> Maybe (Path Abs File)
-    -> m ()
+    -> RIO env ()
 setup SetupCmdOpts{..} wantedCompiler compilerCheck mstack = do
     Config{..} <- view configL
     (_, _, sandboxedGhc) <- ensureCompiler SetupOpts

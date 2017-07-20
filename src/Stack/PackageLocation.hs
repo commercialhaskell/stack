@@ -42,11 +42,11 @@ import System.Process.Run
 -- | Same as 'resolveMultiPackageLocation', but works on a
 -- 'SinglePackageLocation'.
 resolveSinglePackageLocation
-    :: (StackMiniM env m, HasConfig env)
+    :: HasConfig env
     => EnvOverride
     -> Path Abs Dir -- ^ project root
     -> PackageLocation FilePath
-    -> m (Path Abs Dir)
+    -> RIO env (Path Abs Dir)
 resolveSinglePackageLocation _ projRoot (PLFilePath fp) = resolveDir projRoot fp
 resolveSinglePackageLocation _ projRoot (PLArchive (Archive url subdir msha)) = do
     workDir <- view workDirL
@@ -144,11 +144,11 @@ resolveSinglePackageLocation menv projRoot (PLRepo (Repo url commit repoType' su
 -- Returns the updated PackageLocation value with just a single subdir
 -- (if relevant).
 resolveMultiPackageLocation
-    :: (StackMiniM env m, HasConfig env)
+    :: HasConfig env
     => EnvOverride
     -> Path Abs Dir -- ^ project root
     -> PackageLocation Subdirs
-    -> m [(Path Abs Dir, PackageLocation FilePath)]
+    -> RIO env [(Path Abs Dir, PackageLocation FilePath)]
 resolveMultiPackageLocation x y (PLFilePath fp) = do
   dir <- resolveSinglePackageLocation x y (PLFilePath fp)
   return [(dir, PLFilePath fp)]
@@ -173,13 +173,13 @@ resolveMultiPackageLocation menv projRoot (PLRepo (Repo url commit repoType' sub
     return (dir', PLRepo $ Repo url commit repoType' subdir)
 
 cloneRepo
-    :: (StackMiniM env m, HasConfig env)
+    :: HasConfig env
     => EnvOverride
     -> Path Abs Dir -- ^ project root
     -> Text -- ^ URL
     -> Text -- ^ commit
     -> RepoType
-    -> m (Path Abs Dir)
+    -> RIO env (Path Abs Dir)
 cloneRepo menv projRoot url commit repoType' = do
     workDir <- view workDirL
     let nameBeforeHashing = case repoType' of
@@ -228,13 +228,13 @@ cloneRepo menv projRoot url commit repoType' = do
 -- | Load the raw bytes in the cabal files present in the given
 -- 'SinglePackageLocation'.
 loadSingleRawCabalFile
-  :: forall m env.
-     (StackMiniM env m, HasConfig env)
+  :: forall env.
+     HasConfig env
   => (PackageIdentifierRevision -> IO ByteString) -- ^ lookup in index
   -> EnvOverride
   -> Path Abs Dir -- ^ project root, used for checking out necessary files
   -> PackageLocationIndex FilePath
-  -> m ByteString
+  -> RIO env ByteString
 -- Need special handling of PLIndex for efficiency (just read from the
 -- index tarball) and correctness (get the cabal file from the index,
 -- not the package tarball itself, yay Hackage revisions).
@@ -246,13 +246,13 @@ loadSingleRawCabalFile _ menv root (PLOther loc) =
 
 -- | Same as 'loadMultiRawCabalFiles' but for 'PackageLocationIndex'.
 loadMultiRawCabalFilesIndex
-  :: forall m env.
-     (StackMiniM env m, HasConfig env)
+  :: forall env.
+     HasConfig env
   => (PackageIdentifierRevision -> IO ByteString) -- ^ lookup in index
   -> EnvOverride
   -> Path Abs Dir -- ^ project root, used for checking out necessary files
   -> PackageLocationIndex Subdirs
-  -> m [(ByteString, PackageLocationIndex FilePath)]
+  -> RIO env [(ByteString, PackageLocationIndex FilePath)]
 -- Need special handling of PLIndex for efficiency (just read from the
 -- index tarball) and correctness (get the cabal file from the index,
 -- not the package tarball itself, yay Hackage revisions).
@@ -267,12 +267,12 @@ loadMultiRawCabalFilesIndex _ x y (PLOther z) =
 -- in which case the returned 'PackageLocation' will have just the
 -- relevant subdirectory selected.
 loadMultiRawCabalFiles
-  :: forall m env.
-     (StackMiniM env m, HasConfig env)
+  :: forall env.
+     HasConfig env
   => EnvOverride
   -> Path Abs Dir -- ^ project root, used for checking out necessary files
   -> PackageLocation Subdirs
-  -> m [(ByteString, PackageLocation FilePath)]
+  -> RIO env [(ByteString, PackageLocation FilePath)]
 loadMultiRawCabalFiles menv root loc =
     resolveMultiPackageLocation menv root loc >>= mapM go
   where

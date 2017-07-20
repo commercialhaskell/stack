@@ -69,9 +69,7 @@ data NewOpts = NewOpts
     }
 
 -- | Create a new project with the given options.
-new
-    :: (StackM env m, HasConfig env)
-    => NewOpts -> Bool -> m (Path Abs Dir)
+new :: HasConfig env => NewOpts -> Bool -> RIO env (Path Abs Dir)
 new opts forceOverwrite = do
     when (newOptsProjectName opts `elem` wiredInPackages) $
       throwM $ Can'tUseWiredInName (newOptsProjectName opts)
@@ -121,8 +119,10 @@ data TemplateFrom = LocalTemp | RemoteTemp
 
 -- | Download and read in a template's text content.
 loadTemplate
-    :: forall env m. (StackM env m, HasConfig env)
-    => TemplateName -> (TemplateFrom -> m ()) -> m Text
+    :: forall env. HasConfig env
+    => TemplateName
+    -> (TemplateFrom -> RIO env ())
+    -> RIO env Text
 loadTemplate name logIt = do
     templateDir <- view $ configL.to templatesDir
     case templatePath name of
@@ -143,7 +143,7 @@ loadTemplate name logIt = do
                         Nothing -> throwM e
                 )
   where
-    loadLocalFile :: Path b File -> m Text
+    loadLocalFile :: Path b File -> RIO env Text
     loadLocalFile path = do
         $logDebug ("Opening local template: \"" <> T.pack (toFilePath path)
                                                 <> "\"")
@@ -153,7 +153,7 @@ loadTemplate name logIt = do
             else throwM (FailedToLoadTemplate name (toFilePath path))
     relRequest :: MonadThrow n => Path Rel File -> n Request
     relRequest rel = parseRequest (defaultTemplateUrl <> "/" <> toFilePath rel)
-    downloadTemplate :: Request -> Path Abs File -> m Text
+    downloadTemplate :: Request -> Path Abs File -> RIO env Text
     downloadTemplate req path = do
         logIt RemoteTemp
         _ <-
@@ -165,13 +165,13 @@ loadTemplate name logIt = do
 
 -- | Apply and unpack a template into a directory.
 applyTemplate
-    :: (StackM env m, HasConfig env)
+    :: HasConfig env
     => PackageName
     -> TemplateName
     -> Map Text Text
     -> Path Abs Dir
     -> Text
-    -> m (Map (Path Abs File) LB.ByteString)
+    -> RIO env  (Map (Path Abs File) LB.ByteString)
 applyTemplate project template nonceParams dir templateText = do
     config <- view configL
     currentYear <- do
@@ -251,8 +251,8 @@ writeTemplateFiles files =
 
 -- | Run any initialization functions, such as Git.
 runTemplateInits
-    :: (StackM env m, HasConfig env)
-    => Path Abs Dir -> m ()
+    :: HasConfig env
+    => Path Abs Dir -> RIO env ()
 runTemplateInits dir = do
     menv <- getMinimalEnvOverride
     config <- view configL
@@ -264,7 +264,7 @@ runTemplateInits dir = do
                          $logInfo "git init failed to run, ignoring ...")
 
 -- | Display the set of templates accompanied with description if available.
-listTemplates :: StackM env m => m ()
+listTemplates :: HasLogFunc env => RIO env ()
 listTemplates = do
     templates <- getTemplates
     templateInfo <- getTemplateInfo
@@ -281,7 +281,7 @@ listTemplates = do
       else mapM_ (liftIO . T.putStrLn . templateName) (S.toList templates)
 
 -- | Get the set of templates.
-getTemplates :: StackM env m => m (Set TemplateName)
+getTemplates :: HasLogFunc env => RIO env (Set TemplateName)
 getTemplates = do
     req <- liftM setGithubHeaders (parseUrlThrow defaultTemplatesList)
     resp <- catch (httpJSON req) (throwM . FailedToDownloadTemplates)
@@ -289,7 +289,7 @@ getTemplates = do
         200 -> return $ unTemplateSet $ getResponseBody resp
         code -> throwM (BadTemplatesResponse code)
 
-getTemplateInfo :: StackM env m => m (Map Text TemplateInfo)
+getTemplateInfo :: HasLogFunc env => RIO env (Map Text TemplateInfo)
 getTemplateInfo = do
   req <- liftM setGithubHeaders (parseUrlThrow defaultTemplateInfoUrl)
   resp <- catch (liftM Right $ httpLbs req) (\(ex :: HttpException) -> return . Left $ "Failed to download template info. The HTTP error was: " <> show ex)

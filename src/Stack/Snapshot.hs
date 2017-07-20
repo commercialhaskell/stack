@@ -126,10 +126,9 @@ instance Show SnapshotException where
 
 -- | Convert a 'Resolver' into a 'SnapshotDef'
 loadResolver
-  :: forall env m.
-     (StackMiniM env m, HasConfig env)
+  :: forall env. HasConfig env
   => Resolver
-  -> m SnapshotDef
+  -> RIO env SnapshotDef
 loadResolver (ResolverSnapshot name) = do
     stackage <- view stackRootL
     file' <- parseRelFile $ T.unpack file
@@ -239,20 +238,20 @@ loadResolver (ResolverCustom url loc) = do
     Left req -> download' req >>= load . toFilePath
     Right fp -> load fp
   where
-    download' :: Request -> m (Path Abs File)
+    download' :: Request -> RIO env (Path Abs File)
     download' req = do
       let urlHash = S8.unpack $ trimmedSnapshotHash $ doHash $ encodeUtf8 url
       hashFP <- parseRelFile $ urlHash ++ ".yaml"
       customPlanDir <- getCustomPlanDir
       let cacheFP = customPlanDir </> $(mkRelDir "yaml") </> hashFP
-      void (download req cacheFP :: m Bool)
+      void (download req cacheFP :: RIO env Bool)
       return cacheFP
 
     getCustomPlanDir = do
         root <- view stackRootL
         return $ root </> $(mkRelDir "custom-plan")
 
-    load :: FilePath -> m SnapshotDef
+    load :: FilePath -> RIO env SnapshotDef
     load fp = do
       WithJSONWarnings (sd0, mparentResolver, mcompiler) warnings <-
         liftIO (decodeFileEither fp) >>= either
@@ -290,13 +289,13 @@ loadResolver (ResolverCustom url loc) = do
 
       -- Calculate the hash of the current file, and then combine it
       -- with parent hashes if necessary below.
-      rawHash :: SnapshotHash <- fromDigest <$> hashFile fp :: m SnapshotHash
+      rawHash :: SnapshotHash <- fromDigest <$> hashFile fp :: RIO env SnapshotHash
 
       (parent', hash') <-
         case parentResolver' of
           ResolverCompiler cv -> return (Left cv, rawHash) -- just a small optimization
           _ -> do
-            parent' :: SnapshotDef <- loadResolver (parentResolver' :: Resolver) :: m SnapshotDef
+            parent' :: SnapshotDef <- loadResolver (parentResolver' :: Resolver) :: RIO env SnapshotDef
             let hash' :: SnapshotHash
                 hash' = combineHash rawHash $
                   case sdResolver parent' of
@@ -340,25 +339,25 @@ loadResolver (ResolverCustom url loc) = do
 
 -- | Fully load up a 'SnapshotDef' into a 'LoadedSnapshot'
 loadSnapshot
-  :: forall env m.
-     (StackMiniM env m, HasConfig env, HasGHCVariant env)
+  :: forall env.
+     (HasConfig env, HasGHCVariant env)
   => EnvOverride -- ^ used for running Git/Hg, and if relevant, getting global package info
   -> Maybe (CompilerVersion 'CVActual) -- ^ installed GHC we should query; if none provided, use the global hints
   -> Path Abs Dir -- ^ project root, used for checking out necessary files
   -> SnapshotDef
-  -> m LoadedSnapshot
+  -> RIO env LoadedSnapshot
 loadSnapshot menv mcompiler root sd = withCabalLoader $ \loader -> loadSnapshot' loader menv mcompiler root sd
 
 -- | Fully load up a 'SnapshotDef' into a 'LoadedSnapshot'
 loadSnapshot'
-  :: forall env m.
-     (StackMiniM env m, HasConfig env, HasGHCVariant env)
+  :: forall env.
+     (HasConfig env, HasGHCVariant env)
   => (PackageIdentifierRevision -> IO ByteString) -- ^ load a cabal file's contents from the index
   -> EnvOverride -- ^ used for running Git/Hg, and if relevant, getting global package info
   -> Maybe (CompilerVersion 'CVActual) -- ^ installed GHC we should query; if none provided, use the global hints
   -> Path Abs Dir -- ^ project root, used for checking out necessary files
   -> SnapshotDef
-  -> m LoadedSnapshot
+  -> RIO env LoadedSnapshot
 loadSnapshot' loadFromIndex menv mcompiler root =
     start
   where
@@ -368,7 +367,7 @@ loadSnapshot' loadFromIndex menv mcompiler root =
         (maybe GISSnapshotHints GISCompiler mcompiler)
       $(versionedDecodeOrLoad loadedSnapshotVC) path (inner sd)
 
-    inner :: SnapshotDef -> m LoadedSnapshot
+    inner :: SnapshotDef -> RIO env LoadedSnapshot
     inner sd = do
       ls0 <-
         case sdParent sd of
@@ -406,8 +405,8 @@ loadSnapshot' loadFromIndex menv mcompiler root =
 -- The new globals and snapshots must be a subset of the initial
 -- values.
 calculatePackagePromotion
-  :: forall env m localLocation.
-     (StackMiniM env m, HasConfig env, HasGHCVariant env)
+  :: forall env localLocation.
+     (HasConfig env, HasGHCVariant env)
   => (PackageIdentifierRevision -> IO ByteString) -- ^ load from index
   -> EnvOverride
   -> Path Abs Dir -- ^ project root
@@ -417,7 +416,8 @@ calculatePackagePromotion
   -> Map PackageName Bool -- ^ overrides whether a package should be registered hidden
   -> Map PackageName [Text] -- ^ GHC options
   -> Set PackageName -- ^ packages in the snapshot to drop
-  -> m ( Map PackageName (LoadedPackageInfo GhcPkgId) -- new globals
+  -> RIO env
+       ( Map PackageName (LoadedPackageInfo GhcPkgId) -- new globals
        , Map PackageName (LoadedPackageInfo SinglePackageLocation) -- new snapshot
        , Map PackageName (LoadedPackageInfo (SinglePackageLocation, Maybe localLocation)) -- new locals
        , Set PackageName -- packages explicitly upgraded via flags/options/hide values
@@ -510,8 +510,8 @@ calculatePackagePromotion
 
 -- | Recalculate a 'LoadedPackageInfo' based on updates to flags,
 -- hide values, and GHC options.
-recalculate :: forall env m.
-               (StackMiniM env m, HasConfig env, HasGHCVariant env)
+recalculate :: forall env.
+               (HasConfig env, HasGHCVariant env)
             => (PackageIdentifierRevision -> IO ByteString)
             -> EnvOverride
             -> Path Abs Dir -- ^ root
@@ -520,7 +520,7 @@ recalculate :: forall env m.
             -> Map PackageName Bool -- ^ hide?
             -> Map PackageName [Text] -- ^ GHC options
             -> (PackageName, LoadedPackageInfo SinglePackageLocation)
-            -> m (PackageName, LoadedPackageInfo SinglePackageLocation)
+            -> RIO env (PackageName, LoadedPackageInfo SinglePackageLocation)
 recalculate loadFromIndex menv root compilerVersion allFlags allHide allOptions (name, lpi0) = do
   let hide = fromMaybe (lpiHide lpi0) (Map.lookup name allHide)
       options = fromMaybe (lpiGhcOptions lpi0) (Map.lookup name allOptions)
@@ -588,10 +588,10 @@ checkDepsMet available m
 
 -- | Load a snapshot from the given compiler version, using just the
 -- information in the global package database.
-loadCompiler :: forall env m.
-                (StackMiniM env m, HasConfig env)
+loadCompiler :: forall env.
+                HasConfig env
              => CompilerVersion 'CVActual
-             -> m LoadedSnapshot
+             -> RIO env LoadedSnapshot
 loadCompiler cv = do
   menv <- getMinimalEnvOverride
   m <- ghcPkgDump menv (whichCompiler cv) []

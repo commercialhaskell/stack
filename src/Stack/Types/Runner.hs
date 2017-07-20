@@ -54,7 +54,7 @@ data Runner = Runner
   , runnerSticky     :: !Sticky
   }
 
-class HasRunner env where
+class HasLogFunc env => HasRunner env where
   runnerL :: Lens' env Runner
 instance HasRunner Runner where
   runnerL = id

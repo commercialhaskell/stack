@@ -392,12 +392,12 @@ instance Show BuildPlanCheck where
 -- given snapshot. Returns how well the snapshot satisfies the dependencies of
 -- the packages.
 checkSnapBuildPlan
-    :: (StackM env m, HasConfig env, HasGHCVariant env)
+    :: (HasConfig env, HasGHCVariant env)
     => Path Abs Dir -- ^ project root, used for checking out necessary files
     -> [GenericPackageDescription]
     -> Maybe (Map PackageName (Map FlagName Bool))
     -> SnapshotDef
-    -> m BuildPlanCheck
+    -> RIO env BuildPlanCheck
 checkSnapBuildPlan root gpds flags snapshotDef = do
     platform <- view platformL
     menv <- getMinimalEnvOverride
@@ -429,11 +429,11 @@ checkSnapBuildPlan root gpds flags snapshotDef = do
 -- | Find a snapshot and set of flags that is compatible with and matches as
 -- best as possible with the given 'GenericPackageDescription's.
 selectBestSnapshot
-    :: (StackM env m, HasConfig env, HasGHCVariant env)
+    :: (HasConfig env, HasGHCVariant env)
     => Path Abs Dir -- ^ project root, used for checking out necessary files
     -> [GenericPackageDescription]
     -> NonEmpty SnapshotDef
-    -> m (SnapshotDef, BuildPlanCheck)
+    -> RIO env (SnapshotDef, BuildPlanCheck)
 selectBestSnapshot root gpds snaps = do
     $logInfo $ "Selecting the best among "
                <> T.pack (show (NonEmpty.length snaps))

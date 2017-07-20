@@ -50,9 +50,6 @@ module Stack.Types.Config
   ,parseGHCVariant
   ,HasGHCVariant(..)
   ,snapshotsDir
-  -- ** Constraint synonym for use with StackMini
-  ,StackMiniM
-  ,StackM
   -- ** EnvConfig & HasEnvConfig
   ,EnvConfig(..)
   ,HasEnvConfig(..)
@@ -649,15 +646,6 @@ instance ToJSON Project where
       , ["packages" .= packages]
       , ["resolver" .= resolver]
       ]
-
--- | Constraint synonym for constraints satisfied by a 'MiniConfig'
--- environment.
-type StackMiniM r m =
-    ( MonadReader r m, MonadUnliftIO m, MonadLoggerIO m, MonadThrow m
-    )
-
--- | Constraint synonym for constraints commonly satisifed by monads used in stack.
-type StackM r m = (StackMiniM r m, HasRunner r)
 
 -- An uninterpreted representation of configuration options.
 -- Configurations may be "cascaded" using mappend (left-biased).
@@ -1784,7 +1772,7 @@ class HasGHCVariant env where
     {-# INLINE ghcVariantL #-}
 
 -- | Class for environment values that can provide a 'Config'.
-class HasPlatform env => HasConfig env where
+class (HasPlatform env, HasRunner env) => HasConfig env where
     configL :: Lens' env Config
     default configL :: HasBuildConfig env => Lens' env Config
     configL = buildConfigL.lens bcConfig (\x y -> x { bcConfig = y })

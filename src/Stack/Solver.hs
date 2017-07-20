@@ -73,14 +73,14 @@ import qualified Data.Text.Normalize as T ( normalize , NormalizationMode(NFC) )
 data ConstraintType = Constraint | Preference deriving (Eq)
 type ConstraintSpec = Map PackageName (Version, Map FlagName Bool)
 
-cabalSolver :: (StackM env m, HasConfig env)
+cabalSolver :: HasConfig env
             => EnvOverride
             -> [Path Abs Dir] -- ^ cabal files
             -> ConstraintType
             -> ConstraintSpec -- ^ src constraints
             -> ConstraintSpec -- ^ dep constraints
             -> [String] -- ^ additional arguments
-            -> m (Either [PackageName] ConstraintSpec)
+            -> RIO env (Either [PackageName] ConstraintSpec)
 cabalSolver menv cabalfps constraintType
             srcConstraints depConstraints cabalArgs =
   withSystemTempDir "cabal-solver" $ \dir' -> do
@@ -220,11 +220,11 @@ parseCabalOutputLine t0 = maybe (Left t0) Right . join .  match re $ t0
 
     lexeme r = some (psym isSpace) *> r
 
-getCabalConfig :: (StackM env m, HasConfig env)
+getCabalConfig :: HasConfig env
                => FilePath -- ^ temp dir
                -> ConstraintType
                -> Map PackageName Version -- ^ constraints
-               -> m [Text]
+               -> RIO env [Text]
 getCabalConfig dir constraintType constraints = do
     indices <- view $ configL.to configPackageIndices
     remotes <- mapM goIndex indices
@@ -262,9 +262,9 @@ getCabalConfig dir constraintType constraints = do
               ]
 
 setupCompiler
-    :: (StackM env m, HasConfig env, HasGHCVariant env)
+    :: (HasConfig env, HasGHCVariant env)
     => CompilerVersion 'CVWanted
-    -> m (Maybe ExtraDirs)
+    -> RIO env (Maybe ExtraDirs)
 setupCompiler compiler = do
     let msg = Just $ T.concat
           [ "Compiler version (" <> compilerVersionText compiler <> ") "
@@ -293,9 +293,9 @@ setupCompiler compiler = do
     return dirs
 
 setupCabalEnv
-    :: (StackM env m, HasConfig env, HasGHCVariant env)
+    :: (HasConfig env, HasGHCVariant env)
     => CompilerVersion 'CVWanted
-    -> m (EnvOverride, CompilerVersion 'CVActual)
+    -> RIO env (EnvOverride, CompilerVersion 'CVActual)
 setupCabalEnv compiler = do
     mpaths <- setupCompiler compiler
     menv0 <- getMinimalEnvOverride
@@ -358,7 +358,7 @@ mergeConstraints = Map.mergeWithKey
 -- or the solution in terms of src package flag settings and extra
 -- dependencies.
 solveResolverSpec
-    :: (StackM env m, HasConfig env, HasGHCVariant env)
+    :: (HasConfig env, HasGHCVariant env)
     => Path Abs File  -- ^ stack.yaml file location
     -> [Path Abs Dir] -- ^ package dirs containing cabal files
     -> ( SnapshotDef
@@ -366,7 +366,8 @@ solveResolverSpec
        , ConstraintSpec) -- ^ ( resolver
                          --   , src package constraints
                          --   , extra dependency constraints )
-    -> m (Either [PackageName] (ConstraintSpec , ConstraintSpec))
+    -> RIO env
+         (Either [PackageName] (ConstraintSpec , ConstraintSpec))
        -- ^ (Conflicting packages
        --    (resulting src package specs, external dependency specs))
 
@@ -466,12 +467,13 @@ solveResolverSpec stackYaml cabalDirs
 -- return the compiler version, package versions and packages flags
 -- for that resolver.
 getResolverConstraints
-    :: (StackM env m, HasConfig env, HasGHCVariant env)
+    :: (HasConfig env, HasGHCVariant env)
     => EnvOverride -- ^ for running Git/Hg clone commands
     -> Maybe (CompilerVersion 'CVActual) -- ^ actually installed compiler
     -> Path Abs File
     -> SnapshotDef
-    -> m (CompilerVersion 'CVActual,
+    -> RIO env
+         (CompilerVersion 'CVActual,
           Map PackageName (Version, Map FlagName Bool))
 getResolverConstraints menv mcompilerVersion stackYaml sd = do
     ls <- loadSnapshot menv mcompilerVersion (parent stackYaml) sd
@@ -513,11 +515,12 @@ ignoredDirs = Set.fromList
 -- pairs as well as any filenames for duplicate packages not included in the
 -- pairs.
 cabalPackagesCheck
-    :: (StackM env m, HasConfig env, HasGHCVariant env)
+    :: (HasConfig env, HasGHCVariant env)
      => [Path Abs File]
      -> String
      -> Maybe String
-     -> m ( Map PackageName (Path Abs File, C.GenericPackageDescription)
+     -> RIO env
+          ( Map PackageName (Path Abs File, C.GenericPackageDescription)
           , [Path Abs File])
 cabalPackagesCheck cabalfps noPkgMsg dupErrMsg = do
     when (null cabalfps) $
@@ -601,9 +604,9 @@ reportMissingCabalFiles cabalfps includeSubdirs = do
 -- dependencies in an existing stack.yaml and suggest changes in flags or
 -- extra dependencies so that the specified packages can be compiled.
 solveExtraDeps
-    :: (StackM env m, HasEnvConfig env)
+    :: HasEnvConfig env
     => Bool -- ^ modify stack.yaml?
-    -> m ()
+    -> RIO env ()
 solveExtraDeps modStackYaml = do
     bconfig <- view buildConfigL
 

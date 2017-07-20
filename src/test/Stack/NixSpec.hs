@@ -47,7 +47,7 @@ spec :: Spec
 spec = beforeAll setup $ do
   let loadConfig' cmdLineArgs =
         withRunner LevelDebug True False ColorAuto False $ \runner ->
-        runStackT runner $ loadConfig cmdLineArgs Nothing SYLDefault
+        runRIO runner $ loadConfig cmdLineArgs Nothing SYLDefault
       inTempDir test = do
         currentDirectory <- getCurrentDirectory
         withSystemTempDirectory "Stack_ConfigSpec" $ \tempDir -> do

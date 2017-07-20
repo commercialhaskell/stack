@@ -21,6 +21,7 @@ import           Stack.Constants
 import           Stack.Constants.Config
 import           Stack.GhcPkg as GhcPkg
 import           Stack.Types.Config
+import           Stack.Types.Runner
 import qualified System.FilePath as FP
 import           System.IO (stderr)
 import           System.Process.Read (EnvOverride(eoPath))
@@ -113,6 +114,10 @@ data PathInfo = PathInfo
     }
 
 instance HasPlatform PathInfo
+instance HasLogFunc PathInfo where
+    logFuncL = configL.logFuncL
+instance HasRunner PathInfo where
+    runnerL = configL.runnerL
 instance HasConfig PathInfo
 instance HasBuildConfig PathInfo where
     buildConfigL = lens piBuildConfig (\x y -> x { piBuildConfig = y })

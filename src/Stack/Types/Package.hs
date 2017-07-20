@@ -105,13 +105,14 @@ packageDefinedFlags = M.keysSet . packageDefaultFlags
 -- | Files that the package depends on, relative to package directory.
 -- Argument is the location of the .cabal file
 newtype GetPackageOpts = GetPackageOpts
-    { getPackageOpts :: forall env m. (StackM env m, HasEnvConfig env)
+    { getPackageOpts :: forall env. HasEnvConfig env
                      => SourceMap
                      -> InstalledMap
                      -> [PackageName]
                      -> [PackageName]
                      -> Path Abs File
-                     -> m (Map NamedComponent (Set ModuleName)
+                     -> RIO env
+                          (Map NamedComponent (Set ModuleName)
                           ,Map NamedComponent (Set DotCabalPath)
                           ,Map NamedComponent BuildInfoOpts)
     }
@@ -137,9 +138,10 @@ data CabalFileType
 -- | Files that the package depends on, relative to package directory.
 -- Argument is the location of the .cabal file
 newtype GetPackageFiles = GetPackageFiles
-    { getPackageFiles :: forall m env. (StackM env m, HasEnvConfig env)
+    { getPackageFiles :: forall env. HasEnvConfig env
                       => Path Abs File
-                      -> m (Map NamedComponent (Set ModuleName)
+                      -> RIO env
+                           (Map NamedComponent (Set ModuleName)
                            ,Map NamedComponent (Set DotCabalPath)
                            ,Set (Path Abs File)
                            ,[PackageWarning])

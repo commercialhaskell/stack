@@ -22,7 +22,7 @@ import           Stack.Types.Package
 import           Stack.Types.PackageName
 
 -- | List the packages inside the current project.
-listPackages :: (StackM env m, HasEnvConfig env) => m ()
+listPackages :: HasEnvConfig env => RIO env ()
 listPackages = do
     -- TODO: Instead of setting up an entire EnvConfig only to look up the package directories,
     -- make do with a Config (and the Project inside) and use resolvePackageEntry to get
@@ -34,7 +34,7 @@ listPackages = do
         ($logInfo . packageNameText) pkgName
 
 -- | List the targets in the current project.
-listTargets :: (StackM env m, HasEnvConfig env) => m ()
+listTargets :: HasEnvConfig env => RIO env ()
 listTargets =
     do rawLocals <- lpProject <$> getLocalPackages
        $logInfo

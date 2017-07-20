@@ -47,11 +47,12 @@ data GetInstalledOpts = GetInstalledOpts
     }
 
 -- | Returns the new InstalledMap and all of the locally registered packages.
-getInstalled :: (StackM env m, HasEnvConfig env, PackageInstallInfo pii)
+getInstalled :: (HasEnvConfig env, PackageInstallInfo pii)
              => EnvOverride
              -> GetInstalledOpts
              -> Map PackageName pii -- ^ does not contain any installed information
-             -> m ( InstalledMap
+             -> RIO env
+                  ( InstalledMap
                   , [DumpPackage () () ()] -- globally installed
                   , [DumpPackage () () ()] -- snapshot installed
                   , [DumpPackage () () ()] -- locally installed
@@ -117,14 +118,14 @@ getInstalled menv opts sourceMap = do
 -- The goal is to ascertain that the dependencies for a package are present,
 -- that it has profiling if necessary, and that it matches the version and
 -- location needed by the SourceMap
-loadDatabase :: (StackM env m, HasEnvConfig env, PackageInstallInfo pii)
+loadDatabase :: (HasEnvConfig env, PackageInstallInfo pii)
              => EnvOverride
              -> GetInstalledOpts
              -> Maybe InstalledCache -- ^ if Just, profiling or haddock is required
              -> Map PackageName pii -- ^ to determine which installed things we should include
              -> Maybe (InstalledPackageLocation, Path Abs Dir) -- ^ package database, Nothing for global
              -> [LoadHelper] -- ^ from parent databases
-             -> m ([LoadHelper], [DumpPackage () () ()])
+             -> RIO env ([LoadHelper], [DumpPackage () () ()])
 loadDatabase menv opts mcache sourceMap mdb lhs0 = do
     wc <- view $ actualCompilerVersionL.to whichCompiler
     (lhs1', dps) <- ghcPkgDump menv wc (fmap snd (maybeToList mdb))

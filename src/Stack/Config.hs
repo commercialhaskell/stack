@@ -145,9 +145,7 @@ getImplicitGlobalProjectDir config =
 
 -- | This is slightly more expensive than @'asks' ('bcStackYaml' '.' 'getBuildConfig')@
 -- and should only be used when no 'BuildConfig' is at hand.
-getStackYaml
-    :: (StackMiniM env m, HasConfig env)
-    => m (Path Abs File)
+getStackYaml :: HasConfig env => RIO env (Path Abs File)
 getStackYaml = do
     config <- view configL
     case configMaybeProject config of
@@ -155,9 +153,7 @@ getStackYaml = do
         Nothing -> liftM (</> stackDotYaml) (getImplicitGlobalProjectDir config)
 
 -- | Download the 'Snapshots' value from stackage.org.
-getSnapshots
-    :: (StackMiniM env m, HasConfig env)
-    => m Snapshots
+getSnapshots :: HasConfig env => RIO env Snapshots
 getSnapshots = do
     latestUrlText <- askLatestSnapshotUrl
     latestUrl <- parseUrlThrow (T.unpack latestUrlText)
@@ -168,10 +164,10 @@ getSnapshots = do
 
 -- | Turn an 'AbstractResolver' into a 'Resolver'.
 makeConcreteResolver
-    :: (StackMiniM env m, HasConfig env)
+    :: HasConfig env
     => Maybe (Path Abs Dir) -- ^ root of project for resolving custom relative paths
     -> AbstractResolver
-    -> m Resolver
+    -> RIO env Resolver
 makeConcreteResolver root (ARResolver r) = parseCustomLocation root r
 makeConcreteResolver root ar = do
     snapshots <- getSnapshots
@@ -199,7 +195,7 @@ makeConcreteResolver root ar = do
     return r
 
 -- | Get the latest snapshot resolver available.
-getLatestResolver :: (StackMiniM env m, HasConfig env) => m (ResolverWith a)
+getLatestResolver :: HasConfig env => RIO env (ResolverWith a)
 getLatestResolver = do
     snapshots <- getSnapshots
     let mlts = do
@@ -439,14 +435,14 @@ configGHCVariantDefault = fromMaybe GHCStandard . configGHCVariant0
 -- Load the configuration, using environment variables, and defaults as
 -- necessary.
 loadConfigMaybeProject
-    :: StackM env m
+    :: HasRunner env
     => ConfigMonoid
     -- ^ Config monoid from parsed command-line arguments
     -> Maybe AbstractResolver
     -- ^ Override resolver
     -> LocalConfigStatus (Project, Path Abs File, ConfigMonoid)
     -- ^ Project config to use, if any
-    -> m LoadConfig
+    -> RIO env LoadConfig
 loadConfigMaybeProject configArgs mresolver mproject = do
     (stackRoot, userOwnsStackRoot) <- determineStackRootAndOwnership configArgs
 
@@ -485,11 +481,9 @@ loadConfigMaybeProject configArgs mresolver mproject = do
         forM_ mprojectRoot $ \dir ->
             checkOwnership (dir </> configWorkDir config)
 
-    run <- askRunInIO
-
     return LoadConfig
         { lcConfig          = config
-        , lcLoadBuildConfig = run . loadBuildConfig mproject config mresolver
+        , lcLoadBuildConfig = runRIO config . loadBuildConfig mproject mresolver
         , lcProjectRoot     =
             case mprojectRoot of
               LCSProject fp -> Just fp
@@ -500,28 +494,25 @@ loadConfigMaybeProject configArgs mresolver mproject = do
 -- | Load the configuration, using current directory, environment variables,
 -- and defaults as necessary. The passed @Maybe (Path Abs File)@ is an
 -- override for the location of the project's stack.yaml.
-loadConfig :: StackM env m
+loadConfig :: HasRunner env
            => ConfigMonoid
            -- ^ Config monoid from parsed command-line arguments
            -> Maybe AbstractResolver
            -- ^ Override resolver
            -> StackYamlLoc (Path Abs File)
            -- ^ Override stack.yaml
-           -> m LoadConfig
+           -> RIO env LoadConfig
 loadConfig configArgs mresolver mstackYaml =
     loadProjectConfig mstackYaml >>= loadConfigMaybeProject configArgs mresolver
 
 -- | Load the build configuration, adds build-specific values to config loaded by @loadConfig@.
 -- values.
-loadBuildConfig :: forall env m.
-                   StackM env m
-                => LocalConfigStatus (Project, Path Abs File, ConfigMonoid)
-                -> Config
+loadBuildConfig :: LocalConfigStatus (Project, Path Abs File, ConfigMonoid)
                 -> Maybe AbstractResolver -- override resolver
                 -> Maybe (CompilerVersion 'CVWanted) -- override compiler
-                -> m BuildConfig
-loadBuildConfig mproject config mresolver mcompiler = do
-    env <- ask
+                -> RIO Config BuildConfig
+loadBuildConfig mproject mresolver mcompiler = do
+    config <- ask
 
     (project', stackYamlFP) <- case mproject of
       LCSProject (project, fp, _) -> do
@@ -542,7 +533,7 @@ loadBuildConfig mproject config mresolver mcompiler = do
             if exists
                then do
                    ProjectAndConfigMonoid project _ <- loadConfigYaml (parseProjectAndConfigMonoid destDir) dest
-                   when (view terminalL env) $
+                   when (view terminalL config) $
                        case mresolver of
                            Nothing ->
                                $logDebug ("Using resolver: " <> resolverRawName (projectResolver project) <>
@@ -581,13 +572,13 @@ loadBuildConfig mproject config mresolver mcompiler = do
         case mresolver of
             Nothing -> return $ projectResolver project'
             Just aresolver ->
-                runReaderT (makeConcreteResolver (Just (parent stackYamlFP)) aresolver) config
+                runRIO config $ makeConcreteResolver (Just (parent stackYamlFP)) aresolver
     let project = project'
             { projectResolver = resolver
             , projectCompiler = mcompiler <|> projectCompiler project'
             }
 
-    sd0 <- flip runReaderT config $ loadResolver resolver
+    sd0 <- runRIO config $ loadResolver resolver
     let sd = maybe id setCompilerVersion (projectCompiler project) sd0
 
     extraPackageDBs <- mapM resolveDir' (projectExtraPackageDBs project)
@@ -608,15 +599,15 @@ loadBuildConfig mproject config mresolver mcompiler = do
                 LCSNoConfig  -> False
         }
   where
-    getEmptyProject :: m Project
+    getEmptyProject :: RIO Config Project
     getEmptyProject = do
       r <- case mresolver of
             Just aresolver -> do
-                r' <- runReaderT (makeConcreteResolver Nothing aresolver) config
+                r' <- makeConcreteResolver Nothing aresolver
                 $logInfo ("Using resolver: " <> resolverRawName r' <> " specified on command line")
                 return r'
             Nothing -> do
-                r'' <- runReaderT getLatestResolver config
+                r'' <- getLatestResolver
                 $logInfo ("Using latest snapshot resolver: " <> resolverRawName r'')
                 return r''
       return Project
@@ -631,10 +622,7 @@ loadBuildConfig mproject config mresolver mcompiler = do
 
 -- | Get packages from EnvConfig, downloading and cloning as necessary.
 -- If the packages have already been downloaded, this uses a cached value (
-getLocalPackages
-    :: forall env m.
-       (StackMiniM env m, HasEnvConfig env)
-    => m LocalPackages
+getLocalPackages :: forall env. HasEnvConfig env => RIO env LocalPackages
 getLocalPackages = do
     cacheRef <- view $ envConfigL.to envConfigPackagesRef
     mcached <- liftIO $ readIORef cacheRef
