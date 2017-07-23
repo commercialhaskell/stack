@@ -30,11 +30,12 @@ import           System.Process.Read
 -- | Run a Stack Script
 scriptCmd :: ScriptOpts -> GlobalOpts -> IO ()
 scriptCmd opts go' = do
+    file <- resolveFile' $ soFile opts
     let go = go'
             { globalConfigMonoid = (globalConfigMonoid go')
                 { configMonoidInstallGHC = First $ Just True
                 }
-            , globalStackYaml = SYLNoConfig
+            , globalStackYaml = SYLNoConfig $ parent file
             }
     withBuildConfigAndLock go $ \lk -> do
         -- Some warnings in case the user somehow tries to set a
@@ -46,7 +47,7 @@ scriptCmd opts go' = do
           SYLOverride fp -> $logError $ T.pack
             $ "Ignoring override stack.yaml file for script command: " ++ fp
           SYLDefault -> return ()
-          SYLNoConfig -> assert False (return ())
+          SYLNoConfig _ -> assert False (return ())
 
         config <- view configL
         menv <- liftIO $ configEnvOverride config defaultEnvSettings
@@ -100,7 +101,6 @@ scriptCmd opts go' = do
           SEInterpret -> exec menv ("run" ++ compilerExeName wc)
                 (ghcArgs ++ soFile opts : soArgs opts)
           _ -> do
-            file <- resolveFile' $ soFile opts
             let dir = parent file
             -- use sinkProcessStdout to ensure a ProcessFailed
             -- exception is generated for better error messages
