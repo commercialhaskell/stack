@@ -47,7 +47,7 @@ import           Data.List.NonEmpty (NonEmpty)
 newtype PackageCache index = PackageCache
   (HashMap PackageName
   (HashMap Version
-   (index, Maybe PackageDownload, NonEmpty (CabalHash, OffsetSize))))
+   (index, Maybe PackageDownload, NonEmpty ([CabalHash], OffsetSize))))
   deriving (Generic, Eq, Show, Data, Typeable, Store, NFData)
 
 instance Monoid (PackageCache index) where

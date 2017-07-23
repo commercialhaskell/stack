@@ -89,7 +89,7 @@ populateCache index = do
     return cache
   where
     convertPI :: MonadIO m
-              => (PackageIdentifier, ((), Maybe PackageDownload, Endo [(CabalHash, OffsetSize)]))
+              => (PackageIdentifier, ((), Maybe PackageDownload, Endo [([CabalHash], OffsetSize)]))
               -> m (PackageCache ())
     convertPI (ident@(PackageIdentifier name version), ((), mpd, Endo front)) =
       case NE.nonEmpty $ front [] of
@@ -102,18 +102,18 @@ populateCache index = do
 
     loop :: MonadThrow m
          => Int64
-         -> HashMap PackageIdentifier ((), Maybe PackageDownload, Endo [(CabalHash, OffsetSize)])
+         -> HashMap PackageIdentifier ((), Maybe PackageDownload, Endo [([CabalHash], OffsetSize)])
          -> Tar.Entries Tar.FormatError
-         -> m (HashMap PackageIdentifier ((), Maybe PackageDownload, Endo [(CabalHash, OffsetSize)]))
+         -> m (HashMap PackageIdentifier ((), Maybe PackageDownload, Endo [([CabalHash], OffsetSize)]))
     loop !blockNo !m (Tar.Next e es) =
         loop (blockNo + entrySizeInBlocks e) (goE blockNo m e) es
     loop _ m Tar.Done = return m
     loop _ _ (Tar.Fail e) = throwM e
 
     goE :: Int64
-        -> HashMap PackageIdentifier ((), Maybe PackageDownload, Endo [(CabalHash, OffsetSize)])
+        -> HashMap PackageIdentifier ((), Maybe PackageDownload, Endo [([CabalHash], OffsetSize)])
         -> Tar.Entry
-        -> HashMap PackageIdentifier ((), Maybe PackageDownload, Endo [(CabalHash, OffsetSize)])
+        -> HashMap PackageIdentifier ((), Maybe PackageDownload, Endo [([CabalHash], OffsetSize)])
     goE blockNo m e =
         case Tar.entryContent e of
             Tar.NormalFile lbs size ->
@@ -134,15 +134,26 @@ populateCache index = do
             m
           where
             cabalHash = computeCabalHash lbs
+
+            -- Some older Stackage snapshots ended up with slightly
+            -- modified cabal files, in particular having DOS-style
+            -- line endings (CRLF) converted to Unix-style (LF). As a
+            -- result, we track both hashes with and without CR
+            -- characters stripped for compatibility with these older
+            -- snapshots.
+            cr = 13
+            cabalHashes
+              | cr `L.elem` lbs = [cabalHash, computeCabalHash (L.filter (/= cr) lbs)]
+              | otherwise = [cabalHash]
             offsetSize = OffsetSize ((blockNo + 1) * 512) size
-            newPair = (cabalHash, offsetSize)
+            newPair = (cabalHashes, offsetSize)
             newEndo = Endo (newPair:)
 
         addJSON :: FromJSON a
                 => (a -> PackageDownload)
                 -> PackageIdentifier
                 -> L.ByteString
-                -> HashMap PackageIdentifier ((), Maybe PackageDownload, Endo [(CabalHash, OffsetSize)])
+                -> HashMap PackageIdentifier ((), Maybe PackageDownload, Endo [([CabalHash], OffsetSize)])
         addJSON unwrap ident lbs =
             case decode lbs of
                 Nothing -> m
@@ -360,7 +371,7 @@ getPackageCaches = do
             result <- liftM mconcat $ forM (configPackageIndices config) $ \index -> do
                 fp <- configPackageIndexCache (indexName index)
                 PackageCache pis <-
-                    $(versionedDecodeOrLoad (storeVersionConfig "pkg-v5" "p0nBN2U7Y3RmJII0WaFJtTC1cDc="
+                    $(versionedDecodeOrLoad (storeVersionConfig "pkg-v5" "PIEH62CpuuOl_fyE25-ncPVZgMU="
                                              :: VersionConfig (PackageCache ())))
                     fp
                     (populateCache index)

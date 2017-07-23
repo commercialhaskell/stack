@@ -267,7 +267,10 @@ lookupResolvedPackage (PackageIdentifierRevision ident@(PackageIdentifier name v
   offsetSize <-
     case cfi of
       CFILatest -> Just $ snd $ NE.last files
-      CFIHash _msize hash' -> lookup hash' $ NE.toList files -- TODO check size?
+      CFIHash _msize hash' -> -- TODO check size?
+          lookup hash'
+        $ concatMap (\(hashes, x) -> map (, x) hashes)
+        $ NE.toList files
       CFIRevision rev -> fmap snd $ listToMaybe $ drop (fromIntegral rev) $ NE.toList files
   Just ResolvedPackage
     { rpIdent = ident
