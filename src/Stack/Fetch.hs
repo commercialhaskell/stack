@@ -340,13 +340,15 @@ withCabalLoader inner = do
                 Nothing -> do
                     let fuzzy = fuzzyLookupCandidates ident bothCaches
                         suggestions = case fuzzy of
-                            Nothing ->
-                              case typoCorrectionCandidates ident bothCaches of
-                                  Nothing -> ""
-                                  Just cs -> "Perhaps you meant " <>
-                                    orSeparated cs <> "?"
-                            Just cs -> "Possible candidates: " <>
+                            FRNameNotFound Nothing -> ""
+                            FRNameNotFound (Just cs) ->
+                                  "Perhaps you meant " <> orSeparated cs <> "?"
+                            FRVersionNotFound cs -> "Possible candidates: " <>
                               commaSeparated (NE.map packageIdentifierText cs)
+                              <> "."
+                            FRRevisionNotFound cs ->
+                              "The specified revision was not found.\nPossible candidates: " <>
+                              commaSeparated (NE.map (T.pack . packageIdentifierRevisionString) cs)
                               <> "."
                     join $ modifyMVar updateRef $ \toUpdate ->
                         if toUpdate then do
@@ -376,15 +378,36 @@ lookupPackageIdentifierExact identRev cache = do
     [bs] <- withCabalFiles (indexName (rpIndex rp)) [(rp, ())] $ \_ _ bs -> return bs
     return bs
 
+data FuzzyResults
+  = FRNameNotFound !(Maybe (NonEmpty T.Text))
+  | FRVersionNotFound !(NonEmpty PackageIdentifier)
+  | FRRevisionNotFound !(NonEmpty PackageIdentifierRevision)
+
 -- | Given package identifier and package caches, return list of packages
 -- with the same name and the same two first version number components found
 -- in the caches.
 fuzzyLookupCandidates
   :: PackageIdentifierRevision
   -> PackageCache index
-  -> Maybe (NonEmpty PackageIdentifier)
+  -> FuzzyResults
 fuzzyLookupCandidates (PackageIdentifierRevision (PackageIdentifier name ver) _rev) (PackageCache caches) =
-    NE.nonEmpty $ map (PackageIdentifier name) $ filter sameMajor $ maybe [] HashMap.keys $ HashMap.lookup name caches
+  case HashMap.lookup name caches of
+    Nothing -> FRNameNotFound $ typoCorrectionCandidates name (PackageCache caches)
+    Just m ->
+      case HashMap.lookup ver m of
+        Nothing ->
+          case NE.nonEmpty $ filter sameMajor $ HashMap.keys m of
+            Just vers -> FRVersionNotFound $ NE.map (PackageIdentifier name) vers
+            Nothing ->
+              case NE.nonEmpty $ HashMap.keys m of
+                Nothing -> error "fuzzyLookupCandidates: no versions"
+                Just vers -> FRVersionNotFound $ NE.map (PackageIdentifier name) vers
+        Just (_index, _mpd, revisions) ->
+          let hashes = concatMap fst $ NE.toList revisions
+              pirs = map (PackageIdentifierRevision (PackageIdentifier name ver) . CFIHash Nothing) hashes
+           in case NE.nonEmpty pirs of
+                Nothing -> error "fuzzyLookupCandidates: no revisions"
+                Just pirs' -> FRRevisionNotFound pirs'
   where
     sameMajor v = toMajorVersion v == toMajorVersion ver
 
@@ -392,11 +415,11 @@ fuzzyLookupCandidates (PackageIdentifierRevision (PackageIdentifier name ver) _r
 -- package caches. This should be called before giving up, i.e. when
 -- 'fuzzyLookupCandidates' cannot return anything.
 typoCorrectionCandidates
-  :: PackageIdentifierRevision
+  :: PackageName
   -> PackageCache index
   -> Maybe (NonEmpty T.Text)
-typoCorrectionCandidates (PackageIdentifierRevision ident _mcfi) (PackageCache cache) =
-  let name = packageNameText (packageIdentifierName ident)
+typoCorrectionCandidates name' (PackageCache cache) =
+  let name = packageNameText name'
   in  NE.nonEmpty
     . take 10
     . map snd
