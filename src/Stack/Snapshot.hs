@@ -77,6 +77,7 @@ data SnapshotException
   | FilepathInCustomSnapshot !Text
   | NeedResolverOrCompiler !Text
   | MissingPackages !(Set PackageName)
+  | CustomResolverException !Text !(Either Request FilePath) !ParseException
   deriving Typeable
 instance Exception SnapshotException
 instance Show SnapshotException where
@@ -123,6 +124,14 @@ instance Show SnapshotException where
   show (MissingPackages names) =
     "The following packages specified by flags or options are not found: " ++
     unwords (map packageNameString (Set.toList names))
+  show (CustomResolverException url loc e) = concat
+    [ "Unable to load custom resolver "
+    , T.unpack url
+    , " from location\n"
+    , show loc
+    , "\nException: "
+    , show e
+    ]
 
 -- | Convert a 'Resolver' into a 'SnapshotDef'
 loadResolver
@@ -233,7 +242,7 @@ loadResolver (ResolverCompiler compiler) = return SnapshotDef
     , sdGlobalHints = Map.empty
     }
 loadResolver (ResolverCustom url loc) = do
-  $logDebug $ "Loading " <> url <> " build plan"
+  $logDebug $ "Loading " <> url <> " build plan from " <> T.pack (show loc)
   case loc of
     Left req -> download' req >>= load . toFilePath
     Right fp -> load fp
@@ -255,7 +264,7 @@ loadResolver (ResolverCustom url loc) = do
     load fp = do
       WithJSONWarnings (sd0, mparentResolver, mcompiler) warnings <-
         liftIO (decodeFileEither fp) >>= either
-          throwM
+          (throwM . CustomResolverException url loc)
           (either (throwM . AesonException) return . parseEither parseCustom)
       logJSONWarnings (T.unpack url) warnings
 

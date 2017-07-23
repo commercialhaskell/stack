@@ -468,7 +468,7 @@ loadConfigMaybeProject configArgs mresolver mproject = do
 
     config <-
         case mproject of
-          LCSNoConfig -> configNoLocalConfig stackRoot mresolver configArgs
+          LCSNoConfig _ -> configNoLocalConfig stackRoot mresolver configArgs
           LCSProject project -> loadHelper $ Just project
           LCSNoProject -> loadHelper Nothing
     unless (fromCabalVersion Meta.version `withinRange` configRequireStackVersion config)
@@ -488,7 +488,7 @@ loadConfigMaybeProject configArgs mresolver mproject = do
             case mprojectRoot of
               LCSProject fp -> Just fp
               LCSNoProject  -> Nothing
-              LCSNoConfig   -> Nothing
+              LCSNoConfig _ -> Nothing
         }
 
 -- | Load the configuration, using current directory, environment variables,
@@ -517,9 +517,14 @@ loadBuildConfig mproject mresolver mcompiler = do
     (project', stackYamlFP) <- case mproject of
       LCSProject (project, fp, _) -> do
           forM_ (projectUserMsg project) ($logWarn . T.pack)
-          return (project, fp)
-      LCSNoConfig -> do
-          p <- getEmptyProject
+          resolver <-
+              case mresolver of
+                  Nothing -> return $ projectResolver project
+                  Just aresolver ->
+                      runRIO config $ makeConcreteResolver (Just (parent fp)) aresolver
+          return (project { projectResolver = resolver }, fp)
+      LCSNoConfig parentDir -> do
+          p <- getEmptyProject (Just parentDir)
           return (p, configUserConfigPath config)
       LCSNoProject -> do
             $logDebug "Run from outside a project, using implicit global project config"
@@ -552,7 +557,7 @@ loadBuildConfig mproject mresolver mcompiler = do
                else do
                    $logInfo ("Writing implicit global project config file to: " <> T.pack dest')
                    $logInfo "Note: You can change the snapshot via the resolver field there."
-                   p <- getEmptyProject
+                   p <- getEmptyProject Nothing
                    liftIO $ do
                        S.writeFile dest' $ S.concat
                            [ "# This is the implicit global project's config file, which is only used when\n"
@@ -568,17 +573,11 @@ loadBuildConfig mproject mresolver mcompiler = do
                            [ "This is the implicit global project, which is used only when 'stack' is run\n"
                            , "outside of a real project.\n" ]
                    return (p, dest)
-    resolver <-
-        case mresolver of
-            Nothing -> return $ projectResolver project'
-            Just aresolver ->
-                runRIO config $ makeConcreteResolver (Just (parent stackYamlFP)) aresolver
     let project = project'
-            { projectResolver = resolver
-            , projectCompiler = mcompiler <|> projectCompiler project'
+            { projectCompiler = mcompiler <|> projectCompiler project'
             }
 
-    sd0 <- runRIO config $ loadResolver resolver
+    sd0 <- runRIO config $ loadResolver $ projectResolver project
     let sd = maybe id setCompilerVersion (projectCompiler project) sd0
 
     extraPackageDBs <- mapM resolveDir' (projectExtraPackageDBs project)
@@ -596,14 +595,15 @@ loadBuildConfig mproject mresolver mcompiler = do
             case mproject of
                 LCSNoProject -> True
                 LCSProject _ -> False
-                LCSNoConfig  -> False
+                LCSNoConfig _ -> False
         }
   where
-    getEmptyProject :: RIO Config Project
-    getEmptyProject = do
+    getEmptyProject :: Maybe (Path Abs Dir) -- ^ directory used for making concrete resolver
+                    -> RIO Config Project
+    getEmptyProject mparentDir = do
       r <- case mresolver of
             Just aresolver -> do
-                r' <- makeConcreteResolver Nothing aresolver
+                r' <- makeConcreteResolver mparentDir aresolver
                 $logInfo ("Using resolver: " <> resolverRawName r' <> " specified on command line")
                 return r'
             Nothing -> do
@@ -862,12 +862,13 @@ getProjectConfig SYLDefault = do
         if exists
             then return $ Just fp
             else return Nothing
-getProjectConfig SYLNoConfig = return LCSNoConfig
+getProjectConfig (SYLNoConfig parentDir) = return (LCSNoConfig parentDir)
 
 data LocalConfigStatus a
     = LCSNoProject
     | LCSProject a
-    | LCSNoConfig
+    | LCSNoConfig !(Path Abs Dir)
+    -- ^ parent directory for making a concrete resolving
     deriving (Show,Functor,Foldable,Traversable)
 
 -- | Find the project config file location, respecting environment variables
@@ -888,9 +889,9 @@ loadProjectConfig mstackYaml = do
         LCSNoProject -> do
             $logDebug $ "No project config file found, using defaults."
             return LCSNoProject
-        LCSNoConfig -> do
+        LCSNoConfig mparentDir -> do
             $logDebug "Ignoring config files"
-            return LCSNoConfig
+            return (LCSNoConfig mparentDir)
   where
     load fp = do
         ProjectAndConfigMonoid project config <- loadConfigYaml (parseProjectAndConfigMonoid (parent fp)) fp
@@ -943,7 +944,13 @@ getFakeConfigPath stackRoot ar = do
     case ar of
       ARResolver r -> return $ T.unpack $ resolverRawName r
       _ -> throwM $ InvalidResolverForNoLocalConfig $ show ar
-  asDir <- parseRelDir asString
+  -- This takeWhile is an ugly hack. We don't actually need this
+  -- path for anything useful. But if we take the raw value for
+  -- a custom snapshot, it will be unparseable in a PATH.
+  -- Therefore, we add in this silly "strip up to :".
+  -- Better would be to defer figuring out this value until
+  -- after we have a fully loaded snapshot with a hash.
+  asDir <- parseRelDir $ takeWhile (/= ':') asString
   let full = stackRoot </> $(mkRelDir "script") </> asDir </> $(mkRelFile "config.yaml")
   ensureDir (parent full)
   return full
