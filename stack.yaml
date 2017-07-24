@@ -18,3 +18,4 @@ flags:
     win32-2-5: false
 extra-deps:
 - mintty-0.1.1
+- unicode-transforms-0.3.2
