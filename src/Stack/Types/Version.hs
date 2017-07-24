@@ -139,12 +139,12 @@ versionText (Version v) =
 -- | Convert to a Cabal version.
 toCabalVersion :: Version -> Cabal.Version
 toCabalVersion (Version v) =
-  Cabal.Version (map fromIntegral (V.toList v)) []
+  Cabal.mkVersion (map fromIntegral (V.toList v))
 
 -- | Convert from a Cabal version.
 fromCabalVersion :: Cabal.Version -> Version
-fromCabalVersion (Cabal.Version vs _) =
-  let !v = V.fromList (map fromIntegral vs)
+fromCabalVersion vs =
+  let !v = V.fromList (map fromIntegral (Cabal.versionNumbers vs))
   in Version v
 
 -- | Make a package version.

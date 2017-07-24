@@ -44,6 +44,7 @@ import           Distribution.PackageDescription (GenericPackageDescription,
                                                   flagName, genPackageFlags,
                                                   condExecutables)
 import qualified Distribution.PackageDescription as C
+import qualified Distribution.Types.UnqualComponentName as C
 import           Distribution.System (Platform)
 import           Distribution.Text (display)
 import qualified Distribution.Version as C
@@ -186,7 +187,7 @@ getToolMap ls locals =
     -- worse case scenario is we build an extra package that wasn't
     -- strictly needed.
     gpdExes :: GenericPackageDescription -> [Text]
-    gpdExes = map (T.pack . fst) . condExecutables
+    gpdExes = map (T.pack . C.unUnqualComponentName . fst) . condExecutables
 
 gpdPackages :: [GenericPackageDescription] -> Map PackageName Version
 gpdPackages gpds = Map.fromList $

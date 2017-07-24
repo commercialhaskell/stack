@@ -293,7 +293,7 @@ renderStackYaml p ignoredPackages dupPackages =
 
     footerHelp =
         let major = toCabalVersion
-                    $ toMajorVersion $ fromCabalVersion Meta.version
+                    $ toMajorVersion $ fromCabalVersion $ C.mkVersion' Meta.version
         in commentHelp
         [ "Control whether we use the GHC we find on the path"
         , "system-ghc: true"

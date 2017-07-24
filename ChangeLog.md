@@ -11,6 +11,7 @@ Major changes:
   details, please see
   [the writeup on these changes](https://www.fpcomplete.com/blog/2017/07/stacks-new-extensible-snapshots). [PR #3249](https://github.com/commercialhaskell/stack/pull/3249),
   see the PR description for a number of related issues.
+* Upgraded to version 2.0 of the Cabal library.
 
 Behavior changes:
 

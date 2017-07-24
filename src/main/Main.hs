@@ -34,6 +34,7 @@ import           Development.GitRev (gitCommitCount, gitHash)
 #endif
 import           Distribution.System (buildArch, buildPlatform)
 import           Distribution.Text (display)
+import           Distribution.Version (mkVersion')
 import           GHC.IO.Encoding (mkTextEncoding, textEncodingName)
 import           Lens.Micro
 import           Options.Applicative
@@ -173,7 +174,7 @@ main = do
       case globalReExecVersion global of
           Just expectVersion -> do
               expectVersion' <- parseVersionFromString expectVersion
-              unless (checkVersion MatchMinor expectVersion' (fromCabalVersion Meta.version))
+              unless (checkVersion MatchMinor expectVersion' (fromCabalVersion (mkVersion' Meta.version)))
                   $ throwIO $ InvalidReExecVersion expectVersion (showVersion Meta.version)
           _ -> return ()
       run global `catch` \e ->

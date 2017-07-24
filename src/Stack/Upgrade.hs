@@ -17,6 +17,7 @@ import qualified Data.HashMap.Strict         as HashMap
 import qualified Data.List
 import qualified Data.Map                    as Map
 import qualified Data.Text as T
+import           Distribution.Version        (mkVersion')
 import           Lens.Micro                  (set)
 import           Options.Applicative
 import           Path
@@ -218,7 +219,7 @@ sourceUpgrade gConfigMonoid mresolver builtHash (SourceOpts gitRepo) =
         when (null versions) (throwString "No stack found in package indices")
 
         let version = Data.List.maximum versions
-        if version <= fromCabalVersion Paths.version
+        if version <= fromCabalVersion (mkVersion' Paths.version)
             then do
                 $logInfo "Already at latest version, no upgrade required"
                 return Nothing

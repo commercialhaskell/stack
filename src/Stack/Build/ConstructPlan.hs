@@ -795,7 +795,7 @@ packageDepsWithTools p = do
     ctx <- ask
     -- TODO: it would be cool to defer these warnings until there's an
     -- actual issue building the package.
-    let toEither (Cabal.Dependency (Cabal.PackageName name) _) mp =
+    let toEither (Cabal.Dependency (Cabal.unPackageName -> name) _) mp =
             case Map.toList mp of
                 [] -> Left (NoToolFound name (packageName p))
                 [_] -> Right mp

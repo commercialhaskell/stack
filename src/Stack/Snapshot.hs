@@ -38,6 +38,7 @@ import           Data.Yaml (decodeFileEither, ParseException (AesonException))
 import           Distribution.InstalledPackageInfo (PError)
 import           Distribution.PackageDescription (GenericPackageDescription)
 import qualified Distribution.PackageDescription as C
+import qualified Distribution.Types.UnqualComponentName as C
 import           Distribution.System (Platform)
 import           Distribution.Text (display)
 import qualified Distribution.Version as C
@@ -787,7 +788,10 @@ calculate gpd platform compilerVersion loc flags hide options =
       , lpiPackageDeps = Map.map fromVersionRange
                        $ Map.filterWithKey (const . (/= name))
                        $ packageDependencies pd
-      , lpiProvidedExes = Set.fromList $ map (ExeName . T.pack . C.exeName) $ C.executables pd
+      , lpiProvidedExes =
+            Set.fromList
+          $ map (ExeName . T.pack . C.unUnqualComponentName . C.exeName)
+          $ C.executables pd
       , lpiNeededExes = Map.mapKeys ExeName
                       $ Map.map fromVersionRange
                       $ packageToolDependencies pd

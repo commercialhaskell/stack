@@ -193,7 +193,7 @@ import           Distribution.PackageDescription (GenericPackageDescription)
 import           Distribution.ParseUtils (PError)
 import           Distribution.System (Platform)
 import qualified Distribution.Text
-import           Distribution.Version (anyVersion)
+import           Distribution.Version (anyVersion, mkVersion')
 import           Generics.Deriving.Monoid (memptydefault, mappenddefault)
 import           Lens.Micro (Lens', lens, _1, _2, to)
 import           Options.Applicative (ReadM)
@@ -1031,7 +1031,7 @@ instance Show ConfigException where
         ]
     show (BadStackVersionException requiredRange) = concat
         [ "The version of stack you are using ("
-        , show (fromCabalVersion Meta.version)
+        , show (fromCabalVersion (mkVersion' Meta.version))
         , ") is outside the required\n"
         ,"version range specified in stack.yaml ("
         , T.unpack (versionRangeText requiredRange)

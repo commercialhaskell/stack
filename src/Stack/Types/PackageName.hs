@@ -112,15 +112,15 @@ packageNameText (PackageName n) = n
 
 -- | Convert from a Cabal package name.
 fromCabalPackageName :: Cabal.PackageName -> PackageName
-fromCabalPackageName (Cabal.PackageName name) =
-  let !x = T.pack name
+fromCabalPackageName name =
+  let !x = T.pack $ Cabal.unPackageName name
   in PackageName x
 
 -- | Convert to a Cabal package name.
 toCabalPackageName :: PackageName -> Cabal.PackageName
 toCabalPackageName (PackageName name) =
   let !x = T.unpack name
-  in Cabal.PackageName x
+  in Cabal.mkPackageName x
 
 -- | Parse a package name from a file path.
 parsePackageNameFromFilePath :: MonadThrow m => Path a File -> m PackageName
