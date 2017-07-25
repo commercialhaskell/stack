@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE RecordWildCards #-}
 
 import Control.Applicative
@@ -172,7 +173,11 @@ rules global@Global{..} args = do
             entries <- forM stageFiles $ \stageFile -> do
                 Zip.readEntry
                     [Zip.OptLocation
+#if MIN_VERSION_zip_archive(0,3,0)
+                        (dropFileName (dropDirectoryPrefix (releaseStageDir </> binaryName) stageFile))
+#else
                         (dropDirectoryPrefix (releaseStageDir </> binaryName) stageFile)
+#endif
                         False]
                     stageFile
             let archive = foldr Zip.addEntryToArchive Zip.emptyArchive entries
