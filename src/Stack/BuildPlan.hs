@@ -152,7 +152,7 @@ instance Show BuildPlanException where
 -- both snapshot and local packages (deps and project packages).
 getToolMap :: LoadedSnapshot
            -> LocalPackages
-           -> Map Text (Set PackageName)
+           -> Map ExeName (Set PackageName)
 getToolMap ls locals =
 
     {- We no longer do this, following discussion at:
@@ -171,13 +171,13 @@ getToolMap ls locals =
         ]
   where
     goSnap (pname, lpi) =
-        map (flip Map.singleton (Set.singleton pname) . unExeName)
+        map (flip Map.singleton (Set.singleton pname))
       $ Set.toList
       $ lpiProvidedExes lpi
 
     goLocalProj (pname, lpv) =
         map (flip Map.singleton (Set.singleton pname))
-        [t | CExe t <- Set.toList (lpvComponents lpv)]
+        [ExeName t | CExe t <- Set.toList (lpvComponents lpv)]
 
     goLocalDep (pname, (gpd, _loc)) =
         map (flip Map.singleton (Set.singleton pname))
@@ -186,8 +186,8 @@ getToolMap ls locals =
     -- TODO consider doing buildable checking. Not a big deal though:
     -- worse case scenario is we build an extra package that wasn't
     -- strictly needed.
-    gpdExes :: GenericPackageDescription -> [Text]
-    gpdExes = map (T.pack . C.unUnqualComponentName . fst) . condExecutables
+    gpdExes :: GenericPackageDescription -> [ExeName]
+    gpdExes = map (ExeName . T.pack . C.unUnqualComponentName . fst) . condExecutables
 
 gpdPackages :: [GenericPackageDescription] -> Map PackageName Version
 gpdPackages gpds = Map.fromList $

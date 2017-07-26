@@ -65,7 +65,6 @@ import           Distribution.Simple.Utils
 import           Distribution.System (OS (..), Arch, Platform (..))
 import qualified Distribution.Text as D
 import qualified Distribution.Types.CondTree as Cabal
-import qualified Distribution.Types.Dependency as Cabal
 import qualified Distribution.Types.ExeDependency as Cabal
 import qualified Distribution.Types.LegacyExeDependency as Cabal
 import qualified Distribution.Types.UnqualComponentName as Cabal
@@ -83,7 +82,7 @@ import           Stack.Constants.Config
 import           Stack.Prelude
 import           Stack.PrettyPrint
 import           Stack.Types.Build
-import           Stack.Types.BuildPlan (PackageLocationIndex (..), PackageLocation (..))
+import           Stack.Types.BuildPlan (PackageLocationIndex (..), PackageLocation (..), ExeName (..))
 import           Stack.Types.Compiler
 import           Stack.Types.Config
 import           Stack.Types.FlagName
@@ -222,9 +221,7 @@ packageFromPackageDescription packageConfig pkgFlags pkg =
     , packageLicense = license pkg
     , packageDeps = deps
     , packageFiles = pkgFiles
-    , packageTools = map
-        (\(Cabal.ExeDependency name' _ range) -> Cabal.Dependency name' range)
-        (packageDescTools pkg)
+    , packageTools = packageDescTools pkg
     , packageGhcOptions = packageConfigGhcOptions packageConfig
     , packageFlags = packageConfigFlags packageConfig
     , packageDefaultFlags = M.fromList
@@ -544,8 +541,20 @@ packageToolDependencies =
   allBuildInfo
 
 -- | Get all dependencies of the package (buildable targets only).
-packageDescTools :: PackageDescription -> [Cabal.ExeDependency]
-packageDescTools = concatMap buildToolDepends . allBuildInfo
+--
+-- This uses both the new 'buildToolDepends' and old 'buildTools'
+-- information.
+packageDescTools :: PackageDescription -> Map ExeName VersionRange
+packageDescTools =
+  M.fromList . concatMap tools . allBuildInfo
+  where
+    tools bi = map go1 (buildTools bi) ++ map go2 (buildToolDepends bi)
+
+    go1 :: Cabal.LegacyExeDependency -> (ExeName, VersionRange)
+    go1 (Cabal.LegacyExeDependency name range) = (ExeName $ T.pack name, range)
+
+    go2 :: Cabal.ExeDependency -> (ExeName, VersionRange)
+    go2 (Cabal.ExeDependency _pkg name range) = (ExeName $ T.pack $ Cabal.unUnqualComponentName name, range)
 
 -- | Get all files referenced by the package.
 packageDescModulesAndFiles
