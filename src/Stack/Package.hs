@@ -532,7 +532,7 @@ packageDependencies :: PackageDescription -> Map PackageName VersionRange
 packageDependencies pkg =
   M.fromListWith intersectVersionRanges $
   map (depName &&& depRange) $
-  concatMap targetBuildDepends (allBuildInfo' pkg) ++
+  concatMap targetBuildDepends (allBuildInfo pkg) ++
   maybe [] setupDepends (setupBuildInfo pkg)
 
 -- | Get all build tool dependencies of the package (buildable targets only).
@@ -541,28 +541,11 @@ packageToolDependencies =
   M.fromList .
   concatMap (fmap (\(Cabal.LegacyExeDependency name range) -> (T.pack name, range)) .
              buildTools) .
-  allBuildInfo'
+  allBuildInfo
 
 -- | Get all dependencies of the package (buildable targets only).
 packageDescTools :: PackageDescription -> [Cabal.ExeDependency]
-packageDescTools = concatMap buildToolDepends . allBuildInfo'
-
--- | This is a copy-paste from Cabal's @allBuildInfo@ function, but with the
--- @buildable@ test removed. The implementation is broken.
--- See: https://github.com/haskell/cabal/issues/1725
-allBuildInfo' :: PackageDescription -> [BuildInfo]
-allBuildInfo' pkg_descr = [ bi | Just lib <- [library pkg_descr]
-                              , let bi = libBuildInfo lib
-                              , True || buildable bi ]
-                      ++ [ bi | exe <- executables pkg_descr
-                              , let bi = buildInfo exe
-                              , True || buildable bi ]
-                      ++ [ bi | tst <- testSuites pkg_descr
-                              , let bi = testBuildInfo tst
-                              , True || buildable bi ]
-                      ++ [ bi | tst <- benchmarks pkg_descr
-                              , let bi = benchmarkBuildInfo tst
-                              , True || buildable bi ]
+packageDescTools = concatMap buildToolDepends . allBuildInfo
 
 -- | Get all files referenced by the package.
 packageDescModulesAndFiles
@@ -809,12 +792,27 @@ resolvePackageDescription packageConfig (GenericPackageDescription desc defaultF
                 (packageConfigPlatform packageConfig)
                 flags
 
+        -- Due to https://github.com/haskell/cabal/issues/1725,
+        -- versions of Cabal before 2.0 would always require that the
+        -- dependencies for all libraries and executables be present,
+        -- even if they were not buildable. To ensure that Stack is
+        -- compatible with those older Cabal libraries (which may be
+        -- in use depending on the snapshot chosen), we set buildable
+        -- to True for libraries and executables.
         updateLibDeps lib deps =
           lib {libBuildInfo =
-                 (libBuildInfo lib) {targetBuildDepends = deps}}
+                 (libBuildInfo lib)
+                   { targetBuildDepends = deps
+                   , buildable = True
+                   }
+              }
         updateExeDeps exe deps =
           exe {buildInfo =
-                 (buildInfo exe) {targetBuildDepends = deps}}
+                 (buildInfo exe)
+                   { targetBuildDepends = deps
+                   , buildable = True
+                   }
+              }
         updateTestDeps test deps =
           test {testBuildInfo =
                   (testBuildInfo test)
