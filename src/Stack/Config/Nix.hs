@@ -41,7 +41,7 @@ nixOptsFromMonoid NixOptsMonoid{..} os = do
 nixCompiler :: CompilerVersion a -> Either StringException T.Text
 nixCompiler compilerVersion =
   let -- These are the latest minor versions for each respective major version available in nixpkgs
-      fixMinor "8.0" = "8.0.1"
+      fixMinor "8.0" = "8.0.2"
       fixMinor "7.10" = "7.10.3"
       fixMinor "7.8" = "7.8.4"
       fixMinor "7.6" = "7.6.3"
