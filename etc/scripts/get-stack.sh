@@ -658,10 +658,16 @@ check_stack_installed() {
     if [ "$FORCE" = "true" ] ; then
       [ "$DEST" != "" ] || DEST="$(stack_location)"
     else
+      if has_curl; then
+        get="curl -sSL"
+      else
+        get="wget -qO-"
+      fi
       die "Stack $(stack_version) already appears to be installed at:
   $(stack_location)
 Use 'stack upgrade' or your OS's package manager to upgrade,
-or pass '-f' to this script to over-write the existing binary."
+or pass '-f' to this script to over-write the existing binary, e.g.:
+  $get https://get.haskellstack.org/ | sh -s - -f"
     fi
   else
     [ "$DEST" != "" ] || DEST="$DEFAULT_DEST"
