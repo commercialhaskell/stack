@@ -35,6 +35,7 @@ import Foreign.ForeignPtr
 import Foreign.Storable
 import Data.Bits
 import qualified Data.Primitive.ByteArray as BA
+import Data.ByteArray
 
 newtype Bytes8 = Bytes8 Word64
   deriving (Eq, Ord, Generic, NFData, Hashable, Data, Store)
@@ -169,6 +170,25 @@ instance StaticBytes Bytes128 where
   lengthS _ = 128
   toWordsS (Bytes128 b1 b2) = toWordsS b1 . toWordsS b2
   usePeekS off f = Bytes128 <$> usePeekS off f <*> usePeekS (off + 64) f
+
+instance ByteArrayAccess Bytes8 where
+  length _ = 8
+  withByteArray = withByteArrayS
+instance ByteArrayAccess Bytes16 where
+  length _ = 16
+  withByteArray = withByteArrayS
+instance ByteArrayAccess Bytes32 where
+  length _ = 32
+  withByteArray = withByteArrayS
+instance ByteArrayAccess Bytes64 where
+  length _ = 64
+  withByteArray = withByteArrayS
+instance ByteArrayAccess Bytes128 where
+  length _ = 128
+  withByteArray = withByteArrayS
+
+withByteArrayS :: StaticBytes sbytes => sbytes -> (Ptr p -> IO a) -> IO a
+withByteArrayS sbytes = withByteArray (fromStatic sbytes :: ByteString)
 
 toStaticExact
   :: forall dbytes sbytes.

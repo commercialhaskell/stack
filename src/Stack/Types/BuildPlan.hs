@@ -283,7 +283,7 @@ instance Store LoadedSnapshot
 instance NFData LoadedSnapshot
 
 loadedSnapshotVC :: VersionConfig LoadedSnapshot
-loadedSnapshotVC = storeVersionConfig "ls-v4" "SAac9cP0PrUmpJ7zA3mhPVK2-zg="
+loadedSnapshotVC = storeVersionConfig "ls-v4" "a_ljrJRo8hA_-gcIDP9c6NXJ2pE="
 
 -- | Information on a single package for the 'LoadedSnapshot' which
 -- can be installed.
