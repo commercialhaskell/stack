@@ -371,7 +371,7 @@ getPackageCaches = do
             result <- liftM mconcat $ forM (configPackageIndices config) $ \index -> do
                 fp <- configPackageIndexCache (indexName index)
                 PackageCache pis <-
-                    $(versionedDecodeOrLoad (storeVersionConfig "pkg-v5" "PIEH62CpuuOl_fyE25-ncPVZgMU="
+                    $(versionedDecodeOrLoad (storeVersionConfig "pkg-v5" "InumGzcLY3PEJmcTS_Apdy7pRGI="
                                              :: VersionConfig (PackageCache ())))
                     fp
                     (populateCache index)

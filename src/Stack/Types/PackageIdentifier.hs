@@ -43,12 +43,10 @@ import           Data.Aeson.Extended
 import           Data.Attoparsec.Text as A
 import qualified Data.ByteArray.Encoding as Mem (convertToBase, Base(Base16))
 import qualified Data.ByteString.Lazy as L
-import           Data.Hashable
-import           Data.Store.Internal (Size (..), StaticSize (..), size,
-                                      toStaticSize, toStaticSizeEx, unStaticSize)
 import qualified Data.Text as T
 import           Data.Text.Encoding (decodeUtf8, encodeUtf8)
 import qualified Distribution.Package as C
+import           Stack.StaticBytes
 import           Stack.Types.PackageName
 import           Stack.Types.Version
 
@@ -119,35 +117,23 @@ newtype CabalHash = CabalHash { unCabalHash :: StaticSHA256 }
 
 -- | A SHA256 hash, stored in a static size for more efficient
 -- serialization with store.
-newtype StaticSHA256 = StaticSHA256 (StaticSize 64 ByteString)
-    deriving (Generic, Show, Eq, NFData, Data, Typeable, Ord)
-
-instance Store StaticSHA256 where
-    size = ConstSize 64
-    -- poke (GitSHA1 x) = do
-    --   let (sourceFp, sourceOffset, sourceLength) = BSI.toForeignPtr (unStaticSize x)
-    --   pokeFromForeignPtr sourceFp sourceOffset sourceLength
-    -- peek = do
-    --     let len = 20
-    --     fp <- peekToPlainForeignPtr ("StaticSize " ++ show len ++ " Data.ByteString.ByteString") len
-    --     return (GitSHA1 $ StaticSize (BSI.PS fp 0 len))
-    -- {-# INLINE size #-}
-    -- {-# INLINE peek #-}
-    -- {-# INLINE poke #-}
-
-instance Hashable StaticSHA256 where
-  hashWithSalt s (StaticSHA256 x) = hashWithSalt s (unStaticSize x)
+newtype StaticSHA256 = StaticSHA256 Bytes64
+    deriving (Generic, Show, Eq, NFData, Data, Typeable, Ord, Hashable, Store)
 
 -- | Generate a 'StaticSHA256' value from a base16-encoded SHA256 hash.
-mkStaticSHA256FromText :: Text -> Maybe StaticSHA256
-mkStaticSHA256FromText = fmap StaticSHA256 . toStaticSize . encodeUtf8
+mkStaticSHA256FromText :: Text -> Either StaticBytesException StaticSHA256
+mkStaticSHA256FromText = fmap StaticSHA256 . toStaticExact . encodeUtf8
 
 -- | Generate a 'StaticSHA256' value from the contents of a file.
 mkStaticSHA256FromFile :: MonadIO m => Path Abs File -> m StaticSHA256
 mkStaticSHA256FromFile fp = liftIO $ fromDigest <$> hashFile (toFilePath fp)
 
 fromDigest :: Hash.Digest Hash.SHA256 -> StaticSHA256
-fromDigest = StaticSHA256 . toStaticSizeEx . Mem.convertToBase Mem.Base16
+fromDigest digest
+  = StaticSHA256
+  $ either impureThrow id
+  $ toStaticExact
+    (Mem.convertToBase Mem.Base16 digest :: ByteString)
 
 -- | Convert a 'StaticSHA256' into a base16-encoded SHA256 hash.
 staticSHA256ToText :: StaticSHA256 -> Text
@@ -155,10 +141,10 @@ staticSHA256ToText = decodeUtf8 . staticSHA256ToBase16
 
 -- | Convert a 'StaticSHA256' into a base16-encoded SHA256 hash.
 staticSHA256ToBase16 :: StaticSHA256 -> ByteString
-staticSHA256ToBase16 (StaticSHA256 x) = unStaticSize x
+staticSHA256ToBase16 (StaticSHA256 x) = fromStatic x
 
 -- | Generate a 'CabalHash' value from a base16-encoded SHA256 hash.
-mkCabalHashFromSHA256 :: Text -> Maybe CabalHash
+mkCabalHashFromSHA256 :: Text -> Either StaticBytesException CabalHash
 mkCabalHashFromSHA256 = fmap CabalHash . mkStaticSHA256FromText
 
 -- | Convert a 'CabalHash' into a base16-encoded SHA256 hash.
@@ -234,7 +220,7 @@ parsePackageIdentifierRevision x = go x
     cfiHash = do
       _ <- string $ T.pack "@sha256:"
       hash' <- A.takeWhile (/= ',')
-      hash'' <- maybe (fail "Invalid SHA256") return
+      hash'' <- either (\e -> fail $ "Invalid SHA256: " ++ show e) return
               $ mkCabalHashFromSHA256 hash'
       msize <- optional $ do
         _ <- A.char ','
