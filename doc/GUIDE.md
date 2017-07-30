@@ -1246,7 +1246,7 @@ executables to the local bin path. You may recognize the default value for that
 path:
 
 ```
-michael@d30748af6d3d:~/helloworld$ stack path --local-bin-path
+michael@d30748af6d3d:~/helloworld$ stack path --local-bin
 /home/michael/.local/bin
 ```
 
