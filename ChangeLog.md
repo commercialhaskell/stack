@@ -40,6 +40,8 @@ Other enhancements:
   assist with the user experience when the `PATH` environment variable
   has not been properly configured, see
   [#3232](https://github.com/commercialhaskell/stack/issues/3232).
+* The `hpack` dependency was updated allowing projects with Alex and Happy files
+  to build successfully with `stack`.
 
 Bug fixes:
 
