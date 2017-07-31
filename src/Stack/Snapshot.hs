@@ -215,8 +215,8 @@ loadResolver (ResolverSnapshot name) = do
                     Nothing -> fail "Could not find SHA256"
                     Just shaText ->
                       case mkCabalHashFromSHA256 shaText of
-                        Nothing -> fail "Invalid SHA256"
-                        Just x -> return x
+                        Left e -> fail $ "Invalid SHA256: " ++ show e
+                        Right x -> return x
                 return $ CFIHash msize hash'
 
             Object constraints <- o .: "constraints"

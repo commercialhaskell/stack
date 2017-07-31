@@ -156,6 +156,7 @@ library
                      Stack.Sig.Sign
                      Stack.Snapshot
                      Stack.Solver
+                     Stack.StaticBytes
                      Stack.Types.Build
                      Stack.Types.BuildPlan
                      Stack.Types.CompilerBuild
@@ -236,6 +237,7 @@ library
                    , persistent-sqlite (>= 2.1.4 && < 2.5.0.1) || (> 2.5.0.1 && < 2.7)
                    , persistent-template >= 2.1.1 && < 2.6
                    , pretty >= 1.1.1.1
+                   , primitive
                    , process >= 1.2.1.0 && < 1.5
                    , regex-applicative-text >=0.1.0.1 && <0.2
                    , resourcet >= 1.1.4.1
@@ -330,6 +332,7 @@ test-suite stack-test
                 , Stack.PackageDumpSpec
                 , Stack.ArgsSpec
                 , Stack.NixSpec
+                , Stack.StaticBytesSpec
                 , Stack.StoreSpec
                 , Network.HTTP.Download.VerifiedSpec
                 , Stack.SolverSpec

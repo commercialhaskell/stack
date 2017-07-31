@@ -255,8 +255,8 @@ instance subdirs ~ Subdirs => FromJSON (WithJSONWarnings (PackageLocation subdir
               Nothing -> return Nothing
               Just t ->
                 case mkStaticSHA256FromText t of
-                  Nothing -> fail $ "Invalid SHA256: " ++ T.unpack t
-                  Just x -> return $ Just x
+                  Left e -> fail $ "Invalid SHA256: " ++ T.unpack t ++ ", " ++ show e
+                  Right x -> return $ Just x
           return $ PLArchive Archive
             { archiveUrl = url
             , archiveSubdirs = subdirs :: Subdirs
@@ -283,7 +283,7 @@ instance Store LoadedSnapshot
 instance NFData LoadedSnapshot
 
 loadedSnapshotVC :: VersionConfig LoadedSnapshot
-loadedSnapshotVC = storeVersionConfig "ls-v4" "UQQmEqSZneE0IrDjeIy_uvDkhvM="
+loadedSnapshotVC = storeVersionConfig "ls-v4" "a_ljrJRo8hA_-gcIDP9c6NXJ2pE="
 
 -- | Information on a single package for the 'LoadedSnapshot' which
 -- can be installed.
