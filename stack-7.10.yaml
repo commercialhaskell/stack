@@ -39,3 +39,4 @@ extra-deps:
 - unliftio-core-0.1.0.0
 - unliftio-0.1.0.0
 - async-2.1.1.1
+- hpack-0.18.1
