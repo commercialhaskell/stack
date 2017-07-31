@@ -299,9 +299,14 @@ addDeps allowMissing compilerVersion toCalc = do
                             Nothing -> (Map.empty, [], Nothing)
                             Just (_, x, y, z) -> (x, y, z)
                  in (indexName $ rpIndex rp, [(rp, (cache, ghcOptions, sha))])
-    res <- forM (Map.toList byIndex) $ \(indexName', pkgs) -> withCabalFiles indexName' pkgs
-        $ \ident (flags, ghcOptions, mgitSha) cabalBS -> do
-            (_warnings,gpd) <- readPackageUnresolvedBS (Right ident) cabalBS
+    res <- forM (Map.toList byIndex) $ \(indexName', pkgs) ->
+      fmap Map.unions $ withCabalFiles indexName' pkgs
+        $ \ident (flags, ghcOptions, mgitSha) cabalBS ->
+        case readPackageUnresolvedBS (Right ident) cabalBS of
+          Left e
+            | allowedToSkip ident -> return Map.empty
+            | otherwise -> throwM e
+          Right (_warnings, gpd) -> do
             let packageConfig = PackageConfig
                     { packageConfigEnableTests = False
                     , packageConfigEnableBenchmarks = False
@@ -314,7 +319,7 @@ addDeps allowMissing compilerVersion toCalc = do
                 pd = resolvePackageDescription packageConfig gpd
                 exes = Set.fromList $ map (ExeName . T.pack . exeName) $ executables pd
                 notMe = Set.filter (/= name) . Map.keysSet
-            return (name, MiniPackageInfo
+            return $ Map.singleton name MiniPackageInfo
                 { mpiVersion = packageIdentifierVersion ident
                 , mpiFlags = flags
                 , mpiGhcOptions = ghcOptions
@@ -326,12 +331,30 @@ addDeps allowMissing compilerVersion toCalc = do
                     (buildable . libBuildInfo)
                     (library pd)
                 , mpiGitSHA1 = mgitSha
-                })
-    return (Map.fromList $ concat res, missingIdents)
+                }
+    return (Map.unions res, missingIdents)
   where
     shaMap = Map.fromList
         $ map (\(n, (v, _f, _ghcOptions, gitsha)) -> (PackageIdentifier n v, gitsha))
         $ Map.toList toCalc
+
+    -- Michael Snoyman, 2017-07-31:
+    --
+    -- This is a stop-gap measure to address a specific concern around
+    -- the GHC 8.2.1 release. The current Stack version (1.5.0) will
+    -- eagerly parse all cabal files mentioned in a snapshot,
+    -- including global packages. Additionally, for the first time
+    -- (AFAICT), GHC 8.2.1 is providing a package on Hackage with a
+    -- ghc.cabal file, which requires the (not yet supported) Cabal
+    -- 2.0 file format. To work around this, we're adding a special
+    -- dispensation to ignore parse failures for this package.
+    --
+    -- Master already does better by simply ignoring global
+    -- information and looking things up in the database. We may want
+    -- to consider going a step further and simply ignoring _all_
+    -- parse failures, or turning them into warnings, though I haven't
+    -- considered the repercussions of that.
+    allowedToSkip (PackageIdentifier name _) = name == $(mkPackageName "ghc")
 
 -- | Resolve all packages necessary to install for the needed packages.
 getDeps :: MiniBuildPlan
