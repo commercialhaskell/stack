@@ -110,17 +110,17 @@ readPackageUnresolved :: (MonadIO m, MonadThrow m)
                       -> m ([PWarning],GenericPackageDescription)
 readPackageUnresolved cabalfp =
   liftIO (BS.readFile (FL.toFilePath cabalfp))
-  >>= readPackageUnresolvedBS (Just cabalfp)
+  >>= readPackageUnresolvedBS (Left cabalfp)
 
 -- | Read the raw, unresolved package information from a ByteString.
 readPackageUnresolvedBS :: (MonadThrow m)
-                        => Maybe (Path Abs File)
+                        => Either (Path Abs File) PackageIdentifier
                         -> BS.ByteString
                         -> m ([PWarning],GenericPackageDescription)
-readPackageUnresolvedBS mcabalfp bs =
+readPackageUnresolvedBS source bs =
     case parsePackageDescription chars of
        ParseFailed per ->
-         throwM (PackageInvalidCabalFile mcabalfp per)
+         throwM (PackageInvalidCabalFile source per)
        ParseOk warnings gpkg -> return (warnings,gpkg)
   where
     chars = T.unpack (dropBOM (decodeUtf8With lenientDecode bs))
@@ -140,10 +140,11 @@ readPackage packageConfig cabalfp =
 -- | Reads and exposes the package information, from a ByteString
 readPackageBS :: (MonadThrow m)
               => PackageConfig
+              -> PackageIdentifier
               -> BS.ByteString
               -> m ([PWarning],Package)
-readPackageBS packageConfig bs =
-  do (warnings,gpkg) <- readPackageUnresolvedBS Nothing bs
+readPackageBS packageConfig ident bs =
+  do (warnings,gpkg) <- readPackageUnresolvedBS (Right ident) bs
      return (warnings,resolvePackage packageConfig gpkg)
 
 -- | Get 'GenericPackageDescription' and 'PackageDescription' reading info

@@ -177,8 +177,8 @@ getCabalLbs :: (StackM env m, HasEnvConfig env)
             -> FilePath
             -> m (PackageIdentifier, L.ByteString)
 getCabalLbs pvpBounds mrev fp = do
-    bs <- liftIO $ S.readFile fp
-    (_warnings, gpd) <- readPackageUnresolvedBS Nothing bs
+    path <- liftIO $ resolveFile' fp
+    (_warnings, gpd) <- readPackageUnresolved path
     (_, sourceMap) <- loadSourceMap AllowNoTargets defaultBuildOptsCLI
     menv <- getMinimalEnvOverride
     (installedMap, _, _, _) <- getInstalled menv GetInstalledOpts

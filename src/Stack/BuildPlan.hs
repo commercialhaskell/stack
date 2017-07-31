@@ -301,7 +301,7 @@ addDeps allowMissing compilerVersion toCalc = do
                  in (indexName $ rpIndex rp, [(rp, (cache, ghcOptions, sha))])
     res <- forM (Map.toList byIndex) $ \(indexName', pkgs) -> withCabalFiles indexName' pkgs
         $ \ident (flags, ghcOptions, mgitSha) cabalBS -> do
-            (_warnings,gpd) <- readPackageUnresolvedBS Nothing cabalBS
+            (_warnings,gpd) <- readPackageUnresolvedBS (Right ident) cabalBS
             let packageConfig = PackageConfig
                     { packageConfigEnableTests = False
                     , packageConfigEnableBenchmarks = False
