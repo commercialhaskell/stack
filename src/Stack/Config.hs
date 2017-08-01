@@ -520,8 +520,7 @@ loadBuildConfig mproject mresolver mcompiler = do
           resolver <-
               case mresolver of
                   Nothing -> return $ projectResolver project
-                  Just aresolver ->
-                      runRIO config $ makeConcreteResolver (Just (parent fp)) aresolver
+                  Just aresolver -> makeConcreteResolver (Just (parent fp)) aresolver
           return (project { projectResolver = resolver }, fp)
       LCSNoConfig parentDir -> do
           p <- getEmptyProject (Just parentDir)
