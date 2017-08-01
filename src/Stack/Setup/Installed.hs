@@ -87,15 +87,20 @@ listInstalled programsPath = do
         x <- T.stripSuffix ".installed" $ T.pack $ toFilePath $ filename fp
         parseToolText x
 
-getCompilerVersion :: (MonadLogger m, MonadUnliftIO m, MonadThrow m)
-              => EnvOverride -> WhichCompiler -> m (CompilerVersion 'CVActual)
+getCompilerVersion
+  :: HasLogFunc env
+  => EnvOverride
+  -> WhichCompiler
+  -> RIO env (CompilerVersion 'CVActual)
 getCompilerVersion menv wc =
     case wc of
         Ghc -> do
             $logDebug "Asking GHC for its version"
             bs <- readProcessStdout Nothing menv "ghc" ["--numeric-version"]
             let (_, ghcVersion) = versionFromEnd bs
-            GhcVersion <$> parseVersion (T.decodeUtf8 ghcVersion)
+            x <- GhcVersion <$> parseVersion (T.decodeUtf8 ghcVersion)
+            $logDebug $ "GHC version is: " <> compilerVersionText x
+            return x
         Ghcjs -> do
             $logDebug "Asking GHCJS for its version"
             -- Output looks like

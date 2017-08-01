@@ -240,10 +240,10 @@ setupEnv mResolveMissingGHC = do
              <$> augmentPathMap (maybe [] edBins mghcBin) (unEnvOverride menv0)
     menv <- mkEnvOverride platform env
 
-    (compilerVer, cabalVer, globaldb) <- withUnliftIO $ \u -> runConcurrently $ (,,)
-        <$> Concurrently (unliftIO u $ getCompilerVersion menv wc)
-        <*> Concurrently (unliftIO u $ getCabalPkgVer menv wc)
-        <*> Concurrently (unliftIO u $ getGlobalDB menv wc)
+    (compilerVer, cabalVer, globaldb) <- runConcurrently $ (,,)
+        <$> Concurrently (getCompilerVersion menv wc)
+        <*> Concurrently (getCabalPkgVer menv wc)
+        <*> Concurrently (getGlobalDB menv wc)
 
     $logDebug "Resolving package entries"
     packagesRef <- liftIO $ newIORef Nothing
@@ -697,8 +697,11 @@ doCabalInstall menv wc installed version = do
         $logInfo "New Cabal library installed"
 
 -- | Get the version of the system compiler, if available
-getSystemCompiler :: (MonadUnliftIO m, MonadLogger m, MonadThrow m)
-                  => EnvOverride -> WhichCompiler -> m (Maybe (CompilerVersion 'CVActual, Arch))
+getSystemCompiler
+  :: HasLogFunc env
+  => EnvOverride
+  -> WhichCompiler
+  -> RIO env (Maybe (CompilerVersion 'CVActual, Arch))
 getSystemCompiler menv wc = do
     let exeName = case wc of
             Ghc -> "ghc"
@@ -724,9 +727,7 @@ getSystemCompiler menv wc = do
         else return Nothing
 
 -- | Download the most recent SetupInfo
-getSetupInfo
-    :: (MonadIO m, MonadThrow m, MonadLogger m, MonadReader env m, HasConfig env)
-    => String -> m SetupInfo
+getSetupInfo :: HasConfig env => String -> RIO env SetupInfo
 getSetupInfo stackSetupYaml = do
     config <- view configL
     setupInfos <-
@@ -1204,8 +1205,7 @@ loadGhcjsEnvConfig stackYaml binPath = do
     bconfig <- liftIO $ lcLoadBuildConfig lc Nothing
     runRIO bconfig $ setupEnv Nothing
 
-getCabalInstallVersion :: (MonadUnliftIO m, MonadLogger m)
-                       => EnvOverride -> m (Maybe Version)
+getCabalInstallVersion :: HasLogFunc env => EnvOverride -> RIO env (Maybe Version)
 getCabalInstallVersion menv = do
     ebs <- tryProcessStdout Nothing menv "cabal" ["--numeric-version"]
     liftIO $ case ebs of
@@ -1347,9 +1347,9 @@ expectSingleUnpackedDir archiveFile destDir = do
 -- | Download 7z as necessary, and get a function for unpacking things.
 --
 -- Returned function takes an unpack directory and archive.
-setup7z :: (MonadIO n, MonadLogger n, HasConfig env)
+setup7z :: (HasConfig env, MonadIO m)
         => SetupInfo
-        -> RIO env (Path Abs Dir -> Path Abs File -> n ())
+        -> RIO env (Path Abs Dir -> Path Abs File -> m ())
 setup7z si = do
     dir <- view $ configL.to configLocalPrograms
     ensureDir dir
@@ -1359,7 +1359,7 @@ setup7z si = do
         (Just sevenzDll, Just sevenzExe) -> do
             chattyDownload "7z.dll" sevenzDll dll
             chattyDownload "7z.exe" sevenzExe exe
-            return $ \outdir archive -> do
+            withRunInIO $ \run -> return $ \outdir archive -> liftIO $ run $ do
                 let cmd = toFilePath exe
                     args =
                         [ "x"
@@ -1496,10 +1496,10 @@ chunksOverTime diff = do
         go
 
 -- | Perform a basic sanity check of GHC
-sanityCheck :: (MonadUnliftIO m, MonadLogger m)
+sanityCheck :: HasLogFunc env
             => EnvOverride
             -> WhichCompiler
-            -> m ()
+            -> RIO env ()
 sanityCheck menv wc = withSystemTempDir "stack-sanity-check" $ \dir -> do
     let fp = toFilePath $ dir </> $(mkRelFile "Main.hs")
     liftIO $ S.writeFile fp $ T.encodeUtf8 $ T.pack $ unlines
@@ -1530,9 +1530,10 @@ removeHaskellEnvVars =
 
 -- | Get map of environment variables to set to change the GHC's encoding to UTF-8
 getUtf8EnvVars
-    :: forall m env.
-       (MonadReader env m, HasPlatform env, MonadLogger m, MonadUnliftIO m)
-    => EnvOverride -> CompilerVersion 'CVActual -> m (Map Text Text)
+    :: (HasLogFunc env, HasPlatform env)
+    => EnvOverride
+    -> CompilerVersion 'CVActual
+    -> RIO env (Map Text Text)
 getUtf8EnvVars menv compilerVer =
     if getGhcVersion compilerVer >= $(mkVersion "7.10.3")
         -- GHC_CHARENC supported by GHC >=7.10.3
@@ -1710,13 +1711,13 @@ preferredPlatforms = do
     return $ map (\suffix -> (isWindows, concat [os, "-", arch, suffix])) suffixes
 
 downloadStackExe
-    :: (MonadUnliftIO m, MonadLogger m, MonadThrow m, MonadReader env m, HasConfig env)
+    :: HasConfig env
     => [(Bool, String)] -- ^ acceptable platforms
     -> StackReleaseInfo
     -> Path Abs Dir -- ^ destination directory
     -> Bool -- ^ perform PATH-aware checking, see #3232
     -> (Path Abs File -> IO ()) -- ^ test the temp exe before renaming
-    -> m ()
+    -> RIO env ()
 downloadStackExe platforms0 archiveInfo destDir checkPath testExe = do
     (isWindows, archiveURL) <-
       let loop [] = throwString $ "Unable to find binary Stack archive for platforms: "
@@ -1829,9 +1830,9 @@ downloadStackExe platforms0 archiveInfo destDir checkPath testExe = do
 -- as the currently running executable. See:
 -- https://github.com/commercialhaskell/stack/issues/3232
 performPathChecking
-    :: (MonadUnliftIO m, MonadLogger m, MonadThrow m, MonadReader env m, HasConfig env)
+    :: HasConfig env
     => Path Abs File -- ^ location of the newly downloaded file
-    -> m ()
+    -> RIO env ()
 performPathChecking newFile = do
   executablePath <- liftIO getExecutablePath
   executablePath' <- parseAbsFile executablePath
