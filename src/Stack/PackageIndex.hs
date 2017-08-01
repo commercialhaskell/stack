@@ -66,9 +66,9 @@ populateCache index = do
     -- This uses full on lazy I/O instead of ResourceT to provide some
     -- protections. Caveat emptor
     path <- configPackageIndex (indexName index)
-    let loadPIS = do
+    let loadPIS = withBinaryFile (Path.toFilePath path) ReadMode $ \h -> do
             $logSticky "Populating index cache ..."
-            lbs <- liftIO $ L.readFile $ Path.toFilePath path
+            lbs <- liftIO $ L.hGetContents h
             loop 0 HashMap.empty (Tar.read lbs)
     pis0 <- loadPIS `catch` \e -> do
         $logWarn $ "Exception encountered when parsing index tarball: "
