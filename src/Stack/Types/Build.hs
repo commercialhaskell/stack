@@ -17,7 +17,8 @@ module Stack.Types.Build
     ,ModTime
     ,modTime
     ,Installed(..)
-    ,PackageInstallInfo(..)
+    ,piiVersion
+    ,piiLocation
     ,Task(..)
     ,taskIsTarget
     ,taskLocation

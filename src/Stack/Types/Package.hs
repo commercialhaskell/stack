@@ -191,18 +191,13 @@ data PackageSource
     -- databases; this is what 'InstallLocation' specifies.
     deriving Show
 
-instance PackageInstallInfo PackageSource where
-    piiVersion (PSLocal lp) = packageVersion $ lpPackage lp
-    piiVersion (PSUpstream v _ _ _ _) = v
+piiVersion :: PackageSource -> Version
+piiVersion (PSLocal lp) = packageVersion $ lpPackage lp
+piiVersion (PSUpstream v _ _ _ _) = v
 
-    piiLocation (PSLocal _) = Local
-    piiLocation (PSUpstream _ loc _ _ _) = loc
-
--- | Datatype which tells how which version of a package to install and where
--- to install it into
-class PackageInstallInfo a where
-    piiVersion :: a -> Version
-    piiLocation :: a -> InstallLocation
+piiLocation :: PackageSource -> InstallLocation
+piiLocation (PSLocal _) = Local
+piiLocation (PSUpstream _ loc _ _ _) = loc
 
 -- | Information on a locally available package of source code
 data LocalPackage = LocalPackage

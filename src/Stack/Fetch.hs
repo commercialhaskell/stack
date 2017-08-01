@@ -325,18 +325,16 @@ withCabalLoader inner = do
     -- time
     --
     -- TODO: probably makes sense to move this concern into getPackageCaches
-    updateRef <- liftIO $ newMVar True
+    updateRef <- newMVar True
 
     u <- askUnliftIO
-
-    env <- ask
 
     -- TODO in the future, keep all of the necessary @Handle@s open
     let doLookup :: PackageIdentifierRevision
                  -> IO ByteString
         doLookup ident = do
             bothCaches <- unliftIO u getPackageCaches
-            eres <- runReaderT (lookupPackageIdentifierExact ident bothCaches) env
+            eres <- unliftIO u $ lookupPackageIdentifierExact ident bothCaches
             case eres of
                 Just bs -> return bs
                 -- Update the cache and try again
@@ -367,7 +365,7 @@ withCabalLoader inner = do
                                 return ()
                             return (False, doLookup ident)
                         else return (toUpdate,
-                                     throwM $ UnknownPackageIdentifiers
+                                     throwIO $ UnknownPackageIdentifiers
                                        (HashSet.singleton ident) (T.unpack suggestions))
     inner doLookup
 

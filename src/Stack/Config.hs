@@ -511,20 +511,48 @@ loadBuildConfig :: LocalConfigStatus (Project, Path Abs File, ConfigMonoid)
                 -> Maybe AbstractResolver -- override resolver
                 -> Maybe (CompilerVersion 'CVWanted) -- override compiler
                 -> RIO Config BuildConfig
-loadBuildConfig mproject mresolver mcompiler = do
+loadBuildConfig mproject maresolver mcompiler = do
     config <- ask
+
+    -- If provided, turn the AbstractResolver from the command line
+    -- into a Resolver that can be used below.
+
+    -- The maresolver and mcompiler are provided on the command
+    -- line. In order to properly deal with an AbstractResolver, we
+    -- need a base directory (to deal with custom snapshot relative
+    -- paths). We consider the current working directory to be the
+    -- correct base. Let's calculate the mresolver first.
+    mresolver <- forM maresolver $ \aresolver -> do
+      -- For display purposes only
+      let name =
+            case aresolver of
+              ARResolver resolver -> resolverRawName resolver
+              ARLatestNightly -> "nightly"
+              ARLatestLTS -> "lts"
+              ARLatestLTSMajor x -> T.pack $ "lts-" ++ show x
+              ARGlobal -> "global"
+      $logDebug ("Using resolver: " <> name <> " specified on command line")
+
+      -- In order to resolve custom snapshots, we need a base
+      -- directory to deal with relative paths. For the case of
+      -- LCSNoConfig, we use the parent directory provided. This is
+      -- because, when running the script interpreter, we assume the
+      -- resolver is in fact coming from the file contents itself and
+      -- not the command line. For the project and non project cases,
+      -- however, we use the current directory.
+      base <-
+        case mproject of
+          LCSNoConfig parentDir -> return parentDir
+          LCSProject _ -> resolveDir' "."
+          LCSNoProject -> resolveDir' "."
+      makeConcreteResolver (Just base) aresolver
 
     (project', stackYamlFP) <- case mproject of
       LCSProject (project, fp, _) -> do
           forM_ (projectUserMsg project) ($logWarn . T.pack)
-          resolver <-
-              case mresolver of
-                  Nothing -> return $ projectResolver project
-                  Just aresolver ->
-                      runRIO config $ makeConcreteResolver (Just (parent fp)) aresolver
-          return (project { projectResolver = resolver }, fp)
-      LCSNoConfig parentDir -> do
-          p <- getEmptyProject (Just parentDir)
+          return (project, fp)
+      LCSNoConfig _ -> do
+          p <- assert (isJust mresolver) (getEmptyProject mresolver)
           return (p, configUserConfigPath config)
       LCSNoProject -> do
             $logDebug "Run from outside a project, using implicit global project config"
@@ -539,25 +567,16 @@ loadBuildConfig mproject mresolver mcompiler = do
                then do
                    ProjectAndConfigMonoid project _ <- loadConfigYaml (parseProjectAndConfigMonoid destDir) dest
                    when (view terminalL config) $
-                       case mresolver of
+                       case maresolver of
                            Nothing ->
                                $logDebug ("Using resolver: " <> resolverRawName (projectResolver project) <>
                                          " from implicit global project's config file: " <> T.pack dest')
-                           Just aresolver -> do
-                               let name =
-                                        case aresolver of
-                                            ARResolver resolver -> resolverRawName resolver
-                                            ARLatestNightly -> "nightly"
-                                            ARLatestLTS -> "lts"
-                                            ARLatestLTSMajor x -> T.pack $ "lts-" ++ show x
-                                            ARGlobal -> "global"
-                               $logDebug ("Using resolver: " <> name <>
-                                         " specified on command line")
+                           Just _ -> return ()
                    return (project, dest)
                else do
                    $logInfo ("Writing implicit global project config file to: " <> T.pack dest')
                    $logInfo "Note: You can change the snapshot via the resolver field there."
-                   p <- getEmptyProject Nothing
+                   p <- getEmptyProject mresolver
                    liftIO $ do
                        S.writeFile dest' $ S.concat
                            [ "# This is the implicit global project's config file, which is only used when\n"
@@ -575,6 +594,7 @@ loadBuildConfig mproject mresolver mcompiler = do
                    return (p, dest)
     let project = project'
             { projectCompiler = mcompiler <|> projectCompiler project'
+            , projectResolver = fromMaybe (projectResolver project') mresolver
             }
 
     sd0 <- runRIO config $ loadResolver $ projectResolver project
@@ -598,14 +618,12 @@ loadBuildConfig mproject mresolver mcompiler = do
                 LCSNoConfig _ -> False
         }
   where
-    getEmptyProject :: Maybe (Path Abs Dir) -- ^ directory used for making concrete resolver
-                    -> RIO Config Project
-    getEmptyProject mparentDir = do
+    getEmptyProject :: Maybe Resolver -> RIO Config Project
+    getEmptyProject mresolver = do
       r <- case mresolver of
-            Just aresolver -> do
-                r' <- makeConcreteResolver mparentDir aresolver
-                $logInfo ("Using resolver: " <> resolverRawName r' <> " specified on command line")
-                return r'
+            Just resolver -> do
+                $logInfo ("Using resolver: " <> resolverRawName resolver <> " specified on command line")
+                return resolver
             Nothing -> do
                 r'' <- getLatestResolver
                 $logInfo ("Using latest snapshot resolver: " <> resolverRawName r'')
