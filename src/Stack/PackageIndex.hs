@@ -246,6 +246,7 @@ updateIndex index =
      case indexType index of
        ITVanilla -> updateIndexHTTP name url
        ITHackageSecurity hs -> updateIndexHackageSecurity name url hs
+     $logStickyDone "Update complete"
 
      -- Copy to the 00-index.tar filename for backwards
      -- compatibility. First wipe out the cache file if present.
