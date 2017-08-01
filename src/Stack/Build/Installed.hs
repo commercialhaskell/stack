@@ -47,10 +47,10 @@ data GetInstalledOpts = GetInstalledOpts
     }
 
 -- | Returns the new InstalledMap and all of the locally registered packages.
-getInstalled :: (HasEnvConfig env, PackageInstallInfo pii)
+getInstalled :: HasEnvConfig env
              => EnvOverride
              -> GetInstalledOpts
-             -> Map PackageName pii -- ^ does not contain any installed information
+             -> Map PackageName PackageSource -- ^ does not contain any installed information
              -> RIO env
                   ( InstalledMap
                   , [DumpPackage () () ()] -- globally installed
@@ -118,11 +118,11 @@ getInstalled menv opts sourceMap = do
 -- The goal is to ascertain that the dependencies for a package are present,
 -- that it has profiling if necessary, and that it matches the version and
 -- location needed by the SourceMap
-loadDatabase :: (HasEnvConfig env, PackageInstallInfo pii)
+loadDatabase :: HasEnvConfig env
              => EnvOverride
              -> GetInstalledOpts
              -> Maybe InstalledCache -- ^ if Just, profiling or haddock is required
-             -> Map PackageName pii -- ^ to determine which installed things we should include
+             -> Map PackageName PackageSource -- ^ to determine which installed things we should include
              -> Maybe (InstalledPackageLocation, Path Abs Dir) -- ^ package database, Nothing for global
              -> [LoadHelper] -- ^ from parent databases
              -> RIO env ([LoadHelper], [DumpPackage () () ()])
@@ -223,10 +223,9 @@ data Allowed
 -- | Check if a can be included in the set of installed packages or not, based
 -- on the package selections made by the user. This does not perform any
 -- dirtiness or flag change checks.
-isAllowed :: PackageInstallInfo pii
-          => GetInstalledOpts
+isAllowed :: GetInstalledOpts
           -> Maybe InstalledCache
-          -> Map PackageName pii
+          -> Map PackageName PackageSource
           -> Maybe InstalledPackageLocation
           -> DumpPackage Bool Bool Bool
           -> Allowed
