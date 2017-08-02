@@ -48,20 +48,25 @@ import           Stack.Types.Version
 
 -- | All exceptions thrown by the library.
 data PackageException
-  = PackageInvalidCabalFile (Maybe (Path Abs File)) PError
+  = PackageInvalidCabalFile (Either (Path Abs File) PackageIdentifier) PError
   | PackageNoCabalFileFound (Path Abs Dir)
   | PackageMultipleCabalFilesFound (Path Abs Dir) [Path Abs File]
   | MismatchedCabalName (Path Abs File) PackageName
   deriving Typeable
 instance Exception PackageException
 instance Show PackageException where
-    show (PackageInvalidCabalFile mfile err) =
-        "Unable to parse cabal file" ++
-        (case mfile of
-            Nothing -> ""
-            Just file -> ' ' : toFilePath file) ++
-        ": " ++
-        show err
+    show (PackageInvalidCabalFile (Left file) err) = concat
+        [ "Unable to parse cabal file "
+        , toFilePath file
+        , ": "
+        , show err
+        ]
+    show (PackageInvalidCabalFile (Right ident) err) = concat
+        [ "Unable to parse cabal file for "
+        , packageIdentifierString ident
+        , ": "
+        , show err
+        ]
     show (PackageNoCabalFileFound dir) = concat
         [ "Stack looks for packages in the directories configured in"
         , " the 'packages' variable defined in your stack.yaml\n"

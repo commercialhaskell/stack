@@ -1,6 +1,18 @@
 # Changelog
 
 
+## 1.5.1
+
+Bug fixes:
+
+* Stack eagerly tries to parse all cabal files related to a
+  snapshot. Starting with Stackage Nightly 2017-07-31, snapshots are
+  using GHC 8.2.1, and the `ghc.cabal` file implicitly referenced uses
+  the (not yet supported) Cabal 2.0 file format. Future releases of
+  Stack will both be less eager about cabal file parsing and support
+  Cabal 2.0. This patch simply bypasses the error for invalid parsing.
+
+
 ## 1.5.0
 
 Behavior changes:
