@@ -195,7 +195,6 @@ library
                    , base >= 4.8 && <5
                    , base64-bytestring
                    , binary >= 0.7 && < 0.9
-                   , bindings-uname >= 0.1
                    , binary-tagged >= 0.1.1
                    , blaze-builder
                    , bytestring >= 0.10.4.0
@@ -277,6 +276,7 @@ library
   else
     build-depends:   unix >= 2.7.0.1
                    , pid1 >= 0.1 && < 0.2
+                   , bindings-uname >= 0.1
   default-language:  Haskell2010
 
 executable stack

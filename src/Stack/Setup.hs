@@ -33,7 +33,6 @@ module Stack.Setup
   , downloadStackExe
   ) where
 
-import              Bindings.Uname (uname, release)
 import qualified    Codec.Archive.Tar as Tar
 import              Control.Applicative (empty)
 import              Control.Monad.Logger
@@ -64,8 +63,6 @@ import qualified    Data.Yaml as Yaml
 import              Distribution.System (OS, Arch (..), Platform (..))
 import qualified    Distribution.System as Cabal
 import              Distribution.Text (simpleParse)
-import              Foreign.C (throwErrnoIfMinus1_, peekCString)
-import              Foreign.Marshal (alloca)
 import              Lens.Micro (set)
 import              Network.HTTP.Simple (getResponseBody, httpLBS, withResponse, getResponseStatusCode)
 import              Network.HTTP.Download
@@ -109,7 +106,10 @@ import              System.Process.Run (runCmd, Cmd(..))
 import              Text.Printf (printf)
 
 #if !WINDOWS
-import           System.Posix.Files (setFileMode)
+import              Bindings.Uname (uname, release)
+import              Foreign.C (throwErrnoIfMinus1_, peekCString)
+import              Foreign.Marshal (alloca)
+import              System.Posix.Files (setFileMode)
 #endif
 
 -- | Default location of the stack-setup.yaml file
@@ -605,9 +605,11 @@ getGhcBuild menv = do
                 case libComponents ++ pieComponents of
                     [] -> useBuild CompilerBuildStandard
                     components -> useBuild (CompilerBuildSpecialized (intercalate "-" components))
+#if !WINDOWS
             Platform _ Cabal.OpenBSD -> do
                 releaseStr <- mungeRelease <$> sysRelease
                 useBuild (CompilerBuildSpecialized releaseStr)
+#endif
             _ -> useBuild CompilerBuildStandard
     useBuild CompilerBuildStandard = do
         $logDebug "Using standard GHC build"
@@ -629,6 +631,7 @@ mungeRelease = intercalate "-" . prefixMaj . splitOn "."
     prefixMaj = prefixFst "maj" prefixMin
     prefixMin = prefixFst "min" (map ('r':))
 
+#if !WINDOWS
 sysRelease :: (MonadUnliftIO m, MonadLogger m) => m String
 sysRelease =
   handleIO (\e -> do
@@ -640,6 +643,7 @@ sysRelease =
   alloca $ \ ptr ->
              do throwErrnoIfMinus1_ "uname" $ uname ptr
                 peekCString $ release ptr
+#endif
 
 -- | Ensure Docker container-compatible 'stack' executable is downloaded
 ensureDockerStackExe :: HasConfig env => Platform -> RIO env (Path Abs File)
