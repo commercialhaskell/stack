@@ -68,6 +68,7 @@ data GhciOpts = GhciOpts
     , ghciSkipIntermediate   :: !Bool
     , ghciHidePackages       :: !Bool
     , ghciNoBuild            :: !Bool
+    , ghciOnlyMain           :: !Bool
     } deriving Show
 
 -- | Necessary information to load a package or its components.
@@ -334,7 +335,7 @@ runGhci GhciOpts{..} targets mainIsTargets pkgs extraFiles = do
             -- it doesn't matter if it's intero or ghci when loading
             -- multiple packages.
             case pkgs of
-                [pkg] -> do
+                [_] -> do
                     menv <- liftIO $ configEnvOverride config defaultEnvSettings
                     output <- execObserve menv (fromMaybe (compilerExeName wc) ghciGhcCommand) ["--version"]
                     return $ "Intero" `isPrefixOf` output
@@ -348,7 +349,7 @@ runGhci GhciOpts{..} targets mainIsTargets pkgs extraFiles = do
                 isIntero <- checkIsIntero
                 bopts <- view buildOptsL
                 mainFile <- figureOutMainFile bopts mainIsTargets targets pkgs
-                scriptPath <- writeGhciScript tmpDirectory (renderScript isIntero pkgs mainFile extraFiles)
+                scriptPath <- writeGhciScript tmpDirectory (renderScript isIntero pkgs mainFile ghciOnlyMain extraFiles)
                 execGhci (macrosOptions ++ ["-ghci-script=" <> toFilePath scriptPath])
 
 writeMacrosFile :: (MonadIO m) => Path Abs Dir -> [GhciPkgInfo] -> m [String]
@@ -366,8 +367,8 @@ writeGhciScript tmpDirectory script = do
     scriptPath = tmpDirectory </> $(mkRelFile "ghci-script")
     scriptFilePath = toFilePath scriptPath
 
-renderScript :: Bool -> [GhciPkgInfo] -> Maybe (Path Abs File) -> [Path Abs File] -> GhciScript
-renderScript isIntero pkgs mainFile extraFiles = do
+renderScript :: Bool -> [GhciPkgInfo] -> Maybe (Path Abs File) -> Bool -> [Path Abs File] -> GhciScript
+renderScript isIntero pkgs mainFile onlyMain extraFiles = do
     let cdPhase = case (isIntero, pkgs) of
           -- If only loading one package, set the cwd properly.
           -- Otherwise don't try. See
@@ -381,7 +382,10 @@ renderScript isIntero pkgs mainFile extraFiles = do
         modulePhase = cmdModule $ S.fromList allModules
         allModules = concatMap (S.toList . ghciPkgModules) pkgs
     case getFileTargets pkgs <> extraFiles of
-        [] -> cdPhase <> addPhase <> modulePhase
+        [] ->
+          if onlyMain
+            then cdPhase <> if isJust mainFile then cmdAdd (S.fromList addMain) else mempty
+            else cdPhase <> addPhase <> modulePhase
         fileTargets -> cmdAdd (S.fromList (map Right fileTargets))
 
 -- Hacky check if module / main phase should be omitted. This should be
