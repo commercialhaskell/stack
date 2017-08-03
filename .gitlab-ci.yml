@@ -27,3 +27,10 @@ docker_image_lts-8:
   script:
     - docker login -u "$PROD_DOCKER_USERNAME" -p "$PROD_DOCKER_PASSWORD"
     - etc/dockerfiles/stack-build/build.sh --push lts-8
+
+docker_image_lts-9:
+  stage: build
+  when: manual
+  script:
+    - docker login -u "$PROD_DOCKER_USERNAME" -p "$PROD_DOCKER_PASSWORD"
+    - etc/dockerfiles/stack-build/build.sh --push lts-9
