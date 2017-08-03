@@ -27,23 +27,23 @@ spec = do
         it "should seperate commands with a newline" $ do
           let dir = $(mkAbsDir $ defaultDrive FP.</> "src" FP.</> "package-a")
               script = cmdCdGhc dir
-                    <> cmdAdd [fromString "Lib.A"]
+                    <> cmdAdd [Left (fromString "Lib.A")]
           scriptToLazyByteString script `shouldBe`
             ":cd-ghc " <> pathToLazyByteString dir <> "\n:add Lib.A\n"
 
       describe ":add" $ do
         it "should not render empty add commands" $ do
-          let script = cmdAdd []
+          let script = cmdAdd S.empty
           scriptToLazyByteString script `shouldBe` ""
 
         it "should ensure that a space exists between each module in an add command" $ do
-          let script = cmdAdd (S.fromList [fromString "Lib.A", fromString "Lib.B"])
+          let script = cmdAdd (S.fromList [Left (fromString "Lib.A"), Left (fromString "Lib.B")])
           scriptToLazyByteString script `shouldBe` ":add Lib.A Lib.B\n"
 
       describe ":add (by file)" $ do
         it "should render a full file path" $ do
           let file = $(mkAbsFile $ defaultDrive FP.</> "Users" FP.</> "someone" FP.</> "src" FP.</> "project" FP.</> "package-a" FP.</> "src" FP.</> "Main.hs")
-              script = cmdAddFile file
+              script = cmdAdd (S.fromList [Right file])
           scriptToLazyByteString script `shouldBe`
             ":add " <> pathToLazyByteString file <> "\n"
 

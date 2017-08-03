@@ -15,10 +15,6 @@ module Stack.Ghci
     , GhciPkgInfo(..)
     , GhciException(..)
     , ghci
-
-    -- TODO: Address what should and should not be exported.
-    , renderScriptGhci
-    , renderScriptIntero
     ) where
 
 import           Stack.Prelude
@@ -331,72 +327,62 @@ runGhci GhciOpts{..} targets mainIsTargets pkgs extraFiles = do
                  -- is included.
                   (if null pkgs then id else ("-i" : )) $
                   odir <> pkgopts <> map T.unpack ghciGhcOptions <> ghciArgs <> extras)
-        interrogateExeForRenderFunction = do
-            menv <- liftIO $ configEnvOverride config defaultEnvSettings
-            output <- execObserve menv (fromMaybe (compilerExeName wc) ghciGhcCommand) ["--version"]
-            if "Intero" `isPrefixOf` output
-                then return renderScriptIntero
-                else return renderScriptGhci
+        -- TODO: Consider optimizing this check. Perhaps if no
+        -- "with-ghc" is specified, assume that it is not using intero.
+        checkIsIntero =
+            -- Optimization dependent on the behavior of renderScript -
+            -- it doesn't matter if it's intero or ghci when loading
+            -- multiple packages.
+            case pkgs of
+                [pkg] -> do
+                    menv <- liftIO $ configEnvOverride config defaultEnvSettings
+                    output <- execObserve menv (fromMaybe (compilerExeName wc) ghciGhcCommand) ["--version"]
+                    return $ "Intero" `isPrefixOf` output
+                _ -> return False
     withSystemTempDir "ghci" $ \tmpDirectory -> do
         macrosOptions <- writeMacrosFile tmpDirectory pkgs
         if ghciNoLoadModules
             then execGhci macrosOptions
             else do
                 checkForDuplicateModules pkgs
-                renderFn <- interrogateExeForRenderFunction
+                isIntero <- checkIsIntero
                 bopts <- view buildOptsL
                 mainFile <- figureOutMainFile bopts mainIsTargets targets pkgs
-                scriptPath <- writeGhciScript tmpDirectory (renderFn pkgs mainFile extraFiles)
+                scriptPath <- writeGhciScript tmpDirectory (renderScript isIntero pkgs mainFile extraFiles)
                 execGhci (macrosOptions ++ ["-ghci-script=" <> toFilePath scriptPath])
 
 writeMacrosFile :: (MonadIO m) => Path Abs Dir -> [GhciPkgInfo] -> m [String]
 writeMacrosFile tmpDirectory packages = do
-  preprocessCabalMacros packages macrosFile
+    preprocessCabalMacros packages macrosFile
   where
     macrosFile = tmpDirectory </> $(mkRelFile "cabal_macros.h")
 
 writeGhciScript :: (MonadIO m) => Path Abs Dir -> GhciScript -> m (Path Abs File)
 writeGhciScript tmpDirectory script = do
-  liftIO $ scriptToFile scriptPath script
-  setScriptPerms scriptFilePath
-  return scriptPath
+    liftIO $ scriptToFile scriptPath script
+    setScriptPerms scriptFilePath
+    return scriptPath
   where
     scriptPath = tmpDirectory </> $(mkRelFile "ghci-script")
     scriptFilePath = toFilePath scriptPath
 
-findOwningPackageForMain :: [GhciPkgInfo] -> Path Abs File -> Maybe GhciPkgInfo
-findOwningPackageForMain pkgs mainFile =
-  find (\pkg -> toFilePath (ghciPkgDir pkg) `isPrefixOf` toFilePath mainFile) pkgs
-
-renderScriptGhci :: [GhciPkgInfo] -> Maybe (Path Abs File) -> [Path Abs File] -> GhciScript
-renderScriptGhci pkgs mainFile extraFiles =
-  let addPhase    = mconcat $ fmap renderPkg pkgs
-      mainPhase   = case mainFile of
-                      Just path -> cmdAddFile path
-                      Nothing   -> mempty
-      modulePhase = cmdModule $ foldl' S.union S.empty (fmap ghciPkgModules pkgs)
-   in case getFileTargets pkgs <> extraFiles of
-          [] -> addPhase <> mainPhase <> modulePhase
-          fileTargets -> mconcat $ map cmdAddFile fileTargets
-  where
-    renderPkg pkg = cmdAdd (ghciPkgModules pkg)
-
-renderScriptIntero :: [GhciPkgInfo] -> Maybe (Path Abs File) -> [Path Abs File] -> GhciScript
-renderScriptIntero pkgs mainFile extraFiles =
-  let addPhase    = mconcat $ fmap renderPkg pkgs
-      mainPhase   = case mainFile of
-                      Just path ->
-                        case findOwningPackageForMain pkgs path of
-                          Just mainPkg -> cmdCdGhc (ghciPkgDir mainPkg) <> cmdAddFile path
-                          Nothing      -> cmdAddFile path
-                      Nothing   -> mempty
-      modulePhase = cmdModule $ foldl' S.union S.empty (fmap ghciPkgModules pkgs)
-   in case getFileTargets pkgs <> extraFiles of
-          [] -> addPhase <> mainPhase <> modulePhase
-          fileTargets -> mconcat $ map cmdAddFile fileTargets
-  where
-    renderPkg pkg = cmdCdGhc (ghciPkgDir pkg)
-                 <> cmdAdd (ghciPkgModules pkg)
+renderScript :: Bool -> [GhciPkgInfo] -> Maybe (Path Abs File) -> [Path Abs File] -> GhciScript
+renderScript isIntero pkgs mainFile extraFiles = do
+    let cdPhase = case (isIntero, pkgs) of
+          -- If only loading one package, set the cwd properly.
+          -- Otherwise don't try. See
+          -- https://github.com/commercialhaskell/stack/issues/3309
+          (True, [pkg]) -> cmdCdGhc (ghciPkgDir pkg)
+          _ -> mempty
+        addPhase = cmdAdd $ S.fromList (map Left allModules ++ addMain)
+        addMain = case mainFile of
+            Just path -> [Right path]
+            _ -> []
+        modulePhase = cmdModule $ S.fromList allModules
+        allModules = concatMap (S.toList . ghciPkgModules) pkgs
+    case getFileTargets pkgs <> extraFiles of
+        [] -> cdPhase <> addPhase <> modulePhase
+        fileTargets -> cmdAdd (S.fromList (map Right fileTargets))
 
 -- Hacky check if module / main phase should be omitted. This should be
 -- improved if / when we have a better per-component load.
