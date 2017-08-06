@@ -1,5 +1,4 @@
 -- {-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE OverloadedStrings #-}
 -- {-# LANGUAGE QuasiQuotes #-}
 -- {-# LANGUAGE TemplateHaskell #-}
 
