@@ -28,12 +28,11 @@ ghciOptsParser = GhciOpts
                                     metavar "OPTIONS" <>
                                     completer ghcOptsCompleter <>
                                     help "Additional options passed to GHCi")))
-             <*> many
-                     (textOption
-                          (long "ghc-options" <>
-                           metavar "OPTIONS" <>
-                           completer ghcOptsCompleter <>
-                           help "Additional options passed to both GHC and GHCi"))
+             <*> manyArgsOptions
+                     (long "ghc-options" <>
+                      metavar "OPTIONS" <>
+                      completer ghcOptsCompleter <>
+                      help "Additional options passed to both GHC and GHCi")
              <*> flagsParser
              <*> optional
                      (strOption (long "with-ghc" <>

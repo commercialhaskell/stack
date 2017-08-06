@@ -42,6 +42,9 @@ Other enhancements:
   [#3232](https://github.com/commercialhaskell/stack/issues/3232).
 * Introduce the `Stack.StaticBytes` module for more efficiently
   holding statically-known byte sizes.
+* `--ghc-options` and `--ghcjs-boot-options` now parse their input, so
+  multiple arguments can be passed in one option.
+  See [#3315](https://github.com/commercialhaskell/stack/issues/3315)
 
 Bug fixes:
 

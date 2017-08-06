@@ -21,7 +21,6 @@ import           Control.Monad.Logger (runNoLoggingT)
 import           Control.Monad.Reader (local)
 import           Control.Monad.Trans.Except (ExceptT)
 import           Control.Monad.Writer.Lazy (Writer)
-import           Data.Attoparsec.Args (parseArgs, EscapingMode (Escaping))
 import           Data.Attoparsec.Interpreter (getInterpreterArgs)
 import qualified Data.ByteString.Lazy as L
 import           Data.IORef.RunOnce (runOnce)
@@ -584,7 +583,7 @@ cleanCmd opts go = withBuildConfigAndLockNoDocker go (const (clean opts))
 -- | Helper for build and install commands
 buildCmd :: BuildOptsCLI -> GlobalOpts -> IO ()
 buildCmd opts go = do
-  when (any (("-prof" `elem`) . either (const []) id . parseArgs Escaping) (boptsCLIGhcOptions opts)) $ do
+  when ("-prof" `elem` boptsCLIGhcOptions opts) $ do
     hPutStrLn stderr "Error: When building with stack, you should not use the -prof GHC option"
     hPutStrLn stderr "Instead, please use --library-profiling and --executable-profiling"
     hPutStrLn stderr "See: https://github.com/commercialhaskell/stack/issues/1015"
