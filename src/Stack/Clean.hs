@@ -2,6 +2,8 @@
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 -- | Clean a project.
 module Stack.Clean
@@ -13,19 +15,27 @@ module Stack.Clean
 import           Stack.Prelude
 import           Data.List ((\\),intercalate)
 import qualified Data.Map.Strict as Map
+import qualified Data.Text as T
 import           Path.IO (ignoringAbsence, removeDirRecur)
 import           Stack.Config (getLocalPackages)
 import           Stack.Constants.Config (distDirFromDir, workDirFromDir)
 import           Stack.Types.PackageName
 import           Stack.Types.Config
+import           System.Exit (exitFailure)
 
 -- | Deletes build artifacts in the current project.
 --
 -- Throws 'StackCleanException'.
 clean :: HasEnvConfig env => CleanOpts -> RIO env ()
 clean cleanOpts = do
-    dirs <- dirsToDelete cleanOpts
-    liftIO $ forM_ dirs (ignoringAbsence . removeDirRecur)
+    failures <- mapM cleanDir =<< dirsToDelete cleanOpts
+    when (or failures) $ liftIO exitFailure
+  where
+    cleanDir dir =
+      liftIO (ignoringAbsence (removeDirRecur dir) >> return False) `catchAny` \ex -> do
+        $logError $ "Exception while recursively deleting " <> T.pack (toFilePath dir) <> "\n" <> T.pack (show ex)
+        $logError "Perhaps you do not have permission to delete these files or they are in use?"
+        return True
 
 dirsToDelete :: HasEnvConfig env => CleanOpts -> RIO env [Path Abs Dir]
 dirsToDelete cleanOpts = do
