@@ -284,7 +284,13 @@ withLoadPackage inner = do
         inner $ \loc flags ghcOptions -> do
             bs <- run $ loadSingleRawCabalFile loadFromIndex menv root loc
 
-            (_warnings,pkg) <- readPackageBS (depPackageConfig econfig flags ghcOptions) bs
+            -- Intentionally ignore warnings, as it's not really
+            -- appropriate to print a bunch of warnings out while
+            -- resolving the package index.
+            (_warnings,pkg) <- readPackageBS
+              (depPackageConfig econfig flags ghcOptions)
+              loc
+              bs
             return pkg
   where
     -- | Package config to be used for dependencies

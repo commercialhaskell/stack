@@ -78,6 +78,7 @@ import           Stack.Constants.Config
 import           Stack.Prelude
 import           Stack.PrettyPrint
 import           Stack.Types.Build
+import           Stack.Types.BuildPlan (PackageLocationIndex (..), PackageLocation (..))
 import           Stack.Types.Compiler
 import           Stack.Types.Config
 import           Stack.Types.FlagName
@@ -97,17 +98,17 @@ readPackageUnresolved :: (MonadIO m, MonadThrow m)
                       -> m ([PWarning],GenericPackageDescription)
 readPackageUnresolved cabalfp =
   liftIO (BS.readFile (FL.toFilePath cabalfp))
-  >>= readPackageUnresolvedBS (Just cabalfp)
+  >>= readPackageUnresolvedBS (PLOther $ PLFilePath $ toFilePath cabalfp)
 
 -- | Read the raw, unresolved package information from a ByteString.
 readPackageUnresolvedBS :: (MonadThrow m)
-                        => Maybe (Path Abs File)
+                        => PackageLocationIndex FilePath
                         -> BS.ByteString
                         -> m ([PWarning],GenericPackageDescription)
-readPackageUnresolvedBS mcabalfp bs =
+readPackageUnresolvedBS source bs =
     case rawParseGPD bs of
        Left per ->
-         throwM (PackageInvalidCabalFile mcabalfp per)
+         throwM (PackageInvalidCabalFile source per)
        Right x -> return x
 
 -- | A helper function that performs the basic character encoding
@@ -136,10 +137,11 @@ readPackage packageConfig cabalfp =
 -- | Reads and exposes the package information, from a ByteString
 readPackageBS :: (MonadThrow m)
               => PackageConfig
+              -> PackageLocationIndex FilePath
               -> BS.ByteString
               -> m ([PWarning],Package)
-readPackageBS packageConfig bs =
-  do (warnings,gpkg) <- readPackageUnresolvedBS Nothing bs
+readPackageBS packageConfig loc bs =
+  do (warnings,gpkg) <- readPackageUnresolvedBS loc bs
      return (warnings,resolvePackage packageConfig gpkg)
 
 -- | Get 'GenericPackageDescription' and 'PackageDescription' reading info
