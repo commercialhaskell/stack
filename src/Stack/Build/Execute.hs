@@ -1225,7 +1225,7 @@ singleBuild runInBase ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} in
 
                 menv' <- modifyEnvOverride menv
                        $ Map.insert
-                            "GHC_PACKAGE_PATH"
+                            (ghcPkgPathEnvVar wc)
                             (T.pack $ toFilePathNoTrailingSep $ bcoSnapDB eeBaseConfigOpts)
 
                 -- In case a build of the library with different flags already exists, unregister it

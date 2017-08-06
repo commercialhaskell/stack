@@ -17,6 +17,7 @@ module Stack.GhcPkg
   ,unregisterGhcPkgId
   ,getCabalPkgVer
   ,ghcPkgExeName
+  ,ghcPkgPathEnvVar
   ,mkGhcPackagePath)
   where
 
@@ -109,6 +110,11 @@ createDatabase menv wc db = do
 ghcPkgExeName :: WhichCompiler -> String
 ghcPkgExeName Ghc = "ghc-pkg"
 ghcPkgExeName Ghcjs = "ghcjs-pkg"
+
+-- | Get the environment variable to use for the package DB paths.
+ghcPkgPathEnvVar :: WhichCompiler -> Text
+ghcPkgPathEnvVar Ghc = "GHC_PACKAGE_PATH"
+ghcPkgPathEnvVar Ghcjs = "GHCJS_PACKAGE_PATH"
 
 -- | Get the necessary ghc-pkg flags for setting up the given package database
 packageDbFlags :: [Path Abs Dir] -> [String]

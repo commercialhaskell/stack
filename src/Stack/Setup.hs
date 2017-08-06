@@ -78,7 +78,7 @@ import              Stack.Constants (stackProgName)
 import              Stack.Constants.Config (distRelativeDir)
 import              Stack.Exec (defaultEnvSettings)
 import              Stack.Fetch
-import              Stack.GhcPkg (createDatabase, getCabalPkgVer, getGlobalDB, mkGhcPackagePath)
+import              Stack.GhcPkg (createDatabase, getCabalPkgVer, getGlobalDB, mkGhcPackagePath, ghcPkgPathEnvVar)
 import              Stack.Prelude
 import              Stack.PrettyPrint
 import              Stack.Setup.Installed
@@ -301,9 +301,7 @@ setupEnv mResolveMissingGHC = do
                     eo <- mkEnvOverride platform
                         $ Map.insert "PATH" (if esIncludeLocals es then localsPath else depsPath)
                         $ (if esIncludeGhcPackagePath es
-                                then Map.insert
-                                       (case wc of { Ghc -> "GHC_PACKAGE_PATH"; Ghcjs -> "GHCJS_PACKAGE_PATH" })
-                                       (mkGPP (esIncludeLocals es))
+                                then Map.insert (ghcPkgPathEnvVar wc) (mkGPP (esIncludeLocals es))
                                 else id)
 
                         $ (if esStackExe es
