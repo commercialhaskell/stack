@@ -52,6 +52,7 @@ import              Data.Foldable (maximumBy)
 import qualified    Data.HashMap.Strict as HashMap
 import              Data.IORef.RunOnce (runOnce)
 import              Data.List hiding (concat, elem, maximumBy, any)
+import              Data.List.Split (splitOn)
 import qualified    Data.Map as Map
 import qualified    Data.Set as Set
 import qualified    Data.Text as T
@@ -59,7 +60,7 @@ import qualified    Data.Text.Encoding as T
 import qualified    Data.Text.Encoding.Error as T
 import              Data.Time.Clock (NominalDiffTime, diffUTCTime, getCurrentTime)
 import qualified    Data.Yaml as Yaml
-import              Distribution.System (OS (Linux), Arch (..), Platform (..))
+import              Distribution.System (OS, Arch (..), Platform (..))
 import qualified    Distribution.System as Cabal
 import              Distribution.Text (simpleParse)
 import              Lens.Micro (set)
@@ -105,7 +106,10 @@ import              System.Process.Run (runCmd, Cmd(..))
 import              Text.Printf (printf)
 
 #if !WINDOWS
-import           System.Posix.Files (setFileMode)
+import              Bindings.Uname (uname, release)
+import              Foreign.C (throwErrnoIfMinus1_, peekCString)
+import              Foreign.Marshal (alloca)
+import              System.Posix.Files (setFileMode)
 #endif
 
 -- | Default location of the stack-setup.yaml file
@@ -542,7 +546,7 @@ getGhcBuild menv = do
 
         platform <- view platformL
         case platform of
-            Platform _ Linux -> do
+            Platform _ Cabal.Linux -> do
                 -- Some systems don't have ldconfig in the PATH, so make sure to look in /sbin and /usr/sbin as well
                 sbinEnv <- modifyEnvOverride menv $
                     Map.insert "PATH" $
@@ -601,6 +605,11 @@ getGhcBuild menv = do
                 case libComponents ++ pieComponents of
                     [] -> useBuild CompilerBuildStandard
                     components -> useBuild (CompilerBuildSpecialized (intercalate "-" components))
+#if !WINDOWS
+            Platform _ Cabal.OpenBSD -> do
+                releaseStr <- mungeRelease <$> sysRelease
+                useBuild (CompilerBuildSpecialized releaseStr)
+#endif
             _ -> useBuild CompilerBuildStandard
     useBuild CompilerBuildStandard = do
         $logDebug "Using standard GHC build"
@@ -608,6 +617,33 @@ getGhcBuild menv = do
     useBuild (CompilerBuildSpecialized s) = do
         $logDebug ("Using " <> T.pack s <> " GHC build")
         return (CompilerBuildSpecialized s)
+
+-- | Encode an OpenBSD version (like "6.1") into a valid argument for
+-- CompilerBuildSpecialized, so "maj6-min1". Later version numbers are prefixed
+-- with "r".
+-- The result r must be such that "ghc-" ++ r is a valid package name,
+-- as recognized by parsePackageNameFromString.
+mungeRelease :: String -> String
+mungeRelease = intercalate "-" . prefixMaj . splitOn "."
+  where
+    prefixFst pfx k (rev : revs) = (pfx ++ rev) : k revs
+    prefixFst _ _ [] = []
+    prefixMaj = prefixFst "maj" prefixMin
+    prefixMin = prefixFst "min" (map ('r':))
+
+#if !WINDOWS
+sysRelease :: (MonadUnliftIO m, MonadLogger m) => m String
+sysRelease =
+  handleIO (\e -> do
+               $logWarn $ T.concat [ T.pack "Could not query OS version"
+                                   , T.pack $ show e
+                                   ]
+               return "") .
+  liftIO .
+  alloca $ \ ptr ->
+             do throwErrnoIfMinus1_ "uname" $ uname ptr
+                peekCString $ release ptr
+#endif
 
 -- | Ensure Docker container-compatible 'stack' executable is downloaded
 ensureDockerStackExe :: HasConfig env => Platform -> RIO env (Path Abs File)

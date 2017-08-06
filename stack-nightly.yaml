@@ -15,3 +15,4 @@ flags:
 extra-deps:
 - mintty-0.1.1
 - text-metrics-0.3.0
+- bindings-uname-0.1
