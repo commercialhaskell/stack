@@ -14,17 +14,20 @@ module Path.Extra
   ,pathToByteString
   ,pathToLazyByteString
   ,pathToText
+  ,tryGetModificationTime
   ) where
 
-import qualified Data.ByteString.Lazy.Char8 as BSL
-import qualified Data.ByteString.Char8 as BS
-import qualified Data.Text as T
-import qualified Data.Text.Encoding as T
-import           Stack.Prelude
 import           Data.Bool (bool)
+import           Data.Time (UTCTime)
 import           Path
 import           Path.IO
 import           Path.Internal (Path(..))
+import           Stack.Prelude
+import           System.IO.Error (isDoesNotExistError)
+import qualified Data.ByteString.Char8 as BS
+import qualified Data.ByteString.Lazy.Char8 as BSL
+import qualified Data.Text as T
+import qualified Data.Text.Encoding as T
 import qualified System.FilePath as FP
 
 -- | Convert to FilePath but don't add a trailing slash.
@@ -116,3 +119,6 @@ pathToByteString = T.encodeUtf8 . pathToText
 
 pathToText :: Path b t -> T.Text
 pathToText = T.pack . toFilePath
+
+tryGetModificationTime :: MonadIO m => Path Abs File -> m (Either () UTCTime)
+tryGetModificationTime = liftIO . tryJust (guard . isDoesNotExistError) . getModificationTime

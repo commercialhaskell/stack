@@ -98,6 +98,10 @@ Bug fixes:
 * Modified the flag parser within Stack to match the behavior of
   Cabal's flag parser, which allows multiple sequential dashes. See
   [#3345](https://github.com/commercialhaskell/stack/issues/3345)
+* Now clears the hackage index cache if it is older than the
+  downloaded index.  Fixes potential issue if stack was interrupted when
+  updating index.
+  See [#3033](https://github.com/commercialhaskell/stack/issues/3033)
 
 ## 1.5.1
 

@@ -50,6 +50,7 @@ import           Network.HTTP.Client.TLS (getGlobalManager)
 import           Network.HTTP.Download
 import           Network.URI (parseURI)
 import           Path (toFilePath, parseAbsFile)
+import           Path.Extra (tryGetModificationTime)
 import           Path.IO
 import           Stack.Types.Config
 import           Stack.Types.PackageIdentifier
@@ -267,24 +268,26 @@ updateIndexHTTP indexName' url = do
     gz <- configPackageIndexGz indexName'
     tar <- configPackageIndex indexName'
     wasDownloaded <- redownload req gz
-    toUnpack <-
+    shouldUnpack <-
         if wasDownloaded
             then return True
             else not `liftM` doesFileExist tar
 
-    when toUnpack $ do
-        let tmp = toFilePath tar <.> "tmp"
-        tmpPath <- parseAbsFile tmp
+    if not shouldUnpack
+        then packageIndexNotUpdated indexName'
+        else do
+            let tmp = toFilePath tar <.> "tmp"
+            tmpPath <- parseAbsFile tmp
 
-        deleteCache indexName'
+            deleteCache indexName'
 
-        liftIO $ do
-            withBinaryFile (toFilePath gz) ReadMode $ \input ->
-                withBinaryFile tmp WriteMode $ \output -> runConduit
-                  $ sourceHandle input
-                 .| ungzip
-                 .| sinkHandle output
-            renameFile tmpPath tar
+            liftIO $ do
+                withBinaryFile (toFilePath gz) ReadMode $ \input ->
+                    withBinaryFile tmp WriteMode $ \output -> runConduit
+                      $ sourceHandle input
+                     .| ungzip
+                     .| sinkHandle output
+                renameFile tmpPath tar
 
 -- | Update the index tarball via Hackage Security
 updateIndexHackageSecurity
@@ -329,6 +332,7 @@ updateIndexHackageSecurity indexName' url (HackageSecurity keyIds threshold) = d
         HS.checkForUpdates repo (Just now)
 
     case didUpdate of
+        HS.NoUpdates -> packageIndexNotUpdated indexName'
         HS.HasUpdates -> do
             -- The index actually updated. Delete the old cache, and
             -- then move the temporary unpacked file to its real
@@ -336,8 +340,26 @@ updateIndexHackageSecurity indexName' url (HackageSecurity keyIds threshold) = d
             tar <- configPackageIndex indexName'
             deleteCache indexName'
             liftIO $ D.renameFile (toFilePath tar ++ "-tmp") (toFilePath tar)
-            $logInfo "Updated package list downloaded"
-        HS.NoUpdates -> $logInfo "No updates to your package list were found"
+            $logInfo "Updated package index downloaded"
+
+-- If the index is newer than the cache, delete it so that
+-- the next 'getPackageCaches' call recomputes it. This
+-- could happen if a prior run of stack updated the index,
+-- but exited before deleting the cache.
+--
+-- See https://github.com/commercialhaskell/stack/issues/3033
+packageIndexNotUpdated :: HasConfig env => IndexName -> RIO env ()
+packageIndexNotUpdated indexName' = do
+    mindexModTime <- tryGetModificationTime =<< configPackageIndex indexName'
+    mcacheModTime <- tryGetModificationTime =<< configPackageIndexCache indexName'
+    case (mindexModTime, mcacheModTime) of
+        (Right indexModTime, Right cacheModTime) | cacheModTime < indexModTime -> do
+            deleteCache indexName'
+            $logInfo "No updates to your package index were found, but clearing the index cache as it is older than the index."
+        (Left _, _) -> do
+            deleteCache indexName'
+            $logError "Error: No updates to your package index were found, but downloaded index is missing."
+        _ -> $logInfo "No updates to your package index were found"
 
 -- | Delete the package index cache
 deleteCache :: HasConfig env => IndexName -> RIO env ()
