@@ -183,11 +183,22 @@ loadLocalPackage boptsCli targets (name, lpv) = do
                     )
                 Nothing -> mempty
 
+        -- See https://github.com/commercialhaskell/stack/issues/2862
+        isWanted = case mtarget of
+            Nothing -> False
+            -- FIXME: When issue #1406 ("stack 0.1.8 lost ability to
+            -- build individual executables or library") is resolved,
+            -- 'packageHasLibrary' is only relevant if the library is
+            -- part of the target spec.
+            Just _ -> packageHasLibrary pkg || not (Set.null allComponents)
+
         filterSkippedComponents = Set.filter (not . (`elem` boptsSkipComponents bopts))
 
         (exes, tests, benches) = (filterSkippedComponents exeCandidates,
                                   filterSkippedComponents testCandidates,
                                   filterSkippedComponents benchCandidates)
+
+        allComponents = toComponents exes tests benches
 
         toComponents e t b = Set.unions
             [ Set.map CExe e
@@ -254,8 +265,8 @@ loadLocalPackage boptsCli targets (name, lpv) = do
         , lpNewBuildCache = newBuildCache
         , lpCabalFile = lpvCabalFP lpv
         , lpDir = lpvRoot lpv
-        , lpWanted = isJust mtarget
-        , lpComponents = toComponents exes tests benches
+        , lpWanted = isWanted
+        , lpComponents = allComponents
         -- TODO: refactor this so that it's easier to be sure that these
         -- components are indeed unbuildable.
         --

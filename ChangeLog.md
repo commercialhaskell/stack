@@ -51,6 +51,8 @@ Bug fixes:
 * Fixed an issue where Stack wouldn't detect missing Docker images
   properly with newer Docker versions.
   [#3171](https://github.com/commercialhaskell/stack/pull/3171)
+* Previously, cabal files with just test-suite could cause build to fail
+  ([#2862](https://github.com/commercialhaskell/stack/issues/2862))
 
 
 ## 1.5.1
