@@ -487,7 +487,7 @@ ensureCompiler sopts = do
         Nothing -> return Nothing
         Just (compilerTool, mmsys2Tool) -> do
             -- Add GHC's and MSYS's paths to the config.
-            let idents = catMaybes [compilerTool, mmsys2Tool]
+            let idents = catMaybes [mmsys2Tool, compilerTool]
             paths <- mapM extraDirs idents
             return $ Just $ mconcat paths
 

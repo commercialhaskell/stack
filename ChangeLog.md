@@ -19,6 +19,8 @@ Behavior changes:
   currently have, Stack will automatically download and install that
   GHC. You can explicitly set `install-ghc: false` or pass the flag
   `--no-install-ghc` to regain the previous behavior.
+* On windows, the msys bin directory now comes before the ghc bin
+  directory. See [#3154](https://github.com/commercialhaskell/stack/issues/3154)
 
 Other enhancements:
 
