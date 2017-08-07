@@ -465,9 +465,20 @@ install_from_bindist() {
     fi
     STACK_TEMP_EXE="$STACK_TEMP_DIR/$(basename "$DEST")"
     mv "$STACK_TEMP_DIR/$1"/*/stack "$STACK_TEMP_EXE"
+    destdir="$(dirname "$DEST")"
+    if [ ! -d "$destdir" ]; then
+        info "$destdir directory does not exist; creating it..."
+        # First try to create directory as current user, then try with sudo if it fails.
+        if ! mkdir -p "$destdir" 2>/dev/null; then
+            if ! sudocmd mkdir -p "$destdir"; then
+                die "Could not create directory: $DEST"
+            fi
+        fi
+    fi
     # First attempt to install 'stack' as current user, then try with sudo if it fails
-    if ! install -c -m 0755 "$STACK_TEMP_EXE" "$(dirname "$DEST")" 2>/dev/null; then
-      if ! sudocmd install -c -o 0 -g 0 -m 0755 "$STACK_TEMP_EXE" "$(dirname "$DEST")"; then
+    info "Installing Stack to: $DEST..."
+    if ! install -c -m 0755 "$STACK_TEMP_EXE" "$destdir" 2>/dev/null; then
+      if ! sudocmd install -c -o 0 -g 0 -m 0755 "$STACK_TEMP_EXE" "$destdir"; then
         die "Install to $DEST failed"
       fi
     fi
