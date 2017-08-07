@@ -110,7 +110,7 @@ instance Show VerifiedDownloadException where
     show (WrongDigest req algo expected actual) =
         "Download expectation failure: content hash (" ++ algo ++  ")\n"
         ++ "Expected: " ++ displayCheckHexDigest expected ++ "\n"
-        ++ "Actual:   " ++ show actual ++ "\n"
+        ++ "Actual:   " ++ actual ++ "\n"
         ++ "For: " ++ show (getUri req)
 
 instance Exception VerifiedDownloadException
