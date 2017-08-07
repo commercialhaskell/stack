@@ -49,6 +49,9 @@ Other enhancements:
   [#3232](https://github.com/commercialhaskell/stack/issues/3232).
 * Introduce the `Stack.StaticBytes` module for more efficiently
   holding statically-known byte sizes.
+* `--ghc-options` and `--ghcjs-boot-options` now parse their input, so
+  multiple arguments can be passed in one option.
+  See [#3315](https://github.com/commercialhaskell/stack/issues/3315)
 * Added `stack ghci --only-main` flag, to skip loading / importing
   all but main modules. See the ghci documentation page
   for further info.
