@@ -521,4 +521,8 @@ where you keep your SSL certificates.
 Unfortunately `stack build` does not have an obvious equivalent to `cabal build -vN` which shows verbose output from GHC when building. The easiest workaround is to add `ghc-options: -vN` to the .cabal file or pass it via `stack build --ghc-options="-v"`.
 
 ## Does Stack support the Hpack specification?
-Yes. You can run `stack init` as usual and Stack will create a matching `stack.yaml`.
+
+Yes:
+
+* If a package directory contains an Hpack `package.yaml` file, then Stack will use it to generate a `.cabal` file when building the package.
+* You can run `stack init` to initialize a `stack.yaml` file regardless of whether your packages are declared with `.cabal` files or with Hpack `package.yaml` files.
