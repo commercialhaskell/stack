@@ -42,6 +42,9 @@ Other enhancements:
   [#3232](https://github.com/commercialhaskell/stack/issues/3232).
 * Introduce the `Stack.StaticBytes` module for more efficiently
   holding statically-known byte sizes.
+* `stack setup` for ghcjs will now install `alex` and `happy` if
+  they are not present.  See
+  [#3109](https://github.com/commercialhaskell/stack/issues/3232).
 
 Bug fixes:
 
@@ -53,7 +56,6 @@ Bug fixes:
   [#3171](https://github.com/commercialhaskell/stack/pull/3171)
 * Previously, cabal files with just test-suite could cause build to fail
   ([#2862](https://github.com/commercialhaskell/stack/issues/2862))
-
 
 ## 1.5.1
 
