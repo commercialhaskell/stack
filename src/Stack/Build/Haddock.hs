@@ -39,7 +39,6 @@ import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageName
 import           Stack.Types.Runner
 import qualified System.FilePath as FP
-import           System.IO.Error (isDoesNotExistError)
 import           System.Process.Read
 import           Web.Browser (openBrowser)
 
@@ -261,8 +260,6 @@ generateHaddockIndex descr envOverride wc bco dumpPackages docRelFP destDir = do
                                 , srcInterfaceModTime
                                 , srcInterfaceAbsFile
                                 , destInterfaceAbsFile )
-    tryGetModificationTime :: Path Abs File -> IO (Either () UTCTime)
-    tryGetModificationTime = tryJust (guard . isDoesNotExistError) . getModificationTime
     copyPkgDocs :: (a, UTCTime, Path Abs File, Path Abs File) -> IO ()
     copyPkgDocs (_,srcInterfaceModTime,srcInterfaceAbsFile,destInterfaceAbsFile) = do
         -- Copy dependencies' haddocks to documentation directory.  This way, relative @../$pkg-$ver@
