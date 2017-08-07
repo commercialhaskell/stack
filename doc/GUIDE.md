@@ -1985,7 +1985,7 @@ the following (or add it to `.bashrc`):
     eval "$(stack --bash-completion-script stack)"
 
 For more information and other shells, see [the Shell auto-completion wiki
-page](https://github.com/commercialhaskell/stack/wiki/Shell-autocompletion)
+page](https://docs.haskellstack.org/en/stable/shell_autocompletion)
 
 ### Docker
 

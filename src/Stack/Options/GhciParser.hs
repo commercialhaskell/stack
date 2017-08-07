@@ -53,3 +53,4 @@ ghciOptsParser = GhciOpts
              <*> switch (long "skip-intermediate-deps" <> help "Skip loading intermediate target dependencies" <> internal)
              <*> boolFlags True "package-hiding" "package hiding" idm
              <*> switch (long "no-build" <> help "Don't build before launching GHCi" <> internal)
+             <*> switch (long "only-main" <> help "Only load and import the main module.  If no main module, no modules will be loaded.")

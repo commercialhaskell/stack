@@ -19,6 +19,13 @@ Behavior changes:
   currently have, Stack will automatically download and install that
   GHC. You can explicitly set `install-ghc: false` or pass the flag
   `--no-install-ghc` to regain the previous behavior.
+* `stack ghci` no longer loads modules grouped by package. This is
+  always an improvement for plain ghci - it makes loading faster and
+  less noisy. For intero, this has the side-effect that it will no
+  longer load multiple packages that depend on TH loading relative
+  paths.  TH relative paths will still work when loading a single
+  package into intero. See
+  [#3309](https://github.com/commercialhaskell/stack/issues/3309)
 
 Other enhancements:
 
@@ -45,6 +52,9 @@ Other enhancements:
 * `--ghc-options` and `--ghcjs-boot-options` now parse their input, so
   multiple arguments can be passed in one option.
   See [#3315](https://github.com/commercialhaskell/stack/issues/3315)
+* Added `stack ghci --only-main` flag, to skip loading / importing
+  all but main modules. See the ghci documentation page
+  for further info.
 
 Bug fixes:
 
