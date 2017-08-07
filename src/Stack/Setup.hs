@@ -1120,9 +1120,7 @@ installGHCJS si archiveFile archiveType _tempDir destDir = do
         _ -> return Nothing
 
     $logSticky "Installing GHCJS (this will take a long time) ..."
-    runRIO (set (buildOptsL.buildOptsInstallExesL) True $
-               set (buildOptsL.buildOptsHaddockL) False envConfig') $
-        build (\_ -> return ()) Nothing defaultBuildOptsCLI
+    buildInGhcjsEnv envConfig' defaultBuildOptsCLI
     -- Copy over *.options files needed on windows.
     forM_ mwindowsInstallDir $ \dir -> do
         (_, files) <- listDir (dir </> $(mkRelDir "bin"))
@@ -1204,24 +1202,40 @@ bootGhcjs ghcjsVersion stackYaml destDir bootOpts = do
             | otherwise -> return False
     let envSettings = defaultEnvSettings { esIncludeGhcPackagePath = False }
     menv' <- liftIO $ configEnvOverride (view configL envConfig) envSettings
-    when shouldInstallCabal $ do
-        $logInfo "Building a local copy of cabal-install from source."
-        runRIO envConfig $
-            build (\_ -> return ())
-                  Nothing
-                  defaultBuildOptsCLI { boptsCLITargets = ["cabal-install"] }
-        mcabal' <- getCabalInstallVersion menv'
-        case mcabal' of
-            Nothing ->
-                $logError $
-                    "Failed to get cabal-install version after installing it.\n" <>
-                    "This shouldn't happen, because it gets built to the snapshot bin directory, which should be treated as being on the PATH."
-            Just v | v >= $(mkVersion "1.22.8") && v < $(mkVersion "1.23") ->
-                $logWarn $
-                    "Installed version of cabal-install is in a version range which may not work.\n" <>
-                    "See this issue: https://github.com/ghcjs/ghcjs/issues/470\n" <>
-                    "This version is specified by the stack.yaml file included in the ghcjs tarball.\n"
-            _ -> return ()
+    shouldInstallAlex <- not <$> doesExecutableExist menv "alex"
+    shouldInstallHappy <- not <$> doesExecutableExist menv "happy"
+    let bootDepsToInstall =
+          [ "cabal-install" | shouldInstallCabal ] ++
+          [ "alex" | shouldInstallAlex ] ++
+          [ "happy" | shouldInstallHappy ]
+    when (not (null bootDepsToInstall)) $ do
+        $logInfo $ "Building tools from source, needed for ghcjs-boot: " <> T.pack (show bootDepsToInstall)
+        buildInGhcjsEnv envConfig $ defaultBuildOptsCLI { boptsCLITargets = bootDepsToInstall }
+        let failedToFindErr = do
+                $logError "This shouldn't happen, because it gets built to the snapshot bin directory, which should be treated as being on the PATH."
+                liftIO exitFailure
+        when shouldInstallCabal $ do
+            mcabal' <- getCabalInstallVersion menv'
+            case mcabal' of
+                Nothing -> do
+                    $logError "Failed to get cabal-install version after installing it."
+                    failedToFindErr
+                Just v | v >= $(mkVersion "1.22.8") && v < $(mkVersion "1.23") ->
+                    $logWarn $
+                        "Installed version of cabal-install is in a version range which may not work.\n" <>
+                        "See this issue: https://github.com/ghcjs/ghcjs/issues/470\n" <>
+                        "This version is specified by the stack.yaml file included in the ghcjs tarball.\n"
+                _ -> return ()
+        when shouldInstallAlex $ do
+            alexInstalled <- doesExecutableExist menv "alex"
+            when (not alexInstalled) $ do
+                $logError "Failed to find 'alex' executable after installing it."
+                failedToFindErr
+        when shouldInstallHappy $ do
+            happyInstalled <- doesExecutableExist menv "happy"
+            when (not happyInstalled) $ do
+                $logError "Failed to find 'happy' executable after installing it."
+                failedToFindErr
     $logSticky "Booting GHCJS (this will take a long time) ..."
     logProcessStderrStdout Nothing "ghcjs-boot" menv' bootOpts
     $logStickyDone "GHCJS booted."
@@ -1238,6 +1252,12 @@ loadGhcjsEnvConfig stackYaml binPath = do
         (SYLOverride stackYaml)
     bconfig <- liftIO $ lcLoadBuildConfig lc Nothing
     runRIO bconfig $ setupEnv Nothing
+
+buildInGhcjsEnv :: (HasEnvConfig env, MonadIO m) => env -> BuildOptsCLI -> m ()
+buildInGhcjsEnv envConfig boptsCli = do
+    runRIO (set (buildOptsL.buildOptsInstallExesL) True $
+            set (buildOptsL.buildOptsHaddockL) False envConfig) $
+        build (\_ -> return ()) Nothing boptsCli
 
 getCabalInstallVersion :: HasLogFunc env => EnvOverride -> RIO env (Maybe Version)
 getCabalInstallVersion menv = do
