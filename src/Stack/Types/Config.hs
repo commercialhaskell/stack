@@ -104,9 +104,6 @@ module Stack.Types.Config
   ,readColorWhen
   -- ** SCM
   ,SCM(..)
-  -- ** GhcOptions
-  ,GhcOptions(..)
-  ,ghcOptionsFor
   -- * Paths
   ,bindirSuffix
   ,configInstalledCache
@@ -314,9 +311,10 @@ data Config =
          -- ^ Parameters for templates.
          ,configScmInit             :: !(Maybe SCM)
          -- ^ Initialize SCM (e.g. git) when creating new projects.
-         ,configGhcOptions          :: !GhcOptions
-         -- ^ Additional GHC options to apply to either all packages (Nothing)
-         -- or a specific package (Just).
+         ,configGhcOptionsByName    :: !(Map PackageName [Text])
+         -- ^ Additional GHC options to apply to specific packages.
+         ,configGhcOptionsAll       :: ![Text]
+         -- ^ Additional GHC options to apply to all packages
          ,configSetupInfoLocations  :: ![SetupInfoLocation]
          -- ^ Additional SetupInfo (inline or remote) to use to find tools.
          ,configPvpBounds           :: !PvpBounds
@@ -709,8 +707,10 @@ data ConfigMonoid =
     -- ^ Template parameters.
     ,configMonoidScmInit             :: !(First SCM)
     -- ^ Initialize SCM (e.g. git init) when making new projects?
-    ,configMonoidGhcOptions          :: !GhcOptions
-    -- ^ See 'configGhcOptions'
+    ,configMonoidGhcOptionsByName    :: !(Map PackageName [Text])
+    -- ^ See 'configGhcOptionsByName'
+    ,configMonoidGhcOptionsAll       :: ![Text]
+    -- ^ See 'configGhcOptionsAll'
     ,configMonoidExtraPath           :: ![Path Abs Dir]
     -- ^ Additional paths to search for executables in
     ,configMonoidSetupInfoLocations  :: ![SetupInfoLocation]
@@ -794,7 +794,15 @@ parseConfigMonoidObject rootDir obj = do
           return (First scmInit,fromMaybe M.empty params)
     configMonoidCompilerCheck <- First <$> obj ..:? configMonoidCompilerCheckName
 
-    configMonoidGhcOptions <- obj ..:? configMonoidGhcOptionsName ..!= mempty
+    GhcOptions configMonoidGhcOptions <- obj ..:? configMonoidGhcOptionsName ..!= mempty
+    let configMonoidGhcOptionsByName = Map.unions (map
+          (\(mname, opts) ->
+              case mname of
+                Nothing -> Map.empty
+                Just name -> Map.singleton name opts)
+          (Map.toList configMonoidGhcOptions))
+        configMonoidGhcOptionsAll = fromMaybe [] (Map.lookup Nothing configMonoidGhcOptions)
+
     configMonoidExtraPath <- obj ..:? configMonoidExtraPathName ..!= []
     configMonoidSetupInfoLocations <-
         maybeToList <$> jsonSubWarningsT (obj ..:?  configMonoidSetupInfoLocationsName)
@@ -1745,11 +1753,6 @@ instance Monoid GhcOptions where
     -- snapshots)
     mappend (GhcOptions l) (GhcOptions r) =
         GhcOptions (Map.unionWith (++) l r)
-
-ghcOptionsFor :: PackageName -> GhcOptions -> [Text]
-ghcOptionsFor name (GhcOptions mp) =
-    M.findWithDefault [] Nothing mp ++
-    M.findWithDefault [] (Just name) mp
 
 -----------------------------------
 -- Lens classes
