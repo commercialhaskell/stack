@@ -66,6 +66,10 @@ Bug fixes:
   [#3171](https://github.com/commercialhaskell/stack/pull/3171)
 * Previously, cabal files with just test-suite could cause build to fail
   ([#2862](https://github.com/commercialhaskell/stack/issues/2862))
+* If an invalid snapshot file has been detected (usually due to
+  mismatched hashes), Stack will delete the downloaded file and
+  recommend either retrying or filing an issue upstream. See
+  [#3319](https://github.com/commercialhaskell/stack/issues/3319).
 
 
 ## 1.5.1
