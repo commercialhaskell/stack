@@ -169,11 +169,11 @@ module Stack.Types.Config
 
 import           Stack.Prelude
 import           Data.Aeson.Extended
-                 (ToJSON, toJSON, FromJSON, parseJSON, withText, object,
+                 (ToJSON, toJSON, FromJSON, FromJSONKey (..), parseJSON, withText, object,
                   (.=), (..:), (..:?), (..!=), Value(Bool, String),
                   withObjectWarnings, WarningParser, Object, jsonSubWarnings,
-                  jsonSubWarningsT, jsonSubWarningsTT, WithJSONWarnings(..), noJSONWarnings)
-import           Data.Attoparsec.Args
+                  jsonSubWarningsT, jsonSubWarningsTT, WithJSONWarnings(..), noJSONWarnings,
+                  FromJSONKeyFunction (FromJSONKeyTextParser))
 import qualified Data.ByteString.Char8 as S8
 import           Data.List (stripPrefix)
 import           Data.List.NonEmpty (NonEmpty)
@@ -794,14 +794,14 @@ parseConfigMonoidObject rootDir obj = do
           return (First scmInit,fromMaybe M.empty params)
     configMonoidCompilerCheck <- First <$> obj ..:? configMonoidCompilerCheckName
 
-    GhcOptions configMonoidGhcOptions <- obj ..:? configMonoidGhcOptionsName ..!= mempty
+    configMonoidGhcOptions <- obj ..:? configMonoidGhcOptionsName ..!= mempty
     let configMonoidGhcOptionsByName = Map.unions (map
           (\(mname, opts) ->
               case mname of
-                Nothing -> Map.empty
-                Just name -> Map.singleton name opts)
+                GOKAll -> Map.empty
+                GOKPackage name -> Map.singleton name opts)
           (Map.toList configMonoidGhcOptions))
-        configMonoidGhcOptionsAll = fromMaybe [] (Map.lookup Nothing configMonoidGhcOptions)
+        configMonoidGhcOptionsAll = Map.findWithDefault [] GOKAll configMonoidGhcOptions
 
     configMonoidExtraPath <- obj ..:? configMonoidExtraPathName ..!= []
     configMonoidSetupInfoLocations <-
@@ -1721,38 +1721,16 @@ data DockerUser = DockerUser
     , duUmask :: FileMode -- ^ File creation mask }
     } deriving (Read,Show)
 
-newtype GhcOptions = GhcOptions
-    { unGhcOptions :: Map (Maybe PackageName) [Text] }
-    deriving Show
-
-instance FromJSON GhcOptions where
-    parseJSON val = do
-        ghcOptions <- parseJSON val
-        fmap (GhcOptions . Map.fromList) $ mapM handleGhcOptions $ Map.toList ghcOptions
-      where
-        handleGhcOptions :: Monad m => (Text, Text) -> m (Maybe PackageName, [Text])
-        handleGhcOptions (name', vals') = do
-            name <-
-                if name' == "*"
-                    then return Nothing
-                    else case parsePackageNameFromString $ T.unpack name' of
-                            Left e -> fail $ show e
-                            Right x -> return $ Just x
-
-            case parseArgs Escaping vals' of
-                Left e -> fail e
-                Right vals -> return (name, map T.pack vals)
-
-instance Monoid GhcOptions where
-    mempty = GhcOptions mempty
-    -- FIXME: Should GhcOptions really monoid like this? Keeping it this
-    -- way preserves the behavior of the ConfigMonoid. However, this
-    -- means there isn't the ability to fully override snapshot
-    -- ghc-options in the same way there is for flags. Do we want to
-    -- change the semantics here? (particularly for extensible
-    -- snapshots)
-    mappend (GhcOptions l) (GhcOptions r) =
-        GhcOptions (Map.unionWith (++) l r)
+data GhcOptionKey = GOKAll | GOKPackage !PackageName
+  deriving (Eq, Ord)
+instance FromJSONKey GhcOptionKey where
+  fromJSONKey = FromJSONKeyTextParser $ \t ->
+    if t == "*"
+      then return GOKAll
+      else case parsePackageName t of
+             Left e -> fail $ show e
+             Right x -> return $ GOKPackage x
+  fromJSONKeyList = FromJSONKeyTextParser $ \_ -> fail "GhcOptionKey.fromJSONKeyList"
 
 -----------------------------------
 -- Lens classes
