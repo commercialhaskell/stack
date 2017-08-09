@@ -301,10 +301,8 @@ runGhci GhciOpts{..} targets mainIsTargets pkgs extraFiles = do
         genOpts = nubOrd (concatMap (concatMap (oneWordOpts . snd) . ghciPkgOpts) pkgs)
         (omittedOpts, ghcOpts) = partition badForGhci $
             concatMap (concatMap (bioOpts . snd) . ghciPkgOpts) pkgs ++
-            getUserOptions Nothing ++
-            concatMap (getUserOptions . Just . ghciPkgName) pkgs
-        getUserOptions mpkg =
-            map T.unpack (M.findWithDefault [] mpkg (unGhcOptions (configGhcOptions config)))
+            map T.unpack (configGhcOptionsAll config ++ concatMap (getUserOptions . ghciPkgName) pkgs)
+        getUserOptions pkg = M.findWithDefault [] pkg (configGhcOptionsByName config)
         badForGhci x =
             isPrefixOf "-O" x || elem x (words "-debug -threaded -ticky -static -Werror")
     unless (null omittedOpts) $

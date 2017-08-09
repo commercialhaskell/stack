@@ -26,6 +26,10 @@ Behavior changes:
   paths.  TH relative paths will still work when loading a single
   package into intero. See
   [#3309](https://github.com/commercialhaskell/stack/issues/3309)
+* Setting GHC options for a package via `ghc-options:` in your
+  `stack.yaml` will promote it to a local package, providing for more
+  consistency with flags and better reproducibility. See:
+  [#849](https://github.com/commercialhaskell/stack/issues/849)
 
 Other enhancements:
 
