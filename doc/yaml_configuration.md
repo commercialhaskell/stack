@@ -499,21 +499,29 @@ Allows specifying per-package and global GHC options:
 ```yaml
 ghc-options:
     # All packages
-    "*": -Wall
+    "$locals": -Wall
+    "$targets": -Werror
+    "$everything": -O2
     some-package: -DSOME_CPP_FLAG
 ```
 
-Since 0.1.6, setting a GHC options for a specific package will
+Since 1.6.0, setting a GHC options for a specific package will
 automatically promote it to a local package (much like setting a
-custom package flag). However, setting options via `"*"` on all flags
+custom package flag). However, setting options via `$everything` on all flags
 will not do so (see
 [Github discussion](https://github.com/commercialhaskell/stack/issues/849#issuecomment-320892095)
 for reasoning). This can lead to unpredicable behavior by affecting
 your snapshot packages.
 
-By contrast, the `ghc-options` command line flag will only affect the
-packages specified by the
-[`apply-ghc-options` option](yaml_configuration.md#apply-ghc-options).
+The behavior of the `$locals`, `$targets`, and `$everything` special
+keys mirrors the behavior for the
+[`apply-ghc-options` setting](#apply-ghc-options), which affects
+command line parameters.
+
+NOTE: Prior to version 1.6.0, the `$locals`, `$targets`, and
+`$everything` keys were not support. Instead, you could use `"*"` for
+the behavior represented now by `$everything`. It is highly
+recommended to switch to the new, more expressive, keys.
 
 ### apply-ghc-options
 

@@ -167,6 +167,7 @@ module Stack.Types.Config
   ,to
   ) where
 
+import           Control.Monad.Writer (tell)
 import           Stack.Prelude
 import           Data.Aeson.Extended
                  (ToJSON, toJSON, FromJSON, FromJSONKey (..), parseJSON, withText, object,
@@ -174,6 +175,7 @@ import           Data.Aeson.Extended
                   withObjectWarnings, WarningParser, Object, jsonSubWarnings,
                   jsonSubWarningsT, jsonSubWarningsTT, WithJSONWarnings(..), noJSONWarnings,
                   FromJSONKeyFunction (FromJSONKeyTextParser))
+import           Data.Attoparsec.Args (parseArgs, EscapingMode (Escaping))
 import qualified Data.ByteString.Char8 as S8
 import           Data.List (stripPrefix)
 import           Data.List.NonEmpty (NonEmpty)
@@ -313,8 +315,8 @@ data Config =
          -- ^ Initialize SCM (e.g. git) when creating new projects.
          ,configGhcOptionsByName    :: !(Map PackageName [Text])
          -- ^ Additional GHC options to apply to specific packages.
-         ,configGhcOptionsAll       :: ![Text]
-         -- ^ Additional GHC options to apply to all packages
+         ,configGhcOptionsByCat     :: !(Map ApplyGhcOptions [Text])
+         -- ^ Additional GHC options to apply to categories of packages
          ,configSetupInfoLocations  :: ![SetupInfoLocation]
          -- ^ Additional SetupInfo (inline or remote) to use to find tools.
          ,configPvpBounds           :: !PvpBounds
@@ -709,7 +711,7 @@ data ConfigMonoid =
     -- ^ Initialize SCM (e.g. git init) when making new projects?
     ,configMonoidGhcOptionsByName    :: !(Map PackageName [Text])
     -- ^ See 'configGhcOptionsByName'
-    ,configMonoidGhcOptionsAll       :: ![Text]
+    ,configMonoidGhcOptionsByCat     :: !(Map ApplyGhcOptions [Text])
     -- ^ See 'configGhcOptionsAll'
     ,configMonoidExtraPath           :: ![Path Abs Dir]
     -- ^ Additional paths to search for executables in
@@ -794,14 +796,25 @@ parseConfigMonoidObject rootDir obj = do
           return (First scmInit,fromMaybe M.empty params)
     configMonoidCompilerCheck <- First <$> obj ..:? configMonoidCompilerCheckName
 
-    configMonoidGhcOptions <- obj ..:? configMonoidGhcOptionsName ..!= mempty
-    let configMonoidGhcOptionsByName = Map.unions (map
-          (\(mname, opts) ->
-              case mname of
-                GOKAll -> Map.empty
-                GOKPackage name -> Map.singleton name opts)
-          (Map.toList configMonoidGhcOptions))
-        configMonoidGhcOptionsAll = Map.findWithDefault [] GOKAll configMonoidGhcOptions
+    options <- Map.map unGhcOptions <$> obj ..:? configMonoidGhcOptionsName ..!= mempty
+
+    optionsEverything <-
+      case (Map.lookup GOKOldEverything options, Map.lookup GOKEverything options) of
+        (Just _, Just _) -> fail "Cannot specify both `*` and `$everything` GHC options"
+        (Nothing, Just x) -> return x
+        (Just x, Nothing) -> do
+          tell "The `*` ghc-options key is not recommended. Consider using $locals, or if really needed, $everything"
+          return x
+        (Nothing, Nothing) -> return []
+
+    let configMonoidGhcOptionsByCat = Map.fromList
+          [ (AGOEverything, optionsEverything)
+          , (AGOLocals, Map.findWithDefault [] GOKLocals options)
+          , (AGOTargets, Map.findWithDefault [] GOKTargets options)
+          ]
+
+        configMonoidGhcOptionsByName = Map.fromList
+            [(name, opts) | (GOKPackage name, opts) <- Map.toList options]
 
     configMonoidExtraPath <- obj ..:? configMonoidExtraPathName ..!= []
     configMonoidSetupInfoLocations <-
@@ -1721,16 +1734,34 @@ data DockerUser = DockerUser
     , duUmask :: FileMode -- ^ File creation mask }
     } deriving (Read,Show)
 
-data GhcOptionKey = GOKAll | GOKPackage !PackageName
+data GhcOptionKey
+  = GOKOldEverything
+  | GOKEverything
+  | GOKLocals
+  | GOKTargets
+  | GOKPackage !PackageName
   deriving (Eq, Ord)
+
 instance FromJSONKey GhcOptionKey where
   fromJSONKey = FromJSONKeyTextParser $ \t ->
-    if t == "*"
-      then return GOKAll
-      else case parsePackageName t of
-             Left e -> fail $ show e
-             Right x -> return $ GOKPackage x
+    case t of
+      "*" -> return GOKOldEverything
+      "$everything" -> return GOKEverything
+      "$locals" -> return GOKLocals
+      "$targets" -> return GOKTargets
+      _ ->
+        case parsePackageName t of
+          Left e -> fail $ show e
+          Right x -> return $ GOKPackage x
   fromJSONKeyList = FromJSONKeyTextParser $ \_ -> fail "GhcOptionKey.fromJSONKeyList"
+
+newtype GhcOptions = GhcOptions { unGhcOptions :: [Text] }
+
+instance FromJSON GhcOptions where
+  parseJSON = withText "GhcOptions" $ \t ->
+    case parseArgs Escaping t of
+      Left e -> fail e
+      Right opts -> return $ GhcOptions $ map T.pack opts
 
 -----------------------------------
 -- Lens classes

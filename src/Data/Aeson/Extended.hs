@@ -147,6 +147,8 @@ data WarningParserMonoid = WarningParserMonoid
 instance Monoid WarningParserMonoid where
     mempty = memptydefault
     mappend = mappenddefault
+instance IsString WarningParserMonoid where
+    fromString s = mempty { wpmWarnings = [fromString s] }
 
 -- Parsed JSON value with its warnings
 data WithJSONWarnings a = WithJSONWarnings a [JSONWarning]
@@ -159,8 +161,12 @@ instance Monoid a => Monoid (WithJSONWarnings a) where
 
 -- | Warning output from 'WarningParser'.
 data JSONWarning = JSONUnrecognizedFields String [Text]
+                 | JSONGeneralWarning !Text
 instance Show JSONWarning where
     show (JSONUnrecognizedFields obj [field]) =
         "Unrecognized field in " <> obj <> ": " <> T.unpack field
     show (JSONUnrecognizedFields obj fields) =
         "Unrecognized fields in " <> obj <> ": " <> T.unpack (T.intercalate ", " fields)
+    show (JSONGeneralWarning t) = T.unpack t
+instance IsString JSONWarning where
+  fromString = JSONGeneralWarning . T.pack
