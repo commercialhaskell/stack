@@ -1138,7 +1138,7 @@ withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} md
 --   local install directory. Note that this is literally invoking Cabal
 --   with @copy@, and not the copying done by @stack install@ - that is
 --   handled by 'copyExecutables'.
-singleBuild :: forall env. HasEnvConfig env
+singleBuild :: forall env. (HasEnvConfig env, HasRunner env)
             => (RIO env () -> IO ())
             -> ActionContext
             -> ExecuteEnv
@@ -1786,12 +1786,15 @@ getSetupHs dir = do
 -- Do not pass `-hpcdir` as GHC option if the coverage is not enabled.
 -- This helps running stack-compiled programs with dynamic interpreters like `hint`.
 -- Cfr: https://github.com/commercialhaskell/stack/issues/997
-extraBuildOptions :: HasEnvConfig env => WhichCompiler -> BuildOpts -> RIO env [String]
+extraBuildOptions :: (HasEnvConfig env, HasRunner env)
+                  => WhichCompiler -> BuildOpts -> RIO env [String]
 extraBuildOptions wc bopts = do
     canDoColor <- (>= $(mkVersion "8.2.1")) . getGhcVersion
               <$> view actualCompilerVersionL
+    shouldDoColor <- logUseColor <$> view logOptionsL
     let ddumpOpts = " -ddump-hi -ddump-to-file"
-        colorOpt = if canDoColor then "-fdiagnostics-color=always" else ""
+        colorOpt = if canDoColor && shouldDoColor
+                     then "-fdiagnostics-color=always" else ""
         optsFlag = compilerOptionsCabalFlag wc
         baseOpts = ddumpOpts ++ " " ++ colorOpt
     if toCoverage (boptsTestOpts bopts)
