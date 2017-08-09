@@ -1788,14 +1788,18 @@ getSetupHs dir = do
 -- Cfr: https://github.com/commercialhaskell/stack/issues/997
 extraBuildOptions :: HasEnvConfig env => WhichCompiler -> BuildOpts -> RIO env [String]
 extraBuildOptions wc bopts = do
+    canDoColor <- (>= $(mkVersion "8.2.1")) . getGhcVersion
+              <$> view actualCompilerVersionL
     let ddumpOpts = " -ddump-hi -ddump-to-file"
+        colorOpt = if canDoColor then "-fdiagnostics-color=always" else ""
         optsFlag = compilerOptionsCabalFlag wc
+        baseOpts = ddumpOpts ++ " " ++ colorOpt
     if toCoverage (boptsTestOpts bopts)
       then do
         hpcIndexDir <- toFilePathNoTrailingSep <$> hpcRelativeDir
-        return [optsFlag, "-hpcdir " ++ hpcIndexDir ++ ddumpOpts]
+        return [optsFlag, "-hpcdir " ++ hpcIndexDir ++ baseOpts]
       else
-        return [optsFlag, ddumpOpts]
+        return [optsFlag, baseOpts]
 
 -- Library and executable build components.
 primaryComponentOptions :: Map Text ExecutableBuildStatus -> LocalPackage -> [String]
