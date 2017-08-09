@@ -694,7 +694,7 @@ getExtraLoadDeps loadAllDeps sourceMap targets =
     getDeps :: PackageName -> [PackageName]
     getDeps name =
         case M.lookup name sourceMap of
-            Just (PSLocal lp) -> M.keys (packageDeps (lpPackage lp))
+            Just (PSFiles lp _) -> M.keys (packageDeps (lpPackage lp)) -- FIXME just Local?
             _ -> []
     go :: PackageName -> State (Map PackageName (Maybe (Path Abs File, Target))) Bool
     go name = do
@@ -702,7 +702,7 @@ getExtraLoadDeps loadAllDeps sourceMap targets =
         case (M.lookup name cache, M.lookup name sourceMap) of
             (Just (Just _), _) -> return True
             (Just Nothing, _) | not loadAllDeps -> return False
-            (_, Just (PSLocal lp)) -> do
+            (_, Just (PSFiles lp _)) -> do
                 let deps = M.keys (packageDeps (lpPackage lp))
                 shouldLoad <- liftM or $ mapM go deps
                 if shouldLoad
@@ -712,7 +712,7 @@ getExtraLoadDeps loadAllDeps sourceMap targets =
                     else do
                         modify (M.insert name Nothing)
                         return False
-            (_, Just PSUpstream{}) -> return loadAllDeps
+            (_, Just PSIndex{}) -> return loadAllDeps
             (_, _) -> return False
 
 preprocessCabalMacros :: MonadIO m => [GhciPkgInfo] -> Path Abs File -> m [String]

@@ -308,7 +308,7 @@ mkUnregisterLocal tasks dirtyReason localDumpPkgs sourceMap initialBuildSteps =
               then Nothing
               else Just $ fromMaybe "" $ Map.lookup name dirtyReason
       -- Check if we're no longer using the local version
-      | Just (PSUpstream _ Snap _ _ _) <- Map.lookup name sourceMap
+      | Just (piiLocation -> Snap) <- Map.lookup name sourceMap
           = Just "Switching to snapshot installed package"
       -- Check if a dependency is going to be unregistered
       | (dep, _):_ <- mapMaybe (`Map.lookup` toUnregister) deps
@@ -350,7 +350,7 @@ addFinal lp package isAllInOne = do
                             Local
                             package
                 , taskPresent = present
-                , taskType = TTLocal lp
+                , taskType = TTFiles lp Local -- FIXME we can rely on this being Local, right?
                 , taskAllInOne = isAllInOne
                 , taskCachePkgSrc = CacheSrcLocal (toFilePath (lpDir lp))
                 }
@@ -391,32 +391,37 @@ addDep treatAsDep' name = do
                         -- recommendation available
                         Nothing -> return $ Left $ UnknownPackage name
                         Just (PIOnlyInstalled loc installed) -> do
-                            -- slightly hacky, no flags since they likely won't affect executable names
-                            tellExecutablesUpstream name (installedVersion installed) loc Map.empty
+                            -- FIXME Slightly hacky, no flags since
+                            -- they likely won't affect executable
+                            -- names. This code does not feel right.
+                            tellExecutablesUpstream
+                              (PackageIdentifierRevision (PackageIdentifier name (installedVersion installed)) CFILatest)
+                              loc
+                              Map.empty
                             return $ Right $ ADRFound loc installed
                         Just (PIOnlySource ps) -> do
-                            tellExecutables name ps
+                            tellExecutables ps
                             installPackage name ps Nothing
                         Just (PIBoth ps installed) -> do
-                            tellExecutables name ps
+                            tellExecutables ps
                             installPackage name ps (Just installed)
             updateLibMap name res
             return res
 
-tellExecutables :: PackageName -> PackageSource -> M ()
-tellExecutables _ (PSLocal lp)
+-- FIXME what's the purpose of this? Add a Haddock!
+tellExecutables :: PackageSource -> M ()
+tellExecutables (PSFiles lp _)
     | lpWanted lp = tellExecutablesPackage Local $ lpPackage lp
     | otherwise = return ()
 -- Ignores ghcOptions because they don't matter for enumerating
 -- executables.
-tellExecutables name (PSUpstream version loc flags _ghcOptions _gitSha) =
-    tellExecutablesUpstream name version loc flags
+tellExecutables (PSIndex loc flags _ghcOptions pir) =
+    tellExecutablesUpstream pir loc flags
 
-tellExecutablesUpstream :: PackageName -> Version -> InstallLocation -> Map FlagName Bool -> M ()
-tellExecutablesUpstream name version loc flags = do
+tellExecutablesUpstream :: PackageIdentifierRevision -> InstallLocation -> Map FlagName Bool -> M ()
+tellExecutablesUpstream pir@(PackageIdentifierRevision (PackageIdentifier name _) _) loc flags = do
     ctx <- ask
     when (name `Set.member` extraToBuild ctx) $ do
-        let pir = PackageIdentifierRevision (PackageIdentifier name version) CFILatest -- FIXME get the real CabalFileInfo
         p <- liftIO $ loadPackage ctx (PLIndex pir) flags []
         tellExecutablesPackage loc p
 
@@ -431,10 +436,10 @@ tellExecutablesPackage loc p = do
                 Just (PIOnlySource ps) -> goSource ps
                 Just (PIBoth ps _) -> goSource ps
 
-        goSource (PSLocal lp)
+        goSource (PSFiles lp _)
             | lpWanted lp = exeComponents (lpComponents lp)
             | otherwise = Set.empty
-        goSource PSUpstream{} = Set.empty
+        goSource PSIndex{} = Set.empty
 
     tell mempty { wInstall = Map.fromList $ map (, loc) $ Set.toList $ filterComps myComps $ packageExes p }
   where
@@ -452,11 +457,11 @@ installPackage
 installPackage name ps minstalled = do
     ctx <- ask
     case ps of
-        PSUpstream _ _ flags ghcOptions pkgLoc -> do
+        PSIndex _ flags ghcOptions pkgLoc -> do
             planDebug $ "installPackage: Doing all-in-one build for upstream package " ++ show name
-            package <- liftIO $ loadPackage ctx pkgLoc flags ghcOptions
+            package <- liftIO $ loadPackage ctx (PLIndex pkgLoc) flags ghcOptions -- FIXME be more efficient! Get this from the LoadedPackageInfo!
             resolveDepsAndInstall True ps package minstalled
-        PSLocal lp ->
+        PSFiles lp _ ->
             case lpTestBench lp of
                 Nothing -> do
                     planDebug $ "installPackage: No test / bench component for " ++ show name ++ " so doing an all-in-one build."
@@ -551,8 +556,8 @@ installPackageGivenDeps isAllInOne ps package minstalled (missing, present, minL
             , taskPresent = present
             , taskType =
                 case ps of
-                    PSLocal lp -> TTLocal lp
-                    PSUpstream _ loc _ _ pkgLoc -> TTUpstream package (loc <> minLoc) pkgLoc
+                    PSFiles lp loc -> TTFiles lp (loc <> minLoc)
+                    PSIndex loc _ _ pkgLoc -> TTIndex package (loc <> minLoc) pkgLoc
             , taskAllInOne = isAllInOne
             , taskCachePkgSrc = toCachePkgSrc ps
             }
@@ -681,8 +686,8 @@ checkDirtiness ps installed package present wanted = do
             , configCacheDeps = Set.fromList $ Map.elems present
             , configCacheComponents =
                 case ps of
-                    PSLocal lp -> Set.map renderComponent $ lpComponents lp
-                    PSUpstream{} -> Set.empty
+                    PSFiles lp _ -> Set.map renderComponent $ lpComponents lp
+                    PSIndex{} -> Set.empty
             , configCacheHaddock =
                 shouldHaddockPackage buildOpts wanted (packageName package) ||
                 -- Disabling haddocks when old config had haddocks doesn't make dirty.
@@ -772,16 +777,16 @@ describeConfigDiff config old new
     pkgSrcName CacheSrcUpstream = "upstream source"
 
 psForceDirty :: PackageSource -> Bool
-psForceDirty (PSLocal lp) = lpForceDirty lp
-psForceDirty PSUpstream{} = False
+psForceDirty (PSFiles lp _) = lpForceDirty lp
+psForceDirty PSIndex{} = False
 
 psDirty :: PackageSource -> Maybe (Set FilePath)
-psDirty (PSLocal lp) = lpDirtyFiles lp
-psDirty PSUpstream{} = Nothing -- files never change in an upstream package
+psDirty (PSFiles lp _) = lpDirtyFiles lp
+psDirty PSIndex{} = Nothing -- files never change in an upstream package
 
 psLocal :: PackageSource -> Bool
-psLocal (PSLocal _) = True
-psLocal PSUpstream{} = False
+psLocal (PSFiles _ loc) = loc == Local -- FIXME this is probably not the right logic, see configureOptsNoDir. We probably want to check if this appears in packages:
+psLocal PSIndex{} = False
 
 -- | Get all of the dependencies for a given package, including guessed build
 -- tool dependencies.
@@ -853,11 +858,7 @@ stripLocals plan = plan
     , planInstallExes = Map.filter (/= Local) $ planInstallExes plan
     }
   where
-    checkTask task =
-        case taskType task of
-            TTLocal _ -> False
-            TTUpstream _ Local _ -> False
-            TTUpstream _ Snap _ -> True
+    checkTask task = taskLocation task == Snap
 
 stripNonDeps :: Set PackageName -> Plan -> Plan
 stripNonDeps deps plan = plan
