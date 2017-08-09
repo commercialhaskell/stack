@@ -55,6 +55,11 @@ Other enhancements:
 * Added `stack ghci --only-main` flag, to skip loading / importing
   all but main modules. See the ghci documentation page
   for further info.
+* Allow GHC's colored output to show through. GHC colors output
+  starting with version 8.2.1, for older GHC this does nothing.
+  Sometimes GHC's heuristics would work fine even before this change,
+  for example in `stack ghci`, but this override's GHC's heuristics
+  when they're broken by our collecting and processing GHC's output.
 
 Bug fixes:
 
