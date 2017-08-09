@@ -59,6 +59,9 @@ Other enhancements:
 * Added `stack ghci --only-main` flag, to skip loading / importing
   all but main modules. See the ghci documentation page
   for further info.
+* Extended the `ghc-options` field to support `$locals`, `$targets`,
+  and `$everything`. See:
+  [#3329](https://github.com/commercialhaskell/stack/issues/3329)
 
 Bug fixes:
 
