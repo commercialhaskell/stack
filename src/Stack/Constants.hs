@@ -27,6 +27,7 @@ module Stack.Constants
     ,defaultGlobalConfigPath
     ,platformVariantEnvVar
     ,compilerOptionsCabalFlag
+    ,ghcColorForceFlag
     )
     where
 
@@ -212,3 +213,6 @@ platformVariantEnvVar = stackProgNameUpper ++ "_PLATFORM_VARIANT"
 compilerOptionsCabalFlag :: WhichCompiler -> String
 compilerOptionsCabalFlag Ghc = "--ghc-options"
 compilerOptionsCabalFlag Ghcjs = "--ghcjs-options"
+
+ghcColorForceFlag :: String
+ghcColorForceFlag = "-fdiagnostics-color=always"

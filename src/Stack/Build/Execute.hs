@@ -1789,12 +1789,8 @@ getSetupHs dir = do
 extraBuildOptions :: (HasEnvConfig env, HasRunner env)
                   => WhichCompiler -> BuildOpts -> RIO env [String]
 extraBuildOptions wc bopts = do
-    canDoColor <- (>= $(mkVersion "8.2.1")) . getGhcVersion
-              <$> view actualCompilerVersionL
-    shouldDoColor <- logUseColor <$> view logOptionsL
+    colorOpt <- appropriateGhcColorFlag
     let ddumpOpts = " -ddump-hi -ddump-to-file"
-        colorOpt = if canDoColor && shouldDoColor
-                     then "-fdiagnostics-color=always" else ""
         optsFlag = compilerOptionsCabalFlag wc
         baseOpts = ddumpOpts ++ " " ++ colorOpt
     if toCoverage (boptsTestOpts bopts)
