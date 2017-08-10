@@ -390,9 +390,27 @@ loadSnapshot' loadFromIndex menv mcompiler root =
               Just cv' -> loadCompiler cv'
           Right sd' -> start sd'
 
-      gpds <- concat <$> mapM
+      gpds <- (concat <$> mapM
         (loadMultiRawCabalFilesIndex loadFromIndex menv root >=> mapM parseGPD)
-        (sdLocations sd)
+        (sdLocations sd)) `onException` do
+          $logError "Unable to load cabal files for snapshot"
+          case sdResolver sd of
+            ResolverSnapshot name -> do
+              stackRoot <- view stackRootL
+              file <- parseRelFile $ T.unpack $ renderSnapName name <> ".yaml"
+              let fp = buildPlanDir stackRoot </> file
+              liftIO $ ignoringAbsence $ removeFile fp
+              $logError ""
+              $logError "----"
+              $logError $ "Deleting cached snapshot file: " <> T.pack (toFilePath fp)
+              $logError "Recommendation: try running again. If this fails again, open an upstream issue at:"
+              $logError $
+                case name of
+                  LTS _ _ -> "https://github.com/fpco/lts-haskell/issues/new"
+                  Nightly _ -> "https://github.com/fpco/stackage-nightly/issues/new"
+              $logError "----"
+              $logError ""
+            _ -> return ()
 
       (globals, snapshot, locals, _upgraded) <-
         calculatePackagePromotion loadFromIndex menv root ls0

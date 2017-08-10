@@ -358,7 +358,8 @@ configFromConfigMonoid
 
      let configTemplateParams = configMonoidTemplateParameters
          configScmInit = getFirst configMonoidScmInit
-         configGhcOptions = configMonoidGhcOptions
+         configGhcOptionsByName = configMonoidGhcOptionsByName
+         configGhcOptionsByCat = configMonoidGhcOptionsByCat
          configSetupInfoLocations = configMonoidSetupInfoLocations
          configPvpBounds = fromFirst (PvpBounds PvpBoundsNone False) configMonoidPvpBounds
          configModifyCodePage = fromFirst True configMonoidModifyCodePage

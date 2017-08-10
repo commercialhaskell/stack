@@ -92,10 +92,12 @@ loadSourceMapFull needTargets boptsCli = do
             [ Map.fromList $ map (\lp' -> (packageName $ lpPackage lp', PSLocal lp')) locals
             , flip Map.mapWithKey localDeps $ \n lpi ->
                 let configOpts = getGhcOptions bconfig boptsCli n False False
-                 in PSUpstream (lpiVersion lpi) Local (lpiFlags lpi) (lpiGhcOptions lpi ++ configOpts) (lpiLocation lpi)
+                 -- NOTE: configOpts includes lpiGhcOptions for now, this may get refactored soon
+                 in PSUpstream (lpiVersion lpi) Local (lpiFlags lpi) configOpts (lpiLocation lpi)
             , flip Map.mapWithKey (lsPackages ls) $ \n lpi ->
                 let configOpts = getGhcOptions bconfig boptsCli n False False
-                 in PSUpstream (lpiVersion lpi) Snap (lpiFlags lpi) (lpiGhcOptions lpi ++ configOpts) (lpiLocation lpi)
+                 -- NOTE: configOpts includes lpiGhcOptions for now, this may get refactored soon
+                 in PSUpstream (lpiVersion lpi) Snap (lpiFlags lpi) configOpts (lpiLocation lpi)
             ]
             `Map.difference` Map.fromList (map (, ()) (HashSet.toList wiredInPackages))
 
@@ -125,7 +127,14 @@ getLocalFlags bconfig boptsCli name = Map.unions
 -- configuration and commandline.
 getGhcOptions :: BuildConfig -> BuildOptsCLI -> PackageName -> Bool -> Bool -> [Text]
 getGhcOptions bconfig boptsCli name isTarget isLocal = concat
-    [ ghcOptionsFor name (configGhcOptions config)
+    [ Map.findWithDefault [] name (configGhcOptionsByName config)
+    , if isTarget
+        then Map.findWithDefault [] AGOTargets (configGhcOptionsByCat config)
+        else []
+    , if isLocal
+        then Map.findWithDefault [] AGOLocals (configGhcOptionsByCat config)
+        else []
+    , Map.findWithDefault [] AGOEverything (configGhcOptionsByCat config)
     , concat [["-fhpc"] | isLocal && toCoverage (boptsTestOpts bopts)]
     , if boptsLibProfile bopts || boptsExeProfile bopts
          then ["-auto-all","-caf-all"]

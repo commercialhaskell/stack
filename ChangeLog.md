@@ -26,6 +26,10 @@ Behavior changes:
   paths.  TH relative paths will still work when loading a single
   package into intero. See
   [#3309](https://github.com/commercialhaskell/stack/issues/3309)
+* Setting GHC options for a package via `ghc-options:` in your
+  `stack.yaml` will promote it to a local package, providing for more
+  consistency with flags and better reproducibility. See:
+  [#849](https://github.com/commercialhaskell/stack/issues/849)
 
 Other enhancements:
 
@@ -60,6 +64,9 @@ Other enhancements:
   Sometimes GHC's heuristics would work fine even before this change,
   for example in `stack ghci`, but this override's GHC's heuristics
   when they're broken by our collecting and processing GHC's output.
+* Extended the `ghc-options` field to support `$locals`, `$targets`,
+  and `$everything`. See:
+  [#3329](https://github.com/commercialhaskell/stack/issues/3329)
 
 Bug fixes:
 
@@ -71,6 +78,10 @@ Bug fixes:
   [#3171](https://github.com/commercialhaskell/stack/pull/3171)
 * Previously, cabal files with just test-suite could cause build to fail
   ([#2862](https://github.com/commercialhaskell/stack/issues/2862))
+* If an invalid snapshot file has been detected (usually due to
+  mismatched hashes), Stack will delete the downloaded file and
+  recommend either retrying or filing an issue upstream. See
+  [#3319](https://github.com/commercialhaskell/stack/issues/3319).
 
 
 ## 1.5.1
