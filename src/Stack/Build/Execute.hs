@@ -32,7 +32,7 @@ import qualified Data.ByteArray as Mem (convert)
 import qualified Data.ByteString as S
 import qualified Data.ByteString.Base64.URL as B64URL
 import           Data.Char (isSpace)
-import           Data.Conduit
+import           Data.Conduit hiding (runConduitRes)
 import qualified Data.Conduit.Binary as CB
 import qualified Data.Conduit.List as CL
 import qualified Data.Conduit.Text as CT
@@ -412,6 +412,11 @@ withExecuteEnv menv bopts boptsCli baseConfigOpts locals globalPackages snapshot
                         | otherwise -> return ()
                 $logInfo $ T.pack $ "Log files have been written to: "
                         ++ toFilePath (parent (snd firstLog))
+
+        -- We only strip the colors /after/ we've dumped logs, so that
+        -- we get pretty colors in our dump output on the terminal.
+        colors <- shouldForceGhcColorFlag
+        when colors $ liftIO $ mapM_ (stripColors . snd) allLogs
       where
         drainChan :: STM [(Path Abs Dir, Path Abs File)]
         drainChan = do
@@ -447,6 +452,27 @@ withExecuteEnv menv bopts boptsCli baseConfigOpts locals globalPackages snapshot
            =$ mungeBuildOutput ExcludeTHLoading ConvertPathsToAbsolute pkgDir compilerVer
            =$ CL.mapM_ $logInfo
         $logInfo $ T.pack $ "\n--  End of log file: " ++ toFilePath filepath ++ "\n"
+
+    stripColors :: Path Abs File -> IO ()
+    stripColors fp = do
+      let colorfp = toFilePath fp ++ "-color"
+      runConduitRes $ CB.sourceFile (toFilePath fp) .| CB.sinkFile colorfp
+      runConduitRes
+        $ CB.sourceFile colorfp
+       .| noColors
+       .| CB.sinkFile (toFilePath fp)
+
+      where
+        noColors = do
+          CB.takeWhile (/= 27) -- ESC
+          mnext <- CB.head
+          case mnext of
+            Nothing -> return ()
+            Just x -> assert (x == 27) $ do
+              -- Color sequences always end with an m
+              CB.dropWhile (/= 109) -- m
+              CB.drop 1 -- drop the m itself
+              noColors
 
 -- | Perform the actual plan
 executePlan :: HasEnvConfig env
@@ -1138,7 +1164,7 @@ withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} md
 --   local install directory. Note that this is literally invoking Cabal
 --   with @copy@, and not the copying done by @stack install@ - that is
 --   handled by 'copyExecutables'.
-singleBuild :: forall env. HasEnvConfig env
+singleBuild :: forall env. (HasEnvConfig env, HasRunner env)
             => (RIO env () -> IO ())
             -> ActionContext
             -> ExecuteEnv
@@ -1786,16 +1812,19 @@ getSetupHs dir = do
 -- Do not pass `-hpcdir` as GHC option if the coverage is not enabled.
 -- This helps running stack-compiled programs with dynamic interpreters like `hint`.
 -- Cfr: https://github.com/commercialhaskell/stack/issues/997
-extraBuildOptions :: HasEnvConfig env => WhichCompiler -> BuildOpts -> RIO env [String]
+extraBuildOptions :: (HasEnvConfig env, HasRunner env)
+                  => WhichCompiler -> BuildOpts -> RIO env [String]
 extraBuildOptions wc bopts = do
+    colorOpt <- appropriateGhcColorFlag
     let ddumpOpts = " -ddump-hi -ddump-to-file"
         optsFlag = compilerOptionsCabalFlag wc
+        baseOpts = ddumpOpts ++ " " ++ colorOpt
     if toCoverage (boptsTestOpts bopts)
       then do
         hpcIndexDir <- toFilePathNoTrailingSep <$> hpcRelativeDir
-        return [optsFlag, "-hpcdir " ++ hpcIndexDir ++ ddumpOpts]
+        return [optsFlag, "-hpcdir " ++ hpcIndexDir ++ baseOpts]
       else
-        return [optsFlag, ddumpOpts]
+        return [optsFlag, baseOpts]
 
 -- Library and executable build components.
 primaryComponentOptions :: Map Text ExecutableBuildStatus -> LocalPackage -> [String]

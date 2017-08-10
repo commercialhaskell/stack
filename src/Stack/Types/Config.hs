@@ -162,6 +162,8 @@ module Stack.Types.Config
   ,whichCompilerL
   ,envOverrideL
   ,loadedSnapshotL
+  ,shouldForceGhcColorFlag
+  ,appropriateGhcColorFlag
   -- * Lens reexport
   ,view
   ,to
@@ -199,6 +201,7 @@ import qualified Options.Applicative as OA
 import qualified Options.Applicative.Types as OA
 import           Path
 import qualified Paths_stack as Meta
+import           Stack.Constants
 import           Stack.Types.BuildPlan
 import           Stack.Types.Compiler
 import           Stack.Types.CompilerBuild
@@ -1949,3 +1952,17 @@ envOverrideL :: HasConfig env => Lens' env (EnvSettings -> IO EnvOverride)
 envOverrideL = configL.lens
     configEnvOverride
     (\x y -> x { configEnvOverride = y })
+
+shouldForceGhcColorFlag :: (HasRunner env, HasEnvConfig env)
+                        => RIO env Bool
+shouldForceGhcColorFlag = do
+    canDoColor <- (>= $(mkVersion "8.2.1")) . getGhcVersion
+              <$> view actualCompilerVersionL
+    shouldDoColor <- logUseColor <$> view logOptionsL
+    return $ canDoColor && shouldDoColor
+
+appropriateGhcColorFlag :: (HasRunner env, HasEnvConfig env)
+                        => RIO env String
+appropriateGhcColorFlag = f <$> shouldForceGhcColorFlag
+  where f True = ghcColorForceFlag
+        f False = ""
