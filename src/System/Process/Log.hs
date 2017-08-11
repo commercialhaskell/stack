@@ -65,7 +65,7 @@ timeSpecMilliSecondText t =
 -- debugging purposes, not functionally important.
 showProcessArgDebug :: String -> Text
 showProcessArgDebug x
-    | any special x = T.pack (show x)
+    | any special x || null x = T.pack (show x)
     | otherwise = T.pack x
   where special '"' = True
         special ' ' = True
