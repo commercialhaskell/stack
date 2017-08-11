@@ -90,6 +90,7 @@ data GhciException
     | MissingFileTarget String
     | Can'tSpecifyFilesAndTargets
     | Can'tSpecifyFilesAndMainIs
+    | GhciTargetParseException [Text]
     deriving (Typeable)
 
 instance Exception GhciException
@@ -104,9 +105,12 @@ instance Show GhciException where
     show (MissingFileTarget name) =
         "Cannot find file target " ++ name
     show Can'tSpecifyFilesAndTargets =
-        "Cannot use 'stack ghci' with both file targets and build targets"
+        "Cannot use 'stack ghci' with both file targets and package targets"
     show Can'tSpecifyFilesAndMainIs =
         "Cannot use 'stack ghci' with both file targets and --main-is flag"
+    show (GhciTargetParseException xs) =
+        show (TargetParseException xs) ++
+        "\nNote that to specify options to be passed to GHCi, use the --ghci-options flag"
 
 -- | Launch a GHCi session for the given local package targets with the
 -- given options and configure it with the load paths and extensions
@@ -122,8 +126,9 @@ ghci opts@GhciOpts{..} = do
     -- Parse --main-is argument.
     mainIsTargets <- parseMainIsTargets buildOptsCLI ghciMainIs
     -- Parse to either file targets or build targets
-    etargets <- preprocessTargets ghciTargets
+    etargets <- preprocessTargets buildOptsCLI ghciTargets
     (inputTargets, mfileTargets) <- case etargets of
+        Right packageTargets -> return (packageTargets, Nothing)
         Left rawFileTargets -> do
             case mainIsTargets of
                 Nothing -> return ()
@@ -131,10 +136,6 @@ ghci opts@GhciOpts{..} = do
             -- Figure out targets based on filepath targets
             (targetMap, fileInfo, extraFiles) <- findFileTargets locals rawFileTargets
             return (targetMap, Just (fileInfo, extraFiles))
-        Right rawTargets -> do
-            (_,_,normalTargets) <- parseTargets AllowNoTargets buildOptsCLI
-                { boptsCLITargets = rawTargets }
-            return (normalTargets, Nothing)
     -- Get a list of all the local target packages.
     localTargets <- getAllLocalTargets opts inputTargets mainIsTargets sourceMap
     -- Check if additional package arguments are sensible.
@@ -147,21 +148,29 @@ ghci opts@GhciOpts{..} = do
     -- Finally, do the invocation of ghci
     runGhci opts localTargets mainIsTargets pkgs (maybe [] snd mfileTargets)
 
-preprocessTargets :: HasRunner env => [Text] -> RIO env (Either [Path Abs File] [Text])
-preprocessTargets rawTargets = do
-    let (fileTargetsRaw, normalTargets) =
+preprocessTargets :: HasEnvConfig env => BuildOptsCLI -> [Text] -> RIO env (Either [Path Abs File] (Map PackageName Target))
+preprocessTargets buildOptsCLI rawTargets = do
+    let (fileTargetsRaw, otherTargets) =
             partition (\t -> ".hs" `T.isSuffixOf` t || ".lhs" `T.isSuffixOf` t)
                       rawTargets
-    fileTargets <- forM fileTargetsRaw $ \fp0 -> do
-        let fp = T.unpack fp0
-        mpath <- liftIO $ forgivingAbsence (resolveFile' fp)
-        case mpath of
-            Nothing -> throwM (MissingFileTarget fp)
-            Just path -> return path
-    case (null fileTargets, null normalTargets) of
-        (False, False) -> throwM Can'tSpecifyFilesAndTargets
-        (False, _) -> return (Left fileTargets)
-        _ -> return (Right normalTargets)
+    case otherTargets of
+        [] -> do
+            fileTargets <- forM fileTargetsRaw $ \fp0 -> do
+                let fp = T.unpack fp0
+                mpath <- liftIO $ forgivingAbsence (resolveFile' fp)
+                case mpath of
+                    Nothing -> throwM (MissingFileTarget fp)
+                    Just path -> return path
+            return (Left fileTargets)
+        _ -> do
+            -- Try parsing targets before checking if both file and
+            -- module targets are specified (see issue#3342).
+            (_,_,normalTargets) <- parseTargets AllowNoTargets buildOptsCLI { boptsCLITargets = otherTargets }
+                `catch` \ex -> case ex of
+                    TargetParseException xs -> throwM (GhciTargetParseException xs)
+                    _ -> throwM ex
+            unless (null fileTargetsRaw) $ throwM Can'tSpecifyFilesAndTargets
+            return (Right normalTargets)
 
 parseMainIsTargets :: HasEnvConfig env => BuildOptsCLI -> Maybe Text -> RIO env (Maybe (Map PackageName Target))
 parseMainIsTargets buildOptsCLI mtarget = forM mtarget $ \target -> do
@@ -327,7 +336,7 @@ runGhci GhciOpts{..} targets mainIsTargets pkgs extraFiles = do
                  -- not include CWD. If there aren't any packages, CWD
                  -- is included.
                   (if null pkgs then id else ("-i" : )) $
-                  odir <> pkgopts <> map T.unpack ghciGhcOptions <> ghciArgs <> extras)
+                  odir <> pkgopts <> extras <> map T.unpack ghciGhcOptions <> ghciArgs)
         -- TODO: Consider optimizing this check. Perhaps if no
         -- "with-ghc" is specified, assume that it is not using intero.
         checkIsIntero =

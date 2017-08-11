@@ -30,6 +30,9 @@ Behavior changes:
   `stack.yaml` will promote it to a local package, providing for more
   consistency with flags and better reproducibility. See:
   [#849](https://github.com/commercialhaskell/stack/issues/849)
+* Options passsed via `--ghci-options` are now passed to the end of the
+  invocation of ghci, instead of the middle.  This allows using `+RTS`
+  without an accompanying `-RTS`.
 
 Other enhancements:
 
@@ -67,6 +70,9 @@ Other enhancements:
 * Extended the `ghc-options` field to support `$locals`, `$targets`,
   and `$everything`. See:
   [#3329](https://github.com/commercialhaskell/stack/issues/3329)
+* Better error message for case that `stack ghci` file targets are
+  combined with invalid package targets. See:
+  [#3342](https://github.com/commercialhaskell/stack/issues/3342)
 
 Bug fixes:
 
