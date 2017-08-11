@@ -1818,7 +1818,7 @@ extraBuildOptions wc bopts = do
     colorOpt <- appropriateGhcColorFlag
     let ddumpOpts = " -ddump-hi -ddump-to-file"
         optsFlag = compilerOptionsCabalFlag wc
-        baseOpts = ddumpOpts ++ " " ++ colorOpt
+        baseOpts = ddumpOpts ++ maybe "" (" " ++) colorOpt
     if toCoverage (boptsTestOpts bopts)
       then do
         hpcIndexDir <- toFilePathNoTrailingSep <$> hpcRelativeDir

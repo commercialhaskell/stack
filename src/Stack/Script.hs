@@ -88,7 +88,7 @@ scriptCmd opts go' = do
 
         let ghcArgs = concat
                 [ ["-hide-all-packages"]
-                , [colorFlag]
+                , maybeToList colorFlag
                 , map (\x -> "-package" ++ x)
                     $ Set.toList
                     $ Set.insert "base"

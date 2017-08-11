@@ -1962,7 +1962,7 @@ shouldForceGhcColorFlag = do
     return $ canDoColor && shouldDoColor
 
 appropriateGhcColorFlag :: (HasRunner env, HasEnvConfig env)
-                        => RIO env String
+                        => RIO env (Maybe String)
 appropriateGhcColorFlag = f <$> shouldForceGhcColorFlag
-  where f True = ghcColorForceFlag
-        f False = ""
+  where f True = Just ghcColorForceFlag
+        f False = Nothing
