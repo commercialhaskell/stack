@@ -1236,9 +1236,9 @@ installationRootLocal = do
 -- | Installation root for compiler tools
 bindirCompilerTools :: (MonadThrow m, MonadReader env m, HasEnvConfig env) => m (Path Abs Dir)
 bindirCompilerTools = do
-    config <- asks getConfig
+    config <- view configL
     platform <- platformGhcRelDir
-    compilerVersion <- asks (envConfigCompilerVersion . getEnvConfig)
+    compilerVersion <- envConfigCompilerVersion <$> view envConfigL
     compiler <- parseRelDir $ compilerVersionString compilerVersion
     return $
         configStackRoot config </>
