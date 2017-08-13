@@ -591,8 +591,8 @@ getGhcBuild menv = do
                 hasgmp5 <- checkLib $(mkRelFile "libgmp.so.10")
                 hasgmp4 <- checkLib $(mkRelFile "libgmp.so.3")
                 let libComponents =
-                        if  | hastinfo5 && hasgmp5 -> []
-                            | hastinfo6 && hasgmp5 -> ["tinfo6"]
+                        if  | hastinfo6 && hasgmp5 -> ["tinfo6"]
+                            | hastinfo5 && hasgmp5 -> []
                             | hasncurses6 && hasgmp5 -> ["ncurses6"]
                             | hasgmp4 && hastinfo5 -> ["gmp4"]
                             | otherwise -> []

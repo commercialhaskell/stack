@@ -33,6 +33,8 @@ Behavior changes:
 * Options passsed via `--ghci-options` are now passed to the end of the
   invocation of ghci, instead of the middle.  This allows using `+RTS`
   without an accompanying `-RTS`.
+* When auto-detecting `--ghc-build`, `tinfo6` is now preferred over
+  `standard` if both versions of libtinfo are installed
 
 Other enhancements:
 
