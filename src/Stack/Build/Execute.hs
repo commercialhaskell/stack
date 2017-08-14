@@ -1214,9 +1214,13 @@ singleBuild runInBase ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} in
     getPrecompiled cache =
         case taskLocation task of
             Snap | not shouldHaddockPackage' -> do
-                mpc <- readPrecompiledCache taskProvides
-                    (configCacheOpts cache)
-                    (configCacheDeps cache)
+                mpc <-
+                  case taskType of
+                    TTUpstream _ _ loc -> readPrecompiledCache
+                      loc
+                      (configCacheOpts cache)
+                      (configCacheDeps cache)
+                    _ -> return Nothing
                 case mpc of
                     Nothing -> return Nothing
                     -- Only pay attention to precompiled caches that refer to packages within
@@ -1443,12 +1447,15 @@ singleBuild runInBase ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} in
                 markExeInstalled (taskLocation task) taskProvides -- TODO unify somehow with writeFlagCache?
                 return $ Executable ident
 
-        case taskLocation task of
-            Snap -> writePrecompiledCache eeBaseConfigOpts taskProvides
+        case (taskLocation task, taskType) of
+            (Snap, TTUpstream _ _ loc) ->
+              writePrecompiledCache
+                eeBaseConfigOpts
+                loc
                 (configCacheOpts cache)
                 (configCacheDeps cache)
                 mpkgid (packageExes package)
-            Local -> return ()
+            _ -> return ()
 
         case taskType of
             -- For upstream packages from a package index, pkgDir is in the tmp

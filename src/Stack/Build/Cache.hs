@@ -43,10 +43,12 @@ import qualified Data.Set as Set
 import qualified Data.Store as Store
 import           Data.Store.VersionTagged
 import qualified Data.Text as T
+import qualified Data.Text.Encoding as TE
 import           Path
 import           Path.IO
 import           Stack.Constants.Config
 import           Stack.Types.Build
+import           Stack.Types.BuildPlan
 import           Stack.Types.Compiler
 import           Stack.Types.Config
 import           Stack.Types.GhcPkgId
@@ -226,49 +228,70 @@ checkTestSuccess dir =
 -- We only pay attention to non-directory options. We don't want to avoid a
 -- cache hit just because it was installed in a different directory.
 precompiledCacheFile :: (MonadThrow m, MonadReader env m, HasEnvConfig env, MonadLogger m)
-                     => PackageIdentifier
+                     => PackageLocationIndex FilePath
                      -> ConfigureOpts
                      -> Set GhcPkgId -- ^ dependencies
-                     -> m (Path Abs File)
-precompiledCacheFile pkgident copts installedPackageIDs = do
-    ec <- view envConfigL
+                     -> m (Maybe (Path Abs File))
+precompiledCacheFile loc copts installedPackageIDs = do
+  ec <- view envConfigL
 
-    compiler <- view actualCompilerVersionL >>= parseRelDir . compilerVersionString
-    cabal <- view cabalVersionL >>= parseRelDir . versionString
-    pkg <- parseRelDir $ packageIdentifierString pkgident
+  compiler <- view actualCompilerVersionL >>= parseRelDir . compilerVersionString
+  cabal <- view cabalVersionL >>= parseRelDir . versionString
+  let mpkgRaw =
+        -- The goal here is to come up with a string representing the
+        -- package location which is unique. For archives and repos,
+        -- we rely upon cryptographic hashes paired with
+        -- subdirectories to identify this specific package version.
+        case loc of
+          PLIndex pir -> Just $ packageIdentifierRevisionString pir
+          PLOther other -> case other of
+            PLFilePath _ -> assert False Nothing -- no PLFilePaths should end up in a snapshot
+            PLArchive a -> fmap
+              (\h -> T.unpack (staticSHA256ToText h) ++ archiveSubdirs a)
+              (archiveHash a)
+            PLRepo r -> Just $ T.unpack (repoCommit r) ++ repoSubdirs r
+
+  forM mpkgRaw $ \pkgRaw -> do
+    pkg <-
+      case parseRelDir pkgRaw of
+        Just x -> return x
+        Nothing -> parseRelDir
+                 $ T.unpack
+                 $ TE.decodeUtf8
+                 $ B64URL.encode
+                 $ TE.encodeUtf8
+                 $ T.pack pkgRaw
     platformRelDir <- platformGhcRelDir
-
-    let input = (coNoDirs copts, installedPackageIDs)
 
     -- In Cabal versions 1.22 and later, the configure options contain the
     -- installed package IDs, which is what we need for a unique hash.
     -- Unfortunately, earlier Cabals don't have the information, so we must
     -- supplement it with the installed package IDs directly.
     -- See issue: https://github.com/commercialhaskell/stack/issues/1103
-    let hashToPath hash = do
-            hashPath <- parseRelFile $ S8.unpack hash
-            return $ view stackRootL ec
-                 </> $(mkRelDir "precompiled")
-                 </> platformRelDir
-                 </> compiler
-                 </> cabal
-                 </> pkg
-                 </> hashPath
+    let input = (coNoDirs copts, installedPackageIDs)
+    hashPath <- parseRelFile $ S8.unpack $ B64URL.encode
+              $ Mem.convert $ hashWith SHA256 $ Store.encode input
 
-    newPath <- hashToPath $ B64URL.encode $ Mem.convert $ hashWith SHA256 $ Store.encode input
-    return newPath
+    return $ view stackRootL ec
+         </> $(mkRelDir "precompiled")
+         </> platformRelDir
+         </> compiler
+         </> cabal
+         </> pkg
+         </> hashPath
 
 -- | Write out information about a newly built package
 writePrecompiledCache :: (MonadThrow m, MonadReader env m, HasEnvConfig env, MonadIO m, MonadLogger m)
                       => BaseConfigOpts
-                      -> PackageIdentifier
+                      -> PackageLocationIndex FilePath
                       -> ConfigureOpts
                       -> Set GhcPkgId -- ^ dependencies
                       -> Installed -- ^ library
                       -> Set Text -- ^ executables
                       -> m ()
-writePrecompiledCache baseConfigOpts pkgident copts depIDs mghcPkgId exes = do
-    file <- precompiledCacheFile pkgident copts depIDs
+writePrecompiledCache baseConfigOpts loc copts depIDs mghcPkgId exes = do
+  mfile <- precompiledCacheFile loc copts depIDs
+  forM_ mfile $ \file -> do
     ensureDir (parent file)
     ec <- view envConfigL
     let stackRootRelative = makeRelative (view stackRootL ec)
@@ -291,10 +314,10 @@ writePrecompiledCache baseConfigOpts pkgident copts depIDs mghcPkgId exes = do
 -- | Check the cache for a precompiled package matching the given
 -- configuration.
 readPrecompiledCache :: (MonadThrow m, MonadReader env m, HasEnvConfig env, MonadUnliftIO m, MonadLogger m)
-                     => PackageIdentifier -- ^ target package
+                     => PackageLocationIndex FilePath -- ^ target package
                      -> ConfigureOpts
                      -> Set GhcPkgId -- ^ dependencies
                      -> m (Maybe PrecompiledCache)
-readPrecompiledCache pkgident copts depIDs = do
-    file <- precompiledCacheFile pkgident copts depIDs
-    $(versionedDecodeFile precompiledCacheVC) file
+readPrecompiledCache loc copts depIDs =
+    precompiledCacheFile loc copts depIDs >>=
+    maybe (return Nothing) $(versionedDecodeFile precompiledCacheVC)
