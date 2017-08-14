@@ -7,10 +7,10 @@ main = do
 
   -- check assumptions on exec and the build flags and clean
   stack ["build", "--flag", "*:build-baz"]
-  stack ["exec", "--", "baz-exe"]
-  stackErr ["exec", "--", "bar-exe"]
+  stack ["exec", "--", "baz-exe" ++ exeExt]
+  stackErr ["exec", "--", "bar-exe" ++ exeExt]
   stack ["clean", "--full"]
-  stackErr ["exec", "--", "baz-exe"]
+  stackErr ["exec", "--", "baz-exe" ++ exeExt]
 
   -- install one exe normally and two compiler-tools, opposite ways
   -- (build or install)
@@ -23,11 +23,11 @@ main = do
   stack ["clean", "--full"]
 
   -- bar and baz were installed as compiler tools, should work fine
-  stack ["exec", "--", "bar-exe"]
-  stack ["exec", "--", "baz-exe"]
+  stack ["exec", "--", "bar-exe" ++ exeExt]
+  stack ["exec", "--", "baz-exe" ++ exeExt]
 
   -- foo was installed as a normal exe (in .local/bin/), so shouldn't
   -- TODO: Check this in a more reliable fashion
-  stackErr ["exec", "--", "foo-exe"]
+  stackErr ["exec", "--", "foo-exe" ++ exeExt]
 
   -- TODO: check paths against `stack path`
