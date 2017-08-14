@@ -88,6 +88,9 @@ Bug fixes:
   mismatched hashes), Stack will delete the downloaded file and
   recommend either retrying or filing an issue upstream. See
   [#3319](https://github.com/commercialhaskell/stack/issues/3319).
+* Modified the flag parser within Stack to match the behavior of
+  Cabal's flag parser, which allows multiple sequential dashes. See
+  [#3345](https://github.com/commercialhaskell/stack/issues/3345)
 
 
 ## 1.5.1
