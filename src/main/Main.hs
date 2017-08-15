@@ -655,7 +655,7 @@ uploadCmd sdistOpts go = do
             let invalidList = bulletedList $ map (fileWhite . fromString) invalid
             $prettyError . align . (<> (line <> invalidList))
                          . sep . map fromString $
-                ["stack upload expects a list sdist tarballs or cabal directories.",
+                ["stack upload expects a list of sdist tarballs or cabal directories.",
                  "Can't find:"]
             liftIO exitFailure
         config <- view configL
