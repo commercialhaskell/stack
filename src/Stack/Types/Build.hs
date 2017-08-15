@@ -49,9 +49,6 @@ module Stack.Types.Build
     where
 
 import           Stack.Prelude
-import           Data.Binary                     (Binary)
-import           Data.Binary.Tagged              (HasSemanticVersion,
-                                                  HasStructuralInfo)
 import qualified Data.ByteString                 as S
 import           Data.Char                       (isSpace)
 import           Data.List.Extra
@@ -637,9 +634,6 @@ data PrecompiledCache = PrecompiledCache
     -- ^ Full paths to executables
     }
     deriving (Show, Eq, Generic, Data, Typeable)
-instance Binary PrecompiledCache
-instance HasSemanticVersion PrecompiledCache
-instance HasStructuralInfo PrecompiledCache
 instance Store PrecompiledCache
 instance NFData PrecompiledCache
 

@@ -14,8 +14,6 @@ module Stack.Types.GhcPkgId
 import           Stack.Prelude
 import           Data.Aeson.Extended
 import           Data.Attoparsec.Text
-import           Data.Binary (Binary(..), putWord8, getWord8)
-import           Data.Binary.Tagged
 import qualified Data.Text as T
 
 -- | A parse fail.
@@ -31,22 +29,7 @@ newtype GhcPkgId = GhcPkgId Text
   deriving (Eq,Ord,Data,Typeable,Generic)
 
 instance Hashable GhcPkgId
-instance Binary GhcPkgId where
-    put (GhcPkgId x) = do
-        -- magic string
-        putWord8 1
-        putWord8 3
-        putWord8 4
-        putWord8 7
-        put x
-    get = do
-        1 <- getWord8
-        3 <- getWord8
-        4 <- getWord8
-        7 <- getWord8
-        fmap GhcPkgId get
 instance NFData GhcPkgId
-instance HasStructuralInfo GhcPkgId
 instance Store GhcPkgId
 
 instance Show GhcPkgId where
