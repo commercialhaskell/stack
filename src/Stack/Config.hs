@@ -45,6 +45,7 @@ module Stack.Config
   ,defaultConfigYaml
   ,getProjectConfig
   ,LocalConfigStatus(..)
+  ,getNamedComponents
   ) where
 
 import           Control.Monad.Extra (firstJustM)
@@ -697,18 +698,19 @@ getLocalPackages = do
               { lpProject = Map.fromList packages
               , lpDependencies = Map.fromList deps
               }
+
+getNamedComponents :: C.GenericPackageDescription -> Set NamedComponent
+getNamedComponents gpkg = Set.fromList $ concat
+    [ maybe []  (const [CLib]) (C.condLibrary gpkg)
+    , go CExe   (map fst . C.condExecutables)
+    , go CTest  (map fst . C.condTestSuites)
+    , go CBench (map fst . C.condBenchmarks)
+    ]
   where
-    getNamedComponents gpkg = Set.fromList $ concat
-        [ maybe []  (const [CLib]) (C.condLibrary gpkg)
-        , go CExe   (map fst . C.condExecutables)
-        , go CTest  (map fst . C.condTestSuites)
-        , go CBench (map fst . C.condBenchmarks)
-        ]
-      where
-        go :: (T.Text -> NamedComponent)
-           -> (C.GenericPackageDescription -> [String])
-           -> [NamedComponent]
-        go wrapper f = map (wrapper . T.pack) $ f gpkg
+    go :: (T.Text -> NamedComponent)
+       -> (C.GenericPackageDescription -> [String])
+       -> [NamedComponent]
+    go wrapper f = map (wrapper . T.pack) $ f gpkg
 
 -- | Check if there are any duplicate package names and, if so, throw an
 -- exception.

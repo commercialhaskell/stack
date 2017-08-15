@@ -31,18 +31,24 @@ module Stack.Types.Resolver
   ,Snapshots (..)
   ,renderSnapName
   ,parseSnapName
-  ,SnapshotHash (..)
+  ,SnapshotHash
   ,trimmedSnapshotHash
+  ,snapshotHashToBS
+  ,snapshotHashFromBS
+  ,snapshotHashFromDigest
   ,parseCustomLocation
   ) where
 
+import           Crypto.Hash as Hash (hash, Digest, SHA256)
 import           Data.Aeson.Extended
                  (ToJSON, toJSON, FromJSON, parseJSON,
                   withObject, (.:), withText)
-import qualified Data.ByteString as BS
+import qualified Data.ByteString as B
+import qualified Data.ByteString.Base64.URL as B64URL
 import qualified Data.HashMap.Strict as HashMap
 import qualified Data.IntMap.Strict as IntMap
 import qualified Data.Text as T
+import           Data.Text.Encoding (decodeUtf8)
 import           Data.Text.Read (decimal)
 import           Data.Time (Day)
 import           Network.HTTP.Client (Request, parseUrlThrow)
@@ -51,6 +57,7 @@ import qualified Options.Applicative.Types as OA
 import           Path
 import           Stack.Prelude
 import           Stack.Types.Compiler
+import           Stack.Types.PackageIdentifier
 import qualified System.FilePath as FP
 
 data IsLoaded = Loaded | NotLoaded
@@ -228,10 +235,24 @@ instance FromJSON Snapshots where
                 Right (LTS x y) -> return $ IntMap.singleton x y
                 Right (Nightly _) -> fail "Unexpected nightly value"
 
-newtype SnapshotHash = SnapshotHash { unShapshotHash :: ByteString }
+newtype SnapshotHash = SnapshotHash { unSnapshotHash :: StaticSHA256 }
     deriving (Generic, Typeable, Show, Data, Eq)
 instance Store SnapshotHash
 instance NFData SnapshotHash
 
-trimmedSnapshotHash :: SnapshotHash -> ByteString
-trimmedSnapshotHash = BS.take 12 . unShapshotHash
+-- | Return the first 12 characters of the hash as a B64URL-encoded
+-- string.
+trimmedSnapshotHash :: SnapshotHash -> Text
+trimmedSnapshotHash = decodeUtf8 . B.take 12 . B64URL.encode . staticSHA256ToRaw . unSnapshotHash
+
+-- | Return the raw bytes in the hash
+snapshotHashToBS :: SnapshotHash -> ByteString
+snapshotHashToBS = staticSHA256ToRaw . unSnapshotHash
+
+-- | Create a new SnapshotHash by SHA256 hashing the given contents
+snapshotHashFromBS :: ByteString -> SnapshotHash
+snapshotHashFromBS = snapshotHashFromDigest . Hash.hash
+
+-- | Create a new SnapshotHash from the given digest
+snapshotHashFromDigest :: Digest SHA256 -> SnapshotHash
+snapshotHashFromDigest = SnapshotHash . mkStaticSHA256FromDigest
