@@ -85,6 +85,7 @@ import           Stack.Options.SolverParser
 import           Stack.Options.Utils
 import qualified Stack.PackageIndex
 import qualified Stack.Path
+import           Stack.PrettyPrint hiding (display)
 import           Stack.Runners
 import           Stack.Script
 import           Stack.SDist (getSDistTarball, checkSDistTarball, checkSDistTarball', SDistOpts(..))
@@ -606,9 +607,12 @@ buildCmd opts go = do
 
 uninstallCmd :: [String] -> GlobalOpts -> IO ()
 uninstallCmd _ go = withConfigAndLock go $ do
-    $logError "stack does not manage installations in global locations"
-    $logError "The only global mutation stack performs is executable copying"
-    $logError "For the default executable destination, please run 'stack path --local-bin'"
+    $prettyError . align . fillSep . (++ [cmd])
+                 . map fromString . concatMap words $
+      ["stack does not manage installations in global locations.",
+       "The only global mutation stack performs is executable copying.",
+       "For the default executable destination, please run"]
+   where cmd = shellMagenta . fromString $ "stack path --local-bin"
 
 -- | Unpack packages to the filesystem
 unpackCmd :: [String] -> GlobalOpts -> IO ()
