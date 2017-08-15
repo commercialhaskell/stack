@@ -15,7 +15,7 @@ module Stack.PrettyPrint
       -- * Color utils
       -- | These are preferred to colors directly, so that we can
       -- encourage consistency of color meanings.
-    , errorRed, goodGreen, shellMagenta, fileWhite
+    , errorColor, goodColor, shellColor, fileColor
     , displayTargetPkgId, displayCurrentPkgId, displayCurrentPkgName, displayErrorPkgId
     , displayMilliseconds
       -- * Formatting utils
@@ -65,12 +65,12 @@ prettyInfo = do
 prettyWarn :: Q Exp
 prettyWarn = do
     loc <- location
-    [e| monadLoggerLog loc "" LevelWarn <=< displayWithColor . (line <>) . (warningYellow "Warning:" <+>) |]
+    [e| monadLoggerLog loc "" LevelWarn <=< displayWithColor . (line <>) . (warningColor "Warning:" <+>) |]
 
 prettyError :: Q Exp
 prettyError = do
     loc <- location
-    [e| monadLoggerLog loc "" LevelError <=< displayWithColor . (line <>) . (errorRed "Error:" <+>) |]
+    [e| monadLoggerLog loc "" LevelError <=< displayWithColor . (line <>) . (errorColor "Error:" <+>) |]
 
 debugBracket :: Q Exp
 debugBracket = do
@@ -92,20 +92,23 @@ debugBracket = do
             return x
       |]
 
-errorRed :: AnsiDoc -> AnsiDoc
-errorRed = dullred
+errorColor :: AnsiDoc -> AnsiDoc
+errorColor = dullred
 
-warningYellow :: AnsiDoc -> AnsiDoc
-warningYellow = yellow
+warningColor :: AnsiDoc -> AnsiDoc
+warningColor = yellow
 
-goodGreen :: AnsiDoc -> AnsiDoc
-goodGreen = green
+goodColor :: AnsiDoc -> AnsiDoc
+goodColor = green
 
-shellMagenta :: AnsiDoc -> AnsiDoc
-shellMagenta = magenta
+shellColor :: AnsiDoc -> AnsiDoc
+shellColor = magenta
 
-fileWhite :: AnsiDoc -> AnsiDoc
-fileWhite = bold . white
+fileColor :: AnsiDoc -> AnsiDoc
+fileColor = bold . white
+
+dirColor :: AnsiDoc -> AnsiDoc
+dirColor = bold . blue
 
 displayTargetPkgId :: PackageIdentifier -> AnsiDoc
 displayTargetPkgId = cyan . display
@@ -117,7 +120,7 @@ displayCurrentPkgName :: PackageName -> AnsiDoc
 displayCurrentPkgName = yellow . display
 
 displayErrorPkgId :: PackageIdentifier -> AnsiDoc
-displayErrorPkgId = errorRed . display
+displayErrorPkgId = errorColor . display
 
 instance Display PackageName where
     display = fromString . packageNameString
@@ -129,17 +132,17 @@ instance Display Version where
     display = fromString . versionString
 
 instance Display (Path b File) where
-    display = fileWhite . fromString . toFilePath
+    display = fileColor . fromString . toFilePath
 
 instance Display (Path b Dir) where
-    display = bold . blue . fromString . toFilePath
+    display = dirColor . fromString . toFilePath
 
 instance Display (PackageName, NamedComponent) where
     display = cyan . fromString . T.unpack . renderPkgComponent
 
 -- Display milliseconds.
 displayMilliseconds :: Clock.TimeSpec -> AnsiDoc
-displayMilliseconds t = goodGreen $
+displayMilliseconds t = goodColor $
     (fromString . show . (`div` 10^(6 :: Int)) . Clock.toNanoSecs) t <> "ms"
 
 bulletedList :: [AnsiDoc] -> AnsiDoc

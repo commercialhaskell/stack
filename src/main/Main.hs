@@ -612,7 +612,7 @@ uninstallCmd _ go = withConfigAndLock go $ do
       ["stack does not manage installations in global locations.",
        "The only global mutation stack performs is executable copying.",
        "For the default executable destination, please run"]
-   where cmd = shellMagenta . fromString $ "stack path --local-bin"
+   where cmd = shellColor . fromString $ "stack path --local-bin"
 
 -- | Unpack packages to the filesystem
 unpackCmd :: [String] -> GlobalOpts -> IO ()
@@ -640,7 +640,7 @@ uploadCmd :: SDistOpts -> GlobalOpts -> IO ()
 uploadCmd (SDistOpts [] _ _ _ _ _) go =
     withConfigAndLock go . $prettyError . align . sep $
         ["To upload the current package, please run",
-         shellMagenta (fromString "stack upload ."),
+         shellColor (fromString "stack upload ."),
          "(with the period at the end)"]
 uploadCmd sdistOpts go = do
     let partitionM _ [] = return ([], [])
@@ -652,7 +652,7 @@ uploadCmd sdistOpts go = do
     (dirs, invalid) <- partitionM D.doesDirectoryExist nonFiles
     withBuildConfigAndLock go $ \_ -> do
         unless (null invalid) $ do
-            let invalidList = bulletedList $ map (fileWhite . fromString) invalid
+            let invalidList = bulletedList $ map (fileColor . fromString) invalid
             $prettyError . align . (<> (line <> invalidList))
                          . sep . map fromString $
                 ["stack upload expects a list of sdist tarballs or cabal directories.",

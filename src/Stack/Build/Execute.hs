@@ -1362,7 +1362,7 @@ singleBuild runInBase ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} in
                       "- In" <+>
                       maybe "the library component" (\c -> fromString c <+> "component") mcomp <>
                       ":" <> line <>
-                      indent 4 (mconcat $ intersperse line $ map (goodGreen . fromString . C.display) modules)
+                      indent 4 (mconcat $ intersperse line $ map (goodColor . fromString . C.display) modules)
                 forM_ mlocalWarnings $ \(cabalfp, warnings) -> do
                     unless (null warnings) $ $prettyWarn $
                         "The following modules should be added to exposed-modules or other-modules in" <+>
