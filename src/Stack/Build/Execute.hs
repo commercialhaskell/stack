@@ -970,13 +970,11 @@ withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} md
                 warnCustomNoDeps =
                     case (taskType, packageBuildType package) of
                         (TTFiles lp Local, Just C.Custom) | lpWanted lp -> do
-                            $logWarn $ T.pack $ concat
-                                [ "Package "
-                                , packageNameString $ packageName package
-                                , " uses a custom Cabal build, but does not use a custom-setup stanza"
+                            $prettyWarnL $
+                                [ flow "Package"
+                                , display $ packageName package
+                                , flow "uses a custom Cabal build, but does not use a custom-setup stanza"
                                 ]
-                            $logWarn "Using the explicit setup deps approach based on configuration"
-                            $logWarn "Strongly recommend fixing the package's cabal file"
                         _ -> return ()
 
                 getPackageArgs :: Path Abs Dir -> RIO env [String]
@@ -992,7 +990,7 @@ withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} md
                                 case mdeps of
                                     Just x -> return x
                                     Nothing -> do
-                                        $logWarn "In getPackageArgs: custom-setup in use, but no dependency map present"
+                                        $prettyWarn "In getPackageArgs: custom-setup in use, but no dependency map present"
                                         return Map.empty
                             matchedDeps <- forM (Map.toList customSetupDeps) $ \(name, range) -> do
                                 let matches (PackageIdentifier name' version) =
