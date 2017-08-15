@@ -28,6 +28,7 @@ module Stack.PrettyPrint
     , hsep, vsep, fillSep, sep, hcat, vcat, fillCat, cat, punctuate
     , fill, fillBreak
     , enclose, squotes, dquotes, parens, angles, braces, brackets
+    , indentAfterLabel
     ) where
 
 import           Stack.Prelude
@@ -65,12 +66,15 @@ prettyInfo = do
 prettyWarn :: Q Exp
 prettyWarn = do
     loc <- location
-    [e| monadLoggerLog loc "" LevelWarn <=< displayWithColor . (line <>) . (warningColor "Warning:" <+>) |]
+    [e| monadLoggerLog loc "" LevelWarn <=< displayWithColor . (line <>) . (warningColor "Warning:" <+>) . indentAfterLabel |]
 
 prettyError :: Q Exp
 prettyError = do
     loc <- location
-    [e| monadLoggerLog loc "" LevelError <=< displayWithColor . (line <>) . (errorColor "Error:" <+>) |]
+    [e| monadLoggerLog loc "" LevelError <=< displayWithColor . (line <>) . (errorColor "Error:" <+>) . indentAfterLabel |]
+
+indentAfterLabel :: Doc a -> Doc a
+indentAfterLabel = align
 
 debugBracket :: Q Exp
 debugBracket = do
