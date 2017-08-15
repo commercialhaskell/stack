@@ -23,15 +23,11 @@ module Stack.Snapshot
 
 import           Stack.Prelude
 import           Control.Monad.State.Strict      (get, put, StateT, execStateT)
-import           Crypto.Hash (hash, SHA256(..), Digest)
 import           Crypto.Hash.Conduit (hashFile)
 import           Data.Aeson (withObject, (.!=), (.:), (.:?), Value (Object))
 import           Data.Aeson.Extended (WithJSONWarnings(..), logJSONWarnings, (..!=), (..:?), jsonSubWarningsT, withObjectWarnings, (..:))
 import           Data.Aeson.Types (Parser, parseEither)
 import           Data.Store.VersionTagged
-import qualified Data.ByteArray as Mem (convert)
-import qualified Data.ByteString.Base64.URL as B64URL
-import qualified Data.ByteString.Char8 as S8
 import qualified Data.Conduit.List as CL
 import qualified Data.HashMap.Strict as HashMap
 import qualified Data.Map as Map
@@ -249,7 +245,7 @@ loadResolver (ResolverCustom url loc) = do
   where
     download' :: Request -> RIO env (Path Abs File)
     download' req = do
-      let urlHash = S8.unpack $ trimmedSnapshotHash $ doHash $ encodeUtf8 url
+      let urlHash = T.unpack $ trimmedSnapshotHash $ snapshotHashFromBS $ encodeUtf8 url
       hashFP <- parseRelFile $ urlHash ++ ".yaml"
       customPlanDir <- getCustomPlanDir
       let cacheFP = customPlanDir </> $(mkRelDir "yaml") </> hashFP
@@ -298,7 +294,7 @@ loadResolver (ResolverCustom url loc) = do
 
       -- Calculate the hash of the current file, and then combine it
       -- with parent hashes if necessary below.
-      rawHash :: SnapshotHash <- fromDigest <$> hashFile fp :: RIO env SnapshotHash
+      rawHash :: SnapshotHash <- snapshotHashFromDigest <$> hashFile fp :: RIO env SnapshotHash
 
       (parent', hash') <-
         case parentResolver' of
@@ -334,17 +330,11 @@ loadResolver (ResolverCustom url loc) = do
         <*> (o ..:? "resolver")
         <*> (o ..:? "compiler")
 
-    fromDigest :: Digest SHA256 -> SnapshotHash
-    fromDigest = SnapshotHash . B64URL.encode . Mem.convert
-
     combineHash :: SnapshotHash -> SnapshotHash -> SnapshotHash
-    combineHash (SnapshotHash x) (SnapshotHash y) = doHash (x <> y)
+    combineHash x y = snapshotHashFromBS (snapshotHashToBS x <> snapshotHashToBS y)
 
     snapNameToHash :: SnapName -> SnapshotHash
-    snapNameToHash = doHash . encodeUtf8 . renderSnapName
-
-    doHash :: ByteString -> SnapshotHash
-    doHash = fromDigest . hash
+    snapNameToHash = snapshotHashFromBS . encodeUtf8 . renderSnapName
 
 -- | Fully load up a 'SnapshotDef' into a 'LoadedSnapshot'
 loadSnapshot

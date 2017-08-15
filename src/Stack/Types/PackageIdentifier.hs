@@ -31,8 +31,10 @@ module Stack.Types.PackageIdentifier
   , StaticSHA256
   , mkStaticSHA256FromText
   , mkStaticSHA256FromFile
+  , mkStaticSHA256FromDigest
   , staticSHA256ToText
   , staticSHA256ToBase16
+  , staticSHA256ToRaw
   )
   where
 
@@ -138,10 +140,10 @@ mkStaticSHA256FromText t =
 
 -- | Generate a 'StaticSHA256' value from the contents of a file.
 mkStaticSHA256FromFile :: MonadIO m => Path Abs File -> m StaticSHA256
-mkStaticSHA256FromFile fp = liftIO $ fromDigest <$> hashFile (toFilePath fp)
+mkStaticSHA256FromFile fp = liftIO $ mkStaticSHA256FromDigest <$> hashFile (toFilePath fp)
 
-fromDigest :: Hash.Digest Hash.SHA256 -> StaticSHA256
-fromDigest digest
+mkStaticSHA256FromDigest :: Hash.Digest Hash.SHA256 -> StaticSHA256
+mkStaticSHA256FromDigest digest
   = StaticSHA256
   $ either impureThrow id
   $ toStaticExact
@@ -155,6 +157,9 @@ staticSHA256ToText = decodeUtf8 . staticSHA256ToBase16
 staticSHA256ToBase16 :: StaticSHA256 -> ByteString
 staticSHA256ToBase16 (StaticSHA256 x) = Mem.convertToBase Mem.Base16 x
 
+staticSHA256ToRaw :: StaticSHA256 -> ByteString
+staticSHA256ToRaw (StaticSHA256 x) = Data.ByteArray.convert x
+
 -- | Generate a 'CabalHash' value from a base16-encoded SHA256 hash.
 mkCabalHashFromSHA256 :: Text -> Either SomeException CabalHash
 mkCabalHashFromSHA256 = fmap CabalHash . mkStaticSHA256FromText
@@ -165,7 +170,7 @@ cabalHashToText = staticSHA256ToText . unCabalHash
 
 -- | Compute a 'CabalHash' value from a cabal file's contents.
 computeCabalHash :: L.ByteString -> CabalHash
-computeCabalHash = CabalHash . fromDigest . Hash.hashlazy
+computeCabalHash = CabalHash . mkStaticSHA256FromDigest . Hash.hashlazy
 
 showCabalHash :: CabalHash -> Text
 showCabalHash = T.append (T.pack "sha256:") . cabalHashToText
