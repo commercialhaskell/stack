@@ -637,7 +637,11 @@ upgradeCmd upgradeOpts' go = withGlobalConfigAndLock go $
 
 -- | Upload to Hackage
 uploadCmd :: SDistOpts -> GlobalOpts -> IO ()
-uploadCmd (SDistOpts [] _ _ _ _ _) _ = throwString "Error: To upload the current package, please run 'stack upload .'"
+uploadCmd (SDistOpts [] _ _ _ _ _) go =
+    withConfigAndLock go . $prettyError . align . sep $
+        ["To upload the current package, please run",
+         shellMagenta (fromString "stack upload ."),
+         "(with the period at the end)"]
 uploadCmd sdistOpts go = do
     let partitionM _ [] = return ([], [])
         partitionM f (x:xs) = do
@@ -646,12 +650,14 @@ uploadCmd sdistOpts go = do
             return $ if r then (x:as, bs) else (as, x:bs)
     (files, nonFiles) <- partitionM D.doesFileExist (sdoptsDirsToWorkWith sdistOpts)
     (dirs, invalid) <- partitionM D.doesDirectoryExist nonFiles
-    unless (null invalid) $ do
-        hPutStrLn stderr $
-            "Error: stack upload expects a list sdist tarballs or cabal directories.  Can't find " ++
-            show invalid
-        exitFailure
     withBuildConfigAndLock go $ \_ -> do
+        unless (null invalid) $ do
+            let invalidList = bulletedList $ map (fileWhite . fromString) invalid
+            $prettyError . align . (<> (line <> invalidList))
+                         . sep . map fromString $
+                ["stack upload expects a list sdist tarballs or cabal directories.",
+                 "Can't find:"]
+            liftIO exitFailure
         config <- view configL
         getCreds <- liftIO (runOnce (Upload.loadCreds config))
         mapM_ (resolveFile' >=> checkSDistTarball sdistOpts) files

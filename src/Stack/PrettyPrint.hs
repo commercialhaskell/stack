@@ -15,7 +15,7 @@ module Stack.PrettyPrint
       -- * Color utils
       -- | These are preferred to colors directly, so that we can
       -- encourage consistency of color meanings.
-    , errorRed, goodGreen, shellMagenta
+    , errorRed, goodGreen, shellMagenta, fileWhite
     , displayTargetPkgId, displayCurrentPkgId, displayCurrentPkgName, displayErrorPkgId
     , displayMilliseconds
       -- * Formatting utils
@@ -104,6 +104,9 @@ goodGreen = green
 shellMagenta :: AnsiDoc -> AnsiDoc
 shellMagenta = magenta
 
+fileWhite :: AnsiDoc -> AnsiDoc
+fileWhite = bold . white
+
 displayTargetPkgId :: PackageIdentifier -> AnsiDoc
 displayTargetPkgId = cyan . display
 
@@ -126,7 +129,7 @@ instance Display Version where
     display = fromString . versionString
 
 instance Display (Path b File) where
-    display = bold . white . fromString . toFilePath
+    display = fileWhite . fromString . toFilePath
 
 instance Display (Path b Dir) where
     display = bold . blue . fromString . toFilePath
