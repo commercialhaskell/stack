@@ -333,6 +333,7 @@ missingExeError isSimpleBuildType msg =
   where
     possibleCauses =
         "No module named \"Main\". The 'main-is' source file should usually have a header indicating that it's a 'Main' module." :
+        "A cabal file that refers to nonexistent other files (e.g. a license-file that doesn't exist). Running 'cabal check' may point out these issues." :
         if isSimpleBuildType
             then []
             else ["The Setup.hs file is changing the installation target dir."]
