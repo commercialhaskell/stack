@@ -74,44 +74,56 @@ before_install:
 install:
  - echo "$(ghc --version) [$(ghc --print-project-git-commit-id 2> /dev/null || echo '?')]"
  # Note: we build store by itself below due to high memory usage
- - case "$BUILD" in
+ - |
+   set -ex
+   case "$BUILD" in
      style)
-       stack --system-ghc --no-terminal install hlint;;
+       stack --system-ghc --no-terminal install hlint
+       ;;
      stack)
-       stack --no-terminal build store;
-       stack --no-terminal test --only-dependencies;;
+       stack --no-terminal build store
+       stack --no-terminal test --only-dependencies
+       ;;
      cabal)
-       cabal --version;
-       travis_retry cabal update;
-       rm -f $HOME/.cabal/bin/stack;
-       echo "stack is located at $(which stack)";
-       stack --version;
-       rm -f $(stack --compiler=ghc-$GHCVER path --dist-dir)/stack-*.tar.gz &&
-       stack --system-ghc --compiler=ghc-$GHCVER sdist --pvp-bounds=both &&
-       tar xf $(stack --system-ghc --compiler=ghc-$GHCVER path --dist-dir)/stack-*.tar.gz --wildcards --strip-components=1 '*/stack.cabal' &&
-       cabal install --only-dependencies --enable-tests --enable-benchmarks --force-reinstalls --ghc-options=-O0 --reorder-goals --max-backjumps=-1;;
+       cabal --version
+       travis_retry cabal update
+       rm -f $HOME/.cabal/bin/stack
+       echo "stack is located at $(which stack)"
+       stack --version
+       rm -f $(stack --compiler=ghc-$GHCVER path --dist-dir)/stack-*.tar.gz
+       stack --system-ghc --compiler=ghc-$GHCVER sdist --pvp-bounds=both
+       tar xf $(stack --system-ghc --compiler=ghc-$GHCVER path --dist-dir)/stack-*.tar.gz --wildcards --strip-components=1 '*/stack.cabal'
+       cabal install --only-dependencies --enable-tests --enable-benchmarks --force-reinstalls --ghc-options=-O0 --reorder-goals --max-backjumps=-1
+       ;;
    esac
+   set +ex
 
 script:
- - set -e; case "$BUILD" in
+ - |
+   set -ex
+   case "$BUILD" in
      style)
-       hlint src/ --hint=HLint.hs;
-       hlint src/ --cpp-define=WINDOWS=1 --hint=HLint.hs;
-       hlint test/ --cpp-simple --hint=HLint.hs;
-       stack --system-ghc --no-terminal build --pedantic;;
+       hlint src/ --hint=HLint.hs
+       hlint src/ --cpp-define=WINDOWS=1 --hint=HLint.hs
+       hlint test/ --cpp-simple --hint=HLint.hs
+       stack --system-ghc --no-terminal build --pedantic
+       ;;
      stack)
-       stack --no-terminal test --haddock --no-haddock-deps --ghc-options="-Werror";;
+       stack --no-terminal test --haddock --no-haddock-deps --ghc-options="-Werror"
+       ;;
      cabal)
-       cabal configure --enable-tests --enable-benchmarks -v2 --ghc-options="-O0 -Werror";
-       cabal build;
-       cabal test;
-       cabal check;
-       cabal sdist;
-       cabal copy;
-       cd test/integration;
-       true stack setup --compiler=ghc-$GHCVER;
-       true stack test --compiler=ghc-$GHCVER;
-       cd ../..;
-       SRC_TGZ=$(cabal info . | awk '{print $2;exit}').tar.gz &&
-       (cd dist && cabal install --force-reinstalls "$SRC_TGZ");;
+       cabal configure --enable-tests --enable-benchmarks -v2 --ghc-options="-O0 -Werror"
+       cabal build
+       cabal test
+       cabal check
+       cabal sdist
+       cabal copy
+       cd test/integration
+       true stack setup --compiler=ghc-$GHCVER
+       true stack test --compiler=ghc-$GHCVER
+       cd ../..
+       SRC_TGZ=$(cabal info . | awk '{print $2;exit}').tar.gz
+       (cd dist && cabal install --force-reinstalls "$SRC_TGZ")
+       ;;
    esac
+   set +ex
