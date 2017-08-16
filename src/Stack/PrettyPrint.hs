@@ -11,6 +11,8 @@ module Stack.PrettyPrint
       displayPlain, displayWithColor
       -- * Logging based on pretty-print typeclass
     , prettyDebug, prettyInfo, prettyWarn, prettyError
+    , prettyDebugL, prettyInfoL, prettyWarnL, prettyErrorL
+    , prettyDebugS, prettyInfoS, prettyWarnS, prettyErrorS
     , debugBracket
       -- * Color utils
       -- | These are preferred to colors directly, so that we can
@@ -28,7 +30,7 @@ module Stack.PrettyPrint
     , hsep, vsep, fillSep, sep, hcat, vcat, fillCat, cat, punctuate
     , fill, fillBreak
     , enclose, squotes, dquotes, parens, angles, braces, brackets
-    , indentAfterLabel
+    , indentAfterLabel, wordDoc
     ) where
 
 import           Stack.Prelude
@@ -73,8 +75,56 @@ prettyError = do
     loc <- location
     [e| monadLoggerLog loc "" LevelError <=< displayWithColor . (line <>) . (errorColor "Error:" <+>) . indentAfterLabel |]
 
+-- TODO: Figure out how to collapse these to use the same implementation
+--       as the above ones!
+
+prettyDebugL :: Q Exp
+prettyDebugL = do
+    loc <- location
+    [e| monadLoggerLog loc "" LevelDebug <=< displayWithColor . fillSep|]
+
+prettyInfoL :: Q Exp
+prettyInfoL = do
+    loc <- location
+    [e| monadLoggerLog loc "" LevelInfo <=< displayWithColor . fillSep|]
+
+prettyWarnL :: Q Exp
+prettyWarnL = do
+    loc <- location
+    [e| monadLoggerLog loc "" LevelWarn <=< displayWithColor . (line <>) . (warningColor "Warning:" <+>) . indentAfterLabel . fillSep|]
+
+prettyErrorL :: Q Exp
+prettyErrorL = do
+    loc <- location
+    [e| monadLoggerLog loc "" LevelError <=< displayWithColor . (line <>) . (errorColor "Error:" <+>) . indentAfterLabel . fillSep|]
+
+prettyDebugS :: Q Exp
+prettyDebugS = do
+    loc <- location
+    [e| monadLoggerLog loc "" LevelDebug <=< displayWithColor . fillSep . wordDoc|]
+
+prettyInfoS :: Q Exp
+prettyInfoS = do
+    loc <- location
+    [e| monadLoggerLog loc "" LevelInfo <=< displayWithColor . fillSep . wordDoc|]
+
+prettyWarnS :: Q Exp
+prettyWarnS = do
+    loc <- location
+    [e| monadLoggerLog loc "" LevelWarn <=< displayWithColor . (line <>) . (warningColor "Warning:" <+>) . indentAfterLabel . fillSep . wordDoc|]
+
+prettyErrorS :: Q Exp
+prettyErrorS = do
+    loc <- location
+    [e| monadLoggerLog loc "" LevelError <=< displayWithColor . (line <>) . (errorColor "Error:" <+>) . indentAfterLabel . fillSep . wordDoc|]
+
+-- End of duplicates
+
 indentAfterLabel :: Doc a -> Doc a
 indentAfterLabel = align
+
+wordDoc :: String -> [Doc a]
+wordDoc = map fromString . words
 
 debugBracket :: Q Exp
 debugBracket = do

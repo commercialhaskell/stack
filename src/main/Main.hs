@@ -607,8 +607,7 @@ buildCmd opts go = do
 
 uninstallCmd :: [String] -> GlobalOpts -> IO ()
 uninstallCmd _ go = withConfigAndLock go $ do
-    $prettyError . fillSep . (++ [cmd])
-                 . map fromString . concatMap words $
+    $prettyErrorL . (++ [cmd]) . concatMap wordDoc $
       ["stack does not manage installations in global locations.",
        "The only global mutation stack performs is executable copying.",
        "For the default executable destination, please run"]
@@ -638,10 +637,10 @@ upgradeCmd upgradeOpts' go = withGlobalConfigAndLock go $
 -- | Upload to Hackage
 uploadCmd :: SDistOpts -> GlobalOpts -> IO ()
 uploadCmd (SDistOpts [] _ _ _ _ _) go =
-    withConfigAndLock go . $prettyError . sep $
-        ["To upload the current package, please run",
-         shellColor (fromString "stack upload ."),
-         "(with the period at the end)"]
+    withConfigAndLock go . $prettyErrorL . concat $
+        [wordDoc "To upload the current package, please run",
+         [shellColor (fromString "stack upload .")],
+         wordDoc "(with the period at the end)"]
 uploadCmd sdistOpts go = do
     let partitionM _ [] = return ([], [])
         partitionM f (x:xs) = do
@@ -654,7 +653,7 @@ uploadCmd sdistOpts go = do
         unless (null invalid) $ do
             let invalidList = bulletedList $ map (fileColor . fromString) invalid
             $prettyError . (<> (line <> invalidList))
-                         . sep . map fromString $
+                         . fillSep . concatMap wordDoc $
                 ["stack upload expects a list of sdist tarballs or cabal directories.",
                  "Can't find:"]
             liftIO exitFailure

@@ -990,7 +990,7 @@ withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} md
                                 case mdeps of
                                     Just x -> return x
                                     Nothing -> do
-                                        $prettyWarn "In getPackageArgs: custom-setup in use, but no dependency map present"
+                                        $prettyWarnS "In getPackageArgs: custom-setup in use, but no dependency map present"
                                         return Map.empty
                             matchedDeps <- forM (Map.toList customSetupDeps) $ \(name, range) -> do
                                 let matches (PackageIdentifier name' version) =
