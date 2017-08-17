@@ -905,7 +905,7 @@ loadProjectConfig mstackYaml = do
         LCSProject fp -> do
             currDir <- getCurrentDir
             $logDebug $ "Loading project config file " <>
-                        T.pack (maybe (toFilePath fp) toFilePath (stripDir currDir fp))
+                        T.pack (maybe (toFilePath fp) toFilePath (stripProperPrefix currDir fp))
             LCSProject <$> load fp
         LCSNoProject -> do
             $logDebug $ "No project config file found, using defaults."

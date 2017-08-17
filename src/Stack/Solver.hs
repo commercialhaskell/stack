@@ -754,5 +754,5 @@ prettyPath
 prettyPath path = do
     eres <- liftIO $ try $ makeRelativeToCurrentDir path
     return $ case eres of
-        Left (_ :: PathParseException) -> toFilePath path
+        Left (_ :: PathException) -> toFilePath path
         Right res -> toFilePath (res :: Path Rel t)

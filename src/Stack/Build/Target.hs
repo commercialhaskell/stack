@@ -166,7 +166,7 @@ parseRawTargetDirs root locals ri =
                         names -> return $ Right $ map ((ri, ) . RTPackage) names
   where
     childOf dir (name, lpv) =
-        if dir == lpvRoot lpv || isParentOf dir (lpvRoot lpv)
+        if dir == lpvRoot lpv || isProperPrefixOf dir (lpvRoot lpv)
             then Just name
             else Nothing
 

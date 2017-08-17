@@ -127,7 +127,7 @@ initProject whichCmd currDir initOpts mresolver = do
             }
 
         makeRelDir dir =
-            case stripDir currDir dir of
+            case stripProperPrefix currDir dir of
                 Nothing
                     | currDir == dir -> "."
                     | otherwise -> assert False $ toFilePathNoTrailingSep dir

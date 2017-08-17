@@ -486,7 +486,7 @@ makeObjectFilePathFromC
     -> Path Abs File         -- ^ The path to the .c file.
     -> m (Path Abs File) -- ^ The path to the .o file for the component.
 makeObjectFilePathFromC cabalDir namedComponent distDir cFilePath = do
-    relCFilePath <- stripDir cabalDir cFilePath
+    relCFilePath <- stripProperPrefix cabalDir cFilePath
     relOFilePath <-
         parseRelFile (replaceExtension (toFilePath relCFilePath) "o")
     addComponentPrefix <- fileGenDirFromComponentName namedComponent
@@ -977,7 +977,7 @@ getDependencies component dotCabalPath =
     readResolvedHi resolvedFile = do
         dumpHIDir <- getDumpHIDir
         dir <- asks (parent . fst)
-        case stripDir dir resolvedFile of
+        case stripProperPrefix dir resolvedFile of
             Nothing -> return (S.empty, [])
             Just fileRel -> do
                 let dumpHIPath =
@@ -1229,7 +1229,7 @@ resolveOrWarn subject resolver path =
      result <- resolver dir path
      when (isNothing result) $
        $logWarn ("Warning: " <> subject <> " listed in " <>
-         T.pack (maybe (FL.toFilePath file) FL.toFilePath (stripDir cwd file)) <>
+         T.pack (maybe (FL.toFilePath file) FL.toFilePath (stripProperPrefix cwd file)) <>
          " file does not exist: " <>
          T.pack path)
      return result
