@@ -799,41 +799,38 @@ resolvePackageDescription packageConfig (GenericPackageDescription desc defaultF
                 (packageConfigPlatform packageConfig)
                 flags
 
-        -- Due to https://github.com/haskell/cabal/issues/1725,
-        -- versions of Cabal before 2.0 would always require that the
-        -- dependencies for all libraries and executables be present,
-        -- even if they were not buildable. To ensure that Stack is
-        -- compatible with those older Cabal libraries (which may be
-        -- in use depending on the snapshot chosen), we set buildable
-        -- to True for libraries and executables.
         updateLibDeps lib deps =
           lib {libBuildInfo =
-                 (libBuildInfo lib)
-                   { targetBuildDepends = deps
-                   , buildable = True
-                   }
-              }
+                 (libBuildInfo lib) {targetBuildDepends = deps}}
         updateExeDeps exe deps =
           exe {buildInfo =
-                 (buildInfo exe)
-                   { targetBuildDepends = deps
-                   , buildable = True
-                   }
-              }
+                 (buildInfo exe) {targetBuildDepends = deps}}
+
+        -- Note that, prior to moving to Cabal 2.0, we would set
+        -- testEnabled/benchmarkEnabled here. These fields no longer
+        -- exist, so we modify buildable instead here.  The only
+        -- wrinkle in the Cabal 2.0 story is
+        -- https://github.com/haskell/cabal/issues/1725, where older
+        -- versions of Cabal (which may be used for actually building
+        -- code) don't properly exclude build-depends for
+        -- non-buildable components. Testing indicates that everything
+        -- is working fine, and that this comment can be completely
+        -- ignored. I'm leaving the comment anyway in case something
+        -- breaks and you, poor reader, are investigating.
         updateTestDeps test deps =
-          test {testBuildInfo =
-                  (testBuildInfo test)
-                    { targetBuildDepends = deps
-                    , buildable = packageConfigEnableTests packageConfig
-                    }
-               }
+          let bi = testBuildInfo test
+              bi' = bi
+                { targetBuildDepends = deps
+                , buildable = buildable bi && packageConfigEnableTests packageConfig
+                }
+           in test { testBuildInfo = bi' }
         updateBenchmarkDeps benchmark deps =
-          benchmark {benchmarkBuildInfo =
-                       (benchmarkBuildInfo benchmark)
-                         { targetBuildDepends = deps
-                         , buildable = packageConfigEnableBenchmarks packageConfig
-                         }
-                    }
+          let bi = benchmarkBuildInfo benchmark
+              bi' = bi
+                { targetBuildDepends = deps
+                , buildable = buildable bi && packageConfigEnableBenchmarks packageConfig
+                }
+           in benchmark { benchmarkBuildInfo = bi' }
 
 -- | Make a map from a list of flag specifications.
 --
