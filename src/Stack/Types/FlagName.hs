@@ -107,12 +107,12 @@ flagNameText (FlagName n) = n
 
 -- | Convert from a Cabal flag name.
 fromCabalFlagName :: Cabal.FlagName -> FlagName
-fromCabalFlagName (Cabal.FlagName name) =
-  let !x = T.pack name
+fromCabalFlagName name =
+  let !x = T.pack $ Cabal.unFlagName name
   in FlagName x
 
 -- | Convert to a Cabal flag name.
 toCabalFlagName :: FlagName -> Cabal.FlagName
 toCabalFlagName (FlagName name) =
   let !x = T.unpack name
-  in Cabal.FlagName x
+  in Cabal.mkFlagName x

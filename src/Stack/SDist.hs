@@ -51,7 +51,7 @@ import           Path.IO hiding (getModificationTime, getPermissions, withSystem
 import           Stack.Build (mkBaseConfigOpts, build)
 import           Stack.Build.Execute
 import           Stack.Build.Installed
-import           Stack.Build.Source (loadSourceMap, getDefaultPackageConfig)
+import           Stack.Build.Source (loadSourceMap)
 import           Stack.Build.Target hiding (PackageType (..))
 import           Stack.PackageLocation (resolveMultiPackageLocation)
 import           Stack.Constants
@@ -443,3 +443,17 @@ getModTime :: FilePath -> IO Tar.EpochTime
 getModTime path = do
     t <- getModificationTime path
     return . floor . utcTimeToPOSIXSeconds $ t
+
+getDefaultPackageConfig :: (MonadIO m, MonadReader env m, HasEnvConfig env)
+  => m PackageConfig
+getDefaultPackageConfig = do
+  platform <- view platformL
+  compilerVersion <- view actualCompilerVersionL
+  return PackageConfig
+    { packageConfigEnableTests = False
+    , packageConfigEnableBenchmarks = False
+    , packageConfigFlags = mempty
+    , packageConfigGhcOptions = []
+    , packageConfigCompilerVersion = compilerVersion
+    , packageConfigPlatform = platform
+    }

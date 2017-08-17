@@ -30,7 +30,6 @@ import qualified Data.Set as Set
 import qualified Data.Text as T
 import           Data.Text.Encoding (decodeUtf8With)
 import           Data.Text.Encoding.Error (lenientDecode)
-import qualified Distribution.Package as Cabal
 import qualified Distribution.Text as Cabal
 import qualified Distribution.Version as Cabal
 import           Generics.Deriving.Monoid (memptydefault, mappenddefault)
@@ -129,7 +128,7 @@ data Ctx = Ctx
     , baseConfigOpts :: !BaseConfigOpts
     , loadPackage    :: !(PackageLocationIndex FilePath -> Map FlagName Bool -> [Text] -> IO Package)
     , combinedMap    :: !CombinedMap
-    , toolToPackages :: !(Cabal.Dependency -> Map PackageName VersionRange)
+    , toolToPackages :: !(ExeName -> Map PackageName VersionRange)
     , ctxEnvConfig   :: !EnvConfig
     , callStack      :: ![PackageName]
     , extraToBuild   :: !(Set PackageName)
@@ -224,9 +223,9 @@ constructPlan ls0 baseConfigOpts0 locals extraToBuild0 localDumpPkgs loadPackage
         , baseConfigOpts = baseConfigOpts0
         , loadPackage = loadPackage0
         , combinedMap = combineMap sourceMap installedMap
-        , toolToPackages = \(Cabal.Dependency name _) ->
+        , toolToPackages = \name ->
           maybe Map.empty (Map.fromSet (const Cabal.anyVersion)) $
-          Map.lookup (T.pack . packageNameString . fromCabalPackageName $ name) (toolMap lp)
+          Map.lookup name toolMap
         , ctxEnvConfig = econfig
         , callStack = []
         , extraToBuild = extraToBuild0
@@ -234,8 +233,8 @@ constructPlan ls0 baseConfigOpts0 locals extraToBuild0 localDumpPkgs loadPackage
         , wanted = wantedLocalPackages locals <> extraToBuild0
         , localNames = Set.fromList $ map (packageName . lpPackage) locals
         }
-
-    toolMap = getToolMap ls0
+      where
+        toolMap = getToolMap ls0 lp
 
 -- | State to be maintained during the calculation of local packages
 -- to unregister.
@@ -795,58 +794,49 @@ packageDepsWithTools p = do
     ctx <- ask
     -- TODO: it would be cool to defer these warnings until there's an
     -- actual issue building the package.
-    let toEither (Cabal.Dependency (Cabal.PackageName name) _) mp =
+    let toEither name mp =
             case Map.toList mp of
-                [] -> Left (NoToolFound name (packageName p))
+                [] -> Left (ToolWarning name (packageName p) Nothing)
                 [_] -> Right mp
-                xs -> Left (AmbiguousToolsFound name (packageName p) (map fst xs))
+                ((x, _):(y, _):zs) ->
+                  Left (ToolWarning name (packageName p) (Just (x, y, map fst zs)))
         (warnings0, toolDeps) =
              partitionEithers $
-             map (\dep -> toEither dep (toolToPackages ctx dep)) (packageTools p)
+             map (\dep -> toEither dep (toolToPackages ctx dep)) (Map.keys (packageTools p))
     -- Check whether the tool is on the PATH before warning about it.
-    warnings <- fmap catMaybes $ forM warnings0 $ \warning -> do
-        let toolName = case warning of
-                NoToolFound tool _ -> tool
-                AmbiguousToolsFound tool _ _ -> tool
+    warnings <- fmap catMaybes $ forM warnings0 $ \warning@(ToolWarning (ExeName toolName) _ _) -> do
         config <- view configL
         menv <- liftIO $ configEnvOverride config minimalEnvSettings { esIncludeLocals = True }
-        mfound <- findExecutable menv toolName
+        mfound <- findExecutable menv $ T.unpack toolName
         case mfound of
             Nothing -> return (Just warning)
             Just _ -> return Nothing
     tell mempty { wWarnings = (map toolWarningText warnings ++) }
-    when (any isNoToolFound warnings) $ do
-        let msg = T.unlines
-                [ "Missing build-tools may be caused by dependencies of the build-tool being overridden by extra-deps."
-                , "This should be fixed soon - see this issue https://github.com/commercialhaskell/stack/issues/595"
-                ]
-        tell mempty { wWarnings = (msg:) }
     return $ Map.unionsWith intersectVersionRanges
            $ packageDeps p
            : toolDeps
 
-data ToolWarning
-    = NoToolFound String PackageName
-    | AmbiguousToolsFound String PackageName [PackageName]
-
-isNoToolFound :: ToolWarning -> Bool
-isNoToolFound NoToolFound{} = True
-isNoToolFound _ = False
+-- | Warn about tools in the snapshot definition. States the tool name
+-- expected, the package name using it, and found packages. If the
+-- last value is Nothing, it means the tool was not found
+-- anywhere. For a Just value, it was found in at least two packages.
+data ToolWarning = ToolWarning ExeName PackageName (Maybe (PackageName, PackageName, [PackageName]))
+  deriving Show
 
 toolWarningText :: ToolWarning -> Text
-toolWarningText (NoToolFound toolName pkgName) =
+toolWarningText (ToolWarning (ExeName toolName) pkgName Nothing) =
     "No packages found in snapshot which provide a " <>
     T.pack (show toolName) <>
     " executable, which is a build-tool dependency of " <>
     T.pack (show (packageNameString pkgName))
-toolWarningText (AmbiguousToolsFound toolName pkgName options) =
+toolWarningText (ToolWarning (ExeName toolName) pkgName (Just (option1, option2, options))) =
     "Multiple packages found in snapshot which provide a " <>
     T.pack (show toolName) <>
     " exeuctable, which is a build-tool dependency of " <>
     T.pack (show (packageNameString pkgName)) <>
     ", so none will be installed.\n" <>
     "Here's the list of packages which provide it: " <>
-    T.intercalate ", " (map packageNameText options) <>
+    T.intercalate ", " (map packageNameText (option1:option2:options)) <>
     "\nSince there's no good way to choose, you may need to install it manually."
 
 -- | Strip out anything from the @Plan@ intended for the local database
