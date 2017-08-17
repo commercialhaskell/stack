@@ -792,9 +792,8 @@ calculate gpd platform compilerVersion loc flags hide options =
             Set.fromList
           $ map (ExeName . T.pack . C.unUnqualComponentName . C.exeName)
           $ C.executables pd
-      , lpiNeededExes = Map.mapKeys ExeName
-                      $ Map.map fromVersionRange
-                      $ packageToolDependencies pd
+      , lpiNeededExes = Map.map fromVersionRange
+                      $ packageDescTools pd
       , lpiExposedModules = maybe
           Set.empty
           (Set.fromList . map fromCabalModuleName . C.exposedModules)

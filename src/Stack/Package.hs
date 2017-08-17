@@ -33,7 +33,7 @@ module Stack.Package
   ,buildLogPath
   ,PackageException (..)
   ,resolvePackageDescription
-  ,packageToolDependencies
+  ,packageDescTools
   ,packageDependencies
   ,autogenDir
   ,checkCabalFileName
@@ -531,14 +531,6 @@ packageDependencies pkg =
   map (depName &&& depRange) $
   concatMap targetBuildDepends (allBuildInfo pkg) ++
   maybe [] setupDepends (setupBuildInfo pkg)
-
--- | Get all build tool dependencies of the package (buildable targets only).
-packageToolDependencies :: PackageDescription -> Map Text VersionRange
-packageToolDependencies =
-  M.fromList .
-  concatMap (fmap (\(Cabal.LegacyExeDependency name range) -> (T.pack name, range)) .
-             buildTools) .
-  allBuildInfo
 
 -- | Get all dependencies of the package (buildable targets only).
 --
