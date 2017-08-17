@@ -229,11 +229,17 @@ packageFromPackageDescription packageConfig pkgFlags pkg =
     , packageAllDeps = S.fromList (M.keys deps)
     , packageHasLibrary = maybe False (buildable . libBuildInfo) (library pkg)
     , packageTests = M.fromList
-      [(T.pack (Cabal.unUnqualComponentName $ testName t), testInterface t) | t <- testSuites pkg
-                                              , buildable (testBuildInfo t)]
+      [(T.pack (Cabal.unUnqualComponentName $ testName t), testInterface t) | t <- testSuites pkg]
+        -- FIXME: Previously, we only included buildable components
+        -- here. Since Cabal 2.0, this ended up disabling test running
+        -- in all cases. Need to investigate if that's a change in
+        -- Cabal behavior or how we're piping data through the system
+        -- in response to Cabal data type changes. A cleanup of the
+        -- PackageConfig datatype (which will probably happen for
+        -- componentized builds) will likely make all of this clearer.
     , packageBenchmarks = S.fromList
-      [T.pack (Cabal.unUnqualComponentName $ benchmarkName biBuildInfo) | biBuildInfo <- benchmarks pkg
-                                          , buildable (benchmarkBuildInfo biBuildInfo)]
+      [T.pack (Cabal.unUnqualComponentName $ benchmarkName biBuildInfo) | biBuildInfo <- benchmarks pkg]
+        -- Same comment about buildable applies here too.
     , packageExes = S.fromList
       [T.pack (Cabal.unUnqualComponentName $ exeName biBuildInfo)
         | biBuildInfo <- executables pkg
