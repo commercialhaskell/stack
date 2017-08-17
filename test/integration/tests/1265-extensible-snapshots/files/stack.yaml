@@ -1,5 +1,3 @@
-resolver:
-    name: test-snapshot
-    location: snapshot.yaml
+resolver: snapshot.yaml
 packages: []
 allow-newer: true

@@ -1,4 +1,5 @@
 resolver: ghc-8.0
+name: test-snapshot-2
 packages:
 - stm-2.4.4.1
 - async-2.1.0
