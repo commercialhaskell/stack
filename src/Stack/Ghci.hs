@@ -779,7 +779,7 @@ getPackageOptsAndTargetFiles pwd pkg = do
           -- FIXME: use compilerOptionsCabalFlag
           map ("--ghc-option=" ++) (concatMap (ghcOptions . snd) (ghciPkgOpts pkg))
         , mapMaybe
-              (fmap toFilePath . stripDir pwd)
+              (fmap toFilePath . stripProperPrefix pwd)
               (S.toList (ghciPkgCFiles pkg) <> S.toList (ghciPkgModFiles pkg) <>
                [paths_foo | paths_foo_exists]))
 

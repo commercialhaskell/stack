@@ -344,7 +344,7 @@ generateHpcMarkupIndex = do
             let indexPath = subdir </> $(mkRelFile "hpc_index.html")
             exists' <- doesFileExist indexPath
             if not exists' then return Nothing else do
-                relPath <- stripDir outputDir indexPath
+                relPath <- stripProperPrefix outputDir indexPath
                 let package = dirname dir
                     testsuite = dirname subdir
                 return $ Just $ T.concat

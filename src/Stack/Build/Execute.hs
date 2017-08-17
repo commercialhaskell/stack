@@ -1218,7 +1218,7 @@ singleBuild runInBase ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} in
                     -- Only pay attention to precompiled caches that refer to packages within
                     -- the snapshot.
                     Just pc | maybe False
-                                    (bcoSnapInstallRoot eeBaseConfigOpts `isParentOf`)
+                                    (bcoSnapInstallRoot eeBaseConfigOpts `isProperPrefixOf`)
                                     (parseAbsFile =<< pcLibrary pc) ->
                         return Nothing
                     -- If old precompiled cache files are left around but snapshots are deleted,
@@ -1768,7 +1768,7 @@ mungeBuildOutput excludeTHLoading makeAbsolute pkgDir compilerVer = void $
             if isValidSuffix y
                 then liftIO $ liftM (fmap ((T.takeWhile isSpace x <>) . T.pack . toFilePath)) $
                          forgivingAbsence (resolveFile pkgDir (T.unpack $ T.dropWhile isSpace x)) `catch`
-                             \(_ :: PathParseException) -> return Nothing
+                             \(_ :: PathException) -> return Nothing
                 else return Nothing
         case mabs of
             Nothing -> return bs
