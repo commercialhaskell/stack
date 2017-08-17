@@ -13,7 +13,6 @@ module Stack.Build.Source
     , getLocalFlags
     , getGhcOptions
     , addUnlistedToBuildCache
-    , getDefaultPackageConfig
     ) where
 
 import              Stack.Prelude
@@ -470,20 +469,6 @@ checkComponentsBuildable lps =
         | lp <- lps
         , c <- Set.toList (lpUnbuildable lp)
         ]
-
-getDefaultPackageConfig :: (MonadIO m, MonadReader env m, HasEnvConfig env)
-  => m PackageConfig
-getDefaultPackageConfig = do
-  platform <- view platformL
-  compilerVersion <- view actualCompilerVersionL
-  return PackageConfig
-    { packageConfigEnableTests = False
-    , packageConfigEnableBenchmarks = False
-    , packageConfigFlags = M.empty
-    , packageConfigGhcOptions = []
-    , packageConfigCompilerVersion = compilerVersion
-    , packageConfigPlatform = platform
-    }
 
 -- | Get 'PackageConfig' for package given its name.
 getPackageConfig :: (MonadIO m, MonadReader env m, HasEnvConfig env)
