@@ -57,6 +57,9 @@ Other enhancements:
   [#3232](https://github.com/commercialhaskell/stack/issues/3232).
 * Introduce the `Stack.StaticBytes` module for more efficiently
   holding statically-known byte sizes.
+* `stack setup` for ghcjs will now install `alex` and `happy` if
+  they are not present.  See
+  [#3109](https://github.com/commercialhaskell/stack/issues/3232).
 * `--ghc-options` and `--ghcjs-boot-options` now parse their input, so
   multiple arguments can be passed in one option.
   See [#3315](https://github.com/commercialhaskell/stack/issues/3315)
@@ -95,7 +98,6 @@ Bug fixes:
 * Modified the flag parser within Stack to match the behavior of
   Cabal's flag parser, which allows multiple sequential dashes. See
   [#3345](https://github.com/commercialhaskell/stack/issues/3345)
-
 
 ## 1.5.1
 
