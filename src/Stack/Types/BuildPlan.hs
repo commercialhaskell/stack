@@ -39,7 +39,7 @@ import qualified Data.Set as Set
 import           Data.Store.Version
 import           Data.Store.VersionTagged
 import qualified Data.Text as T
-import           Data.Text.Encoding (decodeUtf8, encodeUtf8)
+import           Data.Text.Encoding (encodeUtf8)
 import qualified Distribution.ModuleName as C
 import qualified Distribution.Version as C
 import           Network.HTTP.Client (parseRequest)
@@ -106,7 +106,7 @@ sdRawPathName sd =
   where
     go (ResolverSnapshot name) = renderSnapName name
     go (ResolverCompiler version) = compilerVersionText version
-    go (ResolverCustom _ hash) = "custom-" <> sdResolverName sd <> "-" <> decodeUtf8 (trimmedSnapshotHash hash)
+    go (ResolverCustom _ hash) = "custom-" <> sdResolverName sd <> "-" <> trimmedSnapshotHash hash
 
 -- | Modify the wanted compiler version in this snapshot. This is used
 -- when overriding via the `compiler` value in a custom snapshot or

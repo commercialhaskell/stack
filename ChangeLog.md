@@ -11,6 +11,7 @@ Major changes:
   details, please see
   [the writeup on these changes](https://www.fpcomplete.com/blog/2017/07/stacks-new-extensible-snapshots). [PR #3249](https://github.com/commercialhaskell/stack/pull/3249),
   see the PR description for a number of related issues.
+* Upgraded to version 2.0 of the Cabal library.
 
 Behavior changes:
 
@@ -19,6 +20,20 @@ Behavior changes:
   currently have, Stack will automatically download and install that
   GHC. You can explicitly set `install-ghc: false` or pass the flag
   `--no-install-ghc` to regain the previous behavior.
+* `stack ghci` no longer loads modules grouped by package. This is
+  always an improvement for plain ghci - it makes loading faster and
+  less noisy. For intero, this has the side-effect that it will no
+  longer load multiple packages that depend on TH loading relative
+  paths.  TH relative paths will still work when loading a single
+  package into intero. See
+  [#3309](https://github.com/commercialhaskell/stack/issues/3309)
+* Setting GHC options for a package via `ghc-options:` in your
+  `stack.yaml` will promote it to a local package, providing for more
+  consistency with flags and better reproducibility. See:
+  [#849](https://github.com/commercialhaskell/stack/issues/849)
+* Options passsed via `--ghci-options` are now passed to the end of the
+  invocation of ghci, instead of the middle.  This allows using `+RTS`
+  without an accompanying `-RTS`.
 
 Other enhancements:
 
@@ -45,6 +60,26 @@ Other enhancements:
 * `stack setup` for ghcjs will now install `alex` and `happy` if
   they are not present.  See
   [#3109](https://github.com/commercialhaskell/stack/issues/3232).
+* `--ghc-options` and `--ghcjs-boot-options` now parse their input, so
+  multiple arguments can be passed in one option.
+  See [#3315](https://github.com/commercialhaskell/stack/issues/3315)
+* Added `stack ghci --only-main` flag, to skip loading / importing
+  all but main modules. See the ghci documentation page
+  for further info.
+* Allow GHC's colored output to show through. GHC colors output
+  starting with version 8.2.1, for older GHC this does nothing.
+  Sometimes GHC's heuristics would work fine even before this change,
+  for example in `stack ghci`, but this override's GHC's heuristics
+  when they're broken by our collecting and processing GHC's output.
+* Extended the `ghc-options` field to support `$locals`, `$targets`,
+  and `$everything`. See:
+  [#3329](https://github.com/commercialhaskell/stack/issues/3329)
+* Better error message for case that `stack ghci` file targets are
+  combined with invalid package targets. See:
+  [#3342](https://github.com/commercialhaskell/stack/issues/3342)
+* For profiling now uses `-fprof-auto -fprof-cafs` instead of
+  the deprecated `-auto-all -caf-all`. See:
+  [#3360](https://github.com/commercialhaskell/stack/issues/3360)
 
 Bug fixes:
 
@@ -56,6 +91,13 @@ Bug fixes:
   [#3171](https://github.com/commercialhaskell/stack/pull/3171)
 * Previously, cabal files with just test-suite could cause build to fail
   ([#2862](https://github.com/commercialhaskell/stack/issues/2862))
+* If an invalid snapshot file has been detected (usually due to
+  mismatched hashes), Stack will delete the downloaded file and
+  recommend either retrying or filing an issue upstream. See
+  [#3319](https://github.com/commercialhaskell/stack/issues/3319).
+* Modified the flag parser within Stack to match the behavior of
+  Cabal's flag parser, which allows multiple sequential dashes. See
+  [#3345](https://github.com/commercialhaskell/stack/issues/3345)
 
 ## 1.5.1
 

@@ -28,12 +28,11 @@ ghciOptsParser = GhciOpts
                                     metavar "OPTIONS" <>
                                     completer ghcOptsCompleter <>
                                     help "Additional options passed to GHCi")))
-             <*> many
-                     (textOption
-                          (long "ghc-options" <>
-                           metavar "OPTIONS" <>
-                           completer ghcOptsCompleter <>
-                           help "Additional options passed to both GHC and GHCi"))
+             <*> manyArgsOptions
+                     (long "ghc-options" <>
+                      metavar "OPTIONS" <>
+                      completer ghcOptsCompleter <>
+                      help "Additional options passed to both GHC and GHCi")
              <*> flagsParser
              <*> optional
                      (strOption (long "with-ghc" <>
@@ -54,3 +53,4 @@ ghciOptsParser = GhciOpts
              <*> switch (long "skip-intermediate-deps" <> help "Skip loading intermediate target dependencies" <> internal)
              <*> boolFlags True "package-hiding" "package hiding" idm
              <*> switch (long "no-build" <> help "Don't build before launching GHCi" <> internal)
+             <*> switch (long "only-main" <> help "Only load and import the main module.  If no main module, no modules will be loaded.")

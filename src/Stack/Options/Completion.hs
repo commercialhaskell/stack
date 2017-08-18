@@ -18,6 +18,7 @@ import           Data.Maybe
 import qualified Data.Set as Set
 import qualified Data.Text as T
 import qualified Distribution.PackageDescription as C
+import qualified Distribution.Types.UnqualComponentName as C
 import           Options.Applicative
 import           Options.Applicative.Builder.Extra
 import           Stack.Config (getLocalPackages)
@@ -89,8 +90,8 @@ flagCompleter = buildConfigCompleter $ \input -> do
                     (C.genPackageFlags (lpvGPD lpv)))
             $ Map.toList lpvs
         flagString name fl =
-            case C.flagName fl of
-                C.FlagName flname -> (if flagEnabled name fl then "-" else "") ++ flname
+            let flname = C.unFlagName $ C.flagName fl
+             in (if flagEnabled name fl then "-" else "") ++ flname
         flagEnabled name fl =
             fromMaybe (C.flagDefault fl) $
             Map.lookup (fromCabalFlagName (C.flagName fl)) $
@@ -107,5 +108,5 @@ projectExeCompleter = buildConfigCompleter $ \input -> do
     return $
         filter (input `isPrefixOf`) $
         nubOrd $
-        concatMap (\(_, lpv) -> map fst (C.condExecutables (lpvGPD lpv))) $
+        concatMap (\(_, lpv) -> map (C.unUnqualComponentName . fst) (C.condExecutables (lpvGPD lpv))) $
         Map.toList lpvs

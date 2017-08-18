@@ -15,10 +15,6 @@ module Stack.Ghci
     , GhciPkgInfo(..)
     , GhciException(..)
     , ghci
-
-    -- TODO: Address what should and should not be exported.
-    , renderScriptGhci
-    , renderScriptIntero
     ) where
 
 import           Stack.Prelude
@@ -72,6 +68,7 @@ data GhciOpts = GhciOpts
     , ghciSkipIntermediate   :: !Bool
     , ghciHidePackages       :: !Bool
     , ghciNoBuild            :: !Bool
+    , ghciOnlyMain           :: !Bool
     } deriving Show
 
 -- | Necessary information to load a package or its components.
@@ -93,6 +90,7 @@ data GhciException
     | MissingFileTarget String
     | Can'tSpecifyFilesAndTargets
     | Can'tSpecifyFilesAndMainIs
+    | GhciTargetParseException [Text]
     deriving (Typeable)
 
 instance Exception GhciException
@@ -107,9 +105,12 @@ instance Show GhciException where
     show (MissingFileTarget name) =
         "Cannot find file target " ++ name
     show Can'tSpecifyFilesAndTargets =
-        "Cannot use 'stack ghci' with both file targets and build targets"
+        "Cannot use 'stack ghci' with both file targets and package targets"
     show Can'tSpecifyFilesAndMainIs =
         "Cannot use 'stack ghci' with both file targets and --main-is flag"
+    show (GhciTargetParseException xs) =
+        show (TargetParseException xs) ++
+        "\nNote that to specify options to be passed to GHCi, use the --ghci-options flag"
 
 -- | Launch a GHCi session for the given local package targets with the
 -- given options and configure it with the load paths and extensions
@@ -125,8 +126,9 @@ ghci opts@GhciOpts{..} = do
     -- Parse --main-is argument.
     mainIsTargets <- parseMainIsTargets buildOptsCLI ghciMainIs
     -- Parse to either file targets or build targets
-    etargets <- preprocessTargets ghciTargets
+    etargets <- preprocessTargets buildOptsCLI ghciTargets
     (inputTargets, mfileTargets) <- case etargets of
+        Right packageTargets -> return (packageTargets, Nothing)
         Left rawFileTargets -> do
             case mainIsTargets of
                 Nothing -> return ()
@@ -134,10 +136,6 @@ ghci opts@GhciOpts{..} = do
             -- Figure out targets based on filepath targets
             (targetMap, fileInfo, extraFiles) <- findFileTargets locals rawFileTargets
             return (targetMap, Just (fileInfo, extraFiles))
-        Right rawTargets -> do
-            (_,_,normalTargets) <- parseTargets AllowNoTargets buildOptsCLI
-                { boptsCLITargets = rawTargets }
-            return (normalTargets, Nothing)
     -- Get a list of all the local target packages.
     localTargets <- getAllLocalTargets opts inputTargets mainIsTargets sourceMap
     -- Check if additional package arguments are sensible.
@@ -150,21 +148,29 @@ ghci opts@GhciOpts{..} = do
     -- Finally, do the invocation of ghci
     runGhci opts localTargets mainIsTargets pkgs (maybe [] snd mfileTargets)
 
-preprocessTargets :: HasRunner env => [Text] -> RIO env (Either [Path Abs File] [Text])
-preprocessTargets rawTargets = do
-    let (fileTargetsRaw, normalTargets) =
+preprocessTargets :: HasEnvConfig env => BuildOptsCLI -> [Text] -> RIO env (Either [Path Abs File] (Map PackageName Target))
+preprocessTargets buildOptsCLI rawTargets = do
+    let (fileTargetsRaw, otherTargets) =
             partition (\t -> ".hs" `T.isSuffixOf` t || ".lhs" `T.isSuffixOf` t)
                       rawTargets
-    fileTargets <- forM fileTargetsRaw $ \fp0 -> do
-        let fp = T.unpack fp0
-        mpath <- liftIO $ forgivingAbsence (resolveFile' fp)
-        case mpath of
-            Nothing -> throwM (MissingFileTarget fp)
-            Just path -> return path
-    case (null fileTargets, null normalTargets) of
-        (False, False) -> throwM Can'tSpecifyFilesAndTargets
-        (False, _) -> return (Left fileTargets)
-        _ -> return (Right normalTargets)
+    case otherTargets of
+        [] -> do
+            fileTargets <- forM fileTargetsRaw $ \fp0 -> do
+                let fp = T.unpack fp0
+                mpath <- liftIO $ forgivingAbsence (resolveFile' fp)
+                case mpath of
+                    Nothing -> throwM (MissingFileTarget fp)
+                    Just path -> return path
+            return (Left fileTargets)
+        _ -> do
+            -- Try parsing targets before checking if both file and
+            -- module targets are specified (see issue#3342).
+            (_,_,normalTargets) <- parseTargets AllowNoTargets buildOptsCLI { boptsCLITargets = otherTargets }
+                `catch` \ex -> case ex of
+                    TargetParseException xs -> throwM (GhciTargetParseException xs)
+                    _ -> throwM ex
+            unless (null fileTargetsRaw) $ throwM Can'tSpecifyFilesAndTargets
+            return (Right normalTargets)
 
 parseMainIsTargets :: HasEnvConfig env => BuildOptsCLI -> Maybe Text -> RIO env (Maybe (Map PackageName Target))
 parseMainIsTargets buildOptsCLI mtarget = forM mtarget $ \target -> do
@@ -303,11 +309,11 @@ runGhci GhciOpts{..} targets mainIsTargets pkgs extraFiles = do
             | otherwise = bioOneWordOpts bio
         genOpts = nubOrd (concatMap (concatMap (oneWordOpts . snd) . ghciPkgOpts) pkgs)
         (omittedOpts, ghcOpts) = partition badForGhci $
-            concatMap (concatMap (bioOpts . snd) . ghciPkgOpts) pkgs ++
-            getUserOptions Nothing ++
-            concatMap (getUserOptions . Just . ghciPkgName) pkgs
-        getUserOptions mpkg =
-            map T.unpack (M.findWithDefault [] mpkg (unGhcOptions (configGhcOptions config)))
+            concatMap (concatMap (bioOpts . snd) . ghciPkgOpts) pkgs ++ map T.unpack
+              ( fold (configGhcOptionsByCat config) -- include everything, locals, and targets
+             ++ concatMap (getUserOptions . ghciPkgName) pkgs
+              )
+        getUserOptions pkg = M.findWithDefault [] pkg (configGhcOptionsByName config)
         badForGhci x =
             isPrefixOf "-O" x || elem x (words "-debug -threaded -ticky -static -Werror")
     unless (null omittedOpts) $
@@ -330,73 +336,66 @@ runGhci GhciOpts{..} targets mainIsTargets pkgs extraFiles = do
                  -- not include CWD. If there aren't any packages, CWD
                  -- is included.
                   (if null pkgs then id else ("-i" : )) $
-                  odir <> pkgopts <> map T.unpack ghciGhcOptions <> ghciArgs <> extras)
-        interrogateExeForRenderFunction = do
-            menv <- liftIO $ configEnvOverride config defaultEnvSettings
-            output <- execObserve menv (fromMaybe (compilerExeName wc) ghciGhcCommand) ["--version"]
-            if "Intero" `isPrefixOf` output
-                then return renderScriptIntero
-                else return renderScriptGhci
+                  odir <> pkgopts <> extras <> map T.unpack ghciGhcOptions <> ghciArgs)
+        -- TODO: Consider optimizing this check. Perhaps if no
+        -- "with-ghc" is specified, assume that it is not using intero.
+        checkIsIntero =
+            -- Optimization dependent on the behavior of renderScript -
+            -- it doesn't matter if it's intero or ghci when loading
+            -- multiple packages.
+            case pkgs of
+                [_] -> do
+                    menv <- liftIO $ configEnvOverride config defaultEnvSettings
+                    output <- execObserve menv (fromMaybe (compilerExeName wc) ghciGhcCommand) ["--version"]
+                    return $ "Intero" `isPrefixOf` output
+                _ -> return False
     withSystemTempDir "ghci" $ \tmpDirectory -> do
         macrosOptions <- writeMacrosFile tmpDirectory pkgs
         if ghciNoLoadModules
             then execGhci macrosOptions
             else do
                 checkForDuplicateModules pkgs
-                renderFn <- interrogateExeForRenderFunction
+                isIntero <- checkIsIntero
                 bopts <- view buildOptsL
                 mainFile <- figureOutMainFile bopts mainIsTargets targets pkgs
-                scriptPath <- writeGhciScript tmpDirectory (renderFn pkgs mainFile extraFiles)
+                scriptPath <- writeGhciScript tmpDirectory (renderScript isIntero pkgs mainFile ghciOnlyMain extraFiles)
                 execGhci (macrosOptions ++ ["-ghci-script=" <> toFilePath scriptPath])
 
 writeMacrosFile :: (MonadIO m) => Path Abs Dir -> [GhciPkgInfo] -> m [String]
 writeMacrosFile tmpDirectory packages = do
-  preprocessCabalMacros packages macrosFile
+    preprocessCabalMacros packages macrosFile
   where
     macrosFile = tmpDirectory </> $(mkRelFile "cabal_macros.h")
 
 writeGhciScript :: (MonadIO m) => Path Abs Dir -> GhciScript -> m (Path Abs File)
 writeGhciScript tmpDirectory script = do
-  liftIO $ scriptToFile scriptPath script
-  setScriptPerms scriptFilePath
-  return scriptPath
+    liftIO $ scriptToFile scriptPath script
+    setScriptPerms scriptFilePath
+    return scriptPath
   where
     scriptPath = tmpDirectory </> $(mkRelFile "ghci-script")
     scriptFilePath = toFilePath scriptPath
 
-findOwningPackageForMain :: [GhciPkgInfo] -> Path Abs File -> Maybe GhciPkgInfo
-findOwningPackageForMain pkgs mainFile =
-  find (\pkg -> toFilePath (ghciPkgDir pkg) `isPrefixOf` toFilePath mainFile) pkgs
-
-renderScriptGhci :: [GhciPkgInfo] -> Maybe (Path Abs File) -> [Path Abs File] -> GhciScript
-renderScriptGhci pkgs mainFile extraFiles =
-  let addPhase    = mconcat $ fmap renderPkg pkgs
-      mainPhase   = case mainFile of
-                      Just path -> cmdAddFile path
-                      Nothing   -> mempty
-      modulePhase = cmdModule $ foldl' S.union S.empty (fmap ghciPkgModules pkgs)
-   in case getFileTargets pkgs <> extraFiles of
-          [] -> addPhase <> mainPhase <> modulePhase
-          fileTargets -> mconcat $ map cmdAddFile fileTargets
-  where
-    renderPkg pkg = cmdAdd (ghciPkgModules pkg)
-
-renderScriptIntero :: [GhciPkgInfo] -> Maybe (Path Abs File) -> [Path Abs File] -> GhciScript
-renderScriptIntero pkgs mainFile extraFiles =
-  let addPhase    = mconcat $ fmap renderPkg pkgs
-      mainPhase   = case mainFile of
-                      Just path ->
-                        case findOwningPackageForMain pkgs path of
-                          Just mainPkg -> cmdCdGhc (ghciPkgDir mainPkg) <> cmdAddFile path
-                          Nothing      -> cmdAddFile path
-                      Nothing   -> mempty
-      modulePhase = cmdModule $ foldl' S.union S.empty (fmap ghciPkgModules pkgs)
-   in case getFileTargets pkgs <> extraFiles of
-          [] -> addPhase <> mainPhase <> modulePhase
-          fileTargets -> mconcat $ map cmdAddFile fileTargets
-  where
-    renderPkg pkg = cmdCdGhc (ghciPkgDir pkg)
-                 <> cmdAdd (ghciPkgModules pkg)
+renderScript :: Bool -> [GhciPkgInfo] -> Maybe (Path Abs File) -> Bool -> [Path Abs File] -> GhciScript
+renderScript isIntero pkgs mainFile onlyMain extraFiles = do
+    let cdPhase = case (isIntero, pkgs) of
+          -- If only loading one package, set the cwd properly.
+          -- Otherwise don't try. See
+          -- https://github.com/commercialhaskell/stack/issues/3309
+          (True, [pkg]) -> cmdCdGhc (ghciPkgDir pkg)
+          _ -> mempty
+        addPhase = cmdAdd $ S.fromList (map Left allModules ++ addMain)
+        addMain = case mainFile of
+            Just path -> [Right path]
+            _ -> []
+        modulePhase = cmdModule $ S.fromList allModules
+        allModules = concatMap (S.toList . ghciPkgModules) pkgs
+    case getFileTargets pkgs <> extraFiles of
+        [] ->
+          if onlyMain
+            then cdPhase <> if isJust mainFile then cmdAdd (S.fromList addMain) else mempty
+            else cdPhase <> addPhase <> modulePhase
+        fileTargets -> cmdAdd (S.fromList (map Right fileTargets))
 
 -- Hacky check if module / main phase should be omitted. This should be
 -- improved if / when we have a better per-component load.
@@ -695,7 +694,7 @@ getExtraLoadDeps loadAllDeps sourceMap targets =
     getDeps :: PackageName -> [PackageName]
     getDeps name =
         case M.lookup name sourceMap of
-            Just (PSLocal lp) -> M.keys (packageDeps (lpPackage lp))
+            Just (PSFiles lp _) -> M.keys (packageDeps (lpPackage lp)) -- FIXME just Local?
             _ -> []
     go :: PackageName -> State (Map PackageName (Maybe (Path Abs File, Target))) Bool
     go name = do
@@ -703,7 +702,7 @@ getExtraLoadDeps loadAllDeps sourceMap targets =
         case (M.lookup name cache, M.lookup name sourceMap) of
             (Just (Just _), _) -> return True
             (Just Nothing, _) | not loadAllDeps -> return False
-            (_, Just (PSLocal lp)) -> do
+            (_, Just (PSFiles lp _)) -> do
                 let deps = M.keys (packageDeps (lpPackage lp))
                 shouldLoad <- liftM or $ mapM go deps
                 if shouldLoad
@@ -713,7 +712,7 @@ getExtraLoadDeps loadAllDeps sourceMap targets =
                     else do
                         modify (M.insert name Nothing)
                         return False
-            (_, Just PSUpstream{}) -> return loadAllDeps
+            (_, Just PSIndex{}) -> return loadAllDeps
             (_, _) -> return False
 
 preprocessCabalMacros :: MonadIO m => [GhciPkgInfo] -> Path Abs File -> m [String]

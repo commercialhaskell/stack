@@ -52,6 +52,7 @@ scriptCmd opts go' = do
         config <- view configL
         menv <- liftIO $ configEnvOverride config defaultEnvSettings
         wc <- view $ actualCompilerVersionL.whichCompilerL
+        colorFlag <- appropriateGhcColorFlag
 
         targetsSet <-
             case soPackages opts of
@@ -87,6 +88,7 @@ scriptCmd opts go' = do
 
         let ghcArgs = concat
                 [ ["-hide-all-packages"]
+                , maybeToList colorFlag
                 , map (\x -> "-package" ++ x)
                     $ Set.toList
                     $ Set.insert "base"

@@ -30,7 +30,6 @@ import qualified Data.Set as Set
 import qualified Data.Text as T
 import           Data.Text.Encoding (decodeUtf8With)
 import           Data.Text.Encoding.Error (lenientDecode)
-import qualified Distribution.Package as Cabal
 import qualified Distribution.Text as Cabal
 import qualified Distribution.Version as Cabal
 import           Generics.Deriving.Monoid (memptydefault, mappenddefault)
@@ -129,7 +128,7 @@ data Ctx = Ctx
     , baseConfigOpts :: !BaseConfigOpts
     , loadPackage    :: !(PackageLocationIndex FilePath -> Map FlagName Bool -> [Text] -> IO Package)
     , combinedMap    :: !CombinedMap
-    , toolToPackages :: !(Cabal.Dependency -> Map PackageName VersionRange)
+    , toolToPackages :: !(ExeName -> Map PackageName VersionRange)
     , ctxEnvConfig   :: !EnvConfig
     , callStack      :: ![PackageName]
     , extraToBuild   :: !(Set PackageName)
@@ -224,9 +223,9 @@ constructPlan ls0 baseConfigOpts0 locals extraToBuild0 localDumpPkgs loadPackage
         , baseConfigOpts = baseConfigOpts0
         , loadPackage = loadPackage0
         , combinedMap = combineMap sourceMap installedMap
-        , toolToPackages = \(Cabal.Dependency name _) ->
+        , toolToPackages = \name ->
           maybe Map.empty (Map.fromSet (const Cabal.anyVersion)) $
-          Map.lookup (T.pack . packageNameString . fromCabalPackageName $ name) (toolMap lp)
+          Map.lookup name toolMap
         , ctxEnvConfig = econfig
         , callStack = []
         , extraToBuild = extraToBuild0
@@ -234,8 +233,8 @@ constructPlan ls0 baseConfigOpts0 locals extraToBuild0 localDumpPkgs loadPackage
         , wanted = wantedLocalPackages locals <> extraToBuild0
         , localNames = Set.fromList $ map (packageName . lpPackage) locals
         }
-
-    toolMap = getToolMap ls0
+      where
+        toolMap = getToolMap ls0 lp
 
 -- | State to be maintained during the calculation of local packages
 -- to unregister.
@@ -308,7 +307,7 @@ mkUnregisterLocal tasks dirtyReason localDumpPkgs sourceMap initialBuildSteps =
               then Nothing
               else Just $ fromMaybe "" $ Map.lookup name dirtyReason
       -- Check if we're no longer using the local version
-      | Just (PSUpstream _ Snap _ _ _) <- Map.lookup name sourceMap
+      | Just (piiLocation -> Snap) <- Map.lookup name sourceMap
           = Just "Switching to snapshot installed package"
       -- Check if a dependency is going to be unregistered
       | (dep, _):_ <- mapMaybe (`Map.lookup` toUnregister) deps
@@ -350,7 +349,7 @@ addFinal lp package isAllInOne = do
                             Local
                             package
                 , taskPresent = present
-                , taskType = TTLocal lp
+                , taskType = TTFiles lp Local -- FIXME we can rely on this being Local, right?
                 , taskAllInOne = isAllInOne
                 , taskCachePkgSrc = CacheSrcLocal (toFilePath (lpDir lp))
                 }
@@ -391,32 +390,37 @@ addDep treatAsDep' name = do
                         -- recommendation available
                         Nothing -> return $ Left $ UnknownPackage name
                         Just (PIOnlyInstalled loc installed) -> do
-                            -- slightly hacky, no flags since they likely won't affect executable names
-                            tellExecutablesUpstream name (installedVersion installed) loc Map.empty
+                            -- FIXME Slightly hacky, no flags since
+                            -- they likely won't affect executable
+                            -- names. This code does not feel right.
+                            tellExecutablesUpstream
+                              (PackageIdentifierRevision (PackageIdentifier name (installedVersion installed)) CFILatest)
+                              loc
+                              Map.empty
                             return $ Right $ ADRFound loc installed
                         Just (PIOnlySource ps) -> do
-                            tellExecutables name ps
+                            tellExecutables ps
                             installPackage name ps Nothing
                         Just (PIBoth ps installed) -> do
-                            tellExecutables name ps
+                            tellExecutables ps
                             installPackage name ps (Just installed)
             updateLibMap name res
             return res
 
-tellExecutables :: PackageName -> PackageSource -> M ()
-tellExecutables _ (PSLocal lp)
+-- FIXME what's the purpose of this? Add a Haddock!
+tellExecutables :: PackageSource -> M ()
+tellExecutables (PSFiles lp _)
     | lpWanted lp = tellExecutablesPackage Local $ lpPackage lp
     | otherwise = return ()
 -- Ignores ghcOptions because they don't matter for enumerating
 -- executables.
-tellExecutables name (PSUpstream version loc flags _ghcOptions _gitSha) =
-    tellExecutablesUpstream name version loc flags
+tellExecutables (PSIndex loc flags _ghcOptions pir) =
+    tellExecutablesUpstream pir loc flags
 
-tellExecutablesUpstream :: PackageName -> Version -> InstallLocation -> Map FlagName Bool -> M ()
-tellExecutablesUpstream name version loc flags = do
+tellExecutablesUpstream :: PackageIdentifierRevision -> InstallLocation -> Map FlagName Bool -> M ()
+tellExecutablesUpstream pir@(PackageIdentifierRevision (PackageIdentifier name _) _) loc flags = do
     ctx <- ask
     when (name `Set.member` extraToBuild ctx) $ do
-        let pir = PackageIdentifierRevision (PackageIdentifier name version) CFILatest -- FIXME get the real CabalFileInfo
         p <- liftIO $ loadPackage ctx (PLIndex pir) flags []
         tellExecutablesPackage loc p
 
@@ -431,10 +435,10 @@ tellExecutablesPackage loc p = do
                 Just (PIOnlySource ps) -> goSource ps
                 Just (PIBoth ps _) -> goSource ps
 
-        goSource (PSLocal lp)
+        goSource (PSFiles lp _)
             | lpWanted lp = exeComponents (lpComponents lp)
             | otherwise = Set.empty
-        goSource PSUpstream{} = Set.empty
+        goSource PSIndex{} = Set.empty
 
     tell mempty { wInstall = Map.fromList $ map (, loc) $ Set.toList $ filterComps myComps $ packageExes p }
   where
@@ -452,11 +456,11 @@ installPackage
 installPackage name ps minstalled = do
     ctx <- ask
     case ps of
-        PSUpstream _ _ flags ghcOptions pkgLoc -> do
+        PSIndex _ flags ghcOptions pkgLoc -> do
             planDebug $ "installPackage: Doing all-in-one build for upstream package " ++ show name
-            package <- liftIO $ loadPackage ctx pkgLoc flags ghcOptions
+            package <- liftIO $ loadPackage ctx (PLIndex pkgLoc) flags ghcOptions -- FIXME be more efficient! Get this from the LoadedPackageInfo!
             resolveDepsAndInstall True ps package minstalled
-        PSLocal lp ->
+        PSFiles lp _ ->
             case lpTestBench lp of
                 Nothing -> do
                     planDebug $ "installPackage: No test / bench component for " ++ show name ++ " so doing an all-in-one build."
@@ -551,8 +555,8 @@ installPackageGivenDeps isAllInOne ps package minstalled (missing, present, minL
             , taskPresent = present
             , taskType =
                 case ps of
-                    PSLocal lp -> TTLocal lp
-                    PSUpstream _ loc _ _ pkgLoc -> TTUpstream package (loc <> minLoc) pkgLoc
+                    PSFiles lp loc -> TTFiles lp (loc <> minLoc)
+                    PSIndex loc _ _ pkgLoc -> TTIndex package (loc <> minLoc) pkgLoc
             , taskAllInOne = isAllInOne
             , taskCachePkgSrc = toCachePkgSrc ps
             }
@@ -681,8 +685,8 @@ checkDirtiness ps installed package present wanted = do
             , configCacheDeps = Set.fromList $ Map.elems present
             , configCacheComponents =
                 case ps of
-                    PSLocal lp -> Set.map renderComponent $ lpComponents lp
-                    PSUpstream{} -> Set.empty
+                    PSFiles lp _ -> Set.map renderComponent $ lpComponents lp
+                    PSIndex{} -> Set.empty
             , configCacheHaddock =
                 shouldHaddockPackage buildOpts wanted (packageName package) ||
                 -- Disabling haddocks when old config had haddocks doesn't make dirty.
@@ -772,16 +776,16 @@ describeConfigDiff config old new
     pkgSrcName CacheSrcUpstream = "upstream source"
 
 psForceDirty :: PackageSource -> Bool
-psForceDirty (PSLocal lp) = lpForceDirty lp
-psForceDirty PSUpstream{} = False
+psForceDirty (PSFiles lp _) = lpForceDirty lp
+psForceDirty PSIndex{} = False
 
 psDirty :: PackageSource -> Maybe (Set FilePath)
-psDirty (PSLocal lp) = lpDirtyFiles lp
-psDirty PSUpstream{} = Nothing -- files never change in an upstream package
+psDirty (PSFiles lp _) = lpDirtyFiles lp
+psDirty PSIndex{} = Nothing -- files never change in an upstream package
 
 psLocal :: PackageSource -> Bool
-psLocal (PSLocal _) = True
-psLocal PSUpstream{} = False
+psLocal (PSFiles _ loc) = loc == Local -- FIXME this is probably not the right logic, see configureOptsNoDir. We probably want to check if this appears in packages:
+psLocal PSIndex{} = False
 
 -- | Get all of the dependencies for a given package, including guessed build
 -- tool dependencies.
@@ -790,58 +794,49 @@ packageDepsWithTools p = do
     ctx <- ask
     -- TODO: it would be cool to defer these warnings until there's an
     -- actual issue building the package.
-    let toEither (Cabal.Dependency (Cabal.PackageName name) _) mp =
+    let toEither name mp =
             case Map.toList mp of
-                [] -> Left (NoToolFound name (packageName p))
+                [] -> Left (ToolWarning name (packageName p) Nothing)
                 [_] -> Right mp
-                xs -> Left (AmbiguousToolsFound name (packageName p) (map fst xs))
+                ((x, _):(y, _):zs) ->
+                  Left (ToolWarning name (packageName p) (Just (x, y, map fst zs)))
         (warnings0, toolDeps) =
              partitionEithers $
-             map (\dep -> toEither dep (toolToPackages ctx dep)) (packageTools p)
+             map (\dep -> toEither dep (toolToPackages ctx dep)) (Map.keys (packageTools p))
     -- Check whether the tool is on the PATH before warning about it.
-    warnings <- fmap catMaybes $ forM warnings0 $ \warning -> do
-        let toolName = case warning of
-                NoToolFound tool _ -> tool
-                AmbiguousToolsFound tool _ _ -> tool
+    warnings <- fmap catMaybes $ forM warnings0 $ \warning@(ToolWarning (ExeName toolName) _ _) -> do
         config <- view configL
         menv <- liftIO $ configEnvOverride config minimalEnvSettings { esIncludeLocals = True }
-        mfound <- findExecutable menv toolName
+        mfound <- findExecutable menv $ T.unpack toolName
         case mfound of
             Nothing -> return (Just warning)
             Just _ -> return Nothing
     tell mempty { wWarnings = (map toolWarningText warnings ++) }
-    when (any isNoToolFound warnings) $ do
-        let msg = T.unlines
-                [ "Missing build-tools may be caused by dependencies of the build-tool being overridden by extra-deps."
-                , "This should be fixed soon - see this issue https://github.com/commercialhaskell/stack/issues/595"
-                ]
-        tell mempty { wWarnings = (msg:) }
     return $ Map.unionsWith intersectVersionRanges
            $ packageDeps p
            : toolDeps
 
-data ToolWarning
-    = NoToolFound String PackageName
-    | AmbiguousToolsFound String PackageName [PackageName]
-
-isNoToolFound :: ToolWarning -> Bool
-isNoToolFound NoToolFound{} = True
-isNoToolFound _ = False
+-- | Warn about tools in the snapshot definition. States the tool name
+-- expected, the package name using it, and found packages. If the
+-- last value is Nothing, it means the tool was not found
+-- anywhere. For a Just value, it was found in at least two packages.
+data ToolWarning = ToolWarning ExeName PackageName (Maybe (PackageName, PackageName, [PackageName]))
+  deriving Show
 
 toolWarningText :: ToolWarning -> Text
-toolWarningText (NoToolFound toolName pkgName) =
+toolWarningText (ToolWarning (ExeName toolName) pkgName Nothing) =
     "No packages found in snapshot which provide a " <>
     T.pack (show toolName) <>
     " executable, which is a build-tool dependency of " <>
     T.pack (show (packageNameString pkgName))
-toolWarningText (AmbiguousToolsFound toolName pkgName options) =
+toolWarningText (ToolWarning (ExeName toolName) pkgName (Just (option1, option2, options))) =
     "Multiple packages found in snapshot which provide a " <>
     T.pack (show toolName) <>
     " exeuctable, which is a build-tool dependency of " <>
     T.pack (show (packageNameString pkgName)) <>
     ", so none will be installed.\n" <>
     "Here's the list of packages which provide it: " <>
-    T.intercalate ", " (map packageNameText options) <>
+    T.intercalate ", " (map packageNameText (option1:option2:options)) <>
     "\nSince there's no good way to choose, you may need to install it manually."
 
 -- | Strip out anything from the @Plan@ intended for the local database
@@ -853,11 +848,7 @@ stripLocals plan = plan
     , planInstallExes = Map.filter (/= Local) $ planInstallExes plan
     }
   where
-    checkTask task =
-        case taskType task of
-            TTLocal _ -> False
-            TTUpstream _ Local _ -> False
-            TTUpstream _ Snap _ -> True
+    checkTask task = taskLocation task == Snap
 
 stripNonDeps :: Set PackageName -> Plan -> Plan
 stripNonDeps deps plan = plan

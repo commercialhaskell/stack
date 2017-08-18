@@ -34,32 +34,27 @@ module Stack.Build.Cache
 
 import           Stack.Prelude
 import           Crypto.Hash (hashWith, SHA256(..))
-import           Data.Binary (Binary (..))
-import qualified Data.Binary as Binary
-import           Data.Binary.Tagged (HasStructuralInfo, HasSemanticVersion)
-import qualified Data.Binary.Tagged as BinaryTagged
 import qualified Data.ByteArray as Mem (convert)
-import qualified Data.ByteArray.Encoding as Mem (convertToBase, Base(Base16))
 import qualified Data.ByteString.Base64.URL as B64URL
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as S8
-import qualified Data.ByteString.Lazy as LBS
 import qualified Data.Map as M
 import qualified Data.Set as Set
 import qualified Data.Store as Store
 import           Data.Store.VersionTagged
 import qualified Data.Text as T
+import qualified Data.Text.Encoding as TE
 import           Path
 import           Path.IO
 import           Stack.Constants.Config
 import           Stack.Types.Build
+import           Stack.Types.BuildPlan
 import           Stack.Types.Compiler
 import           Stack.Types.Config
 import           Stack.Types.GhcPkgId
 import           Stack.Types.Package
 import           Stack.Types.PackageIdentifier
 import           Stack.Types.Version
-import qualified System.FilePath as FilePath
 
 -- | Directory containing files to mark an executable as installed
 exeInstalledDir :: (MonadReader env m, HasEnvConfig env, MonadThrow m)
@@ -233,53 +228,70 @@ checkTestSuccess dir =
 -- We only pay attention to non-directory options. We don't want to avoid a
 -- cache hit just because it was installed in a different directory.
 precompiledCacheFile :: (MonadThrow m, MonadReader env m, HasEnvConfig env, MonadLogger m)
-                     => PackageIdentifier
+                     => PackageLocationIndex FilePath
                      -> ConfigureOpts
                      -> Set GhcPkgId -- ^ dependencies
-                     -> m (Path Abs File, m (Path Abs File))
-precompiledCacheFile pkgident copts installedPackageIDs = do
-    ec <- view envConfigL
+                     -> m (Maybe (Path Abs File))
+precompiledCacheFile loc copts installedPackageIDs = do
+  ec <- view envConfigL
 
-    compiler <- view actualCompilerVersionL >>= parseRelDir . compilerVersionString
-    cabal <- view cabalVersionL >>= parseRelDir . versionString
-    pkg <- parseRelDir $ packageIdentifierString pkgident
+  compiler <- view actualCompilerVersionL >>= parseRelDir . compilerVersionString
+  cabal <- view cabalVersionL >>= parseRelDir . versionString
+  let mpkgRaw =
+        -- The goal here is to come up with a string representing the
+        -- package location which is unique. For archives and repos,
+        -- we rely upon cryptographic hashes paired with
+        -- subdirectories to identify this specific package version.
+        case loc of
+          PLIndex pir -> Just $ packageIdentifierRevisionString pir
+          PLOther other -> case other of
+            PLFilePath _ -> assert False Nothing -- no PLFilePaths should end up in a snapshot
+            PLArchive a -> fmap
+              (\h -> T.unpack (staticSHA256ToText h) ++ archiveSubdirs a)
+              (archiveHash a)
+            PLRepo r -> Just $ T.unpack (repoCommit r) ++ repoSubdirs r
+
+  forM mpkgRaw $ \pkgRaw -> do
+    pkg <-
+      case parseRelDir pkgRaw of
+        Just x -> return x
+        Nothing -> parseRelDir
+                 $ T.unpack
+                 $ TE.decodeUtf8
+                 $ B64URL.encode
+                 $ TE.encodeUtf8
+                 $ T.pack pkgRaw
     platformRelDir <- platformGhcRelDir
-
-    let input = (coNoDirs copts, installedPackageIDs)
 
     -- In Cabal versions 1.22 and later, the configure options contain the
     -- installed package IDs, which is what we need for a unique hash.
     -- Unfortunately, earlier Cabals don't have the information, so we must
     -- supplement it with the installed package IDs directly.
     -- See issue: https://github.com/commercialhaskell/stack/issues/1103
-    let oldHash = Mem.convertToBase Mem.Base16 $ hashWith SHA256 $ LBS.toStrict $
-            if view cabalVersionL ec >= $(mkVersion "1.22")
-                then Binary.encode (coNoDirs copts)
-                else Binary.encode input
-        hashToPath hash = do
-            hashPath <- parseRelFile $ S8.unpack hash
-            return $ view stackRootL ec
-                 </> $(mkRelDir "precompiled")
-                 </> platformRelDir
-                 </> compiler
-                 </> cabal
-                 </> pkg
-                 </> hashPath
+    let input = (coNoDirs copts, installedPackageIDs)
+    hashPath <- parseRelFile $ S8.unpack $ B64URL.encode
+              $ Mem.convert $ hashWith SHA256 $ Store.encode input
 
-    newPath <- hashToPath $ B64URL.encode $ Mem.convert $ hashWith SHA256 $ Store.encode input
-    return (newPath, hashToPath oldHash)
+    return $ view stackRootL ec
+         </> $(mkRelDir "precompiled")
+         </> platformRelDir
+         </> compiler
+         </> cabal
+         </> pkg
+         </> hashPath
 
 -- | Write out information about a newly built package
 writePrecompiledCache :: (MonadThrow m, MonadReader env m, HasEnvConfig env, MonadIO m, MonadLogger m)
                       => BaseConfigOpts
-                      -> PackageIdentifier
+                      -> PackageLocationIndex FilePath
                       -> ConfigureOpts
                       -> Set GhcPkgId -- ^ dependencies
                       -> Installed -- ^ library
                       -> Set Text -- ^ executables
                       -> m ()
-writePrecompiledCache baseConfigOpts pkgident copts depIDs mghcPkgId exes = do
-    (file, _) <- precompiledCacheFile pkgident copts depIDs
+writePrecompiledCache baseConfigOpts loc copts depIDs mghcPkgId exes = do
+  mfile <- precompiledCacheFile loc copts depIDs
+  forM_ mfile $ \file -> do
     ensureDir (parent file)
     ec <- view envConfigL
     let stackRootRelative = makeRelative (view stackRootL ec)
@@ -302,45 +314,10 @@ writePrecompiledCache baseConfigOpts pkgident copts depIDs mghcPkgId exes = do
 -- | Check the cache for a precompiled package matching the given
 -- configuration.
 readPrecompiledCache :: (MonadThrow m, MonadReader env m, HasEnvConfig env, MonadUnliftIO m, MonadLogger m)
-                     => PackageIdentifier -- ^ target package
+                     => PackageLocationIndex FilePath -- ^ target package
                      -> ConfigureOpts
                      -> Set GhcPkgId -- ^ dependencies
                      -> m (Maybe PrecompiledCache)
-readPrecompiledCache pkgident copts depIDs = do
-    ec <- view envConfigL
-    let toAbsPath path = do
-          if FilePath.isAbsolute path
-              then path -- Only older version store absolute path
-              else toFilePath (view stackRootL ec) FilePath.</> path
-    let toAbsPC pc =
-            PrecompiledCache
-                  { pcLibrary = fmap toAbsPath (pcLibrary pc)
-                  , pcExes = map toAbsPath (pcExes pc)
-                  }
-
-    (file, getOldFile) <- precompiledCacheFile pkgident copts depIDs
-    mres <- $(versionedDecodeFile precompiledCacheVC) file
-    case mres of
-        Just res -> return (Just $ toAbsPC res)
-        Nothing -> do
-            -- Fallback on trying the old binary format.
-            oldFile <- getOldFile
-            mpc <- fmap toAbsPC <$> binaryDecodeFileOrFailDeep oldFile
-            -- Write out file in new format. Keep old file around for
-            -- the benefit of older stack versions.
-            forM_ mpc ($(versionedEncodeFile precompiledCacheVC) file)
-            return mpc
-
--- | Ensure that there are no lurking exceptions deep inside the parsed
--- value... because that happens unfortunately. See
--- https://github.com/commercialhaskell/stack/issues/554
-binaryDecodeFileOrFailDeep :: (BinarySchema a, MonadIO m)
-                           => Path loc File
-                           -> m (Maybe a)
-binaryDecodeFileOrFailDeep fp = liftIO $ fmap (either (const Nothing) id) $ tryAnyDeep $ do
-    eres <- BinaryTagged.taggedDecodeFileOrFail (toFilePath fp)
-    case eres of
-        Left _ -> return Nothing
-        Right x -> return (Just x)
-
-type BinarySchema a = (Binary a, NFData a, HasStructuralInfo a, HasSemanticVersion a)
+readPrecompiledCache loc copts depIDs =
+    precompiledCacheFile loc copts depIDs >>=
+    maybe (return Nothing) $(versionedDecodeFile precompiledCacheVC)

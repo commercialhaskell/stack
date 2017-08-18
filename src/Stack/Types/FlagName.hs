@@ -24,8 +24,7 @@ module Stack.Types.FlagName
 
 import           Stack.Prelude
 import           Data.Aeson.Extended
-import           Data.Attoparsec.Combinators
-import           Data.Attoparsec.Text
+import           Data.Attoparsec.Text as A
 import           Data.Char (isLetter, isDigit, toLower)
 import qualified Data.Text as T
 import qualified Distribution.PackageDescription as Cabal
@@ -72,13 +71,10 @@ instance FromJSONKey FlagName where
 
 -- | Attoparsec parser for a flag name
 flagNameParser :: Parser FlagName
-flagNameParser =
-  fmap (FlagName . T.pack)
-       (appending (many1 (satisfy isLetter))
-                  (concating (many (alternating
-                                      (pured (satisfy isAlphaNum))
-                                      (appending (pured (satisfy separator))
-                                                 (pured (satisfy isAlphaNum)))))))
+flagNameParser = fmap FlagName $ do
+  t <- A.takeWhile1 (\c -> isAlphaNum c || separator c)
+  when (T.head t == '-') $ fail "flag name cannot start with dash"
+  return t
   where separator c = c == '-' || c == '_'
         isAlphaNum c = isLetter c || isDigit c
 
@@ -111,12 +107,12 @@ flagNameText (FlagName n) = n
 
 -- | Convert from a Cabal flag name.
 fromCabalFlagName :: Cabal.FlagName -> FlagName
-fromCabalFlagName (Cabal.FlagName name) =
-  let !x = T.pack name
+fromCabalFlagName name =
+  let !x = T.pack $ Cabal.unFlagName name
   in FlagName x
 
 -- | Convert to a Cabal flag name.
 toCabalFlagName :: FlagName -> Cabal.FlagName
 toCabalFlagName (FlagName name) =
   let !x = T.unpack name
-  in Cabal.FlagName x
+  in Cabal.mkFlagName x

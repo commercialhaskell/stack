@@ -31,6 +31,25 @@ There are two ways to speed up the initial startup of ghci:
 * `--no-load`, to skip loading all defined modules into ghci.  You can then
   directly use `:load MyModule` to load a specific module in your project.
 
+## Loading just the main module
+
+By default, `stack ghci` loads and imports all of the modules in the package.
+This allows you to easily use anything exported by your package.  This is
+usually quite convenient, but in some cases it makes sense to only load one
+module, or no modules at all.  The `--only-main` flag allows this.  It specifies
+that only the main module will be loaded, if any.  This is particularly useful
+in the following circumstances:
+
+1. You're loading the project in order to run it in ghci (e.g. via `main`), and
+   you intend to reload while developing.  Without the `--only-main` flag, you
+   will need to quit and restart ghci whenever a module gets deleted.  With the
+   flag, reloading should work fine in this case.
+
+2. If many of your modules have exports named the same thing, then you'll need to
+   refer to them using qualified names.  To avoid this, it may be easier to use
+   `--only-main` to start with a blank slate and just import the modules you are
+   interested in.
+
 ## Loading a filepath directly
 
 Instead of the `TARGET` syntax, it is also possible to directly run

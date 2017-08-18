@@ -45,6 +45,7 @@ module Stack.Config
   ,defaultConfigYaml
   ,getProjectConfig
   ,LocalConfigStatus(..)
+  ,getNamedComponents
   ) where
 
 import           Control.Monad.Extra (firstJustM)
@@ -58,9 +59,10 @@ import qualified Data.Text as T
 import           Data.Text.Encoding (encodeUtf8)
 import qualified Data.Yaml as Yaml
 import qualified Distribution.PackageDescription as C
+import qualified Distribution.Types.UnqualComponentName as C
 import           Distribution.System (OS (..), Platform (..), buildPlatform, Arch(OtherArch))
 import qualified Distribution.Text
-import           Distribution.Version (simplifyVersionRange)
+import           Distribution.Version (simplifyVersionRange, mkVersion')
 import           GHC.Conc (getNumProcessors)
 import           Lens.Micro (lens)
 import           Network.HTTP.Client (parseUrlThrow)
@@ -358,7 +360,8 @@ configFromConfigMonoid
 
      let configTemplateParams = configMonoidTemplateParameters
          configScmInit = getFirst configMonoidScmInit
-         configGhcOptions = configMonoidGhcOptions
+         configGhcOptionsByName = configMonoidGhcOptionsByName
+         configGhcOptionsByCat = configMonoidGhcOptionsByCat
          configSetupInfoLocations = configMonoidSetupInfoLocations
          configPvpBounds = fromFirst (PvpBounds PvpBoundsNone False) configMonoidPvpBounds
          configModifyCodePage = fromFirst True configMonoidModifyCodePage
@@ -471,7 +474,7 @@ loadConfigMaybeProject configArgs mresolver mproject = do
           LCSNoConfig _ -> configNoLocalConfig stackRoot mresolver configArgs
           LCSProject project -> loadHelper $ Just project
           LCSNoProject -> loadHelper Nothing
-    unless (fromCabalVersion Meta.version `withinRange` configRequireStackVersion config)
+    unless (fromCabalVersion (mkVersion' Meta.version) `withinRange` configRequireStackVersion config)
         (throwM (BadStackVersionException (configRequireStackVersion config)))
 
     let mprojectRoot = fmap (\(_, fp, _) -> parent fp) mproject
@@ -696,18 +699,19 @@ getLocalPackages = do
               { lpProject = Map.fromList packages
               , lpDependencies = Map.fromList deps
               }
+
+getNamedComponents :: C.GenericPackageDescription -> Set NamedComponent
+getNamedComponents gpkg = Set.fromList $ concat
+    [ maybe []  (const [CLib]) (C.condLibrary gpkg)
+    , go CExe   (map fst . C.condExecutables)
+    , go CTest  (map fst . C.condTestSuites)
+    , go CBench (map fst . C.condBenchmarks)
+    ]
   where
-    getNamedComponents gpkg = Set.fromList $ concat
-        [ maybe []  (const [CLib]) (C.condLibrary gpkg)
-        , go CExe   (map fst . C.condExecutables)
-        , go CTest  (map fst . C.condTestSuites)
-        , go CBench (map fst . C.condBenchmarks)
-        ]
-      where
-        go :: (T.Text -> NamedComponent)
-           -> (C.GenericPackageDescription -> [String])
-           -> [NamedComponent]
-        go wrapper f = map (wrapper . T.pack) $ f gpkg
+    go :: (T.Text -> NamedComponent)
+       -> (C.GenericPackageDescription -> [C.UnqualComponentName])
+       -> [NamedComponent]
+    go wrapper f = map (wrapper . T.pack . C.unUnqualComponentName) $ f gpkg
 
 -- | Check if there are any duplicate package names and, if so, throw an
 -- exception.

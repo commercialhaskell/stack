@@ -21,11 +21,10 @@ import           Data.Text.Encoding (encodeUtf8, decodeUtf8)
 import           Distribution.InstalledPackageInfo (PError)
 import           Distribution.License (License)
 import           Distribution.ModuleName (ModuleName)
-import           Distribution.Package hiding (Package,PackageName,packageName,packageVersion,PackageIdentifier)
 import           Distribution.PackageDescription (TestSuiteInterface, BuildType)
 import           Distribution.System (Platform (..))
 import           Path as FL
-import           Stack.Types.BuildPlan (PackageLocationIndex)
+import           Stack.Types.BuildPlan (PackageLocation, PackageLocationIndex (..), ExeName)
 import           Stack.Types.Compiler
 import           Stack.Types.Config
 import           Stack.Types.FlagName
@@ -77,7 +76,7 @@ data Package =
           ,packageLicense :: !License                     -- ^ The license the package was released under.
           ,packageFiles :: !GetPackageFiles               -- ^ Get all files of the package.
           ,packageDeps :: !(Map PackageName VersionRange) -- ^ Packages that the package depends on.
-          ,packageTools :: ![Dependency]                  -- ^ A build tool name.
+          ,packageTools :: !(Map ExeName VersionRange)    -- ^ A build tool name.
           ,packageAllDeps :: !(Set PackageName)           -- ^ Original dependencies (not sieved).
           ,packageGhcOptions :: ![Text]                   -- ^ Ghc options used on package.
           ,packageFlags :: !(Map FlagName Bool)           -- ^ Flags used on package.
@@ -184,19 +183,24 @@ type SourceMap = Map PackageName PackageSource
 
 -- | Where the package's source is located: local directory or package index
 data PackageSource
-    = PSLocal LocalPackage
-    | PSUpstream Version InstallLocation (Map FlagName Bool) [Text] (PackageLocationIndex FilePath) -- FIXME still seems like we could do better... Minimum: rename from Upstream to Dependency and Local to Project
-    -- ^ Upstream packages could be installed in either local or snapshot
-    -- databases; this is what 'InstallLocation' specifies.
+  = PSFiles LocalPackage InstallLocation
+  -- ^ Package which exist on the filesystem (as opposed to an index tarball)
+  | PSIndex InstallLocation (Map FlagName Bool) [Text] PackageIdentifierRevision
+  -- ^ Package which is in an index, and the files do not exist on the
+  -- filesystem yet.
     deriving Show
 
 piiVersion :: PackageSource -> Version
-piiVersion (PSLocal lp) = packageVersion $ lpPackage lp
-piiVersion (PSUpstream v _ _ _ _) = v
+piiVersion (PSFiles lp _) = packageVersion $ lpPackage lp
+piiVersion (PSIndex _ _ _ (PackageIdentifierRevision (PackageIdentifier _ v) _)) = v
 
 piiLocation :: PackageSource -> InstallLocation
-piiLocation (PSLocal _) = Local
-piiLocation (PSUpstream _ loc _ _ _) = loc
+piiLocation (PSFiles _ loc) = loc
+piiLocation (PSIndex loc _ _ _) = loc
+
+piiPackageLocation :: PackageSource -> PackageLocationIndex FilePath
+piiPackageLocation (PSFiles lp _) = PLOther (lpLocation lp)
+piiPackageLocation (PSIndex _ _ _ pir) = PLIndex pir
 
 -- | Information on a locally available package of source code
 data LocalPackage = LocalPackage
@@ -208,7 +212,7 @@ data LocalPackage = LocalPackage
     , lpUnbuildable   :: !(Set NamedComponent)
     -- ^ Components explicitly requested for build, that are marked
     -- "buildable: false".
-    , lpWanted        :: !Bool
+    , lpWanted        :: !Bool -- FIXME Should completely drop this "wanted" terminology, it's unclear
     -- ^ Whether this package is wanted as a target.
     , lpTestDeps      :: !(Map PackageName VersionRange)
     -- ^ Used for determining if we can use --enable-tests in a normal build.
@@ -231,6 +235,8 @@ data LocalPackage = LocalPackage
     -- ^ current state of the files
     , lpFiles         :: !(Set (Path Abs File))
     -- ^ all files used by this package
+    , lpLocation      :: !(PackageLocation FilePath)
+    -- ^ Where this source code came from
     }
     deriving Show
 

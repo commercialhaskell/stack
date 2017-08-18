@@ -522,16 +522,12 @@ parseTargets needTargets boptscli = do
         (bcFlags bconfig)
       hides = Map.empty -- not supported to add hidden packages
 
-      -- We set this to empty here, which will prevent the call to
-      -- calculatePackagePromotion from promoting packages based on
-      -- changed GHC options. This is probably not ideal behavior,
-      -- but is consistent with pre-extensible-snapshots behavior of
-      -- Stack. We can consider modifying this instead.
+      -- We promote packages to the local database if the GHC options
+      -- are added to them by name. See:
+      -- https://github.com/commercialhaskell/stack/issues/849#issuecomment-320892095.
       --
-      -- Nonetheless, GHC options will be calculated later based on
-      -- config file and command line parameters, so we're not
-      -- actually losing them.
-      options = Map.empty
+      -- GHC options applied to all packages are handled by getGhcOptions.
+      options = configGhcOptionsByName (bcConfig bconfig)
 
       drops = Set.empty -- not supported to add drops
 

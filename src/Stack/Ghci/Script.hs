@@ -6,7 +6,6 @@ module Stack.Ghci.Script
   , ModuleName
 
   , cmdAdd
-  , cmdAddFile
   , cmdCdGhc
   , cmdModule
 
@@ -33,17 +32,13 @@ instance Monoid GhciScript where
   (GhciScript xs) `mappend` (GhciScript ys) = GhciScript (ys <> xs)
 
 data GhciCommand
-  = Add (Set ModuleName)
-  | AddFile (Path Abs File)
+  = Add (Set (Either ModuleName (Path Abs File)))
   | CdGhc (Path Abs Dir)
   | Module (Set ModuleName)
   deriving (Show)
 
-cmdAdd :: Set ModuleName -> GhciScript
+cmdAdd :: Set (Either ModuleName (Path Abs File)) -> GhciScript
 cmdAdd = GhciScript . (:[]) . Add
-
-cmdAddFile :: Path Abs File -> GhciScript
-cmdAddFile = GhciScript . (:[]) . AddFile
 
 cmdCdGhc :: Path Abs Dir -> GhciScript
 cmdCdGhc = GhciScript . (:[]) . CdGhc
@@ -79,12 +74,10 @@ commandToBuilder (Add modules)
   | S.null modules = mempty
   | otherwise      =
        fromText ":add "
-    <> mconcat (intersperse (fromText " ")
-        $ (stringUtf8 . quoteFileName . mconcat . intersperse "." . components) <$> S.toAscList modules)
+    <> mconcat (intersperse (fromText " ") $
+         fmap (stringUtf8 . quoteFileName . either (mconcat . intersperse "." . components) toFilePath)
+              (S.toAscList modules))
     <> fromText "\n"
-
-commandToBuilder (AddFile path) =
-  fromText ":add " <> stringUtf8 (quoteFileName (toFilePath path)) <> fromText "\n"
 
 commandToBuilder (CdGhc path) =
   fromText ":cd-ghc " <> stringUtf8 (quoteFileName (toFilePath path)) <> fromText "\n"

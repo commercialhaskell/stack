@@ -33,7 +33,7 @@ module Stack.Package
   ,buildLogPath
   ,PackageException (..)
   ,resolvePackageDescription
-  ,packageToolDependencies
+  ,packageDescTools
   ,packageDependencies
   ,autogenDir
   ,checkCabalFileName
@@ -51,7 +51,6 @@ import qualified Data.Set as S
 import qualified Data.Text as T
 import           Data.Text.Encoding (decodeUtf8, decodeUtf8With)
 import           Data.Text.Encoding.Error (lenientDecode)
-import           Data.Version (showVersion)
 import           Distribution.Compiler
 import           Distribution.ModuleName (ModuleName)
 import qualified Distribution.ModuleName as Cabal
@@ -65,7 +64,12 @@ import           Distribution.ParseUtils
 import           Distribution.Simple.Utils
 import           Distribution.System (OS (..), Arch, Platform (..))
 import qualified Distribution.Text as D
+import qualified Distribution.Types.CondTree as Cabal
+import qualified Distribution.Types.ExeDependency as Cabal
+import qualified Distribution.Types.LegacyExeDependency as Cabal
+import qualified Distribution.Types.UnqualComponentName as Cabal
 import qualified Distribution.Verbosity as D
+import           Distribution.Version (showVersion)
 import qualified Hpack
 import qualified Hpack.Config as Hpack
 import           Path as FL
@@ -78,7 +82,7 @@ import           Stack.Constants.Config
 import           Stack.Prelude
 import           Stack.PrettyPrint
 import           Stack.Types.Build
-import           Stack.Types.BuildPlan (PackageLocationIndex (..), PackageLocation (..))
+import           Stack.Types.BuildPlan (PackageLocationIndex (..), PackageLocation (..), ExeName (..))
 import           Stack.Types.Compiler
 import           Stack.Types.Config
 import           Stack.Types.FlagName
@@ -116,7 +120,7 @@ readPackageUnresolvedBS source bs =
 rawParseGPD :: BS.ByteString
             -> Either PError ([PWarning], GenericPackageDescription)
 rawParseGPD bs =
-    case parsePackageDescription chars of
+    case parseGenericPackageDescription chars of
        ParseFailed per -> Left per
        ParseOk warnings gpkg -> Right (warnings,gpkg)
   where
@@ -225,13 +229,20 @@ packageFromPackageDescription packageConfig pkgFlags pkg =
     , packageAllDeps = S.fromList (M.keys deps)
     , packageHasLibrary = maybe False (buildable . libBuildInfo) (library pkg)
     , packageTests = M.fromList
-      [(T.pack (testName t), testInterface t) | t <- testSuites pkg
-                                              , buildable (testBuildInfo t)]
+      [(T.pack (Cabal.unUnqualComponentName $ testName t), testInterface t) | t <- testSuites pkg]
+        -- FIXME: Previously, we only included buildable components
+        -- here. Since Cabal 2.0, this ended up disabling test running
+        -- in all cases. Need to investigate if that's a change in
+        -- Cabal behavior or how we're piping data through the system
+        -- in response to Cabal data type changes. A cleanup of the
+        -- PackageConfig datatype (which will probably happen for
+        -- componentized builds) will likely make all of this clearer.
     , packageBenchmarks = S.fromList
-      [T.pack (benchmarkName biBuildInfo) | biBuildInfo <- benchmarks pkg
-                                          , buildable (benchmarkBuildInfo biBuildInfo)]
+      [T.pack (Cabal.unUnqualComponentName $ benchmarkName biBuildInfo) | biBuildInfo <- benchmarks pkg]
+        -- Same comment about buildable applies here too.
     , packageExes = S.fromList
-      [T.pack (exeName biBuildInfo) | biBuildInfo <- executables pkg
+      [T.pack (Cabal.unUnqualComponentName $ exeName biBuildInfo)
+        | biBuildInfo <- executables pkg
                                     , buildable (buildInfo biBuildInfo)]
     -- This is an action used to collect info needed for "stack ghci".
     -- This info isn't usually needed, so computation of it is deferred.
@@ -338,19 +349,19 @@ generatePkgDescOpts sourceMap installedMap omitPkgs addPkgs cabalfp pkg componen
                    , fmap
                          (\exe ->
                                generate
-                                    (CExe (T.pack (exeName exe)))
+                                    (CExe (T.pack (Cabal.unUnqualComponentName (exeName exe))))
                                     (buildInfo exe))
                          (executables pkg)
                    , fmap
                          (\bench ->
                                generate
-                                    (CBench (T.pack (benchmarkName bench)))
+                                    (CBench (T.pack (Cabal.unUnqualComponentName (benchmarkName bench))))
                                     (benchmarkBuildInfo bench))
                          (benchmarks pkg)
                    , fmap
                          (\test ->
                                generate
-                                    (CTest (T.pack (testName test)))
+                                    (CTest (T.pack (Cabal.unUnqualComponentName (testName test))))
                                     (testBuildInfo test))
                          (testSuites pkg)]))
   where
@@ -524,39 +535,24 @@ packageDependencies :: PackageDescription -> Map PackageName VersionRange
 packageDependencies pkg =
   M.fromListWith intersectVersionRanges $
   map (depName &&& depRange) $
-  concatMap targetBuildDepends (allBuildInfo' pkg) ++
+  concatMap targetBuildDepends (allBuildInfo pkg) ++
   maybe [] setupDepends (setupBuildInfo pkg)
 
--- | Get all build tool dependencies of the package (buildable targets only).
-packageToolDependencies :: PackageDescription -> Map Text VersionRange
-packageToolDependencies =
-  M.fromList .
-  concatMap (fmap (packageNameText . depName &&& depRange) .
-             buildTools) .
-  allBuildInfo'
-
 -- | Get all dependencies of the package (buildable targets only).
-packageDescTools :: PackageDescription -> [Dependency]
-packageDescTools = concatMap buildTools . allBuildInfo'
+--
+-- This uses both the new 'buildToolDepends' and old 'buildTools'
+-- information.
+packageDescTools :: PackageDescription -> Map ExeName VersionRange
+packageDescTools =
+  M.fromList . concatMap tools . allBuildInfo
+  where
+    tools bi = map go1 (buildTools bi) ++ map go2 (buildToolDepends bi)
 
--- | This is a copy-paste from Cabal's @allBuildInfo@ function, but with the
--- @buildable@ test removed. The implementation is broken.
--- See: https://github.com/haskell/cabal/issues/1725
-allBuildInfo' :: PackageDescription -> [BuildInfo]
-allBuildInfo' pkg_descr = [ bi | Just lib <- [library pkg_descr]
-                              , let bi = libBuildInfo lib
-                              , True || buildable bi ]
-                      ++ [ bi | exe <- executables pkg_descr
-                              , let bi = buildInfo exe
-                              , True || buildable bi ]
-                      ++ [ bi | tst <- testSuites pkg_descr
-                              , let bi = testBuildInfo tst
-                              , True || buildable bi
-                              , testEnabled tst ]
-                      ++ [ bi | tst <- benchmarks pkg_descr
-                              , let bi = benchmarkBuildInfo tst
-                              , True || buildable bi
-                              , benchmarkEnabled tst ]
+    go1 :: Cabal.LegacyExeDependency -> (ExeName, VersionRange)
+    go1 (Cabal.LegacyExeDependency name range) = (ExeName $ T.pack name, range)
+
+    go2 :: Cabal.ExeDependency -> (ExeName, VersionRange)
+    go2 (Cabal.ExeDependency _pkg name range) = (ExeName $ T.pack $ Cabal.unUnqualComponentName name, range)
 
 -- | Get all files referenced by the package.
 packageDescModulesAndFiles
@@ -596,9 +592,9 @@ packageDescModulesAndFiles pkg = do
     return (modules, files, dfiles, warnings)
   where
     libComponent = const CLib
-    exeComponent = CExe . T.pack . exeName
-    testComponent = CTest . T.pack . testName
-    benchComponent = CBench . T.pack . benchmarkName
+    exeComponent = CExe . T.pack . Cabal.unUnqualComponentName . exeName
+    testComponent = CTest . T.pack . Cabal.unUnqualComponentName . testName
+    benchComponent = CBench . T.pack . Cabal.unUnqualComponentName . benchmarkName
     asModuleAndFileMap label f lib = do
         (a,b,c) <- f lib
         return (M.singleton (label lib) a, M.singleton (label lib) b, c)
@@ -651,7 +647,7 @@ resolveGlobFiles =
 --
 matchDirFileGlob_ :: (MonadLogger m, MonadIO m) => String -> String -> m [String]
 matchDirFileGlob_ dir filepath = case parseFileGlob filepath of
-  Nothing -> liftIO $ die $
+  Nothing -> liftIO $ throwString $
       "invalid file glob '" ++ filepath
       ++ "'. Wildcards '*' are only allowed in place of the file"
       ++ " name, not in the directory name or file extension."
@@ -681,7 +677,7 @@ benchmarkFiles bench = do
     dir <- asks (parent . fst)
     (modules,files,warnings) <-
         resolveFilesAndDeps
-            (Just $ benchmarkName bench)
+            (Just $ Cabal.unUnqualComponentName $ benchmarkName bench)
             (dirs ++ [dir])
             (bnames <> exposed)
             haskellModuleExts
@@ -705,7 +701,7 @@ testFiles test = do
     dir <- asks (parent . fst)
     (modules,files,warnings) <-
         resolveFilesAndDeps
-            (Just $ testName test)
+            (Just $ Cabal.unUnqualComponentName $ testName test)
             (dirs ++ [dir])
             (bnames <> exposed)
             haskellModuleExts
@@ -730,7 +726,7 @@ executableFiles exe = do
     dir <- asks (parent . fst)
     (modules,files,warnings) <-
         resolveFilesAndDeps
-            (Just $ exeName exe)
+            (Just $ Cabal.unUnqualComponentName $ exeName exe)
             (dirs ++ [dir])
             (map DotCabalModule (otherModules build) ++
              [DotCabalMain (modulePath exe)])
@@ -782,7 +778,7 @@ targetJsSources = jsSources
 resolvePackageDescription :: PackageConfig
                           -> GenericPackageDescription
                           -> PackageDescription
-resolvePackageDescription packageConfig (GenericPackageDescription desc defaultFlags mlib exes tests benches) =
+resolvePackageDescription packageConfig (GenericPackageDescription desc defaultFlags mlib _subLibs _foreignLibs exes tests benches) =
   desc {library =
           fmap (resolveConditions rc updateLibDeps) mlib
        ,executables =
@@ -809,14 +805,32 @@ resolvePackageDescription packageConfig (GenericPackageDescription desc defaultF
         updateExeDeps exe deps =
           exe {buildInfo =
                  (buildInfo exe) {targetBuildDepends = deps}}
+
+        -- Note that, prior to moving to Cabal 2.0, we would set
+        -- testEnabled/benchmarkEnabled here. These fields no longer
+        -- exist, so we modify buildable instead here.  The only
+        -- wrinkle in the Cabal 2.0 story is
+        -- https://github.com/haskell/cabal/issues/1725, where older
+        -- versions of Cabal (which may be used for actually building
+        -- code) don't properly exclude build-depends for
+        -- non-buildable components. Testing indicates that everything
+        -- is working fine, and that this comment can be completely
+        -- ignored. I'm leaving the comment anyway in case something
+        -- breaks and you, poor reader, are investigating.
         updateTestDeps test deps =
-          test {testBuildInfo =
-                  (testBuildInfo test) {targetBuildDepends = deps}
-               ,testEnabled = packageConfigEnableTests packageConfig}
+          let bi = testBuildInfo test
+              bi' = bi
+                { targetBuildDepends = deps
+                , buildable = buildable bi && packageConfigEnableTests packageConfig
+                }
+           in test { testBuildInfo = bi' }
         updateBenchmarkDeps benchmark deps =
-          benchmark {benchmarkBuildInfo =
-                       (benchmarkBuildInfo benchmark) {targetBuildDepends = deps}
-                    ,benchmarkEnabled = packageConfigEnableBenchmarks packageConfig}
+          let bi = benchmarkBuildInfo benchmark
+              bi' = bi
+                { targetBuildDepends = deps
+                , buildable = buildable bi && packageConfigEnableBenchmarks packageConfig
+                }
+           in benchmark { benchmarkBuildInfo = bi' }
 
 -- | Make a map from a list of flag specifications.
 --
@@ -854,7 +868,7 @@ resolveConditions :: (Monoid target,Show target)
 resolveConditions rc addDeps (CondNode lib deps cs) = basic <> children
   where basic = addDeps lib deps
         children = mconcat (map apply cs)
-          where apply (cond,node,mcs) =
+          where apply (Cabal.CondBranch cond node mcs) =
                   if condSatisfied cond
                      then resolveConditions rc addDeps node
                      else maybe mempty (resolveConditions rc addDeps) mcs
@@ -1256,10 +1270,10 @@ cabalFilePackageId
     :: (MonadIO m, MonadThrow m)
     => Path Abs File -> m PackageIdentifier
 cabalFilePackageId fp = do
-    pkgDescr <- liftIO (D.readPackageDescription D.silent $ toFilePath fp)
+    pkgDescr <- liftIO (D.readGenericPackageDescription D.silent $ toFilePath fp)
     (toStackPI . D.package . D.packageDescription) pkgDescr
   where
-    toStackPI (D.PackageIdentifier (D.PackageName name) ver) = do
+    toStackPI (D.PackageIdentifier (D.unPackageName -> name) ver) = do
         name' <- parsePackageNameFromString name
         ver' <- parseVersionFromString (showVersion ver)
         return (PackageIdentifier name' ver')

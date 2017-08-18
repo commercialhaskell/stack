@@ -13,7 +13,6 @@ module Stack.Build.Source
     , getLocalFlags
     , getGhcOptions
     , addUnlistedToBuildCache
-    , getDefaultPackageConfig
     ) where
 
 import              Stack.Prelude
@@ -31,9 +30,10 @@ import qualified    Data.Map.Strict as M
 import qualified    Data.Set as Set
 import              Stack.Build.Cache
 import              Stack.Build.Target
-import              Stack.Config (getLocalPackages)
+import              Stack.Config (getLocalPackages, getNamedComponents)
 import              Stack.Constants (wiredInPackages)
 import              Stack.Package
+import              Stack.PackageLocation
 import              Stack.Types.Build
 import              Stack.Types.BuildPlan
 import              Stack.Types.Config
@@ -71,7 +71,7 @@ loadSourceMapFull :: HasEnvConfig env
                   -> RIO env
                        ( Map PackageName Target
                        , LoadedSnapshot
-                       , [LocalPackage]
+                       , [LocalPackage] -- FIXME do we really want this? it's in the SourceMap
                        , Set PackageName -- non-project targets
                        , SourceMap
                        )
@@ -88,15 +88,38 @@ loadSourceMapFull needTargets boptsCli = do
 
     -- Combine the local packages, extra-deps, and LoadedSnapshot into
     -- one unified source map.
-    let sourceMap = Map.unions
-            [ Map.fromList $ map (\lp' -> (packageName $ lpPackage lp', PSLocal lp')) locals
-            , flip Map.mapWithKey localDeps $ \n lpi ->
-                let configOpts = getGhcOptions bconfig boptsCli n False False
-                 in PSUpstream (lpiVersion lpi) Local (lpiFlags lpi) (lpiGhcOptions lpi ++ configOpts) (lpiLocation lpi)
-            , flip Map.mapWithKey (lsPackages ls) $ \n lpi ->
-                let configOpts = getGhcOptions bconfig boptsCli n False False
-                 in PSUpstream (lpiVersion lpi) Snap (lpiFlags lpi) (lpiGhcOptions lpi ++ configOpts) (lpiLocation lpi)
-            ]
+    let goLPI loc n lpi = do
+          let configOpts = getGhcOptions bconfig boptsCli n False False
+          case lpiLocation lpi of
+            -- NOTE: configOpts includes lpiGhcOptions for now, this may get refactored soon
+            PLIndex pir -> return $ PSIndex loc (lpiFlags lpi) configOpts pir
+            PLOther pl -> do
+              -- FIXME lots of code duplication with getLocalPackages
+              menv <- getMinimalEnvOverride
+              root <- view projectRootL
+              dir <- resolveSinglePackageLocation menv root pl
+              cabalfp <- findOrGenerateCabalFile dir
+              bs <- liftIO (S.readFile (toFilePath cabalfp))
+              (warnings, gpd) <-
+                case rawParseGPD bs of
+                  Left e -> throwM $ InvalidCabalFileInLocal (PLOther pl) e bs
+                  Right x -> return x
+              mapM_ (printCabalFileWarning cabalfp) warnings
+              lp' <- loadLocalPackage boptsCli targets (n, LocalPackageView
+                { lpvVersion = lpiVersion lpi
+                , lpvRoot = dir
+                , lpvCabalFP = cabalfp
+                , lpvComponents = getNamedComponents gpd
+                , lpvGPD = gpd
+                , lpvLoc = pl
+                })
+              return $ PSFiles lp' loc
+    sourceMap' <- Map.unions <$> sequence
+      [ return $ Map.fromList $ map (\lp' -> (packageName $ lpPackage lp', PSFiles lp' Local)) locals
+      , sequence $ Map.mapWithKey (goLPI Local) localDeps
+      , sequence $ Map.mapWithKey (goLPI Snap) (lsPackages ls)
+      ]
+    let sourceMap = sourceMap'
             `Map.difference` Map.fromList (map (, ()) (HashSet.toList wiredInPackages))
 
     return
@@ -125,10 +148,17 @@ getLocalFlags bconfig boptsCli name = Map.unions
 -- configuration and commandline.
 getGhcOptions :: BuildConfig -> BuildOptsCLI -> PackageName -> Bool -> Bool -> [Text]
 getGhcOptions bconfig boptsCli name isTarget isLocal = concat
-    [ ghcOptionsFor name (configGhcOptions config)
+    [ Map.findWithDefault [] name (configGhcOptionsByName config)
+    , if isTarget
+        then Map.findWithDefault [] AGOTargets (configGhcOptionsByCat config)
+        else []
+    , if isLocal
+        then Map.findWithDefault [] AGOLocals (configGhcOptionsByCat config)
+        else []
+    , Map.findWithDefault [] AGOEverything (configGhcOptionsByCat config)
     , concat [["-fhpc"] | isLocal && toCoverage (boptsTestOpts bopts)]
     , if boptsLibProfile bopts || boptsExeProfile bopts
-         then ["-auto-all","-caf-all"]
+         then ["-fprof-auto","-fprof-cafs"]
          else []
     , if not $ boptsLibStrip bopts || boptsExeStrip bopts
          then ["-g"]
@@ -277,6 +307,7 @@ loadLocalPackage boptsCli targets (name, lpv) = do
             (exes `Set.difference` packageExes pkg)
             (tests `Set.difference` Map.keysSet (packageTests pkg))
             (benches `Set.difference` packageBenchmarks pkg)
+        , lpLocation = lpvLoc lpv
         }
 
 -- | Ensure that the flags specified in the stack.yaml file and on the command
@@ -438,20 +469,6 @@ checkComponentsBuildable lps =
         | lp <- lps
         , c <- Set.toList (lpUnbuildable lp)
         ]
-
-getDefaultPackageConfig :: (MonadIO m, MonadReader env m, HasEnvConfig env)
-  => m PackageConfig
-getDefaultPackageConfig = do
-  platform <- view platformL
-  compilerVersion <- view actualCompilerVersionL
-  return PackageConfig
-    { packageConfigEnableTests = False
-    , packageConfigEnableBenchmarks = False
-    , packageConfigFlags = M.empty
-    , packageConfigGhcOptions = []
-    , packageConfigCompilerVersion = compilerVersion
-    , packageConfigPlatform = platform
-    }
 
 -- | Get 'PackageConfig' for package given its name.
 getPackageConfig :: (MonadIO m, MonadReader env m, HasEnvConfig env)

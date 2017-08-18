@@ -86,7 +86,13 @@ build setLocalFiles mbuildLk boptsCli = fixCodePage $ do
     liftIO $ setLocalFiles
            $ Set.insert stackYaml
            $ Set.unions
-           $ map lpFiles locals
+             -- The `locals` value above only contains local project
+             -- packages, not local dependencies. This will get _all_
+             -- of the local files we're interested in
+             -- watching. Arguably, we should not bother watching repo
+             -- and archive files, since those shouldn't
+             -- change. That's a possible optimization to consider.
+             [lpFiles lp | PSFiles lp _ <- Map.elems sourceMap]
 
     (installedMap, globalDumpPkgs, snapshotDumpPkgs, localDumpPkgs) <-
         getInstalled menv
@@ -220,14 +226,9 @@ warnIfExecutablesWithSameNameCouldBeOverwritten locals plan = do
         collect
             [ (exe,pkgName)
             | (pkgName,task) <- Map.toList (planTasks plan)
-            , isLocal task
-            , exe <- (Set.toList . exeComponents . lpComponents . taskLP) task
+            , TTFiles lp _ <- [taskType task] -- FIXME analyze logic here, do we need to check for Local?
+            , exe <- (Set.toList . exeComponents . lpComponents) lp
             ]
-      where
-        isLocal Task{taskType = (TTLocal _)} = True
-        isLocal _ = False
-        taskLP Task{taskType = (TTLocal lp)} = lp
-        taskLP _ = error "warnIfExecutablesWithSameNameCouldBeOverwritten/taskLP: task isn't local"
     localExes :: Map Text (NonEmpty PackageName)
     localExes =
         collect

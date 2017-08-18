@@ -104,9 +104,6 @@ module Stack.Types.Config
   ,readColorWhen
   -- ** SCM
   ,SCM(..)
-  -- ** GhcOptions
-  ,GhcOptions(..)
-  ,ghcOptionsFor
   -- * Paths
   ,bindirSuffix
   ,configInstalledCache
@@ -165,18 +162,22 @@ module Stack.Types.Config
   ,whichCompilerL
   ,envOverrideL
   ,loadedSnapshotL
+  ,shouldForceGhcColorFlag
+  ,appropriateGhcColorFlag
   -- * Lens reexport
   ,view
   ,to
   ) where
 
+import           Control.Monad.Writer (tell)
 import           Stack.Prelude
 import           Data.Aeson.Extended
-                 (ToJSON, toJSON, FromJSON, parseJSON, withText, object,
+                 (ToJSON, toJSON, FromJSON, FromJSONKey (..), parseJSON, withText, object,
                   (.=), (..:), (..:?), (..!=), Value(Bool, String),
                   withObjectWarnings, WarningParser, Object, jsonSubWarnings,
-                  jsonSubWarningsT, jsonSubWarningsTT, WithJSONWarnings(..), noJSONWarnings)
-import           Data.Attoparsec.Args
+                  jsonSubWarningsT, jsonSubWarningsTT, WithJSONWarnings(..), noJSONWarnings,
+                  FromJSONKeyFunction (FromJSONKeyTextParser))
+import           Data.Attoparsec.Args (parseArgs, EscapingMode (Escaping))
 import qualified Data.ByteString.Char8 as S8
 import           Data.List (stripPrefix)
 import           Data.List.NonEmpty (NonEmpty)
@@ -192,7 +193,7 @@ import           Distribution.PackageDescription (GenericPackageDescription)
 import           Distribution.ParseUtils (PError)
 import           Distribution.System (Platform)
 import qualified Distribution.Text
-import           Distribution.Version (anyVersion)
+import           Distribution.Version (anyVersion, mkVersion')
 import           Generics.Deriving.Monoid (memptydefault, mappenddefault)
 import           Lens.Micro (Lens', lens, _1, _2, to)
 import           Options.Applicative (ReadM)
@@ -200,6 +201,7 @@ import qualified Options.Applicative as OA
 import qualified Options.Applicative.Types as OA
 import           Path
 import qualified Paths_stack as Meta
+import           Stack.Constants
 import           Stack.Types.BuildPlan
 import           Stack.Types.Compiler
 import           Stack.Types.CompilerBuild
@@ -314,9 +316,10 @@ data Config =
          -- ^ Parameters for templates.
          ,configScmInit             :: !(Maybe SCM)
          -- ^ Initialize SCM (e.g. git) when creating new projects.
-         ,configGhcOptions          :: !GhcOptions
-         -- ^ Additional GHC options to apply to either all packages (Nothing)
-         -- or a specific package (Just).
+         ,configGhcOptionsByName    :: !(Map PackageName [Text])
+         -- ^ Additional GHC options to apply to specific packages.
+         ,configGhcOptionsByCat     :: !(Map ApplyGhcOptions [Text])
+         -- ^ Additional GHC options to apply to categories of packages
          ,configSetupInfoLocations  :: ![SetupInfoLocation]
          -- ^ Additional SetupInfo (inline or remote) to use to find tools.
          ,configPvpBounds           :: !PvpBounds
@@ -709,8 +712,10 @@ data ConfigMonoid =
     -- ^ Template parameters.
     ,configMonoidScmInit             :: !(First SCM)
     -- ^ Initialize SCM (e.g. git init) when making new projects?
-    ,configMonoidGhcOptions          :: !GhcOptions
-    -- ^ See 'configGhcOptions'
+    ,configMonoidGhcOptionsByName    :: !(Map PackageName [Text])
+    -- ^ See 'configGhcOptionsByName'
+    ,configMonoidGhcOptionsByCat     :: !(Map ApplyGhcOptions [Text])
+    -- ^ See 'configGhcOptionsAll'
     ,configMonoidExtraPath           :: ![Path Abs Dir]
     -- ^ Additional paths to search for executables in
     ,configMonoidSetupInfoLocations  :: ![SetupInfoLocation]
@@ -794,7 +799,26 @@ parseConfigMonoidObject rootDir obj = do
           return (First scmInit,fromMaybe M.empty params)
     configMonoidCompilerCheck <- First <$> obj ..:? configMonoidCompilerCheckName
 
-    configMonoidGhcOptions <- obj ..:? configMonoidGhcOptionsName ..!= mempty
+    options <- Map.map unGhcOptions <$> obj ..:? configMonoidGhcOptionsName ..!= mempty
+
+    optionsEverything <-
+      case (Map.lookup GOKOldEverything options, Map.lookup GOKEverything options) of
+        (Just _, Just _) -> fail "Cannot specify both `*` and `$everything` GHC options"
+        (Nothing, Just x) -> return x
+        (Just x, Nothing) -> do
+          tell "The `*` ghc-options key is not recommended. Consider using $locals, or if really needed, $everything"
+          return x
+        (Nothing, Nothing) -> return []
+
+    let configMonoidGhcOptionsByCat = Map.fromList
+          [ (AGOEverything, optionsEverything)
+          , (AGOLocals, Map.findWithDefault [] GOKLocals options)
+          , (AGOTargets, Map.findWithDefault [] GOKTargets options)
+          ]
+
+        configMonoidGhcOptionsByName = Map.fromList
+            [(name, opts) | (GOKPackage name, opts) <- Map.toList options]
+
     configMonoidExtraPath <- obj ..:? configMonoidExtraPathName ..!= []
     configMonoidSetupInfoLocations <-
         maybeToList <$> jsonSubWarningsT (obj ..:?  configMonoidSetupInfoLocationsName)
@@ -1007,7 +1031,7 @@ instance Show ConfigException where
         ]
     show (BadStackVersionException requiredRange) = concat
         [ "The version of stack you are using ("
-        , show (fromCabalVersion Meta.version)
+        , show (fromCabalVersion (mkVersion' Meta.version))
         , ") is outside the required\n"
         ,"version range specified in stack.yaml ("
         , T.unpack (versionRangeText requiredRange)
@@ -1713,43 +1737,34 @@ data DockerUser = DockerUser
     , duUmask :: FileMode -- ^ File creation mask }
     } deriving (Read,Show)
 
-newtype GhcOptions = GhcOptions
-    { unGhcOptions :: Map (Maybe PackageName) [Text] }
-    deriving Show
+data GhcOptionKey
+  = GOKOldEverything
+  | GOKEverything
+  | GOKLocals
+  | GOKTargets
+  | GOKPackage !PackageName
+  deriving (Eq, Ord)
+
+instance FromJSONKey GhcOptionKey where
+  fromJSONKey = FromJSONKeyTextParser $ \t ->
+    case t of
+      "*" -> return GOKOldEverything
+      "$everything" -> return GOKEverything
+      "$locals" -> return GOKLocals
+      "$targets" -> return GOKTargets
+      _ ->
+        case parsePackageName t of
+          Left e -> fail $ show e
+          Right x -> return $ GOKPackage x
+  fromJSONKeyList = FromJSONKeyTextParser $ \_ -> fail "GhcOptionKey.fromJSONKeyList"
+
+newtype GhcOptions = GhcOptions { unGhcOptions :: [Text] }
 
 instance FromJSON GhcOptions where
-    parseJSON val = do
-        ghcOptions <- parseJSON val
-        fmap (GhcOptions . Map.fromList) $ mapM handleGhcOptions $ Map.toList ghcOptions
-      where
-        handleGhcOptions :: Monad m => (Text, Text) -> m (Maybe PackageName, [Text])
-        handleGhcOptions (name', vals') = do
-            name <-
-                if name' == "*"
-                    then return Nothing
-                    else case parsePackageNameFromString $ T.unpack name' of
-                            Left e -> fail $ show e
-                            Right x -> return $ Just x
-
-            case parseArgs Escaping vals' of
-                Left e -> fail e
-                Right vals -> return (name, map T.pack vals)
-
-instance Monoid GhcOptions where
-    mempty = GhcOptions mempty
-    -- FIXME: Should GhcOptions really monoid like this? Keeping it this
-    -- way preserves the behavior of the ConfigMonoid. However, this
-    -- means there isn't the ability to fully override snapshot
-    -- ghc-options in the same way there is for flags. Do we want to
-    -- change the semantics here? (particularly for extensible
-    -- snapshots)
-    mappend (GhcOptions l) (GhcOptions r) =
-        GhcOptions (Map.unionWith (++) l r)
-
-ghcOptionsFor :: PackageName -> GhcOptions -> [Text]
-ghcOptionsFor name (GhcOptions mp) =
-    M.findWithDefault [] Nothing mp ++
-    M.findWithDefault [] (Just name) mp
+  parseJSON = withText "GhcOptions" $ \t ->
+    case parseArgs Escaping t of
+      Left e -> fail e
+      Right opts -> return $ GhcOptions $ map T.pack opts
 
 -----------------------------------
 -- Lens classes
@@ -1937,3 +1952,17 @@ envOverrideL :: HasConfig env => Lens' env (EnvSettings -> IO EnvOverride)
 envOverrideL = configL.lens
     configEnvOverride
     (\x y -> x { configEnvOverride = y })
+
+shouldForceGhcColorFlag :: (HasRunner env, HasEnvConfig env)
+                        => RIO env Bool
+shouldForceGhcColorFlag = do
+    canDoColor <- (>= $(mkVersion "8.2.1")) . getGhcVersion
+              <$> view actualCompilerVersionL
+    shouldDoColor <- logUseColor <$> view logOptionsL
+    return $ canDoColor && shouldDoColor
+
+appropriateGhcColorFlag :: (HasRunner env, HasEnvConfig env)
+                        => RIO env (Maybe String)
+appropriateGhcColorFlag = f <$> shouldForceGhcColorFlag
+  where f True = Just ghcColorForceFlag
+        f False = Nothing

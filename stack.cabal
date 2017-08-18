@@ -31,7 +31,7 @@ extra-source-files:  CONTRIBUTING.md
 
 custom-setup
   setup-depends: base
-               , Cabal
+               , Cabal >= 2.0 && < 2.1
                , filepath
 
 flag integration-tests
@@ -188,14 +188,12 @@ library
                      System.Process.Read
                      System.Process.Run
   other-modules:     Hackage.Security.Client.Repository.HttpLib.HttpClient
-  build-depends:     Cabal >= 1.24 && < 1.25
+  build-depends:     Cabal >= 2.0 && < 2.1
                    , aeson (>= 1.0 && < 1.2)
                    , ansi-terminal >= 0.6.2.3
                    , attoparsec >= 0.12.1.5 && < 0.14
                    , base >= 4.8 && <5
                    , base64-bytestring
-                   , binary >= 0.7 && < 0.9
-                   , binary-tagged >= 0.1.1
                    , blaze-builder
                    , bytestring >= 0.10.4.0
                    , clock >= 0.7.2
@@ -249,7 +247,6 @@ library
                    , tar >= 0.5.0.3 && < 0.6
                    , template-haskell >= 2.9.0.0 && < 2.12
                    , text >= 1.2.0.4
-                   , text-binary
                    , text-metrics >= 0.3 && < 0.4
                    , time >= 1.5 && < 1.7
                    , tls >= 1.3.8
@@ -287,7 +284,7 @@ executable stack
   if flag(static)
       ld-options: -static -pthread
 
-  build-depends:  Cabal >= 1.18.1.5 && < 1.25
+  build-depends:  Cabal >= 2.0 && < 2.1
                 , base >=4.7 && < 5
                 , bytestring >= 0.10.4.0
                 , conduit >= 1.2.8
@@ -339,7 +336,7 @@ test-suite stack-test
                 , Stack.SolverSpec
                 , Stack.Untar.UntarSpec
   ghc-options:    -threaded -Wall -fwarn-tabs -fwarn-incomplete-uni-patterns -fwarn-incomplete-record-updates
-  build-depends:  Cabal >= 1.18.1.5 && < 1.25
+  build-depends:  Cabal >= 2.0 && < 2.1
                 , QuickCheck >= 2.8.2 && < 2.10
                 , attoparsec < 0.14
                 , base >=4.7 && <5
