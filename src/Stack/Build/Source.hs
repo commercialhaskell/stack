@@ -158,7 +158,7 @@ getGhcOptions bconfig boptsCli name isTarget isLocal = concat
     , Map.findWithDefault [] AGOEverything (configGhcOptionsByCat config)
     , concat [["-fhpc"] | isLocal && toCoverage (boptsTestOpts bopts)]
     , if boptsLibProfile bopts || boptsExeProfile bopts
-         then ["-auto-all","-caf-all"]
+         then ["-fprof-auto","-fprof-cafs"]
          else []
     , if not $ boptsLibStrip bopts || boptsExeStrip bopts
          then ["-g"]

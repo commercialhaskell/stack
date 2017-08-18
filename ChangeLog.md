@@ -74,6 +74,9 @@ Other enhancements:
 * Better error message for case that `stack ghci` file targets are
   combined with invalid package targets. See:
   [#3342](https://github.com/commercialhaskell/stack/issues/3342)
+* For profiling now uses `-fprof-auto -fprof-cafs` instead of
+  the deprecated `-auto-all -caf-all`. See:
+  [#3360](https://github.com/commercialhaskell/stack/issues/3360)
 
 Bug fixes:
 
