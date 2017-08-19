@@ -606,12 +606,13 @@ buildCmd opts go = do
                Build -> go -- Default case is just Build
 
 uninstallCmd :: [String] -> GlobalOpts -> IO ()
-uninstallCmd _ go = withConfigAndLock go $ do
-    $prettyErrorL . (++ [cmd]) . concatMap wordDocs $
-      ["stack does not manage installations in global locations.",
-       "The only global mutation stack performs is executable copying.",
-       "For the default executable destination, please run"]
-   where cmd = shellColor . fromString $ "stack path --local-bin"
+uninstallCmd _ go = withConfigAndLock go $
+    $prettyErrorL
+      [ flow "stack does not manage installations in global locations."
+      , flow "The only global mutation stack performs is executable copying."
+      , flow "For the default executable destination, please run"
+      , shellColor "stack path --local-bin"
+      ]
 
 -- | Unpack packages to the filesystem
 unpackCmd :: [String] -> GlobalOpts -> IO ()
