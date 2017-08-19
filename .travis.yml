@@ -120,9 +120,9 @@ script:
    set -ex
    case "$BUILD" in
      style)
-       hlint src/ --hint=HLint.hs
-       hlint src/ --cpp-define=WINDOWS=1 --hint=HLint.hs
-       hlint test/ --cpp-simple --hint=HLint.hs
+       hlint src/
+       hlint src/ --cpp-define=WINDOWS=1
+       hlint test/ --cpp-simple
        stack --system-ghc --no-terminal build --pedantic
        ;;
      stack)
