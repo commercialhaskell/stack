@@ -102,6 +102,8 @@ Bug fixes:
   downloaded index.  Fixes potential issue if stack was interrupted when
   updating index.
   See [#3033](https://github.com/commercialhaskell/stack/issues/3033)
+* The Stack install script now respects the `-d` option.
+  See [#3366](https://github.com/commercialhaskell/stack/pull/3366).
 
 ## 1.5.1
 

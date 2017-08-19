@@ -577,7 +577,11 @@ stack_location() {
 
 # Check whether 'stack' command exists
 has_stack() {
-  has_cmd stack
+  if [ "$DEST" != "" ] ; then
+    has_cmd "$DEST"
+  else
+    has_cmd stack
+  fi
 }
 
 # Check whether 'wget' command exists
@@ -674,8 +678,9 @@ check_stack_installed() {
       else
         get="wget -qO-"
       fi
+      [ "$DEST" != "" ] && location=$(realpath "$DEST") || location=$(stack_location)
       die "Stack $(stack_version) already appears to be installed at:
-  $(stack_location)
+  $location
 Use 'stack upgrade' or your OS's package manager to upgrade,
 or pass '-f' to this script to over-write the existing binary, e.g.:
   $get https://get.haskellstack.org/ | sh -s - -f"
