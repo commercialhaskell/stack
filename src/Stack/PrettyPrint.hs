@@ -30,7 +30,7 @@ module Stack.PrettyPrint
     , hsep, vsep, fillSep, sep, hcat, vcat, fillCat, cat, punctuate
     , fill, fillBreak
     , enclose, squotes, dquotes, parens, angles, braces, brackets
-    , indentAfterLabel, wordDocs
+    , indentAfterLabel, wordDocs, flow
     ) where
 
 import           Stack.Prelude
@@ -101,22 +101,22 @@ prettyErrorL = do
 prettyDebugS :: Q Exp
 prettyDebugS = do
     loc <- location
-    [e| monadLoggerLog loc "" LevelDebug <=< displayWithColor . fillSep . wordDocs|]
+    [e| monadLoggerLog loc "" LevelDebug <=< displayWithColor . flow|]
 
 prettyInfoS :: Q Exp
 prettyInfoS = do
     loc <- location
-    [e| monadLoggerLog loc "" LevelInfo <=< displayWithColor . fillSep . wordDocs|]
+    [e| monadLoggerLog loc "" LevelInfo <=< displayWithColor . flow|]
 
 prettyWarnS :: Q Exp
 prettyWarnS = do
     loc <- location
-    [e| monadLoggerLog loc "" LevelWarn <=< displayWithColor . (line <>) . (warningColor "Warning:" <+>) . indentAfterLabel . fillSep . wordDocs|]
+    [e| monadLoggerLog loc "" LevelWarn <=< displayWithColor . (line <>) . (warningColor "Warning:" <+>) . indentAfterLabel . flow|]
 
 prettyErrorS :: Q Exp
 prettyErrorS = do
     loc <- location
-    [e| monadLoggerLog loc "" LevelError <=< displayWithColor . (line <>) . (errorColor "Error:" <+>) . indentAfterLabel . fillSep . wordDocs|]
+    [e| monadLoggerLog loc "" LevelError <=< displayWithColor . (line <>) . (errorColor "Error:" <+>) . indentAfterLabel . flow|]
 
 -- End of duplicates
 
@@ -125,6 +125,9 @@ indentAfterLabel = align
 
 wordDocs :: String -> [Doc a]
 wordDocs = map fromString . words
+
+flow :: String -> Doc a
+flow = fillSep . wordDocs
 
 debugBracket :: Q Exp
 debugBracket = do
