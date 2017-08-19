@@ -655,7 +655,7 @@ check_home_local_bin_on_path() {
   fi
 }
 
-# Check whether /usr/local/bin is on the PATH, and print a warning if not.
+# Check whether $DEST is on the PATH, and print a warning if not.
 check_dest_on_path() {
   if ! on_path "$(dirname $DEST)" ; then
     info "WARNING: '$(dirname $DEST)' is not on your PATH."
