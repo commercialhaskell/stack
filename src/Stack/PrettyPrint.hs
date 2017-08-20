@@ -55,70 +55,41 @@ displayWithColor x = do
 
 -- TODO: switch to using implicit callstacks once 7.8 support is dropped
 
-prettyDebug :: Q Exp
-prettyDebug = do
+prettyWith :: LogLevel -> ExpQ -> Q Exp
+prettyWith level f = do
     loc <- location
-    [e| monadLoggerLog loc "" LevelDebug <=< displayWithColor |]
+    [e| monadLoggerLog loc "" level <=< displayWithColor . $f |]
 
-prettyInfo :: Q Exp
-prettyInfo = do
-    loc <- location
-    [e| monadLoggerLog loc "" LevelInfo <=< displayWithColor |]
+-- Note: I think keeping this section aligned helps spot errors, might be
+-- worth keeping the alignment in place.
+prettyDebugWith, prettyInfoWith, prettyWarnWith, prettyErrorWith :: ExpQ -> Q Exp
+prettyDebugWith   = prettyWith LevelDebug
+prettyInfoWith    = prettyWith LevelInfo
+prettyWarnWith  f = prettyWith LevelWarn
+                        [| (line <>) . (warningColor "Warning:" <+>) .
+                           indentAfterLabel . $f |]
+prettyErrorWith f = prettyWith LevelError
+                        [| (line <>) . (errorColor   "Error:" <+>) .
+                           indentAfterLabel . $f |]
 
-prettyWarn :: Q Exp
-prettyWarn = do
-    loc <- location
-    [e| monadLoggerLog loc "" LevelWarn <=< displayWithColor . (line <>) . (warningColor "Warning:" <+>) . indentAfterLabel |]
+prettyDebug, prettyInfo, prettyWarn, prettyError :: Q Exp
+prettyDebug  = prettyDebugWith [| id |]
+prettyInfo   = prettyInfoWith  [| id |]
+prettyWarn   = prettyWarnWith  [| id |]
+prettyError  = prettyErrorWith [| id |]
 
-prettyError :: Q Exp
-prettyError = do
-    loc <- location
-    [e| monadLoggerLog loc "" LevelError <=< displayWithColor . (line <>) . (errorColor "Error:" <+>) . indentAfterLabel |]
+prettyDebugL, prettyInfoL, prettyWarnL, prettyErrorL :: Q Exp
+prettyDebugL = prettyDebugWith [| fillSep |]
+prettyInfoL  = prettyInfoWith  [| fillSep |]
+prettyWarnL  = prettyWarnWith  [| fillSep |]
+prettyErrorL = prettyErrorWith [| fillSep |]
 
--- TODO: Figure out how to collapse these to use the same implementation
---       as the above ones!
-
-prettyDebugL :: Q Exp
-prettyDebugL = do
-    loc <- location
-    [e| monadLoggerLog loc "" LevelDebug <=< displayWithColor . fillSep|]
-
-prettyInfoL :: Q Exp
-prettyInfoL = do
-    loc <- location
-    [e| monadLoggerLog loc "" LevelInfo <=< displayWithColor . fillSep|]
-
-prettyWarnL :: Q Exp
-prettyWarnL = do
-    loc <- location
-    [e| monadLoggerLog loc "" LevelWarn <=< displayWithColor . (line <>) . (warningColor "Warning:" <+>) . indentAfterLabel . fillSep|]
-
-prettyErrorL :: Q Exp
-prettyErrorL = do
-    loc <- location
-    [e| monadLoggerLog loc "" LevelError <=< displayWithColor . (line <>) . (errorColor "Error:" <+>) . indentAfterLabel . fillSep|]
-
-prettyDebugS :: Q Exp
-prettyDebugS = do
-    loc <- location
-    [e| monadLoggerLog loc "" LevelDebug <=< displayWithColor . flow|]
-
-prettyInfoS :: Q Exp
-prettyInfoS = do
-    loc <- location
-    [e| monadLoggerLog loc "" LevelInfo <=< displayWithColor . flow|]
-
-prettyWarnS :: Q Exp
-prettyWarnS = do
-    loc <- location
-    [e| monadLoggerLog loc "" LevelWarn <=< displayWithColor . (line <>) . (warningColor "Warning:" <+>) . indentAfterLabel . flow|]
-
-prettyErrorS :: Q Exp
-prettyErrorS = do
-    loc <- location
-    [e| monadLoggerLog loc "" LevelError <=< displayWithColor . (line <>) . (errorColor "Error:" <+>) . indentAfterLabel . flow|]
-
--- End of duplicates
+prettyDebugS, prettyInfoS, prettyWarnS, prettyErrorS :: Q Exp
+prettyDebugS = prettyDebugWith [| flow |]
+prettyInfoS  = prettyInfoWith  [| flow |]
+prettyWarnS  = prettyWarnWith  [| flow |]
+prettyErrorS = prettyErrorWith [| flow |]
+-- End of aligned section
 
 indentAfterLabel :: Doc a -> Doc a
 indentAfterLabel = align
