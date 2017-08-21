@@ -19,7 +19,7 @@ module Stack.PrettyPrint
       -- encourage consistency of color meanings.
     , styleWarning, styleError, styleGood
     , styleShell, styleFile, styleDir
-    , displayTargetPkgId, displayCurrentPkgId, displayCurrentPkgName, displayErrorPkgId
+    , styleCurrent, styleTarget
     , displayMilliseconds
       -- * Formatting utils
     , bulletedList
@@ -139,17 +139,11 @@ styleFile = bold . white
 styleDir :: AnsiDoc -> AnsiDoc
 styleDir = bold . blue
 
-displayTargetPkgId :: PackageIdentifier -> AnsiDoc
-displayTargetPkgId = cyan . display
+styleCurrent :: AnsiDoc -> AnsiDoc
+styleCurrent = yellow
 
-displayCurrentPkgId :: PackageIdentifier -> AnsiDoc
-displayCurrentPkgId = yellow . display
-
-displayCurrentPkgName :: PackageName -> AnsiDoc
-displayCurrentPkgName = yellow . display
-
-displayErrorPkgId :: PackageIdentifier -> AnsiDoc
-displayErrorPkgId = styleError . display
+styleTarget :: AnsiDoc -> AnsiDoc
+styleTarget = cyan
 
 instance Display PackageName where
     display = fromString . packageNameString
