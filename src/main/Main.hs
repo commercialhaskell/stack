@@ -638,10 +638,11 @@ upgradeCmd upgradeOpts' go = withGlobalConfigAndLock go $
 -- | Upload to Hackage
 uploadCmd :: SDistOpts -> GlobalOpts -> IO ()
 uploadCmd (SDistOpts [] _ _ _ _ _) go =
-    withConfigAndLock go . $prettyErrorL . concat $
-        [wordDocs "To upload the current package, please run",
-         [styleShell (fromString "stack upload .")],
-         wordDocs "(with the period at the end)"]
+    withConfigAndLock go . $prettyErrorL $
+        [ flow "To upload the current package, please run"
+        , styleShell "stack upload ."
+        , flow "(with the period at the end)"
+        ]
 uploadCmd sdistOpts go = do
     let partitionM _ [] = return ([], [])
         partitionM f (x:xs) = do
@@ -653,10 +654,12 @@ uploadCmd sdistOpts go = do
     withBuildConfigAndLock go $ \_ -> do
         unless (null invalid) $ do
             let invalidList = bulletedList $ map (styleFile . fromString) invalid
-            $prettyError . (<> (line <> invalidList))
-                         . fillSep . concatMap wordDocs $
-                ["stack upload expects a list of sdist tarballs or cabal directories.",
-                 "Can't find:"]
+            $prettyErrorL $
+                [ styleShell "stack upload"
+                , flow "expects a list of sdist tarballs or cabal directories."
+                , flow "Can't find:"
+                , line <> invalidList
+                ]
             liftIO exitFailure
         config <- view configL
         getCreds <- liftIO (runOnce (Upload.loadCreds config))
