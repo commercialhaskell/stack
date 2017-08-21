@@ -86,6 +86,7 @@ import           Stack.Options.Utils
 import qualified Stack.PackageIndex
 import qualified Stack.Path
 import           Stack.PrettyPrint hiding (display)
+import qualified Stack.PrettyPrint as P
 import           Stack.Runners
 import           Stack.Script
 import           Stack.SDist (getSDistTarball, checkSDistTarball, checkSDistTarball', SDistOpts(..))
@@ -709,7 +710,7 @@ sdistCmd sdistOpts go =
             ensureDir (parent tarPath)
             liftIO $ L.writeFile (toFilePath tarPath) tarBytes
             checkSDistTarball sdistOpts tarPath
-            $logInfo $ "Wrote sdist tarball to " <> T.pack (toFilePath tarPath)
+            $prettyInfoL [flow "Wrote sdist tarball to", P.display tarPath]
             when (sdoptsSign sdistOpts) (void $ Sig.sign (sdoptsSignServerUrl sdistOpts) tarPath)
 
 -- | Execute a command.
