@@ -1027,7 +1027,7 @@ installGHCPosix version downloadInfo _ archiveFile archiveType tempDir destDir =
                     $prettyError $
                         hang 2
                           ("Error encountered while" <+> step <+> "GHC with" <> line <>
-                           shellColor (fromString (unwords (cmd : args))) <> line <>
+                           styleShell (fromString (unwords (cmd : args))) <> line <>
                            -- TODO: Figure out how to insert \ in the appropriate spots
                            -- hang 2 (shellColor (fillSep (fromString cmd : map fromString args))) <> line <>
                            "run in " <> display wd) <> line <> line <>

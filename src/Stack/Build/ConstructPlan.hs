@@ -935,7 +935,7 @@ pprintExceptions exceptions stackYaml parentMap wanted =
 
     pprintException (DependencyCycleDetected pNames) = Just $
         "Dependency cycle detected in packages:" <> line <>
-        indent 4 (encloseSep "[" "]" "," (map (errorColor . fromString . packageNameString) pNames))
+        indent 4 (encloseSep "[" "]" "," (map (styleError . display) pNames))
     pprintException (DependencyPlanFailures pkg pDeps) =
         case mapMaybe pprintDep (Map.toList pDeps) of
             [] -> Nothing
@@ -969,7 +969,7 @@ pprintExceptions exceptions stackYaml parentMap wanted =
 
     pprintDep (name, (range, mlatestApplicable, badDep)) = case badDep of
         NotInBuildPlan -> Just $
-            errorColor (display name) <+>
+            styleError (display name) <+>
             align ("must match" <+> goodRange <> "," <> softline <>
                    "but the stack configuration has no specified version" <>
                    latestApplicable Nothing)
@@ -983,7 +983,7 @@ pprintExceptions exceptions stackYaml parentMap wanted =
         -- path from a target to the package.
         Couldn'tResolveItsDependencies _version -> Nothing
       where
-        goodRange = goodColor (fromString (Cabal.display range))
+        goodRange = styleGood (fromString (Cabal.display range))
         latestApplicable mversion =
             case mlatestApplicable of
                 Nothing -> ""
@@ -991,7 +991,7 @@ pprintExceptions exceptions stackYaml parentMap wanted =
                     | mlatestApplicable == mversion -> softline <>
                         "(latest applicable is specified)"
                     | otherwise -> softline <>
-                        "(latest applicable is " <> goodColor (display la) <> ")"
+                        "(latest applicable is " <> styleGood (display la) <> ")"
 
 -- | Get the shortest reason for the package to be in the build plan. In
 -- other words, trace the parent dependencies back to a 'wanted'
