@@ -150,11 +150,12 @@ ghci opts@GhciOpts{..} = do
 
 preprocessTargets :: HasEnvConfig env => BuildOptsCLI -> [Text] -> RIO env (Either [Path Abs File] (Map PackageName Target))
 preprocessTargets buildOptsCLI rawTargets = do
-    let (fileTargetsRaw, otherTargets) =
+    let (fileTargetsRaw, normalTargetsRaw) =
             partition (\t -> ".hs" `T.isSuffixOf` t || ".lhs" `T.isSuffixOf` t)
                       rawTargets
-    case otherTargets of
-        [] -> do
+    -- Only use file targets if we have no normal targets.
+    if not (null fileTargetsRaw) && null normalTargetsRaw
+        then do
             fileTargets <- forM fileTargetsRaw $ \fp0 -> do
                 let fp = T.unpack fp0
                 mpath <- liftIO $ forgivingAbsence (resolveFile' fp)
@@ -162,10 +163,10 @@ preprocessTargets buildOptsCLI rawTargets = do
                     Nothing -> throwM (MissingFileTarget fp)
                     Just path -> return path
             return (Left fileTargets)
-        _ -> do
+        else do
             -- Try parsing targets before checking if both file and
             -- module targets are specified (see issue#3342).
-            (_,_,normalTargets) <- parseTargets AllowNoTargets buildOptsCLI { boptsCLITargets = otherTargets }
+            (_,_,normalTargets) <- parseTargets AllowNoTargets buildOptsCLI { boptsCLITargets = normalTargetsRaw }
                 `catch` \ex -> case ex of
                     TargetParseException xs -> throwM (GhciTargetParseException xs)
                     _ -> throwM ex
