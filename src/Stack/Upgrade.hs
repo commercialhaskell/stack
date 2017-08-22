@@ -52,10 +52,10 @@ upgradeOpts = UpgradeOpts
              <> showDefault))
         <*> switch
          (long "force-download" <>
-          help "Download a stack executable, even if the version number is older than what we have")
+          help "Download the latest available stack executable")
         <*> optional (strOption
          (long "binary-version" <>
-          help "Download a specific version, even if it's out of date"))
+          help "Download a specific stack version"))
         <*> optional (strOption
          (long "github-org" <>
           help "Github organization name"))

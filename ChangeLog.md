@@ -85,6 +85,8 @@ Other enhancements:
 * For profiling now uses `-fprof-auto -fprof-cafs` instead of
   the deprecated `-auto-all -caf-all`. See:
   [#3360](https://github.com/commercialhaskell/stack/issues/3360)
+* Better descriptions are now available for `stack upgrade --help`. See:
+  [#3070](https://github.com/commercialhaskell/stack/issues/3070)
 
 Bug fixes:
 
