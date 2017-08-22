@@ -111,6 +111,9 @@ Bug fixes:
   See [#3033](https://github.com/commercialhaskell/stack/issues/3033)
 * The Stack install script now respects the `-d` option.
   See [#3366](https://github.com/commercialhaskell/stack/pull/3366).
+* `stack script` can now handle relative paths to source files.
+  See [#3372](https://github.com/commercialhaskell/stack/issues/3372).
+
 
 ## 1.5.1
 

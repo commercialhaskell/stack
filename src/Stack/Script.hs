@@ -101,7 +101,7 @@ scriptCmd opts go' = do
         munlockFile lk -- Unlock before transferring control away.
         case soCompile opts of
           SEInterpret -> exec menv ("run" ++ compilerExeName wc)
-                (ghcArgs ++ soFile opts : soArgs opts)
+                (ghcArgs ++ toFilePath file : soArgs opts)
           _ -> do
             let dir = parent file
             -- use sinkProcessStdout to ensure a ProcessFailed
@@ -110,7 +110,7 @@ scriptCmd opts go' = do
               (Just dir)
               menv
               (compilerExeName wc)
-              (ghcArgs ++ [soFile opts])
+              (ghcArgs ++ [toFilePath file])
               CL.sinkNull
             exec menv (toExeName $ toFilePath file) (soArgs opts)
   where
