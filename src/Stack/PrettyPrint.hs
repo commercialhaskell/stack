@@ -11,15 +11,18 @@ module Stack.PrettyPrint
       displayPlain, displayWithColor
       -- * Logging based on pretty-print typeclass
     , prettyDebug, prettyInfo, prettyWarn, prettyError
-    , debugBracket
-      -- * Color utils
-      -- | These are preferred to colors directly, so that we can
-      -- encourage consistency of color meanings.
-    , errorRed, goodGreen, shellMagenta
-    , displayTargetPkgId, displayCurrentPkgId, displayCurrentPkgName, displayErrorPkgId
+    , prettyDebugL, prettyInfoL, prettyWarnL, prettyErrorL
+    , prettyDebugS, prettyInfoS, prettyWarnS, prettyErrorS
+      -- * Semantic styling functions
+      -- | These are preferred to styling or colors directly, so that we can
+      -- encourage consistency.
+    , styleWarning, styleError, styleGood
+    , styleShell, styleFile, styleDir
+    , styleCurrent, styleTarget
     , displayMilliseconds
       -- * Formatting utils
     , bulletedList
+    , debugBracket
       -- * Re-exports from "Text.PrettyPrint.Leijen.Extended"
     , Display(..), AnsiDoc, AnsiAnn(..), HasAnsiAnn(..), Doc
     , nest, line, linebreak, group, softline, softbreak
@@ -28,6 +31,7 @@ module Stack.PrettyPrint
     , hsep, vsep, fillSep, sep, hcat, vcat, fillCat, cat, punctuate
     , fill, fillBreak
     , enclose, squotes, dquotes, parens, angles, braces, brackets
+    , indentAfterLabel, wordDocs, flow
     ) where
 
 import           Stack.Prelude
@@ -52,25 +56,56 @@ displayWithColor x = do
 
 -- TODO: switch to using implicit callstacks once 7.8 support is dropped
 
-prettyDebug :: Q Exp
-prettyDebug = do
+prettyWith :: LogLevel -> ExpQ -> Q Exp
+prettyWith level f = do
     loc <- location
-    [e| monadLoggerLog loc "" LevelDebug <=< displayWithColor |]
+    [e| monadLoggerLog loc "" level <=< displayWithColor . $f |]
 
-prettyInfo :: Q Exp
-prettyInfo = do
-    loc <- location
-    [e| monadLoggerLog loc "" LevelInfo <=< displayWithColor |]
+-- Note: I think keeping this section aligned helps spot errors, might be
+-- worth keeping the alignment in place.
+prettyDebugWith, prettyInfoWith, prettyWarnWith, prettyErrorWith :: ExpQ -> Q Exp
+prettyDebugWith   = prettyWith LevelDebug
+prettyInfoWith    = prettyWith LevelInfo
+prettyWarnWith  f = prettyWith LevelWarn
+                        [| (line <>) . (styleWarning "Warning:" <+>) .
+                           indentAfterLabel . $f |]
+prettyErrorWith f = prettyWith LevelError
+                        [| (line <>) . (styleError   "Error:" <+>) .
+                           indentAfterLabel . $f |]
 
-prettyWarn :: Q Exp
-prettyWarn = do
-    loc <- location
-    [e| monadLoggerLog loc "" LevelWarn <=< displayWithColor . (line <>) . (warningYellow "Warning:" <+>) |]
+prettyDebug, prettyInfo, prettyWarn, prettyError :: Q Exp
+prettyDebug  = prettyDebugWith [| id |]
+prettyInfo   = prettyInfoWith  [| id |]
+prettyWarn   = prettyWarnWith  [| id |]
+prettyError  = prettyErrorWith [| id |]
 
-prettyError :: Q Exp
-prettyError = do
-    loc <- location
-    [e| monadLoggerLog loc "" LevelError <=< displayWithColor . (line <>) . (errorRed "Error:" <+>) |]
+prettyDebugL, prettyInfoL, prettyWarnL, prettyErrorL :: Q Exp
+prettyDebugL = prettyDebugWith [| fillSep |]
+prettyInfoL  = prettyInfoWith  [| fillSep |]
+prettyWarnL  = prettyWarnWith  [| fillSep |]
+prettyErrorL = prettyErrorWith [| fillSep |]
+
+prettyDebugS, prettyInfoS, prettyWarnS, prettyErrorS :: Q Exp
+prettyDebugS = prettyDebugWith [| flow |]
+prettyInfoS  = prettyInfoWith  [| flow |]
+prettyWarnS  = prettyWarnWith  [| flow |]
+prettyErrorS = prettyErrorWith [| flow |]
+-- End of aligned section
+
+-- | Use after a label and before the rest of what's being labelled for
+--   consistent spacing/indenting/etc.
+--
+--   For example this is used after "Warning:" in warning messages.
+indentAfterLabel :: Doc a -> Doc a
+indentAfterLabel = align
+
+-- | Make a 'Doc' from each word in a 'String'
+wordDocs :: String -> [Doc a]
+wordDocs = map fromString . words
+
+-- | Wordwrap a 'String'
+flow :: String -> Doc a
+flow = fillSep . wordDocs
 
 debugBracket :: Q Exp
 debugBracket = do
@@ -92,29 +127,45 @@ debugBracket = do
             return x
       |]
 
-errorRed :: AnsiDoc -> AnsiDoc
-errorRed = dullred
+-- | Style an 'AnsiDoc' as an error. Should be used sparingly, not to style
+--   entire long messages. For example, it's used to style the "Error:"
+--   label for an error message, not the entire message.
+styleError :: AnsiDoc -> AnsiDoc
+styleError = dullred
 
-warningYellow :: AnsiDoc -> AnsiDoc
-warningYellow = yellow
+-- | Style an 'AnsiDoc' as a warning. Should be used sparingly, not to style
+--   entire long messages. For example, it's used to style the "Warning:"
+--   label for an error message, not the entire message.
+styleWarning :: AnsiDoc -> AnsiDoc
+styleWarning = yellow
 
-goodGreen :: AnsiDoc -> AnsiDoc
-goodGreen = green
+-- | Style an 'AnsiDoc' in a way to emphasize that it is a particularly good
+--   thing.
+styleGood :: AnsiDoc -> AnsiDoc
+styleGood = green
 
-shellMagenta :: AnsiDoc -> AnsiDoc
-shellMagenta = magenta
+-- | Style an 'AnsiDoc' as a shell command, i.e. when suggesting something
+--   to the user that should be typed in directly as written.
+styleShell :: AnsiDoc -> AnsiDoc
+styleShell = magenta
 
-displayTargetPkgId :: PackageIdentifier -> AnsiDoc
-displayTargetPkgId = cyan . display
+-- | Style an 'AnsiDoc' as a filename. See 'styleDir' for directories.
+styleFile :: AnsiDoc -> AnsiDoc
+styleFile = bold . white
 
-displayCurrentPkgId :: PackageIdentifier -> AnsiDoc
-displayCurrentPkgId = yellow . display
+-- | Style an 'AnsiDoc' as a directory name. See 'styleFile' for files.
+styleDir :: AnsiDoc -> AnsiDoc
+styleDir = bold . blue
 
-displayCurrentPkgName :: PackageName -> AnsiDoc
-displayCurrentPkgName = yellow . display
+-- | Style an 'AnsiDoc' in a way that emphasizes that it is related to
+--   a current thing. For example, could be used when talking about the
+--   current package we're processing when outputting the name of it.
+styleCurrent :: AnsiDoc -> AnsiDoc
+styleCurrent = yellow
 
-displayErrorPkgId :: PackageIdentifier -> AnsiDoc
-displayErrorPkgId = errorRed . display
+-- TODO: figure out how to describe this
+styleTarget :: AnsiDoc -> AnsiDoc
+styleTarget = cyan
 
 instance Display PackageName where
     display = fromString . packageNameString
@@ -126,18 +177,19 @@ instance Display Version where
     display = fromString . versionString
 
 instance Display (Path b File) where
-    display = bold . white . fromString . toFilePath
+    display = styleFile . fromString . toFilePath
 
 instance Display (Path b Dir) where
-    display = bold . blue . fromString . toFilePath
+    display = styleDir . fromString . toFilePath
 
 instance Display (PackageName, NamedComponent) where
     display = cyan . fromString . T.unpack . renderPkgComponent
 
 -- Display milliseconds.
 displayMilliseconds :: Clock.TimeSpec -> AnsiDoc
-displayMilliseconds t = goodGreen $
+displayMilliseconds t = green $
     (fromString . show . (`div` 10^(6 :: Int)) . Clock.toNanoSecs) t <> "ms"
 
+-- | Display a list of 'AnsiDoc', one per line, with bullets before each
 bulletedList :: [AnsiDoc] -> AnsiDoc
 bulletedList = mconcat . intersperse line . map ("*" <+>)

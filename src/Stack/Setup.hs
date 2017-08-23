@@ -1027,9 +1027,9 @@ installGHCPosix version downloadInfo _ archiveFile archiveType tempDir destDir =
                     $prettyError $
                         hang 2
                           ("Error encountered while" <+> step <+> "GHC with" <> line <>
-                           shellMagenta (fromString (unwords (cmd : args))) <> line <>
+                           styleShell (fromString (unwords (cmd : args))) <> line <>
                            -- TODO: Figure out how to insert \ in the appropriate spots
-                           -- hang 2 (shellMagenta (fillSep (fromString cmd : map fromString args))) <> line <>
+                           -- hang 2 (shellColor (fillSep (fromString cmd : map fromString args))) <> line <>
                            "run in " <> display wd) <> line <> line <>
                         "The following directories may now contain files, but won't be used by stack:" <> line <>
                         "  -" <+> display tempDir <> line <>

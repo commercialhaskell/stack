@@ -85,6 +85,8 @@ import           Stack.Options.SolverParser
 import           Stack.Options.Utils
 import qualified Stack.PackageIndex
 import qualified Stack.Path
+import           Stack.PrettyPrint hiding (display)
+import qualified Stack.PrettyPrint as P
 import           Stack.Runners
 import           Stack.Script
 import           Stack.SDist (getSDistTarball, checkSDistTarball, checkSDistTarball', SDistOpts(..))
@@ -605,10 +607,13 @@ buildCmd opts go = do
                Build -> go -- Default case is just Build
 
 uninstallCmd :: [String] -> GlobalOpts -> IO ()
-uninstallCmd _ go = withConfigAndLock go $ do
-    $logError "stack does not manage installations in global locations"
-    $logError "The only global mutation stack performs is executable copying"
-    $logError "For the default executable destination, please run 'stack path --local-bin'"
+uninstallCmd _ go = withConfigAndLock go $
+    $prettyErrorL
+      [ flow "stack does not manage installations in global locations."
+      , flow "The only global mutation stack performs is executable copying."
+      , flow "For the default executable destination, please run"
+      , styleShell "stack path --local-bin"
+      ]
 
 -- | Unpack packages to the filesystem
 unpackCmd :: [String] -> GlobalOpts -> IO ()
@@ -633,7 +638,12 @@ upgradeCmd upgradeOpts' go = withGlobalConfigAndLock go $
 
 -- | Upload to Hackage
 uploadCmd :: SDistOpts -> GlobalOpts -> IO ()
-uploadCmd (SDistOpts [] _ _ _ _ _) _ = throwString "Error: To upload the current package, please run 'stack upload .'"
+uploadCmd (SDistOpts [] _ _ _ _ _) go =
+    withConfigAndLock go . $prettyErrorL $
+        [ flow "To upload the current package, please run"
+        , styleShell "stack upload ."
+        , flow "(with the period at the end)"
+        ]
 uploadCmd sdistOpts go = do
     let partitionM _ [] = return ([], [])
         partitionM f (x:xs) = do
@@ -642,12 +652,16 @@ uploadCmd sdistOpts go = do
             return $ if r then (x:as, bs) else (as, x:bs)
     (files, nonFiles) <- partitionM D.doesFileExist (sdoptsDirsToWorkWith sdistOpts)
     (dirs, invalid) <- partitionM D.doesDirectoryExist nonFiles
-    unless (null invalid) $ do
-        hPutStrLn stderr $
-            "Error: stack upload expects a list sdist tarballs or cabal directories.  Can't find " ++
-            show invalid
-        exitFailure
     withBuildConfigAndLock go $ \_ -> do
+        unless (null invalid) $ do
+            let invalidList = bulletedList $ map (styleFile . fromString) invalid
+            $prettyErrorL $
+                [ styleShell "stack upload"
+                , flow "expects a list of sdist tarballs or cabal directories."
+                , flow "Can't find:"
+                , line <> invalidList
+                ]
+            liftIO exitFailure
         config <- view configL
         getCreds <- liftIO (runOnce (Upload.loadCreds config))
         mapM_ (resolveFile' >=> checkSDistTarball sdistOpts) files
@@ -696,7 +710,7 @@ sdistCmd sdistOpts go =
             ensureDir (parent tarPath)
             liftIO $ L.writeFile (toFilePath tarPath) tarBytes
             checkSDistTarball sdistOpts tarPath
-            $logInfo $ "Wrote sdist tarball to " <> T.pack (toFilePath tarPath)
+            $prettyInfoL [flow "Wrote sdist tarball to", P.display tarPath]
             when (sdoptsSign sdistOpts) (void $ Sig.sign (sdoptsSignServerUrl sdistOpts) tarPath)
 
 -- | Execute a command.

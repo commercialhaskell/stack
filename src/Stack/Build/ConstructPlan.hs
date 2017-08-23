@@ -935,7 +935,7 @@ pprintExceptions exceptions stackYaml parentMap wanted =
 
     pprintException (DependencyCycleDetected pNames) = Just $
         "Dependency cycle detected in packages:" <> line <>
-        indent 4 (encloseSep "[" "]" "," (map (errorRed . fromString . packageNameString) pNames))
+        indent 4 (encloseSep "[" "]" "," (map (styleError . display) pNames))
     pprintException (DependencyPlanFailures pkg pDeps) =
         case mapMaybe pprintDep (Map.toList pDeps) of
             [] -> Nothing
@@ -949,17 +949,17 @@ pprintExceptions exceptions stackYaml parentMap wanted =
                     Just (target:path) -> line <> "needed due to " <> encloseSep "" "" " -> " pathElems
                       where
                         pathElems =
-                            [displayTargetPkgId target] ++
+                            [styleTarget . display $ target] ++
                             map display path ++
                             [pkgIdent]
               where
-                pkgIdent = displayCurrentPkgId (packageIdentifier pkg)
+                pkgIdent = styleCurrent . display $ packageIdentifier pkg
     -- Skip these when they are redundant with 'NotInBuildPlan' info.
     pprintException (UnknownPackage name)
         | name `Set.member` allNotInBuildPlan = Nothing
         | name `HashSet.member` wiredInPackages =
-            Just $ "Can't build a package with same name as a wired-in-package:" <+> displayCurrentPkgName name
-        | otherwise = Just $ "Unknown package:" <+> displayCurrentPkgName name
+            Just $ "Can't build a package with same name as a wired-in-package:" <+> (styleCurrent . display $ name)
+        | otherwise = Just $ "Unknown package:" <+> (styleCurrent . display $ name)
 
     pprintFlags flags
         | Map.null flags = ""
@@ -969,13 +969,13 @@ pprintExceptions exceptions stackYaml parentMap wanted =
 
     pprintDep (name, (range, mlatestApplicable, badDep)) = case badDep of
         NotInBuildPlan -> Just $
-            errorRed (display name) <+>
+            styleError (display name) <+>
             align ("must match" <+> goodRange <> "," <> softline <>
                    "but the stack configuration has no specified version" <>
                    latestApplicable Nothing)
         -- TODO: For local packages, suggest editing constraints
         DependencyMismatch version -> Just $
-            displayErrorPkgId (PackageIdentifier name version) <+>
+            (styleError . display) (PackageIdentifier name version) <+>
             align ("must match" <+> goodRange <>
                    latestApplicable (Just version))
         -- I think the main useful info is these explain why missing
@@ -983,7 +983,7 @@ pprintExceptions exceptions stackYaml parentMap wanted =
         -- path from a target to the package.
         Couldn'tResolveItsDependencies _version -> Nothing
       where
-        goodRange = goodGreen (fromString (Cabal.display range))
+        goodRange = styleGood (fromString (Cabal.display range))
         latestApplicable mversion =
             case mlatestApplicable of
                 Nothing -> ""
@@ -991,7 +991,7 @@ pprintExceptions exceptions stackYaml parentMap wanted =
                     | mlatestApplicable == mversion -> softline <>
                         "(latest applicable is specified)"
                     | otherwise -> softline <>
-                        "(latest applicable is " <> goodGreen (display la) <> ")"
+                        "(latest applicable is " <> styleGood (display la) <> ")"
 
 -- | Get the shortest reason for the package to be in the build plan. In
 -- other words, trace the parent dependencies back to a 'wanted'
