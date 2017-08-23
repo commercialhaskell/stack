@@ -122,6 +122,10 @@ Bug fixes:
   trust the etag and not re-download.  Fixed in this version.
 * Invoking `stack --docker` in parallel now correctly locks the sqlite database.
   See [#3400](https://github.com/commercialhaskell/stack/issues/3400).
+* docs.haskellstack.org RTD documentation search is replaced by the mkdocs
+  search. Please see
+  [#3376](https://github.com/commercialhaskell/stack/issues/3376).
+
 
 ## 1.5.1
 
