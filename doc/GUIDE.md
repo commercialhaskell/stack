@@ -2007,24 +2007,31 @@ to stack.yaml:
 
 ```yaml
 image:
-  # YOU NEED A `container` YAML SECTION FOR `stack image container`
-  container:
-    # YOU NEED A BASE IMAGE NAME. STACK LAYERS EXES ON TOP OF
-    # THE BASE IMAGE. PREPARE YOUR PROJECT IMAGE IN ADVANCE. PUT
-    # ALL YOUR RUNTIME DEPENDENCIES IN THE IMAGE.
-    base: "fpco/ubuntu-with-libgmp:14.04"
-    # YOU CAN OPTIONALY NAME THE IMAGE. STACK WILL USE THE PROJECT
-    # DIRECTORY NAME IF YOU LEAVE OUT THIS OPTION.
-    name: "fpco/hello-world"
-    # OPTIONALLY ADD A HASH OF LOCAL PROJECT DIRECTORIES AND THEIR
-    # DESTINATIONS INSIDE THE DOCKER IMAGE.
-    add:
-      man/: /usr/local/share/man/
-    # OPTIONALLY SPECIFY A LIST OF EXECUTABLES. STACK WILL CREATE
-    # A TAGGED IMAGE FOR EACH IN THE LIST. THESE IMAGES WILL HAVE
-    # THEIR RESPECTIVE "ENTRYPOINT" SET.
-    entrypoints:
-      - stack
+
+  # You need a `containers` yaml section for `stack image container`.
+  # A `container` section that does not contain a list is also valid.
+  containers:
+
+    # This example just has one container.
+    -
+      # You need a base image name. Stack layers exes on top of
+      # the base image. Prepare your project image in advance by
+      # putting all your runtime dependencies in the image.
+      base: "fpco/ubuntu-with-libgmp:14.04"
+
+      # You can optionally name the image. Stack will use the project
+      # directory name if you leave out this option.
+      name: "fpco/hello-world"
+
+      # Optionally add a directory to a path inside the docker image.
+      add:
+        man/: /usr/local/share/man/
+
+      # Optionally specify a list of executables. Stack will create
+      # a tagged image for each in the list. these images will have
+      # their respective "ENTRYPOINT" set.
+      entrypoints:
+        - stack
 ```
 
 and then run `stack image container` and then `docker images` to list
