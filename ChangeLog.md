@@ -113,6 +113,8 @@ Bug fixes:
   See [#3366](https://github.com/commercialhaskell/stack/pull/3366).
 * `stack script` can now handle relative paths to source files.
   See [#3372](https://github.com/commercialhaskell/stack/issues/3372).
+* RTD documentation search is replaced by the mkdocs search. Please
+  see [#3379](https://github.com/commercialhaskell/stack/pull/3379).
 
 
 ## 1.5.1
