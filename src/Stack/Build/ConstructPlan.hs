@@ -953,7 +953,7 @@ pprintExceptions exceptions stackYaml parentMap wanted =
                             map display path ++
                             [pkgIdent]
               where
-                pkgIdent = styleCurrent . display $ (packageIdentifier pkg)
+                pkgIdent = styleCurrent . display $ packageIdentifier pkg
     -- Skip these when they are redundant with 'NotInBuildPlan' info.
     pprintException (UnknownPackage name)
         | name `Set.member` allNotInBuildPlan = Nothing
