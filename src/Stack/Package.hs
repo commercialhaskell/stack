@@ -1173,13 +1173,12 @@ logPossibilities dirs mn = do
         [ flow "Unable to find a known candidate for the Cabal entry"
         , (styleModule . fromString $ D.display mn) <> ","
         , flow "but did find:"
-        , line <> bulletedList (map dispPoss possibilities)
+        , line <> bulletedList (map display possibilities)
         , flow "If you are using a custom preprocessor for this module"
         , flow "with its own file extension, consider adding the file(s)"
         , flow "to your .cabal under extra-source-files."
         ]
   where
-    dispPoss = styleFile . fromString . toFilePath
     makePossibilities name =
         mapM
             (\dir ->
