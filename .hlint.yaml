@@ -35,3 +35,7 @@
     "Stack.Docker"
   ]
 }
+
+# Pretty-printing
+- error: {lhs: "fromString . toFilePath", rhs: "display"}
+- ignore: {name: "Use display", within: "warnMultiple"}
