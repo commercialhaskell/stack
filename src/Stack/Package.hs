@@ -1237,8 +1237,7 @@ hpack pkgDir = do
     let hpackFile = pkgDir </> $(mkRelFile Hpack.packageConfig)
     exists <- liftIO $ doesFileExist hpackFile
     when exists $ do
-        let fpt = T.pack (toFilePath hpackFile)
-        logDebug $ "Running hpack on " <> fpt
+        prettyDebugL [flow "Running hpack on", display hpackFile]
 #if MIN_VERSION_hpack(0,18,0)
         r <- liftIO $ Hpack.hpackResult (Just $ toFilePath pkgDir)
 #else
@@ -1280,10 +1279,13 @@ resolveOrWarn subject resolver path =
      dir <- asks (parent . ctxFile)
      result <- resolver dir path
      when (isNothing result) $
-       logWarn ("Warning: " <> subject <> " listed in " <>
-         T.pack (maybe (FL.toFilePath file) FL.toFilePath (stripProperPrefix cwd file)) <>
-         " file does not exist: " <>
-         T.pack path)
+       prettyWarnL
+           [ fromString . T.unpack $ subject -- TODO: needs style?
+           , flow "listed in"
+           , maybe (display file) display (stripProperPrefix cwd file)
+           , flow "file does not exist:"
+           , styleDir . fromString $ path
+           ]
      return result
 
 -- | Resolve the file, if it can't be resolved, warn for the user
