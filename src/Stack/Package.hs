@@ -644,9 +644,12 @@ resolveGlobFiles =
             (\(e :: IOException) ->
                   if isUserError e
                       then do
-                          logWarn
-                              ("Wildcard does not match any files: " <> T.pack glob <> "\n" <>
-                               "in directory: " <> T.pack dir)
+                          prettyWarnL
+                              [ flow "Wildcard does not match any files:"
+                              , styleFile $ fromString glob
+                              , line <> flow "in directory:"
+                              , styleDir $ fromString dir
+                              ]
                           return []
                       else throwIO e)
 
@@ -665,7 +668,7 @@ resolveGlobFiles =
 -- ["test/package-dump/ghc-7.8.txt","test/package-dump/ghc-7.10.txt"]
 -- @
 --
-matchDirFileGlob_ :: (MonadLogger m, MonadIO m) => String -> String -> m [String]
+matchDirFileGlob_ :: (MonadLogger m, MonadIO m, HasRunner env, MonadReader env m) => String -> String -> m [String]
 matchDirFileGlob_ dir filepath = case parseFileGlob filepath of
   Nothing -> liftIO $ throwString $
       "invalid file glob '" ++ filepath
@@ -685,7 +688,11 @@ matchDirFileGlob_ dir filepath = case parseFileGlob filepath of
                     , not (null name) && isSuffixOf ext ext'
                     ]
     when (null matches) $
-        logWarn $ "WARNING: filepath wildcard '" <> T.pack filepath <> "' does not match any files."
+        prettyWarnL
+            [ flow "filepath wildcard"
+            , "'" <> styleFile (fromString filepath) <> "'"
+            , flow "does not match any files."
+            ]
     return matches
 
 -- | Get all files referenced by the benchmark.
@@ -1053,8 +1060,12 @@ parseDumpHI dumpHIPath = do
     thDepsResolved <- liftM catMaybes $ forM thDeps $ \x -> do
         mresolved <- liftIO (forgivingAbsence (resolveFile dir x)) >>= rejectMissingFile
         when (isNothing mresolved) $
-            logWarn $ "Warning: addDependentFile path (Template Haskell) listed in " <> T.pack dumpHIPath <>
-                " does not exist: " <> T.pack x
+            prettyWarnL
+                [ flow "addDependentFile path (Template Haskell) listed in"
+                , styleFile $ fromString dumpHIPath
+                , flow "does not exist:"
+                , styleFile $ fromString x
+                ]
         return mresolved
     return (moduleDeps, thDepsResolved)
 
@@ -1128,20 +1139,22 @@ findCandidate dirs exts name = do
 -- | Warn the user that multiple candidates are available for an
 -- entry, but that we picked one anyway and continued.
 warnMultiple
-    :: MonadLogger m
+    :: (MonadLogger m, HasRunner env, MonadReader env m)
     => DotCabalDescriptor -> Path b t -> [Path b t] -> m ()
 warnMultiple name candidate rest =
-    logWarn
-        ("There were multiple candidates for the Cabal entry \"" <>
-         showName name <>
-         "\" (" <>
-         T.intercalate "," (map (T.pack . toFilePath) rest) <>
-         "), picking " <>
-         T.pack (toFilePath candidate))
-  where showName (DotCabalModule name') = T.pack (D.display name')
-        showName (DotCabalMain fp) = T.pack fp
-        showName (DotCabalFile fp) = T.pack fp
-        showName (DotCabalCFile fp) = T.pack fp
+    -- TODO: figure out how to style 'name' and the dispOne stuff
+    prettyWarnL
+        [ flow "There were multiple candidates for the Cabal entry \""
+        , fromString . showName $ name
+        , line <> bulletedList (map dispOne rest)
+        , line <> flow "picking:"
+        , dispOne candidate
+        ]
+  where showName (DotCabalModule name') = D.display name'
+        showName (DotCabalMain fp) = fp
+        showName (DotCabalFile fp) = fp
+        showName (DotCabalCFile fp) = fp
+        dispOne = fromString . toFilePath
 
 -- | Log that we couldn't find a candidate, but there are
 -- possibilities for custom preprocessor extensions.
