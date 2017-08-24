@@ -2167,7 +2167,7 @@ but adds the `+RTS -xc` runtime option.
 
 `stack` now supports debugging and profiling with
 [DWARF information](https://ghc.haskell.org/trac/ghc/wiki/DWARF),
-using the `--no-strip`, `--no-library-stripping`, and `--no-executable-shipping`
+using the `--no-strip`, `--no-library-stripping`, and `--no-executable-stripping`
 flags to disable the default behavior of removing such information from compiled
 libraries and executables.
 
