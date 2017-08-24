@@ -70,6 +70,7 @@ import qualified Distribution.Types.LegacyExeDependency as Cabal
 import qualified Distribution.Types.UnqualComponentName as Cabal
 import qualified Distribution.Verbosity as D
 import           Distribution.Version (showVersion)
+import           Lens.Micro (lens)
 import qualified Hpack
 import qualified Hpack.Config as Hpack
 import           Path as FL
@@ -96,6 +97,22 @@ import qualified System.Directory as D
 import           System.FilePath (splitExtensions, replaceExtension)
 import qualified System.FilePath as FilePath
 import           System.IO.Error
+
+data Ctx = Ctx { ctxFile :: !(Path Abs File)
+               , ctxDir :: !(Path Abs Dir)
+               , ctxEnvConfig :: !EnvConfig
+               }
+
+instance HasPlatform Ctx
+instance HasGHCVariant Ctx
+instance HasLogFunc Ctx where
+    logFuncL = configL.logFuncL
+instance HasRunner Ctx where
+    runnerL = configL.runnerL
+instance HasConfig Ctx
+instance HasBuildConfig Ctx
+instance HasEnvConfig Ctx where
+    envConfigL = lens ctxEnvConfig (\x y -> x { ctxEnvConfig = y })
 
 -- | Read the raw, unresolved package information.
 readPackageUnresolved :: (MonadIO m, MonadThrow m)
@@ -269,10 +286,11 @@ packageFromPackageDescription packageConfig pkgFlags pkg =
         \cabalfp -> debugBracket ("getPackageFiles" <+> display cabalfp) $ do
              let pkgDir = parent cabalfp
              distDir <- distDirFromDir pkgDir
+             env <- view envConfigL
              (componentModules,componentFiles,dataFiles',warnings) <-
                  runReaderT
                      (packageDescModulesAndFiles pkg)
-                     (cabalfp, buildDir distDir)
+                     (Ctx cabalfp (buildDir distDir) env)
              setupFiles <-
                  if buildType pkg `elem` [Nothing, Just Custom]
                  then do
@@ -558,7 +576,7 @@ packageDescTools =
 
 -- | Get all files referenced by the package.
 packageDescModulesAndFiles
-    :: (MonadLogger m, MonadUnliftIO m, MonadReader (Path Abs File, Path Abs Dir) m, MonadThrow m)
+    :: (MonadLogger m, MonadUnliftIO m, MonadReader Ctx m, MonadThrow m)
     => PackageDescription
     -> m (Map NamedComponent (Set ModuleName), Map NamedComponent (Set DotCabalPath), Set (Path Abs File), [PackageWarning])
 packageDescModulesAndFiles pkg = do
@@ -603,7 +621,7 @@ packageDescModulesAndFiles pkg = do
     foldTuples = foldl' (<>) (M.empty, M.empty, [])
 
 -- | Resolve globbing of files (e.g. data files) to absolute paths.
-resolveGlobFiles :: (MonadLogger m,MonadUnliftIO m,MonadReader (Path Abs File, Path Abs Dir) m)
+resolveGlobFiles :: (MonadLogger m,MonadUnliftIO m,MonadReader Ctx m)
                  => [String] -> m (Set (Path Abs File))
 resolveGlobFiles =
     liftM (S.fromList . catMaybes . concat) .
@@ -614,7 +632,7 @@ resolveGlobFiles =
             then explode name
             else liftM return (resolveFileOrWarn name)
     explode name = do
-        dir <- asks (parent . fst)
+        dir <- asks (parent . ctxFile)
         names <-
             matchDirFileGlob'
                 (FL.toFilePath dir)
@@ -672,11 +690,11 @@ matchDirFileGlob_ dir filepath = case parseFileGlob filepath of
 
 -- | Get all files referenced by the benchmark.
 benchmarkFiles
-    :: (MonadLogger m, MonadIO m, MonadReader (Path Abs File, Path Abs Dir) m, MonadThrow m)
+    :: (MonadLogger m, MonadIO m, MonadReader Ctx m, MonadThrow m)
     => Benchmark -> m (Set ModuleName, Set DotCabalPath, [PackageWarning])
 benchmarkFiles bench = do
     dirs <- mapMaybeM resolveDirOrWarn (hsSourceDirs build)
-    dir <- asks (parent . fst)
+    dir <- asks (parent . ctxFile)
     (modules,files,warnings) <-
         resolveFilesAndDeps
             (Just $ Cabal.unUnqualComponentName $ benchmarkName bench)
@@ -695,12 +713,12 @@ benchmarkFiles bench = do
 
 -- | Get all files referenced by the test.
 testFiles
-    :: (MonadLogger m, MonadIO m, MonadReader (Path Abs File, Path Abs Dir) m, MonadThrow m)
+    :: (MonadLogger m, MonadIO m, MonadReader Ctx m, MonadThrow m)
     => TestSuite
     -> m (Set ModuleName, Set DotCabalPath, [PackageWarning])
 testFiles test = do
     dirs <- mapMaybeM resolveDirOrWarn (hsSourceDirs build)
-    dir <- asks (parent . fst)
+    dir <- asks (parent . ctxFile)
     (modules,files,warnings) <-
         resolveFilesAndDeps
             (Just $ Cabal.unUnqualComponentName $ testName test)
@@ -720,12 +738,12 @@ testFiles test = do
 
 -- | Get all files referenced by the executable.
 executableFiles
-    :: (MonadLogger m, MonadIO m, MonadReader (Path Abs File, Path Abs Dir) m, MonadThrow m)
+    :: (MonadLogger m, MonadIO m, MonadReader Ctx m, MonadThrow m)
     => Executable
     -> m (Set ModuleName, Set DotCabalPath, [PackageWarning])
 executableFiles exe = do
     dirs <- mapMaybeM resolveDirOrWarn (hsSourceDirs build)
-    dir <- asks (parent . fst)
+    dir <- asks (parent . ctxFile)
     (modules,files,warnings) <-
         resolveFilesAndDeps
             (Just $ Cabal.unUnqualComponentName $ exeName exe)
@@ -740,11 +758,11 @@ executableFiles exe = do
 
 -- | Get all files referenced by the library.
 libraryFiles
-    :: (MonadLogger m, MonadIO m, MonadReader (Path Abs File, Path Abs Dir) m, MonadThrow m)
+    :: (MonadLogger m, MonadIO m, MonadReader Ctx m, MonadThrow m)
     => Library -> m (Set ModuleName, Set DotCabalPath, [PackageWarning])
 libraryFiles lib = do
     dirs <- mapMaybeM resolveDirOrWarn (hsSourceDirs build)
-    dir <- asks (parent . fst)
+    dir <- asks (parent . ctxFile)
     (modules,files,warnings) <-
         resolveFilesAndDeps
             Nothing
@@ -760,7 +778,7 @@ libraryFiles lib = do
     build = libBuildInfo lib
 
 -- | Get all C sources and extra source files in a build.
-buildOtherSources :: (MonadLogger m,MonadIO m,MonadReader (Path Abs File, Path Abs Dir) m)
+buildOtherSources :: (MonadLogger m,MonadIO m,MonadReader Ctx m)
            => BuildInfo -> m (Set DotCabalPath)
 buildOtherSources build =
     do csources <- liftM
@@ -914,7 +932,7 @@ depRange (Dependency _ r) = r
 -- extensions, plus find any of their module and TemplateHaskell
 -- dependencies.
 resolveFilesAndDeps
-    :: (MonadIO m, MonadLogger m, MonadReader (Path Abs File, Path Abs Dir) m, MonadThrow m)
+    :: (MonadIO m, MonadLogger m, MonadReader Ctx m, MonadThrow m)
     => Maybe String         -- ^ Package component name
     -> [Path Abs Dir]       -- ^ Directories to look in.
     -> [DotCabalDescriptor] -- ^ Base names.
@@ -968,7 +986,7 @@ resolveFilesAndDeps component dirs names0 exts = do
         -- TODO: bring this back - see
         -- https://github.com/commercialhaskell/stack/issues/2649
         {-
-        cabalfp <- asks fst
+        cabalfp <- asks ctxFile
         return $
             if null missingModules
                then []
@@ -981,7 +999,7 @@ resolveFilesAndDeps component dirs names0 exts = do
 
 -- | Get the dependencies of a Haskell module file.
 getDependencies
-    :: (MonadReader (Path Abs File, Path Abs Dir) m, MonadIO m, MonadLogger m)
+    :: (MonadReader Ctx m, MonadIO m, MonadLogger m)
     => Maybe String -> DotCabalPath -> m (Set ModuleName, [Path Abs File])
 getDependencies component dotCabalPath =
     case dotCabalPath of
@@ -992,7 +1010,7 @@ getDependencies component dotCabalPath =
   where
     readResolvedHi resolvedFile = do
         dumpHIDir <- getDumpHIDir
-        dir <- asks (parent . fst)
+        dir <- asks (parent . ctxFile)
         case stripProperPrefix dir resolvedFile of
             Nothing -> return (S.empty, [])
             Just fileRel -> do
@@ -1005,15 +1023,15 @@ getDependencies component dotCabalPath =
                     then parseDumpHI dumpHIPath
                     else return (S.empty, [])
     getDumpHIDir = do
-        bld <- asks snd
+        bld <- asks ctxDir
         return $ maybe bld (bld </>) (getBuildComponentDir component)
 
 -- | Parse a .dump-hi file into a set of modules and files.
 parseDumpHI
-    :: (MonadReader (Path Abs File, void) m, MonadIO m, MonadLogger m)
+    :: (MonadReader Ctx m, MonadIO m, MonadLogger m)
     => FilePath -> m (Set ModuleName, [Path Abs File])
 parseDumpHI dumpHIPath = do
-    dir <- asks (parent . fst)
+    dir <- asks (parent . ctxFile)
     dumpHI <- liftIO $ fmap C8.lines (C8.readFile dumpHIPath)
     let startModuleDeps =
             dropWhile (not . ("module dependencies:" `C8.isPrefixOf`)) dumpHI
@@ -1044,7 +1062,7 @@ parseDumpHI dumpHIPath = do
 -- looking for unique instances of base names applied with the given
 -- extensions.
 resolveFiles
-    :: (MonadIO m, MonadLogger m, MonadThrow m, MonadReader (Path Abs File, Path Abs Dir) m)
+    :: (MonadIO m, MonadLogger m, MonadThrow m, MonadReader Ctx m)
     => [Path Abs Dir] -- ^ Directories to look in.
     -> [DotCabalDescriptor] -- ^ Base names.
     -> [Text] -- ^ Extensions.
@@ -1055,13 +1073,13 @@ resolveFiles dirs names exts =
 -- | Find a candidate for the given module-or-filename from the list
 -- of directories and given extensions.
 findCandidate
-    :: (MonadIO m, MonadLogger m, MonadThrow m, MonadReader (Path Abs File, Path Abs Dir) m)
+    :: (MonadIO m, MonadLogger m, MonadThrow m, MonadReader Ctx m)
     => [Path Abs Dir]
     -> [Text]
     -> DotCabalDescriptor
     -> m (Maybe DotCabalPath)
 findCandidate dirs exts name = do
-    pkg <- asks fst >>= parsePackageNameFromFilePath
+    pkg <- asks ctxFile >>= parsePackageNameFromFilePath
     candidates <- liftIO makeNameCandidates
     case candidates of
         [candidate] -> return (Just (cons candidate))
@@ -1233,15 +1251,15 @@ buildLogPath package' msuffix = do
   return $ stack </> $(mkRelDir "logs") </> fp
 
 -- Internal helper to define resolveFileOrWarn and resolveDirOrWarn
-resolveOrWarn :: (MonadLogger m, MonadIO m, MonadReader (Path Abs File, Path Abs Dir) m)
+resolveOrWarn :: (MonadLogger m, MonadIO m, MonadReader Ctx m)
               => Text
               -> (Path Abs Dir -> String -> m (Maybe a))
               -> FilePath.FilePath
               -> m (Maybe a)
 resolveOrWarn subject resolver path =
   do cwd <- liftIO getCurrentDir
-     file <- asks fst
-     dir <- asks (parent . fst)
+     file <- asks ctxFile
+     dir <- asks (parent . ctxFile)
      result <- resolver dir path
      when (isNothing result) $
        logWarn ("Warning: " <> subject <> " listed in " <>
@@ -1252,7 +1270,7 @@ resolveOrWarn subject resolver path =
 
 -- | Resolve the file, if it can't be resolved, warn for the user
 -- (purely to be helpful).
-resolveFileOrWarn :: (MonadIO m,MonadLogger m,MonadReader (Path Abs File, Path Abs Dir) m)
+resolveFileOrWarn :: (MonadIO m,MonadLogger m,MonadReader Ctx m)
                   => FilePath.FilePath
                   -> m (Maybe (Path Abs File))
 resolveFileOrWarn = resolveOrWarn "File" f
@@ -1260,7 +1278,7 @@ resolveFileOrWarn = resolveOrWarn "File" f
 
 -- | Resolve the directory, if it can't be resolved, warn for the user
 -- (purely to be helpful).
-resolveDirOrWarn :: (MonadIO m,MonadLogger m,MonadReader (Path Abs File, Path Abs Dir) m)
+resolveDirOrWarn :: (MonadIO m,MonadLogger m,MonadReader Ctx m)
                  => FilePath.FilePath
                  -> m (Maybe (Path Abs Dir))
 resolveDirOrWarn = resolveOrWarn "Directory" f
