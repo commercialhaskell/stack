@@ -168,7 +168,9 @@ readPackageBS packageConfig loc bs =
 
 -- | Get 'GenericPackageDescription' and 'PackageDescription' reading info
 -- from given directory.
-readPackageDescriptionDir :: (MonadLogger m, MonadIO m, MonadThrow m)
+readPackageDescriptionDir
+  :: (MonadLogger m, MonadIO m, MonadThrow m, HasRunner env,
+      MonadReader env m)
   => PackageConfig
   -> Path Abs Dir
   -> m (GenericPackageDescription, PackageDescription)
@@ -1199,7 +1201,8 @@ logPossibilities dirs mn = do
 -- If the directory contains a file named package.yaml, hpack is used to
 -- generate a .cabal file from it.
 findOrGenerateCabalFile
-    :: forall m. (MonadIO m, MonadLogger m)
+    :: forall m env.
+          (MonadIO m, MonadLogger m, HasRunner env, MonadReader env m)
     => Path Abs Dir -- ^ package directory
     -> m (Path Abs File)
 findOrGenerateCabalFile pkgDir = do
@@ -1228,7 +1231,8 @@ findOrGenerateCabalFile pkgDir = do
       where hasExtension fp x = FilePath.takeExtension fp == "." ++ x
 
 -- | Generate .cabal file from package.yaml, if necessary.
-hpack :: (MonadIO m, MonadLogger m) => Path Abs Dir -> m ()
+hpack :: (MonadIO m, MonadLogger m, HasRunner env, MonadReader env m)
+      => Path Abs Dir -> m ()
 hpack pkgDir = do
     let hpackFile = pkgDir </> $(mkRelFile Hpack.packageConfig)
     exists <- liftIO $ doesFileExist hpackFile
@@ -1240,17 +1244,18 @@ hpack pkgDir = do
 #else
         r <- liftIO $ Hpack.hpackResult (toFilePath pkgDir)
 #endif
-        forM_ (Hpack.resultWarnings r) $ \w -> logWarn ("WARNING: " <> T.pack w)
-        let cabalFile = T.pack (Hpack.resultCabalFile r)
+        forM_ (Hpack.resultWarnings r) prettyWarnS
+        let cabalFile = styleFile . fromString . Hpack.resultCabalFile $ r
         case Hpack.resultStatus r of
-            Hpack.Generated -> logDebug $
-                "hpack generated a modified version of " <> cabalFile
-            Hpack.OutputUnchanged -> logDebug $
-                "hpack output unchanged in " <> cabalFile
-            -- NOTE: this is 'logInfo' so it will be outputted to the
-            -- user by default.
-            Hpack.AlreadyGeneratedByNewerHpack -> logWarn $
-                "WARNING: " <> cabalFile <> " was generated with a newer version of hpack, please upgrade and try again."
+            Hpack.Generated -> prettyDebugL
+                [flow "hpack generated a modified version of", cabalFile]
+            Hpack.OutputUnchanged -> prettyDebugL
+                [flow "hpack output unchanged in", cabalFile]
+            Hpack.AlreadyGeneratedByNewerHpack -> prettyWarnL
+                [ display cabalFile
+                , flow "was generated with a newer version of hpack,"
+                , flow "please upgrade and try again."
+                ]
 
 -- | Path for the package's build log.
 buildLogPath :: (MonadReader env m, HasBuildConfig env, MonadThrow m)
