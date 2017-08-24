@@ -16,7 +16,7 @@ module Stack.PrettyPrint
       -- | These are preferred to styling or colors directly, so that we can
       -- encourage consistency.
     , styleWarning, styleError, styleGood
-    , styleShell, styleFile, styleDir
+    , styleShell, styleFile, styleDir, styleModule
     , styleCurrent, styleTarget
     , displayMilliseconds
       -- * Formatting utils
@@ -183,6 +183,10 @@ styleCurrent = yellow
 -- TODO: figure out how to describe this
 styleTarget :: AnsiDoc -> AnsiDoc
 styleTarget = cyan
+
+-- | Style an 'AnsiDoc' as a module name
+styleModule :: AnsiDoc -> AnsiDoc
+styleModule = magenta -- TODO: what color should this be?
 
 instance Display PackageName where
     display = fromString . packageNameString
