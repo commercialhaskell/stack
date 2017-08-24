@@ -1164,22 +1164,22 @@ warnMultiple name candidate rest =
 -- For example: .erb for a Ruby file might exist in one of the
 -- directories.
 logPossibilities
-    :: (MonadIO m, MonadThrow m, MonadLogger m)
+    :: (MonadIO m, MonadThrow m, MonadLogger m, HasRunner env,
+        MonadReader env m)
     => [Path Abs Dir] -> ModuleName -> m ()
 logPossibilities dirs mn = do
     possibilities <- liftM concat (makePossibilities mn)
-    case possibilities of
-        [] -> return ()
-        _ ->
-            logWarn
-                ("Unable to find a known candidate for the Cabal entry \"" <>
-                 T.pack (D.display mn) <>
-                 "\", but did find: " <>
-                 T.intercalate ", " (map (T.pack . toFilePath) possibilities) <>
-                 ". If you are using a custom preprocessor for this module " <>
-                 "with its own file extension, consider adding the file(s) " <>
-                 "to your .cabal under extra-source-files.")
+    unless (null possibilities) $ prettyWarnL
+        [ flow "Unable to find a known candidate for the Cabal entry"
+        , (styleModule . fromString $ D.display mn) <> ","
+        , flow "but did find:"
+        , line <> bulletedList (map dispPoss possibilities)
+        , flow "If you are using a custom preprocessor for this module"
+        , flow "with its own file extension, consider adding the file(s)"
+        , flow "to your .cabal under extra-source-files."
+        ]
   where
+    dispPoss = styleFile . fromString . toFilePath
     makePossibilities name =
         mapM
             (\dir ->
@@ -1252,7 +1252,7 @@ hpack pkgDir = do
             Hpack.OutputUnchanged -> prettyDebugL
                 [flow "hpack output unchanged in", cabalFile]
             Hpack.AlreadyGeneratedByNewerHpack -> prettyWarnL
-                [ display cabalFile
+                [ cabalFile
                 , flow "was generated with a newer version of hpack,"
                 , flow "please upgrade and try again."
                 ]
