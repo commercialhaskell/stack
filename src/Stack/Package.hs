@@ -1157,6 +1157,8 @@ warnMultiple name candidate rest =
         showName (DotCabalFile fp) = fp
         showName (DotCabalCFile fp) = fp
         dispOne = fromString . toFilePath
+          -- TODO: figure out why dispOne can't be just `display`
+          --       (remove the .hlint.yaml exception if it can be)
 
 -- | Log that we couldn't find a candidate, but there are
 -- possibilities for custom preprocessor extensions.
