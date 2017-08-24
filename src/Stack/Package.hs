@@ -90,6 +90,7 @@ import           Stack.Types.GhcPkgId
 import           Stack.Types.Package
 import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageName
+import           Stack.Types.Runner
 import           Stack.Types.Version
 import qualified System.Directory as D
 import           System.FilePath (splitExtensions, replaceExtension)
@@ -172,21 +173,22 @@ readDotBuildinfo buildinfofp =
 
 -- | Print cabal file warnings.
 printCabalFileWarning
-    :: (MonadLogger m)
+    :: (MonadLogger m, HasRunner env, MonadReader env m)
     => Path Abs File -> PWarning -> m ()
 printCabalFileWarning cabalfp =
     \case
         (PWarning x) ->
-            logWarn
-                ("Cabal file warning in " <> T.pack (toFilePath cabalfp) <>
-                 ": " <>
-                 T.pack x)
+            prettyWarnL
+                [ flow "Cabal file warning in"
+                , display cabalfp <> ":"
+                , flow x
+                ]
         (UTFWarning ln msg) ->
-            logWarn
-                ("Cabal file warning in " <> T.pack (toFilePath cabalfp) <> ":" <>
-                 T.pack (show ln) <>
-                 ": " <>
-                 T.pack msg)
+            prettyWarnL
+                [ flow "Cabal file warning in"
+                , display cabalfp <> ":" <> fromString (show ln) <> ":"
+                , flow msg
+                ]
 
 -- | Check if the given name in the @Package@ matches the name of the .cabal file
 checkCabalFileName :: MonadThrow m => PackageName -> Path Abs File -> m ()
