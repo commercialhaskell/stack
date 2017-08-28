@@ -434,7 +434,7 @@ such hardening flags by default which may be the cause of some instances of the
 problem. Therefore, a possible workaround might be to turn off PIE related
 flags.
 
-In Arch Linux, install the package `ncurses5-compat-libs` from AUR resolves this issue [see issue](https://github.com/commercialhaskell/stack/issues/2712).
+On Arch Linux, install the package `ncurses5-compat-libs` from AUR to resolve [this issue](https://github.com/commercialhaskell/stack/issues/2712).
 
 ## Where does the output from `--ghc-options=-ddump-splices` (and other `-ddump*` options) go?
 
