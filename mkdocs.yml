@@ -36,3 +36,6 @@ pages:
 markdown_extensions:
 - toc:
     permalink: true
+
+extra_javascript:
+- etc/mkdocsjs/searchhack.js
