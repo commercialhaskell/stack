@@ -113,7 +113,9 @@ Bug fixes:
   See [#3366](https://github.com/commercialhaskell/stack/pull/3366).
 * `stack script` can now handle relative paths to source files.
   See [#3372](https://github.com/commercialhaskell/stack/issues/3372).
-
+* Fixes explanation of why a target is needed by the build plan, when the
+  target is an extra dependency from the commandline.
+  See [#3378](https://github.com/commercialhaskell/stack/issues/3378).
 
 ## 1.5.1
 

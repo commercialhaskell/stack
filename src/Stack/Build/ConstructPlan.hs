@@ -185,8 +185,9 @@ constructPlan ls0 baseConfigOpts0 locals extraToBuild0 localDumpPkgs loadPackage
             mapM_ onWanted $ filter lpWanted locals
             mapM_ (addDep False) $ Set.toList extraToBuild0
     lp <- getLocalPackages
+    let ctx = mkCtx econfig (unliftIO u . getPackageVersions) lp
     ((), m, W efinals installExes dirtyReason deps warnings parents) <-
-        liftIO $ runRWST inner (ctx econfig (unliftIO u . getPackageVersions) lp) M.empty
+        liftIO $ runRWST inner ctx M.empty
     mapM_ logWarn (warnings [])
     let toEither (_, Left e)  = Left e
         toEither (k, Right v) = Right (k, v)
@@ -216,10 +217,10 @@ constructPlan ls0 baseConfigOpts0 locals extraToBuild0 localDumpPkgs loadPackage
         else do
             planDebug $ show errs
             stackYaml <- view stackYamlL
-            prettyError $ pprintExceptions errs stackYaml parents (wantedLocalPackages locals)
+            prettyError $ pprintExceptions errs stackYaml parents (wanted ctx)
             throwM $ ConstructPlanFailed "Plan construction failed."
   where
-    ctx econfig getVersions0 lp = Ctx
+    mkCtx econfig getVersions0 lp = Ctx
         { ls = ls0
         , baseConfigOpts = baseConfigOpts0
         , loadPackage = loadPackage0
