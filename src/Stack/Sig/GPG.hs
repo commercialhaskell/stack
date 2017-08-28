@@ -1,7 +1,6 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE TupleSections #-}
 
 {-|
 Module      : Stack.Sig.GPG

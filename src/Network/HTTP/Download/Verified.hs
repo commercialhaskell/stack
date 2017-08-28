@@ -2,7 +2,6 @@
 {-# LANGUAGE CPP                   #-}
 {-# LANGUAGE DeriveDataTypeable    #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE PackageImports        #-}
 {-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
 {-# LANGUAGE RecordWildCards       #-}

@@ -2,13 +2,10 @@
 {-# LANGUAGE ConstraintKinds    #-}
 {-# LANGUAGE DataKinds          #-}
 {-# LANGUAGE DeriveDataTypeable #-}
-{-# LANGUAGE DeriveGeneric      #-}
-{-# LANGUAGE EmptyDataDecls     #-}
 {-# LANGUAGE FlexibleContexts   #-}
 {-# LANGUAGE GADTs              #-}
 {-# LANGUAGE OverloadedStrings  #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TupleSections      #-}
 
 -- | Resolving a build plan for a set of packages in a given Stackage
 -- snapshot.

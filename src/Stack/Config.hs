@@ -161,7 +161,7 @@ getSnapshots = do
     latestUrl <- parseUrlThrow (T.unpack latestUrlText)
     logDebug $ "Downloading snapshot versions file from " <> latestUrlText
     result <- httpJSON latestUrl
-    logDebug $ "Done downloading and parsing snapshot versions file"
+    logDebug "Done downloading and parsing snapshot versions file"
     return $ getResponseBody result
 
 -- | Turn an 'AbstractResolver' into a 'Resolver'.
@@ -909,7 +909,7 @@ loadProjectConfig mstackYaml = do
                         T.pack (maybe (toFilePath fp) toFilePath (stripProperPrefix currDir fp))
             LCSProject <$> load fp
         LCSNoProject -> do
-            logDebug $ "No project config file found, using defaults."
+            logDebug "No project config file found, using defaults."
             return LCSNoProject
         LCSNoConfig mparentDir -> do
             logDebug "Ignoring config files"

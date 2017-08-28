@@ -970,7 +970,7 @@ withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} md
                 warnCustomNoDeps =
                     case (taskType, packageBuildType package) of
                         (TTFiles lp Local, Just C.Custom) | lpWanted lp -> do
-                            prettyWarnL $
+                            prettyWarnL
                                 [ flow "Package"
                                 , display $ packageName package
                                 , flow "uses a custom Cabal build, but does not use a custom-setup stanza"

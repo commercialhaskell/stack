@@ -1,10 +1,8 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE DataKinds          #-}
 {-# LANGUAGE GADTs              #-}
-{-# LANGUAGE KindSignatures     #-}
 {-# LANGUAGE OverloadedStrings  #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TupleSections      #-}
 {-# LANGUAGE ViewPatterns       #-}
 -- | Parsing command line targets

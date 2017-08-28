@@ -3,7 +3,6 @@
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE RankNTypes            #-}
-{-# LANGUAGE ViewPatterns          #-}
 {-# LANGUAGE DeriveDataTypeable    #-}
 {-# LANGUAGE TypeFamilies          #-}
 -- Create a source distribution tarball

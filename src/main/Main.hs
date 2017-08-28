@@ -1,13 +1,15 @@
 {-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE TupleSections #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE RecordWildCards #-}
+
+#ifdef USE_GIT_INFO
+{-# LANGUAGE TemplateHaskell #-}
+#endif
 
 -- | Main stack tool entry point.
 
@@ -655,7 +657,7 @@ uploadCmd sdistOpts go = do
     withBuildConfigAndLock go $ \_ -> do
         unless (null invalid) $ do
             let invalidList = bulletedList $ map (styleFile . fromString) invalid
-            prettyErrorL $
+            prettyErrorL
                 [ styleShell "stack upload"
                 , flow "expects a list of sdist tarballs or cabal directories."
                 , flow "Can't find:"

@@ -1,7 +1,6 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE OverloadedStrings #-}
 
 #if __GLASGOW_HASKELL__ >= 800
 {-# OPTIONS_GHC -Wno-redundant-constraints #-}

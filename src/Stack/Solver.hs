@@ -446,7 +446,7 @@ solveResolverSpec stackYaml cabalDirs
 
             return $ Right (srcs, external)
         Left x -> do
-            logInfo $ "*** Failed to arrive at a workable build plan."
+            logInfo "*** Failed to arrive at a workable build plan."
             return $ Left x
     where
         -- Think of the first map as the deps reported in cabal output and
@@ -527,7 +527,7 @@ cabalPackagesCheck cabalfps noPkgMsg dupErrMsg = do
         error noPkgMsg
 
     relpaths <- mapM prettyPath cabalfps
-    logInfo $ "Using cabal packages:"
+    logInfo "Using cabal packages:"
     logInfo $ T.pack (formatGroup relpaths)
 
     (warnings, gpds) <- mapAndUnzipM readPackageUnresolved cabalfps
@@ -591,7 +591,7 @@ reportMissingCabalFiles cabalfps includeSubdirs = do
 
     relpaths <- mapM prettyPath (allCabalfps \\ cabalfps)
     unless (null relpaths) $ do
-        logWarn $ "The following packages are missing from the config:"
+        logWarn "The following packages are missing from the config:"
         logWarn $ T.pack (formatGroup relpaths)
 
 -- TODO Currently solver uses a stack.yaml in the parent chain when there is
