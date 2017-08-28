@@ -436,7 +436,7 @@ selectBestSnapshot
     -> NonEmpty SnapshotDef
     -> RIO env (SnapshotDef, BuildPlanCheck)
 selectBestSnapshot root gpds snaps = do
-    $logInfo $ "Selecting the best among "
+    logInfo $ "Selecting the best among "
                <> T.pack (show (NonEmpty.length snaps))
                <> " snapshots...\n"
     F.foldr1 go (NonEmpty.map getResult snaps)
@@ -457,16 +457,16 @@ selectBestSnapshot root gpds snaps = do
           | otherwise = (s2, r2)
 
         reportResult BuildPlanCheckOk {} snap = do
-            $logInfo $ "* Matches " <> sdResolverName snap
-            $logInfo ""
+            logInfo $ "* Matches " <> sdResolverName snap
+            logInfo ""
 
         reportResult r@BuildPlanCheckPartial {} snap = do
-            $logWarn $ "* Partially matches " <> sdResolverName snap
-            $logWarn $ indent $ T.pack $ show r
+            logWarn $ "* Partially matches " <> sdResolverName snap
+            logWarn $ indent $ T.pack $ show r
 
         reportResult r@BuildPlanCheckFail {} snap = do
-            $logWarn $ "* Rejected " <> sdResolverName snap
-            $logWarn $ indent $ T.pack $ show r
+            logWarn $ "* Rejected " <> sdResolverName snap
+            logWarn $ indent $ T.pack $ show r
 
         indent t = T.unlines $ fmap ("    " <>) (T.lines t)
 

@@ -45,12 +45,12 @@ storeEncodeFile :: (Store a, MonadIO m, MonadLogger m, Eq a)
                 -> m ()
 storeEncodeFile pokeFunc peekFunc fp x = do
     let fpt = T.pack (toFilePath fp)
-    $logDebug $ "Encoding " <> fpt
+    logDebug $ "Encoding " <> fpt
     ensureDir (parent fp)
     let (sz, poker) = pokeFunc x
         encoded = unsafeEncodeWith poker sz
     assert (decodeExWith peekFunc encoded == x) $ liftIO $ BS.writeFile (toFilePath fp) encoded
-    $logDebug $ "Finished writing " <> fpt
+    logDebug $ "Finished writing " <> fpt
 
 -- | Read from the given file. If the read fails, run the given action and
 -- write that back to the file. Always starts the file off with the
@@ -63,14 +63,14 @@ versionedDecodeOrLoadImpl :: (Store a, Eq a, MonadUnliftIO m, MonadLogger m)
                           -> m a
 versionedDecodeOrLoadImpl pokeFunc peekFunc fp mx = do
     let fpt = T.pack (toFilePath fp)
-    $logDebug $ "Trying to decode " <> fpt
+    logDebug $ "Trying to decode " <> fpt
     mres <- versionedDecodeFileImpl peekFunc fp
     case mres of
         Just x -> do
-            $logDebug $ "Success decoding " <> fpt
+            logDebug $ "Success decoding " <> fpt
             return x
         _ -> do
-            $logDebug $ "Failure decoding " <> fpt
+            logDebug $ "Failure decoding " <> fpt
             x <- mx
             storeEncodeFile pokeFunc peekFunc fp x
             return x
@@ -81,14 +81,14 @@ versionedDecodeFileImpl :: (Store a, MonadUnliftIO m, MonadLogger m)
                         -> m (Maybe a)
 versionedDecodeFileImpl peekFunc fp = do
     mbs <- liftIO (Just <$> BS.readFile (toFilePath fp)) `catch` \(err :: IOException) -> do
-        $logDebug ("Exception ignored when attempting to load " <> T.pack (toFilePath fp) <> ": " <> T.pack (show err))
+        logDebug ("Exception ignored when attempting to load " <> T.pack (toFilePath fp) <> ": " <> T.pack (show err))
         return Nothing
     case mbs of
         Nothing -> return Nothing
         Just bs ->
             liftIO (Just <$> decodeIOWith peekFunc bs) `catch` \(err :: PeekException) -> do
                  let fpt = T.pack (toFilePath fp)
-                 $logDebug ("Error while decoding " <> fpt <> ": " <> T.pack (show err) <> " (this might not be an error, when switching between stack versions)")
+                 logDebug ("Error while decoding " <> fpt <> ": " <> T.pack (show err) <> " (this might not be an error, when switching between stack versions)")
                  return Nothing
 
 storeVersionConfig :: String -> String -> VersionConfig a

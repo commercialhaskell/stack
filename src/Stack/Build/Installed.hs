@@ -58,7 +58,7 @@ getInstalled :: HasEnvConfig env
                   , [DumpPackage () () ()] -- locally installed
                   )
 getInstalled menv opts sourceMap = do
-    $logDebug "Finding out which packages are already installed"
+    logDebug "Finding out which packages are already installed"
     snapDBPath <- packageDatabaseDeps
     localDBPath <- packageDatabaseLocal
     extraDBPaths <- packageDatabaseExtra
@@ -178,7 +178,7 @@ processLoadResult _ True (WrongVersion actual wanted, lh)
     -- Allow some packages in the ghcjs global DB to have the wrong
     -- versions.  Treat them as wired-ins by setting deps to [].
     | fst (lhPair lh) `HashSet.member` ghcjsBootPackages = do
-        $logWarn $ T.concat
+        logWarn $ T.concat
             [ "Ignoring that the GHCJS boot package \""
             , packageNameText (fst (lhPair lh))
             , "\" has a different version, "
@@ -188,7 +188,7 @@ processLoadResult _ True (WrongVersion actual wanted, lh)
             ]
         return (Just lh)
 processLoadResult mdb _ (reason, lh) = do
-    $logDebug $ T.concat $
+    logDebug $ T.concat $
         [ "Ignoring package "
         , packageNameText (fst (lhPair lh))
         ] ++

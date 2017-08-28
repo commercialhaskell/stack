@@ -105,7 +105,7 @@ logJSONWarnings
     :: MonadLogger m
     => FilePath -> [JSONWarning] -> m ()
 logJSONWarnings fp =
-    mapM_ (\w -> $logWarn ("Warning: " <> T.pack fp <> ": " <> T.pack (show w)))
+    mapM_ (\w -> logWarn ("Warning: " <> T.pack fp <> ": " <> T.pack (show w)))
 
 -- | Handle warnings in a sub-object.
 jsonSubWarnings :: WarningParser (WithJSONWarnings a) -> WarningParser a

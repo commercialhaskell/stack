@@ -108,13 +108,13 @@ resolveSinglePackageLocation _ projRoot (PLArchive (Archive url subdir msha)) = 
         let fp = toFilePath file
 
         let tryTar = do
-                $logDebug $ "Trying to untar " <> T.pack fp
+                logDebug $ "Trying to untar " <> T.pack fp
                 liftIO $ withBinaryFile fp ReadMode $ \h -> do
                     lbs <- L.hGetContents h
                     let entries = Tar.read $ GZip.decompress lbs
                     Tar.unpack (toFilePath dirTmp) entries
             tryZip = do
-                $logDebug $ "Trying to unzip " <> T.pack fp
+                logDebug $ "Trying to unzip " <> T.pack fp
                 archive <- fmap Zip.toArchive $ liftIO $ L.readFile fp
                 liftIO $  Zip.extractFilesFromArchive [Zip.OptDestination
                                                        (toFilePath dirTmp)] archive
@@ -122,7 +122,7 @@ resolveSinglePackageLocation _ projRoot (PLArchive (Archive url subdir msha)) = 
 
             catchAnyLog goodpath handler =
                 catchAny goodpath $ \e -> do
-                    $logDebug $ "Got exception: " <> T.pack (show e)
+                    logDebug $ "Got exception: " <> T.pack (show e)
                     handler
 
         tryTar `catchAnyLog` tryZip `catchAnyLog` err
@@ -215,7 +215,7 @@ cloneRepo menv projRoot url commit repoType' = do
                     (resetCommand ++ [T.unpack commit, "--"])
                     `catch` \case
                         ex@ProcessFailed{} -> do
-                            $logInfo $ "Please ensure that commit " <> commit <> " exists within " <> url
+                            logInfo $ "Please ensure that commit " <> commit <> " exists within " <> url
                             throwM ex
                         ex -> throwM ex
 

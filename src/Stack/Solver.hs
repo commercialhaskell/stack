@@ -132,15 +132,15 @@ cabalSolver menv cabalfps constraintType
             msg = LT.toStrict $ decodeUtf8With lenientDecode err
 
         if errCheck msg then do
-            $logInfo "Attempt failed.\n"
-            $logInfo $ cabalBuildErrMsg msg
+            logInfo "Attempt failed.\n"
+            logInfo $ cabalBuildErrMsg msg
             let pkgs = parseConflictingPkgs msg
                 mPkgNames = map (C.simpleParse . T.unpack) pkgs
                 pkgNames  = map (fromCabalPackageName . C.pkgName)
                                 (catMaybes mPkgNames)
 
             when (any isNothing mPkgNames) $ do
-                  $logInfo $ "*** Only some package names could be parsed: " <>
+                  logInfo $ "*** Only some package names could be parsed: " <>
                       T.pack (intercalate ", " (map show pkgNames))
                   error $ T.unpack $
                        "*** User packages involved in cabal failure: "
@@ -323,7 +323,7 @@ setupCabalEnv compiler = do
     mver <- getSystemCompiler menv (whichCompiler compiler)
     version <- case mver of
         Just (version, _) -> do
-            $logInfo $ "Using compiler: " <> compilerVersionText version
+            logInfo $ "Using compiler: " <> compilerVersionText version
             return version
         Nothing -> error "Failed to determine compiler version. \
                          \This is most likely a bug."
@@ -373,7 +373,7 @@ solveResolverSpec
 
 solveResolverSpec stackYaml cabalDirs
                   (sd, srcConstraints, extraConstraints) = do
-    $logInfo $ "Using resolver: " <> sdResolverName sd
+    logInfo $ "Using resolver: " <> sdResolverName sd
     let wantedCompilerVersion = sdWantedCompilerVersion sd
     (menv, compilerVersion) <- setupCabalEnv wantedCompilerVersion
     (compilerVer, snapConstraints) <- getResolverConstraints menv (Just compilerVersion) stackYaml sd
@@ -396,14 +396,14 @@ solveResolverSpec stackYaml cabalDirs
           [T.pack (show (Map.size extraConstraints) <> " external packages")
               | not (Map.null extraConstraints)]
 
-    $logInfo "Asking cabal to calculate a build plan..."
+    logInfo "Asking cabal to calculate a build plan..."
     unless (Map.null depOnlyConstraints)
-        ($logInfo $ "Trying with " <> srcNames <> " as hard constraints...")
+        (logInfo $ "Trying with " <> srcNames <> " as hard constraints...")
 
     eresult <- solver Constraint
     eresult' <- case eresult of
         Left _ | not (Map.null depOnlyConstraints) -> do
-            $logInfo $ "Retrying with " <> srcNames <> " as preferences..."
+            logInfo $ "Retrying with " <> srcNames <> " as preferences..."
             solver Preference
         _ -> return eresult
 
@@ -440,13 +440,13 @@ solveResolverSpec stackYaml cabalDirs
                 error $ T.unpack $ msg
                         <> showItems (map show (Map.toList bothVers))
 
-            $logInfo $ "Successfully determined a build plan with "
+            logInfo $ "Successfully determined a build plan with "
                      <> T.pack (show $ Map.size external)
                      <> " external dependencies."
 
             return $ Right (srcs, external)
         Left x -> do
-            $logInfo $ "*** Failed to arrive at a workable build plan."
+            logInfo $ "*** Failed to arrive at a workable build plan."
             return $ Left x
     where
         -- Think of the first map as the deps reported in cabal output and
@@ -527,8 +527,8 @@ cabalPackagesCheck cabalfps noPkgMsg dupErrMsg = do
         error noPkgMsg
 
     relpaths <- mapM prettyPath cabalfps
-    $logInfo $ "Using cabal packages:"
-    $logInfo $ T.pack (formatGroup relpaths)
+    logInfo $ "Using cabal packages:"
+    logInfo $ T.pack (formatGroup relpaths)
 
     (warnings, gpds) <- mapAndUnzipM readPackageUnresolved cabalfps
     zipWithM_ (mapM_ . printCabalFileWarning) cabalfps warnings
@@ -566,11 +566,11 @@ cabalPackagesCheck cabalfps noPkgMsg dupErrMsg = do
 
     when (dupIgnored /= []) $ do
         dups <- mapM (mapM (prettyPath. fst)) (dupGroups packages)
-        $logWarn $ T.pack $
+        logWarn $ T.pack $
             "Following packages have duplicate package names:\n"
             <> intercalate "\n" (map formatGroup dups)
         case dupErrMsg of
-          Nothing -> $logWarn $ T.pack $
+          Nothing -> logWarn $ T.pack $
                  "Packages with duplicate names will be ignored.\n"
               <> "Packages in upper level directories will be preferred.\n"
           Just msg -> error msg
@@ -591,8 +591,8 @@ reportMissingCabalFiles cabalfps includeSubdirs = do
 
     relpaths <- mapM prettyPath (allCabalfps \\ cabalfps)
     unless (null relpaths) $ do
-        $logWarn $ "The following packages are missing from the config:"
-        $logWarn $ T.pack (formatGroup relpaths)
+        logWarn $ "The following packages are missing from the config:"
+        logWarn $ T.pack (formatGroup relpaths)
 
 -- TODO Currently solver uses a stack.yaml in the parent chain when there is
 -- no stack.yaml in the current directory. It should instead look for a
@@ -613,7 +613,7 @@ solveExtraDeps modStackYaml = do
     let stackYaml = bcStackYaml bconfig
     relStackYaml <- prettyPath stackYaml
 
-    $logInfo $ "Using configuration file: " <> T.pack relStackYaml
+    logInfo $ "Using configuration file: " <> T.pack relStackYaml
     lp <- getLocalPackages
     let packages = lpProject lp
     let noPkgMsg = "No cabal packages found in " <> relStackYaml <>
@@ -680,8 +680,8 @@ solveExtraDeps modStackYaml = do
                   || any (/= void resolver) (fmap void mOldResolver)
 
     if changed then do
-        $logInfo ""
-        $logInfo $ "The following changes will be made to "
+        logInfo ""
+        logInfo $ "The following changes will be made to "
                    <> T.pack relStackYaml <> ":"
 
         printResolver (fmap void mOldResolver) (void resolver)
@@ -695,12 +695,12 @@ solveExtraDeps modStackYaml = do
         -- TODO backup the old config file
         if modStackYaml then do
             writeStackYaml stackYaml resolver versions flags
-            $logInfo $ "Updated " <> T.pack relStackYaml
+            logInfo $ "Updated " <> T.pack relStackYaml
         else do
-            $logInfo $ "To automatically update " <> T.pack relStackYaml
+            logInfo $ "To automatically update " <> T.pack relStackYaml
                        <> ", rerun with '--update-config'"
      else
-        $logInfo $ "No changes needed to " <> T.pack relStackYaml
+        logInfo $ "No changes needed to " <> T.pack relStackYaml
 
     where
         indentLines t = T.unlines $ fmap ("    " <>) (T.lines t)
@@ -708,7 +708,7 @@ solveExtraDeps modStackYaml = do
         printResolver mOldRes res = do
             forM_ mOldRes $ \oldRes ->
                 when (res /= oldRes) $ do
-                    $logInfo $ T.concat
+                    logInfo $ T.concat
                         [ "* Resolver changes from "
                         , resolverRawName oldRes
                         , " to "
@@ -717,14 +717,14 @@ solveExtraDeps modStackYaml = do
 
         printFlags fl msg = do
             unless (Map.null fl) $ do
-                $logInfo $ T.pack msg
-                $logInfo $ indentLines $ decodeUtf8 $ Yaml.encode
+                logInfo $ T.pack msg
+                logInfo $ indentLines $ decodeUtf8 $ Yaml.encode
                                        $ object ["flags" .= fl]
 
         printDeps deps msg = do
             unless (Map.null deps) $ do
-                $logInfo $ T.pack msg
-                $logInfo $ indentLines $ decodeUtf8 $ Yaml.encode $ object
+                logInfo $ T.pack msg
+                logInfo $ indentLines $ decodeUtf8 $ Yaml.encode $ object
                         ["extra-deps" .= map fromTuple (Map.toList deps)]
 
         writeStackYaml path res deps fl = do

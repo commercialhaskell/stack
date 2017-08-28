@@ -114,8 +114,8 @@ runShellAndExit mprojectRoot getCompilerVersion getCmdArgs = do
                            -- Using --run instead of --command so we cannot
                            -- end up in the nix-shell if stack build is Ctrl-C'd
      pathVar <- liftIO $ lookupEnv "PATH"
-     $logDebug $ "PATH is: " <> T.pack (show pathVar)
-     $logDebug $
+     logDebug $ "PATH is: " <> T.pack (show pathVar)
+     logDebug $
        "Using a nix-shell environment " <> (case mshellFile of
             Just path -> "from file: " <> T.pack (toFilePath path)
             Nothing -> "with nix packages: " <> T.intercalate ", " pkgs)

@@ -60,7 +60,7 @@ exec = execSpawn
 #else
 exec menv cmd0 args = do
     cmd <- preProcess Nothing menv cmd0
-    $withProcessTimeLog cmd args $
+    withProcessTimeLog cmd args $
         liftIO $ PID1.run cmd args (envHelper menv)
 #endif
 
@@ -71,7 +71,7 @@ exec menv cmd0 args = do
 execSpawn :: (MonadUnliftIO m, MonadLogger m)
      => EnvOverride -> String -> [String] -> m b
 execSpawn menv cmd0 args = do
-    e <- $withProcessTimeLog cmd0 args $
+    e <- withProcessTimeLog cmd0 args $
         try (callProcess (Cmd Nothing cmd0 menv args))
     liftIO $ case e of
         Left (ProcessExitedUnsuccessfully _ ec) -> exitWith ec
@@ -80,7 +80,7 @@ execSpawn menv cmd0 args = do
 execObserve :: (MonadUnliftIO m, MonadLogger m)
     => EnvOverride -> String -> [String] -> m String
 execObserve menv cmd0 args = do
-    e <- $withProcessTimeLog cmd0 args $
+    e <- withProcessTimeLog cmd0 args $
         try (callProcessObserveStdout (Cmd Nothing cmd0 menv args))
     case e of
         Left (ProcessExitedUnsuccessfully _ ec) -> liftIO $ exitWith ec

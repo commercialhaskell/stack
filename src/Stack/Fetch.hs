@@ -130,7 +130,7 @@ unpackPackages mSnapshotDef dest input = do
     unless (Map.null alreadyUnpacked) $
         throwM $ UnpackDirectoryAlreadyExists $ Set.fromList $ map toFilePath $ Map.elems alreadyUnpacked
     unpacked <- fetchPackages' Nothing toFetch
-    F.forM_ (Map.toList unpacked) $ \(ident, dest'') -> $logInfo $ T.pack $ concat
+    F.forM_ (Map.toList unpacked) $ \(ident, dest'') -> logInfo $ T.pack $ concat
         [ "Unpacked "
         , packageIdentifierString ident
         , " to "
@@ -354,7 +354,7 @@ withCabalLoader inner = do
                     join $ modifyMVar updateRef $ \toUpdate ->
                         if toUpdate then do
                             unliftIO u $ do
-                                $logInfo $ T.concat
+                                logInfo $ T.concat
                                     [ "Didn't see "
                                     , T.pack $ packageIdentifierRevisionString ident
                                     , " in your package indices.\n"
@@ -522,7 +522,7 @@ fetchPackages' mdistDir toFetchAll = do
                 , drRetryPolicy = drRetryPolicyDefault
                 }
         let progressSink _ =
-                liftIO $ run $ $logInfo $ packageIdentifierText ident <> ": download"
+                liftIO $ run $ logInfo $ packageIdentifierText ident <> ": download"
         _ <- verifiedDownload downloadReq destpath progressSink
 
         identStrP <- parseRelDir $ packageIdentifierString ident
@@ -559,7 +559,7 @@ fetchPackages' mdistDir toFetchAll = do
                 atomically $ modifyTVar outputVar $ Map.insert ident destDir
 
             F.forM_ unexpectedEntries $ \(path, entryType) ->
-                $logWarn $ "Unexpected entry type " <> entryType <> " for entry " <> T.pack path
+                logWarn $ "Unexpected entry type " <> entryType <> " for entry " <> T.pack path
 
 -- | Internal function used to unpack tarball.
 --

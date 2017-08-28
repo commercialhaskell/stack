@@ -68,13 +68,13 @@ populateCache index = do
     -- protections. Caveat emptor
     path <- configPackageIndex (indexName index)
     let loadPIS = withBinaryFile (Path.toFilePath path) ReadMode $ \h -> do
-            $logSticky "Populating index cache ..."
+            logSticky "Populating index cache ..."
             lbs <- liftIO $ L.hGetContents h
             loop 0 HashMap.empty (Tar.read lbs)
     pis0 <- loadPIS `catch` \e -> do
-        $logWarn $ "Exception encountered when parsing index tarball: "
+        logWarn $ "Exception encountered when parsing index tarball: "
                 <> T.pack (show (e :: Tar.FormatError))
-        $logWarn "Automatically updating index and trying again"
+        logWarn "Automatically updating index and trying again"
         updateIndex index
         loadPIS
 
@@ -85,7 +85,7 @@ populateCache index = do
 
     cache <- fmap mconcat $ mapM convertPI $ HashMap.toList pis0
 
-    $logStickyDone "Populated index cache."
+    logStickyDone "Populated index cache."
 
     return cache
   where
@@ -239,7 +239,7 @@ updateIndex :: HasConfig env => PackageIndex -> RIO env ()
 updateIndex index =
   do let name = indexName index
          url = indexLocation index
-     $logSticky $ "Updating package index "
+     logSticky $ "Updating package index "
                <> indexNameText (indexName index)
                <> " (mirrored at "
                <> url
@@ -247,7 +247,7 @@ updateIndex index =
      case indexType index of
        ITVanilla -> updateIndexHTTP name url
        ITHackageSecurity hs -> updateIndexHackageSecurity name url hs
-     $logStickyDone "Update complete"
+     logStickyDone "Update complete"
 
      -- Copy to the 00-index.tar filename for backwards
      -- compatibility. First wipe out the cache file if present.
@@ -264,7 +264,7 @@ updateIndexHTTP :: HasConfig env
                 -> RIO env ()
 updateIndexHTTP indexName' url = do
     req <- parseRequest $ T.unpack url
-    $logInfo ("Downloading package index from " <> url)
+    logInfo ("Downloading package index from " <> url)
     gz <- configPackageIndexGz indexName'
     tar <- configPackageIndex indexName'
     wasDownloaded <- redownload req gz
@@ -304,7 +304,7 @@ updateIndexHackageSecurity indexName' url (HackageSecurity keyIds threshold) = d
     manager <- liftIO getGlobalManager
     root <- configPackageIndexRoot indexName'
     run <- askRunInIO
-    let logTUF = run . $logInfo . T.pack . HS.pretty
+    let logTUF = run . logInfo . T.pack . HS.pretty
         withRepo = HS.withRepository
             (HS.makeHttpLib manager)
             [baseURI]
@@ -340,7 +340,7 @@ updateIndexHackageSecurity indexName' url (HackageSecurity keyIds threshold) = d
             tar <- configPackageIndex indexName'
             deleteCache indexName'
             liftIO $ D.renameFile (toFilePath tar ++ "-tmp") (toFilePath tar)
-            $logInfo "Updated package index downloaded"
+            logInfo "Updated package index downloaded"
 
 -- If the index is newer than the cache, delete it so that
 -- the next 'getPackageCaches' call recomputes it. This
@@ -355,11 +355,11 @@ packageIndexNotUpdated indexName' = do
     case (mindexModTime, mcacheModTime) of
         (Right indexModTime, Right cacheModTime) | cacheModTime < indexModTime -> do
             deleteCache indexName'
-            $logInfo "No updates to your package index were found, but clearing the index cache as it is older than the index."
+            logInfo "No updates to your package index were found, but clearing the index cache as it is older than the index."
         (Left _, _) -> do
             deleteCache indexName'
-            $logError "Error: No updates to your package index were found, but downloaded index is missing."
-        _ -> $logInfo "No updates to your package index were found"
+            logError "Error: No updates to your package index were found, but downloaded index is missing."
+        _ -> logInfo "No updates to your package index were found"
 
 -- | Delete the package index cache
 deleteCache :: HasConfig env => IndexName -> RIO env ()
@@ -367,8 +367,8 @@ deleteCache indexName' = do
     fp <- configPackageIndexCache indexName'
     eres <- liftIO $ tryIO $ removeFile fp
     case eres of
-        Left e -> $logDebug $ "Could not delete cache: " <> T.pack (show e)
-        Right () -> $logDebug $ "Deleted index cache at " <> T.pack (toFilePath fp)
+        Left e -> logDebug $ "Could not delete cache: " <> T.pack (show e)
+        Right () -> logDebug $ "Deleted index cache at " <> T.pack (toFilePath fp)
 
 -- | Get the known versions for a given package from the package caches.
 --

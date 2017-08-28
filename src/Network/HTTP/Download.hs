@@ -65,7 +65,7 @@ redownload :: (MonadIO m, MonadLogger m)
            -> Path Abs File -- ^ destination
            -> m Bool
 redownload req0 dest = do
-    $logDebug $ "Downloading " <> decodeUtf8With lenientDecode (path req0)
+    logDebug $ "Downloading " <> decodeUtf8With lenientDecode (path req0)
     let destFilePath = toFilePath dest
         etagFilePath = destFilePath <.> "etag"
 

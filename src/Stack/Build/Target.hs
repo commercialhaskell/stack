@@ -438,7 +438,7 @@ combineResolveResults results = do
         Nothing -> return Map.empty
         Just version -> do
           let ident = PackageIdentifier (rrName result) version
-          $logWarn $ T.concat
+          logWarn $ T.concat
               [ "- Implicitly adding "
               , packageIdentifierText ident
               , " to extra-deps based on command line target"
@@ -478,7 +478,7 @@ parseTargets
          , Map PackageName Target
          )
 parseTargets needTargets boptscli = do
-  $logDebug "Parsing the targets"
+  logDebug "Parsing the targets"
   bconfig <- view buildConfigL
   ls0 <- view loadedSnapshotL
   workingDir <- getCurrentDir
@@ -560,7 +560,7 @@ parseTargets needTargets boptscli = do
       flags hides options drops
 
   -- Warn about packages upgraded based on flags
-  forM_ upgraded $ \name -> $logWarn $ T.concat
+  forM_ upgraded $ \name -> logWarn $ T.concat
     [ "- Implicitly adding "
     , packageNameText name
     , " to extra-deps based on command line flag"

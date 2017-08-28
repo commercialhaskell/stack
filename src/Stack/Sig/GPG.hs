@@ -106,5 +106,5 @@ gpgWarnTTY =
         (do mTTY <- liftIO (lookupEnv "GPG_TTY")
             when
                 (null mTTY)
-                ($logWarn
+                (logWarn
                      "Environment variable GPG_TTY is not set (see `man gpg-agent`)"))

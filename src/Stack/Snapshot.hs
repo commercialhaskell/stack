@@ -148,19 +148,19 @@ loadResolver (ResolverSnapshot name) = do
                 case parseEither parseStackageSnapshot value of
                   Left s -> Left $ AesonException s
                   Right x -> Right x
-    $logDebug $ "Decoding build plan from: " <> T.pack (toFilePath fp)
+    logDebug $ "Decoding build plan from: " <> T.pack (toFilePath fp)
     eres <- tryDecode
     case eres of
         Right sd -> return sd
         Left e -> do
-            $logDebug $ "Decoding Stackage snapshot definition from file failed: " <> T.pack (show e)
+            logDebug $ "Decoding Stackage snapshot definition from file failed: " <> T.pack (show e)
             ensureDir (parent fp)
             url <- buildBuildPlanUrl name file
             req <- parseRequest $ T.unpack url
-            $logSticky $ "Downloading " <> renderSnapName name <> " build plan ..."
-            $logDebug $ "Downloading build plan from: " <> url
+            logSticky $ "Downloading " <> renderSnapName name <> " build plan ..."
+            logDebug $ "Downloading build plan from: " <> url
             _ <- redownload req fp
-            $logStickyDone $ "Downloaded " <> renderSnapName name <> " build plan."
+            logStickyDone $ "Downloaded " <> renderSnapName name <> " build plan."
             tryDecode >>= either throwM return
 
   where
@@ -239,7 +239,7 @@ loadResolver (ResolverCompiler compiler) = return SnapshotDef
     , sdGlobalHints = Map.empty
     }
 loadResolver (ResolverCustom url loc) = do
-  $logDebug $ "Loading " <> url <> " build plan from " <> T.pack (show loc)
+  logDebug $ "Loading " <> url <> " build plan from " <> T.pack (show loc)
   case loc of
     Left req -> download' req >>= load . toFilePath
     Right fp -> load fp
@@ -384,23 +384,23 @@ loadSnapshot' loadFromIndex menv mcompiler root =
       gpds <- (concat <$> mapM
         (loadMultiRawCabalFilesIndex loadFromIndex menv root >=> mapM parseGPD)
         (sdLocations sd)) `onException` do
-          $logError "Unable to load cabal files for snapshot"
+          logError "Unable to load cabal files for snapshot"
           case sdResolver sd of
             ResolverSnapshot name -> do
               stackRoot <- view stackRootL
               file <- parseRelFile $ T.unpack $ renderSnapName name <> ".yaml"
               let fp = buildPlanDir stackRoot </> file
               liftIO $ ignoringAbsence $ removeFile fp
-              $logError ""
-              $logError "----"
-              $logError $ "Deleting cached snapshot file: " <> T.pack (toFilePath fp)
-              $logError "Recommendation: try running again. If this fails again, open an upstream issue at:"
-              $logError $
+              logError ""
+              logError "----"
+              logError $ "Deleting cached snapshot file: " <> T.pack (toFilePath fp)
+              logError "Recommendation: try running again. If this fails again, open an upstream issue at:"
+              logError $
                 case name of
                   LTS _ _ -> "https://github.com/fpco/lts-haskell/issues/new"
                   Nightly _ -> "https://github.com/fpco/stackage-nightly/issues/new"
-              $logError "----"
-              $logError ""
+              logError "----"
+              logError ""
             _ -> return ()
 
       (globals, snapshot, locals, _upgraded) <-

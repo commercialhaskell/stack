@@ -60,7 +60,7 @@ runCmd' modCP cmd@Cmd{..} mbErrMsg = do
     result <- try (callProcess' modCP cmd)
     case result of
         Left (ProcessExitedUnsuccessfully _ ec) -> do
-            $logError $
+            logError $
                 T.pack $
                 concat $
                     [ "Exit code "
@@ -71,7 +71,7 @@ runCmd' modCP cmd@Cmd{..} mbErrMsg = do
                             Nothing -> []
                             Just mbDir -> [" in ", toFilePath mbDir]
                             )
-            forM_ mbErrMsg $logError
+            forM_ mbErrMsg logError
             liftIO (exitWith ec)
         Right () -> return ()
 
@@ -92,7 +92,7 @@ callProcess' :: (MonadIO m, MonadLogger m)
              => (CreateProcess -> CreateProcess) -> Cmd -> m ()
 callProcess' modCP cmd = do
     c <- liftM modCP (cmdToCreateProcess cmd)
-    $logCreateProcess c
+    logCreateProcess c
     liftIO $ do
         (_, _, _, p) <- System.Process.createProcess c
         exit_code <- waitForProcess p
@@ -108,7 +108,7 @@ callProcessInheritStderrStdout cmd = do
 callProcessObserveStdout :: (MonadIO m, MonadLogger m) => Cmd -> m String
 callProcessObserveStdout cmd = do
     c <- liftM modCP (cmdToCreateProcess cmd)
-    $logCreateProcess c
+    logCreateProcess c
     liftIO $ do
         (_, Just hStdout, _, p) <- System.Process.createProcess c
         hSetBuffering hStdout NoBuffering
@@ -129,7 +129,7 @@ createProcess' :: (MonadIO m, MonadLogger m)
                -> m (Maybe Handle, Maybe Handle, Maybe Handle, ProcessHandle)
 createProcess' tag modCP cmd = do
     c <- liftM modCP (cmdToCreateProcess cmd)
-    $logCreateProcess c
+    logCreateProcess c
     liftIO $ System.Process.createProcess_ tag c
 
 -- Throws a 'ReadProcessException' if process is not found.

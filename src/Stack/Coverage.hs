@@ -65,7 +65,7 @@ updateTixFile pkgName tixSrc testName = do
         -- version that fixes https://ghc.haskell.org/trac/ghc/ticket/1853
         mtix <- readTixOrLog tixSrc
         case mtix of
-            Nothing -> $logError $ "Failed to read " <> T.pack (toFilePath tixSrc)
+            Nothing -> logError $ "Failed to read " <> T.pack (toFilePath tixSrc)
             Just tix -> do
                 liftIO $ writeTix (toFilePath tixDest) (removeExeModules tix)
                 -- TODO: ideally we'd do a file move, but IIRC this can
@@ -114,7 +114,7 @@ generateHpcReport pkgDir package tests = do
             eincludeName <- findPackageFieldForBuiltPackage pkgDir (packageIdentifier package) hpcNameField
             case eincludeName of
                 Left err -> do
-                    $logError err
+                    logError err
                     return $ Left err
                 Right includeName -> return $ Right $ Just $ T.unpack includeName
     forM_ tests $ \testName -> do
@@ -140,7 +140,7 @@ generateHpcReportInternal tixSrc reportDir report extraMarkupArgs extraReportArg
     tixFileExists <- doesFileExist tixSrc
     if not tixFileExists
         then do
-            $logError $ T.concat
+            logError $ T.concat
                  [ "Didn't find .tix for "
                  , report
                  , " - expected to find it at "
@@ -150,10 +150,10 @@ generateHpcReportInternal tixSrc reportDir report extraMarkupArgs extraReportArg
             return Nothing
         else (`catch` \err -> do
                  let msg = show (err :: ReadProcessException)
-                 $logError (T.pack msg)
+                 logError (T.pack msg)
                  generateHpcErrorReport reportDir $ sanitize msg
                  return Nothing) $
-             (`onException` $logError ("Error occurred while producing " <> report)) $ do
+             (`onException` logError ("Error occurred while producing " <> report)) $ do
             -- Directories for .mix files.
             hpcRelDir <- hpcRelativeDir
             -- Compute arguments used for both "hpc markup" and "hpc report".
@@ -164,7 +164,7 @@ generateHpcReportInternal tixSrc reportDir report extraMarkupArgs extraReportArg
                     -- Look for index files in the correct dir (relative to each pkgdir).
                     ["--hpcdir", toFilePathNoTrailingSep hpcRelDir, "--reset-hpcdirs"]
             menv <- getMinimalEnvOverride
-            $logInfo $ "Generating " <> report
+            logInfo $ "Generating " <> report
             outputLines <- liftM (map (S8.filter (/= '\r')) . S8.lines) $
                 readProcessStdout Nothing menv "hpc"
                 ( "report"
@@ -185,13 +185,13 @@ generateHpcReportInternal tixSrc reportDir report extraMarkupArgs extraReportArg
                             , " the hpc program. Please report this issue if you think"
                             , " your coverage report should have meaningful results."
                             ]
-                    $logError (msg False)
+                    logError (msg False)
                     generateHpcErrorReport reportDir (msg True)
                     return Nothing
                 else do
                     let reportPath = reportDir </> $(mkRelFile "hpc_index.html")
                     -- Print output, stripping @\r@ characters because Windows.
-                    forM_ outputLines ($logInfo . T.decodeUtf8)
+                    forM_ outputLines (logInfo . T.decodeUtf8)
                     -- Generate the markup.
                     void $ readProcessStdout Nothing menv "hpc"
                         ( "markup"
@@ -219,7 +219,7 @@ generateHpcReportForTargets opts = do
          then return []
          else do
              when (hroptsAll opts && not (null targetNames)) $
-                 $logWarn $ "Since --all is used, it is redundant to specify these targets: " <> T.pack (show targetNames)
+                 logWarn $ "Since --all is used, it is redundant to specify these targets: " <> T.pack (show targetNames)
              (_,_,targets) <- parseTargets
                  AllowNoTargets
                  defaultBuildOptsCLI
@@ -283,7 +283,7 @@ generateHpcUnifiedReport = do
     let tixFiles = tixFiles0  ++ extraTixFiles
         reportDir = outputDir </> $(mkRelDir "combined/all")
     if length tixFiles < 2
-        then $logInfo $ T.concat
+        then logInfo $ T.concat
             [ if null tixFiles then "No tix files" else "Only one tix file"
             , " found in "
             , T.pack (toFilePath outputDir)
@@ -299,8 +299,8 @@ generateUnionReport :: HasEnvConfig env
                     -> RIO env (Maybe (Path Abs File))
 generateUnionReport report reportDir tixFiles = do
     (errs, tix) <- fmap (unionTixes . map removeExeModules) (mapMaybeM readTixOrLog tixFiles)
-    $logDebug $ "Using the following tix files: " <> T.pack (show tixFiles)
-    unless (null errs) $ $logWarn $ T.concat $
+    logDebug $ "Using the following tix files: " <> T.pack (show tixFiles)
+    unless (null errs) $ logWarn $ T.concat $
         "The following modules are left out of the " : report : " due to version mismatches: " :
         intersperse ", " (map T.pack errs)
     tixDest <- liftM (reportDir </>) $ parseRelFile (dirnameString reportDir ++ ".tix")
@@ -311,10 +311,10 @@ generateUnionReport report reportDir tixFiles = do
 readTixOrLog :: (MonadLogger m, MonadUnliftIO m) => Path b File -> m (Maybe Tix)
 readTixOrLog path = do
     mtix <- liftIO (readTix (toFilePath path)) `catchAny` \errorCall -> do
-        $logError $ "Error while reading tix: " <> T.pack (show errorCall)
+        logError $ "Error while reading tix: " <> T.pack (show errorCall)
         return Nothing
     when (isNothing mtix) $
-        $logError $ "Failed to read tix file " <> T.pack (toFilePath path)
+        logError $ "Failed to read tix file " <> T.pack (toFilePath path)
     return mtix
 
 -- | Module names which contain '/' have a package name, and so they weren't built into the
@@ -382,7 +382,7 @@ generateHpcMarkupIndex = do
                 ["</tbody></table>"]) ++
         ["</body></html>"]
     unless (null rows) $
-        $logInfo $ "\nAn index of the generated HTML coverage reports is available at " <>
+        logInfo $ "\nAn index of the generated HTML coverage reports is available at " <>
             T.pack (toFilePath outputFile)
 
 generateHpcErrorReport :: MonadIO m => Path Abs Dir -> Text -> m ()
@@ -424,14 +424,14 @@ findPackageFieldForBuiltPackage pkgDir pkgId field = do
     if cabalVer < $(mkVersion "1.24")
         then do
             path <- liftM (inplaceDir </>) $ parseRelFile (pkgIdStr ++ "-inplace.conf")
-            $logDebug $ "Parsing config in Cabal < 1.24 location: " <> T.pack (toFilePath path)
+            logDebug $ "Parsing config in Cabal < 1.24 location: " <> T.pack (toFilePath path)
             exists <- doesFileExist path
             if exists then extractField path else notFoundErr
         else do
             -- With Cabal-1.24, it's in a different location.
-            $logDebug $ "Scanning " <> T.pack (toFilePath inplaceDir) <> " for files matching " <> T.pack pkgIdStr
+            logDebug $ "Scanning " <> T.pack (toFilePath inplaceDir) <> " for files matching " <> T.pack pkgIdStr
             (_, files) <- handleIO (const $ return ([], [])) $ listDir inplaceDir
-            $logDebug $ T.pack (show files)
+            logDebug $ T.pack (show files)
             case mapMaybe (\file -> fmap (const file) . (T.stripSuffix ".conf" <=< T.stripPrefix (T.pack (pkgIdStr ++ "-")))
                           . T.pack . toFilePath . filename $ file) files of
                 [] -> notFoundErr

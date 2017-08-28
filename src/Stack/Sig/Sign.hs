@@ -117,5 +117,5 @@ signPackage url pkg filePath = do
     when
         (getResponseStatusCode res /= 200)
         (throwM (GPGSignException "unable to sign & upload package"))
-    $logInfo ("Signature uploaded to " <> T.pack fullUrl)
+    logInfo ("Signature uploaded to " <> T.pack fullUrl)
     return sig

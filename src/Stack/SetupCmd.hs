@@ -14,7 +14,7 @@ module Stack.SetupCmd
     ) where
 
 import           Control.Applicative
-import           Control.Monad.Logger
+import           Control.Monad.Logger ()
 import           Control.Monad.Reader
 import qualified Data.Text as T
 import qualified Options.Applicative as OA
@@ -130,8 +130,8 @@ setup SetupCmdOpts{..} wantedCompiler compilerCheck mstack = do
             GhcVersion _ -> "GHC"
             GhcjsVersion {} -> "GHCJS"
     if sandboxedGhc
-        then $logInfo $ "stack will use a sandboxed " <> compiler <> " it installed"
-        else $logInfo $ "stack will use the " <> compiler <> " on your PATH"
-    $logInfo "For more information on paths, see 'stack path' and 'stack exec env'"
-    $logInfo $ "To use this " <> compiler <> " and packages outside of a project, consider using:"
-    $logInfo "stack ghc, stack ghci, stack runghc, or stack exec"
+        then logInfo $ "stack will use a sandboxed " <> compiler <> " it installed"
+        else logInfo $ "stack will use the " <> compiler <> " on your PATH"
+    logInfo "For more information on paths, see 'stack path' and 'stack exec env'"
+    logInfo $ "To use this " <> compiler <> " and packages outside of a project, consider using:"
+    logInfo "stack ghc, stack ghci, stack runghc, or stack exec"

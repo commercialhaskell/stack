@@ -103,9 +103,9 @@ data ExecutableBuildStatus
 -- | Fetch the packages necessary for a build, for example in combination with a dry run.
 preFetch :: HasEnvConfig env => Plan -> RIO env ()
 preFetch plan
-    | Set.null idents = $logDebug "Nothing to fetch"
+    | Set.null idents = logDebug "Nothing to fetch"
     | otherwise = do
-        $logDebug $ T.pack $
+        logDebug $ T.pack $
             "Prefetching: " ++
             intercalate ", " (map packageIdentifierString $ Set.toList idents)
         fetchPackages idents
@@ -121,10 +121,10 @@ preFetch plan
 printPlan :: HasRunner env => Plan -> RIO env ()
 printPlan plan = do
     case Map.elems $ planUnregisterLocal plan of
-        [] -> $logInfo "No packages would be unregistered."
+        [] -> logInfo "No packages would be unregistered."
         xs -> do
-            $logInfo "Would unregister locally:"
-            forM_ xs $ \(ident, reason) -> $logInfo $ T.concat
+            logInfo "Would unregister locally:"
+            forM_ xs $ \(ident, reason) -> logInfo $ T.concat
                 [ T.pack $ packageIdentifierString ident
                 , if T.null reason
                     then ""
@@ -135,13 +135,13 @@ printPlan plan = do
                         ]
                 ]
 
-    $logInfo ""
+    logInfo ""
 
     case Map.elems $ planTasks plan of
-        [] -> $logInfo "Nothing to build."
+        [] -> logInfo "Nothing to build."
         xs -> do
-            $logInfo "Would build:"
-            mapM_ ($logInfo . displayTask) xs
+            logInfo "Would build:"
+            mapM_ (logInfo . displayTask) xs
 
     let hasTests = not . Set.null . testComponents . taskComponents
         hasBenches = not . Set.null . benchComponents . taskComponents
@@ -149,21 +149,21 @@ printPlan plan = do
         benches = Map.elems $ Map.filter hasBenches $ planFinals plan
 
     unless (null tests) $ do
-        $logInfo ""
-        $logInfo "Would test:"
-        mapM_ ($logInfo . displayTask) tests
+        logInfo ""
+        logInfo "Would test:"
+        mapM_ (logInfo . displayTask) tests
     unless (null benches) $ do
-        $logInfo ""
-        $logInfo "Would benchmark:"
-        mapM_ ($logInfo . displayTask) benches
+        logInfo ""
+        logInfo "Would benchmark:"
+        mapM_ (logInfo . displayTask) benches
 
-    $logInfo ""
+    logInfo ""
 
     case Map.toList $ planInstallExes plan of
-        [] -> $logInfo "No executables to be installed."
+        [] -> logInfo "No executables to be installed."
         xs -> do
-            $logInfo "Would install executables:"
-            forM_ xs $ \(name, loc) -> $logInfo $ T.concat
+            logInfo "Would install executables:"
+            forM_ xs $ \(name, loc) -> logInfo $ T.concat
                 [ name
                 , " from "
                 , case loc of
@@ -401,12 +401,12 @@ withExecuteEnv menv bopts boptsCli baseConfigOpts locals globalPackages snapshot
                     DumpWarningLogs -> mapM_ dumpLogIfWarning allLogs
                     DumpNoLogs
                         | totalWanted > 1 ->
-                            $logInfo $ T.concat
+                            logInfo $ T.concat
                                 [ "Build output has been captured to log files, use "
                                 , "--dump-logs to see it on the console"
                                 ]
                         | otherwise -> return ()
-                $logInfo $ T.pack $ "Log files have been written to: "
+                logInfo $ T.pack $ "Log files have been written to: "
                         ++ toFilePath (parent (snd firstLog))
 
         -- We only strip the colors /after/ we've dumped logs, so that
@@ -440,14 +440,14 @@ withExecuteEnv menv bopts boptsCli baseConfigOpts locals globalPackages snapshot
 
     dumpLog :: String -> (Path Abs Dir, Path Abs File) -> RIO env ()
     dumpLog msgSuffix (pkgDir, filepath) = do
-        $logInfo $ T.pack $ concat ["\n--  Dumping log file", msgSuffix, ": ", toFilePath filepath, "\n"]
+        logInfo $ T.pack $ concat ["\n--  Dumping log file", msgSuffix, ": ", toFilePath filepath, "\n"]
         compilerVer <- view actualCompilerVersionL
         runResourceT
             $ transPipe liftResourceT (CB.sourceFile (toFilePath filepath))
            $$ CT.decodeUtf8Lenient
            =$ mungeBuildOutput ExcludeTHLoading ConvertPathsToAbsolute pkgDir compilerVer
-           =$ CL.mapM_ $logInfo
-        $logInfo $ T.pack $ "\n--  End of log file: " ++ toFilePath filepath ++ "\n"
+           =$ CL.mapM_ logInfo
+        logInfo $ T.pack $ "\n--  End of log file: " ++ toFilePath filepath ++ "\n"
 
     stripColors :: Path Abs File -> IO ()
     stripColors fp = do
@@ -484,7 +484,7 @@ executePlan :: HasEnvConfig env
             -> Plan
             -> RIO env ()
 executePlan menv boptsCli baseConfigOpts locals globalPackages snapshotPackages localPackages installedMap targets plan = do
-    $logDebug "Executing the build plan"
+    logDebug "Executing the build plan"
     bopts <- view buildOptsL
     withExecuteEnv menv bopts boptsCli baseConfigOpts locals globalPackages snapshotPackages localPackages (executePlan' installedMap targets plan)
 
@@ -498,7 +498,7 @@ executePlan menv boptsCli baseConfigOpts locals globalPackages snapshotPackages 
                     , esLocaleUtf8 = False
                     }
     forM_ (boptsCLIExec boptsCli) $ \(cmd, args) ->
-        $withProcessTimeLog cmd args $
+        withProcessTimeLog cmd args $
             callProcess (Cmd Nothing cmd menv' args)
 
 copyExecutables
@@ -534,7 +534,7 @@ copyExecutables exes = do
           >>= rejectMissingFile
         case mfp of
             Nothing -> do
-                $logWarn $ T.concat
+                logWarn $ T.concat
                     [ "Couldn't find executable "
                     , name
                     , " in directory "
@@ -543,7 +543,7 @@ copyExecutables exes = do
                 return Nothing
             Just file -> do
                 let destFile = destDir' FP.</> T.unpack name ++ ext
-                $logInfo $ T.concat
+                logInfo $ T.concat
                     [ "Copying from "
                     , T.pack $ toFilePath file
                     , " to "
@@ -557,12 +557,12 @@ copyExecutables exes = do
                 return $ Just (name <> T.pack ext)
 
     unless (null installed) $ do
-        $logInfo ""
-        $logInfo $ T.concat
+        logInfo ""
+        logInfo $ T.concat
             [ "Copied executables to "
             , T.pack destDir'
             , ":"]
-    forM_ installed $ \exe -> $logInfo ("- " <> exe)
+    forM_ installed $ \exe -> logInfo ("- " <> exe)
     unless compilerSpecific $ warnInstallSearchPathIssues destDir' installed
 
 
@@ -593,7 +593,7 @@ executePlan' installedMap0 targets plan ee@ExecuteEnv {..} = do
         ids -> do
             localDB <- packageDatabaseLocal
             forM_ ids $ \(id', (ident, reason)) -> do
-                $logInfo $ T.concat
+                logInfo $ T.concat
                     [ T.pack $ packageIdentifierString ident
                     , ": unregistering"
                     , if T.null reason
@@ -633,10 +633,10 @@ executePlan' installedMap0 targets plan ee@ExecuteEnv {..} = do
         let total = length actions
             loop prev
                 | prev == total =
-                    run $ $logStickyDone ("Completed " <> T.pack (show total) <> " action(s).")
+                    run $ logStickyDone ("Completed " <> T.pack (show total) <> " action(s).")
                 | otherwise = do
                     when terminal $ run $
-                        $logSticky ("Progress: " <> T.pack (show prev) <> "/" <> T.pack (show total))
+                        logSticky ("Progress: " <> T.pack (show prev) <> "/" <> T.pack (show total))
                     done <- atomically $ do
                         done <- readTVar doneVar
                         check $ done /= prev
@@ -835,7 +835,7 @@ ensureConfig newConfigCache pkgDir ExecuteEnv {..} announce cabal cabalfp = do
     return needConfig
 
 announceTask :: MonadLogger m => Task -> Text -> m ()
-announceTask task x = $logInfo $ T.concat
+announceTask task x = logInfo $ T.concat
     [ T.pack $ packageIdentifierString $ taskProvides task
     , ": "
     , x
@@ -999,10 +999,10 @@ withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} md
                                 case filter (matches . fst) (Map.toList allDeps) of
                                     x:xs -> do
                                         unless (null xs)
-                                            ($logWarn (T.pack ("Found multiple installed packages for custom-setup dep: " ++ packageNameString name)))
+                                            (logWarn (T.pack ("Found multiple installed packages for custom-setup dep: " ++ packageNameString name)))
                                         return ("-package-id=" ++ ghcPkgIdString (snd x), Just (toCabalPackageIdentifier (fst x)))
                                     [] -> do
-                                        $logWarn (T.pack ("Could not find custom-setup dep: " ++ packageNameString name))
+                                        logWarn (T.pack ("Could not find custom-setup dep: " ++ packageNameString name))
                                         return ("-package=" ++ packageNameString name, Nothing)
                             let depsArgs = map fst matchedDeps
                             -- Generate setup_macros.h and provide it to ghc
@@ -1296,7 +1296,7 @@ singleBuild runInBase ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} in
         $ \package cabalfp pkgDir cabal announce _console _mlogFile -> do
             executableBuildStatuses <- getExecutableBuildStatuses package pkgDir
             when (not (cabalIsSatisfied executableBuildStatuses) && taskIsTarget task)
-                 ($logInfo
+                 (logInfo
                       ("Building all executables for `" <> packageNameText (packageName package) <>
                        "' once. After a successful build of all of them, only specified executables will be rebuilt."))
 
@@ -1399,7 +1399,7 @@ singleBuild runInBase ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} in
                     -- Older hscolour colouring
                     Left _  -> do
                         hscolourExists <- doesExecutableExist eeEnvOverride "HsColour"
-                        unless hscolourExists $ $logWarn
+                        unless hscolourExists $ logWarn
                             ("Warning: haddock not generating hyperlinked sources because 'HsColour' not\n" <>
                              "found on PATH (use 'stack install hscolour' to install).")
                         return ["--hyperlink-source" | hscolourExists]
@@ -1617,7 +1617,7 @@ singleTest runInBase topts testsToRun ac ee task installedMap = do
                         when needHpc $ do
                             tixexists <- doesFileExist tixPath
                             when tixexists $
-                                $logWarn ("Removing HPC file " <> T.pack (toFilePath tixPath))
+                                logWarn ("Removing HPC file " <> T.pack (toFilePath tixPath))
                             liftIO $ ignoringAbsence (removeFile tixPath)
 
                         let args = toAdditionalArgs topts
@@ -1629,7 +1629,7 @@ singleTest runInBase topts testsToRun ac ee task installedMap = do
                         -- Clear "Progress: ..." message before
                         -- redirecting output.
                         when (isNothing mlogFile) $ do
-                            $logStickyDone ""
+                            logStickyDone ""
                             liftIO $ hFlush stdout
                             liftIO $ hFlush stderr
 
@@ -1651,7 +1651,7 @@ singleTest runInBase topts testsToRun ac ee task installedMap = do
                         ec <- liftIO $ waitForProcess ph
                         -- Add a trailing newline, incase the test
                         -- output didn't finish with a newline.
-                        when (isNothing mlogFile) ($logInfo "")
+                        when (isNothing mlogFile) (logInfo "")
                         -- Move the .tix file out of the package
                         -- directory into the hpc work dir, for
                         -- tidiness.
@@ -1661,7 +1661,7 @@ singleTest runInBase topts testsToRun ac ee task installedMap = do
                             ExitSuccess -> Map.empty
                             _ -> Map.singleton testName $ Just ec
                     else do
-                        $logError $ T.pack $ show $ TestSuiteExeMissing
+                        logError $ T.pack $ show $ TestSuiteExeMissing
                             (packageBuildType package == Just C.Simple)
                             exeName
                             (packageNameString (packageName package))

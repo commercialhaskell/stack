@@ -114,9 +114,9 @@ getSDistTarball mpvpBounds pkgDir = do
         tweakCabal = pvpBounds /= PvpBoundsNone
         pkgFp = toFilePath pkgDir
     lp <- readLocalPackage pkgDir
-    $logInfo $ "Getting file list for " <> T.pack pkgFp
+    logInfo $ "Getting file list for " <> T.pack pkgFp
     (fileList, cabalfp) <-  getSDistFileList lp
-    $logInfo $ "Building sdist tarball for " <> T.pack pkgFp
+    logInfo $ "Building sdist tarball for " <> T.pack pkgFp
     files <- normalizeTarballPaths (lines fileList)
 
     -- We're going to loop below and eventually find the cabal
@@ -300,7 +300,7 @@ normalizeTarballPaths fps = do
     -- TODO: consider whether erroring out is better - otherwise the
     -- user might upload an incomplete tar?
     unless (null outsideDir) $
-        $logWarn $ T.concat
+        logWarn $ T.concat
             [ "Warning: These files are outside of the package directory, and will be omitted from the tarball: "
             , T.pack (show outsideDir)]
     return (nubOrd files)
@@ -349,7 +349,7 @@ checkPackageInExtractedTarball pkgDir = do
     name    <- parsePackageNameFromFilePath cabalfp
     config  <- getDefaultPackageConfig
     (gdesc, pkgDesc) <- readPackageDescriptionDir config pkgDir
-    $logInfo $
+    logInfo $
         "Checking package '" <> packageNameText name <> "' for common mistakes"
     let pkgChecks = Check.checkPackage gdesc (Just pkgDesc)
     fileChecks <- liftIO $ Check.checkPackageFiles pkgDesc (toFilePath pkgDir)
@@ -360,7 +360,7 @@ checkPackageInExtractedTarball pkgDir = do
               criticalIssue _ = False
           in partition criticalIssue checks
     unless (null warnings) $
-        $logWarn $ "Package check reported the following warnings:\n" <>
+        logWarn $ "Package check reported the following warnings:\n" <>
                    T.pack (intercalate "\n" . fmap show $ warnings)
     case NE.nonEmpty errors of
         Nothing -> return ()

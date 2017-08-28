@@ -289,7 +289,7 @@ sinkProcessStderrStdout :: forall m e o. (MonadIO m, MonadLogger m)
                         -> m (e,o)
 sinkProcessStderrStdout wd menv name args sinkStderr sinkStdout = do
   name' <- preProcess wd menv name
-  $withProcessTimeLog name' args $
+  withProcessTimeLog name' args $
       liftIO $ withCheckedProcess
           (proc name' args) { env = envHelper menv, cwd = fmap toFilePath wd }
           (\ClosedStream out err -> f err out)
@@ -323,7 +323,7 @@ sinkProcessStderrStdoutHandle :: (MonadIO m, MonadLogger m)
                               -> m ()
 sinkProcessStderrStdoutHandle wd menv name args err out = do
   name' <- preProcess wd menv name
-  $withProcessTimeLog name' args $
+  withProcessTimeLog name' args $
       liftIO $ withCheckedProcess
           (proc name' args)
               { env = envHelper menv

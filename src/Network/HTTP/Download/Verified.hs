@@ -225,7 +225,7 @@ verifiedDownload :: (MonadIO m, MonadLogger m)
 verifiedDownload DownloadRequest{..} destpath progressSink = do
     let req = drRequest
     whenM' (liftIO getShouldDownload) $ do
-        $logDebug $ "Downloading " <> decodeUtf8With lenientDecode (path req)
+        logDebug $ "Downloading " <> decodeUtf8With lenientDecode (path req)
         liftIO $ do
             createDirectoryIfMissing True dir
             recoveringHttp drRetryPolicy $

@@ -120,7 +120,7 @@ tryDeprecatedPath mWarningDesc exists new old = do
                     case mWarningDesc of
                         Nothing -> return ()
                         Just desc ->
-                            $logWarn $ T.concat
+                            logWarn $ T.concat
                                 [ "Warning: Location of ", desc, " at '"
                                 , T.pack (toFilePath old)
                                 , "' is deprecated; rename it to '"
@@ -159,9 +159,9 @@ getSnapshots :: HasConfig env => RIO env Snapshots
 getSnapshots = do
     latestUrlText <- askLatestSnapshotUrl
     latestUrl <- parseUrlThrow (T.unpack latestUrlText)
-    $logDebug $ "Downloading snapshot versions file from " <> latestUrlText
+    logDebug $ "Downloading snapshot versions file from " <> latestUrlText
     result <- httpJSON latestUrl
-    $logDebug $ "Done downloading and parsing snapshot versions file"
+    logDebug $ "Done downloading and parsing snapshot versions file"
     return $ getResponseBody result
 
 -- | Turn an 'AbstractResolver' into a 'Resolver'.
@@ -193,7 +193,7 @@ makeConcreteResolver root ar = do
                 | otherwise ->
                     let (x, y) = IntMap.findMax $ snapshotsLts snapshots
                      in return $ ResolverSnapshot $ LTS x y
-    $logInfo $ "Selected resolver: " <> resolverRawName r
+    logInfo $ "Selected resolver: " <> resolverRawName r
     return r
 
 -- | Get the latest snapshot resolver available.
@@ -246,7 +246,7 @@ configFromConfigMonoid
      -- This code is to handle the deprecation of latest-snapshot-url
      configUrls <- case (getFirst configMonoidLatestSnapshotUrl, getFirst (urlsMonoidLatestSnapshot configMonoidUrls)) of
          (Just url, Nothing) -> do
-             $logWarn "The latest-snapshot-url field is deprecated in favor of 'urls' configuration"
+             logWarn "The latest-snapshot-url field is deprecated in favor of 'urls' configuration"
              return (urlsFromMonoid configMonoidUrls) { urlsLatestSnapshot = url }
          _ -> return (urlsFromMonoid configMonoidUrls)
      let configConnectionCount = fromFirst 8 configMonoidConnectionCount
@@ -299,7 +299,7 @@ configFromConfigMonoid
          configCompilerCheck = fromFirst MatchMinor configMonoidCompilerCheck
 
      case arch of
-         OtherArch unk -> $logWarn $ "Warning: Unknown value for architecture setting: " <> T.pack (show unk)
+         OtherArch unk -> logWarn $ "Warning: Unknown value for architecture setting: " <> T.pack (show unk)
          _ -> return ()
 
      configPlatformVariant <- liftIO $
@@ -534,7 +534,7 @@ loadBuildConfig mproject maresolver mcompiler = do
               ARLatestLTS -> "lts"
               ARLatestLTSMajor x -> T.pack $ "lts-" ++ show x
               ARGlobal -> "global"
-      $logDebug ("Using resolver: " <> name <> " specified on command line")
+      logDebug ("Using resolver: " <> name <> " specified on command line")
 
       -- In order to resolve custom snapshots, we need a base
       -- directory to deal with relative paths. For the case of
@@ -552,13 +552,13 @@ loadBuildConfig mproject maresolver mcompiler = do
 
     (project', stackYamlFP) <- case mproject of
       LCSProject (project, fp, _) -> do
-          forM_ (projectUserMsg project) ($logWarn . T.pack)
+          forM_ (projectUserMsg project) (logWarn . T.pack)
           return (project, fp)
       LCSNoConfig _ -> do
           p <- assert (isJust mresolver) (getEmptyProject mresolver)
           return (p, configUserConfigPath config)
       LCSNoProject -> do
-            $logDebug "Run from outside a project, using implicit global project config"
+            logDebug "Run from outside a project, using implicit global project config"
             destDir <- getImplicitGlobalProjectDir config
             let dest :: Path Abs File
                 dest = destDir </> stackDotYaml
@@ -572,13 +572,13 @@ loadBuildConfig mproject maresolver mcompiler = do
                    when (view terminalL config) $
                        case maresolver of
                            Nothing ->
-                               $logDebug ("Using resolver: " <> resolverRawName (projectResolver project) <>
+                               logDebug ("Using resolver: " <> resolverRawName (projectResolver project) <>
                                          " from implicit global project's config file: " <> T.pack dest')
                            Just _ -> return ()
                    return (project, dest)
                else do
-                   $logInfo ("Writing implicit global project config file to: " <> T.pack dest')
-                   $logInfo "Note: You can change the snapshot via the resolver field there."
+                   logInfo ("Writing implicit global project config file to: " <> T.pack dest')
+                   logInfo "Note: You can change the snapshot via the resolver field there."
                    p <- getEmptyProject mresolver
                    liftIO $ do
                        S.writeFile dest' $ S.concat
@@ -625,11 +625,11 @@ loadBuildConfig mproject maresolver mcompiler = do
     getEmptyProject mresolver = do
       r <- case mresolver of
             Just resolver -> do
-                $logInfo ("Using resolver: " <> resolverRawName resolver <> " specified on command line")
+                logInfo ("Using resolver: " <> resolverRawName resolver <> " specified on command line")
                 return resolver
             Nothing -> do
                 r'' <- getLatestResolver
-                $logInfo ("Using latest snapshot resolver: " <> resolverRawName r'')
+                logInfo ("Using latest snapshot resolver: " <> resolverRawName r'')
                 return r''
       return Project
         { projectUserMsg = Nothing
@@ -870,7 +870,7 @@ getProjectConfig SYLDefault = do
     env <- liftIO getEnvironment
     case lookup "STACK_YAML" env of
         Just fp -> do
-            $logInfo "Getting project config file from STACK_YAML environment"
+            logInfo "Getting project config file from STACK_YAML environment"
             liftM LCSProject $ resolveFile' fp
         Nothing -> do
             currDir <- getCurrentDir
@@ -879,7 +879,7 @@ getProjectConfig SYLDefault = do
     getStackDotYaml dir = do
         let fp = dir </> stackDotYaml
             fp' = toFilePath fp
-        $logDebug $ "Checking for project config at: " <> T.pack fp'
+        logDebug $ "Checking for project config at: " <> T.pack fp'
         exists <- doesFileExist fp
         if exists
             then return $ Just fp
@@ -905,14 +905,14 @@ loadProjectConfig mstackYaml = do
     case mfp of
         LCSProject fp -> do
             currDir <- getCurrentDir
-            $logDebug $ "Loading project config file " <>
+            logDebug $ "Loading project config file " <>
                         T.pack (maybe (toFilePath fp) toFilePath (stripProperPrefix currDir fp))
             LCSProject <$> load fp
         LCSNoProject -> do
-            $logDebug $ "No project config file found, using defaults."
+            logDebug $ "No project config file found, using defaults."
             return LCSNoProject
         LCSNoConfig mparentDir -> do
-            $logDebug "Ignoring config files"
+            logDebug "Ignoring config files"
             return (LCSNoConfig mparentDir)
   where
     load fp = do

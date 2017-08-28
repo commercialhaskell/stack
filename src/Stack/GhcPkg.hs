@@ -43,7 +43,7 @@ import           System.Process.Read
 getGlobalDB :: (MonadUnliftIO m, MonadLogger m)
             => EnvOverride -> WhichCompiler -> m (Path Abs Dir)
 getGlobalDB menv wc = do
-    $logDebug "Getting global package database location"
+    logDebug "Getting global package database location"
     -- This seems like a strange way to get the global package database
     -- location, but I don't know of a better one
     bs <- ghcPkg menv wc [] ["list", "--global"] >>= either throwIO return
@@ -86,12 +86,12 @@ createDatabase menv wc db = do
         dirExists <- doesDirExist db
         args <- if dirExists
             then do
-                $logWarn $ T.pack $ concat
+                logWarn $ T.pack $ concat
                     [ "The package database located at "
                     , toFilePath db
                     , " is corrupted (missing its package.cache file)."
                     ]
-                $logWarn "Proceeding with a recache"
+                logWarn "Proceeding with a recache"
                 return ["--package-db", toFilePath db, "recache"]
             else do
                 -- Creating the parent doesn't seem necessary, as ghc-pkg
@@ -102,7 +102,7 @@ createDatabase menv wc db = do
         eres <- tryProcessStdout Nothing menv (ghcPkgExeName wc) args
         case eres of
             Left e -> do
-                $logError $ T.pack $ "Unable to create package database at " ++ toFilePath db
+                logError $ T.pack $ "Unable to create package database at " ++ toFilePath db
                 throwIO e
             Right _ -> return ()
 
@@ -168,7 +168,7 @@ unregisterGhcPkgId :: (MonadUnliftIO m, MonadLogger m)
 unregisterGhcPkgId menv wc cv pkgDb gid ident = do
     eres <- ghcPkg menv wc [pkgDb] args
     case eres of
-        Left e -> $logWarn $ T.pack $ show e
+        Left e -> logWarn $ T.pack $ show e
         Right _ -> return ()
   where
     -- TODO ideally we'd tell ghc-pkg a GhcPkgId instead
@@ -182,7 +182,7 @@ unregisterGhcPkgId menv wc cv pkgDb gid ident = do
 getCabalPkgVer :: (MonadUnliftIO m, MonadLogger m)
                => EnvOverride -> WhichCompiler -> m Version
 getCabalPkgVer menv wc = do
-    $logDebug "Getting Cabal package version"
+    logDebug "Getting Cabal package version"
     mres <- findGhcPkgVersion
         menv
         wc

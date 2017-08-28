@@ -37,12 +37,12 @@ hoogleCmd (args,setup,rebuild) go = withBuildConfig go pathToHaddocks
             else do
                 if setup
                     then do
-                        $logWarn
+                        logWarn
                             "Hoogle isn't installed or is too old. Automatically installing (use --no-setup to disable) ..."
                         installHoogle
                         haddocksToDb
                     else do
-                        $logError
+                        logError
                             "Hoogle isn't installed or is too old. Not installing it due to --no-setup."
                         bail
     haddocksToDb :: RIO EnvConfig ()
@@ -52,17 +52,17 @@ hoogleCmd (args,setup,rebuild) go = withBuildConfig go pathToHaddocks
             then runHoogle args
             else if setup || rebuild
                      then do
-                         $logWarn
+                         logWarn
                              (if rebuild
                                   then "Rebuilding database ..."
                                   else "No Hoogle database yet. Automatically building haddocks and hoogle database (use --no-setup to disable) ...")
                          buildHaddocks
-                         $logInfo "Built docs."
+                         logInfo "Built docs."
                          generateDb
-                         $logInfo "Generated DB."
+                         logInfo "Generated DB."
                          runHoogle args
                      else do
-                         $logError
+                         logError
                              "No Hoogle database. Not building one due to --no-setup"
                          bail
     generateDb :: RIO EnvConfig ()
@@ -117,11 +117,11 @@ hoogleCmd (args,setup,rebuild) go = withBuildConfig go pathToHaddocks
                         _ -> Left hoogleMinIdent)
         case hooglePackageIdentifier of
             Left{} ->
-                $logInfo
+                logInfo
                     ("Minimum " <> packageIdentifierText hoogleMinIdent <>
                      " is not in your index. Installing the minimum version.")
             Right ident ->
-                $logInfo
+                logInfo
                     ("Minimum version is " <> packageIdentifierText hoogleMinIdent <>
                      ". Found acceptable " <>
                      packageIdentifierText ident <>

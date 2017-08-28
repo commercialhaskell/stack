@@ -30,7 +30,8 @@ import           Control.Monad        as X (Monad (..), MonadPlus (..), filterM,
                                             when, zipWithM, zipWithM_, (<$!>),
                                             (<=<), (=<<), (>=>))
 import           Control.Monad.Catch  as X (MonadThrow (..))
-import           Control.Monad.Logger as X (Loc, LogLevel (..), LogSource,
+import           Control.Monad.Logger.CallStack
+                                      as X (Loc, LogLevel (..), LogSource,
                                             LogStr, MonadLogger (..),
                                             MonadLoggerIO (..), liftLoc,
                                             logDebug, logError, logInfo,
@@ -104,7 +105,6 @@ import           UnliftIO             as X
 
 import qualified Data.Text            as T
 import qualified Path.IO
-import Language.Haskell.TH            (Q, Exp)
 
 mapLeft :: (a1 -> a2) -> Either a1 b -> Either a2 b
 mapLeft f (Left a1) = Left (f a1)
@@ -147,9 +147,9 @@ withSystemTempDir str inner = withRunInIO $ \run -> Path.IO.withSystemTempDir st
 -- with a new sticky line. When you want to get rid of the sticky
 -- line, run 'logStickyDone'.
 --
-logSticky :: Q Exp
+logSticky :: MonadLogger m => Text -> m ()
 logSticky =
-    logOther "sticky"
+    logOther (LevelOther "sticky")
 
 -- | This will print out the given message with a newline and disable
 -- any further stickiness of the line until a new call to 'logSticky'
@@ -157,9 +157,9 @@ logSticky =
 --
 -- It might be better at some point to have a 'runSticky' function
 -- that encompasses the logSticky->logStickyDone pairing.
-logStickyDone :: Q Exp
+logStickyDone :: MonadLogger m => Text -> m ()
 logStickyDone =
-    logOther "sticky-done"
+    logOther (LevelOther "sticky-done")
 
 -- | The Reader+IO monad. This is different from a 'ReaderT' because:
 --
