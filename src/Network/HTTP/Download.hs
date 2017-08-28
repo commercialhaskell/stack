@@ -2,7 +2,6 @@
 {-# LANGUAGE DeriveDataTypeable    #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings     #-}
-{-# LANGUAGE TemplateHaskell  #-}
 module Network.HTTP.Download
     ( verifiedDownload
     , DownloadRequest(..)

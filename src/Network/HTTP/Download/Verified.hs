@@ -9,7 +9,6 @@
 {-# LANGUAGE RankNTypes            #-}
 {-# LANGUAGE GADTs                 #-}
 {-# LANGUAGE StandaloneDeriving    #-}
-{-# LANGUAGE TemplateHaskell       #-}
 module Network.HTTP.Download.Verified
   ( verifiedDownload
   , recoveringHttp

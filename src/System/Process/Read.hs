@@ -5,7 +5,6 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 -- | Reading from external processes.
@@ -48,11 +47,11 @@ import qualified Data.Conduit.List as CL
 import           Data.Conduit.Process hiding (callProcess)
 import qualified Data.Map as Map
 import qualified Data.Text as T
+import           Data.Text.Encoding (decodeUtf8With)
 import           Data.Text.Encoding.Error (lenientDecode)
 import qualified Data.Text.Lazy as LT
 import qualified Data.Text.Lazy.Encoding as LT
 import           Distribution.System (OS (Windows), Platform (Platform))
-import           Language.Haskell.TH as TH (location)
 import           Path
 import           Path.Extra
 import           Path.IO hiding (findExecutable)
@@ -265,14 +264,14 @@ sinkProcessStdout wd menv name args sinkStdout = do
   return sinkRet
 
 logProcessStderrStdout
-    :: (MonadUnliftIO m, MonadLogger m)
+    :: (HasCallStack, MonadUnliftIO m, MonadLogger m)
     => Maybe (Path Abs Dir)
     -> String
     -> EnvOverride
     -> [String]
     -> m ()
 logProcessStderrStdout mdir name menv args = withUnliftIO $ \u -> do
-    let logLines = CB.lines =$ CL.mapM_ (unliftIO u . monadLoggerLog $(TH.location >>= liftLoc) "" LevelInfo . toLogStr)
+    let logLines = CB.lines =$ CL.mapM_ (unliftIO u . logInfo . decodeUtf8With lenientDecode)
     ((), ()) <- unliftIO u $ sinkProcessStderrStdout mdir menv name args logLines logLines
     return ()
 

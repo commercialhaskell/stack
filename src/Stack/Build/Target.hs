@@ -5,7 +5,6 @@
 {-# LANGUAGE OverloadedStrings  #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneDeriving #-}
-{-# LANGUAGE TemplateHaskell    #-}
 {-# LANGUAGE TupleSections      #-}
 {-# LANGUAGE ViewPatterns       #-}
 -- | Parsing command line targets
