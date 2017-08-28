@@ -198,18 +198,18 @@ findFileTargets locals fileTargets = do
     results <- forM foundFileTargetComponents $ \(fp, xs) ->
         case xs of
             [] -> do
-                $prettyWarn $
+                prettyWarn $
                     "Couldn't find a component for file target" <+>
                     display fp <>
                     ". Attempting to load anyway."
                 return $ Left fp
             [x] -> do
-                $prettyInfo $
+                prettyInfo $
                     "Using configuration for" <+> display x <+>
                     "to load" <+> display fp
                 return $ Right (fp, x)
             (x:_) -> do
-                $prettyWarn $
+                prettyWarn $
                     "Multiple components contain file target" <+>
                     display fp <> ":" <+>
                     mconcat (intersperse ", " (map display xs)) <> line <>
@@ -255,12 +255,12 @@ getAllLocalTargets GhciOpts{..} targets0 mainIsTargets sourceMap = do
         else do
             let extraList = T.intercalate ", " (map (packageNameText . fst) extraLoadDeps)
             if ghciLoadLocalDeps
-                then $logInfo $ T.concat
+                then logInfo $ T.concat
                     [ "The following libraries will also be loaded into GHCi because "
                     , "they are local dependencies of your targets, and you specified --load-local-deps:\n    "
                     , extraList
                     ]
-                else $logInfo $ T.concat
+                else logInfo $ T.concat
                     [ "The following libraries will also be loaded into GHCi because "
                     , "they are intermediate dependencies of your targets:\n    "
                     , extraList
@@ -283,8 +283,8 @@ buildDepsAndInitialSteps GhciOpts{..} targets0 = do
         case eres of
             Right () -> return ()
             Left err -> do
-                $prettyError $ fromString (show err)
-                $prettyWarn "Build failed, but optimistically launching GHCi anyway"
+                prettyError $ fromString (show err)
+                prettyWarn "Build failed, but optimistically launching GHCi anyway"
 
 checkAdditionalPackages :: MonadThrow m => [String] -> m [PackageName]
 checkAdditionalPackages pkgs = forM pkgs $ \name -> do
@@ -318,14 +318,14 @@ runGhci GhciOpts{..} targets mainIsTargets pkgs extraFiles = do
         badForGhci x =
             isPrefixOf "-O" x || elem x (words "-debug -threaded -ticky -static -Werror")
     unless (null omittedOpts) $
-        $logWarn
+        logWarn
             ("The following GHC options are incompatible with GHCi and have not been passed to it: " <>
              T.unwords (map T.pack (nubOrd omittedOpts)))
     oiDir <- view objectInterfaceDirL
     let odir =
             [ "-odir=" <> toFilePathNoTrailingSep oiDir
             , "-hidir=" <> toFilePathNoTrailingSep oiDir ]
-    $logInfo
+    logInfo
         ("Configuring GHCi with the following packages: " <>
          T.intercalate ", " (map (packageNameText . ghciPkgName) pkgs))
     let execGhci extras = do
@@ -416,21 +416,21 @@ figureOutMainFile
 figureOutMainFile bopts mainIsTargets targets0 packages = do
     case candidates of
         [] -> return Nothing
-        [c@(_,_,fp)] -> do $logInfo ("Using main module: " <> renderCandidate c)
+        [c@(_,_,fp)] -> do logInfo ("Using main module: " <> renderCandidate c)
                            return (Just fp)
         candidate:_ -> do
           borderedWarning $ do
-            $logWarn "The main module to load is ambiguous. Candidates are: "
-            forM_ (map renderCandidate candidates) $logWarn
-            $logWarn
+            logWarn "The main module to load is ambiguous. Candidates are: "
+            forM_ (map renderCandidate candidates) logWarn
+            logWarn
                 "You can specify which one to pick by: "
-            $logWarn
+            logWarn
                 (" * Specifying targets to stack ghci e.g. stack ghci " <>
                  sampleTargetArg candidate)
-            $logWarn
+            logWarn
                 (" * Specifying what the main is e.g. stack ghci " <>
                  sampleMainIsArg candidate)
-            $logWarn
+            logWarn
                 (" * Choosing from the candidate above [1.." <>
                 T.pack (show $ length candidates) <> "]")
           liftIO userOption
@@ -589,15 +589,15 @@ wantedPackageComponents _ _ _ = S.empty
 checkForIssues :: (MonadThrow m, MonadLogger m) => [GhciPkgInfo] -> m ()
 checkForIssues pkgs = do
     unless (null issues) $ borderedWarning $ do
-        $logWarn "Warning: There are cabal settings for this project which may prevent GHCi from loading your code properly."
-        $logWarn "In some cases it can also load some projects which would otherwise fail to build."
-        $logWarn ""
-        mapM_ $logWarn $ intercalate [""] issues
-        $logWarn ""
-        $logWarn "To resolve, remove the flag(s) from the cabal file(s) and instead put them at the top of the haskell files."
-        $logWarn ""
-        $logWarn "It isn't yet possible to load multiple packages into GHCi in all cases - see"
-        $logWarn "https://ghc.haskell.org/trac/ghc/ticket/10827"
+        logWarn "Warning: There are cabal settings for this project which may prevent GHCi from loading your code properly."
+        logWarn "In some cases it can also load some projects which would otherwise fail to build."
+        logWarn ""
+        mapM_ logWarn $ intercalate [""] issues
+        logWarn ""
+        logWarn "To resolve, remove the flag(s) from the cabal file(s) and instead put them at the top of the haskell files."
+        logWarn ""
+        logWarn "It isn't yet possible to load multiple packages into GHCi in all cases - see"
+        logWarn "https://ghc.haskell.org/trac/ghc/ticket/10827"
   where
     issues = concat
         [ mixedFlag "-XNoImplicitPrelude"
@@ -651,20 +651,20 @@ checkForIssues pkgs = do
 
 borderedWarning :: MonadLogger m => m a -> m a
 borderedWarning f = do
-    $logWarn ""
-    $logWarn "* * * * * * * *"
+    logWarn ""
+    logWarn "* * * * * * * *"
     x <- f
-    $logWarn "* * * * * * * *"
-    $logWarn ""
+    logWarn "* * * * * * * *"
+    logWarn ""
     return x
 
 checkForDuplicateModules :: (MonadThrow m, MonadLogger m) => [GhciPkgInfo] -> m ()
 checkForDuplicateModules pkgs = do
     unless (null duplicates) $ do
         borderedWarning $ do
-            $logWarn "The following modules are present in multiple packages:"
+            logWarn "The following modules are present in multiple packages:"
             forM_ duplicates $ \(mn, pns) -> do
-                $logWarn (" * " <> T.pack mn <> " (in " <> T.intercalate ", " (map packageNameText pns) <> ")")
+                logWarn (" * " <> T.pack mn <> " (in " <> T.intercalate ", " (map packageNameText pns) <> ")")
         throwM LoadingDuplicateModules
   where
     duplicates, allModules :: [(String, [PackageName])]

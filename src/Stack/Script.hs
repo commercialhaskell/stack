@@ -44,7 +44,7 @@ scriptCmd opts go' = do
         -- interpreter mode, only error messages are shown. See:
         -- https://github.com/commercialhaskell/stack/issues/3007
         case globalStackYaml go' of
-          SYLOverride fp -> $logError $ T.pack
+          SYLOverride fp -> logError $ T.pack
             $ "Ignoring override stack.yaml file for script command: " ++ fp
           SYLDefault -> return ()
           SYLNoConfig _ -> assert False (return ())
@@ -79,9 +79,9 @@ scriptCmd opts go' = do
                           $ S8.unpack
                           $ S8.concat bss
             if Set.null $ Set.difference (Set.map packageNameString targetsSet) installed
-                then $logDebug "All packages already installed"
+                then logDebug "All packages already installed"
                 else do
-                    $logDebug "Missing packages, performing installation"
+                    logDebug "Missing packages, performing installation"
                     Stack.Build.build (const $ return ()) lk defaultBuildOptsCLI
                         { boptsCLITargets = map packageNameText $ Set.toList targetsSet
                         }

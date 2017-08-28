@@ -2,14 +2,12 @@
 {-# LANGUAGE CPP                   #-}
 {-# LANGUAGE DeriveDataTypeable    #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE PackageImports        #-}
 {-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
 {-# LANGUAGE RecordWildCards       #-}
 {-# LANGUAGE RankNTypes            #-}
 {-# LANGUAGE GADTs                 #-}
 {-# LANGUAGE StandaloneDeriving    #-}
-{-# LANGUAGE TemplateHaskell       #-}
 module Network.HTTP.Download.Verified
   ( verifiedDownload
   , recoveringHttp
@@ -225,7 +223,7 @@ verifiedDownload :: (MonadIO m, MonadLogger m)
 verifiedDownload DownloadRequest{..} destpath progressSink = do
     let req = drRequest
     whenM' (liftIO getShouldDownload) $ do
-        $logDebug $ "Downloading " <> decodeUtf8With lenientDecode (path req)
+        logDebug $ "Downloading " <> decodeUtf8With lenientDecode (path req)
         liftIO $ do
             createDirectoryIfMissing True dir
             recoveringHttp drRetryPolicy $

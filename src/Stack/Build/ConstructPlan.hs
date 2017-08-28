@@ -176,7 +176,7 @@ constructPlan :: forall env. HasEnvConfig env
               -> Bool
               -> RIO env Plan
 constructPlan ls0 baseConfigOpts0 locals extraToBuild0 localDumpPkgs loadPackage0 sourceMap installedMap initialBuildSteps = do
-    $logDebug "Constructing the build plan"
+    logDebug "Constructing the build plan"
     u <- askUnliftIO
 
     econfig <- view envConfigL
@@ -187,7 +187,7 @@ constructPlan ls0 baseConfigOpts0 locals extraToBuild0 localDumpPkgs loadPackage
     lp <- getLocalPackages
     ((), m, W efinals installExes dirtyReason deps warnings parents) <-
         liftIO $ runRWST inner (ctx econfig (unliftIO u . getPackageVersions) lp) M.empty
-    mapM_ $logWarn (warnings [])
+    mapM_ logWarn (warnings [])
     let toEither (_, Left e)  = Left e
         toEither (k, Right v) = Right (k, v)
         (errlibs, adrs) = partitionEithers $ map toEither $ M.toList m
@@ -216,7 +216,7 @@ constructPlan ls0 baseConfigOpts0 locals extraToBuild0 localDumpPkgs loadPackage
         else do
             planDebug $ show errs
             stackYaml <- view stackYamlL
-            $prettyError $ pprintExceptions errs stackYaml parents (wantedLocalPackages locals)
+            prettyError $ pprintExceptions errs stackYaml parents (wantedLocalPackages locals)
             throwM $ ConstructPlanFailed "Plan construction failed."
   where
     ctx econfig getVersions0 lp = Ctx

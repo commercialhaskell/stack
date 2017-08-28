@@ -87,14 +87,14 @@ stageExesInDir opts dir = do
     ensureDir destBinPath
     case imgDockerExecutables opts of
         Nothing -> do
-            $logInfo ""
-            $logInfo "Note: 'executables' not specified for a image container, so every executable in the project's local bin dir will be used."
+            logInfo ""
+            logInfo "Note: 'executables' not specified for a image container, so every executable in the project's local bin dir will be used."
             mcontents <- liftIO $ forgivingAbsence $ listDir srcBinPath
             case mcontents of
                 Just (files, dirs)
                     | not (null files) || not (null dirs) -> liftIO $ copyDirRecur srcBinPath destBinPath
-                _ -> $prettyWarn "The project's local bin dir contains no files, so no executables will be added to the docker image."
-            $logInfo ""
+                _ -> prettyWarn "The project's local bin dir contains no files, so no executables will be added to the docker image."
+            logInfo ""
 
         Just exes ->
             forM_

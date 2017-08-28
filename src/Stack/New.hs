@@ -106,7 +106,7 @@ new opts forceOverwrite = do
                           LocalTemp -> "Loading local"
                           RemoteTemp -> "Downloading"
          in
-        $logInfo
+        logInfo
             (loading <> " template \"" <> templateName template <>
              "\" to create project \"" <>
              packageNameText project <>
@@ -145,7 +145,7 @@ loadTemplate name logIt = do
   where
     loadLocalFile :: Path b File -> RIO env Text
     loadLocalFile path = do
-        $logDebug ("Opening local template: \"" <> T.pack (toFilePath path)
+        logDebug ("Opening local template: \"" <> T.pack (toFilePath path)
                                                 <> "\"")
         exists <- doesFileExist path
         if exists
@@ -194,7 +194,7 @@ applyTemplate project template nonceParams dir templateText = do
                  templateText
                  (mkStrContextM (contextFunction context)))
     unless (S.null missingKeys)
-         ($logInfo ("\n" <> T.pack (show (MissingParameters project template missingKeys (configUserConfigPath config))) <> "\n"))
+         (logInfo ("\n" <> T.pack (show (MissingParameters project template missingKeys (configUserConfigPath config))) <> "\n"))
     files :: Map FilePath LB.ByteString <-
         catch (execWriterT $
                yield (T.encodeUtf8 (LT.toStrict applied)) $$
@@ -261,7 +261,7 @@ runTemplateInits dir = do
         Just Git ->
             catch (callProcess $ Cmd (Just dir) "git" menv ["init"])
                   (\(_ :: ProcessExitedUnsuccessfully) ->
-                         $logInfo "git init failed to run, ignoring ...")
+                         logInfo "git init failed to run, ignoring ...")
 
 -- | Display the set of templates accompanied with description if available.
 listTemplates :: HasLogFunc env => RIO env ()
@@ -295,7 +295,7 @@ getTemplateInfo = do
   resp <- catch (liftM Right $ httpLbs req) (\(ex :: HttpException) -> return . Left $ "Failed to download template info. The HTTP error was: " <> show ex)
   case resp >>= is200 of
     Left err -> do
-      $logInfo $ T.pack err
+      logInfo $ T.pack err
       return M.empty
     Right resp' ->
       case Yaml.decodeEither (LB.toStrict $ getResponseBody resp') :: Either String Object of

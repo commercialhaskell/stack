@@ -2,7 +2,6 @@
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 -- | Clean a project.
@@ -33,8 +32,8 @@ clean cleanOpts = do
   where
     cleanDir dir =
       liftIO (ignoringAbsence (removeDirRecur dir) >> return False) `catchAny` \ex -> do
-        $logError $ "Exception while recursively deleting " <> T.pack (toFilePath dir) <> "\n" <> T.pack (show ex)
-        $logError "Perhaps you do not have permission to delete these files or they are in use?"
+        logError $ "Exception while recursively deleting " <> T.pack (toFilePath dir) <> "\n" <> T.pack (show ex)
+        logError "Perhaps you do not have permission to delete these files or they are in use?"
         return True
 
 dirsToDelete :: HasEnvConfig env => CleanOpts -> RIO env [Path Abs Dir]

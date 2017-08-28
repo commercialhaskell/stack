@@ -3,7 +3,6 @@
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings     #-}
-{-# LANGUAGE TemplateHaskell       #-}
 module Stack.Init
     ( initProject
     , InitOpts (..)
@@ -71,7 +70,7 @@ initProject whichCmd currDir initOpts mresolver = do
                     \file. Please try \"stack new\" instead."
         find  = findCabalFiles (includeSubDirs initOpts)
         dirs' = if null dirs then [currDir] else dirs
-    $logInfo "Looking for .cabal or package.yaml files to use to init the project."
+    logInfo "Looking for .cabal or package.yaml files to use to init the project."
     cabalfps <- liftM concat $ mapM find dirs'
     (bundle, dupPkgs)  <- cabalPackagesCheck cabalfps noPkgMsg Nothing
 
@@ -139,28 +138,28 @@ initProject whichCmd currDir initOpts mresolver = do
         toPkg dir = PLFilePath $ makeRelDir dir
         indent t = T.unlines $ fmap ("    " <>) (T.lines t)
 
-    $logInfo $ "Initialising configuration using resolver: " <> sdResolverName sd
-    $logInfo $ "Total number of user packages considered: "
+    logInfo $ "Initialising configuration using resolver: " <> sdResolverName sd
+    logInfo $ "Total number of user packages considered: "
                <> T.pack (show (Map.size bundle + length dupPkgs))
 
     when (dupPkgs /= []) $ do
-        $logWarn $ "Warning! Ignoring "
+        logWarn $ "Warning! Ignoring "
                    <> T.pack (show $ length dupPkgs)
                    <> " duplicate packages:"
         rels <- mapM makeRel dupPkgs
-        $logWarn $ indent $ showItems rels
+        logWarn $ indent $ showItems rels
 
     when (Map.size ignored > 0) $ do
-        $logWarn $ "Warning! Ignoring "
+        logWarn $ "Warning! Ignoring "
                    <> T.pack (show $ Map.size ignored)
                    <> " packages due to dependency conflicts:"
         rels <- mapM makeRel (Map.elems (fmap fst ignored))
-        $logWarn $ indent $ showItems rels
+        logWarn $ indent $ showItems rels
 
     when (Map.size extraDeps > 0) $ do
-        $logWarn $ "Warning! " <> T.pack (show $ Map.size extraDeps)
+        logWarn $ "Warning! " <> T.pack (show $ Map.size extraDeps)
                    <> " external dependencies were added."
-    $logInfo $
+    logInfo $
         (if exists then "Overwriting existing configuration file: "
          else "Writing configuration to file: ")
         <> T.pack reldest
@@ -169,7 +168,7 @@ initProject whichCmd currDir initOpts mresolver = do
            $ renderStackYaml p
                (Map.elems $ fmap (makeRelDir . parent . fst) ignored)
                (map (makeRelDir . parent) dupPkgs)
-    $logInfo "All done."
+    logInfo "All done."
 
 -- | Render a stack.yaml file with comments, see:
 -- https://github.com/commercialhaskell/stack/issues/226
@@ -318,20 +317,20 @@ renderStackYaml p ignoredPackages dupPackages =
 getSnapshots' :: HasConfig env => RIO env Snapshots
 getSnapshots' = do
     getSnapshots `catchAny` \e -> do
-        $logError $
+        logError $
             "Unable to download snapshot list, and therefore could " <>
             "not generate a stack.yaml file automatically"
-        $logError $
+        logError $
             "This sometimes happens due to missing Certificate Authorities " <>
             "on your system. For more information, see:"
-        $logError ""
-        $logError "    https://github.com/commercialhaskell/stack/issues/234"
-        $logError ""
-        $logError "You can try again, or create your stack.yaml file by hand. See:"
-        $logError ""
-        $logError "    http://docs.haskellstack.org/en/stable/yaml_configuration/"
-        $logError ""
-        $logError $ "Exception was: " <> T.pack (show e)
+        logError ""
+        logError "    https://github.com/commercialhaskell/stack/issues/234"
+        logError ""
+        logError "You can try again, or create your stack.yaml file by hand. See:"
+        logError ""
+        logError "    http://docs.haskellstack.org/en/stable/yaml_configuration/"
+        logError ""
+        logError $ "Exception was: " <> T.pack (show e)
         throwString ""
 
 -- | Get the default resolver value
@@ -386,7 +385,7 @@ getWorkingResolverPlan
        --   , Extra dependencies
        --   , Src packages actually considered)
 getWorkingResolverPlan whichCmd stackYaml initOpts bundle sd = do
-    $logInfo $ "Selected resolver: " <> sdResolverName sd
+    logInfo $ "Selected resolver: " <> sdResolverName sd
     go bundle
     where
         go info = do
@@ -396,7 +395,7 @@ getWorkingResolverPlan whichCmd stackYaml initOpts bundle sd = do
                 Right (f, edeps)-> return (sd, f, edeps, info)
                 Left ignored
                     | Map.null available -> do
-                        $logWarn "*** Could not find a working plan for any of \
+                        logWarn "*** Could not find a working plan for any of \
                                  \the user packages.\nProceeding to create a \
                                  \config anyway."
                         return (sd, Map.empty, Map.empty, Map.empty)
@@ -405,10 +404,10 @@ getWorkingResolverPlan whichCmd stackYaml initOpts bundle sd = do
                             error "Bug: No packages to ignore"
 
                         if length ignored > 1 then do
-                          $logWarn "*** Ignoring packages:"
-                          $logWarn $ indent $ showItems ignored
+                          logWarn "*** Ignoring packages:"
+                          logWarn $ indent $ showItems ignored
                         else
-                          $logWarn $ "*** Ignoring package: "
+                          logWarn $ "*** Ignoring package: "
                                  <> T.pack (packageNameString
                                                 (case ignored of
                                                     [] -> error "getWorkingResolverPlan.head"
@@ -441,23 +440,23 @@ checkBundleResolver whichCmd stackYaml initOpts bundle sd = do
                 solve f
             | omitPackages initOpts -> do
                 warnPartial result
-                $logWarn "*** Omitting packages with unsatisfied dependencies"
+                logWarn "*** Omitting packages with unsatisfied dependencies"
                 return $ Left $ failedUserPkgs e
             | otherwise -> throwM $ ResolverPartial whichCmd (sdResolverName sd) (show result)
         BuildPlanCheckFail _ e _
             | omitPackages initOpts -> do
-                $logWarn $ "*** Resolver compiler mismatch: "
+                logWarn $ "*** Resolver compiler mismatch: "
                            <> sdResolverName sd
-                $logWarn $ indent $ T.pack $ show result
+                logWarn $ indent $ T.pack $ show result
                 return $ Left $ failedUserPkgs e
             | otherwise -> throwM $ ResolverMismatch whichCmd (sdResolverName sd) (show result)
     where
       resolver = sdResolver sd
       indent t  = T.unlines $ fmap ("    " <>) (T.lines t)
       warnPartial res = do
-          $logWarn $ "*** Resolver " <> sdResolverName sd
+          logWarn $ "*** Resolver " <> sdResolverName sd
                       <> " will need external packages: "
-          $logWarn $ indent $ T.pack $ show res
+          logWarn $ indent $ T.pack $ show res
 
       failedUserPkgs e = Map.keys $ Map.unions (Map.elems (fmap deNeededBy e))
 

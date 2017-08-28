@@ -117,7 +117,7 @@ build setLocalFiles mbuildLk boptsCli = fixCodePage $ do
        -- NOTE: This policy is too conservative.  In the future we should be able to
        -- schedule unlocking as an Action that happens after all non-local actions are
        -- complete.
-      (Just lk,True) -> do $logDebug "All installs are local; releasing snapshot lock early."
+      (Just lk,True) -> do logDebug "All installs are local; releasing snapshot lock early."
                            liftIO $ unlockFile lk
       _ -> return ()
 
@@ -174,7 +174,7 @@ instance Exception CabalVersionException
 warnIfExecutablesWithSameNameCouldBeOverwritten
     :: MonadLogger m => [LocalPackage] -> Plan -> m ()
 warnIfExecutablesWithSameNameCouldBeOverwritten locals plan = do
-    $logDebug "Checking if we are going to build multiple executables with the same name"
+    logDebug "Checking if we are going to build multiple executables with the same name"
     forM_ (Map.toList warnings) $ \(exe,(toBuild,otherLocals)) -> do
         let exe_s
                 | length toBuild > 1 = "several executables with the same name:"
@@ -183,7 +183,7 @@ warnIfExecutablesWithSameNameCouldBeOverwritten locals plan = do
                 T.intercalate
                     ", "
                     ["'" <> packageNameText p <> ":" <> exe <> "'" | p <- pkgs]
-        ($logWarn . T.unlines . concat)
+        (logWarn . T.unlines . concat)
             [ [ "Building " <> exe_s <> " " <> exesText toBuild <> "." ]
             , [ "Only one of them will be available via 'stack exec' or locally installed."
               | length toBuild > 1
@@ -241,7 +241,7 @@ warnIfExecutablesWithSameNameCouldBeOverwritten locals plan = do
 
 warnAboutSplitObjs :: MonadLogger m => BuildOpts -> m ()
 warnAboutSplitObjs bopts | boptsSplitObjs bopts = do
-    $logWarn $ "Building with --split-objs is enabled. " <> T.pack splitObjsWarning
+    logWarn $ "Building with --split-objs is enabled. " <> T.pack splitObjsWarning
 warnAboutSplitObjs _ = return ()
 
 splitObjsWarning :: String
@@ -344,7 +344,7 @@ fixCodePage inner = do
 
         fixInput $ fixOutput inner
     expected = 65001 -- UTF-8
-    warn typ = $logInfo $ T.concat
+    warn typ = logInfo $ T.concat
         [ "Setting"
         , typ
         , " codepage to UTF-8 (65001) to ensure correct output from GHC"

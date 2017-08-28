@@ -1,6 +1,5 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module Path.CheckInstall where
@@ -26,22 +25,22 @@ warnInstallSearchPathIssues destDir installed = do
                 Just exePath -> do
                     exeDir <- (liftIO . fmap FP.takeDirectory . D.canonicalizePath) exePath
                     unless (exeDir `FP.equalFilePath` destDir) $ do
-                        $logWarn ""
-                        $logWarn $ T.concat
+                        logWarn ""
+                        logWarn $ T.concat
                             [ "WARNING: The \""
                             , exe
                             , "\" executable found on the PATH environment variable is "
                             , T.pack exePath
                             , ", and not the version that was just installed."
                             ]
-                        $logWarn $ T.concat
+                        logWarn $ T.concat
                             [ "This means that \""
                             , exe
                             , "\" calls on the command line will not use this version."
                             ]
                 Nothing -> do
-                    $logWarn ""
-                    $logWarn $ T.concat
+                    logWarn ""
+                    logWarn $ T.concat
                         [ "WARNING: Installation path "
                         , T.pack destDir
                         , " is on the PATH but the \""
@@ -49,8 +48,8 @@ warnInstallSearchPathIssues destDir installed = do
                         , "\" executable that was just installed could not be found on the PATH."
                         ]
         else do
-            $logWarn ""
-            $logWarn $ T.concat
+            logWarn ""
+            logWarn $ T.concat
                 [ "WARNING: Installation path "
                 , T.pack destDir
                 , " not found on the PATH environment variable"

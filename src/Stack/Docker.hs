@@ -259,7 +259,7 @@ runContainerAndExit getCmdArgs
          image = dockerImage docker
      when (isRemoteDocker &&
            maybe False (isInfixOf "boot2docker") dockerCertPath)
-          ($logWarn "Warning: Using boot2docker is NOT supported, and not likely to perform well.")
+          (logWarn "Warning: Using boot2docker is NOT supported, and not likely to perform well.")
      maybeImageInfo <- inspect envOverride image
      imageInfo@Inspect{..} <- case maybeImageInfo of
        Just ii -> return ii
@@ -462,16 +462,16 @@ cleanup opts =
         [] -> return ()
         (c:_):t:v:_ ->
           do args <- if | toUpper c == 'R' && t == imageStr ->
-                            do $logInfo (concatT ["Removing image: '",v,"'"])
+                            do logInfo (concatT ["Removing image: '",v,"'"])
                                return ["rmi",v]
                         | toUpper c == 'R' && t == containerStr ->
-                            do $logInfo (concatT ["Removing container: '",v,"'"])
+                            do logInfo (concatT ["Removing container: '",v,"'"])
                                return ["rm","-f",v]
                         | otherwise -> throwM (InvalidCleanupCommandException line)
              e <- try (readDockerProcess envOverride Nothing args)
              case e of
                Left ex@ProcessFailed{} ->
-                 $logError (concatT ["Could not remove: '",v,"': ", show ex])
+                 logError (concatT ["Could not remove: '",v,"': ", show ex])
                Left e' -> throwM e'
                Right _ -> return ()
         _ -> throwM (InvalidCleanupCommandException line)
@@ -669,9 +669,9 @@ pull =
 pullImage :: (MonadLogger m,MonadIO m,MonadThrow m)
           => EnvOverride -> DockerOpts -> String -> m ()
 pullImage envOverride docker image =
-  do $logInfo (concatT ["Pulling image from registry: '",image,"'"])
+  do logInfo (concatT ["Pulling image from registry: '",image,"'"])
      when (dockerRegistryLogin docker)
-          (do $logInfo "You may need to log in."
+          (do logInfo "You may need to log in."
               callProcess $ Cmd
                 Nothing
                 "docker"
@@ -852,7 +852,7 @@ removeDirectoryContents path excludeDirs excludeFiles =
 
 -- | Produce a strict 'S.ByteString' from the stdout of a
 -- process. Throws a 'ReadProcessException' exception if the
--- process fails.  Logs process's stderr using @$logError@.
+-- process fails.  Logs process's stderr using @logError@.
 readDockerProcess
     :: (MonadUnliftIO m, MonadLogger m)
     => EnvOverride -> Maybe (Path Abs Dir) -> [String] -> m BS.ByteString
@@ -870,7 +870,7 @@ hostBinDir = "/opt/host/bin"
 decodeUtf8 :: BS.ByteString -> String
 decodeUtf8 bs = T.unpack (T.decodeUtf8 bs)
 
--- | Convenience function constructing message for @$log*@.
+-- | Convenience function constructing message for @log*@.
 concatT :: [String] -> Text
 concatT = T.pack . concat
 

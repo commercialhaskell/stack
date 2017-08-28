@@ -95,14 +95,14 @@ getCompilerVersion
 getCompilerVersion menv wc =
     case wc of
         Ghc -> do
-            $logDebug "Asking GHC for its version"
+            logDebug "Asking GHC for its version"
             bs <- readProcessStdout Nothing menv "ghc" ["--numeric-version"]
             let (_, ghcVersion) = versionFromEnd bs
             x <- GhcVersion <$> parseVersion (T.decodeUtf8 ghcVersion)
-            $logDebug $ "GHC version is: " <> compilerVersionText x
+            logDebug $ "GHC version is: " <> compilerVersionText x
             return x
         Ghcjs -> do
-            $logDebug "Asking GHCJS for its version"
+            logDebug "Asking GHCJS for its version"
             -- Output looks like
             --
             -- The Glorious Glasgow Haskell Compilation System for JavaScript, version 0.1.0 (GHC 7.10.2)
@@ -165,7 +165,7 @@ extraDirs tool = do
                 ]
             }
         (Platform _ x, toolName) -> do
-            $logWarn $ "binDirs: unexpected OS/tool combo: " <> T.pack (show (x, toolName))
+            logWarn $ "binDirs: unexpected OS/tool combo: " <> T.pack (show (x, toolName))
             return mempty
   where
     isGHC n = "ghc" == n || "ghc-" `isPrefixOf` n

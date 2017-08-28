@@ -2,7 +2,6 @@
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TupleSections #-}
 
 -- | Functions for IDEs.
@@ -31,13 +30,13 @@ listPackages = do
     forM_ packageDirs $ \dir -> do
         cabalfp <- findOrGenerateCabalFile dir
         pkgName <- parsePackageNameFromFilePath cabalfp
-        ($logInfo . packageNameText) pkgName
+        (logInfo . packageNameText) pkgName
 
 -- | List the targets in the current project.
 listTargets :: HasEnvConfig env => RIO env ()
 listTargets =
     do rawLocals <- lpProject <$> getLocalPackages
-       $logInfo
+       logInfo
            (T.intercalate
                 "\n"
                 (map

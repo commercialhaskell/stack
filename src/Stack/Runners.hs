@@ -165,7 +165,7 @@ withBuildConfigExt skipDocker go@GlobalOpts{..} mbefore inner mafter = loadConfi
                withUserFileLock go dir $ \lk2 -> do
                  liftIO $ writeIORef curLk lk2
                  liftIO $ munlockFile lk
-                 $logDebug "Starting to execute command inside EnvConfig"
+                 logDebug "Starting to execute command inside EnvConfig"
                  inner lk2
 
       let inner'' lk = do

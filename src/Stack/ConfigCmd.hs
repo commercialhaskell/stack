@@ -3,7 +3,6 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE GADTs #-}
 
 -- | Make changes to project or global configuration.
@@ -70,12 +69,12 @@ cfgCmdSet go cmd = do
     let cmdKey = cfgCmdSetOptionName cmd
         config' = HMap.insert cmdKey newValue config
     if config' == config
-        then $logInfo
+        then logInfo
                  (T.pack (toFilePath configFilePath) <>
                   " already contained the intended configuration and remains unchanged.")
         else do
             liftIO (S.writeFile (toFilePath configFilePath) (Yaml.encode config'))
-            $logInfo (T.pack (toFilePath configFilePath) <> " has been updated.")
+            logInfo (T.pack (toFilePath configFilePath) <> " has been updated.")
 
 cfgCmdSetValue
     :: (HasConfig env, HasGHCVariant env)

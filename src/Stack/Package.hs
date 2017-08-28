@@ -177,12 +177,12 @@ printCabalFileWarning
 printCabalFileWarning cabalfp =
     \case
         (PWarning x) ->
-            $logWarn
+            logWarn
                 ("Cabal file warning in " <> T.pack (toFilePath cabalfp) <>
                  ": " <>
                  T.pack x)
         (UTFWarning ln msg) ->
-            $logWarn
+            logWarn
                 ("Cabal file warning in " <> T.pack (toFilePath cabalfp) <> ":" <>
                  T.pack (show ln) <>
                  ": " <>
@@ -264,7 +264,7 @@ packageFromPackageDescription packageConfig pkgFlags pkg =
     -- constitute the package. This is primarily used for dirtiness
     -- checking during build, as well as use by "stack ghci"
     pkgFiles = GetPackageFiles $
-        \cabalfp -> $debugBracket ("getPackageFiles" <+> display cabalfp) $ do
+        \cabalfp -> debugBracket ("getPackageFiles" <+> display cabalfp) $ do
              let pkgDir = parent cabalfp
              distDir <- distDirFromDir pkgDir
              (componentModules,componentFiles,dataFiles',warnings) <-
@@ -624,7 +624,7 @@ resolveGlobFiles =
             (\(e :: IOException) ->
                   if isUserError e
                       then do
-                          $logWarn
+                          logWarn
                               ("Wildcard does not match any files: " <> T.pack glob <> "\n" <>
                                "in directory: " <> T.pack dir)
                           return []
@@ -665,7 +665,7 @@ matchDirFileGlob_ dir filepath = case parseFileGlob filepath of
                     , not (null name) && isSuffixOf ext ext'
                     ]
     when (null matches) $
-        $logWarn $ "WARNING: filepath wildcard '" <> T.pack filepath <> "' does not match any files."
+        logWarn $ "WARNING: filepath wildcard '" <> T.pack filepath <> "' does not match any files."
     return matches
 
 -- | Get all files referenced by the benchmark.
@@ -1033,7 +1033,7 @@ parseDumpHI dumpHIPath = do
     thDepsResolved <- liftM catMaybes $ forM thDeps $ \x -> do
         mresolved <- liftIO (forgivingAbsence (resolveFile dir x)) >>= rejectMissingFile
         when (isNothing mresolved) $
-            $logWarn $ "Warning: addDependentFile path (Template Haskell) listed in " <> T.pack dumpHIPath <>
+            logWarn $ "Warning: addDependentFile path (Template Haskell) listed in " <> T.pack dumpHIPath <>
                 " does not exist: " <> T.pack x
         return mresolved
     return (moduleDeps, thDepsResolved)
@@ -1111,7 +1111,7 @@ warnMultiple
     :: MonadLogger m
     => DotCabalDescriptor -> Path b t -> [Path b t] -> m ()
 warnMultiple name candidate rest =
-    $logWarn
+    logWarn
         ("There were multiple candidates for the Cabal entry \"" <>
          showName name <>
          "\" (" <>
@@ -1136,7 +1136,7 @@ logPossibilities dirs mn = do
     case possibilities of
         [] -> return ()
         _ ->
-            $logWarn
+            logWarn
                 ("Unable to find a known candidate for the Cabal entry \"" <>
                  T.pack (D.display mn) <>
                  "\", but did find: " <>
@@ -1201,22 +1201,22 @@ hpack pkgDir = do
     exists <- liftIO $ doesFileExist hpackFile
     when exists $ do
         let fpt = T.pack (toFilePath hpackFile)
-        $logDebug $ "Running hpack on " <> fpt
+        logDebug $ "Running hpack on " <> fpt
 #if MIN_VERSION_hpack(0,18,0)
         r <- liftIO $ Hpack.hpackResult (Just $ toFilePath pkgDir)
 #else
         r <- liftIO $ Hpack.hpackResult (toFilePath pkgDir)
 #endif
-        forM_ (Hpack.resultWarnings r) $ \w -> $logWarn ("WARNING: " <> T.pack w)
+        forM_ (Hpack.resultWarnings r) $ \w -> logWarn ("WARNING: " <> T.pack w)
         let cabalFile = T.pack (Hpack.resultCabalFile r)
         case Hpack.resultStatus r of
-            Hpack.Generated -> $logDebug $
+            Hpack.Generated -> logDebug $
                 "hpack generated a modified version of " <> cabalFile
-            Hpack.OutputUnchanged -> $logDebug $
+            Hpack.OutputUnchanged -> logDebug $
                 "hpack output unchanged in " <> cabalFile
             -- NOTE: this is 'logInfo' so it will be outputted to the
             -- user by default.
-            Hpack.AlreadyGeneratedByNewerHpack -> $logWarn $
+            Hpack.AlreadyGeneratedByNewerHpack -> logWarn $
                 "WARNING: " <> cabalFile <> " was generated with a newer version of hpack, please upgrade and try again."
 
 -- | Path for the package's build log.
@@ -1242,7 +1242,7 @@ resolveOrWarn subject resolver path =
      dir <- asks (parent . fst)
      result <- resolver dir path
      when (isNothing result) $
-       $logWarn ("Warning: " <> subject <> " listed in " <>
+       logWarn ("Warning: " <> subject <> " listed in " <>
          T.pack (maybe (FL.toFilePath file) FL.toFilePath (stripProperPrefix cwd file)) <>
          " file does not exist: " <>
          T.pack path)

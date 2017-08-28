@@ -76,13 +76,13 @@ openHaddocksInBrowser bco pkgLocations buildTargets = do
                 if exists
                     then return docFile
                     else do
-                        $logWarn $
+                        logWarn $
                             "Expected to find documentation at " <>
                             T.pack (toFilePath docFile) <>
                             ", but that file is missing.  Opening doc index instead."
                         getDocIndex
             _ -> getDocIndex
-    $prettyInfo $ "Opening" <+> display docFile <+> "in the browser."
+    prettyInfo $ "Opening" <+> display docFile <+> "in the browser."
     _ <- liftIO $ openBrowser (toFilePath docFile)
     return ()
 
@@ -216,7 +216,7 @@ generateHaddockIndex descr envOverride wc bco dumpPackages docRelFP destDir = do
                         or [mt > indexModTime | (_,mt,_,_) <- interfaceOpts]
         if needUpdate
             then do
-                $logInfo
+                logInfo
                     (T.concat ["Updating Haddock index for ", descr, " in\n",
                                T.pack (toFilePath destIndexFile)])
                 liftIO (mapM_ copyPkgDocs interfaceOpts)
@@ -230,7 +230,7 @@ generateHaddockIndex descr envOverride wc bco dumpPackages docRelFP destDir = do
                      ["--gen-contents", "--gen-index"] ++
                      [x | (xs,_,_,_) <- interfaceOpts, x <- xs])
             else
-              $logInfo
+              logInfo
                     (T.concat ["Haddock index for ", descr, " already up to date at:\n",
                                T.pack (toFilePath destIndexFile)])
   where

@@ -1,13 +1,15 @@
 {-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE TupleSections #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE RecordWildCards #-}
+
+#ifdef USE_GIT_INFO
+{-# LANGUAGE TemplateHaskell #-}
+#endif
 
 -- | Main stack tool entry point.
 
@@ -608,7 +610,7 @@ buildCmd opts go = do
 
 uninstallCmd :: [String] -> GlobalOpts -> IO ()
 uninstallCmd _ go = withConfigAndLock go $
-    $prettyErrorL
+    prettyErrorL
       [ flow "stack does not manage installations in global locations."
       , flow "The only global mutation stack performs is executable copying."
       , flow "For the default executable destination, please run"
@@ -639,7 +641,7 @@ upgradeCmd upgradeOpts' go = withGlobalConfigAndLock go $
 -- | Upload to Hackage
 uploadCmd :: SDistOpts -> GlobalOpts -> IO ()
 uploadCmd (SDistOpts [] _ _ _ _ _) go =
-    withConfigAndLock go . $prettyErrorL $
+    withConfigAndLock go . prettyErrorL $
         [ flow "To upload the current package, please run"
         , styleShell "stack upload ."
         , flow "(with the period at the end)"
@@ -655,7 +657,7 @@ uploadCmd sdistOpts go = do
     withBuildConfigAndLock go $ \_ -> do
         unless (null invalid) $ do
             let invalidList = bulletedList $ map (styleFile . fromString) invalid
-            $prettyErrorL $
+            prettyErrorL
                 [ styleShell "stack upload"
                 , flow "expects a list of sdist tarballs or cabal directories."
                 , flow "Can't find:"
@@ -710,7 +712,7 @@ sdistCmd sdistOpts go =
             ensureDir (parent tarPath)
             liftIO $ L.writeFile (toFilePath tarPath) tarBytes
             checkSDistTarball sdistOpts tarPath
-            $prettyInfoL [flow "Wrote sdist tarball to", P.display tarPath]
+            prettyInfoL [flow "Wrote sdist tarball to", P.display tarPath]
             when (sdoptsSign sdistOpts) (void $ Sig.sign (sdoptsSignServerUrl sdistOpts) tarPath)
 
 -- | Execute a command.
