@@ -265,7 +265,7 @@ generateHpcReportForTargets opts = do
     forM_ mreportPath $ \reportPath ->
         if hroptsOpenBrowser opts
             then do
-                $prettyInfo $ "Opening" <+> display reportPath <+> "in the browser."
+                prettyInfo $ "Opening" <+> display reportPath <+> "in the browser."
                 void $ liftIO $ openBrowser (toFilePath reportPath)
             else displayReportPath report reportPath
 
@@ -442,7 +442,7 @@ findPackageFieldForBuiltPackage pkgDir pkgId field = do
 displayReportPath :: (HasAnsiAnn (Ann a), Display a, HasRunner env)
                   => Text -> a -> RIO env ()
 displayReportPath report reportPath =
-     $prettyInfo $ "The" <+> fromString (T.unpack report) <+> "is available at" <+> display reportPath
+     prettyInfo $ "The" <+> fromString (T.unpack report) <+> "is available at" <+> display reportPath
 
 findExtraTixFiles :: HasEnvConfig env => RIO env [Path Abs File]
 findExtraTixFiles = do

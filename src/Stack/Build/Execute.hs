@@ -970,7 +970,7 @@ withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} md
                 warnCustomNoDeps =
                     case (taskType, packageBuildType package) of
                         (TTFiles lp Local, Just C.Custom) | lpWanted lp -> do
-                            $prettyWarnL $
+                            prettyWarnL $
                                 [ flow "Package"
                                 , display $ packageName package
                                 , flow "uses a custom Cabal build, but does not use a custom-setup stanza"
@@ -990,7 +990,7 @@ withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} md
                                 case mdeps of
                                     Just x -> return x
                                     Nothing -> do
-                                        $prettyWarnS "In getPackageArgs: custom-setup in use, but no dependency map present"
+                                        prettyWarnS "In getPackageArgs: custom-setup in use, but no dependency map present"
                                         return Map.empty
                             matchedDeps <- forM (Map.toList customSetupDeps) $ \(name, range) -> do
                                 let matches (PackageIdentifier name' version) =
@@ -1362,7 +1362,7 @@ singleBuild runInBase ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} in
                       ":" <> line <>
                       indent 4 (mconcat $ intersperse line $ map (styleGood . fromString . C.display) modules)
                 forM_ mlocalWarnings $ \(cabalfp, warnings) -> do
-                    unless (null warnings) $ $prettyWarn $
+                    unless (null warnings) $ prettyWarn $
                         "The following modules should be added to exposed-modules or other-modules in" <+>
                         display cabalfp <> ":" <> line <>
                         indent 4 (mconcat $ map showModuleWarning warnings) <>

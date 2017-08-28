@@ -309,12 +309,12 @@ setupCabalEnv compiler = do
     case mcabal of
         Nothing -> throwM SolverMissingCabalInstall
         Just version
-            | version < $(mkVersion "1.24") -> $prettyWarn $
+            | version < $(mkVersion "1.24") -> prettyWarn $
                 "Installed version of cabal-install (" <>
                 display version <>
                 ") doesn't support custom-setup clause, and so may not yield correct results." <> line <>
                 "To resolve this, install a newer version via 'stack install cabal-install'." <> line
-            | version >= $(mkVersion "1.25") -> $prettyWarn $
+            | version >= $(mkVersion "1.25") -> prettyWarn $
                 "Installed version of cabal-install (" <>
                 display version <>
                 ") is newer than stack has been tested with.  If you run into difficulties, consider downgrading." <> line

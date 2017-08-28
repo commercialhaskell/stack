@@ -93,7 +93,7 @@ stageExesInDir opts dir = do
             case mcontents of
                 Just (files, dirs)
                     | not (null files) || not (null dirs) -> liftIO $ copyDirRecur srcBinPath destBinPath
-                _ -> $prettyWarn "The project's local bin dir contains no files, so no executables will be added to the docker image."
+                _ -> prettyWarn "The project's local bin dir contains no files, so no executables will be added to the docker image."
             logInfo ""
 
         Just exes ->

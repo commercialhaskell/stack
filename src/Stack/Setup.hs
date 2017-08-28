@@ -1023,7 +1023,7 @@ installGHCPosix version downloadInfo _ archiveFile archiveType tempDir destDir =
                 Right _ -> return ()
                 Left ex -> do
                     logError (T.pack (show (ex :: ReadProcessException)))
-                    $prettyError $
+                    prettyError $
                         hang 2
                           ("Error encountered while" <+> step <+> "GHC with" <> line <>
                            styleShell (fromString (unwords (cmd : args))) <> line <>

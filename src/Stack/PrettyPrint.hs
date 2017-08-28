@@ -1,7 +1,6 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
 
@@ -12,7 +11,7 @@ module Stack.PrettyPrint
       -- * Logging based on pretty-print typeclass
     , prettyDebug, prettyInfo, prettyWarn, prettyError
     , prettyDebugL, prettyInfoL, prettyWarnL, prettyErrorL
-    , prettyDebugS, prettyInfoS, prettyWarnS, prettyErrorS
+    , prettyWarnS, prettyErrorS
       -- * Semantic styling functions
       -- | These are preferred to styling or colors directly, so that we can
       -- encourage consistency.
@@ -37,7 +36,6 @@ module Stack.PrettyPrint
 import           Stack.Prelude
 import           Data.List (intersperse)
 import qualified Data.Text as T
-import           Language.Haskell.TH
 import           Stack.Types.Config
 import           Stack.Types.Package
 import           Stack.Types.PackageIdentifier
@@ -48,48 +46,65 @@ import qualified System.Clock as Clock
 import           Text.PrettyPrint.Leijen.Extended
 
 displayWithColor
-    :: (HasRunner env, MonadReader env m, Display a, HasAnsiAnn (Ann a))
-    => a -> m T.Text
+    :: (HasRunner env, Display a, HasAnsiAnn (Ann a))
+    => a -> RIO env T.Text
 displayWithColor x = do
     useAnsi <- liftM logUseColor $ view logOptionsL
     return $ if useAnsi then displayAnsi x else displayPlain x
 
 -- TODO: switch to using implicit callstacks once 7.8 support is dropped
 
-prettyWith :: LogLevel -> ExpQ -> Q Exp
-prettyWith level f = do
-    loc <- location
-    [e| monadLoggerLog loc "" level <=< displayWithColor . $f |]
+prettyWith :: (HasRunner env, HasCallStack, Display b, HasAnsiAnn (Ann b))
+           => LogLevel -> (a -> b) -> a -> RIO env ()
+prettyWith level f = logOther level <=< displayWithColor . f
 
 -- Note: I think keeping this section aligned helps spot errors, might be
 -- worth keeping the alignment in place.
-prettyDebugWith, prettyInfoWith, prettyWarnWith, prettyErrorWith :: ExpQ -> Q Exp
-prettyDebugWith   = prettyWith LevelDebug
-prettyInfoWith    = prettyWith LevelInfo
-prettyWarnWith  f = prettyWith LevelWarn
-                        [| (line <>) . (styleWarning "Warning:" <+>) .
-                           indentAfterLabel . $f |]
+prettyDebugWith, prettyInfoWith
+  :: (HasCallStack, HasRunner env, Display b, HasAnsiAnn (Ann b))
+  => (a -> b) -> a -> RIO env ()
+prettyDebugWith = prettyWith LevelDebug
+prettyInfoWith  = prettyWith LevelInfo
+
+prettyWarnWith, prettyErrorWith
+  :: (HasCallStack, HasRunner env)
+  => (a -> Doc AnsiAnn) -> a -> RIO env ()
+prettyWarnWith f  = prettyWith LevelWarn
+                          ((line <>) . (styleWarning "Warning:" <+>) .
+                           indentAfterLabel . f)
 prettyErrorWith f = prettyWith LevelError
-                        [| (line <>) . (styleError   "Error:" <+>) .
-                           indentAfterLabel . $f |]
+                          ((line <>) . (styleError   "Error:" <+>) .
+                           indentAfterLabel . f)
 
-prettyDebug, prettyInfo, prettyWarn, prettyError :: Q Exp
-prettyDebug  = prettyDebugWith [| id |]
-prettyInfo   = prettyInfoWith  [| id |]
-prettyWarn   = prettyWarnWith  [| id |]
-prettyError  = prettyErrorWith [| id |]
+prettyDebug, prettyInfo
+  :: (HasCallStack, HasRunner env, Display b, HasAnsiAnn (Ann b))
+  => b -> RIO env ()
+prettyDebug  = prettyDebugWith id
+prettyInfo   = prettyInfoWith  id
 
-prettyDebugL, prettyInfoL, prettyWarnL, prettyErrorL :: Q Exp
-prettyDebugL = prettyDebugWith [| fillSep |]
-prettyInfoL  = prettyInfoWith  [| fillSep |]
-prettyWarnL  = prettyWarnWith  [| fillSep |]
-prettyErrorL = prettyErrorWith [| fillSep |]
+prettyWarn, prettyError
+  :: (HasCallStack, HasRunner env)
+  => Doc AnsiAnn -> RIO env ()
+prettyWarn   = prettyWarnWith  id
+prettyError  = prettyErrorWith id
 
-prettyDebugS, prettyInfoS, prettyWarnS, prettyErrorS :: Q Exp
-prettyDebugS = prettyDebugWith [| flow |]
-prettyInfoS  = prettyInfoWith  [| flow |]
-prettyWarnS  = prettyWarnWith  [| flow |]
-prettyErrorS = prettyErrorWith [| flow |]
+prettyDebugL, prettyInfoL
+  :: (HasCallStack, HasRunner env, HasAnsiAnn a)
+  => [Doc a] -> RIO env ()
+prettyDebugL = prettyDebugWith fillSep
+prettyInfoL  = prettyInfoWith  fillSep
+
+prettyWarnL, prettyErrorL
+  :: (HasCallStack, HasRunner env)
+  => [Doc AnsiAnn] -> RIO env ()
+prettyWarnL  = prettyWarnWith  fillSep
+prettyErrorL = prettyErrorWith fillSep
+
+prettyWarnS, prettyErrorS
+  :: (HasCallStack, HasRunner env)
+  => String -> RIO env ()
+prettyWarnS  = prettyWarnWith  flow
+prettyErrorS = prettyErrorWith flow
 -- End of aligned section
 
 -- | Use after a label and before the rest of what's being labelled for
@@ -107,25 +122,22 @@ wordDocs = map fromString . words
 flow :: String -> Doc a
 flow = fillSep . wordDocs
 
-debugBracket :: Q Exp
-debugBracket = do
-    loc <- location
-    [e| \msg f -> do
-            let output = monadLoggerLog loc "" LevelDebug <=< displayWithColor
-            output $ "Start: " <> msg
-            start <- liftIO $ Clock.getTime Clock.Monotonic
-            x <- f `catch` \ex -> do
-                end <- liftIO $ Clock.getTime Clock.Monotonic
-                let diff = Clock.diffTimeSpec start end
-                output $ "Finished with exception in" <+> displayMilliseconds diff <> ":" <+>
-                    msg <> line <>
-                    "Exception thrown: " <> fromString (show ex)
-                throwIO (ex :: SomeException)
-            end <- liftIO $ Clock.getTime Clock.Monotonic
-            let diff = Clock.diffTimeSpec start end
-            output $ "Finished in" <+> displayMilliseconds diff <> ":" <+> msg
-            return x
-      |]
+debugBracket :: (HasCallStack, HasRunner env) => Doc AnsiAnn -> RIO env a -> RIO env a
+debugBracket msg f = do
+  let output = logDebug <=< displayWithColor
+  output $ "Start: " <> msg
+  start <- liftIO $ Clock.getTime Clock.Monotonic
+  x <- f `catch` \ex -> do
+      end <- liftIO $ Clock.getTime Clock.Monotonic
+      let diff = Clock.diffTimeSpec start end
+      output $ "Finished with exception in" <+> displayMilliseconds diff <> ":" <+>
+          msg <> line <>
+          "Exception thrown: " <> fromString (show ex)
+      throwIO (ex :: SomeException)
+  end <- liftIO $ Clock.getTime Clock.Monotonic
+  let diff = Clock.diffTimeSpec start end
+  output $ "Finished in" <+> displayMilliseconds diff <> ":" <+> msg
+  return x
 
 -- | Style an 'AnsiDoc' as an error. Should be used sparingly, not to style
 --   entire long messages. For example, it's used to style the "Error:"

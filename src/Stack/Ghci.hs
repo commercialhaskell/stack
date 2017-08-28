@@ -198,18 +198,18 @@ findFileTargets locals fileTargets = do
     results <- forM foundFileTargetComponents $ \(fp, xs) ->
         case xs of
             [] -> do
-                $prettyWarn $
+                prettyWarn $
                     "Couldn't find a component for file target" <+>
                     display fp <>
                     ". Attempting to load anyway."
                 return $ Left fp
             [x] -> do
-                $prettyInfo $
+                prettyInfo $
                     "Using configuration for" <+> display x <+>
                     "to load" <+> display fp
                 return $ Right (fp, x)
             (x:_) -> do
-                $prettyWarn $
+                prettyWarn $
                     "Multiple components contain file target" <+>
                     display fp <> ":" <+>
                     mconcat (intersperse ", " (map display xs)) <> line <>
@@ -283,8 +283,8 @@ buildDepsAndInitialSteps GhciOpts{..} targets0 = do
         case eres of
             Right () -> return ()
             Left err -> do
-                $prettyError $ fromString (show err)
-                $prettyWarn "Build failed, but optimistically launching GHCi anyway"
+                prettyError $ fromString (show err)
+                prettyWarn "Build failed, but optimistically launching GHCi anyway"
 
 checkAdditionalPackages :: MonadThrow m => [String] -> m [PackageName]
 checkAdditionalPackages pkgs = forM pkgs $ \name -> do

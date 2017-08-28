@@ -85,6 +85,7 @@ import           Data.Vector          as X (Vector)
 import           Data.Void            as X (Void, absurd)
 import           Data.Word            as X
 import           GHC.Generics         as X (Generic)
+import           GHC.Stack            as X (HasCallStack)
 import           Lens.Micro           as X (Getting)
 import           Lens.Micro.Mtl       as X (view)
 import           Path                 as X (Abs, Dir, File, Path, Rel,

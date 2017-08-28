@@ -264,7 +264,7 @@ packageFromPackageDescription packageConfig pkgFlags pkg =
     -- constitute the package. This is primarily used for dirtiness
     -- checking during build, as well as use by "stack ghci"
     pkgFiles = GetPackageFiles $
-        \cabalfp -> $debugBracket ("getPackageFiles" <+> display cabalfp) $ do
+        \cabalfp -> debugBracket ("getPackageFiles" <+> display cabalfp) $ do
              let pkgDir = parent cabalfp
              distDir <- distDirFromDir pkgDir
              (componentModules,componentFiles,dataFiles',warnings) <-
