@@ -208,7 +208,9 @@ gpdPackageDeps gpd cv platform flags =
     Map.filterWithKey (const . (/= name)) (packageDependencies pkgDesc)
     where
         name = gpdPackageName gpd
-        pkgDesc = resolvePackageDescription pkgConfig gpd
+        -- Since tests and benchmarks are both enabled, doesn't matter
+        -- if we choose modified or unmodified
+        pkgDesc = pdpModifiedBuildable $ resolvePackageDescription pkgConfig gpd
         pkgConfig = PackageConfig
             { packageConfigEnableTests = True
             , packageConfigEnableBenchmarks = True

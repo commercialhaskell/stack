@@ -346,7 +346,7 @@ checkPackageInExtractedTarball pkgDir = do
     cabalfp <- findOrGenerateCabalFile pkgDir
     name    <- parsePackageNameFromFilePath cabalfp
     config  <- getDefaultPackageConfig
-    (gdesc, pkgDesc) <- readPackageDescriptionDir config pkgDir
+    (gdesc, PackageDescriptionPair pkgDesc _) <- readPackageDescriptionDir config pkgDir
     logInfo $
         "Checking package '" <> packageNameText name <> "' for common mistakes"
     let pkgChecks = Check.checkPackage gdesc (Just pkgDesc)

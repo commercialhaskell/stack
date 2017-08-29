@@ -550,10 +550,17 @@ makeGhciPkgInfo buildOptsCLI sourceMap installedMap locals addPkgs mfileTargets 
           | hasDotBuildinfo = Just (parent cabalfp </> buildinfofp)
           | otherwise = Nothing
     mbuildinfo <- forM mbuildinfofp readDotBuildinfo
-    let pkg =
+    let pdp = resolvePackageDescription config gpkgdesc
+        pkg =
             packageFromPackageDescription config (C.genPackageFlags gpkgdesc) $
-            maybe id C.updatePackageDescription mbuildinfo $
-            resolvePackageDescription config gpkgdesc
+            maybe
+              pdp
+              (\bi ->
+               let PackageDescriptionPair x y = pdp
+                in PackageDescriptionPair
+                    (C.updatePackageDescription bi x)
+                    (C.updatePackageDescription bi y))
+              mbuildinfo
 
     mapM_ (printCabalFileWarning cabalfp) warnings
     (mods,files,opts) <- getPackageOpts (packageOpts pkg) sourceMap installedMap locals addPkgs cabalfp

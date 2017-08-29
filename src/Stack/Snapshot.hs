@@ -778,7 +778,9 @@ calculate gpd platform compilerVersion loc flags hide options =
       , packageConfigCompilerVersion = compilerVersion
       , packageConfigPlatform = platform
       }
-    pd = resolvePackageDescription pconfig gpd
+    -- We want to ignore test suites and benchmarks, therefore choose
+    -- the package description which modifies buildable
+    pd = pdpModifiedBuildable $ resolvePackageDescription pconfig gpd
     PackageIdentifier name version = fromCabalPackageIdentifier $ C.package pd
     lpi = LoadedPackageInfo
       { lpiVersion = version
