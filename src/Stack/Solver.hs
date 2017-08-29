@@ -62,6 +62,7 @@ import           Stack.Types.FlagName
 import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageName
 import           Stack.Types.Resolver
+import           Stack.Types.Runner
 import           Stack.Types.Version
 import qualified System.Directory as D
 import qualified System.FilePath as FP
@@ -488,7 +489,9 @@ getResolverConstraints menv mcompilerVersion stackYaml sd = do
 -- a `hpack` `package.yaml` file exists, this will be used to generate a cabal
 -- file.
 -- Subdirectories can be included depending on the @recurse@ parameter.
-findCabalFiles :: (MonadIO m, MonadLogger m) => Bool -> Path Abs Dir -> m [Path Abs File]
+findCabalFiles
+  :: (MonadIO m, MonadLogger m, HasRunner env, MonadReader env m)
+  => Bool -> Path Abs Dir -> m [Path Abs File]
 findCabalFiles recurse dir = do
     liftIO (findFiles dir isHpack subdirFilter) >>= mapM_ (hpack . parent)
     liftIO (findFiles dir isCabal subdirFilter)
@@ -582,7 +585,9 @@ cabalPackagesCheck cabalfps noPkgMsg dupErrMsg = do
 formatGroup :: [String] -> String
 formatGroup = concatMap (\path -> "- " <> path <> "\n")
 
-reportMissingCabalFiles :: (MonadIO m, MonadThrow m, MonadLogger m)
+reportMissingCabalFiles
+  :: (MonadIO m, MonadThrow m, MonadLogger m,
+      HasRunner env, MonadReader env m)
   => [Path Abs File]   -- ^ Directories to scan
   -> Bool              -- ^ Whether to scan sub-directories
   -> m ()

@@ -35,3 +35,8 @@
     "Stack.Docker"
   ]
 }
+
+# Pretty-printing
+- error: {lhs: "fromString . toFilePath", rhs: "display"}
+- ignore: {name: "Use display", within: "warnMultiple"}
+- ignore: {name: "Use display", within: "Stack.PrettyPrint"}
