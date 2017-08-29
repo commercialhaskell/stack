@@ -27,6 +27,7 @@ module Stack.Package
   ,findOrGenerateCabalFile
   ,hpack
   ,Package(..)
+  ,PackageDescriptionPair(..)
   ,GetPackageFiles(..)
   ,GetPackageOpts(..)
   ,PackageConfig(..)
@@ -153,7 +154,7 @@ readPackageBS packageConfig loc bs =
 readPackageDescriptionDir :: (MonadLogger m, MonadIO m, MonadThrow m)
   => PackageConfig
   -> Path Abs Dir
-  -> m (GenericPackageDescription, PackageDescription)
+  -> m (GenericPackageDescription, PackageDescriptionPair)
 readPackageDescriptionDir config pkgDir = do
     cabalfp <- findOrGenerateCabalFile pkgDir
     gdesc   <- liftM snd (readPackageUnresolved cabalfp)
@@ -212,9 +213,9 @@ resolvePackage packageConfig gpkg =
 
 packageFromPackageDescription :: PackageConfig
                               -> [D.Flag]
-                              -> PackageDescription
+                              -> PackageDescriptionPair
                               -> Package
-packageFromPackageDescription packageConfig pkgFlags pkg =
+packageFromPackageDescription packageConfig pkgFlags (PackageDescriptionPair pkgNoMod pkg) =
     Package
     { packageName = name
     , packageVersion = fromCabalVersion (pkgVersion pkgId)
@@ -229,16 +230,15 @@ packageFromPackageDescription packageConfig pkgFlags pkg =
     , packageAllDeps = S.fromList (M.keys deps)
     , packageHasLibrary = maybe False (buildable . libBuildInfo) (library pkg)
     , packageTests = M.fromList
-      [(T.pack (Cabal.unUnqualComponentName $ testName t), testInterface t) | t <- testSuites pkg]
-        -- FIXME: Previously, we only included buildable components
-        -- here. Since Cabal 2.0, this ended up disabling test running
-        -- in all cases. Need to investigate if that's a change in
-        -- Cabal behavior or how we're piping data through the system
-        -- in response to Cabal data type changes. A cleanup of the
-        -- PackageConfig datatype (which will probably happen for
-        -- componentized builds) will likely make all of this clearer.
+      [(T.pack (Cabal.unUnqualComponentName $ testName t), testInterface t)
+          | t <- testSuites pkgNoMod
+          , buildable (testBuildInfo t)
+      ]
     , packageBenchmarks = S.fromList
-      [T.pack (Cabal.unUnqualComponentName $ benchmarkName biBuildInfo) | biBuildInfo <- benchmarks pkg]
+      [T.pack (Cabal.unUnqualComponentName $ benchmarkName b)
+          | b <- benchmarks pkgNoMod
+          , buildable (benchmarkBuildInfo b)
+      ]
         -- Same comment about buildable applies here too.
     , packageExes = S.fromList
       [T.pack (Cabal.unUnqualComponentName $ exeName biBuildInfo)
@@ -773,24 +773,53 @@ buildOtherSources build =
 targetJsSources :: BuildInfo -> [FilePath]
 targetJsSources = jsSources
 
+-- | A pair of package descriptions: one which modified the buildable
+-- values of test suites and benchmarks depending on whether they are
+-- enabled, and one which does not.
+--
+-- Fields are intentionally lazy, we may only need one or the other
+-- value.
+--
+-- MSS 2017-08-29: The very presence of this data type is terribly
+-- ugly, it represents the fact that the Cabal 2.0 upgrade did _not_
+-- go well. Specifically, we used to have a field to indicate whether
+-- a component was enabled in addition to buildable, but that's gone
+-- now, and this is an ugly proxy. We should at some point clean up
+-- the mess of Package, LocalPackage, etc, and probably pull in the
+-- definition of PackageDescription from Cabal with our additionally
+-- needed metadata. But this is a good enough hack for the
+-- moment. Odds are, you're reading this in the year 2024 and thinking
+-- "wtf?"
+data PackageDescriptionPair = PackageDescriptionPair
+  { pdpOrigBuildable :: PackageDescription
+  , pdpModifiedBuildable :: PackageDescription
+  }
+
 -- | Evaluates the conditions of a 'GenericPackageDescription', yielding
 -- a resolved 'PackageDescription'.
 resolvePackageDescription :: PackageConfig
                           -> GenericPackageDescription
-                          -> PackageDescription
+                          -> PackageDescriptionPair
 resolvePackageDescription packageConfig (GenericPackageDescription desc defaultFlags mlib _subLibs _foreignLibs exes tests benches) =
-  desc {library =
-          fmap (resolveConditions rc updateLibDeps) mlib
-       ,executables =
-          map (\(n, v) -> (resolveConditions rc updateExeDeps v){exeName=n})
-              exes
-       ,testSuites =
-          map (\(n,v) -> (resolveConditions rc updateTestDeps v){testName=n})
-              tests
-       ,benchmarks =
-          map (\(n,v) -> (resolveConditions rc updateBenchmarkDeps v){benchmarkName=n})
-              benches}
-  where flags =
+    PackageDescriptionPair
+      { pdpOrigBuildable = go False
+      , pdpModifiedBuildable = go True
+      }
+  where
+        go modBuildable =
+          desc {library =
+                  fmap (resolveConditions rc updateLibDeps) mlib
+               ,executables =
+                  map (\(n, v) -> (resolveConditions rc updateExeDeps v){exeName=n})
+                      exes
+               ,testSuites =
+                  map (\(n,v) -> (resolveConditions rc (updateTestDeps modBuildable) v){testName=n})
+                      tests
+               ,benchmarks =
+                  map (\(n,v) -> (resolveConditions rc (updateBenchmarkDeps modBuildable) v){benchmarkName=n})
+                      benches}
+
+        flags =
           M.union (packageConfigFlags packageConfig)
                   (flagMap defaultFlags)
 
@@ -817,18 +846,18 @@ resolvePackageDescription packageConfig (GenericPackageDescription desc defaultF
         -- is working fine, and that this comment can be completely
         -- ignored. I'm leaving the comment anyway in case something
         -- breaks and you, poor reader, are investigating.
-        updateTestDeps test deps =
+        updateTestDeps modBuildable test deps =
           let bi = testBuildInfo test
               bi' = bi
                 { targetBuildDepends = deps
-                , buildable = buildable bi && packageConfigEnableTests packageConfig
+                , buildable = buildable bi && (if modBuildable then packageConfigEnableTests packageConfig else True)
                 }
            in test { testBuildInfo = bi' }
-        updateBenchmarkDeps benchmark deps =
+        updateBenchmarkDeps modBuildable benchmark deps =
           let bi = benchmarkBuildInfo benchmark
               bi' = bi
                 { targetBuildDepends = deps
-                , buildable = buildable bi && packageConfigEnableBenchmarks packageConfig
+                , buildable = buildable bi && (if modBuildable then packageConfigEnableBenchmarks packageConfig else True)
                 }
            in benchmark { benchmarkBuildInfo = bi' }
 
