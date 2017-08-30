@@ -23,10 +23,20 @@ instance Storable WindowWidth where
   poke p (WindowWidth w) = do
     (#poke struct winsize, ws_col) p w
 
+foreign import ccall "sys/ioctl.h ioctl"
+  ioctl :: CInt -> CInt -> Ptr WindowWidth -> IO CInt
+
 -- | Get the width, in columns, of the terminal if we can.
 getTerminalWidth :: IO (Maybe Int)
 #ifndef WINDOWS
-getTerminalWidth = pure Nothing
+getTerminalWidth =
+  alloca $ \p -> do
+    errno <- ioctl (#const STDOUT_FILENO) (#const TIOCGWINSZ) p
+    if errno < 0
+      then return Nothing
+      else do
+        WindowWidth w <- peek p
+        return . Just . fromIntegral $ w
 #else
 getTerminalWidth = pure Nothing
 #endif
