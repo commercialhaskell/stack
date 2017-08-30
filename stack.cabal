@@ -268,6 +268,7 @@ library
                    , store-core >= 0.4 && < 0.5
                    , annotated-wl-pprint
                    , file-embed >= 0.0.10
+  build-tools:       hsc2hs >= 0.68
   if os(windows)
     cpp-options:     -DWINDOWS
     build-depends:   Win32
