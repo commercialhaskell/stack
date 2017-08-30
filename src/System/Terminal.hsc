@@ -1,4 +1,7 @@
+{-# LANGUAGE CPP #-}
+#ifndef WINDOWS
 {-# LANGUAGE ForeignFunctionInterface #-}
+#endif
 
 module System.Terminal
 ( getTerminalWidth
@@ -6,4 +9,8 @@ module System.Terminal
 
 -- | Get the width, in columns, of the terminal if we can.
 getTerminalWidth :: IO (Maybe Int)
+#ifndef WINDOWS
 getTerminalWidth = pure Nothing
+#else
+getTerminalWidth = pure Nothing
+#endif
