@@ -187,6 +187,7 @@ library
                      System.Process.PagerEditor
                      System.Process.Read
                      System.Process.Run
+                     System.Terminal
   other-modules:     Hackage.Security.Client.Repository.HttpLib.HttpClient
   build-depends:     Cabal >= 2.0 && < 2.1
                    , aeson (>= 1.0 && < 1.2)
