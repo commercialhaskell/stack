@@ -7,6 +7,7 @@ module System.Terminal
 ( getTerminalWidth
 ) where
 
+#ifndef WINDOWS
 import           Foreign
 import           Foreign.C.Types
 
@@ -25,6 +26,7 @@ instance Storable WindowWidth where
 
 foreign import ccall "sys/ioctl.h ioctl"
   ioctl :: CInt -> CInt -> Ptr WindowWidth -> IO CInt
+#endif
 
 -- | Get the width, in columns, of the terminal if we can.
 getTerminalWidth :: IO (Maybe Int)
