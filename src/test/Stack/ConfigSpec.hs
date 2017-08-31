@@ -76,7 +76,7 @@ spec = beforeAll setup $ do
 
   describe "loadConfig" $ do
     let loadConfig' inner =
-          withRunner logLevel True False ColorAuto False $ \runner -> do
+          withRunner logLevel True False ColorAuto Nothing False $ \runner -> do
             lc <- runRIO runner $ loadConfig mempty Nothing SYLDefault
             inner lc
     -- TODO(danburton): make sure parent dirs also don't have config file
