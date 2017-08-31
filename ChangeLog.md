@@ -90,6 +90,8 @@ Other enhancements:
 
 Bug fixes:
 
+* `stack --docker-help` is now clearer about --docker implying
+   system-ghc: true, rather than both --docker and --no-docker.
 * `stack haddock` now includes package names for all modules in the
    Haddock index page. See:
   [#2886](https://github.com/commercialhaskell/stack/issues/2886)
