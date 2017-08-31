@@ -20,4 +20,5 @@ test_script:
 - stack setup > nul
 # The ugly echo "" hack is to avoid complaints about 0 being an invalid file
 # descriptor
+- stack install hsc2hs
 - echo "" | stack --no-terminal test --jobs 1
