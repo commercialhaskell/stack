@@ -221,7 +221,7 @@ ghcColorForceFlag :: String
 ghcColorForceFlag = "-fdiagnostics-color=always"
 
 minTerminalWidth :: Int
-minTerminalWidth = 20
+minTerminalWidth = 40
 
 maxTerminalWidth :: Int
 maxTerminalWidth = 200
