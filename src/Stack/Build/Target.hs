@@ -435,11 +435,6 @@ combineResolveResults results = do
         Nothing -> return Map.empty
         Just version -> do
           let ident = PackageIdentifier (rrName result) version
-          logWarn $ T.concat
-              [ "- Implicitly adding "
-              , packageIdentifierText ident
-              , " to extra-deps based on command line target"
-              ]
           return $ Map.singleton (rrName result) $ PLIndex $ PackageIdentifierRevision ident CFILatest
 
     let m0 = Map.unionsWith (++) $ map (\rr -> Map.singleton (rrName rr) [rr]) results
@@ -528,7 +523,7 @@ parseTargets needTargets boptscli = do
 
       drops = Set.empty -- not supported to add drops
 
-  (globals', snapshots, locals', upgraded) <- withCabalLoader $ \loadFromIndex -> do
+  (globals', snapshots, locals') <- withCabalLoader $ \loadFromIndex -> do
     addedDeps' <- fmap Map.fromList $ forM (Map.toList addedDeps) $ \(name, loc) -> do
       bs <- loadSingleRawCabalFile loadFromIndex menv root loc
       case rawParseGPD bs of
@@ -555,13 +550,6 @@ parseTargets needTargets boptscli = do
     calculatePackagePromotion
       loadFromIndex menv root ls0 (Map.elems allLocals)
       flags hides options drops
-
-  -- Warn about packages upgraded based on flags
-  forM_ upgraded $ \name -> logWarn $ T.concat
-    [ "- Implicitly adding "
-    , packageNameText name
-    , " to extra-deps based on command line flag"
-    ]
 
   let ls = LoadedSnapshot
         { lsCompilerVersion = lsCompilerVersion ls0
