@@ -130,7 +130,7 @@ generateHpcReport pkgDir package tests = do
                         Just includeName -> ["--include", includeName ++ ":"]
                         Nothing -> []
                 mreportPath <- generateHpcReportInternal tixSrc reportDir report extraArgs extraArgs
-                forM_ mreportPath (displayReportPath report)
+                forM_ mreportPath (displayReportPath report . display)
 
 generateHpcReportInternal :: HasEnvConfig env
                           => Path Abs File -> Path Abs Dir -> Text -> [String] -> [String]
@@ -267,7 +267,7 @@ generateHpcReportForTargets opts = do
             then do
                 prettyInfo $ "Opening" <+> display reportPath <+> "in the browser."
                 void $ liftIO $ openBrowser (toFilePath reportPath)
-            else displayReportPath report reportPath
+            else displayReportPath report (display reportPath)
 
 generateHpcUnifiedReport :: HasEnvConfig env => RIO env ()
 generateHpcUnifiedReport = do
@@ -292,7 +292,7 @@ generateHpcUnifiedReport = do
         else do
             let report = "unified report"
             mreportPath <- generateUnionReport report reportDir tixFiles
-            forM_ mreportPath (displayReportPath report)
+            forM_ mreportPath (displayReportPath report . display)
 
 generateUnionReport :: HasEnvConfig env
                     => Text -> Path Abs Dir -> [Path Abs File]
@@ -439,10 +439,10 @@ findPackageFieldForBuiltPackage pkgDir pkgId field = do
                 _ -> return $ Left $ "Multiple files matching " <> T.pack (pkgIdStr ++ "-*.conf") <> " found in " <>
                     T.pack (toFilePath inplaceDir) <> ". Maybe try 'stack clean' on this package?"
 
-displayReportPath :: (HasAnsiAnn (Ann a), Display a, HasRunner env)
-                  => Text -> a -> RIO env ()
+displayReportPath :: (HasRunner env)
+                  => Text -> AnsiDoc -> RIO env ()
 displayReportPath report reportPath =
-     prettyInfo $ "The" <+> fromString (T.unpack report) <+> "is available at" <+> display reportPath
+     prettyInfo $ "The" <+> fromString (T.unpack report) <+> "is available at" <+> reportPath
 
 findExtraTixFiles :: HasEnvConfig env => RIO env [Path Abs File]
 findExtraTixFiles = do

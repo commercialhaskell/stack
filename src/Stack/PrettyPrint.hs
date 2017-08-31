@@ -11,7 +11,7 @@ module Stack.PrettyPrint
       -- * Logging based on pretty-print typeclass
     , prettyDebug, prettyInfo, prettyWarn, prettyError
     , prettyDebugL, prettyInfoL, prettyWarnL, prettyErrorL
-    , prettyWarnS, prettyErrorS
+    , prettyDebugS, prettyInfoS, prettyWarnS, prettyErrorS
       -- * Semantic styling functions
       -- | These are preferred to styling or colors directly, so that we can
       -- encourage consistency.
@@ -62,16 +62,12 @@ prettyWith level f = logOther level <=< displayWithColor . f
 
 -- Note: I think keeping this section aligned helps spot errors, might be
 -- worth keeping the alignment in place.
-prettyDebugWith, prettyInfoWith
-  :: (HasCallStack, HasRunner env, Display b, HasAnsiAnn (Ann b),
-      MonadReader env m, MonadLogger m)
-  => (a -> b) -> a -> m ()
-prettyDebugWith = prettyWith LevelDebug
-prettyInfoWith  = prettyWith LevelInfo
 
-prettyWarnWith, prettyErrorWith
+prettyDebugWith, prettyInfoWith, prettyWarnWith, prettyErrorWith
   :: (HasCallStack, HasRunner env, MonadReader env m, MonadLogger m)
   => (a -> Doc AnsiAnn) -> a -> m ()
+prettyDebugWith = prettyWith LevelDebug
+prettyInfoWith  = prettyWith LevelInfo
 prettyWarnWith f  = prettyWith LevelWarn
                           ((line <>) . (styleWarning "Warning:" <+>) .
                            indentAfterLabel . f)
@@ -79,36 +75,30 @@ prettyErrorWith f = prettyWith LevelError
                           ((line <>) . (styleError   "Error:" <+>) .
                            indentAfterLabel . f)
 
-prettyDebug, prettyInfo
-  :: (HasCallStack, HasRunner env, Display b, HasAnsiAnn (Ann b),
-      MonadReader env m, MonadLogger m)
-  => b -> m ()
-prettyDebug  = prettyDebugWith id
-prettyInfo   = prettyInfoWith  id
-
-prettyWarn, prettyError
+prettyDebug, prettyInfo, prettyWarn, prettyError
   :: (HasCallStack, HasRunner env, MonadReader env m, MonadLogger m)
   => Doc AnsiAnn -> m ()
+prettyDebug  = prettyDebugWith id
+prettyInfo   = prettyInfoWith  id
 prettyWarn   = prettyWarnWith  id
 prettyError  = prettyErrorWith id
 
-prettyDebugL, prettyInfoL
-  :: (HasCallStack, HasRunner env, HasAnsiAnn a, MonadReader env m, MonadLogger m)
-  => [Doc a] -> m ()
-prettyDebugL = prettyDebugWith fillSep
-prettyInfoL  = prettyInfoWith  fillSep
-
-prettyWarnL, prettyErrorL
+prettyDebugL, prettyInfoL, prettyWarnL, prettyErrorL
   :: (HasCallStack, HasRunner env, MonadReader env m, MonadLogger m)
   => [Doc AnsiAnn] -> m ()
+prettyDebugL = prettyDebugWith fillSep
+prettyInfoL  = prettyInfoWith  fillSep
 prettyWarnL  = prettyWarnWith  fillSep
 prettyErrorL = prettyErrorWith fillSep
 
-prettyWarnS, prettyErrorS
+prettyDebugS, prettyInfoS, prettyWarnS, prettyErrorS
   :: (HasCallStack, HasRunner env, MonadReader env m, MonadLogger m)
   => String -> m ()
+prettyDebugS = prettyDebugWith flow
+prettyInfoS  = prettyInfoWith  flow
 prettyWarnS  = prettyWarnWith  flow
 prettyErrorS = prettyErrorWith flow
+
 -- End of aligned section
 
 -- | Use after a label and before the rest of what's being labelled for
