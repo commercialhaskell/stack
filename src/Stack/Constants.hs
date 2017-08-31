@@ -29,6 +29,7 @@ module Stack.Constants
     ,compilerOptionsCabalFlag
     ,ghcColorForceFlag
     ,minTerminalWidth
+    ,maxTerminalWidth
     ,defaultTerminalWidth
     )
     where
@@ -221,6 +222,9 @@ ghcColorForceFlag = "-fdiagnostics-color=always"
 
 minTerminalWidth :: Int
 minTerminalWidth = 20
+
+maxTerminalWidth :: Int
+maxTerminalWidth = 200
 
 defaultTerminalWidth :: Int
 defaultTerminalWidth = 100

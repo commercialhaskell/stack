@@ -255,9 +255,9 @@ withRunner logLevel useTime terminal colorWhen widthOverride reExec inner = do
     ColorNever -> return False
     ColorAlways -> return True
     ColorAuto -> liftIO $ hSupportsANSI stderr
-  termWidth <- case widthOverride >>= checkWidth of
-      Nothing -> fromMaybe defaultTerminalWidth <$> liftIO getTerminalWidth
-      Just w -> return w
+  termWidth <- clipWidth <$> maybe (fromMaybe defaultTerminalWidth
+                                    <$> liftIO getTerminalWidth)
+                                   pure widthOverride
   canUseUnicode <- liftIO getCanUseUnicode
   withSticky terminal $ \sticky -> inner Runner
     { runnerReExec = reExec
@@ -272,9 +272,10 @@ withRunner logLevel useTime terminal colorWhen widthOverride reExec inner = do
     , runnerTerminal = terminal
     , runnerSticky = sticky
     }
-  where checkWidth w
-          | w < minTerminalWidth = Nothing
-          | otherwise = Just w
+  where clipWidth w
+          | w < minTerminalWidth = minTerminalWidth
+          | w > maxTerminalWidth = maxTerminalWidth
+          | otherwise = w
 
 -- | Taken from GHC: determine if we should use Unicode syntax
 getCanUseUnicode :: IO Bool
