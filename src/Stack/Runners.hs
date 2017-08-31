@@ -214,6 +214,7 @@ withRunnerGlobal GlobalOpts{..} = withRunner
   globalTimeInLog
   globalTerminal
   globalColorWhen
+  globalTermWidth
   (isJust globalReExecVersion)
 
 withMiniConfigAndLock

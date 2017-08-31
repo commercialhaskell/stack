@@ -45,6 +45,7 @@ import           System.Console.ANSI
 import           System.FilePath
 import           System.IO
 import           System.Log.FastLogger
+import           System.Terminal
 
 -- | Monadic environment.
 data Runner = Runner
@@ -77,6 +78,7 @@ newtype Sticky = Sticky
 
 data LogOptions = LogOptions
   { logUseColor      :: Bool
+  , logTermWidth     :: Int
   , logUseUnicode    :: Bool
   , logUseTime       :: Bool
   , logMinLevel      :: LogLevel
@@ -243,19 +245,24 @@ withRunner :: MonadIO m
            -> Bool -- ^ use time?
            -> Bool -- ^ terminal?
            -> ColorWhen
+           -> Maybe Int -- ^ terminal width override
            -> Bool -- ^ reexec?
            -> (Runner -> m a)
            -> m a
-withRunner logLevel useTime terminal colorWhen reExec inner = do
+withRunner logLevel useTime terminal colorWhen widthOverride reExec inner = do
   useColor <- case colorWhen of
     ColorNever -> return False
     ColorAlways -> return True
     ColorAuto -> liftIO $ hSupportsANSI stderr
+  termWidth <- case widthOverride >>= checkWidth of
+      Nothing -> fromMaybe 100 <$> liftIO getTerminalWidth
+      Just w -> return w
   canUseUnicode <- liftIO getCanUseUnicode
   withSticky terminal $ \sticky -> inner Runner
     { runnerReExec = reExec
     , runnerLogOptions = LogOptions
         { logUseColor = useColor
+        , logTermWidth = termWidth
         , logUseUnicode = canUseUnicode
         , logUseTime = useTime
         , logMinLevel = logLevel
@@ -264,6 +271,9 @@ withRunner logLevel useTime terminal colorWhen reExec inner = do
     , runnerTerminal = terminal
     , runnerSticky = sticky
     }
+  where checkWidth w
+          | w < 20 = Nothing
+          | otherwise = Just w
 
 -- | Taken from GHC: determine if we should use Unicode syntax
 getCanUseUnicode :: IO Bool
