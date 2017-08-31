@@ -1,13 +1,9 @@
-{-# LANGUAGE CPP #-}
-#ifndef WINDOWS
 {-# LANGUAGE ForeignFunctionInterface #-}
-#endif
 
 module System.Terminal
 ( getTerminalWidth
 ) where
 
-#ifndef WINDOWS
 import           Foreign
 import           Foreign.C.Types
 
@@ -26,11 +22,9 @@ instance Storable WindowWidth where
 
 foreign import ccall "sys/ioctl.h ioctl"
   ioctl :: CInt -> CInt -> Ptr WindowWidth -> IO CInt
-#endif
 
 -- | Get the width, in columns, of the terminal if we can.
 getTerminalWidth :: IO (Maybe Int)
-#ifndef WINDOWS
 getTerminalWidth =
   alloca $ \p -> do
     errno <- ioctl (#const STDOUT_FILENO) (#const TIOCGWINSZ) p
@@ -39,6 +33,3 @@ getTerminalWidth =
       else do
         WindowWidth w <- peek p
         return . Just . fromIntegral $ w
-#else
-getTerminalWidth = pure Nothing
-#endif

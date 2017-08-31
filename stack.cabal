@@ -187,7 +187,6 @@ library
                      System.Process.PagerEditor
                      System.Process.Read
                      System.Process.Run
-                     System.Terminal
   other-modules:     Hackage.Security.Client.Repository.HttpLib.HttpClient
   build-depends:     Cabal >= 2.0 && < 2.1
                    , aeson (>= 1.0 && < 1.2)
@@ -268,7 +267,6 @@ library
                    , store-core >= 0.4 && < 0.5
                    , annotated-wl-pprint
                    , file-embed >= 0.0.10
-  build-tools:       hsc2hs >= 0.68
   if os(windows)
     cpp-options:     -DWINDOWS
     build-depends:   Win32
@@ -276,6 +274,8 @@ library
     build-depends:   unix >= 2.7.0.1
                    , pid1 >= 0.1 && < 0.2
                    , bindings-uname >= 0.1
+    build-tools:     hsc2hs >= 0.68
+    exposed-modules: System.Terminal
   default-language:  Haskell2010
 
 executable stack
