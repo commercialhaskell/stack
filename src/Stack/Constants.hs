@@ -28,6 +28,8 @@ module Stack.Constants
     ,platformVariantEnvVar
     ,compilerOptionsCabalFlag
     ,ghcColorForceFlag
+    ,minTerminalWidth
+    ,defaultTerminalWidth
     )
     where
 
@@ -216,3 +218,9 @@ compilerOptionsCabalFlag Ghcjs = "--ghcjs-options"
 
 ghcColorForceFlag :: String
 ghcColorForceFlag = "-fdiagnostics-color=always"
+
+minTerminalWidth :: Int
+minTerminalWidth = 20
+
+defaultTerminalWidth :: Int
+defaultTerminalWidth = 100

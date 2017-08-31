@@ -41,6 +41,7 @@ import           Language.Haskell.TH
 import           Language.Haskell.TH.Syntax (lift)
 import           Lens.Micro
 import           Stack.Prelude              hiding (lift)
+import           Stack.Constants
 import           System.Console.ANSI
 import           System.FilePath
 import           System.IO
@@ -255,7 +256,7 @@ withRunner logLevel useTime terminal colorWhen widthOverride reExec inner = do
     ColorAlways -> return True
     ColorAuto -> liftIO $ hSupportsANSI stderr
   termWidth <- case widthOverride >>= checkWidth of
-      Nothing -> fromMaybe 100 <$> liftIO getTerminalWidth
+      Nothing -> fromMaybe defaultTerminalWidth <$> liftIO getTerminalWidth
       Just w -> return w
   canUseUnicode <- liftIO getCanUseUnicode
   withSticky terminal $ \sticky -> inner Runner
@@ -272,7 +273,7 @@ withRunner logLevel useTime terminal colorWhen widthOverride reExec inner = do
     , runnerSticky = sticky
     }
   where checkWidth w
-          | w < 20 = Nothing
+          | w < minTerminalWidth = Nothing
           | otherwise = Just w
 
 -- | Taken from GHC: determine if we should use Unicode syntax
