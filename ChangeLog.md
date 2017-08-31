@@ -39,6 +39,12 @@ Behavior changes:
 * Addition of `stack build --copy-compiler-tool`, to allow tools like
   intero to be installed globally for a particular compiler.
   [#2643](https://github.com/commercialhaskell/stack/issues/2643)
+* Stack will now try to detect the width of the running terminal
+  (only on POSIX for the moment) and use that to better display
+  output messages. Work is ongoing, so some messages will not
+  be optimal yet. The terminal width can be overriden with the
+  new `--terminal-width` command-line option (this works even on
+  non-POSIX).
 
 Other enhancements:
 
