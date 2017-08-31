@@ -442,6 +442,7 @@ data GlobalOpts = GlobalOpts
     , globalCompiler     :: !(Maybe (CompilerVersion 'CVWanted)) -- ^ Compiler override
     , globalTerminal     :: !Bool -- ^ We're in a terminal?
     , globalColorWhen    :: !ColorWhen -- ^ When to use ansi terminal colors
+    , globalTermWidth    :: !(Maybe Int) -- ^ Terminal width override
     , globalStackYaml    :: !(StackYamlLoc FilePath) -- ^ Override project stack.yaml
     } deriving (Show)
 
@@ -465,6 +466,7 @@ data GlobalOptsMonoid = GlobalOptsMonoid
     , globalMonoidCompiler     :: !(First (CompilerVersion 'CVWanted)) -- ^ Compiler override
     , globalMonoidTerminal     :: !(First Bool) -- ^ We're in a terminal?
     , globalMonoidColorWhen    :: !(First ColorWhen) -- ^ When to use ansi colors
+    , globalMonoidTermWidth    :: !(First Int) -- ^ Terminal width override
     , globalMonoidStackYaml    :: !(First FilePath) -- ^ Override project stack.yaml
     } deriving (Show, Generic)
 
