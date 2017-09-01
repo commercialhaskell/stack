@@ -118,6 +118,8 @@ Bug fixes:
 * Fixes explanation of why a target is needed by the build plan, when the
   target is an extra dependency from the commandline.
   See [#3378](https://github.com/commercialhaskell/stack/issues/3378).
+* Previously, if you delete a yaml file from ~/.stack/build-plan, it would
+  trust the etag and not re-download.  Fixed in this version.
 
 ## 1.5.1
 

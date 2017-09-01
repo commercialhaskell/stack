@@ -32,6 +32,7 @@ import           Network.HTTP.Client.Conduit (requestHeaders)
 import           Network.HTTP.Download.Verified
 import           Network.HTTP.Simple         (httpJSON, withResponse, getResponseBody, getResponseHeaders, getResponseStatusCode,
                                               setRequestHeader)
+import           Path.IO                     (doesFileExist)
 import           System.Directory            (createDirectoryIfMissing,
                                               removeFile)
 import           System.FilePath             (takeDirectory, (<.>))
@@ -68,9 +69,13 @@ redownload req0 dest = do
     let destFilePath = toFilePath dest
         etagFilePath = destFilePath <.> "etag"
 
-    metag <- liftIO $ handleIO (const $ return Nothing) $ fmap Just $
-        withBinaryFile etagFilePath ReadMode $ \h ->
-            runConduit $ sourceHandle h .| CB.take 512
+    metag <- do
+      exists <- doesFileExist dest
+      if not exists
+        then return Nothing
+        else liftIO $ handleIO (const $ return Nothing) $ fmap Just $
+                 withBinaryFile etagFilePath ReadMode $ \h ->
+                     runConduit $ sourceHandle h .| CB.take 512
 
     let req1 =
             case metag of

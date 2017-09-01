@@ -159,8 +159,10 @@ loadResolver (ResolverSnapshot name) = do
             req <- parseRequest $ T.unpack url
             logSticky $ "Downloading " <> renderSnapName name <> " build plan ..."
             logDebug $ "Downloading build plan from: " <> url
-            _ <- redownload req fp
-            logStickyDone $ "Downloaded " <> renderSnapName name <> " build plan."
+            wasDownloaded <- redownload req fp
+            if wasDownloaded
+              then logStickyDone $ "Downloaded " <> renderSnapName name <> " build plan."
+              else logStickyDone $ "Skipped download of " <> renderSnapName name <> " because its the stored entity tag matches the server version"
             tryDecode >>= either throwM return
 
   where
