@@ -120,6 +120,8 @@ Bug fixes:
   See [#3378](https://github.com/commercialhaskell/stack/issues/3378).
 * Previously, if you delete a yaml file from ~/.stack/build-plan, it would
   trust the etag and not re-download.  Fixed in this version.
+* Invoking `stack --docker` in parallel now correctly locks the sqlite database.
+  See [#3400](https://github.com/commercialhaskell/stack/issues/3400).
 
 ## 1.5.1
 
