@@ -1,3 +1,5 @@
+<div class="hidden-warning"><a href="https://docs.haskellstack.org/"><img src="https://rawgit.com/commercialhaskell/stack/master/doc/img/hidden-warning.svg"></a></div>
+
 # YAML Configuration
 
 This page is intended to fully document all configuration options available in
