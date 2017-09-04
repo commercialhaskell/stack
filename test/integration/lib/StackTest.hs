@@ -5,9 +5,7 @@ import Control.Monad.IO.Class
 import Control.Monad.Trans.Reader
 import Control.Concurrent
 import Control.Exception
-import Data.List (intercalate)
 import System.Environment
-import System.FilePath
 import System.Directory
 import System.IO
 import System.IO.Error
@@ -28,8 +26,8 @@ run cmd args = do
 
 stack' :: [String] -> IO ExitCode
 stack' args = do
-    stack <- getEnv "STACK_EXE"
-    run' stack args
+    stackEnv <- getEnv "STACK_EXE"
+    run' stackEnv args
 
 stack :: [String] -> IO ()
 stack args = do
@@ -51,10 +49,10 @@ data ReplConnection
 
 nextPrompt :: Repl ()
 nextPrompt = do
-    (ReplConnection _ handle) <- ask
-    c <- liftIO $ hGetChar handle
+    (ReplConnection _ inputHandle) <- ask
+    c <- liftIO $ hGetChar inputHandle
     if c == '>'
-      then do _ <- liftIO $ hGetChar handle
+      then do _ <- liftIO $ hGetChar inputHandle
               return ()
       else nextPrompt
 
@@ -82,7 +80,7 @@ runRepl cmd args actions = do
     hSetBuffering rStdout NoBuffering
     hSetBuffering rStderr NoBuffering
 
-    forkIO $ withFile "/tmp/stderr" WriteMode
+    _ <- forkIO $ withFile "/tmp/stderr" WriteMode
         $ \err -> forever $ catch (hGetChar rStderr >>= hPutChar err)
                   $ \e -> unless (isEOFError e) $ throw e
 
@@ -91,8 +89,8 @@ runRepl cmd args actions = do
 
 repl :: [String] -> Repl () -> IO ()
 repl args action = do
-    stack <- getEnv "STACK_EXE"
-    ec <- runRepl stack ("repl":args) action
+    stackExe <- getEnv "STACK_EXE"
+    ec <- runRepl stackExe ("repl":args) action
     unless (ec == ExitSuccess) $ return ()
         -- TODO: Understand why the exit code is 1 despite running GHCi tests
         -- successfully.
@@ -102,9 +100,9 @@ repl args action = do
 -- stderr output if the process succeeded.
 stackCheckStderr :: [String] -> (String -> IO ()) -> IO ()
 stackCheckStderr args check = do
-    stack <- getEnv "STACK_EXE"
-    logInfo $ "Running: " ++ stack ++ " " ++ unwords (map showProcessArgDebug args)
-    (ec, _, err) <- readProcessWithExitCode stack args ""
+    stackExe <- getEnv "STACK_EXE"
+    logInfo $ "Running: " ++ stackExe ++ " " ++ unwords (map showProcessArgDebug args)
+    (ec, _, err) <- readProcessWithExitCode stackExe args ""
     hPutStr stderr err
     if ec /= ExitSuccess
         then error $ "Exited with exit code: " ++ show ec
@@ -123,7 +121,7 @@ doesExist fp = do
     logInfo $ "doesExist " ++ fp
     exists <- doesFileOrDirExist fp
     case exists of
-      (Right msg) -> return ()
+      (Right _) -> return ()
       (Left _) -> error "No file or directory exists"
 
 doesFileOrDirExist :: FilePath -> IO (Either () String)
@@ -168,15 +166,19 @@ showProcessArgDebug x
         special _ = False
 
 -- | Extension of executables
+exeExt :: String
 exeExt = if isWindows then ".exe" else ""
 
 -- | Is the OS Windows?
+isWindows :: Bool
 isWindows = os == "mingw32"
 
 -- | Is the OS Alpine Linux?
+getIsAlpine :: IO Bool
 getIsAlpine = doesFileExist "/etc/alpine-release"
 
 -- | Is the architecture ARM?
+isARM :: Bool
 isARM = arch == "arm"
 
 -- | To avoid problems with GHC version mismatch when a new LTS major
@@ -185,4 +187,5 @@ isARM = arch == "arm"
 -- the main @stack.yaml@ (and ordinarily be the `.0` minor version).
 --
 -- NOTE: currently using lts-8.22 instead of lts-8.0 because the `cyclic-test-deps` integration test is broken with lts-8.0 because a hackage metadata revision invalidated the snapshot (snapshot has `test-framework-quickcheck2-0.3.0.3` and `QuickCheck-2.9.2`, which used to be fine, but now test-framework-quickcheck2 was revised to have a `QuickCheck < 2.8` constraint).
+defaultResolverArg :: String
 defaultResolverArg = "--resolver=lts-8.22"
