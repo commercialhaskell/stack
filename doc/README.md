@@ -1,3 +1,5 @@
+<div class="hidden-warning"><a href="https://docs.haskellstack.org/"><img src="https://rawgit.com/commercialhaskell/stack/master/doc/img/hidden-warning.svg"></a></div>
+
 # The Haskell Tool Stack
 
 Stack is a cross-platform program for developing Haskell

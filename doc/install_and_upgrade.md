@@ -1,3 +1,5 @@
+<div class="hidden-warning"><a href="https://docs.haskellstack.org/"><img src="https://rawgit.com/commercialhaskell/stack/master/doc/img/hidden-warning.svg"></a></div>
+
 # Install/upgrade
 
 For common Un*x operating systems (including macOS), all you need to do is run:
