@@ -13,7 +13,7 @@
       observer.disconnect();
       var form = $('#rtd-search-form');
       form.empty();
-      form.attr('action', 'https://' + window.location.hostname + '/en/' + determineSelectedBranch() + '/search.html');
+      form.attr('action', 'https://' + window.location.hostname + '/' + window.location.pathname.split('/')[1] + '/' + window.location.pathname.split('/')[2] + '/search.html');
       $('<input>').attr({
         type: "text",
         name: "q",
@@ -21,7 +21,7 @@
       }).appendTo(form);
     });
 
-    if (window.location.origin.indexOf('readthedocs') > -1) {
+    if (window.location.origin.indexOf('readthedocs') > -1 || window.location.origin.indexOf('docs.haskellstack') > -1) {
       observer.observe(target, config);
     }
   }
