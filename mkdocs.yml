@@ -8,6 +8,8 @@ site_dir: _site
 theme: readthedocs
 extra_css:
 - css/extra.css
+extra_javascript:
+- js/searchhack.js
 
 pages:
 - Home: README.md
