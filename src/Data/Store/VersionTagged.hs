@@ -105,5 +105,8 @@ storeVersionConfig name hash = (namedVersionConfig name hash)
         , ( "Stack.Types.Compiler.CVWanted"
           , "Stack.Types.Compiler.'CVWanted"
           )
+        -- moved in containers 0.5.9.1
+        , ( "Data.Map.Internal.Map", "Data.Map.Base.Map")
+        , ( "Data.Set.Internal.Set", "Data.Set.Base.Set")
         ]
     }
