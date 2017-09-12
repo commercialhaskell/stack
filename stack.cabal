@@ -274,6 +274,8 @@ library
     build-depends:   unix >= 2.7.0.1
                    , pid1 >= 0.1 && < 0.2
                    , bindings-uname >= 0.1
+    build-tools:     hsc2hs >= 0.68
+    exposed-modules: System.Terminal
   default-language:  Haskell2010
 
 executable stack

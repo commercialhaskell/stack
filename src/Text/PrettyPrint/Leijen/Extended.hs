@@ -176,24 +176,24 @@ instance HasAnsiAnn AnsiAnn where
 instance HasAnsiAnn () where
     getAnsiAnn _ = mempty
 
-displayPlain :: Display a => a -> T.Text
-displayPlain = LT.toStrict . displayAnsiSimple . renderDefault . fmap (const mempty) . display
+displayPlain :: Display a => Int -> a -> T.Text
+displayPlain w = LT.toStrict . displayAnsiSimple . renderDefault w . fmap (const mempty) . display
 
 -- TODO: tweak these settings more?
 -- TODO: options for settings if this is released as a lib
 
-renderDefault :: Doc a -> SimpleDoc a
-renderDefault = renderPretty 1 120
+renderDefault :: Int -> Doc a -> SimpleDoc a
+renderDefault = renderPretty 1
 
-displayAnsi :: (Display a, HasAnsiAnn (Ann a)) => a -> T.Text
-displayAnsi = LT.toStrict . displayAnsiSimple . renderDefault . toAnsiDoc . display
+displayAnsi :: (Display a, HasAnsiAnn (Ann a)) => Int -> a -> T.Text
+displayAnsi w = LT.toStrict . displayAnsiSimple . renderDefault w . toAnsiDoc . display
 
 hDisplayAnsi
     :: (Display a, HasAnsiAnn (Ann a), MonadIO m)
-    => Handle -> a -> m ()
-hDisplayAnsi h x = liftIO $ do
+    => Handle -> Int -> a -> m ()
+hDisplayAnsi h w x = liftIO $ do
     useAnsi <- hSupportsANSI h
-    T.hPutStr h $ if useAnsi then displayAnsi x else displayPlain x
+    T.hPutStr h $ if useAnsi then displayAnsi w x else displayPlain w x
 
 displayAnsiSimple :: SimpleDoc AnsiAnn -> LT.Text
 displayAnsiSimple doc =

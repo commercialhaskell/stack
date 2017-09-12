@@ -28,6 +28,9 @@ module Stack.Constants
     ,platformVariantEnvVar
     ,compilerOptionsCabalFlag
     ,ghcColorForceFlag
+    ,minTerminalWidth
+    ,maxTerminalWidth
+    ,defaultTerminalWidth
     )
     where
 
@@ -214,5 +217,20 @@ compilerOptionsCabalFlag :: WhichCompiler -> String
 compilerOptionsCabalFlag Ghc = "--ghc-options"
 compilerOptionsCabalFlag Ghcjs = "--ghcjs-options"
 
+-- | The flag to pass to GHC when we want to force its output to be
+-- colorized.
 ghcColorForceFlag :: String
 ghcColorForceFlag = "-fdiagnostics-color=always"
+
+-- | The minimum allowed terminal width. Used for pretty-printing.
+minTerminalWidth :: Int
+minTerminalWidth = 40
+
+-- | The maximum allowed terminal width. Used for pretty-printing.
+maxTerminalWidth :: Int
+maxTerminalWidth = 200
+
+-- | The default terminal width. Used for pretty-printing when we can't
+-- automatically detect it and when the user doesn't supply one.
+defaultTerminalWidth :: Int
+defaultTerminalWidth = 100

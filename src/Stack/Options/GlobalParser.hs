@@ -40,6 +40,10 @@ globalOptsParser currentDir kind defLogLevel =
          completeWith ["always", "never", "auto"] <>
          help "Specify when to use color in output; WHEN is 'always', 'never', or 'auto'" <>
          hide)) <*>
+    optionalFirst (option auto
+        (long "terminal-width" <>
+         metavar "INT" <>
+         help "Specify the width of the terminal, used for pretty-print messages")) <*>
     optionalFirst
         (strOption
             (long "stack-yaml" <>
@@ -64,6 +68,7 @@ globalOptsFromMonoid defaultTerminal GlobalOptsMonoid{..} = GlobalOpts
     , globalCompiler = getFirst globalMonoidCompiler
     , globalTerminal = fromFirst defaultTerminal globalMonoidTerminal
     , globalColorWhen = fromFirst ColorAuto globalMonoidColorWhen
+    , globalTermWidth = getFirst globalMonoidTermWidth
     , globalStackYaml = maybe SYLDefault SYLOverride $ getFirst globalMonoidStackYaml }
 
 initOptsParser :: Parser InitOpts

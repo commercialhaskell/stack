@@ -51,7 +51,8 @@ displayWithColor
     => a -> m T.Text
 displayWithColor x = do
     useAnsi <- liftM logUseColor $ view logOptionsL
-    return $ if useAnsi then displayAnsi x else displayPlain x
+    termWidth <- liftM logTermWidth $ view logOptionsL
+    return $ (if useAnsi then displayAnsi else displayPlain) termWidth x
 
 -- TODO: switch to using implicit callstacks once 7.8 support is dropped
 

@@ -41,10 +41,14 @@ import           Language.Haskell.TH
 import           Language.Haskell.TH.Syntax (lift)
 import           Lens.Micro
 import           Stack.Prelude              hiding (lift)
+import           Stack.Constants
 import           System.Console.ANSI
 import           System.FilePath
 import           System.IO
 import           System.Log.FastLogger
+#ifndef WINDOWS
+import           System.Terminal
+#endif
 
 -- | Monadic environment.
 data Runner = Runner
@@ -77,6 +81,7 @@ newtype Sticky = Sticky
 
 data LogOptions = LogOptions
   { logUseColor      :: Bool
+  , logTermWidth     :: Int
   , logUseUnicode    :: Bool
   , logUseTime       :: Bool
   , logMinLevel      :: LogLevel
@@ -243,19 +248,24 @@ withRunner :: MonadIO m
            -> Bool -- ^ use time?
            -> Bool -- ^ terminal?
            -> ColorWhen
+           -> Maybe Int -- ^ terminal width override
            -> Bool -- ^ reexec?
            -> (Runner -> m a)
            -> m a
-withRunner logLevel useTime terminal colorWhen reExec inner = do
+withRunner logLevel useTime terminal colorWhen widthOverride reExec inner = do
   useColor <- case colorWhen of
     ColorNever -> return False
     ColorAlways -> return True
     ColorAuto -> liftIO $ hSupportsANSI stderr
+  termWidth <- clipWidth <$> maybe (fromMaybe defaultTerminalWidth
+                                    <$> liftIO getTerminalWidth)
+                                   pure widthOverride
   canUseUnicode <- liftIO getCanUseUnicode
   withSticky terminal $ \sticky -> inner Runner
     { runnerReExec = reExec
     , runnerLogOptions = LogOptions
         { logUseColor = useColor
+        , logTermWidth = termWidth
         , logUseUnicode = canUseUnicode
         , logUseTime = useTime
         , logMinLevel = logLevel
@@ -264,6 +274,13 @@ withRunner logLevel useTime terminal colorWhen reExec inner = do
     , runnerTerminal = terminal
     , runnerSticky = sticky
     }
+  where clipWidth w
+          | w < minTerminalWidth = minTerminalWidth
+          | w > maxTerminalWidth = maxTerminalWidth
+          | otherwise = w
+#ifdef WINDOWS
+        getTerminalWidth = pure Nothing
+#endif
 
 -- | Taken from GHC: determine if we should use Unicode syntax
 getCanUseUnicode :: IO Bool
