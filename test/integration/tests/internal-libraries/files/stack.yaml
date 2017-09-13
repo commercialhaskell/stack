@@ -1,0 +1,3 @@
+resolver: ghc-8.2.1
+extra-deps:
+- stm-2.4.4.1

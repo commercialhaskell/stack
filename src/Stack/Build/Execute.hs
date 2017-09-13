@@ -1199,7 +1199,12 @@ singleBuild runInBase ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} in
             , ["bench" | enableBenchmarks]
             ]
         (hasLib, hasExe) = case taskType of
-            TTFiles lp Local -> (packageHasLibrary (lpPackage lp), not (Set.null (exesToBuild executableBuildStatuses lp)))
+            TTFiles lp Local ->
+              let hasLibrary =
+                    case packageLibraries (lpPackage lp) of
+                      NoLibraries -> False
+                      HasLibraries _ -> True
+               in (hasLibrary, not (Set.null (exesToBuild executableBuildStatuses lp)))
             -- This isn't true, but we don't want to have this info for
             -- upstream deps.
             _ -> (False, False)
@@ -1411,7 +1416,11 @@ singleBuild runInBase ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} in
                   | opt <- hoAdditionalArgs (boptsHaddockOpts eeBuildOpts) ]
                 ]
 
-        let shouldCopy = not isFinalBuild && (packageHasLibrary package || not (Set.null (packageExes package)))
+        let hasLibrary =
+              case packageLibraries package of
+                NoLibraries -> False
+                HasLibraries _ -> True
+            shouldCopy = not isFinalBuild && (hasLibrary || not (Set.null (packageExes package)))
         when shouldCopy $ withMVar eeInstallLock $ \() -> do
             announce "copy/register"
             eres <- try $ cabal KeepTHLoading ["copy"]
@@ -1419,7 +1428,7 @@ singleBuild runInBase ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} in
                 Left err@CabalExitedUnsuccessfully{} ->
                     throwM $ CabalCopyFailed (packageBuildType package == Just C.Simple) (show err)
                 _ -> return ()
-            when (packageHasLibrary package) $ cabal KeepTHLoading ["register"]
+            when hasLibrary $ cabal KeepTHLoading ["register"]
 
         let (installedPkgDb, installedDumpPkgsTVar) =
                 case taskLocation task of
@@ -1430,13 +1439,13 @@ singleBuild runInBase ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} in
                         ( bcoLocalDB eeBaseConfigOpts
                         , eeLocalDumpPkgs )
         let ident = PackageIdentifier (packageName package) (packageVersion package)
-        mpkgid <- if packageHasLibrary package
-            then do
+        mpkgid <- case packageLibraries package of
+            HasLibraries _ -> do
                 mpkgid <- loadInstalledPkg eeEnvOverride wc [installedPkgDb] installedDumpPkgsTVar (packageName package)
                 case mpkgid of
                     Nothing -> throwM $ Couldn'tFindPkgId $ packageName package
                     Just pkgid -> return $ Library ident pkgid
-            else do
+            NoLibraries -> do
                 markExeInstalled (taskLocation task) taskProvides -- TODO unify somehow with writeFlagCache?
                 return $ Executable ident
 
@@ -1825,11 +1834,16 @@ extraBuildOptions wc bopts = do
 
 -- Library and executable build components.
 primaryComponentOptions :: Map Text ExecutableBuildStatus -> LocalPackage -> [String]
-primaryComponentOptions executableBuildStatuses lp = ["lib:" ++ packageNameString (packageName (lpPackage lp))
+primaryComponentOptions executableBuildStatuses lp =
       -- TODO: get this information from target parsing instead,
       -- which will allow users to turn off library building if
       -- desired
-      | packageHasLibrary (lpPackage lp)] ++
+      (case packageLibraries (lpPackage lp) of
+         NoLibraries -> []
+         HasLibraries names ->
+             map T.unpack
+           $ T.append "lib:" (packageNameText (packageName (lpPackage lp)))
+           : map (T.append "flib:") (Set.toList names)) ++
       map (T.unpack . T.append "exe:") (Set.toList $ exesToBuild executableBuildStatuses lp)
 
 -- | History of this function:

@@ -587,7 +587,9 @@ makeGhciPkgInfo buildOptsCLI sourceMap installedMap locals addPkgs mfileTargets 
 wantedPackageComponents :: BuildOpts -> Target -> Package -> Set NamedComponent
 wantedPackageComponents _ (TargetComps cs) _ = cs
 wantedPackageComponents bopts (TargetAll ProjectPackage) pkg = S.fromList $
-    (if packageHasLibrary pkg then [CLib] else []) ++
+    (case packageLibraries pkg of
+       NoLibraries -> []
+       HasLibraries _names -> CLib : []) ++ -- FIXME. This ignores sub libraries and foreign libraries. Is that OK?
     map CExe (S.toList (packageExes pkg)) <>
     (if boptsTests bopts then map CTest (M.keys (packageTests pkg)) else []) <>
     (if boptsBenchmarks bopts then map CBench (S.toList (packageBenchmarks pkg)) else [])

@@ -100,11 +100,15 @@ generateHpcReport pkgDir package tests = do
     let pkgName = packageNameText (packageName package)
         pkgId = packageIdentifierString (packageIdentifier package)
         ghcVersion = getGhcVersion compilerVersion
+        hasLibrary =
+          case packageLibraries package of
+            NoLibraries -> False
+            HasLibraries _ -> True
     eincludeName <-
         -- Pre-7.8 uses plain PKG-version in tix files.
         if ghcVersion < $(mkVersion "7.10") then return $ Right $ Just pkgId
         -- We don't expect to find a package key if there is no library.
-        else if not (packageHasLibrary package) then return $ Right Nothing
+        else if not hasLibrary then return $ Right Nothing
         -- Look in the inplace DB for the package key.
         -- See https://github.com/commercialhaskell/stack/issues/1181#issuecomment-148968986
         else do

@@ -218,9 +218,14 @@ loadLocalPackage boptsCli targets (name, lpv) = do
             Nothing -> False
             -- FIXME: When issue #1406 ("stack 0.1.8 lost ability to
             -- build individual executables or library") is resolved,
-            -- 'packageHasLibrary' is only relevant if the library is
+            -- 'hasLibrary' is only relevant if the library is
             -- part of the target spec.
-            Just _ -> packageHasLibrary pkg || not (Set.null allComponents)
+            Just _ ->
+              let hasLibrary =
+                    case packageLibraries pkg of
+                      NoLibraries -> False
+                      HasLibraries _ -> True
+               in hasLibrary || not (Set.null allComponents)
 
         filterSkippedComponents = Set.filter (not . (`elem` boptsSkipComponents bopts))
 

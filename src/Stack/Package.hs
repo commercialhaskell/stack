@@ -67,6 +67,7 @@ import           Distribution.System (OS (..), Arch, Platform (..))
 import qualified Distribution.Text as D
 import qualified Distribution.Types.CondTree as Cabal
 import qualified Distribution.Types.ExeDependency as Cabal
+import           Distribution.Types.ForeignLib
 import qualified Distribution.Types.LegacyExeDependency as Cabal
 import qualified Distribution.Types.UnqualComponentName as Cabal
 import qualified Distribution.Verbosity as D
@@ -249,7 +250,17 @@ packageFromPackageDescription packageConfig pkgFlags (PackageDescriptionPair pkg
     , packageDefaultFlags = M.fromList
       [(fromCabalFlagName (flagName flag), flagDefault flag) | flag <- pkgFlags]
     , packageAllDeps = S.fromList (M.keys deps)
-    , packageHasLibrary = maybe False (buildable . libBuildInfo) (library pkg)
+    , packageLibraries =
+        let mlib = do
+              lib <- library pkg
+              guard $ buildable $ libBuildInfo lib
+              Just lib
+         in
+          case mlib of
+            Nothing
+              | null extraLibNames -> NoLibraries
+              | otherwise -> error "Package has buildable sublibraries but no buildable libraries, I'm giving up"
+            Just _ -> HasLibraries foreignLibNames
     , packageTests = M.fromList
       [(T.pack (Cabal.unUnqualComponentName $ testName t), testInterface t)
           | t <- testSuites pkgNoMod
@@ -281,6 +292,21 @@ packageFromPackageDescription packageConfig pkgFlags (PackageDescriptionPair pkg
     , packageSetupDeps = msetupDeps
     }
   where
+    extraLibNames = S.union subLibNames foreignLibNames
+
+    subLibNames
+      = S.fromList
+      $ map (T.pack . Cabal.unUnqualComponentName)
+      $ mapMaybe libName -- this is a design bug in the Cabal API: this should statically be known to exist
+      $ filter (buildable . libBuildInfo)
+      $ subLibraries pkg
+
+    foreignLibNames
+      = S.fromList
+      $ map (T.pack . Cabal.unUnqualComponentName . foreignLibName)
+      $ filter (buildable . foreignLibBuildInfo)
+      $ foreignLibs pkg
+
     -- Gets all of the modules, files, build files, and data files that
     -- constitute the package. This is primarily used for dirtiness
     -- checking during build, as well as use by "stack ghci"
@@ -310,7 +336,7 @@ packageFromPackageDescription packageConfig pkgFlags (PackageDescriptionPair pkg
              return (componentModules, componentFiles, buildFiles <> dataFiles', warnings)
     pkgId = package pkg
     name = fromCabalPackageName (pkgName pkgId)
-    deps = M.filterWithKey (const . (/= name)) (M.union
+    deps = M.filterWithKey (const . (not . isMe)) (M.union
         (packageDependencies pkg)
         -- We include all custom-setup deps - if present - in the
         -- package deps themselves. Stack always works with the
@@ -321,6 +347,10 @@ packageFromPackageDescription packageConfig pkgFlags (PackageDescriptionPair pkg
     msetupDeps = fmap
         (M.fromList . map (depName &&& depRange) . setupDepends)
         (setupBuildInfo pkg)
+
+    -- Is the package dependency mentioned here me: either the package
+    -- name itself, or the name of one of the sub libraries
+    isMe name' = name' == name || packageNameText name' `S.member` extraLibNames
 
 -- | Generate GHC options for the package's components, and a list of
 -- options which apply generally to the package, not one specific
@@ -582,7 +612,7 @@ packageDescModulesAndFiles
     => PackageDescription
     -> m (Map NamedComponent (Set ModuleName), Map NamedComponent (Set DotCabalPath), Set (Path Abs File), [PackageWarning])
 packageDescModulesAndFiles pkg = do
-    (libraryMods,libDotCabalFiles,libWarnings) <-
+    (libraryMods,libDotCabalFiles,libWarnings) <- -- FIXME add in sub libraries
         maybe
             (return (M.empty, M.empty, []))
             (asModuleAndFileMap libComponent libraryFiles)
@@ -829,7 +859,7 @@ data PackageDescriptionPair = PackageDescriptionPair
 resolvePackageDescription :: PackageConfig
                           -> GenericPackageDescription
                           -> PackageDescriptionPair
-resolvePackageDescription packageConfig (GenericPackageDescription desc defaultFlags mlib _subLibs _foreignLibs exes tests benches) =
+resolvePackageDescription packageConfig (GenericPackageDescription desc defaultFlags mlib subLibs foreignLibs' exes tests benches) =
     PackageDescriptionPair
       { pdpOrigBuildable = go False
       , pdpModifiedBuildable = go True
@@ -838,6 +868,12 @@ resolvePackageDescription packageConfig (GenericPackageDescription desc defaultF
         go modBuildable =
           desc {library =
                   fmap (resolveConditions rc updateLibDeps) mlib
+               ,subLibraries =
+                  map (\(n, v) -> (resolveConditions rc updateLibDeps v){libName=Just n})
+                      subLibs
+               ,foreignLibs =
+                  map (\(n, v) -> (resolveConditions rc updateForeignLibDeps v){foreignLibName=n})
+                      foreignLibs'
                ,executables =
                   map (\(n, v) -> (resolveConditions rc updateExeDeps v){exeName=n})
                       exes
@@ -860,6 +896,9 @@ resolvePackageDescription packageConfig (GenericPackageDescription desc defaultF
         updateLibDeps lib deps =
           lib {libBuildInfo =
                  (libBuildInfo lib) {targetBuildDepends = deps}}
+        updateForeignLibDeps lib deps =
+          lib {foreignLibBuildInfo =
+                 (foreignLibBuildInfo lib) {targetBuildDepends = deps}}
         updateExeDeps exe deps =
           exe {buildInfo =
                  (buildInfo exe) {targetBuildDepends = deps}}

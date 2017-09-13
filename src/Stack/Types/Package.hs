@@ -69,6 +69,13 @@ instance Show PackageException where
         , "For more information, see: https://github.com/commercialhaskell/stack/issues/317"
         ]
 
+-- | Libraries in a package. Since Cabal 2.0, internal libraries are a
+-- thing.
+data PackageLibraries
+  = NoLibraries
+  | HasLibraries !(Set Text) -- ^ the foreign library names, sub libraries get built automatically without explicit component name passing
+ deriving (Show,Typeable)
+
 -- | Some package info.
 data Package =
   Package {packageName :: !PackageName                    -- ^ Name of the package.
@@ -81,7 +88,7 @@ data Package =
           ,packageGhcOptions :: ![Text]                   -- ^ Ghc options used on package.
           ,packageFlags :: !(Map FlagName Bool)           -- ^ Flags used on package.
           ,packageDefaultFlags :: !(Map FlagName Bool)    -- ^ Defaults for unspecified flags.
-          ,packageHasLibrary :: !Bool                     -- ^ does the package have a buildable library stanza?
+          ,packageLibraries :: !PackageLibraries          -- ^ does the package have a buildable library stanza?
           ,packageTests :: !(Map Text TestSuiteInterface) -- ^ names and interfaces of test suites
           ,packageBenchmarks :: !(Set Text)               -- ^ names of benchmarks
           ,packageExes :: !(Set Text)                     -- ^ names of executables
