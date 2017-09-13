@@ -587,7 +587,7 @@ packageDependencies :: PackageDescription -> Map PackageName VersionRange
 packageDependencies pkg =
   M.fromListWith intersectVersionRanges $
   map (depName &&& depRange) $
-  concatMap targetBuildDepends (allBuildInfo pkg) ++
+  concatMap targetBuildDepends (allBuildInfo' pkg) ++
   maybe [] setupDepends (setupBuildInfo pkg)
 
 -- | Get all dependencies of the package (buildable targets only).
@@ -596,7 +596,7 @@ packageDependencies pkg =
 -- information.
 packageDescTools :: PackageDescription -> Map ExeName VersionRange
 packageDescTools =
-  M.fromList . concatMap tools . allBuildInfo
+  M.fromList . concatMap tools . allBuildInfo'
   where
     tools bi = map go1 (buildTools bi) ++ map go2 (buildToolDepends bi)
 
@@ -605,6 +605,15 @@ packageDescTools =
 
     go2 :: Cabal.ExeDependency -> (ExeName, VersionRange)
     go2 (Cabal.ExeDependency _pkg name range) = (ExeName $ T.pack $ Cabal.unUnqualComponentName name, range)
+
+-- | Variant of 'allBuildInfo' from Cabal that includes foreign
+-- libraries; see <https://github.com/haskell/cabal/issues/4763>
+allBuildInfo' :: PackageDescription -> [BuildInfo]
+allBuildInfo' pkg = allBuildInfo pkg ++
+  [ bi | flib <- foreignLibs pkg
+       , let bi = foreignLibBuildInfo flib
+       , buildable bi
+  ]
 
 -- | Get all files referenced by the package.
 packageDescModulesAndFiles
