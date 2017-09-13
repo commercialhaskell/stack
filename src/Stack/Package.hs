@@ -336,7 +336,7 @@ packageFromPackageDescription packageConfig pkgFlags (PackageDescriptionPair pkg
              return (componentModules, componentFiles, buildFiles <> dataFiles', warnings)
     pkgId = package pkg
     name = fromCabalPackageName (pkgName pkgId)
-    deps = M.filterWithKey (const . (not . isMe)) (M.union
+    deps = M.filterWithKey (const . not . isMe) (M.union
         (packageDependencies pkg)
         -- We include all custom-setup deps - if present - in the
         -- package deps themselves. Stack always works with the
