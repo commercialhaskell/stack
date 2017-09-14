@@ -27,6 +27,10 @@ matrix:
       compiler: ": #stack 8.0.2"
       addons: {apt: {packages: [ghc-8.0.2], sources: [hvr-ghc]}}
 
+    - env: BUILD=stack GHCVER=8.2.1 STACK_YAML=stack-nightly.yaml
+      compiler: ": #stack 8.2.1"
+      addons: {apt: {packages: [ghc-8.2.1], sources: [hvr-ghc]}}
+
     - env: BUILD=stack GHCVER=8.0.2 STACK_YAML=stack.yaml
       compiler: ": #stack 8.0.2 osx"
       os: osx
@@ -104,6 +108,8 @@ install:
    set +ex
 
 script:
+ - GHC_OPTIONS="-Werror"
+ - if [ $GHCVER = 8.2.1 ]; then GHC_OPTIONS="$GHC_OPTIONS -Wno-missing-home-modules"; fi
  - |
    set -ex
    case "$BUILD" in
@@ -114,10 +120,10 @@ script:
        stack --system-ghc --no-terminal build --pedantic
        ;;
      stack)
-       stack --no-terminal test --haddock --no-haddock-deps --ghc-options="-Werror"
+       stack --no-terminal test --haddock --no-haddock-deps --ghc-options="$GHC_OPTIONS"
        ;;
      cabal)
-       cabal configure --enable-tests --enable-benchmarks -v2 --ghc-options="-O0 -Werror"
+       cabal configure --enable-tests --enable-benchmarks -v2 --ghc-options="-O0 $GHC_OPTIONS"
        cabal build
        cabal test
        cabal check

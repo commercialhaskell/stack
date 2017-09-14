@@ -144,7 +144,7 @@ execExtraHelp args helpOpt parser pd =
         _ <- execParser (info (hiddenHelper <*>
                                ((,) <$>
                                 parser <*>
-                                some (strArgument (metavar "OTHER ARGUMENTS"))))
+                                some (strArgument (metavar "OTHER ARGUMENTS") :: Parser String)))
                         (fullDesc <> progDesc pd))
         return ()
   where hiddenHelper = abortOption ShowHelpText (long "help" <> hidden <> internal)

@@ -193,8 +193,7 @@ main = do
 -- Vertically combine only the error component of the first argument with the
 -- error component of the second.
 vcatErrorHelp :: ParserHelp -> ParserHelp -> ParserHelp
-vcatErrorHelp (ParserHelp e1 _ _ _ _) (ParserHelp e2 h2 u2 b2 f2) =
-  ParserHelp (vcatChunks [e2, e1]) h2 u2 b2 f2
+vcatErrorHelp h1 h2 = h2 { helpError = vcatChunks [helpError h2, helpError h1] }
 
 commandLineHandler
   :: FilePath
@@ -534,8 +533,7 @@ interpreterHandler currentDir args f = do
       then overrideErrorHelp
       else vcatErrorHelp
 
-    overrideErrorHelp (ParserHelp e1 _ _ _ _) (ParserHelp _ h2 u2 b2 f2) =
-      ParserHelp e1 h2 u2 b2 f2
+    overrideErrorHelp h1 h2 = h2 { helpError = helpError h1 }
 
     parseResultHandler fn = handleParseResult (overFailure fn (Failure f))
     noSuchFile name = errorHelp $ stringChunk
