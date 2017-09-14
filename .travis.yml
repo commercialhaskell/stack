@@ -109,7 +109,7 @@ install:
 
 script:
  - GHC_OPTIONS="-Werror"
- - if [ $GHCVER = 8.2.1 ]; then GHC_OPTIONS="-Wno-missing-home-modules"; fi
+ - if [ $GHCVER = 8.2.1 ]; then GHC_OPTIONS="$GHC_OPTIONS -Wno-missing-home-modules"; fi
  - |
    set -ex
    case "$BUILD" in
