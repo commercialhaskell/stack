@@ -88,9 +88,6 @@ loadCreds config = do
       return $ mkCreds fp
   where
     fromPrompt fp = do
-      when (configSaveHackageCreds config) $ do
-        putStrLn "NOTE: Username and password will be saved in a local file"
-        putStrLn "You can modify this behavior with the save-hackage-creds config option"
       putStr "Hackage username: "
       hFlush stdout
       username <- TIO.getLine
@@ -100,8 +97,31 @@ loadCreds config = do
             , hcPassword = password
             , hcCredsFile = fp
             }
-      L.writeFile fp (encode hc)
+
+      when (configSaveHackageCreds config) $ do
+        let prompt = "Save hackage credentials to file at " ++ fp ++ " [y/n]? "
+        putStr prompt
+        input <- loopPrompt prompt
+        putStrLn "NOTE: Avoid this prompt in the future by using: save-hackage-creds: false"
+        hFlush stdout
+        case input of
+          "y" -> do
+            L.writeFile fp (encode hc)
+            putStrLn "Saved!"
+            hFlush stdout
+          _ -> return ()
+
       return hc
+
+    loopPrompt :: String -> IO String
+    loopPrompt p = do
+      input <- TIO.getLine
+      case input of
+        "y" -> return "y"
+        "n" -> return "n"
+        _   -> do
+          putStr p
+          loopPrompt p
 
 credsFile :: Config -> IO FilePath
 credsFile config = do

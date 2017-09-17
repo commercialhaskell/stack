@@ -45,6 +45,9 @@ Behavior changes:
   be optimal yet. The terminal width can be overriden with the
   new `--terminal-width` command-line option (this works even on
   non-POSIX).
+* Stack will ask before saving hackage credentials to file. This new
+  prompt can be avoided by using the `save-hackage-creds` setting. Please
+  see [#2159](https://github.com/commercialhaskell/stack/issues/2159).
 
 Other enhancements:
 
