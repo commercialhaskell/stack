@@ -55,7 +55,8 @@ parseGhcPkgId x = go x
 -- | A parser for a package-version-hash pair.
 ghcPkgIdParser :: Parser GhcPkgId
 ghcPkgIdParser =
-    GhcPkgId . T.pack <$> many1 (choice [digit, letter, satisfy (`elem` "_.-")])
+    let elements =  "_.-" :: String in
+    GhcPkgId . T.pack <$> many1 (choice [digit, letter, satisfy (`elem` elements)])
 
 -- | Get a string representation of GHC package id.
 ghcPkgIdString :: GhcPkgId -> String
