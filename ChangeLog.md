@@ -93,6 +93,9 @@ Other enhancements:
   [#3360](https://github.com/commercialhaskell/stack/issues/3360)
 * Better descriptions are now available for `stack upgrade --help`. See:
   [#3070](https://github.com/commercialhaskell/stack/issues/3070)
+* When using Nix, nix-shell now depends always on gcc to prevent build errors
+  when using the FFI. As ghc depends on gcc anyway, this doesn't increase the
+  dependency footprint.
 
 Bug fixes:
 
