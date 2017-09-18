@@ -198,6 +198,7 @@ cloneRepo menv projRoot url commit repoType' = do
 
         let cloneAndExtract commandName cloneArgs resetCommand = do
                 ensureDir root
+                logInfo $ "Cloning " <> commit <> " from " <> url
                 callProcessInheritStderrStdout Cmd
                     { cmdDirectoryToRunIn = Just root
                     , cmdCommandToRun = commandName
