@@ -26,6 +26,7 @@ import           Stack.Build
 import           Stack.Config
 import           Stack.Fetch
 import           Stack.PackageIndex
+import           Stack.PrettyPrint
 import           Stack.Setup
 import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageIndex
@@ -116,9 +117,11 @@ upgrade gConfigMonoid mresolver builtHash (UpgradeOpts mbo mso) =
         -- See #2977 - if --git or --git-repo is specified, do source upgrade.
         (_, Just so@(SourceOpts (Just _))) -> source so
         (Just bo, Just so) -> binary bo `catchAny` \e -> do
-            logWarn "Exception occured when trying to perform binary upgrade:"
-            logWarn $ T.pack $ show e
-            logWarn "Falling back to source upgrade"
+            prettyWarnL
+               [ flow "Exception occured when trying to perform binary upgrade:"
+               , fromString . show $ e
+               , line <> flow "Falling back to source upgrade"
+               ]
 
             source so
   where
@@ -141,28 +144,30 @@ binaryUpgrade (BinaryOpts mplatform force' mver morg mrepo) = do
     isNewer <-
         case mdownloadVersion of
             Nothing -> do
-                logError "Unable to determine upstream version from Github metadata"
-                unless force $
-                    logError "Rerun with --force-download to force an upgrade"
+                prettyErrorL $
+                    flow "Unable to determine upstream version from Github metadata"
+                  :
+                  [ line <> flow "Rerun with --force-download to force an upgrade"
+                    | not force]
                 return False
             Just downloadVersion -> do
-                logInfo $ T.concat
-                    [ "Current Stack version: "
-                    , versionText stackVersion
-                    , ", available download version: "
-                    , versionText downloadVersion
+                prettyInfoL
+                    [ flow "Current Stack version:"
+                    , display stackVersion <> ","
+                    , flow "available download version:"
+                    , display downloadVersion
                     ]
                 return $ downloadVersion > stackVersion
 
     toUpgrade <- case (force, isNewer) of
         (False, False) -> do
-            logInfo "Skipping binary upgrade, you are already running the most recent version"
+            prettyInfoS "Skipping binary upgrade, you are already running the most recent version"
             return False
         (True, False) -> do
-            logInfo "Forcing binary upgrade"
+            prettyInfoS "Forcing binary upgrade"
             return True
         (_, True) -> do
-            logInfo "Newer version detected, downloading"
+            prettyInfoS "Newer version detected, downloading"
             return True
     when toUpgrade $ do
         config <- view configL
@@ -191,16 +196,17 @@ sourceUpgrade gConfigMonoid mresolver builtHash (SourceOpts gitRepo) =
             [] -> throwString $ "No commits found for branch " ++ branch ++ " on repo " ++ repo
             x:_ -> return x
         when (isNothing builtHash) $
-            logWarn $ "Information about the commit this version of stack was "
+            prettyWarnS $
+                       "Information about the commit this version of stack was "
                     <> "built from is not available due to how it was built. "
                     <> "Will continue by assuming an upgrade is needed "
                     <> "because we have no information to the contrary."
         if builtHash == Just latestCommit
             then do
-                logInfo "Already up-to-date, no upgrade required"
+                prettyInfoS "Already up-to-date, no upgrade required"
                 return Nothing
             else do
-                logInfo "Cloning stack"
+                prettyInfoS "Cloning stack"
                 -- NOTE: "--recursive" was added after v1.0.0 (and before the
                 -- next release).  This means that we can't use submodules in
                 -- the stack repo until we're comfortable with "stack upgrade
@@ -221,7 +227,7 @@ sourceUpgrade gConfigMonoid mresolver builtHash (SourceOpts gitRepo) =
         let version = Data.List.maximum versions
         if version <= fromCabalVersion (mkVersion' Paths.version)
             then do
-                logInfo "Already at latest version, no upgrade required"
+                prettyInfoS "Already at latest version, no upgrade required"
                 return Nothing
             else do
                 let ident = PackageIdentifier $(mkPackageName "stack") version
