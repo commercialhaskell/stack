@@ -4,10 +4,10 @@
 module Stack.ArgsSpec where
 
 import Control.Monad
+import Data.Attoparsec.Args (EscapingMode(..), parseArgsFromString)
 import Data.Attoparsec.Interpreter (interpreterArgsParser)
 import qualified Data.Attoparsec.Text as P
 import Data.Text (pack)
-import Options.Applicative.Args
 import Stack.Constants (stackProgName)
 import Stack.Prelude
 import Test.Hspec
@@ -21,7 +21,7 @@ spec = do
 
 argsSpec :: Spec
 argsSpec = forM_ argsInputOutput
-    (\(input,output) -> it input (parseArgsFromString input == output))
+    (\(input,output) -> it input (parseArgsFromString Escaping input == output))
 
 -- | Fairly comprehensive checks.
 argsInputOutput :: [(String, Either String [String])]
