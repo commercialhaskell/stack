@@ -93,7 +93,7 @@ import              Stack.Types.PackageName
 import              Stack.Types.Runner
 import              Stack.Types.Version
 import qualified    System.Directory as D
-import              System.Environment (getExecutablePath)
+import              System.Environment (getExecutablePath, lookupEnv)
 import              System.Exit (ExitCode (..), exitFailure)
 import              System.IO (hFlush, stdout)
 import              System.IO.Error (isPermissionError)
@@ -292,6 +292,8 @@ setupEnv mResolveMissingGHC = do
 
     utf8EnvVars <- getUtf8EnvVars menv compilerVer
 
+    mGhcRtsEnvVar <- liftIO $ lookupEnv "GHCRTS"
+
     envRef <- liftIO $ newIORef Map.empty
     let getEnvOverride' es = do
             m <- readIORef envRef
@@ -318,6 +320,11 @@ setupEnv mResolveMissingGHC = do
                             (False, Platform Cabal.X86_64 Cabal.Windows)
                                 -> Map.insert "MSYSTEM" "MINGW64"
                             _   -> id
+
+                        -- See https://github.com/commercialhaskell/stack/issues/3444
+                        $ case (esKeepGhcRts es, mGhcRtsEnvVar) of
+                            (True, Just ghcRts) -> Map.insert "GHCRTS" (T.pack ghcRts)
+                            _ -> id
 
                         -- For reasoning and duplication, see: https://github.com/fpco/stack/issues/70
                         $ Map.insert "HASKELL_PACKAGE_SANDBOX" (T.pack $ toFilePathNoTrailingSep deps)
@@ -1200,7 +1207,13 @@ bootGhcjs ghcjsVersion stackYaml destDir bootOpts = do
                     "See this issue: https://github.com/ghcjs/ghcjs/issues/470"
                 return True
             | otherwise -> return False
-    let envSettings = defaultEnvSettings { esIncludeGhcPackagePath = False }
+    let envSettings = EnvSettings
+          { esIncludeLocals = True
+          , esIncludeGhcPackagePath = False
+          , esStackExe = True
+          , esLocaleUtf8 = True
+          , esKeepGhcRts = False
+          }
     menv' <- liftIO $ configEnvOverride (view configL envConfig) envSettings
     shouldInstallAlex <- not <$> doesExecutableExist menv "alex"
     shouldInstallHappy <- not <$> doesExecutableExist menv "happy"
@@ -1580,7 +1593,9 @@ removeHaskellEnvVars =
     Map.delete "HASKELL_PACKAGE_SANDBOXES" .
     Map.delete "HASKELL_DIST_DIR" .
     -- https://github.com/commercialhaskell/stack/issues/1460
-    Map.delete "DESTDIR"
+    Map.delete "DESTDIR" .
+    -- https://github.com/commercialhaskell/stack/issues/3444
+    Map.delete "GHCRTS"
 
 -- | Get map of environment variables to set to change the GHC's encoding to UTF-8
 getUtf8EnvVars
