@@ -283,7 +283,8 @@ configFromConfigMonoid
          configExtraIncludeDirs = configMonoidExtraIncludeDirs
          configExtraLibDirs = configMonoidExtraLibDirs
          configOverrideGccPath = getFirst configMonoidOverrideGccPath
-
+         configOverrideHpack = maybe HpackBundled HpackCommand $ getFirst configMonoidOverrideHpack
+         
          -- Only place in the codebase where platform is hard-coded. In theory
          -- in the future, allow it to be configured.
          (Platform defArch defOS) = buildPlatform

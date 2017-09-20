@@ -490,7 +490,7 @@ getResolverConstraints menv mcompilerVersion stackYaml sd = do
 -- file.
 -- Subdirectories can be included depending on the @recurse@ parameter.
 findCabalFiles
-  :: (MonadIO m, MonadLogger m, HasRunner env, MonadReader env m)
+  :: (MonadIO m, MonadUnliftIO m, MonadLogger m, HasRunner env, MonadReader env m, HasConfig env)
   => Bool -> Path Abs Dir -> m [Path Abs File]
 findCabalFiles recurse dir = do
     liftIO (findFiles dir isHpack subdirFilter) >>= mapM_ (hpack . parent)
@@ -586,8 +586,8 @@ formatGroup :: [String] -> String
 formatGroup = concatMap (\path -> "- " <> path <> "\n")
 
 reportMissingCabalFiles
-  :: (MonadIO m, MonadThrow m, MonadLogger m,
-      HasRunner env, MonadReader env m)
+  :: (MonadIO m, MonadUnliftIO m, MonadThrow m, MonadLogger m,
+      HasRunner env, MonadReader env m, HasConfig env)
   => [Path Abs File]   -- ^ Directories to scan
   -> Bool              -- ^ Whether to scan sub-directories
   -> m ()

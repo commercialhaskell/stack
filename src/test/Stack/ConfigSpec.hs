@@ -48,6 +48,12 @@ buildOptsConfig =
   "  reconfigure: true\n" ++
   "  cabal-verbose: true\n"
 
+hpackConfig :: String
+hpackConfig =
+  "resolver: lts-2.10\n" ++
+  "with-hpack: /usr/local/bin/hpack\n" ++
+  "packages: ['.']\n"
+
 stackDotYaml :: Path Rel File
 stackDotYaml = $(mkRelFile "stack.yaml")
 
@@ -87,6 +93,18 @@ spec = beforeAll setup $ do
       writeFile (toFilePath stackDotYaml) ""
       -- TODO(danburton): more specific test for exception
       loadConfig' (const (return ())) `shouldThrow` anyException
+
+    it "parses config option with-hpack" $ inTempDir $ do
+      writeFile (toFilePath stackDotYaml) hpackConfig
+      loadConfig' $ \lc -> do
+        let Config{..} = lcConfig lc
+        configOverrideHpack `shouldBe` HpackCommand "/usr/local/bin/hpack"
+
+    it "parses config bundled hpack" $ inTempDir $ do
+      writeFile (toFilePath stackDotYaml) sampleConfig
+      loadConfig' $ \lc -> do
+        let Config{..} = lcConfig lc
+        configOverrideHpack `shouldBe` HpackBundled
 
     it "parses build config options" $ inTempDir $ do
      writeFile (toFilePath stackDotYaml) buildOptsConfig
