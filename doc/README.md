@@ -53,7 +53,7 @@ the needed files to start a project correctly.
 - The `stack build` command will build the minimal project.
 - `stack exec my-project-exe` will execute the command.
 - If you just want to install an executable using stack, then all you have to do
-is`stack install <package-name>`.
+is `stack install <package-name>`.
 
 If you want to launch a REPL:
 
@@ -116,7 +116,10 @@ installed.
 4. Once `stack` finishes building, check the stack version with
    `stack exec stack -- --version`. Make sure the version is the latest.
 5. Look for issues tagged with
-   [`newcomer` and `awaiting-pr` labels](https://github.com/commercialhaskell/stack/issues?q=is%3Aopen+is%3Aissue+label%3Anewcomer+label%3A%22awaiting+pr%22).
+   [newcomer friendly](https://github.com/commercialhaskell/stack/issues?q=is%3Aopen+is%3Aissue+label%3a%22newcomer+friendly%22)
+   and
+   [awaiting pull request](https://github.com/commercialhaskell/stack/issues?q=is%3Aopen+is%3Aissue+label%3A%22awaiting+pull+request%22)
+   labels.
 
 Build from source as a one-liner:
 
@@ -173,4 +176,4 @@ commercial Haskell users, and has since become a thriving open source
 project meeting the needs of Haskell users of all stripes.
 
 If you'd like to get involved with Stack, check out the
-[newcomers label on the Github issue tracker](https://github.com/commercialhaskell/stack/issues?q=is%3Aopen+is%3Aissue+label%3Anewcomer).
+[newcomer friendly](https://github.com/commercialhaskell/stack/issues?q=is%3Aopen+is%3Aissue+label%3a%22newcomer+friendly%22) label on the Github issue tracker.
