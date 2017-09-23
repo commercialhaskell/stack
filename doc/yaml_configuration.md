@@ -460,6 +460,14 @@ Specify a path to gcc explicitly, rather than relying on the normal path resolut
 with-gcc: /usr/local/bin/gcc-5
 ```
 
+### with-hpack
+
+Use an Hpack executable, rather than using the bundled Hpack.
+
+```yaml
+with-hpack: /usr/local/bin/hpack
+```
+
 ### compiler-check
 
 (Since 0.1.4)

@@ -51,6 +51,9 @@ Behavior changes:
 
 Other enhancements:
 
+* The `with-hpack` configuration option specifies an Hpack executable to use
+  instead of the Hpack bundled with Stack. Please
+  see [#3179](https://github.com/commercialhaskell/stack/issues/3179).
 * It's now possible to skip tests and benchmarks using `--skip`
   flag
 * `GitSHA1` is now `StaticSHA256` and is implemented using the `StaticSize 64 ByteString` for improved performance.
