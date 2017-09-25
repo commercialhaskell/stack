@@ -23,7 +23,7 @@ scriptOptsParser :: Parser ScriptOpts
 scriptOptsParser = ScriptOpts
     <$> many (strOption (long "package" <> help "Additional packages that must be installed"))
     <*> strArgument (metavar "FILE" <> completer (fileExtCompleter [".hs", ".lhs"]))
-    <*> many (strArgument (metavar "-- ARGS (e.g. stack ghc -- X.hs -o x)"))
+    <*> many (strArgument (metavar "-- ARGS (e.g. stack script X.hs -- args to program)"))
     <*> (flag' SECompile
             ( long "compile"
            <> help "Compile the script without optimization and run the executable"
