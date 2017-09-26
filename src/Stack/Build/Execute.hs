@@ -1353,8 +1353,9 @@ singleBuild runInBase ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} in
         preBuildTime <- modTime <$> liftIO getCurrentTime
         let postBuildCheck _succeeded = do
                 mlocalWarnings <- case taskType of
-                    TTFiles lp Local | lpWanted lp -> do -- FIXME is lpWanted correct here?
+                    TTFiles lp Local -> do
                         warnings <- checkForUnlistedFiles taskType preBuildTime pkgDir
+                        -- TODO: Perhaps only emit these warnings for non extra-dep?
                         return (Just (lpCabalFile lp, warnings))
                     _ -> return Nothing
                 -- NOTE: once
