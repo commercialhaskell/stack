@@ -383,7 +383,7 @@ checkBuildCache oldCache files = do
     go fp _ _ | takeFileName fp == "cabal_macros.h" = return (Set.empty, Map.empty)
     -- Common case where it's in the cache and on the filesystem.
     go fp (Just modTime') (Just fci)
-        | fciModTime fci == modTime' = return (Set.empty, Map.empty)
+        | fciModTime fci == modTime' = return (Set.empty, Map.singleton fp fci)
         | otherwise = do
             newFci <- calcFci modTime' fp
             let isDirty =
