@@ -217,7 +217,7 @@ constructPlan ls0 baseConfigOpts0 locals extraToBuild0 localDumpPkgs loadPackage
         else do
             planDebug $ show errs
             stackYaml <- view stackYamlL
-            prettyError $ pprintExceptions errs stackYaml parents (wanted ctx)
+            prettyErrorNoIndent $ pprintExceptions errs stackYaml parents (wanted ctx)
             throwM $ ConstructPlanFailed "Plan construction failed."
   where
     mkCtx econfig getVersions0 lp = Ctx
@@ -903,17 +903,28 @@ pprintExceptions
     -> Set PackageName
     -> AnsiDoc
 pprintExceptions exceptions stackYaml parentMap wanted =
-    "While constructing the build plan, the following exceptions were encountered:" <> line <> line <>
-    mconcat (intersperse (line <> line) (mapMaybe pprintException exceptions')) <> line <>
-    if Map.null extras then "" else
-        line <>
-        "Recommended action: try adding the following to your extra-deps in" <+>
-        toAnsiDoc (display stackYaml) <> ":" <>
-        line <>
-        vsep (map pprintExtra (Map.toList extras)) <>
-        line <>
-        line <>
-        "You may also want to try the 'stack solver' command"
+    mconcat $
+      [ flow "While constructing the build plan, the following exceptions were encountered:"
+      , line <> line
+      , mconcat (intersperse (line <> line) (mapMaybe pprintException exceptions'))
+      , line <> line
+      , flow "Some potential ways to resolve this:"
+      , line <> line
+      ] ++
+      (if Map.null extras then [] else
+         [ "  *" <+> align
+           (flow "Recommended action: try adding the following to your extra-deps in" <+>
+            toAnsiDoc (display stackYaml) <> ":")
+         , line <> line
+         , vsep (map pprintExtra (Map.toList extras))
+         , line <> line
+         ]
+      ) ++
+      [ "  *" <+> align (flow "Pass --allow-newer to ignore all version constraints and build anyway.")
+      , line <> line
+      , "  *" <+> align (flow "You may also want to try using the 'stack solver' command.")
+      , line
+      ]
   where
     exceptions' = nubOrd exceptions
 
@@ -923,7 +934,10 @@ pprintExceptions exceptions stackYaml parentMap wanted =
     getExtras (DependencyPlanFailures _ m) =
        Map.unions $ map go $ Map.toList m
      where
+       -- TODO: Likely a good idea to distinguish these to the user.  In particular, for DependencyMismatch
        go (name, (_range, Just version, NotInBuildPlan)) =
+           Map.singleton name version
+       go (name, (_range, Just version, DependencyMismatch{})) =
            Map.singleton name version
        go _ = Map.empty
     pprintExtra (name, version) =
@@ -935,32 +949,33 @@ pprintExceptions exceptions stackYaml parentMap wanted =
     toNotInBuildPlan _ = []
 
     pprintException (DependencyCycleDetected pNames) = Just $
-        "Dependency cycle detected in packages:" <> line <>
+        flow "Dependency cycle detected in packages:" <> line <>
         indent 4 (encloseSep "[" "]" "," (map (styleError . display) pNames))
     pprintException (DependencyPlanFailures pkg pDeps) =
         case mapMaybe pprintDep (Map.toList pDeps) of
             [] -> Nothing
             depErrors -> Just $
-                "In the dependencies for" <+> pkgIdent <>
+                flow "In the dependencies for" <+> pkgIdent <>
                 pprintFlags (packageFlags pkg) <> ":" <> line <>
                 indent 4 (vsep depErrors) <>
                 case getShortestDepsPath parentMap wanted (packageName pkg) of
-                    Nothing -> line <> "needed for unknown reason - stack invariant violated."
-                    Just [] -> line <> "needed since" <+> pkgIdent <+> "is a build target."
-                    Just (target:path) -> line <> "needed due to " <> encloseSep "" "" " -> " pathElems
+                    Nothing -> line <> flow "needed for unknown reason - stack invariant violated."
+                    Just [] -> line <> flow "needed since" <+> pkgName <+> flow "is a build target."
+                    Just (target:path) -> line <> flow "needed due to " <> encloseSep "" "" " -> " pathElems
                       where
                         pathElems =
                             [styleTarget . display $ target] ++
                             map display path ++
                             [pkgIdent]
               where
+                pkgName = styleCurrent . display $ packageName pkg
                 pkgIdent = styleCurrent . display $ packageIdentifier pkg
     -- Skip these when they are redundant with 'NotInBuildPlan' info.
     pprintException (UnknownPackage name)
         | name `Set.member` allNotInBuildPlan = Nothing
         | name `HashSet.member` wiredInPackages =
-            Just $ "Can't build a package with same name as a wired-in-package:" <+> (styleCurrent . display $ name)
-        | otherwise = Just $ "Unknown package:" <+> (styleCurrent . display $ name)
+            Just $ flow "Can't build a package with same name as a wired-in-package:" <+> (styleCurrent . display $ name)
+        | otherwise = Just $ flow "Unknown package:" <+> (styleCurrent . display $ name)
 
     pprintFlags flags
         | Map.null flags = ""
@@ -971,13 +986,13 @@ pprintExceptions exceptions stackYaml parentMap wanted =
     pprintDep (name, (range, mlatestApplicable, badDep)) = case badDep of
         NotInBuildPlan -> Just $
             styleError (display name) <+>
-            align ("must match" <+> goodRange <> "," <> softline <>
-                   "but the stack configuration has no specified version" <>
+            align (flow "must match" <+> goodRange <> "," <> softline <>
+                   flow "but the stack configuration has no specified version" <>
                    latestApplicable Nothing)
         -- TODO: For local packages, suggest editing constraints
         DependencyMismatch version -> Just $
             (styleError . display) (PackageIdentifier name version) <+>
-            align ("must match" <+> goodRange <>
+            align (flow "from stack configuration does not match" <+> goodRange <>
                    latestApplicable (Just version))
         -- I think the main useful info is these explain why missing
         -- packages are needed. Instead lets give the user the shortest
@@ -990,9 +1005,9 @@ pprintExceptions exceptions stackYaml parentMap wanted =
                 Nothing -> ""
                 Just la
                     | mlatestApplicable == mversion -> softline <>
-                        "(latest applicable is specified)"
+                        flow "(latest matching version is specified)"
                     | otherwise -> softline <>
-                        "(latest applicable is " <> styleGood (display la) <> ")"
+                        flow "(latest matching version is" <+> styleGood (display la) <> ")"
 
 -- | Get the shortest reason for the package to be in the build plan. In
 -- other words, trace the parent dependencies back to a 'wanted'
