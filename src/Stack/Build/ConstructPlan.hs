@@ -920,7 +920,7 @@ pprintExceptions exceptions stackYaml parentMap wanted =
          , line <> line
          ]
       ) ++
-      [ "  *" <+> align (flow "Pass --allow-newer to ignore all version constraints and build anyway.")
+      [ "  *" <+> align (flow "Set 'allow-newer: true' to ignore all version constraints and build anyway.")
       , line <> line
       , "  *" <+> align (flow "You may also want to try using the 'stack solver' command.")
       , line
