@@ -434,15 +434,23 @@ checkBundleResolver whichCmd stackYaml initOpts bundle sd = do
     result <- checkSnapBuildPlan (parent stackYaml) gpds Nothing sd
     case result of
         BuildPlanCheckOk f -> return $ Right (f, Map.empty)
-        BuildPlanCheckPartial f e
-            | needSolver resolver initOpts -> do
-                warnPartial result
-                solve f
-            | omitPackages initOpts -> do
-                warnPartial result
-                logWarn "*** Omitting packages with unsatisfied dependencies"
-                return $ Left $ failedUserPkgs e
-            | otherwise -> throwM $ ResolverPartial whichCmd (sdResolverName sd) (show result)
+        BuildPlanCheckPartial f e -> do
+            shouldUseSolver <- case (resolver, initOpts) of
+                (_, InitOpts { useSolver = True }) -> return True
+                (ResolverCompiler _, _) -> do
+                    logInfo "Using solver because a compiler resolver was specified."
+                    return True
+                _ -> return False
+            if shouldUseSolver
+                then do
+                    warnPartial result
+                    solve f
+                else if omitPackages initOpts
+                    then do
+                        warnPartial result
+                        logWarn "*** Omitting packages with unsatisfied dependencies"
+                        return $ Left $ failedUserPkgs e
+                    else throwM $ ResolverPartial whichCmd (sdResolverName sd) (show result)
         BuildPlanCheckFail _ e _
             | omitPackages initOpts -> do
                 logWarn $ "*** Resolver compiler mismatch: "
@@ -507,10 +515,6 @@ checkBundleResolver whichCmd stackYaml initOpts bundle sd = do
           , "        - Add extra dependencies to guide solver.\n"
           , "    - Update external packages with 'stack update' and try again.\n"
           ]
-
-      needSolver _ InitOpts {useSolver = True} = True
-      needSolver (ResolverCompiler _)  _ = True
-      needSolver _ _ = False
 
 getRecommendedSnapshots :: Snapshots -> NonEmpty SnapName
 getRecommendedSnapshots snapshots =
