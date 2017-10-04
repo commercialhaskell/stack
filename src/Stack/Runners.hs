@@ -128,6 +128,8 @@ withBuildConfigAndLock
 withBuildConfigAndLock go inner =
     withBuildConfigExt False go Nothing inner Nothing
 
+-- | See issue #2010 for why this exists. Currently just used for the
+-- specific case of "stack clean --full".
 withBuildConfigAndLockNoDocker
     :: GlobalOpts
     -> (Maybe FileLock -> RIO EnvConfig ())
@@ -177,7 +179,7 @@ withBuildConfigExt skipDocker go@GlobalOpts{..} mbefore inner mafter = loadConfi
       if skipDocker
           then runRIO (lcConfig lc) $ do
               forM_ mbefore id
-              liftIO $ inner'' lk0
+              Nix.reexecWithOptionalShell (lcProjectRoot lc) getCompilerVersion (inner'' lk0)
               forM_ mafter id
           else runRIO (lcConfig lc) $
               Docker.reexecWithOptionalContainer
