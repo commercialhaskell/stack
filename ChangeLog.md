@@ -72,8 +72,6 @@ Other enhancements:
   assist with the user experience when the `PATH` environment variable
   has not been properly configured, see
   [#3232](https://github.com/commercialhaskell/stack/issues/3232).
-* Introduce the `Stack.StaticBytes` module for more efficiently
-  holding statically-known byte sizes.
 * `stack setup` for ghcjs will now install `alex` and `happy` if
   they are not present.  See
   [#3109](https://github.com/commercialhaskell/stack/issues/3232).
