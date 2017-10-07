@@ -1410,7 +1410,7 @@ singleBuild runInBase ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} in
                              "found on PATH (use 'stack install hscolour' to install).")
                         return ["--hyperlink-source" | hscolourExists]
             cabal KeepTHLoading $ concat
-                [ ["haddock", "--html", "--html-location=../$pkg-$version/"]
+                [ ["haddock", "--html", "--hoogle", "--html-location=../$pkg-$version/"]
                 , sourceFlag
                 , ["--internal" | boptsHaddockInternal eeBuildOpts]
                 , [ "--haddock-option=" <> opt
