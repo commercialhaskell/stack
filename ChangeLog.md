@@ -103,6 +103,8 @@ Other enhancements:
 
 Bug fixes:
 
+* `stack hoogle` correctly generates Hoogle databases. See:
+  [#3362](https://github.com/commercialhaskell/stack/issues/3362)
 * `stack --docker-help` is now clearer about --docker implying
    system-ghc: true, rather than both --docker and --no-docker.
 * `stack haddock` now includes package names for all modules in the
