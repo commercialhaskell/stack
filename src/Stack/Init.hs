@@ -360,8 +360,7 @@ getDefaultResolver whichCmd stackYaml initOpts mresolver bundle = do
         selectSnapResolver = do
             let gpds = Map.elems (fmap snd bundle)
             snaps <- fmap getRecommendedSnapshots getSnapshots'
-            sds <- mapM (loadResolver . ResolverSnapshot) snaps
-            (s, r) <- selectBestSnapshot (parent stackYaml) gpds sds
+            (s, r) <- selectBestSnapshot (parent stackYaml) gpds snaps
             case r of
                 BuildPlanCheckFail {} | not (omitPackages initOpts)
                         -> throwM (NoMatchingSnapshot whichCmd snaps)

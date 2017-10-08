@@ -431,13 +431,13 @@ selectBestSnapshot
     :: (HasConfig env, HasGHCVariant env)
     => Path Abs Dir -- ^ project root, used for checking out necessary files
     -> [GenericPackageDescription]
-    -> NonEmpty SnapshotDef
+    -> NonEmpty SnapName
     -> RIO env (SnapshotDef, BuildPlanCheck)
 selectBestSnapshot root gpds snaps = do
     logInfo $ "Selecting the best among "
                <> T.pack (show (NonEmpty.length snaps))
                <> " snapshots...\n"
-    F.foldr1 go (NonEmpty.map getResult snaps)
+    F.foldr1 go (NonEmpty.map (getResult <=< loadResolver . ResolverSnapshot) snaps)
     where
         go mold mnew = do
             old@(_snap, bpc) <- mold
