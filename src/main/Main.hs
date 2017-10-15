@@ -105,7 +105,7 @@ import qualified Stack.Upload as Upload
 import qualified System.Directory as D
 import           System.Environment (getProgName, getArgs, withArgs)
 import           System.Exit
-import           System.FilePath (pathSeparator)
+import           System.FilePath (isRelative, isValid, pathSeparator)
 import           System.IO (hIsTerminalDevice, stderr, stdin, stdout, hSetBuffering, BufferMode(..), hPutStrLn, hGetEncoding, hSetEncoding)
 
 -- | Change the character encoding of the given Handle to transliterate
@@ -767,7 +767,8 @@ execCmd ExecOpts {..} go@GlobalOpts{..} =
                     (ExecRunGhc, args) ->
                         getGhcCmd "run" menv eoPackages args
                 munlockFile lk -- Unlock before transferring control away.
-                exec menv cmd args
+
+                runWithPath eoCwd $ exec menv cmd args
   where
       -- return the package-id of the first package in GHC_PACKAGE_PATH
       getPkgId menv wc name = do
@@ -787,6 +788,20 @@ execCmd ExecOpts {..} go@GlobalOpts{..} =
           wc <- view $ actualCompilerVersionL.whichCompilerL
           pkgopts <- getPkgOpts menv wc pkgs
           return (prefix ++ compilerExeName wc, pkgopts ++ args)
+
+      runWithPath path callback = case path of
+        Nothing -> callback
+        Just p | not (isValid p) -> callback
+        Just p                   ->
+          if isRelative p
+          then parseRelDir p >>= runInDirectory
+          else parseAbsDir p >>= runInDirectory
+          where
+            runInDirectory :: (Path t Dir) -> RIO EnvConfig ()
+            runInDirectory directory =
+              withUnliftIO $ \unlift ->
+                withCurrentDir directory $ unliftIO unlift callback
+
 
 -- | Evaluate some haskell code inline.
 evalCmd :: EvalOpts -> GlobalOpts -> IO ()

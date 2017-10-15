@@ -430,6 +430,7 @@ data ExecOptsExtra
         { eoEnvSettings :: !EnvSettings
         , eoPackages :: ![String]
         , eoRtsOptions :: ![String]
+        , eoCwd :: !(Maybe FilePath)
         }
     deriving (Show)
 
