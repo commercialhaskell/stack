@@ -387,7 +387,7 @@ GETDISTRO
   fi
 
   case "$DISTRO" in
-    ubuntu)
+    ubuntu|linuxmint)
       do_ubuntu_install "$VERSION"
       ;;
     debian|kali|raspbian)
