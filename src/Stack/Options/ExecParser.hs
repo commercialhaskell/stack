@@ -75,5 +75,7 @@ execOptsExtraParser = eoPlainParser <|>
     eoCwdParser :: Parser (Maybe FilePath)
     eoCwdParser = optional
                   (strOption (long "cwd"
-                             <> help "Sets the working directory before executing")
+                             <> help "Sets the working directory before executing"
+                             <> metavar "DIR"
+                             <> completer dirCompleter)
                   )

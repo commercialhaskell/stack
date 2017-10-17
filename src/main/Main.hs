@@ -105,7 +105,7 @@ import qualified Stack.Upload as Upload
 import qualified System.Directory as D
 import           System.Environment (getProgName, getArgs, withArgs)
 import           System.Exit
-import           System.FilePath (isRelative, isValid, pathSeparator)
+import           System.FilePath (isValid, pathSeparator)
 import           System.IO (hIsTerminalDevice, stderr, stdin, stdout, hSetBuffering, BufferMode(..), hPutStrLn, hGetEncoding, hSetEncoding)
 
 -- | Change the character encoding of the given Handle to transliterate
@@ -789,19 +789,11 @@ execCmd ExecOpts {..} go@GlobalOpts{..} =
           pkgopts <- getPkgOpts menv wc pkgs
           return (prefix ++ compilerExeName wc, pkgopts ++ args)
 
+      runWithPath :: Maybe FilePath -> RIO EnvConfig () -> RIO EnvConfig ()
       runWithPath path callback = case path of
-        Nothing -> callback
-        Just p | not (isValid p) -> callback
-        Just p                   ->
-          if isRelative p
-          then parseRelDir p >>= runInDirectory
-          else parseAbsDir p >>= runInDirectory
-          where
-            runInDirectory :: (Path t Dir) -> RIO EnvConfig ()
-            runInDirectory directory =
-              withUnliftIO $ \unlift ->
-                withCurrentDir directory $ unliftIO unlift callback
-
+        Nothing                  -> callback
+        Just p | not (isValid p) -> throwIO $ InvalidPathForExec p
+        Just p                   -> withUnliftIO $ \ul -> D.withCurrentDirectory p $ unliftIO ul callback
 
 -- | Evaluate some haskell code inline.
 evalCmd :: EvalOpts -> GlobalOpts -> IO ()
@@ -938,6 +930,7 @@ hpcReportCmd hropts go = withBuildConfig go $ generateHpcReportForTargets hropts
 
 data MainException = InvalidReExecVersion String String
                    | UpgradeCabalUnusable
+                   | InvalidPathForExec FilePath
      deriving (Typeable)
 instance Exception MainException
 instance Show MainException where
@@ -949,3 +942,7 @@ instance Show MainException where
         , "; found: "
         , actual]
     show UpgradeCabalUnusable = "--upgrade-cabal cannot be used when nix is activated"
+    show (InvalidPathForExec path) = concat
+        [ "Got an invalid --cwd argument for stack exec ("
+        , path
+        , ")"]
