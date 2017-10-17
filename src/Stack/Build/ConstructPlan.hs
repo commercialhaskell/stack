@@ -332,7 +332,7 @@ mkUnregisterLocal tasks dirtyReason localDumpPkgs sourceMap initialBuildSteps =
 -- step.
 addFinal :: LocalPackage -> Package -> Bool -> M ()
 addFinal lp package isAllInOne = do
-    depsRes <- addPackageDeps package
+    depsRes <- addPackageDeps False package
     res <- case depsRes of
         Left e -> return $ Left e
         Right (missing, present, _minLoc) -> do
@@ -402,10 +402,10 @@ addDep treatAsDep' name = do
                             return $ Right $ ADRFound loc installed
                         Just (PIOnlySource ps) -> do
                             tellExecutables ps
-                            installPackage name ps Nothing
+                            installPackage treatAsDep name ps Nothing
                         Just (PIBoth ps installed) -> do
                             tellExecutables ps
-                            installPackage name ps (Just installed)
+                            installPackage treatAsDep name ps (Just installed)
             updateLibMap name res
             return res
 
@@ -450,30 +450,30 @@ tellExecutablesPackage loc p = do
 
 -- | Given a 'PackageSource' and perhaps an 'Installed' value, adds
 -- build 'Task's for the package and its dependencies.
-installPackage
-    :: PackageName
-    -> PackageSource
-    -> Maybe Installed
-    -> M (Either ConstructPlanException AddDepRes)
-installPackage name ps minstalled = do
+installPackage :: Bool -- ^ is this being used by a dependency?
+               -> PackageName
+               -> PackageSource
+               -> Maybe Installed
+               -> M (Either ConstructPlanException AddDepRes)
+installPackage treatAsDep name ps minstalled = do
     ctx <- ask
     case ps of
         PSIndex _ flags ghcOptions pkgLoc -> do
             planDebug $ "installPackage: Doing all-in-one build for upstream package " ++ show name
             package <- liftIO $ loadPackage ctx (PLIndex pkgLoc) flags ghcOptions -- FIXME be more efficient! Get this from the LoadedPackageInfo!
-            resolveDepsAndInstall True ps package minstalled
+            resolveDepsAndInstall True treatAsDep ps package minstalled
         PSFiles lp _ ->
             case lpTestBench lp of
                 Nothing -> do
                     planDebug $ "installPackage: No test / bench component for " ++ show name ++ " so doing an all-in-one build."
-                    resolveDepsAndInstall True ps (lpPackage lp) minstalled
+                    resolveDepsAndInstall True treatAsDep ps (lpPackage lp) minstalled
                 Just tb -> do
                     -- Attempt to find a plan which performs an all-in-one
                     -- build.  Ignore the writer action + reset the state if
                     -- it fails.
                     s <- get
                     res <- pass $ do
-                        res <- addPackageDeps tb
+                        res <- addPackageDeps treatAsDep tb
                         let writerFunc w = case res of
                                 Left _ -> mempty
                                 _ -> w
@@ -494,7 +494,7 @@ installPackage name ps minstalled = do
                             put s
                             -- Otherwise, fall back on building the
                             -- tests / benchmarks in a separate step.
-                            res' <- resolveDepsAndInstall False ps (lpPackage lp) minstalled
+                            res' <- resolveDepsAndInstall False treatAsDep ps (lpPackage lp) minstalled
                             when (isRight res') $ do
                                 -- Insert it into the map so that it's
                                 -- available for addFinal.
@@ -503,12 +503,13 @@ installPackage name ps minstalled = do
                             return res'
 
 resolveDepsAndInstall :: Bool
+                      -> Bool
                       -> PackageSource
                       -> Package
                       -> Maybe Installed
                       -> M (Either ConstructPlanException AddDepRes)
-resolveDepsAndInstall isAllInOne ps package minstalled = do
-    res <- addPackageDeps package
+resolveDepsAndInstall isAllInOne treatAsDep ps package minstalled = do
+    res <- addPackageDeps treatAsDep package
     case res of
         Left err -> return $ Left err
         Right deps -> liftM Right $ installPackageGivenDeps isAllInOne ps package minstalled deps
@@ -586,12 +587,13 @@ addEllipsis t
 -- then the parent package must be installed locally. Otherwise, if it
 -- is 'Snap', then it can either be installed locally or in the
 -- snapshot.
-addPackageDeps :: Package -> M (Either ConstructPlanException (Set PackageIdentifier, Map PackageIdentifier GhcPkgId, InstallLocation))
-addPackageDeps package = do
+addPackageDeps :: Bool -- ^ is this being used by a dependency?
+               -> Package -> M (Either ConstructPlanException (Set PackageIdentifier, Map PackageIdentifier GhcPkgId, InstallLocation))
+addPackageDeps treatAsDep package = do
     ctx <- ask
     deps' <- packageDepsWithTools package
     deps <- forM (Map.toList deps') $ \(depname, range) -> do
-        eres <- addDep True depname
+        eres <- addDep treatAsDep depname
         let getLatestApplicable = do
                 vs <- liftIO $ getVersions ctx depname
                 return (latestApplicableVersion range vs)
