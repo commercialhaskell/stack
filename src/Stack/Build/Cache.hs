@@ -34,6 +34,7 @@ module Stack.Build.Cache
 
 import           Stack.Prelude
 import           Crypto.Hash (hashWith, SHA256(..))
+import           Control.Monad.Trans.Maybe
 import qualified Data.ByteArray as Mem (convert)
 import qualified Data.ByteString.Base64.URL as B64URL
 import qualified Data.ByteString as B
@@ -55,6 +56,7 @@ import           Stack.Types.GhcPkgId
 import           Stack.Types.Package
 import           Stack.Types.PackageIdentifier
 import           Stack.Types.Version
+import qualified System.FilePath as FP
 
 -- | Directory containing files to mark an executable as installed
 exeInstalledDir :: (MonadReader env m, HasEnvConfig env, MonadThrow m)
@@ -313,11 +315,27 @@ writePrecompiledCache baseConfigOpts loc copts depIDs mghcPkgId exes = do
 
 -- | Check the cache for a precompiled package matching the given
 -- configuration.
-readPrecompiledCache :: (MonadThrow m, MonadReader env m, HasEnvConfig env, MonadUnliftIO m, MonadLogger m)
+readPrecompiledCache :: forall env. HasEnvConfig env
                      => PackageLocationIndex FilePath -- ^ target package
                      -> ConfigureOpts
                      -> Set GhcPkgId -- ^ dependencies
-                     -> m (Maybe PrecompiledCache)
-readPrecompiledCache loc copts depIDs =
-    precompiledCacheFile loc copts depIDs >>=
-    maybe (return Nothing) $(versionedDecodeFile precompiledCacheVC)
+                     -> RIO env (Maybe PrecompiledCache)
+readPrecompiledCache loc copts depIDs = runMaybeT $
+    MaybeT (precompiledCacheFile loc copts depIDs) >>=
+    MaybeT . $(versionedDecodeFile precompiledCacheVC) >>=
+    lift . mkAbs
+  where
+    -- Since commit ed9ccc08f327bad68dd2d09a1851ce0d055c0422,
+    -- pcLibrary paths are stored as relative to the stack
+    -- root. Therefore, we need to prepend the stack root when
+    -- checking that the file exists. For the older cached paths, the
+    -- file will contain an absolute path, which will make `stackRoot
+    -- </>` a no-op.
+    mkAbs :: PrecompiledCache -> RIO env PrecompiledCache
+    mkAbs pc0 = do
+      stackRoot <- view stackRootL
+      let mkAbs' = (toFilePath stackRoot FP.</>)
+      return PrecompiledCache
+        { pcLibrary = mkAbs' <$> pcLibrary pc0
+        , pcExes = mkAbs' <$> pcExes pc0
+        }
