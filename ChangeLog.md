@@ -100,6 +100,9 @@ Other enhancements:
 * When using Nix, nix-shell now depends always on gcc to prevent build errors
   when using the FFI. As ghc depends on gcc anyway, this doesn't increase the
   dependency footprint.
+* `--cwd DIR` can now be passed to `stack exec` in order to execute the
+  program in a different directory. See:
+  [#3264](https://github.com/commercialhaskell/stack/issues/3264)
 
 Bug fixes:
 
