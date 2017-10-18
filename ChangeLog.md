@@ -148,6 +148,8 @@ Bug fixes:
 * `stack build --only-dependencies` no longer builds local project packages
   that are depended on. See
   [#3476](https://github.com/commercialhaskell/stack/issues/3476).
+* Properly handle relative paths stored in the precompiled cache files. See
+  [#3431](https://github.com/commercialhaskell/stack/issues/3431).
 
 
 ## 1.5.1
