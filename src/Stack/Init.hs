@@ -430,7 +430,7 @@ checkBundleResolver
          (Either [PackageName] ( Map PackageName (Map FlagName Bool)
                                , Map PackageName Version))
 checkBundleResolver whichCmd stackYaml initOpts bundle sd = do
-    result <- checkSnapBuildPlan (parent stackYaml) gpds Nothing sd
+    result <- checkSnapBuildPlanActual (parent stackYaml) gpds Nothing sd
     case result of
         BuildPlanCheckOk f -> return $ Right (f, Map.empty)
         BuildPlanCheckPartial f e -> do
