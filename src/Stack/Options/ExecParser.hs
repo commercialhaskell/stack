@@ -43,6 +43,7 @@ execOptsExtraParser = eoPlainParser <|>
                          <$> eoEnvSettingsParser
                          <*> eoPackagesParser
                          <*> eoRtsOptionsParser
+                         <*> eoCwdParser
   where
     eoEnvSettingsParser :: Parser EnvSettings
     eoEnvSettingsParser = EnvSettings
@@ -70,3 +71,11 @@ execOptsExtraParser = eoPlainParser <|>
     eoPlainParser = flag' ExecOptsPlain
                           (long "plain" <>
                            help "Use an unmodified environment (only useful with Docker)")
+
+    eoCwdParser :: Parser (Maybe FilePath)
+    eoCwdParser = optional
+                  (strOption (long "cwd"
+                             <> help "Sets the working directory before executing"
+                             <> metavar "DIR"
+                             <> completer dirCompleter)
+                  )
