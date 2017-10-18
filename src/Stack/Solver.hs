@@ -14,6 +14,7 @@ module Stack.Solver
     , mergeConstraints
     , solveExtraDeps
     , solveResolverSpec
+    , checkSnapBuildPlanActual
     -- * Internal - for tests
     , parseCabalOutputLine
     ) where
@@ -647,7 +648,7 @@ solveExtraDeps modStackYaml = do
         srcConstraints    = mergeConstraints oldSrcs oldSrcFlags
         extraConstraints  = mergeConstraints oldExtraVersions oldExtraFlags
 
-    resolverResult <- checkSnapBuildPlan (parent stackYaml) gpds (Just oldSrcFlags) sd
+    resolverResult <- checkSnapBuildPlanActual (parent stackYaml) gpds (Just oldSrcFlags) sd
     resultSpecs <- case resolverResult of
         BuildPlanCheckOk flags ->
             return $ Just (mergeConstraints oldSrcs flags, Map.empty)
@@ -752,6 +753,31 @@ solveExtraDeps modStackYaml = do
             , "        - Add extra dependencies to guide solver.\n"
             , "        - Adjust resolver.\n"
             ]
+
+-- | Same as 'checkSnapBuildPLan', but set up a real GHC if needed.
+--
+-- If we're using a Stackage snapshot, we can use the snapshot hints
+-- to determine global library information. This will not be available
+-- for custom and GHC resolvers, however. Therefore, we insist that it
+-- be installed first. Fortunately, the standard `stack solver`
+-- behavior only chooses Stackage snapshots, so the common case will
+-- not force the installation of a bunch of GHC versions.
+checkSnapBuildPlanActual
+    :: (HasConfig env, HasGHCVariant env)
+    => Path Abs Dir -- ^ project root, used for checking out necessary files
+    -> [C.GenericPackageDescription]
+    -> Maybe (Map PackageName (Map FlagName Bool))
+    -> SnapshotDef
+    -> RIO env BuildPlanCheck
+checkSnapBuildPlanActual root gpds flags sd = do
+    let forNonSnapshot = (Just . snd) <$> setupCabalEnv (sdWantedCompilerVersion sd)
+    mactualCompiler <-
+      case sdResolver sd of
+        ResolverSnapshot _ -> return Nothing
+        ResolverCompiler _ -> forNonSnapshot
+        ResolverCustom _ _ -> forNonSnapshot
+
+    checkSnapBuildPlan root gpds flags sd mactualCompiler
 
 prettyPath
     :: forall r t m. (MonadIO m, RelPath (Path r t) ~ Path Rel t, AnyPath (Path r t))
