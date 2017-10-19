@@ -189,3 +189,10 @@ isARM = arch == "arm"
 -- NOTE: currently using lts-8.22 instead of lts-8.0 because the `cyclic-test-deps` integration test is broken with lts-8.0 because a hackage metadata revision invalidated the snapshot (snapshot has `test-framework-quickcheck2-0.3.0.3` and `QuickCheck-2.9.2`, which used to be fine, but now test-framework-quickcheck2 was revised to have a `QuickCheck < 2.8` constraint).
 defaultResolverArg :: String
 defaultResolverArg = "--resolver=lts-8.22"
+
+-- | Remove a file and ignore any warnings about missing files.
+removeFileIgnore :: FilePath -> IO ()
+removeFileIgnore fp = removeFile fp `catch` \e ->
+  if isDoesNotExistError e
+    then return ()
+    else throwIO e
