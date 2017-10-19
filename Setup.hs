@@ -47,7 +47,7 @@ generateBuildModule verbosity pkg lbi = do
       where
         allInstPkgsIdx = installedPkgs lbi
         allInstPkgIds = map installedPackageId $ allPackages allInstPkgsIdx
-        -- instPkgIds includes `stack-X.X.X`, which is not a depedency hence is missing from allInstPkgsIdx. Filter that out.
+        -- instPkgIds includes `stack-X.X.X`, which is not a dependency hence is missing from allInstPkgsIdx. Filter that out.
         availInstPkgIds = filter (`elem` allInstPkgIds) $ testDeps xs ys
         handleDepClosureFailure unsatisfied =
           error $
