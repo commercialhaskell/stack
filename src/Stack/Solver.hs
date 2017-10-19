@@ -41,6 +41,7 @@ import qualified Data.Yaml as Yaml
 import qualified Distribution.Package as C
 import qualified Distribution.PackageDescription as C
 import qualified Distribution.Text as C
+import           Lens.Micro (set)
 import           Path
 import           Path.Find (findFiles)
 import           Path.IO hiding (findExecutable, findFiles, withSystemTempDir)
@@ -770,14 +771,20 @@ checkSnapBuildPlanActual
     -> SnapshotDef
     -> RIO env BuildPlanCheck
 checkSnapBuildPlanActual root gpds flags sd = do
-    let forNonSnapshot = (Just . snd) <$> setupCabalEnv (sdWantedCompilerVersion sd)
+    let forNonSnapshot = Just <$> setupCabalEnv (sdWantedCompilerVersion sd)
     mactualCompiler <-
       case sdResolver sd of
         ResolverSnapshot _ -> return Nothing
         ResolverCompiler _ -> forNonSnapshot
         ResolverCustom _ _ -> forNonSnapshot
 
-    checkSnapBuildPlan root gpds flags sd mactualCompiler
+    let inner = checkSnapBuildPlan root gpds flags sd
+    case mactualCompiler of
+      Nothing -> inner Nothing
+      Just (modifiedPath, actualCompiler) -> do
+        env0 <- ask
+        let env = set envOverrideL (const $ return modifiedPath) env0
+        runRIO env $ inner (Just actualCompiler)
 
 prettyPath
     :: forall r t m. (MonadIO m, RelPath (Path r t) ~ Path Rel t, AnyPath (Path r t))
