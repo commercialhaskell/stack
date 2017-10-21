@@ -44,9 +44,9 @@ discuss the change before plowing into writing code.
 
 If you'd like to help out but aren't sure what to work on, look for issues with
 the
-[awaiting pr](https://github.com/commercialhaskell/stack/issues?q=is%3Aopen+is%3Aissue+label%3A%22awaiting+pr%22)
+[awaiting pull request](https://github.com/commercialhaskell/stack/issues?q=is%3Aopen+is%3Aissue+label%3A%22awaiting+pull+request%22)
 label. Issues that are suitable for newcomers to the codebase have the
-[newcomer](https://github.com/commercialhaskell/stack/issues?q=is%3Aopen+is%3Aissue+label%3A%22awaiting+pr%22+label%3Anewcomer)
+[newcomer friendly](https://github.com/commercialhaskell/stack/issues?q=is%3Aopen+is%3Aissue+label%3A%22awaiting+pull+request%22+label%3a%22newcomer+friendly%22)
 label. Best to post a comment to the issue before you start work, in case anyone
 has already started.
 

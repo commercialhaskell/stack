@@ -436,11 +436,7 @@ such hardening flags by default which may be the cause of some instances of the
 problem. Therefore, a possible workaround might be to turn off PIE related
 flags.
 
-In Arch Linux, the support for this is provided by the `hardening-wrapper`
-package. Some possible workarounds:
-
-* Selectively disabling its PIE forcing by setting `HARDENING_PIE=0` in `/etc/hardening-wrapper.conf`.
-* Uninstalling the `hardening-wrapper` package and logging out then into your account again.
+On Arch Linux, installing the `ncurses5-compat-libs` package from AUR resolves [this issue](https://github.com/commercialhaskell/stack/issues/2712).
 
 If you manage to work around this in other distributions, please include instructions here.
 
