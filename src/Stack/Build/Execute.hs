@@ -787,11 +787,12 @@ ensureConfig :: HasEnvConfig env
              -> RIO env () -- ^ announce
              -> (ExcludeTHLoading -> [String] -> RIO env ()) -- ^ cabal
              -> Path Abs File -- ^ .cabal file
+             -> Task
              -> RIO env Bool
-ensureConfig newConfigCache pkgDir ExecuteEnv {..} announce cabal cabalfp = do
+ensureConfig newConfigCache pkgDir ExecuteEnv {..} announce cabal cabalfp task = do
     newCabalMod <- liftIO (fmap modTime (D.getModificationTime (toFilePath cabalfp)))
     needConfig <-
-        if boptsReconfigure eeBuildOpts
+        if boptsReconfigure eeBuildOpts || taskAnyMissing task
             then return True
             else do
                 -- We can ignore the components portion of the config
@@ -1305,7 +1306,7 @@ singleBuild runInBase ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} in
                       ("Building all executables for `" <> packageNameText (packageName package) <>
                        "' once. After a successful build of all of them, only specified executables will be rebuilt."))
 
-            _neededConfig <- ensureConfig cache pkgDir ee (announce ("configure" <> annSuffix executableBuildStatuses)) cabal cabalfp
+            _neededConfig <- ensureConfig cache pkgDir ee (announce ("configure" <> annSuffix executableBuildStatuses)) cabal cabalfp task
 
             let installedMapHasThisPkg :: Bool
                 installedMapHasThisPkg =

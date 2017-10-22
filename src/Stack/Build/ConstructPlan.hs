@@ -354,6 +354,7 @@ addFinal lp package isAllInOne = do
                 , taskType = TTFiles lp Local -- FIXME we can rely on this being Local, right?
                 , taskAllInOne = isAllInOne
                 , taskCachePkgSrc = CacheSrcLocal (toFilePath (lpDir lp))
+                , taskAnyMissing = not $ Set.null missing
                 }
     tell mempty { wFinals = Map.singleton (packageName package) res }
 
@@ -562,6 +563,7 @@ installPackageGivenDeps isAllInOne ps package minstalled (missing, present, minL
                     PSIndex loc _ _ pkgLoc -> TTIndex package (loc <> minLoc) pkgLoc
             , taskAllInOne = isAllInOne
             , taskCachePkgSrc = toCachePkgSrc ps
+            , taskAnyMissing = not $ Set.null missing
             }
 
 -- Update response in the lib map. If it is an error, and there's

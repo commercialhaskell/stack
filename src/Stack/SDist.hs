@@ -291,6 +291,7 @@ getSDistFileList lp =
         , taskPresent = Map.empty
         , taskAllInOne = True
         , taskCachePkgSrc = CacheSrcLocal (toFilePath (lpDir lp))
+        , taskAnyMissing = True
         }
 
 normalizeTarballPaths :: HasRunner env => [FilePath] -> RIO env [FilePath]
