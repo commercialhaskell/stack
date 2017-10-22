@@ -1,13 +1,13 @@
-resolver: nightly-2017-09-14
-image:
-  containers:
-    - base: "fpco/stack-base" # see ./etc/docker/stack-base/Dockerfile
-      name: "fpco/stack-test"
+resolver: nightly-2017-10-17
 nix:
   # --nix on the command-line to enable.
   enable: false
   packages:
     - zlib
     - http-client-tls-0.3.4
+flags:
+  mintty:
+    win32-2-5: false
 extra-deps:
 - bindings-uname-0.1
+- mintty-0.1.1

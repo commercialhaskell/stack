@@ -72,15 +72,6 @@ before_install:
 - travis_retry curl -L https://www.stackage.org/stack/linux-x86_64 | tar xz --wildcards --strip-components=1 -C ~/.local/bin '*/stack'
 ```
 
-Once Travis whitelists the stack .deb files, we'll be able to simply include
-stack in the `addons` section, and automatically use the newest version of
-stack, avoiding that complicated `before_install` section This is being
-tracked in the
-[apt-source-whitelist](https://github.com/travis-ci/apt-source-whitelist/pull/7)
-and
-[apt-package-whitelist](https://github.com/travis-ci/apt-package-whitelist/issues/379)
-issue trackers.
-
 ## Installing GHC
 
 There are two ways to install GHC:

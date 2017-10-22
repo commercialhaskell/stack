@@ -7,7 +7,9 @@ The purpose of this page is to collect information about issues that arise when
 users either have an existing cabal project or another nonstandard setup such
 as a private hackage database.
 
-## Using a Cabal File New users may be confused by the fact that you must add
+## Using a Cabal File
+
+New users may be confused by the fact that you must add
 dependencies to the package's cabal file, even in the case when you have
 already listed the package in the `stack.yaml`. In most cases, dependencies for
 your package that are in the Stackage snapshot need *only* be added to the
