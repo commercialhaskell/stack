@@ -24,9 +24,12 @@ run cmd args = do
     ec <- run' cmd args
     unless (ec == ExitSuccess) $ error $ "Exited with exit code: " ++ show ec
 
+stackExe :: IO String
+stackExe = getEnv "STACK_EXE"
+
 stack' :: [String] -> IO ExitCode
 stack' args = do
-    stackEnv <- getEnv "STACK_EXE"
+    stackEnv <- stackExe
     run' stackEnv args
 
 stack :: [String] -> IO ()
@@ -89,23 +92,37 @@ runRepl cmd args actions = do
 
 repl :: [String] -> Repl () -> IO ()
 repl args action = do
-    stackExe <- getEnv "STACK_EXE"
-    ec <- runRepl stackExe ("repl":args) action
+    stackExe' <- stackExe
+    ec <- runRepl stackExe' ("repl":args) action
     unless (ec == ExitSuccess) $ return ()
         -- TODO: Understand why the exit code is 1 despite running GHCi tests
         -- successfully.
         -- else error $ "Exited with exit code: " ++ show ec
 
+stackStderr :: [String] -> IO (ExitCode, String)
+stackStderr args = do
+    stackExe' <- stackExe
+    logInfo $ "Running: " ++ stackExe' ++ " " ++ unwords (map showProcessArgDebug args)
+    (ec, _, err) <- readProcessWithExitCode stackExe' args ""
+    hPutStr stderr err
+    return (ec, err)
+
 -- | Run stack with arguments and apply a check to the resulting
 -- stderr output if the process succeeded.
 stackCheckStderr :: [String] -> (String -> IO ()) -> IO ()
 stackCheckStderr args check = do
-    stackExe <- getEnv "STACK_EXE"
-    logInfo $ "Running: " ++ stackExe ++ " " ++ unwords (map showProcessArgDebug args)
-    (ec, _, err) <- readProcessWithExitCode stackExe args ""
-    hPutStr stderr err
+    (ec, err) <- stackStderr args
     if ec /= ExitSuccess
         then error $ "Exited with exit code: " ++ show ec
+        else check err
+
+-- | Same as 'stackCheckStderr', but ensures that the Stack process
+-- fails.
+stackErrStderr :: [String] -> (String -> IO ()) -> IO ()
+stackErrStderr args check = do
+    (ec, err) <- stackStderr args
+    if ec == ExitSuccess
+        then error "Stack process succeeded, but it shouldn't"
         else check err
 
 doesNotExist :: FilePath -> IO ()
