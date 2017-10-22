@@ -404,6 +404,17 @@ data Task = Task
     , taskAllInOne        :: !Bool
     -- ^ indicates that the package can be built in one step
     , taskCachePkgSrc     :: !CachePkgSrc
+    , taskAnyMissing      :: !Bool
+    -- ^ Were any of the dependencies missing? The reason this is
+    -- necessary is... hairy. And as you may expect, a bug in
+    -- Cabal. See:
+    -- <https://github.com/haskell/cabal/issues/4728#issuecomment-337937673>. The
+    -- problem is that Cabal may end up generating the same package ID
+    -- for a dependency, even if the ABI has changed. As a result,
+    -- without this field, Stack would think that a reconfigure is
+    -- unnecessary, when in fact we _do_ need to reconfigure. The
+    -- details here suck. We really need proper hashes for package
+    -- identifiers.
     }
     deriving Show
 

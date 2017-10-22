@@ -150,6 +150,11 @@ Bug fixes:
   [#3476](https://github.com/commercialhaskell/stack/issues/3476).
 * Properly handle relative paths stored in the precompiled cache files. See
   [#3431](https://github.com/commercialhaskell/stack/issues/3431).
+* In some cases, Cabal does not realize that it needs to reconfigure, and must
+  be told to do so automatically. This would manifest as a "shadowed
+  dependency" error message. We now force a reconfigure whenever a dependency is
+  built, even if the package ID remained the same. See
+  [#2781](https://github.com/commercialhaskell/stack/issues/2781).
 
 
 ## 1.5.1
