@@ -353,7 +353,7 @@ Other enhancements:
   ([#2986](https://github.com/commercialhaskell/stack/issues/2986))
 * `stack exec` now takes `--rts-options` which passes the given arguments inside of
   `+RTS ... args .. -RTS` to the executable. This works around stack itself consuming
-  the RTS flags on Windows. ([#2986](https://github.com/commercialhaskell/stack/issues/2640))
+  the RTS flags on Windows. ([#2640](https://github.com/commercialhaskell/stack/issues/2640))
 * Upgraded `http-client-tls` version, which now offers support for the
   `socks5://` and `socks5h://` values in the `http_proxy` and `https_proxy`
   environment variables.
