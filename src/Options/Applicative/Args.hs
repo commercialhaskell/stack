@@ -10,7 +10,6 @@ module Options.Applicative.Args
     where
 
 import           Data.Attoparsec.Args
-import qualified Data.Text as T
 import qualified Options.Applicative as O
 import           Stack.Prelude
 
