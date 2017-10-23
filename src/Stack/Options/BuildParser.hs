@@ -37,11 +37,12 @@ buildOptsParser cmd =
          ["-O0"]
          (long "fast" <>
           help "Turn off optimizations (-O0)") <*>
-     manyArgsOptions
-         (long "ghc-options" <>
-          metavar "OPTIONS" <>
-          completer ghcOptsCompleter <>
-          help "Additional options passed to GHC")) <*>
+     many
+         (textOption
+              (long "ghc-options" <>
+               metavar "OPTIONS" <>
+               completer ghcOptsCompleter <>
+               help "Additional options passed to GHC"))) <*>
     flagsParser <*>
     (flag'
          BSOnlyDependencies

@@ -1,13 +1,14 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 module Stack.Options.NixParser where
 
-import Options.Applicative
-import Options.Applicative.Args
-import Options.Applicative.Builder.Extra
-import Stack.Nix
-import Stack.Options.Utils
-import Stack.Prelude
-import Stack.Types.Nix
+import qualified Data.Text                         as T
+import           Options.Applicative
+import           Options.Applicative.Args
+import           Options.Applicative.Builder.Extra
+import           Stack.Nix
+import           Stack.Options.Utils
+import           Stack.Prelude
+import           Stack.Types.Nix
 
 nixOptsParser :: Bool -> Parser NixOptsMonoid
 nixOptsParser hide0 = overrideActivation <$>
@@ -55,3 +56,4 @@ nixOptsParser hide0 = overrideActivation <$>
       if fromFirst False (nixMonoidPureShell m)
         then m { nixMonoidEnable = (First . Just . fromFirst True) (nixMonoidEnable m) }
         else m
+    textArgsOption = fmap (map T.pack) . argsOption
