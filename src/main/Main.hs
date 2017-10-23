@@ -36,7 +36,7 @@ import           System.Process.Read
 import           Development.GitRev (gitCommitCount, gitHash)
 #endif
 import           Distribution.System (buildArch, buildPlatform)
-import           Distribution.Text (display)
+import qualified Distribution.Text as Cabal (display)
 import           Distribution.Version (mkVersion')
 import           GHC.IO.Encoding (mkTextEncoding, textEncodingName)
 import           Lens.Micro
@@ -88,8 +88,7 @@ import           Stack.Options.SolverParser
 import           Stack.Options.Utils
 import qualified Stack.PackageIndex
 import qualified Stack.Path
-import           Stack.PrettyPrint hiding (display)
-import qualified Stack.PrettyPrint as P
+import           Stack.PrettyPrint
 import           Stack.Runners
 import           Stack.Script
 import           Stack.SDist (getSDistTarball, checkSDistTarball, checkSDistTarball', SDistOpts(..))
@@ -129,7 +128,7 @@ versionString' = concat $ concat
       -- See https://github.com/commercialhaskell/stack/issues/792
     , [" (" ++ commitCount ++ " commits)" | commitCount /= ("1"::String) &&
                                           commitCount /= ("UNKNOWN" :: String)]
-    , [" ", display buildArch]
+    , [" ", Cabal.display buildArch]
     , [depsString]
     ]
   where
@@ -137,7 +136,7 @@ versionString' = concat $ concat
 #else
 versionString' =
     showVersion Meta.version
-    ++ ' ' : display buildArch
+    ++ ' ' : Cabal.display buildArch
     ++ depsString
   where
 #endif
@@ -663,9 +662,15 @@ uploadCmd sdistOpts go = do
             let invalidList = bulletedList $ map (styleFile . fromString) invalid
             prettyErrorL
                 [ styleShell "stack upload"
-                , flow "expects a list of sdist tarballs or cabal directories."
+                , flow "expects a list of sdist tarballs or package directories."
                 , flow "Can't find:"
                 , line <> invalidList
+                ]
+            liftIO exitFailure
+        when (null files && null dirs) $ do
+            prettyErrorL
+                [ styleShell "stack upload"
+                , flow "expects a list of sdist tarballs or package directories, but none were specified."
                 ]
             liftIO exitFailure
         config <- view configL
@@ -707,7 +712,19 @@ sdistCmd sdistOpts go =
     withBuildConfig go $ do -- No locking needed.
         -- If no directories are specified, build all sdist tarballs.
         dirs' <- if null (sdoptsDirsToWorkWith sdistOpts)
-            then liftM (map lpvRoot . Map.elems . lpProject) getLocalPackages
+            then do
+                dirs <- liftM (map lpvRoot . Map.elems . lpProject) getLocalPackages
+                when (null dirs) $ do
+                    stackYaml <- view stackYamlL
+                    prettyErrorL
+                        [ styleShell "stack sdist"
+                        , flow "expects a list of targets, and otherwise defaults to all of the project's packages."
+                        , flow "However, the configuration at"
+                        , display stackYaml
+                        , flow "contains no packages, so no sdist tarballs will be generated."
+                        ]
+                    liftIO exitFailure
+                return dirs
             else mapM resolveDir' (sdoptsDirsToWorkWith sdistOpts)
         forM_ dirs' $ \dir -> do
             (tarName, tarBytes, _mcabalRevision) <- getSDistTarball (sdoptsPvpBounds sdistOpts) dir
@@ -716,7 +733,7 @@ sdistCmd sdistOpts go =
             ensureDir (parent tarPath)
             liftIO $ L.writeFile (toFilePath tarPath) tarBytes
             checkSDistTarball sdistOpts tarPath
-            prettyInfoL [flow "Wrote sdist tarball to", P.display tarPath]
+            prettyInfoL [flow "Wrote sdist tarball to", display tarPath]
             when (sdoptsSign sdistOpts) (void $ Sig.sign (sdoptsSignServerUrl sdistOpts) tarPath)
 
 -- | Execute a command.
