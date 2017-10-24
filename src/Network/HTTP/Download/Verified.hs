@@ -30,7 +30,7 @@ import qualified    Data.Text.Encoding as Text
 import              Control.Monad
 import              Control.Monad.Catch (Handler (..)) -- would be nice if retry exported this itself
 import              Stack.Prelude hiding (Handler (..))
-import              Control.Retry (recovering,limitRetries,RetryPolicy,constantDelay)
+import              Control.Retry (recovering,limitRetries,RetryPolicy,constantDelay,RetryStatus(..))
 import              Crypto.Hash
 import              Crypto.Hash.Conduit (sinkHash)
 import              Data.ByteArray as Mem (convert)
@@ -179,21 +179,37 @@ hashChecksToZipSink :: MonadThrow m => Request -> [HashCheck] -> ZipSink ByteStr
 hashChecksToZipSink req = traverse_ (ZipSink . sinkCheckHash req)
 
 -- 'Control.Retry.recovering' customized for HTTP failures
-recoveringHttp :: MonadUnliftIO m
+recoveringHttp :: (MonadUnliftIO m, MonadLogger m)
                => RetryPolicy -> m a -> m a
 recoveringHttp retryPolicy =
 #if MIN_VERSION_retry(0,7,0)
-    helper $ recovering retryPolicy handlers . const
+    helper $ \run -> recovering retryPolicy (handlers run) . const
 #else
-    helper $ recovering retryPolicy handlers
+    helper $ \run -> recovering retryPolicy (handlers run)
 #endif
   where
-    helper wrapper action = withRunInIO $ \run -> wrapper (run action)
+    helper :: MonadUnliftIO m => (UnliftIO m -> IO a -> IO a) -> m a -> m a
+    helper wrapper action = withUnliftIO $ \run -> wrapper run (unliftIO run action)
 
-    handlers = [const $ Handler alwaysRetryHttp,const $ Handler retrySomeIO]
+    handlers :: MonadLogger m => UnliftIO m -> [RetryStatus -> Handler IO Bool]
+    handlers run = [Handler . alwaysRetryHttp (unliftIO run),const $ Handler retrySomeIO]
 
-    alwaysRetryHttp :: Monad m => HttpException -> m Bool
-    alwaysRetryHttp _ = return True
+    alwaysRetryHttp :: (MonadLogger m', Monad m) => (m' () -> m ()) -> RetryStatus -> HttpException -> m Bool
+    alwaysRetryHttp run rs e = do
+      run $ do
+        logWarn $ Text.unwords
+          [ "Retry number"
+          , Text.pack $ show (rsIterNumber rs)
+          , "after a total delay of"
+          , Text.pack $ show (rsCumulativeDelay rs)
+          , "us"
+          ]
+        logWarn $ Text.unwords
+          [ "If you see this warning and stack fails,"
+          , "but running the command again solves the problem,"
+          , "please report here: https://github.com/commercialhaskell/stack/issues/3510"
+          ]
+      return True
 
     retrySomeIO :: Monad m => IOException -> m Bool
     retrySomeIO e = return $ case ioe_type e of
@@ -215,7 +231,7 @@ recoveringHttp retryPolicy =
 -- Throws VerifiedDownloadException.
 -- Throws IOExceptions related to file system operations.
 -- Throws HttpException.
-verifiedDownload :: (MonadIO m, MonadLogger m)
+verifiedDownload :: (MonadUnliftIO m, MonadLogger m)
          => DownloadRequest
          -> Path Abs File -- ^ destination
          -> (Maybe Integer -> Sink ByteString IO ()) -- ^ custom hook to observe progress
@@ -224,12 +240,11 @@ verifiedDownload DownloadRequest{..} destpath progressSink = do
     let req = drRequest
     whenM' (liftIO getShouldDownload) $ do
         logDebug $ "Downloading " <> decodeUtf8With lenientDecode (path req)
-        liftIO $ do
-            createDirectoryIfMissing True dir
-            recoveringHttp drRetryPolicy $
-                withBinaryFile fptmp WriteMode $ \h ->
-                    httpSink req (go h)
-            renameFile fptmp fp
+        liftIO $ createDirectoryIfMissing True dir
+        recoveringHttp drRetryPolicy $ liftIO $ 
+            withBinaryFile fptmp WriteMode $ \h ->
+                httpSink req (go h)
+        liftIO $ renameFile fptmp fp
   where
     whenM' mp m = do
         p <- mp

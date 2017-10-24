@@ -43,7 +43,7 @@ import           System.FilePath             (takeDirectory, (<.>))
 -- appropriate destination.
 --
 -- Throws an exception if things go wrong
-download :: (MonadIO m, MonadLogger m)
+download :: (MonadUnliftIO m, MonadLogger m)
          => Request
          -> Path Abs File -- ^ destination
          -> m Bool -- ^ Was a downloaded performed (True) or did the file already exist (False)?
@@ -60,7 +60,7 @@ download req destpath = do
 -- | Same as 'download', but will download a file a second time if it is already present.
 --
 -- Returns 'True' if the file was downloaded, 'False' otherwise
-redownload :: (MonadIO m, MonadLogger m)
+redownload :: (MonadUnliftIO m, MonadLogger m)
            => Request
            -> Path Abs File -- ^ destination
            -> m Bool
@@ -86,7 +86,7 @@ redownload req0 dest = do
                         [("If-None-Match", L.toStrict etag)]
                     }
         req2 = req1 { checkResponse = \_ _ -> return () }
-    liftIO $ recoveringHttp drRetryPolicyDefault $
+    recoveringHttp drRetryPolicyDefault $ liftIO $
       withResponse req2 $ \res -> case getResponseStatusCode res of
         200 -> do
           createDirectoryIfMissing True $ takeDirectory destFilePath

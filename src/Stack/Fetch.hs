@@ -505,7 +505,7 @@ fetchPackages' mdistDir toFetchAll = do
 
     liftIO $ readTVarIO outputVar
   where
-    go :: (MonadIO m,MonadThrow m,MonadLogger m)
+    go :: (MonadUnliftIO m,MonadThrow m,MonadLogger m)
        => TVar (Map PackageIdentifier (Path Abs Dir))
        -> (m () -> IO ())
        -> (PackageIdentifier, ToFetch)
