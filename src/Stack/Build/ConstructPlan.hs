@@ -358,6 +358,13 @@ addFinal lp package isAllInOne = do
                 }
     tell mempty { wFinals = Map.singleton (packageName package) res }
 
+-- | Is this package being used as a library, or just as a build tool?
+-- If the former, we need to ensure that a library actually
+-- exists. See
+-- <https://github.com/commercialhaskell/stack/issues/2195>
+data DepType = AsLibrary | AsBuildTool
+  deriving (Show, Eq)
+
 -- | Given a 'PackageName', adds all of the build tasks to build the
 -- package, if needed.
 --
@@ -594,7 +601,7 @@ addPackageDeps :: Bool -- ^ is this being used by a dependency?
 addPackageDeps treatAsDep package = do
     ctx <- ask
     deps' <- packageDepsWithTools package
-    deps <- forM (Map.toList deps') $ \(depname, range) -> do
+    deps <- forM (Map.toList deps') $ \(depname, (range, depType)) -> do
         eres <- addDep treatAsDep depname
         let getLatestApplicable = do
                 vs <- liftIO $ getVersions ctx depname
@@ -608,6 +615,8 @@ addPackageDeps treatAsDep package = do
                             _ -> Couldn'tResolveItsDependencies (packageVersion package)
                 mlatestApplicable <- getLatestApplicable
                 return $ Left (depname, (range, mlatestApplicable, bd))
+            Right adr | depType == AsLibrary && not (adrHasLibrary adr) ->
+                return $ Left (depname, (range, Nothing, HasNoLibrary))
             Right adr -> do
                 addParent depname range Nothing
                 inRange <- if adrVersion adr `withinRange` range
@@ -668,6 +677,23 @@ addPackageDeps treatAsDep package = do
     addParent depname range mversion = tell mempty { wParents = MonoidMap $ M.singleton depname val }
       where
         val = (First mversion, [(packageIdentifier package, range)])
+
+    adrHasLibrary :: AddDepRes -> Bool
+    adrHasLibrary (ADRToInstall task) = taskHasLibrary task
+    adrHasLibrary (ADRFound _ (Library _ _)) = True
+    adrHasLibrary (ADRFound _ (Executable _)) = False
+
+    taskHasLibrary :: Task -> Bool
+    taskHasLibrary task =
+      case taskType task of
+        TTFiles lp _ -> packageHasLibrary $ lpPackage lp
+        TTIndex p _ _ -> packageHasLibrary p
+
+    packageHasLibrary :: Package -> Bool
+    packageHasLibrary p =
+      case packageLibraries p of
+        HasLibraries _ -> True
+        NoLibraries -> False
 
 checkDirtiness :: PackageSource
                -> Installed
@@ -795,7 +821,7 @@ psLocal PSIndex{} = False
 
 -- | Get all of the dependencies for a given package, including guessed build
 -- tool dependencies.
-packageDepsWithTools :: Package -> M (Map PackageName VersionRange)
+packageDepsWithTools :: Package -> M (Map PackageName (VersionRange, DepType))
 packageDepsWithTools p = do
     ctx <- ask
     -- TODO: it would be cool to defer these warnings until there's an
@@ -818,9 +844,16 @@ packageDepsWithTools p = do
             Nothing -> return (Just warning)
             Just _ -> return Nothing
     tell mempty { wWarnings = (map toolWarningText warnings ++) }
-    return $ Map.unionsWith intersectVersionRanges
-           $ packageDeps p
-           : toolDeps
+    return $ Map.unionsWith
+               (\(vr1, dt1) (vr2, dt2) ->
+                    ( intersectVersionRanges vr1 vr2
+                    , case dt1 of
+                        AsLibrary -> AsLibrary
+                        AsBuildTool -> dt2
+                    )
+               )
+           $ ((, AsLibrary) <$> packageDeps p)
+           : (Map.map (, AsBuildTool) <$> toolDeps)
 
 -- | Warn about tools in the snapshot definition. States the tool name
 -- expected, the package name using it, and found packages. If the
@@ -895,6 +928,8 @@ data BadDependency
     = NotInBuildPlan
     | Couldn'tResolveItsDependencies Version
     | DependencyMismatch Version
+    | HasNoLibrary
+    -- ^ See description of 'DepType'
     deriving (Typeable, Eq, Ord, Show)
 
 -- TODO: Consider intersecting version ranges for multiple deps on a
@@ -1002,6 +1037,9 @@ pprintExceptions exceptions stackYaml parentMap wanted =
         -- packages are needed. Instead lets give the user the shortest
         -- path from a target to the package.
         Couldn'tResolveItsDependencies _version -> Nothing
+        HasNoLibrary -> Just $
+            styleError (display name) <+>
+            align (flow "is a library dependency, but the package provides no library")
       where
         goodRange = styleGood (fromString (Cabal.display range))
         latestApplicable mversion =

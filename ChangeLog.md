@@ -100,6 +100,10 @@ Other enhancements:
 * `--cwd DIR` can now be passed to `stack exec` in order to execute the
   program in a different directory. See:
   [#3264](https://github.com/commercialhaskell/stack/issues/3264)
+* Plan construction will detect if you add an executable-only package
+  as a library dependency, resulting in much clearer error
+  messages. See:
+  [#2195](https://github.com/commercialhaskell/stack/issues/2195).
 
 Bug fixes:
 
