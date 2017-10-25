@@ -197,7 +197,7 @@ recoveringHttp retryPolicy =
     handlers run = [Handler . alwaysRetryHttp (unliftIO run),const $ Handler retrySomeIO]
 
     alwaysRetryHttp :: (MonadLogger m', Monad m, HasRunner env, MonadReader env m') => (m' () -> m ()) -> RetryStatus -> HttpException -> m Bool
-    alwaysRetryHttp run rs e = do
+    alwaysRetryHttp run rs _ = do
       run $
         prettyWarn $ vcat
           [ flow $ unwords
