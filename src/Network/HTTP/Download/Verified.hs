@@ -205,7 +205,7 @@ recoveringHttp retryPolicy =
           , "us"
           ]
         logWarn $ Text.unwords
-          [ "If you see this warning and stack fails,"
+          [ "If you see this warning and stack fails to download,"
           , "but running the command again solves the problem,"
           , "please report here: https://github.com/commercialhaskell/stack/issues/3510"
           ]
