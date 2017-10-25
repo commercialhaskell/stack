@@ -45,6 +45,8 @@ import              Network.HTTP.Client (getUri, path)
 import              Network.HTTP.Simple (Request, HttpException, httpSink, getResponseHeaders)
 import              Network.HTTP.Types.Header (hContentLength, hContentMD5)
 import              Path
+import              Stack.Types.Runner
+import              Stack.PrettyPrint
 import              System.Directory
 import qualified    System.FilePath as FP ((<.>))
 import              System.IO (hFileSize)
@@ -179,7 +181,7 @@ hashChecksToZipSink :: MonadThrow m => Request -> [HashCheck] -> ZipSink ByteStr
 hashChecksToZipSink req = traverse_ (ZipSink . sinkCheckHash req)
 
 -- 'Control.Retry.recovering' customized for HTTP failures
-recoveringHttp :: (MonadUnliftIO m, MonadLogger m)
+recoveringHttp :: (MonadUnliftIO m, MonadLogger m, HasRunner env, MonadReader env m)
                => RetryPolicy -> m a -> m a
 recoveringHttp retryPolicy =
 #if MIN_VERSION_retry(0,7,0)
@@ -188,26 +190,28 @@ recoveringHttp retryPolicy =
     helper $ \run -> recovering retryPolicy (handlers run)
 #endif
   where
-    helper :: MonadUnliftIO m => (UnliftIO m -> IO a -> IO a) -> m a -> m a
+    helper :: (MonadUnliftIO m, HasRunner env, MonadReader env m) => (UnliftIO m -> IO a -> IO a) -> m a -> m a
     helper wrapper action = withUnliftIO $ \run -> wrapper run (unliftIO run action)
 
-    handlers :: MonadLogger m => UnliftIO m -> [RetryStatus -> Handler IO Bool]
+    handlers :: (MonadLogger m, HasRunner env, MonadReader env m) => UnliftIO m -> [RetryStatus -> Handler IO Bool]
     handlers run = [Handler . alwaysRetryHttp (unliftIO run),const $ Handler retrySomeIO]
 
-    alwaysRetryHttp :: (MonadLogger m', Monad m) => (m' () -> m ()) -> RetryStatus -> HttpException -> m Bool
+    alwaysRetryHttp :: (MonadLogger m', Monad m, HasRunner env, MonadReader env m') => (m' () -> m ()) -> RetryStatus -> HttpException -> m Bool
     alwaysRetryHttp run rs e = do
-      run $ do
-        logWarn $ Text.unwords
-          [ "Retry number"
-          , Text.pack $ show (rsIterNumber rs)
-          , "after a total delay of"
-          , Text.pack $ show (rsCumulativeDelay rs)
-          , "us"
-          ]
-        logWarn $ Text.unwords
-          [ "If you see this warning and stack fails to download,"
-          , "but running the command again solves the problem,"
-          , "please report here: https://github.com/commercialhaskell/stack/issues/3510"
+      run $
+        prettyWarn $ vcat
+          [ flow $ unwords
+            [ "Retry number"
+            , show (rsIterNumber rs)
+            , "after a total delay of"
+            , show (rsCumulativeDelay rs)
+            , "us"
+            ]
+          , flow $ unwords
+            [ "If you see this warning and stack fails to download,"
+            , "but running the command again solves the problem,"
+            , "please report here: https://github.com/commercialhaskell/stack/issues/3510"
+            ]
           ]
       return True
 
@@ -231,7 +235,7 @@ recoveringHttp retryPolicy =
 -- Throws VerifiedDownloadException.
 -- Throws IOExceptions related to file system operations.
 -- Throws HttpException.
-verifiedDownload :: (MonadUnliftIO m, MonadLogger m)
+verifiedDownload :: (MonadUnliftIO m, MonadLogger m, HasRunner env, MonadReader env m)
          => DownloadRequest
          -> Path Abs File -- ^ destination
          -> (Maybe Integer -> Sink ByteString IO ()) -- ^ custom hook to observe progress

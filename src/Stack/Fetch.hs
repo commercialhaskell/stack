@@ -59,6 +59,7 @@ import              Stack.Types.Config
 import              Stack.Types.PackageIdentifier
 import              Stack.Types.PackageIndex
 import              Stack.Types.PackageName
+import              Stack.Types.Runner
 import              Stack.Types.Version
 import qualified    System.FilePath as FP
 import              System.IO (hSeek, SeekMode (AbsoluteSeek))
@@ -505,7 +506,7 @@ fetchPackages' mdistDir toFetchAll = do
 
     liftIO $ readTVarIO outputVar
   where
-    go :: (MonadUnliftIO m,MonadThrow m,MonadLogger m)
+    go :: (MonadUnliftIO m,MonadThrow m,MonadLogger m,HasRunner env, MonadReader env m)
        => TVar (Map PackageIdentifier (Path Abs Dir))
        -> (m () -> IO ())
        -> (PackageIdentifier, ToFetch)

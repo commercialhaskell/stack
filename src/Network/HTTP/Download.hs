@@ -21,6 +21,7 @@ module Network.HTTP.Download
     ) where
 
 import           Stack.Prelude
+import           Stack.Types.Runner
 import qualified Data.ByteString.Lazy        as L
 import           Data.Conduit                (yield)
 import           Data.Conduit.Binary         (sourceHandle)
@@ -43,7 +44,7 @@ import           System.FilePath             (takeDirectory, (<.>))
 -- appropriate destination.
 --
 -- Throws an exception if things go wrong
-download :: (MonadUnliftIO m, MonadLogger m)
+download :: (MonadUnliftIO m, MonadLogger m, HasRunner env, MonadReader env m)
          => Request
          -> Path Abs File -- ^ destination
          -> m Bool -- ^ Was a downloaded performed (True) or did the file already exist (False)?
@@ -60,7 +61,7 @@ download req destpath = do
 -- | Same as 'download', but will download a file a second time if it is already present.
 --
 -- Returns 'True' if the file was downloaded, 'False' otherwise
-redownload :: (MonadUnliftIO m, MonadLogger m)
+redownload :: (MonadUnliftIO m, MonadLogger m, HasRunner env, MonadReader env m)
            => Request
            -> Path Abs File -- ^ destination
            -> m Bool
