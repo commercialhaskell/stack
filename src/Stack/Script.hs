@@ -97,6 +97,7 @@ scriptCmd opts go' = do
                     SEInterpret -> []
                     SECompile -> []
                     SEOptimize -> ["-O2"]
+                , map (\x -> "--ghc-arg=" ++ x) (soGhcOptions opts)
                 ]
         munlockFile lk -- Unlock before transferring control away.
         case soCompile opts of

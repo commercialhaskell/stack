@@ -104,6 +104,9 @@ Other enhancements:
   as a library dependency, resulting in much clearer error
   messages. See:
   [#2195](https://github.com/commercialhaskell/stack/issues/2195).
+* Addition of `--ghc-options` to `stack script` to pass options directly
+  to GHC. See:
+  [#3454](https://github.com/commercialhaskell/stack/issues/3454)
 
 Bug fixes:
 
