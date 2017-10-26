@@ -3,6 +3,7 @@ module Stack.Options.ScriptParser where
 
 import           Options.Applicative
 import           Options.Applicative.Builder.Extra
+import           Stack.Options.Completion
 import           Stack.Prelude
 
 data ScriptOpts = ScriptOpts
@@ -10,6 +11,7 @@ data ScriptOpts = ScriptOpts
   , soFile :: !FilePath
   , soArgs :: ![String]
   , soCompile :: !ScriptExecute
+  , soGhcOptions :: ![String]
   }
   deriving Show
 
@@ -33,3 +35,8 @@ scriptOptsParser = ScriptOpts
            <> help "Compile the script with optimization and run the executable"
             ) <|>
          pure SEInterpret)
+    <*> many (strOption
+          (long "ghc-options" <>
+            metavar "OPTIONS" <>
+            completer ghcOptsCompleter <>
+            help "Additional options passed to GHC"))
