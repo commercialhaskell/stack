@@ -7,3 +7,4 @@ nix:
     - http-client-tls-0.3.4
 extra-deps:
 - bindings-uname-0.1
+- conduit-extra-1.2.0
