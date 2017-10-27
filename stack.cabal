@@ -60,6 +60,11 @@ flag hide-dependency-versions
   default: False
   description: Hides dependency versions from "stack --version", used only by building with stack.yaml
 
+flag supported-build
+  description: If false, causes "stack --version" to issue a warning about the build being unsupported.  True only if building with stack.yaml
+  manual: True
+  default: False
+
 library
   hs-source-dirs:    src/
   ghc-options:       -Wall -fwarn-tabs -fwarn-incomplete-uni-patterns -fwarn-incomplete-record-updates -fwarn-identities
@@ -316,6 +321,8 @@ executable stack
                    , optparse-simple >= 0.0.3
   if flag(hide-dependency-versions)
     cpp-options:     -DHIDE_DEP_VERSIONS
+  if flag(supported-build)
+    cpp-options: -DSUPPORTED_BUILD
 
 test-suite stack-test
   type:           exitcode-stdio-1.0

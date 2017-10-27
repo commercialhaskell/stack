@@ -129,7 +129,7 @@ versionString' = concat $ concat
     , [" (" ++ commitCount ++ " commits)" | commitCount /= ("1"::String) &&
                                           commitCount /= ("UNKNOWN" :: String)]
     , [" ", Cabal.display buildArch]
-    , [depsString]
+    , [depsString, warningString]
     ]
   where
     commitCount = $gitCommitCount
@@ -138,12 +138,24 @@ versionString' =
     showVersion Meta.version
     ++ ' ' : Cabal.display buildArch
     ++ depsString
+    ++ warningString
   where
 #endif
 #ifdef HIDE_DEP_VERSIONS
     depsString = " hpack-" ++ VERSION_hpack
 #else
     depsString = "\nCompiled with:\n" ++ unlines (map ("- " ++) Build_stack.deps)
+#endif
+#ifdef SUPPORTED_BUILD
+    warningString = ""
+#else
+    warningString = unlines
+      [ ""
+      , "Warning: this is an unsupported build that may have been built with different"
+      , "versions of dependencies and GHC than the officially release binaries, and"
+      , "therefore may not behave identically.  If you encounter problems, please try"
+      , "the latest official build by running 'stack upgrade --force-download'."
+      ]
 #endif
 
 main :: IO ()
