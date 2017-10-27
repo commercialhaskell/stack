@@ -5,9 +5,5 @@ nix:
   packages:
     - zlib
     - http-client-tls-0.3.4
-flags:
-  mintty:
-    win32-2-5: false
 extra-deps:
 - bindings-uname-0.1
-- mintty-0.1.1
