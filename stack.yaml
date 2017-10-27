@@ -14,6 +14,7 @@ nix:
 flags:
   stack:
     hide-dependency-versions: true
+    supported-build: true
   mintty:
     win32-2-5: false
 extra-deps:
