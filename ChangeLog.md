@@ -159,6 +159,9 @@ Bug fixes:
   dependency" error message. We now force a reconfigure whenever a dependency is
   built, even if the package ID remained the same. See
   [#2781](https://github.com/commercialhaskell/stack/issues/2781).
+* When `--pvp-bounds` is enabled for sdist or upload, internal
+  dependencies could cause errors when uploaded to hackage.  This is
+  fixed, see [#3290](https://github.com/commercialhaskell/stack/issues/3290)
 
 
 ## 1.5.1

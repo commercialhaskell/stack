@@ -41,6 +41,7 @@ import           Distribution.Package (Dependency (..))
 import qualified Distribution.PackageDescription as Cabal
 import qualified Distribution.PackageDescription.Check as Check
 import           Distribution.PackageDescription.PrettyPrint (showGenericPackageDescription)
+import qualified Distribution.Types.UnqualComponentName as Cabal
 import           Distribution.Text (display)
 import           Distribution.Version (simplifyVersionRange, orLaterVersion, earlierVersion, hasUpperBound, hasLowerBound)
 import           Lens.Micro (set)
@@ -51,6 +52,7 @@ import           Stack.Build.Execute
 import           Stack.Build.Installed
 import           Stack.Build.Source (loadSourceMap)
 import           Stack.Build.Target hiding (PackageType (..))
+import           Stack.BuildPlan
 import           Stack.PackageLocation (resolveMultiPackageLocation)
 import           Stack.Constants
 import           Stack.Package
@@ -176,7 +178,10 @@ getCabalLbs pvpBounds mrev fp = do
                                 , getInstalledSymbols = False
                                 }
                                 sourceMap
-    let gpd' = gtraverseT (addBounds sourceMap installedMap) gpd
+    let internalPackages = Set.fromList $
+          gpdPackageName gpd :
+          map (fromCabalPackageName . Cabal.unqualComponentNameToPackageName . fst) (Cabal.condSubLibraries gpd)
+        gpd' = gtraverseT (addBounds internalPackages sourceMap installedMap) gpd
         gpd'' =
           case mrev of
             Nothing -> gpd'
@@ -196,16 +201,19 @@ getCabalLbs pvpBounds mrev fp = do
       , TLE.encodeUtf8 $ TL.pack $ showGenericPackageDescription gpd''
       )
   where
-    addBounds :: SourceMap -> InstalledMap -> Dependency -> Dependency
-    addBounds sourceMap installedMap dep@(Dependency cname range) =
-      case lookupVersion (fromCabalPackageName cname) of
-        Nothing -> dep
-        Just version -> Dependency cname $ simplifyVersionRange
-          $ (if toAddUpper && not (hasUpperBound range) then addUpper version else id)
-          $ (if toAddLower && not (hasLowerBound range) then addLower version else id)
-            range
+    addBounds :: Set PackageName -> SourceMap -> InstalledMap -> Dependency -> Dependency
+    addBounds internalPackages sourceMap installedMap dep@(Dependency cname range) =
+      if name `Set.member` internalPackages
+        then dep
+        else case foundVersion of
+          Nothing -> dep
+          Just version -> Dependency cname $ simplifyVersionRange
+            $ (if toAddUpper && not (hasUpperBound range) then addUpper version else id)
+            $ (if toAddLower && not (hasLowerBound range) then addLower version else id)
+              range
       where
-        lookupVersion name =
+        name = fromCabalPackageName cname
+        foundVersion =
           case Map.lookup name sourceMap of
               Just ps -> Just (piiVersion ps)
               Nothing ->
