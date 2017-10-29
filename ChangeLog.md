@@ -107,6 +107,7 @@ Other enhancements:
 * Addition of `--ghc-options` to `stack script` to pass options directly
   to GHC. See:
   [#3454](https://github.com/commercialhaskell/stack/issues/3454)
+* Add hpack `package.yaml` to build Stack itself
 
 Bug fixes:
 

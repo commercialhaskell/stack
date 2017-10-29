@@ -46,9 +46,7 @@ import           System.Console.ANSI
 import           System.FilePath
 import           System.IO
 import           System.Log.FastLogger
-#ifndef WINDOWS
 import           System.Terminal
-#endif
 
 -- | Monadic environment.
 data Runner = Runner
@@ -278,9 +276,6 @@ withRunner logLevel useTime terminal colorWhen widthOverride reExec inner = do
           | w < minTerminalWidth = minTerminalWidth
           | w > maxTerminalWidth = maxTerminalWidth
           | otherwise = w
-#ifdef WINDOWS
-        getTerminalWidth = pure Nothing
-#endif
 
 -- | Taken from GHC: determine if we should use Unicode syntax
 getCanUseUnicode :: IO Bool
