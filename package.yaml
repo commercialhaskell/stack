@@ -23,10 +23,10 @@ extra-source-files:
 - README.md
 - doc/*.md
 - src/setup-shim/StackSetupShim.hs
-- test/package-dump/ghc-7.8.txt
-- test/package-dump/ghc-7.8.4-osx.txt
-- test/package-dump/ghc-7.10.txt
 - stack.yaml
+- test/package-dump/ghc-7.10.txt
+- test/package-dump/ghc-7.8.4-osx.txt
+- test/package-dump/ghc-7.8.txt
 ghc-options:
 - -Wall
 - -fwarn-tabs
@@ -125,9 +125,9 @@ when:
     build-tools:
     - hsc2hs
     dependencies:
-    - unix
-    - pid1
     - bindings-uname
+    - pid1
+    - unix
 library:
   source-dirs: src/
   ghc-options:
@@ -257,12 +257,15 @@ library:
   - System.Process.PagerEditor
   - System.Process.Read
   - System.Process.Run
+  - System.Terminal
   other-modules:
   - Hackage.Security.Client.Repository.HttpLib.HttpClient
   when:
-  - condition: '!os(windows)'
-    other-modules:
-    - System.Terminal
+  - condition: 'os(windows)'
+    then:
+      source-dirs: windows/
+    else:
+      source-dirs: unix/
 executables:
   stack:
     main: Main.hs
