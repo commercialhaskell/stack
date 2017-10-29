@@ -31,6 +31,9 @@ Behavior changes:
   `stack.yaml` will promote it to a local package, providing for more
   consistency with flags and better reproducibility. See:
   [#849](https://github.com/commercialhaskell/stack/issues/849)
+* The `package-indices` setting with Hackage no longer works with the
+  `00-index.tar.gz` tarball, but must use the `01-index.tar.gz` file
+  to allow revised packages to be found.
 * Options passsed via `--ghci-options` are now passed to the end of the
   invocation of ghci, instead of the middle.  This allows using `+RTS`
   without an accompanying `-RTS`.
