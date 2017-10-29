@@ -374,7 +374,7 @@ package-indices:
   download-prefix: https://s3.amazonaws.com/hackage.fpcomplete.com/package/
 
   # HTTP location of the package index
-  http: https://s3.amazonaws.com/hackage.fpcomplete.com/00-index.tar.gz
+  http: https://s3.amazonaws.com/hackage.fpcomplete.com/01-index.tar.gz
 
   # Or, if using Hackage Security below, give the root URL:
   http: https://s3.amazonaws.com/hackage.fpcomplete.com/
