@@ -465,7 +465,7 @@ generateBuildInfoOpts BioInput {..} =
     deps =
         concat
             [ case M.lookup name biInstalledMap of
-                Just (_, Stack.Types.Package.Library _ident ipid) -> ["-package-id=" <> ghcPkgIdString ipid]
+                Just (_, Stack.Types.Package.Library _ident ipid_) -> ["-package-id=" <> ghcPkgIdString ipid]
                 _ -> ["-package=" <> packageNameString name <>
                  maybe "" -- This empty case applies to e.g. base.
                      ((("-" <>) . versionString) . piiVersion)

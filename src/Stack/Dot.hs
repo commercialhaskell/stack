@@ -232,7 +232,10 @@ createDepLoader sourceMap installed globalDumpMap globalIdMap loadPackageDeps pk
                          (dpDepends dp)
   where
     payloadFromLocal pkg = DotPayload (Just $ packageVersion pkg) (Just $ packageLicense pkg)
-    payloadFromInstalled maybePkg = DotPayload (fmap (installedVersion . snd) maybePkg) Nothing
+    payloadFromInstalled maybePkg = DotPayload (fmap (installedVersion . snd) maybePkg) $
+        case maybePkg of
+            Just (_, Library _ _ mlicense) -> mlicense
+            _ -> Nothing
     payloadFromDump dp = DotPayload (Just $ packageIdentifierVersion $ dpPackageIdent dp) (dpLicense dp)
 
 -- | Resolve the direct (depth 0) external dependencies of the given local packages

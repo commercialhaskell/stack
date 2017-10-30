@@ -757,7 +757,7 @@ getConfigCache ExecuteEnv {..} task@Task {..} installedMap enableTest enableBenc
                         -> installedToGhcPkgId ident installed
                 Just installed -> installedToGhcPkgId ident installed
                 _ -> error "singleBuild: invariant violated, missing package ID missing"
-        installedToGhcPkgId ident (Library ident' x) = assert (ident == ident') $ Just (ident, x)
+        installedToGhcPkgId ident (Library ident' x _) = assert (ident == ident') $ Just (ident, x)
         installedToGhcPkgId _ (Executable _) = Nothing
         missing' = Map.fromList $ mapMaybe getMissing $ Set.toList missing
         TaskConfigOpts missing mkOpts = taskConfigOpts
@@ -1294,7 +1294,7 @@ singleBuild runInBase ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} in
                 return $ Just $
                     case mpkgid of
                         Nothing -> assert False $ Executable taskProvides
-                        Just pkgid -> Library taskProvides pkgid
+                        Just pkgid -> Library taskProvides pkgid Nothing
       where
         bindir = toFilePath $ bcoSnapInstallRoot eeBaseConfigOpts </> bindirSuffix
 
@@ -1311,7 +1311,7 @@ singleBuild runInBase ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} in
             let installedMapHasThisPkg :: Bool
                 installedMapHasThisPkg =
                     case Map.lookup (packageName package) installedMap of
-                        Just (_, Library ident _) -> ident == taskProvides
+                        Just (_, Library ident _ _) -> ident == taskProvides
                         Just (_, Executable _) -> True
                         _ -> False
 
@@ -1446,7 +1446,7 @@ singleBuild runInBase ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} in
                 mpkgid <- loadInstalledPkg eeEnvOverride wc [installedPkgDb] installedDumpPkgsTVar (packageName package)
                 case mpkgid of
                     Nothing -> throwM $ Couldn'tFindPkgId $ packageName package
-                    Just pkgid -> return $ Library ident pkgid
+                    Just pkgid -> return $ Library ident pkgid Nothing
             NoLibraries -> do
                 markExeInstalled (taskLocation task) taskProvides -- TODO unify somehow with writeFlagCache?
                 return $ Executable ident

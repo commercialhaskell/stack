@@ -654,7 +654,7 @@ addPackageDeps treatAsDep package = do
                             (Set.singleton $ taskProvides task, Map.empty, taskLocation task)
                         ADRFound loc (Executable _) -> return $ Right
                             (Set.empty, Map.empty, loc)
-                        ADRFound loc (Library ident gid) -> return $ Right
+                        ADRFound loc (Library ident gid _) -> return $ Right
                             (Set.empty, Map.singleton ident gid, loc)
                     else do
                         mlatestApplicable <- getLatestApplicable
@@ -680,8 +680,8 @@ addPackageDeps treatAsDep package = do
 
     adrHasLibrary :: AddDepRes -> Bool
     adrHasLibrary (ADRToInstall task) = taskHasLibrary task
-    adrHasLibrary (ADRFound _ (Library _ _)) = True
-    adrHasLibrary (ADRFound _ (Executable _)) = False
+    adrHasLibrary (ADRFound _ Library{}) = True
+    adrHasLibrary (ADRFound _ Executable{}) = False
 
     taskHasLibrary :: Task -> Bool
     taskHasLibrary task =

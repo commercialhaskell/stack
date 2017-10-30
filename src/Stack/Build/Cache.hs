@@ -165,7 +165,7 @@ flagCacheFile :: (MonadIO m, MonadThrow m, MonadReader env m, HasEnvConfig env)
 flagCacheFile installed = do
     rel <- parseRelFile $
         case installed of
-            Library _ gid -> ghcPkgIdString gid
+            Library _ gid _ -> ghcPkgIdString gid
             Executable ident -> packageIdentifierString ident
     dir <- flagCacheLocal
     return $ dir </> rel
@@ -300,7 +300,7 @@ writePrecompiledCache baseConfigOpts loc copts depIDs mghcPkgId exes = do
     mlibpath <-
         case mghcPkgId of
             Executable _ -> return Nothing
-            Library _ ipid -> liftM Just $ do
+            Library _ ipid _ -> liftM Just $ do
                 ipid' <- parseRelFile $ ghcPkgIdString ipid ++ ".conf"
                 relPath <- stackRootRelative $ bcoSnapDB baseConfigOpts </> ipid'
                 return $ toFilePath relPath
