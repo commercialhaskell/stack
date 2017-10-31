@@ -246,7 +246,7 @@ image:
     - app-backend
 ```
 
-will build one container tagged `myproject:latest` which contains the project 
+will build one container tagged `myproject:latest` which contains the project
 including the `/etc/app-backend` configuration data.
 
 Another container tagged `myproject-app-backend:latest` based on the `myproject:latest`
@@ -756,7 +756,7 @@ save-hackage-creds: true
 ```
 
 Since 1.5.0
-  
+
 # urls
 
 Customize the URLs where `stack` looks for snapshot build plans.
