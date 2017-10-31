@@ -421,6 +421,15 @@ solveResolverSpec stackYaml cabalDirs
                 -- returned versions or flags different from the snapshot.
                 inSnapChanged = Map.differenceWith diffConstraints
                                                    inSnap snapConstraints
+
+                           -- If a package appears in both the
+                           -- snapshot and locally, we don't want to
+                           -- include it in extra-deps. This makes
+                           -- sure we filter out such packages. See:
+                           -- https://github.com/commercialhaskell/stack/issues/3533
+
+                                    `Map.difference` srcConstraints
+
                 -- Packages neither in snapshot, nor srcs
                 extra = Map.difference deps (Map.union srcConstraints
                                                        snapConstraints)
