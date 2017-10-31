@@ -715,7 +715,7 @@ The 5 parameters are: `author-email`, `author-name`, `category`, `copyright` and
   set per project by passing `-p "category:value"` to the `stack new` command.
 * _copyright_ - sets the `copyright` property in cabal. It is typically the
   name of the holder of the copyright on the package and the year(s) from which
-  copyright is claimed. For example: `Copyright: (c) 2006-2007 Joe Bloggs`
+  copyright is claimed. For example: `Copyright (c) 2006-2007 Joe Bloggs`
 * _github-username_ - used to generate `homepage` and `source-repository` in
   cabal. For instance `github-username: myusername` and `stack new my-project new-template`
   would result:
@@ -735,7 +735,7 @@ templates:
     author-name: Your Name
     author-email: youremail@example.com
     category: Your Projects Category
-    copyright: 'Copyright: (c) 2017 Your Name'
+    copyright: 'Copyright (c) 2017 Your Name'
     github-username: yourusername
 ```
 
