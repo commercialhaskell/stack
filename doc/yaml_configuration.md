@@ -99,7 +99,9 @@ packages:
 Note: it is highly recommended that you only use SHA1 values for a Git or
 Mercurial commit. Other values may work, but they are not officially supported,
 and may result in unexpected behavior (namely, stack will not automatically
-pull to update to new versions).
+pull to update to new versions). Another problem with this is that your build
+will not be deterministic, because when someone else tries to build the project
+they can get a different checkout of the dependency.
 
 A `location` key can be accompanied by a `subdirs` key to look for cabal files
 in a list of subdirectories as well in addition to the top level directory.
