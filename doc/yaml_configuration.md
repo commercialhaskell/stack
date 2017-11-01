@@ -401,6 +401,13 @@ gpg-verify: false
 
 Will now be ignored.
 
+__IMPORTANT__ Hackage and its mirrors typically have two index files
+available: `00-index.tar.gz` and `01-index.tar.gz`. The former is a
+legacy file for backwards compatibility. It does not contain the cabal
+file revisions produced by Hackage, and therefore _will not work_ with
+most snapshots. Instead, you need to use `01-index.tar.gz` to ensure
+that exact revisions can be found, ensuring more reproducible builds.
+
 ### system-ghc
 
 Enables or disables using the GHC available on the PATH.
