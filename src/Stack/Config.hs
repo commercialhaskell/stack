@@ -373,6 +373,7 @@ configFromConfigMonoid
          configDefaultTemplate = getFirst configMonoidDefaultTemplate
          configDumpLogs = fromFirst DumpWarningLogs configMonoidDumpLogs
          configSaveHackageCreds = fromFirst True configMonoidSaveHackageCreds
+         configIgnoreRevisionMismatch = fromFirst False configMonoidIgnoreRevisionMismatch
 
      configAllowDifferentUser <-
         case getFirst configMonoidAllowDifferentUser of

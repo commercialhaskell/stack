@@ -111,6 +111,8 @@ Other enhancements:
   to GHC. See:
   [#3454](https://github.com/commercialhaskell/stack/issues/3454)
 * Add hpack `package.yaml` to build Stack itself
+* Add `ignore-revision-mismatch` setting. See:
+  [#3520](https://github.com/commercialhaskell/stack/issues/3520).
 
 Bug fixes:
 
