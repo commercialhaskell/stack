@@ -141,7 +141,23 @@ ghci opts@GhciOpts{..} = do
     -- Check if additional package arguments are sensible.
     addPkgs <- checkAdditionalPackages ghciAdditionalPackages
     -- Build required dependencies and setup local packages.
+    stackYaml <- view stackYamlL
     buildDepsAndInitialSteps opts (map (packageNameText . fst) localTargets)
+    when (M.null inputTargets && isNothing mfileTargets) $
+        prettyWarn $ vsep
+            [ flow "No targets specified, so ghci will not use any options from your package.yaml / *.cabal files."
+            , ""
+            , flow "Potential ways to resolve this:"
+            , bulletedList
+                [ fillSep
+                    [ flow "If you want to use the package.yaml / *.cabal package in the current directory, use"
+                    , styleShell "stack init"
+                    , flow "to create a new stack.yaml."
+                    ]
+                , flow "Add to the 'packages' field of" <+> display stackYaml
+                ]
+            , ""
+            ]
     -- Load the list of modules _after_ building, to catch changes in unlisted dependencies (#1180)
     pkgs <- getGhciPkgInfos buildOptsCLI sourceMap addPkgs (fmap fst mfileTargets) localTargets
     checkForIssues pkgs
@@ -198,10 +214,12 @@ findFileTargets locals fileTargets = do
     results <- forM foundFileTargetComponents $ \(fp, xs) ->
         case xs of
             [] -> do
-                prettyWarn $
-                    "Couldn't find a component for file target" <+>
-                    display fp <>
-                    ". Attempting to load anyway."
+                prettyWarn $ vsep
+                    [ "Couldn't find a component for file target" <+>
+                      display fp <>
+                      ". This means that the correct ghc options might not be used."
+                    , "Attempting to load the file anyway."
+                    ]
                 return $ Left fp
             [x] -> do
                 prettyInfo $
