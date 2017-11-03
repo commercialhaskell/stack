@@ -358,6 +358,10 @@ data Config =
          ,configSaveHackageCreds    :: !Bool
          -- ^ Should we save Hackage credentials to a file?
          ,configRunner              :: !Runner
+         ,configIgnoreRevisionMismatch :: !Bool
+         -- ^ Ignore a revision mismatch when loading up cabal files,
+         -- and fall back to the latest revision. See:
+         -- <https://github.com/commercialhaskell/stack/issues/3520>
          }
 
 data HpackExecutable
@@ -758,6 +762,8 @@ data ConfigMonoid =
     -- ^ See 'configDumpLogs'
     , configMonoidSaveHackageCreds   :: !(First Bool)
     -- ^ See 'configSaveHackageCreds'
+    , configMonoidIgnoreRevisionMismatch :: !(First Bool)
+    -- ^ See 'configIgnoreRevisionMismatch'
     }
   deriving (Show, Generic)
 
@@ -850,6 +856,7 @@ parseConfigMonoidObject rootDir obj = do
     configMonoidAllowDifferentUser <- First <$> obj ..:? configMonoidAllowDifferentUserName
     configMonoidDumpLogs <- First <$> obj ..:? configMonoidDumpLogsName
     configMonoidSaveHackageCreds <- First <$> obj ..:? configMonoidSaveHackageCredsName
+    configMonoidIgnoreRevisionMismatch <- First <$> obj ..:? configMonoidIgnoreRevisionMismatchName
 
     return ConfigMonoid {..}
   where
@@ -988,6 +995,9 @@ configMonoidDumpLogsName = "dump-logs"
 
 configMonoidSaveHackageCredsName :: Text
 configMonoidSaveHackageCredsName = "save-hackage-creds"
+
+configMonoidIgnoreRevisionMismatchName :: Text
+configMonoidIgnoreRevisionMismatchName = "ignore-revision-mismatch"
 
 data ConfigException
   = ParseConfigFileException (Path Abs File) ParseException

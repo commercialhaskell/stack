@@ -840,7 +840,25 @@ save-hackage-creds: true
 ```
 
 Since 1.5.0
-  
+
+### ignore-revision-mismatch
+
+Cabal files in packages can be specified via exact revisions to deal
+with Hackage revision metadata. The default behavior of Stack (since
+1.6.0) is to fail if an exact match is not found. In some cases
+(specifically, when using a legacy `00-index.tar.gz` file), users may
+wish to allow a mismatch. In such cases, you can change
+`ignore-revision-mismatch` from `false` to `true`.
+
+```yaml
+ignore-revision-mismatch: false
+```
+
+For more information, see
+[the Github issue #3520 discussion](https://github.com/commercialhaskell/stack/issues/3520).
+
+Since 1.6.0
+
 # urls
 
 Customize the URLs where `stack` looks for snapshot build plans.

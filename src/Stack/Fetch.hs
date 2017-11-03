@@ -72,6 +72,7 @@ data FetchException
     | CouldNotParsePackageSelectors [String]
     | UnknownPackageNames (Set PackageName)
     | UnknownPackageIdentifiers (HashSet PackageIdentifierRevision) String
+        Bool -- Do we use any 00-index.tar.gz indices? Just used for more informative error messages
     deriving Typeable
 instance Exception FetchException
 
@@ -97,10 +98,11 @@ instance Show FetchException where
     show (UnknownPackageNames names) =
         "The following packages were not found in your indices: " ++
         intercalate ", " (map packageNameString $ Set.toList names)
-    show (UnknownPackageIdentifiers idents suggestions) =
+    show (UnknownPackageIdentifiers idents suggestions uses00Index) =
         "The following package identifiers were not found in your indices: " ++
         intercalate ", " (map packageIdentifierRevisionString $ HashSet.toList idents) ++
-        (if null suggestions then "" else "\n" ++ suggestions)
+        (if null suggestions then "" else "\n" ++ suggestions) ++
+        (if uses00Index then "\n\nYou seem to be using a legacy 00-index.tar.gz tarball.\nConsider changing your configuration to use a 01-index.tar.gz file.\nAlternatively, you can set the ignore-revision-mismatch setting to true.\nFor more information, see: https://github.com/commercialhaskell/stack/issues/3520" else "")
 
 -- | Fetch packages into the cache without unpacking
 fetchPackages :: HasConfig env => Set PackageIdentifier -> RIO env ()
@@ -202,11 +204,20 @@ resolvePackages mSnapshotDef idents0 names0 = do
             go >>= either throwM return
         Right x -> return x
   where
-    go = r <$> resolvePackagesAllowMissing mSnapshotDef idents0 names0
-    r (missingNames, missingIdents, idents)
+    go = r <$> getUses00Index <*> resolvePackagesAllowMissing mSnapshotDef idents0 names0
+    r uses00Index (missingNames, missingIdents, idents)
       | not $ Set.null missingNames  = Left $ UnknownPackageNames       missingNames
-      | not $ HashSet.null missingIdents = Left $ UnknownPackageIdentifiers missingIdents ""
+      | not $ HashSet.null missingIdents = Left $ UnknownPackageIdentifiers missingIdents "" uses00Index
       | otherwise                    = Right idents
+
+-- | Does the configuration use a 00-index.tar.gz file for indices?
+-- See <https://github.com/commercialhaskell/stack/issues/3520>
+getUses00Index :: HasConfig env => RIO env Bool
+getUses00Index =
+    any is00 <$> view packageIndicesL
+  where
+    is00 :: PackageIndex -> Bool
+    is00 index = "00-index.tar.gz" `T.isInfixOf` indexLocation index
 
 -- | Turn package identifiers and package names into a list of
 -- @ResolvedPackage@s. Returns any unresolved names and
@@ -256,23 +267,30 @@ resolvePackagesAllowMissing mSnapshotDef idents0 names0 = do
       (missingNames, idents1) = partitionEithers $ map
           (\name -> maybe (Left name) Right (getNamed name))
           (Set.toList names0)
+  config <- view configL
   let (missingIdents, resolved) =
         partitionEithers
-          $ map (\pir -> maybe (Left pir) Right (lookupResolvedPackage pir cache))
+          $ map (\pir -> maybe (Left pir) Right (lookupResolvedPackage config pir cache))
           $ idents0 <> idents1
   return (Set.fromList missingNames, HashSet.fromList missingIdents, resolved)
 
-lookupResolvedPackage :: PackageIdentifierRevision -> PackageCache PackageIndex -> Maybe ResolvedPackage
-lookupResolvedPackage (PackageIdentifierRevision ident@(PackageIdentifier name version) cfi) (PackageCache cache) = do
+lookupResolvedPackage :: Config -> PackageIdentifierRevision -> PackageCache PackageIndex -> Maybe ResolvedPackage
+lookupResolvedPackage config (PackageIdentifierRevision ident@(PackageIdentifier name version) cfi) (PackageCache cache) = do
   (index, mdownload, files) <- HashMap.lookup name cache >>= HashMap.lookup version
+  let moffsetSize =
+        case cfi of
+          CFILatest -> Just $ snd $ NE.last files
+          CFIHash _msize hash' -> -- TODO check size?
+              lookup hash'
+            $ concatMap (\(hashes, x) -> map (, x) hashes)
+            $ NE.toList files
+          CFIRevision rev -> fmap snd $ listToMaybe $ drop (fromIntegral rev) $ NE.toList files
   offsetSize <-
-    case cfi of
-      CFILatest -> Just $ snd $ NE.last files
-      CFIHash _msize hash' -> -- TODO check size?
-          lookup hash'
-        $ concatMap (\(hashes, x) -> map (, x) hashes)
-        $ NE.toList files
-      CFIRevision rev -> fmap snd $ listToMaybe $ drop (fromIntegral rev) $ NE.toList files
+    case moffsetSize of
+      Just x -> Just x
+      Nothing
+        | configIgnoreRevisionMismatch config -> Just $ snd $ NE.last files
+        | otherwise -> Nothing
   Just ResolvedPackage
     { rpIdent = ident
     , rpDownload = mdownload
@@ -365,9 +383,10 @@ withCabalLoader inner = do
                                 _ <- getPackageCaches
                                 return ()
                             return (False, doLookup ident)
-                        else return (toUpdate,
-                                     throwIO $ UnknownPackageIdentifiers
-                                       (HashSet.singleton ident) (T.unpack suggestions))
+                        else do
+                          uses00Index <- unliftIO u getUses00Index
+                          return (toUpdate, throwIO $ UnknownPackageIdentifiers
+                                       (HashSet.singleton ident) (T.unpack suggestions) uses00Index)
     inner doLookup
 
 lookupPackageIdentifierExact
@@ -376,7 +395,8 @@ lookupPackageIdentifierExact
   -> PackageCache PackageIndex
   -> m (Maybe ByteString)
 lookupPackageIdentifierExact identRev cache = do
-  forM (lookupResolvedPackage identRev cache) $ \rp -> do
+  config <- view configL
+  forM (lookupResolvedPackage config identRev cache) $ \rp -> do
     [bs] <- withCabalFiles (indexName (rpIndex rp)) [(rp, ())] $ \_ _ bs -> return bs
     return bs
 
