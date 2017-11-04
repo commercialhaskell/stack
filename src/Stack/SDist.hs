@@ -40,9 +40,10 @@ import           Data.Time.Clock.POSIX
 import           Distribution.Package (Dependency (..))
 import qualified Distribution.PackageDescription as Cabal
 import qualified Distribution.PackageDescription.Check as Check
+import qualified Distribution.PackageDescription.Parse as Cabal
 import           Distribution.PackageDescription.PrettyPrint (showGenericPackageDescription)
 import qualified Distribution.Types.UnqualComponentName as Cabal
-import           Distribution.Text (display)
+import qualified Distribution.Text as Cabal
 import           Distribution.Version (simplifyVersionRange, orLaterVersion, earlierVersion, hasUpperBound, hasLowerBound)
 import           Lens.Micro (set)
 import           Path
@@ -54,6 +55,7 @@ import           Stack.Build.Source (loadSourceMap)
 import           Stack.Build.Target hiding (PackageType (..))
 import           Stack.BuildPlan
 import           Stack.PackageLocation (resolveMultiPackageLocation)
+import           Stack.PrettyPrint
 import           Stack.Constants
 import           Stack.Package
 import           Stack.Types.Build
@@ -111,7 +113,7 @@ getSDistTarball
 getSDistTarball mpvpBounds pkgDir = do
     config <- view configL
     let PvpBounds pvpBounds asRevision = fromMaybe (configPvpBounds config) mpvpBounds
-        tweakCabal = pvpBounds /= PvpBoundsNone
+        tweakCabal = True -- pvpBounds /= PvpBoundsNone
         pkgFp = toFilePath pkgDir
     lp <- readLocalPackage pkgDir
     logInfo $ "Getting file list for " <> T.pack pkgFp
@@ -195,7 +197,56 @@ getCabalLbs pvpBounds mrev fp = do
                   $ Cabal.packageDescription gpd'
                   }
               }
-    ident <- parsePackageIdentifierFromString $ display $ Cabal.package $ Cabal.packageDescription gpd''
+    ident <- parsePackageIdentifierFromString $ Cabal.display $ Cabal.package $ Cabal.packageDescription gpd''
+    -- Sanity rendering and reparsing the input, to ensure there are no
+    -- cabal bugs, since there have been bugs here before, and currently
+    -- are at the time of writing:
+    --
+    -- * https://github.com/haskell/cabal/issues/1202
+    -- * https://github.com/haskell/cabal/issues/2353
+    -- * https://github.com/haskell/cabal/issues/4863
+    let roundtripErrs =
+          [ flow "Bug detected in Cabal library. ((parse . render . parse) === id) does not hold for the cabal file at"
+          <+> display path
+          , ""
+          ]
+    case Cabal.parseGenericPackageDescription (showGenericPackageDescription gpd) of
+      Cabal.ParseOk _ roundtripped
+        | roundtripped == gpd -> return ()
+        | otherwise -> do
+            prettyWarn $ vsep $ roundtripErrs ++
+              [ "Please see the following issues:"
+              , indent 2 $ bulletedList
+                [ styleUrl "https://github.com/commercialhaskell/stack/issues/3549"
+                , styleUrl "https://github.com/haskell/cabal/issues/4863"
+                ]
+              , ""
+              , fillSep
+                [ flow "If these are closed as resolved, then you may be able to fix this by upgrading to a newer version of stack via"
+                , styleShell "stack upgrade"
+                , flow "for latest stable version or"
+                , styleShell "stack upgrade --git"
+                , flow "for the latest development version."
+                ]
+              , ""
+              , fillSep
+                [ flow "If the issues are fixed, but that doesn't solve the problem, please check if there are similar open issues, and if not, report a new issue to the stack issue tracker, at"
+                , styleUrl "https://github.com/commercialhaskell/stack/issues/new"
+                ]
+              , ""
+              , flow "If these issues are not fixed, feel free to leave a comment on the issues indicating that you would like it to be fixed."
+              , ""
+              ]
+      Cabal.ParseFailed err -> do
+        prettyWarn $ vsep $ roundtripErrs ++
+          [ flow "In particular, parsing the rendered cabal file is yielding a parse error.  Please check if there are already issues tracking this, and if not, please report new issues to the stack and cabal issue trackers, via"
+          , bulletedList
+            [ styleUrl "https://github.com/commercialhaskell/stack/issues/new"
+            , styleUrl "https://github.com/haskell/cabal/issues/new"
+            ]
+          , flow $ "The parse error is: " ++ show err
+          , ""
+          ]
     return
       ( ident
       , TLE.encodeUtf8 $ TL.pack $ showGenericPackageDescription gpd''

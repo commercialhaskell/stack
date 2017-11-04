@@ -16,7 +16,7 @@ module Stack.PrettyPrint
       -- | These are preferred to styling or colors directly, so that we can
       -- encourage consistency.
     , styleWarning, styleError, styleGood
-    , styleShell, styleFile, styleDir, styleModule
+    , styleShell, styleFile, styleUrl, styleDir, styleModule
     , styleCurrent, styleTarget
     , displayMilliseconds
       -- * Formatting utils
@@ -171,6 +171,10 @@ styleShell = magenta
 -- | Style an 'AnsiDoc' as a filename. See 'styleDir' for directories.
 styleFile :: AnsiDoc -> AnsiDoc
 styleFile = bold . white
+
+-- | Style an 'AsciDoc' as a URL.  For now using the same style as files.
+styleUrl :: AnsiDoc -> AnsiDoc
+styleUrl = styleFile
 
 -- | Style an 'AnsiDoc' as a directory name. See 'styleFile' for files.
 styleDir :: AnsiDoc -> AnsiDoc
