@@ -113,6 +113,8 @@ Other enhancements:
 * Add hpack `package.yaml` to build Stack itself
 * Add `ignore-revision-mismatch` setting. See:
   [#3520](https://github.com/commercialhaskell/stack/issues/3520).
+* Log when each individual test suite finishes. See:
+  [#3552](https://github.com/commercialhaskell/stack/issues/3552).
 
 Bug fixes:
 
