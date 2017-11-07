@@ -215,14 +215,12 @@ getCabalLbs pvpBounds mrev fp = do
         | roundtripped == gpd -> return ()
         | otherwise -> do
             prettyWarn $ vsep $ roundtripErrs ++
-              [ "Please see the following issues:"
-              , indent 2 $ bulletedList
-                [ styleUrl "https://github.com/commercialhaskell/stack/issues/3549"
-                , styleUrl "https://github.com/haskell/cabal/issues/4863"
-                ]
+              [ "This seems to be fixed in development versions of Cabal, but at time of writing, the fix is not in any released versions."
+              , ""
+              ,  "Please see this GitHub issue for status:" <+> styleUrl "https://github.com/commercialhaskell/stack/issues/3549"
               , ""
               , fillSep
-                [ flow "If these are closed as resolved, then you may be able to fix this by upgrading to a newer version of stack via"
+                [ flow "If the issue is closed as resolved, then you may be able to fix this by upgrading to a newer version of stack via"
                 , styleShell "stack upgrade"
                 , flow "for latest stable version or"
                 , styleShell "stack upgrade --git"
@@ -230,11 +228,11 @@ getCabalLbs pvpBounds mrev fp = do
                 ]
               , ""
               , fillSep
-                [ flow "If the issues are fixed, but that doesn't solve the problem, please check if there are similar open issues, and if not, report a new issue to the stack issue tracker, at"
+                [ flow "If the issue is fixed, but updating doesn't solve the problem, please check if there are similar open issues, and if not, report a new issue to the stack issue tracker, at"
                 , styleUrl "https://github.com/commercialhaskell/stack/issues/new"
                 ]
               , ""
-              , flow "If these issues are not fixed, feel free to leave a comment on the issues indicating that you would like it to be fixed."
+              , flow "If the issue is not fixed, feel free to leave a comment on it indicating that you would like it to be fixed."
               , ""
               ]
       Cabal.ParseFailed err -> do
