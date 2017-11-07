@@ -1668,9 +1668,14 @@ singleTest runInBase topts testsToRun ac ee task installedMap = do
                         -- tidiness.
                         when needHpc $
                             updateTixFile (packageName package) tixPath testName'
-                        return $ case ec of
-                            ExitSuccess -> Map.empty
-                            _ -> Map.singleton testName $ Just ec
+                        let announceResult result = announce $ "Test suite " <> testName <> " " <> result
+                        case ec of
+                            ExitSuccess -> do
+                                announceResult "passed"
+                                return Map.empty
+                            _ -> do
+                                announceResult "failed"
+                                return $ Map.singleton testName (Just ec)
                     else do
                         logError $ T.pack $ show $ TestSuiteExeMissing
                             (packageBuildType package == Just C.Simple)
