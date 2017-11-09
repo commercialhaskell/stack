@@ -170,6 +170,9 @@ Bug fixes:
 * When `--pvp-bounds` is enabled for sdist or upload, internal
   dependencies could cause errors when uploaded to hackage.  This is
   fixed, see [#3290](https://github.com/commercialhaskell/stack/issues/3290)
+* Fixes a bug where nonexistent hackage versions would cause stack to
+  suggest the same package name, without giving version info. See
+  [#3562](https://github.com/commercialhaskell/stack/issues/3562)
 
 
 ## 1.5.1
