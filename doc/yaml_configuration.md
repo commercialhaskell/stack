@@ -260,8 +260,8 @@ flags:
     flag-name: true
 ```
 
-Flags will only affect packages in your `packages` and `extra-deps` settings.
-Packages that come from the snapshot global database are not affected.
+If a specified flag is different than the one specified for a snapshot package,
+then the snapshot package will automatically be promoted to be an extra-dep.
 
 ### image
 
@@ -299,7 +299,7 @@ image:
     - app-backend
 ```
 
-will build one container tagged `myproject:latest` which contains the project 
+will build one container tagged `myproject:latest` which contains the project
 including the `/etc/app-backend` configuration data.
 
 Another container tagged `myproject-app-backend:latest` based on the `myproject:latest`
