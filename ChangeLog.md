@@ -173,6 +173,9 @@ Bug fixes:
 * Fixes a bug where nonexistent hackage versions would cause stack to
   suggest the same package name, without giving version info. See
   [#3562](https://github.com/commercialhaskell/stack/issues/3562)
+* Fixes a bug that has existed since 1.5.0, where
+  `stack setup --upgrade-cabal` would say that Cabal is already the latest
+  version, when it wasn't.
 
 
 ## 1.5.1

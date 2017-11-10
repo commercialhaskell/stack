@@ -666,26 +666,31 @@ upgradeCabal :: (HasConfig env, HasGHCVariant env)
              -> WhichCompiler
              -> UpgradeTo
              -> RIO env ()
-upgradeCabal menv wc cabalVersion = do
+upgradeCabal menv wc upgradeTo = do
     logInfo "Manipulating the global Cabal is only for debugging purposes"
     let name = $(mkPackageName "Cabal")
     rmap <- resolvePackages Nothing mempty (Set.singleton name)
     installed <- getCabalPkgVer menv wc
-    case cabalVersion of
-        Specific version -> do
-            if installed /= version then
-                doCabalInstall menv wc installed version
+    case upgradeTo of
+        Specific wantedVersion -> do
+            if installed /= wantedVersion then
+                doCabalInstall menv wc installed wantedVersion
             else
                 logInfo $ T.concat ["No install necessary. Cabal "
                                     , T.pack $ versionString installed
                                     , " is already installed"]
         Latest     -> case map rpIdent rmap of
             [] -> throwString "No Cabal library found in index, cannot upgrade"
-            [PackageIdentifier name' version] | name == name' -> do
-                if installed > version then
-                    doCabalInstall menv wc installed version
+            [PackageIdentifier name' latestVersion] | name == name' -> do
+                if installed < latestVersion then
+                    doCabalInstall menv wc installed latestVersion
                 else
-                    logInfo $ "No upgrade necessary. Latest Cabal already installed"
+                    logInfo $ T.concat
+                        [ "No upgrade necessary: Cabal-"
+                        , T.pack $ versionString latestVersion
+                        , " is the same or newer than latest hackage version "
+                        , T.pack $ versionString installed
+                        ]
             x -> error $ "Unexpected results for resolvePackages: " ++ show x
 
 -- Configure and run the necessary commands for a cabal install
@@ -695,19 +700,19 @@ doCabalInstall :: (HasConfig env, HasGHCVariant env)
                -> Version
                -> Version
                -> RIO env ()
-doCabalInstall menv wc installed version = do
+doCabalInstall menv wc installed wantedVersion = do
     withSystemTempDir "stack-cabal-upgrade" $ \tmpdir -> do
         logInfo $ T.concat
             [ "Installing Cabal-"
-            , T.pack $ versionString version
+            , T.pack $ versionString wantedVersion
             , " to replace "
             , T.pack $ versionString installed
             ]
         let name = $(mkPackageName "Cabal")
-            ident = PackageIdentifier name version
+            ident = PackageIdentifier name wantedVersion
         m <- unpackPackageIdents tmpdir Nothing [PackageIdentifierRevision ident CFILatest]
         compilerPath <- join $ findExecutable menv (compilerExeName wc)
-        versionDir <- parseRelDir $ versionString version
+        versionDir <- parseRelDir $ versionString wantedVersion
         let installRoot = toFilePath $ parent (parent compilerPath)
                                     </> $(mkRelDir "new-cabal")
                                     </> versionDir
