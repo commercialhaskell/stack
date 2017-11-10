@@ -225,7 +225,7 @@ loadLocalPackage boptsCli targets (name, lpv) = do
                     case packageLibraries pkg of
                       NoLibraries -> False
                       HasLibraries _ -> True
-               in hasLibrary || not (Set.null allComponents)
+               in hasLibrary || not (Set.null nonLibComponents)
 
         filterSkippedComponents = Set.filter (not . (`elem` boptsSkipComponents bopts))
 
@@ -233,7 +233,7 @@ loadLocalPackage boptsCli targets (name, lpv) = do
                                   filterSkippedComponents testCandidates,
                                   filterSkippedComponents benchCandidates)
 
-        allComponents = toComponents exes tests benches
+        nonLibComponents = toComponents exes tests benches
 
         toComponents e t b = Set.unions
             [ Set.map CExe e
@@ -278,7 +278,14 @@ loadLocalPackage boptsCli targets (name, lpv) = do
         benchpkg = resolvePackage benchconfig gpkg
 
     mbuildCache <- tryGetBuildCache $ lpvRoot lpv
-    (files,_) <- getPackageFilesSimple pkg (lpvCabalFP lpv)
+
+    (_,compFiles,otherFiles,_) <-
+        getPackageFiles (packageFiles pkg) (lpvCabalFP lpv)
+    let filesForComponent cn = Set.map dotCabalGetPath
+                             $ M.findWithDefault mempty cn compFiles
+        files = Set.unions
+              $ otherFiles
+              : map filesForComponent (CLib : Set.toList nonLibComponents)
 
     (dirtyFiles, newBuildCache) <- checkBuildCache
         (fromMaybe Map.empty mbuildCache)
@@ -301,7 +308,7 @@ loadLocalPackage boptsCli targets (name, lpv) = do
         , lpCabalFile = lpvCabalFP lpv
         , lpDir = lpvRoot lpv
         , lpWanted = isWanted
-        , lpComponents = allComponents
+        , lpComponents = nonLibComponents
         -- TODO: refactor this so that it's easier to be sure that these
         -- components are indeed unbuildable.
         --
