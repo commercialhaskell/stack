@@ -19,7 +19,6 @@ import qualified Data.List as L
 import Data.Monoid
 import Data.Text hiding (pack, intercalate)
 import qualified Data.Text as T
-import qualified Data.Text.IO as T
 import Data.Typeable (Typeable)
 import qualified Data.Vector as V
 import Network.HTTP.Simple
@@ -30,7 +29,6 @@ import qualified Options.Applicative as OA
 import Path
 import Stack.Runners (withBuildConfig)
 import Stack.Types.Config
-import System.Console.ANSI
 import System.Process.PagerEditor
 import System.Directory (listDirectory)
 import Network.HTTP.Client.TLS (getGlobalManager)
@@ -119,45 +117,23 @@ parseSnapshot :: Value -> A.Parser Snapshot
 parseSnapshot =
     A.withArray "array of snapshot" (\val -> return $ toSnapshot (V.toList val))
 
-displaySnap :: Snapshot -> IO ()
-displaySnap snapshot = do
-    T.putStrLn $ "Resolver name: " <> snapId snapshot
-    T.putStrLn $ snapTitle snapshot
-    putStrLn ""
+displayTime :: Snapshot -> [ByteString]
+displayTime Snapshot {..} = [pack $ T.unpack snapTime]
 
-displayTime' :: Snapshot -> [ByteString]
-displayTime' Snapshot {..} = [pack $ T.unpack snapTime]
-
-displaySnap' :: Snapshot -> [ByteString]
-displaySnap' Snapshot {..} =
+displaySnap :: Snapshot -> [ByteString]
+displaySnap Snapshot {..} =
     [ "Resolver name: " <> (pack $ T.unpack snapId)
     , "\n" <> pack (T.unpack snapTitle) <> "\n\n"
     ]
 
-displayTime :: Snapshot -> IO ()
-displayTime snapshot = do
-    setSGR [SetColor Foreground Dull Green]
-    T.putStrLn $ snapTime snapshot
-    setSGR [Reset]
-    putStrLn ""
-
-displaySingleSnap :: [Snapshot] -> IO ()
+displaySingleSnap :: [Snapshot] -> ByteString
 displaySingleSnap snapshots =
-    case snapshots of
-        [] -> return ()
-        (x:xs) -> do
-            displayTime x
-            displaySnap x
-            mapM_ displaySnap xs
-
-displaySingleSnap' :: [Snapshot] -> ByteString
-displaySingleSnap' snapshots =
     case snapshots of
         [] -> mempty
         (x:xs) ->
             let snaps =
-                    displayTime' x <> ["\n\n"] <> displaySnap' x <>
-                    (L.concatMap displaySnap' xs)
+                    displayTime x <> ["\n\n"] <> displaySnap x <>
+                    (L.concatMap displaySnap xs)
             in BC.concat snaps
 
 displaySnapshotData :: SnapshotData -> IO ()
@@ -165,7 +141,7 @@ displaySnapshotData sdata =
     case L.reverse $ snaps sdata of
         [] -> return ()
         xs ->
-            let snaps = BC.concat $ L.map displaySingleSnap' xs
+            let snaps = BC.concat $ L.map displaySingleSnap xs
             in pageByteString snaps
 
 filterSnapshotData :: SnapshotData -> SnapshotType -> SnapshotData
