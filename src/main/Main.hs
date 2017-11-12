@@ -293,7 +293,7 @@ commandLineHandler currentDir progName isInterpreter = complicatedOptions
                     pathCmd
                     Stack.Path.pathParser
         addCommand' "ls"
-                    "List latest Stackage snapshots"
+                    "List command. (Supports snapshots)"
                     lsCmd
                     lsParser
         addCommand' "unpack"
