@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE FlexibleContexts    #-}
 {-# LANGUAGE FlexibleInstances   #-}
 {-# LANGUAGE OverloadedStrings   #-}
@@ -13,10 +14,7 @@ module Stack.Upload
     , loadCreds
     ) where
 
-import           Control.Applicative
-import           Control.Exception.Safe                (handleIO, tryIO)
-import qualified Control.Exception                     as E
-import           Control.Monad                         (void, when, unless)
+import           Stack.Prelude
 import           Data.Aeson                            (FromJSON (..),
                                                         ToJSON (..),
                                                         decode', encode,
@@ -24,9 +22,7 @@ import           Data.Aeson                            (FromJSON (..),
                                                         (.:), (.=))
 import qualified Data.ByteString.Char8                 as S
 import qualified Data.ByteString.Lazy                  as L
-import           Data.Conduit                          (ConduitM, runConduit, (.|))
 import qualified Data.Conduit.Binary                   as CB
-import           Data.Text                             (Text)
 import qualified Data.Text                             as T
 import           Data.Text.Encoding                    (encodeUtf8)
 import qualified Data.Text.IO                          as TIO
@@ -44,17 +40,14 @@ import           Network.HTTP.Client.MultipartFormData (formDataBody, partFileRe
 import           Network.HTTP.Client.TLS               (getGlobalManager,
                                                         applyDigestAuth,
                                                         displayDigestAuthException)
-import           Path                                  (toFilePath)
-import           Prelude -- Fix redundant import warnings
 import           Stack.Types.Config
 import           Stack.Types.PackageIdentifier         (PackageIdentifier, packageIdentifierString,
                                                         packageIdentifierName)
 import           Stack.Types.PackageName               (packageNameString)
-import           Stack.Types.StringError
 import           System.Directory                      (createDirectoryIfMissing,
                                                         removeFile)
 import           System.FilePath                       ((</>), takeFileName)
-import           System.IO                             (hFlush, stdout)
+import           System.IO                             (hFlush, stdout, putStrLn, putStr, getLine, print) -- TODO remove putStrLn, use logInfo
 import           System.IO.Echo                        (withoutInputEcho)
 
 -- | Username and password to log into Hackage.
@@ -95,9 +88,6 @@ loadCreds config = do
       return $ mkCreds fp
   where
     fromPrompt fp = do
-      when (configSaveHackageCreds config) $ do
-        putStrLn "NOTE: Username and password will be saved in a local file"
-        putStrLn "You can modify this behavior with the save-hackage-creds config option"
       putStr "Hackage username: "
       hFlush stdout
       username <- TIO.getLine
@@ -107,8 +97,31 @@ loadCreds config = do
             , hcPassword = password
             , hcCredsFile = fp
             }
-      L.writeFile fp (encode hc)
+
+      when (configSaveHackageCreds config) $ do
+        let prompt = "Save hackage credentials to file at " ++ fp ++ " [y/n]? "
+        putStr prompt
+        input <- loopPrompt prompt
+        putStrLn "NOTE: Avoid this prompt in the future by using: save-hackage-creds: false"
+        hFlush stdout
+        case input of
+          "y" -> do
+            L.writeFile fp (encode hc)
+            putStrLn "Saved!"
+            hFlush stdout
+          _ -> return ()
+
       return hc
+
+    loopPrompt :: String -> IO String
+    loopPrompt p = do
+      input <- TIO.getLine
+      case input of
+        "y" -> return "y"
+        "n" -> return "n"
+        _   -> do
+          putStr p
+          loopPrompt p
 
 credsFile :: Config -> IO FilePath
 credsFile config = do
@@ -137,7 +150,7 @@ applyCreds creds req0 = do
   case ereq of
       Left e -> do
           putStrLn "WARNING: No HTTP digest prompt found, this will probably fail"
-          case E.fromException e of
+          case fromException e of
               Just e' -> putStrLn $ displayDigestAuthException e'
               Nothing -> print e
           return req0

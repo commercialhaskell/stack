@@ -6,6 +6,10 @@ copyright: Copyright (c) 2015-2017, Stack contributors
 docs_dir: doc
 site_dir: _site
 theme: readthedocs
+extra_css:
+- css/extra.css
+extra_javascript:
+- js/searchhack.js
 
 pages:
 - Home: README.md

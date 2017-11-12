@@ -1,27 +1,25 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE RecordWildCards  #-}
 {-# LANGUAGE TemplateHaskell, OverloadedStrings #-}
 module Stack.NixSpec where
 
-import Control.Exception
-import Control.Monad.Logger
-import Data.Maybe
-import Data.Monoid
 import Options.Applicative
 import Path
-import Prelude -- to remove the warning about Data.Monoid being redundant on GHC 7.10
 import Stack.Config
 import Stack.Options.NixParser
 import Stack.Config.Nix
+import Stack.Prelude
 import Stack.Types.Compiler
 import Stack.Types.Config
 import Stack.Types.Nix
-import Stack.Types.StackT
+import Stack.Types.Runner
 import Stack.Types.Version
 import System.Directory
 import System.Environment
-import System.IO.Temp (withSystemTempDirectory)
 import Test.Hspec
+import Prelude (writeFile)
+import Data.Maybe (fromJust)
 
 sampleConfigNixEnabled :: String
 sampleConfigNixEnabled =
@@ -47,7 +45,9 @@ setup = unsetEnv "STACK_YAML"
 
 spec :: Spec
 spec = beforeAll setup $ do
-  let loadConfig' cmdLineArgs = runStackT () LevelDebug True False ColorAuto False (loadConfig cmdLineArgs Nothing SYLDefault)
+  let loadConfig' cmdLineArgs =
+        withRunner LevelDebug True False ColorAuto Nothing False $ \runner ->
+        runRIO runner $ loadConfig cmdLineArgs Nothing SYLDefault
       inTempDir test = do
         currentDirectory <- getCurrentDirectory
         withSystemTempDirectory "Stack_ConfigSpec" $ \tempDir -> do
@@ -104,4 +104,5 @@ spec = beforeAll setup $ do
         lc <- loadConfig' mempty
         nixPackages (configNix $ lcConfig lc) `shouldBe` ["glpk"]
         v <- parseVersion "7.10.3"
-        nixCompiler (GhcVersion v) `shouldBe` "haskell.compiler.ghc7103"
+        ghc <- either throwIO return $ nixCompiler (GhcVersion v)
+        ghc `shouldBe` "haskell.compiler.ghc7103"

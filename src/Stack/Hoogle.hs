@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell #-}
@@ -7,74 +8,57 @@ module Stack.Hoogle
     ( hoogleCmd
     ) where
 
-import           Control.Exception
-import           Control.Monad.IO.Class
-import           Control.Monad.Logger
+import           Stack.Prelude
 import qualified Data.ByteString.Char8 as S8
+import           Data.Char (isSpace)
 import           Data.List (find)
-import           Data.Monoid
 import qualified Data.Set as Set
+import qualified Data.Text as T
 import           Lens.Micro
-import           Path
-import           Path.IO
+import           Path.IO hiding (findExecutable)
 import qualified Stack.Build
 import           Stack.Fetch
 import           Stack.Runners
 import           Stack.Types.Config
 import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageName
-import           Stack.Types.StackT
 import           Stack.Types.Version
 import           System.Exit
-import           System.Process.Read (resetExeCache, tryProcessStdout)
+import           System.Process.Read (resetExeCache, tryProcessStdout, findExecutable)
 import           System.Process.Run
 
 -- | Hoogle command.
 hoogleCmd :: ([String],Bool,Bool) -> GlobalOpts -> IO ()
-hoogleCmd (args,setup,rebuild) go = withBuildConfig go pathToHaddocks
+hoogleCmd (args,setup,rebuild) go = withBuildConfig go $ do
+    hooglePath <- ensureHoogleInPath
+    generateDbIfNeeded hooglePath
+    runHoogle hooglePath args
   where
-    pathToHaddocks :: StackT EnvConfig IO ()
-    pathToHaddocks = do
-        hoogleIsInPath <- checkHoogleInPath
-        if hoogleIsInPath
-            then haddocksToDb
-            else do
-                if setup
-                    then do
-                        $logWarn
-                            "Hoogle isn't installed or is too old. Automatically installing (use --no-setup to disable) ..."
-                        installHoogle
-                        haddocksToDb
-                    else do
-                        $logError
-                            "Hoogle isn't installed or is too old. Not installing it due to --no-setup."
-                        bail
-    haddocksToDb :: StackT EnvConfig IO ()
-    haddocksToDb = do
+    generateDbIfNeeded :: Path Abs File -> RIO EnvConfig ()
+    generateDbIfNeeded hooglePath = do
         databaseExists <- checkDatabaseExists
         if databaseExists && not rebuild
-            then runHoogle args
+            then return ()
             else if setup || rebuild
                      then do
-                         $logWarn
+                         logWarn
                              (if rebuild
                                   then "Rebuilding database ..."
                                   else "No Hoogle database yet. Automatically building haddocks and hoogle database (use --no-setup to disable) ...")
                          buildHaddocks
-                         $logInfo "Built docs."
-                         generateDb
-                         $logInfo "Generated DB."
-                         runHoogle args
+                         logInfo "Built docs."
+                         generateDb hooglePath
+                         logInfo "Generated DB."
                      else do
-                         $logError
+                         logError
                              "No Hoogle database. Not building one due to --no-setup"
                          bail
-    generateDb :: StackT EnvConfig IO ()
-    generateDb = do
+    generateDb :: Path Abs File -> RIO EnvConfig ()
+    generateDb hooglePath = do
         do dir <- hoogleRoot
            createDirIfMissing True dir
-           runHoogle ["generate", "--local"]
-    buildHaddocks :: StackT EnvConfig IO ()
+           runHoogle hooglePath ["generate", "--local"]
+    buildHaddocks :: RIO EnvConfig ()
     buildHaddocks =
         liftIO
             (catch
@@ -90,12 +74,12 @@ hoogleCmd (args,setup,rebuild) go = withBuildConfig go pathToHaddocks
                                 defaultBuildOptsCLI))
                  (\(_ :: ExitCode) ->
                        return ()))
-    installHoogle :: StackT EnvConfig IO ()
+    hooglePackageName = $(mkPackageName "hoogle")
+    hoogleMinVersion = $(mkVersion "5.0")
+    hoogleMinIdent =
+        PackageIdentifier hooglePackageName hoogleMinVersion
+    installHoogle :: RIO EnvConfig ()
     installHoogle = do
-        let hooglePackageName = $(mkPackageName "hoogle")
-            hoogleMinVersion = $(mkVersion "5.0")
-            hoogleMinIdent =
-                PackageIdentifier hooglePackageName hoogleMinVersion
         hooglePackageIdentifier <-
             do (_,_,resolved) <-
                    resolvePackagesAllowMissing
@@ -121,11 +105,11 @@ hoogleCmd (args,setup,rebuild) go = withBuildConfig go pathToHaddocks
                         _ -> Left hoogleMinIdent)
         case hooglePackageIdentifier of
             Left{} ->
-                $logInfo
+                logInfo
                     ("Minimum " <> packageIdentifierText hoogleMinIdent <>
                      " is not in your index. Installing the minimum version.")
             Right ident ->
-                $logInfo
+                logInfo
                     ("Minimum version is " <> packageIdentifierText hoogleMinIdent <>
                      ". Found acceptable " <>
                      packageIdentifierText ident <>
@@ -151,8 +135,8 @@ hoogleCmd (args,setup,rebuild) go = withBuildConfig go pathToHaddocks
                        case e of
                            ExitSuccess -> resetExeCache menv
                            _ -> throwIO e))
-    runHoogle :: [String] -> StackT EnvConfig IO ()
-    runHoogle hoogleArgs = do
+    runHoogle :: Path Abs File -> [String] -> RIO EnvConfig ()
+    runHoogle hooglePath hoogleArgs = do
         config <- view configL
         menv <- liftIO $ configEnvOverride config envSettings
         dbpath <- hoogleDatabasePath
@@ -160,23 +144,59 @@ hoogleCmd (args,setup,rebuild) go = withBuildConfig go pathToHaddocks
         runCmd
             Cmd
              { cmdDirectoryToRunIn = Nothing
-             , cmdCommandToRun = "hoogle"
+             , cmdCommandToRun = toFilePath hooglePath
              , cmdEnvOverride = menv
              , cmdCommandLineArguments = hoogleArgs ++ databaseArg
              }
             Nothing
-    bail :: StackT EnvConfig IO ()
+    bail :: RIO EnvConfig a
     bail = liftIO (exitWith (ExitFailure (-1)))
     checkDatabaseExists = do
         path <- hoogleDatabasePath
         liftIO (doesFileExist path)
-    checkHoogleInPath = do
+    ensureHoogleInPath :: RIO EnvConfig (Path Abs File)
+    ensureHoogleInPath = do
         config <- view configL
         menv <- liftIO $ configEnvOverride config envSettings
-        result <- tryProcessStdout Nothing menv "hoogle" ["--numeric-version"]
-        case fmap (reads . S8.unpack) result of
-            Right [(ver :: Double,_)] -> return (ver >= 5.0)
-            _ -> return False
+        mhooglePath <- findExecutable menv "hoogle"
+        eres <- case mhooglePath of
+            Nothing -> return $ Left "Hoogle isn't installed."
+            Just hooglePath -> do
+                result <- tryProcessStdout Nothing menv (toFilePath hooglePath) ["--numeric-version"]
+                let unexpectedResult got = Left $ T.concat
+                        [ "'"
+                        , T.pack (toFilePath hooglePath)
+                        , " --numeric-version' did not respond with expected value. Got: "
+                        , got
+                        ]
+                return $ case result of
+                    Left err -> unexpectedResult $ T.pack (show err)
+                    Right bs -> case parseVersionFromString (takeWhile (not . isSpace) (S8.unpack bs)) of
+                        Nothing -> unexpectedResult $ T.pack (S8.unpack bs)
+                        Just ver
+                            | ver >= hoogleMinVersion -> Right hooglePath
+                            | otherwise -> Left $ T.concat
+                                [ "Installed Hoogle is too old, "
+                                , T.pack (toFilePath hooglePath)
+                                , " is version "
+                                , versionText ver
+                                , " but >= 5.0 is required."
+                                ]
+        case eres of
+            Right hooglePath -> return hooglePath
+            Left err
+                | setup -> do
+                    logWarn $ err <> " Automatically installing (use --no-setup to disable) ..."
+                    installHoogle
+                    mhooglePath' <- findExecutable menv "hoogle"
+                    case mhooglePath' of
+                        Just hooglePath -> return hooglePath
+                        Nothing -> do
+                            logWarn "Couldn't find hoogle in path after installing.  This shouldn't happen, may be a bug."
+                            bail
+                | otherwise -> do
+                    logWarn $ err <> " Not installing it due to --no-setup."
+                    bail
     envSettings =
         EnvSettings
         { esIncludeLocals = True

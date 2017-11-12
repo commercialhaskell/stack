@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -7,13 +8,9 @@
 
 module Stack.Types.Nix where
 
-import Control.Applicative
 import Data.Aeson.Extended
-import Data.Monoid
-import Data.Text (Text)
-import GHC.Generics (Generic)
+import Stack.Prelude
 import Generics.Deriving.Monoid (mappenddefault, memptydefault)
-import Prelude
 
 -- | Nix configuration. Parameterize by resolver type to avoid cyclic
 -- dependency.

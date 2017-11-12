@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleInstances #-}
@@ -8,22 +9,18 @@
 
 module Stack.Types.Docker where
 
-import Control.Applicative
-import Control.Monad.Catch
+import Stack.Prelude
 import Data.Aeson.Extended
 import Data.List (intercalate)
-import Data.Monoid
-import Data.Text (Text)
 import qualified Data.Text as T
-import Data.Typeable
 import Distribution.System (Platform(..), OS(..), Arch(..))
 import Distribution.Text (simpleParse, display)
 import Distribution.Version (anyVersion)
-import GHC.Generics (Generic)
 import Generics.Deriving.Monoid (mappenddefault, memptydefault)
 import Path
-import {-# SOURCE #-} Stack.Constants
+import Stack.Constants
 import Stack.Types.Version
+import Text.Read (Read (..))
 
 -- | Docker configuration.
 data DockerOpts = DockerOpts
@@ -183,7 +180,11 @@ instance Show Mount where
 
 -- | For YAML.
 instance FromJSON Mount where
-  parseJSON v = fmap read (parseJSON v)
+  parseJSON v = do
+    s <- parseJSON v
+    case readMaybe s of
+      Nothing -> fail $ "Mount read failed: " ++ s
+      Just x -> return x
 
 -- | Options for Docker repository or image.
 data DockerMonoidRepoOrImage

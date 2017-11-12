@@ -1,7 +1,6 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TupleSections #-}
 
 -- | Extensions to Aeson parsing of objects.
@@ -27,23 +26,16 @@ module Data.Aeson.Extended (
   , (..!=)
   ) where
 
-import Control.Monad.Logger (MonadLogger, logWarn)
-import Control.Monad.Trans (lift)
 import Control.Monad.Trans.Writer.Strict (WriterT, mapWriterT, runWriterT, tell)
 import Data.Aeson as Export hiding ((.:), (.:?))
 import qualified Data.Aeson as A
 import Data.Aeson.Types hiding ((.:), (.:?))
 import qualified Data.HashMap.Strict as HashMap
-import Data.Monoid
-import Data.Set (Set)
 import qualified Data.Set as Set
-import Data.Text (unpack, Text)
+import Data.Text (unpack)
 import qualified Data.Text as T
-import Data.Traversable
-import qualified Data.Traversable as Traversable
-import GHC.Generics (Generic)
 import Generics.Deriving.Monoid (mappenddefault, memptydefault)
-import Prelude -- Fix redundant import warnings
+import Stack.Prelude
 
 -- | Extends @.:@ warning to include field name.
 (.:) :: FromJSON a => Object -> Text -> Parser a
@@ -111,7 +103,7 @@ logJSONWarnings
     :: MonadLogger m
     => FilePath -> [JSONWarning] -> m ()
 logJSONWarnings fp =
-    mapM_ (\w -> $logWarn ("Warning: " <> T.pack fp <> ": " <> T.pack (show w)))
+    mapM_ (\w -> logWarn ("Warning: " <> T.pack fp <> ": " <> T.pack (show w)))
 
 -- | Handle warnings in a sub-object.
 jsonSubWarnings :: WarningParser (WithJSONWarnings a) -> WarningParser a
@@ -128,7 +120,7 @@ jsonSubWarningsT
     :: Traversable t
     => WarningParser (t (WithJSONWarnings a)) -> WarningParser (t a)
 jsonSubWarningsT f =
-    Traversable.mapM (jsonSubWarnings . return) =<< f
+    mapM (jsonSubWarnings . return) =<< f
 
 -- | Handle warnings in a @Maybe Traversable@ of sub-objects.
 jsonSubWarningsTT
@@ -136,7 +128,7 @@ jsonSubWarningsTT
     => WarningParser (u (t (WithJSONWarnings a)))
     -> WarningParser (u (t a))
 jsonSubWarningsTT f =
-    Traversable.mapM (jsonSubWarningsT . return) =<< f
+    mapM (jsonSubWarningsT . return) =<< f
 
 -- Parsed JSON value without any warnings
 noJSONWarnings :: a -> WithJSONWarnings a
@@ -153,6 +145,8 @@ data WarningParserMonoid = WarningParserMonoid
 instance Monoid WarningParserMonoid where
     mempty = memptydefault
     mappend = mappenddefault
+instance IsString WarningParserMonoid where
+    fromString s = mempty { wpmWarnings = [fromString s] }
 
 -- Parsed JSON value with its warnings
 data WithJSONWarnings a = WithJSONWarnings a [JSONWarning]
@@ -165,8 +159,12 @@ instance Monoid a => Monoid (WithJSONWarnings a) where
 
 -- | Warning output from 'WarningParser'.
 data JSONWarning = JSONUnrecognizedFields String [Text]
+                 | JSONGeneralWarning !Text
 instance Show JSONWarning where
     show (JSONUnrecognizedFields obj [field]) =
         "Unrecognized field in " <> obj <> ": " <> T.unpack field
     show (JSONUnrecognizedFields obj fields) =
         "Unrecognized fields in " <> obj <> ": " <> T.unpack (T.intercalate ", " fields)
+    show (JSONGeneralWarning t) = T.unpack t
+instance IsString JSONWarning where
+  fromString = JSONGeneralWarning . T.pack

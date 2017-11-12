@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE QuasiQuotes, TemplateHaskell, TypeFamilies, OverloadedStrings,
              GADTs, FlexibleContexts, MultiParamTypeClasses, GeneralizedNewtypeDeriving,
              RankNTypes, NamedFieldPuns #-}
@@ -15,24 +16,21 @@ module Stack.Docker.GlobalDB
   ,DockerImageExeId)
   where
 
-import           Control.Exception (IOException,catch,throwIO)
-import           Control.Monad (forM_, when)
 import           Control.Monad.Logger (NoLoggingT)
-import           Control.Monad.Trans.Resource (ResourceT)
+import           Stack.Prelude
 import           Data.List (sortBy, isInfixOf, stripPrefix)
 import           Data.List.Extra (stripSuffix)
 import qualified Data.Map.Strict as Map
-import           Data.Maybe (fromMaybe)
 import qualified Data.Text as T
 import           Data.Time.Clock (UTCTime,getCurrentTime)
 import           Database.Persist
 import           Database.Persist.Sqlite
 import           Database.Persist.TH
-import           Path (toFilePath, parent)
+import           Path (parent, (<.>))
 import           Path.IO (ensureDir)
 import           Stack.Types.Config
 import           Stack.Types.Docker
-import           Stack.Types.StringError
+import           System.FileLock (withFileLock, SharedExclusive(Exclusive))
 
 share [mkPersist sqlSettings, mkMigrate "migrateTables"] [persistLowerCase|
 DockerImageProject
@@ -101,10 +99,11 @@ setDockerImageExe config imageId exePath exeTimestamp compatible =
 withGlobalDB :: forall a. Config -> SqlPersistT (NoLoggingT (ResourceT IO)) a -> IO a
 withGlobalDB config action =
   do let db = dockerDatabasePath (configDocker config)
+     dbLock <- db <.> "lock"
      ensureDir (parent db)
-     runSqlite (T.pack (toFilePath db))
+     withFileLock (toFilePath dbLock) Exclusive (\_fl -> runSqlite (T.pack (toFilePath db))
                (do _ <- runMigrationSilent migrateTables
-                   action)
+                   action))
          `catch` \ex -> do
              let str = show ex
                  str' = fromMaybe str $ stripPrefix "user error (" $

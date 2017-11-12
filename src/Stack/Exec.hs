@@ -1,7 +1,6 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE OverloadedStrings #-}
 
 #if __GLASGOW_HASKELL__ >= 800
 {-# OPTIONS_GHC -Wno-redundant-constraints #-}
@@ -12,13 +11,10 @@
 
 module Stack.Exec where
 
-import           Control.Monad.Reader
-import           Control.Monad.Logger
-import           Control.Monad.Trans.Control (MonadBaseControl)
+import           Stack.Prelude
 import           Stack.Types.Config
 import           System.Process.Log
 
-import           Control.Exception.Lifted
 import           Data.Streaming.Process (ProcessExitedUnsuccessfully(..))
 import           System.Exit
 import           System.Process.Run (callProcess, callProcessObserveStdout, Cmd(..))
@@ -55,14 +51,14 @@ plainEnvSettings = EnvSettings
 -- sub-process. This allows signals to be propagated (#527)
 --
 -- 2) On windows, an 'ExitCode' exception will be thrown.
-exec :: (MonadIO m, MonadLogger m, MonadBaseControl IO m)
+exec :: (MonadUnliftIO m, MonadLogger m)
      => EnvOverride -> String -> [String] -> m b
 #ifdef WINDOWS
 exec = execSpawn
 #else
 exec menv cmd0 args = do
     cmd <- preProcess Nothing menv cmd0
-    $withProcessTimeLog cmd args $
+    withProcessTimeLog cmd args $
         liftIO $ PID1.run cmd args (envHelper menv)
 #endif
 
@@ -70,19 +66,19 @@ exec menv cmd0 args = do
 -- is a sub-process, which is helpful in some cases (#1306)
 --
 -- This function only exits by throwing 'ExitCode'.
-execSpawn :: (MonadIO m, MonadLogger m, MonadBaseControl IO m)
+execSpawn :: (MonadUnliftIO m, MonadLogger m)
      => EnvOverride -> String -> [String] -> m b
 execSpawn menv cmd0 args = do
-    e <- $withProcessTimeLog cmd0 args $
+    e <- withProcessTimeLog cmd0 args $
         try (callProcess (Cmd Nothing cmd0 menv args))
     liftIO $ case e of
         Left (ProcessExitedUnsuccessfully _ ec) -> exitWith ec
         Right () -> exitSuccess
 
-execObserve :: (MonadIO m, MonadLogger m, MonadBaseControl IO m)
+execObserve :: (MonadUnliftIO m, MonadLogger m)
     => EnvOverride -> String -> [String] -> m String
 execObserve menv cmd0 args = do
-    e <- $withProcessTimeLog cmd0 args $
+    e <- withProcessTimeLog cmd0 args $
         try (callProcessObserveStdout (Cmd Nothing cmd0 menv args))
     case e of
         Left (ProcessExitedUnsuccessfully _ ec) -> liftIO $ exitWith ec

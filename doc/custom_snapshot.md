@@ -1,29 +1,61 @@
+<div class="hidden-warning"><a href="https://docs.haskellstack.org/"><img src="https://rawgit.com/commercialhaskell/stack/master/doc/img/hidden-warning.svg"></a></div>
+
 # Custom Snapshots
 
-Custom snapshots allow you to create your own snapshots, which provide a list of
-specific hackage packages to use, along with flags and ghc-options.  The
-definition of a basic snapshot looks like the following:
+Custom snapshots were totally reworked with the extensible snapshots
+overhaul in Stack 1.6.0, see
+[the writeup](https://www.fpcomplete.com/blog/2017/07/stacks-new-extensible-snapshots)
+and
+[PR #3249](https://github.com/commercialhaskell/stack/pull/3249)). This
+documentation covers the new syntax only.
+
+Custom snapshots allow you to create your own snapshots, which provide
+a list of packages to use, along with flags, ghc-options, and a few
+other settings. Custom snapshots may extend any other snapshot that
+can be specified in a `resolver` field. The packages specified follow
+the syntax of `extra-deps` in the `stack.yaml` file, with one
+exception: to ensure reproducibility of snapshots, local directories
+are not allowed for custom snapshots (as they are expected to change
+regularly).
 
 ```yaml
-resolver: ghc-8.0
+resolver: lts-8.21 # Inherits GHC version and package set
+compiler: ghc-8.0.1 # Overwrites GHC version in the resolver, optional
 
+name: my-snapshot # User-friendly name
+
+# Additional packages, follows extra-deps syntax
 packages:
-  - unordered-containers-0.2.7.1
-  - hashable-1.2.4.0
-  - text-1.2.2.1
+- unordered-containers-0.2.7.1
+- hashable-1.2.4.0
+- text-1.2.2.1
 
+# Override flags, can also override flags in the parent snapshot
 flags:
   unordered-containers:
     debug: true
+
+# Packages from the parent snapshot to ignore
+drop-packages:
+- wai-extra
+
+# Packages which should be hidden (affects script command's import
+# parser
+hidden:
+  wai: true
+  warp: false
+
+# Set GHC options for specific packages
+ghc-options:
+  warp:
+  - -O2
 ```
 
 If you put this in a `snapshot.yaml` file in the same directory as your project,
 you can now use the custom snapshot like this:
 
 ```yaml
-resolver:
-  name: simple-snapshot  # Human readable name for the snapshot
-  location: simple-snapshot.yaml
+resolver: snapshot.yaml
 ```
 
 This is an example of a custom snapshot stored in the filesystem. They are
@@ -37,24 +69,6 @@ custom snapshot, due to stack sharing snapshot packages whenever possible.
 For efficiency, URLs are treated differently. If I uploaded the snapshot to
 `https://domain.org/snapshot-1.yaml`, it is expected to be immutable. If you
 change that file, then you lose any reproducibility guarantees.
-
-## Extending snapshots
-
-The example custom snapshot above uses a compiler resolver, and so has few
-packages.  We can also extend existing snapshots, by using the usual
-[resolver setting found in stack configurations](yaml_configuration.md#resolver).
-All possible resolver choices are valid, so this means that custom snapshots can
-even extend other custom snapshots.
-
-Lets say that we want to use `lts-7.1`, but use a different version of `text`
-than the one it comes with, `1.2.2.1`.  To downgrade it to `1.2.2.0`, we need a
-custom snapshot file with the following:
-
-```yaml
-resolver: lts-7.1
-packages:
-  - text-1.2.2.0
-```
 
 ### Overriding the compiler
 
@@ -113,61 +127,7 @@ it enables the `developer` cabal flag:
 resolver: lts-7.1
 packages:
   - text-1.2.2.1
-ghc-options:
+flags:
   text:
     developer: true
 ```
-
-## YAML format
-
-In summary, the YAML format of custom snapshots has the following fields which
-are directly related to the same fields in the
-[build configuration format](yaml_configuration.md):
-
-* `resolver`, which specifies which snapshot to extend. It takes the same values
-  as the [`resolver` field in stack.yaml](yaml_configuration.md#resolver).
-
-* `compiler`, which specifies or overrides the selection of compiler. If
-  `resolver` is absent, then a specification of `compiler` is required. Its
-  semantics are the same as the
-  [`compiler` field in stack.yaml](yaml_configuration.md#compiler).
-
-Some fields look similar, but behave differently:
-
-* `flags` specifies which cabal flags to use with each package. In order to
-  specify a flag for a package, it *must* be listed in the `packages` list.
-
-* `ghc-options`, which specifies which cabal flags to use with each package. In
-  order to specify ghc-options for a package, it *must* be listed in the
-  `packages` list. The `*` member of the map specifies flags that apply to every
-  package in the `packages` list.
-
-There are two fields which work differently than in the build configuration
-format:
-
-* `packages`, which specifies a list of hackage package versions.  Note that
-  when a package version is overridden, no `flags` or `ghc-options` are taken
-  from the snapshot that is being extended.  If you want the same options as the
-  snapshot being extended, they must be re-specified.
-
-* `drop-packages`, which specifies a list of packages to drop from the snapshot
-  being overridden.
-
-## Future enhancements
-
-We plan to enhance extensible snapshots in several ways in the future. See
-[issue #1265, about "implicit snapshots"](https://github.com/commercialhaskell/stack/issues/1265).
-In summary, in the future:
-
-1) It will be possible to use a specific git repository + commit hash in the
-`packages` list, like in regular stack.yaml configuration. Currently, custom
-snapshots only work with packages on hackage.
-
-2) `stack.yaml` configurations will implicitly create a snapshot. This means
-that the non-local packages will get shared between your projects, so there is
-less redundant compilation!
-
-3) `flags` and `ghc-options` for packages which are not listed in `packages` are
-silently ignored. See
-[#2654](https://github.com/commercialhaskell/stack/issues/2654) for the current
-status of this.

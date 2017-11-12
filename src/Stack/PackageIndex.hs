@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE BangPatterns               #-}
 {-# LANGUAGE ConstraintKinds            #-}
 {-# LANGUAGE DataKinds                  #-}
@@ -21,47 +22,24 @@
 module Stack.PackageIndex
     ( updateAllIndices
     , getPackageCaches
-    , getPackageCachesIO
     , getPackageVersions
-    , getPackageVersionsIO
     , lookupPackageVersions
     ) where
 
 import qualified Codec.Archive.Tar as Tar
-import           Control.Exception (Exception)
-import           Control.Exception.Safe (tryIO)
-import           Control.Monad (unless, when, liftM, void, guard)
-import           Control.Monad.Catch (throwM)
-import qualified Control.Monad.Catch as C
-import           Control.Monad.IO.Class (MonadIO, liftIO)
-import           Control.Monad.Logger (logDebug, logInfo, logWarn)
-import           Control.Monad.Trans.Control
-import           Crypto.Hash as Hash (hashlazy, Digest, SHA1)
+import           Stack.Prelude
 import           Data.Aeson.Extended
-import qualified Data.ByteArray.Encoding as Mem (convertToBase, Base(Base16))
-import qualified Data.ByteString.Char8 as S8
 import qualified Data.ByteString.Lazy as L
-import           Data.Conduit (($$), (=$), (.|), runConduitRes)
 import           Data.Conduit.Binary (sinkHandle, sourceHandle, sourceFile, sinkFile)
 import           Data.Conduit.Zlib (ungzip)
-import           Data.Foldable (forM_)
-import           Data.IORef
-import           Data.Int (Int64)
-import           Data.HashMap.Strict (HashMap)
+import qualified Data.List.NonEmpty as NE
 import qualified Data.HashMap.Strict as HashMap
-import           Data.Map (Map)
-import qualified Data.Map.Strict as Map
-import           Data.Monoid
-import           Data.Set (Set)
 import qualified Data.Set as Set
 import           Data.Store.Version
 import           Data.Store.VersionTagged
-import           Data.Text (Text)
 import qualified Data.Text as T
 import           Data.Text.Unsafe (unsafeTail)
 import           Data.Time (getCurrentTime)
-import           Data.Traversable (forM)
-import           Data.Typeable (Typeable)
 import qualified Hackage.Security.Client as HS
 import qualified Hackage.Security.Client.Repository.Cache as HS
 import qualified Hackage.Security.Client.Repository.Remote as HS
@@ -72,113 +50,130 @@ import           Network.HTTP.Client.TLS (getGlobalManager)
 import           Network.HTTP.Download
 import           Network.URI (parseURI)
 import           Path (toFilePath, parseAbsFile)
+import           Path.Extra (tryGetModificationTime)
 import           Path.IO
-import           Prelude -- Fix AMP warning
-import           Stack.Types.BuildPlan (GitSHA1 (..))
 import           Stack.Types.Config
 import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageIndex
 import           Stack.Types.PackageName
-import           Stack.Types.StackT
-import           Stack.Types.StringError
 import           Stack.Types.Version
 import qualified System.Directory as D
 import           System.FilePath ((<.>))
-import           System.IO (IOMode (ReadMode, WriteMode), withBinaryFile)
 
 -- | Populate the package index caches and return them.
-populateCache
-    :: (StackMiniM env m, HasConfig env)
-    => PackageIndex
-    -> m PackageCacheMap
+populateCache :: HasConfig env => PackageIndex -> RIO env (PackageCache ())
 populateCache index = do
     requireIndex index
     -- This uses full on lazy I/O instead of ResourceT to provide some
     -- protections. Caveat emptor
     path <- configPackageIndex (indexName index)
-    let loadPIS = do
-            $logSticky "Populating index cache ..."
-            lbs <- liftIO $ L.readFile $ Path.toFilePath path
-            loop 0 (Map.empty, HashMap.empty) (Tar.read lbs)
-    (pis, gitPIs) <- loadPIS `C.catch` \e -> do
-        $logWarn $ "Exception encountered when parsing index tarball: "
+    let loadPIS = withBinaryFile (Path.toFilePath path) ReadMode $ \h -> do
+            logSticky "Populating index cache ..."
+            lbs <- liftIO $ L.hGetContents h
+            loop 0 HashMap.empty (Tar.read lbs)
+    pis0 <- loadPIS `catch` \e -> do
+        logWarn $ "Exception encountered when parsing index tarball: "
                 <> T.pack (show (e :: Tar.FormatError))
-        $logWarn "Automatically updating index and trying again"
+        logWarn "Automatically updating index and trying again"
         updateIndex index
         loadPIS
 
-    when (indexRequireHashes index) $ forM_ (Map.toList pis) $ \(ident, pc) ->
-        case pcDownload pc of
+    when (indexRequireHashes index) $ forM_ (HashMap.toList pis0) $ \(ident, (_, mpd, _)) ->
+        case mpd :: Maybe PackageDownload of
             Just _ -> return ()
             Nothing -> throwM $ MissingRequiredHashes (indexName index) ident
 
-    $logStickyDone "Populated index cache."
+    cache <- fmap mconcat $ mapM convertPI $ HashMap.toList pis0
 
-    return $ PackageCacheMap pis gitPIs
+    logStickyDone "Populated index cache."
+
+    return cache
   where
-    loop !blockNo (!m, !hm) (Tar.Next e es) =
-        loop (blockNo + entrySizeInBlocks e) (goE blockNo m hm e) es
-    loop _ (m, hm) Tar.Done = return (m, hm)
+    convertPI :: MonadIO m
+              => (PackageIdentifier, ((), Maybe PackageDownload, Endo [([CabalHash], OffsetSize)]))
+              -> m (PackageCache ())
+    convertPI (ident@(PackageIdentifier name version), ((), mpd, Endo front)) =
+      case NE.nonEmpty $ front [] of
+        Nothing -> throwString $ "Missing cabal file info for: " ++ show ident
+        Just files -> return
+                    $ PackageCache
+                    $ HashMap.singleton name
+                    $ HashMap.singleton version
+                      ((), mpd, files)
+
+    loop :: MonadThrow m
+         => Int64
+         -> HashMap PackageIdentifier ((), Maybe PackageDownload, Endo [([CabalHash], OffsetSize)])
+         -> Tar.Entries Tar.FormatError
+         -> m (HashMap PackageIdentifier ((), Maybe PackageDownload, Endo [([CabalHash], OffsetSize)]))
+    loop !blockNo !m (Tar.Next e es) =
+        loop (blockNo + entrySizeInBlocks e) (goE blockNo m e) es
+    loop _ m Tar.Done = return m
     loop _ _ (Tar.Fail e) = throwM e
 
-    goE blockNo m hm e =
+    goE :: Int64
+        -> HashMap PackageIdentifier ((), Maybe PackageDownload, Endo [([CabalHash], OffsetSize)])
+        -> Tar.Entry
+        -> HashMap PackageIdentifier ((), Maybe PackageDownload, Endo [([CabalHash], OffsetSize)])
+    goE blockNo m e =
         case Tar.entryContent e of
             Tar.NormalFile lbs size ->
                 case parseNameVersionSuffix $ Tar.entryPath e of
                     Just (ident, ".cabal") -> addCabal lbs ident size
-                    Just (ident, ".json") -> (addJSON id ident lbs, hm)
+                    Just (ident, ".json") -> addJSON id ident lbs
                     _ ->
                         case parsePackageJSON $ Tar.entryPath e of
-                            Just ident -> (addJSON unHSPackageDownload ident lbs, hm)
-                            Nothing -> (m, hm)
-            _ -> (m, hm)
+                            Just ident -> addJSON unHSPackageDownload ident lbs
+                            Nothing -> m
+            _ -> m
       where
         addCabal lbs ident size =
-            ( Map.insertWith
-                (\_ pcOld -> pcNew { pcDownload = pcDownload pcOld })
-                ident
-                pcNew
-                m
-            , HashMap.insert gitSHA1 offsetSize hm
-            )
+            HashMap.insert ident
+            (case HashMap.lookup ident m of
+              Nothing -> ((), Nothing, newEndo)
+              Just ((), mpd, oldEndo) -> ((), mpd, oldEndo <> newEndo))
+            m
           where
-            pcNew = PackageCache
-                { pcOffsetSize = offsetSize
-                , pcDownload = Nothing
-                }
-            offsetSize = OffsetSize
-                    ((blockNo + 1) * 512)
-                    size
+            cabalHash = computeCabalHash lbs
 
-            -- Calculate the Git SHA1 of the contents. This uses the
-            -- Git algorithm of prepending "blob <size>\0" to the raw
-            -- contents. We use this to be able to share the same SHA
-            -- information between the Git and tarball backends.
-            gitSHA1 = GitSHA1 $ Mem.convertToBase Mem.Base16 $ hashSHA1 $ L.fromChunks
-                $ "blob "
-                : S8.pack (show $ L.length lbs)
-                : "\0"
-                : L.toChunks lbs
-
-        hashSHA1 :: L.ByteString -> Hash.Digest Hash.SHA1
-        hashSHA1 = Hash.hashlazy
+            -- Some older Stackage snapshots ended up with slightly
+            -- modified cabal files, in particular having DOS-style
+            -- line endings (CRLF) converted to Unix-style (LF). As a
+            -- result, we track both hashes with and without CR
+            -- characters stripped for compatibility with these older
+            -- snapshots.
+            cr = 13
+            cabalHashes
+              | cr `L.elem` lbs = [cabalHash, computeCabalHash (L.filter (/= cr) lbs)]
+              | otherwise = [cabalHash]
+            offsetSize = OffsetSize ((blockNo + 1) * 512) size
+            newPair = (cabalHashes, offsetSize)
+            newEndo = Endo (newPair:)
 
         addJSON :: FromJSON a
                 => (a -> PackageDownload)
                 -> PackageIdentifier
                 -> L.ByteString
-                -> Map PackageIdentifier PackageCache
+                -> HashMap PackageIdentifier ((), Maybe PackageDownload, Endo [([CabalHash], OffsetSize)])
         addJSON unwrap ident lbs =
             case decode lbs of
                 Nothing -> m
-                Just (unwrap -> pd) -> Map.insertWith
-                    (\_ pc -> pc { pcDownload = Just pd })
-                    ident
-                    PackageCache
-                        { pcOffsetSize = OffsetSize 0 0
-                        , pcDownload = Just pd
-                        }
-                    m
+                Just (unwrap -> pd) ->
+                  HashMap.insert ident
+                  (case HashMap.lookup ident m of
+                    Nothing -> ((), Just pd, mempty)
+                    Just ((), Just oldPD, _)
+                      | oldPD /= pd -> error $ concat
+                        [ "Conflicting package hash information discovered for "
+                        , packageIdentifierString ident
+                        , "\nFound both: \n- "
+                        , show oldPD
+                        , "\n- "
+                        , show pd
+                        , "\n\nThis should not happen. See: https://github.com/haskell/hackage-security/issues/189"
+                        ]
+                    Just ((), _, files) -> ((), Just pd, files))
+                  m
 
     breakSlash x
         | T.null z = Nothing
@@ -227,24 +222,24 @@ instance Show PackageIndexException where
         ]
 
 -- | Require that an index be present, updating if it isn't.
-requireIndex :: (StackMiniM env m, HasConfig env) => PackageIndex -> m ()
+requireIndex :: HasConfig env => PackageIndex -> RIO env ()
 requireIndex index = do
     tarFile <- configPackageIndex $ indexName index
     exists <- doesFileExist tarFile
     unless exists $ updateIndex index
 
 -- | Update all of the package indices
-updateAllIndices :: (StackMiniM env m, HasConfig env) => m ()
+updateAllIndices :: HasConfig env => RIO env ()
 updateAllIndices = do
     clearPackageCaches
     view packageIndicesL >>= mapM_ updateIndex
 
 -- | Update the index tarball
-updateIndex :: (StackMiniM env m, HasConfig env) => PackageIndex -> m ()
+updateIndex :: HasConfig env => PackageIndex -> RIO env ()
 updateIndex index =
   do let name = indexName index
          url = indexLocation index
-     $logSticky $ "Updating package index "
+     logSticky $ "Updating package index "
                <> indexNameText (indexName index)
                <> " (mirrored at "
                <> url
@@ -252,61 +247,65 @@ updateIndex index =
      case indexType index of
        ITVanilla -> updateIndexHTTP name url
        ITHackageSecurity hs -> updateIndexHackageSecurity name url hs
+     logStickyDone "Update complete"
 
      -- Copy to the 00-index.tar filename for backwards
      -- compatibility. First wipe out the cache file if present.
      tarFile <- configPackageIndex name
      oldTarFile <- configPackageIndexOld name
      oldCacheFile <- configPackageIndexCacheOld name
-     ignoringAbsence (removeFile oldCacheFile)
-     runConduitRes $ sourceFile (toFilePath tarFile) .| sinkFile (toFilePath oldTarFile)
+     liftIO $ ignoringAbsence (removeFile oldCacheFile)
+     liftIO $ runConduitRes $ sourceFile (toFilePath tarFile) .| sinkFile (toFilePath oldTarFile)
 
 -- | Update the index tarball via HTTP
-updateIndexHTTP :: (StackMiniM env m, HasConfig env)
+updateIndexHTTP :: HasConfig env
                 => IndexName
                 -> Text -- ^ url
-                -> m ()
+                -> RIO env ()
 updateIndexHTTP indexName' url = do
     req <- parseRequest $ T.unpack url
-    $logInfo ("Downloading package index from " <> url)
+    logInfo ("Downloading package index from " <> url)
     gz <- configPackageIndexGz indexName'
     tar <- configPackageIndex indexName'
     wasDownloaded <- redownload req gz
-    toUnpack <-
+    shouldUnpack <-
         if wasDownloaded
             then return True
             else not `liftM` doesFileExist tar
 
-    when toUnpack $ do
-        let tmp = toFilePath tar <.> "tmp"
-        tmpPath <- parseAbsFile tmp
+    if not shouldUnpack
+        then packageIndexNotUpdated indexName'
+        else do
+            let tmp = toFilePath tar <.> "tmp"
+            tmpPath <- parseAbsFile tmp
 
-        deleteCache indexName'
+            deleteCache indexName'
 
-        liftIO $ do
-            withBinaryFile (toFilePath gz) ReadMode $ \input ->
-                withBinaryFile tmp WriteMode $ \output ->
-                    sourceHandle input
-                    $$ ungzip
-                    =$ sinkHandle output
-            renameFile tmpPath tar
+            liftIO $ do
+                withBinaryFile (toFilePath gz) ReadMode $ \input ->
+                    withBinaryFile tmp WriteMode $ \output -> runConduit
+                      $ sourceHandle input
+                     .| ungzip
+                     .| sinkHandle output
+                renameFile tmpPath tar
 
 -- | Update the index tarball via Hackage Security
 updateIndexHackageSecurity
-    :: (StackMiniM env m, HasConfig env)
+    :: HasConfig env
     => IndexName
     -> Text -- ^ base URL
     -> HackageSecurity
-    -> m ()
+    -> RIO env ()
 updateIndexHackageSecurity indexName' url (HackageSecurity keyIds threshold) = do
     baseURI <-
         case parseURI $ T.unpack url of
-            Nothing -> errorString $ "Invalid Hackage Security base URL: " ++ T.unpack url
+            Nothing -> throwString $ "Invalid Hackage Security base URL: " ++ T.unpack url
             Just x -> return x
     manager <- liftIO getGlobalManager
     root <- configPackageIndexRoot indexName'
-    logTUF <- embed_ ($logInfo . T.pack . HS.pretty)
-    let withRepo = HS.withRepository
+    run <- askRunInIO
+    let logTUF = run . logInfo . T.pack . HS.pretty
+        withRepo = HS.withRepository
             (HS.makeHttpLib manager)
             [baseURI]
             HS.defaultRepoOpts
@@ -333,6 +332,7 @@ updateIndexHackageSecurity indexName' url (HackageSecurity keyIds threshold) = d
         HS.checkForUpdates repo (Just now)
 
     case didUpdate of
+        HS.NoUpdates -> packageIndexNotUpdated indexName'
         HS.HasUpdates -> do
             -- The index actually updated. Delete the old cache, and
             -- then move the temporary unpacked file to its real
@@ -340,95 +340,73 @@ updateIndexHackageSecurity indexName' url (HackageSecurity keyIds threshold) = d
             tar <- configPackageIndex indexName'
             deleteCache indexName'
             liftIO $ D.renameFile (toFilePath tar ++ "-tmp") (toFilePath tar)
-            $logInfo "Updated package list downloaded"
-        HS.NoUpdates -> $logInfo "No updates to your package list were found"
+            logInfo "Updated package index downloaded"
+
+-- If the index is newer than the cache, delete it so that
+-- the next 'getPackageCaches' call recomputes it. This
+-- could happen if a prior run of stack updated the index,
+-- but exited before deleting the cache.
+--
+-- See https://github.com/commercialhaskell/stack/issues/3033
+packageIndexNotUpdated :: HasConfig env => IndexName -> RIO env ()
+packageIndexNotUpdated indexName' = do
+    mindexModTime <- tryGetModificationTime =<< configPackageIndex indexName'
+    mcacheModTime <- tryGetModificationTime =<< configPackageIndexCache indexName'
+    case (mindexModTime, mcacheModTime) of
+        (Right indexModTime, Right cacheModTime) | cacheModTime < indexModTime -> do
+            deleteCache indexName'
+            logInfo "No updates to your package index were found, but clearing the index cache as it is older than the index."
+        (Left _, _) -> do
+            deleteCache indexName'
+            logError "Error: No updates to your package index were found, but downloaded index is missing."
+        _ -> logInfo "No updates to your package index were found"
 
 -- | Delete the package index cache
-deleteCache
-    :: (StackMiniM env m, HasConfig env)
-    => IndexName -> m ()
+deleteCache :: HasConfig env => IndexName -> RIO env ()
 deleteCache indexName' = do
     fp <- configPackageIndexCache indexName'
     eres <- liftIO $ tryIO $ removeFile fp
     case eres of
-        Left e -> $logDebug $ "Could not delete cache: " <> T.pack (show e)
-        Right () -> $logDebug $ "Deleted index cache at " <> T.pack (toFilePath fp)
-
--- | Lookup a package's versions from 'IO'.
-getPackageVersionsIO
-    :: (StackMiniM env m, HasConfig env)
-    => m (PackageName -> IO (Set Version))
-getPackageVersionsIO = do
-    getCaches <- getPackageCachesIO
-    return $ \name ->
-        fmap (lookupPackageVersions name . fst) getCaches
+        Left e -> logDebug $ "Could not delete cache: " <> T.pack (show e)
+        Right () -> logDebug $ "Deleted index cache at " <> T.pack (toFilePath fp)
 
 -- | Get the known versions for a given package from the package caches.
 --
 -- See 'getPackageCaches' for performance notes.
-getPackageVersions
-    :: (StackMiniM env m, HasConfig env)
-    => PackageName
-    -> m (Set Version)
-getPackageVersions pkgName =
-    fmap (lookupPackageVersions pkgName . fst) getPackageCaches
+getPackageVersions :: HasConfig env => PackageName -> RIO env (Set Version)
+getPackageVersions pkgName = fmap (lookupPackageVersions pkgName) getPackageCaches
 
-lookupPackageVersions :: PackageName -> Map PackageIdentifier a -> Set Version
-lookupPackageVersions pkgName pkgCaches =
-    Set.fromList [v | PackageIdentifier n v <- Map.keys pkgCaches, n == pkgName]
-
--- | Access the package caches from 'IO'.
---
--- FIXME: This is a temporary solution until a better solution
--- to access the package caches from Stack.Build.ConstructPlan
--- has been found.
-getPackageCachesIO
-    :: (StackMiniM env m, HasConfig env)
-    => m (IO ( Map PackageIdentifier (PackageIndex, PackageCache)
-             , HashMap GitSHA1 (PackageIndex, OffsetSize)))
-getPackageCachesIO = toIO getPackageCaches
-  where
-    toIO :: (MonadIO m, MonadBaseControl IO m) => m a -> m (IO a)
-    toIO m = do
-        runInBase <- liftBaseWith $ \run -> return (void . run)
-        return $ do
-            i <- newIORef (error "Impossible evaluation in toIO")
-            runInBase $ do
-                x <- m
-                liftIO $ writeIORef i x
-            readIORef i
+lookupPackageVersions :: PackageName -> PackageCache index -> Set Version
+lookupPackageVersions pkgName (PackageCache m) =
+    maybe Set.empty (Set.fromList . HashMap.keys) $ HashMap.lookup pkgName m
 
 -- | Load the package caches, or create the caches if necessary.
 --
 -- This has two levels of caching: in memory, and the on-disk cache. So,
 -- feel free to call this function multiple times.
-getPackageCaches
-    :: (StackMiniM env m, HasConfig env)
-    => m ( Map PackageIdentifier (PackageIndex, PackageCache)
-         , HashMap GitSHA1 (PackageIndex, OffsetSize)
-         )
+getPackageCaches :: HasConfig env => RIO env (PackageCache PackageIndex)
 getPackageCaches = do
     config <- view configL
-    mcached <- liftIO $ readIORef (configPackageCaches config)
+    mcached <- liftIO $ readIORef (configPackageCache config)
     case mcached of
         Just cached -> return cached
         Nothing -> do
             result <- liftM mconcat $ forM (configPackageIndices config) $ \index -> do
                 fp <- configPackageIndexCache (indexName index)
-                PackageCacheMap pis' gitPIs <-
-                    $(versionedDecodeOrLoad (storeVersionConfig "pkg-v2" "WlAvAaRXlIMkjSmg5G3dD16UpT8="
-                                             :: VersionConfig PackageCacheMap))
+                PackageCache pis <-
+                    $(versionedDecodeOrLoad (storeVersionConfig "pkg-v5" "A607WaDwhg5VVvZTxNgU9g52DO8="
+                                             :: VersionConfig (PackageCache ())))
                     fp
                     (populateCache index)
-                return (fmap (index,) pis', fmap (index,) gitPIs)
-            liftIO $ writeIORef (configPackageCaches config) (Just result)
+                return $ PackageCache ((fmap.fmap) (\((), mpd, files) -> (index, mpd, files)) pis)
+            liftIO $ writeIORef (configPackageCache config) (Just result)
             return result
 
 -- | Clear the in-memory hackage index cache. This is needed when the
 -- hackage index is updated.
-clearPackageCaches :: (StackMiniM env m, HasConfig env) => m ()
+clearPackageCaches :: HasConfig env => RIO env ()
 clearPackageCaches = do
-    cacheRef <- view packageCachesL
+    cacheRef <- view $ configL.to configPackageCache
     liftIO $ writeIORef cacheRef Nothing
 
 --------------- Lifted from cabal-install, Distribution.Client.Tar:

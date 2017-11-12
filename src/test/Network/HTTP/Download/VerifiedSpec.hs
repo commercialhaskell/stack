@@ -1,15 +1,16 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 module Network.HTTP.Download.VerifiedSpec where
 
-import           Control.Applicative
 import           Control.Monad.Logger           (runStdoutLoggingT)
 import           Control.Retry                  (limitRetries)
 import           Crypto.Hash
-import           Data.Maybe
 import           Network.HTTP.Client.Conduit
 import           Network.HTTP.Download.Verified
 import           Path
-import           Path.IO
-import           Prelude -- Fix redundant imports warnings
+import           Path.IO hiding (withSystemTempDir)
+import           Stack.Prelude
+import           Stack.Types.Runner
+import           System.IO (writeFile, readFile)
 import           Test.Hspec
 
 -- TODO: share across test files
@@ -66,20 +67,23 @@ spec = do
   let exampleProgressHook _ = return ()
 
   describe "verifiedDownload" $ do
+    let run func = runStdoutLoggingT
+                 $ withRunner LevelError True True ColorNever Nothing False
+                 $ \runner -> runRIO runner func
     -- Preconditions:
     -- * the exampleReq server is running
     -- * the test runner has working internet access to it
     it "downloads the file correctly" $ withTempDir' $ \dir -> do
       examplePath <- getExamplePath dir
       doesFileExist examplePath `shouldReturn` False
-      let go = runStdoutLoggingT $ verifiedDownload exampleReq examplePath exampleProgressHook
+      let go = run $ verifiedDownload exampleReq examplePath exampleProgressHook
       go `shouldReturn` True
       doesFileExist examplePath `shouldReturn` True
 
     it "is idempotent, and doesn't redownload unnecessarily" $ withTempDir' $ \dir -> do
       examplePath <- getExamplePath dir
       doesFileExist examplePath `shouldReturn` False
-      let go = runStdoutLoggingT $ verifiedDownload exampleReq examplePath exampleProgressHook
+      let go = run $ verifiedDownload exampleReq examplePath exampleProgressHook
       go `shouldReturn` True
       doesFileExist examplePath `shouldReturn` True
       go `shouldReturn` False
@@ -92,7 +96,7 @@ spec = do
       writeFile exampleFilePath exampleWrongContent
       doesFileExist examplePath `shouldReturn` True
       readFile exampleFilePath `shouldReturn` exampleWrongContent
-      let go = runStdoutLoggingT $ verifiedDownload exampleReq examplePath exampleProgressHook
+      let go = run $ verifiedDownload exampleReq examplePath exampleProgressHook
       go `shouldReturn` True
       doesFileExist examplePath `shouldReturn` True
       readFile exampleFilePath `shouldNotReturn` exampleWrongContent
@@ -102,7 +106,7 @@ spec = do
       let wrongContentLengthReq = exampleReq
             { drLengthCheck = Just exampleWrongContentLength
             }
-      let go = runStdoutLoggingT $ verifiedDownload wrongContentLengthReq examplePath exampleProgressHook
+      let go = run $ verifiedDownload wrongContentLengthReq examplePath exampleProgressHook
       go `shouldThrow` isWrongContentLength
       doesFileExist examplePath `shouldReturn` False
 
@@ -110,7 +114,7 @@ spec = do
       examplePath <- getExamplePath dir
       let wrongHashCheck = exampleHashCheck { hashCheckHexDigest = exampleWrongDigest }
       let wrongDigestReq = exampleReq { drHashChecks = [wrongHashCheck] }
-      let go = runStdoutLoggingT $ verifiedDownload wrongDigestReq examplePath exampleProgressHook
+      let go = run $ verifiedDownload wrongDigestReq examplePath exampleProgressHook
       go `shouldThrow` isWrongDigest
       doesFileExist examplePath `shouldReturn` False
 
@@ -124,7 +128,7 @@ spec = do
             , drLengthCheck = Nothing
             , drRetryPolicy = limitRetries 1
             }
-      let go = runStdoutLoggingT $ verifiedDownload dReq dest exampleProgressHook
+      let go = run $ verifiedDownload dReq dest exampleProgressHook
       doesFileExist dest `shouldReturn` False
       go `shouldReturn` True
       doesFileExist dest `shouldReturn` True

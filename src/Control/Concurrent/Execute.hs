@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE RecordWildCards    #-}
 -- Concurrent execution with dependencies. Types currently hard-coded for needs
@@ -10,16 +11,9 @@ module Control.Concurrent.Execute
     , runActions
     ) where
 
-import           Control.Applicative
-import           Control.Concurrent.Async (Concurrently (..), async)
 import           Control.Concurrent.STM
-import           Control.Exception
-import           Control.Monad            (join, unless)
-import           Data.Foldable            (sequenceA_)
-import           Data.Set                 (Set)
+import           Stack.Prelude
 import qualified Data.Set                 as Set
-import           Data.Typeable            (Typeable)
-import           Prelude -- Fix AMP warning
 import           Stack.Types.PackageIdentifier
 
 data ActionType
@@ -79,7 +73,7 @@ runActions threads keepGoing concurrentFinal actions0 withProgress = do
     _ <- async $ withProgress $ esCompleted es
     if threads <= 1
         then runActions' es
-        else runConcurrently $ sequenceA_ $ replicate threads $ Concurrently $ runActions' es
+        else replicateConcurrently_ threads $ runActions' es
     readTVarIO $ esExceptions es
 
 runActions' :: ExecuteState -> IO ()

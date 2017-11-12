@@ -1,3 +1,5 @@
+<div class="hidden-warning"><a href="https://docs.haskellstack.org/"><img src="https://rawgit.com/commercialhaskell/stack/master/doc/img/hidden-warning.svg"></a></div>
+
 # User guide
 
 stack is a modern, cross-platform build tool for Haskell code.
@@ -1246,7 +1248,7 @@ executables to the local bin path. You may recognize the default value for that
 path:
 
 ```
-michael@d30748af6d3d:~/helloworld$ stack path --local-bin-path
+michael@d30748af6d3d:~/helloworld$ stack path --local-bin
 /home/michael/.local/bin
 ```
 
@@ -1985,7 +1987,7 @@ the following (or add it to `.bashrc`):
     eval "$(stack --bash-completion-script stack)"
 
 For more information and other shells, see [the Shell auto-completion wiki
-page](https://github.com/commercialhaskell/stack/wiki/Shell-autocompletion)
+page](https://docs.haskellstack.org/en/stable/shell_autocompletion)
 
 ### Docker
 
@@ -2007,28 +2009,52 @@ to stack.yaml:
 
 ```yaml
 image:
-  # YOU NEED A `container` YAML SECTION FOR `stack image container`
-  container:
-    # YOU NEED A BASE IMAGE NAME. STACK LAYERS EXES ON TOP OF
-    # THE BASE IMAGE. PREPARE YOUR PROJECT IMAGE IN ADVANCE. PUT
-    # ALL YOUR RUNTIME DEPENDENCIES IN THE IMAGE.
-    base: "fpco/ubuntu-with-libgmp:14.04"
-    # YOU CAN OPTIONALY NAME THE IMAGE. STACK WILL USE THE PROJECT
-    # DIRECTORY NAME IF YOU LEAVE OUT THIS OPTION.
-    name: "fpco/hello-world"
-    # OPTIONALLY ADD A HASH OF LOCAL PROJECT DIRECTORIES AND THEIR
-    # DESTINATIONS INSIDE THE DOCKER IMAGE.
-    add:
-      man/: /usr/local/share/man/
-    # OPTIONALLY SPECIFY A LIST OF EXECUTABLES. STACK WILL CREATE
-    # A TAGGED IMAGE FOR EACH IN THE LIST. THESE IMAGES WILL HAVE
-    # THEIR RESPECTIVE "ENTRYPOINT" SET.
-    entrypoints:
-      - stack
+
+  # You need a `containers` yaml section for `stack image container`.
+  # A `container` section that does not contain a list is also valid.
+  containers:
+
+    # This example just has one container.
+    -
+      # You need a base image name. Stack layers exes on top of
+      # the base image. Prepare your project image in advance by
+      # putting all your runtime dependencies in the image.
+      base: "fpco/ubuntu-with-libgmp:14.04"
+
+      # You can optionally name the image. Stack will use the project
+      # directory name if you leave out this option.
+      name: "fpco/hello-world"
+
+      # Optionally add a directory to a path inside the docker image.
+      add:
+        man/: /usr/local/share/man/
+
+      # Optionally specify a list of executables. Stack will create
+      # a tagged image for each in the list. these images will have
+      # their respective "ENTRYPOINT" set.
+      entrypoints:
+        - stack
 ```
 
 and then run `stack image container` and then `docker images` to list
 the images.
+
+Note that the executable will be built in the development environment 
+and copied to the container, so the dev OS must match that of the 
+container OS. This is easily accomplished using [Docker integration](docker_integration.md),
+under which the exe emitted by `stack build` will be built on the 
+Docker container, not the local OS. 
+
+The executable will be stored under `/usr/local/bin/<your-project>-exe`
+in the running container.
+
+If you want the container to run the executable immediately on startup
+then set an entrypoint as follows:
+
+```yaml
+entrypoints:
+    - <your-project>-exe
+```
 
 ### Nix
 
@@ -2079,7 +2105,7 @@ users. Here's a quick rundown:
   tarball and unpacks it.
 * `stack sdist` generates an uploading tarball containing your package code
 * `stack upload` uploads an sdist to Hackage. As of
-  version [1.1.0](https://docs.haskellstack.org/en/latest/ChangeLog/#110) stack
+  version [1.1.0](https://docs.haskellstack.org/en/v1.1.0/ChangeLog/) stack
   will also attempt to GPG sign your packages as
   per
   [our blog post](https://www.fpcomplete.com/blog/2016/05/stack-security-gnupg-keys).
@@ -2143,7 +2169,7 @@ but adds the `+RTS -xc` runtime option.
 
 `stack` now supports debugging and profiling with
 [DWARF information](https://ghc.haskell.org/trac/ghc/wiki/DWARF),
-using the `--no-strip`, `--no-library-stripping`, and `--no-executable-shipping`
+using the `--no-strip`, `--no-library-stripping`, and `--no-executable-stripping`
 flags to disable the default behavior of removing such information from compiled
 libraries and executables.
 

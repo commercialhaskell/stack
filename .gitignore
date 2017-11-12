@@ -23,3 +23,5 @@ tags
 /_site/
 /.dir-locals.el
 /.git/
+/stack.cabal
+/etc/scripts/stack-scripts.cabal

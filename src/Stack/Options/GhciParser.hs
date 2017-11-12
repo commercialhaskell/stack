@@ -1,6 +1,6 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 module Stack.Options.GhciParser where
 
-import           Data.Monoid.Extra
 import           Data.Version                      (showVersion)
 import           Options.Applicative
 import           Options.Applicative.Args
@@ -10,6 +10,7 @@ import           Stack.Config                      (packagesParser)
 import           Stack.Ghci                        (GhciOpts (..))
 import           Stack.Options.BuildParser         (flagsParser)
 import           Stack.Options.Completion
+import           Stack.Prelude
 
 -- | Parser for GHCI options
 ghciOptsParser :: Parser GhciOpts
@@ -53,3 +54,4 @@ ghciOptsParser = GhciOpts
              <*> switch (long "skip-intermediate-deps" <> help "Skip loading intermediate target dependencies" <> internal)
              <*> boolFlags True "package-hiding" "package hiding" idm
              <*> switch (long "no-build" <> help "Don't build before launching GHCi" <> internal)
+             <*> switch (long "only-main" <> help "Only load and import the main module.  If no main module, no modules will be loaded.")

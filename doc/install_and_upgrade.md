@@ -1,3 +1,5 @@
+<div class="hidden-warning"><a href="https://docs.haskellstack.org/"><img src="https://rawgit.com/commercialhaskell/stack/master/doc/img/hidden-warning.svg"></a></div>
+
 # Install/upgrade
 
 For common Un*x operating systems (including macOS), all you need to do is run:
@@ -24,41 +26,25 @@ find links that always point to the latest bindists
 
 ## Windows
 
-*Note*: Due to specific Windows limitations,
- [some temporary workarounds](https://www.fpcomplete.com/blog/2015/08/stack-ghc-windows)
- may be required. It is strongly advised to set your `STACK_ROOT` environment
- variable similarly to your root (e.g., `set STACK_ROOT=c:\stack_root`) *before*
- running `stack`.
-
-*Note:* while generally 32-bit GHC is better tested on Windows, there are
-reports that recent versions of Windows only work with the 64-bit version of
-Stack (see
-[issue #393](https://github.com/commercialhaskell/stack/issues/393)).
-
-### Installer
-
 We recommend installing to the default location with these installers, as that
 will make `stack install` and `stack upgrade` work correctly out of the box.
 
-  * [Windows 32-bit Installer](https://www.stackage.org/stack/windows-i386-installer)
   * [Windows 64-bit Installer](https://www.stackage.org/stack/windows-x86_64-installer)
+  * [Windows 32-bit Installer](https://www.stackage.org/stack/windows-i386-installer)
+
+If in doubt: you should prefer the 64-bit installer.
 
 ### Manual download
 
 * Download the latest release:
 
-    * [Windows 32-bit](https://www.stackage.org/stack/windows-i386)
     * [Windows 64-bit](https://www.stackage.org/stack/windows-x86_64)
+    * [Windows 32-bit](https://www.stackage.org/stack/windows-i386)
 
 * Unpack the archive and place `stack.exe` somewhere on your `%PATH%` (see
   [Path section below](#path)) and you can then run `stack` on the command line.
 
 * Now you can run `stack` from the terminal.
-
-NOTE: These executables have been built and tested on a Windows 7, 8.1, and 10
-64-bit machines. They should run on older Windows installs as well, but have not
-been tested. If you do test, please edit and update this page to indicate as
-such.
 
 ## macOS
 
@@ -292,10 +278,6 @@ Run:
 
 * Now you can run `stack` from the terminal.
 
-An unofficial package repository for FreeBSD 10 (amd64 only) and install
-instructions are available at [http://stack-pkg.applicative.tech](http://stack-pkg.applicative.tech/).  The
-repository is not official and as such might lag behind new releases.
-
 ## Path
 
 You can install stack by copying it anywhere on your PATH environment variable. We recommend installing in the same directory where stack itself will install executables (that way stack is able to upgrade itself!). On Windows, that directory is `%APPDATA%\local\bin`, e.g. "c:\Users\Michael\AppData\Roaming\local\bin". For other systems, use `$HOME/.local/bin`.
@@ -315,10 +297,18 @@ For more information and other shells, see [the shell auto-completion page](shel
 
 ## Upgrade
 
-There are essentially three different approaches to upgrade:
+There are essentially four different approaches to upgrade:
 
-* The `stack` tool itself ships with an `upgrade` command, which will build `stack` from source and install it to the default install path (see the previous section). You can use `stack upgrade` to get the latest official release, and `stack upgrade --git` to install from Git and live on the bleeding edge. If you follow this, make sure that this directory is on your `PATH` and takes precedence over the system installed `stack`. For more information, see [this discussion](https://github.com/commercialhaskell/stack/issues/237#issuecomment-126793301).
+* The `stack` tool itself ships with an `upgrade` command, which download a `stack` binary or build it from source and install it to the default install path (e.g. `~/.local/bin` or `%APPDATA%\local\bin`; see the [Path](#Path) section above). You can use `stack upgrade` to get the latest official release, and `stack upgrade --git` to install from Git and live on the bleeding edge. Make sure the default install directory is on your `PATH` and takes precedence over the system installed `stack`, or copy `stack` from that directory to the system location afterward. For more information, see [this discussion](https://github.com/commercialhaskell/stack/issues/237#issuecomment-126793301).
 
-* If you're using a package manager (e.g., the Ubuntu debs listed above) and are happy with sticking with the officially released binaries, simply follow your normal package manager strategies for upgrading (e.g. `apt-get update && apt-get upgrade`).
+* If you're using a package manager and are happy with sticking with the officially released binaries from the distribution (which may the lag behind latest version of Stack significantly), simply follow your normal package manager strategies for upgrading (e.g. `apt-get update && apt-get upgrade`).
 
-* If you're not using a package manager but want to stick with the official binaries (such as on Windows or Mac), you'll need to manually follow the steps above to download the newest binaries from the release page and replace the old binary.
+* The get.haskellstack.org script supports the `-f` argument to over-write the current stack executable.  For example:
+
+      curl -sSL https://get.haskellstack.org/ | sh -s - -f
+
+  or:
+
+      wget -qO- https://get.haskellstack.org/ | sh -s - -f
+
+* Manually follow the steps above to download the newest binaries from the release page and replace the old binary.

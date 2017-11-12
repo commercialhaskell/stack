@@ -1,8 +1,38 @@
+<div class="hidden-warning"><a href="https://docs.haskellstack.org/"><img src="https://rawgit.com/commercialhaskell/stack/master/doc/img/hidden-warning.svg"></a></div>
+
 # FAQ
 
 So that this doesn't become repetitive: for the reasons behind the answers
 below, see the [Architecture](architecture.md) page. The goal of the answers
 here is to be as helpful and concise as possible.
+
+## What version of GHC is used when I run something like `stack ghci`?
+
+The version of GHC, as well as which packages can be installed, are
+specified by the _resolver_. This may be something like `lts-8.12`,
+which is from the
+[Long Term Support (LTS) Haskell](https://github.com/fpco/lts-haskell/)
+project. The [user guide](GUIDE.md) discusses resolvers in more
+detail.
+
+Which resolver is used is determined by finding the relevant
+`stack.yaml` configuration file for the directory you're running the
+command from. This essentially works by:
+
+1. Check for a `STACK_YAML` environment variable or the `--stack-yaml`
+   command line argument
+2. If none present, check for a `stack.yaml` file in the current
+   directory or any parents
+3. If no `stack.yaml` was found, use the _implicit global_
+
+The implicit global is a shared project used whenever you're outside
+of another project. It's a sort of "mutable shared state" that you
+should be aware of when working with Stack. The most recent request
+when working with the implicit global is how to move to a more recent
+LTS snapshot. You can do this by running the following from outside of
+a project:
+
+    stack config set resolver lts
 
 ## Where is stack installed and will it interfere with `ghc` (etc) I already have installed?
 
@@ -406,11 +436,7 @@ such hardening flags by default which may be the cause of some instances of the
 problem. Therefore, a possible workaround might be to turn off PIE related
 flags.
 
-In Arch Linux, the support for this is provided by the `hardening-wrapper`
-package. Some possible workarounds:
-
-* Selectively disabling its PIE forcing by setting `HARDENING_PIE=0` in `/etc/hardening-wrapper.conf`.
-* Uninstalling the `hardening-wrapper` package and logging out then into your account again.
+On Arch Linux, installing the `ncurses5-compat-libs` package from AUR resolves [this issue](https://github.com/commercialhaskell/stack/issues/2712).
 
 If you manage to work around this in other distributions, please include instructions here.
 
@@ -493,4 +519,9 @@ where you keep your SSL certificates.
 Unfortunately `stack build` does not have an obvious equivalent to `cabal build -vN` which shows verbose output from GHC when building. The easiest workaround is to add `ghc-options: -vN` to the .cabal file or pass it via `stack build --ghc-options="-v"`.
 
 ## Does Stack support the Hpack specification?
-Yes. You can run `stack init` as usual and Stack will create a matching `stack.yaml`.
+
+Yes:
+
+* If a package directory contains an Hpack `package.yaml` file, then Stack will use it to generate a `.cabal` file when building the package.
+* You can run `stack init` to initialize a `stack.yaml` file regardless of whether your packages are declared with `.cabal` files or with Hpack `package.yaml` files.
+* You can use the `with-hpack` configuration option to specify an Hpack executable to use instead of the Hpack bundled with Stack.

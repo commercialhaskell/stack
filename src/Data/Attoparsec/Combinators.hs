@@ -1,9 +1,9 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 -- | More readable combinators for writing parsers.
 
 module Data.Attoparsec.Combinators where
 
-import Control.Applicative
-import Data.Monoid
+import Stack.Prelude
 
 -- | Concatenate two parsers.
 appending :: (Applicative f,Monoid a)

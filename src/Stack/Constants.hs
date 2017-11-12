@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE OverloadedStrings #-}
 
@@ -5,12 +6,7 @@
 
 module Stack.Constants
     (buildPlanDir
-    ,distDirFromDir
-    ,workDirFromDir
-    ,distRelativeDir
     ,haskellModuleExts
-    ,imageStagingDir
-    ,projectDockerSandboxDir
     ,stackDotYaml
     ,stackWorkEnvVar
     ,stackRootEnvVar
@@ -18,11 +14,6 @@ module Stack.Constants
     ,deprecatedStackRootOptionName
     ,inContainerEnvVar
     ,inNixShellEnvVar
-    ,configCacheFile
-    ,configCabalMod
-    ,buildCacheFile
-    ,testSuccessFile
-    ,testBuiltFile
     ,stackProgName
     ,stackProgNameUpper
     ,wiredInPackages
@@ -30,31 +21,24 @@ module Stack.Constants
     ,cabalPackageName
     ,implicitGlobalProjectDirDeprecated
     ,implicitGlobalProjectDir
-    ,hpcRelativeDir
-    ,hpcDirFromDir
-    ,objectInterfaceDirL
-    ,templatesDir
     ,defaultUserConfigPathDeprecated
     ,defaultUserConfigPath
     ,defaultGlobalConfigPathDeprecated
     ,defaultGlobalConfigPath
     ,platformVariantEnvVar
     ,compilerOptionsCabalFlag
+    ,ghcColorForceFlag
+    ,minTerminalWidth
+    ,maxTerminalWidth
+    ,defaultTerminalWidth
     )
     where
 
-import           Control.Monad.Catch (MonadThrow)
-import           Control.Monad.Reader
 import           Data.Char (toUpper)
-import           Data.HashSet (HashSet)
 import qualified Data.HashSet as HashSet
-import           Data.Text (Text)
-import           Lens.Micro (Getting)
 import           Path as FL
-import           Prelude
+import           Stack.Prelude
 import           Stack.Types.Compiler
-import           Stack.Types.Config
-import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageName
 
 -- | Extensions for anything that can be a Haskell module.
@@ -68,127 +52,6 @@ haskellFileExts = ["hs", "hsc", "lhs"]
 -- | Extensions for modules that are preprocessed by common preprocessors.
 haskellPreprocessorExts :: [Text]
 haskellPreprocessorExts = ["gc", "chs", "hsc", "x", "y", "ly", "cpphs"]
-
--- | Output .o/.hi directory.
-objectInterfaceDirL :: HasBuildConfig env => Getting r env (Path Abs Dir)
-objectInterfaceDirL = to $ \env -> -- FIXME is this idomatic lens code?
-  let workDir = view workDirL env
-      root = view projectRootL env
-   in root </> workDir </> $(mkRelDir "odir/")
-
--- | The filename used for dirtiness check of source files.
-buildCacheFile :: (MonadThrow m, MonadReader env m, HasEnvConfig env)
-               => Path Abs Dir      -- ^ Package directory.
-               -> m (Path Abs File)
-buildCacheFile dir =
-    liftM
-        (</> $(mkRelFile "stack-build-cache"))
-        (distDirFromDir dir)
-
--- | The filename used to mark tests as having succeeded
-testSuccessFile :: (MonadThrow m, MonadReader env m, HasEnvConfig env)
-                => Path Abs Dir -- ^ Package directory
-                -> m (Path Abs File)
-testSuccessFile dir =
-    liftM
-        (</> $(mkRelFile "stack-test-success"))
-        (distDirFromDir dir)
-
--- | The filename used to mark tests as having built
-testBuiltFile :: (MonadThrow m, MonadReader env m, HasEnvConfig env)
-              => Path Abs Dir -- ^ Package directory
-              -> m (Path Abs File)
-testBuiltFile dir =
-    liftM
-        (</> $(mkRelFile "stack-test-built"))
-        (distDirFromDir dir)
-
--- | The filename used for dirtiness check of config.
-configCacheFile :: (MonadThrow m, MonadReader env m, HasEnvConfig env)
-                => Path Abs Dir      -- ^ Package directory.
-                -> m (Path Abs File)
-configCacheFile dir =
-    liftM
-        (</> $(mkRelFile "stack-config-cache"))
-        (distDirFromDir dir)
-
--- | The filename used for modification check of .cabal
-configCabalMod :: (MonadThrow m, MonadReader env m, HasEnvConfig env)
-               => Path Abs Dir      -- ^ Package directory.
-               -> m (Path Abs File)
-configCabalMod dir =
-    liftM
-        (</> $(mkRelFile "stack-cabal-mod"))
-        (distDirFromDir dir)
-
--- | Directory for HPC work.
-hpcDirFromDir
-    :: (MonadThrow m, MonadReader env m, HasEnvConfig env)
-    => Path Abs Dir  -- ^ Package directory.
-    -> m (Path Abs Dir)
-hpcDirFromDir fp =
-    liftM (fp </>) hpcRelativeDir
-
--- | Relative location of directory for HPC work.
-hpcRelativeDir :: (MonadThrow m, MonadReader env m, HasEnvConfig env)
-               => m (Path Rel Dir)
-hpcRelativeDir =
-    liftM (</> $(mkRelDir "hpc")) distRelativeDir
-
--- | Package's build artifacts directory.
-distDirFromDir :: (MonadThrow m, MonadReader env m, HasEnvConfig env)
-               => Path Abs Dir
-               -> m (Path Abs Dir)
-distDirFromDir fp =
-    liftM (fp </>) distRelativeDir
-
--- | Package's working directory.
-workDirFromDir :: (MonadReader env m, HasEnvConfig env)
-               => Path Abs Dir
-               -> m (Path Abs Dir)
-workDirFromDir fp = view $ workDirL.to (fp </>)
-
--- | Directory for project templates.
-templatesDir :: Config -> Path Abs Dir
-templatesDir config = configStackRoot config </> $(mkRelDir "templates")
-
--- | Relative location of build artifacts.
-distRelativeDir :: (MonadThrow m, MonadReader env m, HasEnvConfig env)
-                => m (Path Rel Dir)
-distRelativeDir = do
-    cabalPkgVer <- view cabalVersionL
-    platform <- platformGhcRelDir
-    wc <- view $ actualCompilerVersionL.to whichCompiler
-    -- Cabal version, suffixed with "_ghcjs" if we're using GHCJS.
-    envDir <-
-        parseRelDir $
-        (if wc == Ghcjs then (++ "_ghcjs") else id) $
-        packageIdentifierString $
-        PackageIdentifier cabalPackageName cabalPkgVer
-    platformAndCabal <- useShaPathOnWindows (platform </> envDir)
-    workDir <- view workDirL
-    return $
-        workDir </>
-        $(mkRelDir "dist") </>
-        platformAndCabal
-
--- | Docker sandbox from project root.
-projectDockerSandboxDir :: (MonadReader env m, HasConfig env)
-  => Path Abs Dir      -- ^ Project root
-  -> m (Path Abs Dir)  -- ^ Docker sandbox
-projectDockerSandboxDir projectRoot = do
-  workDir <- view workDirL
-  return $ projectRoot </> workDir </> $(mkRelDir "docker/")
-
--- | Image staging dir from project root.
-imageStagingDir :: (MonadReader env m, HasConfig env, MonadThrow m)
-  => Path Abs Dir      -- ^ Project root
-  -> Int               -- ^ Index of image
-  -> m (Path Abs Dir)  -- ^ Docker sandbox
-imageStagingDir projectRoot imageIdx = do
-  workDir <- view workDirL
-  idxRelDir <- parseRelDir (show imageIdx)
-  return $ projectRoot </> workDir </> $(mkRelDir "image") </> idxRelDir
 
 -- | Name of the 'stack' program, uppercased
 stackProgNameUpper :: String
@@ -231,7 +94,7 @@ inContainerEnvVar = stackProgNameUpper ++ "_IN_CONTAINER"
 -- although we already have STACK_IN_NIX_EXTRA_ARGS that is set in the same conditions,
 -- it can happen that STACK_IN_NIX_EXTRA_ARGS is set to empty.
 inNixShellEnvVar :: String
-inNixShellEnvVar = map toUpper stackProgName ++ "_IN_NIXSHELL"
+inNixShellEnvVar = map toUpper stackProgName ++ "_IN_NIX_SHELL"
 
 -- See https://downloads.haskell.org/~ghc/7.10.1/docs/html/libraries/ghc/src/Module.html#integerPackageKey
 wiredInPackages :: HashSet PackageName
@@ -353,3 +216,21 @@ platformVariantEnvVar = stackProgNameUpper ++ "_PLATFORM_VARIANT"
 compilerOptionsCabalFlag :: WhichCompiler -> String
 compilerOptionsCabalFlag Ghc = "--ghc-options"
 compilerOptionsCabalFlag Ghcjs = "--ghcjs-options"
+
+-- | The flag to pass to GHC when we want to force its output to be
+-- colorized.
+ghcColorForceFlag :: String
+ghcColorForceFlag = "-fdiagnostics-color=always"
+
+-- | The minimum allowed terminal width. Used for pretty-printing.
+minTerminalWidth :: Int
+minTerminalWidth = 40
+
+-- | The maximum allowed terminal width. Used for pretty-printing.
+maxTerminalWidth :: Int
+maxTerminalWidth = 200
+
+-- | The default terminal width. Used for pretty-printing when we can't
+-- automatically detect it and when the user doesn't supply one.
+defaultTerminalWidth :: Int
+defaultTerminalWidth = 100

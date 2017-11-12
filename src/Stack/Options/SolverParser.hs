@@ -1,7 +1,9 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 module Stack.Options.SolverParser where
 
 import           Options.Applicative
 import           Options.Applicative.Builder.Extra
+import           Stack.Prelude
 
 -- | Parser for @solverCmd@
 solverOptsParser :: Parser Bool

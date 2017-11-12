@@ -1,6 +1,8 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 -- | Clean a project.
 module Stack.Clean
@@ -9,53 +11,47 @@ module Stack.Clean
     ,StackCleanException(..)
     ) where
 
-import           Control.Exception (Exception)
-import           Control.Monad.Catch (throwM)
-import           Data.Foldable (forM_)
+import           Stack.Prelude
 import           Data.List ((\\),intercalate)
 import qualified Data.Map.Strict as Map
-import           Data.Maybe (mapMaybe)
-import           Data.Typeable (Typeable)
-import           Path (Path, Abs, Dir)
+import qualified Data.Text as T
 import           Path.IO (ignoringAbsence, removeDirRecur)
-import           Stack.Build.Source (getLocalPackageViews)
-import           Stack.Build.Target (LocalPackageView(..))
 import           Stack.Config (getLocalPackages)
-import           Stack.Constants (distDirFromDir, workDirFromDir)
+import           Stack.Constants.Config (distDirFromDir, workDirFromDir)
 import           Stack.Types.PackageName
 import           Stack.Types.Config
-import           Stack.Types.StackT
+import           System.Exit (exitFailure)
 
 -- | Deletes build artifacts in the current project.
 --
 -- Throws 'StackCleanException'.
-clean
-    :: (StackM env m, HasEnvConfig env)
-    => CleanOpts
-    -> m ()
+clean :: HasEnvConfig env => CleanOpts -> RIO env ()
 clean cleanOpts = do
-    dirs <- dirsToDelete cleanOpts
-    forM_ dirs (ignoringAbsence . removeDirRecur)
+    failures <- mapM cleanDir =<< dirsToDelete cleanOpts
+    when (or failures) $ liftIO exitFailure
+  where
+    cleanDir dir =
+      liftIO (ignoringAbsence (removeDirRecur dir) >> return False) `catchAny` \ex -> do
+        logError $ "Exception while recursively deleting " <> T.pack (toFilePath dir) <> "\n" <> T.pack (show ex)
+        logError "Perhaps you do not have permission to delete these files or they are in use?"
+        return True
 
-dirsToDelete
-    :: (StackM env m, HasEnvConfig env)
-    => CleanOpts
-    -> m [Path Abs Dir]
+dirsToDelete :: HasEnvConfig env => CleanOpts -> RIO env [Path Abs Dir]
 dirsToDelete cleanOpts = do
     packages <- getLocalPackages
     case cleanOpts of
         CleanShallow [] ->
             -- Filter out packages listed as extra-deps
-            mapM distDirFromDir . Map.keys . Map.filter (== False) $ packages
+            mapM (distDirFromDir . lpvRoot) $ Map.elems $ lpProject packages
         CleanShallow targets -> do
-            localPkgViews <- getLocalPackageViews
-            let localPkgNames = Map.keys localPkgViews
-                getPkgDir pkgName = fmap (lpvRoot . fst) (Map.lookup pkgName localPkgViews)
+            let localPkgViews = lpProject packages
+                localPkgNames = Map.keys localPkgViews
+                getPkgDir pkgName = fmap lpvRoot (Map.lookup pkgName localPkgViews)
             case targets \\ localPkgNames of
                 [] -> mapM distDirFromDir (mapMaybe getPkgDir targets)
                 xs -> throwM (NonLocalPackages xs)
         CleanFull -> do
-            pkgWorkDirs <- mapM workDirFromDir (Map.keys packages)
+            pkgWorkDirs <- mapM (workDirFromDir . lpvRoot) $ Map.elems $ lpProject packages
             projectWorkDir <- getProjectWorkDir
             return (projectWorkDir : pkgWorkDirs)
 

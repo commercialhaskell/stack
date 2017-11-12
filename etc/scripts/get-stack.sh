@@ -7,12 +7,21 @@
 # or:
 #   'wget -qO- https://get.haskellstack.org/ | sh'
 #
+# By default, this installs 'stack' to '/usr/local/bin'.
+#
+# Arguments (use `... | sh -s - ARGUMENTS`)
+#
+# -q: reduce script's output
+# -f: force over-write even if 'stack' already installed
+# -d DESTDIR: change destination directory
+#
 # Make pull requests at:
 # https://github.com/commercialhaskell/stack/blob/master/etc/scripts/get-stack.sh
 #
 
 HOME_LOCAL_BIN="$HOME/.local/bin"
-USR_LOCAL_BIN="/usr/local/bin"
+DEFAULT_DEST="/usr/local/bin/stack"
+DEST=""
 QUIET=""
 FORCE=""
 STACK_TEMP_DIR=
@@ -108,7 +117,7 @@ print_bindist_notice() {
   fi
 }
 
-# Adds a `sudo` prefix if sudo is available to execute the given command
+# Adds a 'sudo' prefix if sudo is available to execute the given command
 # If not, the given command is run as is
 sudocmd() {
   $(command -v sudo) "$@"
@@ -378,7 +387,7 @@ GETDISTRO
   fi
 
   case "$DISTRO" in
-    ubuntu)
+    ubuntu|linuxmint)
       do_ubuntu_install "$VERSION"
       ;;
     debian|kali|raspbian)
@@ -387,7 +396,7 @@ GETDISTRO
     fedora)
       do_fedora_install "$VERSION"
       ;;
-    centos|rhel)
+    centos|rhel|redhatenterpriseserver)
       do_centos_install "$VERSION"
       ;;
     alpine)
@@ -454,15 +463,31 @@ install_from_bindist() {
     if ! tar xzf "$STACK_TEMP_DIR/$1.bindist" -C "$STACK_TEMP_DIR/$1"; then
       die "Extract bindist failed"
     fi
-    if ! sudocmd install -c -o 0 -g 0 -m 0755 "$STACK_TEMP_DIR/$1"/*/stack "$USR_LOCAL_BIN/stack"; then
-      die "Install to $USR_LOCAL_BIN/stack failed"
+    STACK_TEMP_EXE="$STACK_TEMP_DIR/$(basename "$DEST")"
+    mv "$STACK_TEMP_DIR/$1"/*/stack "$STACK_TEMP_EXE"
+    destdir="$(dirname "$DEST")"
+    if [ ! -d "$destdir" ]; then
+        info "$destdir directory does not exist; creating it..."
+        # First try to create directory as current user, then try with sudo if it fails.
+        if ! mkdir -p "$destdir" 2>/dev/null; then
+            if ! sudocmd mkdir -p "$destdir"; then
+                die "Could not create directory: $DEST"
+            fi
+        fi
+    fi
+    # First attempt to install 'stack' as current user, then try with sudo if it fails
+    info "Installing Stack to: $DEST..."
+    if ! install -c -m 0755 "$STACK_TEMP_EXE" "$destdir" 2>/dev/null; then
+      if ! sudocmd install -c -o 0 -g 0 -m 0755 "$STACK_TEMP_EXE" "$destdir"; then
+        die "Install to $DEST failed"
+      fi
     fi
 
     post_install_separator
-    info "Stack has been installed to: $USR_LOCAL_BIN/stack"
+    info "Stack has been installed to: $DEST"
     info ""
 
-    check_usr_local_bin_on_path
+    check_dest_on_path
 }
 
 install_arm_binary() {
@@ -552,7 +577,11 @@ stack_location() {
 
 # Check whether 'stack' command exists
 has_stack() {
-  has_cmd stack
+  if [ "$DEST" != "" ] ; then
+    has_cmd "$DEST"
+  else
+    has_cmd stack
+  fi
 }
 
 # Check whether 'wget' command exists
@@ -630,21 +659,34 @@ check_home_local_bin_on_path() {
   fi
 }
 
-# Check whether /usr/local/bin is on the PATH, and print a warning if not.
-check_usr_local_bin_on_path() {
-  if ! on_path "$USR_LOCAL_BIN" ; then
-    info "WARNING: '$USR_LOCAL_BIN' is not on your PATH."
+# Check whether $DEST is on the PATH, and print a warning if not.
+check_dest_on_path() {
+  if ! on_path "$(dirname $DEST)" ; then
+    info "WARNING: '$(dirname $DEST)' is not on your PATH."
     info ""
   fi
 }
 
 # Check whether Stack is already installed, and print an error if it is.
 check_stack_installed() {
-  if [ "$FORCE" != "true" ] && has_stack ; then
-    die "Stack $(stack_version) already appears to be installed at:
-  $(stack_location)
+  if has_stack ; then
+    if [ "$FORCE" = "true" ] ; then
+      [ "$DEST" != "" ] || DEST="$(stack_location)"
+    else
+      if has_curl; then
+        get="curl -sSL"
+      else
+        get="wget -qO-"
+      fi
+      [ "$DEST" != "" ] && location=$(realpath "$DEST") || location=$(stack_location)
+      die "Stack $(stack_version) already appears to be installed at:
+  $location
 Use 'stack upgrade' or your OS's package manager to upgrade,
-or pass --force to this script to install anyway."
+or pass '-f' to this script to over-write the existing binary, e.g.:
+  $get https://get.haskellstack.org/ | sh -s - -f"
+    fi
+  else
+    [ "$DEST" != "" ] || DEST="$DEFAULT_DEST"
   fi
 }
 
@@ -661,6 +703,10 @@ while [ $# -gt 0 ]; do
     -f|--force)
       FORCE="true"
       shift
+      ;;
+    -d|--dest)
+      DEST="$2/stack"
+      shift 2
       ;;
     *)
       echo "Invalid argument: $1" >&2

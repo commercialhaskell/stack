@@ -1,19 +1,20 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE RecordWildCards #-}
 
 module Stack.Options.GlobalParser where
 
-import           Control.Monad.Logger              (LogLevel (..))
-import           Data.Monoid.Extra
 import           Options.Applicative
 import           Options.Applicative.Builder.Extra
 import qualified Stack.Docker                      as Docker
 import           Stack.Init
+import           Stack.Prelude
 import           Stack.Options.ConfigParser
 import           Stack.Options.LogLevelParser
 import           Stack.Options.ResolverParser
 import           Stack.Options.Utils
 import           Stack.Types.Config
 import           Stack.Types.Docker
+import           Stack.Types.Runner
 
 -- | Parser for global command-line options.
 globalOptsParser :: FilePath -> GlobalOptsContext -> Maybe LogLevel -> Parser GlobalOptsMonoid
@@ -39,6 +40,11 @@ globalOptsParser currentDir kind defLogLevel =
          completeWith ["always", "never", "auto"] <>
          help "Specify when to use color in output; WHEN is 'always', 'never', or 'auto'" <>
          hide)) <*>
+    optionalFirst (option auto
+        (long "terminal-width" <>
+         metavar "INT" <>
+         help "Specify the width of the terminal, used for pretty-print messages" <>
+         hide)) <*>
     optionalFirst
         (strOption
             (long "stack-yaml" <>
@@ -63,6 +69,7 @@ globalOptsFromMonoid defaultTerminal GlobalOptsMonoid{..} = GlobalOpts
     , globalCompiler = getFirst globalMonoidCompiler
     , globalTerminal = fromFirst defaultTerminal globalMonoidTerminal
     , globalColorWhen = fromFirst ColorAuto globalMonoidColorWhen
+    , globalTermWidth = getFirst globalMonoidTermWidth
     , globalStackYaml = maybe SYLDefault SYLOverride $ getFirst globalMonoidStackYaml }
 
 initOptsParser :: Parser InitOpts

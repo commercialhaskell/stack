@@ -1,0 +1,339 @@
+name: stack
+version: '1.6.0'
+synopsis: The Haskell Tool Stack
+description: ! 'Please see the README.md for usage information, and
+  the wiki on Github for more details.  Also, note that
+  the API for the library is not currently stable, and may
+  change significantly, even between minor releases. It is
+  currently only intended for use by the executable.'
+category: Development
+author: Commercial Haskell SIG
+maintainer: manny@fpcomplete.com
+license: BSD3
+github: commercialhaskell/stack.git
+homepage: http://haskellstack.org
+custom-setup:
+  dependencies:
+  - base
+  - Cabal
+  - filepath
+extra-source-files:
+- CONTRIBUTING.md
+- ChangeLog.md
+- README.md
+- doc/*.md
+- src/setup-shim/StackSetupShim.hs
+- stack.yaml
+- test/package-dump/ghc-7.10.txt
+- test/package-dump/ghc-7.8.4-osx.txt
+- test/package-dump/ghc-7.8.txt
+ghc-options:
+- -Wall
+- -fwarn-tabs
+- -fwarn-incomplete-uni-patterns
+- -fwarn-incomplete-record-updates
+dependencies:
+- Cabal
+- aeson
+- annotated-wl-pprint
+- ansi-terminal
+- async
+- attoparsec
+- base >=4.9 && < 5
+- base64-bytestring
+- blaze-builder
+- bytestring
+- clock
+- conduit
+- conduit-extra
+- containers
+- cryptonite
+- cryptonite-conduit
+- deepseq
+- directory
+- echo
+- exceptions
+- extra
+- fast-logger
+- file-embed
+- filelock
+- filepath
+- fsnotify
+- generic-deriving
+- hackage-security
+- hashable
+- hastache
+- hpack
+- hpc
+- http-client
+- http-client-tls
+- http-conduit
+- http-types
+- memory
+- microlens
+- microlens-mtl
+- mintty
+- monad-logger
+- mono-traversable
+- mtl
+- neat-interpolation
+- network-uri
+- open-browser
+- optparse-applicative
+- path
+- path-io
+- persistent
+- persistent-sqlite
+- persistent-template
+- pretty
+- primitive
+- process
+- project-template
+- regex-applicative-text
+- resourcet
+- retry
+- semigroups
+- split
+- stm
+- store
+- store-core
+- streaming-commons
+- tar
+- template-haskell
+- temporary
+- text
+- text-metrics
+- th-reify-many
+- time
+- tls
+- transformers
+- unicode-transforms
+- unix-compat
+- unliftio
+- unordered-containers
+- vector
+- yaml
+- zip-archive
+- zlib
+when:
+- condition: os(windows)
+  then:
+    cpp-options: -DWINDOWS
+    dependencies:
+    - Win32
+  else:
+    build-tools:
+    - hsc2hs
+    dependencies:
+    - bindings-uname
+    - pid1
+    - unix
+library:
+  source-dirs: src/
+  ghc-options:
+  - -fwarn-identities
+  exposed-modules:
+  - Control.Concurrent.Execute
+  - Data.Aeson.Extended
+  - Data.Attoparsec.Args
+  - Data.Attoparsec.Combinators
+  - Data.Attoparsec.Interpreter
+  - Data.IORef.RunOnce
+  - Data.Store.VersionTagged
+  - Network.HTTP.Download
+  - Network.HTTP.Download.Verified
+  - Options.Applicative.Args
+  - Options.Applicative.Builder.Extra
+  - Options.Applicative.Complicated
+  - Path.CheckInstall
+  - Path.Extra
+  - Path.Find
+  - Paths_stack
+  - Stack.Build
+  - Stack.Build.Cache
+  - Stack.Build.ConstructPlan
+  - Stack.Build.Execute
+  - Stack.Build.Haddock
+  - Stack.Build.Installed
+  - Stack.Build.Source
+  - Stack.Build.Target
+  - Stack.BuildPlan
+  - Stack.Clean
+  - Stack.Config
+  - Stack.Config.Build
+  - Stack.Config.Urls
+  - Stack.Config.Docker
+  - Stack.Config.Nix
+  - Stack.ConfigCmd
+  - Stack.Constants
+  - Stack.Constants.Config
+  - Stack.Coverage
+  - Stack.Docker
+  - Stack.Docker.GlobalDB
+  - Stack.Dot
+  - Stack.Exec
+  - Stack.Fetch
+  - Stack.FileWatch
+  - Stack.GhcPkg
+  - Stack.Ghci
+  - Stack.Ghci.Script
+  - Stack.Hoogle
+  - Stack.IDE
+  - Stack.Image
+  - Stack.Init
+  - Stack.New
+  - Stack.Nix
+  - Stack.Options.BenchParser
+  - Stack.Options.BuildMonoidParser
+  - Stack.Options.BuildParser
+  - Stack.Options.CleanParser
+  - Stack.Options.ConfigParser
+  - Stack.Options.Completion
+  - Stack.Options.DockerParser
+  - Stack.Options.DotParser
+  - Stack.Options.ExecParser
+  - Stack.Options.GhcBuildParser
+  - Stack.Options.GhciParser
+  - Stack.Options.GhcVariantParser
+  - Stack.Options.GlobalParser
+  - Stack.Options.HaddockParser
+  - Stack.Options.HpcReportParser
+  - Stack.Options.LogLevelParser
+  - Stack.Options.NewParser
+  - Stack.Options.NixParser
+  - Stack.Options.PackageParser
+  - Stack.Options.ResolverParser
+  - Stack.Options.ScriptParser
+  - Stack.Options.SDistParser
+  - Stack.Options.SolverParser
+  - Stack.Options.TestParser
+  - Stack.Options.Utils
+  - Stack.Package
+  - Stack.PackageDump
+  - Stack.PackageIndex
+  - Stack.PackageLocation
+  - Stack.Path
+  - Stack.Prelude
+  - Stack.PrettyPrint
+  - Stack.Runners
+  - Stack.Script
+  - Stack.SDist
+  - Stack.Setup
+  - Stack.Setup.Installed
+  - Stack.SetupCmd
+  - Stack.Sig
+  - Stack.Sig.GPG
+  - Stack.Sig.Sign
+  - Stack.Snapshot
+  - Stack.Solver
+  - Stack.StaticBytes
+  - Stack.Types.Build
+  - Stack.Types.BuildPlan
+  - Stack.Types.CompilerBuild
+  - Stack.Types.Urls
+  - Stack.Types.Compiler
+  - Stack.Types.Config
+  - Stack.Types.Config.Build
+  - Stack.Types.Docker
+  - Stack.Types.FlagName
+  - Stack.Types.GhcPkgId
+  - Stack.Types.Image
+  - Stack.Types.Nix
+  - Stack.Types.Package
+  - Stack.Types.PackageDump
+  - Stack.Types.PackageIdentifier
+  - Stack.Types.PackageIndex
+  - Stack.Types.PackageName
+  - Stack.Types.Resolver
+  - Stack.Types.Runner
+  - Stack.Types.Sig
+  - Stack.Types.TemplateName
+  - Stack.Types.Version
+  - Stack.Types.VersionIntervals
+  - Stack.Upgrade
+  - Stack.Upload
+  - Text.PrettyPrint.Leijen.Extended
+  - System.Process.Log
+  - System.Process.PagerEditor
+  - System.Process.Read
+  - System.Process.Run
+  - System.Terminal
+  other-modules:
+  - Hackage.Security.Client.Repository.HttpLib.HttpClient
+  when:
+  - condition: 'os(windows)'
+    then:
+      source-dirs: windows/
+    else:
+      source-dirs: unix/
+executables:
+  stack:
+    main: Main.hs
+    source-dirs: src/main
+    ghc-options:
+    - -threaded
+    dependencies:
+    - stack
+    other-modules:
+    - Paths_stack
+    when:
+    - condition: flag(static)
+      ld-options:
+      - -static
+      - -pthread
+    - condition: ! '!(flag(disable-git-info))'
+      cpp-options: -DUSE_GIT_INFO
+      dependencies:
+      - gitrev
+      - optparse-simple
+    - condition: flag(hide-dependency-versions)
+      cpp-options: -DHIDE_DEP_VERSIONS
+    - condition: flag(supported-build)
+      cpp-options: -DSUPPORTED_BUILD
+tests:
+  stack-test:
+    main: Test.hs
+    source-dirs: src/test
+    ghc-options:
+    - -threaded
+    dependencies:
+    - QuickCheck
+    - hspec
+    - stack
+    - smallcheck
+  stack-integration-test:
+    main: IntegrationSpec.hs
+    source-dirs:
+    - test/integration
+    - test/integration/lib
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    dependencies:
+    - hspec
+    when:
+    - condition: ! '!(flag(integration-tests))'
+      buildable: false
+flags:
+  static:
+    description: Pass -static/-pthread to ghc when linking the stack binary.
+    manual: true
+    default: false
+  disable-git-info:
+    description: Disable compile-time inclusion of current git info in stack
+    manual: true
+    default: false
+  hide-dependency-versions:
+    description: Hides dependency versions from "stack --version", used only by building
+      with stack.yaml
+    manual: true
+    default: false
+  integration-tests:
+    description: Run the integration test suite
+    manual: true
+    default: false
+  supported-build:
+    description: If false, causes "stack --version" to issue a warning about the build being unsupported.  True only if building with stack.yaml
+    manual: true
+    default: false

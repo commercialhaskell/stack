@@ -1,0 +1,42 @@
+# HLint configuration file
+# https://github.com/ndmitchell/hlint
+
+# Not considered useful hints
+- ignore: {name: "Redundant do"}
+- ignore: {name: "Use section"}
+- ignore: {name: "Use camelCase"}
+- ignore: {name: "Use list comprehension"}
+- ignore: {name: "Redundant if"}
+- ignore: {name: "Avoid lambda"}
+- ignore: {name: "Eta reduce"}
+- ignore: {name: "Use fmap"}  # specific for GHC 7.8 compat
+- ignore: {name: "Parse error"}  # we trust the compiler over HLint
+- ignore: {name: "Use =="}  # Creates infinite loops in `EQ` using expressions
+- ignore: {name: "Evaluate"}
+- ignore: {name: "Use &&&"}
+- ignore: {name: "Redundant compare"}
+
+- ignore: {name: "Use fewer imports", within: [
+  "System.Process.Read",  # Related to 'Hide post-AMP warnings' comment
+  "Stack.Exec"  # ifdef for System.Process.Read
+  ]
+}
+
+- ignore: {name: "Use fromMaybe", within: [
+    "Stack.Types.Config.explicitSetupDeps"  # Related to 'explicit pattern matching is clearer' comment
+  ]
+}
+
+# For clarity (related to do syntax)
+- ignore: {name: "Reduce duplication", within: [
+    "Network.HTTP.Download.VerifiedSpec",
+    "Stack.PackageDumpSpec",
+    "Stack.Types.StackT",
+    "Stack.Docker"
+  ]
+}
+
+# Pretty-printing
+- error: {lhs: "fromString . toFilePath", rhs: "display"}
+- ignore: {name: "Use display", within: "warnMultiple"}
+- ignore: {name: "Use display", within: "Stack.PrettyPrint"}

@@ -1,0 +1,8 @@
+resolver: lts-9.10
+
+package-indices:
+- name: Hackage00
+  download-prefix: https://hackage.haskell.org/package
+  http: https://hackage.haskell.org/00-index.tar.gz
+
+ignore-revision-mismatch: true

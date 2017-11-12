@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE ConstraintKinds    #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE FlexibleContexts   #-}
@@ -11,32 +12,26 @@ module Stack.Image
         imgCmdName, imgDockerCmdName, imgOptsFromMonoid)
        where
 
-import           Control.Exception.Lifted hiding (finally)
-import           Control.Monad
-import           Control.Monad.Catch hiding (bracket)
-import           Control.Monad.IO.Class
-import           Control.Monad.Logger
+import           Stack.Prelude
+import qualified Data.ByteString as B
 import           Data.Char (toLower)
 import qualified Data.Map.Strict as Map
-import           Data.Maybe
-import           Data.Typeable
-import           Data.Text (Text)
+import           Data.Text.Encoding (encodeUtf8)
 import qualified Data.Text as T
 import           Path
 import           Path.Extra
 import           Path.IO
-import           Stack.Constants
+import           Stack.Constants.Config
 import           Stack.PrettyPrint
 import           Stack.Types.Config
 import           Stack.Types.Image
-import           Stack.Types.StackT
 import           System.Process.Run
 
 -- | Stages the executables & additional content in a staging
 -- directory under '.stack-work'
 stageContainerImageArtifacts
-    :: (StackM env m, HasEnvConfig env)
-    => Maybe (Path Abs Dir) -> [Text] -> m ()
+    :: HasEnvConfig env
+    => Maybe (Path Abs Dir) -> [Text] -> RIO env ()
 stageContainerImageArtifacts mProjectRoot imageNames = do
     config <- view configL
     forM_
@@ -48,7 +43,7 @@ stageContainerImageArtifacts mProjectRoot imageNames = do
         (\(idx,opts) ->
               do imageDir <-
                      imageStagingDir (fromMaybeProjectRoot mProjectRoot) idx
-                 ignoringAbsence (removeDirRecur imageDir)
+                 liftIO (ignoringAbsence (removeDirRecur imageDir))
                  ensureDir imageDir
                  stageExesInDir opts imageDir
                  syncAddContentToDir opts imageDir)
@@ -58,8 +53,8 @@ stageContainerImageArtifacts mProjectRoot imageNames = do
 -- extended with an ENTRYPOINT specified for each `entrypoint` listed
 -- in the config file.
 createContainerImageFromStage
-    :: (StackM env m, HasConfig env)
-    => Maybe (Path Abs Dir) -> [Text] -> m ()
+    :: HasConfig env
+    => Maybe (Path Abs Dir) -> [Text] -> RIO env ()
 createContainerImageFromStage mProjectRoot imageNames = do
     config <- view configL
     forM_
@@ -84,22 +79,22 @@ filterImages names = filter (imageNameFound . imgDockerImageName)
 -- | Stage all the Package executables in the usr/local/bin
 -- subdirectory of a temp directory.
 stageExesInDir
-    :: (StackM env m, HasEnvConfig env)
-    => ImageDockerOpts -> Path Abs Dir -> m ()
+    :: HasEnvConfig env
+    => ImageDockerOpts -> Path Abs Dir -> RIO env ()
 stageExesInDir opts dir = do
     srcBinPath <- fmap (</> $(mkRelDir "bin")) installationRootLocal
     let destBinPath = dir </> $(mkRelDir "usr/local/bin")
     ensureDir destBinPath
     case imgDockerExecutables opts of
         Nothing -> do
-            $logInfo ""
-            $logInfo "Note: 'executables' not specified for a image container, so every executable in the project's local bin dir will be used."
-            mcontents <- forgivingAbsence $ listDir srcBinPath
+            logInfo ""
+            logInfo "Note: 'executables' not specified for a image container, so every executable in the project's local bin dir will be used."
+            mcontents <- liftIO $ forgivingAbsence $ listDir srcBinPath
             case mcontents of
                 Just (files, dirs)
-                    | not (null files) || not (null dirs) -> copyDirRecur srcBinPath destBinPath
-                _ -> $prettyWarn "The project's local bin dir contains no files, so no executables will be added to the docker image."
-            $logInfo ""
+                    | not (null files) || not (null dirs) -> liftIO $ copyDirRecur srcBinPath destBinPath
+                _ -> prettyWarn "The project's local bin dir contains no files, so no executables will be added to the docker image."
+            logInfo ""
 
         Just exes ->
             forM_
@@ -112,8 +107,8 @@ stageExesInDir opts dir = do
 -- | Add any additional files into the temp directory, respecting the
 -- (Source, Destination) mapping.
 syncAddContentToDir
-    :: (StackM env m, HasEnvConfig env)
-    => ImageDockerOpts -> Path Abs Dir -> m ()
+    :: HasEnvConfig env
+    => ImageDockerOpts -> Path Abs Dir -> RIO env ()
 syncAddContentToDir opts dir = do
     root <- view projectRootL
     let imgAdd = imgDockerAdd opts
@@ -123,7 +118,7 @@ syncAddContentToDir opts dir = do
               do sourcePath <- resolveDir root source
                  let destFullPath = dir </> dropRoot destPath
                  ensureDir destFullPath
-                 copyDirRecur sourcePath destFullPath)
+                 liftIO $ copyDirRecur sourcePath destFullPath)
 
 -- | Derive an image name from the project directory.
 imageName
@@ -133,17 +128,17 @@ imageName = map toLower . toFilePathNoTrailingSep . dirname
 -- | Create a general purpose docker image from the temporary
 -- directory of executables & static content.
 createDockerImage
-    :: (StackM env m, HasConfig env)
-    => ImageDockerOpts -> Path Abs Dir -> m ()
+    :: HasConfig env
+    => ImageDockerOpts -> Path Abs Dir -> RIO env ()
 createDockerImage dockerConfig dir = do
     menv <- getMinimalEnvOverride
     case imgDockerBase dockerConfig of
         Nothing -> throwM StackImageDockerBaseUnspecifiedException
         Just base -> do
             liftIO
-                (writeFile
+                (B.writeFile
                      (toFilePath (dir </> $(mkRelFile "Dockerfile")))
-                     (unlines ["FROM " ++ base, "ADD ./ /"]))
+                     (encodeUtf8 (T.pack (unlines ["FROM " ++ base, "ADD ./ /"]))))
             let args =
                     [ "build"
                     , "-t"
@@ -155,8 +150,8 @@ createDockerImage dockerConfig dir = do
 
 -- | Extend the general purpose docker image with entrypoints (if specified).
 extendDockerImageWithEntrypoint
-    :: (StackM env m, HasConfig env)
-    => ImageDockerOpts -> Path Abs Dir -> m ()
+    :: HasConfig env
+    => ImageDockerOpts -> Path Abs Dir -> RIO env ()
 extendDockerImageWithEntrypoint dockerConfig dir = do
     menv <- getMinimalEnvOverride
     let dockerImageName =
@@ -171,14 +166,14 @@ extendDockerImageWithEntrypoint dockerConfig dir = do
                 eps
                 (\ep ->
                       do liftIO
-                             (writeFile
+                             (B.writeFile
                                   (toFilePath
                                        (dir </> $(mkRelFile "Dockerfile")))
-                                  (unlines
+                                  (encodeUtf8 (T.pack (unlines
                                        [ "FROM " ++ dockerImageName
                                        , "ENTRYPOINT [\"/usr/local/bin/" ++
                                          ep ++ "\"]"
-                                       , "CMD []"]))
+                                       , "CMD []"]))))
                          callProcess
                              (Cmd
                                   Nothing
@@ -192,7 +187,7 @@ extendDockerImageWithEntrypoint dockerConfig dir = do
 -- | Fail with friendly error if project root not set.
 fromMaybeProjectRoot :: Maybe (Path Abs Dir) -> Path Abs Dir
 fromMaybeProjectRoot =
-    fromMaybe (throw StackImageCannotDetermineProjectRootException)
+    fromMaybe (impureThrow StackImageCannotDetermineProjectRootException)
 
 -- | The command name for dealing with images.
 imgCmdName

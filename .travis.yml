@@ -19,25 +19,18 @@ cache:
 matrix:
   fast_finish: true
   include:
-    - env: BUILD=cabal CABALVER=1.24 GHCVER=7.10.3
-      compiler: ": #GHC 7.10.3"
-      addons: {apt: {packages: [cabal-install-1.24,ghc-7.10.3], sources: [hvr-ghc]}}
-
-    - env: BUILD=stack STACK_YAML=stack-7.10.yaml
-      compiler: ": #stack 7.10.3"
-      addons: {apt: {packages: [ghc-7.10.3], sources: [hvr-ghc]}}
-
-    - env: BUILD=stack STACK_YAML=stack-7.10.yaml
-      compiler: ": #stack 7.10.3 osx"
-      os: osx
-
-    - env: BUILD=cabal CABALVER=1.24 GHCVER=8.0.2
-      compiler: ": #GHC 8.0.2"
-      addons: {apt: {packages: [cabal-install-1.24,ghc-8.0.2], sources: [hvr-ghc]}}
+    # FIXME: Removing because the build keeps timing out.
+    # - env: BUILD=cabal STACK_YAML=stack.yaml CABALVER=1.24 GHCVER=8.0.2
+    #  compiler: ": #GHC 8.0.2"
+    #  addons: {apt: {packages: [cabal-install-1.24,ghc-8.0.2], sources: [hvr-ghc]}}
 
     - env: BUILD=stack GHCVER=8.0.2 STACK_YAML=stack.yaml
       compiler: ": #stack 8.0.2"
       addons: {apt: {packages: [ghc-8.0.2], sources: [hvr-ghc]}}
+
+    - env: BUILD=stack GHCVER=8.2.1 STACK_YAML=stack-nightly.yaml
+      compiler: ": #stack 8.2.1"
+      addons: {apt: {packages: [ghc-8.2.1], sources: [hvr-ghc]}}
 
     - env: BUILD=stack GHCVER=8.0.2 STACK_YAML=stack.yaml
       compiler: ": #stack 8.0.2 osx"
@@ -48,10 +41,6 @@ matrix:
       addons: {apt: {packages: [ghc-8.0.2], sources: [hvr-ghc]}}
 
   allow_failures:
-    - env: BUILD=stack STACK_YAML=stack-7.10.yaml
-      compiler: ": #stack 7.10.3 osx"
-      os: osx
-
     - env: BUILD=stack GHCVER=8.0.2 STACK_YAML=stack.yaml
       compiler: ": #stack 8.0.2 osx"
       os: osx
@@ -73,43 +62,80 @@ before_install:
 
 install:
  - echo "$(ghc --version) [$(ghc --print-project-git-commit-id 2> /dev/null || echo '?')]"
- - case "$BUILD" in
+ # Note: we build store by itself below due to high memory usage
+ - |
+   set -ex
+   case "$BUILD" in
      style)
-       stack --system-ghc --no-terminal install hlint;;
+       # This should be resolved (and removed) by Stack 1.6
+       # Follows from https://github.com/commercialhaskell/stack/issues/3178
+       stack --system-ghc --no-terminal install happy
+
+       stack --system-ghc --no-terminal install hlint
+       ;;
      stack)
-       stack --no-terminal test --only-dependencies;;
+       stack --no-terminal build store
+       stack --no-terminal test --only-dependencies
+       ;;
      cabal)
-       cabal --version;
-       travis_retry cabal update;
-       rm -f $HOME/.cabal/bin/stack;
-       echo "stack is located at $(which stack)";
-       stack --version;
-       rm -f $(stack --compiler=ghc-$GHCVER path --dist-dir)/stack-*.tar.gz &&
-       stack --system-ghc --compiler=ghc-$GHCVER sdist --pvp-bounds=both &&
-       tar xf $(stack --system-ghc --compiler=ghc-$GHCVER path --dist-dir)/stack-*.tar.gz --wildcards --strip-components=1 '*/stack.cabal' &&
-       cabal install --only-dependencies --enable-tests --enable-benchmarks --force-reinstalls --ghc-options=-O0 --reorder-goals --max-backjumps=-1;;
+       cabal --version
+       travis_retry cabal update
+       rm -f $HOME/.cabal/bin/stack
+       echo "stack is located at $(which stack)"
+       stack --version
+
+       echo Removing any old dist files
+       rm -f $(stack --stack-yaml=$STACK_YAML path --dist-dir)/stack-*.tar.gz
+
+       echo To avoid custom Cabal setup business, switching temporarily to Simple
+       cp stack.cabal stack.orig-cabal
+       sed 's@build-type\:.*@build-type\: Simple@' < stack.orig-cabal > stack.cabal
+
+       echo Generating new dist with pvp bounds in the cabal file
+       stack --system-ghc --stack-yaml=$STACK_YAML sdist --pvp-bounds=both
+
+       echo Grabbing the newly generated stack.cabal file from the tarball
+       tar xf $(stack --system-ghc --compiler=ghc-$GHCVER path --dist-dir)/stack-*.tar.gz --wildcards --strip-components=1 '*/stack.cabal'
+
+       echo Switching back to Custom build type
+       cp stack.cabal stack.orig-cabal
+       sed 's@build-type\:.*@build-type\: Custom@' < stack.orig-cabal > stack.cabal
+       rm -f stack.orig-cabal
+
+       echo Performing the actual build now that we have the right stack.cabal
+       cabal install --only-dependencies --enable-tests --enable-benchmarks --force-reinstalls --ghc-options=-O0 --reorder-goals --max-backjumps=-1
+       ;;
    esac
+   set +ex
 
 script:
- - set -e; case "$BUILD" in
+ - GHC_OPTIONS="-Werror"
+ - if [ $GHCVER = 8.2.1 ]; then GHC_OPTIONS="$GHC_OPTIONS -Wno-missing-home-modules"; fi
+ - |
+   set -ex
+   case "$BUILD" in
      style)
-       hlint src/ --hint=HLint.hs;
-       hlint src/ --cpp-define=WINDOWS=1 --hint=HLint.hs;
-       hlint test/ --cpp-simple --hint=HLint.hs;
-       stack --system-ghc --no-terminal build --pedantic;;
+       hlint src/
+       hlint src/ --cpp-define=WINDOWS=1
+       hlint test/ --cpp-simple
+       stack --system-ghc --no-terminal build --pedantic
+       ;;
      stack)
-       stack --no-terminal test --haddock --no-haddock-deps --ghc-options="-Werror";;
+       stack --no-terminal test --haddock --no-haddock-deps --ghc-options="$GHC_OPTIONS"
+       ;;
      cabal)
-       cabal configure --enable-tests --enable-benchmarks -v2 --ghc-options="-O0 -Werror";
-       cabal build;
-       cabal test;
-       cabal check;
-       cabal sdist;
-       cabal copy;
-       cd test/integration;
-       true stack setup --compiler=ghc-$GHCVER;
-       true stack test --compiler=ghc-$GHCVER;
-       cd ../..;
-       SRC_TGZ=$(cabal info . | awk '{print $2;exit}').tar.gz &&
-       (cd dist && cabal install --force-reinstalls "$SRC_TGZ");;
+       cabal configure --enable-tests --enable-benchmarks -v2 --ghc-options="-O0 $GHC_OPTIONS"
+       cabal build
+       cabal test
+       cabal check
+       cabal sdist
+       cabal copy
+       cd test/integration
+       true stack setup --compiler=ghc-$GHCVER
+       true stack test --compiler=ghc-$GHCVER
+       cd ../..
+       SRC_TGZ=$(cabal info . | awk '{print $2;exit}').tar.gz
+       (cd dist && cabal install --force-reinstalls "$SRC_TGZ")
+       ;;
    esac
+   set +ex

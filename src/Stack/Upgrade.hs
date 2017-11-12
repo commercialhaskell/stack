@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE CPP                   #-}
 {-# LANGUAGE ConstraintKinds       #-}
 {-# LANGUAGE FlexibleContexts      #-}
@@ -11,32 +12,28 @@ module Stack.Upgrade
     , upgradeOpts
     ) where
 
-import           Control.Exception.Safe      (catchAny)
-import           Control.Monad               (unless, when)
-import           Control.Monad.IO.Class
-import           Control.Monad.Logger
-import           Data.Foldable               (forM_)
+import           Stack.Prelude               hiding (force)
+import qualified Data.HashMap.Strict         as HashMap
+import qualified Data.List
 import qualified Data.Map                    as Map
-import           Data.Maybe                  (isNothing)
-import           Data.Monoid.Extra
 import qualified Data.Text as T
+import           Distribution.Version        (mkVersion')
 import           Lens.Micro                  (set)
 import           Options.Applicative
 import           Path
-import           Path.IO
 import qualified Paths_stack as Paths
 import           Stack.Build
 import           Stack.Config
 import           Stack.Fetch
 import           Stack.PackageIndex
+import           Stack.PrettyPrint
 import           Stack.Setup
 import           Stack.Types.PackageIdentifier
+import           Stack.Types.PackageIndex
 import           Stack.Types.PackageName
 import           Stack.Types.Version
 import           Stack.Types.Config
 import           Stack.Types.Resolver
-import           Stack.Types.StackT
-import           Stack.Types.StringError
 import           System.Exit                 (ExitCode (ExitSuccess))
 import           System.Process              (rawSystem, readProcess)
 import           System.Process.Run
@@ -56,10 +53,10 @@ upgradeOpts = UpgradeOpts
              <> showDefault))
         <*> switch
          (long "force-download" <>
-          help "Download a stack executable, even if the version number is older than what we have")
+          help "Download the latest available stack executable")
         <*> optional (strOption
          (long "binary-version" <>
-          help "Download a specific version, even if it's out of date"))
+          help "Download a specific stack version"))
         <*> optional (strOption
          (long "github-org" <>
           help "Github organization name"))
@@ -68,7 +65,7 @@ upgradeOpts = UpgradeOpts
           help "Github repository name"))
 
     sourceOpts = SourceOpts
-        <$> ((\fromGit repo -> if fromGit then Just repo else Nothing)
+        <$> ((\fromGit repo branch -> if fromGit then Just (repo, branch) else Nothing)
                 <$> switch
                     ( long "git"
                     <> help "Clone from Git instead of downloading from Hackage (more dangerous)" )
@@ -76,7 +73,12 @@ upgradeOpts = UpgradeOpts
                     ( long "git-repo"
                     <> help "Clone from specified git repository"
                     <> value "https://github.com/commercialhaskell/stack"
-                    <> showDefault ))
+                    <> showDefault )
+                <*> strOption
+                    ( long "git-branch"
+                   <> help "Clone from this git branch"
+                   <> value "master"
+                   <> showDefault ))
 
 data BinaryOpts = BinaryOpts
     { _boPlatform :: !(Maybe String)
@@ -89,9 +91,7 @@ data BinaryOpts = BinaryOpts
     , _boGithubRepo :: !(Maybe String)
     }
     deriving Show
-newtype SourceOpts = SourceOpts
-    { _soRepo :: Maybe String
-    }
+newtype SourceOpts = SourceOpts (Maybe (String, String)) -- repo and branch
     deriving Show
 
 data UpgradeOpts = UpgradeOpts
@@ -100,12 +100,12 @@ data UpgradeOpts = UpgradeOpts
     }
     deriving Show
 
-upgrade :: (StackM env m, HasConfig env)
+upgrade :: HasConfig env
         => ConfigMonoid
         -> Maybe AbstractResolver
         -> Maybe String -- ^ git hash at time of building, if known
         -> UpgradeOpts
-        -> m ()
+        -> RIO env ()
 upgrade gConfigMonoid mresolver builtHash (UpgradeOpts mbo mso) =
     case (mbo, mso) of
         -- FIXME It would be far nicer to capture this case in the
@@ -117,19 +117,18 @@ upgrade gConfigMonoid mresolver builtHash (UpgradeOpts mbo mso) =
         -- See #2977 - if --git or --git-repo is specified, do source upgrade.
         (_, Just so@(SourceOpts (Just _))) -> source so
         (Just bo, Just so) -> binary bo `catchAny` \e -> do
-            $logWarn "Exception occured when trying to perform binary upgrade:"
-            $logWarn $ T.pack $ show e
-            $logWarn "Falling back to source upgrade"
+            prettyWarnL
+               [ flow "Exception occured when trying to perform binary upgrade:"
+               , fromString . show $ e
+               , line <> flow "Falling back to source upgrade"
+               ]
 
             source so
   where
     binary bo = binaryUpgrade bo
     source so = sourceUpgrade gConfigMonoid mresolver builtHash so
 
-binaryUpgrade
-  :: (StackM env m, HasConfig env)
-  => BinaryOpts
-  -> m ()
+binaryUpgrade :: HasConfig env => BinaryOpts -> RIO env ()
 binaryUpgrade (BinaryOpts mplatform force' mver morg mrepo) = do
     platforms0 <-
       case mplatform of
@@ -145,32 +144,34 @@ binaryUpgrade (BinaryOpts mplatform force' mver morg mrepo) = do
     isNewer <-
         case mdownloadVersion of
             Nothing -> do
-                $logError "Unable to determine upstream version from Github metadata"
-                unless force $
-                    $logError "Rerun with --force-download to force an upgrade"
+                prettyErrorL $
+                    flow "Unable to determine upstream version from Github metadata"
+                  :
+                  [ line <> flow "Rerun with --force-download to force an upgrade"
+                    | not force]
                 return False
             Just downloadVersion -> do
-                $logInfo $ T.concat
-                    [ "Current Stack version: "
-                    , versionText stackVersion
-                    , ", available download version: "
-                    , versionText downloadVersion
+                prettyInfoL
+                    [ flow "Current Stack version:"
+                    , display stackVersion <> ","
+                    , flow "available download version:"
+                    , display downloadVersion
                     ]
                 return $ downloadVersion > stackVersion
 
     toUpgrade <- case (force, isNewer) of
         (False, False) -> do
-            $logInfo "Skipping binary upgrade, you are already running the most recent version"
+            prettyInfoS "Skipping binary upgrade, you are already running the most recent version"
             return False
         (True, False) -> do
-            $logInfo "Forcing binary upgrade"
+            prettyInfoS "Forcing binary upgrade"
             return True
         (_, True) -> do
-            $logInfo "Newer version detected, downloading"
+            prettyInfoS "Newer version detected, downloading"
             return True
     when toUpgrade $ do
         config <- view configL
-        downloadStackExe platforms0 archiveInfo (configLocalBin config) $ \tmpFile -> do
+        downloadStackExe platforms0 archiveInfo (configLocalBin config) True $ \tmpFile -> do
             -- Sanity check!
             ec <- rawSystem (toFilePath tmpFile) ["--version"]
 
@@ -178,60 +179,61 @@ binaryUpgrade (BinaryOpts mplatform force' mver morg mrepo) = do
                     $ throwString "Non-success exit code from running newly downloaded executable"
 
 sourceUpgrade
-  :: (StackM env m, HasConfig env)
+  :: HasConfig env
   => ConfigMonoid
   -> Maybe AbstractResolver
   -> Maybe String
   -> SourceOpts
-  -> m ()
+  -> RIO env ()
 sourceUpgrade gConfigMonoid mresolver builtHash (SourceOpts gitRepo) =
   withSystemTempDir "stack-upgrade" $ \tmp -> do
     menv <- getMinimalEnvOverride
     mdir <- case gitRepo of
-      Just repo -> do
-        remote <- liftIO $ readProcess "git" ["ls-remote", repo, "master"] []
-        let latestCommit = head . words $ remote
+      Just (repo, branch) -> do
+        remote <- liftIO $ readProcess "git" ["ls-remote", repo, branch] []
+        latestCommit <-
+          case words remote of
+            [] -> throwString $ "No commits found for branch " ++ branch ++ " on repo " ++ repo
+            x:_ -> return x
         when (isNothing builtHash) $
-            $logWarn $ "Information about the commit this version of stack was "
+            prettyWarnS $
+                       "Information about the commit this version of stack was "
                     <> "built from is not available due to how it was built. "
                     <> "Will continue by assuming an upgrade is needed "
                     <> "because we have no information to the contrary."
         if builtHash == Just latestCommit
             then do
-                $logInfo "Already up-to-date, no upgrade required"
+                prettyInfoS "Already up-to-date, no upgrade required"
                 return Nothing
             else do
-                $logInfo "Cloning stack"
+                prettyInfoS "Cloning stack"
                 -- NOTE: "--recursive" was added after v1.0.0 (and before the
                 -- next release).  This means that we can't use submodules in
                 -- the stack repo until we're comfortable with "stack upgrade
                 -- --git" not working for earlier versions.
-                let args = [ "clone", repo , "stack", "--depth", "1", "--recursive"]
+                let args = [ "clone", repo , "stack", "--depth", "1", "--recursive", "--branch", branch]
                 runCmd (Cmd (Just tmp) "git" menv args) Nothing
                 return $ Just $ tmp </> $(mkRelDir "stack")
       Nothing -> do
         updateAllIndices
-        (caches, _gitShaCaches) <- getPackageCaches
-        let latest = Map.fromListWith max
-                   $ map toTuple
-                   $ Map.keys
+        PackageCache caches <- getPackageCaches
+        let versions
+                = filter (/= $(mkVersion "9.9.9")) -- Mistaken upload to Hackage, just ignore it
+                $ maybe [] HashMap.keys
+                $ HashMap.lookup $(mkPackageName "stack") caches
 
-                   -- Mistaken upload to Hackage, just ignore it
-                   $ Map.delete (PackageIdentifier
-                        $(mkPackageName "stack")
-                        $(mkVersion "9.9.9"))
+        when (null versions) (throwString "No stack found in package indices")
 
-                     caches
-        case Map.lookup $(mkPackageName "stack") latest of
-            Nothing -> throwString "No stack found in package indices"
-            Just version | version <= fromCabalVersion Paths.version -> do
-                $logInfo "Already at latest version, no upgrade required"
+        let version = Data.List.maximum versions
+        if version <= fromCabalVersion (mkVersion' Paths.version)
+            then do
+                prettyInfoS "Already at latest version, no upgrade required"
                 return Nothing
-            Just version -> do
+            else do
                 let ident = PackageIdentifier $(mkPackageName "stack") version
                 paths <- unpackPackageIdents tmp Nothing
-                    -- accept latest cabal revision by not supplying a Git SHA
-                    $ Map.singleton ident Nothing
+                    -- accept latest cabal revision
+                    [PackageIdentifierRevision ident CFILatest]
                 case Map.lookup ident paths of
                     Nothing -> error "Stack.Upgrade.upgrade: invariant violated, unpacked directory not found"
                     Just path -> return $ Just path
@@ -241,11 +243,11 @@ sourceUpgrade gConfigMonoid mresolver builtHash (SourceOpts gitRepo) =
             gConfigMonoid
             mresolver
             (SYLOverride $ dir </> $(mkRelFile "stack.yaml"))
-        bconfig <- lcLoadBuildConfig lc Nothing
-        envConfig1 <- runInnerStackT bconfig $ setupEnv $ Just $
+        bconfig <- liftIO $ lcLoadBuildConfig lc Nothing
+        envConfig1 <- runRIO bconfig $ setupEnv $ Just $
             "Try rerunning with --install-ghc to install the correct GHC into " <>
             T.pack (toFilePath (configLocalPrograms (view configL bconfig)))
-        runInnerStackT (set (buildOptsL.buildOptsInstallExesL) True envConfig1) $
+        runRIO (set (buildOptsL.buildOptsInstallExesL) True envConfig1) $
             build (const $ return ()) Nothing defaultBuildOptsCLI
                 { boptsCLITargets = ["stack"]
                 }

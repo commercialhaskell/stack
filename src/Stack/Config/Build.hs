@@ -1,10 +1,10 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE RecordWildCards #-}
 
 -- | Build configuration
 module Stack.Config.Build where
 
-import           Data.Maybe
-import           Data.Monoid.Extra
+import           Stack.Prelude
 import           Stack.Types.Config
 
 -- | Interprets BuildOptsMonoid options.
@@ -43,6 +43,9 @@ buildOptsFromMonoid BuildOptsMonoid{..} = BuildOpts
     , boptsInstallExes = fromFirst
           (boptsInstallExes defaultBuildOpts)
           buildMonoidInstallExes
+    , boptsInstallCompilerTool = fromFirst
+          (boptsInstallCompilerTool defaultBuildOpts)
+          buildMonoidInstallCompilerTool
     , boptsPreFetch = fromFirst
           (boptsPreFetch defaultBuildOpts)
           buildMonoidPreFetch
@@ -67,6 +70,7 @@ buildOptsFromMonoid BuildOptsMonoid{..} = BuildOpts
     , boptsSplitObjs = fromFirst
           (boptsSplitObjs defaultBuildOpts)
           buildMonoidSplitObjs
+    , boptsSkipComponents = buildMonoidSkipComponents
     }
   where
     -- These options are not directly used in bopts, instead they

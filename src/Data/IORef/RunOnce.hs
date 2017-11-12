@@ -1,16 +1,16 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 module Data.IORef.RunOnce (runOnce) where
 
-import Control.Monad.IO.Class
-import Data.IORef
+import Stack.Prelude
 
-runOnce :: MonadIO m => m a -> m (m a)
-runOnce f = do
-    ref <- liftIO $ newIORef Nothing
-    return $ do
-        mval <- liftIO $ readIORef ref
+runOnce :: (MonadUnliftIO m, MonadIO n) => m a -> m (n a)
+runOnce f = withRunInIO $ \run -> do
+    ref <- newIORef Nothing
+    return $ liftIO $ do
+        mval <- readIORef ref
         case mval of
             Just val -> return val
             Nothing -> do
-                val <- f
-                liftIO $ writeIORef ref (Just val)
+                val <- run f
+                writeIORef ref (Just val)
                 return val

@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE DeriveDataTypeable #-}
@@ -17,49 +18,35 @@ module Stack.Build.ConstructPlan
     ( constructPlan
     ) where
 
-import           Control.Exception.Lifted
-import           Control.Monad
-import           Control.Monad.IO.Class
-import           Control.Monad.Logger
+import           Stack.Prelude
 import           Control.Monad.RWS.Strict
 import           Control.Monad.State.Strict (execState)
-import           Control.Monad.Trans.Resource
-import           Data.Either
-import           Data.Function
 import qualified Data.HashSet as HashSet
 import           Data.List
 import           Data.List.Extra (nubOrd)
-import           Data.Map.Strict (Map)
 import qualified Data.Map.Strict as M
 import qualified Data.Map.Strict as Map
-import           Data.Maybe
-import           Data.Set (Set)
 import qualified Data.Set as Set
-import           Data.String (fromString)
-import           Data.Text (Text)
 import qualified Data.Text as T
 import           Data.Text.Encoding (decodeUtf8With)
 import           Data.Text.Encoding.Error (lenientDecode)
-import           Data.Typeable
-import qualified Distribution.Package as Cabal
 import qualified Distribution.Text as Cabal
 import qualified Distribution.Version as Cabal
-import           GHC.Generics (Generic)
 import           Generics.Deriving.Monoid (memptydefault, mappenddefault)
 import           Lens.Micro (lens)
-import           Path
-import           Prelude hiding (pi, writeFile)
 import           Stack.Build.Cache
 import           Stack.Build.Haddock
 import           Stack.Build.Installed
 import           Stack.Build.Source
 import           Stack.BuildPlan
+import           Stack.Config (getLocalPackages)
 import           Stack.Constants
 import           Stack.Package
 import           Stack.PackageDump
 import           Stack.PackageIndex
 import           Stack.PrettyPrint
 import           Stack.Types.Build
+import           Stack.Types.BuildPlan
 import           Stack.Types.Compiler
 import           Stack.Types.Config
 import           Stack.Types.FlagName
@@ -67,8 +54,9 @@ import           Stack.Types.GhcPkgId
 import           Stack.Types.Package
 import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageName
-import           Stack.Types.StackT (StackM)
+import           Stack.Types.Runner
 import           Stack.Types.Version
+import           System.IO (putStrLn)
 import           System.Process.Read (findExecutable)
 
 data PackageInfo
@@ -129,29 +117,32 @@ instance Monoid W where
     mempty = memptydefault
     mappend = mappenddefault
 
-type M = RWST
+type M = RWST -- TODO replace with more efficient WS stack on top of StackT
     Ctx
     W
     (Map PackageName (Either ConstructPlanException AddDepRes))
     IO
 
 data Ctx = Ctx
-    { mbp            :: !MiniBuildPlan
+    { ls             :: !LoadedSnapshot
     , baseConfigOpts :: !BaseConfigOpts
-    , loadPackage    :: !(PackageName -> Version -> Map FlagName Bool -> [Text] -> IO Package)
+    , loadPackage    :: !(PackageLocationIndex FilePath -> Map FlagName Bool -> [Text] -> IO Package)
     , combinedMap    :: !CombinedMap
-    , toolToPackages :: !(Cabal.Dependency -> Map PackageName VersionRange)
+    , toolToPackages :: !(ExeName -> Map PackageName VersionRange)
     , ctxEnvConfig   :: !EnvConfig
     , callStack      :: ![PackageName]
     , extraToBuild   :: !(Set PackageName)
     , getVersions    :: !(PackageName -> IO (Set Version))
     , wanted         :: !(Set PackageName)
     , localNames     :: !(Set PackageName)
-    , logFunc        :: Loc -> LogSource -> LogLevel -> LogStr -> IO ()
     }
 
 instance HasPlatform Ctx
 instance HasGHCVariant Ctx
+instance HasLogFunc Ctx where
+    logFuncL = configL.logFuncL
+instance HasRunner Ctx where
+    runnerL = configL.runnerL
 instance HasConfig Ctx
 instance HasBuildConfig Ctx
 instance HasEnvConfig Ctx where
@@ -173,30 +164,31 @@ instance HasEnvConfig Ctx where
 --
 -- 3) It will only rebuild a local package if its files are dirty or
 -- some of its dependencies have changed.
-constructPlan :: forall env m. (StackM env m, HasEnvConfig env)
-              => MiniBuildPlan
+constructPlan :: forall env. HasEnvConfig env
+              => LoadedSnapshot
               -> BaseConfigOpts
               -> [LocalPackage]
               -> Set PackageName -- ^ additional packages that must be built
               -> [DumpPackage () () ()] -- ^ locally registered
-              -> (PackageName -> Version -> Map FlagName Bool -> [Text] -> IO Package) -- ^ load upstream package
+              -> (PackageLocationIndex FilePath -> Map FlagName Bool -> [Text] -> IO Package) -- ^ load upstream package
               -> SourceMap
               -> InstalledMap
               -> Bool
-              -> m Plan
-constructPlan mbp0 baseConfigOpts0 locals extraToBuild0 localDumpPkgs loadPackage0 sourceMap installedMap initialBuildSteps = do
-    $logDebug "Constructing the build plan"
-    getVersions0 <- getPackageVersionsIO
+              -> RIO env Plan
+constructPlan ls0 baseConfigOpts0 locals extraToBuild0 localDumpPkgs loadPackage0 sourceMap installedMap initialBuildSteps = do
+    logDebug "Constructing the build plan"
+    u <- askUnliftIO
 
     econfig <- view envConfigL
     let onWanted = void . addDep False . packageName . lpPackage
     let inner = do
             mapM_ onWanted $ filter lpWanted locals
             mapM_ (addDep False) $ Set.toList extraToBuild0
-    lf <- askLoggerIO
+    lp <- getLocalPackages
+    let ctx = mkCtx econfig (unliftIO u . getPackageVersions) lp
     ((), m, W efinals installExes dirtyReason deps warnings parents) <-
-        liftIO $ runRWST inner (ctx econfig getVersions0 lf) M.empty
-    mapM_ $logWarn (warnings [])
+        liftIO $ runRWST inner ctx M.empty
+    mapM_ logWarn (warnings [])
     let toEither (_, Left e)  = Left e
         toEither (k, Right v) = Right (k, v)
         (errlibs, adrs) = partitionEithers $ map toEither $ M.toList m
@@ -217,36 +209,34 @@ constructPlan mbp0 baseConfigOpts0 locals extraToBuild0 localDumpPkgs loadPackag
                 , planFinals = M.fromList finals
                 , planUnregisterLocal = mkUnregisterLocal tasks dirtyReason localDumpPkgs sourceMap initialBuildSteps
                 , planInstallExes =
-                    if boptsInstallExes $ bcoBuildOpts baseConfigOpts0
+                    if boptsInstallExes (bcoBuildOpts baseConfigOpts0) ||
+                       boptsInstallCompilerTool (bcoBuildOpts baseConfigOpts0)
                         then installExes
                         else Map.empty
                 }
         else do
             planDebug $ show errs
             stackYaml <- view stackYamlL
-            $prettyError $ pprintExceptions errs stackYaml parents (wantedLocalPackages locals)
+            prettyErrorNoIndent $ pprintExceptions errs stackYaml parents (wanted ctx)
             throwM $ ConstructPlanFailed "Plan construction failed."
   where
-    ctx econfig getVersions0 lf = Ctx
-        { mbp = mbp0
+    mkCtx econfig getVersions0 lp = Ctx
+        { ls = ls0
         , baseConfigOpts = baseConfigOpts0
         , loadPackage = loadPackage0
         , combinedMap = combineMap sourceMap installedMap
-        , toolToPackages = \(Cabal.Dependency name _) ->
+        , toolToPackages = \name ->
           maybe Map.empty (Map.fromSet (const Cabal.anyVersion)) $
-          Map.lookup (T.pack . packageNameString . fromCabalPackageName $ name) toolMap
+          Map.lookup name toolMap
         , ctxEnvConfig = econfig
         , callStack = []
         , extraToBuild = extraToBuild0
         , getVersions = getVersions0
         , wanted = wantedLocalPackages locals <> extraToBuild0
         , localNames = Set.fromList $ map (packageName . lpPackage) locals
-        , logFunc = lf
         }
-    -- TODO Currently, this will only consider and install tools from the
-    -- snapshot. It will not automatically install build tools from extra-deps
-    -- or local packages.
-    toolMap = getToolMap mbp0
+      where
+        toolMap = getToolMap ls0 lp
 
 -- | State to be maintained during the calculation of local packages
 -- to unregister.
@@ -319,7 +309,7 @@ mkUnregisterLocal tasks dirtyReason localDumpPkgs sourceMap initialBuildSteps =
               then Nothing
               else Just $ fromMaybe "" $ Map.lookup name dirtyReason
       -- Check if we're no longer using the local version
-      | Just (PSUpstream _ Snap _ _ _) <- Map.lookup name sourceMap
+      | Just (piiLocation -> Snap) <- Map.lookup name sourceMap
           = Just "Switching to snapshot installed package"
       -- Check if a dependency is going to be unregistered
       | (dep, _):_ <- mapMaybe (`Map.lookup` toUnregister) deps
@@ -342,7 +332,7 @@ mkUnregisterLocal tasks dirtyReason localDumpPkgs sourceMap initialBuildSteps =
 -- step.
 addFinal :: LocalPackage -> Package -> Bool -> M ()
 addFinal lp package isAllInOne = do
-    depsRes <- addPackageDeps package
+    depsRes <- addPackageDeps False package
     res <- case depsRes of
         Left e -> return $ Left e
         Right (missing, present, _minLoc) -> do
@@ -361,11 +351,19 @@ addFinal lp package isAllInOne = do
                             Local
                             package
                 , taskPresent = present
-                , taskType = TTLocal lp
+                , taskType = TTFiles lp Local -- FIXME we can rely on this being Local, right?
                 , taskAllInOne = isAllInOne
                 , taskCachePkgSrc = CacheSrcLocal (toFilePath (lpDir lp))
+                , taskAnyMissing = not $ Set.null missing
                 }
     tell mempty { wFinals = Map.singleton (packageName package) res }
+
+-- | Is this package being used as a library, or just as a build tool?
+-- If the former, we need to ensure that a library actually
+-- exists. See
+-- <https://github.com/commercialhaskell/stack/issues/2195>
+data DepType = AsLibrary | AsBuildTool
+  deriving (Show, Eq)
 
 -- | Given a 'PackageName', adds all of the build tasks to build the
 -- package, if needed.
@@ -402,32 +400,38 @@ addDep treatAsDep' name = do
                         -- recommendation available
                         Nothing -> return $ Left $ UnknownPackage name
                         Just (PIOnlyInstalled loc installed) -> do
-                            -- slightly hacky, no flags since they likely won't affect executable names
-                            tellExecutablesUpstream name (installedVersion installed) loc Map.empty
+                            -- FIXME Slightly hacky, no flags since
+                            -- they likely won't affect executable
+                            -- names. This code does not feel right.
+                            tellExecutablesUpstream
+                              (PackageIdentifierRevision (PackageIdentifier name (installedVersion installed)) CFILatest)
+                              loc
+                              Map.empty
                             return $ Right $ ADRFound loc installed
                         Just (PIOnlySource ps) -> do
-                            tellExecutables name ps
-                            installPackage name ps Nothing
+                            tellExecutables ps
+                            installPackage treatAsDep name ps Nothing
                         Just (PIBoth ps installed) -> do
-                            tellExecutables name ps
-                            installPackage name ps (Just installed)
+                            tellExecutables ps
+                            installPackage treatAsDep name ps (Just installed)
             updateLibMap name res
             return res
 
-tellExecutables :: PackageName -> PackageSource -> M ()
-tellExecutables _ (PSLocal lp)
+-- FIXME what's the purpose of this? Add a Haddock!
+tellExecutables :: PackageSource -> M ()
+tellExecutables (PSFiles lp _)
     | lpWanted lp = tellExecutablesPackage Local $ lpPackage lp
     | otherwise = return ()
 -- Ignores ghcOptions because they don't matter for enumerating
 -- executables.
-tellExecutables name (PSUpstream version loc flags _ghcOptions _gitSha) =
-    tellExecutablesUpstream name version loc flags
+tellExecutables (PSIndex loc flags _ghcOptions pir) =
+    tellExecutablesUpstream pir loc flags
 
-tellExecutablesUpstream :: PackageName -> Version -> InstallLocation -> Map FlagName Bool -> M ()
-tellExecutablesUpstream name version loc flags = do
+tellExecutablesUpstream :: PackageIdentifierRevision -> InstallLocation -> Map FlagName Bool -> M ()
+tellExecutablesUpstream pir@(PackageIdentifierRevision (PackageIdentifier name _) _) loc flags = do
     ctx <- ask
     when (name `Set.member` extraToBuild ctx) $ do
-        p <- liftIO $ loadPackage ctx name version flags []
+        p <- liftIO $ loadPackage ctx (PLIndex pir) flags []
         tellExecutablesPackage loc p
 
 tellExecutablesPackage :: InstallLocation -> Package -> M ()
@@ -441,10 +445,10 @@ tellExecutablesPackage loc p = do
                 Just (PIOnlySource ps) -> goSource ps
                 Just (PIBoth ps _) -> goSource ps
 
-        goSource (PSLocal lp)
+        goSource (PSFiles lp _)
             | lpWanted lp = exeComponents (lpComponents lp)
             | otherwise = Set.empty
-        goSource PSUpstream{} = Set.empty
+        goSource PSIndex{} = Set.empty
 
     tell mempty { wInstall = Map.fromList $ map (, loc) $ Set.toList $ filterComps myComps $ packageExes p }
   where
@@ -454,30 +458,30 @@ tellExecutablesPackage loc p = do
 
 -- | Given a 'PackageSource' and perhaps an 'Installed' value, adds
 -- build 'Task's for the package and its dependencies.
-installPackage
-    :: PackageName
-    -> PackageSource
-    -> Maybe Installed
-    -> M (Either ConstructPlanException AddDepRes)
-installPackage name ps minstalled = do
+installPackage :: Bool -- ^ is this being used by a dependency?
+               -> PackageName
+               -> PackageSource
+               -> Maybe Installed
+               -> M (Either ConstructPlanException AddDepRes)
+installPackage treatAsDep name ps minstalled = do
     ctx <- ask
     case ps of
-        PSUpstream version _ flags ghcOptions _ -> do
+        PSIndex _ flags ghcOptions pkgLoc -> do
             planDebug $ "installPackage: Doing all-in-one build for upstream package " ++ show name
-            package <- liftIO $ loadPackage ctx name version flags ghcOptions
-            resolveDepsAndInstall True ps package minstalled
-        PSLocal lp ->
+            package <- liftIO $ loadPackage ctx (PLIndex pkgLoc) flags ghcOptions -- FIXME be more efficient! Get this from the LoadedPackageInfo!
+            resolveDepsAndInstall True treatAsDep ps package minstalled
+        PSFiles lp _ ->
             case lpTestBench lp of
                 Nothing -> do
                     planDebug $ "installPackage: No test / bench component for " ++ show name ++ " so doing an all-in-one build."
-                    resolveDepsAndInstall True ps (lpPackage lp) minstalled
+                    resolveDepsAndInstall True treatAsDep ps (lpPackage lp) minstalled
                 Just tb -> do
                     -- Attempt to find a plan which performs an all-in-one
                     -- build.  Ignore the writer action + reset the state if
                     -- it fails.
                     s <- get
                     res <- pass $ do
-                        res <- addPackageDeps tb
+                        res <- addPackageDeps treatAsDep tb
                         let writerFunc w = case res of
                                 Left _ -> mempty
                                 _ -> w
@@ -498,7 +502,7 @@ installPackage name ps minstalled = do
                             put s
                             -- Otherwise, fall back on building the
                             -- tests / benchmarks in a separate step.
-                            res' <- resolveDepsAndInstall False ps (lpPackage lp) minstalled
+                            res' <- resolveDepsAndInstall False treatAsDep ps (lpPackage lp) minstalled
                             when (isRight res') $ do
                                 -- Insert it into the map so that it's
                                 -- available for addFinal.
@@ -507,12 +511,13 @@ installPackage name ps minstalled = do
                             return res'
 
 resolveDepsAndInstall :: Bool
+                      -> Bool
                       -> PackageSource
                       -> Package
                       -> Maybe Installed
                       -> M (Either ConstructPlanException AddDepRes)
-resolveDepsAndInstall isAllInOne ps package minstalled = do
-    res <- addPackageDeps package
+resolveDepsAndInstall isAllInOne treatAsDep ps package minstalled = do
+    res <- addPackageDeps treatAsDep package
     case res of
         Left err -> return $ Left err
         Right deps -> liftM Right $ installPackageGivenDeps isAllInOne ps package minstalled deps
@@ -561,10 +566,11 @@ installPackageGivenDeps isAllInOne ps package minstalled (missing, present, minL
             , taskPresent = present
             , taskType =
                 case ps of
-                    PSLocal lp -> TTLocal lp
-                    PSUpstream _ loc _ _ sha -> TTUpstream package (loc <> minLoc) sha
+                    PSFiles lp loc -> TTFiles lp (loc <> minLoc)
+                    PSIndex loc _ _ pkgLoc -> TTIndex package (loc <> minLoc) pkgLoc
             , taskAllInOne = isAllInOne
             , taskCachePkgSrc = toCachePkgSrc ps
+            , taskAnyMissing = not $ Set.null missing
             }
 
 -- Update response in the lib map. If it is an error, and there's
@@ -590,12 +596,13 @@ addEllipsis t
 -- then the parent package must be installed locally. Otherwise, if it
 -- is 'Snap', then it can either be installed locally or in the
 -- snapshot.
-addPackageDeps :: Package -> M (Either ConstructPlanException (Set PackageIdentifier, Map PackageIdentifier GhcPkgId, InstallLocation))
-addPackageDeps package = do
+addPackageDeps :: Bool -- ^ is this being used by a dependency?
+               -> Package -> M (Either ConstructPlanException (Set PackageIdentifier, Map PackageIdentifier GhcPkgId, InstallLocation))
+addPackageDeps treatAsDep package = do
     ctx <- ask
     deps' <- packageDepsWithTools package
-    deps <- forM (Map.toList deps') $ \(depname, range) -> do
-        eres <- addDep True depname
+    deps <- forM (Map.toList deps') $ \(depname, (range, depType)) -> do
+        eres <- addDep treatAsDep depname
         let getLatestApplicable = do
                 vs <- liftIO $ getVersions ctx depname
                 return (latestApplicableVersion range vs)
@@ -608,6 +615,8 @@ addPackageDeps package = do
                             _ -> Couldn'tResolveItsDependencies (packageVersion package)
                 mlatestApplicable <- getLatestApplicable
                 return $ Left (depname, (range, mlatestApplicable, bd))
+            Right adr | depType == AsLibrary && not (adrHasLibrary adr) ->
+                return $ Left (depname, (range, Nothing, HasNoLibrary))
             Right adr -> do
                 addParent depname range Nothing
                 inRange <- if adrVersion adr `withinRange` range
@@ -645,7 +654,7 @@ addPackageDeps package = do
                             (Set.singleton $ taskProvides task, Map.empty, taskLocation task)
                         ADRFound loc (Executable _) -> return $ Right
                             (Set.empty, Map.empty, loc)
-                        ADRFound loc (Library ident gid) -> return $ Right
+                        ADRFound loc (Library ident gid _) -> return $ Right
                             (Set.empty, Map.singleton ident gid, loc)
                     else do
                         mlatestApplicable <- getLatestApplicable
@@ -669,6 +678,23 @@ addPackageDeps package = do
       where
         val = (First mversion, [(packageIdentifier package, range)])
 
+    adrHasLibrary :: AddDepRes -> Bool
+    adrHasLibrary (ADRToInstall task) = taskHasLibrary task
+    adrHasLibrary (ADRFound _ Library{}) = True
+    adrHasLibrary (ADRFound _ Executable{}) = False
+
+    taskHasLibrary :: Task -> Bool
+    taskHasLibrary task =
+      case taskType task of
+        TTFiles lp _ -> packageHasLibrary $ lpPackage lp
+        TTIndex p _ _ -> packageHasLibrary p
+
+    packageHasLibrary :: Package -> Bool
+    packageHasLibrary p =
+      case packageLibraries p of
+        HasLibraries _ -> True
+        NoLibraries -> False
+
 checkDirtiness :: PackageSource
                -> Installed
                -> Package
@@ -677,7 +703,7 @@ checkDirtiness :: PackageSource
                -> M Bool
 checkDirtiness ps installed package present wanted = do
     ctx <- ask
-    moldOpts <- flip runLoggingT (logFunc ctx) $ tryGetFlagCache installed
+    moldOpts <- runRIO ctx $ tryGetFlagCache installed
     let configOpts = configureOpts
             (view envConfigL ctx)
             (baseConfigOpts ctx)
@@ -691,8 +717,8 @@ checkDirtiness ps installed package present wanted = do
             , configCacheDeps = Set.fromList $ Map.elems present
             , configCacheComponents =
                 case ps of
-                    PSLocal lp -> Set.map renderComponent $ lpComponents lp
-                    PSUpstream{} -> Set.empty
+                    PSFiles lp _ -> Set.map renderComponent $ lpComponents lp
+                    PSIndex{} -> Set.empty
             , configCacheHaddock =
                 shouldHaddockPackage buildOpts wanted (packageName package) ||
                 -- Disabling haddocks when old config had haddocks doesn't make dirty.
@@ -782,76 +808,74 @@ describeConfigDiff config old new
     pkgSrcName CacheSrcUpstream = "upstream source"
 
 psForceDirty :: PackageSource -> Bool
-psForceDirty (PSLocal lp) = lpForceDirty lp
-psForceDirty PSUpstream{} = False
+psForceDirty (PSFiles lp _) = lpForceDirty lp
+psForceDirty PSIndex{} = False
 
 psDirty :: PackageSource -> Maybe (Set FilePath)
-psDirty (PSLocal lp) = lpDirtyFiles lp
-psDirty PSUpstream{} = Nothing -- files never change in an upstream package
+psDirty (PSFiles lp _) = lpDirtyFiles lp
+psDirty PSIndex{} = Nothing -- files never change in an upstream package
 
 psLocal :: PackageSource -> Bool
-psLocal (PSLocal _) = True
-psLocal PSUpstream{} = False
+psLocal (PSFiles _ loc) = loc == Local -- FIXME this is probably not the right logic, see configureOptsNoDir. We probably want to check if this appears in packages:
+psLocal PSIndex{} = False
 
 -- | Get all of the dependencies for a given package, including guessed build
 -- tool dependencies.
-packageDepsWithTools :: Package -> M (Map PackageName VersionRange)
+packageDepsWithTools :: Package -> M (Map PackageName (VersionRange, DepType))
 packageDepsWithTools p = do
     ctx <- ask
     -- TODO: it would be cool to defer these warnings until there's an
     -- actual issue building the package.
-    let toEither (Cabal.Dependency (Cabal.PackageName name) _) mp =
+    let toEither name mp =
             case Map.toList mp of
-                [] -> Left (NoToolFound name (packageName p))
+                [] -> Left (ToolWarning name (packageName p) Nothing)
                 [_] -> Right mp
-                xs -> Left (AmbiguousToolsFound name (packageName p) (map fst xs))
+                ((x, _):(y, _):zs) ->
+                  Left (ToolWarning name (packageName p) (Just (x, y, map fst zs)))
         (warnings0, toolDeps) =
              partitionEithers $
-             map (\dep -> toEither dep (toolToPackages ctx dep)) (packageTools p)
+             map (\dep -> toEither dep (toolToPackages ctx dep)) (Map.keys (packageTools p))
     -- Check whether the tool is on the PATH before warning about it.
-    warnings <- fmap catMaybes $ forM warnings0 $ \warning -> do
-        let toolName = case warning of
-                NoToolFound tool _ -> tool
-                AmbiguousToolsFound tool _ _ -> tool
+    warnings <- fmap catMaybes $ forM warnings0 $ \warning@(ToolWarning (ExeName toolName) _ _) -> do
         config <- view configL
         menv <- liftIO $ configEnvOverride config minimalEnvSettings { esIncludeLocals = True }
-        mfound <- findExecutable menv toolName
+        mfound <- findExecutable menv $ T.unpack toolName
         case mfound of
             Nothing -> return (Just warning)
             Just _ -> return Nothing
     tell mempty { wWarnings = (map toolWarningText warnings ++) }
-    when (any isNoToolFound warnings) $ do
-        let msg = T.unlines
-                [ "Missing build-tools may be caused by dependencies of the build-tool being overridden by extra-deps."
-                , "This should be fixed soon - see this issue https://github.com/commercialhaskell/stack/issues/595"
-                ]
-        tell mempty { wWarnings = (msg:) }
-    return $ Map.unionsWith intersectVersionRanges
-           $ packageDeps p
-           : toolDeps
+    return $ Map.unionsWith
+               (\(vr1, dt1) (vr2, dt2) ->
+                    ( intersectVersionRanges vr1 vr2
+                    , case dt1 of
+                        AsLibrary -> AsLibrary
+                        AsBuildTool -> dt2
+                    )
+               )
+           $ ((, AsLibrary) <$> packageDeps p)
+           : (Map.map (, AsBuildTool) <$> toolDeps)
 
-data ToolWarning
-    = NoToolFound String PackageName
-    | AmbiguousToolsFound String PackageName [PackageName]
-
-isNoToolFound :: ToolWarning -> Bool
-isNoToolFound NoToolFound{} = True
-isNoToolFound _ = False
+-- | Warn about tools in the snapshot definition. States the tool name
+-- expected, the package name using it, and found packages. If the
+-- last value is Nothing, it means the tool was not found
+-- anywhere. For a Just value, it was found in at least two packages.
+data ToolWarning = ToolWarning ExeName PackageName (Maybe (PackageName, PackageName, [PackageName]))
+  deriving Show
 
 toolWarningText :: ToolWarning -> Text
-toolWarningText (NoToolFound toolName pkgName) =
+toolWarningText (ToolWarning (ExeName toolName) pkgName Nothing) =
     "No packages found in snapshot which provide a " <>
     T.pack (show toolName) <>
     " executable, which is a build-tool dependency of " <>
     T.pack (show (packageNameString pkgName))
-toolWarningText (AmbiguousToolsFound toolName pkgName options) =
+toolWarningText (ToolWarning (ExeName toolName) pkgName (Just (option1, option2, options))) =
     "Multiple packages found in snapshot which provide a " <>
     T.pack (show toolName) <>
     " exeuctable, which is a build-tool dependency of " <>
     T.pack (show (packageNameString pkgName)) <>
     ", so none will be installed.\n" <>
     "Here's the list of packages which provide it: " <>
-    T.intercalate ", " (map packageNameText options) <>
+    T.intercalate ", " (map packageNameText (option1:option2:options)) <>
     "\nSince there's no good way to choose, you may need to install it manually."
 
 -- | Strip out anything from the @Plan@ intended for the local database
@@ -863,11 +887,7 @@ stripLocals plan = plan
     , planInstallExes = Map.filter (/= Local) $ planInstallExes plan
     }
   where
-    checkTask task =
-        case taskType task of
-            TTLocal _ -> False
-            TTUpstream _ Local _ -> False
-            TTUpstream _ Snap _ -> True
+    checkTask task = taskLocation task == Snap
 
 stripNonDeps :: Set PackageName -> Plan -> Plan
 stripNonDeps deps plan = plan
@@ -884,12 +904,12 @@ markAsDep name = tell mempty { wDeps = Set.singleton name }
 -- | Is the given package/version combo defined in the snapshot?
 inSnapshot :: PackageName -> Version -> M Bool
 inSnapshot name version = do
-    p <- asks mbp
+    p <- asks ls
     ls <- asks localNames
     return $ fromMaybe False $ do
         guard $ not $ name `Set.member` ls
-        mpi <- Map.lookup name (mbpPackages p)
-        return $ mpiVersion mpi == version
+        lpi <- Map.lookup name (lsPackages p)
+        return $ lpiVersion lpi == version
 
 data ConstructPlanException
     = DependencyCycleDetected [PackageName]
@@ -908,6 +928,8 @@ data BadDependency
     = NotInBuildPlan
     | Couldn'tResolveItsDependencies Version
     | DependencyMismatch Version
+    | HasNoLibrary
+    -- ^ See description of 'DepType'
     deriving (Typeable, Eq, Ord, Show)
 
 -- TODO: Consider intersecting version ranges for multiple deps on a
@@ -920,17 +942,28 @@ pprintExceptions
     -> Set PackageName
     -> AnsiDoc
 pprintExceptions exceptions stackYaml parentMap wanted =
-    "While constructing the build plan, the following exceptions were encountered:" <> line <> line <>
-    mconcat (intersperse (line <> line) (mapMaybe pprintException exceptions')) <> line <>
-    if Map.null extras then "" else
-        line <>
-        "Recommended action: try adding the following to your extra-deps in" <+>
-        toAnsiDoc (display stackYaml) <> ":" <>
-        line <>
-        vsep (map pprintExtra (Map.toList extras)) <>
-        line <>
-        line <>
-        "You may also want to try the 'stack solver' command"
+    mconcat $
+      [ flow "While constructing the build plan, the following exceptions were encountered:"
+      , line <> line
+      , mconcat (intersperse (line <> line) (mapMaybe pprintException exceptions'))
+      , line <> line
+      , flow "Some potential ways to resolve this:"
+      , line <> line
+      ] ++
+      (if Map.null extras then [] else
+         [ "  *" <+> align
+           (flow "Recommended action: try adding the following to your extra-deps in" <+>
+            toAnsiDoc (display stackYaml) <> ":")
+         , line <> line
+         , vsep (map pprintExtra (Map.toList extras))
+         , line <> line
+         ]
+      ) ++
+      [ "  *" <+> align (flow "Set 'allow-newer: true' to ignore all version constraints and build anyway.")
+      , line <> line
+      , "  *" <+> align (flow "You may also want to try using the 'stack solver' command.")
+      , line
+      ]
   where
     exceptions' = nubOrd exceptions
 
@@ -940,7 +973,10 @@ pprintExceptions exceptions stackYaml parentMap wanted =
     getExtras (DependencyPlanFailures _ m) =
        Map.unions $ map go $ Map.toList m
      where
+       -- TODO: Likely a good idea to distinguish these to the user.  In particular, for DependencyMismatch
        go (name, (_range, Just version, NotInBuildPlan)) =
+           Map.singleton name version
+       go (name, (_range, Just version, DependencyMismatch{})) =
            Map.singleton name version
        go _ = Map.empty
     pprintExtra (name, version) =
@@ -952,32 +988,33 @@ pprintExceptions exceptions stackYaml parentMap wanted =
     toNotInBuildPlan _ = []
 
     pprintException (DependencyCycleDetected pNames) = Just $
-        "Dependency cycle detected in packages:" <> line <>
-        indent 4 (encloseSep "[" "]" "," (map (errorRed . fromString . packageNameString) pNames))
+        flow "Dependency cycle detected in packages:" <> line <>
+        indent 4 (encloseSep "[" "]" "," (map (styleError . display) pNames))
     pprintException (DependencyPlanFailures pkg pDeps) =
         case mapMaybe pprintDep (Map.toList pDeps) of
             [] -> Nothing
             depErrors -> Just $
-                "In the dependencies for" <+> pkgIdent <>
+                flow "In the dependencies for" <+> pkgIdent <>
                 pprintFlags (packageFlags pkg) <> ":" <> line <>
                 indent 4 (vsep depErrors) <>
                 case getShortestDepsPath parentMap wanted (packageName pkg) of
-                    Nothing -> line <> "needed for unknown reason - stack invariant violated."
-                    Just [] -> line <> "needed since" <+> pkgIdent <+> "is a build target."
-                    Just (target:path) -> line <> "needed due to " <> encloseSep "" "" " -> " pathElems
+                    Nothing -> line <> flow "needed for unknown reason - stack invariant violated."
+                    Just [] -> line <> flow "needed since" <+> pkgName <+> flow "is a build target."
+                    Just (target:path) -> line <> flow "needed due to " <> encloseSep "" "" " -> " pathElems
                       where
                         pathElems =
-                            [displayTargetPkgId target] ++
+                            [styleTarget . display $ target] ++
                             map display path ++
                             [pkgIdent]
               where
-                pkgIdent = displayCurrentPkgId (packageIdentifier pkg)
+                pkgName = styleCurrent . display $ packageName pkg
+                pkgIdent = styleCurrent . display $ packageIdentifier pkg
     -- Skip these when they are redundant with 'NotInBuildPlan' info.
     pprintException (UnknownPackage name)
         | name `Set.member` allNotInBuildPlan = Nothing
         | name `HashSet.member` wiredInPackages =
-            Just $ "Can't build a package with same name as a wired-in-package:" <+> displayCurrentPkgName name
-        | otherwise = Just $ "Unknown package:" <+> displayCurrentPkgName name
+            Just $ flow "Can't build a package with same name as a wired-in-package:" <+> (styleCurrent . display $ name)
+        | otherwise = Just $ flow "Unknown package:" <+> (styleCurrent . display $ name)
 
     pprintFlags flags
         | Map.null flags = ""
@@ -987,29 +1024,32 @@ pprintExceptions exceptions stackYaml parentMap wanted =
 
     pprintDep (name, (range, mlatestApplicable, badDep)) = case badDep of
         NotInBuildPlan -> Just $
-            errorRed (display name) <+>
-            align ("must match" <+> goodRange <> "," <> softline <>
-                   "but the stack configuration has no specified version" <>
+            styleError (display name) <+>
+            align (flow "must match" <+> goodRange <> "," <> softline <>
+                   flow "but the stack configuration has no specified version" <>
                    latestApplicable Nothing)
         -- TODO: For local packages, suggest editing constraints
         DependencyMismatch version -> Just $
-            displayErrorPkgId (PackageIdentifier name version) <+>
-            align ("must match" <+> goodRange <>
+            (styleError . display) (PackageIdentifier name version) <+>
+            align (flow "from stack configuration does not match" <+> goodRange <>
                    latestApplicable (Just version))
         -- I think the main useful info is these explain why missing
         -- packages are needed. Instead lets give the user the shortest
         -- path from a target to the package.
         Couldn'tResolveItsDependencies _version -> Nothing
+        HasNoLibrary -> Just $
+            styleError (display name) <+>
+            align (flow "is a library dependency, but the package provides no library")
       where
-        goodRange = goodGreen (fromString (Cabal.display range))
+        goodRange = styleGood (fromString (Cabal.display range))
         latestApplicable mversion =
             case mlatestApplicable of
                 Nothing -> ""
                 Just la
                     | mlatestApplicable == mversion -> softline <>
-                        "(latest applicable is specified)"
+                        flow "(latest matching version is specified)"
                     | otherwise -> softline <>
-                        "(latest applicable is " <> goodGreen (display la) <> ")"
+                        flow "(latest matching version is" <+> styleGood (display la) <> ")"
 
 -- | Get the shortest reason for the package to be in the build plan. In
 -- other words, trace the parent dependencies back to a 'wanted'

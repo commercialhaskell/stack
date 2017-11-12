@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
 
@@ -7,15 +8,9 @@ module Stack.Path
     , pathParser
     ) where
 
-import           Control.Monad.Catch
-import           Control.Monad.Logger
-import           Control.Monad.Reader
-import           Control.Monad.Trans.Control
+import           Stack.Prelude
 import           Data.List (intercalate)
-import           Data.Maybe.Extra
-import           Data.Monoid
 import qualified Data.Set as Set
-import           Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.IO as T
 import           Lens.Micro (lens)
@@ -23,8 +18,10 @@ import qualified Options.Applicative as OA
 import           Path
 import           Path.Extra
 import           Stack.Constants
+import           Stack.Constants.Config
 import           Stack.GhcPkg as GhcPkg
 import           Stack.Types.Config
+import           Stack.Types.Runner
 import qualified System.FilePath as FP
 import           System.IO (stderr)
 import           System.Process.Read (EnvOverride(eoPath))
@@ -32,8 +29,8 @@ import           System.Process.Read (EnvOverride(eoPath))
 -- | Print out useful path information in a human-readable format (and
 -- support others later).
 path
-    :: (MonadIO m, MonadBaseControl IO m, MonadReader env m, HasEnvConfig env,
-        MonadCatch m, MonadLogger m)
+    :: (MonadUnliftIO m, MonadReader env m, HasEnvConfig env, MonadThrow m,
+        MonadLogger m)
     => [Text]
     -> m ()
 path keys =
@@ -53,6 +50,7 @@ path keys =
        global <- GhcPkg.getGlobalDB menv whichCompiler
        snaproot <- installationRootDeps
        localroot <- installationRootLocal
+       toolsDir <- bindirCompilerTools
        distDir <- distRelativeDir
        hpcDir <- hpcReportDir
        compiler <- getCompilerPath whichCompiler
@@ -86,6 +84,7 @@ path keys =
                                global
                                snaproot
                                localroot
+                               toolsDir
                                distDir
                                hpcDir
                                extra
@@ -110,6 +109,7 @@ data PathInfo = PathInfo
     , piGlobalDb     :: Path Abs Dir
     , piSnapRoot     :: Path Abs Dir
     , piLocalRoot    :: Path Abs Dir
+    , piToolsDir     :: Path Abs Dir
     , piDistDir      :: Path Rel Dir
     , piHpcDir       :: Path Abs Dir
     , piExtraDbs     :: [Path Abs Dir]
@@ -117,6 +117,10 @@ data PathInfo = PathInfo
     }
 
 instance HasPlatform PathInfo
+instance HasLogFunc PathInfo where
+    logFuncL = configL.logFuncL
+instance HasRunner PathInfo where
+    runnerL = configL.runnerL
 instance HasConfig PathInfo
 instance HasBuildConfig PathInfo where
     buildConfigL = lens piBuildConfig (\x y -> x { piBuildConfig = y })
@@ -154,6 +158,9 @@ paths =
     , ( "Directory containing the compiler binary (e.g. ghc)"
       , "compiler-bin"
       , T.pack . toFilePathNoTrailingSep . parent . piCompiler )
+    , ( "Directory containing binaries specific to a particular compiler (e.g. intero)"
+      , "compiler-tools-bin"
+      , T.pack . toFilePathNoTrailingSep . piToolsDir )
     , ( "Local bin dir where stack installs executables (e.g. ~/.local/bin)"
       , "local-bin"
       , view $ configL.to configLocalBin.to toFilePathNoTrailingSep.to T.pack)

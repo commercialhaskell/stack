@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE FlexibleContexts #-}
@@ -14,40 +15,32 @@ module Stack.Dot (dot
                  ,pruneGraph
                  ) where
 
-import           Control.Applicative
-import           Control.Arrow ((&&&))
-import           Control.Monad (liftM, void)
-import           Control.Monad.IO.Class
-import           Control.Monad.Trans.Unlift (MonadBaseUnlift)
 import qualified Data.Foldable as F
 import qualified Data.HashSet as HashSet
-import           Data.Map (Map)
 import qualified Data.Map as Map
-import           Data.Maybe
-import           Data.Monoid ((<>))
-import           Data.Set (Set)
 import qualified Data.Set as Set
-import           Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Text.IO as Text
 import qualified Data.Traversable as T
+import           Distribution.Text (display)
 import           Distribution.License (License(BSD3))
-import           Prelude -- Fix redundant import warnings
 import           Stack.Build (withLoadPackage)
 import           Stack.Build.Installed (getInstalled, GetInstalledOpts(..))
 import           Stack.Build.Source
 import           Stack.Build.Target
+import           Stack.Config (getLocalPackages)
 import           Stack.Constants
 import           Stack.Package
 import           Stack.PackageDump (DumpPackage(..))
+import           Stack.Prelude
 import           Stack.Types.Build
+import           Stack.Types.BuildPlan
 import           Stack.Types.Config
 import           Stack.Types.FlagName
 import           Stack.Types.GhcPkgId
 import           Stack.Types.Package
 import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageName
-import           Stack.Types.StackT
 import           Stack.Types.Version
 
 -- | Options record for @stack dot@
@@ -80,9 +73,7 @@ data ListDepsOpts = ListDepsOpts
     }
 
 -- | Visualize the project's dependencies as a graphviz graph
-dot :: (StackM env m, HasEnvConfig env, MonadBaseUnlift IO m)
-    => DotOpts
-    -> m ()
+dot :: HasEnvConfig env => DotOpts -> RIO env ()
 dot dotOpts = do
   (localNames, prunedGraph) <- createPrunedDependencyGraph dotOpts
   printGraph dotOpts localNames prunedGraph
@@ -98,12 +89,13 @@ data DotPayload = DotPayload
 -- | Create the dependency graph and also prune it as specified in the dot
 -- options. Returns a set of local names and and a map from package names to
 -- dependencies.
-createPrunedDependencyGraph :: (StackM env m, HasEnvConfig env, MonadBaseUnlift IO m)
+createPrunedDependencyGraph :: HasEnvConfig env
                             => DotOpts
-                            -> m (Set PackageName,
+                            -> RIO env
+                                 (Set PackageName,
                                   Map PackageName (Set PackageName, DotPayload))
 createPrunedDependencyGraph dotOpts = do
-  localNames <- liftM Map.keysSet getLocalPackageViews
+  localNames <- liftM (Map.keysSet . lpProject) getLocalPackages
   resultGraph <- createDependencyGraph dotOpts
   let pkgsToPrune = if dotIncludeBase dotOpts
                        then dotPrune dotOpts
@@ -115,11 +107,11 @@ createPrunedDependencyGraph dotOpts = do
 -- name to a tuple of dependencies and payload if available. This
 -- function mainly gathers the required arguments for
 -- @resolveDependencies@.
-createDependencyGraph :: (StackM env m, HasEnvConfig env, MonadBaseUnlift IO m)
+createDependencyGraph :: HasEnvConfig env
                        => DotOpts
-                       -> m (Map PackageName (Set PackageName, DotPayload))
+                       -> RIO env (Map PackageName (Set PackageName, DotPayload))
 createDependencyGraph dotOpts = do
-  (_, _, locals, _, _, sourceMap) <- loadSourceMapFull NeedTargets defaultBuildOptsCLI
+  (locals, sourceMap) <- loadSourceMap NeedTargets defaultBuildOptsCLI
       { boptsCLITargets = dotTargets dotOpts
       , boptsCLIFlags = dotFlags dotOpts
       }
@@ -134,27 +126,26 @@ createDependencyGraph dotOpts = do
       globalIdMap = Map.fromList $ map (\dp -> (dpGhcPkgId dp, dpPackageIdent dp)) globalDump
   withLoadPackage (\loader -> do
     let depLoader = createDepLoader sourceMap installedMap globalDumpMap globalIdMap loadPackageDeps
-        loadPackageDeps name version flags ghcOptions
+        loadPackageDeps name version loc flags ghcOptions
             -- Skip packages that can't be loaded - see
             -- https://github.com/commercialhaskell/stack/issues/2967
             | name `elem` [$(mkPackageName "rts"), $(mkPackageName "ghc")] =
                 return (Set.empty, DotPayload (Just version) (Just BSD3))
-            | otherwise = fmap (packageAllDeps &&& makePayload)
-                               (loader name version flags ghcOptions)
+            | otherwise = fmap (packageAllDeps &&& makePayload) (loader loc flags ghcOptions)
     liftIO $ resolveDependencies (dotDependencyDepth dotOpts) graph depLoader)
   where makePayload pkg = DotPayload (Just $ packageVersion pkg) (Just $ packageLicense pkg)
 
-listDependencies :: (StackM env m, HasEnvConfig env, MonadBaseUnlift IO m)
+listDependencies :: HasEnvConfig env
                   => ListDepsOpts
-                  -> m ()
+                  -> RIO env ()
 listDependencies opts = do
   let dotOpts = listDepsDotOpts opts
   (_, resultGraph) <- createPrunedDependencyGraph dotOpts
   void (Map.traverseWithKey go (snd <$> resultGraph))
     where go name payload =
             let payloadText =
-                    if listDepsLicense opts
-                      then maybe "<unknown>" (Text.pack . show) (payloadLicense payload)
+                  if listDepsLicense opts
+                      then maybe "<unknown>" (Text.pack . display) (payloadLicense payload)
                       else maybe "<unknown>" (Text.pack . show) (payloadVersion payload)
                 line = packageNameText name <> listDepsSep opts <> payloadText
             in  liftIO $ Text.putStrLn line
@@ -215,17 +206,20 @@ createDepLoader :: Applicative m
                 -> Map PackageName (InstallLocation, Installed)
                 -> Map PackageName (DumpPackage () () ())
                 -> Map GhcPkgId PackageIdentifier
-                -> (PackageName -> Version -> Map FlagName Bool -> [Text] -> m (Set PackageName, DotPayload))
+                -> (PackageName -> Version -> PackageLocationIndex FilePath ->
+                    Map FlagName Bool -> [Text] -> m (Set PackageName, DotPayload))
                 -> PackageName
                 -> m (Set PackageName, DotPayload)
 createDepLoader sourceMap installed globalDumpMap globalIdMap loadPackageDeps pkgName =
   if not (pkgName `HashSet.member` wiredInPackages)
       then case Map.lookup pkgName sourceMap of
-          Just (PSLocal lp) -> pure (packageAllDeps pkg, payloadFromLocal pkg)
+          Just (PSFiles lp _) -> pure (packageAllDeps pkg, payloadFromLocal pkg)
             where
               pkg = localPackageToPackage lp
-          Just (PSUpstream version _ flags ghcOptions _) ->
-              loadPackageDeps pkgName version flags ghcOptions
+          Just (PSIndex _ flags ghcOptions loc) ->
+              -- FIXME pretty certain this could be cleaned up a lot by including more info in PackageSource
+              let PackageIdentifierRevision (PackageIdentifier name version) _ = loc
+               in assert (pkgName == name) (loadPackageDeps pkgName version (PLIndex loc) flags ghcOptions)
           Nothing -> pure (Set.empty, payloadFromInstalled (Map.lookup pkgName installed))
       -- For wired-in-packages, use information from ghc-pkg (see #3084)
       else case Map.lookup pkgName globalDumpMap of
@@ -238,7 +232,10 @@ createDepLoader sourceMap installed globalDumpMap globalIdMap loadPackageDeps pk
                          (dpDepends dp)
   where
     payloadFromLocal pkg = DotPayload (Just $ packageVersion pkg) (Just $ packageLicense pkg)
-    payloadFromInstalled maybePkg = DotPayload (fmap (installedVersion . snd) maybePkg) Nothing
+    payloadFromInstalled maybePkg = DotPayload (fmap (installedVersion . snd) maybePkg) $
+        case maybePkg of
+            Just (_, Library _ _ mlicense) -> mlicense
+            _ -> Nothing
     payloadFromDump dp = DotPayload (Just $ packageIdentifierVersion $ dpPackageIdent dp) (dpLicense dp)
 
 -- | Resolve the direct (depth 0) external dependencies of the given local packages

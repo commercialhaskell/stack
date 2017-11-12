@@ -2,5 +2,4 @@ resolver: ghc-8.0
 ghc-options:
     "*": -DFOO
     ghc-options: -DBAR
-    text: -DBAZ
 rebuild-ghc-options: true

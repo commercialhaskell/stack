@@ -1,0 +1,18 @@
+resolver: my-snapshot.yaml
+
+packages:
+- .
+
+extra-deps: []
+
+# Override default flag values for local packages and extra-deps
+flags: {}
+
+# Extra package databases containing global packages
+extra-package-dbs: []
+
+package-indices:
+  - name: CustomIndex
+    download-prefix: http://0.0.0.0:8080/
+    http: http://0.0.0.0:8080/custom.index.tar.gz
+

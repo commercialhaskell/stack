@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DeriveDataTypeable #-}
@@ -8,60 +9,45 @@
 {-# LANGUAGE ConstraintKinds #-}
 module Stack.Types.Package where
 
-import           Control.DeepSeq
-import           Control.Exception hiding (try,catch)
+import           Stack.Prelude
 import qualified Data.ByteString as S
-import           Data.Data
-import           Data.Function
 import           Data.List
 import qualified Data.Map as M
-import           Data.Map.Strict (Map)
-import           Data.Maybe
-import           Data.Monoid
-import           Data.Set (Set)
 import qualified Data.Set as Set
-import           Data.Store (Store)
 import           Data.Store.Version (VersionConfig)
 import           Data.Store.VersionTagged (storeVersionConfig)
-import           Data.Text (Text)
 import qualified Data.Text as T
 import           Data.Text.Encoding (encodeUtf8, decodeUtf8)
-import           Data.Word (Word64)
 import           Distribution.InstalledPackageInfo (PError)
 import           Distribution.License (License)
 import           Distribution.ModuleName (ModuleName)
-import           Distribution.Package hiding (Package,PackageName,packageName,packageVersion,PackageIdentifier)
 import           Distribution.PackageDescription (TestSuiteInterface, BuildType)
 import           Distribution.System (Platform (..))
-import           GHC.Generics (Generic)
 import           Path as FL
-import           Prelude
-import           Stack.Types.BuildPlan (GitSHA1)
+import           Stack.Types.BuildPlan (PackageLocation, PackageLocationIndex (..), ExeName)
 import           Stack.Types.Compiler
 import           Stack.Types.Config
 import           Stack.Types.FlagName
 import           Stack.Types.GhcPkgId
 import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageName
-import           Stack.Types.StackT (StackM)
 import           Stack.Types.Version
 
 -- | All exceptions thrown by the library.
 data PackageException
-  = PackageInvalidCabalFile (Maybe (Path Abs File)) PError
+  = PackageInvalidCabalFile (PackageLocationIndex FilePath) PError
   | PackageNoCabalFileFound (Path Abs Dir)
   | PackageMultipleCabalFilesFound (Path Abs Dir) [Path Abs File]
   | MismatchedCabalName (Path Abs File) PackageName
   deriving Typeable
 instance Exception PackageException
 instance Show PackageException where
-    show (PackageInvalidCabalFile mfile err) =
-        "Unable to parse cabal file" ++
-        (case mfile of
-            Nothing -> ""
-            Just file -> ' ' : toFilePath file) ++
-        ": " ++
-        show err
+    show (PackageInvalidCabalFile loc err) = concat
+        [ "Unable to parse cabal file for "
+        , show loc
+        , ": "
+        , show err
+        ]
     show (PackageNoCabalFileFound dir) = concat
         [ "Stack looks for packages in the directories configured in"
         , " the 'packages' variable defined in your stack.yaml\n"
@@ -83,6 +69,13 @@ instance Show PackageException where
         , "For more information, see: https://github.com/commercialhaskell/stack/issues/317"
         ]
 
+-- | Libraries in a package. Since Cabal 2.0, internal libraries are a
+-- thing.
+data PackageLibraries
+  = NoLibraries
+  | HasLibraries !(Set Text) -- ^ the foreign library names, sub libraries get built automatically without explicit component name passing
+ deriving (Show,Typeable)
+
 -- | Some package info.
 data Package =
   Package {packageName :: !PackageName                    -- ^ Name of the package.
@@ -90,12 +83,12 @@ data Package =
           ,packageLicense :: !License                     -- ^ The license the package was released under.
           ,packageFiles :: !GetPackageFiles               -- ^ Get all files of the package.
           ,packageDeps :: !(Map PackageName VersionRange) -- ^ Packages that the package depends on.
-          ,packageTools :: ![Dependency]                  -- ^ A build tool name.
+          ,packageTools :: !(Map ExeName VersionRange)    -- ^ A build tool name.
           ,packageAllDeps :: !(Set PackageName)           -- ^ Original dependencies (not sieved).
           ,packageGhcOptions :: ![Text]                   -- ^ Ghc options used on package.
           ,packageFlags :: !(Map FlagName Bool)           -- ^ Flags used on package.
           ,packageDefaultFlags :: !(Map FlagName Bool)    -- ^ Defaults for unspecified flags.
-          ,packageHasLibrary :: !Bool                     -- ^ does the package have a buildable library stanza?
+          ,packageLibraries :: !PackageLibraries          -- ^ does the package have a buildable library stanza?
           ,packageTests :: !(Map Text TestSuiteInterface) -- ^ names and interfaces of test suites
           ,packageBenchmarks :: !(Set Text)               -- ^ names of benchmarks
           ,packageExes :: !(Set Text)                     -- ^ names of executables
@@ -117,13 +110,14 @@ packageDefinedFlags = M.keysSet . packageDefaultFlags
 -- | Files that the package depends on, relative to package directory.
 -- Argument is the location of the .cabal file
 newtype GetPackageOpts = GetPackageOpts
-    { getPackageOpts :: forall env m. (StackM env m, HasEnvConfig env)
+    { getPackageOpts :: forall env. HasEnvConfig env
                      => SourceMap
                      -> InstalledMap
                      -> [PackageName]
                      -> [PackageName]
                      -> Path Abs File
-                     -> m (Map NamedComponent (Set ModuleName)
+                     -> RIO env
+                          (Map NamedComponent (Set ModuleName)
                           ,Map NamedComponent (Set DotCabalPath)
                           ,Map NamedComponent BuildInfoOpts)
     }
@@ -149,9 +143,10 @@ data CabalFileType
 -- | Files that the package depends on, relative to package directory.
 -- Argument is the location of the .cabal file
 newtype GetPackageFiles = GetPackageFiles
-    { getPackageFiles :: forall m env. (StackM env m, HasEnvConfig env)
+    { getPackageFiles :: forall env. HasEnvConfig env
                       => Path Abs File
-                      -> m (Map NamedComponent (Set ModuleName)
+                      -> RIO env
+                           (Map NamedComponent (Set ModuleName)
                            ,Map NamedComponent (Set DotCabalPath)
                            ,Set (Path Abs File)
                            ,[PackageWarning])
@@ -177,7 +172,8 @@ data PackageConfig =
                 ,packageConfigEnableBenchmarks :: !Bool           -- ^ Are benchmarks enabled?
                 ,packageConfigFlags :: !(Map FlagName Bool)       -- ^ Configured flags.
                 ,packageConfigGhcOptions :: ![Text]               -- ^ Configured ghc options.
-                ,packageConfigCompilerVersion :: !CompilerVersion -- ^ GHC version
+                ,packageConfigCompilerVersion
+                                  :: !(CompilerVersion 'CVActual) -- ^ GHC version
                 ,packageConfigPlatform :: !Platform               -- ^ host platform
                 }
  deriving (Show,Typeable)
@@ -194,24 +190,24 @@ type SourceMap = Map PackageName PackageSource
 
 -- | Where the package's source is located: local directory or package index
 data PackageSource
-    = PSLocal LocalPackage
-    | PSUpstream Version InstallLocation (Map FlagName Bool) [Text] (Maybe GitSHA1)
-    -- ^ Upstream packages could be installed in either local or snapshot
-    -- databases; this is what 'InstallLocation' specifies.
+  = PSFiles LocalPackage InstallLocation
+  -- ^ Package which exist on the filesystem (as opposed to an index tarball)
+  | PSIndex InstallLocation (Map FlagName Bool) [Text] PackageIdentifierRevision
+  -- ^ Package which is in an index, and the files do not exist on the
+  -- filesystem yet.
     deriving Show
 
-instance PackageInstallInfo PackageSource where
-    piiVersion (PSLocal lp) = packageVersion $ lpPackage lp
-    piiVersion (PSUpstream v _ _ _ _) = v
+piiVersion :: PackageSource -> Version
+piiVersion (PSFiles lp _) = packageVersion $ lpPackage lp
+piiVersion (PSIndex _ _ _ (PackageIdentifierRevision (PackageIdentifier _ v) _)) = v
 
-    piiLocation (PSLocal _) = Local
-    piiLocation (PSUpstream _ loc _ _ _) = loc
+piiLocation :: PackageSource -> InstallLocation
+piiLocation (PSFiles _ loc) = loc
+piiLocation (PSIndex loc _ _ _) = loc
 
--- | Datatype which tells how which version of a package to install and where
--- to install it into
-class PackageInstallInfo a where
-    piiVersion :: a -> Version
-    piiLocation :: a -> InstallLocation
+piiPackageLocation :: PackageSource -> PackageLocationIndex FilePath
+piiPackageLocation (PSFiles lp _) = PLOther (lpLocation lp)
+piiPackageLocation (PSIndex _ _ _ pir) = PLIndex pir
 
 -- | Information on a locally available package of source code
 data LocalPackage = LocalPackage
@@ -223,7 +219,7 @@ data LocalPackage = LocalPackage
     , lpUnbuildable   :: !(Set NamedComponent)
     -- ^ Components explicitly requested for build, that are marked
     -- "buildable: false".
-    , lpWanted        :: !Bool
+    , lpWanted        :: !Bool -- FIXME Should completely drop this "wanted" terminology, it's unclear
     -- ^ Whether this package is wanted as a target.
     , lpTestDeps      :: !(Map PackageName VersionRange)
     -- ^ Used for determining if we can use --enable-tests in a normal build.
@@ -246,16 +242,10 @@ data LocalPackage = LocalPackage
     -- ^ current state of the files
     , lpFiles         :: !(Set (Path Abs File))
     -- ^ all files used by this package
+    , lpLocation      :: !(PackageLocation FilePath)
+    -- ^ Where this source code came from
     }
     deriving Show
-
--- | A single, fully resolved component of a package
-data NamedComponent
-    = CLib
-    | CExe !Text
-    | CTest !Text
-    | CBench !Text
-    deriving (Show, Eq, Ord)
 
 renderComponent :: NamedComponent -> S.ByteString
 renderComponent CLib = "lib"
@@ -393,11 +383,13 @@ dotCabalGetPath dcp =
 
 type InstalledMap = Map PackageName (InstallLocation, Installed)
 
-data Installed = Library PackageIdentifier GhcPkgId | Executable PackageIdentifier
-    deriving (Show, Eq, Ord)
+data Installed
+    = Library PackageIdentifier GhcPkgId (Maybe License)
+    | Executable PackageIdentifier
+    deriving (Show, Eq)
 
 installedPackageIdentifier :: Installed -> PackageIdentifier
-installedPackageIdentifier (Library pid _) = pid
+installedPackageIdentifier (Library pid _ _) = pid
 installedPackageIdentifier (Executable pid) = pid
 
 -- | Get the installed Version.

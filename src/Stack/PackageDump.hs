@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE RankNTypes #-}
@@ -24,37 +25,21 @@ module Stack.PackageDump
     , pruneDeps
     ) where
 
-import           Control.Applicative
-import           Control.Arrow ((&&&))
-import           Control.Exception.Safe (tryIO)
-import           Control.Monad (liftM)
-import           Control.Monad.Catch
-import           Control.Monad.IO.Class
-import           Control.Monad.Logger (MonadLogger)
-import           Control.Monad.Trans.Control
+import           Stack.Prelude
 import           Data.Attoparsec.Args
 import           Data.Attoparsec.Text as P
 import           Data.Conduit
 import qualified Data.Conduit.List as CL
 import qualified Data.Conduit.Text as CT
-import           Data.Either (partitionEithers)
-import           Data.IORef
 import           Data.List (isPrefixOf)
-import           Data.Map (Map)
 import qualified Data.Map as Map
-import           Data.Maybe (catMaybes, listToMaybe)
-import           Data.Maybe.Extra (mapMaybeM)
 import qualified Data.Set as Set
 import           Data.Store.VersionTagged
-import           Data.Text (Text)
 import qualified Data.Text as T
-import           Data.Typeable (Typeable)
 import qualified Distribution.License as C
 import qualified Distribution.System as OS
 import qualified Distribution.Text as C
-import           Path
 import           Path.Extra (toFilePathNoTrailingSep)
-import           Prelude -- Fix AMP warning
 import           Stack.GhcPkg
 import           Stack.Types.Compiler
 import           Stack.Types.GhcPkgId
@@ -67,7 +52,7 @@ import           System.Process.Read
 
 -- | Call ghc-pkg dump with appropriate flags and stream to the given @Sink@, for a single database
 ghcPkgDump
-    :: (MonadIO m, MonadLogger m, MonadBaseControl IO m, MonadCatch m)
+    :: (MonadUnliftIO m, MonadLogger m)
     => EnvOverride
     -> WhichCompiler
     -> [Path Abs Dir] -- ^ if empty, use global
@@ -77,7 +62,7 @@ ghcPkgDump = ghcPkgCmdArgs ["dump"]
 
 -- | Call ghc-pkg describe with appropriate flags and stream to the given @Sink@, for a single database
 ghcPkgDescribe
-    :: (MonadIO m, MonadLogger m, MonadBaseControl IO m, MonadCatch m)
+    :: (MonadUnliftIO m, MonadLogger m)
     => PackageName
     -> EnvOverride
     -> WhichCompiler
@@ -88,7 +73,7 @@ ghcPkgDescribe pkgName = ghcPkgCmdArgs ["describe", "--simple-output", packageNa
 
 -- | Call ghc-pkg and stream to the given @Sink@, for a single database
 ghcPkgCmdArgs
-    :: (MonadIO m, MonadLogger m, MonadBaseControl IO m, MonadCatch m)
+    :: (MonadUnliftIO m, MonadLogger m)
     => [String]
     -> EnvOverride
     -> WhichCompiler
@@ -117,7 +102,7 @@ newInstalledCache = liftIO $ InstalledCache <$> newIORef (InstalledCacheInner Ma
 
 -- | Load a @InstalledCache@ from disk, swallowing any errors and returning an
 -- empty cache.
-loadInstalledCache :: (MonadLogger m, MonadIO m, MonadBaseControl IO m)
+loadInstalledCache :: (MonadLogger m, MonadUnliftIO m)
                    => Path Abs File -> m InstalledCache
 loadInstalledCache path = do
     m <- $(versionedDecodeOrLoad installedCacheVC) path (return $ InstalledCacheInner Map.empty)
@@ -267,9 +252,11 @@ addSymbols (InstalledCache ref) =
         s <- case Map.lookup gid m of
             Just installed -> return (installedCacheSymbols installed)
             Nothing | null (dpLibraries dp) -> return True
-            Nothing -> do
-                let lib = T.unpack . head $ dpLibraries dp
-                liftM or . mapM (\dir -> liftIO $ hasDebuggingSymbols dir lib) $ dpLibDirs dp
+            Nothing ->
+              case dpLibraries dp of
+                [] -> return True
+                lib:_ ->
+                  liftM or . mapM (\dir -> liftIO $ hasDebuggingSymbols dir (T.unpack lib)) $ dpLibDirs dp
         return dp { dpSymbols = s }
 
 hasDebuggingSymbols :: FilePath -- ^ library directory
@@ -298,6 +285,7 @@ data DumpPackage profiling haddock symbols = DumpPackage
     , dpLibDirs :: ![FilePath]
     , dpLibraries :: ![Text]
     , dpHasExposedModules :: !Bool
+    , dpExposedModules :: ![Text]
     , dpDepends :: ![GhcPkgId]
     , dpHaddockInterfaces :: ![FilePath]
     , dpHaddockHtml :: !(Maybe FilePath)
@@ -384,6 +372,7 @@ conduitDumpPackage = (=$= CL.catMaybes) $ eachSection $ do
                 , dpLibDirs = libDirPaths
                 , dpLibraries = T.words $ T.unwords libraries
                 , dpHasExposedModules = not (null libraries || null exposedModules)
+                , dpExposedModules = T.words $ T.unwords exposedModules
                 , dpDepends = depends
                 , dpHaddockInterfaces = haddockInterfaces
                 , dpHaddockHtml = listToMaybe haddockHtml

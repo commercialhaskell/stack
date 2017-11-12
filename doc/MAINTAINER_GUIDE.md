@@ -1,27 +1,40 @@
+<div class="hidden-warning"><a href="https://docs.haskellstack.org/"><img src="https://rawgit.com/commercialhaskell/stack/master/doc/img/hidden-warning.svg"></a></div>
+
 # Maintainer guide
 
 ## Next release:
 
-* Adjust static binary build on Alpine. See
-  https://github.com/commercialhaskell/stack/issues/3045
-* For minor release, ensure https://github.com/commercialhaskell/stack/commit/d3637126b9045b266d2e53387e183915cb4a912d cherry-picked
+* Create release candidate process (maybe switch to GHC-style versioning)
+* Maybe drop 32-bit CentOS 6 bindists, since GHC 8.2.1 seems to have dropped them.
+* Replace non-static Linux bindists with static (but keep old links active so
+  links don't break and 'stack upgrade' in old versions still work)
 
 ## Pre-release steps
 
+* Check for any P0 and P1 issues.
 * Ensure `release` and `stable` branches merged to `master`
+* Check compatibility with latest Stackage snapshots
+    * stack-*.yaml (where `*` is not `nightly`): bump to use latest LTS minor
+      version (be sure any extra-deps that exist only for custom flags have
+      versions matching the snapshot)
+    * Check for any redundant extra-deps
+    * Run `stack --stack-yaml=stack-*.yaml test --pedantic` (replace `*` with
+      the actual file)
 * Check compatibility with latest nightly stackage snapshot:
-    * Update `stack-nightly.yaml` with latest nightly and remove extra-deps
+    * Update `stack-nightly.yaml` with latest nightly and remove extra-deps (be
+      sure any extra-deps that exist only for custom flags have versions
+      matching the snapshot)
     * Run `stack --stack-yaml=stack-nightly.yaml test --pedantic`
 * Check pvp-bounds compatibility with Stackage snapshots:
     * Create an sdist using `stack sdist --pvp-bounds=both`
     * Temporarily replace `stack.cabal` with the `stack.cabal` in that sdist
-    * Run `stack --stack-yaml=stack-SNAPSHOT.yaml test --pedantic` for each
+    * Run `stack --stack-yaml=stack-*.yaml test --pedantic` for each
       `stack-*.yaml` and adjust upper bounds in original `stack.cabal` until it
       works with pvp-bounds.
 * Ensure integration tests pass on a Windows, macOS, and Linux (Linux
   integration tests are run
   by
-  [Jenkins](https://jenkins-public.fpcomplete.com/job/stack-integration-tests)):
+  [Gitlab](http://gitlab.fpcomplete.com/fpco-mirrors/stack/pipelines)):
   `stack install --pedantic && stack test --pedantic --flag
   stack:integration-tests`. The actual release script will perform a more
   thorough test for every platform/variant prior to uploading, so this is just a
@@ -29,13 +42,11 @@
 * In master branch:
     * stack.cabal: bump the version number to release (even third
       component)
-    * ChangeLog: rename the "unreleased changes" section to the new version
+    * ChangeLog: rename the "Unreleased changes" section to the new version
 * Cut a release candidate branch `rc/vX.Y.Z` from master
 * In master branch:
     * stack.cabal: bump version number to unstable (odd third component)
     * Changelog: add new "unreleased changes" section
-    * stack-*.yaml: bump to use latest LTS minor version or nightly, and check
-      whether extra-deps still needed
 * In RC branch:
     * Update the ChangeLog:
         * Check for any important changes that missed getting an entry in
@@ -49,14 +60,6 @@
         * Look for any links to "latest" documentation, replace with version tag
         * Ensure all documentation pages listed in `mkdocs.yaml`
     * Update `.github/ISSUE_TEMPLATE.md` to point at the new version.
-    * <del>
-      Check that any new Linux distribution versions added to
-      `etc/scripts/release.hs` and `etc/scripts/vagrant-releases.sh`
-        * [Ubuntu](https://wiki.ubuntu.com/Releases)
-        * [Debian](https://www.debian.org/releases/)
-        * [CentOS](https://wiki.centos.org/Download)
-        * [Fedora](https://fedoraproject.org/wiki/Releases)
-      </del>
     * Check for new [FreeBSD release](https://www.freebsd.org/releases/).
     * Check that no new entries need to be added to
       [releases.yaml](https://github.com/fpco/stackage-content/blob/master/stack/releases.yaml),
@@ -65,11 +68,8 @@
       `README.md`
     * Remove unsupported/obsolete distribution versions from the release process.
         * [Ubuntu](https://wiki.ubuntu.com/Releases)
-            * 12.04 EOL 2017-APR
-            * 16.10 EOL 2017-JUL
             * 14.04 EOL 2019-APR
             * 16.04 EOL 2021-APR
-        * [Debian](https://www.debian.org/releases/)
         * [CentOS](https://wiki.centos.org/Download) 
             * 6 EOL 2020-NOV-30
             * 7 EOL 2024-JUN-30
@@ -119,18 +119,18 @@ consistent and clean stack version.
 * Build sdist using `stack sdist . --pvp-bounds=both`, and upload it to the
   Github release with a name like `stack-X.Y.Z-sdist-0.tar.gz`.
 
-* Publish Github release. Use e.g. `git shortlog -s v1.1.2..rc/v1.2.0|sed 's/^[0-9 ]*/* /'|sort -f`
+* Publish Github release. Use e.g. `git shortlog -s release..HEAD|sed $'s/^[0-9 \t]*/* /'|sort -f`
   to get the list of contributors.
 
 * Upload package to Hackage: `stack upload . --pvp-bounds=both`
 
-* Push signed Git tag, matching Github release tag name, e.g.: `git tag -d vX.Y.Z; git tag -u 0x575159689BEFB442 vX.Y.Z && git push -f origin vX.Y.Z`
+* Push signed Git tag, matching Github release tag name, e.g.: `git tag -d vX.Y.Z; git tag -u 0x575159689BEFB442 -m vX.Y.Z vX.Y.Z && git push -f origin vX.Y.Z`
 
 * Reset the `release` branch to the released commit, e.g.: `git checkout release && git merge --ff-only vX.Y.Z && git push origin release`
 
 * Update the `stable` branch similarly
 
-* Delete the RC branch (locally and on origin)
+* Delete the RC branch and any RC tags (locally and on origin)
 
 * Activate version for new release tag on
   [readthedocs.org](https://readthedocs.org/dashboard/stack/versions/), and
@@ -139,16 +139,8 @@ consistent and clean stack version.
 * Merge any changes made in the RC/release/stable branches to master.
 
 * On a machine with Vagrant installed:
+    * Make sure you are on the same commit as when `vagrant-release.sh` was run.
     * Run `etc/scripts/vagrant-distros.sh`
-
-* <del>Submit a PR for the
-  [haskell-stack Homebrew formula](https://github.com/Homebrew/homebrew-core/blob/master/Formula/haskell-stack.rb)
-      * Ensure that the formula use the sdist uploaded to the Github release
-      * Be sure to update the SHA sum
-      * The commit message should just be `haskell-stack <VERSION>`
-  </del>
-
-* <del>[Flag the Arch Linux package as out-of-date](https://www.archlinux.org/packages/community/x86_64/stack/flag/)</del>
 
 * Upload haddocks to Hackage: `etc/scripts/upload-haddocks.sh` (if they weren't auto-built)
 
@@ -264,21 +256,26 @@ line.
     qemu-system-arm -M vexpress-a9 -cpu cortex-a9 -kernel vmlinuz -initrd initrd.gz -sd armdisk.raw -append "root=/dev/mmcblk0p2" -m 1024M -redir tcp:2223::22 -dtb vexpress-v2p-ca9.dtb -append "console=ttyAMA0,115200" -serial stdio
 
 Now the Debian installer will run. Don't use LVM for partitioning (it won't
-BOOT), and add at least 2 GB swap during installation.
+boot), and add at least 4 GB swap during installation.
 
 ### Get boot files after install
 
+Adjust the disk number `/dev/disk3` below to match the output from `hdiutil attach`.
+
     hdiutil attach -imagekey diskimage-class=CRawDiskImage -nomount armdisk.raw && \
-    mkdir -p /Volumes/armdeb && \
-    fuse-ext2 /dev/disk2s1 /Volumes/armdeb/ && \
+    sudo mkdir -p /Volumes/debarm && \
+    sudo fuse-ext2 /dev/disk3s1 /Volumes/debarm/ && \
     sleep 5 && \
-    cp /Volumes/armdeb/vmlinuz-3.16.0-4-armmp . && \
-    cp /Volumes/armdeb/initrd.img-3.16.0-4-armmp . && \
-    hdiutil detach /dev/disk2
+    cp /Volumes/debarm/vmlinuz-3.16.0-4-armmp . && \
+    cp /Volumes/debarm/initrd.img-3.16.0-4-armmp . && \
+    sudo umount /Volumes/debarm && \
+    hdiutil detach /dev/disk3
 
 ### Boot VM
 
-    qemu-system-arm -M vexpress-a9 -cpu cortex-a9 -kernel vmlinuz-3.16.0-4-armmp -initrd initrd.img-3.16.0-4-armmp -sd armdisk.raw -m 1024M -dtb vexpress-v2p-ca9.dtb -append "root=/dev/mmcblk0p2 console=ttyAMA0,115200" -serial stdio -redir tcp:2223::22
+Adjust `/dev/mmcblk0p3` below to the root partition you created during installation.
+
+    qemu-system-arm -M vexpress-a9 -cpu cortex-a9 -kernel vmlinuz-3.16.0-4-armmp -initrd initrd.img-3.16.0-4-armmp -sd armdisk.raw -m 1024M -dtb vexpress-v2p-ca9.dtb -append "root=/dev/mmcblk0p3 console=ttyAMA0,115200" -serial stdio -redir tcp:2223::22
 
 ### Setup rest of system
 
@@ -292,27 +289,30 @@ during Debian installation):
 Now you can SSH to the VM using `ssh -p 2223 <<<USERNAME>>>@localhost` and use `sudo` in
 the shell.
 
-### Install clang+llvmGHC/clang
+### Install build tools and dependencies packages
+
+    sudo apt-get install -y g++ gcc libc6-dev libffi-dev libgmp-dev make xz-utils zlib1g-dev git gnupg
+
+### Install clang+llvm
 
 NOTE: the Debian jessie `llvm` packge does not work (executables built with it
 just exit with "schedule: re-entered unsafely.").
 
 The version of LLVM needed depends on the version of GHC you need.
 
-#### GHC 7.10.3 (the standard for building Stack)
-
-    sudo apt-get install -y g++ gcc libc6-dev libffi-dev libgmp-dev make xz-utils zlib1g-dev git gnupg && \
-    wget http://llvm.org/releases/3.5.2/clang+llvm-3.5.2-armv7a-linux-gnueabihf.tar.xz && \
-    sudo tar xvf clang+llvm-3.5.2-armv7a-linux-gnueabihf.tar.xz -C /opt
-
-Run this now and add it to the `.profile`:
-
-    export PATH="$HOME/.local/bin:/opt/clang+llvm-3.5.2-armv7a-linux-gnueabihf/bin:$PATH"
-
-#### GHC 8.0.1
+#### GHC 8.0.2 (the standard for building Stack)
 
     wget http://llvm.org/releases/3.7.1/clang+llvm-3.7.1-armv7a-linux-gnueabihf.tar.xz && \
     sudo tar xvf clang+llvm-3.7.1-armv7a-linux-gnueabihf.tar.xz -C /opt
+
+Run this now and add it to the `.profile`:
+
+    export PATH="$HOME/.local/bin:/opt/clang+llvm-3.7.1-armv7a-linux-gnueabihf/bin:$PATH"
+
+#### GHC 7.10.3
+
+    wget http://llvm.org/releases/3.5.2/clang+llvm-3.5.2-armv7a-linux-gnueabihf.tar.xz && \
+    sudo tar xvf clang+llvm-3.5.2-armv7a-linux-gnueabihf.tar.xz -C /opt
 
 Run this now and add it to the `.profile`:
 
@@ -349,6 +349,10 @@ Edit `~/.cabal/config`, and set `executable-stripping: False` and
     cd stack-* && \
     cabal install && \
     mv ~/.cabal/bin/stack ~/.local/bin
+
+### Import GPG private key
+
+Import the `dev@fpcomplete.com` (0x575159689BEFB442) GPG secret key
 
 ### Resources
 

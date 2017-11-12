@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -31,31 +32,19 @@ module Stack.Types.Version
   ,UpgradeTo(..))
   where
 
-import           Control.Applicative
-import           Control.DeepSeq
-import           Control.Monad.Catch
+import           Stack.Prelude hiding (Vector)
 import           Data.Aeson.Extended
 import           Data.Attoparsec.Text
-import           Data.Data
-import           Data.Hashable
+import           Data.Hashable (Hashable (..))
 import           Data.List
-import           Data.Maybe (listToMaybe)
-import           Data.Monoid
-import           Data.Set (Set)
 import qualified Data.Set as Set
-import           Data.Store (Store)
-import           Data.Text (Text)
 import qualified Data.Text as T
 import           Data.Vector.Unboxed (Vector)
 import qualified Data.Vector.Unboxed as V
-import           Data.Word
 import           Distribution.Text (disp)
 import qualified Distribution.Version as Cabal
-import           GHC.Generics
 import           Language.Haskell.TH
 import           Language.Haskell.TH.Syntax
-import           Prelude -- Fix warning: Word in Prelude from base-4.8.
-import           Stack.Types.StringError
 import           Text.PrettyPrint (render)
 
 -- | A parse fail.
@@ -150,19 +139,19 @@ versionText (Version v) =
 -- | Convert to a Cabal version.
 toCabalVersion :: Version -> Cabal.Version
 toCabalVersion (Version v) =
-  Cabal.Version (map fromIntegral (V.toList v)) []
+  Cabal.mkVersion (map fromIntegral (V.toList v))
 
 -- | Convert from a Cabal version.
 fromCabalVersion :: Cabal.Version -> Version
-fromCabalVersion (Cabal.Version vs _) =
-  let !v = V.fromList (map fromIntegral vs)
+fromCabalVersion vs =
+  let !v = V.fromList (map fromIntegral (Cabal.versionNumbers vs))
   in Version v
 
 -- | Make a package version.
 mkVersion :: String -> Q Exp
 mkVersion s =
   case parseVersionFromString s of
-    Nothing -> errorString ("Invalid package version: " ++ show s)
+    Nothing -> qRunIO $ throwString ("Invalid package version: " ++ show s)
     Just pn -> [|pn|]
 
 -- | Display a version range

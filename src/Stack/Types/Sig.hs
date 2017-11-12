@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE FlexibleInstances  #-}
 {-# LANGUAGE OverloadedStrings  #-}
@@ -15,19 +16,11 @@ Portability : POSIX
 module Stack.Types.Sig
        (Signature(..), Fingerprint, mkFingerprint, SigException(..)) where
 
-import Prelude ()
-import Prelude.Compat
-
-import           Control.Exception (Exception)
+import           Stack.Prelude
 import           Data.Aeson (Value(..), ToJSON(..), FromJSON(..))
-import           Data.ByteString (ByteString)
 import qualified Data.ByteString as SB
 import           Data.Char (isHexDigit)
-import           Data.Monoid ((<>))
-import           Data.String (IsString(..))
-import           Data.Text (Text)
 import qualified Data.Text as T
-import           Data.Typeable (Typeable)
 import           Stack.Types.PackageName
 
 -- | A GPG signature.

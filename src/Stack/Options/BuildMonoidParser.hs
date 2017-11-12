@@ -1,9 +1,11 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 module Stack.Options.BuildMonoidParser where
 
-import           Data.Monoid.Extra
+import qualified Data.Text as T
 import           Options.Applicative
 import           Options.Applicative.Builder.Extra
 import           Stack.Build                       (splitObjsWarning)
+import           Stack.Prelude
 import           Stack.Options.BenchParser
 import           Stack.Options.TestParser
 import           Stack.Options.HaddockParser
@@ -16,9 +18,10 @@ buildOptsMonoidParser hide0 =
     libProfiling <*> exeProfiling <*> libStripping <*>
     exeStripping <*> haddock <*> haddockOptsParser hideBool <*>
     openHaddocks <*> haddockDeps <*> haddockInternal <*>
-    haddockHyperlinkSource <*> copyBins <*> preFetch <*> keepGoing <*>
-    forceDirty <*> tests <*> testOptsParser hideBool <*> benches <*>
-    benchOptsParser hideBool <*> reconfigure <*> cabalVerbose <*> splitObjs
+    haddockHyperlinkSource <*> copyBins <*> copyCompilerTool <*>
+    preFetch <*> keepGoing <*> forceDirty <*>
+    tests <*> testOptsParser hideBool <*> benches <*>
+    benchOptsParser hideBool <*> reconfigure <*> cabalVerbose <*> splitObjs <*> skipComponents
   where
     hideBool = hide0 /= BuildCmdGlobalOpts
     hide =
@@ -60,7 +63,6 @@ buildOptsMonoidParser hide0 =
                       \debuggers/profiling tools/other utilities that use \
                       \debugging symbols." <>
              hideExceptGhci)
-
     libProfiling =
         firstBoolFlags
             "library-profiling"
@@ -108,6 +110,11 @@ buildOptsMonoidParser hide0 =
             "copy-bins"
             "copying binaries to the local-bin-path (see 'stack path')"
             hide
+    copyCompilerTool =
+        firstBoolFlags
+            "copy-compiler-tool"
+            "copying binaries of targets to compiler-tools-bin (see 'stack path')"
+            hide
     keepGoing =
         firstBoolFlags
             "keep-going"
@@ -148,3 +155,10 @@ buildOptsMonoidParser hide0 =
             "split-objs"
             ("Enable split-objs, to reduce output size (at the cost of build time). " ++ splitObjsWarning)
             hide
+    skipComponents = many
+        (fmap
+            T.pack
+            (strOption
+                (long "skip" <>
+                 help "Skip given component, can be specified multiple times" <>
+                 hide)))

@@ -1,5 +1,7 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveFoldable #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DeriveTraversable #-}
@@ -33,7 +35,6 @@ module Stack.Config
   ,loadConfigYaml
   ,packagesParser
   ,getLocalPackages
-  ,resolvePackageEntry
   ,getImplicitGlobalProjectDir
   ,getStackYaml
   ,getSnapshots
@@ -44,43 +45,27 @@ module Stack.Config
   ,defaultConfigYaml
   ,getProjectConfig
   ,LocalConfigStatus(..)
-  ,removePathFromPackageEntry
+  ,getNamedComponents
   ) where
 
-import qualified Codec.Archive.Tar as Tar
-import qualified Codec.Archive.Zip as Zip
-import qualified Codec.Compression.GZip as GZip
-import           Control.Applicative
-import           Control.Arrow ((***))
-import           Control.Exception (assert)
-import           Control.Monad (liftM, unless, when, filterM)
-import           Control.Monad.Catch (MonadThrow, MonadCatch, catchAll, throwM, catch)
 import           Control.Monad.Extra (firstJustM)
-import           Control.Monad.IO.Class
-import           Control.Monad.Logger hiding (Loc)
-import           Control.Monad.Reader (ask, runReaderT)
-import           Crypto.Hash (hashWith, SHA256(..))
+import           Stack.Prelude
 import           Data.Aeson.Extended
-import qualified Data.ByteArray as Mem (convert)
 import qualified Data.ByteString as S
-import qualified Data.ByteString.Base64.URL as B64URL
-import qualified Data.ByteString.Lazy as L
-import           Data.Foldable (forM_)
-import           Data.IORef
 import qualified Data.IntMap as IntMap
 import qualified Data.Map as Map
-import           Data.Maybe
-import           Data.Monoid.Extra
+import qualified Data.Set as Set
 import qualified Data.Text as T
-import           Data.Text.Encoding (encodeUtf8, decodeUtf8)
+import           Data.Text.Encoding (encodeUtf8)
 import qualified Data.Yaml as Yaml
+import qualified Distribution.PackageDescription as C
+import qualified Distribution.Types.UnqualComponentName as C
 import           Distribution.System (OS (..), Platform (..), buildPlatform, Arch(OtherArch))
 import qualified Distribution.Text
-import           Distribution.Version (simplifyVersionRange)
+import           Distribution.Version (simplifyVersionRange, mkVersion')
 import           GHC.Conc (getNumProcessors)
 import           Lens.Micro (lens)
 import           Network.HTTP.Client (parseUrlThrow)
-import           Network.HTTP.Download (download)
 import           Network.HTTP.Simple (httpJSON, getResponseBody)
 import           Options.Applicative (Parser, strOption, long, help)
 import           Path
@@ -88,31 +73,32 @@ import           Path.Extra (toFilePathNoTrailingSep)
 import           Path.Find (findInParents)
 import           Path.IO
 import qualified Paths_stack as Meta
-import           Stack.BuildPlan
 import           Stack.Config.Build
 import           Stack.Config.Docker
 import           Stack.Config.Nix
 import           Stack.Config.Urls
 import           Stack.Constants
+import           Stack.Fetch
 import qualified Stack.Image as Image
+import           Stack.Package
+import           Stack.PackageLocation
+import           Stack.Snapshot
 import           Stack.Types.BuildPlan
 import           Stack.Types.Compiler
 import           Stack.Types.Config
 import           Stack.Types.Docker
-import           Stack.Types.Internal
 import           Stack.Types.Nix
+import           Stack.Types.PackageName (PackageName)
+import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageIndex (IndexType (ITHackageSecurity), HackageSecurity (..))
 import           Stack.Types.Resolver
-import           Stack.Types.StackT
-import           Stack.Types.StringError
+import           Stack.Types.Runner
 import           Stack.Types.Urls
 import           Stack.Types.Version
 import           System.Environment
-import           System.IO
 import           System.PosixCompat.Files (fileOwner, getFileStatus)
 import           System.PosixCompat.User (getEffectiveUserID)
 import           System.Process.Read
-import           System.Process.Run
 
 -- | If deprecated path exists, use it and print a warning.
 -- Otherwise, return the new path.
@@ -134,7 +120,7 @@ tryDeprecatedPath mWarningDesc exists new old = do
                     case mWarningDesc of
                         Nothing -> return ()
                         Just desc ->
-                            $logWarn $ T.concat
+                            logWarn $ T.concat
                                 [ "Warning: Location of ", desc, " at '"
                                 , T.pack (toFilePath old)
                                 , "' is deprecated; rename it to '"
@@ -161,9 +147,7 @@ getImplicitGlobalProjectDir config =
 
 -- | This is slightly more expensive than @'asks' ('bcStackYaml' '.' 'getBuildConfig')@
 -- and should only be used when no 'BuildConfig' is at hand.
-getStackYaml
-    :: (StackMiniM env m, HasConfig env)
-    => m (Path Abs File)
+getStackYaml :: HasConfig env => RIO env (Path Abs File)
 getStackYaml = do
     config <- view configL
     case configMaybeProject config of
@@ -171,28 +155,27 @@ getStackYaml = do
         Nothing -> liftM (</> stackDotYaml) (getImplicitGlobalProjectDir config)
 
 -- | Download the 'Snapshots' value from stackage.org.
-getSnapshots
-    :: (StackMiniM env m, HasConfig env)
-    => m Snapshots
+getSnapshots :: HasConfig env => RIO env Snapshots
 getSnapshots = do
     latestUrlText <- askLatestSnapshotUrl
     latestUrl <- parseUrlThrow (T.unpack latestUrlText)
-    $logDebug $ "Downloading snapshot versions file from " <> latestUrlText
+    logDebug $ "Downloading snapshot versions file from " <> latestUrlText
     result <- httpJSON latestUrl
-    $logDebug $ "Done downloading and parsing snapshot versions file"
+    logDebug "Done downloading and parsing snapshot versions file"
     return $ getResponseBody result
 
 -- | Turn an 'AbstractResolver' into a 'Resolver'.
 makeConcreteResolver
-    :: (StackMiniM env m, HasConfig env)
-    => AbstractResolver
-    -> m Resolver
-makeConcreteResolver (ARResolver r) = return r
-makeConcreteResolver ar = do
+    :: HasConfig env
+    => Maybe (Path Abs Dir) -- ^ root of project for resolving custom relative paths
+    -> AbstractResolver
+    -> RIO env Resolver
+makeConcreteResolver root (ARResolver r) = parseCustomLocation root r
+makeConcreteResolver root ar = do
     snapshots <- getSnapshots
     r <-
         case ar of
-            ARResolver r -> assert False $ return r
+            ARResolver r -> assert False $ makeConcreteResolver root $ ARResolver r
             ARGlobal -> do
                 config <- view configL
                 implicitGlobalDir <- getImplicitGlobalProjectDir config
@@ -203,18 +186,18 @@ makeConcreteResolver ar = do
             ARLatestNightly -> return $ ResolverSnapshot $ Nightly $ snapshotsNightly snapshots
             ARLatestLTSMajor x ->
                 case IntMap.lookup x $ snapshotsLts snapshots of
-                    Nothing -> errorString $ "No LTS release found with major version " ++ show x
+                    Nothing -> throwString $ "No LTS release found with major version " ++ show x
                     Just y -> return $ ResolverSnapshot $ LTS x y
             ARLatestLTS
-                | IntMap.null $ snapshotsLts snapshots -> errorString "No LTS releases found"
+                | IntMap.null $ snapshotsLts snapshots -> throwString "No LTS releases found"
                 | otherwise ->
                     let (x, y) = IntMap.findMax $ snapshotsLts snapshots
                      in return $ ResolverSnapshot $ LTS x y
-    $logInfo $ "Selected resolver: " <> resolverName r
+    logInfo $ "Selected resolver: " <> resolverRawName r
     return r
 
 -- | Get the latest snapshot resolver available.
-getLatestResolver :: (StackMiniM env m, HasConfig env) => m Resolver
+getLatestResolver :: HasConfig env => RIO env (ResolverWith a)
 getLatestResolver = do
     snapshots <- getSnapshots
     let mlts = do
@@ -226,14 +209,14 @@ getLatestResolver = do
 -- | Create a 'Config' value when we're not using any local
 -- configuration files (e.g., the script command)
 configNoLocalConfig
-    :: (MonadLogger m, MonadIO m, MonadCatch m)
+    :: (MonadLogger m, MonadUnliftIO m, MonadThrow m, MonadReader env m, HasRunner env)
     => Path Abs Dir -- ^ stack root
     -> Maybe AbstractResolver
     -> ConfigMonoid
     -> m Config
-configNoLocalConfig _ Nothing _ = throwM NoResolverWhenUsingNoLocalConfig
+configNoLocalConfig _ Nothing _ = throwIO NoResolverWhenUsingNoLocalConfig
 configNoLocalConfig stackRoot (Just resolver) configMonoid = do
-    userConfigPath <- getFakeConfigPath stackRoot resolver
+    userConfigPath <- liftIO $ getFakeConfigPath stackRoot resolver
     configFromConfigMonoid
       stackRoot
       userConfigPath
@@ -244,7 +227,7 @@ configNoLocalConfig stackRoot (Just resolver) configMonoid = do
 
 -- Interprets ConfigMonoid options.
 configFromConfigMonoid
-    :: (MonadLogger m, MonadIO m, MonadCatch m)
+    :: (MonadLogger m, MonadUnliftIO m, MonadThrow m, MonadReader env m, HasRunner env)
     => Path Abs Dir -- ^ stack root, e.g. ~/.stack
     -> Path Abs File -- ^ user config file path, e.g. ~/.stack/config.yaml
     -> Bool -- ^ allow locals?
@@ -258,12 +241,12 @@ configFromConfigMonoid
      -- If --stack-work is passed, prefer it. Otherwise, if STACK_WORK
      -- is set, use that. If neither, use the default ".stack-work"
      mstackWorkEnv <- liftIO $ lookupEnv stackWorkEnvVar
-     configWorkDir0 <- maybe (return $(mkRelDir ".stack-work")) parseRelDir mstackWorkEnv
+     configWorkDir0 <- maybe (return $(mkRelDir ".stack-work")) (liftIO . parseRelDir) mstackWorkEnv
      let configWorkDir = fromFirst configWorkDir0 configMonoidWorkDir
      -- This code is to handle the deprecation of latest-snapshot-url
      configUrls <- case (getFirst configMonoidLatestSnapshotUrl, getFirst (urlsMonoidLatestSnapshot configMonoidUrls)) of
          (Just url, Nothing) -> do
-             $logWarn "The latest-snapshot-url field is deprecated in favor of 'urls' configuration"
+             logWarn "The latest-snapshot-url field is deprecated in favor of 'urls' configuration"
              return (urlsFromMonoid configMonoidUrls) { urlsLatestSnapshot = url }
          _ -> return (urlsFromMonoid configMonoidUrls)
      let configConnectionCount = fromFirst 8 configMonoidConnectionCount
@@ -293,14 +276,15 @@ configFromConfigMonoid
 
          configGHCVariant0 = getFirst configMonoidGHCVariant
          configGHCBuild = getFirst configMonoidGHCBuild
-         configInstallGHC = fromFirst False configMonoidInstallGHC
+         configInstallGHC = fromFirst True configMonoidInstallGHC
          configSkipGHCCheck = fromFirst False configMonoidSkipGHCCheck
          configSkipMsys = fromFirst False configMonoidSkipMsys
 
          configExtraIncludeDirs = configMonoidExtraIncludeDirs
          configExtraLibDirs = configMonoidExtraLibDirs
          configOverrideGccPath = getFirst configMonoidOverrideGccPath
-
+         configOverrideHpack = maybe HpackBundled HpackCommand $ getFirst configMonoidOverrideHpack
+         
          -- Only place in the codebase where platform is hard-coded. In theory
          -- in the future, allow it to be configured.
          (Platform defArch defOS) = buildPlatform
@@ -316,7 +300,7 @@ configFromConfigMonoid
          configCompilerCheck = fromFirst MatchMinor configMonoidCompilerCheck
 
      case arch of
-         OtherArch unk -> $logWarn $ "Warning: Unknown value for architecture setting: " <> T.pack (show unk)
+         OtherArch unk -> logWarn $ "Warning: Unknown value for architecture setting: " <> T.pack (show unk)
          _ -> return ()
 
      configPlatformVariant <- liftIO $
@@ -366,8 +350,8 @@ configFromConfigMonoid
                  -- TODO: Either catch specific exceptions or add a
                  -- parseRelAsAbsDirMaybe utility and use it along with
                  -- resolveDirMaybe.
-                 `catchAll`
-                 const (throwM (NoSuchDirectory userPath))
+                 `catchAny`
+                 const (throwIO (NoSuchDirectory userPath))
 
      configJobs <-
         case getFirst configMonoidJobs of
@@ -377,7 +361,8 @@ configFromConfigMonoid
 
      let configTemplateParams = configMonoidTemplateParameters
          configScmInit = getFirst configMonoidScmInit
-         configGhcOptions = configMonoidGhcOptions
+         configGhcOptionsByName = configMonoidGhcOptionsByName
+         configGhcOptionsByCat = configMonoidGhcOptionsByCat
          configSetupInfoLocations = configMonoidSetupInfoLocations
          configPvpBounds = fromFirst (PvpBounds PvpBoundsNone False) configMonoidPvpBounds
          configModifyCodePage = fromFirst True configMonoidModifyCodePage
@@ -388,15 +373,18 @@ configFromConfigMonoid
          configDefaultTemplate = getFirst configMonoidDefaultTemplate
          configDumpLogs = fromFirst DumpWarningLogs configMonoidDumpLogs
          configSaveHackageCreds = fromFirst True configMonoidSaveHackageCreds
+         configIgnoreRevisionMismatch = fromFirst False configMonoidIgnoreRevisionMismatch
 
      configAllowDifferentUser <-
         case getFirst configMonoidAllowDifferentUser of
             Just True -> return True
             _ -> getInContainer
 
-     configPackageCaches <- liftIO $ newIORef Nothing
+     configPackageCache <- liftIO $ newIORef Nothing
 
      let configMaybeProject = mproject
+
+     configRunner <- view runnerL
 
      return Config {..}
 
@@ -419,13 +407,13 @@ getDefaultLocalProgramsBase configStackRoot configPlatform override =
         case Map.lookup "LOCALAPPDATA" $ unEnvOverride override of
           Just t ->
             case parseAbsDir $ T.unpack t of
-              Nothing -> throwString ("Failed to parse LOCALAPPDATA environment variable (expected absolute directory): " ++ show t)
+              Nothing -> throwM $ stringException ("Failed to parse LOCALAPPDATA environment variable (expected absolute directory): " ++ show t)
               Just lad -> return $ lad </> $(mkRelDir "Programs") </> $(mkRelDir stackProgName)
           Nothing -> return defaultBase
       _ -> return defaultBase
 
 -- | An environment with a subset of BuildConfig used for setup.
-data MiniConfig = MiniConfig
+data MiniConfig = MiniConfig -- TODO do we really need a whole extra data type?
     { mcGHCVariant :: !GHCVariant
     , mcConfig :: !Config
     }
@@ -434,24 +422,32 @@ instance HasConfig MiniConfig where
 instance HasPlatform MiniConfig
 instance HasGHCVariant MiniConfig where
     ghcVariantL = lens mcGHCVariant (\x y -> x { mcGHCVariant = y })
+instance HasRunner MiniConfig where
+    runnerL = configL.runnerL
+instance HasLogFunc MiniConfig where
+    logFuncL = configL.logFuncL
 
 -- | Load the 'MiniConfig'.
 loadMiniConfig :: Config -> MiniConfig
-loadMiniConfig config =
-    let ghcVariant = fromMaybe GHCStandard (configGHCVariant0 config)
-     in MiniConfig ghcVariant config
+loadMiniConfig config = MiniConfig
+  { mcGHCVariant = configGHCVariantDefault config
+  , mcConfig = config
+  }
+
+configGHCVariantDefault :: Config -> GHCVariant -- FIXME why not just use this as the HasGHCVariant instance for Config?
+configGHCVariantDefault = fromMaybe GHCStandard . configGHCVariant0
 
 -- Load the configuration, using environment variables, and defaults as
 -- necessary.
 loadConfigMaybeProject
-    :: StackM env m
+    :: HasRunner env
     => ConfigMonoid
     -- ^ Config monoid from parsed command-line arguments
     -> Maybe AbstractResolver
     -- ^ Override resolver
     -> LocalConfigStatus (Project, Path Abs File, ConfigMonoid)
     -- ^ Project config to use, if any
-    -> m (LoadConfig m)
+    -> RIO env LoadConfig
 loadConfigMaybeProject configArgs mresolver mproject = do
     (stackRoot, userOwnsStackRoot) <- determineStackRootAndOwnership configArgs
 
@@ -477,10 +473,10 @@ loadConfigMaybeProject configArgs mresolver mproject = do
 
     config <-
         case mproject of
-          LCSNoConfig -> configNoLocalConfig stackRoot mresolver configArgs
+          LCSNoConfig _ -> configNoLocalConfig stackRoot mresolver configArgs
           LCSProject project -> loadHelper $ Just project
           LCSNoProject -> loadHelper Nothing
-    unless (fromCabalVersion Meta.version `withinRange` configRequireStackVersion config)
+    unless (fromCabalVersion (mkVersion' Meta.version) `withinRange` configRequireStackVersion config)
         (throwM (BadStackVersionException (configRequireStackVersion config)))
 
     let mprojectRoot = fmap (\(_, fp, _) -> parent fp) mproject
@@ -492,48 +488,79 @@ loadConfigMaybeProject configArgs mresolver mproject = do
 
     return LoadConfig
         { lcConfig          = config
-        , lcLoadBuildConfig = loadBuildConfig mproject config mresolver
+        , lcLoadBuildConfig = runRIO config . loadBuildConfig mproject mresolver
         , lcProjectRoot     =
             case mprojectRoot of
               LCSProject fp -> Just fp
               LCSNoProject  -> Nothing
-              LCSNoConfig   -> Nothing
+              LCSNoConfig _ -> Nothing
         }
 
 -- | Load the configuration, using current directory, environment variables,
 -- and defaults as necessary. The passed @Maybe (Path Abs File)@ is an
 -- override for the location of the project's stack.yaml.
-loadConfig :: StackM env m
+loadConfig :: HasRunner env
            => ConfigMonoid
            -- ^ Config monoid from parsed command-line arguments
            -> Maybe AbstractResolver
            -- ^ Override resolver
            -> StackYamlLoc (Path Abs File)
            -- ^ Override stack.yaml
-           -> m (LoadConfig m)
+           -> RIO env LoadConfig
 loadConfig configArgs mresolver mstackYaml =
     loadProjectConfig mstackYaml >>= loadConfigMaybeProject configArgs mresolver
 
 -- | Load the build configuration, adds build-specific values to config loaded by @loadConfig@.
 -- values.
-loadBuildConfig :: StackM env m
-                => LocalConfigStatus (Project, Path Abs File, ConfigMonoid)
-                -> Config
+loadBuildConfig :: LocalConfigStatus (Project, Path Abs File, ConfigMonoid)
                 -> Maybe AbstractResolver -- override resolver
-                -> Maybe CompilerVersion -- override compiler
-                -> m BuildConfig
-loadBuildConfig mproject config mresolver mcompiler = do
-    env <- ask
+                -> Maybe (CompilerVersion 'CVWanted) -- override compiler
+                -> RIO Config BuildConfig
+loadBuildConfig mproject maresolver mcompiler = do
+    config <- ask
+
+    -- If provided, turn the AbstractResolver from the command line
+    -- into a Resolver that can be used below.
+
+    -- The maresolver and mcompiler are provided on the command
+    -- line. In order to properly deal with an AbstractResolver, we
+    -- need a base directory (to deal with custom snapshot relative
+    -- paths). We consider the current working directory to be the
+    -- correct base. Let's calculate the mresolver first.
+    mresolver <- forM maresolver $ \aresolver -> do
+      -- For display purposes only
+      let name =
+            case aresolver of
+              ARResolver resolver -> resolverRawName resolver
+              ARLatestNightly -> "nightly"
+              ARLatestLTS -> "lts"
+              ARLatestLTSMajor x -> T.pack $ "lts-" ++ show x
+              ARGlobal -> "global"
+      logDebug ("Using resolver: " <> name <> " specified on command line")
+
+      -- In order to resolve custom snapshots, we need a base
+      -- directory to deal with relative paths. For the case of
+      -- LCSNoConfig, we use the parent directory provided. This is
+      -- because, when running the script interpreter, we assume the
+      -- resolver is in fact coming from the file contents itself and
+      -- not the command line. For the project and non project cases,
+      -- however, we use the current directory.
+      base <-
+        case mproject of
+          LCSNoConfig parentDir -> return parentDir
+          LCSProject _ -> resolveDir' "."
+          LCSNoProject -> resolveDir' "."
+      makeConcreteResolver (Just base) aresolver
 
     (project', stackYamlFP) <- case mproject of
       LCSProject (project, fp, _) -> do
-          forM_ (projectUserMsg project) ($logWarn . T.pack)
+          forM_ (projectUserMsg project) (logWarn . T.pack)
           return (project, fp)
-      LCSNoConfig -> do
-          p <- getEmptyProject
+      LCSNoConfig _ -> do
+          p <- assert (isJust mresolver) (getEmptyProject mresolver)
           return (p, configUserConfigPath config)
       LCSNoProject -> do
-            $logDebug "Run from outside a project, using implicit global project config"
+            logDebug "Run from outside a project, using implicit global project config"
             destDir <- getImplicitGlobalProjectDir config
             let dest :: Path Abs File
                 dest = destDir </> stackDotYaml
@@ -544,26 +571,17 @@ loadBuildConfig mproject config mresolver mcompiler = do
             if exists
                then do
                    ProjectAndConfigMonoid project _ <- loadConfigYaml (parseProjectAndConfigMonoid destDir) dest
-                   when (view terminalL env) $
-                       case mresolver of
+                   when (view terminalL config) $
+                       case maresolver of
                            Nothing ->
-                               $logDebug ("Using resolver: " <> resolverName (projectResolver project) <>
+                               logDebug ("Using resolver: " <> resolverRawName (projectResolver project) <>
                                          " from implicit global project's config file: " <> T.pack dest')
-                           Just aresolver -> do
-                               let name =
-                                        case aresolver of
-                                            ARResolver resolver -> resolverName resolver
-                                            ARLatestNightly -> "nightly"
-                                            ARLatestLTS -> "lts"
-                                            ARLatestLTSMajor x -> T.pack $ "lts-" ++ show x
-                                            ARGlobal -> "global"
-                               $logDebug ("Using resolver: " <> name <>
-                                         " specified on command line")
+                           Just _ -> return ()
                    return (project, dest)
                else do
-                   $logInfo ("Writing implicit global project config file to: " <> T.pack dest')
-                   $logInfo "Note: You can change the snapshot via the resolver field there."
-                   p <- getEmptyProject
+                   logInfo ("Writing implicit global project config file to: " <> T.pack dest')
+                   logInfo "Note: You can change the snapshot via the resolver field there."
+                   p <- getEmptyProject mresolver
                    liftIO $ do
                        S.writeFile dest' $ S.concat
                            [ "# This is the implicit global project's config file, which is only used when\n"
@@ -579,31 +597,22 @@ loadBuildConfig mproject config mresolver mcompiler = do
                            [ "This is the implicit global project, which is used only when 'stack' is run\n"
                            , "outside of a real project.\n" ]
                    return (p, dest)
-    resolver <-
-        case mresolver of
-            Nothing -> return $ projectResolver project'
-            Just aresolver ->
-                runReaderT (makeConcreteResolver aresolver) miniConfig
     let project = project'
-            { projectResolver = resolver
-            , projectCompiler = mcompiler <|> projectCompiler project'
+            { projectCompiler = mcompiler <|> projectCompiler project'
+            , projectResolver = fromMaybe (projectResolver project') mresolver
             }
 
-    (mbp0, loadedResolver) <- flip runReaderT miniConfig $
-        loadResolver (Just stackYamlFP) (projectResolver project)
-    let mbp = case projectCompiler project of
-            Just compiler -> mbp0 { mbpCompilerVersion = compiler }
-            Nothing -> mbp0
+    sd0 <- runRIO config $ loadResolver $ projectResolver project
+    let sd = maybe id setCompilerVersion (projectCompiler project) sd0
 
     extraPackageDBs <- mapM resolveDir' (projectExtraPackageDBs project)
 
     return BuildConfig
         { bcConfig = config
-        , bcResolver = loadedResolver
-        , bcWantedMiniBuildPlan = mbp
-        , bcGHCVariant = view ghcVariantL miniConfig
-        , bcPackageEntries = projectPackages project
-        , bcExtraDeps = projectExtraDeps project
+        , bcSnapshotDef = sd
+        , bcGHCVariant = configGHCVariantDefault config
+        , bcPackages = projectPackages project
+        , bcDependencies = projectDependencies project
         , bcExtraPackageDBs = extraPackageDBs
         , bcStackYaml = stackYamlFP
         , bcFlags = projectFlags project
@@ -611,25 +620,23 @@ loadBuildConfig mproject config mresolver mcompiler = do
             case mproject of
                 LCSNoProject -> True
                 LCSProject _ -> False
-                LCSNoConfig  -> False
+                LCSNoConfig _ -> False
         }
   where
-    miniConfig = loadMiniConfig config
-
-    getEmptyProject = do
+    getEmptyProject :: Maybe Resolver -> RIO Config Project
+    getEmptyProject mresolver = do
       r <- case mresolver of
-            Just aresolver -> do
-                r' <- runReaderT (makeConcreteResolver aresolver) miniConfig
-                $logInfo ("Using resolver: " <> resolverName r' <> " specified on command line")
-                return r'
+            Just resolver -> do
+                logInfo ("Using resolver: " <> resolverRawName resolver <> " specified on command line")
+                return resolver
             Nothing -> do
-                r'' <- runReaderT getLatestResolver miniConfig
-                $logInfo ("Using latest snapshot resolver: " <> resolverName r'')
+                r'' <- getLatestResolver
+                logInfo ("Using latest snapshot resolver: " <> resolverRawName r'')
                 return r''
       return Project
         { projectUserMsg = Nothing
-        , projectPackages = mempty
-        , projectExtraDeps = mempty
+        , projectPackages = []
+        , projectDependencies = []
         , projectFlags = mempty
         , projectResolver = r
         , projectCompiler = Nothing
@@ -638,199 +645,102 @@ loadBuildConfig mproject config mresolver mcompiler = do
 
 -- | Get packages from EnvConfig, downloading and cloning as necessary.
 -- If the packages have already been downloaded, this uses a cached value (
-getLocalPackages
-    :: (StackMiniM env m, HasEnvConfig env)
-    => m (Map.Map (Path Abs Dir) TreatLikeExtraDep)
+getLocalPackages :: forall env. HasEnvConfig env => RIO env LocalPackages
 getLocalPackages = do
     cacheRef <- view $ envConfigL.to envConfigPackagesRef
     mcached <- liftIO $ readIORef cacheRef
     case mcached of
         Just cached -> return cached
-        Nothing -> do
+        Nothing -> withCabalLoader $ \loadFromIndex -> do
             menv <- getMinimalEnvOverride
             root <- view projectRootL
-            entries <- view $ buildConfigL.to bcPackageEntries
-            liftM (Map.fromList . concat) $ mapM
-                (resolvePackageEntry menv root)
-                entries
+            bc <- view buildConfigL
 
--- | Resolve a PackageEntry into a list of paths, downloading and cloning as
--- necessary.
-resolvePackageEntry
-    :: (StackMiniM env m, HasConfig env)
-    => EnvOverride
-    -> Path Abs Dir -- ^ project root
-    -> PackageEntry
-    -> m [(Path Abs Dir, TreatLikeExtraDep)]
-resolvePackageEntry menv projRoot pe = do
-    entryRoot <- resolvePackageLocation menv projRoot (peLocation pe)
-    paths <-
-        case peSubdirs pe of
-            [] -> return [entryRoot]
-            subs -> mapM (resolveDir entryRoot) subs
-    extraDep <-
-        case peExtraDepMaybe pe of
-            Just e -> return e
-            Nothing ->
-                case peLocation pe of
-                    PLFilePath _ ->
-                        -- we don't give a warning on missing explicit
-                        -- value here, user intent is almost always
-                        -- the default for a local directory
-                        return False
-                    PLRemote url _ -> do
-                        $logWarn $ mconcat
-                            [ "No extra-dep setting found for package at URL:\n\n"
-                            , url
-                            , "\n\n"
-                            , "This is usually a mistake, external packages "
-                            , "should typically\nbe treated as extra-deps to avoid "
-                            , "spurious test case failures."
-                            ]
-                        return False
-    return $ map (, extraDep) paths
+            packages <- do
+              bss <- concat <$> mapM (loadMultiRawCabalFiles menv root) (bcPackages bc)
+              forM bss $ \(bs, loc) -> do
+                (warnings, gpd) <-
+                  case rawParseGPD bs of
+                    Left e -> throwM $ InvalidCabalFileInLocal (PLOther loc) e bs
+                    Right x -> return x
+                let PackageIdentifier name version =
+                           fromCabalPackageIdentifier
+                         $ C.package
+                         $ C.packageDescription gpd
+                dir <- resolveSinglePackageLocation menv root loc
+                cabalfp <- findOrGenerateCabalFile dir
+                mapM_ (printCabalFileWarning cabalfp) warnings
+                checkCabalFileName name cabalfp
+                let lpv = LocalPackageView
+                      { lpvVersion = version
+                      , lpvRoot = dir
+                      , lpvCabalFP = cabalfp
+                      , lpvComponents = getNamedComponents gpd
+                      , lpvGPD = gpd
+                      , lpvLoc = loc
+                      }
+                return (name, lpv)
 
--- | Resolve a PackageLocation into a path, downloading and cloning as
--- necessary.
-resolvePackageLocation
-    :: (StackMiniM env m, HasConfig env)
-    => EnvOverride
-    -> Path Abs Dir -- ^ project root
-    -> PackageLocation
-    -> m (Path Abs Dir)
-resolvePackageLocation _ projRoot (PLFilePath fp) = resolveDir projRoot fp
-resolvePackageLocation menv projRoot (PLRemote url remotePackageType) = do
-    workDir <- view workDirL
-    let nameBeforeHashing = case remotePackageType of
-            RPTHttp{} -> url
-            RPTGit commit -> T.unwords [url, commit]
-            RPTHg commit -> T.unwords [url, commit, "hg"]
-        -- TODO: dedupe with code for snapshot hash?
-        name = T.unpack $ decodeUtf8 $ S.take 12 $ B64URL.encode $ Mem.convert $ hashWith SHA256 $ encodeUtf8 nameBeforeHashing
-        root = projRoot </> workDir </> $(mkRelDir "downloaded")
-        fileExtension' = case remotePackageType of
-            RPTHttp -> ".http-archive"
-            _       -> ".unused"
+            deps <- mapM (loadMultiRawCabalFilesIndex loadFromIndex menv root) (bcDependencies bc)
+                >>= mapM (\(bs, loc :: PackageLocationIndex FilePath) -> do
+                     (_warnings, gpd) <- do
+                       case rawParseGPD bs of
+                         Left e -> throwM $ InvalidCabalFileInLocal loc e bs
+                         Right x -> return x
+                     let PackageIdentifier name _version =
+                                fromCabalPackageIdentifier
+                              $ C.package
+                              $ C.packageDescription gpd
+                     return (name, (gpd, loc))) . concat
 
-    fileRel <- parseRelFile $ name ++ fileExtension'
-    dirRel <- parseRelDir name
-    dirRelTmp <- parseRelDir $ name ++ ".tmp"
-    let file = root </> fileRel
-        dir = root </> dirRel
+            checkDuplicateNames $
+              map (second (PLOther . lpvLoc)) packages ++
+              map (second snd) deps
 
-    exists <- doesDirExist dir
-    unless exists $ do
-        ignoringAbsence (removeDirRecur dir)
+            return LocalPackages
+              { lpProject = Map.fromList packages
+              , lpDependencies = Map.fromList deps
+              }
 
-        let cloneAndExtract commandName cloneArgs resetCommand commit = do
-                ensureDir root
-                callProcessInheritStderrStdout Cmd
-                    { cmdDirectoryToRunIn = Just root
-                    , cmdCommandToRun = commandName
-                    , cmdEnvOverride = menv
-                    , cmdCommandLineArguments =
-                        "clone" :
-                        cloneArgs ++
-                        [ T.unpack url
-                        , toFilePathNoTrailingSep dir
-                        ]
-                    }
-                created <- doesDirExist dir
-                unless created $ throwM $ FailedToCloneRepo commandName
-                readProcessNull (Just dir) menv commandName
-                    (resetCommand ++ [T.unpack commit, "--"])
-                    `catch` \case
-                        ex@ProcessFailed{} -> do
-                            $logInfo $ "Please ensure that commit " <> commit <> " exists within " <> url
-                            throwM ex
-                        ex -> throwM ex
+getNamedComponents :: C.GenericPackageDescription -> Set NamedComponent
+getNamedComponents gpkg = Set.fromList $ concat
+    [ maybe []  (const [CLib]) (C.condLibrary gpkg)
+    , go CExe   (map fst . C.condExecutables)
+    , go CTest  (map fst . C.condTestSuites)
+    , go CBench (map fst . C.condBenchmarks)
+    ]
+  where
+    go :: (T.Text -> NamedComponent)
+       -> (C.GenericPackageDescription -> [C.UnqualComponentName])
+       -> [NamedComponent]
+    go wrapper f = map (wrapper . T.pack . C.unUnqualComponentName) $ f gpkg
 
-        case remotePackageType of
-            RPTHttp -> do
-                let dirTmp = root </> dirRelTmp
-                ignoringAbsence (removeDirRecur dirTmp)
-
-                let fp = toFilePath file
-                req <- parseUrlThrow $ T.unpack url
-                _ <- download req file
-
-                let tryTar = do
-                        $logDebug $ "Trying to untar " <> T.pack fp
-                        liftIO $ withBinaryFile fp ReadMode $ \h -> do
-                            lbs <- L.hGetContents h
-                            let entries = Tar.read $ GZip.decompress lbs
-                            Tar.unpack (toFilePath dirTmp) entries
-                    tryZip = do
-                        $logDebug $ "Trying to unzip " <> T.pack fp
-                        archive <- fmap Zip.toArchive $ liftIO $ L.readFile fp
-                        liftIO $  Zip.extractFilesFromArchive [Zip.OptDestination
-                                                               (toFilePath dirTmp)] archive
-                    err = throwM $ UnableToExtractArchive url file
-
-                    catchAllLog goodpath handler =
-                        catchAll goodpath $ \e -> do
-                            $logDebug $ "Got exception: " <> T.pack (show e)
-                            handler
-
-                tryTar `catchAllLog` tryZip `catchAllLog` err
-                renameDir dirTmp dir
-
-            -- Passes in --git-dir to git and --repository to hg, in order
-            -- to avoid the update commands being applied to the user's
-            -- repo.  See https://github.com/commercialhaskell/stack/issues/2748
-            RPTGit commit -> cloneAndExtract "git" ["--recursive"] ["--git-dir=.git", "reset", "--hard"] commit
-            RPTHg  commit -> cloneAndExtract "hg"  []              ["--repository", ".", "update", "-C"] commit
-
-    case remotePackageType of
-        RPTHttp -> do
-            x <- listDir dir
-            case x of
-                ([dir'], []) -> return dir'
-                (dirs, files) -> do
-                    ignoringAbsence (removeFile file)
-                    ignoringAbsence (removeDirRecur dir)
-                    throwM $ UnexpectedArchiveContents dirs files
-        _ -> return dir
-
--- | Remove path from package entry. If the package entry contains subdirs, then it removes
--- the subdir. If the package entry points to the path to remove, this function returns
--- Nothing. If the package entry doesn't mention the path to remove, it is returned unchanged
-removePathFromPackageEntry
-    :: (StackMiniM env m, HasConfig env)
-    => EnvOverride
-    -> Path Abs Dir -- ^ project root
-    -> Path Abs Dir -- ^ path to remove
-    -> PackageEntry
-    -> m (Maybe PackageEntry)
-    -- ^ Nothing if the whole package entry should be removed, otherwise
-    -- it returns the updated PackageEntry
-removePathFromPackageEntry menv projectRoot pathToRemove packageEntry = do
-  locationPath <- resolvePackageLocation menv projectRoot (peLocation packageEntry)
-  case peSubdirs packageEntry of
-    [] -> if locationPath == pathToRemove then return Nothing else return (Just packageEntry)
-    subdirPaths -> do
-      let shouldKeepSubdir path = do
-            resolvedPath <- resolveDir locationPath path
-            return (pathToRemove /= resolvedPath)
-      filteredSubdirs <- filterM shouldKeepSubdir subdirPaths
-      if null filteredSubdirs then return Nothing else return (Just packageEntry {peSubdirs = filteredSubdirs})
-
+-- | Check if there are any duplicate package names and, if so, throw an
+-- exception.
+checkDuplicateNames :: MonadThrow m => [(PackageName, PackageLocationIndex FilePath)] -> m ()
+checkDuplicateNames locals =
+    case filter hasMultiples $ Map.toList $ Map.fromListWith (++) $ map (second return) locals of
+        [] -> return ()
+        x -> throwM $ DuplicateLocalPackageNames x
+  where
+    hasMultiples (_, _:_:_) = True
+    hasMultiples _ = False
 
 
 -- | Get the stack root, e.g. @~/.stack@, and determine whether the user owns it.
 --
 -- On Windows, the second value is always 'True'.
 determineStackRootAndOwnership
-    :: (MonadIO m, MonadCatch m)
+    :: (MonadIO m)
     => ConfigMonoid
     -- ^ Parsed command-line arguments
     -> m (Path Abs Dir, Bool)
-determineStackRootAndOwnership clArgs = do
+determineStackRootAndOwnership clArgs = liftIO $ do
     stackRoot <- do
         case getFirst (configMonoidStackRoot clArgs) of
             Just x -> return x
             Nothing -> do
-                mstackRoot <- liftIO $ lookupEnv stackRootEnvVar
+                mstackRoot <- lookupEnv stackRootEnvVar
                 case mstackRoot of
                     Nothing -> getAppUserDataDir stackProgName
                     Just x -> case parseAbsDir x of
@@ -841,12 +751,12 @@ determineStackRootAndOwnership clArgs = do
         mdirAndOwnership <- findInParents getDirAndOwnership stackRoot
         case mdirAndOwnership of
             Just x -> return x
-            Nothing -> throwM (BadStackRoot stackRoot)
+            Nothing -> throwIO (BadStackRoot stackRoot)
 
     when (existingStackRootOrParentDir /= stackRoot) $
         if userOwnsIt
-            then liftIO $ ensureDir stackRoot
-            else throwM $
+            then ensureDir stackRoot
+            else throwIO $
                 Won'tCreateStackRootInDirectoryOwnedByDifferentUser
                     stackRoot
                     existingStackRootOrParentDir
@@ -860,22 +770,22 @@ determineStackRootAndOwnership clArgs = do
 -- If @dir@ doesn't exist, its parent directory is checked instead.
 -- If the parent directory doesn't exist either, @'NoSuchDirectory' ('parent' dir)@
 -- is thrown.
-checkOwnership :: (MonadIO m, MonadCatch m) => Path Abs Dir -> m ()
+checkOwnership :: (MonadIO m) => Path Abs Dir -> m ()
 checkOwnership dir = do
     mdirAndOwnership <- firstJustM getDirAndOwnership [dir, parent dir]
     case mdirAndOwnership of
         Just (_, True) -> return ()
-        Just (dir', False) -> throwM (UserDoesn'tOwnDirectory dir')
+        Just (dir', False) -> throwIO (UserDoesn'tOwnDirectory dir')
         Nothing ->
-            (throwM . NoSuchDirectory) $ (toFilePathNoTrailingSep . parent) dir
+            (throwIO . NoSuchDirectory) $ (toFilePathNoTrailingSep . parent) dir
 
 -- | @'getDirAndOwnership' dir@ returns @'Just' (dir, 'True')@ when @dir@
 -- exists and the current user owns it in the sense of 'isOwnedByUser'.
 getDirAndOwnership
-    :: (MonadIO m, MonadCatch m)
+    :: (MonadIO m)
     => Path Abs Dir
     -> m (Maybe (Path Abs Dir, Bool))
-getDirAndOwnership dir = forgivingAbsence $ do
+getDirAndOwnership dir = liftIO $ forgivingAbsence $ do
     ownership <- isOwnedByUser dir
     return (dir, ownership)
 
@@ -962,7 +872,7 @@ getProjectConfig SYLDefault = do
     env <- liftIO getEnvironment
     case lookup "STACK_YAML" env of
         Just fp -> do
-            $logInfo "Getting project config file from STACK_YAML environment"
+            logInfo "Getting project config file from STACK_YAML environment"
             liftM LCSProject $ resolveFile' fp
         Nothing -> do
             currDir <- getCurrentDir
@@ -971,17 +881,18 @@ getProjectConfig SYLDefault = do
     getStackDotYaml dir = do
         let fp = dir </> stackDotYaml
             fp' = toFilePath fp
-        $logDebug $ "Checking for project config at: " <> T.pack fp'
+        logDebug $ "Checking for project config at: " <> T.pack fp'
         exists <- doesFileExist fp
         if exists
             then return $ Just fp
             else return Nothing
-getProjectConfig SYLNoConfig = return LCSNoConfig
+getProjectConfig (SYLNoConfig parentDir) = return (LCSNoConfig parentDir)
 
 data LocalConfigStatus a
     = LCSNoProject
     | LCSProject a
-    | LCSNoConfig
+    | LCSNoConfig !(Path Abs Dir)
+    -- ^ parent directory for making a concrete resolving
     deriving (Show,Functor,Foldable,Traversable)
 
 -- | Find the project config file location, respecting environment variables
@@ -996,15 +907,15 @@ loadProjectConfig mstackYaml = do
     case mfp of
         LCSProject fp -> do
             currDir <- getCurrentDir
-            $logDebug $ "Loading project config file " <>
-                        T.pack (maybe (toFilePath fp) toFilePath (stripDir currDir fp))
+            logDebug $ "Loading project config file " <>
+                        T.pack (maybe (toFilePath fp) toFilePath (stripProperPrefix currDir fp))
             LCSProject <$> load fp
         LCSNoProject -> do
-            $logDebug $ "No project config file found, using defaults."
+            logDebug "No project config file found, using defaults."
             return LCSNoProject
-        LCSNoConfig -> do
-            $logDebug "Ignoring config files"
-            return LCSNoConfig
+        LCSNoConfig mparentDir -> do
+            logDebug "Ignoring config files"
+            return (LCSNoConfig mparentDir)
   where
     load fp = do
         ProjectAndConfigMonoid project config <- loadConfigYaml (parseProjectAndConfigMonoid (parent fp)) fp
@@ -1055,9 +966,15 @@ getFakeConfigPath
 getFakeConfigPath stackRoot ar = do
   asString <-
     case ar of
-      ARResolver r -> return $ T.unpack $ resolverName r
+      ARResolver r -> return $ T.unpack $ resolverRawName r
       _ -> throwM $ InvalidResolverForNoLocalConfig $ show ar
-  asDir <- parseRelDir asString
+  -- This takeWhile is an ugly hack. We don't actually need this
+  -- path for anything useful. But if we take the raw value for
+  -- a custom snapshot, it will be unparseable in a PATH.
+  -- Therefore, we add in this silly "strip up to :".
+  -- Better would be to defer figuring out this value until
+  -- after we have a fully loaded snapshot with a hash.
+  asDir <- parseRelDir $ takeWhile (/= ':') asString
   let full = stackRoot </> $(mkRelDir "script") </> asDir </> $(mkRelFile "config.yaml")
   ensureDir (parent full)
   return full

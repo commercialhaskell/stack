@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE CPP               #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell   #-}
@@ -5,28 +6,16 @@ module Stack.Script
     ( scriptCmd
     ) where
 
-import           Control.Exception          (assert)
-import           Control.Exception.Safe     (throwM)
-import           Control.Monad              (unless, forM)
-import           Control.Monad.IO.Class     (liftIO)
-import           Control.Monad.Logger
-import           Data.ByteString            (ByteString)
+import           Stack.Prelude
 import qualified Data.ByteString.Char8      as S8
 import qualified Data.Conduit.List          as CL
-import           Data.Foldable              (fold)
 import           Data.List.Split            (splitWhen)
 import qualified Data.Map.Strict            as Map
-import           Data.Maybe                 (fromMaybe, mapMaybe)
-import           Data.Monoid
-import           Data.Set                   (Set)
 import qualified Data.Set                   as Set
-import           Data.Store.VersionTagged   (versionedDecodeOrLoad)
 import qualified Data.Text                  as T
-import           Data.Text.Encoding         (encodeUtf8)
 import           Path
 import           Path.IO
 import qualified Stack.Build
-import           Stack.BuildPlan            (loadBuildPlan)
 import           Stack.Exec
 import           Stack.GhcPkg               (ghcPkgExeName)
 import           Stack.Options.ScriptParser
@@ -35,20 +24,18 @@ import           Stack.Types.BuildPlan
 import           Stack.Types.Compiler
 import           Stack.Types.Config
 import           Stack.Types.PackageName
-import           Stack.Types.Resolver
-import           Stack.Types.StackT
-import           Stack.Types.StringError
 import           System.FilePath            (dropExtension, replaceExtension)
 import           System.Process.Read
 
 -- | Run a Stack Script
 scriptCmd :: ScriptOpts -> GlobalOpts -> IO ()
 scriptCmd opts go' = do
+    file <- resolveFile' $ soFile opts
     let go = go'
             { globalConfigMonoid = (globalConfigMonoid go')
                 { configMonoidInstallGHC = First $ Just True
                 }
-            , globalStackYaml = SYLNoConfig
+            , globalStackYaml = SYLNoConfig $ parent file
             }
     withBuildConfigAndLock go $ \lk -> do
         -- Some warnings in case the user somehow tries to set a
@@ -57,24 +44,26 @@ scriptCmd opts go' = do
         -- interpreter mode, only error messages are shown. See:
         -- https://github.com/commercialhaskell/stack/issues/3007
         case globalStackYaml go' of
-          SYLOverride fp -> $logError $ T.pack
+          SYLOverride fp -> logError $ T.pack
             $ "Ignoring override stack.yaml file for script command: " ++ fp
           SYLDefault -> return ()
-          SYLNoConfig -> assert False (return ())
+          SYLNoConfig _ -> assert False (return ())
 
         config <- view configL
         menv <- liftIO $ configEnvOverride config defaultEnvSettings
         wc <- view $ actualCompilerVersionL.whichCompilerL
+        colorFlag <- appropriateGhcColorFlag
 
-        (targetsSet, coresSet) <-
+        targetsSet <-
             case soPackages opts of
-                [] ->
+                [] -> do
                     -- Using the import parser
-                    getPackagesFromImports (globalResolver go) (soFile opts)
+                    moduleInfo <- view $ loadedSnapshotL.to toModuleInfo
+                    getPackagesFromModuleInfo moduleInfo (soFile opts)
                 packages -> do
                     let targets = concatMap wordsComma packages
                     targets' <- mapM parsePackageNameFromString targets
-                    return (Set.fromList targets', Set.empty)
+                    return $ Set.fromList targets'
 
         unless (Set.null targetsSet) $ do
             -- Optimization: use the relatively cheap ghc-pkg list
@@ -90,30 +79,31 @@ scriptCmd opts go' = do
                           $ S8.unpack
                           $ S8.concat bss
             if Set.null $ Set.difference (Set.map packageNameString targetsSet) installed
-                then $logDebug "All packages already installed"
+                then logDebug "All packages already installed"
                 else do
-                    $logDebug "Missing packages, performing installation"
+                    logDebug "Missing packages, performing installation"
                     Stack.Build.build (const $ return ()) lk defaultBuildOptsCLI
                         { boptsCLITargets = map packageNameText $ Set.toList targetsSet
                         }
 
         let ghcArgs = concat
                 [ ["-hide-all-packages"]
+                , maybeToList colorFlag
                 , map (\x -> "-package" ++ x)
                     $ Set.toList
                     $ Set.insert "base"
-                    $ Set.map packageNameString (Set.union targetsSet coresSet)
+                    $ Set.map packageNameString targetsSet
                 , case soCompile opts of
                     SEInterpret -> []
                     SECompile -> []
                     SEOptimize -> ["-O2"]
+                , map (\x -> "--ghc-arg=" ++ x) (soGhcOptions opts)
                 ]
         munlockFile lk -- Unlock before transferring control away.
         case soCompile opts of
           SEInterpret -> exec menv ("run" ++ compilerExeName wc)
-                (ghcArgs ++ soFile opts : soArgs opts)
+                (ghcArgs ++ toFilePath file : soArgs opts)
           _ -> do
-            file <- resolveFile' $ soFile opts
             let dir = parent file
             -- use sinkProcessStdout to ensure a ProcessFailed
             -- exception is generated for better error messages
@@ -121,7 +111,7 @@ scriptCmd opts go' = do
               (Just dir)
               menv
               (compilerExeName wc)
-              (ghcArgs ++ [soFile opts])
+              (ghcArgs ++ [toFilePath file])
               CL.sinkNull
             exec menv (toExeName $ toFilePath file) (soArgs opts)
   where
@@ -142,19 +132,12 @@ isWindows = True
 isWindows = False
 #endif
 
--- | Returns packages that need to be installed, and all of the core
--- packages. Reason for the core packages:
-
--- Ideally we'd have the list of modules per core package listed in
--- the build plan, but that doesn't exist yet. Next best would be to
--- list the modules available at runtime, but that gets tricky with when we install GHC. Instead, we'll just list all core packages
-getPackagesFromImports :: Maybe AbstractResolver
-                       -> FilePath
-                       -> StackT EnvConfig IO (Set PackageName, Set PackageName)
-getPackagesFromImports Nothing _ = throwM NoResolverWhenUsingNoLocalConfig
-getPackagesFromImports (Just (ARResolver (ResolverSnapshot name))) scriptFP = do
+getPackagesFromModuleInfo
+  :: ModuleInfo
+  -> FilePath -- ^ script filename
+  -> RIO EnvConfig (Set PackageName)
+getPackagesFromModuleInfo mi scriptFP = do
     (pns1, mns) <- liftIO $ parseImports <$> S8.readFile scriptFP
-    mi <- loadModuleInfo name
     pns2 <-
         if Set.null mns
             then return Set.empty
@@ -173,14 +156,7 @@ getPackagesFromImports (Just (ARResolver (ResolverSnapshot name))) scriptFP = do
                                     ]
                         Nothing -> return Set.empty
                 return $ Set.unions pns `Set.difference` blacklist
-    return (Set.union pns1 pns2, modifyForWindows $ miCorePackages mi)
-  where
-    modifyForWindows
-        | isWindows = Set.insert $(mkPackageName "Win32") . Set.delete $(mkPackageName "unix")
-        | otherwise = id
-
-getPackagesFromImports (Just (ARResolver (ResolverCompiler _))) _ = return (Set.empty, Set.empty)
-getPackagesFromImports (Just aresolver) _ = throwM $ InvalidResolverForNoLocalConfig $ show aresolver
+    return $ Set.union pns1 pns2
 
 -- | The Stackage project introduced the concept of hidden packages,
 -- to deal with conflicting module names. However, this is a
@@ -234,43 +210,28 @@ blacklist = Set.fromList
     , $(mkPackageName "cryptohash-sha256")
     ]
 
-toModuleInfo :: BuildPlan -> ModuleInfo
-toModuleInfo bp = ModuleInfo
-    { miCorePackages = Map.keysSet $ siCorePackages $ bpSystemInfo bp
-    , miModules =
-              Map.unionsWith Set.union
-            $ map ((\(pn, mns) ->
-                    Map.fromList
-                  $ map (\mn -> (ModuleName $ encodeUtf8 mn, Set.singleton pn))
-                  $ Set.toList mns) . fmap (sdModules . ppDesc))
-            $ filter (\(pn, pp) ->
-                    not (pcHide $ ppConstraints pp) &&
-                    pn `Set.notMember` blacklist)
-            $ Map.toList (bpPackages bp)
-    }
-
--- | Where to store module info caches
-moduleInfoCache :: SnapName -> StackT EnvConfig IO (Path Abs File)
-moduleInfoCache name = do
-    root <- view stackRootL
-    platform <- platformGhcVerOnlyRelDir
-    name' <- parseRelDir $ T.unpack $ renderSnapName name
-    -- These probably can't vary at all based on platform, even in the
-    -- future, so it's safe to call this unnecessarily paranoid.
-    return (root </> $(mkRelDir "script") </> name' </> platform </> $(mkRelFile "module-info.cache"))
-
-loadModuleInfo :: SnapName -> StackT EnvConfig IO ModuleInfo
-loadModuleInfo name = do
-    path <- moduleInfoCache name
-    $(versionedDecodeOrLoad moduleInfoVC) path $ toModuleInfo <$> loadBuildPlan name
+toModuleInfo :: LoadedSnapshot -> ModuleInfo
+toModuleInfo ls =
+      mconcat
+    $ map (\(pn, lpi) ->
+            ModuleInfo
+            $ Map.fromList
+            $ map (\mn -> (mn, Set.singleton pn))
+            $ Set.toList
+            $ lpiExposedModules lpi)
+    $ filter (\(pn, lpi) ->
+            not (lpiHide lpi) &&
+            pn `Set.notMember` blacklist)
+    $ Map.toList
+    $ Map.union (void <$> lsPackages ls) (void <$> lsGlobals ls)
 
 parseImports :: ByteString -> (Set PackageName, Set ModuleName)
 parseImports =
-    fold . mapMaybe (parseLine . stripCR) . S8.lines
+    fold . mapMaybe (parseLine . stripCR') . S8.lines
   where
     -- Remove any carriage return character present at the end, to
     -- support Windows-style line endings (CRLF)
-    stripCR bs
+    stripCR' bs
       | S8.null bs = bs
       | S8.last bs == '\r' = S8.init bs
       | otherwise = bs

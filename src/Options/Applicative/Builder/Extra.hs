@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
@@ -29,17 +30,14 @@ module Options.Applicative.Builder.Extra
   ,unescapeBashArg
   ) where
 
-import Control.Exception (IOException, catch)
-import Control.Monad (when, forM)
-import Data.Either.Combinators
 import Data.List (isPrefixOf)
 import Data.Maybe
 import Data.Monoid
-import Data.Text (Text)
 import qualified Data.Text as T
 import Options.Applicative
 import Options.Applicative.Types (readerAsk)
 import Path hiding ((</>))
+import Stack.Prelude
 import System.Directory (getCurrentDirectory, getDirectoryContents, doesDirectoryExist)
 import System.Environment (withArgs)
 import System.FilePath (takeBaseName, (</>), splitFileName, isRelative, takeExtension)
@@ -110,6 +108,11 @@ enableDisableFlagsNoDefault enabledValue disabledValue name helpSuffix mods =
            (long ("[no-]" ++ name) <>
             help ("Enable/disable " ++ helpSuffix) <>
             mods))
+  where
+    last xs =
+      case reverse xs of
+        [] -> impureThrow $ stringException "enableDisableFlagsNoDefault.last"
+        x:_ -> x
 
 -- | Show an extra help option (e.g. @--docker-help@ shows help for all @--docker*@ args).
 --
@@ -141,7 +144,7 @@ execExtraHelp args helpOpt parser pd =
         _ <- execParser (info (hiddenHelper <*>
                                ((,) <$>
                                 parser <*>
-                                some (strArgument (metavar "OTHER ARGUMENTS"))))
+                                some (strArgument (metavar "OTHER ARGUMENTS") :: Parser String)))
                         (fullDesc <> progDesc pd))
         return ()
   where hiddenHelper = abortOption ShowHelpText (long "help" <> hidden <> internal)
@@ -244,9 +247,10 @@ unescapeBashArg :: String -> String
 unescapeBashArg ('\'' : rest) = rest
 unescapeBashArg ('\"' : rest) = go rest
   where
+    pattern = "$`\"\\\n" :: String
     go [] = []
     go ('\\' : x : xs)
-        | x `elem` "$`\"\\\n" = x : xs
+        | x `elem` pattern = x : xs
         | otherwise = '\\' : x : go xs
     go (x : xs) = x : go xs
 unescapeBashArg input = go input

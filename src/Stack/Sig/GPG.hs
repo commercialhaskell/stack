@@ -1,7 +1,6 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE TupleSections #-}
-{-# LANGUAGE TemplateHaskell #-}
 
 {-|
 Module      : Stack.Sig.GPG
@@ -15,23 +14,15 @@ Portability : POSIX
 
 module Stack.Sig.GPG (gpgSign, gpgVerify) where
 
-import Prelude ()
-import Prelude.Compat
-
-import           Control.Monad (unless, when)
-import           Control.Monad.Catch (MonadThrow, throwM)
-import           Control.Monad.IO.Class (MonadIO, liftIO)
-import           Control.Monad.Logger (MonadLogger, logWarn)
+import           Stack.Prelude
 import qualified Data.ByteString.Char8 as C
 import           Data.List (find, isPrefixOf)
-import           Data.Monoid ((<>))
 import qualified Data.Text as T
-import           Path
 import           Stack.Types.Sig
 import           System.Directory (findExecutable)
 import           System.Environment (lookupEnv)
 import           System.Exit (ExitCode(..))
-import           System.IO (Handle, hGetContents, hPutStrLn)
+import           System.IO (hGetContents, hPutStrLn)
 import           System.Info (os)
 import           System.Process (ProcessHandle, runInteractiveProcess,
                                  waitForProcess)
@@ -113,5 +104,5 @@ gpgWarnTTY =
         (do mTTY <- liftIO (lookupEnv "GPG_TTY")
             when
                 (null mTTY)
-                ($logWarn
+                (logWarn
                      "Environment variable GPG_TTY is not set (see `man gpg-agent`)"))

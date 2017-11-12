@@ -1,22 +1,20 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell   #-}
 {-# LANGUAGE TupleSections     #-}
 module Stack.PackageDumpSpec where
 
-import           Control.Applicative
 import           Control.Monad.Logger
-import           Control.Monad.Trans.Resource  (runResourceT)
 import           Data.Conduit
 import qualified Data.Conduit.Binary           as CB
 import qualified Data.Conduit.List             as CL
 import           Data.Conduit.Text             (decodeUtf8)
-import           Data.Map                      (Map)
 import qualified Data.Map                      as Map
 import qualified Data.Set                      as Set
 import           Distribution.System           (buildPlatform)
 import           Distribution.License          (License(..))
-import           Prelude -- Fix redundant imports warnings
 import           Stack.PackageDump
+import           Stack.Prelude
 import           Stack.Types.Compiler
 import           Stack.Types.GhcPkgId
 import           Stack.Types.PackageIdentifier
@@ -81,7 +79,7 @@ spec = do
                 , "base-4.7.0.2-bfd89587617e381ae01b8dd7b6c7f1c1"
                 , "ghc-prim-0.3.1.0-a24f9c14c632d75b683d0f93283aea37"
                 ]
-            haskell2010 `shouldBe` DumpPackage
+            haskell2010 { dpExposedModules = [] } `shouldBe` DumpPackage
                 { dpGhcPkgId = ghcPkgId
                 , dpPackageIdent = packageIdent
                 , dpLicense = Just BSD3
@@ -95,6 +93,7 @@ spec = do
                 , dpHaddock = ()
                 , dpSymbols = ()
                 , dpIsExposed = False
+                , dpExposedModules = []
                 }
 
         it "ghc 7.10" $ do
@@ -121,7 +120,7 @@ spec = do
                 , "transformers-0.4.2.0-c1a7bb855a176fe475d7b665301cd48f"
                 , "unix-2.7.1.0-e5915eb989e568b732bc7286b0d0817f"
                 ]
-            haskell2010 `shouldBe` DumpPackage
+            haskell2010 { dpExposedModules = [] } `shouldBe` DumpPackage
                 { dpGhcPkgId = ghcPkgId
                 , dpPackageIdent = pkgIdent
                 , dpLicense = Just BSD3
@@ -135,6 +134,7 @@ spec = do
                 , dpHaddock = ()
                 , dpSymbols = ()
                 , dpIsExposed = False
+                , dpExposedModules = []
                 }
         it "ghc 7.8.4 (osx)" $ do
             hmatrix:_ <- runResourceT
@@ -172,6 +172,7 @@ spec = do
                 , dpHaddock = ()
                 , dpSymbols = ()
                 , dpIsExposed = True
+                , dpExposedModules = ["Data.Packed","Data.Packed.Vector","Data.Packed.Matrix","Data.Packed.Foreign","Data.Packed.ST","Data.Packed.Development","Numeric.LinearAlgebra","Numeric.LinearAlgebra.LAPACK","Numeric.LinearAlgebra.Algorithms","Numeric.Container","Numeric.LinearAlgebra.Util","Numeric.LinearAlgebra.Devel","Numeric.LinearAlgebra.Data","Numeric.LinearAlgebra.HMatrix","Numeric.LinearAlgebra.Static"]
                 }
         it "ghc HEAD" $ do
           ghcBoot:_ <- runResourceT
@@ -203,6 +204,7 @@ spec = do
             , dpHaddock = ()
             , dpSymbols = ()
             , dpIsExposed = True
+            , dpExposedModules = ["GHC.Lexeme", "GHC.PackageDb"]
             }
 
 

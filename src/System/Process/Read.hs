@@ -1,10 +1,8 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 -- | Reading from external processes.
@@ -37,15 +35,7 @@ module System.Process.Read
   )
   where
 
-import           Control.Applicative
-import           Control.Arrow ((***), first)
-import           Control.Concurrent.Async (concurrently)
-import           Control.Exception hiding (try, catch)
-import           Control.Monad (join, liftM, unless, void)
-import           Control.Monad.Catch (MonadThrow, MonadCatch, throwM, try, catch)
-import           Control.Monad.IO.Class (MonadIO, liftIO)
-import           Control.Monad.Logger
-import           Control.Monad.Trans.Control (MonadBaseControl, liftBaseWith)
+import           Stack.Prelude
 import qualified Data.ByteString as S
 import           Data.ByteString.Builder
 import qualified Data.ByteString.Lazy as L
@@ -53,30 +43,22 @@ import           Data.Conduit
 import qualified Data.Conduit.Binary as CB
 import qualified Data.Conduit.List as CL
 import           Data.Conduit.Process hiding (callProcess)
-import           Data.IORef
-import           Data.Map (Map)
 import qualified Data.Map as Map
-import           Data.Maybe (isJust, maybeToList, fromMaybe)
-import           Data.Monoid
-import           Data.Text (Text)
 import qualified Data.Text as T
+import           Data.Text.Encoding (decodeUtf8With)
 import           Data.Text.Encoding.Error (lenientDecode)
 import qualified Data.Text.Lazy as LT
 import qualified Data.Text.Lazy.Encoding as LT
-import           Data.Typeable (Typeable)
 import           Distribution.System (OS (Windows), Platform (Platform))
-import           Language.Haskell.TH as TH (location)
 import           Path
 import           Path.Extra
 import           Path.IO hiding (findExecutable)
-import           Prelude -- Fix AMP warning
 import qualified System.Directory as D
 import           System.Environment (getEnvironment)
 import           System.Exit
 import qualified System.FilePath as FP
-import           System.IO (Handle, hClose)
+import           System.IO (hClose)
 import           System.Process.Log
-import           Prelude () -- Hide post-AMP warnings
 
 -- | Override the environment received by a child process.
 data EnvOverride = EnvOverride
@@ -148,7 +130,7 @@ envHelper = Just . eoStringList
 -- | Read from the process, ignoring any output.
 --
 -- Throws a 'ReadProcessException' exception if the process fails.
-readProcessNull :: (MonadIO m, MonadLogger m, MonadBaseControl IO m, MonadCatch m)
+readProcessNull :: (MonadUnliftIO m, MonadLogger m)
                 => Maybe (Path Abs Dir) -- ^ Optional working directory
                 -> EnvOverride
                 -> String -- ^ Command
@@ -159,7 +141,7 @@ readProcessNull wd menv name args =
 
 -- | Try to produce a strict 'S.ByteString' from the stdout of a
 -- process.
-tryProcessStdout :: (MonadIO m, MonadLogger m, MonadBaseControl IO m, MonadCatch m)
+tryProcessStdout :: (MonadUnliftIO m, MonadLogger m)
                  => Maybe (Path Abs Dir) -- ^ Optional directory to run in
                  -> EnvOverride
                  -> String -- ^ Command
@@ -170,7 +152,7 @@ tryProcessStdout wd menv name args =
 
 -- | Try to produce strict 'S.ByteString's from the stderr and stdout of a
 -- process.
-tryProcessStderrStdout :: (MonadIO m, MonadLogger m, MonadBaseControl IO m, MonadCatch m)
+tryProcessStderrStdout :: (MonadUnliftIO m, MonadLogger m)
                        => Maybe (Path Abs Dir) -- ^ Optional directory to run in
                        -> EnvOverride
                        -> String -- ^ Command
@@ -182,7 +164,7 @@ tryProcessStderrStdout wd menv name args =
 -- | Produce a strict 'S.ByteString' from the stdout of a process.
 --
 -- Throws a 'ReadProcessException' exception if the process fails.
-readProcessStdout :: (MonadIO m, MonadLogger m, MonadBaseControl IO m, MonadCatch m)
+readProcessStdout :: (MonadUnliftIO m, MonadLogger m)
                   => Maybe (Path Abs Dir) -- ^ Optional directory to run in
                   -> EnvOverride
                   -> String -- ^ Command
@@ -195,7 +177,7 @@ readProcessStdout wd menv name args =
 -- | Produce strict 'S.ByteString's from the stderr and stdout of a process.
 --
 -- Throws a 'ReadProcessException' exception if the process fails.
-readProcessStderrStdout :: (MonadIO m, MonadLogger m, MonadBaseControl IO m)
+readProcessStderrStdout :: (MonadUnliftIO m, MonadLogger m)
                         => Maybe (Path Abs Dir) -- ^ Optional directory to run in
                         -> EnvOverride
                         -> String -- ^ Command
@@ -249,7 +231,7 @@ instance Exception ReadProcessException
 --
 -- Throws a 'ReadProcessException' if unsuccessful.
 sinkProcessStdout
-    :: (MonadIO m, MonadLogger m, MonadBaseControl IO m, MonadCatch m)
+    :: (MonadUnliftIO m, MonadLogger m)
     => Maybe (Path Abs Dir) -- ^ Optional directory to run in
     -> EnvOverride
     -> String -- ^ Command
@@ -272,7 +254,7 @@ sinkProcessStdout wd menv name args sinkStdout = do
           (\(ProcessExitedUnsuccessfully cp ec) ->
                do stderrBuilder <- liftIO (readIORef stderrBuffer)
                   stdoutBuilder <- liftIO (readIORef stdoutBuffer)
-                  throwM $ ProcessFailed
+                  liftIO $ throwM $ ProcessFailed
                     cp
                     ec
                     (toLazyByteString stdoutBuilder)
@@ -280,15 +262,16 @@ sinkProcessStdout wd menv name args sinkStdout = do
   return sinkRet
 
 logProcessStderrStdout
-    :: (MonadIO m, MonadBaseControl IO m, MonadLogger m)
+    :: (HasCallStack, MonadUnliftIO m, MonadLogger m)
     => Maybe (Path Abs Dir)
     -> String
     -> EnvOverride
     -> [String]
     -> m ()
-logProcessStderrStdout mdir name menv args = liftBaseWith $ \restore -> do
-    let logLines = CB.lines =$ CL.mapM_ (void . restore . monadLoggerLog $(TH.location >>= liftLoc) "" LevelInfo . toLogStr)
-    void $ restore $ sinkProcessStderrStdout mdir menv name args logLines logLines
+logProcessStderrStdout mdir name menv args = withUnliftIO $ \u -> do
+    let logLines = CB.lines =$ CL.mapM_ (unliftIO u . logInfo . decodeUtf8With lenientDecode)
+    ((), ()) <- unliftIO u $ sinkProcessStderrStdout mdir menv name args logLines logLines
+    return ()
 
 -- | Consume the stdout and stderr of a process feeding strict 'S.ByteString's to the consumers.
 --
@@ -303,7 +286,7 @@ sinkProcessStderrStdout :: forall m e o. (MonadIO m, MonadLogger m)
                         -> m (e,o)
 sinkProcessStderrStdout wd menv name args sinkStderr sinkStdout = do
   name' <- preProcess wd menv name
-  $withProcessTimeLog name' args $
+  withProcessTimeLog name' args $
       liftIO $ withCheckedProcess
           (proc name' args) { env = envHelper menv, cwd = fmap toFilePath wd }
           (\ClosedStream out err -> f err out)
@@ -337,7 +320,7 @@ sinkProcessStderrStdoutHandle :: (MonadIO m, MonadLogger m)
                               -> m ()
 sinkProcessStderrStdoutHandle wd menv name args err out = do
   name' <- preProcess wd menv name
-  $withProcessTimeLog name' args $
+  withProcessTimeLog name' args $
       liftIO $ withCheckedProcess
           (proc name' args)
               { env = envHelper menv

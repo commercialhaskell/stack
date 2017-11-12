@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE DataKinds #-}
 
 -- | Finding files.
@@ -9,11 +10,7 @@ module Path.Find
   ,findInParents)
   where
 
-import Control.Exception (evaluate)
-import Control.DeepSeq (force)
-import Control.Monad
-import Control.Monad.Catch
-import Control.Monad.IO.Class
+import Stack.Prelude
 import System.IO.Error (isPermissionError)
 import Data.List
 import Path

@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TupleSections #-}
@@ -9,7 +10,6 @@ module Stack.Options.Completion
     , projectExeCompleter
     ) where
 
-import           Control.Monad.Logger (LogLevel (LevelOther))
 import           Data.Char (isSpace)
 import           Data.List (isPrefixOf)
 import           Data.List.Extra (nubOrd)
@@ -18,18 +18,18 @@ import           Data.Maybe
 import qualified Data.Set as Set
 import qualified Data.Text as T
 import qualified Distribution.PackageDescription as C
+import qualified Distribution.Types.UnqualComponentName as C
 import           Options.Applicative
 import           Options.Applicative.Builder.Extra
-import           Stack.Build.Target (LocalPackageView(..))
-import           Stack.Build.Source (getLocalPackageViews)
+import           Stack.Config (getLocalPackages)
 import           Stack.Options.GlobalParser (globalOptsFromMonoid)
 import           Stack.Runners (loadConfigWithOpts)
+import           Stack.Prelude hiding (lift)
 import           Stack.Setup
 import           Stack.Types.Config
 import           Stack.Types.FlagName
 import           Stack.Types.Package
 import           Stack.Types.PackageName
-import           Stack.Types.StackT
 import           System.Process (readProcess)
 import           Language.Haskell.TH.Syntax (runIO, lift)
 
@@ -50,7 +50,7 @@ ghcOptsCompleter = mkCompleter $ \inputRaw -> return $
 -- changes to optparse-applicative.
 
 buildConfigCompleter
-    :: (String -> StackT EnvConfig IO [String])
+    :: (String -> RIO EnvConfig [String])
     -> Completer
 buildConfigCompleter inner = mkCompleter $ \inputRaw -> do
     let input = unescapeBashArg inputRaw
@@ -60,44 +60,42 @@ buildConfigCompleter inner = mkCompleter $ \inputRaw -> do
         _ -> do
             let go = (globalOptsFromMonoid False mempty)
                     { globalLogLevel = LevelOther "silent" }
-            lc <- loadConfigWithOpts go
-            bconfig <- runStackTGlobal () go $
-                lcLoadBuildConfig lc (globalCompiler go)
-            envConfig <-
-                runStackTGlobal bconfig go (setupEnv Nothing)
-            runStackTGlobal envConfig go (inner input)
+            loadConfigWithOpts go $ \lc -> do
+              bconfig <- liftIO $ lcLoadBuildConfig lc (globalCompiler go)
+              envConfig <- runRIO bconfig (setupEnv Nothing)
+              runRIO envConfig (inner input)
 
 targetCompleter :: Completer
 targetCompleter = buildConfigCompleter $ \input -> do
-    lpvs <- getLocalPackageViews
+    lpvs <- fmap lpProject getLocalPackages
     return $
         filter (input `isPrefixOf`) $
         concatMap allComponentNames (Map.toList lpvs)
   where
-    allComponentNames (name, (lpv, _)) =
+    allComponentNames (name, lpv) =
         map (T.unpack . renderPkgComponent . (name,)) (Set.toList (lpvComponents lpv))
 
 flagCompleter :: Completer
 flagCompleter = buildConfigCompleter $ \input -> do
-    lpvs <- getLocalPackageViews
+    lpvs <- fmap lpProject getLocalPackages
     bconfig <- view buildConfigL
     let wildcardFlags
             = nubOrd
-            $ concatMap (\(name, (_, gpd)) ->
-                map (\fl -> "*:" ++ flagString name fl) (C.genPackageFlags gpd))
+            $ concatMap (\(name, lpv) ->
+                map (\fl -> "*:" ++ flagString name fl) (C.genPackageFlags (lpvGPD lpv)))
             $ Map.toList lpvs
         normalFlags
-            = concatMap (\(name, (_, gpd)) ->
+            = concatMap (\(name, lpv) ->
                 map (\fl -> packageNameString name ++ ":" ++ flagString name fl)
-                    (C.genPackageFlags gpd))
+                    (C.genPackageFlags (lpvGPD lpv)))
             $ Map.toList lpvs
         flagString name fl =
-            case C.flagName fl of
-                C.FlagName flname -> (if flagEnabled name fl then "-" else "") ++ flname
+            let flname = C.unFlagName $ C.flagName fl
+             in (if flagEnabled name fl then "-" else "") ++ flname
         flagEnabled name fl =
             fromMaybe (C.flagDefault fl) $
             Map.lookup (fromCabalFlagName (C.flagName fl)) $
-            Map.findWithDefault Map.empty name (unPackageFlags (bcFlags bconfig))
+            Map.findWithDefault Map.empty name (bcFlags bconfig)
     return $ filter (input `isPrefixOf`) $
         case input of
             ('*' : ':' : _) -> wildcardFlags
@@ -106,9 +104,9 @@ flagCompleter = buildConfigCompleter $ \input -> do
 
 projectExeCompleter :: Completer
 projectExeCompleter = buildConfigCompleter $ \input -> do
-    lpvs <- getLocalPackageViews
+    lpvs <- fmap lpProject getLocalPackages
     return $
         filter (input `isPrefixOf`) $
         nubOrd $
-        concatMap (\(_, (_, gpd)) -> map fst (C.condExecutables gpd)) $
+        concatMap (\(_, lpv) -> map (C.unUnqualComponentName . fst) (C.condExecutables (lpvGPD lpv))) $
         Map.toList lpvs

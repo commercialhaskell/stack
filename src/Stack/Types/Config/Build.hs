@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -27,15 +28,10 @@ module Stack.Types.Config.Build
     )
     where
 
-import           Control.Applicative
 import           Data.Aeson.Extended
-import           Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
-import           Data.Monoid
-import           Data.Text (Text)
-import           GHC.Generics (Generic)
 import           Generics.Deriving.Monoid (memptydefault, mappenddefault)
-import           Prelude -- Fix AMP warning
+import           Stack.Prelude
 import           Stack.Types.FlagName
 import           Stack.Types.PackageName
 
@@ -61,6 +57,8 @@ data BuildOpts =
             -- @hscolour@. Disable for no sources.
             ,boptsInstallExes :: !Bool
             -- ^ Install executables to user path after building?
+            ,boptsInstallCompilerTool :: !Bool
+            -- ^ Install executables to compiler tools path after building?
             ,boptsPreFetch :: !Bool
             -- ^ Fetch all packages immediately
             -- ^ Watch files for changes and automatically rebuild
@@ -86,6 +84,8 @@ data BuildOpts =
             -- ^ Ask Cabal to be verbose in its builds
             ,boptsSplitObjs :: !Bool
             -- ^ Whether to enable split-objs.
+            ,boptsSkipComponents :: ![Text]
+            -- ^ Which components to skip when building
             }
   deriving (Show)
 
@@ -102,6 +102,7 @@ defaultBuildOpts = BuildOpts
     , boptsHaddockInternal = False
     , boptsHaddockHyperlinkSource = True
     , boptsInstallExes = False
+    , boptsInstallCompilerTool = False
     , boptsPreFetch = False
     , boptsKeepGoing = Nothing
     , boptsForceDirty = False
@@ -112,6 +113,7 @@ defaultBuildOpts = BuildOpts
     , boptsReconfigure = False
     , boptsCabalVerbose = False
     , boptsSplitObjs = False
+    , boptsSkipComponents = []
     }
 
 defaultBuildOptsCLI ::BuildOptsCLI
@@ -167,6 +169,7 @@ data BuildOptsMonoid = BuildOptsMonoid
     , buildMonoidHaddockInternal :: !(First Bool)
     , buildMonoidHaddockHyperlinkSource :: !(First Bool)
     , buildMonoidInstallExes :: !(First Bool)
+    , buildMonoidInstallCompilerTool :: !(First Bool)
     , buildMonoidPreFetch :: !(First Bool)
     , buildMonoidKeepGoing :: !(First Bool)
     , buildMonoidForceDirty :: !(First Bool)
@@ -177,6 +180,7 @@ data BuildOptsMonoid = BuildOptsMonoid
     , buildMonoidReconfigure :: !(First Bool)
     , buildMonoidCabalVerbose :: !(First Bool)
     , buildMonoidSplitObjs :: !(First Bool)
+    , buildMonoidSkipComponents :: ![Text]
     } deriving (Show, Generic)
 
 instance FromJSON (WithJSONWarnings BuildOptsMonoid) where
@@ -195,6 +199,7 @@ instance FromJSON (WithJSONWarnings BuildOptsMonoid) where
               buildMonoidHaddockInternal <- First <$> o ..:? buildMonoidHaddockInternalArgName
               buildMonoidHaddockHyperlinkSource <- First <$> o ..:? buildMonoidHaddockHyperlinkSourceArgName
               buildMonoidInstallExes <- First <$> o ..:? buildMonoidInstallExesArgName
+              buildMonoidInstallCompilerTool <- First <$> o ..:? buildMonoidInstallCompilerToolArgName
               buildMonoidPreFetch <- First <$> o ..:? buildMonoidPreFetchArgName
               buildMonoidKeepGoing <- First <$> o ..:? buildMonoidKeepGoingArgName
               buildMonoidForceDirty <- First <$> o ..:? buildMonoidForceDirtyArgName
@@ -205,6 +210,7 @@ instance FromJSON (WithJSONWarnings BuildOptsMonoid) where
               buildMonoidReconfigure <- First <$> o ..:? buildMonoidReconfigureArgName
               buildMonoidCabalVerbose <- First <$> o ..:? buildMonoidCabalVerboseArgName
               buildMonoidSplitObjs <- First <$> o ..:? buildMonoidSplitObjsName
+              buildMonoidSkipComponents <- o ..:? buildMonoidSkipComponentsName ..!= mempty
               return BuildOptsMonoid{..})
 
 buildMonoidLibProfileArgName :: Text
@@ -240,6 +246,9 @@ buildMonoidHaddockHyperlinkSourceArgName = "haddock-hyperlink-source"
 buildMonoidInstallExesArgName :: Text
 buildMonoidInstallExesArgName = "copy-bins"
 
+buildMonoidInstallCompilerToolArgName :: Text
+buildMonoidInstallCompilerToolArgName = "copy-compiler-tool"
+
 buildMonoidPreFetchArgName :: Text
 buildMonoidPreFetchArgName = "prefetch"
 
@@ -269,6 +278,9 @@ buildMonoidCabalVerboseArgName = "cabal-verbose"
 
 buildMonoidSplitObjsName :: Text
 buildMonoidSplitObjsName = "split-objs"
+
+buildMonoidSkipComponentsName :: Text
+buildMonoidSkipComponentsName = "skip-components"
 
 instance Monoid BuildOptsMonoid where
     mempty = memptydefault

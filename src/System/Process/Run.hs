@@ -1,8 +1,6 @@
-{-# LANGUAGE BangPatterns #-}
-{-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE RecordWildCards #-}
@@ -21,17 +19,9 @@ module System.Process.Run
     )
     where
 
-import           Control.Exception.Lifted
-import           Control.Monad (liftM)
-import           Control.Monad.IO.Class (MonadIO, liftIO)
-import           Control.Monad.Logger (MonadLogger, logError)
-import           Control.Monad.Trans.Control (MonadBaseControl)
+import           Stack.Prelude
 import           Data.Conduit.Process hiding (callProcess)
-import           Data.Foldable (forM_)
-import           Data.Text (Text)
 import qualified Data.Text as T
-import           Path (Dir, Abs, Path, toFilePath)
-import           Prelude -- Fix AMP warning
 import           System.Exit (exitWith, ExitCode (..))
 import           System.IO
 import qualified System.Process
@@ -51,14 +41,14 @@ data Cmd = Cmd
 -- If it exits with anything but success, prints an error
 -- and then calls 'exitWith' to exit the program.
 runCmd :: forall (m :: * -> *).
-         (MonadLogger m,MonadIO m,MonadBaseControl IO m)
+         (MonadLogger m, MonadUnliftIO m)
       => Cmd
       -> Maybe Text  -- ^ optional additional error message
       -> m ()
 runCmd = runCmd' id
 
 runCmd' :: forall (m :: * -> *).
-         (MonadLogger m,MonadIO m,MonadBaseControl IO m)
+         (MonadLogger m, MonadUnliftIO m)
       => (CreateProcess -> CreateProcess)
       -> Cmd
       -> Maybe Text  -- ^ optional additional error message
@@ -67,7 +57,7 @@ runCmd' modCP cmd@Cmd{..} mbErrMsg = do
     result <- try (callProcess' modCP cmd)
     case result of
         Left (ProcessExitedUnsuccessfully _ ec) -> do
-            $logError $
+            logError $
                 T.pack $
                 concat $
                     [ "Exit code "
@@ -78,7 +68,7 @@ runCmd' modCP cmd@Cmd{..} mbErrMsg = do
                             Nothing -> []
                             Just mbDir -> [" in ", toFilePath mbDir]
                             )
-            forM_ mbErrMsg $logError
+            forM_ mbErrMsg logError
             liftIO (exitWith ec)
         Right () -> return ()
 
@@ -99,13 +89,13 @@ callProcess' :: (MonadIO m, MonadLogger m)
              => (CreateProcess -> CreateProcess) -> Cmd -> m ()
 callProcess' modCP cmd = do
     c <- liftM modCP (cmdToCreateProcess cmd)
-    $logCreateProcess c
+    logCreateProcess c
     liftIO $ do
         (_, _, _, p) <- System.Process.createProcess c
         exit_code <- waitForProcess p
         case exit_code of
             ExitSuccess   -> return ()
-            ExitFailure _ -> throwIO (ProcessExitedUnsuccessfully c exit_code)
+            ExitFailure _ -> throwM (ProcessExitedUnsuccessfully c exit_code)
 
 callProcessInheritStderrStdout :: (MonadIO m, MonadLogger m) => Cmd -> m ()
 callProcessInheritStderrStdout cmd = do
@@ -115,14 +105,14 @@ callProcessInheritStderrStdout cmd = do
 callProcessObserveStdout :: (MonadIO m, MonadLogger m) => Cmd -> m String
 callProcessObserveStdout cmd = do
     c <- liftM modCP (cmdToCreateProcess cmd)
-    $logCreateProcess c
+    logCreateProcess c
     liftIO $ do
         (_, Just hStdout, _, p) <- System.Process.createProcess c
         hSetBuffering hStdout NoBuffering
         exit_code <- waitForProcess p
         case exit_code of
             ExitSuccess   -> hGetLine hStdout
-            ExitFailure _ -> throwIO (ProcessExitedUnsuccessfully c exit_code)
+            ExitFailure _ -> throwM (ProcessExitedUnsuccessfully c exit_code)
   where
     modCP c = c { std_in = CreatePipe, std_out = CreatePipe, std_err = Inherit }
 
@@ -136,7 +126,7 @@ createProcess' :: (MonadIO m, MonadLogger m)
                -> m (Maybe Handle, Maybe Handle, Maybe Handle, ProcessHandle)
 createProcess' tag modCP cmd = do
     c <- liftM modCP (cmdToCreateProcess cmd)
-    $logCreateProcess c
+    logCreateProcess c
     liftIO $ System.Process.createProcess_ tag c
 
 -- Throws a 'ReadProcessException' if process is not found.

@@ -1,484 +1,376 @@
+{-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE DataKinds                  #-}
 {-# LANGUAGE DeriveDataTypeable         #-}
+{-# LANGUAGE DeriveFunctor              #-}
 {-# LANGUAGE DeriveGeneric              #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE OverloadedStrings          #-}
 {-# LANGUAGE RecordWildCards            #-}
 {-# LANGUAGE FlexibleInstances          #-}
-
-{-# LANGUAGE DataKinds                  #-}
+{-# LANGUAGE TupleSections              #-}
+{-# LANGUAGE TypeFamilies               #-}
 -- | Shared types for various stackage packages.
 module Stack.Types.BuildPlan
     ( -- * Types
-      BuildPlan (..)
-    , PackagePlan (..)
-    , PackageConstraints (..)
-    , TestState (..)
-    , SystemInfo (..)
-    , Maintainer (..)
+      SnapshotDef (..)
+    , sdRawPathName
+    , PackageLocation (..)
+    , PackageLocationIndex (..)
+    , RepoType (..)
+    , Subdirs (..)
+    , Repo (..)
+    , Archive (..)
     , ExeName (..)
-    , SimpleDesc (..)
-    , Snapshots (..)
-    , DepInfo (..)
-    , Component (..)
-    , SnapName (..)
-    , MiniBuildPlan (..)
-    , miniBuildPlanVC
-    , MiniPackageInfo (..)
-    , CabalFileInfo (..)
-    , GitSHA1 (..)
-    , renderSnapName
-    , parseSnapName
-    , SnapshotHash (..)
-    , trimmedSnapshotHash
+    , LoadedSnapshot (..)
+    , loadedSnapshotVC
+    , LoadedPackageInfo (..)
     , ModuleName (..)
+    , fromCabalModuleName
     , ModuleInfo (..)
     , moduleInfoVC
+    , setCompilerVersion
+    , sdWantedCompilerVersion
     ) where
 
-import           Control.Applicative
-import           Control.Arrow ((&&&))
-import           Control.DeepSeq (NFData)
-import           Control.Exception (Exception)
-import           Control.Monad.Catch (MonadThrow, throwM)
-import           Data.Aeson (FromJSON (..), FromJSONKey(..), ToJSON (..), ToJSONKey (..), object, withObject, withText, (.!=), (.:), (.:?), (.=))
-import           Data.ByteString (ByteString)
-import qualified Data.ByteString as BS
-import           Data.Data
-import qualified Data.HashMap.Strict as HashMap
-import           Data.Hashable (Hashable)
-import           Data.IntMap (IntMap)
-import qualified Data.IntMap as IntMap
-import           Data.Map (Map)
+import           Data.Aeson (ToJSON (..), FromJSON (..), withText, object, (.=))
+import           Data.Aeson.Extended (WithJSONWarnings (..), (..:), (..:?), withObjectWarnings, noJSONWarnings, (..!=))
 import qualified Data.Map as Map
-import           Data.Maybe (fromMaybe)
-import           Data.Monoid
-import           Data.Set (Set)
-import           Data.Store (Store)
+import qualified Data.Set as Set
 import           Data.Store.Version
 import           Data.Store.VersionTagged
-import           Data.String (IsString, fromString)
-import           Data.Text (Text, pack, unpack)
 import qualified Data.Text as T
-import           Data.Text.Read (decimal)
-import           Data.Time (Day)
-import qualified Data.Traversable as T
-import           Data.Vector (Vector)
-import           Distribution.System (Arch, OS (..))
-import qualified Distribution.Text as DT
+import           Data.Text.Encoding (encodeUtf8)
+import qualified Distribution.ModuleName as C
 import qualified Distribution.Version as C
-import           GHC.Generics (Generic)
-import           Prelude -- Fix AMP warning
-import           Safe (readMay)
+import           Network.HTTP.Client (parseRequest)
+import           Stack.Prelude
 import           Stack.Types.Compiler
 import           Stack.Types.FlagName
+import           Stack.Types.GhcPkgId
+import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageName
+import           Stack.Types.Resolver
 import           Stack.Types.Version
+import           Stack.Types.VersionIntervals
 
--- | The name of an LTS Haskell or Stackage Nightly snapshot.
-data SnapName
-    = LTS !Int !Int
-    | Nightly !Day
-    deriving (Show, Eq, Ord)
-
-data BuildPlan = BuildPlan
-    { bpSystemInfo  :: SystemInfo
-    , bpTools       :: Vector (PackageName, Version)
-    , bpPackages    :: Map PackageName PackagePlan
-    , bpGithubUsers :: Map Text (Set Text)
+-- | A definition of a snapshot. This could be a Stackage snapshot or
+-- something custom. It does not include information on the global
+-- package database, this is added later.
+--
+-- It may seem more logic to attach flags, options, etc, directly with
+-- the desired package. However, this isn't possible yet: our
+-- definition may contain tarballs or Git repos, and we don't actually
+-- know the package names contained there. Therefore, we capture all
+-- of this additional information by package name, and later in the
+-- snapshot load step we will resolve the contents of tarballs and
+-- repos, figure out package names, and assigned values appropriately.
+data SnapshotDef = SnapshotDef
+    { sdParent :: !(Either (CompilerVersion 'CVWanted) SnapshotDef)
+    -- ^ The snapshot to extend from. This is either a specific
+    -- compiler, or a @SnapshotDef@ which gives us more information
+    -- (like packages). Ultimately, we'll end up with a
+    -- @CompilerVersion@.
+    , sdResolver        :: !LoadedResolver
+    -- ^ The resolver that provides this definition.
+    , sdResolverName    :: !Text
+    -- ^ A user-friendly way of referring to this resolver.
+    , sdLocations :: ![PackageLocationIndex Subdirs]
+    -- ^ Where to grab all of the packages from.
+    , sdDropPackages :: !(Set PackageName)
+    -- ^ Packages present in the parent which should not be included
+    -- here.
+    , sdFlags :: !(Map PackageName (Map FlagName Bool))
+    -- ^ Flag values to override from the defaults
+    , sdHidden :: !(Map PackageName Bool)
+    -- ^ Packages which should be hidden when registering. This will
+    -- affect, for example, the import parser in the script
+    -- command. We use a 'Map' instead of just a 'Set' to allow
+    -- overriding the hidden settings in a parent snapshot.
+    , sdGhcOptions :: !(Map PackageName [Text])
+    -- ^ GHC options per package
+    , sdGlobalHints :: !(Map PackageName (Maybe Version))
+    -- ^ Hints about which packages are available globally. When
+    -- actually building code, we trust the package database provided
+    -- by GHC itself, since it may be different based on platform or
+    -- GHC install. However, when we want to check the compatibility
+    -- of a snapshot with some codebase without installing GHC (e.g.,
+    -- during stack init), we would use this field.
     }
     deriving (Show, Eq)
 
-instance ToJSON BuildPlan where
-    toJSON BuildPlan {..} = object
-        [ "system-info" .= bpSystemInfo
-        , "tools" .= fmap goTool bpTools
-        , "packages" .= bpPackages
-        , "github-users" .= bpGithubUsers
-        ]
-      where
-        goTool (k, v) = object
-            [ "name" .= k
-            , "version" .= v
-            ]
-instance FromJSON BuildPlan where
-    parseJSON = withObject "BuildPlan" $ \o -> do
-        bpSystemInfo <- o .: "system-info"
-        bpTools <- o .: "tools" >>= T.mapM goTool
-        bpPackages <- o .: "packages"
-        bpGithubUsers <- o .:? "github-users" .!= mempty
-        return BuildPlan {..}
-      where
-        goTool = withObject "Tool" $ \o -> (,)
-            <$> o .: "name"
-            <*> o .: "version"
-
-data PackagePlan = PackagePlan
-    { ppVersion     :: Version
-    , ppCabalFileInfo :: Maybe CabalFileInfo
-    , ppGithubPings :: Set Text
-    , ppUsers       :: Set PackageName
-    , ppConstraints :: PackageConstraints
-    , ppDesc        :: SimpleDesc
-    }
-    deriving (Show, Eq)
-
-instance ToJSON PackagePlan where
-    toJSON PackagePlan {..} = object
-        $ maybe id (\cfi -> (("cabal-file-info" .= cfi):)) ppCabalFileInfo
-        [ "version"      .= ppVersion
-        , "github-pings" .= ppGithubPings
-        , "users"        .= ppUsers
-        , "constraints"  .= ppConstraints
-        , "description"  .= ppDesc
-        ]
-instance FromJSON PackagePlan where
-    parseJSON = withObject "PackageBuild" $ \o -> do
-        ppVersion <- o .: "version"
-        ppCabalFileInfo <- o .:? "cabal-file-info"
-        ppGithubPings <- o .:? "github-pings" .!= mempty
-        ppUsers <- o .:? "users" .!= mempty
-        ppConstraints <- o .: "constraints"
-        ppDesc <- o .: "description"
-        return PackagePlan {..}
-
--- | Information on the contents of a cabal file
-data CabalFileInfo = CabalFileInfo
-    { cfiSize :: !Int
-    -- ^ File size in bytes
-    , cfiHashes :: !(Map.Map Text Text)
-    -- ^ Various hashes of the file contents
-    }
-    deriving (Show, Eq, Generic)
-instance ToJSON CabalFileInfo where
-    toJSON CabalFileInfo {..} = object
-        [ "size" .= cfiSize
-        , "hashes" .= cfiHashes
-        ]
-instance FromJSON CabalFileInfo where
-    parseJSON = withObject "CabalFileInfo" $ \o -> do
-        cfiSize <- o .: "size"
-        cfiHashes <- o .: "hashes"
-        return CabalFileInfo {..}
-
-display :: DT.Text a => a -> Text
-display = fromString . DT.display
-
-simpleParse :: (MonadThrow m, DT.Text a, Typeable a) => Text -> m a
-simpleParse orig = withTypeRep $ \rep ->
-    case DT.simpleParse str of
-        Nothing -> throwM (ParseFailedException rep (pack str))
-        Just v  -> return v
+-- | A relative file path including a unique string for the given
+-- snapshot.
+sdRawPathName :: SnapshotDef -> String
+sdRawPathName sd =
+    T.unpack $ go $ sdResolver sd
   where
-    str = unpack orig
+    go (ResolverSnapshot name) = renderSnapName name
+    go (ResolverCompiler version) = compilerVersionText version
+    go (ResolverCustom _ hash) = "custom-" <> sdResolverName sd <> "-" <> trimmedSnapshotHash hash
 
-    withTypeRep :: Typeable a => (TypeRep -> m a) -> m a
-    withTypeRep f =
-        res
-      where
-        res = f (typeOf (unwrap res))
+-- | Modify the wanted compiler version in this snapshot. This is used
+-- when overriding via the `compiler` value in a custom snapshot or
+-- stack.yaml file. We do _not_ need to modify the snapshot's hash for
+-- this: all binary caches of a snapshot are stored in a filepath that
+-- encodes the actual compiler version in addition to the
+-- hash. Therefore, modifications here will not lead to any invalid
+-- data.
+setCompilerVersion :: CompilerVersion 'CVWanted -> SnapshotDef -> SnapshotDef
+setCompilerVersion cv =
+    go
+  where
+    go sd =
+      case sdParent sd of
+        Left _ -> sd { sdParent = Left cv }
+        Right sd' -> sd { sdParent = Right $ go sd' }
 
-        unwrap :: m a -> a
-        unwrap _ = error "unwrap"
+-- | Where to get the contents of a package (including cabal file
+-- revisions) from.
+--
+-- A GADT may be more logical than the index parameter, but this plays
+-- more nicely with Generic deriving.
+data PackageLocation subdirs
+  = PLFilePath !FilePath
+    -- ^ Note that we use @FilePath@ and not @Path@s. The goal is: first parse
+    -- the value raw, and then use @canonicalizePath@ and @parseAbsDir@.
+  | PLArchive !(Archive subdirs)
+  | PLRepo !(Repo subdirs)
+  -- ^ Stored in a source control repository
+    deriving (Generic, Show, Eq, Data, Typeable, Functor)
+instance (Store a) => Store (PackageLocation a)
+instance (NFData a) => NFData (PackageLocation a)
 
-data BuildPlanTypesException
-    = ParseSnapNameException Text
-    | ParseFailedException TypeRep Text
-    deriving Typeable
-instance Exception BuildPlanTypesException
-instance Show BuildPlanTypesException where
-    show (ParseSnapNameException t) = "Invalid snapshot name: " ++ T.unpack t
-    show (ParseFailedException rep t) =
-        "Unable to parse " ++ show t ++ " as " ++ show rep
+-- | Add in the possibility of getting packages from the index
+-- (including cabal file revisions). We have special handling of this
+-- case in many places in the codebase, and therefore represent it
+-- with a separate data type from 'PackageLocation'.
+data PackageLocationIndex subdirs
+  = PLIndex !PackageIdentifierRevision
+    -- ^ Grab the package from the package index with the given
+    -- version and (optional) cabal file info to specify the correct
+    -- revision.
+  | PLOther !(PackageLocation subdirs)
+    deriving (Generic, Show, Eq, Data, Typeable, Functor)
+instance (Store a) => Store (PackageLocationIndex a)
+instance (NFData a) => NFData (PackageLocationIndex a)
 
-data PackageConstraints = PackageConstraints
-    { pcVersionRange     :: VersionRange
-    , pcMaintainer       :: Maybe Maintainer
-    , pcTests            :: TestState
-    , pcHaddocks         :: TestState
-    , pcBuildBenchmarks  :: Bool
-    , pcFlagOverrides    :: Map FlagName Bool
-    , pcEnableLibProfile :: Bool
-    , pcHide             :: Bool
+-- | A package archive, could be from a URL or a local file
+-- path. Local file path archives are assumed to be unchanging
+-- over time, and so are allowed in custom snapshots.
+data Archive subdirs = Archive
+  { archiveUrl :: !Text
+  , archiveSubdirs :: !subdirs
+  , archiveHash :: !(Maybe StaticSHA256)
+  }
+    deriving (Generic, Show, Eq, Data, Typeable, Functor)
+instance Store a => Store (Archive a)
+instance NFData a => NFData (Archive a)
+
+-- | The type of a source control repository.
+data RepoType = RepoGit | RepoHg
+    deriving (Generic, Show, Eq, Data, Typeable)
+instance Store RepoType
+instance NFData RepoType
+
+data Subdirs
+  = DefaultSubdirs
+  | ExplicitSubdirs ![FilePath]
+    deriving (Generic, Show, Eq, Data, Typeable)
+instance Store Subdirs
+instance NFData Subdirs
+instance FromJSON Subdirs where
+  parseJSON = fmap ExplicitSubdirs . parseJSON
+
+-- | Information on packages stored in a source control repository.
+data Repo subdirs = Repo
+    { repoUrl :: !Text
+    , repoCommit :: !Text
+    , repoType :: !RepoType
+    , repoSubdirs :: !subdirs
     }
-    deriving (Show, Eq)
-instance ToJSON PackageConstraints where
-    toJSON PackageConstraints {..} = object $ addMaintainer
-        [ "version-range" .= display pcVersionRange
-        , "tests" .= pcTests
-        , "haddocks" .= pcHaddocks
-        , "build-benchmarks" .= pcBuildBenchmarks
-        , "flags" .= pcFlagOverrides
-        , "library-profiling" .= pcEnableLibProfile
-        , "hide" .= pcHide
+    deriving (Generic, Show, Eq, Data, Typeable, Functor)
+instance Store a => Store (Repo a)
+instance NFData a => NFData (Repo a)
+
+instance subdirs ~ Subdirs => ToJSON (PackageLocationIndex subdirs) where
+    toJSON (PLIndex ident) = toJSON ident
+    toJSON (PLOther loc) = toJSON loc
+
+instance subdirs ~ Subdirs => ToJSON (PackageLocation subdirs) where
+    toJSON (PLFilePath fp) = toJSON fp
+    toJSON (PLArchive (Archive t DefaultSubdirs Nothing)) = toJSON t
+    toJSON (PLArchive (Archive t subdirs msha)) = object $ concat
+        [ ["location" .= t]
+        , case subdirs of
+            DefaultSubdirs    -> []
+            ExplicitSubdirs x -> ["subdirs" .= x]
+        , case msha of
+            Nothing -> []
+            Just sha -> ["sha256" .= staticSHA256ToText sha]
+        ]
+    toJSON (PLRepo (Repo url commit typ subdirs)) = object $ concat
+        [ case subdirs of
+            DefaultSubdirs -> []
+            ExplicitSubdirs x -> ["subdirs" .= x]
+        , [urlKey .= url]
+        , ["commit" .= commit]
         ]
       where
-        addMaintainer = maybe id (\m -> (("maintainer" .= m):)) pcMaintainer
-instance FromJSON PackageConstraints where
-    parseJSON = withObject "PackageConstraints" $ \o -> do
-        pcVersionRange <- (o .: "version-range")
-                      >>= either (fail . show) return . simpleParse
-        pcTests <- o .: "tests"
-        pcHaddocks <- o .: "haddocks"
-        pcBuildBenchmarks <- o .: "build-benchmarks"
-        pcFlagOverrides <- o .: "flags"
-        pcMaintainer <- o .:? "maintainer"
-        pcEnableLibProfile <- fmap (fromMaybe True) (o .:? "library-profiling")
-        pcHide <- o .:? "hide" .!= False
-        return PackageConstraints {..}
+        urlKey =
+          case typ of
+            RepoGit -> "git"
+            RepoHg  -> "hg"
 
-data TestState = ExpectSuccess
-               | ExpectFailure
-               | Don'tBuild -- ^ when the test suite will pull in things we don't want
-    deriving (Show, Eq, Ord, Bounded, Enum)
+instance subdirs ~ Subdirs => FromJSON (WithJSONWarnings (PackageLocationIndex subdirs)) where
+    parseJSON v
+        = ((noJSONWarnings . PLIndex) <$> parseJSON v)
+      <|> (fmap PLOther <$> parseJSON v)
 
-testStateToText :: TestState -> Text
-testStateToText ExpectSuccess = "expect-success"
-testStateToText ExpectFailure = "expect-failure"
-testStateToText Don'tBuild    = "do-not-build"
-
-instance ToJSON TestState where
-    toJSON = toJSON . testStateToText
-instance FromJSON TestState where
-    parseJSON = withText "TestState" $ \t ->
-        case HashMap.lookup t states of
-            Nothing -> fail $ "Invalid state: " ++ unpack t
-            Just v -> return v
+instance subdirs ~ Subdirs => FromJSON (WithJSONWarnings (PackageLocation subdirs)) where
+    parseJSON v
+        = (noJSONWarnings <$> withText "PackageLocation" (\t -> http t <|> file t) v)
+        <|> repo v
+        <|> archiveObject v
       where
-        states = HashMap.fromList
-               $ map (\x -> (testStateToText x, x)) [minBound..maxBound]
+        file t = pure $ PLFilePath $ T.unpack t
+        http t =
+            case parseRequest $ T.unpack t of
+                Left  _ -> fail $ "Could not parse URL: " ++ T.unpack t
+                Right _ -> return $ PLArchive $ Archive t DefaultSubdirs Nothing
 
-data SystemInfo = SystemInfo
-    { siCompilerVersion :: CompilerVersion
-    , siOS              :: OS
-    , siArch            :: Arch
-    , siCorePackages    :: Map PackageName Version
-    , siCoreExecutables :: Set ExeName
-    }
-    deriving (Show, Eq, Ord)
-instance ToJSON SystemInfo where
-    toJSON SystemInfo {..} = object $
-        (case siCompilerVersion of
-            GhcVersion version -> "ghc-version" .= version
-            _ -> "compiler-version" .= siCompilerVersion) :
-        [ "os" .= display siOS
-        , "arch" .= display siArch
-        , "core-packages" .= siCorePackages
-        , "core-executables" .= siCoreExecutables
-        ]
-instance FromJSON SystemInfo where
-    parseJSON = withObject "SystemInfo" $ \o -> do
-        let helper name = (o .: name) >>= either (fail . show) return . simpleParse
-        ghcVersion <- o .:? "ghc-version"
-        compilerVersion <- o .:? "compiler-version"
-        siCompilerVersion <-
-            case (ghcVersion, compilerVersion) of
-                (Just _, Just _) -> fail "can't have both compiler-version and ghc-version fields"
-                (Just ghc, _) -> return (GhcVersion ghc)
-                (_, Just compiler) -> return compiler
-                _ -> fail "expected field \"ghc-version\" or \"compiler-version\" not present"
-        siOS <- helper "os"
-        siArch <- helper "arch"
-        siCorePackages <- o .: "core-packages"
-        siCoreExecutables <- o .: "core-executables"
-        return SystemInfo {..}
+        repo = withObjectWarnings "PLRepo" $ \o -> do
+          (repoType, repoUrl) <-
+            ((RepoGit, ) <$> o ..: "git") <|>
+            ((RepoHg, ) <$> o ..: "hg")
+          repoCommit <- o ..: "commit"
+          repoSubdirs <- o ..:? "subdirs" ..!= DefaultSubdirs
+          return $ PLRepo Repo {..}
 
-newtype Maintainer = Maintainer { unMaintainer :: Text }
-    deriving (Show, Eq, Ord, Hashable, ToJSON, FromJSON, IsString)
+        archiveObject = withObjectWarnings "PLArchive" $ \o -> do
+          url <- o ..: "archive"
+          subdirs <- o ..:? "subdirs" ..!= DefaultSubdirs
+          msha <- o ..:? "sha256"
+          msha' <-
+            case msha of
+              Nothing -> return Nothing
+              Just t ->
+                case mkStaticSHA256FromText t of
+                  Left e -> fail $ "Invalid SHA256: " ++ T.unpack t ++ ", " ++ show e
+                  Right x -> return $ Just x
+          return $ PLArchive Archive
+            { archiveUrl = url
+            , archiveSubdirs = subdirs :: Subdirs
+            , archiveHash = msha'
+            }
 
 -- | Name of an executable.
 newtype ExeName = ExeName { unExeName :: Text }
-    deriving (Show, Eq, Ord, Hashable, IsString, Generic, Store, NFData, Data, Typeable, ToJSON, ToJSONKey, FromJSONKey)
-instance FromJSON ExeName where
-    parseJSON = withText "ExeName" $ return . ExeName
+    deriving (Show, Eq, Ord, Hashable, IsString, Generic, Store, NFData, Data, Typeable)
 
--- | A simplified package description that tracks:
+-- | A fully loaded snapshot combined , including information gleaned from the
+-- global database and parsing cabal files.
 --
--- * Package dependencies
+-- Invariant: a global package may not depend upon a snapshot package,
+-- a snapshot may not depend upon a local or project, and all
+-- dependencies must be satisfied.
+data LoadedSnapshot = LoadedSnapshot
+  { lsCompilerVersion :: !(CompilerVersion 'CVActual)
+  , lsGlobals         :: !(Map PackageName (LoadedPackageInfo GhcPkgId))
+  , lsPackages        :: !(Map PackageName (LoadedPackageInfo (PackageLocationIndex FilePath)))
+  }
+    deriving (Generic, Show, Data, Eq, Typeable)
+instance Store LoadedSnapshot
+instance NFData LoadedSnapshot
+
+loadedSnapshotVC :: VersionConfig LoadedSnapshot
+loadedSnapshotVC = storeVersionConfig "ls-v4" "a_ljrJRo8hA_-gcIDP9c6NXJ2pE="
+
+-- | Information on a single package for the 'LoadedSnapshot' which
+-- can be installed.
 --
--- * Build tool dependencies
---
--- * Provided executables
---
--- It has fully resolved all conditionals
-data SimpleDesc = SimpleDesc
-    { sdPackages     :: Map PackageName DepInfo
-    , sdTools        :: Map ExeName DepInfo
-    , sdProvidedExes :: Set ExeName
-    , sdModules      :: Set Text
-    -- ^ modules exported by the library
+-- Note that much of the information below (such as the package
+-- dependencies or exposed modules) can be conditional in the cabal
+-- file, which means it will vary based on flags, arch, and OS.
+data LoadedPackageInfo loc = LoadedPackageInfo
+    { lpiVersion :: !Version
+    -- ^ This /must/ match the version specified within 'rpiDef'.
+    , lpiLocation :: !loc
+    -- ^ Where to get the package from. This could be a few different
+    -- things:
+    --
+    -- * For a global package, it will be the @GhcPkgId@. (If we end
+    -- up needing to rebuild this because we've changed a
+    -- dependency, we will take it from the package index with no
+    -- @CabalFileInfo@.
+    --
+    -- * For a dependency, it will be a @PackageLocation@.
+    --
+    -- * For a project package, it will be a @Path Abs Dir@.
+    , lpiFlags :: !(Map FlagName Bool)
+    -- ^ Flags to build this package with.
+    , lpiGhcOptions :: ![Text]
+    -- ^ GHC options to use when building this package.
+    , lpiPackageDeps :: !(Map PackageName VersionIntervals)
+    -- ^ All packages which must be built/copied/registered before
+    -- this package.
+    , lpiProvidedExes :: !(Set ExeName)
+    -- ^ The names of executables provided by this package, for
+    -- performing build tool lookups.
+    , lpiNeededExes :: !(Map ExeName VersionIntervals)
+    -- ^ Executables needed by this package.
+    , lpiExposedModules :: !(Set ModuleName)
+    -- ^ Modules exposed by this package's library
+    , lpiHide :: !Bool
+    -- ^ Should this package be hidden in the database. Affects the
+    -- script interpreter's module name import parser.
     }
-    deriving (Show, Eq)
-instance Monoid SimpleDesc where
-    mempty = SimpleDesc mempty mempty mempty mempty
-    mappend (SimpleDesc a b c d) (SimpleDesc w x y z) = SimpleDesc
-        (Map.unionWith (<>) a w)
-        (Map.unionWith (<>) b x)
-        (c <> y)
-        (d <> z)
-instance ToJSON SimpleDesc where
-    toJSON SimpleDesc {..} = object
-        [ "packages" .= sdPackages
-        , "tools" .= sdTools
-        , "provided-exes" .= sdProvidedExes
-        , "modules" .= sdModules
-        ]
-instance FromJSON SimpleDesc where
-    parseJSON = withObject "SimpleDesc" $ \o -> do
-        sdPackages <- o .: "packages"
-        sdTools <- o .: "tools"
-        sdProvidedExes <- o .: "provided-exes"
-        sdModules <- o .: "modules"
-        return SimpleDesc {..}
+    deriving (Generic, Show, Eq, Data, Typeable, Functor)
+instance Store a => Store (LoadedPackageInfo a)
+instance NFData a => NFData (LoadedPackageInfo a)
 
 data DepInfo = DepInfo
-    { diComponents :: Set Component
-    , diRange      :: VersionRange
+    { _diComponents :: !(Set Component)
+    , _diRange      :: !VersionIntervals
     }
-    deriving (Show, Eq)
+    deriving (Generic, Show, Eq, Data, Typeable)
+instance Store DepInfo
+instance NFData DepInfo
 
 instance Monoid DepInfo where
-    mempty = DepInfo mempty C.anyVersion
+    mempty = DepInfo mempty (fromVersionRange C.anyVersion)
     DepInfo a x `mappend` DepInfo b y = DepInfo
         (mappend a b)
-        (C.intersectVersionRanges x y)
-instance ToJSON DepInfo where
-    toJSON DepInfo {..} = object
-        [ "components" .= diComponents
-        , "range" .= display diRange
-        ]
-instance FromJSON DepInfo where
-    parseJSON = withObject "DepInfo" $ \o -> do
-        diComponents <- o .: "components"
-        diRange <- o .: "range" >>= either (fail . show) return . simpleParse
-        return DepInfo {..}
+        (intersectVersionIntervals x y)
 
 data Component = CompLibrary
                | CompExecutable
                | CompTestSuite
                | CompBenchmark
-    deriving (Show, Read, Eq, Ord, Enum, Bounded)
-
-compToText :: Component -> Text
-compToText CompLibrary = "library"
-compToText CompExecutable = "executable"
-compToText CompTestSuite = "test-suite"
-compToText CompBenchmark = "benchmark"
-
-instance ToJSON Component where
-    toJSON = toJSON . compToText
-instance FromJSON Component where
-    parseJSON = withText "Component" $ \t -> maybe
-        (fail $ "Invalid component: " ++ unpack t)
-        return
-        (HashMap.lookup t comps)
-      where
-        comps = HashMap.fromList $ map (compToText &&& id) [minBound..maxBound]
-
--- | Convert a 'SnapName' into its short representation, e.g. @lts-2.8@,
--- @nightly-2015-03-05@.
-renderSnapName :: SnapName -> Text
-renderSnapName (LTS x y) = T.pack $ concat ["lts-", show x, ".", show y]
-renderSnapName (Nightly d) = T.pack $ "nightly-" ++ show d
-
--- | Parse the short representation of a 'SnapName'.
-parseSnapName :: MonadThrow m => Text -> m SnapName
-parseSnapName t0 =
-    case lts <|> nightly of
-        Nothing -> throwM $ ParseSnapNameException t0
-        Just sn -> return sn
-  where
-    lts = do
-        t1 <- T.stripPrefix "lts-" t0
-        Right (x, t2) <- Just $ decimal t1
-        t3 <- T.stripPrefix "." t2
-        Right (y, "") <- Just $ decimal t3
-        return $ LTS x y
-    nightly = do
-        t1 <- T.stripPrefix "nightly-" t0
-        Nightly <$> readMay (T.unpack t1)
-
--- | Most recent Nightly and newest LTS version per major release.
-data Snapshots = Snapshots
-    { snapshotsNightly :: !Day
-    , snapshotsLts     :: !(IntMap Int)
-    }
-    deriving Show
-instance FromJSON Snapshots where
-    parseJSON = withObject "Snapshots" $ \o -> Snapshots
-        <$> (o .: "nightly" >>= parseNightly)
-        <*> fmap IntMap.unions (mapM (parseLTS . snd)
-                $ filter (isLTS . fst)
-                $ HashMap.toList o)
-      where
-        parseNightly t =
-            case parseSnapName t of
-                Left e -> fail $ show e
-                Right (LTS _ _) -> fail "Unexpected LTS value"
-                Right (Nightly d) -> return d
-
-        isLTS = ("lts-" `T.isPrefixOf`)
-
-        parseLTS = withText "LTS" $ \t ->
-            case parseSnapName t of
-                Left e -> fail $ show e
-                Right (LTS x y) -> return $ IntMap.singleton x y
-                Right (Nightly _) -> fail "Unexpected nightly value"
-
--- | A simplified version of the 'BuildPlan' + cabal file.
-data MiniBuildPlan = MiniBuildPlan
-    { mbpCompilerVersion :: !CompilerVersion
-    , mbpPackages :: !(Map PackageName MiniPackageInfo)
-    }
-    deriving (Generic, Show, Eq, Data, Typeable)
-instance Store MiniBuildPlan
-instance NFData MiniBuildPlan
-
-miniBuildPlanVC :: VersionConfig MiniBuildPlan
-miniBuildPlanVC = storeVersionConfig "mbp-v2" "C8q73RrYq3plf9hDCapjWpnm_yc="
-
--- | Information on a single package for the 'MiniBuildPlan'.
-data MiniPackageInfo = MiniPackageInfo
-    { mpiVersion :: !Version
-    , mpiFlags :: !(Map FlagName Bool)
-    , mpiGhcOptions :: ![Text]
-    , mpiPackageDeps :: !(Set PackageName)
-    , mpiToolDeps :: !(Set Text)
-    -- ^ Due to ambiguity in Cabal, it is unclear whether this refers to the
-    -- executable name, the package name, or something else. We have to guess
-    -- based on what's available, which is why we store this is an unwrapped
-    -- 'Text'.
-    , mpiExes :: !(Set ExeName)
-    -- ^ Executables provided by this package
-    , mpiHasLibrary :: !Bool
-    -- ^ Is there a library present?
-    , mpiGitSHA1 :: !(Maybe GitSHA1)
-    -- ^ An optional SHA1 representation in hex format of the blob containing
-    -- the cabal file contents. Useful for grabbing the correct cabal file
-    -- revision directly from a Git repo
-    }
-    deriving (Generic, Show, Eq, Data, Typeable)
-instance Store MiniPackageInfo
-instance NFData MiniPackageInfo
-
-newtype GitSHA1 = GitSHA1 ByteString
-    deriving (Generic, Show, Eq, NFData, Store, Data, Typeable, Ord, Hashable)
-
-newtype SnapshotHash = SnapshotHash { unShapshotHash :: ByteString }
-    deriving (Generic, Show, Eq)
-
-trimmedSnapshotHash :: SnapshotHash -> ByteString
-trimmedSnapshotHash = BS.take 12 . unShapshotHash
+    deriving (Generic, Show, Eq, Ord, Data, Typeable, Enum, Bounded)
+instance Store Component
+instance NFData Component
 
 newtype ModuleName = ModuleName { unModuleName :: ByteString }
   deriving (Show, Eq, Ord, Generic, Store, NFData, Typeable, Data)
 
-data ModuleInfo = ModuleInfo
-    { miCorePackages :: !(Set PackageName)
-    , miModules      :: !(Map ModuleName (Set PackageName))
+fromCabalModuleName :: C.ModuleName -> ModuleName
+fromCabalModuleName = ModuleName . encodeUtf8 . T.intercalate "." . map T.pack . C.components
+
+newtype ModuleInfo = ModuleInfo
+    { miModules      :: Map ModuleName (Set PackageName)
     }
   deriving (Show, Eq, Ord, Generic, Typeable, Data)
 instance Store ModuleInfo
 instance NFData ModuleInfo
 
+instance Monoid ModuleInfo where
+  mempty = ModuleInfo mempty
+  mappend (ModuleInfo x) (ModuleInfo y) =
+    ModuleInfo (Map.unionWith Set.union x y)
+
 moduleInfoVC :: VersionConfig ModuleInfo
-moduleInfoVC = storeVersionConfig "mi-v1" "zyCpzzGXA8fTeBmKEWLa_6kF2_s="
+moduleInfoVC = storeVersionConfig "mi-v2" "8ImAfrwMVmqoSoEpt85pLvFeV3s="
+
+-- | Determined the desired compiler version for this 'SnapshotDef'.
+sdWantedCompilerVersion :: SnapshotDef -> CompilerVersion 'CVWanted
+sdWantedCompilerVersion = either id sdWantedCompilerVersion . sdParent

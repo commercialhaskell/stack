@@ -1,8 +1,8 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE ConstraintKinds       #-}
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings     #-}
-{-# LANGUAGE TemplateHaskell       #-}
 -- Determine which packages are already installed
 module Stack.Build.Installed
     ( InstalledMap
@@ -11,29 +11,19 @@ module Stack.Build.Installed
     , getInstalled
     ) where
 
-import           Control.Applicative
-import           Control.Arrow
-import           Control.Monad
-import           Control.Monad.Logger
 import           Data.Conduit
 import qualified Data.Conduit.List as CL
 import qualified Data.Foldable as F
-import           Data.Function
 import qualified Data.HashSet as HashSet
 import           Data.List
-import           Data.Map.Strict (Map)
 import qualified Data.Map.Strict as M
 import qualified Data.Map.Strict as Map
-import           Data.Maybe
-import           Data.Maybe.Extra (mapMaybeM)
-import           Data.Monoid
 import qualified Data.Text as T
 import           Path
-import           Prelude hiding (FilePath, writeFile)
 import           Stack.Build.Cache
 import           Stack.Constants
-import           Stack.GhcPkg
 import           Stack.PackageDump
+import           Stack.Prelude
 import           Stack.Types.Build
 import           Stack.Types.Compiler
 import           Stack.Types.Config
@@ -42,8 +32,8 @@ import           Stack.Types.Package
 import           Stack.Types.PackageDump
 import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageName
-import           Stack.Types.StackT
 import           Stack.Types.Version
+import           System.Process.Read (EnvOverride)
 
 -- | Options for 'getInstalled'.
 data GetInstalledOpts = GetInstalledOpts
@@ -56,17 +46,18 @@ data GetInstalledOpts = GetInstalledOpts
     }
 
 -- | Returns the new InstalledMap and all of the locally registered packages.
-getInstalled :: (StackM env m, HasEnvConfig env, PackageInstallInfo pii)
+getInstalled :: HasEnvConfig env
              => EnvOverride
              -> GetInstalledOpts
-             -> Map PackageName pii -- ^ does not contain any installed information
-             -> m ( InstalledMap
+             -> Map PackageName PackageSource -- ^ does not contain any installed information
+             -> RIO env
+                  ( InstalledMap
                   , [DumpPackage () () ()] -- globally installed
                   , [DumpPackage () () ()] -- snapshot installed
                   , [DumpPackage () () ()] -- locally installed
                   )
 getInstalled menv opts sourceMap = do
-    $logDebug "Finding out which packages are already installed"
+    logDebug "Finding out which packages are already installed"
     snapDBPath <- packageDatabaseDeps
     localDBPath <- packageDatabaseLocal
     extraDBPaths <- packageDatabaseExtra
@@ -126,14 +117,14 @@ getInstalled menv opts sourceMap = do
 -- The goal is to ascertain that the dependencies for a package are present,
 -- that it has profiling if necessary, and that it matches the version and
 -- location needed by the SourceMap
-loadDatabase :: (StackM env m, HasEnvConfig env, PackageInstallInfo pii)
+loadDatabase :: HasEnvConfig env
              => EnvOverride
              -> GetInstalledOpts
              -> Maybe InstalledCache -- ^ if Just, profiling or haddock is required
-             -> Map PackageName pii -- ^ to determine which installed things we should include
+             -> Map PackageName PackageSource -- ^ to determine which installed things we should include
              -> Maybe (InstalledPackageLocation, Path Abs Dir) -- ^ package database, Nothing for global
              -> [LoadHelper] -- ^ from parent databases
-             -> m ([LoadHelper], [DumpPackage () () ()])
+             -> RIO env ([LoadHelper], [DumpPackage () () ()])
 loadDatabase menv opts mcache sourceMap mdb lhs0 = do
     wc <- view $ actualCompilerVersionL.to whichCompiler
     (lhs1', dps) <- ghcPkgDump menv wc (fmap snd (maybeToList mdb))
@@ -186,7 +177,7 @@ processLoadResult _ True (WrongVersion actual wanted, lh)
     -- Allow some packages in the ghcjs global DB to have the wrong
     -- versions.  Treat them as wired-ins by setting deps to [].
     | fst (lhPair lh) `HashSet.member` ghcjsBootPackages = do
-        $logWarn $ T.concat
+        logWarn $ T.concat
             [ "Ignoring that the GHCJS boot package \""
             , packageNameText (fst (lhPair lh))
             , "\" has a different version, "
@@ -196,7 +187,7 @@ processLoadResult _ True (WrongVersion actual wanted, lh)
             ]
         return (Just lh)
 processLoadResult mdb _ (reason, lh) = do
-    $logDebug $ T.concat $
+    logDebug $ T.concat $
         [ "Ignoring package "
         , packageNameText (fst (lhPair lh))
         ] ++
@@ -231,10 +222,9 @@ data Allowed
 -- | Check if a can be included in the set of installed packages or not, based
 -- on the package selections made by the user. This does not perform any
 -- dirtiness or flag change checks.
-isAllowed :: PackageInstallInfo pii
-          => GetInstalledOpts
+isAllowed :: GetInstalledOpts
           -> Maybe InstalledCache
-          -> Map PackageName pii
+          -> Map PackageName PackageSource
           -> Maybe InstalledPackageLocation
           -> DumpPackage Bool Bool Bool
           -> Allowed
@@ -288,7 +278,7 @@ toLoadHelper mloc dp = LoadHelper
         if name `HashSet.member` wiredInPackages
             then []
             else dpDepends dp
-    , lhPair = (name, (toPackageLocation mloc, Library ident gid))
+    , lhPair = (name, (toPackageLocation mloc, Library ident gid (dpLicense dp)))
     }
   where
     gid = dpGhcPkgId dp

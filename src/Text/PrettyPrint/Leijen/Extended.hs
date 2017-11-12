@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -117,18 +118,14 @@ module Text.PrettyPrint.Leijen.Extended
   -- @
   ) where
 
-import Control.Monad.Reader
-import Data.Either (partitionEithers)
+import Control.Monad.Reader (runReader, local)
 import qualified Data.Map.Strict as M
-import Data.Maybe (mapMaybe)
-import Data.Monoid
-import Data.String
 import qualified Data.Text as T
 import qualified Data.Text.IO as T
 import qualified Data.Text.Lazy as LT
 import qualified Data.Text.Lazy.Builder as LTB
+import Stack.Prelude
 import System.Console.ANSI (Color(..), ColorIntensity(..), ConsoleLayer(..), ConsoleIntensity(..), SGR(..), setSGRCode, hSupportsANSI)
-import System.IO (Handle)
 import qualified Text.PrettyPrint.Annotated.Leijen as P
 import Text.PrettyPrint.Annotated.Leijen hiding ((<>), display)
 
@@ -179,24 +176,24 @@ instance HasAnsiAnn AnsiAnn where
 instance HasAnsiAnn () where
     getAnsiAnn _ = mempty
 
-displayPlain :: Display a => a -> T.Text
-displayPlain = LT.toStrict . displayAnsiSimple . renderDefault . fmap (const mempty) . display
+displayPlain :: Display a => Int -> a -> T.Text
+displayPlain w = LT.toStrict . displayAnsiSimple . renderDefault w . fmap (const mempty) . display
 
 -- TODO: tweak these settings more?
 -- TODO: options for settings if this is released as a lib
 
-renderDefault :: Doc a -> SimpleDoc a
-renderDefault = renderPretty 1 120
+renderDefault :: Int -> Doc a -> SimpleDoc a
+renderDefault = renderPretty 1
 
-displayAnsi :: (Display a, HasAnsiAnn (Ann a)) => a -> T.Text
-displayAnsi = LT.toStrict . displayAnsiSimple . renderDefault . toAnsiDoc . display
+displayAnsi :: (Display a, HasAnsiAnn (Ann a)) => Int -> a -> T.Text
+displayAnsi w = LT.toStrict . displayAnsiSimple . renderDefault w . toAnsiDoc . display
 
 hDisplayAnsi
     :: (Display a, HasAnsiAnn (Ann a), MonadIO m)
-    => Handle -> a -> m ()
-hDisplayAnsi h x = liftIO $ do
+    => Handle -> Int -> a -> m ()
+hDisplayAnsi h w x = liftIO $ do
     useAnsi <- hSupportsANSI h
-    T.hPutStr h $ if useAnsi then displayAnsi x else displayPlain x
+    T.hPutStr h $ if useAnsi then displayAnsi w x else displayPlain w x
 
 displayAnsiSimple :: SimpleDoc AnsiAnn -> LT.Text
 displayAnsiSimple doc =
@@ -207,7 +204,7 @@ displayAnsiSimple doc =
         let sgrs' = mapMaybe (\sgr -> if sgr == Reset then Nothing else Just (getSGRTag sgr, sgr)) sgrs
             new = if Reset `elem` sgrs
                       then M.fromList sgrs'
-                      else foldl (\mp (tag, sgr) -> M.insert tag sgr mp) old sgrs'
+                      else foldl' (\mp (tag, sgr) -> M.insert tag sgr mp) old sgrs'
         (extra, contents) <- local (const new) inner
         return (extra, transitionCodes old new <> contents <> transitionCodes new old)
     transitionCodes old new =

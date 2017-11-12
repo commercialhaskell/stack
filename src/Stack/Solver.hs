@@ -1,4 +1,6 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE ConstraintKinds       #-}
+{-# LANGUAGE DataKinds             #-}
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings     #-}
@@ -6,49 +8,32 @@
 {-# LANGUAGE ScopedTypeVariables   #-}
 {-# LANGUAGE TypeFamilies          #-}
 module Stack.Solver
-    ( checkResolverSpec
-    , cabalPackagesCheck
+    ( cabalPackagesCheck
     , findCabalFiles
     , getResolverConstraints
     , mergeConstraints
     , solveExtraDeps
     , solveResolverSpec
+    , checkSnapBuildPlanActual
     -- * Internal - for tests
     , parseCabalOutputLine
     ) where
 
-import           Prelude ()
-import           Prelude.Compat
-
-import           Control.Applicative
-import           Control.Exception (assert)
-import           Control.Exception.Safe (tryIO)
-import           Control.Monad (when,void,join,liftM,unless,mapAndUnzipM, zipWithM_)
-import           Control.Monad.Catch
-import           Control.Monad.IO.Class
-import           Control.Monad.Logger
+import           Control.Monad (mapAndUnzipM)
+import           Stack.Prelude
 import           Data.Aeson.Extended         (object, (.=), toJSON)
 import qualified Data.ByteString as S
 import           Data.Char (isSpace)
-import           Data.Either
-import           Data.Foldable (forM_)
-import           Data.Function (on)
 import qualified Data.HashMap.Strict as HashMap
 import qualified Data.HashSet as HashSet
 import           Data.List                   ( (\\), isSuffixOf, intercalate
                                              , minimumBy, isPrefixOf)
 import           Data.List.Extra (groupSortOn)
-import           Data.Map (Map)
 import qualified Data.Map as Map
-import           Data.Maybe (catMaybes, isNothing, mapMaybe)
-import           Data.Monoid
-import           Data.Set (Set)
 import qualified Data.Set as Set
-import           Data.Text (Text)
 import qualified Data.Text as T
 import           Data.Text.Encoding (decodeUtf8, encodeUtf8)
 import           Data.Text.Encoding.Error (lenientDecode)
-import           Data.Text.Extra (stripCR)
 import qualified Data.Text.Lazy as LT
 import           Data.Text.Lazy.Encoding (decodeUtf8With)
 import           Data.Tuple (swap)
@@ -56,9 +41,11 @@ import qualified Data.Yaml as Yaml
 import qualified Distribution.Package as C
 import qualified Distribution.PackageDescription as C
 import qualified Distribution.Text as C
+import           Lens.Micro (set)
 import           Path
 import           Path.Find (findFiles)
-import           Path.IO hiding (findExecutable, findFiles)
+import           Path.IO hiding (findExecutable, findFiles, withSystemTempDir)
+import           Stack.Build.Target (gpdVersion)
 import           Stack.BuildPlan
 import           Stack.Config (getLocalPackages, loadConfigYaml)
 import           Stack.Constants (stackDotYaml, wiredInPackages)
@@ -68,14 +55,16 @@ import           Stack.Package               (printCabalFileWarning
 import           Stack.PrettyPrint
 import           Stack.Setup
 import           Stack.Setup.Installed
+import           Stack.Snapshot (loadSnapshot)
 import           Stack.Types.Build
+import           Stack.Types.BuildPlan
 import           Stack.Types.Compiler
 import           Stack.Types.Config
 import           Stack.Types.FlagName
 import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageName
 import           Stack.Types.Resolver
-import           Stack.Types.StackT (StackM)
+import           Stack.Types.Runner
 import           Stack.Types.Version
 import qualified System.Directory as D
 import qualified System.FilePath as FP
@@ -87,14 +76,14 @@ import qualified Data.Text.Normalize as T ( normalize , NormalizationMode(NFC) )
 data ConstraintType = Constraint | Preference deriving (Eq)
 type ConstraintSpec = Map PackageName (Version, Map FlagName Bool)
 
-cabalSolver :: (StackM env m, HasConfig env)
+cabalSolver :: HasConfig env
             => EnvOverride
             -> [Path Abs Dir] -- ^ cabal files
             -> ConstraintType
             -> ConstraintSpec -- ^ src constraints
             -> ConstraintSpec -- ^ dep constraints
             -> [String] -- ^ additional arguments
-            -> m (Either [PackageName] ConstraintSpec)
+            -> RIO env (Either [PackageName] ConstraintSpec)
 cabalSolver menv cabalfps constraintType
             srcConstraints depConstraints cabalArgs =
   withSystemTempDir "cabal-solver" $ \dir' -> do
@@ -146,15 +135,15 @@ cabalSolver menv cabalfps constraintType
             msg = LT.toStrict $ decodeUtf8With lenientDecode err
 
         if errCheck msg then do
-            $logInfo "Attempt failed.\n"
-            $logInfo $ cabalBuildErrMsg msg
+            logInfo "Attempt failed.\n"
+            logInfo $ cabalBuildErrMsg msg
             let pkgs = parseConflictingPkgs msg
                 mPkgNames = map (C.simpleParse . T.unpack) pkgs
                 pkgNames  = map (fromCabalPackageName . C.pkgName)
                                 (catMaybes mPkgNames)
 
             when (any isNothing mPkgNames) $ do
-                  $logInfo $ "*** Only some package names could be parsed: " <>
+                  logInfo $ "*** Only some package names could be parsed: " <>
                       T.pack (intercalate ", " (map show pkgNames))
                   error $ T.unpack $
                        "*** User packages involved in cabal failure: "
@@ -234,11 +223,11 @@ parseCabalOutputLine t0 = maybe (Left t0) Right . join .  match re $ t0
 
     lexeme r = some (psym isSpace) *> r
 
-getCabalConfig :: (StackM env m, HasConfig env)
+getCabalConfig :: HasConfig env
                => FilePath -- ^ temp dir
                -> ConstraintType
                -> Map PackageName Version -- ^ constraints
-               -> m [Text]
+               -> RIO env [Text]
 getCabalConfig dir constraintType constraints = do
     indices <- view $ configL.to configPackageIndices
     remotes <- mapM goIndex indices
@@ -276,9 +265,9 @@ getCabalConfig dir constraintType constraints = do
               ]
 
 setupCompiler
-    :: (StackM env m, HasConfig env, HasGHCVariant env)
-    => CompilerVersion
-    -> m (Maybe ExtraDirs)
+    :: (HasConfig env, HasGHCVariant env)
+    => CompilerVersion 'CVWanted
+    -> RIO env (Maybe ExtraDirs)
 setupCompiler compiler = do
     let msg = Just $ T.concat
           [ "Compiler version (" <> compilerVersionText compiler <> ") "
@@ -307,9 +296,9 @@ setupCompiler compiler = do
     return dirs
 
 setupCabalEnv
-    :: (StackM env m, HasConfig env, HasGHCVariant env)
-    => CompilerVersion
-    -> m EnvOverride
+    :: (HasConfig env, HasGHCVariant env)
+    => CompilerVersion 'CVWanted
+    -> RIO env (EnvOverride, CompilerVersion 'CVActual)
 setupCabalEnv compiler = do
     mpaths <- setupCompiler compiler
     menv0 <- getMinimalEnvOverride
@@ -323,24 +312,25 @@ setupCabalEnv compiler = do
     case mcabal of
         Nothing -> throwM SolverMissingCabalInstall
         Just version
-            | version < $(mkVersion "1.24") -> $prettyWarn $
+            | version < $(mkVersion "1.24") -> prettyWarn $
                 "Installed version of cabal-install (" <>
                 display version <>
                 ") doesn't support custom-setup clause, and so may not yield correct results." <> line <>
                 "To resolve this, install a newer version via 'stack install cabal-install'." <> line
-            | version >= $(mkVersion "1.25") -> $prettyWarn $
+            | version >= $(mkVersion "1.25") -> prettyWarn $
                 "Installed version of cabal-install (" <>
                 display version <>
                 ") is newer than stack has been tested with.  If you run into difficulties, consider downgrading." <> line
             | otherwise -> return ()
 
     mver <- getSystemCompiler menv (whichCompiler compiler)
-    case mver of
-        Just (version, _) ->
-            $logInfo $ "Using compiler: " <> compilerVersionText version
+    version <- case mver of
+        Just (version, _) -> do
+            logInfo $ "Using compiler: " <> compilerVersionText version
+            return version
         Nothing -> error "Failed to determine compiler version. \
                          \This is most likely a bug."
-    return menv
+    return (menv, version)
 
 -- | Merge two separate maps, one defining constraints on package versions and
 -- the other defining package flagmap, into a single map of version and flagmap
@@ -371,23 +361,25 @@ mergeConstraints = Map.mergeWithKey
 -- or the solution in terms of src package flag settings and extra
 -- dependencies.
 solveResolverSpec
-    :: (StackM env m, HasConfig env, HasGHCVariant env)
+    :: (HasConfig env, HasGHCVariant env)
     => Path Abs File  -- ^ stack.yaml file location
     -> [Path Abs Dir] -- ^ package dirs containing cabal files
-    -> ( Resolver
+    -> ( SnapshotDef
        , ConstraintSpec
        , ConstraintSpec) -- ^ ( resolver
                          --   , src package constraints
                          --   , extra dependency constraints )
-    -> m (Either [PackageName] (ConstraintSpec , ConstraintSpec))
+    -> RIO env
+         (Either [PackageName] (ConstraintSpec , ConstraintSpec))
        -- ^ (Conflicting packages
        --    (resulting src package specs, external dependency specs))
 
 solveResolverSpec stackYaml cabalDirs
-                  (resolver, srcConstraints, extraConstraints) = do
-    $logInfo $ "Using resolver: " <> resolverName resolver
-    (compilerVer, snapConstraints) <- getResolverConstraints stackYaml resolver
-    menv <- setupCabalEnv compilerVer
+                  (sd, srcConstraints, extraConstraints) = do
+    logInfo $ "Using resolver: " <> sdResolverName sd
+    let wantedCompilerVersion = sdWantedCompilerVersion sd
+    (menv, compilerVersion) <- setupCabalEnv wantedCompilerVersion
+    (compilerVer, snapConstraints) <- getResolverConstraints menv (Just compilerVersion) stackYaml sd
 
     let -- Note - The order in Map.union below is important.
         -- We want to override snapshot with extra deps
@@ -402,19 +394,19 @@ solveResolverSpec stackYaml cabalDirs
                      ["--ghcjs" | whichCompiler compilerVer == Ghcjs]
 
     let srcNames = T.intercalate " and " $
-          ["packages from " <> resolverName resolver
+          ["packages from " <> sdResolverName sd
               | not (Map.null snapConstraints)] ++
           [T.pack (show (Map.size extraConstraints) <> " external packages")
               | not (Map.null extraConstraints)]
 
-    $logInfo "Asking cabal to calculate a build plan..."
+    logInfo "Asking cabal to calculate a build plan..."
     unless (Map.null depOnlyConstraints)
-        ($logInfo $ "Trying with " <> srcNames <> " as hard constraints...")
+        (logInfo $ "Trying with " <> srcNames <> " as hard constraints...")
 
     eresult <- solver Constraint
     eresult' <- case eresult of
         Left _ | not (Map.null depOnlyConstraints) -> do
-            $logInfo $ "Retrying with " <> srcNames <> " as preferences..."
+            logInfo $ "Retrying with " <> srcNames <> " as preferences..."
             solver Preference
         _ -> return eresult
 
@@ -429,6 +421,15 @@ solveResolverSpec stackYaml cabalDirs
                 -- returned versions or flags different from the snapshot.
                 inSnapChanged = Map.differenceWith diffConstraints
                                                    inSnap snapConstraints
+
+                           -- If a package appears in both the
+                           -- snapshot and locally, we don't want to
+                           -- include it in extra-deps. This makes
+                           -- sure we filter out such packages. See:
+                           -- https://github.com/commercialhaskell/stack/issues/3533
+
+                                    `Map.difference` srcConstraints
+
                 -- Packages neither in snapshot, nor srcs
                 extra = Map.difference deps (Map.union srcConstraints
                                                        snapConstraints)
@@ -451,13 +452,13 @@ solveResolverSpec stackYaml cabalDirs
                 error $ T.unpack $ msg
                         <> showItems (map show (Map.toList bothVers))
 
-            $logInfo $ "Successfully determined a build plan with "
+            logInfo $ "Successfully determined a build plan with "
                      <> T.pack (show $ Map.size external)
                      <> " external dependencies."
 
             return $ Right (srcs, external)
         Left x -> do
-            $logInfo $ "*** Failed to arrive at a workable build plan."
+            logInfo "*** Failed to arrive at a workable build plan."
             return $ Left x
     where
         -- Think of the first map as the deps reported in cabal output and
@@ -478,42 +479,30 @@ solveResolverSpec stackYaml cabalDirs
 -- return the compiler version, package versions and packages flags
 -- for that resolver.
 getResolverConstraints
-    :: (StackM env m, HasConfig env, HasGHCVariant env)
-    => Path Abs File
-    -> Resolver
-    -> m (CompilerVersion,
+    :: (HasConfig env, HasGHCVariant env)
+    => EnvOverride -- ^ for running Git/Hg clone commands
+    -> Maybe (CompilerVersion 'CVActual) -- ^ actually installed compiler
+    -> Path Abs File
+    -> SnapshotDef
+    -> RIO env
+         (CompilerVersion 'CVActual,
           Map PackageName (Version, Map FlagName Bool))
-getResolverConstraints stackYaml resolver = do
-    (mbp, _loadedResolver) <- loadResolver (Just stackYaml) resolver
-    return (mbpCompilerVersion mbp, mbpConstraints mbp)
+getResolverConstraints menv mcompilerVersion stackYaml sd = do
+    ls <- loadSnapshot menv mcompilerVersion (parent stackYaml) sd
+    return (lsCompilerVersion ls, lsConstraints ls)
   where
-    mpiConstraints mpi = (mpiVersion mpi, mpiFlags mpi)
-    mbpConstraints mbp = fmap mpiConstraints (mbpPackages mbp)
-
--- | Given a bundle of user packages, flag constraints on those packages and a
--- resolver, determine if the resolver fully, partially or fails to satisfy the
--- dependencies of the user packages.
---
--- If the package flags are passed as 'Nothing' then flags are chosen
--- automatically.
-checkResolverSpec
-    :: (StackM env m, HasConfig env, HasGHCVariant env)
-    => [C.GenericPackageDescription]
-    -> Maybe (Map PackageName (Map FlagName Bool))
-    -> Resolver
-    -> m BuildPlanCheck
-checkResolverSpec gpds flags resolver = do
-    case resolver of
-      ResolverSnapshot name -> checkSnapBuildPlan gpds flags name
-      ResolverCompiler {} -> return $ BuildPlanCheckPartial Map.empty Map.empty
-      -- TODO support custom resolver for stack init
-      ResolverCustom {} -> return $ BuildPlanCheckPartial Map.empty Map.empty
+    lpiConstraints lpi = (lpiVersion lpi, lpiFlags lpi)
+    lsConstraints ls = Map.union
+      (Map.map lpiConstraints (lsPackages ls))
+      (Map.map lpiConstraints (lsGlobals ls))
 
 -- | Finds all files with a .cabal extension under a given directory. If
 -- a `hpack` `package.yaml` file exists, this will be used to generate a cabal
 -- file.
 -- Subdirectories can be included depending on the @recurse@ parameter.
-findCabalFiles :: (MonadIO m, MonadLogger m) => Bool -> Path Abs Dir -> m [Path Abs File]
+findCabalFiles
+  :: (MonadIO m, MonadUnliftIO m, MonadLogger m, HasRunner env, MonadReader env m, HasConfig env)
+  => Bool -> Path Abs Dir -> m [Path Abs File]
 findCabalFiles recurse dir = do
     liftIO (findFiles dir isHpack subdirFilter) >>= mapM_ (hpack . parent)
     liftIO (findFiles dir isCabal subdirFilter)
@@ -540,19 +529,20 @@ ignoredDirs = Set.fromList
 -- pairs as well as any filenames for duplicate packages not included in the
 -- pairs.
 cabalPackagesCheck
-    :: (StackM env m, HasConfig env, HasGHCVariant env)
+    :: (HasConfig env, HasGHCVariant env)
      => [Path Abs File]
      -> String
      -> Maybe String
-     -> m ( Map PackageName (Path Abs File, C.GenericPackageDescription)
+     -> RIO env
+          ( Map PackageName (Path Abs File, C.GenericPackageDescription)
           , [Path Abs File])
 cabalPackagesCheck cabalfps noPkgMsg dupErrMsg = do
     when (null cabalfps) $
         error noPkgMsg
 
     relpaths <- mapM prettyPath cabalfps
-    $logInfo $ "Using cabal packages:"
-    $logInfo $ T.pack (formatGroup relpaths)
+    logInfo "Using cabal packages:"
+    logInfo $ T.pack (formatGroup relpaths)
 
     (warnings, gpds) <- mapAndUnzipM readPackageUnresolved cabalfps
     zipWithM_ (mapM_ . printCabalFileWarning) cabalfps warnings
@@ -590,11 +580,11 @@ cabalPackagesCheck cabalfps noPkgMsg dupErrMsg = do
 
     when (dupIgnored /= []) $ do
         dups <- mapM (mapM (prettyPath. fst)) (dupGroups packages)
-        $logWarn $ T.pack $
+        logWarn $ T.pack $
             "Following packages have duplicate package names:\n"
             <> intercalate "\n" (map formatGroup dups)
         case dupErrMsg of
-          Nothing -> $logWarn $ T.pack $
+          Nothing -> logWarn $ T.pack $
                  "Packages with duplicate names will be ignored.\n"
               <> "Packages in upper level directories will be preferred.\n"
           Just msg -> error msg
@@ -606,7 +596,9 @@ cabalPackagesCheck cabalfps noPkgMsg dupErrMsg = do
 formatGroup :: [String] -> String
 formatGroup = concatMap (\path -> "- " <> path <> "\n")
 
-reportMissingCabalFiles :: (MonadIO m, MonadThrow m, MonadLogger m)
+reportMissingCabalFiles
+  :: (MonadIO m, MonadUnliftIO m, MonadThrow m, MonadLogger m,
+      HasRunner env, MonadReader env m, HasConfig env)
   => [Path Abs File]   -- ^ Directories to scan
   -> Bool              -- ^ Whether to scan sub-directories
   -> m ()
@@ -615,8 +607,8 @@ reportMissingCabalFiles cabalfps includeSubdirs = do
 
     relpaths <- mapM prettyPath (allCabalfps \\ cabalfps)
     unless (null relpaths) $ do
-        $logWarn $ "The following packages are missing from the config:"
-        $logWarn $ T.pack (formatGroup relpaths)
+        logWarn "The following packages are missing from the config:"
+        logWarn $ T.pack (formatGroup relpaths)
 
 -- TODO Currently solver uses a stack.yaml in the parent chain when there is
 -- no stack.yaml in the current directory. It should instead look for a
@@ -628,35 +620,37 @@ reportMissingCabalFiles cabalfps includeSubdirs = do
 -- dependencies in an existing stack.yaml and suggest changes in flags or
 -- extra dependencies so that the specified packages can be compiled.
 solveExtraDeps
-    :: (StackM env m, HasEnvConfig env)
+    :: HasEnvConfig env
     => Bool -- ^ modify stack.yaml?
-    -> m ()
+    -> RIO env ()
 solveExtraDeps modStackYaml = do
     bconfig <- view buildConfigL
 
     let stackYaml = bcStackYaml bconfig
     relStackYaml <- prettyPath stackYaml
 
-    $logInfo $ "Using configuration file: " <> T.pack relStackYaml
-    packages <- getLocalPackages
-    let cabalDirs = Map.keys packages
-        noPkgMsg = "No cabal packages found in " <> relStackYaml <>
+    logInfo $ "Using configuration file: " <> T.pack relStackYaml
+    lp <- getLocalPackages
+    let packages = lpProject lp
+    let noPkgMsg = "No cabal packages found in " <> relStackYaml <>
                    ". Please add at least one directory containing a .cabal \
                    \file. You can also use 'stack init' to automatically \
                    \generate the config file."
         dupPkgFooter = "Please remove the directories containing duplicate \
                        \entries from '" <> relStackYaml <> "'."
 
-    cabalfps  <- liftM concat (mapM (findCabalFiles False) cabalDirs)
+        cabalDirs = map lpvRoot    $ Map.elems packages
+        cabalfps  = map lpvCabalFP $ Map.elems packages
     -- TODO when solver supports --ignore-subdirs option pass that as the
     -- second argument here.
     reportMissingCabalFiles cabalfps True
     (bundle, _) <- cabalPackagesCheck cabalfps noPkgMsg (Just dupPkgFooter)
 
     let gpds              = Map.elems $ fmap snd bundle
-        oldFlags          = unPackageFlags (bcFlags bconfig)
-        oldExtraVersions  = bcExtraDeps bconfig
-        resolver          = bcResolver bconfig
+        oldFlags          = bcFlags bconfig
+        oldExtraVersions  = Map.map (gpdVersion . fst) (lpDependencies lp)
+        sd                = bcSnapshotDef bconfig
+        resolver          = sdResolver sd
         oldSrcs           = gpdPackages gpds
         oldSrcFlags       = Map.intersection oldFlags oldSrcs
         oldExtraFlags     = Map.intersection oldFlags oldExtraVersions
@@ -664,19 +658,18 @@ solveExtraDeps modStackYaml = do
         srcConstraints    = mergeConstraints oldSrcs oldSrcFlags
         extraConstraints  = mergeConstraints oldExtraVersions oldExtraFlags
 
-    let resolver' = toResolverNotLoaded resolver
-    resolverResult <- checkResolverSpec gpds (Just oldSrcFlags) resolver'
+    resolverResult <- checkSnapBuildPlanActual (parent stackYaml) gpds (Just oldSrcFlags) sd
     resultSpecs <- case resolverResult of
         BuildPlanCheckOk flags ->
             return $ Just (mergeConstraints oldSrcs flags, Map.empty)
         BuildPlanCheckPartial {} -> do
             eres <- solveResolverSpec stackYaml cabalDirs
-                              (resolver', srcConstraints, extraConstraints)
+                              (sd, srcConstraints, extraConstraints)
             -- TODO Solver should also use the init code to ignore incompatible
             -- packages
             return $ either (const Nothing) Just eres
         BuildPlanCheckFail {} ->
-            throwM $ ResolverMismatch IsSolverCmd resolver (show resolverResult)
+            throwM $ ResolverMismatch IsSolverCmd (sdResolverName sd) (show resolverResult)
 
     (srcs, edeps) <- case resultSpecs of
         Nothing -> throwM (SolverGiveUp giveUpMsg)
@@ -700,14 +693,14 @@ solveExtraDeps modStackYaml = do
 
         changed =    any (not . Map.null) [newVersions, goneVersions]
                   || any (not . Map.null) [newFlags, goneFlags]
-                  || any (/= resolver') mOldResolver
+                  || any (/= void resolver) (fmap void mOldResolver)
 
     if changed then do
-        $logInfo ""
-        $logInfo $ "The following changes will be made to "
+        logInfo ""
+        logInfo $ "The following changes will be made to "
                    <> T.pack relStackYaml <> ":"
 
-        printResolver mOldResolver resolver'
+        printResolver (fmap void mOldResolver) (void resolver)
 
         printFlags newFlags  "* Flags to be added"
         printDeps  newVersions   "* Dependencies to be added"
@@ -718,12 +711,12 @@ solveExtraDeps modStackYaml = do
         -- TODO backup the old config file
         if modStackYaml then do
             writeStackYaml stackYaml resolver versions flags
-            $logInfo $ "Updated " <> T.pack relStackYaml
+            logInfo $ "Updated " <> T.pack relStackYaml
         else do
-            $logInfo $ "To automatically update " <> T.pack relStackYaml
+            logInfo $ "To automatically update " <> T.pack relStackYaml
                        <> ", rerun with '--update-config'"
      else
-        $logInfo $ "No changes needed to " <> T.pack relStackYaml
+        logInfo $ "No changes needed to " <> T.pack relStackYaml
 
     where
         indentLines t = T.unlines $ fmap ("    " <>) (T.lines t)
@@ -731,23 +724,23 @@ solveExtraDeps modStackYaml = do
         printResolver mOldRes res = do
             forM_ mOldRes $ \oldRes ->
                 when (res /= oldRes) $ do
-                    $logInfo $ T.concat
+                    logInfo $ T.concat
                         [ "* Resolver changes from "
-                        , resolverName oldRes
+                        , resolverRawName oldRes
                         , " to "
-                        , resolverName res
+                        , resolverRawName res
                         ]
 
         printFlags fl msg = do
             unless (Map.null fl) $ do
-                $logInfo $ T.pack msg
-                $logInfo $ indentLines $ decodeUtf8 $ Yaml.encode
+                logInfo $ T.pack msg
+                logInfo $ indentLines $ decodeUtf8 $ Yaml.encode
                                        $ object ["flags" .= fl]
 
         printDeps deps msg = do
             unless (Map.null deps) $ do
-                $logInfo $ T.pack msg
-                $logInfo $ indentLines $ decodeUtf8 $ Yaml.encode $ object
+                logInfo $ T.pack msg
+                logInfo $ indentLines $ decodeUtf8 $ Yaml.encode $ object
                         ["extra-deps" .= map fromTuple (Map.toList deps)]
 
         writeStackYaml path res deps fl = do
@@ -759,7 +752,7 @@ solveExtraDeps modStackYaml = do
                     HashMap.insert "extra-deps"
                         (toJSON $ map fromTuple $ Map.toList deps)
                   $ HashMap.insert ("flags" :: Text) (toJSON fl)
-                  $ HashMap.insert ("resolver" :: Text) (toJSON (resolverName res)) obj
+                  $ HashMap.insert ("resolver" :: Text) (toJSON res) obj
             liftIO $ Yaml.encodeFile fp obj'
 
         giveUpMsg = concat
@@ -771,11 +764,42 @@ solveExtraDeps modStackYaml = do
             , "        - Adjust resolver.\n"
             ]
 
+-- | Same as 'checkSnapBuildPLan', but set up a real GHC if needed.
+--
+-- If we're using a Stackage snapshot, we can use the snapshot hints
+-- to determine global library information. This will not be available
+-- for custom and GHC resolvers, however. Therefore, we insist that it
+-- be installed first. Fortunately, the standard `stack solver`
+-- behavior only chooses Stackage snapshots, so the common case will
+-- not force the installation of a bunch of GHC versions.
+checkSnapBuildPlanActual
+    :: (HasConfig env, HasGHCVariant env)
+    => Path Abs Dir -- ^ project root, used for checking out necessary files
+    -> [C.GenericPackageDescription]
+    -> Maybe (Map PackageName (Map FlagName Bool))
+    -> SnapshotDef
+    -> RIO env BuildPlanCheck
+checkSnapBuildPlanActual root gpds flags sd = do
+    let forNonSnapshot = Just <$> setupCabalEnv (sdWantedCompilerVersion sd)
+    mactualCompiler <-
+      case sdResolver sd of
+        ResolverSnapshot _ -> return Nothing
+        ResolverCompiler _ -> forNonSnapshot
+        ResolverCustom _ _ -> forNonSnapshot
+
+    let inner = checkSnapBuildPlan root gpds flags sd
+    case mactualCompiler of
+      Nothing -> inner Nothing
+      Just (modifiedPath, actualCompiler) -> do
+        env0 <- ask
+        let env = set envOverrideL (const $ return modifiedPath) env0
+        runRIO env $ inner (Just actualCompiler)
+
 prettyPath
     :: forall r t m. (MonadIO m, RelPath (Path r t) ~ Path Rel t, AnyPath (Path r t))
     => Path r t -> m String
 prettyPath path = do
     eres <- liftIO $ try $ makeRelativeToCurrentDir path
     return $ case eres of
-        Left (_ :: PathParseException) -> toFilePath path
+        Left (_ :: PathException) -> toFilePath path
         Right res -> toFilePath (res :: Path Rel t)

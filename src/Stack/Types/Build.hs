@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE DataKinds                  #-}
 {-# LANGUAGE DeriveDataTypeable         #-}
 {-# LANGUAGE DeriveGeneric              #-}
@@ -16,7 +17,8 @@ module Stack.Types.Build
     ,ModTime
     ,modTime
     ,Installed(..)
-    ,PackageInstallInfo(..)
+    ,piiVersion
+    ,piiLocation
     ,Task(..)
     ,taskIsTarget
     ,taskLocation
@@ -30,6 +32,7 @@ module Stack.Types.Build
     ,BuildSubset(..)
     ,defaultBuildOpts
     ,TaskType(..)
+    ,ttPackageLocation
     ,TaskConfigOpts(..)
     ,BuildCache(..)
     ,buildCacheVC
@@ -46,26 +49,14 @@ module Stack.Types.Build
     ,precompiledCacheVC)
     where
 
-import           Control.DeepSeq
-import           Control.Exception
-import           Data.Binary                     (Binary)
-import           Data.Binary.Tagged              (HasSemanticVersion,
-                                                  HasStructuralInfo)
+import           Stack.Prelude
 import qualified Data.ByteString                 as S
 import           Data.Char                       (isSpace)
-import           Data.Data
-import           Data.Hashable
 import           Data.List.Extra
 import qualified Data.Map                        as Map
-import           Data.Map.Strict                 (Map)
-import           Data.Maybe
-import           Data.Monoid
-import           Data.Set                        (Set)
 import qualified Data.Set                        as Set
-import           Data.Store.Internal             (Store)
 import           Data.Store.Version
 import           Data.Store.VersionTagged
-import           Data.Text                       (Text)
 import qualified Data.Text                       as T
 import           Data.Text.Encoding              (decodeUtf8With)
 import           Data.Text.Encoding.Error        (lenientDecode)
@@ -75,15 +66,11 @@ import           Data.Version                    (showVersion)
 import           Distribution.PackageDescription (TestSuiteInterface)
 import           Distribution.System             (Arch)
 import qualified Distribution.Text               as C
-import           GHC.Generics                    (Generic)
-import           Path                            (Abs, Dir, File, Path,
-                                                  mkRelDir, parseRelDir,
-                                                  toFilePath, (</>))
+import           Path                            (mkRelDir, parseRelDir, (</>))
 import           Path.Extra                      (toFilePathNoTrailingSep)
 import           Paths_stack                     as Meta
-import           Prelude
 import           Stack.Constants
-import           Stack.Types.BuildPlan           (GitSHA1)
+import           Stack.Types.BuildPlan
 import           Stack.Types.Compiler
 import           Stack.Types.CompilerBuild
 import           Stack.Types.Config
@@ -102,8 +89,8 @@ import           System.Process.Log              (showProcessArgDebug)
 data StackBuildException
   = Couldn'tFindPkgId PackageName
   | CompilerVersionMismatch
-        (Maybe (CompilerVersion, Arch)) -- found
-        (CompilerVersion, Arch) -- expected
+        (Maybe (CompilerVersion 'CVActual, Arch)) -- found
+        (CompilerVersion 'CVWanted, Arch) -- expected
         GHCVariant -- expected
         CompilerBuild -- expected
         VersionCheck
@@ -132,7 +119,6 @@ data StackBuildException
   | NoSetupHsFound (Path Abs Dir)
   | InvalidFlagSpecification (Set UnusedFlags)
   | TargetParseException [Text]
-  | DuplicateLocalPackageNames [(PackageName, [Path Abs Dir])]
   | SolverGiveUp String
   | SolverMissingCabalInstall
   | SomeTargetsNotBuildable [(PackageName, NamedComponent)]
@@ -304,15 +290,6 @@ instance Show StackBuildException where
         $ "The following errors occurred while parsing the build targets:"
         : map (("- " ++) . T.unpack) errs
 
-    show (DuplicateLocalPackageNames pairs) = concat
-        $ "The same package name is used in multiple local packages\n"
-        : map go pairs
-      where
-        go (name, dirs) = unlines
-            $ ""
-            : (packageNameString name ++ " used in:")
-            : map goDir dirs
-        goDir dir = "- " ++ toFilePath dir
     show (SolverGiveUp msg) = concat
         [ "\nSolver could not resolve package dependencies.\n"
         , "You can try the following:\n"
@@ -356,6 +333,7 @@ missingExeError isSimpleBuildType msg =
   where
     possibleCauses =
         "No module named \"Main\". The 'main-is' source file should usually have a header indicating that it's a 'Main' module." :
+        "A cabal file that refers to nonexistent other files (e.g. a license-file that doesn't exist). Running 'cabal check' may point out these issues." :
         if isSimpleBuildType
             then []
             else ["The Setup.hs file is changing the installation target dir."]
@@ -408,15 +386,15 @@ instance Store CachePkgSrc
 instance NFData CachePkgSrc
 
 toCachePkgSrc :: PackageSource -> CachePkgSrc
-toCachePkgSrc (PSLocal lp) = CacheSrcLocal (toFilePath (lpDir lp))
-toCachePkgSrc PSUpstream{} = CacheSrcUpstream
+toCachePkgSrc (PSFiles lp _) = CacheSrcLocal (toFilePath (lpDir lp))
+toCachePkgSrc PSIndex{} = CacheSrcUpstream
 
 configCacheVC :: VersionConfig ConfigCache
 configCacheVC = storeVersionConfig "config-v3" "z7N_NxX7Gbz41Gi9AGEa1zoLE-4="
 
 -- | A task to perform when building
 data Task = Task
-    { taskProvides        :: !PackageIdentifier
+    { taskProvides        :: !PackageIdentifier -- FIXME turn this into a function on taskType?
     -- ^ the package/version to be built
     , taskType            :: !TaskType
     -- ^ the task type, telling us how to build this
@@ -426,6 +404,17 @@ data Task = Task
     , taskAllInOne        :: !Bool
     -- ^ indicates that the package can be built in one step
     , taskCachePkgSrc     :: !CachePkgSrc
+    , taskAnyMissing      :: !Bool
+    -- ^ Were any of the dependencies missing? The reason this is
+    -- necessary is... hairy. And as you may expect, a bug in
+    -- Cabal. See:
+    -- <https://github.com/haskell/cabal/issues/4728#issuecomment-337937673>. The
+    -- problem is that Cabal may end up generating the same package ID
+    -- for a dependency, even if the ABI has changed. As a result,
+    -- without this field, Stack would think that a reconfigure is
+    -- unnecessary, when in fact we _do_ need to reconfigure. The
+    -- details here suck. We really need proper hashes for package
+    -- identifiers.
     }
     deriving Show
 
@@ -446,21 +435,25 @@ instance Show TaskConfigOpts where
 
 -- | The type of a task, either building local code or something from the
 -- package index (upstream)
-data TaskType = TTLocal LocalPackage
-              | TTUpstream Package InstallLocation (Maybe GitSHA1)
+data TaskType = TTFiles LocalPackage InstallLocation
+              | TTIndex Package InstallLocation PackageIdentifierRevision -- FIXME major overhaul for PackageLocation?
     deriving Show
+
+ttPackageLocation :: TaskType -> PackageLocationIndex FilePath
+ttPackageLocation (TTFiles lp _) = PLOther (lpLocation lp)
+ttPackageLocation (TTIndex _ _ pir) = PLIndex pir
 
 taskIsTarget :: Task -> Bool
 taskIsTarget t =
     case taskType t of
-        TTLocal lp -> lpWanted lp
+        TTFiles lp _ -> lpWanted lp
         _ -> False
 
 taskLocation :: Task -> InstallLocation
 taskLocation task =
     case taskType task of
-        TTLocal _ -> Local
-        TTUpstream _ loc _ -> loc
+        TTFiles _ loc -> loc
+        TTIndex _ loc _ -> loc
 
 -- | A complete plan of what needs to be built and how to do it
 data Plan = Plan
@@ -583,6 +576,7 @@ configureOptsNoDir econfig bco deps isLocal package = concat
     , map ("--extra-include-dirs=" ++) (Set.toList (configExtraIncludeDirs config))
     , map ("--extra-lib-dirs=" ++) (Set.toList (configExtraLibDirs config))
     , maybe [] (\customGcc -> ["--with-gcc=" ++ toFilePath customGcc]) (configOverrideGccPath config)
+    , hpackOptions (configOverrideHpack config)
     , ["--ghcjs" | wc == Ghcjs]
     , ["--exact-configuration" | useExactConf]
     ]
@@ -606,6 +600,9 @@ configureOptsNoDir econfig bco deps isLocal package = concat
     depOptions = map (uncurry toDepOption) $ Map.toList deps
       where
         toDepOption = if newerCabal then toDepOption1_22 else toDepOption1_18
+
+    hpackOptions HpackBundled = []
+    hpackOptions (HpackCommand cmd) = ["--with-hpack=" ++ cmd]
 
     toDepOption1_22 ident gid = concat
         [ "--dependency="
@@ -658,9 +655,6 @@ data PrecompiledCache = PrecompiledCache
     -- ^ Full paths to executables
     }
     deriving (Show, Eq, Generic, Data, Typeable)
-instance Binary PrecompiledCache
-instance HasSemanticVersion PrecompiledCache
-instance HasStructuralInfo PrecompiledCache
 instance Store PrecompiledCache
 instance NFData PrecompiledCache
 

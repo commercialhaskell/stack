@@ -1,7 +1,8 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 module Stack.Options.Utils where
 
-import           Data.Monoid.Extra
 import           Options.Applicative
+import           Stack.Prelude
 
 -- | If argument is True, hides the option from usage and help
 hideMods :: Bool -> Mod f a
