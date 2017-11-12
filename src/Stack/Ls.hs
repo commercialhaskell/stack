@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
 module Stack.Ls
@@ -6,8 +7,7 @@ module Stack.Ls
   , lsParser
   ) where
 
-import Control.Exception (Exception)
-import Control.Exception.Safe (impureThrow)
+import Control.Exception (Exception, throw)
 import Control.Monad.Catch (MonadThrow)
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import Control.Monad.Reader (MonadReader)
@@ -41,11 +41,45 @@ data SnapshotType
     | Nightly
     deriving (Show, Eq, Ord)
 
+data LsCmds = LsSnapshot SnapshotOpts deriving (Eq, Show, Ord)
+
+data SnapshotOpts = SnapshotOpts {
+      soptViewType :: LsView
+    , soptLtsSnapView :: Bool      
+    , soptNightlySnapView :: Bool
+} deriving (Eq, Show, Ord)
+
 data LsCmdOpts = LsCmdOpts
-    { lsView :: LsView
-    , lsLtsSnapView :: Bool
-    , lsNightlySnapView :: Bool
+    { lsView :: LsCmds
     } deriving (Eq, Show, Ord)
+
+lsParser :: OA.Parser LsCmdOpts
+lsParser = LsCmdOpts <$> OA.hsubparser lsSnapCmd
+
+lsCmdOptsParser :: OA.Parser LsCmds
+lsCmdOptsParser = fmap LsSnapshot lsViewSnapCmd
+
+lsViewSnapCmd :: OA.Parser SnapshotOpts
+lsViewSnapCmd = SnapshotOpts <$> OA.hsubparser (lsViewRemoteCmd <> lsViewLocalCmd) <*> OA.switch (OA.long "some-flag" <> OA.help "Set the flag") <*> OA.switch (OA.long "ome-flag" <> OA.help "Set the flag")
+
+lsSnapCmd :: OA.Mod OA.CommandFields LsCmds
+lsSnapCmd = OA.command "snapshots" (OA.info lsCmdOptsParser (OA.progDesc "View local snapshot"))
+
+
+
+-- <*>
+--     OA.switch
+--         (OA.long "lts" <> OA.short 'l' <> OA.help "Only show lts snapshots") <*>
+--     OA.switch
+--         (OA.long "nightly" <> OA.short 'n' <>
+--          OA.help "Only show nightly snapshots") <*>
+--     OA.option
+--         OA.auto
+--         (OA.long "package" <> OA.help "Show packages list" <> OA.short 'p' <>
+--          OA.value Nothing <>
+--          OA.metavar "RESOLVER")
+
+
 
 data Snapshot = Snapshot
     { snapId :: Text
@@ -58,6 +92,48 @@ data SnapshotData = SnapshotData
     , snaps :: [[Snapshot]]
     } deriving (Show, Eq, Ord)
 
+instance FromJSON Snapshot where
+    parseJSON o@(Array _) = parseSnapshot o
+    parseJSON _ = mempty
+
+instance FromJSON SnapshotData where
+    parseJSON (Object s) =
+        SnapshotData <$> s .: "totalCount" <*> s .: "snapshots"
+    parseJSON _ = mempty
+
+data Package = Package
+    { pkgSynopsis :: Text
+    , pkgVersion :: Text
+    , pkgName :: Text
+    , _pkgCore :: Bool
+    } deriving (Show, Eq, Ord)
+
+data PackageSnapshot = PackageSnapshot
+    { pkgSnapName :: Text
+    , pkgSnapCreated :: Text
+    , pkgSnapGhc :: Text
+    } deriving (Show, Eq, Ord)
+
+instance FromJSON PackageSnapshot where
+    parseJSON (Object s) =
+        PackageSnapshot <$> s .: "name" <*> s .: "created" <*> s .: "ghc"
+    parseJSON _ = mempty
+
+instance FromJSON Package where
+    parseJSON (Object s) =
+        Package <$> s .: "synopsis" <*> s .: "version" <*> s .: "name" <*>
+        s .: "isCore"
+    parseJSON _ = mempty
+
+data Packages = Packages
+    { pkgPackages :: [Package]
+    , pkgSnapshot :: PackageSnapshot
+    } deriving (Show, Eq, Ord)
+
+instance FromJSON Packages where
+    parseJSON (Object s) = Packages <$> s .: "packages" <*> s .: "snapshot"
+    parseJSON _ = mempty
+
 toSnapshot :: [Value] -> Snapshot
 toSnapshot [String sid, String stitle, String stime] =
     Snapshot
@@ -65,7 +141,7 @@ toSnapshot [String sid, String stitle, String stime] =
     , snapTitle = stitle
     , snapTime = stime
     }
-toSnapshot val = impureThrow $ ParseFailure val
+toSnapshot val = throw $ ParseFailure val
 
 newtype LsException =
     ParseFailure [Value]
@@ -76,15 +152,6 @@ instance Exception LsException
 parseSnapshot :: Value -> A.Parser Snapshot
 parseSnapshot =
     A.withArray "array of snapshot" (\val -> return $ toSnapshot (V.toList val))
-
-instance FromJSON Snapshot where
-    parseJSON o@(Array _) = parseSnapshot o
-    parseJSON _ = mempty
-
-instance FromJSON SnapshotData where
-    parseJSON (Object s) =
-        SnapshotData <$> s .: "totalCount" <*> s .: "snapshots"
-    parseJSON _ = mempty
 
 displaySnap :: Snapshot -> IO ()
 displaySnap snapshot = do
@@ -141,46 +208,42 @@ handleLocal lsOpts = do
     let snapRootDir = parent $ parent instRoot
     snapData' <- liftIO $ listDirectory $ toFilePath snapRootDir
     let snapData = L.sort snapData'
-    case (lsLtsSnapView lsOpts, lsNightlySnapView lsOpts) of
-        (True, False) ->
-            liftIO $ displayLocalSnapshot $ L.filter (L.isPrefixOf "lts") snapData
-        (False, True) ->
-            liftIO $ displayLocalSnapshot $ L.filter (L.isPrefixOf "night") snapData
-        _ -> liftIO $ displayLocalSnapshot snapData
+    case (lsView lsOpts) of
+      LsSnapshot SnapshotOpts{..} -> 
+          case (soptLtsSnapView, soptNightlySnapView) of
+            (True, False) ->
+                liftIO $ displayLocalSnapshot $ L.filter (L.isPrefixOf "lts") snapData
+            (False, True) ->
+                liftIO $ displayLocalSnapshot $ L.filter (L.isPrefixOf "night") snapData
+            _ -> liftIO $ displayLocalSnapshot snapData
 
 lsCmd :: LsCmdOpts -> GlobalOpts -> IO ()
-lsCmd lsOpts go =
+lsCmd lsOpts go = do
     case lsView lsOpts of
+      LsSnapshot SnapshotOpts{..} -> case soptViewType of
         Local -> withBuildConfig go (handleLocal lsOpts)
         Remote -> do
-            req <- parseRequest "https://www.stackage.org/snapshots"
+            req <- parseRequest urlInfo
             mgr <- getGlobalManager
             let req' =
                     setRequestManager mgr $
                     addRequestHeader hAccept "application/json" req
             result <- httpJSON req'
             let snapData = getResponseBody result
-            case (lsLtsSnapView lsOpts, lsNightlySnapView lsOpts) of
+            case (soptLtsSnapView, soptNightlySnapView) of
                 (True, False) ->
                     liftIO $ displaySnapshotData $ filterSnapshotData snapData Lts
                 (False, True) ->
                     liftIO $ displaySnapshotData $ filterSnapshotData snapData Nightly
                 _ -> liftIO $ displaySnapshotData snapData
-
-lsParser :: OA.Parser LsCmdOpts
-lsParser =
-    LsCmdOpts <$> OA.hsubparser (lsViewLocalCmd <> lsViewRemoteCmd) <*>
-    OA.switch
-        (OA.long "lts" <> OA.short 'l' <> OA.help "Only show lts snapshots") <*>
-    OA.switch
-        (OA.long "nightly" <> OA.short 'n' <>
-         OA.help "Only show nightly snapshots")
+  where
+    urlInfo = "https://www.stackage.org/snapshots"
 
 lsViewLocalCmd :: OA.Mod OA.CommandFields LsView
 lsViewLocalCmd =
     OA.command
         "local"
-        (OA.info (pure Local) (OA.progDesc "View local snapshot"))
+        (OA.info (pure Remote) (OA.progDesc "View local snapshot"))
 
 lsViewRemoteCmd :: OA.Mod OA.CommandFields LsView
 lsViewRemoteCmd =
