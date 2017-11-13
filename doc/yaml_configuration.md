@@ -318,7 +318,7 @@ user-message: ! 'Warning: Some packages were found to be incompatible with the r
   Warning: Specified resolver could not satisfy all dependencies. Some external packages
   have been added as dependencies.
 
-  You can suppress this message by removing it from stack.yaml
+  You can omit this message by removing it from stack.yaml
 
 '
 ```
