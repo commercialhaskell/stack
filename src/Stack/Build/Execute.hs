@@ -306,7 +306,10 @@ getSetupExe setupHs setupShimHs tmpdir = do
                     , toFilePath tmpOutputPath
                     ] ++
                     ["-build-runner" | wc == Ghcjs]
-            runCmd' (\cp -> cp { std_out = UseHandle stderr }) (Cmd (Just tmpdir) (compilerExeName wc) menv args) Nothing
+            callProcess' (\cp -> cp { std_out = UseHandle stderr }) (Cmd (Just tmpdir) (compilerExeName wc) menv args)
+                `catch` \(ProcessExitedUnsuccessfully _ ec) -> do
+                    compilerPath <- getCompilerPath wc
+                    throwM $ SetupHsBuildFailure ec Nothing compilerPath args Nothing []
             when (wc == Ghcjs) $ renameDir tmpJsExePath jsExePath
             renameFile tmpExePath exePath
             return $ Just exePath
@@ -1073,9 +1076,9 @@ withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} md
                                         =$= CT.decodeUtf8Lenient
                                         $$ mungeBuildOutput stripTHLoading makeAbsolute pkgDir compilerVer
                                         =$ CL.consume
-                        throwM $ CabalExitedUnsuccessfully
+                        throwM $ SetupHsBuildFailure
                             ec
-                            taskProvides
+                            (Just taskProvides)
                             exeName
                             fullArgs
                             (fmap fst mlogFile)
@@ -1104,10 +1107,9 @@ withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} md
                         ExcludeTHLoading -> ConvertPathsToAbsolute
                         KeepTHLoading    -> KeepPathsAsIs
 
-            wc <- view $ actualCompilerVersionL.whichCompilerL
-            exeName <- case (esetupexehs, wc) of
-                (Left setupExe, _) -> return setupExe
-                (Right setuphs, compiler) -> do
+            exeName <- case esetupexehs of
+                Left setupExe -> return setupExe
+                Right setuphs -> do
                     distDir <- distDirFromDir pkgDir
                     let setupDir = distDir </> $(mkRelDir "setup")
                         outputFile = setupDir </> $(mkRelFile "setup")
@@ -1116,6 +1118,7 @@ withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} md
                         then return outputFile
                         else do
                             ensureDir setupDir
+                            compiler <- view $ actualCompilerVersionL.whichCompilerL
                             compilerPath <-
                                 case compiler of
                                     Ghc -> eeGetGhcPath
