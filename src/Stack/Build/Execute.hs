@@ -993,7 +993,7 @@ withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} md
                             unless (Map.member $(mkPackageName "Cabal") customSetupDeps) $
                                 prettyWarnL $
                                     [ display $ packageName package
-                                    , "has setup-depends, but they do not mention a Cabal dependency. This is likely to cause build errors."
+                                    , "has a setup-depends field, but it does not mention a Cabal dependency. This is likely to cause build errors."
                                     ]
                             allDeps <-
                                 case mdeps of
