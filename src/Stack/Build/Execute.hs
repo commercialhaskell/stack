@@ -990,6 +990,11 @@ withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} md
                         -- explicit list of dependencies, and we
                         -- should simply use all of them.
                         (Just customSetupDeps, _) -> do
+                            unless (Map.member $(mkPackageName "Cabal") customSetupDeps) $
+                                prettyWarnL $
+                                    [ display $ packageName package
+                                    , "has setup-depends, but they do not mention a Cabal dependency. This is likely to cause build errors."
+                                    ]
                             allDeps <-
                                 case mdeps of
                                     Just x -> return x
