@@ -991,7 +991,7 @@ withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} md
                         -- should simply use all of them.
                         (Just customSetupDeps, _) -> do
                             unless (Map.member $(mkPackageName "Cabal") customSetupDeps) $
-                                prettyWarnL $
+                                prettyWarnL
                                     [ display $ packageName package
                                     , "has a setup-depends field, but it does not mention a Cabal dependency. This is likely to cause build errors."
                                     ]
