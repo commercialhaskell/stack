@@ -45,6 +45,9 @@ Behavior changes:
 * Stack will ask before saving hackage credentials to file. This new
   prompt can be avoided by using the `save-hackage-creds` setting. Please
   see [#2159](https://github.com/commercialhaskell/stack/issues/2159).
+* `ghc-options:` for specific packages will now come after the options
+  specified for all packages / particular sets of packages. See
+  [#3573](https://github.com/commercialhaskell/stack/issues/3573).
 
 Other enhancements:
 

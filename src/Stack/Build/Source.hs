@@ -148,14 +148,14 @@ getLocalFlags bconfig boptsCli name = Map.unions
 -- configuration and commandline.
 getGhcOptions :: BuildConfig -> BuildOptsCLI -> PackageName -> Bool -> Bool -> [Text]
 getGhcOptions bconfig boptsCli name isTarget isLocal = concat
-    [ Map.findWithDefault [] name (configGhcOptionsByName config)
-    , if isTarget
-        then Map.findWithDefault [] AGOTargets (configGhcOptionsByCat config)
-        else []
+    [ Map.findWithDefault [] AGOEverything (configGhcOptionsByCat config)
     , if isLocal
         then Map.findWithDefault [] AGOLocals (configGhcOptionsByCat config)
         else []
-    , Map.findWithDefault [] AGOEverything (configGhcOptionsByCat config)
+    , if isTarget
+        then Map.findWithDefault [] AGOTargets (configGhcOptionsByCat config)
+        else []
+    , Map.findWithDefault [] name (configGhcOptionsByName config)
     , concat [["-fhpc"] | isLocal && toCoverage (boptsTestOpts bopts)]
     , if boptsLibProfile bopts || boptsExeProfile bopts
          then ["-fprof-auto","-fprof-cafs"]
