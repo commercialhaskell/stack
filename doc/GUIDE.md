@@ -1085,7 +1085,7 @@ The following changes will be made to stack.yaml:
     - aeson-0.10.0.0
     - aeson-compat-0.3.0.0
     - attoparsec-0.13.0.1
-    - conduit-extra-1.1.9.2
+    - conduit-extra-1.2.0
     - email-validate-2.2.0
     - hex-0.1.2
     - http-api-data-0.2.2
@@ -2039,11 +2039,11 @@ image:
 and then run `stack image container` and then `docker images` to list
 the images.
 
-Note that the executable will be built in the development environment 
-and copied to the container, so the dev OS must match that of the 
+Note that the executable will be built in the development environment
+and copied to the container, so the dev OS must match that of the
 container OS. This is easily accomplished using [Docker integration](docker_integration.md),
-under which the exe emitted by `stack build` will be built on the 
-Docker container, not the local OS. 
+under which the exe emitted by `stack build` will be built on the
+Docker container, not the local OS.
 
 The executable will be stored under `/usr/local/bin/<your-project>-exe`
 in the running container.
