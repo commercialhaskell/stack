@@ -115,6 +115,9 @@ Other enhancements:
   [#3520](https://github.com/commercialhaskell/stack/issues/3520).
 * Log when each individual test suite finishes. See:
   [#3552](https://github.com/commercialhaskell/stack/issues/3552).
+* Avoid spurious rebuilds when using `--file-watch` by not watching files for
+  executable, test and benchmark components that aren't a target. See:
+  [#3483](https://github.com/commercialhaskell/stack/issues/3483).
 
 Bug fixes:
 
