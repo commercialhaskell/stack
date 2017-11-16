@@ -1321,11 +1321,7 @@ hpack pkgDir = do
         config <- view configL
         case configOverrideHpack config of
             HpackBundled -> do
-#if MIN_VERSION_hpack(0,18,0)
-                r <- liftIO $ Hpack.hpackResult (Just $ toFilePath pkgDir)
-#else
-                r <- liftIO $ Hpack.hpackResult (toFilePath pkgDir)
-#endif
+                r <- liftIO $ Hpack.hpackResult (Just $ toFilePath pkgDir) Hpack.NoForce
                 forM_ (Hpack.resultWarnings r) prettyWarnS
                 let cabalFile = styleFile . fromString . Hpack.resultCabalFile $ r
                 case Hpack.resultStatus r of
@@ -1337,6 +1333,13 @@ hpack pkgDir = do
                         [ cabalFile
                         , flow "was generated with a newer version of hpack,"
                         , flow "please upgrade and try again."
+                        ]
+                    Hpack.ExistingCabalFileWasModifiedManually -> prettyWarnL
+                        [ flow "WARNING: "
+                        , cabalFile
+                        , flow " was modified manually.  Ignoring package.yaml in favor of cabal file."
+                        , flow "If you want to use package.yaml instead of the cabal file, "
+                        , flow "then please delete the cabal file."
                         ]
             HpackCommand command -> do
                 envOverride <- getMinimalEnvOverride
