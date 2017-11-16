@@ -13,6 +13,7 @@
 module Stack.Types.BuildPlan
     ( -- * Types
       SnapshotDef (..)
+    , snapshotDefVC
     , sdRawPathName
     , PackageLocation (..)
     , PackageLocationIndex (..)
@@ -96,7 +97,12 @@ data SnapshotDef = SnapshotDef
     -- of a snapshot with some codebase without installing GHC (e.g.,
     -- during stack init), we would use this field.
     }
-    deriving (Show, Eq)
+    deriving (Show, Eq, Data, Generic, Typeable)
+instance Store SnapshotDef
+instance NFData SnapshotDef
+
+snapshotDefVC :: VersionConfig SnapshotDef
+snapshotDefVC = storeVersionConfig "sd-v1" "tnwWSSLerZ2XeR6XpVwj5Uh0eF4="
 
 -- | A relative file path including a unique string for the given
 -- snapshot.
