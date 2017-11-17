@@ -6,6 +6,7 @@
 
 module Stack.Constants
     (buildPlanDir
+    ,buildPlanCacheDir
     ,haskellModuleExts
     ,stackDotYaml
     ,stackWorkEnvVar
@@ -205,6 +206,12 @@ defaultGlobalConfigPath = parseAbsFile "/etc/stack/config.yaml"
 buildPlanDir :: Path Abs Dir -- ^ Stack root
              -> Path Abs Dir
 buildPlanDir = (</> $(mkRelDir "build-plan"))
+
+-- | Path where binary caches of the build plans are stored.
+buildPlanCacheDir
+  :: Path Abs Dir -- ^ Stack root
+  -> Path Abs Dir
+buildPlanCacheDir = (</> $(mkRelDir "build-plan-cache"))
 
 -- | Environment variable that stores a variant to append to platform-specific directory
 -- names.  Used to ensure incompatible binaries aren't shared between Docker builds and host
