@@ -115,6 +115,9 @@ Other enhancements:
   be optimal yet. The terminal width can be overriden with the
   new `--terminal-width` command-line option (this works even on
   non-POSIX).
+* Passing non local packages as targets to `stack ghci` will now
+  cause them to be used as `-package` args along with package
+  hiding.
 
 Bug fixes:
 
