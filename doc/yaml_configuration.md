@@ -759,7 +759,7 @@ save-hackage-creds: true
 
 Since 1.5.0
 
-# urls
+### urls
 
 Customize the URLs where `stack` looks for snapshot build plans.
 
@@ -774,3 +774,91 @@ urls:
 
 **Note:** The `latest-snapshot-url` field has been deprecated in favor of `latest-snapshot`
 and will be removed in a future version of `stack`.
+
+### jobs
+
+Specifies how many build tasks should be run in parallel. This can be overloaded
+on the commandline via `-jN`, for example `-j2`.  The default is to use the
+number of processors reported by your CPU.  One usage for this might be to avoid
+running out of memory by setting it to 1, like this:
+
+```yaml
+jobs: 1
+```
+
+### work-dir
+
+Specifies relative path of work directory (default is `.stack-work`. This can
+also be specified by env var or cli flag, in particular, the earlier items in
+this list take precedence:
+
+1. `--work-dir DIR` passed on the commandline
+2. `work-dir` in stack.yaml
+3. `STACK_WORK` environment variable
+
+Since 0.1.10.0
+
+### skip-msys
+
+Skips checking for and installing msys2 when stack is setting up the
+environment.  This is only useful on Windows machines, and usually doesn't make
+sense in project configurations, just in `config.yaml`.  Defaults to `false`, so
+if this is used, it only really makes sense to use it like this:
+
+```yaml
+skip-msys: true
+```
+
+Since 0.1.2.0
+
+### concurrent-tests
+
+This option specifies whether test-suites should be executed concurrently with
+each-other. The default for this is true, since this is usually fine and it
+often means that tests can complete earlier. However, if some test-suites
+require exclusive access to some resource, or require a great deal of CPU or
+memory resources, then it makes sense to set this to `false` (the default is
+`true`).
+
+```yaml
+concurrent-tests: false
+```
+
+Since 0.1.2.0
+
+### extra-path
+
+This option specifies additional directories to prepend to the PATH environment
+variable.  These will be used when resolving the location of executables, and
+will also be visible in the `PATH` variable of processes run by stack.
+
+For example, to prepend `/path-to-some-dep/bin` to your PATh:
+
+```yaml
+extra-path:
+- /path-to-some-dep/bin
+```
+
+One thing to note is that other paths added by stack - things like the project's
+bin dir and the compiler's bin dir - will take precedence over those specified
+here (the automatic paths get prepended).
+
+Since 0.1.4.0
+
+### local-programs-path
+
+This overrides the location of the programs directory, where tools like ghc and
+msys get installed.
+
+On most systems, this defaults to a folder called `programs`
+within the stack root directory. On windows, if the `LOCALAPPDATA` environment
+variable exists, then it defaults to `$LOCALAPPDATA/Programs/stack/`, which
+follows windows conventions.
+
+Since 1.3.0
+
+### default-template
+
+This option specifies which template to use with `stack new`, when none is
+specified. The default is called `new-template`. The other templates are listed
+in [the stack-templates repo](https://github.com/commercialhaskell/stack-templates/).
