@@ -118,6 +118,9 @@ Other enhancements:
 * Passing non local packages as targets to `stack ghci` will now
   cause them to be used as `-package` args along with package
   hiding.
+* Detect when user changed .cabal file instead of package.yaml. This
+  was implemented upstream in hpack. See
+  [#3383](https://github.com/commercialhaskell/stack/issues/3383).
 
 Bug fixes:
 

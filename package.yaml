@@ -63,7 +63,7 @@ dependencies:
 - hackage-security
 - hashable
 - hastache
-- hpack
+- hpack >= 0.20
 - hpc
 - http-client
 - http-client-tls
