@@ -114,15 +114,14 @@ newtype LsException =
 instance Exception LsException
 
 parseSnapshot :: Value -> A.Parser Snapshot
-parseSnapshot =
-    A.withArray "array of snapshot" (\val -> return $ toSnapshot (V.toList val))
+parseSnapshot = A.withArray "array of snapshot" (return . toSnapshot . V.toList)
 
 displayTime :: Snapshot -> [ByteString]
 displayTime Snapshot {..} = [pack $ T.unpack snapTime]
 
 displaySnap :: Snapshot -> [ByteString]
 displaySnap Snapshot {..} =
-    [ "Resolver name: " <> (pack $ T.unpack snapId)
+    [ "Resolver name: " <> pack (T.unpack snapId)
     , "\n" <> pack (T.unpack snapTitle) <> "\n\n"
     ]
 
@@ -133,7 +132,7 @@ displaySingleSnap snapshots =
         (x:xs) ->
             let snaps =
                     displayTime x <> ["\n\n"] <> displaySnap x <>
-                    (L.concatMap displaySnap xs)
+                    L.concatMap displaySnap xs
             in BC.concat snaps
 
 displaySnapshotData :: SnapshotData -> IO ()
@@ -153,12 +152,9 @@ filterSnapshotData sdata stype =
     snapdata = snaps sdata
     filterSnapData =
         case stype of
-            Lts ->
-                L.map (\s -> L.filter (\x -> "lts" `isPrefixOf` snapId x) s) snapdata
+            Lts -> L.map (L.filter (\x -> "lts" `isPrefixOf` snapId x)) snapdata
             Nightly ->
-                L.map
-                    (\s -> L.filter (\x -> "nightly" `isPrefixOf` snapId x) s)
-                    snapdata
+                L.map (L.filter (\x -> "nightly" `isPrefixOf` snapId x)) snapdata
 
 displayLocalSnapshot :: [String] -> IO ()
 displayLocalSnapshot xs = pageByteString $ localSnaptoByteString xs
@@ -174,7 +170,7 @@ handleLocal lsOpts = do
     let snapRootDir = parent $ parent instRoot
     snapData' <- liftIO $ listDirectory $ toFilePath snapRootDir
     let snapData = L.sort snapData'
-    case (lsView lsOpts) of
+    case lsView lsOpts of
         LsSnapshot SnapshotOpts {..} ->
             case (soptLtsSnapView, soptNightlySnapView) of
                 (True, False) ->
@@ -186,7 +182,7 @@ handleLocal lsOpts = do
                 _ -> liftIO $ displayLocalSnapshot snapData
 
 lsCmd :: LsCmdOpts -> GlobalOpts -> IO ()
-lsCmd lsOpts go = do
+lsCmd lsOpts go =
     case lsView lsOpts of
         LsSnapshot SnapshotOpts {..} ->
             case soptViewType of
