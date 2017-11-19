@@ -320,11 +320,7 @@ runGhci GhciOpts{..} targets mainIsTargets pkgs extraFiles exposePackages = do
     wc <- view $ actualCompilerVersionL.whichCompilerL
     let pkgopts = hidePkgOpts ++ genOpts ++ ghcOpts
         shouldHidePackages =
-          case ghciHidePackages of
-            -- Default to not hiding anything if there's nothing to
-            -- expose.
-            Nothing -> not (null pkgs && null exposePackages)
-            Just x -> x
+          fromMaybe (not (null pkgs && null exposePackages)) ghciHidePackages
         hidePkgOpts =
           if shouldHidePackages
             then "-hide-all-packages" : concatMap (\n -> ["-package", packageNameString n]) exposePackages
