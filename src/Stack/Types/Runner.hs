@@ -54,6 +54,14 @@ data Runner = Runner
   , runnerLogOptions :: !LogOptions
   , runnerTerminal   :: !Bool
   , runnerSticky     :: !Sticky
+  , runnerWarnedCabalFiles :: !(IORef (HashSet FilePath))
+  -- ^ Set of all cabal files that have already been warned about.
+  --
+  -- TODO: This is really an ugly hack to avoid spamming the user with
+  -- warnings when we parse cabal files multiple times. Ideally: we
+  -- would just design the system such that it only ever parses a
+  -- cabal file once. But for now, this is a decent workaround. See:
+  -- <https://github.com/commercialhaskell/stack/issues/3591>.
   }
 
 class HasLogFunc env => HasRunner env where
@@ -259,6 +267,7 @@ withRunner logLevel useTime terminal colorWhen widthOverride reExec inner = do
                                     <$> liftIO getTerminalWidth)
                                    pure widthOverride
   canUseUnicode <- liftIO getCanUseUnicode
+  ref <- newIORef mempty
   withSticky terminal $ \sticky -> inner Runner
     { runnerReExec = reExec
     , runnerLogOptions = LogOptions
@@ -271,6 +280,7 @@ withRunner logLevel useTime terminal colorWhen widthOverride reExec inner = do
         }
     , runnerTerminal = terminal
     , runnerSticky = sticky
+    , runnerWarnedCabalFiles = ref
     }
   where clipWidth w
           | w < minTerminalWidth = minTerminalWidth

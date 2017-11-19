@@ -45,6 +45,7 @@ module Stack.Package
 
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Char8 as C8
+import qualified Data.HashSet as HashSet
 import           Data.List (isSuffixOf, partition, isPrefixOf)
 import           Data.List.Extra (nubOrd)
 import qualified Data.Map.Strict as M
@@ -195,22 +196,28 @@ readDotBuildinfo buildinfofp =
 
 -- | Print cabal file warnings.
 printCabalFileWarning
-    :: (MonadLogger m, HasRunner env, MonadReader env m)
-    => Path Abs File -> PWarning -> m ()
-printCabalFileWarning cabalfp =
-    \case
-        (PWarning x) ->
-            prettyWarnL
-                [ flow "Cabal file warning in"
-                , display cabalfp <> ":"
-                , flow x
-                ]
-        (UTFWarning ln msg) ->
-            prettyWarnL
-                [ flow "Cabal file warning in"
-                , display cabalfp <> ":" <> fromString (show ln) <> ":"
-                , flow msg
-                ]
+    :: HasRunner env
+    => Path Abs File
+    -> PWarning
+    -> RIO env ()
+printCabalFileWarning cabalfp warning' = do
+    let fp = toFilePath cabalfp
+    ref <- view $ runnerL.to runnerWarnedCabalFiles
+    join $ atomicModifyIORef' ref $ \hs ->
+      if fp `HashSet.member` hs
+        then (hs, return ())
+        else (HashSet.insert fp hs, prettyWarnL (toPretty warning'))
+  where
+    toPretty (PWarning x) =
+      [ flow "Cabal file warning in"
+      , display cabalfp <> ":"
+      , flow x
+      ]
+    toPretty (UTFWarning ln msg) =
+      [ flow "Cabal file warning in"
+      , display cabalfp <> ":" <> fromString (show ln) <> ":"
+      , flow msg
+      ]
 
 -- | Check if the given name in the @Package@ matches the name of the .cabal file
 checkCabalFileName :: MonadThrow m => PackageName -> Path Abs File -> m ()
