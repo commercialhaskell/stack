@@ -33,9 +33,7 @@ warnInstallSearchPathIssues destDir installed = do
                           , flow "executable found on the PATH environment variable is"
                           , styleFile . fromString $ exePath
                           , flow "and not the version that was just installed."
-                          ]
-                        prettyWarnL
-                          [ flow "This means that"
+                          , flow "This means that"
                           , styleFile . fromString . T.unpack $ exe
                           , "calls on the command line will not use this version."
                           ]
