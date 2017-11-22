@@ -36,7 +36,7 @@ module Stack.Setup
 import qualified    Codec.Archive.Tar as Tar
 import              Control.Applicative (empty)
 import              Control.Monad.State (get, put, modify)
-import "cryptonite" Crypto.Hash (SHA1(..))
+import "cryptonite" Crypto.Hash (SHA1(..), SHA256(..))
 import              Data.Aeson.Extended
 import qualified    Data.ByteString as S
 import qualified    Data.ByteString.Char8 as S8
@@ -852,7 +852,12 @@ downloadAndInstallCompiler ghcBuild si wanted@GhcVersion{} versionCheck mbindist
                 _ -> throwM RequireCustomGHCVariant
             case wanted of
                 GhcVersion version ->
-                    return (version, GHCDownloadInfo mempty mempty (DownloadInfo (T.pack bindistURL) Nothing Nothing))
+                    return (version, GHCDownloadInfo mempty mempty DownloadInfo
+                             { downloadInfoUrl = T.pack bindistURL
+                             , downloadInfoContentLength = Nothing
+                             , downloadInfoSha1 = Nothing
+                             , downloadInfoSha256 = Nothing
+                             })
                 _ ->
                     throwM WantedMustBeGHC
         _ -> do
@@ -953,13 +958,17 @@ downloadFromInfo programsDir downloadInfo tool = do
             chattyDownload (T.pack (toolString tool)) downloadInfo path
             return path
         (parseAbsFile -> Just path) -> do
-            let DownloadInfo{downloadInfoContentLength=contentLength, downloadInfoSha1=sha1} =
+            let DownloadInfo{downloadInfoContentLength=contentLength, downloadInfoSha1=sha1,
+                             downloadInfoSha256=sha256} =
                     downloadInfo
             when (isJust contentLength) $
                 logWarn ("`content-length` in not checked \n" <>
                           "and should not be specified when `url` is a file path")
             when (isJust sha1) $
                 logWarn ("`sha1` is not checked and \n" <>
+                          "should not be specified when `url` is a file path")
+            when (isJust sha256) $
+                logWarn ("`sha256` is not checked and \n" <>
                           "should not be specified when `url` is a file path")
             return path
         _ ->
@@ -1427,7 +1436,7 @@ setup7z si = do
 
 chattyDownload :: HasRunner env
                => Text          -- ^ label
-               -> DownloadInfo  -- ^ URL, content-length, and sha1
+               -> DownloadInfo  -- ^ URL, content-length, sha1, and sha256
                -> Path Abs File -- ^ destination
                -> RIO env ()
 chattyDownload label downloadInfo path = do
@@ -1445,20 +1454,25 @@ chattyDownload label downloadInfo path = do
       , T.pack $ toFilePath path
       , " ..."
       ]
-    hashChecks <- case downloadInfoSha1 downloadInfo of
-        Just sha1ByteString -> do
-            let sha1 = CheckHexDigestByteString sha1ByteString
+    hashChecks <- fmap catMaybes $ forM
+      [ ("sha1",   HashCheck SHA1,   downloadInfoSha1)
+      , ("sha256", HashCheck SHA256, downloadInfoSha256)
+      ]
+      $ \(name, constr, getter) ->
+        case getter downloadInfo of
+          Just bs -> do
             logDebug $ T.concat
-                [ "Will check against sha1 hash: "
-                , T.decodeUtf8With T.lenientDecode sha1ByteString
+                [ "Will check against "
+                , name
+                , " hash: "
+                , T.decodeUtf8With T.lenientDecode bs
                 ]
-            return [HashCheck SHA1 sha1]
-        Nothing -> do
-            logWarn $ T.concat
-                [ "No sha1 found in metadata,"
-                , " download hash won't be checked."
-                ]
-            return []
+            return $ Just $ constr $ CheckHexDigestByteString bs
+          Nothing -> return Nothing
+    when (null hashChecks) $ logWarn $ T.concat
+        [ "No sha1 or sha256 found in metadata,"
+        , " download hash won't be checked."
+        ]
     let dReq = DownloadRequest
             { drRequest = req
             , drHashChecks = hashChecks
