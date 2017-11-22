@@ -263,9 +263,9 @@ library:
   when:
   - condition: 'os(windows)'
     then:
-      source-dirs: windows/
+      source-dirs: src/windows/
     else:
-      source-dirs: unix/
+      source-dirs: src/unix/
 executables:
   stack:
     main: Main.hs
