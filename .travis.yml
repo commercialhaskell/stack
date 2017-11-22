@@ -76,7 +76,7 @@ install:
      stack)
        stack --no-terminal build store
        stack --no-terminal test --only-dependencies
-       stack --no-terminal test --flag stack:integrations-tests
+       stack --no-terminal test --flag stack:integration-tests
        ;;
      cabal)
        cabal --version
