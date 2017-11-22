@@ -124,6 +124,9 @@ Other enhancements:
 * Detect when user changed .cabal file instead of package.yaml. This
   was implemented upstream in hpack. See
   [#3383](https://github.com/commercialhaskell/stack/issues/3383).
+* Automatically run `autoreconf -i` as necessary when a `configure`
+  script is missing. See
+  [#3534](https://github.com/commercialhaskell/stack/issues/3534)
 
 Bug fixes:
 

@@ -442,6 +442,9 @@ data Task = Task
     -- unnecessary, when in fact we _do_ need to reconfigure. The
     -- details here suck. We really need proper hashes for package
     -- identifiers.
+    , taskBuildTypeConfig :: !Bool
+    -- ^ Is the build type of this package Configure. Check out
+    -- ensureConfigureScript in Stack.Build.Execute for the motivation
     }
     deriving Show
 
