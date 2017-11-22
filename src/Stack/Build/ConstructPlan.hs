@@ -1000,7 +1000,7 @@ pprintExceptions exceptions stackYaml parentMap wanted =
                 case getShortestDepsPath parentMap wanted (packageName pkg) of
                     Nothing -> line <> flow "needed for unknown reason - stack invariant violated."
                     Just [] -> line <> flow "needed since" <+> pkgName <+> flow "is a build target."
-                    Just (target:path) -> line <> flow "needed due to " <> encloseSep "" "" " -> " pathElems
+                    Just (target:path) -> line <> flow "needed due to" <+> encloseSep "" "" " -> " pathElems
                       where
                         pathElems =
                             [styleTarget . display $ target] ++
