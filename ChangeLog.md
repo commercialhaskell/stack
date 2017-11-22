@@ -45,6 +45,9 @@ Behavior changes:
 * Stack will ask before saving hackage credentials to file. This new
   prompt can be avoided by using the `save-hackage-creds` setting. Please
   see [#2159](https://github.com/commercialhaskell/stack/issues/2159).
+* The `pvp-bounds` feature is no longer fully functional, due to some
+  issues with the Cabal library's printer. See
+  [#3550](https://github.com/commercialhaskell/stack/issues/3550).
 
 Other enhancements:
 
