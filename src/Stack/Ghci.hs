@@ -323,7 +323,13 @@ runGhci GhciOpts{..} targets mainIsTargets pkgs extraFiles exposePackages = do
           fromMaybe (not (null pkgs && null exposePackages)) ghciHidePackages
         hidePkgOpts =
           if shouldHidePackages
-            then "-hide-all-packages" : concatMap (\n -> ["-package", packageNameString n]) exposePackages
+            then "-hide-all-packages" :
+              -- This is necessary, because current versions of ghci
+              -- will entirely fail to start if base isn't visible. This
+              -- is because it tries to use the interpreter to set
+              -- buffering options on standard IO.
+              "-package" : "base" :
+              concatMap (\n -> ["-package", packageNameString n]) exposePackages
             else []
         oneWordOpts bio
             | shouldHidePackages = bioOneWordOpts bio ++ bioPackageFlags bio
