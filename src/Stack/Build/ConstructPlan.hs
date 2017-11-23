@@ -32,6 +32,7 @@ import           Data.Text.Encoding (decodeUtf8With)
 import           Data.Text.Encoding.Error (lenientDecode)
 import qualified Distribution.Text as Cabal
 import qualified Distribution.Version as Cabal
+import           Distribution.Types.BuildType (BuildType (Configure))
 import           Generics.Deriving.Monoid (memptydefault, mappenddefault)
 import           Lens.Micro (lens)
 import           Stack.Build.Cache
@@ -355,6 +356,7 @@ addFinal lp package isAllInOne = do
                 , taskAllInOne = isAllInOne
                 , taskCachePkgSrc = CacheSrcLocal (toFilePath (lpDir lp))
                 , taskAnyMissing = not $ Set.null missing
+                , taskBuildTypeConfig = packageBuildTypeConfig package
                 }
     tell mempty { wFinals = Map.singleton (packageName package) res }
 
@@ -571,7 +573,12 @@ installPackageGivenDeps isAllInOne ps package minstalled (missing, present, minL
             , taskAllInOne = isAllInOne
             , taskCachePkgSrc = toCachePkgSrc ps
             , taskAnyMissing = not $ Set.null missing
+            , taskBuildTypeConfig = packageBuildTypeConfig package
             }
+
+-- | Is the build type of the package Configure
+packageBuildTypeConfig :: Package -> Bool
+packageBuildTypeConfig pkg = packageBuildType pkg == Just Configure
 
 -- Update response in the lib map. If it is an error, and there's
 -- already an error about cyclic dependencies, prefer the cyclic error.
