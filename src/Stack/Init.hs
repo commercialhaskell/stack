@@ -106,7 +106,7 @@ initProject whichCmd currDir initOpts mresolver = do
         makeUserMsg msgs =
             let msg = concat msgs
             in if msg /= "" then
-                  msg <> "You can suppress this message by removing it from \
+                  msg <> "You can omit this message by removing it from \
                          \stack.yaml\n"
                  else ""
 

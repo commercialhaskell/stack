@@ -138,16 +138,16 @@ loadResolver
 loadResolver (ResolverSnapshot name) = do
     stackage <- view stackRootL
     file' <- parseRelFile $ T.unpack file
+    cachePath <- (buildPlanCacheDir stackage </>) <$> parseRelFile (T.unpack (renderSnapName name <> ".cache"))
     let fp = buildPlanDir stackage </> file'
-        tryDecode = liftIO $ do
+        tryDecode = tryAny $ $(versionedDecodeOrLoad snapshotDefVC) cachePath $ liftIO $ do
           evalue <- decodeFileEither $ toFilePath fp
-          return $
-            case evalue of
-              Left e -> Left e
-              Right value ->
-                case parseEither parseStackageSnapshot value of
-                  Left s -> Left $ AesonException s
-                  Right x -> Right x
+          case evalue of
+            Left e -> throwIO e
+            Right value ->
+              case parseEither parseStackageSnapshot value of
+                Left s -> throwIO $ AesonException s
+                Right x -> return x
     logDebug $ "Decoding build plan from: " <> T.pack (toFilePath fp)
     eres <- tryDecode
     case eres of

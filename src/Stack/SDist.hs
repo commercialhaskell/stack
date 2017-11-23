@@ -113,7 +113,7 @@ getSDistTarball
 getSDistTarball mpvpBounds pkgDir = do
     config <- view configL
     let PvpBounds pvpBounds asRevision = fromMaybe (configPvpBounds config) mpvpBounds
-        tweakCabal = True -- pvpBounds /= PvpBoundsNone
+        tweakCabal = pvpBounds /= PvpBoundsNone
         pkgFp = toFilePath pkgDir
     lp <- readLocalPackage pkgDir
     logInfo $ "Getting file list for " <> T.pack pkgFp
@@ -349,6 +349,7 @@ getSDistFileList lp =
         , taskAllInOne = True
         , taskCachePkgSrc = CacheSrcLocal (toFilePath (lpDir lp))
         , taskAnyMissing = True
+        , taskBuildTypeConfig = False
         }
 
 normalizeTarballPaths :: HasRunner env => [FilePath] -> RIO env [FilePath]

@@ -318,7 +318,7 @@ user-message: ! 'Warning: Some packages were found to be incompatible with the r
   Warning: Specified resolver could not satisfy all dependencies. Some external packages
   have been added as dependencies.
 
-  You can suppress this message by removing it from stack.yaml
+  You can omit this message by removing it from stack.yaml
 
 '
 ```
@@ -618,6 +618,13 @@ setup-info: "https://raw.githubusercontent.com/fpco/stackage-content/master/stac
 ### pvp-bounds
 
 (Since 0.1.5)
+
+__NOTE__ As of Stack 1.6.0, this feature does not reliably work, due
+to issues with the Cabal library's printer. Stack will generate a
+warning when a lossy conversion occurs, in which case you may need to
+disable this setting. See
+[#3550](https://github.com/commercialhaskell/stack/issues/3550) for
+more information.
 
 When using the `sdist` and `upload` commands, this setting determines whether
 the cabal file's dependencies should be modified to reflect PVP lower and upper

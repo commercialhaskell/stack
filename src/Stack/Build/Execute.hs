@@ -306,7 +306,10 @@ getSetupExe setupHs setupShimHs tmpdir = do
                     , toFilePath tmpOutputPath
                     ] ++
                     ["-build-runner" | wc == Ghcjs]
-            runCmd' (\cp -> cp { std_out = UseHandle stderr }) (Cmd (Just tmpdir) (compilerExeName wc) menv args) Nothing
+            callProcess' (\cp -> cp { std_out = UseHandle stderr }) (Cmd (Just tmpdir) (compilerExeName wc) menv args)
+                `catch` \(ProcessExitedUnsuccessfully _ ec) -> do
+                    compilerPath <- getCompilerPath wc
+                    throwM $ SetupHsBuildFailure ec Nothing compilerPath args Nothing []
             when (wc == Ghcjs) $ renameDir tmpJsExePath jsExePath
             renameFile tmpExePath exePath
             return $ Just exePath
@@ -810,6 +813,9 @@ ensureConfig newConfigCache pkgDir ExecuteEnv {..} announce cabal cabalfp task =
                 return $ fmap ignoreComponents mOldConfigCache /= Just (ignoreComponents newConfigCache)
                       || mOldCabalMod /= Just newCabalMod
     let ConfigureOpts dirs nodirs = configCacheOpts newConfigCache
+
+    when (taskBuildTypeConfig task) ensureConfigureScript
+
     when needConfig $ withMVar eeConfigureLock $ \_ -> do
         deleteCaches pkgDir
         announce
@@ -834,6 +840,19 @@ ensureConfig newConfigCache pkgDir ExecuteEnv {..} announce cabal cabalfp task =
         writeCabalMod pkgDir newCabalMod
 
     return needConfig
+  where
+    -- When build-type is Configure, we need to have a configure
+    -- script in the local directory. If it doesn't exist, build it
+    -- with autoreconf -i. See:
+    -- https://github.com/commercialhaskell/stack/issues/3534
+    ensureConfigureScript = do
+      let fp = pkgDir </> $(mkRelFile "configure")
+      exists <- doesFileExist fp
+      unless exists $ do
+        logInfo $ "Trying to generate configure with autoreconf in " <> T.pack (toFilePath pkgDir)
+        menv <- getMinimalEnvOverride
+        readProcessNull (Just pkgDir) menv "autoreconf" ["-i"] `catchAny` \ex ->
+          logWarn $ "Unable to run autoreconf: " <> T.pack (show ex)
 
 announceTask :: MonadLogger m => Task -> Text -> m ()
 announceTask task x = logInfo $ T.concat
@@ -987,6 +1006,11 @@ withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} md
                         -- explicit list of dependencies, and we
                         -- should simply use all of them.
                         (Just customSetupDeps, _) -> do
+                            unless (Map.member $(mkPackageName "Cabal") customSetupDeps) $
+                                prettyWarnL
+                                    [ display $ packageName package
+                                    , "has a setup-depends field, but it does not mention a Cabal dependency. This is likely to cause build errors."
+                                    ]
                             allDeps <-
                                 case mdeps of
                                     Just x -> return x
@@ -1073,9 +1097,9 @@ withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} md
                                         =$= CT.decodeUtf8Lenient
                                         $$ mungeBuildOutput stripTHLoading makeAbsolute pkgDir compilerVer
                                         =$ CL.consume
-                        throwM $ CabalExitedUnsuccessfully
+                        throwM $ SetupHsBuildFailure
                             ec
-                            taskProvides
+                            (Just taskProvides)
                             exeName
                             fullArgs
                             (fmap fst mlogFile)
@@ -1104,10 +1128,9 @@ withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} md
                         ExcludeTHLoading -> ConvertPathsToAbsolute
                         KeepTHLoading    -> KeepPathsAsIs
 
-            wc <- view $ actualCompilerVersionL.whichCompilerL
-            exeName <- case (esetupexehs, wc) of
-                (Left setupExe, _) -> return setupExe
-                (Right setuphs, compiler) -> do
+            exeName <- case esetupexehs of
+                Left setupExe -> return setupExe
+                Right setuphs -> do
                     distDir <- distDirFromDir pkgDir
                     let setupDir = distDir </> $(mkRelDir "setup")
                         outputFile = setupDir </> $(mkRelFile "setup")
@@ -1116,6 +1139,7 @@ withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} md
                         then return outputFile
                         else do
                             ensureDir setupDir
+                            compiler <- view $ actualCompilerVersionL.whichCompilerL
                             compilerPath <-
                                 case compiler of
                                     Ghc -> eeGetGhcPath
