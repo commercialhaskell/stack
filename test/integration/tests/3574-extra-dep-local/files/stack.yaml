@@ -1,0 +1,8 @@
+resolver: ghc-8.0.2
+
+packages:
+- location: foo
+  extra-dep: true
+
+ghc-options:
+  $locals: -bob

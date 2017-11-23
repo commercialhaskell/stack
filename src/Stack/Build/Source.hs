@@ -79,7 +79,7 @@ loadSourceMapFull needTargets boptsCli = do
     bconfig <- view buildConfigL
     (ls, localDeps, targets) <- parseTargets needTargets boptsCli
     lp <- getLocalPackages
-    locals <- mapM (loadLocalPackage boptsCli targets) $ Map.toList $ lpProject lp
+    locals <- mapM (loadLocalPackage True boptsCli targets) $ Map.toList $ lpProject lp
     checkFlagsUsed boptsCli locals localDeps (lsPackages ls)
     checkComponentsBuildable locals
 
@@ -105,7 +105,7 @@ loadSourceMapFull needTargets boptsCli = do
                   Left e -> throwM $ InvalidCabalFileInLocal (PLOther pl) e bs
                   Right x -> return x
               mapM_ (printCabalFileWarning cabalfp) warnings
-              lp' <- loadLocalPackage boptsCli targets (n, LocalPackageView
+              lp' <- loadLocalPackage False boptsCli targets (n, LocalPackageView
                 { lpvVersion = lpiVersion lpi
                 , lpvRoot = dir
                 , lpvCabalFP = cabalfp
@@ -191,13 +191,17 @@ splitComponents =
 -- based on the selected components
 loadLocalPackage
     :: forall env. HasEnvConfig env
-    => BuildOptsCLI
+    => Bool
+    -- ^ Should this be treated as part of $locals? False for extra-deps.
+    --
+    -- See: https://github.com/commercialhaskell/stack/issues/3574#issuecomment-346512821
+    -> BuildOptsCLI
     -> Map PackageName Target
     -> (PackageName, LocalPackageView)
     -> RIO env LocalPackage
-loadLocalPackage boptsCli targets (name, lpv) = do
+loadLocalPackage isLocal boptsCli targets (name, lpv) = do
     let mtarget = Map.lookup name targets
-    config  <- getPackageConfig boptsCli name (isJust mtarget) True
+    config  <- getPackageConfig boptsCli name (isJust mtarget) isLocal
     bopts <- view buildOptsL
     let (exeCandidates, testCandidates, benchCandidates) =
             case mtarget of
