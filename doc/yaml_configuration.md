@@ -400,6 +400,13 @@ extra-lib-dirs:
 - /opt/foo/lib
 ```
 
+Since these are system-dependent absolute paths, it is recommended that you
+specify these in your `config.yaml` within the stack root (usually, `~/.stack`).
+If you control the build environment in your project's ``stack.yaml``, perhaps
+through docker or other means, then it may well make sense to include these
+there as well.
+
+
 ### with-gcc
 
 Specify a path to gcc explicitly, rather than relying on the normal path resolution.
