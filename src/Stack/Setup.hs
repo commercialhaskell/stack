@@ -51,7 +51,6 @@ import              Data.Foldable (maximumBy)
 import qualified    Data.HashMap.Strict as HashMap
 import              Data.IORef.RunOnce (runOnce)
 import              Data.List hiding (concat, elem, maximumBy, any)
-import              Data.List.Split (splitOn)
 import qualified    Data.Map as Map
 import qualified    Data.Set as Set
 import qualified    Data.Text as T
@@ -107,6 +106,7 @@ import              Text.Printf (printf)
 
 #if !WINDOWS
 import              Bindings.Uname (uname, release)
+import              Data.List.Split (splitOn)
 import              Foreign.C (throwErrnoIfMinus1_, peekCString)
 import              Foreign.Marshal (alloca)
 import              System.Posix.Files (setFileMode)
@@ -616,6 +616,7 @@ getGhcBuild menv = do
         logDebug ("Using " <> T.pack s <> " GHC build")
         return (CompilerBuildSpecialized s)
 
+#if !WINDOWS
 -- | Encode an OpenBSD version (like "6.1") into a valid argument for
 -- CompilerBuildSpecialized, so "maj6-min1". Later version numbers are prefixed
 -- with "r".
@@ -629,7 +630,6 @@ mungeRelease = intercalate "-" . prefixMaj . splitOn "."
     prefixMaj = prefixFst "maj" prefixMin
     prefixMin = prefixFst "min" (map ('r':))
 
-#if !WINDOWS
 sysRelease :: (MonadUnliftIO m, MonadLogger m) => m String
 sysRelease =
   handleIO (\e -> do
