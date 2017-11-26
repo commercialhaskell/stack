@@ -202,7 +202,7 @@ loadLocalPackage boptsCli targets (name, lpv) = do
     let (exeCandidates, testCandidates, benchCandidates) =
             case mtarget of
                 Just (TargetComps comps) -> splitComponents $ Set.toList comps
-                Just (TargetAll packageType) -> assert (packageType == ProjectPackage)
+                Just (TargetAll _packageType) ->
                     ( packageExes pkg
                     , if boptsTests bopts
                         then Map.keysSet (packageTests pkg)

@@ -42,15 +42,12 @@ Behavior changes:
 * Addition of `stack build --copy-compiler-tool`, to allow tools like
   intero to be installed globally for a particular compiler.
   [#2643](https://github.com/commercialhaskell/stack/issues/2643)
-* Stack will now try to detect the width of the running terminal
-  (only on POSIX for the moment) and use that to better display
-  output messages. Work is ongoing, so some messages will not
-  be optimal yet. The terminal width can be overriden with the
-  new `--terminal-width` command-line option (this works even on
-  non-POSIX).
 * Stack will ask before saving hackage credentials to file. This new
   prompt can be avoided by using the `save-hackage-creds` setting. Please
   see [#2159](https://github.com/commercialhaskell/stack/issues/2159).
+* The `pvp-bounds` feature is no longer fully functional, due to some
+  issues with the Cabal library's printer. See
+  [#3550](https://github.com/commercialhaskell/stack/issues/3550).
 
 Other enhancements:
 
@@ -118,6 +115,23 @@ Other enhancements:
 * Avoid spurious rebuilds when using `--file-watch` by not watching files for
   executable, test and benchmark components that aren't a target. See:
   [#3483](https://github.com/commercialhaskell/stack/issues/3483).
+* Stack will now try to detect the width of the running terminal
+  (only on POSIX for the moment) and use that to better display
+  output messages. Work is ongoing, so some messages will not
+  be optimal yet. The terminal width can be overriden with the
+  new `--terminal-width` command-line option (this works even on
+  non-POSIX).
+* Passing non local packages as targets to `stack ghci` will now
+  cause them to be used as `-package` args along with package
+  hiding.
+* Detect when user changed .cabal file instead of package.yaml. This
+  was implemented upstream in hpack. See
+  [#3383](https://github.com/commercialhaskell/stack/issues/3383).
+* Automatically run `autoreconf -i` as necessary when a `configure`
+  script is missing. See
+  [#3534](https://github.com/commercialhaskell/stack/issues/3534)
+* GHC bindists can now be identified by their SHA256 checksum in addition to
+  their SHA1 checksum, allowing for more security in download.
 
 Bug fixes:
 

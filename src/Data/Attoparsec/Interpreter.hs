@@ -1,5 +1,6 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE CPP #-}
 {- |  This module implements parsing of additional arguments embedded in a
       comment when stack is invoked as a script interpreter
 
@@ -139,14 +140,18 @@ getInterpreterArgs file = do
 
     parseArgStr str =
       case P.parseOnly (argsParser Escaping) (pack str) of
-        Left err -> handleFailure ("Error parsing command specified in the \
-                        \stack options comment: " ++ err)
+        Left err -> handleFailure ("Error parsing command specified in the "
+                        ++ "stack options comment: " ++ err)
         Right [] -> handleFailure "Empty argument list in stack options comment"
         Right args -> return args
 
     decodeError e =
       case e of
+#if MIN_VERSION_conduit_extra(1,2,0)
+        ParseError ctxs _ (Position line col _) ->
+#else
         ParseError ctxs _ (Position line col) ->
+#endif
           if null ctxs
           then "Parse error"
           else ("Expecting " ++ intercalate " or " ctxs)
