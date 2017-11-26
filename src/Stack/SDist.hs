@@ -119,7 +119,7 @@ getSDistTarball mpvpBounds pkgDir = do
     logInfo $ "Getting file list for " <> T.pack pkgFp
     (fileList, cabalfp) <-  getSDistFileList lp
     logInfo $ "Building sdist tarball for " <> T.pack pkgFp
-    files <- normalizeTarballPaths (lines fileList)
+    files <- normalizeTarballPaths (map (T.unpack . stripCR . T.pack) (lines fileList))
 
     -- We're going to loop below and eventually find the cabal
     -- file. When we do, we'll upload this reference, if the
