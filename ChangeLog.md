@@ -190,6 +190,9 @@ Bug fixes:
 * Fixes a bug that has existed since 1.5.0, where
   `stack setup --upgrade-cabal` would say that Cabal is already the latest
   version, when it wasn't.
+* Ensure that an `extra-dep` from a local directory is not treated as
+  a `$locals` for GHC options purposes. See
+  [#3574](https://github.com/commercialhaskell/stack/issues/3574).
 
 
 ## 1.5.1
