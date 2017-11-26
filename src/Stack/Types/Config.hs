@@ -1602,6 +1602,7 @@ data DownloadInfo = DownloadInfo
       -- ^ URL or absolute file path
     , downloadInfoContentLength :: Maybe Int
     , downloadInfoSha1 :: Maybe ByteString
+    , downloadInfoSha256 :: Maybe ByteString
     } deriving (Show)
 
 instance FromJSON (WithJSONWarnings DownloadInfo) where
@@ -1613,11 +1614,13 @@ parseDownloadInfoFromObject o = do
     url <- o ..: "url"
     contentLength <- o ..:? "content-length"
     sha1TextMay <- o ..:? "sha1"
+    sha256TextMay <- o ..:? "sha256"
     return
         DownloadInfo
         { downloadInfoUrl = url
         , downloadInfoContentLength = contentLength
         , downloadInfoSha1 = fmap encodeUtf8 sha1TextMay
+        , downloadInfoSha256 = fmap encodeUtf8 sha256TextMay
         }
 
 data VersionedDownloadInfo = VersionedDownloadInfo

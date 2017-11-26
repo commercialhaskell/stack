@@ -127,6 +127,8 @@ Other enhancements:
 * Automatically run `autoreconf -i` as necessary when a `configure`
   script is missing. See
   [#3534](https://github.com/commercialhaskell/stack/issues/3534)
+* GHC bindists can now be identified by their SHA256 checksum in addition to
+  their SHA1 checksum, allowing for more security in download.
 
 Bug fixes:
 
