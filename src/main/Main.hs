@@ -268,11 +268,20 @@ commandLineHandler currentDir progName isInterpreter = complicatedOptions
                          buildCmd
                          (buildOptsParser Haddock)
         addCommand' "new"
-                    "Create a new project from a template. Run `stack templates' to see available templates."
+         (unwords [ "Create a new project from a template."
+                  , "Run `stack templates' to see available templates."
+                  , "Note: you can also specify a local file or a"
+                  , "remote URL as a template."
+                  ] )
                     newCmd
                     newOptsParser
         addCommand' "templates"
-                    "List the templates available for `stack new'."
+         (unwords [ "List the templates available for `stack new'."
+                  , "Templates are drawn from"
+                  , "https://github.com/commercialhaskell/stack-templates"
+                  , "Note: `stack new' can also accept a template from a"
+                  , "local file or a remote URL."
+                  ] )
                     templatesCmd
                     (pure ())
         addCommand' "init"

@@ -45,6 +45,7 @@ module Stack.Package
 
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Char8 as C8
+import qualified Data.HashSet as HashSet
 import           Data.List (isSuffixOf, partition, isPrefixOf)
 import           Data.List.Extra (nubOrd)
 import qualified Data.Map.Strict as M
@@ -195,22 +196,28 @@ readDotBuildinfo buildinfofp =
 
 -- | Print cabal file warnings.
 printCabalFileWarning
-    :: (MonadLogger m, HasRunner env, MonadReader env m)
-    => Path Abs File -> PWarning -> m ()
-printCabalFileWarning cabalfp =
-    \case
-        (PWarning x) ->
-            prettyWarnL
-                [ flow "Cabal file warning in"
-                , display cabalfp <> ":"
-                , flow x
-                ]
-        (UTFWarning ln msg) ->
-            prettyWarnL
-                [ flow "Cabal file warning in"
-                , display cabalfp <> ":" <> fromString (show ln) <> ":"
-                , flow msg
-                ]
+    :: HasRunner env
+    => Path Abs File
+    -> PWarning
+    -> RIO env ()
+printCabalFileWarning cabalfp warning' = do
+    let fp = toFilePath cabalfp
+    ref <- view $ runnerL.to runnerWarnedCabalFiles
+    join $ atomicModifyIORef' ref $ \hs ->
+      if fp `HashSet.member` hs
+        then (hs, return ())
+        else (HashSet.insert fp hs, prettyWarnL (toPretty warning'))
+  where
+    toPretty (PWarning x) =
+      [ flow "Cabal file warning in"
+      , display cabalfp <> ":"
+      , flow x
+      ]
+    toPretty (UTFWarning ln msg) =
+      [ flow "Cabal file warning in"
+      , display cabalfp <> ":" <> fromString (show ln) <> ":"
+      , flow msg
+      ]
 
 -- | Check if the given name in the @Package@ matches the name of the .cabal file
 checkCabalFileName :: MonadThrow m => PackageName -> Path Abs File -> m ()
@@ -1321,11 +1328,7 @@ hpack pkgDir = do
         config <- view configL
         case configOverrideHpack config of
             HpackBundled -> do
-#if MIN_VERSION_hpack(0,18,0)
-                r <- liftIO $ Hpack.hpackResult (Just $ toFilePath pkgDir)
-#else
-                r <- liftIO $ Hpack.hpackResult (toFilePath pkgDir)
-#endif
+                r <- liftIO $ Hpack.hpackResult (Just $ toFilePath pkgDir) Hpack.NoForce
                 forM_ (Hpack.resultWarnings r) prettyWarnS
                 let cabalFile = styleFile . fromString . Hpack.resultCabalFile $ r
                 case Hpack.resultStatus r of
@@ -1337,6 +1340,13 @@ hpack pkgDir = do
                         [ cabalFile
                         , flow "was generated with a newer version of hpack,"
                         , flow "please upgrade and try again."
+                        ]
+                    Hpack.ExistingCabalFileWasModifiedManually -> prettyWarnL
+                        [ flow "WARNING: "
+                        , cabalFile
+                        , flow " was modified manually.  Ignoring package.yaml in favor of cabal file."
+                        , flow "If you want to use package.yaml instead of the cabal file, "
+                        , flow "then please delete the cabal file."
                         ]
             HpackCommand command -> do
                 envOverride <- getMinimalEnvOverride

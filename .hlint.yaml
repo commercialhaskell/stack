@@ -16,6 +16,10 @@
 - ignore: {name: "Use &&&"}
 - ignore: {name: "Redundant compare"}
 
+# Added in hlint-2.0.10, ignoring for now
+- ignore: {name: "Unnecessary hiding"}
+- ignore: {name: "Use lambda-case"}
+
 - ignore: {name: "Use fewer imports", within: [
   "System.Process.Read",  # Related to 'Hide post-AMP warnings' comment
   "Stack.Exec"  # ifdef for System.Process.Read

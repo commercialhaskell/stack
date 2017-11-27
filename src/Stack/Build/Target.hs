@@ -205,18 +205,6 @@ parseRawTarget t =
 -- Resolve the raw targets
 ---------------------------------------------------------------------------------
 
--- | Simplified target information, after we've done a bunch of
--- resolving.
-data SimpleTarget
-    = STComponent !NamedComponent
-    -- ^ Targets a project package (non-dependency) with an explicit
-    -- component to be built.
-    | STDefaultComponents
-    -- ^ Targets a package with the default set of components (library
-    -- and all executables, plus test/bench for project packages if
-    -- the relevant flags are turned on).
-    deriving (Show, Eq, Ord)
-
 data ResolveResult = ResolveResult
   { rrName :: !PackageName
   , rrRaw :: !RawInput

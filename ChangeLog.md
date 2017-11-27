@@ -48,6 +48,9 @@ Behavior changes:
 * `ghc-options:` for specific packages will now come after the options
   specified for all packages / particular sets of packages. See
   [#3573](https://github.com/commercialhaskell/stack/issues/3573).
+* The `pvp-bounds` feature is no longer fully functional, due to some
+  issues with the Cabal library's printer. See
+  [#3550](https://github.com/commercialhaskell/stack/issues/3550).
 
 Other enhancements:
 
@@ -118,6 +121,17 @@ Other enhancements:
   be optimal yet. The terminal width can be overriden with the
   new `--terminal-width` command-line option (this works even on
   non-POSIX).
+* Passing non local packages as targets to `stack ghci` will now
+  cause them to be used as `-package` args along with package
+  hiding.
+* Detect when user changed .cabal file instead of package.yaml. This
+  was implemented upstream in hpack. See
+  [#3383](https://github.com/commercialhaskell/stack/issues/3383).
+* Automatically run `autoreconf -i` as necessary when a `configure`
+  script is missing. See
+  [#3534](https://github.com/commercialhaskell/stack/issues/3534)
+* GHC bindists can now be identified by their SHA256 checksum in addition to
+  their SHA1 checksum, allowing for more security in download.
 
 Bug fixes:
 
@@ -179,6 +193,9 @@ Bug fixes:
 * Fixes a bug that has existed since 1.5.0, where
   `stack setup --upgrade-cabal` would say that Cabal is already the latest
   version, when it wasn't.
+* Ensure that an `extra-dep` from a local directory is not treated as
+  a `$locals` for GHC options purposes. See
+  [#3574](https://github.com/commercialhaskell/stack/issues/3574).
 
 
 ## 1.5.1

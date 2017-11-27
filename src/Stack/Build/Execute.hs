@@ -813,6 +813,9 @@ ensureConfig newConfigCache pkgDir ExecuteEnv {..} announce cabal cabalfp task =
                 return $ fmap ignoreComponents mOldConfigCache /= Just (ignoreComponents newConfigCache)
                       || mOldCabalMod /= Just newCabalMod
     let ConfigureOpts dirs nodirs = configCacheOpts newConfigCache
+
+    when (taskBuildTypeConfig task) ensureConfigureScript
+
     when needConfig $ withMVar eeConfigureLock $ \_ -> do
         deleteCaches pkgDir
         announce
@@ -837,6 +840,19 @@ ensureConfig newConfigCache pkgDir ExecuteEnv {..} announce cabal cabalfp task =
         writeCabalMod pkgDir newCabalMod
 
     return needConfig
+  where
+    -- When build-type is Configure, we need to have a configure
+    -- script in the local directory. If it doesn't exist, build it
+    -- with autoreconf -i. See:
+    -- https://github.com/commercialhaskell/stack/issues/3534
+    ensureConfigureScript = do
+      let fp = pkgDir </> $(mkRelFile "configure")
+      exists <- doesFileExist fp
+      unless exists $ do
+        logInfo $ "Trying to generate configure with autoreconf in " <> T.pack (toFilePath pkgDir)
+        menv <- getMinimalEnvOverride
+        readProcessNull (Just pkgDir) menv "autoreconf" ["-i"] `catchAny` \ex ->
+          logWarn $ "Unable to run autoreconf: " <> T.pack (show ex)
 
 announceTask :: MonadLogger m => Task -> Text -> m ()
 announceTask task x = logInfo $ T.concat
@@ -991,7 +1007,7 @@ withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} md
                         -- should simply use all of them.
                         (Just customSetupDeps, _) -> do
                             unless (Map.member $(mkPackageName "Cabal") customSetupDeps) $
-                                prettyWarnL $
+                                prettyWarnL
                                     [ display $ packageName package
                                     , "has a setup-depends field, but it does not mention a Cabal dependency. This is likely to cause build errors."
                                     ]

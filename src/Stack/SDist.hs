@@ -113,13 +113,13 @@ getSDistTarball
 getSDistTarball mpvpBounds pkgDir = do
     config <- view configL
     let PvpBounds pvpBounds asRevision = fromMaybe (configPvpBounds config) mpvpBounds
-        tweakCabal = True -- pvpBounds /= PvpBoundsNone
+        tweakCabal = pvpBounds /= PvpBoundsNone
         pkgFp = toFilePath pkgDir
     lp <- readLocalPackage pkgDir
     logInfo $ "Getting file list for " <> T.pack pkgFp
     (fileList, cabalfp) <-  getSDistFileList lp
     logInfo $ "Building sdist tarball for " <> T.pack pkgFp
-    files <- normalizeTarballPaths (lines fileList)
+    files <- normalizeTarballPaths (map (T.unpack . stripCR . T.pack) (lines fileList))
 
     -- We're going to loop below and eventually find the cabal
     -- file. When we do, we'll upload this reference, if the
@@ -349,6 +349,7 @@ getSDistFileList lp =
         , taskAllInOne = True
         , taskCachePkgSrc = CacheSrcLocal (toFilePath (lpDir lp))
         , taskAnyMissing = True
+        , taskBuildTypeConfig = False
         }
 
 normalizeTarballPaths :: HasRunner env => [FilePath] -> RIO env [FilePath]
