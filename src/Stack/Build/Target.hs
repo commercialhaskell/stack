@@ -493,7 +493,6 @@ parseTargets needTargets boptscli = do
           ["The specified targets matched no packages"]
 
   root <- view projectRootL
-  menv <- getMinimalEnvOverride
 
   let dropMaybeKey (Nothing, _) = Map.empty
       dropMaybeKey (Just key, value) = Map.singleton key value
@@ -513,7 +512,7 @@ parseTargets needTargets boptscli = do
 
   (globals', snapshots, locals') <- withCabalLoader $ \loadFromIndex -> do
     addedDeps' <- fmap Map.fromList $ forM (Map.toList addedDeps) $ \(name, loc) -> do
-      bs <- loadSingleRawCabalFile loadFromIndex menv root loc
+      bs <- loadSingleRawCabalFile loadFromIndex root loc
       case rawParseGPD bs of
         Left e -> throwIO $ InvalidCabalFileInLocal loc e bs
         Right (_warnings, gpd) -> return (name, (gpd, loc, Nothing))
@@ -536,7 +535,7 @@ parseTargets needTargets boptscli = do
           ]
 
     calculatePackagePromotion
-      loadFromIndex menv root ls0 (Map.elems allLocals)
+      loadFromIndex root ls0 (Map.elems allLocals)
       flags hides options drops
 
   let ls = LoadedSnapshot

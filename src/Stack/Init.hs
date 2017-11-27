@@ -490,8 +490,7 @@ checkBundleResolver whichCmd stackYaml initOpts bundle sd = do
       -- set of packages.
       findOneIndependent packages flags = do
           platform <- view platformL
-          menv <- getMinimalEnvOverride
-          (compiler, _) <- getResolverConstraints menv Nothing stackYaml sd
+          (compiler, _) <- getResolverConstraints Nothing stackYaml sd
           let getGpd pkg = snd (fromMaybe (error "findOneIndependent: getGpd") (Map.lookup pkg bundle))
               getFlags pkg = fromMaybe (error "fromOneIndependent: getFlags") (Map.lookup pkg flags)
               deps pkg = gpdPackageDeps (getGpd pkg) compiler platform

@@ -427,10 +427,9 @@ buildExtractedTarball :: HasEnvConfig env => Path Abs Dir -> RIO env ()
 buildExtractedTarball pkgDir = do
   projectRoot <- view projectRootL
   envConfig <- view envConfigL
-  menv <- getMinimalEnvOverride
   localPackageToBuild <- readLocalPackage pkgDir
   let packageEntries = bcPackages (envConfigBuildConfig envConfig)
-      getPaths = resolveMultiPackageLocation menv projectRoot
+      getPaths = resolveMultiPackageLocation projectRoot
   allPackagePaths <- fmap (map fst . mconcat) (mapM getPaths packageEntries)
   -- We remove the path based on the name of the package
   let isPathToRemove path = do

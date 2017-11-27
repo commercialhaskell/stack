@@ -95,9 +95,8 @@ loadSourceMapFull needTargets boptsCli = do
             PLIndex pir -> return $ PSIndex loc (lpiFlags lpi) configOpts pir
             PLOther pl -> do
               -- FIXME lots of code duplication with getLocalPackages
-              menv <- getMinimalEnvOverride
               root <- view projectRootL
-              dir <- resolveSinglePackageLocation menv root pl
+              dir <- resolveSinglePackageLocation root pl
               cabalfp <- findOrGenerateCabalFile dir
               bs <- liftIO (S.readFile (toFilePath cabalfp))
               (warnings, gpd) <-
