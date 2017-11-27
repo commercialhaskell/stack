@@ -49,6 +49,9 @@ Behavior changes:
   every program stack runs. Instead, it will only be passed through
   commands like `exec`, `runghc`, `script`, `ghci`, etc.
   See [#3444](https://github.com/commercialhaskell/stack/issues/3444).
+* `ghc-options:` for specific packages will now come after the options
+  specified for all packages / particular sets of packages. See
+  [#3573](https://github.com/commercialhaskell/stack/issues/3573).
 * The `pvp-bounds` feature is no longer fully functional, due to some
   issues with the Cabal library's printer. See
   [#3550](https://github.com/commercialhaskell/stack/issues/3550).
