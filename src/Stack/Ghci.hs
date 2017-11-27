@@ -66,7 +66,7 @@ data GhciOpts = GhciOpts
     , ghciMainIs             :: !(Maybe Text)
     , ghciLoadLocalDeps      :: !Bool
     , ghciSkipIntermediate   :: !Bool
-    , ghciHidePackages       :: !Bool
+    , ghciHidePackages       :: !(Maybe Bool)
     , ghciNoBuild            :: !Bool
     , ghciOnlyMain           :: !Bool
     } deriving Show
@@ -138,15 +138,19 @@ ghci opts@GhciOpts{..} = do
             return (targetMap, Just (fileInfo, extraFiles))
     -- Get a list of all the local target packages.
     localTargets <- getAllLocalTargets opts inputTargets mainIsTargets sourceMap
+    -- Get a list of all the non-local target packages.
+    nonLocalTargets <- getAllNonLocalTargets inputTargets
     -- Check if additional package arguments are sensible.
     addPkgs <- checkAdditionalPackages ghciAdditionalPackages
     -- Build required dependencies and setup local packages.
+    stackYaml <- view stackYamlL
     buildDepsAndInitialSteps opts (map (packageNameText . fst) localTargets)
+    targetWarnings stackYaml localTargets nonLocalTargets mfileTargets
     -- Load the list of modules _after_ building, to catch changes in unlisted dependencies (#1180)
     pkgs <- getGhciPkgInfos buildOptsCLI sourceMap addPkgs (fmap fst mfileTargets) localTargets
     checkForIssues pkgs
     -- Finally, do the invocation of ghci
-    runGhci opts localTargets mainIsTargets pkgs (maybe [] snd mfileTargets)
+    runGhci opts localTargets mainIsTargets pkgs (maybe [] snd mfileTargets) (nonLocalTargets ++ addPkgs)
 
 preprocessTargets :: HasEnvConfig env => BuildOptsCLI -> [Text] -> RIO env (Either [Path Abs File] (Map PackageName Target))
 preprocessTargets buildOptsCLI rawTargets = do
@@ -198,10 +202,12 @@ findFileTargets locals fileTargets = do
     results <- forM foundFileTargetComponents $ \(fp, xs) ->
         case xs of
             [] -> do
-                prettyWarn $
-                    "Couldn't find a component for file target" <+>
-                    display fp <>
-                    ". Attempting to load anyway."
+                prettyWarn $ vsep
+                    [ "Couldn't find a component for file target" <+>
+                      display fp <>
+                      ". This means that the correct ghc options might not be used."
+                    , "Attempting to load the file anyway."
+                    ]
                 return $ Left fp
             [x] -> do
                 prettyInfo $
@@ -268,6 +274,14 @@ getAllLocalTargets GhciOpts{..} targets0 mainIsTargets sourceMap = do
                     ]
             return (directlyWanted ++ extraLoadDeps)
 
+getAllNonLocalTargets
+    :: Map PackageName Target
+    -> RIO env [PackageName]
+getAllNonLocalTargets targets = do
+  let isNonLocal (TargetAll Dependency) = True
+      isNonLocal _ = False
+  return $ map fst $ filter (isNonLocal . snd) (M.toList targets)
+
 buildDepsAndInitialSteps :: HasEnvConfig env => GhciOpts -> [Text] -> RIO env ()
 buildDepsAndInitialSteps GhciOpts{..} targets0 = do
     let targets = targets0 ++ map T.pack ghciAdditionalPackages
@@ -299,14 +313,26 @@ runGhci
     -> Maybe (Map PackageName Target)
     -> [GhciPkgInfo]
     -> [Path Abs File]
+    -> [PackageName]
     -> RIO env ()
-runGhci GhciOpts{..} targets mainIsTargets pkgs extraFiles = do
+runGhci GhciOpts{..} targets mainIsTargets pkgs extraFiles exposePackages = do
     config <- view configL
     wc <- view $ actualCompilerVersionL.whichCompilerL
-    let pkgopts = hidePkgOpt ++ genOpts ++ ghcOpts
-        hidePkgOpt = if null pkgs || not ghciHidePackages then [] else ["-hide-all-packages"]
+    let pkgopts = hidePkgOpts ++ genOpts ++ ghcOpts
+        shouldHidePackages =
+          fromMaybe (not (null pkgs && null exposePackages)) ghciHidePackages
+        hidePkgOpts =
+          if shouldHidePackages
+            then "-hide-all-packages" :
+              -- This is necessary, because current versions of ghci
+              -- will entirely fail to start if base isn't visible. This
+              -- is because it tries to use the interpreter to set
+              -- buffering options on standard IO.
+              "-package" : "base" :
+              concatMap (\n -> ["-package", packageNameString n]) exposePackages
+            else []
         oneWordOpts bio
-            | ghciHidePackages = bioOneWordOpts bio ++ bioPackageFlags bio
+            | shouldHidePackages = bioOneWordOpts bio ++ bioPackageFlags bio
             | otherwise = bioOneWordOpts bio
         genOpts = nubOrd (concatMap (concatMap (oneWordOpts . snd) . ghciPkgOpts) pkgs)
         (omittedOpts, ghcOpts) = partition badForGhci $
@@ -681,6 +707,40 @@ checkForDuplicateModules pkgs = do
     allModules =
         M.toList $ M.fromListWith (++) $
         concatMap (\pkg -> map ((, [ghciPkgName pkg]) . C.display) (S.toList (ghciPkgModules pkg))) pkgs
+
+targetWarnings
+  :: HasRunner env
+  => Path Abs File
+  -> [(PackageName, (Path Abs File, Target))]
+  -> [PackageName]
+  -> Maybe (Map PackageName (Set (Path Abs File)), [Path Abs File])
+  -> RIO env ()
+targetWarnings stackYaml localTargets nonLocalTargets mfileTargets = do
+  unless (null nonLocalTargets) $
+    prettyWarnL
+      [ flow "Some targets"
+      , parens $ fillSep $ punctuate "," $ map (styleGood . display) nonLocalTargets
+      , flow "are not local packages, and so cannot be directly loaded."
+      , flow "In future versions of stack, this might be supported - see"
+      , styleUrl "https://github.com/commercialhaskell/stack/issues/1441"
+      , "."
+      , flow "It can still be useful to specify these, as they will be passed to ghci via -package flags."
+      ]
+  when (null localTargets && isNothing mfileTargets) $
+      prettyWarn $ vsep
+          [ flow "No local targets specified, so ghci will not use any options from your package.yaml / *.cabal files."
+          , ""
+          , flow "Potential ways to resolve this:"
+          , bulletedList
+              [ fillSep
+                  [ flow "If you want to use the package.yaml / *.cabal package in the current directory, use"
+                  , styleShell "stack init"
+                  , flow "to create a new stack.yaml."
+                  ]
+              , flow "Add to the 'packages' field of" <+> display stackYaml
+              ]
+          , ""
+          ]
 
 -- Adds in intermediate dependencies between ghci targets. Note that it
 -- will return a Lib component for these intermediate dependencies even

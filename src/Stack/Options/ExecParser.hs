@@ -17,7 +17,14 @@ execOptsParser mcmd =
         <*> execOptsExtraParser
   where
     eoCmdParser = ExecCmd <$> strArgument (metavar "CMD" <> completer projectExeCompleter)
-    eoArgsParser = many (strArgument (metavar "-- ARGS (e.g. stack ghc -- X.hs -o x)"))
+    eoArgsParser = many (strArgument (metavar txt))
+      where
+        txt = case mcmd of
+            Nothing -> normalTxt
+            Just ExecCmd{} -> normalTxt
+            Just ExecGhc -> "-- ARGS (e.g. stack runghc -- X.hs -o x)"
+            Just ExecRunGhc -> "-- ARGS (e.g. stack runghc -- X.hs)"
+        normalTxt = "-- ARGS (e.g. stack exec -- ghc-pkg describe base)"
 
 evalOptsParser :: String -- ^ metavar
                -> Parser EvalOpts
@@ -36,6 +43,7 @@ execOptsExtraParser = eoPlainParser <|>
                          <$> eoEnvSettingsParser
                          <*> eoPackagesParser
                          <*> eoRtsOptionsParser
+                         <*> eoCwdParser
   where
     eoEnvSettingsParser :: Parser EnvSettings
     eoEnvSettingsParser = EnvSettings
@@ -64,3 +72,11 @@ execOptsExtraParser = eoPlainParser <|>
     eoPlainParser = flag' ExecOptsPlain
                           (long "plain" <>
                            help "Use an unmodified environment (only useful with Docker)")
+
+    eoCwdParser :: Parser (Maybe FilePath)
+    eoCwdParser = optional
+                  (strOption (long "cwd"
+                             <> help "Sets the working directory before executing"
+                             <> metavar "DIR"
+                             <> completer dirCompleter)
+                  )

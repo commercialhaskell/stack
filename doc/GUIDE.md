@@ -1085,7 +1085,7 @@ The following changes will be made to stack.yaml:
     - aeson-0.10.0.0
     - aeson-compat-0.3.0.0
     - attoparsec-0.13.0.1
-    - conduit-extra-1.1.9.2
+    - conduit-extra-1.2.0
     - email-validate-2.2.0
     - hex-0.1.2
     - http-api-data-0.2.2
@@ -1579,8 +1579,9 @@ what needs to be removed:
 We've already used `stack exec` used multiple times in this guide. As you've
 likely already guessed, it allows you to run executables, but with a slightly
 modified environment. In particular: `stack exec` looks for executables on
-stack's bin paths, and sets a few additional environment variables (like
-`GHC_PACKAGE_PATH`, which tells GHC which package databases to use).
+stack's bin paths, and sets a few additional environment variables (like adding
+those paths to `PATH`, and setting `GHC_PACKAGE_PATH`, which tells GHC which
+package databases to use).
 
 If you want to see exactly what the modified environment looks like, try:
 
@@ -1789,7 +1790,7 @@ it. Here is an example:
 -}
 ```
 
-## Finding project configs, and the implicit global
+## Finding project configs, and the implicit global project
 
 Whenever you run something with stack, it needs a `stack.yaml` project file. The
 algorithm stack uses to find this is:
@@ -1819,6 +1820,15 @@ Keep in mind that there's nothing magical about this implicit global
 configuration. It has no impact on projects at all. Every package you install
 with it is put into isolated databases just like everywhere else. The only magic
 is that it's the catch-all project whenever you're running stack somewhere else.
+
+## Setting stack root location
+
+`stack path --stack-root` will tell you the location of the "stack root". Among
+other things, this is where stack stores downloaded programs and snapshot
+packages. This location can be configured by setting the STACK_ROOT environment
+variable or passing the `--stack-root` commandline option. It is particularly
+useful to do this on Windows, where filepaths are limited (MAX_PATH), and things
+can break when this limit is exceeded.
 
 ## `stack.yaml` vs `.cabal` files
 
@@ -1899,21 +1909,6 @@ __Other tools for comparison (including active and historical)__
 * [cabal-src](https://hackage.haskell.org/package/cabal-src) is mostly irrelevant in the presence of both stack and cabal sandboxes, both of which make it easier to add additional package sources easily. The mega-sdist executable that ships with cabal-src is, however, still relevant. Its functionality may some day be folded into stack
 * [stackage-cli](https://hackage.haskell.org/package/stackage-cli) was an initial attempt to make cabal-install work more easily with curated snapshots, but due to a slight impedance mismatch between cabal.config constraints and snapshots, it did not work as well as hoped. It is deprecated in favor of stack.
 
-## More resources
-
-There are lots of resources available for learning more about stack:
-
-* `stack --help`
-* `stack --version` — identify the version and Git hash of the stack executable
-* `--verbose` (or `-v`) — much more info about internal operations (useful for bug reports)
-* The [home page](http://haskellstack.org)
-* The [stack mailing list](https://groups.google.com/d/forum/haskell-stack)
-* The [the FAQ](faq.md)
-* The [stack wiki](https://github.com/commercialhaskell/stack/wiki)
-* The [haskell-stack tag on Stack Overflow](http://stackoverflow.com/questions/tagged/haskell-stack)
-* [Another getting started with stack tutorial](http://seanhess.github.io/2015/08/04/practical-haskell-getting-started.html)
-* [Why is stack not cabal?](https://www.fpcomplete.com/blog/2015/06/why-is-stack-not-cabal)
-
 
 ## Fun features
 
@@ -1962,11 +1957,11 @@ As a starting point you can use [the "simple" template](https://github.com/comme
 An introduction into template-writing and a place for submitting official templates,
 you will find at [the stack-templates repository](https://github.com/commercialhaskell/stack-templates#readme).
 
-### IDE
+### Editor integration
 
-stack has a work-in-progress suite of editor integrations, to do things like
-getting type information in Emacs. For more information, see
-[stack-ide](https://github.com/commercialhaskell/stack-ide#readme).
+For editor integration, stack has a related project called
+[intero](https://github.com/commercialhaskell/intero).  It is particularly well
+supported by emacs, but some other editors have integration for it as well.
 
 ### Visualizing dependencies
 
@@ -2039,11 +2034,11 @@ image:
 and then run `stack image container` and then `docker images` to list
 the images.
 
-Note that the executable will be built in the development environment 
-and copied to the container, so the dev OS must match that of the 
+Note that the executable will be built in the development environment
+and copied to the container, so the dev OS must match that of the
 container OS. This is easily accomplished using [Docker integration](docker_integration.md),
-under which the exe emitted by `stack build` will be built on the 
-Docker container, not the local OS. 
+under which the exe emitted by `stack build` will be built on the
+Docker container, not the local OS.
 
 The executable will be stored under `/usr/local/bin/<your-project>-exe`
 in the running container.
@@ -2159,6 +2154,14 @@ build:
   executable-profiling: true
 ```
 
+### Further reading
+
+For more commands and uses, see [the official GHC chapter on
+profiling](https://downloads.haskell.org/~ghc/latest/docs/html/users_guide/profiling.html),
+[the Haskell wiki](https://wiki.haskell.org/How_to_profile_a_Haskell_program),
+and [the chapter on profiling in Real World
+Haskell](http://book.realworldhaskell.org/read/profiling-and-optimization.html).
+
 ### Tracing
 
 To generate a backtrace in case of exceptions during a test or benchmarks run,
@@ -2169,14 +2172,21 @@ but adds the `+RTS -xc` runtime option.
 
 `stack` now supports debugging and profiling with
 [DWARF information](https://ghc.haskell.org/trac/ghc/wiki/DWARF),
-using the `--no-strip`, `--no-library-stripping`, and `--no-executable-shipping`
+using the `--no-strip`, `--no-library-stripping`, and `--no-executable-stripping`
 flags to disable the default behavior of removing such information from compiled
 libraries and executables.
 
-### Further reading
+## More resources
 
-For more commands and uses, see [the official GHC chapter on
-profiling](https://downloads.haskell.org/~ghc/latest/docs/html/users_guide/profiling.html),
-[the Haskell wiki](https://wiki.haskell.org/How_to_profile_a_Haskell_program),
-and [the chapter on profiling in Real World
-Haskell](http://book.realworldhaskell.org/read/profiling-and-optimization.html).
+There are lots of resources available for learning more about stack:
+
+* `stack --help`
+* `stack --version` — identify the version and Git hash of the stack executable
+* `--verbose` (or `-v`) — much more info about internal operations (useful for bug reports)
+* The [home page](http://haskellstack.org)
+* The [stack mailing list](https://groups.google.com/d/forum/haskell-stack)
+* The [the FAQ](faq.md)
+* The [stack wiki](https://github.com/commercialhaskell/stack/wiki)
+* The [haskell-stack tag on Stack Overflow](http://stackoverflow.com/questions/tagged/haskell-stack)
+* [Another getting started with stack tutorial](http://seanhess.github.io/2015/08/04/practical-haskell-getting-started.html)
+* [Why is stack not cabal?](https://www.fpcomplete.com/blog/2015/06/why-is-stack-not-cabal)

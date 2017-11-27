@@ -306,7 +306,10 @@ getSetupExe setupHs setupShimHs tmpdir = do
                     , toFilePath tmpOutputPath
                     ] ++
                     ["-build-runner" | wc == Ghcjs]
-            runCmd' (\cp -> cp { std_out = UseHandle stderr }) (Cmd (Just tmpdir) (compilerExeName wc) menv args) Nothing
+            callProcess' (\cp -> cp { std_out = UseHandle stderr }) (Cmd (Just tmpdir) (compilerExeName wc) menv args)
+                `catch` \(ProcessExitedUnsuccessfully _ ec) -> do
+                    compilerPath <- getCompilerPath wc
+                    throwM $ SetupHsBuildFailure ec Nothing compilerPath args Nothing []
             when (wc == Ghcjs) $ renameDir tmpJsExePath jsExePath
             renameFile tmpExePath exePath
             return $ Just exePath
@@ -758,7 +761,7 @@ getConfigCache ExecuteEnv {..} task@Task {..} installedMap enableTest enableBenc
                         -> installedToGhcPkgId ident installed
                 Just installed -> installedToGhcPkgId ident installed
                 _ -> error "singleBuild: invariant violated, missing package ID missing"
-        installedToGhcPkgId ident (Library ident' x) = assert (ident == ident') $ Just (ident, x)
+        installedToGhcPkgId ident (Library ident' x _) = assert (ident == ident') $ Just (ident, x)
         installedToGhcPkgId _ (Executable _) = Nothing
         missing' = Map.fromList $ mapMaybe getMissing $ Set.toList missing
         TaskConfigOpts missing mkOpts = taskConfigOpts
@@ -788,11 +791,12 @@ ensureConfig :: HasEnvConfig env
              -> RIO env () -- ^ announce
              -> (ExcludeTHLoading -> [String] -> RIO env ()) -- ^ cabal
              -> Path Abs File -- ^ .cabal file
+             -> Task
              -> RIO env Bool
-ensureConfig newConfigCache pkgDir ExecuteEnv {..} announce cabal cabalfp = do
+ensureConfig newConfigCache pkgDir ExecuteEnv {..} announce cabal cabalfp task = do
     newCabalMod <- liftIO (fmap modTime (D.getModificationTime (toFilePath cabalfp)))
     needConfig <-
-        if boptsReconfigure eeBuildOpts
+        if boptsReconfigure eeBuildOpts || taskAnyMissing task
             then return True
             else do
                 -- We can ignore the components portion of the config
@@ -810,6 +814,9 @@ ensureConfig newConfigCache pkgDir ExecuteEnv {..} announce cabal cabalfp = do
                 return $ fmap ignoreComponents mOldConfigCache /= Just (ignoreComponents newConfigCache)
                       || mOldCabalMod /= Just newCabalMod
     let ConfigureOpts dirs nodirs = configCacheOpts newConfigCache
+
+    when (taskBuildTypeConfig task) ensureConfigureScript
+
     when needConfig $ withMVar eeConfigureLock $ \_ -> do
         deleteCaches pkgDir
         announce
@@ -834,6 +841,19 @@ ensureConfig newConfigCache pkgDir ExecuteEnv {..} announce cabal cabalfp = do
         writeCabalMod pkgDir newCabalMod
 
     return needConfig
+  where
+    -- When build-type is Configure, we need to have a configure
+    -- script in the local directory. If it doesn't exist, build it
+    -- with autoreconf -i. See:
+    -- https://github.com/commercialhaskell/stack/issues/3534
+    ensureConfigureScript = do
+      let fp = pkgDir </> $(mkRelFile "configure")
+      exists <- doesFileExist fp
+      unless exists $ do
+        logInfo $ "Trying to generate configure with autoreconf in " <> T.pack (toFilePath pkgDir)
+        menv <- getMinimalEnvOverride
+        readProcessNull (Just pkgDir) menv "autoreconf" ["-i"] `catchAny` \ex ->
+          logWarn $ "Unable to run autoreconf: " <> T.pack (show ex)
 
 announceTask :: MonadLogger m => Task -> Text -> m ()
 announceTask task x = logInfo $ T.concat
@@ -988,6 +1008,11 @@ withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} md
                         -- explicit list of dependencies, and we
                         -- should simply use all of them.
                         (Just customSetupDeps, _) -> do
+                            unless (Map.member $(mkPackageName "Cabal") customSetupDeps) $
+                                prettyWarnL
+                                    [ display $ packageName package
+                                    , "has a setup-depends field, but it does not mention a Cabal dependency. This is likely to cause build errors."
+                                    ]
                             allDeps <-
                                 case mdeps of
                                     Just x -> return x
@@ -1074,9 +1099,9 @@ withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} md
                                         =$= CT.decodeUtf8Lenient
                                         $$ mungeBuildOutput stripTHLoading makeAbsolute pkgDir compilerVer
                                         =$ CL.consume
-                        throwM $ CabalExitedUnsuccessfully
+                        throwM $ SetupHsBuildFailure
                             ec
-                            taskProvides
+                            (Just taskProvides)
                             exeName
                             fullArgs
                             (fmap fst mlogFile)
@@ -1105,10 +1130,9 @@ withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} md
                         ExcludeTHLoading -> ConvertPathsToAbsolute
                         KeepTHLoading    -> KeepPathsAsIs
 
-            wc <- view $ actualCompilerVersionL.whichCompilerL
-            exeName <- case (esetupexehs, wc) of
-                (Left setupExe, _) -> return setupExe
-                (Right setuphs, compiler) -> do
+            exeName <- case esetupexehs of
+                Left setupExe -> return setupExe
+                Right setuphs -> do
                     distDir <- distDirFromDir pkgDir
                     let setupDir = distDir </> $(mkRelDir "setup")
                         outputFile = setupDir </> $(mkRelFile "setup")
@@ -1117,6 +1141,7 @@ withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} md
                         then return outputFile
                         else do
                             ensureDir setupDir
+                            compiler <- view $ actualCompilerVersionL.whichCompilerL
                             compilerPath <-
                                 case compiler of
                                     Ghc -> eeGetGhcPath
@@ -1295,7 +1320,7 @@ singleBuild runInBase ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} in
                 return $ Just $
                     case mpkgid of
                         Nothing -> assert False $ Executable taskProvides
-                        Just pkgid -> Library taskProvides pkgid
+                        Just pkgid -> Library taskProvides pkgid Nothing
       where
         bindir = toFilePath $ bcoSnapInstallRoot eeBaseConfigOpts </> bindirSuffix
 
@@ -1307,12 +1332,12 @@ singleBuild runInBase ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} in
                       ("Building all executables for `" <> packageNameText (packageName package) <>
                        "' once. After a successful build of all of them, only specified executables will be rebuilt."))
 
-            _neededConfig <- ensureConfig cache pkgDir ee (announce ("configure" <> annSuffix executableBuildStatuses)) cabal cabalfp
+            _neededConfig <- ensureConfig cache pkgDir ee (announce ("configure" <> annSuffix executableBuildStatuses)) cabal cabalfp task
 
             let installedMapHasThisPkg :: Bool
                 installedMapHasThisPkg =
                     case Map.lookup (packageName package) installedMap of
-                        Just (_, Library ident _) -> ident == taskProvides
+                        Just (_, Library ident _ _) -> ident == taskProvides
                         Just (_, Executable _) -> True
                         _ -> False
 
@@ -1355,8 +1380,9 @@ singleBuild runInBase ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} in
         preBuildTime <- modTime <$> liftIO getCurrentTime
         let postBuildCheck _succeeded = do
                 mlocalWarnings <- case taskType of
-                    TTFiles lp Local | lpWanted lp -> do -- FIXME is lpWanted correct here?
+                    TTFiles lp Local -> do
                         warnings <- checkForUnlistedFiles taskType preBuildTime pkgDir
+                        -- TODO: Perhaps only emit these warnings for non extra-dep?
                         return (Just (lpCabalFile lp, warnings))
                     _ -> return Nothing
                 -- NOTE: once
@@ -1411,7 +1437,7 @@ singleBuild runInBase ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} in
                              "found on PATH (use 'stack install hscolour' to install).")
                         return ["--hyperlink-source" | hscolourExists]
             cabal KeepTHLoading $ concat
-                [ ["haddock", "--html", "--html-location=../$pkg-$version/"]
+                [ ["haddock", "--html", "--hoogle", "--html-location=../$pkg-$version/"]
                 , sourceFlag
                 , ["--internal" | boptsHaddockInternal eeBuildOpts]
                 , [ "--haddock-option=" <> opt
@@ -1446,7 +1472,7 @@ singleBuild runInBase ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} in
                 mpkgid <- loadInstalledPkg eeEnvOverride wc [installedPkgDb] installedDumpPkgsTVar (packageName package)
                 case mpkgid of
                     Nothing -> throwM $ Couldn'tFindPkgId $ packageName package
-                    Just pkgid -> return $ Library ident pkgid
+                    Just pkgid -> return $ Library ident pkgid Nothing
             NoLibraries -> do
                 markExeInstalled (taskLocation task) taskProvides -- TODO unify somehow with writeFlagCache?
                 return $ Executable ident
@@ -1669,9 +1695,14 @@ singleTest runInBase topts testsToRun ac ee task installedMap = do
                         -- tidiness.
                         when needHpc $
                             updateTixFile (packageName package) tixPath testName'
-                        return $ case ec of
-                            ExitSuccess -> Map.empty
-                            _ -> Map.singleton testName $ Just ec
+                        let announceResult result = announce $ "Test suite " <> testName <> " " <> result
+                        case ec of
+                            ExitSuccess -> do
+                                announceResult "passed"
+                                return Map.empty
+                            _ -> do
+                                announceResult "failed"
+                                return $ Map.singleton testName (Just ec)
                     else do
                         logError $ T.pack $ show $ TestSuiteExeMissing
                             (packageBuildType package == Just C.Simple)

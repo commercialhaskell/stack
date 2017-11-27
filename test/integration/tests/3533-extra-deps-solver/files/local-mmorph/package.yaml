@@ -1,0 +1,10 @@
+name: mmorph
+version: 1.2.0
+
+dependencies:
+- base
+- acme-missiles
+
+library:
+  source-dirs:
+  - src

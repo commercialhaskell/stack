@@ -36,7 +36,7 @@ module Stack.Setup
 import qualified    Codec.Archive.Tar as Tar
 import              Control.Applicative (empty)
 import              Control.Monad.State (get, put, modify)
-import "cryptonite" Crypto.Hash (SHA1(..))
+import "cryptonite" Crypto.Hash (SHA1(..), SHA256(..))
 import              Data.Aeson.Extended
 import qualified    Data.ByteString as S
 import qualified    Data.ByteString.Char8 as S8
@@ -51,7 +51,6 @@ import              Data.Foldable (maximumBy)
 import qualified    Data.HashMap.Strict as HashMap
 import              Data.IORef.RunOnce (runOnce)
 import              Data.List hiding (concat, elem, maximumBy, any)
-import              Data.List.Split (splitOn)
 import qualified    Data.Map as Map
 import qualified    Data.Set as Set
 import qualified    Data.Text as T
@@ -107,6 +106,7 @@ import              Text.Printf (printf)
 
 #if !WINDOWS
 import              Bindings.Uname (uname, release)
+import              Data.List.Split (splitOn)
 import              Foreign.C (throwErrnoIfMinus1_, peekCString)
 import              Foreign.Marshal (alloca)
 import              System.Posix.Files (setFileMode)
@@ -623,6 +623,7 @@ getGhcBuild menv = do
         logDebug ("Using " <> T.pack s <> " GHC build")
         return (CompilerBuildSpecialized s)
 
+#if !WINDOWS
 -- | Encode an OpenBSD version (like "6.1") into a valid argument for
 -- CompilerBuildSpecialized, so "maj6-min1". Later version numbers are prefixed
 -- with "r".
@@ -636,7 +637,6 @@ mungeRelease = intercalate "-" . prefixMaj . splitOn "."
     prefixMaj = prefixFst "maj" prefixMin
     prefixMin = prefixFst "min" (map ('r':))
 
-#if !WINDOWS
 sysRelease :: (MonadUnliftIO m, MonadLogger m) => m String
 sysRelease =
   handleIO (\e -> do
@@ -673,26 +673,31 @@ upgradeCabal :: (HasConfig env, HasGHCVariant env)
              -> WhichCompiler
              -> UpgradeTo
              -> RIO env ()
-upgradeCabal menv wc cabalVersion = do
+upgradeCabal menv wc upgradeTo = do
     logInfo "Manipulating the global Cabal is only for debugging purposes"
     let name = $(mkPackageName "Cabal")
     rmap <- resolvePackages Nothing mempty (Set.singleton name)
     installed <- getCabalPkgVer menv wc
-    case cabalVersion of
-        Specific version -> do
-            if installed /= version then
-                doCabalInstall menv wc installed version
+    case upgradeTo of
+        Specific wantedVersion -> do
+            if installed /= wantedVersion then
+                doCabalInstall menv wc installed wantedVersion
             else
                 logInfo $ T.concat ["No install necessary. Cabal "
                                     , T.pack $ versionString installed
                                     , " is already installed"]
         Latest     -> case map rpIdent rmap of
             [] -> throwString "No Cabal library found in index, cannot upgrade"
-            [PackageIdentifier name' version] | name == name' -> do
-                if installed > version then
-                    doCabalInstall menv wc installed version
+            [PackageIdentifier name' latestVersion] | name == name' -> do
+                if installed < latestVersion then
+                    doCabalInstall menv wc installed latestVersion
                 else
-                    logInfo $ "No upgrade necessary. Latest Cabal already installed"
+                    logInfo $ T.concat
+                        [ "No upgrade necessary: Cabal-"
+                        , T.pack $ versionString latestVersion
+                        , " is the same or newer than latest hackage version "
+                        , T.pack $ versionString installed
+                        ]
             x -> error $ "Unexpected results for resolvePackages: " ++ show x
 
 -- Configure and run the necessary commands for a cabal install
@@ -702,19 +707,19 @@ doCabalInstall :: (HasConfig env, HasGHCVariant env)
                -> Version
                -> Version
                -> RIO env ()
-doCabalInstall menv wc installed version = do
+doCabalInstall menv wc installed wantedVersion = do
     withSystemTempDir "stack-cabal-upgrade" $ \tmpdir -> do
         logInfo $ T.concat
             [ "Installing Cabal-"
-            , T.pack $ versionString version
+            , T.pack $ versionString wantedVersion
             , " to replace "
             , T.pack $ versionString installed
             ]
         let name = $(mkPackageName "Cabal")
-            ident = PackageIdentifier name version
+            ident = PackageIdentifier name wantedVersion
         m <- unpackPackageIdents tmpdir Nothing [PackageIdentifierRevision ident CFILatest]
         compilerPath <- join $ findExecutable menv (compilerExeName wc)
-        versionDir <- parseRelDir $ versionString version
+        versionDir <- parseRelDir $ versionString wantedVersion
         let installRoot = toFilePath $ parent (parent compilerPath)
                                     </> $(mkRelDir "new-cabal")
                                     </> versionDir
@@ -854,7 +859,12 @@ downloadAndInstallCompiler ghcBuild si wanted@GhcVersion{} versionCheck mbindist
                 _ -> throwM RequireCustomGHCVariant
             case wanted of
                 GhcVersion version ->
-                    return (version, GHCDownloadInfo mempty mempty (DownloadInfo (T.pack bindistURL) Nothing Nothing))
+                    return (version, GHCDownloadInfo mempty mempty DownloadInfo
+                             { downloadInfoUrl = T.pack bindistURL
+                             , downloadInfoContentLength = Nothing
+                             , downloadInfoSha1 = Nothing
+                             , downloadInfoSha256 = Nothing
+                             })
                 _ ->
                     throwM WantedMustBeGHC
         _ -> do
@@ -955,13 +965,17 @@ downloadFromInfo programsDir downloadInfo tool = do
             chattyDownload (T.pack (toolString tool)) downloadInfo path
             return path
         (parseAbsFile -> Just path) -> do
-            let DownloadInfo{downloadInfoContentLength=contentLength, downloadInfoSha1=sha1} =
+            let DownloadInfo{downloadInfoContentLength=contentLength, downloadInfoSha1=sha1,
+                             downloadInfoSha256=sha256} =
                     downloadInfo
             when (isJust contentLength) $
                 logWarn ("`content-length` in not checked \n" <>
                           "and should not be specified when `url` is a file path")
             when (isJust sha1) $
                 logWarn ("`sha1` is not checked and \n" <>
+                          "should not be specified when `url` is a file path")
+            when (isJust sha256) $
+                logWarn ("`sha256` is not checked and \n" <>
                           "should not be specified when `url` is a file path")
             return path
         _ ->
@@ -1382,26 +1396,19 @@ withUnpackedTarball7z name si archiveFile archiveType msrcDir destDir = do
             TarGz -> return ".gz"
             _ -> throwString $ name ++ " must be a tarball file"
     tarFile <-
-        case T.stripSuffix suffix $ T.pack $ toFilePath archiveFile of
+        case T.stripSuffix suffix $ T.pack $ toFilePath (filename archiveFile) of
             Nothing -> throwString $ "Invalid " ++ name ++ " filename: " ++ show archiveFile
-            Just x -> parseAbsFile $ T.unpack x
+            Just x -> parseRelFile $ T.unpack x
     run7z <- setup7z si
     let tmpName = toFilePathNoTrailingSep (dirname destDir) ++ "-tmp"
     ensureDir (parent destDir)
     withRunInIO $ \run -> withTempDir (parent destDir) tmpName $ \tmpDir -> run $ do
         liftIO $ ignoringAbsence (removeDirRecur destDir)
-        run7z (parent archiveFile) archiveFile
-        run7z tmpDir tarFile
+        run7z tmpDir archiveFile
+        run7z tmpDir (tmpDir </> tarFile)
         absSrcDir <- case msrcDir of
             Just srcDir -> return $ tmpDir </> srcDir
             Nothing -> expectSingleUnpackedDir archiveFile tmpDir
-        removeFile tarFile `catchIO` \e ->
-            logWarn (T.concat
-                [ "Exception when removing "
-                , T.pack $ toFilePath tarFile
-                , ": "
-                , T.pack $ show e
-                ])
         renameDir absSrcDir destDir
 
 expectSingleUnpackedDir :: (MonadIO m, MonadThrow m) => Path Abs File -> Path Abs Dir -> m (Path Abs Dir)
@@ -1442,7 +1449,7 @@ setup7z si = do
 
 chattyDownload :: HasRunner env
                => Text          -- ^ label
-               -> DownloadInfo  -- ^ URL, content-length, and sha1
+               -> DownloadInfo  -- ^ URL, content-length, sha1, and sha256
                -> Path Abs File -- ^ destination
                -> RIO env ()
 chattyDownload label downloadInfo path = do
@@ -1460,20 +1467,25 @@ chattyDownload label downloadInfo path = do
       , T.pack $ toFilePath path
       , " ..."
       ]
-    hashChecks <- case downloadInfoSha1 downloadInfo of
-        Just sha1ByteString -> do
-            let sha1 = CheckHexDigestByteString sha1ByteString
+    hashChecks <- fmap catMaybes $ forM
+      [ ("sha1",   HashCheck SHA1,   downloadInfoSha1)
+      , ("sha256", HashCheck SHA256, downloadInfoSha256)
+      ]
+      $ \(name, constr, getter) ->
+        case getter downloadInfo of
+          Just bs -> do
             logDebug $ T.concat
-                [ "Will check against sha1 hash: "
-                , T.decodeUtf8With T.lenientDecode sha1ByteString
+                [ "Will check against "
+                , name
+                , " hash: "
+                , T.decodeUtf8With T.lenientDecode bs
                 ]
-            return [HashCheck SHA1 sha1]
-        Nothing -> do
-            logWarn $ T.concat
-                [ "No sha1 found in metadata,"
-                , " download hash won't be checked."
-                ]
-            return []
+            return $ Just $ constr $ CheckHexDigestByteString bs
+          Nothing -> return Nothing
+    when (null hashChecks) $ logWarn $ T.concat
+        [ "No sha1 or sha256 found in metadata,"
+        , " download hash won't be checked."
+        ]
     let dReq = DownloadRequest
             { drRequest = req
             , drHashChecks = hashChecks

@@ -14,6 +14,7 @@ module Stack.Solver
     , mergeConstraints
     , solveExtraDeps
     , solveResolverSpec
+    , checkSnapBuildPlanActual
     -- * Internal - for tests
     , parseCabalOutputLine
     ) where
@@ -40,6 +41,7 @@ import qualified Data.Yaml as Yaml
 import qualified Distribution.Package as C
 import qualified Distribution.PackageDescription as C
 import qualified Distribution.Text as C
+import           Lens.Micro (set)
 import           Path
 import           Path.Find (findFiles)
 import           Path.IO hiding (findExecutable, findFiles, withSystemTempDir)
@@ -419,6 +421,15 @@ solveResolverSpec stackYaml cabalDirs
                 -- returned versions or flags different from the snapshot.
                 inSnapChanged = Map.differenceWith diffConstraints
                                                    inSnap snapConstraints
+
+                           -- If a package appears in both the
+                           -- snapshot and locally, we don't want to
+                           -- include it in extra-deps. This makes
+                           -- sure we filter out such packages. See:
+                           -- https://github.com/commercialhaskell/stack/issues/3533
+
+                                    `Map.difference` srcConstraints
+
                 -- Packages neither in snapshot, nor srcs
                 extra = Map.difference deps (Map.union srcConstraints
                                                        snapConstraints)
@@ -490,7 +501,7 @@ getResolverConstraints menv mcompilerVersion stackYaml sd = do
 -- file.
 -- Subdirectories can be included depending on the @recurse@ parameter.
 findCabalFiles
-  :: (MonadIO m, MonadLogger m, HasRunner env, MonadReader env m)
+  :: (MonadIO m, MonadUnliftIO m, MonadLogger m, HasRunner env, MonadReader env m, HasConfig env)
   => Bool -> Path Abs Dir -> m [Path Abs File]
 findCabalFiles recurse dir = do
     liftIO (findFiles dir isHpack subdirFilter) >>= mapM_ (hpack . parent)
@@ -586,8 +597,8 @@ formatGroup :: [String] -> String
 formatGroup = concatMap (\path -> "- " <> path <> "\n")
 
 reportMissingCabalFiles
-  :: (MonadIO m, MonadThrow m, MonadLogger m,
-      HasRunner env, MonadReader env m)
+  :: (MonadIO m, MonadUnliftIO m, MonadThrow m, MonadLogger m,
+      HasRunner env, MonadReader env m, HasConfig env)
   => [Path Abs File]   -- ^ Directories to scan
   -> Bool              -- ^ Whether to scan sub-directories
   -> m ()
@@ -647,7 +658,7 @@ solveExtraDeps modStackYaml = do
         srcConstraints    = mergeConstraints oldSrcs oldSrcFlags
         extraConstraints  = mergeConstraints oldExtraVersions oldExtraFlags
 
-    resolverResult <- checkSnapBuildPlan (parent stackYaml) gpds (Just oldSrcFlags) sd
+    resolverResult <- checkSnapBuildPlanActual (parent stackYaml) gpds (Just oldSrcFlags) sd
     resultSpecs <- case resolverResult of
         BuildPlanCheckOk flags ->
             return $ Just (mergeConstraints oldSrcs flags, Map.empty)
@@ -752,6 +763,37 @@ solveExtraDeps modStackYaml = do
             , "        - Add extra dependencies to guide solver.\n"
             , "        - Adjust resolver.\n"
             ]
+
+-- | Same as 'checkSnapBuildPLan', but set up a real GHC if needed.
+--
+-- If we're using a Stackage snapshot, we can use the snapshot hints
+-- to determine global library information. This will not be available
+-- for custom and GHC resolvers, however. Therefore, we insist that it
+-- be installed first. Fortunately, the standard `stack solver`
+-- behavior only chooses Stackage snapshots, so the common case will
+-- not force the installation of a bunch of GHC versions.
+checkSnapBuildPlanActual
+    :: (HasConfig env, HasGHCVariant env)
+    => Path Abs Dir -- ^ project root, used for checking out necessary files
+    -> [C.GenericPackageDescription]
+    -> Maybe (Map PackageName (Map FlagName Bool))
+    -> SnapshotDef
+    -> RIO env BuildPlanCheck
+checkSnapBuildPlanActual root gpds flags sd = do
+    let forNonSnapshot = Just <$> setupCabalEnv (sdWantedCompilerVersion sd)
+    mactualCompiler <-
+      case sdResolver sd of
+        ResolverSnapshot _ -> return Nothing
+        ResolverCompiler _ -> forNonSnapshot
+        ResolverCustom _ _ -> forNonSnapshot
+
+    let inner = checkSnapBuildPlan root gpds flags sd
+    case mactualCompiler of
+      Nothing -> inner Nothing
+      Just (modifiedPath, actualCompiler) -> do
+        env0 <- ask
+        let env = set envOverrideL (const $ return modifiedPath) env0
+        runRIO env $ inner (Just actualCompiler)
 
 prettyPath
     :: forall r t m. (MonadIO m, RelPath (Path r t) ~ Path Rel t, AnyPath (Path r t))

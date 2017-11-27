@@ -31,6 +31,9 @@ Behavior changes:
   `stack.yaml` will promote it to a local package, providing for more
   consistency with flags and better reproducibility. See:
   [#849](https://github.com/commercialhaskell/stack/issues/849)
+* The `package-indices` setting with Hackage no longer works with the
+  `00-index.tar.gz` tarball, but must use the `01-index.tar.gz` file
+  to allow revised packages to be found.
 * Options passsed via `--ghci-options` are now passed to the end of the
   invocation of ghci, instead of the middle.  This allows using `+RTS`
   without an accompanying `-RTS`.
@@ -39,22 +42,22 @@ Behavior changes:
 * Addition of `stack build --copy-compiler-tool`, to allow tools like
   intero to be installed globally for a particular compiler.
   [#2643](https://github.com/commercialhaskell/stack/issues/2643)
-* Stack will now try to detect the width of the running terminal
-  (only on POSIX for the moment) and use that to better display
-  output messages. Work is ongoing, so some messages will not
-  be optimal yet. The terminal width can be overriden with the
-  new `--terminal-width` command-line option (this works even on
-  non-POSIX).
 * Stack will ask before saving hackage credentials to file. This new
   prompt can be avoided by using the `save-hackage-creds` setting. Please
   see [#2159](https://github.com/commercialhaskell/stack/issues/2159).
-* The `GHCRTS` environment variable will no longer be passed to
+* The `GHCRTS` environment variable will no longer be passed through to 
   every program stack runs. Instead, it will only be passed through
   commands like `exec`, `runghc`, `script`, `ghci`, etc.
   See [#3444](https://github.com/commercialhaskell/stack/issues/3444).
+* The `pvp-bounds` feature is no longer fully functional, due to some
+  issues with the Cabal library's printer. See
+  [#3550](https://github.com/commercialhaskell/stack/issues/3550).
 
 Other enhancements:
 
+* The `with-hpack` configuration option specifies an Hpack executable to use
+  instead of the Hpack bundled with Stack. Please
+  see [#3179](https://github.com/commercialhaskell/stack/issues/3179).
 * It's now possible to skip tests and benchmarks using `--skip`
   flag
 * `GitSHA1` is now `StaticSHA256` and is implemented using the `StaticSize 64 ByteString` for improved performance.
@@ -73,14 +76,9 @@ Other enhancements:
   assist with the user experience when the `PATH` environment variable
   has not been properly configured, see
   [#3232](https://github.com/commercialhaskell/stack/issues/3232).
-* Introduce the `Stack.StaticBytes` module for more efficiently
-  holding statically-known byte sizes.
 * `stack setup` for ghcjs will now install `alex` and `happy` if
   they are not present.  See
   [#3109](https://github.com/commercialhaskell/stack/issues/3232).
-* `--ghc-options` and `--ghcjs-boot-options` now parse their input, so
-  multiple arguments can be passed in one option.
-  See [#3315](https://github.com/commercialhaskell/stack/issues/3315)
 * Added `stack ghci --only-main` flag, to skip loading / importing
   all but main modules. See the ghci documentation page
   for further info.
@@ -103,9 +101,43 @@ Other enhancements:
 * When using Nix, nix-shell now depends always on gcc to prevent build errors
   when using the FFI. As ghc depends on gcc anyway, this doesn't increase the
   dependency footprint.
+* `--cwd DIR` can now be passed to `stack exec` in order to execute the
+  program in a different directory. See:
+  [#3264](https://github.com/commercialhaskell/stack/issues/3264)
+* Plan construction will detect if you add an executable-only package
+  as a library dependency, resulting in much clearer error
+  messages. See:
+  [#2195](https://github.com/commercialhaskell/stack/issues/2195).
+* Addition of `--ghc-options` to `stack script` to pass options directly
+  to GHC. See:
+  [#3454](https://github.com/commercialhaskell/stack/issues/3454)
+* Add hpack `package.yaml` to build Stack itself
+* Add `ignore-revision-mismatch` setting. See:
+  [#3520](https://github.com/commercialhaskell/stack/issues/3520).
+* Log when each individual test suite finishes. See:
+  [#3552](https://github.com/commercialhaskell/stack/issues/3552).
+* Stack will now try to detect the width of the running terminal
+  (only on POSIX for the moment) and use that to better display
+  output messages. Work is ongoing, so some messages will not
+  be optimal yet. The terminal width can be overriden with the
+  new `--terminal-width` command-line option (this works even on
+  non-POSIX).
+* Passing non local packages as targets to `stack ghci` will now
+  cause them to be used as `-package` args along with package
+  hiding.
+* Detect when user changed .cabal file instead of package.yaml. This
+  was implemented upstream in hpack. See
+  [#3383](https://github.com/commercialhaskell/stack/issues/3383).
+* Automatically run `autoreconf -i` as necessary when a `configure`
+  script is missing. See
+  [#3534](https://github.com/commercialhaskell/stack/issues/3534)
+* GHC bindists can now be identified by their SHA256 checksum in addition to
+  their SHA1 checksum, allowing for more security in download.
 
 Bug fixes:
 
+* `stack hoogle` correctly generates Hoogle databases. See:
+  [#3362](https://github.com/commercialhaskell/stack/issues/3362)
 * `stack --docker-help` is now clearer about --docker implying
    system-ghc: true, rather than both --docker and --no-docker.
 * `stack haddock` now includes package names for all modules in the
@@ -141,6 +173,30 @@ Bug fixes:
 * docs.haskellstack.org RTD documentation search is replaced by the mkdocs
   search. Please see
   [#3376](https://github.com/commercialhaskell/stack/issues/3376).
+* `stack clean` now works with nix.  See
+  [#3468](https://github.com/commercialhaskell/stack/issues/3376).
+* `stack build --only-dependencies` no longer builds local project packages
+  that are depended on. See
+  [#3476](https://github.com/commercialhaskell/stack/issues/3476).
+* Properly handle relative paths stored in the precompiled cache files. See
+  [#3431](https://github.com/commercialhaskell/stack/issues/3431).
+* In some cases, Cabal does not realize that it needs to reconfigure, and must
+  be told to do so automatically. This would manifest as a "shadowed
+  dependency" error message. We now force a reconfigure whenever a dependency is
+  built, even if the package ID remained the same. See
+  [#2781](https://github.com/commercialhaskell/stack/issues/2781).
+* When `--pvp-bounds` is enabled for sdist or upload, internal
+  dependencies could cause errors when uploaded to hackage.  This is
+  fixed, see [#3290](https://github.com/commercialhaskell/stack/issues/3290)
+* Fixes a bug where nonexistent hackage versions would cause stack to
+  suggest the same package name, without giving version info. See
+  [#3562](https://github.com/commercialhaskell/stack/issues/3562)
+* Fixes a bug that has existed since 1.5.0, where
+  `stack setup --upgrade-cabal` would say that Cabal is already the latest
+  version, when it wasn't.
+* Ensure that an `extra-dep` from a local directory is not treated as
+  a `$locals` for GHC options purposes. See
+  [#3574](https://github.com/commercialhaskell/stack/issues/3574).
 
 
 ## 1.5.1
@@ -219,6 +275,9 @@ Other enhancements:
   on the PATH or shadowed by another entry.
 * Allow running tests on tarball created by sdist and upload
   [#717](https://github.com/commercialhaskell/stack/issues/717).
+* For filesystem setup-info paths, it's no longer assumed that the
+  directory is writable, instead a temp dir is used.  See
+  [#3188](https://github.com/commercialhaskell/stack/issues/3188).
 
 Bug fixes:
 
@@ -339,7 +398,7 @@ Other enhancements:
   ([#2986](https://github.com/commercialhaskell/stack/issues/2986))
 * `stack exec` now takes `--rts-options` which passes the given arguments inside of
   `+RTS ... args .. -RTS` to the executable. This works around stack itself consuming
-  the RTS flags on Windows. ([#2986](https://github.com/commercialhaskell/stack/issues/2640))
+  the RTS flags on Windows. ([#2640](https://github.com/commercialhaskell/stack/issues/2640))
 * Upgraded `http-client-tls` version, which now offers support for the
   `socks5://` and `socks5h://` values in the `http_proxy` and `https_proxy`
   environment variables.

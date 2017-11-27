@@ -20,7 +20,7 @@ import qualified System.FilePath as FilePath
 -- | Command-line arguments parser for configuration.
 configOptsParser :: FilePath -> GlobalOptsContext -> Parser ConfigMonoid
 configOptsParser currentDir hide0 =
-    (\stackRoot workDir buildOpts dockerOpts nixOpts systemGHC installGHC arch ghcVariant ghcBuild jobs includes libs overrideGccPath skipGHCCheck skipMsys localBin modifyCodePage allowDifferentUser dumpLogs -> mempty
+    (\stackRoot workDir buildOpts dockerOpts nixOpts systemGHC installGHC arch ghcVariant ghcBuild jobs includes libs overrideGccPath overrideHpack skipGHCCheck skipMsys localBin modifyCodePage allowDifferentUser dumpLogs -> mempty
         { configMonoidStackRoot = stackRoot
         , configMonoidWorkDir = workDir
         , configMonoidBuildOpts = buildOpts
@@ -36,6 +36,7 @@ configOptsParser currentDir hide0 =
         , configMonoidExtraIncludeDirs = includes
         , configMonoidExtraLibDirs = libs
         , configMonoidOverrideGccPath = overrideGccPath
+        , configMonoidOverrideHpack = overrideHpack
         , configMonoidSkipMsys = skipMsys
         , configMonoidLocalBinPath = localBin
         , configMonoidModifyCodePage = modifyCodePage
@@ -101,6 +102,12 @@ configOptsParser currentDir hide0 =
              ( long "with-gcc"
             <> metavar "PATH-TO-GCC"
             <> help "Use gcc found at PATH-TO-GCC"
+            <> hide
+             ))
+    <*> optionalFirst (strOption
+             ( long "with-hpack"
+            <> metavar "HPACK"
+            <> help "Use HPACK executable (overrides bundled Hpack)"
             <> hide
              ))
     <*> firstBoolFlags

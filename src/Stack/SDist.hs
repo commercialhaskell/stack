@@ -40,8 +40,10 @@ import           Data.Time.Clock.POSIX
 import           Distribution.Package (Dependency (..))
 import qualified Distribution.PackageDescription as Cabal
 import qualified Distribution.PackageDescription.Check as Check
+import qualified Distribution.PackageDescription.Parse as Cabal
 import           Distribution.PackageDescription.PrettyPrint (showGenericPackageDescription)
-import           Distribution.Text (display)
+import qualified Distribution.Types.UnqualComponentName as Cabal
+import qualified Distribution.Text as Cabal
 import           Distribution.Version (simplifyVersionRange, orLaterVersion, earlierVersion, hasUpperBound, hasLowerBound)
 import           Lens.Micro (set)
 import           Path
@@ -51,7 +53,9 @@ import           Stack.Build.Execute
 import           Stack.Build.Installed
 import           Stack.Build.Source (loadSourceMap)
 import           Stack.Build.Target hiding (PackageType (..))
+import           Stack.BuildPlan
 import           Stack.PackageLocation (resolveMultiPackageLocation)
+import           Stack.PrettyPrint
 import           Stack.Constants
 import           Stack.Package
 import           Stack.Types.Build
@@ -115,7 +119,7 @@ getSDistTarball mpvpBounds pkgDir = do
     logInfo $ "Getting file list for " <> T.pack pkgFp
     (fileList, cabalfp) <-  getSDistFileList lp
     logInfo $ "Building sdist tarball for " <> T.pack pkgFp
-    files <- normalizeTarballPaths (lines fileList)
+    files <- normalizeTarballPaths (map (T.unpack . stripCR . T.pack) (lines fileList))
 
     -- We're going to loop below and eventually find the cabal
     -- file. When we do, we'll upload this reference, if the
@@ -176,7 +180,10 @@ getCabalLbs pvpBounds mrev fp = do
                                 , getInstalledSymbols = False
                                 }
                                 sourceMap
-    let gpd' = gtraverseT (addBounds sourceMap installedMap) gpd
+    let internalPackages = Set.fromList $
+          gpdPackageName gpd :
+          map (fromCabalPackageName . Cabal.unqualComponentNameToPackageName . fst) (Cabal.condSubLibraries gpd)
+        gpd' = gtraverseT (addBounds internalPackages sourceMap installedMap) gpd
         gpd'' =
           case mrev of
             Nothing -> gpd'
@@ -190,22 +197,72 @@ getCabalLbs pvpBounds mrev fp = do
                   $ Cabal.packageDescription gpd'
                   }
               }
-    ident <- parsePackageIdentifierFromString $ display $ Cabal.package $ Cabal.packageDescription gpd''
+    ident <- parsePackageIdentifierFromString $ Cabal.display $ Cabal.package $ Cabal.packageDescription gpd''
+    -- Sanity rendering and reparsing the input, to ensure there are no
+    -- cabal bugs, since there have been bugs here before, and currently
+    -- are at the time of writing:
+    --
+    -- https://github.com/haskell/cabal/issues/1202
+    -- https://github.com/haskell/cabal/issues/2353
+    -- https://github.com/haskell/cabal/issues/4863 (current issue)
+    let roundtripErrs =
+          [ flow "Bug detected in Cabal library. ((parse . render . parse) === id) does not hold for the cabal file at"
+          <+> display path
+          , ""
+          ]
+    case Cabal.parseGenericPackageDescription (showGenericPackageDescription gpd) of
+      Cabal.ParseOk _ roundtripped
+        | roundtripped == gpd -> return ()
+        | otherwise -> do
+            prettyWarn $ vsep $ roundtripErrs ++
+              [ "This seems to be fixed in development versions of Cabal, but at time of writing, the fix is not in any released versions."
+              , ""
+              ,  "Please see this GitHub issue for status:" <+> styleUrl "https://github.com/commercialhaskell/stack/issues/3549"
+              , ""
+              , fillSep
+                [ flow "If the issue is closed as resolved, then you may be able to fix this by upgrading to a newer version of stack via"
+                , styleShell "stack upgrade"
+                , flow "for latest stable version or"
+                , styleShell "stack upgrade --git"
+                , flow "for the latest development version."
+                ]
+              , ""
+              , fillSep
+                [ flow "If the issue is fixed, but updating doesn't solve the problem, please check if there are similar open issues, and if not, report a new issue to the stack issue tracker, at"
+                , styleUrl "https://github.com/commercialhaskell/stack/issues/new"
+                ]
+              , ""
+              , flow "If the issue is not fixed, feel free to leave a comment on it indicating that you would like it to be fixed."
+              , ""
+              ]
+      Cabal.ParseFailed err -> do
+        prettyWarn $ vsep $ roundtripErrs ++
+          [ flow "In particular, parsing the rendered cabal file is yielding a parse error.  Please check if there are already issues tracking this, and if not, please report new issues to the stack and cabal issue trackers, via"
+          , bulletedList
+            [ styleUrl "https://github.com/commercialhaskell/stack/issues/new"
+            , styleUrl "https://github.com/haskell/cabal/issues/new"
+            ]
+          , flow $ "The parse error is: " ++ show err
+          , ""
+          ]
     return
       ( ident
       , TLE.encodeUtf8 $ TL.pack $ showGenericPackageDescription gpd''
       )
   where
-    addBounds :: SourceMap -> InstalledMap -> Dependency -> Dependency
-    addBounds sourceMap installedMap dep@(Dependency cname range) =
-      case lookupVersion (fromCabalPackageName cname) of
-        Nothing -> dep
-        Just version -> Dependency cname $ simplifyVersionRange
-          $ (if toAddUpper && not (hasUpperBound range) then addUpper version else id)
-          $ (if toAddLower && not (hasLowerBound range) then addLower version else id)
-            range
+    addBounds :: Set PackageName -> SourceMap -> InstalledMap -> Dependency -> Dependency
+    addBounds internalPackages sourceMap installedMap dep@(Dependency cname range) =
+      if name `Set.member` internalPackages
+        then dep
+        else case foundVersion of
+          Nothing -> dep
+          Just version -> Dependency cname $ simplifyVersionRange
+            $ (if toAddUpper && not (hasUpperBound range) then addUpper version else id)
+            $ (if toAddLower && not (hasLowerBound range) then addLower version else id)
+              range
       where
-        lookupVersion name =
+        name = fromCabalPackageName cname
+        foundVersion =
           case Map.lookup name sourceMap of
               Just ps -> Just (piiVersion ps)
               Nothing ->
@@ -291,6 +348,8 @@ getSDistFileList lp =
         , taskPresent = Map.empty
         , taskAllInOne = True
         , taskCachePkgSrc = CacheSrcLocal (toFilePath (lpDir lp))
+        , taskAnyMissing = True
+        , taskBuildTypeConfig = False
         }
 
 normalizeTarballPaths :: HasRunner env => [FilePath] -> RIO env [FilePath]

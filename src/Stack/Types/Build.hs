@@ -111,6 +111,13 @@ data StackBuildException
         [String]         -- cabal arguments
         (Maybe (Path Abs File)) -- logfiles location
         [Text]     -- log contents
+  | SetupHsBuildFailure
+        ExitCode
+        (Maybe PackageIdentifier) -- which package's custom setup, is simple setup if Nothing
+        (Path Abs File)  -- ghc Executable
+        [String]         -- ghc arguments
+        (Maybe (Path Abs File)) -- logfiles location
+        [Text]     -- log contents
   | ExecutionFailure [SomeException]
   | LocalPackageDoesn'tMatchTarget
         PackageName
@@ -220,23 +227,9 @@ instance Show StackBuildException where
               "Unsupported test suite type: " <> show interface
      -- Supressing duplicate output
     show (CabalExitedUnsuccessfully exitCode taskProvides' execName fullArgs logFiles bss) =
-        let fullCmd = unwords
-                    $ dropQuotes (toFilePath execName)
-                    : map (T.unpack . showProcessArgDebug) fullArgs
-            logLocations = maybe "" (\fp -> "\n    Logs have been written to: " ++ toFilePath fp) logFiles
-        in "\n--  While building package " ++ dropQuotes (show taskProvides') ++ " using:\n" ++
-           "      " ++ fullCmd ++ "\n" ++
-           "    Process exited with code: " ++ show exitCode ++
-           (if exitCode == ExitFailure (-9)
-                then " (THIS MAY INDICATE OUT OF MEMORY)"
-                else "") ++
-           logLocations ++
-           (if null bss
-                then ""
-                else "\n\n" ++ doubleIndent (map T.unpack bss))
-         where
-          doubleIndent = dropWhileEnd isSpace . unlines . fmap (\line -> "    " ++ line)
-          dropQuotes = filter ('\"' /=)
+      showBuildError False exitCode (Just taskProvides') execName fullArgs logFiles bss
+    show (SetupHsBuildFailure exitCode mtaskProvides execName fullArgs logFiles bss) =
+      showBuildError True exitCode mtaskProvides execName fullArgs logFiles bss
     show (ExecutionFailure es) = intercalate "\n\n" $ map show es
     show (LocalPackageDoesn'tMatchTarget name localV requestedV) = concat
         [ "Version for local package "
@@ -338,6 +331,40 @@ missingExeError isSimpleBuildType msg =
             then []
             else ["The Setup.hs file is changing the installation target dir."]
 
+showBuildError
+  :: Bool
+  -> ExitCode
+  -> Maybe PackageIdentifier
+  -> Path Abs File
+  -> [String]
+  -> Maybe (Path Abs File)
+  -> [Text]
+  -> String
+showBuildError isBuildingSetup exitCode mtaskProvides execName fullArgs logFiles bss =
+  let fullCmd = unwords
+              $ dropQuotes (toFilePath execName)
+              : map (T.unpack . showProcessArgDebug) fullArgs
+      logLocations = maybe "" (\fp -> "\n    Logs have been written to: " ++ toFilePath fp) logFiles
+  in "\n--  While building " ++
+     (case (isBuildingSetup, mtaskProvides) of
+       (False, Nothing) -> error "Invariant violated: unexpected case in showBuildError"
+       (False, Just taskProvides') -> "package " ++ dropQuotes (show taskProvides')
+       (True, Nothing) -> "simple Setup.hs"
+       (True, Just taskProvides') -> "custom Setup.hs for package " ++ dropQuotes (show taskProvides')
+     ) ++
+     " using:\n      " ++ fullCmd ++ "\n" ++
+     "    Process exited with code: " ++ show exitCode ++
+     (if exitCode == ExitFailure (-9)
+          then " (THIS MAY INDICATE OUT OF MEMORY)"
+          else "") ++
+     logLocations ++
+     (if null bss
+          then ""
+          else "\n\n" ++ doubleIndent (map T.unpack bss))
+   where
+    doubleIndent = dropWhileEnd isSpace . unlines . fmap (\line -> "    " ++ line)
+    dropQuotes = filter ('\"' /=)
+
 instance Exception StackBuildException
 
 ----------------------------------------------
@@ -404,6 +431,20 @@ data Task = Task
     , taskAllInOne        :: !Bool
     -- ^ indicates that the package can be built in one step
     , taskCachePkgSrc     :: !CachePkgSrc
+    , taskAnyMissing      :: !Bool
+    -- ^ Were any of the dependencies missing? The reason this is
+    -- necessary is... hairy. And as you may expect, a bug in
+    -- Cabal. See:
+    -- <https://github.com/haskell/cabal/issues/4728#issuecomment-337937673>. The
+    -- problem is that Cabal may end up generating the same package ID
+    -- for a dependency, even if the ABI has changed. As a result,
+    -- without this field, Stack would think that a reconfigure is
+    -- unnecessary, when in fact we _do_ need to reconfigure. The
+    -- details here suck. We really need proper hashes for package
+    -- identifiers.
+    , taskBuildTypeConfig :: !Bool
+    -- ^ Is the build type of this package Configure. Check out
+    -- ensureConfigureScript in Stack.Build.Execute for the motivation
     }
     deriving Show
 
@@ -565,6 +606,7 @@ configureOptsNoDir econfig bco deps isLocal package = concat
     , map ("--extra-include-dirs=" ++) (Set.toList (configExtraIncludeDirs config))
     , map ("--extra-lib-dirs=" ++) (Set.toList (configExtraLibDirs config))
     , maybe [] (\customGcc -> ["--with-gcc=" ++ toFilePath customGcc]) (configOverrideGccPath config)
+    , hpackOptions (configOverrideHpack config)
     , ["--ghcjs" | wc == Ghcjs]
     , ["--exact-configuration" | useExactConf]
     ]
@@ -588,6 +630,9 @@ configureOptsNoDir econfig bco deps isLocal package = concat
     depOptions = map (uncurry toDepOption) $ Map.toList deps
       where
         toDepOption = if newerCabal then toDepOption1_22 else toDepOption1_18
+
+    hpackOptions HpackBundled = []
+    hpackOptions (HpackCommand cmd) = ["--with-hpack=" ++ cmd]
 
     toDepOption1_22 ident gid = concat
         [ "--dependency="

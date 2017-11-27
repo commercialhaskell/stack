@@ -58,6 +58,7 @@ module Stack.Types.Config
   -- ** ApplyGhcOptions
   ,ApplyGhcOptions(..)
   -- ** ConfigException
+  ,HpackExecutable(..)
   ,ConfigException(..)
   -- ** WhichSolverCmd
   ,WhichSolverCmd(..)
@@ -306,6 +307,8 @@ data Config =
          -- ^ How many concurrent jobs to run, defaults to number of capabilities
          ,configOverrideGccPath     :: !(Maybe (Path Abs File))
          -- ^ Optional gcc override path
+         ,configOverrideHpack       :: !HpackExecutable
+         -- ^ Use Hpack executable (overrides bundled Hpack)
          ,configExtraIncludeDirs    :: !(Set FilePath)
          -- ^ --extra-include-dirs arguments
          ,configExtraLibDirs        :: !(Set FilePath)
@@ -355,7 +358,16 @@ data Config =
          ,configSaveHackageCreds    :: !Bool
          -- ^ Should we save Hackage credentials to a file?
          ,configRunner              :: !Runner
+         ,configIgnoreRevisionMismatch :: !Bool
+         -- ^ Ignore a revision mismatch when loading up cabal files,
+         -- and fall back to the latest revision. See:
+         -- <https://github.com/commercialhaskell/stack/issues/3520>
          }
+
+data HpackExecutable
+    = HpackBundled
+    | HpackCommand String
+    deriving (Show, Read, Eq, Ord)
 
 -- | Which packages do ghc-options on the command line apply to?
 data ApplyGhcOptions = AGOTargets -- ^ all local targets
@@ -424,6 +436,7 @@ data ExecOptsExtra
         { eoEnvSettings :: !EnvSettings
         , eoPackages :: ![String]
         , eoRtsOptions :: ![String]
+        , eoCwd :: !(Maybe FilePath)
         }
     deriving (Show)
 
@@ -707,6 +720,8 @@ data ConfigMonoid =
     -- ^ See: 'configExtraLibDirs'
     , configMonoidOverrideGccPath    :: !(First (Path Abs File))
     -- ^ Allow users to override the path to gcc
+    ,configMonoidOverrideHpack       :: !(First FilePath)
+    -- ^ Use Hpack executable (overrides bundled Hpack)
     ,configMonoidConcurrentTests     :: !(First Bool)
     -- ^ See: 'configConcurrentTests'
     ,configMonoidLocalBinPath        :: !(First FilePath)
@@ -749,6 +764,8 @@ data ConfigMonoid =
     -- ^ See 'configDumpLogs'
     , configMonoidSaveHackageCreds   :: !(First Bool)
     -- ^ See 'configSaveHackageCreds'
+    , configMonoidIgnoreRevisionMismatch :: !(First Bool)
+    -- ^ See 'configIgnoreRevisionMismatch'
     }
   deriving (Show, Generic)
 
@@ -791,6 +808,7 @@ parseConfigMonoidObject rootDir obj = do
     configMonoidExtraLibDirs <- fmap (Set.map (toFilePath rootDir FilePath.</>)) $
         obj ..:?  configMonoidExtraLibDirsName ..!= Set.empty
     configMonoidOverrideGccPath <- First <$> obj ..:? configMonoidOverrideGccPathName
+    configMonoidOverrideHpack <- First <$> obj ..:? configMonoidOverrideHpackName
     configMonoidConcurrentTests <- First <$> obj ..:? configMonoidConcurrentTestsName
     configMonoidLocalBinPath <- First <$> obj ..:? configMonoidLocalBinPathName
     configMonoidImageOpts <- jsonSubWarnings (obj ..:?  configMonoidImageOptsName ..!= mempty)
@@ -840,6 +858,7 @@ parseConfigMonoidObject rootDir obj = do
     configMonoidAllowDifferentUser <- First <$> obj ..:? configMonoidAllowDifferentUserName
     configMonoidDumpLogs <- First <$> obj ..:? configMonoidDumpLogsName
     configMonoidSaveHackageCreds <- First <$> obj ..:? configMonoidSaveHackageCredsName
+    configMonoidIgnoreRevisionMismatch <- First <$> obj ..:? configMonoidIgnoreRevisionMismatchName
 
     return ConfigMonoid {..}
   where
@@ -916,6 +935,9 @@ configMonoidExtraLibDirsName = "extra-lib-dirs"
 configMonoidOverrideGccPathName :: Text
 configMonoidOverrideGccPathName = "with-gcc"
 
+configMonoidOverrideHpackName :: Text
+configMonoidOverrideHpackName = "with-hpack"
+
 configMonoidConcurrentTestsName :: Text
 configMonoidConcurrentTestsName = "concurrent-tests"
 
@@ -975,6 +997,9 @@ configMonoidDumpLogsName = "dump-logs"
 
 configMonoidSaveHackageCredsName :: Text
 configMonoidSaveHackageCredsName = "save-hackage-creds"
+
+configMonoidIgnoreRevisionMismatchName :: Text
+configMonoidIgnoreRevisionMismatchName = "ignore-revision-mismatch"
 
 data ConfigException
   = ParseConfigFileException (Path Abs File) ParseException
@@ -1580,6 +1605,7 @@ data DownloadInfo = DownloadInfo
       -- ^ URL or absolute file path
     , downloadInfoContentLength :: Maybe Int
     , downloadInfoSha1 :: Maybe ByteString
+    , downloadInfoSha256 :: Maybe ByteString
     } deriving (Show)
 
 instance FromJSON (WithJSONWarnings DownloadInfo) where
@@ -1591,11 +1617,13 @@ parseDownloadInfoFromObject o = do
     url <- o ..: "url"
     contentLength <- o ..:? "content-length"
     sha1TextMay <- o ..:? "sha1"
+    sha256TextMay <- o ..:? "sha256"
     return
         DownloadInfo
         { downloadInfoUrl = url
         , downloadInfoContentLength = contentLength
         , downloadInfoSha1 = fmap encodeUtf8 sha1TextMay
+        , downloadInfoSha256 = fmap encodeUtf8 sha256TextMay
         }
 
 data VersionedDownloadInfo = VersionedDownloadInfo

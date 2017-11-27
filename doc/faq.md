@@ -436,11 +436,7 @@ such hardening flags by default which may be the cause of some instances of the
 problem. Therefore, a possible workaround might be to turn off PIE related
 flags.
 
-In Arch Linux, the support for this is provided by the `hardening-wrapper`
-package. Some possible workarounds:
-
-* Selectively disabling its PIE forcing by setting `HARDENING_PIE=0` in `/etc/hardening-wrapper.conf`.
-* Uninstalling the `hardening-wrapper` package and logging out then into your account again.
+On Arch Linux, installing the `ncurses5-compat-libs` package from AUR resolves [this issue](https://github.com/commercialhaskell/stack/issues/2712).
 
 If you manage to work around this in other distributions, please include instructions here.
 
@@ -528,3 +524,4 @@ Yes:
 
 * If a package directory contains an Hpack `package.yaml` file, then Stack will use it to generate a `.cabal` file when building the package.
 * You can run `stack init` to initialize a `stack.yaml` file regardless of whether your packages are declared with `.cabal` files or with Hpack `package.yaml` files.
+* You can use the `with-hpack` configuration option to specify an Hpack executable to use instead of the Hpack bundled with Stack.

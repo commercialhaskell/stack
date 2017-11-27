@@ -396,11 +396,12 @@ checkSnapBuildPlan
     -> [GenericPackageDescription]
     -> Maybe (Map PackageName (Map FlagName Bool))
     -> SnapshotDef
+    -> Maybe (CompilerVersion 'CVActual)
     -> RIO env BuildPlanCheck
-checkSnapBuildPlan root gpds flags snapshotDef = do
+checkSnapBuildPlan root gpds flags snapshotDef mactualCompiler = do
     platform <- view platformL
     menv <- getMinimalEnvOverride
-    rs <- loadSnapshot menv Nothing root snapshotDef
+    rs <- loadSnapshot menv mactualCompiler root snapshotDef
 
     let
         compiler = lsCompilerVersion rs
@@ -431,13 +432,13 @@ selectBestSnapshot
     :: (HasConfig env, HasGHCVariant env)
     => Path Abs Dir -- ^ project root, used for checking out necessary files
     -> [GenericPackageDescription]
-    -> NonEmpty SnapshotDef
+    -> NonEmpty SnapName
     -> RIO env (SnapshotDef, BuildPlanCheck)
 selectBestSnapshot root gpds snaps = do
     logInfo $ "Selecting the best among "
                <> T.pack (show (NonEmpty.length snaps))
                <> " snapshots...\n"
-    F.foldr1 go (NonEmpty.map getResult snaps)
+    F.foldr1 go (NonEmpty.map (getResult <=< loadResolver . ResolverSnapshot) snaps)
     where
         go mold mnew = do
             old@(_snap, bpc) <- mold
@@ -447,6 +448,12 @@ selectBestSnapshot root gpds snaps = do
 
         getResult snap = do
             result <- checkSnapBuildPlan root gpds Nothing snap
+              -- We know that we're only dealing with ResolverSnapshot
+              -- here, where we can rely on the global package hints.
+              -- Therefore, we don't use an actual compiler. For more
+              -- info, see comments on
+              -- Stack.Solver.checkSnapBuildPlanActual.
+              Nothing
             reportResult result snap
             return (snap, result)
 

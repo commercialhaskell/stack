@@ -43,7 +43,8 @@ globalOptsParser currentDir kind defLogLevel =
     optionalFirst (option auto
         (long "terminal-width" <>
          metavar "INT" <>
-         help "Specify the width of the terminal, used for pretty-print messages")) <*>
+         help "Specify the width of the terminal, used for pretty-print messages" <>
+         hide)) <*>
     optionalFirst
         (strOption
             (long "stack-yaml" <>

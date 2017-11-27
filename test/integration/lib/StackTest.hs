@@ -24,9 +24,12 @@ run cmd args = do
     ec <- run' cmd args
     unless (ec == ExitSuccess) $ error $ "Exited with exit code: " ++ show ec
 
+stackExe :: IO String
+stackExe = getEnv "STACK_EXE"
+
 stack' :: [String] -> IO ExitCode
 stack' args = do
-    stackEnv <- getEnv "STACK_EXE"
+    stackEnv <- stackExe
     run' stackEnv args
 
 stack :: [String] -> IO ()
@@ -89,23 +92,37 @@ runRepl cmd args actions = do
 
 repl :: [String] -> Repl () -> IO ()
 repl args action = do
-    stackExe <- getEnv "STACK_EXE"
-    ec <- runRepl stackExe ("repl":args) action
+    stackExe' <- stackExe
+    ec <- runRepl stackExe' ("repl":args) action
     unless (ec == ExitSuccess) $ return ()
         -- TODO: Understand why the exit code is 1 despite running GHCi tests
         -- successfully.
         -- else error $ "Exited with exit code: " ++ show ec
 
+stackStderr :: [String] -> IO (ExitCode, String)
+stackStderr args = do
+    stackExe' <- stackExe
+    logInfo $ "Running: " ++ stackExe' ++ " " ++ unwords (map showProcessArgDebug args)
+    (ec, _, err) <- readProcessWithExitCode stackExe' args ""
+    hPutStr stderr err
+    return (ec, err)
+
 -- | Run stack with arguments and apply a check to the resulting
 -- stderr output if the process succeeded.
 stackCheckStderr :: [String] -> (String -> IO ()) -> IO ()
 stackCheckStderr args check = do
-    stackExe <- getEnv "STACK_EXE"
-    logInfo $ "Running: " ++ stackExe ++ " " ++ unwords (map showProcessArgDebug args)
-    (ec, _, err) <- readProcessWithExitCode stackExe args ""
-    hPutStr stderr err
+    (ec, err) <- stackStderr args
     if ec /= ExitSuccess
         then error $ "Exited with exit code: " ++ show ec
+        else check err
+
+-- | Same as 'stackCheckStderr', but ensures that the Stack process
+-- fails.
+stackErrStderr :: [String] -> (String -> IO ()) -> IO ()
+stackErrStderr args check = do
+    (ec, err) <- stackStderr args
+    if ec == ExitSuccess
+        then error "Stack process succeeded, but it shouldn't"
         else check err
 
 doesNotExist :: FilePath -> IO ()
@@ -189,3 +206,10 @@ isARM = arch == "arm"
 -- NOTE: currently using lts-8.22 instead of lts-8.0 because the `cyclic-test-deps` integration test is broken with lts-8.0 because a hackage metadata revision invalidated the snapshot (snapshot has `test-framework-quickcheck2-0.3.0.3` and `QuickCheck-2.9.2`, which used to be fine, but now test-framework-quickcheck2 was revised to have a `QuickCheck < 2.8` constraint).
 defaultResolverArg :: String
 defaultResolverArg = "--resolver=lts-8.22"
+
+-- | Remove a file and ignore any warnings about missing files.
+removeFileIgnore :: FilePath -> IO ()
+removeFileIgnore fp = removeFile fp `catch` \e ->
+  if isDoesNotExistError e
+    then return ()
+    else throwIO e

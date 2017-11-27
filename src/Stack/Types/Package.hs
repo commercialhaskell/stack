@@ -383,11 +383,13 @@ dotCabalGetPath dcp =
 
 type InstalledMap = Map PackageName (InstallLocation, Installed)
 
-data Installed = Library PackageIdentifier GhcPkgId | Executable PackageIdentifier
-    deriving (Show, Eq, Ord)
+data Installed
+    = Library PackageIdentifier GhcPkgId (Maybe License)
+    | Executable PackageIdentifier
+    deriving (Show, Eq)
 
 installedPackageIdentifier :: Installed -> PackageIdentifier
-installedPackageIdentifier (Library pid _) = pid
+installedPackageIdentifier (Library pid _ _) = pid
 installedPackageIdentifier (Executable pid) = pid
 
 -- | Get the installed Version.

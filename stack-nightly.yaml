@@ -1,8 +1,4 @@
-resolver: nightly-2017-09-14
-image:
-  containers:
-    - base: "fpco/stack-base" # see ./etc/docker/stack-base/Dockerfile
-      name: "fpco/stack-test"
+resolver: nightly-2017-11-25
 nix:
   # --nix on the command-line to enable.
   enable: false

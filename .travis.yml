@@ -19,9 +19,10 @@ cache:
 matrix:
   fast_finish: true
   include:
-    - env: BUILD=cabal STACK_YAML=stack.yaml CABALVER=1.24 GHCVER=8.0.2
-      compiler: ": #GHC 8.0.2"
-      addons: {apt: {packages: [cabal-install-1.24,ghc-8.0.2], sources: [hvr-ghc]}}
+    # FIXME: Removing because the build keeps timing out.
+    # - env: BUILD=cabal STACK_YAML=stack.yaml CABALVER=1.24 GHCVER=8.0.2
+    #  compiler: ": #GHC 8.0.2"
+    #  addons: {apt: {packages: [cabal-install-1.24,ghc-8.0.2], sources: [hvr-ghc]}}
 
     - env: BUILD=stack GHCVER=8.0.2 STACK_YAML=stack.yaml
       compiler: ": #stack 8.0.2"

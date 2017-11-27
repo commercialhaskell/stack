@@ -23,6 +23,7 @@ import           Control.Monad.Logger (runNoLoggingT)
 import           Control.Monad.Reader (local)
 import           Control.Monad.Trans.Except (ExceptT)
 import           Control.Monad.Writer.Lazy (Writer)
+import           Data.Attoparsec.Args (parseArgs, EscapingMode (Escaping))
 import           Data.Attoparsec.Interpreter (getInterpreterArgs)
 import qualified Data.ByteString.Lazy as L
 import           Data.IORef.RunOnce (runOnce)
@@ -35,7 +36,7 @@ import           System.Process.Read
 import           Development.GitRev (gitCommitCount, gitHash)
 #endif
 import           Distribution.System (buildArch, buildPlatform)
-import           Distribution.Text (display)
+import qualified Distribution.Text as Cabal (display)
 import           Distribution.Version (mkVersion')
 import           GHC.IO.Encoding (mkTextEncoding, textEncodingName)
 import           Lens.Micro
@@ -51,7 +52,7 @@ import           Path
 import           Path.IO
 import qualified Paths_stack as Meta
 import           Stack.Build
-import           Stack.Clean (CleanOpts, clean)
+import           Stack.Clean (CleanOpts(..), clean)
 import           Stack.Config
 import           Stack.ConfigCmd as ConfigCmd
 import           Stack.Constants
@@ -87,8 +88,7 @@ import           Stack.Options.SolverParser
 import           Stack.Options.Utils
 import qualified Stack.PackageIndex
 import qualified Stack.Path
-import           Stack.PrettyPrint hiding (display)
-import qualified Stack.PrettyPrint as P
+import           Stack.PrettyPrint
 import           Stack.Runners
 import           Stack.Script
 import           Stack.SDist (getSDistTarball, checkSDistTarball, checkSDistTarball', SDistOpts(..))
@@ -105,7 +105,7 @@ import qualified Stack.Upload as Upload
 import qualified System.Directory as D
 import           System.Environment (getProgName, getArgs, withArgs)
 import           System.Exit
-import           System.FilePath (pathSeparator)
+import           System.FilePath (isValid, pathSeparator)
 import           System.IO (hIsTerminalDevice, stderr, stdin, stdout, hSetBuffering, BufferMode(..), hPutStrLn, hGetEncoding, hSetEncoding)
 
 -- | Change the character encoding of the given Handle to transliterate
@@ -128,22 +128,34 @@ versionString' = concat $ concat
       -- See https://github.com/commercialhaskell/stack/issues/792
     , [" (" ++ commitCount ++ " commits)" | commitCount /= ("1"::String) &&
                                           commitCount /= ("UNKNOWN" :: String)]
-    , [" ", display buildArch]
-    , [depsString]
+    , [" ", Cabal.display buildArch]
+    , [depsString, warningString]
     ]
   where
     commitCount = $gitCommitCount
 #else
 versionString' =
     showVersion Meta.version
-    ++ ' ' : display buildArch
+    ++ ' ' : Cabal.display buildArch
     ++ depsString
+    ++ warningString
   where
 #endif
 #ifdef HIDE_DEP_VERSIONS
     depsString = " hpack-" ++ VERSION_hpack
 #else
     depsString = "\nCompiled with:\n" ++ unlines (map ("- " ++) Build_stack.deps)
+#endif
+#ifdef SUPPORTED_BUILD
+    warningString = ""
+#else
+    warningString = unlines
+      [ ""
+      , "Warning: this is an unsupported build that may have been built with different"
+      , "versions of dependencies and GHC than the officially release binaries, and"
+      , "therefore may not behave identically.  If you encounter problems, please try"
+      , "the latest official build by running 'stack upgrade --force-download'."
+      ]
 #endif
 
 main :: IO ()
@@ -256,11 +268,20 @@ commandLineHandler currentDir progName isInterpreter = complicatedOptions
                          buildCmd
                          (buildOptsParser Haddock)
         addCommand' "new"
-                    "Create a new project from a template. Run `stack templates' to see available templates."
+         (unwords [ "Create a new project from a template."
+                  , "Run `stack templates' to see available templates."
+                  , "Note: you can also specify a local file or a"
+                  , "remote URL as a template."
+                  ] )
                     newCmd
                     newOptsParser
         addCommand' "templates"
-                    "List the templates available for `stack new'."
+         (unwords [ "List the templates available for `stack new'."
+                  , "Templates are drawn from"
+                  , "https://github.com/commercialhaskell/stack-templates"
+                  , "Note: `stack new' can also accept a template from a"
+                  , "local file or a remote URL."
+                  ] )
                     templatesCmd
                     (pure ())
         addCommand' "init"
@@ -581,12 +602,17 @@ setupCmd sco@SetupCmdOpts{..} go@GlobalOpts{..} = loadConfigWithOpts go $ \lc ->
           (Just $ munlockFile lk)
 
 cleanCmd :: CleanOpts -> GlobalOpts -> IO ()
-cleanCmd opts go = withBuildConfigAndLockNoDocker go (const (clean opts))
+cleanCmd opts go =
+  -- See issues #2010 and #3468 for why "stack clean --full" is not used
+  -- within docker.
+  case opts of
+    CleanFull{} -> withBuildConfigAndLock go (const (clean opts))
+    CleanShallow{} -> withBuildConfigAndLockNoDocker go (const (clean opts))
 
 -- | Helper for build and install commands
 buildCmd :: BuildOptsCLI -> GlobalOpts -> IO ()
 buildCmd opts go = do
-  when ("-prof" `elem` boptsCLIGhcOptions opts) $ do
+  when (any (("-prof" `elem`) . either (const []) id . parseArgs Escaping) (boptsCLIGhcOptions opts)) $ do
     hPutStrLn stderr "Error: When building with stack, you should not use the -prof GHC option"
     hPutStrLn stderr "Instead, please use --library-profiling and --executable-profiling"
     hPutStrLn stderr "See: https://github.com/commercialhaskell/stack/issues/1015"
@@ -657,9 +683,15 @@ uploadCmd sdistOpts go = do
             let invalidList = bulletedList $ map (styleFile . fromString) invalid
             prettyErrorL
                 [ styleShell "stack upload"
-                , flow "expects a list of sdist tarballs or cabal directories."
+                , flow "expects a list of sdist tarballs or package directories."
                 , flow "Can't find:"
                 , line <> invalidList
+                ]
+            liftIO exitFailure
+        when (null files && null dirs) $ do
+            prettyErrorL
+                [ styleShell "stack upload"
+                , flow "expects a list of sdist tarballs or package directories, but none were specified."
                 ]
             liftIO exitFailure
         config <- view configL
@@ -701,7 +733,19 @@ sdistCmd sdistOpts go =
     withBuildConfig go $ do -- No locking needed.
         -- If no directories are specified, build all sdist tarballs.
         dirs' <- if null (sdoptsDirsToWorkWith sdistOpts)
-            then liftM (map lpvRoot . Map.elems . lpProject) getLocalPackages
+            then do
+                dirs <- liftM (map lpvRoot . Map.elems . lpProject) getLocalPackages
+                when (null dirs) $ do
+                    stackYaml <- view stackYamlL
+                    prettyErrorL
+                        [ styleShell "stack sdist"
+                        , flow "expects a list of targets, and otherwise defaults to all of the project's packages."
+                        , flow "However, the configuration at"
+                        , display stackYaml
+                        , flow "contains no packages, so no sdist tarballs will be generated."
+                        ]
+                    liftIO exitFailure
+                return dirs
             else mapM resolveDir' (sdoptsDirsToWorkWith sdistOpts)
         forM_ dirs' $ \dir -> do
             (tarName, tarBytes, _mcabalRevision) <- getSDistTarball (sdoptsPvpBounds sdistOpts) dir
@@ -710,7 +754,7 @@ sdistCmd sdistOpts go =
             ensureDir (parent tarPath)
             liftIO $ L.writeFile (toFilePath tarPath) tarBytes
             checkSDistTarball sdistOpts tarPath
-            prettyInfoL [flow "Wrote sdist tarball to", P.display tarPath]
+            prettyInfoL [flow "Wrote sdist tarball to", display tarPath]
             when (sdoptsSign sdistOpts) (void $ Sig.sign (sdoptsSignServerUrl sdistOpts) tarPath)
 
 -- | Execute a command.
@@ -762,7 +806,8 @@ execCmd ExecOpts {..} go@GlobalOpts{..} =
                     (ExecRunGhc, args) ->
                         getGhcCmd "run" menv eoPackages args
                 munlockFile lk -- Unlock before transferring control away.
-                exec menv cmd args
+
+                runWithPath eoCwd $ exec menv cmd args
   where
       -- return the package-id of the first package in GHC_PACKAGE_PATH
       getPkgId menv wc name = do
@@ -782,6 +827,12 @@ execCmd ExecOpts {..} go@GlobalOpts{..} =
           wc <- view $ actualCompilerVersionL.whichCompilerL
           pkgopts <- getPkgOpts menv wc pkgs
           return (prefix ++ compilerExeName wc, pkgopts ++ args)
+
+      runWithPath :: Maybe FilePath -> RIO EnvConfig () -> RIO EnvConfig ()
+      runWithPath path callback = case path of
+        Nothing                  -> callback
+        Just p | not (isValid p) -> throwIO $ InvalidPathForExec p
+        Just p                   -> withUnliftIO $ \ul -> D.withCurrentDirectory p $ unliftIO ul callback
 
 -- | Evaluate some haskell code inline.
 evalCmd :: EvalOpts -> GlobalOpts -> IO ()
@@ -918,6 +969,7 @@ hpcReportCmd hropts go = withBuildConfig go $ generateHpcReportForTargets hropts
 
 data MainException = InvalidReExecVersion String String
                    | UpgradeCabalUnusable
+                   | InvalidPathForExec FilePath
      deriving (Typeable)
 instance Exception MainException
 instance Show MainException where
@@ -929,3 +981,7 @@ instance Show MainException where
         , "; found: "
         , actual]
     show UpgradeCabalUnusable = "--upgrade-cabal cannot be used when nix is activated"
+    show (InvalidPathForExec path) = concat
+        [ "Got an invalid --cwd argument for stack exec ("
+        , path
+        , ")"]

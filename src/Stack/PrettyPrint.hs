@@ -9,18 +9,19 @@ module Stack.PrettyPrint
       -- * Pretty printing functions
       displayPlain, displayWithColor
       -- * Logging based on pretty-print typeclass
-    , prettyDebug, prettyInfo, prettyWarn, prettyError
-    , prettyDebugL, prettyInfoL, prettyWarnL, prettyErrorL
-    , prettyDebugS, prettyInfoS, prettyWarnS, prettyErrorS
+    , prettyDebug, prettyInfo, prettyWarn, prettyError, prettyWarnNoIndent, prettyErrorNoIndent
+    , prettyDebugL, prettyInfoL, prettyWarnL, prettyErrorL, prettyWarnNoIndentL, prettyErrorNoIndentL
+    , prettyDebugS, prettyInfoS, prettyWarnS, prettyErrorS, prettyWarnNoIndentS, prettyErrorNoIndentS
       -- * Semantic styling functions
       -- | These are preferred to styling or colors directly, so that we can
       -- encourage consistency.
     , styleWarning, styleError, styleGood
-    , styleShell, styleFile, styleDir, styleModule
+    , styleShell, styleFile, styleUrl, styleDir, styleModule
     , styleCurrent, styleTarget
     , displayMilliseconds
       -- * Formatting utils
     , bulletedList
+    , spacedBulletedList
     , debugBracket
       -- * Re-exports from "Text.PrettyPrint.Leijen.Extended"
     , Display(..), AnsiDoc, AnsiAnn(..), HasAnsiAnn(..), Doc
@@ -64,7 +65,7 @@ prettyWith level f = logOther level <=< displayWithColor . f
 -- Note: I think keeping this section aligned helps spot errors, might be
 -- worth keeping the alignment in place.
 
-prettyDebugWith, prettyInfoWith, prettyWarnWith, prettyErrorWith
+prettyDebugWith, prettyInfoWith, prettyWarnWith, prettyErrorWith, prettyWarnNoIndentWith, prettyErrorNoIndentWith
   :: (HasCallStack, HasRunner env, MonadReader env m, MonadLogger m)
   => (a -> Doc AnsiAnn) -> a -> m ()
 prettyDebugWith = prettyWith LevelDebug
@@ -75,30 +76,40 @@ prettyWarnWith f  = prettyWith LevelWarn
 prettyErrorWith f = prettyWith LevelError
                           ((line <>) . (styleError   "Error:" <+>) .
                            indentAfterLabel . f)
+prettyWarnNoIndentWith f  = prettyWith LevelWarn
+                                  ((line <>) . (styleWarning "Warning:" <+>) . f)
+prettyErrorNoIndentWith f = prettyWith LevelWarn
+                                  ((line <>) . (styleError   "Error:" <+>) . f)
 
-prettyDebug, prettyInfo, prettyWarn, prettyError
+prettyDebug, prettyInfo, prettyWarn, prettyError, prettyWarnNoIndent, prettyErrorNoIndent
   :: (HasCallStack, HasRunner env, MonadReader env m, MonadLogger m)
   => Doc AnsiAnn -> m ()
-prettyDebug  = prettyDebugWith id
-prettyInfo   = prettyInfoWith  id
-prettyWarn   = prettyWarnWith  id
-prettyError  = prettyErrorWith id
+prettyDebug         = prettyDebugWith         id
+prettyInfo          = prettyInfoWith          id
+prettyWarn          = prettyWarnWith          id
+prettyError         = prettyErrorWith         id
+prettyWarnNoIndent  = prettyWarnNoIndentWith  id
+prettyErrorNoIndent = prettyErrorNoIndentWith id
 
-prettyDebugL, prettyInfoL, prettyWarnL, prettyErrorL
+prettyDebugL, prettyInfoL, prettyWarnL, prettyErrorL, prettyWarnNoIndentL, prettyErrorNoIndentL
   :: (HasCallStack, HasRunner env, MonadReader env m, MonadLogger m)
   => [Doc AnsiAnn] -> m ()
-prettyDebugL = prettyDebugWith fillSep
-prettyInfoL  = prettyInfoWith  fillSep
-prettyWarnL  = prettyWarnWith  fillSep
-prettyErrorL = prettyErrorWith fillSep
+prettyDebugL         = prettyDebugWith         fillSep
+prettyInfoL          = prettyInfoWith          fillSep
+prettyWarnL          = prettyWarnWith          fillSep
+prettyErrorL         = prettyErrorWith         fillSep
+prettyWarnNoIndentL  = prettyWarnNoIndentWith  fillSep
+prettyErrorNoIndentL = prettyErrorNoIndentWith fillSep
 
-prettyDebugS, prettyInfoS, prettyWarnS, prettyErrorS
+prettyDebugS, prettyInfoS, prettyWarnS, prettyErrorS, prettyWarnNoIndentS, prettyErrorNoIndentS
   :: (HasCallStack, HasRunner env, MonadReader env m, MonadLogger m)
   => String -> m ()
-prettyDebugS = prettyDebugWith flow
-prettyInfoS  = prettyInfoWith  flow
-prettyWarnS  = prettyWarnWith  flow
-prettyErrorS = prettyErrorWith flow
+prettyDebugS         = prettyDebugWith         flow
+prettyInfoS          = prettyInfoWith          flow
+prettyWarnS          = prettyWarnWith          flow
+prettyErrorS         = prettyErrorWith         flow
+prettyWarnNoIndentS  = prettyWarnNoIndentWith  flow
+prettyErrorNoIndentS = prettyErrorNoIndentWith flow
 
 -- End of aligned section
 
@@ -161,6 +172,10 @@ styleShell = magenta
 styleFile :: AnsiDoc -> AnsiDoc
 styleFile = bold . white
 
+-- | Style an 'AsciDoc' as a URL.  For now using the same style as files.
+styleUrl :: AnsiDoc -> AnsiDoc
+styleUrl = styleFile
+
 -- | Style an 'AnsiDoc' as a directory name. See 'styleFile' for files.
 styleDir :: AnsiDoc -> AnsiDoc
 styleDir = bold . blue
@@ -202,6 +217,11 @@ displayMilliseconds :: Clock.TimeSpec -> AnsiDoc
 displayMilliseconds t = green $
     (fromString . show . (`div` 10^(6 :: Int)) . Clock.toNanoSecs) t <> "ms"
 
--- | Display a list of 'AnsiDoc', one per line, with bullets before each
+-- | Display a bulleted list of 'AnsiDoc'.
 bulletedList :: [AnsiDoc] -> AnsiDoc
-bulletedList = mconcat . intersperse line . map ("*" <+>)
+bulletedList = mconcat . intersperse line . map (("*" <+>) . align)
+
+-- | Display a bulleted list of 'AnsiDoc' with a blank line between
+-- each.
+spacedBulletedList :: [AnsiDoc] -> AnsiDoc
+spacedBulletedList = mconcat . intersperse (line <> line) . map (("*" <+>) . align)

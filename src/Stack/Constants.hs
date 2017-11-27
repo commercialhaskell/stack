@@ -6,6 +6,7 @@
 
 module Stack.Constants
     (buildPlanDir
+    ,buildPlanCacheDir
     ,haskellModuleExts
     ,stackDotYaml
     ,stackWorkEnvVar
@@ -94,7 +95,7 @@ inContainerEnvVar = stackProgNameUpper ++ "_IN_CONTAINER"
 -- although we already have STACK_IN_NIX_EXTRA_ARGS that is set in the same conditions,
 -- it can happen that STACK_IN_NIX_EXTRA_ARGS is set to empty.
 inNixShellEnvVar :: String
-inNixShellEnvVar = map toUpper stackProgName ++ "_IN_NIXSHELL"
+inNixShellEnvVar = map toUpper stackProgName ++ "_IN_NIX_SHELL"
 
 -- See https://downloads.haskell.org/~ghc/7.10.1/docs/html/libraries/ghc/src/Module.html#integerPackageKey
 wiredInPackages :: HashSet PackageName
@@ -205,6 +206,12 @@ defaultGlobalConfigPath = parseAbsFile "/etc/stack/config.yaml"
 buildPlanDir :: Path Abs Dir -- ^ Stack root
              -> Path Abs Dir
 buildPlanDir = (</> $(mkRelDir "build-plan"))
+
+-- | Path where binary caches of the build plans are stored.
+buildPlanCacheDir
+  :: Path Abs Dir -- ^ Stack root
+  -> Path Abs Dir
+buildPlanCacheDir = (</> $(mkRelDir "build-plan-cache"))
 
 -- | Environment variable that stores a variant to append to platform-specific directory
 -- names.  Used to ensure incompatible binaries aren't shared between Docker builds and host

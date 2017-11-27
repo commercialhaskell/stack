@@ -22,6 +22,7 @@ import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Data.Text.IO as Text
 import qualified Data.Traversable as T
+import           Distribution.Text (display)
 import           Distribution.License (License(BSD3))
 import           Stack.Build (withLoadPackage)
 import           Stack.Build.Installed (getInstalled, GetInstalledOpts(..))
@@ -143,8 +144,8 @@ listDependencies opts = do
   void (Map.traverseWithKey go (snd <$> resultGraph))
     where go name payload =
             let payloadText =
-                    if listDepsLicense opts
-                      then maybe "<unknown>" (Text.pack . show) (payloadLicense payload)
+                  if listDepsLicense opts
+                      then maybe "<unknown>" (Text.pack . display) (payloadLicense payload)
                       else maybe "<unknown>" (Text.pack . show) (payloadVersion payload)
                 line = packageNameText name <> listDepsSep opts <> payloadText
             in  liftIO $ Text.putStrLn line
@@ -231,7 +232,10 @@ createDepLoader sourceMap installed globalDumpMap globalIdMap loadPackageDeps pk
                          (dpDepends dp)
   where
     payloadFromLocal pkg = DotPayload (Just $ packageVersion pkg) (Just $ packageLicense pkg)
-    payloadFromInstalled maybePkg = DotPayload (fmap (installedVersion . snd) maybePkg) Nothing
+    payloadFromInstalled maybePkg = DotPayload (fmap (installedVersion . snd) maybePkg) $
+        case maybePkg of
+            Just (_, Library _ _ mlicense) -> mlicense
+            _ -> Nothing
     payloadFromDump dp = DotPayload (Just $ packageIdentifierVersion $ dpPackageIdent dp) (dpLicense dp)
 
 -- | Resolve the direct (depth 0) external dependencies of the given local packages

@@ -17,7 +17,6 @@ import           Control.Monad.Logger ()
 import           Control.Monad.Reader
 import qualified Data.Text as T
 import qualified Options.Applicative as OA
-import qualified Options.Applicative.Args as OA
 import qualified Options.Applicative.Builder.Extra as OA
 import qualified Options.Applicative.Types as OA
 import           Path
@@ -33,7 +32,7 @@ data SetupCmdOpts = SetupCmdOpts
     , scoUpgradeCabal    :: !(Maybe UpgradeTo)
     , scoSetupInfoYaml   :: !String
     , scoGHCBindistURL   :: !(Maybe String)
-    , scoGHCJSBootOpts   :: ![Text]
+    , scoGHCJSBootOpts   :: ![String]
     , scoGHCJSBootClean  :: !Bool
     }
 
@@ -82,10 +81,10 @@ setupParser = SetupCmdOpts
             (OA.long "ghc-bindist"
            <> OA.metavar "URL"
            <> OA.help "Alternate GHC binary distribution (requires custom --ghc-variant)"))
-    <*> OA.manyArgsOptions
+    <*> OA.many (OA.strOption
             (OA.long "ghcjs-boot-options"
            <> OA.metavar "GHCJS_BOOT"
-           <> OA.help "Additional ghcjs-boot options")
+           <> OA.help "Additional ghcjs-boot options"))
     <*> OA.boolFlags True
             "ghcjs-boot-clean"
             "Control if ghcjs-boot should have --clean option present"
@@ -123,7 +122,7 @@ setup SetupCmdOpts{..} wantedCompiler compilerCheck mstack = do
         , soptsResolveMissingGHC = Nothing
         , soptsSetupInfoYaml = scoSetupInfoYaml
         , soptsGHCBindistURL = scoGHCBindistURL
-        , soptsGHCJSBootOpts = map T.unpack scoGHCJSBootOpts ++ ["--clean" | scoGHCJSBootClean]
+        , soptsGHCJSBootOpts = scoGHCJSBootOpts ++ ["--clean" | scoGHCJSBootClean]
         }
     let compiler = case wantedCompiler of
             GhcVersion _ -> "GHC"

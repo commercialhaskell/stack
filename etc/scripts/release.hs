@@ -46,6 +46,8 @@ main =
                      , shakeChange = ChangeModtimeAndDigestInput }
         options $
         \flags args -> do
+            -- 'stack list-dependencies' just ensures that 'stack.cabal' is generated from hpack
+            _ <- readProcess "stack" ["list-dependencies"] ""
             gStackPackageDescription <-
                 packageDescription <$> readPackageDescription silent "stack.cabal"
             gGithubAuthToken <- lookupEnv githubAuthTokenEnvVar
