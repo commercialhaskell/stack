@@ -376,9 +376,11 @@ solveResolverSpec
 
 solveResolverSpec stackYaml cabalDirs
                   (sd, srcConstraints, extraConstraints) = do
-    logInfo $ "Using resolver: " <> sdResolverName sd
-    let wantedCompilerVersion = sdWantedCompilerVersion sd
-    (menv, compilerVersion) <- setupCabalEnv wantedCompilerVersion
+  logInfo $ "Using resolver: " <> sdResolverName sd
+  let wantedCompilerVersion = sdWantedCompilerVersion sd
+  (menv, compilerVersion) <- setupCabalEnv wantedCompilerVersion
+  env <- set envOverrideL (const (return menv)) <$> ask
+  runRIO env $ do
     (compilerVer, snapConstraints) <- getResolverConstraints menv (Just compilerVersion) stackYaml sd
 
     let -- Note - The order in Map.union below is important.
