@@ -57,6 +57,7 @@ execOptsExtraParser = eoPlainParser <|>
                 "setting the STACK_EXE environment variable to the path for the stack executable"
                 idm
         <*> pure False
+        <*> pure True
 
     eoPackagesParser :: Parser [String]
     eoPackagesParser = many (strOption (long "package" <> help "Additional packages that must be installed"))

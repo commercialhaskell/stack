@@ -499,6 +499,7 @@ executePlan menv boptsCli baseConfigOpts locals globalPackages snapshotPackages 
                     , esIncludeGhcPackagePath = True
                     , esStackExe = True
                     , esLocaleUtf8 = False
+                    , esKeepGhcRts = False
                     }
     forM_ (boptsCLIExec boptsCli) $ \(cmd, args) ->
         withProcessTimeLog cmd args $
@@ -956,6 +957,7 @@ withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} md
                 , esIncludeGhcPackagePath = False
                 , esStackExe = False
                 , esLocaleUtf8 = True
+                , esKeepGhcRts = False
                 }
         menv <- liftIO $ configEnvOverride config envSettings
         distRelativeDir' <- distRelativeDir
@@ -1645,6 +1647,7 @@ singleTest runInBase topts testsToRun ac ee task installedMap = do
                     , esIncludeGhcPackagePath = True
                     , esStackExe = True
                     , esLocaleUtf8 = False
+                    , esKeepGhcRts = False
                     }
                 if exists
                     then do

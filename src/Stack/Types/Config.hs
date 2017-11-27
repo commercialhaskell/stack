@@ -413,6 +413,8 @@ data EnvSettings = EnvSettings
     -- ^ set the STACK_EXE variable to the current executable name
     , esLocaleUtf8 :: !Bool
     -- ^ set the locale to C.UTF-8
+    , esKeepGhcRts :: !Bool
+    -- ^ if True, keep GHCRTS variable in environment
     }
     deriving (Show, Eq, Ord)
 
@@ -1437,6 +1439,7 @@ minimalEnvSettings =
     , esIncludeGhcPackagePath = False
     , esStackExe = False
     , esLocaleUtf8 = False
+    , esKeepGhcRts = False
     }
 
 -- | Get the path for the given compiler ignoring any local binaries.
