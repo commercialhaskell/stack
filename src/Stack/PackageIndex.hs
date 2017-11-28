@@ -78,7 +78,7 @@ populateCache index = do
         updateIndex index
         loadPIS
 
-    when (indexRequireHashes index) $ forM_ (HashMap.toList pis0) $ \(ident, (_, mpd, _)) ->
+    when (indexRequireHashes index) $ forM_ (HashMap.toList pis0) $ \(ident, (mpd, _)) ->
         case mpd :: Maybe PackageDownload of
             Just _ -> return ()
             Nothing -> throwM $ MissingRequiredHashes (indexName index) ident
@@ -90,9 +90,9 @@ populateCache index = do
     return cache
   where
     convertPI :: MonadIO m
-              => (PackageIdentifier, ((), Maybe PackageDownload, Endo [([CabalHash], OffsetSize)]))
+              => (PackageIdentifier, (Maybe PackageDownload, Endo [([CabalHash], OffsetSize)]))
               -> m (PackageCache ())
-    convertPI (ident@(PackageIdentifier name version), ((), mpd, Endo front)) =
+    convertPI (ident@(PackageIdentifier name version), (mpd, Endo front)) =
       case NE.nonEmpty $ front [] of
         Nothing -> throwString $ "Missing cabal file info for: " ++ show ident
         Just files -> return
@@ -103,18 +103,18 @@ populateCache index = do
 
     loop :: MonadThrow m
          => Int64
-         -> HashMap PackageIdentifier ((), Maybe PackageDownload, Endo [([CabalHash], OffsetSize)])
+         -> HashMap PackageIdentifier (Maybe PackageDownload, Endo [([CabalHash], OffsetSize)])
          -> Tar.Entries Tar.FormatError
-         -> m (HashMap PackageIdentifier ((), Maybe PackageDownload, Endo [([CabalHash], OffsetSize)]))
+         -> m (HashMap PackageIdentifier (Maybe PackageDownload, Endo [([CabalHash], OffsetSize)]))
     loop !blockNo !m (Tar.Next e es) =
         loop (blockNo + entrySizeInBlocks e) (goE blockNo m e) es
     loop _ m Tar.Done = return m
     loop _ _ (Tar.Fail e) = throwM e
 
     goE :: Int64
-        -> HashMap PackageIdentifier ((), Maybe PackageDownload, Endo [([CabalHash], OffsetSize)])
+        -> HashMap PackageIdentifier (Maybe PackageDownload, Endo [([CabalHash], OffsetSize)])
         -> Tar.Entry
-        -> HashMap PackageIdentifier ((), Maybe PackageDownload, Endo [([CabalHash], OffsetSize)])
+        -> HashMap PackageIdentifier (Maybe PackageDownload, Endo [([CabalHash], OffsetSize)])
     goE blockNo m e =
         case Tar.entryContent e of
             Tar.NormalFile lbs size ->
@@ -127,14 +127,14 @@ populateCache index = do
                             Nothing -> m
             _ -> m
       where
-        addCabal lbs ident size =
-            HashMap.insert ident
-            (case HashMap.lookup ident m of
-              Nothing -> ((), Nothing, newEndo)
-              Just ((), mpd, oldEndo) -> ((), mpd, oldEndo <> newEndo))
+        addCabal lbs ident size = HashMap.alter
+            (\case
+                Nothing -> Just (Nothing, newEndo)
+                Just (mpd, oldEndo) -> Just (mpd, oldEndo <> newEndo))
+            ident
             m
           where
-            cabalHash = computeCabalHash lbs
+            !cabalHash = computeCabalHash lbs
 
             -- Some older Stackage snapshots ended up with slightly
             -- modified cabal files, in particular having DOS-style
@@ -144,7 +144,9 @@ populateCache index = do
             -- snapshots.
             cr = 13
             cabalHashes
-              | cr `L.elem` lbs = [cabalHash, computeCabalHash (L.filter (/= cr) lbs)]
+              | cr `L.elem` lbs =
+                  let !cabalHash' = computeCabalHash (L.filter (/= cr) lbs)
+                   in [cabalHash, cabalHash']
               | otherwise = [cabalHash]
             offsetSize = OffsetSize ((blockNo + 1) * 512) size
             newPair = (cabalHashes, offsetSize)
@@ -154,15 +156,14 @@ populateCache index = do
                 => (a -> PackageDownload)
                 -> PackageIdentifier
                 -> L.ByteString
-                -> HashMap PackageIdentifier ((), Maybe PackageDownload, Endo [([CabalHash], OffsetSize)])
+                -> HashMap PackageIdentifier (Maybe PackageDownload, Endo [([CabalHash], OffsetSize)])
         addJSON unwrap ident lbs =
             case decode lbs of
                 Nothing -> m
-                Just (unwrap -> pd) ->
-                  HashMap.insert ident
-                  (case HashMap.lookup ident m of
-                    Nothing -> ((), Just pd, mempty)
-                    Just ((), Just oldPD, _)
+                Just (unwrap -> pd) -> HashMap.alter
+                  (\case
+                    Nothing -> Just (Just pd, mempty)
+                    Just (Just oldPD, _)
                       | oldPD /= pd -> error $ concat
                         [ "Conflicting package hash information discovered for "
                         , packageIdentifierString ident
@@ -172,7 +173,8 @@ populateCache index = do
                         , show pd
                         , "\n\nThis should not happen. See: https://github.com/haskell/hackage-security/issues/189"
                         ]
-                    Just ((), _, files) -> ((), Just pd, files))
+                    Just (_, files) -> Just (Just pd, files))
+                  ident
                   m
 
     breakSlash x
