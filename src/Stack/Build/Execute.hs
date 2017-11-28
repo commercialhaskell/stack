@@ -1565,6 +1565,7 @@ checkForUnlistedFiles (TTFiles lp _) preBuildTime pkgDir = do
             preBuildTime
             (lpPackage lp)
             (lpCabalFile lp)
+            (lpComponents lp)
             (lpNewBuildCache lp)
     unless (null addBuildCache) $
         writeBuildCache pkgDir $

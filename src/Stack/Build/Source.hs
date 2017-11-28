@@ -228,7 +228,7 @@ loadLocalPackage isLocal boptsCli targets (name, lpv) = do
                     case packageLibraries pkg of
                       NoLibraries -> False
                       HasLibraries _ -> True
-               in hasLibrary || not (Set.null allComponents)
+               in hasLibrary || not (Set.null nonLibComponents)
 
         filterSkippedComponents = Set.filter (not . (`elem` boptsSkipComponents bopts))
 
@@ -236,7 +236,7 @@ loadLocalPackage isLocal boptsCli targets (name, lpv) = do
                                   filterSkippedComponents testCandidates,
                                   filterSkippedComponents benchCandidates)
 
-        allComponents = toComponents exes tests benches
+        nonLibComponents = toComponents exes tests benches
 
         toComponents e t b = Set.unions
             [ Set.map CExe e
@@ -281,7 +281,8 @@ loadLocalPackage isLocal boptsCli targets (name, lpv) = do
         benchpkg = resolvePackage benchconfig gpkg
 
     mbuildCache <- tryGetBuildCache $ lpvRoot lpv
-    (files,_) <- getPackageFilesSimple pkg (lpvCabalFP lpv)
+
+    (files,_) <- getPackageFilesForTargets pkg (lpvCabalFP lpv) nonLibComponents
 
     (dirtyFiles, newBuildCache) <- checkBuildCache
         (fromMaybe Map.empty mbuildCache)
@@ -304,7 +305,7 @@ loadLocalPackage isLocal boptsCli targets (name, lpv) = do
         , lpCabalFile = lpvCabalFP lpv
         , lpDir = lpvRoot lpv
         , lpWanted = isWanted
-        , lpComponents = allComponents
+        , lpComponents = nonLibComponents
         -- TODO: refactor this so that it's easier to be sure that these
         -- components are indeed unbuildable.
         --
@@ -407,10 +408,11 @@ addUnlistedToBuildCache
     => ModTime
     -> Package
     -> Path Abs File
+    -> Set NamedComponent
     -> Map FilePath a
     -> RIO env ([Map FilePath FileCacheInfo], [PackageWarning])
-addUnlistedToBuildCache preBuildTime pkg cabalFP buildCache = do
-    (files,warnings) <- getPackageFilesSimple pkg cabalFP
+addUnlistedToBuildCache preBuildTime pkg cabalFP nonLibComponents buildCache = do
+    (files,warnings) <- getPackageFilesForTargets pkg cabalFP nonLibComponents
     let newFiles =
             Set.toList $
             Set.map toFilePath files `Set.difference` Map.keysSet buildCache
@@ -428,16 +430,21 @@ addUnlistedToBuildCache preBuildTime pkg cabalFP buildCache = do
                         return (Map.singleton fp newFci)
                     else return Map.empty
 
--- | Gets list of Paths for files in a package
-getPackageFilesSimple
+-- | Gets list of Paths for files relevant to a set of components in a package.
+--   Note that the library component, if any, is always automatically added to the
+--   set of components.
+getPackageFilesForTargets
     :: HasEnvConfig env
-    => Package -> Path Abs File -> RIO env (Set (Path Abs File), [PackageWarning])
-getPackageFilesSimple pkg cabalFP = do
-    (_,compFiles,cabalFiles,warnings) <-
+    => Package -> Path Abs File -> Set NamedComponent -> RIO env (Set (Path Abs File), [PackageWarning])
+getPackageFilesForTargets pkg cabalFP components = do
+    (_,compFiles,otherFiles,warnings) <-
         getPackageFiles (packageFiles pkg) cabalFP
-    return
-        ( Set.map dotCabalGetPath (mconcat (M.elems compFiles)) <> cabalFiles
-        , warnings)
+    let filesForComponent cn = Set.map dotCabalGetPath
+                             $ M.findWithDefault mempty cn compFiles
+        files = Set.unions
+                $ otherFiles
+                : map filesForComponent (Set.toList $ Set.insert CLib components)
+    return (files, warnings)
 
 -- | Get file modification time, if it exists.
 getModTimeMaybe :: MonadIO m => FilePath -> m (Maybe ModTime)
