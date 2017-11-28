@@ -652,12 +652,11 @@ getLocalPackages = do
     case mcached of
         Just cached -> return cached
         Nothing -> withCabalLoader $ \loadFromIndex -> do
-            menv <- getMinimalEnvOverride
             root <- view projectRootL
             bc <- view buildConfigL
 
             packages <- do
-              bss <- concat <$> mapM (loadMultiRawCabalFiles menv root) (bcPackages bc)
+              bss <- concat <$> mapM (loadMultiRawCabalFiles root) (bcPackages bc)
               forM bss $ \(bs, loc) -> do
                 (warnings, gpd) <-
                   case rawParseGPD bs of
@@ -667,7 +666,7 @@ getLocalPackages = do
                            fromCabalPackageIdentifier
                          $ C.package
                          $ C.packageDescription gpd
-                dir <- resolveSinglePackageLocation menv root loc
+                dir <- resolveSinglePackageLocation root loc
                 cabalfp <- findOrGenerateCabalFile dir
                 mapM_ (printCabalFileWarning cabalfp) warnings
                 checkCabalFileName name cabalfp
@@ -681,7 +680,7 @@ getLocalPackages = do
                       }
                 return (name, lpv)
 
-            deps <- mapM (loadMultiRawCabalFilesIndex loadFromIndex menv root) (bcDependencies bc)
+            deps <- mapM (loadMultiRawCabalFilesIndex loadFromIndex root) (bcDependencies bc)
                 >>= mapM (\(bs, loc :: PackageLocationIndex FilePath) -> do
                      (_warnings, gpd) <- do
                        case rawParseGPD bs of

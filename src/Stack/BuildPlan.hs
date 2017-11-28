@@ -400,8 +400,7 @@ checkSnapBuildPlan
     -> RIO env BuildPlanCheck
 checkSnapBuildPlan root gpds flags snapshotDef mactualCompiler = do
     platform <- view platformL
-    menv <- getMinimalEnvOverride
-    rs <- loadSnapshot menv mactualCompiler root snapshotDef
+    rs <- loadSnapshot mactualCompiler root snapshotDef
 
     let
         compiler = lsCompilerVersion rs

@@ -77,14 +77,13 @@ data ConstraintType = Constraint | Preference deriving (Eq)
 type ConstraintSpec = Map PackageName (Version, Map FlagName Bool)
 
 cabalSolver :: HasConfig env
-            => EnvOverride
-            -> [Path Abs Dir] -- ^ cabal files
+            => [Path Abs Dir] -- ^ cabal files
             -> ConstraintType
             -> ConstraintSpec -- ^ src constraints
             -> ConstraintSpec -- ^ dep constraints
             -> [String] -- ^ additional arguments
             -> RIO env (Either [PackageName] ConstraintSpec)
-cabalSolver menv cabalfps constraintType
+cabalSolver cabalfps constraintType
             srcConstraints depConstraints cabalArgs =
   withSystemTempDir "cabal-solver" $ \dir' -> do
 
@@ -115,6 +114,7 @@ cabalSolver menv cabalfps constraintType
                toConstraintArgs (flagConstraints constraintType) ++
                fmap toFilePath cabalfps
 
+    menv <- getMinimalEnvOverride
     catch (liftM Right (readProcessStdout (Just tmpdir) menv "cabal" args))
           (\ex -> case ex of
               ProcessFailed _ _ _ err -> return $ Left err
@@ -295,11 +295,14 @@ setupCompiler compiler = do
         }
     return dirs
 
+-- | Runs the given inner command with an updated configuration that
+-- has the desired GHC on the PATH.
 setupCabalEnv
     :: (HasConfig env, HasGHCVariant env)
     => CompilerVersion 'CVWanted
-    -> RIO env (EnvOverride, CompilerVersion 'CVActual)
-setupCabalEnv compiler = do
+    -> (CompilerVersion 'CVActual -> RIO env a)
+    -> RIO env a
+setupCabalEnv compiler inner = do
     mpaths <- setupCompiler compiler
     menv0 <- getMinimalEnvOverride
     envMap <- removeHaskellEnvVars
@@ -330,7 +333,9 @@ setupCabalEnv compiler = do
             return version
         Nothing -> error "Failed to determine compiler version. \
                          \This is most likely a bug."
-    return (menv, version)
+
+    env <- set envOverrideL (const (return menv)) <$> ask
+    runRIO env (inner version)
 
 -- | Merge two separate maps, one defining constraints on package versions and
 -- the other defining package flagmap, into a single map of version and flagmap
@@ -376,10 +381,10 @@ solveResolverSpec
 
 solveResolverSpec stackYaml cabalDirs
                   (sd, srcConstraints, extraConstraints) = do
-    logInfo $ "Using resolver: " <> sdResolverName sd
-    let wantedCompilerVersion = sdWantedCompilerVersion sd
-    (menv, compilerVersion) <- setupCabalEnv wantedCompilerVersion
-    (compilerVer, snapConstraints) <- getResolverConstraints menv (Just compilerVersion) stackYaml sd
+  logInfo $ "Using resolver: " <> sdResolverName sd
+  let wantedCompilerVersion = sdWantedCompilerVersion sd
+  setupCabalEnv wantedCompilerVersion $ \compilerVersion -> do
+    (compilerVer, snapConstraints) <- getResolverConstraints (Just compilerVersion) stackYaml sd
 
     let -- Note - The order in Map.union below is important.
         -- We want to override snapshot with extra deps
@@ -389,7 +394,7 @@ solveResolverSpec stackYaml cabalDirs
         -- 1. We do not want snapshot versions to override the sources
         -- 2. Sources may have blank versions leading to bad cabal constraints
         depOnlyConstraints = Map.difference depConstraints srcConstraints
-        solver t = cabalSolver menv cabalDirs t srcConstraints depOnlyConstraints $
+        solver t = cabalSolver cabalDirs t srcConstraints depOnlyConstraints $
                      "-v" : -- TODO make it conditional on debug
                      ["--ghcjs" | whichCompiler compilerVer == Ghcjs]
 
@@ -480,15 +485,14 @@ solveResolverSpec stackYaml cabalDirs
 -- for that resolver.
 getResolverConstraints
     :: (HasConfig env, HasGHCVariant env)
-    => EnvOverride -- ^ for running Git/Hg clone commands
-    -> Maybe (CompilerVersion 'CVActual) -- ^ actually installed compiler
+    => Maybe (CompilerVersion 'CVActual) -- ^ actually installed compiler
     -> Path Abs File
     -> SnapshotDef
     -> RIO env
          (CompilerVersion 'CVActual,
           Map PackageName (Version, Map FlagName Bool))
-getResolverConstraints menv mcompilerVersion stackYaml sd = do
-    ls <- loadSnapshot menv mcompilerVersion (parent stackYaml) sd
+getResolverConstraints mcompilerVersion stackYaml sd = do
+    ls <- loadSnapshot mcompilerVersion (parent stackYaml) sd
     return (lsCompilerVersion ls, lsConstraints ls)
   where
     lpiConstraints lpi = (lpiVersion lpi, lpiFlags lpi)
@@ -780,20 +784,14 @@ checkSnapBuildPlanActual
     -> SnapshotDef
     -> RIO env BuildPlanCheck
 checkSnapBuildPlanActual root gpds flags sd = do
-    let forNonSnapshot = Just <$> setupCabalEnv (sdWantedCompilerVersion sd)
-    mactualCompiler <-
-      case sdResolver sd of
-        ResolverSnapshot _ -> return Nothing
-        ResolverCompiler _ -> forNonSnapshot
-        ResolverCustom _ _ -> forNonSnapshot
+    let forNonSnapshot inner = setupCabalEnv (sdWantedCompilerVersion sd) (inner . Just)
+        runner =
+          case sdResolver sd of
+            ResolverSnapshot _ -> ($ Nothing)
+            ResolverCompiler _ -> forNonSnapshot
+            ResolverCustom _ _ -> forNonSnapshot
 
-    let inner = checkSnapBuildPlan root gpds flags sd
-    case mactualCompiler of
-      Nothing -> inner Nothing
-      Just (modifiedPath, actualCompiler) -> do
-        env0 <- ask
-        let env = set envOverrideL (const $ return modifiedPath) env0
-        runRIO env $ inner (Just actualCompiler)
+    runner $ checkSnapBuildPlan root gpds flags sd
 
 prettyPath
     :: forall r t m. (MonadIO m, RelPath (Path r t) ~ Path Rel t, AnyPath (Path r t))

@@ -260,7 +260,6 @@ setupEnv mResolveMissingGHC = do
         bcPath = set envOverrideL (const (return menv)) bc
 
     ls <- runRIO bcPath $ loadSnapshot
-      menv
       (Just compilerVer)
       (view projectRootL bc)
       (bcSnapshotDef bc)

@@ -278,12 +278,11 @@ withLoadPackage :: HasEnvConfig env
                 -> RIO env a
 withLoadPackage inner = do
     econfig <- view envConfigL
-    menv <- getMinimalEnvOverride
     root <- view projectRootL
     run <- askRunInIO
     withCabalLoader $ \loadFromIndex ->
         inner $ \loc flags ghcOptions -> do
-            bs <- run $ loadSingleRawCabalFile loadFromIndex menv root loc
+            bs <- run $ loadSingleRawCabalFile loadFromIndex root loc
 
             -- Intentionally ignore warnings, as it's not really
             -- appropriate to print a bunch of warnings out while
