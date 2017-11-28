@@ -298,7 +298,7 @@ buildDepsAndInitialSteps GhciOpts{..} targets0 = do
             Right () -> return ()
             Left err -> do
                 prettyError $ fromString (show err)
-                prettyWarn "Build failed, but optimistically launching GHCi anyway"
+                prettyWarn "Build failed, but trying to launch GHCi anyway"
 
 checkAdditionalPackages :: MonadThrow m => [String] -> m [PackageName]
 checkAdditionalPackages pkgs = forM pkgs $ \name -> do

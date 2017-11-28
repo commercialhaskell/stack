@@ -1282,8 +1282,8 @@ Other enhancements:
 * `stack ghci` now accepts all the flags accepted by `stack build`. See
   [#1186](https://github.com/commercialhaskell/stack/issues/1186)
 * `stack ghci` builds the project before launching GHCi. If the build fails,
-  optimistically launch GHCi anyway. Use `stack ghci --no-build` option to
-  disable [#1065](https://github.com/commercialhaskell/stack/issues/1065)
+  try to launch GHCi anyway. Use `stack ghci --no-build` option to disable
+  [#1065](https://github.com/commercialhaskell/stack/issues/1065)
 * `stack ghci` now detects and warns about various circumstances where it is
   liable to fail. See
   [#1270](https://github.com/commercialhaskell/stack/issues/1270)
