@@ -4,6 +4,13 @@
 
 Release notes:
 
+* The `--pvp-bounds` option for `stack upload` and `stack sdist` is
+  effectively unusable due to a bug in the released version of Cabal
+  library that causes it to remove fields from the re-written `.cabal`
+  file (this is fixed in the development version of Cabal).  See
+  [#3549](https://github.com/commercialhaskell/stack/issues/3549) for
+  more details.
+
 Major changes:
 
 * Complete overhaul of how snapshots are defined, the `packages` and
