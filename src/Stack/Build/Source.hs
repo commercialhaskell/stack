@@ -30,7 +30,7 @@ import qualified    Data.Map.Strict as M
 import qualified    Data.Set as Set
 import              Stack.Build.Cache
 import              Stack.Build.Target
-import              Stack.Config (getLocalPackages, getNamedComponents)
+import              Stack.Config (getLocalPackages)
 import              Stack.Constants (wiredInPackages)
 import              Stack.Package
 import              Stack.PackageLocation
@@ -94,25 +94,9 @@ loadSourceMapFull needTargets boptsCli = do
             -- NOTE: configOpts includes lpiGhcOptions for now, this may get refactored soon
             PLIndex pir -> return $ PSIndex loc (lpiFlags lpi) configOpts pir
             PLOther pl -> do
-              -- FIXME lots of code duplication with getLocalPackages
               root <- view projectRootL
-              dir <- resolveSinglePackageLocation root pl
-              cabalfp <- findOrGenerateCabalFile dir
-              eres <- cachedCabalFileParse
-                (PLOther pl)
-                (CWPrint (toFilePath cabalfp))
-                (liftIO (S.readFile (toFilePath cabalfp)))
-              gpd <-
-                case eres of
-                  Left e -> throwM $ InvalidCabalFileInLocal (Left cabalfp) e
-                  Right x -> return x
-              lp' <- loadLocalPackage False boptsCli targets (n, LocalPackageView
-                { lpvVersion = lpiVersion lpi
-                , lpvCabalFP = cabalfp
-                , lpvComponents = getNamedComponents gpd
-                , lpvGPD = gpd
-                , lpvLoc = pl
-                })
+              lpv <- parseSingleCabalFile root True pl
+              lp' <- loadLocalPackage False boptsCli targets (n, lpv)
               return $ PSFiles lp' loc
     sourceMap' <- Map.unions <$> sequence
       [ return $ Map.fromList $ map (\lp' -> (packageName $ lpPackage lp', PSFiles lp' Local)) locals

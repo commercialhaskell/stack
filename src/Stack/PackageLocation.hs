@@ -11,9 +11,10 @@
 module Stack.PackageLocation
   ( resolveSinglePackageLocation
   , resolveMultiPackageLocation
-  , loadSingleRawCabalFile
-  , loadMultiRawCabalFiles
-  , loadMultiRawCabalFilesIndex
+  , parseSingleCabalFile
+  , parseSingleCabalFileIndex
+  , parseMultiCabalFiles
+  , parseMultiCabalFilesIndex
   ) where
 
 import qualified Codec.Archive.Tar as Tar
@@ -27,6 +28,7 @@ import qualified Data.ByteString.Base64.URL as B64URL
 import qualified Data.ByteString.Lazy as L
 import qualified Data.Text as T
 import Data.Text.Encoding (encodeUtf8, decodeUtf8)
+import Distribution.PackageDescription (GenericPackageDescription)
 import Network.HTTP.Client (parseUrlThrow)
 import Network.HTTP.Download.Verified
 import Path
@@ -225,55 +227,65 @@ cloneRepo projRoot url commit repoType' = do
 
     return dir
 
--- | Load the raw bytes in the cabal files present in the given
--- 'SinglePackageLocation'.
-loadSingleRawCabalFile
+-- | Parse the cabal files present in the given
+-- 'PackageLocationIndex FilePath'.
+parseSingleCabalFileIndex
   :: forall env.
      HasConfig env
   => (PackageIdentifierRevision -> IO ByteString) -- ^ lookup in index
   -> Path Abs Dir -- ^ project root, used for checking out necessary files
   -> PackageLocationIndex FilePath
-  -> RIO env ByteString
+  -> RIO env GenericPackageDescription
 -- Need special handling of PLIndex for efficiency (just read from the
 -- index tarball) and correctness (get the cabal file from the index,
 -- not the package tarball itself, yay Hackage revisions).
-loadSingleRawCabalFile loadFromIndex _ (PLIndex pir) = liftIO $ loadFromIndex pir
-loadSingleRawCabalFile _ root (PLOther loc) =
-  resolveSinglePackageLocation root loc >>=
-  findOrGenerateCabalFile >>=
-  liftIO . S.readFile . toFilePath
+parseSingleCabalFileIndex loadFromIndex _ (PLIndex pir) = readPackageUnresolvedFromIndex loadFromIndex pir
+parseSingleCabalFileIndex _ root (PLOther loc) = lpvGPD <$> parseSingleCabalFile root False loc
 
--- | Same as 'loadMultiRawCabalFiles' but for 'PackageLocationIndex'.
-loadMultiRawCabalFilesIndex
-  :: forall env.
-     HasConfig env
-  => (PackageIdentifierRevision -> IO ByteString) -- ^ lookup in index
+parseSingleCabalFile
+  :: forall env. HasConfig env
+  => Path Abs Dir -- ^ project root, used for checking out necessary files
+  -> Bool -- ^ print warnings?
+  -> PackageLocation FilePath
+  -> RIO env LocalPackageView
+parseSingleCabalFile root printWarnings loc = do
+  dir <- resolveSinglePackageLocation root loc
+  cabalfp <- findOrGenerateCabalFile dir
+  gpd <- readPackageUnresolved cabalfp printWarnings
+  return LocalPackageView
+    { lpvCabalFP = cabalfp
+    , lpvGPD = gpd
+    , lpvLoc = loc
+    }
+
+-- | Load and parse cabal files into 'GenericPackageDescription's
+parseMultiCabalFiles
+  :: forall env. HasConfig env
+  => Path Abs Dir -- ^ project root, used for checking out necessary files
+  -> Bool -- ^ print warnings?
+  -> PackageLocation Subdirs
+  -> RIO env [LocalPackageView]
+parseMultiCabalFiles root printWarnings loc0 =
+  resolveMultiPackageLocation root loc0 >>=
+  mapM (\(dir, loc1) -> do
+    cabalfp <- findOrGenerateCabalFile dir
+    gpd <- readPackageUnresolved cabalfp printWarnings
+    return LocalPackageView
+      { lpvCabalFP = cabalfp
+      , lpvGPD = gpd
+      , lpvLoc = loc1
+      })
+
+-- | 'parseMultiCabalFiles' but supports 'PLIndex'
+parseMultiCabalFilesIndex
+  :: forall env. HasConfig env
+  => (PackageIdentifierRevision -> IO ByteString)
   -> Path Abs Dir -- ^ project root, used for checking out necessary files
   -> PackageLocationIndex Subdirs
-  -> RIO env [(ByteString, PackageLocationIndex FilePath)]
--- Need special handling of PLIndex for efficiency (just read from the
--- index tarball) and correctness (get the cabal file from the index,
--- not the package tarball itself, yay Hackage revisions).
-loadMultiRawCabalFilesIndex loadFromIndex _ (PLIndex pir) = do
-  bs <- liftIO $ loadFromIndex pir
-  return [(bs, PLIndex pir)]
-loadMultiRawCabalFilesIndex _ y (PLOther z) =
-  loadMultiRawCabalFiles y z >>=
-  liftIO . mapM (\(fp, loc) -> (, PLOther loc) <$> S.readFile (toFilePath fp))
-
--- | Same as 'loadSingleRawCabalFile', but for 'PackageLocation' There
--- may be multiple results if dealing with a repository with subdirs,
--- in which case the returned 'PackageLocation' will have just the
--- relevant subdirectory selected.
-loadMultiRawCabalFiles
-  :: forall env.
-     HasConfig env
-  => Path Abs Dir -- ^ project root, used for checking out necessary files
-  -> PackageLocation Subdirs
-  -> RIO env [(Path Abs File, PackageLocation FilePath)]
-loadMultiRawCabalFiles root loc =
-    resolveMultiPackageLocation root loc >>= mapM go
-  where
-    go (dir, loc') = do
-      cabalFile <- findOrGenerateCabalFile dir
-      return (cabalFile, loc')
+  -> RIO env [(GenericPackageDescription, PackageLocationIndex FilePath)]
+parseMultiCabalFilesIndex loadFromIndex _root (PLIndex pir) =
+  (pure . (, PLIndex pir)) <$>
+  readPackageUnresolvedFromIndex loadFromIndex pir
+parseMultiCabalFilesIndex _ root (PLOther loc0) =
+  map (\lpv -> (lpvGPD lpv, PLOther $ lpvLoc lpv)) <$>
+  parseMultiCabalFiles root False loc0

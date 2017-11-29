@@ -37,14 +37,13 @@ import qualified Data.Text.Encoding.Error   as T
 import qualified Data.Text.IO               as T
 import           Data.Time
 import           Distribution.PackageDescription (GenericPackageDescription)
-import           Distribution.ParseUtils         (PError)
 import           GHC.Foreign                (peekCString, withCString)
 import           Language.Haskell.TH
 import           Language.Haskell.TH.Syntax (lift)
 import           Lens.Micro
 import           Stack.Prelude              hiding (lift)
 import           Stack.Constants
-import           Stack.Types.BuildPlan      (PackageLocationIndex)
+import           Stack.Types.PackageIdentifier (PackageIdentifierRevision)
 import           System.Console.ANSI
 import           System.FilePath
 import           System.IO
@@ -57,7 +56,7 @@ data Runner = Runner
   , runnerLogOptions :: !LogOptions
   , runnerTerminal   :: !Bool
   , runnerSticky     :: !Sticky
-  , runnerParsedCabalFiles :: !(IORef (Map (PackageLocationIndex FilePath) (Either PError GenericPackageDescription)))
+  , runnerParsedCabalFiles :: !(IORef (Map (Either PackageIdentifierRevision (Path Abs File)) GenericPackageDescription))
   -- ^ Cache of previously parsed cabal files.
   --
   -- TODO: This is really an ugly hack to avoid spamming the user with

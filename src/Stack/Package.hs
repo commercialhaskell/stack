@@ -17,12 +17,11 @@
 
 module Stack.Package
   (readPackage
-  ,readPackageBS
   ,readPackageDescriptionDir
   ,readDotBuildinfo
   ,readPackageUnresolved
+  ,readPackageUnresolvedFromIndex
   ,resolvePackage
-  ,cachedCabalFileParse
   ,CabalWarnings(..)
   ,packageFromPackageDescription
   ,findOrGenerateCabalFile
@@ -38,7 +37,6 @@ module Stack.Package
   ,packageDescTools
   ,packageDependencies
   ,autogenDir
-  ,checkCabalFileName
   ,cabalFilePackageId)
   where
 
@@ -85,7 +83,7 @@ import           Stack.Constants.Config
 import           Stack.Prelude
 import           Stack.PrettyPrint
 import           Stack.Types.Build
-import           Stack.Types.BuildPlan (PackageLocationIndex (..), PackageLocation (..), ExeName (..))
+import           Stack.Types.BuildPlan (ExeName (..))
 import           Stack.Types.Compiler
 import           Stack.Types.Config
 import           Stack.Types.FlagName
@@ -119,7 +117,7 @@ instance HasEnvConfig Ctx where
 
 data CabalWarnings
   = CWNoPrint
-  | CWPrint !String
+  | CWPrint !(Path Abs File)
 
 -- | Parse a cabal file from the given location. This performs caching
 -- (based on the 'PackageLocationIndex'), and will only use the second
@@ -128,10 +126,10 @@ data CabalWarnings
 -- 'True', then they will be printed.
 cachedCabalFileParse
   :: forall env. HasRunner env
-  => PackageLocationIndex FilePath
+  => Either PackageIdentifierRevision (Path Abs File)
   -> CabalWarnings
   -> RIO env BS.ByteString -- ^ get the bytestring contents
-  -> RIO env (Either PError GenericPackageDescription)
+  -> RIO env GenericPackageDescription
 cachedCabalFileParse key cw getBS = do
   ref <- view $ runnerL.to runnerParsedCabalFiles
   m0 <- readIORef ref
@@ -141,12 +139,12 @@ cachedCabalFileParse key cw getBS = do
       bs <- getBS
       val <-
         case rawParseGPD bs of
-          Left e -> return $ Left e
+          Left e -> throwM $ PackageInvalidCabalFile key e
           Right (warnings, gpd) -> do
             case cw of
               CWNoPrint -> return ()
-              CWPrint src -> mapM_ (prettyWarnL . toPretty src) warnings
-            return $ Right gpd
+              CWPrint src -> mapM_ (prettyWarnL . toPretty (toFilePath src)) warnings
+            return gpd
       atomicModifyIORef' ref $ \m -> (M.insert key val m, ())
       return val
   where
@@ -182,23 +180,36 @@ readPackageUnresolved
   => Path Abs File -- ^ cabal file location
   -> Bool -- ^ print warnings?
   -> RIO env GenericPackageDescription
-readPackageUnresolved cabalfp printWarnings = readPackageUnresolvedBS
-  (PLOther $ PLFilePath $ toFilePath cabalfp)
-  (if printWarnings then CWPrint (toFilePath cabalfp) else CWNoPrint)
-  (liftIO (BS.readFile (FL.toFilePath cabalfp)))
+readPackageUnresolved cabalfp printWarnings = do
+  gpd <- cachedCabalFileParse
+    (Right cabalfp)
+    (if printWarnings then CWPrint cabalfp else CWNoPrint)
+    (liftIO (BS.readFile (FL.toFilePath cabalfp)))
+  let PackageIdentifier name _version =
+          fromCabalPackageIdentifier
+        $ D.package
+        $ D.packageDescription gpd
+  checkCabalFileName name cabalfp
+  return gpd
 
--- | Read the raw, unresolved package information from a ByteString.
-readPackageUnresolvedBS
+-- | Read the 'GenericPackageDescription' from the given
+-- 'PackageIdentifierRevision'.
+readPackageUnresolvedFromIndex
   :: forall env. HasRunner env
-  => PackageLocationIndex FilePath
-  -> CabalWarnings
-  -> RIO env BS.ByteString -- ^ get the contents
+  => (PackageIdentifierRevision -> IO ByteString) -- ^ load the raw bytes
+  -> PackageIdentifierRevision
   -> RIO env GenericPackageDescription
-readPackageUnresolvedBS loc cw getBS = do
-  eres <- cachedCabalFileParse loc cw getBS
-  case eres of
-    Left e -> throwM $ PackageInvalidCabalFile loc e
-    Right x -> return x
+readPackageUnresolvedFromIndex loadFromIndex pir@(PackageIdentifierRevision pi' _) = do
+  gpd <- cachedCabalFileParse
+    (Left pir)
+    CWNoPrint
+    (liftIO $ loadFromIndex pir)
+  let foundPI =
+          fromCabalPackageIdentifier
+        $ D.package
+        $ D.packageDescription gpd
+  unless (pi' == foundPI) $ error $ "Mismatched package identifiers found: " ++ show (pi', foundPI) -- FIXME better error message
+  return gpd
 
 -- | Reads and exposes the package information
 readPackage
@@ -209,18 +220,6 @@ readPackage
   -> RIO env Package
 readPackage packageConfig cabalfp printWarnings =
   resolvePackage packageConfig <$> readPackageUnresolved cabalfp printWarnings
-
--- | Reads and exposes the package information, from a ByteString
-readPackageBS
-  :: forall env. HasRunner env
-  => PackageConfig
-  -> PackageLocationIndex FilePath
-  -> CabalWarnings
-  -> RIO env BS.ByteString
-  -> RIO env Package
-readPackageBS packageConfig loc cw getBS =
-  cachedCabalFileParse loc cw getBS >>=
-  either (throwM . PackageInvalidCabalFile loc) (return . resolvePackage packageConfig)
 
 -- | Get 'GenericPackageDescription' and 'PackageDescription' reading info
 -- from given directory.

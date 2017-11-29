@@ -380,10 +380,9 @@ loadSnapshot' loadFromIndex mcompiler root =
               Just cv' -> loadCompiler cv'
           Right sd' -> start sd'
 
-      gpds <- (concat <$> mapM
-        (loadMultiRawCabalFilesIndex loadFromIndex root >=>
-           mapM (\(bs, loc) -> (, loc) <$> parseGPD loc (return bs)))
-        (sdLocations sd)) `onException` do
+      gpds <-
+        (concat <$> mapM (parseMultiCabalFilesIndex loadFromIndex root) (sdLocations sd))
+        `onException` do
           logError "Unable to load cabal files for snapshot"
           case sdResolver sd of
             ResolverSnapshot name -> do
@@ -542,7 +541,7 @@ recalculate loadFromIndex root compilerVersion allFlags allHide allOptions (name
     Nothing -> return (name, lpi0 { lpiHide = hide, lpiGhcOptions = options }) -- optimization
     Just flags -> do
       let loc = lpiLocation lpi0
-      gpd <- parseGPD loc $ loadSingleRawCabalFile loadFromIndex root loc
+      gpd <- parseSingleCabalFileIndex loadFromIndex root loc
       platform <- view platformL
       let res@(name', lpi) = calculate gpd platform compilerVersion loc flags hide options
       unless (name == name' && lpiVersion lpi0 == lpiVersion lpi) $ error "recalculate invariant violated"
@@ -738,23 +737,6 @@ splitUnmetDeps extra =
       case (lpiVersion <$> Map.lookup name globals) <|> Map.lookup name extra of
         Nothing -> False
         Just version -> version `withinIntervals` intervals
-
--- | Parse a 'GenericPackageDescription' from the given location and
--- contents. Will not print warnings from the parsing, and throws
--- exceptions on parse errors.
-parseGPD
-  :: forall env. HasConfig env
-  => SinglePackageLocation
-  -> RIO env ByteString
-  -> RIO env GenericPackageDescription
-parseGPD loc getBS = do
-  eres <- cachedCabalFileParse
-    loc
-    CWNoPrint
-    getBS
-  case eres of
-    Left e -> throwM $ InvalidCabalFileInSnapshot loc e
-    Right gpd -> return gpd
 
 -- | Calculate a 'LoadedPackageInfo' from the given 'GenericPackageDescription'
 calculate :: GenericPackageDescription

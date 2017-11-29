@@ -80,7 +80,6 @@ import           Path.Extra (rejectMissingDir)
 import           Path.IO
 import           Stack.Config (getLocalPackages)
 import           Stack.Fetch (withCabalLoader)
-import           Stack.Package
 import           Stack.PackageIndex
 import           Stack.PackageLocation
 import           Stack.Snapshot (calculatePackagePromotion)
@@ -512,13 +511,8 @@ parseTargets needTargets boptscli = do
 
   (globals', snapshots, locals') <- withCabalLoader $ \loadFromIndex -> do
     addedDeps' <- fmap Map.fromList $ forM (Map.toList addedDeps) $ \(name, loc) -> do
-      eres <- cachedCabalFileParse
-        loc
-        CWNoPrint
-        (loadSingleRawCabalFile loadFromIndex root loc)
-      case eres of
-        Left e -> throwIO $ InvalidCabalFileInLocal (Right loc) e
-        Right gpd -> return (name, (gpd, loc, Nothing))
+      gpd <- parseSingleCabalFileIndex loadFromIndex root loc
+      return (name, (gpd, loc, Nothing))
 
     -- Calculate a list of all of the locals, based on the project
     -- packages, local dependencies, and added deps found from the

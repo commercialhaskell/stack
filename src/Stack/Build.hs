@@ -44,7 +44,7 @@ import           Stack.Build.Source
 import           Stack.Build.Target
 import           Stack.Fetch as Fetch
 import           Stack.Package
-import           Stack.PackageLocation (loadSingleRawCabalFile)
+import           Stack.PackageLocation (parseSingleCabalFileIndex)
 import           Stack.Types.Build
 import           Stack.Types.BuildPlan
 import           Stack.Types.Config
@@ -281,17 +281,10 @@ withLoadPackage inner = do
     root <- view projectRootL
     run <- askRunInIO
     withCabalLoader $ \loadFromIndex ->
-        inner $ \loc flags ghcOptions ->
-            run $ readPackageBS
+        inner $ \loc flags ghcOptions -> run $
+            resolvePackage
               (depPackageConfig econfig flags ghcOptions)
-              loc
-
-              -- Intentionally ignore warnings, as it's not really
-              -- appropriate to print a bunch of warnings out while
-              -- resolving the package index.
-              CWNoPrint
-
-              (loadSingleRawCabalFile loadFromIndex root loc)
+              <$> parseSingleCabalFileIndex loadFromIndex root loc
   where
     -- | Package config to be used for dependencies
     depPackageConfig :: EnvConfig -> Map FlagName Bool -> [Text] -> PackageConfig

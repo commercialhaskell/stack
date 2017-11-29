@@ -35,7 +35,7 @@ import           Stack.Types.Version
 
 -- | All exceptions thrown by the library.
 data PackageException
-  = PackageInvalidCabalFile (PackageLocationIndex FilePath) PError
+  = PackageInvalidCabalFile (Either PackageIdentifierRevision (Path Abs File)) PError
   | PackageNoCabalFileFound (Path Abs Dir)
   | PackageMultipleCabalFilesFound (Path Abs Dir) [Path Abs File]
   | MismatchedCabalName (Path Abs File) PackageName
@@ -43,8 +43,10 @@ data PackageException
 instance Exception PackageException
 instance Show PackageException where
     show (PackageInvalidCabalFile loc err) = concat
-        [ "Unable to parse cabal file for "
-        , show loc
+        [ "Unable to parse cabal file "
+        , case loc of
+            Left pir -> "for " ++ packageIdentifierRevisionString pir
+            Right fp -> toFilePath fp
         , ": "
         , show err
         ]
