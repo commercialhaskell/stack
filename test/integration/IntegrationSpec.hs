@@ -48,7 +48,7 @@ main = do
 
     envOrig <- getEnvironment
 
-    withSystemTempDirectory "stack-integration-home" $ \newHome -> do
+    withSystemTempDirectory "stackhome" $ \newHome -> do
         defaultStackRoot <- getAppUserDataDirectory "stack"
         let newStackRoot = newHome </> takeFileName defaultStackRoot
             env' = Map.toList
