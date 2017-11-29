@@ -61,7 +61,7 @@ main = do
                  $ map (first (map toUpper)) envOrig
             origStackRoot = fromMaybe defaultStackRoot (lookup "STACK_ROOT" envOrig)
 
-        hspec $ mapM_ (test runghc env' currDir defaultStackRoot origStackRoot newHome newStackRoot) tests
+        hspec $ mapM_ (test runghc env' currDir origStackRoot newHome newStackRoot) tests
 
 hasTest :: FilePath -> FilePath -> IO Bool
 hasTest root dir = doesFileExist $ root </> dir </> "Main.hs"
@@ -69,13 +69,12 @@ hasTest root dir = doesFileExist $ root </> dir </> "Main.hs"
 test :: FilePath -- ^ runghc
      -> [(String, String)] -- ^ env
      -> FilePath -- ^ currdir
-     -> FilePath -- ^ defaultStackRoot
      -> FilePath -- ^ origStackRoot
      -> FilePath -- ^ newHome
      -> FilePath -- ^ newStackRoot
      -> String
      -> Spec
-test runghc env' currDir defaultStackRoot origStackRoot newHome newStackRoot name = it name $ withDir $ \dir -> do
+test runghc env' currDir origStackRoot newHome newStackRoot name = it name $ withDir $ \dir -> do
     newHomeExists <- doesDirectoryExist newHome
     when newHomeExists (removeDirectoryRecursive newHome)
     copyTree toCopyRoot origStackRoot newStackRoot
