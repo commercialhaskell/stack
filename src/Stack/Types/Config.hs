@@ -39,6 +39,7 @@ module Stack.Types.Config
   ,BuildConfig(..)
   ,LocalPackages(..)
   ,LocalPackageView(..)
+  ,lpvRoot
   ,NamedComponent(..)
   ,stackYamlL
   ,projectRootL
@@ -572,13 +573,16 @@ data LocalPackages = LocalPackages
 
 -- | A view of a local package needed for resolving components
 data LocalPackageView = LocalPackageView
-    { lpvVersion    :: !Version
-    , lpvRoot       :: !(Path Abs Dir)
+    { lpvVersion    :: !Version -- FIXME make this a separate function on GenericPackageDescription
     , lpvCabalFP    :: !(Path Abs File)
-    , lpvComponents :: !(Set NamedComponent)
+    , lpvComponents :: !(Set NamedComponent) -- FIXME make this a separate function using getNamedComponents
     , lpvGPD        :: !GenericPackageDescription
     , lpvLoc        :: !(PackageLocation FilePath)
     }
+
+-- | Root directory for the given 'LocalPackageView'
+lpvRoot :: LocalPackageView -> Path Abs Dir
+lpvRoot = parent . lpvCabalFP
 
 -- | A single, fully resolved component of a package
 data NamedComponent
@@ -1021,7 +1025,7 @@ data ConfigException
   | NixRequiresSystemGhc
   | NoResolverWhenUsingNoLocalConfig
   | InvalidResolverForNoLocalConfig String
-  | InvalidCabalFileInLocal !(PackageLocationIndex FilePath) !PError !ByteString
+  | InvalidCabalFileInLocal !(Either (Path Abs File) (PackageLocationIndex FilePath)) !PError
   | DuplicateLocalPackageNames ![(PackageName, [PackageLocationIndex FilePath])]
   deriving Typeable
 instance Show ConfigException where
@@ -1137,9 +1141,15 @@ instance Show ConfigException where
         ]
     show NoResolverWhenUsingNoLocalConfig = "When using the script command, you must provide a resolver argument"
     show (InvalidResolverForNoLocalConfig ar) = "The script command requires a specific resolver, you provided " ++ ar
-    show (InvalidCabalFileInLocal loc err _) = concat
+    show (InvalidCabalFileInLocal loc err) = concat
       [ "Unable to parse cabal file from "
-      , show loc
+
+        -- TODO make the display here nicer than a `show`, perhaps
+        -- drop the constructor entirely and leave it up to the
+        -- exception mechanisms in Stack.Package. How about `Either
+        -- PackageIdentifierRevision (Path Abs File)`?
+      , either toFilePath show loc
+
       , ": "
       , show err
       ]

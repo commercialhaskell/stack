@@ -512,10 +512,13 @@ parseTargets needTargets boptscli = do
 
   (globals', snapshots, locals') <- withCabalLoader $ \loadFromIndex -> do
     addedDeps' <- fmap Map.fromList $ forM (Map.toList addedDeps) $ \(name, loc) -> do
-      bs <- loadSingleRawCabalFile loadFromIndex root loc
-      case rawParseGPD bs of
-        Left e -> throwIO $ InvalidCabalFileInLocal loc e bs
-        Right (_warnings, gpd) -> return (name, (gpd, loc, Nothing))
+      eres <- cachedCabalFileParse
+        loc
+        CWNoPrint
+        (loadSingleRawCabalFile loadFromIndex root loc)
+      case eres of
+        Left e -> throwIO $ InvalidCabalFileInLocal (Right loc) e
+        Right gpd -> return (name, (gpd, loc, Nothing))
 
     -- Calculate a list of all of the locals, based on the project
     -- packages, local dependencies, and added deps found from the

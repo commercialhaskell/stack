@@ -566,7 +566,7 @@ makeGhciPkgInfo buildOptsCLI sourceMap installedMap locals addPkgs mfileTargets 
             , packageConfigCompilerVersion = compilerVersion
             , packageConfigPlatform = view platformL econfig
             }
-    (warnings,gpkgdesc) <- readPackageUnresolved cabalfp
+    gpkgdesc <- readPackageUnresolved cabalfp True
 
     -- Source the package's *.buildinfo file created by configure if any. See
     -- https://www.haskell.org/cabal/users-guide/developing-packages.html#system-dependent-parameters
@@ -588,7 +588,6 @@ makeGhciPkgInfo buildOptsCLI sourceMap installedMap locals addPkgs mfileTargets 
                     (C.updatePackageDescription bi y))
               mbuildinfo
 
-    mapM_ (printCabalFileWarning cabalfp) warnings
     (mods,files,opts) <- getPackageOpts (packageOpts pkg) sourceMap installedMap locals addPkgs cabalfp
     let filteredOpts = filterWanted opts
         filterWanted = M.filterWithKey (\k _ -> k `S.member` allWanted)

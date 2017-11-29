@@ -281,17 +281,17 @@ withLoadPackage inner = do
     root <- view projectRootL
     run <- askRunInIO
     withCabalLoader $ \loadFromIndex ->
-        inner $ \loc flags ghcOptions -> do
-            bs <- run $ loadSingleRawCabalFile loadFromIndex root loc
-
-            -- Intentionally ignore warnings, as it's not really
-            -- appropriate to print a bunch of warnings out while
-            -- resolving the package index.
-            (_warnings,pkg) <- readPackageBS
+        inner $ \loc flags ghcOptions ->
+            run $ readPackageBS
               (depPackageConfig econfig flags ghcOptions)
               loc
-              bs
-            return pkg
+
+              -- Intentionally ignore warnings, as it's not really
+              -- appropriate to print a bunch of warnings out while
+              -- resolving the package index.
+              CWNoPrint
+
+              (loadSingleRawCabalFile loadFromIndex root loc)
   where
     -- | Package config to be used for dependencies
     depPackageConfig :: EnvConfig -> Map FlagName Bool -> [Text] -> PackageConfig

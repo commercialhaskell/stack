@@ -4,6 +4,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TupleSections #-}
 
 -- | Deal with downloading, cloning, or whatever else is necessary for
 -- getting a 'PackageLocation' into something Stack can work with.
@@ -257,7 +258,8 @@ loadMultiRawCabalFilesIndex loadFromIndex _ (PLIndex pir) = do
   bs <- liftIO $ loadFromIndex pir
   return [(bs, PLIndex pir)]
 loadMultiRawCabalFilesIndex _ y (PLOther z) =
-  map (second PLOther) <$> loadMultiRawCabalFiles y z
+  loadMultiRawCabalFiles y z >>=
+  liftIO . mapM (\(fp, loc) -> (, PLOther loc) <$> S.readFile (toFilePath fp))
 
 -- | Same as 'loadSingleRawCabalFile', but for 'PackageLocation' There
 -- may be multiple results if dealing with a repository with subdirs,
@@ -268,11 +270,10 @@ loadMultiRawCabalFiles
      HasConfig env
   => Path Abs Dir -- ^ project root, used for checking out necessary files
   -> PackageLocation Subdirs
-  -> RIO env [(ByteString, PackageLocation FilePath)]
+  -> RIO env [(Path Abs File, PackageLocation FilePath)]
 loadMultiRawCabalFiles root loc =
     resolveMultiPackageLocation root loc >>= mapM go
   where
     go (dir, loc') = do
       cabalFile <- findOrGenerateCabalFile dir
-      bs <- liftIO $ S.readFile $ toFilePath cabalFile
-      return (bs, loc')
+      return (cabalFile, loc')

@@ -19,7 +19,6 @@ module Stack.Solver
     , parseCabalOutputLine
     ) where
 
-import           Control.Monad (mapAndUnzipM)
 import           Stack.Prelude
 import           Data.Aeson.Extended         (object, (.=), toJSON)
 import qualified Data.ByteString as S
@@ -49,9 +48,7 @@ import           Stack.Build.Target (gpdVersion)
 import           Stack.BuildPlan
 import           Stack.Config (getLocalPackages, loadConfigYaml)
 import           Stack.Constants (stackDotYaml, wiredInPackages)
-import           Stack.Package               (printCabalFileWarning
-                                             , hpack
-                                             , readPackageUnresolved)
+import           Stack.Package               (hpack, readPackageUnresolved)
 import           Stack.PrettyPrint
 import           Stack.Setup
 import           Stack.Setup.Installed
@@ -548,8 +545,7 @@ cabalPackagesCheck cabalfps noPkgMsg dupErrMsg = do
     logInfo "Using cabal packages:"
     logInfo $ T.pack (formatGroup relpaths)
 
-    (warnings, gpds) <- mapAndUnzipM readPackageUnresolved cabalfps
-    zipWithM_ (mapM_ . printCabalFileWarning) cabalfps warnings
+    gpds <- mapM (flip readPackageUnresolved True) cabalfps
 
     -- package name cannot be empty or missing otherwise
     -- it will result in cabal solver failure.

@@ -657,22 +657,22 @@ getLocalPackages = do
 
             packages <- do
               bss <- concat <$> mapM (loadMultiRawCabalFiles root) (bcPackages bc)
-              forM bss $ \(bs, loc) -> do
-                (warnings, gpd) <-
-                  case rawParseGPD bs of
-                    Left e -> throwM $ InvalidCabalFileInLocal (PLOther loc) e bs
+              forM bss $ \(cabalfp, loc) -> do
+                eres <- cachedCabalFileParse
+                  (PLOther loc)
+                  (CWPrint (toFilePath cabalfp))
+                  (liftIO (S.readFile (toFilePath cabalfp)))
+                gpd <-
+                  case eres of
+                    Left e -> throwM $ InvalidCabalFileInLocal (Left cabalfp) e
                     Right x -> return x
                 let PackageIdentifier name version =
                            fromCabalPackageIdentifier
                          $ C.package
                          $ C.packageDescription gpd
-                dir <- resolveSinglePackageLocation root loc
-                cabalfp <- findOrGenerateCabalFile dir
-                mapM_ (printCabalFileWarning cabalfp) warnings
                 checkCabalFileName name cabalfp
                 let lpv = LocalPackageView
                       { lpvVersion = version
-                      , lpvRoot = dir
                       , lpvCabalFP = cabalfp
                       , lpvComponents = getNamedComponents gpd
                       , lpvGPD = gpd
@@ -682,9 +682,10 @@ getLocalPackages = do
 
             deps <- mapM (loadMultiRawCabalFilesIndex loadFromIndex root) (bcDependencies bc)
                 >>= mapM (\(bs, loc :: PackageLocationIndex FilePath) -> do
-                     (_warnings, gpd) <- do
-                       case rawParseGPD bs of
-                         Left e -> throwM $ InvalidCabalFileInLocal loc e bs
+                     eres <- cachedCabalFileParse loc CWNoPrint (return bs)
+                     gpd <- do
+                       case eres of
+                         Left e -> throwM $ InvalidCabalFileInLocal (Right loc) e
                          Right x -> return x
                      let PackageIdentifier name _version =
                                 fromCabalPackageIdentifier

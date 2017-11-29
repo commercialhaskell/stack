@@ -171,7 +171,7 @@ getCabalLbs :: HasEnvConfig env
             -> RIO env (PackageIdentifier, L.ByteString)
 getCabalLbs pvpBounds mrev fp = do
     path <- liftIO $ resolveFile' fp
-    (_warnings, gpd) <- readPackageUnresolved path
+    gpd <- readPackageUnresolved path False
     (_, sourceMap) <- loadSourceMap AllowNoTargets defaultBuildOptsCLI
     menv <- getMinimalEnvOverride
     (installedMap, _, _, _) <- getInstalled menv GetInstalledOpts
@@ -296,8 +296,7 @@ readLocalPackage :: HasEnvConfig env => Path Abs Dir -> RIO env LocalPackage
 readLocalPackage pkgDir = do
     cabalfp <- findOrGenerateCabalFile pkgDir
     config  <- getDefaultPackageConfig
-    (warnings,package) <- readPackage config cabalfp
-    mapM_ (printCabalFileWarning cabalfp) warnings
+    package <- readPackage config cabalfp True
     return LocalPackage
         { lpPackage = package
         , lpWanted = False -- HACK: makes it so that sdist output goes to a log instead of a file.
@@ -405,7 +404,7 @@ checkPackageInExtractedTarball pkgDir = do
     cabalfp <- findOrGenerateCabalFile pkgDir
     name    <- parsePackageNameFromFilePath cabalfp
     config  <- getDefaultPackageConfig
-    (gdesc, PackageDescriptionPair pkgDesc _) <- readPackageDescriptionDir config pkgDir
+    (gdesc, PackageDescriptionPair pkgDesc _) <- readPackageDescriptionDir config pkgDir False
     logInfo $
         "Checking package '" <> packageNameText name <> "' for common mistakes"
     let pkgChecks = Check.checkPackage gdesc (Just pkgDesc)

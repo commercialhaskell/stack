@@ -98,15 +98,16 @@ loadSourceMapFull needTargets boptsCli = do
               root <- view projectRootL
               dir <- resolveSinglePackageLocation root pl
               cabalfp <- findOrGenerateCabalFile dir
-              bs <- liftIO (S.readFile (toFilePath cabalfp))
-              (warnings, gpd) <-
-                case rawParseGPD bs of
-                  Left e -> throwM $ InvalidCabalFileInLocal (PLOther pl) e bs
+              eres <- cachedCabalFileParse
+                (PLOther pl)
+                (CWPrint (toFilePath cabalfp))
+                (liftIO (S.readFile (toFilePath cabalfp)))
+              gpd <-
+                case eres of
+                  Left e -> throwM $ InvalidCabalFileInLocal (Left cabalfp) e
                   Right x -> return x
-              mapM_ (printCabalFileWarning cabalfp) warnings
               lp' <- loadLocalPackage False boptsCli targets (n, LocalPackageView
                 { lpvVersion = lpiVersion lpi
-                , lpvRoot = dir
                 , lpvCabalFP = cabalfp
                 , lpvComponents = getNamedComponents gpd
                 , lpvGPD = gpd
