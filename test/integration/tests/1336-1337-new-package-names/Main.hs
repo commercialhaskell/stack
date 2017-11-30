@@ -1,4 +1,5 @@
 import StackTest
+import Control.Monad
 import System.Directory
 import System.FilePath
 
@@ -17,7 +18,7 @@ main =
             stackErr ["new", "44444444444444"]
             stackErr ["new", "abc-1"]
             stackErr ["new", "444-ば日本-4本"]
-            stack ["new", "ば日本-4本"]
+            unless isMacOSX $ stack ["new", "ば日本-4本"]
             stack ["new", "אבהץש"]
             stack ["new", "ΔΘΩϬ"]
             doesExist "./ΔΘΩϬ/stack.yaml"
