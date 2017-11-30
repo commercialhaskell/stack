@@ -661,8 +661,8 @@ getLocalPackages = do
                               $ C.package
                               $ C.packageDescription gpd
                       in (name, (gpd, loc))
-            deps <- fmap (map wrapGPD . concat)
-                  $ mapM (parseMultiCabalFilesIndex loadFromIndex root) (bcDependencies bc)
+            deps <- (map wrapGPD . concat)
+                <$> mapM (parseMultiCabalFilesIndex loadFromIndex root) (bcDependencies bc)
 
             checkDuplicateNames $
               map (second (PLOther . lpvLoc)) packages ++
