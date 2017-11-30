@@ -56,7 +56,10 @@ data Runner = Runner
   , runnerLogOptions :: !LogOptions
   , runnerTerminal   :: !Bool
   , runnerSticky     :: !Sticky
-  , runnerParsedCabalFiles :: !(IORef (Map (Either PackageIdentifierRevision (Path Abs File)) GenericPackageDescription))
+  , runnerParsedCabalFiles :: !(IORef
+      ( Map PackageIdentifierRevision GenericPackageDescription
+      , Map (Path Abs Dir)            (GenericPackageDescription, Path Abs File)
+      ))
   -- ^ Cache of previously parsed cabal files.
   --
   -- TODO: This is really an ugly hack to avoid spamming the user with
@@ -65,9 +68,6 @@ data Runner = Runner
   -- that it only ever parses a cabal file once. But for now, this is
   -- a decent workaround. See:
   -- <https://github.com/commercialhaskell/stack/issues/3591>.
-  , runnerHpackRun :: !(IORef (HashSet FilePath))
-  -- ^ Same insanity as 'runnerParsedCabalFiles', but indicates if
-  -- hpack has been run on a directory.
   }
 
 class HasLogFunc env => HasRunner env where
@@ -273,8 +273,7 @@ withRunner logLevel useTime terminal colorWhen widthOverride reExec inner = do
                                     <$> liftIO getTerminalWidth)
                                    pure widthOverride
   canUseUnicode <- liftIO getCanUseUnicode
-  ref1 <- newIORef mempty
-  ref2 <- newIORef mempty
+  ref <- newIORef mempty
   withSticky terminal $ \sticky -> inner Runner
     { runnerReExec = reExec
     , runnerLogOptions = LogOptions
@@ -287,8 +286,7 @@ withRunner logLevel useTime terminal colorWhen widthOverride reExec inner = do
         }
     , runnerTerminal = terminal
     , runnerSticky = sticky
-    , runnerParsedCabalFiles = ref1
-    , runnerHpackRun = ref2
+    , runnerParsedCabalFiles = ref
     }
   where clipWidth w
           | w < minTerminalWidth = minTerminalWidth

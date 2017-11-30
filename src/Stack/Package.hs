@@ -16,16 +16,13 @@
 -- | Dealing with Cabal.
 
 module Stack.Package
-  (readPackage
+  (readPackageDir
+  ,readPackageUnresolvedDir
+  ,readPackageUnresolvedIndex
   ,readPackageDescriptionDir
   ,readDotBuildinfo
-  ,readPackageUnresolved
-  ,readPackageUnresolvedFromIndex
   ,resolvePackage
-  ,CabalWarnings(..)
   ,packageFromPackageDescription
-  ,findOrGenerateCabalFile
-  ,hpack
   ,Package(..)
   ,PackageDescriptionPair(..)
   ,GetPackageFiles(..)
@@ -37,12 +34,14 @@ module Stack.Package
   ,packageDescTools
   ,packageDependencies
   ,autogenDir
-  ,cabalFilePackageId)
+  ,cabalFilePackageId
+  ,gpdPackageIdentifier
+  ,gpdPackageName
+  ,gpdVersion)
   where
 
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Char8 as C8
-import qualified Data.HashSet as HashSet
 import           Data.List (isSuffixOf, partition, isPrefixOf)
 import           Data.List.Extra (nubOrd)
 import qualified Data.Map.Strict as M
@@ -115,38 +114,44 @@ instance HasBuildConfig Ctx
 instance HasEnvConfig Ctx where
     envConfigL = lens ctxEnvConfig (\x y -> x { ctxEnvConfig = y })
 
-data CabalWarnings
-  = CWNoPrint
-  | CWPrint !(Path Abs File)
-
--- | Parse a cabal file from the given location. This performs caching
--- (based on the 'PackageLocationIndex'), and will only use the second
--- argument to grab a 'ByteString' on a cache miss. If we actually
--- perform a parse, and there are warnings, and the third argument is
--- 'True', then they will be printed.
-cachedCabalFileParse
-  :: forall env. HasRunner env
+-- | A helper function that performs the basic character encoding
+-- necessary.
+rawParseGPD
+  :: MonadThrow m
   => Either PackageIdentifierRevision (Path Abs File)
-  -> CabalWarnings
-  -> RIO env BS.ByteString -- ^ get the bytestring contents
-  -> RIO env GenericPackageDescription
-cachedCabalFileParse key cw getBS = do
+  -> BS.ByteString
+  -> m ([PWarning], GenericPackageDescription)
+rawParseGPD key bs =
+    case parseGenericPackageDescription chars of
+       ParseFailed e -> throwM $ PackageInvalidCabalFile key e
+       ParseOk warnings gpkg -> return (warnings,gpkg)
+  where
+    chars = T.unpack (dropBOM (decodeUtf8With lenientDecode bs))
+
+    -- https://github.com/haskell/hackage-server/issues/351
+    dropBOM t = fromMaybe t $ T.stripPrefix "\xFEFF" t
+
+-- | Read the raw, unresolved package information from a file.
+readPackageUnresolvedDir
+  :: forall env. HasConfig env
+  => Path Abs Dir -- ^ directory holding the cabal file
+  -> Bool -- ^ print warnings?
+  -> RIO env (GenericPackageDescription, Path Abs File)
+readPackageUnresolvedDir dir printWarnings = do
   ref <- view $ runnerL.to runnerParsedCabalFiles
-  m0 <- readIORef ref
-  case M.lookup key m0 of
-    Just val -> return val
+  (_, m) <- readIORef ref
+  case M.lookup dir m of
+    Just x -> return x
     Nothing -> do
-      bs <- getBS
-      val <-
-        case rawParseGPD bs of
-          Left e -> throwM $ PackageInvalidCabalFile key e
-          Right (warnings, gpd) -> do
-            case cw of
-              CWNoPrint -> return ()
-              CWPrint src -> mapM_ (prettyWarnL . toPretty (toFilePath src)) warnings
-            return gpd
-      atomicModifyIORef' ref $ \m -> (M.insert key val m, ())
-      return val
+      cabalfp <- findOrGenerateCabalFile dir
+      bs <- liftIO $ BS.readFile $ toFilePath cabalfp
+      (warnings, gpd) <- rawParseGPD (Right cabalfp) bs
+      when printWarnings
+        $ mapM_ (prettyWarnL . toPretty (toFilePath cabalfp)) warnings
+      checkCabalFileName (gpdPackageName gpd) cabalfp
+      let ret = (gpd, cabalfp)
+      atomicModifyIORef' ref $ \(m1, m2) ->
+        ((m1, M.insert dir ret m2), ret)
   where
     toPretty :: String -> PWarning -> [Doc AnsiAnn]
     toPretty src (PWarning x) =
@@ -160,66 +165,57 @@ cachedCabalFileParse key cw getBS = do
       , flow msg
       ]
 
-    -- | A helper function that performs the basic character encoding
-    -- necessary.
-    rawParseGPD :: BS.ByteString
-                -> Either PError ([PWarning], GenericPackageDescription)
-    rawParseGPD bs =
-        case parseGenericPackageDescription chars of
-           ParseFailed per -> Left per
-           ParseOk warnings gpkg -> Right (warnings,gpkg)
-      where
-        chars = T.unpack (dropBOM (decodeUtf8With lenientDecode bs))
+    -- | Check if the given name in the @Package@ matches the name of the .cabal file
+    checkCabalFileName :: MonadThrow m => PackageName -> Path Abs File -> m ()
+    checkCabalFileName name cabalfp = do
+        -- Previously, we just use parsePackageNameFromFilePath. However, that can
+        -- lead to confusing error messages. See:
+        -- https://github.com/commercialhaskell/stack/issues/895
+        let expected = packageNameString name ++ ".cabal"
+        when (expected /= toFilePath (filename cabalfp))
+            $ throwM $ MismatchedCabalName cabalfp name
 
-        -- https://github.com/haskell/hackage-server/issues/351
-        dropBOM t = fromMaybe t $ T.stripPrefix "\xFEFF" t
+gpdPackageIdentifier :: GenericPackageDescription -> PackageIdentifier
+gpdPackageIdentifier = fromCabalPackageIdentifier . D.package . D.packageDescription
 
--- | Read the raw, unresolved package information from a file.
-readPackageUnresolved
-  :: forall env. HasRunner env
-  => Path Abs File -- ^ cabal file location
-  -> Bool -- ^ print warnings?
-  -> RIO env GenericPackageDescription
-readPackageUnresolved cabalfp printWarnings = do
-  gpd <- cachedCabalFileParse
-    (Right cabalfp)
-    (if printWarnings then CWPrint cabalfp else CWNoPrint)
-    (liftIO (BS.readFile (FL.toFilePath cabalfp)))
-  let PackageIdentifier name _version =
-          fromCabalPackageIdentifier
-        $ D.package
-        $ D.packageDescription gpd
-  checkCabalFileName name cabalfp
-  return gpd
+gpdPackageName :: GenericPackageDescription -> PackageName
+gpdPackageName = packageIdentifierName . gpdPackageIdentifier
+
+gpdVersion :: GenericPackageDescription -> Version
+gpdVersion = packageIdentifierVersion . gpdPackageIdentifier
 
 -- | Read the 'GenericPackageDescription' from the given
 -- 'PackageIdentifierRevision'.
-readPackageUnresolvedFromIndex
+readPackageUnresolvedIndex
   :: forall env. HasRunner env
   => (PackageIdentifierRevision -> IO ByteString) -- ^ load the raw bytes
   -> PackageIdentifierRevision
   -> RIO env GenericPackageDescription
-readPackageUnresolvedFromIndex loadFromIndex pir@(PackageIdentifierRevision pi' _) = do
-  gpd <- cachedCabalFileParse
-    (Left pir)
-    CWNoPrint
-    (liftIO $ loadFromIndex pir)
-  let foundPI =
-          fromCabalPackageIdentifier
-        $ D.package
-        $ D.packageDescription gpd
-  unless (pi' == foundPI) $ throwM $ MismatchedCabalIdentifier pir foundPI
-  return gpd
+readPackageUnresolvedIndex loadFromIndex pir@(PackageIdentifierRevision pi' _) = do
+  ref <- view $ runnerL.to runnerParsedCabalFiles
+  (m, _) <- readIORef ref
+  case M.lookup pir m of
+    Just gpd -> return gpd
+    Nothing -> do
+      bs <- liftIO $ loadFromIndex pir
+      (_warnings, gpd) <- rawParseGPD (Left pir) bs
+      let foundPI =
+              fromCabalPackageIdentifier
+            $ D.package
+            $ D.packageDescription gpd
+      unless (pi' == foundPI) $ throwM $ MismatchedCabalIdentifier pir foundPI
+      atomicModifyIORef' ref $ \(m1, m2) ->
+        ((M.insert pir gpd m1, m2), gpd)
 
 -- | Reads and exposes the package information
-readPackage
-  :: forall env. HasRunner env
+readPackageDir
+  :: forall env. HasConfig env
   => PackageConfig
-  -> Path Abs File
+  -> Path Abs Dir
   -> Bool -- ^ print warnings from cabal file parsing?
-  -> RIO env Package
-readPackage packageConfig cabalfp printWarnings =
-  resolvePackage packageConfig <$> readPackageUnresolved cabalfp printWarnings
+  -> RIO env (Package, Path Abs File)
+readPackageDir packageConfig dir printWarnings =
+  first (resolvePackage packageConfig) <$> readPackageUnresolvedDir dir printWarnings
 
 -- | Get 'GenericPackageDescription' and 'PackageDescription' reading info
 -- from given directory.
@@ -230,8 +226,7 @@ readPackageDescriptionDir
   -> Bool -- ^ print warnings?
   -> RIO env (GenericPackageDescription, PackageDescriptionPair)
 readPackageDescriptionDir config pkgDir printWarnings = do
-    cabalfp <- findOrGenerateCabalFile pkgDir
-    gdesc   <- readPackageUnresolved cabalfp printWarnings
+    (gdesc, _) <- readPackageUnresolvedDir pkgDir printWarnings
     return (gdesc, resolvePackageDescription config gdesc)
 
 -- | Read @<package>.buildinfo@ ancillary files produced by some Setup.hs hooks.
@@ -244,16 +239,6 @@ readDotBuildinfo :: MonadIO m
                  -> m HookedBuildInfo
 readDotBuildinfo buildinfofp =
     liftIO $ readHookedBuildInfo D.silent (toFilePath buildinfofp)
-
--- | Check if the given name in the @Package@ matches the name of the .cabal file
-checkCabalFileName :: MonadThrow m => PackageName -> Path Abs File -> m ()
-checkCabalFileName name cabalfp = do
-    -- Previously, we just use parsePackageNameFromFilePath. However, that can
-    -- lead to confusing error messages. See:
-    -- https://github.com/commercialhaskell/stack/issues/895
-    let expected = packageNameString name ++ ".cabal"
-    when (expected /= toFilePath (filename cabalfp))
-        $ throwM $ MismatchedCabalName cabalfp name
 
 -- | Resolve a parsed cabal file into a 'Package', which contains all of
 -- the info needed for stack to build the 'Package' given the current
@@ -1345,7 +1330,7 @@ findOrGenerateCabalFile pkgDir = do
 -- | Generate .cabal file from package.yaml, if necessary.
 hpack :: (MonadIO m, MonadUnliftIO m, MonadLogger m, HasRunner env, HasConfig env, MonadReader env m)
       => Path Abs Dir -> m ()
-hpack pkgDir = don'tHpackTwice $ do
+hpack pkgDir = do
     let hpackFile = pkgDir </> $(mkRelFile Hpack.packageConfig)
     exists <- liftIO $ doesFileExist hpackFile
     when exists $ do
@@ -1378,14 +1363,6 @@ hpack pkgDir = don'tHpackTwice $ do
                 envOverride <- getMinimalEnvOverride
                 let cmd = Cmd (Just pkgDir) command envOverride []
                 runCmd cmd Nothing
-  where
-    don'tHpackTwice inner = do
-      ref <- view $ runnerL.to runnerHpackRun
-      let fp = toFilePath pkgDir
-      join $ atomicModifyIORef' ref $ \hs ->
-        if fp `HashSet.member` hs
-          then (hs, return ())
-          else (HashSet.insert fp hs, inner)
 
 -- | Path for the package's build log.
 buildLogPath :: (MonadReader env m, HasBuildConfig env, MonadThrow m)

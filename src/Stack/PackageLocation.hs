@@ -239,7 +239,7 @@ parseSingleCabalFileIndex
 -- Need special handling of PLIndex for efficiency (just read from the
 -- index tarball) and correctness (get the cabal file from the index,
 -- not the package tarball itself, yay Hackage revisions).
-parseSingleCabalFileIndex loadFromIndex _ (PLIndex pir) = readPackageUnresolvedFromIndex loadFromIndex pir
+parseSingleCabalFileIndex loadFromIndex _ (PLIndex pir) = readPackageUnresolvedIndex loadFromIndex pir
 parseSingleCabalFileIndex _ root (PLOther loc) = lpvGPD <$> parseSingleCabalFile root False loc
 
 parseSingleCabalFile
@@ -250,8 +250,7 @@ parseSingleCabalFile
   -> RIO env LocalPackageView
 parseSingleCabalFile root printWarnings loc = do
   dir <- resolveSinglePackageLocation root loc
-  cabalfp <- findOrGenerateCabalFile dir
-  gpd <- readPackageUnresolved cabalfp printWarnings
+  (gpd, cabalfp) <- readPackageUnresolvedDir dir printWarnings
   return LocalPackageView
     { lpvCabalFP = cabalfp
     , lpvGPD = gpd
@@ -268,8 +267,7 @@ parseMultiCabalFiles
 parseMultiCabalFiles root printWarnings loc0 =
   resolveMultiPackageLocation root loc0 >>=
   mapM (\(dir, loc1) -> do
-    cabalfp <- findOrGenerateCabalFile dir
-    gpd <- readPackageUnresolved cabalfp printWarnings
+    (gpd, cabalfp) <- readPackageUnresolvedDir dir printWarnings
     return LocalPackageView
       { lpvCabalFP = cabalfp
       , lpvGPD = gpd
@@ -285,7 +283,7 @@ parseMultiCabalFilesIndex
   -> RIO env [(GenericPackageDescription, PackageLocationIndex FilePath)]
 parseMultiCabalFilesIndex loadFromIndex _root (PLIndex pir) =
   (pure . (, PLIndex pir)) <$>
-  readPackageUnresolvedFromIndex loadFromIndex pir
+  readPackageUnresolvedIndex loadFromIndex pir
 parseMultiCabalFilesIndex _ root (PLOther loc0) =
   map (\lpv -> (lpvGPD lpv, PLOther $ lpvLoc lpv)) <$>
   parseMultiCabalFiles root False loc0

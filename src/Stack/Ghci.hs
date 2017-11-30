@@ -566,7 +566,11 @@ makeGhciPkgInfo buildOptsCLI sourceMap installedMap locals addPkgs mfileTargets 
             , packageConfigCompilerVersion = compilerVersion
             , packageConfigPlatform = view platformL econfig
             }
-    gpkgdesc <- readPackageUnresolved cabalfp True
+    -- TODO we've already parsed this information, otherwise we
+    -- wouldn't have figured out the cabalfp already. In the future:
+    -- retain that GenericPackageDescription in the relevant data
+    -- structures to avoid reparsing.
+    (gpkgdesc, _cabalfp) <- readPackageUnresolvedDir (parent cabalfp) True
 
     -- Source the package's *.buildinfo file created by configure if any. See
     -- https://www.haskell.org/cabal/users-guide/developing-packages.html#system-dependent-parameters
