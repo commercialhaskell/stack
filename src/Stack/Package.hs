@@ -208,7 +208,7 @@ readPackageUnresolvedFromIndex loadFromIndex pir@(PackageIdentifierRevision pi' 
           fromCabalPackageIdentifier
         $ D.package
         $ D.packageDescription gpd
-  unless (pi' == foundPI) $ error $ "Mismatched package identifiers found: " ++ show (pi', foundPI) -- FIXME better error message
+  unless (pi' == foundPI) $ throwM $ MismatchedCabalIdentifier pir foundPI
   return gpd
 
 -- | Reads and exposes the package information
