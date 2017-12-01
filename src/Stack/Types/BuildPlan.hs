@@ -142,7 +142,7 @@ data PackageLocation subdirs
   | PLArchive !(Archive subdirs)
   | PLRepo !(Repo subdirs)
   -- ^ Stored in a source control repository
-    deriving (Generic, Show, Eq, Data, Typeable, Functor)
+    deriving (Generic, Show, Eq, Ord, Data, Typeable, Functor)
 instance (Store a) => Store (PackageLocation a)
 instance (NFData a) => NFData (PackageLocation a)
 
@@ -156,7 +156,7 @@ data PackageLocationIndex subdirs
     -- version and (optional) cabal file info to specify the correct
     -- revision.
   | PLOther !(PackageLocation subdirs)
-    deriving (Generic, Show, Eq, Data, Typeable, Functor)
+    deriving (Generic, Show, Eq, Ord, Data, Typeable, Functor)
 instance (Store a) => Store (PackageLocationIndex a)
 instance (NFData a) => NFData (PackageLocationIndex a)
 
@@ -168,13 +168,13 @@ data Archive subdirs = Archive
   , archiveSubdirs :: !subdirs
   , archiveHash :: !(Maybe StaticSHA256)
   }
-    deriving (Generic, Show, Eq, Data, Typeable, Functor)
+    deriving (Generic, Show, Eq, Ord, Data, Typeable, Functor)
 instance Store a => Store (Archive a)
 instance NFData a => NFData (Archive a)
 
 -- | The type of a source control repository.
 data RepoType = RepoGit | RepoHg
-    deriving (Generic, Show, Eq, Data, Typeable)
+    deriving (Generic, Show, Eq, Ord, Data, Typeable)
 instance Store RepoType
 instance NFData RepoType
 
@@ -194,7 +194,7 @@ data Repo subdirs = Repo
     , repoType :: !RepoType
     , repoSubdirs :: !subdirs
     }
-    deriving (Generic, Show, Eq, Data, Typeable, Functor)
+    deriving (Generic, Show, Eq, Ord, Data, Typeable, Functor)
 instance Store a => Store (Repo a)
 instance NFData a => NFData (Repo a)
 

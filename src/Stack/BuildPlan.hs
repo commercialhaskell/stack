@@ -18,7 +18,6 @@ module Stack.BuildPlan
     , DepErrors
     , gpdPackageDeps
     , gpdPackages
-    , gpdPackageName
     , removeSrcPkgDefaultFlags
     , selectBestSnapshot
     , getToolMap
@@ -191,12 +190,6 @@ gpdPackages gpds = Map.fromList $
     where
         fromCabalIdent (C.PackageIdentifier name version) =
             (fromCabalPackageName name, fromCabalVersion version)
-
-gpdPackageName :: GenericPackageDescription -> PackageName
-gpdPackageName = fromCabalPackageName
-    . C.pkgName
-    . C.package
-    . C.packageDescription
 
 gpdPackageDeps
     :: GenericPackageDescription

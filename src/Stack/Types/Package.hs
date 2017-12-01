@@ -35,16 +35,19 @@ import           Stack.Types.Version
 
 -- | All exceptions thrown by the library.
 data PackageException
-  = PackageInvalidCabalFile (PackageLocationIndex FilePath) PError
+  = PackageInvalidCabalFile (Either PackageIdentifierRevision (Path Abs File)) PError
   | PackageNoCabalFileFound (Path Abs Dir)
   | PackageMultipleCabalFilesFound (Path Abs Dir) [Path Abs File]
   | MismatchedCabalName (Path Abs File) PackageName
+  | MismatchedCabalIdentifier !PackageIdentifierRevision !PackageIdentifier
   deriving Typeable
 instance Exception PackageException
 instance Show PackageException where
     show (PackageInvalidCabalFile loc err) = concat
-        [ "Unable to parse cabal file for "
-        , show loc
+        [ "Unable to parse cabal file "
+        , case loc of
+            Left pir -> "for " ++ packageIdentifierRevisionString pir
+            Right fp -> toFilePath fp
         , ": "
         , show err
         ]
@@ -67,6 +70,13 @@ instance Show PackageException where
         , packageNameString name
         , ".cabal\n"
         , "For more information, see: https://github.com/commercialhaskell/stack/issues/317"
+        ]
+    show (MismatchedCabalIdentifier pir ident) = concat
+        [ "Mismatched package identifier."
+        , "\nFound:    "
+        , packageIdentifierString ident
+        , "\nExpected: "
+        , packageIdentifierRevisionString pir
         ]
 
 -- | Libraries in a package. Since Cabal 2.0, internal libraries are a

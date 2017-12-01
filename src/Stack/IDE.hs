@@ -14,7 +14,7 @@ import qualified Data.Map as Map
 import qualified Data.Set as Set
 import qualified Data.Text as T
 import           Stack.Config (getLocalPackages)
-import           Stack.Package (findOrGenerateCabalFile)
+import           Stack.Package (readPackageUnresolvedDir, gpdPackageName)
 import           Stack.Prelude
 import           Stack.Types.Config
 import           Stack.Types.Package
@@ -28,9 +28,8 @@ listPackages = do
     -- the directory.
     packageDirs <- liftM (map lpvRoot . Map.elems . lpProject) getLocalPackages
     forM_ packageDirs $ \dir -> do
-        cabalfp <- findOrGenerateCabalFile dir
-        pkgName <- parsePackageNameFromFilePath cabalfp
-        (logInfo . packageNameText) pkgName
+        (gpd, _) <- readPackageUnresolvedDir dir False
+        (logInfo . packageNameText) (gpdPackageName gpd)
 
 -- | List the targets in the current project.
 listTargets :: HasEnvConfig env => RIO env ()

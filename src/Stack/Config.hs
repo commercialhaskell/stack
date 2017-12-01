@@ -45,7 +45,6 @@ module Stack.Config
   ,defaultConfigYaml
   ,getProjectConfig
   ,LocalConfigStatus(..)
-  ,getNamedComponents
   ) where
 
 import           Control.Monad.Extra (firstJustM)
@@ -54,12 +53,10 @@ import           Data.Aeson.Extended
 import qualified Data.ByteString as S
 import qualified Data.IntMap as IntMap
 import qualified Data.Map as Map
-import qualified Data.Set as Set
 import qualified Data.Text as T
 import           Data.Text.Encoding (encodeUtf8)
 import qualified Data.Yaml as Yaml
 import qualified Distribution.PackageDescription as C
-import qualified Distribution.Types.UnqualComponentName as C
 import           Distribution.System (OS (..), Platform (..), buildPlatform, Arch(OtherArch))
 import qualified Distribution.Text
 import           Distribution.Version (simplifyVersionRange, mkVersion')
@@ -80,7 +77,6 @@ import           Stack.Config.Urls
 import           Stack.Constants
 import           Stack.Fetch
 import qualified Stack.Image as Image
-import           Stack.Package
 import           Stack.PackageLocation
 import           Stack.Snapshot
 import           Stack.Types.BuildPlan
@@ -656,41 +652,17 @@ getLocalPackages = do
             bc <- view buildConfigL
 
             packages <- do
-              bss <- concat <$> mapM (loadMultiRawCabalFiles root) (bcPackages bc)
-              forM bss $ \(bs, loc) -> do
-                (warnings, gpd) <-
-                  case rawParseGPD bs of
-                    Left e -> throwM $ InvalidCabalFileInLocal (PLOther loc) e bs
-                    Right x -> return x
-                let PackageIdentifier name version =
-                           fromCabalPackageIdentifier
-                         $ C.package
-                         $ C.packageDescription gpd
-                dir <- resolveSinglePackageLocation root loc
-                cabalfp <- findOrGenerateCabalFile dir
-                mapM_ (printCabalFileWarning cabalfp) warnings
-                checkCabalFileName name cabalfp
-                let lpv = LocalPackageView
-                      { lpvVersion = version
-                      , lpvRoot = dir
-                      , lpvCabalFP = cabalfp
-                      , lpvComponents = getNamedComponents gpd
-                      , lpvGPD = gpd
-                      , lpvLoc = loc
-                      }
-                return (name, lpv)
+              let withName lpv = (lpvName lpv, lpv)
+              map withName . concat <$> mapM (parseMultiCabalFiles root True) (bcPackages bc)
 
-            deps <- mapM (loadMultiRawCabalFilesIndex loadFromIndex root) (bcDependencies bc)
-                >>= mapM (\(bs, loc :: PackageLocationIndex FilePath) -> do
-                     (_warnings, gpd) <- do
-                       case rawParseGPD bs of
-                         Left e -> throwM $ InvalidCabalFileInLocal loc e bs
-                         Right x -> return x
+            let wrapGPD (gpd, loc) =
                      let PackageIdentifier name _version =
                                 fromCabalPackageIdentifier
                               $ C.package
                               $ C.packageDescription gpd
-                     return (name, (gpd, loc))) . concat
+                      in (name, (gpd, loc))
+            deps <- (map wrapGPD . concat)
+                <$> mapM (parseMultiCabalFilesIndex loadFromIndex root) (bcDependencies bc)
 
             checkDuplicateNames $
               map (second (PLOther . lpvLoc)) packages ++
@@ -700,19 +672,6 @@ getLocalPackages = do
               { lpProject = Map.fromList packages
               , lpDependencies = Map.fromList deps
               }
-
-getNamedComponents :: C.GenericPackageDescription -> Set NamedComponent
-getNamedComponents gpkg = Set.fromList $ concat
-    [ maybe []  (const [CLib]) (C.condLibrary gpkg)
-    , go CExe   (map fst . C.condExecutables)
-    , go CTest  (map fst . C.condTestSuites)
-    , go CBench (map fst . C.condBenchmarks)
-    ]
-  where
-    go :: (T.Text -> NamedComponent)
-       -> (C.GenericPackageDescription -> [C.UnqualComponentName])
-       -> [NamedComponent]
-    go wrapper f = map (wrapper . T.pack . C.unUnqualComponentName) $ f gpkg
 
 -- | Check if there are any duplicate package names and, if so, throw an
 -- exception.
