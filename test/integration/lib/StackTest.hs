@@ -199,6 +199,7 @@ isARM :: Bool
 isARM = arch == "arm"
 
 -- | Is the OS Mac OS X?
+isMacOSX :: Bool
 isMacOSX = os == "darwin"
 
 -- | To avoid problems with GHC version mismatch when a new LTS major
