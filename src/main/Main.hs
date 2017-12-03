@@ -664,7 +664,7 @@ upgradeCmd upgradeOpts' go = withGlobalConfigAndLock go $
 
 -- | Upload to Hackage
 uploadCmd :: SDistOpts -> GlobalOpts -> IO ()
-uploadCmd (SDistOpts [] _ _ _ _ _) go =
+uploadCmd (SDistOpts [] _ _ _ _ _ _) go =
     withConfigAndLock go . prettyErrorL $
         [ flow "To upload the current package, please run"
         , styleShell "stack upload ."
