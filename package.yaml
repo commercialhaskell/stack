@@ -22,6 +22,7 @@ extra-source-files:
 - ChangeLog.md
 - README.md
 - doc/*.md
+- package.yaml
 - src/setup-shim/StackSetupShim.hs
 - stack.yaml
 - test/package-dump/ghc-7.10.txt
