@@ -755,7 +755,14 @@ sdistCmd sdistOpts go =
             liftIO $ L.writeFile (toFilePath tarPath) tarBytes
             checkSDistTarball sdistOpts tarPath
             prettyInfoL [flow "Wrote sdist tarball to", display tarPath]
+            unless (null $ sdoptsTarPath sdistOpts) (copyTarToTarPath tarPath tarName)
             when (sdoptsSign sdistOpts) (void $ Sig.sign (sdoptsSignServerUrl sdistOpts) tarPath)
+        where
+          copyTarToTarPath tarPath tarName = liftIO $ do
+            targetDir <- resolveDir' $ sdoptsTarPath sdistOpts
+            targetTarPath <- (targetDir </>) <$> parseRelFile tarName
+            D.createDirectoryIfMissing True (toFilePath targetDir)
+            D.copyFile (toFilePath tarPath) (toFilePath targetTarPath)
 
 -- | Execute a command.
 execCmd :: ExecOpts -> GlobalOpts -> IO ()
