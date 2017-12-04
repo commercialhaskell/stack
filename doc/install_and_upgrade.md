@@ -240,7 +240,7 @@ If you use the [ArchHaskell repository](https://wiki.archlinux.org/index.php/Arc
 
 Users who follow the `nixos-unstable` channel or the Nixpkgs `master` branch can install the latest `stack` release into their profile by running:
 
-    nix-env -f "<nixpkgs>" -i stack
+    nix-env -f "<nixpkgs>" -iA stack
 
 Alternatively, the package can be built from source as follows.
 
