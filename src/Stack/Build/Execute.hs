@@ -84,7 +84,7 @@ import qualified System.Directory as D
 import           System.Environment (getExecutablePath)
 import           System.Exit (ExitCode (ExitSuccess))
 import qualified System.FilePath as FP
-import           System.IO
+import           System.IO (hClose, hPutStr, hFlush, stderr, stdout)
 import           System.PosixCompat.Files (createLink)
 import           System.Process.Log (showProcessArgDebug, withProcessTimeLog)
 import           System.Process.Read
@@ -428,8 +428,8 @@ withExecuteEnv menv bopts boptsCli baseConfigOpts locals globalPackages snapshot
 
     dumpLogIfWarning :: (Path Abs Dir, Path Abs File) -> RIO env ()
     dumpLogIfWarning (pkgDir, filepath) = do
-      firstWarning <- runResourceT
-          $ transPipe liftResourceT (CB.sourceFile (toFilePath filepath))
+      firstWarning <- withBinaryFile (toFilePath filepath) ReadMode $ \h ->
+            CB.sourceHandle h
          $$ CT.decodeUtf8Lenient
          =$ CT.lines
          =$ CL.map stripCR
@@ -445,8 +445,8 @@ withExecuteEnv menv bopts boptsCli baseConfigOpts locals globalPackages snapshot
     dumpLog msgSuffix (pkgDir, filepath) = do
         logInfo $ T.pack $ concat ["\n--  Dumping log file", msgSuffix, ": ", toFilePath filepath, "\n"]
         compilerVer <- view actualCompilerVersionL
-        runResourceT
-            $ transPipe liftResourceT (CB.sourceFile (toFilePath filepath))
+        withBinaryFile (toFilePath filepath) ReadMode $ \h ->
+              CB.sourceHandle h
            $$ CT.decodeUtf8Lenient
            =$ mungeBuildOutput ExcludeTHLoading ConvertPathsToAbsolute pkgDir compilerVer
            =$ CL.mapM_ logInfo
@@ -935,10 +935,7 @@ withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} md
                     liftIO $ atomically $ writeTChan eeLogFiles (pkgDir, logPath)
                 _ -> return ()
 
-            bracket
-                (liftIO $ openBinaryFile fp WriteMode)
-                (liftIO . hClose)
-                $ \h -> inner (Just (logPath, h))
+            withBinaryFile fp WriteMode $ \h -> inner (Just (logPath, h))
 
     withCabal
         :: Package
@@ -1094,11 +1091,12 @@ withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} md
                                 Nothing -> return []
                                 Just (logFile, h) -> do
                                     liftIO $ hClose h
-                                    runResourceT
-                                        $ transPipe liftResourceT (CB.sourceFile (toFilePath logFile))
-                                        =$= CT.decodeUtf8Lenient
-                                        $$ mungeBuildOutput stripTHLoading makeAbsolute pkgDir compilerVer
-                                        =$ CL.consume
+                                    withBinaryFile (toFilePath logFile) WriteMode $ \h' ->
+                                           runConduit
+                                         $ CB.sourceHandle h'
+                                        .| CT.decodeUtf8Lenient
+                                        .| mungeBuildOutput stripTHLoading makeAbsolute pkgDir compilerVer
+                                        .| CL.consume
                         throwM $ SetupHsBuildFailure
                             ec
                             (Just taskProvides)
