@@ -9,7 +9,7 @@
 {-# LANGUAGE TypeFamilies          #-}
 module Stack.Solver
     ( cabalPackagesCheck
-    , findCabalFiles
+    , findCabalDirs
     , getResolverConstraints
     , mergeConstraints
     , solveExtraDeps
@@ -19,7 +19,6 @@ module Stack.Solver
     , parseCabalOutputLine
     ) where
 
-import           Control.Monad (mapAndUnzipM)
 import           Stack.Prelude
 import           Data.Aeson.Extended         (object, (.=), toJSON)
 import qualified Data.ByteString as S
@@ -49,9 +48,7 @@ import           Stack.Build.Target (gpdVersion)
 import           Stack.BuildPlan
 import           Stack.Config (getLocalPackages, loadConfigYaml)
 import           Stack.Constants (stackDotYaml, wiredInPackages)
-import           Stack.Package               (printCabalFileWarning
-                                             , hpack
-                                             , readPackageUnresolved)
+import           Stack.Package               (readPackageUnresolvedDir, gpdPackageName)
 import           Stack.PrettyPrint
 import           Stack.Setup
 import           Stack.Setup.Installed
@@ -500,20 +497,20 @@ getResolverConstraints mcompilerVersion stackYaml sd = do
       (Map.map lpiConstraints (lsPackages ls))
       (Map.map lpiConstraints (lsGlobals ls))
 
--- | Finds all files with a .cabal extension under a given directory. If
--- a `hpack` `package.yaml` file exists, this will be used to generate a cabal
--- file.
--- Subdirectories can be included depending on the @recurse@ parameter.
-findCabalFiles
+-- | Finds all directories with a .cabal file or an hpack
+-- package.yaml.  Subdirectories can be included depending on the
+-- @recurse@ parameter.
+findCabalDirs
   :: (MonadIO m, MonadUnliftIO m, MonadLogger m, HasRunner env, MonadReader env m, HasConfig env)
-  => Bool -> Path Abs Dir -> m [Path Abs File]
-findCabalFiles recurse dir = do
-    liftIO (findFiles dir isHpack subdirFilter) >>= mapM_ (hpack . parent)
-    liftIO (findFiles dir isCabal subdirFilter)
+  => Bool -> Path Abs Dir -> m (Set (Path Abs Dir))
+findCabalDirs recurse dir =
+    (Set.fromList . map parent)
+    <$> liftIO (findFiles dir isHpackOrCabal subdirFilter)
   where
     subdirFilter subdir = recurse && not (isIgnored subdir)
     isHpack = (== "package.yaml")     . toFilePath . filename
     isCabal = (".cabal" `isSuffixOf`) . toFilePath
+    isHpackOrCabal x = isHpack x || isCabal x
 
     isIgnored path = "." `isPrefixOf` dirName || dirName `Set.member` ignoredDirs
       where
@@ -534,30 +531,30 @@ ignoredDirs = Set.fromList
 -- pairs.
 cabalPackagesCheck
     :: (HasConfig env, HasGHCVariant env)
-     => [Path Abs File]
+     => [Path Abs Dir]
      -> String
      -> Maybe String
      -> RIO env
           ( Map PackageName (Path Abs File, C.GenericPackageDescription)
           , [Path Abs File])
-cabalPackagesCheck cabalfps noPkgMsg dupErrMsg = do
-    when (null cabalfps) $
+cabalPackagesCheck cabaldirs noPkgMsg dupErrMsg = do
+    when (null cabaldirs) $
         error noPkgMsg
 
-    relpaths <- mapM prettyPath cabalfps
+    relpaths <- mapM prettyPath cabaldirs
     logInfo "Using cabal packages:"
     logInfo $ T.pack (formatGroup relpaths)
 
-    (warnings, gpds) <- mapAndUnzipM readPackageUnresolved cabalfps
-    zipWithM_ (mapM_ . printCabalFileWarning) cabalfps warnings
+    packages <- map (\(x, y) -> (y, x)) <$>
+                mapM (flip readPackageUnresolvedDir True)
+                cabaldirs
 
     -- package name cannot be empty or missing otherwise
     -- it will result in cabal solver failure.
     -- stack requires packages name to match the cabal file name
     -- Just the latter check is enough to cover both the cases
 
-    let packages  = zip cabalfps gpds
-        normalizeString = T.unpack . T.normalize T.NFC . T.pack
+    let normalizeString = T.unpack . T.normalize T.NFC . T.pack
         getNameMismatchPkg (fp, gpd)
             | (normalizeString . show . gpdPackageName) gpd /= (normalizeString . FP.takeBaseName . toFilePath) fp
                 = Just fp
@@ -607,9 +604,11 @@ reportMissingCabalFiles
   -> Bool              -- ^ Whether to scan sub-directories
   -> m ()
 reportMissingCabalFiles cabalfps includeSubdirs = do
-    allCabalfps <- findCabalFiles includeSubdirs =<< getCurrentDir
+    allCabalDirs <- findCabalDirs includeSubdirs =<< getCurrentDir
 
-    relpaths <- mapM prettyPath (allCabalfps \\ cabalfps)
+    relpaths <- mapM prettyPath
+              $ Set.toList
+              $ allCabalDirs `Set.difference` Set.fromList (map parent cabalfps)
     unless (null relpaths) $ do
         logWarn "The following packages are missing from the config:"
         logWarn $ T.pack (formatGroup relpaths)
@@ -648,7 +647,7 @@ solveExtraDeps modStackYaml = do
     -- TODO when solver supports --ignore-subdirs option pass that as the
     -- second argument here.
     reportMissingCabalFiles cabalfps True
-    (bundle, _) <- cabalPackagesCheck cabalfps noPkgMsg (Just dupPkgFooter)
+    (bundle, _) <- cabalPackagesCheck cabalDirs noPkgMsg (Just dupPkgFooter)
 
     let gpds              = Map.elems $ fmap snd bundle
         oldFlags          = bcFlags bconfig

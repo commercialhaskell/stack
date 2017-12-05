@@ -67,7 +67,7 @@ import qualified System.Directory as Dir
 type SinglePackageLocation = PackageLocationIndex FilePath
 
 data SnapshotException
-  = InvalidCabalFileInSnapshot !SinglePackageLocation !PError !ByteString
+  = InvalidCabalFileInSnapshot !SinglePackageLocation !PError
   | PackageDefinedTwice !PackageName !SinglePackageLocation !SinglePackageLocation
   | UnmetDeps !(Map PackageName (Map PackageName (VersionIntervals, Maybe Version)))
   | FilepathInCustomSnapshot !Text
@@ -77,7 +77,7 @@ data SnapshotException
   deriving Typeable
 instance Exception SnapshotException
 instance Show SnapshotException where
-  show (InvalidCabalFileInSnapshot loc err _bs) = concat
+  show (InvalidCabalFileInSnapshot loc err) = concat
     [ "Invalid cabal file at "
     , show loc
     , ": "
@@ -380,9 +380,9 @@ loadSnapshot' loadFromIndex mcompiler root =
               Just cv' -> loadCompiler cv'
           Right sd' -> start sd'
 
-      gpds <- (concat <$> mapM
-        (loadMultiRawCabalFilesIndex loadFromIndex root >=> mapM parseGPD)
-        (sdLocations sd)) `onException` do
+      gpds <-
+        (concat <$> mapM (parseMultiCabalFilesIndex loadFromIndex root) (sdLocations sd))
+        `onException` do
           logError "Unable to load cabal files for snapshot"
           case sdResolver sd of
             ResolverSnapshot name -> do
@@ -541,7 +541,7 @@ recalculate loadFromIndex root compilerVersion allFlags allHide allOptions (name
     Nothing -> return (name, lpi0 { lpiHide = hide, lpiGhcOptions = options }) -- optimization
     Just flags -> do
       let loc = lpiLocation lpi0
-      gpd <- loadSingleRawCabalFile loadFromIndex root loc >>= parseGPDSingle loc
+      gpd <- parseSingleCabalFileIndex loadFromIndex root loc
       platform <- view platformL
       let res@(name', lpi) = calculate gpd platform compilerVersion loc flags hide options
       unless (name == name' && lpiVersion lpi0 == lpiVersion lpi) $ error "recalculate invariant violated"
@@ -737,21 +737,6 @@ splitUnmetDeps extra =
       case (lpiVersion <$> Map.lookup name globals) <|> Map.lookup name extra of
         Nothing -> False
         Just version -> version `withinIntervals` intervals
-
-parseGPDSingle :: MonadThrow m => SinglePackageLocation -> ByteString -> m GenericPackageDescription
-parseGPDSingle loc bs =
-  either (\e -> throwM $ InvalidCabalFileInSnapshot loc e bs) (return . snd)
-  $ rawParseGPD bs
-
-parseGPD :: MonadThrow m
-         => ( ByteString -- raw contents
-            , SinglePackageLocation -- for error reporting
-            )
-         -> m (GenericPackageDescription, SinglePackageLocation)
-parseGPD (bs, loc) = do
-  case rawParseGPD bs of
-    Left e -> throwM $ InvalidCabalFileInSnapshot loc e bs
-    Right (_warnings, gpd) -> return (gpd, loc)
 
 -- | Calculate a 'LoadedPackageInfo' from the given 'GenericPackageDescription'
 calculate :: GenericPackageDescription

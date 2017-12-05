@@ -4,12 +4,15 @@
 
 Release notes:
 
-* The `--pvp-bounds` option for `stack upload` and `stack sdist` is
-  effectively unusable due to a bug in the released version of Cabal
-  library that causes it to remove fields from the re-written `.cabal`
-  file (this is fixed in the development version of Cabal).  See
-  [#3549](https://github.com/commercialhaskell/stack/issues/3549) for
-  more details.
+Major changes:
+
+Behaviour changes:
+
+Other enhancements:
+
+Bug fixes:
+
+## v1.6.1
 
 Major changes:
 
@@ -148,6 +151,9 @@ Other enhancements:
   their SHA1 checksum, allowing for more security in download.
 * Added new `--tar-files` option to `stack sdist`, that allows to copy
   the resulting tarball to the specified directory.
+* For filesystem setup-info paths, it's no longer assumed that the
+  directory is writable, instead a temp dir is used.  See
+  [#3188](https://github.com/commercialhaskell/stack/issues/3188).
 
 Bug fixes:
 
@@ -212,6 +218,10 @@ Bug fixes:
 * Ensure that an `extra-dep` from a local directory is not treated as
   a `$locals` for GHC options purposes. See
   [#3574](https://github.com/commercialhaskell/stack/issues/3574).
+* Building all executables only happens once instead of every
+  time. See
+  [#3229](https://github.com/commercialhaskell/stack/issues/3229) for
+  more info.
 
 
 ## 1.5.1
@@ -290,16 +300,9 @@ Other enhancements:
   on the PATH or shadowed by another entry.
 * Allow running tests on tarball created by sdist and upload
   [#717](https://github.com/commercialhaskell/stack/issues/717).
-* For filesystem setup-info paths, it's no longer assumed that the
-  directory is writable, instead a temp dir is used.  See
-  [#3188](https://github.com/commercialhaskell/stack/issues/3188).
 
 Bug fixes:
 
-* Building all executables only happens once instead of every
-  time. See
-  [#3229](https://github.com/commercialhaskell/stack/issues/3229) for
-  more info.
 * Fixes case where `stack build --profile` might not cause executables /
   tests / benchmarks to be rebuilt.
   See [#2984](https://github.com/commercialhaskell/stack/issues/2984)

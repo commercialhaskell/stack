@@ -36,12 +36,14 @@ import qualified Data.Text.Encoding         as T
 import qualified Data.Text.Encoding.Error   as T
 import qualified Data.Text.IO               as T
 import           Data.Time
+import           Distribution.PackageDescription (GenericPackageDescription)
 import           GHC.Foreign                (peekCString, withCString)
 import           Language.Haskell.TH
 import           Language.Haskell.TH.Syntax (lift)
 import           Lens.Micro
 import           Stack.Prelude              hiding (lift)
 import           Stack.Constants
+import           Stack.Types.PackageIdentifier (PackageIdentifierRevision)
 import           System.Console.ANSI
 import           System.FilePath
 import           System.IO
@@ -54,13 +56,17 @@ data Runner = Runner
   , runnerLogOptions :: !LogOptions
   , runnerTerminal   :: !Bool
   , runnerSticky     :: !Sticky
-  , runnerWarnedCabalFiles :: !(IORef (HashSet FilePath))
-  -- ^ Set of all cabal files that have already been warned about.
+  , runnerParsedCabalFiles :: !(IORef
+      ( Map PackageIdentifierRevision GenericPackageDescription
+      , Map (Path Abs Dir)            (GenericPackageDescription, Path Abs File)
+      ))
+  -- ^ Cache of previously parsed cabal files.
   --
   -- TODO: This is really an ugly hack to avoid spamming the user with
-  -- warnings when we parse cabal files multiple times. Ideally: we
-  -- would just design the system such that it only ever parses a
-  -- cabal file once. But for now, this is a decent workaround. See:
+  -- warnings when we parse cabal files multiple times and bypass
+  -- performance issues. Ideally: we would just design the system such
+  -- that it only ever parses a cabal file once. But for now, this is
+  -- a decent workaround. See:
   -- <https://github.com/commercialhaskell/stack/issues/3591>.
   }
 
@@ -280,7 +286,7 @@ withRunner logLevel useTime terminal colorWhen widthOverride reExec inner = do
         }
     , runnerTerminal = terminal
     , runnerSticky = sticky
-    , runnerWarnedCabalFiles = ref
+    , runnerParsedCabalFiles = ref
     }
   where clipWidth w
           | w < minTerminalWidth = minTerminalWidth

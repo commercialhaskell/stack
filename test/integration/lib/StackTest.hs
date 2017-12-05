@@ -198,6 +198,10 @@ getIsAlpine = doesFileExist "/etc/alpine-release"
 isARM :: Bool
 isARM = arch == "arm"
 
+-- | Is the OS Mac OS X?
+isMacOSX :: Bool
+isMacOSX = os == "darwin"
+
 -- | To avoid problems with GHC version mismatch when a new LTS major
 -- version is released, pass this argument to @stack@ when running in
 -- a global context. The LTS major version here should match that of
