@@ -3,7 +3,11 @@
 {-# LANGUAGE OverloadedStrings          #-}
 module Stack.Prelude
   ( mapLeft
+  , ResourceT
   , runConduitRes
+  , runResourceT
+  , liftResourceT
+  , NoLogging (..)
   , withSystemTempDir
   , fromFirst
   , mapMaybeA
@@ -107,6 +111,9 @@ import           UnliftIO             as X
 import qualified Data.Text            as T
 import qualified Path.IO
 
+import qualified Control.Monad.Trans.Resource as Res (runResourceT, transResourceT)
+import           Control.Monad.Trans.Resource.Internal (ResourceT (ResourceT))
+
 mapLeft :: (a1 -> a2) -> Either a1 b -> Either a2 b
 mapLeft f (Left a1) = Left (f a1)
 mapLeft _ (Right b) = Right b
@@ -136,6 +143,22 @@ stripCR t = fromMaybe t (T.stripSuffix "\r" t)
 
 runConduitRes :: MonadUnliftIO m => ConduitM () Void (ResourceT m) r -> m r
 runConduitRes = runResourceT . runConduit
+
+runResourceT :: MonadUnliftIO m => ResourceT m a -> m a
+runResourceT r = withRunInIO $ \run -> Res.runResourceT (Res.transResourceT run r)
+
+liftResourceT :: MonadIO m => ResourceT IO a -> ResourceT m a
+liftResourceT (ResourceT f) = ResourceT $ liftIO . f
+
+-- | Avoid orphan messes
+newtype NoLogging a = NoLogging { runNoLogging :: IO a }
+  deriving (Functor, Applicative, Monad, MonadIO)
+instance MonadUnliftIO NoLogging where
+  askUnliftIO = NoLogging $
+                withUnliftIO $ \u ->
+                return (UnliftIO (unliftIO u . runNoLogging))
+instance MonadLogger NoLogging where
+  monadLoggerLog _ _ _ _ = return ()
 
 -- | Path version
 withSystemTempDir :: MonadUnliftIO m => String -> (Path Abs Dir -> m a) -> m a

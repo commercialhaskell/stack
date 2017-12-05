@@ -7,3 +7,4 @@ nix:
     - http-client-tls-0.3.4
 extra-deps:
 - bindings-uname-0.1
+- unliftio-0.2.0.0

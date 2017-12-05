@@ -26,3 +26,4 @@ extra-deps:
 - extra-1.6
 - hsc2hs-0.68.2
 - hpack-0.20.0
+- unliftio-0.2.0.0
