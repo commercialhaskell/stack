@@ -162,7 +162,7 @@ instance Display (Doc a) where
 type AnsiDoc = Doc AnsiAnn
 
 newtype AnsiAnn = AnsiAnn [SGR]
-    deriving (Eq, Ord, Show, Monoid)
+    deriving (Eq, Show, Monoid)
 
 class HasAnsiAnn a where
     getAnsiAnn :: a -> AnsiAnn
@@ -297,6 +297,7 @@ data SGRTag
     | TagSwapForegroundBackground
     | TagColorForeground
     | TagColorBackground
+    | TagRGBColor
     deriving (Eq, Ord)
 
 getSGRTag :: SGR -> SGRTag
@@ -309,3 +310,4 @@ getSGRTag SetVisible{}                  = TagVisible
 getSGRTag SetSwapForegroundBackground{} = TagSwapForegroundBackground
 getSGRTag (SetColor Foreground _ _)     = TagColorForeground
 getSGRTag (SetColor Background _ _)     = TagColorBackground
+getSGRTag SetRGBColor{}                 = TagRGBColor

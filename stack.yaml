@@ -27,3 +27,5 @@ extra-deps:
 - hsc2hs-0.68.2
 - hpack-0.20.0
 - unliftio-0.2.0.0
+- ansi-terminal-0.7.1.1
+- ansi-wl-pprint-0.6.8.1
