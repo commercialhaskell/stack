@@ -4,7 +4,6 @@
 {-# LANGUAGE TupleSections     #-}
 module Stack.PackageDumpSpec where
 
-import           Control.Monad.Logger
 import           Data.Conduit
 import qualified Data.Conduit.Binary           as CB
 import qualified Data.Conduit.List             as CL
@@ -208,7 +207,7 @@ spec = do
             }
 
 
-    it "ghcPkgDump + addProfiling + addHaddock" $ (id :: IO () -> IO ()) $ runNoLoggingT $ do
+    it "ghcPkgDump + addProfiling + addHaddock" $ (id :: IO () -> IO ()) $ runNoLogging $ do
         menv' <- getEnvOverride buildPlatform
         menv <- mkEnvOverride buildPlatform $ Map.delete "GHC_PACKAGE_PATH" $ unEnvOverride menv'
         icache <- newInstalledCache
@@ -223,7 +222,7 @@ spec = do
         menv' <- getEnvOverride buildPlatform
         menv <- mkEnvOverride buildPlatform $ Map.delete "GHC_PACKAGE_PATH" $ unEnvOverride menv'
         icache <- newInstalledCache
-        m <- runNoLoggingT $ ghcPkgDump menv Ghc []
+        m <- runNoLogging $ ghcPkgDump menv Ghc []
             $  conduitDumpPackage
             =$ addProfiling icache
             =$ addHaddock icache

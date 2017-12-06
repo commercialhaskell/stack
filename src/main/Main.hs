@@ -19,7 +19,6 @@ module Main (main) where
 import qualified Build_stack
 #endif
 import           Stack.Prelude
-import           Control.Monad.Logger (runNoLoggingT)
 import           Control.Monad.Reader (local)
 import           Control.Monad.Trans.Except (ExceptT)
 import           Control.Monad.Writer.Lazy (Writer)
@@ -508,7 +507,7 @@ secondaryCommandHandler args f =
           -- TODO show the command in verbose mode
           -- hPutStrLn stderr $ unwords $
           --   ["Running", "[" ++ ex, unwords (tail args) ++ "]"]
-          _ <- runNoLoggingT (exec menv ex (tail args))
+          _ <- runNoLogging (exec menv ex (tail args))
           return f
         Nothing -> return $ fmap (vcatErrorHelp (noSuchCmd cmd)) f
   where
