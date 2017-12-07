@@ -1,4 +1,4 @@
-resolver: nightly-2017-11-25
+resolver: nightly-2017-12-06
 nix:
   # --nix on the command-line to enable.
   enable: false
@@ -8,3 +8,4 @@ nix:
 extra-deps:
 - bindings-uname-0.1
 - unliftio-0.2.0.0
+- ansi-terminal-0.7.1.1
