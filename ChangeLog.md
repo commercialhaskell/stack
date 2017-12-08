@@ -1,5 +1,21 @@
 # Changelog
 
+## Unreleased changes
+
+Release notes:
+
+Major changes:
+
+Behaviour changes:
+
+Other enhancements:
+
+Bug fixes:
+
+* For versions of Cabal before 1.24, ensure that the dependencies of
+  non-buildable components are part of the build plan to work around an old
+  Cabal bug.
+
 ## v1.6.1
 
 Major changes:
