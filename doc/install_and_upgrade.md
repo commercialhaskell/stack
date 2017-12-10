@@ -34,6 +34,10 @@ will make `stack install` and `stack upgrade` work correctly out of the box.
 
 If in doubt: you should prefer the 64-bit installer.
 
+You may see a "Windows Defender SmartScreen prevented an unrecognized app from
+starting" warning when you try to run the installer. If so, click on
+**More info**, and then click on the **Run anyway** button that appears.
+
 ### Manual download
 
 * Download the latest release:

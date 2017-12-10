@@ -356,7 +356,7 @@ packageFromPackageDescription packageConfig pkgFlags (PackageDescriptionPair pkg
     pkgId = package pkg
     name = fromCabalPackageName (pkgName pkgId)
     deps = M.filterWithKey (const . not . isMe) (M.union
-        (packageDependencies pkg)
+        (packageDependencies (packageConfigCompilerVersion packageConfig) pkg)
         -- We include all custom-setup deps - if present - in the
         -- package deps themselves. Stack always works with the
         -- invariant that there will be a single installed package
@@ -602,12 +602,36 @@ getBuildComponentDir Nothing = Nothing
 getBuildComponentDir (Just name) = parseRelDir (name FilePath.</> (name ++ "-tmp"))
 
 -- | Get all dependencies of the package (buildable targets only).
-packageDependencies :: PackageDescription -> Map PackageName VersionRange
-packageDependencies pkg =
+--
+-- Note that for Cabal versions 1.22 and earlier, there is a bug where
+-- Cabal requires dependencies for non-buildable components to be
+-- present. We're going to use GHC version as a proxy for Cabal
+-- library version in this case for simplicity, so we'll check for GHC
+-- being 7.10 or earlier. This obviously makes our function a lot more
+-- fun to write...
+packageDependencies
+  :: CompilerVersion 'CVActual
+  -> PackageDescription
+  -> Map PackageName VersionRange
+packageDependencies ghcVersion pkg' =
   M.fromListWith intersectVersionRanges $
   map (depName &&& depRange) $
   concatMap targetBuildDepends (allBuildInfo' pkg) ++
   maybe [] setupDepends (setupBuildInfo pkg)
+  where
+    pkg
+      | getGhcVersion ghcVersion >= $(mkVersion "8.0") = pkg'
+      -- Set all components to buildable. Only need to worry about
+      -- library, exe, test, and bench, since others didn't exist in
+      -- older Cabal versions
+      | otherwise = pkg'
+        { library = (\c -> c { libBuildInfo = go (libBuildInfo c) }) <$> library pkg'
+        , executables = (\c -> c { buildInfo = go (buildInfo c) }) <$> executables pkg'
+        , testSuites = (\c -> c { testBuildInfo = go (testBuildInfo c) }) <$> testSuites pkg'
+        , benchmarks = (\c -> c { benchmarkBuildInfo = go (benchmarkBuildInfo c) }) <$> benchmarks pkg'
+        }
+
+    go bi = bi { buildable = True }
 
 -- | Get all dependencies of the package (buildable targets only).
 --
