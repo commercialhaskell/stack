@@ -198,7 +198,7 @@ gpdPackageDeps
     -> Map FlagName Bool
     -> Map PackageName VersionRange
 gpdPackageDeps gpd cv platform flags =
-    Map.filterWithKey (const . (/= name)) (packageDependencies pkgDesc)
+    Map.filterWithKey (const . (/= name)) (packageDependencies cv pkgDesc)
     where
         name = gpdPackageName gpd
         -- Since tests and benchmarks are both enabled, doesn't matter
