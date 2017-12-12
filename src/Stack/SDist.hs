@@ -406,7 +406,20 @@ checkPackageInExtractedTarball pkgDir = do
     (gdesc, PackageDescriptionPair pkgDesc _) <- readPackageDescriptionDir config pkgDir False
     logInfo $
         "Checking package '" <> packageNameText name <> "' for common mistakes"
-    let pkgChecks = Check.checkPackage gdesc (Just pkgDesc)
+    let pkgChecks =
+          -- MSS 2017-12-12: Try out a few different variants of
+          -- pkgDesc to try and provoke an error or warning. I don't
+          -- know why, but when using `Just pkgDesc`, it appears that
+          -- Cabal does not detect that `^>=` is used with
+          -- `cabal-version: 1.24` or earlier. It seems like pkgDesc
+          -- (the one we create) does not populate the `buildDepends`
+          -- field, whereas flattenPackageDescription from Cabal
+          -- does. In any event, using `Nothing` seems more logical
+          -- for this check anyway, and the fallback to `Just pkgDesc`
+          -- is just a crazy sanity check.
+          case Check.checkPackage gdesc Nothing of
+            [] -> Check.checkPackage gdesc (Just pkgDesc)
+            x -> x
     fileChecks <- liftIO $ Check.checkPackageFiles pkgDesc (toFilePath pkgDir)
     let checks = pkgChecks ++ fileChecks
         (errors, warnings) =
