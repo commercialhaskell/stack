@@ -37,7 +37,6 @@ import              Control.Concurrent.STM
 import              Stack.Prelude
 import              Crypto.Hash (SHA256 (..))
 import qualified    Data.ByteString as S
-import qualified    Data.ByteString.Lazy as L
 import qualified    Data.Foldable as F
 import qualified    Data.HashMap.Strict as HashMap
 import qualified    Data.HashSet as HashSet
@@ -590,10 +589,7 @@ fetchPackages' mdistDir toFetchAll = do
 untar :: forall b1 b2. Path b1 File -> Path Rel Dir -> Path b2 Dir -> IO [(FilePath, T.Text)]
 untar tarPath expectedTarFolder destDirParent = do
   ensureDir destDirParent
-  withBinaryFile (toFilePath tarPath) ReadMode $ \h -> do
-                -- Avoid using L.readFile, which is more likely to leak
-                -- resources
-                lbs <- L.hGetContents h
+  withLazyFile (toFilePath tarPath) $ \lbs -> do
                 let rawEntries = fmap (either wrap wrap)
                             $ Tar.checkTarbomb (toFilePathNoTrailingSep expectedTarFolder)
                             $ Tar.read $ decompress lbs

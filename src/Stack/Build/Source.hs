@@ -20,8 +20,7 @@ import              Crypto.Hash (Digest, SHA256(..))
 import              Crypto.Hash.Conduit (sinkHash)
 import qualified    Data.ByteArray as Mem (convert)
 import qualified    Data.ByteString as S
-import              Data.Conduit (($$), ZipSink (..))
-import qualified    Data.Conduit.Binary as CB
+import              Data.Conduit (ZipSink (..))
 import qualified    Data.Conduit.List as CL
 import qualified    Data.HashSet as HashSet
 import              Data.List
@@ -447,8 +446,8 @@ getModTimeMaybe fp =
 -- | Create FileCacheInfo for a file.
 calcFci :: MonadIO m => ModTime -> FilePath -> m FileCacheInfo
 calcFci modTime' fp = liftIO $
-    withBinaryFile fp ReadMode $ \h -> do
-        (size, digest) <- CB.sourceHandle h $$ getZipSink
+    withSourceFile fp $ \src -> do
+        (size, digest) <- runConduit $ src .| getZipSink
             ((,)
                 <$> ZipSink (CL.fold
                     (\x y -> x + fromIntegral (S.length y))

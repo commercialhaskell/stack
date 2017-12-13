@@ -5,7 +5,6 @@
 module Stack.PackageDumpSpec where
 
 import           Data.Conduit
-import qualified Data.Conduit.Binary           as CB
 import qualified Data.Conduit.List             as CL
 import           Data.Conduit.Text             (decodeUtf8)
 import qualified Data.Map                      as Map
@@ -67,9 +66,9 @@ spec = do
     describe "conduitDumpPackage" $ do
         it "ghc 7.8" $ do
             haskell2010:_ <-
-                  withBinaryFile "test/package-dump/ghc-7.8.txt" ReadMode $ \h ->
+                  withSourceFile "test/package-dump/ghc-7.8.txt" $ \src ->
                   runConduit
-                $ CB.sourceHandle h
+                $ src
                .| decodeUtf8
                .| conduitDumpPackage
                .| CL.consume
@@ -99,9 +98,9 @@ spec = do
 
         it "ghc 7.10" $ do
             haskell2010:_ <-
-                  withBinaryFile "test/package-dump/ghc-7.10.txt" ReadMode $ \h ->
+                  withSourceFile "test/package-dump/ghc-7.10.txt" $ \src ->
                   runConduit
-                $ CB.sourceHandle h
+                $ src
                .| decodeUtf8
                .| conduitDumpPackage
                .| CL.consume
@@ -141,9 +140,9 @@ spec = do
                 }
         it "ghc 7.8.4 (osx)" $ do
             hmatrix:_ <-
-                  withBinaryFile "test/package-dump/ghc-7.8.4-osx.txt" ReadMode $ \h ->
+                  withSourceFile "test/package-dump/ghc-7.8.4-osx.txt" $ \src ->
                   runConduit
-                $ CB.sourceHandle h
+                $ src
                .| decodeUtf8
                .| conduitDumpPackage
                .| CL.consume
@@ -181,9 +180,9 @@ spec = do
                 }
         it "ghc HEAD" $ do
           ghcBoot:_ <-
-                withBinaryFile "test/package-dump/ghc-head.txt" ReadMode $ \h ->
+                withSourceFile "test/package-dump/ghc-head.txt" $ \src ->
                 runConduit
-              $ CB.sourceHandle h
+              $ src
              .| decodeUtf8
              .| conduitDumpPackage
              .| CL.consume

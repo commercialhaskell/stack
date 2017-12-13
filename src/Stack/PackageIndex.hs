@@ -30,7 +30,6 @@ import qualified Codec.Archive.Tar as Tar
 import           Stack.Prelude
 import           Data.Aeson.Extended
 import qualified Data.ByteString.Lazy as L
-import           Data.Conduit.Binary (sinkHandle, sourceHandle, sourceFile, sinkFile)
 import           Data.Conduit.Zlib (ungzip)
 import qualified Data.List.NonEmpty as NE
 import qualified Data.HashMap.Strict as HashMap
@@ -67,9 +66,8 @@ populateCache index = do
     -- This uses full on lazy I/O instead of ResourceT to provide some
     -- protections. Caveat emptor
     path <- configPackageIndex (indexName index)
-    let loadPIS = withBinaryFile (Path.toFilePath path) ReadMode $ \h -> do
+    let loadPIS = withLazyFile (Path.toFilePath path) $ \lbs -> do
             logSticky "Populating index cache ..."
-            lbs <- liftIO $ L.hGetContents h
             loop 0 HashMap.empty (Tar.read lbs)
     pis0 <- loadPIS `catch` \e -> do
         logWarn $ "Exception encountered when parsing index tarball: "
@@ -257,7 +255,9 @@ updateIndex index =
      oldTarFile <- configPackageIndexOld name
      oldCacheFile <- configPackageIndexCacheOld name
      liftIO $ ignoringAbsence (removeFile oldCacheFile)
-     liftIO $ runConduitRes $ sourceFile (toFilePath tarFile) .| sinkFile (toFilePath oldTarFile)
+     withSourceFile (toFilePath tarFile) $ \src ->
+       withSinkFile (toFilePath oldTarFile) $ \sink ->
+       runConduit $ src .| sink
 
 -- | Update the index tarball via HTTP
 updateIndexHTTP :: HasConfig env
@@ -284,11 +284,9 @@ updateIndexHTTP indexName' url = do
             deleteCache indexName'
 
             liftIO $ do
-                withBinaryFile (toFilePath gz) ReadMode $ \input ->
-                    withBinaryFile tmp WriteMode $ \output -> runConduit
-                      $ sourceHandle input
-                     .| ungzip
-                     .| sinkHandle output
+                withSourceFile (toFilePath gz) $ \input ->
+                  withSinkFile tmp $ \output ->
+                  runConduit $ input .| ungzip .| output
                 renameFile tmpPath tar
 
 -- | Update the index tarball via Hackage Security
