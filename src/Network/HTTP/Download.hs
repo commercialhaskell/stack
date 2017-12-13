@@ -95,10 +95,12 @@ redownload req0 dest = do
           -- force the download to happen again.
           handleIO (const $ return ()) $ removeFile etagFilePath
 
-          runConduitRes $ getResponseBody res .| CB.sinkFileCautious destFilePath
+          withSinkFileCautious destFilePath $ \sink ->
+            runConduit $ getResponseBody res .| sink
 
           forM_ (lookup "ETag" (getResponseHeaders res)) $ \e ->
-            runConduitRes $ yield e .| CB.sinkFileCautious etagFilePath
+            withSinkFileCautious etagFilePath $ \sink ->
+            runConduit $ yield e .| sink
 
           return True
         304 -> return False
