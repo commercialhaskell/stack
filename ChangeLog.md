@@ -15,6 +15,9 @@ Bug fixes:
 * For versions of Cabal before 1.24, ensure that the dependencies of
   non-buildable components are part of the build plan to work around an old
   Cabal bug.
+* Run the Cabal file checking in the `sdist` command more reliably by
+  allowing the Cabal library to flatten the
+  `GenericPackageDescription` itself.
 
 ## v1.6.1
 
