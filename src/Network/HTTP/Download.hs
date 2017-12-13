@@ -24,7 +24,6 @@ import           Stack.Prelude
 import           Stack.Types.Runner
 import qualified Data.ByteString.Lazy        as L
 import           Data.Conduit                (yield)
-import           Data.Conduit.Binary         (sourceHandle)
 import qualified Data.Conduit.Binary         as CB
 import           Data.Text.Encoding.Error    (lenientDecode)
 import           Data.Text.Encoding          (decodeUtf8With)
@@ -75,8 +74,7 @@ redownload req0 dest = do
       if not exists
         then return Nothing
         else liftIO $ handleIO (const $ return Nothing) $ fmap Just $
-                 withBinaryFile etagFilePath ReadMode $ \h ->
-                     runConduit $ sourceHandle h .| CB.take 512
+                 withSourceFile etagFilePath $ \src -> runConduit $ src .| CB.take 512
 
     let req1 =
             case metag of

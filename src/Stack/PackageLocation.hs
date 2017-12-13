@@ -111,10 +111,8 @@ resolveSinglePackageLocation projRoot (PLArchive (Archive url subdir msha)) = do
 
         let tryTar = do
                 logDebug $ "Trying to untar " <> T.pack fp
-                liftIO $ withBinaryFile fp ReadMode $ \h -> do
-                    lbs <- L.hGetContents h
-                    let entries = Tar.read $ GZip.decompress lbs
-                    Tar.unpack (toFilePath dirTmp) entries
+                liftIO $ withLazyFile fp $
+                    Tar.unpack (toFilePath dirTmp) . Tar.read . GZip.decompress
             tryZip = do
                 logDebug $ "Trying to unzip " <> T.pack fp
                 archive <- fmap Zip.toArchive $ liftIO $ L.readFile fp

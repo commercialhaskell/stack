@@ -5,6 +5,9 @@ module Stack.Prelude
   ( mapLeft
   , ResourceT
   , runConduitRes
+  , withSourceFile
+  , withSinkFile
+  , withLazyFile
   , NoLogging (..)
   , withSystemTempDir
   , fromFirst
@@ -111,6 +114,8 @@ import qualified Path.IO
 
 import qualified Control.Monad.Trans.Resource as Res (runResourceT, transResourceT)
 import           Control.Monad.Trans.Resource (ResourceT)
+import           Data.Conduit.Binary (sourceHandle, sinkHandle)
+import qualified Data.ByteString.Lazy as BL
 
 mapLeft :: (a1 -> a2) -> Either a1 b -> Either a2 b
 mapLeft f (Left a1) = Left (f a1)
@@ -144,6 +149,23 @@ runConduitRes = runResourceT . runConduit
 
 runResourceT :: MonadUnliftIO m => ResourceT m a -> m a
 runResourceT r = withRunInIO $ \run -> Res.runResourceT (Res.transResourceT run r)
+
+-- | Get a source for a file. Unlike @sourceFile@, doesn't require
+-- @ResourceT@. Unlike explicit @withBinaryFile@ and @sourceHandle@
+-- usage, you can't accidentally use @WriteMode@ instead of
+-- @ReadMode@.
+withSourceFile :: MonadUnliftIO m => FilePath -> (ConduitM i ByteString m () -> m a) -> m a
+withSourceFile fp inner = withBinaryFile fp ReadMode $ inner . sourceHandle
+
+-- | Same idea as 'withSourceFile', see comments there.
+withSinkFile :: MonadUnliftIO m => FilePath -> (ConduitM ByteString o m () -> m a) -> m a
+withSinkFile fp inner = withBinaryFile fp WriteMode $ inner . sinkHandle
+
+-- | Lazily get the contents of a file. Unlike 'BL.readFile', this
+-- ensures that if an exception is thrown, the file handle is closed
+-- immediately.
+withLazyFile :: MonadUnliftIO m => FilePath -> (BL.ByteString -> m a) -> m a
+withLazyFile fp inner = withBinaryFile fp ReadMode $ inner <=< liftIO . BL.hGetContents
 
 -- | Avoid orphan messes
 newtype NoLogging a = NoLogging { runNoLogging :: IO a }

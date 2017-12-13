@@ -32,7 +32,7 @@ import qualified Data.ByteArray as Mem (convert)
 import qualified Data.ByteString as S
 import qualified Data.ByteString.Base64.URL as B64URL
 import           Data.Char (isSpace)
-import           Data.Conduit hiding (runConduitRes)
+import           Data.Conduit
 import qualified Data.Conduit.Binary as CB
 import qualified Data.Conduit.List as CL
 import qualified Data.Conduit.Text as CT
@@ -428,8 +428,8 @@ withExecuteEnv menv bopts boptsCli baseConfigOpts locals globalPackages snapshot
 
     dumpLogIfWarning :: (Path Abs Dir, Path Abs File) -> RIO env ()
     dumpLogIfWarning (pkgDir, filepath) = do
-      firstWarning <- withBinaryFile (toFilePath filepath) ReadMode $ \h ->
-            CB.sourceHandle h
+      firstWarning <- withSourceFile (toFilePath filepath) $ \src ->
+            src
          $$ CT.decodeUtf8Lenient
          =$ CT.lines
          =$ CL.map stripCR
@@ -445,8 +445,8 @@ withExecuteEnv menv bopts boptsCli baseConfigOpts locals globalPackages snapshot
     dumpLog msgSuffix (pkgDir, filepath) = do
         logInfo $ T.pack $ concat ["\n--  Dumping log file", msgSuffix, ": ", toFilePath filepath, "\n"]
         compilerVer <- view actualCompilerVersionL
-        withBinaryFile (toFilePath filepath) ReadMode $ \h ->
-              CB.sourceHandle h
+        withSourceFile (toFilePath filepath) $ \src ->
+              src
            $$ CT.decodeUtf8Lenient
            =$ mungeBuildOutput ExcludeTHLoading ConvertPathsToAbsolute pkgDir compilerVer
            =$ CL.mapM_ logInfo
@@ -455,11 +455,12 @@ withExecuteEnv menv bopts boptsCli baseConfigOpts locals globalPackages snapshot
     stripColors :: Path Abs File -> IO ()
     stripColors fp = do
       let colorfp = toFilePath fp ++ "-color"
-      runConduitRes $ CB.sourceFile (toFilePath fp) .| CB.sinkFile colorfp
-      runConduitRes
-        $ CB.sourceFile colorfp
-       .| noColors
-       .| CB.sinkFile (toFilePath fp)
+      withSourceFile (toFilePath fp) $ \src ->
+        withSinkFile colorfp $ \sink ->
+        runConduit $ src .| sink
+      withSourceFile colorfp $ \src ->
+        withSinkFile (toFilePath fp) $ \sink ->
+        runConduit $ src .| noColors .| sink
 
       where
         noColors = do
@@ -1091,9 +1092,9 @@ withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} md
                                 Nothing -> return []
                                 Just (logFile, h) -> do
                                     liftIO $ hClose h
-                                    withBinaryFile (toFilePath logFile) ReadMode $ \h' ->
+                                    withSourceFile (toFilePath logFile) $ \src ->
                                            runConduit
-                                         $ CB.sourceHandle h'
+                                         $ src
                                         .| CT.decodeUtf8Lenient
                                         .| mungeBuildOutput stripTHLoading makeAbsolute pkgDir compilerVer
                                         .| CL.consume
