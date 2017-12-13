@@ -1091,7 +1091,7 @@ withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} md
                                 Nothing -> return []
                                 Just (logFile, h) -> do
                                     liftIO $ hClose h
-                                    withBinaryFile (toFilePath logFile) WriteMode $ \h' ->
+                                    withBinaryFile (toFilePath logFile) ReadMode $ \h' ->
                                            runConduit
                                          $ CB.sourceHandle h'
                                         .| CT.decodeUtf8Lenient
