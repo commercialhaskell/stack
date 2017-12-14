@@ -1096,7 +1096,7 @@ instance Show ConfigException where
                )
         ]
     show (UnableToExtractArchive url file) = concat
-        [ "Archive extraction failed. We support tarballs and zip, couldn't handle the following URL, "
+        [ "Archive extraction failed. Tarballs and zip archives are supported, couldn't handle the following URL, "
         , T.unpack url, " downloaded to the file ", toFilePath $ filename file
         ]
     show (BadStackVersionException requiredRange) = concat
