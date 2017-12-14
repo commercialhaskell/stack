@@ -109,31 +109,34 @@ resolveSinglePackageLocation projRoot (PLArchive (Archive url subdir msha)) = do
 
         let fp = toFilePath file
 
-        let tryTargz = do
+        withBinaryFile fp ReadMode $ \h -> do
+          -- Share a single file read among all of the different
+          -- parsing attempts. We're not worried about unbounded
+          -- memory usage, as we will detect almost immediately if
+          -- this is the wrong type of file.
+          lbs <- liftIO $ L.hGetContents h
+
+          let tryTargz = do
                 logDebug $ "Trying to ungzip/untar " <> T.pack fp
-                liftIO $ withBinaryFile fp ReadMode $ \h -> do
-                    lbs <- L.hGetContents h
-                    let entries = Tar.read $ GZip.decompress lbs
-                    Tar.unpack (toFilePath dirTmp) entries
-            tryZip = do
+                let entries = Tar.read $ GZip.decompress lbs
+                liftIO $ Tar.unpack (toFilePath dirTmp) entries
+              tryZip = do
                 logDebug $ "Trying to unzip " <> T.pack fp
-                archive <- fmap Zip.toArchive $ liftIO $ L.readFile fp
+                let archive = Zip.toArchive lbs
                 liftIO $  Zip.extractFilesFromArchive [Zip.OptDestination
                                                        (toFilePath dirTmp)] archive
-            tryTar = do
+              tryTar = do
                 logDebug $ "Trying to untar (no ungzip) " <> T.pack fp
-                liftIO $ withBinaryFile fp ReadMode $ \h -> do
-                    lbs <- L.hGetContents h
-                    let entries = Tar.read lbs
-                    Tar.unpack (toFilePath dirTmp) entries
-            err = throwM $ UnableToExtractArchive url file
+                let entries = Tar.read lbs
+                liftIO $ Tar.unpack (toFilePath dirTmp) entries
+              err = throwM $ UnableToExtractArchive url file
 
-            catchAnyLog goodpath handler =
-                catchAny goodpath $ \e -> do
-                    logDebug $ "Got exception: " <> T.pack (show e)
-                    handler
+              catchAnyLog goodpath handler =
+                  catchAny goodpath $ \e -> do
+                      logDebug $ "Got exception: " <> T.pack (show e)
+                      handler
 
-        tryTargz `catchAnyLog` tryZip `catchAnyLog` tryTar `catchAnyLog` err
+          tryTargz `catchAnyLog` tryZip `catchAnyLog` tryTar `catchAnyLog` err
         renameDir dirTmp dir
 
     x <- listDir dir
