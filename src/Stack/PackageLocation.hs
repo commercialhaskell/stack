@@ -109,8 +109,8 @@ resolveSinglePackageLocation projRoot (PLArchive (Archive url subdir msha)) = do
 
         let fp = toFilePath file
 
-        let tryTar = do
-                logDebug $ "Trying to untar " <> T.pack fp
+        let tryTargz = do
+                logDebug $ "Trying to ungzip/untar " <> T.pack fp
                 liftIO $ withBinaryFile fp ReadMode $ \h -> do
                     lbs <- L.hGetContents h
                     let entries = Tar.read $ GZip.decompress lbs
@@ -120,6 +120,12 @@ resolveSinglePackageLocation projRoot (PLArchive (Archive url subdir msha)) = do
                 archive <- fmap Zip.toArchive $ liftIO $ L.readFile fp
                 liftIO $  Zip.extractFilesFromArchive [Zip.OptDestination
                                                        (toFilePath dirTmp)] archive
+            tryTar = do
+                logDebug $ "Trying to untar (no ungzip) " <> T.pack fp
+                liftIO $ withBinaryFile fp ReadMode $ \h -> do
+                    lbs <- L.hGetContents h
+                    let entries = Tar.read lbs
+                    Tar.unpack (toFilePath dirTmp) entries
             err = throwM $ UnableToExtractArchive url file
 
             catchAnyLog goodpath handler =
@@ -127,7 +133,7 @@ resolveSinglePackageLocation projRoot (PLArchive (Archive url subdir msha)) = do
                     logDebug $ "Got exception: " <> T.pack (show e)
                     handler
 
-        tryTar `catchAnyLog` tryZip `catchAnyLog` err
+        tryTargz `catchAnyLog` tryZip `catchAnyLog` tryTar `catchAnyLog` err
         renameDir dirTmp dir
 
     x <- listDir dir
