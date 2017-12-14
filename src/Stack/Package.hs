@@ -356,7 +356,7 @@ packageFromPackageDescription packageConfig pkgFlags (PackageDescriptionPair pkg
     pkgId = package pkg
     name = fromCabalPackageName (pkgName pkgId)
     deps = M.filterWithKey (const . not . isMe) (M.union
-        (packageDependencies (packageConfigCompilerVersion packageConfig) pkg)
+        (packageDependencies packageConfig pkg)
         -- We include all custom-setup deps - if present - in the
         -- package deps themselves. Stack always works with the
         -- invariant that there will be a single installed package
@@ -610,25 +610,31 @@ getBuildComponentDir (Just name) = parseRelDir (name FilePath.</> (name ++ "-tmp
 -- being 7.10 or earlier. This obviously makes our function a lot more
 -- fun to write...
 packageDependencies
-  :: CompilerVersion 'CVActual
+  :: PackageConfig
   -> PackageDescription
   -> Map PackageName VersionRange
-packageDependencies ghcVersion pkg' =
+packageDependencies pkgConfig pkg' =
   M.fromListWith intersectVersionRanges $
   map (depName &&& depRange) $
   concatMap targetBuildDepends (allBuildInfo' pkg) ++
   maybe [] setupDepends (setupBuildInfo pkg)
   where
     pkg
-      | getGhcVersion ghcVersion >= $(mkVersion "8.0") = pkg'
+      | getGhcVersion (packageConfigCompilerVersion pkgConfig) >= $(mkVersion "8.0") = pkg'
       -- Set all components to buildable. Only need to worry about
       -- library, exe, test, and bench, since others didn't exist in
       -- older Cabal versions
       | otherwise = pkg'
         { library = (\c -> c { libBuildInfo = go (libBuildInfo c) }) <$> library pkg'
         , executables = (\c -> c { buildInfo = go (buildInfo c) }) <$> executables pkg'
-        , testSuites = (\c -> c { testBuildInfo = go (testBuildInfo c) }) <$> testSuites pkg'
-        , benchmarks = (\c -> c { benchmarkBuildInfo = go (benchmarkBuildInfo c) }) <$> benchmarks pkg'
+        , testSuites =
+            if packageConfigEnableTests pkgConfig
+              then (\c -> c { testBuildInfo = go (testBuildInfo c) }) <$> testSuites pkg'
+              else testSuites pkg'
+        , benchmarks =
+            if packageConfigEnableBenchmarks pkgConfig
+              then (\c -> c { benchmarkBuildInfo = go (benchmarkBuildInfo c) }) <$> benchmarks pkg'
+              else benchmarks pkg'
         }
 
     go bi = bi { buildable = True }

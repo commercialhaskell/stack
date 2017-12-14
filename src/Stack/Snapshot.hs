@@ -769,7 +769,7 @@ calculate gpd platform compilerVersion loc flags hide options =
       , lpiGhcOptions = options
       , lpiPackageDeps = Map.map fromVersionRange
                        $ Map.filterWithKey (const . (/= name))
-                       $ packageDependencies compilerVersion pd
+                       $ packageDependencies pconfig pd
       , lpiProvidedExes =
             Set.fromList
           $ map (ExeName . T.pack . C.unUnqualComponentName . C.exeName)
