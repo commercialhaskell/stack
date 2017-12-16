@@ -77,6 +77,7 @@ test :: FilePath -- ^ runghc
 test runghc env' currDir origStackRoot newHome newStackRoot name = it name $ withDir $ \dir -> do
     newHomeExists <- doesDirectoryExist newHome
     when newHomeExists (removeDirectoryRecursive newHome)
+    createDirectoryIfMissing True newStackRoot
     copyTree toCopyRoot origStackRoot newStackRoot
     writeFile (newStackRoot </> "config.yaml") "system-ghc: true"
     let testDir = currDir </> "tests" </> name
