@@ -10,6 +10,12 @@ Behaviour changes:
 
 Other enhancements:
 
+* A new sub command `ls` has been introduced to stack to view
+  local and remote snapshots present in the system. Use `stack ls
+  snapshots --help` to get more details about it.
+* `pageText` function introduced in `System.Process.PagerEditor`
+   module.
+
 Bug fixes:
 
 * For versions of Cabal before 1.24, ensure that the dependencies of
@@ -252,8 +258,6 @@ Behavior changes:
 
 Other enhancements:
 
-* A new sub command `ls` has been introduced to stack to view
-  local and remote snapshots present in the system.
 * `stack setup` allow to control options passed to ghcjs-boot with
   `--ghcjs-boot-options` (one word at a time) and `--[no-]ghcjs-boot-clean`
 * `stack setup` now accepts a `--install-cabal VERSION` option which
