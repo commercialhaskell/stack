@@ -42,13 +42,16 @@ Bug fixes:
   arguments. See [#3658](https://github.com/commercialhaskell/stack/issues/3658).
   In particular, this makes it possible to pass `-- +RTS ... -RTS` to specify
   RTS arguments used when running the script.
-
+* Benchmarks used to be run concurrently with other benchmarks
+  and build steps. This is non-ideal because CPU usage of other processes
+  may interfere with benchmarks. It also prevented benchmark output from
+  being displayed by default. This is now fixed. See
+  [#3663](https://github.com/commercialhaskell/stack/issues/3663).
 
 ## v1.6.1.1
 
 Hackage-only release with no user facing changes (updated to build with
 newer dependency versions).
-
 
 ## v1.6.1
 

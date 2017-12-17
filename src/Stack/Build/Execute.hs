@@ -616,25 +616,22 @@ executePlan' installedMap0 targets plan ee@ExecuteEnv {..} = do
 
     run <- askRunInIO
 
-    let actions = concatMap (toActions installedMap' run ee) $ Map.elems $ Map.mergeWithKey
+    -- If running tests concurrently with eachother, then create an MVar
+    -- which is empty while each test is being run.
+    concurrentTests <- view $ configL.to configConcurrentTests
+    mtestLock <- if concurrentTests then return Nothing else Just <$> liftIO (newMVar ())
+
+    let actions = concatMap (toActions installedMap' mtestLock run ee) $ Map.elems $ Map.mergeWithKey
             (\_ b f -> Just (Just b, Just f))
             (fmap (\b -> (Just b, Nothing)))
             (fmap (\f -> (Nothing, Just f)))
             (planTasks plan)
             (planFinals plan)
     threads <- view $ configL.to configJobs
-    concurrentTests <- view $ configL.to configConcurrentTests
     let keepGoing =
-            fromMaybe (boptsTests eeBuildOpts || boptsBenchmarks eeBuildOpts) (boptsKeepGoing eeBuildOpts)
-        concurrentFinal =
-            -- TODO it probably makes more sense to use a lock for test suites
-            -- and just have the execution blocked. Turning off all concurrency
-            -- on finals based on the --test option doesn't fit in well.
-            if boptsTests eeBuildOpts
-                then concurrentTests
-                else True
+            fromMaybe (not (M.null (planFinals plan))) (boptsKeepGoing eeBuildOpts)
     terminal <- view terminalL
-    errs <- liftIO $ runActions threads keepGoing concurrentFinal actions $ \doneVar -> do
+    errs <- liftIO $ runActions threads keepGoing actions $ \doneVar -> do
         let total = length actions
             loop prev
                 | prev == total =
@@ -677,11 +674,12 @@ executePlan' installedMap0 targets plan ee@ExecuteEnv {..} = do
 
 toActions :: HasEnvConfig env
           => InstalledMap
+          -> Maybe (MVar ())
           -> (RIO env () -> IO ())
           -> ExecuteEnv
           -> (Maybe Task, Maybe Task) -- build and final
           -> [Action]
-toActions installedMap runInBase ee (mbuild, mfinal) =
+toActions installedMap mtestLock runInBase ee (mbuild, mfinal) =
     abuild ++ afinal
   where
     abuild =
@@ -693,40 +691,58 @@ toActions installedMap runInBase ee (mbuild, mfinal) =
                     , actionDeps =
                         Set.map (\ident -> ActionId ident ATBuild) (tcoMissing taskConfigOpts)
                     , actionDo = \ac -> runInBase $ singleBuild runInBase ac ee task installedMap False
+                    , actionConcurrency = ConcurrencyAllowed
                     }
                 ]
     afinal =
         case mfinal of
             Nothing -> []
             Just task@Task {..} ->
-                (if taskAllInOne then [] else
-                    [Action
+                (if taskAllInOne then id else (:)
+                    Action
                         { actionId = ActionId taskProvides ATBuildFinal
                         , actionDeps = addBuild
                             (Set.map (\ident -> ActionId ident ATBuild) (tcoMissing taskConfigOpts))
                         , actionDo = \ac -> runInBase $ singleBuild runInBase ac ee task installedMap True
-                        }]) ++
-                [ Action
-                    { actionId = ActionId taskProvides ATFinal
-                    , actionDeps =
-                        if taskAllInOne
-                            then addBuild mempty
-                            else Set.singleton (ActionId taskProvides ATBuildFinal)
-                    , actionDo = \ac -> runInBase $ do
-                        let comps = taskComponents task
-                            tests = testComponents comps
-                            benches = benchComponents comps
-                        unless (Set.null tests) $ do
+                        , actionConcurrency = ConcurrencyAllowed
+                        }) $
+                -- These are the "final" actions - running tests and benchmarks.
+                (if Set.null tests then id else (:)
+                    Action
+                        { actionId = ActionId taskProvides ATRunTests
+                        , actionDeps = finalDeps
+                        , actionDo = \ac -> withLock mtestLock $ runInBase $ do
                             singleTest runInBase topts (Set.toList tests) ac ee task installedMap
-                        unless (Set.null benches) $ do
+                        -- Always allow tests tasks to run concurrently with
+                        -- other tasks, particularly build tasks. Note that
+                        -- 'mtestLock' can optionally make it so that only
+                        -- one test is run at a time.
+                        , actionConcurrency = ConcurrencyAllowed
+                        }) $
+                (if Set.null benches then id else (:)
+                    Action
+                        { actionId = ActionId taskProvides ATRunBenchmarks
+                        , actionDeps = finalDeps
+                        , actionDo = \ac -> runInBase $ do
                             singleBench runInBase beopts (Set.toList benches) ac ee task installedMap
-                    }
-                ]
+                        -- Never run benchmarks concurrently with any other task, see #3663
+                        , actionConcurrency = ConcurrencyDisallowed
+                        })
+                []
               where
+                comps = taskComponents task
+                tests = testComponents comps
+                benches = benchComponents comps
+                finalDeps =
+                    if taskAllInOne
+                        then addBuild mempty
+                        else Set.singleton (ActionId taskProvides ATBuildFinal)
                 addBuild =
                     case mbuild of
                         Nothing -> id
                         Just _ -> Set.insert $ ActionId taskProvides ATBuild
+    withLock Nothing f = f
+    withLock (Just lock) f = withMVar lock $ \() -> f
     bopts = eeBuildOpts ee
     topts = boptsTestOpts bopts
     beopts = boptsBenchmarkOpts bopts
@@ -907,9 +923,19 @@ withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} md
             TTFiles lp _ -> lpWanted lp
             TTIndex{} -> False
 
-    console = wanted
-           && all (\(ActionId ident _) -> ident == taskProvides) (Set.toList acRemaining)
-           && eeTotalWanted == 1
+    -- Output to the console if this is the last task, and the user
+    -- asked to build it specifically. When the action is a
+    -- 'ConcurrencyDisallowed' action (benchmarks), then we can also be
+    -- sure to have excluse access to the console, so output is also
+    -- sent to the console in this case.
+    --
+    -- See the discussion on #426 for thoughts on sending output to the
+    -- console from concurrent tasks.
+    console =
+      (wanted &&
+       all (\(ActionId ident _) -> ident == taskProvides) (Set.toList acRemaining) &&
+       eeTotalWanted == 1
+      ) || (acConcurrency == ConcurrencyDisallowed)
 
     withPackage inner =
         case taskType of
