@@ -62,7 +62,7 @@ Behavior changes:
 * Stack will ask before saving hackage credentials to file. This new
   prompt can be avoided by using the `save-hackage-creds` setting. Please
   see [#2159](https://github.com/commercialhaskell/stack/issues/2159).
-* The `GHCRTS` environment variable will no longer be passed through to 
+* The `GHCRTS` environment variable will no longer be passed through to
   every program stack runs. Instead, it will only be passed through
   commands like `exec`, `runghc`, `script`, `ghci`, etc.
   See [#3444](https://github.com/commercialhaskell/stack/issues/3444).
