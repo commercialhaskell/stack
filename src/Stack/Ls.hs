@@ -44,7 +44,7 @@ data SnapshotType
     | Nightly
     deriving (Show, Eq, Ord)
 
-data LsCmds =
+newtype LsCmds =
     LsSnapshot SnapshotOpts
     deriving (Eq, Show, Ord)
 
@@ -54,12 +54,12 @@ data SnapshotOpts = SnapshotOpts
     , soptNightlySnapView :: Bool
     } deriving (Eq, Show, Ord)
 
-data LsCmdOpts = LsCmdOpts
+newtype LsCmdOpts = LsCmdOpts
     { lsView :: LsCmds
     } deriving (Eq, Show, Ord)
 
 lsParser :: OA.Parser LsCmdOpts
-lsParser = LsCmdOpts <$> (OA.hsubparser lsSnapCmd)
+lsParser = LsCmdOpts <$> OA.hsubparser lsSnapCmd
 
 lsCmdOptsParser :: OA.Parser LsCmds
 lsCmdOptsParser = fmap LsSnapshot lsViewSnapCmd
@@ -195,7 +195,7 @@ handleRemote
     => LsCmdOpts -> m ()
 handleRemote lsOpts = do
     req <- liftIO $ parseRequest urlInfo
-    mgr <- liftIO $ getGlobalManager
+    mgr <- liftIO getGlobalManager
     isStdoutTerminal <- view terminalL
     let req' =
             setRequestManager mgr $
