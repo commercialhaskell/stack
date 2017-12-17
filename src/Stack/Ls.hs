@@ -26,6 +26,7 @@ import Network.HTTP.Simple
         setRequestManager)
 import Network.HTTP.Types.Header (hAccept)
 import qualified Options.Applicative as OA
+import Options.Applicative ((<|>))
 import Path
 import Stack.Runners (withBuildConfig)
 import Stack.Types.Config
@@ -58,14 +59,15 @@ data LsCmdOpts = LsCmdOpts
     } deriving (Eq, Show, Ord)
 
 lsParser :: OA.Parser LsCmdOpts
-lsParser = LsCmdOpts <$> OA.hsubparser lsSnapCmd
+lsParser = LsCmdOpts <$> (OA.hsubparser lsSnapCmd)
 
 lsCmdOptsParser :: OA.Parser LsCmds
 lsCmdOptsParser = fmap LsSnapshot lsViewSnapCmd
 
 lsViewSnapCmd :: OA.Parser SnapshotOpts
 lsViewSnapCmd =
-    SnapshotOpts <$> OA.hsubparser (lsViewRemoteCmd <> lsViewLocalCmd) <*>
+    SnapshotOpts <$>
+    (OA.hsubparser (lsViewRemoteCmd <> lsViewLocalCmd) <|> pure Local) <*>
     OA.switch
         (OA.long "lts" <> OA.short 'l' <> OA.help "Only show lts snapshots") <*>
     OA.switch
