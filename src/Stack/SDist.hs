@@ -53,7 +53,6 @@ import           Stack.Build.Execute
 import           Stack.Build.Installed
 import           Stack.Build.Source (loadSourceMap)
 import           Stack.Build.Target hiding (PackageType (..))
-import           Stack.BuildPlan
 import           Stack.PackageLocation (resolveMultiPackageLocation)
 import           Stack.PrettyPrint
 import           Stack.Constants
@@ -119,7 +118,7 @@ getSDistTarball mpvpBounds pkgDir = do
     logInfo $ "Getting file list for " <> T.pack pkgFp
     (fileList, cabalfp) <-  getSDistFileList lp
     logInfo $ "Building sdist tarball for " <> T.pack pkgFp
-    files <- normalizeTarballPaths (lines fileList)
+    files <- normalizeTarballPaths (map (T.unpack . stripCR . T.pack) (lines fileList))
 
     -- We're going to loop below and eventually find the cabal
     -- file. When we do, we'll upload this reference, if the
@@ -144,13 +143,13 @@ getSDistTarball mpvpBounds pkgDir = do
             -- This is a cabal file, we're going to tweak it, but only
             -- tweak it as a revision.
             | tweakCabal && isCabalFp fp && asRevision = do
-                lbsIdent <- getCabalLbs pvpBounds (Just 1) $ toFilePath cabalfp
+                lbsIdent <- getCabalLbs pvpBounds (Just 1) cabalfp
                 liftIO (writeIORef cabalFileRevisionRef (Just lbsIdent))
                 packWith packFileEntry False fp
             -- Same, except we'll include the cabal file in the
             -- original tarball upload.
             | tweakCabal && isCabalFp fp = do
-                (_ident, lbs) <- getCabalLbs pvpBounds Nothing $ toFilePath cabalfp
+                (_ident, lbs) <- getCabalLbs pvpBounds Nothing cabalfp
                 currTime <- liftIO getPOSIXTime -- Seconds from UNIX epoch
                 tp <- liftIO $ tarPath False fp
                 return $ (Tar.fileEntry tp lbs) { Tar.entryTime = floor currTime }
@@ -167,11 +166,12 @@ getSDistTarball mpvpBounds pkgDir = do
 getCabalLbs :: HasEnvConfig env
             => PvpBoundsType
             -> Maybe Int -- ^ optional revision
-            -> FilePath
+            -> Path Abs File -- ^ cabal file
             -> RIO env (PackageIdentifier, L.ByteString)
-getCabalLbs pvpBounds mrev fp = do
-    path <- liftIO $ resolveFile' fp
-    (_warnings, gpd) <- readPackageUnresolved path
+getCabalLbs pvpBounds mrev cabalfp = do
+    (gpd, cabalfp') <- readPackageUnresolvedDir (parent cabalfp) False
+    unless (cabalfp == cabalfp')
+      $ error $ "getCabalLbs: cabalfp /= cabalfp': " ++ show (cabalfp, cabalfp')
     (_, sourceMap) <- loadSourceMap AllowNoTargets defaultBuildOptsCLI
     menv <- getMinimalEnvOverride
     (installedMap, _, _, _) <- getInstalled menv GetInstalledOpts
@@ -207,7 +207,7 @@ getCabalLbs pvpBounds mrev fp = do
     -- https://github.com/haskell/cabal/issues/4863 (current issue)
     let roundtripErrs =
           [ flow "Bug detected in Cabal library. ((parse . render . parse) === id) does not hold for the cabal file at"
-          <+> display path
+          <+> display cabalfp
           , ""
           ]
     case Cabal.parseGenericPackageDescription (showGenericPackageDescription gpd) of
@@ -294,10 +294,8 @@ gtraverseT f =
 -- use-cases.
 readLocalPackage :: HasEnvConfig env => Path Abs Dir -> RIO env LocalPackage
 readLocalPackage pkgDir = do
-    cabalfp <- findOrGenerateCabalFile pkgDir
     config  <- getDefaultPackageConfig
-    (warnings,package) <- readPackage config cabalfp
-    mapM_ (printCabalFileWarning cabalfp) warnings
+    (package, cabalfp) <- readPackageDir config pkgDir True
     return LocalPackage
         { lpPackage = package
         , lpWanted = False -- HACK: makes it so that sdist output goes to a log instead of a file.
@@ -402,13 +400,26 @@ checkPackageInExtractedTarball
   => Path Abs Dir -- ^ Absolute path to tarball
   -> RIO env ()
 checkPackageInExtractedTarball pkgDir = do
-    cabalfp <- findOrGenerateCabalFile pkgDir
-    name    <- parsePackageNameFromFilePath cabalfp
+    (gpd, _cabalfp) <- readPackageUnresolvedDir pkgDir True
+    let name = gpdPackageName gpd
     config  <- getDefaultPackageConfig
-    (gdesc, PackageDescriptionPair pkgDesc _) <- readPackageDescriptionDir config pkgDir
+    (gdesc, PackageDescriptionPair pkgDesc _) <- readPackageDescriptionDir config pkgDir False
     logInfo $
         "Checking package '" <> packageNameText name <> "' for common mistakes"
-    let pkgChecks = Check.checkPackage gdesc (Just pkgDesc)
+    let pkgChecks =
+          -- MSS 2017-12-12: Try out a few different variants of
+          -- pkgDesc to try and provoke an error or warning. I don't
+          -- know why, but when using `Just pkgDesc`, it appears that
+          -- Cabal does not detect that `^>=` is used with
+          -- `cabal-version: 1.24` or earlier. It seems like pkgDesc
+          -- (the one we create) does not populate the `buildDepends`
+          -- field, whereas flattenPackageDescription from Cabal
+          -- does. In any event, using `Nothing` seems more logical
+          -- for this check anyway, and the fallback to `Just pkgDesc`
+          -- is just a crazy sanity check.
+          case Check.checkPackage gdesc Nothing of
+            [] -> Check.checkPackage gdesc (Just pkgDesc)
+            x -> x
     fileChecks <- liftIO $ Check.checkPackageFiles pkgDesc (toFilePath pkgDir)
     let checks = pkgChecks ++ fileChecks
         (errors, warnings) =
@@ -427,10 +438,9 @@ buildExtractedTarball :: HasEnvConfig env => Path Abs Dir -> RIO env ()
 buildExtractedTarball pkgDir = do
   projectRoot <- view projectRootL
   envConfig <- view envConfigL
-  menv <- getMinimalEnvOverride
   localPackageToBuild <- readLocalPackage pkgDir
   let packageEntries = bcPackages (envConfigBuildConfig envConfig)
-      getPaths = resolveMultiPackageLocation menv projectRoot
+      getPaths = resolveMultiPackageLocation projectRoot
   allPackagePaths <- fmap (map fst . mconcat) (mapM getPaths packageEntries)
   -- We remove the path based on the name of the package
   let isPathToRemove path = do

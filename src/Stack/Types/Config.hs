@@ -39,6 +39,10 @@ module Stack.Types.Config
   ,BuildConfig(..)
   ,LocalPackages(..)
   ,LocalPackageView(..)
+  ,lpvRoot
+  ,lpvName
+  ,lpvVersion
+  ,lpvComponents
   ,NamedComponent(..)
   ,stackYamlL
   ,projectRootL
@@ -192,9 +196,10 @@ import           Data.Text.Encoding (encodeUtf8)
 import           Data.Yaml (ParseException)
 import qualified Data.Yaml as Yaml
 import           Distribution.PackageDescription (GenericPackageDescription)
-import           Distribution.ParseUtils (PError)
+import qualified Distribution.PackageDescription as C
 import           Distribution.System (Platform)
 import qualified Distribution.Text
+import qualified Distribution.Types.UnqualComponentName as C
 import           Distribution.Version (anyVersion, mkVersion')
 import           Generics.Deriving.Monoid (memptydefault, mappenddefault)
 import           Lens.Micro (Lens', lens, _1, _2, to)
@@ -413,6 +418,8 @@ data EnvSettings = EnvSettings
     -- ^ set the STACK_EXE variable to the current executable name
     , esLocaleUtf8 :: !Bool
     -- ^ set the locale to C.UTF-8
+    , esKeepGhcRts :: !Bool
+    -- ^ if True, keep GHCRTS variable in environment
     }
     deriving (Show, Eq, Ord)
 
@@ -570,13 +577,49 @@ data LocalPackages = LocalPackages
 
 -- | A view of a local package needed for resolving components
 data LocalPackageView = LocalPackageView
-    { lpvVersion    :: !Version
-    , lpvRoot       :: !(Path Abs Dir)
-    , lpvCabalFP    :: !(Path Abs File)
-    , lpvComponents :: !(Set NamedComponent)
+    { lpvCabalFP    :: !(Path Abs File)
     , lpvGPD        :: !GenericPackageDescription
     , lpvLoc        :: !(PackageLocation FilePath)
     }
+
+-- | Root directory for the given 'LocalPackageView'
+lpvRoot :: LocalPackageView -> Path Abs Dir
+lpvRoot = parent . lpvCabalFP
+
+-- | Package name for the given 'LocalPackageView
+lpvName :: LocalPackageView -> PackageName
+lpvName lpv =
+  let PackageIdentifier name _version =
+         fromCabalPackageIdentifier
+       $ C.package
+       $ C.packageDescription
+       $ lpvGPD lpv
+   in name
+
+-- | All components available in the given 'LocalPackageView'
+lpvComponents :: LocalPackageView -> Set NamedComponent
+lpvComponents lpv = Set.fromList $ concat
+    [ maybe []  (const [CLib]) (C.condLibrary gpkg)
+    , go CExe   (map fst . C.condExecutables)
+    , go CTest  (map fst . C.condTestSuites)
+    , go CBench (map fst . C.condBenchmarks)
+    ]
+  where
+    gpkg = lpvGPD lpv
+    go :: (T.Text -> NamedComponent)
+       -> (C.GenericPackageDescription -> [C.UnqualComponentName])
+       -> [NamedComponent]
+    go wrapper f = map (wrapper . T.pack . C.unUnqualComponentName) $ f gpkg
+
+-- | Version for the given 'LocalPackageView
+lpvVersion :: LocalPackageView -> Version
+lpvVersion lpv =
+  let PackageIdentifier _name version =
+         fromCabalPackageIdentifier
+       $ C.package
+       $ C.packageDescription
+       $ lpvGPD lpv
+   in version
 
 -- | A single, fully resolved component of a package
 data NamedComponent
@@ -1019,7 +1062,6 @@ data ConfigException
   | NixRequiresSystemGhc
   | NoResolverWhenUsingNoLocalConfig
   | InvalidResolverForNoLocalConfig String
-  | InvalidCabalFileInLocal !(PackageLocationIndex FilePath) !PError !ByteString
   | DuplicateLocalPackageNames ![(PackageName, [PackageLocationIndex FilePath])]
   deriving Typeable
 instance Show ConfigException where
@@ -1054,7 +1096,7 @@ instance Show ConfigException where
                )
         ]
     show (UnableToExtractArchive url file) = concat
-        [ "Archive extraction failed. We support tarballs and zip, couldn't handle the following URL, "
+        [ "Archive extraction failed. Tarballs and zip archives are supported, couldn't handle the following URL, "
         , T.unpack url, " downloaded to the file ", toFilePath $ filename file
         ]
     show (BadStackVersionException requiredRange) = concat
@@ -1135,12 +1177,6 @@ instance Show ConfigException where
         ]
     show NoResolverWhenUsingNoLocalConfig = "When using the script command, you must provide a resolver argument"
     show (InvalidResolverForNoLocalConfig ar) = "The script command requires a specific resolver, you provided " ++ ar
-    show (InvalidCabalFileInLocal loc err _) = concat
-      [ "Unable to parse cabal file from "
-      , show loc
-      , ": "
-      , show err
-      ]
     show (DuplicateLocalPackageNames pairs) = concat
         $ "The same package name is used in multiple local packages\n"
         : map go pairs
@@ -1437,6 +1473,7 @@ minimalEnvSettings =
     , esIncludeGhcPackagePath = False
     , esStackExe = False
     , esLocaleUtf8 = False
+    , esKeepGhcRts = False
     }
 
 -- | Get the path for the given compiler ignoring any local binaries.
@@ -1602,6 +1639,7 @@ data DownloadInfo = DownloadInfo
       -- ^ URL or absolute file path
     , downloadInfoContentLength :: Maybe Int
     , downloadInfoSha1 :: Maybe ByteString
+    , downloadInfoSha256 :: Maybe ByteString
     } deriving (Show)
 
 instance FromJSON (WithJSONWarnings DownloadInfo) where
@@ -1613,11 +1651,13 @@ parseDownloadInfoFromObject o = do
     url <- o ..: "url"
     contentLength <- o ..:? "content-length"
     sha1TextMay <- o ..:? "sha1"
+    sha256TextMay <- o ..:? "sha256"
     return
         DownloadInfo
         { downloadInfoUrl = url
         , downloadInfoContentLength = contentLength
         , downloadInfoSha1 = fmap encodeUtf8 sha1TextMay
+        , downloadInfoSha256 = fmap encodeUtf8 sha256TextMay
         }
 
 data VersionedDownloadInfo = VersionedDownloadInfo

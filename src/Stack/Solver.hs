@@ -9,7 +9,7 @@
 {-# LANGUAGE TypeFamilies          #-}
 module Stack.Solver
     ( cabalPackagesCheck
-    , findCabalFiles
+    , findCabalDirs
     , getResolverConstraints
     , mergeConstraints
     , solveExtraDeps
@@ -19,7 +19,6 @@ module Stack.Solver
     , parseCabalOutputLine
     ) where
 
-import           Control.Monad (mapAndUnzipM)
 import           Stack.Prelude
 import           Data.Aeson.Extended         (object, (.=), toJSON)
 import qualified Data.ByteString as S
@@ -49,9 +48,7 @@ import           Stack.Build.Target (gpdVersion)
 import           Stack.BuildPlan
 import           Stack.Config (getLocalPackages, loadConfigYaml)
 import           Stack.Constants (stackDotYaml, wiredInPackages)
-import           Stack.Package               (printCabalFileWarning
-                                             , hpack
-                                             , readPackageUnresolved)
+import           Stack.Package               (readPackageUnresolvedDir, gpdPackageName)
 import           Stack.PrettyPrint
 import           Stack.Setup
 import           Stack.Setup.Installed
@@ -77,14 +74,13 @@ data ConstraintType = Constraint | Preference deriving (Eq)
 type ConstraintSpec = Map PackageName (Version, Map FlagName Bool)
 
 cabalSolver :: HasConfig env
-            => EnvOverride
-            -> [Path Abs Dir] -- ^ cabal files
+            => [Path Abs Dir] -- ^ cabal files
             -> ConstraintType
             -> ConstraintSpec -- ^ src constraints
             -> ConstraintSpec -- ^ dep constraints
             -> [String] -- ^ additional arguments
             -> RIO env (Either [PackageName] ConstraintSpec)
-cabalSolver menv cabalfps constraintType
+cabalSolver cabalfps constraintType
             srcConstraints depConstraints cabalArgs =
   withSystemTempDir "cabal-solver" $ \dir' -> do
 
@@ -115,6 +111,7 @@ cabalSolver menv cabalfps constraintType
                toConstraintArgs (flagConstraints constraintType) ++
                fmap toFilePath cabalfps
 
+    menv <- getMinimalEnvOverride
     catch (liftM Right (readProcessStdout (Just tmpdir) menv "cabal" args))
           (\ex -> case ex of
               ProcessFailed _ _ _ err -> return $ Left err
@@ -295,11 +292,14 @@ setupCompiler compiler = do
         }
     return dirs
 
+-- | Runs the given inner command with an updated configuration that
+-- has the desired GHC on the PATH.
 setupCabalEnv
     :: (HasConfig env, HasGHCVariant env)
     => CompilerVersion 'CVWanted
-    -> RIO env (EnvOverride, CompilerVersion 'CVActual)
-setupCabalEnv compiler = do
+    -> (CompilerVersion 'CVActual -> RIO env a)
+    -> RIO env a
+setupCabalEnv compiler inner = do
     mpaths <- setupCompiler compiler
     menv0 <- getMinimalEnvOverride
     envMap <- removeHaskellEnvVars
@@ -330,7 +330,9 @@ setupCabalEnv compiler = do
             return version
         Nothing -> error "Failed to determine compiler version. \
                          \This is most likely a bug."
-    return (menv, version)
+
+    env <- set envOverrideL (const (return menv)) <$> ask
+    runRIO env (inner version)
 
 -- | Merge two separate maps, one defining constraints on package versions and
 -- the other defining package flagmap, into a single map of version and flagmap
@@ -376,10 +378,10 @@ solveResolverSpec
 
 solveResolverSpec stackYaml cabalDirs
                   (sd, srcConstraints, extraConstraints) = do
-    logInfo $ "Using resolver: " <> sdResolverName sd
-    let wantedCompilerVersion = sdWantedCompilerVersion sd
-    (menv, compilerVersion) <- setupCabalEnv wantedCompilerVersion
-    (compilerVer, snapConstraints) <- getResolverConstraints menv (Just compilerVersion) stackYaml sd
+  logInfo $ "Using resolver: " <> sdResolverName sd
+  let wantedCompilerVersion = sdWantedCompilerVersion sd
+  setupCabalEnv wantedCompilerVersion $ \compilerVersion -> do
+    (compilerVer, snapConstraints) <- getResolverConstraints (Just compilerVersion) stackYaml sd
 
     let -- Note - The order in Map.union below is important.
         -- We want to override snapshot with extra deps
@@ -389,7 +391,7 @@ solveResolverSpec stackYaml cabalDirs
         -- 1. We do not want snapshot versions to override the sources
         -- 2. Sources may have blank versions leading to bad cabal constraints
         depOnlyConstraints = Map.difference depConstraints srcConstraints
-        solver t = cabalSolver menv cabalDirs t srcConstraints depOnlyConstraints $
+        solver t = cabalSolver cabalDirs t srcConstraints depOnlyConstraints $
                      "-v" : -- TODO make it conditional on debug
                      ["--ghcjs" | whichCompiler compilerVer == Ghcjs]
 
@@ -480,15 +482,14 @@ solveResolverSpec stackYaml cabalDirs
 -- for that resolver.
 getResolverConstraints
     :: (HasConfig env, HasGHCVariant env)
-    => EnvOverride -- ^ for running Git/Hg clone commands
-    -> Maybe (CompilerVersion 'CVActual) -- ^ actually installed compiler
+    => Maybe (CompilerVersion 'CVActual) -- ^ actually installed compiler
     -> Path Abs File
     -> SnapshotDef
     -> RIO env
          (CompilerVersion 'CVActual,
           Map PackageName (Version, Map FlagName Bool))
-getResolverConstraints menv mcompilerVersion stackYaml sd = do
-    ls <- loadSnapshot menv mcompilerVersion (parent stackYaml) sd
+getResolverConstraints mcompilerVersion stackYaml sd = do
+    ls <- loadSnapshot mcompilerVersion (parent stackYaml) sd
     return (lsCompilerVersion ls, lsConstraints ls)
   where
     lpiConstraints lpi = (lpiVersion lpi, lpiFlags lpi)
@@ -496,20 +497,20 @@ getResolverConstraints menv mcompilerVersion stackYaml sd = do
       (Map.map lpiConstraints (lsPackages ls))
       (Map.map lpiConstraints (lsGlobals ls))
 
--- | Finds all files with a .cabal extension under a given directory. If
--- a `hpack` `package.yaml` file exists, this will be used to generate a cabal
--- file.
--- Subdirectories can be included depending on the @recurse@ parameter.
-findCabalFiles
+-- | Finds all directories with a .cabal file or an hpack
+-- package.yaml.  Subdirectories can be included depending on the
+-- @recurse@ parameter.
+findCabalDirs
   :: (MonadIO m, MonadUnliftIO m, MonadLogger m, HasRunner env, MonadReader env m, HasConfig env)
-  => Bool -> Path Abs Dir -> m [Path Abs File]
-findCabalFiles recurse dir = do
-    liftIO (findFiles dir isHpack subdirFilter) >>= mapM_ (hpack . parent)
-    liftIO (findFiles dir isCabal subdirFilter)
+  => Bool -> Path Abs Dir -> m (Set (Path Abs Dir))
+findCabalDirs recurse dir =
+    (Set.fromList . map parent)
+    <$> liftIO (findFiles dir isHpackOrCabal subdirFilter)
   where
     subdirFilter subdir = recurse && not (isIgnored subdir)
     isHpack = (== "package.yaml")     . toFilePath . filename
     isCabal = (".cabal" `isSuffixOf`) . toFilePath
+    isHpackOrCabal x = isHpack x || isCabal x
 
     isIgnored path = "." `isPrefixOf` dirName || dirName `Set.member` ignoredDirs
       where
@@ -530,30 +531,30 @@ ignoredDirs = Set.fromList
 -- pairs.
 cabalPackagesCheck
     :: (HasConfig env, HasGHCVariant env)
-     => [Path Abs File]
+     => [Path Abs Dir]
      -> String
      -> Maybe String
      -> RIO env
           ( Map PackageName (Path Abs File, C.GenericPackageDescription)
           , [Path Abs File])
-cabalPackagesCheck cabalfps noPkgMsg dupErrMsg = do
-    when (null cabalfps) $
+cabalPackagesCheck cabaldirs noPkgMsg dupErrMsg = do
+    when (null cabaldirs) $
         error noPkgMsg
 
-    relpaths <- mapM prettyPath cabalfps
+    relpaths <- mapM prettyPath cabaldirs
     logInfo "Using cabal packages:"
     logInfo $ T.pack (formatGroup relpaths)
 
-    (warnings, gpds) <- mapAndUnzipM readPackageUnresolved cabalfps
-    zipWithM_ (mapM_ . printCabalFileWarning) cabalfps warnings
+    packages <- map (\(x, y) -> (y, x)) <$>
+                mapM (flip readPackageUnresolvedDir True)
+                cabaldirs
 
     -- package name cannot be empty or missing otherwise
     -- it will result in cabal solver failure.
     -- stack requires packages name to match the cabal file name
     -- Just the latter check is enough to cover both the cases
 
-    let packages  = zip cabalfps gpds
-        normalizeString = T.unpack . T.normalize T.NFC . T.pack
+    let normalizeString = T.unpack . T.normalize T.NFC . T.pack
         getNameMismatchPkg (fp, gpd)
             | (normalizeString . show . gpdPackageName) gpd /= (normalizeString . FP.takeBaseName . toFilePath) fp
                 = Just fp
@@ -603,9 +604,11 @@ reportMissingCabalFiles
   -> Bool              -- ^ Whether to scan sub-directories
   -> m ()
 reportMissingCabalFiles cabalfps includeSubdirs = do
-    allCabalfps <- findCabalFiles includeSubdirs =<< getCurrentDir
+    allCabalDirs <- findCabalDirs includeSubdirs =<< getCurrentDir
 
-    relpaths <- mapM prettyPath (allCabalfps \\ cabalfps)
+    relpaths <- mapM prettyPath
+              $ Set.toList
+              $ allCabalDirs `Set.difference` Set.fromList (map parent cabalfps)
     unless (null relpaths) $ do
         logWarn "The following packages are missing from the config:"
         logWarn $ T.pack (formatGroup relpaths)
@@ -644,7 +647,7 @@ solveExtraDeps modStackYaml = do
     -- TODO when solver supports --ignore-subdirs option pass that as the
     -- second argument here.
     reportMissingCabalFiles cabalfps True
-    (bundle, _) <- cabalPackagesCheck cabalfps noPkgMsg (Just dupPkgFooter)
+    (bundle, _) <- cabalPackagesCheck cabalDirs noPkgMsg (Just dupPkgFooter)
 
     let gpds              = Map.elems $ fmap snd bundle
         oldFlags          = bcFlags bconfig
@@ -780,20 +783,14 @@ checkSnapBuildPlanActual
     -> SnapshotDef
     -> RIO env BuildPlanCheck
 checkSnapBuildPlanActual root gpds flags sd = do
-    let forNonSnapshot = Just <$> setupCabalEnv (sdWantedCompilerVersion sd)
-    mactualCompiler <-
-      case sdResolver sd of
-        ResolverSnapshot _ -> return Nothing
-        ResolverCompiler _ -> forNonSnapshot
-        ResolverCustom _ _ -> forNonSnapshot
+    let forNonSnapshot inner = setupCabalEnv (sdWantedCompilerVersion sd) (inner . Just)
+        runner =
+          case sdResolver sd of
+            ResolverSnapshot _ -> ($ Nothing)
+            ResolverCompiler _ -> forNonSnapshot
+            ResolverCustom _ _ -> forNonSnapshot
 
-    let inner = checkSnapBuildPlan root gpds flags sd
-    case mactualCompiler of
-      Nothing -> inner Nothing
-      Just (modifiedPath, actualCompiler) -> do
-        env0 <- ask
-        let env = set envOverrideL (const $ return modifiedPath) env0
-        runRIO env $ inner (Just actualCompiler)
+    runner $ checkSnapBuildPlan root gpds flags sd
 
 prettyPath
     :: forall r t m. (MonadIO m, RelPath (Path r t) ~ Path Rel t, AnyPath (Path r t))

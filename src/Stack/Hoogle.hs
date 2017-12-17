@@ -203,4 +203,5 @@ hoogleCmd (args,setup,rebuild) go = withBuildConfig go $ do
         , esIncludeGhcPackagePath = True
         , esStackExe = True
         , esLocaleUtf8 = False
+        , esKeepGhcRts = False
         }

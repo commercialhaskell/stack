@@ -36,7 +36,7 @@ module Stack.Setup
 import qualified    Codec.Archive.Tar as Tar
 import              Control.Applicative (empty)
 import              Control.Monad.State (get, put, modify)
-import "cryptonite" Crypto.Hash (SHA1(..))
+import "cryptonite" Crypto.Hash (SHA1(..), SHA256(..))
 import              Data.Aeson.Extended
 import qualified    Data.ByteString as S
 import qualified    Data.ByteString.Char8 as S8
@@ -51,7 +51,6 @@ import              Data.Foldable (maximumBy)
 import qualified    Data.HashMap.Strict as HashMap
 import              Data.IORef.RunOnce (runOnce)
 import              Data.List hiding (concat, elem, maximumBy, any)
-import              Data.List.Split (splitOn)
 import qualified    Data.Map as Map
 import qualified    Data.Set as Set
 import qualified    Data.Text as T
@@ -93,7 +92,7 @@ import              Stack.Types.PackageName
 import              Stack.Types.Runner
 import              Stack.Types.Version
 import qualified    System.Directory as D
-import              System.Environment (getExecutablePath)
+import              System.Environment (getExecutablePath, lookupEnv)
 import              System.Exit (ExitCode (..), exitFailure)
 import              System.IO (hFlush, stdout)
 import              System.IO.Error (isPermissionError)
@@ -107,6 +106,7 @@ import              Text.Printf (printf)
 
 #if !WINDOWS
 import              Bindings.Uname (uname, release)
+import              Data.List.Split (splitOn)
 import              Foreign.C (throwErrnoIfMinus1_, peekCString)
 import              Foreign.Marshal (alloca)
 import              System.Posix.Files (setFileMode)
@@ -260,7 +260,6 @@ setupEnv mResolveMissingGHC = do
         bcPath = set envOverrideL (const (return menv)) bc
 
     ls <- runRIO bcPath $ loadSnapshot
-      menv
       (Just compilerVer)
       (view projectRootL bc)
       (bcSnapshotDef bc)
@@ -292,6 +291,8 @@ setupEnv mResolveMissingGHC = do
 
     utf8EnvVars <- getUtf8EnvVars menv compilerVer
 
+    mGhcRtsEnvVar <- liftIO $ lookupEnv "GHCRTS"
+
     envRef <- liftIO $ newIORef Map.empty
     let getEnvOverride' es = do
             m <- readIORef envRef
@@ -318,6 +319,11 @@ setupEnv mResolveMissingGHC = do
                             (False, Platform Cabal.X86_64 Cabal.Windows)
                                 -> Map.insert "MSYSTEM" "MINGW64"
                             _   -> id
+
+                        -- See https://github.com/commercialhaskell/stack/issues/3444
+                        $ case (esKeepGhcRts es, mGhcRtsEnvVar) of
+                            (True, Just ghcRts) -> Map.insert "GHCRTS" (T.pack ghcRts)
+                            _ -> id
 
                         -- For reasoning and duplication, see: https://github.com/fpco/stack/issues/70
                         $ Map.insert "HASKELL_PACKAGE_SANDBOX" (T.pack $ toFilePathNoTrailingSep deps)
@@ -616,6 +622,7 @@ getGhcBuild menv = do
         logDebug ("Using " <> T.pack s <> " GHC build")
         return (CompilerBuildSpecialized s)
 
+#if !WINDOWS
 -- | Encode an OpenBSD version (like "6.1") into a valid argument for
 -- CompilerBuildSpecialized, so "maj6-min1". Later version numbers are prefixed
 -- with "r".
@@ -629,7 +636,6 @@ mungeRelease = intercalate "-" . prefixMaj . splitOn "."
     prefixMaj = prefixFst "maj" prefixMin
     prefixMin = prefixFst "min" (map ('r':))
 
-#if !WINDOWS
 sysRelease :: (MonadUnliftIO m, MonadLogger m) => m String
 sysRelease =
   handleIO (\e -> do
@@ -852,7 +858,12 @@ downloadAndInstallCompiler ghcBuild si wanted@GhcVersion{} versionCheck mbindist
                 _ -> throwM RequireCustomGHCVariant
             case wanted of
                 GhcVersion version ->
-                    return (version, GHCDownloadInfo mempty mempty (DownloadInfo (T.pack bindistURL) Nothing Nothing))
+                    return (version, GHCDownloadInfo mempty mempty DownloadInfo
+                             { downloadInfoUrl = T.pack bindistURL
+                             , downloadInfoContentLength = Nothing
+                             , downloadInfoSha1 = Nothing
+                             , downloadInfoSha256 = Nothing
+                             })
                 _ ->
                     throwM WantedMustBeGHC
         _ -> do
@@ -953,13 +964,17 @@ downloadFromInfo programsDir downloadInfo tool = do
             chattyDownload (T.pack (toolString tool)) downloadInfo path
             return path
         (parseAbsFile -> Just path) -> do
-            let DownloadInfo{downloadInfoContentLength=contentLength, downloadInfoSha1=sha1} =
+            let DownloadInfo{downloadInfoContentLength=contentLength, downloadInfoSha1=sha1,
+                             downloadInfoSha256=sha256} =
                     downloadInfo
             when (isJust contentLength) $
                 logWarn ("`content-length` in not checked \n" <>
                           "and should not be specified when `url` is a file path")
             when (isJust sha1) $
                 logWarn ("`sha1` is not checked and \n" <>
+                          "should not be specified when `url` is a file path")
+            when (isJust sha256) $
+                logWarn ("`sha256` is not checked and \n" <>
                           "should not be specified when `url` is a file path")
             return path
         _ ->
@@ -1205,7 +1220,13 @@ bootGhcjs ghcjsVersion stackYaml destDir bootOpts = do
                     "See this issue: https://github.com/ghcjs/ghcjs/issues/470"
                 return True
             | otherwise -> return False
-    let envSettings = defaultEnvSettings { esIncludeGhcPackagePath = False }
+    let envSettings = EnvSettings
+          { esIncludeLocals = True
+          , esIncludeGhcPackagePath = False
+          , esStackExe = True
+          , esLocaleUtf8 = True
+          , esKeepGhcRts = False
+          }
     menv' <- liftIO $ configEnvOverride (view configL envConfig) envSettings
     shouldInstallAlex <- not <$> doesExecutableExist menv "alex"
     shouldInstallHappy <- not <$> doesExecutableExist menv "happy"
@@ -1427,7 +1448,7 @@ setup7z si = do
 
 chattyDownload :: HasRunner env
                => Text          -- ^ label
-               -> DownloadInfo  -- ^ URL, content-length, and sha1
+               -> DownloadInfo  -- ^ URL, content-length, sha1, and sha256
                -> Path Abs File -- ^ destination
                -> RIO env ()
 chattyDownload label downloadInfo path = do
@@ -1445,20 +1466,25 @@ chattyDownload label downloadInfo path = do
       , T.pack $ toFilePath path
       , " ..."
       ]
-    hashChecks <- case downloadInfoSha1 downloadInfo of
-        Just sha1ByteString -> do
-            let sha1 = CheckHexDigestByteString sha1ByteString
+    hashChecks <- fmap catMaybes $ forM
+      [ ("sha1",   HashCheck SHA1,   downloadInfoSha1)
+      , ("sha256", HashCheck SHA256, downloadInfoSha256)
+      ]
+      $ \(name, constr, getter) ->
+        case getter downloadInfo of
+          Just bs -> do
             logDebug $ T.concat
-                [ "Will check against sha1 hash: "
-                , T.decodeUtf8With T.lenientDecode sha1ByteString
+                [ "Will check against "
+                , name
+                , " hash: "
+                , T.decodeUtf8With T.lenientDecode bs
                 ]
-            return [HashCheck SHA1 sha1]
-        Nothing -> do
-            logWarn $ T.concat
-                [ "No sha1 found in metadata,"
-                , " download hash won't be checked."
-                ]
-            return []
+            return $ Just $ constr $ CheckHexDigestByteString bs
+          Nothing -> return Nothing
+    when (null hashChecks) $ logWarn $ T.concat
+        [ "No sha1 or sha256 found in metadata,"
+        , " download hash won't be checked."
+        ]
     let dReq = DownloadRequest
             { drRequest = req
             , drHashChecks = hashChecks
@@ -1578,7 +1604,9 @@ removeHaskellEnvVars =
     Map.delete "HASKELL_PACKAGE_SANDBOXES" .
     Map.delete "HASKELL_DIST_DIR" .
     -- https://github.com/commercialhaskell/stack/issues/1460
-    Map.delete "DESTDIR"
+    Map.delete "DESTDIR" .
+    -- https://github.com/commercialhaskell/stack/issues/3444
+    Map.delete "GHCRTS"
 
 -- | Get map of environment variables to set to change the GHC's encoding to UTF-8
 getUtf8EnvVars

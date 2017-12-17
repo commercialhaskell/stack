@@ -17,6 +17,7 @@ module Stack.Docker.GlobalDB
   where
 
 import           Control.Monad.Logger (NoLoggingT)
+import           Control.Monad.Trans.Resource (ResourceT)
 import           Stack.Prelude
 import           Data.List (sortBy, isInfixOf, stripPrefix)
 import           Data.List.Extra (stripSuffix)

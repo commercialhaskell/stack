@@ -44,7 +44,7 @@ import           Stack.Build.Source
 import           Stack.Build.Target
 import           Stack.Fetch as Fetch
 import           Stack.Package
-import           Stack.PackageLocation (loadSingleRawCabalFile)
+import           Stack.PackageLocation (parseSingleCabalFileIndex)
 import           Stack.Types.Build
 import           Stack.Types.BuildPlan
 import           Stack.Types.Config
@@ -278,21 +278,13 @@ withLoadPackage :: HasEnvConfig env
                 -> RIO env a
 withLoadPackage inner = do
     econfig <- view envConfigL
-    menv <- getMinimalEnvOverride
     root <- view projectRootL
     run <- askRunInIO
     withCabalLoader $ \loadFromIndex ->
-        inner $ \loc flags ghcOptions -> do
-            bs <- run $ loadSingleRawCabalFile loadFromIndex menv root loc
-
-            -- Intentionally ignore warnings, as it's not really
-            -- appropriate to print a bunch of warnings out while
-            -- resolving the package index.
-            (_warnings,pkg) <- readPackageBS
+        inner $ \loc flags ghcOptions -> run $
+            resolvePackage
               (depPackageConfig econfig flags ghcOptions)
-              loc
-              bs
-            return pkg
+              <$> parseSingleCabalFileIndex loadFromIndex root loc
   where
     -- | Package config to be used for dependencies
     depPackageConfig :: EnvConfig -> Map FlagName Bool -> [Text] -> PackageConfig

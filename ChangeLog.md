@@ -6,6 +6,23 @@ Release notes:
 
 Major changes:
 
+Behaviour changes:
+
+Other enhancements:
+
+Bug fixes:
+
+* For versions of Cabal before 1.24, ensure that the dependencies of
+  non-buildable components are part of the build plan to work around an old
+  Cabal bug. See [#3631](https://github.com/commercialhaskell/stack/issues/3631).
+* Run the Cabal file checking in the `sdist` command more reliably by
+  allowing the Cabal library to flatten the
+  `GenericPackageDescription` itself.
+
+## v1.6.1
+
+Major changes:
+
 * Complete overhaul of how snapshots are defined, the `packages` and
   `extra-deps` fields, and a number of related items. For full
   details, please see
@@ -45,6 +62,13 @@ Behavior changes:
 * Stack will ask before saving hackage credentials to file. This new
   prompt can be avoided by using the `save-hackage-creds` setting. Please
   see [#2159](https://github.com/commercialhaskell/stack/issues/2159).
+* The `GHCRTS` environment variable will no longer be passed through to 
+  every program stack runs. Instead, it will only be passed through
+  commands like `exec`, `runghc`, `script`, `ghci`, etc.
+  See [#3444](https://github.com/commercialhaskell/stack/issues/3444).
+* `ghc-options:` for specific packages will now come after the options
+  specified for all packages / particular sets of packages. See
+  [#3573](https://github.com/commercialhaskell/stack/issues/3573).
 * The `pvp-bounds` feature is no longer fully functional, due to some
   issues with the Cabal library's printer. See
   [#3550](https://github.com/commercialhaskell/stack/issues/3550).
@@ -112,6 +136,9 @@ Other enhancements:
   [#3520](https://github.com/commercialhaskell/stack/issues/3520).
 * Log when each individual test suite finishes. See:
   [#3552](https://github.com/commercialhaskell/stack/issues/3552).
+* Avoid spurious rebuilds when using `--file-watch` by not watching files for
+  executable, test and benchmark components that aren't a target. See:
+  [#3483](https://github.com/commercialhaskell/stack/issues/3483).
 * Stack will now try to detect the width of the running terminal
   (only on POSIX for the moment) and use that to better display
   output messages. Work is ongoing, so some messages will not
@@ -127,6 +154,11 @@ Other enhancements:
 * Automatically run `autoreconf -i` as necessary when a `configure`
   script is missing. See
   [#3534](https://github.com/commercialhaskell/stack/issues/3534)
+* GHC bindists can now be identified by their SHA256 checksum in addition to
+  their SHA1 checksum, allowing for more security in download.
+* For filesystem setup-info paths, it's no longer assumed that the
+  directory is writable, instead a temp dir is used.  See
+  [#3188](https://github.com/commercialhaskell/stack/issues/3188).
 
 Bug fixes:
 
@@ -188,6 +220,13 @@ Bug fixes:
 * Fixes a bug that has existed since 1.5.0, where
   `stack setup --upgrade-cabal` would say that Cabal is already the latest
   version, when it wasn't.
+* Ensure that an `extra-dep` from a local directory is not treated as
+  a `$locals` for GHC options purposes. See
+  [#3574](https://github.com/commercialhaskell/stack/issues/3574).
+* Building all executables only happens once instead of every
+  time. See
+  [#3229](https://github.com/commercialhaskell/stack/issues/3229) for
+  more info.
 
 
 ## 1.5.1
@@ -268,16 +307,9 @@ Other enhancements:
   on the PATH or shadowed by another entry.
 * Allow running tests on tarball created by sdist and upload
   [#717](https://github.com/commercialhaskell/stack/issues/717).
-* For filesystem setup-info paths, it's no longer assumed that the
-  directory is writable, instead a temp dir is used.  See
-  [#3188](https://github.com/commercialhaskell/stack/issues/3188).
 
 Bug fixes:
 
-* Building all executables only happens once instead of every
-  time. See
-  [#3229](https://github.com/commercialhaskell/stack/issues/3229) for
-  more info.
 * Fixes case where `stack build --profile` might not cause executables /
   tests / benchmarks to be rebuilt.
   See [#2984](https://github.com/commercialhaskell/stack/issues/2984)
@@ -1269,8 +1301,8 @@ Other enhancements:
 * `stack ghci` now accepts all the flags accepted by `stack build`. See
   [#1186](https://github.com/commercialhaskell/stack/issues/1186)
 * `stack ghci` builds the project before launching GHCi. If the build fails,
-  optimistically launch GHCi anyway. Use `stack ghci --no-build` option to
-  disable [#1065](https://github.com/commercialhaskell/stack/issues/1065)
+  try to launch GHCi anyway. Use `stack ghci --no-build` option to disable
+  [#1065](https://github.com/commercialhaskell/stack/issues/1065)
 * `stack ghci` now detects and warns about various circumstances where it is
   liable to fail. See
   [#1270](https://github.com/commercialhaskell/stack/issues/1270)

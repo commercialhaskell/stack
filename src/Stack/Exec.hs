@@ -25,22 +25,30 @@ import qualified System.Process.PID1 as PID1
 import           System.Process.Read (EnvOverride, envHelper, preProcess)
 #endif
 
--- | Default @EnvSettings@ which includes locals and GHC_PACKAGE_PATH
+-- | Default @EnvSettings@ which includes locals and GHC_PACKAGE_PATH.
+--
+-- Note that this also passes through the GHCRTS environment variable.
+-- See https://github.com/commercialhaskell/stack/issues/3444
 defaultEnvSettings :: EnvSettings
 defaultEnvSettings = EnvSettings
     { esIncludeLocals = True
     , esIncludeGhcPackagePath = True
     , esStackExe = True
     , esLocaleUtf8 = False
+    , esKeepGhcRts = True
     }
 
 -- | Environment settings which do not embellish the environment
+--
+-- Note that this also passes through the GHCRTS environment variable.
+-- See https://github.com/commercialhaskell/stack/issues/3444
 plainEnvSettings :: EnvSettings
 plainEnvSettings = EnvSettings
     { esIncludeLocals = False
     , esIncludeGhcPackagePath = False
     , esStackExe = False
     , esLocaleUtf8 = False
+    , esKeepGhcRts = True
     }
 
 -- | Execute a process within the Stack configured environment.

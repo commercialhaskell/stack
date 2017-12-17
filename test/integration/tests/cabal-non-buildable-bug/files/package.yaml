@@ -1,0 +1,14 @@
+name: foo
+version: "0"
+
+dependencies:
+- base
+
+library: {}
+
+executables:
+  not-built:
+    main: Main.hs
+    dependencies:
+    - does-not-exist
+    buildable: false

@@ -16,16 +16,13 @@
 -- | Dealing with Cabal.
 
 module Stack.Package
-  (readPackage
-  ,readPackageBS
+  (readPackageDir
+  ,readPackageUnresolvedDir
+  ,readPackageUnresolvedIndex
   ,readPackageDescriptionDir
   ,readDotBuildinfo
-  ,readPackageUnresolved
-  ,readPackageUnresolvedBS
   ,resolvePackage
   ,packageFromPackageDescription
-  ,findOrGenerateCabalFile
-  ,hpack
   ,Package(..)
   ,PackageDescriptionPair(..)
   ,GetPackageFiles(..)
@@ -37,15 +34,14 @@ module Stack.Package
   ,packageDescTools
   ,packageDependencies
   ,autogenDir
-  ,checkCabalFileName
-  ,printCabalFileWarning
   ,cabalFilePackageId
-  ,rawParseGPD)
+  ,gpdPackageIdentifier
+  ,gpdPackageName
+  ,gpdVersion)
   where
 
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Char8 as C8
-import qualified Data.HashSet as HashSet
 import           Data.List (isSuffixOf, partition, isPrefixOf)
 import           Data.List.Extra (nubOrd)
 import qualified Data.Map.Strict as M
@@ -86,7 +82,7 @@ import           Stack.Constants.Config
 import           Stack.Prelude
 import           Stack.PrettyPrint
 import           Stack.Types.Build
-import           Stack.Types.BuildPlan (PackageLocationIndex (..), PackageLocation (..), ExeName (..))
+import           Stack.Types.BuildPlan (ExeName (..))
 import           Stack.Types.Compiler
 import           Stack.Types.Config
 import           Stack.Types.FlagName
@@ -118,69 +114,119 @@ instance HasBuildConfig Ctx
 instance HasEnvConfig Ctx where
     envConfigL = lens ctxEnvConfig (\x y -> x { ctxEnvConfig = y })
 
--- | Read the raw, unresolved package information.
-readPackageUnresolved :: (MonadIO m, MonadThrow m)
-                      => Path Abs File
-                      -> m ([PWarning],GenericPackageDescription)
-readPackageUnresolved cabalfp =
-  liftIO (BS.readFile (FL.toFilePath cabalfp))
-  >>= readPackageUnresolvedBS (PLOther $ PLFilePath $ toFilePath cabalfp)
-
--- | Read the raw, unresolved package information from a ByteString.
-readPackageUnresolvedBS :: (MonadThrow m)
-                        => PackageLocationIndex FilePath
-                        -> BS.ByteString
-                        -> m ([PWarning],GenericPackageDescription)
-readPackageUnresolvedBS source bs =
-    case rawParseGPD bs of
-       Left per ->
-         throwM (PackageInvalidCabalFile source per)
-       Right x -> return x
-
 -- | A helper function that performs the basic character encoding
 -- necessary.
-rawParseGPD :: BS.ByteString
-            -> Either PError ([PWarning], GenericPackageDescription)
-rawParseGPD bs =
+rawParseGPD
+  :: MonadThrow m
+  => Either PackageIdentifierRevision (Path Abs File)
+  -> BS.ByteString
+  -> m ([PWarning], GenericPackageDescription)
+rawParseGPD key bs =
     case parseGenericPackageDescription chars of
-       ParseFailed per -> Left per
-       ParseOk warnings gpkg -> Right (warnings,gpkg)
+       ParseFailed e -> throwM $ PackageInvalidCabalFile key e
+       ParseOk warnings gpkg -> return (warnings,gpkg)
   where
     chars = T.unpack (dropBOM (decodeUtf8With lenientDecode bs))
 
     -- https://github.com/haskell/hackage-server/issues/351
     dropBOM t = fromMaybe t $ T.stripPrefix "\xFEFF" t
 
--- | Reads and exposes the package information
-readPackage :: (MonadLogger m, MonadIO m)
-            => PackageConfig
-            -> Path Abs File
-            -> m ([PWarning],Package)
-readPackage packageConfig cabalfp =
-  do (warnings,gpkg) <- liftIO $ readPackageUnresolved cabalfp
-     return (warnings,resolvePackage packageConfig gpkg)
+-- | Read the raw, unresolved package information from a file.
+readPackageUnresolvedDir
+  :: forall env. HasConfig env
+  => Path Abs Dir -- ^ directory holding the cabal file
+  -> Bool -- ^ print warnings?
+  -> RIO env (GenericPackageDescription, Path Abs File)
+readPackageUnresolvedDir dir printWarnings = do
+  ref <- view $ runnerL.to runnerParsedCabalFiles
+  (_, m) <- readIORef ref
+  case M.lookup dir m of
+    Just x -> return x
+    Nothing -> do
+      cabalfp <- findOrGenerateCabalFile dir
+      bs <- liftIO $ BS.readFile $ toFilePath cabalfp
+      (warnings, gpd) <- rawParseGPD (Right cabalfp) bs
+      when printWarnings
+        $ mapM_ (prettyWarnL . toPretty (toFilePath cabalfp)) warnings
+      checkCabalFileName (gpdPackageName gpd) cabalfp
+      let ret = (gpd, cabalfp)
+      atomicModifyIORef' ref $ \(m1, m2) ->
+        ((m1, M.insert dir ret m2), ret)
+  where
+    toPretty :: String -> PWarning -> [Doc AnsiAnn]
+    toPretty src (PWarning x) =
+      [ flow "Cabal file warning in"
+      , fromString src <> ":"
+      , flow x
+      ]
+    toPretty src (UTFWarning ln msg) =
+      [ flow "Cabal file warning in"
+      , fromString src <> ":" <> fromString (show ln) <> ":"
+      , flow msg
+      ]
 
--- | Reads and exposes the package information, from a ByteString
-readPackageBS :: (MonadThrow m)
-              => PackageConfig
-              -> PackageLocationIndex FilePath
-              -> BS.ByteString
-              -> m ([PWarning],Package)
-readPackageBS packageConfig loc bs =
-  do (warnings,gpkg) <- readPackageUnresolvedBS loc bs
-     return (warnings,resolvePackage packageConfig gpkg)
+    -- | Check if the given name in the @Package@ matches the name of the .cabal file
+    checkCabalFileName :: MonadThrow m => PackageName -> Path Abs File -> m ()
+    checkCabalFileName name cabalfp = do
+        -- Previously, we just use parsePackageNameFromFilePath. However, that can
+        -- lead to confusing error messages. See:
+        -- https://github.com/commercialhaskell/stack/issues/895
+        let expected = packageNameString name ++ ".cabal"
+        when (expected /= toFilePath (filename cabalfp))
+            $ throwM $ MismatchedCabalName cabalfp name
+
+gpdPackageIdentifier :: GenericPackageDescription -> PackageIdentifier
+gpdPackageIdentifier = fromCabalPackageIdentifier . D.package . D.packageDescription
+
+gpdPackageName :: GenericPackageDescription -> PackageName
+gpdPackageName = packageIdentifierName . gpdPackageIdentifier
+
+gpdVersion :: GenericPackageDescription -> Version
+gpdVersion = packageIdentifierVersion . gpdPackageIdentifier
+
+-- | Read the 'GenericPackageDescription' from the given
+-- 'PackageIdentifierRevision'.
+readPackageUnresolvedIndex
+  :: forall env. HasRunner env
+  => (PackageIdentifierRevision -> IO ByteString) -- ^ load the raw bytes
+  -> PackageIdentifierRevision
+  -> RIO env GenericPackageDescription
+readPackageUnresolvedIndex loadFromIndex pir@(PackageIdentifierRevision pi' _) = do
+  ref <- view $ runnerL.to runnerParsedCabalFiles
+  (m, _) <- readIORef ref
+  case M.lookup pir m of
+    Just gpd -> return gpd
+    Nothing -> do
+      bs <- liftIO $ loadFromIndex pir
+      (_warnings, gpd) <- rawParseGPD (Left pir) bs
+      let foundPI =
+              fromCabalPackageIdentifier
+            $ D.package
+            $ D.packageDescription gpd
+      unless (pi' == foundPI) $ throwM $ MismatchedCabalIdentifier pir foundPI
+      atomicModifyIORef' ref $ \(m1, m2) ->
+        ((M.insert pir gpd m1, m2), gpd)
+
+-- | Reads and exposes the package information
+readPackageDir
+  :: forall env. HasConfig env
+  => PackageConfig
+  -> Path Abs Dir
+  -> Bool -- ^ print warnings from cabal file parsing?
+  -> RIO env (Package, Path Abs File)
+readPackageDir packageConfig dir printWarnings =
+  first (resolvePackage packageConfig) <$> readPackageUnresolvedDir dir printWarnings
 
 -- | Get 'GenericPackageDescription' and 'PackageDescription' reading info
 -- from given directory.
 readPackageDescriptionDir
-  :: (MonadLogger m, MonadIO m, MonadUnliftIO m, MonadThrow m, HasRunner env, HasConfig env,
-      MonadReader env m)
+  :: forall env. HasConfig env
   => PackageConfig
   -> Path Abs Dir
-  -> m (GenericPackageDescription, PackageDescriptionPair)
-readPackageDescriptionDir config pkgDir = do
-    cabalfp <- findOrGenerateCabalFile pkgDir
-    gdesc   <- liftM snd (readPackageUnresolved cabalfp)
+  -> Bool -- ^ print warnings?
+  -> RIO env (GenericPackageDescription, PackageDescriptionPair)
+readPackageDescriptionDir config pkgDir printWarnings = do
+    (gdesc, _) <- readPackageUnresolvedDir pkgDir printWarnings
     return (gdesc, resolvePackageDescription config gdesc)
 
 -- | Read @<package>.buildinfo@ ancillary files produced by some Setup.hs hooks.
@@ -193,41 +239,6 @@ readDotBuildinfo :: MonadIO m
                  -> m HookedBuildInfo
 readDotBuildinfo buildinfofp =
     liftIO $ readHookedBuildInfo D.silent (toFilePath buildinfofp)
-
--- | Print cabal file warnings.
-printCabalFileWarning
-    :: HasRunner env
-    => Path Abs File
-    -> PWarning
-    -> RIO env ()
-printCabalFileWarning cabalfp warning' = do
-    let fp = toFilePath cabalfp
-    ref <- view $ runnerL.to runnerWarnedCabalFiles
-    join $ atomicModifyIORef' ref $ \hs ->
-      if fp `HashSet.member` hs
-        then (hs, return ())
-        else (HashSet.insert fp hs, prettyWarnL (toPretty warning'))
-  where
-    toPretty (PWarning x) =
-      [ flow "Cabal file warning in"
-      , display cabalfp <> ":"
-      , flow x
-      ]
-    toPretty (UTFWarning ln msg) =
-      [ flow "Cabal file warning in"
-      , display cabalfp <> ":" <> fromString (show ln) <> ":"
-      , flow msg
-      ]
-
--- | Check if the given name in the @Package@ matches the name of the .cabal file
-checkCabalFileName :: MonadThrow m => PackageName -> Path Abs File -> m ()
-checkCabalFileName name cabalfp = do
-    -- Previously, we just use parsePackageNameFromFilePath. However, that can
-    -- lead to confusing error messages. See:
-    -- https://github.com/commercialhaskell/stack/issues/895
-    let expected = packageNameString name ++ ".cabal"
-    when (expected /= toFilePath (filename cabalfp))
-        $ throwM $ MismatchedCabalName cabalfp name
 
 -- | Resolve a parsed cabal file into a 'Package', which contains all of
 -- the info needed for stack to build the 'Package' given the current
@@ -345,7 +356,7 @@ packageFromPackageDescription packageConfig pkgFlags (PackageDescriptionPair pkg
     pkgId = package pkg
     name = fromCabalPackageName (pkgName pkgId)
     deps = M.filterWithKey (const . not . isMe) (M.union
-        (packageDependencies pkg)
+        (packageDependencies packageConfig pkg)
         -- We include all custom-setup deps - if present - in the
         -- package deps themselves. Stack always works with the
         -- invariant that there will be a single installed package
@@ -591,12 +602,42 @@ getBuildComponentDir Nothing = Nothing
 getBuildComponentDir (Just name) = parseRelDir (name FilePath.</> (name ++ "-tmp"))
 
 -- | Get all dependencies of the package (buildable targets only).
-packageDependencies :: PackageDescription -> Map PackageName VersionRange
-packageDependencies pkg =
+--
+-- Note that for Cabal versions 1.22 and earlier, there is a bug where
+-- Cabal requires dependencies for non-buildable components to be
+-- present. We're going to use GHC version as a proxy for Cabal
+-- library version in this case for simplicity, so we'll check for GHC
+-- being 7.10 or earlier. This obviously makes our function a lot more
+-- fun to write...
+packageDependencies
+  :: PackageConfig
+  -> PackageDescription
+  -> Map PackageName VersionRange
+packageDependencies pkgConfig pkg' =
   M.fromListWith intersectVersionRanges $
   map (depName &&& depRange) $
   concatMap targetBuildDepends (allBuildInfo' pkg) ++
   maybe [] setupDepends (setupBuildInfo pkg)
+  where
+    pkg
+      | getGhcVersion (packageConfigCompilerVersion pkgConfig) >= $(mkVersion "8.0") = pkg'
+      -- Set all components to buildable. Only need to worry about
+      -- library, exe, test, and bench, since others didn't exist in
+      -- older Cabal versions
+      | otherwise = pkg'
+        { library = (\c -> c { libBuildInfo = go (libBuildInfo c) }) <$> library pkg'
+        , executables = (\c -> c { buildInfo = go (buildInfo c) }) <$> executables pkg'
+        , testSuites =
+            if packageConfigEnableTests pkgConfig
+              then (\c -> c { testBuildInfo = go (testBuildInfo c) }) <$> testSuites pkg'
+              else testSuites pkg'
+        , benchmarks =
+            if packageConfigEnableBenchmarks pkgConfig
+              then (\c -> c { benchmarkBuildInfo = go (benchmarkBuildInfo c) }) <$> benchmarks pkg'
+              else benchmarks pkg'
+        }
+
+    go bi = bi { buildable = True }
 
 -- | Get all dependencies of the package (buildable targets only).
 --

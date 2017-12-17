@@ -298,7 +298,7 @@ buildDepsAndInitialSteps GhciOpts{..} targets0 = do
             Right () -> return ()
             Left err -> do
                 prettyError $ fromString (show err)
-                prettyWarn "Build failed, but optimistically launching GHCi anyway"
+                prettyWarn "Build failed, but trying to launch GHCi anyway"
 
 checkAdditionalPackages :: MonadThrow m => [String] -> m [PackageName]
 checkAdditionalPackages pkgs = forM pkgs $ \name -> do
@@ -566,7 +566,11 @@ makeGhciPkgInfo buildOptsCLI sourceMap installedMap locals addPkgs mfileTargets 
             , packageConfigCompilerVersion = compilerVersion
             , packageConfigPlatform = view platformL econfig
             }
-    (warnings,gpkgdesc) <- readPackageUnresolved cabalfp
+    -- TODO we've already parsed this information, otherwise we
+    -- wouldn't have figured out the cabalfp already. In the future:
+    -- retain that GenericPackageDescription in the relevant data
+    -- structures to avoid reparsing.
+    (gpkgdesc, _cabalfp) <- readPackageUnresolvedDir (parent cabalfp) True
 
     -- Source the package's *.buildinfo file created by configure if any. See
     -- https://www.haskell.org/cabal/users-guide/developing-packages.html#system-dependent-parameters
@@ -588,7 +592,6 @@ makeGhciPkgInfo buildOptsCLI sourceMap installedMap locals addPkgs mfileTargets 
                     (C.updatePackageDescription bi y))
               mbuildinfo
 
-    mapM_ (printCabalFileWarning cabalfp) warnings
     (mods,files,opts) <- getPackageOpts (packageOpts pkg) sourceMap installedMap locals addPkgs cabalfp
     let filteredOpts = filterWanted opts
         filterWanted = M.filterWithKey (\k _ -> k `S.member` allWanted)

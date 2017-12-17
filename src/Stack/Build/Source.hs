@@ -20,8 +20,7 @@ import              Crypto.Hash (Digest, SHA256(..))
 import              Crypto.Hash.Conduit (sinkHash)
 import qualified    Data.ByteArray as Mem (convert)
 import qualified    Data.ByteString as S
-import              Data.Conduit (($$), ZipSink (..))
-import qualified    Data.Conduit.Binary as CB
+import              Data.Conduit (ZipSink (..))
 import qualified    Data.Conduit.List as CL
 import qualified    Data.HashSet as HashSet
 import              Data.List
@@ -30,7 +29,7 @@ import qualified    Data.Map.Strict as M
 import qualified    Data.Set as Set
 import              Stack.Build.Cache
 import              Stack.Build.Target
-import              Stack.Config (getLocalPackages, getNamedComponents)
+import              Stack.Config (getLocalPackages)
 import              Stack.Constants (wiredInPackages)
 import              Stack.Package
 import              Stack.PackageLocation
@@ -79,7 +78,7 @@ loadSourceMapFull needTargets boptsCli = do
     bconfig <- view buildConfigL
     (ls, localDeps, targets) <- parseTargets needTargets boptsCli
     lp <- getLocalPackages
-    locals <- mapM (loadLocalPackage boptsCli targets) $ Map.toList $ lpProject lp
+    locals <- mapM (loadLocalPackage True boptsCli targets) $ Map.toList $ lpProject lp
     checkFlagsUsed boptsCli locals localDeps (lsPackages ls)
     checkComponentsBuildable locals
 
@@ -94,25 +93,9 @@ loadSourceMapFull needTargets boptsCli = do
             -- NOTE: configOpts includes lpiGhcOptions for now, this may get refactored soon
             PLIndex pir -> return $ PSIndex loc (lpiFlags lpi) configOpts pir
             PLOther pl -> do
-              -- FIXME lots of code duplication with getLocalPackages
-              menv <- getMinimalEnvOverride
               root <- view projectRootL
-              dir <- resolveSinglePackageLocation menv root pl
-              cabalfp <- findOrGenerateCabalFile dir
-              bs <- liftIO (S.readFile (toFilePath cabalfp))
-              (warnings, gpd) <-
-                case rawParseGPD bs of
-                  Left e -> throwM $ InvalidCabalFileInLocal (PLOther pl) e bs
-                  Right x -> return x
-              mapM_ (printCabalFileWarning cabalfp) warnings
-              lp' <- loadLocalPackage boptsCli targets (n, LocalPackageView
-                { lpvVersion = lpiVersion lpi
-                , lpvRoot = dir
-                , lpvCabalFP = cabalfp
-                , lpvComponents = getNamedComponents gpd
-                , lpvGPD = gpd
-                , lpvLoc = pl
-                })
+              lpv <- parseSingleCabalFile root True pl
+              lp' <- loadLocalPackage False boptsCli targets (n, lpv)
               return $ PSFiles lp' loc
     sourceMap' <- Map.unions <$> sequence
       [ return $ Map.fromList $ map (\lp' -> (packageName $ lpPackage lp', PSFiles lp' Local)) locals
@@ -148,14 +131,14 @@ getLocalFlags bconfig boptsCli name = Map.unions
 -- configuration and commandline.
 getGhcOptions :: BuildConfig -> BuildOptsCLI -> PackageName -> Bool -> Bool -> [Text]
 getGhcOptions bconfig boptsCli name isTarget isLocal = concat
-    [ Map.findWithDefault [] name (configGhcOptionsByName config)
-    , if isTarget
-        then Map.findWithDefault [] AGOTargets (configGhcOptionsByCat config)
-        else []
+    [ Map.findWithDefault [] AGOEverything (configGhcOptionsByCat config)
     , if isLocal
         then Map.findWithDefault [] AGOLocals (configGhcOptionsByCat config)
         else []
-    , Map.findWithDefault [] AGOEverything (configGhcOptionsByCat config)
+    , if isTarget
+        then Map.findWithDefault [] AGOTargets (configGhcOptionsByCat config)
+        else []
+    , Map.findWithDefault [] name (configGhcOptionsByName config)
     , concat [["-fhpc"] | isLocal && toCoverage (boptsTestOpts bopts)]
     , if boptsLibProfile bopts || boptsExeProfile bopts
          then ["-fprof-auto","-fprof-cafs"]
@@ -191,13 +174,17 @@ splitComponents =
 -- based on the selected components
 loadLocalPackage
     :: forall env. HasEnvConfig env
-    => BuildOptsCLI
+    => Bool
+    -- ^ Should this be treated as part of $locals? False for extra-deps.
+    --
+    -- See: https://github.com/commercialhaskell/stack/issues/3574#issuecomment-346512821
+    -> BuildOptsCLI
     -> Map PackageName Target
     -> (PackageName, LocalPackageView)
     -> RIO env LocalPackage
-loadLocalPackage boptsCli targets (name, lpv) = do
+loadLocalPackage isLocal boptsCli targets (name, lpv) = do
     let mtarget = Map.lookup name targets
-    config  <- getPackageConfig boptsCli name (isJust mtarget) True
+    config  <- getPackageConfig boptsCli name (isJust mtarget) isLocal
     bopts <- view buildOptsL
     let (exeCandidates, testCandidates, benchCandidates) =
             case mtarget of
@@ -225,7 +212,7 @@ loadLocalPackage boptsCli targets (name, lpv) = do
                     case packageLibraries pkg of
                       NoLibraries -> False
                       HasLibraries _ -> True
-               in hasLibrary || not (Set.null allComponents)
+               in hasLibrary || not (Set.null nonLibComponents)
 
         filterSkippedComponents = Set.filter (not . (`elem` boptsSkipComponents bopts))
 
@@ -233,7 +220,7 @@ loadLocalPackage boptsCli targets (name, lpv) = do
                                   filterSkippedComponents testCandidates,
                                   filterSkippedComponents benchCandidates)
 
-        allComponents = toComponents exes tests benches
+        nonLibComponents = toComponents exes tests benches
 
         toComponents e t b = Set.unions
             [ Set.map CExe e
@@ -278,7 +265,8 @@ loadLocalPackage boptsCli targets (name, lpv) = do
         benchpkg = resolvePackage benchconfig gpkg
 
     mbuildCache <- tryGetBuildCache $ lpvRoot lpv
-    (files,_) <- getPackageFilesSimple pkg (lpvCabalFP lpv)
+
+    (files,_) <- getPackageFilesForTargets pkg (lpvCabalFP lpv) nonLibComponents
 
     (dirtyFiles, newBuildCache) <- checkBuildCache
         (fromMaybe Map.empty mbuildCache)
@@ -301,7 +289,7 @@ loadLocalPackage boptsCli targets (name, lpv) = do
         , lpCabalFile = lpvCabalFP lpv
         , lpDir = lpvRoot lpv
         , lpWanted = isWanted
-        , lpComponents = allComponents
+        , lpComponents = nonLibComponents
         -- TODO: refactor this so that it's easier to be sure that these
         -- components are indeed unbuildable.
         --
@@ -404,10 +392,11 @@ addUnlistedToBuildCache
     => ModTime
     -> Package
     -> Path Abs File
+    -> Set NamedComponent
     -> Map FilePath a
     -> RIO env ([Map FilePath FileCacheInfo], [PackageWarning])
-addUnlistedToBuildCache preBuildTime pkg cabalFP buildCache = do
-    (files,warnings) <- getPackageFilesSimple pkg cabalFP
+addUnlistedToBuildCache preBuildTime pkg cabalFP nonLibComponents buildCache = do
+    (files,warnings) <- getPackageFilesForTargets pkg cabalFP nonLibComponents
     let newFiles =
             Set.toList $
             Set.map toFilePath files `Set.difference` Map.keysSet buildCache
@@ -425,16 +414,21 @@ addUnlistedToBuildCache preBuildTime pkg cabalFP buildCache = do
                         return (Map.singleton fp newFci)
                     else return Map.empty
 
--- | Gets list of Paths for files in a package
-getPackageFilesSimple
+-- | Gets list of Paths for files relevant to a set of components in a package.
+--   Note that the library component, if any, is always automatically added to the
+--   set of components.
+getPackageFilesForTargets
     :: HasEnvConfig env
-    => Package -> Path Abs File -> RIO env (Set (Path Abs File), [PackageWarning])
-getPackageFilesSimple pkg cabalFP = do
-    (_,compFiles,cabalFiles,warnings) <-
+    => Package -> Path Abs File -> Set NamedComponent -> RIO env (Set (Path Abs File), [PackageWarning])
+getPackageFilesForTargets pkg cabalFP components = do
+    (_,compFiles,otherFiles,warnings) <-
         getPackageFiles (packageFiles pkg) cabalFP
-    return
-        ( Set.map dotCabalGetPath (mconcat (M.elems compFiles)) <> cabalFiles
-        , warnings)
+    let filesForComponent cn = Set.map dotCabalGetPath
+                             $ M.findWithDefault mempty cn compFiles
+        files = Set.unions
+                $ otherFiles
+                : map filesForComponent (Set.toList $ Set.insert CLib components)
+    return (files, warnings)
 
 -- | Get file modification time, if it exists.
 getModTimeMaybe :: MonadIO m => FilePath -> m (Maybe ModTime)
@@ -452,8 +446,8 @@ getModTimeMaybe fp =
 -- | Create FileCacheInfo for a file.
 calcFci :: MonadIO m => ModTime -> FilePath -> m FileCacheInfo
 calcFci modTime' fp = liftIO $
-    withBinaryFile fp ReadMode $ \h -> do
-        (size, digest) <- CB.sourceHandle h $$ getZipSink
+    withSourceFile fp $ \src -> do
+        (size, digest) <- runConduit $ src .| getZipSink
             ((,)
                 <$> ZipSink (CL.fold
                     (\x y -> x + fromIntegral (S.length y))

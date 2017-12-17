@@ -18,7 +18,6 @@ module Stack.BuildPlan
     , DepErrors
     , gpdPackageDeps
     , gpdPackages
-    , gpdPackageName
     , removeSrcPkgDefaultFlags
     , selectBestSnapshot
     , getToolMap
@@ -192,12 +191,6 @@ gpdPackages gpds = Map.fromList $
         fromCabalIdent (C.PackageIdentifier name version) =
             (fromCabalPackageName name, fromCabalVersion version)
 
-gpdPackageName :: GenericPackageDescription -> PackageName
-gpdPackageName = fromCabalPackageName
-    . C.pkgName
-    . C.package
-    . C.packageDescription
-
 gpdPackageDeps
     :: GenericPackageDescription
     -> CompilerVersion 'CVActual
@@ -205,7 +198,7 @@ gpdPackageDeps
     -> Map FlagName Bool
     -> Map PackageName VersionRange
 gpdPackageDeps gpd cv platform flags =
-    Map.filterWithKey (const . (/= name)) (packageDependencies pkgDesc)
+    Map.filterWithKey (const . (/= name)) (packageDependencies pkgConfig pkgDesc)
     where
         name = gpdPackageName gpd
         -- Since tests and benchmarks are both enabled, doesn't matter
@@ -400,8 +393,7 @@ checkSnapBuildPlan
     -> RIO env BuildPlanCheck
 checkSnapBuildPlan root gpds flags snapshotDef mactualCompiler = do
     platform <- view platformL
-    menv <- getMinimalEnvOverride
-    rs <- loadSnapshot menv mactualCompiler root snapshotDef
+    rs <- loadSnapshot mactualCompiler root snapshotDef
 
     let
         compiler = lsCompilerVersion rs

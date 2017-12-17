@@ -1,4 +1,4 @@
-resolver: lts-9.9
+resolver: lts-9.14
 # docker:
 #   enable: true
 #   repo: fpco/stack-full
@@ -18,7 +18,7 @@ flags:
   mintty:
     win32-2-5: false
 extra-deps:
-- Cabal-2.0.0.2
+- Cabal-2.0.1.0
 - mintty-0.1.1
 - bindings-uname-0.1
 - path-0.6.1
@@ -26,3 +26,6 @@ extra-deps:
 - extra-1.6
 - hsc2hs-0.68.2
 - hpack-0.20.0
+- unliftio-0.2.0.0
+- ansi-terminal-0.7.1.1
+- ansi-wl-pprint-0.6.8.1

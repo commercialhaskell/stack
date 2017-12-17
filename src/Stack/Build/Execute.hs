@@ -32,7 +32,7 @@ import qualified Data.ByteArray as Mem (convert)
 import qualified Data.ByteString as S
 import qualified Data.ByteString.Base64.URL as B64URL
 import           Data.Char (isSpace)
-import           Data.Conduit hiding (runConduitRes)
+import           Data.Conduit
 import qualified Data.Conduit.Binary as CB
 import qualified Data.Conduit.List as CL
 import qualified Data.Conduit.Text as CT
@@ -84,7 +84,7 @@ import qualified System.Directory as D
 import           System.Environment (getExecutablePath)
 import           System.Exit (ExitCode (ExitSuccess))
 import qualified System.FilePath as FP
-import           System.IO
+import           System.IO (hClose, hPutStr, hFlush, stderr, stdout)
 import           System.PosixCompat.Files (createLink)
 import           System.Process.Log (showProcessArgDebug, withProcessTimeLog)
 import           System.Process.Read
@@ -428,8 +428,8 @@ withExecuteEnv menv bopts boptsCli baseConfigOpts locals globalPackages snapshot
 
     dumpLogIfWarning :: (Path Abs Dir, Path Abs File) -> RIO env ()
     dumpLogIfWarning (pkgDir, filepath) = do
-      firstWarning <- runResourceT
-          $ transPipe liftResourceT (CB.sourceFile (toFilePath filepath))
+      firstWarning <- withSourceFile (toFilePath filepath) $ \src ->
+            src
          $$ CT.decodeUtf8Lenient
          =$ CT.lines
          =$ CL.map stripCR
@@ -445,8 +445,8 @@ withExecuteEnv menv bopts boptsCli baseConfigOpts locals globalPackages snapshot
     dumpLog msgSuffix (pkgDir, filepath) = do
         logInfo $ T.pack $ concat ["\n--  Dumping log file", msgSuffix, ": ", toFilePath filepath, "\n"]
         compilerVer <- view actualCompilerVersionL
-        runResourceT
-            $ transPipe liftResourceT (CB.sourceFile (toFilePath filepath))
+        withSourceFile (toFilePath filepath) $ \src ->
+              src
            $$ CT.decodeUtf8Lenient
            =$ mungeBuildOutput ExcludeTHLoading ConvertPathsToAbsolute pkgDir compilerVer
            =$ CL.mapM_ logInfo
@@ -455,11 +455,12 @@ withExecuteEnv menv bopts boptsCli baseConfigOpts locals globalPackages snapshot
     stripColors :: Path Abs File -> IO ()
     stripColors fp = do
       let colorfp = toFilePath fp ++ "-color"
-      runConduitRes $ CB.sourceFile (toFilePath fp) .| CB.sinkFile colorfp
-      runConduitRes
-        $ CB.sourceFile colorfp
-       .| noColors
-       .| CB.sinkFile (toFilePath fp)
+      withSourceFile (toFilePath fp) $ \src ->
+        withSinkFile colorfp $ \sink ->
+        runConduit $ src .| sink
+      withSourceFile colorfp $ \src ->
+        withSinkFile (toFilePath fp) $ \sink ->
+        runConduit $ src .| noColors .| sink
 
       where
         noColors = do
@@ -499,6 +500,7 @@ executePlan menv boptsCli baseConfigOpts locals globalPackages snapshotPackages 
                     , esIncludeGhcPackagePath = True
                     , esStackExe = True
                     , esLocaleUtf8 = False
+                    , esKeepGhcRts = False
                     }
     forM_ (boptsCLIExec boptsCli) $ \(cmd, args) ->
         withProcessTimeLog cmd args $
@@ -934,10 +936,7 @@ withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} md
                     liftIO $ atomically $ writeTChan eeLogFiles (pkgDir, logPath)
                 _ -> return ()
 
-            bracket
-                (liftIO $ openBinaryFile fp WriteMode)
-                (liftIO . hClose)
-                $ \h -> inner (Just (logPath, h))
+            withBinaryFile fp WriteMode $ \h -> inner (Just (logPath, h))
 
     withCabal
         :: Package
@@ -956,6 +955,7 @@ withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} md
                 , esIncludeGhcPackagePath = False
                 , esStackExe = False
                 , esLocaleUtf8 = True
+                , esKeepGhcRts = False
                 }
         menv <- liftIO $ configEnvOverride config envSettings
         distRelativeDir' <- distRelativeDir
@@ -1092,11 +1092,12 @@ withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} md
                                 Nothing -> return []
                                 Just (logFile, h) -> do
                                     liftIO $ hClose h
-                                    runResourceT
-                                        $ transPipe liftResourceT (CB.sourceFile (toFilePath logFile))
-                                        =$= CT.decodeUtf8Lenient
-                                        $$ mungeBuildOutput stripTHLoading makeAbsolute pkgDir compilerVer
-                                        =$ CL.consume
+                                    withSourceFile (toFilePath logFile) $ \src ->
+                                           runConduit
+                                         $ src
+                                        .| CT.decodeUtf8Lenient
+                                        .| mungeBuildOutput stripTHLoading makeAbsolute pkgDir compilerVer
+                                        .| CL.consume
                         throwM $ SetupHsBuildFailure
                             ec
                             (Just taskProvides)
@@ -1563,6 +1564,7 @@ checkForUnlistedFiles (TTFiles lp _) preBuildTime pkgDir = do
             preBuildTime
             (lpPackage lp)
             (lpCabalFile lp)
+            (lpComponents lp)
             (lpNewBuildCache lp)
     unless (null addBuildCache) $
         writeBuildCache pkgDir $
@@ -1645,6 +1647,7 @@ singleTest runInBase topts testsToRun ac ee task installedMap = do
                     , esIncludeGhcPackagePath = True
                     , esStackExe = True
                     , esLocaleUtf8 = False
+                    , esKeepGhcRts = False
                     }
                 if exists
                     then do
@@ -1762,7 +1765,7 @@ data ExcludeTHLoading = ExcludeTHLoading | KeepTHLoading
 data ConvertPathsToAbsolute = ConvertPathsToAbsolute | KeepPathsAsIs
 
 -- | Strip Template Haskell "Loading package" lines and making paths absolute.
-mungeBuildOutput :: forall m. (MonadUnliftIO m, MonadThrow m)
+mungeBuildOutput :: forall m. MonadIO m
                  => ExcludeTHLoading       -- ^ exclude TH loading?
                  -> ConvertPathsToAbsolute -- ^ convert paths to absolute?
                  -> Path Abs Dir           -- ^ package's root directory

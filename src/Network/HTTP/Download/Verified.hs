@@ -37,7 +37,7 @@ import              Data.ByteArray as Mem (convert)
 import              Data.ByteArray.Encoding as Mem (convertToBase, Base(Base16))
 import              Data.ByteString.Char8 (readInteger)
 import              Data.Conduit
-import              Data.Conduit.Binary (sourceHandle, sinkHandle)
+import              Data.Conduit.Binary (sourceHandle)
 import              Data.Text.Encoding (decodeUtf8With)
 import              Data.Text.Encoding.Error (lenientDecode)
 import              GHC.IO.Exception (IOException(..),IOErrorType(..))
@@ -245,9 +245,8 @@ verifiedDownload DownloadRequest{..} destpath progressSink = do
     whenM' (liftIO getShouldDownload) $ do
         logDebug $ "Downloading " <> decodeUtf8With lenientDecode (path req)
         liftIO $ createDirectoryIfMissing True dir
-        recoveringHttp drRetryPolicy $ liftIO $ 
-            withBinaryFile fptmp WriteMode $ \h ->
-                httpSink req (go h)
+        recoveringHttp drRetryPolicy $ liftIO $
+            withSinkFile fptmp $ httpSink req . go
         liftIO $ renameFile fptmp fp
   where
     whenM' mp m = do
@@ -294,7 +293,7 @@ verifiedDownload DownloadRequest{..} destpath progressSink = do
                 throwM $ WrongContentLength drRequest expectedContentLength lengthBS
             _ -> return ()
 
-    go h res = do
+    go sink res = do
         let headers = getResponseHeaders res
             mcontentLength = do
               hLength <- List.lookup hContentLength headers
@@ -315,5 +314,5 @@ verifiedDownload DownloadRequest{..} destpath progressSink = do
             $ getZipSink
                 ( hashChecksToZipSink drRequest hashChecks
                   *> maybe (pure ()) (assertLengthSink drRequest) drLengthCheck
-                  *> ZipSink (sinkHandle h)
+                  *> ZipSink sink
                   *> ZipSink (progressSink mcontentLength))

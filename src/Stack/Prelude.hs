@@ -3,7 +3,11 @@
 {-# LANGUAGE OverloadedStrings          #-}
 module Stack.Prelude
   ( mapLeft
-  , runConduitRes
+  , withSourceFile
+  , withSinkFile
+  , withSinkFileCautious
+  , withLazyFile
+  , NoLogging (..)
   , withSystemTempDir
   , fromFirst
   , mapMaybeA
@@ -107,6 +111,14 @@ import           UnliftIO             as X
 import qualified Data.Text            as T
 import qualified Path.IO
 
+import           Data.Conduit.Binary (sourceHandle, sinkHandle)
+import qualified Data.ByteString.Lazy as BL
+
+import qualified System.IO as IO
+import qualified System.Directory as Dir
+import qualified System.FilePath as FP
+import           System.IO.Error (isDoesNotExistError)
+
 mapLeft :: (a1 -> a2) -> Either a1 b -> Either a2 b
 mapLeft f (Left a1) = Left (f a1)
 mapLeft _ (Right b) = Right b
@@ -134,8 +146,51 @@ forMaybeM = flip mapMaybeM
 stripCR :: T.Text -> T.Text
 stripCR t = fromMaybe t (T.stripSuffix "\r" t)
 
-runConduitRes :: MonadUnliftIO m => ConduitM () Void (ResourceT m) r -> m r
-runConduitRes = runResourceT . runConduit
+-- | Get a source for a file. Unlike @sourceFile@, doesn't require
+-- @ResourceT@. Unlike explicit @withBinaryFile@ and @sourceHandle@
+-- usage, you can't accidentally use @WriteMode@ instead of
+-- @ReadMode@.
+withSourceFile :: MonadUnliftIO m => FilePath -> (ConduitM i ByteString m () -> m a) -> m a
+withSourceFile fp inner = withBinaryFile fp ReadMode $ inner . sourceHandle
+
+-- | Same idea as 'withSourceFile', see comments there.
+withSinkFile :: MonadUnliftIO m => FilePath -> (ConduitM ByteString o m () -> m a) -> m a
+withSinkFile fp inner = withBinaryFile fp WriteMode $ inner . sinkHandle
+
+-- | Like 'withSinkFile', but ensures that the file is atomically
+-- moved after all contents are written.
+withSinkFileCautious
+  :: MonadUnliftIO m
+  => FilePath
+  -> (ConduitM ByteString o m () -> m a)
+  -> m a
+withSinkFileCautious fp inner =
+    withRunInIO $ \run -> bracket acquire cleanup $ \(tmpFP, h) ->
+      run (inner $ sinkHandle h) <* (IO.hClose h *> Dir.renameFile tmpFP fp)
+  where
+    acquire = IO.openBinaryTempFile (FP.takeDirectory fp) (FP.takeFileName fp FP.<.> "tmp")
+    cleanup (tmpFP, h) = do
+        IO.hClose h
+        Dir.removeFile tmpFP `catch` \e ->
+            if isDoesNotExistError e
+                then return ()
+                else throwIO e
+
+-- | Lazily get the contents of a file. Unlike 'BL.readFile', this
+-- ensures that if an exception is thrown, the file handle is closed
+-- immediately.
+withLazyFile :: MonadUnliftIO m => FilePath -> (BL.ByteString -> m a) -> m a
+withLazyFile fp inner = withBinaryFile fp ReadMode $ inner <=< liftIO . BL.hGetContents
+
+-- | Avoid orphan messes
+newtype NoLogging a = NoLogging { runNoLogging :: IO a }
+  deriving (Functor, Applicative, Monad, MonadIO)
+instance MonadUnliftIO NoLogging where
+  askUnliftIO = NoLogging $
+                withUnliftIO $ \u ->
+                return (UnliftIO (unliftIO u . runNoLogging))
+instance MonadLogger NoLogging where
+  monadLoggerLog _ _ _ _ = return ()
 
 -- | Path version
 withSystemTempDir :: MonadUnliftIO m => String -> (Path Abs Dir -> m a) -> m a

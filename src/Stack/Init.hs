@@ -19,7 +19,8 @@ import           Data.List                       (intercalate, intersect,
                                                   maximumBy)
 import           Data.List.NonEmpty              (NonEmpty (..))
 import qualified Data.List.NonEmpty              as NonEmpty
-import qualified Data.Map                        as Map
+import qualified Data.Map.Strict                 as Map
+import qualified Data.Set                        as Set
 import qualified Data.Text                       as T
 import qualified Data.Yaml                       as Yaml
 import qualified Distribution.PackageDescription as C
@@ -68,11 +69,11 @@ initProject whichCmd currDir initOpts mresolver = do
     dirs <- mapM (resolveDir' . T.unpack) (searchDirs initOpts)
     let noPkgMsg =  "In order to init, you should have an existing .cabal \
                     \file. Please try \"stack new\" instead."
-        find  = findCabalFiles (includeSubDirs initOpts)
+        find  = findCabalDirs (includeSubDirs initOpts)
         dirs' = if null dirs then [currDir] else dirs
     logInfo "Looking for .cabal or package.yaml files to use to init the project."
-    cabalfps <- liftM concat $ mapM find dirs'
-    (bundle, dupPkgs)  <- cabalPackagesCheck cabalfps noPkgMsg Nothing
+    cabaldirs <- (Set.toList . Set.unions) <$> mapM find dirs'
+    (bundle, dupPkgs)  <- cabalPackagesCheck cabaldirs noPkgMsg Nothing
 
     (sd, flags, extraDeps, rbundle) <- getDefaultResolver whichCmd dest initOpts
                                                           mresolver bundle
@@ -490,8 +491,7 @@ checkBundleResolver whichCmd stackYaml initOpts bundle sd = do
       -- set of packages.
       findOneIndependent packages flags = do
           platform <- view platformL
-          menv <- getMinimalEnvOverride
-          (compiler, _) <- getResolverConstraints menv Nothing stackYaml sd
+          (compiler, _) <- getResolverConstraints Nothing stackYaml sd
           let getGpd pkg = snd (fromMaybe (error "findOneIndependent: getGpd") (Map.lookup pkg bundle))
               getFlags pkg = fromMaybe (error "fromOneIndependent: getFlags") (Map.lookup pkg flags)
               deps pkg = gpdPackageDeps (getGpd pkg) compiler platform

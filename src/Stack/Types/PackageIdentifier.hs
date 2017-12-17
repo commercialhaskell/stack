@@ -94,7 +94,7 @@ instance FromJSON PackageIdentifier where
 data PackageIdentifierRevision = PackageIdentifierRevision
   { pirIdent :: !PackageIdentifier
   , pirRevision :: !CabalFileInfo
-  } deriving (Eq,Generic,Data,Typeable)
+  } deriving (Eq,Ord,Generic,Data,Typeable)
 
 instance NFData PackageIdentifierRevision where
   rnf (PackageIdentifierRevision !i !c) =
@@ -189,7 +189,7 @@ data CabalFileInfo
   | CFIRevision !Word
   -- ^ Identify by revision number, with 0 being the original and
   -- counting upward.
-    deriving (Generic, Show, Eq, Data, Typeable)
+    deriving (Generic, Show, Eq, Ord, Data, Typeable)
 instance Store CabalFileInfo
 instance NFData CabalFileInfo
 instance Hashable CabalFileInfo

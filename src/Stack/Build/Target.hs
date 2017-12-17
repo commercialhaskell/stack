@@ -80,7 +80,6 @@ import           Path.Extra (rejectMissingDir)
 import           Path.IO
 import           Stack.Config (getLocalPackages)
 import           Stack.Fetch (withCabalLoader)
-import           Stack.Package
 import           Stack.PackageIndex
 import           Stack.PackageLocation
 import           Stack.Snapshot (calculatePackagePromotion)
@@ -493,7 +492,6 @@ parseTargets needTargets boptscli = do
           ["The specified targets matched no packages"]
 
   root <- view projectRootL
-  menv <- getMinimalEnvOverride
 
   let dropMaybeKey (Nothing, _) = Map.empty
       dropMaybeKey (Just key, value) = Map.singleton key value
@@ -513,10 +511,8 @@ parseTargets needTargets boptscli = do
 
   (globals', snapshots, locals') <- withCabalLoader $ \loadFromIndex -> do
     addedDeps' <- fmap Map.fromList $ forM (Map.toList addedDeps) $ \(name, loc) -> do
-      bs <- loadSingleRawCabalFile loadFromIndex menv root loc
-      case rawParseGPD bs of
-        Left e -> throwIO $ InvalidCabalFileInLocal loc e bs
-        Right (_warnings, gpd) -> return (name, (gpd, loc, Nothing))
+      gpd <- parseSingleCabalFileIndex loadFromIndex root loc
+      return (name, (gpd, loc, Nothing))
 
     -- Calculate a list of all of the locals, based on the project
     -- packages, local dependencies, and added deps found from the
@@ -536,7 +532,7 @@ parseTargets needTargets boptscli = do
           ]
 
     calculatePackagePromotion
-      loadFromIndex menv root ls0 (Map.elems allLocals)
+      loadFromIndex root ls0 (Map.elems allLocals)
       flags hides options drops
 
   let ls = LoadedSnapshot

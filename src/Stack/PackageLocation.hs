@@ -4,15 +4,17 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TupleSections #-}
 
 -- | Deal with downloading, cloning, or whatever else is necessary for
 -- getting a 'PackageLocation' into something Stack can work with.
 module Stack.PackageLocation
   ( resolveSinglePackageLocation
   , resolveMultiPackageLocation
-  , loadSingleRawCabalFile
-  , loadMultiRawCabalFiles
-  , loadMultiRawCabalFilesIndex
+  , parseSingleCabalFile
+  , parseSingleCabalFileIndex
+  , parseMultiCabalFiles
+  , parseMultiCabalFilesIndex
   ) where
 
 import qualified Codec.Archive.Tar as Tar
@@ -26,6 +28,7 @@ import qualified Data.ByteString.Base64.URL as B64URL
 import qualified Data.ByteString.Lazy as L
 import qualified Data.Text as T
 import Data.Text.Encoding (encodeUtf8, decodeUtf8)
+import Distribution.PackageDescription (GenericPackageDescription)
 import Network.HTTP.Client (parseUrlThrow)
 import Network.HTTP.Download.Verified
 import Path
@@ -43,12 +46,11 @@ import System.Process.Run
 -- 'SinglePackageLocation'.
 resolveSinglePackageLocation
     :: HasConfig env
-    => EnvOverride
-    -> Path Abs Dir -- ^ project root
+    => Path Abs Dir -- ^ project root
     -> PackageLocation FilePath
     -> RIO env (Path Abs Dir)
-resolveSinglePackageLocation _ projRoot (PLFilePath fp) = resolveDir projRoot fp
-resolveSinglePackageLocation _ projRoot (PLArchive (Archive url subdir msha)) = do
+resolveSinglePackageLocation projRoot (PLFilePath fp) = resolveDir projRoot fp
+resolveSinglePackageLocation projRoot (PLArchive (Archive url subdir msha)) = do
     workDir <- view workDirL
 
         -- TODO: dedupe with code for snapshot hash?
@@ -109,10 +111,8 @@ resolveSinglePackageLocation _ projRoot (PLArchive (Archive url subdir msha)) = 
 
         let tryTar = do
                 logDebug $ "Trying to untar " <> T.pack fp
-                liftIO $ withBinaryFile fp ReadMode $ \h -> do
-                    lbs <- L.hGetContents h
-                    let entries = Tar.read $ GZip.decompress lbs
-                    Tar.unpack (toFilePath dirTmp) entries
+                liftIO $ withLazyFile fp $
+                    Tar.unpack (toFilePath dirTmp) . Tar.read . GZip.decompress
             tryZip = do
                 logDebug $ "Trying to unzip " <> T.pack fp
                 archive <- fmap Zip.toArchive $ liftIO $ L.readFile fp
@@ -135,8 +135,8 @@ resolveSinglePackageLocation _ projRoot (PLArchive (Archive url subdir msha)) = 
             ignoringAbsence (removeFile fileDownload)
             ignoringAbsence (removeDirRecur dir)
             throwIO $ UnexpectedArchiveContents dirs files
-resolveSinglePackageLocation menv projRoot (PLRepo (Repo url commit repoType' subdir)) =
-    cloneRepo menv projRoot url commit repoType' >>= flip resolveDir subdir
+resolveSinglePackageLocation projRoot (PLRepo (Repo url commit repoType' subdir)) =
+    cloneRepo projRoot url commit repoType' >>= flip resolveDir subdir
 
 -- | Resolve a PackageLocation into a path, downloading and cloning as
 -- necessary.
@@ -145,15 +145,14 @@ resolveSinglePackageLocation menv projRoot (PLRepo (Repo url commit repoType' su
 -- (if relevant).
 resolveMultiPackageLocation
     :: HasConfig env
-    => EnvOverride
-    -> Path Abs Dir -- ^ project root
+    => Path Abs Dir -- ^ project root
     -> PackageLocation Subdirs
     -> RIO env [(Path Abs Dir, PackageLocation FilePath)]
-resolveMultiPackageLocation x y (PLFilePath fp) = do
-  dir <- resolveSinglePackageLocation x y (PLFilePath fp)
+resolveMultiPackageLocation y (PLFilePath fp) = do
+  dir <- resolveSinglePackageLocation y (PLFilePath fp)
   return [(dir, PLFilePath fp)]
-resolveMultiPackageLocation x y (PLArchive (Archive url subdirs msha)) = do
-  dir <- resolveSinglePackageLocation x y (PLArchive (Archive url "." msha))
+resolveMultiPackageLocation y (PLArchive (Archive url subdirs msha)) = do
+  dir <- resolveSinglePackageLocation y (PLArchive (Archive url "." msha))
   let subdirs' =
         case subdirs of
           DefaultSubdirs -> ["."]
@@ -161,8 +160,8 @@ resolveMultiPackageLocation x y (PLArchive (Archive url subdirs msha)) = do
   forM subdirs' $ \subdir -> do
     dir' <- resolveDir dir subdir
     return (dir', PLArchive (Archive url subdir msha))
-resolveMultiPackageLocation menv projRoot (PLRepo (Repo url commit repoType' subdirs)) = do
-  dir <- cloneRepo menv projRoot url commit repoType'
+resolveMultiPackageLocation projRoot (PLRepo (Repo url commit repoType' subdirs)) = do
+  dir <- cloneRepo projRoot url commit repoType'
 
   let subdirs' =
         case subdirs of
@@ -174,13 +173,12 @@ resolveMultiPackageLocation menv projRoot (PLRepo (Repo url commit repoType' sub
 
 cloneRepo
     :: HasConfig env
-    => EnvOverride
-    -> Path Abs Dir -- ^ project root
+    => Path Abs Dir -- ^ project root
     -> Text -- ^ URL
     -> Text -- ^ commit
     -> RepoType
     -> RIO env (Path Abs Dir)
-cloneRepo menv projRoot url commit repoType' = do
+cloneRepo projRoot url commit repoType' = do
     workDir <- view workDirL
     let nameBeforeHashing = case repoType' of
             RepoGit -> T.unwords [url, commit]
@@ -195,6 +193,7 @@ cloneRepo menv projRoot url commit repoType' = do
     exists <- doesDirExist dir
     unless exists $ do
         liftIO $ ignoringAbsence (removeDirRecur dir)
+        menv <- getMinimalEnvOverride
 
         let cloneAndExtract commandName cloneArgs resetCommand = do
                 ensureDir root
@@ -226,58 +225,63 @@ cloneRepo menv projRoot url commit repoType' = do
 
     return dir
 
--- | Load the raw bytes in the cabal files present in the given
--- 'SinglePackageLocation'.
-loadSingleRawCabalFile
+-- | Parse the cabal files present in the given
+-- 'PackageLocationIndex FilePath'.
+parseSingleCabalFileIndex
   :: forall env.
      HasConfig env
   => (PackageIdentifierRevision -> IO ByteString) -- ^ lookup in index
-  -> EnvOverride
   -> Path Abs Dir -- ^ project root, used for checking out necessary files
   -> PackageLocationIndex FilePath
-  -> RIO env ByteString
+  -> RIO env GenericPackageDescription
 -- Need special handling of PLIndex for efficiency (just read from the
 -- index tarball) and correctness (get the cabal file from the index,
 -- not the package tarball itself, yay Hackage revisions).
-loadSingleRawCabalFile loadFromIndex _ _ (PLIndex pir) = liftIO $ loadFromIndex pir
-loadSingleRawCabalFile _ menv root (PLOther loc) =
-  resolveSinglePackageLocation menv root loc >>=
-  findOrGenerateCabalFile >>=
-  liftIO . S.readFile . toFilePath
+parseSingleCabalFileIndex loadFromIndex _ (PLIndex pir) = readPackageUnresolvedIndex loadFromIndex pir
+parseSingleCabalFileIndex _ root (PLOther loc) = lpvGPD <$> parseSingleCabalFile root False loc
 
--- | Same as 'loadMultiRawCabalFiles' but for 'PackageLocationIndex'.
-loadMultiRawCabalFilesIndex
-  :: forall env.
-     HasConfig env
-  => (PackageIdentifierRevision -> IO ByteString) -- ^ lookup in index
-  -> EnvOverride
+parseSingleCabalFile
+  :: forall env. HasConfig env
+  => Path Abs Dir -- ^ project root, used for checking out necessary files
+  -> Bool -- ^ print warnings?
+  -> PackageLocation FilePath
+  -> RIO env LocalPackageView
+parseSingleCabalFile root printWarnings loc = do
+  dir <- resolveSinglePackageLocation root loc
+  (gpd, cabalfp) <- readPackageUnresolvedDir dir printWarnings
+  return LocalPackageView
+    { lpvCabalFP = cabalfp
+    , lpvGPD = gpd
+    , lpvLoc = loc
+    }
+
+-- | Load and parse cabal files into 'GenericPackageDescription's
+parseMultiCabalFiles
+  :: forall env. HasConfig env
+  => Path Abs Dir -- ^ project root, used for checking out necessary files
+  -> Bool -- ^ print warnings?
+  -> PackageLocation Subdirs
+  -> RIO env [LocalPackageView]
+parseMultiCabalFiles root printWarnings loc0 =
+  resolveMultiPackageLocation root loc0 >>=
+  mapM (\(dir, loc1) -> do
+    (gpd, cabalfp) <- readPackageUnresolvedDir dir printWarnings
+    return LocalPackageView
+      { lpvCabalFP = cabalfp
+      , lpvGPD = gpd
+      , lpvLoc = loc1
+      })
+
+-- | 'parseMultiCabalFiles' but supports 'PLIndex'
+parseMultiCabalFilesIndex
+  :: forall env. HasConfig env
+  => (PackageIdentifierRevision -> IO ByteString)
   -> Path Abs Dir -- ^ project root, used for checking out necessary files
   -> PackageLocationIndex Subdirs
-  -> RIO env [(ByteString, PackageLocationIndex FilePath)]
--- Need special handling of PLIndex for efficiency (just read from the
--- index tarball) and correctness (get the cabal file from the index,
--- not the package tarball itself, yay Hackage revisions).
-loadMultiRawCabalFilesIndex loadFromIndex _ _ (PLIndex pir) = do
-  bs <- liftIO $ loadFromIndex pir
-  return [(bs, PLIndex pir)]
-loadMultiRawCabalFilesIndex _ x y (PLOther z) =
-  map (second PLOther) <$> loadMultiRawCabalFiles x y z
-
--- | Same as 'loadSingleRawCabalFile', but for 'PackageLocation' There
--- may be multiple results if dealing with a repository with subdirs,
--- in which case the returned 'PackageLocation' will have just the
--- relevant subdirectory selected.
-loadMultiRawCabalFiles
-  :: forall env.
-     HasConfig env
-  => EnvOverride
-  -> Path Abs Dir -- ^ project root, used for checking out necessary files
-  -> PackageLocation Subdirs
-  -> RIO env [(ByteString, PackageLocation FilePath)]
-loadMultiRawCabalFiles menv root loc =
-    resolveMultiPackageLocation menv root loc >>= mapM go
-  where
-    go (dir, loc') = do
-      cabalFile <- findOrGenerateCabalFile dir
-      bs <- liftIO $ S.readFile $ toFilePath cabalFile
-      return (bs, loc')
+  -> RIO env [(GenericPackageDescription, PackageLocationIndex FilePath)]
+parseMultiCabalFilesIndex loadFromIndex _root (PLIndex pir) =
+  (pure . (, PLIndex pir)) <$>
+  readPackageUnresolvedIndex loadFromIndex pir
+parseMultiCabalFilesIndex _ root (PLOther loc0) =
+  map (\lpv -> (lpvGPD lpv, PLOther $ lpvLoc lpv)) <$>
+  parseMultiCabalFiles root False loc0
