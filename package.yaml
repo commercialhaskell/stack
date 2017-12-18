@@ -182,6 +182,7 @@ library:
   - Stack.IDE
   - Stack.Image
   - Stack.Init
+  - Stack.Ls
   - Stack.New
   - Stack.Nix
   - Stack.Options.BenchParser

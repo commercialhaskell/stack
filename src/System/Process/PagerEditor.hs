@@ -7,6 +7,7 @@ module System.Process.PagerEditor
   (-- * Pager
    pageWriter
   ,pageByteString
+  ,pageText
   ,pageBuilder
   ,pageFile
   ,pageString
@@ -29,6 +30,7 @@ import System.FilePath ((</>))
 import System.Process (createProcess,shell,proc,waitForProcess,StdStream (CreatePipe)
                       ,CreateProcess(std_in, close_fds, delegate_ctlc))
 import System.IO (hClose,hPutStr,readFile,stdout)
+import qualified Data.Text.IO as T
 
 -- | Run pager, providing a function that writes to the pager's input.
 pageWriter :: (Handle -> IO ()) -> IO ()
@@ -54,6 +56,10 @@ pageWriter writer =
 -- | Run pager to display a lazy ByteString.
 pageByteString :: ByteString -> IO ()
 pageByteString = pageWriter . flip hPut
+
+-- | Run pager to display a 'Text'
+pageText :: Text -> IO ()
+pageText = pageWriter . flip T.hPutStr
 
 -- | Run pager to display a ByteString-Builder.
 pageBuilder :: Builder -> IO ()
