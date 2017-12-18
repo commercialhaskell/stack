@@ -13,8 +13,6 @@ Other enhancements:
 * A new sub command `ls` has been introduced to stack to view
   local and remote snapshots present in the system. Use `stack ls
   snapshots --help` to get more details about it.
-* `pageText` function introduced in `System.Process.PagerEditor`
-   module.
 
 Bug fixes:
 
