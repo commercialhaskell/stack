@@ -67,10 +67,6 @@ install:
    set -ex
    case "$BUILD" in
      style)
-       # This should be resolved (and removed) by Stack 1.6
-       # Follows from https://github.com/commercialhaskell/stack/issues/3178
-       stack --system-ghc --no-terminal install happy
-
        stack --system-ghc --no-terminal install hlint
        ;;
      stack)
