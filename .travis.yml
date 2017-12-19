@@ -36,9 +36,8 @@ matrix:
       compiler: ": #stack 8.0.2 osx"
       os: osx
 
-    - env: BUILD=style GHCVER=8.0.2 STACK_YAML=stack.yaml
+    - env: BUILD=style
       compiler: ": #stack 8.0.2"
-      addons: {apt: {packages: [ghc-8.0.2], sources: [hvr-ghc]}}
 
   allow_failures:
     - env: BUILD=stack GHCVER=8.0.2 STACK_YAML=stack.yaml
@@ -52,7 +51,7 @@ before_install:
  - unset CC
  - case "$BUILD" in
      style)
-       export PATH=$HOME/.local/bin:/opt/ghc/$GHCVER/bin:$PATH;;
+       export PATH="$TRAVIS_BUILD_DIR"/hlint:$PATH;;
      stack)
        export PATH=$HOME/.local/bin:/opt/ghc/$GHCVER/bin:$PATH;;
      cabal)
@@ -61,13 +60,13 @@ before_install:
  - ./.travis-setup.sh
 
 install:
- - echo "$(ghc --version) [$(ghc --print-project-git-commit-id 2> /dev/null || echo '?')]"
+ - if ! [ "$BUILD" = style ]; then echo "$(ghc --version) [$(ghc --print-project-git-commit-id 2> /dev/null || echo '?')]"; fi
  # Note: we build store by itself below due to high memory usage
  - |
    set -ex
    case "$BUILD" in
      style)
-       stack --system-ghc --no-terminal install hlint
+       ./etc/scripts/get-hlint.sh
        ;;
      stack)
        stack --no-terminal build store
