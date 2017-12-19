@@ -6,6 +6,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE CPP #-}
 module Stack.StoreSpec where
 
 import qualified Data.ByteString as BS
@@ -51,7 +52,11 @@ addMinAndMaxBounds xs =
     (if (minBound :: a) `notElem` xs then [minBound] else []) ++
     (if (maxBound :: a) `notElem` xs && (maxBound :: a) /= minBound then maxBound : xs else xs)
 
+#if MIN_VERSION_smallcheck(1,1,3)
+$(do let ns = [ ''Int64, ''Word64, ''Word8
+#else
 $(do let ns = [ ''Int64, ''Word64, ''Word, ''Word8
+#endif
               ]
          f n = [d| instance Monad m => Serial m $(conT n) where
                       series = generate (\_ -> addMinAndMaxBounds [0, 1]) |]
