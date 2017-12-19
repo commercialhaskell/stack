@@ -107,7 +107,7 @@ compiler-check: match-exact
 
 ### Custom installed GHCJS
 
-In order to use a GHCJS installed to your PATH, just add the following to your `stack.yaml`:
+In order to use a GHCJS installed on your PATH, just add the following to your `stack.yaml`:
 
 ```yaml
 compiler: ghcjs-0.2.0_ghc-7.10.2
