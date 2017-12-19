@@ -568,8 +568,12 @@ interpreterHandler currentDir args f = do
       progName <- getProgName
       iargs <- getInterpreterArgs path
       let parseCmdLine = commandLineHandler currentDir progName True
-          separator = if "--" `elem` iargs then [] else ["--"]
-          cmdArgs = stackArgs ++ iargs ++ separator ++ path : fileArgs
+          -- Implicit file arguments are put before other arguments that
+          -- occur after "--". See #3658
+          cmdArgs = stackArgs ++ case break (== "--") iargs of
+            (beforeSep, []) -> beforeSep ++ ["--"] ++ [path] ++ fileArgs
+            (beforeSep, optSep : afterSep) ->
+              beforeSep ++ [optSep] ++ [path] ++ fileArgs ++ afterSep
        -- TODO show the command in verbose mode
        -- hPutStrLn stderr $ unwords $
        --   ["Running", "[" ++ progName, unwords cmdArgs ++ "]"]
