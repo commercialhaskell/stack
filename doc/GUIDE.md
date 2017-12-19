@@ -58,16 +58,12 @@ The rest of this session will demonstrate the installation procedure on a
 vanilla Ubuntu 14.04 machine.
 
 ```
-# Starting with a *really* bare machine
 michael@d30748af6d3d:~$ sudo apt-get install wget
-# Demonstrate that stack really isn't available
-michael@d30748af6d3d:~$ stack
--bash: stack: command not found
-# Install stack
-wget -qO- https://get.haskellstack.org/ | sh
-# downloading...
-michael@d30748af6d3d:~$ stack --version
-Version 0.1.3.1, Git revision 908b04205e6f436d4a5f420b1c6c646ed2b804d7
+# installing ...
+michael@d30748af6d3d:~$ wget -qO- https://get.haskellstack.org/ | sh
+# downloading ...
+michael@d30748af6d3d:~$ stack --help
+# help output ...
 ```
 
 With stack now up and running, you're good to go. Though not required, we
@@ -89,8 +85,8 @@ will contain a Haskell *package* of the same name. So let's pick a valid
 package name first:
 
 > A package is identified by a globally-unique package name, which consists
-of one or more alphanumeric words separated by hyphens. To avoid ambiguity,
-each of these words should contain at least one letter.
+> of one or more alphanumeric words separated by hyphens. To avoid ambiguity,
+> each of these words should contain at least one letter.
 
 (From the [Cabal users guide](https://www.haskell.org/cabal/users-guide/developing-packages.html#developing-packages))
 
@@ -103,94 +99,33 @@ michael@d30748af6d3d:~$ stack new helloworld new-template
 
 For this first stack command, there's quite a bit of initial setup it needs to
 do (such as downloading the list of packages available upstream), so you'll see
-a lot of output. Though your exact results may vary, below is an example of the
-sort of output you will see. Over the course of this guide a lot of the content
-will begin to make more sense:
+a lot of output. Over the course of this guide a lot of the content will begin
+to make more sense.
 
-```
-Downloading template "new-template" to create project "helloworld" in helloworld/ ...
-Using the following authorship configuration:
-author-email: example@example.com
-author-name: Example Author Name
-Copy these to /home/michael/.stack/config.yaml and edit to use different values.
-Writing default config file to: /home/michael/helloworld/stack.yaml
-Basing on cabal files:
-- /home/michael/helloworld/helloworld.cabal
-
-Downloaded lts-3.2 build plan.
-Caching build plan
-Fetched package index.
-Populated index cache.
-Checking against build plan lts-3.2
-Selected resolver: lts-3.2
-Wrote project config to: /home/michael/helloworld/stack.yaml
-```
 We now have a project in the `helloworld` directory!
-
-### stack setup
-
-Instead of assuming you want stack to download and install
-GHC for you, it asks you to do this as a separate command:
-`setup`. If we don't run `stack setup` now, we'll later see a
-message that we are missing the right GHC version.
-
-Let's run stack setup:
-
-```
-michael@d30748af6d3d:~/helloworld$ stack setup
-Downloaded ghc-7.10.2.
-Installed GHC.
-stack will use a sandboxed GHC it installed
-For more information on paths, see 'stack path' and 'stack exec env'
-To use this GHC and packages outside of a project, consider using:
-stack ghc, stack ghci, stack runghc, or stack exec
-```
-
-It doesn't come through in the output here, but you'll get intermediate
-download percentage statistics while the download is occurring. This command
-may take some time, depending on download speeds.
-
-__NOTE__: GHC will be installed to your global stack root directory, so
-calling `ghc` on the command line won't work. See the `stack exec`,
-`stack ghc`, and `stack runghc` commands below for more information.
 
 ### stack build
 
 Next, we'll run the most important stack command: `stack build`.
 
-__NOTE__: If you forgot to run `stack setup` in the previous step you'll get an
-error:
-
 ```
-michael@d30748af6d3d:~$ cd helloworld/
+michael@d30748af6d3d:~$ cd helloworld
 michael@d30748af6d3d:~/helloworld$ stack build
-No GHC found, expected version 7.10.2 (x86_64) (based on resolver setting in /home/michael/helloworld/stack.yaml).
-Try running stack setup
+# installing ... building ...
 ```
 
-stack needs GHC in order to build your project, and `stack setup` must be run to
-check whether GHC is available (and install it if not).
+stack needs a GHC in order to build your project. stack will discover that you
+are missing it and will install it for you. You can do this manually by using
+the `stack setup` command.
 
-Having run `stack setup` successfully, `stack build` should build our project:
+You'll get intermediate download percentage statistics while the download is
+occurring. This command may take some time, depending on download speeds.
 
-```
-michael@d30748af6d3d:~/helloworld$ stack build
-helloworld-0.1.0.0: configure
-Configuring helloworld-0.1.0.0...
-helloworld-0.1.0.0: build
-Preprocessing library helloworld-0.1.0.0...
-[1 of 1] Compiling Lib              ( src/Lib.hs, .stack-work/dist/x86_64-linux/Cabal-1.22.4.0/build/Lib.o )
-In-place registering helloworld-0.1.0.0...
-Preprocessing executable 'helloworld-exe' for helloworld-0.1.0.0...
-[1 of 1] Compiling Main             ( app/Main.hs, .stack-work/dist/x86_64-linux/Cabal-1.22.4.0/build/helloworld-exe/helloworld-exe-tmp/Main.o )
-Linking .stack-work/dist/x86_64-linux/Cabal-1.22.4.0/build/helloworld-exe/helloworld-exe ...
-helloworld-0.1.0.0: install
-Installing library in
-/home/michael/helloworld/.stack-work/install/x86_64-linux/lts-3.2/7.10.2/lib/x86_64-linux-ghc-7.10.2/helloworld-0.1.0.0-6urpPe0MO7OHasGCFSyIAT
-Installing executable(s) in
-/home/michael/helloworld/.stack-work/install/x86_64-linux/lts-3.2/7.10.2/bin
-Registering helloworld-0.1.0.0...
-```
+__NOTE__: GHC will be installed to your global stack root directory, so
+calling `ghc` on the command line won't work. See the `stack exec`,
+`stack ghc`, and `stack runghc` commands below for more information.
+
+Once a GHC is installed, stack will then build your project.
 
 ### stack exec
 
@@ -215,21 +150,12 @@ directory.
 ### stack test
 
 Finally, like all good software, helloworld actually has a test suite.
+
 Let's run it with `stack test`:
 
 ```
 michael@d30748af6d3d:~/helloworld$ stack test
-NOTE: the test command is functionally equivalent to 'build --test'
-helloworld-0.1.0.0: configure (test)
-Configuring helloworld-0.1.0.0...
-helloworld-0.1.0.0: build (test)
-Preprocessing library helloworld-0.1.0.0...
-In-place registering helloworld-0.1.0.0...
-Preprocessing test suite 'helloworld-test' for helloworld-0.1.0.0...
-[1 of 1] Compiling Main             ( test/Spec.hs, .stack-work/dist/x86_64-linux/Cabal-1.22.4.0/build/helloworld-test/helloworld-test-tmp/Main.o )
-Linking .stack-work/dist/x86_64-linux/Cabal-1.22.4.0/build/helloworld-test/helloworld-test ...
-helloworld-0.1.0.0: test (suite: helloworld-test)
-Test suite not yet implemented
+# build output ...
 ```
 
 Reading the output, you'll see that stack first builds the test suite and then
@@ -240,9 +166,7 @@ and `stack test` a second time:
 ```
 michael@d30748af6d3d:~/helloworld$ stack build
 michael@d30748af6d3d:~/helloworld$ stack test
-NOTE: the test command is functionally equivalent to 'build --test'
-helloworld-0.1.0.0: test (suite: helloworld-test)
-Test suite not yet implemented
+# build output ...
 ```
 
 ## Inner Workings of stack
@@ -256,18 +180,20 @@ Before studying stack more, let's understand our project a bit better.
 ```
 michael@d30748af6d3d:~/helloworld$ find * -type f
 LICENSE
+README.md
 Setup.hs
 app/Main.hs
 helloworld.cabal
+package.yaml
 src/Lib.hs
 stack.yaml
 test/Spec.hs
 ```
 
-The `app/Main.hs`, `src/Lib.hs`, and `test/Spec.hs` files are all Haskell source
-files that compose the actual functionality of our project (we won't dwell on
-them here). The `LICENSE` file has no impact on the build, but is there for
-informational/legal purposes only. The files of interest here are `Setup.hs`,
+The `app/Main.hs`, `src/Lib.hs`, and `test/Spec.hs` files are all Haskell
+source files that compose the actual functionality of our project (we won't
+dwell on them here). The `LICENSE` file and `README.md` have no impact on the
+build. The files of interest here are `Setup.hs`, `package.yaml`,
 `helloworld.cabal`, and `stack.yaml`.
 
 The `Setup.hs` file is a component of the Cabal build system which stack uses.
@@ -280,15 +206,7 @@ import Distribution.Simple
 main = defaultMain
 ```
 
-Next, let's look at our `stack.yaml` file, which gives our project-level settings:
-
-```yaml
-flags: {}
-packages:
-- '.'
-extra-deps: []
-resolver: lts-3.2
-```
+Next, let's look at our `stack.yaml` file, which gives our project-level settings.
 
 If you're familiar with YAML, you may recognize that the `flags` and
 `extra-deps` keys have empty values. We'll see more interesting usages for these
@@ -305,21 +223,31 @@ value here says to use [LTS Haskell version
 `stack setup` installs that version of GHC). There are a number of values you
 can use for `resolver`, which we'll cover later.
 
-The final file of import is `helloworld.cabal`. stack is built on top of the
-Cabal build system. In Cabal, we have individual *packages*, each of which
-contains a single `.cabal` file. The `.cabal` file can define 1 or more
-*components*: a library, executables, test suites, and benchmarks. It also
-specifies additional information such as library dependencies, default language
+The other files important to the build are the `helloworld.cabal` and `package.yaml`.
+
+Since Stack 1.6.1, the `package.yaml` is an alternative package format that is
+provided built-in by stack through [the hpack tool](https://github.com/sol/hpack). The
+default behaviour is to generate the `.cabal` file from this `package.yaml`, and you
+can see that from the general message header in your new `helloworld.cabal` file. It
+is therefore important to understand that your `package.yaml` drives the package
+configuration and you should not modify the `.cabal` file.
+
+It is also important to remember that stack is built on top of the Cabal build system. Therefore, an
+understanding of the moving parts in Cabal are necessary. In Cabal, we have individual
+*packages*, each of which contains a single `.cabal` file. The `.cabal` file
+can define 1 or more *components*: a library, executables, test suites, and benchmarks.
+It also specifies additional information such as library dependencies, default language
 pragmas, and so on.
 
 In this guide, we'll discuss the bare minimum necessary to understand how to
-modify a `.cabal` file. Haskell.org has the definitive [reference for the `.cabal`
-file format](https://www.haskell.org/cabal/users-guide/developing-packages.html).
+modify a `package.yaml` file. You can see a full list of the available options
+at the [hpack documentation](https://github.com/sol/hpack#quick-reference). Haskell.org
+has the definitive [reference for the `.cabal` file format](https://www.haskell.org/cabal/users-guide/developing-packages.html).
 
 ### The setup command
 
-As we saw above, the `setup` command installed GHC for us. Just for kicks,
-let's run `setup` a second time:
+As we saw above, the `build` command installed GHC for us. Just for kicks,
+let's manually run the `setup` command:
 
 ```
 michael@d30748af6d3d:~/helloworld$ stack setup
@@ -332,6 +260,7 @@ stack ghc, stack ghci, stack runghc, or stack exec
 Thankfully, the command is smart enough to know not to perform an installation
 twice. As the command output above indicates, you can use `stack path`
 for quite a bit of path information (which we'll play with more later).
+
 For now, we'll just look at where GHC is installed:
 
 ```
@@ -358,8 +287,8 @@ between different runs.
 
 ## Adding dependencies
 
-Let's say we decide to modify our helloworld source a bit to use a new library,
-perhaps the ubiquitous text package. For example:
+Let's say we decide to modify our `helloworld` source a bit to use a new library,
+perhaps the ubiquitous text package. In `src/Lib.hs`, we can, for example add:
 
 ```haskell
 {-# LANGUAGE OverloadedStrings #-}
@@ -377,60 +306,30 @@ When we try to build this, things don't go as expected:
 
 ```haskell
 michael@d30748af6d3d:~/helloworld$ stack build
-helloworld-0.1.0.0-c91e853ce4bfbf6d394f54b135573db8: unregistering (local file changes)
-helloworld-0.1.0.0: configure
-Configuring helloworld-0.1.0.0...
-helloworld-0.1.0.0: build
-Preprocessing library helloworld-0.1.0.0...
-
-/home/michael/helloworld/src/Lib.hs:6:18:
+# build failure output (abridged for clarity) ...
+/helloworld/src/Lib.hs:5:1: error:
     Could not find module `Data.Text.IO'
     Use -v to see a list of the files searched for.
-
---  While building package helloworld-0.1.0.0 using:
-      /home/michael/.stack/programs/x86_64-linux/ghc-7.10.2/bin/runhaskell -package=Cabal-1.22.4.0 -clear-package-db -global-package-db -package-db=/home/michael/.stack/snapshots/x86_64-linux/lts-3.2/7.10.2/pkgdb/ /tmp/stack5846/Setup.hs --builddir=.stack-work/dist/x86_64-linux/Cabal-1.22.4.0/ build exe:helloworld-exe --ghc-options -hpcdir .stack-work/dist/x86_64-linux/Cabal-1.22.4.0/hpc/.hpc/ -ddump-hi -ddump-to-file
-    Process exited with code: ExitFailure 1
+  |
+5 | import qualified Data.Text.IO as T
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 ```
 
-Notice that it says "Could not find module." This means that the package
-containing the module in question is not available. To tell stack to use text,
-you need to add it to your `.cabal` file — specifically in your build-depends
-section, like this:
+This means that the package containing the module in question is not available. To tell
+stack to use [text](https://hackage.haskell.org/package/text), you need to add it to your
+`package.yaml` file — specifically in your `dependencies` section, like this:
 
 ```
-library
-  hs-source-dirs:      src
-  exposed-modules:     Lib
-  build-depends:       base >= 4.7 && < 5
-                       -- This next line is the new one
-                     , text
-  default-language:    Haskell2010
+dependencies:
+- base >= 4.7 && < 5
+- text # added here
 ```
 
 Now if we rerun `stack build`, we should get a successful result:
 
 ```
 michael@d30748af6d3d:~/helloworld$ stack build
-text-1.2.1.3: download
-text-1.2.1.3: configure
-text-1.2.1.3: build
-text-1.2.1.3: install
-helloworld-0.1.0.0: configure
-Configuring helloworld-0.1.0.0...
-helloworld-0.1.0.0: build
-Preprocessing library helloworld-0.1.0.0...
-[1 of 1] Compiling Lib              ( src/Lib.hs, .stack-work/dist/x86_64-linux/Cabal-1.22.4.0/build/Lib.o )
-In-place registering helloworld-0.1.0.0...
-Preprocessing executable 'helloworld-exe' for helloworld-0.1.0.0...
-[1 of 1] Compiling Main             ( app/Main.hs, .stack-work/dist/x86_64-linux/Cabal-1.22.4.0/build/helloworld-exe/helloworld-exe-tmp/Main.o ) [Lib changed]
-Linking .stack-work/dist/x86_64-linux/Cabal-1.22.4.0/build/helloworld-exe/helloworld-exe ...
-helloworld-0.1.0.0: install
-Installing library in
-/home/michael/helloworld/.stack-work/install/x86_64-linux/lts-3.2/7.10.2/lib/x86_64-linux-ghc-7.10.2/helloworld-0.1.0.0-HI1deOtDlWiAIDtsSJiOtw
-Installing executable(s) in
-/home/michael/helloworld/.stack-work/install/x86_64-linux/lts-3.2/7.10.2/bin
-Registering helloworld-0.1.0.0...
-Completed all 2 actions.
+# build output ...
 ```
 
 This output means that the text package was downloaded, configured, built, and
@@ -444,41 +343,23 @@ Let's have stack add a few more dependencies to our project. First, we'll includ
 `build-depends` section for our library in our `helloworld.cabal`:
 
 ```
-library
-  hs-source-dirs:      src
-  exposed-modules:     Lib
-  build-depends:       base >= 4.7 && < 5
-                     , text
-                     -- a couple more dependencies...
-                     , filepath
-                     , containers
+dependencies:
+- filepath
+- containers
 ```
 
 After adding these two dependencies, we can again run `stack build` to have them installed:
 
 ```
 michael@d30748af6d3d:~/helloworld$ stack build
-helloworld-0.1.0.0: unregistering (dependencies changed)
-helloworld-0.1.0.0: configure
-Configuring helloworld-0.1.0.0...
-...
+# build output ...
 ```
 
 Finally, to find out which versions of these libraries stack installed, we can ask stack to `list-dependencies`:
 
 ```
 michael@d30748af6d3d:~/helloworld$ stack list-dependencies
-array 0.5.1.0
-base 4.8.2.0
-binary 0.7.5.0
-bytestring 0.10.6.0
-containers 0.5.6.2
-deepseq 1.4.1.1
-filepath 1.4.0.0
-ghc-prim 0.4.0.0
-helloworld 0.1.0.0
-integer-gmp 1.0.0.0
-text 1.2.2.1
+# dependency output ...
 ```
 
 ### extra-deps
@@ -498,75 +379,57 @@ someFunc :: IO ()
 someFunc = launchMissiles
 ```
 
-Again, we add this new dependency to the `.cabal` file like this:
+Again, we add this new dependency to the `package.yaml` file like this:
 
 ```
-library
-  hs-source-dirs:      src
-  exposed-modules:     Lib
-  build-depends:       base >= 4.7 && < 5
-                     , text
-                       -- This next line is the new one
-                     , acme-missiles
-  default-language:    Haskell2010
+dependencies:
+- base >= 4.7 && 5
+- text
+- filepath
+- containers
+- acme-missiles # added
 ```
 
 However, rerunning `stack build` shows us the following error message:
 
 ```
 michael@d30748af6d3d:~/helloworld$ stack build
-While constructing the BuildPlan the following exceptions were encountered:
-
---  While attempting to add dependency,
-    Could not find package acme-missiles in known packages
-
---  Failure when adding dependencies:
-      acme-missiles: needed (-any), stack configuration has no specified version (latest applicable is 0.3)
-    needed for package: helloworld-0.1.0.0
-
-Recommended action: try adding the following to your extra-deps in /home/michael/helloworld/stack.yaml
-- acme-missiles-0.3
-
-You may also want to try the 'stack solver' command
+# build failure output ...
 ```
 
-It says acme-missiles is "not present in build plan." This brings us to the next
-major topic in using stack.
+It says that it was unable to construct the build plan.
+
+This brings us to the next major topic in using stack.
 
 ## Curated package sets
 
-Remember above when `stack new` selected the lts-3.2 resolver for us? That
-defined our build plan and available packages. When we tried using the
-text package, it just worked, because it was part of the lts-3.2 *package set*.
-But acme-missiles is not part of that package set, so building failed.
+Remember above when `stack new` selected some [LTS resolver](https://github.com/fpco/lts-haskell#readme)
+for us? That defined our build plan and available packages. When we tried using the
+`text` package, it just worked, because it was part of the LTS *package set*.
+
+But `acme-missiles` is not part of that package set, so building failed.
 
 To add this new dependency, we'll use the `extra-deps` field in `stack.yaml` to
-define extra dependencies not present in the resolver. With that change, our
-`stack.yaml` looks like:
+define extra dependencies not present in the resolver. You can add this like so:
 
 ```yaml
-flags: {}
-packages:
-- '.'
 extra-deps:
-- acme-missiles-0.3 # not in lts-3.2
-resolver: lts-3.2
+- acme-missiles-0.3 # not in the LTS
 ```
 
 Now `stack build` will succeed.
 
 With that out of the way, let's dig a little bit more into these package sets,
-also known as *snapshots*. We mentioned lts-3.2, and you can get quite a bit of
-information about it at
-[https://www.stackage.org/lts-3.2](https://www.stackage.org/lts-3.2), including:
+also known as *snapshots*. We mentioned the LTS resolvers, and you can get quite a bit of
+information about it at [https://www.stackage.org/lts](https://www.stackage.org/lts), including:
 
-* The appropriate resolver value (`resolver: lts-3.2`, as we used above)
+* The appropriate resolver value (`resolver: lts-10.0`, as is currently the latest LTS)
 * The GHC version used
 * A full list of all packages available in this snapshot
 * The ability to perform a Hoogle search on the packages in this snapshot
-* A [list of all modules](https://www.stackage.org/lts-3.2/docs) in a snapshot,
+* A [list of all modules](https://www.stackage.org/lts/docs) in a snapshot,
   which can be useful when trying to determine which package to add to your
-  `.cabal` file
+  `package.yaml` file.
 
 You can also see a [list of all available
 snapshots](https://www.stackage.org/snapshots). You'll notice two flavors: LTS
@@ -577,46 +440,25 @@ default as well).
 
 ## Resolvers and changing your compiler version
 
-Let's explore package sets a bit further. Instead of lts-3.2, let's change our
-`stack.yaml` file to use
-[nightly-2015-08-26](https://www.stackage.org/nightly-2015-08-26). Rerunning
-`stack build` will produce:
+Let's explore package sets a bit further. Instead of lts-10.0, let's change our
+`stack.yaml` file to use [the latest nightly](https://www.stackage.org/nightly). Right now,
+this is currently 2017-12-19 - please see the resolve from the link above to get the latest.
+
+Then, Rerunning `stack build` will produce:
 
 ```
 michael@d30748af6d3d:~/helloworld$ stack build
-Downloaded nightly-2015-08-26 build plan.
-Caching build plan
-stm-2.4.4: configure
-stm-2.4.4: build
-stm-2.4.4: install
-acme-missiles-0.3: configure
-acme-missiles-0.3: build
-acme-missiles-0.3: install
-helloworld-0.1.0.0: configure
-Configuring helloworld-0.1.0.0...
-helloworld-0.1.0.0: build
-Preprocessing library helloworld-0.1.0.0...
-In-place registering helloworld-0.1.0.0...
-Preprocessing executable 'helloworld-exe' for helloworld-0.1.0.0...
-Linking .stack-work/dist/x86_64-linux/Cabal-1.22.4.0/build/helloworld-exe/helloworld-exe ...
-helloworld-0.1.0.0: install
-Installing library in
-/home/michael/helloworld/.stack-work/install/x86_64-linux/nightly-2015-08-26/7.10.2/lib/x86_64-linux-ghc-7.10.2/helloworld-0.1.0.0-6cKaFKQBPsi7wB4XdqRv8w
-Installing executable(s) in
-/home/michael/helloworld/.stack-work/install/x86_64-linux/nightly-2015-08-26/7.10.2/bin
-Registering helloworld-0.1.0.0...
-Completed all 3 actions.
+Downloaded nightly-2017-12-19 build plan.
+# build output ...
 ```
 
 We can also change resolvers on the command line, which can be useful in a
 Continuous Integration (CI) setting, like on Travis. For example:
 
 ```
-michael@d30748af6d3d:~/helloworld$ stack --resolver lts-3.1 build
-Downloaded lts-3.1 build plan.
-Caching build plan
-stm-2.4.4: configure
-# Rest is the same, no point copying it
+michael@d30748af6d3d:~/helloworld$ stack --resolver lts-9.18 build
+Downloaded lts-9.18 build plan.
+# build output ...
 ```
 
 When passed on the command line, you also get some additional "short-cut"
@@ -636,38 +478,13 @@ Finally, let's try using an older LTS snapshot. We'll use the newest 2.X
 snapshot:
 
 ```
-michael@d30748af6d3d:~/helloworld$ stack --resolver lts-2 build
-Selected resolver: lts-2.22
-Downloaded lts-2.22 build plan.
-Caching build plan
-No GHC found, expected version 7.8.4 (x86_64) (based on resolver setting in /home/michael/helloworld/stack.yaml). Try running stack setup
+michael@d30748af6d3d:~/helloworld$ stack --resolver lts-9 build
+# build output ...
 ```
 
-This fails, because GHC 7.8.4 (which lts-2.22 uses) is not available on our
-system. So, we see that different LTS versions (2 vs 3 in this case) use
-different GHC versions. Now, how do we get the right GHC version after changing
-the LTS version?  One answer is to use `stack setup` like we did above, this
-time with the `--resolver lts-2` option. However, there's another method worth
-mentioning: the `--install-ghc` flag.
-
-```
-michael@d30748af6d3d:~/helloworld$ stack --resolver lts-2 --install-ghc build
-Selected resolver: lts-2.22
-Downloaded ghc-7.8.4.
-Installed GHC.
-stm-2.4.4: configure
-# Mostly same as before, nothing interesting to see
-```
-
-What's nice about `--install-ghc` is:
-
-1. You don't need to have an extra step in your build script
-2. It only requires downloading the information on latest snapshots once
-
-As mentioned above, the default behavior of stack is to *not* install new
-versions of GHC automatically. We want to avoid surprising users with large
-downloads/installs. The `--install-ghc` flag simply changes that default
-behavior.
+This succeeds, automatically installing the necessary GHC along the way. So,
+we see that different LTS versions use different GHC versions and stack can
+handle that.
 
 ### Other resolver values
 
@@ -703,18 +520,7 @@ command:
 
 ```
 cueball:~/yackage-0.8.0$ stack init
-Using cabal packages:
-- yackage.cabal
-
-Selecting the best among 6 snapshots...
-
-* Matches lts-4.1
-
-Selected resolver: lts-4.1
-Initialising configuration using resolver: lts-4.1
-Total number of user packages considered: 1
-Writing configuration to file: stack.yaml
-All done.
+# init output ...
 ```
 
 stack init does quite a few things for you behind the scenes:
@@ -737,42 +543,13 @@ Haskell packages, this will often be enough to build most packages. However,
 at times, you may find that not all dependencies required may be available in
 the Stackage snapshots.
 
-Let's simulate an unsatisfied dependency by adding acme-missiles to our
-build-depends and re-initing:
+Let's simulate an unsatisfied dependency by adding acme-missiles to the `.cabal` file
+(yackage does not currently support hpack, but you can also [hpack-convert](https://github.com/yamadapc/hpack-convert)
+should you need to generate a `package.yaml`) build-depends and then re-initing:
 
 ```
 cueball:~/yackage-0.8.0$ stack init --force
-Using cabal packages:
-- yackage.cabal
-
-Selecting the best among 6 snapshots...
-
-* Partially matches lts-4.1
-    acme-missiles not found
-        - yackage requires -any
-        - yackage flags: upload = True
-
-* Partially matches nightly-2016-01-16
-    acme-missiles not found
-        - yackage requires -any
-        - yackage flags: upload = True
-
-* Partially matches lts-3.22
-    acme-missiles not found
-        - yackage requires -any
-        - yackage flags: upload = True
-
-.
-.
-.
-
-Selected resolver: lts-4.1
-Resolver 'lts-4.1' does not have all the packages to match your requirements.
-    acme-missiles not found
-        - yackage requires -any
-        - yackage flags: upload = True
-
-However, you can try '--solver' to use external packages.
+# init failure output
 ```
 
 stack has tested six different snapshots, and in every case discovered that
@@ -780,54 +557,23 @@ acme-missiles is not available. In the end it suggested that you use the
 `--solver` command line switch if you want to use packages outside Stackage. So
 let's give it a try:
 
-
 ```
 cueball:~/yackage-0.8.0$ stack init --force --solver
-Using cabal packages:
-- yackage.cabal
-
-Selecting the best among 6 snapshots...
-
-* Partially matches lts-4.1
-    acme-missiles not found
-        - yackage requires -any
-        - yackage flags: upload = True
-
-.
-.
-.
-
-Selected resolver: lts-4.1
-*** Resolver lts-4.1 will need external packages:
-    acme-missiles not found
-        - yackage requires -any
-        - yackage flags: upload = True
-
-Using resolver: lts-4.1
-Using compiler: ghc-7.10.3
-Asking cabal to calculate a build plan...
-Trying with packages from lts-4.1 as hard constraints...
-Successfully determined a build plan with 3 external dependencies.
-Initialising configuration using resolver: lts-4.1
-Total number of user packages considered: 1
-Warning! 3 external dependencies were added.
-Overwriting existing configuration file: stack.yaml
-All done.
+# solver output ...
 ```
+
+stack will complain that it needs a `cabal-install` installation. Let's get that:
+
+```
+cueball:~/yackage-0.8.0$ stack install cabal-install
+```
+
+Then run the above `stack init` command above again and it will succeed.
 
 As you can verify by viewing `stack.yaml`, three external dependencies were added
-by stack init:
-
-```
-# Packages to be pulled from upstream that are not in the resolver (e.g., acme-missiles-0.3)
-extra-deps:
-- acme-missiles-0.3
-- text-1.2.2.0
-- yaml-0.8.15.2
-```
-
-Of course, you could have added the external dependencies by manually editing
-`stack.yaml` but stack init does the hard work for you.
+by stack init under the `extra-deps` field. Of course, you could have added the
+external dependencies by manually editing `stack.yaml` but stack init does the
+hard work for you.
 
 #### Excluded Packages
 
@@ -846,57 +592,12 @@ instead. Let's see what happens when we run solver:
 
 ```
 cueball:~/yackage-0.8.0$ stack init --force --solver --omit-packages
-Using cabal packages:
-- yackage.cabal
-- example/yackage-test.cabal
-
-Selecting the best among 6 snapshots...
-
-* Partially matches lts-4.2
-    acme-missiles not found
-        - yackage requires ==0.3
-        - yackage-test requires ==0.2
-        - yackage flags: upload = True
-        - yackage-test flags: upload = True
-.
-.
-.
-
-*** Failed to arrive at a workable build plan.
-*** Ignoring package: yackage-test
-*** Resolver lts-4.2 will need external packages:
-    acme-missiles not found
-        - yackage requires ==0.3
-        - yackage flags: upload = True
-
-Using resolver: lts-4.2
-Using compiler: ghc-7.10.3
-Asking cabal to calculate a build plan...
-Trying with packages from lts-4.2 as hard constraints...
-Successfully determined a build plan with 3 external dependencies.
-Initialising configuration using resolver: lts-4.2
-Total number of user packages considered: 2
-Warning! Ignoring 1 packages due to dependency conflicts:
-        - "example/yackage-test.cabal"
-
-Warning! 3 external dependencies were added.
-Overwriting existing configuration file: stack.yaml
-All done.
+# init failure output ...
 ```
 
 Looking at `stack.yaml`, you will see that the excluded packages have been
-commented out:
-
-```
-# Local packages, usually specified by relative directory name
-packages:
-- '.'
-# The following packages have been ignored due to incompatibility with the resolver compiler or dependency conflicts with other packages
-#- example/
-```
-
-In case wrong packages are excluded you can uncomment the right one and comment
-the other one.
+commented out under the `packages` field. In case wrong packages are excluded
+you can uncomment the right one and comment the other one.
 
 Packages may get excluded due to conflicting requirements among user packages
 or due to conflicting requirements between a user package and the resolver
@@ -904,8 +605,8 @@ compiler. If all of the packages have a conflict with the compiler then all of
 them may get commented out.
 
 When packages are commented out you will see a warning every time you run a
-command which needs the config file. The warning can be disabled by editing the
-config file and removing it.
+command which needs the configuration file. The warning can be disabled by
+editing the configuration file and removing it.
 
 #### Using a specific resolver
 
@@ -919,8 +620,8 @@ under the `extra-deps` section.
 
 #### Installing the compiler
 
-You can install the required compiler if not already installed by using the
-`--install-ghc` flag with the `stack init` command.
+stack will automatically install the compiler when you run `stack build` but you can
+manually specify the compiler by running `stack setup <GHC-VERSION>`.
 
 #### Miscellaneous and diagnostics
 
@@ -957,7 +658,6 @@ cueball:~/yackage-0.8.0$ stack build
 Warning: Some packages were found to be incompatible with the resolver and have been left commented out in the packages section.
 Warning: Specified resolver could not satisfy all dependencies. Some external packages have been added as dependencies.
 You can suppress this message by removing it from stack.yaml
-
 ```
 ### stack solver
 
@@ -974,22 +674,10 @@ Let's try `stack solver` to verify the config that we generated earlier with
 
 ```
 cueball:~/yackage-0.8.0$ stack solver
-Using configuration file: stack.yaml
-The following packages are missing from the config:
-- example/yackage-test.cabal
-
-Using cabal packages:
-- yackage.cabal
-
-Using resolver: lts-4.2
-Using compiler: ghc-7.10.3
-Asking cabal to calculate a build plan...
-Trying with packages from lts-4.2 and 3 external packages as hard constraints...
-Successfully determined a build plan with 3 external dependencies.
-No changes needed to stack.yaml
+# solver output ...
 ```
 
-It says there are no changes needed to your config. Notice that it also reports
+It says there are no changes needed to your configuration. Notice that it also reports
 `example/yackage-test.cabal` as missing from the config. It was purposely
 omitted by `stack init` to resolve a conflict.
 
@@ -1007,34 +695,7 @@ generated `stack.yaml` and then run `stack solver`:
 
 ```
 cueball:~/yackage-0.8.0$ stack solver
-
-Using configuration file: stack.yaml
-The following packages are missing from the config:
-- yackage.cabal
-
-Using cabal packages:
-- example/yackage-test.cabal
-
-.
-.
-.
-
-Retrying with packages from lts-4.2 and 3 external packages as preferences...
-Successfully determined a build plan with 5 external dependencies.
-
-The following changes will be made to stack.yaml:
-* Resolver is lts-4.2
-* Dependencies to be added
-    extra-deps:
-    - acme-missiles-0.2
-    - email-validate-2.2.0
-    - tar-0.5.0.1
-
-* Dependencies to be deleted
-    extra-deps:
-    - acme-missiles-0.3
-
-To automatically update stack.yaml, rerun with '--update-config'
+# solver failure output ...
 ```
 
 Due to the change that we made, solver suggested some new dependencies.
@@ -1052,58 +713,11 @@ feasible to use those or what other dependencies are needed as a result.
 If you want to change the resolver for your project, you can run
 `stack solver --resolver <resolver name>` and it will figure out the changes needed for you.
 
-Let's see what happens if we change the resolver to lts-2.22:
+Let's see what happens if we change the resolver to an older resolver - lts-2.22:
 
 ```
 cueball:~/yackage-0.8.0$ stack solver --resolver lts-2.22
-Using configuration file: stack.yaml
-The following packages are missing from the config:
-- yackage.cabal
-
-Using cabal packages:
-- example/yackage-test.cabal
-
-Using resolver: lts-2.22
-Using compiler: ghc-7.8.4
-
-.
-.
-.
-
-Retrying with packages from lts-2.22 and 3 external packages as preferences...
-Successfully determined a build plan with 19 external dependencies.
-
-The following changes will be made to stack.yaml:
-* Resolver is lts-2.22
-* Flags to be added
-    flags:
-    - old-locale: true
-
-* Dependencies to be added
-    extra-deps:
-    - acme-missiles-0.2
-    - aeson-0.10.0.0
-    - aeson-compat-0.3.0.0
-    - attoparsec-0.13.0.1
-    - conduit-extra-1.2.0
-    - email-validate-2.2.0
-    - hex-0.1.2
-    - http-api-data-0.2.2
-    - http2-1.1.0
-    - persistent-2.2.4
-    - persistent-template-2.1.5
-    - primitive-0.6.1.0
-    - tar-0.5.0.1
-    - unix-time-0.3.6
-    - vector-0.11.0.0
-    - wai-extra-3.0.14
-    - warp-3.1.3.1
-
-* Dependencies to be deleted
-    extra-deps:
-    - acme-missiles-0.3
-
-To automatically update stack.yaml, rerun with '--update-config'
+# solver failure output ...
 ```
 
 As you can see, it automatically suggested changes in `extra-deps` due to the
