@@ -2112,6 +2112,10 @@ users. Here's a quick rundown:
   library, used for performing actual builds. You shouldn't generally do this,
   since new Cabal versions may introduce incompatibilities with package sets,
   but it can be useful if you're trying to test a specific bugfix.
+* `stack ls snapshots` will list all the local snapshots by
+  default. You can also view the remote snapshots using `stack ls
+  snapshots remote`. It also supports option for viewing only lts
+  (`-l`) and nightly (`-n`) snapshots.
 * `stack list-dependencies` lists all of the packages and versions used for a
   project
 * `stack sig` subcommand can help you with GPG signing & verification
