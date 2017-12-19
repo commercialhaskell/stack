@@ -39,6 +39,10 @@ matrix:
     - env: BUILD=style
       compiler: ": #stack 8.0.2"
 
+    - env: BUILD=pedantic GHCVER=8.0.2 STACK_YAML=stack.yaml
+      compiler: ": #stack 8.0.2"
+      addons: {apt: {packages: [ghc-8.0.2], sources: [hvr-ghc]}}
+
   allow_failures:
     - env: BUILD=stack GHCVER=8.0.2 STACK_YAML=stack.yaml
       compiler: ": #stack 8.0.2 osx"
@@ -51,11 +55,14 @@ before_install:
  - unset CC
  - case "$BUILD" in
      style)
-       export PATH="$TRAVIS_BUILD_DIR"/hlint:$PATH;;
-     stack)
-       export PATH=$HOME/.local/bin:/opt/ghc/$GHCVER/bin:$PATH;;
+       export PATH="$TRAVIS_BUILD_DIR"/hlint:$PATH
+       ;;
      cabal)
-       export PATH=$HOME/.cabal/bin:/opt/ghc/$GHCVER/bin:/opt/cabal/$CABALVER/bin:$PATH;;
+       export PATH=$HOME/.cabal/bin:/opt/ghc/$GHCVER/bin:/opt/cabal/$CABALVER/bin:$PATH
+       ;;
+     *)
+       export PATH=$HOME/.local/bin:/opt/ghc/$GHCVER/bin:$PATH
+       ;;
    esac
  - ./.travis-setup.sh
 
@@ -113,10 +120,12 @@ script:
        hlint src/
        hlint src/ --cpp-define=WINDOWS=1
        hlint test/ --cpp-simple
-       stack --system-ghc --no-terminal build --pedantic
        ;;
      stack)
        stack --no-terminal test --haddock --no-haddock-deps --ghc-options="$GHC_OPTIONS"
+       ;;
+     pedantic)
+       stack --system-ghc --no-terminal build --pedantic
        ;;
      cabal)
        cabal configure --enable-tests --enable-benchmarks -v2 --ghc-options="-O0 $GHC_OPTIONS"
