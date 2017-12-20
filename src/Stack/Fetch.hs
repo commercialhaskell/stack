@@ -33,7 +33,6 @@ import qualified    Codec.Archive.Tar as Tar
 import qualified    Codec.Archive.Tar.Check as Tar
 import qualified    Codec.Archive.Tar.Entry as Tar
 import              Codec.Compression.GZip (decompress)
-import              Control.Concurrent.STM
 import              Stack.Prelude
 import              Crypto.Hash (SHA256 (..))
 import qualified    Data.ByteString as S
@@ -61,7 +60,7 @@ import              Stack.Types.PackageName
 import              Stack.Types.Runner
 import              Stack.Types.Version
 import qualified    System.FilePath as FP
-import              System.IO (hSeek, SeekMode (AbsoluteSeek))
+import              System.IO (SeekMode (AbsoluteSeek))
 import              System.PosixCompat (setFileMode)
 
 data FetchException

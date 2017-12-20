@@ -47,7 +47,7 @@ import           Stack.Types.PackageName               (packageNameString)
 import           System.Directory                      (createDirectoryIfMissing,
                                                         removeFile)
 import           System.FilePath                       ((</>), takeFileName)
-import           System.IO                             (hFlush, stdout, putStrLn, putStr, getLine, print) -- TODO remove putStrLn, use logInfo
+import           System.IO                             (stdout, putStrLn, putStr, getLine, print) -- TODO remove putStrLn, use logInfo
 import           System.IO.Echo                        (withoutInputEcho)
 
 -- | Username and password to log into Hackage.

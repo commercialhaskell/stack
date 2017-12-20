@@ -23,7 +23,7 @@ import           Stack.Prelude
 import           Data.Conduit.Process hiding (callProcess)
 import qualified Data.Text as T
 import           System.Exit (exitWith, ExitCode (..))
-import           System.IO
+import           System.IO (hGetLine)
 import qualified System.Process
 import           System.Process.Log
 import           System.Process.Read

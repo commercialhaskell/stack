@@ -106,7 +106,7 @@ import qualified System.Directory as D
 import           System.Environment (getProgName, getArgs, withArgs)
 import           System.Exit
 import           System.FilePath (isValid, pathSeparator)
-import           System.IO (hIsTerminalDevice, stderr, stdin, stdout, hSetBuffering, BufferMode(..), hPutStrLn, hGetEncoding, hSetEncoding)
+import           System.IO (stderr, stdin, stdout, BufferMode(..), hPutStrLn, hGetEncoding, hSetEncoding)
 
 -- | Change the character encoding of the given Handle to transliterate
 -- on unsupported characters instead of throwing an exception

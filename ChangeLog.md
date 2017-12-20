@@ -14,6 +14,11 @@ Other enhancements:
   local and remote snapshots present in the system. Use `stack ls
   snapshots --help` to get more details about it.
 
+* In addition to supporting `.tar.gz` and `.zip` files as remote archives,
+  plain `.tar` files are now accepted too. This will additionally help with
+  cases where HTTP servers mistakenly set the transfer encoding to `gzip`. See
+  [#3647](https://github.com/commercialhaskell/stack/issues/3647).
+
 Bug fixes:
 
 * For versions of Cabal before 1.24, ensure that the dependencies of
