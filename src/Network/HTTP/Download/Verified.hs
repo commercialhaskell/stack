@@ -42,7 +42,8 @@ import              Data.Text.Encoding (decodeUtf8With)
 import              Data.Text.Encoding.Error (lenientDecode)
 import              GHC.IO.Exception (IOException(..),IOErrorType(..))
 import              Network.HTTP.Client (getUri, path)
-import              Network.HTTP.Simple (Request, HttpException, httpSink, getResponseHeaders)
+import              Network.HTTP.StackClient (httpSink)
+import              Network.HTTP.Simple (Request, HttpException, getResponseHeaders)
 import              Network.HTTP.Types.Header (hContentLength, hContentMD5)
 import              Path
 import              Stack.Types.Runner

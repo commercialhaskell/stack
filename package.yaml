@@ -143,6 +143,7 @@ library:
   - Data.Store.VersionTagged
   - Network.HTTP.Download
   - Network.HTTP.Download.Verified
+  - Network.HTTP.StackClient
   - Options.Applicative.Args
   - Options.Applicative.Builder.Extra
   - Options.Applicative.Complicated

@@ -24,7 +24,7 @@ import qualified Data.ByteString.Lazy as L
 import qualified Data.Text as T
 import           Network.HTTP.Client (RequestBody (RequestBodyBS))
 import           Network.HTTP.Download
-import           Network.HTTP.Simple
+import           Network.HTTP.Simple (setRequestMethod, setRequestBody, getResponseStatusCode)
 import           Network.HTTP.Types (methodPut)
 import           Path
 import           Stack.Package

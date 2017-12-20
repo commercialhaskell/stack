@@ -29,12 +29,11 @@ import qualified Data.Text.IO                          as TIO
 import           Network.HTTP.Client                   (Response,
                                                         RequestBody(RequestBodyLBS),
                                                         Request)
-import           Network.HTTP.Simple                   (withResponse,
-                                                        getResponseStatusCode,
+import           Network.HTTP.StackClient              (withResponse, httpNoBody)
+import           Network.HTTP.Simple                   (getResponseStatusCode,
                                                         getResponseBody,
                                                         setRequestHeader,
-                                                        parseRequest,
-                                                        httpNoBody)
+                                                        parseRequest)
 import           Network.HTTP.Client.MultipartFormData (formDataBody, partFileRequestBody,
                                                         partBS, partLBS)
 import           Network.HTTP.Client.TLS               (getGlobalManager,
