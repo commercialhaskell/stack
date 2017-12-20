@@ -9,13 +9,12 @@ module Stack.FileWatch
 
 import Blaze.ByteString.Builder (toLazyByteString, copyByteString)
 import Blaze.ByteString.Builder.Char.Utf8 (fromShow)
-import Control.Concurrent.STM
+import Control.Concurrent.STM (check)
 import Stack.Prelude
 import qualified Data.ByteString.Lazy as L
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import GHC.IO.Exception
-import GHC.IO.Handle (hIsTerminalDevice)
 import Path
 import System.Console.ANSI
 import System.FSNotify

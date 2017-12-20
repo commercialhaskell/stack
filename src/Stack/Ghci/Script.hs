@@ -21,7 +21,7 @@ import qualified Data.Set as S
 import           Data.Text.Encoding (encodeUtf8Builder)
 import           Path
 import           Stack.Prelude hiding (ByteString)
-import           System.IO (hSetBuffering, BufferMode (..), hSetBinaryMode)
+import           System.IO (BufferMode (..), hSetBinaryMode)
 
 import           Distribution.ModuleName hiding (toFilePath)
 

@@ -49,7 +49,6 @@ import              Stack.Types.Runner
 import              Stack.PrettyPrint
 import              System.Directory
 import qualified    System.FilePath as FP ((<.>))
-import              System.IO (hFileSize)
 
 -- | A request together with some checks to perform.
 data DownloadRequest = DownloadRequest

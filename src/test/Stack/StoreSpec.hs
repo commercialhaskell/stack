@@ -51,7 +51,7 @@ addMinAndMaxBounds xs =
     (if (minBound :: a) `notElem` xs then [minBound] else []) ++
     (if (maxBound :: a) `notElem` xs && (maxBound :: a) /= minBound then maxBound : xs else xs)
 
-$(do let ns = [ ''Int64, ''Word64, ''Word, ''Word8
+$(do let ns = [ ''Int64, ''Word64, ''Word8
               ]
          f n = [d| instance Monad m => Serial m $(conT n) where
                       series = generate (\_ -> addMinAndMaxBounds [0, 1]) |]

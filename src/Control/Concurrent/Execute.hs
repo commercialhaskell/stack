@@ -11,7 +11,7 @@ module Control.Concurrent.Execute
     , runActions
     ) where
 
-import           Control.Concurrent.STM
+import           Control.Concurrent.STM   (retry)
 import           Stack.Prelude
 import qualified Data.Set                 as Set
 import           Stack.Types.PackageIdentifier
