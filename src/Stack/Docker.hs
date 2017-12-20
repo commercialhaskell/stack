@@ -58,7 +58,7 @@ import           System.Directory (canonicalizePath,getHomeDirectory)
 import           System.Environment (getEnv,getEnvironment,getProgName,getArgs,getExecutablePath)
 import           System.Exit (exitSuccess, exitWith, ExitCode(..))
 import qualified System.FilePath as FP
-import           System.IO (stderr,stdin,stdout,hIsTerminalDevice, hClose)
+import           System.IO (stderr,stdin,stdout)
 import           System.IO.Error (isDoesNotExistError)
 import           System.IO.Unsafe (unsafePerformIO)
 import qualified System.PosixCompat.User as User

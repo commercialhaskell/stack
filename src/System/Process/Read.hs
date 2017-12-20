@@ -57,7 +57,6 @@ import qualified System.Directory as D
 import           System.Environment (getEnvironment)
 import           System.Exit
 import qualified System.FilePath as FP
-import           System.IO (hClose)
 import           System.Process.Log
 
 -- | Override the environment received by a child process.

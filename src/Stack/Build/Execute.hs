@@ -24,7 +24,7 @@ module Stack.Build.Execute
     ) where
 
 import           Control.Concurrent.Execute
-import           Control.Concurrent.STM
+import           Control.Concurrent.STM (check)
 import           Stack.Prelude
 import           Crypto.Hash
 import           Data.Attoparsec.Text hiding (try)
@@ -84,7 +84,7 @@ import qualified System.Directory as D
 import           System.Environment (getExecutablePath)
 import           System.Exit (ExitCode (ExitSuccess))
 import qualified System.FilePath as FP
-import           System.IO
+import           System.IO (hPutStr, openBinaryFile)
 import           System.PosixCompat.Files (createLink)
 import           System.Process.Log (showProcessArgDebug, withProcessTimeLog)
 import           System.Process.Read

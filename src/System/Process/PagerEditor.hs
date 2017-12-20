@@ -28,7 +28,7 @@ import System.Exit (ExitCode(..))
 import System.FilePath ((</>))
 import System.Process (createProcess,shell,proc,waitForProcess,StdStream (CreatePipe)
                       ,CreateProcess(std_in, close_fds, delegate_ctlc))
-import System.IO (hClose,hPutStr,readFile,stdout)
+import System.IO (hPutStr,readFile,stdout)
 
 -- | Run pager, providing a function that writes to the pager's input.
 pageWriter :: (Handle -> IO ()) -> IO ()

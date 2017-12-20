@@ -46,7 +46,7 @@ import           Stack.Constants
 import           Stack.Types.PackageIdentifier (PackageIdentifierRevision)
 import           System.Console.ANSI
 import           System.FilePath
-import           System.IO
+import           System.IO                  (localeEncoding)
 import           System.Log.FastLogger
 import           System.Terminal
 
