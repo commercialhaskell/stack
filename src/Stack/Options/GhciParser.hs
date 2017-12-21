@@ -1,16 +1,15 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 module Stack.Options.GhciParser where
 
-import           Data.Version                      (showVersion)
 import           Options.Applicative
 import           Options.Applicative.Args
 import           Options.Applicative.Builder.Extra
-import           Paths_stack                       as Meta
 import           Stack.Config                      (packagesParser)
 import           Stack.Ghci                        (GhciOpts (..))
 import           Stack.Options.BuildParser         (flagsParser)
 import           Stack.Options.Completion
 import           Stack.Prelude
+import           Stack.Types.Version
 
 -- | Parser for GHCI options
 ghciOptsParser :: Parser GhciOpts
@@ -21,7 +20,7 @@ ghciOptsParser = GhciOpts
                          completer (targetCompleter <> fileExtCompleter [".hs", ".lhs"]) <>
                          help ("If none specified, use all local packages. " <>
                                "See https://docs.haskellstack.org/en/v" <>
-                               showVersion Meta.version <>
+                               versionString stackMinorVersion <>
                                "/build_command/#target-syntax for details. " <>
                                "If a path to a .hs or .lhs file is specified, it will be loaded.")))
              <*> fmap concat (many (argsOption (long "ghci-options" <>

@@ -29,7 +29,10 @@ module Stack.Types.Version
   ,latestApplicableVersion
   ,checkVersion
   ,nextMajorVersion
-  ,UpgradeTo(..))
+  ,UpgradeTo(..)
+  ,minorVersion
+  ,stackVersion
+  ,stackMinorVersion)
   where
 
 import           Stack.Prelude hiding (Vector)
@@ -45,6 +48,7 @@ import           Distribution.Text (disp)
 import qualified Distribution.Version as Cabal
 import           Language.Haskell.TH
 import           Language.Haskell.TH.Syntax
+import qualified Paths_stack as Meta
 import           Text.PrettyPrint (render)
 
 -- | A parse fail.
@@ -219,3 +223,15 @@ checkVersion check (Version wanted) (Version actual) =
             (Nothing, _) -> True
             (Just _, Nothing) -> False
             (Just w, Just a) -> a >= w
+
+-- | Get minor version (excludes any patchlevel)
+minorVersion :: Version -> Version
+minorVersion (Version v) = Version (V.take 3 v)
+
+-- | Current Stack version
+stackVersion :: Version
+stackVersion = fromCabalVersion (Cabal.mkVersion' Meta.version)
+
+-- | Current Stack minor version (excludes patchlevel)
+stackMinorVersion :: Version
+stackMinorVersion = minorVersion stackVersion

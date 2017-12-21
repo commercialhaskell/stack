@@ -61,7 +61,6 @@ import qualified    Data.Yaml as Yaml
 import              Distribution.System (OS, Arch (..), Platform (..))
 import qualified    Distribution.System as Cabal
 import              Distribution.Text (simpleParse)
-import              Distribution.Version (mkVersion')
 import              Lens.Micro (set)
 import              Network.HTTP.Simple (getResponseBody, httpLBS, withResponse, getResponseStatusCode)
 import              Network.HTTP.Download
@@ -69,7 +68,6 @@ import              Path
 import              Path.CheckInstall (warnInstallSearchPathIssues)
 import              Path.Extra (toFilePathNoTrailingSep)
 import              Path.IO hiding (findExecutable, withSystemTempDir)
-import qualified    Paths_stack as Meta
 import              Prelude (getLine, putStr, putStrLn, until)
 import              Stack.Build (build)
 import              Stack.Config (loadConfig)
@@ -661,7 +659,7 @@ ensureDockerStackExe containerPlatform = do
     stackExeExists <- doesFileExist stackExePath
     unless stackExeExists $ do
         logInfo $ mconcat ["Downloading Docker-compatible ", T.pack stackProgName, " executable"]
-        sri <- downloadStackReleaseInfo Nothing Nothing (Just (versionString stackVersion))
+        sri <- downloadStackReleaseInfo Nothing Nothing (Just (versionString stackMinorVersion))
         platforms <- runReaderT preferredPlatforms (containerPlatform, PlatformVariantNone)
         downloadStackExe platforms sri stackExeDir False (const $ return ())
     return stackExePath
@@ -1983,6 +1981,3 @@ getDownloadVersion (StackReleaseInfo val) = do
     String rawName <- HashMap.lookup "name" o
     -- drop the "v" at the beginning of the name
     parseVersion $ T.drop 1 rawName
-
-stackVersion :: Version
-stackVersion = fromCabalVersion (mkVersion' Meta.version)

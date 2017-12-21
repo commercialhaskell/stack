@@ -4,17 +4,16 @@
 module Stack.Options.BuildParser where
 
 import qualified Data.Map as Map
-import           Data.Version (showVersion)
 import           Options.Applicative
 import           Options.Applicative.Args
 import           Options.Applicative.Builder.Extra
-import           Paths_stack as Meta
 import           Stack.Options.Completion
 import           Stack.Options.PackageParser (readFlag)
 import           Stack.Prelude
 import           Stack.Types.Config
 import           Stack.Types.FlagName
 import           Stack.Types.PackageName
+import           Stack.Types.Version
 
 -- | Parser for CLI-only build arguments
 buildOptsParser :: BuildCommand
@@ -92,7 +91,7 @@ targetsParser =
               completer targetCompleter <>
               help ("If none specified, use all local packages. " <>
                     "See https://docs.haskellstack.org/en/v" <>
-                    showVersion Meta.version <>
+                    versionString stackMinorVersion <>
                     "/build_command/#target-syntax for details.")))
 
 flagsParser :: Parser (Map.Map (Maybe PackageName) (Map.Map FlagName Bool))
