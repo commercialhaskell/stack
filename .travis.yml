@@ -37,7 +37,6 @@ matrix:
       os: osx
 
     - env: BUILD=style
-      compiler: ": #stack 8.0.2"
 
     - env: BUILD=pedantic GHCVER=8.2.1 STACK_YAML=stack.yaml
       compiler: ": #stack 8.2.1"
