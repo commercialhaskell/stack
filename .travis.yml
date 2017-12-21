@@ -39,9 +39,9 @@ matrix:
     - env: BUILD=style
       compiler: ": #stack 8.0.2"
 
-    - env: BUILD=pedantic GHCVER=8.0.2 STACK_YAML=stack.yaml
-      compiler: ": #stack 8.0.2"
-      addons: {apt: {packages: [ghc-8.0.2], sources: [hvr-ghc]}}
+    - env: BUILD=pedantic GHCVER=8.2.1 STACK_YAML=stack.yaml
+      compiler: ": #stack 8.2.1"
+      addons: {apt: {packages: [ghc-8.2.1], sources: [hvr-ghc]}}
 
   allow_failures:
     - env: BUILD=stack GHCVER=8.0.2 STACK_YAML=stack.yaml
