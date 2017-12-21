@@ -24,6 +24,12 @@ Bug fixes:
   allowing the Cabal library to flatten the
   `GenericPackageDescription` itself.
 
+
+## v1.6.1.1
+
+No user facing changes.
+
+
 ## v1.6.1
 
 Major changes:
