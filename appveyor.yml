@@ -1,23 +1,46 @@
-# Disabled cache in hope of improving reliability of AppVeyor builds
-#cache:
-#- "c:\\sr" # stack root, short paths == fewer problems
+# See https://github.com/harendra-kumar/packcheck for all parameters and their
+# explanation.
+environment:
+  global:
+    PACKCHECK: ./packcheck.sh
+    # The commit id of packcheck.sh to use from
+    # https://github.com/harendra-kumar/packcheck.  Used only when the script
+    # does not exist in the package repo at the path specified by "PACKCHECK"
+    PACKCHECK_COMMIT: "1908b7070ab5bd074c475b42b554f5a44650cc1f"
+    GHC_OPTIONS: "-Werror"
+    RESOLVER: "lts-10.0"
+    DISABLE_SDIST_BUILD: "y"
+    # ------------------------------------------------------------------------
+    # Normally you would not need to customize these params
+    # ------------------------------------------------------------------------
+    CABAL_REINIT_CONFIG: "y"
+    CABAL_CHECK_RELAX: "y"
+    CABAL_NO_SANDBOX: "y"
+    CABAL_HACKAGE_MIRROR: "hackage.haskell.org:http://hackage.fpcomplete.com"
+    TEST_INSTALL: "y"
+    LC_ALL: "C.UTF-8"
+    PATH: "%PATH%;%APPDATA%\\local\\bin"
 
+    STACK_ROOT: "c:\\sr"
+    LOCAL_BIN: "%APPDATA%\\local\\bin"
+
+cache:
+  - "%STACK_ROOT%"
+  - "%APPDATA%\\cabal"
+  - "%APPDATA%\\ghc"
+# - "%LOCAL_BIN%" stack gets installed here after build so do not cache it
+# - "%LOCALAPPDATA%\\Programs\\stack"
+
+clone_folder: "c:\\pkg"
 build: off
 
 before_test:
-# http://help.appveyor.com/discussions/problems/6312-curl-command-not-found
-- set PATH=C:\Program Files\Git\mingw64\bin;%PATH%
-
-- curl -sS -ostack.zip -L --insecure http://www.stackage.org/stack/windows-i386
-- 7z x stack.zip stack.exe
-
-clone_folder: "c:\\stack"
-environment:
-  global:
-    STACK_ROOT: "c:\\sr"
+- if not exist %PACKCHECK% curl -sSkL -o%PACKCHECK% https://raw.githubusercontent.com/harendra-kumar/packcheck/%PACKCHECK_COMMIT%/packcheck.sh
+- if not exist %LOCAL_BIN% mkdir %LOCAL_BIN%
+- where stack.exe || curl -sSkL -ostack.zip http://www.stackage.org/stack/windows-x86_64 && 7z x stack.zip stack.exe && move stack.exe %LOCAL_BIN%
+#- stack upgrade --binary-only --binary-version %STACKVER%
+- stack --version
 
 test_script:
 - stack setup > nul
-# The ugly echo "" hack is to avoid complaints about 0 being an invalid file
-# descriptor
-- echo "" | stack --no-terminal test --jobs 1
+- chcp 65001 && stack exec bash -- -c "chmod +x %PACKCHECK%; %PACKCHECK% stack"
