@@ -63,7 +63,7 @@ import qualified    Distribution.System as Cabal
 import              Distribution.Text (simpleParse)
 import              Distribution.Version (mkVersion')
 import              Lens.Micro (set)
-import              Network.HTTP.Simple (getResponseBody, httpLBS, withResponse, getResponseStatusCode)
+import              Network.HTTP.Simple (getResponseBody, getResponseStatusCode)
 import              Network.HTTP.Download
 import              Path
 import              Path.CheckInstall (warnInstallSearchPathIssues)
