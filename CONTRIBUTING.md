@@ -19,7 +19,7 @@ If you would like to help with documentation, please note that for most cases
 the Wiki has been deprecated in favor of markdown files placed in a new `/doc`
 subdirectory of the repository itself. Please submit a
 [pull request](https://help.github.com/articles/using-pull-requests/) with your
-changes/additions.
+changes/additions based off the [the stable branch](https://github.com/commercialhaskell/stack/tree/stable).
 
 The documentation is rendered on [haskellstack.org](http://haskellstack.org) by
 readthedocs.org using Sphinx and CommonMark. Since links and formatting vary
