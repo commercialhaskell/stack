@@ -24,9 +24,7 @@ changes/additions based off the [the stable branch](https://github.com/commercia
 The documentation is rendered on [haskellstack.org](http://haskellstack.org) by
 readthedocs.org using Sphinx and CommonMark. Since links and formatting vary
 from GFM, please check the documentation there before submitting a PR to fix
-those.  In particular, links to other documentation files intentionally have
-`.html` extensions instead of `.md`, unfortunately (see
-[#1506](https://github.com/commercialhaskell/stack/issues/1506) for details).
+those.
 
 If your changes move or rename files, or subsume Wiki content, please continue
 to leave a file/page in the old location temporarily, in addition to the new
