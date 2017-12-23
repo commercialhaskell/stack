@@ -1,19 +1,15 @@
 # Changelog
 
-## Unreleased changes
+## v1.6.3
 
-Release notes:
-
-Major changes:
-
-Behaviour changes:
-
-Other enhancements:
+Enhancements:
 
 * In addition to supporting `.tar.gz` and `.zip` files as remote archives,
   plain `.tar` files are now accepted too. This will additionally help with
   cases where HTTP servers mistakenly set the transfer encoding to `gzip`. See
   [#3647](https://github.com/commercialhaskell/stack/issues/3647).
+* Links to docs.haskellstack.org ignore Stack version patchlevel.
+* Downloading Docker-compatible `stack` binary ignores Stack version patchlevel.
 
 Bug fixes:
 
@@ -27,7 +23,8 @@ Bug fixes:
 
 ## v1.6.1.1
 
-No user facing changes.
+Hackage-only release with no user facing changes (updated to build with
+newer dependency versions).
 
 
 ## v1.6.1
