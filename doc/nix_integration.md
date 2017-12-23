@@ -35,7 +35,7 @@ etc) should be available.  If they are not, it should be because the file
 located at `$HOME/.nix-profile/etc/profile.d/nix.sh` is not sourced by your shell.
 
 You should either run `source ~/.nix-profile/etc/profile.d/nix.sh` manually
-everytime you open a terminal and need Nix or add this command to your
+every time you open a terminal and need Nix or add this command to your
 `~/.bashrc` or `~/.bash_profile`.
 
 ### Additions to your `stack.yaml`

@@ -537,7 +537,7 @@ automatically promote it to a local package (much like setting a
 custom package flag). However, setting options via `$everything` on all flags
 will not do so (see
 [Github discussion](https://github.com/commercialhaskell/stack/issues/849#issuecomment-320892095)
-for reasoning). This can lead to unpredicable behavior by affecting
+for reasoning). This can lead to unpredictable behavior by affecting
 your snapshot packages.
 
 The behavior of the `$locals`, `$targets`, and `$everything` special

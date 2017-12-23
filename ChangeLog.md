@@ -16,10 +16,19 @@ Other enhancements:
 * Specify User-Agent HTTP request header on every HTTP request.
   See [#3628](https://github.com/commercialhaskell/stack/issues/3628) for details.
 
+Bug fixes:
+
+
+## v1.6.3
+
+Enhancements:
+
 * In addition to supporting `.tar.gz` and `.zip` files as remote archives,
   plain `.tar` files are now accepted too. This will additionally help with
   cases where HTTP servers mistakenly set the transfer encoding to `gzip`. See
   [#3647](https://github.com/commercialhaskell/stack/issues/3647).
+* Links to docs.haskellstack.org ignore Stack version patchlevel.
+* Downloading Docker-compatible `stack` binary ignores Stack version patchlevel.
 
 Bug fixes:
 
@@ -33,6 +42,13 @@ Bug fixes:
   arguments. See [#3658](https://github.com/commercialhaskell/stack/issues/3658).
   In particular, this makes it possible to pass `-- +RTS ... -RTS` to specify
   RTS arguments used when running the script.
+
+
+## v1.6.1.1
+
+Hackage-only release with no user facing changes (updated to build with
+newer dependency versions).
+
 
 ## v1.6.1
 
@@ -66,7 +82,7 @@ Behavior changes:
 * The `package-indices` setting with Hackage no longer works with the
   `00-index.tar.gz` tarball, but must use the `01-index.tar.gz` file
   to allow revised packages to be found.
-* Options passsed via `--ghci-options` are now passed to the end of the
+* Options passed via `--ghci-options` are now passed to the end of the
   invocation of ghci, instead of the middle.  This allows using `+RTS`
   without an accompanying `-RTS`.
 * When auto-detecting `--ghc-build`, `tinfo6` is now preferred over
@@ -157,7 +173,7 @@ Other enhancements:
 * Stack will now try to detect the width of the running terminal
   (only on POSIX for the moment) and use that to better display
   output messages. Work is ongoing, so some messages will not
-  be optimal yet. The terminal width can be overriden with the
+  be optimal yet. The terminal width can be overridden with the
   new `--terminal-width` command-line option (this works even on
   non-POSIX).
 * Passing non local packages as targets to `stack ghci` will now
@@ -431,7 +447,7 @@ Other enhancements:
 * The script interpreter will now output error logging.  In particular,
   this means it will output info about plan construction errors.
   ([#2879](https://github.com/commercialhaskell/stack/issues/2879))
-* `stack ghci` now takes `--flag` and `--ghc-options` again (inadverently
+* `stack ghci` now takes `--flag` and `--ghc-options` again (inadvertently
   removed in 1.3.0).
   ([#2986](https://github.com/commercialhaskell/stack/issues/2986))
 * `stack exec` now takes `--rts-options` which passes the given arguments inside of
@@ -703,7 +719,7 @@ Other enhancements:
 * Parse CLI arguments and configuration files into less permissive types,
   improving error messages for bad inputs.
   [#2267](https://github.com/commercialhaskell/stack/issues/2267)
-* Add the ability to explictly specify a gcc executable.
+* Add the ability to explicitly specify a gcc executable.
   [#593](https://github.com/commercialhaskell/stack/issues/593)
 * Nix: No longer uses LTS mirroring in nixpkgs. Gives to nix-shell a derivation
   like `haskell.compiler.ghc801`
@@ -1110,7 +1126,7 @@ Other enhancements:
   [docs](http://docs.haskellstack.org/en/stable/yaml_configuration/#image)
 - Specify which executables to include in images for `stack image container`
   [docs](http://docs.haskellstack.org/en/stable/yaml_configuration/#image)
-- Docker: pass supplemantary groups and umask into container
+- Docker: pass supplementary groups and umask into container
 - If git fetch fails wipe the directory and try again from scratch
   [#1418](https://github.com/commercialhaskell/stack/issues/1418)
 - Warn if newly installed executables won't be available on the PATH
@@ -1169,7 +1185,7 @@ Enhancements:
   profiling, but instead of generating a report for `--bench` and
   `--test`, prints out a stack trace on exception. Great for using
   like `stack build --test --trace`
-* Nix: all options can be overriden on command line
+* Nix: all options can be overridden on command line
   [#1483](https://github.com/commercialhaskell/stack/issues/1483)
 * Nix: build environments (shells) are now pure by default.
 * Make verbosity silent by default in script interpreter mode
@@ -1282,7 +1298,7 @@ Bug fixes:
   [#1401](https://github.com/commercialhaskell/stack/issues/1401)
 * GHCi: cpp-options in cabal files weren't used
   [#1419](https://github.com/commercialhaskell/stack/issues/1419)
-* Benchmarks couldn't be run independently of eachother
+* Benchmarks couldn't be run independently of each other
   [#1412](https://github.com/commercialhaskell/stack/issues/1412)
 * Send output of building setup to stderr
   [#1410](https://github.com/commercialhaskell/stack/issues/1410)
@@ -1469,7 +1485,7 @@ Other enhancements:
 
 * Added the `--docker-env` argument, to set environment variables in Docker container.
 * Set locale environment variables to UTF-8 encoding for builds to avoid "commitBuffer: invalid argument" errors from GHC [#793](https://github.com/commercialhaskell/stack/issues/793)
-* Enable translitation for encoding on stdout and stderr [#824](https://github.com/commercialhaskell/stack/issues/824)
+* Enable transliteration for encoding on stdout and stderr [#824](https://github.com/commercialhaskell/stack/issues/824)
 * By default, `stack upgrade` automatically installs GHC as necessary [#797](https://github.com/commercialhaskell/stack/issues/797)
 * Added the `ghc-options` field to stack.yaml [#796](https://github.com/commercialhaskell/stack/issues/796)
 * Added the `extra-path` field to stack.yaml

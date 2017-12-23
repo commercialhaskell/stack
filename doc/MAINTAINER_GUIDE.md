@@ -90,7 +90,7 @@ consistent and clean stack version.
 
 * Create a
   [new draft Github release](https://github.com/commercialhaskell/stack/releases/new)
-  with tag and name `vX.Y.Z` (where X.Y.Z is the stack package's version), targetting the
+  with tag and name `vX.Y.Z` (where X.Y.Z is the stack package's version), targeting the
   RC branch
 
 * On each machine you'll be releasing from, set environment variables:
@@ -295,7 +295,7 @@ the shell.
 
 ### Install clang+llvm
 
-NOTE: the Debian jessie `llvm` packge does not work (executables built with it
+NOTE: the Debian jessie `llvm` package does not work (executables built with it
 just exit with "schedule: re-entered unsafely.").
 
 The version of LLVM needed depends on the version of GHC you need.
