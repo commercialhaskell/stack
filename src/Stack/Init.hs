@@ -239,7 +239,7 @@ renderStackYaml p ignoredPackages dupPackages =
         [ ("user-message"     , userMsgHelp)
         , ("resolver"         , resolverHelp)
         , ("packages"         , packageHelp)
-        , ("extra-deps"       , "# Dependency packages to be pulled from upstream that are not in the resolver\n# using the same syntax as packages.\n# (e.g., acme-missiles-0.3)")
+        , ("extra-deps"       , "# Dependency packages to be pulled from upstream that are not in the resolver\n# using the same syntax as the packages field.\n# (e.g., acme-missiles-0.3)")
         , ("flags"            , "# Override default flag values for local packages and extra-deps")
         , ("extra-package-dbs", "# Extra package databases containing global packages")
         ]
