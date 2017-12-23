@@ -12,7 +12,7 @@ You can also build existing stack projects which target GHC, and instead build
 them with GHCJS.  For example: `stack build --compiler ghcjs-0.2.0.9006020_ghc-7.10.3`
 
 There are advanced options for `stack setup`: `--ghcjs-boot-options` (one word at a time) and `--[no-]ghcjs-boot-clean`
-which will passyour settings down to the `ghcjs-boot`. You will need to know exacty what you are doing with them.  
+which will pass your settings down to the `ghcjs-boot`. You will need to know exactly what you are doing with them.  
 
 Sidenote: If you receive a message like
 `The program 'ghcjs' version >=0.1 is required but the version of .../ghcjs could not be determined.`,
@@ -56,9 +56,9 @@ setup-info:
            sha1: d2cfc25f9cda32a25a87d9af68891b2186ee52f9
 ```
 The later can be generated via: https://github.com/tolysz/prepare-ghcjs
-the fromer is a bit more manual. Those bundles are only tested against the latest `node-7.4.0`.
+the former is a bit more manual. Those bundles are only tested against the latest `node-7.4.0`.
 
-In order to corrrectly boot and use ghcjs, one might need to install `alex` `happy` `hscolour` `hsc2hs` with the normal ghc.
+In order to correctly boot and use ghcjs, one might need to install `alex` `happy` `hscolour` `hsc2hs` with the normal ghc.
 
 Older resolvers:
 
