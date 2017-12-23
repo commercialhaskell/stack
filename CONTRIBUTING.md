@@ -8,7 +8,7 @@ and use the provided template to include all necessary details.
 The more detailed your report, the faster it can be resolved and will ensure it
 is resolved in the right way. Once your bug has been resolved, the responsible
 person will tag the issue as _Needs confirmation_ and assign the issue back to
-you. Once you have tested and confirmed that the issue is resolved, close the 
+you. Once you have tested and confirmed that the issue is resolved, close the
 issue. If you are not a member of the project, you will be asked for
 confirmation and we will close it.
 
@@ -85,7 +85,5 @@ stack install hlint
 Once installed, you can check your changes with:
 
 ```
-hlint src/ test/ --cpp-simple
+$ ./etc/scripts/hlint.sh
 ```
-
-Where `--cpp-simple` strips `#` lines.
