@@ -85,3 +85,77 @@ Once installed, you can check your changes with:
 ```
 $ ./etc/scripts/hlint.sh
 ```
+
+## Testing
+
+The Stack code has both unit tests and integration tests. Integration tests can
+be found in the [test/integration](https://github.com/commercialhaskell/stack/tree/master/test/integration)
+folder and unit tests, in the [src/test](https://github.com/commercialhaskell/stack/tree/master/src/test)
+folder. Tests are written using the [Hspec](https://hspec.github.io/) framework. In
+order to run the full test suite, you can simply do:
+
+```bash
+$ stack test
+```
+
+The `--file-watch` is a very useful option to get quick feedback. However,
+running the entire test suite after each file change will slow you down. You'll
+need to specify which test suite (unit test or integration) and pass arguments
+to specify which module you'd specifically like to run to get quick feedback. A
+description of this follows below.
+
+### Working with Unit Tests
+
+If you would like to run the unit tests on their own, you can:
+
+```bash
+$ stack test stack:stack-test
+```
+
+Running an individual module works like this:
+
+```bash
+$ stack test stack:stack-test --ta "-m <PATTERN>"
+```
+
+Where `<PATTERN>` is the name of the module without `Spec.hs`.
+
+You may also load tests into GHCi and run them with:
+
+```bash
+$ stack ghci stack:stack-test --only-main
+# GHCi starting up output ...
+> :main -m "<PATTERN>"
+```
+
+Where again, `<PATTERN>` is the name of the module without `Spec.hs`.
+
+### Working with Integration Tests
+
+Running the integration tests is a little involved, you'll need to:
+
+```bash
+$ stack test stack:integration-test --flag stack:stack-integration-tests
+```
+
+Running an individual module works like this:
+
+```bash
+$ stack test stack:stack-integration-test --flag stack:integration-tests --ta "-m <PATTERN>"
+```
+
+Where `<PATTERN>` is the name of the folder listed in the
+[test/integration/tests/](https://github.com/commercialhaskell/stack/tree/master/test/integration/tests)
+folder.
+
+You may also achieve this through GHCi with:
+
+```bash
+$ stack ghci stack:stack-integration-test
+# GHCi starting up output ...
+> :main -m "<PATTERN>"
+```
+
+Where again, `<PATTERN>` is the name of the folder listed in the
+[test/integration/tests/](https://github.com/commercialhaskell/stack/tree/master/test/integration/tests)
+folder.
