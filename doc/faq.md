@@ -393,7 +393,7 @@ If you are using a powershell session, it is easy to automate even that step:
 
     $env:Path = ( stack setup | %{ $_ -replace '[^ ]+ ', ''} ), $env:Path -join ";"
 
-## How do I reset / remove Stack (such as to to do a completely fresh build)?
+## How do I reset / remove Stack (such as to do a completely fresh build)?
 
 The first thing to remove is project-specific `.stack-work` directory within
 the project's directory. Next, remove `~/.stack` directory overall. You may
