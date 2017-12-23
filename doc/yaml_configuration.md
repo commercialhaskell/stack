@@ -799,9 +799,10 @@ dump-logs: all       # dump all logs for local non-dependency packages
 
 Templates used with `stack new` have a number of parameters that affect the
 generated code. These can be set for all new projects you create. The result of
-them can be observed in the generated LICENSE and cabal files.
+them can be observed in the generated LICENSE and cabal files. The value for all
+of these parameters must be strings.
 
-The 5 parameters are: `author-email`, `author-name`, `category`, `copyright` and `github-username`.
+The parameters are: `author-email`, `author-name`, `category`, `copyright`, `year` and `github-username`.
 
 * _author-email_ - sets the `maintainer` property in cabal
 * _author-name_ - sets the `author` property in cabal and the name used in
@@ -815,6 +816,9 @@ The 5 parameters are: `author-email`, `author-name`, `category`, `copyright` and
 * _copyright_ - sets the `copyright` property in cabal. It is typically the
   name of the holder of the copyright on the package and the year(s) from which
   copyright is claimed. For example: `Copyright (c) 2006-2007 Joe Bloggs`
+* _year_ - if `copyright` is not specified, `year` and `author-name` are used
+  to generate the copyright property in cabal. If `year` is not specified, it
+  defaults to the current year.
 * _github-username_ - used to generate `homepage` and `source-repository` in
   cabal. For instance `github-username: myusername` and `stack new my-project new-template`
   would result:

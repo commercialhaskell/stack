@@ -33,6 +33,9 @@ Bug fixes:
   arguments. See [#3658](https://github.com/commercialhaskell/stack/issues/3658).
   In particular, this makes it possible to pass `-- +RTS ... -RTS` to specify
   RTS arguments used when running the script.
+* Don't ignore the template `year` parameter in config files, and clarify the
+  surrounding documentation. See
+  [#2275](https://github.com/commercialhaskell/stack/issues/2275).
 
 ## v1.6.1
 
