@@ -589,15 +589,15 @@ getGhcBuild menv = do
                 logDebug $ if noPie
                                then "PIE disabled"
                                else "PIE enabled"
+                hasncurses6 <- checkLib $(mkRelFile "libncursesw.so.6")
                 hastinfo5 <- checkLib $(mkRelFile "libtinfo.so.5")
                 hastinfo6 <- checkLib $(mkRelFile "libtinfo.so.6")
-                hasncurses6 <- checkLib $(mkRelFile "libncursesw.so.6")
                 hasgmp5 <- checkLib $(mkRelFile "libgmp.so.10")
                 hasgmp4 <- checkLib $(mkRelFile "libgmp.so.3")
                 let libComponents =
-                        if  | hastinfo6 && hasgmp5 -> ["tinfo6"]
+                        if  | hasncurses6 && hasgmp5 -> ["ncurses6"]
+                            | hastinfo6 && hasgmp5 -> ["tinfo6"]
                             | hastinfo5 && hasgmp5 -> []
-                            | hasncurses6 && hasgmp5 -> ["ncurses6"]
                             | hasgmp4 && hastinfo5 -> ["gmp4"]
                             | otherwise -> []
                     pieComponents =
