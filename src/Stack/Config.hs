@@ -61,7 +61,7 @@ import           Distribution.System (OS (..), Platform (..), buildPlatform, Arc
 import qualified Distribution.Text
 import           Distribution.Version (simplifyVersionRange, mkVersion')
 import           GHC.Conc (getNumProcessors)
-import           Lens.Micro (lens)
+import           Lens.Micro (lens, set)
 import           Network.HTTP.Client (parseUrlThrow)
 import           Network.HTTP.StackClient (httpJSON)
 import           Network.HTTP.Simple (getResponseBody)
@@ -281,7 +281,7 @@ configFromConfigMonoid
          configExtraLibDirs = configMonoidExtraLibDirs
          configOverrideGccPath = getFirst configMonoidOverrideGccPath
          configOverrideHpack = maybe HpackBundled HpackCommand $ getFirst configMonoidOverrideHpack
-         
+
          -- Only place in the codebase where platform is hard-coded. In theory
          -- in the future, allow it to be configured.
          (Platform defArch defOS) = buildPlatform
@@ -324,8 +324,8 @@ configFromConfigMonoid
      rawEnv <- liftIO getEnvironment
      pathsEnv <- augmentPathMap configMonoidExtraPath
                                 (Map.fromList (map (T.pack *** T.pack) rawEnv))
-     origEnv <- mkEnvOverride configPlatform pathsEnv
-     let configEnvOverride _ = return origEnv
+     origEnv <- mkEnvOverride pathsEnv
+     let configEnvOverrideSettings _ = return origEnv
 
      configLocalProgramsBase <- case getFirst configMonoidLocalProgramsBase of
        Nothing -> getDefaultLocalProgramsBase configStackRoot configPlatform origEnv
@@ -381,7 +381,8 @@ configFromConfigMonoid
 
      let configMaybeProject = mproject
 
-     configRunner <- view runnerL
+     configRunner' <- view runnerL
+     let configRunner = set envOverrideL origEnv configRunner'
 
      return Config {..}
 
@@ -416,6 +417,8 @@ data MiniConfig = MiniConfig -- TODO do we really need a whole extra data type?
     }
 instance HasConfig MiniConfig where
     configL = lens mcConfig (\x y -> x { mcConfig = y })
+instance HasEnvOverride MiniConfig where
+    envOverrideL = configL.envOverrideL
 instance HasPlatform MiniConfig
 instance HasGHCVariant MiniConfig where
     ghcVariantL = lens mcGHCVariant (\x y -> x { mcGHCVariant = y })

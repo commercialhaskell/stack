@@ -41,7 +41,7 @@ import           Control.Monad.Logger.CallStack
                                             logDebug, logError, logInfo,
                                             logOther, logWarn, toLogStr)
 import           Control.Monad.Reader as X (MonadReader, MonadTrans (..),
-                                            ReaderT (..), ask, asks)
+                                            ReaderT (..), ask, asks, local)
 import           Data.Bool            as X (Bool (..), not, otherwise, (&&),
                                             (||))
 import           Data.ByteString      as X (ByteString)
@@ -90,7 +90,7 @@ import           Data.Void            as X (Void, absurd)
 import           Data.Word            as X
 import           GHC.Generics         as X (Generic)
 import           GHC.Stack            as X (HasCallStack)
-import           Lens.Micro           as X (Getting)
+import           Lens.Micro           as X (Getting, Lens', lens)
 import           Lens.Micro.Mtl       as X (view)
 import           Path                 as X (Abs, Dir, File, Path, Rel,
                                             toFilePath)

@@ -15,6 +15,7 @@ module Stack.Nix
 import           Stack.Prelude
 import qualified Data.Text as T
 import           Data.Version (showVersion)
+import           Lens.Micro (set)
 import           Path.IO
 import qualified Paths_stack as Meta
 import           Stack.Config (getInNixShell, getInContainer)
@@ -28,7 +29,7 @@ import           Stack.Types.Runner
 import           Stack.Types.Compiler
 import           System.Environment (getArgs,getExecutablePath,lookupEnv)
 import qualified System.FilePath  as F
-import           System.Process.Read (getEnvOverride)
+import           System.Process.Read (getEnvOverride, envOverrideL)
 
 -- | If Nix is enabled, re-runs the currently running OS command in a Nix container.
 -- Otherwise, runs the inner action.
@@ -63,8 +64,9 @@ runShellAndExit
     -> RIO env (String, [String])
     -> RIO env ()
 runShellAndExit mprojectRoot getCompilerVersion getCmdArgs = do
-     config <- view configL
-     envOverride <- getEnvOverride (configPlatform config)
+   config <- view configL
+   envOverride <- getEnvOverride
+   local (set envOverrideL envOverride) $ do
      (cmnd,args) <- fmap (escape *** map escape) getCmdArgs
      mshellFile <-
          traverse (resolveFile (fromMaybeProjectRoot mprojectRoot)) $
@@ -118,7 +120,7 @@ runShellAndExit mprojectRoot getCompilerVersion getCmdArgs = do
        "Using a nix-shell environment " <> (case mshellFile of
             Just path -> "from file: " <> T.pack (toFilePath path)
             Nothing -> "with nix packages: " <> T.intercalate ", " pkgs)
-     exec envOverride "nix-shell" fullArgs
+     exec "nix-shell" fullArgs
 
 -- | Shell-escape quotes inside the string and enclose it in quotes.
 escape :: String -> String

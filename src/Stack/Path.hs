@@ -24,15 +24,14 @@ import           Stack.Types.Config
 import           Stack.Types.Runner
 import qualified System.FilePath as FP
 import           System.IO (stderr)
-import           System.Process.Read (EnvOverride(eoPath))
+import           System.Process.Read (EnvOverride(eoPath), HasEnvOverride (..))
 
 -- | Print out useful path information in a human-readable format (and
 -- support others later).
 path
-    :: (MonadUnliftIO m, MonadReader env m, HasEnvConfig env, MonadThrow m,
-        MonadLogger m)
+    :: HasEnvConfig env
     => [Text]
-    -> m ()
+    -> RIO env ()
 path keys =
     do -- We must use a BuildConfig from an EnvConfig to ensure that it contains the
        -- full environment info including GHC paths etc.
@@ -42,12 +41,11 @@ path keys =
        -- global GHC.
        -- It was set up in 'withBuildConfigAndLock -> withBuildConfigExt -> setupEnv'.
        -- So it's not the *minimal* override path.
-       menv <- getMinimalEnvOverride
        snap <- packageDatabaseDeps
        plocal <- packageDatabaseLocal
        extra <- packageDatabaseExtra
        whichCompiler <- view $ actualCompilerVersionL.whichCompilerL
-       global <- GhcPkg.getGlobalDB menv whichCompiler
+       global <- GhcPkg.getGlobalDB whichCompiler
        snaproot <- installationRootDeps
        localroot <- installationRootLocal
        toolsDir <- bindirCompilerTools
@@ -78,7 +76,6 @@ path keys =
                       path'
                           (PathInfo
                                bc
-                               menv
                                snap
                                plocal
                                global
@@ -103,7 +100,6 @@ pathParser =
 -- | Passed to all the path printers as a source of info.
 data PathInfo = PathInfo
     { piBuildConfig  :: BuildConfig
-    , piEnvOverride  :: EnvOverride
     , piSnapDb       :: Path Abs Dir
     , piLocalDb      :: Path Abs Dir
     , piGlobalDb     :: Path Abs Dir
@@ -122,6 +118,8 @@ instance HasLogFunc PathInfo where
 instance HasRunner PathInfo where
     runnerL = configL.runnerL
 instance HasConfig PathInfo
+instance HasEnvOverride PathInfo where
+    envOverrideL = configL.envOverrideL
 instance HasBuildConfig PathInfo where
     buildConfigL = lens piBuildConfig (\x y -> x { piBuildConfig = y })
                  . buildConfigL
@@ -148,7 +146,7 @@ paths =
       , view $ stackYamlL.to toFilePath.to T.pack)
     , ( "PATH environment variable"
       , "bin-path"
-      , T.pack . intercalate [FP.searchPathSeparator] . eoPath . piEnvOverride )
+      , T.pack . intercalate [FP.searchPathSeparator] . eoPath . view envOverrideL )
     , ( "Install location for GHC and other core tools"
       , "programs"
       , view $ configL.to configLocalPrograms.to toFilePathNoTrailingSep.to T.pack)

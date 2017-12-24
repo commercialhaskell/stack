@@ -33,7 +33,6 @@ import           Stack.Types.PackageDump
 import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageName
 import           Stack.Types.Version
-import           System.Process.Read (EnvOverride)
 
 -- | Options for 'getInstalled'.
 data GetInstalledOpts = GetInstalledOpts
@@ -47,8 +46,7 @@ data GetInstalledOpts = GetInstalledOpts
 
 -- | Returns the new InstalledMap and all of the locally registered packages.
 getInstalled :: HasEnvConfig env
-             => EnvOverride
-             -> GetInstalledOpts
+             => GetInstalledOpts
              -> Map PackageName PackageSource -- ^ does not contain any installed information
              -> RIO env
                   ( InstalledMap
@@ -56,7 +54,7 @@ getInstalled :: HasEnvConfig env
                   , [DumpPackage () () ()] -- snapshot installed
                   , [DumpPackage () () ()] -- locally installed
                   )
-getInstalled menv opts sourceMap = do
+getInstalled opts sourceMap = do
     logDebug "Finding out which packages are already installed"
     snapDBPath <- packageDatabaseDeps
     localDBPath <- packageDatabaseLocal
@@ -67,7 +65,7 @@ getInstalled menv opts sourceMap = do
             then configInstalledCache >>= liftM Just . loadInstalledCache
             else return Nothing
 
-    let loadDatabase' = loadDatabase menv opts mcache sourceMap
+    let loadDatabase' = loadDatabase opts mcache sourceMap
 
     (installedLibs0, globalDumpPkgs) <- loadDatabase' Nothing []
     (installedLibs1, _extraInstalled) <-
@@ -118,16 +116,15 @@ getInstalled menv opts sourceMap = do
 -- that it has profiling if necessary, and that it matches the version and
 -- location needed by the SourceMap
 loadDatabase :: HasEnvConfig env
-             => EnvOverride
-             -> GetInstalledOpts
+             => GetInstalledOpts
              -> Maybe InstalledCache -- ^ if Just, profiling or haddock is required
              -> Map PackageName PackageSource -- ^ to determine which installed things we should include
              -> Maybe (InstalledPackageLocation, Path Abs Dir) -- ^ package database, Nothing for global
              -> [LoadHelper] -- ^ from parent databases
              -> RIO env ([LoadHelper], [DumpPackage () () ()])
-loadDatabase menv opts mcache sourceMap mdb lhs0 = do
+loadDatabase opts mcache sourceMap mdb lhs0 = do
     wc <- view $ actualCompilerVersionL.to whichCompiler
-    (lhs1', dps) <- ghcPkgDump menv wc (fmap snd (maybeToList mdb))
+    (lhs1', dps) <- ghcPkgDump wc (fmap snd (maybeToList mdb))
                 $ conduitDumpPackage =$ sink
     let ghcjsHack = wc == Ghcjs && isNothing mdb
     lhs1 <- mapMaybeM (processLoadResult mdb ghcjsHack) lhs1'

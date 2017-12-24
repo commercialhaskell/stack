@@ -96,7 +96,7 @@ import qualified System.Directory as D
 import           System.FilePath (splitExtensions, replaceExtension)
 import qualified System.FilePath as FilePath
 import           System.IO.Error
-import           System.Process.Run (runCmd, Cmd(..))
+import           System.Process.Read
 
 data Ctx = Ctx { ctxFile :: !(Path Abs File)
                , ctxDir :: !(Path Abs Dir)
@@ -110,6 +110,8 @@ instance HasLogFunc Ctx where
 instance HasRunner Ctx where
     runnerL = configL.runnerL
 instance HasConfig Ctx
+instance HasEnvOverride Ctx where
+    envOverrideL = configL.envOverrideL
 instance HasBuildConfig Ctx
 instance HasEnvConfig Ctx where
     envConfigL = lens ctxEnvConfig (\x y -> x { ctxEnvConfig = y })
@@ -1328,18 +1330,17 @@ logPossibilities dirs mn = do
 -- If the directory contains a file named package.yaml, hpack is used to
 -- generate a .cabal file from it.
 findOrGenerateCabalFile
-    :: forall m env.
-          (MonadIO m, MonadUnliftIO m, MonadLogger m, HasRunner env, HasConfig env, MonadReader env m)
+    :: forall env. HasConfig env
     => Path Abs Dir -- ^ package directory
-    -> m (Path Abs File)
+    -> RIO env (Path Abs File)
 findOrGenerateCabalFile pkgDir = do
     hpack pkgDir
     findCabalFile
   where
-    findCabalFile :: m (Path Abs File)
+    findCabalFile :: RIO env (Path Abs File)
     findCabalFile = findCabalFile' >>= either throwIO return
 
-    findCabalFile' :: m (Either PackageException (Path Abs File))
+    findCabalFile' :: RIO env (Either PackageException (Path Abs File))
     findCabalFile' = do
         files <- liftIO $ findFiles
             pkgDir
@@ -1358,8 +1359,7 @@ findOrGenerateCabalFile pkgDir = do
       where hasExtension fp x = FilePath.takeExtension fp == "." ++ x
 
 -- | Generate .cabal file from package.yaml, if necessary.
-hpack :: (MonadIO m, MonadUnliftIO m, MonadLogger m, HasRunner env, HasConfig env, MonadReader env m)
-      => Path Abs Dir -> m ()
+hpack :: HasConfig env => Path Abs Dir -> RIO env ()
 hpack pkgDir = do
     let hpackFile = pkgDir </> $(mkRelFile Hpack.packageConfig)
     exists <- liftIO $ doesFileExist hpackFile
@@ -1389,10 +1389,8 @@ hpack pkgDir = do
                         , flow "If you want to use package.yaml instead of the cabal file, "
                         , flow "then please delete the cabal file."
                         ]
-            HpackCommand command -> do
-                envOverride <- getMinimalEnvOverride
-                let cmd = Cmd (Just pkgDir) command envOverride []
-                runCmd cmd Nothing
+            HpackCommand command ->
+                withWorkingDir pkgDir $ withProc command [] runProcess_
 
 -- | Path for the package's build log.
 buildLogPath :: (MonadReader env m, HasBuildConfig env, MonadThrow m)

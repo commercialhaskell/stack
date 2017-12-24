@@ -46,7 +46,7 @@ dependencies:
 - bytestring
 - clock
 - conduit
-- conduit-extra
+- conduit-extra >= 1.2.3.1
 - containers
 - cryptonite
 - cryptonite-conduit
@@ -259,7 +259,6 @@ library:
   - System.Process.Log
   - System.Process.PagerEditor
   - System.Process.Read
-  - System.Process.Run
   - System.Terminal
   other-modules:
   - Hackage.Security.Client.Repository.HttpLib.HttpClient

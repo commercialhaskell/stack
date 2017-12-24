@@ -167,10 +167,9 @@ generateHpcReportInternal tixSrc reportDir report extraMarkupArgs extraReportArg
                     concatMap (\x -> ["--srcdir", toFilePathNoTrailingSep x]) pkgDirs ++
                     -- Look for index files in the correct dir (relative to each pkgdir).
                     ["--hpcdir", toFilePathNoTrailingSep hpcRelDir, "--reset-hpcdirs"]
-            menv <- getMinimalEnvOverride
             logInfo $ "Generating " <> report
             outputLines <- liftM (map (S8.filter (/= '\r')) . S8.lines) $
-                readProcessStdout Nothing menv "hpc"
+                readProcessStdout "hpc"
                 ( "report"
                 : toFilePath tixSrc
                 : (args ++ extraReportArgs)
@@ -197,7 +196,7 @@ generateHpcReportInternal tixSrc reportDir report extraMarkupArgs extraReportArg
                     -- Print output, stripping @\r@ characters because Windows.
                     forM_ outputLines (logInfo . T.decodeUtf8)
                     -- Generate the markup.
-                    void $ readProcessStdout Nothing menv "hpc"
+                    void $ readProcessStdout "hpc"
                         ( "markup"
                         : toFilePath tixSrc
                         : ("--destdir=" ++ toFilePathNoTrailingSep reportDir)

@@ -116,9 +116,7 @@ createDependencyGraph dotOpts = do
       , boptsCLIFlags = dotFlags dotOpts
       }
   let graph = Map.fromList (localDependencies dotOpts (filter lpWanted locals))
-  menv <- getMinimalEnvOverride
-  (installedMap, globalDump, _, _) <- getInstalled menv
-                                                   (GetInstalledOpts False False False)
+  (installedMap, globalDump, _, _) <- getInstalled (GetInstalledOpts False False False)
                                                    sourceMap
   -- TODO: Can there be multiple entries for wired-in-packages? If so,
   -- this will choose one arbitrarily..
@@ -263,8 +261,8 @@ printGraph dotOpts locals graph = do
   printLeaves graph
   void (Map.traverseWithKey printEdges (fst <$> graph))
   liftIO $ Text.putStrLn "}"
-  where filteredLocals = Set.filter (\local ->
-          packageNameString local `Set.notMember` dotPrune dotOpts) locals
+  where filteredLocals = Set.filter (\local' ->
+          packageNameString local' `Set.notMember` dotPrune dotOpts) locals
 
 -- | Print the local nodes with a different style depending on options
 printLocalNodes :: (F.Foldable t, MonadIO m)

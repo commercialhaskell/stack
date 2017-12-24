@@ -14,16 +14,15 @@ module Stack.Exec where
 import           Stack.Prelude
 import           Stack.Types.Config
 import           System.Process.Log
+import           Data.Conduit.Process.Typed (readProcess_, runProcess, setStdin, inherit)
+import qualified Data.Text.Lazy as TL
+import           Data.Text.Lazy.Encoding (decodeUtf8With)
+import           Data.Text.Encoding.Error (lenientDecode)
 
-import           Data.Streaming.Process (ProcessExitedUnsuccessfully(..))
 import           System.Exit
-import           System.Process.Run (callProcess, callProcessObserveStdout, Cmd(..))
-#ifdef WINDOWS
-import           System.Process.Read (EnvOverride)
-#else
+import           System.Process.Read (withProc, HasEnvOverride (..))
 import qualified System.Process.PID1 as PID1
-import           System.Process.Read (EnvOverride, envHelper, preProcess)
-#endif
+import           System.Process.Read (envHelper, preProcess)
 
 -- | Default @EnvSettings@ which includes locals and GHC_PACKAGE_PATH.
 --
@@ -59,35 +58,32 @@ plainEnvSettings = EnvSettings
 -- sub-process. This allows signals to be propagated (#527)
 --
 -- 2) On windows, an 'ExitCode' exception will be thrown.
-exec :: (MonadUnliftIO m, MonadLogger m)
-     => EnvOverride -> String -> [String] -> m b
+exec :: HasEnvOverride env => String -> [String] -> RIO env b
 #ifdef WINDOWS
 exec = execSpawn
 #else
-exec menv cmd0 args = do
-    cmd <- preProcess Nothing menv cmd0
-    withProcessTimeLog cmd args $
-        liftIO $ PID1.run cmd args (envHelper menv)
+exec cmd0 args = do
+    menv <- view envOverrideL
+    cmd <- preProcess cmd0
+    withProcessTimeLog Nothing cmd args $
+        liftIO $ PID1.run cmd args $ Just $ envHelper menv
 #endif
 
 -- | Like 'exec', but does not use 'execv' on non-windows. This way, there
 -- is a sub-process, which is helpful in some cases (#1306)
 --
 -- This function only exits by throwing 'ExitCode'.
-execSpawn :: (MonadUnliftIO m, MonadLogger m)
-     => EnvOverride -> String -> [String] -> m b
-execSpawn menv cmd0 args = do
-    e <- withProcessTimeLog cmd0 args $
-        try (callProcess (Cmd Nothing cmd0 menv args))
-    liftIO $ case e of
-        Left (ProcessExitedUnsuccessfully _ ec) -> exitWith ec
-        Right () -> exitSuccess
+execSpawn :: HasEnvOverride env => String -> [String] -> RIO env a
+execSpawn cmd args = withProc cmd args (runProcess . setStdin inherit) >>= liftIO . exitWith
 
-execObserve :: (MonadUnliftIO m, MonadLogger m)
-    => EnvOverride -> String -> [String] -> m String
-execObserve menv cmd0 args = do
-    e <- withProcessTimeLog cmd0 args $
-        try (callProcessObserveStdout (Cmd Nothing cmd0 menv args))
-    case e of
-        Left (ProcessExitedUnsuccessfully _ ec) -> liftIO $ exitWith ec
-        Right s -> return s
+execObserve :: HasEnvOverride env => String -> [String] -> RIO env String
+execObserve cmd0 args =
+  withProc cmd0 args $ \pc -> do
+    (out, _err) <- readProcess_ pc
+    return
+      $ TL.unpack
+      $ TL.filter (/= '\r')
+      $ TL.concat
+      $ take 1
+      $ TL.lines
+      $ decodeUtf8With lenientDecode out

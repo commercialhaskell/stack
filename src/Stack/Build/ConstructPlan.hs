@@ -58,7 +58,7 @@ import           Stack.Types.PackageName
 import           Stack.Types.Runner
 import           Stack.Types.Version
 import           System.IO (putStrLn)
-import           System.Process.Read (findExecutable)
+import           System.Process.Read (findExecutable, HasEnvOverride (..))
 
 data PackageInfo
     =
@@ -145,6 +145,8 @@ instance HasLogFunc Ctx where
 instance HasRunner Ctx where
     runnerL = configL.runnerL
 instance HasConfig Ctx
+instance HasEnvOverride Ctx where
+    envOverrideL = configL.envOverrideL
 instance HasBuildConfig Ctx
 instance HasEnvConfig Ctx where
     envConfigL = lens ctxEnvConfig (\x y -> x { ctxEnvConfig = y })
@@ -844,8 +846,9 @@ packageDepsWithTools p = do
              map (\dep -> toEither dep (toolToPackages ctx dep)) (Map.keys (packageTools p))
     -- Check whether the tool is on the PATH before warning about it.
     warnings <- fmap catMaybes $ forM warnings0 $ \warning@(ToolWarning (ExeName toolName) _ _) -> do
+        let settings = minimalEnvSettings { esIncludeLocals = True }
         config <- view configL
-        menv <- liftIO $ configEnvOverride config minimalEnvSettings { esIncludeLocals = True }
+        menv <- liftIO $ configEnvOverrideSettings config settings
         mfound <- findExecutable menv $ T.unpack toolName
         case mfound of
             Nothing -> return (Just warning)

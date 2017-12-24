@@ -23,6 +23,7 @@ import           Stack.Prelude
 import           Data.Aeson.Extended         (object, (.=), toJSON)
 import qualified Data.ByteString as S
 import           Data.Char (isSpace)
+import           Data.Conduit.Process.Typed (eceStderr)
 import qualified Data.HashMap.Strict as HashMap
 import qualified Data.HashSet as HashSet
 import           Data.List                   ( (\\), isSuffixOf, intercalate
@@ -40,7 +41,6 @@ import qualified Data.Yaml as Yaml
 import qualified Distribution.Package as C
 import qualified Distribution.PackageDescription as C
 import qualified Distribution.Text as C
-import           Lens.Micro (set)
 import           Path
 import           Path.Find (findFiles)
 import           Path.IO hiding (findExecutable, findFiles, withSystemTempDir)
@@ -111,11 +111,8 @@ cabalSolver cabalfps constraintType
                toConstraintArgs (flagConstraints constraintType) ++
                fmap toFilePath cabalfps
 
-    menv <- getMinimalEnvOverride
-    catch (liftM Right (readProcessStdout (Just tmpdir) menv "cabal" args))
-          (\ex -> case ex of
-              ProcessFailed _ _ _ err -> return $ Left err
-              _ -> throwM ex)
+    catch (withWorkingDir tmpdir $ liftM Right (readProcessStdout "cabal" args))
+          (return . Left . eceStderr)
     >>= either parseCabalErrors parseCabalOutput
 
   where
@@ -300,15 +297,14 @@ setupCabalEnv
     -> (CompilerVersion 'CVActual -> RIO env a)
     -> RIO env a
 setupCabalEnv compiler inner = do
-    mpaths <- setupCompiler compiler
-    menv0 <- getMinimalEnvOverride
-    envMap <- removeHaskellEnvVars
-              <$> augmentPathMap (maybe [] edBins mpaths)
-                                 (unEnvOverride menv0)
-    platform <- view platformL
-    menv <- mkEnvOverride platform envMap
-
-    mcabal <- getCabalInstallVersion menv
+  mpaths <- setupCompiler compiler
+  menv0 <- view envOverrideL
+  envMap <- removeHaskellEnvVars
+            <$> augmentPathMap (maybe [] edBins mpaths)
+                               (unEnvOverride menv0)
+  menv <- mkEnvOverride envMap
+  withEnvOverride menv $ do
+    mcabal <- getCabalInstallVersion
     case mcabal of
         Nothing -> throwM SolverMissingCabalInstall
         Just version
@@ -323,7 +319,7 @@ setupCabalEnv compiler inner = do
                 ") is newer than stack has been tested with.  If you run into difficulties, consider downgrading." <> line
             | otherwise -> return ()
 
-    mver <- getSystemCompiler menv (whichCompiler compiler)
+    mver <- getSystemCompiler (whichCompiler compiler)
     version <- case mver of
         Just (version, _) -> do
             logInfo $ "Using compiler: " <> compilerVersionText version
@@ -331,8 +327,7 @@ setupCabalEnv compiler inner = do
         Nothing -> error "Failed to determine compiler version. \
                          \This is most likely a bug."
 
-    env <- set envOverrideL (const (return menv)) <$> ask
-    runRIO env (inner version)
+    inner version
 
 -- | Merge two separate maps, one defining constraints on package versions and
 -- the other defining package flagmap, into a single map of version and flagmap

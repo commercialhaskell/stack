@@ -34,7 +34,6 @@ module Stack.Types.Config
   ,HasConfig(..)
   ,askLatestSnapshotUrl
   ,explicitSetupDeps
-  ,getMinimalEnvOverride
   -- ** BuildConfig & HasBuildConfig
   ,BuildConfig(..)
   ,LocalPackages(..)
@@ -166,7 +165,7 @@ module Stack.Types.Config
   ,configUrlsL
   ,cabalVersionL
   ,whichCompilerL
-  ,envOverrideL
+  ,envOverrideSettingsL
   ,loadedSnapshotL
   ,shouldForceGhcColorFlag
   ,appropriateGhcColorFlag
@@ -226,7 +225,7 @@ import           Stack.Types.Urls
 import           Stack.Types.Version
 import qualified System.FilePath as FilePath
 import           System.PosixCompat.Types (UserID, GroupID, FileMode)
-import           System.Process.Read (EnvOverride, findExecutable)
+import           System.Process.Read (EnvOverride, HasEnvOverride (..), findExecutable)
 
 -- Re-exports
 import           Stack.Types.Config.Build as X
@@ -250,7 +249,7 @@ data Config =
          -- ^ Docker configuration
          ,configNix                 :: !NixOpts
          -- ^ Execution environment (e.g nix-shell) configuration
-         ,configEnvOverride         :: !(EnvSettings -> IO EnvOverride)
+         ,configEnvOverrideSettings :: !(EnvSettings -> IO EnvOverride)
          -- ^ Environment variables to be passed to external tools
          ,configLocalProgramsBase   :: !(Path Abs Dir)
          -- ^ Non-platform-specific path containing local installations
@@ -1453,18 +1452,11 @@ extraBinDirs :: (MonadThrow m, MonadReader env m, HasEnvConfig env)
              => m (Bool -> [Path Abs Dir])
 extraBinDirs = do
     deps <- installationRootDeps
-    local <- installationRootLocal
+    local' <- installationRootLocal
     tools <- bindirCompilerTools
     return $ \locals -> if locals
-        then [local </> bindirSuffix, deps </> bindirSuffix, tools]
+        then [local' </> bindirSuffix, deps </> bindirSuffix, tools]
         else [deps </> bindirSuffix, tools]
-
--- | Get the minimal environment override, useful for just calling external
--- processes like git or ghc
-getMinimalEnvOverride :: (MonadReader env m, HasConfig env, MonadIO m) => m EnvOverride
-getMinimalEnvOverride = do
-    config' <- view configL
-    liftIO $ configEnvOverride config' minimalEnvSettings
 
 minimalEnvSettings :: EnvSettings
 minimalEnvSettings =
@@ -1486,7 +1478,7 @@ getCompilerPath
 getCompilerPath wc = do
     config' <- view configL
     eoWithoutLocals <- liftIO $
-        configEnvOverride config' minimalEnvSettings { esLocaleUtf8 = True }
+        configEnvOverrideSettings config' minimalEnvSettings { esLocaleUtf8 = True }
     join (findExecutable eoWithoutLocals (compilerExeName wc))
 
 data ProjectAndConfigMonoid
@@ -1872,7 +1864,7 @@ class HasGHCVariant env where
     {-# INLINE ghcVariantL #-}
 
 -- | Class for environment values that can provide a 'Config'.
-class (HasPlatform env, HasRunner env) => HasConfig env where
+class (HasPlatform env, HasRunner env, HasEnvOverride env) => HasConfig env where
     configL :: Lens' env Config
     default configL :: HasBuildConfig env => Lens' env Config
     configL = buildConfigL.lens bcConfig (\x y -> x { bcConfig = y })
@@ -1908,6 +1900,15 @@ instance HasGHCVariant GHCVariant where
 instance HasGHCVariant BuildConfig where
     ghcVariantL = lens bcGHCVariant (\x y -> x { bcGHCVariant = y })
 instance HasGHCVariant EnvConfig
+
+instance HasEnvOverride Config where
+    envOverrideL = runnerL.envOverrideL
+instance HasEnvOverride LoadConfig where
+    envOverrideL = configL.envOverrideL
+instance HasEnvOverride BuildConfig where
+    envOverrideL = configL.envOverrideL
+instance HasEnvOverride EnvConfig where
+    envOverrideL = configL.envOverrideL
 
 instance HasConfig Config where
     configL = id
@@ -2031,10 +2032,10 @@ loadedSnapshotL = envConfigL.lens
 whichCompilerL :: Getting r (CompilerVersion a) WhichCompiler
 whichCompilerL = to whichCompiler
 
-envOverrideL :: HasConfig env => Lens' env (EnvSettings -> IO EnvOverride)
-envOverrideL = configL.lens
-    configEnvOverride
-    (\x y -> x { configEnvOverride = y })
+envOverrideSettingsL :: HasConfig env => Lens' env (EnvSettings -> IO EnvOverride)
+envOverrideSettingsL = configL.lens
+    configEnvOverrideSettings
+    (\x y -> x { configEnvOverrideSettings = y })
 
 shouldForceGhcColorFlag :: (HasRunner env, HasEnvConfig env)
                         => RIO env Bool

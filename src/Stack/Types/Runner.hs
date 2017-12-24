@@ -48,6 +48,7 @@ import           System.Console.ANSI
 import           System.FilePath
 import           System.IO                  (localeEncoding)
 import           System.Log.FastLogger
+import           System.Process.Read (HasEnvOverride (..), EnvOverride, getEnvOverride)
 import           System.Terminal
 
 -- | Monadic environment.
@@ -56,6 +57,7 @@ data Runner = Runner
   , runnerLogOptions :: !LogOptions
   , runnerTerminal   :: !Bool
   , runnerSticky     :: !Sticky
+  , runnerEnvOverride :: !EnvOverride
   , runnerParsedCabalFiles :: !(IORef
       ( Map PackageIdentifierRevision GenericPackageDescription
       , Map (Path Abs Dir)            (GenericPackageDescription, Path Abs File)
@@ -70,8 +72,10 @@ data Runner = Runner
   -- <https://github.com/commercialhaskell/stack/issues/3591>.
   }
 
-class HasLogFunc env => HasRunner env where
+class HasEnvOverride env => HasRunner env where
   runnerL :: Lens' env Runner
+instance HasEnvOverride Runner where
+  envOverrideL = lens runnerEnvOverride (\x y -> x { runnerEnvOverride = y })
 instance HasRunner Runner where
   runnerL = id
 
@@ -274,6 +278,7 @@ withRunner logLevel useTime terminal colorWhen widthOverride reExec inner = do
                                    pure widthOverride
   canUseUnicode <- liftIO getCanUseUnicode
   ref <- newIORef mempty
+  menv <- getEnvOverride
   withSticky terminal $ \sticky -> inner Runner
     { runnerReExec = reExec
     , runnerLogOptions = LogOptions
@@ -287,6 +292,7 @@ withRunner logLevel useTime terminal colorWhen widthOverride reExec inner = do
     , runnerTerminal = terminal
     , runnerSticky = sticky
     , runnerParsedCabalFiles = ref
+    , runnerEnvOverride = menv
     }
   where clipWidth w
           | w < minTerminalWidth = minTerminalWidth

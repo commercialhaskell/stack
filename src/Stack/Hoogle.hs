@@ -24,8 +24,7 @@ import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageName
 import           Stack.Types.Version
 import           System.Exit
-import           System.Process.Read (resetExeCache, tryProcessStdout, findExecutable)
-import           System.Process.Run
+import           System.Process.Read
 
 -- | Hoogle command.
 hoogleCmd :: ([String],Bool,Bool) -> GlobalOpts -> IO ()
@@ -115,7 +114,7 @@ hoogleCmd (args,setup,rebuild) go = withBuildConfig go $ do
                      packageIdentifierText ident <>
                      " in your index, installing it.")
         config <- view configL
-        menv <- liftIO $ configEnvOverride config envSettings
+        menv <- liftIO $ configEnvOverrideSettings config envSettings
         liftIO
             (catch
                  (withBuildConfigAndLock
@@ -138,17 +137,13 @@ hoogleCmd (args,setup,rebuild) go = withBuildConfig go $ do
     runHoogle :: Path Abs File -> [String] -> RIO EnvConfig ()
     runHoogle hooglePath hoogleArgs = do
         config <- view configL
-        menv <- liftIO $ configEnvOverride config envSettings
+        menv <- liftIO $ configEnvOverrideSettings config envSettings
         dbpath <- hoogleDatabasePath
         let databaseArg = ["--database=" ++ toFilePath dbpath]
-        runCmd
-            Cmd
-             { cmdDirectoryToRunIn = Nothing
-             , cmdCommandToRun = toFilePath hooglePath
-             , cmdEnvOverride = menv
-             , cmdCommandLineArguments = hoogleArgs ++ databaseArg
-             }
-            Nothing
+        withEnvOverride menv $ withProc
+          (toFilePath hooglePath)
+          (hoogleArgs ++ databaseArg)
+          runProcess_
     bail :: RIO EnvConfig a
     bail = liftIO (exitWith (ExitFailure (-1)))
     checkDatabaseExists = do
@@ -157,12 +152,12 @@ hoogleCmd (args,setup,rebuild) go = withBuildConfig go $ do
     ensureHoogleInPath :: RIO EnvConfig (Path Abs File)
     ensureHoogleInPath = do
         config <- view configL
-        menv <- liftIO $ configEnvOverride config envSettings
+        menv <- liftIO $ configEnvOverrideSettings config envSettings
         mhooglePath <- findExecutable menv "hoogle"
         eres <- case mhooglePath of
             Nothing -> return $ Left "Hoogle isn't installed."
             Just hooglePath -> do
-                result <- tryProcessStdout Nothing menv (toFilePath hooglePath) ["--numeric-version"]
+                result <- withEnvOverride menv $ tryProcessStdout (toFilePath hooglePath) ["--numeric-version"]
                 let unexpectedResult got = Left $ T.concat
                         [ "'"
                         , T.pack (toFilePath hooglePath)

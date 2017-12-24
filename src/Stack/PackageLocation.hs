@@ -39,7 +39,6 @@ import Stack.Types.Config
 import Stack.Types.PackageIdentifier
 import qualified System.Directory as Dir
 import System.Process.Read
-import System.Process.Run
 
 -- | Same as 'resolveMultiPackageLocation', but works on a
 -- 'SinglePackageLocation'.
@@ -202,31 +201,24 @@ cloneRepo projRoot url commit repoType' = do
     exists <- doesDirExist dir
     unless exists $ do
         liftIO $ ignoringAbsence (removeDirRecur dir)
-        menv <- getMinimalEnvOverride
 
-        let cloneAndExtract commandName cloneArgs resetCommand = do
+        let cloneAndExtract commandName cloneArgs resetCommand = withWorkingDir root $ do
                 ensureDir root
                 logInfo $ "Cloning " <> commit <> " from " <> url
-                callProcessInheritStderrStdout Cmd
-                    { cmdDirectoryToRunIn = Just root
-                    , cmdCommandToRun = commandName
-                    , cmdEnvOverride = menv
-                    , cmdCommandLineArguments =
-                        "clone" :
+                withProc commandName
+                       ("clone" :
                         cloneArgs ++
                         [ T.unpack url
                         , toFilePathNoTrailingSep dir
-                        ]
-                    }
+                        ]) runProcess_
                 created <- doesDirExist dir
                 unless created $ throwM $ FailedToCloneRepo commandName
-                readProcessNull (Just dir) menv commandName
+                readProcessNull commandName
                     (resetCommand ++ [T.unpack commit, "--"])
-                    `catch` \case
-                        ex@ProcessFailed{} -> do
+                    `catchAny` \case
+                        ex -> do
                             logInfo $ "Please ensure that commit " <> commit <> " exists within " <> url
                             throwM ex
-                        ex -> throwM ex
 
         case repoType' of
             RepoGit -> cloneAndExtract "git" ["--recursive"] ["--git-dir=.git", "reset", "--hard"]

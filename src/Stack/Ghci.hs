@@ -49,6 +49,7 @@ import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageName
 import           Stack.Types.Runner
 import           System.IO (putStrLn, putStr, getLine)
+import           System.Process.Read (withEnvOverride)
 
 #ifndef WINDOWS
 import qualified System.Posix.Files as Posix
@@ -355,8 +356,8 @@ runGhci GhciOpts{..} targets mainIsTargets pkgs extraFiles exposePackages = do
         ("Configuring GHCi with the following packages: " <>
          T.intercalate ", " (map (packageNameText . ghciPkgName) pkgs))
     let execGhci extras = do
-            menv <- liftIO $ configEnvOverride config defaultEnvSettings
-            execSpawn menv
+            menv <- liftIO $ configEnvOverrideSettings config defaultEnvSettings
+            withEnvOverride menv $ execSpawn
                  (fromMaybe (compilerExeName wc) ghciGhcCommand)
                  (("--interactive" : ) $
                  -- This initial "-i" resets the include directories to
@@ -372,8 +373,9 @@ runGhci GhciOpts{..} targets mainIsTargets pkgs extraFiles exposePackages = do
             -- multiple packages.
             case pkgs of
                 [_] -> do
-                    menv <- liftIO $ configEnvOverride config defaultEnvSettings
-                    output <- execObserve menv (fromMaybe (compilerExeName wc) ghciGhcCommand) ["--version"]
+                    menv <- liftIO $ configEnvOverrideSettings config defaultEnvSettings
+                    output <- withEnvOverride menv
+                            $ execObserve (fromMaybe (compilerExeName wc) ghciGhcCommand) ["--version"]
                     return $ "Intero" `isPrefixOf` output
                 _ -> return False
     withSystemTempDir "ghci" $ \tmpDirectory -> do
@@ -526,9 +528,7 @@ getGhciPkgInfos
     -> [(PackageName, (Path Abs File, Target))]
     -> RIO env [GhciPkgInfo]
 getGhciPkgInfos buildOptsCLI sourceMap addPkgs mfileTargets localTargets = do
-    menv <- getMinimalEnvOverride
     (installedMap, _, _, _) <- getInstalled
-        menv
         GetInstalledOpts
             { getInstalledProfiling = False
             , getInstalledHaddock   = False

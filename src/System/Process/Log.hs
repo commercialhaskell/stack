@@ -4,37 +4,28 @@
 -- | Separate module because TH.
 
 module System.Process.Log
-    (logCreateProcess
-    ,withProcessTimeLog
+    (withProcessTimeLog -- FIXME move into System.Process.Read
     ,showProcessArgDebug)
     where
 
 import qualified Data.Text as T
 import           Stack.Prelude
 import qualified System.Clock as Clock
-import           System.Process (CreateProcess(..), CmdSpec(..))
-
--- | Log running a process with its arguments, for debugging (-v).
-logCreateProcess :: MonadLogger m => CreateProcess -> m ()
-logCreateProcess CreateProcess { cmdspec = ShellCommand shellCmd } =
-  logDebug ("Creating shell process: " <> T.pack shellCmd)
-logCreateProcess CreateProcess { cmdspec = RawCommand name args } =
-  logDebug
-      ("Creating process: " <> T.pack name <> " " <>
-       T.intercalate
-           " "
-           (map showProcessArgDebug args))
 
 -- | Log running a process with its arguments, for debugging (-v).
 --
 -- This logs one message before running the process and one message after.
-withProcessTimeLog :: (MonadIO m, MonadLogger m) => String -> [String] -> m a -> m a
-withProcessTimeLog name args proc = do
+withProcessTimeLog :: (MonadIO m, MonadLogger m) => Maybe FilePath -> String -> [String] -> m a -> m a
+withProcessTimeLog mdir name args proc = do
   let cmdText =
           T.intercalate
               " "
               (T.pack name : map showProcessArgDebug args)
-  logDebug ("Run process: " <> cmdText)
+      dirMsg =
+        case mdir of
+          Nothing -> ""
+          Just dir -> " within " <> T.pack dir
+  logDebug ("Run process" <> dirMsg <> ": " <> cmdText)
   start <- liftIO $ Clock.getTime Clock.Monotonic
   x <- proc
   end <- liftIO $ Clock.getTime Clock.Monotonic

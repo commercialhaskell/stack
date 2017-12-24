@@ -77,7 +77,6 @@ build setLocalFiles mbuildLk boptsCli = fixCodePage $ do
     bopts <- view buildOptsL
     let profiling = boptsLibProfile bopts || boptsExeProfile bopts
     let symbols = not (boptsLibStrip bopts || boptsExeStrip bopts)
-    menv <- getMinimalEnvOverride
 
     (targets, mbp, locals, extraToBuild, sourceMap) <- loadSourceMapFull NeedTargets boptsCli
 
@@ -95,7 +94,7 @@ build setLocalFiles mbuildLk boptsCli = fixCodePage $ do
              [lpFiles lp | PSFiles lp _ <- Map.elems sourceMap]
 
     (installedMap, globalDumpPkgs, snapshotDumpPkgs, localDumpPkgs) <-
-        getInstalled menv
+        getInstalled
                      GetInstalledOpts
                          { getInstalledProfiling = profiling
                          , getInstalledHaddock   = shouldHaddockDeps bopts
@@ -130,7 +129,7 @@ build setLocalFiles mbuildLk boptsCli = fixCodePage $ do
 
     if boptsCLIDryrun boptsCli
         then printPlan plan
-        else executePlan menv boptsCli baseConfigOpts locals
+        else executePlan boptsCli baseConfigOpts locals
                          globalDumpPkgs
                          snapshotDumpPkgs
                          localDumpPkgs

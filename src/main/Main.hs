@@ -34,7 +34,7 @@ import           System.Process.Read
 #ifdef USE_GIT_INFO
 import           Development.GitRev (gitCommitCount, gitHash)
 #endif
-import           Distribution.System (buildArch, buildPlatform)
+import           Distribution.System (buildArch)
 import qualified Distribution.Text as Cabal (display)
 import           Distribution.Version (mkVersion')
 import           GHC.IO.Encoding (mkTextEncoding, textEncodingName)
@@ -507,12 +507,11 @@ secondaryCommandHandler args f =
     else do
       mExternalExec <- D.findExecutable cmd
       case mExternalExec of
-        Just ex -> do
-          menv <- getEnvOverride buildPlatform
+        Just ex -> runEnvNoLogging $ do
           -- TODO show the command in verbose mode
           -- hPutStrLn stderr $ unwords $
           --   ["Running", "[" ++ ex, unwords (tail args) ++ "]"]
-          _ <- runNoLogging (exec menv ex (tail args))
+          _ <- exec ex (tail args)
           return f
         Nothing -> return $ fmap (vcatErrorHelp (noSuchCmd cmd)) f
   where
@@ -784,42 +783,43 @@ execCmd ExecOpts {..} go@GlobalOpts{..} =
                     (Just $ munlockFile lk)
                     (runRIO (lcConfig lc) $ do
                         config <- view configL
-                        menv <- liftIO $ configEnvOverride config plainEnvSettings
-                        Nix.reexecWithOptionalShell
+                        menv <- liftIO $ configEnvOverrideSettings config plainEnvSettings
+                        withEnvOverride menv $ Nix.reexecWithOptionalShell
                             (lcProjectRoot lc)
                             getCompilerVersion
                             (runRIO (lcConfig lc) $
-                                exec menv cmd args))
+                                exec cmd args))
                     Nothing
                     Nothing -- Unlocked already above.
         ExecOptsEmbellished {..} ->
             withBuildConfigAndLock go $ \lk -> do
-                let targets = concatMap words eoPackages
-                unless (null targets) $
-                    Stack.Build.build (const $ return ()) lk defaultBuildOptsCLI
-                        { boptsCLITargets = map T.pack targets
-                        }
+              let targets = concatMap words eoPackages
+              unless (null targets) $
+                  Stack.Build.build (const $ return ()) lk defaultBuildOptsCLI
+                      { boptsCLITargets = map T.pack targets
+                      }
 
-                config <- view configL
-                menv <- liftIO $ configEnvOverride config eoEnvSettings
+              config <- view configL
+              menv <- liftIO $ configEnvOverrideSettings config eoEnvSettings
+              withEnvOverride menv $ do
                 -- Add RTS options to arguments
                 let argsWithRts args = if null eoRtsOptions
                             then args :: [String]
                             else args ++ ["+RTS"] ++ eoRtsOptions ++ ["-RTS"]
                 (cmd, args) <- case (eoCmd, argsWithRts eoArgs) of
                     (ExecCmd cmd, args) -> return (cmd, args)
-                    (ExecGhc, args) -> getGhcCmd "" menv eoPackages args
+                    (ExecGhc, args) -> getGhcCmd "" eoPackages args
                     -- NOTE: this won't currently work for GHCJS, because it doesn't have
                     -- a runghcjs binary. It probably will someday, though.
                     (ExecRunGhc, args) ->
-                        getGhcCmd "run" menv eoPackages args
+                        getGhcCmd "run" eoPackages args
                 munlockFile lk -- Unlock before transferring control away.
 
-                runWithPath eoCwd $ exec menv cmd args
+                runWithPath eoCwd $ exec cmd args
   where
       -- return the package-id of the first package in GHC_PACKAGE_PATH
-      getPkgId menv wc name = do
-          mId <- findGhcPkgField menv wc [] name "id"
+      getPkgId wc name = do
+          mId <- findGhcPkgField wc [] name "id"
           case mId of
               Just i -> return (head $ words (T.unpack i))
               -- should never happen as we have already installed the packages
@@ -827,13 +827,13 @@ execCmd ExecOpts {..} go@GlobalOpts{..} =
                   hPutStrLn stderr ("Could not find package id of package " ++ name)
                   exitFailure
 
-      getPkgOpts menv wc pkgs = do
-          ids <- mapM (getPkgId menv wc) pkgs
+      getPkgOpts wc pkgs = do
+          ids <- mapM (getPkgId wc) pkgs
           return $ map ("-package-id=" ++) ids
 
-      getGhcCmd prefix menv pkgs args = do
+      getGhcCmd prefix pkgs args = do
           wc <- view $ actualCompilerVersionL.whichCompilerL
-          pkgopts <- getPkgOpts menv wc pkgs
+          pkgopts <- getPkgOpts wc pkgs
           return (prefix ++ compilerExeName wc, pkgopts ++ args)
 
       runWithPath :: Maybe FilePath -> RIO EnvConfig () -> RIO EnvConfig ()

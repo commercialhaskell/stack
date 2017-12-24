@@ -38,19 +38,20 @@ scriptCmd opts go' = do
             , globalStackYaml = SYLNoConfig $ parent file
             }
     withBuildConfigAndLock go $ \lk -> do
-        -- Some warnings in case the user somehow tries to set a
-        -- stack.yaml location. Note that in this functions we use
-        -- logError instead of logWarn because, when using the
-        -- interpreter mode, only error messages are shown. See:
-        -- https://github.com/commercialhaskell/stack/issues/3007
-        case globalStackYaml go' of
-          SYLOverride fp -> logError $ T.pack
-            $ "Ignoring override stack.yaml file for script command: " ++ fp
-          SYLDefault -> return ()
-          SYLNoConfig _ -> assert False (return ())
+      -- Some warnings in case the user somehow tries to set a
+      -- stack.yaml location. Note that in this functions we use
+      -- logError instead of logWarn because, when using the
+      -- interpreter mode, only error messages are shown. See:
+      -- https://github.com/commercialhaskell/stack/issues/3007
+      case globalStackYaml go' of
+        SYLOverride fp -> logError $ T.pack
+          $ "Ignoring override stack.yaml file for script command: " ++ fp
+        SYLDefault -> return ()
+        SYLNoConfig _ -> assert False (return ())
 
-        config <- view configL
-        menv <- liftIO $ configEnvOverride config defaultEnvSettings
+      config <- view configL
+      menv <- liftIO $ configEnvOverrideSettings config defaultEnvSettings
+      withEnvOverride menv $ do
         wc <- view $ actualCompilerVersionL.whichCompilerL
         colorFlag <- appropriateGhcColorFlag
 
@@ -71,7 +72,7 @@ scriptCmd opts go' = do
             -- already. If all needed packages are available, we can
             -- skip the (rather expensive) build call below.
             bss <- sinkProcessStdout
-                Nothing menv (ghcPkgExeName wc)
+                (ghcPkgExeName wc)
                 ["list", "--simple-output"] CL.consume -- FIXME use the package info from envConfigPackages, or is that crazy?
             let installed = Set.fromList
                           $ map toPackageName
@@ -101,19 +102,17 @@ scriptCmd opts go' = do
                 ]
         munlockFile lk -- Unlock before transferring control away.
         case soCompile opts of
-          SEInterpret -> exec menv ("run" ++ compilerExeName wc)
+          SEInterpret -> exec ("run" ++ compilerExeName wc)
                 (ghcArgs ++ toFilePath file : soArgs opts)
           _ -> do
             let dir = parent file
             -- use sinkProcessStdout to ensure a ProcessFailed
             -- exception is generated for better error messages
-            sinkProcessStdout
-              (Just dir)
-              menv
+            withWorkingDir dir $ sinkProcessStdout
               (compilerExeName wc)
               (ghcArgs ++ [toFilePath file])
               CL.sinkNull
-            exec menv (toExeName $ toFilePath file) (soArgs opts)
+            exec (toExeName $ toFilePath file) (soArgs opts)
   where
     toPackageName = reverse . drop 1 . dropWhile (/= '-') . reverse
 

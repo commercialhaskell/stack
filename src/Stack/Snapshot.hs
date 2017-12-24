@@ -606,8 +606,7 @@ loadCompiler :: forall env.
              => CompilerVersion 'CVActual
              -> RIO env LoadedSnapshot
 loadCompiler cv = do
-  menv <- getMinimalEnvOverride
-  m <- ghcPkgDump menv (whichCompiler cv) []
+  m <- ghcPkgDump (whichCompiler cv) []
     (conduitDumpPackage .| CL.foldMap (\dp -> Map.singleton (dpGhcPkgId dp) dp))
   return LoadedSnapshot
     { lsCompilerVersion = cv

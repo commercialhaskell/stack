@@ -48,43 +48,41 @@ import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageName
 import           Stack.Types.Version
 import           System.Directory (getDirectoryContents, doesFileExist)
-import           System.Process.Read
+import           System.Process (readProcess) -- FIXME confirm that this is correct
+import           System.Process.Read hiding (readProcess)
 
 -- | Call ghc-pkg dump with appropriate flags and stream to the given @Sink@, for a single database
 ghcPkgDump
-    :: (MonadUnliftIO m, MonadLogger m)
-    => EnvOverride
-    -> WhichCompiler
+    :: HasEnvOverride env
+    => WhichCompiler
     -> [Path Abs Dir] -- ^ if empty, use global
-    -> Sink Text IO a
-    -> m a
+    -> Sink Text (RIO env) a
+    -> RIO env a
 ghcPkgDump = ghcPkgCmdArgs ["dump"]
 
 -- | Call ghc-pkg describe with appropriate flags and stream to the given @Sink@, for a single database
 ghcPkgDescribe
-    :: (MonadUnliftIO m, MonadLogger m)
+    :: HasEnvOverride env
     => PackageName
-    -> EnvOverride
     -> WhichCompiler
     -> [Path Abs Dir] -- ^ if empty, use global
-    -> Sink Text IO a
-    -> m a
+    -> Sink Text (RIO env) a
+    -> RIO env a
 ghcPkgDescribe pkgName = ghcPkgCmdArgs ["describe", "--simple-output", packageNameString pkgName]
 
 -- | Call ghc-pkg and stream to the given @Sink@, for a single database
 ghcPkgCmdArgs
-    :: (MonadUnliftIO m, MonadLogger m)
+    :: HasEnvOverride env
     => [String]
-    -> EnvOverride
     -> WhichCompiler
     -> [Path Abs Dir] -- ^ if empty, use global
-    -> Sink Text IO a
-    -> m a
-ghcPkgCmdArgs cmd menv wc mpkgDbs sink = do
+    -> Sink Text (RIO env) a
+    -> RIO env a
+ghcPkgCmdArgs cmd wc mpkgDbs sink = do
     case reverse mpkgDbs of
-        (pkgDb:_) -> createDatabase menv wc pkgDb -- TODO maybe use some retry logic instead?
+        (pkgDb:_) -> createDatabase wc pkgDb -- TODO maybe use some retry logic instead?
         _ -> return ()
-    sinkProcessStdout Nothing menv (ghcPkgExeName wc) args sink'
+    sinkProcessStdout (ghcPkgExeName wc) args sink'
   where
     args = concat
         [ case mpkgDbs of

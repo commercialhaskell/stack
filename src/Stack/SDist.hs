@@ -173,8 +173,7 @@ getCabalLbs pvpBounds mrev cabalfp = do
     unless (cabalfp == cabalfp')
       $ error $ "getCabalLbs: cabalfp /= cabalfp': " ++ show (cabalfp, cabalfp')
     (_, sourceMap) <- loadSourceMap AllowNoTargets defaultBuildOptsCLI
-    menv <- getMinimalEnvOverride
-    (installedMap, _, _, _) <- getInstalled menv GetInstalledOpts
+    (installedMap, _, _, _) <- getInstalled GetInstalledOpts
                                 { getInstalledProfiling = False
                                 , getInstalledHaddock = False
                                 , getInstalledSymbols = False
@@ -319,16 +318,14 @@ readLocalPackage pkgDir = do
 getSDistFileList :: HasEnvConfig env => LocalPackage -> RIO env (String, Path Abs File)
 getSDistFileList lp =
     withSystemTempDir (stackProgName <> "-sdist") $ \tmpdir -> do
-        menv <- getMinimalEnvOverride
         let bopts = defaultBuildOpts
         let boptsCli = defaultBuildOptsCLI
         baseConfigOpts <- mkBaseConfigOpts boptsCli
         (locals, _) <- loadSourceMap NeedTargets boptsCli
-        run <- askRunInIO
-        withExecuteEnv menv bopts boptsCli baseConfigOpts locals
+        withExecuteEnv bopts boptsCli baseConfigOpts locals
             [] [] [] -- provide empty list of globals. This is a hack around custom Setup.hs files
             $ \ee ->
-            withSingleContext run ac ee task Nothing (Just "sdist") $ \_package cabalfp _pkgDir cabal _announce _console _mlogFile -> do
+            withSingleContext ac ee task Nothing (Just "sdist") $ \_package cabalfp _pkgDir cabal _announce _console _mlogFile -> do
                 let outFile = toFilePath tmpdir FP.</> "source-files-list"
                 cabal KeepTHLoading ["sdist", "--list-sources", outFile]
                 contents <- liftIO (S.readFile outFile)

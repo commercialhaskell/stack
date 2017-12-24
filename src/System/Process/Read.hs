@@ -32,32 +32,49 @@ module System.Process.Read
   ,augmentPath
   ,augmentPathMap
   ,resetExeCache
+  ,HasEnvOverride (..)
+  ,workingDirL
+  ,withProc
+  ,withEnvOverride
+  ,withModifyEnvOverride
+  ,withWorkingDir
+  ,runProcess
+  ,runProcess_
+  ,runEnvNoLogging
   )
   where
 
 import           Stack.Prelude
 import qualified Data.ByteString as S
-import           Data.ByteString.Builder
-import qualified Data.ByteString.Lazy as L
 import           Data.Conduit
 import qualified Data.Conduit.Binary as CB
 import qualified Data.Conduit.List as CL
-import           Data.Conduit.Process hiding (callProcess)
+import           Data.Conduit.Process.Typed
 import qualified Data.Map as Map
 import qualified Data.Text as T
 import           Data.Text.Encoding (decodeUtf8With)
 import           Data.Text.Encoding.Error (lenientDecode)
-import qualified Data.Text.Lazy as LT
-import qualified Data.Text.Lazy.Encoding as LT
-import           Distribution.System (OS (Windows), Platform (Platform))
+import           Distribution.System (OS (Windows), Platform (Platform), buildPlatform)
+import           Lens.Micro (set, to)
 import           Path
 import           Path.Extra
 import           Path.IO hiding (findExecutable)
 import qualified System.Directory as D
 import           System.Environment (getEnvironment)
-import           System.Exit
 import qualified System.FilePath as FP
 import           System.Process.Log
+
+class HasLogFunc env => HasEnvOverride env where
+  envOverrideL :: Lens' env EnvOverride
+
+data EnvVarFormat = EVFWindows | EVFNotWindows
+
+evfFromPlatform :: Platform -> EnvVarFormat
+evfFromPlatform (Platform _ Windows) = EVFWindows
+evfFromPlatform (Platform _ _) = EVFNotWindows
+
+currentEnvVarFormat :: EnvVarFormat
+currentEnvVarFormat = evfFromPlatform buildPlatform
 
 -- | Override the environment received by a child process.
 data EnvOverride = EnvOverride
@@ -66,8 +83,11 @@ data EnvOverride = EnvOverride
     , eoPath :: [FilePath] -- ^ List of directories searched for executables (@PATH@)
     , eoExeCache :: IORef (Map FilePath (Either ReadProcessException (Path Abs File)))
     , eoExeExtensions :: [String] -- ^ @[""]@ on non-Windows systems, @["", ".exe", ".bat"]@ on Windows
-    , eoPlatform :: Platform
+    , eoWorkingDir :: !(Maybe (Path Abs Dir))
     }
+
+workingDirL :: HasEnvOverride env => Lens' env (Maybe (Path Abs Dir))
+workingDirL = envOverrideL.lens eoWorkingDir (\x y -> x { eoWorkingDir = y })
 
 -- | Get the environment variables from an 'EnvOverride'.
 unEnvOverride :: EnvOverride -> Map Text Text
@@ -82,16 +102,13 @@ modifyEnvOverride :: MonadIO m
                   => EnvOverride
                   -> (Map Text Text -> Map Text Text)
                   -> m EnvOverride
-modifyEnvOverride eo f = mkEnvOverride
-    (eoPlatform eo)
-    (f $ eoTextMap eo)
+modifyEnvOverride eo f = mkEnvOverride (f $ eoTextMap eo)
 
 -- | Create a new 'EnvOverride'.
 mkEnvOverride :: MonadIO m
-              => Platform
-              -> Map Text Text
+              => Map Text Text
               -> m EnvOverride
-mkEnvOverride platform tm' = do
+mkEnvOverride tm' = do
     ref <- liftIO $ newIORef Map.empty
     return EnvOverride
         { eoTextMap = tm
@@ -107,7 +124,7 @@ mkEnvOverride platform tm' = do
                            (Map.lookup "PATHEXT" tm)
                       in map T.unpack $ "" : T.splitOn ";" pathext
                 else [""]
-        , eoPlatform = platform
+        , eoWorkingDir = Nothing
         }
   where
     -- Fix case insensitivity of the PATH environment variable on Windows.
@@ -118,100 +135,72 @@ mkEnvOverride platform tm' = do
     -- Don't use CPP so that the Windows code path is at least type checked
     -- regularly
     isWindows =
-        case platform of
-            Platform _ Windows -> True
-            _ -> False
+        case currentEnvVarFormat of
+            EVFWindows -> True
+            EVFNotWindows -> False
 
 -- | Helper conversion function.
-envHelper :: EnvOverride -> Maybe [(String, String)]
-envHelper = Just . eoStringList
+envHelper :: EnvOverride -> [(String, String)]
+envHelper = eoStringList
 
 -- | Read from the process, ignoring any output.
 --
 -- Throws a 'ReadProcessException' exception if the process fails.
-readProcessNull :: (MonadUnliftIO m, MonadLogger m)
-                => Maybe (Path Abs Dir) -- ^ Optional working directory
-                -> EnvOverride
-                -> String -- ^ Command
+readProcessNull :: HasEnvOverride env
+                => String -- ^ Command
                 -> [String] -- ^ Command line arguments
-                -> m ()
-readProcessNull wd menv name args =
-    sinkProcessStdout wd menv name args CL.sinkNull
+                -> RIO env ()
+readProcessNull name args = sinkProcessStdout name args CL.sinkNull
 
 -- | Try to produce a strict 'S.ByteString' from the stdout of a
 -- process.
-tryProcessStdout :: (MonadUnliftIO m, MonadLogger m)
-                 => Maybe (Path Abs Dir) -- ^ Optional directory to run in
-                 -> EnvOverride
-                 -> String -- ^ Command
+tryProcessStdout :: HasEnvOverride env
+                 => String -- ^ Command
                  -> [String] -- ^ Command line arguments
-                 -> m (Either ReadProcessException S.ByteString)
-tryProcessStdout wd menv name args =
-    try (readProcessStdout wd menv name args)
+                 -> RIO env (Either SomeException S.ByteString)
+tryProcessStdout name args = tryAny (readProcessStdout name args)
 
 -- | Try to produce strict 'S.ByteString's from the stderr and stdout of a
 -- process.
-tryProcessStderrStdout :: (MonadUnliftIO m, MonadLogger m)
-                       => Maybe (Path Abs Dir) -- ^ Optional directory to run in
-                       -> EnvOverride
-                       -> String -- ^ Command
-                       -> [String] -- ^ Command line arguments
-                       -> m (Either ReadProcessException (S.ByteString, S.ByteString))
-tryProcessStderrStdout wd menv name args =
-    try (readProcessStderrStdout wd menv name args)
+tryProcessStderrStdout
+  :: HasEnvOverride env
+  => String -- ^ Command
+  -> [String] -- ^ Command line arguments
+  -> RIO env (Either ReadProcessException (S.ByteString, S.ByteString))
+tryProcessStderrStdout name args =
+    try (readProcessStderrStdout name args)
 
 -- | Produce a strict 'S.ByteString' from the stdout of a process.
 --
 -- Throws a 'ReadProcessException' exception if the process fails.
-readProcessStdout :: (MonadUnliftIO m, MonadLogger m)
-                  => Maybe (Path Abs Dir) -- ^ Optional directory to run in
-                  -> EnvOverride
-                  -> String -- ^ Command
-                  -> [String] -- ^ Command line arguments
-                  -> m S.ByteString
-readProcessStdout wd menv name args =
-  sinkProcessStdout wd menv name args CL.consume >>=
+readProcessStdout
+  :: HasEnvOverride env
+  => String -- ^ Command
+  -> [String] -- ^ Command line arguments
+  -> RIO env S.ByteString
+readProcessStdout name args =
+  sinkProcessStdout name args CL.consume >>=
   liftIO . evaluate . S.concat
 
 -- | Produce strict 'S.ByteString's from the stderr and stdout of a process.
 --
 -- Throws a 'ReadProcessException' exception if the process fails.
-readProcessStderrStdout :: (MonadUnliftIO m, MonadLogger m)
-                        => Maybe (Path Abs Dir) -- ^ Optional directory to run in
-                        -> EnvOverride
-                        -> String -- ^ Command
-                        -> [String] -- ^ Command line arguments
-                        -> m (S.ByteString, S.ByteString)
-readProcessStderrStdout wd menv name args = do
-  (e, o) <- sinkProcessStderrStdout wd menv name args CL.consume CL.consume
+readProcessStderrStdout
+  :: HasEnvOverride env
+  => String -- ^ Command
+  -> [String] -- ^ Command line arguments
+  -> RIO env (S.ByteString, S.ByteString)
+readProcessStderrStdout name args = do
+  (e, o) <- sinkProcessStderrStdout name args CL.consume CL.consume
   liftIO $ (,) <$> evaluate (S.concat e) <*> evaluate (S.concat o)
 
 -- | An exception while trying to read from process.
 data ReadProcessException
-    = ProcessFailed CreateProcess ExitCode L.ByteString L.ByteString
-    -- ^ @'ProcessFailed' createProcess exitCode stdout stderr@
-    | NoPathFound
+    = NoPathFound
     | ExecutableNotFound String [FilePath]
     | ExecutableNotFoundAt FilePath
     deriving Typeable
 instance Show ReadProcessException where
-    show (ProcessFailed cp ec out err) = concat $
-        [ "Running "
-        , showSpec $ cmdspec cp] ++
-        maybe [] (\x -> [" in directory ", x]) (cwd cp) ++
-        [ " exited with "
-        , show ec
-        , "\n\n"
-        , toStr out
-        , "\n"
-        , toStr err
-        ]
-      where
-        toStr = LT.unpack . LT.decodeUtf8With lenientDecode
-
-        showSpec (ShellCommand str) = str
-        showSpec (RawCommand cmd args) =
-            unwords $ cmd : map (T.unpack . showProcessArgDebug) args
     show NoPathFound = "PATH not found in EnvOverride"
     show (ExecutableNotFound name path) = concat
         [ "Executable named "
@@ -230,115 +219,122 @@ instance Exception ReadProcessException
 --
 -- Throws a 'ReadProcessException' if unsuccessful.
 sinkProcessStdout
-    :: (MonadUnliftIO m, MonadLogger m)
-    => Maybe (Path Abs Dir) -- ^ Optional directory to run in
-    -> EnvOverride
-    -> String -- ^ Command
+    :: HasEnvOverride env
+    => String -- ^ Command
     -> [String] -- ^ Command line arguments
-    -> Sink S.ByteString IO a -- ^ Sink for stdout
-    -> m a
-sinkProcessStdout wd menv name args sinkStdout = do
-  stderrBuffer <- liftIO (newIORef mempty)
-  stdoutBuffer <- liftIO (newIORef mempty)
-  (_,sinkRet) <-
-      catch
-          (sinkProcessStderrStdout
-               wd
-               menv
-               name
-               args
-               (CL.mapM_ (\bytes -> liftIO (modifyIORef' stderrBuffer (<> byteString bytes))))
-               (CL.iterM (\bytes -> liftIO (modifyIORef' stdoutBuffer (<> byteString bytes))) $=
-                sinkStdout))
-          (\(ProcessExitedUnsuccessfully cp ec) ->
-               do stderrBuilder <- liftIO (readIORef stderrBuffer)
-                  stdoutBuilder <- liftIO (readIORef stdoutBuffer)
-                  liftIO $ throwM $ ProcessFailed
-                    cp
-                    ec
-                    (toLazyByteString stdoutBuilder)
-                    (toLazyByteString stderrBuilder))
-  return sinkRet
+    -> Sink S.ByteString (RIO env) a -- ^ Sink for stdout
+    -> RIO env a
+sinkProcessStdout name args sinkStdout =
+  withProc name args $ \pc ->
+  withLoggedProcess_ (setStdin closed pc) $ \p -> runConcurrently
+    $ Concurrently (runConduit $ getStderr p .| CL.sinkNull)
+   *> Concurrently (runConduit $ getStdout p .| sinkStdout)
 
 logProcessStderrStdout
-    :: (HasCallStack, MonadUnliftIO m, MonadLogger m)
-    => Maybe (Path Abs Dir)
-    -> String
-    -> EnvOverride
+    :: (HasCallStack, HasEnvOverride env)
+    => String
     -> [String]
-    -> m ()
-logProcessStderrStdout mdir name menv args = withUnliftIO $ \u -> do
-    let logLines = CB.lines =$ CL.mapM_ (unliftIO u . logInfo . decodeUtf8With lenientDecode)
-    ((), ()) <- unliftIO u $ sinkProcessStderrStdout mdir menv name args logLines logLines
+    -> RIO env ()
+logProcessStderrStdout name args = do
+    let logLines = CB.lines =$ CL.mapM_ (logInfo . decodeUtf8With lenientDecode)
+    ((), ()) <- sinkProcessStderrStdout name args logLines logLines
     return ()
 
 -- | Consume the stdout and stderr of a process feeding strict 'S.ByteString's to the consumers.
 --
 -- Throws a 'ReadProcessException' if unsuccessful in launching, or 'ProcessExitedUnsuccessfully' if the process itself fails.
-sinkProcessStderrStdout :: forall m e o. (MonadIO m, MonadLogger m)
-                        => Maybe (Path Abs Dir) -- ^ Optional directory to run in
-                        -> EnvOverride
-                        -> String -- ^ Command
-                        -> [String] -- ^ Command line arguments
-                        -> Sink S.ByteString IO e -- ^ Sink for stderr
-                        -> Sink S.ByteString IO o -- ^ Sink for stdout
-                        -> m (e,o)
-sinkProcessStderrStdout wd menv name args sinkStderr sinkStdout = do
-  name' <- preProcess wd menv name
-  withProcessTimeLog name' args $
-      liftIO $ withCheckedProcess
-          (proc name' args) { env = envHelper menv, cwd = fmap toFilePath wd }
-          (\ClosedStream out err -> f err out)
-  where
-
-    -- There is a bug in streaming-commons or conduit-extra which
-    -- leads to a file descriptor leak. Ideally, we should be able to
-    -- simply use the following code. Instead, we're using the code
-    -- below it, which is explicit in closing Handles. When the
-    -- upstream bug is fixed, we can consider moving back to the
-    -- simpler code, though there's really no downside to the more
-    -- complex version used here.
-    --
-    -- f :: Source IO S.ByteString -> Source IO S.ByteString -> IO (e, o)
-    -- f err out = (err $$ sinkStderr) `concurrently` (out $$ sinkStdout)
-
-    f :: Handle -> Handle -> IO (e, o)
-    f err out = ((CB.sourceHandle err $$ sinkStderr) `concurrently` (CB.sourceHandle out $$ sinkStdout))
-        `finally` hClose err `finally` hClose out
+sinkProcessStderrStdout
+  :: forall e o env. HasEnvOverride env
+  => String -- ^ Command
+  -> [String] -- ^ Command line arguments
+  -> Sink S.ByteString (RIO env) e -- ^ Sink for stderr
+  -> Sink S.ByteString (RIO env) o -- ^ Sink for stdout
+  -> RIO env (e,o)
+sinkProcessStderrStdout name args sinkStderr sinkStdout =
+  withProc name args $ \pc0 -> do
+    let pc = setStdin closed
+           $ setStdout createSource
+           $ setStderr createSource
+             pc0
+    withProcess_ pc $ \p ->
+      (runConduit $ getStderr p .| sinkStderr) `concurrently`
+      (runConduit $ getStdout p .| sinkStdout)
 
 -- | Like sinkProcessStderrStdout, but receives Handles for stderr and stdout instead of 'Sink's.
 --
 -- Throws a 'ReadProcessException' if unsuccessful in launching, or 'ProcessExitedUnsuccessfully' if the process itself fails.
-sinkProcessStderrStdoutHandle :: (MonadIO m, MonadLogger m)
-                              => Maybe (Path Abs Dir) -- ^ Optional directory to run in
-                              -> EnvOverride
-                              -> String -- ^ Command
-                              -> [String] -- ^ Command line arguments
-                              -> Handle
-                              -> Handle
-                              -> m ()
-sinkProcessStderrStdoutHandle wd menv name args err out = do
-  name' <- preProcess wd menv name
-  withProcessTimeLog name' args $
-      liftIO $ withCheckedProcess
-          (proc name' args)
-              { env = envHelper menv
-              , cwd = fmap toFilePath wd
-              , std_err = UseHandle err
-              , std_out = UseHandle out
-              }
-          (\ClosedStream UseProvidedHandle UseProvidedHandle -> return ())
+sinkProcessStderrStdoutHandle
+  :: HasEnvOverride env
+  => String -- ^ Command
+  -> [String] -- ^ Command line arguments
+  -> Handle
+  -> Handle
+  -> RIO env ()
+sinkProcessStderrStdoutHandle name args err out =
+      withProc name args
+    $ runProcess_
+    . setStdin closed
+    . setStdout (useHandleOpen out)
+    . setStderr (useHandleOpen err)
+
+-- | Provide a 'ProcessConfig' based on the 'EnvOverride' in
+-- scope. Deals with resolving the full path, setting the child
+-- process's environment variables, setting the working directory, and
+-- wrapping the call with 'withProcessTimeLog' for debugging output.
+withProc
+  :: HasEnvOverride env
+  => FilePath -- ^ command to run
+  -> [String] -- ^ command line arguments
+  -> (ProcessConfig () () () -> RIO env a)
+  -> RIO env a
+withProc name0 args inner = do
+  menv <- view envOverrideL
+  name <- preProcess name0
+
+  withProcessTimeLog (toFilePath <$> eoWorkingDir menv) name args
+    $ inner
+    $ setDelegateCtlc True
+    $ setEnv (envHelper menv)
+    $ maybe id (setWorkingDir . toFilePath) (eoWorkingDir menv)
+
+    -- sensible default in Stack: we do not want subprocesses to be
+    -- able to interact with the user by default. If a specific case
+    -- requires interaction, we can override with `setStdin
+    -- (useHandleOpen stdin)`.
+    $ setStdin closed
+
+    $ proc name args
+
+-- | Apply the given function to the modified environment
+-- variables. For more details, see 'withEnvOverride'.
+withModifyEnvOverride :: HasEnvOverride env => (Map Text Text -> Map Text Text) -> RIO env a -> RIO env a
+withModifyEnvOverride f inner = do
+  menv <- view envOverrideL
+  menv' <- modifyEnvOverride menv f
+  withEnvOverride menv' inner
+
+-- | Set a new 'EnvOverride' in the child reader. Note that this will
+-- keep the working directory set in the parent with 'withWorkingDir'.
+withEnvOverride :: HasEnvOverride env => EnvOverride -> RIO env a -> RIO env a
+withEnvOverride newEnv = local $ \r ->
+  let newEnv' = newEnv { eoWorkingDir = eoWorkingDir $ view envOverrideL r }
+   in set envOverrideL newEnv' r
+
+-- | Set the working directory to be used by child processes.
+withWorkingDir :: HasEnvOverride env => Path Abs Dir -> RIO env a -> RIO env a
+withWorkingDir = local . set workingDirL . Just
 
 -- | Perform pre-call-process tasks.  Ensure the working directory exists and find the
 -- executable path.
 --
 -- Throws a 'ReadProcessException' if unsuccessful.
-preProcess :: (MonadIO m)
-  => Maybe (Path Abs Dir) -- ^ Optional directory to create if necessary
-  -> EnvOverride       -- ^ How to override environment
-  -> String            -- ^ Command name
-  -> m FilePath
-preProcess wd menv name = do
+preProcess
+  :: HasEnvOverride env
+  => String            -- ^ Command name
+  -> RIO env  FilePath
+preProcess name = do
+  menv <- view envOverrideL
+  let wd = eoWorkingDir menv
   name' <- liftIO $ liftM toFilePath $ join $ findExecutable menv name
   maybe (return ()) ensureDir wd
   return name'
@@ -398,11 +394,11 @@ resetExeCache :: MonadIO m => EnvOverride -> m ()
 resetExeCache eo = liftIO (atomicModifyIORef (eoExeCache eo) (const mempty))
 
 -- | Load up an 'EnvOverride' from the standard environment.
-getEnvOverride :: MonadIO m => Platform -> m EnvOverride
-getEnvOverride platform =
+getEnvOverride :: MonadIO m => m EnvOverride
+getEnvOverride =
     liftIO $
     getEnvironment >>=
-          mkEnvOverride platform
+          mkEnvOverride
         . Map.fromList . map (T.pack *** T.pack)
 
 newtype InvalidPathException = PathsInvalidInPath [FilePath]
@@ -434,3 +430,14 @@ augmentPathMap dirs origEnv =
      return $ Map.insert "PATH" path origEnv
   where
     mpath = Map.lookup "PATH" origEnv
+
+runEnvNoLogging :: RIO EnvNoLogging a -> IO a
+runEnvNoLogging inner = do
+  menv <- getEnvOverride
+  runRIO (EnvNoLogging menv) inner
+
+newtype EnvNoLogging = EnvNoLogging EnvOverride
+instance HasLogFunc EnvNoLogging where
+  logFuncL = to (\_ _ _ _ _ -> return ())
+instance HasEnvOverride EnvNoLogging where
+  envOverrideL = lens (\(EnvNoLogging x) -> x) (const EnvNoLogging)
