@@ -239,7 +239,7 @@ renderStackYaml p ignoredPackages dupPackages =
         [ ("user-message"     , userMsgHelp)
         , ("resolver"         , resolverHelp)
         , ("packages"         , packageHelp)
-        , ("extra-deps"       , "# Dependency packages to be pulled from upstream that are not in the resolver\n# (e.g., acme-missiles-0.3)")
+        , ("extra-deps"       , "# Dependency packages to be pulled from upstream that are not in the resolver\n# using the same syntax as the packages field.\n# (e.g., acme-missiles-0.3)")
         , ("flags"            , "# Override default flag values for local packages and extra-deps")
         , ("extra-package-dbs", "# Extra package databases containing global packages")
         ]
@@ -262,9 +262,12 @@ renderStackYaml p ignoredPackages dupPackages =
         , "resolver: nightly-2015-09-21"
         , "resolver: ghc-7.10.2"
         , "resolver: ghcjs-0.1.0_ghc-7.10.2"
-        , "resolver:"
-        , " name: custom-snapshot"
-        , " location: \"./custom-snapshot.yaml\""
+        , ""
+        , "The location of a snapshot can be provided as a file or url. Stack assumes"
+        , "a snapshot provided as a file might change, whereas a url resource does not."
+        , ""
+        , "resolver: ./custom-snapshot.yaml"
+        , "resolver: https://example.com/snapshots/2018-01-01.yaml"
         ]
 
     userMsgHelp = commentHelp
@@ -281,14 +284,9 @@ renderStackYaml p ignoredPackages dupPackages =
         , "   git: https://github.com/commercialhaskell/stack.git"
         , "   commit: e7b331f14bcffb8367cd58fbfc8b40ec7642100a"
         , "- location: https://github.com/commercialhaskell/stack/commit/e7b331f14bcffb8367cd58fbfc8b40ec7642100a"
-        , "  extra-dep: true"
         , " subdirs:"
         , " - auto-update"
         , " - wai"
-        , ""
-        , "A package marked 'extra-dep: true' will only be built if demanded by a"
-        , "non-dependency (i.e. a user package), and its test suites and benchmarks"
-        , "will not be run. This is useful for tweaking upstream packages."
         ]
 
     footerHelp =

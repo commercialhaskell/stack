@@ -18,6 +18,11 @@ Other enhancements:
 
 Bug fixes:
 
+* Benchmarks used to be run concurrently with other benchmarks
+  and build steps. This is non-ideal because CPU usage of other processes
+  may interfere with benchmarks. It also prevented benchmark output from
+  being displayed by default. This is now fixed. See
+  [#3663](https://github.com/commercialhaskell/stack/issues/3663).
 
 ## v1.6.3
 
@@ -42,11 +47,9 @@ Bug fixes:
   arguments. See [#3658](https://github.com/commercialhaskell/stack/issues/3658).
   In particular, this makes it possible to pass `-- +RTS ... -RTS` to specify
   RTS arguments used when running the script.
-* Benchmarks used to be run concurrently with other benchmarks
-  and build steps. This is non-ideal because CPU usage of other processes
-  may interfere with benchmarks. It also prevented benchmark output from
-  being displayed by default. This is now fixed. See
-  [#3663](https://github.com/commercialhaskell/stack/issues/3663).
+* Don't ignore the template `year` parameter in config files, and clarify the
+  surrounding documentation. See
+  [#2275](https://github.com/commercialhaskell/stack/issues/2275).
 
 ## v1.6.1.1
 

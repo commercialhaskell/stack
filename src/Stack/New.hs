@@ -176,17 +176,17 @@ applyTemplate project template nonceParams dir templateText = do
     config <- view configL
     currentYear <- do
       now <- liftIO getCurrentTime
-      (year, _, _) <- return $ toGregorian . utctDay $ now
+      let (year, _, _) = toGregorian (utctDay now)
       return $ T.pack . show $ year
-    let context = M.union (M.union nonceParams extraParams) configParams
+    let context = M.unions [nonceParams, nameParams, configParams, yearParam]
           where
             nameAsVarId = T.replace "-" "_" $ packageNameText project
             nameAsModule = T.filter (/= '-') $ T.toTitle $ packageNameText project
-            extraParams = M.fromList [ ("name", packageNameText project)
-                                     , ("name-as-varid", nameAsVarId)
-                                     , ("name-as-module", nameAsModule)
-                                     , ("year", currentYear) ]
+            nameParams = M.fromList [ ("name", packageNameText project)
+                                    , ("name-as-varid", nameAsVarId)
+                                    , ("name-as-module", nameAsModule) ]
             configParams = configTemplateParams config
+            yearParam = M.singleton "year" currentYear
     (applied,missingKeys) <-
         runWriterT
             (hastacheStr
