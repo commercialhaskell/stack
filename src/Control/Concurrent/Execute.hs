@@ -8,32 +8,49 @@ module Control.Concurrent.Execute
     , ActionId (..)
     , ActionContext (..)
     , Action (..)
+    , Concurrency(..)
     , runActions
     ) where
 
 import           Control.Concurrent.STM   (retry)
 import           Stack.Prelude
+import           Data.List (sortBy)
 import qualified Data.Set                 as Set
 import           Stack.Types.PackageIdentifier
 
 data ActionType
     = ATBuild
+      -- ^ Action for building a package's library and executables. If
+      -- 'taskAllInOne' is 'True', then this will also build benchmarks
+      -- and tests. It is 'False' when then library's benchmarks or
+      -- test-suites have cyclic dependencies.
     | ATBuildFinal
-    | ATFinal
+      -- ^ Task for building the package's benchmarks and test-suites.
+      -- Requires that the library was already built.
+    | ATRunTests
+      -- ^ Task for running the package's test-suites.
+    | ATRunBenchmarks
+      -- ^ Task for running the package's benchmarks.
     deriving (Show, Eq, Ord)
 data ActionId = ActionId !PackageIdentifier !ActionType
     deriving (Show, Eq, Ord)
 data Action = Action
-    { actionId   :: !ActionId
+    { actionId :: !ActionId
     , actionDeps :: !(Set ActionId)
-    , actionDo   :: !(ActionContext -> IO ())
+    , actionDo :: !(ActionContext -> IO ())
+    , actionConcurrency :: !Concurrency
     }
+
+data Concurrency = ConcurrencyAllowed | ConcurrencyDisallowed
+    deriving (Eq)
 
 data ActionContext = ActionContext
     { acRemaining :: !(Set ActionId)
     -- ^ Does not include the current action
     , acDownstream :: [Action]
     -- ^ Actions which depend on the current action
+    , acConcurrency :: !Concurrency
+    -- ^ Whether this action may be run concurrently with others
     }
 
 data ExecuteState = ExecuteState
@@ -41,7 +58,6 @@ data ExecuteState = ExecuteState
     , esExceptions :: TVar [SomeException]
     , esInAction   :: TVar (Set ActionId)
     , esCompleted  :: TVar Int
-    , esFinalLock  :: Maybe (TMVar ())
     , esKeepGoing  :: Bool
     }
 
@@ -56,25 +72,33 @@ instance Show ExecuteException where
 
 runActions :: Int -- ^ threads
            -> Bool -- ^ keep going after one task has failed
-           -> Bool -- ^ run final actions concurrently?
            -> [Action]
            -> (TVar Int -> IO ()) -- ^ progress updated
            -> IO [SomeException]
-runActions threads keepGoing concurrentFinal actions0 withProgress = do
+runActions threads keepGoing actions0 withProgress = do
     es <- ExecuteState
-        <$> newTVarIO actions0
+        <$> newTVarIO (sortActions actions0)
         <*> newTVarIO []
         <*> newTVarIO Set.empty
         <*> newTVarIO 0
-        <*> (if concurrentFinal
-                then pure Nothing
-                else Just <$> atomically (newTMVar ()))
         <*> pure keepGoing
     _ <- async $ withProgress $ esCompleted es
     if threads <= 1
         then runActions' es
         else replicateConcurrently_ threads $ runActions' es
     readTVarIO $ esExceptions es
+
+-- | Sort actions such that those that can't be run concurrently are at
+-- the end.
+sortActions :: [Action] -> [Action]
+sortActions = sortBy (compareConcurrency `on` actionConcurrency)
+  where
+    -- NOTE: Could derive Ord. However, I like to make this explicit so
+    -- that changes to the datatype must consider how it's affecting
+    -- this.
+    compareConcurrency ConcurrencyAllowed ConcurrencyDisallowed = LT
+    compareConcurrency ConcurrencyDisallowed ConcurrencyAllowed = GT
+    compareConcurrency _ _ = EQ
 
 runActions' :: ExecuteState -> IO ()
 runActions' ExecuteState {..} =
@@ -101,16 +125,12 @@ runActions' ExecuteState {..} =
                         return $ return ()
                     else retry
             (xs, action:ys) -> do
-                unlock <-
-                    case (actionId action, esFinalLock) of
-                        (ActionId _ ATFinal, Just lock) -> do
-                            takeTMVar lock
-                            return $ putTMVar lock ()
-                        _ -> return $ return ()
-
-                let as' = xs ++ ys
                 inAction <- readTVar esInAction
-                let remaining = Set.union
+                case actionConcurrency action of
+                  ConcurrencyAllowed -> return ()
+                  ConcurrencyDisallowed -> unless (Set.null inAction) retry
+                let as' = xs ++ ys
+                    remaining = Set.union
                         (Set.fromList $ map actionId as')
                         inAction
                 writeTVar esActions as'
@@ -119,9 +139,9 @@ runActions' ExecuteState {..} =
                     eres <- try $ restore $ actionDo action ActionContext
                         { acRemaining = remaining
                         , acDownstream = downstreamActions (actionId action) as'
+                        , acConcurrency = actionConcurrency action
                         }
                     atomically $ do
-                        unlock
                         modifyTVar esInAction (Set.delete $ actionId action)
                         modifyTVar esCompleted (+1)
                         case eres of

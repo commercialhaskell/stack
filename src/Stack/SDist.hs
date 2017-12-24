@@ -17,7 +17,7 @@ import qualified Codec.Archive.Tar as Tar
 import qualified Codec.Archive.Tar.Entry as Tar
 import qualified Codec.Compression.GZip as GZip
 import           Control.Applicative
-import           Control.Concurrent.Execute (ActionContext(..))
+import           Control.Concurrent.Execute (ActionContext(..), Concurrency(..))
 import           Stack.Prelude
 import           Control.Monad.Reader.Class (local)
 import qualified Data.ByteString as S
@@ -335,7 +335,7 @@ getSDistFileList lp =
                 return (T.unpack $ T.decodeUtf8With T.lenientDecode contents, cabalfp)
   where
     package = lpPackage lp
-    ac = ActionContext Set.empty []
+    ac = ActionContext Set.empty [] ConcurrencyAllowed
     task = Task
         { taskProvides = PackageIdentifier (packageName package) (packageVersion package)
         , taskType = TTFiles lp Local
