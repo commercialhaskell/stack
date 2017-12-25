@@ -430,7 +430,7 @@ selectBestSnapshot root gpds snaps = do
     logInfo $ "Selecting the best among "
                <> T.pack (show (NonEmpty.length snaps))
                <> " snapshots...\n"
-    F.foldr1 go (NonEmpty.map (getResult <=< loadResolver . ResolverSnapshot) snaps)
+    F.foldr1 go (NonEmpty.map (getResult <=< loadResolver . ResolverStackage) snaps)
     where
         go mold mnew = do
             old@(_snap, bpc) <- mold
@@ -440,7 +440,7 @@ selectBestSnapshot root gpds snaps = do
 
         getResult snap = do
             result <- checkSnapBuildPlan root gpds Nothing snap
-              -- We know that we're only dealing with ResolverSnapshot
+              -- We know that we're only dealing with ResolverStackage
               -- here, where we can rely on the global package hints.
               -- Therefore, we don't use an actual compiler. For more
               -- info, see comments on

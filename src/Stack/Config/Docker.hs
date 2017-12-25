@@ -41,7 +41,7 @@ dockerOptsFromMonoid mproject stackRoot maresolver DockerOptsMonoid{..} = do
                         Nothing -> ""
                         Just resolver ->
                             case resolver of
-                                ResolverSnapshot n@(LTS _ _) ->
+                                ResolverStackage n@(LTS _ _) ->
                                     ":" ++ T.unpack (renderSnapName n)
                                 _ ->
                                     impureThrow

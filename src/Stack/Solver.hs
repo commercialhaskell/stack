@@ -786,7 +786,7 @@ checkSnapBuildPlanActual root gpds flags sd = do
     let forNonSnapshot inner = setupCabalEnv (sdWantedCompilerVersion sd) (inner . Just)
         runner =
           case sdResolver sd of
-            ResolverSnapshot _ -> ($ Nothing)
+            ResolverStackage _ -> ($ Nothing)
             ResolverCompiler _ -> forNonSnapshot
             ResolverCustom _ _ -> forNonSnapshot
 

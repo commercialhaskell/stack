@@ -134,7 +134,7 @@ loadResolver
   :: forall env. HasConfig env
   => Resolver
   -> RIO env SnapshotDef
-loadResolver (ResolverSnapshot name) = do
+loadResolver (ResolverStackage name) = do
     stackage <- view stackRootL
     file' <- parseRelFile $ T.unpack file
     cachePath <- (buildPlanCacheDir stackage </>) <$> parseRelFile (T.unpack (renderSnapName name <> ".cache"))
@@ -197,7 +197,7 @@ loadResolver (ResolverSnapshot name) = do
         -- Not dropping any packages in a Stackage snapshot
         let sdDropPackages = Set.empty
 
-        let sdResolver = ResolverSnapshot name
+        let sdResolver = ResolverStackage name
             sdResolverName = renderSnapName name
 
         return SnapshotDef {..}
@@ -306,7 +306,7 @@ loadResolver (ResolverCustom url loc) = do
             let hash' :: SnapshotHash
                 hash' = combineHash rawHash $
                   case sdResolver parent' of
-                    ResolverSnapshot snapName -> snapNameToHash snapName
+                    ResolverStackage snapName -> snapNameToHash snapName
                     ResolverCustom _ parentHash -> parentHash
                     ResolverCompiler _ -> error "loadResolver: Receieved ResolverCompiler in impossible location"
             return (Right parent', hash')
@@ -321,7 +321,7 @@ loadResolver (ResolverCustom url loc) = do
     parseCustom :: Value
                 -> Parser (WithJSONWarnings (SnapshotDef, Maybe (ResolverWith ()), Maybe (CompilerVersion 'CVWanted)))
     parseCustom = withObjectWarnings "CustomSnapshot" $ \o -> (,,)
-        <$> (SnapshotDef (Left (error "loadResolver")) (ResolverSnapshot (LTS 0 0))
+        <$> (SnapshotDef (Left (error "loadResolver")) (ResolverStackage (LTS 0 0))
             <$> (o ..: "name")
             <*> jsonSubWarningsT (o ..:? "packages" ..!= [])
             <*> o ..:? "drop-packages" ..!= Set.empty
@@ -385,7 +385,7 @@ loadSnapshot' loadFromIndex mcompiler root =
         `onException` do
           logError "Unable to load cabal files for snapshot"
           case sdResolver sd of
-            ResolverSnapshot name -> do
+            ResolverStackage name -> do
               stackRoot <- view stackRootL
               file <- parseRelFile $ T.unpack $ renderSnapName name <> ".yaml"
               let fp = buildPlanDir stackRoot </> file
@@ -698,7 +698,7 @@ snapshotDefFixes sd | isStackage (sdResolver sd) = sd
       , ($(mkPackageName "yaml"), Map.singleton $(mkFlagName "system-libyaml") False)
       ]
 
-    isStackage (ResolverSnapshot _) = True
+    isStackage (ResolverStackage _) = True
     isStackage _ = False
 snapshotDefFixes sd = sd
 
