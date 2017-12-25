@@ -2116,7 +2116,7 @@ users. Here's a quick rundown:
   default. You can also view the remote snapshots using `stack ls
   snapshots remote`. It also supports option for viewing only lts
   (`-l`) and nightly (`-n`) snapshots.
-* `stack list-dependencies` lists all of the packages and versions used for a
+* `stack ls dependencies` lists all of the packages and versions used for a
   project
 * `stack sig` subcommand can help you with GPG signing & verification
     * `sign` will sign an sdist tarball and submit the signature to
