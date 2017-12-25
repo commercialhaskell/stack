@@ -5,6 +5,7 @@
 module Stack.Ls
   ( lsCmd
   , lsParser
+  , listDependenciesCmd
   ) where
 
 import Control.Exception (Exception, throw)
@@ -29,8 +30,10 @@ import Network.HTTP.Types.Header (hAccept)
 import qualified Options.Applicative as OA
 import Options.Applicative ((<|>))
 import Path
-import Stack.Runners (withBuildConfig)
+import Stack.Runners (withBuildConfig, withBuildConfigDot)
 import Stack.Types.Config
+import Stack.Dot
+import Stack.Options.DotParser (listDepsOptsParser)
 import System.Process.PagerEditor (pageText)
 import System.Directory (listDirectory)
 import Network.HTTP.Client.TLS (getGlobalManager)
@@ -45,9 +48,9 @@ data SnapshotType
     | Nightly
     deriving (Show, Eq, Ord)
 
-newtype LsCmds =
-    LsSnapshot SnapshotOpts
-    deriving (Eq, Show, Ord)
+data LsCmds
+    = LsSnapshot SnapshotOpts
+    | LsDependencies ListDepsOpts
 
 data SnapshotOpts = SnapshotOpts
     { soptViewType :: LsView
@@ -57,13 +60,16 @@ data SnapshotOpts = SnapshotOpts
 
 newtype LsCmdOpts = LsCmdOpts
     { lsView :: LsCmds
-    } deriving (Eq, Show, Ord)
+    }
 
 lsParser :: OA.Parser LsCmdOpts
-lsParser = LsCmdOpts <$> OA.hsubparser lsSnapCmd
+lsParser = LsCmdOpts <$> OA.hsubparser (lsSnapCmd <> lsDepsCmd)
 
 lsCmdOptsParser :: OA.Parser LsCmds
-lsCmdOptsParser = fmap LsSnapshot lsViewSnapCmd
+lsCmdOptsParser = LsSnapshot <$> lsViewSnapCmd
+
+lsDepOptsParser :: OA.Parser LsCmds
+lsDepOptsParser = LsDependencies <$> listDepsOptsParser
 
 lsViewSnapCmd :: OA.Parser SnapshotOpts
 lsViewSnapCmd =
@@ -82,6 +88,12 @@ lsSnapCmd =
         (OA.info
              lsCmdOptsParser
              (OA.progDesc "View local snapshot (default option)"))
+
+lsDepsCmd :: OA.Mod OA.CommandFields LsCmds
+lsDepsCmd =
+    OA.command
+        "dependencies"
+        (OA.info lsDepOptsParser (OA.progDesc "View the dependencies"))
 
 data Snapshot = Snapshot
     { snapId :: Text
@@ -190,6 +202,7 @@ handleLocal lsOpts = do
                     displayLocalSnapshot isStdoutTerminal $
                     L.filter (L.isPrefixOf "night") snapData
                 _ -> liftIO $ displayLocalSnapshot isStdoutTerminal snapData
+        LsDependencies _ -> return ()
 
 handleRemote
     :: (MonadIO m, MonadThrow m, MonadReader env m, HasEnvConfig env)
@@ -215,6 +228,7 @@ handleRemote lsOpts = do
                     displaySnapshotData isStdoutTerminal $
                     filterSnapshotData snapData Nightly
                 _ -> liftIO $ displaySnapshotData isStdoutTerminal snapData
+        LsDependencies _ -> return ()
   where
     urlInfo = "https://www.stackage.org/snapshots"
 
@@ -225,6 +239,12 @@ lsCmd lsOpts go =
             case soptViewType of
                 Local -> withBuildConfig go (handleLocal lsOpts)
                 Remote -> withBuildConfig go (handleRemote lsOpts)
+        LsDependencies depOpts -> listDependenciesCmd depOpts go
+
+-- | List the dependencies
+listDependenciesCmd :: ListDepsOpts -> GlobalOpts -> IO ()
+listDependenciesCmd opts go =
+    withBuildConfigDot (listDepsDotOpts opts) go $ listDependencies opts
 
 lsViewLocalCmd :: OA.Mod OA.CommandFields LsView
 lsViewLocalCmd =
