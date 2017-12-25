@@ -301,7 +301,7 @@ commandLineHandler currentDir progName isInterpreter = complicatedOptions
                     pathCmd
                     Stack.Path.pathParser
         addCommand' "ls"
-                    "List command. (Supports snapshots)"
+                    "List command. (Supports snapshots and dependencies)"
                     lsCmd
                     lsParser
         addCommand' "unpack"
@@ -385,7 +385,7 @@ commandLineHandler currentDir progName isInterpreter = complicatedOptions
                     cleanCmd
                     cleanOptsParser
         addCommand' "list-dependencies"
-                    "List the dependencies"
+                    "DEPRECATED: Use ls dependencies instead. Will be removed in next major version."
                     listDependenciesCmd
                     listDepsOptsParser
         addCommand' "query"
@@ -953,19 +953,6 @@ solverCmd fixStackYaml go =
 -- | Visualize dependencies
 dotCmd :: DotOpts -> GlobalOpts -> IO ()
 dotCmd dotOpts go = withBuildConfigDot dotOpts go $ dot dotOpts
-
--- | List the dependencies
-listDependenciesCmd :: ListDepsOpts -> GlobalOpts -> IO ()
-listDependenciesCmd opts go = withBuildConfigDot (listDepsDotOpts opts) go $ listDependencies opts
-
--- Plumbing for --test and --bench flags
-withBuildConfigDot :: DotOpts -> GlobalOpts -> RIO EnvConfig () -> IO ()
-withBuildConfigDot opts go f = withBuildConfig go' f
-  where
-    go' =
-        (if dotTestTargets opts then set (globalOptsBuildOptsMonoidL.buildOptsMonoidTestsL) (Just True) else id) $
-        (if dotBenchTargets opts then set (globalOptsBuildOptsMonoidL.buildOptsMonoidBenchmarksL) (Just True) else id)
-        go
 
 -- | Query build information
 queryCmd :: [String] -> GlobalOpts -> IO ()
