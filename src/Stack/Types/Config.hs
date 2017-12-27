@@ -1,6 +1,6 @@
-{-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DefaultSignatures #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveFoldable #-}
@@ -9,17 +9,18 @@
 {-# LANGUAGE DeriveTraversable #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE GADTs #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE MultiWayIf #-}
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE GADTs #-}
-{-# LANGUAGE StandaloneDeriving #-}
 
 -- | The Config type.
 
@@ -131,6 +132,7 @@ module Stack.Types.Config
   ,platformGhcRelDir
   ,platformGhcVerOnlyRelDir
   ,useShaPathOnWindows
+  ,shaPath
   ,workDirL
   -- * Command-specific types
   -- ** Eval
@@ -176,6 +178,7 @@ module Stack.Types.Config
   ) where
 
 import           Control.Monad.Writer (tell)
+import           Crypto.Hash (hashWith, SHA1(..))
 import           Stack.Prelude
 import           Data.Aeson.Extended
                  (ToJSON, toJSON, FromJSON, FromJSONKey (..), parseJSON, withText, object,
@@ -184,6 +187,7 @@ import           Data.Aeson.Extended
                   jsonSubWarningsT, jsonSubWarningsTT, WithJSONWarnings(..), noJSONWarnings,
                   FromJSONKeyFunction (FromJSONKeyTextParser))
 import           Data.Attoparsec.Args (parseArgs, EscapingMode (Escaping))
+import qualified Data.ByteArray.Encoding as Mem (convertToBase, Base(Base16))
 import qualified Data.ByteString.Char8 as S8
 import           Data.List (stripPrefix)
 import           Data.List.NonEmpty (NonEmpty)
@@ -230,11 +234,6 @@ import           System.Process.Read (EnvOverride, findExecutable)
 
 -- Re-exports
 import           Stack.Types.Config.Build as X
-
-#ifdef mingw32_HOST_OS
-import           Crypto.Hash (hashWith, SHA1(..))
-import qualified Data.ByteArray.Encoding as Mem (convertToBase, Base(Base16))
-#endif
 
 -- | The top-level Stackage configuration.
 data Config =
@@ -1372,10 +1371,26 @@ platformGhcVerOnlyRelDirStr = do
 useShaPathOnWindows :: MonadThrow m => Path Rel Dir -> m (Path Rel Dir)
 useShaPathOnWindows =
 #ifdef mingw32_HOST_OS
-    parseRelDir . S8.unpack . S8.take 8 . Mem.convertToBase Mem.Base16 . hashWith SHA1 . encodeUtf8 . T.pack . toFilePath
+    shaPath
 #else
     return
 #endif
+
+shaPath :: (IsPath Rel t, MonadThrow m) => Path Rel t -> m (Path Rel t)
+shaPath
+    = parsePath . S8.unpack . S8.take 8
+    . Mem.convertToBase Mem.Base16 . hashWith SHA1
+    . encodeUtf8 . T.pack . toFilePath
+
+-- TODO: Move something like this into the path package. Consider
+-- subsuming path-io's 'AnyPath'?
+class IsPath b t where
+  parsePath :: MonadThrow m => FilePath -> m (Path b t)
+
+instance IsPath Abs Dir where parsePath = parseAbsDir
+instance IsPath Rel Dir where parsePath = parseRelDir
+instance IsPath Abs File where parsePath = parseAbsFile
+instance IsPath Rel File where parsePath = parseRelFile
 
 compilerVersionDir :: (MonadThrow m, MonadReader env m, HasEnvConfig env) => m (Path Rel Dir)
 compilerVersionDir = do
