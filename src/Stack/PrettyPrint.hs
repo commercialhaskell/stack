@@ -37,8 +37,7 @@ module Stack.PrettyPrint
 import           Stack.Prelude
 import           Data.List (intersperse)
 import qualified Data.Text as T
-import           Stack.Types.Config
-import           Stack.Types.Package
+import           Stack.Types.NamedComponent
 import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageName
 import           Stack.Types.Runner

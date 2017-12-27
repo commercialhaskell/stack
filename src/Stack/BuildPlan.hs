@@ -48,6 +48,7 @@ import           Stack.Package
 import           Stack.Snapshot
 import           Stack.Types.BuildPlan
 import           Stack.Types.FlagName
+import           Stack.Types.NamedComponent
 import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageName
 import           Stack.Types.Version

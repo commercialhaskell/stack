@@ -14,7 +14,7 @@
 
 module Stack.Build
   (build
-  ,withLoadPackage
+  ,loadPackage
   ,mkBaseConfigOpts
   ,queryBuildInfo
   ,splitObjsWarning
@@ -42,13 +42,13 @@ import           Stack.Build.Haddock
 import           Stack.Build.Installed
 import           Stack.Build.Source
 import           Stack.Build.Target
-import           Stack.Fetch as Fetch
 import           Stack.Package
 import           Stack.PackageLocation (parseSingleCabalFileIndex)
 import           Stack.Types.Build
 import           Stack.Types.BuildPlan
 import           Stack.Types.Config
 import           Stack.Types.FlagName
+import           Stack.Types.NamedComponent
 import           Stack.Types.Package
 import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageName
@@ -102,8 +102,7 @@ build setLocalFiles mbuildLk boptsCli = fixCodePage $ do
                      sourceMap
 
     baseConfigOpts <- mkBaseConfigOpts boptsCli
-    plan <- withLoadPackage $ \loadPackage ->
-        constructPlan mbp baseConfigOpts locals extraToBuild localDumpPkgs loadPackage sourceMap installedMap (boptsCLIInitialBuildSteps boptsCli)
+    plan <- constructPlan mbp baseConfigOpts locals extraToBuild localDumpPkgs loadPackage sourceMap installedMap (boptsCLIInitialBuildSteps boptsCli)
 
     allowLocals <- view $ configL.to configAllowLocals
     unless allowLocals $ case justLocals plan of
@@ -272,29 +271,25 @@ mkBaseConfigOpts boptsCli = do
         }
 
 -- | Provide a function for loading package information from the package index
-withLoadPackage :: HasEnvConfig env
-                => ((PackageLocationIndex FilePath -> Map FlagName Bool -> [Text] -> IO Package) -> RIO env a)
-                -> RIO env a
-withLoadPackage inner = do
-    econfig <- view envConfigL
-    root <- view projectRootL
-    run <- askRunInIO
-    withCabalLoader $ \loadFromIndex ->
-        inner $ \loc flags ghcOptions -> run $
-            resolvePackage
-              (depPackageConfig econfig flags ghcOptions)
-              <$> parseSingleCabalFileIndex loadFromIndex root loc
-  where
-    -- | Package config to be used for dependencies
-    depPackageConfig :: EnvConfig -> Map FlagName Bool -> [Text] -> PackageConfig
-    depPackageConfig econfig flags ghcOptions = PackageConfig
+loadPackage
+  :: HasEnvConfig env
+  => PackageLocationIndex FilePath
+  -> Map FlagName Bool
+  -> [Text]
+  -> RIO env Package
+loadPackage loc flags ghcOptions = do
+  compiler <- view actualCompilerVersionL
+  platform <- view platformL
+  root <- view projectRootL
+  let pkgConfig = PackageConfig
         { packageConfigEnableTests = False
         , packageConfigEnableBenchmarks = False
         , packageConfigFlags = flags
         , packageConfigGhcOptions = ghcOptions
-        , packageConfigCompilerVersion = view actualCompilerVersionL econfig
-        , packageConfigPlatform = view platformL econfig
+        , packageConfigCompilerVersion = compiler
+        , packageConfigPlatform = platform
         }
+  resolvePackage pkgConfig <$> parseSingleCabalFileIndex root loc
 
 -- | Set the code page for this process as necessary. Only applies to Windows.
 -- See: https://github.com/commercialhaskell/stack/issues/738

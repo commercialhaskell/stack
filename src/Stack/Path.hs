@@ -20,6 +20,7 @@ import           Path.Extra
 import           Stack.Constants
 import           Stack.Constants.Config
 import           Stack.GhcPkg as GhcPkg
+import           Stack.PackageIndex (HasCabalLoader (..))
 import           Stack.Types.Config
 import           Stack.Types.Runner
 import qualified System.FilePath as FP
@@ -118,6 +119,8 @@ instance HasLogFunc PathInfo where
 instance HasRunner PathInfo where
     runnerL = configL.runnerL
 instance HasConfig PathInfo
+instance HasCabalLoader PathInfo where
+    cabalLoaderL = configL.cabalLoaderL
 instance HasEnvOverride PathInfo where
     envOverrideL = configL.envOverrideL
 instance HasBuildConfig PathInfo where

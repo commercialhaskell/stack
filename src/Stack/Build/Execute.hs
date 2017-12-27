@@ -79,6 +79,7 @@ import           Stack.Types.Build
 import           Stack.Types.Compiler
 import           Stack.Types.Config
 import           Stack.Types.GhcPkgId
+import           Stack.Types.NamedComponent
 import           Stack.Types.Package
 import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageName
@@ -278,7 +279,7 @@ getSetupExe setupHs setupShimHs tmpdir = do
         jsExeNameS =
             baseNameS ++ ".jsexe"
         setupDir =
-            configStackRoot config </>
+            view stackRootL config </>
             $(mkRelDir "setup-exe-cache") </>
             platformDir
 
@@ -337,7 +338,7 @@ withExecuteEnv bopts boptsCli baseConfigOpts locals globalPackages snapshotPacka
 
         -- Create files for simple setup and setup shim, if necessary
         let setupSrcDir =
-                configStackRoot config </>
+                view stackRootL config </>
                 $(mkRelDir "setup-exe-src")
         ensureDir setupSrcDir
         setupFileName <- parseRelFile ("setup-" ++ simpleSetupHash ++ ".hs")

@@ -42,7 +42,6 @@ module Stack.Types.Config
   ,lpvName
   ,lpvVersion
   ,lpvComponents
-  ,NamedComponent(..)
   ,stackYamlL
   ,projectRootL
   ,HasBuildConfig(..)
@@ -88,14 +87,6 @@ module Stack.Types.Config
   ,PackageIndex(..)
   ,IndexName(..)
   ,indexNameText
-  -- Config fields
-  ,configPackageIndex
-  ,configPackageIndexOld
-  ,configPackageIndexCache
-  ,configPackageIndexCacheOld
-  ,configPackageIndexGz
-  ,configPackageIndexRoot
-  ,configPackageTarball
   -- ** Project & ProjectAndConfigMonoid
   ,Project(..)
   ,ProjectAndConfigMonoid(..)
@@ -160,7 +151,6 @@ module Stack.Types.Config
   ,buildOptsMonoidInstallExesL
   ,buildOptsHaddockL
   ,globalOptsBuildOptsMonoidL
-  ,packageIndicesL
   ,stackRootL
   ,configUrlsL
   ,cabalVersionL
@@ -183,7 +173,6 @@ import           Data.Aeson.Extended
                   jsonSubWarningsT, jsonSubWarningsTT, WithJSONWarnings(..), noJSONWarnings,
                   FromJSONKeyFunction (FromJSONKeyTextParser))
 import           Data.Attoparsec.Args (parseArgs, EscapingMode (Escaping))
-import qualified Data.ByteString.Char8 as S8
 import           Data.List (stripPrefix)
 import           Data.List.NonEmpty (NonEmpty)
 import qualified Data.List.NonEmpty as NonEmpty
@@ -208,12 +197,14 @@ import qualified Options.Applicative.Types as OA
 import           Path
 import qualified Paths_stack as Meta
 import           Stack.Constants
+import           Stack.PackageIndex (HasCabalLoader (..), CabalLoader (clStackRoot))
 import           Stack.Types.BuildPlan
 import           Stack.Types.Compiler
 import           Stack.Types.CompilerBuild
 import           Stack.Types.Docker
 import           Stack.Types.FlagName
 import           Stack.Types.Image
+import           Stack.Types.NamedComponent
 import           Stack.Types.Nix
 import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageIndex
@@ -237,9 +228,7 @@ import qualified Data.ByteArray.Encoding as Mem (convertToBase, Base(Base16))
 
 -- | The top-level Stackage configuration.
 data Config =
-  Config {configStackRoot           :: !(Path Abs Dir)
-         -- ^ ~/.stack more often than not
-         ,configWorkDir             :: !(Path Rel Dir)
+  Config {configWorkDir             :: !(Path Rel Dir)
          -- ^ this allows to override .stack-work directory
          ,configUserConfigPath      :: !(Path Abs File)
          -- ^ Path to user configuration file (usually ~/.stack/config.yaml)
@@ -255,8 +244,6 @@ data Config =
          -- ^ Non-platform-specific path containing local installations
          ,configLocalPrograms       :: !(Path Abs Dir)
          -- ^ Path containing local installations (mainly GHC)
-         ,configConnectionCount     :: !Int
-         -- ^ How many concurrent connections are allowed when downloading
          ,configHideTHLoading       :: !Bool
          -- ^ Hide the Template Haskell "Loading package ..." messages from the
          -- console
@@ -276,21 +263,6 @@ data Config =
          -- e.g. The latest snapshot file.
          -- A build plan name (e.g. lts5.9.yaml) is appended when downloading
          -- the build plan actually.
-         ,configPackageIndices      :: ![PackageIndex]
-         -- ^ Information on package indices. This is left biased, meaning that
-         -- packages in an earlier index will shadow those in a later index.
-         --
-         -- Warning: if you override packages in an index vs what's available
-         -- upstream, you may correct your compiled snapshots, as different
-         -- projects may have different definitions of what pkg-ver means! This
-         -- feature is primarily intended for adding local packages, not
-         -- overriding. Overriding is better accomplished by adding to your
-         -- list of packages.
-         --
-         -- Note that indices specified in a later config file will override
-         -- previous indices, /not/ extend them.
-         --
-         -- Using an assoc list instead of a Map to keep track of priority
          ,configSystemGHC           :: !Bool
          -- ^ Should we use the system-installed GHC (on the PATH) if
          -- available? Can be overridden by command line options.
@@ -349,8 +321,6 @@ data Config =
          ,configAllowDifferentUser  :: !Bool
          -- ^ Allow users other than the stack root owner to use the stack
          -- installation.
-         ,configPackageCache        :: !(IORef (Maybe (PackageCache PackageIndex)))
-         -- ^ In memory cache of hackage index.
          ,configDumpLogs            :: !DumpLogs
          -- ^ Dump logs of local non-dependencies when doing a build.
          ,configMaybeProject        :: !(Maybe (Project, Path Abs File))
@@ -362,10 +332,7 @@ data Config =
          ,configSaveHackageCreds    :: !Bool
          -- ^ Should we save Hackage credentials to a file?
          ,configRunner              :: !Runner
-         ,configIgnoreRevisionMismatch :: !Bool
-         -- ^ Ignore a revision mismatch when loading up cabal files,
-         -- and fall back to the latest revision. See:
-         -- <https://github.com/commercialhaskell/stack/issues/3520>
+         ,configCabalLoader         :: !CabalLoader
          }
 
 data HpackExecutable
@@ -620,14 +587,6 @@ lpvVersion lpv =
        $ lpvGPD lpv
    in version
 
--- | A single, fully resolved component of a package
-data NamedComponent
-    = CLib
-    | CExe !Text
-    | CTest !Text
-    | CBench !Text
-    deriving (Show, Eq, Ord)
-
 -- | Value returned by 'Stack.Config.loadConfig'.
 data LoadConfig = LoadConfig
     { lcConfig          :: !Config
@@ -715,7 +674,7 @@ instance ToJSON Project where
 data ConfigMonoid =
   ConfigMonoid
     { configMonoidStackRoot          :: !(First (Path Abs Dir))
-    -- ^ See: 'configStackRoot'
+    -- ^ See: 'clStackRoot'
     , configMonoidWorkDir            :: !(First (Path Rel Dir))
     -- ^ See: 'configWorkDir'.
     , configMonoidBuildOpts          :: !BuildOptsMonoid
@@ -733,7 +692,7 @@ data ConfigMonoid =
     , configMonoidUrls               :: !UrlsMonoid
     -- ^ See: 'configUrls
     , configMonoidPackageIndices     :: !(First [PackageIndex])
-    -- ^ See: 'configPackageIndices'
+    -- ^ See: @picIndices@
     , configMonoidSystemGHC          :: !(First Bool)
     -- ^ See: 'configSystemGHC'
     ,configMonoidInstallGHC          :: !(First Bool)
@@ -1211,44 +1170,6 @@ data SuggestSolver = SuggestSolver | Don'tSuggestSolver
 askLatestSnapshotUrl :: (MonadReader env m, HasConfig env) => m Text
 askLatestSnapshotUrl = view $ configL.to configUrls.to urlsLatestSnapshot
 
--- | Root for a specific package index
-configPackageIndexRoot :: (MonadReader env m, HasConfig env, MonadThrow m) => IndexName -> m (Path Abs Dir)
-configPackageIndexRoot (IndexName name) = do
-    root <- view stackRootL
-    dir <- parseRelDir $ S8.unpack name
-    return (root </> $(mkRelDir "indices") </> dir)
-
--- | Location of the 01-index.cache file
-configPackageIndexCache :: (MonadReader env m, HasConfig env, MonadThrow m) => IndexName -> m (Path Abs File)
-configPackageIndexCache = liftM (</> $(mkRelFile "01-index.cache")) . configPackageIndexRoot
-
--- | Location of the 00-index.cache file
-configPackageIndexCacheOld :: (MonadReader env m, HasConfig env, MonadThrow m) => IndexName -> m (Path Abs File)
-configPackageIndexCacheOld = liftM (</> $(mkRelFile "00-index.cache")) . configPackageIndexRoot
-
--- | Location of the 01-index.tar file
-configPackageIndex :: (MonadReader env m, HasConfig env, MonadThrow m) => IndexName -> m (Path Abs File)
-configPackageIndex = liftM (</> $(mkRelFile "01-index.tar")) . configPackageIndexRoot
-
--- | Location of the 00-index.tar file. This file is just a copy of
--- the 01-index.tar file, provided for tools which still look for the
--- 00-index.tar file.
-configPackageIndexOld :: (MonadReader env m, HasConfig env, MonadThrow m) => IndexName -> m (Path Abs File)
-configPackageIndexOld = liftM (</> $(mkRelFile "00-index.tar")) . configPackageIndexRoot
-
--- | Location of the 01-index.tar.gz file
-configPackageIndexGz :: (MonadReader env m, HasConfig env, MonadThrow m) => IndexName -> m (Path Abs File)
-configPackageIndexGz = liftM (</> $(mkRelFile "01-index.tar.gz")) . configPackageIndexRoot
-
--- | Location of a package tarball
-configPackageTarball :: (MonadReader env m, HasConfig env, MonadThrow m) => IndexName -> PackageIdentifier -> m (Path Abs File)
-configPackageTarball iname ident = do
-    root <- configPackageIndexRoot iname
-    name <- parseRelDir $ packageNameString $ packageIdentifierName ident
-    ver <- parseRelDir $ versionString $ packageIdentifierVersion ident
-    base <- parseRelFile $ packageIdentifierString ident ++ ".tar.gz"
-    return (root </> $(mkRelDir "packages") </> name </> ver </> base)
-
 -- | @".stack-work"@
 workDirL :: HasConfig env => Lens' env (Path Rel Dir)
 workDirL = configL.lens configWorkDir (\x y -> x { configWorkDir = y })
@@ -1303,7 +1224,7 @@ bindirCompilerTools = do
     compilerVersion <- envConfigCompilerVersion <$> view envConfigL
     compiler <- parseRelDir $ compilerVersionString compilerVersion
     return $
-        configStackRoot config </>
+        view stackRootL config </>
         $(mkRelDir "compiler-tools") </>
         platform </>
         compiler </>
@@ -1864,7 +1785,7 @@ class HasGHCVariant env where
     {-# INLINE ghcVariantL #-}
 
 -- | Class for environment values that can provide a 'Config'.
-class (HasPlatform env, HasRunner env, HasEnvOverride env) => HasConfig env where
+class (HasPlatform env, HasEnvOverride env, HasCabalLoader env) => HasConfig env where
     configL :: Lens' env Config
     default configL :: HasBuildConfig env => Lens' env Config
     configL = buildConfigL.lens bcConfig (\x y -> x { bcConfig = y })
@@ -1910,6 +1831,15 @@ instance HasEnvOverride BuildConfig where
 instance HasEnvOverride EnvConfig where
     envOverrideL = configL.envOverrideL
 
+instance HasCabalLoader Config where
+    cabalLoaderL = lens configCabalLoader (\x y -> x { configCabalLoader = y })
+instance HasCabalLoader LoadConfig where
+    cabalLoaderL = configL.cabalLoaderL
+instance HasCabalLoader BuildConfig where
+    cabalLoaderL = configL.cabalLoaderL
+instance HasCabalLoader EnvConfig where
+    cabalLoaderL = configL.cabalLoaderL
+
 instance HasConfig Config where
     configL = id
     {-# INLINE configL #-}
@@ -1950,8 +1880,8 @@ instance HasLogFunc EnvConfig where
 -- Helper lenses
 -----------------------------------
 
-stackRootL :: HasConfig s => Lens' s (Path Abs Dir)
-stackRootL = configL.lens configStackRoot (\x y -> x { configStackRoot = y })
+stackRootL :: HasCabalLoader s => Lens' s (Path Abs Dir)
+stackRootL = cabalLoaderL.lens clStackRoot (\x y -> x { clStackRoot = y })
 
 -- | The compiler specified by the @MiniBuildPlan@. This may be
 -- different from the actual compiler used!
@@ -1970,11 +1900,6 @@ snapshotDefL :: HasBuildConfig s => Lens' s SnapshotDef
 snapshotDefL = buildConfigL.lens
     bcSnapshotDef
     (\x y -> x { bcSnapshotDef = y })
-
-packageIndicesL :: HasConfig s => Lens' s [PackageIndex]
-packageIndicesL = configL.lens
-    configPackageIndices
-    (\x y -> x { configPackageIndices = y })
 
 buildOptsL :: HasConfig s => Lens' s BuildOpts
 buildOptsL = configL.lens

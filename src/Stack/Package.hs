@@ -79,6 +79,8 @@ import           Path.IO hiding (findFiles)
 import           Stack.Build.Installed
 import           Stack.Constants
 import           Stack.Constants.Config
+import           Stack.Fetch (loadFromIndex)
+import           Stack.PackageIndex (HasCabalLoader (..))
 import           Stack.Prelude
 import           Stack.PrettyPrint
 import           Stack.Types.Build
@@ -87,6 +89,7 @@ import           Stack.Types.Compiler
 import           Stack.Types.Config
 import           Stack.Types.FlagName
 import           Stack.Types.GhcPkgId
+import           Stack.Types.NamedComponent
 import           Stack.Types.Package
 import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageName
@@ -110,6 +113,8 @@ instance HasLogFunc Ctx where
 instance HasRunner Ctx where
     runnerL = configL.runnerL
 instance HasConfig Ctx
+instance HasCabalLoader Ctx where
+    cabalLoaderL = configL.cabalLoaderL
 instance HasEnvOverride Ctx where
     envOverrideL = configL.envOverrideL
 instance HasBuildConfig Ctx
@@ -189,17 +194,16 @@ gpdVersion = packageIdentifierVersion . gpdPackageIdentifier
 -- | Read the 'GenericPackageDescription' from the given
 -- 'PackageIdentifierRevision'.
 readPackageUnresolvedIndex
-  :: forall env. HasRunner env
-  => (PackageIdentifierRevision -> IO ByteString) -- ^ load the raw bytes
-  -> PackageIdentifierRevision
+  :: forall env. HasCabalLoader env
+  => PackageIdentifierRevision
   -> RIO env GenericPackageDescription
-readPackageUnresolvedIndex loadFromIndex pir@(PackageIdentifierRevision pi' _) = do
+readPackageUnresolvedIndex pir@(PackageIdentifierRevision pi' _) = do
   ref <- view $ runnerL.to runnerParsedCabalFiles
   (m, _) <- readIORef ref
   case M.lookup pir m of
     Just gpd -> return gpd
     Nothing -> do
-      bs <- liftIO $ loadFromIndex pir
+      bs <- loadFromIndex pir
       (_warnings, gpd) <- rawParseGPD (Left pir) bs
       let foundPI =
               fromCabalPackageIdentifier

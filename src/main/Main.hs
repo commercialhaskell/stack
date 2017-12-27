@@ -586,7 +586,7 @@ setupCmd :: SetupCmdOpts -> GlobalOpts -> IO ()
 setupCmd sco@SetupCmdOpts{..} go@GlobalOpts{..} = loadConfigWithOpts go $ \lc -> do
   when (isJust scoUpgradeCabal && nixEnable (configNix (lcConfig lc))) $ do
     throwIO UpgradeCabalUnusable
-  withUserFileLock go (configStackRoot $ lcConfig lc) $ \lk -> do
+  withUserFileLock go (view stackRootL lc) $ \lk -> do
     let getCompilerVersion = loadCompilerVersion go lc
     runRIO (lcConfig lc) $
       Docker.reexecWithOptionalContainer
@@ -774,7 +774,7 @@ execCmd ExecOpts {..} go@GlobalOpts{..} =
                 (ExecGhc, args) -> return ("ghc", args)
                 (ExecRunGhc, args) -> return ("runghc", args)
           loadConfigWithOpts go $ \lc ->
-            withUserFileLock go (configStackRoot $ lcConfig lc) $ \lk -> do
+            withUserFileLock go (view stackRootL lc) $ \lk -> do
               let getCompilerVersion = loadCompilerVersion go lc
               runRIO (lcConfig lc) $
                 Docker.reexecWithOptionalContainer
@@ -881,7 +881,7 @@ dockerPullCmd :: () -> GlobalOpts -> IO ()
 dockerPullCmd _ go@GlobalOpts{..} =
     loadConfigWithOpts go $ \lc ->
     -- TODO: can we eliminate this lock if it doesn't touch ~/.stack/?
-    withUserFileLock go (configStackRoot $ lcConfig lc) $ \_ ->
+    withUserFileLock go (view stackRootL lc) $ \_ ->
      runRIO (lcConfig lc) $
        Docker.preventInContainer Docker.pull
 
@@ -890,7 +890,7 @@ dockerResetCmd :: Bool -> GlobalOpts -> IO ()
 dockerResetCmd keepHome go@GlobalOpts{..} =
     loadConfigWithOpts go $ \lc ->
     -- TODO: can we eliminate this lock if it doesn't touch ~/.stack/?
-    withUserFileLock go (configStackRoot $ lcConfig lc) $ \_ ->
+    withUserFileLock go (view stackRootL lc) $ \_ ->
       runRIO (lcConfig lc) $
         Docker.preventInContainer $ Docker.reset (lcProjectRoot lc) keepHome
 
@@ -899,7 +899,7 @@ dockerCleanupCmd :: Docker.CleanupOpts -> GlobalOpts -> IO ()
 dockerCleanupCmd cleanupOpts go@GlobalOpts{..} =
     loadConfigWithOpts go $ \lc ->
     -- TODO: can we eliminate this lock if it doesn't touch ~/.stack/?
-    withUserFileLock go (configStackRoot $ lcConfig lc) $ \_ ->
+    withUserFileLock go (view stackRootL lc) $ \_ ->
      runRIO (lcConfig lc) $
         Docker.preventInContainer $
             Docker.cleanup cleanupOpts

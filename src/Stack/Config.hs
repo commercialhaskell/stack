@@ -76,9 +76,9 @@ import           Stack.Config.Docker
 import           Stack.Config.Nix
 import           Stack.Config.Urls
 import           Stack.Constants
-import           Stack.Fetch
 import qualified Stack.Image as Image
 import           Stack.PackageLocation
+import           Stack.PackageIndex (CabalLoader (..), HasCabalLoader (..))
 import           Stack.Snapshot
 import           Stack.Types.BuildPlan
 import           Stack.Types.Compiler
@@ -140,7 +140,7 @@ getImplicitGlobalProjectDir config =
         (implicitGlobalProjectDir stackRoot)
         (implicitGlobalProjectDirDeprecated stackRoot)
   where
-    stackRoot = configStackRoot config
+    stackRoot = view stackRootL config
 
 -- | This is slightly more expensive than @'asks' ('bcStackYaml' '.' 'getBuildConfig')@
 -- and should only be used when no 'BuildConfig' is at hand.
@@ -233,7 +233,7 @@ configFromConfigMonoid
     -> ConfigMonoid
     -> m Config
 configFromConfigMonoid
-    configStackRoot configUserConfigPath configAllowLocals mresolver
+    clStackRoot configUserConfigPath configAllowLocals mresolver
     mproject ConfigMonoid{..} = do
      -- If --stack-work is passed, prefer it. Otherwise, if STACK_WORK
      -- is set, use that. If neither, use the default ".stack-work"
@@ -246,9 +246,9 @@ configFromConfigMonoid
              logWarn "The latest-snapshot-url field is deprecated in favor of 'urls' configuration"
              return (urlsFromMonoid configMonoidUrls) { urlsLatestSnapshot = url }
          _ -> return (urlsFromMonoid configMonoidUrls)
-     let configConnectionCount = fromFirst 8 configMonoidConnectionCount
+     let clConnectionCount = fromFirst 8 configMonoidConnectionCount
          configHideTHLoading = fromFirst True configMonoidHideTHLoading
-         configPackageIndices = fromFirst
+         clIndices = fromFirst
             [PackageIndex
                 { indexName = IndexName "Hackage"
                 , indexLocation = "https://s3.amazonaws.com/hackage.fpcomplete.com/"
@@ -305,7 +305,7 @@ configFromConfigMonoid
 
      let configBuild = buildOptsFromMonoid configMonoidBuildOpts
      configDocker <-
-         dockerOptsFromMonoid (fmap fst mproject) configStackRoot mresolver configMonoidDockerOpts
+         dockerOptsFromMonoid (fmap fst mproject) clStackRoot mresolver configMonoidDockerOpts
      configNix <- nixOptsFromMonoid configMonoidNixOpts os
 
      configSystemGHC <-
@@ -328,7 +328,7 @@ configFromConfigMonoid
      let configEnvOverrideSettings _ = return origEnv
 
      configLocalProgramsBase <- case getFirst configMonoidLocalProgramsBase of
-       Nothing -> getDefaultLocalProgramsBase configStackRoot configPlatform origEnv
+       Nothing -> getDefaultLocalProgramsBase clStackRoot configPlatform origEnv
        Just path -> return path
      platformOnlyDir <- runReaderT platformOnlyRelDir (configPlatform, configPlatformVariant)
      let configLocalPrograms = configLocalProgramsBase </> platformOnlyDir
@@ -370,19 +370,22 @@ configFromConfigMonoid
          configDefaultTemplate = getFirst configMonoidDefaultTemplate
          configDumpLogs = fromFirst DumpWarningLogs configMonoidDumpLogs
          configSaveHackageCreds = fromFirst True configMonoidSaveHackageCreds
-         configIgnoreRevisionMismatch = fromFirst False configMonoidIgnoreRevisionMismatch
+         clIgnoreRevisionMismatch = fromFirst False configMonoidIgnoreRevisionMismatch
 
      configAllowDifferentUser <-
         case getFirst configMonoidAllowDifferentUser of
             Just True -> return True
             _ -> getInContainer
 
-     configPackageCache <- liftIO $ newIORef Nothing
-
      let configMaybeProject = mproject
 
      configRunner' <- view runnerL
+
+     clCache <- newIORef Nothing
+     clUpdateRef <- newMVar True
+
      let configRunner = set envOverrideL origEnv configRunner'
+         configCabalLoader = CabalLoader {..}
 
      return Config {..}
 
@@ -419,6 +422,8 @@ instance HasConfig MiniConfig where
     configL = lens mcConfig (\x y -> x { mcConfig = y })
 instance HasEnvOverride MiniConfig where
     envOverrideL = configL.envOverrideL
+instance HasCabalLoader MiniConfig where
+    cabalLoaderL = configL.cabalLoaderL
 instance HasPlatform MiniConfig
 instance HasGHCVariant MiniConfig where
     ghcVariantL = lens mcGHCVariant (\x y -> x { mcGHCVariant = y })
@@ -651,7 +656,7 @@ getLocalPackages = do
     mcached <- liftIO $ readIORef cacheRef
     case mcached of
         Just cached -> return cached
-        Nothing -> withCabalLoader $ \loadFromIndex -> do
+        Nothing -> do
             root <- view projectRootL
             bc <- view buildConfigL
 
@@ -666,7 +671,7 @@ getLocalPackages = do
                               $ C.packageDescription gpd
                       in (name, (gpd, loc))
             deps <- (map wrapGPD . concat)
-                <$> mapM (parseMultiCabalFilesIndex loadFromIndex root) (bcDependencies bc)
+                <$> mapM (parseMultiCabalFilesIndex root) (bcDependencies bc)
 
             checkDuplicateNames $
               map (second (PLOther . lpvLoc)) packages ++

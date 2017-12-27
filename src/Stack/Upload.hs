@@ -124,7 +124,7 @@ loadCreds config = do
 
 credsFile :: Config -> IO FilePath
 credsFile config = do
-    let dir = toFilePath (configStackRoot config) </> "upload"
+    let dir = toFilePath (view stackRootL config) </> "upload"
     createDirectoryIfMissing True dir
     return $ dir </> "credentials.json"
 

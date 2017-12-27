@@ -35,6 +35,7 @@ import           Stack.Package
 import           Stack.PrettyPrint
 import           Stack.Types.Compiler
 import           Stack.Types.Config
+import           Stack.Types.NamedComponent
 import           Stack.Types.Package
 import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageName

@@ -49,6 +49,7 @@ import           Stack.BuildPlan
 import           Stack.Config (getLocalPackages, loadConfigYaml)
 import           Stack.Constants (stackDotYaml, wiredInPackages)
 import           Stack.Package               (readPackageUnresolvedDir, gpdPackageName)
+import           Stack.PackageIndex
 import           Stack.PrettyPrint
 import           Stack.Setup
 import           Stack.Setup.Installed
@@ -223,7 +224,7 @@ getCabalConfig :: HasConfig env
                -> Map PackageName Version -- ^ constraints
                -> RIO env [Text]
 getCabalConfig dir constraintType constraints = do
-    indices <- view $ configL.to configPackageIndices
+    indices <- view $ cabalLoaderL.to clIndices
     remotes <- mapM goIndex indices
     let cache = T.pack $ "remote-repo-cache: " ++ dir
     return $ cache : remotes ++ map goConstraint (Map.toList constraints)

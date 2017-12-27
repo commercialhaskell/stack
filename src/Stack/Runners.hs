@@ -87,7 +87,7 @@ withConfigAndLock
     -> RIO Config ()
     -> IO ()
 withConfigAndLock go@GlobalOpts{..} inner = loadConfigWithOpts go $ \lc -> do
-    withUserFileLock go (configStackRoot $ lcConfig lc) $ \lk ->
+    withUserFileLock go (view stackRootL lc) $ \lk ->
         runRIO (lcConfig lc) $
             Docker.reexecWithOptionalContainer
                 (lcProjectRoot lc)
@@ -108,7 +108,7 @@ withGlobalConfigAndLock go@GlobalOpts{..} inner = withRunnerGlobal go $ \runner 
             globalConfigMonoid
             Nothing
             LCSNoProject
-    withUserFileLock go (configStackRoot $ lcConfig lc) $ \_lk ->
+    withUserFileLock go (view stackRootL lc) $ \_lk ->
         runRIO (lcConfig lc) inner
 
 -- For now the non-locking version just unlocks immediately.
@@ -155,7 +155,7 @@ withBuildConfigExt
     -- installed on the host OS.
     -> IO ()
 withBuildConfigExt skipDocker go@GlobalOpts{..} mbefore inner mafter = loadConfigWithOpts go $ \lc -> do
-    withUserFileLock go (configStackRoot $ lcConfig lc) $ \lk0 -> do
+    withUserFileLock go (view stackRootL lc) $ \lk0 -> do
       -- A local bit of state for communication between callbacks:
       curLk <- newIORef lk0
       let inner' lk =

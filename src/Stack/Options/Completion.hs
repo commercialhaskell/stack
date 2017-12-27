@@ -28,7 +28,7 @@ import           Stack.Prelude hiding (lift)
 import           Stack.Setup
 import           Stack.Types.Config
 import           Stack.Types.FlagName
-import           Stack.Types.Package
+import           Stack.Types.NamedComponent
 import           Stack.Types.PackageName
 import           System.Process (readProcess)
 import           Language.Haskell.TH.Syntax (runIO, lift)

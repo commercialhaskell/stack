@@ -41,6 +41,7 @@ import qualified Data.Text.Encoding as T
 import           Data.Time (UTCTime,LocalTime(..),diffDays,utcToLocalTime,getZonedTime,ZonedTime(..))
 import           Data.Version (showVersion)
 import           GHC.Exts (sortWith)
+import           Lens.Micro (set)
 import           Path
 import           Path.Extra (toFilePathNoTrailingSep)
 import           Path.IO hiding (canonicalizePath)
@@ -49,6 +50,7 @@ import           Stack.Config (getInContainer)
 import           Stack.Constants
 import           Stack.Constants.Config
 import           Stack.Docker.GlobalDB
+import           Stack.PackageIndex
 import           Stack.Types.PackageIndex
 import           Stack.Types.Runner
 import           Stack.Types.Version
@@ -273,7 +275,7 @@ runContainerAndExit getCmdArgs
      let ImageConfig {..} = iiConfig
          imageEnvVars = map (break (== '=')) icEnv
          platformVariant = show $ hashRepoName image
-         stackRoot = configStackRoot config
+         stackRoot = view stackRootL config
          sandboxHomeDir = sandboxDir </> homeDirName
          isTerm = not (dockerDetach docker) &&
                   isStdinTerminal &&
@@ -749,13 +751,13 @@ entrypoint config@Config{..} DockerEntrypoint{..} =
           when buildPlanDirExists $ do
             (_, buildPlans) <- listDir (buildPlanDir origStackRoot)
             forM_ buildPlans $ \srcBuildPlan -> do
-              let destBuildPlan = buildPlanDir configStackRoot </> filename srcBuildPlan
+              let destBuildPlan = buildPlanDir (view stackRootL config) </> filename srcBuildPlan
               exists <- doesFileExist destBuildPlan
               unless exists $ do
                 ensureDir (parent destBuildPlan)
                 copyFile srcBuildPlan destBuildPlan
-          forM_ configPackageIndices $ \pkgIdx -> do
-            msrcIndex <- flip runReaderT (config{configStackRoot = origStackRoot}) $ do
+          forM_ clIndices $ \pkgIdx -> do
+            msrcIndex <- runRIO (set stackRootL origStackRoot config) $ do
                srcIndex <- configPackageIndex (indexName pkgIdx)
                exists <- doesFileExist srcIndex
                return $ if exists
@@ -763,8 +765,8 @@ entrypoint config@Config{..} DockerEntrypoint{..} =
                  else Nothing
             case msrcIndex of
               Nothing -> return ()
-              Just srcIndex -> do
-                flip runReaderT config $ do
+              Just srcIndex ->
+                runRIO config $ do
                   destIndex <- configPackageIndex (indexName pkgIdx)
                   exists <- doesFileExist destIndex
                   unless exists $ do
@@ -772,6 +774,7 @@ entrypoint config@Config{..} DockerEntrypoint{..} =
                     copyFile srcIndex destIndex
     return True
   where
+    CabalLoader {..} = configCabalLoader
     updateOrCreateStackUser estackUserEntry homeDir DockerUser{..} = do
       case estackUserEntry of
         Left _ -> do

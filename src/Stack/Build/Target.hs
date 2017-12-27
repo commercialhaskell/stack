@@ -79,11 +79,11 @@ import           Path
 import           Path.Extra (rejectMissingDir)
 import           Path.IO
 import           Stack.Config (getLocalPackages)
-import           Stack.Fetch (withCabalLoader)
 import           Stack.PackageIndex
 import           Stack.PackageLocation
 import           Stack.Snapshot (calculatePackagePromotion)
 import           Stack.Types.Config
+import           Stack.Types.NamedComponent
 import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageName
 import           Stack.Types.Version
@@ -509,9 +509,9 @@ parseTargets needTargets boptscli = do
 
       drops = Set.empty -- not supported to add drops
 
-  (globals', snapshots, locals') <- withCabalLoader $ \loadFromIndex -> do
+  (globals', snapshots, locals') <- do
     addedDeps' <- fmap Map.fromList $ forM (Map.toList addedDeps) $ \(name, loc) -> do
-      gpd <- parseSingleCabalFileIndex loadFromIndex root loc
+      gpd <- parseSingleCabalFileIndex root loc
       return (name, (gpd, loc, Nothing))
 
     -- Calculate a list of all of the locals, based on the project
@@ -532,7 +532,7 @@ parseTargets needTargets boptscli = do
           ]
 
     calculatePackagePromotion
-      loadFromIndex root ls0 (Map.elems allLocals)
+      root ls0 (Map.elems allLocals)
       flags hides options drops
 
   let ls = LoadedSnapshot

@@ -241,6 +241,7 @@ library:
   - Stack.Types.FlagName
   - Stack.Types.GhcPkgId
   - Stack.Types.Image
+  - Stack.Types.NamedComponent
   - Stack.Types.Nix
   - Stack.Types.Package
   - Stack.Types.PackageDump
