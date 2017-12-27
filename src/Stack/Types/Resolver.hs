@@ -68,7 +68,7 @@ type Resolver = ResolverWith (Either Request FilePath)
 
 -- | How we resolve which dependencies to install given a set of packages.
 data ResolverWith customContents
-    = ResolverSnapshot !SnapName -- FIXME rename to ResolverStackage
+    = ResolverStackage !SnapName
     -- ^ Use an official snapshot from the Stackage project, either an
     -- LTS Haskell or Stackage Nightly.
 
@@ -92,7 +92,7 @@ instance NFData LoadedResolver
 
 instance ToJSON (ResolverWith a) where
     toJSON x = case x of
-        ResolverSnapshot name -> toJSON $ renderSnapName name
+        ResolverStackage name -> toJSON $ renderSnapName name
         ResolverCompiler version -> toJSON $ compilerVersionText version
         ResolverCustom loc _ -> toJSON loc
 instance a ~ () => FromJSON (ResolverWith a) where
@@ -102,7 +102,7 @@ instance a ~ () => FromJSON (ResolverWith a) where
 -- presentation. When possible, you should prefer @sdResolverName@, as
 -- it will handle the human-friendly name inside a custom snapshot.
 resolverRawName :: ResolverWith a -> Text
-resolverRawName (ResolverSnapshot name) = renderSnapName name
+resolverRawName (ResolverStackage name) = renderSnapName name
 resolverRawName (ResolverCompiler v) = compilerVersionText v
 resolverRawName (ResolverCustom loc _ ) = "custom: " <> loc
 
@@ -124,13 +124,13 @@ parseCustomLocation mdir (ResolverCustom t ()) =
             $ T.stripPrefix "file://" t <|> T.stripPrefix "file:" t
       return $ toFilePath dir FP.</> rel
     Just req -> return $ Left req
-parseCustomLocation _ (ResolverSnapshot name) = return $ ResolverSnapshot name
+parseCustomLocation _ (ResolverStackage name) = return $ ResolverStackage name
 parseCustomLocation _ (ResolverCompiler cv) = return $ ResolverCompiler cv
 
 -- | Parse a @Resolver@ from a @Text@
 parseResolverText :: Text -> ResolverWith ()
 parseResolverText t
-    | Right x <- parseSnapName t = ResolverSnapshot x
+    | Right x <- parseSnapName t = ResolverStackage x
     | Just v <- parseCompilerVersion t = ResolverCompiler v
     | otherwise = ResolverCustom t ()
 
