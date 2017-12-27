@@ -8,6 +8,11 @@ Major changes:
 
 Behaviour changes:
 
+* `stack setup` no longer uses different GHC configure options on Linux
+  distributions that use GCC with PIE enabled by default.  GHC detects
+  this itself since ghc-8.0.2, and Stack's attempted workaround for older
+  versions caused more problems than it solved.
+
 Other enhancements:
 
 * A new sub command `ls` has been introduced to stack to view
@@ -15,6 +20,11 @@ Other enhancements:
   snapshots --help` to get more details about it.
 * Specify User-Agent HTTP request header on every HTTP request.
   See [#3628](https://github.com/commercialhaskell/stack/issues/3628) for details.
+* `stack setup` looks for GHC bindists and installations by any OS key
+  that is compatible (rather than only checking a single one).   This is
+  relevant on Linux where different distributions may have different
+  combinations of libtinfo 5/6, ncurses 5/6, and gmp 4/5, and will allow
+  simpifying the setup-info metadata YAML for future GHC releases.
 
 Bug fixes:
 
