@@ -257,8 +257,8 @@ sinkProcessStderrStdout name args sinkStderr sinkStdout =
            $ setStderr createSource
              pc0
     withProcess_ pc $ \p ->
-      (runConduit $ getStderr p .| sinkStderr) `concurrently`
-      (runConduit $ getStdout p .| sinkStdout)
+      runConduit (getStderr p .| sinkStderr) `concurrently`
+      runConduit (getStdout p .| sinkStdout)
 
 -- | Like sinkProcessStderrStdout, but receives Handles for stderr and stdout instead of 'Sink's.
 --

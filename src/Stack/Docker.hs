@@ -362,17 +362,15 @@ runContainerAndExit getCmdArgs
        oldHandler <- liftIO $ installHandler sig (Catch sigHandler) Nothing
        return (sig, oldHandler)
 #endif
-     let args' = (concat [["start"]
-                         ,["-a" | not (dockerDetach docker)]
-                         ,["-i" | keepStdinOpen]
-                         ,[containerID]])
-     e <- finally
-         (try $ withProc "docker" args' $ \cp ->
-            runProcess_ $ setDelegateCtlc False cp)
+     let args' = concat [["start"]
+                        ,["-a" | not (dockerDetach docker)]
+                        ,["-i" | keepStdinOpen]
+                        ,[containerID]]
+     e <- try (withProc "docker" args' $ runProcess_ . setDelegateCtlc False)
+         `finally`
          (do unless (dockerPersist docker || dockerDetach docker) $
-               catch
-                 (readProcessNull "docker" ["rm","-f",containerID])
-                 (\(_::ExitCodeException) -> return ())
+                 readProcessNull "docker" ["rm","-f",containerID]
+                 `catch` (\(_::ExitCodeException) -> return ())
 #ifndef WINDOWS
              forM_ oldHandlers $ \(sig,oldHandler) ->
                liftIO $ installHandler sig oldHandler Nothing

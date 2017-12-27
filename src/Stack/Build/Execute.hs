@@ -304,7 +304,7 @@ getSetupExe setupHs setupShimHs tmpdir = do
                     , toFilePath tmpOutputPath
                     ] ++
                     ["-build-runner" | wc == Ghcjs]
-            (withWorkingDir tmpdir $ withProc (compilerExeName wc) args $ \pc0 -> do
+            withWorkingDir tmpdir (withProc (compilerExeName wc) args $ \pc0 -> do
               let pc = setStdout (useHandleOpen stderr) pc0
               runProcess_ pc)
                 `catch` \ece -> do
