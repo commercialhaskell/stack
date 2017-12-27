@@ -145,7 +145,7 @@ data SetupOpts = SetupOpts
     deriving Show
 data SetupException = UnsupportedSetupCombo OS Arch
                     | MissingDependencies [String]
-                    | UnknownCompilerVersion Text (CompilerVersion 'CVWanted) [CompilerVersion 'CVActual]
+                    | UnknownCompilerVersion (Set.Set Text) (CompilerVersion 'CVWanted) (Set.Set (CompilerVersion 'CVActual))
                     | UnknownOSKey Text
                     | GHCSanityCheckCompileFailed ReadProcessException (Path Abs File)
                     | WantedMustBeGHC
@@ -155,6 +155,7 @@ data SetupException = UnsupportedSetupCombo OS Arch
                     | GHCJSRequiresStandardVariant
                     | GHCJSNotBooted
                     | DockerStackExeNotFound Version Text
+                    | UnsupportedSetupConfiguration
     deriving Typeable
 instance Exception SetupException
 instance Show SetupException where
@@ -166,11 +167,13 @@ instance Show SetupException where
     show (MissingDependencies tools) =
         "The following executables are missing and must be installed: " ++
         intercalate ", " tools
-    show (UnknownCompilerVersion oskey wanted known) = concat
-        [ "No information found for "
+    show (UnknownCompilerVersion oskeys wanted known) = concat
+        [ "No setup information found for "
         , compilerVersionString wanted
-        , ".\nSupported versions for OS key '" ++ T.unpack oskey ++ "': "
-        , intercalate ", " (map show known)
+        , " on your platform.\nThis probably means a GHC bindist has not yet been added for OS key '"
+        , T.unpack (T.intercalate "', '" (sort $ Set.toList oskeys))
+        , "'.\nSupported versions: "
+        , T.unpack (T.intercalate ", " (map compilerVersionText (sort $ Set.toList known)))
         ]
     show (UnknownOSKey oskey) =
         "Unable to find installation URLs for OS key: " ++
@@ -204,6 +207,8 @@ instance Show SetupException where
         , "\nUse the '"
         , T.unpack dockerStackExeArgName
         , "' option to specify a location"]
+    show UnsupportedSetupConfiguration =
+        "I don't know how to install GHC on your system configuration, please install manually"
 
 -- | Modify the environment variables (like PATH) appropriately, possibly doing installation too
 setupEnv :: (HasBuildConfig env, HasGHCVariant env)
@@ -373,7 +378,7 @@ ensureCompiler :: (HasConfig env, HasGHCVariant env)
 ensureCompiler sopts = do
     let wc = whichCompiler (soptsWantedCompiler sopts)
     when (getGhcVersion (soptsWantedCompiler sopts) < $(mkVersion "7.8")) $ do
-        logWarn "stack will almost certainly fail with GHC below version 7.8"
+        logWarn "Stack will almost certainly fail with GHC below version 7.8"
         logWarn "Valiantly attempting to run anyway, but I know this is doomed"
         logWarn "For more information, see: https://github.com/commercialhaskell/stack/issues/648"
         logWarn ""
@@ -435,20 +440,29 @@ ensureCompiler sopts = do
             let localPrograms = configLocalPrograms config
             installed <- listInstalled localPrograms
 
-            (installedCompiler, compilerBuild) <-
+            possibleCompilers <-
                     case wc of
                         Ghc -> do
-                            ghcBuild <- getGhcBuild menv0
-                            ghcPkgName <- parsePackageNameFromString ("ghc" ++ ghcVariantSuffix ghcVariant ++ compilerBuildSuffix ghcBuild)
-                            return (getInstalledTool installed ghcPkgName (isWanted . GhcVersion), ghcBuild)
-                        Ghcjs -> return (getInstalledGhcjs installed isWanted, CompilerBuildStandard)
-            compilerTool <- case (installedCompiler, soptsForceReinstall sopts) of
-                (Just tool, False) -> return tool
-                _
+                            ghcBuilds <- getGhcBuilds menv0
+                            forM ghcBuilds $ \ghcBuild -> do
+                                ghcPkgName <- parsePackageNameFromString ("ghc" ++ ghcVariantSuffix ghcVariant ++ compilerBuildSuffix ghcBuild)
+                                return (getInstalledTool installed ghcPkgName (isWanted . GhcVersion), ghcBuild)
+                        Ghcjs -> return [(getInstalledGhcjs installed isWanted, CompilerBuildStandard)]
+            let existingCompilers = concatMap
+                    (\(installedCompiler, compilerBuild) ->
+                        case (installedCompiler, soptsForceReinstall sopts) of
+                            (Just tool, False) -> [(tool, compilerBuild)]
+                            _ -> [])
+                    possibleCompilers
+            logDebug $ "Found already installed GHC builds: "
+                <> T.intercalate ", " (map (T.pack . compilerBuildName . snd) existingCompilers)
+            (compilerTool, compilerBuild) <- case existingCompilers of
+                (tool, build_):_ -> return (tool, build_)
+                []
                     | soptsInstallIfMissing sopts -> do
                         si <- getSetupInfo'
-                        downloadAndInstallCompiler
-                            compilerBuild
+                        downloadAndInstallPossibleCompilers
+                            (map snd possibleCompilers)
                             si
                             (soptsWantedCompiler sopts)
                             (soptsCompilerCheck sopts)
@@ -474,7 +488,9 @@ ensureCompiler sopts = do
                             msystem
                             (soptsWantedCompiler sopts, expectedArch)
                             ghcVariant
-                            compilerBuild
+                            (case possibleCompilers of
+                                [] -> CompilerBuildStandard
+                                (_, compilerBuild):_ -> compilerBuild)
                             (soptsCompilerCheck sopts)
                             (soptsStackYaml sopts)
                             suggestion
@@ -517,14 +533,14 @@ ensureCompiler sopts = do
 
     return (mpaths, compilerBuild, needLocal)
 
--- | Determine which GHC build to use depending on which shared libraries are available
+-- | Determine which GHC builds to use depending on which shared libraries are available
 -- on the system.
-getGhcBuild :: HasConfig env => EnvOverride -> RIO env CompilerBuild
-getGhcBuild menv = do
+getGhcBuilds :: HasConfig env => EnvOverride -> RIO env [CompilerBuild]
+getGhcBuilds menv = do
 
     config <- view configL
     case configGHCBuild config of
-        Just ghcBuild -> return ghcBuild
+        Just ghcBuild -> return [ghcBuild]
         Nothing -> determineGhcBuild
   where
     determineGhcBuild = do
@@ -555,7 +571,6 @@ getGhcBuild menv = do
                     "/sbin:/usr/sbin" <>
                     maybe "" (":" <>) (Map.lookup "PATH" (eoTextMap menv))
                 eldconfigOut <- tryProcessStdout Nothing sbinEnv "ldconfig" ["-p"]
-                egccErrOut <- tryProcessStderrStdout Nothing menv "gcc" ["-v"]
                 let firstWords = case eldconfigOut of
                         Right ldconfigOut -> mapMaybe (listToMaybe . T.words) $
                             T.lines $ T.decodeUtf8With T.lenientDecode ldconfigOut
@@ -581,44 +596,31 @@ getGhcBuild menv = do
 #endif
                       where
                         libT = T.pack (toFilePath lib)
-                    noPie = case egccErrOut of
-                        Right (gccErr,gccOut) ->
-                            "--enable-default-pie" `elem` S8.words gccOutput || "Gentoo Hardened" `S8.isInfixOf` gccOutput
-                                where gccOutput = gccOut <> gccErr
-                        Left _ -> False
-                logDebug $ if noPie
-                               then "PIE disabled"
-                               else "PIE enabled"
                 hastinfo5 <- checkLib $(mkRelFile "libtinfo.so.5")
                 hastinfo6 <- checkLib $(mkRelFile "libtinfo.so.6")
                 hasncurses6 <- checkLib $(mkRelFile "libncursesw.so.6")
                 hasgmp5 <- checkLib $(mkRelFile "libgmp.so.10")
                 hasgmp4 <- checkLib $(mkRelFile "libgmp.so.3")
-                let libComponents =
-                        if  | hastinfo6 && hasgmp5 -> ["tinfo6"]
-                            | hastinfo5 && hasgmp5 -> []
-                            | hasncurses6 && hasgmp5 -> ["ncurses6"]
-                            | hasgmp4 && hastinfo5 -> ["gmp4"]
-                            | otherwise -> []
-                    pieComponents =
-                        if noPie
-                            then ["nopie"]
-                            else []
-                case libComponents ++ pieComponents of
-                    [] -> useBuild CompilerBuildStandard
-                    components -> useBuild (CompilerBuildSpecialized (intercalate "-" components))
+                let libComponents = concat
+                        [ [["tinfo6"] | hastinfo6 && hasgmp5]
+                        , [[] | hastinfo5 && hasgmp5]
+                        , [["ncurses6"] | hasncurses6 && hasgmp5 ]
+                        , [["gmp4"] | hasgmp4 ]
+                        ]
+                useBuilds $ map
+                    (\c -> case c of
+                        [] -> CompilerBuildStandard
+                        _ -> CompilerBuildSpecialized (intercalate "-" c))
+                    libComponents
 #if !WINDOWS
             Platform _ Cabal.OpenBSD -> do
                 releaseStr <- mungeRelease <$> sysRelease
-                useBuild (CompilerBuildSpecialized releaseStr)
+                useBuilds [CompilerBuildSpecialized releaseStr]
 #endif
-            _ -> useBuild CompilerBuildStandard
-    useBuild CompilerBuildStandard = do
-        logDebug "Using standard GHC build"
-        return CompilerBuildStandard
-    useBuild (CompilerBuildSpecialized s) = do
-        logDebug ("Using " <> T.pack s <> " GHC build")
-        return (CompilerBuildSpecialized s)
+            _ -> useBuilds [CompilerBuildStandard]
+    useBuilds builds = do
+        logDebug $ "Potential GHC builds: " <> T.intercalate ", " (map (T.pack . compilerBuildName) builds)
+        return builds
 
 #if !WINDOWS
 -- | Encode an OpenBSD version (like "6.1") into a valid argument for
@@ -911,12 +913,55 @@ getWantedCompilerInfo :: (Ord k, MonadThrow m)
 getWantedCompilerInfo key versionCheck wanted toCV pairs_ =
     case mpair of
         Just pair -> return pair
-        Nothing -> throwM $ UnknownCompilerVersion key wanted (map toCV (Map.keys pairs_))
+        Nothing -> throwM $ UnknownCompilerVersion (Set.singleton key) wanted (Set.fromList $ map toCV (Map.keys pairs_))
   where
     mpair =
         listToMaybe $
         sortBy (flip (comparing fst)) $
         filter (isWantedCompiler versionCheck wanted . toCV . fst) (Map.toList pairs_)
+
+-- | Download and install the first available compiler build.
+downloadAndInstallPossibleCompilers
+    :: (HasGHCVariant env, HasConfig env)
+    => [CompilerBuild]
+    -> SetupInfo
+    -> CompilerVersion 'CVWanted
+    -> VersionCheck
+    -> Maybe String
+    -> RIO env (Tool, CompilerBuild)
+downloadAndInstallPossibleCompilers possibleCompilers si wanted versionCheck mbindistURL =
+    go possibleCompilers Nothing
+  where
+    -- This will stop as soon as one of the builds doesn't throw an @UnknownOSKey@ or
+    -- @UnknownCompilerVersion@ exception (so it will only try subsequent builds if one is non-existent,
+    -- not if the download or install fails for some other reason).
+    -- The @Unknown*@ exceptions thrown by each attempt are combined into a single exception
+    -- (if only @UnknownOSKey@ is thrown, then the first of those is rethrown, but if any
+    -- @UnknownCompilerVersion@s are thrown then the attempted OS keys and available versions
+    -- are unioned).
+    go [] Nothing = throwM UnsupportedSetupConfiguration
+    go [] (Just e) = throwM e
+    go (b:bs) e = do
+        logDebug $ "Trying to setup GHC build: " <> T.pack (compilerBuildName b)
+        er <- try $ downloadAndInstallCompiler b si wanted versionCheck mbindistURL
+        case er of
+            Left e'@(UnknownCompilerVersion ks' w' vs') ->
+                case e of
+                    Nothing -> go bs (Just e')
+                    Just (UnknownOSKey k) ->
+                        go bs $ Just $ UnknownCompilerVersion (Set.insert k ks') w' vs'
+                    Just (UnknownCompilerVersion ks _ vs) ->
+                        go bs $ Just $ UnknownCompilerVersion (Set.union ks' ks) w' (Set.union vs' vs)
+                    Just x -> throwM x
+            Left e'@(UnknownOSKey k') ->
+                case e of
+                    Nothing -> go bs (Just e')
+                    Just (UnknownOSKey _) -> go bs e
+                    Just (UnknownCompilerVersion ks w vs) ->
+                        go bs $ Just $ UnknownCompilerVersion (Set.insert k' ks) w vs
+                    Just x -> throwM x
+            Left e' -> throwM e'
+            Right r -> return (r, b)
 
 getGhcKey :: (MonadReader env m, HasPlatform env, HasGHCVariant env, MonadThrow m)
           => CompilerBuild -> m Text
