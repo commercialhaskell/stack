@@ -308,7 +308,7 @@ loadResolver (ResolverCustom url loc) = do
                   case sdResolver parent' of
                     ResolverStackage snapName -> snapNameToHash snapName
                     ResolverCustom _ parentHash -> parentHash
-                    ResolverCompiler _ -> error "loadResolver: Receieved ResolverCompiler in impossible location"
+                    ResolverCompiler _ -> error "loadResolver: Received ResolverCompiler in impossible location"
             return (Right parent', hash')
       return $ overrideCompiler sd0
         { sdParent = parent'
