@@ -213,7 +213,7 @@ cloneRepo projRoot url commit repoType' = do
                         ]) runProcess_
                 created <- doesDirExist dir
                 unless created $ throwM $ FailedToCloneRepo commandName
-                readProcessNull commandName
+                withWorkingDir dir $ readProcessNull commandName
                     (resetCommand ++ [T.unpack commit, "--"])
                     `catchAny` \case
                         ex -> do
