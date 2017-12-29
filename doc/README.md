@@ -132,6 +132,17 @@ stack setup && \
 stack build
 ```
 
+If you need to check you changes quickly run:
+
+```bash
+stack ghci
+λ: :main --stack-root /path/to/root/ --stack-yaml /path/to/stack.yaml COMMAND
+```
+
+This allows you to set a special stack root (instead of `~/.stack/`) and to
+target your commands at a particular `stack.yaml` instead of the one found in
+the current directory.
+
 #### Complete guide to stack
 
 This repository also contains a complete [user guide to using stack
