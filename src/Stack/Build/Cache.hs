@@ -32,6 +32,7 @@ module Stack.Build.Cache
     , BuildCache(..)
     ) where
 
+import           Stack.Constants
 import           Stack.Prelude
 import           Crypto.Hash (hashWith, SHA256(..))
 import           Control.Monad.Trans.Maybe
@@ -254,6 +255,14 @@ precompiledCacheFile loc copts installedPackageIDs = do
             PLRepo r -> Just $ T.unpack (repoCommit r) ++ repoSubdirs r
 
   forM mpkgRaw $ \pkgRaw -> do
+    platformRelDir <- platformGhcRelDir
+    let precompiledDir =
+              view stackRootL ec
+          </> $(mkRelDir "precompiled")
+          </> platformRelDir
+          </> compiler
+          </> cabal
+
     pkg <-
       case parseRelDir pkgRaw of
         Just x -> return x
@@ -263,7 +272,6 @@ precompiledCacheFile loc copts installedPackageIDs = do
                  $ B64URL.encode
                  $ TE.encodeUtf8
                  $ T.pack pkgRaw
-    platformRelDir <- platformGhcRelDir
 
     -- In Cabal versions 1.22 and later, the configure options contain the
     -- installed package IDs, which is what we need for a unique hash.
@@ -274,13 +282,19 @@ precompiledCacheFile loc copts installedPackageIDs = do
     hashPath <- parseRelFile $ S8.unpack $ B64URL.encode
               $ Mem.convert $ hashWith SHA256 $ Store.encode input
 
-    return $ view stackRootL ec
-         </> $(mkRelDir "precompiled")
-         </> platformRelDir
-         </> compiler
-         </> cabal
-         </> pkg
-         </> hashPath
+    let longPath = precompiledDir </> pkg </> hashPath
+
+    -- See #3649 - shorten the paths on windows if MAX_PATH will be
+    -- violated. Doing this only when necessary allows use of existing
+    -- precompiled packages.
+    case maxPathLength of
+      Nothing -> return longPath
+      Just maxPath
+        | length (toFilePath longPath) > maxPath -> do
+            shortPkg <- shaPath pkg
+            shortHash <- shaPath hashPath
+            return $ precompiledDir </> shortPkg </> shortHash
+        | otherwise -> return longPath
 
 -- | Write out information about a newly built package
 writePrecompiledCache :: (MonadThrow m, MonadReader env m, HasEnvConfig env, MonadIO m, MonadLogger m)

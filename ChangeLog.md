@@ -17,6 +17,9 @@ Other enhancements:
   See [#3628](https://github.com/commercialhaskell/stack/issues/3628) for details.
 
 Bug fixes:
+* 1.6.1 introduced a change that made some precompiled cache files use
+  longer paths, sometimes causing builds to fail on windows. This has been
+  fixed. See [#3649](https://github.com/commercialhaskell/stack/issues/3649)
 
 * The script interpreter's implicit file arguments are now passed before other
   arguments. See [#3658](https://github.com/commercialhaskell/stack/issues/3658).
