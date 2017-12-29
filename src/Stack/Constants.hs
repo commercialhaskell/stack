@@ -247,7 +247,7 @@ defaultTerminalWidth = 100
 -- | Maximum length to use in paths. Is only a 'Just' value on windows,
 -- corresponding to MAX_PATH.
 maxPathLength :: Maybe Int
-#ifdef mings32_HOST_OS
+#ifdef mingw32_HOST_OS
 maxPathLength = Just 260
 #else
 maxPathLength = Nothing
