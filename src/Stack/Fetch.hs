@@ -351,8 +351,8 @@ withCabalLoader inner = do
                  -> IO ByteString
         doLookup ident = do
             bothCaches <- unliftIO u getPackageCaches
-            eres <- unliftIO u $ lookupPackageIdentifierExact ident bothCaches
-            case eres of
+            mres <- unliftIO u $ lookupPackageIdentifierExact ident bothCaches
+            case mres of
                 Just bs -> return bs
                 -- Update the cache and try again
                 Nothing -> do
