@@ -26,10 +26,18 @@ dependencies:
 - unordered-containers
 - vector
 
+when:
+- condition: os(windows)
+  then:
+    cpp-options: -DWINDOWS
+    dependencies:
+    - Win32
+  else:
+    dependencies:
+    - pid1
+    - unix
+
 library:
   source-dirs: src/
-  when:
-    - condition: os(windows)
-      cpp-options: -DWINDOWS
   other-modules:
   - RIO.Prelude
