@@ -58,7 +58,6 @@ import              Stack.Types.BuildPlan
 import              Stack.Types.PackageIdentifier
 import              Stack.Types.PackageIndex
 import              Stack.Types.PackageName
-import              Stack.Types.Runner
 import              Stack.Types.Version
 import qualified    System.FilePath as FP
 import              System.IO (SeekMode (AbsoluteSeek))
@@ -494,28 +493,25 @@ getToFetch mdest resolvedAll = do
 -- @
 --
 -- Since 0.1.0.0
-fetchPackages' :: HasCabalLoader env
+fetchPackages' :: forall env. HasCabalLoader env
                => Maybe (Path Rel Dir) -- ^ the dist rename directory, see: https://github.com/fpco/stack/issues/157
                -> Map PackageIdentifier ToFetch
                -> RIO env (Map PackageIdentifier (Path Abs Dir))
 fetchPackages' mdistDir toFetchAll = do
     connCount <- view $ cabalLoaderL.to clConnectionCount
-    outputVar <- liftIO $ newTVarIO Map.empty
+    outputVar <- newTVarIO Map.empty
 
-    run <- askRunInIO
     parMapM_
         connCount
-        (go outputVar run)
+        (go outputVar)
         (Map.toList toFetchAll)
 
-    liftIO $ readTVarIO outputVar
+    readTVarIO outputVar
   where
-    go :: (MonadUnliftIO m,MonadThrow m,MonadLogger m,HasRunner env, MonadReader env m)
-       => TVar (Map PackageIdentifier (Path Abs Dir))
-       -> (m () -> IO ())
+    go :: TVar (Map PackageIdentifier (Path Abs Dir))
        -> (PackageIdentifier, ToFetch)
-       -> m ()
-    go outputVar run (ident, toFetch) = do
+       -> RIO env ()
+    go outputVar (ident, toFetch) = do
         req <- parseUrlThrow $ T.unpack $ tfUrl toFetch
         let destpath = tfTarball toFetch
 
@@ -527,7 +523,7 @@ fetchPackages' mdistDir toFetchAll = do
                 , drRetryPolicy = drRetryPolicyDefault
                 }
         let progressSink _ =
-                liftIO $ run $ logInfo $ packageIdentifierText ident <> ": download"
+                logInfo $ packageIdentifierText ident <> ": download"
         _ <- verifiedDownload downloadReq destpath progressSink
 
         identStrP <- parseRelDir $ packageIdentifierString ident

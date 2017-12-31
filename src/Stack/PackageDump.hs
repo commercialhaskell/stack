@@ -100,14 +100,13 @@ newInstalledCache = liftIO $ InstalledCache <$> newIORef (InstalledCacheInner Ma
 
 -- | Load a @InstalledCache@ from disk, swallowing any errors and returning an
 -- empty cache.
-loadInstalledCache :: (MonadLogger m, MonadUnliftIO m)
-                   => Path Abs File -> m InstalledCache
+loadInstalledCache :: HasLogFunc env => Path Abs File -> RIO env InstalledCache
 loadInstalledCache path = do
     m <- $(versionedDecodeOrLoad installedCacheVC) path (return $ InstalledCacheInner Map.empty)
     liftIO $ InstalledCache <$> newIORef m
 
 -- | Save a @InstalledCache@ to disk
-saveInstalledCache :: (MonadLogger m, MonadIO m) => Path Abs File -> InstalledCache -> m ()
+saveInstalledCache :: HasLogFunc env => Path Abs File -> InstalledCache -> RIO env ()
 saveInstalledCache path (InstalledCache ref) =
     liftIO (readIORef ref) >>= $(versionedEncodeFile installedCacheVC) path
 

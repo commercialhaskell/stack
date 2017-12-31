@@ -100,12 +100,12 @@ import           System.Process.Read
 -- | If deprecated path exists, use it and print a warning.
 -- Otherwise, return the new path.
 tryDeprecatedPath
-    :: (MonadIO m, MonadLogger m)
+    :: HasLogFunc env
     => Maybe T.Text -- ^ Description of file for warning (if Nothing, no deprecation warning is displayed)
-    -> (Path Abs a -> m Bool) -- ^ Test for existence
+    -> (Path Abs a -> RIO env Bool) -- ^ Test for existence
     -> Path Abs a -- ^ New path
     -> Path Abs a -- ^ Deprecated path
-    -> m (Path Abs a, Bool) -- ^ (Path to use, whether it already exists)
+    -> RIO env (Path Abs a, Bool) -- ^ (Path to use, whether it already exists)
 tryDeprecatedPath mWarningDesc exists new old = do
     newExists <- exists new
     if newExists
@@ -130,8 +130,8 @@ tryDeprecatedPath mWarningDesc exists new old = do
 -- If the directory already exists at the deprecated location, its location is returned.
 -- Otherwise, the new location is returned.
 getImplicitGlobalProjectDir
-    :: (MonadIO m, MonadLogger m)
-    => Config -> m (Path Abs Dir)
+    :: HasLogFunc env
+    => Config -> RIO env (Path Abs Dir)
 getImplicitGlobalProjectDir config =
     --TEST no warning printed
     liftM fst $ tryDeprecatedPath
@@ -206,11 +206,11 @@ getLatestResolver = do
 -- | Create a 'Config' value when we're not using any local
 -- configuration files (e.g., the script command)
 configNoLocalConfig
-    :: (MonadLogger m, MonadUnliftIO m, MonadThrow m, MonadReader env m, HasRunner env)
+    :: HasRunner env
     => Path Abs Dir -- ^ stack root
     -> Maybe AbstractResolver
     -> ConfigMonoid
-    -> m Config
+    -> RIO env Config
 configNoLocalConfig _ Nothing _ = throwIO NoResolverWhenUsingNoLocalConfig
 configNoLocalConfig stackRoot (Just resolver) configMonoid = do
     userConfigPath <- liftIO $ getFakeConfigPath stackRoot resolver
@@ -224,14 +224,14 @@ configNoLocalConfig stackRoot (Just resolver) configMonoid = do
 
 -- Interprets ConfigMonoid options.
 configFromConfigMonoid
-    :: (MonadLogger m, MonadUnliftIO m, MonadThrow m, MonadReader env m, HasRunner env)
+    :: HasRunner env
     => Path Abs Dir -- ^ stack root, e.g. ~/.stack
     -> Path Abs File -- ^ user config file path, e.g. ~/.stack/config.yaml
     -> Bool -- ^ allow locals?
     -> Maybe AbstractResolver
     -> Maybe (Project, Path Abs File)
     -> ConfigMonoid
-    -> m Config
+    -> RIO env Config
 configFromConfigMonoid
     clStackRoot configUserConfigPath configAllowLocals mresolver
     mproject ConfigMonoid{..} = do
@@ -786,9 +786,9 @@ getInNixShell = liftIO (isJust <$> lookupEnv inNixShellEnvVar)
 -- | Determine the extra config file locations which exist.
 --
 -- Returns most local first
-getExtraConfigs :: (MonadIO m, MonadLogger m)
+getExtraConfigs :: HasLogFunc env
                 => Path Abs File -- ^ use config path
-                -> m [Path Abs File]
+                -> RIO env [Path Abs File]
 getExtraConfigs userConfigPath = do
   defaultStackGlobalConfigPath <- getDefaultGlobalConfigPath
   liftIO $ do
@@ -806,8 +806,8 @@ getExtraConfigs userConfigPath = do
 -- | Load and parse YAML from the given config file. Throws
 -- 'ParseConfigFileException' when there's a decoding error.
 loadConfigYaml
-    :: (MonadIO m, MonadLogger m)
-    => (Value -> Yaml.Parser (WithJSONWarnings a)) -> Path Abs File -> m a
+    :: HasLogFunc env
+    => (Value -> Yaml.Parser (WithJSONWarnings a)) -> Path Abs File -> RIO env a
 loadConfigYaml parser path = do
     eres <- loadYaml parser path
     case eres of
@@ -816,8 +816,8 @@ loadConfigYaml parser path = do
 
 -- | Load and parse YAML from the given file.
 loadYaml
-    :: (MonadIO m, MonadLogger m)
-    => (Value -> Yaml.Parser (WithJSONWarnings a)) -> Path Abs File -> m (Either Yaml.ParseException a)
+    :: HasLogFunc env
+    => (Value -> Yaml.Parser (WithJSONWarnings a)) -> Path Abs File -> RIO env (Either Yaml.ParseException a)
 loadYaml parser path = do
     eres <- liftIO $ Yaml.decodeFileEither (toFilePath path)
     case eres  of
@@ -830,10 +830,10 @@ loadYaml parser path = do
                     return (Right res)
 
 -- | Get the location of the project config file, if it exists.
-getProjectConfig :: (MonadIO m, MonadThrow m, MonadLogger m)
+getProjectConfig :: HasLogFunc env
                  => StackYamlLoc (Path Abs File)
                  -- ^ Override stack.yaml
-                 -> m (LocalConfigStatus (Path Abs File))
+                 -> RIO env (LocalConfigStatus (Path Abs File))
 getProjectConfig (SYLOverride stackYaml) = return $ LCSProject stackYaml
 getProjectConfig SYLDefault = do
     env <- liftIO getEnvironment
@@ -865,10 +865,10 @@ data LocalConfigStatus a
 -- | Find the project config file location, respecting environment variables
 -- and otherwise traversing parents. If no config is found, we supply a default
 -- based on current directory.
-loadProjectConfig :: (MonadIO m, MonadThrow m, MonadLogger m)
+loadProjectConfig :: HasLogFunc env
                   => StackYamlLoc (Path Abs File)
                   -- ^ Override stack.yaml
-                  -> m (LocalConfigStatus (Project, Path Abs File, ConfigMonoid))
+                  -> RIO env (LocalConfigStatus (Project, Path Abs File, ConfigMonoid))
 loadProjectConfig mstackYaml = do
     mfp <- getProjectConfig mstackYaml
     case mfp of
@@ -892,8 +892,8 @@ loadProjectConfig mstackYaml = do
 -- If a file already exists at the deprecated location, its location is returned.
 -- Otherwise, the new location is returned.
 getDefaultGlobalConfigPath
-    :: (MonadIO m, MonadLogger m)
-    => m (Maybe (Path Abs File))
+    :: HasLogFunc env
+    => RIO env (Maybe (Path Abs File))
 getDefaultGlobalConfigPath =
     case (defaultGlobalConfigPath, defaultGlobalConfigPathDeprecated) of
         (Just new,Just old) ->
@@ -910,8 +910,8 @@ getDefaultGlobalConfigPath =
 -- If a file already exists at the deprecated location, its location is returned.
 -- Otherwise, the new location is returned.
 getDefaultUserConfigPath
-    :: (MonadIO m, MonadLogger m)
-    => Path Abs Dir -> m (Path Abs File)
+    :: HasLogFunc env
+    => Path Abs Dir -> RIO env (Path Abs File)
 getDefaultUserConfigPath stackRoot = do
     (path, exists) <- tryDeprecatedPath
         (Just "non-project configuration file")

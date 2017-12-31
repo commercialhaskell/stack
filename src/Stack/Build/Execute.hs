@@ -868,7 +868,7 @@ ensureConfig newConfigCache pkgDir ExecuteEnv {..} announce cabal cabalfp task =
         withWorkingDir pkgDir $ readProcessNull "autoreconf" ["-i"] `catchAny` \ex ->
           logWarn $ "Unable to run autoreconf: " <> T.pack (show ex)
 
-announceTask :: MonadLogger m => Task -> Text -> m ()
+announceTask :: HasLogFunc env => Task -> Text -> RIO env ()
 announceTask task x = logInfo $ T.concat
     [ T.pack $ packageIdentifierString $ taskProvides task
     , ": "
@@ -1136,14 +1136,15 @@ withSingleContext ActionContext {..} ExecuteEnv {..} task@Task {..} mdeps msuffi
                                 (outputSink KeepTHLoading LevelWarn compilerVer)
                                 (outputSink stripTHLoading LevelInfo compilerVer)
                     outputSink
-                        :: ExcludeTHLoading
+                        :: HasCallStack
+                        => ExcludeTHLoading
                         -> LogLevel
                         -> CompilerVersion 'CVActual
                         -> Sink S.ByteString (RIO env) ()
                     outputSink excludeTH level compilerVer =
                         CT.decodeUtf8Lenient
-                        =$ mungeBuildOutput excludeTH makeAbsolute pkgDir compilerVer
-                        =$ CL.mapM_ (monadLoggerLog $(TH.location >>= liftLoc) "" level)
+                        .| mungeBuildOutput excludeTH makeAbsolute pkgDir compilerVer
+                        .| CL.mapM_ (logGeneric "" level)
                     -- If users want control, we should add a config option for this
                     makeAbsolute :: ConvertPathsToAbsolute
                     makeAbsolute = case stripTHLoading of
@@ -1550,12 +1551,12 @@ getExecutableBuildStatuses package pkgDir = do
 
 -- | Check whether the given executable is defined in the given dist directory.
 checkExeStatus
-    :: (MonadLogger m, MonadIO m, MonadThrow m)
+    :: HasLogFunc env
     => WhichCompiler
     -> Platform
     -> Path b Dir
     -> Text
-    -> m (Text, ExecutableBuildStatus)
+    -> RIO env (Text, ExecutableBuildStatus)
 checkExeStatus compiler platform distDir name = do
     exename <- parseRelDir (T.unpack name)
     exists <- checkPath (distDir </> $(mkRelDir "build") </> exename)

@@ -312,7 +312,7 @@ generateUnionReport report reportDir tixFiles = do
     liftIO $ writeTix (toFilePath tixDest) tix
     generateHpcReportInternal tixDest reportDir report [] []
 
-readTixOrLog :: (MonadLogger m, MonadUnliftIO m) => Path b File -> m (Maybe Tix)
+readTixOrLog :: HasLogFunc env => Path b File -> RIO env (Maybe Tix)
 readTixOrLog path = do
     mtix <- liftIO (readTix (toFilePath path)) `catchAny` \errorCall -> do
         logError $ "Error while reading tix: " <> T.pack (show errorCall)

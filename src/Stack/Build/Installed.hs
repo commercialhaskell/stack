@@ -164,11 +164,11 @@ loadDatabase opts mcache sourceMap mdb lhs0 = do
         <$> ZipSink sinkDP
         <*> ZipSink CL.consume
 
-processLoadResult :: MonadLogger m
+processLoadResult :: HasLogFunc env
                   => Maybe (InstalledPackageLocation, Path Abs Dir)
                   -> Bool
                   -> (Allowed, LoadHelper)
-                  -> m (Maybe LoadHelper)
+                  -> RIO env (Maybe LoadHelper)
 processLoadResult _ _ (Allowed, lh) = return (Just lh)
 processLoadResult _ True (WrongVersion actual wanted, lh)
     -- Allow some packages in the ghcjs global DB to have the wrong

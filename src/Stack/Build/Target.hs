@@ -413,9 +413,9 @@ data PackageType = ProjectPackage | Dependency
   deriving (Eq, Show)
 
 combineResolveResults
-  :: forall m. MonadLogger m
+  :: forall env. HasLogFunc env
   => [ResolveResult]
-  -> m ([Text], Map PackageName Target, Map PackageName (PackageLocationIndex FilePath))
+  -> RIO env ([Text], Map PackageName Target, Map PackageName (PackageLocationIndex FilePath))
 combineResolveResults results = do
     addedDeps <- fmap Map.unions $ forM results $ \result ->
       case rrAddedDep result of

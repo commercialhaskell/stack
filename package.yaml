@@ -55,7 +55,6 @@ dependencies:
 - echo
 - exceptions
 - extra
-- fast-logger
 - file-embed
 - filelock
 - filepath
@@ -74,7 +73,7 @@ dependencies:
 - microlens
 - microlens-mtl
 - mintty
-- monad-logger
+- monad-logger # TODO remove dep when persistent drops monad-logger
 - mono-traversable
 - mtl
 - neat-interpolation
@@ -151,6 +150,7 @@ library:
   - Path.Extra
   - Path.Find
   - Paths_stack
+  - RIO.Logger
   - Stack.Build
   - Stack.Build.Cache
   - Stack.Build.ConstructPlan

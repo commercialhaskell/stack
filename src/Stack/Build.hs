@@ -170,7 +170,7 @@ instance Exception CabalVersionException
 
 -- | See https://github.com/commercialhaskell/stack/issues/1198.
 warnIfExecutablesWithSameNameCouldBeOverwritten
-    :: MonadLogger m => [LocalPackage] -> Plan -> m ()
+    :: HasLogFunc env => [LocalPackage] -> Plan -> RIO env ()
 warnIfExecutablesWithSameNameCouldBeOverwritten locals plan = do
     logDebug "Checking if we are going to build multiple executables with the same name"
     forM_ (Map.toList warnings) $ \(exe,(toBuild,otherLocals)) -> do
@@ -237,7 +237,7 @@ warnIfExecutablesWithSameNameCouldBeOverwritten locals plan = do
     collect :: Ord k => [(k,v)] -> Map k (NonEmpty v)
     collect = Map.map NE.fromList . Map.fromDistinctAscList . groupSort
 
-warnAboutSplitObjs :: MonadLogger m => BuildOpts -> m ()
+warnAboutSplitObjs :: HasLogFunc env => BuildOpts -> RIO env ()
 warnAboutSplitObjs bopts | boptsSplitObjs bopts = do
     logWarn $ "Building with --split-objs is enabled. " <> T.pack splitObjsWarning
 warnAboutSplitObjs _ = return ()

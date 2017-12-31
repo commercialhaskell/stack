@@ -15,7 +15,7 @@ import qualified System.Clock as Clock
 -- | Log running a process with its arguments, for debugging (-v).
 --
 -- This logs one message before running the process and one message after.
-withProcessTimeLog :: (MonadIO m, MonadLogger m) => Maybe FilePath -> String -> [String] -> m a -> m a
+withProcessTimeLog :: (MonadIO m, MonadReader env m, HasLogFunc env, HasCallStack) => Maybe FilePath -> String -> [String] -> m a -> m a
 withProcessTimeLog mdir name args proc = do
   let cmdText =
           T.intercalate

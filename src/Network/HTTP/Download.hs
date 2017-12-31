@@ -47,10 +47,10 @@ import           System.FilePath             (takeDirectory, (<.>))
 -- appropriate destination.
 --
 -- Throws an exception if things go wrong
-download :: (MonadUnliftIO m, MonadLogger m, HasRunner env, MonadReader env m)
+download :: HasRunner env
          => Request
          -> Path Abs File -- ^ destination
-         -> m Bool -- ^ Was a downloaded performed (True) or did the file already exist (False)?
+         -> RIO env Bool -- ^ Was a downloaded performed (True) or did the file already exist (False)?
 download req destpath = do
     let downloadReq = DownloadRequest
             { drRequest = req
@@ -64,10 +64,10 @@ download req destpath = do
 -- | Same as 'download', but will download a file a second time if it is already present.
 --
 -- Returns 'True' if the file was downloaded, 'False' otherwise
-redownload :: (MonadUnliftIO m, MonadLogger m, HasRunner env, MonadReader env m)
+redownload :: HasRunner env
            => Request
            -> Path Abs File -- ^ destination
-           -> m Bool
+           -> RIO env Bool
 redownload req0 dest = do
     logDebug $ "Downloading " <> decodeUtf8With lenientDecode (path req0)
     let destFilePath = toFilePath dest

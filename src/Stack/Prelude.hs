@@ -7,7 +7,6 @@ module Stack.Prelude
   , withSinkFile
   , withSinkFileCautious
   , withLazyFile
-  , NoLogging (..)
   , withSystemTempDir
   , fromFirst
   , mapMaybeA
@@ -15,11 +14,8 @@ module Stack.Prelude
   , forMaybeA
   , forMaybeM
   , stripCR
-  , logSticky
-  , logStickyDone
   , RIO (..)
   , runRIO
-  , HasLogFunc (..)
   , module X
   ) where
 
@@ -34,12 +30,7 @@ import           Control.Monad        as X (Monad (..), MonadPlus (..), filterM,
                                             when, zipWithM, zipWithM_, (<$!>),
                                             (<=<), (=<<), (>=>))
 import           Control.Monad.Catch  as X (MonadThrow (..))
-import           Control.Monad.Logger.CallStack
-                                      as X (Loc, LogLevel (..), LogSource,
-                                            LogStr, MonadLogger (..),
-                                            MonadLoggerIO (..), liftLoc,
-                                            logDebug, logError, logInfo,
-                                            logOther, logWarn, toLogStr)
+import           RIO.Logger           as X
 import           Control.Monad.Reader as X (MonadReader, MonadTrans (..),
                                             ReaderT (..), ask, asks, local)
 import           Data.Bool            as X (Bool (..), not, otherwise, (&&),
@@ -182,40 +173,9 @@ withSinkFileCautious fp inner =
 withLazyFile :: MonadUnliftIO m => FilePath -> (BL.ByteString -> m a) -> m a
 withLazyFile fp inner = withBinaryFile fp ReadMode $ inner <=< liftIO . BL.hGetContents
 
--- | Avoid orphan messes
-newtype NoLogging a = NoLogging { runNoLogging :: IO a }
-  deriving (Functor, Applicative, Monad, MonadIO)
-instance MonadUnliftIO NoLogging where
-  askUnliftIO = NoLogging $
-                withUnliftIO $ \u ->
-                return (UnliftIO (unliftIO u . runNoLogging))
-instance MonadLogger NoLogging where
-  monadLoggerLog _ _ _ _ = return ()
-
 -- | Path version
 withSystemTempDir :: MonadUnliftIO m => String -> (Path Abs Dir -> m a) -> m a
 withSystemTempDir str inner = withRunInIO $ \run -> Path.IO.withSystemTempDir str $ run . inner
-
--- | Write a "sticky" line to the terminal. Any subsequent lines will
--- overwrite this one, and that same line will be repeated below
--- again. In other words, the line sticks at the bottom of the output
--- forever. Running this function again will replace the sticky line
--- with a new sticky line. When you want to get rid of the sticky
--- line, run 'logStickyDone'.
---
-logSticky :: MonadLogger m => Text -> m ()
-logSticky =
-    logOther (LevelOther "sticky")
-
--- | This will print out the given message with a newline and disable
--- any further stickiness of the line until a new call to 'logSticky'
--- happens.
---
--- It might be better at some point to have a 'runSticky' function
--- that encompasses the logSticky->logStickyDone pairing.
-logStickyDone :: MonadLogger m => Text -> m ()
-logStickyDone =
-    logOther (LevelOther "sticky-done")
 
 -- | The Reader+IO monad. This is different from a 'ReaderT' because:
 --
@@ -230,17 +190,6 @@ newtype RIO env a = RIO { unRIO :: ReaderT env IO a }
 
 runRIO :: MonadIO m => env -> RIO env a -> m a
 runRIO env (RIO (ReaderT f)) = liftIO (f env)
-
-class HasLogFunc env where
-  logFuncL :: Getting r env (Loc -> LogSource -> LogLevel -> LogStr -> IO ())
-
-instance HasLogFunc env => MonadLogger (RIO env) where
-  monadLoggerLog a b c d = do
-    f <- view logFuncL
-    liftIO $ f a b c $ toLogStr d
-
-instance HasLogFunc env => MonadLoggerIO (RIO env) where
-  askLoggerIO = view logFuncL
 
 instance MonadUnliftIO (RIO env) where
     askUnliftIO = RIO $ ReaderT $ \r ->

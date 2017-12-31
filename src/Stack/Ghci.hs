@@ -625,7 +625,7 @@ wantedPackageComponents bopts (TargetAll ProjectPackage) pkg = S.fromList $
     (if boptsBenchmarks bopts then map CBench (S.toList (packageBenchmarks pkg)) else [])
 wantedPackageComponents _ _ _ = S.empty
 
-checkForIssues :: (MonadThrow m, MonadLogger m) => [GhciPkgInfo] -> m ()
+checkForIssues :: HasLogFunc env => [GhciPkgInfo] -> RIO env ()
 checkForIssues pkgs = do
     unless (null issues) $ borderedWarning $ do
         logWarn "Warning: There are cabal settings for this project which may prevent GHCi from loading your code properly."
@@ -688,7 +688,7 @@ checkForIssues pkgs = do
         , (c, bio) <- ghciPkgOpts pkg
         ]
 
-borderedWarning :: MonadLogger m => m a -> m a
+borderedWarning :: HasLogFunc env => RIO env a -> RIO env a
 borderedWarning f = do
     logWarn ""
     logWarn "* * * * * * * *"
@@ -697,7 +697,7 @@ borderedWarning f = do
     logWarn ""
     return x
 
-checkForDuplicateModules :: (MonadThrow m, MonadLogger m) => [GhciPkgInfo] -> m ()
+checkForDuplicateModules :: HasLogFunc env => [GhciPkgInfo] -> RIO env ()
 checkForDuplicateModules pkgs = do
     unless (null duplicates) $ do
         borderedWarning $ do

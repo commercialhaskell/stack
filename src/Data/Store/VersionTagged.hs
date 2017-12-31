@@ -37,7 +37,7 @@ versionedDecodeFile :: Data a => VersionConfig a -> Q Exp
 versionedDecodeFile vc = [e| versionedDecodeFileImpl $(decodeWithVersionQ vc) |]
 
 -- | Write to the given file.
-storeEncodeFile :: (Store a, MonadIO m, MonadLogger m, Eq a)
+storeEncodeFile :: (Store a, MonadIO m, MonadReader env m, HasCallStack, HasLogFunc env, Eq a)
                 => (a -> (Int, Poke ()))
                 -> Peek a
                 -> Path Abs File
@@ -55,7 +55,7 @@ storeEncodeFile pokeFunc peekFunc fp x = do
 -- | Read from the given file. If the read fails, run the given action and
 -- write that back to the file. Always starts the file off with the
 -- version tag.
-versionedDecodeOrLoadImpl :: (Store a, Eq a, MonadUnliftIO m, MonadLogger m)
+versionedDecodeOrLoadImpl :: (Store a, Eq a, MonadUnliftIO m, MonadReader env m, HasCallStack, HasLogFunc env)
                           => (a -> (Int, Poke ()))
                           -> Peek a
                           -> Path Abs File
@@ -75,7 +75,7 @@ versionedDecodeOrLoadImpl pokeFunc peekFunc fp mx = do
             storeEncodeFile pokeFunc peekFunc fp x
             return x
 
-versionedDecodeFileImpl :: (Store a, MonadUnliftIO m, MonadLogger m)
+versionedDecodeFileImpl :: (Store a, MonadUnliftIO m, MonadReader env m, HasCallStack, HasLogFunc env)
                         => Peek a
                         -> Path loc File
                         -> m (Maybe a)

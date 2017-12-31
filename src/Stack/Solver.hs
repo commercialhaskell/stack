@@ -62,7 +62,6 @@ import           Stack.Types.FlagName
 import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageName
 import           Stack.Types.Resolver
-import           Stack.Types.Runner
 import           Stack.Types.Version
 import qualified System.Directory as D
 import qualified System.FilePath as FP
@@ -497,8 +496,8 @@ getResolverConstraints mcompilerVersion stackYaml sd = do
 -- package.yaml.  Subdirectories can be included depending on the
 -- @recurse@ parameter.
 findCabalDirs
-  :: (MonadIO m, MonadUnliftIO m, MonadLogger m, HasRunner env, MonadReader env m, HasConfig env)
-  => Bool -> Path Abs Dir -> m (Set (Path Abs Dir))
+  :: HasConfig env
+  => Bool -> Path Abs Dir -> RIO env (Set (Path Abs Dir))
 findCabalDirs recurse dir =
     (Set.fromList . map parent)
     <$> liftIO (findFiles dir isHpackOrCabal subdirFilter)
@@ -594,11 +593,10 @@ formatGroup :: [String] -> String
 formatGroup = concatMap (\path -> "- " <> path <> "\n")
 
 reportMissingCabalFiles
-  :: (MonadIO m, MonadUnliftIO m, MonadThrow m, MonadLogger m,
-      HasRunner env, MonadReader env m, HasConfig env)
+  :: HasConfig env
   => [Path Abs File]   -- ^ Directories to scan
   -> Bool              -- ^ Whether to scan sub-directories
-  -> m ()
+  -> RIO env ()
 reportMissingCabalFiles cabalfps includeSubdirs = do
     allCabalDirs <- findCabalDirs includeSubdirs =<< getCurrentDir
 

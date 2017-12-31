@@ -47,7 +47,7 @@ import           Text.PrettyPrint.Leijen.Extended
 
 displayWithColor
     :: (HasRunner env, Display a, HasAnsiAnn (Ann a),
-        MonadReader env m, MonadLogger m)
+        MonadReader env m, HasLogFunc env, HasCallStack)
     => a -> m T.Text
 displayWithColor x = do
     useAnsi <- liftM logUseColor $ view logOptionsL
@@ -57,15 +57,15 @@ displayWithColor x = do
 -- TODO: switch to using implicit callstacks once 7.8 support is dropped
 
 prettyWith :: (HasRunner env, HasCallStack, Display b, HasAnsiAnn (Ann b),
-               MonadReader env m, MonadLogger m)
+               MonadReader env m, MonadIO m)
            => LogLevel -> (a -> b) -> a -> m ()
-prettyWith level f = logOther level <=< displayWithColor . f
+prettyWith level f = logGeneric "" level <=< displayWithColor . f
 
 -- Note: I think keeping this section aligned helps spot errors, might be
 -- worth keeping the alignment in place.
 
 prettyDebugWith, prettyInfoWith, prettyWarnWith, prettyErrorWith, prettyWarnNoIndentWith, prettyErrorNoIndentWith
-  :: (HasCallStack, HasRunner env, MonadReader env m, MonadLogger m)
+  :: (HasCallStack, HasRunner env, MonadReader env m, MonadIO m)
   => (a -> Doc AnsiAnn) -> a -> m ()
 prettyDebugWith = prettyWith LevelDebug
 prettyInfoWith  = prettyWith LevelInfo
@@ -81,7 +81,7 @@ prettyErrorNoIndentWith f = prettyWith LevelWarn
                                   ((line <>) . (styleError   "Error:" <+>) . f)
 
 prettyDebug, prettyInfo, prettyWarn, prettyError, prettyWarnNoIndent, prettyErrorNoIndent
-  :: (HasCallStack, HasRunner env, MonadReader env m, MonadLogger m)
+  :: (HasCallStack, HasRunner env, MonadReader env m, MonadIO m)
   => Doc AnsiAnn -> m ()
 prettyDebug         = prettyDebugWith         id
 prettyInfo          = prettyInfoWith          id
@@ -91,7 +91,7 @@ prettyWarnNoIndent  = prettyWarnNoIndentWith  id
 prettyErrorNoIndent = prettyErrorNoIndentWith id
 
 prettyDebugL, prettyInfoL, prettyWarnL, prettyErrorL, prettyWarnNoIndentL, prettyErrorNoIndentL
-  :: (HasCallStack, HasRunner env, MonadReader env m, MonadLogger m)
+  :: (HasCallStack, HasRunner env, MonadReader env m, MonadIO m)
   => [Doc AnsiAnn] -> m ()
 prettyDebugL         = prettyDebugWith         fillSep
 prettyInfoL          = prettyInfoWith          fillSep
@@ -101,7 +101,7 @@ prettyWarnNoIndentL  = prettyWarnNoIndentWith  fillSep
 prettyErrorNoIndentL = prettyErrorNoIndentWith fillSep
 
 prettyDebugS, prettyInfoS, prettyWarnS, prettyErrorS, prettyWarnNoIndentS, prettyErrorNoIndentS
-  :: (HasCallStack, HasRunner env, MonadReader env m, MonadLogger m)
+  :: (HasCallStack, HasRunner env, MonadReader env m, MonadIO m)
   => String -> m ()
 prettyDebugS         = prettyDebugWith         flow
 prettyInfoS          = prettyInfoWith          flow
@@ -127,7 +127,7 @@ wordDocs = map fromString . words
 flow :: String -> Doc a
 flow = fillSep . wordDocs
 
-debugBracket :: (HasCallStack, HasRunner env, MonadReader env m, MonadLogger m,
+debugBracket :: (HasCallStack, HasRunner env, MonadReader env m,
                  MonadIO m, MonadUnliftIO m) => Doc AnsiAnn -> m a -> m a
 debugBracket msg f = do
   let output = logDebug <=< displayWithColor

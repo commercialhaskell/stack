@@ -636,7 +636,7 @@ mungeRelease = intercalate "-" . prefixMaj . splitOn "."
     prefixMaj = prefixFst "maj" prefixMin
     prefixMin = prefixFst "min" (map ('r':))
 
-sysRelease :: (MonadUnliftIO m, MonadLogger m) => m String
+sysRelease :: HasLogFunc env => RIO env String
 sysRelease =
   handleIO (\e -> do
                logWarn $ T.concat [ T.pack "Could not query OS version"
