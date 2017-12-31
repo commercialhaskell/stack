@@ -73,7 +73,10 @@ import           System.Environment (getEnvironment)
 import           System.Exit (exitWith)
 import qualified System.FilePath as FP
 import qualified System.Clock as Clock
+
+#ifndef WINDOWS
 import qualified System.Process.PID1 as PID1
+#endif
 
 class HasLogFunc env => HasEnvOverride env where
   envOverrideL :: Lens' env EnvOverride
