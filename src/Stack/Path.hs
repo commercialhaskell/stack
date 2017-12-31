@@ -25,7 +25,7 @@ import           Stack.Types.Config
 import           Stack.Types.Runner
 import qualified System.FilePath as FP
 import           System.IO (stderr)
-import           System.Process.Read (EnvOverride(eoPath), HasEnvOverride (..))
+import           RIO.Process (EnvOverride(eoPath), HasEnvOverride (..))
 
 -- | Print out useful path information in a human-readable format (and
 -- support others later).

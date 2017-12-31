@@ -42,7 +42,7 @@ import           Stack.Types.PackageName
 import           Stack.Types.Runner
 import           Stack.Types.Version
 import           System.FilePath (isPathSeparator)
-import           System.Process.Read
+import           RIO.Process
 import           Text.Hastache (htmlEscape)
 import           Trace.Hpc.Tix
 import           Web.Browser (openBrowser)

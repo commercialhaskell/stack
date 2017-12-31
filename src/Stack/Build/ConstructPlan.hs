@@ -59,7 +59,7 @@ import           Stack.Types.PackageName
 import           Stack.Types.Runner
 import           Stack.Types.Version
 import           System.IO (putStrLn)
-import           System.Process.Read (findExecutable, HasEnvOverride (..))
+import           RIO.Process (findExecutable, HasEnvOverride (..))
 
 data PackageInfo
     =

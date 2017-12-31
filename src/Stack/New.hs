@@ -47,7 +47,7 @@ import           Stack.Constants.Config
 import           Stack.Types.Config
 import           Stack.Types.PackageName
 import           Stack.Types.TemplateName
-import           System.Process.Read
+import           RIO.Process
 import           Text.Hastache
 import           Text.Hastache.Context
 import           Text.Printf

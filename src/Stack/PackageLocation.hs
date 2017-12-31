@@ -38,7 +38,7 @@ import Stack.Types.BuildPlan
 import Stack.Types.Config
 import Stack.Types.PackageIdentifier
 import qualified System.Directory as Dir
-import System.Process.Read
+import RIO.Process
 
 -- | Same as 'resolveMultiPackageLocation', but works on a
 -- 'SinglePackageLocation'.

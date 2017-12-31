@@ -1,13 +1,9 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE NoImplicitPrelude          #-}
 {-# LANGUAGE OverloadedStrings          #-}
-module Stack.Prelude
+module RIO.Prelude
   ( mapLeft
-  , withSourceFile
-  , withSinkFile
-  , withSinkFileCautious
   , withLazyFile
-  , withSystemTempDir
   , fromFirst
   , mapMaybeA
   , mapMaybeM
@@ -30,7 +26,6 @@ import           Control.Monad        as X (Monad (..), MonadPlus (..), filterM,
                                             when, zipWithM, zipWithM_, (<$!>),
                                             (<=<), (=<<), (>=>))
 import           Control.Monad.Catch  as X (MonadThrow (..))
-import           RIO.Logger           as X
 import           Control.Monad.Reader as X (MonadReader, MonadTrans (..),
                                             ReaderT (..), ask, asks, local)
 import           Data.Bool            as X (Bool (..), not, otherwise, (&&),
@@ -83,8 +78,6 @@ import           GHC.Generics         as X (Generic)
 import           GHC.Stack            as X (HasCallStack)
 import           Lens.Micro           as X (Getting, Lens', lens)
 import           Lens.Micro.Mtl       as X (view)
-import           Path                 as X (Abs, Dir, File, Path, Rel,
-                                            toFilePath)
 import           Prelude              as X (Bounded (..), Double, Enum,
                                             FilePath, Float, Floating (..),
                                             Fractional (..), IO, Integer,
@@ -137,45 +130,11 @@ forMaybeM = flip mapMaybeM
 stripCR :: T.Text -> T.Text
 stripCR t = fromMaybe t (T.stripSuffix "\r" t)
 
--- | Get a source for a file. Unlike @sourceFile@, doesn't require
--- @ResourceT@. Unlike explicit @withBinaryFile@ and @sourceHandle@
--- usage, you can't accidentally use @WriteMode@ instead of
--- @ReadMode@.
-withSourceFile :: MonadUnliftIO m => FilePath -> (ConduitM i ByteString m () -> m a) -> m a
-withSourceFile fp inner = withBinaryFile fp ReadMode $ inner . sourceHandle
-
--- | Same idea as 'withSourceFile', see comments there.
-withSinkFile :: MonadUnliftIO m => FilePath -> (ConduitM ByteString o m () -> m a) -> m a
-withSinkFile fp inner = withBinaryFile fp WriteMode $ inner . sinkHandle
-
--- | Like 'withSinkFile', but ensures that the file is atomically
--- moved after all contents are written.
-withSinkFileCautious
-  :: MonadUnliftIO m
-  => FilePath
-  -> (ConduitM ByteString o m () -> m a)
-  -> m a
-withSinkFileCautious fp inner =
-    withRunInIO $ \run -> bracket acquire cleanup $ \(tmpFP, h) ->
-      run (inner $ sinkHandle h) <* (IO.hClose h *> Dir.renameFile tmpFP fp)
-  where
-    acquire = IO.openBinaryTempFile (FP.takeDirectory fp) (FP.takeFileName fp FP.<.> "tmp")
-    cleanup (tmpFP, h) = do
-        IO.hClose h
-        Dir.removeFile tmpFP `catch` \e ->
-            if isDoesNotExistError e
-                then return ()
-                else throwIO e
-
 -- | Lazily get the contents of a file. Unlike 'BL.readFile', this
 -- ensures that if an exception is thrown, the file handle is closed
 -- immediately.
 withLazyFile :: MonadUnliftIO m => FilePath -> (BL.ByteString -> m a) -> m a
 withLazyFile fp inner = withBinaryFile fp ReadMode $ inner <=< liftIO . BL.hGetContents
-
--- | Path version
-withSystemTempDir :: MonadUnliftIO m => String -> (Path Abs Dir -> m a) -> m a
-withSystemTempDir str inner = withRunInIO $ \run -> Path.IO.withSystemTempDir str $ run . inner
 
 -- | The Reader+IO monad. This is different from a 'ReaderT' because:
 --

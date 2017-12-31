@@ -36,7 +36,6 @@ import           Stack.Build.Source
 import           Stack.Build.Target
 import           Stack.Config (getLocalPackages)
 import           Stack.Constants.Config
-import           Stack.Exec
 import           Stack.Ghci.Script
 import           Stack.Package
 import           Stack.PrettyPrint
@@ -50,7 +49,7 @@ import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageName
 import           Stack.Types.Runner
 import           System.IO (putStrLn, putStr, getLine)
-import           System.Process.Read (withEnvOverride)
+import           RIO.Process (withEnvOverride, execSpawn, execObserve)
 
 #ifndef WINDOWS
 import qualified System.Posix.Files as Posix

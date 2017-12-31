@@ -18,6 +18,7 @@ dependencies:
 - mtl
 - path # FIXME drop
 - path-io # FIXME drop
+- pid1 # FIXME drop, likely move code in here or typed-process
 - store # FIXME drop
 - text
 - time
@@ -30,3 +31,5 @@ library:
   when:
     - condition: os(windows)
       cpp-options: -DWINDOWS
+  other-modules:
+  - RIO.Prelude

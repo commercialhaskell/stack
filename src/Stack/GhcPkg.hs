@@ -37,7 +37,7 @@ import           Stack.Types.Compiler
 import           Stack.Types.PackageName
 import           Stack.Types.Version
 import           System.FilePath (searchPathSeparator)
-import           System.Process.Read
+import           RIO.Process
 
 -- | Get the global package database
 getGlobalDB :: HasEnvOverride env

@@ -30,7 +30,7 @@ import           Data.List
 import qualified Data.Map.Strict as Map
 import qualified Data.Text as T
 import           Data.Version (showVersion)
-import           System.Process.Read
+import           RIO.Process
 #ifdef USE_GIT_INFO
 import           Development.GitRev (gitCommitCount, gitHash)
 #endif
@@ -59,7 +59,6 @@ import           Stack.Constants.Config
 import           Stack.Coverage
 import qualified Stack.Docker as Docker
 import           Stack.Dot
-import           Stack.Exec
 import           Stack.GhcPkg (findGhcPkgField)
 import qualified Stack.Nix as Nix
 import           Stack.Fetch

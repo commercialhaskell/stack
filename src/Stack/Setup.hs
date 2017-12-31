@@ -74,7 +74,6 @@ import              Stack.Build (build)
 import              Stack.Config (loadConfig)
 import              Stack.Constants (stackProgName)
 import              Stack.Constants.Config (distRelativeDir)
-import              Stack.Exec (defaultEnvSettings)
 import              Stack.Fetch
 import              Stack.GhcPkg (createDatabase, getCabalPkgVer, getGlobalDB, mkGhcPackagePath, ghcPkgPathEnvVar)
 import              Stack.Prelude
@@ -97,9 +96,8 @@ import              System.IO (stdout)
 import              System.IO.Error (isPermissionError)
 import              System.FilePath (searchPathSeparator)
 import qualified    System.FilePath as FP
-import              System.Process (rawSystem)
-import              System.Process.Log (withProcessTimeLog)
-import              System.Process.Read
+import              System.Process (rawSystem) -- FIXME remove usage
+import              RIO.Process
 import              Text.Printf (printf)
 
 #if !WINDOWS

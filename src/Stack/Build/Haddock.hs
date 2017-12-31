@@ -39,7 +39,7 @@ import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageName
 import           Stack.Types.Runner
 import qualified System.FilePath as FP
-import           System.Process.Read
+import           RIO.Process
 import           Web.Browser (openBrowser)
 
 openHaddocksInBrowser

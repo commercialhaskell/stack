@@ -25,7 +25,7 @@ import           Stack.Constants.Config
 import           Stack.PrettyPrint
 import           Stack.Types.Config
 import           Stack.Types.Image
-import           System.Process.Read
+import           RIO.Process
 
 -- | Stages the executables & additional content in a staging
 -- directory under '.stack-work'

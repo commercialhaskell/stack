@@ -18,7 +18,7 @@ import           Stack.Types.GhcPkgId
 import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageName
 import           Stack.Types.Version
-import           System.Process.Read hiding (runEnvNoLogging)
+import           RIO.Process hiding (runEnvNoLogging)
 import           Test.Hspec
 import           Test.Hspec.QuickCheck
 

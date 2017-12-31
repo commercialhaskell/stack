@@ -81,7 +81,7 @@ import           Stack.Types.PackageName
 import           Stack.Types.Version
 import           System.Exit                     (ExitCode (ExitFailure))
 import           System.FilePath                 (pathSeparator)
-import           System.Process.Log              (showProcessArgDebug)
+import           RIO.Process                     (showProcessArgDebug)
 
 ----------------------------------------------
 -- Exceptions

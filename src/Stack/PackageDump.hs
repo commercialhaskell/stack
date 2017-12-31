@@ -49,7 +49,7 @@ import           Stack.Types.PackageName
 import           Stack.Types.Version
 import           System.Directory (getDirectoryContents, doesFileExist)
 import           System.Process (readProcess) -- FIXME confirm that this is correct
-import           System.Process.Read hiding (readProcess)
+import           RIO.Process hiding (readProcess)
 
 -- | Call ghc-pkg dump with appropriate flags and stream to the given @Sink@, for a single database
 ghcPkgDump

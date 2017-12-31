@@ -152,7 +152,9 @@ library:
   - Path.Extra
   - Path.Find
   - Paths_stack
+  - RIO
   - RIO.Logger
+  - RIO.Process
   - Stack.Build
   - Stack.Build.Cache
   - Stack.Build.ConstructPlan
@@ -175,7 +177,6 @@ library:
   - Stack.Docker
   - Stack.Docker.GlobalDB
   - Stack.Dot
-  - Stack.Exec
   - Stack.Fetch
   - Stack.FileWatch
   - Stack.GhcPkg
@@ -259,12 +260,11 @@ library:
   - Stack.Upgrade
   - Stack.Upload
   - Text.PrettyPrint.Leijen.Extended
-  - System.Process.Log
   - System.Process.PagerEditor
-  - System.Process.Read
   - System.Terminal
   other-modules:
   - Hackage.Security.Client.Repository.HttpLib.HttpClient
+  - RIO.Prelude
   when:
   - condition: 'os(windows)'
     then:

@@ -8,7 +8,7 @@
 
 -- | Reading from external processes.
 
-module System.Process.Read
+module RIO.Process
   (readProcessStdout
   ,readProcessStderrStdout
   ,tryProcessStdout
@@ -42,10 +42,16 @@ module System.Process.Read
   ,runProcess
   ,runProcess_
   ,runEnvNoLogging
+  ,withProcessTimeLog
+  ,showProcessArgDebug
+  ,exec
+  ,execSpawn
+  ,execObserve
   )
   where
 
-import           Stack.Prelude
+import           RIO.Prelude
+import           RIO.Logger
 import qualified Data.ByteString as S
 import           Data.Conduit
 import qualified Data.Conduit.Binary as CB
@@ -53,6 +59,8 @@ import qualified Data.Conduit.List as CL
 import           Data.Conduit.Process.Typed
 import qualified Data.Map as Map
 import qualified Data.Text as T
+import qualified Data.Text.Lazy as TL
+import qualified Data.Text.Lazy.Encoding as TLE
 import           Data.Text.Encoding (decodeUtf8With)
 import           Data.Text.Encoding.Error (lenientDecode)
 import           Lens.Micro (set, to)
@@ -61,8 +69,10 @@ import           Path.Extra
 import           Path.IO hiding (findExecutable)
 import qualified System.Directory as D
 import           System.Environment (getEnvironment)
+import           System.Exit (exitWith)
 import qualified System.FilePath as FP
-import           System.Process.Log
+import qualified System.Clock as Clock
+import qualified System.Process.PID1 as PID1
 
 class HasLogFunc env => HasEnvOverride env where
   envOverrideL :: Lens' env EnvOverride
@@ -442,3 +452,83 @@ instance HasLogFunc EnvNoLogging where
   logFuncL = to (\_ _ _ _ _ -> return ())
 instance HasEnvOverride EnvNoLogging where
   envOverrideL = lens (\(EnvNoLogging x) -> x) (const EnvNoLogging)
+
+-- | Log running a process with its arguments, for debugging (-v).
+--
+-- This logs one message before running the process and one message after.
+withProcessTimeLog :: (MonadIO m, MonadReader env m, HasLogFunc env, HasCallStack) => Maybe FilePath -> String -> [String] -> m a -> m a
+withProcessTimeLog mdir name args proc = do
+  let cmdText =
+          T.intercalate
+              " "
+              (T.pack name : map showProcessArgDebug args)
+      dirMsg =
+        case mdir of
+          Nothing -> ""
+          Just dir -> " within " <> T.pack dir
+  logDebug ("Run process" <> dirMsg <> ": " <> cmdText)
+  start <- liftIO $ Clock.getTime Clock.Monotonic
+  x <- proc
+  end <- liftIO $ Clock.getTime Clock.Monotonic
+  let diff = Clock.diffTimeSpec start end
+  -- useAnsi <- asks getAnsiTerminal
+  let useAnsi = True
+  logDebug
+      ("Process finished in " <>
+      (if useAnsi then "\ESC[92m" else "") <> -- green
+      timeSpecMilliSecondText diff <>
+      (if useAnsi then "\ESC[0m" else "") <> -- reset
+       ": " <> cmdText)
+  return x
+
+timeSpecMilliSecondText :: Clock.TimeSpec -> Text
+timeSpecMilliSecondText t =
+    (T.pack . show . (`div` 10^(6 :: Int)) . Clock.toNanoSecs) t <> "ms"
+
+-- | Show a process arg including speechmarks when necessary. Just for
+-- debugging purposes, not functionally important.
+showProcessArgDebug :: String -> Text
+showProcessArgDebug x
+    | any special x || null x = T.pack (show x)
+    | otherwise = T.pack x
+  where special '"' = True
+        special ' ' = True
+        special _ = False
+
+-- | Execute a process within the Stack configured environment.
+--
+-- Execution will not return, because either:
+--
+-- 1) On non-windows, execution is taken over by execv of the
+-- sub-process. This allows signals to be propagated (#527)
+--
+-- 2) On windows, an 'ExitCode' exception will be thrown.
+exec :: HasEnvOverride env => String -> [String] -> RIO env b
+#ifdef WINDOWS
+exec = execSpawn
+#else
+exec cmd0 args = do
+    menv <- view envOverrideL
+    cmd <- preProcess cmd0
+    withProcessTimeLog Nothing cmd args $
+        liftIO $ PID1.run cmd args $ Just $ envHelper menv
+#endif
+
+-- | Like 'exec', but does not use 'execv' on non-windows. This way, there
+-- is a sub-process, which is helpful in some cases (#1306)
+--
+-- This function only exits by throwing 'ExitCode'.
+execSpawn :: HasEnvOverride env => String -> [String] -> RIO env a
+execSpawn cmd args = withProc cmd args (runProcess . setStdin inherit) >>= liftIO . exitWith
+
+execObserve :: HasEnvOverride env => String -> [String] -> RIO env String
+execObserve cmd0 args =
+  withProc cmd0 args $ \pc -> do
+    (out, _err) <- readProcess_ pc
+    return
+      $ TL.unpack
+      $ TL.filter (/= '\r')
+      $ TL.concat
+      $ take 1
+      $ TL.lines
+      $ TLE.decodeUtf8With lenientDecode out

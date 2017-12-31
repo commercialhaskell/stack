@@ -46,7 +46,7 @@ import           Stack.Types.PackageIdentifier (PackageIdentifierRevision)
 import           System.Console.ANSI
 import           System.FilePath
 import           System.IO                  (localeEncoding)
-import           System.Process.Read (HasEnvOverride (..), EnvOverride, getEnvOverride)
+import           RIO.Process (HasEnvOverride (..), EnvOverride, getEnvOverride)
 import           System.Terminal
 
 -- | Monadic environment.

@@ -24,7 +24,7 @@ import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageName
 import           Stack.Types.Version
 import           System.Exit
-import           System.Process.Read
+import           RIO.Process
 
 -- | Hoogle command.
 hoogleCmd :: ([String],Bool,Bool) -> GlobalOpts -> IO ()

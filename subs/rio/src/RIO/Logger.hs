@@ -1,5 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ImplicitParams #-}
+{-# LANGUAGE NoImplicitPrelude #-}
 module RIO.Logger
   ( LogLevel (..)
   , LogSource
@@ -17,6 +18,7 @@ module RIO.Logger
   , NoLogging (..)
   ) where
 
+import RIO.Prelude
 import Data.Text (Text)
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import Control.Monad.Reader (MonadReader, ReaderT, runReaderT)

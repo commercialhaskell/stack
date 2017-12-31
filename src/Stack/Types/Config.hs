@@ -74,6 +74,8 @@ module Stack.Types.Config
   -- ** EnvSettings
   ,EnvSettings(..)
   ,minimalEnvSettings
+  ,defaultEnvSettings
+  ,plainEnvSettings
   -- ** GlobalOpts & GlobalOptsMonoid
   ,GlobalOpts(..)
   ,GlobalOptsMonoid(..)
@@ -216,7 +218,7 @@ import           Stack.Types.Urls
 import           Stack.Types.Version
 import qualified System.FilePath as FilePath
 import           System.PosixCompat.Types (UserID, GroupID, FileMode)
-import           System.Process.Read (EnvOverride, HasEnvOverride (..), findExecutable)
+import           RIO.Process (EnvOverride, HasEnvOverride (..), findExecutable)
 
 -- Re-exports
 import           Stack.Types.Config.Build as X
@@ -1387,6 +1389,32 @@ minimalEnvSettings =
     , esStackExe = False
     , esLocaleUtf8 = False
     , esKeepGhcRts = False
+    }
+
+-- | Default @EnvSettings@ which includes locals and GHC_PACKAGE_PATH.
+--
+-- Note that this also passes through the GHCRTS environment variable.
+-- See https://github.com/commercialhaskell/stack/issues/3444
+defaultEnvSettings :: EnvSettings
+defaultEnvSettings = EnvSettings
+    { esIncludeLocals = True
+    , esIncludeGhcPackagePath = True
+    , esStackExe = True
+    , esLocaleUtf8 = False
+    , esKeepGhcRts = True
+    }
+
+-- | Environment settings which do not embellish the environment
+--
+-- Note that this also passes through the GHCRTS environment variable.
+-- See https://github.com/commercialhaskell/stack/issues/3444
+plainEnvSettings :: EnvSettings
+plainEnvSettings = EnvSettings
+    { esIncludeLocals = False
+    , esIncludeGhcPackagePath = False
+    , esStackExe = False
+    , esLocaleUtf8 = False
+    , esKeepGhcRts = True
     }
 
 -- | Get the path for the given compiler ignoring any local binaries.

@@ -95,7 +95,7 @@ import           Stack.Types.Version
 import           System.Environment
 import           System.PosixCompat.Files (fileOwner, getFileStatus)
 import           System.PosixCompat.User (getEffectiveUserID)
-import           System.Process.Read
+import           RIO.Process
 
 -- | If deprecated path exists, use it and print a warning.
 -- Otherwise, return the new path.

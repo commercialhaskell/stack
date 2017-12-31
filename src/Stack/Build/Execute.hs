@@ -91,8 +91,7 @@ import           System.Exit (ExitCode (..))
 import qualified System.FilePath as FP
 import           System.IO (hPutStr, stderr, stdout)
 import           System.PosixCompat.Files (createLink)
-import           System.Process.Log (showProcessArgDebug)
-import           System.Process.Read
+import           RIO.Process
 
 -- | Has an executable been built or not?
 data ExecutableBuildStatus

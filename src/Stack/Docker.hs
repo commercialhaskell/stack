@@ -67,7 +67,7 @@ import           System.IO.Unsafe (unsafePerformIO)
 import qualified System.PosixCompat.User as User
 import qualified System.PosixCompat.Files as Files
 import           System.Process.PagerEditor (editByteString)
-import           System.Process.Read
+import           RIO.Process
 import           Text.Printf (printf)
 
 #ifndef WINDOWS

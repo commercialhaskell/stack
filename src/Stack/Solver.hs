@@ -65,7 +65,7 @@ import           Stack.Types.Resolver
 import           Stack.Types.Version
 import qualified System.Directory as D
 import qualified System.FilePath as FP
-import           System.Process.Read
+import           RIO.Process
 import           Text.Regex.Applicative.Text (match, sym, psym, anySym, few)
 
 import qualified Data.Text.Normalize as T ( normalize , NormalizationMode(NFC) )

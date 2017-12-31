@@ -36,7 +36,7 @@ import           Stack.Types.Config
 import           Stack.Types.Resolver
 import           System.Exit                 (ExitCode (ExitSuccess))
 import           System.Process              (rawSystem, readProcess)
-import           System.Process.Read
+import           RIO.Process
 
 upgradeOpts :: Parser UpgradeOpts
 upgradeOpts = UpgradeOpts

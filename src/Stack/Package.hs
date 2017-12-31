@@ -99,7 +99,7 @@ import qualified System.Directory as D
 import           System.FilePath (splitExtensions, replaceExtension)
 import qualified System.FilePath as FilePath
 import           System.IO.Error
-import           System.Process.Read
+import           RIO.Process
 
 data Ctx = Ctx { ctxFile :: !(Path Abs File)
                , ctxDir :: !(Path Abs Dir)

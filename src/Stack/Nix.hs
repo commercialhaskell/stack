@@ -21,7 +21,6 @@ import qualified Paths_stack as Meta
 import           Stack.Config (getInNixShell, getInContainer)
 import           Stack.Config.Nix (nixCompiler)
 import           Stack.Constants (platformVariantEnvVar,inNixShellEnvVar,inContainerEnvVar)
-import           Stack.Exec (exec)
 import           Stack.Types.Config
 import           Stack.Types.Docker
 import           Stack.Types.Nix
@@ -29,7 +28,7 @@ import           Stack.Types.Runner
 import           Stack.Types.Compiler
 import           System.Environment (getArgs,getExecutablePath,lookupEnv)
 import qualified System.FilePath  as F
-import           System.Process.Read (getEnvOverride, envOverrideL)
+import           RIO.Process (getEnvOverride, envOverrideL, exec)
 
 -- | If Nix is enabled, re-runs the currently running OS command in a Nix container.
 -- Otherwise, runs the inner action.

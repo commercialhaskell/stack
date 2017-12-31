@@ -16,7 +16,6 @@ import qualified Data.Text                  as T
 import           Path
 import           Path.IO
 import qualified Stack.Build
-import           Stack.Exec
 import           Stack.GhcPkg               (ghcPkgExeName)
 import           Stack.Options.ScriptParser
 import           Stack.Runners
@@ -25,7 +24,7 @@ import           Stack.Types.Compiler
 import           Stack.Types.Config
 import           Stack.Types.PackageName
 import           System.FilePath            (dropExtension, replaceExtension)
-import           System.Process.Read
+import           RIO.Process
 
 -- | Run a Stack Script
 scriptCmd :: ScriptOpts -> GlobalOpts -> IO ()
