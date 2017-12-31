@@ -8,7 +8,7 @@ and use the provided template to include all necessary details.
 The more detailed your report, the faster it can be resolved and will ensure it
 is resolved in the right way. Once your bug has been resolved, the responsible
 person will tag the issue as _Needs confirmation_ and assign the issue back to
-you. Once you have tested and confirmed that the issue is resolved, close the 
+you. Once you have tested and confirmed that the issue is resolved, close the
 issue. If you are not a member of the project, you will be asked for
 confirmation and we will close it.
 
@@ -19,14 +19,12 @@ If you would like to help with documentation, please note that for most cases
 the Wiki has been deprecated in favor of markdown files placed in a new `/doc`
 subdirectory of the repository itself. Please submit a
 [pull request](https://help.github.com/articles/using-pull-requests/) with your
-changes/additions.
+changes/additions based off the [the stable branch](https://github.com/commercialhaskell/stack/tree/stable).
 
 The documentation is rendered on [haskellstack.org](http://haskellstack.org) by
 readthedocs.org using Sphinx and CommonMark. Since links and formatting vary
 from GFM, please check the documentation there before submitting a PR to fix
-those.  In particular, links to other documentation files intentionally have
-`.html` extensions instead of `.md`, unfortunately (see
-[#1506](https://github.com/commercialhaskell/stack/issues/1506) for details).
+those.
 
 If your changes move or rename files, or subsume Wiki content, please continue
 to leave a file/page in the old location temporarily, in addition to the new
@@ -85,7 +83,79 @@ stack install hlint
 Once installed, you can check your changes with:
 
 ```
-hlint src/ test/ --cpp-simple
+$ ./etc/scripts/hlint.sh
 ```
 
-Where `--cpp-simple` strips `#` lines.
+## Testing
+
+The Stack code has both unit tests and integration tests. Integration tests can
+be found in the [test/integration](https://github.com/commercialhaskell/stack/tree/master/test/integration)
+folder and unit tests, in the [src/test](https://github.com/commercialhaskell/stack/tree/master/src/test)
+folder. Tests are written using the [Hspec](https://hspec.github.io/) framework. In
+order to run the full test suite, you can simply do:
+
+```bash
+$ stack test
+```
+
+The `--file-watch` is a very useful option to get quick feedback. However,
+running the entire test suite after each file change will slow you down. You'll
+need to specify which test suite (unit test or integration) and pass arguments
+to specify which module you'd specifically like to run to get quick feedback. A
+description of this follows below.
+
+### Working with Unit Tests
+
+If you would like to run the unit tests on their own, you can:
+
+```bash
+$ stack test stack:stack-test
+```
+
+Running an individual module works like this:
+
+```bash
+$ stack test stack:stack-test --ta "-m <PATTERN>"
+```
+
+Where `<PATTERN>` is the name of the module without `Spec.hs`.
+
+You may also load tests into GHCi and run them with:
+
+```bash
+$ stack ghci stack:stack-test --only-main
+# GHCi starting up output ...
+> :main -m "<PATTERN>"
+```
+
+Where again, `<PATTERN>` is the name of the module without `Spec.hs`.
+
+### Working with Integration Tests
+
+Running the integration tests is a little involved, you'll need to:
+
+```bash
+$ stack test stack:integration-test --flag stack:stack-integration-tests
+```
+
+Running an individual module works like this:
+
+```bash
+$ stack test stack:stack-integration-test --flag stack:integration-tests --ta "-m <PATTERN>"
+```
+
+Where `<PATTERN>` is the name of the folder listed in the
+[test/integration/tests/](https://github.com/commercialhaskell/stack/tree/master/test/integration/tests)
+folder.
+
+You may also achieve this through GHCi with:
+
+```bash
+$ stack ghci stack:stack-integration-test
+# GHCi starting up output ...
+> :main -m "<PATTERN>"
+```
+
+Where again, `<PATTERN>` is the name of the folder listed in the
+[test/integration/tests/](https://github.com/commercialhaskell/stack/tree/master/test/integration/tests)
+folder.

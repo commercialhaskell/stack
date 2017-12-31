@@ -180,16 +180,16 @@ makeConcreteResolver root ar = do
                 ProjectAndConfigMonoid project _ <-
                     loadConfigYaml (parseProjectAndConfigMonoid (parent fp)) fp
                 return $ projectResolver project
-            ARLatestNightly -> return $ ResolverSnapshot $ Nightly $ snapshotsNightly snapshots
+            ARLatestNightly -> return $ ResolverStackage $ Nightly $ snapshotsNightly snapshots
             ARLatestLTSMajor x ->
                 case IntMap.lookup x $ snapshotsLts snapshots of
                     Nothing -> throwString $ "No LTS release found with major version " ++ show x
-                    Just y -> return $ ResolverSnapshot $ LTS x y
+                    Just y -> return $ ResolverStackage $ LTS x y
             ARLatestLTS
                 | IntMap.null $ snapshotsLts snapshots -> throwString "No LTS releases found"
                 | otherwise ->
                     let (x, y) = IntMap.findMax $ snapshotsLts snapshots
-                     in return $ ResolverSnapshot $ LTS x y
+                     in return $ ResolverStackage $ LTS x y
     logInfo $ "Selected resolver: " <> resolverRawName r
     return r
 
@@ -201,7 +201,7 @@ getLatestResolver = do
             (x,y) <- listToMaybe (reverse (IntMap.toList (snapshotsLts snapshots)))
             return (LTS x y)
         snap = fromMaybe (Nightly (snapshotsNightly snapshots)) mlts
-    return (ResolverSnapshot snap)
+    return (ResolverStackage snap)
 
 -- | Create a 'Config' value when we're not using any local
 -- configuration files (e.g., the script command)

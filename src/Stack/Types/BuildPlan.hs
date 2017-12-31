@@ -102,7 +102,7 @@ instance Store SnapshotDef
 instance NFData SnapshotDef
 
 snapshotDefVC :: VersionConfig SnapshotDef
-snapshotDefVC = storeVersionConfig "sd-v1" "tnwWSSLerZ2XeR6XpVwj5Uh0eF4="
+snapshotDefVC = storeVersionConfig "sd-v1" "CKo7nln8EXkw07Gq-4ATxszNZiE="
 
 -- | A relative file path including a unique string for the given
 -- snapshot.
@@ -110,7 +110,7 @@ sdRawPathName :: SnapshotDef -> String
 sdRawPathName sd =
     T.unpack $ go $ sdResolver sd
   where
-    go (ResolverSnapshot name) = renderSnapName name
+    go (ResolverStackage name) = renderSnapName name
     go (ResolverCompiler version) = compilerVersionText version
     go (ResolverCustom _ hash) = "custom-" <> sdResolverName sd <> "-" <> trimmedSnapshotHash hash
 

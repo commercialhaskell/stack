@@ -44,3 +44,13 @@
 - error: {lhs: "fromString . toFilePath", rhs: "display"}
 - ignore: {name: "Use display", within: "warnMultiple"}
 - ignore: {name: "Use display", within: "Stack.PrettyPrint"}
+
+- error: {lhs: "Network.HTTP.Simple.httpJSON", rhs: "Network.HTTP.StackClient.httpJSON"}
+- error: {lhs: "Network.HTTP.Simple.httpLbs", rhs: "Network.HTTP.StackClient.httpLbs"}
+- error: {lhs: "Network.HTTP.Simple.httpLBS", rhs: "Network.HTTP.StackClient.httpLBS"}
+- error: {lhs: "Network.HTTP.Simple.httpSink", rhs: "Network.HTTP.StackClient.httpSink"}
+- error: {lhs: "Network.HTTP.Simple.httpNoBody", rhs: "Network.HTTP.StackClient.httpNoBody"}
+- error: {lhs: "Network.HTTP.Simple.withResponse", rhs: "Network.HTTP.StackClient.withResponse"}
+- error: {lhs: "Network.HTTP.Client.withResponse", rhs: "Network.HTTP.StackClient.withResponseByManager"}
+- ignore: {name: "Use alternative", within: "Network.HTTP.StackClient"}
+- ignore: {name: "Use withResponseByManager", within: "Network.HTTP.StackClient"}

@@ -338,8 +338,8 @@ loadFromIndex :: HasCabalLoader env => PackageIdentifierRevision -> RIO env Byte
 loadFromIndex ident = do
   -- TODO in the future, keep all of the necessary @Handle@s open
   bothCaches <- getPackageCaches
-  eres <- lookupPackageIdentifierExact ident bothCaches
-  case eres of
+  mres <- lookupPackageIdentifierExact ident bothCaches
+  case mres of
       Just bs -> return bs
       -- Update the cache and try again
       Nothing -> do
