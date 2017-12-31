@@ -93,15 +93,8 @@ import           Text.Read            as X (Read, readMaybe)
 import           UnliftIO             as X
 
 import qualified Data.Text            as T
-import qualified Path.IO
 
-import           Data.Conduit.Binary (sourceHandle, sinkHandle)
 import qualified Data.ByteString.Lazy as BL
-
-import qualified System.IO as IO
-import qualified System.Directory as Dir
-import qualified System.FilePath as FP
-import           System.IO.Error (isDoesNotExistError)
 
 mapLeft :: (a1 -> a2) -> Either a1 b -> Either a2 b
 mapLeft f (Left a1) = Left (f a1)

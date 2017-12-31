@@ -53,7 +53,7 @@ module RIO.Process
 import           RIO.Prelude
 import           RIO.Logger
 import qualified Data.ByteString as S
-import           Data.Conduit
+import           Data.Conduit (ConduitM, (.|), runConduit)
 import qualified Data.Conduit.Binary as CB
 import qualified Data.Conduit.List as CL
 import           Data.Conduit.Process.Typed
@@ -63,6 +63,7 @@ import qualified Data.Text.Lazy as TL
 import qualified Data.Text.Lazy.Encoding as TLE
 import           Data.Text.Encoding (decodeUtf8With)
 import           Data.Text.Encoding.Error (lenientDecode)
+import           Data.Void (Void)
 import           Lens.Micro (set, to)
 import           Path
 import           Path.Extra
@@ -233,7 +234,7 @@ sinkProcessStdout
     :: HasEnvOverride env
     => String -- ^ Command
     -> [String] -- ^ Command line arguments
-    -> Sink S.ByteString (RIO env) a -- ^ Sink for stdout
+    -> ConduitM S.ByteString Void (RIO env) a -- ^ Sink for stdout
     -> RIO env a
 sinkProcessStdout name args sinkStdout =
   withProc name args $ \pc ->
@@ -247,7 +248,7 @@ logProcessStderrStdout
     -> [String]
     -> RIO env ()
 logProcessStderrStdout name args = do
-    let logLines = CB.lines =$ CL.mapM_ (logInfo . decodeUtf8With lenientDecode)
+    let logLines = CB.lines .| CL.mapM_ (logInfo . decodeUtf8With lenientDecode)
     ((), ()) <- sinkProcessStderrStdout name args logLines logLines
     return ()
 
@@ -258,8 +259,8 @@ sinkProcessStderrStdout
   :: forall e o env. HasEnvOverride env
   => String -- ^ Command
   -> [String] -- ^ Command line arguments
-  -> Sink S.ByteString (RIO env) e -- ^ Sink for stderr
-  -> Sink S.ByteString (RIO env) o -- ^ Sink for stdout
+  -> ConduitM S.ByteString Void (RIO env) e -- ^ Sink for stderr
+  -> ConduitM S.ByteString Void (RIO env) o -- ^ Sink for stdout
   -> RIO env (e,o)
 sinkProcessStderrStdout name args sinkStderr sinkStdout =
   withProc name args $ \pc0 -> do
@@ -457,7 +458,7 @@ instance HasEnvOverride EnvNoLogging where
 --
 -- This logs one message before running the process and one message after.
 withProcessTimeLog :: (MonadIO m, MonadReader env m, HasLogFunc env, HasCallStack) => Maybe FilePath -> String -> [String] -> m a -> m a
-withProcessTimeLog mdir name args proc = do
+withProcessTimeLog mdir name args proc' = do
   let cmdText =
           T.intercalate
               " "
@@ -468,7 +469,7 @@ withProcessTimeLog mdir name args proc = do
           Just dir -> " within " <> T.pack dir
   logDebug ("Run process" <> dirMsg <> ": " <> cmdText)
   start <- liftIO $ Clock.getTime Clock.Monotonic
-  x <- proc
+  x <- proc'
   end <- liftIO $ Clock.getTime Clock.Monotonic
   let diff = Clock.diffTimeSpec start end
   -- useAnsi <- asks getAnsiTerminal

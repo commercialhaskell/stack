@@ -125,7 +125,7 @@ loadDatabase :: HasEnvConfig env
 loadDatabase opts mcache sourceMap mdb lhs0 = do
     wc <- view $ actualCompilerVersionL.to whichCompiler
     (lhs1', dps) <- ghcPkgDump wc (fmap snd (maybeToList mdb))
-                $ conduitDumpPackage =$ sink
+                $ conduitDumpPackage .| sink
     let ghcjsHack = wc == Ghcjs && isNothing mdb
     lhs1 <- mapMaybeM (processLoadResult mdb ghcjsHack) lhs1'
     let lhs = pruneDeps
@@ -156,10 +156,10 @@ loadDatabase opts mcache sourceMap mdb lhs0 = do
             _ -> CL.map (\dp -> dp { dpSymbols = False })
     mloc = fmap fst mdb
     sinkDP = conduitProfilingCache
-           =$ conduitHaddockCache
-           =$ conduitSymbolsCache
-           =$ CL.map (isAllowed opts mcache sourceMap mloc &&& toLoadHelper mloc)
-           =$ CL.consume
+           .| conduitHaddockCache
+           .| conduitSymbolsCache
+           .| CL.map (isAllowed opts mcache sourceMap mloc &&& toLoadHelper mloc)
+           .| CL.consume
     sink = getZipSink $ (,)
         <$> ZipSink sinkDP
         <*> ZipSink CL.consume

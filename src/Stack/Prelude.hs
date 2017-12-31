@@ -10,13 +10,11 @@ module Stack.Prelude
   ) where
 
 import RIO as X
-import qualified Data.Text            as T
 import           Path                 as X (Abs, Dir, File, Path, Rel,
                                             toFilePath)
 import qualified Path.IO
 
 import           Data.Conduit.Binary (sourceHandle, sinkHandle)
-import qualified Data.ByteString.Lazy as BL
 
 import qualified System.IO as IO
 import qualified System.Directory as Dir

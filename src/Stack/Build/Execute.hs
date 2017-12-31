@@ -56,7 +56,6 @@ import qualified Distribution.Simple.Build.Macros as C
 import           Distribution.System            (OS (Windows),
                                                  Platform (Platform))
 import qualified Distribution.Text as C
-import           Language.Haskell.TH as TH (location)
 import           Path
 import           Path.CheckInstall
 import           Path.Extra (toFilePathNoTrailingSep, rejectMissingFile)
@@ -426,12 +425,13 @@ withExecuteEnv bopts boptsCli baseConfigOpts locals globalPackages snapshotPacka
     dumpLogIfWarning :: (Path Abs Dir, Path Abs File) -> RIO env ()
     dumpLogIfWarning (pkgDir, filepath) = do
       firstWarning <- withSourceFile (toFilePath filepath) $ \src ->
-            src
-         $$ CT.decodeUtf8Lenient
-         =$ CT.lines
-         =$ CL.map stripCR
-         =$ CL.filter isWarning
-         =$ CL.take 1
+            runConduit
+          $ src
+         .| CT.decodeUtf8Lenient
+         .| CT.lines
+         .| CL.map stripCR
+         .| CL.filter isWarning
+         .| CL.take 1
       unless (null firstWarning) $ dumpLog " due to warnings" (pkgDir, filepath)
 
     isWarning :: Text -> Bool
@@ -443,10 +443,11 @@ withExecuteEnv bopts boptsCli baseConfigOpts locals globalPackages snapshotPacka
         logInfo $ T.pack $ concat ["\n--  Dumping log file", msgSuffix, ": ", toFilePath filepath, "\n"]
         compilerVer <- view actualCompilerVersionL
         withSourceFile (toFilePath filepath) $ \src ->
-              src
-           $$ CT.decodeUtf8Lenient
-           =$ mungeBuildOutput ExcludeTHLoading ConvertPathsToAbsolute pkgDir compilerVer
-           =$ CL.mapM_ logInfo
+              runConduit
+            $ src
+           .| CT.decodeUtf8Lenient
+           .| mungeBuildOutput ExcludeTHLoading ConvertPathsToAbsolute pkgDir compilerVer
+           .| CL.mapM_ logInfo
         logInfo $ T.pack $ "\n--  End of log file: " ++ toFilePath filepath ++ "\n"
 
     stripColors :: Path Abs File -> IO ()
@@ -1139,7 +1140,7 @@ withSingleContext ActionContext {..} ExecuteEnv {..} task@Task {..} mdeps msuffi
                         => ExcludeTHLoading
                         -> LogLevel
                         -> CompilerVersion 'CVActual
-                        -> Sink S.ByteString (RIO env) ()
+                        -> ConduitM S.ByteString Void (RIO env) ()
                     outputSink excludeTH level compilerVer =
                         CT.decodeUtf8Lenient
                         .| mungeBuildOutput excludeTH makeAbsolute pkgDir compilerVer
@@ -1523,7 +1524,7 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
         return mpkgid
 
     loadInstalledPkg wc pkgDbs tvar name = do
-        dps <- ghcPkgDescribe name wc pkgDbs $ conduitDumpPackage =$ CL.consume
+        dps <- ghcPkgDescribe name wc pkgDbs $ conduitDumpPackage .| CL.consume
         case dps of
             [] -> return Nothing
             [dp] -> do
@@ -1797,10 +1798,10 @@ mungeBuildOutput :: forall m. MonadIO m
                  -> ConduitM Text Text m ()
 mungeBuildOutput excludeTHLoading makeAbsolute pkgDir compilerVer = void $
     CT.lines
-    =$ CL.map stripCR
-    =$ CL.filter (not . isTHLoading)
-    =$ filterLinkerWarnings
-    =$ toAbsolute
+    .| CL.map stripCR
+    .| CL.filter (not . isTHLoading)
+    .| filterLinkerWarnings
+    .| toAbsolute
   where
     -- | Is this line a Template Haskell "Loading package" line
     -- ByteString

@@ -143,7 +143,7 @@ displayCheckHexDigest (CheckHexDigestHeader h) =
 sinkCheckHash :: MonadThrow m
     => Request
     -> HashCheck
-    -> Consumer ByteString m ()
+    -> ConduitM ByteString o m ()
 sinkCheckHash req HashCheck{..} = do
     digest <- sinkHashUsing hashCheckAlgorithm
     let actualDigestString = show digest
@@ -173,7 +173,7 @@ assertLengthSink req expectedStreamLength = ZipSink $ do
     throwM $ WrongStreamLength req expectedStreamLength actualStreamLength
 
 -- | A more explicitly type-guided sinkHash.
-sinkHashUsing :: (Monad m, HashAlgorithm a) => a -> Consumer ByteString m (Digest a)
+sinkHashUsing :: (Monad m, HashAlgorithm a) => a -> ConduitM ByteString o m (Digest a)
 sinkHashUsing _ = sinkHash
 
 -- | Turns a list of hash checks into a ZipSink that checks all of them.
@@ -238,7 +238,7 @@ verifiedDownload
          :: HasRunner env
          => DownloadRequest
          -> Path Abs File -- ^ destination
-         -> (Maybe Integer -> Sink ByteString (RIO env) ()) -- ^ custom hook to observe progress
+         -> (Maybe Integer -> ConduitM ByteString Void (RIO env) ()) -- ^ custom hook to observe progress
          -> RIO env Bool -- ^ Whether a download was performed
 verifiedDownload DownloadRequest{..} destpath progressSink = do
     let req = drRequest
@@ -274,7 +274,9 @@ verifiedDownload DownloadRequest{..} destpath progressSink = do
 
     checkExpectations = withBinaryFile fp ReadMode $ \h -> do
         for_ drLengthCheck $ checkFileSizeExpectations h
-        sourceHandle h $$ getZipSink (hashChecksToZipSink drRequest drHashChecks)
+        runConduit
+            $ sourceHandle h
+           .| getZipSink (hashChecksToZipSink drRequest drHashChecks)
 
     -- doesn't move the handle
     checkFileSizeExpectations h expectedFileSize = do
@@ -310,7 +312,7 @@ verifiedDownload DownloadRequest{..} destpath progressSink = do
                 Nothing -> []
                 ) ++ drHashChecks
 
-        maybe id (\len -> (CB.isolate len =$=)) drLengthCheck
+        maybe id (\len -> (CB.isolate len .|)) drLengthCheck
             $ getZipSink
                 ( hashChecksToZipSink drRequest hashChecks
                   *> maybe (pure ()) (assertLengthSink drRequest) drLengthCheck

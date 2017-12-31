@@ -42,7 +42,7 @@ import qualified    Data.ByteString as S
 import qualified    Data.ByteString.Char8 as S8
 import qualified    Data.ByteString.Lazy as LBS
 import              Data.Char (isSpace)
-import              Data.Conduit (Conduit, (=$), await, yield, awaitForever)
+import              Data.Conduit (await, yield, awaitForever)
 import              Data.Conduit.Lazy (lazyConsume)
 import              Data.Conduit.Lift (evalStateC)
 import qualified    Data.Conduit.List as CL
@@ -1543,8 +1543,8 @@ chattyDownload label downloadInfo path = do
         _ <- liftIO $ runInBase $ logSticky $
           label <> ": download has begun"
         CL.map (Sum . S.length)
-          =$ chunksOverTime 1
-          =$ go
+          .| chunksOverTime 1
+          .| go
       where
         go = evalStateC 0 $ awaitForever $ \(Sum size) -> do
             modify (+ size)
@@ -1593,7 +1593,7 @@ bytesfmt formatter bs = printf (formatter <> " %s")
 -- The final yield may come sooner, and may be a superfluous mempty.
 -- Note that Integer and Float literals can be turned into NominalDiffTime
 -- (these literals are interpreted as "seconds")
-chunksOverTime :: (Monoid a, MonadIO m) => NominalDiffTime -> Conduit a m a
+chunksOverTime :: (Monoid a, MonadIO m) => NominalDiffTime -> ConduitM a a m ()
 chunksOverTime diff = do
     currentTime <- liftIO getCurrentTime
     evalStateC (currentTime, mempty) go

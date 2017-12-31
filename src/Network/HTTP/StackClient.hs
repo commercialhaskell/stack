@@ -18,7 +18,8 @@ module Network.HTTP.StackClient
 import           Data.Aeson (FromJSON)
 import qualified Data.ByteString as Strict
 import           Data.ByteString.Lazy (ByteString)
-import           Data.Conduit (ConduitM, Sink, transPipe)
+import           Data.Conduit (ConduitM, transPipe)
+import           Data.Void (Void)
 import qualified Network.HTTP.Client
 import           Network.HTTP.Client (BodyReader, Manager, Request, Response)
 import           Network.HTTP.Simple (setRequestHeader)
@@ -46,7 +47,11 @@ httpNoBody :: MonadIO m => Request -> m (Response ())
 httpNoBody = Network.HTTP.Simple.httpNoBody . setUserAgent
 
 
-httpSink :: MonadUnliftIO m => Request -> (Response () -> Sink Strict.ByteString m a) -> m a
+httpSink
+  :: MonadUnliftIO m
+  => Request
+  -> (Response () -> ConduitM Strict.ByteString Void m a)
+  -> m a
 httpSink req inner = withUnliftIO $ \u ->
   Network.HTTP.Simple.httpSink (setUserAgent req) (transPipe (unliftIO u) . inner)
 

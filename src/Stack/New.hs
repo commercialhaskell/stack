@@ -196,8 +196,8 @@ applyTemplate project template nonceParams dir templateText = do
     unless (S.null missingKeys)
          (logInfo ("\n" <> T.pack (show (MissingParameters project template missingKeys (configUserConfigPath config))) <> "\n"))
     files :: Map FilePath LB.ByteString <-
-        catch (execWriterT $
-               yield (T.encodeUtf8 (LT.toStrict applied)) $$
+        catch (execWriterT $ runConduit $
+               yield (T.encodeUtf8 (LT.toStrict applied)) .|
                unpackTemplate receiveMem id
               )
               (\(e :: ProjectTemplateException) ->
