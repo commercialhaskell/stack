@@ -1,0 +1,32 @@
+name: rio
+version: 0.0.0.0
+
+dependencies:
+- base
+- bytestring
+- clock # FIXME perhaps drop
+- conduit # FIXME drop
+- conduit-extra # FIXME drop
+- containers
+- deepseq
+- directory
+- exceptions
+- filepath
+- hashable
+- microlens # FIXME perhaps drop
+- microlens-mtl # FIXME perhaps drop
+- mtl
+- path # FIXME drop
+- path-io # FIXME drop
+- store # FIXME drop
+- text
+- time
+- unliftio
+- unordered-containers
+- vector
+
+library:
+  source-dirs: src/
+  when:
+    - condition: os(windows)
+      cpp-options: -DWINDOWS

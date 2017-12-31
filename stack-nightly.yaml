@@ -1,4 +1,8 @@
 resolver: nightly-2017-12-20
+packages:
+- .
+- subs/rio
+
 nix:
   # --nix on the command-line to enable.
   enable: false

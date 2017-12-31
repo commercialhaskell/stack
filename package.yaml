@@ -129,7 +129,9 @@ when:
     - pid1
     - unix
 library:
-  source-dirs: src/
+  source-dirs:
+  - src/
+  - subs/rio/src/
   ghc-options:
   - -fwarn-identities
   exposed-modules:

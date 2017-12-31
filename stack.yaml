@@ -1,4 +1,8 @@
 resolver: lts-9.14
+packages:
+- .
+- subs/rio
+
 # docker:
 #   enable: true
 #   repo: fpco/stack-full

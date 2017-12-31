@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE DeriveDataTypeable #-}
@@ -54,7 +55,6 @@ import qualified Data.Map as Map
 import qualified Data.Text as T
 import           Data.Text.Encoding (decodeUtf8With)
 import           Data.Text.Encoding.Error (lenientDecode)
-import           Distribution.System (OS (Windows), Platform (Platform), buildPlatform)
 import           Lens.Micro (set, to)
 import           Path
 import           Path.Extra
@@ -69,12 +69,13 @@ class HasLogFunc env => HasEnvOverride env where
 
 data EnvVarFormat = EVFWindows | EVFNotWindows
 
-evfFromPlatform :: Platform -> EnvVarFormat
-evfFromPlatform (Platform _ Windows) = EVFWindows
-evfFromPlatform (Platform _ _) = EVFNotWindows
-
 currentEnvVarFormat :: EnvVarFormat
-currentEnvVarFormat = evfFromPlatform buildPlatform
+currentEnvVarFormat =
+#if WINDOWS
+  EVFWindows
+#else
+  EVFNotWindows
+#endif
 
 -- | Override the environment received by a child process.
 data EnvOverride = EnvOverride
