@@ -18,7 +18,6 @@ dependencies:
 - mtl
 - path # FIXME drop
 - path-io # FIXME drop
-- pid1 # FIXME drop, likely move code in here or typed-process
 - store # FIXME drop
 - text
 - time
@@ -34,7 +33,7 @@ when:
     - Win32
   else:
     dependencies:
-    - pid1
+    - pid1 # FIXME drop, likely move code in here or typed-process
     - unix
 
 library:
