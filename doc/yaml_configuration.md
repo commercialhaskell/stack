@@ -838,7 +838,7 @@ templates:
     author-name: Your Name
     author-email: youremail@example.com
     category: Your Projects Category
-    copyright: 'Copyright (c) 2017 Your Name'
+    copyright: 'Copyright (c) 2018 Your Name'
     github-username: yourusername
 ```
 

@@ -7,7 +7,7 @@
 {-|
 Module      : Stack.Sig.Sign
 Description : Signing Packages
-Copyright   : (c) FPComplete.com, 2015
+Copyright   : (c) 2015-2018, Stack contributors
 License     : BSD3
 Maintainer  : Tim Dysinger <tim@fpcomplete.com>
 Stability   : experimental

@@ -5,7 +5,7 @@
 {-|
 Module      : Stack.Sig.GPG
 Description : GPG Functions
-Copyright   : (c) FPComplete.com, 2015
+Copyright   : (c) 2015-2018, Stack contributors
 License     : BSD3
 Maintainer  : Tim Dysinger <tim@fpcomplete.com>
 Stability   : experimental
