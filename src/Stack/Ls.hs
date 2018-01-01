@@ -12,6 +12,7 @@ import Control.Exception (Exception, throw)
 import Control.Monad.Catch (MonadThrow)
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import Control.Monad.Reader (MonadReader)
+import Control.Monad (when)
 import Data.Aeson
 import Stack.Types.Runner
 import qualified Data.Aeson.Types as A
@@ -36,6 +37,7 @@ import Stack.Dot
 import Stack.Options.DotParser (listDepsOptsParser)
 import System.Process.PagerEditor (pageText)
 import System.Directory (listDirectory)
+import System.IO (stderr, hPutStrLn)
 import Network.HTTP.Client.TLS (getGlobalManager)
 
 data LsView
@@ -239,11 +241,16 @@ lsCmd lsOpts go =
             case soptViewType of
                 Local -> withBuildConfig go (handleLocal lsOpts)
                 Remote -> withBuildConfig go (handleRemote lsOpts)
-        LsDependencies depOpts -> listDependenciesCmd depOpts go
+        LsDependencies depOpts -> listDependenciesCmd False depOpts go
 
 -- | List the dependencies
-listDependenciesCmd :: ListDepsOpts -> GlobalOpts -> IO ()
-listDependenciesCmd opts go =
+listDependenciesCmd :: Bool -> ListDepsOpts -> GlobalOpts -> IO ()
+listDependenciesCmd deprecated opts go = do
+    when
+        deprecated
+        (hPutStrLn
+             stderr
+             "DEPRECATED: Use ls dependencies instead. Will be removed in next major version.")
     withBuildConfigDot (listDepsDotOpts opts) go $ listDependencies opts
 
 lsViewLocalCmd :: OA.Mod OA.CommandFields LsView

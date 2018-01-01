@@ -385,8 +385,8 @@ commandLineHandler currentDir progName isInterpreter = complicatedOptions
                     cleanCmd
                     cleanOptsParser
         addCommand' "list-dependencies"
-                    "DEPRECATED: Use ls dependencies instead. Will be removed in next major version."
-                    listDependenciesCmd
+                    "List the dependencies"
+                    (listDependenciesCmd True)
                     listDepsOptsParser
         addCommand' "query"
                     "Query general build information (experimental)"
