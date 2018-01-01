@@ -75,7 +75,8 @@ install:
        ./etc/scripts/get-hlint.sh
        ;;
      stack)
-       stack --no-terminal build store
+       travis_wait stack --no-terminal build Cabal
+       travis_wait stack --no-terminal build store
        stack --no-terminal test --only-dependencies
        ;;
      cabal)
