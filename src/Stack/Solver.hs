@@ -113,8 +113,7 @@ cabalSolver cabalfps constraintType
                fmap toFilePath cabalfps
 
     try ( withWorkingDir tmpdir
-        $ withProc "cabal" args
-        $ readProcessStdout_
+        $ withProc "cabal" args readProcessStdout_
         )
         >>= either
           (parseCabalErrors . eceStderr)
