@@ -13,8 +13,10 @@ Other enhancements:
 * A new sub command `ls` has been introduced to stack to view
   local and remote snapshots present in the system. Use `stack ls
   snapshots --help` to get more details about it.
-* `list-dependencies` has been deprecated. The functionality has
-  to accessed through the new `ls dependencies` interface.
+*`list-dependencies` has been deprecated. The functionality has
+  to accessed through the new `ls dependencies` interface. See
+  [#3669](https://github.com/commercialhaskell/stack/issues/3669)
+  for details.
 * Specify User-Agent HTTP request header on every HTTP request.
   See [#3628](https://github.com/commercialhaskell/stack/issues/3628) for details.
 
