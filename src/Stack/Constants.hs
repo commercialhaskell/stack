@@ -1,4 +1,3 @@
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
@@ -33,7 +32,6 @@ module Stack.Constants
     ,minTerminalWidth
     ,maxTerminalWidth
     ,defaultTerminalWidth
-    ,maxPathLength
     )
     where
 
@@ -243,12 +241,3 @@ maxTerminalWidth = 200
 -- automatically detect it and when the user doesn't supply one.
 defaultTerminalWidth :: Int
 defaultTerminalWidth = 100
-
--- | Maximum length to use in paths. Is only a 'Just' value on windows,
--- corresponding to MAX_PATH.
-maxPathLength :: Maybe Int
-#ifdef mingw32_HOST_OS
-maxPathLength = Just 260
-#else
-maxPathLength = Nothing
-#endif
