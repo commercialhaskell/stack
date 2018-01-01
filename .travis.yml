@@ -121,9 +121,15 @@ script:
        hlint test/ --cpp-simple
        ;;
      stack)
+       echo Build stack package first, so that it generates output to stdout.
+       echo Otherwise Travis thinks we stalled.
+       stack --no-terminal test --haddock --no-haddock-deps --ghc-options="$GHC_OPTIONS" stack
+
+       echo Build the other, smaller subpackages.
        stack --no-terminal test --haddock --no-haddock-deps --ghc-options="$GHC_OPTIONS"
        ;;
      pedantic)
+       stack --system-ghc --no-terminal build --pedantic stack
        stack --system-ghc --no-terminal build --pedantic
        ;;
      cabal)
