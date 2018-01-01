@@ -89,6 +89,7 @@ import           Prelude              as X (Bounded (..), Double, Enum,
                                             realToFrac, seq, show, snd,
                                             subtract, uncurry, undefined, ($!),
                                             (^), (^^))
+import           System.Exit          as X (ExitCode (..))
 import           Text.Read            as X (Read, readMaybe)
 import           UnliftIO             as X
 

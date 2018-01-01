@@ -39,8 +39,8 @@ import              Control.Monad.State (get, put, modify)
 import "cryptonite" Crypto.Hash (SHA1(..), SHA256(..))
 import              Data.Aeson.Extended
 import qualified    Data.ByteString as S
-import qualified    Data.ByteString.Char8 as S8
 import qualified    Data.ByteString.Lazy as LBS
+import qualified    Data.ByteString.Lazy.Char8 as BL8
 import              Data.Char (isSpace)
 import              Data.Conduit (await, yield, awaitForever)
 import              Data.Conduit.Lazy (lazyConsume)
@@ -570,10 +570,14 @@ getGhcBuilds = do
                       "PATH"
                       ("/sbin:/usr/sbin" <> maybe "" (":" <>) (Map.lookup "PATH" m))
                       m
-                eldconfigOut <- withModifyEnvOverride sbinEnv $ tryProcessStdout "ldconfig" ["-p"]
+                eldconfigOut
+                  <- withModifyEnvOverride sbinEnv
+                   $ withProc "ldconfig" ["-p"]
+                   $ tryAny . readProcessStdout_
                 let firstWords = case eldconfigOut of
                         Right ldconfigOut -> mapMaybe (listToMaybe . T.words) $
-                            T.lines $ T.decodeUtf8With T.lenientDecode ldconfigOut
+                            T.lines $ T.decodeUtf8With T.lenientDecode
+                                    $ LBS.toStrict ldconfigOut
                         Left _ -> []
                     checkLib lib
                         | libT `elem` firstWords = do
@@ -754,10 +758,10 @@ getSystemCompiler wc = do
     exists <- doesExecutableExist menv exeName
     if exists
         then do
-            eres <- tryProcessStdout exeName ["--info"]
+            eres <- withProc exeName ["--info"] $ tryAny . readProcessStdout_
             let minfo = do
-                    Right bs <- Just eres
-                    pairs_ <- readMaybe $ S8.unpack bs :: Maybe [(String, String)]
+                    Right lbs <- Just eres
+                    pairs_ <- readMaybe $ BL8.unpack lbs :: Maybe [(String, String)]
                     version <- lookup "Project version" pairs_ >>= parseVersionFromString
                     arch <- lookup "Target platform" pairs_ >>= simpleParse . takeWhile (/= '-')
                     return (version, arch)
@@ -1330,10 +1334,10 @@ buildInGhcjsEnv envConfig boptsCli = do
 
 getCabalInstallVersion :: HasEnvOverride env => RIO env (Maybe Version)
 getCabalInstallVersion = do
-    ebs <- tryProcessStdout "cabal" ["--numeric-version"]
-    liftIO $ case ebs of
+    ebs <- withProc "cabal" ["--numeric-version"] $ tryAny . readProcessStdout_
+    case ebs of
         Left _ -> return Nothing
-        Right bs -> Just <$> parseVersion (T.dropWhileEnd isSpace (T.decodeUtf8 bs))
+        Right bs -> Just <$> parseVersion (T.dropWhileEnd isSpace (T.decodeUtf8 (LBS.toStrict bs)))
 
 -- | Check if given processes appear to be present, throwing an exception if
 -- missing.
@@ -1628,10 +1632,10 @@ sanityCheck wc = withSystemTempDir "stack-sanity-check" $ \dir -> do
     menv <- view envOverrideL
     ghc <- liftIO $ join $ findExecutable menv exeName
     logDebug $ "Performing a sanity check on: " <> T.pack (toFilePath ghc)
-    eres <- withWorkingDir dir $ tryProcessStdout exeName
+    eres <- withWorkingDir dir $ withProc exeName
         [ fp
         , "-no-user-package-db"
-        ]
+        ] $ try . readProcessStdout_
     case eres of
         Left e -> throwIO $ GHCSanityCheckCompileFailed e ghc
         Right _ -> return () -- TODO check that the output of running the command is correct
@@ -1687,7 +1691,7 @@ getUtf8EnvVars compilerVer =
                              Map.empty
                     else do
                         -- Get a list of known locales by running @locale -a@.
-                        elocales <- tryProcessStdout "locale" ["-a"]
+                        elocales <- tryAny $ withProc "locale" ["-a"] readProcessStdout_
                         let
                             -- Filter the list to only include locales with UTF-8 encoding.
                             utf8Locales =
@@ -1698,8 +1702,8 @@ getUtf8EnvVars compilerVer =
                                             isUtf8Locale
                                             (T.lines $
                                              T.decodeUtf8With
-                                                 T.lenientDecode
-                                                 locales)
+                                                 T.lenientDecode $
+                                                 LBS.toStrict locales)
                             mfallback = getFallbackLocale utf8Locales
                         when
                             (isNothing mfallback)

@@ -19,6 +19,7 @@ module Stack.Coverage
 
 import           Stack.Prelude
 import qualified Data.ByteString.Char8 as S8
+import qualified Data.ByteString.Lazy as BL
 import           Data.List
 import qualified Data.Map.Strict as Map
 import qualified Data.Text as T
@@ -169,12 +170,13 @@ generateHpcReportInternal tixSrc reportDir report extraMarkupArgs extraReportArg
                     -- Look for index files in the correct dir (relative to each pkgdir).
                     ["--hpcdir", toFilePathNoTrailingSep hpcRelDir, "--reset-hpcdirs"]
             logInfo $ "Generating " <> report
-            outputLines <- liftM (map (S8.filter (/= '\r')) . S8.lines) $
-                readProcessStdout "hpc"
+            outputLines <- liftM (map (S8.filter (/= '\r')) . S8.lines . BL.toStrict) $
+                withProc "hpc"
                 ( "report"
                 : toFilePath tixSrc
                 : (args ++ extraReportArgs)
                 )
+                readProcessStdout_
             if all ("(0/0)" `S8.isSuffixOf`) outputLines
                 then do
                     let msg html = T.concat
@@ -197,12 +199,13 @@ generateHpcReportInternal tixSrc reportDir report extraMarkupArgs extraReportArg
                     -- Print output, stripping @\r@ characters because Windows.
                     forM_ outputLines (logInfo . T.decodeUtf8)
                     -- Generate the markup.
-                    void $ readProcessStdout "hpc"
+                    void $ withProc "hpc"
                         ( "markup"
                         : toFilePath tixSrc
                         : ("--destdir=" ++ toFilePathNoTrailingSep reportDir)
                         : (args ++ extraMarkupArgs)
                         )
+                        readProcessStdout_
                     return (Just reportPath)
 
 data HpcReportOpts = HpcReportOpts

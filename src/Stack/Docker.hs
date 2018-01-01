@@ -27,6 +27,7 @@ import qualified Crypto.Hash as Hash (Digest, MD5, hash)
 import           Data.Aeson.Extended (FromJSON(..),(.:),(.:?),(.!=),eitherDecode)
 import           Data.ByteString.Builder (stringUtf8,charUtf8,toLazyByteString)
 import qualified Data.ByteString.Char8 as BS
+import qualified Data.ByteString.Lazy as BL
 import qualified Data.ByteString.Lazy.Char8 as LBS
 import           Data.Char (isSpace,toUpper,isAscii,isDigit)
 import           Data.Conduit.List (sinkNull)
@@ -843,7 +844,7 @@ removeDirectoryContents path excludeDirs excludeFiles =
 readDockerProcess
     :: HasEnvOverride env
     => [String] -> RIO env BS.ByteString
-readDockerProcess = readProcessStdout "docker"
+readDockerProcess args = BL.toStrict <$> withProc "docker" args readProcessStdout_ -- FIXME stderr isn't logged with logError, should it be?
 
 -- | Name of home directory within docker sandbox.
 homeDirName :: Path Rel Dir

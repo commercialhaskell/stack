@@ -23,6 +23,7 @@ module Stack.GhcPkg
 
 import           Stack.Prelude
 import qualified Data.ByteString.Char8 as S8
+import qualified Data.ByteString.Lazy as BL
 import           Data.List
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
@@ -65,12 +66,14 @@ ghcPkg :: HasEnvOverride env
 ghcPkg wc pkgDbs args = do
     eres <- go
     case eres of
-          Left _ -> do
-              mapM_ (createDatabase wc) pkgDbs
-              go
-          Right _ -> return eres
+      Left _ -> do
+        mapM_ (createDatabase wc) pkgDbs
+        go
+      Right _ -> return eres
   where
-    go = tryProcessStdout (ghcPkgExeName wc) args'
+    go = fmap (fmap BL.toStrict)
+       $ tryAny
+       $ withProc (ghcPkgExeName wc) args' readProcessStdout_
     args' = packageDbFlags pkgDbs ++ args
 
 -- | Create a package database in the given directory, if it doesn't exist.
@@ -99,12 +102,9 @@ createDatabase wc db = do
                 -- finding out it isn't the hard way
                 ensureDir (parent db)
                 return ["init", toFilePath db]
-        eres <- tryProcessStdout (ghcPkgExeName wc) args
-        case eres of
-            Left e -> do
-                logError $ T.pack $ "Unable to create package database at " ++ toFilePath db
-                throwIO e
-            Right _ -> return ()
+        void $ withProc (ghcPkgExeName wc) args $ \pc ->
+          readProcessStdout_ pc `onException`
+          logError (T.pack $ "Unable to create package database at " ++ toFilePath db)
 
 -- | Get the name to use for "ghc-pkg", given the compiler version.
 ghcPkgExeName :: WhichCompiler -> String
@@ -139,8 +139,8 @@ findGhcPkgField wc pkgDbs name field = do
     return $
         case result of
             Left{} -> Nothing
-            Right lbs ->
-                fmap (stripCR . T.decodeUtf8) $ listToMaybe $ S8.lines lbs
+            Right bs ->
+                fmap (stripCR . T.decodeUtf8) $ listToMaybe $ S8.lines bs
 
 -- | Get the version of the package
 findGhcPkgVersion :: HasEnvOverride env

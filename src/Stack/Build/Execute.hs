@@ -36,7 +36,7 @@ import           Data.Conduit
 import qualified Data.Conduit.Binary as CB
 import qualified Data.Conduit.List as CL
 import           Data.Conduit.Process.Typed
-                    (ExitCodeException (..), waitExitCode, withProcess,
+                    (ExitCodeException (..), waitExitCode,
                      useHandleOpen, setStdin, setStdout, setStderr, getStdin,
                      createPipe, runProcess_, getStdout,
                      getStderr, createSource)
@@ -1130,7 +1130,11 @@ withSingleContext ActionContext {..} ExecuteEnv {..} task@Task {..} mdeps msuffi
                     runAndOutput :: CompilerVersion 'CVActual -> RIO env ()
                     runAndOutput compilerVer = withWorkingDir pkgDir $ withEnvOverride menv $ case mlogFile of
                         Just (_, h) ->
-                            sinkProcessStderrStdoutHandle (toFilePath exeName) fullArgs h h
+                            withProc (toFilePath exeName) fullArgs
+                          $ runProcess_
+                          . setStdin closed
+                          . setStdout (useHandleOpen h)
+                          . setStderr (useHandleOpen h)
                         Nothing ->
                             void $ sinkProcessStderrStdout (toFilePath exeName) fullArgs
                                 (outputSink KeepTHLoading LevelWarn compilerVer)

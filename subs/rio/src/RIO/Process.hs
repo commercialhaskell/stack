@@ -9,15 +9,8 @@
 -- | Reading from external processes.
 
 module RIO.Process
-  (readProcessStdout
-  ,readProcessStderrStdout
-  ,tryProcessStdout
-  ,tryProcessStderrStdout
-  ,sinkProcessStdout
-  ,sinkProcessStderrStdout
-  ,sinkProcessStderrStdoutHandle
-  ,logProcessStderrStdout
-  ,readProcess
+  (withProcess
+  ,withProcess_
   ,EnvOverride(..)
   ,unEnvOverride
   ,mkEnvOverride
@@ -39,31 +32,23 @@ module RIO.Process
   ,withEnvOverride
   ,withModifyEnvOverride
   ,withWorkingDir
-  ,runProcess
-  ,runProcess_
   ,runEnvNoLogging
   ,withProcessTimeLog
   ,showProcessArgDebug
   ,exec
   ,execSpawn
   ,execObserve
+  ,module System.Process.Typed
   )
   where
 
 import           RIO.Prelude
 import           RIO.Logger
-import qualified Data.ByteString as S
-import           Data.Conduit (ConduitM, (.|), runConduit)
-import qualified Data.Conduit.Binary as CB
-import qualified Data.Conduit.List as CL
-import           Data.Conduit.Process.Typed
 import qualified Data.Map as Map
 import qualified Data.Text as T
 import qualified Data.Text.Lazy as TL
 import qualified Data.Text.Lazy.Encoding as TLE
-import           Data.Text.Encoding (decodeUtf8With)
 import           Data.Text.Encoding.Error (lenientDecode)
-import           Data.Void (Void)
 import           Lens.Micro (set, to)
 import           Path
 import           Path.Extra
@@ -73,6 +58,8 @@ import           System.Environment (getEnvironment)
 import           System.Exit (exitWith)
 import qualified System.FilePath as FP
 import qualified System.Clock as Clock
+import qualified System.Process.Typed as P
+import           System.Process.Typed hiding (withProcess, withProcess_)
 
 #ifndef WINDOWS
 import qualified System.Process.PID1 as PID1
@@ -161,53 +148,13 @@ envHelper = eoStringList
 -- | Read from the process, ignoring any output.
 --
 -- Throws a 'ReadProcessException' exception if the process fails.
-readProcessNull :: HasEnvOverride env
+readProcessNull :: HasEnvOverride env -- FIXME remove
                 => String -- ^ Command
                 -> [String] -- ^ Command line arguments
                 -> RIO env ()
-readProcessNull name args = sinkProcessStdout name args CL.sinkNull
-
--- | Try to produce a strict 'S.ByteString' from the stdout of a
--- process.
-tryProcessStdout :: HasEnvOverride env
-                 => String -- ^ Command
-                 -> [String] -- ^ Command line arguments
-                 -> RIO env (Either SomeException S.ByteString)
-tryProcessStdout name args = tryAny (readProcessStdout name args)
-
--- | Try to produce strict 'S.ByteString's from the stderr and stdout of a
--- process.
-tryProcessStderrStdout
-  :: HasEnvOverride env
-  => String -- ^ Command
-  -> [String] -- ^ Command line arguments
-  -> RIO env (Either ReadProcessException (S.ByteString, S.ByteString))
-tryProcessStderrStdout name args =
-    try (readProcessStderrStdout name args)
-
--- | Produce a strict 'S.ByteString' from the stdout of a process.
---
--- Throws a 'ReadProcessException' exception if the process fails.
-readProcessStdout
-  :: HasEnvOverride env
-  => String -- ^ Command
-  -> [String] -- ^ Command line arguments
-  -> RIO env S.ByteString
-readProcessStdout name args =
-  sinkProcessStdout name args CL.consume >>=
-  liftIO . evaluate . S.concat
-
--- | Produce strict 'S.ByteString's from the stderr and stdout of a process.
---
--- Throws a 'ReadProcessException' exception if the process fails.
-readProcessStderrStdout
-  :: HasEnvOverride env
-  => String -- ^ Command
-  -> [String] -- ^ Command line arguments
-  -> RIO env (S.ByteString, S.ByteString)
-readProcessStderrStdout name args = do
-  (e, o) <- sinkProcessStderrStdout name args CL.consume CL.consume
-  liftIO $ (,) <$> evaluate (S.concat e) <*> evaluate (S.concat o)
+readProcessNull name args =
+  -- We want the output to appear in any exceptions, so we capture and drop it
+  void $ withProc name args readProcessStdout_
 
 -- | An exception while trying to read from process.
 data ReadProcessException
@@ -226,71 +173,6 @@ instance Show ReadProcessException where
     show (ExecutableNotFoundAt name) =
         "Did not find executable at specified path: " ++ name
 instance Exception ReadProcessException
-
--- | Consume the stdout of a process feeding strict 'S.ByteString's to a consumer.
--- If the process fails, spits out stdout and stderr as error log
--- level. Should not be used for long-running processes or ones with
--- lots of output; for that use 'sinkProcessStdoutLogStderr'.
---
--- Throws a 'ReadProcessException' if unsuccessful.
-sinkProcessStdout
-    :: HasEnvOverride env
-    => String -- ^ Command
-    -> [String] -- ^ Command line arguments
-    -> ConduitM S.ByteString Void (RIO env) a -- ^ Sink for stdout
-    -> RIO env a
-sinkProcessStdout name args sinkStdout =
-  withProc name args $ \pc ->
-  withLoggedProcess_ (setStdin closed pc) $ \p -> runConcurrently
-    $ Concurrently (runConduit $ getStderr p .| CL.sinkNull)
-   *> Concurrently (runConduit $ getStdout p .| sinkStdout)
-
-logProcessStderrStdout
-    :: (HasCallStack, HasEnvOverride env)
-    => String
-    -> [String]
-    -> RIO env ()
-logProcessStderrStdout name args = do
-    let logLines = CB.lines .| CL.mapM_ (logInfo . decodeUtf8With lenientDecode)
-    ((), ()) <- sinkProcessStderrStdout name args logLines logLines
-    return ()
-
--- | Consume the stdout and stderr of a process feeding strict 'S.ByteString's to the consumers.
---
--- Throws a 'ReadProcessException' if unsuccessful in launching, or 'ProcessExitedUnsuccessfully' if the process itself fails.
-sinkProcessStderrStdout
-  :: forall e o env. HasEnvOverride env
-  => String -- ^ Command
-  -> [String] -- ^ Command line arguments
-  -> ConduitM S.ByteString Void (RIO env) e -- ^ Sink for stderr
-  -> ConduitM S.ByteString Void (RIO env) o -- ^ Sink for stdout
-  -> RIO env (e,o)
-sinkProcessStderrStdout name args sinkStderr sinkStdout =
-  withProc name args $ \pc0 -> do
-    let pc = setStdin closed
-           $ setStdout createSource
-           $ setStderr createSource
-             pc0
-    withProcess_ pc $ \p ->
-      runConduit (getStderr p .| sinkStderr) `concurrently`
-      runConduit (getStdout p .| sinkStdout)
-
--- | Like sinkProcessStderrStdout, but receives Handles for stderr and stdout instead of 'Sink's.
---
--- Throws a 'ReadProcessException' if unsuccessful in launching, or 'ProcessExitedUnsuccessfully' if the process itself fails.
-sinkProcessStderrStdoutHandle
-  :: HasEnvOverride env
-  => String -- ^ Command
-  -> [String] -- ^ Command line arguments
-  -> Handle
-  -> Handle
-  -> RIO env ()
-sinkProcessStderrStdoutHandle name args err out =
-      withProc name args
-    $ runProcess_
-    . setStdin closed
-    . setStdout (useHandleOpen out)
-    . setStderr (useHandleOpen err)
 
 -- | Provide a 'ProcessConfig' based on the 'EnvOverride' in
 -- scope. Deals with resolving the full path, setting the child
@@ -536,3 +418,19 @@ execObserve cmd0 args =
       $ take 1
       $ TL.lines
       $ TLE.decodeUtf8With lenientDecode out
+
+-- | Same as 'P.withProcess', but generalized to 'MonadUnliftIO'.
+withProcess
+  :: MonadUnliftIO m
+  => ProcessConfig stdin stdout stderr
+  -> (Process stdin stdout stderr -> m a)
+  -> m a
+withProcess pc f = withRunInIO $ \run -> P.withProcess pc (run . f)
+
+-- | Same as 'P.withProcess_', but generalized to 'MonadUnliftIO'.
+withProcess_
+  :: MonadUnliftIO m
+  => ProcessConfig stdin stdout stderr
+  -> (Process stdin stdout stderr -> m a)
+  -> m a
+withProcess_ pc f = withRunInIO $ \run -> P.withProcess_ pc (run . f)

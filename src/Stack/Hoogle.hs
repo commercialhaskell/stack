@@ -9,7 +9,7 @@ module Stack.Hoogle
     ) where
 
 import           Stack.Prelude
-import qualified Data.ByteString.Char8 as S8
+import qualified Data.ByteString.Lazy.Char8 as BL8
 import           Data.Char (isSpace)
 import           Data.List (find)
 import qualified Data.Set as Set
@@ -157,7 +157,9 @@ hoogleCmd (args,setup,rebuild) go = withBuildConfig go $ do
         eres <- case mhooglePath of
             Nothing -> return $ Left "Hoogle isn't installed."
             Just hooglePath -> do
-                result <- withEnvOverride menv $ tryProcessStdout (toFilePath hooglePath) ["--numeric-version"]
+                result <- withEnvOverride menv
+                        $ withProc (toFilePath hooglePath) ["--numeric-version"]
+                        $ tryAny . readProcessStdout_
                 let unexpectedResult got = Left $ T.concat
                         [ "'"
                         , T.pack (toFilePath hooglePath)
@@ -166,8 +168,8 @@ hoogleCmd (args,setup,rebuild) go = withBuildConfig go $ do
                         ]
                 return $ case result of
                     Left err -> unexpectedResult $ T.pack (show err)
-                    Right bs -> case parseVersionFromString (takeWhile (not . isSpace) (S8.unpack bs)) of
-                        Nothing -> unexpectedResult $ T.pack (S8.unpack bs)
+                    Right bs -> case parseVersionFromString (takeWhile (not . isSpace) (BL8.unpack bs)) of
+                        Nothing -> unexpectedResult $ T.pack (BL8.unpack bs)
                         Just ver
                             | ver >= hoogleMinVersion -> Right hooglePath
                             | otherwise -> Left $ T.concat

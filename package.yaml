@@ -107,6 +107,7 @@ dependencies:
 - time
 - tls
 - transformers
+- typed-process >= 0.2.1.0
 - unicode-transforms
 - unix-compat
 - unliftio

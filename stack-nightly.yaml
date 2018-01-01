@@ -12,3 +12,4 @@ nix:
 extra-deps:
 - bindings-uname-0.1
 - conduit-extra-1.2.3.1
+- typed-process-0.2.1.0

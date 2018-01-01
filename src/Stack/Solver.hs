@@ -22,6 +22,7 @@ module Stack.Solver
 import           Stack.Prelude
 import           Data.Aeson.Extended         (object, (.=), toJSON)
 import qualified Data.ByteString as S
+import qualified Data.ByteString.Lazy as BL
 import           Data.Char (isSpace)
 import           Data.Conduit.Process.Typed (eceStderr)
 import qualified Data.HashMap.Strict as HashMap
@@ -111,9 +112,13 @@ cabalSolver cabalfps constraintType
                toConstraintArgs (flagConstraints constraintType) ++
                fmap toFilePath cabalfps
 
-    catch (withWorkingDir tmpdir $ liftM Right (readProcessStdout "cabal" args))
-          (return . Left . eceStderr)
-    >>= either parseCabalErrors parseCabalOutput
+    try ( withWorkingDir tmpdir
+        $ withProc "cabal" args
+        $ readProcessStdout_
+        )
+        >>= either
+          (parseCabalErrors . eceStderr)
+          (parseCabalOutput . BL.toStrict)
 
   where
     errCheck = T.isInfixOf "Could not resolve dependencies"
