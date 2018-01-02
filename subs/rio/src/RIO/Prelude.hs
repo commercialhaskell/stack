@@ -12,6 +12,7 @@ module RIO.Prelude
   , stripCR
   , RIO (..)
   , runRIO
+  , tshow
   , module X
   ) where
 
@@ -31,6 +32,7 @@ import           Control.Monad.Reader as X (MonadReader, MonadTrans (..),
 import           Data.Bool            as X (Bool (..), not, otherwise, (&&),
                                             (||))
 import           Data.ByteString      as X (ByteString)
+import           Data.ByteString.Short as X (ShortByteString, toShort, fromShort)
 import           Data.Char            as X (Char)
 import           Data.Conduit         as X (ConduitM, runConduit, (.|))
 import           Data.Data            as X (Data (..))
@@ -148,3 +150,6 @@ instance MonadUnliftIO (RIO env) where
     askUnliftIO = RIO $ ReaderT $ \r ->
                   withUnliftIO $ \u ->
                   return (UnliftIO (unliftIO u . flip runReaderT r . unRIO))
+
+tshow :: Show a => a -> Text
+tshow = T.pack . show
