@@ -100,7 +100,7 @@ unWarningParser wp = do
 
 -- | Log JSON warnings.
 logJSONWarnings
-    :: MonadLogger m
+    :: (MonadReader env m, HasLogFunc env, HasCallStack, MonadIO m)
     => FilePath -> [JSONWarning] -> m ()
 logJSONWarnings fp =
     mapM_ (\w -> logWarn ("Warning: " <> T.pack fp <> ": " <> T.pack (show w)))

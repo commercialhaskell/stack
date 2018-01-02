@@ -16,7 +16,7 @@ module Stack.Docker.GlobalDB
   ,DockerImageExeId)
   where
 
-import           Control.Monad.Logger (NoLoggingT)
+import           Control.Monad.Logger (NoLoggingT) -- TODO remove dep when persistent drops monad-logger
 import           Control.Monad.Trans.Resource (ResourceT)
 import           Stack.Prelude
 import           Data.List (sortBy, isInfixOf, stripPrefix)

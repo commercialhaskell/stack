@@ -14,7 +14,7 @@
 
 module Stack.Build
   (build
-  ,withLoadPackage
+  ,loadPackage
   ,mkBaseConfigOpts
   ,queryBuildInfo
   ,splitObjsWarning
@@ -42,13 +42,13 @@ import           Stack.Build.Haddock
 import           Stack.Build.Installed
 import           Stack.Build.Source
 import           Stack.Build.Target
-import           Stack.Fetch as Fetch
 import           Stack.Package
 import           Stack.PackageLocation (parseSingleCabalFileIndex)
 import           Stack.Types.Build
 import           Stack.Types.BuildPlan
 import           Stack.Types.Config
 import           Stack.Types.FlagName
+import           Stack.Types.NamedComponent
 import           Stack.Types.Package
 import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageName
@@ -77,7 +77,6 @@ build setLocalFiles mbuildLk boptsCli = fixCodePage $ do
     bopts <- view buildOptsL
     let profiling = boptsLibProfile bopts || boptsExeProfile bopts
     let symbols = not (boptsLibStrip bopts || boptsExeStrip bopts)
-    menv <- getMinimalEnvOverride
 
     (targets, mbp, locals, extraToBuild, sourceMap) <- loadSourceMapFull NeedTargets boptsCli
 
@@ -95,7 +94,7 @@ build setLocalFiles mbuildLk boptsCli = fixCodePage $ do
              [lpFiles lp | PSFiles lp _ <- Map.elems sourceMap]
 
     (installedMap, globalDumpPkgs, snapshotDumpPkgs, localDumpPkgs) <-
-        getInstalled menv
+        getInstalled
                      GetInstalledOpts
                          { getInstalledProfiling = profiling
                          , getInstalledHaddock   = shouldHaddockDeps bopts
@@ -103,8 +102,7 @@ build setLocalFiles mbuildLk boptsCli = fixCodePage $ do
                      sourceMap
 
     baseConfigOpts <- mkBaseConfigOpts boptsCli
-    plan <- withLoadPackage $ \loadPackage ->
-        constructPlan mbp baseConfigOpts locals extraToBuild localDumpPkgs loadPackage sourceMap installedMap (boptsCLIInitialBuildSteps boptsCli)
+    plan <- constructPlan mbp baseConfigOpts locals extraToBuild localDumpPkgs loadPackage sourceMap installedMap (boptsCLIInitialBuildSteps boptsCli)
 
     allowLocals <- view $ configL.to configAllowLocals
     unless allowLocals $ case justLocals plan of
@@ -130,7 +128,7 @@ build setLocalFiles mbuildLk boptsCli = fixCodePage $ do
 
     if boptsCLIDryrun boptsCli
         then printPlan plan
-        else executePlan menv boptsCli baseConfigOpts locals
+        else executePlan boptsCli baseConfigOpts locals
                          globalDumpPkgs
                          snapshotDumpPkgs
                          localDumpPkgs
@@ -172,7 +170,7 @@ instance Exception CabalVersionException
 
 -- | See https://github.com/commercialhaskell/stack/issues/1198.
 warnIfExecutablesWithSameNameCouldBeOverwritten
-    :: MonadLogger m => [LocalPackage] -> Plan -> m ()
+    :: HasLogFunc env => [LocalPackage] -> Plan -> RIO env ()
 warnIfExecutablesWithSameNameCouldBeOverwritten locals plan = do
     logDebug "Checking if we are going to build multiple executables with the same name"
     forM_ (Map.toList warnings) $ \(exe,(toBuild,otherLocals)) -> do
@@ -239,7 +237,7 @@ warnIfExecutablesWithSameNameCouldBeOverwritten locals plan = do
     collect :: Ord k => [(k,v)] -> Map k (NonEmpty v)
     collect = Map.map NE.fromList . Map.fromDistinctAscList . groupSort
 
-warnAboutSplitObjs :: MonadLogger m => BuildOpts -> m ()
+warnAboutSplitObjs :: HasLogFunc env => BuildOpts -> RIO env ()
 warnAboutSplitObjs bopts | boptsSplitObjs bopts = do
     logWarn $ "Building with --split-objs is enabled. " <> T.pack splitObjsWarning
 warnAboutSplitObjs _ = return ()
@@ -273,29 +271,25 @@ mkBaseConfigOpts boptsCli = do
         }
 
 -- | Provide a function for loading package information from the package index
-withLoadPackage :: HasEnvConfig env
-                => ((PackageLocationIndex FilePath -> Map FlagName Bool -> [Text] -> IO Package) -> RIO env a)
-                -> RIO env a
-withLoadPackage inner = do
-    econfig <- view envConfigL
-    root <- view projectRootL
-    run <- askRunInIO
-    withCabalLoader $ \loadFromIndex ->
-        inner $ \loc flags ghcOptions -> run $
-            resolvePackage
-              (depPackageConfig econfig flags ghcOptions)
-              <$> parseSingleCabalFileIndex loadFromIndex root loc
-  where
-    -- | Package config to be used for dependencies
-    depPackageConfig :: EnvConfig -> Map FlagName Bool -> [Text] -> PackageConfig
-    depPackageConfig econfig flags ghcOptions = PackageConfig
+loadPackage
+  :: HasEnvConfig env
+  => PackageLocationIndex FilePath
+  -> Map FlagName Bool
+  -> [Text]
+  -> RIO env Package
+loadPackage loc flags ghcOptions = do
+  compiler <- view actualCompilerVersionL
+  platform <- view platformL
+  root <- view projectRootL
+  let pkgConfig = PackageConfig
         { packageConfigEnableTests = False
         , packageConfigEnableBenchmarks = False
         , packageConfigFlags = flags
         , packageConfigGhcOptions = ghcOptions
-        , packageConfigCompilerVersion = view actualCompilerVersionL econfig
-        , packageConfigPlatform = view platformL econfig
+        , packageConfigCompilerVersion = compiler
+        , packageConfigPlatform = platform
         }
+  resolvePackage pkgConfig <$> parseSingleCabalFileIndex root loc
 
 -- | Set the code page for this process as necessary. Only applies to Windows.
 -- See: https://github.com/commercialhaskell/stack/issues/738

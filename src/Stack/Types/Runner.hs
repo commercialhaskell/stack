@@ -32,12 +32,11 @@ import qualified Data.ByteString.Char8      as S8
 import           Data.Char
 import           Data.List                  (stripPrefix)
 import qualified Data.Text                  as T
-import qualified Data.Text.Encoding         as T
-import qualified Data.Text.Encoding.Error   as T
 import qualified Data.Text.IO               as T
 import           Data.Time
 import           Distribution.PackageDescription (GenericPackageDescription)
 import           GHC.Foreign                (peekCString, withCString)
+import           GHC.Stack                  (CallStack, SrcLoc (..), getCallStack)
 import           Language.Haskell.TH
 import           Language.Haskell.TH.Syntax (lift)
 import           Lens.Micro
@@ -47,7 +46,7 @@ import           Stack.Types.PackageIdentifier (PackageIdentifierRevision)
 import           System.Console.ANSI
 import           System.FilePath
 import           System.IO                  (localeEncoding)
-import           System.Log.FastLogger
+import           RIO.Process (HasEnvOverride (..), EnvOverride, getEnvOverride)
 import           System.Terminal
 
 -- | Monadic environment.
@@ -56,6 +55,7 @@ data Runner = Runner
   , runnerLogOptions :: !LogOptions
   , runnerTerminal   :: !Bool
   , runnerSticky     :: !Sticky
+  , runnerEnvOverride :: !EnvOverride
   , runnerParsedCabalFiles :: !(IORef
       ( Map PackageIdentifierRevision GenericPackageDescription
       , Map (Path Abs Dir)            (GenericPackageDescription, Path Abs File)
@@ -70,8 +70,10 @@ data Runner = Runner
   -- <https://github.com/commercialhaskell/stack/issues/3591>.
   }
 
-class HasLogFunc env => HasRunner env where
+class HasEnvOverride env => HasRunner env where
   runnerL :: Lens' env Runner
+instance HasEnvOverride Runner where
+  envOverrideL = lens runnerEnvOverride (\x y -> x { runnerEnvOverride = y })
 instance HasRunner Runner where
   runnerL = id
 
@@ -106,11 +108,11 @@ data LogOptions = LogOptions
 instance HasLogFunc Runner where
   logFuncL = to $ \env -> stickyLoggerFuncImpl (view stickyL env) (view logOptionsL env)
 
+-- FIXME move into RIO.Logger?
 stickyLoggerFuncImpl
-    :: ToLogStr msg
-    => Sticky -> LogOptions
-    -> (Loc -> LogSource -> LogLevel -> msg -> IO ())
-stickyLoggerFuncImpl (Sticky mref) lo loc src level msg =
+    :: Sticky -> LogOptions
+    -> (CallStack -> LogSource -> LogLevel -> LogStr -> IO ())
+stickyLoggerFuncImpl (Sticky mref) lo loc src level msgTextRaw =
     case mref of
         Nothing ->
             loggerFunc
@@ -122,7 +124,7 @@ stickyLoggerFuncImpl (Sticky mref) lo loc src level msg =
                      LevelOther "sticky-done" -> LevelInfo
                      LevelOther "sticky" -> LevelInfo
                      _ -> level)
-                msg
+                msgTextRaw
         Just ref -> modifyMVar_ ref $ \sticky -> do
             let backSpaceChar = '\8'
                 repeating = S8.replicate (maybe 0 T.length sticky)
@@ -150,7 +152,7 @@ stickyLoggerFuncImpl (Sticky mref) lo loc src level msg =
                 _
                     | level >= logMinLevel lo -> do
                         clear
-                        loggerFunc lo out loc src level $ toLogStr msgText
+                        loggerFunc lo out loc src level msgText
                         case sticky of
                             Nothing ->
                                 return Nothing
@@ -161,8 +163,6 @@ stickyLoggerFuncImpl (Sticky mref) lo loc src level msg =
                         return sticky
   where
     out = stderr
-    msgTextRaw = T.decodeUtf8With T.lenientDecode msgBytes
-    msgBytes = fromLogStr (toLogStr msg)
 
 -- | Replace Unicode characters with non-Unicode equivalents
 replaceUnicode :: Char -> Char
@@ -171,9 +171,8 @@ replaceUnicode '\x2019' = '\''
 replaceUnicode c = c
 
 -- | Logging function takes the log level into account.
-loggerFunc :: ToLogStr msg
-           => LogOptions -> Handle -> Loc -> Text -> LogLevel -> msg -> IO ()
-loggerFunc lo outputChannel loc _src level msg =
+loggerFunc :: LogOptions -> Handle -> CallStack -> Text -> LogLevel -> LogStr -> IO ()
+loggerFunc lo outputChannel cs _src level msg =
    when (level >= logMinLevel lo)
         (liftIO (do out <- getOutput
                     T.hPutStrLn outputChannel out))
@@ -186,7 +185,7 @@ loggerFunc lo outputChannel loc _src level msg =
         [ T.pack timestamp
         , T.pack l
         , T.pack (ansi [Reset])
-        , T.decodeUtf8 (fromLogStr (toLogStr msg))
+        , msg
         , T.pack lc
         , T.pack (ansi [Reset])
         ]
@@ -222,16 +221,18 @@ loggerFunc lo outputChannel loc _src level msg =
                "\n@(" ++ fileLocStr ++ ")"
          | otherwise = return ""
        fileLocStr =
-         fromMaybe file (stripPrefix dirRoot file) ++
-         ':' :
-         line loc ++
-         ':' :
-         char loc
-         where
-           file = loc_filename loc
-           line = show . fst . loc_start
-           char = show . snd . loc_start
-       dirRoot = $(lift . T.unpack . fromMaybe undefined . T.stripSuffix (T.pack $ "Stack" </> "Types" </> "Runner.hs") . T.pack . loc_filename =<< location)
+         case reverse $ getCallStack cs of
+           [] -> "<no call stack found>"
+           (_desc, loc):_ ->
+             let file = srcLocFile loc
+                 line = show $ srcLocStartLine loc
+                 char = show $ srcLocStartCol loc
+                 dirRoot = $(lift . T.unpack . fromMaybe undefined . T.stripSuffix (T.pack $ "Stack" </> "Types" </> "Runner.hs") . T.pack . loc_filename =<< location)
+              in fromMaybe file (stripPrefix dirRoot file) ++
+                 ':' :
+                 line ++
+                 ':' :
+                 char
 
 -- | The length of a timestamp in the format "YYYY-MM-DD hh:mm:ss.μμμμμμ".
 -- This definition is top-level in order to avoid multiple reevaluation at runtime.
@@ -274,6 +275,7 @@ withRunner logLevel useTime terminal colorWhen widthOverride reExec inner = do
                                    pure widthOverride
   canUseUnicode <- liftIO getCanUseUnicode
   ref <- newIORef mempty
+  menv <- getEnvOverride
   withSticky terminal $ \sticky -> inner Runner
     { runnerReExec = reExec
     , runnerLogOptions = LogOptions
@@ -287,6 +289,7 @@ withRunner logLevel useTime terminal colorWhen widthOverride reExec inner = do
     , runnerTerminal = terminal
     , runnerSticky = sticky
     , runnerParsedCabalFiles = ref
+    , runnerEnvOverride = menv
     }
   where clipWidth w
           | w < minTerminalWidth = minTerminalWidth

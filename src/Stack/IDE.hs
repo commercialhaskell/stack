@@ -17,7 +17,7 @@ import           Stack.Config (getLocalPackages)
 import           Stack.Package (readPackageUnresolvedDir, gpdPackageName)
 import           Stack.Prelude
 import           Stack.Types.Config
-import           Stack.Types.Package
+import           Stack.Types.NamedComponent
 import           Stack.Types.PackageName
 
 -- | List the packages inside the current project.

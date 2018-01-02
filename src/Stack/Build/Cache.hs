@@ -108,23 +108,23 @@ markExeNotInstalled loc ident = do
     liftIO $ ignoringAbsence (removeFile $ dir </> ident')
 
 -- | Try to read the dirtiness cache for the given package directory.
-tryGetBuildCache :: (MonadUnliftIO m, MonadReader env m, MonadThrow m, MonadLogger m, HasEnvConfig env)
-                 => Path Abs Dir -> m (Maybe (Map FilePath FileCacheInfo))
+tryGetBuildCache :: HasEnvConfig env
+                 => Path Abs Dir -> RIO env (Maybe (Map FilePath FileCacheInfo))
 tryGetBuildCache dir = liftM (fmap buildCacheTimes) . $(versionedDecodeFile buildCacheVC) =<< buildCacheFile dir
 
 -- | Try to read the dirtiness cache for the given package directory.
-tryGetConfigCache :: (MonadUnliftIO m, MonadReader env m, MonadThrow m, HasEnvConfig env, MonadLogger m)
-                  => Path Abs Dir -> m (Maybe ConfigCache)
+tryGetConfigCache :: HasEnvConfig env
+                  => Path Abs Dir -> RIO env (Maybe ConfigCache)
 tryGetConfigCache dir = $(versionedDecodeFile configCacheVC) =<< configCacheFile dir
 
 -- | Try to read the mod time of the cabal file from the last build
-tryGetCabalMod :: (MonadUnliftIO m, MonadReader env m, MonadThrow m, HasEnvConfig env, MonadLogger m)
-               => Path Abs Dir -> m (Maybe ModTime)
+tryGetCabalMod :: HasEnvConfig env
+               => Path Abs Dir -> RIO env (Maybe ModTime)
 tryGetCabalMod dir = $(versionedDecodeFile modTimeVC) =<< configCabalMod dir
 
 -- | Write the dirtiness cache for this package's files.
-writeBuildCache :: (MonadIO m, MonadReader env m, MonadThrow m, HasEnvConfig env, MonadLogger m)
-                => Path Abs Dir -> Map FilePath FileCacheInfo -> m ()
+writeBuildCache :: HasEnvConfig env
+                => Path Abs Dir -> Map FilePath FileCacheInfo -> RIO env ()
 writeBuildCache dir times = do
     fp <- buildCacheFile dir
     $(versionedEncodeFile buildCacheVC) fp BuildCache
@@ -132,19 +132,19 @@ writeBuildCache dir times = do
         }
 
 -- | Write the dirtiness cache for this package's configuration.
-writeConfigCache :: (MonadIO m, MonadReader env m, MonadThrow m, HasEnvConfig env, MonadLogger m)
+writeConfigCache :: HasEnvConfig env
                 => Path Abs Dir
                 -> ConfigCache
-                -> m ()
+                -> RIO env ()
 writeConfigCache dir x = do
     fp <- configCacheFile dir
     $(versionedEncodeFile configCacheVC) fp x
 
 -- | See 'tryGetCabalMod'
-writeCabalMod :: (MonadIO m, MonadReader env m, MonadThrow m, HasEnvConfig env, MonadLogger m)
+writeCabalMod :: HasEnvConfig env
               => Path Abs Dir
               -> ModTime
-              -> m ()
+              -> RIO env ()
 writeCabalMod dir x = do
     fp <- configCabalMod dir
     $(versionedEncodeFile modTimeVC) fp x
@@ -172,42 +172,42 @@ flagCacheFile installed = do
     return $ dir </> rel
 
 -- | Loads the flag cache for the given installed extra-deps
-tryGetFlagCache :: (MonadUnliftIO m, MonadThrow m, MonadReader env m, HasEnvConfig env, MonadLogger m)
+tryGetFlagCache :: HasEnvConfig env
                 => Installed
-                -> m (Maybe ConfigCache)
+                -> RIO env (Maybe ConfigCache)
 tryGetFlagCache gid = do
     fp <- flagCacheFile gid
     $(versionedDecodeFile configCacheVC) fp
 
-writeFlagCache :: (MonadIO m, MonadReader env m, HasEnvConfig env, MonadThrow m, MonadLogger m)
+writeFlagCache :: HasEnvConfig env
                => Installed
                -> ConfigCache
-               -> m ()
+               -> RIO env ()
 writeFlagCache gid cache = do
     file <- flagCacheFile gid
     ensureDir (parent file)
     $(versionedEncodeFile configCacheVC) file cache
 
 -- | Mark a test suite as having succeeded
-setTestSuccess :: (MonadIO m, MonadThrow m, MonadReader env m, HasEnvConfig env, MonadLogger m)
+setTestSuccess :: HasEnvConfig env
                => Path Abs Dir
-               -> m ()
+               -> RIO env ()
 setTestSuccess dir = do
     fp <- testSuccessFile dir
     $(versionedEncodeFile testSuccessVC) fp True
 
 -- | Mark a test suite as not having succeeded
-unsetTestSuccess :: (MonadIO m, MonadThrow m, MonadReader env m, HasEnvConfig env, MonadLogger m)
+unsetTestSuccess :: HasEnvConfig env
                  => Path Abs Dir
-                 -> m ()
+                 -> RIO env ()
 unsetTestSuccess dir = do
     fp <- testSuccessFile dir
     $(versionedEncodeFile testSuccessVC) fp False
 
 -- | Check if the test suite already passed
-checkTestSuccess :: (MonadUnliftIO m, MonadThrow m, MonadReader env m, HasEnvConfig env, MonadLogger m)
+checkTestSuccess :: HasEnvConfig env
                  => Path Abs Dir
-                 -> m Bool
+                 -> RIO env Bool
 checkTestSuccess dir =
     liftM
         (fromMaybe False)
@@ -230,11 +230,11 @@ checkTestSuccess dir =
 --
 -- We only pay attention to non-directory options. We don't want to avoid a
 -- cache hit just because it was installed in a different directory.
-precompiledCacheFile :: (MonadThrow m, MonadReader env m, HasEnvConfig env, MonadLogger m)
+precompiledCacheFile :: HasEnvConfig env
                      => PackageLocationIndex FilePath
                      -> ConfigureOpts
                      -> Set GhcPkgId -- ^ dependencies
-                     -> m (Maybe (Path Abs File))
+                     -> RIO env (Maybe (Path Abs File))
 precompiledCacheFile loc copts installedPackageIDs = do
   ec <- view envConfigL
 
@@ -297,14 +297,14 @@ precompiledCacheFile loc copts installedPackageIDs = do
         | otherwise -> return longPath
 
 -- | Write out information about a newly built package
-writePrecompiledCache :: (MonadThrow m, MonadReader env m, HasEnvConfig env, MonadIO m, MonadLogger m)
+writePrecompiledCache :: HasEnvConfig env
                       => BaseConfigOpts
                       -> PackageLocationIndex FilePath
                       -> ConfigureOpts
                       -> Set GhcPkgId -- ^ dependencies
                       -> Installed -- ^ library
                       -> Set Text -- ^ executables
-                      -> m ()
+                      -> RIO env ()
 writePrecompiledCache baseConfigOpts loc copts depIDs mghcPkgId exes = do
   mfile <- precompiledCacheFile loc copts depIDs
   forM_ mfile $ \file -> do

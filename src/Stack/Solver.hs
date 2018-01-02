@@ -22,7 +22,9 @@ module Stack.Solver
 import           Stack.Prelude
 import           Data.Aeson.Extended         (object, (.=), toJSON)
 import qualified Data.ByteString as S
+import qualified Data.ByteString.Lazy as BL
 import           Data.Char (isSpace)
+import           Data.Conduit.Process.Typed (eceStderr)
 import qualified Data.HashMap.Strict as HashMap
 import qualified Data.HashSet as HashSet
 import           Data.List                   ( (\\), isSuffixOf, intercalate
@@ -40,7 +42,6 @@ import qualified Data.Yaml as Yaml
 import qualified Distribution.Package as C
 import qualified Distribution.PackageDescription as C
 import qualified Distribution.Text as C
-import           Lens.Micro (set)
 import           Path
 import           Path.Find (findFiles)
 import           Path.IO hiding (findExecutable, findFiles, withSystemTempDir)
@@ -49,6 +50,7 @@ import           Stack.BuildPlan
 import           Stack.Config (getLocalPackages, loadConfigYaml)
 import           Stack.Constants (stackDotYaml, wiredInPackages)
 import           Stack.Package               (readPackageUnresolvedDir, gpdPackageName)
+import           Stack.PackageIndex
 import           Stack.PrettyPrint
 import           Stack.Setup
 import           Stack.Setup.Installed
@@ -61,11 +63,10 @@ import           Stack.Types.FlagName
 import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageName
 import           Stack.Types.Resolver
-import           Stack.Types.Runner
 import           Stack.Types.Version
 import qualified System.Directory as D
 import qualified System.FilePath as FP
-import           System.Process.Read
+import           RIO.Process
 import           Text.Regex.Applicative.Text (match, sym, psym, anySym, few)
 
 import qualified Data.Text.Normalize as T ( normalize , NormalizationMode(NFC) )
@@ -111,12 +112,12 @@ cabalSolver cabalfps constraintType
                toConstraintArgs (flagConstraints constraintType) ++
                fmap toFilePath cabalfps
 
-    menv <- getMinimalEnvOverride
-    catch (liftM Right (readProcessStdout (Just tmpdir) menv "cabal" args))
-          (\ex -> case ex of
-              ProcessFailed _ _ _ err -> return $ Left err
-              _ -> throwM ex)
-    >>= either parseCabalErrors parseCabalOutput
+    try ( withWorkingDir tmpdir
+        $ withProc "cabal" args readProcessStdout_
+        )
+        >>= either
+          (parseCabalErrors . eceStderr)
+          (parseCabalOutput . BL.toStrict)
 
   where
     errCheck = T.isInfixOf "Could not resolve dependencies"
@@ -226,7 +227,7 @@ getCabalConfig :: HasConfig env
                -> Map PackageName Version -- ^ constraints
                -> RIO env [Text]
 getCabalConfig dir constraintType constraints = do
-    indices <- view $ configL.to configPackageIndices
+    indices <- view $ cabalLoaderL.to clIndices
     remotes <- mapM goIndex indices
     let cache = T.pack $ "remote-repo-cache: " ++ dir
     return $ cache : remotes ++ map goConstraint (Map.toList constraints)
@@ -300,15 +301,14 @@ setupCabalEnv
     -> (CompilerVersion 'CVActual -> RIO env a)
     -> RIO env a
 setupCabalEnv compiler inner = do
-    mpaths <- setupCompiler compiler
-    menv0 <- getMinimalEnvOverride
-    envMap <- removeHaskellEnvVars
-              <$> augmentPathMap (maybe [] edBins mpaths)
-                                 (unEnvOverride menv0)
-    platform <- view platformL
-    menv <- mkEnvOverride platform envMap
-
-    mcabal <- getCabalInstallVersion menv
+  mpaths <- setupCompiler compiler
+  menv0 <- view envOverrideL
+  envMap <- removeHaskellEnvVars
+            <$> augmentPathMap (maybe [] edBins mpaths)
+                               (unEnvOverride menv0)
+  menv <- mkEnvOverride envMap
+  withEnvOverride menv $ do
+    mcabal <- getCabalInstallVersion
     case mcabal of
         Nothing -> throwM SolverMissingCabalInstall
         Just version
@@ -323,7 +323,7 @@ setupCabalEnv compiler inner = do
                 ") is newer than stack has been tested with.  If you run into difficulties, consider downgrading." <> line
             | otherwise -> return ()
 
-    mver <- getSystemCompiler menv (whichCompiler compiler)
+    mver <- getSystemCompiler (whichCompiler compiler)
     version <- case mver of
         Just (version, _) -> do
             logInfo $ "Using compiler: " <> compilerVersionText version
@@ -331,8 +331,7 @@ setupCabalEnv compiler inner = do
         Nothing -> error "Failed to determine compiler version. \
                          \This is most likely a bug."
 
-    env <- set envOverrideL (const (return menv)) <$> ask
-    runRIO env (inner version)
+    inner version
 
 -- | Merge two separate maps, one defining constraints on package versions and
 -- the other defining package flagmap, into a single map of version and flagmap
@@ -501,8 +500,8 @@ getResolverConstraints mcompilerVersion stackYaml sd = do
 -- package.yaml.  Subdirectories can be included depending on the
 -- @recurse@ parameter.
 findCabalDirs
-  :: (MonadIO m, MonadUnliftIO m, MonadLogger m, HasRunner env, MonadReader env m, HasConfig env)
-  => Bool -> Path Abs Dir -> m (Set (Path Abs Dir))
+  :: HasConfig env
+  => Bool -> Path Abs Dir -> RIO env (Set (Path Abs Dir))
 findCabalDirs recurse dir =
     (Set.fromList . map parent)
     <$> liftIO (findFiles dir isHpackOrCabal subdirFilter)
@@ -598,11 +597,10 @@ formatGroup :: [String] -> String
 formatGroup = concatMap (\path -> "- " <> path <> "\n")
 
 reportMissingCabalFiles
-  :: (MonadIO m, MonadUnliftIO m, MonadThrow m, MonadLogger m,
-      HasRunner env, MonadReader env m, HasConfig env)
+  :: HasConfig env
   => [Path Abs File]   -- ^ Directories to scan
   -> Bool              -- ^ Whether to scan sub-directories
-  -> m ()
+  -> RIO env ()
 reportMissingCabalFiles cabalfps includeSubdirs = do
     allCabalDirs <- findCabalDirs includeSubdirs =<< getCurrentDir
 

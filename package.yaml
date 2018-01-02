@@ -46,7 +46,7 @@ dependencies:
 - bytestring
 - clock
 - conduit
-- conduit-extra
+- conduit-extra >= 1.2.3.1
 - containers
 - cryptonite
 - cryptonite-conduit
@@ -55,7 +55,6 @@ dependencies:
 - echo
 - exceptions
 - extra
-- fast-logger
 - file-embed
 - filelock
 - filepath
@@ -74,7 +73,7 @@ dependencies:
 - microlens
 - microlens-mtl
 - mintty
-- monad-logger
+- monad-logger # TODO remove dep when persistent drops monad-logger
 - mono-traversable
 - mtl
 - neat-interpolation
@@ -108,6 +107,7 @@ dependencies:
 - time
 - tls
 - transformers
+- typed-process >= 0.2.1.0
 - unicode-transforms
 - unix-compat
 - unliftio
@@ -130,7 +130,9 @@ when:
     - pid1
     - unix
 library:
-  source-dirs: src/
+  source-dirs:
+  - src/
+  - subs/rio/src/
   ghc-options:
   - -fwarn-identities
   exposed-modules:
@@ -151,6 +153,9 @@ library:
   - Path.Extra
   - Path.Find
   - Paths_stack
+  - RIO
+  - RIO.Logger
+  - RIO.Process
   - Stack.Build
   - Stack.Build.Cache
   - Stack.Build.ConstructPlan
@@ -173,7 +178,6 @@ library:
   - Stack.Docker
   - Stack.Docker.GlobalDB
   - Stack.Dot
-  - Stack.Exec
   - Stack.Fetch
   - Stack.FileWatch
   - Stack.GhcPkg
@@ -241,6 +245,7 @@ library:
   - Stack.Types.FlagName
   - Stack.Types.GhcPkgId
   - Stack.Types.Image
+  - Stack.Types.NamedComponent
   - Stack.Types.Nix
   - Stack.Types.Package
   - Stack.Types.PackageDump
@@ -256,13 +261,11 @@ library:
   - Stack.Upgrade
   - Stack.Upload
   - Text.PrettyPrint.Leijen.Extended
-  - System.Process.Log
   - System.Process.PagerEditor
-  - System.Process.Read
-  - System.Process.Run
   - System.Terminal
   other-modules:
   - Hackage.Security.Client.Repository.HttpLib.HttpClient
+  - RIO.Prelude
   when:
   - condition: 'os(windows)'
     then:

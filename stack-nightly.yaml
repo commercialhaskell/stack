@@ -1,4 +1,8 @@
 resolver: nightly-2017-12-20
+packages:
+- .
+- subs/rio
+
 nix:
   # --nix on the command-line to enable.
   enable: false
@@ -7,3 +11,5 @@ nix:
     - http-client-tls-0.3.4
 extra-deps:
 - bindings-uname-0.1
+- conduit-extra-1.2.3.1
+- typed-process-0.2.1.0

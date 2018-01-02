@@ -30,11 +30,11 @@ import           Data.List
 import qualified Data.Map.Strict as Map
 import qualified Data.Text as T
 import           Data.Version (showVersion)
-import           System.Process.Read
+import           RIO.Process
 #ifdef USE_GIT_INFO
 import           Development.GitRev (gitCommitCount, gitHash)
 #endif
-import           Distribution.System (buildArch, buildPlatform)
+import           Distribution.System (buildArch)
 import qualified Distribution.Text as Cabal (display)
 import           Distribution.Version (mkVersion')
 import           GHC.IO.Encoding (mkTextEncoding, textEncodingName)
@@ -59,7 +59,6 @@ import           Stack.Constants.Config
 import           Stack.Coverage
 import qualified Stack.Docker as Docker
 import           Stack.Dot
-import           Stack.Exec
 import           Stack.GhcPkg (findGhcPkgField)
 import qualified Stack.Nix as Nix
 import           Stack.Fetch
@@ -507,12 +506,11 @@ secondaryCommandHandler args f =
     else do
       mExternalExec <- D.findExecutable cmd
       case mExternalExec of
-        Just ex -> do
-          menv <- getEnvOverride buildPlatform
+        Just ex -> runEnvNoLogging $ do
           -- TODO show the command in verbose mode
           -- hPutStrLn stderr $ unwords $
           --   ["Running", "[" ++ ex, unwords (tail args) ++ "]"]
-          _ <- runNoLogging (exec menv ex (tail args))
+          _ <- exec ex (tail args)
           return f
         Nothing -> return $ fmap (vcatErrorHelp (noSuchCmd cmd)) f
   where
@@ -587,7 +585,7 @@ setupCmd :: SetupCmdOpts -> GlobalOpts -> IO ()
 setupCmd sco@SetupCmdOpts{..} go@GlobalOpts{..} = loadConfigWithOpts go $ \lc -> do
   when (isJust scoUpgradeCabal && nixEnable (configNix (lcConfig lc))) $ do
     throwIO UpgradeCabalUnusable
-  withUserFileLock go (configStackRoot $ lcConfig lc) $ \lk -> do
+  withUserFileLock go (view stackRootL lc) $ \lk -> do
     let getCompilerVersion = loadCompilerVersion go lc
     runRIO (lcConfig lc) $
       Docker.reexecWithOptionalContainer
@@ -775,7 +773,7 @@ execCmd ExecOpts {..} go@GlobalOpts{..} =
                 (ExecGhc, args) -> return ("ghc", args)
                 (ExecRunGhc, args) -> return ("runghc", args)
           loadConfigWithOpts go $ \lc ->
-            withUserFileLock go (configStackRoot $ lcConfig lc) $ \lk -> do
+            withUserFileLock go (view stackRootL lc) $ \lk -> do
               let getCompilerVersion = loadCompilerVersion go lc
               runRIO (lcConfig lc) $
                 Docker.reexecWithOptionalContainer
@@ -784,42 +782,43 @@ execCmd ExecOpts {..} go@GlobalOpts{..} =
                     (Just $ munlockFile lk)
                     (runRIO (lcConfig lc) $ do
                         config <- view configL
-                        menv <- liftIO $ configEnvOverride config plainEnvSettings
-                        Nix.reexecWithOptionalShell
+                        menv <- liftIO $ configEnvOverrideSettings config plainEnvSettings
+                        withEnvOverride menv $ Nix.reexecWithOptionalShell
                             (lcProjectRoot lc)
                             getCompilerVersion
                             (runRIO (lcConfig lc) $
-                                exec menv cmd args))
+                                exec cmd args))
                     Nothing
                     Nothing -- Unlocked already above.
         ExecOptsEmbellished {..} ->
             withBuildConfigAndLock go $ \lk -> do
-                let targets = concatMap words eoPackages
-                unless (null targets) $
-                    Stack.Build.build (const $ return ()) lk defaultBuildOptsCLI
-                        { boptsCLITargets = map T.pack targets
-                        }
+              let targets = concatMap words eoPackages
+              unless (null targets) $
+                  Stack.Build.build (const $ return ()) lk defaultBuildOptsCLI
+                      { boptsCLITargets = map T.pack targets
+                      }
 
-                config <- view configL
-                menv <- liftIO $ configEnvOverride config eoEnvSettings
+              config <- view configL
+              menv <- liftIO $ configEnvOverrideSettings config eoEnvSettings
+              withEnvOverride menv $ do
                 -- Add RTS options to arguments
                 let argsWithRts args = if null eoRtsOptions
                             then args :: [String]
                             else args ++ ["+RTS"] ++ eoRtsOptions ++ ["-RTS"]
                 (cmd, args) <- case (eoCmd, argsWithRts eoArgs) of
                     (ExecCmd cmd, args) -> return (cmd, args)
-                    (ExecGhc, args) -> getGhcCmd "" menv eoPackages args
+                    (ExecGhc, args) -> getGhcCmd "" eoPackages args
                     -- NOTE: this won't currently work for GHCJS, because it doesn't have
                     -- a runghcjs binary. It probably will someday, though.
                     (ExecRunGhc, args) ->
-                        getGhcCmd "run" menv eoPackages args
+                        getGhcCmd "run" eoPackages args
                 munlockFile lk -- Unlock before transferring control away.
 
-                runWithPath eoCwd $ exec menv cmd args
+                runWithPath eoCwd $ exec cmd args
   where
       -- return the package-id of the first package in GHC_PACKAGE_PATH
-      getPkgId menv wc name = do
-          mId <- findGhcPkgField menv wc [] name "id"
+      getPkgId wc name = do
+          mId <- findGhcPkgField wc [] name "id"
           case mId of
               Just i -> return (head $ words (T.unpack i))
               -- should never happen as we have already installed the packages
@@ -827,13 +826,13 @@ execCmd ExecOpts {..} go@GlobalOpts{..} =
                   hPutStrLn stderr ("Could not find package id of package " ++ name)
                   exitFailure
 
-      getPkgOpts menv wc pkgs = do
-          ids <- mapM (getPkgId menv wc) pkgs
+      getPkgOpts wc pkgs = do
+          ids <- mapM (getPkgId wc) pkgs
           return $ map ("-package-id=" ++) ids
 
-      getGhcCmd prefix menv pkgs args = do
+      getGhcCmd prefix pkgs args = do
           wc <- view $ actualCompilerVersionL.whichCompilerL
-          pkgopts <- getPkgOpts menv wc pkgs
+          pkgopts <- getPkgOpts wc pkgs
           return (prefix ++ compilerExeName wc, pkgopts ++ args)
 
       runWithPath :: Maybe FilePath -> RIO EnvConfig () -> RIO EnvConfig ()
@@ -881,7 +880,7 @@ dockerPullCmd :: () -> GlobalOpts -> IO ()
 dockerPullCmd _ go@GlobalOpts{..} =
     loadConfigWithOpts go $ \lc ->
     -- TODO: can we eliminate this lock if it doesn't touch ~/.stack/?
-    withUserFileLock go (configStackRoot $ lcConfig lc) $ \_ ->
+    withUserFileLock go (view stackRootL lc) $ \_ ->
      runRIO (lcConfig lc) $
        Docker.preventInContainer Docker.pull
 
@@ -890,7 +889,7 @@ dockerResetCmd :: Bool -> GlobalOpts -> IO ()
 dockerResetCmd keepHome go@GlobalOpts{..} =
     loadConfigWithOpts go $ \lc ->
     -- TODO: can we eliminate this lock if it doesn't touch ~/.stack/?
-    withUserFileLock go (configStackRoot $ lcConfig lc) $ \_ ->
+    withUserFileLock go (view stackRootL lc) $ \_ ->
       runRIO (lcConfig lc) $
         Docker.preventInContainer $ Docker.reset (lcProjectRoot lc) keepHome
 
@@ -899,7 +898,7 @@ dockerCleanupCmd :: Docker.CleanupOpts -> GlobalOpts -> IO ()
 dockerCleanupCmd cleanupOpts go@GlobalOpts{..} =
     loadConfigWithOpts go $ \lc ->
     -- TODO: can we eliminate this lock if it doesn't touch ~/.stack/?
-    withUserFileLock go (configStackRoot $ lcConfig lc) $ \_ ->
+    withUserFileLock go (view stackRootL lc) $ \_ ->
      runRIO (lcConfig lc) $
         Docker.preventInContainer $
             Docker.cleanup cleanupOpts

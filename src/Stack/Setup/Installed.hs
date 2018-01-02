@@ -26,6 +26,7 @@ module Stack.Setup.Installed
 import           Stack.Prelude
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as S8
+import qualified Data.ByteString.Lazy as BL
 import           Data.List hiding (concat, elem, maximumBy)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
@@ -39,7 +40,7 @@ import           Stack.Types.Config
 import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageName
 import           Stack.Types.Version
-import           System.Process.Read
+import           RIO.Process
 
 data Tool
     = Tool PackageIdentifier -- ^ e.g. ghc-7.8.4, msys2-20150512
@@ -88,16 +89,15 @@ listInstalled programsPath = do
         parseToolText x
 
 getCompilerVersion
-  :: HasLogFunc env
-  => EnvOverride
-  -> WhichCompiler
+  :: HasEnvOverride env
+  => WhichCompiler
   -> RIO env (CompilerVersion 'CVActual)
-getCompilerVersion menv wc =
+getCompilerVersion wc =
     case wc of
         Ghc -> do
             logDebug "Asking GHC for its version"
-            bs <- readProcessStdout Nothing menv "ghc" ["--numeric-version"]
-            let (_, ghcVersion) = versionFromEnd bs
+            bs <- withProc "ghc" ["--numeric-version"] readProcessStdout_
+            let (_, ghcVersion) = versionFromEnd $ BL.toStrict bs
             x <- GhcVersion <$> parseVersion (T.decodeUtf8 ghcVersion)
             logDebug $ "GHC version is: " <> compilerVersionText x
             return x
@@ -106,8 +106,8 @@ getCompilerVersion menv wc =
             -- Output looks like
             --
             -- The Glorious Glasgow Haskell Compilation System for JavaScript, version 0.1.0 (GHC 7.10.2)
-            bs <- readProcessStdout Nothing menv "ghcjs" ["--version"]
-            let (rest, ghcVersion) = T.decodeUtf8 <$> versionFromEnd bs
+            bs <- withProc "ghcjs" ["--version"] readProcessStdout_
+            let (rest, ghcVersion) = T.decodeUtf8 <$> versionFromEnd (BL.toStrict bs)
                 (_, ghcjsVersion) = T.decodeUtf8 <$> versionFromEnd rest
             GhcjsVersion <$> parseVersion ghcjsVersion <*> parseVersion ghcVersion
   where

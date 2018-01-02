@@ -36,7 +36,6 @@ import           Stack.Build.Source
 import           Stack.Build.Target
 import           Stack.Config (getLocalPackages)
 import           Stack.Constants.Config
-import           Stack.Exec
 import           Stack.Ghci.Script
 import           Stack.Package
 import           Stack.PrettyPrint
@@ -44,11 +43,13 @@ import           Stack.Types.Build
 import           Stack.Types.Compiler
 import           Stack.Types.Config
 import           Stack.Types.FlagName
+import           Stack.Types.NamedComponent
 import           Stack.Types.Package
 import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageName
 import           Stack.Types.Runner
 import           System.IO (putStrLn, putStr, getLine)
+import           RIO.Process (withEnvOverride, execSpawn, execObserve)
 
 #ifndef WINDOWS
 import qualified System.Posix.Files as Posix
@@ -355,8 +356,8 @@ runGhci GhciOpts{..} targets mainIsTargets pkgs extraFiles exposePackages = do
         ("Configuring GHCi with the following packages: " <>
          T.intercalate ", " (map (packageNameText . ghciPkgName) pkgs))
     let execGhci extras = do
-            menv <- liftIO $ configEnvOverride config defaultEnvSettings
-            execSpawn menv
+            menv <- liftIO $ configEnvOverrideSettings config defaultEnvSettings
+            withEnvOverride menv $ execSpawn
                  (fromMaybe (compilerExeName wc) ghciGhcCommand)
                  (("--interactive" : ) $
                  -- This initial "-i" resets the include directories to
@@ -372,8 +373,9 @@ runGhci GhciOpts{..} targets mainIsTargets pkgs extraFiles exposePackages = do
             -- multiple packages.
             case pkgs of
                 [_] -> do
-                    menv <- liftIO $ configEnvOverride config defaultEnvSettings
-                    output <- execObserve menv (fromMaybe (compilerExeName wc) ghciGhcCommand) ["--version"]
+                    menv <- liftIO $ configEnvOverrideSettings config defaultEnvSettings
+                    output <- withEnvOverride menv
+                            $ execObserve (fromMaybe (compilerExeName wc) ghciGhcCommand) ["--version"]
                     return $ "Intero" `isPrefixOf` output
                 _ -> return False
     withSystemTempDir "ghci" $ \tmpDirectory -> do
@@ -526,9 +528,7 @@ getGhciPkgInfos
     -> [(PackageName, (Path Abs File, Target))]
     -> RIO env [GhciPkgInfo]
 getGhciPkgInfos buildOptsCLI sourceMap addPkgs mfileTargets localTargets = do
-    menv <- getMinimalEnvOverride
     (installedMap, _, _, _) <- getInstalled
-        menv
         GetInstalledOpts
             { getInstalledProfiling = False
             , getInstalledHaddock   = False
@@ -624,7 +624,7 @@ wantedPackageComponents bopts (TargetAll ProjectPackage) pkg = S.fromList $
     (if boptsBenchmarks bopts then map CBench (S.toList (packageBenchmarks pkg)) else [])
 wantedPackageComponents _ _ _ = S.empty
 
-checkForIssues :: (MonadThrow m, MonadLogger m) => [GhciPkgInfo] -> m ()
+checkForIssues :: HasLogFunc env => [GhciPkgInfo] -> RIO env ()
 checkForIssues pkgs = do
     unless (null issues) $ borderedWarning $ do
         logWarn "Warning: There are cabal settings for this project which may prevent GHCi from loading your code properly."
@@ -687,7 +687,7 @@ checkForIssues pkgs = do
         , (c, bio) <- ghciPkgOpts pkg
         ]
 
-borderedWarning :: MonadLogger m => m a -> m a
+borderedWarning :: HasLogFunc env => RIO env a -> RIO env a
 borderedWarning f = do
     logWarn ""
     logWarn "* * * * * * * *"
@@ -696,7 +696,7 @@ borderedWarning f = do
     logWarn ""
     return x
 
-checkForDuplicateModules :: (MonadThrow m, MonadLogger m) => [GhciPkgInfo] -> m ()
+checkForDuplicateModules :: HasLogFunc env => [GhciPkgInfo] -> RIO env ()
 checkForDuplicateModules pkgs = do
     unless (null duplicates) $ do
         borderedWarning $ do

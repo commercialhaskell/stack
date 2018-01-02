@@ -9,8 +9,8 @@ import qualified Data.Conduit.List             as CL
 import           Data.Conduit.Text             (decodeUtf8)
 import qualified Data.Map                      as Map
 import qualified Data.Set                      as Set
-import           Distribution.System           (buildPlatform)
 import           Distribution.License          (License(..))
+import           Lens.Micro                    (to)
 import           Stack.PackageDump
 import           Stack.Prelude
 import           Stack.Types.Compiler
@@ -18,7 +18,7 @@ import           Stack.Types.GhcPkgId
 import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageName
 import           Stack.Types.Version
-import           System.Process.Read
+import           RIO.Process hiding (runEnvNoLogging)
 import           Test.Hspec
 import           Test.Hspec.QuickCheck
 
@@ -29,7 +29,7 @@ spec :: Spec
 spec = do
     describe "eachSection" $ do
         let test name content expected = it name $ do
-                actual <- yield content $$ eachSection CL.consume =$ CL.consume
+                actual <- runConduit $ yield content .| eachSection CL.consume .| CL.consume
                 actual `shouldBe` expected
         test
             "unix line endings"
@@ -55,7 +55,7 @@ spec = do
                 , "   val4b"
                 ]
             sink k = fmap (k, ) CL.consume
-        actual <- mapM_ yield bss $$ eachPair sink =$ CL.consume
+        actual <- runConduit $ mapM_ yield bss .| eachPair sink .| CL.consume
         actual `shouldBe`
             [ ("key1", ["val1"])
             , ("key2", ["val2a", "val2b"])
@@ -214,32 +214,29 @@ spec = do
             }
 
 
-    it "ghcPkgDump + addProfiling + addHaddock" $ (id :: IO () -> IO ()) $ runNoLogging $ do
-        menv' <- getEnvOverride buildPlatform
-        menv <- mkEnvOverride buildPlatform $ Map.delete "GHC_PACKAGE_PATH" $ unEnvOverride menv'
+    it "ghcPkgDump + addProfiling + addHaddock" $ (id :: IO () -> IO ()) $ runEnvNoLogging $ do
         icache <- newInstalledCache
-        ghcPkgDump menv Ghc []
+        ghcPkgDump Ghc []
             $  conduitDumpPackage
-            =$ addProfiling icache
-            =$ addHaddock icache
-            =$ fakeAddSymbols
-            =$ CL.sinkNull
+            .| addProfiling icache
+            .| addHaddock icache
+            .| fakeAddSymbols
+            .| CL.sinkNull
 
-    it "sinkMatching" $ do
-        menv' <- getEnvOverride buildPlatform
-        menv <- mkEnvOverride buildPlatform $ Map.delete "GHC_PACKAGE_PATH" $ unEnvOverride menv'
+    it "sinkMatching" $ runEnvNoLogging $ do
         icache <- newInstalledCache
-        m <- runNoLogging $ ghcPkgDump menv Ghc []
+        m <- ghcPkgDump Ghc []
             $  conduitDumpPackage
-            =$ addProfiling icache
-            =$ addHaddock icache
-            =$ fakeAddSymbols
-            =$ sinkMatching False False False (Map.singleton $(mkPackageName "transformers") $(mkVersion "0.0.0.0.0.0.1"))
+            .| addProfiling icache
+            .| addHaddock icache
+            .| fakeAddSymbols
+            .| sinkMatching False False False (Map.singleton $(mkPackageName "transformers") $(mkVersion "0.0.0.0.0.0.1"))
         case Map.lookup $(mkPackageName "base") m of
             Nothing -> error "base not present"
             Just _ -> return ()
-        Map.lookup $(mkPackageName "transformers") m `shouldBe` Nothing
-        Map.lookup $(mkPackageName "ghc") m `shouldBe` Nothing
+        liftIO $ do
+          Map.lookup $(mkPackageName "transformers") m `shouldBe` Nothing
+          Map.lookup $(mkPackageName "ghc") m `shouldBe` Nothing
 
     describe "pruneDeps" $ do
         it "sanity check" $ do
@@ -283,5 +280,17 @@ checkDepsPresent prunes selected =
             Just deps -> Set.null $ Set.difference (Set.fromList deps) allIds
 
 -- addSymbols can't be reasonably tested like this
-fakeAddSymbols :: Monad m => Conduit (DumpPackage a b c) m (DumpPackage a b Bool)
+fakeAddSymbols :: Monad m => ConduitM (DumpPackage a b c) (DumpPackage a b Bool) m ()
 fakeAddSymbols = CL.map (\dp -> dp { dpSymbols = False })
+
+runEnvNoLogging :: RIO EnvNoLogging a -> IO a
+runEnvNoLogging inner = do
+  menv' <- getEnvOverride
+  menv <- mkEnvOverride $ Map.delete "GHC_PACKAGE_PATH" $ unEnvOverride menv'
+  runRIO (EnvNoLogging menv) inner
+
+newtype EnvNoLogging = EnvNoLogging EnvOverride
+instance HasLogFunc EnvNoLogging where
+  logFuncL = to (\_ _ _ _ _ -> return ())
+instance HasEnvOverride EnvNoLogging where
+  envOverrideL = lens (\(EnvNoLogging x) -> x) (const EnvNoLogging)

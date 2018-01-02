@@ -15,16 +15,16 @@ module Network.HTTP.StackClient
   , withResponseByManager
   ) where
 
-import           Control.Monad.Catch (MonadMask)
 import           Data.Aeson (FromJSON)
 import qualified Data.ByteString as Strict
 import           Data.ByteString.Lazy (ByteString)
-import           Data.Conduit (ConduitM, Sink)
+import           Data.Conduit (ConduitM, transPipe)
+import           Data.Void (Void)
 import qualified Network.HTTP.Client
 import           Network.HTTP.Client (BodyReader, Manager, Request, Response)
 import           Network.HTTP.Simple (setRequestHeader)
 import qualified Network.HTTP.Simple
-import           UnliftIO (MonadIO)
+import           UnliftIO (MonadIO, MonadUnliftIO, withRunInIO, withUnliftIO, unliftIO)
 
 
 setUserAgent :: Request -> Request
@@ -47,15 +47,22 @@ httpNoBody :: MonadIO m => Request -> m (Response ())
 httpNoBody = Network.HTTP.Simple.httpNoBody . setUserAgent
 
 
-httpSink :: (MonadIO m, MonadMask m) => Request -> (Response () -> Sink Strict.ByteString m a) -> m a
-httpSink = Network.HTTP.Simple.httpSink . setUserAgent
+httpSink
+  :: MonadUnliftIO m
+  => Request
+  -> (Response () -> ConduitM Strict.ByteString Void m a)
+  -> m a
+httpSink req inner = withUnliftIO $ \u ->
+  Network.HTTP.Simple.httpSink (setUserAgent req) (transPipe (unliftIO u) . inner)
 
 
 withResponse
-  :: (MonadIO m, MonadMask m, MonadIO n)
+  :: (MonadUnliftIO m, MonadIO n)
   => Request -> (Response (ConduitM i Strict.ByteString n ()) -> m a) -> m a
-withResponse = Network.HTTP.Simple.withResponse . setUserAgent
+withResponse req inner = withRunInIO $ \run ->
+  Network.HTTP.Simple.withResponse (setUserAgent req) (run . inner)
 
 
-withResponseByManager :: Request -> Manager -> (Response BodyReader -> IO a) -> IO a
-withResponseByManager = Network.HTTP.Client.withResponse . setUserAgent
+withResponseByManager :: MonadUnliftIO m => Request -> Manager -> (Response BodyReader -> m a) -> m a
+withResponseByManager req man inner = withRunInIO $ \run ->
+  Network.HTTP.Client.withResponse (setUserAgent req) man (run . inner)

@@ -47,7 +47,7 @@ import           Stack.Constants.Config
 import           Stack.Types.Config
 import           Stack.Types.PackageName
 import           Stack.Types.TemplateName
-import           System.Process.Run
+import           RIO.Process
 import           Text.Hastache
 import           Text.Hastache.Context
 import           Text.Printf
@@ -196,8 +196,8 @@ applyTemplate project template nonceParams dir templateText = do
     unless (S.null missingKeys)
          (logInfo ("\n" <> T.pack (show (MissingParameters project template missingKeys (configUserConfigPath config))) <> "\n"))
     files :: Map FilePath LB.ByteString <-
-        catch (execWriterT $
-               yield (T.encodeUtf8 (LT.toStrict applied)) $$
+        catch (execWriterT $ runConduit $
+               yield (T.encodeUtf8 (LT.toStrict applied)) .|
                unpackTemplate receiveMem id
               )
               (\(e :: ProjectTemplateException) ->
@@ -252,16 +252,16 @@ writeTemplateFiles files =
 -- | Run any initialization functions, such as Git.
 runTemplateInits
     :: HasConfig env
-    => Path Abs Dir -> RIO env ()
+    => Path Abs Dir
+    -> RIO env ()
 runTemplateInits dir = do
-    menv <- getMinimalEnvOverride
     config <- view configL
     case configScmInit config of
         Nothing -> return ()
         Just Git ->
-            catch (callProcess $ Cmd (Just dir) "git" menv ["init"])
-                  (\(_ :: ProcessExitedUnsuccessfully) ->
-                         logInfo "git init failed to run, ignoring ...")
+            withWorkingDir dir $
+            catchAny (withProc "git" ["init"] runProcess_)
+                  (\_ -> logInfo "git init failed to run, ignoring ...")
 
 -- | Display the set of templates accompanied with description if available.
 listTemplates :: HasLogFunc env => RIO env ()

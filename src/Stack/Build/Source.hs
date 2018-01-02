@@ -37,6 +37,7 @@ import              Stack.Types.Build
 import              Stack.Types.BuildPlan
 import              Stack.Types.Config
 import              Stack.Types.FlagName
+import              Stack.Types.NamedComponent
 import              Stack.Types.Package
 import              Stack.Types.PackageName
 import qualified    System.Directory as D

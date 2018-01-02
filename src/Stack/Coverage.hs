@@ -19,6 +19,7 @@ module Stack.Coverage
 
 import           Stack.Prelude
 import qualified Data.ByteString.Char8 as S8
+import qualified Data.ByteString.Lazy as BL
 import           Data.List
 import qualified Data.Map.Strict as Map
 import qualified Data.Text as T
@@ -35,13 +36,14 @@ import           Stack.Package
 import           Stack.PrettyPrint
 import           Stack.Types.Compiler
 import           Stack.Types.Config
+import           Stack.Types.NamedComponent
 import           Stack.Types.Package
 import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageName
 import           Stack.Types.Runner
 import           Stack.Types.Version
 import           System.FilePath (isPathSeparator)
-import           System.Process.Read
+import           RIO.Process
 import           Text.Hastache (htmlEscape)
 import           Trace.Hpc.Tix
 import           Web.Browser (openBrowser)
@@ -167,14 +169,14 @@ generateHpcReportInternal tixSrc reportDir report extraMarkupArgs extraReportArg
                     concatMap (\x -> ["--srcdir", toFilePathNoTrailingSep x]) pkgDirs ++
                     -- Look for index files in the correct dir (relative to each pkgdir).
                     ["--hpcdir", toFilePathNoTrailingSep hpcRelDir, "--reset-hpcdirs"]
-            menv <- getMinimalEnvOverride
             logInfo $ "Generating " <> report
-            outputLines <- liftM (map (S8.filter (/= '\r')) . S8.lines) $
-                readProcessStdout Nothing menv "hpc"
+            outputLines <- liftM (map (S8.filter (/= '\r')) . S8.lines . BL.toStrict) $
+                withProc "hpc"
                 ( "report"
                 : toFilePath tixSrc
                 : (args ++ extraReportArgs)
                 )
+                readProcessStdout_
             if all ("(0/0)" `S8.isSuffixOf`) outputLines
                 then do
                     let msg html = T.concat
@@ -197,12 +199,13 @@ generateHpcReportInternal tixSrc reportDir report extraMarkupArgs extraReportArg
                     -- Print output, stripping @\r@ characters because Windows.
                     forM_ outputLines (logInfo . T.decodeUtf8)
                     -- Generate the markup.
-                    void $ readProcessStdout Nothing menv "hpc"
+                    void $ withProc "hpc"
                         ( "markup"
                         : toFilePath tixSrc
                         : ("--destdir=" ++ toFilePathNoTrailingSep reportDir)
                         : (args ++ extraMarkupArgs)
                         )
+                        readProcessStdout_
                     return (Just reportPath)
 
 data HpcReportOpts = HpcReportOpts
@@ -312,7 +315,7 @@ generateUnionReport report reportDir tixFiles = do
     liftIO $ writeTix (toFilePath tixDest) tix
     generateHpcReportInternal tixDest reportDir report [] []
 
-readTixOrLog :: (MonadLogger m, MonadUnliftIO m) => Path b File -> m (Maybe Tix)
+readTixOrLog :: HasLogFunc env => Path b File -> RIO env (Maybe Tix)
 readTixOrLog path = do
     mtix <- liftIO (readTix (toFilePath path)) `catchAny` \errorCall -> do
         logError $ "Error while reading tix: " <> T.pack (show errorCall)

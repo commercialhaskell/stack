@@ -47,7 +47,6 @@ import           Network.HTTP.Download
 import           Path
 import           Path.IO
 import           Stack.Constants
-import           Stack.Fetch
 import           Stack.Package
 import           Stack.PackageDump
 import           Stack.PackageLocation
@@ -346,18 +345,7 @@ loadSnapshot
   -> Path Abs Dir -- ^ project root, used for checking out necessary files
   -> SnapshotDef
   -> RIO env LoadedSnapshot
-loadSnapshot mcompiler root sd = withCabalLoader $ \loader -> loadSnapshot' loader mcompiler root sd
-
--- | Fully load up a 'SnapshotDef' into a 'LoadedSnapshot'
-loadSnapshot'
-  :: forall env.
-     (HasConfig env, HasGHCVariant env)
-  => (PackageIdentifierRevision -> IO ByteString) -- ^ load a cabal file's contents from the index
-  -> Maybe (CompilerVersion 'CVActual) -- ^ installed GHC we should query; if none provided, use the global hints
-  -> Path Abs Dir -- ^ project root, used for checking out necessary files
-  -> SnapshotDef
-  -> RIO env LoadedSnapshot
-loadSnapshot' loadFromIndex mcompiler root =
+loadSnapshot mcompiler root =
     start
   where
     start (snapshotDefFixes -> sd) = do
@@ -381,7 +369,7 @@ loadSnapshot' loadFromIndex mcompiler root =
           Right sd' -> start sd'
 
       gpds <-
-        (concat <$> mapM (parseMultiCabalFilesIndex loadFromIndex root) (sdLocations sd))
+        (concat <$> mapM (parseMultiCabalFilesIndex root) (sdLocations sd))
         `onException` do
           logError "Unable to load cabal files for snapshot"
           case sdResolver sd of
@@ -403,7 +391,7 @@ loadSnapshot' loadFromIndex mcompiler root =
             _ -> return ()
 
       (globals, snapshot, locals) <-
-        calculatePackagePromotion loadFromIndex root ls0
+        calculatePackagePromotion root ls0
         (map (\(x, y) -> (x, y, ())) gpds)
         (sdFlags sd) (sdHidden sd) (sdGhcOptions sd) (sdDropPackages sd)
 
@@ -424,8 +412,7 @@ loadSnapshot' loadFromIndex mcompiler root =
 calculatePackagePromotion
   :: forall env localLocation.
      (HasConfig env, HasGHCVariant env)
-  => (PackageIdentifierRevision -> IO ByteString) -- ^ load from index
-  -> Path Abs Dir -- ^ project root
+  => Path Abs Dir -- ^ project root
   -> LoadedSnapshot
   -> [(GenericPackageDescription, SinglePackageLocation, localLocation)] -- ^ packages we want to add on top of this snapshot
   -> Map PackageName (Map FlagName Bool) -- ^ flags
@@ -438,7 +425,7 @@ calculatePackagePromotion
        , Map PackageName (LoadedPackageInfo (SinglePackageLocation, Maybe localLocation)) -- new locals
        )
 calculatePackagePromotion
-  loadFromIndex root (LoadedSnapshot compilerVersion globals0 parentPackages0)
+  root (LoadedSnapshot compilerVersion globals0 parentPackages0)
   gpds flags0 hides0 options0 drops0 = do
 
       platform <- view platformL
@@ -500,7 +487,7 @@ calculatePackagePromotion
 
       -- ... so recalculate based on new values
       upgraded <- fmap Map.fromList
-                $ mapM (recalculate loadFromIndex root compilerVersion flags hide ghcOptions)
+                $ mapM (recalculate root compilerVersion flags hide ghcOptions)
                 $ Map.toList allToUpgrade
 
       -- Could be nice to check snapshot early... but disabling
@@ -526,22 +513,21 @@ calculatePackagePromotion
 -- hide values, and GHC options.
 recalculate :: forall env.
                (HasConfig env, HasGHCVariant env)
-            => (PackageIdentifierRevision -> IO ByteString)
-            -> Path Abs Dir -- ^ root
+            => Path Abs Dir -- ^ root
             -> CompilerVersion 'CVActual
             -> Map PackageName (Map FlagName Bool)
             -> Map PackageName Bool -- ^ hide?
             -> Map PackageName [Text] -- ^ GHC options
             -> (PackageName, LoadedPackageInfo SinglePackageLocation)
             -> RIO env (PackageName, LoadedPackageInfo SinglePackageLocation)
-recalculate loadFromIndex root compilerVersion allFlags allHide allOptions (name, lpi0) = do
+recalculate root compilerVersion allFlags allHide allOptions (name, lpi0) = do
   let hide = fromMaybe (lpiHide lpi0) (Map.lookup name allHide)
       options = fromMaybe (lpiGhcOptions lpi0) (Map.lookup name allOptions)
   case Map.lookup name allFlags of
     Nothing -> return (name, lpi0 { lpiHide = hide, lpiGhcOptions = options }) -- optimization
     Just flags -> do
       let loc = lpiLocation lpi0
-      gpd <- parseSingleCabalFileIndex loadFromIndex root loc
+      gpd <- parseSingleCabalFileIndex root loc
       platform <- view platformL
       let res@(name', lpi) = calculate gpd platform compilerVersion loc flags hide options
       unless (name == name' && lpiVersion lpi0 == lpiVersion lpi) $ error "recalculate invariant violated"
@@ -606,8 +592,7 @@ loadCompiler :: forall env.
              => CompilerVersion 'CVActual
              -> RIO env LoadedSnapshot
 loadCompiler cv = do
-  menv <- getMinimalEnvOverride
-  m <- ghcPkgDump menv (whichCompiler cv) []
+  m <- ghcPkgDump (whichCompiler cv) []
     (conduitDumpPackage .| CL.foldMap (\dp -> Map.singleton (dpGhcPkgId dp) dp))
   return LoadedSnapshot
     { lsCompilerVersion = cv

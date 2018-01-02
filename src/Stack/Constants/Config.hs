@@ -106,7 +106,7 @@ workDirFromDir fp = view $ workDirL.to (fp </>)
 
 -- | Directory for project templates.
 templatesDir :: Config -> Path Abs Dir
-templatesDir config = configStackRoot config </> $(mkRelDir "templates")
+templatesDir config = view stackRootL config </> $(mkRelDir "templates")
 
 -- | Relative location of build artifacts.
 distRelativeDir :: (MonadThrow m, MonadReader env m, HasEnvConfig env)
