@@ -190,7 +190,6 @@ withProc name0 args inner = do
 
   withProcessTimeLog (toFilePath <$> eoWorkingDir menv) name args
     $ inner
-    $ setDelegateCtlc True
     $ setEnv (envHelper menv)
     $ maybe id (setWorkingDir . toFilePath) (eoWorkingDir menv)
 

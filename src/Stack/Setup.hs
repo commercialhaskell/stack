@@ -1085,7 +1085,14 @@ installGHCPosix version downloadInfo _ archiveFile archiveType tempDir destDir =
 
     let runStep step wd env cmd args = do
             menv' <- modifyEnvOverride menv (Map.union env)
-            result <- withWorkingDir wd $ withEnvOverride menv' $ try $ readProcessNull cmd args
+            result <- withWorkingDir wd
+                    $ withEnvOverride menv'
+                    $ withProc cmd args
+                    $ try
+                    . readProcessStdout_
+                    -- Calling the ./configure script requires that stdin is
+                    -- open
+                    . setStdin (useHandleOpen stdin)
             case result of
                 Right _ -> return ()
                 Left ex -> do
