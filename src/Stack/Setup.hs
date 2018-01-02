@@ -43,11 +43,12 @@ import qualified    Data.ByteString.Lazy as LBS
 import qualified    Data.ByteString.Lazy.Char8 as BL8
 import              Data.Char (isSpace)
 import              Data.Conduit (await, yield, awaitForever)
+import qualified    Data.Conduit.Binary as CB
 import              Data.Conduit.Lazy (lazyConsume)
 import              Data.Conduit.Lift (evalStateC)
 import qualified    Data.Conduit.List as CL
-import              Data.Conduit.Process.Typed (eceStderr)
-import              Data.Conduit.Zlib           (ungzip)
+import              Data.Conduit.Process.Typed (eceStderr, withLoggedProcess_)
+import              Data.Conduit.Zlib          (ungzip)
 import              Data.Foldable (maximumBy)
 import qualified    Data.HashMap.Strict as HashMap
 import              Data.IORef.RunOnce (runOnce)
@@ -236,7 +237,7 @@ setupEnv mResolveMissingGHC = do
             , soptsGHCJSBootOpts = ["--clean"]
             }
 
-    (mghcBin, compilerBuild, _) <- ensureCompiler sopts
+    (mghcBin, compilerBuild, _) <- ensureCompiler sopts LevelInfo
 
     -- Modify the initial environment to include the GHC path, if a local GHC
     -- is being used
@@ -375,8 +376,9 @@ addIncludeLib (ExtraDirs _bins includes libs) config = config
 -- | Ensure compiler (ghc or ghcjs) is installed and provide the PATHs to add if necessary
 ensureCompiler :: (HasConfig env, HasGHCVariant env)
                => SetupOpts
+               -> LogLevel
                -> RIO env (Maybe ExtraDirs, CompilerBuild, Bool)
-ensureCompiler sopts = do
+ensureCompiler sopts logLevel = do
     let wc = whichCompiler (soptsWantedCompiler sopts)
     when (getGhcVersion (soptsWantedCompiler sopts) < $(mkVersion "7.8")) $ do
         logWarn "Stack will almost certainly fail with GHC below version 7.8"
@@ -465,6 +467,7 @@ ensureCompiler sopts = do
                             (soptsWantedCompiler sopts)
                             (soptsCompilerCheck sopts)
                             (soptsGHCBindistURL sopts)
+                            logLevel
                     | otherwise -> do
                         recommendSystemGhc <-
                             if soptsUseSystem sopts
@@ -852,8 +855,9 @@ downloadAndInstallCompiler :: (HasConfig env, HasGHCVariant env)
                            -> CompilerVersion 'CVWanted
                            -> VersionCheck
                            -> Maybe String
+                           -> LogLevel
                            -> RIO env Tool
-downloadAndInstallCompiler ghcBuild si wanted@GhcVersion{} versionCheck mbindistURL = do
+downloadAndInstallCompiler ghcBuild si wanted@GhcVersion{} versionCheck mbindistURL logLevel = do
     ghcVariant <- view ghcVariantL
     (selectedVersion, downloadInfo) <- case mbindistURL of
         Just bindistURL -> do
@@ -879,7 +883,7 @@ downloadAndInstallCompiler ghcBuild si wanted@GhcVersion{} versionCheck mbindist
     let installer =
             case configPlatform config of
                 Platform _ Cabal.Windows -> installGHCWindows selectedVersion
-                _ -> installGHCPosix selectedVersion downloadInfo
+                _ -> installGHCPosix selectedVersion downloadInfo logLevel
     logInfo $
         "Preparing to install GHC" <>
         (case ghcVariant of
@@ -893,7 +897,7 @@ downloadAndInstallCompiler ghcBuild si wanted@GhcVersion{} versionCheck mbindist
     ghcPkgName <- parsePackageNameFromString ("ghc" ++ ghcVariantSuffix ghcVariant ++ compilerBuildSuffix ghcBuild)
     let tool = Tool $ PackageIdentifier ghcPkgName selectedVersion
     downloadAndInstallTool (configLocalPrograms config) si (gdiDownloadInfo downloadInfo) tool installer
-downloadAndInstallCompiler compilerBuild si wanted versionCheck _mbindistUrl = do
+downloadAndInstallCompiler compilerBuild si wanted versionCheck _mbindistUrl _ = do
     config <- view configL
     ghcVariant <- view ghcVariantL
     case (ghcVariant, compilerBuild) of
@@ -932,9 +936,10 @@ downloadAndInstallPossibleCompilers
     -> CompilerVersion 'CVWanted
     -> VersionCheck
     -> Maybe String
+    -> LogLevel
     -> RIO env (Tool, CompilerBuild)
-downloadAndInstallPossibleCompilers possibleCompilers si wanted versionCheck mbindistURL =
-    go possibleCompilers Nothing
+downloadAndInstallPossibleCompilers possibleCompilers si wanted versionCheck mbindistURL logLevel =
+    go logLevel possibleCompilers Nothing
   where
     -- This will stop as soon as one of the builds doesn't throw an @UnknownOSKey@ or
     -- @UnknownCompilerVersion@ exception (so it will only try subsequent builds if one is non-existent,
@@ -943,26 +948,26 @@ downloadAndInstallPossibleCompilers possibleCompilers si wanted versionCheck mbi
     -- (if only @UnknownOSKey@ is thrown, then the first of those is rethrown, but if any
     -- @UnknownCompilerVersion@s are thrown then the attempted OS keys and available versions
     -- are unioned).
-    go [] Nothing = throwM UnsupportedSetupConfiguration
-    go [] (Just e) = throwM e
-    go (b:bs) e = do
+    go _ [] Nothing = throwM UnsupportedSetupConfiguration
+    go _ [] (Just e) = throwM e
+    go logLevel (b:bs) e = do
         logDebug $ "Trying to setup GHC build: " <> T.pack (compilerBuildName b)
-        er <- try $ downloadAndInstallCompiler b si wanted versionCheck mbindistURL
+        er <- try $ downloadAndInstallCompiler b si wanted versionCheck mbindistURL logLevel
         case er of
             Left e'@(UnknownCompilerVersion ks' w' vs') ->
                 case e of
-                    Nothing -> go bs (Just e')
+                    Nothing -> go logLevel bs (Just e')
                     Just (UnknownOSKey k) ->
-                        go bs $ Just $ UnknownCompilerVersion (Set.insert k ks') w' vs'
+                        go logLevel bs $ Just $ UnknownCompilerVersion (Set.insert k ks') w' vs'
                     Just (UnknownCompilerVersion ks _ vs) ->
-                        go bs $ Just $ UnknownCompilerVersion (Set.union ks' ks) w' (Set.union vs' vs)
+                        go logLevel bs $ Just $ UnknownCompilerVersion (Set.union ks' ks) w' (Set.union vs' vs)
                     Just x -> throwM x
             Left e'@(UnknownOSKey k') ->
                 case e of
-                    Nothing -> go bs (Just e')
-                    Just (UnknownOSKey _) -> go bs e
+                    Nothing -> go logLevel bs (Just e')
+                    Just (UnknownOSKey _) -> go logLevel bs e
                     Just (UnknownCompilerVersion ks w vs) ->
-                        go bs $ Just $ UnknownCompilerVersion (Set.insert k' ks) w vs
+                        go logLevel bs $ Just $ UnknownCompilerVersion (Set.insert k' ks) w vs
                     Just x -> throwM x
             Left e' -> throwM e'
             Right r -> return (r, b)
@@ -1046,13 +1051,14 @@ data ArchiveType
 installGHCPosix :: HasConfig env
                 => Version
                 -> GHCDownloadInfo
+                -> LogLevel
                 -> SetupInfo
                 -> Path Abs File
                 -> ArchiveType
                 -> Path Abs Dir
                 -> Path Abs Dir
                 -> RIO env ()
-installGHCPosix version downloadInfo _ archiveFile archiveType tempDir destDir = do
+installGHCPosix version downloadInfo logLevel _ archiveFile archiveType tempDir destDir = do
     platform <- view platformL
     menv0 <- view envOverrideL
     menv <- mkEnvOverride (removeHaskellEnvVars (unEnvOverride menv0))
@@ -1085,14 +1091,27 @@ installGHCPosix version downloadInfo _ archiveFile archiveType tempDir destDir =
 
     let runStep step wd env cmd args = do
             menv' <- modifyEnvOverride menv (Map.union env)
-            result <- withWorkingDir wd
-                    $ withEnvOverride menv'
-                    $ withProc cmd args
-                    $ try
-                    . readProcessStdout_
-                    -- Calling the ./configure script requires that stdin is
-                    -- open
-                    . setStdin (useHandleOpen stdin)
+            result <- case logLevel of
+              LevelDebug -> do
+                let logLines = CB.lines .| CL.mapM_ (logInfo . T.decodeUtf8With T.lenientDecode)
+                withWorkingDir wd
+                            $ withEnvOverride menv'
+                            $ withProc cmd args
+                            $ try
+                            . (flip withLoggedProcess_ $ \p ->
+                                  runConduit (getStderr p .| logLines) `concurrently_`
+                                  runConduit (getStdout p .| logLines))
+                            . setStdin (useHandleOpen stdin)
+
+              _ -> withWorkingDir wd
+                   $ withEnvOverride menv'
+                   $ withProc cmd args
+                   $ try
+                   . (void . readProcessStdout_)
+                   -- Calling the ./configure script requires that stdin is
+                   -- open
+                   . setStdin (useHandleOpen stdin)
+
             case result of
                 Right _ -> return ()
                 Left ex -> do
