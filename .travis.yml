@@ -43,10 +43,6 @@ matrix:
   - env: BUILD=stack GHCVER=8.0.2 HLINT_COMMANDS="hlint src/; hlint src/ --cpp-define=WINDOWS=1; hlint test/ --cpp-simple"
     addons: {apt: {packages: [ghc-8.0.2], sources: [hvr-ghc]}}
 
-  - env: BUILD=stack GHCVER=8.2.2 STACK_YAML=stack-nightly.yaml STACK_BUILD_OPTIONS=--pedantic DISABLE_SDIST_BUILD=y
-    compiler: ": #stack 8.2.2"
-    addons: {apt: {packages: [ghc-8.2.2], sources: [hvr-ghc]}}
-
   allow_failures:
   - env: BUILD=stack DISABLE_SDIST_BUILD=y
     compiler: ": #stack 8.0.2 osx"
