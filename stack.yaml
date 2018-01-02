@@ -15,8 +15,6 @@ flags:
   stack:
     hide-dependency-versions: true
     supported-build: true
-  mintty:
-    win32-2-5: false
 extra-deps:
 - Cabal-2.0.1.0
 - mintty-0.1.1
