@@ -43,7 +43,6 @@ import qualified    Data.ByteString.Lazy as LBS
 import qualified    Data.ByteString.Lazy.Char8 as BL8
 import              Data.Char (isSpace)
 import              Data.Conduit (await, yield, awaitForever)
-import qualified    Data.Conduit.Binary as CB
 import              Data.Conduit.Lazy (lazyConsume)
 import              Data.Conduit.Lift (evalStateC)
 import qualified    Data.Conduit.List as CL
@@ -1086,10 +1085,8 @@ installGHCPosix version downloadInfo _ archiveFile archiveType tempDir destDir =
 
     let runStep step wd env cmd args = do
             menv' <- modifyEnvOverride menv (Map.union env)
-            logLevel <- logMinLevel <$> view logOptionsL
-            result <- case logLevel of
-              LevelDebug -> do
-                let logLines = CB.lines .| CL.mapM_ (logInfo . T.decodeUtf8With T.lenientDecode)
+            result <- do
+                let logLines = CL.mapM_ (logDebug . T.decodeUtf8With T.lenientDecode)
                 withWorkingDir wd
                   $ withEnvOverride menv'
                   $ withProc cmd args
@@ -1097,16 +1094,9 @@ installGHCPosix version downloadInfo _ archiveFile archiveType tempDir destDir =
                   . (flip withLoggedProcess_ $ \p ->
                         runConduit (getStderr p .| logLines) `concurrently_`
                         runConduit (getStdout p .| logLines))
-                  . setStdin (useHandleOpen stdin)
-
-              _ -> withWorkingDir wd
-                   $ withEnvOverride menv'
-                   $ withProc cmd args
-                   $ try
-                   . (void . readProcessStdout_)
                    -- Calling the ./configure script requires that stdin is
                    -- open
-                   . setStdin (useHandleOpen stdin)
+                  . setStdin (useHandleOpen stdin)
 
             case result of
                 Right _ -> return ()
