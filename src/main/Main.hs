@@ -602,7 +602,7 @@ setupCmd sco@SetupCmdOpts{..} go@GlobalOpts{..} = loadConfigWithOpts go $ \lc ->
                               , configCompilerCheck (lcConfig lc)
                               , Just $ view stackYamlL bc
                               )
-           runRIO (loadMiniConfig (lcConfig lc)) $ setup go sco wantedCompiler compilerCheck mstack
+           runRIO (loadMiniConfig (lcConfig lc)) $ setup sco wantedCompiler compilerCheck mstack
            )
           Nothing
           (Just $ munlockFile lk)

@@ -290,7 +290,7 @@ setupCompiler compiler = do
         , soptsSetupInfoYaml     = defaultSetupInfoYaml
         , soptsGHCBindistURL     = Nothing
         , soptsGHCJSBootOpts     = ["--clean"]
-        } LevelInfo
+        }
     return dirs
 
 -- | Runs the given inner command with an updated configuration that

@@ -237,7 +237,7 @@ setupEnv mResolveMissingGHC = do
             , soptsGHCJSBootOpts = ["--clean"]
             }
 
-    (mghcBin, compilerBuild, _) <- ensureCompiler sopts LevelInfo
+    (mghcBin, compilerBuild, _) <- ensureCompiler sopts
 
     -- Modify the initial environment to include the GHC path, if a local GHC
     -- is being used
@@ -376,9 +376,8 @@ addIncludeLib (ExtraDirs _bins includes libs) config = config
 -- | Ensure compiler (ghc or ghcjs) is installed and provide the PATHs to add if necessary
 ensureCompiler :: (HasConfig env, HasGHCVariant env)
                => SetupOpts
-               -> LogLevel
                -> RIO env (Maybe ExtraDirs, CompilerBuild, Bool)
-ensureCompiler sopts logLevel = do
+ensureCompiler sopts = do
     let wc = whichCompiler (soptsWantedCompiler sopts)
     when (getGhcVersion (soptsWantedCompiler sopts) < $(mkVersion "7.8")) $ do
         logWarn "Stack will almost certainly fail with GHC below version 7.8"
@@ -467,7 +466,6 @@ ensureCompiler sopts logLevel = do
                             (soptsWantedCompiler sopts)
                             (soptsCompilerCheck sopts)
                             (soptsGHCBindistURL sopts)
-                            logLevel
                     | otherwise -> do
                         recommendSystemGhc <-
                             if soptsUseSystem sopts
@@ -855,9 +853,8 @@ downloadAndInstallCompiler :: (HasConfig env, HasGHCVariant env)
                            -> CompilerVersion 'CVWanted
                            -> VersionCheck
                            -> Maybe String
-                           -> LogLevel
                            -> RIO env Tool
-downloadAndInstallCompiler ghcBuild si wanted@GhcVersion{} versionCheck mbindistURL logLevel = do
+downloadAndInstallCompiler ghcBuild si wanted@GhcVersion{} versionCheck mbindistURL = do
     ghcVariant <- view ghcVariantL
     (selectedVersion, downloadInfo) <- case mbindistURL of
         Just bindistURL -> do
@@ -883,7 +880,7 @@ downloadAndInstallCompiler ghcBuild si wanted@GhcVersion{} versionCheck mbindist
     let installer =
             case configPlatform config of
                 Platform _ Cabal.Windows -> installGHCWindows selectedVersion
-                _ -> installGHCPosix selectedVersion downloadInfo logLevel
+                _ -> installGHCPosix selectedVersion downloadInfo
     logInfo $
         "Preparing to install GHC" <>
         (case ghcVariant of
@@ -897,7 +894,7 @@ downloadAndInstallCompiler ghcBuild si wanted@GhcVersion{} versionCheck mbindist
     ghcPkgName <- parsePackageNameFromString ("ghc" ++ ghcVariantSuffix ghcVariant ++ compilerBuildSuffix ghcBuild)
     let tool = Tool $ PackageIdentifier ghcPkgName selectedVersion
     downloadAndInstallTool (configLocalPrograms config) si (gdiDownloadInfo downloadInfo) tool installer
-downloadAndInstallCompiler compilerBuild si wanted versionCheck _mbindistUrl _ = do
+downloadAndInstallCompiler compilerBuild si wanted versionCheck _mbindistUrl = do
     config <- view configL
     ghcVariant <- view ghcVariantL
     case (ghcVariant, compilerBuild) of
@@ -936,10 +933,9 @@ downloadAndInstallPossibleCompilers
     -> CompilerVersion 'CVWanted
     -> VersionCheck
     -> Maybe String
-    -> LogLevel
     -> RIO env (Tool, CompilerBuild)
-downloadAndInstallPossibleCompilers possibleCompilers si wanted versionCheck mbindistURL logLevel =
-    go logLevel possibleCompilers Nothing
+downloadAndInstallPossibleCompilers possibleCompilers si wanted versionCheck mbindistURL =
+    go possibleCompilers Nothing
   where
     -- This will stop as soon as one of the builds doesn't throw an @UnknownOSKey@ or
     -- @UnknownCompilerVersion@ exception (so it will only try subsequent builds if one is non-existent,
@@ -948,26 +944,26 @@ downloadAndInstallPossibleCompilers possibleCompilers si wanted versionCheck mbi
     -- (if only @UnknownOSKey@ is thrown, then the first of those is rethrown, but if any
     -- @UnknownCompilerVersion@s are thrown then the attempted OS keys and available versions
     -- are unioned).
-    go _ [] Nothing = throwM UnsupportedSetupConfiguration
-    go _ [] (Just e) = throwM e
-    go ll (b:bs) e = do
+    go [] Nothing = throwM UnsupportedSetupConfiguration
+    go [] (Just e) = throwM e
+    go (b:bs) e = do
         logDebug $ "Trying to setup GHC build: " <> T.pack (compilerBuildName b)
-        er <- try $ downloadAndInstallCompiler b si wanted versionCheck mbindistURL ll
+        er <- try $ downloadAndInstallCompiler b si wanted versionCheck mbindistURL
         case er of
             Left e'@(UnknownCompilerVersion ks' w' vs') ->
                 case e of
-                    Nothing -> go ll bs (Just e')
+                    Nothing -> go bs (Just e')
                     Just (UnknownOSKey k) ->
-                        go ll bs $ Just $ UnknownCompilerVersion (Set.insert k ks') w' vs'
+                        go bs $ Just $ UnknownCompilerVersion (Set.insert k ks') w' vs'
                     Just (UnknownCompilerVersion ks _ vs) ->
-                        go ll bs $ Just $ UnknownCompilerVersion (Set.union ks' ks) w' (Set.union vs' vs)
+                        go bs $ Just $ UnknownCompilerVersion (Set.union ks' ks) w' (Set.union vs' vs)
                     Just x -> throwM x
             Left e'@(UnknownOSKey k') ->
                 case e of
-                    Nothing -> go ll bs (Just e')
-                    Just (UnknownOSKey _) -> go ll bs e
+                    Nothing -> go bs (Just e')
+                    Just (UnknownOSKey _) -> go bs e
                     Just (UnknownCompilerVersion ks w vs) ->
-                        go ll bs $ Just $ UnknownCompilerVersion (Set.insert k' ks) w vs
+                        go bs $ Just $ UnknownCompilerVersion (Set.insert k' ks) w vs
                     Just x -> throwM x
             Left e' -> throwM e'
             Right r -> return (r, b)
@@ -1051,14 +1047,13 @@ data ArchiveType
 installGHCPosix :: HasConfig env
                 => Version
                 -> GHCDownloadInfo
-                -> LogLevel
                 -> SetupInfo
                 -> Path Abs File
                 -> ArchiveType
                 -> Path Abs Dir
                 -> Path Abs Dir
                 -> RIO env ()
-installGHCPosix version downloadInfo logLevel _ archiveFile archiveType tempDir destDir = do
+installGHCPosix version downloadInfo _ archiveFile archiveType tempDir destDir = do
     platform <- view platformL
     menv0 <- view envOverrideL
     menv <- mkEnvOverride (removeHaskellEnvVars (unEnvOverride menv0))
@@ -1091,6 +1086,7 @@ installGHCPosix version downloadInfo logLevel _ archiveFile archiveType tempDir 
 
     let runStep step wd env cmd args = do
             menv' <- modifyEnvOverride menv (Map.union env)
+            logLevel <- logMinLevel <$> view logOptionsL
             result <- case logLevel of
               LevelDebug -> do
                 let logLines = CB.lines .| CL.mapM_ (logInfo . T.decodeUtf8With T.lenientDecode)

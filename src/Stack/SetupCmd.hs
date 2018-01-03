@@ -101,13 +101,12 @@ setupParser = SetupCmdOpts
 
 setup
     :: (HasConfig env, HasGHCVariant env)
-    => GlobalOpts
-    -> SetupCmdOpts
+    => SetupCmdOpts
     -> CompilerVersion 'CVWanted
     -> VersionCheck
     -> Maybe (Path Abs File)
     -> RIO env ()
-setup gopts SetupCmdOpts{..} wantedCompiler compilerCheck mstack = do
+setup SetupCmdOpts{..} wantedCompiler compilerCheck mstack = do
     Config{..} <- view configL
     (_, _, sandboxedGhc) <- ensureCompiler SetupOpts
         { soptsInstallIfMissing = True
@@ -124,7 +123,7 @@ setup gopts SetupCmdOpts{..} wantedCompiler compilerCheck mstack = do
         , soptsSetupInfoYaml = scoSetupInfoYaml
         , soptsGHCBindistURL = scoGHCBindistURL
         , soptsGHCJSBootOpts = scoGHCJSBootOpts ++ ["--clean" | scoGHCJSBootClean]
-        } (globalLogLevel gopts)
+        }
     let compiler = case wantedCompiler of
             GhcVersion _ -> "GHC"
             GhcjsVersion {} -> "GHCJS"
