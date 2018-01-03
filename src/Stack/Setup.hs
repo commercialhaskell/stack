@@ -950,24 +950,24 @@ downloadAndInstallPossibleCompilers possibleCompilers si wanted versionCheck mbi
     -- are unioned).
     go _ [] Nothing = throwM UnsupportedSetupConfiguration
     go _ [] (Just e) = throwM e
-    go logLevel (b:bs) e = do
+    go ll (b:bs) e = do
         logDebug $ "Trying to setup GHC build: " <> T.pack (compilerBuildName b)
-        er <- try $ downloadAndInstallCompiler b si wanted versionCheck mbindistURL logLevel
+        er <- try $ downloadAndInstallCompiler b si wanted versionCheck mbindistURL ll
         case er of
             Left e'@(UnknownCompilerVersion ks' w' vs') ->
                 case e of
-                    Nothing -> go logLevel bs (Just e')
+                    Nothing -> go ll bs (Just e')
                     Just (UnknownOSKey k) ->
-                        go logLevel bs $ Just $ UnknownCompilerVersion (Set.insert k ks') w' vs'
+                        go ll bs $ Just $ UnknownCompilerVersion (Set.insert k ks') w' vs'
                     Just (UnknownCompilerVersion ks _ vs) ->
-                        go logLevel bs $ Just $ UnknownCompilerVersion (Set.union ks' ks) w' (Set.union vs' vs)
+                        go ll bs $ Just $ UnknownCompilerVersion (Set.union ks' ks) w' (Set.union vs' vs)
                     Just x -> throwM x
             Left e'@(UnknownOSKey k') ->
                 case e of
-                    Nothing -> go logLevel bs (Just e')
-                    Just (UnknownOSKey _) -> go logLevel bs e
+                    Nothing -> go ll bs (Just e')
+                    Just (UnknownOSKey _) -> go ll bs e
                     Just (UnknownCompilerVersion ks w vs) ->
-                        go logLevel bs $ Just $ UnknownCompilerVersion (Set.insert k' ks) w vs
+                        go ll bs $ Just $ UnknownCompilerVersion (Set.insert k' ks) w vs
                     Just x -> throwM x
             Left e' -> throwM e'
             Right r -> return (r, b)
@@ -1095,13 +1095,13 @@ installGHCPosix version downloadInfo logLevel _ archiveFile archiveType tempDir 
               LevelDebug -> do
                 let logLines = CB.lines .| CL.mapM_ (logInfo . T.decodeUtf8With T.lenientDecode)
                 withWorkingDir wd
-                            $ withEnvOverride menv'
-                            $ withProc cmd args
-                            $ try
-                            . (flip withLoggedProcess_ $ \p ->
-                                  runConduit (getStderr p .| logLines) `concurrently_`
-                                  runConduit (getStdout p .| logLines))
-                            . setStdin (useHandleOpen stdin)
+                  $ withEnvOverride menv'
+                  $ withProc cmd args
+                  $ try
+                  . (flip withLoggedProcess_ $ \p ->
+                        runConduit (getStderr p .| logLines) `concurrently_`
+                        runConduit (getStdout p .| logLines))
+                  . setStdin (useHandleOpen stdin)
 
               _ -> withWorkingDir wd
                    $ withEnvOverride menv'
