@@ -13,6 +13,11 @@ module RIO.Prelude
   , RIO (..)
   , runRIO
   , tshow
+  , readFileBinary
+  , writeFileBinary
+  , ReadFileUtf8Exception (..)
+  , readFileUtf8
+  , writeFileUtf8
   , module X
   ) where
 
@@ -72,6 +77,8 @@ import           Data.Set             as X (Set)
 import           Data.Store           as X (Store)
 import           Data.String          as X (IsString (..))
 import           Data.Text            as X (Text)
+import           Data.Text.Encoding   as X (encodeUtf8, decodeUtf8', decodeUtf8With)
+import           Data.Text.Encoding.Error as X (lenientDecode, UnicodeException (..))
 import           Data.Traversable     as X (Traversable (..), for, forM)
 import           Data.Vector          as X (Vector)
 import           Data.Void            as X (Void, absurd)
@@ -97,6 +104,7 @@ import           UnliftIO             as X
 
 import qualified Data.Text            as T
 
+import qualified Data.ByteString      as B
 import qualified Data.ByteString.Lazy as BL
 
 mapLeft :: (a1 -> a2) -> Either a1 b -> Either a2 b
@@ -153,3 +161,28 @@ instance MonadUnliftIO (RIO env) where
 
 tshow :: Show a => a -> Text
 tshow = T.pack . show
+
+-- | Same as 'B.readFile', but generalized to 'MonadIO'
+readFileBinary :: MonadIO m => FilePath -> m ByteString
+readFileBinary = liftIO . B.readFile
+
+-- | Same as 'B.writeFile', but generalized to 'MonadIO'
+writeFileBinary :: MonadIO m => FilePath -> ByteString -> m ()
+writeFileBinary fp = liftIO . B.writeFile fp
+
+-- | Read a file in UTF8 encoding, throwing an exception on invalid character
+-- encoding.
+readFileUtf8 :: MonadIO m => FilePath -> m Text
+readFileUtf8 fp = do
+  bs <- readFileBinary fp
+  case decodeUtf8' bs of
+    Left e -> throwIO $ ReadFileUtf8Exception fp e
+    Right text -> return text
+
+data ReadFileUtf8Exception = ReadFileUtf8Exception !FilePath !UnicodeException
+  deriving (Show, Typeable)
+instance Exception ReadFileUtf8Exception
+
+-- | Write a file in UTF8 encoding
+writeFileUtf8 :: MonadIO m => FilePath -> Text -> m ()
+writeFileUtf8 fp = writeFileBinary fp . encodeUtf8
