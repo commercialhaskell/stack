@@ -18,6 +18,10 @@ module RIO.Prelude
   , ReadFileUtf8Exception (..)
   , readFileUtf8
   , writeFileUtf8
+  , LByteString
+  , toStrictBytes
+  , fromStrictBytes
+  , view
   , module X
   ) where
 
@@ -39,7 +43,6 @@ import           Data.Bool            as X (Bool (..), not, otherwise, (&&),
 import           Data.ByteString      as X (ByteString)
 import           Data.ByteString.Short as X (ShortByteString, toShort, fromShort)
 import           Data.Char            as X (Char)
-import           Data.Conduit         as X (ConduitM, runConduit, (.|))
 import           Data.Data            as X (Data (..))
 import           Data.Either          as X (Either (..), either, isLeft,
                                             isRight, lefts, partitionEithers,
@@ -85,8 +88,7 @@ import           Data.Void            as X (Void, absurd)
 import           Data.Word            as X
 import           GHC.Generics         as X (Generic)
 import           GHC.Stack            as X (HasCallStack)
-import           Lens.Micro           as X (Getting, Lens', lens)
-import           Lens.Micro.Mtl       as X (view)
+import           Lens.Micro           as X (ASetter, ASetter', sets, over, set, SimpleGetter, Getting, (^.), to, Lens, Lens', lens)
 import           Prelude              as X (Bounded (..), Double, Enum,
                                             FilePath, Float, Floating (..),
                                             Fractional (..), IO, Integer,
@@ -106,6 +108,9 @@ import qualified Data.Text            as T
 
 import qualified Data.ByteString      as B
 import qualified Data.ByteString.Lazy as BL
+
+import Control.Applicative (Const (..))
+import Lens.Micro.Internal ((#.))
 
 mapLeft :: (a1 -> a2) -> Either a1 b -> Either a2 b
 mapLeft f (Left a1) = Left (f a1)
@@ -191,3 +196,14 @@ instance Exception ReadFileUtf8Exception
 -- | Write a file in UTF8 encoding
 writeFileUtf8 :: MonadIO m => FilePath -> Text -> m ()
 writeFileUtf8 fp = writeFileBinary fp . encodeUtf8
+
+type LByteString = BL.ByteString
+
+toStrictBytes :: LByteString -> ByteString
+toStrictBytes = BL.toStrict
+
+fromStrictBytes :: ByteString -> LByteString
+fromStrictBytes = BL.fromStrict
+
+view :: MonadReader s m => Getting a s a -> m a
+view l = asks (getConst #. l Const)

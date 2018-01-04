@@ -23,7 +23,6 @@ import Data.Text (Text)
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import Control.Monad.Reader (MonadReader, ReaderT, runReaderT)
 import Lens.Micro (Getting, to)
-import Lens.Micro.Mtl (view)
 import GHC.Stack (HasCallStack, CallStack)
 
 data LogLevel = LevelDebug | LevelInfo | LevelWarn | LevelError | LevelOther !Text

@@ -71,7 +71,6 @@ dependencies:
 - http-types
 - memory
 - microlens
-- microlens-mtl
 - mintty
 - monad-logger # TODO remove dep when persistent drops monad-logger
 - mono-traversable

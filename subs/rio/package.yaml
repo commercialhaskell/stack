@@ -8,11 +8,10 @@ dependencies:
 - containers
 - deepseq
 - directory
-- exceptions
+- exceptions # FIXME what do we do with MonadThrow?
 - filepath
 - hashable
-- microlens # FIXME perhaps drop
-- microlens-mtl # FIXME perhaps drop
+- microlens
 - mtl
 - path # FIXME drop
 - path-io # FIXME drop

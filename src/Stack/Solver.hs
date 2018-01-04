@@ -34,9 +34,7 @@ import qualified Data.Map as Map
 import qualified Data.Set as Set
 import qualified Data.Text as T
 import           Data.Text.Encoding (decodeUtf8, encodeUtf8)
-import           Data.Text.Encoding.Error (lenientDecode)
 import qualified Data.Text.Lazy as LT
-import           Data.Text.Lazy.Encoding (decodeUtf8With)
 import           Data.Tuple (swap)
 import qualified Data.Yaml as Yaml
 import qualified Distribution.Package as C
@@ -130,7 +128,7 @@ cabalSolver cabalfps constraintType
     parseCabalErrors err = do
         let errExit e = error $ "Could not parse cabal-install errors:\n\n"
                               ++ cabalBuildErrMsg (T.unpack e)
-            msg = LT.toStrict $ decodeUtf8With lenientDecode err
+            msg = decodeUtf8With lenientDecode $ toStrictBytes err
 
         if errCheck msg then do
             logInfo "Attempt failed.\n"
@@ -167,7 +165,7 @@ cabalSolver cabalfps constraintType
         let ls = drop 1
                $ dropWhile (not . T.isPrefixOf "In order, ")
                $ linesNoCR
-               $ decodeUtf8 bs
+               $ decodeUtf8With lenientDecode bs
             (errs, pairs) = partitionEithers $ map parseCabalOutputLine ls
         if null errs
           then return $ Right (Map.fromList pairs)

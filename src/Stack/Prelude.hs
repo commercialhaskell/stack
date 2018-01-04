@@ -12,7 +12,8 @@ module Stack.Prelude
   , module X
   ) where
 
-import RIO as X
+import           RIO                  as X
+import           Data.Conduit         as X (ConduitM, runConduit, (.|))
 import           Path                 as X (Abs, Dir, File, Path, Rel,
                                             toFilePath)
 import qualified Path.IO
