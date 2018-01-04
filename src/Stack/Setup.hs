@@ -43,6 +43,7 @@ import qualified    Data.ByteString.Lazy as LBS
 import qualified    Data.ByteString.Lazy.Char8 as BL8
 import              Data.Char (isSpace)
 import              Data.Conduit (await, yield, awaitForever)
+import qualified    Data.Conduit.Binary as CB
 import              Data.Conduit.Lazy (lazyConsume)
 import              Data.Conduit.Lift (evalStateC)
 import qualified    Data.Conduit.List as CL
@@ -1086,7 +1087,7 @@ installGHCPosix version downloadInfo _ archiveFile archiveType tempDir destDir =
     let runStep step wd env cmd args = do
             menv' <- modifyEnvOverride menv (Map.union env)
             result <- do
-                let logLines = CL.mapM_ (logDebug . T.decodeUtf8With T.lenientDecode)
+                let logLines = CB.lines .| CL.mapM_ (logDebug . T.decodeUtf8With T.lenientDecode)
                 withWorkingDir wd
                   $ withEnvOverride menv'
                   $ withProc cmd args
