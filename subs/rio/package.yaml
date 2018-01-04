@@ -5,8 +5,6 @@ dependencies:
 - base
 - bytestring
 - clock # FIXME perhaps drop
-- conduit # FIXME drop
-- conduit-extra # FIXME drop
 - containers
 - deepseq
 - directory

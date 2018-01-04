@@ -154,6 +154,11 @@ newtype RIO env a = RIO { unRIO :: ReaderT env IO a }
 runRIO :: MonadIO m => env -> RIO env a -> m a
 runRIO env (RIO (ReaderT f)) = liftIO (f env)
 
+liftRIO :: (MonadIO m, MonadReader env m) => RIO env a -> m a
+liftRIO rio = do
+  env <- ask
+  runRIO env rio
+
 instance MonadUnliftIO (RIO env) where
     askUnliftIO = RIO $ ReaderT $ \r ->
                   withUnliftIO $ \u ->

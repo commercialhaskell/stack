@@ -24,3 +24,5 @@ project. This README will guide you through using `rio` to its fullest
 extent.
 
 *FIXME* Totally incomplete
+
+<https://www.fpcomplete.com/blog/2017/07/the-rio-monad>
