@@ -211,7 +211,7 @@ sourceUpgrade gConfigMonoid mresolver builtHash (SourceOpts gitRepo) =
                 -- the stack repo until we're comfortable with "stack upgrade
                 -- --git" not working for earlier versions.
                 let args = [ "clone", repo , "stack", "--depth", "1", "--recursive", "--branch", branch]
-                withProc "git" args runProcess_
+                withWorkingDir tmp $ withProc "git" args runProcess_
                 return $ Just $ tmp </> $(mkRelDir "stack")
       Nothing -> do
         updateAllIndices
