@@ -15,14 +15,81 @@ and the
 The goal of the `rio` library is to help you jump start your Haskell
 coding. It is intended as a cross between:
 
-* Useful `Prelude` replacement
 * Collection of well designed, trusted libraries
+* Useful `Prelude` replacement
 * A set of best practices for writing production quality Haskell code
 
 You're free to use any subset of functionality desired in your
 project. This README will guide you through using `rio` to its fullest
 extent.
 
-*FIXME* Totally incomplete
+## Standard library
 
-<https://www.fpcomplete.com/blog/2017/07/the-rio-monad>
+While GHC ships with a `base` library, as well as another of other
+common packages like `directory` and `transformers`, there are large
+gaps in functionality provided by these libraries. This choice for a
+more minimalistic `base` is by design, but it leads to some
+unfortunate consequences:
+
+* For a given task, it's often unclear which is the right library to
+  use
+* When writing libraries, there is often concern about adding
+  dependencies to any libraries outside of `base`, due to creating a
+  heavier dependency footprint
+* By avoiding adding dependencies, many libraries end up
+  reimplementing the same functionality, often with incompatible types
+  and type classes, leading to difficulty using libraries together
+
+This library attempts to define a standard library for Haskell. One
+immediate response may be [XKCD #927](https://xkcd.com/927/):
+
+![XKCD Standards](https://imgs.xkcd.com/comics/standards.png)
+
+To counter that effect, this library takes a specific approach: __it
+reuses existing, commonly used libraries__. Instead of defining an
+incompatible `Map` type, for instance, we standardize on the commonly
+used one from the `containers` library and reexport it from this
+library.
+
+This library attempts to define a set of libraries as "standard,"
+meaning they are recommended for use, and should be encouraged as
+dependencies for other libraries. It does this by depending on these
+libraries itself, and reexporting their types and functions for easy
+use.
+
+Beyond the ecosystem effects we hope to achieve, this will hopefully
+make the user story much easier. For a new user or team trying to get
+started, there is an easy library to depend upon for a large
+percentage of common functionality.
+
+See the dependencies of this package to see the list of packages
+considered standard. The primary interfaces of each of these packages
+is exposed from this library via a `RIO.`-prefixed module reexporting
+its interface.
+
+## Prelude replacement
+
+The `RIO` module works as a prelude replacement, providing more
+functionality and types out of the box than the standard prelude (such
+as common data types like `ByteString` and `Text`), as well as
+removing common "gotchas", like partial functions and lazy I/O. The
+guiding principle here is:
+
+* If something is safe to use in general and has no expected naming
+  conflicts, expose it from `RIO`
+* If something should not always be used, or has naming conflicts,
+  expose it from another module in the `RIO.` hierarchy.
+
+## Best practices
+
+__NOTE__ There is no need to follow any best practices listed here
+when using `rio`. However, in some cases, `rio` will make design
+decisions towards optimizing for these use cases. And for Haskellers
+looking for a set of best practices to follow: you've come to the
+right place!
+
+For now, this is just a collection of links to existing best practices
+documents. We'll expand in the future.
+
+* https://www.fpcomplete.com/blog/2017/07/the-rio-monad
+* https://www.fpcomplete.com/blog/2016/11/exceptions-best-practices-haskell
