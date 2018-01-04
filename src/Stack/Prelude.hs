@@ -87,7 +87,7 @@ sinkProcessStderrStdout name args sinkStderr sinkStdout =
 -- | Consume the stdout of a process feeding strict 'ByteString's to a consumer.
 -- If the process fails, spits out stdout and stderr as error log
 -- level. Should not be used for long-running processes or ones with
--- lots of output; for that use 'sinkProcessStdoutLogStderr'.
+-- lots of output; for that use 'logProcessStderrStdout'.
 --
 -- Throws a 'ReadProcessException' if unsuccessful.
 sinkProcessStdout

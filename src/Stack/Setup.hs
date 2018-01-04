@@ -46,7 +46,7 @@ import              Data.Conduit (await, yield, awaitForever)
 import              Data.Conduit.Lazy (lazyConsume)
 import              Data.Conduit.Lift (evalStateC)
 import qualified    Data.Conduit.List as CL
-import              Data.Conduit.Process.Typed (eceStderr, withLoggedProcess_)
+import              Data.Conduit.Process.Typed (eceStderr, createSource)
 import              Data.Conduit.Zlib          (ungzip)
 import              Data.Foldable (maximumBy)
 import qualified    Data.HashMap.Strict as HashMap
@@ -1091,12 +1091,14 @@ installGHCPosix version downloadInfo _ archiveFile archiveType tempDir destDir =
                   $ withEnvOverride menv'
                   $ withProc cmd args
                   $ try
-                  . (flip withLoggedProcess_ $ \p ->
+                  . (flip withProcess_ $ \p ->
                         runConduit (getStderr p .| logLines) `concurrently_`
                         runConduit (getStdout p .| logLines))
                    -- Calling the ./configure script requires that stdin is
                    -- open
                   . setStdin (useHandleOpen stdin)
+                  . setStdout createSource
+                  . setStderr createSource
 
             case result of
                 Right _ -> return ()
