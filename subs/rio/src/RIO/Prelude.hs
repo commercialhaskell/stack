@@ -1,3 +1,4 @@
+{-# LANGUAGE ConstraintKinds            #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE NoImplicitPrelude          #-}
 {-# LANGUAGE OverloadedStrings          #-}
@@ -22,6 +23,9 @@ module RIO.Prelude
   , toStrictBytes
   , fromStrictBytes
   , view
+  , UVector
+  , SVector
+  , GVector
   , module X
   ) where
 
@@ -41,6 +45,7 @@ import           Control.Monad.Reader as X (MonadReader, MonadTrans (..),
 import           Data.Bool            as X (Bool (..), not, otherwise, (&&),
                                             (||))
 import           Data.ByteString      as X (ByteString)
+import           Data.ByteString.Builder as X (Builder, hPutBuilder)
 import           Data.ByteString.Short as X (ShortByteString, toShort, fromShort)
 import           Data.Char            as X (Char)
 import           Data.Data            as X (Data (..))
@@ -86,6 +91,7 @@ import           Data.Traversable     as X (Traversable (..), for, forM)
 import           Data.Vector          as X (Vector)
 import           Data.Void            as X (Void, absurd)
 import           Data.Word            as X
+import           Foreign.Storable     as X (Storable)
 import           GHC.Generics         as X (Generic)
 import           GHC.Stack            as X (HasCallStack)
 import           Lens.Micro           as X (ASetter, ASetter', sets, over, set, SimpleGetter, Getting, (^.), to, Lens, Lens', lens)
@@ -108,6 +114,10 @@ import qualified Data.Text            as T
 
 import qualified Data.ByteString      as B
 import qualified Data.ByteString.Lazy as BL
+
+import qualified Data.Vector.Unboxed as UVector
+import qualified Data.Vector.Storable as SVector
+import qualified Data.Vector.Generic as GVector
 
 import Control.Applicative (Const (..))
 import Lens.Micro.Internal ((#.))
@@ -207,3 +217,7 @@ fromStrictBytes = BL.fromStrict
 
 view :: MonadReader s m => Getting a s a -> m a
 view l = asks (getConst #. l Const)
+
+type UVector = UVector.Vector
+type SVector = SVector.Vector
+type GVector = GVector.Vector
