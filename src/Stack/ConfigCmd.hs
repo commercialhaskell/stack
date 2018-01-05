@@ -70,11 +70,11 @@ cfgCmdSet go cmd = do
         config' = HMap.insert cmdKey newValue config
     if config' == config
         then logInfo
-                 (T.pack (toFilePath configFilePath) <>
+                 (fromString (toFilePath configFilePath) <>
                   " already contained the intended configuration and remains unchanged.")
         else do
             liftIO (S.writeFile (toFilePath configFilePath) (Yaml.encode config'))
-            logInfo (T.pack (toFilePath configFilePath) <> " has been updated.")
+            logInfo (fromString (toFilePath configFilePath) <> " has been updated.")
 
 cfgCmdSetValue
     :: (HasConfig env, HasGHCVariant env)

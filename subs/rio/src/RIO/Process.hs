@@ -347,19 +347,19 @@ withProcessTimeLog mdir name args proc' = do
         case mdir of
           Nothing -> ""
           Just dir -> " within " <> T.pack dir
-  logDebug ("Run process" <> dirMsg <> ": " <> cmdText)
+  logDebug ("Run process" <> display dirMsg <> ": " <> display cmdText)
   start <- liftIO $ Clock.getTime Clock.Monotonic
   x <- proc'
   end <- liftIO $ Clock.getTime Clock.Monotonic
   let diff = Clock.diffTimeSpec start end
-  -- useAnsi <- asks getAnsiTerminal
+  -- useAnsi <- asks getAnsiTerminal FIXME
   let useAnsi = True
   logDebug
       ("Process finished in " <>
       (if useAnsi then "\ESC[92m" else "") <> -- green
-      timeSpecMilliSecondText diff <>
+      display (timeSpecMilliSecondText diff) <>
       (if useAnsi then "\ESC[0m" else "") <> -- reset
-       ": " <> cmdText)
+       ": " <> display cmdText)
   return x
 
 timeSpecMilliSecondText :: Clock.TimeSpec -> Text

@@ -103,16 +103,16 @@ hoogleCmd (args,setup,rebuild) go = withBuildConfig go $ do
                           | ver >= hoogleMinVersion -> Right ident
                         _ -> Left hoogleMinIdent)
         case hooglePackageIdentifier of
-            Left{} ->
-                logInfo
-                    ("Minimum " <> packageIdentifierText hoogleMinIdent <>
-                     " is not in your index. Installing the minimum version.")
-            Right ident ->
-                logInfo
-                    ("Minimum version is " <> packageIdentifierText hoogleMinIdent <>
-                     ". Found acceptable " <>
-                     packageIdentifierText ident <>
-                     " in your index, installing it.")
+            Left{} -> logInfo $
+              "Minimum " <>
+              display hoogleMinIdent <>
+              " is not in your index. Installing the minimum version."
+            Right ident -> logInfo $
+              "Minimum version is " <>
+              display hoogleMinIdent <>
+              ". Found acceptable " <>
+              display ident <>
+              " in your index, installing it."
         config <- view configL
         menv <- liftIO $ configEnvOverrideSettings config envSettings
         liftIO
@@ -183,7 +183,7 @@ hoogleCmd (args,setup,rebuild) go = withBuildConfig go $ do
             Right hooglePath -> parseAbsFile hooglePath
             Left err
                 | setup -> do
-                    logWarn $ err <> " Automatically installing (use --no-setup to disable) ..."
+                    logWarn $ display err <> " Automatically installing (use --no-setup to disable) ..."
                     installHoogle
                     mhooglePath' <- findExecutable menv "hoogle"
                     case mhooglePath' of
@@ -192,7 +192,7 @@ hoogleCmd (args,setup,rebuild) go = withBuildConfig go $ do
                             logWarn "Couldn't find hoogle in path after installing.  This shouldn't happen, may be a bug."
                             bail
                 | otherwise -> do
-                    logWarn $ err <> " Not installing it due to --no-setup."
+                    logWarn $ display err <> " Not installing it due to --no-setup."
                     bail
     envSettings =
         EnvSettings

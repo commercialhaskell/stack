@@ -9,7 +9,7 @@
 
 module Stack.Types.Docker where
 
-import Stack.Prelude
+import Stack.Prelude hiding (Display (..))
 import Data.Aeson.Extended
 import Data.List (intercalate)
 import qualified Data.Text as T

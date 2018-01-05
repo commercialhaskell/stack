@@ -34,7 +34,8 @@ module Stack.PrettyPrint
     , indentAfterLabel, wordDocs, flow
     ) where
 
-import           Stack.Prelude
+import qualified RIO
+import           Stack.Prelude hiding (Display (..))
 import           Data.List (intersperse)
 import qualified Data.Text as T
 import           Stack.Types.NamedComponent
@@ -51,7 +52,7 @@ displayWithColor
     => a -> m T.Text
 displayWithColor x = do
     useAnsi <- liftM logUseColor $ view logOptionsL
-    termWidth <- liftM logTermWidth $ view logOptionsL
+    termWidth <- view $ runnerL.to runnerTermWidth
     return $ (if useAnsi then displayAnsi else displayPlain) termWidth x
 
 -- TODO: switch to using implicit callstacks once 7.8 support is dropped
@@ -59,7 +60,7 @@ displayWithColor x = do
 prettyWith :: (HasRunner env, HasCallStack, Display b, HasAnsiAnn (Ann b),
                MonadReader env m, MonadIO m)
            => LogLevel -> (a -> b) -> a -> m ()
-prettyWith level f = logGeneric "" level <=< displayWithColor . f
+prettyWith level f = logGeneric "" level . RIO.display <=< displayWithColor . f
 
 -- Note: I think keeping this section aligned helps spot errors, might be
 -- worth keeping the alignment in place.
@@ -130,7 +131,7 @@ flow = fillSep . wordDocs
 debugBracket :: (HasCallStack, HasRunner env, MonadReader env m,
                  MonadIO m, MonadUnliftIO m) => Doc AnsiAnn -> m a -> m a
 debugBracket msg f = do
-  let output = logDebug <=< displayWithColor
+  let output = logDebug . RIO.display <=< displayWithColor
   output $ "Start: " <> msg
   start <- liftIO $ Clock.getTime Clock.Monotonic
   x <- f `catch` \ex -> do

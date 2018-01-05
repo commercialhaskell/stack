@@ -81,6 +81,8 @@ instance Show Version where
   show (Version v) =
     intercalate "."
                 (map show (V.toList v))
+instance Display Version where
+  display = display . versionText
 
 instance ToJSON Version where
   toJSON = toJSON . versionText

@@ -80,6 +80,8 @@ instance Store PackageIdentifier
 
 instance Show PackageIdentifier where
   show = show . packageIdentifierString
+instance Display PackageIdentifier where
+  display = fromString . packageIdentifierString
 
 instance ToJSON PackageIdentifier where
   toJSON = toJSON . packageIdentifierString

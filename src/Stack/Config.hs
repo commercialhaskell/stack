@@ -117,12 +117,12 @@ tryDeprecatedPath mWarningDesc exists new old = do
                     case mWarningDesc of
                         Nothing -> return ()
                         Just desc ->
-                            logWarn $ T.concat
-                                [ "Warning: Location of ", desc, " at '"
-                                , T.pack (toFilePath old)
-                                , "' is deprecated; rename it to '"
-                                , T.pack (toFilePath new)
-                                , "' instead" ]
+                            logWarn $
+                                "Warning: Location of " <> display desc <> " at '" <>
+                                fromString (toFilePath old) <>
+                                "' is deprecated; rename it to '" <>
+                                fromString (toFilePath new) <>
+                                "' instead"
                     return (old, True)
                 else return (new, False)
 
@@ -156,7 +156,7 @@ getSnapshots :: HasConfig env => RIO env Snapshots
 getSnapshots = do
     latestUrlText <- askLatestSnapshotUrl
     latestUrl <- parseUrlThrow (T.unpack latestUrlText)
-    logDebug $ "Downloading snapshot versions file from " <> latestUrlText
+    logDebug $ "Downloading snapshot versions file from " <> display latestUrlText
     result <- httpJSON latestUrl
     logDebug "Done downloading and parsing snapshot versions file"
     return $ getResponseBody result
@@ -190,7 +190,7 @@ makeConcreteResolver root ar = do
                 | otherwise ->
                     let (x, y) = IntMap.findMax $ snapshotsLts snapshots
                      in return $ ResolverStackage $ LTS x y
-    logInfo $ "Selected resolver: " <> resolverRawName r
+    logInfo $ "Selected resolver: " <> display (resolverRawName r)
     return r
 
 -- | Get the latest snapshot resolver available.
@@ -297,7 +297,7 @@ configFromConfigMonoid
          configCompilerCheck = fromFirst MatchMinor configMonoidCompilerCheck
 
      case arch of
-         OtherArch unk -> logWarn $ "Warning: Unknown value for architecture setting: " <> T.pack (show unk)
+         OtherArch unk -> logWarn $ "Warning: Unknown value for architecture setting: " <> displayShow unk
          _ -> return ()
 
      configPlatformVariant <- liftIO $
@@ -541,7 +541,7 @@ loadBuildConfig mproject maresolver mcompiler = do
               ARLatestLTS -> "lts"
               ARLatestLTSMajor x -> T.pack $ "lts-" ++ show x
               ARGlobal -> "global"
-      logDebug ("Using resolver: " <> name <> " specified on command line")
+      logDebug ("Using resolver: " <> display name <> " specified on command line")
 
       -- In order to resolve custom snapshots, we need a base
       -- directory to deal with relative paths. For the case of
@@ -559,7 +559,7 @@ loadBuildConfig mproject maresolver mcompiler = do
 
     (project', stackYamlFP) <- case mproject of
       LCSProject (project, fp, _) -> do
-          forM_ (projectUserMsg project) (logWarn . T.pack)
+          forM_ (projectUserMsg project) (logWarn . fromString)
           return (project, fp)
       LCSNoConfig _ -> do
           p <- assert (isJust mresolver) (getEmptyProject mresolver)
@@ -579,12 +579,15 @@ loadBuildConfig mproject maresolver mcompiler = do
                    when (view terminalL config) $
                        case maresolver of
                            Nothing ->
-                               logDebug ("Using resolver: " <> resolverRawName (projectResolver project) <>
-                                         " from implicit global project's config file: " <> T.pack dest')
+                               logDebug $
+                                 "Using resolver: " <>
+                                 display (resolverRawName (projectResolver project)) <>
+                                 " from implicit global project's config file: " <>
+                                 fromString dest'
                            Just _ -> return ()
                    return (project, dest)
                else do
-                   logInfo ("Writing implicit global project config file to: " <> T.pack dest')
+                   logInfo ("Writing implicit global project config file to: " <> fromString dest')
                    logInfo "Note: You can change the snapshot via the resolver field there."
                    p <- getEmptyProject mresolver
                    liftIO $ do
@@ -632,11 +635,11 @@ loadBuildConfig mproject maresolver mcompiler = do
     getEmptyProject mresolver = do
       r <- case mresolver of
             Just resolver -> do
-                logInfo ("Using resolver: " <> resolverRawName resolver <> " specified on command line")
+                logInfo ("Using resolver: " <> display (resolverRawName resolver) <> " specified on command line")
                 return resolver
             Nothing -> do
                 r'' <- getLatestResolver
-                logInfo ("Using latest snapshot resolver: " <> resolverRawName r'')
+                logInfo ("Using latest snapshot resolver: " <> display (resolverRawName r''))
                 return r''
       return Project
         { projectUserMsg = Nothing
@@ -848,7 +851,7 @@ getProjectConfig SYLDefault = do
     getStackDotYaml dir = do
         let fp = dir </> stackDotYaml
             fp' = toFilePath fp
-        logDebug $ "Checking for project config at: " <> T.pack fp'
+        logDebug $ "Checking for project config at: " <> fromString fp'
         exists <- doesFileExist fp
         if exists
             then return $ Just fp
@@ -875,7 +878,7 @@ loadProjectConfig mstackYaml = do
         LCSProject fp -> do
             currDir <- getCurrentDir
             logDebug $ "Loading project config file " <>
-                        T.pack (maybe (toFilePath fp) toFilePath (stripProperPrefix currDir fp))
+                        fromString (maybe (toFilePath fp) toFilePath (stripProperPrefix currDir fp))
             LCSProject <$> load fp
         LCSNoProject -> do
             logDebug "No project config file found, using defaults."

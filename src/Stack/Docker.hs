@@ -454,16 +454,26 @@ cleanup opts = do
         [] -> return ()
         (c:_):t:v:_ ->
           do args <- if | toUpper c == 'R' && t == imageStr ->
-                            do logInfo (concatT ["Removing image: '",v,"'"])
+                            do logInfo $
+                                 "Removing image: '" <>
+                                 fromString v <>
+                                 "'"
                                return ["rmi",v]
                         | toUpper c == 'R' && t == containerStr ->
-                            do logInfo (concatT ["Removing container: '",v,"'"])
+                            do logInfo $
+                                 "Removing container: '" <>
+                                 fromString v <>
+                                 "'"
                                return ["rm","-f",v]
                         | otherwise -> throwM (InvalidCleanupCommandException line)
              e <- try (readDockerProcess args)
              case e of
                Left ex ->
-                 logError (concatT ["Could not remove: '",v,"': ", show (ex :: ExitCodeException)])
+                 logError $
+                   "Could not remove: '" <>
+                   fromString v <>
+                   "': " <>
+                   displayShow (ex :: ExitCodeException)
                Right _ -> return ()
         _ -> throwM (InvalidCleanupCommandException line)
     parseImagesOut = Map.fromListWith (++) . map parseImageRepo . drop 1 . lines . decodeUtf8
@@ -660,7 +670,7 @@ pull =
 pullImage :: HasEnvOverride env
           => DockerOpts -> String -> RIO env ()
 pullImage docker image =
-  do logInfo (concatT ["Pulling image from registry: '",image,"'"])
+  do logInfo ("Pulling image from registry: '" <> fromString image <> "'")
      when (dockerRegistryLogin docker)
           (do logInfo "You may need to log in."
               withProc
@@ -858,10 +868,6 @@ hostBinDir = "/opt/host/bin"
 -- | Convenience function to decode ByteString to String.
 decodeUtf8 :: BS.ByteString -> String
 decodeUtf8 bs = T.unpack (T.decodeUtf8 bs)
-
--- | Convenience function constructing message for @log*@.
-concatT :: [String] -> Text
-concatT = T.pack . concat
 
 -- | Fail with friendly error if project root not set.
 fromMaybeProjectRoot :: Maybe (Path Abs Dir) -> Path Abs Dir

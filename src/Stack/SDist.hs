@@ -18,7 +18,7 @@ import qualified Codec.Archive.Tar.Entry as Tar
 import qualified Codec.Compression.GZip as GZip
 import           Control.Applicative
 import           Control.Concurrent.Execute (ActionContext(..), Concurrency(..))
-import           Stack.Prelude
+import           Stack.Prelude hiding (Display (..))
 import           Control.Monad.Reader.Class (local)
 import qualified Data.ByteString as S
 import qualified Data.ByteString.Char8 as S8
@@ -48,6 +48,7 @@ import           Distribution.Version (simplifyVersionRange, orLaterVersion, ear
 import           Lens.Micro (set)
 import           Path
 import           Path.IO hiding (getModificationTime, getPermissions, withSystemTempDir)
+import qualified RIO
 import           Stack.Build (mkBaseConfigOpts, build)
 import           Stack.Build.Execute
 import           Stack.Build.Installed
@@ -115,9 +116,9 @@ getSDistTarball mpvpBounds pkgDir = do
         tweakCabal = pvpBounds /= PvpBoundsNone
         pkgFp = toFilePath pkgDir
     lp <- readLocalPackage pkgDir
-    logInfo $ "Getting file list for " <> T.pack pkgFp
+    logInfo $ "Getting file list for " <> fromString pkgFp
     (fileList, cabalfp) <-  getSDistFileList lp
-    logInfo $ "Building sdist tarball for " <> T.pack pkgFp
+    logInfo $ "Building sdist tarball for " <> fromString pkgFp
     files <- normalizeTarballPaths (map (T.unpack . stripCR . T.pack) (lines fileList))
 
     -- We're going to loop below and eventually find the cabal
@@ -352,9 +353,9 @@ normalizeTarballPaths fps = do
     -- TODO: consider whether erroring out is better - otherwise the
     -- user might upload an incomplete tar?
     unless (null outsideDir) $
-        logWarn $ T.concat
-            [ "Warning: These files are outside of the package directory, and will be omitted from the tarball: "
-            , T.pack (show outsideDir)]
+        logWarn $
+            "Warning: These files are outside of the package directory, and will be omitted from the tarball: " <>
+            displayShow outsideDir
     return (nubOrd files)
   where
     (outsideDir, files) = partitionEithers (map pathToEither fps)
@@ -402,7 +403,7 @@ checkPackageInExtractedTarball pkgDir = do
     config  <- getDefaultPackageConfig
     (gdesc, PackageDescriptionPair pkgDesc _) <- readPackageDescriptionDir config pkgDir False
     logInfo $
-        "Checking package '" <> packageNameText name <> "' for common mistakes"
+        "Checking package '" <> RIO.display name <> "' for common mistakes"
     let pkgChecks =
           -- MSS 2017-12-12: Try out a few different variants of
           -- pkgDesc to try and provoke an error or warning. I don't
@@ -426,7 +427,7 @@ checkPackageInExtractedTarball pkgDir = do
           in partition criticalIssue checks
     unless (null warnings) $
         logWarn $ "Package check reported the following warnings:\n" <>
-                   T.pack (intercalate "\n" . fmap show $ warnings)
+                   mconcat (intersperse "\n" . fmap displayShow $ warnings)
     case NE.nonEmpty errors of
         Nothing -> return ()
         Just ne -> throwM $ CheckException ne

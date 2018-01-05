@@ -89,11 +89,10 @@ createDatabase wc db = do
         dirExists <- doesDirExist db
         args <- if dirExists
             then do
-                logWarn $ T.pack $ concat
-                    [ "The package database located at "
-                    , toFilePath db
-                    , " is corrupted (missing its package.cache file)."
-                    ]
+                logWarn $
+                    "The package database located at " <>
+                    fromString (toFilePath db) <>
+                    " is corrupted (missing its package.cache file)."
                 logWarn "Proceeding with a recache"
                 return ["--package-db", toFilePath db, "recache"]
             else do
@@ -104,7 +103,7 @@ createDatabase wc db = do
                 return ["init", toFilePath db]
         void $ withProc (ghcPkgExeName wc) args $ \pc ->
           readProcessStdout_ pc `onException`
-          logError (T.pack $ "Unable to create package database at " ++ toFilePath db)
+          logError ("Unable to create package database at " <> fromString (toFilePath db))
 
 -- | Get the name to use for "ghc-pkg", given the compiler version.
 ghcPkgExeName :: WhichCompiler -> String
@@ -164,7 +163,7 @@ unregisterGhcPkgId :: HasEnvOverride env
 unregisterGhcPkgId wc cv pkgDb gid ident = do
     eres <- ghcPkg wc [pkgDb] args
     case eres of
-        Left e -> logWarn $ T.pack $ show e
+        Left e -> logWarn $ displayShow e
         Right _ -> return ()
   where
     -- TODO ideally we'd tell ghc-pkg a GhcPkgId instead

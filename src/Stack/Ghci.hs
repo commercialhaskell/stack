@@ -17,7 +17,7 @@ module Stack.Ghci
     , ghci
     ) where
 
-import           Stack.Prelude
+import           Stack.Prelude hiding (Display (..))
 import           Control.Monad.State.Strict (State, execState, get, modify)
 import qualified Data.ByteString.Char8 as S8
 import           Data.List
@@ -30,6 +30,7 @@ import qualified Distribution.Text as C
 import           Path
 import           Path.Extra (toFilePathNoTrailingSep)
 import           Path.IO hiding (withSystemTempDir)
+import qualified RIO
 import           Stack.Build
 import           Stack.Build.Installed
 import           Stack.Build.Source
@@ -260,19 +261,18 @@ getAllLocalTargets GhciOpts{..} targets0 mainIsTargets sourceMap = do
     if (ghciSkipIntermediate && not ghciLoadLocalDeps) || null extraLoadDeps
         then return directlyWanted
         else do
-            let extraList = T.intercalate ", " (map (packageNameText . fst) extraLoadDeps)
+            let extraList =
+                  mconcat $ intersperse ", " (map (RIO.display . fst) extraLoadDeps)
             if ghciLoadLocalDeps
-                then logInfo $ T.concat
-                    [ "The following libraries will also be loaded into GHCi because "
-                    , "they are local dependencies of your targets, and you specified --load-local-deps:\n    "
-                    , extraList
-                    ]
-                else logInfo $ T.concat
-                    [ "The following libraries will also be loaded into GHCi because "
-                    , "they are intermediate dependencies of your targets:\n    "
-                    , extraList
-                    , "\n(Use --skip-intermediate-deps to omit these)"
-                    ]
+                then logInfo $
+                  "The following libraries will also be loaded into GHCi because " <>
+                  "they are local dependencies of your targets, and you specified --load-local-deps:\n    " <>
+                  extraList
+                else logInfo $
+                  "The following libraries will also be loaded into GHCi because " <>
+                  "they are intermediate dependencies of your targets:\n    " <>
+                  extraList <>
+                  "\n(Use --skip-intermediate-deps to omit these)"
             return (directlyWanted ++ extraLoadDeps)
 
 getAllNonLocalTargets
@@ -347,14 +347,14 @@ runGhci GhciOpts{..} targets mainIsTargets pkgs extraFiles exposePackages = do
     unless (null omittedOpts) $
         logWarn
             ("The following GHC options are incompatible with GHCi and have not been passed to it: " <>
-             T.unwords (map T.pack (nubOrd omittedOpts)))
+             mconcat (intersperse " " (fromString <$> nubOrd omittedOpts)))
     oiDir <- view objectInterfaceDirL
     let odir =
             [ "-odir=" <> toFilePathNoTrailingSep oiDir
             , "-hidir=" <> toFilePathNoTrailingSep oiDir ]
-    logInfo
-        ("Configuring GHCi with the following packages: " <>
-         T.intercalate ", " (map (packageNameText . ghciPkgName) pkgs))
+    logInfo $
+      "Configuring GHCi with the following packages: " <>
+      mconcat (intersperse ", " (map (RIO.display . ghciPkgName) pkgs))
     let execGhci extras = do
             menv <- liftIO $ configEnvOverrideSettings config defaultEnvSettings
             withEnvOverride menv $ execSpawn
@@ -444,23 +444,23 @@ figureOutMainFile
 figureOutMainFile bopts mainIsTargets targets0 packages = do
     case candidates of
         [] -> return Nothing
-        [c@(_,_,fp)] -> do logInfo ("Using main module: " <> renderCandidate c)
+        [c@(_,_,fp)] -> do logInfo ("Using main module: " <> RIO.display (renderCandidate c))
                            return (Just fp)
         candidate:_ -> do
           borderedWarning $ do
             logWarn "The main module to load is ambiguous. Candidates are: "
-            forM_ (map renderCandidate candidates) logWarn
+            forM_ (map renderCandidate candidates) (logWarn . RIO.display)
             logWarn
                 "You can specify which one to pick by: "
             logWarn
                 (" * Specifying targets to stack ghci e.g. stack ghci " <>
-                 sampleTargetArg candidate)
+                RIO.display ( sampleTargetArg candidate))
             logWarn
                 (" * Specifying what the main is e.g. stack ghci " <>
-                 sampleMainIsArg candidate)
+                 RIO.display (sampleMainIsArg candidate))
             logWarn
                 (" * Choosing from the candidate above [1.." <>
-                T.pack (show $ length candidates) <> "]")
+                RIO.display (length candidates) <> "]")
           liftIO userOption
   where
     targets = fromMaybe (M.fromList $ map (\(k, (_, x)) -> (k, x)) targets0)
@@ -630,7 +630,7 @@ checkForIssues pkgs = do
         logWarn "Warning: There are cabal settings for this project which may prevent GHCi from loading your code properly."
         logWarn "In some cases it can also load some projects which would otherwise fail to build."
         logWarn ""
-        mapM_ logWarn $ intercalate [""] issues
+        mapM_ (logWarn . RIO.display) $ intercalate [""] issues
         logWarn ""
         logWarn "To resolve, remove the flag(s) from the cabal file(s) and instead put them at the top of the haskell files."
         logWarn ""
@@ -701,8 +701,12 @@ checkForDuplicateModules pkgs = do
     unless (null duplicates) $ do
         borderedWarning $ do
             logWarn "The following modules are present in multiple packages:"
-            forM_ duplicates $ \(mn, pns) -> do
-                logWarn (" * " <> T.pack mn <> " (in " <> T.intercalate ", " (map packageNameText pns) <> ")")
+            forM_ duplicates $ \(mn, pns) -> logWarn $
+              " * " <>
+              fromString mn <>
+              " (in " <>
+              mconcat (intersperse ", " (map RIO.display pns)) <>
+              ")"
         throwM LoadingDuplicateModules
   where
     duplicates, allModules :: [(String, [PackageName])]

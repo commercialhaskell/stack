@@ -23,7 +23,6 @@ import qualified Data.HashSet as HS
 import           Data.List.Extra (nubOrd)
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
-import qualified Data.Text as T
 import           Data.Time (UTCTime)
 import           Path
 import           Path.Extra
@@ -78,11 +77,11 @@ openHaddocksInBrowser bco pkgLocations buildTargets = do
                     else do
                         logWarn $
                             "Expected to find documentation at " <>
-                            T.pack (toFilePath docFile) <>
+                            fromString (toFilePath docFile) <>
                             ", but that file is missing.  Opening doc index instead."
                         getDocIndex
             _ -> getDocIndex
-    prettyInfo $ "Opening" <+> display docFile <+> "in the browser."
+    prettyInfo $ "Opening" <+> Stack.PrettyPrint.display docFile <+> "in the browser."
     _ <- liftIO $ openBrowser (toFilePath docFile)
     return ()
 
@@ -209,9 +208,11 @@ generateHaddockIndex descr wc bco dumpPackages docRelFP destDir = do
                         or [mt > indexModTime | (_,mt,_,_) <- interfaceOpts]
         if needUpdate
             then do
-                logInfo
-                    (T.concat ["Updating Haddock index for ", descr, " in\n",
-                               T.pack (toFilePath destIndexFile)])
+                logInfo $
+                  "Updating Haddock index for " <>
+                  Stack.Prelude.display descr <>
+                  " in\n" <>
+                  fromString (toFilePath destIndexFile)
                 liftIO (mapM_ copyPkgDocs interfaceOpts)
                 withWorkingDir (toFilePath destDir) $ readProcessNull
                     (haddockExeName wc)
@@ -221,9 +222,11 @@ generateHaddockIndex descr wc bco dumpPackages docRelFP destDir = do
                      ["--gen-contents", "--gen-index"] ++
                      [x | (xs,_,_,_) <- interfaceOpts, x <- xs])
             else
-              logInfo
-                    (T.concat ["Haddock index for ", descr, " already up to date at:\n",
-                               T.pack (toFilePath destIndexFile)])
+              logInfo $
+                "Haddock index for " <>
+                Stack.Prelude.display descr <>
+                " already up to date at:\n" <>
+                fromString (toFilePath destIndexFile)
   where
     toInterfaceOpt :: DumpPackage a b c -> IO (Maybe ([String], UTCTime, Path Abs File, Path Abs File))
     toInterfaceOpt DumpPackage {..} =

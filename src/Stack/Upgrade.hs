@@ -12,7 +12,7 @@ module Stack.Upgrade
     , upgradeOpts
     ) where
 
-import           Stack.Prelude               hiding (force)
+import           Stack.Prelude               hiding (force, Display (..))
 import qualified Data.HashMap.Strict         as HashMap
 import qualified Data.List
 import qualified Data.Map                    as Map

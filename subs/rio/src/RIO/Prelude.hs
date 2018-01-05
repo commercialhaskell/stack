@@ -2,6 +2,7 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE NoImplicitPrelude          #-}
 {-# LANGUAGE OverloadedStrings          #-}
+{-# LANGUAGE TypeSynonymInstances       #-}
 module RIO.Prelude
   ( mapLeft
   , withLazyFile
@@ -30,6 +31,14 @@ module RIO.Prelude
   , SVector
   , GVector
   , module X
+  , DisplayBuilder (..)
+  , Display (..)
+  , displayShow
+  , displayBuilderToText
+  , displayBytesUtf8
+  , writeFileDisplayBuilder
+  , hPutBuilder
+  , sappend
   ) where
 
 import           Control.Applicative  as X (Alternative, Applicative (..),
@@ -48,7 +57,7 @@ import           Control.Monad.Reader as X (MonadReader, MonadTrans (..),
 import           Data.Bool            as X (Bool (..), not, otherwise, (&&),
                                             (||))
 import           Data.ByteString      as X (ByteString)
-import           Data.ByteString.Builder as X (Builder, hPutBuilder)
+import           Data.ByteString.Builder as X (Builder)
 import           Data.ByteString.Short as X (ShortByteString, toShort, fromShort)
 import           Data.Char            as X (Char)
 import           Data.Data            as X (Data (..))
@@ -84,10 +93,11 @@ import           Data.Monoid          as X (All (..), Any (..), Endo (..),
                                             First (..), Last (..), Monoid (..),
                                             Product (..), Sum (..), (<>))
 import           Data.Ord             as X (Ord (..), Ordering (..), comparing)
+import           Data.Semigroup       as X (Semigroup)
 import           Data.Set             as X (Set)
 import           Data.String          as X (IsString (..))
 import           Data.Text            as X (Text)
-import           Data.Text.Encoding   as X (encodeUtf8, decodeUtf8', decodeUtf8With)
+import           Data.Text.Encoding   as X (encodeUtf8, decodeUtf8', decodeUtf8With, encodeUtf8Builder)
 import           Data.Text.Encoding.Error as X (lenientDecode, UnicodeException (..))
 import           Data.Traversable     as X (Traversable (..), for, forM)
 import           Data.Vector          as X (Vector)
@@ -121,6 +131,9 @@ import qualified Data.ByteString.Lazy as BL
 import qualified Data.Vector.Unboxed as UVector
 import qualified Data.Vector.Storable as SVector
 import qualified Data.Vector.Generic as GVector
+
+import qualified Data.ByteString.Builder as BB
+import qualified Data.Semigroup
 
 import Control.Applicative (Const (..))
 import Lens.Micro.Internal ((#.))
@@ -229,3 +242,39 @@ decodeUtf8Lenient :: ByteString -> Text
 decodeUtf8Lenient = decodeUtf8With lenientDecode
 
 type LText = TL.Text
+
+newtype DisplayBuilder = DisplayBuilder { getUtf8Builder :: Builder }
+  deriving (Semigroup, Monoid)
+
+instance IsString DisplayBuilder where
+  fromString = DisplayBuilder . BB.stringUtf8
+
+class Display a where
+  display :: a -> DisplayBuilder
+instance Display Text where
+  display = DisplayBuilder . encodeUtf8Builder
+instance Display LText where
+  display = foldMap display . TL.toChunks
+instance Display Int where
+  display = DisplayBuilder . BB.intDec
+
+displayShow :: Show a => a -> DisplayBuilder
+displayShow = fromString . show
+
+displayBytesUtf8 :: ByteString -> DisplayBuilder
+displayBytesUtf8 = DisplayBuilder . BB.byteString
+
+displayBuilderToText :: DisplayBuilder -> Text
+displayBuilderToText =
+  decodeUtf8With lenientDecode . BL.toStrict . BB.toLazyByteString . getUtf8Builder
+
+sappend :: Semigroup s => s -> s -> s
+sappend = (Data.Semigroup.<>)
+
+writeFileDisplayBuilder :: MonadIO m => FilePath -> DisplayBuilder -> m ()
+writeFileDisplayBuilder fp (DisplayBuilder builder) =
+  liftIO $ withBinaryFile fp WriteMode $ \h -> hPutBuilder h builder
+
+hPutBuilder :: MonadIO m => Handle -> Builder -> m ()
+hPutBuilder h = liftIO . BB.hPutBuilder h
+{-# INLINE hPutBuilder #-}

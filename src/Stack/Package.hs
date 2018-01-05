@@ -81,7 +81,7 @@ import           Stack.Constants
 import           Stack.Constants.Config
 import           Stack.Fetch (loadFromIndex)
 import           Stack.PackageIndex (HasCabalLoader (..))
-import           Stack.Prelude
+import           Stack.Prelude hiding (Display (..))
 import           Stack.PrettyPrint
 import           Stack.Types.Build
 import           Stack.Types.BuildPlan (ExeName (..))

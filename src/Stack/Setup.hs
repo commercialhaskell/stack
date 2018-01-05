@@ -70,13 +70,14 @@ import              Path.CheckInstall (warnInstallSearchPathIssues)
 import              Path.Extra (toFilePathNoTrailingSep)
 import              Path.IO hiding (findExecutable, withSystemTempDir)
 import              Prelude (getLine, putStr, putStrLn, until)
+import qualified    RIO
 import              Stack.Build (build)
 import              Stack.Config (loadConfig)
 import              Stack.Constants (stackProgName)
 import              Stack.Constants.Config (distRelativeDir)
 import              Stack.Fetch
 import              Stack.GhcPkg (createDatabase, getCabalPkgVer, getGlobalDB, mkGhcPackagePath, ghcPkgPathEnvVar)
-import              Stack.Prelude
+import              Stack.Prelude hiding (Display (..))
 import              Stack.PrettyPrint
 import              Stack.Setup.Installed
 import              Stack.Snapshot (loadSnapshot)
@@ -454,8 +455,9 @@ ensureCompiler sopts = do
                             (Just tool, False) -> [(tool, compilerBuild)]
                             _ -> [])
                     possibleCompilers
-            logDebug $ "Found already installed GHC builds: "
-                <> T.intercalate ", " (map (T.pack . compilerBuildName . snd) existingCompilers)
+            logDebug $
+              "Found already installed GHC builds: " <>
+              mconcat (intersperse ", " (map (fromString . compilerBuildName . snd) existingCompilers))
             (compilerTool, compilerBuild) <- case existingCompilers of
                 (tool, build_):_ -> return (tool, build_)
                 []
@@ -583,7 +585,7 @@ getGhcBuilds = do
                         Left _ -> []
                     checkLib lib
                         | libT `elem` firstWords = do
-                            logDebug ("Found shared library " <> libT <> " in 'ldconfig -p' output")
+                            logDebug ("Found shared library " <> libD <> " in 'ldconfig -p' output")
                             return True
                         | otherwise = do
 #ifdef WINDOWS
@@ -596,12 +598,13 @@ getGhcBuilds = do
                             -- to scan for shared libs, but this works for our particular case.
                             e <- doesFileExist ($(mkAbsDir "/usr/lib") </> lib)
                             if e
-                                then logDebug ("Found shared library " <> libT <> " in /usr/lib")
-                                else logDebug ("Did not find shared library " <> libT)
+                                then logDebug ("Found shared library " <> libD <> " in /usr/lib")
+                                else logDebug ("Did not find shared library " <> libD)
                             return e
 #endif
                       where
                         libT = T.pack (toFilePath lib)
+                        libD = fromString (toFilePath lib)
                 hastinfo5 <- checkLib $(mkRelFile "libtinfo.so.5")
                 hastinfo6 <- checkLib $(mkRelFile "libtinfo.so.6")
                 hasncurses6 <- checkLib $(mkRelFile "libncursesw.so.6")
@@ -625,7 +628,9 @@ getGhcBuilds = do
 #endif
             _ -> useBuilds [CompilerBuildStandard]
     useBuilds builds = do
-        logDebug $ "Potential GHC builds: " <> T.intercalate ", " (map (T.pack . compilerBuildName) builds)
+        logDebug $
+          "Potential GHC builds: " <>
+          mconcat (intersperse ", " (map (fromString . compilerBuildName) builds))
         return builds
 
 #if !WINDOWS
@@ -645,9 +650,7 @@ mungeRelease = intercalate "-" . prefixMaj . splitOn "."
 sysRelease :: HasLogFunc env => RIO env String
 sysRelease =
   handleIO (\e -> do
-               logWarn $ T.concat [ T.pack "Could not query OS version"
-                                   , T.pack $ show e
-                                   ]
+               logWarn $ "Could not query OS version" <> displayShow e
                return "") .
   liftIO .
   alloca $ \ ptr ->
@@ -666,7 +669,10 @@ ensureDockerStackExe containerPlatform = do
     let stackExePath = stackExeDir </> $(mkRelFile "stack")
     stackExeExists <- doesFileExist stackExePath
     unless stackExeExists $ do
-        logInfo $ mconcat ["Downloading Docker-compatible ", T.pack stackProgName, " executable"]
+        logInfo $
+          "Downloading Docker-compatible " <>
+          fromString stackProgName <>
+          " executable"
         sri <- downloadStackReleaseInfo Nothing Nothing (Just (versionString stackMinorVersion))
         platforms <- runReaderT preferredPlatforms (containerPlatform, PlatformVariantNone)
         downloadStackExe platforms sri stackExeDir False (const $ return ())
@@ -687,21 +693,21 @@ upgradeCabal wc upgradeTo = do
             if installed /= wantedVersion then
                 doCabalInstall wc installed wantedVersion
             else
-                logInfo $ T.concat ["No install necessary. Cabal "
-                                    , T.pack $ versionString installed
-                                    , " is already installed"]
+                logInfo $
+                  "No install necessary. Cabal " <>
+                  RIO.display installed <>
+                  " is already installed"
         Latest     -> case map rpIdent rmap of
             [] -> throwString "No Cabal library found in index, cannot upgrade"
             [PackageIdentifier name' latestVersion] | name == name' -> do
                 if installed < latestVersion then
                     doCabalInstall wc installed latestVersion
                 else
-                    logInfo $ T.concat
-                        [ "No upgrade necessary: Cabal-"
-                        , T.pack $ versionString latestVersion
-                        , " is the same or newer than latest hackage version "
-                        , T.pack $ versionString installed
-                        ]
+                    logInfo $
+                        "No upgrade necessary: Cabal-" <>
+                        RIO.display latestVersion <>
+                        " is the same or newer than latest hackage version " <>
+                        RIO.display installed
             x -> error $ "Unexpected results for resolvePackages: " ++ show x
 
 -- Configure and run the necessary commands for a cabal install
@@ -712,12 +718,11 @@ doCabalInstall :: (HasConfig env, HasGHCVariant env)
                -> RIO env ()
 doCabalInstall wc installed wantedVersion = do
     withSystemTempDir "stack-cabal-upgrade" $ \tmpdir -> do
-        logInfo $ T.concat
-            [ "Installing Cabal-"
-            , T.pack $ versionString wantedVersion
-            , " to replace "
-            , T.pack $ versionString installed
-            ]
+        logInfo $
+            "Installing Cabal-" <>
+            RIO.display wantedVersion <>
+            " to replace " <>
+            RIO.display installed
         let name = $(mkPackageName "Cabal")
             ident = PackageIdentifier name wantedVersion
         m <- unpackPackageIdents tmpdir Nothing [PackageIdentifierRevision ident CFILatest]
@@ -887,10 +892,10 @@ downloadAndInstallCompiler ghcBuild si wanted@GhcVersion{} versionCheck mbindist
         "Preparing to install GHC" <>
         (case ghcVariant of
             GHCStandard -> ""
-            v -> " (" <> T.pack (ghcVariantName v) <> ")") <>
+            v -> " (" <> fromString (ghcVariantName v) <> ")") <>
         (case ghcBuild of
             CompilerBuildStandard -> ""
-            b -> " (" <> T.pack (compilerBuildName b) <> ")") <>
+            b -> " (" <> fromString (compilerBuildName b) <> ")") <>
         " to an isolated location."
     logInfo "This will not interfere with any system-level installation."
     ghcPkgName <- parsePackageNameFromString ("ghc" ++ ghcVariantSuffix ghcVariant ++ compilerBuildSuffix ghcBuild)
@@ -949,7 +954,7 @@ downloadAndInstallPossibleCompilers possibleCompilers si wanted versionCheck mbi
     go [] Nothing = throwM UnsupportedSetupConfiguration
     go [] (Just e) = throwM e
     go (b:bs) e = do
-        logDebug $ "Trying to setup GHC build: " <> T.pack (compilerBuildName b)
+        logDebug $ "Trying to setup GHC build: " <> fromString (compilerBuildName b)
         er <- try $ downloadAndInstallCompiler b si wanted versionCheck mbindistURL
         case er of
             Left e'@(UnknownCompilerVersion ks' w' vs') ->
@@ -1059,7 +1064,7 @@ installGHCPosix version downloadInfo _ archiveFile archiveType tempDir destDir =
     platform <- view platformL
     menv0 <- view envOverrideL
     menv <- mkEnvOverride (removeHaskellEnvVars (unEnvOverride menv0))
-    logDebug $ "menv = " <> T.pack (show (unEnvOverride menv))
+    logDebug $ "menv = " <> displayShow (unEnvOverride menv)
     (zipTool', compOpt) <-
         case archiveType of
             TarXz -> return ("xz", 'J')
@@ -1077,9 +1082,9 @@ installGHCPosix version downloadInfo _ archiveFile archiveType tempDir destDir =
         <*> (checkDependency "gmake" <|> checkDependency "make")
         <*> tarDep
 
-    logDebug $ "ziptool: " <> T.pack zipTool
-    logDebug $ "make: " <> T.pack makeTool
-    logDebug $ "tar: " <> T.pack tarTool
+    logDebug $ "ziptool: " <> fromString zipTool
+    logDebug $ "make: " <> fromString makeTool
+    logDebug $ "tar: " <> fromString tarTool
 
     dir <-
         liftM (tempDir </>) $
@@ -1099,7 +1104,7 @@ installGHCPosix version downloadInfo _ archiveFile archiveType tempDir destDir =
             case result of
                 Right _ -> return ()
                 Left ex -> do
-                    logError (T.pack (show (ex :: ReadProcessException)))
+                    logError (displayShow (ex :: ReadProcessException))
                     prettyError $
                         hang 2
                           ("Error encountered while" <+> step <+> "GHC with" <> line <>
@@ -1112,8 +1117,11 @@ installGHCPosix version downloadInfo _ archiveFile archiveType tempDir destDir =
                         "  -" <+> display destDir <> line
                     liftIO exitFailure
 
-    logSticky $ T.concat ["Unpacking GHC into ", T.pack . toFilePath $ tempDir, " ..."]
-    logDebug $ "Unpacking " <> T.pack (toFilePath archiveFile)
+    logSticky $
+      "Unpacking GHC into " <>
+      fromString (toFilePath tempDir) <>
+      " ..."
+    logDebug $ "Unpacking " <> fromString (toFilePath archiveFile)
     runStep "unpacking" tempDir mempty tarTool [compOpt : "xf", toFilePath archiveFile]
 
     logSticky "Configuring GHC ..."
@@ -1126,7 +1134,7 @@ installGHCPosix version downloadInfo _ archiveFile archiveType tempDir destDir =
     runStep "installing" dir mempty makeTool ["install"]
 
     logStickyDone $ "Installed GHC."
-    logDebug $ "GHC installed to " <> T.pack (toFilePath destDir)
+    logDebug $ "GHC installed to " <> fromString (toFilePath destDir)
 
 installGHCJS :: HasConfig env
              => SetupInfo
@@ -1142,7 +1150,7 @@ installGHCJS si archiveFile archiveType _tempDir destDir = do
     -- stack below.
     let removeLockVar = Map.delete "STACK_LOCK"
     menv <- mkEnvOverride (removeLockVar (removeHaskellEnvVars (unEnvOverride menv0)))
-    logDebug $ "menv = " <> T.pack (show (unEnvOverride menv))
+    logDebug $ "menv = " <> displayShow (unEnvOverride menv)
 
     -- NOTE: this is a bit of a hack - instead of using the temp
     -- directory, leave the unpacked source tarball in the destination
@@ -1169,8 +1177,8 @@ installGHCJS si archiveFile archiveType _tempDir destDir = do
             (zipTool, tarTool) <- checkDependencies $ (,)
                 <$> checkDependency zipTool'
                 <*> checkDependency "tar"
-            logDebug $ "ziptool: " <> T.pack zipTool
-            logDebug $ "tar: " <> T.pack tarTool
+            logDebug $ "ziptool: " <> fromString zipTool
+            logDebug $ "tar: " <> fromString tarTool
             return $ do
                 liftIO $ ignoringAbsence (removeDirRecur destDir)
                 liftIO $ ignoringAbsence (removeDirRecur unpackDir)
@@ -1178,8 +1186,11 @@ installGHCJS si archiveFile archiveType _tempDir destDir = do
                 innerDir <- expectSingleUnpackedDir archiveFile destDir
                 renameDir innerDir unpackDir
 
-    logSticky $ T.concat ["Unpacking GHCJS into ", T.pack . toFilePath $ unpackDir, " ..."]
-    logDebug $ "Unpacking " <> T.pack (toFilePath archiveFile)
+    logSticky $
+      "Unpacking GHCJS into " <>
+      fromString (toFilePath unpackDir) <>
+      " ..."
+    logDebug $ "Unpacking " <> fromString (toFilePath archiveFile)
     runUnpack
 
     logSticky "Setting up GHCJS build environment"
@@ -1258,20 +1269,20 @@ bootGhcjs ghcjsVersion stackYaml destDir bootOpts = do
             | v < $(mkVersion "1.22.4") -> do
                 logInfo $
                     "The cabal-install found on PATH is too old to be used for booting GHCJS (version " <>
-                    versionText v <>
+                    RIO.display v <>
                     ")."
                 return True
             | v >= $(mkVersion "1.23") -> do
                 logWarn $
                     "The cabal-install found on PATH is a version stack doesn't know about, version " <>
-                    versionText v <>
+                    RIO.display v <>
                     ". This may or may not work.\n" <>
                     "See this issue: https://github.com/ghcjs/ghcjs/issues/470"
                 return False
             | ghcjsVersion >= $(mkVersion "0.2.0.20160413") && v >= $(mkVersion "1.22.8") -> do
                 logWarn $
                     "The cabal-install found on PATH, version " <>
-                    versionText v <>
+                    RIO.display v <>
                     ", is >= 1.22.8.\n" <>
                     "That version has a bug preventing ghcjs < 0.2.0.20160413 from booting.\n" <>
                     "See this issue: https://github.com/ghcjs/ghcjs/issues/470"
@@ -1292,7 +1303,7 @@ bootGhcjs ghcjsVersion stackYaml destDir bootOpts = do
           [ "alex" | shouldInstallAlex ] ++
           [ "happy" | shouldInstallHappy ]
     when (not (null bootDepsToInstall)) $ do
-        logInfo $ "Building tools from source, needed for ghcjs-boot: " <> T.pack (show bootDepsToInstall)
+        logInfo $ "Building tools from source, needed for ghcjs-boot: " <> displayShow bootDepsToInstall
         buildInGhcjsEnv envConfig $ defaultBuildOptsCLI { boptsCLITargets = bootDepsToInstall }
         let failedToFindErr = do
                 logError "This shouldn't happen, because it gets built to the snapshot bin directory, which should be treated as being on the PATH."
@@ -1392,7 +1403,7 @@ installGHCWindows :: HasConfig env
 installGHCWindows version si archiveFile archiveType _tempDir destDir = do
     tarComponent <- parseRelDir $ "ghc-" ++ versionString version
     withUnpackedTarball7z "GHC" si archiveFile archiveType (Just tarComponent) destDir
-    logInfo $ "GHC installed to " <> T.pack (toFilePath destDir)
+    logInfo $ "GHC installed to " <> fromString (toFilePath destDir)
 
 installMsys2Windows :: HasConfig env
                   => Text -- ^ OS Key
@@ -1405,9 +1416,9 @@ installMsys2Windows :: HasConfig env
 installMsys2Windows osKey si archiveFile archiveType _tempDir destDir = do
     exists <- liftIO $ D.doesDirectoryExist $ toFilePath destDir
     when exists $ liftIO (D.removeDirectoryRecursive $ toFilePath destDir) `catchIO` \e -> do
-        logError $ T.pack $
-            "Could not delete existing msys directory: " ++
-            toFilePath destDir
+        logError $
+            "Could not delete existing msys directory: " <>
+            fromString (toFilePath destDir)
         throwM e
 
     msys <- parseRelDir $ "msys" ++ T.unpack (fromMaybe "32" $ T.stripPrefix "windows" osKey)
@@ -1510,18 +1521,16 @@ chattyDownload :: HasRunner env
 chattyDownload label downloadInfo path = do
     let url = downloadInfoUrl downloadInfo
     req <- parseUrlThrow $ T.unpack url
-    logSticky $ T.concat
-      [ "Preparing to download "
-      , label
-      , " ..."
-      ]
-    logDebug $ T.concat
-      [ "Downloading from "
-      , url
-      , " to "
-      , T.pack $ toFilePath path
-      , " ..."
-      ]
+    logSticky $
+      "Preparing to download " <>
+      RIO.display label <>
+      " ..."
+    logDebug $
+      "Downloading from " <>
+      RIO.display url <>
+      " to " <>
+      fromString (toFilePath path) <>
+      " ..."
     hashChecks <- fmap catMaybes $ forM
       [ ("sha1",   HashCheck SHA1,   downloadInfoSha1)
       , ("sha256", HashCheck SHA256, downloadInfoSha256)
@@ -1529,34 +1538,30 @@ chattyDownload label downloadInfo path = do
       $ \(name, constr, getter) ->
         case getter downloadInfo of
           Just bs -> do
-            logDebug $ T.concat
-                [ "Will check against "
-                , name
-                , " hash: "
-                , T.decodeUtf8With T.lenientDecode bs
-                ]
+            logDebug $
+                "Will check against " <>
+                name <>
+                " hash: " <>
+                displayBytesUtf8 bs
             return $ Just $ constr $ CheckHexDigestByteString bs
           Nothing -> return Nothing
-    when (null hashChecks) $ logWarn $ T.concat
-        [ "No sha1 or sha256 found in metadata,"
-        , " download hash won't be checked."
-        ]
+    when (null hashChecks) $ logWarn $
+        "No sha1 or sha256 found in metadata," <>
+        " download hash won't be checked."
     let dReq = DownloadRequest
             { drRequest = req
             , drHashChecks = hashChecks
             , drLengthCheck = mtotalSize
             , drRetryPolicy = drRetryPolicyDefault
             }
-    run <- askRunInIO
-    x <- verifiedDownload dReq path (chattyDownloadProgress run)
+    x <- verifiedDownload dReq path chattyDownloadProgress
     if x
-        then logStickyDone ("Downloaded " <> label <> ".")
+        then logStickyDone ("Downloaded " <> RIO.display label <> ".")
         else logStickyDone "Already downloaded."
   where
     mtotalSize = downloadInfoContentLength downloadInfo
-    chattyDownloadProgress runInBase _ = do
-        _ <- liftIO $ runInBase $ logSticky $
-          label <> ": download has begun"
+    chattyDownloadProgress _ = do
+        _ <- logSticky $ RIO.display label <> ": download has begun"
         CL.map (Sum . S.length)
           .| chunksOverTime 1
           .| go
@@ -1564,7 +1569,7 @@ chattyDownload label downloadInfo path = do
         go = evalStateC 0 $ awaitForever $ \(Sum size) -> do
             modify (+ size)
             totalSoFar <- get
-            liftIO $ runInBase $ logSticky $ T.pack $
+            logSticky $ fromString $
                 case mtotalSize of
                     Nothing -> chattyProgressNoTotal totalSoFar
                     Just 0 -> chattyProgressNoTotal totalSoFar
@@ -1642,7 +1647,7 @@ sanityCheck wc = withSystemTempDir "stack-sanity-check" $ \dir -> do
     let exeName = compilerExeName wc
     menv <- view envOverrideL
     ghc <- liftIO $ join (findExecutable menv exeName) >>= parseAbsFile
-    logDebug $ "Performing a sanity check on: " <> T.pack (toFilePath ghc)
+    logDebug $ "Performing a sanity check on: " <> fromString (toFilePath ghc)
     eres <- withWorkingDir (toFilePath dir) $ withProc exeName
         [ fp
         , "-no-user-package-db"
@@ -1860,7 +1865,7 @@ downloadStackExe platforms0 archiveInfo destDir checkPath testExe = do
                                 ++ unwords (map snd platforms0)
           loop ((isWindows, p'):ps) = do
             let p = T.pack p'
-            logInfo $ "Querying for archive location for platform: " <> p
+            logInfo $ "Querying for archive location for platform: " <> fromString p'
             case findArchive archiveInfo p of
               Just x -> return (isWindows, x)
               Nothing -> loop ps
@@ -1876,7 +1881,7 @@ downloadStackExe platforms0 archiveInfo destDir checkPath testExe = do
                 , destDir </> $(mkRelFile "stack.tmp")
                 )
 
-    logInfo $ "Downloading from: " <> archiveURL
+    logInfo $ "Downloading from: " <> RIO.display archiveURL
 
     liftIO $ do
       case () of
@@ -1907,10 +1912,10 @@ downloadStackExe platforms0 archiveInfo destDir checkPath testExe = do
     destDir' <- liftIO . D.canonicalizePath . toFilePath $ destDir
     warnInstallSearchPathIssues destDir' ["stack"]
 
-    logInfo $ T.pack $ "New stack executable available at " ++ toFilePath destFile
+    logInfo $ "New stack executable available at " <> fromString (toFilePath destFile)
 
     when checkPath $ performPathChecking destFile
-      `catchAny` \e -> logError (T.pack (show e))
+      `catchAny` (logError . displayShow)
   where
 
     findArchive (StackReleaseInfo val) pattern = do
@@ -1973,7 +1978,7 @@ performPathChecking newFile = do
   executablePath <- liftIO getExecutablePath
   executablePath' <- parseAbsFile executablePath
   unless (toFilePath newFile == executablePath) $ do
-    logInfo $ T.pack $ "Also copying stack executable to " ++ executablePath
+    logInfo $ "Also copying stack executable to " <> fromString executablePath
     tmpFile <- parseAbsFile $ executablePath ++ ".tmp"
     eres <- tryIO $ do
       liftIO $ copyFile newFile tmpFile
@@ -1986,7 +1991,7 @@ performPathChecking newFile = do
       Right () -> return ()
       Left e
         | isPermissionError e -> do
-            logWarn $ T.pack $ "Permission error when trying to copy: " ++ show e
+            logWarn $ "Permission error when trying to copy: " <> displayShow e
             logWarn "Should I try to perform the file copy using sudo? This may fail"
             toSudo <- prompt "Try using sudo? (y/n) "
             when toSudo $ do
@@ -2014,7 +2019,7 @@ performPathChecking newFile = do
               logInfo "Going to run the following commands:"
               logInfo ""
               forM_ commands $ \(cmd, args) ->
-                logInfo $ "-  " `T.append` T.unwords (map T.pack (cmd:args))
+                logInfo $ "-  " <> mconcat (intersperse " " (fromString <$> (cmd:args)))
               mapM_ (uncurry run) commands
               logInfo ""
               logInfo "sudo file copy worked!"

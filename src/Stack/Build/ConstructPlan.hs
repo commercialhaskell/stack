@@ -18,7 +18,7 @@ module Stack.Build.ConstructPlan
     ( constructPlan
     ) where
 
-import           Stack.Prelude
+import           Stack.Prelude hiding (Display (..))
 import           Control.Monad.RWS.Strict
 import           Control.Monad.State.Strict (execState)
 import qualified Data.HashSet as HashSet
@@ -34,7 +34,7 @@ import qualified Distribution.Text as Cabal
 import qualified Distribution.Version as Cabal
 import           Distribution.Types.BuildType (BuildType (Configure))
 import           Generics.Deriving.Monoid (memptydefault, mappenddefault)
-import           Lens.Micro (lens)
+import qualified RIO
 import           Stack.Build.Cache
 import           Stack.Build.Haddock
 import           Stack.Build.Installed
@@ -193,7 +193,7 @@ constructPlan ls0 baseConfigOpts0 locals extraToBuild0 localDumpPkgs loadPackage
     let ctx = mkCtx econfig lp
     ((), m, W efinals installExes dirtyReason deps warnings parents) <-
         liftIO $ runRWST inner ctx M.empty
-    mapM_ logWarn (warnings [])
+    mapM_ (logWarn . RIO.display) (warnings [])
     let toEither (_, Left e)  = Left e
         toEither (k, Right v) = Right (k, v)
         (errlibs, adrs) = partitionEithers $ map toEither $ M.toList m

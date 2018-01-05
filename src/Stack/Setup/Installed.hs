@@ -99,7 +99,7 @@ getCompilerVersion wc =
             bs <- withProc "ghc" ["--numeric-version"] readProcessStdout_
             let (_, ghcVersion) = versionFromEnd $ BL.toStrict bs
             x <- GhcVersion <$> parseVersion (T.decodeUtf8 ghcVersion)
-            logDebug $ "GHC version is: " <> compilerVersionText x
+            logDebug $ "GHC version is: " <> display x
             return x
         Ghcjs -> do
             logDebug "Asking GHCJS for its version"
@@ -165,7 +165,7 @@ extraDirs tool = do
                 ]
             }
         (Platform _ x, toolName) -> do
-            logWarn $ "binDirs: unexpected OS/tool combo: " <> T.pack (show (x, toolName))
+            logWarn $ "binDirs: unexpected OS/tool combo: " <> displayShow (x, toolName)
             return mempty
   where
     isGHC n = "ghc" == n || "ghc-" `isPrefixOf` n

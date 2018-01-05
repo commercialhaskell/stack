@@ -12,7 +12,6 @@ import qualified Data.Conduit.List          as CL
 import           Data.List.Split            (splitWhen)
 import qualified Data.Map.Strict            as Map
 import qualified Data.Set                   as Set
-import qualified Data.Text                  as T
 import           Path
 import           Path.IO
 import qualified Stack.Build
@@ -43,8 +42,9 @@ scriptCmd opts go' = do
       -- interpreter mode, only error messages are shown. See:
       -- https://github.com/commercialhaskell/stack/issues/3007
       case globalStackYaml go' of
-        SYLOverride fp -> logError $ T.pack
-          $ "Ignoring override stack.yaml file for script command: " ++ fp
+        SYLOverride fp -> logError $
+          "Ignoring override stack.yaml file for script command: " <>
+          fromString fp
         SYLDefault -> return ()
         SYLNoConfig _ -> assert False (return ())
 

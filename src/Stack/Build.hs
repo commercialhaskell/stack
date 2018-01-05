@@ -181,7 +181,7 @@ warnIfExecutablesWithSameNameCouldBeOverwritten locals plan = do
                 T.intercalate
                     ", "
                     ["'" <> packageNameText p <> ":" <> exe <> "'" | p <- pkgs]
-        (logWarn . T.unlines . concat)
+        (logWarn . display . T.unlines . concat)
             [ [ "Building " <> exe_s <> " " <> exesText toBuild <> "." ]
             , [ "Only one of them will be available via 'stack exec' or locally installed."
               | length toBuild > 1
@@ -239,7 +239,7 @@ warnIfExecutablesWithSameNameCouldBeOverwritten locals plan = do
 
 warnAboutSplitObjs :: HasLogFunc env => BuildOpts -> RIO env ()
 warnAboutSplitObjs bopts | boptsSplitObjs bopts = do
-    logWarn $ "Building with --split-objs is enabled. " <> T.pack splitObjsWarning
+    logWarn $ "Building with --split-objs is enabled. " <> fromString splitObjsWarning
 warnAboutSplitObjs _ = return ()
 
 splitObjsWarning :: String

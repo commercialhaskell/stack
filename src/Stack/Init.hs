@@ -139,31 +139,31 @@ initProject whichCmd currDir initOpts mresolver = do
         toPkg dir = PLFilePath $ makeRelDir dir
         indent t = T.unlines $ fmap ("    " <>) (T.lines t)
 
-    logInfo $ "Initialising configuration using resolver: " <> sdResolverName sd
+    logInfo $ "Initialising configuration using resolver: " <> display (sdResolverName sd)
     logInfo $ "Total number of user packages considered: "
-               <> T.pack (show (Map.size bundle + length dupPkgs))
+               <> display (Map.size bundle + length dupPkgs)
 
     when (dupPkgs /= []) $ do
         logWarn $ "Warning! Ignoring "
-                   <> T.pack (show $ length dupPkgs)
+                   <> displayShow (length dupPkgs)
                    <> " duplicate packages:"
         rels <- mapM makeRel dupPkgs
-        logWarn $ indent $ showItems rels
+        logWarn $ display $ indent $ showItems rels
 
     when (Map.size ignored > 0) $ do
         logWarn $ "Warning! Ignoring "
-                   <> T.pack (show $ Map.size ignored)
+                   <> displayShow (Map.size ignored)
                    <> " packages due to dependency conflicts:"
         rels <- mapM makeRel (Map.elems (fmap fst ignored))
-        logWarn $ indent $ showItems rels
+        logWarn $ display $ indent $ showItems rels
 
     when (Map.size extraDeps > 0) $ do
-        logWarn $ "Warning! " <> T.pack (show $ Map.size extraDeps)
+        logWarn $ "Warning! " <> displayShow (Map.size extraDeps)
                    <> " external dependencies were added."
     logInfo $
         (if exists then "Overwriting existing configuration file: "
          else "Writing configuration to file: ")
-        <> T.pack reldest
+        <> fromString reldest
     liftIO $ L.writeFile (toFilePath dest)
            $ B.toLazyByteString
            $ renderStackYaml p
@@ -329,7 +329,7 @@ getSnapshots' = do
         logError ""
         logError "    http://docs.haskellstack.org/en/stable/yaml_configuration/"
         logError ""
-        logError $ "Exception was: " <> T.pack (show e)
+        logError $ "Exception was: " <> displayShow e
         throwString ""
 
 -- | Get the default resolver value
@@ -383,7 +383,7 @@ getWorkingResolverPlan
        --   , Extra dependencies
        --   , Src packages actually considered)
 getWorkingResolverPlan whichCmd stackYaml initOpts bundle sd = do
-    logInfo $ "Selected resolver: " <> sdResolverName sd
+    logInfo $ "Selected resolver: " <> display (sdResolverName sd)
     go bundle
     where
         go info = do
@@ -403,13 +403,13 @@ getWorkingResolverPlan whichCmd stackYaml initOpts bundle sd = do
 
                         if length ignored > 1 then do
                           logWarn "*** Ignoring packages:"
-                          logWarn $ indent $ showItems ignored
+                          logWarn $ display $ indent $ showItems ignored
                         else
                           logWarn $ "*** Ignoring package: "
-                                 <> T.pack (packageNameString
-                                                (case ignored of
-                                                    [] -> error "getWorkingResolverPlan.head"
-                                                    x:_ -> x))
+                                 <> display
+                                      (case ignored of
+                                        [] -> error "getWorkingResolverPlan.head"
+                                        x:_ -> x)
 
                         go available
                     where
@@ -452,17 +452,17 @@ checkBundleResolver whichCmd stackYaml initOpts bundle sd = do
         BuildPlanCheckFail _ e _
             | omitPackages initOpts -> do
                 logWarn $ "*** Resolver compiler mismatch: "
-                           <> sdResolverName sd
-                logWarn $ indent $ T.pack $ show result
+                           <> display (sdResolverName sd)
+                logWarn $ display $ indent $ T.pack $ show result
                 return $ Left $ failedUserPkgs e
             | otherwise -> throwM $ ResolverMismatch whichCmd (sdResolverName sd) (show result)
     where
       resolver = sdResolver sd
       indent t  = T.unlines $ fmap ("    " <>) (T.lines t)
       warnPartial res = do
-          logWarn $ "*** Resolver " <> sdResolverName sd
+          logWarn $ "*** Resolver " <> display (sdResolverName sd)
                       <> " will need external packages: "
-          logWarn $ indent $ T.pack $ show res
+          logWarn $ display $ indent $ T.pack $ show res
 
       failedUserPkgs e = Map.keys $ Map.unions (Map.elems (fmap deNeededBy e))
 

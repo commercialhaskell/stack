@@ -114,23 +114,23 @@ resolveSinglePackageLocation projRoot (PLArchive (Archive url subdir msha)) = do
           -- this is the wrong type of file.
 
           let tryTargz = do
-                logDebug $ "Trying to ungzip/untar " <> T.pack fp
+                logDebug $ "Trying to ungzip/untar " <> fromString fp
                 let entries = Tar.read $ GZip.decompress lbs
                 liftIO $ Tar.unpack (toFilePath dirTmp) entries
               tryZip = do
-                logDebug $ "Trying to unzip " <> T.pack fp
+                logDebug $ "Trying to unzip " <> fromString fp
                 let archive = Zip.toArchive lbs
                 liftIO $  Zip.extractFilesFromArchive [Zip.OptDestination
                                                        (toFilePath dirTmp)] archive
               tryTar = do
-                logDebug $ "Trying to untar (no ungzip) " <> T.pack fp
+                logDebug $ "Trying to untar (no ungzip) " <> fromString fp
                 let entries = Tar.read lbs
                 liftIO $ Tar.unpack (toFilePath dirTmp) entries
               err = throwM $ UnableToExtractArchive url file
 
               catchAnyLog goodpath handler =
                   catchAny goodpath $ \e -> do
-                      logDebug $ "Got exception: " <> T.pack (show e)
+                      logDebug $ "Got exception: " <> displayShow e
                       handler
 
           tryTargz `catchAnyLog` tryZip `catchAnyLog` tryTar `catchAnyLog` err
@@ -205,7 +205,7 @@ cloneRepo projRoot url commit repoType' = do
         let cloneAndExtract commandName cloneArgs resetCommand =
               withWorkingDir (toFilePath root) $ do
                 ensureDir root
-                logInfo $ "Cloning " <> commit <> " from " <> url
+                logInfo $ "Cloning " <> display commit <> " from " <> display url
                 withProc commandName
                        ("clone" :
                         cloneArgs ++
@@ -218,7 +218,11 @@ cloneRepo projRoot url commit repoType' = do
                     (resetCommand ++ [T.unpack commit, "--"])
                     `catchAny` \case
                         ex -> do
-                            logInfo $ "Please ensure that commit " <> commit <> " exists within " <> url
+                            logInfo $
+                              "Please ensure that commit " <>
+                              display commit <>
+                              " exists within " <>
+                              display url
                             throwM ex
 
         case repoType' of

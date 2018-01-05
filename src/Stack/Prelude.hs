@@ -110,6 +110,6 @@ logProcessStderrStdout
     -> [String]
     -> RIO env ()
 logProcessStderrStdout name args = do
-    let logLines = CB.lines .| CL.mapM_ (logInfo . decodeUtf8With lenientDecode)
+    let logLines = CB.lines .| CL.mapM_ (logInfo . displayBytesUtf8)
     ((), ()) <- sinkProcessStderrStdout name args logLines logLines
     return ()

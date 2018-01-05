@@ -103,7 +103,7 @@ logJSONWarnings
     :: (MonadReader env m, HasLogFunc env, HasCallStack, MonadIO m)
     => FilePath -> [JSONWarning] -> m ()
 logJSONWarnings fp =
-    mapM_ (\w -> logWarn ("Warning: " <> T.pack fp <> ": " <> T.pack (show w)))
+    mapM_ (\w -> logWarn ("Warning: " <> fromString fp <> ": " <> displayShow w))
 
 -- | Handle warnings in a sub-object.
 jsonSubWarnings :: WarningParser (WithJSONWarnings a) -> WarningParser a
