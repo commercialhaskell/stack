@@ -14,7 +14,9 @@ Bug fixes:
 * 1.6.1 introduced a change that made some precompiled cache files use
   longer paths, sometimes causing builds to fail on windows. This has been
   fixed. See [#3649](https://github.com/commercialhaskell/stack/issues/3649)
-
+* Some unnecessary rebuilds when no files were changed are now avoided, by
+  having a separate build cache for each component of a package. See
+  [#3732](https://github.com/commercialhaskell/stack/issues/3732).
 
 ## v1.6.3
 

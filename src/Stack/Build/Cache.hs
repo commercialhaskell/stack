@@ -107,10 +107,24 @@ markExeNotInstalled loc ident = do
     ident' <- parseRelFile $ packageIdentifierString ident
     liftIO $ ignoringAbsence (removeFile $ dir </> ident')
 
+buildCacheFile :: (HasEnvConfig env, MonadReader env m, MonadThrow m)
+               => Path Abs Dir
+               -> NamedComponent
+               -> m (Path Abs File)
+buildCacheFile dir component = do
+    cachesDir <- buildCachesDir dir
+    let nonLibComponent prefix name = prefix <> "-" <> T.unpack name
+    cacheFileName <- parseRelFile $ case component of
+        CLib -> "lib"
+        CExe name -> nonLibComponent "exe" name
+        CTest name -> nonLibComponent "test" name
+        CBench name -> nonLibComponent "bench" name
+    return $ cachesDir </> cacheFileName
+
 -- | Try to read the dirtiness cache for the given package directory.
 tryGetBuildCache :: (MonadUnliftIO m, MonadReader env m, MonadThrow m, MonadLogger m, HasEnvConfig env)
-                 => Path Abs Dir -> m (Maybe (Map FilePath FileCacheInfo))
-tryGetBuildCache dir = liftM (fmap buildCacheTimes) . $(versionedDecodeFile buildCacheVC) =<< buildCacheFile dir
+                 => Path Abs Dir -> NamedComponent -> m (Maybe (Map FilePath FileCacheInfo))
+tryGetBuildCache dir component = liftM (fmap buildCacheTimes) . $(versionedDecodeFile buildCacheVC) =<< buildCacheFile dir component
 
 -- | Try to read the dirtiness cache for the given package directory.
 tryGetConfigCache :: (MonadUnliftIO m, MonadReader env m, MonadThrow m, HasEnvConfig env, MonadLogger m)
@@ -124,9 +138,9 @@ tryGetCabalMod dir = $(versionedDecodeFile modTimeVC) =<< configCabalMod dir
 
 -- | Write the dirtiness cache for this package's files.
 writeBuildCache :: (MonadIO m, MonadReader env m, MonadThrow m, HasEnvConfig env, MonadLogger m)
-                => Path Abs Dir -> Map FilePath FileCacheInfo -> m ()
-writeBuildCache dir times = do
-    fp <- buildCacheFile dir
+                => Path Abs Dir -> NamedComponent -> Map FilePath FileCacheInfo -> m ()
+writeBuildCache dir component times = do
+    fp <- buildCacheFile dir component
     $(versionedEncodeFile buildCacheVC) fp BuildCache
         { buildCacheTimes = times
         }
