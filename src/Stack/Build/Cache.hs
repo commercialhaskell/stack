@@ -54,6 +54,7 @@ import           Stack.Types.BuildPlan
 import           Stack.Types.Compiler
 import           Stack.Types.Config
 import           Stack.Types.GhcPkgId
+import           Stack.Types.NamedComponent
 import           Stack.Types.Package
 import           Stack.Types.PackageIdentifier
 import           Stack.Types.Version
@@ -107,10 +108,26 @@ markExeNotInstalled loc ident = do
     ident' <- parseRelFile $ packageIdentifierString ident
     liftIO $ ignoringAbsence (removeFile $ dir </> ident')
 
+buildCacheFile :: (HasEnvConfig env, MonadReader env m, MonadThrow m)
+               => Path Abs Dir
+               -> NamedComponent
+               -> m (Path Abs File)
+buildCacheFile dir component = do
+    cachesDir <- buildCachesDir dir
+    let nonLibComponent prefix name = prefix <> "-" <> T.unpack name
+    cacheFileName <- parseRelFile $ case component of
+        CLib -> "lib"
+        CExe name -> nonLibComponent "exe" name
+        CTest name -> nonLibComponent "test" name
+        CBench name -> nonLibComponent "bench" name
+    return $ cachesDir </> cacheFileName
+
 -- | Try to read the dirtiness cache for the given package directory.
 tryGetBuildCache :: HasEnvConfig env
-                 => Path Abs Dir -> RIO env (Maybe (Map FilePath FileCacheInfo))
-tryGetBuildCache dir = liftM (fmap buildCacheTimes) . $(versionedDecodeFile buildCacheVC) =<< buildCacheFile dir
+                 => Path Abs Dir
+                 -> NamedComponent
+                 -> RIO env (Maybe (Map FilePath FileCacheInfo))
+tryGetBuildCache dir component = liftM (fmap buildCacheTimes) . $(versionedDecodeFile buildCacheVC) =<< buildCacheFile dir component
 
 -- | Try to read the dirtiness cache for the given package directory.
 tryGetConfigCache :: HasEnvConfig env
@@ -124,9 +141,11 @@ tryGetCabalMod dir = $(versionedDecodeFile modTimeVC) =<< configCabalMod dir
 
 -- | Write the dirtiness cache for this package's files.
 writeBuildCache :: HasEnvConfig env
-                => Path Abs Dir -> Map FilePath FileCacheInfo -> RIO env ()
-writeBuildCache dir times = do
-    fp <- buildCacheFile dir
+                => Path Abs Dir
+                -> NamedComponent
+                -> Map FilePath FileCacheInfo -> RIO env ()
+writeBuildCache dir component times = do
+    fp <- buildCacheFile dir component
     $(versionedEncodeFile buildCacheVC) fp BuildCache
         { buildCacheTimes = times
         }

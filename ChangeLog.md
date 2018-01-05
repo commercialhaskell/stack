@@ -49,6 +49,9 @@ Bug fixes:
   may interfere with benchmarks. It also prevented benchmark output from
   being displayed by default. This is now fixed. See
   [#3663](https://github.com/commercialhaskell/stack/issues/3663).
+* Some unnecessary rebuilds when no files were changed are now avoided, by
+  having a separate build cache for each component of a package. See
+  [#3732](https://github.com/commercialhaskell/stack/issues/3732).
 
 ## v1.6.3
 
