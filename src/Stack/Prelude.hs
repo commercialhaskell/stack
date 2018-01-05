@@ -76,8 +76,7 @@ sinkProcessStderrStdout
   -> RIO env (e,o)
 sinkProcessStderrStdout name args sinkStderr sinkStdout =
   withProc name args $ \pc0 -> do
-    let pc = setStdin closed
-           $ setStdout createSource
+    let pc = setStdout createSource
            $ setStderr createSource
              pc0
     withProcess_ pc $ \p ->
@@ -87,7 +86,7 @@ sinkProcessStderrStdout name args sinkStderr sinkStdout =
 -- | Consume the stdout of a process feeding strict 'ByteString's to a consumer.
 -- If the process fails, spits out stdout and stderr as error log
 -- level. Should not be used for long-running processes or ones with
--- lots of output; for that use 'logProcessStderrStdout'.
+-- lots of output; for that use 'sinkProcessStderrStdout'.
 --
 -- Throws a 'ReadProcessException' if unsuccessful.
 sinkProcessStdout
