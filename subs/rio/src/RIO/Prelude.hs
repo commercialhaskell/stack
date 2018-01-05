@@ -22,6 +22,8 @@ module RIO.Prelude
   , LByteString
   , toStrictBytes
   , fromStrictBytes
+  , decodeUtf8Lenient
+  , LText
   , view
   , UVector
   , SVector
@@ -111,6 +113,7 @@ import           Text.Read            as X (Read, readMaybe)
 import           UnliftIO             as X
 
 import qualified Data.Text            as T
+import qualified Data.Text.Lazy       as TL
 
 import qualified Data.ByteString      as B
 import qualified Data.ByteString.Lazy as BL
@@ -221,3 +224,8 @@ view l = asks (getConst #. l Const)
 type UVector = UVector.Vector
 type SVector = SVector.Vector
 type GVector = GVector.Vector
+
+decodeUtf8Lenient :: ByteString -> Text
+decodeUtf8Lenient = decodeUtf8With lenientDecode
+
+type LText = TL.Text
