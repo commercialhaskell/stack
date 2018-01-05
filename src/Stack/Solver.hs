@@ -34,7 +34,6 @@ import qualified Data.Map as Map
 import qualified Data.Set as Set
 import qualified Data.Text as T
 import           Data.Text.Encoding (decodeUtf8, encodeUtf8)
-import qualified Data.Text.Lazy as LT
 import           Data.Tuple (swap)
 import qualified Data.Yaml as Yaml
 import qualified Distribution.Package as C
@@ -110,7 +109,7 @@ cabalSolver cabalfps constraintType
                toConstraintArgs (flagConstraints constraintType) ++
                fmap toFilePath cabalfps
 
-    try ( withWorkingDir tmpdir
+    try ( withWorkingDir (toFilePath tmpdir)
         $ withProc "cabal" args readProcessStdout_
         )
         >>= either
@@ -302,7 +301,7 @@ setupCabalEnv compiler inner = do
   mpaths <- setupCompiler compiler
   menv0 <- view envOverrideL
   envMap <- removeHaskellEnvVars
-            <$> augmentPathMap (maybe [] edBins mpaths)
+            <$> augmentPathMap (toFilePath <$> maybe [] edBins mpaths)
                                (unEnvOverride menv0)
   menv <- mkEnvOverride envMap
   withEnvOverride menv $ do

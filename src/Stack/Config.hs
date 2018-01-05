@@ -322,7 +322,7 @@ configFromConfigMonoid
          throwM ManualGHCVariantSettingsAreIncompatibleWithSystemGHC
 
      rawEnv <- liftIO getEnvironment
-     pathsEnv <- augmentPathMap configMonoidExtraPath
+     pathsEnv <- augmentPathMap (map toFilePath configMonoidExtraPath)
                                 (Map.fromList (map (T.pack *** T.pack) rawEnv))
      origEnv <- mkEnvOverride pathsEnv
      let configEnvOverrideSettings _ = return origEnv

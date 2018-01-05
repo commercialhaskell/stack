@@ -213,7 +213,7 @@ generateHaddockIndex descr wc bco dumpPackages docRelFP destDir = do
                     (T.concat ["Updating Haddock index for ", descr, " in\n",
                                T.pack (toFilePath destIndexFile)])
                 liftIO (mapM_ copyPkgDocs interfaceOpts)
-                withWorkingDir destDir $ readProcessNull
+                withWorkingDir (toFilePath destDir) $ readProcessNull
                     (haddockExeName wc)
                     (map (("--optghc=-package-db=" ++ ) . toFilePathNoTrailingSep)
                         [bcoSnapDB bco, bcoLocalDB bco] ++

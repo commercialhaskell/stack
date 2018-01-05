@@ -107,7 +107,7 @@ scriptCmd opts go' = do
             let dir = parent file
             -- use sinkProcessStdout to ensure a ProcessFailed
             -- exception is generated for better error messages
-            withWorkingDir dir $ sinkProcessStdout
+            withWorkingDir (toFilePath dir) $ sinkProcessStdout
               (compilerExeName wc)
               (ghcArgs ++ [toFilePath file])
               CL.sinkNull

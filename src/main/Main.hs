@@ -38,7 +38,6 @@ import           Distribution.System (buildArch)
 import qualified Distribution.Text as Cabal (display)
 import           Distribution.Version (mkVersion')
 import           GHC.IO.Encoding (mkTextEncoding, textEncodingName)
-import           Lens.Micro
 import           Options.Applicative
 import           Options.Applicative.Help (errorHelp, stringChunk, vcatChunks)
 import           Options.Applicative.Builder.Extra

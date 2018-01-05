@@ -302,7 +302,7 @@ getSetupExe setupHs setupShimHs tmpdir = do
                     , toFilePath tmpOutputPath
                     ] ++
                     ["-build-runner" | wc == Ghcjs]
-            withWorkingDir tmpdir (withProc (compilerExeName wc) args $ \pc0 -> do
+            withWorkingDir (toFilePath tmpdir) (withProc (compilerExeName wc) args $ \pc0 -> do
               let pc = setStdout (useHandleOpen stderr) pc0
               runProcess_ pc)
                 `catch` \ece -> do
@@ -843,7 +843,7 @@ ensureConfig newConfigCache pkgDir ExecuteEnv {..} announce cabal cabalfp task =
             mpath <- findExecutable menv name
             return $ case mpath of
                 Nothing -> []
-                Just x -> return $ concat ["--with-", name, "=", toFilePath x]
+                Just x -> return $ concat ["--with-", name, "=", x]
         -- Configure cabal with arguments determined by
         -- Stack.Types.Build.configureOpts
         cabal KeepTHLoading $ "configure" : concat
@@ -865,7 +865,7 @@ ensureConfig newConfigCache pkgDir ExecuteEnv {..} announce cabal cabalfp task =
       exists <- doesFileExist fp
       unless exists $ do
         logInfo $ "Trying to generate configure with autoreconf in " <> T.pack (toFilePath pkgDir)
-        withWorkingDir pkgDir $ readProcessNull "autoreconf" ["-i"] `catchAny` \ex ->
+        withWorkingDir (toFilePath pkgDir) $ readProcessNull "autoreconf" ["-i"] `catchAny` \ex ->
           logWarn $ "Unable to run autoreconf: " <> T.pack (show ex)
 
 announceTask :: HasLogFunc env => Task -> Text -> RIO env ()
@@ -1128,7 +1128,7 @@ withSingleContext ActionContext {..} ExecuteEnv {..} task@Task {..} mdeps msuffi
                             bss
                   where
                     runAndOutput :: CompilerVersion 'CVActual -> RIO env ()
-                    runAndOutput compilerVer = withWorkingDir pkgDir $ withEnvOverride menv $ case mlogFile of
+                    runAndOutput compilerVer = withWorkingDir (toFilePath pkgDir) $ withEnvOverride menv $ case mlogFile of
                         Just (_, h) ->
                             withProc (toFilePath exeName) fullArgs
                           $ runProcess_
@@ -1446,7 +1446,7 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
             sourceFlag <- if not (boptsHaddockHyperlinkSource eeBuildOpts) then return [] else do
                 -- See #2429 for why the temp dir is used
                 ec
-                  <- withWorkingDir eeTempDir
+                  <- withWorkingDir (toFilePath eeTempDir)
                    $ withProc "haddock" ["--hyperlinked-source"]
                    $ \pc -> withProcess
                      (setStdout createSource $ setStderr createSource pc) $ \p ->
@@ -1705,7 +1705,7 @@ singleTest topts testsToRun ac ee task installedMap = do
                                     Nothing -> id
                                     Just (_, h) -> setter (useHandleOpen h)
 
-                        ec <- withWorkingDir pkgDir $
+                        ec <- withWorkingDir (toFilePath pkgDir) $
                           withProc (toFilePath exePath) args $ \pc0 -> do
                             let pc = setStdin createPipe
                                    $ output setStdout

@@ -259,7 +259,7 @@ runTemplateInits dir = do
     case configScmInit config of
         Nothing -> return ()
         Just Git ->
-            withWorkingDir dir $
+            withWorkingDir (toFilePath dir) $
             catchAny (withProc "git" ["init"] runProcess_)
                   (\_ -> logInfo "git init failed to run, ignoring ...")
 

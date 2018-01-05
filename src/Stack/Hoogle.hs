@@ -14,7 +14,7 @@ import           Data.Char (isSpace)
 import           Data.List (find)
 import qualified Data.Set as Set
 import qualified Data.Text as T
-import           Lens.Micro
+import           Path (parseAbsFile)
 import           Path.IO hiding (findExecutable)
 import qualified Stack.Build
 import           Stack.Fetch
@@ -158,11 +158,11 @@ hoogleCmd (args,setup,rebuild) go = withBuildConfig go $ do
             Nothing -> return $ Left "Hoogle isn't installed."
             Just hooglePath -> do
                 result <- withEnvOverride menv
-                        $ withProc (toFilePath hooglePath) ["--numeric-version"]
+                        $ withProc hooglePath ["--numeric-version"]
                         $ tryAny . readProcessStdout_
                 let unexpectedResult got = Left $ T.concat
                         [ "'"
-                        , T.pack (toFilePath hooglePath)
+                        , T.pack hooglePath
                         , " --numeric-version' did not respond with expected value. Got: "
                         , got
                         ]
@@ -174,20 +174,20 @@ hoogleCmd (args,setup,rebuild) go = withBuildConfig go $ do
                             | ver >= hoogleMinVersion -> Right hooglePath
                             | otherwise -> Left $ T.concat
                                 [ "Installed Hoogle is too old, "
-                                , T.pack (toFilePath hooglePath)
+                                , T.pack hooglePath
                                 , " is version "
                                 , versionText ver
                                 , " but >= 5.0 is required."
                                 ]
         case eres of
-            Right hooglePath -> return hooglePath
+            Right hooglePath -> parseAbsFile hooglePath
             Left err
                 | setup -> do
                     logWarn $ err <> " Automatically installing (use --no-setup to disable) ..."
                     installHoogle
                     mhooglePath' <- findExecutable menv "hoogle"
                     case mhooglePath' of
-                        Just hooglePath -> return hooglePath
+                        Just hooglePath -> parseAbsFile hooglePath
                         Nothing -> do
                             logWarn "Couldn't find hoogle in path after installing.  This shouldn't happen, may be a bug."
                             bail

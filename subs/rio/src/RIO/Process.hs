@@ -50,9 +50,6 @@ import qualified Data.Text.Lazy as TL
 import qualified Data.Text.Lazy.Encoding as TLE
 import           Data.Text.Encoding.Error (lenientDecode)
 import           Lens.Micro (set, to)
-import           Path
-import           Path.Extra
-import           Path.IO hiding (findExecutable)
 import qualified System.Directory as D
 import           System.Environment (getEnvironment)
 import           System.Exit (exitWith)
@@ -83,12 +80,12 @@ data EnvOverride = EnvOverride
     { eoTextMap :: Map Text Text -- ^ Environment variables as map
     , eoStringList :: [(String, String)] -- ^ Environment variables as association list
     , eoPath :: [FilePath] -- ^ List of directories searched for executables (@PATH@)
-    , eoExeCache :: IORef (Map FilePath (Either ReadProcessException (Path Abs File)))
+    , eoExeCache :: IORef (Map FilePath (Either ReadProcessException FilePath))
     , eoExeExtensions :: [String] -- ^ @[""]@ on non-Windows systems, @["", ".exe", ".bat"]@ on Windows
-    , eoWorkingDir :: !(Maybe (Path Abs Dir))
+    , eoWorkingDir :: !(Maybe FilePath)
     }
 
-workingDirL :: HasEnvOverride env => Lens' env (Maybe (Path Abs Dir))
+workingDirL :: HasEnvOverride env => Lens' env (Maybe FilePath)
 workingDirL = envOverrideL.lens eoWorkingDir (\x y -> x { eoWorkingDir = y })
 
 -- | Get the environment variables from an 'EnvOverride'.
@@ -188,10 +185,10 @@ withProc name0 args inner = do
   menv <- view envOverrideL
   name <- preProcess name0
 
-  withProcessTimeLog (toFilePath <$> eoWorkingDir menv) name args
+  withProcessTimeLog (eoWorkingDir menv) name args
     $ inner
     $ setEnv (envHelper menv)
-    $ maybe id (setWorkingDir . toFilePath) (eoWorkingDir menv)
+    $ maybe id setWorkingDir (eoWorkingDir menv)
 
     -- sensible default in Stack: we do not want subprocesses to be
     -- able to interact with the user by default. If a specific case
@@ -217,7 +214,7 @@ withEnvOverride newEnv = local $ \r ->
    in set envOverrideL newEnv' r
 
 -- | Set the working directory to be used by child processes.
-withWorkingDir :: HasEnvOverride env => Path Abs Dir -> RIO env a -> RIO env a
+withWorkingDir :: HasEnvOverride env => FilePath -> RIO env a -> RIO env a
 withWorkingDir = local . set workingDirL . Just
 
 -- | Perform pre-call-process tasks.  Ensure the working directory exists and find the
@@ -231,8 +228,8 @@ preProcess
 preProcess name = do
   menv <- view envOverrideL
   let wd = eoWorkingDir menv
-  name' <- liftIO $ liftM toFilePath $ join $ findExecutable menv name
-  maybe (return ()) ensureDir wd
+  name' <- liftIO $ join $ findExecutable menv name
+  liftIO $ maybe (return ()) (D.createDirectoryIfMissing True) wd
   return name'
 
 -- | Check if the given executable exists on the given PATH.
@@ -248,7 +245,7 @@ doesExecutableExist menv name = liftM isJust $ findExecutable menv name
 findExecutable :: (MonadIO m, MonadThrow n)
   => EnvOverride       -- ^ How to override environment
   -> String            -- ^ Name of executable
-  -> m (n (Path Abs File)) -- ^ Full path to that executable on success
+  -> m (n FilePath) -- ^ Full path to that executable on success
 findExecutable eo name0 | any FP.isPathSeparator name0 = do
     let names0 = map (name0 ++) (eoExeExtensions eo)
         testNames [] = return $ throwM $ ExecutableNotFoundAt name0
@@ -256,7 +253,7 @@ findExecutable eo name0 | any FP.isPathSeparator name0 = do
             exists <- liftIO $ D.doesFileExist name
             if exists
                 then do
-                    path <- liftIO $ resolveFile' name
+                    path <- liftIO $ D.canonicalizePath name
                     return $ return path
                 else testNames names
     testNames names0
@@ -275,7 +272,7 @@ findExecutable eo name = liftIO $ do
                             existsExec <- if exists then liftM D.executable $ D.getPermissions fp else return False
                             if existsExec
                                 then do
-                                    fp' <- D.makeAbsolute fp >>= parseAbsFile
+                                    fp' <- D.makeAbsolute fp
                                     return $ return fp'
                                 else testFPs fps
                     testFPs fps0
@@ -310,17 +307,16 @@ instance Show InvalidPathException where
         ] ++ paths
 
 -- | Augment the PATH environment variable with the given extra paths.
-augmentPath :: MonadThrow m => [Path Abs Dir] -> Maybe Text -> m Text
+augmentPath :: MonadThrow m => [FilePath] -> Maybe Text -> m Text
 augmentPath dirs mpath =
-  do let illegal = filter (FP.searchPathSeparator `elem`) (map toFilePath dirs)
+  do let illegal = filter (FP.searchPathSeparator `elem`) dirs
      unless (null illegal) (throwM $ PathsInvalidInPath illegal)
      return $ T.intercalate (T.singleton FP.searchPathSeparator)
-            $ map (T.pack . toFilePathNoTrailingSep) dirs
+            $ map (T.pack . FP.dropTrailingPathSeparator) dirs
             ++ maybeToList mpath
 
 -- | Apply 'augmentPath' on the PATH value in the given Map.
-augmentPathMap :: MonadThrow m => [Path Abs Dir] -> Map Text Text
-                               -> m (Map Text Text)
+augmentPathMap :: MonadThrow m => [FilePath] -> Map Text Text -> m (Map Text Text)
 augmentPathMap dirs origEnv =
   do path <- augmentPath dirs mpath
      return $ Map.insert "PATH" path origEnv

@@ -289,8 +289,9 @@ runContainerAndExit getCmdArgs
                          (isTerm || (isNothing bamboo && isNothing jenkins))
      hostBinDirPath <- parseAbsDir hostBinDir
      newPathEnv <- augmentPath
+                      ( toFilePath <$>
                       [ hostBinDirPath
-                      , sandboxHomeDir </> $(mkRelDir ".local/bin")]
+                      , sandboxHomeDir </> $(mkRelDir ".local/bin")])
                       (T.pack <$> lookupImageEnv "PATH" imageEnvVars)
      (cmnd,args,envVars,extraMount) <- getCmdArgs docker imageInfo isRemoteDocker
      pwd <- getCurrentDir
@@ -310,7 +311,7 @@ runContainerAndExit getCmdArgs
              (Files.createSymbolicLink
                  (toFilePathNoTrailingSep sshDir)
                  (toFilePathNoTrailingSep (sandboxHomeDir </> sshRelDir))))
-     containerID <- withWorkingDir projectRoot $ (trim . decodeUtf8) <$> readDockerProcess
+     containerID <- withWorkingDir (toFilePath projectRoot) $ (trim . decodeUtf8) <$> readDockerProcess
        (concat
          [["create"
           ,"--net=host"

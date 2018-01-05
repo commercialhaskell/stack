@@ -13,6 +13,7 @@ module RIO.Prelude
   , stripCR
   , RIO (..)
   , runRIO
+  , liftRIO
   , tshow
   , readFileBinary
   , writeFileBinary
@@ -84,7 +85,6 @@ import           Data.Monoid          as X (All (..), Any (..), Endo (..),
                                             Product (..), Sum (..), (<>))
 import           Data.Ord             as X (Ord (..), Ordering (..), comparing)
 import           Data.Set             as X (Set)
-import           Data.Store           as X (Store)
 import           Data.String          as X (IsString (..))
 import           Data.Text            as X (Text)
 import           Data.Text.Encoding   as X (encodeUtf8, decodeUtf8', decodeUtf8With)

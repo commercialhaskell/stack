@@ -1380,7 +1380,8 @@ hpack pkgDir = do
                         , flow "then please delete the cabal file."
                         ]
             HpackCommand command ->
-                withWorkingDir pkgDir $ withProc command [] runProcess_
+                withWorkingDir (toFilePath pkgDir) $
+                withProc command [] runProcess_
 
 -- | Path for the package's build log.
 buildLogPath :: (MonadReader env m, HasBuildConfig env, MonadThrow m)

@@ -28,6 +28,7 @@ import qualified Data.Conduit.Binary as CB
 import qualified Data.Conduit.List as CL
 import           Data.Conduit.Process.Typed (withLoggedProcess_, createSource)
 import           RIO.Process (HasEnvOverride, setStdin, closed, getStderr, getStdout, withProc, withProcess_, setStdout, setStderr)
+import           Data.Store           as X (Store)
 import           Data.Text.Encoding (decodeUtf8With)
 import           Data.Text.Encoding.Error (lenientDecode)
 

@@ -13,9 +13,6 @@ dependencies:
 - hashable
 - microlens
 - mtl
-- path # FIXME drop
-- path-io # FIXME drop
-- store # FIXME drop
 - text
 - time
 - typed-process >= 0.2.1.0

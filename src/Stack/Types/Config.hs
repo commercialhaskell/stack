@@ -1444,7 +1444,7 @@ getCompilerPath wc = do
     config' <- view configL
     eoWithoutLocals <- liftIO $
         configEnvOverrideSettings config' minimalEnvSettings { esLocaleUtf8 = True }
-    join (findExecutable eoWithoutLocals (compilerExeName wc))
+    join (findExecutable eoWithoutLocals (compilerExeName wc)) >>= parseAbsFile
 
 data ProjectAndConfigMonoid
   = ProjectAndConfigMonoid !Project !ConfigMonoid

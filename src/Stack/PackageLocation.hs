@@ -202,7 +202,8 @@ cloneRepo projRoot url commit repoType' = do
     unless exists $ do
         liftIO $ ignoringAbsence (removeDirRecur dir)
 
-        let cloneAndExtract commandName cloneArgs resetCommand = withWorkingDir root $ do
+        let cloneAndExtract commandName cloneArgs resetCommand =
+              withWorkingDir (toFilePath root) $ do
                 ensureDir root
                 logInfo $ "Cloning " <> commit <> " from " <> url
                 withProc commandName
@@ -213,7 +214,7 @@ cloneRepo projRoot url commit repoType' = do
                         ]) runProcess_
                 created <- doesDirExist dir
                 unless created $ throwM $ FailedToCloneRepo commandName
-                withWorkingDir dir $ readProcessNull commandName
+                withWorkingDir (toFilePath dir) $ readProcessNull commandName
                     (resetCommand ++ [T.unpack commit, "--"])
                     `catchAny` \case
                         ex -> do

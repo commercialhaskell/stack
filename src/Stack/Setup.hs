@@ -242,7 +242,9 @@ setupEnv mResolveMissingGHC = do
     -- is being used
     menv0 <- view envOverrideL
     env <- removeHaskellEnvVars
-             <$> augmentPathMap (maybe [] edBins mghcBin) (unEnvOverride menv0)
+             <$> augmentPathMap
+                    (map toFilePath $ maybe [] edBins mghcBin)
+                    (unEnvOverride menv0)
     menv <- mkEnvOverride env
 
     (compilerVer, cabalVer, globaldb) <- withEnvOverride menv $ runConcurrently $ (,,)
@@ -276,8 +278,8 @@ setupEnv mResolveMissingGHC = do
     -- extra installation bin directories
     mkDirs <- runReaderT extraBinDirs envConfig0
     let mpath = Map.lookup "PATH" env
-    depsPath <- augmentPath (mkDirs False) mpath
-    localsPath <- augmentPath (mkDirs True) mpath
+    depsPath <- augmentPath (toFilePath <$> mkDirs False) mpath
+    localsPath <- augmentPath (toFilePath <$> mkDirs True) mpath
 
     deps <- runReaderT packageDatabaseDeps envConfig0
     withEnvOverride menv $ createDatabase wc deps
@@ -514,7 +516,7 @@ ensureCompiler sopts = do
             Nothing -> view envOverrideL
             Just ed -> do
                 menv0 <- view envOverrideL
-                m <- augmentPathMap (edBins ed) (unEnvOverride menv0)
+                m <- augmentPathMap (toFilePath <$> edBins ed) (unEnvOverride menv0)
                 mkEnvOverride (removeHaskellEnvVars m)
 
     forM_ (soptsUpgradeCabal sopts) $ \version -> do
@@ -720,7 +722,8 @@ doCabalInstall wc installed wantedVersion = do
             ident = PackageIdentifier name wantedVersion
         m <- unpackPackageIdents tmpdir Nothing [PackageIdentifierRevision ident CFILatest]
         menv <- view envOverrideL
-        compilerPath <- join $ findExecutable menv (compilerExeName wc)
+        compilerPath <- join (findExecutable menv (compilerExeName wc))
+                    >>= parseAbsFile
         versionDir <- parseRelDir $ versionString wantedVersion
         let installRoot = toFilePath $ parent (parent compilerPath)
                                     </> $(mkRelDir "new-cabal")
@@ -728,7 +731,7 @@ doCabalInstall wc installed wantedVersion = do
         dir <- case Map.lookup ident m of
             Nothing -> error "upgradeCabal: Invariant violated, dir missing"
             Just dir -> return dir
-        withWorkingDir dir $ withProc (compilerExeName wc) ["Setup.hs"] runProcess_
+        withWorkingDir (toFilePath dir) $ withProc (compilerExeName wc) ["Setup.hs"] runProcess_
         platform <- view platformL
         let setupExe = toFilePath $ dir </> case platform of
                 Platform _ Cabal.Windows -> $(mkRelFile "Setup.exe")
@@ -739,7 +742,7 @@ doCabalInstall wc installed wantedVersion = do
                                        , installRoot FP.</> name'
                                        ]
             args = "configure" : map dirArgument (words "lib bin data doc")
-        withWorkingDir dir $ do
+        withWorkingDir (toFilePath dir) $ do
           withProc setupExe args runProcess_
           withProc setupExe ["build"] runProcess_
           withProc setupExe ["install"] runProcess_
@@ -1085,7 +1088,7 @@ installGHCPosix version downloadInfo _ archiveFile archiveType tempDir destDir =
 
     let runStep step wd env cmd args = do
             menv' <- modifyEnvOverride menv (Map.union env)
-            result <- withWorkingDir wd
+            result <- withWorkingDir (toFilePath wd)
                     $ withEnvOverride menv'
                     $ withProc cmd args
                     $ try
@@ -1171,7 +1174,7 @@ installGHCJS si archiveFile archiveType _tempDir destDir = do
             return $ do
                 liftIO $ ignoringAbsence (removeDirRecur destDir)
                 liftIO $ ignoringAbsence (removeDirRecur unpackDir)
-                withEnvOverride menv $ withWorkingDir destDir $ readProcessNull tarTool ["xf", toFilePath archiveFile]
+                withEnvOverride menv $ withWorkingDir (toFilePath destDir) $ readProcessNull tarTool ["xf", toFilePath archiveFile]
                 innerDir <- expectSingleUnpackedDir archiveFile destDir
                 renameDir innerDir unpackDir
 
@@ -1416,10 +1419,11 @@ installMsys2Windows osKey si archiveFile archiveType _tempDir destDir = do
     -- run happens, you can just run commands as usual.
     menv0 <- view envOverrideL
     newEnv0 <- modifyEnvOverride menv0 $ Map.insert "MSYSTEM" "MSYS"
-    newEnv <- augmentPathMap [destDir </> $(mkRelDir "usr") </> $(mkRelDir "bin")]
-                             (unEnvOverride newEnv0)
+    newEnv <- augmentPathMap
+                  [toFilePath $ destDir </> $(mkRelDir "usr") </> $(mkRelDir "bin")]
+                  (unEnvOverride newEnv0)
     menv <- mkEnvOverride newEnv
-    withWorkingDir destDir $ withEnvOverride menv
+    withWorkingDir (toFilePath destDir) $ withEnvOverride menv
       $ withProc "sh" ["--login", "-c", "true"] runProcess_
 
     -- No longer installing git, it's unreliable
@@ -1637,9 +1641,9 @@ sanityCheck wc = withSystemTempDir "stack-sanity-check" $ \dir -> do
         ]
     let exeName = compilerExeName wc
     menv <- view envOverrideL
-    ghc <- liftIO $ join $ findExecutable menv exeName
+    ghc <- liftIO $ join (findExecutable menv exeName) >>= parseAbsFile
     logDebug $ "Performing a sanity check on: " <> T.pack (toFilePath ghc)
-    eres <- withWorkingDir dir $ withProc exeName
+    eres <- withWorkingDir (toFilePath dir) $ withProc exeName
         [ fp
         , "-no-user-package-db"
         ] $ try . readProcessStdout_
