@@ -422,6 +422,11 @@ VER/settings` (replace `VER` with the GHC version) and adding `-no-pie` (or
 `--no-pie` in the case of Gentoo, at least as of December 2017) to the __C
 compiler link flags__.
 
+If `stack setup` complains that there is no `linuxNN-*-nopie` bindist available,
+try adding `ghc-build: *` (replacing the `*` with the actual value that
+precedes `-nopie`, which may be empty) to your `~/.stack/config.yaml` (this
+will no longer be necessary for stack >= 1.7).
+
 If you are experiencing this with GHC >= 8.0.2, try running `stack setup
 --reinstall` if you've upgraded your Linux distribution or you set up GHC
 before late December 2017.
