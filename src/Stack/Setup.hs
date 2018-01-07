@@ -43,11 +43,12 @@ import qualified    Data.ByteString.Lazy as LBS
 import qualified    Data.ByteString.Lazy.Char8 as BL8
 import              Data.Char (isSpace)
 import              Data.Conduit (await, yield, awaitForever)
+import qualified    Data.Conduit.Binary as CB
 import              Data.Conduit.Lazy (lazyConsume)
 import              Data.Conduit.Lift (evalStateC)
 import qualified    Data.Conduit.List as CL
 import              Data.Conduit.Process.Typed (eceStderr)
-import              Data.Conduit.Zlib           (ungzip)
+import              Data.Conduit.Zlib          (ungzip)
 import              Data.Foldable (maximumBy)
 import qualified    Data.HashMap.Strict as HashMap
 import              Data.IORef.RunOnce (runOnce)
@@ -1093,16 +1094,15 @@ installGHCPosix version downloadInfo _ archiveFile archiveType tempDir destDir =
 
     let runStep step wd env cmd args = do
             menv' <- modifyEnvOverride menv (Map.union env)
-            result <- withWorkingDir (toFilePath wd)
-                    $ withEnvOverride menv'
-                    $ withProc cmd args
-                    $ try
-                    . readProcessStdout_
-                    -- Calling the ./configure script requires that stdin is
-                    -- open
-                    . setStdin (useHandleOpen stdin)
+            result <- do
+                let logLines = CB.lines .| CL.mapM_ (logDebug . displayBytesUtf8)
+                withWorkingDir (toFilePath wd)
+                  $ withEnvOverride menv'
+                  $ try
+                  $ sinkProcessStderrStdout cmd args logLines logLines
+
             case result of
-                Right _ -> return ()
+                Right ((), ()) -> return ()
                 Left ex -> do
                     logError (displayShow (ex :: ReadProcessException))
                     prettyError $
@@ -1331,7 +1331,7 @@ bootGhcjs ghcjsVersion stackYaml destDir bootOpts = do
                 logError "Failed to find 'happy' executable after installing it."
                 failedToFindErr
     logSticky "Booting GHCJS (this will take a long time) ..."
-    withEnvOverride menv' $ logProcessStderrStdout "ghcjs-boot" bootOpts
+    withEnvOverride menv' $ withProc "ghcjs-boot" bootOpts logProcessStderrStdout
     logStickyDone "GHCJS booted."
 
 loadGhcjsEnvConfig :: HasRunner env

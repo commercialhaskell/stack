@@ -189,13 +189,6 @@ withProc name0 args inner = do
     $ inner
     $ setEnv (envHelper menv)
     $ maybe id setWorkingDir (eoWorkingDir menv)
-
-    -- sensible default in Stack: we do not want subprocesses to be
-    -- able to interact with the user by default. If a specific case
-    -- requires interaction, we can override with `setStdin
-    -- (useHandleOpen stdin)`.
-    $ setStdin closed
-
     $ proc name args
 
 -- | Apply the given function to the modified environment

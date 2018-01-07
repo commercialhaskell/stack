@@ -27,7 +27,7 @@ import           Data.Conduit.Binary (sourceHandle, sinkHandle)
 import qualified Data.Conduit.Binary as CB
 import qualified Data.Conduit.List as CL
 import           Data.Conduit.Process.Typed (withLoggedProcess_, createSource)
-import           RIO.Process (HasEnvOverride, setStdin, closed, getStderr, getStdout, withProc, withProcess_, setStdout, setStderr)
+import           RIO.Process (HasEnvOverride, setStdin, closed, getStderr, getStdout, withProc, withProcess_, setStdout, setStderr, ProcessConfig)
 import           Data.Store           as X (Store)
 import           Data.Text.Encoding (decodeUtf8With)
 import           Data.Text.Encoding.Error (lenientDecode)
@@ -78,8 +78,7 @@ sinkProcessStderrStdout
   -> RIO env (e,o)
 sinkProcessStderrStdout name args sinkStderr sinkStdout =
   withProc name args $ \pc0 -> do
-    let pc = setStdin closed
-           $ setStdout createSource
+    let pc = setStdout createSource
            $ setStderr createSource
              pc0
     withProcess_ pc $ \p ->
@@ -89,7 +88,7 @@ sinkProcessStderrStdout name args sinkStderr sinkStdout =
 -- | Consume the stdout of a process feeding strict 'ByteString's to a consumer.
 -- If the process fails, spits out stdout and stderr as error log
 -- level. Should not be used for long-running processes or ones with
--- lots of output; for that use 'sinkProcessStdoutLogStderr'.
+-- lots of output; for that use 'sinkProcessStderrStdout'.
 --
 -- Throws a 'ReadProcessException' if unsuccessful.
 sinkProcessStdout
@@ -106,10 +105,10 @@ sinkProcessStdout name args sinkStdout =
 
 logProcessStderrStdout
     :: (HasCallStack, HasEnvOverride env)
-    => String
-    -> [String]
+    => ProcessConfig stdin stdoutIgnored stderrIgnored
     -> RIO env ()
-logProcessStderrStdout name args = do
+logProcessStderrStdout pc = withLoggedProcess_ pc $ \p ->
     let logLines = CB.lines .| CL.mapM_ (logInfo . displayBytesUtf8)
-    ((), ()) <- sinkProcessStderrStdout name args logLines logLines
-    return ()
+     in runConcurrently
+            $ Concurrently (runConduit $ getStdout p .| logLines)
+           *> Concurrently (runConduit $ getStderr p .| logLines)

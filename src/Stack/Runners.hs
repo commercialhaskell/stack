@@ -14,6 +14,7 @@ module Stack.Runners
     , withBuildConfigAndLockNoDocker
     , withBuildConfig
     , withBuildConfigExt
+    , withBuildConfigDot
     , loadConfigWithOpts
     , loadCompilerVersion
     , withUserFileLock
@@ -33,6 +34,8 @@ import           Stack.Types.Runner
 import           System.Environment (getEnvironment)
 import           System.IO
 import           System.FileLock
+import           Stack.Dot
+import           Lens.Micro
 
 -- FIXME it seems wrong that we call lcLoadBuildConfig multiple times
 loadCompilerVersion :: GlobalOpts
@@ -237,3 +240,13 @@ withMiniConfigAndLock go@GlobalOpts{..} inner = withRunnerGlobal go $ \runner ->
 munlockFile :: MonadIO m => Maybe FileLock -> m ()
 munlockFile Nothing = return ()
 munlockFile (Just lk) = liftIO $ unlockFile lk
+
+-- Plumbing for --test and --bench flags
+withBuildConfigDot :: DotOpts -> GlobalOpts -> RIO EnvConfig () -> IO ()
+withBuildConfigDot opts go f = withBuildConfig go' f
+  where
+    go' =
+        (if dotTestTargets opts then set (globalOptsBuildOptsMonoidL.buildOptsMonoidTestsL) (Just True) else id) $
+        (if dotBenchTargets opts then set (globalOptsBuildOptsMonoidL.buildOptsMonoidBenchmarksL) (Just True) else id)
+        go
+
