@@ -43,7 +43,6 @@ import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageName
 import           Stack.Types.Runner
 import           Stack.Types.Version
-import qualified System.Clock as Clock
 import           Text.PrettyPrint.Leijen.Extended
 
 displayWithColor
@@ -133,16 +132,16 @@ debugBracket :: (HasCallStack, HasRunner env, MonadReader env m,
 debugBracket msg f = do
   let output = logDebug . RIO.display <=< displayWithColor
   output $ "Start: " <> msg
-  start <- liftIO $ Clock.getTime Clock.Monotonic
+  start <- getCPUTime
   x <- f `catch` \ex -> do
-      end <- liftIO $ Clock.getTime Clock.Monotonic
-      let diff = Clock.diffTimeSpec start end
+      end <- getCPUTime
+      let diff = end - start
       output $ "Finished with exception in" <+> displayMilliseconds diff <> ":" <+>
           msg <> line <>
           "Exception thrown: " <> fromString (show ex)
       throwIO (ex :: SomeException)
-  end <- liftIO $ Clock.getTime Clock.Monotonic
-  let diff = Clock.diffTimeSpec start end
+  end <- getCPUTime
+  let diff = end - start
   output $ "Finished in" <+> displayMilliseconds diff <> ":" <+> msg
   return x
 
@@ -213,9 +212,9 @@ instance Display (PackageName, NamedComponent) where
     display = cyan . fromString . T.unpack . renderPkgComponent
 
 -- Display milliseconds.
-displayMilliseconds :: Clock.TimeSpec -> AnsiDoc
+displayMilliseconds :: Double -> AnsiDoc
 displayMilliseconds t = green $
-    (fromString . show . (`div` 10^(6 :: Int)) . Clock.toNanoSecs) t <> "ms"
+    fromString (show ((round (t * 1000) :: Int))) <> "ms"
 
 -- | Display a bulleted list of 'AnsiDoc'.
 bulletedList :: [AnsiDoc] -> AnsiDoc

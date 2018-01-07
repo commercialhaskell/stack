@@ -39,7 +39,6 @@ module RIO.Prelude
   , writeFileDisplayBuilder
   , hPutBuilder
   , sappend
-  , getCPUTime
   ) where
 
 import           Control.Applicative  as X (Alternative, Applicative (..),
@@ -138,8 +137,6 @@ import qualified Data.Semigroup
 
 import Control.Applicative (Const (..))
 import Lens.Micro.Internal ((#.))
-
-import System.IO.Unsafe (unsafePerformIO)
 
 mapLeft :: (a1 -> a2) -> Either a1 b -> Either a2 b
 mapLeft f (Left a1) = Left (f a1)
@@ -281,17 +278,3 @@ writeFileDisplayBuilder fp (DisplayBuilder builder) =
 hPutBuilder :: MonadIO m => Handle -> Builder -> m ()
 hPutBuilder h = liftIO . BB.hPutBuilder h
 {-# INLINE hPutBuilder #-}
-
-getCPUTime :: MonadIO m => m Double
-getCPUTime = liftIO $ initted `seq` getCPUTime'
-
--- | Set up time measurement.
-foreign import ccall unsafe "rio_inittime" initializeTime :: IO ()
-
-initted :: ()
-initted = unsafePerformIO initializeTime
-{-# NOINLINE initted #-}
-
--- | Return the amount of elapsed CPU time, combining user and kernel
--- (system) time into a single measure.
-foreign import ccall unsafe "rio_getcputime" getCPUTime' :: IO Double

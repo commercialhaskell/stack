@@ -363,7 +363,7 @@ withProcessTimeLog mdir name args proc' = do
   return x
 
 timeSpecMilliSecondText :: Double -> DisplayBuilder
-timeSpecMilliSecondText d = display (round (d / 1000) :: Int) <> "ms"
+timeSpecMilliSecondText d = display (round (d * 1000) :: Int) <> "ms"
 
 -- | Show a process arg including speechmarks when necessary. Just for
 -- debugging purposes, not functionally important.

@@ -1,5 +1,10 @@
 name: rio
 version: 0.0.0.0
+synopsis: A standard library for Haskell
+description: Work in progress library, see README at <https://github.com/commercialhaskell/stack/tree/rio/subs/rio#readme>
+extra-source-files:
+- README.md
+- ChangeLog.md
 
 dependencies:
 - base
@@ -15,7 +20,7 @@ dependencies:
 - text
 - time
 - typed-process >= 0.2.1.0
-- unliftio
+- unliftio >= 0.2.4.0
 - unordered-containers
 - vector
 
@@ -33,15 +38,3 @@ library:
   source-dirs: src/
   other-modules:
   - RIO.Prelude
-
-  when:
-  - condition: os(darwin)
-    then:
-      c-sources: cbits/time-osx.c
-    else:
-      when:
-      - condition: os(windows)
-        then:
-          c-sources: cbits/time-windows.c
-        else:
-          c-sources: cbits/time-posix.c

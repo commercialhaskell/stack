@@ -108,7 +108,7 @@ dependencies:
 - typed-process >= 0.2.1.0
 - unicode-transforms
 - unix-compat
-- unliftio
+- unliftio >= 0.2.4.0
 - unordered-containers
 - vector
 - yaml
@@ -269,18 +269,6 @@ library:
       source-dirs: src/windows/
     else:
       source-dirs: src/unix/
-
-  when:
-  - condition: os(darwin)
-    then:
-      c-sources: subs/rio/cbits/time-osx.c
-    else:
-      when:
-      - condition: os(windows)
-        then:
-          c-sources: subs/rio/cbits/time-windows.c
-        else:
-          c-sources: subs/rio/cbits/time-posix.c
 executables:
   stack:
     main: Main.hs

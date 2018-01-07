@@ -10,7 +10,10 @@ improving the project and getting it to a useful first release. For
 more information, see the
 [description of goals](https://github.com/snoyberg/codename-karka#readme)
 and the
-[issue tracker for discussions](https://github.com/snoyberg/codename-karka/issues).
+[issue tracker for discussions](https://github.com/snoyberg/codename-karka/issues). If
+you're reading this file anywhere but Github, you should probably
+[read the Github version instead](https://github.com/commercialhaskell/stack/tree/rio/subs/rio#readme),
+which will be more up to date.
 
 The goal of the `rio` library is to help you jump start your Haskell
 coding. It is intended as a cross between:
