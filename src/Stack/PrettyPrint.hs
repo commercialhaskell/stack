@@ -132,15 +132,15 @@ debugBracket :: (HasCallStack, HasRunner env, MonadReader env m,
 debugBracket msg f = do
   let output = logDebug . RIO.display <=< displayWithColor
   output $ "Start: " <> msg
-  start <- getCPUTime
+  start <- getMonotonicTime
   x <- f `catch` \ex -> do
-      end <- getCPUTime
+      end <- getMonotonicTime
       let diff = end - start
       output $ "Finished with exception in" <+> displayMilliseconds diff <> ":" <+>
           msg <> line <>
           "Exception thrown: " <> fromString (show ex)
       throwIO (ex :: SomeException)
-  end <- getCPUTime
+  end <- getMonotonicTime
   let diff = end - start
   output $ "Finished in" <+> displayMilliseconds diff <> ":" <+> msg
   return x

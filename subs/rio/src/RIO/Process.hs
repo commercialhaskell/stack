@@ -348,9 +348,9 @@ withProcessTimeLog mdir name args proc' = do
           Nothing -> ""
           Just dir -> " within " <> T.pack dir
   logDebug ("Run process" <> display dirMsg <> ": " <> display cmdText)
-  start <- getCPUTime
+  start <- getMonotonicTime
   x <- proc'
-  end <- getCPUTime
+  end <- getMonotonicTime
   let diff = end - start
   -- useAnsi <- asks getAnsiTerminal FIXME
   let useAnsi = True
