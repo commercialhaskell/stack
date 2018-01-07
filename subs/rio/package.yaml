@@ -28,7 +28,6 @@ when:
     - Win32
   else:
     dependencies:
-    - pid1 # FIXME drop, likely move code in here or typed-process
     - unix
 
 library:

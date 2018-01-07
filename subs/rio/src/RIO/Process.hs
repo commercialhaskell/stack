@@ -59,7 +59,8 @@ import qualified System.Process.Typed as P
 import           System.Process.Typed hiding (withProcess, withProcess_)
 
 #ifndef WINDOWS
-import qualified System.Process.PID1 as PID1
+import           System.Directory (setCurrentDirectory)
+import           System.Posix.Process (executeFile)
 #endif
 
 class HasLogFunc env => HasEnvOverride env where
@@ -391,8 +392,9 @@ exec = execSpawn
 exec cmd0 args = do
     menv <- view envOverrideL
     cmd <- preProcess cmd0
-    withProcessTimeLog Nothing cmd args $
-        liftIO $ PID1.run cmd args $ Just $ envHelper menv
+    withProcessTimeLog Nothing cmd args $ liftIO $ do
+      for_ (eoWorkingDir menv) setCurrentDirectory
+      executeFile cmd True args $ Just $ envHelper menv
 #endif
 
 -- | Like 'exec', but does not use 'execv' on non-windows. This way, there
