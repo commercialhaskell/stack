@@ -17,12 +17,11 @@ module RIO.Logger
   , logStickyDone
   , runNoLogging
   , NoLogging (..)
-  , mkStickyLogger
+  , withStickyLogger
   , LogOptions (..)
   ) where
 
 import RIO.Prelude
-import Data.List (stripPrefix)
 import Data.Text (Text)
 import qualified Data.Text as T
 import Control.Monad.IO.Class (MonadIO, liftIO)
@@ -31,10 +30,11 @@ import Lens.Micro (to)
 import GHC.Stack (HasCallStack, CallStack, SrcLoc (..), getCallStack)
 import Data.Time
 import qualified Data.Text.IO as TIO
-import Data.ByteString.Builder (toLazyByteString)
+import Data.ByteString.Builder (toLazyByteString, char7)
 import           GHC.IO.Handle.Internals         (wantWritableHandle)
 import           GHC.IO.Encoding.Types           (textEncodingName)
 import           GHC.IO.Handle.Types             (Handle__ (..))
+import qualified Data.ByteString as B
 
 data LogLevel = LevelDebug | LevelInfo | LevelWarn | LevelError | LevelOther !Text
     deriving (Eq, Show, Read, Ord)
@@ -118,8 +118,8 @@ canUseUtf8 h = liftIO $ wantWritableHandle "canUseUtf8" h $ \h_ -> do
   -- TODO also handle haOutputNL for CRLF
   return $ (textEncodingName <$> haCodec h_) == Just "UTF-8"
 
-mkStickyLogger :: MonadIO m => LogOptions -> m LogFunc
-mkStickyLogger options = do
+withStickyLogger :: MonadIO m => LogOptions -> (LogFunc -> m a) -> m a
+withStickyLogger options inner = do
   useUtf8 <- canUseUtf8 stderr
   let printer =
         if useUtf8 && logUseUnicode options
@@ -139,9 +139,10 @@ mkStickyLogger options = do
             TIO.hPutStr stderr text'
             hFlush stderr
   if logTerminal options
-    then undefined
+    then withSticky $ \var ->
+           inner $ stickyImpl var options (simpleLogFunc options printer)
     else
-      return $ \cs src level str ->
+      inner $ \cs src level str ->
       simpleLogFunc options printer cs src (noSticky level) str
 
 -- | Replace Unicode characters with non-Unicode equivalents
@@ -171,19 +172,20 @@ simpleLogFunc lo printer cs _src level msg =
       printer $
         timestamp <>
         getLevel <>
+        " " <>
         ansi reset <>
         msg <>
         getLoc <>
         ansi reset <>
         "\n"
   where
-   reset = undefined
-   setBlack = undefined
-   setGreen = undefined
-   setBlue = undefined
-   setYellow = undefined
-   setRed = undefined
-   setMagenta = undefined
+   reset = "\ESC[0m"
+   setBlack = "\ESC[90m"
+   setGreen = "\ESC[32m"
+   setBlue = "\ESC[34m"
+   setYellow = "\ESC[33m"
+   setRed = "\ESC[31m"
+   setMagenta = "\ESC[35m"
 
    ansi :: DisplayBuilder -> DisplayBuilder
    ansi xs | logUseColor lo = xs
@@ -203,10 +205,10 @@ simpleLogFunc lo printer cs _src level msg =
    getLevel
      | logVerboseFormat lo =
          case level of
-           LevelDebug -> ansi setGreen
-           LevelInfo -> ansi setBlue
-           LevelWarn -> ansi setYellow
-           LevelError -> ansi setRed
+           LevelDebug -> ansi setGreen <> "[debug]"
+           LevelInfo -> ansi setBlue <> "[info]"
+           LevelWarn -> ansi setYellow <> "[warn]"
+           LevelError -> ansi setRed <> "[error]"
            LevelOther name ->
              ansi setMagenta <>
              "[" <>
@@ -225,8 +227,7 @@ simpleLogFunc lo printer cs _src level msg =
        [] -> "<no call stack found>"
        (_desc, loc):_ ->
          let file = srcLocFile loc
-             dirRoot = "" -- FIXME $(lift . T.unpack . fromMaybe undefined . T.stripSuffix (T.pack $ "Stack" </> "Types" </> "Runner.hs") . T.pack . loc_filename =<< location)
-          in fromString (fromMaybe file (stripPrefix dirRoot file)) <>
+          in fromString file <>
              ":" <>
              displayShow (srcLocStartLine loc) <>
              ":" <>
@@ -238,79 +239,48 @@ timestampLength :: Int
 timestampLength =
   length (formatTime defaultTimeLocale "%F %T.000000" (UTCTime (ModifiedJulianDay 0) 0))
 
-{- FIXME
--- FIXME move into RIO.Logger?
-stickyLoggerFuncImpl
-    :: Sticky -> LogOptions
+stickyImpl
+    :: MVar ByteString -> LogOptions -> LogFunc
     -> (CallStack -> LogSource -> LogLevel -> LogStr -> IO ())
-stickyLoggerFuncImpl (Sticky mref) lo loc src level msgOrig =
-    case mref of
-        Nothing ->
-            loggerFunc
-                lo
-                out
-                loc
-                src
-                (case level of
-                     LevelOther "sticky-done" -> LevelInfo
-                     LevelOther "sticky" -> LevelInfo
-                     _ -> level)
-                msgOrig
-        Just ref -> modifyMVar_ ref $ \sticky -> do
-            let backSpaceChar = '\8'
-                repeating = S8.replicate (maybe 0 T.length sticky)
-                clear = S8.hPutStr out
-                    (repeating backSpaceChar <>
-                     repeating ' ' <>
-                     repeating backSpaceChar)
+stickyImpl ref lo logFunc loc src level msgOrig = modifyMVar_ ref $ \sticky -> do
+  let backSpaceChar = '\8'
+      repeating = mconcat . replicate (B.length sticky) . char7
+      clear = hPutBuilder stderr
+        (repeating backSpaceChar <>
+        repeating ' ' <>
+        repeating backSpaceChar)
 
-            -- Convert some GHC-generated Unicode characters as necessary
-            let msgText
-                    | logUseUnicode lo = msgTextRaw
-                    | otherwise = T.map replaceUnicode msgTextRaw
-
-            case level of
-                LevelOther "sticky-done" -> do
-                    clear
-                    T.hPutStrLn out msgText
-                    hFlush out
-                    return Nothing
-                LevelOther "sticky" -> do
-                    clear
-                    T.hPutStr out msgText
-                    hFlush out
-                    return (Just msgText)
-                _
-                    | level >= logMinLevel lo -> do
-                        clear
-                        loggerFunc lo out loc src level msgText
-                        case sticky of
-                            Nothing ->
-                                return Nothing
-                            Just line -> do
-                                T.hPutStr out line >> hFlush out
-                                return sticky
-                    | otherwise ->
-                        return sticky
-  where
-    out = stderr
+  case level of
+    LevelOther "sticky-done" -> do
+      clear
+      logFunc loc src LevelInfo msgOrig
+      hFlush stderr
+      return mempty
+    LevelOther "sticky" -> do
+      clear
+      let bs = toStrictBytes $ toLazyByteString $ getUtf8Builder msgOrig
+      B.hPut stderr bs
+      hFlush stderr
+      return bs
+    _
+      | level >= logMinLevel lo -> do
+          clear
+          logFunc loc src level msgOrig
+          unless (B.null sticky) $ do
+            B.hPut stderr sticky
+            hFlush stderr
+          return sticky
+      | otherwise -> return sticky
 
 -- | With a sticky state, do the thing.
-withSticky :: (MonadIO m)
-           => Bool -> (Sticky -> m b) -> m b
-withSticky terminal m =
-    if terminal
-       then do state <- liftIO (newMVar Nothing)
-               originalMode <- liftIO (hGetBuffering stdout)
-               liftIO (hSetBuffering stdout NoBuffering)
-               a <- m (Sticky (Just state))
-               state' <- liftIO (takeMVar state)
-               liftIO (when (isJust state') (S8.putStr "\n"))
-               liftIO (hSetBuffering stdout originalMode)
-               return a
-       else m (Sticky Nothing)
-
-newtype Sticky = Sticky
-  { unSticky :: Maybe (MVar (Maybe Text))
-  }
--}
+withSticky :: (MonadIO m) => (MVar ByteString -> m b) -> m b
+withSticky inner = do
+  state <- newMVar mempty
+  originalMode <- liftIO (hGetBuffering stdout)
+  liftIO (hSetBuffering stdout NoBuffering)
+  a <- inner state
+  state' <- takeMVar state
+  liftIO $ do
+    unless (B.null state') (B.putStr "\n")
+    hSetBuffering stdout originalMode
+  return a

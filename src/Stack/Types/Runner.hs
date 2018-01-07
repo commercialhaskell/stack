@@ -109,8 +109,7 @@ withRunner logLevel useTime terminal colorWhen widthOverride reExec inner = do
         , logVerboseFormat = logLevel <= LevelDebug
         , logTerminal = terminal
         }
-  logFunc <- mkStickyLogger logOptions
-  inner Runner
+  withStickyLogger logOptions $ \logFunc -> inner Runner
     { runnerReExec = reExec
     , runnerLogFunc = logFunc
     , runnerLogOptions = logOptions
