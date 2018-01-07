@@ -44,7 +44,6 @@ dependencies:
 - base64-bytestring
 - blaze-builder
 - bytestring
-- clock
 - conduit
 - conduit-extra >= 1.2.3.1
 - containers
@@ -126,7 +125,6 @@ when:
     - hsc2hs
     dependencies:
     - bindings-uname
-    - pid1
     - unix
 library:
   source-dirs:
@@ -271,6 +269,18 @@ library:
       source-dirs: src/windows/
     else:
       source-dirs: src/unix/
+
+  when:
+  - condition: os(darwin)
+    then:
+      c-sources: subs/rio/cbits/time-osx.c
+    else:
+      when:
+      - condition: os(windows)
+        then:
+          c-sources: subs/rio/cbits/time-windows.c
+        else:
+          c-sources: subs/rio/cbits/time-posix.c
 executables:
   stack:
     main: Main.hs

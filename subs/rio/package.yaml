@@ -4,7 +4,6 @@ version: 0.0.0.0
 dependencies:
 - base
 - bytestring
-- clock # FIXME perhaps drop
 - containers
 - deepseq
 - directory
@@ -34,3 +33,15 @@ library:
   source-dirs: src/
   other-modules:
   - RIO.Prelude
+
+  when:
+  - condition: os(darwin)
+    then:
+      c-sources: cbits/time-osx.c
+    else:
+      when:
+      - condition: os(windows)
+        then:
+          c-sources: cbits/time-windows.c
+        else:
+          c-sources: cbits/time-posix.c

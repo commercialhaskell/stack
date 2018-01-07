@@ -54,7 +54,6 @@ import qualified System.Directory as D
 import           System.Environment (getEnvironment)
 import           System.Exit (exitWith)
 import qualified System.FilePath as FP
-import qualified System.Clock as Clock
 import qualified System.Process.Typed as P
 import           System.Process.Typed hiding (withProcess, withProcess_)
 
@@ -349,23 +348,22 @@ withProcessTimeLog mdir name args proc' = do
           Nothing -> ""
           Just dir -> " within " <> T.pack dir
   logDebug ("Run process" <> display dirMsg <> ": " <> display cmdText)
-  start <- liftIO $ Clock.getTime Clock.Monotonic
+  start <- getCPUTime
   x <- proc'
-  end <- liftIO $ Clock.getTime Clock.Monotonic
-  let diff = Clock.diffTimeSpec start end
+  end <- getCPUTime
+  let diff = end - start
   -- useAnsi <- asks getAnsiTerminal FIXME
   let useAnsi = True
   logDebug
       ("Process finished in " <>
       (if useAnsi then "\ESC[92m" else "") <> -- green
-      display (timeSpecMilliSecondText diff) <>
+      timeSpecMilliSecondText diff <>
       (if useAnsi then "\ESC[0m" else "") <> -- reset
        ": " <> display cmdText)
   return x
 
-timeSpecMilliSecondText :: Clock.TimeSpec -> Text
-timeSpecMilliSecondText t =
-    (T.pack . show . (`div` 10^(6 :: Int)) . Clock.toNanoSecs) t <> "ms"
+timeSpecMilliSecondText :: Double -> DisplayBuilder
+timeSpecMilliSecondText d = display (round (d / 1000) :: Int) <> "ms"
 
 -- | Show a process arg including speechmarks when necessary. Just for
 -- debugging purposes, not functionally important.
