@@ -2,12 +2,16 @@ name: rio
 version: 0.0.0.0
 synopsis: A standard library for Haskell
 description: Work in progress library, see README at <https://github.com/commercialhaskell/stack/tree/rio/subs/rio#readme>
+license: MIT
+author: Michael Snoyman
+maintainer: michael@snoyman.com
+category: Control
 extra-source-files:
 - README.md
 - ChangeLog.md
 
 dependencies:
-- base
+- base < 10
 - bytestring
 - containers
 - deepseq
