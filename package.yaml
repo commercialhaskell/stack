@@ -90,6 +90,7 @@ dependencies:
 - regex-applicative-text
 - resourcet
 - retry
+- rio
 - semigroups
 - split
 - stm
@@ -127,9 +128,7 @@ when:
     - bindings-uname
     - unix
 library:
-  source-dirs:
-  - src/
-  - subs/rio/src/
+  source-dirs: src/
   ghc-options:
   - -fwarn-identities
   exposed-modules:
@@ -150,9 +149,6 @@ library:
   - Path.Extra
   - Path.Find
   - Paths_stack
-  - RIO
-  - RIO.Logger
-  - RIO.Process
   - Stack.Build
   - Stack.Build.Cache
   - Stack.Build.ConstructPlan
@@ -262,7 +258,6 @@ library:
   - System.Terminal
   other-modules:
   - Hackage.Security.Client.Repository.HttpLib.HttpClient
-  - RIO.Prelude
   when:
   - condition: 'os(windows)'
     then:
