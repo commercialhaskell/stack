@@ -81,7 +81,7 @@ extra-deps:
 What you're saying to Stack is: if at any point you find that you need to build
 the `acme-missiles` package, please use version `0.3`. You are _not_ saying
 "please build `acme-missiles` now." You are also not saying "my package depends
-on `acme-missiles." You are simply making it available should the need arise.
+on `acme-missiles`." You are simply making it available should the need arise.
 
 When you add `build-depends: acme-missiles` to your cabal file or
 `dependencies: [acme-missiles]` to your `package.yaml` file, you're saying
@@ -97,7 +97,7 @@ somehow, you'd lose reproducibility. How would Stack know which version to use?
 It may elect to use the newest version, but if a new version is available in
 the future, will it automatically switch to that?
 
-Stack's baseline philosoph is that build plans are always reproducible\*. The
+Stack's baseline philosophy is that build plans are always reproducible\*. The
 purpose of the `stack.yaml` file is to define an immutable set of packages. No
 matter when in time you use it, and no matter how many new release happen in
 the interim, the build plan generated should be the same.
