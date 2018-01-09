@@ -340,7 +340,7 @@ does so automatically.
 ### Listing Dependencies
 
 Let's have stack add a few more dependencies to our project. First, we'll include two new packages in the
-`build-depends` section for our library in our `helloworld.cabal`:
+`dependencies` section for our library in our `package.yaml`:
 
 ```
 dependencies:
