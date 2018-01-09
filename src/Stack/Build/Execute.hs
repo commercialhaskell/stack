@@ -1132,7 +1132,7 @@ withSingleContext ActionContext {..} ExecuteEnv {..} task@Task {..} mdeps msuffi
                         Just (_, h) ->
                             withProc (toFilePath exeName) fullArgs
                           $ runProcess_
-                          . setStdin closed
+                          . setStdin (byteStringInput "")
                           . setStdout (useHandleOpen h)
                           . setStderr (useHandleOpen h)
                         Nothing ->
