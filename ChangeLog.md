@@ -14,6 +14,12 @@ Bug fixes:
 * 1.6.1 introduced a change that made some precompiled cache files use
   longer paths, sometimes causing builds to fail on windows. This has been
   fixed. See [#3649](https://github.com/commercialhaskell/stack/issues/3649)
+* Correct the behavior of promoting a package from snapshot to local
+  package. This would get triggered when version bounds conflicted in
+  a snapshot, which could be triggered via Hackage revisions for old
+  packages. This also should allow custom snapshots to define
+  conflicting versions of packages without issue. See
+  [Stackage issue #3185](https://github.com/fpco/stackage/issues/3185).
 
 
 ## v1.6.3
