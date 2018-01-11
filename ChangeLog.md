@@ -17,6 +17,13 @@ Bug fixes:
 * Some unnecessary rebuilds when no files were changed are now avoided, by
   having a separate build cache for each component of a package. See
   [#3732](https://github.com/commercialhaskell/stack/issues/3732).
+* When promoting packages from snapshot to local, we were
+  occassionally discarding the actual package location content and
+  instead defaulting to pulling the package from the index. We now
+  correctly retain this information. Note that if you were affected by
+  this bug, you will likely need to delete the binary build cache
+  associated with the relevant custom snapshot. See
+  [#3714](https://github.com/commercialhaskell/stack/issues/3714).
 
 ## v1.6.3
 
