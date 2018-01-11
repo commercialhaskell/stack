@@ -733,10 +733,35 @@ splitUnmetDeps extra =
 
     depsMet globals = all (depsMet' globals) . Map.toList . lpiPackageDeps
 
-    depsMet' globals (name, intervals) =
+    -- MSS 2018-01-10. Previously, we would actually perform a version
+    -- bounds check at this point. I believe this is a mistake: we
+    -- don't want to promote a package from a snapshot to a local just
+    -- because the version ranges aren't satisfied. In fact, we
+    -- intentionally allow snapshots to specify mismatched versions of
+    -- packages, and try building anyway.
+    --
+    -- With the old behavior: a number of packages would be converted
+    -- and treated as local packages. I specifically stumbled on this
+    -- while investigating Stackage issues #3185, where a revision to
+    -- semigroupoids's tagged dependency caused the builds to
+    -- break. Stack should have just ignored this and printed a
+    -- warning. Instead, Stack believed that semigroupoids was a local
+    -- package, not a snapshot package, and failed.
+    --
+    -- All that said: I'm pretty certain this is the right behavior,
+    -- but all of this is strongly indicating that we need some code
+    -- cleanup around this promotion business. I don't think I did a
+    -- particularly good job on this code during the extensible
+    -- snapshot rewrite.
+    depsMet' globals (name, _intervals) =
       case (lpiVersion <$> Map.lookup name globals) <|> Map.lookup name extra of
+        -- The dependency doesn't exist at all in the snapshot or
+        -- extra, therefore this package must be promoted to local as
+        -- well.
         Nothing -> False
-        Just version -> version `withinIntervals` intervals
+        -- It exists. As explained above, don't bother checking the
+        -- version bounds, we trust the snapshot.
+        Just _version -> True
 
 -- | Calculate a 'LoadedPackageInfo' from the given 'GenericPackageDescription'
 calculate :: GenericPackageDescription

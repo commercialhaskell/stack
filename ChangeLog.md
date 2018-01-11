@@ -17,6 +17,12 @@ Bug fixes:
 * Some unnecessary rebuilds when no files were changed are now avoided, by
   having a separate build cache for each component of a package. See
   [#3732](https://github.com/commercialhaskell/stack/issues/3732).
+* Correct the behavior of promoting a package from snapshot to local
+  package. This would get triggered when version bounds conflicted in
+  a snapshot, which could be triggered via Hackage revisions for old
+  packages. This also should allow custom snapshots to define
+  conflicting versions of packages without issue. See
+  [Stackage issue #3185](https://github.com/fpco/stackage/issues/3185).
 * When promoting packages from snapshot to local, we were
   occassionally discarding the actual package location content and
   instead defaulting to pulling the package from the index. We now
