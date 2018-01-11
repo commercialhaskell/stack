@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE DeriveGeneric         #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
@@ -32,7 +33,6 @@ module Stack.Build.Cache
     , BuildCache(..)
     ) where
 
-import           Stack.Constants
 import           Stack.Prelude
 import           Crypto.Hash (hashWith, SHA256(..))
 import           Control.Monad.Trans.Maybe
@@ -40,6 +40,9 @@ import qualified Data.ByteArray as Mem (convert)
 import qualified Data.ByteString.Base64.URL as B64URL
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as S8
+#ifdef mingw32_HOST_OS
+import           Data.Char (ord)
+#endif
 import qualified Data.Map as M
 import qualified Data.Set as Set
 import qualified Data.Store as Store
@@ -107,10 +110,24 @@ markExeNotInstalled loc ident = do
     ident' <- parseRelFile $ packageIdentifierString ident
     liftIO $ ignoringAbsence (removeFile $ dir </> ident')
 
+buildCacheFile :: (HasEnvConfig env, MonadReader env m, MonadThrow m)
+               => Path Abs Dir
+               -> NamedComponent
+               -> m (Path Abs File)
+buildCacheFile dir component = do
+    cachesDir <- buildCachesDir dir
+    let nonLibComponent prefix name = prefix <> "-" <> T.unpack name
+    cacheFileName <- parseRelFile $ case component of
+        CLib -> "lib"
+        CExe name -> nonLibComponent "exe" name
+        CTest name -> nonLibComponent "test" name
+        CBench name -> nonLibComponent "bench" name
+    return $ cachesDir </> cacheFileName
+
 -- | Try to read the dirtiness cache for the given package directory.
 tryGetBuildCache :: (MonadUnliftIO m, MonadReader env m, MonadThrow m, MonadLogger m, HasEnvConfig env)
-                 => Path Abs Dir -> m (Maybe (Map FilePath FileCacheInfo))
-tryGetBuildCache dir = liftM (fmap buildCacheTimes) . $(versionedDecodeFile buildCacheVC) =<< buildCacheFile dir
+                 => Path Abs Dir -> NamedComponent -> m (Maybe (Map FilePath FileCacheInfo))
+tryGetBuildCache dir component = liftM (fmap buildCacheTimes) . $(versionedDecodeFile buildCacheVC) =<< buildCacheFile dir component
 
 -- | Try to read the dirtiness cache for the given package directory.
 tryGetConfigCache :: (MonadUnliftIO m, MonadReader env m, MonadThrow m, HasEnvConfig env, MonadLogger m)
@@ -124,9 +141,9 @@ tryGetCabalMod dir = $(versionedDecodeFile modTimeVC) =<< configCabalMod dir
 
 -- | Write the dirtiness cache for this package's files.
 writeBuildCache :: (MonadIO m, MonadReader env m, MonadThrow m, HasEnvConfig env, MonadLogger m)
-                => Path Abs Dir -> Map FilePath FileCacheInfo -> m ()
-writeBuildCache dir times = do
-    fp <- buildCacheFile dir
+                => Path Abs Dir -> NamedComponent -> Map FilePath FileCacheInfo -> m ()
+writeBuildCache dir component times = do
+    fp <- buildCacheFile dir component
     $(versionedEncodeFile buildCacheVC) fp BuildCache
         { buildCacheTimes = times
         }
@@ -287,14 +304,12 @@ precompiledCacheFile loc copts installedPackageIDs = do
     -- See #3649 - shorten the paths on windows if MAX_PATH will be
     -- violated. Doing this only when necessary allows use of existing
     -- precompiled packages.
-    case maxPathLength of
-      Nothing -> return longPath
-      Just maxPath
-        | length (toFilePath longPath) > maxPath -> do
-            shortPkg <- shaPath pkg
-            shortHash <- shaPath hashPath
-            return $ precompiledDir </> shortPkg </> shortHash
-        | otherwise -> return longPath
+    if pathTooLong (toFilePath longPath) then do
+        shortPkg <- shaPath pkg
+        shortHash <- shaPath hashPath
+        return $ precompiledDir </> shortPkg </> shortHash
+    else
+        return longPath
 
 -- | Write out information about a newly built package
 writePrecompiledCache :: (MonadThrow m, MonadReader env m, HasEnvConfig env, MonadIO m, MonadLogger m)
@@ -353,3 +368,20 @@ readPrecompiledCache loc copts depIDs = runMaybeT $
         { pcLibrary = mkAbs' <$> pcLibrary pc0
         , pcExes = mkAbs' <$> pcExes pc0
         }
+
+-- | Check if a filesystem path is too long.
+pathTooLong :: FilePath -> Bool
+#ifdef mingw32_HOST_OS
+pathTooLong path = utf16StringLength path >= win32MaxPath
+  where
+    win32MaxPath = 260
+    -- Calculate the length of a string in 16-bit units
+    -- if it were converted to utf-16.
+    utf16StringLength :: String -> Integer
+    utf16StringLength = sum . map utf16CharLength
+      where
+        utf16CharLength c | ord c < 0x10000 = 1
+                          | otherwise       = 2
+#else
+pathTooLong _ = False
+#endif
