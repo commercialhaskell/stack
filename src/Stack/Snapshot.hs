@@ -482,7 +482,7 @@ calculatePackagePromotion
 
           -- Put together the two split out groups of packages
           noLongerGlobals3 :: Map PackageName (LoadedPackageInfo SinglePackageLocation)
-          noLongerGlobals3 = Map.union (Map.mapWithKey globalToSnapshot noLongerGlobals1) noLongerGlobals2
+          noLongerGlobals3 = Map.mapWithKey globalToSnapshot (Map.union noLongerGlobals1 noLongerGlobals2)
 
           -- Now do the same thing with parent packages: take out the
           -- packages to be upgraded and then split out unmet
@@ -715,14 +715,14 @@ globalToSnapshot name lpi = lpi
 splitUnmetDeps :: Map PackageName Version -- ^ extra dependencies available
                -> Map PackageName (LoadedPackageInfo loc)
                -> ( Map PackageName (LoadedPackageInfo loc)
-                  , Map PackageName (LoadedPackageInfo (PackageLocationIndex FilePath))
+                  , Map PackageName (LoadedPackageInfo loc)
                   )
 splitUnmetDeps extra =
     start Map.empty . Map.toList
   where
     start newGlobals0 toProcess0
       | anyAdded = start newGlobals1 toProcess1
-      | otherwise = (newGlobals1, Map.mapWithKey globalToSnapshot $ Map.fromList toProcess1)
+      | otherwise = (newGlobals1, Map.fromList toProcess1)
       where
         (newGlobals1, toProcess1, anyAdded) = loop False newGlobals0 id toProcess0
 

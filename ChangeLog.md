@@ -14,6 +14,13 @@ Bug fixes:
 * 1.6.1 introduced a change that made some precompiled cache files use
   longer paths, sometimes causing builds to fail on windows. This has been
   fixed. See [#3649](https://github.com/commercialhaskell/stack/issues/3649)
+* When promoting packages from snapshot to local, we were
+  occassionally discarding the actual package location content and
+  instead defaulting to pulling the package from the index. We now
+  correctly retain this information. Note that if you were affected by
+  this bug, you will likely need to delete the binary build cache
+  associated with the relevant custom snapshot. See
+  [#3714](https://github.com/commercialhaskell/stack/issues/3714).
 
 
 ## v1.6.3
