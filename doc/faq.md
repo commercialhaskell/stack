@@ -407,38 +407,39 @@ See [issue #644](https://github.com/commercialhaskell/stack/issues/644) for more
 
 ## I get strange `ld` errors about recompiling with "-fPIC"
 
-Some users (myself included!) have come across a linker errors (example below)
-that seem to be dependent on the local environment, i.e. the package may
-compile on a different machine. The issue has been reported to be
-[non-deterministic](https://github.com/commercialhaskell/stack/issues/614) in
-some cases. I've had success using the docker functionality to build the
-project on a machine that would not compile it otherwise.
+(Updated in December 2017)
 
-```
-tmp-0.1.0.0: build
-Building tmp-0.1.0.0...
-Preprocessing executable 'tmp' for tmp-0.1.0.0...
-Linking dist-stack/x86_64-linux/Cabal-1.22.2.0/build/tmp/tmp ...
-/usr/bin/ld: dist-stack/x86_64-linux/Cabal-1.22.2.0/build/tmp/tmp-tmp/Main.o: relocation R_X86_64_32S against `stg_bh_upd_frame_info' can not be used when making a shared object; recompile with -fPIC
-dist-stack/x86_64-linux/Cabal-1.22.2.0/build/tmp/tmp-tmp/Main.o: error adding symbols: Bad value
-collect2: error: ld returned 1 exit status
+This is related to more recent versions of Linux distributions that have GCC
+with PIE enabled by default.  The continuously-updated distros like Arch, in
+particular, had been in flux with this change and the upgrading
+libtinfo6/ncurses6, and there were some workarounds attempted in Stack that
+ended up causing trouble as these distros evolved.
 
---  While building package tmp-0.1.0.0 using:
-      /home/philip/.stack/programs/x86_64-linux/ghc-7.10.1/bin/runghc-7.10.1 -package=Cabal-1.22.2.0 -clear-package-db -global-package-db /home/philip/tmp/Setup.hs --builddir=dist-stack/x86_64-linux/Cabal-1.22.2.0/ build
-    Process exited with code: ExitFailure 1
-```
+GHC added official support for this setup in 8.0.2, so if you are using an
+older version your best bet is to upgrade.  You may be able to work around it
+for older versions by editing `~/.stack/programs/x86_64-osx/ghc-VER/lib/ghc-
+VER/settings` (replace `VER` with the GHC version) and adding `-no-pie` (or
+`--no-pie` in the case of Gentoo, at least as of December 2017) to the __C
+compiler link flags__.
 
-The issue may be related to the use of hardening flags in some cases,
-specifically those related to producing position independent executables (PIE).
-This is tracked upstream in the [following
-ticket](https://ghc.haskell.org/trac/ghc/ticket/12759). Some distributions add
-such hardening flags by default which may be the cause of some instances of the
-problem. Therefore, a possible workaround might be to turn off PIE related
-flags.
+If `stack setup` complains that there is no `linuxNN-*-nopie` bindist available,
+try adding `ghc-build: *` (replacing the `*` with the actual value that
+precedes `-nopie`, which may be empty) to your `~/.stack/config.yaml` (this
+will no longer be necessary for stack >= 1.7).
 
-On Arch Linux, installing the `ncurses5-compat-libs` package from AUR resolves [this issue](https://github.com/commercialhaskell/stack/issues/2712).
+If you are experiencing this with GHC >= 8.0.2, try running `stack setup
+--reinstall` if you've upgraded your Linux distribution or you set up GHC
+before late December 2017.
 
-If you manage to work around this in other distributions, please include instructions here.
+If you are still having trouble after trying the above, check the following
+for more possible workarounds:
+
+  * [Previous version of this FAQ entry](https://docs.haskellstack.org/en/v1.6.3/faq/#i-get-strange-ld-errors-about-recompiling-with-fpic)
+  * Related issues:
+    [#3518](https://github.com/commercialhaskell/stack/issues/3518),
+    [#2712](https://github.com/commercialhaskell/stack/issues/2712),
+    [#3630](https://github.com/commercialhaskell/stack/issues/3630),
+    [#3648](https://github.com/commercialhaskell/stack/issues/3648)
 
 ## Where does the output from `--ghc-options=-ddump-splices` (and other `-ddump*` options) go?
 

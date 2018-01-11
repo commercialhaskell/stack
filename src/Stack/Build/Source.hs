@@ -265,28 +265,36 @@ loadLocalPackage isLocal boptsCli targets (name, lpv) = do
         testpkg = resolvePackage testconfig gpkg
         benchpkg = resolvePackage benchconfig gpkg
 
-    mbuildCache <- tryGetBuildCache $ lpvRoot lpv
+    (componentFiles,_) <- getPackageFilesForTargets pkg (lpvCabalFP lpv) nonLibComponents
 
-    (files,_) <- getPackageFilesForTargets pkg (lpvCabalFP lpv) nonLibComponents
+    checkCacheResults <- forM (Map.toList componentFiles) $ \(component, files) -> do
+        mbuildCache <- tryGetBuildCache (lpvRoot lpv) component
+        checkCacheResult <- checkBuildCache
+            (fromMaybe Map.empty mbuildCache)
+            (Set.toList files)
+        return (component, checkCacheResult)
 
-    (dirtyFiles, newBuildCache) <- checkBuildCache
-        (fromMaybe Map.empty mbuildCache)
-        (Set.toList files)
+    let allDirtyFiles =
+            Set.unions $
+                map (\(_, (dirtyFiles, _)) -> dirtyFiles) checkCacheResults
+        newBuildCaches =
+            M.fromList $
+                map (\(c, (_, cache)) -> (c, cache)) checkCacheResults
 
     return LocalPackage
         { lpPackage = pkg
         , lpTestDeps = packageDeps testpkg
         , lpBenchDeps = packageDeps benchpkg
         , lpTestBench = btpkg
-        , lpFiles = files
+        , lpComponentFiles = componentFiles
         , lpForceDirty = boptsForceDirty bopts
         , lpDirtyFiles =
-            if not (Set.null dirtyFiles)
+            if not (Set.null allDirtyFiles)
                 then let tryStripPrefix y =
                           fromMaybe y (stripPrefix (toFilePath $ lpvRoot lpv) y)
-                      in Just $ Set.map tryStripPrefix dirtyFiles
+                      in Just $ Set.map tryStripPrefix allDirtyFiles
                 else Nothing
-        , lpNewBuildCache = newBuildCache
+        , lpNewBuildCaches = newBuildCaches
         , lpCabalFile = lpvCabalFP lpv
         , lpDir = lpvRoot lpv
         , lpWanted = isWanted
@@ -394,15 +402,18 @@ addUnlistedToBuildCache
     -> Package
     -> Path Abs File
     -> Set NamedComponent
-    -> Map FilePath a
-    -> RIO env ([Map FilePath FileCacheInfo], [PackageWarning])
-addUnlistedToBuildCache preBuildTime pkg cabalFP nonLibComponents buildCache = do
-    (files,warnings) <- getPackageFilesForTargets pkg cabalFP nonLibComponents
-    let newFiles =
-            Set.toList $
-            Set.map toFilePath files `Set.difference` Map.keysSet buildCache
-    addBuildCache <- mapM addFileToCache newFiles
-    return (addBuildCache, warnings)
+    -> Map NamedComponent (Map FilePath a)
+    -> RIO env (Map NamedComponent [Map FilePath FileCacheInfo], [PackageWarning])
+addUnlistedToBuildCache preBuildTime pkg cabalFP nonLibComponents buildCaches = do
+    (componentFiles, warnings) <- getPackageFilesForTargets pkg cabalFP nonLibComponents
+    results <- forM (M.toList componentFiles) $ \(component, files) -> do
+        let buildCache = M.findWithDefault M.empty component buildCaches
+            newFiles =
+                Set.toList $
+                Set.map toFilePath files `Set.difference` Map.keysSet buildCache
+        addBuildCache <- mapM addFileToCache newFiles
+        return ((component, addBuildCache), warnings)
+    return (M.fromList (map fst results), concatMap snd results)
   where
     addFileToCache fp = do
         mmodTime <- getModTimeMaybe fp
@@ -420,16 +431,18 @@ addUnlistedToBuildCache preBuildTime pkg cabalFP nonLibComponents buildCache = d
 --   set of components.
 getPackageFilesForTargets
     :: HasEnvConfig env
-    => Package -> Path Abs File -> Set NamedComponent -> RIO env (Set (Path Abs File), [PackageWarning])
-getPackageFilesForTargets pkg cabalFP components = do
+    => Package
+    -> Path Abs File
+    -> Set NamedComponent
+    -> RIO env (Map NamedComponent (Set (Path Abs File)), [PackageWarning])
+getPackageFilesForTargets pkg cabalFP nonLibComponents = do
     (_,compFiles,otherFiles,warnings) <-
         getPackageFiles (packageFiles pkg) cabalFP
-    let filesForComponent cn = Set.map dotCabalGetPath
-                             $ M.findWithDefault mempty cn compFiles
-        files = Set.unions
-                $ otherFiles
-                : map filesForComponent (Set.toList $ Set.insert CLib components)
-    return (files, warnings)
+    let components = Set.insert CLib nonLibComponents
+        componentsFiles =
+            M.map (\files -> Set.union otherFiles (Set.map dotCabalGetPath files)) $
+                M.filterWithKey (\component _ -> component `Set.member` components) compFiles
+    return (componentsFiles, warnings)
 
 -- | Get file modification time, if it exists.
 getModTimeMaybe :: MonadIO m => FilePath -> m (Maybe ModTime)

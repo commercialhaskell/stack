@@ -1123,7 +1123,7 @@ withSingleContext ActionContext {..} ExecuteEnv {..} task@Task {..} mdeps msuffi
                         Just (_, h) ->
                             withProc (toFilePath exeName) fullArgs
                           $ runProcess_
-                          . setStdin closed
+                          . setStdin (byteStringInput "")
                           . setStdout (useHandleOpen h)
                           . setStderr (useHandleOpen h)
                         Nothing ->
@@ -1384,7 +1384,8 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
         case taskType of
             TTFiles lp _ -> do -- FIXME should this only be for local packages?
                 when enableTests $ unsetTestSuccess pkgDir
-                writeBuildCache pkgDir $ lpNewBuildCache lp
+                mapM_ (uncurry (writeBuildCache pkgDir))
+                      (Map.toList $ lpNewBuildCaches lp)
             TTIndex{} -> return ()
 
         -- FIXME: only output these if they're in the build plan.
@@ -1586,10 +1587,11 @@ checkForUnlistedFiles (TTFiles lp _) preBuildTime pkgDir = do
             (lpPackage lp)
             (lpCabalFile lp)
             (lpComponents lp)
-            (lpNewBuildCache lp)
-    unless (null addBuildCache) $
-        writeBuildCache pkgDir $
-        Map.unions (lpNewBuildCache lp : addBuildCache)
+            (lpNewBuildCaches lp)
+    forM_ (M.toList addBuildCache) $ \(component, newToCache) -> do
+        let cache = Map.findWithDefault Map.empty component (lpNewBuildCaches lp)
+        writeBuildCache pkgDir component $
+            Map.unions (cache : newToCache)
     return warnings
 checkForUnlistedFiles TTIndex{} _ _ = return []
 

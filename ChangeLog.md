@@ -36,7 +36,6 @@ Bug fixes:
 * 1.6.1 introduced a change that made some precompiled cache files use
   longer paths, sometimes causing builds to fail on windows. This has been
   fixed. See [#3649](https://github.com/commercialhaskell/stack/issues/3649)
-
 * The script interpreter's implicit file arguments are now passed before other
   arguments. See [#3658](https://github.com/commercialhaskell/stack/issues/3658).
   In particular, this makes it possible to pass `-- +RTS ... -RTS` to specify
@@ -49,6 +48,9 @@ Bug fixes:
   may interfere with benchmarks. It also prevented benchmark output from
   being displayed by default. This is now fixed. See
   [#3663](https://github.com/commercialhaskell/stack/issues/3663).
+* Some unnecessary rebuilds when no files were changed are now avoided, by
+  having a separate build cache for each component of a package. See
+  [#3732](https://github.com/commercialhaskell/stack/issues/3732).
 
 ## v1.6.3
 
