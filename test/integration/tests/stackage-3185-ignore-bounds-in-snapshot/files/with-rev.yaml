@@ -1,3 +1,0 @@
-resolver: lts-3.12
-extra-deps:
-- semigroupoids-5.0.0.4@rev:1
