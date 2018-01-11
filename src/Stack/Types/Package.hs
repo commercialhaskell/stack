@@ -13,6 +13,7 @@ import           Stack.Prelude
 import qualified Data.ByteString as S
 import           Data.List
 import qualified Data.Map as M
+import qualified Data.Set as Set
 import           Data.Store.Version (VersionConfig)
 import           Data.Store.VersionTagged (storeVersionConfig)
 import           Distribution.InstalledPackageInfo (PError)
@@ -246,14 +247,17 @@ data LocalPackage = LocalPackage
     -- ^ Nothing == not dirty, Just == dirty. Note that the Set may be empty if
     -- we forced the build to treat packages as dirty. Also, the Set may not
     -- include all modified files.
-    , lpNewBuildCache :: !(Map FilePath FileCacheInfo)
+    , lpNewBuildCaches :: !(Map NamedComponent (Map FilePath FileCacheInfo))
     -- ^ current state of the files
-    , lpFiles         :: !(Set (Path Abs File))
+    , lpComponentFiles :: !(Map NamedComponent (Set (Path Abs File)))
     -- ^ all files used by this package
     , lpLocation      :: !(PackageLocation FilePath)
     -- ^ Where this source code came from
     }
     deriving Show
+
+lpFiles :: LocalPackage -> Set.Set (Path Abs File)
+lpFiles = Set.unions . M.elems . lpComponentFiles
 
 -- | A location to install a package into, either snapshot or local
 data InstallLocation = Snap | Local

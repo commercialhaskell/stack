@@ -9,7 +9,7 @@ module Stack.Constants.Config
   , projectDockerSandboxDir
   , configCacheFile
   , configCabalMod
-  , buildCacheFile
+  , buildCachesDir
   , testSuccessFile
   , testBuiltFile
   , hpcRelativeDir
@@ -32,13 +32,13 @@ objectInterfaceDirL = to $ \env -> -- FIXME is this idomatic lens code?
       root = view projectRootL env
    in root </> workDir </> $(mkRelDir "odir/")
 
--- | The filename used for dirtiness check of source files.
-buildCacheFile :: (MonadThrow m, MonadReader env m, HasEnvConfig env)
+-- | The directory containing the files used for dirtiness check of source files.
+buildCachesDir :: (MonadThrow m, MonadReader env m, HasEnvConfig env)
                => Path Abs Dir      -- ^ Package directory.
-               -> m (Path Abs File)
-buildCacheFile dir =
+               -> m (Path Abs Dir)
+buildCachesDir dir = 
     liftM
-        (</> $(mkRelFile "stack-build-cache"))
+        (</> $(mkRelDir "stack-build-caches"))
         (distDirFromDir dir)
 
 -- | The filename used to mark tests as having succeeded
