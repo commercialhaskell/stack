@@ -628,14 +628,20 @@ executePlan' installedMap0 targets plan ee@ExecuteEnv {..} = do
     let keepGoing =
             fromMaybe (not (M.null (planFinals plan))) (boptsKeepGoing eeBuildOpts)
     terminal <- view terminalL
-    errs <- liftIO $ runActions threads keepGoing actions $ \doneVar -> do
+    errs <- liftIO $ runActions threads keepGoing actions $ \doneVar actionsVar -> do
         let total = length actions
             loop prev
                 | prev == total =
                     run $ logStickyDone ("Completed " <> T.pack (show total) <> " action(s).")
                 | otherwise = do
+                    inProgress <- readTVarIO actionsVar
+                    let packageNames = map (\(ActionId pkgID _) -> packageIdentifierText pkgID) (toList inProgress)
+                        nowBuilding []    = ""
+                        nowBuilding names = "; [" <> T.intercalate "|" names <> "]"
                     when terminal $ run $
-                        logSticky ("Progress: " <> T.pack (show prev) <> "/" <> T.pack (show total))
+                        logSticky $
+                            "Progress: " <> T.pack (show prev) <> "/" <> T.pack (show total) <>
+                                nowBuilding packageNames
                     done <- atomically $ do
                         done <- readTVar doneVar
                         check $ done /= prev
