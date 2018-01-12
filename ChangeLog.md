@@ -29,6 +29,7 @@ Other enhancements:
   relevant on Linux where different distributions may have different
   combinations of libtinfo 5/6, ncurses 5/6, and gmp 4/5, and will allow
   simpifying the setup-info metadata YAML for future GHC releases.
+* The build progress bar reports names of packages currently building.
 * `stack setup --verbose` causes verbose output of GHC configure process.
   See [#3716](https://github.com/commercialhaskell/stack/issues/3716)
 
