@@ -229,7 +229,7 @@ instance subdirs ~ Subdirs => ToJSON (PackageLocation subdirs) where
 
 instance subdirs ~ Subdirs => FromJSON (WithJSONWarnings (PackageLocationIndex subdirs)) where
     parseJSON v
-        = ((noJSONWarnings . PLIndex) <$> parseJSON v)
+        = (noJSONWarnings . PLIndex <$> parseJSON v)
       <|> (fmap PLOther <$> parseJSON v)
 
 instance subdirs ~ Subdirs => FromJSON (WithJSONWarnings (PackageLocation subdirs)) where

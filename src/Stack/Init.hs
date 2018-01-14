@@ -72,7 +72,7 @@ initProject whichCmd currDir initOpts mresolver = do
         find  = findCabalDirs (includeSubDirs initOpts)
         dirs' = if null dirs then [currDir] else dirs
     logInfo "Looking for .cabal or package.yaml files to use to init the project."
-    cabaldirs <- (Set.toList . Set.unions) <$> mapM find dirs'
+    cabaldirs <- Set.toList . Set.unions <$> mapM find dirs'
     (bundle, dupPkgs)  <- cabalPackagesCheck cabaldirs noPkgMsg Nothing
 
     (sd, flags, extraDeps, rbundle) <- getDefaultResolver whichCmd dest initOpts

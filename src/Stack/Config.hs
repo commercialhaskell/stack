@@ -670,7 +670,7 @@ getLocalPackages = do
                               $ C.package
                               $ C.packageDescription gpd
                       in (name, (gpd, loc))
-            deps <- (map wrapGPD . concat)
+            deps <- map wrapGPD . concat
                 <$> mapM (parseMultiCabalFilesIndex root) (bcDependencies bc)
 
             checkDuplicateNames $

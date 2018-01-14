@@ -25,11 +25,11 @@ dockerOptsParser hide0 =
                        "using a Docker container. --docker implies 'system-ghc: true'"
                        hide
     <*> fmap First
-           ((Just . DockerMonoidRepo) <$> option str (long (dockerOptName dockerRepoArgName) <>
+           (Just . DockerMonoidRepo <$> option str (long (dockerOptName dockerRepoArgName) <>
                                                      hide <>
                                                      metavar "NAME" <>
                                                      help "Docker repository name") <|>
-             (Just . DockerMonoidImage) <$> option str (long (dockerOptName dockerImageArgName) <>
+             Just . DockerMonoidImage <$> option str (long (dockerOptName dockerImageArgName) <>
                                                       hide <>
                                                       metavar "IMAGE" <>
                                                       help "Exact Docker image ID (overrides docker-repo)") <|>

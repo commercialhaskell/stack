@@ -310,7 +310,7 @@ runContainerAndExit getCmdArgs
              (Files.createSymbolicLink
                  (toFilePathNoTrailingSep sshDir)
                  (toFilePathNoTrailingSep (sandboxHomeDir </> sshRelDir))))
-     containerID <- withWorkingDir projectRoot $ (trim . decodeUtf8) <$> readDockerProcess
+     containerID <- withWorkingDir projectRoot $ trim . decodeUtf8 <$> readDockerProcess
        (concat
          [["create"
           ,"--net=host"

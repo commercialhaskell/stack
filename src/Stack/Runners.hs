@@ -229,7 +229,7 @@ withMiniConfigAndLock
 withMiniConfigAndLock go@GlobalOpts{..} inner = withRunnerGlobal go $ \runner -> do
     miniConfig <-
         runRIO runner $
-        (loadMiniConfig . lcConfig) <$>
+        loadMiniConfig . lcConfig <$>
         loadConfigMaybeProject
           globalConfigMonoid
           globalResolver
