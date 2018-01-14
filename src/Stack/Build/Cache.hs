@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE DeriveGeneric         #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
@@ -32,7 +33,6 @@ module Stack.Build.Cache
     , BuildCache(..)
     ) where
 
-import           Stack.Constants
 import           Stack.Prelude
 import           Crypto.Hash (hashWith, SHA256(..))
 import           Control.Monad.Trans.Maybe
@@ -40,6 +40,9 @@ import qualified Data.ByteArray as Mem (convert)
 import qualified Data.ByteString.Base64.URL as B64URL
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as S8
+#ifdef mingw32_HOST_OS
+import           Data.Char (ord)
+#endif
 import qualified Data.Map as M
 import qualified Data.Set as Set
 import qualified Data.Store as Store
@@ -306,14 +309,12 @@ precompiledCacheFile loc copts installedPackageIDs = do
     -- See #3649 - shorten the paths on windows if MAX_PATH will be
     -- violated. Doing this only when necessary allows use of existing
     -- precompiled packages.
-    case maxPathLength of
-      Nothing -> return longPath
-      Just maxPath
-        | length (toFilePath longPath) > maxPath -> do
-            shortPkg <- shaPath pkg
-            shortHash <- shaPath hashPath
-            return $ precompiledDir </> shortPkg </> shortHash
-        | otherwise -> return longPath
+    if pathTooLong (toFilePath longPath) then do
+        shortPkg <- shaPath pkg
+        shortHash <- shaPath hashPath
+        return $ precompiledDir </> shortPkg </> shortHash
+    else
+        return longPath
 
 -- | Write out information about a newly built package
 writePrecompiledCache :: HasEnvConfig env
@@ -372,3 +373,20 @@ readPrecompiledCache loc copts depIDs = runMaybeT $
         { pcLibrary = mkAbs' <$> pcLibrary pc0
         , pcExes = mkAbs' <$> pcExes pc0
         }
+
+-- | Check if a filesystem path is too long.
+pathTooLong :: FilePath -> Bool
+#ifdef mingw32_HOST_OS
+pathTooLong path = utf16StringLength path >= win32MaxPath
+  where
+    win32MaxPath = 260
+    -- Calculate the length of a string in 16-bit units
+    -- if it were converted to utf-16.
+    utf16StringLength :: String -> Integer
+    utf16StringLength = sum . map utf16CharLength
+      where
+        utf16CharLength c | ord c < 0x10000 = 1
+                          | otherwise       = 2
+#else
+pathTooLong _ = False
+#endif
