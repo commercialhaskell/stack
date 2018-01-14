@@ -637,10 +637,10 @@ executePlan' installedMap0 targets plan ee@ExecuteEnv {..} = do
                     inProgress <- readTVarIO actionsVar
                     let packageNames = map (\(ActionId pkgID _) -> packageIdentifierText pkgID) (toList inProgress)
                         nowBuilding []    = ""
-                        nowBuilding names = "; [" <> T.intercalate "|" names <> "]"
+                        nowBuilding names = ": " <> T.intercalate ", " names
                     when terminal $ run $
                         logSticky $
-                            "Progress: " <> T.pack (show prev) <> "/" <> T.pack (show total) <>
+                            "Progress " <> T.pack (show prev) <> "/" <> T.pack (show total) <>
                                 nowBuilding packageNames
                     done <- atomically $ do
                         done <- readTVar doneVar
