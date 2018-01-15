@@ -37,6 +37,8 @@ module Stack.PrettyPrint
 import           Stack.Prelude
 import           Data.List (intersperse)
 import qualified Data.Text as T
+import qualified Distribution.ModuleName as C (ModuleName)
+import qualified Distribution.Text as C (display)
 import           Stack.Types.NamedComponent
 import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageName
@@ -210,6 +212,9 @@ instance Display (Path b Dir) where
 
 instance Display (PackageName, NamedComponent) where
     display = cyan . fromString . T.unpack . renderPkgComponent
+
+instance Display C.ModuleName where
+    display = fromString . C.display
 
 -- Display milliseconds.
 displayMilliseconds :: Clock.TimeSpec -> AnsiDoc
