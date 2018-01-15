@@ -92,6 +92,7 @@ dependencies:
 - regex-applicative-text
 - resourcet
 - retry
+- rio
 - semigroups
 - split
 - stm
@@ -132,7 +133,6 @@ when:
 library:
   source-dirs:
   - src/
-  - subs/rio/src/
   ghc-options:
   - -fwarn-identities
   exposed-modules:
@@ -150,12 +150,8 @@ library:
   - Options.Applicative.Builder.Extra
   - Options.Applicative.Complicated
   - Path.CheckInstall
-  - Path.Extra
   - Path.Find
   - Paths_stack
-  - RIO
-  - RIO.Logger
-  - RIO.Process
   - Stack.Build
   - Stack.Build.Cache
   - Stack.Build.ConstructPlan
