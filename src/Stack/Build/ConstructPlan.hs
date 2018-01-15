@@ -830,13 +830,11 @@ psLocal :: PackageSource -> Bool
 psLocal (PSFiles _ loc) = loc == Local -- FIXME this is probably not the right logic, see configureOptsNoDir. We probably want to check if this appears in packages:
 psLocal PSIndex{} = False
 
--- | Get all of the dependencies for a given package, including guessed build
+-- | Get all of the dependencies for a given package, including build
 -- tool dependencies.
 packageDepsWithTools :: Package -> M (Map PackageName (VersionRange, DepType))
 packageDepsWithTools p = do
     ctx <- ask
-    -- TODO: it would be cool to defer these warnings until there's an
-    -- actual issue building the package.
     let toEither name mp =
             case Map.toList mp of
                 [] -> Left (ToolWarning name (packageName p) Nothing)
@@ -883,7 +881,7 @@ toolWarningText (ToolWarning (ExeName toolName) pkgName Nothing) =
 toolWarningText (ToolWarning (ExeName toolName) pkgName (Just (option1, option2, options))) =
     "Multiple packages found in snapshot which provide a " <>
     T.pack (show toolName) <>
-    " exeuctable, which is a build-tool dependency of " <>
+    " executable, which is a build-tool dependency of " <>
     T.pack (show (packageNameString pkgName)) <>
     ", so none will be installed.\n" <>
     "Here's the list of packages which provide it: " <>

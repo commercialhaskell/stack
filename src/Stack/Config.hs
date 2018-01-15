@@ -649,7 +649,7 @@ loadBuildConfig mproject maresolver mcompiler = do
         }
 
 -- | Get packages from EnvConfig, downloading and cloning as necessary.
--- If the packages have already been downloaded, this uses a cached value (
+-- If the packages have already been downloaded, this uses a cached value.
 getLocalPackages :: forall env. HasEnvConfig env => RIO env LocalPackages
 getLocalPackages = do
     cacheRef <- view $ envConfigL.to envConfigPackagesRef

@@ -694,9 +694,16 @@ globalToSnapshot name lpi = lpi
     { lpiLocation = PLIndex (PackageIdentifierRevision (PackageIdentifier name (lpiVersion lpi)) CFILatest)
     }
 
--- | Split the globals into those which have their dependencies met,
--- and those that don't. This deals with promotion of globals to
--- snapshot when another global has been upgraded already.
+-- | Split the packages into those which have their dependencies met,
+-- and those that don't. The first argument is packages that are known
+-- to be available for use as a dependency. The second argument is the
+-- packages to check.
+--
+-- This works by repeatedly iterating through the list of input
+-- packages, adding any that have their dependencies satisfied to a map
+-- (eventually this set is the fst of the result tuple). Once an
+-- iteration completes without adding anything to this set, it knows it
+-- has found everything that has its dependencies met, and exits.
 splitUnmetDeps :: Map PackageName Version -- ^ extra dependencies available
                -> Map PackageName (LoadedPackageInfo loc)
                -> ( Map PackageName (LoadedPackageInfo loc)
