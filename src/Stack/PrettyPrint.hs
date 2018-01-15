@@ -18,6 +18,7 @@ module Stack.PrettyPrint
     , styleWarning, styleError, styleGood
     , styleShell, styleFile, styleUrl, styleDir, styleModule
     , styleCurrent, styleTarget
+    , styleRecommendation
     , displayMilliseconds
       -- * Formatting utils
     , bulletedList
@@ -178,6 +179,10 @@ styleUrl = styleFile
 -- | Style an 'AnsiDoc' as a directory name. See 'styleFile' for files.
 styleDir :: AnsiDoc -> AnsiDoc
 styleDir = bold . blue
+
+-- | Style used to highlight part of a recommended course of action.
+styleRecommendation :: AnsiDoc -> AnsiDoc
+styleRecommendation = bold . green
 
 -- | Style an 'AnsiDoc' in a way that emphasizes that it is related to
 --   a current thing. For example, could be used when talking about the

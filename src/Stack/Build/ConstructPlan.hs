@@ -957,29 +957,33 @@ pprintExceptions exceptions stackYaml parentMap wanted =
       , line <> line
       , mconcat (intersperse (line <> line) (mapMaybe pprintException exceptions'))
       , line <> line
-      , flow "Some potential ways to resolve this:"
+      , flow "Some different approaches to resolving this:"
+      , line <> line
+      ] ++
+      (if not onlyHasDependencyMismatches then [] else
+         [ "  *" <+> align (flow "Set 'allow-newer: true' to ignore all version constraints and build anyway.")
+         , line <> line
+         ]
+      ) ++
+      [ "  *" <+> align (flow "Consider trying 'stack solver', which uses the cabal-install solver to attempt to find some working build configuration. This can be convenient when dealing with many complicated constraint errors, but results may be unpredictable.")
       , line <> line
       ] ++
       (if Map.null extras then [] else
          [ "  *" <+> align
-           (flow "Recommended action: try adding the following to your extra-deps in" <+>
+           (styleRecommendation (flow "Recommended action:") <+>
+            flow "try adding the following to your extra-deps in" <+>
             toAnsiDoc (display stackYaml) <> ":")
          , line <> line
          , vsep (map pprintExtra (Map.toList extras))
-         , line <> line
+         , line
          ]
-      ) ++
-      [ "  *" <+> align (flow "Set 'allow-newer: true' to ignore all version constraints and build anyway.")
-      , line <> line
-      , "  *" <+> align (flow "You may also want to try using the 'stack solver' command.")
-      , line
-      ]
+      )
   where
     exceptions' = nubOrd exceptions
 
     extras = Map.unions $ map getExtras exceptions'
-    getExtras (DependencyCycleDetected _) = Map.empty
-    getExtras (UnknownPackage _) = Map.empty
+    getExtras DependencyCycleDetected{} = Map.empty
+    getExtras UnknownPackage{} = Map.empty
     getExtras (DependencyPlanFailures _ m) =
        Map.unions $ map go $ Map.toList m
      where
@@ -996,6 +1000,17 @@ pprintExceptions exceptions stackYaml parentMap wanted =
     toNotInBuildPlan (DependencyPlanFailures _ pDeps) =
       map fst $ filter (\(_, (_, _, badDep)) -> badDep == NotInBuildPlan) $ Map.toList pDeps
     toNotInBuildPlan _ = []
+
+    -- This checks if 'allow-newer: true' could resolve all issues.
+    onlyHasDependencyMismatches = all go exceptions'
+      where
+        go DependencyCycleDetected{} = False
+        go UnknownPackage{} = False
+        go (DependencyPlanFailures _ m) =
+          all (\(_, _, depErr) -> isMismatch depErr) (M.elems m)
+        isMismatch DependencyMismatch{} = True
+        isMismatch Couldn'tResolveItsDependencies{} = True
+        isMismatch _ = False
 
     pprintException (DependencyCycleDetected pNames) = Just $
         flow "Dependency cycle detected in packages:" <> line <>
@@ -1035,7 +1050,9 @@ pprintExceptions exceptions stackYaml parentMap wanted =
     pprintDep (name, (range, mlatestApplicable, badDep)) = case badDep of
         NotInBuildPlan -> Just $
             styleError (display name) <+>
-            align (flow "must match" <+> goodRange <> "," <> softline <>
+            align ((if range == Cabal.anyVersion
+                      then flow "needed"
+                      else flow "must match" <+> goodRange) <> "," <> softline <>
                    flow "but the stack configuration has no specified version" <>
                    latestApplicable Nothing)
         -- TODO: For local packages, suggest editing constraints
