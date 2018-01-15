@@ -503,7 +503,7 @@ findCabalDirs
   :: HasConfig env
   => Bool -> Path Abs Dir -> RIO env (Set (Path Abs Dir))
 findCabalDirs recurse dir =
-    (Set.fromList . map parent)
+    Set.fromList . map parent
     <$> liftIO (findFiles dir isHpackOrCabal subdirFilter)
   where
     subdirFilter subdir = recurse && not (isIgnored subdir)

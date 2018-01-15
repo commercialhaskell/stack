@@ -109,8 +109,8 @@ instance FromJSON (WithJSONWarnings DockerOptsMonoid) where
     (\o -> do dockerMonoidDefaultEnable    <- pure (Any True)
               dockerMonoidEnable           <- First <$> o ..:? dockerEnableArgName
               dockerMonoidRepoOrImage      <- First <$>
-                                              (((Just . DockerMonoidImage) <$> o ..: dockerImageArgName) <|>
-                                              ((Just . DockerMonoidRepo) <$> o ..: dockerRepoArgName) <|>
+                                              ((Just . DockerMonoidImage <$> o ..: dockerImageArgName) <|>
+                                              (Just . DockerMonoidRepo <$> o ..: dockerRepoArgName) <|>
                                               pure Nothing)
               dockerMonoidRegistryLogin    <- First <$> o ..:? dockerRegistryLoginArgName
               dockerMonoidRegistryUsername <- First <$> o ..:? dockerRegistryUsernameArgName

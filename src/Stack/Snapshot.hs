@@ -276,7 +276,7 @@ loadResolver (ResolverCustom url loc) = do
       mdir <-
         case loc of
           Left _ -> return Nothing
-          Right fp' -> (Just . parent) <$> liftIO (Dir.canonicalizePath fp' >>= parseAbsFile)
+          Right fp' -> Just . parent <$> liftIO (Dir.canonicalizePath fp' >>= parseAbsFile)
 
       -- Deal with the dual nature of the compiler key, which either
       -- means "use this compiler" or "override the compiler in the
