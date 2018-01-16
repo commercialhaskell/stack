@@ -42,7 +42,7 @@ module Stack.Package
 
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Char8 as C8
-import           Data.List (isSuffixOf, partition, isPrefixOf)
+import           Data.List (isSuffixOf, isPrefixOf)
 import           Data.List.Extra (nubOrd)
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
@@ -673,7 +673,7 @@ allBuildInfo' pkg = allBuildInfo pkg ++
 -- | Get all files referenced by the package.
 packageDescModulesAndFiles
     :: PackageDescription
-    -> RIO Ctx (Map NamedComponent (Set ModuleName), Map NamedComponent (Set DotCabalPath), Set (Path Abs File), [PackageWarning])
+    -> RIO Ctx (Map NamedComponent (Map ModuleName (Path Abs File)), Map NamedComponent (Set DotCabalPath), Set (Path Abs File), [PackageWarning])
 packageDescModulesAndFiles pkg = do
     (libraryMods,libDotCabalFiles,libWarnings) <- -- FIXME add in sub libraries
         maybe
@@ -791,7 +791,7 @@ matchDirFileGlob_ dir filepath = case parseFileGlob filepath of
 
 -- | Get all files referenced by the benchmark.
 benchmarkFiles
-    :: Benchmark -> RIO Ctx (Set ModuleName, Set DotCabalPath, [PackageWarning])
+    :: Benchmark -> RIO Ctx (Map ModuleName (Path Abs File), Set DotCabalPath, [PackageWarning])
 benchmarkFiles bench = do
     dirs <- mapMaybeM resolveDirOrWarn (hsSourceDirs build)
     dir <- asks (parent . ctxFile)
@@ -814,7 +814,7 @@ benchmarkFiles bench = do
 -- | Get all files referenced by the test.
 testFiles
     :: TestSuite
-    -> RIO Ctx (Set ModuleName, Set DotCabalPath, [PackageWarning])
+    -> RIO Ctx (Map ModuleName (Path Abs File), Set DotCabalPath, [PackageWarning])
 testFiles test = do
     dirs <- mapMaybeM resolveDirOrWarn (hsSourceDirs build)
     dir <- asks (parent . ctxFile)
@@ -838,7 +838,7 @@ testFiles test = do
 -- | Get all files referenced by the executable.
 executableFiles
     :: Executable
-    -> RIO Ctx (Set ModuleName, Set DotCabalPath, [PackageWarning])
+    -> RIO Ctx (Map ModuleName (Path Abs File), Set DotCabalPath, [PackageWarning])
 executableFiles exe = do
     dirs <- mapMaybeM resolveDirOrWarn (hsSourceDirs build)
     dir <- asks (parent . ctxFile)
@@ -856,7 +856,7 @@ executableFiles exe = do
 
 -- | Get all files referenced by the library.
 libraryFiles
-    :: Library -> RIO Ctx (Set ModuleName, Set DotCabalPath, [PackageWarning])
+    :: Library -> RIO Ctx (Map ModuleName (Path Abs File), Set DotCabalPath, [PackageWarning])
 libraryFiles lib = do
     dirs <- mapMaybeM resolveDirOrWarn (hsSourceDirs build)
     dir <- asks (parent . ctxFile)
@@ -1070,19 +1070,18 @@ resolveFilesAndDeps
     -> [Path Abs Dir]       -- ^ Directories to look in.
     -> [DotCabalDescriptor] -- ^ Base names.
     -> [Text]               -- ^ Extensions.
-    -> RIO Ctx (Set ModuleName,Set DotCabalPath,[PackageWarning])
+    -> RIO Ctx (Map ModuleName (Path Abs File),Set DotCabalPath,[PackageWarning])
 resolveFilesAndDeps component dirs names0 exts = do
     (dotCabalPaths, foundModules, missingModules) <- loop names0 S.empty
     warnings <- liftM2 (++) (warnUnlisted foundModules) (warnMissing missingModules)
     return (foundModules, dotCabalPaths, warnings)
   where
-    loop [] _ = return (S.empty, S.empty, [])
+    loop [] _ = return (S.empty, M.empty, [])
     loop names doneModules0 = do
         resolved <- resolveFiles dirs names exts
         let foundFiles = mapMaybe snd resolved
-            (foundModules', missingModules') = partition (isJust . snd) resolved
-            foundModules = mapMaybe (dotCabalModule . fst) foundModules'
-            missingModules = mapMaybe (dotCabalModule . fst) missingModules'
+            foundModules = mapMaybe toResolvedModule resolved
+            missingModules = mapMaybe toMissingModule resolved
         pairs <- mapM (getDependencies component) foundFiles
         let doneModules =
                 S.union
@@ -1100,20 +1099,20 @@ resolveFilesAndDeps component dirs names0 exts = do
                   (S.fromList
                        (foundFiles <> map DotCabalFilePath thDepFiles))
                   resolvedFiles
-            , S.union
-                  (S.fromList foundModules)
+            , M.union
+                  (M.fromList foundModules)
                   resolvedModules
             , missingModules)
     warnUnlisted foundModules = do
         let unlistedModules =
-                foundModules `S.difference`
-                S.fromList (mapMaybe dotCabalModule names0)
+                foundModules `M.difference`
+                M.fromList (mapMaybe (fmap (, ()) . dotCabalModule) names0)
         return $
-            if S.null unlistedModules
+            if M.null unlistedModules
                 then []
                 else [ UnlistedModulesWarning
                            component
-                           (S.toList unlistedModules)]
+                           (map fst (M.toList unlistedModules))]
     warnMissing _missingModules = do
         return []
         -- TODO: bring this back - see
@@ -1128,7 +1127,22 @@ resolveFilesAndDeps component dirs names0 exts = do
                            component
                            missingModules]
         -}
-
+    -- TODO: In usages of toResolvedModule / toMissingModule, some sort
+    -- of map + partition would probably be better.
+    toResolvedModule
+        :: (DotCabalDescriptor, Maybe DotCabalPath)
+        -> Maybe (ModuleName, Path Abs File)
+    toResolvedModule (DotCabalModule mn, Just (DotCabalModulePath fp)) =
+        Just (mn, fp)
+    toResolvedModule _ =
+        Nothing
+    toMissingModule
+        :: (DotCabalDescriptor, Maybe DotCabalPath)
+        -> Maybe ModuleName
+    toMissingModule (DotCabalModule mn, Nothing) =
+        Just mn
+    toMissingModule _ =
+        Nothing
 
 -- | Get the dependencies of a Haskell module file.
 getDependencies

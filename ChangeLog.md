@@ -65,6 +65,9 @@ Bug fixes:
   this bug, you will likely need to delete the binary build cache
   associated with the relevant custom snapshot. See
   [#3714](https://github.com/commercialhaskell/stack/issues/3714).
+* `stack ghci` now allows loading multiple packages with the same
+  module name, as long as they are the same filepath. See
+  [#3776](https://github.com/commercialhaskell/stack/pull/3776).
 
 ## v1.6.3
 
