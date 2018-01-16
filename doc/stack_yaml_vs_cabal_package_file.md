@@ -1,21 +1,22 @@
 <div class="hidden-warning"><a href="https://docs.haskellstack.org/"><img src="https://rawgit.com/commercialhaskell/stack/master/doc/img/hidden-warning.svg"></a></div>
 
-# stack vs cabal config files
+# stack.yaml vs cabal package file
 
 Due to their apparent overlap, the purpose of the following three files can be
 unclear:
 
 * `stack.yaml`
-* A cabal file, e.g. `my-package.cabal`
+* A cabal package file, e.g. `my-package.cabal`
 * `package.yaml`
 
 The last two are easy to explain: `package.yaml` is a file format supported by
-[hpack](https://github.com/sol/hpack#readme), which adds some niceties on top
-of cabal like YAML syntax support and automatic generation of `exposed-modules`
-lists. However, it's just a frontend to cabal files. So for this document,
-we're instead going to focus on the first two and try to answer:
+[hpack](https://github.com/sol/hpack#readme). It adds some niceties on top of
+cabal. For example, hpack has YAML syntax support and will automatically
+generate of `exposed-modules` lists. However, it's just a frontend to cabal
+package files. So for this document, we're instead going to focus on the first
+two and try to answer:
 
-_What's the difference between a `stack.yaml` file and a cabal file?_
+_What's the difference between a `stack.yaml` file and a cabal package file?_
 
 ## Package versus project
 

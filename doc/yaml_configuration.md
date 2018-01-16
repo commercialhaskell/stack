@@ -24,7 +24,7 @@ used, and `~/.stack/global-project/stack.yaml` is ignored.
 
 *Note 2:* A common source of confusion is the distinction between configuration
 in a `stack.yaml` file versus a cabal file. If you're trying to understand this
-breakdown, see [stack vs cabal config](stack_vs_cabal_config.md)
+breakdown, see [stack vs cabal config](stack_yaml_vs_cabal_package_file.md).
 
 ## Project-specific config
 
