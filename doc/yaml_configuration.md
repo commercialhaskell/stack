@@ -22,6 +22,10 @@ specific options from `~/.stack/global-project/stack.yaml`. When stack is
 invoked inside a stack project, only options from `<project dir>/stack.yaml` are
 used, and `~/.stack/global-project/stack.yaml` is ignored.
 
+*Note 2:* A common source of confusion is the distinction between configuration
+in a `stack.yaml` file versus a cabal file. If you're trying to understand this
+breakdown, see [stack vs cabal config](stack_yaml_vs_cabal_package_file.md).
+
 ## Project-specific config
 
 Project-specific options are only valid in the `stack.yaml` file local to a
