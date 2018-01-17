@@ -843,8 +843,8 @@ ensureConfig newConfigCache pkgDir ExecuteEnv {..} announce cabal cabalfp task =
         menv <- view envOverrideL
         let programNames =
                 if eeCabalPkgVer < $(mkVersion "1.22")
-                    then ["ghc", "ghc-pkg"]
-                    else ["ghc", "ghc-pkg", "ghcjs", "ghcjs-pkg"]
+                    then ["ghc", "hc-pkg"]
+                    else ["ghc", "hc-pkg", "ghcjs", "ghcjs-pkg"]
         exes <- forM programNames $ \name -> do
             mpath <- findExecutable menv name
             return $ case mpath of
