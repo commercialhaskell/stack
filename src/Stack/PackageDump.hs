@@ -160,19 +160,23 @@ sinkMatching :: Monad m
              -> ConduitM (DumpPackage Bool Bool Bool) o
                          m
                          (Map PackageName (DumpPackage Bool Bool Bool))
-sinkMatching reqProfiling reqHaddock reqSymbols allowed = do
-    dps <- CL.filter (\dp -> isAllowed (dpPackageIdent dp) &&
-                             (not reqProfiling || dpProfiling dp) &&
-                             (not reqHaddock || dpHaddock dp) &&
-                             (not reqSymbols || dpSymbols dp))
-       .| CL.consume
-    return $ Map.fromList $ map (packageIdentifierName . dpPackageIdent &&& id) $ Map.elems $ pruneDeps
+sinkMatching reqProfiling reqHaddock reqSymbols allowed =
+      Map.fromList
+    . map (packageIdentifierName . dpPackageIdent &&& id)
+    . Map.elems
+    . pruneDeps
         id
         dpGhcPkgId
         dpDepends
         const -- Could consider a better comparison in the future
-        dps
+    <$> (CL.filter predicate .| CL.consume)
   where
+    predicate dp =
+      isAllowed (dpPackageIdent dp) &&
+      (not reqProfiling || dpProfiling dp) &&
+      (not reqHaddock || dpHaddock dp) &&
+      (not reqSymbols || dpSymbols dp)
+
     isAllowed (PackageIdentifier name version) =
         case Map.lookup name allowed of
             Just version' | version /= version' -> False

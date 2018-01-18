@@ -826,9 +826,8 @@ execCmd ExecOpts {..} go@GlobalOpts{..} =
                   hPutStrLn stderr ("Could not find package id of package " ++ name)
                   exitFailure
 
-      getPkgOpts wc pkgs = do
-          ids <- mapM (getPkgId wc) pkgs
-          return $ map ("-package-id=" ++) ids
+      getPkgOpts wc pkgs =
+          map ("-package-id-" ++) <$> mapM (getPkgId wc) pkgs
 
       getGhcCmd prefix pkgs args = do
           wc <- view $ actualCompilerVersionL.whichCompilerL

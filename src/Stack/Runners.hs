@@ -41,9 +41,8 @@ import           Lens.Micro
 loadCompilerVersion :: GlobalOpts
                     -> LoadConfig
                     -> IO (CompilerVersion 'CVWanted)
-loadCompilerVersion go lc = do
-    bconfig <- lcLoadBuildConfig lc (globalCompiler go)
-    return $ view wantedCompilerVersionL bconfig
+loadCompilerVersion go lc =
+    view wantedCompilerVersionL <$> lcLoadBuildConfig lc (globalCompiler go)
 
 -- | Enforce mutual exclusion of every action running via this
 -- function, on this path, on this users account.
