@@ -114,9 +114,8 @@ instance word8 ~ Word8 => DynamicBytes (VP.Vector word8) where
   lengthD = VP.length
   fromWordsD len words0 = unsafePerformIO $ do
     ba <- BA.newByteArray len
-    let loop _ [] = do
-          ba' <- BA.unsafeFreezeByteArray ba
-          return $ VP.Vector 0 len ba'
+    let loop _ [] =
+          VP.Vector 0 len <$> BA.unsafeFreezeByteArray ba
         loop i (w:ws) = do
           BA.writeByteArray ba i w
           loop (i + 1) ws

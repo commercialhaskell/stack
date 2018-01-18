@@ -663,12 +663,12 @@ solveExtraDeps modStackYaml = do
     resultSpecs <- case resolverResult of
         BuildPlanCheckOk flags ->
             return $ Just (mergeConstraints oldSrcs flags, Map.empty)
-        BuildPlanCheckPartial {} -> do
-            eres <- solveResolverSpec stackYaml cabalDirs
+        BuildPlanCheckPartial {} ->
+            either (const Nothing) Just <$>
+            solveResolverSpec stackYaml cabalDirs
                               (sd, srcConstraints, extraConstraints)
             -- TODO Solver should also use the init code to ignore incompatible
             -- packages
-            return $ either (const Nothing) Just eres
         BuildPlanCheckFail {} ->
             throwM $ ResolverMismatch IsSolverCmd (sdResolverName sd) (show resolverResult)
 

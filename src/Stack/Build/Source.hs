@@ -421,9 +421,7 @@ addUnlistedToBuildCache preBuildTime pkg cabalFP nonLibComponents buildCaches = 
             Nothing -> return Map.empty
             Just modTime' ->
                 if modTime' < preBuildTime
-                    then do
-                        newFci <- calcFci modTime' fp
-                        return (Map.singleton fp newFci)
+                    then Map.singleton fp <$> calcFci modTime' fp
                     else return Map.empty
 
 -- | Gets list of Paths for files relevant to a set of components in a package.
