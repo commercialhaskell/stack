@@ -1466,7 +1466,7 @@ expectSingleUnpackedDir :: (MonadIO m, MonadThrow m) => Path Abs File -> Path Ab
 expectSingleUnpackedDir archiveFile destDir = do
     contents <- listDir destDir
     case contents of
-        ([dir], []) -> return dir
+        ([dir], _ ) -> return dir
         _ -> throwString $ "Expected a single directory within unpacked " ++ toFilePath archiveFile
 
 -- | Download 7z as necessary, and get a function for unpacking things.
