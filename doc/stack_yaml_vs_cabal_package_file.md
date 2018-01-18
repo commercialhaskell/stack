@@ -30,7 +30,7 @@ _package_. A package has:
   generates a cabal file)
 * And a bunch more
 
-That last bullet bears repeating: there's a 1-to-1 correspondence between
+The second to last bullet bears repeating: there's a 1-to-1 correspondence between
 packages and cabal files. 
 
 Stack is a build tool that works on top of the Cabal build system, and defines
