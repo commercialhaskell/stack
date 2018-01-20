@@ -46,7 +46,6 @@ import           Stack.Package
 import           Stack.PackageLocation (parseSingleCabalFileIndex)
 import           Stack.Types.Build
 import           Stack.Types.BuildPlan
-import           Stack.Types.Compiler (compilerVersionText)
 import           Stack.Types.Config
 import           Stack.Types.FlagName
 import           Stack.Types.NamedComponent
@@ -55,9 +54,11 @@ import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageName
 import           Stack.Types.Version
 
+import           Stack.Types.Compiler (compilerVersionText
 #ifdef WINDOWS
-import           Stack.Types.Compiler (getGhcVersion)
+                                      ,getGhcVersion
 #endif
+                                      )
 import           System.FileLock (FileLock, unlockFile)
 
 #ifdef WINDOWS
