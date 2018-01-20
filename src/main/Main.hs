@@ -827,7 +827,7 @@ execCmd ExecOpts {..} go@GlobalOpts{..} =
                   exitFailure
 
       getPkgOpts wc pkgs =
-          map ("-package-id-" ++) <$> mapM (getPkgId wc) pkgs
+          map ("-package-id=" ++) <$> mapM (getPkgId wc) pkgs
 
       getGhcCmd prefix pkgs args = do
           wc <- view $ actualCompilerVersionL.whichCompilerL
