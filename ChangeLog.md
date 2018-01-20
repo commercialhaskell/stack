@@ -66,8 +66,12 @@ Bug fixes:
   associated with the relevant custom snapshot. See
   [#3714](https://github.com/commercialhaskell/stack/issues/3714).
 * `stack ghci` now allows loading multiple packages with the same
-  module name, as long as they are the same filepath. See
+  module name, as long as they have the same filepath. See
   [#3776](https://github.com/commercialhaskell/stack/pull/3776).
+* `stack ghci` no longer always adds a dependency on `base`. It is
+  now only added when there are no local targets. This allows it to
+  be to load code that uses replacements for `base`. See
+  [#3589](https://github.com/commercialhaskell/stack/issues/3589#issuecomment)
 
 ## v1.6.3
 
