@@ -46,6 +46,7 @@ import           Stack.Package
 import           Stack.PackageLocation (parseSingleCabalFileIndex)
 import           Stack.Types.Build
 import           Stack.Types.BuildPlan
+import           Stack.Types.Compiler (compilerVersionText)
 import           Stack.Types.Config
 import           Stack.Types.FlagName
 import           Stack.Types.NamedComponent
@@ -55,7 +56,7 @@ import           Stack.Types.PackageName
 import           Stack.Types.Version
 
 #ifdef WINDOWS
-import           Stack.Types.Compiler
+import           Stack.Types.Compiler (getGhcVersion)
 #endif
 import           System.FileLock (FileLock, unlockFile)
 
@@ -370,8 +371,16 @@ queryBuildInfo selectors0 =
 rawBuildInfo :: HasEnvConfig env => RIO env Value
 rawBuildInfo = do
     (locals, _sourceMap) <- loadSourceMap NeedTargets defaultBuildOptsCLI
+    wantedCompiler <- view $ wantedCompilerVersionL.to compilerVersionText
+    actualCompiler <- view $ actualCompilerVersionL.to compilerVersionText
+    globalHints <- view globalHintsL
     return $ object
         [ "locals" .= Object (HM.fromList $ map localToPair locals)
+        , "compiler" .= object
+            [ "wanted" .= wantedCompiler
+            , "actual" .= actualCompiler
+            ]
+        , "global-hints" .= globalHints
         ]
   where
     localToPair lp =

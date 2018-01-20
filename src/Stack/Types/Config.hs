@@ -161,6 +161,7 @@ module Stack.Types.Config
   ,whichCompilerL
   ,envOverrideSettingsL
   ,loadedSnapshotL
+  ,globalHintsL
   ,shouldForceGhcColorFlag
   ,appropriateGhcColorFlag
   -- * Lens reexport
@@ -2005,6 +2006,9 @@ envOverrideSettingsL :: HasConfig env => Lens' env (EnvSettings -> IO EnvOverrid
 envOverrideSettingsL = configL.lens
     configEnvOverrideSettings
     (\x y -> x { configEnvOverrideSettings = y })
+
+globalHintsL :: HasBuildConfig s => Getting r s (Map PackageName (Maybe Version))
+globalHintsL = snapshotDefL.to sdGlobalHints
 
 shouldForceGhcColorFlag :: (HasRunner env, HasEnvConfig env)
                         => RIO env Bool
