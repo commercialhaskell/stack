@@ -790,7 +790,7 @@ getConfigCache ExecuteEnv {..} task@Task {..} installedMap enableTest enableBenc
             , configCacheDeps = allDeps
             , configCacheComponents =
                 case taskType of
-                    TTFiles lp _ -> Set.map renderComponent $ lpComponents lp
+                    TTFiles lp _ -> Set.map (encodeUtf8 . renderComponent) $ lpComponents lp
                     TTIndex{} -> Set.empty
             , configCacheHaddock =
                 shouldHaddockPackage eeBuildOpts eeWanted (packageIdentifierName taskProvides)
@@ -1411,9 +1411,9 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
                 -- https://github.com/commercialhaskell/stack/issues/2649
                 -- is resolved, we will want to partition the warnings
                 -- based on variety, and output in different lists.
-                let showModuleWarning (UnlistedModulesWarning mcomp modules) =
+                let showModuleWarning (UnlistedModulesWarning comp modules) =
                       "- In" <+>
-                      maybe "the library component" (\c -> fromString c <+> "component") mcomp <>
+                      fromString (T.unpack (renderComponent comp)) <>
                       ":" <> line <>
                       indent 4 (mconcat $ intersperse line $ map (styleGood . fromString . C.display) modules)
                 forM_ mlocalWarnings $ \(cabalfp, warnings) -> do
@@ -1938,7 +1938,7 @@ cabalIsSatisfied = all (== ExecutableBuilt) . M.elems
 -- Test-suite and benchmark build components.
 finalComponentOptions :: LocalPackage -> [String]
 finalComponentOptions lp =
-    map (T.unpack . decodeUtf8 . renderComponent) $
+    map (T.unpack . renderComponent) $
     Set.toList $
     Set.filter (\c -> isCTest c || isCBench c) (lpComponents lp)
 
