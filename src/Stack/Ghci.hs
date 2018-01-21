@@ -21,7 +21,6 @@ import           Stack.Prelude hiding (Display (..))
 import           Control.Monad.State.Strict (State, execState, get, modify)
 import qualified Data.ByteString.Char8 as S8
 import           Data.List
-import           Data.List.Extra (nubOrd)
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
 import qualified Data.Text as T

@@ -20,7 +20,6 @@ module Stack.Build.Haddock
 import           Stack.Prelude
 import qualified Data.Foldable as F
 import qualified Data.HashSet as HS
-import           Data.List.Extra (nubOrd)
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import           Data.Time (UTCTime)

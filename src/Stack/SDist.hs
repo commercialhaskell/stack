@@ -26,7 +26,6 @@ import qualified Data.ByteString.Lazy as L
 import           Data.Char (toLower)
 import           Data.Data (cast)
 import           Data.List
-import           Data.List.Extra (nubOrd)
 import           Data.List.NonEmpty (NonEmpty)
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Map.Strict as Map

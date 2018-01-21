@@ -33,7 +33,7 @@ import           Data.Char (isSpace,toUpper,isAscii,isDigit)
 import           Data.Conduit.List (sinkNull)
 import           Data.Conduit.Process.Typed
 import           Data.List (dropWhileEnd,intercalate,isPrefixOf,isInfixOf)
-import           Data.List.Extra (trim, nubOrd)
+import           Data.List.Extra (trim)
 import qualified Data.Map.Strict as Map
 import           Data.Ord (Down(..))
 import           Data.Streaming.Process (ProcessExitedUnsuccessfully(..))

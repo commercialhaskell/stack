@@ -23,7 +23,6 @@ import           Control.Monad.RWS.Strict
 import           Control.Monad.State.Strict (execState)
 import qualified Data.HashSet as HashSet
 import           Data.List
-import           Data.List.Extra (nubOrd)
 import qualified Data.Map.Strict as M
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set

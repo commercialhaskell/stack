@@ -43,7 +43,6 @@ module Stack.Package
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Char8 as C8
 import           Data.List (isSuffixOf, isPrefixOf)
-import           Data.List.Extra (nubOrd)
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
 import qualified Data.Text as T
