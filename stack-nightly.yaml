@@ -1,7 +1,4 @@
-resolver: nightly-2017-12-20
-packages:
-- .
-- subs/rio
+resolver: nightly-2018-01-18
 
 nix:
   # --nix on the command-line to enable.
@@ -11,9 +8,7 @@ nix:
     - http-client-tls-0.3.4
 extra-deps:
 - bindings-uname-0.1
-- conduit-extra-1.2.3.1
-- typed-process-0.2.1.0
+- rio-0.0.1.0
 
 # https://github.com/commercialhaskell/stack/issues/3785
 - ansi-terminal-0.8
-- ansi-wl-pprint-0.6.8.2

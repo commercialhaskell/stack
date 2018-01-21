@@ -224,7 +224,7 @@ instance Display C.ModuleName where
 -- Display milliseconds.
 displayMilliseconds :: Double -> AnsiDoc
 displayMilliseconds t = green $
-    fromString (show ((round (t * 1000) :: Int))) <> "ms"
+    fromString (show (round (t * 1000) :: Int)) <> "ms"
 
 -- | Display a bulleted list of 'AnsiDoc'.
 bulletedList :: [AnsiDoc] -> AnsiDoc
