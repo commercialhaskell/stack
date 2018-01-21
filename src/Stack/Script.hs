@@ -105,12 +105,15 @@ scriptCmd opts go' = do
                 (ghcArgs ++ toFilePath file : soArgs opts)
           _ -> do
             let dir = parent file
-            -- use sinkProcessStdout to ensure a ProcessFailed
-            -- exception is generated for better error messages
-            withWorkingDir (toFilePath dir) $ sinkProcessStdout
+            -- Use readProcessStdout_ so that (1) if GHC does send any output
+            -- to stdout, we capture it and stop it from being sent to our
+            -- stdout, which could break scripts, and (2) if there's an
+            -- exception, the standard output we did capture will be reported
+            -- to the user.
+            withWorkingDir (toFilePath dir) $ withProc
               (compilerExeName wc)
               (ghcArgs ++ [toFilePath file])
-              CL.sinkNull
+              (void . readProcessStdout_)
             exec (toExeName $ toFilePath file) (soArgs opts)
   where
     toPackageName = reverse . drop 1 . dropWhile (/= '-') . reverse

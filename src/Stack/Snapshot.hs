@@ -279,7 +279,7 @@ loadResolver (ResolverCustom url loc) = do
       mdir <-
         case loc of
           Left _ -> return Nothing
-          Right fp' -> (Just . parent) <$> liftIO (Dir.canonicalizePath fp' >>= parseAbsFile)
+          Right fp' -> Just . parent <$> liftIO (Dir.canonicalizePath fp' >>= parseAbsFile)
 
       -- Deal with the dual nature of the compiler key, which either
       -- means "use this compiler" or "override the compiler in the
@@ -472,7 +472,7 @@ calculatePackagePromotion
 
           -- Put together the two split out groups of packages
           noLongerGlobals3 :: Map PackageName (LoadedPackageInfo SinglePackageLocation)
-          noLongerGlobals3 = Map.union (Map.mapWithKey globalToSnapshot noLongerGlobals1) noLongerGlobals2
+          noLongerGlobals3 = Map.mapWithKey globalToSnapshot (Map.union noLongerGlobals1 noLongerGlobals2)
 
           -- Now do the same thing with parent packages: take out the
           -- packages to be upgraded and then split out unmet
@@ -697,20 +697,27 @@ globalToSnapshot name lpi = lpi
     { lpiLocation = PLIndex (PackageIdentifierRevision (PackageIdentifier name (lpiVersion lpi)) CFILatest)
     }
 
--- | Split the globals into those which have their dependencies met,
--- and those that don't. This deals with promotion of globals to
--- snapshot when another global has been upgraded already.
+-- | Split the packages into those which have their dependencies met,
+-- and those that don't. The first argument is packages that are known
+-- to be available for use as a dependency. The second argument is the
+-- packages to check.
+--
+-- This works by repeatedly iterating through the list of input
+-- packages, adding any that have their dependencies satisfied to a map
+-- (eventually this set is the fst of the result tuple). Once an
+-- iteration completes without adding anything to this set, it knows it
+-- has found everything that has its dependencies met, and exits.
 splitUnmetDeps :: Map PackageName Version -- ^ extra dependencies available
                -> Map PackageName (LoadedPackageInfo loc)
                -> ( Map PackageName (LoadedPackageInfo loc)
-                  , Map PackageName (LoadedPackageInfo (PackageLocationIndex FilePath))
+                  , Map PackageName (LoadedPackageInfo loc)
                   )
 splitUnmetDeps extra =
     start Map.empty . Map.toList
   where
     start newGlobals0 toProcess0
       | anyAdded = start newGlobals1 toProcess1
-      | otherwise = (newGlobals1, Map.mapWithKey globalToSnapshot $ Map.fromList toProcess1)
+      | otherwise = (newGlobals1, Map.fromList toProcess1)
       where
         (newGlobals1, toProcess1, anyAdded) = loop False newGlobals0 id toProcess0
 
@@ -721,10 +728,35 @@ splitUnmetDeps extra =
 
     depsMet globals = all (depsMet' globals) . Map.toList . lpiPackageDeps
 
-    depsMet' globals (name, intervals) =
+    -- MSS 2018-01-10. Previously, we would actually perform a version
+    -- bounds check at this point. I believe this is a mistake: we
+    -- don't want to promote a package from a snapshot to a local just
+    -- because the version ranges aren't satisfied. In fact, we
+    -- intentionally allow snapshots to specify mismatched versions of
+    -- packages, and try building anyway.
+    --
+    -- With the old behavior: a number of packages would be converted
+    -- and treated as local packages. I specifically stumbled on this
+    -- while investigating Stackage issues #3185, where a revision to
+    -- semigroupoids's tagged dependency caused the builds to
+    -- break. Stack should have just ignored this and printed a
+    -- warning. Instead, Stack believed that semigroupoids was a local
+    -- package, not a snapshot package, and failed.
+    --
+    -- All that said: I'm pretty certain this is the right behavior,
+    -- but all of this is strongly indicating that we need some code
+    -- cleanup around this promotion business. I don't think I did a
+    -- particularly good job on this code during the extensible
+    -- snapshot rewrite.
+    depsMet' globals (name, _intervals) =
       case (lpiVersion <$> Map.lookup name globals) <|> Map.lookup name extra of
+        -- The dependency doesn't exist at all in the snapshot or
+        -- extra, therefore this package must be promoted to local as
+        -- well.
         Nothing -> False
-        Just version -> version `withinIntervals` intervals
+        -- It exists. As explained above, don't bother checking the
+        -- version bounds, we trust the snapshot.
+        Just _version -> True
 
 -- | Calculate a 'LoadedPackageInfo' from the given 'GenericPackageDescription'
 calculate :: GenericPackageDescription

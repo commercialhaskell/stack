@@ -161,6 +161,7 @@ module Stack.Types.Config
   ,whichCompilerL
   ,envOverrideSettingsL
   ,loadedSnapshotL
+  ,globalHintsL
   ,shouldForceGhcColorFlag
   ,appropriateGhcColorFlag
   -- * Lens reexport
@@ -1927,13 +1928,13 @@ instance HasLogFunc EnvConfig where
 stackRootL :: HasCabalLoader s => Lens' s (Path Abs Dir)
 stackRootL = cabalLoaderL.lens clStackRoot (\x y -> x { clStackRoot = y })
 
--- | The compiler specified by the @MiniBuildPlan@. This may be
+-- | The compiler specified by the @SnapshotDef@. This may be
 -- different from the actual compiler used!
 wantedCompilerVersionL :: HasBuildConfig s => Getting r s (CompilerVersion 'CVWanted)
 wantedCompilerVersionL = snapshotDefL.to sdWantedCompilerVersion
 
 -- | The version of the compiler which will actually be used. May be
--- different than that specified in the 'MiniBuildPlan' and returned
+-- different than that specified in the 'SnapshotDef' and returned
 -- by 'wantedCompilerVersionL'.
 actualCompilerVersionL :: HasEnvConfig s => Lens' s (CompilerVersion 'CVActual)
 actualCompilerVersionL = envConfigL.lens
@@ -2005,6 +2006,9 @@ envOverrideSettingsL :: HasConfig env => Lens' env (EnvSettings -> IO EnvOverrid
 envOverrideSettingsL = configL.lens
     configEnvOverrideSettings
     (\x y -> x { configEnvOverrideSettings = y })
+
+globalHintsL :: HasBuildConfig s => Getting r s (Map PackageName (Maybe Version))
+globalHintsL = snapshotDefL.to sdGlobalHints
 
 shouldForceGhcColorFlag :: (HasRunner env, HasEnvConfig env)
                         => RIO env Bool

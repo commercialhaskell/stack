@@ -502,7 +502,7 @@ findCabalDirs
   :: HasConfig env
   => Bool -> Path Abs Dir -> RIO env (Set (Path Abs Dir))
 findCabalDirs recurse dir =
-    (Set.fromList . map parent)
+    Set.fromList . map parent
     <$> liftIO (findFiles dir isHpackOrCabal subdirFilter)
   where
     subdirFilter subdir = recurse && not (isIgnored subdir)
@@ -662,12 +662,12 @@ solveExtraDeps modStackYaml = do
     resultSpecs <- case resolverResult of
         BuildPlanCheckOk flags ->
             return $ Just (mergeConstraints oldSrcs flags, Map.empty)
-        BuildPlanCheckPartial {} -> do
-            eres <- solveResolverSpec stackYaml cabalDirs
+        BuildPlanCheckPartial {} ->
+            either (const Nothing) Just <$>
+            solveResolverSpec stackYaml cabalDirs
                               (sd, srcConstraints, extraConstraints)
             -- TODO Solver should also use the init code to ignore incompatible
             -- packages
-            return $ either (const Nothing) Just eres
         BuildPlanCheckFail {} ->
             throwM $ ResolverMismatch IsSolverCmd (sdResolverName sd) (show resolverResult)
 

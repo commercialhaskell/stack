@@ -126,7 +126,7 @@ newtype GetPackageOpts = GetPackageOpts
                      -> [PackageName]
                      -> Path Abs File
                      -> RIO env
-                          (Map NamedComponent (Set ModuleName)
+                          (Map NamedComponent (Map ModuleName (Path Abs File))
                           ,Map NamedComponent (Set DotCabalPath)
                           ,Map NamedComponent BuildInfoOpts)
     }
@@ -155,7 +155,7 @@ newtype GetPackageFiles = GetPackageFiles
     { getPackageFiles :: forall env. HasEnvConfig env
                       => Path Abs File
                       -> RIO env
-                           (Map NamedComponent (Set ModuleName)
+                           (Map NamedComponent (Map ModuleName (Path Abs File))
                            ,Map NamedComponent (Set DotCabalPath)
                            ,Set (Path Abs File)
                            ,[PackageWarning])

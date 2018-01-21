@@ -73,7 +73,7 @@ instance Show ExecuteException where
 runActions :: Int -- ^ threads
            -> Bool -- ^ keep going after one task has failed
            -> [Action]
-           -> (TVar Int -> IO ()) -- ^ progress updated
+           -> (TVar Int -> TVar (Set ActionId) -> IO ()) -- ^ progress updated
            -> IO [SomeException]
 runActions threads keepGoing actions0 withProgress = do
     es <- ExecuteState
@@ -82,7 +82,7 @@ runActions threads keepGoing actions0 withProgress = do
         <*> newTVarIO Set.empty
         <*> newTVarIO 0
         <*> pure keepGoing
-    _ <- async $ withProgress $ esCompleted es
+    _ <- async $ withProgress (esCompleted es) (esInAction es)
     if threads <= 1
         then runActions' es
         else replicateConcurrently_ threads $ runActions' es

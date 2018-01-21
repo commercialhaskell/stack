@@ -340,9 +340,8 @@ resolveRawTarget globals snap deps locals (ri, rt) =
               , rrPackageType = Dependency
               }
       where
-        getLatestVersion pn = do
-            vs <- getPackageVersions pn
-            return (fmap fst (Set.maxView vs))
+        getLatestVersion pn =
+            fmap fst . Set.maxView <$> getPackageVersions pn
 
     go (RTPackageIdentifier ident@(PackageIdentifier name version))
       | Map.member name locals = return $ Left $ T.concat

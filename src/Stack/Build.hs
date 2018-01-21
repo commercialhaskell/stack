@@ -54,9 +54,11 @@ import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageName
 import           Stack.Types.Version
 
+import           Stack.Types.Compiler (compilerVersionText
 #ifdef WINDOWS
-import           Stack.Types.Compiler
+                                      ,getGhcVersion
 #endif
+                                      )
 import           System.FileLock (FileLock, unlockFile)
 
 #ifdef WINDOWS
@@ -78,7 +80,7 @@ build setLocalFiles mbuildLk boptsCli = fixCodePage $ do
     let profiling = boptsLibProfile bopts || boptsExeProfile bopts
     let symbols = not (boptsLibStrip bopts || boptsExeStrip bopts)
 
-    (targets, mbp, locals, extraToBuild, sourceMap) <- loadSourceMapFull NeedTargets boptsCli
+    (targets, ls, locals, extraToBuild, sourceMap) <- loadSourceMapFull NeedTargets boptsCli
 
     -- Set local files, necessary for file watching
     stackYaml <- view stackYamlL
@@ -102,7 +104,7 @@ build setLocalFiles mbuildLk boptsCli = fixCodePage $ do
                      sourceMap
 
     baseConfigOpts <- mkBaseConfigOpts boptsCli
-    plan <- constructPlan mbp baseConfigOpts locals extraToBuild localDumpPkgs loadPackage sourceMap installedMap (boptsCLIInitialBuildSteps boptsCli)
+    plan <- constructPlan ls baseConfigOpts locals extraToBuild localDumpPkgs loadPackage sourceMap installedMap (boptsCLIInitialBuildSteps boptsCli)
 
     allowLocals <- view $ configL.to configAllowLocals
     unless allowLocals $ case justLocals plan of
@@ -370,8 +372,16 @@ queryBuildInfo selectors0 =
 rawBuildInfo :: HasEnvConfig env => RIO env Value
 rawBuildInfo = do
     (locals, _sourceMap) <- loadSourceMap NeedTargets defaultBuildOptsCLI
+    wantedCompiler <- view $ wantedCompilerVersionL.to compilerVersionText
+    actualCompiler <- view $ actualCompilerVersionL.to compilerVersionText
+    globalHints <- view globalHintsL
     return $ object
         [ "locals" .= Object (HM.fromList $ map localToPair locals)
+        , "compiler" .= object
+            [ "wanted" .= wantedCompiler
+            , "actual" .= actualCompiler
+            ]
+        , "global-hints" .= globalHints
         ]
   where
     localToPair lp =

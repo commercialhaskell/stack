@@ -26,7 +26,6 @@ import qualified Data.Map.Strict as M
 import qualified Data.Set as S
 import qualified Data.Text as T
 import qualified Distribution.PackageDescription as C
-import qualified Distribution.Text as C
 import           Path
 import           Path.Extra (toFilePathNoTrailingSep)
 import           Path.IO hiding (withSystemTempDir)
@@ -78,13 +77,21 @@ data GhciPkgInfo = GhciPkgInfo
     { ghciPkgName :: !PackageName
     , ghciPkgOpts :: ![(NamedComponent, BuildInfoOpts)]
     , ghciPkgDir :: !(Path Abs Dir)
-    , ghciPkgModules :: !(Set ModuleName)
-    , ghciPkgModFiles :: !(Set (Path Abs File)) -- ^ Module file paths.
+    , ghciPkgModules :: !ModuleMap
     , ghciPkgCFiles :: !(Set (Path Abs File)) -- ^ C files.
     , ghciPkgMainIs :: !(Map NamedComponent (Set (Path Abs File)))
     , ghciPkgTargetFiles :: !(Maybe (Set (Path Abs File)))
     , ghciPkgPackage :: !Package
     } deriving Show
+
+-- Mapping from a module name to a map with all of the paths that use
+-- that name. Each of those paths is associated with a set of components
+-- that contain it. Purpose of this complex structure is for use in
+-- 'checkForDuplicateModules'.
+type ModuleMap = Map ModuleName (Map (Path Abs File) (Set (PackageName, NamedComponent)))
+
+unionModuleMaps :: [ModuleMap] -> ModuleMap
+unionModuleMaps = M.unionsWith (M.unionWith S.union)
 
 data GhciException
     = InvalidPackageOption String
@@ -324,12 +331,13 @@ runGhci GhciOpts{..} targets mainIsTargets pkgs extraFiles exposePackages = do
           fromMaybe (not (null pkgs && null exposePackages)) ghciHidePackages
         hidePkgOpts =
           if shouldHidePackages
-            then "-hide-all-packages" :
+            then
+              ["-hide-all-packages"] ++
               -- This is necessary, because current versions of ghci
               -- will entirely fail to start if base isn't visible. This
               -- is because it tries to use the interpreter to set
               -- buffering options on standard IO.
-              "-package" : "base" :
+              (if null targets then ["-package", "base"] else []) ++
               concatMap (\n -> ["-package", packageNameString n]) exposePackages
             else []
         oneWordOpts bio
@@ -418,7 +426,7 @@ renderScript isIntero pkgs mainFile onlyMain extraFiles = do
             Just path -> [Right path]
             _ -> []
         modulePhase = cmdModule $ S.fromList allModules
-        allModules = concatMap (S.toList . ghciPkgModules) pkgs
+        allModules = nubOrd $ concatMap (M.keys . ghciPkgModules) pkgs
     case getFileTargets pkgs <> extraFiles of
         [] ->
           if onlyMain
@@ -602,8 +610,9 @@ makeGhciPkgInfo buildOptsCLI sourceMap installedMap locals addPkgs mfileTargets 
         { ghciPkgName = packageName pkg
         , ghciPkgOpts = M.toList filteredOpts
         , ghciPkgDir = parent cabalfp
-        , ghciPkgModules = mconcat (M.elems (filterWanted mods))
-        , ghciPkgModFiles = mconcat (M.elems (filterWanted (M.map (setMapMaybe dotCabalModulePath) files)))
+        , ghciPkgModules = unionModuleMaps $
+          map (\(comp, mp) -> M.map (\fp -> M.singleton fp (S.singleton (packageName pkg, comp))) mp)
+              (M.toList (filterWanted mods))
         , ghciPkgMainIs = M.map (setMapMaybe dotCabalMainPath) files
         , ghciPkgCFiles = mconcat (M.elems (filterWanted (M.map (setMapMaybe dotCabalCFilePath) files)))
         , ghciPkgTargetFiles = mfileTargets >>= M.lookup name
@@ -696,24 +705,28 @@ borderedWarning f = do
     logWarn ""
     return x
 
-checkForDuplicateModules :: HasLogFunc env => [GhciPkgInfo] -> RIO env ()
+-- TODO: Should this also tell the user the filepaths, not just the
+-- module name?
+checkForDuplicateModules :: HasRunner env => [GhciPkgInfo] -> RIO env ()
 checkForDuplicateModules pkgs = do
     unless (null duplicates) $ do
         borderedWarning $ do
-            logWarn "The following modules are present in multiple packages:"
-            forM_ duplicates $ \(mn, pns) -> logWarn $
-              " * " <>
-              fromString mn <>
-              " (in " <>
-              mconcat (intersperse ", " (map RIO.display pns)) <>
-              ")"
+            prettyError $ "Multiple files use the same module name:" <>
+              line <> bulletedList (map prettyDuplicate duplicates)
         throwM LoadingDuplicateModules
   where
-    duplicates, allModules :: [(String, [PackageName])]
-    duplicates = filter (not . null . tail . snd) allModules
-    allModules =
-        M.toList $ M.fromListWith (++) $
-        concatMap (\pkg -> map ((, [ghciPkgName pkg]) . C.display) (S.toList (ghciPkgModules pkg))) pkgs
+    duplicates :: [(ModuleName, Map (Path Abs File) (Set (PackageName, NamedComponent)))]
+    duplicates =
+      filter (\(_, mp) -> M.size mp > 1) $
+      M.toList $
+      unionModuleMaps (map ghciPkgModules pkgs)
+    prettyDuplicate :: (ModuleName, Map (Path Abs File) (Set (PackageName, NamedComponent))) -> AnsiDoc
+    prettyDuplicate (mn, mp) =
+      styleError (display mn) <+> "found at the following paths" <> line <>
+      bulletedList (map fileDuplicate (M.toList mp))
+    fileDuplicate :: (Path Abs File, Set (PackageName, NamedComponent)) -> AnsiDoc
+    fileDuplicate (fp, comps) =
+      display fp <+> parens (fillSep (punctuate "," (map display (S.toList comps))))
 
 targetWarnings
   :: HasRunner env

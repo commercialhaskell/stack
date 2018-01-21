@@ -59,10 +59,13 @@ updateDockerImageLastUsed config imageId projectPath =
 -- | Get a list of Docker image hashes and when they were last used.
 getDockerImagesLastUsed :: Config -> IO [DockerImageLastUsed]
 getDockerImagesLastUsed config =
-  do imageProjects <- withGlobalDB config (selectList [] [Asc DockerImageProjectLastUsedTime])
-     return (sortBy (flip sortImage)
-                    (Map.toDescList (Map.fromListWith (++)
-                                                      (map mapImageProject imageProjects))))
+      sortBy (flip sortImage)
+    . Map.toDescList
+    . Map.fromListWith (++)
+    . map mapImageProject
+  <$> withGlobalDB
+        config
+        (selectList [] [Asc DockerImageProjectLastUsedTime])
   where
     mapImageProject (Entity _ imageProject) =
       (dockerImageProjectImageHash imageProject
@@ -85,9 +88,9 @@ pruneDockerImagesLastUsed config existingHashes =
 -- | Get the record of whether an executable is compatible with a Docker image
 getDockerImageExe :: Config -> String -> FilePath -> UTCTime -> IO (Maybe Bool)
 getDockerImageExe config imageId exePath exeTimestamp =
-    withGlobalDB config $ do
-        mentity <- getBy (DockerImageExeUnique imageId exePath exeTimestamp)
-        return (fmap (dockerImageExeCompatible . entityVal) mentity)
+    withGlobalDB config $
+      fmap (dockerImageExeCompatible . entityVal) <$>
+      getBy (DockerImageExeUnique imageId exePath exeTimestamp)
 
 -- | Seet the record of whether an executable is compatible with a Docker image
 setDockerImageExe :: Config -> String -> FilePath -> UTCTime -> Bool -> IO ()

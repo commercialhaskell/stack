@@ -31,10 +31,6 @@ data CVType = CVWanted | CVActual
 --
 -- Note that despite having this datatype, stack isn't in a hurry to
 -- support compilers other than GHC.
---
--- NOTE: updating this will change its binary serialization. The
--- version number in the 'BinarySchema' instance for 'MiniBuildPlan'
--- should be updated.
 data CompilerVersion (cvType :: CVType)
     = GhcVersion {-# UNPACK #-} !Version
     | GhcjsVersion

@@ -82,7 +82,7 @@ commandToBuilder (Module modules)
   | otherwise      =
        ":module + "
     <> mconcat (intersperse " "
-        $ (fromString . quoteFileName . mconcat . intersperse "." . components) <$> S.toAscList modules)
+        $ fromString . quoteFileName . mconcat . intersperse "." . components <$> S.toAscList modules)
     <> "\n"
 
 -- | Make sure that a filename with spaces in it gets the proper quotes.

@@ -29,6 +29,7 @@ Other enhancements:
   relevant on Linux where different distributions may have different
   combinations of libtinfo 5/6, ncurses 5/6, and gmp 4/5, and will allow
   simpifying the setup-info metadata YAML for future GHC releases.
+* The build progress bar reports names of packages currently building.
 * `stack setup --verbose` causes verbose output of GHC configure process.
   See [#3716](https://github.com/commercialhaskell/stack/issues/3716)
 
@@ -51,6 +52,26 @@ Bug fixes:
 * Some unnecessary rebuilds when no files were changed are now avoided, by
   having a separate build cache for each component of a package. See
   [#3732](https://github.com/commercialhaskell/stack/issues/3732).
+* Correct the behavior of promoting a package from snapshot to local
+  package. This would get triggered when version bounds conflicted in
+  a snapshot, which could be triggered via Hackage revisions for old
+  packages. This also should allow custom snapshots to define
+  conflicting versions of packages without issue. See
+  [Stackage issue #3185](https://github.com/fpco/stackage/issues/3185).
+* When promoting packages from snapshot to local, we were
+  occassionally discarding the actual package location content and
+  instead defaulting to pulling the package from the index. We now
+  correctly retain this information. Note that if you were affected by
+  this bug, you will likely need to delete the binary build cache
+  associated with the relevant custom snapshot. See
+  [#3714](https://github.com/commercialhaskell/stack/issues/3714).
+* `stack ghci` now allows loading multiple packages with the same
+  module name, as long as they have the same filepath. See
+  [#3776](https://github.com/commercialhaskell/stack/pull/3776).
+* `stack ghci` no longer always adds a dependency on `base`. It is
+  now only added when there are no local targets. This allows it to
+  be to load code that uses replacements for `base`. See
+  [#3589](https://github.com/commercialhaskell/stack/issues/3589#issuecomment)
 
 ## v1.6.3
 

@@ -18,6 +18,7 @@ module Stack.PrettyPrint
     , styleWarning, styleError, styleGood
     , styleShell, styleFile, styleUrl, styleDir, styleModule
     , styleCurrent, styleTarget
+    , styleRecommendation
     , displayMilliseconds
       -- * Formatting utils
     , bulletedList
@@ -38,6 +39,8 @@ import qualified RIO
 import           Stack.Prelude hiding (Display (..))
 import           Data.List (intersperse)
 import qualified Data.Text as T
+import qualified Distribution.ModuleName as C (ModuleName)
+import qualified Distribution.Text as C (display)
 import           Stack.Types.NamedComponent
 import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageName
@@ -179,6 +182,10 @@ styleUrl = styleFile
 styleDir :: AnsiDoc -> AnsiDoc
 styleDir = bold . blue
 
+-- | Style used to highlight part of a recommended course of action.
+styleRecommendation :: AnsiDoc -> AnsiDoc
+styleRecommendation = bold . green
+
 -- | Style an 'AnsiDoc' in a way that emphasizes that it is related to
 --   a current thing. For example, could be used when talking about the
 --   current package we're processing when outputting the name of it.
@@ -210,6 +217,9 @@ instance Display (Path b Dir) where
 
 instance Display (PackageName, NamedComponent) where
     display = cyan . fromString . T.unpack . renderPkgComponent
+
+instance Display C.ModuleName where
+    display = fromString . C.display
 
 -- Display milliseconds.
 displayMilliseconds :: Double -> AnsiDoc

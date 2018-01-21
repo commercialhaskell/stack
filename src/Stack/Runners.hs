@@ -40,9 +40,8 @@ import           Stack.Dot
 loadCompilerVersion :: GlobalOpts
                     -> LoadConfig
                     -> IO (CompilerVersion 'CVWanted)
-loadCompilerVersion go lc = do
-    bconfig <- lcLoadBuildConfig lc (globalCompiler go)
-    return $ view wantedCompilerVersionL bconfig
+loadCompilerVersion go lc =
+    view wantedCompilerVersionL <$> lcLoadBuildConfig lc (globalCompiler go)
 
 -- | Enforce mutual exclusion of every action running via this
 -- function, on this path, on this users account.
@@ -228,7 +227,7 @@ withMiniConfigAndLock
 withMiniConfigAndLock go@GlobalOpts{..} inner = withRunnerGlobal go $ \runner -> do
     miniConfig <-
         runRIO runner $
-        (loadMiniConfig . lcConfig) <$>
+        loadMiniConfig . lcConfig <$>
         loadConfigMaybeProject
           globalConfigMonoid
           globalResolver

@@ -284,7 +284,7 @@ parseMultiCabalFilesIndex
   -> PackageLocationIndex Subdirs
   -> RIO env [(GenericPackageDescription, PackageLocationIndex FilePath)]
 parseMultiCabalFilesIndex _root (PLIndex pir) =
-  (pure . (, PLIndex pir)) <$>
+  pure . (, PLIndex pir) <$>
   readPackageUnresolvedIndex pir
 parseMultiCabalFilesIndex root (PLOther loc0) =
   map (\lpv -> (lpvGPD lpv, PLOther $ lpvLoc lpv)) <$>
