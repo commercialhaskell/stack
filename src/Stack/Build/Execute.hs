@@ -1735,6 +1735,8 @@ singleTest runInBase topts testsToRun ac ee task installedMap = do
                 (fmap fst mlogFile)
                 bs
 
+            setTestSuccess pkgDir
+
 -- | Implements running a package's benchmarks.
 singleBench :: HasEnvConfig env
             => (RIO env () -> IO ())
