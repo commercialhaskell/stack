@@ -102,11 +102,12 @@ If you are on OS X 10.12 ("Sierra") and encounter [GHC panic while building, see
 
 Use the [generic Linux option](#linux).
 
-There is also
+<!-- There is also
 a
 [Ubuntu package](http://packages.ubuntu.com/search?keywords=haskell-stack&searchon=names&suite=all&section=all) for
-Ubuntu 16.04 and up. Note that the distribution's Stack version lags behind, so
-we recommend running `stack upgrade` after installing it.
+Ubuntu 16.10 and up. (Ubuntu 16.04's package cannot upgrade). Note that the distribution's Stack version lags behind, so
+we recommend running `stack upgrade` (--binary?) after installing it.
+-->
 
 ## Debian
 
