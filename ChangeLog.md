@@ -30,6 +30,10 @@ Bug fixes:
   this bug, you will likely need to delete the binary build cache
   associated with the relevant custom snapshot. See
   [#3714](https://github.com/commercialhaskell/stack/issues/3714).
+* `--no-rerun-tests` has been fixed. Previously, after running a test
+  we were forgetting to record the result, which meant that all tests
+  always ran even if they had already passed before. See
+  [#3770](https://github.com/commercialhaskell/stack/pull/3770).
 
 ## v1.6.3
 
