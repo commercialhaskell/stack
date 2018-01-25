@@ -32,6 +32,8 @@ Other enhancements:
 * The build progress bar reports names of packages currently building.
 * `stack setup --verbose` causes verbose output of GHC configure process.
   See [#3716](https://github.com/commercialhaskell/stack/issues/3716)
+* Improve the error message when an `extra-dep` from a path or git reference can't be found
+  See [#3808](https://github.com/commercialhaskell/stack/pull/3808)
 
 Bug fixes:
 * 1.6.1 introduced a change that made some precompiled cache files use
