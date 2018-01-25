@@ -52,9 +52,10 @@ instance Show PackageException where
         ]
     show (PackageNoCabalFileFound dir) = concat
         [ "Stack looks for packages in the directories configured in"
-        , " the 'packages' variable defined in your stack.yaml\n"
-        , "The current entry points to " ++ toFilePath dir ++
-          " but no .cabal file could be found there."
+        , " the 'packages' and 'extra-deps' fields defined in your stack.yaml\n"
+        , "The current entry points to "
+        , toFilePath dir
+        , " but no .cabal or package.yaml file could be found there."
         ]
     show (PackageMultipleCabalFilesFound dir files) =
         "Multiple .cabal files found in directory " ++
