@@ -15,7 +15,7 @@ homepage: http://haskellstack.org
 custom-setup:
   dependencies:
   - base
-  - Cabal
+  - Cabal == 2.*
   - filepath
 extra-source-files:
 - CONTRIBUTING.md
