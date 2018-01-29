@@ -218,7 +218,7 @@ script:
         cd dist
         tar zxfv "$SRC_TGZ"
         cd "$PKGVER"
-        cabal configure --enable-tests
+        cabal configure --enable-tests --ghc-options -O0
         cabal build
         cabal test
         cd $ORIGDIR
