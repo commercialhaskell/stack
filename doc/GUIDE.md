@@ -192,9 +192,15 @@ test/Spec.hs
 
 The `app/Main.hs`, `src/Lib.hs`, and `test/Spec.hs` files are all Haskell
 source files that compose the actual functionality of our project (we won't
-dwell on them here). The `LICENSE` file and `README.md` have no impact on the
-build. The files of interest here are `Setup.hs`, `package.yaml`,
-`helloworld.cabal`, and `stack.yaml`.
+dwell on them here).
+
+The `LICENSE` file and `README.md` have no impact on the
+build.
+
+The `helloworld.cabal` file is updated automatically as part of the
+`stack build` process and should not be modified.
+
+The files of interest here are `Setup.hs`, `stack.yaml`, and `package.yaml`.
 
 The `Setup.hs` file is a component of the Cabal build system which stack uses.
 It's technically not needed by stack, but it is still considered good practice
@@ -223,14 +229,12 @@ value here says to use [LTS Haskell version
 `stack setup` installs that version of GHC). There are a number of values you
 can use for `resolver`, which we'll cover later.
 
-The other files important to the build are the `helloworld.cabal` and `package.yaml`.
+Another file important to the build is `package.yaml`.
 
-Since Stack 1.6.1, the `package.yaml` is an alternative package format that is
-provided built-in by stack through [the hpack tool](https://github.com/sol/hpack). The
-default behaviour is to generate the `.cabal` file from this `package.yaml`, and you
-can see that from the general message header in your new `helloworld.cabal` file. It
-is therefore important to understand that your `package.yaml` drives the package
-configuration and you should not modify the `.cabal` file.
+Since Stack 1.6.1, the `package.yaml` is the preferred package format that is
+provided built-in by stack through [the hpack tool](https://github.com/sol/hpack).
+The default behaviour is to generate the `.cabal` file from this `package.yaml`,
+and accordingly you should **not** modify the `.cabal` file.
 
 It is also important to remember that stack is built on top of the Cabal build system. Therefore, an
 understanding of the moving parts in Cabal are necessary. In Cabal, we have individual
@@ -340,7 +344,7 @@ does so automatically.
 ### Listing Dependencies
 
 Let's have stack add a few more dependencies to our project. First, we'll include two new packages in the
-`build-depends` section for our library in our `helloworld.cabal`:
+`dependencies` section for our library in our `package.yaml`:
 
 ```
 dependencies:

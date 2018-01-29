@@ -1,0 +1,12 @@
+name:                files
+
+dependencies:
+- base >= 4.7 && < 5
+
+library:
+  source-dirs: src
+
+tests:
+  test:
+    main:                Spec.hs
+    source-dirs:         test
