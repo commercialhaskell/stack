@@ -32,6 +32,8 @@ Other enhancements:
 * The build progress bar reports names of packages currently building.
 * `stack setup --verbose` causes verbose output of GHC configure process.
   See [#3716](https://github.com/commercialhaskell/stack/issues/3716)
+* Improve the error message when an `extra-dep` from a path or git reference can't be found
+  See [#3808](https://github.com/commercialhaskell/stack/pull/3808)
 
 Bug fixes:
 * 1.6.1 introduced a change that made some precompiled cache files use
@@ -72,6 +74,10 @@ Bug fixes:
   now only added when there are no local targets. This allows it to
   be to load code that uses replacements for `base`. See
   [#3589](https://github.com/commercialhaskell/stack/issues/3589#issuecomment)
+* `--no-rerun-tests` has been fixed. Previously, after running a test
+  we were forgetting to record the result, which meant that all tests
+  always ran even if they had already passed before. See
+  [#3770](https://github.com/commercialhaskell/stack/pull/3770).
 
 ## v1.6.3
 
