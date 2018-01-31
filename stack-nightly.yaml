@@ -11,4 +11,5 @@ extra-deps:
 - rio-0.0.1.0
 
 # https://github.com/commercialhaskell/stack/issues/3785
-- ansi-terminal-0.8
+- ansi-terminal-0.8.0.1
+- ansi-wl-pprint-0.6.8.2
