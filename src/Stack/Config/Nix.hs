@@ -22,7 +22,7 @@ nixOptsFromMonoid
     -> OS
     -> m NixOpts
 nixOptsFromMonoid NixOptsMonoid{..} os = do
-    let nixEnable = fromFirst (getAny nixMonoidDefaultEnable) nixMonoidEnable
+    let nixEnable = fromFirst False nixMonoidEnable
         defaultPure = case os of
           OSX -> False
           _ -> True
