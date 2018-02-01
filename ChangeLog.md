@@ -34,6 +34,9 @@ Other enhancements:
   See [#3716](https://github.com/commercialhaskell/stack/issues/3716)
 * Improve the error message when an `extra-dep` from a path or git reference can't be found
   See [#3808](https://github.com/commercialhaskell/stack/pull/3808)
+* Nix integration is now disabled on windows even if explicitly enabled,
+  since it isn't supported. See
+  [#3600](https://github.com/commercialhaskell/stack/issues/3600)
 
 Bug fixes:
 * 1.6.1 introduced a change that made some precompiled cache files use
