@@ -332,11 +332,10 @@ fixCodePage inner = do
 
         fixInput $ fixOutput inner
     expected = 65001 -- UTF-8
-    warn typ = logInfo $ T.concat
-        [ "Setting"
-        , typ
-        , " codepage to UTF-8 (65001) to ensure correct output from GHC"
-        ]
+    warn typ = logInfo $
+        "Setting" <>
+        typ <>
+        " codepage to UTF-8 (65001) to ensure correct output from GHC"
 #else
 fixCodePage = id
 #endif
