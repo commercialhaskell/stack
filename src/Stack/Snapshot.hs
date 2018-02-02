@@ -44,7 +44,7 @@ import           Distribution.Text (display)
 import qualified Distribution.Version as C
 import           Network.HTTP.Client (Request)
 import           Network.HTTP.Download
-import           Network.URI
+import           Network.URI (isURI)
 import           Path
 import           Path.IO
 import           Stack.Constants
