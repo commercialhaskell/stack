@@ -1,0 +1,3 @@
+resolver: remote-snapshot.yaml
+packages: []
+allow-newer: true
