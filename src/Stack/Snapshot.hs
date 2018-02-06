@@ -45,6 +45,7 @@ import qualified Distribution.Version as C
 import           Network.HTTP.Client (Request)
 import           Network.HTTP.Download
 import qualified RIO
+import           Network.URI (isURI)
 import           Path
 import           Path.IO
 import           Stack.Constants
@@ -63,6 +64,7 @@ import           Stack.Types.Urls
 import           Stack.Types.Compiler
 import           Stack.Types.Resolver
 import qualified System.Directory as Dir
+import qualified System.FilePath as FilePath
 
 type SinglePackageLocation = PackageLocationIndex FilePath
 
@@ -262,17 +264,29 @@ loadResolver (ResolverCustom url loc) = do
 
     load :: FilePath -> RIO env SnapshotDef
     load fp = do
+      let resolveLocalArchives sd = sd {
+            sdLocations = resolveLocalArchive <$> sdLocations sd
+          }
+          resolveLocalArchive (PLOther (PLArchive archive)) = 
+            PLOther $ PLArchive $ archive {
+              archiveUrl = T.pack $ resolveLocalFilePath (T.unpack $ archiveUrl archive)
+            }
+          resolveLocalArchive pl = pl
+          resolveLocalFilePath path =
+            if not $ isURI path && FilePath.isRelative path
+              then FilePath.dropFileName fp FilePath.</> FilePath.normalise path
+              else path
+
       WithJSONWarnings (sd0, mparentResolver, mcompiler) warnings <-
         liftIO (decodeFileEither fp) >>= either
           (throwM . CustomResolverException url loc)
           (either (throwM . AesonException) return . parseEither parseCustom)
       logJSONWarnings (T.unpack url) warnings
-
       forM_ (sdLocations sd0) $ \loc' ->
         case loc' of
           PLOther (PLFilePath _) -> throwM $ FilepathInCustomSnapshot url
           _ -> return ()
-
+      let sd0' = resolveLocalArchives sd0
       -- The fp above may just be the download location for a URL,
       -- which we don't want to use. Instead, look back at loc from
       -- above.
@@ -312,7 +326,7 @@ loadResolver (ResolverCustom url loc) = do
                     ResolverCustom _ parentHash -> parentHash
                     ResolverCompiler _ -> error "loadResolver: Received ResolverCompiler in impossible location"
             return (Right parent', hash')
-      return $ overrideCompiler sd0
+      return $ overrideCompiler sd0'
         { sdParent = parent'
         , sdResolver = ResolverCustom url hash'
         }

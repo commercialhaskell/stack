@@ -771,12 +771,6 @@ isOwnedByUser path = liftIO $ do
             fileStatus <- getFileStatus (toFilePath path)
             user <- getEffectiveUserID
             return (user == fileOwner fileStatus)
-  where
-#ifdef WINDOWS
-    osIsWindows = True
-#else
-    osIsWindows = False
-#endif
 
 -- | 'True' if we are currently running inside a Docker container.
 getInContainer :: (MonadIO m) => m Bool

@@ -13,8 +13,7 @@ import           Stack.Types.Nix
 nixOptsParser :: Bool -> Parser NixOptsMonoid
 nixOptsParser hide0 = overrideActivation <$>
   (NixOptsMonoid
-  <$> pure (Any False)
-  <*> firstBoolFlags nixCmdName
+  <$> firstBoolFlags nixCmdName
                      "use of a Nix-shell. Implies 'system-ghc: true'"
                      hide
   <*> firstBoolFlags "nix-pure"

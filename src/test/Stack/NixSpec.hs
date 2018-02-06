@@ -1,14 +1,16 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE RecordWildCards  #-}
-{-# LANGUAGE TemplateHaskell, OverloadedStrings #-}
+{-# LANGUAGE OverloadedStrings #-}
 module Stack.NixSpec where
 
+import Data.Maybe (fromJust)
 import Options.Applicative
 import Path
+import Prelude (writeFile)
 import Stack.Config
-import Stack.Options.NixParser
 import Stack.Config.Nix
+import Stack.Constants
+import Stack.Options.NixParser
 import Stack.Prelude
 import Stack.Types.Compiler
 import Stack.Types.Config
@@ -18,8 +20,6 @@ import Stack.Types.Version
 import System.Directory
 import System.Environment
 import Test.Hspec
-import Prelude (writeFile)
-import Data.Maybe (fromJust)
 
 sampleConfigNixEnabled :: String
 sampleConfigNixEnabled =
@@ -36,9 +36,6 @@ sampleConfigNixDisabled =
   "packages: ['.']\n" ++
   "nix:\n" ++
   "   enable: False"
-
-stackDotYaml :: Path Rel File
-stackDotYaml = $(mkRelFile "stack.yaml")
 
 setup :: IO ()
 setup = unsetEnv "STACK_YAML"
@@ -62,6 +59,7 @@ spec = beforeAll setup $ do
         (info (nixOptsParser False) mempty)
         cmdLineOpts
       parseOpts cmdLineOpts = mempty { configMonoidNixOpts = parseNixOpts cmdLineOpts }
+  let trueOnNonWindows = not osIsWindows
   describe "nix disabled in config file" $
     around_ (withStackDotYaml sampleConfigNixDisabled) $ do
       it "sees that the nix shell is not enabled" $ do
@@ -70,11 +68,11 @@ spec = beforeAll setup $ do
       describe "--nix given on command line" $
         it "sees that the nix shell is enabled" $ do
           lc <- loadConfig' (parseOpts ["--nix"])
-          nixEnable (configNix $ lcConfig lc) `shouldBe` True
+          nixEnable (configNix $ lcConfig lc) `shouldBe` trueOnNonWindows
       describe "--nix-pure given on command line" $
         it "sees that the nix shell is enabled" $ do
           lc <- loadConfig' (parseOpts ["--nix-pure"])
-          nixEnable (configNix $ lcConfig lc) `shouldBe` True
+          nixEnable (configNix $ lcConfig lc) `shouldBe` trueOnNonWindows
       describe "--no-nix given on command line" $
         it "sees that the nix shell is not enabled" $ do
           lc <- loadConfig' (parseOpts ["--no-nix"])
@@ -87,7 +85,7 @@ spec = beforeAll setup $ do
     around_ (withStackDotYaml sampleConfigNixEnabled) $ do
       it "sees that the nix shell is enabled" $ do
         lc <- loadConfig' mempty
-        nixEnable (configNix $ lcConfig lc) `shouldBe` True
+        nixEnable (configNix $ lcConfig lc) `shouldBe` trueOnNonWindows
       describe "--no-nix given on command line" $
         it "sees that the nix shell is not enabled" $ do
           lc <- loadConfig' (parseOpts ["--no-nix"])
@@ -95,11 +93,11 @@ spec = beforeAll setup $ do
       describe "--nix-pure given on command line" $
         it "sees that the nix shell is enabled" $ do
           lc <- loadConfig' (parseOpts ["--nix-pure"])
-          nixEnable (configNix $ lcConfig lc) `shouldBe` True
+          nixEnable (configNix $ lcConfig lc) `shouldBe` trueOnNonWindows
       describe "--no-nix-pure given on command line" $
         it "sees that the nix shell is enabled" $ do
           lc <- loadConfig' (parseOpts ["--no-nix-pure"])
-          nixEnable (configNix $ lcConfig lc) `shouldBe` True
+          nixEnable (configNix $ lcConfig lc) `shouldBe` trueOnNonWindows
       it "sees that the only package asked for is glpk and asks for the correct GHC derivation" $ do
         lc <- loadConfig' mempty
         nixPackages (configNix $ lcConfig lc) `shouldBe` ["glpk"]

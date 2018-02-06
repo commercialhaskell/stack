@@ -11,18 +11,20 @@ module Stack.Config.Nix
 import Stack.Prelude
 import qualified Data.Text as T
 import Distribution.System (OS (..))
+import Stack.Constants
 import Stack.Types.Version
 import Stack.Types.Nix
 import Stack.Types.Compiler
+import Stack.Types.Runner
 
 -- | Interprets NixOptsMonoid options.
 nixOptsFromMonoid
-    :: MonadUnliftIO m
+    :: HasRunner env
     => NixOptsMonoid
     -> OS
-    -> m NixOpts
+    -> RIO env NixOpts
 nixOptsFromMonoid NixOptsMonoid{..} os = do
-    let nixEnable = fromFirst (getAny nixMonoidDefaultEnable) nixMonoidEnable
+    let nixEnable0 = fromFirst False nixMonoidEnable
         defaultPure = case os of
           OSX -> False
           _ -> True
@@ -32,6 +34,12 @@ nixOptsFromMonoid NixOptsMonoid{..} os = do
         nixShellOptions = fromFirst [] nixMonoidShellOptions
                           ++ prefixAll (T.pack "-I") (fromFirst [] nixMonoidPath)
         nixAddGCRoots   = fromFirst False nixMonoidAddGCRoots
+    nixEnable <-
+      if nixEnable0 && osIsWindows
+        then do
+          logInfo "Note: Disabling nix integration, since this is being run in Windows"
+          return False
+        else return nixEnable0
     when (not (null nixPackages) && isJust nixInitFile) $
        throwIO NixCannotUseShellFileAndPackagesException
     return NixOpts{..}

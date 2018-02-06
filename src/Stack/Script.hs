@@ -15,6 +15,7 @@ import qualified Data.Set                   as Set
 import           Path
 import           Path.IO
 import qualified Stack.Build
+import           Stack.Constants            (osIsWindows)
 import           Stack.GhcPkg               (ghcPkgExeName)
 import           Stack.Options.ScriptParser
 import           Stack.Runners
@@ -122,16 +123,9 @@ scriptCmd opts go' = do
     wordsComma = splitWhen (\c -> c == ' ' || c == ',')
 
     toExeName fp =
-      if isWindows
+      if osIsWindows
         then replaceExtension fp "exe"
         else dropExtension fp
-
-isWindows :: Bool
-#ifdef WINDOWS
-isWindows = True
-#else
-isWindows = False
-#endif
 
 getPackagesFromModuleInfo
   :: ModuleInfo
