@@ -23,13 +23,11 @@ module Stack.Types.Runner
     ) where
 
 import           Distribution.PackageDescription (GenericPackageDescription)
-import           GHC.Foreign                (peekCString, withCString)
 import           Lens.Micro
 import           Stack.Prelude              hiding (lift)
 import           Stack.Constants
 import           Stack.Types.PackageIdentifier (PackageIdentifierRevision)
 import           System.Console.ANSI
-import           System.IO                  (localeEncoding)
 import           RIO.Process (HasEnvOverride (..), EnvOverride, getEnvOverride)
 import           System.Terminal
 
@@ -77,7 +75,7 @@ instance HasLogFunc Runner where
   logFuncL = lens runnerLogFunc (\x y -> x { runnerLogFunc = y })
 
 -- | With a 'Runner', do the thing
-withRunner :: MonadIO m
+withRunner :: MonadUnliftIO m
            => LogLevel
            -> Bool -- ^ use time?
            -> Bool -- ^ terminal?
@@ -94,12 +92,11 @@ withRunner logLevel useTime terminal colorWhen widthOverride reExec inner = do
   termWidth <- clipWidth <$> maybe (fromMaybe defaultTerminalWidth
                                     <$> liftIO getTerminalWidth)
                                    pure widthOverride
-  canUseUnicode <- liftIO getCanUseUnicode
   ref <- newIORef mempty
   menv <- getEnvOverride
-  let logOptions = LogOptions
+  logOptions0 <- mkLogOptions stderr False
+  let logOptions = logOptions0
         { logUseColor = useColor
-        , logUseUnicode = canUseUnicode
         , logUseTime = useTime
         , logMinLevel = logLevel
         , logVerboseFormat = logLevel <= LevelDebug
@@ -117,16 +114,6 @@ withRunner logLevel useTime terminal colorWhen widthOverride reExec inner = do
           | w < minTerminalWidth = minTerminalWidth
           | w > maxTerminalWidth = maxTerminalWidth
           | otherwise = w
-
--- | Taken from GHC: determine if we should use Unicode syntax
-getCanUseUnicode :: IO Bool
-getCanUseUnicode = do
-    let enc = localeEncoding
-        str = "\x2018\x2019"
-        test = withCString enc str $ \cstr -> do
-            str' <- peekCString enc cstr
-            return (str == str')
-    test `catchIO` \_ -> return False
 
 data ColorWhen = ColorNever | ColorAlways | ColorAuto
     deriving (Show, Generic)

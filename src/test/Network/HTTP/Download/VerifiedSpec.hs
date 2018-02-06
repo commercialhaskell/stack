@@ -67,8 +67,7 @@ spec = do
   let exampleProgressHook _ = return ()
 
   describe "verifiedDownload" $ do
-    let run func = runStdoutLoggingT
-                 $ withRunner LevelError True True ColorNever Nothing False
+    let run func = withRunner LevelError True True ColorNever Nothing False
                  $ \runner -> runRIO runner func
     -- Preconditions:
     -- * the exampleReq server is running

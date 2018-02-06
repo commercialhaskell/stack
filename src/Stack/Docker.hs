@@ -72,7 +72,6 @@ import           RIO.Process
 import           Text.Printf (printf)
 
 #ifndef WINDOWS
-import           Control.Concurrent (threadDelay)
 import           System.Posix.Signals
 import qualified System.Posix.User as PosixUser
 #endif
@@ -359,7 +358,7 @@ runContainerAndExit getCmdArgs
              readProcessNull "docker" ["kill","--signal=" ++ show sig,containerID]
              when (sig `elem` [sigTERM,sigABRT]) $ do
                -- Give the container 30 seconds to exit gracefully, then send a sigKILL to force it
-               liftIO $ threadDelay 30000000
+               threadDelay 30000000
                readProcessNull "docker" ["kill",containerID]
        oldHandler <- liftIO $ installHandler sig (Catch sigHandler) Nothing
        return (sig, oldHandler)
