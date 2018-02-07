@@ -1,7 +1,6 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 module Network.HTTP.Download.VerifiedSpec where
 
-import           Control.Monad.Logger           (runStdoutLoggingT)
 import           Control.Retry                  (limitRetries)
 import           Crypto.Hash
 import           Network.HTTP.Client.Conduit
