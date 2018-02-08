@@ -42,10 +42,12 @@ module Stack.Package
 
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Char8 as C8
+import qualified Data.ByteString.Lazy.Char8 as BL8
 import           Data.List (isSuffixOf, isPrefixOf)
 import           Data.List.Extra (nubOrd)
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
+import           Data.Char (isSpace)
 import qualified Data.Text as T
 import           Data.Text.Encoding (decodeUtf8, decodeUtf8With)
 import           Data.Text.Encoding.Error (lenientDecode)
@@ -75,7 +77,7 @@ import qualified Hpack.Config as Hpack
 import           Path as FL
 import           Path.Extra
 import           Path.Find
-import           Path.IO hiding (findFiles)
+import           Path.IO hiding (findFiles, findExecutable)
 import           Stack.Build.Installed
 import           Stack.Constants
 import           Stack.Constants.Config
@@ -1362,6 +1364,57 @@ findOrGenerateCabalFile pkgDir = do
             _:_ -> Left $ PackageMultipleCabalFilesFound pkgDir files
       where hasExtension fp x = FilePath.takeExtension fp == "." ++ x
 
+-- | Searches user path for hpack executables newer than bundled one.
+findUserExecutableHpack :: HasConfig env => Config -> RIO env HpackExecutable
+findUserExecutableHpack config = do
+  menv <- liftIO $ configEnvOverrideSettings config envSettings
+  mHpackPath <- findExecutable menv "hpack"
+  eres <- case mHpackPath of
+    Nothing -> return $ Left "no user installed hpack found."
+    Just hpackPath -> do
+      result <- withEnvOverride menv
+              $ withProc (toFilePath hpackPath) ["--numeric-version"]
+              $ tryAny . readProcessStdout_
+
+      let unexpectedResult got = Left $ T.concat
+              [ "'"
+              , T.pack (toFilePath hpackPath)
+              , " --numeric-version' did not respond with expected value. Got: "
+              , got
+              ]
+
+      return $ case result of
+        Left err -> unexpectedResult $ T.pack (show err)
+        Right bs -> case parseVersionFromString (takeWhile (not . isSpace) (BL8.unpack bs)) of
+          Nothing -> unexpectedResult $ T.pack (BL8.unpack bs)
+          Just ver
+            | ver >= $(mkVersion VERSION_hpack) -> Right hpackPath
+            | otherwise -> Left $ T.concat
+                [ "Installed hpack is older than bundled one. "
+                , T.pack (toFilePath hpackPath)
+                , " is version "
+                , versionText ver
+                , " but bundled one is "
+                , VERSION_hpack
+                , ". using bundled."
+                ]
+
+  case eres of
+    Right hpackPath -> return $ HpackCommand (toFilePath hpackPath)
+    Left err -> do
+      logDebug err
+      return HpackBundled
+
+  where
+    envSettings =
+      EnvSettings
+      { esIncludeLocals = False
+      , esIncludeGhcPackagePath = False
+      , esStackExe = False
+      , esLocaleUtf8 = False
+      , esKeepGhcRts = False
+      }
+
 -- | Generate .cabal file from package.yaml, if necessary.
 hpack :: HasConfig env => Path Abs Dir -> RIO env ()
 hpack pkgDir = do
@@ -1373,30 +1426,36 @@ hpack pkgDir = do
         config <- view configL
         case configOverrideHpack config of
             HpackBundled -> do
+              h <- findUserExecutableHpack config
+              case h of
+                HpackBundled -> do
 #if MIN_VERSION_hpack(0,23,0)
-                r <- liftIO $ Hpack.hpackResult Hpack.defaultRunOptions {Hpack.runOptionsConfigDir = Just (toFilePath pkgDir)} Hpack.NoForce
+                  r <- liftIO $ Hpack.hpackResult Hpack.defaultRunOptions {Hpack.runOptionsConfigDir = Just (toFilePath pkgDir)} Hpack.NoForce
 #else
-                r <- liftIO $ Hpack.hpackResult (Just $ toFilePath pkgDir) Hpack.NoForce
+                  r <- liftIO $ Hpack.hpackResult (Just $ toFilePath pkgDir) Hpack.NoForce
 #endif
-                forM_ (Hpack.resultWarnings r) prettyWarnS
-                let cabalFile = styleFile . fromString . Hpack.resultCabalFile $ r
-                case Hpack.resultStatus r of
-                    Hpack.Generated -> prettyDebugL
-                        [flow "hpack generated a modified version of", cabalFile]
-                    Hpack.OutputUnchanged -> prettyDebugL
-                        [flow "hpack output unchanged in", cabalFile]
-                    Hpack.AlreadyGeneratedByNewerHpack -> prettyWarnL
-                        [ cabalFile
-                        , flow "was generated with a newer version of hpack,"
-                        , flow "please upgrade and try again."
-                        ]
-                    Hpack.ExistingCabalFileWasModifiedManually -> prettyWarnL
-                        [ flow "WARNING: "
-                        , cabalFile
-                        , flow " was modified manually.  Ignoring package.yaml in favor of cabal file."
-                        , flow "If you want to use package.yaml instead of the cabal file, "
-                        , flow "then please delete the cabal file."
-                        ]
+                  forM_ (Hpack.resultWarnings r) prettyWarnS
+                  let cabalFile = styleFile . fromString . Hpack.resultCabalFile $ r
+                  case Hpack.resultStatus r of
+                      Hpack.Generated -> prettyDebugL
+                          [flow "hpack generated a modified version of", cabalFile]
+                      Hpack.OutputUnchanged -> prettyDebugL
+                          [flow "hpack output unchanged in", cabalFile]
+                      Hpack.AlreadyGeneratedByNewerHpack -> prettyWarnL
+                          [ cabalFile
+                          , flow "was generated with a newer version of hpack,"
+                          , flow "please upgrade and try again."
+                          ]
+                      Hpack.ExistingCabalFileWasModifiedManually -> prettyWarnL
+                          [ flow "WARNING: "
+                          , cabalFile
+                          , flow " was modified manually.  Ignoring package.yaml in favor of cabal file."
+                          , flow "If you want to use package.yaml instead of the cabal file, "
+                          , flow "then please delete the cabal file."
+                          ]
+                HpackCommand command -> do
+                    prettyDebugL [ flow " used newer hpack found at ", fromString command, fromString VERSION_hpack ]
+                    withWorkingDir pkgDir $ withProc command [] runProcess_
             HpackCommand command ->
                 withWorkingDir pkgDir $ withProc command [] runProcess_
 
