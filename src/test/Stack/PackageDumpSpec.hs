@@ -10,7 +10,6 @@ import           Data.Conduit.Text             (decodeUtf8)
 import qualified Data.Map                      as Map
 import qualified Data.Set                      as Set
 import           Distribution.License          (License(..))
-import           Lens.Micro                    (to)
 import           Stack.PackageDump
 import           Stack.Prelude
 import           Stack.Types.Compiler
@@ -291,6 +290,6 @@ runEnvNoLogging inner = do
 
 newtype EnvNoLogging = EnvNoLogging EnvOverride
 instance HasLogFunc EnvNoLogging where
-  logFuncL = to (\_ _ _ _ _ -> return ())
+  logFuncL = lens (const mempty) const -- not a law abiding lens!
 instance HasEnvOverride EnvNoLogging where
   envOverrideL = lens (\(EnvNoLogging x) -> x) (const EnvNoLogging)

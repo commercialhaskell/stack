@@ -14,9 +14,8 @@ module Stack.Types.Runner
     ( Runner (..)
     , HasRunner (..)
     , terminalL
+    , useColorL
     , reExecL
-    , logOptionsL
-    , LogOptions (..)
     , ColorWhen (..)
     , withRunner
     ) where
@@ -33,8 +32,9 @@ import           System.Terminal
 -- | Monadic environment.
 data Runner = Runner
   { runnerReExec     :: !Bool
+  , runnerTerminal   :: !Bool
+  , runnerUseColor   :: !Bool
   , runnerLogFunc    :: !LogFunc
-  , runnerLogOptions :: !LogOptions
   , runnerTermWidth  :: !Int
   , runnerEnvOverride :: !EnvOverride
   , runnerParsedCabalFiles :: !(IORef
@@ -59,13 +59,13 @@ instance HasRunner Runner where
   runnerL = id
 
 terminalL :: HasRunner env => Lens' env Bool
-terminalL = logOptionsL.lens logTerminal (\x y -> x { logTerminal = y })
+terminalL = runnerL.lens runnerTerminal (\x y -> x { runnerTerminal = y })
+
+useColorL :: HasRunner env => Lens' env Bool
+useColorL = runnerL.lens runnerUseColor (\x y -> x { runnerUseColor = y })
 
 reExecL :: HasRunner env => Lens' env Bool
 reExecL = runnerL.lens runnerReExec (\x y -> x { runnerReExec = y })
-
-logOptionsL :: HasRunner env => Lens' env LogOptions
-logOptionsL = runnerL.lens runnerLogOptions (\x y -> x { runnerLogOptions = y })
 
 --------------------------------------------------------------------------------
 -- Logging functionality
@@ -93,18 +93,19 @@ withRunner logLevel useTime terminal colorWhen widthOverride reExec inner = do
                                    pure widthOverride
   ref <- newIORef mempty
   menv <- getEnvOverride
-  logOptions0 <- mkLogOptions stderr False
-  let logOptions = logOptions0
-        { logUseColor = useColor
-        , logUseTime = useTime
-        , logMinLevel = logLevel
-        , logVerboseFormat = logLevel <= LevelDebug
-        , logTerminal = terminal
-        }
-  withStickyLogger logOptions $ \logFunc -> inner Runner
+  logOptions0 <- logOptionsHandle stderr False
+  let logOptions
+        = setLogUseColor useColor
+        $ setLogUseTime useTime
+        $ setLogMinLevel logLevel
+        $ setLogVerboseFormat (logLevel <= LevelDebug)
+        $ setLogTerminal terminal
+          logOptions0
+  withLogFunc logOptions $ \logFunc -> inner Runner
     { runnerReExec = reExec
+    , runnerTerminal = terminal
+    , runnerUseColor = useColor
     , runnerLogFunc = logFunc
-    , runnerLogOptions = logOptions
     , runnerTermWidth = termWidth
     , runnerParsedCabalFiles = ref
     , runnerEnvOverride = menv

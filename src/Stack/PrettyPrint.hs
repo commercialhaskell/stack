@@ -53,7 +53,7 @@ displayWithColor
         MonadReader env m, HasLogFunc env, HasCallStack)
     => a -> m T.Text
 displayWithColor x = do
-    useAnsi <- liftM logUseColor $ view logOptionsL
+    useAnsi <- view useColorL
     termWidth <- view $ runnerL.to runnerTermWidth
     return $ (if useAnsi then displayAnsi else displayPlain) termWidth x
 

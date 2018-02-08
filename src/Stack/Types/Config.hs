@@ -2015,7 +2015,7 @@ shouldForceGhcColorFlag :: (HasRunner env, HasEnvConfig env)
 shouldForceGhcColorFlag = do
     canDoColor <- (>= $(mkVersion "8.2.1")) . getGhcVersion
               <$> view actualCompilerVersionL
-    shouldDoColor <- logUseColor <$> view logOptionsL
+    shouldDoColor <- view useColorL
     return $ canDoColor && shouldDoColor
 
 appropriateGhcColorFlag :: (HasRunner env, HasEnvConfig env)

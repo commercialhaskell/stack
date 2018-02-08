@@ -8,7 +8,8 @@ nix:
     - http-client-tls-0.3.4
 extra-deps:
 - bindings-uname-0.1
-- rio-0.0.2.0
+- git: https://github.com/commercialhaskell/rio
+  commit: 9c487f9ae0568c71855ffa151a137d458f4e60c6
 
 # https://github.com/commercialhaskell/stack/issues/3785
 - ansi-terminal-0.8.0.1

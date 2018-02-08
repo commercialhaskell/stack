@@ -32,7 +32,8 @@ extra-deps:
 - smallcheck-1.1.3
 - conduit-extra-1.2.3.1
 - typed-process-0.2.1.0
-- rio-0.0.2.0
+- git: https://github.com/commercialhaskell/rio
+  commit: 9c487f9ae0568c71855ffa151a137d458f4e60c6
 
 # https://github.com/commercialhaskell/stack/issues/3785
 - ansi-terminal-0.8.0.1
