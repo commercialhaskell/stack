@@ -37,6 +37,11 @@ Other enhancements:
 * Nix integration is now disabled on windows even if explicitly enabled,
   since it isn't supported. See
   [#3600](https://github.com/commercialhaskell/stack/issues/3600)
+* `stack build` now supports a new flag `--keep-tmp-files` to retain intermediate
+  files and directories for the purpose of debugging.
+  It is best used with ghc's equivalent flag,
+  i.e. `stack build --keep-tmp-files --ghc-options=-keep-tmp-files`.
+  See [#3857](https://github.com/commercialhaskell/stack/issues/3857)
 
 Bug fixes:
 * 1.6.1 introduced a change that made some precompiled cache files use

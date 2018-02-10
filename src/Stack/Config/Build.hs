@@ -50,6 +50,7 @@ buildOptsFromMonoid BuildOptsMonoid{..} = BuildOpts
           (boptsPreFetch defaultBuildOpts)
           buildMonoidPreFetch
     , boptsKeepGoing = getFirst buildMonoidKeepGoing
+    , boptsKeepTmpFiles = getFirst buildMonoidKeepTmpFiles
     , boptsForceDirty = fromFirst
           (boptsForceDirty defaultBuildOpts)
           buildMonoidForceDirty
