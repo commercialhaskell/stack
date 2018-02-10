@@ -192,7 +192,7 @@ can also get the `haskell-stack-tool` package from there.
 
 Users who follow the `nixos-unstable` channel or the Nixpkgs `master` branch can install the latest `stack` release into their profile by running:
 
-    nix-env -f "<nixpkgs>" -iA haskellPackages.stack
+    nix-env -f "<nixpkgs>" -iA stack
 
 Alternatively, the package can be built from source as follows.
 
