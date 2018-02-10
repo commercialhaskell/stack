@@ -747,6 +747,7 @@ build:
   copy-bins: false
   prefetch: false
   keep-going: false
+  keep-tmp-files: false
 
   # NOTE: global usage of haddock can cause build failures when documentation is
   # incorrectly formatted.  This could also affect scripts which use stack.

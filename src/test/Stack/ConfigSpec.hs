@@ -35,6 +35,7 @@ buildOptsConfig =
   "  prefetch: true\n" ++
   "  force-dirty: true\n" ++
   "  keep-going: true\n" ++
+  "  keep-tmp-files: true\n" ++
   "  test: true\n" ++
   "  test-arguments:\n" ++
   "    rerun-tests: true\n" ++
@@ -117,6 +118,7 @@ spec = beforeAll setup $ do
       boptsInstallExes `shouldBe` True
       boptsPreFetch `shouldBe` True
       boptsKeepGoing `shouldBe` Just True
+      boptsKeepTmpFiles `shouldBe` Just True
       boptsForceDirty `shouldBe` True
       boptsTests `shouldBe` True
       boptsTestOpts `shouldBe` TestOpts {toRerunTests = True

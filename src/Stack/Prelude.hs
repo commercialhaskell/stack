@@ -6,6 +6,7 @@ module Stack.Prelude
   , withSinkFile
   , withSinkFileCautious
   , withSystemTempDir
+  , withKeepSystemTempDir
   , sinkProcessStderrStdout
   , sinkProcessStdout
   , logProcessStderrStdout
@@ -63,6 +64,13 @@ withSinkFileCautious fp inner =
 -- | Path version
 withSystemTempDir :: MonadUnliftIO m => String -> (Path Abs Dir -> m a) -> m a
 withSystemTempDir str inner = withRunInIO $ \run -> Path.IO.withSystemTempDir str $ run . inner
+
+-- | Like `withSystemTempDir`, but the temporary directory is not deleted.
+withKeepSystemTempDir :: MonadUnliftIO m => String -> (Path Abs Dir -> m a) -> m a
+withKeepSystemTempDir str inner = withRunInIO $ \run -> do
+  path <- Path.IO.getTempDir
+  dir <- Path.IO.createTempDir path str
+  run $ inner dir
 
 -- | Consume the stdout and stderr of a process feeding strict 'ByteString's to the consumers.
 --
