@@ -94,7 +94,7 @@ problems, see the linked FAQ entries:
 
   * [GHC 7.8.4 fails with `/usr/bin/ar: permission denied`](faq.md#usr-bin-ar-permission-denied)
   * [DYLD_LIBRARY_PATH is ignored](faq.md#dyld-library-path-ignored)
-  
+
 
 If you are on OS X 10.12 ("Sierra") and encounter [GHC panic while building, see this issue](https://github.com/commercialhaskell/stack/issues/2577)
 
@@ -102,21 +102,24 @@ If you are on OS X 10.12 ("Sierra") and encounter [GHC panic while building, see
 
 Use the [generic Linux option](#linux).
 
-There is also
-a
-[Ubuntu package](http://packages.ubuntu.com/search?keywords=haskell-stack&searchon=names&suite=all&section=all) for
-Ubuntu 16.04 and up. Note that the distribution's Stack version lags behind, so
-we recommend running `stack upgrade` after installing it.
+There is also a [Ubuntu
+package](http://packages.ubuntu.com/search?keywords=haskell-stack&searchon=names&suite=all&section=all)
+for Ubuntu 16.10 and up, but the distribution's Stack version lags behind, so we
+recommend running `stack upgrade --binary` after installing it. For older stack
+versions which do not support `--binary`, just `stack upgrade` is fine too. The
+version in Ubuntu 16.04 is too old to upgrade successfully, and so in that case
+stack should be installed from a [release
+tarball](https://github.com/commercialhaskell/stack/releases).
 
 ## Debian
 
 Use the [generic Linux option](#linux).
 
-There is also
-a
-[Debian package](https://packages.debian.org/search?keywords=haskell-stack&searchon=names&suite=all&section=all) for
-Stretch and up. Note that the distribution's Stack version lags behind, so
-we recommend running `stack upgrade` after installing it.
+There is also a [Debian
+package](https://packages.debian.org/search?keywords=haskell-stack&searchon=names&suite=all&section=all)
+for Stretch and up, but the distribution's Stack version lags behind, so running
+`stack upgrade --binary` is recommended after installing it. For older stack
+versions which do not support `--binary`, just `stack upgrade` is fine too.
 
 ## <a name="centos"></a>CentOS / Red Hat / Amazon Linux
 
@@ -192,7 +195,7 @@ can also get the `haskell-stack-tool` package from there.
 
 Users who follow the `nixos-unstable` channel or the Nixpkgs `master` branch can install the latest `stack` release into their profile by running:
 
-    nix-env -f "<nixpkgs>" -iA haskellPackages.stack
+    nix-env -f "<nixpkgs>" -iA stack
 
 Alternatively, the package can be built from source as follows.
 
