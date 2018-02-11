@@ -9,9 +9,9 @@ module Stack.PrettyPrint
       -- * Pretty printing functions
       displayPlain, displayWithColor
       -- * Logging based on pretty-print typeclass
-    , prettyDebug, prettyInfo, prettyWarn, prettyError, prettyWarnNoIndent, prettyErrorNoIndent
-    , prettyDebugL, prettyInfoL, prettyWarnL, prettyErrorL, prettyWarnNoIndentL, prettyErrorNoIndentL
-    , prettyDebugS, prettyInfoS, prettyWarnS, prettyErrorS, prettyWarnNoIndentS, prettyErrorNoIndentS
+    , prettyDebug, prettyInfo, prettyNote, prettyWarn, prettyError, prettyWarnNoIndent, prettyErrorNoIndent
+    , prettyDebugL, prettyInfoL, prettyNoteL, prettyWarnL, prettyErrorL, prettyWarnNoIndentL, prettyErrorNoIndentL
+    , prettyDebugS, prettyInfoS, prettyNoteS, prettyWarnS, prettyErrorS, prettyWarnNoIndentS, prettyErrorNoIndentS
       -- * Semantic styling functions
       -- | These are preferred to styling or colors directly, so that we can
       -- encourage consistency.
@@ -67,11 +67,14 @@ prettyWith level f = logGeneric "" level <=< displayWithColor . f
 -- Note: I think keeping this section aligned helps spot errors, might be
 -- worth keeping the alignment in place.
 
-prettyDebugWith, prettyInfoWith, prettyWarnWith, prettyErrorWith, prettyWarnNoIndentWith, prettyErrorNoIndentWith
+prettyDebugWith, prettyInfoWith, prettyNoteWith, prettyWarnWith, prettyErrorWith, prettyWarnNoIndentWith, prettyErrorNoIndentWith
   :: (HasCallStack, HasRunner env, MonadReader env m, MonadIO m)
   => (a -> Doc AnsiAnn) -> a -> m ()
 prettyDebugWith = prettyWith LevelDebug
 prettyInfoWith  = prettyWith LevelInfo
+prettyNoteWith f  = prettyWith LevelInfo
+                          ((line <>) . (styleGood "Note:" <+>) .
+                           indentAfterLabel . f)
 prettyWarnWith f  = prettyWith LevelWarn
                           ((line <>) . (styleWarning "Warning:" <+>) .
                            indentAfterLabel . f)
@@ -83,31 +86,34 @@ prettyWarnNoIndentWith f  = prettyWith LevelWarn
 prettyErrorNoIndentWith f = prettyWith LevelWarn
                                   ((line <>) . (styleError   "Error:" <+>) . f)
 
-prettyDebug, prettyInfo, prettyWarn, prettyError, prettyWarnNoIndent, prettyErrorNoIndent
+prettyDebug, prettyInfo, prettyNote, prettyWarn, prettyError, prettyWarnNoIndent, prettyErrorNoIndent
   :: (HasCallStack, HasRunner env, MonadReader env m, MonadIO m)
   => Doc AnsiAnn -> m ()
 prettyDebug         = prettyDebugWith         id
 prettyInfo          = prettyInfoWith          id
+prettyNote          = prettyNoteWith          id
 prettyWarn          = prettyWarnWith          id
 prettyError         = prettyErrorWith         id
 prettyWarnNoIndent  = prettyWarnNoIndentWith  id
 prettyErrorNoIndent = prettyErrorNoIndentWith id
 
-prettyDebugL, prettyInfoL, prettyWarnL, prettyErrorL, prettyWarnNoIndentL, prettyErrorNoIndentL
+prettyDebugL, prettyInfoL, prettyNoteL, prettyWarnL, prettyErrorL, prettyWarnNoIndentL, prettyErrorNoIndentL
   :: (HasCallStack, HasRunner env, MonadReader env m, MonadIO m)
   => [Doc AnsiAnn] -> m ()
 prettyDebugL         = prettyDebugWith         fillSep
 prettyInfoL          = prettyInfoWith          fillSep
+prettyNoteL          = prettyNoteWith          fillSep
 prettyWarnL          = prettyWarnWith          fillSep
 prettyErrorL         = prettyErrorWith         fillSep
 prettyWarnNoIndentL  = prettyWarnNoIndentWith  fillSep
 prettyErrorNoIndentL = prettyErrorNoIndentWith fillSep
 
-prettyDebugS, prettyInfoS, prettyWarnS, prettyErrorS, prettyWarnNoIndentS, prettyErrorNoIndentS
+prettyDebugS, prettyInfoS, prettyNoteS, prettyWarnS, prettyErrorS, prettyWarnNoIndentS, prettyErrorNoIndentS
   :: (HasCallStack, HasRunner env, MonadReader env m, MonadIO m)
   => String -> m ()
 prettyDebugS         = prettyDebugWith         flow
 prettyInfoS          = prettyInfoWith          flow
+prettyNoteS          = prettyNoteWith          flow
 prettyWarnS          = prettyWarnWith          flow
 prettyErrorS         = prettyErrorWith         flow
 prettyWarnNoIndentS  = prettyWarnNoIndentWith  flow
