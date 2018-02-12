@@ -19,7 +19,7 @@ buildOptsMonoidParser hide0 =
     exeStripping <*> haddock <*> haddockOptsParser hideBool <*>
     openHaddocks <*> haddockDeps <*> haddockInternal <*>
     haddockHyperlinkSource <*> copyBins <*> copyCompilerTool <*>
-    preFetch <*> keepGoing <*> forceDirty <*>
+    preFetch <*> keepGoing <*> keepTmpFiles <*> forceDirty <*>
     tests <*> testOptsParser hideBool <*> benches <*>
     benchOptsParser hideBool <*> reconfigure <*> cabalVerbose <*> splitObjs <*> skipComponents
   where
@@ -119,6 +119,11 @@ buildOptsMonoidParser hide0 =
         firstBoolFlags
             "keep-going"
             "continue running after a step fails (default: false for build, true for test/bench)"
+            hide
+    keepTmpFiles =
+        firstBoolFlags
+            "keep-tmp-files"
+            "keep intermediate files and build directories (default: false)"
             hide
     preFetch =
         firstBoolFlags

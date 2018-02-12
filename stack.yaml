@@ -1,4 +1,4 @@
-resolver: lts-9.14
+resolver: lts-10.5
 
 # docker:
 #   enable: true
@@ -16,25 +16,9 @@ flags:
   stack:
     hide-dependency-versions: true
     supported-build: true
-  mintty:
-    win32-2-5: false
 extra-deps:
-- Cabal-2.0.1.0
-- mintty-0.1.1
-- bindings-uname-0.1
-- path-0.6.1
-- path-io-1.3.3
-- extra-1.6
-- hsc2hs-0.68.2
-- hpack-0.20.0
-- unliftio-core-0.1.1.0
-- unliftio-0.2.4.0
-- smallcheck-1.1.3
-- conduit-extra-1.2.3.1
-- typed-process-0.2.1.0
 - git: https://github.com/commercialhaskell/rio
   commit: 09654f9fcbdcd96d0f5102796b32fdac5da7260e
 
 # https://github.com/commercialhaskell/stack/issues/3785
 - ansi-terminal-0.8.0.1
-- ansi-wl-pprint-0.6.8.2

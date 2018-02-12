@@ -319,7 +319,7 @@ withExecuteEnv :: forall env a. HasEnvConfig env
                -> (ExecuteEnv -> RIO env a)
                -> RIO env a
 withExecuteEnv bopts boptsCli baseConfigOpts locals globalPackages snapshotPackages localPackages inner =
-    withSystemTempDir stackProgName $ \tmpdir -> do
+    createTempDirFunction stackProgName $ \tmpdir -> do
         configLock <- liftIO $ newMVar ()
         installLock <- liftIO $ newMVar ()
         idMap <- liftIO $ newTVarIO Map.empty
@@ -381,6 +381,10 @@ withExecuteEnv bopts boptsCli baseConfigOpts locals globalPackages snapshotPacka
             } `finally` dumpLogs logFilesTChan totalWanted
   where
     toDumpPackagesByGhcPkgId = Map.fromList . map (\dp -> (dpGhcPkgId dp, dp))
+
+    createTempDirFunction
+        | Just True <- boptsKeepTmpFiles bopts = withKeepSystemTempDir
+        | otherwise = withSystemTempDir
 
     dumpLogs :: TChan (Path Abs Dir, Path Abs File) -> Int -> RIO env ()
     dumpLogs chan totalWanted = do

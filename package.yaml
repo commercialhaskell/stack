@@ -268,12 +268,11 @@ executables:
   stack:
     main: Main.hs
     source-dirs: src/main
+    generated-other-modules: Build_stack
     ghc-options:
     - -threaded
     dependencies:
     - stack
-    other-modules:
-    - Paths_stack
     when:
     - condition: flag(static)
       ld-options:

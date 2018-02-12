@@ -746,17 +746,19 @@ targetWarnings stackYaml localTargets nonLocalTargets mfileTargets = do
       , flow "It can still be useful to specify these, as they will be passed to ghci via -package flags."
       ]
   when (null localTargets && isNothing mfileTargets) $
-      prettyWarn $ vsep
-          [ flow "No local targets specified, so ghci will not use any options from your package.yaml / *.cabal files."
+      prettyNote $ vsep
+          [ flow "No local targets specified, so a plain ghci will be started with no package hiding or package options."
           , ""
-          , flow "Potential ways to resolve this:"
+          , flow "If you want to use package hiding and options, then you can try one of the following:"
+          , ""
           , bulletedList
               [ fillSep
-                  [ flow "If you want to use the package.yaml / *.cabal package in the current directory, use"
+                  [ flow "If you want to start a different project configuration than" <+> display stackYaml <> ", then you can use"
                   , styleShell "stack init"
-                  , flow "to create a new stack.yaml."
+                  , flow "to create a new stack.yaml for the packages in the current directory."
+                  , line
                   ]
-              , flow "Add to the 'packages' field of" <+> display stackYaml
+              , flow "If you want to use the project configuration at" <+> display stackYaml <> ", then you can add to its 'packages' field."
               ]
           , ""
           ]

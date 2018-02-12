@@ -1052,12 +1052,12 @@ pprintExceptions exceptions stackYaml parentMap wanted =
             align ((if range == Cabal.anyVersion
                       then flow "needed"
                       else flow "must match" <+> goodRange) <> "," <> softline <>
-                   flow "but the stack configuration has no specified version" <>
+                   flow "but the stack configuration has no specified version" <+>
                    latestApplicable Nothing)
         -- TODO: For local packages, suggest editing constraints
         DependencyMismatch version -> Just $
             (styleError . display) (PackageIdentifier name version) <+>
-            align (flow "from stack configuration does not match" <+> goodRange <>
+            align (flow "from stack configuration does not match" <+> goodRange <+>
                    latestApplicable (Just version))
         -- I think the main useful info is these explain why missing
         -- packages are needed. Instead lets give the user the shortest
@@ -1070,7 +1070,10 @@ pprintExceptions exceptions stackYaml parentMap wanted =
         goodRange = styleGood (fromString (Cabal.display range))
         latestApplicable mversion =
             case mlatestApplicable of
-                Nothing -> ""
+                Nothing
+                    | isNothing mversion ->
+                        flow "(no package with that name found, perhaps there is a typo in a package's build-depends or an omission from the stack.yaml packages list?)"
+                    | otherwise -> ""
                 Just la
                     | mlatestApplicable == mversion -> softline <>
                         flow "(latest matching version is specified)"
