@@ -340,14 +340,14 @@ addFinal lp package isAllInOne = do
     depsRes <- addPackageDeps False package
     res <- case depsRes of
         Left e -> return $ Left e
-        Right (missing, present, _minLoc) -> do
+        Right pdr -> do
             ctx <- ask
             return $ Right Task
                 { taskProvides = PackageIdentifier
                     (packageName package)
                     (packageVersion package)
-                , taskConfigOpts = TaskConfigOpts missing $ \missing' ->
-                    let allDeps = Map.union present missing'
+                , taskConfigOpts = TaskConfigOpts (pdrMissing pdr) $ \missing' ->
+                    let allDeps = Map.union (pdrPresent pdr) missing'
                      in configureOpts
                             (view envConfigL ctx)
                             (baseConfigOpts ctx)
@@ -355,11 +355,11 @@ addFinal lp package isAllInOne = do
                             True -- local
                             Local
                             package
-                , taskPresent = present
+                , taskPresent = pdrPresent pdr
                 , taskType = TTFiles lp Local -- FIXME we can rely on this being Local, right?
                 , taskAllInOne = isAllInOne
                 , taskCachePkgSrc = CacheSrcLocal (toFilePath (lpDir lp))
-                , taskAnyMissing = not $ Set.null missing
+                , taskAnyMissing = not $ Set.null $ pdrMissing pdr
                 , taskBuildTypeConfig = packageBuildTypeConfig package
                 }
     tell mempty { wFinals = Map.singleton (packageName package) res }
@@ -535,12 +535,13 @@ installPackageGivenDeps :: Bool
                         -> PackageSource
                         -> Package
                         -> Maybe Installed
-                        -> ( Set PackageIdentifier
-                           , Map PackageIdentifier GhcPkgId
-                           , InstallLocation )
+                        -> PackageDepsResult
                         -> M AddDepRes
-installPackageGivenDeps isAllInOne ps package minstalled (missing, present, minLoc) = do
+installPackageGivenDeps isAllInOne ps package minstalled pdr = do
     let name = packageName package
+        missing = pdrMissing pdr
+        present = pdrPresent pdr
+        minLoc = pdrLocation pdr
     ctx <- ask
     mRightVersionInstalled <- case (minstalled, Set.null missing) of
         (Just installed, True) -> do
@@ -597,6 +598,15 @@ addEllipsis t
     | T.length t < 100 = t
     | otherwise = T.take 97 t <> "..."
 
+data PackageDepsResult = PackageDepsResult
+  { pdrMissing :: !(Set PackageIdentifier)
+  -- ^ Packages that still need to be installed
+  , pdrPresent :: !(Map PackageIdentifier GhcPkgId)
+  -- ^ Packages which are already installed
+  , pdrLocation :: !InstallLocation
+  -- ^ Does this go in the snapshot or local database?
+  }
+
 -- | Given a package, recurses into all of its dependencies. The results
 -- indicate which packages are missing, meaning that their 'GhcPkgId's
 -- will be figured out during the build, after they've been built. The
@@ -608,7 +618,7 @@ addEllipsis t
 -- is 'Snap', then it can either be installed locally or in the
 -- snapshot.
 addPackageDeps :: Bool -- ^ is this being used by a dependency?
-               -> Package -> M (Either ConstructPlanException (Set PackageIdentifier, Map PackageIdentifier GhcPkgId, InstallLocation))
+               -> Package -> M (Either ConstructPlanException PackageDepsResult)
 addPackageDeps treatAsDep package = do
     ctx <- ask
     deps' <- packageDepsWithTools package
@@ -676,7 +686,9 @@ addPackageDeps treatAsDep package = do
         -- package must be installed locally. Otherwise the result is
         -- 'Snap', indicating that the parent can either be installed
         -- locally or in the snapshot.
-        ([], pairs) -> return $ Right $ mconcat pairs
+        ([], pairs) -> return $ Right $
+                            let (x, y, z) = mconcat pairs
+                             in PackageDepsResult x y z
         (errs, _) -> return $ Left $ DependencyPlanFailures
             package
             (Map.fromList errs)
