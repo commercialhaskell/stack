@@ -9,7 +9,7 @@ nix:
 extra-deps:
 - bindings-uname-0.1
 - git: https://github.com/commercialhaskell/rio
-  commit: 9c487f9ae0568c71855ffa151a137d458f4e60c6
+  commit: 09654f9fcbdcd96d0f5102796b32fdac5da7260e
 
 # https://github.com/commercialhaskell/stack/issues/3785
 - ansi-terminal-0.8.0.1
