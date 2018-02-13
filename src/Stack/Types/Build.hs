@@ -20,6 +20,7 @@ module Stack.Types.Build
     ,piiVersion
     ,piiLocation
     ,Task(..)
+    ,AllImmutable(..)
     ,taskIsTarget
     ,taskLocation
     ,LocalPackage(..)
@@ -444,8 +445,20 @@ data Task = Task
     , taskBuildTypeConfig :: !Bool
     -- ^ Is the build type of this package Configure. Check out
     -- ensureConfigureScript in Stack.Build.Execute for the motivation
+    , taskAllImmutable :: !AllImmutable
+    -- ^ See 'AllImmutable'
     }
     deriving Show
+
+-- | Is this package, and all of its dependencies, from an immutable
+-- package location? See
+-- <https://github.com/commercialhaskell/stack/issues/3860>
+data AllImmutable = AllImmutable | NotAllImmutable
+  deriving Show
+instance Monoid AllImmutable where
+  mempty = AllImmutable
+  mappend AllImmutable AllImmutable = AllImmutable
+  mappend _ _ = NotAllImmutable
 
 -- | Given the IDs of any missing packages, produce the configure options
 data TaskConfigOpts = TaskConfigOpts
