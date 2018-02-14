@@ -7,3 +7,6 @@ nix:
     - http-client-tls-0.3.4
 extra-deps:
 - hpack-0.26.0
+- archive: https://github.com/haskell/hackage-security/archive/3297b0f3f4285cb30321baaa7b54e3d22e1f6bd7.tar.gz
+  subdirs:
+  - hackage-security
