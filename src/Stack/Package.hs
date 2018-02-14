@@ -1369,7 +1369,9 @@ hpack pkgDir = do
         config <- view configL
         case configOverrideHpack config of
             HpackBundled -> do
-#if MIN_VERSION_hpack(0,23,0)
+#if MIN_VERSION_hpack(0,26,0)
+                r <- liftIO $ Hpack.hpackResult $ Hpack.setTarget (toFilePath hpackFile) Hpack.defaultOptions
+#elif MIN_VERSION_hpack(0,23,0)
                 r <- liftIO $ Hpack.hpackResult Hpack.defaultRunOptions {Hpack.runOptionsConfigDir = Just (toFilePath pkgDir)} Hpack.NoForce
 #else
                 r <- liftIO $ Hpack.hpackResult (Just $ toFilePath pkgDir) Hpack.NoForce
