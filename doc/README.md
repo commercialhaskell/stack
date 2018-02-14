@@ -47,7 +47,7 @@ stack exec my-project-exe
 ```
 
 - The `stack new` command will create a new directory containing all
-the needed files to start a project correctly.
+  the needed files to start a project correctly.
 - The `stack setup` will download the compiler if necessary in an isolated
   location (default `~/.stack`) that won't interfere with any system-level
   installations. (For information on installation paths, please use the
@@ -55,14 +55,13 @@ the needed files to start a project correctly.
 - The `stack build` command will build the minimal project.
 - `stack exec my-project-exe` will execute the command.
 - If you just want to install an executable using stack, then all you have to do
-is `stack install <package-name>`.
+  is `stack install <package-name>`.
 
 If you want to launch a REPL:
 
 ```bash
 stack ghci
 ```
-
 
 Run `stack` for a complete list of commands.
 
@@ -90,19 +89,20 @@ So to manage your library:
 
 1. Edit files in the `src/` directory.
 
-The `app` directory should preferably contain only files related to
-executables.
+   The `app` directory should preferably contain only files related to
+   executables.
 
-2. If you need to include another library (for example the package [`text`](https://hackage.haskell.org/package/text):
+2. If you need to include another library (for example the package
+   [`text`](https://hackage.haskell.org/package/text)):
 
    - Add the package `text` to the file `my-project.cabal`
      in the section `build-depends: ...`.
-   - run `stack build` another time
+   - Run `stack build` another time.
 
 3. If you get an error that tells you your package isn't in the LTS.
    Just try to add a new version in the `stack.yaml` file in the `extra-deps` section.
 
-It was a really fast introduction on how to start to code in Haskell using `stack`.
+That was a really fast introduction on how to start to code in Haskell using `stack`.
 If you want to go further, we highly recommend you to read the [`stack` guide](GUIDE.md).
 
 #### How to contribute
@@ -132,7 +132,7 @@ stack setup && \
 stack build
 ```
 
-If you need to check you changes quickly run:
+If you need to check your changes quickly run:
 
 ```bash
 stack ghci
@@ -145,17 +145,17 @@ the current directory.
 
 #### Complete guide to stack
 
-This repository also contains a complete [user guide to using stack
-](GUIDE.md), covering all of the most common use cases.
+This repository also contains a complete [user guide to using
+stack](GUIDE.md), covering all of the most common use cases.
 
 
 #### Questions, Feedback, Discussion
 
 * For frequently asked questions about detailed or specific use-cases, please
   see [the FAQ](faq.md).
-* For general questions, comments, feedback and support please write
+* For general questions, comments, feedback and support, please write
   to [the stack mailing list](https://groups.google.com/d/forum/haskell-stack).
-* For bugs, issues, or requests please
+* For bugs, issues, or requests, please
   [open an issue](https://github.com/commercialhaskell/stack/issues/new).
 * When using Stack Overflow, please use [the haskell-stack
   tag](http://stackoverflow.com/questions/tagged/haskell-stack).
@@ -169,7 +169,7 @@ easy-to-learn interface, while providing the customizability and
 power experienced developers need.  As a build tool, Stack does not
 stand alone. It is built on the great work provided by:
 
-* The __Glasgow Haskell Compiler__ (GHC), the premiere Haskell
+* The __Glasgow Haskell Compiler__ (GHC), the premier Haskell
   compiler. Stack will manage your GHC installations and automatically
   select the appropriate compiler version for your project.
 * The __Cabal build system__, a specification for defining Haskell
@@ -189,4 +189,5 @@ commercial Haskell users, and has since become a thriving open source
 project meeting the needs of Haskell users of all stripes.
 
 If you'd like to get involved with Stack, check out the
-[newcomer friendly](https://github.com/commercialhaskell/stack/issues?q=is%3Aopen+is%3Aissue+label%3a%22newcomer+friendly%22) label on the Github issue tracker.
+[newcomer friendly](https://github.com/commercialhaskell/stack/issues?q=is%3Aopen+is%3Aissue+label%3a%22newcomer+friendly%22)
+label on the Github issue tracker.
