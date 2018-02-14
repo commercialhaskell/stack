@@ -1,4 +1,4 @@
-resolver: nightly-2017-12-20
+resolver: nightly-2018-02-11
 nix:
   # --nix on the command-line to enable.
   enable: false
@@ -6,4 +6,4 @@ nix:
     - zlib
     - http-client-tls-0.3.4
 extra-deps:
-- bindings-uname-0.1
+- hpack-0.26.0
