@@ -1,5 +1,12 @@
 # Changelog
 
+
+## v1.6.3.1
+
+Hackage-only release with no user facing changes (updated to build with
+newer version of hpack dependency).
+
+
 ## v1.6.3
 
 Enhancements:
