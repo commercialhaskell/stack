@@ -32,6 +32,7 @@ import           Path
 import           Path.Extra (toFilePathNoTrailingSep)
 import           Path.IO hiding (withSystemTempDir)
 import qualified RIO
+import           RIO.Process (HasProcessContext, exec, proc, readProcess_)
 import           Stack.Build
 import           Stack.Build.Installed
 import           Stack.Build.Source
@@ -51,7 +52,6 @@ import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageName
 import           Stack.Types.Runner
 import           System.IO (putStrLn, putStr, getLine)
-import           RIO.Process (HasProcessContext, execSpawn, proc, readProcess_)
 import           System.IO.Temp (getCanonicalTemporaryDirectory)
 
 #ifndef WINDOWS
@@ -368,7 +368,7 @@ runGhci GhciOpts{..} targets mainIsTargets pkgs extraFiles exposePackages = do
       mconcat (intersperse ", " (map (RIO.display . ghciPkgName) pkgs))
     let execGhci extras = do
             menv <- liftIO $ configProcessContextSettings config defaultEnvSettings
-            withProcessContext menv $ execSpawn
+            withProcessContext menv $ exec
                  (fromMaybe (compilerExeName wc) ghciGhcCommand)
                  (("--interactive" : ) $
                  -- This initial "-i" resets the include directories to
