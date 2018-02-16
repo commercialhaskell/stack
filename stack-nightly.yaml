@@ -1,4 +1,4 @@
-resolver: nightly-2018-01-18
+resolver: nightly-2018-02-11
 
 nix:
   # --nix on the command-line to enable.
@@ -7,10 +7,12 @@ nix:
     - zlib
     - http-client-tls-0.3.4
 extra-deps:
-- bindings-uname-0.1
 - git: https://github.com/commercialhaskell/rio
   commit: 09654f9fcbdcd96d0f5102796b32fdac5da7260e
+- hpack-0.26.0
 
 # https://github.com/commercialhaskell/stack/issues/3785
 - ansi-terminal-0.8.0.1
-- ansi-wl-pprint-0.6.8.2
+- archive: https://github.com/haskell/hackage-security/archive/3297b0f3f4285cb30321baaa7b54e3d22e1f6bd7.tar.gz
+  subdirs:
+  - hackage-security

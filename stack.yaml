@@ -22,3 +22,6 @@ extra-deps:
 
 # https://github.com/commercialhaskell/stack/issues/3785
 - ansi-terminal-0.8.0.1
+- archive: https://github.com/haskell/hackage-security/archive/3297b0f3f4285cb30321baaa7b54e3d22e1f6bd7.tar.gz
+  subdirs:
+  - hackage-security
