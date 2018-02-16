@@ -7,8 +7,7 @@ nix:
     - zlib
     - http-client-tls-0.3.4
 extra-deps:
-- git: https://github.com/commercialhaskell/rio
-  commit: 09654f9fcbdcd96d0f5102796b32fdac5da7260e
+- https://github.com/commercialhaskell/rio/archive/09654f9fcbdcd96d0f5102796b32fdac5da7260e.tar.gz
 - hpack-0.26.0
 
 # https://github.com/commercialhaskell/stack/issues/3785
