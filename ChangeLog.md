@@ -1,5 +1,6 @@
 # Changelog
 
+
 ## Unreleased changes
 
 Release notes:
@@ -40,6 +41,13 @@ Bug fixes:
   resilient against SIGKILL and machine failure. See
   [hackage-security #187](https://github.com/haskell/hackage-security/issues/187)
   and [#3073](https://github.com/commercialhaskell/stack/issues/3073).
+
+
+## v1.6.3.1
+
+Hackage-only release with no user facing changes (updated to build with
+newer version of hpack dependency).
+
 
 ## v1.6.3
 
