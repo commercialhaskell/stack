@@ -50,7 +50,7 @@ import           Stack.Types.PackageName
 import           Stack.Types.Runner
 import           System.IO (putStrLn, putStr, getLine)
 import           System.IO.Temp (getCanonicalTemporaryDirectory)
-import           RIO.Process (withEnvOverride, execSpawn, execObserve)
+import           RIO.Process (withEnvOverride, exec, execObserve)
 
 #ifndef WINDOWS
 import qualified System.Posix.Files as Posix
@@ -367,7 +367,7 @@ runGhci GhciOpts{..} targets mainIsTargets pkgs extraFiles exposePackages = do
          T.intercalate ", " (map (packageNameText . ghciPkgName) pkgs))
     let execGhci extras = do
             menv <- liftIO $ configEnvOverrideSettings config defaultEnvSettings
-            withEnvOverride menv $ execSpawn
+            withEnvOverride menv $ exec
                  (fromMaybe (compilerExeName wc) ghciGhcCommand)
                  (("--interactive" : ) $
                  -- This initial "-i" resets the include directories to

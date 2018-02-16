@@ -86,6 +86,13 @@ Bug fixes:
   we were forgetting to record the result, which meant that all tests
   always ran even if they had already passed before. See
   [#3770](https://github.com/commercialhaskell/stack/pull/3770).
+* `stack ghci` now replaces the stack process with ghci. This improves
+  signal handling behavior. In particular, handling of Ctrl-C.  To make
+  this possible, the generated files are now left behind after exit.
+  The paths are based on hashing file contents, and it's stored in the
+  system temporary directory, so this shouldn't result in too much
+  garbage. See
+  [#3821](https://github.com/commercialhaskell/stack/issues/3821).
 
 ## v1.6.3
 
