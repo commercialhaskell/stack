@@ -34,6 +34,12 @@ Bug fixes:
   we were forgetting to record the result, which meant that all tests
   always ran even if they had already passed before. See
   [#3770](https://github.com/commercialhaskell/stack/pull/3770).
+* Includes a patched version of `hackage-security` which fixes both
+  some issues around asynchronous exception handling, and moves from
+  directory locking to file locking, making the update mechanism
+  resilient against SIGKILL and machine failure. See
+  [hackage-security #187](https://github.com/haskell/hackage-security/issues/187)
+  and [#3073](https://github.com/commercialhaskell/stack/issues/3073).
 
 ## v1.6.3
 
