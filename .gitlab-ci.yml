@@ -16,6 +16,7 @@ build:
   stage: build
   only:
     - master
+    - stable
   script:
     - export PATH=$HOME/.local/bin:$PATH
     - (cd etc/scripts && stack --install-ghc install --pedantic)
