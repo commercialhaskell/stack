@@ -1,15 +1,7 @@
 # Changelog
 
 
-## Unreleased changes
-
-Release notes:
-
-Major changes:
-
-Behaviour changes:
-
-Other enhancements:
+## v1.6.5
 
 Bug fixes:
 * 1.6.1 introduced a change that made some precompiled cache files use

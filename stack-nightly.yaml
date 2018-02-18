@@ -1,4 +1,4 @@
-resolver: nightly-2018-02-16
+resolver: nightly-2018-02-18
 nix:
   # --nix on the command-line to enable.
   enable: false
@@ -6,7 +6,6 @@ nix:
     - zlib
     - http-client-tls-0.3.4
 extra-deps:
-- hpack-0.27.0
 - archive: https://github.com/haskell/hackage-security/archive/3297b0f3f4285cb30321baaa7b54e3d22e1f6bd7.tar.gz
   subdirs:
   - hackage-security
