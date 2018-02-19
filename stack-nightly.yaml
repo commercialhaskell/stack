@@ -1,4 +1,4 @@
-resolver: nightly-2018-02-11
+resolver: nightly-2018-02-18
 packages:
 - .
 - subs/rio
@@ -10,8 +10,6 @@ nix:
     - zlib
     - http-client-tls-0.3.4
 extra-deps:
-- hpack-0.26.0
-
 # https://github.com/commercialhaskell/stack/issues/3785
 - ansi-terminal-0.8.0.1
 - archive: https://github.com/haskell/hackage-security/archive/3297b0f3f4285cb30321baaa7b54e3d22e1f6bd7.tar.gz
