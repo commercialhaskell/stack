@@ -1,6 +1,20 @@
 # Changelog
 
 
+## Unreleased changes
+
+Release notes:
+
+Major changes:
+
+Behavior changes:
+
+Other enhancements:
+
+Bug fixes:
+
+
+
 ## v1.6.5
 
 Bug fixes:
