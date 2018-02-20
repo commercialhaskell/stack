@@ -7,6 +7,8 @@ Release notes:
 
 Major changes:
 
+* Upgrade from Cabal 2.0 to Cabal 2.2
+
 Behavior changes:
 
 * `stack setup` no longer uses different GHC configure options on Linux

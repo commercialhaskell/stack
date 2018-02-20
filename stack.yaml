@@ -21,7 +21,12 @@ flags:
     supported-build: true
 extra-deps:
 # https://github.com/commercialhaskell/stack/issues/3785
-- ansi-terminal-0.8.0.2
+- ansi-terminal-0.8.0.2@rev:0
 - archive: https://github.com/haskell/hackage-security/archive/3297b0f3f4285cb30321baaa7b54e3d22e1f6bd7.tar.gz
   subdirs:
   - hackage-security
+- Cabal-2.2.0.0@rev:1
+- cabal-doctest-1.0.6@rev:1
+
+# https://github.com/fizruk/http-api-data/issues/72
+- archive: https://github.com/snoyberg/http-api-data/archive/659dc4689355a5881acc2e037090d75391c673bb.tar.gz

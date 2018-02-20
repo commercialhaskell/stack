@@ -995,7 +995,7 @@ withSingleContext ActionContext {..} ExecuteEnv {..} task@Task {..} mdeps msuffi
             -- types, see:
             -- https://github.com/commercialhaskell/stack/issues/370
             case (packageBuildType package, eeSetupExe) of
-                (Just C.Simple, Just setupExe) -> return $ Left setupExe
+                (C.Simple, Just setupExe) -> return $ Left setupExe
                 _ -> liftIO $ Right <$> getSetupHs pkgDir
         inner $ \stripTHLoading args -> do
             let cabalPackageArg
@@ -1020,7 +1020,7 @@ withSingleContext ActionContext {..} ExecuteEnv {..} task@Task {..} mdeps msuffi
                 warnCustomNoDeps :: RIO env ()
                 warnCustomNoDeps =
                     case (taskType, packageBuildType package) of
-                        (TTFiles lp Local, Just C.Custom) | lpWanted lp -> do
+                        (TTFiles lp Local, C.Custom) | lpWanted lp -> do
                             prettyWarnL
                                 [ flow "Package"
                                 , display $ packageName package
@@ -1494,7 +1494,7 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
             eres <- try $ cabal KeepTHLoading ["copy"]
             case eres of
                 Left err@CabalExitedUnsuccessfully{} ->
-                    throwM $ CabalCopyFailed (packageBuildType package == Just C.Simple) (show err)
+                    throwM $ CabalCopyFailed (packageBuildType package == C.Simple) (show err)
                 _ -> return ()
             when hasLibrary $ cabal KeepTHLoading ["register"]
 
@@ -1747,7 +1747,7 @@ singleTest topts testsToRun ac ee task installedMap = do
                                 return $ Map.singleton testName (Just ec)
                     else do
                         logError $ T.pack $ show $ TestSuiteExeMissing
-                            (packageBuildType package == Just C.Simple)
+                            (packageBuildType package == C.Simple)
                             exeName
                             (packageNameString (packageName package))
                             (T.unpack testName)
