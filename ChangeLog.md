@@ -43,6 +43,7 @@ Other enhancements:
   It is best used with ghc's equivalent flag,
   i.e. `stack build --keep-tmp-files --ghc-options=-keep-tmp-files`.
   See [#3857](https://github.com/commercialhaskell/stack/issues/3857)
+* Improved error messages for snapshot parse exceptions
 
 Bug fixes:
 
