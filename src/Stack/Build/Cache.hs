@@ -27,8 +27,6 @@ module Stack.Build.Cache
     , setTestSuccess
     , unsetTestSuccess
     , checkTestSuccess
-    , writePrecompiledCache
-    , readPrecompiledCache
     -- Exported for testing
     , BuildCache(..)
     ) where

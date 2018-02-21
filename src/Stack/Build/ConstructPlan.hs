@@ -97,7 +97,7 @@ combineMap = Map.mergeWithKey
 
 data AddDepRes
     = ADRToInstall Task
-    | ADRFound InstallLocation Installed
+    | ADRFound InstallLocation AllImmutable Installed
     deriving Show
 
 type ParentMap = MonoidMap PackageName (First Version, [(PackageIdentifier, VersionRange)])
@@ -201,7 +201,7 @@ constructPlan ls0 baseConfigOpts0 locals extraToBuild0 localDumpPkgs loadPackage
         errs = errlibs ++ errfinals
     if null errs
         then do
-            let toTask (_, ADRFound _ _) = Nothing
+            let toTask (_, ADRFound _ _ _) = Nothing
                 toTask (name, ADRToInstall task) = Just (name, task)
                 tasks = M.fromList $ mapMaybe toTask adrs
                 takeSubset =
@@ -340,14 +340,14 @@ addFinal lp package isAllInOne = do
     depsRes <- addPackageDeps False package
     res <- case depsRes of
         Left e -> return $ Left e
-        Right (missing, present, _minLoc) -> do
+        Right pdr -> do
             ctx <- ask
             return $ Right Task
                 { taskProvides = PackageIdentifier
                     (packageName package)
                     (packageVersion package)
-                , taskConfigOpts = TaskConfigOpts missing $ \missing' ->
-                    let allDeps = Map.union present missing'
+                , taskConfigOpts = TaskConfigOpts (pdrMissing pdr) $ \missing' ->
+                    let allDeps = Map.union (pdrPresent pdr) missing'
                      in configureOpts
                             (view envConfigL ctx)
                             (baseConfigOpts ctx)
@@ -355,14 +355,21 @@ addFinal lp package isAllInOne = do
                             True -- local
                             Local
                             package
-                , taskPresent = present
+                , taskPresent = pdrPresent pdr
                 , taskType = TTFiles lp Local -- FIXME we can rely on this being Local, right?
                 , taskAllInOne = isAllInOne
                 , taskCachePkgSrc = CacheSrcLocal (toFilePath (lpDir lp))
-                , taskAnyMissing = not $ Set.null missing
+                , taskAnyMissing = not $ Set.null $ pdrMissing pdr
                 , taskBuildTypeConfig = packageBuildTypeConfig package
+                , taskAllImmutable = mappend (pdrAllImmutable pdr) (packageIsImmutable $ PLOther $ lpLocation lp)
                 }
     tell mempty { wFinals = Map.singleton (packageName package) res }
+
+packageIsImmutable :: PackageLocationIndex FilePath -> AllImmutable
+packageIsImmutable PLIndex {} = AllImmutable
+packageIsImmutable (PLOther PLFilePath {}) = NotAllImmutable
+packageIsImmutable (PLOther PLArchive {}) = AllImmutable
+packageIsImmutable (PLOther PLRepo {}) = AllImmutable
 
 -- | Is this package being used as a library, or just as a build tool?
 -- If the former, we need to ensure that a library actually
@@ -413,7 +420,9 @@ addDep treatAsDep' name = do
                               (PackageIdentifierRevision (PackageIdentifier name (installedVersion installed)) CFILatest)
                               loc
                               Map.empty
-                            return $ Right $ ADRFound loc installed
+                            return $ Right $ ADRFound loc
+                              AllImmutable -- MSS 2018-02-12: Is it fair to make this assumption?
+                              installed
                         Just (PIOnlySource ps) -> do
                             tellExecutables ps
                             installPackage treatAsDep name ps Nothing
@@ -469,6 +478,7 @@ installPackage :: Bool -- ^ is this being used by a dependency?
                -> PackageSource
                -> Maybe Installed
                -> M (Either ConstructPlanException AddDepRes)
+-- FIXME if we return an ADRFound, and we say AllImmutable, ensure that the package was installed in ~/.stack
 installPackage treatAsDep name ps minstalled = do
     ctx <- ask
     case ps of
@@ -535,12 +545,14 @@ installPackageGivenDeps :: Bool
                         -> PackageSource
                         -> Package
                         -> Maybe Installed
-                        -> ( Set PackageIdentifier
-                           , Map PackageIdentifier GhcPkgId
-                           , InstallLocation )
+                        -> PackageDepsResult
                         -> M AddDepRes
-installPackageGivenDeps isAllInOne ps package minstalled (missing, present, minLoc) = do
+installPackageGivenDeps isAllInOne ps package minstalled pdr = do
     let name = packageName package
+        missing = pdrMissing pdr
+        present = pdrPresent pdr
+        minLoc = pdrLocation pdr
+        isImmutable = mappend (pdrAllImmutable pdr) $ packageIsImmutable $ piiPackageLocation ps
     ctx <- ask
     mRightVersionInstalled <- case (minstalled, Set.null missing) of
         (Just installed, True) -> do
@@ -552,7 +564,7 @@ installPackageGivenDeps isAllInOne ps package minstalled (missing, present, minL
             return Nothing
         (Nothing, _) -> return Nothing
     return $ case mRightVersionInstalled of
-        Just installed -> ADRFound (piiLocation ps) installed
+        Just installed -> ADRFound (piiLocation ps) isImmutable installed -- FIXME ensure that the cache actually exists. If not, worry that it was installed outside of the ~/.stack directory and may disappear, and force it to get installed again.
         Nothing -> ADRToInstall Task
             { taskProvides = PackageIdentifier
                 (packageName package)
@@ -578,6 +590,7 @@ installPackageGivenDeps isAllInOne ps package minstalled (missing, present, minL
             , taskCachePkgSrc = toCachePkgSrc ps
             , taskAnyMissing = not $ Set.null missing
             , taskBuildTypeConfig = packageBuildTypeConfig package
+            , taskAllImmutable = isImmutable
             }
 
 -- | Is the build type of the package Configure
@@ -597,6 +610,26 @@ addEllipsis t
     | T.length t < 100 = t
     | otherwise = T.take 97 t <> "..."
 
+data PackageDepsResult = PackageDepsResult
+  { pdrMissing :: !(Set PackageIdentifier)
+  -- ^ Packages that still need to be installed
+  , pdrPresent :: !(Map PackageIdentifier GhcPkgId)
+  -- ^ Packages which are already installed
+  , pdrLocation :: !InstallLocation
+  -- ^ Does this go in the snapshot or local database?
+  , pdrAllImmutable :: !AllImmutable
+  -- ^ Is this package, and all of its dependencies, in an immutable
+  -- source location? See
+  -- <https://github.com/commercialhaskell/stack/issues/3860>.
+  }
+instance Monoid PackageDepsResult where
+  mempty = PackageDepsResult mempty mempty mempty mempty
+  mappend (PackageDepsResult x1 x2 x3 x4) (PackageDepsResult y1 y2 y3 y4) = PackageDepsResult
+    (mappend x1 y1)
+    (mappend x2 y2)
+    (mappend x3 y3)
+    (mappend x4 y4)
+
 -- | Given a package, recurses into all of its dependencies. The results
 -- indicate which packages are missing, meaning that their 'GhcPkgId's
 -- will be figured out during the build, after they've been built. The
@@ -608,7 +641,7 @@ addEllipsis t
 -- is 'Snap', then it can either be installed locally or in the
 -- snapshot.
 addPackageDeps :: Bool -- ^ is this being used by a dependency?
-               -> Package -> M (Either ConstructPlanException (Set PackageIdentifier, Map PackageIdentifier GhcPkgId, InstallLocation))
+               -> Package -> M (Either ConstructPlanException PackageDepsResult)
 addPackageDeps treatAsDep package = do
     ctx <- ask
     deps' <- packageDepsWithTools package
@@ -661,12 +694,24 @@ addPackageDeps treatAsDep package = do
                                     else return False
                 if inRange
                     then case adr of
-                        ADRToInstall task -> return $ Right
-                            (Set.singleton $ taskProvides task, Map.empty, taskLocation task)
-                        ADRFound loc (Executable _) -> return $ Right
-                            (Set.empty, Map.empty, loc)
-                        ADRFound loc (Library ident gid _) -> return $ Right
-                            (Set.empty, Map.singleton ident gid, loc)
+                        ADRToInstall task -> return $ Right PackageDepsResult
+                          { pdrMissing = Set.singleton $ taskProvides task
+                          , pdrPresent = Map.empty
+                          , pdrLocation = taskLocation task
+                          , pdrAllImmutable = taskAllImmutable task
+                          }
+                        ADRFound loc allImmutable (Executable _) -> return $ Right PackageDepsResult
+                          { pdrMissing = Set.empty
+                          , pdrPresent = Map.empty
+                          , pdrLocation = loc
+                          , pdrAllImmutable = allImmutable
+                          }
+                        ADRFound loc allImmutable (Library ident gid _) -> return $ Right PackageDepsResult
+                          { pdrMissing = Set.empty
+                          , pdrPresent = Map.singleton ident gid
+                          , pdrLocation = loc
+                          , pdrAllImmutable = allImmutable
+                          }
                     else do
                         mlatestApplicable <- getLatestApplicable
                         return $ Left (depname, (range, mlatestApplicable, DependencyMismatch $ adrVersion adr))
@@ -676,13 +721,13 @@ addPackageDeps treatAsDep package = do
         -- package must be installed locally. Otherwise the result is
         -- 'Snap', indicating that the parent can either be installed
         -- locally or in the snapshot.
-        ([], pairs) -> return $ Right $ mconcat pairs
+        ([], pdrs) -> return $ Right $ mconcat pdrs
         (errs, _) -> return $ Left $ DependencyPlanFailures
             package
             (Map.fromList errs)
   where
     adrVersion (ADRToInstall task) = packageIdentifierVersion $ taskProvides task
-    adrVersion (ADRFound _ installed) = installedVersion installed
+    adrVersion (ADRFound _ _ installed) = installedVersion installed
     -- Update the parents map, for later use in plan construction errors
     -- - see 'getShortestDepsPath'.
     addParent depname range mversion = tell mempty { wParents = MonoidMap $ M.singleton depname val }
@@ -691,8 +736,8 @@ addPackageDeps treatAsDep package = do
 
     adrHasLibrary :: AddDepRes -> Bool
     adrHasLibrary (ADRToInstall task) = taskHasLibrary task
-    adrHasLibrary (ADRFound _ Library{}) = True
-    adrHasLibrary (ADRFound _ Executable{}) = False
+    adrHasLibrary (ADRFound _ _ Library{}) = True
+    adrHasLibrary (ADRFound _ _ Executable{}) = False
 
     taskHasLibrary :: Task -> Bool
     taskHasLibrary task =
