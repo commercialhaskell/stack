@@ -2032,3 +2032,9 @@ addGlobalPackages deps globals0 =
     -- None of the packages we checked can be added, therefore drop them all
     -- and return our results
     loop _ [] gids = gids
+
+
+
+
+readPrecompiledCache = undefined
+writePrecompiledCache = undefined
