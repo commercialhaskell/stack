@@ -104,7 +104,7 @@ import qualified System.Directory as D
 import           System.Environment (getProgName, getArgs, withArgs)
 import           System.Exit
 import           System.FilePath (isValid, pathSeparator)
-import           System.IO (stderr, stdin, stdout, BufferMode(..), hPutStrLn, hGetEncoding, hSetEncoding)
+import           System.IO (stderr, stdin, stdout, BufferMode(..), hPutStrLn, hPrint, hGetEncoding, hSetEncoding)
 
 -- | Change the character encoding of the given Handle to transliterate
 -- on unsupported characters instead of throwing an exception
@@ -197,7 +197,7 @@ main = do
           case fromException e of
               Just ec -> exitWith ec
               Nothing -> do
-                  hPutStrLn stderr $ show e
+                  hPrint stderr e
                   exitFailure
 
 -- Vertically combine only the error component of the first argument with the

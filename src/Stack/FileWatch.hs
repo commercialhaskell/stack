@@ -129,7 +129,7 @@ fileWatchConf cfg out inner = withManagerConf cfg $ \manager -> do
                         Just ExitSuccess -> green
                         _ -> red
                 withColor color $ show e
-            _ -> withColor green $ "Success! Waiting for next file change."
+            _ -> withColor green "Success! Waiting for next file change."
 
         putLn "Type help for available commands. Press enter to force a rebuild."
 
