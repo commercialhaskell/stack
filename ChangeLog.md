@@ -1,12 +1,13 @@
 # Changelog
 
+
 ## Unreleased changes
 
 Release notes:
 
 Major changes:
 
-Behaviour changes:
+Behavior changes:
 
 * `stack setup` no longer uses different GHC configure options on Linux
   distributions that use GCC with PIE enabled by default.  GHC detects
@@ -42,6 +43,13 @@ Other enhancements:
   It is best used with ghc's equivalent flag,
   i.e. `stack build --keep-tmp-files --ghc-options=-keep-tmp-files`.
   See [#3857](https://github.com/commercialhaskell/stack/issues/3857)
+* Improved error messages for snapshot parse exceptions
+
+Bug fixes:
+
+
+
+## v1.6.5
 
 Bug fixes:
 * 1.6.1 introduced a change that made some precompiled cache files use
@@ -92,6 +100,13 @@ Bug fixes:
   resilient against SIGKILL and machine failure. See
   [hackage-security #187](https://github.com/haskell/hackage-security/issues/187)
   and [#3073](https://github.com/commercialhaskell/stack/issues/3073).
+
+
+## v1.6.3.1
+
+Hackage-only release with no user facing changes (updated to build with
+newer version of hpack dependency).
+
 
 ## v1.6.3
 

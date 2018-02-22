@@ -1,4 +1,4 @@
-resolver: nightly-2018-02-11
+resolver: nightly-2018-02-18
 
 nix:
   # --nix on the command-line to enable.
@@ -8,7 +8,6 @@ nix:
     - http-client-tls-0.3.4
 extra-deps:
 - https://github.com/commercialhaskell/rio/archive/090d9ec92e09a9255572d37b993d33f7b9ba946d.tar.gz
-- hpack-0.26.0
 
 # https://github.com/commercialhaskell/stack/issues/3785
 - ansi-terminal-0.8.0.1

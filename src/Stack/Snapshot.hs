@@ -76,6 +76,7 @@ data SnapshotException
   | NeedResolverOrCompiler !Text
   | MissingPackages !(Set PackageName)
   | CustomResolverException !Text !(Either Request FilePath) !ParseException
+  | InvalidStackageException !SnapName !String
   deriving Typeable
 instance Exception SnapshotException
 instance Show SnapshotException where
@@ -125,10 +126,20 @@ instance Show SnapshotException where
   show (CustomResolverException url loc e) = concat
     [ "Unable to load custom resolver "
     , T.unpack url
-    , " from location\n"
-    , show loc
+    , " from "
+    , case loc of
+        Left _req -> "HTTP request"
+        Right fp -> "local file:\n  " ++ fp
     , "\nException: "
-    , show e
+    , case e of
+        AesonException s -> s
+        _ -> show e
+    ]
+  show (InvalidStackageException snapName e) = concat
+    [ "Unable to parse Stackage snapshot "
+    , T.unpack (renderSnapName snapName)
+    , ": "
+    , e
     ]
 
 -- | Convert a 'Resolver' into a 'SnapshotDef'
@@ -147,7 +158,7 @@ loadResolver (ResolverStackage name) = do
             Left e -> throwIO e
             Right value ->
               case parseEither parseStackageSnapshot value of
-                Left s -> throwIO $ AesonException s
+                Left s -> throwIO $ InvalidStackageException name s
                 Right x -> return x
     logDebug $ "Decoding build plan from: " <> fromString (toFilePath fp)
     eres <- tryDecode
@@ -280,7 +291,7 @@ loadResolver (ResolverCustom url loc) = do
       WithJSONWarnings (sd0, mparentResolver, mcompiler) warnings <-
         liftIO (decodeFileEither fp) >>= either
           (throwM . CustomResolverException url loc)
-          (either (throwM . AesonException) return . parseEither parseCustom)
+          (either (throwM . CustomResolverException url loc . AesonException) return . parseEither parseCustom)
       logJSONWarnings (T.unpack url) warnings
       forM_ (sdLocations sd0) $ \loc' ->
         case loc' of
