@@ -17,7 +17,7 @@ import           Stack.Types.GhcPkgId
 import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageName
 import           Stack.Types.Version
-import           RIO.Process hiding (runEnvNoLogging)
+import           RIO.Process
 import           Test.Hspec
 import           Test.Hspec.QuickCheck
 
@@ -213,7 +213,7 @@ spec = do
             }
 
 
-    it "ghcPkgDump + addProfiling + addHaddock" $ (id :: IO () -> IO ()) $ runEnvNoLogging $ do
+    it "ghcPkgDump + addProfiling + addHaddock" $ runEnvNoLogging $ do
         icache <- newInstalledCache
         ghcPkgDump Ghc []
             $  conduitDumpPackage
@@ -282,14 +282,8 @@ checkDepsPresent prunes selected =
 fakeAddSymbols :: Monad m => ConduitM (DumpPackage a b c) (DumpPackage a b Bool) m ()
 fakeAddSymbols = CL.map (\dp -> dp { dpSymbols = False })
 
-runEnvNoLogging :: RIO EnvNoLogging a -> IO a
+runEnvNoLogging :: RIO LoggedProcessContext a -> IO a
 runEnvNoLogging inner = do
-  menv' <- getEnvOverride
-  menv <- mkEnvOverride $ Map.delete "GHC_PACKAGE_PATH" $ unEnvOverride menv'
-  runRIO (EnvNoLogging menv) inner
-
-newtype EnvNoLogging = EnvNoLogging EnvOverride
-instance HasLogFunc EnvNoLogging where
-  logFuncL = lens (const mempty) const -- not a law abiding lens!
-instance HasEnvOverride EnvNoLogging where
-  envOverrideL = lens (\(EnvNoLogging x) -> x) (const EnvNoLogging)
+  envVars <- view envVarsL <$> mkDefaultProcessContext
+  menv <- mkProcessContext $ Map.delete "GHC_PACKAGE_PATH" envVars
+  runRIO (LoggedProcessContext menv mempty) inner

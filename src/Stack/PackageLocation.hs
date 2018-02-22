@@ -206,7 +206,7 @@ cloneRepo projRoot url commit repoType' = do
               withWorkingDir (toFilePath root) $ do
                 ensureDir root
                 logInfo $ "Cloning " <> display commit <> " from " <> display url
-                withProc commandName
+                proc commandName
                        ("clone" :
                         cloneArgs ++
                         [ T.unpack url

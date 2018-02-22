@@ -28,7 +28,7 @@ import           Stack.Types.Runner
 import           Stack.Types.Compiler
 import           System.Environment (getArgs,getExecutablePath,lookupEnv)
 import qualified System.FilePath  as F
-import           RIO.Process (getEnvOverride, envOverrideL, exec)
+import           RIO.Process (processContextL, exec)
 
 -- | If Nix is enabled, re-runs the currently running OS command in a Nix container.
 -- Otherwise, runs the inner action.
@@ -64,8 +64,8 @@ runShellAndExit
     -> RIO env ()
 runShellAndExit mprojectRoot getCompilerVersion getCmdArgs = do
    config <- view configL
-   envOverride <- getEnvOverride
-   local (set envOverrideL envOverride) $ do
+   envOverride <- view processContextL
+   local (set processContextL envOverride) $ do
      (cmnd,args) <- fmap (escape *** map escape) getCmdArgs
      mshellFile <-
          traverse (resolveFile (fromMaybeProjectRoot mprojectRoot)) $

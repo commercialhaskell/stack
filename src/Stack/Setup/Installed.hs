@@ -89,14 +89,14 @@ listInstalled programsPath = do
         parseToolText x
 
 getCompilerVersion
-  :: HasEnvOverride env
+  :: (HasProcessContext env, HasLogFunc env)
   => WhichCompiler
   -> RIO env (CompilerVersion 'CVActual)
 getCompilerVersion wc =
     case wc of
         Ghc -> do
             logDebug "Asking GHC for its version"
-            bs <- withProc "ghc" ["--numeric-version"] readProcessStdout_
+            bs <- proc "ghc" ["--numeric-version"] readProcessStdout_
             let (_, ghcVersion) = versionFromEnd $ BL.toStrict bs
             x <- GhcVersion <$> parseVersion (T.decodeUtf8 ghcVersion)
             logDebug $ "GHC version is: " <> display x
@@ -106,7 +106,7 @@ getCompilerVersion wc =
             -- Output looks like
             --
             -- The Glorious Glasgow Haskell Compilation System for JavaScript, version 0.1.0 (GHC 7.10.2)
-            bs <- withProc "ghcjs" ["--version"] readProcessStdout_
+            bs <- proc "ghcjs" ["--version"] readProcessStdout_
             let (rest, ghcVersion) = T.decodeUtf8 <$> versionFromEnd (BL.toStrict bs)
                 (_, ghcjsVersion) = T.decodeUtf8 <$> versionFromEnd rest
             GhcjsVersion <$> parseVersion ghcjsVersion <*> parseVersion ghcVersion

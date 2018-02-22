@@ -58,7 +58,7 @@ import           Stack.Types.PackageName
 import           Stack.Types.Runner
 import           Stack.Types.Version
 import           System.IO (putStrLn)
-import           RIO.Process (findExecutable, HasEnvOverride (..))
+import           RIO.Process (findExecutable, HasProcessContext (..))
 
 data PackageInfo
     =
@@ -147,8 +147,8 @@ instance HasRunner Ctx where
 instance HasConfig Ctx
 instance HasCabalLoader Ctx where
     cabalLoaderL = configL.cabalLoaderL
-instance HasEnvOverride Ctx where
-    envOverrideL = configL.envOverrideL
+instance HasProcessContext Ctx where
+    processContextL = configL.processContextL
 instance HasBuildConfig Ctx
 instance HasEnvConfig Ctx where
     envConfigL = lens ctxEnvConfig (\x y -> x { ctxEnvConfig = y })
@@ -847,11 +847,11 @@ packageDepsWithTools p = do
     warnings <- fmap catMaybes $ forM warnings0 $ \warning@(ToolWarning (ExeName toolName) _ _) -> do
         let settings = minimalEnvSettings { esIncludeLocals = True }
         config <- view configL
-        menv <- liftIO $ configEnvOverrideSettings config settings
-        mfound <- findExecutable menv $ T.unpack toolName
+        menv <- liftIO $ configProcessContextSettings config settings
+        mfound <- runRIO menv $ findExecutable $ T.unpack toolName
         case mfound of
-            Nothing -> return (Just warning)
-            Just _ -> return Nothing
+            Left _ -> return (Just warning)
+            Right _ -> return Nothing
     tell mempty { wWarnings = (map toolWarningText warnings ++) }
     return $ Map.unionsWith
                (\(vr1, dt1) (vr2, dt2) ->

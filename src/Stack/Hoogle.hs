@@ -114,7 +114,7 @@ hoogleCmd (args,setup,rebuild) go = withBuildConfig go $ do
               display ident <>
               " in your index, installing it."
         config <- view configL
-        menv <- liftIO $ configEnvOverrideSettings config envSettings
+        menv <- liftIO $ configProcessContextSettings config envSettings
         liftIO
             (catch
                  (withBuildConfigAndLock
@@ -132,15 +132,15 @@ hoogleCmd (args,setup,rebuild) go = withBuildConfig go $ do
                                 }))
                  (\(e :: ExitCode) ->
                        case e of
-                           ExitSuccess -> resetExeCache menv
+                           ExitSuccess -> runRIO menv resetExeCache
                            _ -> throwIO e))
     runHoogle :: Path Abs File -> [String] -> RIO EnvConfig ()
     runHoogle hooglePath hoogleArgs = do
         config <- view configL
-        menv <- liftIO $ configEnvOverrideSettings config envSettings
+        menv <- liftIO $ configProcessContextSettings config envSettings
         dbpath <- hoogleDatabasePath
         let databaseArg = ["--database=" ++ toFilePath dbpath]
-        withEnvOverride menv $ withProc
+        withProcessContext menv $ proc
           (toFilePath hooglePath)
           (hoogleArgs ++ databaseArg)
           runProcess_
@@ -152,13 +152,13 @@ hoogleCmd (args,setup,rebuild) go = withBuildConfig go $ do
     ensureHoogleInPath :: RIO EnvConfig (Path Abs File)
     ensureHoogleInPath = do
         config <- view configL
-        menv <- liftIO $ configEnvOverrideSettings config envSettings
-        mhooglePath <- findExecutable menv "hoogle"
+        menv <- liftIO $ configProcessContextSettings config envSettings
+        mhooglePath <- runRIO menv $ findExecutable "hoogle"
         eres <- case mhooglePath of
-            Nothing -> return $ Left "Hoogle isn't installed."
-            Just hooglePath -> do
-                result <- withEnvOverride menv
-                        $ withProc hooglePath ["--numeric-version"]
+            Left _ -> return $ Left "Hoogle isn't installed."
+            Right hooglePath -> do
+                result <- withProcessContext menv
+                        $ proc hooglePath ["--numeric-version"]
                         $ tryAny . readProcessStdout_
                 let unexpectedResult got = Left $ T.concat
                         [ "'"
@@ -185,10 +185,10 @@ hoogleCmd (args,setup,rebuild) go = withBuildConfig go $ do
                 | setup -> do
                     logWarn $ display err <> " Automatically installing (use --no-setup to disable) ..."
                     installHoogle
-                    mhooglePath' <- findExecutable menv "hoogle"
+                    mhooglePath' <- runRIO menv $ findExecutable "hoogle"
                     case mhooglePath' of
-                        Just hooglePath -> parseAbsFile hooglePath
-                        Nothing -> do
+                        Right hooglePath -> parseAbsFile hooglePath
+                        Left _ -> do
                             logWarn "Couldn't find hoogle in path after installing.  This shouldn't happen, may be a bug."
                             bail
                 | otherwise -> do

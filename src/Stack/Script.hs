@@ -50,8 +50,8 @@ scriptCmd opts go' = do
         SYLNoConfig _ -> assert False (return ())
 
       config <- view configL
-      menv <- liftIO $ configEnvOverrideSettings config defaultEnvSettings
-      withEnvOverride menv $ do
+      menv <- liftIO $ configProcessContextSettings config defaultEnvSettings
+      withProcessContext menv $ do
         wc <- view $ actualCompilerVersionL.whichCompilerL
         colorFlag <- appropriateGhcColorFlag
 
@@ -111,7 +111,7 @@ scriptCmd opts go' = do
             -- stdout, which could break scripts, and (2) if there's an
             -- exception, the standard output we did capture will be reported
             -- to the user.
-            withWorkingDir (toFilePath dir) $ withProc
+            withWorkingDir (toFilePath dir) $ proc
               (compilerExeName wc)
               (ghcArgs ++ [toFilePath file])
               (void . readProcessStdout_)

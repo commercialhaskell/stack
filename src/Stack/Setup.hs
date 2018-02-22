@@ -98,7 +98,6 @@ import              System.IO (stdout)
 import              System.IO.Error (isPermissionError)
 import              System.FilePath (searchPathSeparator)
 import qualified    System.FilePath as FP
-import              System.Process (rawSystem) -- FIXME remove usage
 import              RIO.Process
 import              Text.Printf (printf)
 
@@ -242,14 +241,14 @@ setupEnv mResolveMissingGHC = do
 
     -- Modify the initial environment to include the GHC path, if a local GHC
     -- is being used
-    menv0 <- view envOverrideL
-    env <- removeHaskellEnvVars
-             <$> augmentPathMap
+    menv0 <- view processContextL
+    env <- either throwM (return . removeHaskellEnvVars)
+               $ augmentPathMap
                     (map toFilePath $ maybe [] edBins mghcBin)
-                    (unEnvOverride menv0)
-    menv <- mkEnvOverride env
+                    (view envVarsL menv0)
+    menv <- mkProcessContext env
 
-    (compilerVer, cabalVer, globaldb) <- withEnvOverride menv $ runConcurrently $ (,,)
+    (compilerVer, cabalVer, globaldb) <- withProcessContext menv $ runConcurrently $ (,,)
         <$> Concurrently (getCompilerVersion wc)
         <*> Concurrently (getCabalPkgVer wc)
         <*> Concurrently (getGlobalDB wc)
@@ -262,7 +261,7 @@ setupEnv mResolveMissingGHC = do
     -- that GHC can be found on. This is needed for looking up global
     -- package information in loadSnapshot.
     let bcPath :: BuildConfig
-        bcPath = set envOverrideL menv bc
+        bcPath = set processContextL menv bc
 
     ls <- runRIO bcPath $ loadSnapshot
       (Just compilerVer)
@@ -280,13 +279,13 @@ setupEnv mResolveMissingGHC = do
     -- extra installation bin directories
     mkDirs <- runReaderT extraBinDirs envConfig0
     let mpath = Map.lookup "PATH" env
-    depsPath <- augmentPath (toFilePath <$> mkDirs False) mpath
-    localsPath <- augmentPath (toFilePath <$> mkDirs True) mpath
+    depsPath <- either throwM return $ augmentPath (toFilePath <$> mkDirs False) mpath
+    localsPath <- either throwM return $ augmentPath (toFilePath <$> mkDirs True) mpath
 
     deps <- runReaderT packageDatabaseDeps envConfig0
-    withEnvOverride menv $ createDatabase wc deps
+    withProcessContext menv $ createDatabase wc deps
     localdb <- runReaderT packageDatabaseLocal envConfig0
-    withEnvOverride menv $ createDatabase wc localdb
+    withProcessContext menv $ createDatabase wc localdb
     extras <- runReaderT packageDatabaseExtra envConfig0
     let mkGPP locals = mkGhcPackagePath locals localdb deps extras globaldb
 
@@ -294,17 +293,17 @@ setupEnv mResolveMissingGHC = do
 
     executablePath <- liftIO getExecutablePath
 
-    utf8EnvVars <- withEnvOverride menv $ getUtf8EnvVars compilerVer
+    utf8EnvVars <- withProcessContext menv $ getUtf8EnvVars compilerVer
 
     mGhcRtsEnvVar <- liftIO $ lookupEnv "GHCRTS"
 
     envRef <- liftIO $ newIORef Map.empty
-    let getEnvOverride' es = do
+    let getProcessContext' es = do
             m <- readIORef envRef
             case Map.lookup es m of
                 Just eo -> return eo
                 Nothing -> do
-                    eo <- mkEnvOverride
+                    eo <- mkProcessContext
                         $ Map.insert "PATH" (if esIncludeLocals es then localsPath else depsPath)
                         $ (if esIncludeGhcPackagePath es
                                 then Map.insert (ghcPkgPathEnvVar wc) (mkGPP (esIncludeLocals es))
@@ -349,13 +348,13 @@ setupEnv mResolveMissingGHC = do
                         (Map.insert es eo m', ())
                     return eo
 
-    envOverride <- liftIO $ getEnvOverride' minimalEnvSettings
+    envOverride <- liftIO $ getProcessContext' minimalEnvSettings
     return EnvConfig
         { envConfigBuildConfig = bconfig
             { bcConfig = maybe id addIncludeLib mghcBin
-                       $ set envOverrideL envOverride
+                       $ set processContextL envOverride
                          (view configL bconfig)
-                { configEnvOverrideSettings = getEnvOverride'
+                { configProcessContextSettings = getProcessContext'
                 }
             }
         , envConfigCabalVersion = cabalVer
@@ -516,25 +515,26 @@ ensureCompiler sopts = do
 
     menv <-
         case mpaths of
-            Nothing -> view envOverrideL
+            Nothing -> view processContextL
             Just ed -> do
-                menv0 <- view envOverrideL
-                m <- augmentPathMap (toFilePath <$> edBins ed) (unEnvOverride menv0)
-                mkEnvOverride (removeHaskellEnvVars m)
+                menv0 <- view processContextL
+                m <- either throwM return
+                   $ augmentPathMap (toFilePath <$> edBins ed) (view envVarsL menv0)
+                mkProcessContext (removeHaskellEnvVars m)
 
     forM_ (soptsUpgradeCabal sopts) $ \version -> do
         unless needLocal $ do
             logWarn "Trying to change a Cabal library on a GHC not installed by stack."
             logWarn "This may fail, caveat emptor!"
-        withEnvOverride menv $ upgradeCabal wc version
+        withProcessContext menv $ upgradeCabal wc version
 
     case mtools of
         Just (Just (ToolGhcjs cv), _) ->
-            withEnvOverride menv
+            withProcessContext menv
           $ ensureGhcjsBooted cv (soptsInstallIfMissing sopts) (soptsGHCJSBootOpts sopts)
         _ -> return ()
 
-    when (soptsSanityCheck sopts) $ withEnvOverride menv $ sanityCheck wc
+    when (soptsSanityCheck sopts) $ withProcessContext menv $ sanityCheck wc
 
     return (mpaths, compilerBuild, needLocal)
 
@@ -576,8 +576,8 @@ getGhcBuilds = do
                       ("/sbin:/usr/sbin" <> maybe "" (":" <>) (Map.lookup "PATH" m))
                       m
                 eldconfigOut
-                  <- withModifyEnvOverride sbinEnv
-                   $ withProc "ldconfig" ["-p"]
+                  <- withModifyEnvVars sbinEnv
+                   $ proc "ldconfig" ["-p"]
                    $ tryAny . readProcessStdout_
                 let firstWords = case eldconfigOut of
                         Right ldconfigOut -> mapMaybe (listToMaybe . T.words) $
@@ -727,9 +727,8 @@ doCabalInstall wc installed wantedVersion = do
         let name = $(mkPackageName "Cabal")
             ident = PackageIdentifier name wantedVersion
         m <- unpackPackageIdents tmpdir Nothing [PackageIdentifierRevision ident CFILatest]
-        menv <- view envOverrideL
-        compilerPath <- join (findExecutable menv (compilerExeName wc))
-                    >>= parseAbsFile
+        compilerPath <- findExecutable (compilerExeName wc)
+                    >>= either throwM parseAbsFile
         versionDir <- parseRelDir $ versionString wantedVersion
         let installRoot = toFilePath $ parent (parent compilerPath)
                                     </> $(mkRelDir "new-cabal")
@@ -737,7 +736,7 @@ doCabalInstall wc installed wantedVersion = do
         dir <- case Map.lookup ident m of
             Nothing -> error "upgradeCabal: Invariant violated, dir missing"
             Just dir -> return dir
-        withWorkingDir (toFilePath dir) $ withProc (compilerExeName wc) ["Setup.hs"] runProcess_
+        withWorkingDir (toFilePath dir) $ proc (compilerExeName wc) ["Setup.hs"] runProcess_
         platform <- view platformL
         let setupExe = toFilePath $ dir </> case platform of
                 Platform _ Cabal.Windows -> $(mkRelFile "Setup.exe")
@@ -749,25 +748,24 @@ doCabalInstall wc installed wantedVersion = do
                                        ]
             args = "configure" : map dirArgument (words "lib bin data doc")
         withWorkingDir (toFilePath dir) $ do
-          withProc setupExe args runProcess_
-          withProc setupExe ["build"] runProcess_
-          withProc setupExe ["install"] runProcess_
+          proc setupExe args runProcess_
+          proc setupExe ["build"] runProcess_
+          proc setupExe ["install"] runProcess_
         logInfo "New Cabal library installed"
 
 -- | Get the version of the system compiler, if available
 getSystemCompiler
-  :: HasEnvOverride env
+  :: (HasProcessContext env, HasLogFunc env)
   => WhichCompiler
   -> RIO env (Maybe (CompilerVersion 'CVActual, Arch))
 getSystemCompiler wc = do
     let exeName = case wc of
             Ghc -> "ghc"
             Ghcjs -> "ghcjs"
-    menv <- view envOverrideL
-    exists <- doesExecutableExist menv exeName
+    exists <- doesExecutableExist exeName
     if exists
         then do
-            eres <- withProc exeName ["--info"] $ tryAny . readProcessStdout_
+            eres <- proc exeName ["--info"] $ tryAny . readProcessStdout_
             let minfo = do
                     Right lbs <- Just eres
                     pairs_ <- readMaybe $ BL8.unpack lbs :: Maybe [(String, String)]
@@ -1063,9 +1061,9 @@ installGHCPosix :: HasConfig env
                 -> RIO env ()
 installGHCPosix version downloadInfo _ archiveFile archiveType tempDir destDir = do
     platform <- view platformL
-    menv0 <- view envOverrideL
-    menv <- mkEnvOverride (removeHaskellEnvVars (unEnvOverride menv0))
-    logDebug $ "menv = " <> displayShow (unEnvOverride menv)
+    menv0 <- view processContextL
+    menv <- mkProcessContext (removeHaskellEnvVars (view envVarsL menv0))
+    logDebug $ "menv = " <> displayShow (view envVarsL menv)
     (zipTool', compOpt) <-
         case archiveType of
             TarXz -> return ("xz", 'J')
@@ -1093,18 +1091,18 @@ installGHCPosix version downloadInfo _ archiveFile archiveType tempDir destDir =
         "ghc-" ++ versionString version
 
     let runStep step wd env cmd args = do
-            menv' <- modifyEnvOverride menv (Map.union env)
+            menv' <- modifyEnvVars menv (Map.union env)
             result <- do
                 let logLines = CB.lines .| CL.mapM_ (logDebug . displayBytesUtf8)
                 withWorkingDir (toFilePath wd)
-                  $ withEnvOverride menv'
+                  $ withProcessContext menv'
                   $ try
                   $ sinkProcessStderrStdout cmd args logLines logLines
 
             case result of
                 Right ((), ()) -> return ()
                 Left ex -> do
-                    logError (displayShow (ex :: ReadProcessException))
+                    logError (displayShow (ex :: ProcessException))
                     prettyError $
                         hang 2
                           ("Error encountered while" <+> step <+> "GHC with" <> line <>
@@ -1145,12 +1143,12 @@ installGHCJS :: HasConfig env
              -> RIO env ()
 installGHCJS si archiveFile archiveType _tempDir destDir = do
     platform <- view platformL
-    menv0 <- view envOverrideL
+    menv0 <- view processContextL
     -- This ensures that locking is disabled for the invocations of
     -- stack below.
     let removeLockVar = Map.delete "STACK_LOCK"
-    menv <- mkEnvOverride (removeLockVar (removeHaskellEnvVars (unEnvOverride menv0)))
-    logDebug $ "menv = " <> displayShow (unEnvOverride menv)
+    menv <- mkProcessContext (removeLockVar (removeHaskellEnvVars (view envVarsL menv0)))
+    logDebug $ "menv = " <> displayShow (view envVarsL menv)
 
     -- NOTE: this is a bit of a hack - instead of using the temp
     -- directory, leave the unpacked source tarball in the destination
@@ -1182,7 +1180,7 @@ installGHCJS si archiveFile archiveType _tempDir destDir = do
             return $ do
                 liftIO $ ignoringAbsence (removeDirRecur destDir)
                 liftIO $ ignoringAbsence (removeDirRecur unpackDir)
-                withEnvOverride menv $ withWorkingDir (toFilePath destDir) $ readProcessNull tarTool ["xf", toFilePath archiveFile]
+                withProcessContext menv $ withWorkingDir (toFilePath destDir) $ readProcessNull tarTool ["xf", toFilePath archiveFile]
                 innerDir <- expectSingleUnpackedDir archiveFile destDir
                 renameDir innerDir unpackDir
 
@@ -1254,13 +1252,13 @@ ensureGhcjsBooted cv shouldBoot bootOpts = do
                 bootGhcjs ghcjsVersion actualStackYaml destDir bootOpts
         Left ece -> throwIO ece
 
-bootGhcjs :: (HasRunner env, HasEnvOverride env)
+bootGhcjs :: (HasRunner env, HasProcessContext env)
           => Version -> Path Abs File -> Path Abs Dir -> [String] -> RIO env ()
 bootGhcjs ghcjsVersion stackYaml destDir bootOpts = do
     envConfig <- loadGhcjsEnvConfig stackYaml (destDir </> $(mkRelDir "bin"))
-    menv <- liftIO $ configEnvOverrideSettings (view configL envConfig) defaultEnvSettings
+    menv <- liftIO $ configProcessContextSettings (view configL envConfig) defaultEnvSettings
     -- Install cabal-install if missing, or if the installed one is old.
-    mcabal <- withEnvOverride menv getCabalInstallVersion
+    mcabal <- withProcessContext menv getCabalInstallVersion
     shouldInstallCabal <- case mcabal of
         Nothing -> do
             logInfo "No cabal-install binary found for use with GHCJS."
@@ -1295,9 +1293,9 @@ bootGhcjs ghcjsVersion stackYaml destDir bootOpts = do
           , esLocaleUtf8 = True
           , esKeepGhcRts = False
           }
-    menv' <- liftIO $ configEnvOverrideSettings (view configL envConfig) envSettings
-    shouldInstallAlex <- not <$> doesExecutableExist menv "alex"
-    shouldInstallHappy <- not <$> doesExecutableExist menv "happy"
+    menv' <- liftIO $ configProcessContextSettings (view configL envConfig) envSettings
+    shouldInstallAlex <- runRIO menv $ not <$> doesExecutableExist "alex"
+    shouldInstallHappy <- runRIO menv $ not <$> doesExecutableExist "happy"
     let bootDepsToInstall =
           [ "cabal-install" | shouldInstallCabal ] ++
           [ "alex" | shouldInstallAlex ] ++
@@ -1309,7 +1307,7 @@ bootGhcjs ghcjsVersion stackYaml destDir bootOpts = do
                 logError "This shouldn't happen, because it gets built to the snapshot bin directory, which should be treated as being on the PATH."
                 liftIO exitFailure
         when shouldInstallCabal $ do
-            mcabal' <- withEnvOverride menv' getCabalInstallVersion
+            mcabal' <- withProcessContext menv' getCabalInstallVersion
             case mcabal' of
                 Nothing -> do
                     logError "Failed to get cabal-install version after installing it."
@@ -1321,17 +1319,17 @@ bootGhcjs ghcjsVersion stackYaml destDir bootOpts = do
                         "This version is specified by the stack.yaml file included in the ghcjs tarball.\n"
                 _ -> return ()
         when shouldInstallAlex $ do
-            alexInstalled <- doesExecutableExist menv "alex"
+            alexInstalled <- runRIO menv $ doesExecutableExist "alex"
             when (not alexInstalled) $ do
                 logError "Failed to find 'alex' executable after installing it."
                 failedToFindErr
         when shouldInstallHappy $ do
-            happyInstalled <- doesExecutableExist menv "happy"
+            happyInstalled <- runRIO menv $ doesExecutableExist "happy"
             when (not happyInstalled) $ do
                 logError "Failed to find 'happy' executable after installing it."
                 failedToFindErr
     logSticky "Booting GHCJS (this will take a long time) ..."
-    withEnvOverride menv' $ withProc "ghcjs-boot" bootOpts logProcessStderrStdout
+    withProcessContext menv' $ proc "ghcjs-boot" bootOpts logProcessStderrStdout
     logStickyDone "GHCJS booted."
 
 loadGhcjsEnvConfig :: HasRunner env
@@ -1353,9 +1351,9 @@ buildInGhcjsEnv envConfig boptsCli = do
             set (buildOptsL.buildOptsHaddockL) False envConfig) $
         build (\_ -> return ()) Nothing boptsCli
 
-getCabalInstallVersion :: HasEnvOverride env => RIO env (Maybe Version)
+getCabalInstallVersion :: (HasProcessContext env, HasLogFunc env) => RIO env (Maybe Version)
 getCabalInstallVersion = do
-    ebs <- withProc "cabal" ["--numeric-version"] $ tryAny . readProcessStdout_
+    ebs <- proc "cabal" ["--numeric-version"] $ tryAny . readProcessStdout_
     case ebs of
         Left _ -> return Nothing
         Right bs -> Just <$> parseVersion (T.dropWhileEnd isSpace (T.decodeUtf8 (LBS.toStrict bs)))
@@ -1365,10 +1363,9 @@ getCabalInstallVersion = do
 checkDependencies :: CheckDependency env a -> RIO env a
 checkDependencies (CheckDependency f) = f >>= either (throwIO . MissingDependencies) return
 
-checkDependency :: HasEnvOverride env => String -> CheckDependency env String
+checkDependency :: HasProcessContext env => String -> CheckDependency env String
 checkDependency tool = CheckDependency $ do
-    menv <- view envOverrideL
-    exists <- doesExecutableExist menv tool
+    exists <- doesExecutableExist tool
     return $ if exists then Right tool else Left [tool]
 
 newtype CheckDependency env a = CheckDependency (RIO env (Either [String] a))
@@ -1428,14 +1425,14 @@ installMsys2Windows osKey si archiveFile archiveType _tempDir destDir = do
     -- I couldn't find this officially documented anywhere, but you need to run
     -- the MSYS shell once in order to initialize some pacman stuff. Once that
     -- run happens, you can just run commands as usual.
-    menv0 <- view envOverrideL
-    newEnv0 <- modifyEnvOverride menv0 $ Map.insert "MSYSTEM" "MSYS"
-    newEnv <- augmentPathMap
+    menv0 <- view processContextL
+    newEnv0 <- modifyEnvVars menv0 $ Map.insert "MSYSTEM" "MSYS"
+    newEnv <- either throwM return $ augmentPathMap
                   [toFilePath $ destDir </> $(mkRelDir "usr") </> $(mkRelDir "bin")]
-                  (unEnvOverride newEnv0)
-    menv <- mkEnvOverride newEnv
-    withWorkingDir (toFilePath destDir) $ withEnvOverride menv
-      $ withProc "sh" ["--login", "-c", "true"] runProcess_
+                  (view envVarsL newEnv0)
+    menv <- mkProcessContext newEnv
+    withWorkingDir (toFilePath destDir) $ withProcessContext menv
+      $ proc "sh" ["--login", "-c", "true"] runProcess_
 
     -- No longer installing git, it's unreliable
     -- (https://github.com/commercialhaskell/stack/issues/1046) and the
@@ -1507,8 +1504,7 @@ setup7z si = do
                         , "-y"
                         , toFilePath archive
                         ]
-                ec <- withProcessTimeLog Nothing cmd args $
-                    liftIO $ rawSystem cmd args
+                ec <- proc cmd args runProcess
                 when (ec /= ExitSuccess)
                     $ liftIO $ throwM (ProblemWhileDecompressing archive)
         _ -> throwM SetupInfoMissingSevenz
@@ -1635,7 +1631,7 @@ chunksOverTime diff = do
         go
 
 -- | Perform a basic sanity check of GHC
-sanityCheck :: HasEnvOverride env
+sanityCheck :: (HasProcessContext env, HasLogFunc env)
             => WhichCompiler
             -> RIO env ()
 sanityCheck wc = withSystemTempDir "stack-sanity-check" $ \dir -> do
@@ -1645,10 +1641,9 @@ sanityCheck wc = withSystemTempDir "stack-sanity-check" $ \dir -> do
         , "main = putStrLn \"Hello World\""
         ]
     let exeName = compilerExeName wc
-    menv <- view envOverrideL
-    ghc <- liftIO $ join (findExecutable menv exeName) >>= parseAbsFile
+    ghc <- findExecutable exeName >>= either throwM parseAbsFile
     logDebug $ "Performing a sanity check on: " <> fromString (toFilePath ghc)
-    eres <- withWorkingDir (toFilePath dir) $ withProc exeName
+    eres <- withWorkingDir (toFilePath dir) $ proc exeName
         [ fp
         , "-no-user-package-db"
         ] $ try . readProcessStdout_
@@ -1671,7 +1666,7 @@ removeHaskellEnvVars =
 
 -- | Get map of environment variables to set to change the GHC's encoding to UTF-8
 getUtf8EnvVars
-    :: (HasEnvOverride env, HasPlatform env)
+    :: (HasProcessContext env, HasPlatform env, HasLogFunc env)
     => CompilerVersion 'CVActual
     -> RIO env (Map Text Text)
 getUtf8EnvVars compilerVer =
@@ -1681,7 +1676,7 @@ getUtf8EnvVars compilerVer =
         else legacyLocale
   where
     legacyLocale = do
-        menv <- view envOverrideL
+        menv <- view processContextL
         Platform _ os <- view platformL
         if os == Cabal.Windows
             then
@@ -1690,7 +1685,7 @@ getUtf8EnvVars compilerVer =
                  return
                      Map.empty
             else do
-                let checkedVars = map checkVar (Map.toList $ eoTextMap menv)
+                let checkedVars = map checkVar (Map.toList $ view envVarsL menv)
                     -- List of environment variables that will need to be updated to set UTF-8 (because
                     -- they currently do not specify UTF-8).
                     needChangeVars = concatMap fst checkedVars
@@ -1707,7 +1702,7 @@ getUtf8EnvVars compilerVer =
                              Map.empty
                     else do
                         -- Get a list of known locales by running @locale -a@.
-                        elocales <- tryAny $ withProc "locale" ["-a"] readProcessStdout_
+                        elocales <- tryAny $ proc "locale" ["-a"] readProcessStdout_
                         let
                             -- Filter the list to only include locales with UTF-8 encoding.
                             utf8Locales =
@@ -1760,9 +1755,9 @@ getUtf8EnvVars compilerVer =
     -- same language /and/ territory, then with same language, and finally the first UTF-8 locale
     -- returned by @locale -a@.
     adjustedVarValue
-        :: EnvOverride -> [Text] -> Maybe Text -> Text -> Map Text Text
+        :: ProcessContext -> [Text] -> Maybe Text -> Text -> Map Text Text
     adjustedVarValue menv utf8Locales mfallback k =
-        case Map.lookup k (eoTextMap menv) of
+        case Map.lookup k (view envVarsL menv) of
             Nothing -> Map.empty
             Just v ->
                 case concatMap
@@ -1996,8 +1991,7 @@ performPathChecking newFile = do
             toSudo <- prompt "Try using sudo? (y/n) "
             when toSudo $ do
               let run cmd args = do
-                    ec <- withProcessTimeLog Nothing cmd args $
-                        liftIO $ rawSystem cmd args
+                    ec <- proc cmd args runProcess
                     when (ec /= ExitSuccess) $ error $ concat
                           [ "Process exited with "
                           , show ec

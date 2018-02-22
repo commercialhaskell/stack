@@ -25,7 +25,7 @@ import           Stack.Types.Config
 import           Stack.Types.Runner
 import qualified System.FilePath as FP
 import           System.IO (stderr)
-import           RIO.Process (EnvOverride(eoPath), HasEnvOverride (..))
+import           RIO.Process (HasProcessContext (..), exeSearchPathL)
 
 -- | Print out useful path information in a human-readable format (and
 -- support others later).
@@ -121,8 +121,8 @@ instance HasRunner PathInfo where
 instance HasConfig PathInfo
 instance HasCabalLoader PathInfo where
     cabalLoaderL = configL.cabalLoaderL
-instance HasEnvOverride PathInfo where
-    envOverrideL = configL.envOverrideL
+instance HasProcessContext PathInfo where
+    processContextL = configL.processContextL
 instance HasBuildConfig PathInfo where
     buildConfigL = lens piBuildConfig (\x y -> x { piBuildConfig = y })
                  . buildConfigL
@@ -149,7 +149,7 @@ paths =
       , view $ stackYamlL.to toFilePath.to T.pack)
     , ( "PATH environment variable"
       , "bin-path"
-      , T.pack . intercalate [FP.searchPathSeparator] . eoPath . view envOverrideL )
+      , T.pack . intercalate [FP.searchPathSeparator] . view exeSearchPathL)
     , ( "Install location for GHC and other core tools"
       , "programs"
       , view $ configL.to configLocalPrograms.to toFilePathNoTrailingSep.to T.pack)

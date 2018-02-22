@@ -24,6 +24,8 @@ import           Data.List
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
 import qualified Data.Text as T
+import qualified Data.Text.Lazy as TL
+import qualified Data.Text.Lazy.Encoding as TLE
 import qualified Distribution.PackageDescription as C
 import           Path
 import           Path.Extra (toFilePathNoTrailingSep)
@@ -48,7 +50,7 @@ import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageName
 import           Stack.Types.Runner
 import           System.IO (putStrLn, putStr, getLine)
-import           RIO.Process (withEnvOverride, execSpawn, execObserve)
+import           RIO.Process (HasProcessContext, execSpawn, proc, readProcess_)
 
 #ifndef WINDOWS
 import qualified System.Posix.Files as Posix
@@ -363,8 +365,8 @@ runGhci GhciOpts{..} targets mainIsTargets pkgs extraFiles exposePackages = do
       "Configuring GHCi with the following packages: " <>
       mconcat (intersperse ", " (map (RIO.display . ghciPkgName) pkgs))
     let execGhci extras = do
-            menv <- liftIO $ configEnvOverrideSettings config defaultEnvSettings
-            withEnvOverride menv $ execSpawn
+            menv <- liftIO $ configProcessContextSettings config defaultEnvSettings
+            withProcessContext menv $ execSpawn
                  (fromMaybe (compilerExeName wc) ghciGhcCommand)
                  (("--interactive" : ) $
                  -- This initial "-i" resets the include directories to
@@ -380,9 +382,9 @@ runGhci GhciOpts{..} targets mainIsTargets pkgs extraFiles exposePackages = do
             -- multiple packages.
             case pkgs of
                 [_] -> do
-                    menv <- liftIO $ configEnvOverrideSettings config defaultEnvSettings
-                    output <- withEnvOverride menv
-                            $ execObserve (fromMaybe (compilerExeName wc) ghciGhcCommand) ["--version"]
+                    menv <- liftIO $ configProcessContextSettings config defaultEnvSettings
+                    output <- withProcessContext menv
+                            $ runGrabFirstLine (fromMaybe (compilerExeName wc) ghciGhcCommand) ["--version"]
                     return $ "Intero" `isPrefixOf` output
                 _ -> return False
     withSystemTempDir "ghci" $ \tmpDirectory -> do
@@ -887,3 +889,17 @@ targetsCmd target go@GlobalOpts{..} =
                (mapM (getPackageOptsAndTargetFiles pwd) pkgs)
        forM_ targets (liftIO . putStrLn)
 -}
+
+-- | Run a command and grab the first line of stdout, dropping
+-- stderr's contexts completely.
+runGrabFirstLine :: (HasProcessContext env, HasLogFunc env) => String -> [String] -> RIO env String
+runGrabFirstLine cmd0 args =
+  proc cmd0 args $ \pc -> do
+    (out, _err) <- readProcess_ pc
+    return
+      $ TL.unpack
+      $ TL.filter (/= '\r')
+      $ TL.concat
+      $ take 1
+      $ TL.lines
+      $ TLE.decodeUtf8With lenientDecode out

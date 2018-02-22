@@ -260,7 +260,7 @@ runTemplateInits dir = do
         Nothing -> return ()
         Just Git ->
             withWorkingDir (toFilePath dir) $
-            catchAny (withProc "git" ["init"] runProcess_)
+            catchAny (proc "git" ["init"] runProcess_)
                   (\_ -> logInfo "git init failed to run, ignoring ...")
 
 -- | Display the set of templates accompanied with description if available.

@@ -505,7 +505,7 @@ secondaryCommandHandler args f =
     else do
       mExternalExec <- D.findExecutable cmd
       case mExternalExec of
-        Just ex -> runEnvNoLogging $ do
+        Just ex -> withProcessContextNoLogging $ do
           -- TODO show the command in verbose mode
           -- hPutStrLn stderr $ unwords $
           --   ["Running", "[" ++ ex, unwords (tail args) ++ "]"]
@@ -781,8 +781,8 @@ execCmd ExecOpts {..} go@GlobalOpts{..} =
                     (Just $ munlockFile lk)
                     (runRIO (lcConfig lc) $ do
                         config <- view configL
-                        menv <- liftIO $ configEnvOverrideSettings config plainEnvSettings
-                        withEnvOverride menv $ Nix.reexecWithOptionalShell
+                        menv <- liftIO $ configProcessContextSettings config plainEnvSettings
+                        withProcessContext menv $ Nix.reexecWithOptionalShell
                             (lcProjectRoot lc)
                             getCompilerVersion
                             (runRIO (lcConfig lc) $
@@ -798,8 +798,8 @@ execCmd ExecOpts {..} go@GlobalOpts{..} =
                       }
 
               config <- view configL
-              menv <- liftIO $ configEnvOverrideSettings config eoEnvSettings
-              withEnvOverride menv $ do
+              menv <- liftIO $ configProcessContextSettings config eoEnvSettings
+              withProcessContext menv $ do
                 -- Add RTS options to arguments
                 let argsWithRts args = if null eoRtsOptions
                             then args :: [String]

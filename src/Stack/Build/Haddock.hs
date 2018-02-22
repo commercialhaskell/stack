@@ -102,7 +102,7 @@ shouldHaddockDeps bopts = fromMaybe (boptsHaddock bopts) (boptsHaddockDeps bopts
 
 -- | Generate Haddock index and contents for local packages.
 generateLocalHaddockIndex
-    :: HasEnvOverride env
+    :: (HasProcessContext env, HasLogFunc env)
     => WhichCompiler
     -> BaseConfigOpts
     -> Map GhcPkgId (DumpPackage () () ())  -- ^ Local package dump
@@ -126,7 +126,7 @@ generateLocalHaddockIndex wc bco localDumpPkgs locals = do
 
 -- | Generate Haddock index and contents for local packages and their dependencies.
 generateDepsHaddockIndex
-    :: HasEnvOverride env
+    :: (HasProcessContext env, HasLogFunc env)
     => WhichCompiler
     -> BaseConfigOpts
     -> Map GhcPkgId (DumpPackage () () ())  -- ^ Global dump information
@@ -169,7 +169,7 @@ generateDepsHaddockIndex wc bco globalDumpPkgs snapshotDumpPkgs localDumpPkgs lo
 
 -- | Generate Haddock index and contents for all snapshot packages.
 generateSnapHaddockIndex
-    :: HasEnvOverride env
+    :: (HasProcessContext env, HasLogFunc env)
     => WhichCompiler
     -> BaseConfigOpts
     -> Map GhcPkgId (DumpPackage () () ())  -- ^ Global package dump
@@ -186,7 +186,7 @@ generateSnapHaddockIndex wc bco globalDumpPkgs snapshotDumpPkgs =
 
 -- | Generate Haddock index and contents for specified packages.
 generateHaddockIndex
-    :: HasEnvOverride env
+    :: (HasProcessContext env, HasLogFunc env)
     => Text
     -> WhichCompiler
     -> BaseConfigOpts

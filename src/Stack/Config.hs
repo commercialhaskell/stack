@@ -322,10 +322,11 @@ configFromConfigMonoid
          throwM ManualGHCVariantSettingsAreIncompatibleWithSystemGHC
 
      rawEnv <- liftIO getEnvironment
-     pathsEnv <- augmentPathMap (map toFilePath configMonoidExtraPath)
+     pathsEnv <- either throwM return
+               $ augmentPathMap (map toFilePath configMonoidExtraPath)
                                 (Map.fromList (map (T.pack *** T.pack) rawEnv))
-     origEnv <- mkEnvOverride pathsEnv
-     let configEnvOverrideSettings _ = return origEnv
+     origEnv <- mkProcessContext pathsEnv
+     let configProcessContextSettings _ = return origEnv
 
      configLocalProgramsBase <- case getFirst configMonoidLocalProgramsBase of
        Nothing -> getDefaultLocalProgramsBase clStackRoot configPlatform origEnv
@@ -384,7 +385,7 @@ configFromConfigMonoid
      clCache <- newIORef Nothing
      clUpdateRef <- newMVar True
 
-     let configRunner = set envOverrideL origEnv configRunner'
+     let configRunner = set processContextL origEnv configRunner'
          configCabalLoader = CabalLoader {..}
 
      return Config {..}
@@ -393,7 +394,7 @@ configFromConfigMonoid
 getDefaultLocalProgramsBase :: MonadThrow m
                             => Path Abs Dir
                             -> Platform
-                            -> EnvOverride
+                            -> ProcessContext
                             -> m (Path Abs Dir)
 getDefaultLocalProgramsBase configStackRoot configPlatform override =
   let
@@ -405,7 +406,7 @@ getDefaultLocalProgramsBase configStackRoot configPlatform override =
       -- mean that Windows users would manually have to move data from the old
       -- location to the new one, which is undesirable.
       Platform _ Windows ->
-        case Map.lookup "LOCALAPPDATA" $ unEnvOverride override of
+        case Map.lookup "LOCALAPPDATA" $ view envVarsL override of
           Just t ->
             case parseAbsDir $ T.unpack t of
               Nothing -> throwM $ stringException ("Failed to parse LOCALAPPDATA environment variable (expected absolute directory): " ++ show t)
@@ -420,8 +421,8 @@ data MiniConfig = MiniConfig -- TODO do we really need a whole extra data type?
     }
 instance HasConfig MiniConfig where
     configL = lens mcConfig (\x y -> x { mcConfig = y })
-instance HasEnvOverride MiniConfig where
-    envOverrideL = configL.envOverrideL
+instance HasProcessContext MiniConfig where
+    processContextL = configL.processContextL
 instance HasCabalLoader MiniConfig where
     cabalLoaderL = configL.cabalLoaderL
 instance HasPlatform MiniConfig

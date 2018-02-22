@@ -26,7 +26,7 @@ import           Stack.Prelude              hiding (lift)
 import           Stack.Constants
 import           Stack.Types.PackageIdentifier (PackageIdentifierRevision)
 import           System.Console.ANSI
-import           RIO.Process (HasEnvOverride (..), EnvOverride, getEnvOverride)
+import           RIO.Process (HasProcessContext (..), ProcessContext, mkDefaultProcessContext)
 import           System.Terminal
 
 -- | Monadic environment.
@@ -36,7 +36,7 @@ data Runner = Runner
   , runnerUseColor   :: !Bool
   , runnerLogFunc    :: !LogFunc
   , runnerTermWidth  :: !Int
-  , runnerEnvOverride :: !EnvOverride
+  , runnerProcessContext :: !ProcessContext
   , runnerParsedCabalFiles :: !(IORef
       ( Map PackageIdentifierRevision GenericPackageDescription
       , Map (Path Abs Dir)            (GenericPackageDescription, Path Abs File)
@@ -51,10 +51,10 @@ data Runner = Runner
   -- <https://github.com/commercialhaskell/stack/issues/3591>.
   }
 
-class HasEnvOverride env => HasRunner env where
+class (HasProcessContext env, HasLogFunc env) => HasRunner env where
   runnerL :: Lens' env Runner
-instance HasEnvOverride Runner where
-  envOverrideL = lens runnerEnvOverride (\x y -> x { runnerEnvOverride = y })
+instance HasProcessContext Runner where
+  processContextL = lens runnerProcessContext (\x y -> x { runnerProcessContext = y })
 instance HasRunner Runner where
   runnerL = id
 
@@ -92,7 +92,7 @@ withRunner logLevel useTime terminal colorWhen widthOverride reExec inner = do
                                     <$> liftIO getTerminalWidth)
                                    pure widthOverride
   ref <- newIORef mempty
-  menv <- getEnvOverride
+  menv <- mkDefaultProcessContext
   logOptions0 <- logOptionsHandle stderr False
   let logOptions
         = setLogUseColor useColor
@@ -108,7 +108,7 @@ withRunner logLevel useTime terminal colorWhen widthOverride reExec inner = do
     , runnerLogFunc = logFunc
     , runnerTermWidth = termWidth
     , runnerParsedCabalFiles = ref
-    , runnerEnvOverride = menv
+    , runnerProcessContext = menv
     }
   where clipWidth w
           | w < minTerminalWidth = minTerminalWidth

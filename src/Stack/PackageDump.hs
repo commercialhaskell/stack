@@ -53,7 +53,7 @@ import           RIO.Process hiding (readProcess)
 
 -- | Call ghc-pkg dump with appropriate flags and stream to the given @Sink@, for a single database
 ghcPkgDump
-    :: HasEnvOverride env
+    :: (HasProcessContext env, HasLogFunc env)
     => WhichCompiler
     -> [Path Abs Dir] -- ^ if empty, use global
     -> ConduitM Text Void (RIO env) a
@@ -62,7 +62,7 @@ ghcPkgDump = ghcPkgCmdArgs ["dump"]
 
 -- | Call ghc-pkg describe with appropriate flags and stream to the given @Sink@, for a single database
 ghcPkgDescribe
-    :: HasEnvOverride env
+    :: (HasProcessContext env, HasLogFunc env)
     => PackageName
     -> WhichCompiler
     -> [Path Abs Dir] -- ^ if empty, use global
@@ -72,7 +72,7 @@ ghcPkgDescribe pkgName = ghcPkgCmdArgs ["describe", "--simple-output", packageNa
 
 -- | Call ghc-pkg and stream to the given @Sink@, for a single database
 ghcPkgCmdArgs
-    :: HasEnvOverride env
+    :: (HasProcessContext env, HasLogFunc env)
     => [String]
     -> WhichCompiler
     -> [Path Abs Dir] -- ^ if empty, use global

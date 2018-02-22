@@ -114,8 +114,8 @@ instance HasRunner Ctx where
 instance HasConfig Ctx
 instance HasCabalLoader Ctx where
     cabalLoaderL = configL.cabalLoaderL
-instance HasEnvOverride Ctx where
-    envOverrideL = configL.envOverrideL
+instance HasProcessContext Ctx where
+    processContextL = configL.processContextL
 instance HasBuildConfig Ctx
 instance HasEnvConfig Ctx where
     envConfigL = lens ctxEnvConfig (\x y -> x { ctxEnvConfig = y })
@@ -1400,7 +1400,7 @@ hpack pkgDir = do
                         ]
             HpackCommand command ->
                 withWorkingDir (toFilePath pkgDir) $
-                withProc command [] runProcess_
+                proc command [] runProcess_
 
 -- | Path for the package's build log.
 buildLogPath :: (MonadReader env m, HasBuildConfig env, MonadThrow m)

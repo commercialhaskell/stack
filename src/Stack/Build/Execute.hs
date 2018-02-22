@@ -297,7 +297,7 @@ getSetupExe setupHs setupShimHs tmpdir = do
                     , toFilePath tmpOutputPath
                     ] ++
                     ["-build-runner" | wc == Ghcjs]
-            withWorkingDir (toFilePath tmpdir) (withProc (compilerExeName wc) args $ \pc0 -> do
+            withWorkingDir (toFilePath tmpdir) (proc (compilerExeName wc) args $ \pc0 -> do
               let pc = setStdout (useHandleOpen stderr) pc0
               runProcess_ pc)
                 `catch` \ece -> do
@@ -495,16 +495,16 @@ executePlan boptsCli baseConfigOpts locals globalPackages snapshotPackages local
     copyExecutables (planInstallExes plan)
 
     config <- view configL
-    menv' <- liftIO $ configEnvOverrideSettings config EnvSettings
+    menv' <- liftIO $ configProcessContextSettings config EnvSettings
                     { esIncludeLocals = True
                     , esIncludeGhcPackagePath = True
                     , esStackExe = True
                     , esLocaleUtf8 = False
                     , esKeepGhcRts = False
                     }
-    withEnvOverride menv' $
+    withProcessContext menv' $
       forM_ (boptsCLIExec boptsCli) $ \(cmd, args) ->
-      withProc cmd args runProcess_
+      proc cmd args runProcess_
 
 copyExecutables
     :: HasEnvConfig env
@@ -836,16 +836,15 @@ ensureConfig newConfigCache pkgDir ExecuteEnv {..} announce cabal cabalfp task =
     when needConfig $ withMVar eeConfigureLock $ \_ -> do
         deleteCaches pkgDir
         announce
-        menv <- view envOverrideL
         let programNames =
                 if eeCabalPkgVer < $(mkVersion "1.22")
                     then ["ghc", "ghc-pkg"]
                     else ["ghc", "ghc-pkg", "ghcjs", "ghcjs-pkg"]
         exes <- forM programNames $ \name -> do
-            mpath <- findExecutable menv name
+            mpath <- findExecutable name
             return $ case mpath of
-                Nothing -> []
-                Just x -> return $ concat ["--with-", name, "=", x]
+                Left _ -> []
+                Right x -> return $ concat ["--with-", name, "=", x]
         -- Configure cabal with arguments determined by
         -- Stack.Types.Build.configureOpts
         cabal KeepTHLoading $ "configure" : concat
@@ -979,7 +978,7 @@ withSingleContext ActionContext {..} ExecuteEnv {..} task@Task {..} mdeps msuffi
                 , esLocaleUtf8 = True
                 , esKeepGhcRts = False
                 }
-        menv <- liftIO $ configEnvOverrideSettings config envSettings
+        menv <- liftIO $ configProcessContextSettings config envSettings
         distRelativeDir' <- distRelativeDir
         esetupexehs <-
             -- Avoid broken Setup.hs files causing problems for simple build
@@ -1129,9 +1128,9 @@ withSingleContext ActionContext {..} ExecuteEnv {..} task@Task {..} mdeps msuffi
                             bss
                   where
                     runAndOutput :: CompilerVersion 'CVActual -> RIO env ()
-                    runAndOutput compilerVer = withWorkingDir (toFilePath pkgDir) $ withEnvOverride menv $ case mlogFile of
+                    runAndOutput compilerVer = withWorkingDir (toFilePath pkgDir) $ withProcessContext menv $ case mlogFile of
                         Just (_, h) ->
-                            withProc (toFilePath exeName) fullArgs
+                            proc (toFilePath exeName) fullArgs
                           $ runProcess_
                           . setStdin (byteStringInput "")
                           . setStdout (useHandleOpen h)
@@ -1306,7 +1305,7 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
                       (ghcPkgPathEnvVar wc)
                       (T.pack $ toFilePathNoTrailingSep $ bcoSnapDB eeBaseConfigOpts)
 
-                withModifyEnvOverride modifyEnv $ do
+                withModifyEnvVars modifyEnv $ do
                   -- In case a build of the library with different flags already exists, unregister it
                   -- before copying.
                   let ghcPkgExe = ghcPkgExeName wc
@@ -1449,7 +1448,7 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
                 -- See #2429 for why the temp dir is used
                 ec
                   <- withWorkingDir (toFilePath eeTempDir)
-                   $ withProc "haddock" ["--hyperlinked-source"]
+                   $ proc "haddock" ["--hyperlinked-source"]
                    $ \pc -> withProcess
                      (setStdout createSource $ setStderr createSource pc) $ \p ->
                        runConcurrently
@@ -1461,8 +1460,7 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
                     ExitSuccess -> return ["--haddock-option=--hyperlinked-source"]
                     -- Older hscolour colouring
                     ExitFailure _ -> do
-                        menv <- view envOverrideL
-                        hscolourExists <- doesExecutableExist menv "HsColour"
+                        hscolourExists <- doesExecutableExist "HsColour"
                         unless hscolourExists $ logWarn
                             ("Warning: haddock not generating hyperlinked sources because 'HsColour' not\n" <>
                              "found on PATH (use 'stack install hscolour' to install).")
@@ -1674,14 +1672,14 @@ singleTest topts testsToRun ac ee task installedMap = do
                 tixPath <- liftM (pkgDir </>) $ parseRelFile $ exeName ++ ".tix"
                 exePath <- liftM (buildDir </>) $ parseRelFile $ "build/" ++ testName' ++ "/" ++ exeName
                 exists <- doesFileExist exePath
-                menv <- liftIO $ configEnvOverrideSettings config EnvSettings
+                menv <- liftIO $ configProcessContextSettings config EnvSettings
                     { esIncludeLocals = taskLocation task == Local
                     , esIncludeGhcPackagePath = True
                     , esStackExe = True
                     , esLocaleUtf8 = False
                     , esKeepGhcRts = False
                     }
-                withEnvOverride menv $ if exists
+                withProcessContext menv $ if exists
                     then do
                         -- We clear out the .tix files before doing a run.
                         when needHpc $ do
@@ -1709,7 +1707,7 @@ singleTest topts testsToRun ac ee task installedMap = do
                                     Just (_, h) -> setter (useHandleOpen h)
 
                         ec <- withWorkingDir (toFilePath pkgDir) $
-                          withProc (toFilePath exePath) args $ \pc0 -> do
+                          proc (toFilePath exePath) args $ \pc0 -> do
                             let pc = setStdin createPipe
                                    $ output setStdout
                                    $ output setStderr

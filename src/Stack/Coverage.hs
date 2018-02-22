@@ -154,7 +154,7 @@ generateHpcReportInternal tixSrc reportDir report extraMarkupArgs extraReportArg
                  fromString (toFilePath tixSrc) <>
                  "."
             return Nothing
-        else (`catch` \(err :: ReadProcessException) -> do
+        else (`catch` \(err :: ProcessException) -> do
                  logError $ displayShow err
                  generateHpcErrorReport reportDir $ RIO.display $ sanitize $ show err
                  return Nothing) $
@@ -170,7 +170,7 @@ generateHpcReportInternal tixSrc reportDir report extraMarkupArgs extraReportArg
                     ["--hpcdir", toFilePathNoTrailingSep hpcRelDir, "--reset-hpcdirs"]
             logInfo $ "Generating " <> RIO.display report
             outputLines <- liftM (map (S8.filter (/= '\r')) . S8.lines . BL.toStrict) $
-                withProc "hpc"
+                proc "hpc"
                 ( "report"
                 : toFilePath tixSrc
                 : (args ++ extraReportArgs)
@@ -197,7 +197,7 @@ generateHpcReportInternal tixSrc reportDir report extraMarkupArgs extraReportArg
                     -- Print output, stripping @\r@ characters because Windows.
                     forM_ outputLines (logInfo . displayBytesUtf8)
                     -- Generate the markup.
-                    void $ withProc "hpc"
+                    void $ proc "hpc"
                         ( "markup"
                         : toFilePath tixSrc
                         : ("--destdir=" ++ toFilePathNoTrailingSep reportDir)

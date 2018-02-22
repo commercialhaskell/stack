@@ -112,7 +112,7 @@ cabalSolver cabalfps constraintType
                fmap toFilePath cabalfps
 
     try ( withWorkingDir (toFilePath tmpdir)
-        $ withProc "cabal" args readProcessStdout_
+        $ proc "cabal" args readProcessStdout_
         )
         >>= either
           (parseCabalErrors . eceStderr)
@@ -301,12 +301,12 @@ setupCabalEnv
     -> RIO env a
 setupCabalEnv compiler inner = do
   mpaths <- setupCompiler compiler
-  menv0 <- view envOverrideL
-  envMap <- removeHaskellEnvVars
-            <$> augmentPathMap (toFilePath <$> maybe [] edBins mpaths)
-                               (unEnvOverride menv0)
-  menv <- mkEnvOverride envMap
-  withEnvOverride menv $ do
+  menv0 <- view processContextL
+  envMap <- either throwM (return . removeHaskellEnvVars)
+              $ augmentPathMap (toFilePath <$> maybe [] edBins mpaths)
+                               (view envVarsL menv0)
+  menv <- mkProcessContext envMap
+  withProcessContext menv $ do
     mcabal <- getCabalInstallVersion
     case mcabal of
         Nothing -> throwM SolverMissingCabalInstall
