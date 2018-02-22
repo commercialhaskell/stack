@@ -197,7 +197,7 @@ main = do
           case fromException e of
               Just ec -> exitWith ec
               Nothing -> do
-                  printExceptionStderr e
+                  hPutStrLn stderr $ show e
                   exitFailure
 
 -- Vertically combine only the error component of the first argument with the

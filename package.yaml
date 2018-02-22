@@ -42,7 +42,6 @@ dependencies:
 - attoparsec
 - base >=4.9 && < 5
 - base64-bytestring
-- blaze-builder
 - bytestring
 - conduit
 - conduit-extra >= 1.2.3.1
