@@ -1,6 +1,9 @@
 import StackTest
 import Control.Monad
 import Data.List
+import Stack.Types.Build
+
+cache = PrecompiledCache Nothing []
 
 main :: IO ()
 main = do
