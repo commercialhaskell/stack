@@ -4,6 +4,7 @@ import Data.List
 
 main :: IO ()
 main = do
-    stack ["build", "stm", "--stack-yaml", "custom1/stack.yaml"]
-    stackCheckStderr ["build", "stm", "--stack-yaml", "custom2/stack.yaml"] $ \out ->
-      unless ("precompiled" `isInfixOf` out) $ error "Didn't use precompiled!"
+    stack ["build", "stm", "--stack-yaml", "stack.yaml"]
+    stackCheckStderr ["build", "stm", "--stack-yaml", "stack.yaml"] $ \out ->
+      unless ("precompiled" `isInfixOf` out) $ 
+      error "Didn't use precompiled!"
