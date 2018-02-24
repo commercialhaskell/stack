@@ -37,9 +37,9 @@ main = do
 
     let findExe name = do
             mexe <- findExecutable name
-            case mexe of
-                Nothing -> error $ name ++ " not found on PATH"
-                Just exe -> return exe
+            maybe (fail $ name ++ " not found on PATH")
+                  return
+                  mexe
     runghc <- findExe "runghc"
     stack <- findExe "stack"
 
