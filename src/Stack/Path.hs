@@ -214,6 +214,9 @@ paths =
     , ( "DEPRECATED: Use '--" <> stackRootOptionName <> "' instead"
       , T.pack deprecatedStackRootOptionName
       , T.pack . toFilePathNoTrailingSep . view stackRootL )
+    , ( "Location of the immutable cache directory"
+      , "immutable-cache-dir"
+      , T.pack . toFilePath . piImmutableDir )
     ]
 
 deprecatedPathKeys :: [(Text, Text)]
