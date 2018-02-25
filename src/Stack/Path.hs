@@ -1,6 +1,7 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 -- | Handy path information.
 module Stack.Path
@@ -53,6 +54,7 @@ path keys =
        distDir <- distRelativeDir
        hpcDir <- hpcReportDir
        compiler <- getCompilerPath whichCompiler
+       immutableDir <- return $ distDir </> $(mkRelDir "immutable")
        let deprecated = filter ((`elem` keys) . fst) deprecatedPathKeys
        liftIO $ forM_ deprecated $ \(oldOption, newOption) -> T.hPutStrLn stderr $ T.unlines
            [ ""
@@ -86,7 +88,8 @@ path keys =
                                distDir
                                hpcDir
                                extra
-                               compiler)))
+                               compiler
+                               immutableDir)))
 
 pathParser :: OA.Parser [Text]
 pathParser =
@@ -111,6 +114,7 @@ data PathInfo = PathInfo
     , piHpcDir       :: Path Abs Dir
     , piExtraDbs     :: [Path Abs Dir]
     , piCompiler     :: Path Abs File
+    , piImmutableDir :: Path Rel Dir
     }
 
 instance HasPlatform PathInfo

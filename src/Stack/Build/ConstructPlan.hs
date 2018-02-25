@@ -1200,4 +1200,4 @@ instance (Ord k, Monoid a) => Monoid (MonoidMap k a) where
 
 -- Switch this to 'True' to enable some debugging putStrLn in this module
 planDebug :: MonadIO m => String -> m ()
-planDebug = if False then liftIO . putStrLn else \_ -> return ()
+planDebug = if True then liftIO . putStrLn else \_ -> return ()
