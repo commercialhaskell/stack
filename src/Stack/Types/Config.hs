@@ -112,6 +112,7 @@ module Stack.Types.Config
   ,flagCacheLocal
   ,extraBinDirs
   ,hpcReportDir
+  ,immutableDir
   ,installationRootDeps
   ,installationRootLocal
   ,bindirCompilerTools
@@ -1196,6 +1197,13 @@ platformOnlyRelDir = do
     platform <- view platformL
     platformVariant <- view platformVariantL
     parseRelDir (Distribution.Text.display platform ++ platformVariantSuffix platformVariant)
+
+-- | Directory containing immutable cache
+
+immutableDir :: (MonadThrow m, MonadReader env m, HasEnvConfig env) => m (Path Abs Dir)
+immutableDir = do
+    root  <- view stackRootL
+    return $ root  </> $(mkRelDir "immutable")
 
 -- | Directory containing snapshots
 snapshotsDir :: (MonadReader env m, HasEnvConfig env, MonadThrow m) => m (Path Abs Dir)

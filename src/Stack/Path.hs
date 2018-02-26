@@ -55,7 +55,7 @@ path keys =
        hpcDir <- hpcReportDir
        compiler <- getCompilerPath whichCompiler
        stackRoot <- view stackRootL
-       immutableDir <- return $ stackRoot </> $(mkRelDir "immutable")
+       immutableDir <- immutableDir
        let deprecated = filter ((`elem` keys) . fst) deprecatedPathKeys
        liftIO $ forM_ deprecated $ \(oldOption, newOption) -> T.hPutStrLn stderr $ T.unlines
            [ ""
