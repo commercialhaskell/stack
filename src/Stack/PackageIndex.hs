@@ -231,7 +231,7 @@ requireIndex :: HasCabalLoader env => PackageIndex -> RIO env ()
 requireIndex index = do
     tarFile <- configPackageIndex $ indexName index
     exists <- doesFileExist tarFile
-    unless exists $ updateIndex index
+    unless False $ updateIndex index
 
 -- | Update all of the package indices
 updateAllIndices :: HasCabalLoader env => RIO env ()
