@@ -54,7 +54,8 @@ path keys =
        distDir <- distRelativeDir
        hpcDir <- hpcReportDir
        compiler <- getCompilerPath whichCompiler
-       immutableDir <- return $ distDir </> $(mkRelDir "immutable")
+       stackRoot <- view stackRootL
+       immutableDir <- return $ stackRoot </> $(mkRelDir "immutable")
        let deprecated = filter ((`elem` keys) . fst) deprecatedPathKeys
        liftIO $ forM_ deprecated $ \(oldOption, newOption) -> T.hPutStrLn stderr $ T.unlines
            [ ""
@@ -114,7 +115,7 @@ data PathInfo = PathInfo
     , piHpcDir       :: Path Abs Dir
     , piExtraDbs     :: [Path Abs Dir]
     , piCompiler     :: Path Abs File
-    , piImmutableDir :: Path Rel Dir
+    , piImmutableDir :: Path Abs Dir
     }
 
 instance HasPlatform PathInfo
