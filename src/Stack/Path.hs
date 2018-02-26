@@ -217,7 +217,7 @@ paths =
       , T.pack . toFilePathNoTrailingSep . view stackRootL )
     , ( "Location of the immutable cache directory"
       , "immutable-cache-dir"
-      , T.pack .  toFilePath . (\r -> r </> $(mkRelDir "immutable")) . (view stackRootL))
+      , T.pack .  toFilePath . piImmutableDir)
     ]
 
 deprecatedPathKeys :: [(Text, Text)]
