@@ -1203,11 +1203,10 @@ immutableDir :: (MonadThrow m, MonadReader env m, HasEnvConfig env) => m (Path A
 immutableDir = liftM (</> $(mkRelDir "immutable")) (view stackRootL)
 
 -- | Directory containing snapshots
-snapshotsDir :: (MonadReader env m, HasEnvConfig env, MonadThrow m) => m (Path Abs Dir)
-snapshotsDir = do
-    root <- view stackRootL
-    platform <- platformGhcRelDir
-    return $ root </> $(mkRelDir "snapshots") </> platform
+snapshotsDir :: (MonadReader env m, HasEnvConfig env , HasCabalLoader env, MonadThrow m) => m (Path Abs Dir)
+snapshotsDir = liftA2 (</>)
+                    (liftM (</>) (view stackRootL) <*> return $(mkRelDir "snapshots"))
+                    platformGhcRelDir
 
 -- | Installation root for dependencies
 installationRootDeps :: (MonadThrow m, MonadReader env m, HasEnvConfig env) => m (Path Abs Dir)
