@@ -48,11 +48,16 @@ piInfo = OA.info hackParser mempty
 
 main = do
      flags <- OA.execParser piInfo
-     -- deps <- runRIO $ listDependencies ldoOpts
+
      let go = (globalOptsFromMonoid False mempty)
                     { globalLogLevel = LevelDebug }
      void $ Stack.Runners.loadConfigWithOpts go $ \lc -> do
+          Stack.Runners.withUserFileLock go (view stackRootL lc) $ \lk -> do
+             let getCompilerVersion = loadCompilerVersion go lc
           -- envConfig <- runRIO (lcConfig lc) $ (setupEnv Nothing)
-          runRIO (lcConfig lc) $
+             runRIO (lcConfig lc) $
                  liftIO (return ())
-          liftIO (return ())
+             runRIO (lc) $
+                 (return ())
+                 -- listDependencies ldoOpts
+             liftIO (withBuildConfigDot (DotOpts True True Nothing mempty [] mempty  False False) go (listDependencies ldoOpts))
