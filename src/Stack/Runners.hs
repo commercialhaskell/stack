@@ -202,14 +202,13 @@ loadConfigWithOpts
   -> IO a
 loadConfigWithOpts go@GlobalOpts{..} inner = withRunnerGlobal go $ \runner -> do
     mstackYaml <- forM globalStackYaml resolveFile'
-    runRIO runner $ do
-        lc <- loadConfig globalConfigMonoid globalResolver mstackYaml
+    runRIO runner $ loadConfig globalConfigMonoid globalResolver mstackYaml >>= \lc -> do
         -- If we have been relaunched in a Docker container, perform in-container initialization
         -- (switch UID, etc.).  We do this after first loading the configuration since it must
         -- happen ASAP but needs a configuration.
-        case globalDockerEntrypoint of
-            Just de -> Docker.entrypoint (lcConfig lc) de
-            Nothing -> return ()
+        maybe (return ())
+              (Docker.entrypoint (lcConfig lc))
+              globalDockerEntrypoint
         liftIO $ inner lc
 
 withRunnerGlobal :: GlobalOpts -> (Runner -> IO a) -> IO a
@@ -248,4 +247,3 @@ withBuildConfigDot opts go f = withBuildConfig go' f
         (if dotTestTargets opts then set (globalOptsBuildOptsMonoidL.buildOptsMonoidTestsL) (Just True) else id) $
         (if dotBenchTargets opts then set (globalOptsBuildOptsMonoidL.buildOptsMonoidBenchmarksL) (Just True) else id)
         go
-

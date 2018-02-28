@@ -1,7 +1,6 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TemplateHaskell #-}
 
 -- | Handy path information.
 module Stack.Path
@@ -54,7 +53,6 @@ path keys =
        distDir <- distRelativeDir
        hpcDir <- hpcReportDir
        compiler <- getCompilerPath whichCompiler
-       stackRoot <- view stackRootL
        immutableDir <- immutableDir
        let deprecated = filter ((`elem` keys) . fst) deprecatedPathKeys
        liftIO $ forM_ deprecated $ \(oldOption, newOption) -> T.hPutStrLn stderr $ T.unlines

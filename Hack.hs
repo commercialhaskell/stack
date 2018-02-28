@@ -6,6 +6,7 @@ import Stack.Dot -- (listDependencies)
 import Stack.Types.Config.Build(defaultBuildOptsCLI)
 import Stack.Types.Config
 import Stack.Options.GlobalParser (globalOptsFromMonoid)
+import Stack.PackageIndex (getPackageCaches)
 import Stack.Runners
 import Stack.Setup
 import RIO.Process
@@ -53,11 +54,9 @@ main = do
                     { globalLogLevel = LevelDebug }
      void $ Stack.Runners.loadConfigWithOpts go $ \lc -> do
           Stack.Runners.withUserFileLock go (view stackRootL lc) $ \lk -> do
+             munlockFile lk
              let getCompilerVersion = loadCompilerVersion go lc
-          -- envConfig <- runRIO (lcConfig lc) $ (setupEnv Nothing)
-             runRIO (lcConfig lc) $
-                 liftIO (return ())
-             runRIO (lc) $
-                 (return ())
-                 -- listDependencies ldoOpts
+             runRIO (lcConfig lc) $ do
+                 pkgs <- getPackageCaches
+                 liftIO (print pkgstus)
              liftIO (withBuildConfigDot (DotOpts True True Nothing mempty [] mempty  False False) go (listDependencies ldoOpts))
