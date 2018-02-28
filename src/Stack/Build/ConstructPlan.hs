@@ -201,7 +201,7 @@ constructPlan ls0 baseConfigOpts0 locals extraToBuild0 localDumpPkgs loadPackage
         errs = errlibs ++ errfinals
     if null errs
         then do
-            let toTask (_, ADRFound _ _ _) = Nothing
+            let toTask (_, ADRFound{}) = Nothing
                 toTask (name, ADRToInstall task) = Just (name, task)
                 tasks = M.fromList $ mapMaybe toTask adrs
                 takeSubset =

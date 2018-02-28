@@ -64,7 +64,7 @@ main = do
         hspec $ mapM_ (test runghc env' currDir origStackRoot newHome newStackRoot) tests
 
 hasTest :: FilePath -> FilePath -> IO Bool
-hasTest root dir = doesFileExist $ root </> dir </> "hasTest"
+hasTest root dir = doesFileExist $ root </> dir </> "Main.hs"
 
 test :: FilePath -- ^ runghc
      -> [(String, String)] -- ^ env

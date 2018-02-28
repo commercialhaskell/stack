@@ -17,7 +17,7 @@ import qualified Options.Applicative as OA
 import qualified Data.Text           as Text
 
 doOpts = DotOpts True True Nothing mempty mempty mempty True True
-ldoOpts = ListDepsOpts doOpts (Text.pack ",") False
+ldoOpts = ListDepsOpts doOpts (Text.pack "*--*") False
 
 
 data CacheInfoMonoid = CacheInfoMonoid {
@@ -54,9 +54,10 @@ main = do
                     { globalLogLevel = LevelDebug }
      void $ Stack.Runners.loadConfigWithOpts go $ \lc -> do
           Stack.Runners.withUserFileLock go (view stackRootL lc) $ \lk -> do
-             munlockFile lk
-             let getCompilerVersion = loadCompilerVersion go lc
-             runRIO (lcConfig lc) $ do
-                 pkgs <- getPackageCaches
-                 liftIO (print pkgstus)
+             pkgs <- runRIO (lcConfig lc) getPackageCaches
+             print pkgs
              liftIO (withBuildConfigDot (DotOpts True True Nothing mempty [] mempty  False False) go (listDependencies ldoOpts))
+             munlockFile lk
+
+-- compilation: stack ghc -- --make -isrc -isubs/rio/src -hide-package=cryptohash-0.11.9 -hide-package=rio Hack.hs
+-- note: https://github.com/commercialhaskell/stack/issues/1220
