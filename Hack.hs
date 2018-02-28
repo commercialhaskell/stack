@@ -4,19 +4,28 @@ module Main where-- Stack.Hack
 import qualified Data.Text as Text
 import Stack.Dot -- (listDependencies)
 import Stack.Types.Config.Build(defaultBuildOptsCLI)
+import Stack.Types.Config
+import Stack.Options.GlobalParser (globalOptsFromMonoid)
 import Stack.Runners
+import Stack.Setup
 import RIO.Process
 import RIO.Prelude
+import RIO.Logger
 import Data.Map (Map(..))
 import qualified Options.Applicative as OA
+import qualified Data.Text           as Text
 
 doOpts = DotOpts True True Nothing mempty mempty mempty True True
 ldoOpts = ListDepsOpts doOpts (Text.pack ",") False
 
 
 data CacheInfoMonoid = CacheInfoMonoid {
-     cimWantCacheStatus :: Any
-} deriving (Generic,Show)
+     cimWantCacheStatus :: !Any
+} deriving (Generic)
+
+data CacheInfo = CacheInfo {
+     ciWantCacheStatus :: Bool
+} deriving Show
 
 instance Monoid CacheInfoMonoid where
          mempty = CacheInfoMonoid (Any False)
@@ -40,5 +49,10 @@ piInfo = OA.info hackParser mempty
 main = do
      flags <- OA.execParser piInfo
      -- deps <- runRIO $ listDependencies ldoOpts
-     void $ withMiniConfigAndLock undefined $ do
+     let go = (globalOptsFromMonoid False mempty)
+                    { globalLogLevel = LevelDebug }
+     void $ Stack.Runners.loadConfigWithOpts go $ \lc -> do
+          -- envConfig <- runRIO (lcConfig lc) $ (setupEnv Nothing)
+          runRIO (lcConfig lc) $
+                 liftIO (return ())
           liftIO (return ())
