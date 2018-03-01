@@ -466,7 +466,7 @@ instance Monoid GlobalOptsMonoid where
 
 -- | Default logging level should be something useful but not crazy.
 defaultLogLevel :: LogLevel
-defaultLogLevel = LevelInfo
+defaultLogLevel = LevelDebug
 
 readColorWhen :: ReadM ColorWhen
 readColorWhen = do

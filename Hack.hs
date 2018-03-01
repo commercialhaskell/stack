@@ -69,13 +69,31 @@ main = do
      void $ Stack.Runners.loadConfigWithOpts go $ \lc -> do
           Stack.Runners.withUserFileLock go (view stackRootL lc) $ \lk -> do
              munlockFile lk
-             liftIO (print "YOOO")
              stackVersions <- runRIO (lcConfig lc) (getPackageVersions stackPkg)
-             liftIO $ withBuildConfig go $
+             withBuildConfig go $
                     getLocalPackages & fmap lpProject & fmap Map.elems >>= \localPkgs ->
                     logDebug (Text.pack $ "cache space") *>
                     logDebug (Text.pack $ show $ length localPkgs) *>
                     logDebug (Text.pack $ show (lpvGPD <$> localPkgs))
 
+-- mapMaybeA :: Applicative f => (a -> f (Maybe b)) -> [a] -> f [b]
+-- concatMap :: Foldable t => (a -> [b]) -> t a -> [b]
+-- ./Stack/Types/Package.hs:264:data InstallLocation = Snap | Local
 -- compilation: stack ghc -- --make -isrc -isubs/rio/src -hide-package=cryptohash-0.11.9 -hide-package=rio Hack.hs
 -- note: https://github.com/commercialhaskell/stack/issues/1220
+{-
+data PackageInfo
+    =
+      -- | This indicates that the package is already installed, and
+      -- that we shouldn't build it from source. This is always the case
+      -- for snapshot packages.
+      PIOnlyInstalled InstallLocation Installed
+      -- | This indicates that the package isn't installed, and we know
+      -- where to find its source (either a hackage package or a local
+      -- directory).
+    | PIOnlySource PackageSource
+      -- | This indicates that the package is installed and we know
+      -- where to find its source. We may want to reinstall from source.
+    | PIBoth PackageSource Installed
+    deriving (Show)
+-}
