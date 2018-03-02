@@ -47,6 +47,8 @@ Other enhancements:
 
 Bug fixes:
 
+* The `get-stack.sh` install script now matches manual instructions
+  when it comes to Debian/Fedora/CentOS install dependencies.
 
 
 ## v1.6.5
