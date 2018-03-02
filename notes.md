@@ -1,10 +1,10 @@
-Stack Contribution Notes 
+Stack Contribution Notes
 
 Goal Maximize the amount of binary caching Stack is able to do.
 
-We have both immutable and mutable package sources. 
+We have both immutable and mutable package sources.
 
-Local file paths are mutable. We first state than anything mutable, and anything that depends on a mutable package source, cannot be cached. 
+Local file paths are mutable. We first state than anything mutable, and anything that depends on a mutable package source, cannot be cached.
 Immutable package sources, where the package contents come from Hackage, some archive, or a Git/Mercurial repository, can be cached.
 
 We keep snapshot database and local database logic the same. But now, instead of rebuilding packages in local databases, or having special logic for the precompiled cache, we have a simple algorithm we follow every time we build an immutable package:
@@ -34,13 +34,13 @@ Build.hs has configure options for how to build projects. What are the configure
 
 It seems like the majority of the changes should be made in ConstructPlan.hs, specifically `addFinal`, `addDep`, `installPackage`, `installPackageGivenDeps`, and `addPackageDeps` (I think). Based on my digging around it seems like 1 change would happen in Build.hs and a couple of changes in the Packages.hs file, but maybe not for this particular issue. I want to make sure I stay in the scope of this problem.
 
-What is the package index in "look up in the package index and see if there's a recommendation available" and what does that mean in terms of adding code to accomplish seeing if there’s a recommendation? The first part of the question might lead me to answer the second part. 
+What is the package index in "look up in the package index and see if there's a recommendation available" and what does that mean in terms of adding code to accomplish seeing if there’s a recommendation? The first part of the question might lead me to answer the second part.
 
 
 In the ConstructPlan module, we determine which packages are going to be used, and of those which are already installed, and which need to be built
 ConstructPlan.hs determines which packages are immutable.
 
-Cache.hs determines what is stored in cache and how it is created. 
+Cache.hs determines what is stored in cache and how it is created.
 
 What is pdr?
 
@@ -67,7 +67,7 @@ line 567 maybe we want to look at piiLocation ps and see if that tells us if cac
 line 613 pdr data constructors
 line 643 addPackageDeps function.
 
-Build.hs 
+Build.hs
 line 453 just read this after Construct.
 
 ConfigureOpts
@@ -131,6 +131,32 @@ From inside the files subdir of an integration test:
 
 $ stack runghc -- -i../../../lib ../Main.hs
 
+---
+
+Mar 1 '18
+
+@mms
+I just had a call with @DebugSteven to go over things. One takeaway we had is that, instead of focusing on the code in ConstructPlan, going straight to the relevant code in Stack.Build.Execute may make more sense. That code already tracks whether it should use a cache to install, and currently using snapshot-based logic. Instead, moving over to paying attention to whether the package is immutable or not may be the majority of the work for this issue.
+
+Stack.Build.Execute
+
+The note `and currently using snapshot-based logic` implies that because the package location will be `Snap`  we can
+use that as a cue to consider caching for PLOther {Archive,Repo};
+
+we are describing an approach where immutable sources are installed into:
+~/stack/immutable/lts/path/info/pkgname-hash-config-hash/pkg-id-registration.conf
+
+presumably, the package database is a file hierarchy: 
+[http://downloads.haskell.org/~ghc/latest/docs/html/users_guide/packages.html#package-databases]
+
+This would create multiple package dbs, if we made a singleton db for each immutable dependency.
+
+So @mms comment about needing further investigation into cabal's means of handling that resonate clearer with me now; also gives better appreciation of complexity curve  of that solution.
 
 
+https://github.com/commercialhaskell/stack/issues/3860
 
+
+The direction I've taken is to help me better grok the code base; in the hopes I'd be able to contribute something here.
+
+I've added some basic fodder for parsing command line arguments and querying information on the cache.

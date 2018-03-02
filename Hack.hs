@@ -19,6 +19,7 @@ import Data.Map (Map(..))
 import qualified Data.Map            as Map
 import qualified Options.Applicative as OA
 import qualified Data.Text           as Text
+import qualified Data.Set
 
 doOpts = DotOpts True True Nothing mempty mempty mempty True True
 ldoOpts = ListDepsOpts doOpts (Text.pack "*--*") False
@@ -70,10 +71,11 @@ main = do
           Stack.Runners.withUserFileLock go (view stackRootL lc) $ \lk -> do
              munlockFile lk
              stackVersions <- runRIO (lcConfig lc) (getPackageVersions stackPkg)
-             withBuildConfig go $
-                    getLocalPackages & fmap lpProject & fmap Map.elems >>= \localPkgs ->
-                    logDebug (Text.pack $ "cache space") *>
-                    logDebug (Text.pack $ show $ length localPkgs) *>
+             withBuildConfig go $ do
+                    stackVersions <- getPackageVersions stackPkg
+                    localPkgs <- getLocalPackages & fmap lpProject & fmap Map.elems
+                    logDebug (Text.pack $ "cache space")
+                    logDebug (Text.pack $ show $ length localPkgs)
                     logDebug (Text.pack $ show (lpvGPD <$> localPkgs))
 
 -- mapMaybeA :: Applicative f => (a -> f (Maybe b)) -> [a] -> f [b]
