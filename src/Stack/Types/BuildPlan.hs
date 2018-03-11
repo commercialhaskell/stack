@@ -270,7 +270,7 @@ instance subdirs ~ Subdirs => FromJSON (WithJSONWarnings (PackageLocation subdir
             , archiveHash = msha'
             }
 
-        github = withObjectWarnings "PLArchive" $ \o -> do
+        github = withObjectWarnings "PLArchive:github" $ \o -> do
           GitHubRepo ghRepo <- o ..: "github"
           commit <- o ..: "commit"
           subdirs <- o ..:? "subdirs" ..!= DefaultSubdirs
