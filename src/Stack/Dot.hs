@@ -23,7 +23,8 @@ import qualified Data.Text as Text
 import qualified Data.Text.IO as Text
 import qualified Data.Traversable as T
 import           Distribution.Text (display)
-import           Distribution.License (License(BSD3))
+import qualified Distribution.SPDX.License as SPDX
+import           Distribution.License (License(BSD3), licenseFromSPDX)
 import           Stack.Build (loadPackage)
 import           Stack.Build.Installed (getInstalled, GetInstalledOpts(..))
 import           Stack.Build.Source
@@ -82,7 +83,7 @@ dot dotOpts = do
 data DotPayload = DotPayload
   { payloadVersion :: Maybe Version
   -- ^ The package version.
-  , payloadLicense :: Maybe License
+  , payloadLicense :: Maybe (Either SPDX.License License)
   -- ^ The license the package was released under.
   } deriving (Eq, Show)
 
@@ -127,7 +128,7 @@ createDependencyGraph dotOpts = do
           -- Skip packages that can't be loaded - see
           -- https://github.com/commercialhaskell/stack/issues/2967
           | name `elem` [$(mkPackageName "rts"), $(mkPackageName "ghc")] =
-              return (Set.empty, DotPayload (Just version) (Just BSD3))
+              return (Set.empty, DotPayload (Just version) (Just $ Right BSD3))
           | otherwise = fmap (packageAllDeps &&& makePayload) (loadPackage loc flags ghcOptions)
   resolveDependencies (dotDependencyDepth dotOpts) graph depLoader
   where makePayload pkg = DotPayload (Just $ packageVersion pkg) (Just $ packageLicense pkg)
@@ -142,7 +143,7 @@ listDependencies opts = do
     where go name payload =
             let payloadText =
                   if listDepsLicense opts
-                      then maybe "<unknown>" (Text.pack . display) (payloadLicense payload)
+                      then maybe "<unknown>" (Text.pack . display . either licenseFromSPDX id) (payloadLicense payload)
                       else maybe "<unknown>" (Text.pack . show) (payloadVersion payload)
                 line = packageNameText name <> listDepsSep opts <> payloadText
             in  liftIO $ Text.putStrLn line
@@ -233,7 +234,7 @@ createDepLoader sourceMap installed globalDumpMap globalIdMap loadPackageDeps pk
         case maybePkg of
             Just (_, Library _ _ mlicense) -> mlicense
             _ -> Nothing
-    payloadFromDump dp = DotPayload (Just $ packageIdentifierVersion $ dpPackageIdent dp) (dpLicense dp)
+    payloadFromDump dp = DotPayload (Just $ packageIdentifierVersion $ dpPackageIdent dp) (Right <$> dpLicense dp)
 
 -- | Resolve the direct (depth 0) external dependencies of the given local packages
 localDependencies :: DotOpts -> [LocalPackage] -> [(PackageName, (Set PackageName, DotPayload))]

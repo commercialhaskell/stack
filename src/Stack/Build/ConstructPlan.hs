@@ -582,7 +582,7 @@ installPackageGivenDeps isAllInOne ps package minstalled (missing, present, minL
 
 -- | Is the build type of the package Configure
 packageBuildTypeConfig :: Package -> Bool
-packageBuildTypeConfig pkg = packageBuildType pkg == Just Configure
+packageBuildTypeConfig pkg = packageBuildType pkg == Configure
 
 -- Update response in the lib map. If it is an error, and there's
 -- already an error about cyclic dependencies, prefer the cyclic error.

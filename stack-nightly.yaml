@@ -1,4 +1,4 @@
-resolver: nightly-2018-02-18
+resolver: nightly-2018-03-10
 packages:
 - .
 - subs/rio
@@ -11,7 +11,12 @@ nix:
     - http-client-tls-0.3.4
 extra-deps:
 # https://github.com/commercialhaskell/stack/issues/3785
-- ansi-terminal-0.8.0.2
+- ansi-terminal-0.8.0.2@rev:0
 - archive: https://github.com/haskell/hackage-security/archive/3297b0f3f4285cb30321baaa7b54e3d22e1f6bd7.tar.gz
   subdirs:
   - hackage-security
+- Cabal-2.2.0.0@rev:1
+- happy-1.19.9@rev:2 # Otherwise not included in the build plan, unsure why
+
+# https://github.com/fizruk/http-api-data/issues/72
+- archive: https://github.com/snoyberg/http-api-data/archive/659dc4689355a5881acc2e037090d75391c673bb.tar.gz

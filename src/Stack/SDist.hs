@@ -40,7 +40,7 @@ import           Data.Time.Clock.POSIX
 import           Distribution.Package (Dependency (..))
 import qualified Distribution.PackageDescription as Cabal
 import qualified Distribution.PackageDescription.Check as Check
-import qualified Distribution.PackageDescription.Parse as Cabal
+import qualified Distribution.PackageDescription.Parsec as Cabal
 import           Distribution.PackageDescription.PrettyPrint (showGenericPackageDescription)
 import qualified Distribution.Types.UnqualComponentName as Cabal
 import qualified Distribution.Text as Cabal
@@ -209,8 +209,13 @@ getCabalLbs pvpBounds mrev cabalfp = do
           <+> display cabalfp
           , ""
           ]
-    case Cabal.parseGenericPackageDescription (showGenericPackageDescription gpd) of
-      Cabal.ParseOk _ roundtripped
+        (_warnings, eres) = Cabal.runParseResult
+                          $ Cabal.parseGenericPackageDescription
+                          $ T.encodeUtf8
+                          $ T.pack
+                          $ showGenericPackageDescription gpd
+    case eres of
+      Right roundtripped
         | roundtripped == gpd -> return ()
         | otherwise -> do
             prettyWarn $ vsep $ roundtripErrs ++
@@ -234,14 +239,14 @@ getCabalLbs pvpBounds mrev cabalfp = do
               , flow "If the issue is not fixed, feel free to leave a comment on it indicating that you would like it to be fixed."
               , ""
               ]
-      Cabal.ParseFailed err -> do
+      Left (_version, errs) -> do
         prettyWarn $ vsep $ roundtripErrs ++
           [ flow "In particular, parsing the rendered cabal file is yielding a parse error.  Please check if there are already issues tracking this, and if not, please report new issues to the stack and cabal issue trackers, via"
           , bulletedList
             [ styleUrl "https://github.com/commercialhaskell/stack/issues/new"
             , styleUrl "https://github.com/haskell/cabal/issues/new"
             ]
-          , flow $ "The parse error is: " ++ show err
+          , flow $ "The parse error is: " ++ unlines (map show errs)
           , ""
           ]
     return

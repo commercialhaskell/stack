@@ -275,7 +275,7 @@ toLoadHelper mloc dp = LoadHelper
         if name `HashSet.member` wiredInPackages
             then []
             else dpDepends dp
-    , lhPair = (name, (toPackageLocation mloc, Library ident gid (dpLicense dp)))
+    , lhPair = (name, (toPackageLocation mloc, Library ident gid (Right <$> dpLicense dp)))
     }
   where
     gid = dpGhcPkgId dp
