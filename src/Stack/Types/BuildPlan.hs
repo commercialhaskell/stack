@@ -237,6 +237,7 @@ instance subdirs ~ Subdirs => FromJSON (WithJSONWarnings (PackageLocation subdir
         = (noJSONWarnings <$> withText "PackageLocation" (\t -> http t <|> file t) v)
         <|> repo v
         <|> archiveObject v
+        <|> github v
       where
         file t = pure $ PLFilePath $ T.unpack t
         http t =
@@ -268,6 +269,26 @@ instance subdirs ~ Subdirs => FromJSON (WithJSONWarnings (PackageLocation subdir
             , archiveSubdirs = subdirs :: Subdirs
             , archiveHash = msha'
             }
+
+        github = withObjectWarnings "PLArchive:github" $ \o -> do
+          GitHubRepo ghRepo <- o ..: "github"
+          commit <- o ..: "commit"
+          subdirs <- o ..:? "subdirs" ..!= DefaultSubdirs
+          return $ PLArchive Archive
+            { archiveUrl = "https://github.com/" <> ghRepo <> "/archive/" <> commit <> ".tar.gz"
+            , archiveSubdirs = subdirs
+            , archiveHash = Nothing
+            }
+
+-- An unexported newtype wrapper to hang a 'FromJSON' instance off of. Contains
+-- a GitHub user and repo name separated by a forward slash, e.g. "foo/bar".
+newtype GitHubRepo = GitHubRepo Text
+
+instance FromJSON GitHubRepo where
+    parseJSON = withText "GitHubRepo" $ \s -> do
+        case T.split (== '/') s of
+            [x, y] | not (T.null x || T.null y) -> return (GitHubRepo s)
+            _ -> fail "expecting \"user/repo\""
 
 -- | Name of an executable.
 newtype ExeName = ExeName { unExeName :: Text }
