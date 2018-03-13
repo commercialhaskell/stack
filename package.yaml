@@ -34,7 +34,7 @@ ghc-options:
 - -fwarn-incomplete-uni-patterns
 - -fwarn-incomplete-record-updates
 dependencies:
-- Cabal
+- Cabal == 2.2.*
 - aeson
 - annotated-wl-pprint
 - ansi-terminal

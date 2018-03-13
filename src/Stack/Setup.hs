@@ -986,17 +986,18 @@ getOSKey :: (MonadThrow m)
          => Platform -> m Text
 getOSKey platform =
     case platform of
-        Platform I386   Cabal.Linux   -> return "linux32"
-        Platform X86_64 Cabal.Linux   -> return "linux64"
-        Platform I386   Cabal.OSX     -> return "macosx"
-        Platform X86_64 Cabal.OSX     -> return "macosx"
-        Platform I386   Cabal.FreeBSD -> return "freebsd32"
-        Platform X86_64 Cabal.FreeBSD -> return "freebsd64"
-        Platform I386   Cabal.OpenBSD -> return "openbsd32"
-        Platform X86_64 Cabal.OpenBSD -> return "openbsd64"
-        Platform I386   Cabal.Windows -> return "windows32"
-        Platform X86_64 Cabal.Windows -> return "windows64"
-        Platform Arm    Cabal.Linux   -> return "linux-armv7"
+        Platform I386                  Cabal.Linux   -> return "linux32"
+        Platform X86_64                Cabal.Linux   -> return "linux64"
+        Platform I386                  Cabal.OSX     -> return "macosx"
+        Platform X86_64                Cabal.OSX     -> return "macosx"
+        Platform I386                  Cabal.FreeBSD -> return "freebsd32"
+        Platform X86_64                Cabal.FreeBSD -> return "freebsd64"
+        Platform I386                  Cabal.OpenBSD -> return "openbsd32"
+        Platform X86_64                Cabal.OpenBSD -> return "openbsd64"
+        Platform I386                  Cabal.Windows -> return "windows32"
+        Platform X86_64                Cabal.Windows -> return "windows64"
+        Platform Arm                   Cabal.Linux   -> return "linux-armv7"
+        Platform (OtherArch "aarch64") Cabal.Linux   -> return "linux-aarch64"
         Platform arch os -> throwM $ UnsupportedSetupCombo os arch
 
 downloadFromInfo

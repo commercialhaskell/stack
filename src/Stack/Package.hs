@@ -46,8 +46,7 @@ import           Data.List (isSuffixOf, isPrefixOf)
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
 import qualified Data.Text as T
-import           Data.Text.Encoding (decodeUtf8, decodeUtf8With)
-import           Data.Text.Encoding.Error (lenientDecode)
+import           Data.Text.Encoding (decodeUtf8)
 import           Distribution.Compiler
 import           Distribution.ModuleName (ModuleName)
 import qualified Distribution.ModuleName as Cabal
@@ -55,9 +54,9 @@ import qualified Distribution.Package as D
 import           Distribution.Package hiding (Package,PackageName,packageName,packageVersion,PackageIdentifier)
 import qualified Distribution.PackageDescription as D
 import           Distribution.PackageDescription hiding (FlagName)
-import           Distribution.PackageDescription.Parse
-import qualified Distribution.PackageDescription.Parse as D
-import           Distribution.ParseUtils
+import           Distribution.PackageDescription.Parsec
+import qualified Distribution.PackageDescription.Parsec as D
+import           Distribution.Parsec.Common (PWarning (..), showPos)
 import           Distribution.Simple.Utils
 import           Distribution.System (OS (..), Arch, Platform (..))
 import qualified Distribution.Text as D
@@ -67,7 +66,6 @@ import           Distribution.Types.ForeignLib
 import qualified Distribution.Types.LegacyExeDependency as Cabal
 import qualified Distribution.Types.UnqualComponentName as Cabal
 import qualified Distribution.Verbosity as D
-import           Distribution.Version (showVersion)
 import           Lens.Micro (lens)
 import qualified Hpack
 import qualified Hpack.Config as Hpack
@@ -128,14 +126,14 @@ rawParseGPD
   -> BS.ByteString
   -> m ([PWarning], GenericPackageDescription)
 rawParseGPD key bs =
-    case parseGenericPackageDescription chars of
-       ParseFailed e -> throwM $ PackageInvalidCabalFile key e
-       ParseOk warnings gpkg -> return (warnings,gpkg)
+    case eres of
+      Left (mversion, errs) -> throwM $ PackageInvalidCabalFile key
+        (fromCabalVersion <$> mversion)
+        errs
+        warnings
+      Right gpkg -> return (warnings, gpkg)
   where
-    chars = T.unpack (dropBOM (decodeUtf8With lenientDecode bs))
-
-    -- https://github.com/haskell/hackage-server/issues/351
-    dropBOM t = fromMaybe t $ T.stripPrefix "\xFEFF" t
+    (warnings, eres) = runParseResult $ parseGenericPackageDescription bs
 
 -- | Read the raw, unresolved package information from a file.
 readPackageUnresolvedDir
@@ -160,14 +158,10 @@ readPackageUnresolvedDir dir printWarnings = do
         ((m1, M.insert dir ret m2), ret)
   where
     toPretty :: String -> PWarning -> [Doc AnsiAnn]
-    toPretty src (PWarning x) =
+    toPretty src (PWarning _type pos msg) =
       [ flow "Cabal file warning in"
-      , fromString src <> ":"
-      , flow x
-      ]
-    toPretty src (UTFWarning ln msg) =
-      [ flow "Cabal file warning in"
-      , fromString src <> ":" <> fromString (show ln) <> ":"
+      , fromString src <> "@"
+      , fromString (showPos pos) <> ":"
       , flow msg
       ]
 
@@ -265,7 +259,7 @@ packageFromPackageDescription packageConfig pkgFlags (PackageDescriptionPair pkg
     Package
     { packageName = name
     , packageVersion = fromCabalVersion (pkgVersion pkgId)
-    , packageLicense = license pkg
+    , packageLicense = licenseRaw pkg
     , packageDeps = deps
     , packageFiles = pkgFiles
     , packageTools = packageDescTools pkg
@@ -344,7 +338,7 @@ packageFromPackageDescription packageConfig pkgFlags (PackageDescriptionPair pkg
                      (Ctx cabalfp (buildDir distDir) env)
                      (packageDescModulesAndFiles pkg)
              setupFiles <-
-                 if buildType pkg `elem` [Nothing, Just Custom]
+                 if buildType pkg == Custom
                  then do
                      let setupHsPath = pkgDir </> $(mkRelFile "Setup.hs")
                          setupLhsPath = pkgDir </> $(mkRelFile "Setup.lhs")
@@ -660,14 +654,24 @@ packageDescTools =
     go2 :: Cabal.ExeDependency -> (ExeName, VersionRange)
     go2 (Cabal.ExeDependency _pkg name range) = (ExeName $ T.pack $ Cabal.unUnqualComponentName name, range)
 
--- | Variant of 'allBuildInfo' from Cabal that includes foreign
--- libraries; see <https://github.com/haskell/cabal/issues/4763>
+-- | Variant of 'allBuildInfo' from Cabal that, like versions before
+-- 2.2, only includes buildable components.
 allBuildInfo' :: PackageDescription -> [BuildInfo]
-allBuildInfo' pkg = allBuildInfo pkg ++
-  [ bi | flib <- foreignLibs pkg
-       , let bi = foreignLibBuildInfo flib
-       , buildable bi
-  ]
+allBuildInfo' pkg_descr = [ bi | lib <- allLibraries pkg_descr
+                               , let bi = libBuildInfo lib
+                               , buildable bi ]
+                       ++ [ bi | flib <- foreignLibs pkg_descr
+                               , let bi = foreignLibBuildInfo flib
+                               , buildable bi ]
+                       ++ [ bi | exe <- executables pkg_descr
+                               , let bi = buildInfo exe
+                               , buildable bi ]
+                       ++ [ bi | tst <- testSuites pkg_descr
+                               , let bi = testBuildInfo tst
+                               , buildable bi ]
+                       ++ [ bi | tst <- benchmarks pkg_descr
+                               , let bi = benchmarkBuildInfo tst
+                               , buildable bi ]
 
 -- | Get all files referenced by the package.
 packageDescModulesAndFiles
@@ -1458,5 +1462,5 @@ cabalFilePackageId fp = do
   where
     toStackPI (D.PackageIdentifier (D.unPackageName -> name) ver) = do
         name' <- parsePackageNameFromString name
-        ver' <- parseVersionFromString (showVersion ver)
+        let ver' = fromCabalVersion ver
         return (PackageIdentifier name' ver')

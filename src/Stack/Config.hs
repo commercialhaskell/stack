@@ -297,6 +297,7 @@ configFromConfigMonoid
          configCompilerCheck = fromFirst MatchMinor configMonoidCompilerCheck
 
      case arch of
+         OtherArch "aarch64" -> return ()
          OtherArch unk -> logWarn $ "Warning: Unknown value for architecture setting: " <> displayShow unk
          _ -> return ()
 

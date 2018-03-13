@@ -53,9 +53,8 @@ intersectVersionIntervals x y = fromCabal $ C.intersectVersionIntervals
     (toCabal y)
 
 toCabal :: VersionIntervals -> C.VersionIntervals
-toCabal (VersionIntervals vi) = fromMaybe
-  (error "Stack.Types.VersionIntervals.toCabal: invariant violated")
-  (C.mkVersionIntervals $ map go vi)
+toCabal (VersionIntervals vi) =
+  C.mkVersionIntervals $ map go vi
   where
     go (VersionInterval lowerV lowerB mupper) =
         ( C.LowerBound (toCabalVersion lowerV) (toCabalBound lowerB)

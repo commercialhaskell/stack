@@ -150,7 +150,7 @@ instance IsString WarningParserMonoid where
 
 -- Parsed JSON value with its warnings
 data WithJSONWarnings a = WithJSONWarnings a [JSONWarning]
-    deriving Generic
+    deriving (Eq, Generic, Show)
 instance Functor WithJSONWarnings where
     fmap f (WithJSONWarnings x w) = WithJSONWarnings (f x) w
 instance Monoid a => Monoid (WithJSONWarnings a) where
@@ -160,6 +160,7 @@ instance Monoid a => Monoid (WithJSONWarnings a) where
 -- | Warning output from 'WarningParser'.
 data JSONWarning = JSONUnrecognizedFields String [Text]
                  | JSONGeneralWarning !Text
+    deriving Eq
 instance Show JSONWarning where
     show (JSONUnrecognizedFields obj [field]) =
         "Unrecognized field in " <> obj <> ": " <> T.unpack field
