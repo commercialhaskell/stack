@@ -32,6 +32,7 @@ import qualified Data.Conduit.List as CL
 import qualified Data.HashMap.Strict as HashMap
 import qualified Data.Map as Map
 import qualified Data.Set as Set
+import           Data.Time (toGregorian)
 import qualified Data.Text as T
 import           Data.Text.Encoding (encodeUtf8)
 import           Data.Yaml (decodeFileEither, ParseException (AesonException))
@@ -696,10 +697,9 @@ findPackage platform compilerVersion (gpd, loc, localLoc) = do
   where
     PackageIdentifier name _version = fromCabalPackageIdentifier $ C.package $ C.packageDescription gpd
 
--- | Some hard-coded fixes for build plans, hopefully to be irrelevant over
--- time.
+-- | Some hard-coded fixes for build plans, only for hysterical raisins.
 snapshotDefFixes :: SnapshotDef -> SnapshotDef
-snapshotDefFixes sd | isStackage (sdResolver sd) = sd
+snapshotDefFixes sd | isOldStackage (sdResolver sd) = sd
     { sdFlags = Map.unionWith Map.union overrides $ sdFlags sd
     }
   where
@@ -708,8 +708,12 @@ snapshotDefFixes sd | isStackage (sdResolver sd) = sd
       , ($(mkPackageName "yaml"), Map.singleton $(mkFlagName "system-libyaml") False)
       ]
 
-    isStackage (ResolverStackage _) = True
-    isStackage _ = False
+    -- Only apply this hack to older Stackage snapshots. In
+    -- particular, nightly-2018-03-13 did not contain these two
+    -- packages.
+    isOldStackage (ResolverStackage (LTS major _)) = major < 11
+    isOldStackage (ResolverStackage (Nightly (toGregorian -> (year, _, _)))) = year < 2018
+    isOldStackage _ = False
 snapshotDefFixes sd = sd
 
 -- | Convert a global 'LoadedPackageInfo' to a snapshot one by
