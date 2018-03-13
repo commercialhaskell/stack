@@ -7,7 +7,7 @@ nix:
     - zlib
     - http-client-tls-0.3.4
 extra-deps:
-- rio-0.0.3.0
+- archive: https://github.com/commercialhaskell/rio/archive/c4d389fef57472bfd2e109a7c0d0624e95ca9281.tar.gz
 
 # https://github.com/commercialhaskell/stack/issues/3785
 - ansi-terminal-0.8.0.1

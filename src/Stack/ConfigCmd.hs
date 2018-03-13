@@ -85,10 +85,10 @@ cfgCmdSetValue root (ConfigCmdSetResolver newResolver) = do
     -- Check that the snapshot actually exists
     void $ loadResolver concreteResolver
     return (Yaml.toJSON concreteResolver)
-cfgCmdSetValue _ (ConfigCmdSetSystemGhc _ bool) =
-    return (Yaml.Bool bool)
-cfgCmdSetValue _ (ConfigCmdSetInstallGhc _ bool) =
-    return (Yaml.Bool bool)
+cfgCmdSetValue _ (ConfigCmdSetSystemGhc _ bool') =
+    return (Yaml.Bool bool')
+cfgCmdSetValue _ (ConfigCmdSetInstallGhc _ bool') =
+    return (Yaml.Bool bool')
 
 cfgCmdSetOptionName :: ConfigCmdSet -> Text
 cfgCmdSetOptionName (ConfigCmdSetResolver _) = "resolver"
