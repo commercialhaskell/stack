@@ -17,6 +17,4 @@ extra-deps:
   - hackage-security
 - Cabal-2.2.0.0@rev:1
 - happy-1.19.9@rev:2 # Otherwise not included in the build plan, unsure why
-
-# https://github.com/fizruk/http-api-data/issues/72
-- archive: https://github.com/snoyberg/http-api-data/archive/659dc4689355a5881acc2e037090d75391c673bb.tar.gz
+- http-api-data-0.3.8@rev:0
