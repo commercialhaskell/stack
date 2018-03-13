@@ -47,15 +47,21 @@ data PackageException
   deriving Typeable
 instance Exception PackageException
 instance Show PackageException where
-    show (PackageInvalidCabalFile loc mversion errs warnings) = concat
+    show (PackageInvalidCabalFile loc _mversion errs warnings) = concat
         [ "Unable to parse cabal file "
         , case loc of
             Left pir -> "for " ++ packageIdentifierRevisionString pir
             Right fp -> toFilePath fp
+        {-
+
+         Not actually needed, the errors will indicate if a newer version exists.
+         Also, it seems that this is set to Just the version even if we support it.
+
         , case mversion of
             Nothing -> ""
             Just version -> "\nRequires newer Cabal file parser version: " ++
                             versionString version
+        -}
         , "\n\n"
         , unlines $ map
             (\(PError pos msg) -> concat
