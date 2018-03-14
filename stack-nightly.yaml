@@ -22,3 +22,6 @@ extra-deps:
 - archive: https://github.com/snoyberg/cabal/archive/ac6be1854df8413014b9b71f4fc57634db092051.tar.gz
   subdirs:
   - Cabal
+
+# Workaround for https://github.com/commercialhaskell/stack/issues/3922
+- haskell-src-exts-1.20.2@rev:0
