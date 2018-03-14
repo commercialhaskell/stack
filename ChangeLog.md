@@ -16,6 +16,9 @@ Behavior changes:
   this itself since ghc-8.0.2, and Stack's attempted workaround for older
   versions caused more problems than it solved.
 
+* `stack new` no longer initializes a project if the project template contain
+   a stack.yaml file.
+
 Other enhancements:
 
 * A new sub command `ls` has been introduced to stack to view

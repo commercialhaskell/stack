@@ -935,7 +935,9 @@ newCmd :: (NewOpts,InitOpts) -> GlobalOpts -> IO ()
 newCmd (newOpts,initOpts) go@GlobalOpts{..} =
     withMiniConfigAndLock go $ do
         dir <- new newOpts (forceOverwrite initOpts)
-        initProject IsNewCmd dir initOpts globalResolver
+        exists <- doesFileExist $ dir </> stackDotYaml
+        when (forceOverwrite initOpts || not exists) $
+            initProject IsNewCmd dir initOpts globalResolver
 
 -- | List the available templates.
 templatesCmd :: () -> GlobalOpts -> IO ()
