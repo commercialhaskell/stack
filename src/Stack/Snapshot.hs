@@ -271,9 +271,9 @@ loadResolver (ResolverCustom url loc) = do
             }
           resolveLocalArchive pl = pl
           resolveLocalFilePath path =
-            if not $ isURI path && FilePath.isRelative path
-              then FilePath.dropFileName fp FilePath.</> FilePath.normalise path
-              else path
+            if isURI path || FilePath.isAbsolute path
+              then path
+              else FilePath.dropFileName fp FilePath.</> FilePath.normalise path
 
       WithJSONWarnings (sd0, mparentResolver, mcompiler) warnings <-
         liftIO (decodeFileEither fp) >>= either
