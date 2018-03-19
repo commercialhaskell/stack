@@ -7,7 +7,11 @@ nix:
     - zlib
     - http-client-tls-0.3.4
 extra-deps:
-- archive: https://github.com/commercialhaskell/rio/archive/c4d389fef57472bfd2e109a7c0d0624e95ca9281.tar.gz
+- archive: https://github.com/commercialhaskell/rio/archive/248557ef565278b3e63568d7b33a60c19652e9f1.tar.gz
+  subdirs:
+  - rio
+- typed-process-0.2.2.0@rev:0
+- unliftio-0.2.6.0@rev:0
 
 # https://github.com/commercialhaskell/stack/issues/3785
 - ansi-terminal-0.8.0.2@rev:0

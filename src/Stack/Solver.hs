@@ -564,7 +564,7 @@ cabalPackagesCheck cabaldirs noPkgMsg dupErrMsg = do
         error $ "Package name as defined in the .cabal file must match the \
                 \.cabal file name.\n\
                 \Please fix the following packages and try again:\n"
-                <> T.unpack (displayBuilderToText (formatGroup rels))
+                <> T.unpack (utf8BuilderToText (formatGroup rels))
 
     let dupGroups = filter ((> 1) . length)
                             . groupSortOn (gpdPackageName . snd)
@@ -592,7 +592,7 @@ cabalPackagesCheck cabaldirs noPkgMsg dupErrMsg = do
             $ map (\(file, gpd) -> (gpdPackageName gpd,(file, gpd))) unique
            , map fst dupIgnored)
 
-formatGroup :: [String] -> DisplayBuilder
+formatGroup :: [String] -> Utf8Builder
 formatGroup = foldMap (\path -> "- " <> fromString path <> "\n")
 
 reportMissingCabalFiles

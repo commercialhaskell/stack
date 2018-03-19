@@ -166,7 +166,7 @@ printPlan plan = do
                 " database"
 
 -- | For a dry run
-displayTask :: Task -> DisplayBuilder
+displayTask :: Task -> Utf8Builder
 displayTask task =
     RIO.display (taskProvides task) <>
     ": database=" <>

@@ -391,11 +391,11 @@ generateHpcMarkupIndex = do
         logInfo $ "\nAn index of the generated HTML coverage reports is available at " <>
             fromString (toFilePath outputFile)
 
-generateHpcErrorReport :: MonadIO m => Path Abs Dir -> DisplayBuilder -> m ()
+generateHpcErrorReport :: MonadIO m => Path Abs Dir -> Utf8Builder -> m ()
 generateHpcErrorReport dir err = do
     ensureDir dir
     let fp = toFilePath (dir </> $(mkRelFile "hpc_index.html"))
-    writeFileDisplayBuilder fp $
+    writeFileUtf8Builder fp $
         "<html><head><meta http-equiv=\"Content-Type\" content=\"text/html; charset=UTF-8\"></head><body>" <>
         "<h1>HPC Report Generation Error</h1>" <>
         "<p>" <>
