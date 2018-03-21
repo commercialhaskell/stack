@@ -279,6 +279,7 @@ executables:
     generated-other-modules: Build_stack
     ghc-options:
     - -threaded
+    - -rtsopts
     dependencies:
     - stack
     when:
