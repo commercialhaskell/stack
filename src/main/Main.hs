@@ -303,6 +303,14 @@ commandLineHandler currentDir progName isInterpreter = complicatedOptions
                     "List command. (Supports snapshots and dependencies)"
                     lsCmd
                     lsParser
+        addCommand' "elrik"
+                    "Elrik Dante"
+                    (\ _ _ -> return ())
+                    (pure ())
+        addCommand' "cache-status"
+                    "mess with the cache"
+                    (\ _ _ -> return ())
+                    (pure ())
         addCommand' "unpack"
                     "Unpack one or more packages locally"
                     unpackCmd

@@ -1228,7 +1228,9 @@ singleBuild :: forall env. (HasEnvConfig env, HasRunner env)
             -> RIO env ()
 singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap isFinalBuild = do
     (allDepsMap, cache) <- getConfigCache ee task installedMap enableTests enableBenchmarks
+    logDebug "got precompilation cache"
     mprecompiled <- getPrecompiled cache
+    logDebug "got precompilation cache"
     minstalled <-
         case mprecompiled of
             Just precompiled -> copyPreCompiled precompiled
@@ -2032,3 +2034,9 @@ addGlobalPackages deps globals0 =
     -- None of the packages we checked can be added, therefore drop them all
     -- and return our results
     loop _ [] gids = gids
+
+
+
+
+readPrecompiledCache = undefined
+writePrecompiledCache = undefined

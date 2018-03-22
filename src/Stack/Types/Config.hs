@@ -112,6 +112,7 @@ module Stack.Types.Config
   ,flagCacheLocal
   ,extraBinDirs
   ,hpcReportDir
+  ,immutableDir
   ,installationRootDeps
   ,installationRootLocal
   ,bindirCompilerTools
@@ -465,7 +466,7 @@ instance Monoid GlobalOptsMonoid where
 
 -- | Default logging level should be something useful but not crazy.
 defaultLogLevel :: LogLevel
-defaultLogLevel = LevelInfo
+defaultLogLevel = LevelDebug
 
 readColorWhen :: ReadM ColorWhen
 readColorWhen = do
@@ -1197,12 +1198,15 @@ platformOnlyRelDir = do
     platformVariant <- view platformVariantL
     parseRelDir (Distribution.Text.display platform ++ platformVariantSuffix platformVariant)
 
+-- | Directory containing immutable cache
+immutableDir :: (MonadThrow m, MonadReader env m, HasEnvConfig env) => m (Path Abs Dir)
+immutableDir = liftM (</> $(mkRelDir "immutable")) (view stackRootL)
+
 -- | Directory containing snapshots
-snapshotsDir :: (MonadReader env m, HasEnvConfig env, MonadThrow m) => m (Path Abs Dir)
-snapshotsDir = do
-    root <- view stackRootL
-    platform <- platformGhcRelDir
-    return $ root </> $(mkRelDir "snapshots") </> platform
+snapshotsDir :: (MonadReader env m, HasEnvConfig env , HasCabalLoader env, MonadThrow m) => m (Path Abs Dir)
+snapshotsDir = liftA2 (</>)
+                    (liftM (</>) (view stackRootL) <*> return $(mkRelDir "snapshots"))
+                    platformGhcRelDir
 
 -- | Installation root for dependencies
 installationRootDeps :: (MonadThrow m, MonadReader env m, HasEnvConfig env) => m (Path Abs Dir)

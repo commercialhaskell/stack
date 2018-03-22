@@ -1,0 +1,5 @@
+compiler: ghc-8.2
+name: custom1
+packages:
+- mtl-2.2.1
+- stm

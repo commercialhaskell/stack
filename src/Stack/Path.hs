@@ -53,6 +53,7 @@ path keys =
        distDir <- distRelativeDir
        hpcDir <- hpcReportDir
        compiler <- getCompilerPath whichCompiler
+       immutableDir <- immutableDir
        let deprecated = filter ((`elem` keys) . fst) deprecatedPathKeys
        liftIO $ forM_ deprecated $ \(oldOption, newOption) -> T.hPutStrLn stderr $ T.unlines
            [ ""
@@ -86,7 +87,8 @@ path keys =
                                distDir
                                hpcDir
                                extra
-                               compiler)))
+                               compiler
+                               immutableDir)))
 
 pathParser :: OA.Parser [Text]
 pathParser =
@@ -111,6 +113,7 @@ data PathInfo = PathInfo
     , piHpcDir       :: Path Abs Dir
     , piExtraDbs     :: [Path Abs Dir]
     , piCompiler     :: Path Abs File
+    , piImmutableDir :: Path Abs Dir
     }
 
 instance HasPlatform PathInfo
@@ -210,6 +213,9 @@ paths =
     , ( "DEPRECATED: Use '--" <> stackRootOptionName <> "' instead"
       , T.pack deprecatedStackRootOptionName
       , T.pack . toFilePathNoTrailingSep . view stackRootL )
+    , ( "Location of the immutable cache directory"
+      , "immutable-cache-dir"
+      , T.pack .  toFilePath . piImmutableDir)
     ]
 
 deprecatedPathKeys :: [(Text, Text)]

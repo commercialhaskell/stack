@@ -346,6 +346,7 @@ getSDistFileList lp =
             , tcoOpts = \_ -> ConfigureOpts [] []
             }
         , taskPresent = Map.empty
+        , taskAllImmutable = NotAllImmutable
         , taskAllInOne = True
         , taskCachePkgSrc = CacheSrcLocal (toFilePath (lpDir lp))
         , taskAnyMissing = True

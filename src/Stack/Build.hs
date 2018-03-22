@@ -155,7 +155,7 @@ justLocals =
 
 checkCabalVersion :: HasEnvConfig env => RIO env ()
 checkCabalVersion = do
-    allowNewer <- view $ configL.to configAllowNewer
+    allowNewer <- view $ configL . to configAllowNewer
     cabalVer <- view cabalVersionL
     -- https://github.com/haskell/cabal/issues/2023
     when (allowNewer && cabalVer < $(mkVersion "1.22")) $ throwM $

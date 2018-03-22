@@ -342,8 +342,7 @@ setupEnv mResolveMissingGHC = do
                                         ])
                         $ Map.insert "HASKELL_DIST_DIR" (T.pack $ toFilePathNoTrailingSep distDir) env
 
-                    () <- atomicModifyIORef envRef $ \m' ->
-                        (Map.insert es eo m', ())
+                    atomicModifyIORef' envRef (\m -> (Map.insert es eo m,()))
                     return eo
 
     envOverride <- liftIO $ getEnvOverride' minimalEnvSettings

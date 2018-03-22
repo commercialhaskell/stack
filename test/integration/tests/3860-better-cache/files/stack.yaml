@@ -1,0 +1,7 @@
+resolver: lts-9.14
+packages:
+- stm-2.4.4.1
+- acme-missiles-0.3
+extra-deps: []
+flags: {}
+extra-package-dbs: []
