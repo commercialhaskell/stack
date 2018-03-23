@@ -27,12 +27,17 @@ import           System.Exit
 import           RIO.Process
 
 -- | Hoogle command.
-hoogleCmd :: ([String],Bool,Bool) -> GlobalOpts -> IO ()
-hoogleCmd (args,setup,rebuild) go = withBuildConfig go $ do
+hoogleCmd :: ([String],Bool,Bool,Bool) -> GlobalOpts -> IO ()
+hoogleCmd (args,setup,rebuild,startServer) go = withBuildConfig go $ do
     hooglePath <- ensureHoogleInPath
     generateDbIfNeeded hooglePath
-    runHoogle hooglePath args
+    runHoogle hooglePath args'
   where
+    args' :: [String]
+    args' = if startServer
+                 then ["server", "--local", "--port", "8080"]
+                 else []
+            ++ args
     generateDbIfNeeded :: Path Abs File -> RIO EnvConfig ()
     generateDbIfNeeded hooglePath = do
         databaseExists <- checkDatabaseExists
