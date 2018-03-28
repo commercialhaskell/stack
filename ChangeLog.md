@@ -65,6 +65,8 @@ Other enhancements:
   i.e. `stack build --keep-tmp-files --ghc-options=-keep-tmp-files`.
   See [#3857](https://github.com/commercialhaskell/stack/issues/3857)
 * Improved error messages for snapshot parse exceptions
+* `stack unpack` now supports a `--to /target/directory` option to
+  specify where to unpack the package into
 
 Bug fixes:
 
