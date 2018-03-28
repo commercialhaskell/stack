@@ -305,7 +305,9 @@ commandLineHandler currentDir progName isInterpreter = complicatedOptions
         addCommand' "unpack"
                     "Unpack one or more packages locally"
                     unpackCmd
-                    (some $ strArgument $ metavar "PACKAGE")
+                    ((,) <$> (some $ strArgument $ metavar "PACKAGE")
+                         <*> (optional $ textOption $ long "to" <>
+                                help "Optional path to unpack the package into"))
         addCommand' "update"
                     "Update the package index"
                     updateCmd
@@ -647,10 +649,11 @@ uninstallCmd _ go = withConfigAndLock go $
       ]
 
 -- | Unpack packages to the filesystem
-unpackCmd :: [String] -> GlobalOpts -> IO ()
-unpackCmd names go = withConfigAndLock go $ do
+unpackCmd :: ([String], Maybe Text) -> GlobalOpts -> IO ()
+unpackCmd (names, Nothing) go = unpackCmd (names, Just ".") go
+unpackCmd (names, Just dstPath) go = withConfigAndLock go $ do
     mSnapshotDef <- mapM (makeConcreteResolver Nothing >=> loadResolver) (globalResolver go)
-    Stack.Fetch.unpackPackages mSnapshotDef "." names
+    Stack.Fetch.unpackPackages mSnapshotDef (T.unpack dstPath) names
 
 -- | Update the package index
 updateCmd :: () -> GlobalOpts -> IO ()
