@@ -150,10 +150,10 @@ versionString' =
 #else
     warningString = unlines
       [ ""
-      , "Warning: this is an unsupported build that may have been built with different"
-      , "versions of dependencies and GHC than the officially release binaries, and"
-      , "therefore may not behave identically.  If you encounter problems, please try"
-      , "the latest official build by running 'stack upgrade --force-download'."
+      , "Warning: this is an unsupported build that may use different versions of"
+      , "dependencies and GHC than the officially released binaries, and therefore may"
+      , "not behave identically.  If you encounter problems, please try the latest"
+      , "official build by running 'stack upgrade --force-download'."
       ]
 #endif
 
