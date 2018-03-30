@@ -106,7 +106,7 @@ data DockerOptsMonoid = DockerOptsMonoid
 -- | Decode uninterpreted docker options from JSON/YAML.
 instance FromJSON (WithJSONWarnings DockerOptsMonoid) where
   parseJSON = withObjectWarnings "DockerOptsMonoid"
-    (\o -> do dockerMonoidDefaultEnable    <- pure (Any True)
+    (\o -> do let dockerMonoidDefaultEnable = Any True
               dockerMonoidEnable           <- First <$> o ..:? dockerEnableArgName
               dockerMonoidRepoOrImage      <- First <$>
                                               ((Just . DockerMonoidImage <$> o ..: dockerImageArgName) <|>

@@ -14,8 +14,8 @@ github: commercialhaskell/stack
 homepage: http://haskellstack.org
 custom-setup:
   dependencies:
-  - base
-  - Cabal == 2.*
+  - base >=4.10 && < 5
+  - Cabal
   - filepath
 extra-source-files:
 - CONTRIBUTING.md
@@ -34,13 +34,13 @@ ghc-options:
 - -fwarn-incomplete-uni-patterns
 - -fwarn-incomplete-record-updates
 dependencies:
-- Cabal == 2.2.*
+- Cabal
 - aeson
 - annotated-wl-pprint
 - ansi-terminal
 - async
 - attoparsec
-- base >=4.9 && < 5
+- base >=4.10 && < 5
 - base64-bytestring
 - blaze-builder
 - bytestring
@@ -73,7 +73,8 @@ dependencies:
 - microlens
 - microlens-mtl
 - mintty
-- monad-logger # TODO remove dep when persistent drops monad-logger
+# TODO remove dep when persistent drops monad-logger
+- monad-logger
 - mono-traversable
 - mtl
 - neat-interpolation

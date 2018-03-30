@@ -1,4 +1,4 @@
-resolver: lts-10.5
+resolver: lts-11.2
 packages:
 - .
 - subs/rio
@@ -20,15 +20,7 @@ flags:
     hide-dependency-versions: true
     supported-build: true
 extra-deps:
-# https://github.com/commercialhaskell/stack/issues/3785
-- ansi-terminal-0.8.0.2@rev:0
-- archive: https://github.com/haskell/hackage-security/archive/3297b0f3f4285cb30321baaa7b54e3d22e1f6bd7.tar.gz
-  subdirs:
-  - hackage-security
-- cabal-doctest-1.0.6@rev:1
-- http-api-data-0.3.8@rev:0
-
-# https://github.com/haskell/cabal/issues/5206
-- archive: https://github.com/snoyberg/cabal/archive/ac6be1854df8413014b9b71f4fc57634db092051.tar.gz
-  subdirs:
-  - Cabal
+- Cabal-2.2.0.1@rev:0
+- hackage-security-0.5.3.0@rev:0
+- hpack-0.28.2
+- http-api-data-0.3.8.1@rev:0

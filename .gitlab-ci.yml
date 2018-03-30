@@ -17,7 +17,7 @@ build:
   only:
     - master
     - stable
-  script:
+  script: &build
     - export PATH=$HOME/.local/bin:$PATH
     - (cd etc/scripts && stack --install-ghc install --pedantic)
     - stack-release-script check
@@ -25,10 +25,7 @@ build:
 manual_build:
   stage: build
   when: manual
-  script:
-    - export PATH=$HOME/.local/bin:$PATH
-    - (cd etc/scripts && stack --install-ghc install --pedantic)
-    - stack-release-script check
+  script: *build
 
 docker_image_lts-10:
   stage: build
