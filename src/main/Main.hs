@@ -28,6 +28,7 @@ import qualified Data.ByteString.Lazy as L
 import           Data.IORef.RunOnce (runOnce)
 import           Data.List
 import qualified Data.Map.Strict as Map
+import qualified Data.Set as Set
 import qualified Data.Text as T
 import           Data.Version (showVersion)
 import           RIO.Process
@@ -98,6 +99,7 @@ import           Stack.Solver (solveExtraDeps)
 import           Stack.Types.Version
 import           Stack.Types.Config
 import           Stack.Types.Compiler
+import           Stack.Types.NamedComponent
 import           Stack.Types.Nix
 import           Stack.Upgrade
 import qualified Stack.Upload as Upload
@@ -353,6 +355,10 @@ commandLineHandler currentDir progName isInterpreter = complicatedOptions
                   "Execute a command"
                   execCmd
                   (execOptsParser Nothing)
+      addCommand' "run"
+                  "Run the first available executable (alias for 'exec')"
+                  execCmd
+                  (execOptsParser $ Just ExecRun)
       addGhciCommand' "ghci"
                       "Run ghci in the context of package(s) (experimental)"
                       ghciCmd
@@ -770,6 +776,7 @@ execCmd ExecOpts {..} go@GlobalOpts{..} =
         ExecOptsPlain -> do
           (cmd, args) <- case (eoCmd, eoArgs) of
                 (ExecCmd cmd, args) -> return (cmd, args)
+                (ExecRun, args) -> return ("", args)
                 (ExecGhc, args) -> return ("ghc", args)
                 (ExecRunGhc, args) -> return ("runghc", args)
           loadConfigWithOpts go $ \lc ->
@@ -807,6 +814,7 @@ execCmd ExecOpts {..} go@GlobalOpts{..} =
                             else args ++ ["+RTS"] ++ eoRtsOptions ++ ["-RTS"]
                 (cmd, args) <- case (eoCmd, argsWithRts eoArgs) of
                     (ExecCmd cmd, args) -> return (cmd, args)
+                    (ExecRun, args) -> getRunCmd eoPackages args
                     (ExecGhc, args) -> getGhcCmd "" eoPackages args
                     -- NOTE: this won't currently work for GHCJS, because it doesn't have
                     -- a runghcjs binary. It probably will someday, though.
@@ -828,6 +836,15 @@ execCmd ExecOpts {..} go@GlobalOpts{..} =
 
       getPkgOpts wc pkgs =
           map ("-package-id=" ++) <$> mapM (getPkgId wc) pkgs
+
+      getRunCmd pkgs args = do
+          pkgComponents <- liftM (map lpvComponents . Map.elems . lpProject) getLocalPackages
+          let exe = find isCExe $ concat $ map Set.toList pkgComponents
+          case exe of
+              Just (CExe exe) -> return (T.unpack exe, args)
+              _               -> liftIO $ do
+                  hPutStrLn stderr "No executables found."
+                  exitFailure
 
       getGhcCmd prefix pkgs args = do
           wc <- view $ actualCompilerVersionL.whichCompilerL
