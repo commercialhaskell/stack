@@ -49,6 +49,8 @@ Other enhancements:
   i.e. `stack build --keep-tmp-files --ghc-options=-keep-tmp-files`.
   See [#3857](https://github.com/commercialhaskell/stack/issues/3857)
 * Improved error messages for snapshot parse exceptions
+* A new sub command `run` has been introduced to run the first available
+  executable in the current stack project similar to `cabal run`.
 
 Bug fixes:
 
