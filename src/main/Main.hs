@@ -814,7 +814,7 @@ execCmd ExecOpts {..} go@GlobalOpts{..} =
                             else args ++ ["+RTS"] ++ eoRtsOptions ++ ["-RTS"]
                 (cmd, args) <- case (eoCmd, argsWithRts eoArgs) of
                     (ExecCmd cmd, args) -> return (cmd, args)
-                    (ExecRun, args) -> getRunCmd eoPackages args
+                    (ExecRun, args) -> getRunCmd args
                     (ExecGhc, args) -> getGhcCmd "" eoPackages args
                     -- NOTE: this won't currently work for GHCJS, because it doesn't have
                     -- a runghcjs binary. It probably will someday, though.
@@ -837,11 +837,11 @@ execCmd ExecOpts {..} go@GlobalOpts{..} =
       getPkgOpts wc pkgs =
           map ("-package-id=" ++) <$> mapM (getPkgId wc) pkgs
 
-      getRunCmd pkgs args = do
+      getRunCmd args = do
           pkgComponents <- liftM (map lpvComponents . Map.elems . lpProject) getLocalPackages
-          let exe = find isCExe $ concat $ map Set.toList pkgComponents
+          let exe = find isCExe $ concatMap Set.toList pkgComponents
           case exe of
-              Just (CExe exe) -> return (T.unpack exe, args)
+              Just (CExe exe') -> return (T.unpack exe', args)
               _               -> liftIO $ do
                   hPutStrLn stderr "No executables found."
                   exitFailure
