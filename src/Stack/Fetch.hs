@@ -574,7 +574,7 @@ untar tarPath expectedTarFolder destDirParent = do
                             $ Tar.read $ decompress lbs
 
                     filterEntries
-                      :: Monoid w => (Tar.Entry -> (Bool, w))
+                      :: (Semigroup w, Monoid w) => (Tar.Entry -> (Bool, w))
                          -> Tar.Entries b -> (Tar.Entries b, w)
                     -- Allow collecting warnings, Writer-monad style.
                     filterEntries f =

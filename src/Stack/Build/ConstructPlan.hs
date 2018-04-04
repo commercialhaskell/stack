@@ -19,7 +19,7 @@ module Stack.Build.ConstructPlan
     ) where
 
 import           Stack.Prelude hiding (Display (..))
-import           Control.Monad.RWS.Strict
+import           Control.Monad.RWS.Strict hiding ((<>))
 import           Control.Monad.State.Strict (execState)
 import qualified Data.HashSet as HashSet
 import           Data.List

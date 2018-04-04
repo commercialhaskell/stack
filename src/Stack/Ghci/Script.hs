@@ -25,9 +25,11 @@ import           Distribution.ModuleName hiding (toFilePath)
 
 newtype GhciScript = GhciScript { unGhciScript :: [GhciCommand] }
 
+instance Semigroup GhciScript where
+  GhciScript xs <> GhciScript ys = GhciScript (ys <> xs)
 instance Monoid GhciScript where
   mempty = GhciScript []
-  (GhciScript xs) `mappend` (GhciScript ys) = GhciScript (ys <> xs)
+  mappend = (<>)
 
 data GhciCommand
   = Add (Set (Either ModuleName (Path Abs File)))

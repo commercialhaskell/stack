@@ -137,6 +137,8 @@ import Text.PrettyPrint.Annotated.Leijen hiding ((<>), display)
 -- Perhaps it can still have native string support, by adding a type
 -- parameter to Doc?
 
+instance Semigroup (Doc a) where
+    (<>) = (P.<>)
 instance Monoid (Doc a) where
     mappend = (P.<>)
     mempty = empty

@@ -1017,7 +1017,7 @@ mkResolveConditions compilerVersion (Platform arch os) flags = ResolveConditions
     }
 
 -- | Resolve the condition tree for the library.
-resolveConditions :: (Monoid target,Show target)
+resolveConditions :: (Semigroup target,Monoid target,Show target)
                   => ResolveConditions
                   -> (target -> cs -> target)
                   -> CondTree ConfVar cs target

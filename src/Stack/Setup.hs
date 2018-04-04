@@ -1610,7 +1610,7 @@ bytesfmt formatter bs = printf (formatter <> " %s")
 -- The final yield may come sooner, and may be a superfluous mempty.
 -- Note that Integer and Float literals can be turned into NominalDiffTime
 -- (these literals are interpreted as "seconds")
-chunksOverTime :: (Monoid a, MonadIO m) => NominalDiffTime -> ConduitM a a m ()
+chunksOverTime :: (Monoid a, Semigroup a, MonadIO m) => NominalDiffTime -> ConduitM a a m ()
 chunksOverTime diff = do
     currentTime <- liftIO getCurrentTime
     evalStateC (currentTime, mempty) go

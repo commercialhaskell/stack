@@ -32,7 +32,7 @@ module Options.Applicative.Builder.Extra
 
 import Data.List (isPrefixOf)
 import Data.Maybe
-import Data.Monoid
+import Data.Monoid hiding ((<>))
 import qualified Data.Text as T
 import Options.Applicative
 import Options.Applicative.Types (readerAsk)

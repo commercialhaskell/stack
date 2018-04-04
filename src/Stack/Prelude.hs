@@ -12,6 +12,7 @@ module Stack.Prelude
   , logProcessStderrStdout
   , readProcessNull
   , withProcessContext
+  , stripCR
   , module X
   ) where
 
@@ -19,6 +20,9 @@ import           RIO                  as X
 import           Data.Conduit         as X (ConduitM, runConduit, (.|))
 import           Path                 as X (Abs, Dir, File, Path, Rel,
                                             toFilePath)
+
+import           Data.Monoid          as X (First (..), Any (..), Sum (..), Endo (..))
+
 import qualified Path.IO
 
 import qualified System.IO as IO
@@ -34,6 +38,8 @@ import           RIO.Process (HasProcessContext (..), ProcessContext, setStdin, 
 import           Data.Store           as X (Store)
 import           Data.Text.Encoding (decodeUtf8With)
 import           Data.Text.Encoding.Error (lenientDecode)
+
+import qualified RIO.Text as T
 
 -- | Get a source for a file. Unlike @sourceFile@, doesn't require
 -- @ResourceT@. Unlike explicit @withBinaryFile@ and @sourceHandle@
@@ -141,3 +147,7 @@ withProcessContext pcNew inner = do
   pcOld <- view processContextL
   let pcNew' = set workingDirL (view workingDirL pcOld) pcNew
   local (set processContextL pcNew') inner
+
+-- | Remove a trailing carriage return if present
+stripCR :: Text -> Text
+stripCR = T.dropSuffix "\r"

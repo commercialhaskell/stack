@@ -17,7 +17,7 @@ flags:
     hide-dependency-versions: true
     supported-build: true
 extra-deps:
-- archive: https://github.com/commercialhaskell/rio/archive/248557ef565278b3e63568d7b33a60c19652e9f1.tar.gz
+- archive: https://github.com/commercialhaskell/rio/archive/a2de70d41565378f568ec672dadf284cd979c22c.tar.gz
   subdirs:
   - rio
 - typed-process-0.2.2.0@rev:0
