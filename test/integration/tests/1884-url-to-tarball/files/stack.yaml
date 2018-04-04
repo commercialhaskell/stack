@@ -2,4 +2,4 @@ packages:
 - location: https://hackage.haskell.org/package/half-0.2.2.3/half-0.2.2.3.tar.gz
   extra-dep: false
 extra-deps: []
-resolver: lts-9.14
+resolver: lts-11.2

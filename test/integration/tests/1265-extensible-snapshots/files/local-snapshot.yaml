@@ -1,5 +1,5 @@
 ---
-resolver: lts-9.14
+resolver: lts-11.2
 name: local-snapshot
 packages:
 - archive: package-0.1.2.3.tar.gz

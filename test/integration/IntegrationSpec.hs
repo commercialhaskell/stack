@@ -79,7 +79,7 @@ test runghc env' currDir origStackRoot newHome newStackRoot name = it name $ wit
     when newHomeExists (removeDirectoryRecursive newHome)
     createDirectoryIfMissing True newStackRoot
     copyTree toCopyRoot origStackRoot newStackRoot
-    writeFile (newStackRoot </> "config.yaml") "system-ghc: true"
+    writeFile (newStackRoot </> "config.yaml") "system-ghc: true\ninstall-ghc: false\n"
     let testDir = currDir </> "tests" </> name
         mainFile = testDir </> "Main.hs"
         libDir = currDir </> "lib"

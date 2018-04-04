@@ -1,4 +1,4 @@
-resolver: ghc-8.0.2
+resolver: ghc-8.2.2
 extra-deps:
 - async-2.1.1.1
 - stm-2.1.2.2

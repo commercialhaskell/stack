@@ -21,31 +21,33 @@ matrix:
   fast_finish: true
   include:
     # FIXME: Removing because the build keeps timing out.
-    # - env: BUILD=cabal STACK_YAML=stack.yaml CABALVER=1.24 GHCVER=8.0.2
-    #  compiler: ": #GHC 8.0.2"
-    #  addons: {apt: {packages: [cabal-install-1.24,ghc-8.0.2], sources: [hvr-ghc]}}
+    # - env: BUILD=cabal STACK_YAML=stack.yaml CABALVER=1.24 GHCVER=8.2.2
+    #  compiler: ": #GHC 8.2.2"
+    #  addons: {apt: {packages: [cabal-install-1.24,ghc-8.2.2], sources: [hvr-ghc]}}
 
-    - env: BUILD=stack GHCVER=8.0.2 STACK_YAML=stack.yaml
-      compiler: ": #stack 8.0.2"
-      addons: {apt: {packages: [ghc-8.0.2], sources: [hvr-ghc]}}
+    - env: BUILD=stack GHCVER=8.2.2 STACK_YAML=stack.yaml
+      compiler: ": #stack 8.2.2"
+      addons: {apt: {packages: [ghc-8.2.2, alex-3.1.7, happy-1.19.5], sources: [hvr-ghc]}}
 
-    - env: BUILD=stack GHCVER=8.2.1 STACK_YAML=stack-nightly.yaml
-      compiler: ": #stack 8.2.1"
-      addons: {apt: {packages: [ghc-8.2.1], sources: [hvr-ghc]}}
+    ## Disabled because 'stack-nightly.yaml' removed since the latest working
+    ## nightly snapshot the sams as the LTS-11
+    #- env: BUILD=stack GHCVER=8.2.2 STACK_YAML=stack-nightly.yaml
+    #  compiler: ": #stack 8.2.2"
+    #  addons: {apt: {packages: [ghc-8.2.2, alex-3.1.7, happy-1.19.5], sources: [hvr-ghc]}}
 
-    - env: BUILD=stack GHCVER=8.0.2 STACK_YAML=stack.yaml
-      compiler: ": #stack 8.0.2 osx"
+    - env: BUILD=stack GHCVER=8.2.2 STACK_YAML=stack.yaml
+      compiler: ": #stack 8.2.2 osx"
       os: osx
 
     - env: BUILD=style
 
-    - env: BUILD=pedantic GHCVER=8.2.1 STACK_YAML=stack.yaml
-      compiler: ": #stack 8.2.1"
-      addons: {apt: {packages: [ghc-8.2.1], sources: [hvr-ghc]}}
+    - env: BUILD=pedantic GHCVER=8.2.2 STACK_YAML=stack.yaml
+      compiler: ": #stack 8.2.2"
+      addons: {apt: {packages: [ghc-8.2.2, alex-3.1.7, happy-1.19.5], sources: [hvr-ghc]}}
 
   allow_failures:
-    - env: BUILD=stack GHCVER=8.0.2 STACK_YAML=stack.yaml
-      compiler: ": #stack 8.0.2 osx"
+    - env: BUILD=stack GHCVER=8.2.2 STACK_YAML=stack.yaml
+      compiler: ": #stack 8.2.2 osx"
       os: osx
 
 # Note: the distinction between `before_install` and `install` is not important.
@@ -58,10 +60,10 @@ before_install:
        export PATH="$TRAVIS_BUILD_DIR"/hlint:$PATH
        ;;
      cabal)
-       export PATH=$HOME/.cabal/bin:/opt/ghc/$GHCVER/bin:/opt/cabal/$CABALVER/bin:$PATH
+       export PATH=$HOME/.cabal/bin:/opt/ghc/$GHCVER/bin:/opt/happy/1.19.5/bin:/opt/alex/3.1.7/bin:/opt/cabal/$CABALVER/bin:$PATH
        ;;
      *)
-       export PATH=$HOME/.local/bin:/opt/ghc/$GHCVER/bin:$PATH
+       export PATH=$HOME/.local/bin:/opt/ghc/$GHCVER/bin:/opt/happy/1.19.5/bin:/opt/alex/3.1.7/bin:$PATH
        ;;
    esac
  - ./.travis-setup.sh
@@ -74,11 +76,6 @@ install:
    case "$BUILD" in
      style)
        ./etc/scripts/get-hlint.sh
-       ;;
-     stack)
-       travis_wait stack --no-terminal build Cabal
-       travis_wait stack --no-terminal build store
-       stack --no-terminal test --only-dependencies
        ;;
      cabal)
        cabal --version
@@ -108,12 +105,17 @@ install:
        echo Performing the actual build now that we have the right stack.cabal
        cabal install --only-dependencies --enable-tests --enable-benchmarks --force-reinstalls --ghc-options=-O0 --reorder-goals --max-backjumps=-1
        ;;
+     *)
+       travis_wait stack --no-terminal build Cabal
+       travis_wait stack --no-terminal build store
+       stack --no-terminal test --only-dependencies
+       ;;
    esac
    set +ex
 
 script:
  - GHC_OPTIONS="-Werror"
- - if [ $GHCVER = 8.2.1 ]; then GHC_OPTIONS="$GHC_OPTIONS -Wno-missing-home-modules"; fi
+ - if [ $GHCVER = 8.2.2 ]; then GHC_OPTIONS="$GHC_OPTIONS -Wno-missing-home-modules"; fi
  - |
    set -ex
    case "$BUILD" in
@@ -131,8 +133,8 @@ script:
        stack --no-terminal test --haddock --no-haddock-deps --ghc-options="$GHC_OPTIONS"
        ;;
      pedantic)
-       stack --system-ghc --no-terminal build --pedantic stack
-       stack --system-ghc --no-terminal build --pedantic
+       stack --no-terminal build --pedantic stack
+       stack --no-terminal build --pedantic
        ;;
      cabal)
        cabal configure --enable-tests --enable-benchmarks -v2 --ghc-options="-O0 $GHC_OPTIONS"
