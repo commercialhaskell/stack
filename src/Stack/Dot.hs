@@ -33,7 +33,7 @@ import           Stack.Config (getLocalPackages)
 import           Stack.Constants
 import           Stack.Package
 import           Stack.PackageDump (DumpPackage(..))
-import           Stack.Prelude
+import           Stack.Prelude hiding (Display (..))
 import           Stack.Types.Build
 import           Stack.Types.BuildPlan
 import           Stack.Types.Config

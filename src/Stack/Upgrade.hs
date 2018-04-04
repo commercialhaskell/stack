@@ -12,7 +12,7 @@ module Stack.Upgrade
     , upgradeOpts
     ) where
 
-import           Stack.Prelude               hiding (force)
+import           Stack.Prelude               hiding (force, Display (..))
 import qualified Data.HashMap.Strict         as HashMap
 import qualified Data.List
 import qualified Data.Map                    as Map
@@ -211,7 +211,7 @@ sourceUpgrade gConfigMonoid mresolver builtHash (SourceOpts gitRepo) =
                 -- the stack repo until we're comfortable with "stack upgrade
                 -- --git" not working for earlier versions.
                 let args = [ "clone", repo , "stack", "--depth", "1", "--recursive", "--branch", branch]
-                withWorkingDir tmp $ withProc "git" args runProcess_
+                withWorkingDir (toFilePath tmp) $ proc "git" args runProcess_
                 return $ Just $ tmp </> $(mkRelDir "stack")
       Nothing -> do
         updateAllIndices

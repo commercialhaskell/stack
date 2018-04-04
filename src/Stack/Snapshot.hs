@@ -21,7 +21,7 @@ module Stack.Snapshot
   , calculatePackagePromotion
   ) where
 
-import           Stack.Prelude
+import           Stack.Prelude hiding (Display (..))
 import           Control.Monad.State.Strict      (get, put, StateT, execStateT)
 import           Crypto.Hash.Conduit (hashFile)
 import           Data.Aeson (withObject, (.!=), (.:), (.:?), Value (Object))
@@ -45,6 +45,7 @@ import           Distribution.Text (display)
 import qualified Distribution.Version as C
 import           Network.HTTP.Client (Request)
 import           Network.HTTP.Download
+import qualified RIO
 import           Network.URI (isURI)
 import           Path
 import           Path.IO
@@ -160,21 +161,23 @@ loadResolver (ResolverStackage name) = do
               case parseEither parseStackageSnapshot value of
                 Left s -> throwIO $ InvalidStackageException name s
                 Right x -> return x
-    logDebug $ "Decoding build plan from: " <> T.pack (toFilePath fp)
+    logDebug $ "Decoding build plan from: " <> fromString (toFilePath fp)
     eres <- tryDecode
     case eres of
         Right sd -> return sd
         Left e -> do
-            logDebug $ "Decoding Stackage snapshot definition from file failed: " <> T.pack (show e)
+            logDebug $
+              "Decoding Stackage snapshot definition from file failed: " <>
+              displayShow e
             ensureDir (parent fp)
             url <- buildBuildPlanUrl name file
             req <- parseRequest $ T.unpack url
-            logSticky $ "Downloading " <> renderSnapName name <> " build plan ..."
-            logDebug $ "Downloading build plan from: " <> url
+            logSticky $ "Downloading " <> RIO.display name <> " build plan ..."
+            logDebug $ "Downloading build plan from: " <> RIO.display url
             wasDownloaded <- redownload req fp
             if wasDownloaded
-              then logStickyDone $ "Downloaded " <> renderSnapName name <> " build plan."
-              else logStickyDone $ "Skipped download of " <> renderSnapName name <> " because its the stored entity tag matches the server version"
+              then logStickyDone $ "Downloaded " <> RIO.display name <> " build plan."
+              else logStickyDone $ "Skipped download of " <> RIO.display name <> " because its the stored entity tag matches the server version"
             tryDecode >>= either throwM return
 
   where
@@ -253,7 +256,7 @@ loadResolver (ResolverCompiler compiler) = return SnapshotDef
     , sdGlobalHints = Map.empty
     }
 loadResolver (ResolverCustom url loc) = do
-  logDebug $ "Loading " <> url <> " build plan from " <> T.pack (show loc)
+  logDebug $ "Loading " <> RIO.display url <> " build plan from " <> displayShow loc
   case loc of
     Left req -> download' req >>= load . toFilePath
     Right fp -> load fp
@@ -406,7 +409,7 @@ loadSnapshot mcompiler root =
               liftIO $ ignoringAbsence $ removeFile fp
               logError ""
               logError "----"
-              logError $ "Deleting cached snapshot file: " <> T.pack (toFilePath fp)
+              logError $ "Deleting cached snapshot file: " <> fromString (toFilePath fp)
               logError "Recommendation: try running again. If this fails again, open an upstream issue at:"
               logError $
                 case name of

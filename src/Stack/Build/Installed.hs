@@ -18,7 +18,6 @@ import qualified Data.HashSet as HashSet
 import           Data.List
 import qualified Data.Map.Strict as M
 import qualified Data.Map.Strict as Map
-import qualified Data.Text as T
 import           Path
 import           Stack.Build.Cache
 import           Stack.Constants
@@ -174,36 +173,32 @@ processLoadResult _ True (WrongVersion actual wanted, lh)
     -- Allow some packages in the ghcjs global DB to have the wrong
     -- versions.  Treat them as wired-ins by setting deps to [].
     | fst (lhPair lh) `HashSet.member` ghcjsBootPackages = do
-        logWarn $ T.concat
-            [ "Ignoring that the GHCJS boot package \""
-            , packageNameText (fst (lhPair lh))
-            , "\" has a different version, "
-            , versionText actual
-            , ", than the resolver's wanted version, "
-            , versionText wanted
-            ]
+        logWarn $
+            "Ignoring that the GHCJS boot package \"" <>
+            display (packageNameText (fst (lhPair lh))) <>
+            "\" has a different version, " <>
+            display (versionText actual) <>
+            ", than the resolver's wanted version, " <>
+            display (versionText wanted)
         return (Just lh)
 processLoadResult mdb _ (reason, lh) = do
-    logDebug $ T.concat $
-        [ "Ignoring package "
-        , packageNameText (fst (lhPair lh))
-        ] ++
-        maybe [] (\db -> [", from ", T.pack (show db), ","]) mdb ++
-        [ " due to"
-        , case reason of
+    logDebug $
+        "Ignoring package " <>
+        display (packageNameText (fst (lhPair lh))) <>
+        maybe mempty (\db -> ", from " <> displayShow db <> ",") mdb <>
+        " due to" <>
+        case reason of
             Allowed -> " the impossible?!?!"
             NeedsProfiling -> " it needing profiling."
             NeedsHaddock -> " it needing haddocks."
             NeedsSymbols -> " it needing debugging symbols."
             UnknownPkg -> " it being unknown to the resolver / extra-deps."
-            WrongLocation mloc loc -> " wrong location: " <> T.pack (show (mloc, loc))
-            WrongVersion actual wanted -> T.concat
-                [ " wanting version "
-                , versionText wanted
-                , " instead of "
-                , versionText actual
-                ]
-        ]
+            WrongLocation mloc loc -> " wrong location: " <> displayShow (mloc, loc)
+            WrongVersion actual wanted ->
+                " wanting version " <>
+                display (versionText wanted) <>
+                " instead of " <>
+                display (versionText actual)
     return Nothing
 
 data Allowed

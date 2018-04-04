@@ -107,12 +107,12 @@ new opts forceOverwrite = do
                           RemoteTemp -> "Downloading"
          in
         logInfo
-            (loading <> " template \"" <> templateName template <>
+            (loading <> " template \"" <> display (templateName template) <>
              "\" to create project \"" <>
-             packageNameText project <>
+             display (packageNameText project) <>
              "\" in " <>
              if bare then "the current directory"
-                     else T.pack (toFilePath (dirname absDir)) <>
+                     else fromString (toFilePath (dirname absDir)) <>
              " ...")
 
 data TemplateFrom = LocalTemp | RemoteTemp
@@ -145,7 +145,7 @@ loadTemplate name logIt = do
   where
     loadLocalFile :: Path b File -> RIO env Text
     loadLocalFile path = do
-        logDebug ("Opening local template: \"" <> T.pack (toFilePath path)
+        logDebug ("Opening local template: \"" <> fromString (toFilePath path)
                                                 <> "\"")
         exists <- doesFileExist path
         if exists
@@ -194,7 +194,7 @@ applyTemplate project template nonceParams dir templateText = do
                  templateText
                  (mkStrContextM (contextFunction context)))
     unless (S.null missingKeys)
-         (logInfo ("\n" <> T.pack (show (MissingParameters project template missingKeys (configUserConfigPath config))) <> "\n"))
+         (logInfo ("\n" <> displayShow (MissingParameters project template missingKeys (configUserConfigPath config)) <> "\n"))
     files :: Map FilePath LB.ByteString <-
         catch (execWriterT $ runConduit $
                yield (T.encodeUtf8 (LT.toStrict applied)) .|
@@ -259,8 +259,8 @@ runTemplateInits dir = do
     case configScmInit config of
         Nothing -> return ()
         Just Git ->
-            withWorkingDir dir $
-            catchAny (withProc "git" ["init"] runProcess_)
+            withWorkingDir (toFilePath dir) $
+            catchAny (proc "git" ["init"] runProcess_)
                   (\_ -> logInfo "git init failed to run, ignoring ...")
 
 -- | Display the set of templates accompanied with description if available.
@@ -295,7 +295,7 @@ getTemplateInfo = do
   resp <- catch (liftM Right $ httpLbs req) (\(ex :: HttpException) -> return . Left $ "Failed to download template info. The HTTP error was: " <> show ex)
   case resp >>= is200 of
     Left err -> do
-      logInfo $ T.pack err
+      logInfo $ fromString err
       return M.empty
     Right resp' ->
       case Yaml.decodeEither (LB.toStrict $ getResponseBody resp') :: Either String Object of

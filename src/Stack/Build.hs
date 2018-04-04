@@ -183,7 +183,7 @@ warnIfExecutablesWithSameNameCouldBeOverwritten locals plan = do
                 T.intercalate
                     ", "
                     ["'" <> packageNameText p <> ":" <> exe <> "'" | p <- pkgs]
-        (logWarn . T.unlines . concat)
+        (logWarn . display . T.unlines . concat)
             [ [ "Building " <> exe_s <> " " <> exesText toBuild <> "." ]
             , [ "Only one of them will be available via 'stack exec' or locally installed."
               | length toBuild > 1
@@ -241,7 +241,7 @@ warnIfExecutablesWithSameNameCouldBeOverwritten locals plan = do
 
 warnAboutSplitObjs :: HasLogFunc env => BuildOpts -> RIO env ()
 warnAboutSplitObjs bopts | boptsSplitObjs bopts = do
-    logWarn $ "Building with --split-objs is enabled. " <> T.pack splitObjsWarning
+    logWarn $ "Building with --split-objs is enabled. " <> fromString splitObjsWarning
 warnAboutSplitObjs _ = return ()
 
 splitObjsWarning :: String
@@ -332,11 +332,10 @@ fixCodePage inner = do
 
         fixInput $ fixOutput inner
     expected = 65001 -- UTF-8
-    warn typ = logInfo $ T.concat
-        [ "Setting"
-        , typ
-        , " codepage to UTF-8 (65001) to ensure correct output from GHC"
-        ]
+    warn typ = logInfo $
+        "Setting" <>
+        typ <>
+        " codepage to UTF-8 (65001) to ensure correct output from GHC"
 #else
 fixCodePage = id
 #endif

@@ -20,9 +20,9 @@ module System.Process.PagerEditor
   ,EditorException(..))
   where
 
-import Stack.Prelude hiding (ByteString)
-import Data.ByteString.Lazy (ByteString,hPut,readFile)
-import Data.ByteString.Builder (Builder,stringUtf8,hPutBuilder)
+import qualified Data.ByteString.Lazy (readFile)
+import Data.ByteString.Lazy (hPut)
+import Stack.Prelude
 import System.Directory (findExecutable)
 import System.Environment (lookupEnv)
 import System.Exit (ExitCode(..))
@@ -54,7 +54,7 @@ pageWriter writer =
        Nothing -> writer stdout
 
 -- | Run pager to display a lazy ByteString.
-pageByteString :: ByteString -> IO ()
+pageByteString :: LByteString -> IO ()
 pageByteString = pageWriter . flip hPut
 
 -- | Run pager to display a 'Text'
@@ -71,7 +71,7 @@ pageFile p = pageByteString =<< Data.ByteString.Lazy.readFile p
 
 -- | Run pager to display a string.
 pageString :: String -> IO ()
-pageString = pageBuilder . stringUtf8
+pageString = pageBuilder . fromString
 
 -- | Run editor to edit a file.
 editFile :: FilePath -> IO ()
@@ -101,7 +101,7 @@ editReaderWriter filename writer reader =
                                     reader p')
 
 -- | Run editor on a ByteString.
-editByteString :: String -> ByteString -> IO ByteString
+editByteString :: String -> LByteString -> IO LByteString
 editByteString f s = editReaderWriter f (`hPut` s) Data.ByteString.Lazy.readFile
 
 -- | Run editor on a String.

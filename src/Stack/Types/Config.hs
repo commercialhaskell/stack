@@ -224,7 +224,7 @@ import           Stack.Types.Urls
 import           Stack.Types.Version
 import qualified System.FilePath as FilePath
 import           System.PosixCompat.Types (UserID, GroupID, FileMode)
-import           RIO.Process (EnvOverride, HasEnvOverride (..), findExecutable)
+import           RIO.Process (ProcessContext, HasProcessContext (..), findExecutable)
 
 -- Re-exports
 import           Stack.Types.Config.Build as X
@@ -241,7 +241,7 @@ data Config =
          -- ^ Docker configuration
          ,configNix                 :: !NixOpts
          -- ^ Execution environment (e.g nix-shell) configuration
-         ,configEnvOverrideSettings :: !(EnvSettings -> IO EnvOverride)
+         ,configProcessContextSettings :: !(EnvSettings -> IO ProcessContext)
          -- ^ Environment variables to be passed to external tools
          ,configLocalProgramsBase   :: !(Path Abs Dir)
          -- ^ Non-platform-specific path containing local installations
@@ -1444,8 +1444,11 @@ getCompilerPath
 getCompilerPath wc = do
     config' <- view configL
     eoWithoutLocals <- liftIO $
-        configEnvOverrideSettings config' minimalEnvSettings { esLocaleUtf8 = True }
-    join (findExecutable eoWithoutLocals (compilerExeName wc))
+        configProcessContextSettings config' minimalEnvSettings { esLocaleUtf8 = True }
+    eres <- runRIO eoWithoutLocals $ findExecutable $ compilerExeName wc
+    case eres of
+      Left e -> throwM e
+      Right x -> parseAbsFile x
 
 data ProjectAndConfigMonoid
   = ProjectAndConfigMonoid !Project !ConfigMonoid
@@ -1830,7 +1833,7 @@ class HasGHCVariant env where
     {-# INLINE ghcVariantL #-}
 
 -- | Class for environment values that can provide a 'Config'.
-class (HasPlatform env, HasEnvOverride env, HasCabalLoader env) => HasConfig env where
+class (HasPlatform env, HasProcessContext env, HasCabalLoader env) => HasConfig env where
     configL :: Lens' env Config
     default configL :: HasBuildConfig env => Lens' env Config
     configL = buildConfigL.lens bcConfig (\x y -> x { bcConfig = y })
@@ -1867,14 +1870,14 @@ instance HasGHCVariant BuildConfig where
     ghcVariantL = lens bcGHCVariant (\x y -> x { bcGHCVariant = y })
 instance HasGHCVariant EnvConfig
 
-instance HasEnvOverride Config where
-    envOverrideL = runnerL.envOverrideL
-instance HasEnvOverride LoadConfig where
-    envOverrideL = configL.envOverrideL
-instance HasEnvOverride BuildConfig where
-    envOverrideL = configL.envOverrideL
-instance HasEnvOverride EnvConfig where
-    envOverrideL = configL.envOverrideL
+instance HasProcessContext Config where
+    processContextL = runnerL.processContextL
+instance HasProcessContext LoadConfig where
+    processContextL = configL.processContextL
+instance HasProcessContext BuildConfig where
+    processContextL = configL.processContextL
+instance HasProcessContext EnvConfig where
+    processContextL = configL.processContextL
 
 instance HasCabalLoader Config where
     cabalLoaderL = lens configCabalLoader (\x y -> x { configCabalLoader = y })
@@ -2002,10 +2005,10 @@ loadedSnapshotL = envConfigL.lens
 whichCompilerL :: Getting r (CompilerVersion a) WhichCompiler
 whichCompilerL = to whichCompiler
 
-envOverrideSettingsL :: HasConfig env => Lens' env (EnvSettings -> IO EnvOverride)
+envOverrideSettingsL :: HasConfig env => Lens' env (EnvSettings -> IO ProcessContext)
 envOverrideSettingsL = configL.lens
-    configEnvOverrideSettings
-    (\x y -> x { configEnvOverrideSettings = y })
+    configProcessContextSettings
+    (\x y -> x { configProcessContextSettings = y })
 
 globalHintsL :: HasBuildConfig s => Getting r s (Map PackageName (Maybe Version))
 globalHintsL = snapshotDefL.to sdGlobalHints
@@ -2015,7 +2018,7 @@ shouldForceGhcColorFlag :: (HasRunner env, HasEnvConfig env)
 shouldForceGhcColorFlag = do
     canDoColor <- (>= $(mkVersion "8.2.1")) . getGhcVersion
               <$> view actualCompilerVersionL
-    shouldDoColor <- logUseColor <$> view logOptionsL
+    shouldDoColor <- view useColorL
     return $ canDoColor && shouldDoColor
 
 appropriateGhcColorFlag :: (HasRunner env, HasEnvConfig env)

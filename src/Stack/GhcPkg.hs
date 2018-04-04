@@ -41,7 +41,7 @@ import           System.FilePath (searchPathSeparator)
 import           RIO.Process
 
 -- | Get the global package database
-getGlobalDB :: HasEnvOverride env
+getGlobalDB :: (HasProcessContext env, HasLogFunc env)
             => WhichCompiler -> RIO env (Path Abs Dir)
 getGlobalDB wc = do
     logDebug "Getting global package database location"
@@ -58,7 +58,7 @@ getGlobalDB wc = do
     firstLine = S8.takeWhile (\c -> c /= '\r' && c /= '\n')
 
 -- | Run the ghc-pkg executable
-ghcPkg :: HasEnvOverride env
+ghcPkg :: (HasProcessContext env, HasLogFunc env)
        => WhichCompiler
        -> [Path Abs Dir]
        -> [String]
@@ -73,12 +73,12 @@ ghcPkg wc pkgDbs args = do
   where
     go = fmap (fmap BL.toStrict)
        $ tryAny
-       $ withProc (ghcPkgExeName wc) args' readProcessStdout_
+       $ proc (ghcPkgExeName wc) args' readProcessStdout_
     args' = packageDbFlags pkgDbs ++ args
 
 -- | Create a package database in the given directory, if it doesn't exist.
 createDatabase
-  :: HasEnvOverride env
+  :: (HasProcessContext env, HasLogFunc env)
   => WhichCompiler -> Path Abs Dir -> RIO env ()
 createDatabase wc db = do
     exists <- doesFileExist (db </> $(mkRelFile "package.cache"))
@@ -89,11 +89,10 @@ createDatabase wc db = do
         dirExists <- doesDirExist db
         args <- if dirExists
             then do
-                logWarn $ T.pack $ concat
-                    [ "The package database located at "
-                    , toFilePath db
-                    , " is corrupted (missing its package.cache file)."
-                    ]
+                logWarn $
+                    "The package database located at " <>
+                    fromString (toFilePath db) <>
+                    " is corrupted (missing its package.cache file)."
                 logWarn "Proceeding with a recache"
                 return ["--package-db", toFilePath db, "recache"]
             else do
@@ -102,9 +101,9 @@ createDatabase wc db = do
                 -- finding out it isn't the hard way
                 ensureDir (parent db)
                 return ["init", toFilePath db]
-        void $ withProc (ghcPkgExeName wc) args $ \pc ->
+        void $ proc (ghcPkgExeName wc) args $ \pc ->
           readProcessStdout_ pc `onException`
-          logError (T.pack $ "Unable to create package database at " ++ toFilePath db)
+          logError ("Unable to create package database at " <> fromString (toFilePath db))
 
 -- | Get the name to use for "ghc-pkg", given the compiler version.
 ghcPkgExeName :: WhichCompiler -> String
@@ -124,7 +123,7 @@ packageDbFlags pkgDbs =
 
 -- | Get the value of a field of the package.
 findGhcPkgField
-    :: HasEnvOverride env
+    :: (HasProcessContext env, HasLogFunc env)
     => WhichCompiler
     -> [Path Abs Dir] -- ^ package databases
     -> String -- ^ package identifier, or GhcPkgId
@@ -143,7 +142,7 @@ findGhcPkgField wc pkgDbs name field = do
                 fmap (stripCR . T.decodeUtf8) $ listToMaybe $ S8.lines bs
 
 -- | Get the version of the package
-findGhcPkgVersion :: HasEnvOverride env
+findGhcPkgVersion :: (HasProcessContext env, HasLogFunc env)
                   => WhichCompiler
                   -> [Path Abs Dir] -- ^ package databases
                   -> PackageName
@@ -154,7 +153,7 @@ findGhcPkgVersion wc pkgDbs name = do
         Just !v -> return (parseVersion v)
         _ -> return Nothing
 
-unregisterGhcPkgId :: HasEnvOverride env
+unregisterGhcPkgId :: (HasProcessContext env, HasLogFunc env)
                     => WhichCompiler
                     -> CompilerVersion 'CVActual
                     -> Path Abs Dir -- ^ package database
@@ -164,7 +163,7 @@ unregisterGhcPkgId :: HasEnvOverride env
 unregisterGhcPkgId wc cv pkgDb gid ident = do
     eres <- ghcPkg wc [pkgDb] args
     case eres of
-        Left e -> logWarn $ T.pack $ show e
+        Left e -> logWarn $ displayShow e
         Right _ -> return ()
   where
     -- TODO ideally we'd tell ghc-pkg a GhcPkgId instead
@@ -175,7 +174,7 @@ unregisterGhcPkgId wc cv pkgDb gid ident = do
             _ -> ["--ipid", ghcPkgIdString gid])
 
 -- | Get the version of Cabal from the global package database.
-getCabalPkgVer :: HasEnvOverride env
+getCabalPkgVer :: (HasProcessContext env, HasLogFunc env)
                => WhichCompiler -> RIO env Version
 getCabalPkgVer wc = do
     logDebug "Getting Cabal package version"

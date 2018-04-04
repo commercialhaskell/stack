@@ -14,7 +14,6 @@ module Stack.Clean
 import           Stack.Prelude
 import           Data.List ((\\),intercalate)
 import qualified Data.Map.Strict as Map
-import qualified Data.Text as T
 import           Path.IO (ignoringAbsence, removeDirRecur)
 import           Stack.Config (getLocalPackages)
 import           Stack.Constants.Config (distDirFromDir, workDirFromDir)
@@ -32,7 +31,7 @@ clean cleanOpts = do
   where
     cleanDir dir =
       liftIO (ignoringAbsence (removeDirRecur dir) >> return False) `catchAny` \ex -> do
-        logError $ "Exception while recursively deleting " <> T.pack (toFilePath dir) <> "\n" <> T.pack (show ex)
+        logError $ "Exception while recursively deleting " <> fromString (toFilePath dir) <> "\n" <> displayShow ex
         logError "Perhaps you do not have permission to delete these files or they are in use?"
         return True
 

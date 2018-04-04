@@ -39,6 +39,8 @@ data CompilerVersion (cvType :: CVType)
     deriving (Generic, Show, Eq, Ord, Data, Typeable)
 instance Store (CompilerVersion a)
 instance NFData (CompilerVersion a)
+instance Display (CompilerVersion a) where
+    display = display . compilerVersionText
 instance ToJSON (CompilerVersion a) where
     toJSON = toJSON . compilerVersionText
 instance FromJSON (CompilerVersion a) where

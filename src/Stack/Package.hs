@@ -43,7 +43,6 @@ module Stack.Package
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Char8 as C8
 import           Data.List (isSuffixOf, isPrefixOf)
-import           Data.List.Extra (nubOrd)
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
 import qualified Data.Text as T
@@ -79,7 +78,7 @@ import           Stack.Constants
 import           Stack.Constants.Config
 import           Stack.Fetch (loadFromIndex)
 import           Stack.PackageIndex (HasCabalLoader (..))
-import           Stack.Prelude
+import           Stack.Prelude hiding (Display (..))
 import           Stack.PrettyPrint
 import           Stack.Types.Build
 import           Stack.Types.BuildPlan (ExeName (..))
@@ -113,8 +112,8 @@ instance HasRunner Ctx where
 instance HasConfig Ctx
 instance HasCabalLoader Ctx where
     cabalLoaderL = configL.cabalLoaderL
-instance HasEnvOverride Ctx where
-    envOverrideL = configL.envOverrideL
+instance HasProcessContext Ctx where
+    processContextL = configL.processContextL
 instance HasBuildConfig Ctx
 instance HasEnvConfig Ctx where
     envConfigL = lens ctxEnvConfig (\x y -> x { ctxEnvConfig = y })
@@ -1018,7 +1017,7 @@ mkResolveConditions compilerVersion (Platform arch os) flags = ResolveConditions
     }
 
 -- | Resolve the condition tree for the library.
-resolveConditions :: (Monoid target,Show target)
+resolveConditions :: (Semigroup target,Monoid target,Show target)
                   => ResolveConditions
                   -> (target -> cs -> target)
                   -> CondTree ConfVar cs target
@@ -1404,7 +1403,8 @@ hpack pkgDir = do
                         , flow "then please delete the cabal file."
                         ]
             HpackCommand command ->
-                withWorkingDir pkgDir $ withProc command [] runProcess_
+                withWorkingDir (toFilePath pkgDir) $
+                proc command [] runProcess_
 
 -- | Path for the package's build log.
 buildLogPath :: (MonadReader env m, HasBuildConfig env, MonadThrow m)

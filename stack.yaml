@@ -1,7 +1,4 @@
 resolver: lts-11.2
-packages:
-- .
-- subs/rio
 
 # docker:
 #   enable: true
@@ -20,6 +17,7 @@ flags:
     hide-dependency-versions: true
     supported-build: true
 extra-deps:
+- rio-0.1.0.0@rev:0
 - Cabal-2.2.0.1@rev:0
 - hackage-security-0.5.3.0@rev:0
 - hpack-0.28.2

@@ -18,7 +18,7 @@ module Main (main) where
 #ifndef HIDE_DEP_VERSIONS
 import qualified Build_stack
 #endif
-import           Stack.Prelude
+import           Stack.Prelude hiding (Display (..))
 import           Control.Monad.Reader (local)
 import           Control.Monad.Trans.Except (ExceptT)
 import           Control.Monad.Writer.Lazy (Writer)
@@ -38,7 +38,6 @@ import           Distribution.System (buildArch)
 import qualified Distribution.Text as Cabal (display)
 import           Distribution.Version (mkVersion')
 import           GHC.IO.Encoding (mkTextEncoding, textEncodingName)
-import           Lens.Micro
 import           Options.Applicative
 import           Options.Applicative.Help (errorHelp, stringChunk, vcatChunks)
 import           Options.Applicative.Builder.Extra
@@ -105,7 +104,7 @@ import qualified System.Directory as D
 import           System.Environment (getProgName, getArgs, withArgs)
 import           System.Exit
 import           System.FilePath (isValid, pathSeparator)
-import           System.IO (stderr, stdin, stdout, BufferMode(..), hPutStrLn, hGetEncoding, hSetEncoding)
+import           System.IO (stderr, stdin, stdout, BufferMode(..), hPutStrLn, hPrint, hGetEncoding, hSetEncoding)
 
 -- | Change the character encoding of the given Handle to transliterate
 -- on unsupported characters instead of throwing an exception
@@ -198,7 +197,7 @@ main = do
           case fromException e of
               Just ec -> exitWith ec
               Nothing -> do
-                  printExceptionStderr e
+                  hPrint stderr e
                   exitFailure
 
 -- Vertically combine only the error component of the first argument with the
@@ -506,7 +505,7 @@ secondaryCommandHandler args f =
     else do
       mExternalExec <- D.findExecutable cmd
       case mExternalExec of
-        Just ex -> runEnvNoLogging $ do
+        Just ex -> withProcessContextNoLogging $ do
           -- TODO show the command in verbose mode
           -- hPutStrLn stderr $ unwords $
           --   ["Running", "[" ++ ex, unwords (tail args) ++ "]"]
@@ -782,8 +781,8 @@ execCmd ExecOpts {..} go@GlobalOpts{..} =
                     (Just $ munlockFile lk)
                     (runRIO (lcConfig lc) $ do
                         config <- view configL
-                        menv <- liftIO $ configEnvOverrideSettings config plainEnvSettings
-                        withEnvOverride menv $ Nix.reexecWithOptionalShell
+                        menv <- liftIO $ configProcessContextSettings config plainEnvSettings
+                        withProcessContext menv $ Nix.reexecWithOptionalShell
                             (lcProjectRoot lc)
                             getCompilerVersion
                             (runRIO (lcConfig lc) $
@@ -799,8 +798,8 @@ execCmd ExecOpts {..} go@GlobalOpts{..} =
                       }
 
               config <- view configL
-              menv <- liftIO $ configEnvOverrideSettings config eoEnvSettings
-              withEnvOverride menv $ do
+              menv <- liftIO $ configProcessContextSettings config eoEnvSettings
+              withProcessContext menv $ do
                 -- Add RTS options to arguments
                 let argsWithRts args = if null eoRtsOptions
                             then args :: [String]

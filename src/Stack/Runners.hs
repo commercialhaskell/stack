@@ -35,7 +35,6 @@ import           System.Environment (getEnvironment)
 import           System.IO
 import           System.FileLock
 import           Stack.Dot
-import           Lens.Micro
 
 -- FIXME it seems wrong that we call lcLoadBuildConfig multiple times
 loadCompilerVersion :: GlobalOpts

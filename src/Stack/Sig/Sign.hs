@@ -21,7 +21,6 @@ import qualified Codec.Compression.GZip as GZip
 import           Stack.Prelude
 import qualified Data.ByteString.Lazy as BS
 import qualified Data.ByteString.Lazy as L
-import qualified Data.Text as T
 import           Network.HTTP.Client (RequestBody (RequestBodyBS))
 import           Network.HTTP.Download
 import           Network.HTTP.Simple (setRequestMethod, setRequestBody, getResponseStatusCode)
@@ -108,5 +107,5 @@ signPackage url pkg filePath = do
     when
         (getResponseStatusCode res /= 200)
         (throwM (GPGSignException "unable to sign & upload package"))
-    logInfo ("Signature uploaded to " <> T.pack fullUrl)
+    logInfo ("Signature uploaded to " <> fromString fullUrl)
     return sig

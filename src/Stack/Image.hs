@@ -145,7 +145,7 @@ createDockerImage dockerConfig dir =
                           (imageName (parent . parent . parent $ dir))
                           (imgDockerImageName dockerConfig)
                     , toFilePathNoTrailingSep dir]
-            withProc "docker" args runProcess_
+            proc "docker" args runProcess_
 
 -- | Extend the general purpose docker image with entrypoints (if specified).
 extendDockerImageWithEntrypoint
@@ -172,7 +172,7 @@ extendDockerImageWithEntrypoint dockerConfig dir = do
                                        , "ENTRYPOINT [\"/usr/local/bin/" ++
                                          ep ++ "\"]"
                                        , "CMD []"]))))
-                         withProc
+                         proc
                                   "docker"
                                   [ "build"
                                   , "-t"

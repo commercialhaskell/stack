@@ -114,23 +114,23 @@ resolveSinglePackageLocation projRoot (PLArchive (Archive url subdir msha)) = do
           -- this is the wrong type of file.
 
           let tryTargz = do
-                logDebug $ "Trying to ungzip/untar " <> T.pack fp
+                logDebug $ "Trying to ungzip/untar " <> fromString fp
                 let entries = Tar.read $ GZip.decompress lbs
                 liftIO $ Tar.unpack (toFilePath dirTmp) entries
               tryZip = do
-                logDebug $ "Trying to unzip " <> T.pack fp
+                logDebug $ "Trying to unzip " <> fromString fp
                 let archive = Zip.toArchive lbs
                 liftIO $  Zip.extractFilesFromArchive [Zip.OptDestination
                                                        (toFilePath dirTmp)] archive
               tryTar = do
-                logDebug $ "Trying to untar (no ungzip) " <> T.pack fp
+                logDebug $ "Trying to untar (no ungzip) " <> fromString fp
                 let entries = Tar.read lbs
                 liftIO $ Tar.unpack (toFilePath dirTmp) entries
               err = throwM $ UnableToExtractArchive url file
 
               catchAnyLog goodpath handler =
                   catchAny goodpath $ \e -> do
-                      logDebug $ "Got exception: " <> T.pack (show e)
+                      logDebug $ "Got exception: " <> displayShow e
                       handler
 
           tryTargz `catchAnyLog` tryZip `catchAnyLog` tryTar `catchAnyLog` err
@@ -202,10 +202,11 @@ cloneRepo projRoot url commit repoType' = do
     unless exists $ do
         liftIO $ ignoringAbsence (removeDirRecur dir)
 
-        let cloneAndExtract commandName cloneArgs resetCommand = withWorkingDir root $ do
+        let cloneAndExtract commandName cloneArgs resetCommand =
+              withWorkingDir (toFilePath root) $ do
                 ensureDir root
-                logInfo $ "Cloning " <> commit <> " from " <> url
-                withProc commandName
+                logInfo $ "Cloning " <> display commit <> " from " <> display url
+                proc commandName
                        ("clone" :
                         cloneArgs ++
                         [ T.unpack url
@@ -213,11 +214,15 @@ cloneRepo projRoot url commit repoType' = do
                         ]) runProcess_
                 created <- doesDirExist dir
                 unless created $ throwM $ FailedToCloneRepo commandName
-                withWorkingDir dir $ readProcessNull commandName
+                withWorkingDir (toFilePath dir) $ readProcessNull commandName
                     (resetCommand ++ [T.unpack commit, "--"])
                     `catchAny` \case
                         ex -> do
-                            logInfo $ "Please ensure that commit " <> commit <> " exists within " <> url
+                            logInfo $
+                              "Please ensure that commit " <>
+                              display commit <>
+                              " exists within " <>
+                              display url
                             throwM ex
 
         case repoType' of

@@ -12,7 +12,6 @@ module Stack.Options.Completion
 
 import           Data.Char (isSpace)
 import           Data.List (isPrefixOf)
-import           Data.List.Extra (nubOrd)
 import qualified Data.Map as Map
 import           Data.Maybe
 import qualified Data.Set as Set

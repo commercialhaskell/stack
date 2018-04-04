@@ -31,9 +31,9 @@ import qualified Data.ByteString.Lazy as BL
 import qualified Data.ByteString.Lazy.Char8 as LBS
 import           Data.Char (isSpace,toUpper,isAscii,isDigit)
 import           Data.Conduit.List (sinkNull)
-import           Data.Conduit.Process.Typed
+import           Data.Conduit.Process.Typed hiding (proc)
 import           Data.List (dropWhileEnd,intercalate,isPrefixOf,isInfixOf)
-import           Data.List.Extra (trim, nubOrd)
+import           Data.List.Extra (trim)
 import qualified Data.Map.Strict as Map
 import           Data.Ord (Down(..))
 import           Data.Streaming.Process (ProcessExitedUnsuccessfully(..))
@@ -72,7 +72,6 @@ import           RIO.Process
 import           Text.Printf (printf)
 
 #ifndef WINDOWS
-import           Control.Concurrent (threadDelay)
 import           System.Posix.Signals
 import qualified System.Posix.User as PosixUser
 #endif
@@ -238,10 +237,8 @@ runContainerAndExit getCmdArgs
                     mprojectRoot
                     before
                     after = do
-  config <- view configL
-  let docker = configDocker config
-  envOverride <- getEnvOverride -- FIXME do we actually want to be changing the envOverride, or just using the one in RIO?
-  withEnvOverride envOverride $ do
+     config <- view configL
+     let docker = configDocker config
      checkDockerVersion docker
      (env,isStdinTerminal,isStderrTerminal,homeDir) <- liftIO $
        (,,,)
@@ -288,9 +285,10 @@ runContainerAndExit getCmdArgs
                          -- in place for now, for users who haven't upgraded yet.
                          (isTerm || (isNothing bamboo && isNothing jenkins))
      hostBinDirPath <- parseAbsDir hostBinDir
-     newPathEnv <- augmentPath
+     newPathEnv <- either throwM return $ augmentPath
+                      ( toFilePath <$>
                       [ hostBinDirPath
-                      , sandboxHomeDir </> $(mkRelDir ".local/bin")]
+                      , sandboxHomeDir </> $(mkRelDir ".local/bin")])
                       (T.pack <$> lookupImageEnv "PATH" imageEnvVars)
      (cmnd,args,envVars,extraMount) <- getCmdArgs docker imageInfo isRemoteDocker
      pwd <- getCurrentDir
@@ -310,7 +308,7 @@ runContainerAndExit getCmdArgs
              (Files.createSymbolicLink
                  (toFilePathNoTrailingSep sshDir)
                  (toFilePathNoTrailingSep (sandboxHomeDir </> sshRelDir))))
-     containerID <- withWorkingDir projectRoot $ trim . decodeUtf8 <$> readDockerProcess
+     containerID <- withWorkingDir (toFilePath projectRoot) $ trim . decodeUtf8 <$> readDockerProcess
        (concat
          [["create"
           ,"--net=host"
@@ -358,7 +356,7 @@ runContainerAndExit getCmdArgs
              readProcessNull "docker" ["kill","--signal=" ++ show sig,containerID]
              when (sig `elem` [sigTERM,sigABRT]) $ do
                -- Give the container 30 seconds to exit gracefully, then send a sigKILL to force it
-               liftIO $ threadDelay 30000000
+               threadDelay 30000000
                readProcessNull "docker" ["kill",containerID]
        oldHandler <- liftIO $ installHandler sig (Catch sigHandler) Nothing
        return (sig, oldHandler)
@@ -367,7 +365,7 @@ runContainerAndExit getCmdArgs
                         ,["-a" | not (dockerDetach docker)]
                         ,["-i" | keepStdinOpen]
                         ,[containerID]]
-     e <- try (withProc "docker" args' $ runProcess_ . setDelegateCtlc False)
+     e <- try (proc "docker" args' $ runProcess_ . setDelegateCtlc False)
          `finally`
          (do unless (dockerPersist docker || dockerDetach docker) $
                  readProcessNull "docker" ["rm","-f",containerID]
@@ -397,10 +395,8 @@ runContainerAndExit getCmdArgs
 -- | Clean-up old docker images and containers.
 cleanup :: HasConfig env => CleanupOpts -> RIO env ()
 cleanup opts = do
-  config <- view configL
-  let docker = configDocker config
-  envOverride <- getEnvOverride
-  withEnvOverride envOverride $ do
+     config <- view configL
+     let docker = configDocker config
      checkDockerVersion docker
      imagesOut <- readDockerProcess ["images","--no-trunc","-f","dangling=false"]
      danglingImagesOut <- readDockerProcess ["images","--no-trunc","-f","dangling=true"]
@@ -453,16 +449,26 @@ cleanup opts = do
         [] -> return ()
         (c:_):t:v:_ ->
           do args <- if | toUpper c == 'R' && t == imageStr ->
-                            do logInfo (concatT ["Removing image: '",v,"'"])
+                            do logInfo $
+                                 "Removing image: '" <>
+                                 fromString v <>
+                                 "'"
                                return ["rmi",v]
                         | toUpper c == 'R' && t == containerStr ->
-                            do logInfo (concatT ["Removing container: '",v,"'"])
+                            do logInfo $
+                                 "Removing container: '" <>
+                                 fromString v <>
+                                 "'"
                                return ["rm","-f",v]
                         | otherwise -> throwM (InvalidCleanupCommandException line)
              e <- try (readDockerProcess args)
              case e of
                Left ex ->
-                 logError (concatT ["Could not remove: '",v,"': ", show (ex :: ExitCodeException)])
+                 logError $
+                   "Could not remove: '" <>
+                   fromString v <>
+                   "': " <>
+                   displayShow (ex :: ExitCodeException)
                Right _ -> return ()
         _ -> throwM (InvalidCleanupCommandException line)
     parseImagesOut = Map.fromListWith (++) . map parseImageRepo . drop 1 . lines . decodeUtf8
@@ -619,7 +625,7 @@ cleanup opts = do
     containerStr = "container"
 
 -- | Inspect Docker image or container.
-inspect :: HasEnvOverride env
+inspect :: (HasProcessContext env, HasLogFunc env)
         => String -> RIO env (Maybe Inspect)
 inspect image =
   do results <- inspects [image]
@@ -629,7 +635,7 @@ inspect image =
        _ -> throwIO (InvalidInspectOutputException "expect a single result")
 
 -- | Inspect multiple Docker images and/or containers.
-inspects :: HasEnvOverride env
+inspects :: (HasProcessContext env, HasLogFunc env)
          => [String] -> RIO env (Map String Inspect)
 inspects [] = return Map.empty
 inspects images =
@@ -650,19 +656,17 @@ pull :: HasConfig env => RIO env ()
 pull =
   do config <- view configL
      let docker = configDocker config
-     envOverride <- getEnvOverride
-     withEnvOverride envOverride $ do
-       checkDockerVersion docker
-       pullImage docker (dockerImage docker)
+     checkDockerVersion docker
+     pullImage docker (dockerImage docker)
 
 -- | Pull Docker image from registry.
-pullImage :: HasEnvOverride env
+pullImage :: (HasProcessContext env, HasLogFunc env)
           => DockerOpts -> String -> RIO env ()
 pullImage docker image =
-  do logInfo (concatT ["Pulling image from registry: '",image,"'"])
+  do logInfo ("Pulling image from registry: '" <> fromString image <> "'")
      when (dockerRegistryLogin docker)
           (do logInfo "You may need to log in."
-              withProc
+              proc
                 "docker"
                 (concat
                    [["login"]
@@ -673,7 +677,7 @@ pullImage docker image =
      -- We redirect the stdout of the process to stderr so that the output
      -- of @docker pull@ will not interfere with the output of other
      -- commands when using --auto-docker-pull. See issue #2733.
-     ec <- withProc "docker" ["pull", image] $ \pc0 -> do
+     ec <- proc "docker" ["pull", image] $ \pc0 -> do
        let pc = setStdout (useHandleOpen stderr)
               $ setStderr (useHandleOpen stderr)
               $ setStdin closed
@@ -685,11 +689,10 @@ pullImage docker image =
 
 -- | Check docker version (throws exception if incorrect)
 checkDockerVersion
-    :: HasEnvOverride env
+    :: (HasProcessContext env, HasLogFunc env)
     => DockerOpts -> RIO env ()
 checkDockerVersion docker =
-  do envOverride <- view envOverrideL
-     dockerExists <- doesExecutableExist envOverride "docker"
+  do dockerExists <- doesExecutableExist "docker"
      unless dockerExists (throwIO DockerNotInstalledException)
      dockerVersionOut <- readDockerProcess ["--version"]
      case words (decodeUtf8 dockerVersionOut) of
@@ -723,13 +726,13 @@ reset maybeProjectRoot keepHome = do
 
 -- | The Docker container "entrypoint": special actions performed when first entering
 -- a container, such as switching the UID/GID to the "outside-Docker" user's.
-entrypoint :: HasEnvOverride env
+entrypoint :: (HasProcessContext env, HasLogFunc env)
            => Config -> DockerEntrypoint -> RIO env ()
 entrypoint config@Config{..} DockerEntrypoint{..} =
   modifyMVar_ entrypointMVar $ \alreadyRan -> do
     -- Only run the entrypoint once
     unless alreadyRan $ do
-      envOverride <- getEnvOverride
+      envOverride <- view processContextL
       homeDir <- liftIO $ parseAbsDir =<< getEnv "HOME"
       -- Get the UserEntry for the 'stack' user in the image, if it exists
       estackUserEntry0 <- liftIO $ tryJust (guard . isDoesNotExistError) $
@@ -738,7 +741,7 @@ entrypoint config@Config{..} DockerEntrypoint{..} =
       case deUser of
         Nothing -> return ()
         Just (DockerUser 0 _ _ _) -> return ()
-        Just du -> withEnvOverride envOverride $ updateOrCreateStackUser estackUserEntry0 homeDir du
+        Just du -> withProcessContext envOverride $ updateOrCreateStackUser estackUserEntry0 homeDir du
       case estackUserEntry0 of
         Left _ -> return ()
         Right ue -> do
@@ -842,9 +845,9 @@ removeDirectoryContents path excludeDirs excludeFiles =
 -- process. Throws a 'ReadProcessException' exception if the
 -- process fails.  Logs process's stderr using @logError@.
 readDockerProcess
-    :: HasEnvOverride env
+    :: (HasProcessContext env, HasLogFunc env)
     => [String] -> RIO env BS.ByteString
-readDockerProcess args = BL.toStrict <$> withProc "docker" args readProcessStdout_ -- FIXME stderr isn't logged with logError, should it be?
+readDockerProcess args = BL.toStrict <$> proc "docker" args readProcessStdout_ -- FIXME stderr isn't logged with logError, should it be?
 
 -- | Name of home directory within docker sandbox.
 homeDirName :: Path Rel Dir
@@ -857,10 +860,6 @@ hostBinDir = "/opt/host/bin"
 -- | Convenience function to decode ByteString to String.
 decodeUtf8 :: BS.ByteString -> String
 decodeUtf8 bs = T.unpack (T.decodeUtf8 bs)
-
--- | Convenience function constructing message for @log*@.
-concatT :: [String] -> Text
-concatT = T.pack . concat
 
 -- | Fail with friendly error if project root not set.
 fromMaybeProjectRoot :: Maybe (Path Abs Dir) -> Path Abs Dir

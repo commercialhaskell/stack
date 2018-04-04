@@ -4,26 +4,16 @@
 module Stack.FileWatch
     ( fileWatch
     , fileWatchPoll
-    , printExceptionStderr
     ) where
 
-import Blaze.ByteString.Builder (toLazyByteString, copyByteString)
-import Blaze.ByteString.Builder.Char.Utf8 (fromShow)
 import Control.Concurrent.STM (check)
 import Stack.Prelude
-import qualified Data.ByteString.Lazy as L
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import GHC.IO.Exception
 import Path
-import System.Console.ANSI
 import System.FSNotify
-import System.IO (stdout, stderr, hPutStrLn, getLine)
-
--- | Print an exception to stderr
-printExceptionStderr :: Exception e => e -> IO ()
-printExceptionStderr e =
-    L.hPut stderr $ toLazyByteString $ fromShow e <> copyByteString "\n"
+import System.IO (hPutStrLn, getLine)
 
 fileWatch :: Handle
           -> ((Set (Path Abs File) -> IO ()) -> IO ())
@@ -45,14 +35,11 @@ fileWatchConf :: WatchConfig
               -> IO ()
 fileWatchConf cfg out inner = withManagerConf cfg $ \manager -> do
     let putLn = hPutStrLn out
-    let withColor color action = do
-            outputIsTerminal <- hIsTerminalDevice stdout
+    outputIsTerminal <- hIsTerminalDevice out
+    let withColor color str = putLn $ do
             if outputIsTerminal
-            then do
-                setSGR [SetColor Foreground Dull color]
-                action
-                setSGR [Reset]
-            else action
+            then concat [color, str, reset]
+            else str
 
     allFiles <- newTVarIO Set.empty
     dirtyVar <- newTVarIO True
@@ -139,10 +126,14 @@ fileWatchConf cfg out inner = withManagerConf cfg $ \manager -> do
         case eres of
             Left e -> do
                 let color = case fromException e of
-                        Just ExitSuccess -> Green
-                        _ -> Red
-                withColor color $ printExceptionStderr e
-            _ -> withColor Green $
-                putLn "Success! Waiting for next file change."
+                        Just ExitSuccess -> green
+                        _ -> red
+                withColor color $ show e
+            _ -> withColor green "Success! Waiting for next file change."
 
         putLn "Type help for available commands. Press enter to force a rebuild."
+
+green, red, reset :: String
+green = "\ESC[32m"
+red = "\ESC[31m"
+reset = "\ESC[0m"

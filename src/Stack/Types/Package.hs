@@ -293,11 +293,13 @@ lpFiles = Set.unions . M.elems . lpComponentFiles
 -- | A location to install a package into, either snapshot or local
 data InstallLocation = Snap | Local
     deriving (Show, Eq)
+instance Semigroup InstallLocation where
+    Local <> _ = Local
+    _ <> Local = Local
+    Snap <> Snap = Snap
 instance Monoid InstallLocation where
     mempty = Snap
-    mappend Local _ = Local
-    mappend _ Local = Local
-    mappend Snap Snap = Snap
+    mappend = (<>)
 
 data InstalledPackageLocation = InstalledTo InstallLocation | ExtraGlobal
     deriving (Show, Eq)
