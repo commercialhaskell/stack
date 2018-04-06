@@ -435,9 +435,9 @@ getPackageFilesForTargets
     -> Set NamedComponent
     -> RIO env (Map NamedComponent (Set (Path Abs File)), [PackageWarning])
 getPackageFilesForTargets pkg cabalFP nonLibComponents = do
-    (_,compFiles,otherFiles,warnings) <-
+    (components',compFiles,otherFiles,warnings) <-
         getPackageFiles (packageFiles pkg) cabalFP
-    let components = Set.insert CLib nonLibComponents
+    let components = M.keysSet components' `Set.union` nonLibComponents
         componentsFiles =
             M.map (\files -> Set.union otherFiles (Set.map dotCabalGetPath files)) $
                 M.filterWithKey (\component _ -> component `Set.member` components) compFiles
