@@ -229,16 +229,7 @@ isAllowed opts mcache sourceMap mloc dp
     | getInstalledSymbols opts && isJust mcache && not (dpSymbols dp) = NeedsSymbols
     | otherwise =
         case Map.lookup name sourceMap of
-            Nothing ->
-                case mloc of
-                    -- The sourceMap has nothing to say about this global
-                    -- package, so we can use it
-                    Nothing -> Allowed
-                    Just ExtraGlobal -> Allowed
-                    -- For non-global packages, don't include unknown packages.
-                    -- See:
-                    -- https://github.com/commercialhaskell/stack/issues/292
-                    Just _ -> UnknownPkg
+            Nothing -> checkNotFound
             Just pii -> checkFound pii
   where
     PackageIdentifier name version = dpPackageIdent dp
@@ -251,6 +242,14 @@ isAllowed opts mcache sourceMap mloc dp
       | not (checkLocation (piiLocation pii)) = WrongLocation mloc (piiLocation pii)
       | version /= piiVersion pii = WrongVersion version (piiVersion pii)
       | otherwise = Allowed
+    -- check if a package is allowed if it is not found in the sourceMap
+    checkNotFound = case mloc of
+      -- The sourceMap has nothing to say about this global package, so we can use it
+      Nothing -> Allowed
+      Just ExtraGlobal -> Allowed
+      -- For non-global packages, don't include unknown packages.
+      -- See: https://github.com/commercialhaskell/stack/issues/292
+      Just _ -> UnknownPkg
 
 data LoadHelper = LoadHelper
     { lhId   :: !GhcPkgId
