@@ -52,7 +52,9 @@ Other enhancements:
 
 Bug fixes:
 
-
+* When a package contained sublibraries, stack was always recompiling the
+  package. This has been fixed now, no recompilation is being done because of
+  sublibraries. See [#3899](https://github.com/commercialhaskell/stack/issues/3899).
 
 ## v1.6.5
 
