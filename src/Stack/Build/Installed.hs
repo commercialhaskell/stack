@@ -229,7 +229,18 @@ isAllowed opts mcache sourceMap mloc dp
     | getInstalledSymbols opts && isJust mcache && not (dpSymbols dp) = NeedsSymbols
     | otherwise =
         case Map.lookup name sourceMap of
-            Nothing -> checkNotFound
+            Nothing ->
+                -- If the sourceMap has nothing to say about this package,
+                -- check if it represents a sublibrary first
+                -- See: https://github.com/commercialhaskell/stack/issues/3899
+                case dpParentLibIdent dp of
+                  Just (PackageIdentifier parentLibName version') ->
+                    case Map.lookup parentLibName sourceMap of
+                      Nothing -> checkNotFound
+                      Just pii
+                        | version' == version -> checkFound pii
+                        | otherwise -> checkNotFound -- different versions
+                  Nothing -> checkNotFound
             Just pii -> checkFound pii
   where
     PackageIdentifier name version = dpPackageIdent dp
