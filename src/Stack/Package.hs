@@ -43,6 +43,7 @@ module Stack.Package
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Char8 as C8
 import           Data.List (isSuffixOf, isPrefixOf)
+import           Data.Maybe (fromJust)
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
 import qualified Data.Text as T
@@ -580,6 +581,7 @@ fileGenDirFromComponentName
 fileGenDirFromComponentName namedComponent =
     case namedComponent of
         CLib -> return id
+        CInternalLib name -> makeTmp name
         CExe name -> makeTmp name
         CTest name -> makeTmp name
         CBench name -> makeTmp name
@@ -683,6 +685,12 @@ packageDescModulesAndFiles pkg = do
             (return (M.empty, M.empty, []))
             (asModuleAndFileMap libComponent libraryFiles)
             (library pkg)
+    (subLibrariesMods,subLibDotCabalFiles,subLibWarnings) <-
+        liftM
+            foldTuples
+            (mapM
+                 (asModuleAndFileMap internalLibComponent libraryFiles)
+                 (subLibraries pkg))
     (executableMods,exeDotCabalFiles,exeWarnings) <-
         liftM
             foldTuples
@@ -710,6 +718,7 @@ packageDescModulesAndFiles pkg = do
     return (modules, files, dfiles, warnings)
   where
     libComponent = const CLib
+    internalLibComponent = CInternalLib . T.pack . Cabal.unUnqualComponentName . fromJust . libName
     exeComponent = CExe . T.pack . Cabal.unUnqualComponentName . exeName
     testComponent = CTest . T.pack . Cabal.unUnqualComponentName . testName
     benchComponent = CBench . T.pack . Cabal.unUnqualComponentName . benchmarkName

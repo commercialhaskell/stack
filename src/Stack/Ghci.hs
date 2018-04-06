@@ -520,6 +520,7 @@ figureOutMainFile bopts mainIsTargets targets0 packages = do
     renderComp c =
         case c of
             CLib -> "lib"
+            CInternalLib name -> "internal-lib:" <> name
             CExe name -> "exe:" <> name
             CTest name -> "test:" <> name
             CBench name -> "bench:" <> name

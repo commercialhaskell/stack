@@ -24,6 +24,7 @@ import Data.Text.Encoding (encodeUtf8, decodeUtf8)
 -- | A single, fully resolved component of a package
 data NamedComponent
     = CLib
+    | CInternalLib !Text
     | CExe !Text
     | CTest !Text
     | CBench !Text
@@ -31,6 +32,7 @@ data NamedComponent
 
 renderComponent :: NamedComponent -> ByteString
 renderComponent CLib = "lib"
+renderComponent (CInternalLib x) = "internal-lib:" <> encodeUtf8 x
 renderComponent (CExe x) = "exe:" <> encodeUtf8 x
 renderComponent (CTest x) = "test:" <> encodeUtf8 x
 renderComponent (CBench x) = "bench:" <> encodeUtf8 x

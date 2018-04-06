@@ -167,6 +167,7 @@ splitComponents =
   where
     go a b c [] = (Set.fromList $ a [], Set.fromList $ b [], Set.fromList $ c [])
     go a b c (CLib:xs) = go a b c xs
+    go a b c (CInternalLib x:xs) = go (a . (x:)) b c xs
     go a b c (CExe x:xs) = go (a . (x:)) b c xs
     go a b c (CTest x:xs) = go a (b . (x:)) c xs
     go a b c (CBench x:xs) = go a b (c . (x:)) xs
