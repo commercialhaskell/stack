@@ -239,16 +239,18 @@ isAllowed opts mcache sourceMap mloc dp
                     -- See:
                     -- https://github.com/commercialhaskell/stack/issues/292
                     Just _ -> UnknownPkg
-            Just pii
-                | not (checkLocation (piiLocation pii)) -> WrongLocation mloc (piiLocation pii)
-                | version /= piiVersion pii -> WrongVersion version (piiVersion pii)
-                | otherwise -> Allowed
+            Just pii -> checkFound pii
   where
     PackageIdentifier name version = dpPackageIdent dp
     -- Ensure that the installed location matches where the sourceMap says it
     -- should be installed
     checkLocation Snap = mloc /= Just (InstalledTo Local) -- we can allow either global or snap
     checkLocation Local = mloc == Just (InstalledTo Local) || mloc == Just ExtraGlobal -- 'locally' installed snapshot packages can come from extra dbs
+    -- Check if a package is allowed if it is found in the sourceMap
+    checkFound pii
+      | not (checkLocation (piiLocation pii)) = WrongLocation mloc (piiLocation pii)
+      | version /= piiVersion pii = WrongVersion version (piiVersion pii)
+      | otherwise = Allowed
 
 data LoadHelper = LoadHelper
     { lhId   :: !GhcPkgId
