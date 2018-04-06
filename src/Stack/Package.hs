@@ -710,11 +710,11 @@ packageDescModulesAndFiles pkg = do
     dfiles <- resolveGlobFiles
                     (extraSrcFiles pkg
                         ++ map (dataDir pkg FilePath.</>) (dataFiles pkg))
-    let modules = libraryMods <> executableMods <> testMods <> benchModules
+    let modules = libraryMods <> subLibrariesMods <> executableMods <> testMods <> benchModules
         files =
-            libDotCabalFiles <> exeDotCabalFiles <> testDotCabalFiles <>
+            libDotCabalFiles <> subLibDotCabalFiles <> exeDotCabalFiles <> testDotCabalFiles <>
             benchDotCabalPaths
-        warnings = libWarnings <> exeWarnings <> testWarnings <> benchWarnings
+        warnings = libWarnings <> subLibWarnings <> exeWarnings <> testWarnings <> benchWarnings
     return (modules, files, dfiles, warnings)
   where
     libComponent = const CLib
