@@ -24,7 +24,7 @@ module Stack.Build
 import           Stack.Prelude
 import           Data.Aeson (Value (Object, Array), (.=), object)
 import qualified Data.HashMap.Strict as HM
-import           Data.List ((\\))
+import           Data.List ((\\), isPrefixOf)
 import           Data.List.Extra (groupSort)
 import           Data.List.NonEmpty (NonEmpty(..))
 import qualified Data.List.NonEmpty as NE
@@ -347,7 +347,7 @@ queryBuildInfo :: HasEnvConfig env
 queryBuildInfo selectors0 =
         rawBuildInfo
     >>= select id selectors0
-    >>= liftIO . TIO.putStrLn . decodeUtf8 . Yaml.encode
+    >>= liftIO . TIO.putStrLn . addGlobalHintsComment . decodeUtf8 . Yaml.encode
   where
     select _ [] value = return value
     select front (sel:sels) value =
@@ -366,7 +366,21 @@ queryBuildInfo selectors0 =
       where
         cont = select (front . (sel:)) sels
         err msg = throwString $ msg ++ ": " ++ show (front [sel])
-
+    -- Include comments to indicate that this portion of the "stack
+    -- query" API is not necessarily stable.
+    addGlobalHintsComment
+      | null selectors0 = T.replace globalHintsLine ("\n" <> globalHintsComment <> globalHintsLine)
+      -- Append comment instead of pre-pending. The reasoning here is
+      -- that something *could* expect that the result of 'stack query
+      -- global-hints ghc-boot' is just a string literal. Seems easier
+      -- for to expect the first line of the output to be the literal.
+      | ["global-hints"] `isPrefixOf` selectors0 = (<> ("\n" <> globalHintsComment))
+      | otherwise = id
+    globalHintsLine = "\nglobal-hints:\n"
+    globalHintsComment = T.concat
+      [ "# Note: global-hints is experimental and may be renamed / removed in the future.\n"
+      , "# See https://github.com/commercialhaskell/stack/issues/3796"
+      ]
 -- | Get the raw build information object
 rawBuildInfo :: HasEnvConfig env => RIO env Value
 rawBuildInfo = do
