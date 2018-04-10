@@ -33,7 +33,6 @@ module Stack.Package
   ,resolvePackageDescription
   ,packageDescTools
   ,packageDependencies
-  ,autogenDir
   ,cabalFilePackageId
   ,gpdPackageIdentifier
   ,gpdPackageName
@@ -100,7 +99,7 @@ import           System.IO.Error
 import           RIO.Process
 
 data Ctx = Ctx { ctxFile :: !(Path Abs File)
-               , ctxDir :: !(Path Abs Dir)
+               , ctxDistDir :: !(Path Abs Dir)
                , ctxEnvConfig :: !EnvConfig
                }
 
@@ -336,7 +335,7 @@ packageFromPackageDescription packageConfig pkgFlags (PackageDescriptionPair pkg
              env <- view envConfigL
              (componentModules,componentFiles,dataFiles',warnings) <-
                  runRIO
-                     (Ctx cabalfp (buildDir distDir) env)
+                     (Ctx cabalfp distDir env)
                      (packageDescModulesAndFiles pkg)
              setupFiles <-
                  if buildType pkg == Custom
@@ -386,19 +385,13 @@ generatePkgDescOpts
     -> m (Map NamedComponent BuildInfoOpts)
 generatePkgDescOpts sourceMap installedMap omitPkgs addPkgs cabalfp pkg componentPaths = do
     config <- view configL
+    cabalVer <- view cabalVersionL
     distDir <- distDirFromDir cabalDir
-    let cabalMacros = autogenDir distDir </> $(mkRelFile "cabal_macros.h")
-    exists <- doesFileExist cabalMacros
-    let mcabalMacros =
-            if exists
-                then Just cabalMacros
-                else Nothing
     let generate namedComponent binfo =
             ( namedComponent
             , generateBuildInfoOpts BioInput
                 { biSourceMap = sourceMap
                 , biInstalledMap = installedMap
-                , biCabalMacros = mcabalMacros
                 , biCabalDir = cabalDir
                 , biDistDir = distDir
                 , biOmitPackages = omitPkgs
@@ -408,6 +401,7 @@ generatePkgDescOpts sourceMap installedMap omitPkgs addPkgs cabalfp pkg componen
                 , biConfigLibDirs = configExtraLibDirs config
                 , biConfigIncludeDirs = configExtraIncludeDirs config
                 , biComponentName = namedComponent
+                , biCabalVersion = cabalVer
                 }
             )
     return
@@ -442,7 +436,6 @@ generatePkgDescOpts sourceMap installedMap omitPkgs addPkgs cabalfp pkg componen
 data BioInput = BioInput
     { biSourceMap :: !SourceMap
     , biInstalledMap :: !InstalledMap
-    , biCabalMacros :: !(Maybe (Path Abs File))
     , biCabalDir :: !(Path Abs Dir)
     , biDistDir :: !(Path Abs Dir)
     , biOmitPackages :: ![PackageName]
@@ -452,6 +445,7 @@ data BioInput = BioInput
     , biConfigLibDirs :: !(Set FilePath)
     , biConfigIncludeDirs :: !(Set FilePath)
     , biComponentName :: !NamedComponent
+    , biCabalVersion :: !Version
     }
 
 -- | Generate GHC options for the target. Since Cabal also figures out
@@ -471,7 +465,7 @@ generateBuildInfoOpts BioInput {..} =
         , bioOneWordOpts = nubOrd $ concat
             [extOpts, srcOpts, includeOpts, libOpts, fworks, cObjectFiles]
         , bioPackageFlags = deps
-        , bioCabalMacros = biCabalMacros
+        , bioCabalMacros = componentAutogen </> $(mkRelFile "cabal_macros.h")
         }
   where
     cObjectFiles =
@@ -501,14 +495,19 @@ generateBuildInfoOpts BioInput {..} =
         isGhc _ = False
     extOpts = map (("-X" ++) . D.display) (usedExtensions biBuildInfo)
     srcOpts =
-        map
-            (("-i" <>) . toFilePathNoTrailingSep)
-            ([biCabalDir | null (hsSourceDirs biBuildInfo)] <>
-             mapMaybe toIncludeDir (hsSourceDirs biBuildInfo) <>
-             [autogenDir biDistDir,buildDir biDistDir] <>
-             [makeGenDir (buildDir biDistDir)
-             | Just makeGenDir <- [fileGenDirFromComponentName biComponentName]]) ++
-        ["-stubdir=" ++ toFilePathNoTrailingSep (buildDir biDistDir)]
+        map (("-i" <>) . toFilePathNoTrailingSep)
+            (concat
+              [ [ componentBuildDir biCabalVersion biComponentName biDistDir ]
+              , [ biCabalDir
+                | null (hsSourceDirs biBuildInfo)
+                ]
+              , mapMaybe toIncludeDir (hsSourceDirs biBuildInfo)
+              , [ componentAutogen ]
+              , maybeToList (packageAutogenDir biCabalVersion biDistDir)
+              , [ componentOutputDir biComponentName biDistDir ]
+              ]) ++
+        [ "-stubdir=" ++ toFilePathNoTrailingSep (buildDir biDistDir) ]
+    componentAutogen = componentAutogenDir biCabalVersion biComponentName biDistDir
     toIncludeDir "." = Just biCabalDir
     toIncludeDir relDir = concatAndColapseAbsDir biCabalDir relDir
     includeOpts =
@@ -571,36 +570,54 @@ makeObjectFilePathFromC cabalDir namedComponent distDir cFilePath = do
     relCFilePath <- stripProperPrefix cabalDir cFilePath
     relOFilePath <-
         parseRelFile (replaceExtension (toFilePath relCFilePath) "o")
-    addComponentPrefix <- fileGenDirFromComponentName namedComponent
-    return (addComponentPrefix (buildDir distDir) </> relOFilePath)
+    return (componentOutputDir namedComponent distDir </> relOFilePath)
+
+-- | Make the global autogen dir if Cabal version is new enough.
+packageAutogenDir :: Version -> Path Abs Dir -> Maybe (Path Abs Dir)
+packageAutogenDir cabalVer distDir
+    | cabalVer < $(mkVersion "2.0") = Nothing
+    | otherwise = Just $ buildDir distDir </> $(mkRelDir "global-autogen")
+
+-- | Make the autogen dir.
+componentAutogenDir :: Version -> NamedComponent -> Path Abs Dir -> Path Abs Dir
+componentAutogenDir cabalVer component distDir =
+    componentBuildDir cabalVer component distDir </> $(mkRelDir "autogen")
+
+-- | See 'Distribution.Simple.LocalBuildInfo.componentBuildDir'
+componentBuildDir :: Version -> NamedComponent -> Path Abs Dir -> Path Abs Dir
+componentBuildDir cabalVer component distDir
+    | cabalVer < $(mkVersion "2.0") = buildDir distDir
+    | otherwise =
+        case component of
+            CLib -> buildDir distDir
+            CExe name -> buildDir distDir </> componentNameToDir name
+            CTest name -> buildDir distDir </> componentNameToDir name
+            CBench name -> buildDir distDir </> componentNameToDir name
 
 -- | The directory where generated files are put like .o or .hs (from .x files).
-fileGenDirFromComponentName
-    :: MonadThrow m
-    => NamedComponent -> m (Path b Dir -> Path b Dir)
-fileGenDirFromComponentName namedComponent =
+componentOutputDir :: NamedComponent -> Path Abs Dir -> Path Abs Dir
+componentOutputDir namedComponent distDir =
     case namedComponent of
-        CLib -> return id
+        CLib -> buildDir distDir
         CInternalLib name -> makeTmp name
         CExe name -> makeTmp name
         CTest name -> makeTmp name
         CBench name -> makeTmp name
-  where makeTmp name = do
-            prefix <- parseRelDir (T.unpack name <> "/" <> T.unpack name <> "-tmp")
-            return (</> prefix)
+  where
+    makeTmp name =
+      buildDir distDir </> componentNameToDir (name <> "/" <> name <> "-tmp")
 
--- | Make the autogen dir.
-autogenDir :: Path Abs Dir -> Path Abs Dir
-autogenDir distDir = buildDir distDir </> $(mkRelDir "autogen")
-
--- | Make the build dir.
+-- | Make the build dir. Note that Cabal >= 2.0 uses the
+-- 'componentBuildDir' above for some things.
 buildDir :: Path Abs Dir -> Path Abs Dir
 buildDir distDir = distDir </> $(mkRelDir "build")
 
--- | Make the component-specific subdirectory of the build directory.
-getBuildComponentDir :: Maybe String -> Maybe (Path Rel Dir)
-getBuildComponentDir Nothing = Nothing
-getBuildComponentDir (Just name) = parseRelDir (name FilePath.</> (name ++ "-tmp"))
+-- NOTE: don't export this, only use it for valid paths based on
+-- component names.
+componentNameToDir :: Text -> Path Rel Dir
+componentNameToDir name =
+  fromMaybe (error "Invariant violated: component names should always parse as directory names")
+            (parseRelDir (T.unpack name))
 
 -- | Get all dependencies of the package (buildable targets only).
 --
@@ -723,7 +740,7 @@ packageDescModulesAndFiles pkg = do
     testComponent = CTest . T.pack . Cabal.unUnqualComponentName . testName
     benchComponent = CBench . T.pack . Cabal.unUnqualComponentName . benchmarkName
     asModuleAndFileMap label f lib = do
-        (a,b,c) <- f lib
+        (a,b,c) <- f (label lib) lib
         return (M.singleton (label lib) a, M.singleton (label lib) b, c)
     foldTuples = foldl' (<>) (M.empty, M.empty, [])
 
@@ -803,19 +820,13 @@ matchDirFileGlob_ dir filepath = case parseFileGlob filepath of
 
 -- | Get all files referenced by the benchmark.
 benchmarkFiles
-    :: Benchmark -> RIO Ctx (Map ModuleName (Path Abs File), Set DotCabalPath, [PackageWarning])
-benchmarkFiles bench = do
-    dirs <- mapMaybeM resolveDirOrWarn (hsSourceDirs build)
-    dir <- asks (parent . ctxFile)
-    (modules,files,warnings) <-
-        resolveFilesAndDeps
-            (Just $ Cabal.unUnqualComponentName $ benchmarkName bench)
-            (dirs ++ [dir])
-            (bnames <> exposed)
-            haskellModuleExts
-    cfiles <- buildOtherSources build
-    return (modules, files <> cfiles, warnings)
+    :: NamedComponent
+    -> Benchmark
+    -> RIO Ctx (Map ModuleName (Path Abs File), Set DotCabalPath, [PackageWarning])
+benchmarkFiles component bench = do
+    resolveComponentFiles component build names
   where
+    names = bnames <> exposed
     exposed =
         case benchmarkInterface bench of
             BenchmarkExeV10 _ fp -> [DotCabalMain fp]
@@ -825,20 +836,13 @@ benchmarkFiles bench = do
 
 -- | Get all files referenced by the test.
 testFiles
-    :: TestSuite
+    :: NamedComponent
+    -> TestSuite
     -> RIO Ctx (Map ModuleName (Path Abs File), Set DotCabalPath, [PackageWarning])
-testFiles test = do
-    dirs <- mapMaybeM resolveDirOrWarn (hsSourceDirs build)
-    dir <- asks (parent . ctxFile)
-    (modules,files,warnings) <-
-        resolveFilesAndDeps
-            (Just $ Cabal.unUnqualComponentName $ testName test)
-            (dirs ++ [dir])
-            (bnames <> exposed)
-            haskellModuleExts
-    cfiles <- buildOtherSources build
-    return (modules, files <> cfiles, warnings)
+testFiles component test = do
+    resolveComponentFiles component build names
   where
+    names = bnames <> exposed
     exposed =
         case testInterface test of
             TestSuiteExeV10 _ fp -> [DotCabalMain fp]
@@ -849,42 +853,47 @@ testFiles test = do
 
 -- | Get all files referenced by the executable.
 executableFiles
-    :: Executable
+    :: NamedComponent
+    -> Executable
     -> RIO Ctx (Map ModuleName (Path Abs File), Set DotCabalPath, [PackageWarning])
-executableFiles exe = do
-    dirs <- mapMaybeM resolveDirOrWarn (hsSourceDirs build)
-    dir <- asks (parent . ctxFile)
-    (modules,files,warnings) <-
-        resolveFilesAndDeps
-            (Just $ Cabal.unUnqualComponentName $ exeName exe)
-            (dirs ++ [dir])
-            (map DotCabalModule (otherModules build) ++
-             [DotCabalMain (modulePath exe)])
-            haskellModuleExts
-    cfiles <- buildOtherSources build
-    return (modules, files <> cfiles, warnings)
+executableFiles component exe = do
+    resolveComponentFiles component build names
   where
     build = buildInfo exe
+    names =
+        map DotCabalModule (otherModules build) ++
+        [DotCabalMain (modulePath exe)]
 
 -- | Get all files referenced by the library.
 libraryFiles
-    :: Library -> RIO Ctx (Map ModuleName (Path Abs File), Set DotCabalPath, [PackageWarning])
-libraryFiles lib = do
+    :: NamedComponent
+    -> Library
+    -> RIO Ctx (Map ModuleName (Path Abs File), Set DotCabalPath, [PackageWarning])
+libraryFiles component lib = do
+    resolveComponentFiles component build names
+  where
+    build = libBuildInfo lib
+    names = bnames ++ exposed
+    exposed = map DotCabalModule (exposedModules lib)
+    bnames = map DotCabalModule (otherModules build)
+
+-- | Get all files referenced by the component.
+resolveComponentFiles
+    :: NamedComponent
+    -> BuildInfo
+    -> [DotCabalDescriptor]
+    -> RIO Ctx (Map ModuleName (Path Abs File), Set DotCabalPath, [PackageWarning])
+resolveComponentFiles component build names = do
     dirs <- mapMaybeM resolveDirOrWarn (hsSourceDirs build)
     dir <- asks (parent . ctxFile)
     (modules,files,warnings) <-
         resolveFilesAndDeps
-            Nothing
+            component
             (dirs ++ [dir])
             names
             haskellModuleExts
     cfiles <- buildOtherSources build
     return (modules, files <> cfiles, warnings)
-  where
-    names = bnames ++ exposed
-    exposed = map DotCabalModule (exposedModules lib)
-    bnames = map DotCabalModule (otherModules build)
-    build = libBuildInfo lib
 
 -- | Get all C sources and extra source files in a build.
 buildOtherSources :: BuildInfo -> RIO Ctx (Set DotCabalPath)
@@ -1078,7 +1087,7 @@ depRange (Dependency _ r) = r
 -- extensions, plus find any of their module and TemplateHaskell
 -- dependencies.
 resolveFilesAndDeps
-    :: Maybe String         -- ^ Package component name
+    :: NamedComponent       -- ^ Package component name
     -> [Path Abs Dir]       -- ^ Directories to look in.
     -> [DotCabalDescriptor] -- ^ Base names.
     -> [Text]               -- ^ Extensions.
@@ -1158,7 +1167,7 @@ resolveFilesAndDeps component dirs names0 exts = do
 
 -- | Get the dependencies of a Haskell module file.
 getDependencies
-    :: Maybe String -> DotCabalPath -> RIO Ctx (Set ModuleName, [Path Abs File])
+    :: NamedComponent -> DotCabalPath -> RIO Ctx (Set ModuleName, [Path Abs File])
 getDependencies component dotCabalPath =
     case dotCabalPath of
         DotCabalModulePath resolvedFile -> readResolvedHi resolvedFile
@@ -1167,7 +1176,7 @@ getDependencies component dotCabalPath =
         DotCabalCFilePath{} -> return (S.empty, [])
   where
     readResolvedHi resolvedFile = do
-        dumpHIDir <- getDumpHIDir
+        dumpHIDir <- componentOutputDir component <$> asks ctxDistDir
         dir <- asks (parent . ctxFile)
         case stripProperPrefix dir resolvedFile of
             Nothing -> return (S.empty, [])
@@ -1180,9 +1189,6 @@ getDependencies component dotCabalPath =
                 if dumpHIExists
                     then parseDumpHI dumpHIPath
                     else return (S.empty, [])
-    getDumpHIDir = do
-        bld <- asks ctxDir
-        return $ maybe bld (bld </>) (getBuildComponentDir component)
 
 -- | Parse a .dump-hi file into a set of modules and files.
 parseDumpHI

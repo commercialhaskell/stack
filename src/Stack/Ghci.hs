@@ -399,7 +399,7 @@ runGhci GhciOpts{..} targets mainIsTargets pkgs extraFiles exposePackages = do
                 scriptPath <- writeGhciScript tmpDirectory (renderScript isIntero pkgs mainFile ghciOnlyMain extraFiles)
                 execGhci (macrosOptions ++ ["-ghci-script=" <> toFilePath scriptPath])
 
-writeMacrosFile :: (MonadIO m) => Path Abs Dir -> [GhciPkgInfo] -> m [String]
+writeMacrosFile :: HasRunner env => Path Abs Dir -> [GhciPkgInfo] -> RIO env [String]
 writeMacrosFile tmpDirectory packages = do
     preprocessCabalMacros packages macrosFile
   where
@@ -809,12 +809,21 @@ getExtraLoadDeps loadAllDeps sourceMap targets =
             (_, Just PSIndex{}) -> return loadAllDeps
             (_, _) -> return False
 
-preprocessCabalMacros :: MonadIO m => [GhciPkgInfo] -> Path Abs File -> m [String]
-preprocessCabalMacros pkgs out = liftIO $ do
-    let fps = nubOrd (concatMap (mapMaybe (bioCabalMacros . snd) . ghciPkgOpts) pkgs)
-    files <- mapM (S8.readFile . toFilePath) fps
+preprocessCabalMacros :: HasRunner env => [GhciPkgInfo] -> Path Abs File -> RIO env [String]
+preprocessCabalMacros pkgs out = do
+    fps <- fmap (nubOrd . catMaybes . concat) $
+        forM pkgs $ \pkg -> forM (ghciPkgOpts pkg) $ \(_, bio) -> do
+            let cabalMacros = bioCabalMacros bio
+            exists <- liftIO $ doesFileExist cabalMacros
+            if exists
+                then return $ Just cabalMacros
+                else do
+                    prettyWarnL ["Didn't find expected autogen file:", display cabalMacros]
+                    return Nothing
+    files <- liftIO $ mapM (S8.readFile . toFilePath) fps
     if null files then return [] else do
-        S8.writeFile (toFilePath out) $ S8.concat $ map (<> "\n#undef CURRENT_PACKAGE_KEY\n#undef CURRENT_COMPONENT_ID\n") files
+        liftIO $ S8.writeFile (toFilePath out) $ S8.concat $
+            map (<> "\n#undef CURRENT_PACKAGE_KEY\n#undef CURRENT_COMPONENT_ID\n") files
         return ["-optP-include", "-optP" <> toFilePath out]
 
 setScriptPerms :: MonadIO m => FilePath -> m ()
@@ -846,50 +855,6 @@ hasLocalComp p t =
         TargetComps s -> any p (S.toList s)
         TargetAll ProjectPackage -> True
         _ -> False
-
-
-{- Copied from Stack.Ide, may be useful in the future
-
--- | Get options and target files for the given package info.
-getPackageOptsAndTargetFiles
-    :: (MonadThrow m, MonadIO m, MonadReader env m, HasEnvConfig env)
-    => Path Abs Dir -> GhciPkgInfo -> m ([FilePath], [FilePath])
-getPackageOptsAndTargetFiles pwd pkg = do
-    dist <- distDirFromDir (ghciPkgDir pkg)
-    let autogen = autogenDir dist
-    paths_foo <-
-        liftM
-            (autogen </>)
-            (parseRelFile
-                 ("Paths_" ++ packageNameString (ghciPkgName pkg) ++ ".hs"))
-    paths_foo_exists <- doesFileExist paths_foo
-    let ghcOptions bio =
-            bioOneWordOpts bio ++
-            bioOpts bio ++
-            bioPackageFlags bio ++
-            maybe [] (\cabalMacros -> ["-optP-include", "-optP" <> toFilePath cabalMacros]) (bioCabalMacros bio)
-    return
-        ( ("--dist-dir=" <> toFilePathNoTrailingSep dist) :
-          -- FIXME: use compilerOptionsCabalFlag
-          map ("--ghc-option=" ++) (concatMap (ghcOptions . snd) (ghciPkgOpts pkg))
-        , mapMaybe
-              (fmap toFilePath . stripProperPrefix pwd)
-              (S.toList (ghciPkgCFiles pkg) <> S.toList (ghciPkgModFiles pkg) <>
-               [paths_foo | paths_foo_exists]))
-
--- | List load targets for a package target.
-targetsCmd :: Text -> GlobalOpts -> IO ()
-targetsCmd target go@GlobalOpts{..} =
-    withBuildConfig go $
-    do let boptsCli = defaultBuildOptsCLI { boptsCLITargets = [target] }
-       (_realTargets,_,pkgs) <- ghciSetup (ideGhciOpts boptsCli)
-       pwd <- getCurrentDir
-       targets <-
-           fmap
-               (concat . snd . unzip)
-               (mapM (getPackageOptsAndTargetFiles pwd) pkgs)
-       forM_ targets (liftIO . putStrLn)
--}
 
 -- | Run a command and grab the first line of stdout, dropping
 -- stderr's contexts completely.

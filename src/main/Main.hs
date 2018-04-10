@@ -611,8 +611,8 @@ cleanCmd opts go =
   -- See issues #2010 and #3468 for why "stack clean --full" is not used
   -- within docker.
   case opts of
-    CleanFull{} -> withBuildConfigAndLock go (const (clean opts))
-    CleanShallow{} -> withBuildConfigAndLockNoDocker go (const (clean opts))
+    CleanFull{} -> withBuildConfigAndLockNoDocker go (const (clean opts))
+    CleanShallow{} -> withBuildConfigAndLock go (const (clean opts))
 
 -- | Helper for build and install commands
 buildCmd :: BuildOptsCLI -> GlobalOpts -> IO ()

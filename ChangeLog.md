@@ -107,6 +107,8 @@ Bug fixes:
   resilient against SIGKILL and machine failure. See
   [hackage-security #187](https://github.com/haskell/hackage-security/issues/187)
   and [#3073](https://github.com/commercialhaskell/stack/issues/3073).
+* `stack ghci` now uses correct paths for autogen files with
+  [#3791](https://github.com/commercialhaskell/stack/issues/3791)
 
 
 ## v1.6.3.1
