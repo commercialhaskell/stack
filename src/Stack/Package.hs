@@ -590,6 +590,7 @@ componentBuildDir cabalVer component distDir
     | otherwise =
         case component of
             CLib -> buildDir distDir
+            CInternalLib name -> buildDir distDir </> componentNameToDir name
             CExe name -> buildDir distDir </> componentNameToDir name
             CTest name -> buildDir distDir </> componentNameToDir name
             CBench name -> buildDir distDir </> componentNameToDir name
