@@ -14,7 +14,7 @@ Distribution packages are available for [Ubuntu](#ubuntu), [Debian](#debian),
 [Fedora](#fedora),
 [Arch Linux](#arch-linux) and [FreeBSD](#freebsd).
 Binaries for other operating systems are listed below, and available on
-[the Github releases page](https://github.com/fpco/stack/releases). For the
+[the GitHub release page](https://github.com/fpco/stack/releases). For the
 future, we are open to supporting more OSes (to request one, please
 [submit an issue](https://github.com/commercialhaskell/stack/issues/new)).
 
@@ -175,7 +175,7 @@ install it by simply doing:
     sudo pacman -S stack
 
 Note that this version may slightly lag behind, but it should be updated within
-the day. The package is also always rebuilt and updated when one of it's
+the day. The package is also always rebuilt and updated when one of its
 dependencies gets an update.
 
   - [stack](https://www.archlinux.org/packages/community/x86_64/stack/) _latest stable version_
