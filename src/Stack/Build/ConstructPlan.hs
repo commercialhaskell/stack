@@ -27,7 +27,7 @@ import qualified Data.Map.Strict as M
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Data.Text as T
-import           Data.Text.Encoding (decodeUtf8With)
+import           Data.Text.Encoding (encodeUtf8, decodeUtf8With)
 import           Data.Text.Encoding.Error (lenientDecode)
 import qualified Distribution.Text as Cabal
 import qualified Distribution.Version as Cabal
@@ -727,7 +727,7 @@ checkDirtiness ps installed package present wanted = do
             , configCacheDeps = Set.fromList $ Map.elems present
             , configCacheComponents =
                 case ps of
-                    PSFiles lp _ -> Set.map renderComponent $ lpComponents lp
+                    PSFiles lp _ -> Set.map (encodeUtf8 . renderComponent) $ lpComponents lp
                     PSIndex{} -> Set.empty
             , configCacheHaddock =
                 shouldHaddockPackage buildOpts wanted (packageName package) ||
