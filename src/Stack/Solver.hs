@@ -155,7 +155,6 @@ cabalSolver cabalfps constraintType
         let ls = dropWhile (not . errCheck) $ linesNoCR msg
             select s = (T.isPrefixOf "trying:" s
                       || T.isPrefixOf "next goal:" s)
-                      && T.isSuffixOf "(user goal)" s
             pkgName =   take 1
                       . T.words
                       . T.drop 1
