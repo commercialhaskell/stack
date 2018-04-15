@@ -176,9 +176,11 @@ data ExtraDirs = ExtraDirs
     , edInclude :: ![Path Abs Dir]
     , edLib :: ![Path Abs Dir]
     } deriving (Show, Generic)
+instance Semigroup ExtraDirs where
+    (<>) = mappenddefault
 instance Monoid ExtraDirs where
     mempty = memptydefault
-    mappend = mappenddefault
+    mappend = (<>)
 
 installDir :: (MonadReader env m, MonadThrow m)
            => Path Abs Dir

@@ -459,9 +459,12 @@ data GlobalOptsMonoid = GlobalOptsMonoid
     , globalMonoidStackYaml    :: !(First FilePath) -- ^ Override project stack.yaml
     } deriving (Show, Generic)
 
+instance Semigroup GlobalOptsMonoid where
+    (<>) = mappenddefault
+
 instance Monoid GlobalOptsMonoid where
     mempty = memptydefault
-    mappend = mappenddefault
+    mappend = (<>)
 
 -- | Default logging level should be something useful but not crazy.
 defaultLogLevel :: LogLevel
@@ -771,9 +774,12 @@ data ConfigMonoid =
     }
   deriving (Show, Generic)
 
+instance Semigroup ConfigMonoid where
+    (<>) = mappenddefault
+
 instance Monoid ConfigMonoid where
     mempty = memptydefault
-    mappend = mappenddefault
+    mappend = (<>)
 
 parseConfigMonoid :: Path Abs Dir -> Value -> Yaml.Parser (WithJSONWarnings ConfigMonoid)
 parseConfigMonoid = withObjectWarnings "ConfigMonoid" . parseConfigMonoidObject
@@ -1676,6 +1682,16 @@ instance FromJSON (WithJSONWarnings SetupInfo) where
 
 -- | For @siGHCs@ and @siGHCJSs@ fields maps are deeply merged.
 -- For all fields the values from the last @SetupInfo@ win.
+instance Semigroup SetupInfo where
+    l <> r =
+        SetupInfo
+        { siSevenzExe = siSevenzExe r <|> siSevenzExe l
+        , siSevenzDll = siSevenzDll r <|> siSevenzDll l
+        , siMsys2 = siMsys2 r <> siMsys2 l
+        , siGHCs = Map.unionWith (<>) (siGHCs r) (siGHCs l)
+        , siGHCJSs = Map.unionWith (<>) (siGHCJSs r) (siGHCJSs l)
+        , siStack = Map.unionWith (<>) (siStack l) (siStack r) }
+
 instance Monoid SetupInfo where
     mempty =
         SetupInfo
@@ -1686,14 +1702,7 @@ instance Monoid SetupInfo where
         , siGHCJSs = Map.empty
         , siStack = Map.empty
         }
-    mappend l r =
-        SetupInfo
-        { siSevenzExe = siSevenzExe r <|> siSevenzExe l
-        , siSevenzDll = siSevenzDll r <|> siSevenzDll l
-        , siMsys2 = siMsys2 r <> siMsys2 l
-        , siGHCs = Map.unionWith (<>) (siGHCs r) (siGHCs l)
-        , siGHCJSs = Map.unionWith (<>) (siGHCJSs r) (siGHCJSs l)
-        , siStack = Map.unionWith (<>) (siStack l) (siStack r) }
+    mappend = (<>)
 
 -- | Remote or inline 'SetupInfo'
 data SetupInfoLocation

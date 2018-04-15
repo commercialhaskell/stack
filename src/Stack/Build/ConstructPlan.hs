@@ -114,9 +114,11 @@ data W = W
     , wParents :: !ParentMap
     -- ^ Which packages a given package depends on, along with the package's version
     } deriving Generic
+instance Semigroup W where
+    (<>) = mappenddefault
 instance Monoid W where
     mempty = memptydefault
-    mappend = mappenddefault
+    mappend = (<>)
 
 type M = RWST -- TODO replace with more efficient WS stack on top of StackT
     Ctx
@@ -1148,8 +1150,11 @@ extendDepsPath ident dp = DepsPath
 newtype MonoidMap k a = MonoidMap (Map k a)
     deriving (Eq, Ord, Read, Show, Generic, Functor)
 
-instance (Ord k, Monoid a) => Monoid (MonoidMap k a) where
-    mappend (MonoidMap mp1) (MonoidMap mp2) = MonoidMap (M.unionWith mappend mp1 mp2)
+instance (Ord k, Semigroup a) => Semigroup (MonoidMap k a) where
+    MonoidMap mp1 <> MonoidMap mp2 = MonoidMap (M.unionWith (<>) mp1 mp2)
+
+instance (Ord k, Monoid a, Semigroup a) => Monoid (MonoidMap k a) where
+    mappend = (<>)
     mempty = MonoidMap mempty
 
 -- Switch this to 'True' to enable some debugging putStrLn in this module
