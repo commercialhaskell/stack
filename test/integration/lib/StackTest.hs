@@ -208,7 +208,7 @@ isMacOSX = os == "darwin"
 -- the main @stack.yaml@.
 --
 defaultResolverArg :: String
-defaultResolverArg = "--resolver=lts-11.2"
+defaultResolverArg = "--resolver=lts-11.5"
 
 -- | Remove a file and ignore any warnings about missing files.
 removeFileIgnore :: FilePath -> IO ()

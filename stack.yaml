@@ -1,4 +1,4 @@
-resolver: lts-11.2
+resolver: lts-11.5
 
 # docker:
 #   enable: true
@@ -19,7 +19,6 @@ flags:
 extra-deps:
 - rio-0.1.0.0@rev:0
 - Cabal-2.2.0.1@rev:0
-- hackage-security-0.5.3.0@rev:0
 - hpack-0.28.2
 - http-api-data-0.3.8.1@rev:0
 
