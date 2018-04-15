@@ -60,7 +60,6 @@ dependencies:
 - generic-deriving
 - hackage-security
 - hashable
-- hastache
 - hpack
 - hpc
 - http-client
@@ -74,6 +73,7 @@ dependencies:
 - monad-logger
 - mono-traversable
 - mtl
+- mustache
 - neat-interpolation
 - network-uri
 - open-browser
