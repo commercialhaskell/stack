@@ -7,6 +7,19 @@ Release notes:
 
 Major changes:
 
+Behavior changes:
+
+Other enhancements:
+
+Bug fixes:
+
+
+## v1.7.0.1 (releases candidate)
+
+Release notes:
+
+Major changes:
+
 * Upgrade from Cabal 2.0 to Cabal 2.2
 
 Behavior changes:
@@ -16,7 +29,7 @@ Behavior changes:
   this itself since ghc-8.0.2, and Stack's attempted workaround for older
   versions caused more problems than it solved.
 
-* `stack new` no longer initializes a project if the project template contain
+* `stack new` no longer initializes a project if the project template contains
    a stack.yaml file.
 
 Other enhancements:
@@ -24,7 +37,7 @@ Other enhancements:
 * A new sub command `ls` has been introduced to stack to view
   local and remote snapshots present in the system. Use `stack ls
   snapshots --help` to get more details about it.
-*`list-dependencies` has been deprecated. The functionality has
+* `list-dependencies` has been deprecated. The functionality has
   to accessed through the new `ls dependencies` interface. See
   [#3669](https://github.com/commercialhaskell/stack/issues/3669)
   for details.
@@ -51,7 +64,6 @@ Other enhancements:
 * Improved error messages for snapshot parse exceptions
 
 Bug fixes:
-
 * When a package contained sublibraries, stack was always recompiling the
   package. This has been fixed now, no recompilation is being done because of
   sublibraries. See [#3899](https://github.com/commercialhaskell/stack/issues/3899).
@@ -74,6 +86,23 @@ Bug fixes:
   may interfere with benchmarks. It also prevented benchmark output from
   being displayed by default. This is now fixed. See
   [#3663](https://github.com/commercialhaskell/stack/issues/3663).
+* `stack ghci` now allows loading multiple packages with the same
+  module name, as long as they have the same filepath. See
+  [#3776](https://github.com/commercialhaskell/stack/pull/3776).
+* `stack ghci` no longer always adds a dependency on `base`. It is
+  now only added when there are no local targets. This allows it to
+  be to load code that uses replacements for `base`. See
+  [#3589](https://github.com/commercialhaskell/stack/issues/3589#issuecomment)
+* `stack ghci` now uses correct paths for autogen files with
+  [#3791](https://github.com/commercialhaskell/stack/issues/3791)
+
+
+## v1.6.5
+
+Bug fixes:
+* 1.6.1 introduced a change that made some precompiled cache files use
+  longer paths, sometimes causing builds to fail on windows. This has been
+  fixed. See [#3649](https://github.com/commercialhaskell/stack/issues/3649)
 * Some unnecessary rebuilds when no files were changed are now avoided, by
   having a separate build cache for each component of a package. See
   [#3732](https://github.com/commercialhaskell/stack/issues/3732).
@@ -90,13 +119,6 @@ Bug fixes:
   this bug, you will likely need to delete the binary build cache
   associated with the relevant custom snapshot. See
   [#3714](https://github.com/commercialhaskell/stack/issues/3714).
-* `stack ghci` now allows loading multiple packages with the same
-  module name, as long as they have the same filepath. See
-  [#3776](https://github.com/commercialhaskell/stack/pull/3776).
-* `stack ghci` no longer always adds a dependency on `base`. It is
-  now only added when there are no local targets. This allows it to
-  be to load code that uses replacements for `base`. See
-  [#3589](https://github.com/commercialhaskell/stack/issues/3589#issuecomment)
 * `--no-rerun-tests` has been fixed. Previously, after running a test
   we were forgetting to record the result, which meant that all tests
   always ran even if they had already passed before. See
@@ -107,8 +129,6 @@ Bug fixes:
   resilient against SIGKILL and machine failure. See
   [hackage-security #187](https://github.com/haskell/hackage-security/issues/187)
   and [#3073](https://github.com/commercialhaskell/stack/issues/3073).
-* `stack ghci` now uses correct paths for autogen files with
-  [#3791](https://github.com/commercialhaskell/stack/issues/3791)
 
 
 ## v1.6.3.1
@@ -137,10 +157,12 @@ Bug fixes:
   allowing the Cabal library to flatten the
   `GenericPackageDescription` itself.
 
+
 ## v1.6.1.1
 
 Hackage-only release with no user facing changes (updated to build with
 newer dependency versions).
+
 
 ## v1.6.1
 

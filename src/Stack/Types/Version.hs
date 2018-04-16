@@ -101,10 +101,13 @@ newtype IntersectingVersionRange =
     IntersectingVersionRange { getIntersectingVersionRange :: Cabal.VersionRange }
     deriving Show
 
+instance Semigroup IntersectingVersionRange where
+    IntersectingVersionRange l <> IntersectingVersionRange r =
+        IntersectingVersionRange (l `Cabal.intersectVersionRanges` r)
+
 instance Monoid IntersectingVersionRange where
     mempty = IntersectingVersionRange Cabal.anyVersion
-    mappend (IntersectingVersionRange l) (IntersectingVersionRange r) =
-        IntersectingVersionRange (l `Cabal.intersectVersionRanges` r)
+    mappend = (<>)
 
 -- | Attoparsec parser for a package version.
 versionParser :: Parser Version

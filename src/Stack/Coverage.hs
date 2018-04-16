@@ -45,7 +45,6 @@ import           Stack.Types.Version
 import           System.FilePath (isPathSeparator)
 import qualified RIO
 import           RIO.Process
-import           Text.Hastache (htmlEscape)
 import           Trace.Hpc.Tix
 import           Web.Browser (openBrowser)
 
@@ -405,6 +404,18 @@ generateHpcErrorReport dir err = do
 
 pathToHtml :: Path b t -> Text
 pathToHtml = T.dropWhileEnd (=='/') . sanitize . toFilePath
+
+-- | Escape HTML symbols (copied from Text.Hastache)
+htmlEscape :: LT.Text -> LT.Text
+htmlEscape = LT.concatMap proc_
+  where
+    proc_ '&'  = "&amp;"
+    proc_ '\\' = "&#92;"
+    proc_ '"'  = "&quot;"
+    proc_ '\'' = "&#39;"
+    proc_ '<'  = "&lt;"
+    proc_ '>'  = "&gt;"
+    proc_ h    = LT.singleton h
 
 sanitize :: String -> Text
 sanitize = LT.toStrict . htmlEscape . LT.pack

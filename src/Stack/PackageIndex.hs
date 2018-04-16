@@ -1,5 +1,6 @@
-{-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE NoImplicitPrelude          #-}
 {-# LANGUAGE BangPatterns               #-}
+{-# LANGUAGE CPP                        #-}
 {-# LANGUAGE ConstraintKinds            #-}
 {-# LANGUAGE DataKinds                  #-}
 {-# LANGUAGE DeriveDataTypeable         #-}
@@ -400,7 +401,11 @@ getPackageCaches = do
             result <- liftM mconcat $ forM (clIndices cl) $ \index -> do
                 fp <- configPackageIndexCache (indexName index)
                 PackageCache pis <-
+#if MIN_VERSION_template_haskell(2,13,0)
+                    $(versionedDecodeOrLoad (storeVersionConfig "pkg-v5" "LLL6OCcimOqRm3r0JmsSlLHcaLE="
+#else
                     $(versionedDecodeOrLoad (storeVersionConfig "pkg-v5" "A607WaDwhg5VVvZTxNgU9g52DO8="
+#endif
                                              :: VersionConfig (PackageCache ())))
                     fp
                     (populateCache index)
