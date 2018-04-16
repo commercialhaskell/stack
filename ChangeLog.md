@@ -1,7 +1,20 @@
 # Changelog
 
 
-## v1.7.0.1
+## Unreleased changes
+
+Release notes:
+
+Major changes:
+
+Behavior changes:
+
+Other enhancements:
+
+Bug fixes:
+
+
+## v1.7.0.1 (release candidate)
 
 Release notes:
 
