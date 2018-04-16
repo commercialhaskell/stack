@@ -12,6 +12,9 @@ Behavior changes:
 Other enhancements:
 
 Bug fixes:
+* When a package contained sublibraries, stack was always recompiling the
+  package. This has been fixed now, no recompilation is being done because of
+  sublibraries. See [#3899](https://github.com/commercialhaskell/stack/issues/3899).
 
 
 ## v1.7.0.1 (releases candidate)
@@ -64,16 +67,7 @@ Other enhancements:
 * Improved error messages for snapshot parse exceptions
 
 Bug fixes:
-* When a package contained sublibraries, stack was always recompiling the
-  package. This has been fixed now, no recompilation is being done because of
-  sublibraries. See [#3899](https://github.com/commercialhaskell/stack/issues/3899).
 
-## v1.6.5
-
-Bug fixes:
-* 1.6.1 introduced a change that made some precompiled cache files use
-  longer paths, sometimes causing builds to fail on windows. This has been
-  fixed. See [#3649](https://github.com/commercialhaskell/stack/issues/3649)
 * The script interpreter's implicit file arguments are now passed before other
   arguments. See [#3658](https://github.com/commercialhaskell/stack/issues/3658).
   In particular, this makes it possible to pass `-- +RTS ... -RTS` to specify
