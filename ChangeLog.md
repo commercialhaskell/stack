@@ -65,6 +65,9 @@ Other enhancements:
   i.e. `stack build --keep-tmp-files --ghc-options=-keep-tmp-files`.
   See [#3857](https://github.com/commercialhaskell/stack/issues/3857)
 * Improved error messages for snapshot parse exceptions
+* `stack hoogle` now supports a new flag `--server` that launches local
+  Hoogle server on port 8080. See
+  [#2310](https://github.com/commercialhaskell/stack/issues/2310)
 
 Bug fixes:
 

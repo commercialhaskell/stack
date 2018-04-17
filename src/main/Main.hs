@@ -336,7 +336,7 @@ commandLineHandler currentDir progName isInterpreter = complicatedOptions
                     ("Run hoogle, the Haskell API search engine. Use 'stack exec' syntax " ++
                      "to pass Hoogle arguments, e.g. stack hoogle -- --count=20")
                     hoogleCmd
-                    ((,,) <$> many (strArgument (metavar "ARG"))
+                    ((,,,) <$> many (strArgument (metavar "ARG"))
                           <*> boolFlags
                                   True
                                   "setup"
@@ -344,7 +344,10 @@ commandLineHandler currentDir progName isInterpreter = complicatedOptions
                                   idm
                           <*> switch
                                   (long "rebuild" <>
-                                   help "Rebuild the hoogle database"))
+                                   help "Rebuild the hoogle database")
+                          <*> switch
+                                  (long "server" <>
+                                   help "Start local Hoogle server"))
         )
 
       -- These are the only commands allowed in interpreter mode as well
