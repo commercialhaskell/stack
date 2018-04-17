@@ -167,6 +167,7 @@ splitComponents =
   where
     go a b c [] = (Set.fromList $ a [], Set.fromList $ b [], Set.fromList $ c [])
     go a b c (CLib:xs) = go a b c xs
+    go a b c (CInternalLib x:xs) = go (a . (x:)) b c xs
     go a b c (CExe x:xs) = go (a . (x:)) b c xs
     go a b c (CTest x:xs) = go a (b . (x:)) c xs
     go a b c (CBench x:xs) = go a b (c . (x:)) xs
@@ -434,9 +435,9 @@ getPackageFilesForTargets
     -> Set NamedComponent
     -> RIO env (Map NamedComponent (Set (Path Abs File)), [PackageWarning])
 getPackageFilesForTargets pkg cabalFP nonLibComponents = do
-    (_,compFiles,otherFiles,warnings) <-
+    (components',compFiles,otherFiles,warnings) <-
         getPackageFiles (packageFiles pkg) cabalFP
-    let components = Set.insert CLib nonLibComponents
+    let components = M.keysSet components' `Set.union` nonLibComponents
         componentsFiles =
             M.map (\files -> Set.union otherFiles (Set.map dotCabalGetPath files)) $
                 M.filterWithKey (\component _ -> component `Set.member` components) compFiles

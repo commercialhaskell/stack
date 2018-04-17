@@ -282,6 +282,7 @@ hasDebuggingSymbols dir lib = do
 data DumpPackage profiling haddock symbols = DumpPackage
     { dpGhcPkgId :: !GhcPkgId
     , dpPackageIdent :: !PackageIdentifier
+    , dpParentLibIdent :: !(Maybe PackageIdentifier)
     , dpLicense :: !(Maybe C.License)
     , dpLibDirs :: ![FilePath]
     , dpLibraries :: ![Text]
@@ -356,6 +357,11 @@ conduitDumpPackage = (.| CL.catMaybes) $ eachSection $ do
                         _ -> Nothing
             depends <- mapMaybeM parseDepend $ concatMap T.words $ parseM "depends"
 
+            -- Handle sublibs by recording the name of the parent library
+            -- If name of parent library is missing, this is not a sublib.
+            let mkParentLib n = PackageIdentifier n version
+                parentLib = mkParentLib <$> (parseS "package-name" >>= parsePackageName)
+
             let parseQuoted key =
                     case mapM (P.parseOnly (argsParser NoEscaping)) val of
                         Left{} -> throwM (Couldn'tParseField key val)
@@ -369,6 +375,7 @@ conduitDumpPackage = (.| CL.catMaybes) $ eachSection $ do
             return $ Just DumpPackage
                 { dpGhcPkgId = ghcPkgId
                 , dpPackageIdent = PackageIdentifier name version
+                , dpParentLibIdent = parentLib
                 , dpLicense = license
                 , dpLibDirs = libDirPaths
                 , dpLibraries = T.words $ T.unwords libraries
