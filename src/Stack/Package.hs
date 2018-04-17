@@ -1412,10 +1412,12 @@ hpack pkgDir = do
                         , flow "please upgrade and try again."
                         ]
                     Hpack.ExistingCabalFileWasModifiedManually -> prettyWarnL
-                        [ flow "WARNING: "
-                        , cabalFile
-                        , flow " was modified manually.  Ignoring package.yaml in favor of cabal file."
-                        , flow "If you want to use package.yaml instead of the cabal file, "
+                        [ cabalFile
+                        , flow "was modified manually. Ignoring"
+                        , display hpackFile
+                        , flow "in favor of the cabal file. If you want to use the"
+                        , display . filename $ hpackFile
+                        , flow "file instead of the cabal file,"
                         , flow "then please delete the cabal file."
                         ]
             HpackCommand command ->
