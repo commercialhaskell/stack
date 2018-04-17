@@ -164,7 +164,7 @@ do_ubuntu_install() {
 do_debian_install() {
 
   install_dependencies() {
-    apt_install_dependencies g++ gcc libc6-dev libffi-dev libgmp-dev make xz-utils zlib1g-dev
+    apt_install_dependencies g++ gcc libc6-dev libffi-dev libgmp-dev make xz-utils zlib1g-dev git gnupg
   }
 
   if is_arm ; then
@@ -188,7 +188,7 @@ do_debian_install() {
 # and install the necessary dependencies explicitly.
 do_fedora_install() {
   install_dependencies() {
-    dnf_install_pkgs perl make automake gcc gmp-devel libffi zlib xz tar
+    dnf_install_pkgs perl make automake gcc gmp-devel libffi zlib xz tar git gnupg
   }
 
   if is_64_bit ; then
@@ -208,7 +208,7 @@ do_fedora_install() {
 # and install the necessary dependencies explicitly.
 do_centos_install() {
   install_dependencies() {
-    yum_install_pkgs perl make automake gcc gmp-devel libffi zlib xz tar
+    yum_install_pkgs perl make automake gcc gmp-devel libffi zlib xz tar git gnupg
   }
 
   if is_64_bit ; then
