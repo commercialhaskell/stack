@@ -17,6 +17,8 @@ Bug fixes:
   sublibraries. See [#3899](https://github.com/commercialhaskell/stack/issues/3899).
 * The `get-stack.sh` install script now matches manual instructions
   when it comes to Debian/Fedora/CentOS install dependencies.
+* Compile Cabal-simple with gmp when using Nix.
+  See [#2944](https://github.com/commercialhaskell/stack/issues/2944)
 
 
 ## v1.7.0.1 (releases candidate)
