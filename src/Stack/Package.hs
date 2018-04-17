@@ -42,7 +42,7 @@ module Stack.Package
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Char8 as C8
 import           Data.List (isSuffixOf, isPrefixOf)
-import           Data.Maybe (fromJust)
+import           Data.Maybe (maybe)
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
 import qualified Data.Text as T
@@ -736,7 +736,7 @@ packageDescModulesAndFiles pkg = do
     return (modules, files, dfiles, warnings)
   where
     libComponent = const CLib
-    internalLibComponent = CInternalLib . T.pack . Cabal.unUnqualComponentName . fromJust . libName
+    internalLibComponent = CInternalLib . T.pack . maybe "" Cabal.unUnqualComponentName . libName
     exeComponent = CExe . T.pack . Cabal.unUnqualComponentName . exeName
     testComponent = CTest . T.pack . Cabal.unUnqualComponentName . testName
     benchComponent = CBench . T.pack . Cabal.unUnqualComponentName . benchmarkName
