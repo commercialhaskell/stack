@@ -11,6 +11,9 @@ Behavior changes:
 
 Other enhancements:
 
+* `stack unpack` now supports a `--to /target/directory` option to
+  specify where to unpack the package into
+
 Bug fixes:
 * When a package contained sublibraries, stack was always recompiling the
   package. This has been fixed now, no recompilation is being done because of

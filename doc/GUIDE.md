@@ -517,6 +517,13 @@ Unpacked yackage-0.8.0 to /var/home/harendra/yackage-0.8.0/
 cueball:~$ cd yackage-0.8.0/
 ```
 
+Note that you can also unpack to the directory of your liking instead of
+the current one by issueing:
+
+```
+cueball:~$ stack unpack yackage-0.8.0 --to ~/work
+```
+
 ### stack init
 This new directory does not have a `stack.yaml` file, so we need to make one
 first. We could do it by hand, but let's be lazy instead with the `stack init`
@@ -1715,7 +1722,8 @@ users. Here's a quick rundown:
   upstream packages available).
 * `stack unpack` is a command we've already used quite a bit for examples, but
   most users won't use it regularly. It does what you'd expect: downloads a
-  tarball and unpacks it.
+  tarball and unpacks it. It accept optional `--to` argument to specify
+  the destination directory.
 * `stack sdist` generates an uploading tarball containing your package code
 * `stack upload` uploads an sdist to Hackage. As of
   version [1.1.0](https://docs.haskellstack.org/en/v1.1.0/ChangeLog/) stack
