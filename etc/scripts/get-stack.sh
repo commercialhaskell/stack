@@ -188,7 +188,7 @@ do_debian_install() {
 # and install the necessary dependencies explicitly.
 do_fedora_install() {
   install_dependencies() {
-    dnf_install_pkgs perl make automake gcc gmp-devel libffi zlib xz tar git gnupg
+    dnf_install_pkgs perl make automake gcc gmp-devel libffi zlib-devel xz tar git gnupg
   }
 
   if is_64_bit ; then
