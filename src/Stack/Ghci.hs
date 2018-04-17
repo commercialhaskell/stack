@@ -20,6 +20,7 @@ module Stack.Ghci
 import           Stack.Prelude hiding (Display (..))
 import           Control.Monad.State.Strict (State, execState, get, modify)
 import qualified Data.ByteString.Char8 as S8
+import qualified Data.ByteString.Lazy as LBS
 import           Data.List
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
@@ -31,6 +32,7 @@ import           Path
 import           Path.Extra (toFilePathNoTrailingSep)
 import           Path.IO hiding (withSystemTempDir)
 import qualified RIO
+import           RIO.Process (HasProcessContext, exec, proc, readProcess_)
 import           Stack.Build
 import           Stack.Build.Installed
 import           Stack.Build.Source
@@ -50,7 +52,7 @@ import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageName
 import           Stack.Types.Runner
 import           System.IO (putStrLn, putStr, getLine)
-import           RIO.Process (HasProcessContext, execSpawn, proc, readProcess_)
+import           System.IO.Temp (getCanonicalTemporaryDirectory)
 
 #ifndef WINDOWS
 import qualified System.Posix.Files as Posix
@@ -366,7 +368,7 @@ runGhci GhciOpts{..} targets mainIsTargets pkgs extraFiles exposePackages = do
       mconcat (intersperse ", " (map (RIO.display . ghciPkgName) pkgs))
     let execGhci extras = do
             menv <- liftIO $ configProcessContextSettings config defaultEnvSettings
-            withProcessContext menv $ execSpawn
+            withProcessContext menv $ exec
                  (fromMaybe (compilerExeName wc) ghciGhcCommand)
                  (("--interactive" : ) $
                  -- This initial "-i" resets the include directories to
@@ -387,32 +389,62 @@ runGhci GhciOpts{..} targets mainIsTargets pkgs extraFiles exposePackages = do
                             $ runGrabFirstLine (fromMaybe (compilerExeName wc) ghciGhcCommand) ["--version"]
                     return $ "Intero" `isPrefixOf` output
                 _ -> return False
-    withSystemTempDir "ghci" $ \tmpDirectory -> do
-        macrosOptions <- writeMacrosFile tmpDirectory pkgs
-        if ghciNoLoadModules
-            then execGhci macrosOptions
-            else do
-                checkForDuplicateModules pkgs
-                isIntero <- checkIsIntero
-                bopts <- view buildOptsL
-                mainFile <- figureOutMainFile bopts mainIsTargets targets pkgs
-                scriptPath <- writeGhciScript tmpDirectory (renderScript isIntero pkgs mainFile ghciOnlyMain extraFiles)
-                execGhci (macrosOptions ++ ["-ghci-script=" <> toFilePath scriptPath])
+    -- Since usage of 'exec' does not return, we cannot do any cleanup
+    -- on ghci exit. So, instead leave the generated files. To make this
+    -- more efficient and avoid gratuitous generation of garbage, the
+    -- file names are determined by hashing. This also has the nice side
+    -- effect of making it possible to copy the ghci invocation out of
+    -- the log and have it still work.
+    tmpDirectory <-
+        (</> $(mkRelDir "haskell-stack-ghci")) <$>
+        (parseAbsDir =<< liftIO getCanonicalTemporaryDirectory)
+    ensureDir tmpDirectory
+    macrosOptions <- writeMacrosFile tmpDirectory pkgs
+    if ghciNoLoadModules
+        then execGhci macrosOptions
+        else do
+            checkForDuplicateModules pkgs
+            isIntero <- checkIsIntero
+            bopts <- view buildOptsL
+            mainFile <- figureOutMainFile bopts mainIsTargets targets pkgs
+            scriptOptions <- writeGhciScript tmpDirectory (renderScript isIntero pkgs mainFile ghciOnlyMain extraFiles)
+            execGhci (macrosOptions ++ scriptOptions)
 
 writeMacrosFile :: HasRunner env => Path Abs Dir -> [GhciPkgInfo] -> RIO env [String]
-writeMacrosFile tmpDirectory packages = do
-    preprocessCabalMacros packages macrosFile
-  where
-    macrosFile = tmpDirectory </> $(mkRelFile "cabal_macros.h")
+writeMacrosFile tmpDirectory pkgs = do
+    fps <- fmap (nubOrd . catMaybes . concat) $
+        forM pkgs $ \pkg -> forM (ghciPkgOpts pkg) $ \(_, bio) -> do
+            let cabalMacros = bioCabalMacros bio
+            exists <- liftIO $ doesFileExist cabalMacros
+            if exists
+                then return $ Just cabalMacros
+                else do
+                    prettyWarnL ["Didn't find expected autogen file:", display cabalMacros]
+                    return Nothing
+    files <- liftIO $ mapM (S8.readFile . toFilePath) fps
+    if null files then return [] else do
+        out <- liftIO $ writeHashedFile tmpDirectory $(mkRelFile "cabal_macros.h") $
+            S8.concat $ map (<> "\n#undef CURRENT_PACKAGE_KEY\n#undef CURRENT_COMPONENT_ID\n") files
+        return ["-optP-include", "-optP" <> toFilePath out]
 
-writeGhciScript :: (MonadIO m) => Path Abs Dir -> GhciScript -> m (Path Abs File)
+writeGhciScript :: (MonadIO m) => Path Abs Dir -> GhciScript -> m [String]
 writeGhciScript tmpDirectory script = do
-    liftIO $ scriptToFile scriptPath script
+    scriptPath <- liftIO $ writeHashedFile tmpDirectory $(mkRelFile "ghci-script") $
+        LBS.toStrict $ scriptToLazyByteString script
+    let scriptFilePath = toFilePath scriptPath
     setScriptPerms scriptFilePath
-    return scriptPath
-  where
-    scriptPath = tmpDirectory </> $(mkRelFile "ghci-script")
-    scriptFilePath = toFilePath scriptPath
+    return ["-ghci-script=" <> scriptFilePath]
+
+writeHashedFile :: Path Abs Dir -> Path Rel File -> ByteString -> IO (Path Abs File)
+writeHashedFile tmpDirectory relFile contents = do
+    relSha <- shaPathForBytes contents
+    let outDir = tmpDirectory </> relSha
+        outFile = outDir </> relFile
+    alreadyExists <- doesFileExist outFile
+    unless alreadyExists $ do
+        ensureDir outDir
+        S8.writeFile (toFilePath outFile) contents
+    return outFile
 
 renderScript :: Bool -> [GhciPkgInfo] -> Maybe (Path Abs File) -> Bool -> [Path Abs File] -> GhciScript
 renderScript isIntero pkgs mainFile onlyMain extraFiles = do
@@ -808,23 +840,6 @@ getExtraLoadDeps loadAllDeps sourceMap targets =
                         return False
             (_, Just PSIndex{}) -> return loadAllDeps
             (_, _) -> return False
-
-preprocessCabalMacros :: HasRunner env => [GhciPkgInfo] -> Path Abs File -> RIO env [String]
-preprocessCabalMacros pkgs out = do
-    fps <- fmap (nubOrd . catMaybes . concat) $
-        forM pkgs $ \pkg -> forM (ghciPkgOpts pkg) $ \(_, bio) -> do
-            let cabalMacros = bioCabalMacros bio
-            exists <- liftIO $ doesFileExist cabalMacros
-            if exists
-                then return $ Just cabalMacros
-                else do
-                    prettyWarnL ["Didn't find expected autogen file:", display cabalMacros]
-                    return Nothing
-    files <- liftIO $ mapM (S8.readFile . toFilePath) fps
-    if null files then return [] else do
-        liftIO $ S8.writeFile (toFilePath out) $ S8.concat $
-            map (<> "\n#undef CURRENT_PACKAGE_KEY\n#undef CURRENT_COMPONENT_ID\n") files
-        return ["-optP-include", "-optP" <> toFilePath out]
 
 setScriptPerms :: MonadIO m => FilePath -> m ()
 #ifdef WINDOWS

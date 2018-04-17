@@ -78,6 +78,13 @@ Other enhancements:
 
 Bug fixes:
 
+* `stack ghci` now replaces the stack process with ghci. This improves
+  signal handling behavior. In particular, handling of Ctrl-C.  To make
+  this possible, the generated files are now left behind after exit.
+  The paths are based on hashing file contents, and it's stored in the
+  system temporary directory, so this shouldn't result in too much
+  garbage. See
+  [#3821](https://github.com/commercialhaskell/stack/issues/3821).
 
 ## v1.6.5
 
@@ -140,7 +147,6 @@ Bug fixes:
   resilient against SIGKILL and machine failure. See
   [hackage-security #187](https://github.com/haskell/hackage-security/issues/187)
   and [#3073](https://github.com/commercialhaskell/stack/issues/3073).
-
 
 ## v1.6.3.1
 
