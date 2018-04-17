@@ -307,7 +307,7 @@ commandLineHandler currentDir progName isInterpreter = complicatedOptions
                     unpackCmd
                     ((,) <$> some (strArgument $ metavar "PACKAGE")
                          <*> optional (textOption $ long "to" <>
-                                         help "Optional path to unpack the package into"))
+                                         help "Optional path to unpack the package into (will unpack into subdirectory)"))
         addCommand' "update"
                     "Update the package index"
                     updateCmd

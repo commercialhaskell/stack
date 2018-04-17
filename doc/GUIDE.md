@@ -524,6 +524,8 @@ the current one by issueing:
 cueball:~$ stack unpack yackage-0.8.0 --to ~/work
 ```
 
+This will create a `yackage-0.8.0` directory inside `~/work`
+
 ### stack init
 This new directory does not have a `stack.yaml` file, so we need to make one
 first. We could do it by hand, but let's be lazy instead with the `stack init`
