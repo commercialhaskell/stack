@@ -74,7 +74,7 @@ runShellAndExit mprojectRoot getCompilerVersion getCmdArgs = do
      inContainer <- getInContainer
      ghc <- either throwIO return $ nixCompiler compilerVersion
      let pkgsInConfig = nixPackages (configNix config)
-         pkgs = pkgsInConfig ++ [ghc, "git", "gcc"]
+         pkgs = pkgsInConfig ++ [ghc, "git", "gcc", "gmp"]
          pkgsStr = "[" <> T.intercalate " " pkgs <> "]"
          pureShell = nixPureShell (configNix config)
          addGCRoots = nixAddGCRoots (configNix config)

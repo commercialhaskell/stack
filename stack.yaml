@@ -12,6 +12,7 @@ nix:
   enable: false
   packages:
     - zlib
+    - unzip
 flags:
   stack:
     hide-dependency-versions: true
