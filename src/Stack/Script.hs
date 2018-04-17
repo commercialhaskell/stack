@@ -12,11 +12,10 @@ import qualified Data.Conduit.List          as CL
 import           Data.List.Split            (splitWhen)
 import qualified Data.Map.Strict            as Map
 import qualified Data.Set                   as Set
-import qualified Data.Text                  as T
 import           Path
 import           Path.IO
 import qualified Stack.Build
-import           Stack.Exec
+import           Stack.Constants            (osIsWindows)
 import           Stack.GhcPkg               (ghcPkgExeName)
 import           Stack.Options.ScriptParser
 import           Stack.Runners
@@ -25,7 +24,7 @@ import           Stack.Types.Compiler
 import           Stack.Types.Config
 import           Stack.Types.PackageName
 import           System.FilePath            (dropExtension, replaceExtension)
-import           System.Process.Read
+import           RIO.Process
 
 -- | Run a Stack Script
 scriptCmd :: ScriptOpts -> GlobalOpts -> IO ()
@@ -38,19 +37,21 @@ scriptCmd opts go' = do
             , globalStackYaml = SYLNoConfig $ parent file
             }
     withBuildConfigAndLock go $ \lk -> do
-        -- Some warnings in case the user somehow tries to set a
-        -- stack.yaml location. Note that in this functions we use
-        -- logError instead of logWarn because, when using the
-        -- interpreter mode, only error messages are shown. See:
-        -- https://github.com/commercialhaskell/stack/issues/3007
-        case globalStackYaml go' of
-          SYLOverride fp -> logError $ T.pack
-            $ "Ignoring override stack.yaml file for script command: " ++ fp
-          SYLDefault -> return ()
-          SYLNoConfig _ -> assert False (return ())
+      -- Some warnings in case the user somehow tries to set a
+      -- stack.yaml location. Note that in this functions we use
+      -- logError instead of logWarn because, when using the
+      -- interpreter mode, only error messages are shown. See:
+      -- https://github.com/commercialhaskell/stack/issues/3007
+      case globalStackYaml go' of
+        SYLOverride fp -> logError $
+          "Ignoring override stack.yaml file for script command: " <>
+          fromString fp
+        SYLDefault -> return ()
+        SYLNoConfig _ -> assert False (return ())
 
-        config <- view configL
-        menv <- liftIO $ configEnvOverride config defaultEnvSettings
+      config <- view configL
+      menv <- liftIO $ configProcessContextSettings config defaultEnvSettings
+      withProcessContext menv $ do
         wc <- view $ actualCompilerVersionL.whichCompilerL
         colorFlag <- appropriateGhcColorFlag
 
@@ -71,7 +72,7 @@ scriptCmd opts go' = do
             -- already. If all needed packages are available, we can
             -- skip the (rather expensive) build call below.
             bss <- sinkProcessStdout
-                Nothing menv (ghcPkgExeName wc)
+                (ghcPkgExeName wc)
                 ["list", "--simple-output"] CL.consume -- FIXME use the package info from envConfigPackages, or is that crazy?
             let installed = Set.fromList
                           $ map toPackageName
@@ -101,19 +102,20 @@ scriptCmd opts go' = do
                 ]
         munlockFile lk -- Unlock before transferring control away.
         case soCompile opts of
-          SEInterpret -> exec menv ("run" ++ compilerExeName wc)
+          SEInterpret -> exec ("run" ++ compilerExeName wc)
                 (ghcArgs ++ toFilePath file : soArgs opts)
           _ -> do
             let dir = parent file
-            -- use sinkProcessStdout to ensure a ProcessFailed
-            -- exception is generated for better error messages
-            sinkProcessStdout
-              (Just dir)
-              menv
+            -- Use readProcessStdout_ so that (1) if GHC does send any output
+            -- to stdout, we capture it and stop it from being sent to our
+            -- stdout, which could break scripts, and (2) if there's an
+            -- exception, the standard output we did capture will be reported
+            -- to the user.
+            withWorkingDir (toFilePath dir) $ proc
               (compilerExeName wc)
               (ghcArgs ++ [toFilePath file])
-              CL.sinkNull
-            exec menv (toExeName $ toFilePath file) (soArgs opts)
+              (void . readProcessStdout_)
+            exec (toExeName $ toFilePath file) (soArgs opts)
   where
     toPackageName = reverse . drop 1 . dropWhile (/= '-') . reverse
 
@@ -121,16 +123,9 @@ scriptCmd opts go' = do
     wordsComma = splitWhen (\c -> c == ' ' || c == ',')
 
     toExeName fp =
-      if isWindows
+      if osIsWindows
         then replaceExtension fp "exe"
         else dropExtension fp
-
-isWindows :: Bool
-#ifdef WINDOWS
-isWindows = True
-#else
-isWindows = False
-#endif
 
 getPackagesFromModuleInfo
   :: ModuleInfo

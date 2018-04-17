@@ -49,7 +49,7 @@ main =
             -- 'stack list-dependencies' just ensures that 'stack.cabal' is generated from hpack
             _ <- readProcess "stack" ["list-dependencies"] ""
             gStackPackageDescription <-
-                packageDescription <$> readPackageDescription silent "stack.cabal"
+                packageDescription <$> readGenericPackageDescription silent "stack.cabal"
             gGithubAuthToken <- lookupEnv githubAuthTokenEnvVar
             gGitRevCount <- length . lines <$> readProcess "git" ["rev-list", "HEAD"] ""
             gGitSha <- trim <$> readProcess "git" ["rev-parse", "HEAD"] ""
@@ -517,7 +517,7 @@ callGithubApi Global{..} headers mpostFile url = do
     manager <- newManager tlsManagerSettings
     runResourceT $ do
         res <- http req manager
-        responseBody res $$+- CC.sinkLazy
+        runConduit $ responseBody res .| CC.sinkLazy
 
 -- | Create a .tar.gz files from files.  The paths should be absolute, and will
 -- be made relative to the base directory in the tarball.

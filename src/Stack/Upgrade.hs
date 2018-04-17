@@ -12,7 +12,7 @@ module Stack.Upgrade
     , upgradeOpts
     ) where
 
-import           Stack.Prelude               hiding (force)
+import           Stack.Prelude               hiding (force, Display (..))
 import qualified Data.HashMap.Strict         as HashMap
 import qualified Data.List
 import qualified Data.Map                    as Map
@@ -36,7 +36,7 @@ import           Stack.Types.Config
 import           Stack.Types.Resolver
 import           System.Exit                 (ExitCode (ExitSuccess))
 import           System.Process              (rawSystem, readProcess)
-import           System.Process.Run
+import           RIO.Process
 
 upgradeOpts :: Parser UpgradeOpts
 upgradeOpts = UpgradeOpts
@@ -187,10 +187,9 @@ sourceUpgrade
   -> RIO env ()
 sourceUpgrade gConfigMonoid mresolver builtHash (SourceOpts gitRepo) =
   withSystemTempDir "stack-upgrade" $ \tmp -> do
-    menv <- getMinimalEnvOverride
     mdir <- case gitRepo of
       Just (repo, branch) -> do
-        remote <- liftIO $ readProcess "git" ["ls-remote", repo, branch] []
+        remote <- liftIO $ System.Process.readProcess "git" ["ls-remote", repo, branch] []
         latestCommit <-
           case words remote of
             [] -> throwString $ "No commits found for branch " ++ branch ++ " on repo " ++ repo
@@ -212,7 +211,7 @@ sourceUpgrade gConfigMonoid mresolver builtHash (SourceOpts gitRepo) =
                 -- the stack repo until we're comfortable with "stack upgrade
                 -- --git" not working for earlier versions.
                 let args = [ "clone", repo , "stack", "--depth", "1", "--recursive", "--branch", branch]
-                runCmd (Cmd (Just tmp) "git" menv args) Nothing
+                withWorkingDir (toFilePath tmp) $ proc "git" args runProcess_
                 return $ Just $ tmp </> $(mkRelDir "stack")
       Nothing -> do
         updateAllIndices

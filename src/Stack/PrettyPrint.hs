@@ -9,15 +9,16 @@ module Stack.PrettyPrint
       -- * Pretty printing functions
       displayPlain, displayWithColor
       -- * Logging based on pretty-print typeclass
-    , prettyDebug, prettyInfo, prettyWarn, prettyError, prettyWarnNoIndent, prettyErrorNoIndent
-    , prettyDebugL, prettyInfoL, prettyWarnL, prettyErrorL, prettyWarnNoIndentL, prettyErrorNoIndentL
-    , prettyDebugS, prettyInfoS, prettyWarnS, prettyErrorS, prettyWarnNoIndentS, prettyErrorNoIndentS
+    , prettyDebug, prettyInfo, prettyNote, prettyWarn, prettyError, prettyWarnNoIndent, prettyErrorNoIndent
+    , prettyDebugL, prettyInfoL, prettyNoteL, prettyWarnL, prettyErrorL, prettyWarnNoIndentL, prettyErrorNoIndentL
+    , prettyDebugS, prettyInfoS, prettyNoteS, prettyWarnS, prettyErrorS, prettyWarnNoIndentS, prettyErrorNoIndentS
       -- * Semantic styling functions
       -- | These are preferred to styling or colors directly, so that we can
       -- encourage consistency.
     , styleWarning, styleError, styleGood
     , styleShell, styleFile, styleUrl, styleDir, styleModule
     , styleCurrent, styleTarget
+    , styleRecommendation
     , displayMilliseconds
       -- * Formatting utils
     , bulletedList
@@ -34,42 +35,46 @@ module Stack.PrettyPrint
     , indentAfterLabel, wordDocs, flow
     ) where
 
-import           Stack.Prelude
+import qualified RIO
+import           Stack.Prelude hiding (Display (..))
 import           Data.List (intersperse)
 import qualified Data.Text as T
-import           Stack.Types.Config
-import           Stack.Types.Package
+import qualified Distribution.ModuleName as C (ModuleName)
+import qualified Distribution.Text as C (display)
+import           Stack.Types.NamedComponent
 import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageName
 import           Stack.Types.Runner
 import           Stack.Types.Version
-import qualified System.Clock as Clock
 import           Text.PrettyPrint.Leijen.Extended
 
 displayWithColor
     :: (HasRunner env, Display a, HasAnsiAnn (Ann a),
-        MonadReader env m, MonadLogger m)
+        MonadReader env m, HasLogFunc env, HasCallStack)
     => a -> m T.Text
 displayWithColor x = do
-    useAnsi <- liftM logUseColor $ view logOptionsL
-    termWidth <- liftM logTermWidth $ view logOptionsL
+    useAnsi <- view useColorL
+    termWidth <- view $ runnerL.to runnerTermWidth
     return $ (if useAnsi then displayAnsi else displayPlain) termWidth x
 
 -- TODO: switch to using implicit callstacks once 7.8 support is dropped
 
 prettyWith :: (HasRunner env, HasCallStack, Display b, HasAnsiAnn (Ann b),
-               MonadReader env m, MonadLogger m)
+               MonadReader env m, MonadIO m)
            => LogLevel -> (a -> b) -> a -> m ()
-prettyWith level f = logOther level <=< displayWithColor . f
+prettyWith level f = logGeneric "" level . RIO.display <=< displayWithColor . f
 
 -- Note: I think keeping this section aligned helps spot errors, might be
 -- worth keeping the alignment in place.
 
-prettyDebugWith, prettyInfoWith, prettyWarnWith, prettyErrorWith, prettyWarnNoIndentWith, prettyErrorNoIndentWith
-  :: (HasCallStack, HasRunner env, MonadReader env m, MonadLogger m)
+prettyDebugWith, prettyInfoWith, prettyNoteWith, prettyWarnWith, prettyErrorWith, prettyWarnNoIndentWith, prettyErrorNoIndentWith
+  :: (HasCallStack, HasRunner env, MonadReader env m, MonadIO m)
   => (a -> Doc AnsiAnn) -> a -> m ()
 prettyDebugWith = prettyWith LevelDebug
 prettyInfoWith  = prettyWith LevelInfo
+prettyNoteWith f  = prettyWith LevelInfo
+                          ((line <>) . (styleGood "Note:" <+>) .
+                           indentAfterLabel . f)
 prettyWarnWith f  = prettyWith LevelWarn
                           ((line <>) . (styleWarning "Warning:" <+>) .
                            indentAfterLabel . f)
@@ -81,31 +86,34 @@ prettyWarnNoIndentWith f  = prettyWith LevelWarn
 prettyErrorNoIndentWith f = prettyWith LevelWarn
                                   ((line <>) . (styleError   "Error:" <+>) . f)
 
-prettyDebug, prettyInfo, prettyWarn, prettyError, prettyWarnNoIndent, prettyErrorNoIndent
-  :: (HasCallStack, HasRunner env, MonadReader env m, MonadLogger m)
+prettyDebug, prettyInfo, prettyNote, prettyWarn, prettyError, prettyWarnNoIndent, prettyErrorNoIndent
+  :: (HasCallStack, HasRunner env, MonadReader env m, MonadIO m)
   => Doc AnsiAnn -> m ()
 prettyDebug         = prettyDebugWith         id
 prettyInfo          = prettyInfoWith          id
+prettyNote          = prettyNoteWith          id
 prettyWarn          = prettyWarnWith          id
 prettyError         = prettyErrorWith         id
 prettyWarnNoIndent  = prettyWarnNoIndentWith  id
 prettyErrorNoIndent = prettyErrorNoIndentWith id
 
-prettyDebugL, prettyInfoL, prettyWarnL, prettyErrorL, prettyWarnNoIndentL, prettyErrorNoIndentL
-  :: (HasCallStack, HasRunner env, MonadReader env m, MonadLogger m)
+prettyDebugL, prettyInfoL, prettyNoteL, prettyWarnL, prettyErrorL, prettyWarnNoIndentL, prettyErrorNoIndentL
+  :: (HasCallStack, HasRunner env, MonadReader env m, MonadIO m)
   => [Doc AnsiAnn] -> m ()
 prettyDebugL         = prettyDebugWith         fillSep
 prettyInfoL          = prettyInfoWith          fillSep
+prettyNoteL          = prettyNoteWith          fillSep
 prettyWarnL          = prettyWarnWith          fillSep
 prettyErrorL         = prettyErrorWith         fillSep
 prettyWarnNoIndentL  = prettyWarnNoIndentWith  fillSep
 prettyErrorNoIndentL = prettyErrorNoIndentWith fillSep
 
-prettyDebugS, prettyInfoS, prettyWarnS, prettyErrorS, prettyWarnNoIndentS, prettyErrorNoIndentS
-  :: (HasCallStack, HasRunner env, MonadReader env m, MonadLogger m)
+prettyDebugS, prettyInfoS, prettyNoteS, prettyWarnS, prettyErrorS, prettyWarnNoIndentS, prettyErrorNoIndentS
+  :: (HasCallStack, HasRunner env, MonadReader env m, MonadIO m)
   => String -> m ()
 prettyDebugS         = prettyDebugWith         flow
 prettyInfoS          = prettyInfoWith          flow
+prettyNoteS          = prettyNoteWith          flow
 prettyWarnS          = prettyWarnWith          flow
 prettyErrorS         = prettyErrorWith         flow
 prettyWarnNoIndentS  = prettyWarnNoIndentWith  flow
@@ -128,21 +136,21 @@ wordDocs = map fromString . words
 flow :: String -> Doc a
 flow = fillSep . wordDocs
 
-debugBracket :: (HasCallStack, HasRunner env, MonadReader env m, MonadLogger m,
+debugBracket :: (HasCallStack, HasRunner env, MonadReader env m,
                  MonadIO m, MonadUnliftIO m) => Doc AnsiAnn -> m a -> m a
 debugBracket msg f = do
-  let output = logDebug <=< displayWithColor
+  let output = logDebug . RIO.display <=< displayWithColor
   output $ "Start: " <> msg
-  start <- liftIO $ Clock.getTime Clock.Monotonic
+  start <- getMonotonicTime
   x <- f `catch` \ex -> do
-      end <- liftIO $ Clock.getTime Clock.Monotonic
-      let diff = Clock.diffTimeSpec start end
+      end <- getMonotonicTime
+      let diff = end - start
       output $ "Finished with exception in" <+> displayMilliseconds diff <> ":" <+>
           msg <> line <>
           "Exception thrown: " <> fromString (show ex)
       throwIO (ex :: SomeException)
-  end <- liftIO $ Clock.getTime Clock.Monotonic
-  let diff = Clock.diffTimeSpec start end
+  end <- getMonotonicTime
+  let diff = end - start
   output $ "Finished in" <+> displayMilliseconds diff <> ":" <+> msg
   return x
 
@@ -180,6 +188,10 @@ styleUrl = styleFile
 styleDir :: AnsiDoc -> AnsiDoc
 styleDir = bold . blue
 
+-- | Style used to highlight part of a recommended course of action.
+styleRecommendation :: AnsiDoc -> AnsiDoc
+styleRecommendation = bold . green
+
 -- | Style an 'AnsiDoc' in a way that emphasizes that it is related to
 --   a current thing. For example, could be used when talking about the
 --   current package we're processing when outputting the name of it.
@@ -212,10 +224,13 @@ instance Display (Path b Dir) where
 instance Display (PackageName, NamedComponent) where
     display = cyan . fromString . T.unpack . renderPkgComponent
 
+instance Display C.ModuleName where
+    display = fromString . C.display
+
 -- Display milliseconds.
-displayMilliseconds :: Clock.TimeSpec -> AnsiDoc
+displayMilliseconds :: Double -> AnsiDoc
 displayMilliseconds t = green $
-    (fromString . show . (`div` 10^(6 :: Int)) . Clock.toNanoSecs) t <> "ms"
+    fromString (show (round (t * 1000) :: Int)) <> "ms"
 
 -- | Display a bulleted list of 'AnsiDoc'.
 bulletedList :: [AnsiDoc] -> AnsiDoc

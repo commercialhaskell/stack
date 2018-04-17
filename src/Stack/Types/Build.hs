@@ -74,13 +74,14 @@ import           Stack.Types.CompilerBuild
 import           Stack.Types.Config
 import           Stack.Types.FlagName
 import           Stack.Types.GhcPkgId
+import           Stack.Types.NamedComponent
 import           Stack.Types.Package
 import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageName
 import           Stack.Types.Version
 import           System.Exit                     (ExitCode (ExitFailure))
 import           System.FilePath                 (pathSeparator)
-import           System.Process.Log              (showProcessArgDebug)
+import           RIO.Process                     (showProcessArgDebug)
 
 ----------------------------------------------
 -- Exceptions
@@ -604,7 +605,6 @@ configureOptsNoDir econfig bco deps isLocal package = concat
     , map ("--extra-include-dirs=" ++) (Set.toList (configExtraIncludeDirs config))
     , map ("--extra-lib-dirs=" ++) (Set.toList (configExtraLibDirs config))
     , maybe [] (\customGcc -> ["--with-gcc=" ++ toFilePath customGcc]) (configOverrideGccPath config)
-    , hpackOptions (configOverrideHpack config)
     , ["--ghcjs" | wc == Ghcjs]
     , ["--exact-configuration" | useExactConf]
     ]
@@ -628,9 +628,6 @@ configureOptsNoDir econfig bco deps isLocal package = concat
     depOptions = map (uncurry toDepOption) $ Map.toList deps
       where
         toDepOption = if newerCabal then toDepOption1_22 else toDepOption1_18
-
-    hpackOptions HpackBundled = []
-    hpackOptions (HpackCommand cmd) = ["--with-hpack=" ++ cmd]
 
     toDepOption1_22 ident gid = concat
         [ "--dependency="

@@ -6,7 +6,7 @@ homepage:            https://github.com/githubuser/files#readme
 license:             BSD3
 author:              Author name here
 maintainer:          example@example.com
-copyright:           2017 Author name here
+copyright:           2017-2018 Author name here
 category:            Web
 build-type:          Simple
 cabal-version:       >=1.10

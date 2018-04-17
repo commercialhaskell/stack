@@ -17,7 +17,7 @@ build:
   only:
     - master
     - stable
-  script:
+  script: &build
     - export PATH=$HOME/.local/bin:$PATH
     - (cd etc/scripts && stack --install-ghc install --pedantic)
     - stack-release-script check
@@ -25,21 +25,18 @@ build:
 manual_build:
   stage: build
   when: manual
-  script:
-    - export PATH=$HOME/.local/bin:$PATH
-    - (cd etc/scripts && stack --install-ghc install --pedantic)
-    - stack-release-script check
+  script: *build
 
-docker_image_lts-8:
+docker_image_lts-10:
   stage: build
   when: manual
   script:
     - docker login -u "$PROD_DOCKER_USERNAME" -p "$PROD_DOCKER_PASSWORD"
-    - etc/dockerfiles/stack-build/build.sh --push lts-8
+    - etc/dockerfiles/stack-build/build.sh --push lts-10
 
-docker_image_lts-9:
+docker_image_lts-11:
   stage: build
   when: manual
   script:
     - docker login -u "$PROD_DOCKER_USERNAME" -p "$PROD_DOCKER_PASSWORD"
-    - etc/dockerfiles/stack-build/build.sh --push lts-9
+    - etc/dockerfiles/stack-build/build.sh --push lts-11

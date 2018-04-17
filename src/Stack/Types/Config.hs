@@ -35,7 +35,6 @@ module Stack.Types.Config
   ,HasConfig(..)
   ,askLatestSnapshotUrl
   ,explicitSetupDeps
-  ,getMinimalEnvOverride
   -- ** BuildConfig & HasBuildConfig
   ,BuildConfig(..)
   ,LocalPackages(..)
@@ -44,7 +43,6 @@ module Stack.Types.Config
   ,lpvName
   ,lpvVersion
   ,lpvComponents
-  ,NamedComponent(..)
   ,stackYamlL
   ,projectRootL
   ,HasBuildConfig(..)
@@ -77,6 +75,8 @@ module Stack.Types.Config
   -- ** EnvSettings
   ,EnvSettings(..)
   ,minimalEnvSettings
+  ,defaultEnvSettings
+  ,plainEnvSettings
   -- ** GlobalOpts & GlobalOptsMonoid
   ,GlobalOpts(..)
   ,GlobalOptsMonoid(..)
@@ -90,14 +90,6 @@ module Stack.Types.Config
   ,PackageIndex(..)
   ,IndexName(..)
   ,indexNameText
-  -- Config fields
-  ,configPackageIndex
-  ,configPackageIndexOld
-  ,configPackageIndexCache
-  ,configPackageIndexCacheOld
-  ,configPackageIndexGz
-  ,configPackageIndexRoot
-  ,configPackageTarball
   -- ** Project & ProjectAndConfigMonoid
   ,Project(..)
   ,ProjectAndConfigMonoid(..)
@@ -163,13 +155,13 @@ module Stack.Types.Config
   ,buildOptsMonoidInstallExesL
   ,buildOptsHaddockL
   ,globalOptsBuildOptsMonoidL
-  ,packageIndicesL
   ,stackRootL
   ,configUrlsL
   ,cabalVersionL
   ,whichCompilerL
-  ,envOverrideL
+  ,envOverrideSettingsL
   ,loadedSnapshotL
+  ,globalHintsL
   ,shouldForceGhcColorFlag
   ,appropriateGhcColorFlag
   -- * Lens reexport
@@ -213,12 +205,14 @@ import qualified Options.Applicative.Types as OA
 import           Path
 import qualified Paths_stack as Meta
 import           Stack.Constants
+import           Stack.PackageIndex (HasCabalLoader (..), CabalLoader (clStackRoot))
 import           Stack.Types.BuildPlan
 import           Stack.Types.Compiler
 import           Stack.Types.CompilerBuild
 import           Stack.Types.Docker
 import           Stack.Types.FlagName
 import           Stack.Types.Image
+import           Stack.Types.NamedComponent
 import           Stack.Types.Nix
 import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageIndex
@@ -230,16 +224,14 @@ import           Stack.Types.Urls
 import           Stack.Types.Version
 import qualified System.FilePath as FilePath
 import           System.PosixCompat.Types (UserID, GroupID, FileMode)
-import           System.Process.Read (EnvOverride, findExecutable)
+import           RIO.Process (ProcessContext, HasProcessContext (..), findExecutable)
 
 -- Re-exports
 import           Stack.Types.Config.Build as X
 
 -- | The top-level Stackage configuration.
 data Config =
-  Config {configStackRoot           :: !(Path Abs Dir)
-         -- ^ ~/.stack more often than not
-         ,configWorkDir             :: !(Path Rel Dir)
+  Config {configWorkDir             :: !(Path Rel Dir)
          -- ^ this allows to override .stack-work directory
          ,configUserConfigPath      :: !(Path Abs File)
          -- ^ Path to user configuration file (usually ~/.stack/config.yaml)
@@ -249,14 +241,12 @@ data Config =
          -- ^ Docker configuration
          ,configNix                 :: !NixOpts
          -- ^ Execution environment (e.g nix-shell) configuration
-         ,configEnvOverride         :: !(EnvSettings -> IO EnvOverride)
+         ,configProcessContextSettings :: !(EnvSettings -> IO ProcessContext)
          -- ^ Environment variables to be passed to external tools
          ,configLocalProgramsBase   :: !(Path Abs Dir)
          -- ^ Non-platform-specific path containing local installations
          ,configLocalPrograms       :: !(Path Abs Dir)
          -- ^ Path containing local installations (mainly GHC)
-         ,configConnectionCount     :: !Int
-         -- ^ How many concurrent connections are allowed when downloading
          ,configHideTHLoading       :: !Bool
          -- ^ Hide the Template Haskell "Loading package ..." messages from the
          -- console
@@ -276,21 +266,6 @@ data Config =
          -- e.g. The latest snapshot file.
          -- A build plan name (e.g. lts5.9.yaml) is appended when downloading
          -- the build plan actually.
-         ,configPackageIndices      :: ![PackageIndex]
-         -- ^ Information on package indices. This is left biased, meaning that
-         -- packages in an earlier index will shadow those in a later index.
-         --
-         -- Warning: if you override packages in an index vs what's available
-         -- upstream, you may correct your compiled snapshots, as different
-         -- projects may have different definitions of what pkg-ver means! This
-         -- feature is primarily intended for adding local packages, not
-         -- overriding. Overriding is better accomplished by adding to your
-         -- list of packages.
-         --
-         -- Note that indices specified in a later config file will override
-         -- previous indices, /not/ extend them.
-         --
-         -- Using an assoc list instead of a Map to keep track of priority
          ,configSystemGHC           :: !Bool
          -- ^ Should we use the system-installed GHC (on the PATH) if
          -- available? Can be overridden by command line options.
@@ -349,8 +324,6 @@ data Config =
          ,configAllowDifferentUser  :: !Bool
          -- ^ Allow users other than the stack root owner to use the stack
          -- installation.
-         ,configPackageCache        :: !(IORef (Maybe (PackageCache PackageIndex)))
-         -- ^ In memory cache of hackage index.
          ,configDumpLogs            :: !DumpLogs
          -- ^ Dump logs of local non-dependencies when doing a build.
          ,configMaybeProject        :: !(Maybe (Project, Path Abs File))
@@ -362,10 +335,7 @@ data Config =
          ,configSaveHackageCreds    :: !Bool
          -- ^ Should we save Hackage credentials to a file?
          ,configRunner              :: !Runner
-         ,configIgnoreRevisionMismatch :: !Bool
-         -- ^ Ignore a revision mismatch when loading up cabal files,
-         -- and fall back to the latest revision. See:
-         -- <https://github.com/commercialhaskell/stack/issues/3520>
+         ,configCabalLoader         :: !CabalLoader
          }
 
 data HpackExecutable
@@ -620,14 +590,6 @@ lpvVersion lpv =
        $ lpvGPD lpv
    in version
 
--- | A single, fully resolved component of a package
-data NamedComponent
-    = CLib
-    | CExe !Text
-    | CTest !Text
-    | CBench !Text
-    deriving (Show, Eq, Ord)
-
 -- | Value returned by 'Stack.Config.loadConfig'.
 data LoadConfig = LoadConfig
     { lcConfig          :: !Config
@@ -715,7 +677,7 @@ instance ToJSON Project where
 data ConfigMonoid =
   ConfigMonoid
     { configMonoidStackRoot          :: !(First (Path Abs Dir))
-    -- ^ See: 'configStackRoot'
+    -- ^ See: 'clStackRoot'
     , configMonoidWorkDir            :: !(First (Path Rel Dir))
     -- ^ See: 'configWorkDir'.
     , configMonoidBuildOpts          :: !BuildOptsMonoid
@@ -733,7 +695,7 @@ data ConfigMonoid =
     , configMonoidUrls               :: !UrlsMonoid
     -- ^ See: 'configUrls
     , configMonoidPackageIndices     :: !(First [PackageIndex])
-    -- ^ See: 'configPackageIndices'
+    -- ^ See: @picIndices@
     , configMonoidSystemGHC          :: !(First Bool)
     -- ^ See: 'configSystemGHC'
     ,configMonoidInstallGHC          :: !(First Bool)
@@ -1095,7 +1057,7 @@ instance Show ConfigException where
                )
         ]
     show (UnableToExtractArchive url file) = concat
-        [ "Archive extraction failed. We support tarballs and zip, couldn't handle the following URL, "
+        [ "Archive extraction failed. Tarballs and zip archives are supported, couldn't handle the following URL, "
         , T.unpack url, " downloaded to the file ", toFilePath $ filename file
         ]
     show (BadStackVersionException requiredRange) = concat
@@ -1211,44 +1173,6 @@ data SuggestSolver = SuggestSolver | Don'tSuggestSolver
 askLatestSnapshotUrl :: (MonadReader env m, HasConfig env) => m Text
 askLatestSnapshotUrl = view $ configL.to configUrls.to urlsLatestSnapshot
 
--- | Root for a specific package index
-configPackageIndexRoot :: (MonadReader env m, HasConfig env, MonadThrow m) => IndexName -> m (Path Abs Dir)
-configPackageIndexRoot (IndexName name) = do
-    root <- view stackRootL
-    dir <- parseRelDir $ S8.unpack name
-    return (root </> $(mkRelDir "indices") </> dir)
-
--- | Location of the 01-index.cache file
-configPackageIndexCache :: (MonadReader env m, HasConfig env, MonadThrow m) => IndexName -> m (Path Abs File)
-configPackageIndexCache = liftM (</> $(mkRelFile "01-index.cache")) . configPackageIndexRoot
-
--- | Location of the 00-index.cache file
-configPackageIndexCacheOld :: (MonadReader env m, HasConfig env, MonadThrow m) => IndexName -> m (Path Abs File)
-configPackageIndexCacheOld = liftM (</> $(mkRelFile "00-index.cache")) . configPackageIndexRoot
-
--- | Location of the 01-index.tar file
-configPackageIndex :: (MonadReader env m, HasConfig env, MonadThrow m) => IndexName -> m (Path Abs File)
-configPackageIndex = liftM (</> $(mkRelFile "01-index.tar")) . configPackageIndexRoot
-
--- | Location of the 00-index.tar file. This file is just a copy of
--- the 01-index.tar file, provided for tools which still look for the
--- 00-index.tar file.
-configPackageIndexOld :: (MonadReader env m, HasConfig env, MonadThrow m) => IndexName -> m (Path Abs File)
-configPackageIndexOld = liftM (</> $(mkRelFile "00-index.tar")) . configPackageIndexRoot
-
--- | Location of the 01-index.tar.gz file
-configPackageIndexGz :: (MonadReader env m, HasConfig env, MonadThrow m) => IndexName -> m (Path Abs File)
-configPackageIndexGz = liftM (</> $(mkRelFile "01-index.tar.gz")) . configPackageIndexRoot
-
--- | Location of a package tarball
-configPackageTarball :: (MonadReader env m, HasConfig env, MonadThrow m) => IndexName -> PackageIdentifier -> m (Path Abs File)
-configPackageTarball iname ident = do
-    root <- configPackageIndexRoot iname
-    name <- parseRelDir $ packageNameString $ packageIdentifierName ident
-    ver <- parseRelDir $ versionString $ packageIdentifierVersion ident
-    base <- parseRelFile $ packageIdentifierString ident ++ ".tar.gz"
-    return (root </> $(mkRelDir "packages") </> name </> ver </> base)
-
 -- | @".stack-work"@
 workDirL :: HasConfig env => Lens' env (Path Rel Dir)
 workDirL = configL.lens configWorkDir (\x y -> x { configWorkDir = y })
@@ -1303,7 +1227,7 @@ bindirCompilerTools = do
     compilerVersion <- envConfigCompilerVersion <$> view envConfigL
     compiler <- parseRelDir $ compilerVersionString compilerVersion
     return $
-        configStackRoot config </>
+        view stackRootL config </>
         $(mkRelDir "compiler-tools") </>
         platform </>
         compiler </>
@@ -1468,18 +1392,11 @@ extraBinDirs :: (MonadThrow m, MonadReader env m, HasEnvConfig env)
              => m (Bool -> [Path Abs Dir])
 extraBinDirs = do
     deps <- installationRootDeps
-    local <- installationRootLocal
+    local' <- installationRootLocal
     tools <- bindirCompilerTools
     return $ \locals -> if locals
-        then [local </> bindirSuffix, deps </> bindirSuffix, tools]
+        then [local' </> bindirSuffix, deps </> bindirSuffix, tools]
         else [deps </> bindirSuffix, tools]
-
--- | Get the minimal environment override, useful for just calling external
--- processes like git or ghc
-getMinimalEnvOverride :: (MonadReader env m, HasConfig env, MonadIO m) => m EnvOverride
-getMinimalEnvOverride = do
-    config' <- view configL
-    liftIO $ configEnvOverride config' minimalEnvSettings
 
 minimalEnvSettings :: EnvSettings
 minimalEnvSettings =
@@ -1489,6 +1406,32 @@ minimalEnvSettings =
     , esStackExe = False
     , esLocaleUtf8 = False
     , esKeepGhcRts = False
+    }
+
+-- | Default @EnvSettings@ which includes locals and GHC_PACKAGE_PATH.
+--
+-- Note that this also passes through the GHCRTS environment variable.
+-- See https://github.com/commercialhaskell/stack/issues/3444
+defaultEnvSettings :: EnvSettings
+defaultEnvSettings = EnvSettings
+    { esIncludeLocals = True
+    , esIncludeGhcPackagePath = True
+    , esStackExe = True
+    , esLocaleUtf8 = False
+    , esKeepGhcRts = True
+    }
+
+-- | Environment settings which do not embellish the environment
+--
+-- Note that this also passes through the GHCRTS environment variable.
+-- See https://github.com/commercialhaskell/stack/issues/3444
+plainEnvSettings :: EnvSettings
+plainEnvSettings = EnvSettings
+    { esIncludeLocals = False
+    , esIncludeGhcPackagePath = False
+    , esStackExe = False
+    , esLocaleUtf8 = False
+    , esKeepGhcRts = True
     }
 
 -- | Get the path for the given compiler ignoring any local binaries.
@@ -1501,8 +1444,11 @@ getCompilerPath
 getCompilerPath wc = do
     config' <- view configL
     eoWithoutLocals <- liftIO $
-        configEnvOverride config' minimalEnvSettings { esLocaleUtf8 = True }
-    join (findExecutable eoWithoutLocals (compilerExeName wc))
+        configProcessContextSettings config' minimalEnvSettings { esLocaleUtf8 = True }
+    eres <- runRIO eoWithoutLocals $ findExecutable $ compilerExeName wc
+    case eres of
+      Left e -> throwM e
+      Right x -> parseAbsFile x
 
 data ProjectAndConfigMonoid
   = ProjectAndConfigMonoid !Project !ConfigMonoid
@@ -1887,7 +1833,7 @@ class HasGHCVariant env where
     {-# INLINE ghcVariantL #-}
 
 -- | Class for environment values that can provide a 'Config'.
-class (HasPlatform env, HasRunner env) => HasConfig env where
+class (HasPlatform env, HasProcessContext env, HasCabalLoader env) => HasConfig env where
     configL :: Lens' env Config
     default configL :: HasBuildConfig env => Lens' env Config
     configL = buildConfigL.lens bcConfig (\x y -> x { bcConfig = y })
@@ -1923,6 +1869,24 @@ instance HasGHCVariant GHCVariant where
 instance HasGHCVariant BuildConfig where
     ghcVariantL = lens bcGHCVariant (\x y -> x { bcGHCVariant = y })
 instance HasGHCVariant EnvConfig
+
+instance HasProcessContext Config where
+    processContextL = runnerL.processContextL
+instance HasProcessContext LoadConfig where
+    processContextL = configL.processContextL
+instance HasProcessContext BuildConfig where
+    processContextL = configL.processContextL
+instance HasProcessContext EnvConfig where
+    processContextL = configL.processContextL
+
+instance HasCabalLoader Config where
+    cabalLoaderL = lens configCabalLoader (\x y -> x { configCabalLoader = y })
+instance HasCabalLoader LoadConfig where
+    cabalLoaderL = configL.cabalLoaderL
+instance HasCabalLoader BuildConfig where
+    cabalLoaderL = configL.cabalLoaderL
+instance HasCabalLoader EnvConfig where
+    cabalLoaderL = configL.cabalLoaderL
 
 instance HasConfig Config where
     configL = id
@@ -1964,16 +1928,16 @@ instance HasLogFunc EnvConfig where
 -- Helper lenses
 -----------------------------------
 
-stackRootL :: HasConfig s => Lens' s (Path Abs Dir)
-stackRootL = configL.lens configStackRoot (\x y -> x { configStackRoot = y })
+stackRootL :: HasCabalLoader s => Lens' s (Path Abs Dir)
+stackRootL = cabalLoaderL.lens clStackRoot (\x y -> x { clStackRoot = y })
 
--- | The compiler specified by the @MiniBuildPlan@. This may be
+-- | The compiler specified by the @SnapshotDef@. This may be
 -- different from the actual compiler used!
 wantedCompilerVersionL :: HasBuildConfig s => Getting r s (CompilerVersion 'CVWanted)
 wantedCompilerVersionL = snapshotDefL.to sdWantedCompilerVersion
 
 -- | The version of the compiler which will actually be used. May be
--- different than that specified in the 'MiniBuildPlan' and returned
+-- different than that specified in the 'SnapshotDef' and returned
 -- by 'wantedCompilerVersionL'.
 actualCompilerVersionL :: HasEnvConfig s => Lens' s (CompilerVersion 'CVActual)
 actualCompilerVersionL = envConfigL.lens
@@ -1984,11 +1948,6 @@ snapshotDefL :: HasBuildConfig s => Lens' s SnapshotDef
 snapshotDefL = buildConfigL.lens
     bcSnapshotDef
     (\x y -> x { bcSnapshotDef = y })
-
-packageIndicesL :: HasConfig s => Lens' s [PackageIndex]
-packageIndicesL = configL.lens
-    configPackageIndices
-    (\x y -> x { configPackageIndices = y })
 
 buildOptsL :: HasConfig s => Lens' s BuildOpts
 buildOptsL = configL.lens
@@ -2046,17 +2005,20 @@ loadedSnapshotL = envConfigL.lens
 whichCompilerL :: Getting r (CompilerVersion a) WhichCompiler
 whichCompilerL = to whichCompiler
 
-envOverrideL :: HasConfig env => Lens' env (EnvSettings -> IO EnvOverride)
-envOverrideL = configL.lens
-    configEnvOverride
-    (\x y -> x { configEnvOverride = y })
+envOverrideSettingsL :: HasConfig env => Lens' env (EnvSettings -> IO ProcessContext)
+envOverrideSettingsL = configL.lens
+    configProcessContextSettings
+    (\x y -> x { configProcessContextSettings = y })
+
+globalHintsL :: HasBuildConfig s => Getting r s (Map PackageName (Maybe Version))
+globalHintsL = snapshotDefL.to sdGlobalHints
 
 shouldForceGhcColorFlag :: (HasRunner env, HasEnvConfig env)
                         => RIO env Bool
 shouldForceGhcColorFlag = do
     canDoColor <- (>= $(mkVersion "8.2.1")) . getGhcVersion
               <$> view actualCompilerVersionL
-    shouldDoColor <- logUseColor <$> view logOptionsL
+    shouldDoColor <- view useColorL
     return $ canDoColor && shouldDoColor
 
 appropriateGhcColorFlag :: (HasRunner env, HasEnvConfig env)

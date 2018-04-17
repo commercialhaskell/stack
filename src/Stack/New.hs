@@ -39,7 +39,7 @@ import           Data.Time.Calendar
 import           Data.Time.Clock
 import qualified Data.Yaml as Yaml
 import           Network.HTTP.Download
-import           Network.HTTP.Simple
+import           Network.HTTP.Simple (Request, HttpException, getResponseStatusCode, getResponseBody)
 import           Path
 import           Path.IO
 import           Stack.Constants
@@ -47,7 +47,7 @@ import           Stack.Constants.Config
 import           Stack.Types.Config
 import           Stack.Types.PackageName
 import           Stack.Types.TemplateName
-import           System.Process.Run
+import           RIO.Process
 import           Text.Hastache
 import           Text.Hastache.Context
 import           Text.Printf
@@ -107,12 +107,12 @@ new opts forceOverwrite = do
                           RemoteTemp -> "Downloading"
          in
         logInfo
-            (loading <> " template \"" <> templateName template <>
+            (loading <> " template \"" <> display (templateName template) <>
              "\" to create project \"" <>
-             packageNameText project <>
+             display (packageNameText project) <>
              "\" in " <>
              if bare then "the current directory"
-                     else T.pack (toFilePath (dirname absDir)) <>
+                     else fromString (toFilePath (dirname absDir)) <>
              " ...")
 
 data TemplateFrom = LocalTemp | RemoteTemp
@@ -145,7 +145,7 @@ loadTemplate name logIt = do
   where
     loadLocalFile :: Path b File -> RIO env Text
     loadLocalFile path = do
-        logDebug ("Opening local template: \"" <> T.pack (toFilePath path)
+        logDebug ("Opening local template: \"" <> fromString (toFilePath path)
                                                 <> "\"")
         exists <- doesFileExist path
         if exists
@@ -176,17 +176,17 @@ applyTemplate project template nonceParams dir templateText = do
     config <- view configL
     currentYear <- do
       now <- liftIO getCurrentTime
-      (year, _, _) <- return $ toGregorian . utctDay $ now
+      let (year, _, _) = toGregorian (utctDay now)
       return $ T.pack . show $ year
-    let context = M.union (M.union nonceParams extraParams) configParams
+    let context = M.unions [nonceParams, nameParams, configParams, yearParam]
           where
             nameAsVarId = T.replace "-" "_" $ packageNameText project
             nameAsModule = T.filter (/= '-') $ T.toTitle $ packageNameText project
-            extraParams = M.fromList [ ("name", packageNameText project)
-                                     , ("name-as-varid", nameAsVarId)
-                                     , ("name-as-module", nameAsModule)
-                                     , ("year", currentYear) ]
+            nameParams = M.fromList [ ("name", packageNameText project)
+                                    , ("name-as-varid", nameAsVarId)
+                                    , ("name-as-module", nameAsModule) ]
             configParams = configTemplateParams config
+            yearParam = M.singleton "year" currentYear
     (applied,missingKeys) <-
         runWriterT
             (hastacheStr
@@ -194,10 +194,10 @@ applyTemplate project template nonceParams dir templateText = do
                  templateText
                  (mkStrContextM (contextFunction context)))
     unless (S.null missingKeys)
-         (logInfo ("\n" <> T.pack (show (MissingParameters project template missingKeys (configUserConfigPath config))) <> "\n"))
+         (logInfo ("\n" <> displayShow (MissingParameters project template missingKeys (configUserConfigPath config)) <> "\n"))
     files :: Map FilePath LB.ByteString <-
-        catch (execWriterT $
-               yield (T.encodeUtf8 (LT.toStrict applied)) $$
+        catch (execWriterT $ runConduit $
+               yield (T.encodeUtf8 (LT.toStrict applied)) .|
                unpackTemplate receiveMem id
               )
               (\(e :: ProjectTemplateException) ->
@@ -252,16 +252,16 @@ writeTemplateFiles files =
 -- | Run any initialization functions, such as Git.
 runTemplateInits
     :: HasConfig env
-    => Path Abs Dir -> RIO env ()
+    => Path Abs Dir
+    -> RIO env ()
 runTemplateInits dir = do
-    menv <- getMinimalEnvOverride
     config <- view configL
     case configScmInit config of
         Nothing -> return ()
         Just Git ->
-            catch (callProcess $ Cmd (Just dir) "git" menv ["init"])
-                  (\(_ :: ProcessExitedUnsuccessfully) ->
-                         logInfo "git init failed to run, ignoring ...")
+            withWorkingDir (toFilePath dir) $
+            catchAny (proc "git" ["init"] runProcess_)
+                  (\_ -> logInfo "git init failed to run, ignoring ...")
 
 -- | Display the set of templates accompanied with description if available.
 listTemplates :: HasLogFunc env => RIO env ()
@@ -295,7 +295,7 @@ getTemplateInfo = do
   resp <- catch (liftM Right $ httpLbs req) (\(ex :: HttpException) -> return . Left $ "Failed to download template info. The HTTP error was: " <> show ex)
   case resp >>= is200 of
     Left err -> do
-      logInfo $ T.pack err
+      logInfo $ fromString err
       return M.empty
     Right resp' ->
       case Yaml.decodeEither (LB.toStrict $ getResponseBody resp') :: Either String Object of

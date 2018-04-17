@@ -14,6 +14,7 @@ module Stack.Runners
     , withBuildConfigAndLockNoDocker
     , withBuildConfig
     , withBuildConfigExt
+    , withBuildConfigDot
     , loadConfigWithOpts
     , loadCompilerVersion
     , withUserFileLock
@@ -33,14 +34,14 @@ import           Stack.Types.Runner
 import           System.Environment (getEnvironment)
 import           System.IO
 import           System.FileLock
+import           Stack.Dot
 
 -- FIXME it seems wrong that we call lcLoadBuildConfig multiple times
 loadCompilerVersion :: GlobalOpts
                     -> LoadConfig
                     -> IO (CompilerVersion 'CVWanted)
-loadCompilerVersion go lc = do
-    bconfig <- lcLoadBuildConfig lc (globalCompiler go)
-    return $ view wantedCompilerVersionL bconfig
+loadCompilerVersion go lc =
+    view wantedCompilerVersionL <$> lcLoadBuildConfig lc (globalCompiler go)
 
 -- | Enforce mutual exclusion of every action running via this
 -- function, on this path, on this users account.
@@ -87,7 +88,7 @@ withConfigAndLock
     -> RIO Config ()
     -> IO ()
 withConfigAndLock go@GlobalOpts{..} inner = loadConfigWithOpts go $ \lc -> do
-    withUserFileLock go (configStackRoot $ lcConfig lc) $ \lk ->
+    withUserFileLock go (view stackRootL lc) $ \lk ->
         runRIO (lcConfig lc) $
             Docker.reexecWithOptionalContainer
                 (lcProjectRoot lc)
@@ -108,7 +109,7 @@ withGlobalConfigAndLock go@GlobalOpts{..} inner = withRunnerGlobal go $ \runner 
             globalConfigMonoid
             Nothing
             LCSNoProject
-    withUserFileLock go (configStackRoot $ lcConfig lc) $ \_lk ->
+    withUserFileLock go (view stackRootL lc) $ \_lk ->
         runRIO (lcConfig lc) inner
 
 -- For now the non-locking version just unlocks immediately.
@@ -155,7 +156,7 @@ withBuildConfigExt
     -- installed on the host OS.
     -> IO ()
 withBuildConfigExt skipDocker go@GlobalOpts{..} mbefore inner mafter = loadConfigWithOpts go $ \lc -> do
-    withUserFileLock go (configStackRoot $ lcConfig lc) $ \lk0 -> do
+    withUserFileLock go (view stackRootL lc) $ \lk0 -> do
       -- A local bit of state for communication between callbacks:
       curLk <- newIORef lk0
       let inner' lk =
@@ -205,9 +206,7 @@ loadConfigWithOpts go@GlobalOpts{..} inner = withRunnerGlobal go $ \runner -> do
         -- If we have been relaunched in a Docker container, perform in-container initialization
         -- (switch UID, etc.).  We do this after first loading the configuration since it must
         -- happen ASAP but needs a configuration.
-        case globalDockerEntrypoint of
-            Just de -> Docker.entrypoint (lcConfig lc) de
-            Nothing -> return ()
+        forM_ globalDockerEntrypoint $ Docker.entrypoint (lcConfig lc)
         liftIO $ inner lc
 
 withRunnerGlobal :: GlobalOpts -> (Runner -> IO a) -> IO a
@@ -226,7 +225,7 @@ withMiniConfigAndLock
 withMiniConfigAndLock go@GlobalOpts{..} inner = withRunnerGlobal go $ \runner -> do
     miniConfig <-
         runRIO runner $
-        (loadMiniConfig . lcConfig) <$>
+        loadMiniConfig . lcConfig <$>
         loadConfigMaybeProject
           globalConfigMonoid
           globalResolver
@@ -237,3 +236,13 @@ withMiniConfigAndLock go@GlobalOpts{..} inner = withRunnerGlobal go $ \runner ->
 munlockFile :: MonadIO m => Maybe FileLock -> m ()
 munlockFile Nothing = return ()
 munlockFile (Just lk) = liftIO $ unlockFile lk
+
+-- Plumbing for --test and --bench flags
+withBuildConfigDot :: DotOpts -> GlobalOpts -> RIO EnvConfig () -> IO ()
+withBuildConfigDot opts go f = withBuildConfig go' f
+  where
+    go' =
+        (if dotTestTargets opts then set (globalOptsBuildOptsMonoidL.buildOptsMonoidTestsL) (Just True) else id) $
+        (if dotBenchTargets opts then set (globalOptsBuildOptsMonoidL.buildOptsMonoidBenchmarksL) (Just True) else id)
+        go
+

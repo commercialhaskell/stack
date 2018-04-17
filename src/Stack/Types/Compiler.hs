@@ -31,10 +31,6 @@ data CVType = CVWanted | CVActual
 --
 -- Note that despite having this datatype, stack isn't in a hurry to
 -- support compilers other than GHC.
---
--- NOTE: updating this will change its binary serialization. The
--- version number in the 'BinarySchema' instance for 'MiniBuildPlan'
--- should be updated.
 data CompilerVersion (cvType :: CVType)
     = GhcVersion {-# UNPACK #-} !Version
     | GhcjsVersion
@@ -43,6 +39,8 @@ data CompilerVersion (cvType :: CVType)
     deriving (Generic, Show, Eq, Ord, Data, Typeable)
 instance Store (CompilerVersion a)
 instance NFData (CompilerVersion a)
+instance Display (CompilerVersion a) where
+    display = display . compilerVersionText
 instance ToJSON (CompilerVersion a) where
     toJSON = toJSON . compilerVersionText
 instance FromJSON (CompilerVersion a) where

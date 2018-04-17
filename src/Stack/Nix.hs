@@ -15,12 +15,12 @@ module Stack.Nix
 import           Stack.Prelude
 import qualified Data.Text as T
 import           Data.Version (showVersion)
+import           Lens.Micro (set)
 import           Path.IO
 import qualified Paths_stack as Meta
 import           Stack.Config (getInNixShell, getInContainer)
 import           Stack.Config.Nix (nixCompiler)
 import           Stack.Constants (platformVariantEnvVar,inNixShellEnvVar,inContainerEnvVar)
-import           Stack.Exec (exec)
 import           Stack.Types.Config
 import           Stack.Types.Docker
 import           Stack.Types.Nix
@@ -28,7 +28,7 @@ import           Stack.Types.Runner
 import           Stack.Types.Compiler
 import           System.Environment (getArgs,getExecutablePath,lookupEnv)
 import qualified System.FilePath  as F
-import           System.Process.Read (getEnvOverride)
+import           RIO.Process (processContextL, exec)
 
 -- | If Nix is enabled, re-runs the currently running OS command in a Nix container.
 -- Otherwise, runs the inner action.
@@ -63,8 +63,9 @@ runShellAndExit
     -> RIO env (String, [String])
     -> RIO env ()
 runShellAndExit mprojectRoot getCompilerVersion getCmdArgs = do
-     config <- view configL
-     envOverride <- getEnvOverride (configPlatform config)
+   config <- view configL
+   envOverride <- view processContextL
+   local (set processContextL envOverride) $ do
      (cmnd,args) <- fmap (escape *** map escape) getCmdArgs
      mshellFile <-
          traverse (resolveFile (fromMaybeProjectRoot mprojectRoot)) $
@@ -113,12 +114,12 @@ runShellAndExit mprojectRoot getCompilerVersion getCmdArgs = do
                            -- Using --run instead of --command so we cannot
                            -- end up in the nix-shell if stack build is Ctrl-C'd
      pathVar <- liftIO $ lookupEnv "PATH"
-     logDebug $ "PATH is: " <> T.pack (show pathVar)
+     logDebug $ "PATH is: " <> displayShow pathVar
      logDebug $
        "Using a nix-shell environment " <> (case mshellFile of
-            Just path -> "from file: " <> T.pack (toFilePath path)
-            Nothing -> "with nix packages: " <> T.intercalate ", " pkgs)
-     exec envOverride "nix-shell" fullArgs
+            Just path -> "from file: " <> fromString (toFilePath path)
+            Nothing -> "with nix packages: " <> display (T.intercalate ", " pkgs))
+     exec "nix-shell" fullArgs
 
 -- | Shell-escape quotes inside the string and enclose it in quotes.
 escape :: String -> String

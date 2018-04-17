@@ -7,7 +7,7 @@
 {-|
 Module      : Stack.Sig.Sign
 Description : Signing Packages
-Copyright   : (c) FPComplete.com, 2015
+Copyright   : (c) 2015-2018, Stack contributors
 License     : BSD3
 Maintainer  : Tim Dysinger <tim@fpcomplete.com>
 Stability   : experimental
@@ -21,10 +21,9 @@ import qualified Codec.Compression.GZip as GZip
 import           Stack.Prelude
 import qualified Data.ByteString.Lazy as BS
 import qualified Data.ByteString.Lazy as L
-import qualified Data.Text as T
 import           Network.HTTP.Client (RequestBody (RequestBodyBS))
 import           Network.HTTP.Download
-import           Network.HTTP.Simple
+import           Network.HTTP.Simple (setRequestMethod, setRequestBody, getResponseStatusCode)
 import           Network.HTTP.Types (methodPut)
 import           Path
 import           Stack.Package
@@ -36,12 +35,8 @@ import qualified System.FilePath as FP
 -- | Sign a haskell package with the given url of the signature
 -- service and a path to a tarball.
 sign
-#if __GLASGOW_HASKELL__ < 710
-    :: (Applicative m, MonadUnliftIO m, MonadLogger m, MonadThrow m)
-#else
-    :: (MonadUnliftIO m, MonadLogger m, MonadThrow m)
-#endif
-    => String -> Path Abs File -> m Signature
+    :: HasLogFunc env
+    => String -> Path Abs File -> RIO env Signature
 sign url filePath =
     withRunInIO $ \run ->
     withSystemTempDir
@@ -82,12 +77,8 @@ sign url filePath =
 -- function will write the bytes to the path in a temp dir and sign
 -- the tarball with GPG.
 signTarBytes
-#if __GLASGOW_HASKELL__ < 710
-    :: (Applicative m, MonadUnliftIO m, MonadLogger m, MonadThrow m)
-#else
-    :: (MonadUnliftIO m, MonadLogger m, MonadThrow m)
-#endif
-    => String -> Path Rel File -> L.ByteString -> m Signature
+    :: HasLogFunc env
+    => String -> Path Rel File -> L.ByteString -> RIO env Signature
 signTarBytes url tarPath bs =
     withSystemTempDir
         "stack"
@@ -99,8 +90,8 @@ signTarBytes url tarPath bs =
 -- | Sign a haskell package given the url to the signature service, a
 -- @PackageIdentifier@ and a file path to the package on disk.
 signPackage
-    :: (MonadIO m, MonadLogger m, MonadThrow m)
-    => String -> PackageIdentifier -> Path Abs File -> m Signature
+    :: HasLogFunc env
+    => String -> PackageIdentifier -> Path Abs File -> RIO env Signature
 signPackage url pkg filePath = do
     sig@(Signature signature) <- gpgSign filePath
     let (PackageIdentifier name version) = pkg
@@ -116,5 +107,5 @@ signPackage url pkg filePath = do
     when
         (getResponseStatusCode res /= 200)
         (throwM (GPGSignException "unable to sign & upload package"))
-    logInfo ("Signature uploaded to " <> T.pack fullUrl)
+    logInfo ("Signature uploaded to " <> fromString fullUrl)
     return sig

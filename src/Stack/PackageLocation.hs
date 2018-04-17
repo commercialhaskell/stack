@@ -25,7 +25,6 @@ import           Crypto.Hash (hashWith, SHA256(..))
 import qualified Data.ByteArray as Mem (convert)
 import qualified Data.ByteString as S
 import qualified Data.ByteString.Base64.URL as B64URL
-import qualified Data.ByteString.Lazy as L
 import qualified Data.Text as T
 import Data.Text.Encoding (encodeUtf8, decodeUtf8)
 import Distribution.PackageDescription (GenericPackageDescription)
@@ -39,8 +38,7 @@ import Stack.Types.BuildPlan
 import Stack.Types.Config
 import Stack.Types.PackageIdentifier
 import qualified System.Directory as Dir
-import System.Process.Read
-import System.Process.Run
+import RIO.Process
 
 -- | Same as 'resolveMultiPackageLocation', but works on a
 -- 'SinglePackageLocation'.
@@ -109,31 +107,30 @@ resolveSinglePackageLocation projRoot (PLArchive (Archive url subdir msha)) = do
 
         let fp = toFilePath file
 
-        withBinaryFile fp ReadMode $ \h -> do
+        withLazyFile fp $ \lbs -> do
           -- Share a single file read among all of the different
           -- parsing attempts. We're not worried about unbounded
           -- memory usage, as we will detect almost immediately if
           -- this is the wrong type of file.
-          lbs <- liftIO $ L.hGetContents h
 
           let tryTargz = do
-                logDebug $ "Trying to ungzip/untar " <> T.pack fp
+                logDebug $ "Trying to ungzip/untar " <> fromString fp
                 let entries = Tar.read $ GZip.decompress lbs
                 liftIO $ Tar.unpack (toFilePath dirTmp) entries
               tryZip = do
-                logDebug $ "Trying to unzip " <> T.pack fp
+                logDebug $ "Trying to unzip " <> fromString fp
                 let archive = Zip.toArchive lbs
                 liftIO $  Zip.extractFilesFromArchive [Zip.OptDestination
                                                        (toFilePath dirTmp)] archive
               tryTar = do
-                logDebug $ "Trying to untar (no ungzip) " <> T.pack fp
+                logDebug $ "Trying to untar (no ungzip) " <> fromString fp
                 let entries = Tar.read lbs
                 liftIO $ Tar.unpack (toFilePath dirTmp) entries
               err = throwM $ UnableToExtractArchive url file
 
               catchAnyLog goodpath handler =
                   catchAny goodpath $ \e -> do
-                      logDebug $ "Got exception: " <> T.pack (show e)
+                      logDebug $ "Got exception: " <> displayShow e
                       handler
 
           tryTargz `catchAnyLog` tryZip `catchAnyLog` tryTar `catchAnyLog` err
@@ -204,31 +201,29 @@ cloneRepo projRoot url commit repoType' = do
     exists <- doesDirExist dir
     unless exists $ do
         liftIO $ ignoringAbsence (removeDirRecur dir)
-        menv <- getMinimalEnvOverride
 
-        let cloneAndExtract commandName cloneArgs resetCommand = do
+        let cloneAndExtract commandName cloneArgs resetCommand =
+              withWorkingDir (toFilePath root) $ do
                 ensureDir root
-                logInfo $ "Cloning " <> commit <> " from " <> url
-                callProcessInheritStderrStdout Cmd
-                    { cmdDirectoryToRunIn = Just root
-                    , cmdCommandToRun = commandName
-                    , cmdEnvOverride = menv
-                    , cmdCommandLineArguments =
-                        "clone" :
+                logInfo $ "Cloning " <> display commit <> " from " <> display url
+                proc commandName
+                       ("clone" :
                         cloneArgs ++
                         [ T.unpack url
                         , toFilePathNoTrailingSep dir
-                        ]
-                    }
+                        ]) runProcess_
                 created <- doesDirExist dir
                 unless created $ throwM $ FailedToCloneRepo commandName
-                readProcessNull (Just dir) menv commandName
+                withWorkingDir (toFilePath dir) $ readProcessNull commandName
                     (resetCommand ++ [T.unpack commit, "--"])
-                    `catch` \case
-                        ex@ProcessFailed{} -> do
-                            logInfo $ "Please ensure that commit " <> commit <> " exists within " <> url
+                    `catchAny` \case
+                        ex -> do
+                            logInfo $
+                              "Please ensure that commit " <>
+                              display commit <>
+                              " exists within " <>
+                              display url
                             throwM ex
-                        ex -> throwM ex
 
         case repoType' of
             RepoGit -> cloneAndExtract "git" ["--recursive"] ["--git-dir=.git", "reset", "--hard"]
@@ -241,15 +236,14 @@ cloneRepo projRoot url commit repoType' = do
 parseSingleCabalFileIndex
   :: forall env.
      HasConfig env
-  => (PackageIdentifierRevision -> IO ByteString) -- ^ lookup in index
-  -> Path Abs Dir -- ^ project root, used for checking out necessary files
+  => Path Abs Dir -- ^ project root, used for checking out necessary files
   -> PackageLocationIndex FilePath
   -> RIO env GenericPackageDescription
 -- Need special handling of PLIndex for efficiency (just read from the
 -- index tarball) and correctness (get the cabal file from the index,
 -- not the package tarball itself, yay Hackage revisions).
-parseSingleCabalFileIndex loadFromIndex _ (PLIndex pir) = readPackageUnresolvedIndex loadFromIndex pir
-parseSingleCabalFileIndex _ root (PLOther loc) = lpvGPD <$> parseSingleCabalFile root False loc
+parseSingleCabalFileIndex _ (PLIndex pir) = readPackageUnresolvedIndex pir
+parseSingleCabalFileIndex root (PLOther loc) = lpvGPD <$> parseSingleCabalFile root False loc
 
 parseSingleCabalFile
   :: forall env. HasConfig env
@@ -286,13 +280,12 @@ parseMultiCabalFiles root printWarnings loc0 =
 -- | 'parseMultiCabalFiles' but supports 'PLIndex'
 parseMultiCabalFilesIndex
   :: forall env. HasConfig env
-  => (PackageIdentifierRevision -> IO ByteString)
-  -> Path Abs Dir -- ^ project root, used for checking out necessary files
+  => Path Abs Dir -- ^ project root, used for checking out necessary files
   -> PackageLocationIndex Subdirs
   -> RIO env [(GenericPackageDescription, PackageLocationIndex FilePath)]
-parseMultiCabalFilesIndex loadFromIndex _root (PLIndex pir) =
-  (pure . (, PLIndex pir)) <$>
-  readPackageUnresolvedIndex loadFromIndex pir
-parseMultiCabalFilesIndex _ root (PLOther loc0) =
+parseMultiCabalFilesIndex _root (PLIndex pir) =
+  pure . (, PLIndex pir) <$>
+  readPackageUnresolvedIndex pir
+parseMultiCabalFilesIndex root (PLOther loc0) =
   map (\lpv -> (lpvGPD lpv, PLOther $ lpvLoc lpv)) <$>
   parseMultiCabalFiles root False loc0

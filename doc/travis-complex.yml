@@ -20,6 +20,7 @@ cache:
   - $HOME/.ghc
   - $HOME/.cabal
   - $HOME/.stack
+  - $TRAVIS_BUILD_DIR/.stack-work
 
 # The different configurations we want to test. We have BUILD=cabal which uses
 # cabal-install, and BUILD=stack which uses Stack. More documentation on each
@@ -166,10 +167,6 @@ before_install:
   echo 'remote-repo: hackage.haskell.org:http://hackage.fpcomplete.com/' > $HOME/.cabal/config
   echo 'remote-repo-cache: $HOME/.cabal/packages' >> $HOME/.cabal/config
 
-  if [ "$CABALVER" != "1.16" ]
-  then
-    echo 'jobs: $ncpus' >> $HOME/.cabal/config
-  fi
 
 install:
 - echo "$(ghc --version) [$(ghc --print-project-git-commit-id 2> /dev/null || echo '?')]"
@@ -223,7 +220,11 @@ script:
         cd "$PKGVER"
         cabal configure --enable-tests --ghc-options -O0
         cabal build
-        cabal test
+        if [ "$CABALVER" = "1.16" ] || [ "$CABALVER" = "1.18" ]; then
+          cabal test
+        else
+          cabal test --show-details=streaming --log=/dev/stdout
+        fi
         cd $ORIGDIR
       done
       ;;

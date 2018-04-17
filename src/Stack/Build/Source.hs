@@ -20,8 +20,7 @@ import              Crypto.Hash (Digest, SHA256(..))
 import              Crypto.Hash.Conduit (sinkHash)
 import qualified    Data.ByteArray as Mem (convert)
 import qualified    Data.ByteString as S
-import              Data.Conduit (($$), ZipSink (..))
-import qualified    Data.Conduit.Binary as CB
+import              Data.Conduit (ZipSink (..))
 import qualified    Data.Conduit.List as CL
 import qualified    Data.HashSet as HashSet
 import              Data.List
@@ -38,6 +37,7 @@ import              Stack.Types.Build
 import              Stack.Types.BuildPlan
 import              Stack.Types.Config
 import              Stack.Types.FlagName
+import              Stack.Types.NamedComponent
 import              Stack.Types.Package
 import              Stack.Types.PackageName
 import qualified    System.Directory as D
@@ -421,9 +421,7 @@ addUnlistedToBuildCache preBuildTime pkg cabalFP nonLibComponents buildCaches = 
             Nothing -> return Map.empty
             Just modTime' ->
                 if modTime' < preBuildTime
-                    then do
-                        newFci <- calcFci modTime' fp
-                        return (Map.singleton fp newFci)
+                    then Map.singleton fp <$> calcFci modTime' fp
                     else return Map.empty
 
 -- | Gets list of Paths for files relevant to a set of components in a package.
@@ -460,8 +458,8 @@ getModTimeMaybe fp =
 -- | Create FileCacheInfo for a file.
 calcFci :: MonadIO m => ModTime -> FilePath -> m FileCacheInfo
 calcFci modTime' fp = liftIO $
-    withBinaryFile fp ReadMode $ \h -> do
-        (size, digest) <- CB.sourceHandle h $$ getZipSink
+    withSourceFile fp $ \src -> do
+        (size, digest) <- runConduit $ src .| getZipSink
             ((,)
                 <$> ZipSink (CL.fold
                     (\x y -> x + fromIntegral (S.length y))

@@ -6,7 +6,6 @@
 -- | Test suite for the GhciScript DSL
 module Stack.Ghci.ScriptSpec where
 
-import           Data.Monoid
 import qualified Data.Set as S
 import           Distribution.ModuleName
 import           Test.Hspec

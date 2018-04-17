@@ -1,7 +1,6 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 module Network.HTTP.Download.VerifiedSpec where
 
-import           Control.Monad.Logger           (runStdoutLoggingT)
 import           Control.Retry                  (limitRetries)
 import           Crypto.Hash
 import           Network.HTTP.Client.Conduit
@@ -67,8 +66,7 @@ spec = do
   let exampleProgressHook _ = return ()
 
   describe "verifiedDownload" $ do
-    let run func = runStdoutLoggingT
-                 $ withRunner LevelError True True ColorNever Nothing False
+    let run func = withRunner LevelError True True ColorNever Nothing False
                  $ \runner -> runRIO runner func
     -- Preconditions:
     -- * the exampleReq server is running

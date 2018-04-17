@@ -14,7 +14,7 @@
 
 module Stack.Build
   (build
-  ,withLoadPackage
+  ,loadPackage
   ,mkBaseConfigOpts
   ,queryBuildInfo
   ,splitObjsWarning
@@ -24,7 +24,7 @@ module Stack.Build
 import           Stack.Prelude
 import           Data.Aeson (Value (Object, Array), (.=), object)
 import qualified Data.HashMap.Strict as HM
-import           Data.List ((\\))
+import           Data.List ((\\), isPrefixOf)
 import           Data.List.Extra (groupSort)
 import           Data.List.NonEmpty (NonEmpty(..))
 import qualified Data.List.NonEmpty as NE
@@ -42,21 +42,23 @@ import           Stack.Build.Haddock
 import           Stack.Build.Installed
 import           Stack.Build.Source
 import           Stack.Build.Target
-import           Stack.Fetch as Fetch
 import           Stack.Package
 import           Stack.PackageLocation (parseSingleCabalFileIndex)
 import           Stack.Types.Build
 import           Stack.Types.BuildPlan
 import           Stack.Types.Config
 import           Stack.Types.FlagName
+import           Stack.Types.NamedComponent
 import           Stack.Types.Package
 import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageName
 import           Stack.Types.Version
 
+import           Stack.Types.Compiler (compilerVersionText
 #ifdef WINDOWS
-import           Stack.Types.Compiler
+                                      ,getGhcVersion
 #endif
+                                      )
 import           System.FileLock (FileLock, unlockFile)
 
 #ifdef WINDOWS
@@ -77,9 +79,8 @@ build setLocalFiles mbuildLk boptsCli = fixCodePage $ do
     bopts <- view buildOptsL
     let profiling = boptsLibProfile bopts || boptsExeProfile bopts
     let symbols = not (boptsLibStrip bopts || boptsExeStrip bopts)
-    menv <- getMinimalEnvOverride
 
-    (targets, mbp, locals, extraToBuild, sourceMap) <- loadSourceMapFull NeedTargets boptsCli
+    (targets, ls, locals, extraToBuild, sourceMap) <- loadSourceMapFull NeedTargets boptsCli
 
     -- Set local files, necessary for file watching
     stackYaml <- view stackYamlL
@@ -95,7 +96,7 @@ build setLocalFiles mbuildLk boptsCli = fixCodePage $ do
              [lpFiles lp | PSFiles lp _ <- Map.elems sourceMap]
 
     (installedMap, globalDumpPkgs, snapshotDumpPkgs, localDumpPkgs) <-
-        getInstalled menv
+        getInstalled
                      GetInstalledOpts
                          { getInstalledProfiling = profiling
                          , getInstalledHaddock   = shouldHaddockDeps bopts
@@ -103,8 +104,7 @@ build setLocalFiles mbuildLk boptsCli = fixCodePage $ do
                      sourceMap
 
     baseConfigOpts <- mkBaseConfigOpts boptsCli
-    plan <- withLoadPackage $ \loadPackage ->
-        constructPlan mbp baseConfigOpts locals extraToBuild localDumpPkgs loadPackage sourceMap installedMap (boptsCLIInitialBuildSteps boptsCli)
+    plan <- constructPlan ls baseConfigOpts locals extraToBuild localDumpPkgs loadPackage sourceMap installedMap (boptsCLIInitialBuildSteps boptsCli)
 
     allowLocals <- view $ configL.to configAllowLocals
     unless allowLocals $ case justLocals plan of
@@ -130,7 +130,7 @@ build setLocalFiles mbuildLk boptsCli = fixCodePage $ do
 
     if boptsCLIDryrun boptsCli
         then printPlan plan
-        else executePlan menv boptsCli baseConfigOpts locals
+        else executePlan boptsCli baseConfigOpts locals
                          globalDumpPkgs
                          snapshotDumpPkgs
                          localDumpPkgs
@@ -172,7 +172,7 @@ instance Exception CabalVersionException
 
 -- | See https://github.com/commercialhaskell/stack/issues/1198.
 warnIfExecutablesWithSameNameCouldBeOverwritten
-    :: MonadLogger m => [LocalPackage] -> Plan -> m ()
+    :: HasLogFunc env => [LocalPackage] -> Plan -> RIO env ()
 warnIfExecutablesWithSameNameCouldBeOverwritten locals plan = do
     logDebug "Checking if we are going to build multiple executables with the same name"
     forM_ (Map.toList warnings) $ \(exe,(toBuild,otherLocals)) -> do
@@ -183,7 +183,7 @@ warnIfExecutablesWithSameNameCouldBeOverwritten locals plan = do
                 T.intercalate
                     ", "
                     ["'" <> packageNameText p <> ":" <> exe <> "'" | p <- pkgs]
-        (logWarn . T.unlines . concat)
+        (logWarn . display . T.unlines . concat)
             [ [ "Building " <> exe_s <> " " <> exesText toBuild <> "." ]
             , [ "Only one of them will be available via 'stack exec' or locally installed."
               | length toBuild > 1
@@ -239,9 +239,9 @@ warnIfExecutablesWithSameNameCouldBeOverwritten locals plan = do
     collect :: Ord k => [(k,v)] -> Map k (NonEmpty v)
     collect = Map.map NE.fromList . Map.fromDistinctAscList . groupSort
 
-warnAboutSplitObjs :: MonadLogger m => BuildOpts -> m ()
+warnAboutSplitObjs :: HasLogFunc env => BuildOpts -> RIO env ()
 warnAboutSplitObjs bopts | boptsSplitObjs bopts = do
-    logWarn $ "Building with --split-objs is enabled. " <> T.pack splitObjsWarning
+    logWarn $ "Building with --split-objs is enabled. " <> fromString splitObjsWarning
 warnAboutSplitObjs _ = return ()
 
 splitObjsWarning :: String
@@ -273,29 +273,25 @@ mkBaseConfigOpts boptsCli = do
         }
 
 -- | Provide a function for loading package information from the package index
-withLoadPackage :: HasEnvConfig env
-                => ((PackageLocationIndex FilePath -> Map FlagName Bool -> [Text] -> IO Package) -> RIO env a)
-                -> RIO env a
-withLoadPackage inner = do
-    econfig <- view envConfigL
-    root <- view projectRootL
-    run <- askRunInIO
-    withCabalLoader $ \loadFromIndex ->
-        inner $ \loc flags ghcOptions -> run $
-            resolvePackage
-              (depPackageConfig econfig flags ghcOptions)
-              <$> parseSingleCabalFileIndex loadFromIndex root loc
-  where
-    -- | Package config to be used for dependencies
-    depPackageConfig :: EnvConfig -> Map FlagName Bool -> [Text] -> PackageConfig
-    depPackageConfig econfig flags ghcOptions = PackageConfig
+loadPackage
+  :: HasEnvConfig env
+  => PackageLocationIndex FilePath
+  -> Map FlagName Bool
+  -> [Text]
+  -> RIO env Package
+loadPackage loc flags ghcOptions = do
+  compiler <- view actualCompilerVersionL
+  platform <- view platformL
+  root <- view projectRootL
+  let pkgConfig = PackageConfig
         { packageConfigEnableTests = False
         , packageConfigEnableBenchmarks = False
         , packageConfigFlags = flags
         , packageConfigGhcOptions = ghcOptions
-        , packageConfigCompilerVersion = view actualCompilerVersionL econfig
-        , packageConfigPlatform = view platformL econfig
+        , packageConfigCompilerVersion = compiler
+        , packageConfigPlatform = platform
         }
+  resolvePackage pkgConfig <$> parseSingleCabalFileIndex root loc
 
 -- | Set the code page for this process as necessary. Only applies to Windows.
 -- See: https://github.com/commercialhaskell/stack/issues/738
@@ -336,11 +332,10 @@ fixCodePage inner = do
 
         fixInput $ fixOutput inner
     expected = 65001 -- UTF-8
-    warn typ = logInfo $ T.concat
-        [ "Setting"
-        , typ
-        , " codepage to UTF-8 (65001) to ensure correct output from GHC"
-        ]
+    warn typ = logInfo $
+        "Setting" <>
+        typ <>
+        " codepage to UTF-8 (65001) to ensure correct output from GHC"
 #else
 fixCodePage = id
 #endif
@@ -352,7 +347,7 @@ queryBuildInfo :: HasEnvConfig env
 queryBuildInfo selectors0 =
         rawBuildInfo
     >>= select id selectors0
-    >>= liftIO . TIO.putStrLn . decodeUtf8 . Yaml.encode
+    >>= liftIO . TIO.putStrLn . addGlobalHintsComment . decodeUtf8 . Yaml.encode
   where
     select _ [] value = return value
     select front (sel:sels) value =
@@ -371,13 +366,35 @@ queryBuildInfo selectors0 =
       where
         cont = select (front . (sel:)) sels
         err msg = throwString $ msg ++ ": " ++ show (front [sel])
-
+    -- Include comments to indicate that this portion of the "stack
+    -- query" API is not necessarily stable.
+    addGlobalHintsComment
+      | null selectors0 = T.replace globalHintsLine ("\n" <> globalHintsComment <> globalHintsLine)
+      -- Append comment instead of pre-pending. The reasoning here is
+      -- that something *could* expect that the result of 'stack query
+      -- global-hints ghc-boot' is just a string literal. Seems easier
+      -- for to expect the first line of the output to be the literal.
+      | ["global-hints"] `isPrefixOf` selectors0 = (<> ("\n" <> globalHintsComment))
+      | otherwise = id
+    globalHintsLine = "\nglobal-hints:\n"
+    globalHintsComment = T.concat
+      [ "# Note: global-hints is experimental and may be renamed / removed in the future.\n"
+      , "# See https://github.com/commercialhaskell/stack/issues/3796"
+      ]
 -- | Get the raw build information object
 rawBuildInfo :: HasEnvConfig env => RIO env Value
 rawBuildInfo = do
     (locals, _sourceMap) <- loadSourceMap NeedTargets defaultBuildOptsCLI
+    wantedCompiler <- view $ wantedCompilerVersionL.to compilerVersionText
+    actualCompiler <- view $ actualCompilerVersionL.to compilerVersionText
+    globalHints <- view globalHintsL
     return $ object
         [ "locals" .= Object (HM.fromList $ map localToPair locals)
+        , "compiler" .= object
+            [ "wanted" .= wantedCompiler
+            , "actual" .= actualCompiler
+            ]
+        , "global-hints" .= globalHints
         ]
   where
     localToPair lp =

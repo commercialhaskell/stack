@@ -6,5 +6,5 @@
 
 Stack is a cross-platform program for developing Haskell projects. It is intended for Haskellers both new and experienced.
 
-See [haskellstack.org](http://haskellstack.org) or the `doc` directory for more
+See [haskellstack.org](http://haskellstack.org) or the [doc](./doc) directory for more
 information.

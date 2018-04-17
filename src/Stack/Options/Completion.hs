@@ -12,7 +12,6 @@ module Stack.Options.Completion
 
 import           Data.Char (isSpace)
 import           Data.List (isPrefixOf)
-import           Data.List.Extra (nubOrd)
 import qualified Data.Map as Map
 import           Data.Maybe
 import qualified Data.Set as Set
@@ -28,7 +27,7 @@ import           Stack.Prelude hiding (lift)
 import           Stack.Setup
 import           Stack.Types.Config
 import           Stack.Types.FlagName
-import           Stack.Types.Package
+import           Stack.Types.NamedComponent
 import           Stack.Types.PackageName
 import           System.Process (readProcess)
 import           Language.Haskell.TH.Syntax (runIO, lift)
@@ -66,11 +65,12 @@ buildConfigCompleter inner = mkCompleter $ \inputRaw -> do
               runRIO envConfig (inner input)
 
 targetCompleter :: Completer
-targetCompleter = buildConfigCompleter $ \input -> do
-    lpvs <- fmap lpProject getLocalPackages
-    return $
-        filter (input `isPrefixOf`) $
-        concatMap allComponentNames (Map.toList lpvs)
+targetCompleter = buildConfigCompleter $ \input ->
+      filter (input `isPrefixOf`)
+    . concatMap allComponentNames
+    . Map.toList
+    . lpProject
+  <$> getLocalPackages
   where
     allComponentNames (name, lpv) =
         map (T.unpack . renderPkgComponent . (name,)) (Set.toList (lpvComponents lpv))
@@ -103,10 +103,14 @@ flagCompleter = buildConfigCompleter $ \input -> do
             _ -> normalFlags
 
 projectExeCompleter :: Completer
-projectExeCompleter = buildConfigCompleter $ \input -> do
-    lpvs <- fmap lpProject getLocalPackages
-    return $
-        filter (input `isPrefixOf`) $
-        nubOrd $
-        concatMap (\(_, lpv) -> map (C.unUnqualComponentName . fst) (C.condExecutables (lpvGPD lpv))) $
-        Map.toList lpvs
+projectExeCompleter = buildConfigCompleter $ \input ->
+      filter (input `isPrefixOf`)
+    . nubOrd
+    . concatMap
+        (\(_, lpv) -> map
+          (C.unUnqualComponentName . fst)
+          (C.condExecutables (lpvGPD lpv))
+        )
+    . Map.toList
+    . lpProject
+  <$> getLocalPackages

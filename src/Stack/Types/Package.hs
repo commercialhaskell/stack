@@ -16,9 +16,8 @@ import qualified Data.Map as M
 import qualified Data.Set as Set
 import           Data.Store.Version (VersionConfig)
 import           Data.Store.VersionTagged (storeVersionConfig)
-import qualified Data.Text as T
-import           Data.Text.Encoding (encodeUtf8, decodeUtf8)
-import           Distribution.InstalledPackageInfo (PError)
+import           Distribution.Parsec.Common (PError (..), PWarning (..), showPos)
+import qualified Distribution.SPDX.License as SPDX
 import           Distribution.License (License)
 import           Distribution.ModuleName (ModuleName)
 import           Distribution.PackageDescription (TestSuiteInterface, BuildType)
@@ -29,13 +28,18 @@ import           Stack.Types.Compiler
 import           Stack.Types.Config
 import           Stack.Types.FlagName
 import           Stack.Types.GhcPkgId
+import           Stack.Types.NamedComponent
 import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageName
 import           Stack.Types.Version
 
 -- | All exceptions thrown by the library.
 data PackageException
-  = PackageInvalidCabalFile (Either PackageIdentifierRevision (Path Abs File)) PError
+  = PackageInvalidCabalFile
+      !(Either PackageIdentifierRevision (Path Abs File))
+      !(Maybe Version)
+      ![PError]
+      ![PWarning]
   | PackageNoCabalFileFound (Path Abs Dir)
   | PackageMultipleCabalFilesFound (Path Abs Dir) [Path Abs File]
   | MismatchedCabalName (Path Abs File) PackageName
@@ -43,19 +47,45 @@ data PackageException
   deriving Typeable
 instance Exception PackageException
 instance Show PackageException where
-    show (PackageInvalidCabalFile loc err) = concat
+    show (PackageInvalidCabalFile loc _mversion errs warnings) = concat
         [ "Unable to parse cabal file "
         , case loc of
             Left pir -> "for " ++ packageIdentifierRevisionString pir
             Right fp -> toFilePath fp
-        , ": "
-        , show err
+        {-
+
+         Not actually needed, the errors will indicate if a newer version exists.
+         Also, it seems that this is set to Just the version even if we support it.
+
+        , case mversion of
+            Nothing -> ""
+            Just version -> "\nRequires newer Cabal file parser version: " ++
+                            versionString version
+        -}
+        , "\n\n"
+        , unlines $ map
+            (\(PError pos msg) -> concat
+                [ "- "
+                , showPos pos
+                , ": "
+                , msg
+                ])
+            errs
+        , unlines $ map
+            (\(PWarning _ pos msg) -> concat
+                [ "- "
+                , showPos pos
+                , ": "
+                , msg
+                ])
+            warnings
         ]
     show (PackageNoCabalFileFound dir) = concat
         [ "Stack looks for packages in the directories configured in"
-        , " the 'packages' variable defined in your stack.yaml\n"
-        , "The current entry points to " ++ toFilePath dir ++
-          " but no .cabal file could be found there."
+        , " the 'packages' and 'extra-deps' fields defined in your stack.yaml\n"
+        , "The current entry points to "
+        , toFilePath dir
+        , " but no .cabal or package.yaml file could be found there."
         ]
     show (PackageMultipleCabalFilesFound dir files) =
         "Multiple .cabal files found in directory " ++
@@ -90,7 +120,7 @@ data PackageLibraries
 data Package =
   Package {packageName :: !PackageName                    -- ^ Name of the package.
           ,packageVersion :: !Version                     -- ^ Version of the package
-          ,packageLicense :: !License                     -- ^ The license the package was released under.
+          ,packageLicense :: !(Either SPDX.License License) -- ^ The license the package was released under.
           ,packageFiles :: !GetPackageFiles               -- ^ Get all files of the package.
           ,packageDeps :: !(Map PackageName VersionRange) -- ^ Packages that the package depends on.
           ,packageTools :: !(Map ExeName VersionRange)    -- ^ A build tool name.
@@ -104,7 +134,7 @@ data Package =
           ,packageExes :: !(Set Text)                     -- ^ names of executables
           ,packageOpts :: !GetPackageOpts                 -- ^ Args to pass to GHC.
           ,packageHasExposedModules :: !Bool              -- ^ Does the package have exposed modules?
-          ,packageBuildType :: !(Maybe BuildType)         -- ^ Package build-type.
+          ,packageBuildType :: !BuildType                 -- ^ Package build-type.
           ,packageSetupDeps :: !(Maybe (Map PackageName VersionRange))
                                                           -- ^ If present: custom-setup dependencies
           }
@@ -127,7 +157,7 @@ newtype GetPackageOpts = GetPackageOpts
                      -> [PackageName]
                      -> Path Abs File
                      -> RIO env
-                          (Map NamedComponent (Set ModuleName)
+                          (Map NamedComponent (Map ModuleName (Path Abs File))
                           ,Map NamedComponent (Set DotCabalPath)
                           ,Map NamedComponent BuildInfoOpts)
     }
@@ -142,7 +172,7 @@ data BuildInfoOpts = BuildInfoOpts
     -- ^ These options can safely have 'nubOrd' applied to them, as
     -- there are no multi-word options (see
     -- https://github.com/commercialhaskell/stack/issues/1255)
-    , bioCabalMacros :: Maybe (Path Abs File)
+    , bioCabalMacros :: Path Abs File
     } deriving Show
 
 -- | Files to get for a cabal package.
@@ -156,7 +186,7 @@ newtype GetPackageFiles = GetPackageFiles
     { getPackageFiles :: forall env. HasEnvConfig env
                       => Path Abs File
                       -> RIO env
-                           (Map NamedComponent (Set ModuleName)
+                           (Map NamedComponent (Map ModuleName (Path Abs File))
                            ,Map NamedComponent (Set DotCabalPath)
                            ,Set (Path Abs File)
                            ,[PackageWarning])
@@ -166,7 +196,7 @@ instance Show GetPackageFiles where
 
 -- | Warning generated when reading a package
 data PackageWarning
-    = UnlistedModulesWarning (Maybe String) [ModuleName]
+    = UnlistedModulesWarning NamedComponent [ModuleName]
       -- ^ Modules found that are not listed in cabal file
 
     -- TODO: bring this back - see
@@ -257,63 +287,19 @@ data LocalPackage = LocalPackage
     }
     deriving Show
 
-renderComponent :: NamedComponent -> S.ByteString
-renderComponent CLib = "lib"
-renderComponent (CExe x) = "exe:" <> encodeUtf8 x
-renderComponent (CTest x) = "test:" <> encodeUtf8 x
-renderComponent (CBench x) = "bench:" <> encodeUtf8 x
-
-renderPkgComponents :: [(PackageName, NamedComponent)] -> Text
-renderPkgComponents = T.intercalate " " . map renderPkgComponent
-
-renderPkgComponent :: (PackageName, NamedComponent) -> Text
-renderPkgComponent (pkg, comp) = packageNameText pkg <> ":" <> decodeUtf8 (renderComponent comp)
-
-exeComponents :: Set NamedComponent -> Set Text
-exeComponents = Set.fromList . mapMaybe mExeName . Set.toList
-  where
-    mExeName (CExe name) = Just name
-    mExeName _ = Nothing
-
-testComponents :: Set NamedComponent -> Set Text
-testComponents = Set.fromList . mapMaybe mTestName . Set.toList
-  where
-    mTestName (CTest name) = Just name
-    mTestName _ = Nothing
-
-benchComponents :: Set NamedComponent -> Set Text
-benchComponents = Set.fromList . mapMaybe mBenchName . Set.toList
-  where
-    mBenchName (CBench name) = Just name
-    mBenchName _ = Nothing
-
-isCLib :: NamedComponent -> Bool
-isCLib CLib{} = True
-isCLib _ = False
-
-isCExe :: NamedComponent -> Bool
-isCExe CExe{} = True
-isCExe _ = False
-
-isCTest :: NamedComponent -> Bool
-isCTest CTest{} = True
-isCTest _ = False
-
-isCBench :: NamedComponent -> Bool
-isCBench CBench{} = True
-isCBench _ = False
-
 lpFiles :: LocalPackage -> Set.Set (Path Abs File)
 lpFiles = Set.unions . M.elems . lpComponentFiles
 
 -- | A location to install a package into, either snapshot or local
 data InstallLocation = Snap | Local
     deriving (Show, Eq)
+instance Semigroup InstallLocation where
+    Local <> _ = Local
+    _ <> Local = Local
+    Snap <> Snap = Snap
 instance Monoid InstallLocation where
     mempty = Snap
-    mappend Local _ = Local
-    mappend _ Local = Local
-    mappend Snap Snap = Snap
+    mappend = (<>)
 
 data InstalledPackageLocation = InstalledTo InstallLocation | ExtraGlobal
     deriving (Show, Eq)
@@ -397,7 +383,7 @@ dotCabalGetPath dcp =
 type InstalledMap = Map PackageName (InstallLocation, Installed)
 
 data Installed
-    = Library PackageIdentifier GhcPkgId (Maybe License)
+    = Library PackageIdentifier GhcPkgId (Maybe (Either SPDX.License License))
     | Executable PackageIdentifier
     deriving (Show, Eq)
 

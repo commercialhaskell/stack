@@ -1,5 +1,5 @@
 name: stack
-version: '1.6.6'
+version: '1.7.0'
 synopsis: The Haskell Tool Stack
 description: ! 'Please see the README.md for usage information, and
   the wiki on Github for more details.  Also, note that
@@ -14,7 +14,7 @@ github: commercialhaskell/stack
 homepage: http://haskellstack.org
 custom-setup:
   dependencies:
-  - base
+  - base >=4.10 && < 5
   - Cabal
   - filepath
 extra-source-files:
@@ -40,13 +40,11 @@ dependencies:
 - ansi-terminal
 - async
 - attoparsec
-- base >=4.9 && < 5
+- base >=4.10 && < 5
 - base64-bytestring
-- blaze-builder
 - bytestring
-- clock
 - conduit
-- conduit-extra
+- conduit-extra >= 1.2.3.1
 - containers
 - cryptonite
 - cryptonite-conduit
@@ -55,7 +53,6 @@ dependencies:
 - echo
 - exceptions
 - extra
-- fast-logger
 - file-embed
 - filelock
 - filepath
@@ -72,8 +69,8 @@ dependencies:
 - http-types
 - memory
 - microlens
-- microlens-mtl
 - mintty
+# TODO remove dep when persistent drops monad-logger
 - monad-logger
 - mono-traversable
 - mtl
@@ -93,6 +90,7 @@ dependencies:
 - regex-applicative-text
 - resourcet
 - retry
+- rio
 - semigroups
 - split
 - stm
@@ -108,9 +106,10 @@ dependencies:
 - time
 - tls
 - transformers
+- typed-process >= 0.2.1.0
 - unicode-transforms
 - unix-compat
-- unliftio
+- unliftio >= 0.2.4.0
 - unordered-containers
 - vector
 - yaml
@@ -127,7 +126,6 @@ when:
     - hsc2hs
     dependencies:
     - bindings-uname
-    - pid1
     - unix
 library:
   source-dirs: src/
@@ -143,6 +141,7 @@ library:
   - Data.Store.VersionTagged
   - Network.HTTP.Download
   - Network.HTTP.Download.Verified
+  - Network.HTTP.StackClient
   - Options.Applicative.Args
   - Options.Applicative.Builder.Extra
   - Options.Applicative.Complicated
@@ -172,7 +171,6 @@ library:
   - Stack.Docker
   - Stack.Docker.GlobalDB
   - Stack.Dot
-  - Stack.Exec
   - Stack.Fetch
   - Stack.FileWatch
   - Stack.GhcPkg
@@ -182,6 +180,7 @@ library:
   - Stack.IDE
   - Stack.Image
   - Stack.Init
+  - Stack.Ls
   - Stack.New
   - Stack.Nix
   - Stack.Options.BenchParser
@@ -239,6 +238,7 @@ library:
   - Stack.Types.FlagName
   - Stack.Types.GhcPkgId
   - Stack.Types.Image
+  - Stack.Types.NamedComponent
   - Stack.Types.Nix
   - Stack.Types.Package
   - Stack.Types.PackageDump
@@ -254,10 +254,7 @@ library:
   - Stack.Upgrade
   - Stack.Upload
   - Text.PrettyPrint.Leijen.Extended
-  - System.Process.Log
   - System.Process.PagerEditor
-  - System.Process.Read
-  - System.Process.Run
   - System.Terminal
   other-modules:
   - Hackage.Security.Client.Repository.HttpLib.HttpClient
@@ -271,12 +268,12 @@ executables:
   stack:
     main: Main.hs
     source-dirs: src/main
+    generated-other-modules: Build_stack
     ghc-options:
     - -threaded
+    - -rtsopts
     dependencies:
     - stack
-    other-modules:
-    - Paths_stack
     when:
     - condition: flag(static)
       ld-options:

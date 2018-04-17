@@ -14,12 +14,12 @@ import           Stack.Types.Config.Build
 
 buildOptsMonoidParser :: GlobalOptsContext -> Parser BuildOptsMonoid
 buildOptsMonoidParser hide0 =
-    BuildOptsMonoid <$> trace <*> profile <*> noStrip <*>
+    BuildOptsMonoid <$> trace' <*> profile <*> noStrip <*>
     libProfiling <*> exeProfiling <*> libStripping <*>
     exeStripping <*> haddock <*> haddockOptsParser hideBool <*>
     openHaddocks <*> haddockDeps <*> haddockInternal <*>
     haddockHyperlinkSource <*> copyBins <*> copyCompilerTool <*>
-    preFetch <*> keepGoing <*> forceDirty <*>
+    preFetch <*> keepGoing <*> keepTmpFiles <*> forceDirty <*>
     tests <*> testOptsParser hideBool <*> benches <*>
     benchOptsParser hideBool <*> reconfigure <*> cabalVerbose <*> splitObjs <*> skipComponents
   where
@@ -31,7 +31,7 @@ buildOptsMonoidParser hide0 =
 
     -- These use 'Any' because they are not settable in stack.yaml, so
     -- there is no need for options like --no-profile.
-    trace = Any <$>
+    trace' = Any <$>
         flag
             False
             True
@@ -119,6 +119,11 @@ buildOptsMonoidParser hide0 =
         firstBoolFlags
             "keep-going"
             "continue running after a step fails (default: false for build, true for test/bench)"
+            hide
+    keepTmpFiles =
+        firstBoolFlags
+            "keep-tmp-files"
+            "keep intermediate files and build directories (default: false)"
             hide
     preFetch =
         firstBoolFlags

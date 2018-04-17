@@ -1,0 +1,3 @@
+resolver: local-snapshot.yaml
+packages: []
+allow-newer: true

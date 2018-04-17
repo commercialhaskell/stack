@@ -5,7 +5,7 @@
 {-|
 Module      : Stack.Sig.GPG
 Description : GPG Functions
-Copyright   : (c) FPComplete.com, 2015
+Copyright   : (c) 2015-2018, Stack contributors
 License     : BSD3
 Maintainer  : Tim Dysinger <tim@fpcomplete.com>
 Stability   : experimental
@@ -29,8 +29,8 @@ import           System.Process (ProcessHandle, runInteractiveProcess,
 
 -- | Sign a file path with GPG, returning the @Signature@.
 gpgSign
-    :: (MonadIO m, MonadLogger m, MonadThrow m)
-    => Path Abs File -> m Signature
+    :: HasLogFunc env
+    => Path Abs File -> RIO env Signature
 gpgSign path = do
     gpgWarnTTY
     (_hIn,hOut,hErr,process) <-
@@ -97,7 +97,7 @@ gpg args = do
 -- | `man gpg-agent` shows that you need GPG_TTY environment variable set to
 -- properly deal with interactions with gpg-agent. (Doesn't apply to Windows
 -- though)
-gpgWarnTTY :: (MonadIO m, MonadLogger m) => m ()
+gpgWarnTTY :: HasLogFunc env => RIO env ()
 gpgWarnTTY =
     unless
         ("ming" `isPrefixOf` os)

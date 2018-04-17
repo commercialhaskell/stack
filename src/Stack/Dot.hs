@@ -23,8 +23,9 @@ import qualified Data.Text as Text
 import qualified Data.Text.IO as Text
 import qualified Data.Traversable as T
 import           Distribution.Text (display)
-import           Distribution.License (License(BSD3))
-import           Stack.Build (withLoadPackage)
+import qualified Distribution.SPDX.License as SPDX
+import           Distribution.License (License(BSD3), licenseFromSPDX)
+import           Stack.Build (loadPackage)
 import           Stack.Build.Installed (getInstalled, GetInstalledOpts(..))
 import           Stack.Build.Source
 import           Stack.Build.Target
@@ -32,7 +33,7 @@ import           Stack.Config (getLocalPackages)
 import           Stack.Constants
 import           Stack.Package
 import           Stack.PackageDump (DumpPackage(..))
-import           Stack.Prelude
+import           Stack.Prelude hiding (Display (..))
 import           Stack.Types.Build
 import           Stack.Types.BuildPlan
 import           Stack.Types.Config
@@ -82,7 +83,7 @@ dot dotOpts = do
 data DotPayload = DotPayload
   { payloadVersion :: Maybe Version
   -- ^ The package version.
-  , payloadLicense :: Maybe License
+  , payloadLicense :: Maybe (Either SPDX.License License)
   -- ^ The license the package was released under.
   } deriving (Eq, Show)
 
@@ -116,23 +117,20 @@ createDependencyGraph dotOpts = do
       , boptsCLIFlags = dotFlags dotOpts
       }
   let graph = Map.fromList (localDependencies dotOpts (filter lpWanted locals))
-  menv <- getMinimalEnvOverride
-  (installedMap, globalDump, _, _) <- getInstalled menv
-                                                   (GetInstalledOpts False False False)
+  (installedMap, globalDump, _, _) <- getInstalled (GetInstalledOpts False False False)
                                                    sourceMap
   -- TODO: Can there be multiple entries for wired-in-packages? If so,
   -- this will choose one arbitrarily..
   let globalDumpMap = Map.fromList $ map (\dp -> (packageIdentifierName (dpPackageIdent dp), dp)) globalDump
       globalIdMap = Map.fromList $ map (\dp -> (dpGhcPkgId dp, dpPackageIdent dp)) globalDump
-  withLoadPackage (\loader -> do
-    let depLoader = createDepLoader sourceMap installedMap globalDumpMap globalIdMap loadPackageDeps
-        loadPackageDeps name version loc flags ghcOptions
-            -- Skip packages that can't be loaded - see
-            -- https://github.com/commercialhaskell/stack/issues/2967
-            | name `elem` [$(mkPackageName "rts"), $(mkPackageName "ghc")] =
-                return (Set.empty, DotPayload (Just version) (Just BSD3))
-            | otherwise = fmap (packageAllDeps &&& makePayload) (loader loc flags ghcOptions)
-    liftIO $ resolveDependencies (dotDependencyDepth dotOpts) graph depLoader)
+  let depLoader = createDepLoader sourceMap installedMap globalDumpMap globalIdMap loadPackageDeps
+      loadPackageDeps name version loc flags ghcOptions
+          -- Skip packages that can't be loaded - see
+          -- https://github.com/commercialhaskell/stack/issues/2967
+          | name `elem` [$(mkPackageName "rts"), $(mkPackageName "ghc")] =
+              return (Set.empty, DotPayload (Just version) (Just $ Right BSD3))
+          | otherwise = fmap (packageAllDeps &&& makePayload) (loadPackage loc flags ghcOptions)
+  resolveDependencies (dotDependencyDepth dotOpts) graph depLoader
   where makePayload pkg = DotPayload (Just $ packageVersion pkg) (Just $ packageLicense pkg)
 
 listDependencies :: HasEnvConfig env
@@ -145,7 +143,7 @@ listDependencies opts = do
     where go name payload =
             let payloadText =
                   if listDepsLicense opts
-                      then maybe "<unknown>" (Text.pack . display) (payloadLicense payload)
+                      then maybe "<unknown>" (Text.pack . display . either licenseFromSPDX id) (payloadLicense payload)
                       else maybe "<unknown>" (Text.pack . show) (payloadVersion payload)
                 line = packageNameText name <> listDepsSep opts <> payloadText
             in  liftIO $ Text.putStrLn line
@@ -236,7 +234,7 @@ createDepLoader sourceMap installed globalDumpMap globalIdMap loadPackageDeps pk
         case maybePkg of
             Just (_, Library _ _ mlicense) -> mlicense
             _ -> Nothing
-    payloadFromDump dp = DotPayload (Just $ packageIdentifierVersion $ dpPackageIdent dp) (dpLicense dp)
+    payloadFromDump dp = DotPayload (Just $ packageIdentifierVersion $ dpPackageIdent dp) (Right <$> dpLicense dp)
 
 -- | Resolve the direct (depth 0) external dependencies of the given local packages
 localDependencies :: DotOpts -> [LocalPackage] -> [(PackageName, (Set PackageName, DotPayload))]
@@ -263,8 +261,8 @@ printGraph dotOpts locals graph = do
   printLeaves graph
   void (Map.traverseWithKey printEdges (fst <$> graph))
   liftIO $ Text.putStrLn "}"
-  where filteredLocals = Set.filter (\local ->
-          packageNameString local `Set.notMember` dotPrune dotOpts) locals
+  where filteredLocals = Set.filter (\local' ->
+          packageNameString local' `Set.notMember` dotPrune dotOpts) locals
 
 -- | Print the local nodes with a different style depending on options
 printLocalNodes :: (F.Foldable t, MonadIO m)

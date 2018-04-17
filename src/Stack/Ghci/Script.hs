@@ -14,22 +14,22 @@ module Stack.Ghci.Script
   , scriptToFile
   ) where
 
-import           Data.ByteString.Lazy (ByteString)
-import           Data.ByteString.Builder
+import           Data.ByteString.Builder (toLazyByteString)
 import           Data.List
 import qualified Data.Set as S
-import           Data.Text.Encoding (encodeUtf8Builder)
 import           Path
-import           Stack.Prelude hiding (ByteString)
+import           Stack.Prelude
 import           System.IO (BufferMode (..), hSetBinaryMode)
 
 import           Distribution.ModuleName hiding (toFilePath)
 
 newtype GhciScript = GhciScript { unGhciScript :: [GhciCommand] }
 
+instance Semigroup GhciScript where
+  GhciScript xs <> GhciScript ys = GhciScript (ys <> xs)
 instance Monoid GhciScript where
   mempty = GhciScript []
-  (GhciScript xs) `mappend` (GhciScript ys) = GhciScript (ys <> xs)
+  mappend = (<>)
 
 data GhciCommand
   = Add (Set (Either ModuleName (Path Abs File)))
@@ -46,7 +46,7 @@ cmdCdGhc = GhciScript . (:[]) . CdGhc
 cmdModule :: Set ModuleName -> GhciScript
 cmdModule = GhciScript . (:[]) . Module
 
-scriptToLazyByteString :: GhciScript -> ByteString
+scriptToLazyByteString :: GhciScript -> LByteString
 scriptToLazyByteString = toLazyByteString . scriptToBuilder
 
 scriptToBuilder :: GhciScript -> Builder
@@ -65,30 +65,27 @@ scriptToFile path script =
 
 -- Command conversion
 
-fromText :: Text -> Builder
-fromText = encodeUtf8Builder
-
 commandToBuilder :: GhciCommand -> Builder
 
 commandToBuilder (Add modules)
   | S.null modules = mempty
   | otherwise      =
-       fromText ":add "
-    <> mconcat (intersperse (fromText " ") $
-         fmap (stringUtf8 . quoteFileName . either (mconcat . intersperse "." . components) toFilePath)
+       ":add "
+    <> mconcat (intersperse " " $
+         fmap (fromString . quoteFileName . either (mconcat . intersperse "." . components) toFilePath)
               (S.toAscList modules))
-    <> fromText "\n"
+    <> "\n"
 
 commandToBuilder (CdGhc path) =
-  fromText ":cd-ghc " <> stringUtf8 (quoteFileName (toFilePath path)) <> fromText "\n"
+  ":cd-ghc " <> fromString (quoteFileName (toFilePath path)) <> "\n"
 
 commandToBuilder (Module modules)
-  | S.null modules = fromText ":module +\n"
+  | S.null modules = ":module +\n"
   | otherwise      =
-       fromText ":module + "
-    <> mconcat (intersperse (fromText " ")
-        $ (stringUtf8 . quoteFileName . mconcat . intersperse "." . components) <$> S.toAscList modules)
-    <> fromText "\n"
+       ":module + "
+    <> mconcat (intersperse " "
+        $ fromString . quoteFileName . mconcat . intersperse "." . components <$> S.toAscList modules)
+    <> "\n"
 
 -- | Make sure that a filename with spaces in it gets the proper quotes.
 quoteFileName :: String -> String

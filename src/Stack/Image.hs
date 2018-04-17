@@ -25,7 +25,7 @@ import           Stack.Constants.Config
 import           Stack.PrettyPrint
 import           Stack.Types.Config
 import           Stack.Types.Image
-import           System.Process.Run
+import           RIO.Process
 
 -- | Stages the executables & additional content in a staging
 -- directory under '.stack-work'
@@ -130,8 +130,7 @@ imageName = map toLower . toFilePathNoTrailingSep . dirname
 createDockerImage
     :: HasConfig env
     => ImageDockerOpts -> Path Abs Dir -> RIO env ()
-createDockerImage dockerConfig dir = do
-    menv <- getMinimalEnvOverride
+createDockerImage dockerConfig dir =
     case imgDockerBase dockerConfig of
         Nothing -> throwM StackImageDockerBaseUnspecifiedException
         Just base -> do
@@ -146,14 +145,13 @@ createDockerImage dockerConfig dir = do
                           (imageName (parent . parent . parent $ dir))
                           (imgDockerImageName dockerConfig)
                     , toFilePathNoTrailingSep dir]
-            callProcess (Cmd Nothing "docker" menv args)
+            proc "docker" args runProcess_
 
 -- | Extend the general purpose docker image with entrypoints (if specified).
 extendDockerImageWithEntrypoint
     :: HasConfig env
     => ImageDockerOpts -> Path Abs Dir -> RIO env ()
 extendDockerImageWithEntrypoint dockerConfig dir = do
-    menv <- getMinimalEnvOverride
     let dockerImageName =
             fromMaybe
                 (imageName (parent . parent . parent $ dir))
@@ -174,15 +172,13 @@ extendDockerImageWithEntrypoint dockerConfig dir = do
                                        , "ENTRYPOINT [\"/usr/local/bin/" ++
                                          ep ++ "\"]"
                                        , "CMD []"]))))
-                         callProcess
-                             (Cmd
-                                  Nothing
+                         proc
                                   "docker"
-                                  menv
                                   [ "build"
                                   , "-t"
                                   , dockerImageName ++ "-" ++ ep
-                                  , toFilePathNoTrailingSep dir]))
+                                  , toFilePathNoTrailingSep dir]
+                                  runProcess_)
 
 -- | Fail with friendly error if project root not set.
 fromMaybeProjectRoot :: Maybe (Path Abs Dir) -> Path Abs Dir

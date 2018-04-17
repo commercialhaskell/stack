@@ -29,12 +29,11 @@ import qualified Data.Text.IO                          as TIO
 import           Network.HTTP.Client                   (Response,
                                                         RequestBody(RequestBodyLBS),
                                                         Request)
-import           Network.HTTP.Simple                   (withResponse,
-                                                        getResponseStatusCode,
+import           Network.HTTP.StackClient              (withResponse, httpNoBody)
+import           Network.HTTP.Simple                   (getResponseStatusCode,
                                                         getResponseBody,
                                                         setRequestHeader,
-                                                        parseRequest,
-                                                        httpNoBody)
+                                                        parseRequest)
 import           Network.HTTP.Client.MultipartFormData (formDataBody, partFileRequestBody,
                                                         partBS, partLBS)
 import           Network.HTTP.Client.TLS               (getGlobalManager,
@@ -125,7 +124,7 @@ loadCreds config = do
 
 credsFile :: Config -> IO FilePath
 credsFile config = do
-    let dir = toFilePath (configStackRoot config) </> "upload"
+    let dir = toFilePath (view stackRootL config) </> "upload"
     createDirectoryIfMissing True dir
     return $ dir </> "credentials.json"
 

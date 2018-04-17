@@ -31,9 +31,7 @@ data NixOpts = NixOpts
 -- | An uninterpreted representation of nix options.
 -- Configurations may be "cascaded" using mappend (left-biased).
 data NixOptsMonoid = NixOptsMonoid
-  {nixMonoidDefaultEnable :: !Any
-    -- ^ Should nix-shell be defaulted to enabled (does @nix:@ section exist in the config)?
-  ,nixMonoidEnable :: !(First Bool)
+  {nixMonoidEnable :: !(First Bool)
     -- ^ Is using nix-shell enabled?
   ,nixMonoidPureShell :: !(First Bool)
     -- ^ Should the nix-shell be pure
@@ -53,8 +51,7 @@ data NixOptsMonoid = NixOptsMonoid
 -- | Decode uninterpreted nix options from JSON/YAML.
 instance FromJSON (WithJSONWarnings NixOptsMonoid) where
   parseJSON = withObjectWarnings "NixOptsMonoid"
-    (\o -> do nixMonoidDefaultEnable <- pure (Any False)
-              nixMonoidEnable        <- First <$> o ..:? nixEnableArgName
+    (\o -> do nixMonoidEnable        <- First <$> o ..:? nixEnableArgName
               nixMonoidPureShell     <- First <$> o ..:? nixPureShellArgName
               nixMonoidPackages      <- First <$> o ..:? nixPackagesArgName
               nixMonoidInitFile      <- First <$> o ..:? nixInitFileArgName

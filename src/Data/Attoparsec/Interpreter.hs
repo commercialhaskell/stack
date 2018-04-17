@@ -60,7 +60,6 @@ import qualified Data.Attoparsec.Text as P
 import           Data.Char (isSpace)
 import           Data.Conduit
 import           Data.Conduit.Attoparsec
-import qualified Data.Conduit.Binary as CB
 import           Data.Conduit.Text (decodeUtf8)
 import           Data.List (intercalate)
 import           Data.Text (pack)
@@ -113,15 +112,16 @@ interpreterArgsParser isLiterate progName = P.option "" sheBangLine *> interpret
 -- comment when it is being used as an interpreter
 getInterpreterArgs :: String -> IO [String]
 getInterpreterArgs file = do
-  eArgStr <- withBinaryFile file ReadMode parseFile
+  eArgStr <- withSourceFile file parseFile
   case eArgStr of
     Left err -> handleFailure $ decodeError err
     Right str -> parseArgStr str
   where
-    parseFile h =
-      CB.sourceHandle h
-      =$= decodeUtf8
-      $$ sinkParserEither (interpreterArgsParser isLiterate stackProgName)
+    parseFile src =
+         runConduit
+       $ src
+      .| decodeUtf8
+      .| sinkParserEither (interpreterArgsParser isLiterate stackProgName)
 
     isLiterate = takeExtension file == ".lhs"
 

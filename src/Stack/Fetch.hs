@@ -13,6 +13,7 @@
 {-# LANGUAGE TypeFamilies          #-}
 {-# LANGUAGE PackageImports        #-}
 {-# LANGUAGE ViewPatterns          #-}
+{-# LANGUAGE RecordWildCards       #-}
 
 -- | Functionality for downloading packages securely for cabal's usage.
 
@@ -26,7 +27,7 @@ module Stack.Fetch
     , resolvePackagesAllowMissing
     , ResolvedPackage (..)
     , withCabalFiles
-    , withCabalLoader
+    , loadFromIndex
     ) where
 
 import qualified    Codec.Archive.Tar as Tar
@@ -36,7 +37,6 @@ import              Codec.Compression.GZip (decompress)
 import              Stack.Prelude
 import              Crypto.Hash (SHA256 (..))
 import qualified    Data.ByteString as S
-import qualified    Data.ByteString.Lazy as L
 import qualified    Data.Foldable as F
 import qualified    Data.HashMap.Strict as HashMap
 import qualified    Data.HashSet as HashSet
@@ -48,17 +48,16 @@ import qualified    Data.Set as Set
 import qualified    Data.Text as T
 import              Data.Text.Encoding (decodeUtf8)
 import              Data.Text.Metrics
+import              Lens.Micro (to)
 import              Network.HTTP.Download
 import              Path
 import              Path.Extra (toFilePathNoTrailingSep)
 import              Path.IO
 import              Stack.PackageIndex
 import              Stack.Types.BuildPlan
-import              Stack.Types.Config
 import              Stack.Types.PackageIdentifier
 import              Stack.Types.PackageIndex
 import              Stack.Types.PackageName
-import              Stack.Types.Runner
 import              Stack.Types.Version
 import qualified    System.FilePath as FP
 import              System.IO (SeekMode (AbsoluteSeek))
@@ -104,7 +103,7 @@ instance Show FetchException where
         (if uses00Index then "\n\nYou seem to be using a legacy 00-index.tar.gz tarball.\nConsider changing your configuration to use a 01-index.tar.gz file.\nAlternatively, you can set the ignore-revision-mismatch setting to true.\nFor more information, see: https://github.com/commercialhaskell/stack/issues/3520" else "")
 
 -- | Fetch packages into the cache without unpacking
-fetchPackages :: HasConfig env => Set PackageIdentifier -> RIO env ()
+fetchPackages :: HasCabalLoader env => Set PackageIdentifier -> RIO env ()
 fetchPackages idents' = do
     resolved <- resolvePackages Nothing idents Set.empty
     ToFetchResult toFetch alreadyUnpacked <- getToFetch Nothing resolved
@@ -117,7 +116,7 @@ fetchPackages idents' = do
     idents = map (flip PackageIdentifierRevision CFILatest) $ Set.toList idents'
 
 -- | Intended to work for the command line command.
-unpackPackages :: HasConfig env
+unpackPackages :: HasCabalLoader env
                => Maybe SnapshotDef -- ^ when looking up by name, take from this build plan
                -> FilePath -- ^ destination
                -> [String] -- ^ names or identifiers
@@ -132,12 +131,11 @@ unpackPackages mSnapshotDef dest input = do
     unless (Map.null alreadyUnpacked) $
         throwM $ UnpackDirectoryAlreadyExists $ Set.fromList $ map toFilePath $ Map.elems alreadyUnpacked
     unpacked <- fetchPackages' Nothing toFetch
-    F.forM_ (Map.toList unpacked) $ \(ident, dest'') -> logInfo $ T.pack $ concat
-        [ "Unpacked "
-        , packageIdentifierString ident
-        , " to "
-        , toFilePath dest''
-        ]
+    F.forM_ (Map.toList unpacked) $ \(ident, dest'') -> logInfo $
+        "Unpacked " <>
+        fromString (packageIdentifierString ident) <>
+        " to " <>
+        fromString (toFilePath dest'')
   where
     -- Possible future enhancement: parse names as name + version range
     parse s =
@@ -152,7 +150,7 @@ unpackPackages mSnapshotDef dest input = do
 
 -- | Same as 'unpackPackageIdents', but for a single package.
 unpackPackageIdent
-    :: HasConfig env
+    :: HasCabalLoader env
     => Path Abs Dir -- ^ unpack directory
     -> Path Rel Dir -- ^ the dist rename directory, see: https://github.com/fpco/stack/issues/157
     -> PackageIdentifierRevision
@@ -170,7 +168,7 @@ unpackPackageIdent unpackDir distDir (PackageIdentifierRevision ident mcfi) = do
 -- | Ensure that all of the given package idents are unpacked into the build
 -- unpack directory, and return the paths to all of the subdirectories.
 unpackPackageIdents
-    :: HasConfig env
+    :: HasCabalLoader env
     => Path Abs Dir -- ^ unpack directory
     -> Maybe (Path Rel Dir) -- ^ the dist rename directory, see: https://github.com/fpco/stack/issues/157
     -> [PackageIdentifierRevision]
@@ -190,7 +188,7 @@ data ResolvedPackage = ResolvedPackage
     deriving Show
 
 -- | Resolve a set of package names and identifiers into @FetchPackage@ values.
-resolvePackages :: HasConfig env
+resolvePackages :: HasCabalLoader env
                 => Maybe SnapshotDef -- ^ when looking up by name, take from this build plan
                 -> [PackageIdentifierRevision]
                 -> Set PackageName
@@ -211,9 +209,9 @@ resolvePackages mSnapshotDef idents0 names0 = do
 
 -- | Does the configuration use a 00-index.tar.gz file for indices?
 -- See <https://github.com/commercialhaskell/stack/issues/3520>
-getUses00Index :: HasConfig env => RIO env Bool
+getUses00Index :: HasCabalLoader env => RIO env Bool
 getUses00Index =
-    any is00 <$> view packageIndicesL
+    any is00 <$> view (cabalLoaderL.to clIndices)
   where
     is00 :: PackageIndex -> Bool
     is00 index = "00-index.tar.gz" `T.isInfixOf` indexLocation index
@@ -226,7 +224,7 @@ getUses00Index =
 -- a warning, that's no longer necessary or desirable since all info
 -- should be present and checked).
 resolvePackagesAllowMissing
-    :: forall env. HasConfig env
+    :: forall env. HasCabalLoader env
     => Maybe SnapshotDef -- ^ when looking up by name, take from this build plan
     -> [PackageIdentifierRevision]
     -> Set PackageName
@@ -266,15 +264,19 @@ resolvePackagesAllowMissing mSnapshotDef idents0 names0 = do
       (missingNames, idents1) = partitionEithers $ map
           (\name -> maybe (Left name) Right (getNamed name))
           (Set.toList names0)
-  config <- view configL
+  cl <- view cabalLoaderL
   let (missingIdents, resolved) =
         partitionEithers
-          $ map (\pir -> maybe (Left pir) Right (lookupResolvedPackage config pir cache))
+          $ map (\pir -> maybe (Left pir) Right (lookupResolvedPackage cl pir cache))
           $ idents0 <> idents1
   return (Set.fromList missingNames, HashSet.fromList missingIdents, resolved)
 
-lookupResolvedPackage :: Config -> PackageIdentifierRevision -> PackageCache PackageIndex -> Maybe ResolvedPackage
-lookupResolvedPackage config (PackageIdentifierRevision ident@(PackageIdentifier name version) cfi) (PackageCache cache) = do
+lookupResolvedPackage
+  :: CabalLoader
+  -> PackageIdentifierRevision
+  -> PackageCache PackageIndex
+  -> Maybe ResolvedPackage
+lookupResolvedPackage cl (PackageIdentifierRevision ident@(PackageIdentifier name version) cfi) (PackageCache cache) = do
   (index, mdownload, files) <- HashMap.lookup name cache >>= HashMap.lookup version
   let moffsetSize =
         case cfi of
@@ -288,7 +290,7 @@ lookupResolvedPackage config (PackageIdentifierRevision ident@(PackageIdentifier
     case moffsetSize of
       Just x -> Just x
       Nothing
-        | configIgnoreRevisionMismatch config -> Just $ snd $ NE.last files
+        | clIgnoreRevisionMismatch cl -> Just $ snd $ NE.last files
         | otherwise -> Nothing
   Just ResolvedPackage
     { rpIdent = ident
@@ -314,11 +316,11 @@ data ToFetchResult = ToFetchResult
 
 -- | Add the cabal files to a list of idents with their caches.
 withCabalFiles
-    :: (MonadReader env m, MonadUnliftIO m, HasConfig env, MonadThrow m)
+    :: HasCabalLoader env
     => IndexName
     -> [(ResolvedPackage, a)]
     -> (PackageIdentifier -> a -> ByteString -> IO b)
-    -> m [b]
+    -> RIO env [b]
 withCabalFiles name pkgs f = do
     indexPath <- configPackageIndex name
     withBinaryFile (toFilePath indexPath) ReadMode
@@ -331,71 +333,51 @@ withCabalFiles name pkgs f = do
             cabalBS <- S.hGet h $ fromIntegral size
             f ident tf cabalBS
 
--- | Provide a function which will load up a cabal @ByteString@ from the
--- package indices.
-withCabalLoader
-    :: HasConfig env
-    => ((PackageIdentifierRevision -> IO ByteString) -> RIO env a)
-    -> RIO env a
-withCabalLoader inner = do
-    -- Want to try updating the index once during a single run for missing
-    -- package identifiers. We also want to ensure we only update once at a
-    -- time
-    --
-    -- TODO: probably makes sense to move this concern into getPackageCaches
-    updateRef <- newMVar True
-
-    u <- askUnliftIO
-
-    -- TODO in the future, keep all of the necessary @Handle@s open
-    let doLookup :: PackageIdentifierRevision
-                 -> IO ByteString
-        doLookup ident = do
-            bothCaches <- unliftIO u getPackageCaches
-            eres <- unliftIO u $ lookupPackageIdentifierExact ident bothCaches
-            case eres of
-                Just bs -> return bs
-                -- Update the cache and try again
-                Nothing -> do
-                    let fuzzy = fuzzyLookupCandidates ident bothCaches
-                        suggestions = case fuzzy of
-                            FRNameNotFound Nothing -> ""
-                            FRNameNotFound (Just cs) ->
-                                  "Perhaps you meant " <> orSeparated cs <> "?"
-                            FRVersionNotFound cs -> "Possible candidates: " <>
-                              commaSeparated (NE.map packageIdentifierText cs)
-                              <> "."
-                            FRRevisionNotFound cs ->
-                              "The specified revision was not found.\nPossible candidates: " <>
-                              commaSeparated (NE.map (T.pack . packageIdentifierRevisionString) cs)
-                              <> "."
-                    join $ modifyMVar updateRef $ \toUpdate ->
-                        if toUpdate then do
-                            unliftIO u $ do
-                                logInfo $ T.concat
-                                    [ "Didn't see "
-                                    , T.pack $ packageIdentifierRevisionString ident
-                                    , " in your package indices.\n"
-                                    , "Updating and trying again."
-                                    ]
-                                updateAllIndices
-                                _ <- getPackageCaches
-                                return ()
-                            return (False, doLookup ident)
-                        else do
-                          uses00Index <- unliftIO u getUses00Index
-                          return (toUpdate, throwIO $ UnknownPackageIdentifiers
-                                       (HashSet.singleton ident) (T.unpack suggestions) uses00Index)
-    inner doLookup
+loadFromIndex :: HasCabalLoader env => PackageIdentifierRevision -> RIO env ByteString
+loadFromIndex ident = do
+  -- TODO in the future, keep all of the necessary @Handle@s open
+  bothCaches <- getPackageCaches
+  mres <- lookupPackageIdentifierExact ident bothCaches
+  case mres of
+      Just bs -> return bs
+      -- Update the cache and try again
+      Nothing -> do
+          let fuzzy = fuzzyLookupCandidates ident bothCaches
+              suggestions = case fuzzy of
+                  FRNameNotFound Nothing -> ""
+                  FRNameNotFound (Just cs) ->
+                        "Perhaps you meant " <> orSeparated cs <> "?"
+                  FRVersionNotFound cs -> "Possible candidates: " <>
+                    commaSeparated (NE.map packageIdentifierText cs)
+                    <> "."
+                  FRRevisionNotFound cs ->
+                    "The specified revision was not found.\nPossible candidates: " <>
+                    commaSeparated (NE.map (T.pack . packageIdentifierRevisionString) cs)
+                    <> "."
+          cl <- view cabalLoaderL
+          join $ modifyMVar (clUpdateRef cl) $ \toUpdate ->
+              if toUpdate then do
+                  logInfo $
+                      "Didn't see " <>
+                      fromString (packageIdentifierRevisionString ident) <>
+                      " in your package indices.\n" <>
+                      "Updating and trying again."
+                  updateAllIndices
+                  _ <- getPackageCaches
+                  return (False, loadFromIndex ident)
+              else do
+                uses00Index <- getUses00Index
+                return (toUpdate, throwIO $ UnknownPackageIdentifiers
+                             (HashSet.singleton ident) (T.unpack suggestions) uses00Index)
 
 lookupPackageIdentifierExact
-  :: (MonadReader env m, MonadUnliftIO m, HasConfig env, MonadThrow m)
+  :: HasCabalLoader env
   => PackageIdentifierRevision
   -> PackageCache PackageIndex
-  -> m (Maybe ByteString)
+  -> RIO env (Maybe ByteString)
 lookupPackageIdentifierExact identRev cache = do
-  config <- view configL
-  forM (lookupResolvedPackage config identRev cache) $ \rp -> do
+  cl <- view cabalLoaderL
+  forM (lookupResolvedPackage cl identRev cache) $ \rp -> do
     [bs] <- withCabalFiles (indexName (rpIndex rp)) [(rp, ())] $ \_ _ bs -> return bs
     return bs
 
@@ -450,7 +432,7 @@ typoCorrectionCandidates name' (PackageCache cache) =
     $ cache
 
 -- | Figure out where to fetch from.
-getToFetch :: HasConfig env
+getToFetch :: HasCabalLoader env
            => Maybe (Path Abs Dir) -- ^ directory to unpack into, @Nothing@ means no unpack
            -> [ResolvedPackage]
            -> RIO env ToFetchResult
@@ -509,28 +491,25 @@ getToFetch mdest resolvedAll = do
 -- @
 --
 -- Since 0.1.0.0
-fetchPackages' :: HasConfig env
+fetchPackages' :: forall env. HasCabalLoader env
                => Maybe (Path Rel Dir) -- ^ the dist rename directory, see: https://github.com/fpco/stack/issues/157
                -> Map PackageIdentifier ToFetch
                -> RIO env (Map PackageIdentifier (Path Abs Dir))
 fetchPackages' mdistDir toFetchAll = do
-    connCount <- view $ configL.to configConnectionCount
-    outputVar <- liftIO $ newTVarIO Map.empty
+    connCount <- view $ cabalLoaderL.to clConnectionCount
+    outputVar <- newTVarIO Map.empty
 
-    run <- askRunInIO
     parMapM_
         connCount
-        (go outputVar run)
+        (go outputVar)
         (Map.toList toFetchAll)
 
-    liftIO $ readTVarIO outputVar
+    readTVarIO outputVar
   where
-    go :: (MonadUnliftIO m,MonadThrow m,MonadLogger m,HasRunner env, MonadReader env m)
-       => TVar (Map PackageIdentifier (Path Abs Dir))
-       -> (m () -> IO ())
+    go :: TVar (Map PackageIdentifier (Path Abs Dir))
        -> (PackageIdentifier, ToFetch)
-       -> m ()
-    go outputVar run (ident, toFetch) = do
+       -> RIO env ()
+    go outputVar (ident, toFetch) = do
         req <- parseUrlThrow $ T.unpack $ tfUrl toFetch
         let destpath = tfTarball toFetch
 
@@ -542,7 +521,7 @@ fetchPackages' mdistDir toFetchAll = do
                 , drRetryPolicy = drRetryPolicyDefault
                 }
         let progressSink _ =
-                liftIO $ run $ logInfo $ packageIdentifierText ident <> ": download"
+                logInfo $ display ident <> ": download"
         _ <- verifiedDownload downloadReq destpath progressSink
 
         identStrP <- parseRelDir $ packageIdentifierString ident
@@ -579,7 +558,7 @@ fetchPackages' mdistDir toFetchAll = do
                 atomically $ modifyTVar outputVar $ Map.insert ident destDir
 
             F.forM_ unexpectedEntries $ \(path, entryType) ->
-                logWarn $ "Unexpected entry type " <> entryType <> " for entry " <> T.pack path
+                logWarn $ "Unexpected entry type " <> display entryType <> " for entry " <> fromString path
 
 -- | Internal function used to unpack tarball.
 --
@@ -589,16 +568,13 @@ fetchPackages' mdistDir toFetchAll = do
 untar :: forall b1 b2. Path b1 File -> Path Rel Dir -> Path b2 Dir -> IO [(FilePath, T.Text)]
 untar tarPath expectedTarFolder destDirParent = do
   ensureDir destDirParent
-  withBinaryFile (toFilePath tarPath) ReadMode $ \h -> do
-                -- Avoid using L.readFile, which is more likely to leak
-                -- resources
-                lbs <- L.hGetContents h
+  withLazyFile (toFilePath tarPath) $ \lbs -> do
                 let rawEntries = fmap (either wrap wrap)
                             $ Tar.checkTarbomb (toFilePathNoTrailingSep expectedTarFolder)
                             $ Tar.read $ decompress lbs
 
                     filterEntries
-                      :: Monoid w => (Tar.Entry -> (Bool, w))
+                      :: (Semigroup w, Monoid w) => (Tar.Entry -> (Bool, w))
                          -> Tar.Entries b -> (Tar.Entries b, w)
                     -- Allow collecting warnings, Writer-monad style.
                     filterEntries f =
@@ -670,3 +646,12 @@ orSeparated xs
 
 commaSeparated :: NonEmpty T.Text -> T.Text
 commaSeparated = F.fold . NE.intersperse ", "
+
+-- | Location of a package tarball
+configPackageTarball :: HasCabalLoader env => IndexName -> PackageIdentifier -> RIO env (Path Abs File)
+configPackageTarball iname ident = do
+    root <- configPackageIndexRoot iname
+    name <- parseRelDir $ packageNameString $ packageIdentifierName ident
+    ver <- parseRelDir $ versionString $ packageIdentifierVersion ident
+    base <- parseRelFile $ packageIdentifierString ident ++ ".tar.gz"
+    return (root </> $(mkRelDir "packages") </> name </> ver </> base)

@@ -22,7 +22,7 @@ import           Data.Time (UTCTime)
 import           Path
 import           Path.IO
 import           Path.Internal (Path(..))
-import           Stack.Prelude
+import           RIO
 import           System.IO.Error (isDoesNotExistError)
 import qualified Data.ByteString.Char8 as BS
 import qualified Data.ByteString.Lazy.Char8 as BSL

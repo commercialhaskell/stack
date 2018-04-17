@@ -5,12 +5,10 @@
 module Stack.PackageDumpSpec where
 
 import           Data.Conduit
-import qualified Data.Conduit.Binary           as CB
 import qualified Data.Conduit.List             as CL
 import           Data.Conduit.Text             (decodeUtf8)
 import qualified Data.Map                      as Map
 import qualified Data.Set                      as Set
-import           Distribution.System           (buildPlatform)
 import           Distribution.License          (License(..))
 import           Stack.PackageDump
 import           Stack.Prelude
@@ -19,7 +17,7 @@ import           Stack.Types.GhcPkgId
 import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageName
 import           Stack.Types.Version
-import           System.Process.Read
+import           RIO.Process
 import           Test.Hspec
 import           Test.Hspec.QuickCheck
 
@@ -30,7 +28,7 @@ spec :: Spec
 spec = do
     describe "eachSection" $ do
         let test name content expected = it name $ do
-                actual <- yield content $$ eachSection CL.consume =$ CL.consume
+                actual <- runConduit $ yield content .| eachSection CL.consume .| CL.consume
                 actual `shouldBe` expected
         test
             "unix line endings"
@@ -56,7 +54,7 @@ spec = do
                 , "   val4b"
                 ]
             sink k = fmap (k, ) CL.consume
-        actual <- mapM_ yield bss $$ eachPair sink =$ CL.consume
+        actual <- runConduit $ mapM_ yield bss .| eachPair sink .| CL.consume
         actual `shouldBe`
             [ ("key1", ["val1"])
             , ("key2", ["val2a", "val2b"])
@@ -66,11 +64,13 @@ spec = do
 
     describe "conduitDumpPackage" $ do
         it "ghc 7.8" $ do
-            haskell2010:_ <- runResourceT
-                $ CB.sourceFile "test/package-dump/ghc-7.8.txt"
-              =$= decodeUtf8
-               $$ conduitDumpPackage
-               =$ CL.consume
+            haskell2010:_ <-
+                  withSourceFile "test/package-dump/ghc-7.8.txt" $ \src ->
+                  runConduit
+                $ src
+               .| decodeUtf8
+               .| conduitDumpPackage
+               .| CL.consume
             ghcPkgId <- parseGhcPkgId "haskell2010-1.1.2.0-05c8dd51009e08c6371c82972d40f55a"
             packageIdent <- parsePackageIdentifier "haskell2010-1.1.2.0"
             depends <- mapM parseGhcPkgId
@@ -96,11 +96,13 @@ spec = do
                 }
 
         it "ghc 7.10" $ do
-            haskell2010:_ <- runResourceT
-                $ CB.sourceFile "test/package-dump/ghc-7.10.txt"
-              =$= decodeUtf8
-               $$ conduitDumpPackage
-               =$ CL.consume
+            haskell2010:_ <-
+                  withSourceFile "test/package-dump/ghc-7.10.txt" $ \src ->
+                  runConduit
+                $ src
+               .| decodeUtf8
+               .| conduitDumpPackage
+               .| CL.consume
             ghcPkgId <- parseGhcPkgId "ghc-7.10.1-325809317787a897b7a97d646ceaa3a3"
             pkgIdent <- parsePackageIdentifier "ghc-7.10.1"
             depends <- mapM parseGhcPkgId
@@ -136,11 +138,13 @@ spec = do
                 , dpExposedModules = []
                 }
         it "ghc 7.8.4 (osx)" $ do
-            hmatrix:_ <- runResourceT
-                $ CB.sourceFile "test/package-dump/ghc-7.8.4-osx.txt"
-              =$= decodeUtf8
-               $$ conduitDumpPackage
-               =$ CL.consume
+            hmatrix:_ <-
+                  withSourceFile "test/package-dump/ghc-7.8.4-osx.txt" $ \src ->
+                  runConduit
+                $ src
+               .| decodeUtf8
+               .| conduitDumpPackage
+               .| CL.consume
             ghcPkgId <- parseGhcPkgId "hmatrix-0.16.1.5-12d5d21f26aa98774cdd8edbc343fbfe"
             pkgId <- parsePackageIdentifier "hmatrix-0.16.1.5"
             depends <- mapM parseGhcPkgId
@@ -174,11 +178,13 @@ spec = do
                 , dpExposedModules = ["Data.Packed","Data.Packed.Vector","Data.Packed.Matrix","Data.Packed.Foreign","Data.Packed.ST","Data.Packed.Development","Numeric.LinearAlgebra","Numeric.LinearAlgebra.LAPACK","Numeric.LinearAlgebra.Algorithms","Numeric.Container","Numeric.LinearAlgebra.Util","Numeric.LinearAlgebra.Devel","Numeric.LinearAlgebra.Data","Numeric.LinearAlgebra.HMatrix","Numeric.LinearAlgebra.Static"]
                 }
         it "ghc HEAD" $ do
-          ghcBoot:_ <- runResourceT
-              $ CB.sourceFile "test/package-dump/ghc-head.txt"
-            =$= decodeUtf8
-             $$ conduitDumpPackage
-             =$ CL.consume
+          ghcBoot:_ <-
+                withSourceFile "test/package-dump/ghc-head.txt" $ \src ->
+                runConduit
+              $ src
+             .| decodeUtf8
+             .| conduitDumpPackage
+             .| CL.consume
           ghcPkgId <- parseGhcPkgId "ghc-boot-0.0.0.0"
           pkgId <- parsePackageIdentifier "ghc-boot-0.0.0.0"
           depends <- mapM parseGhcPkgId
@@ -207,32 +213,29 @@ spec = do
             }
 
 
-    it "ghcPkgDump + addProfiling + addHaddock" $ (id :: IO () -> IO ()) $ runNoLogging $ do
-        menv' <- getEnvOverride buildPlatform
-        menv <- mkEnvOverride buildPlatform $ Map.delete "GHC_PACKAGE_PATH" $ unEnvOverride menv'
+    it "ghcPkgDump + addProfiling + addHaddock" $ runEnvNoLogging $ do
         icache <- newInstalledCache
-        ghcPkgDump menv Ghc []
+        ghcPkgDump Ghc []
             $  conduitDumpPackage
-            =$ addProfiling icache
-            =$ addHaddock icache
-            =$ fakeAddSymbols
-            =$ CL.sinkNull
+            .| addProfiling icache
+            .| addHaddock icache
+            .| fakeAddSymbols
+            .| CL.sinkNull
 
-    it "sinkMatching" $ do
-        menv' <- getEnvOverride buildPlatform
-        menv <- mkEnvOverride buildPlatform $ Map.delete "GHC_PACKAGE_PATH" $ unEnvOverride menv'
+    it "sinkMatching" $ runEnvNoLogging $ do
         icache <- newInstalledCache
-        m <- runNoLogging $ ghcPkgDump menv Ghc []
+        m <- ghcPkgDump Ghc []
             $  conduitDumpPackage
-            =$ addProfiling icache
-            =$ addHaddock icache
-            =$ fakeAddSymbols
-            =$ sinkMatching False False False (Map.singleton $(mkPackageName "transformers") $(mkVersion "0.0.0.0.0.0.1"))
+            .| addProfiling icache
+            .| addHaddock icache
+            .| fakeAddSymbols
+            .| sinkMatching False False False (Map.singleton $(mkPackageName "transformers") $(mkVersion "0.0.0.0.0.0.1"))
         case Map.lookup $(mkPackageName "base") m of
             Nothing -> error "base not present"
             Just _ -> return ()
-        Map.lookup $(mkPackageName "transformers") m `shouldBe` Nothing
-        Map.lookup $(mkPackageName "ghc") m `shouldBe` Nothing
+        liftIO $ do
+          Map.lookup $(mkPackageName "transformers") m `shouldBe` Nothing
+          Map.lookup $(mkPackageName "ghc") m `shouldBe` Nothing
 
     describe "pruneDeps" $ do
         it "sanity check" $ do
@@ -276,5 +279,11 @@ checkDepsPresent prunes selected =
             Just deps -> Set.null $ Set.difference (Set.fromList deps) allIds
 
 -- addSymbols can't be reasonably tested like this
-fakeAddSymbols :: Monad m => Conduit (DumpPackage a b c) m (DumpPackage a b Bool)
+fakeAddSymbols :: Monad m => ConduitM (DumpPackage a b c) (DumpPackage a b Bool) m ()
 fakeAddSymbols = CL.map (\dp -> dp { dpSymbols = False })
+
+runEnvNoLogging :: RIO LoggedProcessContext a -> IO a
+runEnvNoLogging inner = do
+  envVars <- view envVarsL <$> mkDefaultProcessContext
+  menv <- mkProcessContext $ Map.delete "GHC_PACKAGE_PATH" envVars
+  runRIO (LoggedProcessContext menv mempty) inner

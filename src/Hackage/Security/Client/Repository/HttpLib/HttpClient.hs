@@ -22,6 +22,7 @@ import qualified Data.ByteString              as BS
 import qualified Data.ByteString.Char8        as BS.C8
 import qualified Network.HTTP.Client          as HttpClient
 import qualified Network.HTTP.Client.Internal as HttpClient
+import qualified Network.HTTP.StackClient     as StackClient
 import qualified Network.HTTP.Types           as HttpClient
 
 import Hackage.Security.Client hiding (Header)
@@ -69,7 +70,7 @@ get manager reqHeaders uri callback = wrapCustomEx $ do
     -- the URI contains URL auth. Not sure if this is a concern.
     request' <- HttpClient.setUri HttpClient.defaultRequest uri
     let request = setRequestHeaders reqHeaders request'
-    checkHttpException $ HttpClient.withResponse request manager $ \response -> do
+    checkHttpException $ StackClient.withResponseByManager request manager $ \response -> do
       let br = wrapCustomEx $ HttpClient.responseBody response
       callback (getResponseHeaders response) br
 
@@ -82,7 +83,7 @@ getRange manager reqHeaders uri (from, to) callback = wrapCustomEx $ do
     request' <- HttpClient.setUri HttpClient.defaultRequest uri
     let request = setRange from to
                 $ setRequestHeaders reqHeaders request'
-    checkHttpException $ HttpClient.withResponse request manager $ \response -> do
+    checkHttpException $ StackClient.withResponseByManager request manager $ \response -> do
       let br = wrapCustomEx $ HttpClient.responseBody response
       case () of
          () | HttpClient.responseStatus response == HttpClient.partialContent206 ->

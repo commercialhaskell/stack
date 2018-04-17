@@ -37,12 +37,13 @@ import              Data.ByteArray as Mem (convert)
 import              Data.ByteArray.Encoding as Mem (convertToBase, Base(Base16))
 import              Data.ByteString.Char8 (readInteger)
 import              Data.Conduit
-import              Data.Conduit.Binary (sourceHandle, sinkHandle)
+import              Data.Conduit.Binary (sourceHandle)
 import              Data.Text.Encoding (decodeUtf8With)
 import              Data.Text.Encoding.Error (lenientDecode)
 import              GHC.IO.Exception (IOException(..),IOErrorType(..))
 import              Network.HTTP.Client (getUri, path)
-import              Network.HTTP.Simple (Request, HttpException, httpSink, getResponseHeaders)
+import              Network.HTTP.StackClient (httpSink)
+import              Network.HTTP.Simple (Request, HttpException, getResponseHeaders)
 import              Network.HTTP.Types.Header (hContentLength, hContentMD5)
 import              Path
 import              Stack.Types.Runner
@@ -142,7 +143,7 @@ displayCheckHexDigest (CheckHexDigestHeader h) =
 sinkCheckHash :: MonadThrow m
     => Request
     -> HashCheck
-    -> Consumer ByteString m ()
+    -> ConduitM ByteString o m ()
 sinkCheckHash req HashCheck{..} = do
     digest <- sinkHashUsing hashCheckAlgorithm
     let actualDigestString = show digest
@@ -172,7 +173,7 @@ assertLengthSink req expectedStreamLength = ZipSink $ do
     throwM $ WrongStreamLength req expectedStreamLength actualStreamLength
 
 -- | A more explicitly type-guided sinkHash.
-sinkHashUsing :: (Monad m, HashAlgorithm a) => a -> Consumer ByteString m (Digest a)
+sinkHashUsing :: (Monad m, HashAlgorithm a) => a -> ConduitM ByteString o m (Digest a)
 sinkHashUsing _ = sinkHash
 
 -- | Turns a list of hash checks into a ZipSink that checks all of them.
@@ -180,8 +181,7 @@ hashChecksToZipSink :: MonadThrow m => Request -> [HashCheck] -> ZipSink ByteStr
 hashChecksToZipSink req = traverse_ (ZipSink . sinkCheckHash req)
 
 -- 'Control.Retry.recovering' customized for HTTP failures
-recoveringHttp :: (MonadUnliftIO m, MonadLogger m, HasRunner env, MonadReader env m)
-               => RetryPolicy -> m a -> m a
+recoveringHttp :: forall env a. HasRunner env => RetryPolicy -> RIO env a -> RIO env a
 recoveringHttp retryPolicy =
 #if MIN_VERSION_retry(0,7,0)
     helper $ \run -> recovering retryPolicy (handlers run) . const
@@ -189,15 +189,15 @@ recoveringHttp retryPolicy =
     helper $ \run -> recovering retryPolicy (handlers run)
 #endif
   where
-    helper :: (MonadUnliftIO m, HasRunner env, MonadReader env m) => (UnliftIO m -> IO a -> IO a) -> m a -> m a
+    helper :: (UnliftIO (RIO env) -> IO a -> IO a) -> RIO env a -> RIO env a
     helper wrapper action = withUnliftIO $ \run -> wrapper run (unliftIO run action)
 
-    handlers :: (MonadLogger m, HasRunner env, MonadReader env m) => UnliftIO m -> [RetryStatus -> Handler IO Bool]
-    handlers run = [Handler . alwaysRetryHttp (unliftIO run),const $ Handler retrySomeIO]
+    handlers :: UnliftIO (RIO env) -> [RetryStatus -> Handler IO Bool]
+    handlers u = [Handler . alwaysRetryHttp u,const $ Handler retrySomeIO]
 
-    alwaysRetryHttp :: (MonadLogger m', Monad m, HasRunner env, MonadReader env m') => (m' () -> m ()) -> RetryStatus -> HttpException -> m Bool
-    alwaysRetryHttp run rs _ = do
-      run $
+    alwaysRetryHttp :: UnliftIO (RIO env) -> RetryStatus -> HttpException -> IO Bool
+    alwaysRetryHttp u rs _ = do
+      unliftIO u $
         prettyWarn $ vcat
           [ flow $ unwords
             [ "Retry number"
@@ -234,19 +234,19 @@ recoveringHttp retryPolicy =
 -- Throws VerifiedDownloadException.
 -- Throws IOExceptions related to file system operations.
 -- Throws HttpException.
-verifiedDownload :: (MonadUnliftIO m, MonadLogger m, HasRunner env, MonadReader env m)
+verifiedDownload
+         :: HasRunner env
          => DownloadRequest
          -> Path Abs File -- ^ destination
-         -> (Maybe Integer -> Sink ByteString IO ()) -- ^ custom hook to observe progress
-         -> m Bool -- ^ Whether a download was performed
+         -> (Maybe Integer -> ConduitM ByteString Void (RIO env) ()) -- ^ custom hook to observe progress
+         -> RIO env Bool -- ^ Whether a download was performed
 verifiedDownload DownloadRequest{..} destpath progressSink = do
     let req = drRequest
     whenM' (liftIO getShouldDownload) $ do
-        logDebug $ "Downloading " <> decodeUtf8With lenientDecode (path req)
+        logDebug $ "Downloading " <> Stack.Prelude.display (decodeUtf8With lenientDecode (path req))
         liftIO $ createDirectoryIfMissing True dir
-        recoveringHttp drRetryPolicy $ liftIO $ 
-            withBinaryFile fptmp WriteMode $ \h ->
-                httpSink req (go h)
+        recoveringHttp drRetryPolicy $
+            withSinkFile fptmp $ httpSink req . go
         liftIO $ renameFile fptmp fp
   where
     whenM' mp m = do
@@ -274,7 +274,9 @@ verifiedDownload DownloadRequest{..} destpath progressSink = do
 
     checkExpectations = withBinaryFile fp ReadMode $ \h -> do
         for_ drLengthCheck $ checkFileSizeExpectations h
-        sourceHandle h $$ getZipSink (hashChecksToZipSink drRequest drHashChecks)
+        runConduit
+            $ sourceHandle h
+           .| getZipSink (hashChecksToZipSink drRequest drHashChecks)
 
     -- doesn't move the handle
     checkFileSizeExpectations h expectedFileSize = do
@@ -293,7 +295,7 @@ verifiedDownload DownloadRequest{..} destpath progressSink = do
                 throwM $ WrongContentLength drRequest expectedContentLength lengthBS
             _ -> return ()
 
-    go h res = do
+    go sink res = do
         let headers = getResponseHeaders res
             mcontentLength = do
               hLength <- List.lookup hContentLength headers
@@ -310,9 +312,9 @@ verifiedDownload DownloadRequest{..} destpath progressSink = do
                 Nothing -> []
                 ) ++ drHashChecks
 
-        maybe id (\len -> (CB.isolate len =$=)) drLengthCheck
+        maybe id (\len -> (CB.isolate len .|)) drLengthCheck
             $ getZipSink
                 ( hashChecksToZipSink drRequest hashChecks
                   *> maybe (pure ()) (assertLengthSink drRequest) drLengthCheck
-                  *> ZipSink (sinkHandle h)
+                  *> ZipSink sink
                   *> ZipSink (progressSink mcontentLength))

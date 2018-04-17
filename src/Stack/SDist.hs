@@ -17,8 +17,8 @@ import qualified Codec.Archive.Tar as Tar
 import qualified Codec.Archive.Tar.Entry as Tar
 import qualified Codec.Compression.GZip as GZip
 import           Control.Applicative
-import           Control.Concurrent.Execute (ActionContext(..))
-import           Stack.Prelude
+import           Control.Concurrent.Execute (ActionContext(..), Concurrency(..))
+import           Stack.Prelude hiding (Display (..))
 import           Control.Monad.Reader.Class (local)
 import qualified Data.ByteString as S
 import qualified Data.ByteString.Char8 as S8
@@ -26,7 +26,6 @@ import qualified Data.ByteString.Lazy as L
 import           Data.Char (toLower)
 import           Data.Data (cast)
 import           Data.List
-import           Data.List.Extra (nubOrd)
 import           Data.List.NonEmpty (NonEmpty)
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Map.Strict as Map
@@ -40,7 +39,7 @@ import           Data.Time.Clock.POSIX
 import           Distribution.Package (Dependency (..))
 import qualified Distribution.PackageDescription as Cabal
 import qualified Distribution.PackageDescription.Check as Check
-import qualified Distribution.PackageDescription.Parse as Cabal
+import qualified Distribution.PackageDescription.Parsec as Cabal
 import           Distribution.PackageDescription.PrettyPrint (showGenericPackageDescription)
 import qualified Distribution.Types.UnqualComponentName as Cabal
 import qualified Distribution.Text as Cabal
@@ -48,6 +47,7 @@ import           Distribution.Version (simplifyVersionRange, orLaterVersion, ear
 import           Lens.Micro (set)
 import           Path
 import           Path.IO hiding (getModificationTime, getPermissions, withSystemTempDir)
+import qualified RIO
 import           Stack.Build (mkBaseConfigOpts, build)
 import           Stack.Build.Execute
 import           Stack.Build.Installed
@@ -115,9 +115,9 @@ getSDistTarball mpvpBounds pkgDir = do
         tweakCabal = pvpBounds /= PvpBoundsNone
         pkgFp = toFilePath pkgDir
     lp <- readLocalPackage pkgDir
-    logInfo $ "Getting file list for " <> T.pack pkgFp
+    logInfo $ "Getting file list for " <> fromString pkgFp
     (fileList, cabalfp) <-  getSDistFileList lp
-    logInfo $ "Building sdist tarball for " <> T.pack pkgFp
+    logInfo $ "Building sdist tarball for " <> fromString pkgFp
     files <- normalizeTarballPaths (map (T.unpack . stripCR . T.pack) (lines fileList))
 
     -- We're going to loop below and eventually find the cabal
@@ -173,8 +173,7 @@ getCabalLbs pvpBounds mrev cabalfp = do
     unless (cabalfp == cabalfp')
       $ error $ "getCabalLbs: cabalfp /= cabalfp': " ++ show (cabalfp, cabalfp')
     (_, sourceMap) <- loadSourceMap AllowNoTargets defaultBuildOptsCLI
-    menv <- getMinimalEnvOverride
-    (installedMap, _, _, _) <- getInstalled menv GetInstalledOpts
+    (installedMap, _, _, _) <- getInstalled GetInstalledOpts
                                 { getInstalledProfiling = False
                                 , getInstalledHaddock = False
                                 , getInstalledSymbols = False
@@ -210,8 +209,13 @@ getCabalLbs pvpBounds mrev cabalfp = do
           <+> display cabalfp
           , ""
           ]
-    case Cabal.parseGenericPackageDescription (showGenericPackageDescription gpd) of
-      Cabal.ParseOk _ roundtripped
+        (_warnings, eres) = Cabal.runParseResult
+                          $ Cabal.parseGenericPackageDescription
+                          $ T.encodeUtf8
+                          $ T.pack
+                          $ showGenericPackageDescription gpd
+    case eres of
+      Right roundtripped
         | roundtripped == gpd -> return ()
         | otherwise -> do
             prettyWarn $ vsep $ roundtripErrs ++
@@ -235,14 +239,14 @@ getCabalLbs pvpBounds mrev cabalfp = do
               , flow "If the issue is not fixed, feel free to leave a comment on it indicating that you would like it to be fixed."
               , ""
               ]
-      Cabal.ParseFailed err -> do
+      Left (_version, errs) -> do
         prettyWarn $ vsep $ roundtripErrs ++
           [ flow "In particular, parsing the rendered cabal file is yielding a parse error.  Please check if there are already issues tracking this, and if not, please report new issues to the stack and cabal issue trackers, via"
           , bulletedList
             [ styleUrl "https://github.com/commercialhaskell/stack/issues/new"
             , styleUrl "https://github.com/haskell/cabal/issues/new"
             ]
-          , flow $ "The parse error is: " ++ show err
+          , flow $ "The parse error is: " ++ unlines (map show errs)
           , ""
           ]
     return
@@ -319,23 +323,21 @@ readLocalPackage pkgDir = do
 getSDistFileList :: HasEnvConfig env => LocalPackage -> RIO env (String, Path Abs File)
 getSDistFileList lp =
     withSystemTempDir (stackProgName <> "-sdist") $ \tmpdir -> do
-        menv <- getMinimalEnvOverride
         let bopts = defaultBuildOpts
         let boptsCli = defaultBuildOptsCLI
         baseConfigOpts <- mkBaseConfigOpts boptsCli
         (locals, _) <- loadSourceMap NeedTargets boptsCli
-        run <- askRunInIO
-        withExecuteEnv menv bopts boptsCli baseConfigOpts locals
+        withExecuteEnv bopts boptsCli baseConfigOpts locals
             [] [] [] -- provide empty list of globals. This is a hack around custom Setup.hs files
             $ \ee ->
-            withSingleContext run ac ee task Nothing (Just "sdist") $ \_package cabalfp _pkgDir cabal _announce _console _mlogFile -> do
+            withSingleContext ac ee task Nothing (Just "sdist") $ \_package cabalfp _pkgDir cabal _announce _console _mlogFile -> do
                 let outFile = toFilePath tmpdir FP.</> "source-files-list"
                 cabal KeepTHLoading ["sdist", "--list-sources", outFile]
                 contents <- liftIO (S.readFile outFile)
                 return (T.unpack $ T.decodeUtf8With T.lenientDecode contents, cabalfp)
   where
     package = lpPackage lp
-    ac = ActionContext Set.empty []
+    ac = ActionContext Set.empty [] ConcurrencyAllowed
     task = Task
         { taskProvides = PackageIdentifier (packageName package) (packageVersion package)
         , taskType = TTFiles lp Local
@@ -355,9 +357,9 @@ normalizeTarballPaths fps = do
     -- TODO: consider whether erroring out is better - otherwise the
     -- user might upload an incomplete tar?
     unless (null outsideDir) $
-        logWarn $ T.concat
-            [ "Warning: These files are outside of the package directory, and will be omitted from the tarball: "
-            , T.pack (show outsideDir)]
+        logWarn $
+            "Warning: These files are outside of the package directory, and will be omitted from the tarball: " <>
+            displayShow outsideDir
     return (nubOrd files)
   where
     (outsideDir, files) = partitionEithers (map pathToEither fps)
@@ -405,7 +407,7 @@ checkPackageInExtractedTarball pkgDir = do
     config  <- getDefaultPackageConfig
     (gdesc, PackageDescriptionPair pkgDesc _) <- readPackageDescriptionDir config pkgDir False
     logInfo $
-        "Checking package '" <> packageNameText name <> "' for common mistakes"
+        "Checking package '" <> RIO.display name <> "' for common mistakes"
     let pkgChecks =
           -- MSS 2017-12-12: Try out a few different variants of
           -- pkgDesc to try and provoke an error or warning. I don't
@@ -429,7 +431,7 @@ checkPackageInExtractedTarball pkgDir = do
           in partition criticalIssue checks
     unless (null warnings) $
         logWarn $ "Package check reported the following warnings:\n" <>
-                   T.pack (intercalate "\n" . fmap show $ warnings)
+                   mconcat (intersperse "\n" . fmap displayShow $ warnings)
     case NE.nonEmpty errors of
         Nothing -> return ()
         Just ne -> throwM $ CheckException ne

@@ -135,7 +135,7 @@ Where again, `<PATTERN>` is the name of the module without `Spec.hs`.
 Running the integration tests is a little involved, you'll need to:
 
 ```bash
-$ stack test stack:integration-test --flag stack:stack-integration-tests
+$ stack test stack:stack-integration-test --flag stack:integration-tests
 ```
 
 Running an individual module works like this:
@@ -159,3 +159,12 @@ $ stack ghci stack:stack-integration-test
 Where again, `<PATTERN>` is the name of the folder listed in the
 [test/integration/tests/](https://github.com/commercialhaskell/stack/tree/master/test/integration/tests)
 folder.
+
+
+## Slack channel
+
+If you're making deep changes and real-time communcation with the Stack team
+would be helpful, we have a `#stack-collaborators` Slack channel.  Please
+contact [@borsboom](https://github.com/borsboom) (manny@fpcomplete.com) or
+[@snoyberg](https://github.com/snoyberg) (michael@fpcomplete.com) for an
+invite.

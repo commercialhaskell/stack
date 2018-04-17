@@ -21,7 +21,7 @@ module Stack.Snapshot
   , calculatePackagePromotion
   ) where
 
-import           Stack.Prelude
+import           Stack.Prelude hiding (Display (..))
 import           Control.Monad.State.Strict      (get, put, StateT, execStateT)
 import           Crypto.Hash.Conduit (hashFile)
 import           Data.Aeson (withObject, (.!=), (.:), (.:?), Value (Object))
@@ -45,10 +45,11 @@ import           Distribution.Text (display)
 import qualified Distribution.Version as C
 import           Network.HTTP.Client (Request)
 import           Network.HTTP.Download
+import qualified RIO
+import           Network.URI (isURI)
 import           Path
 import           Path.IO
 import           Stack.Constants
-import           Stack.Fetch
 import           Stack.Package
 import           Stack.PackageDump
 import           Stack.PackageLocation
@@ -64,6 +65,7 @@ import           Stack.Types.Urls
 import           Stack.Types.Compiler
 import           Stack.Types.Resolver
 import qualified System.Directory as Dir
+import qualified System.FilePath as FilePath
 
 type SinglePackageLocation = PackageLocationIndex FilePath
 
@@ -75,6 +77,7 @@ data SnapshotException
   | NeedResolverOrCompiler !Text
   | MissingPackages !(Set PackageName)
   | CustomResolverException !Text !(Either Request FilePath) !ParseException
+  | InvalidStackageException !SnapName !String
   deriving Typeable
 instance Exception SnapshotException
 instance Show SnapshotException where
@@ -124,10 +127,20 @@ instance Show SnapshotException where
   show (CustomResolverException url loc e) = concat
     [ "Unable to load custom resolver "
     , T.unpack url
-    , " from location\n"
-    , show loc
+    , " from "
+    , case loc of
+        Left _req -> "HTTP request"
+        Right fp -> "local file:\n  " ++ fp
     , "\nException: "
-    , show e
+    , case e of
+        AesonException s -> s
+        _ -> show e
+    ]
+  show (InvalidStackageException snapName e) = concat
+    [ "Unable to parse Stackage snapshot "
+    , T.unpack (renderSnapName snapName)
+    , ": "
+    , e
     ]
 
 -- | Convert a 'Resolver' into a 'SnapshotDef'
@@ -135,7 +148,7 @@ loadResolver
   :: forall env. HasConfig env
   => Resolver
   -> RIO env SnapshotDef
-loadResolver (ResolverSnapshot name) = do
+loadResolver (ResolverStackage name) = do
     stackage <- view stackRootL
     file' <- parseRelFile $ T.unpack file
     cachePath <- (buildPlanCacheDir stackage </>) <$> parseRelFile (T.unpack (renderSnapName name <> ".cache"))
@@ -146,23 +159,25 @@ loadResolver (ResolverSnapshot name) = do
             Left e -> throwIO e
             Right value ->
               case parseEither parseStackageSnapshot value of
-                Left s -> throwIO $ AesonException s
+                Left s -> throwIO $ InvalidStackageException name s
                 Right x -> return x
-    logDebug $ "Decoding build plan from: " <> T.pack (toFilePath fp)
+    logDebug $ "Decoding build plan from: " <> fromString (toFilePath fp)
     eres <- tryDecode
     case eres of
         Right sd -> return sd
         Left e -> do
-            logDebug $ "Decoding Stackage snapshot definition from file failed: " <> T.pack (show e)
+            logDebug $
+              "Decoding Stackage snapshot definition from file failed: " <>
+              displayShow e
             ensureDir (parent fp)
             url <- buildBuildPlanUrl name file
             req <- parseRequest $ T.unpack url
-            logSticky $ "Downloading " <> renderSnapName name <> " build plan ..."
-            logDebug $ "Downloading build plan from: " <> url
+            logSticky $ "Downloading " <> RIO.display name <> " build plan ..."
+            logDebug $ "Downloading build plan from: " <> RIO.display url
             wasDownloaded <- redownload req fp
             if wasDownloaded
-              then logStickyDone $ "Downloaded " <> renderSnapName name <> " build plan."
-              else logStickyDone $ "Skipped download of " <> renderSnapName name <> " because its the stored entity tag matches the server version"
+              then logStickyDone $ "Downloaded " <> RIO.display name <> " build plan."
+              else logStickyDone $ "Skipped download of " <> RIO.display name <> " because its the stored entity tag matches the server version"
             tryDecode >>= either throwM return
 
   where
@@ -198,7 +213,7 @@ loadResolver (ResolverSnapshot name) = do
         -- Not dropping any packages in a Stackage snapshot
         let sdDropPackages = Set.empty
 
-        let sdResolver = ResolverSnapshot name
+        let sdResolver = ResolverStackage name
             sdResolverName = renderSnapName name
 
         return SnapshotDef {..}
@@ -241,7 +256,7 @@ loadResolver (ResolverCompiler compiler) = return SnapshotDef
     , sdGlobalHints = Map.empty
     }
 loadResolver (ResolverCustom url loc) = do
-  logDebug $ "Loading " <> url <> " build plan from " <> T.pack (show loc)
+  logDebug $ "Loading " <> RIO.display url <> " build plan from " <> displayShow loc
   case loc of
     Left req -> download' req >>= load . toFilePath
     Right fp -> load fp
@@ -261,24 +276,36 @@ loadResolver (ResolverCustom url loc) = do
 
     load :: FilePath -> RIO env SnapshotDef
     load fp = do
+      let resolveLocalArchives sd = sd {
+            sdLocations = resolveLocalArchive <$> sdLocations sd
+          }
+          resolveLocalArchive (PLOther (PLArchive archive)) = 
+            PLOther $ PLArchive $ archive {
+              archiveUrl = T.pack $ resolveLocalFilePath (T.unpack $ archiveUrl archive)
+            }
+          resolveLocalArchive pl = pl
+          resolveLocalFilePath path =
+            if not $ isURI path && FilePath.isRelative path
+              then FilePath.dropFileName fp FilePath.</> FilePath.normalise path
+              else path
+
       WithJSONWarnings (sd0, mparentResolver, mcompiler) warnings <-
         liftIO (decodeFileEither fp) >>= either
           (throwM . CustomResolverException url loc)
-          (either (throwM . AesonException) return . parseEither parseCustom)
+          (either (throwM . CustomResolverException url loc . AesonException) return . parseEither parseCustom)
       logJSONWarnings (T.unpack url) warnings
-
       forM_ (sdLocations sd0) $ \loc' ->
         case loc' of
           PLOther (PLFilePath _) -> throwM $ FilepathInCustomSnapshot url
           _ -> return ()
-
+      let sd0' = resolveLocalArchives sd0
       -- The fp above may just be the download location for a URL,
       -- which we don't want to use. Instead, look back at loc from
       -- above.
       mdir <-
         case loc of
           Left _ -> return Nothing
-          Right fp' -> (Just . parent) <$> liftIO (Dir.canonicalizePath fp' >>= parseAbsFile)
+          Right fp' -> Just . parent <$> liftIO (Dir.canonicalizePath fp' >>= parseAbsFile)
 
       -- Deal with the dual nature of the compiler key, which either
       -- means "use this compiler" or "override the compiler in the
@@ -307,11 +334,11 @@ loadResolver (ResolverCustom url loc) = do
             let hash' :: SnapshotHash
                 hash' = combineHash rawHash $
                   case sdResolver parent' of
-                    ResolverSnapshot snapName -> snapNameToHash snapName
+                    ResolverStackage snapName -> snapNameToHash snapName
                     ResolverCustom _ parentHash -> parentHash
-                    ResolverCompiler _ -> error "loadResolver: Receieved ResolverCompiler in impossible location"
+                    ResolverCompiler _ -> error "loadResolver: Received ResolverCompiler in impossible location"
             return (Right parent', hash')
-      return $ overrideCompiler sd0
+      return $ overrideCompiler sd0'
         { sdParent = parent'
         , sdResolver = ResolverCustom url hash'
         }
@@ -322,7 +349,7 @@ loadResolver (ResolverCustom url loc) = do
     parseCustom :: Value
                 -> Parser (WithJSONWarnings (SnapshotDef, Maybe (ResolverWith ()), Maybe (CompilerVersion 'CVWanted)))
     parseCustom = withObjectWarnings "CustomSnapshot" $ \o -> (,,)
-        <$> (SnapshotDef (Left (error "loadResolver")) (ResolverSnapshot (LTS 0 0))
+        <$> (SnapshotDef (Left (error "loadResolver")) (ResolverStackage (LTS 0 0))
             <$> (o ..: "name")
             <*> jsonSubWarningsT (o ..:? "packages" ..!= [])
             <*> o ..:? "drop-packages" ..!= Set.empty
@@ -347,18 +374,7 @@ loadSnapshot
   -> Path Abs Dir -- ^ project root, used for checking out necessary files
   -> SnapshotDef
   -> RIO env LoadedSnapshot
-loadSnapshot mcompiler root sd = withCabalLoader $ \loader -> loadSnapshot' loader mcompiler root sd
-
--- | Fully load up a 'SnapshotDef' into a 'LoadedSnapshot'
-loadSnapshot'
-  :: forall env.
-     (HasConfig env, HasGHCVariant env)
-  => (PackageIdentifierRevision -> IO ByteString) -- ^ load a cabal file's contents from the index
-  -> Maybe (CompilerVersion 'CVActual) -- ^ installed GHC we should query; if none provided, use the global hints
-  -> Path Abs Dir -- ^ project root, used for checking out necessary files
-  -> SnapshotDef
-  -> RIO env LoadedSnapshot
-loadSnapshot' loadFromIndex mcompiler root =
+loadSnapshot mcompiler root =
     start
   where
     start (snapshotDefFixes -> sd) = do
@@ -382,18 +398,18 @@ loadSnapshot' loadFromIndex mcompiler root =
           Right sd' -> start sd'
 
       gpds <-
-        (concat <$> mapM (parseMultiCabalFilesIndex loadFromIndex root) (sdLocations sd))
+        (concat <$> mapM (parseMultiCabalFilesIndex root) (sdLocations sd))
         `onException` do
           logError "Unable to load cabal files for snapshot"
           case sdResolver sd of
-            ResolverSnapshot name -> do
+            ResolverStackage name -> do
               stackRoot <- view stackRootL
               file <- parseRelFile $ T.unpack $ renderSnapName name <> ".yaml"
               let fp = buildPlanDir stackRoot </> file
               liftIO $ ignoringAbsence $ removeFile fp
               logError ""
               logError "----"
-              logError $ "Deleting cached snapshot file: " <> T.pack (toFilePath fp)
+              logError $ "Deleting cached snapshot file: " <> fromString (toFilePath fp)
               logError "Recommendation: try running again. If this fails again, open an upstream issue at:"
               logError $
                 case name of
@@ -404,7 +420,7 @@ loadSnapshot' loadFromIndex mcompiler root =
             _ -> return ()
 
       (globals, snapshot, locals) <-
-        calculatePackagePromotion loadFromIndex root ls0
+        calculatePackagePromotion root ls0
         (map (\(x, y) -> (x, y, ())) gpds)
         (sdFlags sd) (sdHidden sd) (sdGhcOptions sd) (sdDropPackages sd)
 
@@ -425,8 +441,7 @@ loadSnapshot' loadFromIndex mcompiler root =
 calculatePackagePromotion
   :: forall env localLocation.
      (HasConfig env, HasGHCVariant env)
-  => (PackageIdentifierRevision -> IO ByteString) -- ^ load from index
-  -> Path Abs Dir -- ^ project root
+  => Path Abs Dir -- ^ project root
   -> LoadedSnapshot
   -> [(GenericPackageDescription, SinglePackageLocation, localLocation)] -- ^ packages we want to add on top of this snapshot
   -> Map PackageName (Map FlagName Bool) -- ^ flags
@@ -439,7 +454,7 @@ calculatePackagePromotion
        , Map PackageName (LoadedPackageInfo (SinglePackageLocation, Maybe localLocation)) -- new locals
        )
 calculatePackagePromotion
-  loadFromIndex root (LoadedSnapshot compilerVersion globals0 parentPackages0)
+  root (LoadedSnapshot compilerVersion globals0 parentPackages0)
   gpds flags0 hides0 options0 drops0 = do
 
       platform <- view platformL
@@ -501,7 +516,7 @@ calculatePackagePromotion
 
       -- ... so recalculate based on new values
       upgraded <- fmap Map.fromList
-                $ mapM (recalculate loadFromIndex root compilerVersion flags hide ghcOptions)
+                $ mapM (recalculate root compilerVersion flags hide ghcOptions)
                 $ Map.toList allToUpgrade
 
       -- Could be nice to check snapshot early... but disabling
@@ -527,22 +542,21 @@ calculatePackagePromotion
 -- hide values, and GHC options.
 recalculate :: forall env.
                (HasConfig env, HasGHCVariant env)
-            => (PackageIdentifierRevision -> IO ByteString)
-            -> Path Abs Dir -- ^ root
+            => Path Abs Dir -- ^ root
             -> CompilerVersion 'CVActual
             -> Map PackageName (Map FlagName Bool)
             -> Map PackageName Bool -- ^ hide?
             -> Map PackageName [Text] -- ^ GHC options
             -> (PackageName, LoadedPackageInfo SinglePackageLocation)
             -> RIO env (PackageName, LoadedPackageInfo SinglePackageLocation)
-recalculate loadFromIndex root compilerVersion allFlags allHide allOptions (name, lpi0) = do
+recalculate root compilerVersion allFlags allHide allOptions (name, lpi0) = do
   let hide = fromMaybe (lpiHide lpi0) (Map.lookup name allHide)
       options = fromMaybe (lpiGhcOptions lpi0) (Map.lookup name allOptions)
   case Map.lookup name allFlags of
     Nothing -> return (name, lpi0 { lpiHide = hide, lpiGhcOptions = options }) -- optimization
     Just flags -> do
       let loc = lpiLocation lpi0
-      gpd <- parseSingleCabalFileIndex loadFromIndex root loc
+      gpd <- parseSingleCabalFileIndex root loc
       platform <- view platformL
       let res@(name', lpi) = calculate gpd platform compilerVersion loc flags hide options
       unless (name == name' && lpiVersion lpi0 == lpiVersion lpi) $ error "recalculate invariant violated"
@@ -607,8 +621,7 @@ loadCompiler :: forall env.
              => CompilerVersion 'CVActual
              -> RIO env LoadedSnapshot
 loadCompiler cv = do
-  menv <- getMinimalEnvOverride
-  m <- ghcPkgDump menv (whichCompiler cv) []
+  m <- ghcPkgDump (whichCompiler cv) []
     (conduitDumpPackage .| CL.foldMap (\dp -> Map.singleton (dpGhcPkgId dp) dp))
   return LoadedSnapshot
     { lsCompilerVersion = cv
@@ -701,8 +714,8 @@ snapshotDefFixes sd | isOldStackage (sdResolver sd) = sd
     -- Only apply this hack to older Stackage snapshots. In
     -- particular, nightly-2018-03-13 did not contain these two
     -- packages.
-    isOldStackage (ResolverSnapshot (LTS major _)) = major < 11
-    isOldStackage (ResolverSnapshot (Nightly (toGregorian -> (year, _, _)))) = year < 2018
+    isOldStackage (ResolverStackage (LTS major _)) = major < 11
+    isOldStackage (ResolverStackage (Nightly (toGregorian -> (year, _, _)))) = year < 2018
     isOldStackage _ = False
 snapshotDefFixes sd = sd
 
@@ -713,9 +726,16 @@ globalToSnapshot name lpi = lpi
     { lpiLocation = PLIndex (PackageIdentifierRevision (PackageIdentifier name (lpiVersion lpi)) CFILatest)
     }
 
--- | Split the globals into those which have their dependencies met,
--- and those that don't. This deals with promotion of globals to
--- snapshot when another global has been upgraded already.
+-- | Split the packages into those which have their dependencies met,
+-- and those that don't. The first argument is packages that are known
+-- to be available for use as a dependency. The second argument is the
+-- packages to check.
+--
+-- This works by repeatedly iterating through the list of input
+-- packages, adding any that have their dependencies satisfied to a map
+-- (eventually this set is the fst of the result tuple). Once an
+-- iteration completes without adding anything to this set, it knows it
+-- has found everything that has its dependencies met, and exits.
 splitUnmetDeps :: Map PackageName Version -- ^ extra dependencies available
                -> Map PackageName (LoadedPackageInfo loc)
                -> ( Map PackageName (LoadedPackageInfo loc)

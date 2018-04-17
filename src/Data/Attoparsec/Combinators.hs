@@ -6,7 +6,7 @@ module Data.Attoparsec.Combinators where
 import Stack.Prelude
 
 -- | Concatenate two parsers.
-appending :: (Applicative f,Monoid a)
+appending :: (Applicative f,Semigroup a)
                  => f a -> f a -> f a
 appending a b = (<>) <$> a <*> b
 

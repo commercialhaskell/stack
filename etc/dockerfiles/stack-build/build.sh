@@ -130,7 +130,7 @@ if [[ -s "$LTS_SLUG/Dockerfile" ]]; then
 else
 
     # If no exact match, find a dockerfile for any earlier minor version of the
-    # selected major version, and just create a new tag rom version's image with the selected
+    # selected major version, and just create a new tag from version's image with the selected
     # minor version (assuming that nothing needs to change), and push it.
 
     minor=$(( LTS_MINOR - 1 ))

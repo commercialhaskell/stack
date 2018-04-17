@@ -64,6 +64,8 @@ data BuildOpts =
             -- ^ Watch files for changes and automatically rebuild
             ,boptsKeepGoing :: !(Maybe Bool)
             -- ^ Keep building/running after failure
+            ,boptsKeepTmpFiles :: !(Maybe Bool)
+            -- ^ Keep intermediate files and build directories
             ,boptsForceDirty :: !Bool
             -- ^ Force treating all local packages as having dirty files
 
@@ -105,6 +107,7 @@ defaultBuildOpts = BuildOpts
     , boptsInstallCompilerTool = False
     , boptsPreFetch = False
     , boptsKeepGoing = Nothing
+    , boptsKeepTmpFiles = Nothing
     , boptsForceDirty = False
     , boptsTests = False
     , boptsTestOpts = defaultTestOpts
@@ -172,6 +175,7 @@ data BuildOptsMonoid = BuildOptsMonoid
     , buildMonoidInstallCompilerTool :: !(First Bool)
     , buildMonoidPreFetch :: !(First Bool)
     , buildMonoidKeepGoing :: !(First Bool)
+    , buildMonoidKeepTmpFiles :: !(First Bool)
     , buildMonoidForceDirty :: !(First Bool)
     , buildMonoidTests :: !(First Bool)
     , buildMonoidTestOpts :: !TestOptsMonoid
@@ -202,6 +206,7 @@ instance FromJSON (WithJSONWarnings BuildOptsMonoid) where
               buildMonoidInstallCompilerTool <- First <$> o ..:? buildMonoidInstallCompilerToolArgName
               buildMonoidPreFetch <- First <$> o ..:? buildMonoidPreFetchArgName
               buildMonoidKeepGoing <- First <$> o ..:? buildMonoidKeepGoingArgName
+              buildMonoidKeepTmpFiles <- First <$> o ..:? buildMonoidKeepTmpFilesArgName
               buildMonoidForceDirty <- First <$> o ..:? buildMonoidForceDirtyArgName
               buildMonoidTests <- First <$> o ..:? buildMonoidTestsArgName
               buildMonoidTestOpts <- jsonSubWarnings (o ..:? buildMonoidTestOptsArgName ..!= mempty)
@@ -254,6 +259,9 @@ buildMonoidPreFetchArgName = "prefetch"
 
 buildMonoidKeepGoingArgName :: Text
 buildMonoidKeepGoingArgName = "keep-going"
+
+buildMonoidKeepTmpFilesArgName :: Text
+buildMonoidKeepTmpFilesArgName = "keep-tmp-files"
 
 buildMonoidForceDirtyArgName :: Text
 buildMonoidForceDirtyArgName = "force-dirty"

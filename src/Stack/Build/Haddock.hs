@@ -20,10 +20,8 @@ module Stack.Build.Haddock
 import           Stack.Prelude
 import qualified Data.Foldable as F
 import qualified Data.HashSet as HS
-import           Data.List.Extra (nubOrd)
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
-import qualified Data.Text as T
 import           Data.Time (UTCTime)
 import           Path
 import           Path.Extra
@@ -39,7 +37,7 @@ import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageName
 import           Stack.Types.Runner
 import qualified System.FilePath as FP
-import           System.Process.Read
+import           RIO.Process
 import           Web.Browser (openBrowser)
 
 openHaddocksInBrowser
@@ -78,11 +76,11 @@ openHaddocksInBrowser bco pkgLocations buildTargets = do
                     else do
                         logWarn $
                             "Expected to find documentation at " <>
-                            T.pack (toFilePath docFile) <>
+                            fromString (toFilePath docFile) <>
                             ", but that file is missing.  Opening doc index instead."
                         getDocIndex
             _ -> getDocIndex
-    prettyInfo $ "Opening" <+> display docFile <+> "in the browser."
+    prettyInfo $ "Opening" <+> Stack.PrettyPrint.display docFile <+> "in the browser."
     _ <- liftIO $ openBrowser (toFilePath docFile)
     return ()
 
@@ -104,14 +102,13 @@ shouldHaddockDeps bopts = fromMaybe (boptsHaddock bopts) (boptsHaddockDeps bopts
 
 -- | Generate Haddock index and contents for local packages.
 generateLocalHaddockIndex
-    :: (MonadUnliftIO m, MonadLogger m)
-    => EnvOverride
-    -> WhichCompiler
+    :: (HasProcessContext env, HasLogFunc env)
+    => WhichCompiler
     -> BaseConfigOpts
     -> Map GhcPkgId (DumpPackage () () ())  -- ^ Local package dump
     -> [LocalPackage]
-    -> m ()
-generateLocalHaddockIndex envOverride wc bco localDumpPkgs locals = do
+    -> RIO env ()
+generateLocalHaddockIndex wc bco localDumpPkgs locals = do
     let dumpPackages =
             mapMaybe
                 (\LocalPackage{lpPackage = Package{..}} ->
@@ -121,7 +118,6 @@ generateLocalHaddockIndex envOverride wc bco localDumpPkgs locals = do
                 locals
     generateHaddockIndex
         "local packages"
-        envOverride
         wc
         bco
         dumpPackages
@@ -130,21 +126,19 @@ generateLocalHaddockIndex envOverride wc bco localDumpPkgs locals = do
 
 -- | Generate Haddock index and contents for local packages and their dependencies.
 generateDepsHaddockIndex
-    :: (MonadUnliftIO m, MonadLogger m)
-    => EnvOverride
-    -> WhichCompiler
+    :: (HasProcessContext env, HasLogFunc env)
+    => WhichCompiler
     -> BaseConfigOpts
     -> Map GhcPkgId (DumpPackage () () ())  -- ^ Global dump information
     -> Map GhcPkgId (DumpPackage () () ())  -- ^ Snapshot dump information
     -> Map GhcPkgId (DumpPackage () () ())  -- ^ Local dump information
     -> [LocalPackage]
-    -> m ()
-generateDepsHaddockIndex envOverride wc bco globalDumpPkgs snapshotDumpPkgs localDumpPkgs locals = do
+    -> RIO env ()
+generateDepsHaddockIndex wc bco globalDumpPkgs snapshotDumpPkgs localDumpPkgs locals = do
     let deps = (mapMaybe (`lookupDumpPackage` allDumpPkgs) . nubOrd . findTransitiveDepends . mapMaybe getGhcPkgId) locals
         depDocDir = localDepsDocDir bco
     generateHaddockIndex
         "local packages and dependencies"
-        envOverride
         wc
         bco
         deps
@@ -175,17 +169,15 @@ generateDepsHaddockIndex envOverride wc bco globalDumpPkgs snapshotDumpPkgs loca
 
 -- | Generate Haddock index and contents for all snapshot packages.
 generateSnapHaddockIndex
-    :: (MonadUnliftIO m, MonadLogger m)
-    => EnvOverride
-    -> WhichCompiler
+    :: (HasProcessContext env, HasLogFunc env)
+    => WhichCompiler
     -> BaseConfigOpts
     -> Map GhcPkgId (DumpPackage () () ())  -- ^ Global package dump
     -> Map GhcPkgId (DumpPackage () () ())  -- ^ Snapshot package dump
-    -> m ()
-generateSnapHaddockIndex envOverride wc bco globalDumpPkgs snapshotDumpPkgs =
+    -> RIO env ()
+generateSnapHaddockIndex wc bco globalDumpPkgs snapshotDumpPkgs =
     generateHaddockIndex
         "snapshot packages"
-        envOverride
         wc
         bco
         (Map.elems snapshotDumpPkgs ++ Map.elems globalDumpPkgs)
@@ -194,16 +186,15 @@ generateSnapHaddockIndex envOverride wc bco globalDumpPkgs snapshotDumpPkgs =
 
 -- | Generate Haddock index and contents for specified packages.
 generateHaddockIndex
-    :: (MonadUnliftIO m, MonadLogger m)
+    :: (HasProcessContext env, HasLogFunc env)
     => Text
-    -> EnvOverride
     -> WhichCompiler
     -> BaseConfigOpts
     -> [DumpPackage () () ()]
     -> FilePath
     -> Path Abs Dir
-    -> m ()
-generateHaddockIndex descr envOverride wc bco dumpPackages docRelFP destDir = do
+    -> RIO env ()
+generateHaddockIndex descr wc bco dumpPackages docRelFP destDir = do
     ensureDir destDir
     interfaceOpts <- (liftIO . fmap nubOrd . mapMaybeM toInterfaceOpt) dumpPackages
     unless (null interfaceOpts) $ do
@@ -216,13 +207,13 @@ generateHaddockIndex descr envOverride wc bco dumpPackages docRelFP destDir = do
                         or [mt > indexModTime | (_,mt,_,_) <- interfaceOpts]
         if needUpdate
             then do
-                logInfo
-                    (T.concat ["Updating Haddock index for ", descr, " in\n",
-                               T.pack (toFilePath destIndexFile)])
+                logInfo $
+                  "Updating Haddock index for " <>
+                  Stack.Prelude.display descr <>
+                  " in\n" <>
+                  fromString (toFilePath destIndexFile)
                 liftIO (mapM_ copyPkgDocs interfaceOpts)
-                readProcessNull
-                    (Just destDir)
-                    envOverride
+                withWorkingDir (toFilePath destDir) $ readProcessNull
                     (haddockExeName wc)
                     (map (("--optghc=-package-db=" ++ ) . toFilePathNoTrailingSep)
                         [bcoSnapDB bco, bcoLocalDB bco] ++
@@ -230,9 +221,11 @@ generateHaddockIndex descr envOverride wc bco dumpPackages docRelFP destDir = do
                      ["--gen-contents", "--gen-index"] ++
                      [x | (xs,_,_,_) <- interfaceOpts, x <- xs])
             else
-              logInfo
-                    (T.concat ["Haddock index for ", descr, " already up to date at:\n",
-                               T.pack (toFilePath destIndexFile)])
+              logInfo $
+                "Haddock index for " <>
+                Stack.Prelude.display descr <>
+                " already up to date at:\n" <>
+                fromString (toFilePath destIndexFile)
   where
     toInterfaceOpt :: DumpPackage a b c -> IO (Maybe ([String], UTCTime, Path Abs File, Path Abs File))
     toInterfaceOpt DumpPackage {..} =

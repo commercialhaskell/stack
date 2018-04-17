@@ -1,216 +1,153 @@
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE NoImplicitPrelude          #-}
 {-# LANGUAGE OverloadedStrings          #-}
+{-# LANGUAGE ScopedTypeVariables        #-}
 module Stack.Prelude
-  ( mapLeft
-  , ResourceT
-  , runConduitRes
-  , runResourceT
-  , liftResourceT
-  , NoLogging (..)
+  ( withSourceFile
+  , withSinkFile
+  , withSinkFileCautious
   , withSystemTempDir
-  , fromFirst
-  , mapMaybeA
-  , mapMaybeM
-  , forMaybeA
-  , forMaybeM
+  , withKeepSystemTempDir
+  , sinkProcessStderrStdout
+  , sinkProcessStdout
+  , logProcessStderrStdout
+  , readProcessNull
+  , withProcessContext
   , stripCR
-  , logSticky
-  , logStickyDone
-  , RIO (..)
-  , runRIO
-  , HasLogFunc (..)
   , module X
   ) where
 
-import           Control.Applicative  as X (Alternative, Applicative (..),
-                                            liftA, liftA2, liftA3, many,
-                                            optional, some, (<|>))
-import           Control.Arrow        as X (first, second, (&&&), (***))
-import           Control.DeepSeq      as X (NFData (..), force, ($!!))
-import           Control.Monad        as X (Monad (..), MonadPlus (..), filterM,
-                                            foldM, foldM_, forever, guard, join,
-                                            liftM, liftM2, replicateM_, unless,
-                                            when, zipWithM, zipWithM_, (<$!>),
-                                            (<=<), (=<<), (>=>))
-import           Control.Monad.Catch  as X (MonadThrow (..))
-import           Control.Monad.Logger.CallStack
-                                      as X (Loc, LogLevel (..), LogSource,
-                                            LogStr, MonadLogger (..),
-                                            MonadLoggerIO (..), liftLoc,
-                                            logDebug, logError, logInfo,
-                                            logOther, logWarn, toLogStr)
-import           Control.Monad.Reader as X (MonadReader, MonadTrans (..),
-                                            ReaderT (..), ask, asks)
-import           Data.Bool            as X (Bool (..), not, otherwise, (&&),
-                                            (||))
-import           Data.ByteString      as X (ByteString)
-import           Data.Char            as X (Char)
+import           RIO                  as X
 import           Data.Conduit         as X (ConduitM, runConduit, (.|))
-import           Data.Data            as X (Data (..))
-import           Data.Either          as X (Either (..), either, isLeft,
-                                            isRight, lefts, partitionEithers,
-                                            rights)
-import           Data.Eq              as X (Eq (..))
-import           Data.Foldable        as X (Foldable, all, and, any, asum,
-                                            concat, concatMap, elem, fold,
-                                            foldMap, foldl', foldr, forM_, for_,
-                                            length, mapM_, msum, notElem, null,
-                                            or, product, sequenceA_, sequence_,
-                                            sum, toList, traverse_)
-import           Data.Function        as X (const, fix, flip, id, on, ($), (&),
-                                            (.))
-import           Data.Functor         as X (Functor (..), void, ($>), (<$),
-                                            (<$>))
-import           Data.Hashable        as X (Hashable)
-import           Data.HashMap.Strict  as X (HashMap)
-import           Data.HashSet         as X (HashSet)
-import           Data.Int             as X
-import           Data.IntMap.Strict   as X (IntMap)
-import           Data.IntSet          as X (IntSet)
-import           Data.List            as X (break, drop, dropWhile, filter,
-                                            lines, lookup, map, replicate,
-                                            reverse, span, take, takeWhile,
-                                            unlines, unwords, words, zip, (++))
-import           Data.Map.Strict      as X (Map)
-import           Data.Maybe           as X (Maybe (..), catMaybes, fromMaybe,
-                                            isJust, isNothing, listToMaybe,
-                                            mapMaybe, maybe, maybeToList)
-import           Data.Monoid          as X (All (..), Any (..), Endo (..),
-                                            First (..), Last (..), Monoid (..),
-                                            Product (..), Sum (..), (<>))
-import           Data.Ord             as X (Ord (..), Ordering (..), comparing)
-import           Data.Set             as X (Set)
-import           Data.Store           as X (Store)
-import           Data.String          as X (IsString (..))
-import           Data.Text            as X (Text)
-import           Data.Traversable     as X (Traversable (..), for, forM)
-import           Data.Vector          as X (Vector)
-import           Data.Void            as X (Void, absurd)
-import           Data.Word            as X
-import           GHC.Generics         as X (Generic)
-import           GHC.Stack            as X (HasCallStack)
-import           Lens.Micro           as X (Getting)
-import           Lens.Micro.Mtl       as X (view)
 import           Path                 as X (Abs, Dir, File, Path, Rel,
                                             toFilePath)
-import           Prelude              as X (Bounded (..), Double, Enum,
-                                            FilePath, Float, Floating (..),
-                                            Fractional (..), IO, Integer,
-                                            Integral (..), Num (..), Rational,
-                                            Real (..), RealFloat (..),
-                                            RealFrac (..), Show, String,
-                                            asTypeOf, curry, error, even,
-                                            fromIntegral, fst, gcd, lcm, odd,
-                                            realToFrac, seq, show, snd,
-                                            subtract, uncurry, undefined, ($!),
-                                            (^), (^^))
-import           Text.Read            as X (Read, readMaybe)
-import           UnliftIO             as X
 
-import qualified Data.Text            as T
+import           Data.Monoid          as X (First (..), Any (..), Sum (..), Endo (..))
+
 import qualified Path.IO
 
-import qualified Control.Monad.Trans.Resource as Res (runResourceT, transResourceT)
-import           Control.Monad.Trans.Resource.Internal (ResourceT (ResourceT))
+import qualified System.IO as IO
+import qualified System.Directory as Dir
+import qualified System.FilePath as FP
+import           System.IO.Error (isDoesNotExistError)
 
-mapLeft :: (a1 -> a2) -> Either a1 b -> Either a2 b
-mapLeft f (Left a1) = Left (f a1)
-mapLeft _ (Right b) = Right b
+import           Data.Conduit.Binary (sourceHandle, sinkHandle)
+import qualified Data.Conduit.Binary as CB
+import qualified Data.Conduit.List as CL
+import           Data.Conduit.Process.Typed (withLoggedProcess_, createSource)
+import           RIO.Process (HasProcessContext (..), ProcessContext, setStdin, closed, getStderr, getStdout, proc, withProcess_, setStdout, setStderr, ProcessConfig, readProcessStdout_, workingDirL)
+import           Data.Store           as X (Store)
+import           Data.Text.Encoding (decodeUtf8With)
+import           Data.Text.Encoding.Error (lenientDecode)
 
-fromFirst :: a -> First a -> a
-fromFirst x = fromMaybe x . getFirst
+import qualified RIO.Text as T
 
--- | Applicative 'mapMaybe'.
-mapMaybeA :: Applicative f => (a -> f (Maybe b)) -> [a] -> f [b]
-mapMaybeA f = fmap catMaybes . traverse f
+-- | Get a source for a file. Unlike @sourceFile@, doesn't require
+-- @ResourceT@. Unlike explicit @withBinaryFile@ and @sourceHandle@
+-- usage, you can't accidentally use @WriteMode@ instead of
+-- @ReadMode@.
+withSourceFile :: MonadUnliftIO m => FilePath -> (ConduitM i ByteString m () -> m a) -> m a
+withSourceFile fp inner = withBinaryFile fp ReadMode $ inner . sourceHandle
 
--- | @'forMaybeA' '==' 'flip' 'mapMaybeA'@
-forMaybeA :: Applicative f => [a] -> (a -> f (Maybe b)) -> f [b]
-forMaybeA = flip mapMaybeA
+-- | Same idea as 'withSourceFile', see comments there.
+withSinkFile :: MonadUnliftIO m => FilePath -> (ConduitM ByteString o m () -> m a) -> m a
+withSinkFile fp inner = withBinaryFile fp WriteMode $ inner . sinkHandle
 
--- | Monadic 'mapMaybe'.
-mapMaybeM :: Monad m => (a -> m (Maybe b)) -> [a] -> m [b]
-mapMaybeM f = liftM catMaybes . mapM f
-
--- | @'forMaybeM' '==' 'flip' 'mapMaybeM'@
-forMaybeM :: Monad m => [a] -> (a -> m (Maybe b)) -> m [b]
-forMaybeM = flip mapMaybeM
-
--- | Strip trailing carriage return from Text
-stripCR :: T.Text -> T.Text
-stripCR t = fromMaybe t (T.stripSuffix "\r" t)
-
-runConduitRes :: MonadUnliftIO m => ConduitM () Void (ResourceT m) r -> m r
-runConduitRes = runResourceT . runConduit
-
-runResourceT :: MonadUnliftIO m => ResourceT m a -> m a
-runResourceT r = withRunInIO $ \run -> Res.runResourceT (Res.transResourceT run r)
-
-liftResourceT :: MonadIO m => ResourceT IO a -> ResourceT m a
-liftResourceT (ResourceT f) = ResourceT $ liftIO . f
-
--- | Avoid orphan messes
-newtype NoLogging a = NoLogging { runNoLogging :: IO a }
-  deriving (Functor, Applicative, Monad, MonadIO)
-instance MonadUnliftIO NoLogging where
-  askUnliftIO = NoLogging $
-                withUnliftIO $ \u ->
-                return (UnliftIO (unliftIO u . runNoLogging))
-instance MonadLogger NoLogging where
-  monadLoggerLog _ _ _ _ = return ()
+-- | Like 'withSinkFile', but ensures that the file is atomically
+-- moved after all contents are written.
+withSinkFileCautious
+  :: MonadUnliftIO m
+  => FilePath
+  -> (ConduitM ByteString o m () -> m a)
+  -> m a
+withSinkFileCautious fp inner =
+    withRunInIO $ \run -> bracket acquire cleanup $ \(tmpFP, h) ->
+      run (inner $ sinkHandle h) <* (IO.hClose h *> Dir.renameFile tmpFP fp)
+  where
+    acquire = IO.openBinaryTempFile (FP.takeDirectory fp) (FP.takeFileName fp FP.<.> "tmp")
+    cleanup (tmpFP, h) = do
+        IO.hClose h
+        Dir.removeFile tmpFP `catch` \e ->
+            if isDoesNotExistError e
+                then return ()
+                else throwIO e
 
 -- | Path version
 withSystemTempDir :: MonadUnliftIO m => String -> (Path Abs Dir -> m a) -> m a
 withSystemTempDir str inner = withRunInIO $ \run -> Path.IO.withSystemTempDir str $ run . inner
 
--- | Write a "sticky" line to the terminal. Any subsequent lines will
--- overwrite this one, and that same line will be repeated below
--- again. In other words, the line sticks at the bottom of the output
--- forever. Running this function again will replace the sticky line
--- with a new sticky line. When you want to get rid of the sticky
--- line, run 'logStickyDone'.
+-- | Like `withSystemTempDir`, but the temporary directory is not deleted.
+withKeepSystemTempDir :: MonadUnliftIO m => String -> (Path Abs Dir -> m a) -> m a
+withKeepSystemTempDir str inner = withRunInIO $ \run -> do
+  path <- Path.IO.getTempDir
+  dir <- Path.IO.createTempDir path str
+  run $ inner dir
+
+-- | Consume the stdout and stderr of a process feeding strict 'ByteString's to the consumers.
 --
-logSticky :: MonadLogger m => Text -> m ()
-logSticky =
-    logOther (LevelOther "sticky")
+-- Throws a 'ReadProcessException' if unsuccessful in launching, or 'ProcessExitedUnsuccessfully' if the process itself fails.
+sinkProcessStderrStdout
+  :: forall e o env. (HasProcessContext env, HasLogFunc env)
+  => String -- ^ Command
+  -> [String] -- ^ Command line arguments
+  -> ConduitM ByteString Void (RIO env) e -- ^ Sink for stderr
+  -> ConduitM ByteString Void (RIO env) o -- ^ Sink for stdout
+  -> RIO env (e,o)
+sinkProcessStderrStdout name args sinkStderr sinkStdout =
+  proc name args $ \pc0 -> do
+    let pc = setStdout createSource
+           $ setStderr createSource
+             pc0
+    withProcess_ pc $ \p ->
+      runConduit (getStderr p .| sinkStderr) `concurrently`
+      runConduit (getStdout p .| sinkStdout)
 
--- | This will print out the given message with a newline and disable
--- any further stickiness of the line until a new call to 'logSticky'
--- happens.
+-- | Consume the stdout of a process feeding strict 'ByteString's to a consumer.
+-- If the process fails, spits out stdout and stderr as error log
+-- level. Should not be used for long-running processes or ones with
+-- lots of output; for that use 'sinkProcessStderrStdout'.
 --
--- It might be better at some point to have a 'runSticky' function
--- that encompasses the logSticky->logStickyDone pairing.
-logStickyDone :: MonadLogger m => Text -> m ()
-logStickyDone =
-    logOther (LevelOther "sticky-done")
+-- Throws a 'ReadProcessException' if unsuccessful.
+sinkProcessStdout
+    :: (HasProcessContext env, HasLogFunc env)
+    => String -- ^ Command
+    -> [String] -- ^ Command line arguments
+    -> ConduitM ByteString Void (RIO env) a -- ^ Sink for stdout
+    -> RIO env a
+sinkProcessStdout name args sinkStdout =
+  proc name args $ \pc ->
+  withLoggedProcess_ (setStdin closed pc) $ \p -> runConcurrently
+    $ Concurrently (runConduit $ getStderr p .| CL.sinkNull)
+   *> Concurrently (runConduit $ getStdout p .| sinkStdout)
 
--- | The Reader+IO monad. This is different from a 'ReaderT' because:
+logProcessStderrStdout
+    :: (HasCallStack, HasProcessContext env, HasLogFunc env)
+    => ProcessConfig stdin stdoutIgnored stderrIgnored
+    -> RIO env ()
+logProcessStderrStdout pc = withLoggedProcess_ pc $ \p ->
+    let logLines = CB.lines .| CL.mapM_ (logInfo . displayBytesUtf8)
+     in runConcurrently
+            $ Concurrently (runConduit $ getStdout p .| logLines)
+           *> Concurrently (runConduit $ getStderr p .| logLines)
+
+-- | Read from the process, ignoring any output.
 --
--- * It's not a transformer, it hardcodes IO for simpler usage and
--- error messages.
---
--- * Instances of typeclasses like 'MonadLogger' are implemented using
--- classes defined on the environment, instead of using an
--- underlying monad.
-newtype RIO env a = RIO { unRIO :: ReaderT env IO a }
-  deriving (Functor,Applicative,Monad,MonadIO,MonadReader env,MonadThrow)
+-- Throws a 'ReadProcessException' exception if the process fails.
+readProcessNull :: (HasProcessContext env, HasLogFunc env)
+                => String -- ^ Command
+                -> [String] -- ^ Command line arguments
+                -> RIO env ()
+readProcessNull name args =
+  -- We want the output to appear in any exceptions, so we capture and drop it
+  void $ proc name args readProcessStdout_
 
-runRIO :: MonadIO m => env -> RIO env a -> m a
-runRIO env (RIO (ReaderT f)) = liftIO (f env)
+-- | Use the new 'ProcessContext', but retain the working directory
+-- from the parent environment.
+withProcessContext :: HasProcessContext env => ProcessContext -> RIO env a -> RIO env a
+withProcessContext pcNew inner = do
+  pcOld <- view processContextL
+  let pcNew' = set workingDirL (view workingDirL pcOld) pcNew
+  local (set processContextL pcNew') inner
 
-class HasLogFunc env where
-  logFuncL :: Getting r env (Loc -> LogSource -> LogLevel -> LogStr -> IO ())
-
-instance HasLogFunc env => MonadLogger (RIO env) where
-  monadLoggerLog a b c d = do
-    f <- view logFuncL
-    liftIO $ f a b c $ toLogStr d
-
-instance HasLogFunc env => MonadLoggerIO (RIO env) where
-  askLoggerIO = view logFuncL
-
-instance MonadUnliftIO (RIO env) where
-    askUnliftIO = RIO $ ReaderT $ \r ->
-                  withUnliftIO $ \u ->
-                  return (UnliftIO (unliftIO u . flip runReaderT r . unRIO))
+-- | Remove a trailing carriage return if present
+stripCR :: Text -> Text
+stripCR = T.dropSuffix "\r"

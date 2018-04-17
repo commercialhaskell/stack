@@ -72,7 +72,7 @@ initProject whichCmd currDir initOpts mresolver = do
         find  = findCabalDirs (includeSubDirs initOpts)
         dirs' = if null dirs then [currDir] else dirs
     logInfo "Looking for .cabal or package.yaml files to use to init the project."
-    cabaldirs <- (Set.toList . Set.unions) <$> mapM find dirs'
+    cabaldirs <- Set.toList . Set.unions <$> mapM find dirs'
     (bundle, dupPkgs)  <- cabalPackagesCheck cabaldirs noPkgMsg Nothing
 
     (sd, flags, extraDeps, rbundle) <- getDefaultResolver whichCmd dest initOpts
@@ -139,31 +139,31 @@ initProject whichCmd currDir initOpts mresolver = do
         toPkg dir = PLFilePath $ makeRelDir dir
         indent t = T.unlines $ fmap ("    " <>) (T.lines t)
 
-    logInfo $ "Initialising configuration using resolver: " <> sdResolverName sd
+    logInfo $ "Initialising configuration using resolver: " <> display (sdResolverName sd)
     logInfo $ "Total number of user packages considered: "
-               <> T.pack (show (Map.size bundle + length dupPkgs))
+               <> display (Map.size bundle + length dupPkgs)
 
     when (dupPkgs /= []) $ do
         logWarn $ "Warning! Ignoring "
-                   <> T.pack (show $ length dupPkgs)
+                   <> displayShow (length dupPkgs)
                    <> " duplicate packages:"
         rels <- mapM makeRel dupPkgs
-        logWarn $ indent $ showItems rels
+        logWarn $ display $ indent $ showItems rels
 
     when (Map.size ignored > 0) $ do
         logWarn $ "Warning! Ignoring "
-                   <> T.pack (show $ Map.size ignored)
+                   <> displayShow (Map.size ignored)
                    <> " packages due to dependency conflicts:"
         rels <- mapM makeRel (Map.elems (fmap fst ignored))
-        logWarn $ indent $ showItems rels
+        logWarn $ display $ indent $ showItems rels
 
     when (Map.size extraDeps > 0) $ do
-        logWarn $ "Warning! " <> T.pack (show $ Map.size extraDeps)
+        logWarn $ "Warning! " <> displayShow (Map.size extraDeps)
                    <> " external dependencies were added."
     logInfo $
         (if exists then "Overwriting existing configuration file: "
          else "Writing configuration to file: ")
-        <> T.pack reldest
+        <> fromString reldest
     liftIO $ L.writeFile (toFilePath dest)
            $ B.toLazyByteString
            $ renderStackYaml p
@@ -239,7 +239,7 @@ renderStackYaml p ignoredPackages dupPackages =
         [ ("user-message"     , userMsgHelp)
         , ("resolver"         , resolverHelp)
         , ("packages"         , packageHelp)
-        , ("extra-deps"       , "# Dependency packages to be pulled from upstream that are not in the resolver\n# (e.g., acme-missiles-0.3)")
+        , ("extra-deps"       , "# Dependency packages to be pulled from upstream that are not in the resolver\n# using the same syntax as the packages field.\n# (e.g., acme-missiles-0.3)")
         , ("flags"            , "# Override default flag values for local packages and extra-deps")
         , ("extra-package-dbs", "# Extra package databases containing global packages")
         ]
@@ -262,9 +262,12 @@ renderStackYaml p ignoredPackages dupPackages =
         , "resolver: nightly-2015-09-21"
         , "resolver: ghc-7.10.2"
         , "resolver: ghcjs-0.1.0_ghc-7.10.2"
-        , "resolver:"
-        , " name: custom-snapshot"
-        , " location: \"./custom-snapshot.yaml\""
+        , ""
+        , "The location of a snapshot can be provided as a file or url. Stack assumes"
+        , "a snapshot provided as a file might change, whereas a url resource does not."
+        , ""
+        , "resolver: ./custom-snapshot.yaml"
+        , "resolver: https://example.com/snapshots/2018-01-01.yaml"
         ]
 
     userMsgHelp = commentHelp
@@ -281,14 +284,9 @@ renderStackYaml p ignoredPackages dupPackages =
         , "   git: https://github.com/commercialhaskell/stack.git"
         , "   commit: e7b331f14bcffb8367cd58fbfc8b40ec7642100a"
         , "- location: https://github.com/commercialhaskell/stack/commit/e7b331f14bcffb8367cd58fbfc8b40ec7642100a"
-        , "  extra-dep: true"
         , " subdirs:"
         , " - auto-update"
         , " - wai"
-        , ""
-        , "A package marked 'extra-dep: true' will only be built if demanded by a"
-        , "non-dependency (i.e. a user package), and its test suites and benchmarks"
-        , "will not be run. This is useful for tweaking upstream packages."
         ]
 
     footerHelp =
@@ -331,7 +329,7 @@ getSnapshots' = do
         logError ""
         logError "    http://docs.haskellstack.org/en/stable/yaml_configuration/"
         logError ""
-        logError $ "Exception was: " <> T.pack (show e)
+        logError $ "Exception was: " <> displayShow e
         throwString ""
 
 -- | Get the default resolver value
@@ -385,7 +383,7 @@ getWorkingResolverPlan
        --   , Extra dependencies
        --   , Src packages actually considered)
 getWorkingResolverPlan whichCmd stackYaml initOpts bundle sd = do
-    logInfo $ "Selected resolver: " <> sdResolverName sd
+    logInfo $ "Selected resolver: " <> display (sdResolverName sd)
     go bundle
     where
         go info = do
@@ -405,13 +403,13 @@ getWorkingResolverPlan whichCmd stackYaml initOpts bundle sd = do
 
                         if length ignored > 1 then do
                           logWarn "*** Ignoring packages:"
-                          logWarn $ indent $ showItems ignored
+                          logWarn $ display $ indent $ showItems ignored
                         else
                           logWarn $ "*** Ignoring package: "
-                                 <> T.pack (packageNameString
-                                                (case ignored of
-                                                    [] -> error "getWorkingResolverPlan.head"
-                                                    x:_ -> x))
+                                 <> display
+                                      (case ignored of
+                                        [] -> error "getWorkingResolverPlan.head"
+                                        x:_ -> x)
 
                         go available
                     where
@@ -454,17 +452,17 @@ checkBundleResolver whichCmd stackYaml initOpts bundle sd = do
         BuildPlanCheckFail _ e _
             | omitPackages initOpts -> do
                 logWarn $ "*** Resolver compiler mismatch: "
-                           <> sdResolverName sd
-                logWarn $ indent $ T.pack $ show result
+                           <> display (sdResolverName sd)
+                logWarn $ display $ indent $ T.pack $ show result
                 return $ Left $ failedUserPkgs e
             | otherwise -> throwM $ ResolverMismatch whichCmd (sdResolverName sd) (show result)
     where
       resolver = sdResolver sd
       indent t  = T.unlines $ fmap ("    " <>) (T.lines t)
       warnPartial res = do
-          logWarn $ "*** Resolver " <> sdResolverName sd
+          logWarn $ "*** Resolver " <> display (sdResolverName sd)
                       <> " will need external packages: "
-          logWarn $ indent $ T.pack $ show res
+          logWarn $ display $ indent $ T.pack $ show res
 
       failedUserPkgs e = Map.keys $ Map.unions (Map.elems (fmap deNeededBy e))
 

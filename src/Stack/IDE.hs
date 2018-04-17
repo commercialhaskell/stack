@@ -17,8 +17,7 @@ import           Stack.Config (getLocalPackages)
 import           Stack.Package (readPackageUnresolvedDir, gpdPackageName)
 import           Stack.Prelude
 import           Stack.Types.Config
-import           Stack.Types.Package
-import           Stack.Types.PackageName
+import           Stack.Types.NamedComponent
 
 -- | List the packages inside the current project.
 listPackages :: HasEnvConfig env => RIO env ()
@@ -29,13 +28,13 @@ listPackages = do
     packageDirs <- liftM (map lpvRoot . Map.elems . lpProject) getLocalPackages
     forM_ packageDirs $ \dir -> do
         (gpd, _) <- readPackageUnresolvedDir dir False
-        (logInfo . packageNameText) (gpdPackageName gpd)
+        (logInfo . display) (gpdPackageName gpd)
 
 -- | List the targets in the current project.
 listTargets :: HasEnvConfig env => RIO env ()
 listTargets =
     do rawLocals <- lpProject <$> getLocalPackages
-       logInfo
+       logInfo $ display
            (T.intercalate
                 "\n"
                 (map

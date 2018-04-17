@@ -60,6 +60,8 @@ instance Lift PackageName where
 
 instance Show PackageName where
   show (PackageName n) = T.unpack n
+instance Display PackageName where
+  display (PackageName n) = display n
 
 instance FromJSON PackageName where
   parseJSON j =

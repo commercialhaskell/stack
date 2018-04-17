@@ -24,13 +24,17 @@ module Stack.PackageIndex
     , getPackageCaches
     , getPackageVersions
     , lookupPackageVersions
+    , CabalLoader (..)
+    , HasCabalLoader (..)
+    , configPackageIndex
+    , configPackageIndexRoot
     ) where
 
 import qualified Codec.Archive.Tar as Tar
 import           Stack.Prelude
 import           Data.Aeson.Extended
+import qualified Data.ByteString.Char8 as B8
 import qualified Data.ByteString.Lazy as L
-import           Data.Conduit.Binary (sinkHandle, sourceHandle, sourceFile, sinkFile)
 import           Data.Conduit.Zlib (ungzip)
 import qualified Data.List.NonEmpty as NE
 import qualified Data.HashMap.Strict as HashMap
@@ -49,31 +53,30 @@ import qualified Hackage.Security.Util.Pretty as HS
 import           Network.HTTP.Client.TLS (getGlobalManager)
 import           Network.HTTP.Download
 import           Network.URI (parseURI)
-import           Path (toFilePath, parseAbsFile)
+import           Path (toFilePath, parseAbsFile, mkRelDir, mkRelFile, (</>), parseRelDir)
 import           Path.Extra (tryGetModificationTime)
 import           Path.IO
-import           Stack.Types.Config
 import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageIndex
 import           Stack.Types.PackageName
+import           Stack.Types.Runner (HasRunner)
 import           Stack.Types.Version
 import qualified System.Directory as D
 import           System.FilePath ((<.>))
 
 -- | Populate the package index caches and return them.
-populateCache :: HasConfig env => PackageIndex -> RIO env (PackageCache ())
+populateCache :: HasCabalLoader env => PackageIndex -> RIO env (PackageCache ())
 populateCache index = do
     requireIndex index
     -- This uses full on lazy I/O instead of ResourceT to provide some
     -- protections. Caveat emptor
     path <- configPackageIndex (indexName index)
-    let loadPIS = withBinaryFile (Path.toFilePath path) ReadMode $ \h -> do
+    let loadPIS = withLazyFile (Path.toFilePath path) $ \lbs -> do
             logSticky "Populating index cache ..."
-            lbs <- liftIO $ L.hGetContents h
             loop 0 HashMap.empty (Tar.read lbs)
     pis0 <- loadPIS `catch` \e -> do
         logWarn $ "Exception encountered when parsing index tarball: "
-                <> T.pack (show (e :: Tar.FormatError))
+                <> displayShow (e :: Tar.FormatError)
         logWarn "Automatically updating index and trying again"
         updateIndex index
         loadPIS
@@ -224,27 +227,28 @@ instance Show PackageIndexException where
         ]
 
 -- | Require that an index be present, updating if it isn't.
-requireIndex :: HasConfig env => PackageIndex -> RIO env ()
+requireIndex :: HasCabalLoader env => PackageIndex -> RIO env ()
 requireIndex index = do
     tarFile <- configPackageIndex $ indexName index
     exists <- doesFileExist tarFile
     unless exists $ updateIndex index
 
 -- | Update all of the package indices
-updateAllIndices :: HasConfig env => RIO env ()
+updateAllIndices :: HasCabalLoader env => RIO env ()
 updateAllIndices = do
     clearPackageCaches
-    view packageIndicesL >>= mapM_ updateIndex
+    cl <- view cabalLoaderL
+    mapM_ updateIndex (clIndices cl)
 
 -- | Update the index tarball
-updateIndex :: HasConfig env => PackageIndex -> RIO env ()
+updateIndex :: HasCabalLoader env => PackageIndex -> RIO env ()
 updateIndex index =
   do let name = indexName index
          url = indexLocation index
      logSticky $ "Updating package index "
-               <> indexNameText (indexName index)
+               <> display (indexNameText (indexName index))
                <> " (mirrored at "
-               <> url
+               <> display url
                <> ") ..."
      case indexType index of
        ITVanilla -> updateIndexHTTP name url
@@ -257,16 +261,18 @@ updateIndex index =
      oldTarFile <- configPackageIndexOld name
      oldCacheFile <- configPackageIndexCacheOld name
      liftIO $ ignoringAbsence (removeFile oldCacheFile)
-     liftIO $ runConduitRes $ sourceFile (toFilePath tarFile) .| sinkFile (toFilePath oldTarFile)
+     withSourceFile (toFilePath tarFile) $ \src ->
+       withSinkFile (toFilePath oldTarFile) $ \sink ->
+       runConduit $ src .| sink
 
 -- | Update the index tarball via HTTP
-updateIndexHTTP :: HasConfig env
+updateIndexHTTP :: HasCabalLoader env
                 => IndexName
                 -> Text -- ^ url
                 -> RIO env ()
 updateIndexHTTP indexName' url = do
     req <- parseRequest $ T.unpack url
-    logInfo ("Downloading package index from " <> url)
+    logInfo ("Downloading package index from " <> display url)
     gz <- configPackageIndexGz indexName'
     tar <- configPackageIndex indexName'
     wasDownloaded <- redownload req gz
@@ -284,16 +290,14 @@ updateIndexHTTP indexName' url = do
             deleteCache indexName'
 
             liftIO $ do
-                withBinaryFile (toFilePath gz) ReadMode $ \input ->
-                    withBinaryFile tmp WriteMode $ \output -> runConduit
-                      $ sourceHandle input
-                     .| ungzip
-                     .| sinkHandle output
+                withSourceFile (toFilePath gz) $ \input ->
+                  withSinkFile tmp $ \output -> -- FIXME use withSinkFileCautious
+                  runConduit $ input .| ungzip .| output
                 renameFile tmpPath tar
 
 -- | Update the index tarball via Hackage Security
 updateIndexHackageSecurity
-    :: HasConfig env
+    :: HasCabalLoader env
     => IndexName
     -> Text -- ^ base URL
     -> HackageSecurity
@@ -306,7 +310,7 @@ updateIndexHackageSecurity indexName' url (HackageSecurity keyIds threshold) = d
     manager <- liftIO getGlobalManager
     root <- configPackageIndexRoot indexName'
     run <- askRunInIO
-    let logTUF = run . logInfo . T.pack . HS.pretty
+    let logTUF = run . logInfo . fromString . HS.pretty
         withRepo = HS.withRepository
             (HS.makeHttpLib manager)
             [baseURI]
@@ -350,7 +354,7 @@ updateIndexHackageSecurity indexName' url (HackageSecurity keyIds threshold) = d
 -- but exited before deleting the cache.
 --
 -- See https://github.com/commercialhaskell/stack/issues/3033
-packageIndexNotUpdated :: HasConfig env => IndexName -> RIO env ()
+packageIndexNotUpdated :: HasCabalLoader env => IndexName -> RIO env ()
 packageIndexNotUpdated indexName' = do
     mindexModTime <- tryGetModificationTime =<< configPackageIndex indexName'
     mcacheModTime <- tryGetModificationTime =<< configPackageIndexCache indexName'
@@ -364,19 +368,19 @@ packageIndexNotUpdated indexName' = do
         _ -> logInfo "No updates to your package index were found"
 
 -- | Delete the package index cache
-deleteCache :: HasConfig env => IndexName -> RIO env ()
+deleteCache :: HasCabalLoader env => IndexName -> RIO env ()
 deleteCache indexName' = do
     fp <- configPackageIndexCache indexName'
     eres <- liftIO $ tryIO $ removeFile fp
     case eres of
-        Left e -> logDebug $ "Could not delete cache: " <> T.pack (show e)
-        Right () -> logDebug $ "Deleted index cache at " <> T.pack (toFilePath fp)
+        Left e -> logDebug $ "Could not delete cache: " <> displayShow e
+        Right () -> logDebug $ "Deleted index cache at " <> fromString (toFilePath fp)
 
 -- | Get the known versions for a given package from the package caches.
 --
 -- See 'getPackageCaches' for performance notes.
-getPackageVersions :: HasConfig env => PackageName -> RIO env (Set Version)
-getPackageVersions pkgName = fmap (lookupPackageVersions pkgName) getPackageCaches
+getPackageVersions :: HasCabalLoader env => PackageName -> RIO env (Set Version)
+getPackageVersions pkgName = lookupPackageVersions pkgName <$> getPackageCaches
 
 lookupPackageVersions :: PackageName -> PackageCache index -> Set Version
 lookupPackageVersions pkgName (PackageCache m) =
@@ -386,14 +390,14 @@ lookupPackageVersions pkgName (PackageCache m) =
 --
 -- This has two levels of caching: in memory, and the on-disk cache. So,
 -- feel free to call this function multiple times.
-getPackageCaches :: HasConfig env => RIO env (PackageCache PackageIndex)
+getPackageCaches :: HasCabalLoader env => RIO env (PackageCache PackageIndex)
 getPackageCaches = do
-    config <- view configL
-    mcached <- liftIO $ readIORef (configPackageCache config)
+    cl <- view cabalLoaderL
+    mcached <- readIORef (clCache cl)
     case mcached of
         Just cached -> return cached
         Nothing -> do
-            result <- liftM mconcat $ forM (configPackageIndices config) $ \index -> do
+            result <- liftM mconcat $ forM (clIndices cl) $ \index -> do
                 fp <- configPackageIndexCache (indexName index)
                 PackageCache pis <-
                     $(versionedDecodeOrLoad (storeVersionConfig "pkg-v5" "A607WaDwhg5VVvZTxNgU9g52DO8="
@@ -401,15 +405,81 @@ getPackageCaches = do
                     fp
                     (populateCache index)
                 return $ PackageCache ((fmap.fmap) (\((), mpd, files) -> (index, mpd, files)) pis)
-            liftIO $ writeIORef (configPackageCache config) (Just result)
+            liftIO $ writeIORef (clCache cl) (Just result)
             return result
 
 -- | Clear the in-memory hackage index cache. This is needed when the
 -- hackage index is updated.
-clearPackageCaches :: HasConfig env => RIO env ()
+clearPackageCaches :: HasCabalLoader env => RIO env ()
 clearPackageCaches = do
-    cacheRef <- view $ configL.to configPackageCache
-    liftIO $ writeIORef cacheRef Nothing
+  cl <- view cabalLoaderL
+  writeIORef (clCache cl) Nothing
+
+class HasRunner env => HasCabalLoader env where
+  cabalLoaderL :: Lens' env CabalLoader
+
+data CabalLoader = CabalLoader
+  { clCache :: !(IORef (Maybe (PackageCache PackageIndex)))
+  , clIndices :: ![PackageIndex]
+  -- ^ Information on package indices. This is left biased, meaning that
+  -- packages in an earlier index will shadow those in a later index.
+  --
+  -- Warning: if you override packages in an index vs what's available
+  -- upstream, you may correct your compiled snapshots, as different
+  -- projects may have different definitions of what pkg-ver means! This
+  -- feature is primarily intended for adding local packages, not
+  -- overriding. Overriding is better accomplished by adding to your
+  -- list of packages.
+  --
+  -- Note that indices specified in a later config file will override
+  -- previous indices, /not/ extend them.
+  --
+  -- Using an assoc list instead of a Map to keep track of priority
+  , clStackRoot :: !(Path Abs Dir)
+  -- ^ ~/.stack more often than not
+  , clUpdateRef :: !(MVar Bool)
+  -- ^ Want to try updating the index once during a single run for missing
+  -- package identifiers. We also want to ensure we only update once at a
+  -- time. Start at @True@.
+  --
+  -- TODO: probably makes sense to move this concern into getPackageCaches
+  , clConnectionCount :: !Int
+  -- ^ How many concurrent connections are allowed when downloading
+  , clIgnoreRevisionMismatch :: !Bool
+  -- ^ Ignore a revision mismatch when loading up cabal files,
+  -- and fall back to the latest revision. See:
+  -- <https://github.com/commercialhaskell/stack/issues/3520>
+  }
+
+-- | Root for a specific package index
+configPackageIndexRoot :: HasCabalLoader env => IndexName -> RIO env (Path Abs Dir)
+configPackageIndexRoot (IndexName name) = do
+    cl <- view cabalLoaderL
+    let root = clStackRoot cl
+    dir <- parseRelDir $ B8.unpack name
+    return (root </> $(mkRelDir "indices") </> dir)
+
+-- | Location of the 01-index.tar file
+configPackageIndex :: HasCabalLoader env => IndexName -> RIO env (Path Abs File)
+configPackageIndex name = (</> $(mkRelFile "01-index.tar")) <$> configPackageIndexRoot name
+
+-- | Location of the 01-index.cache file
+configPackageIndexCache :: HasCabalLoader env => IndexName -> RIO env (Path Abs File)
+configPackageIndexCache name = (</> $(mkRelFile "01-index.cache")) <$> configPackageIndexRoot name
+
+-- | Location of the 00-index.cache file
+configPackageIndexCacheOld :: HasCabalLoader env => IndexName -> RIO env (Path Abs File)
+configPackageIndexCacheOld = liftM (</> $(mkRelFile "00-index.cache")) . configPackageIndexRoot
+
+-- | Location of the 00-index.tar file. This file is just a copy of
+-- the 01-index.tar file, provided for tools which still look for the
+-- 00-index.tar file.
+configPackageIndexOld :: HasCabalLoader env => IndexName -> RIO env (Path Abs File)
+configPackageIndexOld = liftM (</> $(mkRelFile "00-index.tar")) . configPackageIndexRoot
+
+-- | Location of the 01-index.tar.gz file
+configPackageIndexGz :: HasCabalLoader env => IndexName -> RIO env (Path Abs File)
+configPackageIndexGz = liftM (</> $(mkRelFile "01-index.tar.gz")) . configPackageIndexRoot
 
 --------------- Lifted from cabal-install, Distribution.Client.Tar:
 -- | Return the number of blocks in an entry.

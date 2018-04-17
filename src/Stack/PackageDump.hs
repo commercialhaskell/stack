@@ -48,43 +48,41 @@ import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageName
 import           Stack.Types.Version
 import           System.Directory (getDirectoryContents, doesFileExist)
-import           System.Process.Read
+import           System.Process (readProcess) -- FIXME confirm that this is correct
+import           RIO.Process hiding (readProcess)
 
 -- | Call ghc-pkg dump with appropriate flags and stream to the given @Sink@, for a single database
 ghcPkgDump
-    :: (MonadUnliftIO m, MonadLogger m)
-    => EnvOverride
-    -> WhichCompiler
+    :: (HasProcessContext env, HasLogFunc env)
+    => WhichCompiler
     -> [Path Abs Dir] -- ^ if empty, use global
-    -> Sink Text IO a
-    -> m a
+    -> ConduitM Text Void (RIO env) a
+    -> RIO env a
 ghcPkgDump = ghcPkgCmdArgs ["dump"]
 
 -- | Call ghc-pkg describe with appropriate flags and stream to the given @Sink@, for a single database
 ghcPkgDescribe
-    :: (MonadUnliftIO m, MonadLogger m)
+    :: (HasProcessContext env, HasLogFunc env)
     => PackageName
-    -> EnvOverride
     -> WhichCompiler
     -> [Path Abs Dir] -- ^ if empty, use global
-    -> Sink Text IO a
-    -> m a
+    -> ConduitM Text Void (RIO env) a
+    -> RIO env a
 ghcPkgDescribe pkgName = ghcPkgCmdArgs ["describe", "--simple-output", packageNameString pkgName]
 
 -- | Call ghc-pkg and stream to the given @Sink@, for a single database
 ghcPkgCmdArgs
-    :: (MonadUnliftIO m, MonadLogger m)
+    :: (HasProcessContext env, HasLogFunc env)
     => [String]
-    -> EnvOverride
     -> WhichCompiler
     -> [Path Abs Dir] -- ^ if empty, use global
-    -> Sink Text IO a
-    -> m a
-ghcPkgCmdArgs cmd menv wc mpkgDbs sink = do
+    -> ConduitM Text Void (RIO env) a
+    -> RIO env a
+ghcPkgCmdArgs cmd wc mpkgDbs sink = do
     case reverse mpkgDbs of
-        (pkgDb:_) -> createDatabase menv wc pkgDb -- TODO maybe use some retry logic instead?
+        (pkgDb:_) -> createDatabase wc pkgDb -- TODO maybe use some retry logic instead?
         _ -> return ()
-    sinkProcessStdout Nothing menv (ghcPkgExeName wc) args sink'
+    sinkProcessStdout (ghcPkgExeName wc) args sink'
   where
     args = concat
         [ case mpkgDbs of
@@ -94,7 +92,7 @@ ghcPkgCmdArgs cmd menv wc mpkgDbs sink = do
         , cmd
         , ["--expand-pkgroot"]
         ]
-    sink' = CT.decodeUtf8 =$= sink
+    sink' = CT.decodeUtf8 .| sink
 
 -- | Create a new, empty @InstalledCache@
 newInstalledCache :: MonadIO m => m InstalledCache
@@ -102,14 +100,13 @@ newInstalledCache = liftIO $ InstalledCache <$> newIORef (InstalledCacheInner Ma
 
 -- | Load a @InstalledCache@ from disk, swallowing any errors and returning an
 -- empty cache.
-loadInstalledCache :: (MonadLogger m, MonadUnliftIO m)
-                   => Path Abs File -> m InstalledCache
+loadInstalledCache :: HasLogFunc env => Path Abs File -> RIO env InstalledCache
 loadInstalledCache path = do
     m <- $(versionedDecodeOrLoad installedCacheVC) path (return $ InstalledCacheInner Map.empty)
     liftIO $ InstalledCache <$> newIORef m
 
 -- | Save a @InstalledCache@ to disk
-saveInstalledCache :: (MonadLogger m, MonadIO m) => Path Abs File -> InstalledCache -> m ()
+saveInstalledCache :: HasLogFunc env => Path Abs File -> InstalledCache -> RIO env ()
 saveInstalledCache path (InstalledCache ref) =
     liftIO (readIORef ref) >>= $(versionedEncodeFile installedCacheVC) path
 
@@ -160,22 +157,26 @@ sinkMatching :: Monad m
              -> Bool -- ^ require haddock?
              -> Bool -- ^ require debugging symbols?
              -> Map PackageName Version -- ^ allowed versions
-             -> Consumer (DumpPackage Bool Bool Bool)
+             -> ConduitM (DumpPackage Bool Bool Bool) o
                          m
                          (Map PackageName (DumpPackage Bool Bool Bool))
-sinkMatching reqProfiling reqHaddock reqSymbols allowed = do
-    dps <- CL.filter (\dp -> isAllowed (dpPackageIdent dp) &&
-                             (not reqProfiling || dpProfiling dp) &&
-                             (not reqHaddock || dpHaddock dp) &&
-                             (not reqSymbols || dpSymbols dp))
-       =$= CL.consume
-    return $ Map.fromList $ map (packageIdentifierName . dpPackageIdent &&& id) $ Map.elems $ pruneDeps
+sinkMatching reqProfiling reqHaddock reqSymbols allowed =
+      Map.fromList
+    . map (packageIdentifierName . dpPackageIdent &&& id)
+    . Map.elems
+    . pruneDeps
         id
         dpGhcPkgId
         dpDepends
         const -- Could consider a better comparison in the future
-        dps
+    <$> (CL.filter predicate .| CL.consume)
   where
+    predicate dp =
+      isAllowed (dpPackageIdent dp) &&
+      (not reqProfiling || dpProfiling dp) &&
+      (not reqHaddock || dpHaddock dp) &&
+      (not reqSymbols || dpSymbols dp)
+
     isAllowed (PackageIdentifier name version) =
         case Map.lookup name allowed of
             Just version' | version /= version' -> False
@@ -184,7 +185,7 @@ sinkMatching reqProfiling reqHaddock reqSymbols allowed = do
 -- | Add profiling information to the stream of @DumpPackage@s
 addProfiling :: MonadIO m
              => InstalledCache
-             -> Conduit (DumpPackage a b c) m (DumpPackage Bool b c)
+             -> ConduitM (DumpPackage a b c) (DumpPackage Bool b c) m ()
 addProfiling (InstalledCache ref) =
     CL.mapM go
   where
@@ -219,7 +220,7 @@ isProfiling content lib =
 -- | Add haddock information to the stream of @DumpPackage@s
 addHaddock :: MonadIO m
            => InstalledCache
-           -> Conduit (DumpPackage a b c) m (DumpPackage a Bool c)
+           -> ConduitM (DumpPackage a b c) (DumpPackage a Bool c) m ()
 addHaddock (InstalledCache ref) =
     CL.mapM go
   where
@@ -242,7 +243,7 @@ addHaddock (InstalledCache ref) =
 -- | Add debugging symbol information to the stream of @DumpPackage@s
 addSymbols :: MonadIO m
            => InstalledCache
-           -> Conduit (DumpPackage a b c) m (DumpPackage a b Bool)
+           -> ConduitM (DumpPackage a b c) (DumpPackage a b Bool) m ()
 addSymbols (InstalledCache ref) =
     CL.mapM go
   where
@@ -313,9 +314,9 @@ instance Show PackageDumpException where
 
 -- | Convert a stream of bytes into a stream of @DumpPackage@s
 conduitDumpPackage :: MonadThrow m
-                   => Conduit Text m (DumpPackage () () ())
-conduitDumpPackage = (=$= CL.catMaybes) $ eachSection $ do
-    pairs <- eachPair (\k -> (k, ) <$> CL.consume) =$= CL.consume
+                   => ConduitM Text (DumpPackage () () ()) m ()
+conduitDumpPackage = (.| CL.catMaybes) $ eachSection $ do
+    pairs <- eachPair (\k -> (k, ) <$> CL.consume) .| CL.consume
     let m = Map.fromList pairs
     let parseS k =
             case Map.lookup k m of
@@ -397,10 +398,10 @@ type Line = Text
 
 -- | Apply the given Sink to each section of output, broken by a single line containing ---
 eachSection :: Monad m
-            => Sink Line m a
-            -> Conduit Text m a
+            => ConduitM Line Void m a
+            -> ConduitM Text a m ()
 eachSection inner =
-    CL.map (T.filter (/= '\r')) =$= CT.lines =$= start
+    CL.map (T.filter (/= '\r')) .| CT.lines .| start
   where
 
     peekText = await >>= maybe (return Nothing) (\bs ->
@@ -411,22 +412,22 @@ eachSection inner =
     start = peekText >>= maybe (return ()) (const go)
 
     go = do
-        x <- toConsumer $ takeWhileC (/= "---") =$= inner
+        x <- toConsumer $ takeWhileC (/= "---") .| inner
         yield x
         CL.drop 1
         start
 
 -- | Grab each key/value pair
 eachPair :: Monad m
-         => (Text -> Sink Line m a)
-         -> Conduit Line m a
+         => (Text -> ConduitM Line Void m a)
+         -> ConduitM Line a m ()
 eachPair inner =
     start
   where
     start = await >>= maybe (return ()) start'
 
     start' bs1 =
-        toConsumer (valSrc =$= inner key) >>= yield >> start
+        toConsumer (valSrc .| inner key) >>= yield >> start
       where
         (key, bs2) = T.break (== ':') bs1
         (spaces, bs3) = T.span (== ' ') $ T.drop 1 bs2
@@ -461,7 +462,7 @@ eachPair inner =
             (spaces, val) = T.splitAt i bs
 
 -- | General purpose utility
-takeWhileC :: Monad m => (a -> Bool) -> Conduit a m a
+takeWhileC :: Monad m => (a -> Bool) -> ConduitM a a m ()
 takeWhileC f =
     loop
   where

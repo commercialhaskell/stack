@@ -9,7 +9,7 @@
 
 module Stack.Types.Docker where
 
-import Stack.Prelude
+import Stack.Prelude hiding (Display (..))
 import Data.Aeson.Extended
 import Data.List (intercalate)
 import qualified Data.Text as T
@@ -106,11 +106,11 @@ data DockerOptsMonoid = DockerOptsMonoid
 -- | Decode uninterpreted docker options from JSON/YAML.
 instance FromJSON (WithJSONWarnings DockerOptsMonoid) where
   parseJSON = withObjectWarnings "DockerOptsMonoid"
-    (\o -> do dockerMonoidDefaultEnable    <- pure (Any True)
+    (\o -> do let dockerMonoidDefaultEnable = Any True
               dockerMonoidEnable           <- First <$> o ..:? dockerEnableArgName
               dockerMonoidRepoOrImage      <- First <$>
-                                              (((Just . DockerMonoidImage) <$> o ..: dockerImageArgName) <|>
-                                              ((Just . DockerMonoidRepo) <$> o ..: dockerRepoArgName) <|>
+                                              ((Just . DockerMonoidImage <$> o ..: dockerImageArgName) <|>
+                                              (Just . DockerMonoidRepo <$> o ..: dockerRepoArgName) <|>
                                               pure Nothing)
               dockerMonoidRegistryLogin    <- First <$> o ..:? dockerRegistryLoginArgName
               dockerMonoidRegistryUsername <- First <$> o ..:? dockerRegistryUsernameArgName

@@ -18,7 +18,7 @@ module Main (main) where
 #ifndef HIDE_DEP_VERSIONS
 import qualified Build_stack
 #endif
-import           Stack.Prelude
+import           Stack.Prelude hiding (Display (..))
 import           Control.Monad.Reader (local)
 import           Control.Monad.Trans.Except (ExceptT)
 import           Control.Monad.Writer.Lazy (Writer)
@@ -30,15 +30,14 @@ import           Data.List
 import qualified Data.Map.Strict as Map
 import qualified Data.Text as T
 import           Data.Version (showVersion)
-import           System.Process.Read
+import           RIO.Process
 #ifdef USE_GIT_INFO
 import           Development.GitRev (gitCommitCount, gitHash)
 #endif
-import           Distribution.System (buildArch, buildPlatform)
+import           Distribution.System (buildArch)
 import qualified Distribution.Text as Cabal (display)
 import           Distribution.Version (mkVersion')
 import           GHC.IO.Encoding (mkTextEncoding, textEncodingName)
-import           Lens.Micro
 import           Options.Applicative
 import           Options.Applicative.Help (errorHelp, stringChunk, vcatChunks)
 import           Options.Applicative.Builder.Extra
@@ -59,13 +58,13 @@ import           Stack.Constants.Config
 import           Stack.Coverage
 import qualified Stack.Docker as Docker
 import           Stack.Dot
-import           Stack.Exec
 import           Stack.GhcPkg (findGhcPkgField)
 import qualified Stack.Nix as Nix
 import           Stack.Fetch
 import           Stack.FileWatch
 import           Stack.Ghci
 import           Stack.Hoogle
+import           Stack.Ls
 import qualified Stack.IDE as IDE
 import qualified Stack.Image as Image
 import           Stack.Init
@@ -105,7 +104,7 @@ import qualified System.Directory as D
 import           System.Environment (getProgName, getArgs, withArgs)
 import           System.Exit
 import           System.FilePath (isValid, pathSeparator)
-import           System.IO (stderr, stdin, stdout, BufferMode(..), hPutStrLn, hGetEncoding, hSetEncoding)
+import           System.IO (stderr, stdin, stdout, BufferMode(..), hPutStrLn, hPrint, hGetEncoding, hSetEncoding)
 
 -- | Change the character encoding of the given Handle to transliterate
 -- on unsupported characters instead of throwing an exception
@@ -150,10 +149,10 @@ versionString' =
 #else
     warningString = unlines
       [ ""
-      , "Warning: this is an unsupported build that may have been built with different"
-      , "versions of dependencies and GHC than the officially release binaries, and"
-      , "therefore may not behave identically.  If you encounter problems, please try"
-      , "the latest official build by running 'stack upgrade --force-download'."
+      , "Warning: this is an unsupported build that may use different versions of"
+      , "dependencies and GHC than the officially released binaries, and therefore may"
+      , "not behave identically.  If you encounter problems, please try the latest"
+      , "official build by running 'stack upgrade --force-download'."
       ]
 #endif
 
@@ -198,7 +197,7 @@ main = do
           case fromException e of
               Just ec -> exitWith ec
               Nothing -> do
-                  printExceptionStderr e
+                  hPrint stderr e
                   exitFailure
 
 -- Vertically combine only the error component of the first argument with the
@@ -299,6 +298,10 @@ commandLineHandler currentDir progName isInterpreter = complicatedOptions
                     "Print out handy path information"
                     pathCmd
                     Stack.Path.pathParser
+        addCommand' "ls"
+                    "List command. (Supports snapshots and dependencies)"
+                    lsCmd
+                    lsParser
         addCommand' "unpack"
                     "Unpack one or more packages locally"
                     unpackCmd
@@ -381,7 +384,7 @@ commandLineHandler currentDir progName isInterpreter = complicatedOptions
                     cleanOptsParser
         addCommand' "list-dependencies"
                     "List the dependencies"
-                    listDependenciesCmd
+                    (listDependenciesCmd True)
                     listDepsOptsParser
         addCommand' "query"
                     "Query general build information (experimental)"
@@ -502,12 +505,11 @@ secondaryCommandHandler args f =
     else do
       mExternalExec <- D.findExecutable cmd
       case mExternalExec of
-        Just ex -> do
-          menv <- getEnvOverride buildPlatform
+        Just ex -> withProcessContextNoLogging $ do
           -- TODO show the command in verbose mode
           -- hPutStrLn stderr $ unwords $
           --   ["Running", "[" ++ ex, unwords (tail args) ++ "]"]
-          _ <- runNoLogging (exec menv ex (tail args))
+          _ <- exec ex (tail args)
           return f
         Nothing -> return $ fmap (vcatErrorHelp (noSuchCmd cmd)) f
   where
@@ -563,8 +565,12 @@ interpreterHandler currentDir args f = do
       progName <- getProgName
       iargs <- getInterpreterArgs path
       let parseCmdLine = commandLineHandler currentDir progName True
-          separator = if "--" `elem` iargs then [] else ["--"]
-          cmdArgs = stackArgs ++ iargs ++ separator ++ path : fileArgs
+          -- Implicit file arguments are put before other arguments that
+          -- occur after "--". See #3658
+          cmdArgs = stackArgs ++ case break (== "--") iargs of
+            (beforeSep, []) -> beforeSep ++ ["--"] ++ [path] ++ fileArgs
+            (beforeSep, optSep : afterSep) ->
+              beforeSep ++ [optSep] ++ [path] ++ fileArgs ++ afterSep
        -- TODO show the command in verbose mode
        -- hPutStrLn stderr $ unwords $
        --   ["Running", "[" ++ progName, unwords cmdArgs ++ "]"]
@@ -578,7 +584,7 @@ setupCmd :: SetupCmdOpts -> GlobalOpts -> IO ()
 setupCmd sco@SetupCmdOpts{..} go@GlobalOpts{..} = loadConfigWithOpts go $ \lc -> do
   when (isJust scoUpgradeCabal && nixEnable (configNix (lcConfig lc))) $ do
     throwIO UpgradeCabalUnusable
-  withUserFileLock go (configStackRoot $ lcConfig lc) $ \lk -> do
+  withUserFileLock go (view stackRootL lc) $ \lk -> do
     let getCompilerVersion = loadCompilerVersion go lc
     runRIO (lcConfig lc) $
       Docker.reexecWithOptionalContainer
@@ -605,8 +611,8 @@ cleanCmd opts go =
   -- See issues #2010 and #3468 for why "stack clean --full" is not used
   -- within docker.
   case opts of
-    CleanFull{} -> withBuildConfigAndLock go (const (clean opts))
-    CleanShallow{} -> withBuildConfigAndLockNoDocker go (const (clean opts))
+    CleanFull{} -> withBuildConfigAndLockNoDocker go (const (clean opts))
+    CleanShallow{} -> withBuildConfigAndLock go (const (clean opts))
 
 -- | Helper for build and install commands
 buildCmd :: BuildOptsCLI -> GlobalOpts -> IO ()
@@ -766,7 +772,7 @@ execCmd ExecOpts {..} go@GlobalOpts{..} =
                 (ExecGhc, args) -> return ("ghc", args)
                 (ExecRunGhc, args) -> return ("runghc", args)
           loadConfigWithOpts go $ \lc ->
-            withUserFileLock go (configStackRoot $ lcConfig lc) $ \lk -> do
+            withUserFileLock go (view stackRootL lc) $ \lk -> do
               let getCompilerVersion = loadCompilerVersion go lc
               runRIO (lcConfig lc) $
                 Docker.reexecWithOptionalContainer
@@ -775,42 +781,43 @@ execCmd ExecOpts {..} go@GlobalOpts{..} =
                     (Just $ munlockFile lk)
                     (runRIO (lcConfig lc) $ do
                         config <- view configL
-                        menv <- liftIO $ configEnvOverride config plainEnvSettings
-                        Nix.reexecWithOptionalShell
+                        menv <- liftIO $ configProcessContextSettings config plainEnvSettings
+                        withProcessContext menv $ Nix.reexecWithOptionalShell
                             (lcProjectRoot lc)
                             getCompilerVersion
                             (runRIO (lcConfig lc) $
-                                exec menv cmd args))
+                                exec cmd args))
                     Nothing
                     Nothing -- Unlocked already above.
         ExecOptsEmbellished {..} ->
             withBuildConfigAndLock go $ \lk -> do
-                let targets = concatMap words eoPackages
-                unless (null targets) $
-                    Stack.Build.build (const $ return ()) lk defaultBuildOptsCLI
-                        { boptsCLITargets = map T.pack targets
-                        }
+              let targets = concatMap words eoPackages
+              unless (null targets) $
+                  Stack.Build.build (const $ return ()) lk defaultBuildOptsCLI
+                      { boptsCLITargets = map T.pack targets
+                      }
 
-                config <- view configL
-                menv <- liftIO $ configEnvOverride config eoEnvSettings
+              config <- view configL
+              menv <- liftIO $ configProcessContextSettings config eoEnvSettings
+              withProcessContext menv $ do
                 -- Add RTS options to arguments
                 let argsWithRts args = if null eoRtsOptions
                             then args :: [String]
                             else args ++ ["+RTS"] ++ eoRtsOptions ++ ["-RTS"]
                 (cmd, args) <- case (eoCmd, argsWithRts eoArgs) of
                     (ExecCmd cmd, args) -> return (cmd, args)
-                    (ExecGhc, args) -> getGhcCmd "" menv eoPackages args
+                    (ExecGhc, args) -> getGhcCmd "" eoPackages args
                     -- NOTE: this won't currently work for GHCJS, because it doesn't have
                     -- a runghcjs binary. It probably will someday, though.
                     (ExecRunGhc, args) ->
-                        getGhcCmd "run" menv eoPackages args
+                        getGhcCmd "run" eoPackages args
                 munlockFile lk -- Unlock before transferring control away.
 
-                runWithPath eoCwd $ exec menv cmd args
+                runWithPath eoCwd $ exec cmd args
   where
       -- return the package-id of the first package in GHC_PACKAGE_PATH
-      getPkgId menv wc name = do
-          mId <- findGhcPkgField menv wc [] name "id"
+      getPkgId wc name = do
+          mId <- findGhcPkgField wc [] name "id"
           case mId of
               Just i -> return (head $ words (T.unpack i))
               -- should never happen as we have already installed the packages
@@ -818,13 +825,12 @@ execCmd ExecOpts {..} go@GlobalOpts{..} =
                   hPutStrLn stderr ("Could not find package id of package " ++ name)
                   exitFailure
 
-      getPkgOpts menv wc pkgs = do
-          ids <- mapM (getPkgId menv wc) pkgs
-          return $ map ("-package-id=" ++) ids
+      getPkgOpts wc pkgs =
+          map ("-package-id=" ++) <$> mapM (getPkgId wc) pkgs
 
-      getGhcCmd prefix menv pkgs args = do
+      getGhcCmd prefix pkgs args = do
           wc <- view $ actualCompilerVersionL.whichCompilerL
-          pkgopts <- getPkgOpts menv wc pkgs
+          pkgopts <- getPkgOpts wc pkgs
           return (prefix ++ compilerExeName wc, pkgopts ++ args)
 
       runWithPath :: Maybe FilePath -> RIO EnvConfig () -> RIO EnvConfig ()
@@ -872,7 +878,7 @@ dockerPullCmd :: () -> GlobalOpts -> IO ()
 dockerPullCmd _ go@GlobalOpts{..} =
     loadConfigWithOpts go $ \lc ->
     -- TODO: can we eliminate this lock if it doesn't touch ~/.stack/?
-    withUserFileLock go (configStackRoot $ lcConfig lc) $ \_ ->
+    withUserFileLock go (view stackRootL lc) $ \_ ->
      runRIO (lcConfig lc) $
        Docker.preventInContainer Docker.pull
 
@@ -881,7 +887,7 @@ dockerResetCmd :: Bool -> GlobalOpts -> IO ()
 dockerResetCmd keepHome go@GlobalOpts{..} =
     loadConfigWithOpts go $ \lc ->
     -- TODO: can we eliminate this lock if it doesn't touch ~/.stack/?
-    withUserFileLock go (configStackRoot $ lcConfig lc) $ \_ ->
+    withUserFileLock go (view stackRootL lc) $ \_ ->
       runRIO (lcConfig lc) $
         Docker.preventInContainer $ Docker.reset (lcProjectRoot lc) keepHome
 
@@ -890,7 +896,7 @@ dockerCleanupCmd :: Docker.CleanupOpts -> GlobalOpts -> IO ()
 dockerCleanupCmd cleanupOpts go@GlobalOpts{..} =
     loadConfigWithOpts go $ \lc ->
     -- TODO: can we eliminate this lock if it doesn't touch ~/.stack/?
-    withUserFileLock go (configStackRoot $ lcConfig lc) $ \_ ->
+    withUserFileLock go (view stackRootL lc) $ \_ ->
      runRIO (lcConfig lc) $
         Docker.preventInContainer $
             Docker.cleanup cleanupOpts
@@ -928,7 +934,9 @@ newCmd :: (NewOpts,InitOpts) -> GlobalOpts -> IO ()
 newCmd (newOpts,initOpts) go@GlobalOpts{..} =
     withMiniConfigAndLock go $ do
         dir <- new newOpts (forceOverwrite initOpts)
-        initProject IsNewCmd dir initOpts globalResolver
+        exists <- doesFileExist $ dir </> stackDotYaml
+        when (forceOverwrite initOpts || not exists) $
+            initProject IsNewCmd dir initOpts globalResolver
 
 -- | List the available templates.
 templatesCmd :: () -> GlobalOpts -> IO ()
@@ -944,19 +952,6 @@ solverCmd fixStackYaml go =
 -- | Visualize dependencies
 dotCmd :: DotOpts -> GlobalOpts -> IO ()
 dotCmd dotOpts go = withBuildConfigDot dotOpts go $ dot dotOpts
-
--- | List the dependencies
-listDependenciesCmd :: ListDepsOpts -> GlobalOpts -> IO ()
-listDependenciesCmd opts go = withBuildConfigDot (listDepsDotOpts opts) go $ listDependencies opts
-
--- Plumbing for --test and --bench flags
-withBuildConfigDot :: DotOpts -> GlobalOpts -> RIO EnvConfig () -> IO ()
-withBuildConfigDot opts go f = withBuildConfig go' f
-  where
-    go' =
-        (if dotTestTargets opts then set (globalOptsBuildOptsMonoidL.buildOptsMonoidTestsL) (Just True) else id) $
-        (if dotBenchTargets opts then set (globalOptsBuildOptsMonoidL.buildOptsMonoidBenchmarksL) (Just True) else id)
-        go
 
 -- | Query build information
 queryCmd :: [String] -> GlobalOpts -> IO ()
