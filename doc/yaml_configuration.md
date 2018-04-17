@@ -164,11 +164,6 @@ does not rely on correct ordering in the package index, while revision
 number is likely simpler to use. In practice, both should guarantee
 equally reproducible build plans.
 
-If unspecified, `subdirs` defaults to `['.']` (i.e. look only in the top-level
-directory).  Note that if you specify a value of `subdirs`, then `'.'` is _not_
-included by default and needs to be explicitly specified if a required package
-is found in the top-level directory of the repository.
-
 #### Local file path
 
 Like `packages`, local file paths can be used in `extra-deps`, and
@@ -231,8 +226,11 @@ extra-deps:
   - wai
 ```
 
-If unspecified, `subdirs` defaults to `subdirs: [.]`, or looking for a
-package in the root of the repo.
+If unspecified, `subdirs` defaults to `['.']` meaning looking for a
+package in the root of the repo..  Note that if you specify a value of
+`subdirs`, then `'.'` is _not_ included by default and needs to be
+explicitly specified if a required package is found in the top-level
+directory of the repository.
 
 #### Archives (HTTP(S) or local filepath)
 
