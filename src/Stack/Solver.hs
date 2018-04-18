@@ -153,8 +153,7 @@ cabalSolver cabalfps constraintType
 
     parseConflictingPkgs msg =
         let ls = dropWhile (not . errCheck) $ linesNoCR msg
-            select s = (T.isPrefixOf "trying:" s
-                      || T.isPrefixOf "next goal:" s)
+            select = T.isPrefixOf "next goal:"
             pkgName =   take 1
                       . T.words
                       . T.drop 1
