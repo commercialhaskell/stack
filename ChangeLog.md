@@ -33,9 +33,6 @@ Bug fixes:
   system temporary directory, so this shouldn't result in too much
   garbage. See
   [#3821](https://github.com/commercialhaskell/stack/issues/3821).
-* 1.6.1 introduced a change that made some precompiled cache files use
-  longer paths, sometimes causing builds to fail on windows. This has been
-  fixed. See [#3649](https://github.com/commercialhaskell/stack/issues/3649)
 
 
 ## v1.7.0.1 (release candidate)
