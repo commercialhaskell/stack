@@ -38,6 +38,9 @@ instance FromJSON (WithJSONWarnings UrlsMonoid) where
             <*> o ..: "lts-build-plans"
             <*> o ..: "nightly-build-plans"
 
+instance Semigroup UrlsMonoid where
+    (<>) = mappenddefault
+
 instance Monoid UrlsMonoid where
     mempty = memptydefault
-    mappend = mappenddefault
+    mappend = (<>)

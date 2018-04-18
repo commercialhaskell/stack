@@ -305,7 +305,9 @@ commandLineHandler currentDir progName isInterpreter = complicatedOptions
         addCommand' "unpack"
                     "Unpack one or more packages locally"
                     unpackCmd
-                    (some $ strArgument $ metavar "PACKAGE")
+                    ((,) <$> some (strArgument $ metavar "PACKAGE")
+                         <*> optional (textOption $ long "to" <>
+                                         help "Optional path to unpack the package into (will unpack into subdirectory)"))
         addCommand' "update"
                     "Update the package index"
                     updateCmd
@@ -336,7 +338,7 @@ commandLineHandler currentDir progName isInterpreter = complicatedOptions
                     ("Run hoogle, the Haskell API search engine. Use 'stack exec' syntax " ++
                      "to pass Hoogle arguments, e.g. stack hoogle -- --count=20")
                     hoogleCmd
-                    ((,,) <$> many (strArgument (metavar "ARG"))
+                    ((,,,) <$> many (strArgument (metavar "ARG"))
                           <*> boolFlags
                                   True
                                   "setup"
@@ -344,7 +346,10 @@ commandLineHandler currentDir progName isInterpreter = complicatedOptions
                                   idm
                           <*> switch
                                   (long "rebuild" <>
-                                   help "Rebuild the hoogle database"))
+                                   help "Rebuild the hoogle database")
+                          <*> switch
+                                  (long "server" <>
+                                   help "Start local Hoogle server"))
         )
 
       -- These are the only commands allowed in interpreter mode as well
@@ -647,10 +652,11 @@ uninstallCmd _ go = withConfigAndLock go $
       ]
 
 -- | Unpack packages to the filesystem
-unpackCmd :: [String] -> GlobalOpts -> IO ()
-unpackCmd names go = withConfigAndLock go $ do
+unpackCmd :: ([String], Maybe Text) -> GlobalOpts -> IO ()
+unpackCmd (names, Nothing) go = unpackCmd (names, Just ".") go
+unpackCmd (names, Just dstPath) go = withConfigAndLock go $ do
     mSnapshotDef <- mapM (makeConcreteResolver Nothing >=> loadResolver) (globalResolver go)
-    Stack.Fetch.unpackPackages mSnapshotDef "." names
+    Stack.Fetch.unpackPackages mSnapshotDef (T.unpack dstPath) names
 
 -- | Update the package index
 updateCmd :: () -> GlobalOpts -> IO ()

@@ -427,7 +427,7 @@ With that out of the way, let's dig a little bit more into these package sets,
 also known as *snapshots*. We mentioned the LTS resolvers, and you can get quite a bit of
 information about it at [https://www.stackage.org/lts](https://www.stackage.org/lts), including:
 
-* The appropriate resolver value (`resolver: lts-11.2`, as is currently the latest LTS)
+* The appropriate resolver value (`resolver: lts-11.5`, as is currently the latest LTS)
 * The GHC version used
 * A full list of all packages available in this snapshot
 * The ability to perform a Hoogle search on the packages in this snapshot
@@ -444,7 +444,7 @@ default as well).
 
 ## Resolvers and changing your compiler version
 
-Let's explore package sets a bit further. Instead of lts-11.2, let's change our
+Let's explore package sets a bit further. Instead of lts-11.5, let's change our
 `stack.yaml` file to use [the latest nightly](https://www.stackage.org/nightly). Right now,
 this is currently 2017-12-19 - please see the resolve from the link above to get the latest.
 
@@ -460,8 +460,8 @@ We can also change resolvers on the command line, which can be useful in a
 Continuous Integration (CI) setting, like on Travis. For example:
 
 ```
-michael@d30748af6d3d:~/helloworld$ stack --resolver lts-11.2 build
-Downloaded lts-11.2 build plan.
+michael@d30748af6d3d:~/helloworld$ stack --resolver lts-11.5 build
+Downloaded lts-11.5 build plan.
 # build output ...
 ```
 
@@ -516,6 +516,15 @@ cueball:~$ stack unpack yackage-0.8.0
 Unpacked yackage-0.8.0 to /var/home/harendra/yackage-0.8.0/
 cueball:~$ cd yackage-0.8.0/
 ```
+
+Note that you can also unpack to the directory of your liking instead of
+the current one by issueing:
+
+```
+cueball:~$ stack unpack yackage-0.8.0 --to ~/work
+```
+
+This will create a `yackage-0.8.0` directory inside `~/work`
 
 ### stack init
 This new directory does not have a `stack.yaml` file, so we need to make one
@@ -1715,7 +1724,8 @@ users. Here's a quick rundown:
   upstream packages available).
 * `stack unpack` is a command we've already used quite a bit for examples, but
   most users won't use it regularly. It does what you'd expect: downloads a
-  tarball and unpacks it.
+  tarball and unpacks it. It accept optional `--to` argument to specify
+  the destination directory.
 * `stack sdist` generates an uploading tarball containing your package code
 * `stack upload` uploads an sdist to Hackage. As of
   version [1.1.0](https://docs.haskellstack.org/en/v1.1.0/ChangeLog/) stack

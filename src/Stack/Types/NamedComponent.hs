@@ -22,6 +22,7 @@ import qualified Data.Text as T
 -- | A single, fully resolved component of a package
 data NamedComponent
     = CLib
+    | CInternalLib !Text
     | CExe !Text
     | CTest !Text
     | CBench !Text
@@ -29,6 +30,7 @@ data NamedComponent
 
 renderComponent :: NamedComponent -> Text
 renderComponent CLib = "lib"
+renderComponent (CInternalLib x) = "internal-lib:" <> x
 renderComponent (CExe x) = "exe:" <> x
 renderComponent (CTest x) = "test:" <> x
 renderComponent (CBench x) = "bench:" <> x

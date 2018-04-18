@@ -42,6 +42,7 @@ module Stack.Package
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Char8 as C8
 import           Data.List (isSuffixOf, isPrefixOf)
+import           Data.Maybe (maybe)
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
 import qualified Data.Text as T
@@ -589,6 +590,7 @@ componentBuildDir cabalVer component distDir
     | otherwise =
         case component of
             CLib -> buildDir distDir
+            CInternalLib name -> buildDir distDir </> componentNameToDir name
             CExe name -> buildDir distDir </> componentNameToDir name
             CTest name -> buildDir distDir </> componentNameToDir name
             CBench name -> buildDir distDir </> componentNameToDir name
@@ -598,6 +600,7 @@ componentOutputDir :: NamedComponent -> Path Abs Dir -> Path Abs Dir
 componentOutputDir namedComponent distDir =
     case namedComponent of
         CLib -> buildDir distDir
+        CInternalLib name -> makeTmp name
         CExe name -> makeTmp name
         CTest name -> makeTmp name
         CBench name -> makeTmp name
@@ -700,6 +703,12 @@ packageDescModulesAndFiles pkg = do
             (return (M.empty, M.empty, []))
             (asModuleAndFileMap libComponent libraryFiles)
             (library pkg)
+    (subLibrariesMods,subLibDotCabalFiles,subLibWarnings) <-
+        liftM
+            foldTuples
+            (mapM
+                 (asModuleAndFileMap internalLibComponent libraryFiles)
+                 (subLibraries pkg))
     (executableMods,exeDotCabalFiles,exeWarnings) <-
         liftM
             foldTuples
@@ -719,14 +728,15 @@ packageDescModulesAndFiles pkg = do
     dfiles <- resolveGlobFiles
                     (extraSrcFiles pkg
                         ++ map (dataDir pkg FilePath.</>) (dataFiles pkg))
-    let modules = libraryMods <> executableMods <> testMods <> benchModules
+    let modules = libraryMods <> subLibrariesMods <> executableMods <> testMods <> benchModules
         files =
-            libDotCabalFiles <> exeDotCabalFiles <> testDotCabalFiles <>
+            libDotCabalFiles <> subLibDotCabalFiles <> exeDotCabalFiles <> testDotCabalFiles <>
             benchDotCabalPaths
-        warnings = libWarnings <> exeWarnings <> testWarnings <> benchWarnings
+        warnings = libWarnings <> subLibWarnings <> exeWarnings <> testWarnings <> benchWarnings
     return (modules, files, dfiles, warnings)
   where
     libComponent = const CLib
+    internalLibComponent = CInternalLib . T.pack . maybe "" Cabal.unUnqualComponentName . libName
     exeComponent = CExe . T.pack . Cabal.unUnqualComponentName . exeName
     testComponent = CTest . T.pack . Cabal.unUnqualComponentName . testName
     benchComponent = CBench . T.pack . Cabal.unUnqualComponentName . benchmarkName
@@ -1402,10 +1412,12 @@ hpack pkgDir = do
                         , flow "please upgrade and try again."
                         ]
                     Hpack.ExistingCabalFileWasModifiedManually -> prettyWarnL
-                        [ flow "WARNING: "
-                        , cabalFile
-                        , flow " was modified manually.  Ignoring package.yaml in favor of cabal file."
-                        , flow "If you want to use package.yaml instead of the cabal file, "
+                        [ cabalFile
+                        , flow "was modified manually. Ignoring"
+                        , display hpackFile
+                        , flow "in favor of the cabal file. If you want to use the"
+                        , display . filename $ hpackFile
+                        , flow "file instead of the cabal file,"
                         , flow "then please delete the cabal file."
                         ]
             HpackCommand command ->

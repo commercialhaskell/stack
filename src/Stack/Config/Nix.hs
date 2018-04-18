@@ -9,13 +9,16 @@ module Stack.Config.Nix
        ) where
 
 import Stack.Prelude
+import Control.Monad.Extra (ifM)
 import qualified Data.Text as T
+import qualified Data.Text.IO as TIO
 import Distribution.System (OS (..))
 import Stack.Constants
 import Stack.Types.Version
 import Stack.Types.Nix
 import Stack.Types.Compiler
 import Stack.Types.Runner
+import System.Directory (doesFileExist)
 
 -- | Interprets NixOptsMonoid options.
 nixOptsFromMonoid
@@ -34,12 +37,17 @@ nixOptsFromMonoid NixOptsMonoid{..} os = do
         nixShellOptions = fromFirst [] nixMonoidShellOptions
                           ++ prefixAll (T.pack "-I") (fromFirst [] nixMonoidPath)
         nixAddGCRoots   = fromFirst False nixMonoidAddGCRoots
-    nixEnable <-
-      if nixEnable0 && osIsWindows
-        then do
-          logInfo "Note: Disabling nix integration, since this is being run in Windows"
-          return False
-        else return nixEnable0
+
+    osIsNixOS <- isNixOS
+    nixEnable <- case () of _
+                                | nixEnable0 && osIsWindows -> do
+                                      logInfo "Note: Disabling nix integration, since this is being run in Windows"
+                                      return False
+                                | not nixEnable0 && osIsNixOS -> do
+                                      logInfo "Note: Enabling Nix integration, as it is required under NixOS"
+                                      return True
+                                | otherwise                 -> return nixEnable0
+
     when (not (null nixPackages) && isJust nixInitFile) $
        throwIO NixCannotUseShellFileAndPackagesException
     return NixOpts{..}
@@ -77,3 +85,10 @@ instance Exception StackNixException
 instance Show StackNixException where
   show NixCannotUseShellFileAndPackagesException =
     "You cannot have packages and a shell-file filled at the same time in your nix-shell configuration."
+
+isNixOS :: MonadIO m => m Bool
+isNixOS = liftIO $ do
+    let fp = "/etc/os-release"
+    ifM (doesFileExist fp)
+        (T.isInfixOf "ID=nixos" <$> TIO.readFile fp)
+        (return False)

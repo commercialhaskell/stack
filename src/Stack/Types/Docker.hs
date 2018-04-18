@@ -132,9 +132,13 @@ instance FromJSON (WithJSONWarnings DockerOptsMonoid) where
               return DockerOptsMonoid{..})
 
 -- | Left-biased combine Docker options
+instance Semigroup DockerOptsMonoid where
+  (<>) = mappenddefault
+
+-- | Left-biased combine Docker options
 instance Monoid DockerOptsMonoid where
   mempty = memptydefault
-  mappend = mappenddefault
+  mappend = (<>)
 
 -- | Where to get the `stack` executable to run in Docker containers
 data DockerStackExe

@@ -61,9 +61,13 @@ instance FromJSON (WithJSONWarnings NixOptsMonoid) where
               return NixOptsMonoid{..})
 
 -- | Left-biased combine Nix options
+instance Semigroup NixOptsMonoid where
+  (<>) = mappenddefault
+
+-- | Left-biased combine Nix options
 instance Monoid NixOptsMonoid where
   mempty = memptydefault
-  mappend = mappenddefault
+  mappend = (<>)
 
 -- | Nix enable argument name.
 nixEnableArgName :: Text

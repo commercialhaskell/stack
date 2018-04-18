@@ -140,7 +140,7 @@ import Text.PrettyPrint.Annotated.Leijen hiding ((<>), display)
 instance Semigroup (Doc a) where
     (<>) = (P.<>)
 instance Monoid (Doc a) where
-    mappend = (P.<>)
+    mappend = (<>)
     mempty = empty
 
 --------------------------------------------------------------------------------
@@ -164,7 +164,7 @@ instance Display (Doc a) where
 type AnsiDoc = Doc AnsiAnn
 
 newtype AnsiAnn = AnsiAnn [SGR]
-    deriving (Eq, Show, Monoid)
+    deriving (Eq, Show, Semigroup, Monoid)
 
 class HasAnsiAnn a where
     getAnsiAnn :: a -> AnsiAnn
