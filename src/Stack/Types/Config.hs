@@ -125,6 +125,7 @@ module Stack.Types.Config
   ,platformGhcVerOnlyRelDir
   ,useShaPathOnWindows
   ,shaPath
+  ,shaPathForBytes
   ,workDirL
   -- * Command-specific types
   -- ** Eval
@@ -1307,10 +1308,12 @@ useShaPathOnWindows =
 #endif
 
 shaPath :: (IsPath Rel t, MonadThrow m) => Path Rel t -> m (Path Rel t)
-shaPath
+shaPath = shaPathForBytes . encodeUtf8 . T.pack . toFilePath
+
+shaPathForBytes :: (IsPath Rel t, MonadThrow m) => ByteString -> m (Path Rel t)
+shaPathForBytes
     = parsePath . S8.unpack . S8.take 8
     . Mem.convertToBase Mem.Base16 . hashWith SHA1
-    . encodeUtf8 . T.pack . toFilePath
 
 -- TODO: Move something like this into the path package. Consider
 -- subsuming path-io's 'AnyPath'?

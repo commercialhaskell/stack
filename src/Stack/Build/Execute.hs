@@ -1317,11 +1317,12 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
                           ])
                       (const (return ()))
 
-                  readProcessNull ghcPkgExe
+                  void $ proc ghcPkgExe
                       [ "register"
                       , "--force"
                       , libpath
                       ]
+                      readProcess_
         liftIO $ forM_ exes $ \exe -> do
             D.createDirectoryIfMissing True bindir
             let dst = bindir FP.</> FP.takeFileName exe
