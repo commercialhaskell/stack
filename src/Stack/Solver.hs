@@ -112,11 +112,11 @@ cabalSolver cabalfps constraintType
                fmap toFilePath cabalfps
 
     try ( withWorkingDir (toFilePath tmpdir)
-        $ proc "cabal" args readProcessStdout_
+        $ proc "cabal" args readProcess_
         )
         >>= either
           (parseCabalErrors . eceStderr)
-          (parseCabalOutput . BL.toStrict)
+          (parseCabalOutput . BL.toStrict . fst)
 
   where
     errCheck = T.isInfixOf "Could not resolve dependencies"
