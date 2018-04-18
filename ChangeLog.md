@@ -37,6 +37,12 @@ Bug fixes:
 
 ## v1.7.0.1 (release candidate)
 
+Release notes:
+
+* aarch64 (64-bit ARM) bindists are now available for the first time.
+* Statically linked Linux bindists are no longer available, since there is no working GHC 8.2.2 on Alpine Linux.
+* 32-bit Linux GMP4 bindists for CentOS 6 are no longer available, since GHC 8.2.2 is no longer being built for that platform.
+
 Major changes:
 
 * Upgrade from Cabal 2.0 to Cabal 2.2
@@ -796,7 +802,7 @@ Release notes:
   version 1.1.2 for now on those architectures.  This will be rectified soon!
 
 * We are now releasing a
-  [statically linked Stack binary for 64-bit Linux](https://www.stackage.org/stack/linux-x86_64-static).
+  [statically linked Stack binary for 64-bit Linux](https://get.haskellstack.org/stable/linux-x86_64-static.tar.gz).
   Please try it and let us know if you run into any trouble on your platform.
 
 * We are planning some changes to our Linux releases, including dropping our

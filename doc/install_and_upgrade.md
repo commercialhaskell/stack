@@ -21,16 +21,15 @@ future, we are open to supporting more OSes (to request one, please
 Binary packages are signed with this [signing key](SIGNING_KEY.md).
 
 If you are writing a script that needs to download the latest binary, you can
-find links that always point to the latest bindists
-[here](https://www.stackage.org/stack).
+use URLs like `https://get.haskellstack.org/stable/<PLATFORM>.<EXTENSION>` (e.g. //get.haskellstack.org/stable/linux-x86_64.tar.gz) that always point to the latest stable release.
 
 ## Windows
 
 We recommend installing to the default location with these installers, as that
 will make `stack install` and `stack upgrade` work correctly out of the box.
 
-  * [Windows 64-bit Installer](https://www.stackage.org/stack/windows-x86_64-installer)
-  * [Windows 32-bit Installer](https://www.stackage.org/stack/windows-i386-installer)
+  * [Windows 64-bit Installer](https://get.haskellstack.org/stable/windows-x86_64-installer.exe)
+  * [Windows 32-bit Installer](https://get.haskellstack.org/stable/windows-i386-installer.exe)
 
 If in doubt: you should prefer the 64-bit installer.
 
@@ -42,8 +41,8 @@ starting" warning when you try to run the installer. If so, click on
 
 * Download the latest release:
 
-    * [Windows 64-bit](https://www.stackage.org/stack/windows-x86_64)
-    * [Windows 32-bit](https://www.stackage.org/stack/windows-i386)
+    * [Windows 64-bit](https://get.haskellstack.org/stable/windows-x86_64.zip)
+    * [Windows 32-bit](https://get.haskellstack.org/stable/windows-i386.zip)
 
 * Unpack the archive and place `stack.exe` somewhere on your `%PATH%` (see
   [Path section below](#path)) and you can then run `stack` on the command line.
@@ -65,7 +64,7 @@ Run:
 ### Manual download
 
 * Download the latest release:
-    * [macOS 64-bit](https://www.stackage.org/stack/osx-x86_64)
+    * [macOS 64-bit](https://get.haskellstack.org/stable/osx-x86_64.tar.gz)
 * Extract the archive and place `stack` somewhere on your `$PATH` (see
   [Path section below](#path))
 * Now you can run `stack` from the terminal.
@@ -106,7 +105,7 @@ There is also a [Ubuntu
 package](http://packages.ubuntu.com/search?keywords=haskell-stack&searchon=names&suite=all&section=all)
 for Ubuntu 16.10 and up, but the distribution's Stack version lags behind, so we
 recommend running `stack upgrade --binary` after installing it. For older stack
-versions which do not support `--binary`, just `stack upgrade` is fine too. The
+versions which do not support `--binary`, just `stack upgrade` may work too. The
 version in Ubuntu 16.04 is too old to upgrade successfully, and so in that case
 stack should be installed from a [release
 tarball](https://github.com/commercialhaskell/stack/releases).
@@ -119,7 +118,7 @@ There is also a [Debian
 package](https://packages.debian.org/search?keywords=haskell-stack&searchon=names&suite=all&section=all)
 for Stretch and up, but the distribution's Stack version lags behind, so running
 `stack upgrade --binary` is recommended after installing it. For older stack
-versions which do not support `--binary`, just `stack upgrade` is fine too.
+versions which do not support `--binary`, just `stack upgrade` may work too.
 
 ## <a name="centos"></a>CentOS / Red Hat / Amazon Linux
 
@@ -233,13 +232,21 @@ or:
 
 * Download the latest release:
 
-    * [Linux 64-bit, static](https://www.stackage.org/stack/linux-x86_64-static)
+    * [Linux 64-bit, standard](https://get.haskellstack.org/stable/linux-x86_64.tar.gz)
 
-    * [Linux 32-bit, standard](https://www.stackage.org/stack/linux-i386)
+    * [Linux 64-bit, libgmp4](https://get.haskellstack.org/stable/linux-x86_64-gmp4.tar.gz)
+      (if you are on an older 64-bit distribution that only includes libgmp4
+      (libgmp.so.3), such as CentOS/RHEL/Amazon Linux 6.)
 
-    * [Linux 32-bit, libgmp4](https://www.stackage.org/stack/linux-i386-gmp4)
+    * [Linux 32-bit, standard](https://get.haskellstack.org/stable/linux-i386.tar.gz)
+
+    * [Linux 32-bit, libgmp4](https://get.haskellstack.org/stable/linux-i386-gmp4.tar.gz)
       (if you are on an older 32-bit distribution that only includes libgmp4
       (libgmp.so.3), such as CentOS/RHEL/Amazon Linux 6.)
+
+    * [Linux ARMv7](https://get.haskellstack.org/stable/linux-arm.tar.gz)
+
+    * [Linux AArch64](https://get.haskellstack.org/stable/linux-aarch64.tar.gz)
 
 * Extract the archive and place `stack` somewhere on your `$PATH` (see [Path section below](#path))
 
@@ -279,7 +286,7 @@ Run:
 
 * Download the latest release:
 
-    * [FreeBSD 64-bit](https://www.stackage.org/stack/freebsd-x86_64)
+    * [FreeBSD 64-bit](https://get.haskellstack.org/stable/freebsd-x86_64.tar.gz)
 
 * Extract the archive and place `stack` somewhere on your `$PATH` (see [Path section below](#path))
 
