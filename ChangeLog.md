@@ -1,13 +1,7 @@
 # Changelog
 
 
-## Unreleased changes
-
-Release notes:
-
-Major changes:
-
-Behavior changes:
+## v1.7.0.3 (release candidate)
 
 Other enhancements:
 
@@ -40,7 +34,7 @@ Bug fixes:
 Release notes:
 
 * aarch64 (64-bit ARM) bindists are now available for the first time.
-* Statically linked Linux bindists are no longer available, since there is no working GHC 8.2.2 on Alpine Linux.
+* Statically linked Linux bindists are no longer available, due to difficulty with GHC 8.2.2 on Alpine Linux.
 * 32-bit Linux GMP4 bindists for CentOS 6 are no longer available, since GHC 8.2.2 is no longer being built for that platform.
 
 Major changes:
