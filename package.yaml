@@ -131,6 +131,10 @@ library:
   source-dirs: src/
   ghc-options:
   - -fwarn-identities
+  verbatim:
+    # TODO: replace with 'generated-exposed-modules' after stack-1.7 is released.
+    # Using 'verbatim' to support older hpack version.
+    autogen-modules: Paths_stack
   exposed-modules:
   - Control.Concurrent.Execute
   - Data.Aeson.Extended
