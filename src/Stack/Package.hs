@@ -64,6 +64,7 @@ import qualified Distribution.Types.CondTree as Cabal
 import qualified Distribution.Types.ExeDependency as Cabal
 import           Distribution.Types.ForeignLib
 import qualified Distribution.Types.LegacyExeDependency as Cabal
+import           Distribution.Types.MungedPackageName
 import qualified Distribution.Types.UnqualComponentName as Cabal
 import qualified Distribution.Verbosity as D
 import           Lens.Micro (lens)
@@ -300,7 +301,7 @@ packageFromPackageDescription packageConfig pkgFlags (PackageDescriptionPair pkg
       \sourceMap installedMap omitPkgs addPkgs cabalfp ->
            do (componentsModules,componentFiles,_,_) <- getPackageFiles pkgFiles cabalfp
               componentsOpts <-
-                  generatePkgDescOpts sourceMap installedMap omitPkgs addPkgs cabalfp pkg componentFiles
+                  generatePkgDescOpts sourceMap installedMap omitPkgs addPkgs subLibNames cabalfp pkg componentFiles
               return (componentsModules,componentFiles,componentsOpts)
     , packageHasExposedModules = maybe
           False
@@ -311,7 +312,7 @@ packageFromPackageDescription packageConfig pkgFlags (PackageDescriptionPair pkg
     }
   where
     extraLibNames = S.union subLibNames foreignLibNames
-
+    
     subLibNames
       = S.fromList
       $ map (T.pack . Cabal.unUnqualComponentName)
@@ -379,14 +380,17 @@ generatePkgDescOpts
     -> InstalledMap
     -> [PackageName] -- ^ Packages to omit from the "-package" / "-package-id" flags
     -> [PackageName] -- ^ Packages to add to the "-package" flags
+    -> Set Text -- ^ sublibraries
     -> Path Abs File
     -> PackageDescription
     -> Map NamedComponent (Set DotCabalPath)
     -> m (Map NamedComponent BuildInfoOpts)
-generatePkgDescOpts sourceMap installedMap omitPkgs addPkgs cabalfp pkg componentPaths = do
+generatePkgDescOpts sourceMap installedMap omitPkgs addPkgs' subLibs cabalfp pkg componentPaths = do
     config <- view configL
     cabalVer <- view cabalVersionL
     distDir <- distDirFromDir cabalDir
+    mungedSubLibPkgs <- mapM parsePackageName mungedSubLibNames
+    let addPkgs = addPkgs' ++ mungedSubLibPkgs
     let generate namedComponent binfo =
             ( namedComponent
             , generateBuildInfoOpts BioInput
@@ -396,6 +400,7 @@ generatePkgDescOpts sourceMap installedMap omitPkgs addPkgs cabalfp pkg componen
                 , biDistDir = distDir
                 , biOmitPackages = omitPkgs
                 , biAddPackages = addPkgs
+                , biSubLibraries = subLibs
                 , biBuildInfo = binfo
                 , biDotCabalPaths = fromMaybe mempty (M.lookup namedComponent componentPaths)
                 , biConfigLibDirs = configExtraLibDirs config
@@ -431,6 +436,13 @@ generatePkgDescOpts sourceMap installedMap omitPkgs addPkgs cabalfp pkg componen
                          (testSuites pkg)]))
   where
     cabalDir = parent cabalfp
+    mungedSubLibNames
+      = map (T.pack . unMungedPackageName 
+            . computeCompatPackageName (pkgName pkgId) . Just)
+      $ mapMaybe libName -- this is a design bug in the Cabal API: this should statically be known to exist
+      $ filter (buildable . libBuildInfo)
+      $ subLibraries pkg
+    pkgId = package pkg
 
 -- | Input to 'generateBuildInfoOpts'
 data BioInput = BioInput
@@ -440,6 +452,7 @@ data BioInput = BioInput
     , biDistDir :: !(Path Abs Dir)
     , biOmitPackages :: ![PackageName]
     , biAddPackages :: ![PackageName]
+    , biSubLibraries :: !(Set Text)
     , biBuildInfo :: !BuildInfo
     , biDotCabalPaths :: !(Set DotCabalPath)
     , biConfigLibDirs :: !(Set FilePath)
@@ -488,7 +501,9 @@ generateBuildInfoOpts BioInput {..} =
         [ name
         | Dependency cname _ <- targetBuildDepends biBuildInfo
         , let name = fromCabalPackageName cname
-        , name `notElem` biOmitPackages]
+        , name `notElem` biOmitPackages
+        , packageNameText name `S.notMember` biSubLibraries]
+
     ghcOpts = concatMap snd . filter (isGhc . fst) $ options biBuildInfo
       where
         isGhc GHC = True
