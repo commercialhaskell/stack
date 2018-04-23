@@ -280,6 +280,7 @@ packageFromPackageDescription packageConfig pkgFlags (PackageDescriptionPair pkg
               | null extraLibNames -> NoLibraries
               | otherwise -> error "Package has buildable sublibraries but no buildable libraries, I'm giving up"
             Just _ -> HasLibraries foreignLibNames
+    , packageInternalLibraries = subLibNames
     , packageTests = M.fromList
       [(T.pack (Cabal.unUnqualComponentName $ testName t), testInterface t)
           | t <- testSuites pkgNoMod

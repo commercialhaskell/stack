@@ -663,6 +663,7 @@ wantedPackageComponents bopts (TargetAll ProjectPackage) pkg = S.fromList $
        NoLibraries -> []
        HasLibraries names -> [CLib] ++ map CInternalLib (S.toList names)) ++
     map CExe (S.toList (packageExes pkg)) <>
+    (map CInternalLib $ S.toList $ packageInternalLibraries pkg) <>
     (if boptsTests bopts then map CTest (M.keys (packageTests pkg)) else []) <>
     (if boptsBenchmarks bopts then map CBench (S.toList (packageBenchmarks pkg)) else [])
 wantedPackageComponents _ _ _ = S.empty
