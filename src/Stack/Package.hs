@@ -64,6 +64,7 @@ import qualified Distribution.Types.CondTree as Cabal
 import qualified Distribution.Types.ExeDependency as Cabal
 import           Distribution.Types.ForeignLib
 import qualified Distribution.Types.LegacyExeDependency as Cabal
+import           Distribution.Types.MungedPackageName
 import qualified Distribution.Types.UnqualComponentName as Cabal
 import qualified Distribution.Verbosity as D
 import           Lens.Micro (lens)
@@ -299,8 +300,13 @@ packageFromPackageDescription packageConfig pkgFlags (PackageDescriptionPair pkg
     , packageOpts = GetPackageOpts $
       \sourceMap installedMap omitPkgs addPkgs cabalfp ->
            do (componentsModules,componentFiles,_,_) <- getPackageFiles pkgFiles cabalfp
+              let internals = S.toList $ internalLibComponents $ M.keysSet componentsModules
+              excludedInternals <- mapM parsePackageName internals
+              mungedInternals <- mapM (parsePackageName . toInternalPackageMungedName) internals
               componentsOpts <-
-                  generatePkgDescOpts sourceMap installedMap omitPkgs addPkgs cabalfp pkg componentFiles
+                  generatePkgDescOpts sourceMap installedMap
+                  (excludedInternals ++ omitPkgs) (mungedInternals ++ addPkgs)
+                  cabalfp pkg componentFiles
               return (componentsModules,componentFiles,componentsOpts)
     , packageHasExposedModules = maybe
           False
@@ -324,6 +330,10 @@ packageFromPackageDescription packageConfig pkgFlags (PackageDescriptionPair pkg
       $ map (T.pack . Cabal.unUnqualComponentName . foreignLibName)
       $ filter (buildable . foreignLibBuildInfo)
       $ foreignLibs pkg
+
+    toInternalPackageMungedName
+      = T.pack . unMungedPackageName . computeCompatPackageName (pkgName pkgId)
+      . Just . Cabal.mkUnqualComponentName . T.unpack
 
     -- Gets all of the modules, files, build files, and data files that
     -- constitute the package. This is primarily used for dirtiness
