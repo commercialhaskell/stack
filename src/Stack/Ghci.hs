@@ -661,7 +661,7 @@ wantedPackageComponents _ (TargetComps cs) _ = cs
 wantedPackageComponents bopts (TargetAll ProjectPackage) pkg = S.fromList $
     (case packageLibraries pkg of
        NoLibraries -> []
-       HasLibraries _names -> [CLib]) ++ -- FIXME. This ignores sub libraries and foreign libraries. Is that OK?
+       HasLibraries names -> [CLib] ++ map CInternalLib (S.toList names)) ++
     map CExe (S.toList (packageExes pkg)) <>
     (if boptsTests bopts then map CTest (M.keys (packageTests pkg)) else []) <>
     (if boptsBenchmarks bopts then map CBench (S.toList (packageBenchmarks pkg)) else [])
