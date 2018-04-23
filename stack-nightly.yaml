@@ -1,4 +1,4 @@
-resolver: nightly-2018-04-20
+resolver: nightly-2018-04-23
 
 # docker:
 #   enable: true
@@ -15,7 +15,7 @@ nix:
     - unzip
 extra-deps:
 - bitarray-0.0.1.1
-- fsnotify-0.2.1.1
+- fsnotify-0.2.1.2
 - project-template-0.2.0.1
 - regex-applicative-text-0.1.0.1
 - unicode-transforms-0.3.4

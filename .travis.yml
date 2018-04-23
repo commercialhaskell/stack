@@ -29,9 +29,9 @@ matrix:
       compiler: ": #stack 8.2.2"
       addons: {apt: {packages: [ghc-8.2.2, alex-3.1.7, happy-1.19.5], sources: [hvr-ghc]}}
 
-    - env: BUILD=stack GHCVER=8.4.1 STACK_YAML=stack-nightly.yaml
-      compiler: ": #stack 8.4.1"
-      addons: {apt: {packages: [ghc-8.4.1, alex-3.1.7, happy-1.19.5], sources: [hvr-ghc]}}
+    - env: BUILD=stack GHCVER=8.4.2 STACK_YAML=stack-nightly.yaml
+      compiler: ": #stack 8.4.2"
+      addons: {apt: {packages: [ghc-8.4.2, alex-3.1.7, happy-1.19.5], sources: [hvr-ghc]}}
 
     - env: BUILD=stack GHCVER=8.2.2 STACK_YAML=stack.yaml
       compiler: ": #stack 8.2.2 osx"
@@ -47,12 +47,6 @@ matrix:
     - env: BUILD=stack GHCVER=8.2.2 STACK_YAML=stack.yaml
       compiler: ": #stack 8.2.2 osx"
       os: osx
-
-    ## Expected to fail because fsnotify depends on a version of hinotify
-    ## that doesn't support GHC 8.4
-    - env: BUILD=stack GHCVER=8.4.1 STACK_YAML=stack-nightly.yaml
-      compiler: ": #stack 8.4.1"
-      addons: {apt: {packages: [ghc-8.4.1, alex-3.1.7, happy-1.19.5], sources: [hvr-ghc]}}
 
 # Note: the distinction between `before_install` and `install` is not important.
 # - in before_install we install build tools
@@ -119,7 +113,6 @@ install:
 
 script:
  - GHC_OPTIONS="-Werror"
- - if [ $GHCVER = 8.2.2 ]; then GHC_OPTIONS="$GHC_OPTIONS -Wno-missing-home-modules"; fi
  - |
    set -ex
    case "$BUILD" in

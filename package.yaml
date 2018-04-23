@@ -134,7 +134,8 @@ library:
   verbatim:
     # TODO: replace with 'generated-exposed-modules' after stack-1.7 is released.
     # Using 'verbatim' to support older hpack version.
-    autogen-modules: Paths_stack
+    autogen-modules: |
+      Paths_stack
   exposed-modules:
   - Control.Concurrent.Execute
   - Data.Aeson.Extended
@@ -272,7 +273,15 @@ executables:
   stack:
     main: Main.hs
     source-dirs: src/main
-    generated-other-modules: Build_stack
+    verbatim:
+      # TODO: replace with 'generated-other-modules' after stack-1.7 is released.
+      # Using 'verbatim' to support older hpack version.
+      autogen-modules: |
+          Build_stack,
+          Paths_stack
+    other-modules:
+    - Build_stack
+    - Paths_stack
     ghc-options:
     - -threaded
     - -rtsopts
