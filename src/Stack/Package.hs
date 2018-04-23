@@ -698,7 +698,7 @@ packageDescModulesAndFiles
     :: PackageDescription
     -> RIO Ctx (Map NamedComponent (Map ModuleName (Path Abs File)), Map NamedComponent (Set DotCabalPath), Set (Path Abs File), [PackageWarning])
 packageDescModulesAndFiles pkg = do
-    (libraryMods,libDotCabalFiles,libWarnings) <- -- FIXME add in sub libraries
+    (libraryMods,libDotCabalFiles,libWarnings) <-
         maybe
             (return (M.empty, M.empty, []))
             (asModuleAndFileMap libComponent libraryFiles)
