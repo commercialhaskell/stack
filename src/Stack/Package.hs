@@ -411,6 +411,12 @@ generatePkgDescOpts sourceMap installedMap omitPkgs addPkgs cabalfp pkg componen
                          []
                          (return . generate CLib . libBuildInfo)
                          (library pkg)
+                   , mapMaybe
+                         (\sublib -> do
+                            let maybeLib = CInternalLib . T.pack . Cabal.unUnqualComponentName <$> libName sublib
+                            flip generate  (libBuildInfo sublib) <$> maybeLib
+                          )
+                         (subLibraries pkg)
                    , fmap
                          (\exe ->
                                generate
