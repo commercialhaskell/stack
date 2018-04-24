@@ -13,6 +13,7 @@ Other enhancements:
 
 Bug fixes:
 
+* `~/.stack/config.yaml` and `stack.yaml` terminating by newline
 
 ## v1.7.0.3 (release candidate)
 
