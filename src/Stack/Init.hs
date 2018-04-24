@@ -185,6 +185,7 @@ renderStackYaml p ignoredPackages dupPackages =
         <> F.foldMap (goComment o) comments
         <> goOthers (o `HM.difference` HM.fromList comments)
         <> B.byteString footerHelp
+        <> "\n"
 
     goComment o (name, comment) =
         case (convert <$> HM.lookup name o) <|> nonPresentValue name of
