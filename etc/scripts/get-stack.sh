@@ -19,6 +19,7 @@
 # https://github.com/commercialhaskell/stack/blob/master/etc/scripts/get-stack.sh
 #
 
+STACK_VERSION="1.7.1"
 HOME_LOCAL_BIN="$HOME/.local/bin"
 DEFAULT_DEST="/usr/local/bin/stack"
 DEST=""
@@ -239,13 +240,12 @@ do_centos_install() {
         ;;
     esac
   else
-    install_dependencies
     case "$1" in
       "6")
-        print_bindist_notice "libgmp4"
-        install_32bit_gmp4_linked_binary
+        die "Sorry, there is currently no Linux 32-bit gmp4 binary available."
         ;;
       *)
+        install_dependencies
         print_bindist_notice
         install_32bit_standard_binary
         ;;
@@ -479,7 +479,7 @@ check_dl_tools() {
 
 # Download a Stack bindst and install it in /usr/local/bin/stack.
 install_from_bindist() {
-    IFB_URL="https://get.haskellstack.org/stable/$1.tar.gz"
+    IFB_URL="https://github.com/commercialhaskell/stack/releases/download/v${STACK_VERSION}/stack-${STACK_VERSION}-$1"
     check_dl_tools
     make_temp_dir
 
@@ -516,31 +516,31 @@ install_from_bindist() {
 }
 
 install_arm_binary() {
-  install_from_bindist "linux-arm"
+  install_from_bindist "linux-arm.tar.gz"
 }
 
 install_32bit_standard_binary() {
-  install_from_bindist "linux-i386"
+  install_from_bindist "linux-i386.tar.gz"
+}
+
+install_64bit_standard_binary() {
+  install_from_bindist "linux-x86_64.tar.gz"
 }
 
 install_aarch64_binary() {
-  install_from_bindist "linux-aarch64"
-}
-
-install_32bit_gmp4_linked_binary() {
-  install_from_bindist "linux-i386-gmp4"
+  install_from_bindist "linux-aarch64.tar.gz"
 }
 
 install_64bit_gmp4_linked_binary() {
-  install_from_bindist "linux-x86_64-gmp4"
+  install_from_bindist "linux-x86_64-gmp4.tar.gz"
 }
 
 install_64bit_osx_binary() {
-  install_from_bindist "osx-x86_64"
+  install_from_bindist "osx-x86_64.tar.gz"
 }
 
 install_64bit_freebsd_binary() {
-  install_from_bindist "freebsd-x86_64"
+  install_from_bindist "freebsd-x86_64.tar.gz"
 }
 
 # Attempt to install packages using whichever of apt-get, dnf, yum, or apk is
