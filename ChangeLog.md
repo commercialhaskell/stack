@@ -12,6 +12,10 @@ Behavior changes:
 Other enhancements:
 
 * On Windows, recognise a 'mintty' (false) terminal as a terminal, by default
+* `stack build` issues a warning when `base` is explicitly listed in
+  `extra-deps` of `stack.yaml`
+* `stack build` suggests trying another GHC version should the build
+  plan end up requiring unattainable `base` version.
 
 Bug fixes:
 

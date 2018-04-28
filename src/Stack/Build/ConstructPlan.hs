@@ -185,6 +185,10 @@ constructPlan :: forall env. HasEnvConfig env
 constructPlan ls0 baseConfigOpts0 locals extraToBuild0 localDumpPkgs loadPackage0 sourceMap installedMap initialBuildSteps = do
     logDebug "Constructing the build plan"
 
+    bconfig <- view buildConfigL
+    when (hasBaseInDeps bconfig) $
+      prettyWarn $ flow "You are trying to upgrade/downgrade base, which is almost certainly not what you really want. Please, consider using another GHC version if you need a certain version of base, or removing base from extra-deps." <> line
+
     econfig <- view envConfigL
     let onWanted = void . addDep False . packageName . lpPackage
     let inner = do
@@ -226,6 +230,10 @@ constructPlan ls0 baseConfigOpts0 locals extraToBuild0 localDumpPkgs loadPackage
             prettyErrorNoIndent $ pprintExceptions errs stackYaml parents (wanted ctx)
             throwM $ ConstructPlanFailed "Plan construction failed."
   where
+    hasBaseInDeps bconfig =
+        elem $(mkPackageName "base")
+      $ map (packageIdentifierName . pirIdent) [i | (PLIndex i) <- bcDependencies bconfig]
+
     mkCtx econfig lp = Ctx
         { ls = ls0
         , baseConfigOpts = baseConfigOpts0
@@ -968,8 +976,18 @@ pprintExceptions exceptions stackYaml parentMap wanted =
       ) ++
       [ "  *" <+> align (flow "Consider trying 'stack solver', which uses the cabal-install solver to attempt to find some working build configuration. This can be convenient when dealing with many complicated constraint errors, but results may be unpredictable.")
       , line <> line
-      ] ++
-      (if Map.null extras then [] else
+      ] ++ addExtraDepsRecommendations
+      
+  where
+    exceptions' = nubOrd exceptions
+
+    addExtraDepsRecommendations
+      | Map.null extras = []
+      | (Just _) <- Map.lookup $(mkPackageName "base") extras =
+          [ "  *" <+> align (flow "Build requires unattainable version of base. Since base is a part of GHC, you most likely need to use a different GHC version with the matching base.")
+           , line
+          ]
+      | otherwise =
          [ "  *" <+> align
            (styleRecommendation (flow "Recommended action:") <+>
             flow "try adding the following to your extra-deps in" <+>
@@ -978,9 +996,6 @@ pprintExceptions exceptions stackYaml parentMap wanted =
          , vsep (map pprintExtra (Map.toList extras))
          , line
          ]
-      )
-  where
-    exceptions' = nubOrd exceptions
 
     extras = Map.unions $ map getExtras exceptions'
     getExtras DependencyCycleDetected{} = Map.empty
