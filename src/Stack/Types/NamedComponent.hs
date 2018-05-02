@@ -9,6 +9,7 @@ module Stack.Types.NamedComponent
   , testComponents
   , benchComponents
   , isCLib
+  , isCInternalLib
   , isCExe
   , isCTest
   , isCBench
@@ -62,6 +63,10 @@ benchComponents = Set.fromList . mapMaybe mBenchName . Set.toList
 isCLib :: NamedComponent -> Bool
 isCLib CLib{} = True
 isCLib _ = False
+
+isCInternalLib :: NamedComponent -> Bool
+isCInternalLib CInternalLib{} = True
+isCInternalLib _ = False
 
 isCExe :: NamedComponent -> Bool
 isCExe CExe{} = True
