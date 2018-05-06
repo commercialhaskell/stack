@@ -116,4 +116,4 @@ withRunner logLevel useTime terminal colorWhen widthOverride reExec inner = do
           | otherwise = w
 
 data ColorWhen = ColorNever | ColorAlways | ColorAuto
-    deriving (Show, Generic)
+    deriving (Eq, Show, Generic)
