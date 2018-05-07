@@ -11,6 +11,8 @@ Behavior changes:
 
 Other enhancements:
 
+* On Windows, recognise a 'mintty' (false) terminal as a terminal, by default
+
 Bug fixes:
 
 * `~/.stack/config.yaml` and `stack.yaml` terminating by newline
