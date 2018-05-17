@@ -14,6 +14,8 @@ Other enhancements:
 Bug fixes:
 
 * `~/.stack/config.yaml` and `stack.yaml` terminating by newline
+* The previous released caused a regression where some `stderr` from the
+  `ghc-pkg` command showed up in the terminal. This output is now silenced.
 
 
 ## v1.7.1
