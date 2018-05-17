@@ -64,6 +64,7 @@ import qualified Distribution.Types.CondTree as Cabal
 import qualified Distribution.Types.ExeDependency as Cabal
 import           Distribution.Types.ForeignLib
 import qualified Distribution.Types.LegacyExeDependency as Cabal
+import           Distribution.Types.MungedPackageName
 import qualified Distribution.Types.UnqualComponentName as Cabal
 import qualified Distribution.Verbosity as D
 import           Lens.Micro (lens)
@@ -279,6 +280,7 @@ packageFromPackageDescription packageConfig pkgFlags (PackageDescriptionPair pkg
               | null extraLibNames -> NoLibraries
               | otherwise -> error "Package has buildable sublibraries but no buildable libraries, I'm giving up"
             Just _ -> HasLibraries foreignLibNames
+    , packageInternalLibraries = subLibNames
     , packageTests = M.fromList
       [(T.pack (Cabal.unUnqualComponentName $ testName t), testInterface t)
           | t <- testSuites pkgNoMod
@@ -299,8 +301,13 @@ packageFromPackageDescription packageConfig pkgFlags (PackageDescriptionPair pkg
     , packageOpts = GetPackageOpts $
       \sourceMap installedMap omitPkgs addPkgs cabalfp ->
            do (componentsModules,componentFiles,_,_) <- getPackageFiles pkgFiles cabalfp
+              let internals = S.toList $ internalLibComponents $ M.keysSet componentsModules
+              excludedInternals <- mapM parsePackageName internals
+              mungedInternals <- mapM (parsePackageName . toInternalPackageMungedName) internals
               componentsOpts <-
-                  generatePkgDescOpts sourceMap installedMap omitPkgs addPkgs cabalfp pkg componentFiles
+                  generatePkgDescOpts sourceMap installedMap
+                  (excludedInternals ++ omitPkgs) (mungedInternals ++ addPkgs)
+                  cabalfp pkg componentFiles
               return (componentsModules,componentFiles,componentsOpts)
     , packageHasExposedModules = maybe
           False
@@ -324,6 +331,10 @@ packageFromPackageDescription packageConfig pkgFlags (PackageDescriptionPair pkg
       $ map (T.pack . Cabal.unUnqualComponentName . foreignLibName)
       $ filter (buildable . foreignLibBuildInfo)
       $ foreignLibs pkg
+
+    toInternalPackageMungedName
+      = T.pack . unMungedPackageName . computeCompatPackageName (pkgName pkgId)
+      . Just . Cabal.mkUnqualComponentName . T.unpack
 
     -- Gets all of the modules, files, build files, and data files that
     -- constitute the package. This is primarily used for dirtiness
@@ -411,6 +422,12 @@ generatePkgDescOpts sourceMap installedMap omitPkgs addPkgs cabalfp pkg componen
                          []
                          (return . generate CLib . libBuildInfo)
                          (library pkg)
+                   , mapMaybe
+                         (\sublib -> do
+                            let maybeLib = CInternalLib . T.pack . Cabal.unUnqualComponentName <$> libName sublib
+                            flip generate  (libBuildInfo sublib) <$> maybeLib
+                          )
+                         (subLibraries pkg)
                    , fmap
                          (\exe ->
                                generate
@@ -698,7 +715,7 @@ packageDescModulesAndFiles
     :: PackageDescription
     -> RIO Ctx (Map NamedComponent (Map ModuleName (Path Abs File)), Map NamedComponent (Set DotCabalPath), Set (Path Abs File), [PackageWarning])
 packageDescModulesAndFiles pkg = do
-    (libraryMods,libDotCabalFiles,libWarnings) <- -- FIXME add in sub libraries
+    (libraryMods,libDotCabalFiles,libWarnings) <-
         maybe
             (return (M.empty, M.empty, []))
             (asModuleAndFileMap libComponent libraryFiles)

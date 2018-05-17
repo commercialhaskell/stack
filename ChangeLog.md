@@ -14,6 +14,11 @@ Other enhancements:
 Bug fixes:
 
 * `~/.stack/config.yaml` and `stack.yaml` terminating by newline
+* `stack ghci` on a package with internal libraries was erroneously looking
+  for a wrong package corresponding to the internal library and failing to
+  load any module. This has been fixed now and changes to the code in the
+  library and the sublibrary are properly tracked. See
+  [#3926](https://github.com/commercialhaskell/stack/issues/3926).
 
 
 ## v1.7.1
