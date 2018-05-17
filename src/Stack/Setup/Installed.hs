@@ -55,7 +55,7 @@ toolNameString (Tool ident) = packageNameString $ packageIdentifierName ident
 toolNameString ToolGhcjs{} = "ghcjs"
 
 parseToolText :: Text -> Maybe Tool
-parseToolText (parseCompilerVersion -> Just (cv@GhcjsVersion{})) = Just (ToolGhcjs cv)
+parseToolText (parseCompilerVersion -> Just cv@GhcjsVersion{}) = Just (ToolGhcjs cv)
 parseToolText (parsePackageIdentifierFromString . T.unpack -> Just pkgId) = Just (Tool pkgId)
 parseToolText _ = Nothing
 
