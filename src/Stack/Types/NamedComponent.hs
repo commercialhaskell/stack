@@ -8,6 +8,7 @@ module Stack.Types.NamedComponent
   , exeComponents
   , testComponents
   , benchComponents
+  , internalLibComponents
   , isCLib
   , isCInternalLib
   , isCExe
@@ -59,6 +60,12 @@ benchComponents = Set.fromList . mapMaybe mBenchName . Set.toList
   where
     mBenchName (CBench name) = Just name
     mBenchName _ = Nothing
+
+internalLibComponents :: Set NamedComponent -> Set Text
+internalLibComponents = Set.fromList . mapMaybe mInternalName . Set.toList
+  where
+    mInternalName (CInternalLib name) = Just name
+    mInternalName _ = Nothing
 
 isCLib :: NamedComponent -> Bool
 isCLib CLib{} = True

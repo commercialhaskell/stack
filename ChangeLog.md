@@ -16,6 +16,11 @@ Bug fixes:
 * `~/.stack/config.yaml` and `stack.yaml` terminating by newline
 * A regression in recompilation checking introduced in v1.7.1 has been fixed.
   See [#4001](https://github.com/commercialhaskell/stack/issues/4001)
+* `stack ghci` on a package with internal libraries was erroneously looking
+  for a wrong package corresponding to the internal library and failing to
+  load any module. This has been fixed now and changes to the code in the
+  library and the sublibrary are properly tracked. See
+  [#3926](https://github.com/commercialhaskell/stack/issues/3926).
 
 
 ## v1.7.1
