@@ -16,6 +16,8 @@ Other enhancements:
 Bug fixes:
 
 * `~/.stack/config.yaml` and `stack.yaml` terminating by newline
+* The previous released caused a regression where some `stderr` from the
+  `ghc-pkg` command showed up in the terminal. This output is now silenced.
 * A regression in recompilation checking introduced in v1.7.1 has been fixed.
   See [#4001](https://github.com/commercialhaskell/stack/issues/4001)
 * `stack ghci` on a package with internal libraries was erroneously looking
