@@ -1421,7 +1421,7 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
                     unless (null warnings) $ prettyWarn $
                         "The following modules should be added to exposed-modules or other-modules in" <+>
                         display cabalfp <> ":" <> line <>
-                        indent 4 (mconcat $ map showModuleWarning warnings) <>
+                        indent 4 (mconcat $ intersperse line $ map showModuleWarning warnings) <>
                         line <> line <>
                         "Missing modules in the cabal file are likely to cause undefined reference errors from the linker, along with other problems."
 

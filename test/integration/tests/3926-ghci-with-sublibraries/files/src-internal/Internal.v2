@@ -1,0 +1,4 @@
+module Internal where
+
+testInt :: Int
+testInt = 42

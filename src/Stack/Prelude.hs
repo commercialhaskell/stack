@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP                        #-}
 {-# LANGUAGE NoImplicitPrelude          #-}
 {-# LANGUAGE OverloadedStrings          #-}
 {-# LANGUAGE ScopedTypeVariables        #-}
@@ -13,6 +14,7 @@ module Stack.Prelude
   , readProcessNull
   , withProcessContext
   , stripCR
+  , hIsTerminalDeviceOrMinTTY
   , module X
   ) where
 
@@ -29,6 +31,10 @@ import qualified System.IO as IO
 import qualified System.Directory as Dir
 import qualified System.FilePath as FP
 import           System.IO.Error (isDoesNotExistError)
+
+#ifdef WINDOWS
+import           System.Win32 (isMinTTYHandle, withHandleToHANDLE)
+#endif
 
 import           Data.Conduit.Binary (sourceHandle, sinkHandle)
 import qualified Data.Conduit.Binary as CB
@@ -151,3 +157,16 @@ withProcessContext pcNew inner = do
 -- | Remove a trailing carriage return if present
 stripCR :: Text -> Text
 stripCR = T.dropSuffix "\r"
+
+-- | hIsTerminaDevice does not recognise handles to mintty terminals as terminal
+-- devices, but isMinTTYHandle does.
+hIsTerminalDeviceOrMinTTY :: MonadIO m => Handle -> m Bool
+#ifdef WINDOWS
+hIsTerminalDeviceOrMinTTY h = do
+  isTD <- hIsTerminalDevice h
+  if isTD
+    then return True
+    else liftIO $ withHandleToHANDLE h isMinTTYHandle
+#else
+hIsTerminalDeviceOrMinTTY = hIsTerminalDevice
+#endif
