@@ -167,7 +167,7 @@ main = do
   hSetTranslit stderr
   args <- getArgs
   progName <- getProgName
-  isTerminal <- hIsTerminalDevice stdout
+  isTerminal <- hIsTerminalDeviceOrMinTTY stdout
   execExtraHelp args
                 Docker.dockerHelpOptName
                 (dockerOptsParser False)

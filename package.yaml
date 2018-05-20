@@ -121,7 +121,7 @@ when:
   then:
     cpp-options: -DWINDOWS
     dependencies:
-    - Win32
+    - Win32 >= 2.5.3.0
   else:
     build-tools:
     - hsc2hs

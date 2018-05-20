@@ -243,8 +243,8 @@ runContainerAndExit getCmdArgs
      (env,isStdinTerminal,isStderrTerminal,homeDir) <- liftIO $
        (,,,)
        <$> getEnvironment
-       <*> hIsTerminalDevice stdin
-       <*> hIsTerminalDevice stderr
+       <*> hIsTerminalDeviceOrMinTTY stdin
+       <*> hIsTerminalDeviceOrMinTTY stderr
        <*> (parseAbsDir =<< getHomeDirectory)
      isStdoutTerminal <- view terminalL
      let dockerHost = lookup "DOCKER_HOST" env
