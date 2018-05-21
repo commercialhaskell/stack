@@ -1911,7 +1911,7 @@ primaryComponentOptions executableBuildStatuses lp =
              map T.unpack
            $ T.append "lib:" (packageNameText (packageName package))
            : map (T.append "flib:") (Set.toList names)) ++
-      (map (T.unpack . T.append "lib:") (Set.toList $ packageInternalLibraries package)) ++
+      map (T.unpack . T.append "lib:") (Set.toList $ packageInternalLibraries package) ++
       map (T.unpack . T.append "exe:") (Set.toList $ exesToBuild executableBuildStatuses lp)
   where
     package = lpPackage lp
