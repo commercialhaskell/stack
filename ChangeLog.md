@@ -25,6 +25,11 @@ Bug fixes:
   load any module. This has been fixed now and changes to the code in the
   library and the sublibrary are properly tracked. See
   [#3926](https://github.com/commercialhaskell/stack/issues/3926).
+* For packages with internal libraries not depended upon, `stack build` used
+  to fail the build process since the internal library was not built but it
+  was tried to be registered. This is now fixed by always building internal
+  libraries. See
+  [#3996](https://github.com/commercialhaskell/stack/issues/3996).
 
 
 ## v1.7.1
