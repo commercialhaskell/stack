@@ -21,5 +21,5 @@ main = do
 
 expectMessage :: String -> String -> IO ()
 expectMessage msg stderr =
-  unless ((words msg) `isInfixOf` (words stderr))
+  unless (words msg `isInfixOf` words stderr)
          (error $ "Expected a warning: \n" ++ show msg)
