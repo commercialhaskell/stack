@@ -398,8 +398,10 @@ runGhci GhciOpts{..} targets mainIsTargets pkgs extraFiles exposePackages = do
     tmpDirectory <-
         (</> $(mkRelDir "haskell-stack-ghci")) <$>
         (parseAbsDir =<< liftIO getCanonicalTemporaryDirectory)
+    ghciDir <- view ghciDirL
+    ensureDir ghciDir
     ensureDir tmpDirectory
-    macrosOptions <- writeMacrosFile tmpDirectory pkgs
+    macrosOptions <- writeMacrosFile ghciDir pkgs
     if ghciNoLoadModules
         then execGhci macrosOptions
         else do
