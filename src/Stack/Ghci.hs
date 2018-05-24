@@ -411,7 +411,7 @@ runGhci GhciOpts{..} targets mainIsTargets pkgs extraFiles exposePackages = do
             execGhci (macrosOptions ++ scriptOptions)
 
 writeMacrosFile :: HasRunner env => Path Abs Dir -> [GhciPkgInfo] -> RIO env [String]
-writeMacrosFile tmpDirectory pkgs = do
+writeMacrosFile outputDirectory pkgs = do
     fps <- fmap (nubOrd . catMaybes . concat) $
         forM pkgs $ \pkg -> forM (ghciPkgOpts pkg) $ \(_, bio) -> do
             let cabalMacros = bioCabalMacros bio
@@ -423,22 +423,22 @@ writeMacrosFile tmpDirectory pkgs = do
                     return Nothing
     files <- liftIO $ mapM (S8.readFile . toFilePath) fps
     if null files then return [] else do
-        out <- liftIO $ writeHashedFile tmpDirectory $(mkRelFile "cabal_macros.h") $
+        out <- liftIO $ writeHashedFile outputDirectory $(mkRelFile "cabal_macros.h") $
             S8.concat $ map (<> "\n#undef CURRENT_PACKAGE_KEY\n#undef CURRENT_COMPONENT_ID\n") files
         return ["-optP-include", "-optP" <> toFilePath out]
 
 writeGhciScript :: (MonadIO m) => Path Abs Dir -> GhciScript -> m [String]
-writeGhciScript tmpDirectory script = do
-    scriptPath <- liftIO $ writeHashedFile tmpDirectory $(mkRelFile "ghci-script") $
+writeGhciScript outputDirectory script = do
+    scriptPath <- liftIO $ writeHashedFile outputDirectory $(mkRelFile "ghci-script") $
         LBS.toStrict $ scriptToLazyByteString script
     let scriptFilePath = toFilePath scriptPath
     setScriptPerms scriptFilePath
     return ["-ghci-script=" <> scriptFilePath]
 
 writeHashedFile :: Path Abs Dir -> Path Rel File -> ByteString -> IO (Path Abs File)
-writeHashedFile tmpDirectory relFile contents = do
+writeHashedFile outputDirectory relFile contents = do
     relSha <- shaPathForBytes contents
-    let outDir = tmpDirectory </> relSha
+    let outDir = outputDirectory </> relSha
         outFile = outDir </> relFile
     alreadyExists <- doesFileExist outFile
     unless alreadyExists $ do
