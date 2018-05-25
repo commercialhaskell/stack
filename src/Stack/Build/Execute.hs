@@ -1905,7 +1905,7 @@ primaryComponentOptions executableBuildStatuses lp =
       -- TODO: get this information from target parsing instead,
       -- which will allow users to turn off library building if
       -- desired
-      (case packageLibraries (lpPackage lp) of
+      (case packageLibraries package of
          NoLibraries -> []
          HasLibraries names ->
              map T.unpack
