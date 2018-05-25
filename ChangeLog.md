@@ -19,6 +19,10 @@ Other enhancements:
 
 Bug fixes:
 
+* `stack ghci` now does not invalidate `.o` files on repeated runs,
+  meaning any modules compiled with `-fobject-code` will be cached
+  between ghci runs. See
+  [#4038](https://github.com/commercialhaskell/stack/pull/4038).
 * `~/.stack/config.yaml` and `stack.yaml` terminating by newline
 * The previous released caused a regression where some `stderr` from the
   `ghc-pkg` command showed up in the terminal. This output is now silenced.
