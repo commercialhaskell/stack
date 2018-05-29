@@ -1245,20 +1245,23 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
       where
         result = T.intercalate " + " $ concat
             [ ["lib" | taskAllInOne && hasLib]
+            , ["internal-lib" | taskAllInOne && hasSubLib]
             , ["exe" | taskAllInOne && hasExe]
             , ["test" | enableTests]
             , ["bench" | enableBenchmarks]
             ]
-        (hasLib, hasExe) = case taskType of
+        (hasLib, hasSubLib, hasExe) = case taskType of
             TTFiles lp Local ->
-              let hasLibrary =
-                    case packageLibraries (lpPackage lp) of
+              let package = lpPackage lp
+                  hasLibrary =
+                    case packageLibraries package of
                       NoLibraries -> False
                       HasLibraries _ -> True
-               in (hasLibrary, not (Set.null (exesToBuild executableBuildStatuses lp)))
+                  hasSubLibrary = not . Set.null $ packageInternalLibraries package
+               in (hasLibrary, hasSubLibrary, not (Set.null (exesToBuild executableBuildStatuses lp)))
             -- This isn't true, but we don't want to have this info for
             -- upstream deps.
-            _ -> (False, False)
+            _ -> (False, False, False)
 
     getPrecompiled cache =
         case taskLocation task of
