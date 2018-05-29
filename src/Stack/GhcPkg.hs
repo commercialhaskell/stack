@@ -73,7 +73,7 @@ ghcPkg wc pkgDbs args = do
   where
     go = tryAny
        $ BL.toStrict
-     <$> proc (ghcPkgExeName wc) args' readProcessStdout_
+     <$> proc (ghcPkgExeName wc) args' readProcess_
     args' = packageDbFlags pkgDbs ++ args
 
 -- | Create a package database in the given directory, if it doesn't exist.
@@ -102,7 +102,7 @@ createDatabase wc db = do
                 ensureDir (parent db)
                 return ["init", toFilePath db]
         void $ proc (ghcPkgExeName wc) args $ \pc ->
-          readProcessStdout_ pc `onException`
+          readProcess_ pc `onException`
           logError ("Unable to create package database at " <> fromString (toFilePath db))
 
 -- | Get the name to use for "ghc-pkg", given the compiler version.
