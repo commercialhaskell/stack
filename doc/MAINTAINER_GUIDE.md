@@ -442,8 +442,8 @@ GHC 7.8.4 is slightly different:
 
 When installing GHC on Windows, Stack will also install
 [msys2](http://www.msys2.org/) to provide a Unix shell and environment,
-necessary for such things as running configure scripts. This document explains
-the steps to take to upgrade the msys2 version used by Stack.
+necessary for such things as running configure scripts. This section explains
+the steps required to upgrade the msys2 version used by Stack.
 
 1.  Download latest installers from msys2's website. These installers are
     executables, versioned by date (YYYYMMDD), and are separate for `x86_64`
