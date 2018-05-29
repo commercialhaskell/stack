@@ -72,7 +72,7 @@ ghcPkg wc pkgDbs args = do
       Right _ -> return eres
   where
     go = tryAny
-       $ BL.toStrict
+       $ BL.toStrict . fst
      <$> proc (ghcPkgExeName wc) args' readProcess_
     args' = packageDbFlags pkgDbs ++ args
 
