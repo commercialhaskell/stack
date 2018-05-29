@@ -1258,7 +1258,8 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
                       NoLibraries -> False
                       HasLibraries _ -> True
                   hasSubLibrary = not . Set.null $ packageInternalLibraries package
-               in (hasLibrary, hasSubLibrary, not (Set.null (exesToBuild executableBuildStatuses lp)))
+                  hasExecutables = not . Set.null $ exesToBuild executableBuildStatuses lp
+               in (hasLibrary, hasSubLibrary, hasExecutables)
             -- This isn't true, but we don't want to have this info for
             -- upstream deps.
             _ -> (False, False, False)
