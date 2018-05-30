@@ -1678,7 +1678,7 @@ docker:
 ```
 
 You can find more details about the first integration
-method [here](./docker_integration.md).
+method [in the Docker integration documentation](./docker_integration.md).
 
 ### Nix
 
