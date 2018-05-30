@@ -1483,7 +1483,8 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
                 NoLibraries -> False
                 HasLibraries _ -> True
             hasInternalLibrary = not $ Set.null $ packageInternalLibraries package
-            shouldCopy = not isFinalBuild && (hasLibrary || hasInternalLibrary || not (Set.null (packageExes package)))
+            hasExecutables = not $ Set.null $ packageExes package
+            shouldCopy = not isFinalBuild && (hasLibrary || hasInternalLibrary || hasExecutables)
         when shouldCopy $ withMVar eeInstallLock $ \() -> do
             announce "copy/register"
             eres <- try $ cabal KeepTHLoading ["copy"]
