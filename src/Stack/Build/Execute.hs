@@ -1482,8 +1482,9 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
               case packageLibraries package of
                 NoLibraries -> False
                 HasLibraries _ -> True
-            hasInternalLibrary = not $ Set.null $ packageInternalLibraries package
-            hasExecutables = not $ Set.null $ packageExes package
+            packageHasComponentSet f = not $ Set.null $ f package
+            hasInternalLibrary = packageHasComponentSet packageInternalLibraries
+            hasExecutables = packageHasComponentSet packageExes
             shouldCopy = not isFinalBuild && (hasLibrary || hasInternalLibrary || hasExecutables)
         when shouldCopy $ withMVar eeInstallLock $ \() -> do
             announce "copy/register"
