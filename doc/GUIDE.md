@@ -1677,8 +1677,10 @@ docker:
     enable: true
 ```
 
-You can find more details about the first integration
-method [in the Docker integration documentation](./docker_integration.md).
+Alternatively, instead of the above configuration, you can use the
+`--docker` option to achieve the same.  You can find more details
+about the first integration method [in the Docker integration
+documentation](./docker_integration.md).
 
 ### Nix
 
