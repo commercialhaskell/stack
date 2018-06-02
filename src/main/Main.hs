@@ -371,7 +371,7 @@ commandLineHandler currentDir progName isInterpreter = complicatedOptions
                   execCmd
                   (execOptsParser Nothing)
       addCommand' "run"
-                  "Run the first available executable (alias for 'exec')"
+                  "Build and run the first available executable"
                   execCmd
                   (execOptsParser $ Just ExecRun)
       addGhciCommand' "ghci"
@@ -857,8 +857,10 @@ execCmd ExecOpts {..} go@GlobalOpts{..} =
           pkgComponents <- liftM (map lpvComponents . Map.elems . lpProject) getLocalPackages
           let exe = find isCExe $ concatMap Set.toList pkgComponents
           case exe of
-              Just (CExe exe') -> return (T.unpack exe', args)
-              _               -> liftIO $ do
+              Just (CExe exe') -> do
+                Stack.Build.build (const (return ())) Nothing defaultBuildOptsCLI{boptsCLITargets = [T.concat [T.pack ":", exe']]}
+                return (T.unpack exe', args)
+              _                -> liftIO $ do
                   hPutStrLn stderr "No executables found."
                   exitFailure
 
