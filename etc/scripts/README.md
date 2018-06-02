@@ -6,7 +6,7 @@ currently handles some tasks that need to be performed on each platform:
 building the release, running some pre-release checks, and uploading binaries to
 a Github release.
 
-See [Checklist](../../doc/MAINTAINER_GUIDE.md) of
+See [Checklist](../../doc/maintainers/releases.md) of
 additional manual release steps.
 
 Prerequisites
