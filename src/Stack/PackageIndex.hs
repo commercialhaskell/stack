@@ -1,5 +1,6 @@
-{-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE NoImplicitPrelude          #-}
 {-# LANGUAGE BangPatterns               #-}
+{-# LANGUAGE CPP                        #-}
 {-# LANGUAGE ConstraintKinds            #-}
 {-# LANGUAGE DataKinds                  #-}
 {-# LANGUAGE DeriveDataTypeable         #-}
@@ -76,7 +77,7 @@ populateCache index = do
             loop 0 HashMap.empty (Tar.read lbs)
     pis0 <- loadPIS `catch` \e -> do
         logWarn $ "Exception encountered when parsing index tarball: "
-                <> T.pack (show (e :: Tar.FormatError))
+                <> displayShow (e :: Tar.FormatError)
         logWarn "Automatically updating index and trying again"
         updateIndex index
         loadPIS
@@ -246,9 +247,9 @@ updateIndex index =
   do let name = indexName index
          url = indexLocation index
      logSticky $ "Updating package index "
-               <> indexNameText (indexName index)
+               <> display (indexNameText (indexName index))
                <> " (mirrored at "
-               <> url
+               <> display url
                <> ") ..."
      case indexType index of
        ITVanilla -> updateIndexHTTP name url
@@ -272,7 +273,7 @@ updateIndexHTTP :: HasCabalLoader env
                 -> RIO env ()
 updateIndexHTTP indexName' url = do
     req <- parseRequest $ T.unpack url
-    logInfo ("Downloading package index from " <> url)
+    logInfo ("Downloading package index from " <> display url)
     gz <- configPackageIndexGz indexName'
     tar <- configPackageIndex indexName'
     wasDownloaded <- redownload req gz
@@ -310,7 +311,7 @@ updateIndexHackageSecurity indexName' url (HackageSecurity keyIds threshold) = d
     manager <- liftIO getGlobalManager
     root <- configPackageIndexRoot indexName'
     run <- askRunInIO
-    let logTUF = run . logInfo . T.pack . HS.pretty
+    let logTUF = run . logInfo . fromString . HS.pretty
         withRepo = HS.withRepository
             (HS.makeHttpLib manager)
             [baseURI]
@@ -373,8 +374,8 @@ deleteCache indexName' = do
     fp <- configPackageIndexCache indexName'
     eres <- liftIO $ tryIO $ removeFile fp
     case eres of
-        Left e -> logDebug $ "Could not delete cache: " <> T.pack (show e)
-        Right () -> logDebug $ "Deleted index cache at " <> T.pack (toFilePath fp)
+        Left e -> logDebug $ "Could not delete cache: " <> displayShow e
+        Right () -> logDebug $ "Deleted index cache at " <> fromString (toFilePath fp)
 
 -- | Get the known versions for a given package from the package caches.
 --
@@ -400,7 +401,11 @@ getPackageCaches = do
             result <- liftM mconcat $ forM (clIndices cl) $ \index -> do
                 fp <- configPackageIndexCache (indexName index)
                 PackageCache pis <-
+#if MIN_VERSION_template_haskell(2,13,0)
+                    $(versionedDecodeOrLoad (storeVersionConfig "pkg-v5" "LLL6OCcimOqRm3r0JmsSlLHcaLE="
+#else
                     $(versionedDecodeOrLoad (storeVersionConfig "pkg-v5" "A607WaDwhg5VVvZTxNgU9g52DO8="
+#endif
                                              :: VersionConfig (PackageCache ())))
                     fp
                     (populateCache index)

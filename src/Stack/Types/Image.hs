@@ -51,9 +51,12 @@ instance FromJSON (WithJSONWarnings ImageOptsMonoid) where
                          { ..
                          })
 
+instance Semigroup ImageOptsMonoid where
+    (<>) = mappenddefault
+
 instance Monoid ImageOptsMonoid where
     mempty = memptydefault
-    mappend = mappenddefault
+    mappend = (<>)
 
 instance FromJSON (WithJSONWarnings ImageDockerOpts) where
     parseJSON = withObjectWarnings

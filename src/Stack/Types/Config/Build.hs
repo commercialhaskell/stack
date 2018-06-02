@@ -290,9 +290,12 @@ buildMonoidSplitObjsName = "split-objs"
 buildMonoidSkipComponentsName :: Text
 buildMonoidSkipComponentsName = "skip-components"
 
+instance Semigroup BuildOptsMonoid where
+    (<>) = mappenddefault
+
 instance Monoid BuildOptsMonoid where
     mempty = memptydefault
-    mappend = mappenddefault
+    mappend = (<>)
 
 -- | Which subset of packages to build
 data BuildSubset
@@ -347,9 +350,12 @@ toMonoidCoverageArgName = "coverage"
 toMonoidDisableRunArgName :: Text
 toMonoidDisableRunArgName = "no-run-tests"
 
+instance Semigroup TestOptsMonoid where
+  (<>) = mappenddefault
+
 instance Monoid TestOptsMonoid where
   mempty = memptydefault
-  mappend = mappenddefault
+  mappend = (<>)
 
 
 
@@ -370,9 +376,12 @@ instance FromJSON (WithJSONWarnings HaddockOptsMonoid) where
     (\o -> do hoMonoidAdditionalArgs <- o ..:? hoMonoidAdditionalArgsName ..!= []
               return HaddockOptsMonoid{..})
 
+instance Semigroup HaddockOptsMonoid where
+  (<>) = mappenddefault
+
 instance Monoid HaddockOptsMonoid where
   mempty = memptydefault
-  mappend = mappenddefault
+  mappend = (<>)
 
 hoMonoidAdditionalArgsName :: Text
 hoMonoidAdditionalArgsName = "haddock-args"
@@ -409,9 +418,12 @@ beoMonoidAdditionalArgsArgName = "benchmark-arguments"
 beoMonoidDisableRunArgName :: Text
 beoMonoidDisableRunArgName = "no-run-benchmarks"
 
+instance Semigroup BenchmarkOptsMonoid where
+  (<>) = mappenddefault
+
 instance Monoid BenchmarkOptsMonoid where
   mempty = memptydefault
-  mappend = mappenddefault
+  mappend = (<>)
 
 data FileWatchOpts
   = NoFileWatch

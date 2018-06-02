@@ -16,9 +16,7 @@ import qualified Data.Conduit.List as CL
 import qualified Data.Foldable as F
 import qualified Data.HashSet as HashSet
 import           Data.List
-import qualified Data.Map.Strict as M
 import qualified Data.Map.Strict as Map
-import qualified Data.Text as T
 import           Path
 import           Stack.Build.Cache
 import           Stack.Constants
@@ -76,7 +74,7 @@ getInstalled opts sourceMap = do
         loadDatabase' (Just (InstalledTo Snap, snapDBPath)) installedLibs1
     (installedLibs3, localDumpPkgs) <-
         loadDatabase' (Just (InstalledTo Local, localDBPath)) installedLibs2
-    let installedLibs = M.fromList $ map lhPair installedLibs3
+    let installedLibs = Map.fromList $ map lhPair installedLibs3
 
     F.forM_ mcache $ \cache -> do
         icache <- configInstalledCache
@@ -174,36 +172,32 @@ processLoadResult _ True (WrongVersion actual wanted, lh)
     -- Allow some packages in the ghcjs global DB to have the wrong
     -- versions.  Treat them as wired-ins by setting deps to [].
     | fst (lhPair lh) `HashSet.member` ghcjsBootPackages = do
-        logWarn $ T.concat
-            [ "Ignoring that the GHCJS boot package \""
-            , packageNameText (fst (lhPair lh))
-            , "\" has a different version, "
-            , versionText actual
-            , ", than the resolver's wanted version, "
-            , versionText wanted
-            ]
+        logWarn $
+            "Ignoring that the GHCJS boot package \"" <>
+            display (packageNameText (fst (lhPair lh))) <>
+            "\" has a different version, " <>
+            display (versionText actual) <>
+            ", than the resolver's wanted version, " <>
+            display (versionText wanted)
         return (Just lh)
 processLoadResult mdb _ (reason, lh) = do
-    logDebug $ T.concat $
-        [ "Ignoring package "
-        , packageNameText (fst (lhPair lh))
-        ] ++
-        maybe [] (\db -> [", from ", T.pack (show db), ","]) mdb ++
-        [ " due to"
-        , case reason of
+    logDebug $
+        "Ignoring package " <>
+        display (packageNameText (fst (lhPair lh))) <>
+        maybe mempty (\db -> ", from " <> displayShow db <> ",") mdb <>
+        " due to" <>
+        case reason of
             Allowed -> " the impossible?!?!"
             NeedsProfiling -> " it needing profiling."
             NeedsHaddock -> " it needing haddocks."
             NeedsSymbols -> " it needing debugging symbols."
             UnknownPkg -> " it being unknown to the resolver / extra-deps."
-            WrongLocation mloc loc -> " wrong location: " <> T.pack (show (mloc, loc))
-            WrongVersion actual wanted -> T.concat
-                [ " wanting version "
-                , versionText wanted
-                , " instead of "
-                , versionText actual
-                ]
-        ]
+            WrongLocation mloc loc -> " wrong location: " <> displayShow (mloc, loc)
+            WrongVersion actual wanted ->
+                " wanting version " <>
+                display (versionText wanted) <>
+                " instead of " <>
+                display (versionText actual)
     return Nothing
 
 data Allowed
@@ -235,25 +229,37 @@ isAllowed opts mcache sourceMap mloc dp
     | otherwise =
         case Map.lookup name sourceMap of
             Nothing ->
-                case mloc of
-                    -- The sourceMap has nothing to say about this global
-                    -- package, so we can use it
-                    Nothing -> Allowed
-                    Just ExtraGlobal -> Allowed
-                    -- For non-global packages, don't include unknown packages.
-                    -- See:
-                    -- https://github.com/commercialhaskell/stack/issues/292
-                    Just _ -> UnknownPkg
-            Just pii
-                | not (checkLocation (piiLocation pii)) -> WrongLocation mloc (piiLocation pii)
-                | version /= piiVersion pii -> WrongVersion version (piiVersion pii)
-                | otherwise -> Allowed
+                -- If the sourceMap has nothing to say about this package,
+                -- check if it represents a sublibrary first
+                -- See: https://github.com/commercialhaskell/stack/issues/3899
+                case dpParentLibIdent dp of
+                  Just (PackageIdentifier parentLibName version') ->
+                    case Map.lookup parentLibName sourceMap of
+                      Nothing -> checkNotFound
+                      Just pii
+                        | version' == version -> checkFound pii
+                        | otherwise -> checkNotFound -- different versions
+                  Nothing -> checkNotFound
+            Just pii -> checkFound pii
   where
     PackageIdentifier name version = dpPackageIdent dp
     -- Ensure that the installed location matches where the sourceMap says it
     -- should be installed
     checkLocation Snap = mloc /= Just (InstalledTo Local) -- we can allow either global or snap
     checkLocation Local = mloc == Just (InstalledTo Local) || mloc == Just ExtraGlobal -- 'locally' installed snapshot packages can come from extra dbs
+    -- Check if a package is allowed if it is found in the sourceMap
+    checkFound pii
+      | not (checkLocation (piiLocation pii)) = WrongLocation mloc (piiLocation pii)
+      | version /= piiVersion pii = WrongVersion version (piiVersion pii)
+      | otherwise = Allowed
+    -- check if a package is allowed if it is not found in the sourceMap
+    checkNotFound = case mloc of
+      -- The sourceMap has nothing to say about this global package, so we can use it
+      Nothing -> Allowed
+      Just ExtraGlobal -> Allowed
+      -- For non-global packages, don't include unknown packages.
+      -- See: https://github.com/commercialhaskell/stack/issues/292
+      Just _ -> UnknownPkg
 
 data LoadHelper = LoadHelper
     { lhId   :: !GhcPkgId

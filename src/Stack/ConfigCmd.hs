@@ -70,11 +70,11 @@ cfgCmdSet go cmd = do
         config' = HMap.insert cmdKey newValue config
     if config' == config
         then logInfo
-                 (T.pack (toFilePath configFilePath) <>
+                 (fromString (toFilePath configFilePath) <>
                   " already contained the intended configuration and remains unchanged.")
         else do
             liftIO (S.writeFile (toFilePath configFilePath) (Yaml.encode config'))
-            logInfo (T.pack (toFilePath configFilePath) <> " has been updated.")
+            logInfo (fromString (toFilePath configFilePath) <> " has been updated.")
 
 cfgCmdSetValue
     :: (HasConfig env, HasGHCVariant env)
@@ -85,10 +85,10 @@ cfgCmdSetValue root (ConfigCmdSetResolver newResolver) = do
     -- Check that the snapshot actually exists
     void $ loadResolver concreteResolver
     return (Yaml.toJSON concreteResolver)
-cfgCmdSetValue _ (ConfigCmdSetSystemGhc _ bool) =
-    return (Yaml.Bool bool)
-cfgCmdSetValue _ (ConfigCmdSetInstallGhc _ bool) =
-    return (Yaml.Bool bool)
+cfgCmdSetValue _ (ConfigCmdSetSystemGhc _ bool') =
+    return (Yaml.Bool bool')
+cfgCmdSetValue _ (ConfigCmdSetInstallGhc _ bool') =
+    return (Yaml.Bool bool')
 
 cfgCmdSetOptionName :: ConfigCmdSet -> Text
 cfgCmdSetOptionName (ConfigCmdSetResolver _) = "resolver"

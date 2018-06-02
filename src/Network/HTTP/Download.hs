@@ -69,7 +69,7 @@ redownload :: HasRunner env
            -> Path Abs File -- ^ destination
            -> RIO env Bool
 redownload req0 dest = do
-    logDebug $ "Downloading " <> decodeUtf8With lenientDecode (path req0)
+    logDebug $ "Downloading " <> display (decodeUtf8With lenientDecode (path req0))
     let destFilePath = toFilePath dest
         etagFilePath = destFilePath <.> "etag"
 

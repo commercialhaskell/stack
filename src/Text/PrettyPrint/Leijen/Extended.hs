@@ -124,7 +124,7 @@ import qualified Data.Text as T
 import qualified Data.Text.IO as T
 import qualified Data.Text.Lazy as LT
 import qualified Data.Text.Lazy.Builder as LTB
-import Stack.Prelude
+import Stack.Prelude hiding (Display (..))
 import System.Console.ANSI (Color(..), ColorIntensity(..), ConsoleLayer(..), ConsoleIntensity(..), SGR(..), setSGRCode, hSupportsANSI)
 import qualified Text.PrettyPrint.Annotated.Leijen as P
 import Text.PrettyPrint.Annotated.Leijen hiding ((<>), display)
@@ -137,8 +137,10 @@ import Text.PrettyPrint.Annotated.Leijen hiding ((<>), display)
 -- Perhaps it can still have native string support, by adding a type
 -- parameter to Doc?
 
+instance Semigroup (Doc a) where
+    (<>) = (P.<>)
 instance Monoid (Doc a) where
-    mappend = (P.<>)
+    mappend = (<>)
     mempty = empty
 
 --------------------------------------------------------------------------------
@@ -162,7 +164,7 @@ instance Display (Doc a) where
 type AnsiDoc = Doc AnsiAnn
 
 newtype AnsiAnn = AnsiAnn [SGR]
-    deriving (Eq, Show, Monoid)
+    deriving (Eq, Show, Semigroup, Monoid)
 
 class HasAnsiAnn a where
     getAnsiAnn :: a -> AnsiAnn

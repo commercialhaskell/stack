@@ -14,7 +14,7 @@ import           Data.Char (isSpace)
 import           Data.List (find)
 import qualified Data.Set as Set
 import qualified Data.Text as T
-import           Lens.Micro
+import           Path (parseAbsFile)
 import           Path.IO hiding (findExecutable)
 import qualified Stack.Build
 import           Stack.Fetch
@@ -27,12 +27,17 @@ import           System.Exit
 import           RIO.Process
 
 -- | Hoogle command.
-hoogleCmd :: ([String],Bool,Bool) -> GlobalOpts -> IO ()
-hoogleCmd (args,setup,rebuild) go = withBuildConfig go $ do
+hoogleCmd :: ([String],Bool,Bool,Bool) -> GlobalOpts -> IO ()
+hoogleCmd (args,setup,rebuild,startServer) go = withBuildConfig go $ do
     hooglePath <- ensureHoogleInPath
     generateDbIfNeeded hooglePath
-    runHoogle hooglePath args
+    runHoogle hooglePath args'
   where
+    args' :: [String]
+    args' = if startServer
+                 then ["server", "--local", "--port", "8080"]
+                 else []
+            ++ args
     generateDbIfNeeded :: Path Abs File -> RIO EnvConfig ()
     generateDbIfNeeded hooglePath = do
         databaseExists <- checkDatabaseExists
@@ -103,18 +108,18 @@ hoogleCmd (args,setup,rebuild) go = withBuildConfig go $ do
                           | ver >= hoogleMinVersion -> Right ident
                         _ -> Left hoogleMinIdent)
         case hooglePackageIdentifier of
-            Left{} ->
-                logInfo
-                    ("Minimum " <> packageIdentifierText hoogleMinIdent <>
-                     " is not in your index. Installing the minimum version.")
-            Right ident ->
-                logInfo
-                    ("Minimum version is " <> packageIdentifierText hoogleMinIdent <>
-                     ". Found acceptable " <>
-                     packageIdentifierText ident <>
-                     " in your index, installing it.")
+            Left{} -> logInfo $
+              "Minimum " <>
+              display hoogleMinIdent <>
+              " is not in your index. Installing the minimum version."
+            Right ident -> logInfo $
+              "Minimum version is " <>
+              display hoogleMinIdent <>
+              ". Found acceptable " <>
+              display ident <>
+              " in your index, installing it."
         config <- view configL
-        menv <- liftIO $ configEnvOverrideSettings config envSettings
+        menv <- liftIO $ configProcessContextSettings config envSettings
         liftIO
             (catch
                  (withBuildConfigAndLock
@@ -132,15 +137,15 @@ hoogleCmd (args,setup,rebuild) go = withBuildConfig go $ do
                                 }))
                  (\(e :: ExitCode) ->
                        case e of
-                           ExitSuccess -> resetExeCache menv
+                           ExitSuccess -> runRIO menv resetExeCache
                            _ -> throwIO e))
     runHoogle :: Path Abs File -> [String] -> RIO EnvConfig ()
     runHoogle hooglePath hoogleArgs = do
         config <- view configL
-        menv <- liftIO $ configEnvOverrideSettings config envSettings
+        menv <- liftIO $ configProcessContextSettings config envSettings
         dbpath <- hoogleDatabasePath
         let databaseArg = ["--database=" ++ toFilePath dbpath]
-        withEnvOverride menv $ withProc
+        withProcessContext menv $ proc
           (toFilePath hooglePath)
           (hoogleArgs ++ databaseArg)
           runProcess_
@@ -152,17 +157,17 @@ hoogleCmd (args,setup,rebuild) go = withBuildConfig go $ do
     ensureHoogleInPath :: RIO EnvConfig (Path Abs File)
     ensureHoogleInPath = do
         config <- view configL
-        menv <- liftIO $ configEnvOverrideSettings config envSettings
-        mhooglePath <- findExecutable menv "hoogle"
+        menv <- liftIO $ configProcessContextSettings config envSettings
+        mhooglePath <- runRIO menv $ findExecutable "hoogle"
         eres <- case mhooglePath of
-            Nothing -> return $ Left "Hoogle isn't installed."
-            Just hooglePath -> do
-                result <- withEnvOverride menv
-                        $ withProc (toFilePath hooglePath) ["--numeric-version"]
+            Left _ -> return $ Left "Hoogle isn't installed."
+            Right hooglePath -> do
+                result <- withProcessContext menv
+                        $ proc hooglePath ["--numeric-version"]
                         $ tryAny . readProcessStdout_
                 let unexpectedResult got = Left $ T.concat
                         [ "'"
-                        , T.pack (toFilePath hooglePath)
+                        , T.pack hooglePath
                         , " --numeric-version' did not respond with expected value. Got: "
                         , got
                         ]
@@ -174,25 +179,25 @@ hoogleCmd (args,setup,rebuild) go = withBuildConfig go $ do
                             | ver >= hoogleMinVersion -> Right hooglePath
                             | otherwise -> Left $ T.concat
                                 [ "Installed Hoogle is too old, "
-                                , T.pack (toFilePath hooglePath)
+                                , T.pack hooglePath
                                 , " is version "
                                 , versionText ver
                                 , " but >= 5.0 is required."
                                 ]
         case eres of
-            Right hooglePath -> return hooglePath
+            Right hooglePath -> parseAbsFile hooglePath
             Left err
                 | setup -> do
-                    logWarn $ err <> " Automatically installing (use --no-setup to disable) ..."
+                    logWarn $ display err <> " Automatically installing (use --no-setup to disable) ..."
                     installHoogle
-                    mhooglePath' <- findExecutable menv "hoogle"
+                    mhooglePath' <- runRIO menv $ findExecutable "hoogle"
                     case mhooglePath' of
-                        Just hooglePath -> return hooglePath
-                        Nothing -> do
+                        Right hooglePath -> parseAbsFile hooglePath
+                        Left _ -> do
                             logWarn "Couldn't find hoogle in path after installing.  This shouldn't happen, may be a bug."
                             bail
                 | otherwise -> do
-                    logWarn $ err <> " Not installing it due to --no-setup."
+                    logWarn $ display err <> " Not installing it due to --no-setup."
                     bail
     envSettings =
         EnvSettings

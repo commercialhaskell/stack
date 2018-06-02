@@ -120,6 +120,7 @@ buildCacheFile dir component = do
     let nonLibComponent prefix name = prefix <> "-" <> T.unpack name
     cacheFileName <- parseRelFile $ case component of
         CLib -> "lib"
+        CInternalLib name -> nonLibComponent "internal-lib" name
         CExe name -> nonLibComponent "exe" name
         CTest name -> nonLibComponent "test" name
         CBench name -> nonLibComponent "bench" name

@@ -103,7 +103,7 @@ logJSONWarnings
     :: (MonadReader env m, HasLogFunc env, HasCallStack, MonadIO m)
     => FilePath -> [JSONWarning] -> m ()
 logJSONWarnings fp =
-    mapM_ (\w -> logWarn ("Warning: " <> T.pack fp <> ": " <> T.pack (show w)))
+    mapM_ (\w -> logWarn ("Warning: " <> fromString fp <> ": " <> displayShow w))
 
 -- | Handle warnings in a sub-object.
 jsonSubWarnings :: WarningParser (WithJSONWarnings a) -> WarningParser a
@@ -142,9 +142,11 @@ data WarningParserMonoid = WarningParserMonoid
     { wpmExpectedFields :: !(Set Text)
     , wpmWarnings :: [JSONWarning]
     } deriving Generic
+instance Semigroup WarningParserMonoid where
+    (<>) = mappenddefault
 instance Monoid WarningParserMonoid where
     mempty = memptydefault
-    mappend = mappenddefault
+    mappend = (<>)
 instance IsString WarningParserMonoid where
     fromString s = mempty { wpmWarnings = [fromString s] }
 
@@ -153,9 +155,11 @@ data WithJSONWarnings a = WithJSONWarnings a [JSONWarning]
     deriving (Eq, Generic, Show)
 instance Functor WithJSONWarnings where
     fmap f (WithJSONWarnings x w) = WithJSONWarnings (f x) w
+instance Monoid a => Semigroup (WithJSONWarnings a) where
+    (<>) = mappenddefault
 instance Monoid a => Monoid (WithJSONWarnings a) where
     mempty = memptydefault
-    mappend = mappenddefault
+    mappend = (<>)
 
 -- | Warning output from 'WarningParser'.
 data JSONWarning = JSONUnrecognizedFields String [Text]

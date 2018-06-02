@@ -14,7 +14,7 @@ import           Stack.Types.Config.Build
 
 buildOptsMonoidParser :: GlobalOptsContext -> Parser BuildOptsMonoid
 buildOptsMonoidParser hide0 =
-    BuildOptsMonoid <$> trace <*> profile <*> noStrip <*>
+    BuildOptsMonoid <$> trace' <*> profile <*> noStrip <*>
     libProfiling <*> exeProfiling <*> libStripping <*>
     exeStripping <*> haddock <*> haddockOptsParser hideBool <*>
     openHaddocks <*> haddockDeps <*> haddockInternal <*>
@@ -31,7 +31,7 @@ buildOptsMonoidParser hide0 =
 
     -- These use 'Any' because they are not settable in stack.yaml, so
     -- there is no need for options like --no-profile.
-    trace = Any <$>
+    trace' = Any <$>
         flag
             False
             True

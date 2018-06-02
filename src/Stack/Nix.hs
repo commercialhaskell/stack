@@ -28,7 +28,7 @@ import           Stack.Types.Runner
 import           Stack.Types.Compiler
 import           System.Environment (getArgs,getExecutablePath,lookupEnv)
 import qualified System.FilePath  as F
-import           RIO.Process (getEnvOverride, envOverrideL, exec)
+import           RIO.Process (processContextL, exec)
 
 -- | If Nix is enabled, re-runs the currently running OS command in a Nix container.
 -- Otherwise, runs the inner action.
@@ -64,8 +64,8 @@ runShellAndExit
     -> RIO env ()
 runShellAndExit mprojectRoot getCompilerVersion getCmdArgs = do
    config <- view configL
-   envOverride <- getEnvOverride
-   local (set envOverrideL envOverride) $ do
+   envOverride <- view processContextL
+   local (set processContextL envOverride) $ do
      (cmnd,args) <- fmap (escape *** map escape) getCmdArgs
      mshellFile <-
          traverse (resolveFile (fromMaybeProjectRoot mprojectRoot)) $
@@ -74,7 +74,7 @@ runShellAndExit mprojectRoot getCompilerVersion getCmdArgs = do
      inContainer <- getInContainer
      ghc <- either throwIO return $ nixCompiler compilerVersion
      let pkgsInConfig = nixPackages (configNix config)
-         pkgs = pkgsInConfig ++ [ghc, "git", "gcc"]
+         pkgs = pkgsInConfig ++ [ghc, "git", "gcc", "gmp"]
          pkgsStr = "[" <> T.intercalate " " pkgs <> "]"
          pureShell = nixPureShell (configNix config)
          addGCRoots = nixAddGCRoots (configNix config)
@@ -114,11 +114,11 @@ runShellAndExit mprojectRoot getCompilerVersion getCmdArgs = do
                            -- Using --run instead of --command so we cannot
                            -- end up in the nix-shell if stack build is Ctrl-C'd
      pathVar <- liftIO $ lookupEnv "PATH"
-     logDebug $ "PATH is: " <> T.pack (show pathVar)
+     logDebug $ "PATH is: " <> displayShow pathVar
      logDebug $
        "Using a nix-shell environment " <> (case mshellFile of
-            Just path -> "from file: " <> T.pack (toFilePath path)
-            Nothing -> "with nix packages: " <> T.intercalate ", " pkgs)
+            Just path -> "from file: " <> fromString (toFilePath path)
+            Nothing -> "with nix packages: " <> display (T.intercalate ", " pkgs))
      exec "nix-shell" fullArgs
 
 -- | Shell-escape quotes inside the string and enclose it in quotes.

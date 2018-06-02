@@ -117,12 +117,12 @@ tryDeprecatedPath mWarningDesc exists new old = do
                     case mWarningDesc of
                         Nothing -> return ()
                         Just desc ->
-                            logWarn $ T.concat
-                                [ "Warning: Location of ", desc, " at '"
-                                , T.pack (toFilePath old)
-                                , "' is deprecated; rename it to '"
-                                , T.pack (toFilePath new)
-                                , "' instead" ]
+                            logWarn $
+                                "Warning: Location of " <> display desc <> " at '" <>
+                                fromString (toFilePath old) <>
+                                "' is deprecated; rename it to '" <>
+                                fromString (toFilePath new) <>
+                                "' instead"
                     return (old, True)
                 else return (new, False)
 
@@ -156,7 +156,7 @@ getSnapshots :: HasConfig env => RIO env Snapshots
 getSnapshots = do
     latestUrlText <- askLatestSnapshotUrl
     latestUrl <- parseUrlThrow (T.unpack latestUrlText)
-    logDebug $ "Downloading snapshot versions file from " <> latestUrlText
+    logDebug $ "Downloading snapshot versions file from " <> display latestUrlText
     result <- httpJSON latestUrl
     logDebug "Done downloading and parsing snapshot versions file"
     return $ getResponseBody result
@@ -190,7 +190,7 @@ makeConcreteResolver root ar = do
                 | otherwise ->
                     let (x, y) = IntMap.findMax $ snapshotsLts snapshots
                      in return $ ResolverStackage $ LTS x y
-    logInfo $ "Selected resolver: " <> resolverRawName r
+    logInfo $ "Selected resolver: " <> display (resolverRawName r)
     return r
 
 -- | Get the latest snapshot resolver available.
@@ -298,7 +298,7 @@ configFromConfigMonoid
 
      case arch of
          OtherArch "aarch64" -> return ()
-         OtherArch unk -> logWarn $ "Warning: Unknown value for architecture setting: " <> T.pack (show unk)
+         OtherArch unk -> logWarn $ "Warning: Unknown value for architecture setting: " <> displayShow unk
          _ -> return ()
 
      configPlatformVariant <- liftIO $
@@ -323,10 +323,11 @@ configFromConfigMonoid
          throwM ManualGHCVariantSettingsAreIncompatibleWithSystemGHC
 
      rawEnv <- liftIO getEnvironment
-     pathsEnv <- augmentPathMap configMonoidExtraPath
+     pathsEnv <- either throwM return
+               $ augmentPathMap (map toFilePath configMonoidExtraPath)
                                 (Map.fromList (map (T.pack *** T.pack) rawEnv))
-     origEnv <- mkEnvOverride pathsEnv
-     let configEnvOverrideSettings _ = return origEnv
+     origEnv <- mkProcessContext pathsEnv
+     let configProcessContextSettings _ = return origEnv
 
      configLocalProgramsBase <- case getFirst configMonoidLocalProgramsBase of
        Nothing -> getDefaultLocalProgramsBase clStackRoot configPlatform origEnv
@@ -385,7 +386,7 @@ configFromConfigMonoid
      clCache <- newIORef Nothing
      clUpdateRef <- newMVar True
 
-     let configRunner = set envOverrideL origEnv configRunner'
+     let configRunner = set processContextL origEnv configRunner'
          configCabalLoader = CabalLoader {..}
 
      return Config {..}
@@ -394,7 +395,7 @@ configFromConfigMonoid
 getDefaultLocalProgramsBase :: MonadThrow m
                             => Path Abs Dir
                             -> Platform
-                            -> EnvOverride
+                            -> ProcessContext
                             -> m (Path Abs Dir)
 getDefaultLocalProgramsBase configStackRoot configPlatform override =
   let
@@ -406,7 +407,7 @@ getDefaultLocalProgramsBase configStackRoot configPlatform override =
       -- mean that Windows users would manually have to move data from the old
       -- location to the new one, which is undesirable.
       Platform _ Windows ->
-        case Map.lookup "LOCALAPPDATA" $ unEnvOverride override of
+        case Map.lookup "LOCALAPPDATA" $ view envVarsL override of
           Just t ->
             case parseAbsDir $ T.unpack t of
               Nothing -> throwM $ stringException ("Failed to parse LOCALAPPDATA environment variable (expected absolute directory): " ++ show t)
@@ -421,8 +422,8 @@ data MiniConfig = MiniConfig -- TODO do we really need a whole extra data type?
     }
 instance HasConfig MiniConfig where
     configL = lens mcConfig (\x y -> x { mcConfig = y })
-instance HasEnvOverride MiniConfig where
-    envOverrideL = configL.envOverrideL
+instance HasProcessContext MiniConfig where
+    processContextL = configL.processContextL
 instance HasCabalLoader MiniConfig where
     cabalLoaderL = configL.cabalLoaderL
 instance HasPlatform MiniConfig
@@ -542,7 +543,7 @@ loadBuildConfig mproject maresolver mcompiler = do
               ARLatestLTS -> "lts"
               ARLatestLTSMajor x -> T.pack $ "lts-" ++ show x
               ARGlobal -> "global"
-      logDebug ("Using resolver: " <> name <> " specified on command line")
+      logDebug ("Using resolver: " <> display name <> " specified on command line")
 
       -- In order to resolve custom snapshots, we need a base
       -- directory to deal with relative paths. For the case of
@@ -560,7 +561,7 @@ loadBuildConfig mproject maresolver mcompiler = do
 
     (project', stackYamlFP) <- case mproject of
       LCSProject (project, fp, _) -> do
-          forM_ (projectUserMsg project) (logWarn . T.pack)
+          forM_ (projectUserMsg project) (logWarn . fromString)
           return (project, fp)
       LCSNoConfig _ -> do
           p <- assert (isJust mresolver) (getEmptyProject mresolver)
@@ -580,12 +581,15 @@ loadBuildConfig mproject maresolver mcompiler = do
                    when (view terminalL config) $
                        case maresolver of
                            Nothing ->
-                               logDebug ("Using resolver: " <> resolverRawName (projectResolver project) <>
-                                         " from implicit global project's config file: " <> T.pack dest')
+                               logDebug $
+                                 "Using resolver: " <>
+                                 display (resolverRawName (projectResolver project)) <>
+                                 " from implicit global project's config file: " <>
+                                 fromString dest'
                            Just _ -> return ()
                    return (project, dest)
                else do
-                   logInfo ("Writing implicit global project config file to: " <> T.pack dest')
+                   logInfo ("Writing implicit global project config file to: " <> fromString dest')
                    logInfo "Note: You can change the snapshot via the resolver field there."
                    p <- getEmptyProject mresolver
                    liftIO $ do
@@ -633,11 +637,11 @@ loadBuildConfig mproject maresolver mcompiler = do
     getEmptyProject mresolver = do
       r <- case mresolver of
             Just resolver -> do
-                logInfo ("Using resolver: " <> resolverRawName resolver <> " specified on command line")
+                logInfo ("Using resolver: " <> display (resolverRawName resolver) <> " specified on command line")
                 return resolver
             Nothing -> do
                 r'' <- getLatestResolver
-                logInfo ("Using latest snapshot resolver: " <> resolverRawName r'')
+                logInfo ("Using latest snapshot resolver: " <> display (resolverRawName r''))
                 return r''
       return Project
         { projectUserMsg = Nothing
@@ -843,7 +847,7 @@ getProjectConfig SYLDefault = do
     getStackDotYaml dir = do
         let fp = dir </> stackDotYaml
             fp' = toFilePath fp
-        logDebug $ "Checking for project config at: " <> T.pack fp'
+        logDebug $ "Checking for project config at: " <> fromString fp'
         exists <- doesFileExist fp
         if exists
             then return $ Just fp
@@ -870,7 +874,7 @@ loadProjectConfig mstackYaml = do
         LCSProject fp -> do
             currDir <- getCurrentDir
             logDebug $ "Loading project config file " <>
-                        T.pack (maybe (toFilePath fp) toFilePath (stripProperPrefix currDir fp))
+                        fromString (maybe (toFilePath fp) toFilePath (stripProperPrefix currDir fp))
             LCSProject <$> load fp
         LCSNoProject -> do
             logDebug "No project config file found, using defaults."
@@ -960,4 +964,5 @@ defaultConfigYaml = S.intercalate "\n"
      , "#    author-email:"
      , "#    copyright:"
      , "#    github-username:"
+     , ""
      ]

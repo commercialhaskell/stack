@@ -162,6 +162,8 @@ data SnapName
     deriving (Generic, Typeable, Show, Data, Eq)
 instance Store SnapName
 instance NFData SnapName
+instance Display SnapName where
+  display = display . renderSnapName
 
 data BuildPlanTypesException
     = ParseSnapNameException !Text

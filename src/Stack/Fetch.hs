@@ -131,12 +131,11 @@ unpackPackages mSnapshotDef dest input = do
     unless (Map.null alreadyUnpacked) $
         throwM $ UnpackDirectoryAlreadyExists $ Set.fromList $ map toFilePath $ Map.elems alreadyUnpacked
     unpacked <- fetchPackages' Nothing toFetch
-    F.forM_ (Map.toList unpacked) $ \(ident, dest'') -> logInfo $ T.pack $ concat
-        [ "Unpacked "
-        , packageIdentifierString ident
-        , " to "
-        , toFilePath dest''
-        ]
+    F.forM_ (Map.toList unpacked) $ \(ident, dest'') -> logInfo $
+        "Unpacked " <>
+        fromString (packageIdentifierString ident) <>
+        " to " <>
+        fromString (toFilePath dest'')
   where
     -- Possible future enhancement: parse names as name + version range
     parse s =
@@ -358,12 +357,11 @@ loadFromIndex ident = do
           cl <- view cabalLoaderL
           join $ modifyMVar (clUpdateRef cl) $ \toUpdate ->
               if toUpdate then do
-                  logInfo $ T.concat
-                      [ "Didn't see "
-                      , T.pack $ packageIdentifierRevisionString ident
-                      , " in your package indices.\n"
-                      , "Updating and trying again."
-                      ]
+                  logInfo $
+                      "Didn't see " <>
+                      fromString (packageIdentifierRevisionString ident) <>
+                      " in your package indices.\n" <>
+                      "Updating and trying again."
                   updateAllIndices
                   _ <- getPackageCaches
                   return (False, loadFromIndex ident)
@@ -523,7 +521,7 @@ fetchPackages' mdistDir toFetchAll = do
                 , drRetryPolicy = drRetryPolicyDefault
                 }
         let progressSink _ =
-                logInfo $ packageIdentifierText ident <> ": download"
+                logInfo $ display ident <> ": download"
         _ <- verifiedDownload downloadReq destpath progressSink
 
         identStrP <- parseRelDir $ packageIdentifierString ident
@@ -560,7 +558,7 @@ fetchPackages' mdistDir toFetchAll = do
                 atomically $ modifyTVar outputVar $ Map.insert ident destDir
 
             F.forM_ unexpectedEntries $ \(path, entryType) ->
-                logWarn $ "Unexpected entry type " <> entryType <> " for entry " <> T.pack path
+                logWarn $ "Unexpected entry type " <> display entryType <> " for entry " <> fromString path
 
 -- | Internal function used to unpack tarball.
 --
@@ -576,7 +574,7 @@ untar tarPath expectedTarFolder destDirParent = do
                             $ Tar.read $ decompress lbs
 
                     filterEntries
-                      :: Monoid w => (Tar.Entry -> (Bool, w))
+                      :: (Semigroup w, Monoid w) => (Tar.Entry -> (Bool, w))
                          -> Tar.Entries b -> (Tar.Entries b, w)
                     -- Allow collecting warnings, Writer-monad style.
                     filterEntries f =

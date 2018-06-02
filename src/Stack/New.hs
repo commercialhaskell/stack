@@ -34,7 +34,6 @@ import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import qualified Data.Text.Encoding.Error as T (lenientDecode)
 import qualified Data.Text.IO as T
-import qualified Data.Text.Lazy as LT
 import           Data.Time.Calendar
 import           Data.Time.Clock
 import qualified Data.Yaml as Yaml
@@ -48,8 +47,8 @@ import           Stack.Types.Config
 import           Stack.Types.PackageName
 import           Stack.Types.TemplateName
 import           RIO.Process
-import           Text.Hastache
-import           Text.Hastache.Context
+import qualified Text.Mustache as Mustache
+import qualified Text.Mustache.Render as Mustache
 import           Text.Printf
 import           Text.ProjectTemplate
 
@@ -107,12 +106,12 @@ new opts forceOverwrite = do
                           RemoteTemp -> "Downloading"
          in
         logInfo
-            (loading <> " template \"" <> templateName template <>
+            (loading <> " template \"" <> display (templateName template) <>
              "\" to create project \"" <>
-             packageNameText project <>
+             display (packageNameText project) <>
              "\" in " <>
              if bare then "the current directory"
-                     else T.pack (toFilePath (dirname absDir)) <>
+                     else fromString (toFilePath (dirname absDir)) <>
              " ...")
 
 data TemplateFrom = LocalTemp | RemoteTemp
@@ -145,7 +144,7 @@ loadTemplate name logIt = do
   where
     loadLocalFile :: Path b File -> RIO env Text
     loadLocalFile path = do
-        logDebug ("Opening local template: \"" <> T.pack (toFilePath path)
+        logDebug ("Opening local template: \"" <> fromString (toFilePath path)
                                                 <> "\"")
         exists <- doesFileExist path
         if exists
@@ -187,17 +186,17 @@ applyTemplate project template nonceParams dir templateText = do
                                     , ("name-as-module", nameAsModule) ]
             configParams = configTemplateParams config
             yearParam = M.singleton "year" currentYear
-    (applied,missingKeys) <-
-        runWriterT
-            (hastacheStr
-                 defaultConfig { muEscapeFunc = id }
-                 templateText
-                 (mkStrContextM (contextFunction context)))
+        etemplateCompiled = Mustache.compileTemplate (T.unpack (templateName template)) templateText
+    templateCompiled <- case etemplateCompiled of
+      Left e -> throwM $ InvalidTemplate template (show e)
+      Right t -> return t
+    let (substitutionErrors, applied) = Mustache.checkedSubstitute templateCompiled context
+        missingKeys = S.fromList $ concatMap onlyMissingKeys substitutionErrors
     unless (S.null missingKeys)
-         (logInfo ("\n" <> T.pack (show (MissingParameters project template missingKeys (configUserConfigPath config))) <> "\n"))
+         (logInfo ("\n" <> displayShow (MissingParameters project template missingKeys (configUserConfigPath config)) <> "\n"))
     files :: Map FilePath LB.ByteString <-
         catch (execWriterT $ runConduit $
-               yield (T.encodeUtf8 (LT.toStrict applied)) .|
+               yield (T.encodeUtf8 applied) .|
                unpackTemplate receiveMem id
               )
               (\(e :: ProjectTemplateException) ->
@@ -217,20 +216,8 @@ applyTemplate project template nonceParams dir templateText = do
                       return (dir </> path, bytes))
              (M.toList files))
   where
-    -- | Does a lookup in the context and returns a moustache value,
-    -- on the side, writes out a set of keys that were requested but
-    -- not found.
-    contextFunction
-        :: Monad m
-        => Map Text Text
-        -> String
-        -> WriterT (Set String) m (MuType (WriterT (Set String) m))
-    contextFunction context key =
-        case M.lookup (T.pack key) context of
-            Nothing -> do
-                tell (S.singleton key)
-                return MuNothing
-            Just value -> return (MuVariable value)
+    onlyMissingKeys (Mustache.VariableNotFound ks) = map T.unpack ks
+    onlyMissingKeys _ = []
 
 -- | Check if we're going to overwrite any existing files.
 checkForOverwrite :: (MonadIO m, MonadThrow m) => [Path Abs File] -> m ()
@@ -259,8 +246,8 @@ runTemplateInits dir = do
     case configScmInit config of
         Nothing -> return ()
         Just Git ->
-            withWorkingDir dir $
-            catchAny (withProc "git" ["init"] runProcess_)
+            withWorkingDir (toFilePath dir) $
+            catchAny (proc "git" ["init"] runProcess_)
                   (\_ -> logInfo "git init failed to run, ignoring ...")
 
 -- | Display the set of templates accompanied with description if available.
@@ -295,7 +282,7 @@ getTemplateInfo = do
   resp <- catch (liftM Right $ httpLbs req) (\(ex :: HttpException) -> return . Left $ "Failed to download template info. The HTTP error was: " <> show ex)
   case resp >>= is200 of
     Left err -> do
-      logInfo $ T.pack err
+      logInfo $ fromString err
       return M.empty
     Right resp' ->
       case Yaml.decodeEither (LB.toStrict $ getResponseBody resp') :: Either String Object of
@@ -421,7 +408,7 @@ instance Show NewException where
     show (InvalidTemplate name why) =
         "The template \"" <> T.unpack (templateName name) <>
         "\" is invalid and could not be used. " <>
-        "The error was: \"" <> why <> "\""
+        "The error was: " <> why
     show (AttemptedOverwrites fps) =
         "The template would create the following files, but they already exist:\n" <>
         unlines (map (("  " ++) . toFilePath) fps) <>

@@ -1,7 +1,4 @@
-resolver: lts-11.2
-packages:
-- .
-- subs/rio
+resolver: lts-11.6
 
 # docker:
 #   enable: true
@@ -15,12 +12,22 @@ nix:
   enable: false
   packages:
     - zlib
+    - unzip
 flags:
   stack:
     hide-dependency-versions: true
     supported-build: true
 extra-deps:
+- rio-0.1.1.0@rev:0
 - Cabal-2.2.0.1@rev:0
-- hackage-security-0.5.3.0@rev:0
 - hpack-0.28.2
 - http-api-data-0.3.8.1@rev:0
+
+# Avoid https://github.com/commercialhaskell/stack/issues/3922
+# (triggered because later versions of persistent transitively depends
+# on haskell-src-exts, which needs the 'happy' build tool)
+- persistent-2.7.1@rev:0
+- persistent-sqlite-2.6.4@rev:0
+- resourcet-1.1.11@rev:0
+- conduit-1.2.13@rev:0
+- conduit-extra-1.2.3.2@rev:0

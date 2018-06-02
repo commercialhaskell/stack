@@ -18,7 +18,7 @@ module Main (main) where
 #ifndef HIDE_DEP_VERSIONS
 import qualified Build_stack
 #endif
-import           Stack.Prelude
+import           Stack.Prelude hiding (Display (..))
 import           Control.Monad.Reader (local)
 import           Control.Monad.Trans.Except (ExceptT)
 import           Control.Monad.Writer.Lazy (Writer)
@@ -39,7 +39,6 @@ import           Distribution.System (buildArch)
 import qualified Distribution.Text as Cabal (display)
 import           Distribution.Version (mkVersion')
 import           GHC.IO.Encoding (mkTextEncoding, textEncodingName)
-import           Lens.Micro
 import           Options.Applicative
 import           Options.Applicative.Help (errorHelp, stringChunk, vcatChunks)
 import           Options.Applicative.Builder.Extra
@@ -101,13 +100,15 @@ import           Stack.Types.Config
 import           Stack.Types.Compiler
 import           Stack.Types.NamedComponent
 import           Stack.Types.Nix
+import           Stack.Types.Runner
 import           Stack.Upgrade
 import qualified Stack.Upload as Upload
 import qualified System.Directory as D
 import           System.Environment (getProgName, getArgs, withArgs)
 import           System.Exit
 import           System.FilePath (isValid, pathSeparator)
-import           System.IO (stderr, stdin, stdout, BufferMode(..), hPutStrLn, hGetEncoding, hSetEncoding)
+import           System.Console.ANSI (SGR (Reset), hSupportsANSI, setSGR)
+import           System.IO (stderr, stdin, stdout, BufferMode(..), hPutStrLn, hPrint, hGetEncoding, hSetEncoding)
 
 -- | Change the character encoding of the given Handle to transliterate
 -- on unsupported characters instead of throwing an exception
@@ -170,7 +171,7 @@ main = do
   hSetTranslit stderr
   args <- getArgs
   progName <- getProgName
-  isTerminal <- hIsTerminalDevice stdout
+  isTerminal <- hIsTerminalDeviceOrMinTTY stdout
   execExtraHelp args
                 Docker.dockerHelpOptName
                 (dockerOptsParser False)
@@ -187,6 +188,15 @@ main = do
       throwIO exitCode
     Right (globalMonoid,run) -> do
       let global = globalOptsFromMonoid isTerminal globalMonoid
+      -- If stdout is (1) recognised as a terminal supporting ANSI (for the
+      -- purposes of the functions of the ansi-terminal package) and (2) a
+      -- native (ConHost) terminal on Windows 10, then the setSGR function will
+      -- enable the ANSI-capability for that terminal. Later uses of
+      -- hSupportsANSI with the functions of the RIO package that emit ANSI
+      -- codes will then have the intended outcome on native Windows 10
+      -- terminals.
+      when (globalColorWhen global /= ColorNever) $
+        hSupportsANSI stdout >>= flip when (setSGR [Reset])
       when (globalLogLevel global == LevelDebug) $ hPutStrLn stderr versionString'
       case globalReExecVersion global of
           Just expectVersion -> do
@@ -200,7 +210,7 @@ main = do
           case fromException e of
               Just ec -> exitWith ec
               Nothing -> do
-                  printExceptionStderr e
+                  hPrint stderr e
                   exitFailure
 
 -- Vertically combine only the error component of the first argument with the
@@ -308,7 +318,9 @@ commandLineHandler currentDir progName isInterpreter = complicatedOptions
         addCommand' "unpack"
                     "Unpack one or more packages locally"
                     unpackCmd
-                    (some $ strArgument $ metavar "PACKAGE")
+                    ((,) <$> some (strArgument $ metavar "PACKAGE")
+                         <*> optional (textOption $ long "to" <>
+                                         help "Optional path to unpack the package into (will unpack into subdirectory)"))
         addCommand' "update"
                     "Update the package index"
                     updateCmd
@@ -339,7 +351,7 @@ commandLineHandler currentDir progName isInterpreter = complicatedOptions
                     ("Run hoogle, the Haskell API search engine. Use 'stack exec' syntax " ++
                      "to pass Hoogle arguments, e.g. stack hoogle -- --count=20")
                     hoogleCmd
-                    ((,,) <$> many (strArgument (metavar "ARG"))
+                    ((,,,) <$> many (strArgument (metavar "ARG"))
                           <*> boolFlags
                                   True
                                   "setup"
@@ -347,7 +359,10 @@ commandLineHandler currentDir progName isInterpreter = complicatedOptions
                                   idm
                           <*> switch
                                   (long "rebuild" <>
-                                   help "Rebuild the hoogle database"))
+                                   help "Rebuild the hoogle database")
+                          <*> switch
+                                  (long "server" <>
+                                   help "Start local Hoogle server"))
         )
 
       -- These are the only commands allowed in interpreter mode as well
@@ -512,7 +527,7 @@ secondaryCommandHandler args f =
     else do
       mExternalExec <- D.findExecutable cmd
       case mExternalExec of
-        Just ex -> runEnvNoLogging $ do
+        Just ex -> withProcessContextNoLogging $ do
           -- TODO show the command in verbose mode
           -- hPutStrLn stderr $ unwords $
           --   ["Running", "[" ++ ex, unwords (tail args) ++ "]"]
@@ -618,8 +633,8 @@ cleanCmd opts go =
   -- See issues #2010 and #3468 for why "stack clean --full" is not used
   -- within docker.
   case opts of
-    CleanFull{} -> withBuildConfigAndLock go (const (clean opts))
-    CleanShallow{} -> withBuildConfigAndLockNoDocker go (const (clean opts))
+    CleanFull{} -> withBuildConfigAndLockNoDocker go (const (clean opts))
+    CleanShallow{} -> withBuildConfigAndLock go (const (clean opts))
 
 -- | Helper for build and install commands
 buildCmd :: BuildOptsCLI -> GlobalOpts -> IO ()
@@ -654,10 +669,11 @@ uninstallCmd _ go = withConfigAndLock go $
       ]
 
 -- | Unpack packages to the filesystem
-unpackCmd :: [String] -> GlobalOpts -> IO ()
-unpackCmd names go = withConfigAndLock go $ do
+unpackCmd :: ([String], Maybe Text) -> GlobalOpts -> IO ()
+unpackCmd (names, Nothing) go = unpackCmd (names, Just ".") go
+unpackCmd (names, Just dstPath) go = withConfigAndLock go $ do
     mSnapshotDef <- mapM (makeConcreteResolver Nothing >=> loadResolver) (globalResolver go)
-    Stack.Fetch.unpackPackages mSnapshotDef "." names
+    Stack.Fetch.unpackPackages mSnapshotDef (T.unpack dstPath) names
 
 -- | Update the package index
 updateCmd :: () -> GlobalOpts -> IO ()
@@ -789,8 +805,8 @@ execCmd ExecOpts {..} go@GlobalOpts{..} =
                     (Just $ munlockFile lk)
                     (runRIO (lcConfig lc) $ do
                         config <- view configL
-                        menv <- liftIO $ configEnvOverrideSettings config plainEnvSettings
-                        withEnvOverride menv $ Nix.reexecWithOptionalShell
+                        menv <- liftIO $ configProcessContextSettings config plainEnvSettings
+                        withProcessContext menv $ Nix.reexecWithOptionalShell
                             (lcProjectRoot lc)
                             getCompilerVersion
                             (runRIO (lcConfig lc) $
@@ -806,8 +822,8 @@ execCmd ExecOpts {..} go@GlobalOpts{..} =
                       }
 
               config <- view configL
-              menv <- liftIO $ configEnvOverrideSettings config eoEnvSettings
-              withEnvOverride menv $ do
+              menv <- liftIO $ configProcessContextSettings config eoEnvSettings
+              withProcessContext menv $ do
                 -- Add RTS options to arguments
                 let argsWithRts args = if null eoRtsOptions
                             then args :: [String]

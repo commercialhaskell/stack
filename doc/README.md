@@ -26,7 +26,7 @@ or:
     wget -qO- https://get.haskellstack.org/ | sh
 
 On Windows, you can download and install the
-[Windows 64-bit Installer](https://www.stackage.org/stack/windows-x86_64-installer).
+[Windows 64-bit Installer](https://get.haskellstack.org/stable/windows-x86_64-installer.exe).
 
 For detailed instructions and downloads, including many additional
 operating systems, check out the

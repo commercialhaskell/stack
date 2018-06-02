@@ -19,6 +19,7 @@
 # https://github.com/commercialhaskell/stack/blob/master/etc/scripts/get-stack.sh
 #
 
+STACK_VERSION="1.7.1"
 HOME_LOCAL_BIN="$HOME/.local/bin"
 DEFAULT_DEST="/usr/local/bin/stack"
 DEST=""
@@ -63,8 +64,10 @@ post_install_separator() {
 
 # determines the the CPU's instruction set
 get_isa() {
-  if arch | grep -q arm ; then
+  if arch | grep -q armv7 ; then
     echo arm
+  elif arch | grep -q aarch64 ; then
+    echo aarch64
   else
     echo x86
   fi
@@ -73,6 +76,11 @@ get_isa() {
 # exits with code 0 if arm ISA is detected as described above
 is_arm() {
   test "$(get_isa)" = arm
+}
+
+# exits with code 0 if aarch64 ISA is detected as described above
+is_aarch64() {
+  test "$(get_isa)" = aarch64
 }
 
 
@@ -145,10 +153,14 @@ do_ubuntu_install() {
     install_dependencies
     print_bindist_notice
     install_arm_binary
+  elif is_aarch64 ; then
+    install_dependencies
+    print_bindist_notice
+    install_aarch64_binary
   elif is_64_bit ; then
     install_dependencies
     print_bindist_notice
-    install_64bit_static_binary
+    install_64bit_standard_binary
   else
     install_dependencies
     print_bindist_notice
@@ -164,17 +176,21 @@ do_ubuntu_install() {
 do_debian_install() {
 
   install_dependencies() {
-    apt_install_dependencies g++ gcc libc6-dev libffi-dev libgmp-dev make xz-utils zlib1g-dev
+    apt_install_dependencies g++ gcc libc6-dev libffi-dev libgmp-dev make xz-utils zlib1g-dev git gnupg
   }
 
   if is_arm ; then
     install_dependencies
     print_bindist_notice
     install_arm_binary
+  elif is_aarch64 ; then
+    install_dependencies
+    print_bindist_notice
+    install_aarch64_binary
   elif is_64_bit ; then
     install_dependencies
     print_bindist_notice
-    install_64bit_static_binary
+    install_64bit_standard_binary
   else
     install_dependencies
     print_bindist_notice
@@ -188,13 +204,13 @@ do_debian_install() {
 # and install the necessary dependencies explicitly.
 do_fedora_install() {
   install_dependencies() {
-    dnf_install_pkgs perl make automake gcc gmp-devel libffi zlib xz tar
+    dnf_install_pkgs perl make automake gcc gmp-devel libffi zlib-devel xz tar git gnupg
   }
 
   if is_64_bit ; then
     install_dependencies "$1"
     print_bindist_notice
-    install_64bit_static_binary
+    install_64bit_standard_binary
   else
     install_dependencies "$1"
     print_bindist_notice
@@ -208,21 +224,28 @@ do_fedora_install() {
 # and install the necessary dependencies explicitly.
 do_centos_install() {
   install_dependencies() {
-    yum_install_pkgs perl make automake gcc gmp-devel libffi zlib xz tar
+    yum_install_pkgs perl make automake gcc gmp-devel libffi zlib xz tar git gnupg
   }
 
   if is_64_bit ; then
     install_dependencies
-    print_bindist_notice
-    install_64bit_static_binary
-  else
-    install_dependencies
     case "$1" in
       "6")
         print_bindist_notice "libgmp4"
-        install_32bit_gmp4_linked_binary
+        install_64bit_gmp4_linked_binary
         ;;
       *)
+        print_bindist_notice
+        install_64bit_standard_binary
+        ;;
+    esac
+  else
+    case "$1" in
+      "6")
+        die "Sorry, there is currently no Linux 32-bit gmp4 binary available."
+        ;;
+      *)
+        install_dependencies
         print_bindist_notice
         install_32bit_standard_binary
         ;;
@@ -263,7 +286,7 @@ do_alpine_install() {
   }
   install_dependencies
   if is_64_bit ; then
-    install_64bit_static_binary
+    die "Sorry, there is currently no 64-bit Alpine Linux binary available."
   else
     die "Sorry, there is currently no 32-bit Alpine Linux binary available."
   fi
@@ -277,11 +300,13 @@ do_sloppy_install() {
   info ""
 
   if is_arm ; then
-      install_arm_binary
+    install_arm_binary
+  elif is_aarch64 ; then
+    install_aarch64_binary
   elif is_64_bit ; then
-      install_64bit_static_binary
+    install_64bit_standard_binary
   else
-      install_32bit_standard_binary
+    install_32bit_standard_binary
   fi
   info "Since this installer doesn't support your Linux distribution,"
   info "there is no guarantee that 'stack' will work at all!  You may"
@@ -454,7 +479,7 @@ check_dl_tools() {
 
 # Download a Stack bindst and install it in /usr/local/bin/stack.
 install_from_bindist() {
-    IFB_URL="https://www.stackage.org/stack/$1"
+    IFB_URL="https://github.com/commercialhaskell/stack/releases/download/v${STACK_VERSION}/stack-${STACK_VERSION}-$1"
     check_dl_tools
     make_temp_dir
 
@@ -491,27 +516,31 @@ install_from_bindist() {
 }
 
 install_arm_binary() {
-  install_from_bindist "linux-arm"
+  install_from_bindist "linux-arm.tar.gz"
 }
 
 install_32bit_standard_binary() {
-  install_from_bindist "linux-i386"
+  install_from_bindist "linux-i386.tar.gz"
 }
 
-install_64bit_static_binary() {
-  install_from_bindist "linux-x86_64-static"
+install_64bit_standard_binary() {
+  install_from_bindist "linux-x86_64.tar.gz"
 }
 
-install_32bit_gmp4_linked_binary() {
-  install_from_bindist "linux-i386-gmp4"
+install_aarch64_binary() {
+  install_from_bindist "linux-aarch64.tar.gz"
+}
+
+install_64bit_gmp4_linked_binary() {
+  install_from_bindist "linux-x86_64-gmp4.tar.gz"
 }
 
 install_64bit_osx_binary() {
-  install_from_bindist "osx-x86_64"
+  install_from_bindist "osx-x86_64.tar.gz"
 }
 
 install_64bit_freebsd_binary() {
-  install_from_bindist "freebsd-x86_64"
+  install_from_bindist "freebsd-x86_64.tar.gz"
 }
 
 # Attempt to install packages using whichever of apt-get, dnf, yum, or apk is

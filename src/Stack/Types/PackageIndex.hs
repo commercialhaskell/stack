@@ -50,9 +50,12 @@ newtype PackageCache index = PackageCache
    (index, Maybe PackageDownload, NonEmpty ([CabalHash], OffsetSize))))
   deriving (Generic, Eq, Show, Data, Typeable, Store, NFData)
 
+instance Semigroup (PackageCache index) where
+  PackageCache x <> PackageCache y = PackageCache (HashMap.unionWith HashMap.union x y)
+
 instance Monoid (PackageCache index) where
   mempty = PackageCache HashMap.empty
-  mappend (PackageCache x) (PackageCache y) = PackageCache (HashMap.unionWith HashMap.union x y)
+  mappend = (<>)
 
 -- | offset in bytes into the 01-index.tar file for the .cabal file
 -- contents, and size in bytes of the .cabal file

@@ -17,18 +17,22 @@ module Stack.Ghci
     , ghci
     ) where
 
-import           Stack.Prelude
+import           Stack.Prelude hiding (Display (..))
 import           Control.Monad.State.Strict (State, execState, get, modify)
 import qualified Data.ByteString.Char8 as S8
+import qualified Data.ByteString.Lazy as LBS
 import           Data.List
-import           Data.List.Extra (nubOrd)
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
 import qualified Data.Text as T
+import qualified Data.Text.Lazy as TL
+import qualified Data.Text.Lazy.Encoding as TLE
 import qualified Distribution.PackageDescription as C
 import           Path
 import           Path.Extra (toFilePathNoTrailingSep)
 import           Path.IO hiding (withSystemTempDir)
+import qualified RIO
+import           RIO.Process (HasProcessContext, exec, proc, readProcess_)
 import           Stack.Build
 import           Stack.Build.Installed
 import           Stack.Build.Source
@@ -48,7 +52,7 @@ import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageName
 import           Stack.Types.Runner
 import           System.IO (putStrLn, putStr, getLine)
-import           RIO.Process (withEnvOverride, execSpawn, execObserve)
+import           System.IO.Temp (getCanonicalTemporaryDirectory)
 
 #ifndef WINDOWS
 import qualified System.Posix.Files as Posix
@@ -267,19 +271,18 @@ getAllLocalTargets GhciOpts{..} targets0 mainIsTargets sourceMap = do
     if (ghciSkipIntermediate && not ghciLoadLocalDeps) || null extraLoadDeps
         then return directlyWanted
         else do
-            let extraList = T.intercalate ", " (map (packageNameText . fst) extraLoadDeps)
+            let extraList =
+                  mconcat $ intersperse ", " (map (RIO.display . fst) extraLoadDeps)
             if ghciLoadLocalDeps
-                then logInfo $ T.concat
-                    [ "The following libraries will also be loaded into GHCi because "
-                    , "they are local dependencies of your targets, and you specified --load-local-deps:\n    "
-                    , extraList
-                    ]
-                else logInfo $ T.concat
-                    [ "The following libraries will also be loaded into GHCi because "
-                    , "they are intermediate dependencies of your targets:\n    "
-                    , extraList
-                    , "\n(Use --skip-intermediate-deps to omit these)"
-                    ]
+                then logInfo $
+                  "The following libraries will also be loaded into GHCi because " <>
+                  "they are local dependencies of your targets, and you specified --load-local-deps:\n    " <>
+                  extraList
+                else logInfo $
+                  "The following libraries will also be loaded into GHCi because " <>
+                  "they are intermediate dependencies of your targets:\n    " <>
+                  extraList <>
+                  "\n(Use --skip-intermediate-deps to omit these)"
             return (directlyWanted ++ extraLoadDeps)
 
 getAllNonLocalTargets
@@ -355,17 +358,17 @@ runGhci GhciOpts{..} targets mainIsTargets pkgs extraFiles exposePackages = do
     unless (null omittedOpts) $
         logWarn
             ("The following GHC options are incompatible with GHCi and have not been passed to it: " <>
-             T.unwords (map T.pack (nubOrd omittedOpts)))
+             mconcat (intersperse " " (fromString <$> nubOrd omittedOpts)))
     oiDir <- view objectInterfaceDirL
     let odir =
             [ "-odir=" <> toFilePathNoTrailingSep oiDir
             , "-hidir=" <> toFilePathNoTrailingSep oiDir ]
-    logInfo
-        ("Configuring GHCi with the following packages: " <>
-         T.intercalate ", " (map (packageNameText . ghciPkgName) pkgs))
+    logInfo $
+      "Configuring GHCi with the following packages: " <>
+      mconcat (intersperse ", " (map (RIO.display . ghciPkgName) pkgs))
     let execGhci extras = do
-            menv <- liftIO $ configEnvOverrideSettings config defaultEnvSettings
-            withEnvOverride menv $ execSpawn
+            menv <- liftIO $ configProcessContextSettings config defaultEnvSettings
+            withProcessContext menv $ exec
                  (fromMaybe (compilerExeName wc) ghciGhcCommand)
                  (("--interactive" : ) $
                  -- This initial "-i" resets the include directories to
@@ -381,37 +384,69 @@ runGhci GhciOpts{..} targets mainIsTargets pkgs extraFiles exposePackages = do
             -- multiple packages.
             case pkgs of
                 [_] -> do
-                    menv <- liftIO $ configEnvOverrideSettings config defaultEnvSettings
-                    output <- withEnvOverride menv
-                            $ execObserve (fromMaybe (compilerExeName wc) ghciGhcCommand) ["--version"]
+                    menv <- liftIO $ configProcessContextSettings config defaultEnvSettings
+                    output <- withProcessContext menv
+                            $ runGrabFirstLine (fromMaybe (compilerExeName wc) ghciGhcCommand) ["--version"]
                     return $ "Intero" `isPrefixOf` output
                 _ -> return False
-    withSystemTempDir "ghci" $ \tmpDirectory -> do
-        macrosOptions <- writeMacrosFile tmpDirectory pkgs
-        if ghciNoLoadModules
-            then execGhci macrosOptions
-            else do
-                checkForDuplicateModules pkgs
-                isIntero <- checkIsIntero
-                bopts <- view buildOptsL
-                mainFile <- figureOutMainFile bopts mainIsTargets targets pkgs
-                scriptPath <- writeGhciScript tmpDirectory (renderScript isIntero pkgs mainFile ghciOnlyMain extraFiles)
-                execGhci (macrosOptions ++ ["-ghci-script=" <> toFilePath scriptPath])
+    -- Since usage of 'exec' does not return, we cannot do any cleanup
+    -- on ghci exit. So, instead leave the generated files. To make this
+    -- more efficient and avoid gratuitous generation of garbage, the
+    -- file names are determined by hashing. This also has the nice side
+    -- effect of making it possible to copy the ghci invocation out of
+    -- the log and have it still work.
+    tmpDirectory <-
+        (</> $(mkRelDir "haskell-stack-ghci")) <$>
+        (parseAbsDir =<< liftIO getCanonicalTemporaryDirectory)
+    ghciDir <- view ghciDirL
+    ensureDir ghciDir
+    ensureDir tmpDirectory
+    macrosOptions <- writeMacrosFile ghciDir pkgs
+    if ghciNoLoadModules
+        then execGhci macrosOptions
+        else do
+            checkForDuplicateModules pkgs
+            isIntero <- checkIsIntero
+            bopts <- view buildOptsL
+            mainFile <- figureOutMainFile bopts mainIsTargets targets pkgs
+            scriptOptions <- writeGhciScript tmpDirectory (renderScript isIntero pkgs mainFile ghciOnlyMain extraFiles)
+            execGhci (macrosOptions ++ scriptOptions)
 
-writeMacrosFile :: (MonadIO m) => Path Abs Dir -> [GhciPkgInfo] -> m [String]
-writeMacrosFile tmpDirectory packages = do
-    preprocessCabalMacros packages macrosFile
-  where
-    macrosFile = tmpDirectory </> $(mkRelFile "cabal_macros.h")
+writeMacrosFile :: HasRunner env => Path Abs Dir -> [GhciPkgInfo] -> RIO env [String]
+writeMacrosFile outputDirectory pkgs = do
+    fps <- fmap (nubOrd . catMaybes . concat) $
+        forM pkgs $ \pkg -> forM (ghciPkgOpts pkg) $ \(_, bio) -> do
+            let cabalMacros = bioCabalMacros bio
+            exists <- liftIO $ doesFileExist cabalMacros
+            if exists
+                then return $ Just cabalMacros
+                else do
+                    prettyWarnL ["Didn't find expected autogen file:", display cabalMacros]
+                    return Nothing
+    files <- liftIO $ mapM (S8.readFile . toFilePath) fps
+    if null files then return [] else do
+        out <- liftIO $ writeHashedFile outputDirectory $(mkRelFile "cabal_macros.h") $
+            S8.concat $ map (<> "\n#undef CURRENT_PACKAGE_KEY\n#undef CURRENT_COMPONENT_ID\n") files
+        return ["-optP-include", "-optP" <> toFilePath out]
 
-writeGhciScript :: (MonadIO m) => Path Abs Dir -> GhciScript -> m (Path Abs File)
-writeGhciScript tmpDirectory script = do
-    liftIO $ scriptToFile scriptPath script
+writeGhciScript :: (MonadIO m) => Path Abs Dir -> GhciScript -> m [String]
+writeGhciScript outputDirectory script = do
+    scriptPath <- liftIO $ writeHashedFile outputDirectory $(mkRelFile "ghci-script") $
+        LBS.toStrict $ scriptToLazyByteString script
+    let scriptFilePath = toFilePath scriptPath
     setScriptPerms scriptFilePath
-    return scriptPath
-  where
-    scriptPath = tmpDirectory </> $(mkRelFile "ghci-script")
-    scriptFilePath = toFilePath scriptPath
+    return ["-ghci-script=" <> scriptFilePath]
+
+writeHashedFile :: Path Abs Dir -> Path Rel File -> ByteString -> IO (Path Abs File)
+writeHashedFile outputDirectory relFile contents = do
+    relSha <- shaPathForBytes contents
+    let outDir = outputDirectory </> relSha
+        outFile = outDir </> relFile
+    alreadyExists <- doesFileExist outFile
+    unless alreadyExists $ do
+        ensureDir outDir
+        S8.writeFile (toFilePath outFile) contents
+    return outFile
 
 renderScript :: Bool -> [GhciPkgInfo] -> Maybe (Path Abs File) -> Bool -> [Path Abs File] -> GhciScript
 renderScript isIntero pkgs mainFile onlyMain extraFiles = do
@@ -452,23 +487,23 @@ figureOutMainFile
 figureOutMainFile bopts mainIsTargets targets0 packages = do
     case candidates of
         [] -> return Nothing
-        [c@(_,_,fp)] -> do logInfo ("Using main module: " <> renderCandidate c)
+        [c@(_,_,fp)] -> do logInfo ("Using main module: " <> RIO.display (renderCandidate c))
                            return (Just fp)
         candidate:_ -> do
           borderedWarning $ do
             logWarn "The main module to load is ambiguous. Candidates are: "
-            forM_ (map renderCandidate candidates) logWarn
+            forM_ (map renderCandidate candidates) (logWarn . RIO.display)
             logWarn
                 "You can specify which one to pick by: "
             logWarn
                 (" * Specifying targets to stack ghci e.g. stack ghci " <>
-                 sampleTargetArg candidate)
+                RIO.display ( sampleTargetArg candidate))
             logWarn
                 (" * Specifying what the main is e.g. stack ghci " <>
-                 sampleMainIsArg candidate)
+                 RIO.display (sampleMainIsArg candidate))
             logWarn
                 (" * Choosing from the candidate above [1.." <>
-                T.pack (show $ length candidates) <> "]")
+                RIO.display (length candidates) <> "]")
           liftIO userOption
   where
     targets = fromMaybe (M.fromList $ map (\(k, (_, x)) -> (k, x)) targets0)
@@ -519,6 +554,7 @@ figureOutMainFile bopts mainIsTargets targets0 packages = do
     renderComp c =
         case c of
             CLib -> "lib"
+            CInternalLib name -> "internal-lib:" <> name
             CExe name -> "exe:" <> name
             CTest name -> "test:" <> name
             CBench name -> "bench:" <> name
@@ -627,8 +663,9 @@ wantedPackageComponents _ (TargetComps cs) _ = cs
 wantedPackageComponents bopts (TargetAll ProjectPackage) pkg = S.fromList $
     (case packageLibraries pkg of
        NoLibraries -> []
-       HasLibraries _names -> [CLib]) ++ -- FIXME. This ignores sub libraries and foreign libraries. Is that OK?
+       HasLibraries names -> CLib : map CInternalLib (S.toList names)) ++
     map CExe (S.toList (packageExes pkg)) <>
+    map CInternalLib (S.toList $ packageInternalLibraries pkg) <>
     (if boptsTests bopts then map CTest (M.keys (packageTests pkg)) else []) <>
     (if boptsBenchmarks bopts then map CBench (S.toList (packageBenchmarks pkg)) else [])
 wantedPackageComponents _ _ _ = S.empty
@@ -639,7 +676,7 @@ checkForIssues pkgs = do
         logWarn "Warning: There are cabal settings for this project which may prevent GHCi from loading your code properly."
         logWarn "In some cases it can also load some projects which would otherwise fail to build."
         logWarn ""
-        mapM_ logWarn $ intercalate [""] issues
+        mapM_ (logWarn . RIO.display) $ intercalate [""] issues
         logWarn ""
         logWarn "To resolve, remove the flag(s) from the cabal file(s) and instead put them at the top of the haskell files."
         logWarn ""
@@ -807,14 +844,6 @@ getExtraLoadDeps loadAllDeps sourceMap targets =
             (_, Just PSIndex{}) -> return loadAllDeps
             (_, _) -> return False
 
-preprocessCabalMacros :: MonadIO m => [GhciPkgInfo] -> Path Abs File -> m [String]
-preprocessCabalMacros pkgs out = liftIO $ do
-    let fps = nubOrd (concatMap (mapMaybe (bioCabalMacros . snd) . ghciPkgOpts) pkgs)
-    files <- mapM (S8.readFile . toFilePath) fps
-    if null files then return [] else do
-        S8.writeFile (toFilePath out) $ S8.concat $ map (<> "\n#undef CURRENT_PACKAGE_KEY\n#undef CURRENT_COMPONENT_ID\n") files
-        return ["-optP-include", "-optP" <> toFilePath out]
-
 setScriptPerms :: MonadIO m => FilePath -> m ()
 #ifdef WINDOWS
 setScriptPerms _ = do
@@ -845,46 +874,16 @@ hasLocalComp p t =
         TargetAll ProjectPackage -> True
         _ -> False
 
-
-{- Copied from Stack.Ide, may be useful in the future
-
--- | Get options and target files for the given package info.
-getPackageOptsAndTargetFiles
-    :: (MonadThrow m, MonadIO m, MonadReader env m, HasEnvConfig env)
-    => Path Abs Dir -> GhciPkgInfo -> m ([FilePath], [FilePath])
-getPackageOptsAndTargetFiles pwd pkg = do
-    dist <- distDirFromDir (ghciPkgDir pkg)
-    let autogen = autogenDir dist
-    paths_foo <-
-        liftM
-            (autogen </>)
-            (parseRelFile
-                 ("Paths_" ++ packageNameString (ghciPkgName pkg) ++ ".hs"))
-    paths_foo_exists <- doesFileExist paths_foo
-    let ghcOptions bio =
-            bioOneWordOpts bio ++
-            bioOpts bio ++
-            bioPackageFlags bio ++
-            maybe [] (\cabalMacros -> ["-optP-include", "-optP" <> toFilePath cabalMacros]) (bioCabalMacros bio)
+-- | Run a command and grab the first line of stdout, dropping
+-- stderr's contexts completely.
+runGrabFirstLine :: (HasProcessContext env, HasLogFunc env) => String -> [String] -> RIO env String
+runGrabFirstLine cmd0 args =
+  proc cmd0 args $ \pc -> do
+    (out, _err) <- readProcess_ pc
     return
-        ( ("--dist-dir=" <> toFilePathNoTrailingSep dist) :
-          -- FIXME: use compilerOptionsCabalFlag
-          map ("--ghc-option=" ++) (concatMap (ghcOptions . snd) (ghciPkgOpts pkg))
-        , mapMaybe
-              (fmap toFilePath . stripProperPrefix pwd)
-              (S.toList (ghciPkgCFiles pkg) <> S.toList (ghciPkgModFiles pkg) <>
-               [paths_foo | paths_foo_exists]))
-
--- | List load targets for a package target.
-targetsCmd :: Text -> GlobalOpts -> IO ()
-targetsCmd target go@GlobalOpts{..} =
-    withBuildConfig go $
-    do let boptsCli = defaultBuildOptsCLI { boptsCLITargets = [target] }
-       (_realTargets,_,pkgs) <- ghciSetup (ideGhciOpts boptsCli)
-       pwd <- getCurrentDir
-       targets <-
-           fmap
-               (concat . snd . unzip)
-               (mapM (getPackageOptsAndTargetFiles pwd) pkgs)
-       forM_ targets (liftIO . putStrLn)
--}
+      $ TL.unpack
+      $ TL.filter (/= '\r')
+      $ TL.concat
+      $ take 1
+      $ TL.lines
+      $ TLE.decodeUtf8With lenientDecode out

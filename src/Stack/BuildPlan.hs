@@ -24,7 +24,7 @@ module Stack.BuildPlan
     , showItems
     ) where
 
-import           Stack.Prelude
+import           Stack.Prelude hiding (Display (..))
 import qualified Data.Foldable as F
 import qualified Data.HashSet as HashSet
 import           Data.List (intercalate)
@@ -43,6 +43,7 @@ import qualified Distribution.Types.UnqualComponentName as C
 import           Distribution.System (Platform)
 import           Distribution.Text (display)
 import qualified Distribution.Version as C
+import qualified RIO
 import           Stack.Constants
 import           Stack.Package
 import           Stack.Snapshot
@@ -429,7 +430,7 @@ selectBestSnapshot
     -> RIO env (SnapshotDef, BuildPlanCheck)
 selectBestSnapshot root gpds snaps = do
     logInfo $ "Selecting the best among "
-               <> T.pack (show (NonEmpty.length snaps))
+               <> displayShow (NonEmpty.length snaps)
                <> " snapshots...\n"
     F.foldr1 go (NonEmpty.map (getResult <=< loadResolver . ResolverStackage) snaps)
     where
@@ -455,16 +456,16 @@ selectBestSnapshot root gpds snaps = do
           | otherwise = (s2, r2)
 
         reportResult BuildPlanCheckOk {} snap = do
-            logInfo $ "* Matches " <> sdResolverName snap
+            logInfo $ "* Matches " <> RIO.display (sdResolverName snap)
             logInfo ""
 
         reportResult r@BuildPlanCheckPartial {} snap = do
-            logWarn $ "* Partially matches " <> sdResolverName snap
-            logWarn $ indent $ T.pack $ show r
+            logWarn $ "* Partially matches " <> RIO.display (sdResolverName snap)
+            logWarn $ RIO.display $ indent $ T.pack $ show r
 
         reportResult r@BuildPlanCheckFail {} snap = do
-            logWarn $ "* Rejected " <> sdResolverName snap
-            logWarn $ indent $ T.pack $ show r
+            logWarn $ "* Rejected " <> RIO.display (sdResolverName snap)
+            logWarn $ RIO.display $ indent $ T.pack $ show r
 
         indent t = T.unlines $ fmap ("    " <>) (T.lines t)
 

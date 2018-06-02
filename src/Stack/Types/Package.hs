@@ -129,6 +129,7 @@ data Package =
           ,packageFlags :: !(Map FlagName Bool)           -- ^ Flags used on package.
           ,packageDefaultFlags :: !(Map FlagName Bool)    -- ^ Defaults for unspecified flags.
           ,packageLibraries :: !PackageLibraries          -- ^ does the package have a buildable library stanza?
+          ,packageInternalLibraries :: !(Set Text)        -- ^ names of internal libraries
           ,packageTests :: !(Map Text TestSuiteInterface) -- ^ names and interfaces of test suites
           ,packageBenchmarks :: !(Set Text)               -- ^ names of benchmarks
           ,packageExes :: !(Set Text)                     -- ^ names of executables
@@ -172,7 +173,7 @@ data BuildInfoOpts = BuildInfoOpts
     -- ^ These options can safely have 'nubOrd' applied to them, as
     -- there are no multi-word options (see
     -- https://github.com/commercialhaskell/stack/issues/1255)
-    , bioCabalMacros :: Maybe (Path Abs File)
+    , bioCabalMacros :: Path Abs File
     } deriving Show
 
 -- | Files to get for a cabal package.
@@ -196,7 +197,7 @@ instance Show GetPackageFiles where
 
 -- | Warning generated when reading a package
 data PackageWarning
-    = UnlistedModulesWarning (Maybe String) [ModuleName]
+    = UnlistedModulesWarning NamedComponent [ModuleName]
       -- ^ Modules found that are not listed in cabal file
 
     -- TODO: bring this back - see
@@ -293,11 +294,13 @@ lpFiles = Set.unions . M.elems . lpComponentFiles
 -- | A location to install a package into, either snapshot or local
 data InstallLocation = Snap | Local
     deriving (Show, Eq)
+instance Semigroup InstallLocation where
+    Local <> _ = Local
+    _ <> Local = Local
+    Snap <> Snap = Snap
 instance Monoid InstallLocation where
     mempty = Snap
-    mappend Local _ = Local
-    mappend _ Local = Local
-    mappend Snap Snap = Snap
+    mappend = (<>)
 
 data InstalledPackageLocation = InstalledTo InstallLocation | ExtraGlobal
     deriving (Show, Eq)

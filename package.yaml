@@ -1,5 +1,5 @@
 name: stack
-version: '1.7.0'
+version: '1.8.0'
 synopsis: The Haskell Tool Stack
 description: ! 'Please see the README.md for usage information, and
   the wiki on Github for more details.  Also, note that
@@ -18,11 +18,11 @@ custom-setup:
   - Cabal
   - filepath
 extra-source-files:
+# note: leaving out 'package.yaml' because it causes confusion with hackage metadata revisions
 - CONTRIBUTING.md
 - ChangeLog.md
 - README.md
 - doc/*.md
-- package.yaml
 - src/setup-shim/StackSetupShim.hs
 - stack.yaml
 - test/package-dump/ghc-7.10.txt
@@ -33,6 +33,7 @@ ghc-options:
 - -fwarn-tabs
 - -fwarn-incomplete-uni-patterns
 - -fwarn-incomplete-record-updates
+- -optP-Wno-nonportable-include-path # workaround [Filename case on macOS · Issue #4739 · haskell/cabal](https://github.com/haskell/cabal/issues/4739)
 dependencies:
 - Cabal
 - aeson
@@ -42,9 +43,7 @@ dependencies:
 - attoparsec
 - base >=4.10 && < 5
 - base64-bytestring
-- blaze-builder
 - bytestring
-- clock
 - conduit
 - conduit-extra >= 1.2.3.1
 - containers
@@ -62,7 +61,6 @@ dependencies:
 - generic-deriving
 - hackage-security
 - hashable
-- hastache
 - hpack
 - hpc
 - http-client
@@ -71,12 +69,12 @@ dependencies:
 - http-types
 - memory
 - microlens
-- microlens-mtl
 - mintty
 # TODO remove dep when persistent drops monad-logger
 - monad-logger
 - mono-traversable
 - mtl
+- mustache
 - neat-interpolation
 - network-uri
 - open-browser
@@ -93,6 +91,7 @@ dependencies:
 - regex-applicative-text
 - resourcet
 - retry
+- rio
 - semigroups
 - split
 - stm
@@ -111,7 +110,7 @@ dependencies:
 - typed-process >= 0.2.1.0
 - unicode-transforms
 - unix-compat
-- unliftio
+- unliftio >= 0.2.4.0
 - unordered-containers
 - vector
 - yaml
@@ -122,20 +121,22 @@ when:
   then:
     cpp-options: -DWINDOWS
     dependencies:
-    - Win32
+    - Win32 >= 2.5.3.0
   else:
     build-tools:
     - hsc2hs
     dependencies:
     - bindings-uname
-    - pid1
     - unix
 library:
-  source-dirs:
-  - src/
-  - subs/rio/src/
+  source-dirs: src/
   ghc-options:
   - -fwarn-identities
+  verbatim:
+    # TODO: replace with 'generated-exposed-modules' after stack-1.7 is released.
+    # Using 'verbatim' to support older hpack version.
+    autogen-modules: |
+      Paths_stack
   exposed-modules:
   - Control.Concurrent.Execute
   - Data.Aeson.Extended
@@ -154,9 +155,6 @@ library:
   - Path.Extra
   - Path.Find
   - Paths_stack
-  - RIO
-  - RIO.Logger
-  - RIO.Process
   - Stack.Build
   - Stack.Build.Cache
   - Stack.Build.ConstructPlan
@@ -266,7 +264,6 @@ library:
   - System.Terminal
   other-modules:
   - Hackage.Security.Client.Repository.HttpLib.HttpClient
-  - RIO.Prelude
   when:
   - condition: 'os(windows)'
     then:
@@ -277,7 +274,15 @@ executables:
   stack:
     main: Main.hs
     source-dirs: src/main
-    generated-other-modules: Build_stack
+    verbatim:
+      # TODO: replace with 'generated-other-modules' after stack-1.7 is released.
+      # Using 'verbatim' to support older hpack version.
+      autogen-modules: |
+          Build_stack,
+          Paths_stack
+    other-modules:
+    - Build_stack
+    - Paths_stack
     ghc-options:
     - -threaded
     - -rtsopts

@@ -35,7 +35,8 @@ module Stack.PrettyPrint
     , indentAfterLabel, wordDocs, flow
     ) where
 
-import           Stack.Prelude
+import qualified RIO
+import           Stack.Prelude hiding (Display (..))
 import           Data.List (intersperse)
 import qualified Data.Text as T
 import qualified Distribution.ModuleName as C (ModuleName)
@@ -45,7 +46,6 @@ import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageName
 import           Stack.Types.Runner
 import           Stack.Types.Version
-import qualified System.Clock as Clock
 import           Text.PrettyPrint.Leijen.Extended
 
 displayWithColor
@@ -53,8 +53,8 @@ displayWithColor
         MonadReader env m, HasLogFunc env, HasCallStack)
     => a -> m T.Text
 displayWithColor x = do
-    useAnsi <- liftM logUseColor $ view logOptionsL
-    termWidth <- liftM logTermWidth $ view logOptionsL
+    useAnsi <- view useColorL
+    termWidth <- view $ runnerL.to runnerTermWidth
     return $ (if useAnsi then displayAnsi else displayPlain) termWidth x
 
 -- TODO: switch to using implicit callstacks once 7.8 support is dropped
@@ -62,7 +62,7 @@ displayWithColor x = do
 prettyWith :: (HasRunner env, HasCallStack, Display b, HasAnsiAnn (Ann b),
                MonadReader env m, MonadIO m)
            => LogLevel -> (a -> b) -> a -> m ()
-prettyWith level f = logGeneric "" level <=< displayWithColor . f
+prettyWith level f = logGeneric "" level . RIO.display <=< displayWithColor . f
 
 -- Note: I think keeping this section aligned helps spot errors, might be
 -- worth keeping the alignment in place.
@@ -139,18 +139,18 @@ flow = fillSep . wordDocs
 debugBracket :: (HasCallStack, HasRunner env, MonadReader env m,
                  MonadIO m, MonadUnliftIO m) => Doc AnsiAnn -> m a -> m a
 debugBracket msg f = do
-  let output = logDebug <=< displayWithColor
+  let output = logDebug . RIO.display <=< displayWithColor
   output $ "Start: " <> msg
-  start <- liftIO $ Clock.getTime Clock.Monotonic
+  start <- getMonotonicTime
   x <- f `catch` \ex -> do
-      end <- liftIO $ Clock.getTime Clock.Monotonic
-      let diff = Clock.diffTimeSpec start end
+      end <- getMonotonicTime
+      let diff = end - start
       output $ "Finished with exception in" <+> displayMilliseconds diff <> ":" <+>
           msg <> line <>
           "Exception thrown: " <> fromString (show ex)
       throwIO (ex :: SomeException)
-  end <- liftIO $ Clock.getTime Clock.Monotonic
-  let diff = Clock.diffTimeSpec start end
+  end <- getMonotonicTime
+  let diff = end - start
   output $ "Finished in" <+> displayMilliseconds diff <> ":" <+> msg
   return x
 
@@ -228,9 +228,9 @@ instance Display C.ModuleName where
     display = fromString . C.display
 
 -- Display milliseconds.
-displayMilliseconds :: Clock.TimeSpec -> AnsiDoc
+displayMilliseconds :: Double -> AnsiDoc
 displayMilliseconds t = green $
-    (fromString . show . (`div` 10^(6 :: Int)) . Clock.toNanoSecs) t <> "ms"
+    fromString (show (round (t * 1000) :: Int)) <> "ms"
 
 -- | Display a bulleted list of 'AnsiDoc'.
 bulletedList :: [AnsiDoc] -> AnsiDoc

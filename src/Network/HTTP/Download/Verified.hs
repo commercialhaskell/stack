@@ -243,7 +243,7 @@ verifiedDownload
 verifiedDownload DownloadRequest{..} destpath progressSink = do
     let req = drRequest
     whenM' (liftIO getShouldDownload) $ do
-        logDebug $ "Downloading " <> decodeUtf8With lenientDecode (path req)
+        logDebug $ "Downloading " <> Stack.Prelude.display (decodeUtf8With lenientDecode (path req))
         liftIO $ createDirectoryIfMissing True dir
         recoveringHttp drRetryPolicy $
             withSinkFile fptmp $ httpSink req . go

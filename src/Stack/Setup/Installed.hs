@@ -55,7 +55,7 @@ toolNameString (Tool ident) = packageNameString $ packageIdentifierName ident
 toolNameString ToolGhcjs{} = "ghcjs"
 
 parseToolText :: Text -> Maybe Tool
-parseToolText (parseCompilerVersion -> Just (cv@GhcjsVersion{})) = Just (ToolGhcjs cv)
+parseToolText (parseCompilerVersion -> Just cv@GhcjsVersion{}) = Just (ToolGhcjs cv)
 parseToolText (parsePackageIdentifierFromString . T.unpack -> Just pkgId) = Just (Tool pkgId)
 parseToolText _ = Nothing
 
@@ -89,24 +89,24 @@ listInstalled programsPath = do
         parseToolText x
 
 getCompilerVersion
-  :: HasEnvOverride env
+  :: (HasProcessContext env, HasLogFunc env)
   => WhichCompiler
   -> RIO env (CompilerVersion 'CVActual)
 getCompilerVersion wc =
     case wc of
         Ghc -> do
             logDebug "Asking GHC for its version"
-            bs <- withProc "ghc" ["--numeric-version"] readProcessStdout_
+            bs <- proc "ghc" ["--numeric-version"] readProcessStdout_
             let (_, ghcVersion) = versionFromEnd $ BL.toStrict bs
             x <- GhcVersion <$> parseVersion (T.decodeUtf8 ghcVersion)
-            logDebug $ "GHC version is: " <> compilerVersionText x
+            logDebug $ "GHC version is: " <> display x
             return x
         Ghcjs -> do
             logDebug "Asking GHCJS for its version"
             -- Output looks like
             --
             -- The Glorious Glasgow Haskell Compilation System for JavaScript, version 0.1.0 (GHC 7.10.2)
-            bs <- withProc "ghcjs" ["--version"] readProcessStdout_
+            bs <- proc "ghcjs" ["--version"] readProcessStdout_
             let (rest, ghcVersion) = T.decodeUtf8 <$> versionFromEnd (BL.toStrict bs)
                 (_, ghcjsVersion) = T.decodeUtf8 <$> versionFromEnd rest
             GhcjsVersion <$> parseVersion ghcjsVersion <*> parseVersion ghcVersion
@@ -165,7 +165,7 @@ extraDirs tool = do
                 ]
             }
         (Platform _ x, toolName) -> do
-            logWarn $ "binDirs: unexpected OS/tool combo: " <> T.pack (show (x, toolName))
+            logWarn $ "binDirs: unexpected OS/tool combo: " <> displayShow (x, toolName)
             return mempty
   where
     isGHC n = "ghc" == n || "ghc-" `isPrefixOf` n
@@ -176,9 +176,11 @@ data ExtraDirs = ExtraDirs
     , edInclude :: ![Path Abs Dir]
     , edLib :: ![Path Abs Dir]
     } deriving (Show, Generic)
+instance Semigroup ExtraDirs where
+    (<>) = mappenddefault
 instance Monoid ExtraDirs where
     mempty = memptydefault
-    mappend = mappenddefault
+    mappend = (<>)
 
 installDir :: (MonadReader env m, MonadThrow m)
            => Path Abs Dir

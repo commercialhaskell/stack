@@ -1,0 +1,21 @@
+resolver: nightly-2018-04-25
+
+# docker:
+#   enable: true
+#   repo: fpco/stack-full
+# image:
+#   containers:
+#     - base: "fpco/stack-base" # see ./etc/docker/stack-base/Dockerfile
+#       name: "fpco/stack-test"
+nix:
+  # --nix on the command-line to enable.
+  enable: false
+  packages:
+    - zlib
+    - unzip
+extra-deps:
+- bitarray-0.0.1.1
+- fsnotify-0.2.1.2
+- project-template-0.2.0.1
+- regex-applicative-text-0.1.0.1
+- unicode-transforms-0.3.4

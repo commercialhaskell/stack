@@ -363,11 +363,14 @@ data DepInfo = DepInfo
 instance Store DepInfo
 instance NFData DepInfo
 
-instance Monoid DepInfo where
-    mempty = DepInfo mempty (fromVersionRange C.anyVersion)
-    DepInfo a x `mappend` DepInfo b y = DepInfo
+instance Semigroup DepInfo where
+    DepInfo a x <> DepInfo b y = DepInfo
         (mappend a b)
         (intersectVersionIntervals x y)
+
+instance Monoid DepInfo where
+    mempty = DepInfo mempty (fromVersionRange C.anyVersion)
+    mappend = (<>)
 
 data Component = CompLibrary
                | CompExecutable
@@ -390,10 +393,13 @@ newtype ModuleInfo = ModuleInfo
 instance Store ModuleInfo
 instance NFData ModuleInfo
 
+instance Semigroup ModuleInfo where
+  ModuleInfo x <> ModuleInfo y =
+    ModuleInfo (Map.unionWith Set.union x y)
+
 instance Monoid ModuleInfo where
   mempty = ModuleInfo mempty
-  mappend (ModuleInfo x) (ModuleInfo y) =
-    ModuleInfo (Map.unionWith Set.union x y)
+  mappend = (<>)
 
 moduleInfoVC :: VersionConfig ModuleInfo
 moduleInfoVC = storeVersionConfig "mi-v2" "8ImAfrwMVmqoSoEpt85pLvFeV3s="

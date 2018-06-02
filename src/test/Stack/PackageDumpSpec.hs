@@ -10,7 +10,6 @@ import           Data.Conduit.Text             (decodeUtf8)
 import qualified Data.Map                      as Map
 import qualified Data.Set                      as Set
 import           Distribution.License          (License(..))
-import           Lens.Micro                    (to)
 import           Stack.PackageDump
 import           Stack.Prelude
 import           Stack.Types.Compiler
@@ -18,7 +17,7 @@ import           Stack.Types.GhcPkgId
 import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageName
 import           Stack.Types.Version
-import           RIO.Process hiding (runEnvNoLogging)
+import           RIO.Process
 import           Test.Hspec
 import           Test.Hspec.QuickCheck
 
@@ -82,6 +81,7 @@ spec = do
             haskell2010 { dpExposedModules = [] } `shouldBe` DumpPackage
                 { dpGhcPkgId = ghcPkgId
                 , dpPackageIdent = packageIdent
+                , dpParentLibIdent = Nothing
                 , dpLicense = Just BSD3
                 , dpLibDirs = ["/opt/ghc/7.8.4/lib/ghc-7.8.4/haskell2010-1.1.2.0"]
                 , dpDepends = depends
@@ -125,6 +125,7 @@ spec = do
             haskell2010 { dpExposedModules = [] } `shouldBe` DumpPackage
                 { dpGhcPkgId = ghcPkgId
                 , dpPackageIdent = pkgIdent
+                , dpParentLibIdent = Nothing
                 , dpLicense = Just BSD3
                 , dpLibDirs = ["/opt/ghc/7.10.1/lib/ghc-7.10.1/ghc_EMlWrQ42XY0BNVbSrKixqY"]
                 , dpHaddockInterfaces = ["/opt/ghc/7.10.1/share/doc/ghc/html/libraries/ghc-7.10.1/ghc.haddock"]
@@ -161,6 +162,7 @@ spec = do
             hmatrix `shouldBe` DumpPackage
                 { dpGhcPkgId = ghcPkgId
                 , dpPackageIdent = pkgId
+                , dpParentLibIdent = Nothing
                 , dpLicense = Just BSD3
                 , dpLibDirs =
                       [ "/Users/alexbiehl/.stack/snapshots/x86_64-osx/lts-2.13/7.8.4/lib/x86_64-osx-ghc-7.8.4/hmatrix-0.16.1.5"
@@ -198,6 +200,7 @@ spec = do
           ghcBoot `shouldBe` DumpPackage
             { dpGhcPkgId = ghcPkgId
             , dpPackageIdent = pkgId
+            , dpParentLibIdent = Nothing
             , dpLicense = Just BSD3
             , dpLibDirs =
                   ["/opt/ghc/head/lib/ghc-7.11.20151213/ghc-boot-0.0.0.0"]
@@ -214,7 +217,7 @@ spec = do
             }
 
 
-    it "ghcPkgDump + addProfiling + addHaddock" $ (id :: IO () -> IO ()) $ runEnvNoLogging $ do
+    it "ghcPkgDump + addProfiling + addHaddock" $ runEnvNoLogging $ do
         icache <- newInstalledCache
         ghcPkgDump Ghc []
             $  conduitDumpPackage
@@ -283,14 +286,8 @@ checkDepsPresent prunes selected =
 fakeAddSymbols :: Monad m => ConduitM (DumpPackage a b c) (DumpPackage a b Bool) m ()
 fakeAddSymbols = CL.map (\dp -> dp { dpSymbols = False })
 
-runEnvNoLogging :: RIO EnvNoLogging a -> IO a
+runEnvNoLogging :: RIO LoggedProcessContext a -> IO a
 runEnvNoLogging inner = do
-  menv' <- getEnvOverride
-  menv <- mkEnvOverride $ Map.delete "GHC_PACKAGE_PATH" $ unEnvOverride menv'
-  runRIO (EnvNoLogging menv) inner
-
-newtype EnvNoLogging = EnvNoLogging EnvOverride
-instance HasLogFunc EnvNoLogging where
-  logFuncL = to (\_ _ _ _ _ -> return ())
-instance HasEnvOverride EnvNoLogging where
-  envOverrideL = lens (\(EnvNoLogging x) -> x) (const EnvNoLogging)
+  envVars <- view envVarsL <$> mkDefaultProcessContext
+  menv <- mkProcessContext $ Map.delete "GHC_PACKAGE_PATH" envVars
+  runRIO (LoggedProcessContext menv mempty) inner
