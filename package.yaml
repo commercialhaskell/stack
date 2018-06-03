@@ -1,5 +1,5 @@
 name: stack
-version: '1.7.2'
+version: '1.8.0'
 synopsis: The Haskell Tool Stack
 description: ! 'Please see the README.md for usage information, and
   the wiki on Github for more details.  Also, note that
@@ -33,6 +33,7 @@ ghc-options:
 - -fwarn-tabs
 - -fwarn-incomplete-uni-patterns
 - -fwarn-incomplete-record-updates
+- -optP-Wno-nonportable-include-path # workaround [Filename case on macOS · Issue #4739 · haskell/cabal](https://github.com/haskell/cabal/issues/4739)
 dependencies:
 - Cabal
 - aeson
@@ -120,7 +121,7 @@ when:
   then:
     cpp-options: -DWINDOWS
     dependencies:
-    - Win32
+    - Win32 >= 2.5.3.0
   else:
     build-tools:
     - hsc2hs

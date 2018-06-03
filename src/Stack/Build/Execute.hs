@@ -1421,7 +1421,7 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
                     unless (null warnings) $ prettyWarn $
                         "The following modules should be added to exposed-modules or other-modules in" <+>
                         display cabalfp <> ":" <> line <>
-                        indent 4 (mconcat $ map showModuleWarning warnings) <>
+                        indent 4 (mconcat $ intersperse line $ map showModuleWarning warnings) <>
                         line <> line <>
                         "Missing modules in the cabal file are likely to cause undefined reference errors from the linker, along with other problems."
 
@@ -1899,7 +1899,7 @@ extraBuildOptions wc bopts = do
       else
         return [optsFlag, baseOpts]
 
--- Library and executable build components.
+-- Library, internal and foreign libraries and executable build components.
 primaryComponentOptions :: Map Text ExecutableBuildStatus -> LocalPackage -> [String]
 primaryComponentOptions executableBuildStatuses lp =
       -- TODO: get this information from target parsing instead,
@@ -1909,9 +1909,12 @@ primaryComponentOptions executableBuildStatuses lp =
          NoLibraries -> []
          HasLibraries names ->
              map T.unpack
-           $ T.append "lib:" (packageNameText (packageName (lpPackage lp)))
+           $ T.append "lib:" (packageNameText (packageName package))
            : map (T.append "flib:") (Set.toList names)) ++
+      map (T.unpack . T.append "lib:") (Set.toList $ packageInternalLibraries package) ++
       map (T.unpack . T.append "exe:") (Set.toList $ exesToBuild executableBuildStatuses lp)
+  where
+    package = lpPackage lp
 
 -- | History of this function:
 --

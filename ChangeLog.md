@@ -11,7 +11,33 @@ Behavior changes:
 
 Other enhancements:
 
+* On Windows, recognise a 'mintty' (false) terminal as a terminal, by default
+* `stack build` issues a warning when `base` is explicitly listed in
+  `extra-deps` of `stack.yaml`
+* `stack build` suggests trying another GHC version should the build
+  plan end up requiring unattainable `base` version.
+
 Bug fixes:
+
+* `stack ghci` now does not invalidate `.o` files on repeated runs,
+  meaning any modules compiled with `-fobject-code` will be cached
+  between ghci runs. See
+  [#4038](https://github.com/commercialhaskell/stack/pull/4038).
+* `~/.stack/config.yaml` and `stack.yaml` terminating by newline
+* The previous released caused a regression where some `stderr` from the
+  `ghc-pkg` command showed up in the terminal. This output is now silenced.
+* A regression in recompilation checking introduced in v1.7.1 has been fixed.
+  See [#4001](https://github.com/commercialhaskell/stack/issues/4001)
+* `stack ghci` on a package with internal libraries was erroneously looking
+  for a wrong package corresponding to the internal library and failing to
+  load any module. This has been fixed now and changes to the code in the
+  library and the sublibrary are properly tracked. See
+  [#3926](https://github.com/commercialhaskell/stack/issues/3926).
+* For packages with internal libraries not depended upon, `stack build` used
+  to fail the build process since the internal library was not built but it
+  was tried to be registered. This is now fixed by always building internal
+  libraries. See
+  [#3996](https://github.com/commercialhaskell/stack/issues/3996).
 
 
 ## v1.7.1

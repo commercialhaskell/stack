@@ -437,7 +437,8 @@ getPackageFilesForTargets
 getPackageFilesForTargets pkg cabalFP nonLibComponents = do
     (components',compFiles,otherFiles,warnings) <-
         getPackageFiles (packageFiles pkg) cabalFP
-    let components = M.keysSet components' `Set.union` nonLibComponents
+    let necessaryComponents = Set.insert CLib $ Set.filter isCInternalLib (M.keysSet components')
+        components = necessaryComponents `Set.union` nonLibComponents
         componentsFiles =
             M.map (\files -> Set.union otherFiles (Set.map dotCabalGetPath files)) $
                 M.filterWithKey (\component _ -> component `Set.member` components) compFiles

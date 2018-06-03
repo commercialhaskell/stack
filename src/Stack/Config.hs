@@ -964,4 +964,5 @@ defaultConfigYaml = S.intercalate "\n"
      , "#    author-email:"
      , "#    copyright:"
      , "#    github-username:"
+     , ""
      ]

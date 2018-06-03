@@ -35,7 +35,7 @@ fileWatchConf :: WatchConfig
               -> IO ()
 fileWatchConf cfg out inner = withManagerConf cfg $ \manager -> do
     let putLn = hPutStrLn out
-    outputIsTerminal <- hIsTerminalDevice out
+    outputIsTerminal <- hIsTerminalDeviceOrMinTTY out
     let withColor color str = putLn $ do
             if outputIsTerminal
             then concat [color, str, reset]

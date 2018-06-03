@@ -15,6 +15,7 @@ module Stack.Constants.Config
   , hpcRelativeDir
   , hpcDirFromDir
   , objectInterfaceDirL
+  , ghciDirL
   , templatesDir
   ) where
 
@@ -32,11 +33,18 @@ objectInterfaceDirL = to $ \env -> -- FIXME is this idomatic lens code?
       root = view projectRootL env
    in root </> workDir </> $(mkRelDir "odir/")
 
+-- | GHCi files directory.
+ghciDirL :: HasBuildConfig env => Getting r env (Path Abs Dir)
+ghciDirL = to $ \env -> -- FIXME is this idomatic lens code?
+  let workDir = view workDirL env
+      root = view projectRootL env
+   in root </> workDir </> $(mkRelDir "ghci/")
+
 -- | The directory containing the files used for dirtiness check of source files.
 buildCachesDir :: (MonadThrow m, MonadReader env m, HasEnvConfig env)
                => Path Abs Dir      -- ^ Package directory.
                -> m (Path Abs Dir)
-buildCachesDir dir = 
+buildCachesDir dir =
     liftM
         (</> $(mkRelDir "stack-build-caches"))
         (distDirFromDir dir)

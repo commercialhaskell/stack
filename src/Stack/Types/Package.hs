@@ -129,6 +129,7 @@ data Package =
           ,packageFlags :: !(Map FlagName Bool)           -- ^ Flags used on package.
           ,packageDefaultFlags :: !(Map FlagName Bool)    -- ^ Defaults for unspecified flags.
           ,packageLibraries :: !PackageLibraries          -- ^ does the package have a buildable library stanza?
+          ,packageInternalLibraries :: !(Set Text)        -- ^ names of internal libraries
           ,packageTests :: !(Map Text TestSuiteInterface) -- ^ names and interfaces of test suites
           ,packageBenchmarks :: !(Set Text)               -- ^ names of benchmarks
           ,packageExes :: !(Set Text)                     -- ^ names of executables
