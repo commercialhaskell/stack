@@ -855,11 +855,15 @@ execCmd ExecOpts {..} go@GlobalOpts{..} =
 
       getRunCmd args = do
           pkgComponents <- liftM (map lpvComponents . Map.elems . lpProject) getLocalPackages
-          let exe = find isCExe $ concatMap Set.toList pkgComponents
+          let executables = filter isCExe $ concatMap Set.toList pkgComponents
+          let argExe = if not (null args) then find (\x -> x == (CExe $ T.pack $ head args)) executables
+                                          else Nothing
+          let firstExe = if not (null executables) then Just $ head executables else Nothing
+          let (exe, args') = if isJust argExe then (argExe, tail args) else (firstExe, args)
           case exe of
               Just (CExe exe') -> do
                 Stack.Build.build (const (return ())) Nothing defaultBuildOptsCLI{boptsCLITargets = [T.concat [T.pack ":", exe']]}
-                return (T.unpack exe', args)
+                return (T.unpack exe', args')
               _                -> liftIO $ do
                   hPutStrLn stderr "No executables found."
                   exitFailure
