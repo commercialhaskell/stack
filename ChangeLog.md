@@ -38,6 +38,9 @@ Bug fixes:
   was tried to be registered. This is now fixed by always building internal
   libraries. See
   [#3996](https://github.com/commercialhaskell/stack/issues/3996).
+* When prompting users about saving their Hackage credentials on upload,
+  flush to stdout before waiting for the response so the prompt actually
+  displays.
 
 
 ## v1.7.1
