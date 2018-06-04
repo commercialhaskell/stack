@@ -16,8 +16,9 @@ Other enhancements:
   `extra-deps` of `stack.yaml`
 * `stack build` suggests trying another GHC version should the build
   plan end up requiring unattainable `base` version.
-* A new sub command `run` has been introduced to build andrun the first available
-  executable in the current stack project similar to `cabal run`.
+* A new sub command `run` has been introduced to build and run a specified executable
+  similar to `cabal run`. If no executable is provided as the first argument, it
+  defaults to the first available executable in the project.
 
 Bug fixes:
 
