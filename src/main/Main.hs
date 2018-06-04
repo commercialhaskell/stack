@@ -371,7 +371,7 @@ commandLineHandler currentDir progName isInterpreter = complicatedOptions
                   execCmd
                   (execOptsParser Nothing)
       addCommand' "run"
-                  "Build and run the first available executable"
+                  "Build and run an executable. Defaults to the first available executable if none is provided as the first argument."
                   execCmd
                   (execOptsParser $ Just ExecRun)
       addGhciCommand' "ghci"
