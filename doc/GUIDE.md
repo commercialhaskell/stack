@@ -1652,7 +1652,10 @@ the images.
 
 Note that the executable will be built in the development environment
 and copied to the container, so the dev OS must match that of the
-container OS.
+container OS. Note that you can use the `--docker` option to build
+your code inside the Docker container in case you have a different
+development environment or if you specifically want to build on the
+container.
 
 The executable will be stored under `/usr/local/bin/<your-project>-exe`
 in the running container.
