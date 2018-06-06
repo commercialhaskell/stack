@@ -1,0 +1,10 @@
+name: issue3959
+version: 0.1.0.0
+
+dependencies:
+- base
+
+tests:
+  test:
+    main:                Spec.hs
+    source-dirs:         test
