@@ -30,7 +30,16 @@ data TemplatePath = AbsPath (Path Abs File)
                   -- the template repository
                   | UrlPath String
                   -- ^ a full URL
+                  | RepoPath RepoTemplatePath
   deriving (Eq, Ord, Show)
+
+-- | Details for how to access a template from a remote repo.
+data RepoTemplatePath = RepoTemplatePath
+    { rtpService  :: Text
+    , rtpUser     :: Text
+    , rtpTemplate :: Text
+    }
+    deriving (Eq, Ord, Show)
 
 instance FromJSON TemplateName where
     parseJSON = withText "TemplateName" $
@@ -79,7 +88,8 @@ parseTemplateNameFromString fname =
                                            $ asum (validParses prefix hsf orig)
     validParses prefix hsf orig =
         -- NOTE: order is important
-        [ TemplateName (T.pack orig) . UrlPath <$> (parseRequest orig *> Just orig)
+        [ TemplateName prefix        . RepoPath <$> parseRepoPath hsf
+        , TemplateName (T.pack orig) . UrlPath <$> (parseRequest orig *> Just orig)
         , TemplateName prefix        . AbsPath <$> parseAbsFile hsf
         , TemplateName prefix        . RelPath <$> parseRelFile hsf
         ]
@@ -98,6 +108,7 @@ mkTemplateName s =
                           AbsPath (Path fp) -> [|AbsPath (Path fp)|]
                           RelPath (Path fp) -> [|RelPath (Path fp)|]
                           UrlPath fp -> [|UrlPath fp|]
+                          RepoPath (RepoTemplatePath s u t) -> [|RepoTemplatePath s u t|]
 
 -- | Get a text representation of the template name.
 templateName :: TemplateName -> Text
@@ -106,3 +117,25 @@ templateName (TemplateName prefix _) = prefix
 -- | Get the path of the template.
 templatePath :: TemplateName -> TemplatePath
 templatePath (TemplateName _ fp) = fp
+
+defaultRepoService = "github" :: Text
+defaultRepoUser = "commercialhaskell" :: Text
+
+-- | Parses a template path of the form @github:user/template@.
+parseRepoPath :: FilePath -> Maybe RepoTemplatePath
+parseRepoPath path =
+    case T.stripPrefix "github:" (T.pack path) of
+        Just strippedPath ->
+            case T.split (== '/') strippedPath of
+                [tname] -> Just $ RepoTemplatePath
+                    { rtpService = defaultRepoService
+                    , rtpUser = defaultRepoUser
+                    , rtpTemplate = tname
+                    }
+                [user, tname] -> Just $ RepoTemplatePath
+                    { rtpService = defaultRepoService
+                    , rtpUser = user
+                    , rtpTemplate = tname
+                    }
+                _ -> Nothing
+        _ -> Nothing
