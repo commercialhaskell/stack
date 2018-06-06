@@ -39,7 +39,6 @@ import qualified Data.ByteString.Lazy as L
 import           Data.Conduit.Zlib (ungzip)
 import qualified Data.List.NonEmpty as NE
 import qualified Data.HashMap.Strict as HashMap
-import qualified Data.Set as Set
 import           Data.Store.Version
 import           Data.Store.VersionTagged
 import qualified Data.Text as T
@@ -380,12 +379,22 @@ deleteCache indexName' = do
 -- | Get the known versions for a given package from the package caches.
 --
 -- See 'getPackageCaches' for performance notes.
-getPackageVersions :: HasCabalLoader env => PackageName -> RIO env (Set Version)
+getPackageVersions :: HasCabalLoader env => PackageName -> RIO env (HashMap Version (NE.NonEmpty CabalHash))
 getPackageVersions pkgName = lookupPackageVersions pkgName <$> getPackageCaches
 
-lookupPackageVersions :: PackageName -> PackageCache index -> Set Version
+lookupPackageVersions :: PackageName -> PackageCache index -> HashMap Version (NE.NonEmpty CabalHash)
 lookupPackageVersions pkgName (PackageCache m) =
-    maybe Set.empty (Set.fromList . HashMap.keys) $ HashMap.lookup pkgName m
+    maybe HashMap.empty (HashMap.map extractRevisionHashes) $ HashMap.lookup pkgName m
+  where
+    extractRevisionHashes (_,_, neRevHashesAndOffsets) =
+      NE.map (extractOrigCabalHash . fst) neRevHashesAndOffsets
+
+    -- Warning: This function turns a list of one or two cabal file hashes into a
+    -- NonEmpty list value. Practically, the list is "guaranteed" to have at
+    -- least one element (see 'Stack.Types.PackageIndex.PackageCache')
+    extractOrigCabalHash :: [CabalHash] -> CabalHash
+    extractOrigCabalHash = NE.head . NE.fromList
+
 
 -- | Load the package caches, or create the caches if necessary.
 --
