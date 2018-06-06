@@ -38,6 +38,8 @@ Bug fixes:
   was tried to be registered. This is now fixed by always building internal
   libraries. See
   [#3996](https://github.com/commercialhaskell/stack/issues/3996).
+* Fix a regression which might use a lot of RAM. See
+  [#4027](https://github.com/commercialhaskell/stack/issues/4027).
 
 
 ## v1.7.1
