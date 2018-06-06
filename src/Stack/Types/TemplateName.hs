@@ -128,12 +128,12 @@ parseRepoPath path =
         Just strippedPath ->
             case T.split (== '/') strippedPath of
                 [tname] -> Just $ RepoTemplatePath
-                    { rtpService = defaultRepoService
+                    { rtpService = "github"
                     , rtpUser = defaultRepoUser
                     , rtpTemplate = tname
                     }
                 [user, tname] -> Just $ RepoTemplatePath
-                    { rtpService = defaultRepoService
+                    { rtpService = "github"
                     , rtpUser = user
                     , rtpTemplate = tname
                     }

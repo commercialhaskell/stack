@@ -141,6 +141,15 @@ loadTemplate name logIt = do
                                                      (templateDir </> relFile)
                         Nothing -> throwM e
                 )
+        RepoPath (RepoTemplatePath service user name) ->
+            case service of
+                "github" -> do
+                    let url = T.concat ["https://raw.githubusercontent.com", "/", user, "/stack-templates/", name]
+                    let s = T.unpack url
+                    req <- parseRequest s
+                    let rel = fromMaybe backupUrlRelPath (parseRelFile s)
+                    downloadTemplate req (templateDir </> rel)
+                            
   where
     loadLocalFile :: Path b File -> RIO env Text
     loadLocalFile path = do
