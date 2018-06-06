@@ -126,10 +126,7 @@ loadTemplate name logIt = do
     templateDir <- view $ configL.to templatesDir
     case templatePath name of
         AbsPath absFile -> logIt LocalTemp >> loadLocalFile absFile
-        UrlPath s -> do
-            req <- parseRequest s
-            let rel = fromMaybe backupUrlRelPath (parseRelFile s)
-            downloadTemplate req (templateDir </> rel)
+        UrlPath s -> downloadFromUrl s templateDir
         RelPath relFile ->
             catch
                 (do f <- loadLocalFile relFile
@@ -141,14 +138,9 @@ loadTemplate name logIt = do
                                                      (templateDir </> relFile)
                         Nothing -> throwM e
                 )
-        RepoPath (RepoTemplatePath service user name) ->
-            case service of
-                "github" -> do
-                    let url = T.concat ["https://raw.githubusercontent.com", "/", user, "/stack-templates/", name]
-                    let s = T.unpack url
-                    req <- parseRequest s
-                    let rel = fromMaybe backupUrlRelPath (parseRelFile s)
-                    downloadTemplate req (templateDir </> rel)
+        RepoPath rtp -> do
+            let url = urlFromRepoTemplatePath rtp
+            downloadFromUrl (T.unpack url) templateDir
                             
   where
     loadLocalFile :: Path b File -> RIO env Text
@@ -161,6 +153,11 @@ loadTemplate name logIt = do
             else throwM (FailedToLoadTemplate name (toFilePath path))
     relRequest :: MonadThrow n => Path Rel File -> n Request
     relRequest rel = parseRequest (defaultTemplateUrl <> "/" <> toFilePath rel)
+    downloadFromUrl :: String -> Path Abs Dir -> RIO env Text
+    downloadFromUrl s templateDir = do
+        req <- parseRequest s
+        let rel = fromMaybe backupUrlRelPath (parseRelFile s)
+        downloadTemplate req (templateDir </> rel)
     downloadTemplate :: Request -> Path Abs File -> RIO env Text
     downloadTemplate req path = do
         logIt RemoteTemp
@@ -170,6 +167,10 @@ loadTemplate name logIt = do
                 (throwM . FailedToDownloadTemplate name)
         loadLocalFile path
     backupUrlRelPath = $(mkRelFile "downloaded.template.file.hsfiles")
+
+urlFromRepoTemplatePath :: RepoTemplatePath -> Text
+urlFromRepoTemplatePath (RepoTemplatePath Github user name) =
+    T.concat ["https://raw.githubusercontent.com", "/", user, "/stack-templates/master/", name]
 
 -- | Apply and unpack a template into a directory.
 applyTemplate
