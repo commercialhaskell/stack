@@ -42,6 +42,17 @@ import           Data.List.NonEmpty (NonEmpty)
 -- file revision indicates the hash of the contents of the cabal file,
 -- and the offset into the index tarball.
 --
+-- The reason for each 'Version' mapping to a two element list of
+-- 'CabalHash'es is because some older Stackage snapshots have CRs in
+-- their cabal files. For compatibility with these older snapshots,
+-- both hashes are stored: the first element of the two element list
+-- being the original hash, and the (potential) second element with
+-- the CRs stripped. [Note: This is was initially stored as a two
+-- element list, and cannot be easily packed into more explict ADT or
+-- newtype because of some template-haskell that would need to be
+-- modified as well: the 'versionedDecodeOrLoad' function call found
+-- in the 'getPackageCaches' function in 'Stack.PackageIndex'.]
+--
 -- It's assumed that cabal files appear in the index tarball in the
 -- correct revision order.
 newtype PackageCache index = PackageCache
