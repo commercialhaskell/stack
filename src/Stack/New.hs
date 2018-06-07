@@ -153,7 +153,7 @@ loadTemplate name logIt = do
             else throwM (FailedToLoadTemplate name (toFilePath path))
     relRequest :: Path Rel File -> Maybe Request
     relRequest rel = do
-        rtp <- parseRepoPathWithService defaultRepoService (toFilePath rel)
+        rtp <- parseRepoPathWithService defaultRepoService (T.pack (toFilePath rel))
         let url = urlFromRepoTemplatePath rtp
         parseRequest (T.unpack url)
     downloadFromUrl :: String -> Path Abs Dir -> RIO env Text
@@ -175,6 +175,10 @@ loadTemplate name logIt = do
 urlFromRepoTemplatePath :: RepoTemplatePath -> Text
 urlFromRepoTemplatePath (RepoTemplatePath Github user name) =
     T.concat ["https://raw.githubusercontent.com", "/", user, "/stack-templates/master/", name]
+urlFromRepoTemplatePath (RepoTemplatePath Gitlab user name) =
+    T.concat ["https://gitlab.com",                "/", user, "/stack-templates/raw/master/", name]
+urlFromRepoTemplatePath (RepoTemplatePath Bitbucket user name) =
+    T.concat ["https://bitbucket.org",             "/", user, "/stack-templates/raw/master/", name]
 
 -- | Apply and unpack a template into a directory.
 applyTemplate
@@ -336,10 +340,6 @@ parseTemplateSet a = do
 -- | The default template name you can use if you don't have one.
 defaultTemplateName :: TemplateName
 defaultTemplateName = $(mkTemplateName "new-template")
-
--- | The default service to use to download templates.
-defaultRepoService :: RepoService
-defaultRepoService = Github
 
 -- | Default web URL to get a yaml file containing template metadata.
 defaultTemplateInfoUrl :: String

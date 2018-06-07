@@ -42,7 +42,7 @@ data RepoTemplatePath = RepoTemplatePath
     deriving (Eq, Ord, Show)
 
 -- | Services from which templates can be retrieved from a repository.
-data RepoService = Github
+data RepoService = Github | Gitlab | Bitbucket
     deriving (Eq, Ord, Show)
 
 instance FromJSON TemplateName where
@@ -114,7 +114,9 @@ mkTemplateName s =
                           UrlPath fp -> [|UrlPath fp|]
                           RepoPath (RepoTemplatePath sv u t) ->
                             case sv of
-                                Github -> [|RepoTemplatePath Github u t|]
+                                Github    -> [|RepoPath $ RepoTemplatePath Github u t|]
+                                Gitlab    -> [|RepoPath $ RepoTemplatePath Gitlab u t|]
+                                Bitbucket -> [|RepoPath $ RepoTemplatePath Bitbucket u t|]
 
 -- | Get a text representation of the template name.
 templateName :: TemplateName -> Text
@@ -124,29 +126,28 @@ templateName (TemplateName prefix _) = prefix
 templatePath :: TemplateName -> TemplatePath
 templatePath (TemplateName _ fp) = fp
 
+-- | The default service to use to download templates.
+defaultRepoService :: RepoService
+defaultRepoService = Github
+
 defaultRepoUser :: Text
 defaultRepoUser = "commercialhaskell"
 
 -- | Parses a template path of the form @github:user/template@.
-parseRepoPath :: FilePath -> Maybe RepoTemplatePath
-parseRepoPath path =
-    case T.stripPrefix "github:" (T.pack path) of
-        Just strippedPath ->
-            parseRepoPathWithService Github (T.unpack strippedPath)
-        _ -> Nothing
+parseRepoPath :: String -> Maybe RepoTemplatePath
+parseRepoPath s =
+  case T.splitOn ":" (T.pack s) of
+    ["github"    , rest] -> parseRepoPathWithService Github rest
+    ["gitlab"    , rest] -> parseRepoPathWithService Gitlab rest
+    ["bitbucket" , rest] -> parseRepoPathWithService Bitbucket rest
+    [rest]               -> parseRepoPathWithService defaultRepoService rest
+    _                    -> Nothing
 
 -- | Parses a template path of the form @user/template@, assuming the default service.
-parseRepoPathWithService :: RepoService -> FilePath -> Maybe RepoTemplatePath
+parseRepoPathWithService :: RepoService -> Text -> Maybe RepoTemplatePath
 parseRepoPathWithService service path =
-    case T.split (== '/') (T.pack path) of
-        [tname] -> Just $ RepoTemplatePath
-            { rtpService = service
-            , rtpUser = defaultRepoUser
-            , rtpTemplate = tname
-            }
-        [user, tname] -> Just $ RepoTemplatePath
-            { rtpService = service
-            , rtpUser = user
-            , rtpTemplate = tname
-            }
-        _ -> Nothing
+  case T.splitOn "/" path of
+    [user, name] -> Just $ RepoTemplatePath service user name
+    [name]       -> Just $ RepoTemplatePath service defaultRepoUser name
+    _            -> Nothing
+
