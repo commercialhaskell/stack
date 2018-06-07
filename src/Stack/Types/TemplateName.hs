@@ -135,16 +135,21 @@ parseRepoPath :: FilePath -> Maybe RepoTemplatePath
 parseRepoPath path =
     case T.stripPrefix "github:" (T.pack path) of
         Just strippedPath ->
-            case T.split (== '/') strippedPath of
-                [tname] -> Just $ RepoTemplatePath
-                    { rtpService = Github
-                    , rtpUser = defaultRepoUser
-                    , rtpTemplate = tname
-                    }
-                [user, tname] -> Just $ RepoTemplatePath
-                    { rtpService = Github
-                    , rtpUser = user
-                    , rtpTemplate = tname
-                    }
-                _ -> Nothing
+            parseRepoPathWithDefaultService (T.unpack strippedPath)
+        _ -> Nothing
+
+-- | Parses a template path of the form @user/template@, assuming the default service.
+parseRepoPathWithDefaultService :: FilePath -> Maybe RepoTemplatePath
+parseRepoPathWithDefaultService path =
+    case T.split (== '/') (T.pack path) of
+        [tname] -> Just $ RepoTemplatePath
+            { rtpService = Github
+            , rtpUser = defaultRepoUser
+            , rtpTemplate = tname
+            }
+        [user, tname] -> Just $ RepoTemplatePath
+            { rtpService = Github
+            , rtpUser = user
+            , rtpTemplate = tname
+            }
         _ -> Nothing

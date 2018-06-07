@@ -152,7 +152,12 @@ loadTemplate name logIt = do
             then liftIO (fmap (T.decodeUtf8With T.lenientDecode) (SB.readFile (toFilePath path)))
             else throwM (FailedToLoadTemplate name (toFilePath path))
     relRequest :: MonadThrow n => Path Rel File -> n Request
-    relRequest rel = parseRequest (defaultTemplateUrl <> "/" <> toFilePath rel)
+    relRequest rel = do
+        rtp <- case parseRepoPathWithDefaultService (toFilePath rel) of
+                Just rtp -> return rtp
+                Nothing -> throwM (FailedToLoadTemplate name (toFilePath rel))
+        let url = urlFromRepoTemplatePath rtp
+        parseRequest (T.unpack url)
     downloadFromUrl :: String -> Path Abs Dir -> RIO env Text
     downloadFromUrl s templateDir = do
         req <- parseRequest s
@@ -168,6 +173,7 @@ loadTemplate name logIt = do
         loadLocalFile path
     backupUrlRelPath = $(mkRelFile "downloaded.template.file.hsfiles")
 
+-- | Construct a URL for downloading from a repo.
 urlFromRepoTemplatePath :: RepoTemplatePath -> Text
 urlFromRepoTemplatePath (RepoTemplatePath Github user name) =
     T.concat ["https://raw.githubusercontent.com", "/", user, "/stack-templates/master/", name]
@@ -332,11 +338,6 @@ parseTemplateSet a = do
 -- | The default template name you can use if you don't have one.
 defaultTemplateName :: TemplateName
 defaultTemplateName = $(mkTemplateName "new-template")
-
--- | Default web root URL to download from.
-defaultTemplateUrl :: String
-defaultTemplateUrl =
-    "https://raw.githubusercontent.com/commercialhaskell/stack-templates/master"
 
 -- | Default web URL to get a yaml file containing template metadata.
 defaultTemplateInfoUrl :: String
