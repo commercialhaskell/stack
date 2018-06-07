@@ -24,7 +24,6 @@ import           Control.Monad.State.Strict (execState)
 import qualified Data.HashSet as HashSet
 import qualified Data.HashMap.Strict as HashMap
 import           Data.List
-import qualified Data.List.NonEmpty as NE
 import qualified Data.Map.Strict as M
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
@@ -137,7 +136,7 @@ data Ctx = Ctx
     , ctxEnvConfig   :: !EnvConfig
     , callStack      :: ![PackageName]
     , extraToBuild   :: !(Set PackageName)
-    , getVersions    :: !(PackageName -> IO (HashMap Version (NE.NonEmpty CabalHash)))
+    , getVersions    :: !(PackageName -> IO (HashMap Version (Maybe CabalHash)))
     , wanted         :: !(Set PackageName)
     , localNames     :: !(Set PackageName)
     }
@@ -631,7 +630,7 @@ addPackageDeps treatAsDep package = do
                 case latestApplicableVersion range vs of
                   Nothing -> pure Nothing
                   Just lappVer -> do
-                    let mlappRev = NE.head <$> HashMap.lookup lappVer vsAndRevs
+                    let mlappRev = join (HashMap.lookup lappVer vsAndRevs)
                     pure $ (lappVer,) <$> mlappRev
         case eres of
             Left e -> do

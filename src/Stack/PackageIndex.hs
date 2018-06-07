@@ -379,22 +379,17 @@ deleteCache indexName' = do
 -- | Get the known versions for a given package from the package caches.
 --
 -- See 'getPackageCaches' for performance notes.
-getPackageVersions :: HasCabalLoader env => PackageName -> RIO env (HashMap Version (NE.NonEmpty CabalHash))
+getPackageVersions :: HasCabalLoader env => PackageName -> RIO env (HashMap Version (Maybe CabalHash))
 getPackageVersions pkgName = lookupPackageVersions pkgName <$> getPackageCaches
 
-lookupPackageVersions :: PackageName -> PackageCache index -> HashMap Version (NE.NonEmpty CabalHash)
+lookupPackageVersions :: PackageName -> PackageCache index -> HashMap Version (Maybe CabalHash)
 lookupPackageVersions pkgName (PackageCache m) =
-    maybe HashMap.empty (HashMap.map extractRevisionHashes) $ HashMap.lookup pkgName m
+    maybe HashMap.empty (HashMap.map extractOrigRevHash) $ HashMap.lookup pkgName m
   where
-    extractRevisionHashes (_,_, neRevHashesAndOffsets) =
-      NE.map (extractOrigCabalHash . fst) neRevHashesAndOffsets
-
-    -- Warning: This function turns a list of one or two cabal file hashes into a
-    -- NonEmpty list value. Practically, the list is "guaranteed" to have at
-    -- least one element (see 'Stack.Types.PackageIndex.PackageCache')
-    extractOrigCabalHash :: [CabalHash] -> CabalHash
-    extractOrigCabalHash = NE.head . NE.fromList
-
+    -- Extract the original cabal file hash (the first element of the one or two
+    -- element list currently representing the cabal file hashes).
+    extractOrigRevHash (_,_, neRevHashesAndOffsets) =
+      listToMaybe $ fst (NE.last neRevHashesAndOffsets)
 
 -- | Load the package caches, or create the caches if necessary.
 --
