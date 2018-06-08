@@ -42,7 +42,7 @@ Bug fixes:
   was tried to be registered. This is now fixed by always building internal
   libraries. See
   [#3996](https://github.com/commercialhaskell/stack/issues/3996).
-
+* missing of flush before upload prompt. See [#4069](https://github.com/commercialhaskell/stack/pull/4069)
 
 ## v1.7.1
 
