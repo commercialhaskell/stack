@@ -114,6 +114,7 @@ loadCreds config = do
 
     loopPrompt :: String -> IO String
     loopPrompt p = do
+      hFlush stdout
       input <- TIO.getLine
       case input of
         "y" -> return "y"
