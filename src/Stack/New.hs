@@ -153,9 +153,9 @@ loadTemplate name logIt = do
             else throwM (FailedToLoadTemplate name (toFilePath path))
     relRequest :: MonadThrow n => Path Rel File -> n Request
     relRequest rel = do
-        rtp <- case parseRepoPathWithDefaultService (toFilePath rel) of
-                Just rtp -> return rtp
-                Nothing -> throwM (FailedToLoadTemplate name (toFilePath rel))
+        rtp <- case parseRepoPathWithService defaultRepoService (toFilePath rel) of
+            Just rtp -> return rtp
+            Nothing -> throwM (FailedToLoadTemplate name (toFilePath rel)) -- TODO: Is this the right error?
         let url = urlFromRepoTemplatePath rtp
         parseRequest (T.unpack url)
     downloadFromUrl :: String -> Path Abs Dir -> RIO env Text
@@ -338,6 +338,10 @@ parseTemplateSet a = do
 -- | The default template name you can use if you don't have one.
 defaultTemplateName :: TemplateName
 defaultTemplateName = $(mkTemplateName "new-template")
+
+-- | The default service to use to download templates.
+defaultRepoService :: RepoService
+defaultRepoService = Github
 
 -- | Default web URL to get a yaml file containing template metadata.
 defaultTemplateInfoUrl :: String
