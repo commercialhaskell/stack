@@ -19,6 +19,10 @@ Other enhancements:
 * A new sub command `run` has been introduced to build and run a specified executable
   similar to `cabal run`. If no executable is provided as the first argument, it
   defaults to the first available executable in the project.
+* `stack build` missing dependency suggestions (on failure to construct a valid
+  build plan because of missing deps) are now printed with their latest
+  cabal file revision hash. See
+  [#4068](https://github.com/commercialhaskell/stack/pull/4068).
 
 Bug fixes:
 

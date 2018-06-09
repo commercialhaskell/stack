@@ -71,6 +71,7 @@ module Stack.Build.Target
     ) where
 
 import           Stack.Prelude
+import qualified Data.HashMap.Strict as HashMap
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import qualified Data.Text as T
@@ -342,7 +343,7 @@ resolveRawTarget globals snap deps locals (ri, rt) =
               }
       where
         getLatestVersion pn =
-            fmap fst . Set.maxView <$> getPackageVersions pn
+            fmap fst . Set.maxView . Set.fromList . HashMap.keys <$> getPackageVersions pn
 
     go (RTPackageIdentifier ident@(PackageIdentifier name version))
       | Map.member name locals = return $ Left $ T.concat
