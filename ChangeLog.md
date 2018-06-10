@@ -44,7 +44,7 @@ Bug fixes:
   [#3996](https://github.com/commercialhaskell/stack/issues/3996).
 * When prompting users about saving their Hackage credentials on upload,
   flush to stdout before waiting for the response so the prompt actually
-  displays.
+  displays. Also fixes a similar issue with ghci target selection prompt.
 
 
 ## v1.7.1

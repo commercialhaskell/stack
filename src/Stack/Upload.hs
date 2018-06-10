@@ -25,7 +25,6 @@ import qualified Data.ByteString.Lazy                  as L
 import qualified Data.Conduit.Binary                   as CB
 import qualified Data.Text                             as T
 import           Data.Text.Encoding                    (encodeUtf8)
-import qualified Data.Text.IO                          as TIO
 import           Network.HTTP.Client                   (Response,
                                                         RequestBody(RequestBodyLBS),
                                                         Request)
@@ -46,8 +45,7 @@ import           Stack.Types.PackageName               (packageNameString)
 import           System.Directory                      (createDirectoryIfMissing,
                                                         removeFile)
 import           System.FilePath                       ((</>), takeFileName)
-import           System.IO                             (stdout, putStrLn, putStr, getLine, print) -- TODO remove putStrLn, use logInfo
-import           System.IO.Echo                        (withoutInputEcho)
+import           System.IO                             (stdout, putStrLn, putStr, print) -- TODO remove putStrLn, use logInfo
 
 -- | Username and password to log into Hackage.
 --
@@ -87,10 +85,8 @@ loadCreds config = do
       return $ mkCreds fp
   where
     fromPrompt fp = do
-      putStr "Hackage username: "
-      hFlush stdout
-      username <- TIO.getLine
-      password <- promptPassword
+      username <- prompt "Hackage username: "
+      password <- promptPassword "Hackage password: "
       let hc = HackageCreds
             { hcUsername = username
             , hcPassword = password
@@ -98,41 +94,21 @@ loadCreds config = do
             }
 
       when (configSaveHackageCreds config) $ do
-        let prompt = "Save hackage credentials to file at " ++ fp ++ " [y/n]? "
-        input <- loopPrompt prompt
+        shouldSave <- promptBool $ T.pack $
+          "Save hackage credentials to file at " ++ fp ++ " [y/n]? "
         putStrLn "NOTE: Avoid this prompt in the future by using: save-hackage-creds: false"
-        when input $ do
+        when shouldSave $ do
           L.writeFile fp (encode hc)
           putStrLn "Saved!"
           hFlush stdout
 
       return hc
 
-    loopPrompt :: String -> IO Bool
-    loopPrompt p = do
-      putStr p
-      hFlush stdout
-      input <- TIO.getLine
-      case input of
-        "y" -> return True
-        "n" -> return False
-        _   -> loopPrompt p
-
 credsFile :: Config -> IO FilePath
 credsFile config = do
     let dir = toFilePath (view stackRootL config) </> "upload"
     createDirectoryIfMissing True dir
     return $ dir </> "credentials.json"
-
--- | Lifted from cabal-install, Distribution.Client.Upload
-promptPassword :: IO Text
-promptPassword = do
-  putStr "Hackage password: "
-  hFlush stdout
-  -- save/restore the terminal echoing status (no echoing for entering the password)
-  passwd <- withoutInputEcho $ fmap T.pack getLine
-  putStrLn ""
-  return passwd
 
 applyCreds :: HackageCreds -> Request -> IO Request
 applyCreds creds req0 = do

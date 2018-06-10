@@ -70,7 +70,7 @@ import              Path
 import              Path.CheckInstall (warnInstallSearchPathIssues)
 import              Path.Extra (toFilePathNoTrailingSep)
 import              Path.IO hiding (findExecutable, withSystemTempDir)
-import              Prelude (getLine, putStr, putStrLn, until)
+import              Prelude (until)
 import qualified    RIO
 import              Stack.Build (build)
 import              Stack.Config (loadConfig)
@@ -94,7 +94,6 @@ import              Stack.Types.Version
 import qualified    System.Directory as D
 import              System.Environment (getExecutablePath, lookupEnv)
 import              System.Exit (ExitCode (..), exitFailure)
-import              System.IO (stdout)
 import              System.IO.Error (isPermissionError)
 import              System.FilePath (searchPathSeparator)
 import qualified    System.FilePath as FP
@@ -1989,7 +1988,7 @@ performPathChecking newFile = do
         | isPermissionError e -> do
             logWarn $ "Permission error when trying to copy: " <> displayShow e
             logWarn "Should I try to perform the file copy using sudo? This may fail"
-            toSudo <- prompt "Try using sudo? (y/n) "
+            toSudo <- promptBool "Try using sudo? (y/n) "
             when toSudo $ do
               let run cmd args = do
                     ec <- proc cmd args runProcess
@@ -2019,19 +2018,6 @@ performPathChecking newFile = do
               logInfo ""
               logInfo "sudo file copy worked!"
         | otherwise -> throwM e
-
-prompt :: MonadIO m => String -> m Bool
-prompt str =
-    liftIO go
-  where
-    go = do
-      putStr str
-      hFlush stdout
-      l <- getLine
-      case l of
-        'y':_ -> return True
-        'n':_ -> return False
-        _ -> putStrLn "Invalid entry, try again" >> go
 
 getDownloadVersion :: StackReleaseInfo -> Maybe Version
 getDownloadVersion (StackReleaseInfo val) = do
