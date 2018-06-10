@@ -166,8 +166,7 @@ do_ubuntu_install() {
     install_aarch64_binary
   elif is_64_bit ; then
     install_dependencies
-
-print_bindist_notice
+    print_bindist_notice
     install_64bit_standard_binary
   else
     install_dependencies
