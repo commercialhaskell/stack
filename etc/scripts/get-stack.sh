@@ -561,7 +561,9 @@ try_install_pkgs() {
 
 # Install packages using apt-get
 apt_get_install_pkgs() {
-  if ! sudocmd apt-get install -y ${QUIET:+-qq} "$@"; then
+  if dpkg-query -W "$@" > /dev/null; then
+    info "Already installed!"
+  elif ! sudocmd apt-get install -y ${QUIET:+-qq} "$@"; then
     die "Installing apt packages failed.  Please run 'apt-get update' and try again."
   fi
 }
