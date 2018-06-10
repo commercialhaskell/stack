@@ -127,8 +127,15 @@ print_bindist_notice() {
 
 # Adds a 'sudo' prefix if sudo is available to execute the given command
 # If not, the given command is run as is
+# When requesting root permission, always show the command and never re-use cached credentials.
 sudocmd() {
-  $(command -v sudo) "$@"
+  if command -v sudo >/dev/null; then
+    echo "sudo $@"
+    # -k: Always prompt.
+    sudo -k "$@"
+  else
+    "$@"
+  fi
 }
 
 # Install dependencies for distros that use Apt
@@ -159,7 +166,8 @@ do_ubuntu_install() {
     install_aarch64_binary
   elif is_64_bit ; then
     install_dependencies
-    print_bindist_notice
+
+print_bindist_notice
     install_64bit_standard_binary
   else
     install_dependencies
