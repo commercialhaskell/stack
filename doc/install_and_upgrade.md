@@ -73,7 +73,7 @@ Run:
 
 If you have the popular [brew](https://brew.sh/) tool installed, you can just do:
 
-    brew install haskell-stack
+    brew install stack
 
 * The Homebrew formula and bottles are **unofficial** and lag slightly behind new Stack releases,
 but tend to be updated within a day or two.
