@@ -151,11 +151,9 @@ loadTemplate name logIt = do
         if exists
             then liftIO (fmap (T.decodeUtf8With T.lenientDecode) (SB.readFile (toFilePath path)))
             else throwM (FailedToLoadTemplate name (toFilePath path))
-    relRequest :: MonadThrow n => Path Rel File -> n Request
+    relRequest :: Path Rel File -> Maybe Request
     relRequest rel = do
-        rtp <- case parseRepoPathWithService defaultRepoService (toFilePath rel) of
-            Just rtp -> return rtp
-            Nothing -> throwM (FailedToLoadTemplate name (toFilePath rel)) -- TODO: Is this the right error?
+        rtp <- parseRepoPathWithService defaultRepoService (toFilePath rel)
         let url = urlFromRepoTemplatePath rtp
         parseRequest (T.unpack url)
     downloadFromUrl :: String -> Path Abs Dir -> RIO env Text
