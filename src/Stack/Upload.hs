@@ -99,28 +99,24 @@ loadCreds config = do
 
       when (configSaveHackageCreds config) $ do
         let prompt = "Save hackage credentials to file at " ++ fp ++ " [y/n]? "
-        putStr prompt
         input <- loopPrompt prompt
         putStrLn "NOTE: Avoid this prompt in the future by using: save-hackage-creds: false"
-        hFlush stdout
-        case input of
-          "y" -> do
-            L.writeFile fp (encode hc)
-            putStrLn "Saved!"
-            hFlush stdout
-          _ -> return ()
+        when input $ do
+          L.writeFile fp (encode hc)
+          putStrLn "Saved!"
+          hFlush stdout
 
       return hc
 
-    loopPrompt :: String -> IO String
+    loopPrompt :: String -> IO Bool
     loopPrompt p = do
+      putStr p
+      hFlush stdout
       input <- TIO.getLine
       case input of
-        "y" -> return "y"
-        "n" -> return "n"
-        _   -> do
-          putStr p
-          loopPrompt p
+        "y" -> return True
+        "n" -> return False
+        _   -> loopPrompt p
 
 credsFile :: Config -> IO FilePath
 credsFile config = do
