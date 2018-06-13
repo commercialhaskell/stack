@@ -42,6 +42,8 @@ Bug fixes:
   was tried to be registered. This is now fixed by always building internal
   libraries. See
   [#3996](https://github.com/commercialhaskell/stack/issues/3996).
+* Fix a regression which might use a lot of RAM. See
+  [#4027](https://github.com/commercialhaskell/stack/issues/4027).
 * Order of commandline arguments does not matter anymore.
   See [#3959](https://github.com/commercialhaskell/stack/issues/3959)
 * When prompting users about saving their Hackage credentials on upload,
