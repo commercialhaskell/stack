@@ -22,6 +22,7 @@ import           Stack.Prelude hiding (Display (..))
 import           Control.Monad.RWS.Strict hiding ((<>))
 import           Control.Monad.State.Strict (execState)
 import qualified Data.HashSet as HashSet
+import qualified Data.HashMap.Strict as HashMap
 import           Data.List
 import qualified Data.Map.Strict as M
 import qualified Data.Map.Strict as Map
@@ -135,7 +136,7 @@ data Ctx = Ctx
     , ctxEnvConfig   :: !EnvConfig
     , callStack      :: ![PackageName]
     , extraToBuild   :: !(Set PackageName)
-    , getVersions    :: !(PackageName -> IO (Set Version))
+    , getVersions    :: !(PackageName -> IO (HashMap Version (Maybe CabalHash)))
     , wanted         :: !(Set PackageName)
     , localNames     :: !(Set PackageName)
     }
@@ -623,9 +624,14 @@ addPackageDeps treatAsDep package = do
     deps' <- packageDepsWithTools package
     deps <- forM (Map.toList deps') $ \(depname, (range, depType)) -> do
         eres <- addDep treatAsDep depname
-        let getLatestApplicable = do
-                vs <- liftIO $ getVersions ctx depname
-                return (latestApplicableVersion range vs)
+        let getLatestApplicableVersionAndRev = do
+                vsAndRevs <- liftIO $ getVersions ctx depname
+                let vs = Set.fromList (HashMap.keys vsAndRevs)
+                case latestApplicableVersion range vs of
+                  Nothing -> pure Nothing
+                  Just lappVer -> do
+                    let mlappRev = join (HashMap.lookup lappVer vsAndRevs)
+                    pure $ (lappVer,) <$> mlappRev
         case eres of
             Left e -> do
                 addParent depname range Nothing
@@ -633,7 +639,7 @@ addPackageDeps treatAsDep package = do
                         case e of
                             UnknownPackage name -> assert (name == depname) NotInBuildPlan
                             _ -> Couldn'tResolveItsDependencies (packageVersion package)
-                mlatestApplicable <- getLatestApplicable
+                mlatestApplicable <- getLatestApplicableVersionAndRev
                 return $ Left (depname, (range, mlatestApplicable, bd))
             Right adr | depType == AsLibrary && not (adrHasLibrary adr) ->
                 return $ Left (depname, (range, Nothing, HasNoLibrary))
@@ -677,7 +683,7 @@ addPackageDeps treatAsDep package = do
                         ADRFound loc (Library ident gid _) -> return $ Right
                             (Set.empty, Map.singleton ident gid, loc)
                     else do
-                        mlatestApplicable <- getLatestApplicable
+                        mlatestApplicable <- getLatestApplicableVersionAndRev
                         return $ Left (depname, (range, mlatestApplicable, DependencyMismatch $ adrVersion adr))
     case partitionEithers deps of
         -- Note that the Monoid for 'InstallLocation' means that if any
@@ -939,8 +945,9 @@ data ConstructPlanException
 
 deriving instance Ord VersionRange
 
--- | For display purposes only, Nothing if package not found
-type LatestApplicableVersion = Maybe Version
+-- | The latest applicable version and it's latest cabal file revision.
+-- For display purposes only, Nothing if package not found
+type LatestApplicableVersion = Maybe (Version, CabalHash)
 
 -- | Reason why a dependency was not used
 data BadDependency
@@ -977,7 +984,7 @@ pprintExceptions exceptions stackYaml parentMap wanted =
       [ "  *" <+> align (flow "Consider trying 'stack solver', which uses the cabal-install solver to attempt to find some working build configuration. This can be convenient when dealing with many complicated constraint errors, but results may be unpredictable.")
       , line <> line
       ] ++ addExtraDepsRecommendations
-      
+
   where
     exceptions' = nubOrd exceptions
 
@@ -1004,13 +1011,16 @@ pprintExceptions exceptions stackYaml parentMap wanted =
        Map.unions $ map go $ Map.toList m
      where
        -- TODO: Likely a good idea to distinguish these to the user.  In particular, for DependencyMismatch
-       go (name, (_range, Just version, NotInBuildPlan)) =
-           Map.singleton name version
-       go (name, (_range, Just version, DependencyMismatch{})) =
-           Map.singleton name version
+       go (name, (_range, Just (version,cabalHash), NotInBuildPlan)) =
+           Map.singleton name (version,cabalHash)
+       go (name, (_range, Just (version,cabalHash), DependencyMismatch{})) =
+           Map.singleton name (version, cabalHash)
        go _ = Map.empty
-    pprintExtra (name, version) =
-      fromString (concat ["- ", packageNameString name, "-", versionString version])
+    pprintExtra (name, (version, cabalHash)) =
+      let cfInfo = CFIHash Nothing cabalHash
+          packageId = PackageIdentifier name version
+          packageIdRev = PackageIdentifierRevision packageId cfInfo
+       in fromString $ packageIdentifierRevisionString packageIdRev
 
     allNotInBuildPlan = Set.fromList $ concatMap toNotInBuildPlan exceptions'
     toNotInBuildPlan (DependencyPlanFailures _ pDeps) =
@@ -1091,11 +1101,11 @@ pprintExceptions exceptions stackYaml parentMap wanted =
                     | isNothing mversion ->
                         flow "(no package with that name found, perhaps there is a typo in a package's build-depends or an omission from the stack.yaml packages list?)"
                     | otherwise -> ""
-                Just la
-                    | mlatestApplicable == mversion -> softline <>
+                Just (laVer, _)
+                    | Just laVer == mversion -> softline <>
                         flow "(latest matching version is specified)"
                     | otherwise -> softline <>
-                        flow "(latest matching version is" <+> styleGood (display la) <> ")"
+                        flow "(latest matching version is" <+> styleGood (display laVer) <> ")"
 
 -- | Get the shortest reason for the package to be in the build plan. In
 -- other words, trace the parent dependencies back to a 'wanted'

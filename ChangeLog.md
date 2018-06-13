@@ -16,6 +16,10 @@ Other enhancements:
   `extra-deps` of `stack.yaml`
 * `stack build` suggests trying another GHC version should the build
   plan end up requiring unattainable `base` version.
+* `stack build` missing dependency suggestions (on failure to construct a valid
+  build plan because of missing deps) are now printed with their latest
+  cabal file revision hash. See
+  [#4068](https://github.com/commercialhaskell/stack/pull/4068).
 
 Bug fixes:
 
@@ -40,6 +44,11 @@ Bug fixes:
   [#3996](https://github.com/commercialhaskell/stack/issues/3996).
 * Fix a regression which might use a lot of RAM. See
   [#4027](https://github.com/commercialhaskell/stack/issues/4027).
+* Order of commandline arguments does not matter anymore.
+  See [#3959](https://github.com/commercialhaskell/stack/issues/3959)
+* When prompting users about saving their Hackage credentials on upload,
+  flush to stdout before waiting for the response so the prompt actually
+  displays.
 
 
 ## v1.7.1
