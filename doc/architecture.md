@@ -96,7 +96,7 @@ installed executables, since GHC does not track them for us.
 
 When running a build, we know which packages we want installed (inventively
 called "wanteds"), which packages are available to install, and which are
-already installed. In plan construction, we put them information together to
+already installed. In plan construction, we put their information together to
 decide which packages must be built. The code in Stack.Build.ConstructPlan is
 authoritative on this and should be consulted. The basic idea though is:
 
