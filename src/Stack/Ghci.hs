@@ -51,7 +51,7 @@ import           Stack.Types.Package
 import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageName
 import           Stack.Types.Runner
-import           System.IO (putStrLn, putStr, getLine)
+import           System.IO (putStrLn)
 import           System.IO.Temp (getCanonicalTemporaryDirectory)
 
 #ifndef WINDOWS
@@ -474,9 +474,8 @@ renderScript isIntero pkgs mainFile onlyMain extraFiles = do
 getFileTargets :: [GhciPkgInfo] -> [Path Abs File]
 getFileTargets = concatMap (concatMap S.toList . maybeToList . ghciPkgTargetFiles)
 
--- | Figure out the main-is file to load based on the targets. Sometimes there
--- is none, sometimes it's unambiguous, sometimes it's
--- ambiguous. Warns and returns nothing if it's ambiguous.
+-- | Figure out the main-is file to load based on the targets. Asks the
+-- user for input if there is more than one candidate main-is file.
 figureOutMainFile
     :: HasRunner env
     => BuildOpts
@@ -532,11 +531,10 @@ figureOutMainFile bopts mainIsTargets targets0 packages = do
             T.pack (toFilePath mainIs)
     candidateIndices = take (length candidates) [1 :: Int ..]
     userOption = do
-      putStr "Specify main module to use (press enter to load none): "
-      option <- getLine
+      option <- prompt "Specify main module to use (press enter to load none): "
       let selected = fromMaybe
                       ((+1) $ length candidateIndices)
-                      (readMaybe option :: Maybe Int)
+                      (readMaybe (T.unpack option) :: Maybe Int)
       case elemIndex selected candidateIndices  of
         Nothing -> do
             putStrLn
