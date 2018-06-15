@@ -105,6 +105,7 @@ import qualified System.Directory as D
 import           System.Environment (getProgName, getArgs, withArgs)
 import           System.Exit
 import           System.FilePath (isValid, pathSeparator)
+import qualified System.FilePath as FP
 import           System.Console.ANSI (SGR (Reset), hSupportsANSI, setSGR)
 import           System.IO (stderr, stdin, stdout, BufferMode(..), hPutStrLn, hPrint, hGetEncoding, hSetEncoding)
 
@@ -777,14 +778,13 @@ sdistCmd sdistOpts go =
             liftIO $ L.writeFile (toFilePath tarPath) tarBytes
             checkSDistTarball sdistOpts tarPath
             prettyInfoL [flow "Wrote sdist tarball to", display tarPath]
-            unless (null $ sdoptsTarPath sdistOpts) (copyTarToTarPath tarPath tarName)
+            forM_ (sdoptsTarPath sdistOpts) $ copyTarToTarPath tarPath tarName
             when (sdoptsSign sdistOpts) (void $ Sig.sign (sdoptsSignServerUrl sdistOpts) tarPath)
         where
-          copyTarToTarPath tarPath tarName = liftIO $ do
-            targetDir <- resolveDir' $ sdoptsTarPath sdistOpts
-            targetTarPath <- (targetDir </>) <$> parseRelFile tarName
-            D.createDirectoryIfMissing True (toFilePath targetDir)
-            D.copyFile (toFilePath tarPath) (toFilePath targetTarPath)
+          copyTarToTarPath tarPath tarName targetDir = liftIO $ do
+            let targetTarPath = targetDir FP.</> tarName
+            D.createDirectoryIfMissing True $ FP.takeDirectory targetTarPath
+            D.copyFile (toFilePath tarPath) targetTarPath
 
 -- | Execute a command.
 execCmd :: ExecOpts -> GlobalOpts -> IO ()

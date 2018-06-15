@@ -84,7 +84,7 @@ data SDistOpts = SDistOpts
   -- ^ The URL of the signature server
   , sdoptsBuildTarball :: Bool
   -- ^ Whether to build the tarball
-  , sdoptsTarPath :: FilePath
+  , sdoptsTarPath :: Maybe FilePath
   -- ^ Where to copy the tarball
   }
 
