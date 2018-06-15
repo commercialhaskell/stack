@@ -1513,6 +1513,13 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
             NoLibraries -> do
                 markExeInstalled (taskLocation task) taskProvides -- TODO unify somehow with writeFlagCache?
                 return $ Executable ident
+        sublibsPkgIds <- fmap (mapMaybe id) $
+          forM (Set.toList $ packageInternalLibraries package) $ \sublib -> do
+            -- z-haddock-library-z-attoparsec for internal lib attoparsec of haddock-library
+            let sublibName = T.concat ["z-", packageNameText $ packageName package, "-z-", sublib]
+            case parsePackageName sublibName of
+              Nothing -> return Nothing -- invalid lib, ignored
+              Just subLibName -> loadInstalledPkg wc [installedPkgDb] installedDumpPkgsTVar subLibName
 
         case taskLocation task of
             Snap ->
@@ -1521,7 +1528,7 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
                 (ttPackageLocation taskType)
                 (configCacheOpts cache)
                 (configCacheDeps cache)
-                mpkgid (packageExes package)
+                mpkgid sublibsPkgIds (packageExes package)
             _ -> return ()
 
         case taskType of

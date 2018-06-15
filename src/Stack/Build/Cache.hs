@@ -324,30 +324,33 @@ writePrecompiledCache :: HasEnvConfig env
                       -> ConfigureOpts
                       -> Set GhcPkgId -- ^ dependencies
                       -> Installed -- ^ library
+                      -> [GhcPkgId] -- ^ sublibraries, in the GhcPkgId format
                       -> Set Text -- ^ executables
                       -> RIO env ()
-writePrecompiledCache baseConfigOpts loc copts depIDs mghcPkgId exes = do
+writePrecompiledCache baseConfigOpts loc copts depIDs mghcPkgId sublibs exes = do
   mfile <- precompiledCacheFile loc copts depIDs
   forM_ mfile $ \file -> do
     ensureDir (parent file)
     ec <- view envConfigL
     let stackRootRelative = makeRelative (view stackRootL ec)
-    mlibpath <-
-        case mghcPkgId of
-            Executable _ -> return Nothing
-            Library _ ipid _ -> liftM Just $ do
-                ipid' <- parseRelFile $ ghcPkgIdString ipid ++ ".conf"
-                relPath <- stackRootRelative $ bcoSnapDB baseConfigOpts </> ipid'
-                return $ toFilePath relPath
+    mlibpath <- case mghcPkgId of
+      Executable _ -> return Nothing
+      Library _ ipid _ -> liftM Just $ pathFromPkgId stackRootRelative ipid
+    sublibpaths <- mapM (pathFromPkgId stackRootRelative) sublibs
     exes' <- forM (Set.toList exes) $ \exe -> do
         name <- parseRelFile $ T.unpack exe
         relPath <- stackRootRelative $ bcoSnapInstallRoot baseConfigOpts </> bindirSuffix </> name
         return $ toFilePath relPath
     $(versionedEncodeFile precompiledCacheVC) file PrecompiledCache
         { pcLibrary = mlibpath
-        , pcSubLibs = []
+        , pcSubLibs = sublibpaths
         , pcExes = exes'
         }
+  where
+    pathFromPkgId stackRootRelative ipid = do
+      ipid' <- parseRelFile $ ghcPkgIdString ipid ++ ".conf"
+      relPath <- stackRootRelative $ bcoSnapDB baseConfigOpts </> ipid'
+      return $ toFilePath relPath
 
 -- | Check the cache for a precompiled package matching the given
 -- configuration.
