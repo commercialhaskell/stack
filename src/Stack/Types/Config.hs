@@ -836,17 +836,16 @@ parseConfigMonoidObject rootDir obj = do
     optionsEverything <-
       case (Map.lookup GOKOldEverything options, Map.lookup GOKEverything options) of
         (Just _, Just _) -> fail "Cannot specify both `*` and `$everything` GHC options"
-        (Nothing, Just x) -> return x
+        (Nothing, Just x) -> return (Just x)
         (Just x, Nothing) -> do
           tell "The `*` ghc-options key is not recommended. Consider using $locals, or if really needed, $everything"
-          return x
-        (Nothing, Nothing) -> return []
+          return (Just x)
+        (Nothing, Nothing) -> return Nothing
 
-    let configMonoidGhcOptionsByCat = Map.fromList
-          [ (AGOEverything, optionsEverything)
-          , (AGOLocals, Map.findWithDefault [] GOKLocals options)
-          , (AGOTargets, Map.findWithDefault [] GOKTargets options)
-          ]
+    let configMonoidGhcOptionsByCat = Map.fromList $
+          maybeToList (fmap (AGOEverything,) optionsEverything) ++
+          maybeToList (fmap (AGOLocals,) (Map.lookup GOKLocals options)) ++
+          maybeToList (fmap (AGOTargets,) (Map.lookup GOKTargets options))
 
         configMonoidGhcOptionsByName = Map.fromList
             [(name, opts) | (GOKPackage name, opts) <- Map.toList options]
