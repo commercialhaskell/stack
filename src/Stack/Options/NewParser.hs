@@ -23,9 +23,11 @@ newOptsParser = (,) <$> newOpts <*> initOptsParser
              help "Do not create a subdirectory for the project") <*>
         optional (templateNameArgument
             (metavar "TEMPLATE_NAME" <>
-             help "Name of a template or a local template in a file or a URL.\
-                  \ For example: foo or foo.hsfiles or ~/foo or\
-                  \ https://example.com/foo.hsfiles")) <*>
+             help "Name of a template - can take the form\
+                \ [github:][username/]template with optional service name\
+                \ and username for the service; or, a local filename such as\
+                \ foo.hsfiles or ~/foo; or, a full URL such as\
+                \ https://example.com/foo.hsfiles.")) <*>
         fmap
             M.fromList
             (many
