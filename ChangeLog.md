@@ -9,6 +9,9 @@ Major changes:
 
 Behavior changes:
 
+* `ghc-options` from `stack.yaml` are now appended to `ghc-options` from
+  `config.yaml`, whereas before they would be replaced.
+
 Other enhancements:
 
 * On Windows, recognise a 'mintty' (false) terminal as a terminal, by default
