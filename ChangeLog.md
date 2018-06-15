@@ -20,6 +20,8 @@ Other enhancements:
   build plan because of missing deps) are now printed with their latest
   cabal file revision hash. See
   [#4068](https://github.com/commercialhaskell/stack/pull/4068).
+* Added new `--tar-dir` option to `stack sdist`, that allows to copy
+  the resulting tarball to the specified directory.
 
 Bug fixes:
 
