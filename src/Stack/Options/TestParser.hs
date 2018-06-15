@@ -27,12 +27,12 @@ testOptsParser hide0 =
                          help "Arguments passed in to the test suite program" <>
                          hide)))
         <*> optionalFirst
-                (switch
+                (flag' True
                     (long "coverage" <>
                      help "Generate a code coverage report" <>
                      hide))
         <*> optionalFirst
-                (switch
+                (flag' True
                     (long "no-run-tests" <>
                      help "Disable running of tests. (Tests will still be built.)" <>
                      hide))

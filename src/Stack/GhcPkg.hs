@@ -71,9 +71,9 @@ ghcPkg wc pkgDbs args = do
         go
       Right _ -> return eres
   where
-    go = fmap (fmap (BL.toStrict . fst))
-       $ tryAny
-       $ proc (ghcPkgExeName wc) args' readProcess_
+    go = tryAny
+       $ BL.toStrict . fst
+     <$> proc (ghcPkgExeName wc) args' readProcess_
     args' = packageDbFlags pkgDbs ++ args
 
 -- | Create a package database in the given directory, if it doesn't exist.
