@@ -966,7 +966,7 @@ This option specifies additional directories to prepend to the PATH environment
 variable.  These will be used when resolving the location of executables, and
 will also be visible in the `PATH` variable of processes run by stack.
 
-For example, to prepend `/path-to-some-dep/bin` to your PATh:
+For example, to prepend `/path-to-some-dep/bin` to your PATH:
 
 ```yaml
 extra-path:
