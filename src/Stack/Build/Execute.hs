@@ -1295,7 +1295,7 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
                         return $ if b then Just pc else Nothing
             _ -> return Nothing
 
-    copyPreCompiled (PrecompiledCache mlib exes) = do
+    copyPreCompiled (PrecompiledCache mlib sublibs exes) = do
         wc <- view $ actualCompilerVersionL.whichCompilerL
         announceTask task "using precompiled package"
         forM_ mlib $ \libpath -> do

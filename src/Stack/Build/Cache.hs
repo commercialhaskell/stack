@@ -345,6 +345,7 @@ writePrecompiledCache baseConfigOpts loc copts depIDs mghcPkgId exes = do
         return $ toFilePath relPath
     $(versionedEncodeFile precompiledCacheVC) file PrecompiledCache
         { pcLibrary = mlibpath
+        , pcSubLibs = []
         , pcExes = exes'
         }
 
@@ -372,6 +373,7 @@ readPrecompiledCache loc copts depIDs = runMaybeT $
       let mkAbs' = (toFilePath stackRoot FP.</>)
       return PrecompiledCache
         { pcLibrary = mkAbs' <$> pcLibrary pc0
+        , pcSubLibs = mkAbs' <$> pcSubLibs pc0
         , pcExes = mkAbs' <$> pcExes pc0
         }
 
