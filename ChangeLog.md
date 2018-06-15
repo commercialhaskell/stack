@@ -349,6 +349,8 @@ Other enhancements:
   [#3534](https://github.com/commercialhaskell/stack/issues/3534)
 * GHC bindists can now be identified by their SHA256 checksum in addition to
   their SHA1 checksum, allowing for more security in download.
+* Added new `--tar-files` option to `stack sdist`, that allows to copy
+  the resulting tarball to the specified directory.
 * For filesystem setup-info paths, it's no longer assumed that the
   directory is writable, instead a temp dir is used.  See
   [#3188](https://github.com/commercialhaskell/stack/issues/3188).

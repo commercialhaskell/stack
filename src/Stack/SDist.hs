@@ -84,6 +84,8 @@ data SDistOpts = SDistOpts
   -- ^ The URL of the signature server
   , sdoptsBuildTarball :: Bool
   -- ^ Whether to build the tarball
+  , sdoptsTarPath :: FilePath
+  -- ^ Where to copy the tarball
   }
 
 newtype CheckException

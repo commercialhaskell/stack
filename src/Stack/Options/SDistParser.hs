@@ -21,7 +21,8 @@ sdistOptsParser signDefault = SDistOpts <$>
   (long "sig-server" <> metavar "URL" <> showDefault <>
     value "https://sig.commercialhaskell.org" <>
     help "URL") <*>
-  buildPackageOption
+  buildPackageOption <*>
+  strOption (long "tar-files" <> help "If specified, copy all the tar to this dir")
   where
     ignoreCheckSwitch =
       switch (long "ignore-check"
