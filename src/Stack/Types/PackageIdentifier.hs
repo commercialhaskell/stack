@@ -209,8 +209,7 @@ packageIdentifierParser :: Parser PackageIdentifier
 packageIdentifierParser =
   do name <- packageNameParser
      char '-'
-     version <- versionParser
-     return (PackageIdentifier name version)
+     PackageIdentifier name <$> versionParser
 
 -- | Convenient way to parse a package identifier from a 'Text'.
 parsePackageIdentifier :: MonadThrow m => Text -> m PackageIdentifier
