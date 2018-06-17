@@ -180,6 +180,21 @@ now the most important thing is to direct users to a single destination.*
 
 ## Old issue closing policy
 
-We have yet to settle on a precise guide for closing out old issues, but, for
-now, if you happen across something that could easily be marked as resolved,
-please do so.
+A project like Stack can have a tendency to acquire issues over time, which can
+include:
+
+* Feature requests that won't be included
+* Support requests which have either been answered or stalled
+* Legitimate bugs reports to be fixed and features to be implemented
+
+Unfortunately, over time the signal-to-noise ratio can make it difficult to
+focus on the highest value issues. This makes it difficult for maintainers to
+focus their attention, or new contributors to find a good place to start.
+
+Therefore, Stack follows the practice of many other projects in using [a
+bot](https://github.com/apps/stale) to automatically close stale issues. For
+more information on the specific configuration we follow, see the [stale.yml
+file](https://github.com/commercialhaskell/stack/blob/master/.github/stale.yml).
+
+If you wish to keep an issue open, simply comment on the issue when the bot
+indicates that an issue will soon be closed.
