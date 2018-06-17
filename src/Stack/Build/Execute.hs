@@ -1298,7 +1298,24 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
     copyPreCompiled (PrecompiledCache mlib sublibs exes) = do
         wc <- view $ actualCompilerVersionL.whichCompilerL
         announceTask task "using precompiled package"
-        forM_ mlib $ \libpath -> do
+
+        -- We need to copy .conf files for the main library and all sublibraries which exist in the cache,
+        -- from their old snapshot to the new one. However, we must unregister any such library in the new
+        -- snapshot, in case it was built with different flags.
+        let
+          subLibNames = map T.unpack . Set.toList $ case taskType of
+            TTFiles lp _ -> packageInternalLibraries $ lpPackage lp
+            TTIndex p _ _ -> packageInternalLibraries p
+          (name, version) = toTuple taskProvides
+          mainLibName = packageNameString name
+          mainLibVersion = versionString version
+          pkgName = mainLibName ++ "-" ++ mainLibVersion
+          -- z-package-z-internal for internal lib internal of package package
+          toCabalInternalLibName n = concat ["z-", mainLibName, "-z-", n, "-", mainLibVersion]
+          allToUnregister = map (const pkgName) (maybeToList mlib) ++ map toCabalInternalLibName subLibNames
+          allToRegister = maybeToList mlib ++ sublibs
+
+        when (not $ null allToRegister) $ do
             withMVar eeInstallLock $ \() -> do
                 -- We want to ignore the global and user databases.
                 -- Unfortunately, ghc-pkg doesn't take such arguments on the
@@ -1310,23 +1327,17 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
                       (T.pack $ toFilePathNoTrailingSep $ bcoSnapDB eeBaseConfigOpts)
 
                 withModifyEnvVars modifyEnv $ do
-                  -- In case a build of the library with different flags already exists, unregister it
-                  -- before copying.
                   let ghcPkgExe = ghcPkgExeName wc
-                  catchAny
-                      (readProcessNull ghcPkgExe
-                          [ "unregister"
-                          , "--force"
-                          , packageIdentifierString taskProvides
-                          ])
+
+                  -- first unregister everything that needs to be unregistered
+                  forM_ allToUnregister $ \packageName -> catchAny
+                      (readProcessNull ghcPkgExe [ "unregister", "--force", packageName])
                       (const (return ()))
 
-                  void $ proc ghcPkgExe
-                      [ "register"
-                      , "--force"
-                      , libpath
-                      ]
-                      readProcess_
+                  -- now, register the cached conf files
+                  forM_ allToRegister $ \libpath ->
+                    proc ghcPkgExe [ "register", "--force", libpath] readProcess_
+
         liftIO $ forM_ exes $ \exe -> do
             D.createDirectoryIfMissing True bindir
             let dst = bindir FP.</> FP.takeFileName exe
