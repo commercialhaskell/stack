@@ -11,6 +11,9 @@ Behavior changes:
 
 * `ghc-options` from `stack.yaml` are now appended to `ghc-options` from
   `config.yaml`, whereas before they would be replaced.
+* `stack build` will now announce when sublibraries of a package are being
+  build, in the same way executables, tests, benchmarks and libraries are
+  announced
 
 Other enhancements:
 
@@ -57,6 +60,16 @@ Bug fixes:
   displays. Also fixes a similar issue with ghci target selection prompt.
 * If `cabal` is not on PATH, running `stack solver` now prompts the user
   to run `stack install cabal-install`
+* `stack build` now succeeds in building packages which contain sublibraries
+  which are dependencies of executables, tests or benchmarks but not of the
+  main library. See
+  [#3787](https://github.com/commercialhaskell/stack/issues/3959).
+* Sublibraries are now properly considered for coverage reports.
+* Sublibraries are now added to the precompiled cache and recovered from there
+  when the snapshot gets updated. Previously, updating the snapshot when there
+  was a package with a sublibrary in the snapshot resulted in broken builds.
+  This is now fixed, see
+  [#4071](https://github.com/commercialhaskell/stack/issues/4071).
 
 
 ## v1.7.1
