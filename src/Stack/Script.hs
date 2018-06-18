@@ -2,6 +2,7 @@
 {-# LANGUAGE CPP               #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell   #-}
+{-# LANGUAGE TupleSections     #-}
 module Stack.Script
     ( scriptCmd
     ) where
@@ -211,7 +212,7 @@ toModuleInfo ls =
     $ map (\(pn, lpi) ->
             ModuleInfo
             $ Map.fromList
-            $ map (\mn -> (mn, Set.singleton pn))
+            $ map (, Set.singleton pn)
             $ Set.toList
             $ lpiExposedModules lpi)
     $ filter (\(pn, lpi) ->

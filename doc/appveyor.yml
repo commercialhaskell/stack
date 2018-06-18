@@ -12,8 +12,21 @@ environment:
   global:
     STACK_ROOT: "c:\\sr"
 
+  matrix:
+  - ARGS: ""
+  #- ARGS: "--resolver lts-2"
+  #- ARGS: "--resolver lts-3"
+  #- ARGS: "--resolver lts-6"
+  #- ARGS: "--resolver lts-7"
+  - ARGS: "--resolver lts-9"
+  - ARGS: "--resolver lts-11"
+  #- ARGS: "--resolver nightly"
+
 test_script:
-- stack setup > nul
+
+# Install toolchain, but do it silently due to lots of output
+- stack %ARGS% setup > nul
+
 # The ugly echo "" hack is to avoid complaints about 0 being an invalid file
 # descriptor
-- echo "" | stack --no-terminal test
+- echo "" | stack %ARGS% --no-terminal test --pedantic

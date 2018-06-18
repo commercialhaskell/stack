@@ -6,6 +6,7 @@
 {-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE TemplateHaskell       #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
+{-# LANGUAGE TupleSections         #-}
 {-# LANGUAGE TypeFamilies          #-}
 module Stack.Solver
     ( cabalPackagesCheck
@@ -343,7 +344,7 @@ mergeConstraints = Map.mergeWithKey
     -- combine entry in both maps
     (\_ v f -> Just (v, f))
     -- convert entry in first map only
-    (fmap (flip (,) Map.empty))
+    (fmap (, Map.empty))
     -- convert entry in second map only
     (\m -> if Map.null m then Map.empty
            else error "Bug: An entry in flag map must have a corresponding \
