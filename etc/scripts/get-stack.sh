@@ -131,7 +131,7 @@ print_bindist_notice() {
 sudocmd() {
   if command -v sudo >/dev/null; then
     echo "sudo $@"
-    # -k: Always prompt.
+    # -k: Disable cached credentials.
     sudo -k "$@"
   else
     "$@"
