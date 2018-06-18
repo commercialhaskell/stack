@@ -341,6 +341,10 @@ parseTemplateSet a = do
 defaultTemplateName :: TemplateName
 defaultTemplateName = $(mkTemplateName "new-template")
 
+-- | The default service to use to download templates.
+defaultRepoService :: RepoService
+defaultRepoService = Github
+
 -- | Default web URL to get a yaml file containing template metadata.
 defaultTemplateInfoUrl :: String
 defaultTemplateInfoUrl =

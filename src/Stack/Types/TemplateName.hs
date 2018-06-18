@@ -126,10 +126,6 @@ templateName (TemplateName prefix _) = prefix
 templatePath :: TemplateName -> TemplatePath
 templatePath (TemplateName _ fp) = fp
 
--- | The default service to use to download templates.
-defaultRepoService :: RepoService
-defaultRepoService = Github
-
 defaultRepoUser :: Text
 defaultRepoUser = "commercialhaskell"
 
@@ -140,7 +136,6 @@ parseRepoPath s =
     ["github"    , rest] -> parseRepoPathWithService Github rest
     ["gitlab"    , rest] -> parseRepoPathWithService Gitlab rest
     ["bitbucket" , rest] -> parseRepoPathWithService Bitbucket rest
-    [rest]               -> parseRepoPathWithService defaultRepoService rest
     _                    -> Nothing
 
 -- | Parses a template path of the form @user/template@, assuming the default service.
