@@ -51,7 +51,7 @@ import           Stack.Types.Package
 import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageName
 import           Stack.Types.Runner
-import           System.IO (putStrLn, putStr, getLine)
+import           System.IO (putStrLn)
 import           System.IO.Temp (getCanonicalTemporaryDirectory)
 
 #ifndef WINDOWS
@@ -398,8 +398,10 @@ runGhci GhciOpts{..} targets mainIsTargets pkgs extraFiles exposePackages = do
     tmpDirectory <-
         (</> $(mkRelDir "haskell-stack-ghci")) <$>
         (parseAbsDir =<< liftIO getCanonicalTemporaryDirectory)
+    ghciDir <- view ghciDirL
+    ensureDir ghciDir
     ensureDir tmpDirectory
-    macrosOptions <- writeMacrosFile tmpDirectory pkgs
+    macrosOptions <- writeMacrosFile ghciDir pkgs
     if ghciNoLoadModules
         then execGhci macrosOptions
         else do
@@ -411,7 +413,7 @@ runGhci GhciOpts{..} targets mainIsTargets pkgs extraFiles exposePackages = do
             execGhci (macrosOptions ++ scriptOptions)
 
 writeMacrosFile :: HasRunner env => Path Abs Dir -> [GhciPkgInfo] -> RIO env [String]
-writeMacrosFile tmpDirectory pkgs = do
+writeMacrosFile outputDirectory pkgs = do
     fps <- fmap (nubOrd . catMaybes . concat) $
         forM pkgs $ \pkg -> forM (ghciPkgOpts pkg) $ \(_, bio) -> do
             let cabalMacros = bioCabalMacros bio
@@ -423,22 +425,22 @@ writeMacrosFile tmpDirectory pkgs = do
                     return Nothing
     files <- liftIO $ mapM (S8.readFile . toFilePath) fps
     if null files then return [] else do
-        out <- liftIO $ writeHashedFile tmpDirectory $(mkRelFile "cabal_macros.h") $
+        out <- liftIO $ writeHashedFile outputDirectory $(mkRelFile "cabal_macros.h") $
             S8.concat $ map (<> "\n#undef CURRENT_PACKAGE_KEY\n#undef CURRENT_COMPONENT_ID\n") files
         return ["-optP-include", "-optP" <> toFilePath out]
 
 writeGhciScript :: (MonadIO m) => Path Abs Dir -> GhciScript -> m [String]
-writeGhciScript tmpDirectory script = do
-    scriptPath <- liftIO $ writeHashedFile tmpDirectory $(mkRelFile "ghci-script") $
+writeGhciScript outputDirectory script = do
+    scriptPath <- liftIO $ writeHashedFile outputDirectory $(mkRelFile "ghci-script") $
         LBS.toStrict $ scriptToLazyByteString script
     let scriptFilePath = toFilePath scriptPath
     setScriptPerms scriptFilePath
     return ["-ghci-script=" <> scriptFilePath]
 
 writeHashedFile :: Path Abs Dir -> Path Rel File -> ByteString -> IO (Path Abs File)
-writeHashedFile tmpDirectory relFile contents = do
+writeHashedFile outputDirectory relFile contents = do
     relSha <- shaPathForBytes contents
-    let outDir = tmpDirectory </> relSha
+    let outDir = outputDirectory </> relSha
         outFile = outDir </> relFile
     alreadyExists <- doesFileExist outFile
     unless alreadyExists $ do
@@ -472,9 +474,8 @@ renderScript isIntero pkgs mainFile onlyMain extraFiles = do
 getFileTargets :: [GhciPkgInfo] -> [Path Abs File]
 getFileTargets = concatMap (concatMap S.toList . maybeToList . ghciPkgTargetFiles)
 
--- | Figure out the main-is file to load based on the targets. Sometimes there
--- is none, sometimes it's unambiguous, sometimes it's
--- ambiguous. Warns and returns nothing if it's ambiguous.
+-- | Figure out the main-is file to load based on the targets. Asks the
+-- user for input if there is more than one candidate main-is file.
 figureOutMainFile
     :: HasRunner env
     => BuildOpts
@@ -530,11 +531,10 @@ figureOutMainFile bopts mainIsTargets targets0 packages = do
             T.pack (toFilePath mainIs)
     candidateIndices = take (length candidates) [1 :: Int ..]
     userOption = do
-      putStr "Specify main module to use (press enter to load none): "
-      option <- getLine
+      option <- prompt "Specify main module to use (press enter to load none): "
       let selected = fromMaybe
                       ((+1) $ length candidateIndices)
-                      (readMaybe option :: Maybe Int)
+                      (readMaybe (T.unpack option) :: Maybe Int)
       case elemIndex selected candidateIndices  of
         Nothing -> do
             putStrLn
@@ -661,8 +661,9 @@ wantedPackageComponents _ (TargetComps cs) _ = cs
 wantedPackageComponents bopts (TargetAll ProjectPackage) pkg = S.fromList $
     (case packageLibraries pkg of
        NoLibraries -> []
-       HasLibraries _names -> [CLib]) ++ -- FIXME. This ignores sub libraries and foreign libraries. Is that OK?
+       HasLibraries names -> CLib : map CInternalLib (S.toList names)) ++
     map CExe (S.toList (packageExes pkg)) <>
+    map CInternalLib (S.toList $ packageInternalLibraries pkg) <>
     (if boptsTests bopts then map CTest (M.keys (packageTests pkg)) else []) <>
     (if boptsBenchmarks bopts then map CBench (S.toList (packageBenchmarks pkg)) else [])
 wantedPackageComponents _ _ _ = S.empty

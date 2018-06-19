@@ -1,4 +1,4 @@
-resolver: lts-11.5
+resolver: lts-11.6
 
 # docker:
 #   enable: true
@@ -9,7 +9,6 @@ resolver: lts-11.5
 #       name: "fpco/stack-test"
 nix:
   # --nix on the command-line to enable.
-  enable: false
   packages:
     - zlib
     - unzip
@@ -18,7 +17,7 @@ flags:
     hide-dependency-versions: true
     supported-build: true
 extra-deps:
-- rio-0.1.0.0@rev:0
+- rio-0.1.1.0@rev:0
 - Cabal-2.2.0.1@rev:0
 - hpack-0.28.2
 - http-api-data-0.3.8.1@rev:0

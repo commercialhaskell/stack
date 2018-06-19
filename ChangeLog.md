@@ -9,24 +9,61 @@ Major changes:
 
 Behavior changes:
 
+* `ghc-options` from `stack.yaml` are now appended to `ghc-options` from
+  `config.yaml`, whereas before they would be replaced.
+
 Other enhancements:
 
-* `stack unpack` now supports a `--to /target/directory` option to
-  specify where to unpack the package into
+* On Windows, recognise a 'mintty' (false) terminal as a terminal, by default
+* `stack build` issues a warning when `base` is explicitly listed in
+  `extra-deps` of `stack.yaml`
+* `stack build` suggests trying another GHC version should the build
+  plan end up requiring unattainable `base` version.
+* `stack build` missing dependency suggestions (on failure to construct a valid
+  build plan because of missing deps) are now printed with their latest
+  cabal file revision hash. See
+  [#4068](https://github.com/commercialhaskell/stack/pull/4068).
+* Added new `--tar-dir` option to `stack sdist`, that allows to copy
+  the resulting tarball to the specified directory.
 
 Bug fixes:
-* When a package contained sublibraries, stack was always recompiling the
-  package. This has been fixed now, no recompilation is being done because of
-  sublibraries. See [#3899](https://github.com/commercialhaskell/stack/issues/3899).
-* The `get-stack.sh` install script now matches manual instructions
-  when it comes to Debian/Fedora/CentOS install dependencies.
-* Compile Cabal-simple with gmp when using Nix.
-  See [#2944](https://github.com/commercialhaskell/stack/issues/2944)
+
+* `stack ghci` now does not invalidate `.o` files on repeated runs,
+  meaning any modules compiled with `-fobject-code` will be cached
+  between ghci runs. See
+  [#4038](https://github.com/commercialhaskell/stack/pull/4038).
+* `~/.stack/config.yaml` and `stack.yaml` terminating by newline
+* The previous released caused a regression where some `stderr` from the
+  `ghc-pkg` command showed up in the terminal. This output is now silenced.
+* A regression in recompilation checking introduced in v1.7.1 has been fixed.
+  See [#4001](https://github.com/commercialhaskell/stack/issues/4001)
+* `stack ghci` on a package with internal libraries was erroneously looking
+  for a wrong package corresponding to the internal library and failing to
+  load any module. This has been fixed now and changes to the code in the
+  library and the sublibrary are properly tracked. See
+  [#3926](https://github.com/commercialhaskell/stack/issues/3926).
+* For packages with internal libraries not depended upon, `stack build` used
+  to fail the build process since the internal library was not built but it
+  was tried to be registered. This is now fixed by always building internal
+  libraries. See
+  [#3996](https://github.com/commercialhaskell/stack/issues/3996).
+* `--no-nix` was not respected under NixOS
+* Fix a regression which might use a lot of RAM. See
+  [#4027](https://github.com/commercialhaskell/stack/issues/4027).
+* Order of commandline arguments does not matter anymore.
+  See [#3959](https://github.com/commercialhaskell/stack/issues/3959)
+* When prompting users about saving their Hackage credentials on upload,
+  flush to stdout before waiting for the response so the prompt actually
+  displays. Also fixes a similar issue with ghci target selection prompt.
 
 
-## v1.7.0.1 (releases candidate)
+## v1.7.1
 
 Release notes:
+
+* aarch64 (64-bit ARM) bindists are now available for the first time.
+* Statically linked Linux bindists are no longer available, due to difficulty with GHC 8.2.2 on Alpine Linux.
+* 32-bit Linux GMP4 bindists for CentOS 6 are no longer available, since GHC 8.2.2 is no longer being built for that platform.
 
 Major changes:
 
@@ -38,7 +75,6 @@ Behavior changes:
   distributions that use GCC with PIE enabled by default.  GHC detects
   this itself since ghc-8.0.2, and Stack's attempted workaround for older
   versions caused more problems than it solved.
-
 * `stack new` no longer initializes a project if the project template contains
    a stack.yaml file.
 
@@ -72,26 +108,14 @@ Other enhancements:
   i.e. `stack build --keep-tmp-files --ghc-options=-keep-tmp-files`.
   See [#3857](https://github.com/commercialhaskell/stack/issues/3857)
 * Improved error messages for snapshot parse exceptions
+* `stack unpack` now supports a `--to /target/directory` option to
+  specify where to unpack the package into
 * `stack hoogle` now supports a new flag `--server` that launches local
   Hoogle server on port 8080. See
   [#2310](https://github.com/commercialhaskell/stack/issues/2310)
 
 Bug fixes:
 
-* `stack ghci` now replaces the stack process with ghci. This improves
-  signal handling behavior. In particular, handling of Ctrl-C.  To make
-  this possible, the generated files are now left behind after exit.
-  The paths are based on hashing file contents, and it's stored in the
-  system temporary directory, so this shouldn't result in too much
-  garbage. See
-  [#3821](https://github.com/commercialhaskell/stack/issues/3821).
-
-## v1.6.5
-
-Bug fixes:
-* 1.6.1 introduced a change that made some precompiled cache files use
-  longer paths, sometimes causing builds to fail on windows. This has been
-  fixed. See [#3649](https://github.com/commercialhaskell/stack/issues/3649)
 * The script interpreter's implicit file arguments are now passed before other
   arguments. See [#3658](https://github.com/commercialhaskell/stack/issues/3658).
   In particular, this makes it possible to pass `-- +RTS ... -RTS` to specify
@@ -113,14 +137,26 @@ Bug fixes:
   [#3589](https://github.com/commercialhaskell/stack/issues/3589#issuecomment)
 * `stack ghci` now uses correct paths for autogen files with
   [#3791](https://github.com/commercialhaskell/stack/issues/3791)
+* When a package contained sublibraries, stack was always recompiling the
+  package. This has been fixed now, no recompilation is being done because of
+  sublibraries. See [#3899](https://github.com/commercialhaskell/stack/issues/3899).
+* The `get-stack.sh` install script now matches manual instructions
+  when it comes to Debian/Fedora/CentOS install dependencies.
+* Compile Cabal-simple with gmp when using Nix.
+  See [#2944](https://github.com/commercialhaskell/stack/issues/2944)
+* `stack ghci` now replaces the stack process with ghci. This improves
+  signal handling behavior. In particular, handling of Ctrl-C.  To make
+  this possible, the generated files are now left behind after exit.
+  The paths are based on hashing file contents, and it's stored in the
+  system temporary directory, so this shouldn't result in too much
+  garbage. See
+  [#3821](https://github.com/commercialhaskell/stack/issues/3821).
 
 
 ## v1.6.5
 
 Bug fixes:
-* 1.6.1 introduced a change that made some precompiled cache files use
-  longer paths, sometimes causing builds to fail on windows. This has been
-  fixed. See [#3649](https://github.com/commercialhaskell/stack/issues/3649)
+
 * Some unnecessary rebuilds when no files were changed are now avoided, by
   having a separate build cache for each component of a package. See
   [#3732](https://github.com/commercialhaskell/stack/issues/3732).
@@ -147,18 +183,13 @@ Bug fixes:
   resilient against SIGKILL and machine failure. See
   [hackage-security #187](https://github.com/haskell/hackage-security/issues/187)
   and [#3073](https://github.com/commercialhaskell/stack/issues/3073).
-* `stack ghci` now replaces the stack process with ghci. This improves
-  signal handling behavior. In particular, handling of Ctrl-C.  To make
-  this possible, the generated files are now left behind after exit.
-  The paths are based on hashing file contents, and it's stored in the
-  system temporary directory, so this shouldn't result in too much
-  garbage. See
-  [#3821](https://github.com/commercialhaskell/stack/issues/3821).
+
 
 ## v1.6.3.1
 
 Hackage-only release with no user facing changes (updated to build with
 newer version of hpack dependency).
+
 
 ## v1.6.3
 
@@ -812,7 +843,7 @@ Release notes:
   version 1.1.2 for now on those architectures.  This will be rectified soon!
 
 * We are now releasing a
-  [statically linked Stack binary for 64-bit Linux](https://www.stackage.org/stack/linux-x86_64-static).
+  [statically linked Stack binary for 64-bit Linux](https://get.haskellstack.org/stable/linux-x86_64-static.tar.gz).
   Please try it and let us know if you run into any trouble on your platform.
 
 * We are planning some changes to our Linux releases, including dropping our

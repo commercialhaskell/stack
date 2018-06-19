@@ -98,12 +98,15 @@ import           Stack.Types.Version
 import           Stack.Types.Config
 import           Stack.Types.Compiler
 import           Stack.Types.Nix
+import           Stack.Types.Runner
 import           Stack.Upgrade
 import qualified Stack.Upload as Upload
 import qualified System.Directory as D
 import           System.Environment (getProgName, getArgs, withArgs)
 import           System.Exit
 import           System.FilePath (isValid, pathSeparator)
+import qualified System.FilePath as FP
+import           System.Console.ANSI (SGR (Reset), hSupportsANSI, setSGR)
 import           System.IO (stderr, stdin, stdout, BufferMode(..), hPutStrLn, hPrint, hGetEncoding, hSetEncoding)
 
 -- | Change the character encoding of the given Handle to transliterate
@@ -167,7 +170,7 @@ main = do
   hSetTranslit stderr
   args <- getArgs
   progName <- getProgName
-  isTerminal <- hIsTerminalDevice stdout
+  isTerminal <- hIsTerminalDeviceOrMinTTY stdout
   execExtraHelp args
                 Docker.dockerHelpOptName
                 (dockerOptsParser False)
@@ -184,6 +187,15 @@ main = do
       throwIO exitCode
     Right (globalMonoid,run) -> do
       let global = globalOptsFromMonoid isTerminal globalMonoid
+      -- If stdout is (1) recognised as a terminal supporting ANSI (for the
+      -- purposes of the functions of the ansi-terminal package) and (2) a
+      -- native (ConHost) terminal on Windows 10, then the setSGR function will
+      -- enable the ANSI-capability for that terminal. Later uses of
+      -- hSupportsANSI with the functions of the RIO package that emit ANSI
+      -- codes will then have the intended outcome on native Windows 10
+      -- terminals.
+      when (globalColorWhen global /= ColorNever) $
+        hSupportsANSI stdout >>= flip when (setSGR [Reset])
       when (globalLogLevel global == LevelDebug) $ hPutStrLn stderr versionString'
       case globalReExecVersion global of
           Just expectVersion -> do
@@ -675,7 +687,7 @@ upgradeCmd upgradeOpts' go = withGlobalConfigAndLock go $
 
 -- | Upload to Hackage
 uploadCmd :: SDistOpts -> GlobalOpts -> IO ()
-uploadCmd (SDistOpts [] _ _ _ _ _) go =
+uploadCmd (SDistOpts [] _ _ _ _ _ _) go =
     withConfigAndLock go . prettyErrorL $
         [ flow "To upload the current package, please run"
         , styleShell "stack upload ."
@@ -766,7 +778,13 @@ sdistCmd sdistOpts go =
             liftIO $ L.writeFile (toFilePath tarPath) tarBytes
             checkSDistTarball sdistOpts tarPath
             prettyInfoL [flow "Wrote sdist tarball to", display tarPath]
+            forM_ (sdoptsTarPath sdistOpts) $ copyTarToTarPath tarPath tarName
             when (sdoptsSign sdistOpts) (void $ Sig.sign (sdoptsSignServerUrl sdistOpts) tarPath)
+        where
+          copyTarToTarPath tarPath tarName targetDir = liftIO $ do
+            let targetTarPath = targetDir FP.</> tarName
+            D.createDirectoryIfMissing True $ FP.takeDirectory targetTarPath
+            D.copyFile (toFilePath tarPath) targetTarPath
 
 -- | Execute a command.
 execCmd :: ExecOpts -> GlobalOpts -> IO ()

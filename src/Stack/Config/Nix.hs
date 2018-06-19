@@ -27,8 +27,7 @@ nixOptsFromMonoid
     -> OS
     -> RIO env NixOpts
 nixOptsFromMonoid NixOptsMonoid{..} os = do
-    let nixEnable0 = fromFirst False nixMonoidEnable
-        defaultPure = case os of
+    let defaultPure = case os of
           OSX -> False
           _ -> True
         nixPureShell = fromFirst defaultPure nixMonoidPureShell
@@ -38,14 +37,14 @@ nixOptsFromMonoid NixOptsMonoid{..} os = do
                           ++ prefixAll (T.pack "-I") (fromFirst [] nixMonoidPath)
         nixAddGCRoots   = fromFirst False nixMonoidAddGCRoots
 
+    -- Enable Nix-mode by default on NixOS, unless Docker-mode was specified
     osIsNixOS <- isNixOS
+    let nixEnable0 = fromFirst osIsNixOS nixMonoidEnable
+
     nixEnable <- case () of _
                                 | nixEnable0 && osIsWindows -> do
                                       logInfo "Note: Disabling nix integration, since this is being run in Windows"
                                       return False
-                                | not nixEnable0 && osIsNixOS -> do
-                                      logInfo "Note: Enabling Nix integration, as it is required under NixOS"
-                                      return True
                                 | otherwise                 -> return nixEnable0
 
     when (not (null nixPackages) && isJust nixInitFile) $

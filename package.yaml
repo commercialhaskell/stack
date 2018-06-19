@@ -18,11 +18,11 @@ custom-setup:
   - Cabal
   - filepath
 extra-source-files:
+# note: leaving out 'package.yaml' because it causes confusion with hackage metadata revisions
 - CONTRIBUTING.md
 - ChangeLog.md
 - README.md
 - doc/*.md
-- package.yaml
 - src/setup-shim/StackSetupShim.hs
 - stack.yaml
 - test/package-dump/ghc-7.10.txt
@@ -33,6 +33,7 @@ ghc-options:
 - -fwarn-tabs
 - -fwarn-incomplete-uni-patterns
 - -fwarn-incomplete-record-updates
+- -optP-Wno-nonportable-include-path # workaround [Filename case on macOS · Issue #4739 · haskell/cabal](https://github.com/haskell/cabal/issues/4739)
 dependencies:
 - Cabal
 - aeson
@@ -120,7 +121,7 @@ when:
   then:
     cpp-options: -DWINDOWS
     dependencies:
-    - Win32
+    - Win32 >= 2.5.3.0
   else:
     build-tools:
     - hsc2hs
@@ -131,6 +132,11 @@ library:
   source-dirs: src/
   ghc-options:
   - -fwarn-identities
+  verbatim:
+    # TODO: replace with 'generated-exposed-modules' after stack-1.7 is released.
+    # Using 'verbatim' to support older hpack version.
+    autogen-modules: |
+      Paths_stack
   exposed-modules:
   - Control.Concurrent.Execute
   - Data.Aeson.Extended
@@ -138,6 +144,7 @@ library:
   - Data.Attoparsec.Combinators
   - Data.Attoparsec.Interpreter
   - Data.IORef.RunOnce
+  - Data.Monoid.Map
   - Data.Store.VersionTagged
   - Network.HTTP.Download
   - Network.HTTP.Download.Verified
@@ -268,7 +275,15 @@ executables:
   stack:
     main: Main.hs
     source-dirs: src/main
-    generated-other-modules: Build_stack
+    verbatim:
+      # TODO: replace with 'generated-other-modules' after stack-1.7 is released.
+      # Using 'verbatim' to support older hpack version.
+      autogen-modules: |
+          Build_stack,
+          Paths_stack
+    other-modules:
+    - Build_stack
+    - Paths_stack
     ghc-options:
     - -threaded
     - -rtsopts

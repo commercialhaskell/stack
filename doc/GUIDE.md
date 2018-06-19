@@ -427,7 +427,7 @@ With that out of the way, let's dig a little bit more into these package sets,
 also known as *snapshots*. We mentioned the LTS resolvers, and you can get quite a bit of
 information about it at [https://www.stackage.org/lts](https://www.stackage.org/lts), including:
 
-* The appropriate resolver value (`resolver: lts-11.5`, as is currently the latest LTS)
+* The appropriate resolver value (`resolver: lts-11.6`, as is currently the latest LTS)
 * The GHC version used
 * A full list of all packages available in this snapshot
 * The ability to perform a Hoogle search on the packages in this snapshot
@@ -444,7 +444,7 @@ default as well).
 
 ## Resolvers and changing your compiler version
 
-Let's explore package sets a bit further. Instead of lts-11.5, let's change our
+Let's explore package sets a bit further. Instead of lts-11.6, let's change our
 `stack.yaml` file to use [the latest nightly](https://www.stackage.org/nightly). Right now,
 this is currently 2017-12-19 - please see the resolve from the link above to get the latest.
 
@@ -460,8 +460,8 @@ We can also change resolvers on the command line, which can be useful in a
 Continuous Integration (CI) setting, like on Travis. For example:
 
 ```
-michael@d30748af6d3d:~/helloworld$ stack --resolver lts-11.5 build
-Downloaded lts-11.5 build plan.
+michael@d30748af6d3d:~/helloworld$ stack --resolver lts-11.6 build
+Downloaded lts-11.6 build plan.
 # build output ...
 ```
 
@@ -1613,21 +1613,19 @@ page](https://docs.haskellstack.org/en/stable/shell_autocompletion)
 
 ### Docker
 
-stack provides two built-in Docker integrations. Firstly, you can build your
-code inside a Docker image, which means:
+stack provides two built-in Docker integrations. The first way is to
+build your code inside a Docker image, which means:
 
 * even more reproducibility to your builds, since you and the rest of your team
   will always have the same system libraries
 * the Docker images ship with entire precompiled snapshots. That means you have
   a large initial download, but much faster builds
 
-For more information, see
-[the Docker-integration documentation](docker_integration.md).
-
-stack can also generate Docker images for you containing your built executables.
-This feature is great for automating deployments from CI. This feature is not
-yet well-documented, but the basics are to add a section like the following
-to stack.yaml:
+The second way is to generate Docker images for you containing your
+built executables (the executable is built in your local machine and
+copied into the image) .  This feature is great for automating
+deployments from CI. This feature is not yet well-documented, but the
+basics are to add a section like the following to stack.yaml:
 
 ```yaml
 image:
@@ -1663,9 +1661,10 @@ the images.
 
 Note that the executable will be built in the development environment
 and copied to the container, so the dev OS must match that of the
-container OS. This is easily accomplished using [Docker integration](docker_integration.md),
-under which the exe emitted by `stack build` will be built on the
-Docker container, not the local OS.
+container OS. Note that you can use the `--docker` option to build
+your code inside the Docker container in case you have a different
+development environment or if you specifically want to build on the
+container.
 
 The executable will be stored under `/usr/local/bin/<your-project>-exe`
 in the running container.
@@ -1677,6 +1676,23 @@ then set an entrypoint as follows:
 entrypoints:
     - <your-project>-exe
 ```
+
+The difference between the first and second integration methods is
+that in the first one your Haskell code is actually built in the
+container whereas in the second one the executable built in your host
+machine is copied to the container. The presence of the following
+configuration in `stack.yaml` informs stack to switch to the first
+integration method:
+
+```yaml
+docker:
+    enable: true
+```
+
+Alternatively, instead of the above configuration, you can use the
+`--docker` option to achieve the same.  You can find more details
+about the first integration method [in the Docker integration
+documentation](./docker_integration.md).
 
 ### Nix
 
@@ -1817,7 +1833,7 @@ There are lots of resources available for learning more about stack:
 * `--verbose` (or `-v`) — much more info about internal operations (useful for bug reports)
 * The [home page](http://haskellstack.org)
 * The [stack mailing list](https://groups.google.com/d/forum/haskell-stack)
-* The [the FAQ](faq.md)
+* The [FAQ](faq.md)
 * The [stack wiki](https://github.com/commercialhaskell/stack/wiki)
 * The [haskell-stack tag on Stack Overflow](http://stackoverflow.com/questions/tagged/haskell-stack)
 * [Another getting started with stack tutorial](http://seanhess.github.io/2015/08/04/practical-haskell-getting-started.html)

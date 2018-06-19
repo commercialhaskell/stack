@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP                        #-}
 {-# LANGUAGE NoImplicitPrelude          #-}
 {-# LANGUAGE OverloadedStrings          #-}
 {-# LANGUAGE ScopedTypeVariables        #-}
@@ -13,6 +14,10 @@ module Stack.Prelude
   , readProcessNull
   , withProcessContext
   , stripCR
+  , hIsTerminalDeviceOrMinTTY
+  , prompt
+  , promptPassword
+  , promptBool
   , module X
   ) where
 
@@ -28,7 +33,12 @@ import qualified Path.IO
 import qualified System.IO as IO
 import qualified System.Directory as Dir
 import qualified System.FilePath as FP
+import           System.IO.Echo (withoutInputEcho)
 import           System.IO.Error (isDoesNotExistError)
+
+#ifdef WINDOWS
+import           System.Win32 (isMinTTYHandle, withHandleToHANDLE)
+#endif
 
 import           Data.Conduit.Binary (sourceHandle, sinkHandle)
 import qualified Data.Conduit.Binary as CB
@@ -39,6 +49,7 @@ import           Data.Store           as X (Store)
 import           Data.Text.Encoding (decodeUtf8With)
 import           Data.Text.Encoding.Error (lenientDecode)
 
+import qualified Data.Text.IO as T
 import qualified RIO.Text as T
 
 -- | Get a source for a file. Unlike @sourceFile@, doesn't require
@@ -151,3 +162,54 @@ withProcessContext pcNew inner = do
 -- | Remove a trailing carriage return if present
 stripCR :: Text -> Text
 stripCR = T.dropSuffix "\r"
+
+-- | hIsTerminaDevice does not recognise handles to mintty terminals as terminal
+-- devices, but isMinTTYHandle does.
+hIsTerminalDeviceOrMinTTY :: MonadIO m => Handle -> m Bool
+#ifdef WINDOWS
+hIsTerminalDeviceOrMinTTY h = do
+  isTD <- hIsTerminalDevice h
+  if isTD
+    then return True
+    else liftIO $ withHandleToHANDLE h isMinTTYHandle
+#else
+hIsTerminalDeviceOrMinTTY = hIsTerminalDevice
+#endif
+
+-- | Prompt the user by sending text to stdout, and taking a line of
+-- input from stdin.
+prompt :: MonadIO m => Text -> m Text
+prompt txt = liftIO $ do
+  T.putStr txt
+  hFlush stdout
+  T.getLine
+
+-- | Prompt the user by sending text to stdout, and collecting a line
+-- of input from stdin. While taking input from stdin, input echoing is
+-- disabled, to hide passwords.
+--
+-- Based on code from cabal-install, Distribution.Client.Upload
+promptPassword :: MonadIO m => Text -> m Text
+promptPassword txt = liftIO $ do
+  T.putStr txt
+  hFlush stdout
+  -- Save/restore the terminal echoing status (no echoing for entering
+  -- the password).
+  password <- withoutInputEcho T.getLine
+  -- Since the user's newline is not echoed, one needs to be inserted.
+  T.putStrLn ""
+  return password
+
+-- | Prompt the user by sending text to stdout, and collecting a line of
+-- input from stdin. If something other than "y" or "n" is entered, then
+-- print a message indicating that "y" or "n" is expected, and ask
+-- again.
+promptBool :: MonadIO m => Text -> m Bool
+promptBool txt = liftIO $ do
+  input <- prompt txt
+  case input of
+    "y" -> return True
+    "n" -> return False
+    _ -> do
+      T.putStrLn "Please press either 'y' or 'n', and then enter."
+      promptBool txt

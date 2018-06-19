@@ -164,11 +164,6 @@ does not rely on correct ordering in the package index, while revision
 number is likely simpler to use. In practice, both should guarantee
 equally reproducible build plans.
 
-If unspecified, `subdirs` defaults to `['.']` (i.e. look only in the top-level
-directory).  Note that if you specify a value of `subdirs`, then `'.'` is _not_
-included by default and needs to be explicitly specified if a required package
-is found in the top-level directory of the repository.
-
 #### Local file path
 
 Like `packages`, local file paths can be used in `extra-deps`, and
@@ -204,6 +199,8 @@ will clone that repo.
 extra-deps:
 - git: git@github.com:commercialhaskell/stack.git
   commit: 6a86ee32e5b869a877151f74064572225e1a0398
+- git: git@github.com:snoyberg/http-client.git
+  commit: "a5f4f3"
 - hg: https://example.com/hg/repo
   commit: da39a3ee5e6b4b0d3255bfef95601890afd80709
 ```
@@ -231,8 +228,19 @@ extra-deps:
   - wai
 ```
 
-If unspecified, `subdirs` defaults to `subdirs: [.]`, or looking for a
-package in the root of the repo.
+Since v1.7.1, you can specify packages from GitHub repository name using `github`:
+
+```yaml
+extra-deps:
+- github: snoyberg/http-client
+  commit: a5f4f30f01366738f913968163d856366d7e0342
+```
+
+If unspecified, `subdirs` defaults to `['.']` meaning looking for a
+package in the root of the repo..  Note that if you specify a value of
+`subdirs`, then `'.'` is _not_ included by default and needs to be
+explicitly specified if a required package is found in the top-level
+directory of the repository.
 
 #### Archives (HTTP(S) or local filepath)
 
@@ -958,7 +966,7 @@ This option specifies additional directories to prepend to the PATH environment
 variable.  These will be used when resolving the location of executables, and
 will also be visible in the `PATH` variable of processes run by stack.
 
-For example, to prepend `/path-to-some-dep/bin` to your PATh:
+For example, to prepend `/path-to-some-dep/bin` to your PATH:
 
 ```yaml
 extra-path:

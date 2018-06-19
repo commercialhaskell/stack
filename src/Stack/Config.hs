@@ -51,8 +51,11 @@ import           Control.Monad.Extra (firstJustM)
 import           Stack.Prelude
 import           Data.Aeson.Extended
 import qualified Data.ByteString as S
+import           Data.Coerce (coerce)
 import qualified Data.IntMap as IntMap
 import qualified Data.Map as Map
+import qualified Data.Monoid
+import           Data.Monoid.Map (MonoidMap(..))
 import qualified Data.Text as T
 import           Data.Text.Encoding (encodeUtf8)
 import qualified Data.Yaml as Yaml
@@ -360,8 +363,8 @@ configFromConfigMonoid
 
      let configTemplateParams = configMonoidTemplateParameters
          configScmInit = getFirst configMonoidScmInit
-         configGhcOptionsByName = configMonoidGhcOptionsByName
-         configGhcOptionsByCat = configMonoidGhcOptionsByCat
+         configGhcOptionsByName = coerce configMonoidGhcOptionsByName
+         configGhcOptionsByCat = coerce configMonoidGhcOptionsByCat
          configSetupInfoLocations = configMonoidSetupInfoLocations
          configPvpBounds = fromFirst (PvpBounds PvpBoundsNone False) configMonoidPvpBounds
          configModifyCodePage = fromFirst True configMonoidModifyCodePage
@@ -964,4 +967,5 @@ defaultConfigYaml = S.intercalate "\n"
      , "#    author-email:"
      , "#    copyright:"
      , "#    github-username:"
+     , ""
      ]

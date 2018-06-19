@@ -16,7 +16,6 @@ import qualified Data.Conduit.List as CL
 import qualified Data.Foldable as F
 import qualified Data.HashSet as HashSet
 import           Data.List
-import qualified Data.Map.Strict as M
 import qualified Data.Map.Strict as Map
 import           Path
 import           Stack.Build.Cache
@@ -75,7 +74,7 @@ getInstalled opts sourceMap = do
         loadDatabase' (Just (InstalledTo Snap, snapDBPath)) installedLibs1
     (installedLibs3, localDumpPkgs) <-
         loadDatabase' (Just (InstalledTo Local, localDBPath)) installedLibs2
-    let installedLibs = M.fromList $ map lhPair installedLibs3
+    let installedLibs = Map.fromList $ map lhPair installedLibs3
 
     F.forM_ mcache $ \cache -> do
         icache <- configInstalledCache
