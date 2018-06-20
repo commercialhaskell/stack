@@ -27,7 +27,7 @@ Other enhancements:
   the resulting tarball to the specified directory.
 * Introduced the `--interleaved-output` command line option and
   `build.interleaved-output` config value which causes multiple concurrent
-  builds to dump to stdout at the same time with a `packagename> ` prefix. See
+  builds to dump to stderr at the same time with a `packagename> ` prefix. See
   [#3225](https://github.com/commercialhaskell/stack/issues/3225).
 
 Bug fixes:
