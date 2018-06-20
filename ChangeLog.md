@@ -55,6 +55,8 @@ Bug fixes:
 * When prompting users about saving their Hackage credentials on upload,
   flush to stdout before waiting for the response so the prompt actually
   displays. Also fixes a similar issue with ghci target selection prompt.
+* If `cabal` is not on PATH, running `stack solver` now prompts the user
+  to run `stack install cabal-install`
 
 
 ## v1.7.1
