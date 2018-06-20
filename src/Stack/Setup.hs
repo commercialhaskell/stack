@@ -1353,7 +1353,7 @@ buildInGhcjsEnv envConfig boptsCli = do
 
 getCabalInstallVersion :: (HasProcessContext env, HasLogFunc env) => RIO env (Maybe Version)
 getCabalInstallVersion = do
-    ebs <- proc "cabal" ["--numeric-version"] $ tryAny . readProcessStdout_
+    ebs <- tryAny $ proc "cabal" ["--numeric-version"] readProcessStdout_
     case ebs of
         Left _ -> return Nothing
         Right bs -> Just <$> parseVersion (T.dropWhileEnd isSpace (T.decodeUtf8 (LBS.toStrict bs)))
