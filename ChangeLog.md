@@ -64,7 +64,10 @@ Bug fixes:
   which are dependencies of executables, tests or benchmarks but not of the
   main library. See
   [#3787](https://github.com/commercialhaskell/stack/issues/3959).
-* Sublibraries are now properly considered for coverage reports.
+* Sublibraries are now properly considered for coverage reports when the test
+  suite depends on the internal library. Before, stack was erroring when
+  trying to generate the coverage report, see
+  [#4105](https://github.com/commercialhaskell/stack/issues/4105).
 * Sublibraries are now added to the precompiled cache and recovered from there
   when the snapshot gets updated. Previously, updating the snapshot when there
   was a package with a sublibrary in the snapshot resulted in broken builds.
