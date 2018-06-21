@@ -25,6 +25,9 @@ Other enhancements:
   [#4068](https://github.com/commercialhaskell/stack/pull/4068).
 * Added new `--tar-dir` option to `stack sdist`, that allows to copy
   the resulting tarball to the specified directory.
+* `stack new` now allows template names of the form `username/foo` to download
+  from a user other than `commercialstack` on Github, and can be prefixed with
+  the service `github:`, `gitlab:`, or `bitbucket:`.
 
 Bug fixes:
 

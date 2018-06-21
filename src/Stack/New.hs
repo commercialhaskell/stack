@@ -126,10 +126,7 @@ loadTemplate name logIt = do
     templateDir <- view $ configL.to templatesDir
     case templatePath name of
         AbsPath absFile -> logIt LocalTemp >> loadLocalFile absFile
-        UrlPath s -> do
-            req <- parseRequest s
-            let rel = fromMaybe backupUrlRelPath (parseRelFile s)
-            downloadTemplate req (templateDir </> rel)
+        UrlPath s -> downloadFromUrl s templateDir
         RelPath relFile ->
             catch
                 (do f <- loadLocalFile relFile
@@ -141,6 +138,10 @@ loadTemplate name logIt = do
                                                      (templateDir </> relFile)
                         Nothing -> throwM e
                 )
+        RepoPath rtp -> do
+            let url = urlFromRepoTemplatePath rtp
+            downloadFromUrl (T.unpack url) templateDir
+                            
   where
     loadLocalFile :: Path b File -> RIO env Text
     loadLocalFile path = do
@@ -150,8 +151,16 @@ loadTemplate name logIt = do
         if exists
             then liftIO (fmap (T.decodeUtf8With T.lenientDecode) (SB.readFile (toFilePath path)))
             else throwM (FailedToLoadTemplate name (toFilePath path))
-    relRequest :: MonadThrow n => Path Rel File -> n Request
-    relRequest rel = parseRequest (defaultTemplateUrl <> "/" <> toFilePath rel)
+    relRequest :: Path Rel File -> Maybe Request
+    relRequest rel = do
+        rtp <- parseRepoPathWithService defaultRepoService (T.pack (toFilePath rel))
+        let url = urlFromRepoTemplatePath rtp
+        parseRequest (T.unpack url)
+    downloadFromUrl :: String -> Path Abs Dir -> RIO env Text
+    downloadFromUrl s templateDir = do
+        req <- parseRequest s
+        let rel = fromMaybe backupUrlRelPath (parseRelFile s)
+        downloadTemplate req (templateDir </> rel)
     downloadTemplate :: Request -> Path Abs File -> RIO env Text
     downloadTemplate req path = do
         logIt RemoteTemp
@@ -161,6 +170,15 @@ loadTemplate name logIt = do
                 (throwM . FailedToDownloadTemplate name)
         loadLocalFile path
     backupUrlRelPath = $(mkRelFile "downloaded.template.file.hsfiles")
+
+-- | Construct a URL for downloading from a repo.
+urlFromRepoTemplatePath :: RepoTemplatePath -> Text
+urlFromRepoTemplatePath (RepoTemplatePath Github user name) =
+    T.concat ["https://raw.githubusercontent.com", "/", user, "/stack-templates/master/", name]
+urlFromRepoTemplatePath (RepoTemplatePath Gitlab user name) =
+    T.concat ["https://gitlab.com",                "/", user, "/stack-templates/raw/master/", name]
+urlFromRepoTemplatePath (RepoTemplatePath Bitbucket user name) =
+    T.concat ["https://bitbucket.org",             "/", user, "/stack-templates/raw/master/", name]
 
 -- | Apply and unpack a template into a directory.
 applyTemplate
@@ -323,10 +341,9 @@ parseTemplateSet a = do
 defaultTemplateName :: TemplateName
 defaultTemplateName = $(mkTemplateName "new-template")
 
--- | Default web root URL to download from.
-defaultTemplateUrl :: String
-defaultTemplateUrl =
-    "https://raw.githubusercontent.com/commercialhaskell/stack-templates/master"
+-- | The default service to use to download templates.
+defaultRepoService :: RepoService
+defaultRepoService = Github
 
 -- | Default web URL to get a yaml file containing template metadata.
 defaultTemplateInfoUrl :: String
