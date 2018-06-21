@@ -56,6 +56,7 @@ import           Stack.ConfigCmd as ConfigCmd
 import           Stack.Constants
 import           Stack.Constants.Config
 import           Stack.Coverage
+import           Stack.DefaultColorWhen (defaultColorWhen)
 import qualified Stack.Docker as Docker
 import           Stack.Dot
 import           Stack.GhcPkg (findGhcPkgField)
@@ -98,7 +99,6 @@ import           Stack.Types.Version
 import           Stack.Types.Config
 import           Stack.Types.Compiler
 import           Stack.Types.Nix
-import           Stack.Types.Runner
 import           Stack.Upgrade
 import qualified Stack.Upload as Upload
 import qualified System.Directory as D
@@ -106,7 +106,6 @@ import           System.Environment (getProgName, getArgs, withArgs)
 import           System.Exit
 import           System.FilePath (isValid, pathSeparator)
 import qualified System.FilePath as FP
-import           System.Console.ANSI (SGR (Reset), hSupportsANSI, setSGR)
 import           System.IO (stderr, stdin, stdout, BufferMode(..), hPutStrLn, hPrint, hGetEncoding, hSetEncoding)
 
 -- | Change the character encoding of the given Handle to transliterate
@@ -171,6 +170,10 @@ main = do
   args <- getArgs
   progName <- getProgName
   isTerminal <- hIsTerminalDeviceOrMinTTY stdout
+  -- On Windows, where applicable, defaultColorWhen has the side effect of
+  -- enabling ANSI for ANSI-capable native (ConHost) terminals, if not already
+  -- ANSI-enabled.
+  defColorWhen <- defaultColorWhen
   execExtraHelp args
                 Docker.dockerHelpOptName
                 (dockerOptsParser False)
@@ -186,16 +189,7 @@ main = do
     Left (exitCode :: ExitCode) ->
       throwIO exitCode
     Right (globalMonoid,run) -> do
-      let global = globalOptsFromMonoid isTerminal globalMonoid
-      -- If stdout is (1) recognised as a terminal supporting ANSI (for the
-      -- purposes of the functions of the ansi-terminal package) and (2) a
-      -- native (ConHost) terminal on Windows 10, then the setSGR function will
-      -- enable the ANSI-capability for that terminal. Later uses of
-      -- hSupportsANSI with the functions of the RIO package that emit ANSI
-      -- codes will then have the intended outcome on native Windows 10
-      -- terminals.
-      when (globalColorWhen global /= ColorNever) $
-        hSupportsANSI stdout >>= flip when (setSGR [Reset])
+      let global = globalOptsFromMonoid isTerminal defColorWhen globalMonoid
       when (globalLogLevel global == LevelDebug) $ hPutStrLn stderr versionString'
       case globalReExecVersion global of
           Just expectVersion -> do
