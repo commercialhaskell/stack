@@ -16,6 +16,9 @@ Other enhancements:
   `extra-deps` of `stack.yaml`
 * `stack build` suggests trying another GHC version should the build
   plan end up requiring unattainable `base` version.
+* `stack new` now allows template names of the form `username/foo` to download
+  from a user other than `commercialstack` on Github, and can be prefixed with
+  the service `github:`, `gitlab:`, or `bitbucket:`.
 
 Bug fixes:
 
