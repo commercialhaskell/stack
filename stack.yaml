@@ -9,7 +9,6 @@ resolver: lts-11.6
 #       name: "fpco/stack-test"
 nix:
   # --nix on the command-line to enable.
-  enable: false
   packages:
     - zlib
     - unzip

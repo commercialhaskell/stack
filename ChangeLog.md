@@ -9,6 +9,9 @@ Major changes:
 
 Behavior changes:
 
+* `ghc-options` from `stack.yaml` are now appended to `ghc-options` from
+  `config.yaml`, whereas before they would be replaced.
+
 Other enhancements:
 
 * On Windows, recognise a 'mintty' (false) terminal as a terminal, by default
@@ -16,6 +19,12 @@ Other enhancements:
   `extra-deps` of `stack.yaml`
 * `stack build` suggests trying another GHC version should the build
   plan end up requiring unattainable `base` version.
+* `stack build` missing dependency suggestions (on failure to construct a valid
+  build plan because of missing deps) are now printed with their latest
+  cabal file revision hash. See
+  [#4068](https://github.com/commercialhaskell/stack/pull/4068).
+* Added new `--tar-dir` option to `stack sdist`, that allows to copy
+  the resulting tarball to the specified directory.
 * `stack new` now allows template names of the form `username/foo` to download
   from a user other than `commercialstack` on Github, and can be prefixed with
   the service `github:`, `gitlab:`, or `bitbucket:`.
@@ -41,6 +50,16 @@ Bug fixes:
   was tried to be registered. This is now fixed by always building internal
   libraries. See
   [#3996](https://github.com/commercialhaskell/stack/issues/3996).
+* `--no-nix` was not respected under NixOS
+* Fix a regression which might use a lot of RAM. See
+  [#4027](https://github.com/commercialhaskell/stack/issues/4027).
+* Order of commandline arguments does not matter anymore.
+  See [#3959](https://github.com/commercialhaskell/stack/issues/3959)
+* When prompting users about saving their Hackage credentials on upload,
+  flush to stdout before waiting for the response so the prompt actually
+  displays. Also fixes a similar issue with ghci target selection prompt.
+* If `cabal` is not on PATH, running `stack solver` now prompts the user
+  to run `stack install cabal-install`
 
 
 ## v1.7.1
