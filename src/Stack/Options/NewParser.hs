@@ -24,7 +24,8 @@ newOptsParser = (,) <$> newOpts <*> initOptsParser
         optional (templateNameArgument
             (metavar "TEMPLATE_NAME" <>
              help "Name of a template - can take the form\
-                \ [github:][username/]template with optional service name\
+                \ [service:][username/]template with optional service name\
+                \ (github, gitlab, or bitbucket) \
                 \ and username for the service; or, a local filename such as\
                 \ foo.hsfiles or ~/foo; or, a full URL such as\
                 \ https://example.com/foo.hsfiles.")) <*>
