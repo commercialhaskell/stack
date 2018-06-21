@@ -88,6 +88,9 @@ data BuildOpts =
             -- ^ Whether to enable split-objs.
             ,boptsSkipComponents :: ![Text]
             -- ^ Which components to skip when building
+            ,boptsInterleavedOutput :: !Bool
+            -- ^ Should we use the interleaved GHC output when building
+            -- multiple packages?
             }
   deriving (Show)
 
@@ -117,6 +120,7 @@ defaultBuildOpts = BuildOpts
     , boptsCabalVerbose = False
     , boptsSplitObjs = False
     , boptsSkipComponents = []
+    , boptsInterleavedOutput = False
     }
 
 defaultBuildOptsCLI ::BuildOptsCLI
@@ -185,6 +189,7 @@ data BuildOptsMonoid = BuildOptsMonoid
     , buildMonoidCabalVerbose :: !(First Bool)
     , buildMonoidSplitObjs :: !(First Bool)
     , buildMonoidSkipComponents :: ![Text]
+    , buildMonoidInterleavedOutput :: !(First Bool)
     } deriving (Show, Generic)
 
 instance FromJSON (WithJSONWarnings BuildOptsMonoid) where
@@ -216,6 +221,7 @@ instance FromJSON (WithJSONWarnings BuildOptsMonoid) where
               buildMonoidCabalVerbose <- First <$> o ..:? buildMonoidCabalVerboseArgName
               buildMonoidSplitObjs <- First <$> o ..:? buildMonoidSplitObjsName
               buildMonoidSkipComponents <- o ..:? buildMonoidSkipComponentsName ..!= mempty
+              buildMonoidInterleavedOutput <- First <$> o ..:? buildMonoidInterleavedOutputName
               return BuildOptsMonoid{..})
 
 buildMonoidLibProfileArgName :: Text
@@ -289,6 +295,9 @@ buildMonoidSplitObjsName = "split-objs"
 
 buildMonoidSkipComponentsName :: Text
 buildMonoidSkipComponentsName = "skip-components"
+
+buildMonoidInterleavedOutputName :: Text
+buildMonoidInterleavedOutputName = "interleaved-output"
 
 instance Semigroup BuildOptsMonoid where
     (<>) = mappenddefault
