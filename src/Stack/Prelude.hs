@@ -44,7 +44,7 @@ import           Data.Conduit.Binary (sourceHandle, sinkHandle)
 import qualified Data.Conduit.Binary as CB
 import qualified Data.Conduit.List as CL
 import           Data.Conduit.Process.Typed (withLoggedProcess_, createSource)
-import           RIO.Process (HasProcessContext (..), ProcessContext, setStdin, closed, getStderr, getStdout, proc, withProcess_, setStdout, setStderr, ProcessConfig, readProcessStdout_, workingDirL)
+import           RIO.Process (HasProcessContext (..), ProcessContext, setStdin, closed, getStderr, getStdout, proc, withProcess_, setStdout, setStderr, ProcessConfig, readProcess_, workingDirL)
 import           Data.Store           as X (Store)
 import           Data.Text.Encoding (decodeUtf8With)
 import           Data.Text.Encoding.Error (lenientDecode)
@@ -149,7 +149,7 @@ readProcessNull :: (HasProcessContext env, HasLogFunc env)
                 -> RIO env ()
 readProcessNull name args =
   -- We want the output to appear in any exceptions, so we capture and drop it
-  void $ proc name args readProcessStdout_
+  void $ proc name args readProcess_
 
 -- | Use the new 'ProcessContext', but retain the working directory
 -- from the parent environment.
