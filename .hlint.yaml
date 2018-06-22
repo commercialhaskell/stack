@@ -55,5 +55,6 @@
 - error: {lhs: "Network.HTTP.Client.parseRequest", rhs: "Network.HTTP.StackClient.parseRequest"}
 - error: {lhs: "Network.HTTP.Client.getUri", rhs: "Network.HTTP.StackClient.getUri"}
 - error: {lhs: "Network.HTTP.Client.path", rhs: "Network.HTTP.StackClient.path"}
+- error: {lhs: "Network.HTTP.Client.checkResponse", rhs: "Network.HTTP.StackClient.checkResponse"}
 - ignore: {name: "Use alternative", within: "Network.HTTP.StackClient"}
 - ignore: {name: "Use withResponseByManager", within: "Network.HTTP.StackClient"}
