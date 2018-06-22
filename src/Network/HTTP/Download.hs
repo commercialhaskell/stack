@@ -32,9 +32,8 @@ import           Data.Text.Encoding.Error    (lenientDecode)
 import           Data.Text.Encoding          (decodeUtf8With)
 import           Network.HTTP.Client.Conduit (requestHeaders)
 import           Network.HTTP.Download.Verified
-import           Network.HTTP.StackClient    (Request, Response, httpJSON, httpLbs, httpLBS, withResponse, path, checkResponse, parseUrlThrow, parseRequest)
-import           Network.HTTP.Simple         (getResponseBody, getResponseHeaders, getResponseStatusCode,
-                                              setRequestHeader)
+import           Network.HTTP.StackClient    (Request, Response, httpJSON, httpLbs, httpLBS, withResponse, path, checkResponse, parseUrlThrow, parseRequest, setRequestHeader, getResponseHeaders)
+import           Network.HTTP.Simple         (getResponseBody, getResponseStatusCode)
 import           Path.IO                     (doesFileExist)
 import           System.Directory            (createDirectoryIfMissing,
                                               removeFile)

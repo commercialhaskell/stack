@@ -51,6 +51,7 @@
 - error: {lhs: "Network.HTTP.Simple.httpSink", rhs: "Network.HTTP.StackClient.httpSink"}
 - error: {lhs: "Network.HTTP.Simple.httpNoBody", rhs: "Network.HTTP.StackClient.httpNoBody"}
 - error: {lhs: "Network.HTTP.Simple.withResponse", rhs: "Network.HTTP.StackClient.withResponse"}
+- error: {lhs: "Network.HTTP.Simple.getResponseHeaders", rhs: "Network.HTTP.StackClient.getResponseHeaders"}
 - error: {lhs: "Network.HTTP.Client.withResponse", rhs: "Network.HTTP.StackClient.withResponseByManager"}
 - error: {lhs: "Network.HTTP.Client.parseRequest", rhs: "Network.HTTP.StackClient.parseRequest"}
 - error: {lhs: "Network.HTTP.Client.getUri", rhs: "Network.HTTP.StackClient.getUri"}
