@@ -30,7 +30,7 @@ import qualified    Data.Text.Encoding as Text
 import              Control.Monad
 import              Control.Monad.Catch (Handler (..)) -- would be nice if retry exported this itself
 import              Stack.Prelude hiding (Handler (..))
-import              Control.Retry (recovering,limitRetries,RetryPolicy,constantDelay,RetryStatus(..))
+import              Control.Retry (recovering,limitRetries,RetryPolicy,exponentialBackoff,RetryStatus(..))
 import              Crypto.Hash
 import              Crypto.Hash.Conduit (sinkHash)
 import              Data.ByteArray as Mem (convert)
@@ -72,7 +72,7 @@ data DownloadRequest = DownloadRequest
 -- * 3.2s
 -- * 6.4s
 drRetryPolicyDefault :: RetryPolicy
-drRetryPolicyDefault = limitRetries 7 <> constantDelay onehundredMilliseconds
+drRetryPolicyDefault = limitRetries 7 <> exponentialBackoff onehundredMilliseconds
   where onehundredMilliseconds = 100000
 
 data HashCheck = forall a. (Show a, HashAlgorithm a) => HashCheck
