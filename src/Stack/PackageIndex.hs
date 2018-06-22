@@ -50,7 +50,7 @@ import qualified Hackage.Security.Client.Repository.Remote as HS
 import qualified Hackage.Security.Client.Repository.HttpLib.HttpClient as HS
 import qualified Hackage.Security.Util.Path as HS
 import qualified Hackage.Security.Util.Pretty as HS
-import           Network.HTTP.Client.TLS (getGlobalManager)
+import           Network.HTTP.StackClient (getGlobalManager)
 import           Network.HTTP.Download
 import           Network.URI (parseURI)
 import           Path (toFilePath, parseAbsFile, mkRelDir, mkRelFile, (</>), parseRelDir)

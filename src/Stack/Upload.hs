@@ -26,15 +26,14 @@ import qualified Data.Conduit.Binary                   as CB
 import qualified Data.Text                             as T
 import           Data.Text.Encoding                    (encodeUtf8)
 import           Network.HTTP.Client                   (RequestBody(RequestBodyLBS))
-import           Network.HTTP.StackClient              (Request, Response, withResponse, httpNoBody)
+import           Network.HTTP.StackClient              (Request, Response, withResponse, httpNoBody, getGlobalManager)
 import           Network.HTTP.Simple                   (getResponseStatusCode,
                                                         getResponseBody,
                                                         setRequestHeader,
                                                         parseRequest)
 import           Network.HTTP.Client.MultipartFormData (formDataBody, partFileRequestBody,
                                                         partBS, partLBS)
-import           Network.HTTP.Client.TLS               (getGlobalManager,
-                                                        applyDigestAuth,
+import           Network.HTTP.Client.TLS               (applyDigestAuth,
                                                         displayDigestAuthException)
 import           Stack.Types.Config
 import           Stack.Types.PackageIdentifier         (PackageIdentifier, packageIdentifierString,

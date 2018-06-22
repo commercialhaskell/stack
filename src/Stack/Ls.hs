@@ -24,7 +24,7 @@ import qualified Data.Text as T
 import qualified Data.Text.IO as T
 import Data.Typeable (Typeable)
 import qualified Data.Vector as V
-import Network.HTTP.StackClient (httpJSON)
+import Network.HTTP.StackClient (httpJSON, getGlobalManager)
 import Network.HTTP.Simple
        (addRequestHeader, getResponseBody, parseRequest,
         setRequestManager)
@@ -39,7 +39,6 @@ import Stack.Options.DotParser (listDepsOptsParser)
 import System.Process.PagerEditor (pageText)
 import System.Directory (listDirectory)
 import System.IO (stderr, hPutStrLn)
-import Network.HTTP.Client.TLS (getGlobalManager)
 
 data LsView
     = Local
