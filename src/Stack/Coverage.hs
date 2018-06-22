@@ -475,7 +475,7 @@ findPackageFieldForBuiltPackage pkgDir pkgId internalLibs field = do
                 [] -> notFoundErr
                 -- for each of these files, we need to extract the requested field
                 paths -> do
-                  (errors, keys) <- fmap partitionEithers $ traverse extractField paths
+                  (errors, keys) <-  partitionEithers <$> traverse extractField paths
                   case errors of
                     (a:_) -> return $ Left a -- the first error only, since they're repeated anyway
                     [] -> return $ Right keys
