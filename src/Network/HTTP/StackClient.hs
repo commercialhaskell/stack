@@ -20,6 +20,7 @@ module Network.HTTP.StackClient
   , path
   , checkResponse
   , parseUrlThrow
+  , requestHeaders
   , Request
   , Response
   , Manager
@@ -34,6 +35,7 @@ import           Data.Void (Void)
 import qualified Network.HTTP.Client
 import           Network.HTTP.Client (BodyReader, Manager, Request, Response, Manager, parseRequest, getUri, path, checkResponse, parseUrlThrow)
 import           Network.HTTP.Simple (setRequestHeader, HttpException, getResponseHeaders)
+import           Network.HTTP.Conduit (requestHeaders)
 import qualified Network.HTTP.Simple
 import           UnliftIO (MonadIO, MonadUnliftIO, withRunInIO, withUnliftIO, unliftIO)
 

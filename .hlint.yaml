@@ -58,6 +58,7 @@
 - error: {lhs: "Network.HTTP.Client.path", rhs: "Network.HTTP.StackClient.path"}
 - error: {lhs: "Network.HTTP.Client.checkResponse", rhs: "Network.HTTP.StackClient.checkResponse"}
 - error: {lhs: "Network.HTTP.Client.parseUrlThrow", rhs: "Network.HTTP.StackClient.parseUrlThrow"}
+- error: {lhs: "Network.HTTP.Conduit.requestHeaders", rhs: "Network.HTTP.StackClient.requestHeaders"}
 - error: {lhs: "Network.HTTP.Types.Request", rhs: "Network.HTTP.StackClient.Request"}
 - error: {lhs: "Network.HTTP.Types.Response", rhs: "Network.HTTP.StackClient.Response"}
 - error: {lhs: "Network.HTTP.Types.Manager", rhs: "Network.HTTP.StackClient.Manager"}
