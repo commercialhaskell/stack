@@ -57,8 +57,9 @@
 - error: {lhs: "Network.HTTP.Client.path", rhs: "Network.HTTP.StackClient.path"}
 - error: {lhs: "Network.HTTP.Client.checkResponse", rhs: "Network.HTTP.StackClient.checkResponse"}
 - error: {lhs: "Network.HTTP.Client.parseUrlThrow", rhs: "Network.HTTP.StackClient.parseUrlThrow"}
-- error: {lhs: "Network.HTTP.Client.Request", rhs: "Network.HTTP.StackClient.Request"}
-- error: {lhs: "Network.HTTP.Client.Response", rhs: "Network.HTTP.StackClient.Response"}
-- error: {lhs: "Network.HTTP.Client.Manager", rhs: "Network.HTTP.StackClient.Manager"}
+- error: {lhs: "Network.HTTP.Types.Request", rhs: "Network.HTTP.StackClient.Request"}
+- error: {lhs: "Network.HTTP.Types.Response", rhs: "Network.HTTP.StackClient.Response"}
+- error: {lhs: "Network.HTTP.Types.Manager", rhs: "Network.HTTP.StackClient.Manager"}
+- error: {lhs: "Network.HTTP.Simple.HttpException", rhs: "Network.HTTP.StackClient.HttpException"}
 - ignore: {name: "Use alternative", within: "Network.HTTP.StackClient"}
 - ignore: {name: "Use withResponseByManager", within: "Network.HTTP.StackClient"}

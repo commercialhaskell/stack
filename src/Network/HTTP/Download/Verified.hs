@@ -41,8 +41,8 @@ import              Data.Conduit.Binary (sourceHandle)
 import              Data.Text.Encoding (decodeUtf8With)
 import              Data.Text.Encoding.Error (lenientDecode)
 import              GHC.IO.Exception (IOException(..),IOErrorType(..))
-import              Network.HTTP.StackClient (Request, httpSink, getUri, path)
-import              Network.HTTP.Simple (HttpException, getResponseHeaders)
+import              Network.HTTP.StackClient (Request, HttpException, httpSink, getUri, path)
+import              Network.HTTP.Simple (getResponseHeaders)
 import              Network.HTTP.Types.Header (hContentLength, hContentMD5)
 import              Path
 import              Stack.Types.Runner

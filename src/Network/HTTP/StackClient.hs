@@ -21,6 +21,7 @@ module Network.HTTP.StackClient
   , Request
   , Response
   , Manager
+  , HttpException
   ) where
 
 import           Data.Aeson (FromJSON)
@@ -30,7 +31,7 @@ import           Data.Conduit (ConduitM, transPipe)
 import           Data.Void (Void)
 import qualified Network.HTTP.Client
 import           Network.HTTP.Client (BodyReader, Manager, Request, Response, Manager, parseRequest, getUri, path, checkResponse, parseUrlThrow)
-import           Network.HTTP.Simple (setRequestHeader)
+import           Network.HTTP.Simple (setRequestHeader, HttpException)
 import qualified Network.HTTP.Simple
 import           UnliftIO (MonadIO, MonadUnliftIO, withRunInIO, withUnliftIO, unliftIO)
 
