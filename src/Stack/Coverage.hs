@@ -448,7 +448,7 @@ findPackageFieldForBuiltPackage pkgDir pkgId internalLibs field = do
             path <- liftM (inplaceDir </>) $ parseRelFile (pkgIdStr ++ "-inplace.conf")
             logDebug $ "Parsing config in Cabal < 1.24 location: " <> fromString (toFilePath path)
             exists <- doesFileExist path
-            if exists then fmap (\x -> [x]) <$> extractField path else notFoundErr
+            if exists then fmap (:[]) <$> extractField path else notFoundErr
         else do
             -- With Cabal-1.24, it's in a different location.
             logDebug $ "Scanning " <> fromString (toFilePath inplaceDir) <> " for files matching " <> fromString pkgIdStr
@@ -475,7 +475,7 @@ findPackageFieldForBuiltPackage pkgDir pkgId internalLibs field = do
                 [] -> notFoundErr
                 -- for each of these files, we need to extract the requested field
                 paths -> do
-                  (errors, keys) <- fmap partitionEithers $ sequence $ fmap extractField paths
+                  (errors, keys) <- fmap partitionEithers $ traverse extractField paths
                   case errors of
                     (a:_) -> return $ Left a -- the first error only, since they're repeated anyway
                     [] -> return $ Right keys

@@ -719,7 +719,7 @@ addPackageDeps treatAsDep package = do
     -- make sure we consider internal libraries as libraries too
     packageHasLibrary :: Package -> Bool
     packageHasLibrary p =
-      (Set.null $ packageInternalLibraries p) ||
+      Set.null (packageInternalLibraries p) ||
       case packageLibraries p of
         HasLibraries _ -> True
         NoLibraries -> False

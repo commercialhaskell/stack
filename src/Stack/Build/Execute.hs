@@ -1315,7 +1315,7 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
           allToUnregister = map (const pkgName) (maybeToList mlib) ++ map toCabalInternalLibName subLibNames
           allToRegister = maybeToList mlib ++ sublibs
 
-        when (not $ null allToRegister) $ do
+        unless (null allToRegister) $ do
             withMVar eeInstallLock $ \() -> do
                 -- We want to ignore the global and user databases.
                 -- Unfortunately, ghc-pkg doesn't take such arguments on the
@@ -1518,7 +1518,7 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
         -- only return the sublibs to cache them if we also cache the main lib (that is, if it exists)
         (mpkgid, sublibsPkgIds) <- case packageLibraries package of
             HasLibraries _ -> do
-                sublibsPkgIds <- fmap (mapMaybe id) $
+                sublibsPkgIds <- fmap catMaybes $
                   forM (Set.toList $ packageInternalLibraries package) $ \sublib -> do
                     -- z-haddock-library-z-attoparsec for internal lib attoparsec of haddock-library
                     let sublibName = T.concat ["z-", packageNameText $ packageName package, "-z-", sublib]
@@ -1529,7 +1529,7 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
                 mpkgid <- loadInstalledPkg wc [installedPkgDb] installedDumpPkgsTVar (packageName package)
                 case mpkgid of
                     Nothing -> throwM $ Couldn'tFindPkgId $ packageName package
-                    Just pkgid -> return $ (Library ident pkgid Nothing, sublibsPkgIds)
+                    Just pkgid -> return (Library ident pkgid Nothing, sublibsPkgIds)
             NoLibraries -> do
                 markExeInstalled (taskLocation task) taskProvides -- TODO unify somehow with writeFlagCache?
                 return (Executable ident, []) -- don't return sublibs in this case
