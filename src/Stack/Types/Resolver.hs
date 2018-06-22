@@ -49,8 +49,7 @@ import qualified Data.Text as T
 import           Data.Text.Encoding (decodeUtf8)
 import           Data.Text.Read (decimal)
 import           Data.Time (Day)
-import           Network.HTTP.Client (Request)
-import           Network.HTTP.StackClient (parseUrlThrow)
+import           Network.HTTP.StackClient (Request, parseUrlThrow)
 import           Options.Applicative (ReadM)
 import qualified Options.Applicative.Types as OA
 import           Path

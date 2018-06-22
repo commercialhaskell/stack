@@ -38,7 +38,8 @@ import           Data.Time.Calendar
 import           Data.Time.Clock
 import qualified Data.Yaml as Yaml
 import           Network.HTTP.Download
-import           Network.HTTP.Simple (Request, HttpException, getResponseStatusCode, getResponseBody)
+import           Network.HTTP.StackClient (Request)
+import           Network.HTTP.Simple (HttpException, getResponseStatusCode, getResponseBody)
 import           Path
 import           Path.IO
 import           Stack.Constants

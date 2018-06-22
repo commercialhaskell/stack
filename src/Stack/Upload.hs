@@ -25,10 +25,8 @@ import qualified Data.ByteString.Lazy                  as L
 import qualified Data.Conduit.Binary                   as CB
 import qualified Data.Text                             as T
 import           Data.Text.Encoding                    (encodeUtf8)
-import           Network.HTTP.Client                   (Response,
-                                                        RequestBody(RequestBodyLBS),
-                                                        Request)
-import           Network.HTTP.StackClient              (withResponse, httpNoBody)
+import           Network.HTTP.Client                   (RequestBody(RequestBodyLBS))
+import           Network.HTTP.StackClient              (Request, Response, withResponse, httpNoBody)
 import           Network.HTTP.Simple                   (getResponseStatusCode,
                                                         getResponseBody,
                                                         setRequestHeader,

@@ -18,6 +18,8 @@ module Network.HTTP.StackClient
   , path
   , checkResponse
   , parseUrlThrow
+  , Request
+  , Response
   ) where
 
 import           Data.Aeson (FromJSON)
