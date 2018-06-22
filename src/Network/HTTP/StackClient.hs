@@ -17,6 +17,7 @@ module Network.HTTP.StackClient
   , getUri
   , path
   , checkResponse
+  , parseUrlThrow
   ) where
 
 import           Data.Aeson (FromJSON)
@@ -25,7 +26,7 @@ import           Data.ByteString.Lazy (ByteString)
 import           Data.Conduit (ConduitM, transPipe)
 import           Data.Void (Void)
 import qualified Network.HTTP.Client
-import           Network.HTTP.Client (BodyReader, Manager, Request, Response, parseRequest, getUri, path, checkResponse)
+import           Network.HTTP.Client (BodyReader, Manager, Request, Response, parseRequest, getUri, path, checkResponse, parseUrlThrow)
 import           Network.HTTP.Simple (setRequestHeader)
 import qualified Network.HTTP.Simple
 import           UnliftIO (MonadIO, MonadUnliftIO, withRunInIO, withUnliftIO, unliftIO)
