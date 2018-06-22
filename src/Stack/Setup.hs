@@ -577,7 +577,7 @@ getGhcBuilds = do
                 eldconfigOut
                   <- withModifyEnvVars sbinEnv
                    $ proc "ldconfig" ["-p"]
-                   $ tryAny . readProcessStdout_
+                   $ tryAny . fmap fst . readProcess_
                 let firstWords = case eldconfigOut of
                         Right ldconfigOut -> mapMaybe (listToMaybe . T.words) $
                             T.lines $ T.decodeUtf8With T.lenientDecode
@@ -764,7 +764,7 @@ getSystemCompiler wc = do
     exists <- doesExecutableExist exeName
     if exists
         then do
-            eres <- proc exeName ["--info"] $ tryAny . readProcessStdout_
+            eres <- proc exeName ["--info"] $ tryAny . fmap fst . readProcess_
             let minfo = do
                     Right lbs <- Just eres
                     pairs_ <- readMaybe $ BL8.unpack lbs :: Maybe [(String, String)]
@@ -1353,10 +1353,10 @@ buildInGhcjsEnv envConfig boptsCli = do
 
 getCabalInstallVersion :: (HasProcessContext env, HasLogFunc env) => RIO env (Maybe Version)
 getCabalInstallVersion = do
-    ebs <- tryAny $ proc "cabal" ["--numeric-version"] readProcessStdout_
+    ebs <- tryAny $ proc "cabal" ["--numeric-version"] readProcess_
     case ebs of
         Left _ -> return Nothing
-        Right bs -> Just <$> parseVersion (T.dropWhileEnd isSpace (T.decodeUtf8 (LBS.toStrict bs)))
+        Right (bs, _) -> Just <$> parseVersion (T.dropWhileEnd isSpace (T.decodeUtf8 (LBS.toStrict bs)))
 
 -- | Check if given processes appear to be present, throwing an exception if
 -- missing.
@@ -1646,7 +1646,7 @@ sanityCheck wc = withSystemTempDir "stack-sanity-check" $ \dir -> do
     eres <- withWorkingDir (toFilePath dir) $ proc exeName
         [ fp
         , "-no-user-package-db"
-        ] $ try . readProcessStdout_
+        ] $ try . readProcess_
     case eres of
         Left e -> throwIO $ GHCSanityCheckCompileFailed e ghc
         Right _ -> return () -- TODO check that the output of running the command is correct
@@ -1702,7 +1702,7 @@ getUtf8EnvVars compilerVer =
                              Map.empty
                     else do
                         -- Get a list of known locales by running @locale -a@.
-                        elocales <- tryAny $ proc "locale" ["-a"] readProcessStdout_
+                        elocales <- tryAny $ fmap fst $ proc "locale" ["-a"] readProcess_
                         let
                             -- Filter the list to only include locales with UTF-8 encoding.
                             utf8Locales =
