@@ -13,6 +13,7 @@ module Network.HTTP.StackClient
   , setUserAgent
   , withResponse
   , withResponseByManager
+  , parseRequest
   ) where
 
 import           Data.Aeson (FromJSON)
@@ -21,7 +22,7 @@ import           Data.ByteString.Lazy (ByteString)
 import           Data.Conduit (ConduitM, transPipe)
 import           Data.Void (Void)
 import qualified Network.HTTP.Client
-import           Network.HTTP.Client (BodyReader, Manager, Request, Response)
+import           Network.HTTP.Client (BodyReader, Manager, Request, Response, parseRequest)
 import           Network.HTTP.Simple (setRequestHeader)
 import qualified Network.HTTP.Simple
 import           UnliftIO (MonadIO, MonadUnliftIO, withRunInIO, withUnliftIO, unliftIO)
