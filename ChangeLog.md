@@ -29,6 +29,9 @@ Other enhancements:
   `build.interleaved-output` config value which causes multiple concurrent
   builds to dump to stderr at the same time with a `packagename> ` prefix. See
   [#3225](https://github.com/commercialhaskell/stack/issues/3225).
+* The default retry strategy has changed to exponential backoff.
+  This should help with
+  [#3510](https://github.com/commercialhaskell/stack/issues/3510).
 
 Bug fixes:
 
