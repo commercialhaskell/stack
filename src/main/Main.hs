@@ -862,10 +862,12 @@ execCmd ExecOpts {..} go@GlobalOpts{..} =
           pkgComponents <- liftM (map lpvComponents . Map.elems . lpProject) getLocalPackages
           let executables = filter isCExe $ concatMap Set.toList pkgComponents
           let (exe, args') = case args of
-                             []   -> (listToMaybe executables, args)
+                             []   -> (firstExe, args)
                              x:xs -> case find (\y -> y == (CExe $ T.pack x)) executables of
-                                     Nothing -> (listToMaybe executables, args)
+                                     Nothing -> (firstExe, args)
                                      argExe' -> (argExe', xs)
+                             where
+                                firstExe = listToMaybe executables
           case exe of
               Just (CExe exe') -> do
                 Stack.Build.build (const (return ())) Nothing defaultBuildOptsCLI{boptsCLITargets = [T.cons ':' exe']}
