@@ -797,11 +797,6 @@ execCmd :: ExecOpts -> GlobalOpts -> IO ()
 execCmd ExecOpts {..} go@GlobalOpts{..} =
     case eoExtra of
         ExecOptsPlain -> do
-          (cmd, args) <- case (eoCmd, eoArgs) of
-                (ExecCmd cmd, args) -> return (cmd, args)
-                (ExecRun, args) -> return ("", args)
-                (ExecGhc, args) -> return ("ghc", args)
-                (ExecRunGhc, args) -> return ("runghc", args)
           loadConfigWithOpts go $ \lc ->
             withUserFileLock go (view stackRootL lc) $ \lk -> do
               let getCompilerVersion = loadCompilerVersion go lc
@@ -810,14 +805,17 @@ execCmd ExecOpts {..} go@GlobalOpts{..} =
                     (lcProjectRoot lc)
                     -- Unlock before transferring control away, whether using docker or not:
                     (Just $ munlockFile lk)
-                    (runRIO (lcConfig lc) $ do
+                    (withBuildConfigAndLock go $ \buildLock -> do
                         config <- view configL
                         menv <- liftIO $ configProcessContextSettings config plainEnvSettings
-                        withProcessContext menv $ Nix.reexecWithOptionalShell
-                            (lcProjectRoot lc)
-                            getCompilerVersion
-                            (runRIO (lcConfig lc) $
-                                exec cmd args))
+                        withProcessContext menv $ do
+                            (cmd, args) <- case (eoCmd, eoArgs) of
+                                (ExecCmd cmd, args) -> return (cmd, args)
+                                (ExecRun, args) -> getRunCmd args
+                                (ExecGhc, args) -> return ("ghc", args)
+                                (ExecRunGhc, args) -> return ("runghc", args)
+                            munlockFile buildLock
+                            Nix.reexecWithOptionalShell (lcProjectRoot lc) getCompilerVersion (runRIO (lcConfig lc) $ exec cmd args))
                     Nothing
                     Nothing -- Unlocked already above.
         ExecOptsEmbellished {..} ->
@@ -863,17 +861,18 @@ execCmd ExecOpts {..} go@GlobalOpts{..} =
       getRunCmd args = do
           pkgComponents <- liftM (map lpvComponents . Map.elems . lpProject) getLocalPackages
           let executables = filter isCExe $ concatMap Set.toList pkgComponents
-          let argExe = if not (null args) then find (\x -> x == (CExe $ T.pack $ head args)) executables
-                                          else Nothing
-          let firstExe = if not (null executables) then Just $ head executables else Nothing
-          let (exe, args') = if isJust argExe then (argExe, tail args) else (firstExe, args)
+          let (exe, args') = case args of
+                             []   -> (listToMaybe executables, args)
+                             x:xs -> case find (\y -> y == (CExe $ T.pack x)) executables of
+                                     Nothing -> (listToMaybe executables, args)
+                                     argExe' -> (argExe', xs)
           case exe of
               Just (CExe exe') -> do
-                Stack.Build.build (const (return ())) Nothing defaultBuildOptsCLI{boptsCLITargets = [T.concat [T.pack ":", exe']]}
+                Stack.Build.build (const (return ())) Nothing defaultBuildOptsCLI{boptsCLITargets = [T.cons ':' exe']}
                 return (T.unpack exe', args')
-              _                -> liftIO $ do
-                  hPutStrLn stderr "No executables found."
-                  exitFailure
+              _                -> do
+                  logError "No executables found."
+                  liftIO exitFailure
 
       getGhcCmd prefix pkgs args = do
           wc <- view $ actualCompilerVersionL.whichCompilerL
