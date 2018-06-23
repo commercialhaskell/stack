@@ -716,8 +716,10 @@ addPackageDeps treatAsDep package = do
         TTFiles lp _ -> packageHasLibrary $ lpPackage lp
         TTIndex p _ _ -> packageHasLibrary p
 
+    -- make sure we consider internal libraries as libraries too
     packageHasLibrary :: Package -> Bool
     packageHasLibrary p =
+      Set.null (packageInternalLibraries p) ||
       case packageLibraries p of
         HasLibraries _ -> True
         NoLibraries -> False

@@ -671,11 +671,13 @@ instance Store ConfigureOpts
 instance NFData ConfigureOpts
 
 -- | Information on a compiled package: the library conf file (if relevant),
--- and all of the executable paths.
+-- the sublibraries (if present) and all of the executable paths.
 data PrecompiledCache = PrecompiledCache
     -- Use FilePath instead of Path Abs File for Binary instances
     { pcLibrary :: !(Maybe FilePath)
     -- ^ .conf file inside the package database
+    , pcSubLibs :: ![FilePath]
+    -- ^ .conf file inside the package database, for each of the sublibraries
     , pcExes    :: ![FilePath]
     -- ^ Full paths to executables
     }
@@ -684,4 +686,4 @@ instance Store PrecompiledCache
 instance NFData PrecompiledCache
 
 precompiledCacheVC :: VersionConfig PrecompiledCache
-precompiledCacheVC = storeVersionConfig "precompiled-v1" "eMzSOwaHJMamA5iNKs1A025frlQ="
+precompiledCacheVC = storeVersionConfig "precompiled-v2" "55vMMtbIlS4UukKnSmjs1SrI01o="

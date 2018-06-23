@@ -1260,20 +1260,24 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
       where
         result = T.intercalate " + " $ concat
             [ ["lib" | taskAllInOne && hasLib]
+            , ["internal-lib" | taskAllInOne && hasSubLib]
             , ["exe" | taskAllInOne && hasExe]
             , ["test" | enableTests]
             , ["bench" | enableBenchmarks]
             ]
-        (hasLib, hasExe) = case taskType of
+        (hasLib, hasSubLib, hasExe) = case taskType of
             TTFiles lp Local ->
-              let hasLibrary =
-                    case packageLibraries (lpPackage lp) of
+              let package = lpPackage lp
+                  hasLibrary =
+                    case packageLibraries package of
                       NoLibraries -> False
                       HasLibraries _ -> True
-               in (hasLibrary, not (Set.null (exesToBuild executableBuildStatuses lp)))
+                  hasSubLibrary = not . Set.null $ packageInternalLibraries package
+                  hasExecutables = not . Set.null $ exesToBuild executableBuildStatuses lp
+               in (hasLibrary, hasSubLibrary, hasExecutables)
             -- This isn't true, but we don't want to have this info for
             -- upstream deps.
-            _ -> (False, False)
+            _ -> (False, False, False)
 
     getPrecompiled cache =
         case taskLocation task of
@@ -1306,10 +1310,27 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
                         return $ if b then Just pc else Nothing
             _ -> return Nothing
 
-    copyPreCompiled (PrecompiledCache mlib exes) = do
+    copyPreCompiled (PrecompiledCache mlib sublibs exes) = do
         wc <- view $ actualCompilerVersionL.whichCompilerL
         announceTask task "using precompiled package"
-        forM_ mlib $ \libpath -> do
+
+        -- We need to copy .conf files for the main library and all sublibraries which exist in the cache,
+        -- from their old snapshot to the new one. However, we must unregister any such library in the new
+        -- snapshot, in case it was built with different flags.
+        let
+          subLibNames = map T.unpack . Set.toList $ case taskType of
+            TTFiles lp _ -> packageInternalLibraries $ lpPackage lp
+            TTIndex p _ _ -> packageInternalLibraries p
+          (name, version) = toTuple taskProvides
+          mainLibName = packageNameString name
+          mainLibVersion = versionString version
+          pkgName = mainLibName ++ "-" ++ mainLibVersion
+          -- z-package-z-internal for internal lib internal of package package
+          toCabalInternalLibName n = concat ["z-", mainLibName, "-z-", n, "-", mainLibVersion]
+          allToUnregister = map (const pkgName) (maybeToList mlib) ++ map toCabalInternalLibName subLibNames
+          allToRegister = maybeToList mlib ++ sublibs
+
+        unless (null allToRegister) $ do
             withMVar eeInstallLock $ \() -> do
                 -- We want to ignore the global and user databases.
                 -- Unfortunately, ghc-pkg doesn't take such arguments on the
@@ -1321,23 +1342,17 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
                       (T.pack $ toFilePathNoTrailingSep $ bcoSnapDB eeBaseConfigOpts)
 
                 withModifyEnvVars modifyEnv $ do
-                  -- In case a build of the library with different flags already exists, unregister it
-                  -- before copying.
                   let ghcPkgExe = ghcPkgExeName wc
-                  catchAny
-                      (readProcessNull ghcPkgExe
-                          [ "unregister"
-                          , "--force"
-                          , packageIdentifierString taskProvides
-                          ])
+
+                  -- first unregister everything that needs to be unregistered
+                  forM_ allToUnregister $ \packageName -> catchAny
+                      (readProcessNull ghcPkgExe [ "unregister", "--force", packageName])
                       (const (return ()))
 
-                  void $ proc ghcPkgExe
-                      [ "register"
-                      , "--force"
-                      , libpath
-                      ]
-                      readProcess_
+                  -- now, register the cached conf files
+                  forM_ allToRegister $ \libpath ->
+                    proc ghcPkgExe [ "register", "--force", libpath] readProcess_
+
         liftIO $ forM_ exes $ \exe -> do
             D.createDirectoryIfMissing True bindir
             let dst = bindir FP.</> FP.takeFileName exe
@@ -1493,7 +1508,10 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
               case packageLibraries package of
                 NoLibraries -> False
                 HasLibraries _ -> True
-            shouldCopy = not isFinalBuild && (hasLibrary || not (Set.null (packageExes package)))
+            packageHasComponentSet f = not $ Set.null $ f package
+            hasInternalLibrary = packageHasComponentSet packageInternalLibraries
+            hasExecutables = packageHasComponentSet packageExes
+            shouldCopy = not isFinalBuild && (hasLibrary || hasInternalLibrary || hasExecutables)
         when shouldCopy $ withMVar eeInstallLock $ \() -> do
             announce "copy/register"
             eres <- try $ cabal KeepTHLoading ["copy"]
@@ -1512,15 +1530,24 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
                         ( bcoLocalDB eeBaseConfigOpts
                         , eeLocalDumpPkgs )
         let ident = PackageIdentifier (packageName package) (packageVersion package)
-        mpkgid <- case packageLibraries package of
+        -- only return the sublibs to cache them if we also cache the main lib (that is, if it exists)
+        (mpkgid, sublibsPkgIds) <- case packageLibraries package of
             HasLibraries _ -> do
+                sublibsPkgIds <- fmap catMaybes $
+                  forM (Set.toList $ packageInternalLibraries package) $ \sublib -> do
+                    -- z-haddock-library-z-attoparsec for internal lib attoparsec of haddock-library
+                    let sublibName = T.concat ["z-", packageNameText $ packageName package, "-z-", sublib]
+                    case parsePackageName sublibName of
+                      Nothing -> return Nothing -- invalid lib, ignored
+                      Just subLibName -> loadInstalledPkg wc [installedPkgDb] installedDumpPkgsTVar subLibName
+
                 mpkgid <- loadInstalledPkg wc [installedPkgDb] installedDumpPkgsTVar (packageName package)
                 case mpkgid of
                     Nothing -> throwM $ Couldn'tFindPkgId $ packageName package
-                    Just pkgid -> return $ Library ident pkgid Nothing
+                    Just pkgid -> return (Library ident pkgid Nothing, sublibsPkgIds)
             NoLibraries -> do
                 markExeInstalled (taskLocation task) taskProvides -- TODO unify somehow with writeFlagCache?
-                return $ Executable ident
+                return (Executable ident, []) -- don't return sublibs in this case
 
         case taskLocation task of
             Snap ->
@@ -1529,7 +1556,7 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
                 (ttPackageLocation taskType)
                 (configCacheOpts cache)
                 (configCacheDeps cache)
-                mpkgid (packageExes package)
+                mpkgid sublibsPkgIds (packageExes package)
             _ -> return ()
 
         case taskType of
@@ -1926,7 +1953,7 @@ primaryComponentOptions executableBuildStatuses lp =
       -- TODO: get this information from target parsing instead,
       -- which will allow users to turn off library building if
       -- desired
-      (case packageLibraries (lpPackage lp) of
+      (case packageLibraries package of
          NoLibraries -> []
          HasLibraries names ->
              map T.unpack
