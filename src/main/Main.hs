@@ -865,7 +865,7 @@ execCmd ExecOpts {..} go@GlobalOpts{..} =
                              []   -> (firstExe, args)
                              x:xs -> case find (\y -> y == (CExe $ T.pack x)) executables of
                                      Nothing -> (firstExe, args)
-                                     argExe' -> (argExe', xs)
+                                     argExe -> (argExe, xs)
                              where
                                 firstExe = listToMaybe executables
           case exe of
