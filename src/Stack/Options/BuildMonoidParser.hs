@@ -21,7 +21,8 @@ buildOptsMonoidParser hide0 =
     haddockHyperlinkSource <*> copyBins <*> copyCompilerTool <*>
     preFetch <*> keepGoing <*> keepTmpFiles <*> forceDirty <*>
     tests <*> testOptsParser hideBool <*> benches <*>
-    benchOptsParser hideBool <*> reconfigure <*> cabalVerbose <*> splitObjs <*> skipComponents
+    benchOptsParser hideBool <*> reconfigure <*> cabalVerbose <*> splitObjs <*> skipComponents <*>
+    interleavedOutput
   where
     hideBool = hide0 /= BuildCmdGlobalOpts
     hide =
@@ -167,3 +168,8 @@ buildOptsMonoidParser hide0 =
                 (long "skip" <>
                  help "Skip given component, can be specified multiple times" <>
                  hide)))
+    interleavedOutput =
+        firstBoolFlags
+            "interleaved-output"
+            "Print concurrent GHC output to the console with a prefix for the package name"
+            hide

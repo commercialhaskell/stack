@@ -144,6 +144,7 @@ library:
   - Data.Attoparsec.Combinators
   - Data.Attoparsec.Interpreter
   - Data.IORef.RunOnce
+  - Data.Monoid.Map
   - Data.Store.VersionTagged
   - Network.HTTP.Download
   - Network.HTTP.Download.Verified

@@ -182,11 +182,14 @@ import           Data.Aeson.Extended
 import           Data.Attoparsec.Args (parseArgs, EscapingMode (Escaping))
 import qualified Data.ByteArray.Encoding as Mem (convertToBase, Base(Base16))
 import qualified Data.ByteString.Char8 as S8
+import           Data.Coerce (coerce)
 import           Data.List (stripPrefix)
 import           Data.List.NonEmpty (NonEmpty)
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map as Map
 import qualified Data.Map.Strict as M
+import qualified Data.Monoid as Monoid
+import           Data.Monoid.Map (MonoidMap(..))
 import qualified Data.Set as Set
 import qualified Data.Text as T
 import           Data.Text.Encoding (encodeUtf8)
@@ -739,10 +742,14 @@ data ConfigMonoid =
     -- ^ Template parameters.
     ,configMonoidScmInit             :: !(First SCM)
     -- ^ Initialize SCM (e.g. git init) when making new projects?
-    ,configMonoidGhcOptionsByName    :: !(Map PackageName [Text])
-    -- ^ See 'configGhcOptionsByName'
-    ,configMonoidGhcOptionsByCat     :: !(Map ApplyGhcOptions [Text])
-    -- ^ See 'configGhcOptionsAll'
+    ,configMonoidGhcOptionsByName    :: !(MonoidMap PackageName (Monoid.Dual [Text]))
+    -- ^ See 'configGhcOptionsByName'. Uses 'Monoid.Dual' so that
+    -- options from the configs on the right come first, so that they
+    -- can be overridden.
+    ,configMonoidGhcOptionsByCat     :: !(MonoidMap ApplyGhcOptions (Monoid.Dual [Text]))
+    -- ^ See 'configGhcOptionsAll'. Uses 'Monoid.Dual' so that options
+    -- from the configs on the right come first, so that they can be
+    -- overridden.
     ,configMonoidExtraPath           :: ![Path Abs Dir]
     -- ^ Additional paths to search for executables in
     ,configMonoidSetupInfoLocations  :: ![SetupInfoLocation]
@@ -843,13 +850,13 @@ parseConfigMonoidObject rootDir obj = do
           return x
         (Nothing, Nothing) -> return []
 
-    let configMonoidGhcOptionsByCat = Map.fromList
+    let configMonoidGhcOptionsByCat = coerce $ Map.fromList
           [ (AGOEverything, optionsEverything)
           , (AGOLocals, Map.findWithDefault [] GOKLocals options)
           , (AGOTargets, Map.findWithDefault [] GOKTargets options)
           ]
 
-        configMonoidGhcOptionsByName = Map.fromList
+        configMonoidGhcOptionsByName = coerce $ Map.fromList
             [(name, opts) | (GOKPackage name, opts) <- Map.toList options]
 
     configMonoidExtraPath <- obj ..:? configMonoidExtraPathName ..!= []

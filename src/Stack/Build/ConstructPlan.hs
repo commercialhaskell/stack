@@ -26,6 +26,7 @@ import qualified Data.HashMap.Strict as HashMap
 import           Data.List
 import qualified Data.Map.Strict as M
 import qualified Data.Map.Strict as Map
+import           Data.Monoid.Map (MonoidMap(..))
 import qualified Data.Set as Set
 import qualified Data.Text as T
 import           Data.Text.Encoding (encodeUtf8, decodeUtf8With)
@@ -715,8 +716,10 @@ addPackageDeps treatAsDep package = do
         TTFiles lp _ -> packageHasLibrary $ lpPackage lp
         TTIndex p _ _ -> packageHasLibrary p
 
+    -- make sure we consider internal libraries as libraries too
     packageHasLibrary :: Package -> Bool
     packageHasLibrary p =
+      Set.null (packageInternalLibraries p) ||
       case packageLibraries p of
         HasLibraries _ -> True
         NoLibraries -> False
@@ -1168,19 +1171,6 @@ extendDepsPath ident dp = DepsPath
     , dpNameLength = dpNameLength dp + T.length (packageNameText (packageIdentifierName ident))
     , dpPath = [ident]
     }
-
--- Utility newtype wrapper to make make Map's Monoid also use the
--- element's Monoid.
-
-newtype MonoidMap k a = MonoidMap (Map k a)
-    deriving (Eq, Ord, Read, Show, Generic, Functor)
-
-instance (Ord k, Semigroup a) => Semigroup (MonoidMap k a) where
-    MonoidMap mp1 <> MonoidMap mp2 = MonoidMap (M.unionWith (<>) mp1 mp2)
-
-instance (Ord k, Monoid a, Semigroup a) => Monoid (MonoidMap k a) where
-    mappend = (<>)
-    mempty = MonoidMap mempty
 
 -- Switch this to 'True' to enable some debugging putStrLn in this module
 planDebug :: MonadIO m => String -> m ()

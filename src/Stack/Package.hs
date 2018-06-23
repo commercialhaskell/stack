@@ -40,13 +40,14 @@ module Stack.Package
   where
 
 import qualified Data.ByteString as BS
-import qualified Data.ByteString.Char8 as C8
+import qualified Data.ByteString.Lazy.Char8 as CL8
 import           Data.List (isSuffixOf, isPrefixOf)
 import           Data.Maybe (maybe)
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
 import qualified Data.Text as T
-import           Data.Text.Encoding (decodeUtf8)
+import qualified Data.Text.Lazy as TL
+import qualified Data.Text.Lazy.Encoding as TLE
 import           Distribution.Compiler
 import           Distribution.ModuleName (ModuleName)
 import qualified Distribution.ModuleName as Cabal
@@ -276,9 +277,7 @@ packageFromPackageDescription packageConfig pkgFlags (PackageDescriptionPair pkg
               Just lib
          in
           case mlib of
-            Nothing
-              | null extraLibNames -> NoLibraries
-              | otherwise -> error "Package has buildable sublibraries but no buildable libraries, I'm giving up"
+            Nothing -> NoLibraries
             Just _ -> HasLibraries foreignLibNames
     , packageInternalLibraries = subLibNames
     , packageTests = M.fromList
@@ -1213,24 +1212,24 @@ parseDumpHI
     :: FilePath -> RIO Ctx (Set ModuleName, [Path Abs File])
 parseDumpHI dumpHIPath = do
     dir <- asks (parent . ctxFile)
-    dumpHI <- liftIO $ fmap C8.lines (C8.readFile dumpHIPath)
+    dumpHI <- liftIO $ filterDumpHi <$> fmap CL8.lines (CL8.readFile dumpHIPath)
     let startModuleDeps =
-            dropWhile (not . ("module dependencies:" `C8.isPrefixOf`)) dumpHI
+            dropWhile (not . ("module dependencies:" `CL8.isPrefixOf`)) dumpHI
         moduleDeps =
             S.fromList $
-            mapMaybe (D.simpleParse . T.unpack . decodeUtf8) $
-            C8.words $
-            C8.concat $
-            C8.dropWhile (/= ' ') (fromMaybe "" $ listToMaybe startModuleDeps) :
-            takeWhile (" " `C8.isPrefixOf`) (drop 1 startModuleDeps)
+            mapMaybe (D.simpleParse . TL.unpack . TLE.decodeUtf8) $
+            CL8.words $
+            CL8.concat $
+            CL8.dropWhile (/= ' ') (fromMaybe "" $ listToMaybe startModuleDeps) :
+            takeWhile (" " `CL8.isPrefixOf`) (drop 1 startModuleDeps)
         thDeps =
             -- The dependent file path is surrounded by quotes but is not escaped.
             -- It can be an absolute or relative path.
             mapMaybe
-                (fmap T.unpack .
-                  (T.stripSuffix "\"" <=< T.stripPrefix "\"") .
-                  T.dropWhileEnd (== '\r') . decodeUtf8 . C8.dropWhile (/= '"')) $
-            filter ("addDependentFile \"" `C8.isPrefixOf`) dumpHI
+                (fmap TL.unpack .
+                  (TL.stripSuffix "\"" <=< TL.stripPrefix "\"") .
+                  TL.dropWhileEnd (== '\r') . TLE.decodeUtf8 . CL8.dropWhile (/= '"')) $
+            filter ("addDependentFile \"" `CL8.isPrefixOf`) dumpHI
     thDepsResolved <- liftM catMaybes $ forM thDeps $ \x -> do
         mresolved <- liftIO (forgivingAbsence (resolveFile dir x)) >>= rejectMissingFile
         when (isNothing mresolved) $
@@ -1242,6 +1241,22 @@ parseDumpHI dumpHIPath = do
                 ]
         return mresolved
     return (moduleDeps, thDepsResolved)
+  where
+    -- | Filtering step fixing RAM usage upon a big dump-hi file. See
+    --   https://github.com/commercialhaskell/stack/issues/4027 It is
+    --   an optional step from a functionality stand-point.
+    filterDumpHi dumpHI =
+        let dl x xs = x ++ xs
+            isLineInteresting (acc, moduleDepsStarted) l
+                | moduleDepsStarted && " " `CL8.isPrefixOf` l =
+                    (acc . dl [l], True)
+                | "module dependencies:" `CL8.isPrefixOf` l =
+                    (acc . dl [l], True)
+                | "addDependentFile \"" `CL8.isPrefixOf` l =
+                    (acc . dl [l], False)
+                | otherwise = (acc, False)
+         in fst (foldl' isLineInteresting (dl [], False) dumpHI) []
+
 
 -- | Try to resolve the list of base names in the given directory by
 -- looking for unique instances of base names applied with the given

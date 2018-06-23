@@ -127,8 +127,15 @@ print_bindist_notice() {
 
 # Adds a 'sudo' prefix if sudo is available to execute the given command
 # If not, the given command is run as is
+# When requesting root permission, always show the command and never re-use cached credentials.
 sudocmd() {
-  $(command -v sudo) "$@"
+  if command -v sudo >/dev/null; then
+    echo "sudo $@"
+    # -k: Disable cached credentials.
+    sudo -k "$@"
+  else
+    "$@"
+  fi
 }
 
 # Install dependencies for distros that use Apt
