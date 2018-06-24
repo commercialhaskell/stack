@@ -175,6 +175,7 @@ library:
   - Stack.Constants
   - Stack.Constants.Config
   - Stack.Coverage
+  - Stack.DefaultColorWhen
   - Stack.Docker
   - Stack.Docker.GlobalDB
   - Stack.Dot

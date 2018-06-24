@@ -30,3 +30,6 @@ extra-deps:
 - resourcet-1.1.11@rev:0
 - conduit-1.2.13@rev:0
 - conduit-extra-1.2.3.2@rev:0
+
+# Not present until resolver lts-11.9
+- ansi-terminal-0.8.0.4

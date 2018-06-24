@@ -38,7 +38,10 @@ globalOptsParser currentDir kind defLogLevel =
         (long "color" <>
          metavar "WHEN" <>
          completeWith ["always", "never", "auto"] <>
-         help "Specify when to use color in output; WHEN is 'always', 'never', or 'auto'" <>
+         help "Specify when to use color in output; WHEN is 'always', 'never', \
+              \or 'auto'. On Windows versions before Windows 10, for terminals \
+              \that do not support color codes, the default is 'never'; color \
+              \may work on terminals that support color codes" <>
          hide)) <*>
     optionalFirst (option auto
         (long "terminal-width" <>
@@ -58,8 +61,8 @@ globalOptsParser currentDir kind defLogLevel =
     hide0 = kind /= OuterGlobalOpts
 
 -- | Create GlobalOpts from GlobalOptsMonoid.
-globalOptsFromMonoid :: Bool -> GlobalOptsMonoid -> GlobalOpts
-globalOptsFromMonoid defaultTerminal GlobalOptsMonoid{..} = GlobalOpts
+globalOptsFromMonoid :: Bool -> ColorWhen -> GlobalOptsMonoid -> GlobalOpts
+globalOptsFromMonoid defaultTerminal defaultColorWhen GlobalOptsMonoid{..} = GlobalOpts
     { globalReExecVersion = getFirst globalMonoidReExecVersion
     , globalDockerEntrypoint = getFirst globalMonoidDockerEntrypoint
     , globalLogLevel = fromFirst defaultLogLevel globalMonoidLogLevel
@@ -68,7 +71,7 @@ globalOptsFromMonoid defaultTerminal GlobalOptsMonoid{..} = GlobalOpts
     , globalResolver = getFirst globalMonoidResolver
     , globalCompiler = getFirst globalMonoidCompiler
     , globalTerminal = fromFirst defaultTerminal globalMonoidTerminal
-    , globalColorWhen = fromFirst ColorAuto globalMonoidColorWhen
+    , globalColorWhen = fromFirst defaultColorWhen globalMonoidColorWhen
     , globalTermWidth = getFirst globalMonoidTermWidth
     , globalStackYaml = maybe SYLDefault SYLOverride $ getFirst globalMonoidStackYaml }
 
