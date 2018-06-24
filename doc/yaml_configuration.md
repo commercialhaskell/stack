@@ -787,6 +787,9 @@ build:
   reconfigure: false
   cabal-verbose: false
   split-objs: false
+
+  # Since 1.8
+  interleaved-output: false
 ```
 
 The meanings of these settings correspond directly with the CLI flags of the

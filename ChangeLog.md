@@ -11,6 +11,9 @@ Behavior changes:
 
 * `ghc-options` from `stack.yaml` are now appended to `ghc-options` from
   `config.yaml`, whereas before they would be replaced.
+* `stack build` will now announce when sublibraries of a package are being
+  build, in the same way executables, tests, benchmarks and libraries are
+  announced
 
 Other enhancements:
 
@@ -25,9 +28,16 @@ Other enhancements:
   [#4068](https://github.com/commercialhaskell/stack/pull/4068).
 * Added new `--tar-dir` option to `stack sdist`, that allows to copy
   the resulting tarball to the specified directory.
-* `stack new` now allows template names of the form `username/foo` to download
-  from a user other than `commercialstack` on Github, and can be prefixed with
-  the service `github:`, `gitlab:`, or `bitbucket:`.
+* Introduced the `--interleaved-output` command line option and
+  `build.interleaved-output` config value which causes multiple concurrent
+  builds to dump to stderr at the same time with a `packagename> ` prefix. See
+  [#3225](https://github.com/commercialhaskell/stack/issues/3225).
+* The default retry strategy has changed to exponential backoff.
+  This should help with
+  [#3510](https://github.com/commercialhaskell/stack/issues/3510).
+* [#4039] `stack new` now allows template names of the form `username/foo` to
+  download from a user other than `commercialstack` on Github, and can be prefixed
+  with the service `github:`, `gitlab:`, or `bitbucket:`.
 
 Bug fixes:
 
@@ -60,6 +70,19 @@ Bug fixes:
   displays. Also fixes a similar issue with ghci target selection prompt.
 * If `cabal` is not on PATH, running `stack solver` now prompts the user
   to run `stack install cabal-install`
+* `stack build` now succeeds in building packages which contain sublibraries
+  which are dependencies of executables, tests or benchmarks but not of the
+  main library. See
+  [#3787](https://github.com/commercialhaskell/stack/issues/3959).
+* Sublibraries are now properly considered for coverage reports when the test
+  suite depends on the internal library. Before, stack was erroring when
+  trying to generate the coverage report, see
+  [#4105](https://github.com/commercialhaskell/stack/issues/4105).
+* Sublibraries are now added to the precompiled cache and recovered from there
+  when the snapshot gets updated. Previously, updating the snapshot when there
+  was a package with a sublibrary in the snapshot resulted in broken builds.
+  This is now fixed, see
+  [#4071](https://github.com/commercialhaskell/stack/issues/4071).
 
 
 ## v1.7.1

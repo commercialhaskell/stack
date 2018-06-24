@@ -194,3 +194,9 @@ end up in a log file instead of on the console unless it contains errors or
 warnings, to avoid problems of interleaved output and decrease console noise.
 If you would like to see this content instead, you can use the `--dump-logs`
 command line option, or add `dump-logs: all` to your `stack.yaml` file.
+
+Alternatively, starting with Stack 1.8, you can pass `--interleaved-output` to
+see output of all packages being built scroll by in a streaming fashion. The
+output from each package built will be prefixed by the package name, e.g. `mtl>
+Building ...`. Note that, unlike the default output, this will include the
+output from dependencies being built, not just targets.

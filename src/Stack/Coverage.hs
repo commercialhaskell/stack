@@ -1,4 +1,4 @@
-{-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE NoImplicitPrelude     #-}
 {-# LANGUAGE ConstraintKinds       #-}
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
@@ -7,6 +7,8 @@
 {-# LANGUAGE TemplateHaskell       #-}
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE LambdaCase            #-}
+{-# LANGUAGE TupleSections         #-}
+
 -- | Generate HPC (Haskell Program Coverage) reports
 module Stack.Coverage
     ( deleteHpcReports
@@ -23,6 +25,7 @@ import qualified Data.ByteString.Char8 as S8
 import qualified Data.ByteString.Lazy as BL
 import           Data.List
 import qualified Data.Map.Strict as Map
+import qualified Data.Set as Set
 import qualified Data.Text as T
 import qualified Data.Text.IO as T
 import qualified Data.Text.Lazy as LT
@@ -106,23 +109,24 @@ generateHpcReport pkgDir package tests = do
           case packageLibraries package of
             NoLibraries -> False
             HasLibraries _ -> True
+        internalLibs = packageInternalLibraries package
     eincludeName <-
         -- Pre-7.8 uses plain PKG-version in tix files.
-        if ghcVersion < $(mkVersion "7.10") then return $ Right $ Just pkgId
+        if ghcVersion < $(mkVersion "7.10") then return $ Right $ Just [pkgId]
         -- We don't expect to find a package key if there is no library.
-        else if not hasLibrary then return $ Right Nothing
+        else if not hasLibrary && Set.null internalLibs then return $ Right Nothing
         -- Look in the inplace DB for the package key.
         -- See https://github.com/commercialhaskell/stack/issues/1181#issuecomment-148968986
         else do
             -- GHC 8.0 uses package id instead of package key.
             -- See https://github.com/commercialhaskell/stack/issues/2424
             let hpcNameField = if ghcVersion >= $(mkVersion "8.0") then "id" else "key"
-            eincludeName <- findPackageFieldForBuiltPackage pkgDir (packageIdentifier package) hpcNameField
+            eincludeName <- findPackageFieldForBuiltPackage pkgDir (packageIdentifier package) internalLibs hpcNameField
             case eincludeName of
                 Left err -> do
                     logError $ RIO.display err
                     return $ Left err
-                Right includeName -> return $ Right $ Just $ T.unpack includeName
+                Right includeNames -> return $ Right $ Just $ map T.unpack includeNames
     forM_ tests $ \testName -> do
         tixSrc <- tixFilePath (packageName package) (T.unpack testName)
         let report = "coverage report for " <> pkgName <> "'s test-suite \"" <> testName <> "\""
@@ -133,7 +137,7 @@ generateHpcReport pkgDir package tests = do
             -- #634 - this will likely be customizable in the future)
             Right mincludeName -> do
                 let extraArgs = case mincludeName of
-                        Just includeName -> ["--include", includeName ++ ":"]
+                        Just includeNames -> "--include" : intersperse "--include" (map (\n -> n ++ ":") includeNames)
                         Nothing -> []
                 mreportPath <- generateHpcReportInternal tixSrc reportDir report extraArgs extraArgs
                 forM_ mreportPath (displayReportPath report . display)
@@ -425,9 +429,9 @@ dirnameString = dropWhileEnd isPathSeparator . toFilePath . dirname
 
 findPackageFieldForBuiltPackage
     :: HasEnvConfig env
-    => Path Abs Dir -> PackageIdentifier -> Text
-    -> RIO env (Either Text Text)
-findPackageFieldForBuiltPackage pkgDir pkgId field = do
+    => Path Abs Dir -> PackageIdentifier -> Set.Set Text -> Text
+    -> RIO env (Either Text [Text])
+findPackageFieldForBuiltPackage pkgDir pkgId internalLibs field = do
     distDir <- distDirFromDir pkgDir
     let inplaceDir = distDir </> $(mkRelDir "package.conf.inplace")
         pkgIdStr = packageIdentifierString pkgId
@@ -440,20 +444,42 @@ findPackageFieldForBuiltPackage pkgDir pkgId field = do
     cabalVer <- view cabalVersionL
     if cabalVer < $(mkVersion "1.24")
         then do
+            -- here we don't need to handle internal libs
             path <- liftM (inplaceDir </>) $ parseRelFile (pkgIdStr ++ "-inplace.conf")
             logDebug $ "Parsing config in Cabal < 1.24 location: " <> fromString (toFilePath path)
             exists <- doesFileExist path
-            if exists then extractField path else notFoundErr
+            if exists then fmap (:[]) <$> extractField path else notFoundErr
         else do
             -- With Cabal-1.24, it's in a different location.
             logDebug $ "Scanning " <> fromString (toFilePath inplaceDir) <> " for files matching " <> fromString pkgIdStr
             (_, files) <- handleIO (const $ return ([], [])) $ listDir inplaceDir
             logDebug $ displayShow files
-            case mapMaybe (\file -> fmap (const file) . (T.stripSuffix ".conf" <=< T.stripPrefix (T.pack (pkgIdStr ++ "-")))
-                          . T.pack . toFilePath . filename $ file) files of
+            -- From all the files obtained from the scanning process above, we
+            -- need to identify which are .conf files and then ensure that
+            -- there is at most one .conf file for each library and internal
+            -- library (some might be missing if that component has not been
+            -- built yet). We should error if there are more than one .conf
+            -- file for a component or if there are no .conf files at all in
+            -- the searched location.
+            let toFilename = T.pack . toFilePath . filename
+                -- strip known prefix and suffix from the found files to determine only the conf files
+                stripKnown =  T.stripSuffix ".conf" <=< T.stripPrefix (T.pack (pkgIdStr ++ "-"))
+                stripped = mapMaybe (\file -> fmap (,file) . stripKnown . toFilename $ file) files
+                -- which component could have generated each of these conf files
+                stripHash n = let z = T.dropWhile (/= '-') n in if T.null z then "" else T.tail z
+                matchedComponents = map (\(n, f) -> (stripHash n, [f])) stripped
+                byComponents = Map.restrictKeys (Map.fromListWith (++) matchedComponents) $ Set.insert "" internalLibs
+            logDebug $ displayShow byComponents
+            if Map.null $ Map.filter (\fs -> length fs > 1) byComponents
+            then case concat $ Map.elems byComponents of
                 [] -> notFoundErr
-                [path] -> extractField path
-                _ -> return $ Left $ "Multiple files matching " <> T.pack (pkgIdStr ++ "-*.conf") <> " found in " <>
+                -- for each of these files, we need to extract the requested field
+                paths -> do
+                  (errors, keys) <-  partitionEithers <$> traverse extractField paths
+                  case errors of
+                    (a:_) -> return $ Left a -- the first error only, since they're repeated anyway
+                    [] -> return $ Right keys
+            else return $ Left $ "Multiple files matching " <> T.pack (pkgIdStr ++ "-*.conf") <> " found in " <>
                     T.pack (toFilePath inplaceDir) <> ". Maybe try 'stack clean' on this package?"
 
 displayReportPath :: (HasRunner env)

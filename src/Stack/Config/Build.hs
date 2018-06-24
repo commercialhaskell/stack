@@ -72,6 +72,9 @@ buildOptsFromMonoid BuildOptsMonoid{..} = BuildOpts
           (boptsSplitObjs defaultBuildOpts)
           buildMonoidSplitObjs
     , boptsSkipComponents = buildMonoidSkipComponents
+    , boptsInterleavedOutput = fromFirst
+          (boptsInterleavedOutput defaultBuildOpts)
+          buildMonoidInterleavedOutput
     }
   where
     -- These options are not directly used in bopts, instead they
