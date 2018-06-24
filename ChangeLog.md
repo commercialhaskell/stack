@@ -38,6 +38,9 @@ Other enhancements:
 * The default retry strategy has changed to exponential backoff.
   This should help with
   [#3510](https://github.com/commercialhaskell/stack/issues/3510).
+* [#4039] `stack new` now allows template names of the form `username/foo` to
+  download from a user other than `commercialstack` on Github, and can be prefixed
+  with the service `github:`, `gitlab:`, or `bitbucket:`.
 
 Bug fixes:
 
