@@ -88,6 +88,10 @@ Bug fixes:
   was a package with a sublibrary in the snapshot resulted in broken builds.
   This is now fixed, see
   [#4071](https://github.com/commercialhaskell/stack/issues/4071).
+* [#4114] Stack pretty prints error messages with proper `error` logging
+  level instead of `warning` now. This also fixes self-executing scripts
+  not piping plan construction errors from runhaskell to terminal (issue
+  #3942).
 
 
 ## v1.7.1
