@@ -28,6 +28,7 @@ import qualified Data.ByteString.Lazy as L
 import           Data.IORef.RunOnce (runOnce)
 import           Data.List
 import qualified Data.Map.Strict as Map
+import qualified Data.Set as Set
 import qualified Data.Text as T
 import           Data.Version (showVersion)
 import           RIO.Process
@@ -97,6 +98,7 @@ import           Stack.Solver (solveExtraDeps)
 import           Stack.Types.Version
 import           Stack.Types.Config
 import           Stack.Types.Compiler
+import           Stack.Types.NamedComponent
 import           Stack.Types.Nix
 import           Stack.Types.Runner
 import           Stack.Upgrade
@@ -369,6 +371,10 @@ commandLineHandler currentDir progName isInterpreter = complicatedOptions
                   "Execute a command"
                   execCmd
                   (execOptsParser Nothing)
+      addCommand' "run"
+                  "Build and run an executable. Defaults to the first available executable if none is provided as the first argument."
+                  execCmd
+                  (execOptsParser $ Just ExecRun)
       addGhciCommand' "ghci"
                       "Run ghci in the context of package(s) (experimental)"
                       ghciCmd
@@ -791,10 +797,6 @@ execCmd :: ExecOpts -> GlobalOpts -> IO ()
 execCmd ExecOpts {..} go@GlobalOpts{..} =
     case eoExtra of
         ExecOptsPlain -> do
-          (cmd, args) <- case (eoCmd, eoArgs) of
-                (ExecCmd cmd, args) -> return (cmd, args)
-                (ExecGhc, args) -> return ("ghc", args)
-                (ExecRunGhc, args) -> return ("runghc", args)
           loadConfigWithOpts go $ \lc ->
             withUserFileLock go (view stackRootL lc) $ \lk -> do
               let getCompilerVersion = loadCompilerVersion go lc
@@ -803,14 +805,17 @@ execCmd ExecOpts {..} go@GlobalOpts{..} =
                     (lcProjectRoot lc)
                     -- Unlock before transferring control away, whether using docker or not:
                     (Just $ munlockFile lk)
-                    (runRIO (lcConfig lc) $ do
+                    (withBuildConfigAndLock go $ \buildLock -> do
                         config <- view configL
                         menv <- liftIO $ configProcessContextSettings config plainEnvSettings
-                        withProcessContext menv $ Nix.reexecWithOptionalShell
-                            (lcProjectRoot lc)
-                            getCompilerVersion
-                            (runRIO (lcConfig lc) $
-                                exec cmd args))
+                        withProcessContext menv $ do
+                            (cmd, args) <- case (eoCmd, eoArgs) of
+                                (ExecCmd cmd, args) -> return (cmd, args)
+                                (ExecRun, args) -> getRunCmd args
+                                (ExecGhc, args) -> return ("ghc", args)
+                                (ExecRunGhc, args) -> return ("runghc", args)
+                            munlockFile buildLock
+                            Nix.reexecWithOptionalShell (lcProjectRoot lc) getCompilerVersion (runRIO (lcConfig lc) $ exec cmd args))
                     Nothing
                     Nothing -- Unlocked already above.
         ExecOptsEmbellished {..} ->
@@ -830,6 +835,7 @@ execCmd ExecOpts {..} go@GlobalOpts{..} =
                             else args ++ ["+RTS"] ++ eoRtsOptions ++ ["-RTS"]
                 (cmd, args) <- case (eoCmd, argsWithRts eoArgs) of
                     (ExecCmd cmd, args) -> return (cmd, args)
+                    (ExecRun, args) -> getRunCmd args
                     (ExecGhc, args) -> getGhcCmd "" eoPackages args
                     -- NOTE: this won't currently work for GHCJS, because it doesn't have
                     -- a runghcjs binary. It probably will someday, though.
@@ -851,6 +857,24 @@ execCmd ExecOpts {..} go@GlobalOpts{..} =
 
       getPkgOpts wc pkgs =
           map ("-package-id=" ++) <$> mapM (getPkgId wc) pkgs
+
+      getRunCmd args = do
+          pkgComponents <- liftM (map lpvComponents . Map.elems . lpProject) getLocalPackages
+          let executables = filter isCExe $ concatMap Set.toList pkgComponents
+          let (exe, args') = case args of
+                             []   -> (firstExe, args)
+                             x:xs -> case find (\y -> y == (CExe $ T.pack x)) executables of
+                                     Nothing -> (firstExe, args)
+                                     argExe -> (argExe, xs)
+                             where
+                                firstExe = listToMaybe executables
+          case exe of
+              Just (CExe exe') -> do
+                Stack.Build.build (const (return ())) Nothing defaultBuildOptsCLI{boptsCLITargets = [T.cons ':' exe']}
+                return (T.unpack exe', args')
+              _                -> do
+                  logError "No executables found."
+                  liftIO exitFailure
 
       getGhcCmd prefix pkgs args = do
           wc <- view $ actualCompilerVersionL.whichCompilerL

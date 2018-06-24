@@ -22,6 +22,7 @@ execOptsParser mcmd =
         txt = case mcmd of
             Nothing -> normalTxt
             Just ExecCmd{} -> normalTxt
+            Just ExecRun -> "-- ARGS (e.g. stack run -- file.txt)"
             Just ExecGhc -> "-- ARGS (e.g. stack runghc -- X.hs -o x)"
             Just ExecRunGhc -> "-- ARGS (e.g. stack runghc -- X.hs)"
         normalTxt = "-- ARGS (e.g. stack exec -- ghc-pkg describe base)"
