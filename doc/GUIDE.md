@@ -1580,7 +1580,7 @@ Selected resolver: lts-3.2
 Wrote project config to: /home/michael/my-yesod-project/stack.yaml
 ```
 
-The default `stack-templates` repository is on [Github](https://github.com),
+The default `stack-templates` repository is on [Github](https://github.com/commercialhaskell/stack-templates),
 under the user account `commercialstack`. You can download templates from a
 different Github user by prefixing the username and a slash:
 
@@ -1588,12 +1588,18 @@ different Github user by prefixing the username and a slash:
 stack new my-yesod-project yesodweb/yesod-simple
 ```
 
+Then it would be downloaded from Github, user account `yesodweb`,
+repo `stack-templates`, and file `yesod-simple.hsfiles`.
+
 You can even download templates from a service other that Github, such as
 [Gitlab](https://gitlab.com) or [Bitbucket](https://bitbucket.com):
 
 ```
 stack new my-project gitlab:user29/foo
 ```
+
+That template would be downloaded from Gitlab, user account `user29`,
+repo `stack-templates`, and file `foo.hsfiles`.
 
 If you need more flexibility, you can specify the full URL of the template:
 
