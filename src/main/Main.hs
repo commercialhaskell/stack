@@ -776,8 +776,8 @@ sdistCmd sdistOpts go =
             tarPath <- (distDir </>) <$> parseRelFile tarName
             ensureDir (parent tarPath)
             liftIO $ L.writeFile (toFilePath tarPath) tarBytes
-            checkSDistTarball sdistOpts tarPath
             prettyInfoL [flow "Wrote sdist tarball to", display tarPath]
+            checkSDistTarball sdistOpts tarPath
             forM_ (sdoptsTarPath sdistOpts) $ copyTarToTarPath tarPath tarName
             when (sdoptsSign sdistOpts) (void $ Sig.sign (sdoptsSignServerUrl sdistOpts) tarPath)
         where
