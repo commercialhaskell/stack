@@ -65,8 +65,7 @@ import qualified Distribution.Text
 import           Distribution.Version (simplifyVersionRange, mkVersion')
 import           GHC.Conc (getNumProcessors)
 import           Lens.Micro (lens, set)
-import           Network.HTTP.StackClient (httpJSON, parseUrlThrow)
-import           Network.HTTP.Simple (getResponseBody)
+import           Network.HTTP.StackClient (httpJSON, parseUrlThrow, getResponseBody)
 import           Options.Applicative (Parser, strOption, long, help)
 import           Path
 import           Path.Extra (toFilePathNoTrailingSep)

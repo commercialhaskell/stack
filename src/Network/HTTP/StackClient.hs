@@ -13,8 +13,14 @@ module Network.HTTP.StackClient
   , setUserAgent
   , withResponse
   , withResponseByManager
+  , setRequestMethod
   , setRequestHeader
+  , addRequestHeader
+  , setRequestBody
+  , setRequestManager
   , getResponseHeaders
+  , getResponseBody
+  , getResponseStatusCode
   , parseRequest
   , getUri
   , path
@@ -35,7 +41,7 @@ import           Data.Conduit (ConduitM, transPipe)
 import           Data.Void (Void)
 import qualified Network.HTTP.Client
 import           Network.HTTP.Client (BodyReader, Manager, Request, Response, Manager, parseRequest, getUri, path, checkResponse, parseUrlThrow)
-import           Network.HTTP.Simple (setRequestHeader, HttpException, getResponseHeaders)
+import           Network.HTTP.Simple (setRequestMethod, setRequestBody, setRequestHeader, addRequestHeader, setRequestManager, HttpException, getResponseBody, getResponseStatusCode, getResponseHeaders)
 import           Network.HTTP.Conduit (requestHeaders)
 import           Network.HTTP.Client.TLS (getGlobalManager)
 import qualified Network.HTTP.Simple

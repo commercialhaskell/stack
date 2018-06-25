@@ -26,8 +26,7 @@ import qualified Data.Conduit.Binary                   as CB
 import qualified Data.Text                             as T
 import           Data.Text.Encoding                    (encodeUtf8)
 import           Network.HTTP.Client                   (RequestBody(RequestBodyLBS))
-import           Network.HTTP.StackClient              (Request, Response, withResponse, httpNoBody, getGlobalManager)
-import           Network.HTTP.Simple                   (getResponseStatusCode,
+import           Network.HTTP.StackClient              (Request, Response, withResponse, httpNoBody, getGlobalManager, getResponseStatusCode,
                                                         getResponseBody,
                                                         setRequestHeader,
                                                         parseRequest)

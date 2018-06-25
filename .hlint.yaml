@@ -51,7 +51,14 @@
 - error: {lhs: "Network.HTTP.Simple.httpSink", rhs: "Network.HTTP.StackClient.httpSink"}
 - error: {lhs: "Network.HTTP.Simple.httpNoBody", rhs: "Network.HTTP.StackClient.httpNoBody"}
 - error: {lhs: "Network.HTTP.Simple.withResponse", rhs: "Network.HTTP.StackClient.withResponse"}
+- error: {lhs: "Network.HTTP.Simple.setRequestMethod", rhs: "Network.HTTP.StackClient.getRequestMethod"}
+- error: {lhs: "Network.HTTP.Simple.setRequestBody", rhs: "Network.HTTP.StackClient.getRequestBody"}
+- error: {lhs: "Network.HTTP.Simple.setRequestHeader", rhs: "Network.HTTP.StackClient.setRequestHeader"}
+- error: {lhs: "Network.HTTP.Simple.addRequestHeader", rhs: "Network.HTTP.StackClient.addRequestHeader"}
+- error: {lhs: "Network.HTTP.Simple.setRequestManager", rhs: "Network.HTTP.StackClient.setRequestManager"}
 - error: {lhs: "Network.HTTP.Simple.getResponseHeaders", rhs: "Network.HTTP.StackClient.getResponseHeaders"}
+- error: {lhs: "Network.HTTP.Simple.getResponseBody", rhs: "Network.HTTP.StackClient.getResponseBody"}
+- error: {lhs: "Network.HTTP.Simple.getResponseStatusCode", rhs: "Network.HTTP.StackClient.getResponseStatusCode"}
 - error: {lhs: "Network.HTTP.Client.withResponse", rhs: "Network.HTTP.StackClient.withResponseByManager"}
 - error: {lhs: "Network.HTTP.Client.parseRequest", rhs: "Network.HTTP.StackClient.parseRequest"}
 - error: {lhs: "Network.HTTP.Client.getUri", rhs: "Network.HTTP.StackClient.getUri"}
