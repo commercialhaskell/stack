@@ -32,6 +32,10 @@ module Network.HTTP.StackClient
   , Response
   , Manager
   , HttpException
+  , hAccept
+  , hContentLength
+  , hContentMD5
+  , methodPut
   ) where
 
 import           Data.Aeson (FromJSON)
@@ -42,6 +46,7 @@ import           Data.Void (Void)
 import qualified Network.HTTP.Client
 import           Network.HTTP.Client (BodyReader, Manager, Request, Response, Manager, parseRequest, getUri, path, checkResponse, parseUrlThrow)
 import           Network.HTTP.Simple (setRequestMethod, setRequestBody, setRequestHeader, addRequestHeader, setRequestManager, HttpException, getResponseBody, getResponseStatusCode, getResponseHeaders)
+import           Network.HTTP.Types (hAccept, hContentLength, hContentMD5, methodPut)
 import           Network.HTTP.Conduit (requestHeaders)
 import           Network.HTTP.Client.TLS (getGlobalManager)
 import qualified Network.HTTP.Simple

@@ -25,8 +25,7 @@ import qualified Data.Text.IO as T
 import Data.Typeable (Typeable)
 import qualified Data.Vector as V
 import Network.HTTP.StackClient (httpJSON, getGlobalManager, addRequestHeader, getResponseBody, parseRequest,
-        setRequestManager)
-import Network.HTTP.Types.Header (hAccept)
+        setRequestManager, hAccept)
 import qualified Options.Applicative as OA
 import Options.Applicative ((<|>))
 import Path

@@ -70,6 +70,10 @@
 - error: {lhs: "Network.HTTP.Types.Request", rhs: "Network.HTTP.StackClient.Request"}
 - error: {lhs: "Network.HTTP.Types.Response", rhs: "Network.HTTP.StackClient.Response"}
 - error: {lhs: "Network.HTTP.Types.Manager", rhs: "Network.HTTP.StackClient.Manager"}
+- error: {lhs: "Network.HTTP.Types.hAccept", rhs: "Network.HTTP.StackClient.hAccept"}
+- error: {lhs: "Network.HTTP.Types.hContentLength", rhs: "Network.HTTP.StackClient.hContentLength"}
+- error: {lhs: "Network.HTTP.Types.hContentMD5", rhs: "Network.HTTP.StackClient.hContentMD5"}
+- error: {lhs: "Network.HTTP.Types.methodPut", rhs: "Network.HTTP.StackClient.methodPut"}
 - error: {lhs: "Network.HTTP.Simple.HttpException", rhs: "Network.HTTP.StackClient.HttpException"}
 - ignore: {name: "Use alternative", within: "Network.HTTP.StackClient"}
 - ignore: {name: "Use withResponseByManager", within: "Network.HTTP.StackClient"}
