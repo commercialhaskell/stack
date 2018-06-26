@@ -14,6 +14,12 @@ Behavior changes:
 * `stack build` will now announce when sublibraries of a package are being
   build, in the same way executables, tests, benchmarks and libraries are
   announced
+* The `--upgrade-cabal` option to `stack setup` has been
+  deprecated. This feature no longer works with GHC 8.2 and
+  later. Furthermore, the reason for this flag originally being
+  implemented was drastically lessened once Stack started using the
+  snapshot's `Cabal` library for custom setups. See:
+  [#4070](https://github.com/commercialhaskell/stack/issues/4070).
 
 Other enhancements:
 

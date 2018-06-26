@@ -684,7 +684,8 @@ upgradeCabal :: (HasConfig env, HasGHCVariant env)
              -> UpgradeTo
              -> RIO env ()
 upgradeCabal wc upgradeTo = do
-    logInfo "Manipulating the global Cabal is only for debugging purposes"
+    logWarn "Using deprecated --upgrade-cabal feature, this is not recommended"
+    logWarn "Manipulating the global Cabal is only for debugging purposes"
     let name = $(mkPackageName "Cabal")
     rmap <- resolvePackages Nothing mempty (Set.singleton name)
     installed <- getCabalPkgVer wc
@@ -717,6 +718,10 @@ doCabalInstall :: (HasConfig env, HasGHCVariant env)
                -> Version
                -> RIO env ()
 doCabalInstall wc installed wantedVersion = do
+    when (wantedVersion >= $(mkVersion "2.2")) $ do
+        logWarn "--upgrade-cabal will almost certainly fail for Cabal 2.2 or later"
+        logWarn "See: https://github.com/commercialhaskell/stack/issues/4070"
+        logWarn "Valiantly attempting to build it anyway, but I know this is doomed"
     withSystemTempDir "stack-cabal-upgrade" $ \tmpdir -> do
         logInfo $
             "Installing Cabal-" <>
