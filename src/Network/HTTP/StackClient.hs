@@ -21,21 +21,46 @@ module Network.HTTP.StackClient
   , getResponseHeaders
   , getResponseBody
   , getResponseStatusCode
+  , Network.HTTP.Client.responseHeaders
+  , Network.HTTP.Client.responseStatus
+  , Network.HTTP.Client.responseBody
   , parseRequest
+  , parseRequest_
+  , defaultRequest
+  , setUri
   , getUri
   , path
   , checkResponse
   , parseUrlThrow
   , requestHeaders
   , getGlobalManager
+  , applyDigestAuth
+  , displayDigestAuthException
   , Request
+  , RequestBody(RequestBodyBS, RequestBodyLBS)
   , Response
   , Manager
-  , HttpException
+  , Header
+  , HeaderName
+  , HttpException(HttpExceptionRequest)
+  , HttpExceptionContent(StatusCodeException)
   , hAccept
   , hContentLength
   , hContentMD5
+  , hCacheControl
+  , hRange
   , methodPut
+  , ok200
+  , partialContent206
+  , Proxy
+  , useProxy
+  , noProxy
+  , proxyEnvironment
+  , managerSetProxy
+  , formDataBody
+  , partFileRequestBody
+  , partBS
+  , partLBS
   ) where
 
 import           Data.Aeson (FromJSON)
@@ -44,12 +69,14 @@ import           Data.ByteString.Lazy (ByteString)
 import           Data.Conduit (ConduitM, transPipe)
 import           Data.Void (Void)
 import qualified Network.HTTP.Client
-import           Network.HTTP.Client (BodyReader, Manager, Request, Response, Manager, parseRequest, getUri, path, checkResponse, parseUrlThrow)
-import           Network.HTTP.Simple (setRequestMethod, setRequestBody, setRequestHeader, addRequestHeader, setRequestManager, HttpException, getResponseBody, getResponseStatusCode, getResponseHeaders)
-import           Network.HTTP.Types (hAccept, hContentLength, hContentMD5, methodPut)
+import           Network.HTTP.Client (BodyReader, Manager, Request, RequestBody(..), Response, Manager, HttpExceptionContent(..), parseRequest, parseRequest_, defaultRequest, getUri, path, checkResponse, parseUrlThrow, responseStatus, responseBody, useProxy, noProxy, proxyEnvironment, managerSetProxy, Proxy)
+import           Network.HTTP.Client.Internal (setUri)
+import           Network.HTTP.Simple (setRequestMethod, setRequestBody, setRequestHeader, addRequestHeader, setRequestManager, HttpException(..), getResponseBody, getResponseStatusCode, getResponseHeaders)
+import           Network.HTTP.Types (hAccept, hContentLength, hContentMD5, hCacheControl, hRange, methodPut, Header, HeaderName, ok200, partialContent206)
 import           Network.HTTP.Conduit (requestHeaders)
-import           Network.HTTP.Client.TLS (getGlobalManager)
+import           Network.HTTP.Client.TLS (getGlobalManager, applyDigestAuth, displayDigestAuthException)
 import qualified Network.HTTP.Simple
+import           Network.HTTP.Client.MultipartFormData (formDataBody, partFileRequestBody, partBS, partLBS)
 import           UnliftIO (MonadIO, MonadUnliftIO, withRunInIO, withUnliftIO, unliftIO)
 
 
