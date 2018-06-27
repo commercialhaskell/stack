@@ -13,7 +13,7 @@ import           Data.Aeson.Types (typeMismatch)
 import qualified Data.Text as T
 import           Data.Yaml (Value(Object), (.:?))
 import           Language.Haskell.TH
-import           Network.HTTP.Client (parseRequest)
+import           Network.HTTP.StackClient (parseRequest)
 import qualified Options.Applicative as O
 import           Path
 import           Path.Internal

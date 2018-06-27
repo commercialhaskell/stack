@@ -64,7 +64,7 @@ import              Distribution.System (OS, Arch (..), Platform (..))
 import qualified    Distribution.System as Cabal
 import              Distribution.Text (simpleParse)
 import              Lens.Micro (set)
-import              Network.HTTP.Simple (getResponseBody, getResponseStatusCode)
+import              Network.HTTP.StackClient (getResponseBody, getResponseStatusCode)
 import              Network.HTTP.Download
 import              Path
 import              Path.CheckInstall (warnInstallSearchPathIssues)

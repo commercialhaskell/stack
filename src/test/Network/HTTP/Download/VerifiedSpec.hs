@@ -3,7 +3,7 @@ module Network.HTTP.Download.VerifiedSpec where
 
 import           Control.Retry                  (limitRetries)
 import           Crypto.Hash
-import           Network.HTTP.Client.Conduit
+import           Network.HTTP.StackClient
 import           Network.HTTP.Download.Verified
 import           Path
 import           Path.IO hiding (withSystemTempDir)
