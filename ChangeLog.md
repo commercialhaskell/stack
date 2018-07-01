@@ -14,6 +14,8 @@ Behavior changes:
 * `stack build` will now announce when sublibraries of a package are being
   build, in the same way executables, tests, benchmarks and libraries are
   announced
+* `stack sdist` will now announce the destination of the generated tarball,
+    regardless of whether or not it passed the sanity checks
 
 Other enhancements:
 
