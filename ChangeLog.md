@@ -16,6 +16,12 @@ Behavior changes:
   announced
 * `stack sdist` will now announce the destination of the generated tarball,
     regardless of whether or not it passed the sanity checks
+* The `--upgrade-cabal` option to `stack setup` has been
+  deprecated. This feature no longer works with GHC 8.2 and
+  later. Furthermore, the reason for this flag originally being
+  implemented was drastically lessened once Stack started using the
+  snapshot's `Cabal` library for custom setups. See:
+  [#4070](https://github.com/commercialhaskell/stack/issues/4070).
 
 Other enhancements:
 

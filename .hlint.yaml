@@ -45,12 +45,47 @@
 - ignore: {name: "Use display", within: "warnMultiple"}
 - ignore: {name: "Use display", within: "Stack.PrettyPrint"}
 
-- error: {lhs: "Network.HTTP.Simple.httpJSON", rhs: "Network.HTTP.StackClient.httpJSON"}
-- error: {lhs: "Network.HTTP.Simple.httpLbs", rhs: "Network.HTTP.StackClient.httpLbs"}
-- error: {lhs: "Network.HTTP.Simple.httpLBS", rhs: "Network.HTTP.StackClient.httpLBS"}
-- error: {lhs: "Network.HTTP.Simple.httpSink", rhs: "Network.HTTP.StackClient.httpSink"}
-- error: {lhs: "Network.HTTP.Simple.httpNoBody", rhs: "Network.HTTP.StackClient.httpNoBody"}
-- error: {lhs: "Network.HTTP.Simple.withResponse", rhs: "Network.HTTP.StackClient.withResponse"}
+- error: {lhs: "Network.HTTP.Client.MultipartFormData.formDataBody", rhs: "Network.HTTP.StackClient.formDataBody"}
+- error: {lhs: "Network.HTTP.Client.MultipartFormData.partBS", rhs: "Network.HTTP.StackClient.partBS"}
+- error: {lhs: "Network.HTTP.Client.MultipartFormData.partFileRequestBody", rhs: "Network.HTTP.StackClient.partFileRequestBody"}
+- error: {lhs: "Network.HTTP.Client.MultipartFormData.partLBS", rhs: "Network.HTTP.StackClient.partLBS"}
+- error: {lhs: "Network.HTTP.Client.Request.setUri", rhs: "Network.HTTP.StackClient.setUri"}
+- error: {lhs: "Network.HTTP.Client.TLS.applyDigestAuth", rhs: "Network.HTTP.StackClient.applyDigestAuth"}
+- error: {lhs: "Network.HTTP.Client.TLS.displayDigestAuthException", rhs: "Network.HTTP.StackClient.displayDigestAuthException"}
+- error: {lhs: "Network.HTTP.Client.TLS.getGlobalManager", rhs: "Network.HTTP.StackClient.getGlobalManager"}
+- error: {lhs: "Network.HTTP.Client.checkResponse", rhs: "Network.HTTP.StackClient.checkResponse"}
+- error: {lhs: "Network.HTTP.Client.getUri", rhs: "Network.HTTP.StackClient.getUri"}
+- error: {lhs: "Network.HTTP.Client.parseRequest", rhs: "Network.HTTP.StackClient.parseRequest"}
+- error: {lhs: "Network.HTTP.Client.parseRequest_", rhs: "Network.HTTP.StackClient.parseRequest_"}
+- error: {lhs: "Network.HTTP.Client.parseUrlThrow", rhs: "Network.HTTP.StackClient.parseUrlThrow"}
+- error: {lhs: "Network.HTTP.Client.path", rhs: "Network.HTTP.StackClient.path"}
+- error: {lhs: "Network.HTTP.Client.responseHeaders", rhs: "Network.HTTP.StackClient.responseHeaders"}
 - error: {lhs: "Network.HTTP.Client.withResponse", rhs: "Network.HTTP.StackClient.withResponseByManager"}
+- error: {lhs: "Network.HTTP.Conduit.requestHeaders", rhs: "Network.HTTP.StackClient.requestHeaders"}
+- error: {lhs: "Network.HTTP.Simple.HttpException", rhs: "Network.HTTP.StackClient.HttpException"}
+- error: {lhs: "Network.HTTP.Simple.addRequestHeader", rhs: "Network.HTTP.StackClient.addRequestHeader"}
+- error: {lhs: "Network.HTTP.Simple.getResponseBody", rhs: "Network.HTTP.StackClient.getResponseBody"}
+- error: {lhs: "Network.HTTP.Simple.getResponseHeaders", rhs: "Network.HTTP.StackClient.getResponseHeaders"}
+- error: {lhs: "Network.HTTP.Simple.getResponseStatusCode", rhs: "Network.HTTP.StackClient.getResponseStatusCode"}
+- error: {lhs: "Network.HTTP.Simple.httpJSON", rhs: "Network.HTTP.StackClient.httpJSON"}
+- error: {lhs: "Network.HTTP.Simple.httpLBS", rhs: "Network.HTTP.StackClient.httpLBS"}
+- error: {lhs: "Network.HTTP.Simple.httpLbs", rhs: "Network.HTTP.StackClient.httpLbs"}
+- error: {lhs: "Network.HTTP.Simple.httpNoBody", rhs: "Network.HTTP.StackClient.httpNoBody"}
+- error: {lhs: "Network.HTTP.Simple.httpSink", rhs: "Network.HTTP.StackClient.httpSink"}
+- error: {lhs: "Network.HTTP.Simple.setRequestBody", rhs: "Network.HTTP.StackClient.getRequestBody"}
+- error: {lhs: "Network.HTTP.Simple.setRequestHeader", rhs: "Network.HTTP.StackClient.setRequestHeader"}
+- error: {lhs: "Network.HTTP.Simple.setRequestManager", rhs: "Network.HTTP.StackClient.setRequestManager"}
+- error: {lhs: "Network.HTTP.Simple.setRequestMethod", rhs: "Network.HTTP.StackClient.getRequestMethod"}
+- error: {lhs: "Network.HTTP.Simple.withResponse", rhs: "Network.HTTP.StackClient.withResponse"}
+- error: {lhs: "Network.HTTP.Types.Header", rhs: "Network.HTTP.StackClient.Header"}
+- error: {lhs: "Network.HTTP.Types.HeaderName", rhs: "Network.HTTP.StackClient.HeaderName"}
+- error: {lhs: "Network.HTTP.Types.Manager", rhs: "Network.HTTP.StackClient.Manager"}
+- error: {lhs: "Network.HTTP.Types.Request", rhs: "Network.HTTP.StackClient.Request"}
+- error: {lhs: "Network.HTTP.Types.RequestBody", rhs: "Network.HTTP.StackClient.RequestBody"}
+- error: {lhs: "Network.HTTP.Types.Response", rhs: "Network.HTTP.StackClient.Response"}
+- error: {lhs: "Network.HTTP.Types.hAccept", rhs: "Network.HTTP.StackClient.hAccept"}
+- error: {lhs: "Network.HTTP.Types.hContentLength", rhs: "Network.HTTP.StackClient.hContentLength"}
+- error: {lhs: "Network.HTTP.Types.hContentMD5", rhs: "Network.HTTP.StackClient.hContentMD5"}
+- error: {lhs: "Network.HTTP.Types.methodPut", rhs: "Network.HTTP.StackClient.methodPut"}
 - ignore: {name: "Use alternative", within: "Network.HTTP.StackClient"}
 - ignore: {name: "Use withResponseByManager", within: "Network.HTTP.StackClient"}

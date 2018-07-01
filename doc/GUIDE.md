@@ -1787,10 +1787,6 @@ users. Here's a quick rundown:
 * `stack upgrade` will build a new version of stack from source.
     * `--git` is a convenient way to get the most recent version from master for
       those testing and living on the bleeding edge.
-* `stack setup --upgrade-cabal` can install a newer version of the Cabal
-  library, used for performing actual builds. You shouldn't generally do this,
-  since new Cabal versions may introduce incompatibilities with package sets,
-  but it can be useful if you're trying to test a specific bugfix.
 * `stack ls snapshots` will list all the local snapshots by
   default. You can also view the remote snapshots using `stack ls
   snapshots remote`. It also supports option for viewing only lts

@@ -25,17 +25,12 @@ import qualified Data.ByteString.Lazy                  as L
 import qualified Data.Conduit.Binary                   as CB
 import qualified Data.Text                             as T
 import           Data.Text.Encoding                    (encodeUtf8)
-import           Network.HTTP.Client                   (Response,
-                                                        RequestBody(RequestBodyLBS),
-                                                        Request)
-import           Network.HTTP.StackClient              (withResponse, httpNoBody)
-import           Network.HTTP.Simple                   (getResponseStatusCode,
+import           Network.HTTP.StackClient              (Request, RequestBody(RequestBodyLBS), Response, withResponse, httpNoBody, getGlobalManager, getResponseStatusCode,
                                                         getResponseBody,
                                                         setRequestHeader,
-                                                        parseRequest)
-import           Network.HTTP.Client.MultipartFormData (formDataBody, partFileRequestBody,
-                                                        partBS, partLBS)
-import           Network.HTTP.Client.TLS               (getGlobalManager,
+                                                        parseRequest,
+                                                        formDataBody, partFileRequestBody,
+                                                        partBS, partLBS,
                                                         applyDigestAuth,
                                                         displayDigestAuthException)
 import           Stack.Types.Config
