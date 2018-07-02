@@ -176,9 +176,14 @@ install:
   case "$BUILD" in
     stack)
       # Add in extra-deps for older snapshots, as necessary
-      stack --no-terminal --install-ghc $ARGS test --bench --dry-run || ( \
-        stack --no-terminal $ARGS build cabal-install && \
-        stack --no-terminal $ARGS solver --update-config)
+      #
+      # This is disabled by default, as relying on the solver like this can
+      # make builds unreliable. Instead, if you have this situation, it's
+      # recommended that you maintain multiple stack-lts-X.yaml files.
+
+      #stack --no-terminal --install-ghc $ARGS test --bench --dry-run || ( \
+      #  stack --no-terminal $ARGS build cabal-install && \
+      #  stack --no-terminal $ARGS solver --update-config)
 
       # Build the dependencies
       stack --no-terminal --install-ghc $ARGS test --bench --only-dependencies
