@@ -51,6 +51,7 @@ Other enhancements:
 * [#4039] `stack new` now allows template names of the form `username/foo` to
   download from a user other than `commercialstack` on Github, and can be prefixed
   with the service `github:`, `gitlab:`, or `bitbucket:`.
+* Switch to `githash` to include some unmerged bugfixes in `gitrev`
 
 Bug fixes:
 

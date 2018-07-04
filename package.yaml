@@ -298,7 +298,7 @@ executables:
     - condition: ! '!(flag(disable-git-info))'
       cpp-options: -DUSE_GIT_INFO
       dependencies:
-      - gitrev
+      - githash
       - optparse-simple
     - condition: flag(hide-dependency-versions)
       cpp-options: -DHIDE_DEP_VERSIONS
