@@ -6,12 +6,22 @@
 
 -- | Template name handling.
 
-module Stack.Types.TemplateName where
+module Stack.Types.TemplateName
+  ( TemplateName
+  , RepoTemplatePath (..)
+  , RepoService (..)
+  , TemplatePath (..)
+  , mkTemplateName
+  , templateName
+  , templatePath
+  , parseTemplateNameFromString
+  , parseRepoPathWithService
+  , templateNameArgument
+  , templateParamArgument
+  ) where
 
-import           Data.Aeson.Extended (FromJSON, withText, parseJSON)
-import           Data.Aeson.Types (typeMismatch)
+import           Data.Aeson (FromJSON (..), withText)
 import qualified Data.Text as T
-import           Data.Yaml (Value(Object), (.:?))
 import           Language.Haskell.TH
 import           Network.HTTP.StackClient (parseRequest)
 import qualified Options.Applicative as O
@@ -48,15 +58,6 @@ data RepoService = Github | Gitlab | Bitbucket
 instance FromJSON TemplateName where
     parseJSON = withText "TemplateName" $
         either fail return . parseTemplateNameFromString . T.unpack
-
-data TemplateInfo = TemplateInfo
-  { author      :: Maybe Text
-  , description :: Maybe Text }
-  deriving (Eq, Ord, Show)
-
-instance FromJSON TemplateInfo where
-  parseJSON (Object v) = TemplateInfo <$> v .:? "author" <*> v .:? "description"
-  parseJSON invalid = typeMismatch "Template Info" invalid
 
 -- | An argument which accepts a template name of the format
 -- @foo.hsfiles@ or @foo@, ultimately normalized to @foo@.

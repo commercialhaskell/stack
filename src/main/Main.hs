@@ -982,7 +982,7 @@ newCmd (newOpts,initOpts) go@GlobalOpts{..} =
 
 -- | List the available templates.
 templatesCmd :: () -> GlobalOpts -> IO ()
-templatesCmd _ go@GlobalOpts{..} = withConfigAndLock go listTemplates
+templatesCmd _ go@GlobalOpts{..} = withConfigAndLock go templatesHelp
 
 -- | Fix up extra-deps for a project
 solverCmd :: Bool -- ^ modify stack.yaml automatically?

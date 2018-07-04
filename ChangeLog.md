@@ -22,6 +22,12 @@ Behavior changes:
   implemented was drastically lessened once Stack started using the
   snapshot's `Cabal` library for custom setups. See:
   [#4070](https://github.com/commercialhaskell/stack/issues/4070).
+* With the new namespaced template feature, `stack templates` is no
+  longer able to meaningfully display a list of all templates
+  available. Instead, the command will download and display a
+  [help file](https://github.com/commercialhaskell/stack-templates/blob/master/STACK_HELP.md)
+  with more information on how to discover templates. See:
+  [#4039](https://github.com/commercialhaskell/stack/issues/4039)
 
 Other enhancements:
 
@@ -48,7 +54,8 @@ Other enhancements:
 * The default retry strategy has changed to exponential backoff.
   This should help with
   [#3510](https://github.com/commercialhaskell/stack/issues/3510).
-* [#4039] `stack new` now allows template names of the form `username/foo` to
+* [#4039](https://github.com/commercialhaskell/stack/issues/4039)
+  `stack new` now allows template names of the form `username/foo` to
   download from a user other than `commercialstack` on Github, and can be prefixed
   with the service `github:`, `gitlab:`, or `bitbucket:`.
 
