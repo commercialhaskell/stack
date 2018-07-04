@@ -1548,24 +1548,37 @@ multiple templates to start a new project from:
 
 ```
 michael@d30748af6d3d:~$ stack templates
-chrisdone
-hakyll-template
-new-template
-simple
-yesod-minimal
-yesod-mongo
-yesod-mysql
-yesod-postgres
-yesod-postgres-fay
-yesod-simple
-yesod-sqlite
+# Stack Templates
+
+The `stack new` command will create a new project based on a project template.
+Templates can be located on the local filesystem, on Github, or arbitrary URLs.
+For more information, please see the user guide:
+
+https://docs.haskellstack.org/en/stable/GUIDE/#templates
+
+There are many templates available, some simple examples:
+
+    stack new myproj # uses the default template
+    stack new myproj2 rio # uses the rio template
+    stack new website yesodweb/sqlite # Yesod server with SQLite DB
+
+For more information and other templates, please see the `stack-templates`
+Wiki:
+
+https://github.com/commercialhaskell/stack-templates/wiki
+
+Please feel free to add your own templates to the Wiki for discoverability.
+
+Want to improve this text? Send us a PR!
+
+https://github.com/commercialhaskell/stack-templates/edit/master/STACK_HELP.md
 ```
 
 You can specify one of these templates following your project name
 in the `stack new` command:
 
 ```
-michael@d30748af6d3d:~$ stack new my-yesod-project yesod-simple
+michael@d30748af6d3d:~$ stack new my-yesod-project yesodweb/simple
 Downloading template "yesod-simple" to create project "my-yesod-project" in my-yesod-project/ ...
 Using the following authorship configuration:
 author-email: example@example.com
@@ -1585,7 +1598,7 @@ under the user account `commercialstack`. You can download templates from a
 different Github user by prefixing the username and a slash:
 
 ```
-stack new my-yesod-project yesodweb/yesod-simple
+stack new my-yesod-project yesodweb/simple
 ```
 
 Then it would be downloaded from Github, user account `yesodweb`,
