@@ -39,7 +39,6 @@ import           Data.Yaml (decodeFileEither, ParseException (AesonException))
 import           Distribution.InstalledPackageInfo (PError)
 import           Distribution.PackageDescription (GenericPackageDescription)
 import qualified Distribution.PackageDescription as C
-import qualified Distribution.Types.UnqualComponentName as C
 import           Distribution.System (Platform)
 import           Distribution.Text (display)
 import qualified Distribution.Version as C
@@ -579,8 +578,6 @@ fromGlobalHints =
       , lpiFlags = Map.empty
       , lpiGhcOptions = []
       , lpiPackageDeps = Map.empty
-      , lpiProvidedExes = Set.empty
-      , lpiNeededExes = Map.empty
       , lpiExposedModules = Set.empty
       , lpiHide = False
       }
@@ -654,8 +651,6 @@ loadCompiler cv = do
                 , lpiFlags = Map.empty
                 , lpiGhcOptions = []
                 , lpiPackageDeps = Map.unions $ map goDep $ dpDepends dp
-                , lpiProvidedExes = Set.empty
-                , lpiNeededExes = Map.empty
                 , lpiExposedModules = Set.fromList $ map (ModuleName . encodeUtf8) $ dpExposedModules dp
                 , lpiHide = not $ dpIsExposed dp
                 }
@@ -819,12 +814,6 @@ calculate gpd platform compilerVersion loc flags hide options =
       , lpiPackageDeps = Map.map fromVersionRange
                        $ Map.filterWithKey (const . (/= name))
                        $ packageDependencies pconfig pd
-      , lpiProvidedExes =
-            Set.fromList
-          $ map (ExeName . T.pack . C.unUnqualComponentName . C.exeName)
-          $ C.executables pd
-      , lpiNeededExes = Map.map fromVersionRange
-                      $ packageDescTools pd
       , lpiExposedModules = maybe
           Set.empty
           (Set.fromList . map fromCabalModuleName . C.exposedModules)

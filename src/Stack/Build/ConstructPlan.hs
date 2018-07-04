@@ -40,8 +40,6 @@ import           Stack.Build.Cache
 import           Stack.Build.Haddock
 import           Stack.Build.Installed
 import           Stack.Build.Source
-import           Stack.BuildPlan
-import           Stack.Config (getLocalPackages)
 import           Stack.Constants
 import           Stack.Package
 import           Stack.PackageDump
@@ -133,7 +131,6 @@ data Ctx = Ctx
     , baseConfigOpts :: !BaseConfigOpts
     , loadPackage    :: !(PackageLocationIndex FilePath -> Map FlagName Bool -> [Text] -> M Package)
     , combinedMap    :: !CombinedMap
-    , toolToPackages :: !(ExeName -> Map PackageName VersionRange)
     , ctxEnvConfig   :: !EnvConfig
     , callStack      :: ![PackageName]
     , extraToBuild   :: !(Set PackageName)
@@ -196,8 +193,7 @@ constructPlan ls0 baseConfigOpts0 locals extraToBuild0 localDumpPkgs loadPackage
     let inner = do
             mapM_ onWanted $ filter lpWanted locals
             mapM_ (addDep False) $ Set.toList extraToBuild0
-    lp <- getLocalPackages
-    let ctx = mkCtx econfig lp
+    let ctx = mkCtx econfig
     ((), m, W efinals installExes dirtyReason deps warnings parents) <-
         liftIO $ runRWST inner ctx M.empty
     mapM_ (logWarn . RIO.display) (warnings [])
@@ -236,14 +232,11 @@ constructPlan ls0 baseConfigOpts0 locals extraToBuild0 localDumpPkgs loadPackage
         elem $(mkPackageName "base")
       $ map (packageIdentifierName . pirIdent) [i | (PLIndex i) <- bcDependencies bconfig]
 
-    mkCtx econfig lp = Ctx
+    mkCtx econfig = Ctx
         { ls = ls0
         , baseConfigOpts = baseConfigOpts0
         , loadPackage = \x y z -> runRIO econfig $ loadPackage0 x y z
         , combinedMap = combineMap sourceMap installedMap
-        , toolToPackages = \name ->
-          maybe Map.empty (Map.fromSet (const Cabal.anyVersion)) $
-          Map.lookup name toolMap
         , ctxEnvConfig = econfig
         , callStack = []
         , extraToBuild = extraToBuild0
@@ -251,8 +244,6 @@ constructPlan ls0 baseConfigOpts0 locals extraToBuild0 localDumpPkgs loadPackage
         , wanted = wantedLocalPackages locals <> extraToBuild0
         , localNames = Set.fromList $ map (packageName . lpPackage) locals
         }
-      where
-        toolMap = getToolMap ls0 lp
 
 -- | State to be maintained during the calculation of local packages
 -- to unregister.
@@ -374,13 +365,6 @@ addFinal lp package isAllInOne = do
                 , taskBuildTypeConfig = packageBuildTypeConfig package
                 }
     tell mempty { wFinals = Map.singleton (packageName package) res }
-
--- | Is this package being used as a library, or just as a build tool?
--- If the former, we need to ensure that a library actually
--- exists. See
--- <https://github.com/commercialhaskell/stack/issues/2195>
-data DepType = AsLibrary | AsBuildTool
-  deriving (Show, Eq)
 
 -- | Given a 'PackageName', adds all of the build tasks to build the
 -- package, if needed.
@@ -623,7 +607,7 @@ addPackageDeps :: Bool -- ^ is this being used by a dependency?
 addPackageDeps treatAsDep package = do
     ctx <- ask
     deps' <- packageDepsWithTools package
-    deps <- forM (Map.toList deps') $ \(depname, (range, depType)) -> do
+    deps <- forM (Map.toList deps') $ \(depname, DepValue range depType) -> do
         eres <- addDep treatAsDep depname
         let getLatestApplicableVersionAndRev = do
                 vsAndRevs <- liftIO $ getVersions ctx depname
@@ -850,61 +834,32 @@ psLocal PSIndex{} = False
 
 -- | Get all of the dependencies for a given package, including build
 -- tool dependencies.
-packageDepsWithTools :: Package -> M (Map PackageName (VersionRange, DepType))
+packageDepsWithTools :: Package -> M (Map PackageName DepValue)
 packageDepsWithTools p = do
-    ctx <- ask
-    let toEither name mp =
-            case Map.toList mp of
-                [] -> Left (ToolWarning name (packageName p) Nothing)
-                [_] -> Right mp
-                ((x, _):(y, _):zs) ->
-                  Left (ToolWarning name (packageName p) (Just (x, y, map fst zs)))
-        (warnings0, toolDeps) =
-             partitionEithers $
-             map (\dep -> toEither dep (toolToPackages ctx dep)) (Map.keys (packageTools p))
     -- Check whether the tool is on the PATH before warning about it.
-    warnings <- fmap catMaybes $ forM warnings0 $ \warning@(ToolWarning (ExeName toolName) _ _) -> do
+    warnings <- fmap catMaybes $ forM (Set.toList $ packageUnknownTools p) $
+      \name@(ExeName toolName) -> do
         let settings = minimalEnvSettings { esIncludeLocals = True }
         config <- view configL
         menv <- liftIO $ configProcessContextSettings config settings
         mfound <- runRIO menv $ findExecutable $ T.unpack toolName
         case mfound of
-            Left _ -> return (Just warning)
+            Left _ -> return $ Just $ ToolWarning name (packageName p)
             Right _ -> return Nothing
     tell mempty { wWarnings = (map toolWarningText warnings ++) }
-    return $ Map.unionsWith
-               (\(vr1, dt1) (vr2, dt2) ->
-                    ( intersectVersionRanges vr1 vr2
-                    , case dt1 of
-                        AsLibrary -> AsLibrary
-                        AsBuildTool -> dt2
-                    )
-               )
-           $ ((, AsLibrary) <$> packageDeps p)
-           : (Map.map (, AsBuildTool) <$> toolDeps)
+    return $ packageDeps p
 
 -- | Warn about tools in the snapshot definition. States the tool name
--- expected, the package name using it, and found packages. If the
--- last value is Nothing, it means the tool was not found
--- anywhere. For a Just value, it was found in at least two packages.
-data ToolWarning = ToolWarning ExeName PackageName (Maybe (PackageName, PackageName, [PackageName]))
+-- expected and the package name using it.
+data ToolWarning = ToolWarning ExeName PackageName
   deriving Show
 
 toolWarningText :: ToolWarning -> Text
-toolWarningText (ToolWarning (ExeName toolName) pkgName Nothing) =
+toolWarningText (ToolWarning (ExeName toolName) pkgName) =
     "No packages found in snapshot which provide a " <>
     T.pack (show toolName) <>
     " executable, which is a build-tool dependency of " <>
     T.pack (show (packageNameString pkgName))
-toolWarningText (ToolWarning (ExeName toolName) pkgName (Just (option1, option2, options))) =
-    "Multiple packages found in snapshot which provide a " <>
-    T.pack (show toolName) <>
-    " executable, which is a build-tool dependency of " <>
-    T.pack (show (packageNameString pkgName)) <>
-    ", so none will be installed.\n" <>
-    "Here's the list of packages which provide it: " <>
-    T.intercalate ", " (map packageNameText (option1:option2:options)) <>
-    "\nSince there's no good way to choose, you may need to install it manually."
 
 -- | Strip out anything from the @Plan@ intended for the local database
 stripLocals :: Plan -> Plan

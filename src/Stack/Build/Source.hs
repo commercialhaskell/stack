@@ -286,8 +286,8 @@ loadLocalPackage isLocal boptsCli targets (name, lpv) = do
 
     return LocalPackage
         { lpPackage = pkg
-        , lpTestDeps = packageDeps testpkg
-        , lpBenchDeps = packageDeps benchpkg
+        , lpTestDeps = dvVersionRange <$> packageDeps testpkg
+        , lpBenchDeps = dvVersionRange <$> packageDeps benchpkg
         , lpTestBench = btpkg
         , lpComponentFiles = componentFiles
         , lpForceDirty = boptsForceDirty bopts
