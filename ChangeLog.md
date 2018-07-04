@@ -107,6 +107,8 @@ Bug fixes:
   level instead of `warning` now. This also fixes self-executing scripts
   not piping plan construction errors from runhaskell to terminal (issue
   #3942).
+* Fix invalid "While building Setup.hs" when Cabal calls fail. See:
+  [#3934](https://github.com/commercialhaskell/stack/issues/3934)
 
 
 ## v1.7.1
