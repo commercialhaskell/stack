@@ -33,3 +33,6 @@ extra-deps:
 
 # Not present until resolver lts-11.9
 - ansi-terminal-0.8.0.4
+
+ghc-options:
+   "$locals": -fhide-source-paths
