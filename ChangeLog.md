@@ -59,6 +59,9 @@ Other enhancements:
   download from a user other than `commercialstack` on Github, and can be prefixed
   with the service `github:`, `gitlab:`, or `bitbucket:`.
 * Switch to `githash` to include some unmerged bugfixes in `gitrev`
+* [#3685](https://github.com/commercialhaskell/stack/issues/3685)
+  Suggestion to add `'allow-newer': true` now shows path to user config
+  file where this flag should be put into
 
 Bug fixes:
 
