@@ -12,33 +12,25 @@
 module Stack.New
     ( new
     , NewOpts(..)
-    , defaultTemplateName
-    , templateNameArgument
-    , getTemplates
     , TemplateName
-    , listTemplates)
-    where
+    , templatesHelp
+    ) where
 
 import           Stack.Prelude
 import           Control.Monad.Trans.Writer.Strict
-import           Data.Aeson
-import           Data.Aeson.Types
 import qualified Data.ByteString as SB
 import qualified Data.ByteString.Lazy as LB
 import           Data.Conduit
-import qualified Data.HashMap.Strict as HM
 import           Data.List
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import qualified Data.Text.Encoding.Error as T (lenientDecode)
-import qualified Data.Text.IO as T
 import           Data.Time.Calendar
 import           Data.Time.Clock
-import qualified Data.Yaml as Yaml
 import           Network.HTTP.Download
-import           Network.HTTP.Simple (Request, HttpException, getResponseStatusCode, getResponseBody)
+import           Network.HTTP.StackClient (Request, HttpException, getResponseStatusCode, getResponseBody)
 import           Path
 import           Path.IO
 import           Stack.Constants
@@ -49,7 +41,6 @@ import           Stack.Types.TemplateName
 import           RIO.Process
 import qualified Text.Mustache as Mustache
 import qualified Text.Mustache.Render as Mustache
-import           Text.Printf
 import           Text.ProjectTemplate
 
 --------------------------------------------------------------------------------
@@ -126,10 +117,7 @@ loadTemplate name logIt = do
     templateDir <- view $ configL.to templatesDir
     case templatePath name of
         AbsPath absFile -> logIt LocalTemp >> loadLocalFile absFile
-        UrlPath s -> do
-            req <- parseRequest s
-            let rel = fromMaybe backupUrlRelPath (parseRelFile s)
-            downloadTemplate req (templateDir </> rel)
+        UrlPath s -> downloadFromUrl s templateDir
         RelPath relFile ->
             catch
                 (do f <- loadLocalFile relFile
@@ -141,6 +129,10 @@ loadTemplate name logIt = do
                                                      (templateDir </> relFile)
                         Nothing -> throwM e
                 )
+        RepoPath rtp -> do
+            let url = urlFromRepoTemplatePath rtp
+            downloadFromUrl (T.unpack url) templateDir
+                            
   where
     loadLocalFile :: Path b File -> RIO env Text
     loadLocalFile path = do
@@ -150,8 +142,16 @@ loadTemplate name logIt = do
         if exists
             then liftIO (fmap (T.decodeUtf8With T.lenientDecode) (SB.readFile (toFilePath path)))
             else throwM (FailedToLoadTemplate name (toFilePath path))
-    relRequest :: MonadThrow n => Path Rel File -> n Request
-    relRequest rel = parseRequest (defaultTemplateUrl <> "/" <> toFilePath rel)
+    relRequest :: Path Rel File -> Maybe Request
+    relRequest rel = do
+        rtp <- parseRepoPathWithService defaultRepoService (T.pack (toFilePath rel))
+        let url = urlFromRepoTemplatePath rtp
+        parseRequest (T.unpack url)
+    downloadFromUrl :: String -> Path Abs Dir -> RIO env Text
+    downloadFromUrl s templateDir = do
+        req <- parseRequest s
+        let rel = fromMaybe backupUrlRelPath (parseRelFile s)
+        downloadTemplate req (templateDir </> rel)
     downloadTemplate :: Request -> Path Abs File -> RIO env Text
     downloadTemplate req path = do
         logIt RemoteTemp
@@ -161,6 +161,15 @@ loadTemplate name logIt = do
                 (throwM . FailedToDownloadTemplate name)
         loadLocalFile path
     backupUrlRelPath = $(mkRelFile "downloaded.template.file.hsfiles")
+
+-- | Construct a URL for downloading from a repo.
+urlFromRepoTemplatePath :: RepoTemplatePath -> Text
+urlFromRepoTemplatePath (RepoTemplatePath Github user name) =
+    T.concat ["https://raw.githubusercontent.com", "/", user, "/stack-templates/master/", name]
+urlFromRepoTemplatePath (RepoTemplatePath Gitlab user name) =
+    T.concat ["https://gitlab.com",                "/", user, "/stack-templates/raw/master/", name]
+urlFromRepoTemplatePath (RepoTemplatePath Bitbucket user name) =
+    T.concat ["https://bitbucket.org",             "/", user, "/stack-templates/raw/master/", name]
 
 -- | Apply and unpack a template into a directory.
 applyTemplate
@@ -250,71 +259,15 @@ runTemplateInits dir = do
             catchAny (proc "git" ["init"] runProcess_)
                   (\_ -> logInfo "git init failed to run, ignoring ...")
 
--- | Display the set of templates accompanied with description if available.
-listTemplates :: HasLogFunc env => RIO env ()
-listTemplates = do
-    templates <- getTemplates
-    templateInfo <- getTemplateInfo
-    if not . M.null $ templateInfo then do
-      let keySizes  = map (T.length . templateName) $ S.toList templates
-          padWidth  = show $ maximum keySizes
-          outputfmt = "%-" <> padWidth <> "s %s\n"
-          headerfmt = "%-" <> padWidth <> "s   %s\n"
-      liftIO $ printf headerfmt ("Template"::String) ("Description"::String)
-      forM_ (S.toList templates) (\x -> do
-           let name = templateName x
-               desc = fromMaybe "" $ liftM (mappend "- ") (M.lookup name templateInfo >>= description)
-           liftIO $ printf outputfmt (T.unpack name) (T.unpack desc))
-      else mapM_ (liftIO . T.putStrLn . templateName) (S.toList templates)
-
--- | Get the set of templates.
-getTemplates :: HasLogFunc env => RIO env (Set TemplateName)
-getTemplates = do
-    req <- liftM setGithubHeaders (parseUrlThrow defaultTemplatesList)
-    resp <- catch (httpJSON req) (throwM . FailedToDownloadTemplates)
-    case getResponseStatusCode resp of
-        200 -> return $ unTemplateSet $ getResponseBody resp
-        code -> throwM (BadTemplatesResponse code)
-
-getTemplateInfo :: HasLogFunc env => RIO env (Map Text TemplateInfo)
-getTemplateInfo = do
-  req <- liftM setGithubHeaders (parseUrlThrow defaultTemplateInfoUrl)
-  resp <- catch (liftM Right $ httpLbs req) (\(ex :: HttpException) -> return . Left $ "Failed to download template info. The HTTP error was: " <> show ex)
-  case resp >>= is200 of
-    Left err -> do
-      logInfo $ fromString err
-      return M.empty
-    Right resp' ->
-      case Yaml.decodeEither (LB.toStrict $ getResponseBody resp') :: Either String Object of
-        Left err ->
-          throwM $ BadTemplateInfo err
-        Right o ->
-          return (M.mapMaybe (Yaml.parseMaybe Yaml.parseJSON) (M.fromList . HM.toList $ o) :: Map Text TemplateInfo)
-  where
-    is200 resp =
-      case getResponseStatusCode resp of
-        200 -> return resp
-        code -> Left $ "Unexpected status code while retrieving templates info: " <> show code
-
-newtype TemplateSet = TemplateSet { unTemplateSet :: Set TemplateName }
-instance FromJSON TemplateSet where
-  parseJSON = fmap TemplateSet . parseTemplateSet
-
--- | Parser the set of templates from the JSON.
-parseTemplateSet :: Value -> Parser (Set TemplateName)
-parseTemplateSet a = do
-    xs <- parseJSON a
-    fmap S.fromList (mapMaybeM parseTemplate xs)
-  where
-    parseTemplate v = do
-        o <- parseJSON v
-        name <- o .: "name"
-        if ".hsfiles" `isSuffixOf` name
-            then case parseTemplateNameFromString name of
-                     Left{} ->
-                         fail ("Unable to parse template name from " <> name)
-                     Right template -> return (Just template)
-            else return Nothing
+-- | Display help for the templates command.
+templatesHelp :: HasLogFunc env => RIO env ()
+templatesHelp = do
+  let url = defaultTemplatesHelpUrl
+  req <- liftM setGithubHeaders (parseUrlThrow url)
+  resp <- httpLbs req `catch` (throwM . FailedToDownloadTemplatesHelp)
+  case decodeUtf8' $ LB.toStrict $ getResponseBody resp of
+    Left err -> throwM $ BadTemplatesHelpEncoding url err
+    Right txt -> logInfo $ display txt
 
 --------------------------------------------------------------------------------
 -- Defaults
@@ -323,20 +276,14 @@ parseTemplateSet a = do
 defaultTemplateName :: TemplateName
 defaultTemplateName = $(mkTemplateName "new-template")
 
--- | Default web root URL to download from.
-defaultTemplateUrl :: String
-defaultTemplateUrl =
-    "https://raw.githubusercontent.com/commercialhaskell/stack-templates/master"
+-- | The default service to use to download templates.
+defaultRepoService :: RepoService
+defaultRepoService = Github
 
--- | Default web URL to get a yaml file containing template metadata.
-defaultTemplateInfoUrl :: String
-defaultTemplateInfoUrl =
-    "https://raw.githubusercontent.com/commercialhaskell/stack-templates/master/template-info.yaml"
-
--- | Default web URL to list the repo contents.
-defaultTemplatesList :: String
-defaultTemplatesList =
-    "https://api.github.com/repos/commercialhaskell/stack-templates/contents/"
+-- | Default web URL to get the `stack templates` help output.
+defaultTemplatesHelpUrl :: String
+defaultTemplatesHelpUrl =
+    "https://raw.githubusercontent.com/commercialhaskell/stack-templates/master/STACK_HELP.md"
 
 --------------------------------------------------------------------------------
 -- Exceptions
@@ -347,15 +294,14 @@ data NewException
                            !FilePath
     | FailedToDownloadTemplate !TemplateName
                                !DownloadException
-    | FailedToDownloadTemplates !HttpException
-    | BadTemplatesResponse !Int
     | AlreadyExists !(Path Abs Dir)
     | MissingParameters !PackageName !TemplateName !(Set String) !(Path Abs File)
     | InvalidTemplate !TemplateName !String
     | AttemptedOverwrites [Path Abs File]
-    | FailedToDownloadTemplateInfo !HttpException
-    | BadTemplateInfo !String
-    | BadTemplateInfoResponse !Int
+    | FailedToDownloadTemplatesHelp !HttpException
+    | BadTemplatesHelpEncoding
+        !String -- URL it's downloaded from
+        !UnicodeException
     | Can'tUseWiredInName !PackageName
     deriving (Typeable)
 
@@ -369,17 +315,13 @@ instance Show NewException where
     show (FailedToDownloadTemplate name (RedownloadFailed _ _ resp)) =
         case getResponseStatusCode resp of
             404 ->
-                "That template doesn't exist. Run `stack templates' to see a list of available templates."
+                "That template doesn't exist. Run `stack templates' to discover available templates."
             code ->
                 "Failed to download template " <> T.unpack (templateName name) <>
                 ": unknown reason, status code was: " <>
                 show code
     show (AlreadyExists path) =
         "Directory " <> toFilePath path <> " already exists. Aborting."
-    show (FailedToDownloadTemplates ex) =
-        "Failed to download templates. The HTTP error was: " <> show ex
-    show (BadTemplatesResponse code) =
-        "Unexpected status code while retrieving templates list: " <> show code
     show (MissingParameters name template missingKeys userConfigPath) =
         intercalate
             "\n"
@@ -413,11 +355,9 @@ instance Show NewException where
         "The template would create the following files, but they already exist:\n" <>
         unlines (map (("  " ++) . toFilePath) fps) <>
         "Use --force to ignore this, and overwite these files."
-    show (FailedToDownloadTemplateInfo ex) =
-        "Failed to download templates info. The HTTP error was: " <> show ex
-    show (BadTemplateInfo err) =
-        "Template info couldn't be parsed: " <> err
-    show (BadTemplateInfoResponse code) =
-        "Unexpected status code while retrieving templates info: " <> show code
+    show (FailedToDownloadTemplatesHelp ex) =
+        "Failed to download `stack templates` help. The HTTP error was: " <> show ex
+    show (BadTemplatesHelpEncoding url err) =
+        "UTF-8 decoding error on template info from\n    " <> url <> "\n\n" <> show err
     show (Can'tUseWiredInName name) =
         "The name \"" <> packageNameString name <> "\" is used by GHC wired-in packages, and so shouldn't be used as a package name"

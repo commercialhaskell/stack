@@ -83,7 +83,7 @@ prettyErrorWith f = prettyWith LevelError
                            indentAfterLabel . f)
 prettyWarnNoIndentWith f  = prettyWith LevelWarn
                                   ((line <>) . (styleWarning "Warning:" <+>) . f)
-prettyErrorNoIndentWith f = prettyWith LevelWarn
+prettyErrorNoIndentWith f = prettyWith LevelError
                                   ((line <>) . (styleError   "Error:" <+>) . f)
 
 prettyDebug, prettyInfo, prettyNote, prettyWarn, prettyError, prettyWarnNoIndent, prettyErrorNoIndent

@@ -30,7 +30,7 @@ import qualified    Data.Text.Encoding as Text
 import              Control.Monad
 import              Control.Monad.Catch (Handler (..)) -- would be nice if retry exported this itself
 import              Stack.Prelude hiding (Handler (..))
-import              Control.Retry (recovering,limitRetries,RetryPolicy,constantDelay,RetryStatus(..))
+import              Control.Retry (recovering,limitRetries,RetryPolicy,exponentialBackoff,RetryStatus(..))
 import              Crypto.Hash
 import              Crypto.Hash.Conduit (sinkHash)
 import              Data.ByteArray as Mem (convert)
@@ -41,10 +41,7 @@ import              Data.Conduit.Binary (sourceHandle)
 import              Data.Text.Encoding (decodeUtf8With)
 import              Data.Text.Encoding.Error (lenientDecode)
 import              GHC.IO.Exception (IOException(..),IOErrorType(..))
-import              Network.HTTP.Client (getUri, path)
-import              Network.HTTP.StackClient (httpSink)
-import              Network.HTTP.Simple (Request, HttpException, getResponseHeaders)
-import              Network.HTTP.Types.Header (hContentLength, hContentMD5)
+import              Network.HTTP.StackClient (Request, HttpException, httpSink, getUri, path, getResponseHeaders, hContentLength, hContentMD5)
 import              Path
 import              Stack.Types.Runner
 import              Stack.PrettyPrint
@@ -59,9 +56,20 @@ data DownloadRequest = DownloadRequest
     , drRetryPolicy :: RetryPolicy
     }
 
--- | Default to retrying thrice with a short constant delay.
+-- | Default to retrying seven times with exponential backoff starting from
+-- one hundred milliseconds.
+--
+-- This means the tries will occur after these delays if necessary:
+--
+-- * 0.1s
+-- * 0.2s
+-- * 0.4s
+-- * 0.8s
+-- * 1.6s
+-- * 3.2s
+-- * 6.4s
 drRetryPolicyDefault :: RetryPolicy
-drRetryPolicyDefault = limitRetries 3 <> constantDelay onehundredMilliseconds
+drRetryPolicyDefault = limitRetries 7 <> exponentialBackoff onehundredMilliseconds
   where onehundredMilliseconds = 100000
 
 data HashCheck = forall a. (Show a, HashAlgorithm a) => HashCheck
@@ -210,6 +218,7 @@ recoveringHttp retryPolicy =
             [ "If you see this warning and stack fails to download,"
             , "but running the command again solves the problem,"
             , "please report here: https://github.com/commercialhaskell/stack/issues/3510"
+            , "Make sure to paste the output of 'stack --version'"
             ]
           ]
       return True

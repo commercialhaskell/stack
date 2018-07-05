@@ -404,6 +404,7 @@ data ExecOpts = ExecOpts
 
 data SpecialExecCmd
     = ExecCmd String
+    | ExecRun
     | ExecGhc
     | ExecRunGhc
     deriving (Show, Eq)

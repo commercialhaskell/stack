@@ -44,7 +44,7 @@ import           Data.Conduit.Binary (sourceHandle, sinkHandle)
 import qualified Data.Conduit.Binary as CB
 import qualified Data.Conduit.List as CL
 import           Data.Conduit.Process.Typed (withLoggedProcess_, createSource)
-import           RIO.Process (HasProcessContext (..), ProcessContext, setStdin, closed, getStderr, getStdout, proc, withProcess_, setStdout, setStderr, ProcessConfig, readProcessStdout_, workingDirL)
+import           RIO.Process (HasProcessContext (..), ProcessContext, setStdin, closed, getStderr, getStdout, proc, withProcess_, setStdout, setStderr, ProcessConfig, readProcess_, workingDirL)
 import           Data.Store           as X (Store)
 import           Data.Text.Encoding (decodeUtf8With)
 import           Data.Text.Encoding.Error (lenientDecode)
@@ -97,7 +97,7 @@ withKeepSystemTempDir str inner = withRunInIO $ \run -> do
 --
 -- Throws a 'ReadProcessException' if unsuccessful in launching, or 'ProcessExitedUnsuccessfully' if the process itself fails.
 sinkProcessStderrStdout
-  :: forall e o env. (HasProcessContext env, HasLogFunc env)
+  :: forall e o env. (HasProcessContext env, HasLogFunc env, HasCallStack)
   => String -- ^ Command
   -> [String] -- ^ Command line arguments
   -> ConduitM ByteString Void (RIO env) e -- ^ Sink for stderr
@@ -119,7 +119,7 @@ sinkProcessStderrStdout name args sinkStderr sinkStdout =
 --
 -- Throws a 'ReadProcessException' if unsuccessful.
 sinkProcessStdout
-    :: (HasProcessContext env, HasLogFunc env)
+    :: (HasProcessContext env, HasLogFunc env, HasCallStack)
     => String -- ^ Command
     -> [String] -- ^ Command line arguments
     -> ConduitM ByteString Void (RIO env) a -- ^ Sink for stdout
@@ -143,13 +143,13 @@ logProcessStderrStdout pc = withLoggedProcess_ pc $ \p ->
 -- | Read from the process, ignoring any output.
 --
 -- Throws a 'ReadProcessException' exception if the process fails.
-readProcessNull :: (HasProcessContext env, HasLogFunc env)
+readProcessNull :: (HasProcessContext env, HasLogFunc env, HasCallStack)
                 => String -- ^ Command
                 -> [String] -- ^ Command line arguments
                 -> RIO env ()
 readProcessNull name args =
   -- We want the output to appear in any exceptions, so we capture and drop it
-  void $ proc name args readProcessStdout_
+  void $ proc name args readProcess_
 
 -- | Use the new 'ProcessContext', but retain the working directory
 -- from the parent environment.

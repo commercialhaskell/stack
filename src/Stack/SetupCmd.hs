@@ -63,7 +63,7 @@ cabalUpgradeParser = Specific <$> version' <|> latestParser
          <> OA.help "Install a specific version of Cabal" )
         latestParser = OA.flag' Latest (
             OA.long "upgrade-cabal"
-         <> OA.help "Install latest version of Cabal globally" )
+         <> OA.help "DEPRECATED Install latest version of Cabal globally" )
 
 setupParser :: OA.Parser SetupCmdOpts
 setupParser = SetupCmdOpts

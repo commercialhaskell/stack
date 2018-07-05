@@ -28,11 +28,12 @@ import qualified Data.ByteString.Lazy as L
 import           Data.IORef.RunOnce (runOnce)
 import           Data.List
 import qualified Data.Map.Strict as Map
+import qualified Data.Set as Set
 import qualified Data.Text as T
 import           Data.Version (showVersion)
 import           RIO.Process
 #ifdef USE_GIT_INFO
-import           Development.GitRev (gitCommitCount, gitHash)
+import           GitHash (giCommitCount, giHash, tGitInfoCwd)
 #endif
 import           Distribution.System (buildArch)
 import qualified Distribution.Text as Cabal (display)
@@ -56,6 +57,7 @@ import           Stack.ConfigCmd as ConfigCmd
 import           Stack.Constants
 import           Stack.Constants.Config
 import           Stack.Coverage
+import           Stack.DefaultColorWhen (defaultColorWhen)
 import qualified Stack.Docker as Docker
 import           Stack.Dot
 import           Stack.GhcPkg (findGhcPkgField)
@@ -97,8 +99,8 @@ import           Stack.Solver (solveExtraDeps)
 import           Stack.Types.Version
 import           Stack.Types.Config
 import           Stack.Types.Compiler
+import           Stack.Types.NamedComponent
 import           Stack.Types.Nix
-import           Stack.Types.Runner
 import           Stack.Upgrade
 import qualified Stack.Upload as Upload
 import qualified System.Directory as D
@@ -106,7 +108,6 @@ import           System.Environment (getProgName, getArgs, withArgs)
 import           System.Exit
 import           System.FilePath (isValid, pathSeparator)
 import qualified System.FilePath as FP
-import           System.Console.ANSI (SGR (Reset), hSupportsANSI, setSGR)
 import           System.IO (stderr, stdin, stdout, BufferMode(..), hPutStrLn, hPrint, hGetEncoding, hSetEncoding)
 
 -- | Change the character encoding of the given Handle to transliterate
@@ -127,13 +128,12 @@ versionString' = concat $ concat
     [ [$(simpleVersion Meta.version)]
       -- Leave out number of commits for --depth=1 clone
       -- See https://github.com/commercialhaskell/stack/issues/792
-    , [" (" ++ commitCount ++ " commits)" | commitCount /= ("1"::String) &&
-                                          commitCount /= ("UNKNOWN" :: String)]
+    , [" (" ++ show commitCount ++ " commits)" | commitCount /= 1]
     , [" ", Cabal.display buildArch]
     , [depsString, warningString]
     ]
   where
-    commitCount = $gitCommitCount
+    commitCount = giCommitCount $$tGitInfoCwd
 #else
 versionString' =
     showVersion Meta.version
@@ -171,6 +171,10 @@ main = do
   args <- getArgs
   progName <- getProgName
   isTerminal <- hIsTerminalDeviceOrMinTTY stdout
+  -- On Windows, where applicable, defaultColorWhen has the side effect of
+  -- enabling ANSI for ANSI-capable native (ConHost) terminals, if not already
+  -- ANSI-enabled.
+  defColorWhen <- defaultColorWhen
   execExtraHelp args
                 Docker.dockerHelpOptName
                 (dockerOptsParser False)
@@ -186,16 +190,7 @@ main = do
     Left (exitCode :: ExitCode) ->
       throwIO exitCode
     Right (globalMonoid,run) -> do
-      let global = globalOptsFromMonoid isTerminal globalMonoid
-      -- If stdout is (1) recognised as a terminal supporting ANSI (for the
-      -- purposes of the functions of the ansi-terminal package) and (2) a
-      -- native (ConHost) terminal on Windows 10, then the setSGR function will
-      -- enable the ANSI-capability for that terminal. Later uses of
-      -- hSupportsANSI with the functions of the RIO package that emit ANSI
-      -- codes will then have the intended outcome on native Windows 10
-      -- terminals.
-      when (globalColorWhen global /= ColorNever) $
-        hSupportsANSI stdout >>= flip when (setSGR [Reset])
+      let global = globalOptsFromMonoid isTerminal defColorWhen globalMonoid
       when (globalLogLevel global == LevelDebug) $ hPutStrLn stderr versionString'
       case globalReExecVersion global of
           Just expectVersion -> do
@@ -369,6 +364,10 @@ commandLineHandler currentDir progName isInterpreter = complicatedOptions
                   "Execute a command"
                   execCmd
                   (execOptsParser Nothing)
+      addCommand' "run"
+                  "Build and run an executable. Defaults to the first available executable if none is provided as the first argument."
+                  execCmd
+                  (execOptsParser $ Just ExecRun)
       addGhciCommand' "ghci"
                       "Run ghci in the context of package(s) (experimental)"
                       ghciCmd
@@ -679,7 +678,7 @@ upgradeCmd upgradeOpts' go = withGlobalConfigAndLock go $
     upgrade (globalConfigMonoid go)
             (globalResolver go)
 #ifdef USE_GIT_INFO
-            (find (/= "UNKNOWN") [$gitHash])
+            (Just (giHash $$tGitInfoCwd))
 #else
             Nothing
 #endif
@@ -776,8 +775,8 @@ sdistCmd sdistOpts go =
             tarPath <- (distDir </>) <$> parseRelFile tarName
             ensureDir (parent tarPath)
             liftIO $ L.writeFile (toFilePath tarPath) tarBytes
-            checkSDistTarball sdistOpts tarPath
             prettyInfoL [flow "Wrote sdist tarball to", display tarPath]
+            checkSDistTarball sdistOpts tarPath
             forM_ (sdoptsTarPath sdistOpts) $ copyTarToTarPath tarPath tarName
             when (sdoptsSign sdistOpts) (void $ Sig.sign (sdoptsSignServerUrl sdistOpts) tarPath)
         where
@@ -791,10 +790,6 @@ execCmd :: ExecOpts -> GlobalOpts -> IO ()
 execCmd ExecOpts {..} go@GlobalOpts{..} =
     case eoExtra of
         ExecOptsPlain -> do
-          (cmd, args) <- case (eoCmd, eoArgs) of
-                (ExecCmd cmd, args) -> return (cmd, args)
-                (ExecGhc, args) -> return ("ghc", args)
-                (ExecRunGhc, args) -> return ("runghc", args)
           loadConfigWithOpts go $ \lc ->
             withUserFileLock go (view stackRootL lc) $ \lk -> do
               let getCompilerVersion = loadCompilerVersion go lc
@@ -803,14 +798,17 @@ execCmd ExecOpts {..} go@GlobalOpts{..} =
                     (lcProjectRoot lc)
                     -- Unlock before transferring control away, whether using docker or not:
                     (Just $ munlockFile lk)
-                    (runRIO (lcConfig lc) $ do
+                    (withBuildConfigAndLock go $ \buildLock -> do
                         config <- view configL
                         menv <- liftIO $ configProcessContextSettings config plainEnvSettings
-                        withProcessContext menv $ Nix.reexecWithOptionalShell
-                            (lcProjectRoot lc)
-                            getCompilerVersion
-                            (runRIO (lcConfig lc) $
-                                exec cmd args))
+                        withProcessContext menv $ do
+                            (cmd, args) <- case (eoCmd, eoArgs) of
+                                (ExecCmd cmd, args) -> return (cmd, args)
+                                (ExecRun, args) -> getRunCmd args
+                                (ExecGhc, args) -> return ("ghc", args)
+                                (ExecRunGhc, args) -> return ("runghc", args)
+                            munlockFile buildLock
+                            Nix.reexecWithOptionalShell (lcProjectRoot lc) getCompilerVersion (runRIO (lcConfig lc) $ exec cmd args))
                     Nothing
                     Nothing -- Unlocked already above.
         ExecOptsEmbellished {..} ->
@@ -830,6 +828,7 @@ execCmd ExecOpts {..} go@GlobalOpts{..} =
                             else args ++ ["+RTS"] ++ eoRtsOptions ++ ["-RTS"]
                 (cmd, args) <- case (eoCmd, argsWithRts eoArgs) of
                     (ExecCmd cmd, args) -> return (cmd, args)
+                    (ExecRun, args) -> getRunCmd args
                     (ExecGhc, args) -> getGhcCmd "" eoPackages args
                     -- NOTE: this won't currently work for GHCJS, because it doesn't have
                     -- a runghcjs binary. It probably will someday, though.
@@ -851,6 +850,24 @@ execCmd ExecOpts {..} go@GlobalOpts{..} =
 
       getPkgOpts wc pkgs =
           map ("-package-id=" ++) <$> mapM (getPkgId wc) pkgs
+
+      getRunCmd args = do
+          pkgComponents <- liftM (map lpvComponents . Map.elems . lpProject) getLocalPackages
+          let executables = filter isCExe $ concatMap Set.toList pkgComponents
+          let (exe, args') = case args of
+                             []   -> (firstExe, args)
+                             x:xs -> case find (\y -> y == (CExe $ T.pack x)) executables of
+                                     Nothing -> (firstExe, args)
+                                     argExe -> (argExe, xs)
+                             where
+                                firstExe = listToMaybe executables
+          case exe of
+              Just (CExe exe') -> do
+                Stack.Build.build (const (return ())) Nothing defaultBuildOptsCLI{boptsCLITargets = [T.cons ':' exe']}
+                return (T.unpack exe', args')
+              _                -> do
+                  logError "No executables found."
+                  liftIO exitFailure
 
       getGhcCmd prefix pkgs args = do
           wc <- view $ actualCompilerVersionL.whichCompilerL
@@ -964,7 +981,7 @@ newCmd (newOpts,initOpts) go@GlobalOpts{..} =
 
 -- | List the available templates.
 templatesCmd :: () -> GlobalOpts -> IO ()
-templatesCmd _ go@GlobalOpts{..} = withConfigAndLock go listTemplates
+templatesCmd _ go@GlobalOpts{..} = withConfigAndLock go templatesHelp
 
 -- | Fix up extra-deps for a project
 solverCmd :: Bool -- ^ modify stack.yaml automatically?

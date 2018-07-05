@@ -30,12 +30,8 @@ import           Data.Conduit                (yield)
 import qualified Data.Conduit.Binary         as CB
 import           Data.Text.Encoding.Error    (lenientDecode)
 import           Data.Text.Encoding          (decodeUtf8With)
-import           Network.HTTP.Client         (Request, Response, path, checkResponse, parseUrlThrow, parseRequest)
-import           Network.HTTP.Client.Conduit (requestHeaders)
 import           Network.HTTP.Download.Verified
-import           Network.HTTP.StackClient    (httpJSON, httpLbs, httpLBS, withResponse)
-import           Network.HTTP.Simple         (getResponseBody, getResponseHeaders, getResponseStatusCode,
-                                              setRequestHeader)
+import           Network.HTTP.StackClient    (Request, Response, httpJSON, httpLbs, httpLBS, withResponse, path, checkResponse, parseUrlThrow, parseRequest, setRequestHeader, getResponseHeaders, requestHeaders, getResponseBody, getResponseStatusCode)
 import           Path.IO                     (doesFileExist)
 import           System.Directory            (createDirectoryIfMissing,
                                               removeFile)

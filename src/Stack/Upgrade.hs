@@ -1,4 +1,4 @@
-{-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE NoImplicitPrelude     #-}
 {-# LANGUAGE CPP                   #-}
 {-# LANGUAGE ConstraintKinds       #-}
 {-# LANGUAGE FlexibleContexts      #-}
@@ -24,6 +24,10 @@ import           Path
 import qualified Paths_stack as Paths
 import           Stack.Build
 import           Stack.Config
+-- Following import is redundant on non-Windows operating systems
+#ifdef WINDOWS
+import           Stack.DefaultColorWhen (defaultColorWhen)
+#endif
 import           Stack.Fetch
 import           Stack.PackageIndex
 import           Stack.PrettyPrint
@@ -212,6 +216,13 @@ sourceUpgrade gConfigMonoid mresolver builtHash (SourceOpts gitRepo) =
                 -- --git" not working for earlier versions.
                 let args = [ "clone", repo , "stack", "--depth", "1", "--recursive", "--branch", branch]
                 withWorkingDir (toFilePath tmp) $ proc "git" args runProcess_
+#ifdef WINDOWS
+                -- On Windows 10, an upstream issue with the `git clone` command
+                -- means that command clears, but does not then restore, the
+                -- ENABLE_VIRTUAL_TERMINAL_PROCESSING flag for native terminals.
+                -- The folowing hack re-enables the lost ANSI-capability.
+                _ <- liftIO defaultColorWhen
+#endif
                 return $ Just $ tmp </> $(mkRelDir "stack")
       Nothing -> do
         updateAllIndices

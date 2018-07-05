@@ -277,9 +277,7 @@ packageFromPackageDescription packageConfig pkgFlags (PackageDescriptionPair pkg
               Just lib
          in
           case mlib of
-            Nothing
-              | null extraLibNames -> NoLibraries
-              | otherwise -> error "Package has buildable sublibraries but no buildable libraries, I'm giving up"
+            Nothing -> NoLibraries
             Just _ -> HasLibraries foreignLibNames
     , packageInternalLibraries = subLibNames
     , packageTests = M.fromList

@@ -43,7 +43,7 @@ import qualified Distribution.Types.UnqualComponentName as C
 import           Distribution.System (Platform)
 import           Distribution.Text (display)
 import qualified Distribution.Version as C
-import           Network.HTTP.Client (Request)
+import           Network.HTTP.StackClient (Request)
 import           Network.HTTP.Download
 import qualified RIO
 import           Network.URI (isURI)

@@ -43,7 +43,7 @@ import qualified Data.Text as T
 import           Data.Text.Encoding (encodeUtf8)
 import qualified Distribution.ModuleName as C
 import qualified Distribution.Version as C
-import           Network.HTTP.Client (parseRequest)
+import           Network.HTTP.StackClient (parseRequest)
 import           Stack.Prelude
 import           Stack.Types.Compiler
 import           Stack.Types.FlagName

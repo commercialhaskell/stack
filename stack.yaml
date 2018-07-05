@@ -21,6 +21,7 @@ extra-deps:
 - Cabal-2.2.0.1@rev:0
 - hpack-0.28.2
 - http-api-data-0.3.8.1@rev:0
+- githash-0.1.0.0@rev:0
 
 # Avoid https://github.com/commercialhaskell/stack/issues/3922
 # (triggered because later versions of persistent transitively depends
@@ -30,3 +31,9 @@ extra-deps:
 - resourcet-1.1.11@rev:0
 - conduit-1.2.13@rev:0
 - conduit-extra-1.2.3.2@rev:0
+
+# Not present until resolver lts-11.9
+- ansi-terminal-0.8.0.4
+
+ghc-options:
+   "$locals": -fhide-source-paths
