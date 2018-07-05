@@ -21,6 +21,7 @@ extra-deps:
 - Cabal-2.2.0.1@rev:0
 - hpack-0.28.2
 - http-api-data-0.3.8.1@rev:0
+- githash-0.1.0.0@rev:0
 
 # Avoid https://github.com/commercialhaskell/stack/issues/3922
 # (triggered because later versions of persistent transitively depends

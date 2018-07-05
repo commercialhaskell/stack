@@ -19,6 +19,7 @@ extra-deps:
 - project-template-0.2.0.1
 - regex-applicative-text-0.1.0.1
 - unicode-transforms-0.3.4
+- githash-0.1.0.0@rev:0
 
 ghc-options:
    "$locals": -fhide-source-paths

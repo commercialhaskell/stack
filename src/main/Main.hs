@@ -33,7 +33,7 @@ import qualified Data.Text as T
 import           Data.Version (showVersion)
 import           RIO.Process
 #ifdef USE_GIT_INFO
-import           Development.GitRev (gitCommitCount, gitHash)
+import           GitHash (giCommitCount, giHash, tGitInfoCwd)
 #endif
 import           Distribution.System (buildArch)
 import qualified Distribution.Text as Cabal (display)
@@ -128,13 +128,12 @@ versionString' = concat $ concat
     [ [$(simpleVersion Meta.version)]
       -- Leave out number of commits for --depth=1 clone
       -- See https://github.com/commercialhaskell/stack/issues/792
-    , [" (" ++ commitCount ++ " commits)" | commitCount /= ("1"::String) &&
-                                          commitCount /= ("UNKNOWN" :: String)]
+    , [" (" ++ show commitCount ++ " commits)" | commitCount /= 1]
     , [" ", Cabal.display buildArch]
     , [depsString, warningString]
     ]
   where
-    commitCount = $gitCommitCount
+    commitCount = giCommitCount $$tGitInfoCwd
 #else
 versionString' =
     showVersion Meta.version
@@ -679,7 +678,7 @@ upgradeCmd upgradeOpts' go = withGlobalConfigAndLock go $
     upgrade (globalConfigMonoid go)
             (globalResolver go)
 #ifdef USE_GIT_INFO
-            (find (/= "UNKNOWN") [$gitHash])
+            (Just (giHash $$tGitInfoCwd))
 #else
             Nothing
 #endif
