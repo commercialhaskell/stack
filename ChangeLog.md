@@ -51,6 +51,9 @@ Other enhancements:
 * [#4039] `stack new` now allows template names of the form `username/foo` to
   download from a user other than `commercialstack` on Github, and can be prefixed
   with the service `github:`, `gitlab:`, or `bitbucket:`.
+* [#3685](https://github.com/commercialhaskell/stack/issues/3685)
+  Suggestion to add `'allow-newer': true` now shows path to user config
+  file where this flag should be put into
 
 Bug fixes:
 
