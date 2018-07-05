@@ -1133,9 +1133,9 @@ withSingleContext ActionContext {..} ExecuteEnv {..} task@Task {..} mdeps msuffi
                                         .| CT.decodeUtf8Lenient
                                         .| mungeBuildOutput stripTHLoading makeAbsolute pkgDir compilerVer
                                         .| CL.consume
-                        throwM $ SetupHsBuildFailure
+                        throwM $ CabalExitedUnsuccessfully
                             (eceExitCode ece)
-                            (Just taskProvides)
+                            taskProvides
                             exeName
                             fullArgs
                             mlogFile

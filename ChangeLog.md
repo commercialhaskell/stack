@@ -22,6 +22,12 @@ Behavior changes:
   implemented was drastically lessened once Stack started using the
   snapshot's `Cabal` library for custom setups. See:
   [#4070](https://github.com/commercialhaskell/stack/issues/4070).
+* With the new namespaced template feature, `stack templates` is no
+  longer able to meaningfully display a list of all templates
+  available. Instead, the command will download and display a
+  [help file](https://github.com/commercialhaskell/stack-templates/blob/master/STACK_HELP.md)
+  with more information on how to discover templates. See:
+  [#4039](https://github.com/commercialhaskell/stack/issues/4039)
 
 Other enhancements:
 
@@ -48,9 +54,11 @@ Other enhancements:
 * The default retry strategy has changed to exponential backoff.
   This should help with
   [#3510](https://github.com/commercialhaskell/stack/issues/3510).
-* [#4039] `stack new` now allows template names of the form `username/foo` to
+* [#4039](https://github.com/commercialhaskell/stack/issues/4039)
+  `stack new` now allows template names of the form `username/foo` to
   download from a user other than `commercialstack` on Github, and can be prefixed
   with the service `github:`, `gitlab:`, or `bitbucket:`.
+* Switch to `githash` to include some unmerged bugfixes in `gitrev`
 * [#3685](https://github.com/commercialhaskell/stack/issues/3685)
   Suggestion to add `'allow-newer': true` now shows path to user config
   file where this flag should be put into
@@ -103,6 +111,8 @@ Bug fixes:
   level instead of `warning` now. This also fixes self-executing scripts
   not piping plan construction errors from runhaskell to terminal (issue
   #3942).
+* Fix invalid "While building Setup.hs" when Cabal calls fail. See:
+  [#3934](https://github.com/commercialhaskell/stack/issues/3934)
 
 
 ## v1.7.1

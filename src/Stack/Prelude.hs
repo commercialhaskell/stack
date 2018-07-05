@@ -97,7 +97,7 @@ withKeepSystemTempDir str inner = withRunInIO $ \run -> do
 --
 -- Throws a 'ReadProcessException' if unsuccessful in launching, or 'ProcessExitedUnsuccessfully' if the process itself fails.
 sinkProcessStderrStdout
-  :: forall e o env. (HasProcessContext env, HasLogFunc env)
+  :: forall e o env. (HasProcessContext env, HasLogFunc env, HasCallStack)
   => String -- ^ Command
   -> [String] -- ^ Command line arguments
   -> ConduitM ByteString Void (RIO env) e -- ^ Sink for stderr
@@ -119,7 +119,7 @@ sinkProcessStderrStdout name args sinkStderr sinkStdout =
 --
 -- Throws a 'ReadProcessException' if unsuccessful.
 sinkProcessStdout
-    :: (HasProcessContext env, HasLogFunc env)
+    :: (HasProcessContext env, HasLogFunc env, HasCallStack)
     => String -- ^ Command
     -> [String] -- ^ Command line arguments
     -> ConduitM ByteString Void (RIO env) a -- ^ Sink for stdout
@@ -143,7 +143,7 @@ logProcessStderrStdout pc = withLoggedProcess_ pc $ \p ->
 -- | Read from the process, ignoring any output.
 --
 -- Throws a 'ReadProcessException' exception if the process fails.
-readProcessNull :: (HasProcessContext env, HasLogFunc env)
+readProcessNull :: (HasProcessContext env, HasLogFunc env, HasCallStack)
                 => String -- ^ Command
                 -> [String] -- ^ Command line arguments
                 -> RIO env ()
