@@ -28,6 +28,9 @@ Behavior changes:
   [help file](https://github.com/commercialhaskell/stack-templates/blob/master/STACK_HELP.md)
   with more information on how to discover templates. See:
   [#4039](https://github.com/commercialhaskell/stack/issues/4039)
+* Mustache templating is not applied to large files (over 50kb) to
+  avoid performance degredation. See:
+  [#4133](https://github.com/commercialhaskell/stack/issues/4133).
 
 Other enhancements:
 
