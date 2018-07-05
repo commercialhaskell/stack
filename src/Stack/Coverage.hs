@@ -172,13 +172,13 @@ generateHpcReportInternal tixSrc reportDir report extraMarkupArgs extraReportArg
                     -- Look for index files in the correct dir (relative to each pkgdir).
                     ["--hpcdir", toFilePathNoTrailingSep hpcRelDir, "--reset-hpcdirs"]
             logInfo $ "Generating " <> RIO.display report
-            outputLines <- liftM (map (S8.filter (/= '\r')) . S8.lines . BL.toStrict) $
+            outputLines <- liftM (map (S8.filter (/= '\r')) . S8.lines . BL.toStrict . fst) $
                 proc "hpc"
                 ( "report"
                 : toFilePath tixSrc
                 : (args ++ extraReportArgs)
                 )
-                readProcessStdout_
+                readProcess_
             if all ("(0/0)" `S8.isSuffixOf`) outputLines
                 then do
                     let msg html =
@@ -206,7 +206,7 @@ generateHpcReportInternal tixSrc reportDir report extraMarkupArgs extraReportArg
                         : ("--destdir=" ++ toFilePathNoTrailingSep reportDir)
                         : (args ++ extraMarkupArgs)
                         )
-                        readProcessStdout_
+                        readProcess_
                     return (Just reportPath)
 
 data HpcReportOpts = HpcReportOpts
