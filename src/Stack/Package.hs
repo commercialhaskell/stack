@@ -701,7 +701,7 @@ packageDescTools pd =
       where
         (unknownTools, knownTools) = partitionEithers $ map go1 (buildTools bi)
 
-        tools = map go2 (knownTools ++ buildToolDepends bi)
+        tools = mapMaybe go2 (knownTools ++ buildToolDepends bi)
 
         -- This is similar to desugarBuildTool from Cabal, however it
         -- uses our own hard-coded map which drops tools shipped with
@@ -712,14 +712,16 @@ packageDescTools pd =
             Just pkgName -> Right $ Cabal.ExeDependency pkgName (Cabal.mkUnqualComponentName name) range
             Nothing -> Left $ ExeName $ T.pack name
 
-        go2 :: Cabal.ExeDependency -> (PackageName, DepValue)
-        go2 (Cabal.ExeDependency pkg _name range) =
-          ( fromCabalPackageName pkg
-          , DepValue
-              { dvVersionRange = range
-              , dvType = AsBuildTool
-              }
-          )
+        go2 :: Cabal.ExeDependency -> Maybe (PackageName, DepValue)
+        go2 (Cabal.ExeDependency pkg _name range)
+          | pkg `S.member` preInstalledPackages = Nothing
+          | otherwise = Just
+              ( fromCabalPackageName pkg
+              , DepValue
+                  { dvVersionRange = range
+                  , dvType = AsBuildTool
+                  }
+              )
 
 -- | A hard-coded map for tool dependencies
 hardCodedMap :: Map String D.PackageName
@@ -734,6 +736,16 @@ hardCodedMap = M.fromList
   , ("gtk2hsC2hs", Distribution.Package.mkPackageName "gtk2hs-buildtools")
   , ("gtk2hsHookGenerator", Distribution.Package.mkPackageName "gtk2hs-buildtools")
   , ("gtk2hsTypeGen", Distribution.Package.mkPackageName "gtk2hs-buildtools")
+  ]
+
+-- | Executable-only packages which come pre-installed with GHC and do
+-- not need to be built. Without this exception, we would either end
+-- up unnecessarily rebuilding these packages, or failing because the
+-- packages do not appear in the Stackage snapshot.
+preInstalledPackages :: Set D.PackageName
+preInstalledPackages = S.fromList
+  [ D.mkPackageName "hsc2hs"
+  , D.mkPackageName "haddock"
   ]
 
 -- | Variant of 'allBuildInfo' from Cabal that, like versions before
