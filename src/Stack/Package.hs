@@ -733,6 +733,7 @@ hardCodedMap = M.fromList
   , ("c2hs", Distribution.Package.mkPackageName "c2hs")
   , ("hscolour", Distribution.Package.mkPackageName "hscolour")
   , ("hspec-discover", Distribution.Package.mkPackageName "hspec-discover")
+  , ("hsx2hs", Distribution.Package.mkPackageName "hsx2hs")
   , ("gtk2hsC2hs", Distribution.Package.mkPackageName "gtk2hs-buildtools")
   , ("gtk2hsHookGenerator", Distribution.Package.mkPackageName "gtk2hs-buildtools")
   , ("gtk2hsTypeGen", Distribution.Package.mkPackageName "gtk2hs-buildtools")
