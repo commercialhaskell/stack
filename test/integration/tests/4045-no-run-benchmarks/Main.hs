@@ -6,15 +6,12 @@ main :: IO ()
 main = do
     stack [defaultResolverArg, "clean"]
     stack [defaultResolverArg, "build"]
-    stackOk ["test"] 
-    stackFail ["bench"] 
-    stackFail ["test", "--no-run-benchmarks"] 
-    putStrLn "DONE"
+    stackOk ["test"]
+    stackFail ["bench"]
+    stackFail ["test", "--no-run-benchmarks"]
 
 stackOk :: [String] -> IO ()
 stackOk args = stackCheckStderr args (\_ -> return ())
   
 stackFail :: [String] -> IO ()
 stackFail args = stackErrStderr args (\_ -> return ())
-
-
