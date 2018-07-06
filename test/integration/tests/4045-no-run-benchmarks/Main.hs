@@ -12,7 +12,7 @@ main = do
     putStrLn "DONE"
 
 stackOk :: [String] -> IO ()
-stackOk arg = stackCheckStderr args (\_ -> return ())
+stackOk args = stackCheckStderr args (\_ -> return ())
   
 stackFail :: [String] -> IO ()
 stackFail args = stackErrStderr args (\_ -> return ())
