@@ -1,0 +1,72 @@
+-- This file has been generated from package.yaml by hpack version 0.28.2.
+--
+-- see: https://github.com/sol/hpack
+--
+-- hash: 16e036af450badc387dc44fdf3a0e05c2493da33e2faf281f52c5e06e269fbb8
+
+name:           foff-bench-not-build
+version:        0.1.0.0
+description:    Please see the README on GitHub at <https://github.com/githubuser/foff-bench-not-build#readme>
+homepage:       https://github.com/githubuser/foff-bench-not-build#readme
+bug-reports:    https://github.com/githubuser/foff-bench-not-build/issues
+author:         Author name here
+maintainer:     example@example.com
+copyright:      2018 Author name here
+license:        BSD3
+license-file:   LICENSE
+build-type:     Simple
+cabal-version:  >= 1.10
+extra-source-files:
+
+source-repository head
+  type: git
+  location: https://github.com/githubuser/foff-bench-not-build
+
+library
+  exposed-modules:
+      Lib
+  other-modules:
+      Paths_foff_bench_not_build
+  hs-source-dirs:
+      src
+  build-depends:
+      base >=4.7 && <5
+  default-language: Haskell2010
+
+executable foff-bench-not-build-exe
+  main-is: Main.hs
+  other-modules:
+      Paths_foff_bench_not_build
+  hs-source-dirs:
+      app
+  ghc-options: -threaded -rtsopts -with-rtsopts=-N
+  build-depends:
+      base >=4.7 && <5
+    , foff-bench-not-build
+  default-language: Haskell2010
+
+test-suite foff-bench-not-build-test
+  type: exitcode-stdio-1.0
+  main-is: Spec.hs
+  other-modules:
+      Paths_foff_bench_not_build
+  hs-source-dirs:
+      test
+  ghc-options: -threaded -rtsopts -with-rtsopts=-N
+  build-depends:
+      base >=4.7 && <5
+    , foff-bench-not-build
+  default-language: Haskell2010
+
+benchmark foff-bench-not-build-bench
+  type: exitcode-stdio-1.0
+  main-is: Spec.hs
+  other-modules:
+      Paths_foff_bench_not_build
+  hs-source-dirs:
+      bench
+  ghc-options: -threaded -rtsopts -with-rtsopts=-N
+  build-depends:
+      base >=4.7 && <5
+    , foff-bench-not-build
+  default-language: Haskell2010
