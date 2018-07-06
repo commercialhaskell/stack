@@ -8,7 +8,7 @@ main = do
     stack [defaultResolverArg, "init", "--force"]
     stackCheckStderr
         ["build", "also-has-exe-foo", "has-exe-foo"]
-        (expectMessage buildMessage1)
+        (expectMessage buildMessage1) 
     stackCheckStderr
         ["build", "has-exe-foo-too"]
         (expectMessage buildMessage2)
