@@ -87,6 +87,13 @@ data GhciPkgInfo = GhciPkgInfo
     , ghciPkgPackage :: !Package
     } deriving Show
 
+-- | Loaded package description and related info.
+data GhciPkgDesc = GhciPkgDesc
+    { ghciDescPkg :: !Package
+    , ghciDescCabalFp :: !(Path Abs File)
+    , ghciDescTarget :: !Target
+    }
+
 -- Mapping from a module name to a map with all of the paths that use
 -- that name. Each of those paths is associated with a set of components
 -- that contain it. Purpose of this complex structure is for use in
@@ -154,15 +161,31 @@ ghci opts@GhciOpts{..} = do
     nonLocalTargets <- getAllNonLocalTargets inputTargets
     -- Check if additional package arguments are sensible.
     addPkgs <- checkAdditionalPackages ghciAdditionalPackages
+    -- Load package descriptions.
+    pkgDescs <- loadGhciPkgDescs buildOptsCLI localTargets
+    -- If necessary, ask user about which main module to load.
+    bopts <- view buildOptsL
+    mainFile <-
+        if ghciNoLoadModules
+            then return Nothing
+            else do
+              -- Figure out package files, in order to ask the user
+              -- about which main module to load. See the note below for
+              -- why this is done again after the build. This could
+              -- potentially be done more efficiently, because all we
+              -- need is the location of main modules, not the rest.
+              pkgs0 <- getGhciPkgInfos sourceMap addPkgs (fmap fst mfileTargets) pkgDescs
+              figureOutMainFile bopts mainIsTargets localTargets pkgs0
     -- Build required dependencies and setup local packages.
     stackYaml <- view stackYamlL
     buildDepsAndInitialSteps opts (map (packageNameText . fst) localTargets)
     targetWarnings stackYaml localTargets nonLocalTargets mfileTargets
-    -- Load the list of modules _after_ building, to catch changes in unlisted dependencies (#1180)
-    pkgs <- getGhciPkgInfos buildOptsCLI sourceMap addPkgs (fmap fst mfileTargets) localTargets
+    -- Load the list of modules _after_ building, to catch changes in
+    -- unlisted dependencies (#1180)
+    pkgs <- getGhciPkgInfos sourceMap addPkgs (fmap fst mfileTargets) pkgDescs
     checkForIssues pkgs
     -- Finally, do the invocation of ghci
-    runGhci opts localTargets mainIsTargets pkgs (maybe [] snd mfileTargets) (nonLocalTargets ++ addPkgs)
+    runGhci opts localTargets mainFile pkgs (maybe [] snd mfileTargets) (nonLocalTargets ++ addPkgs)
 
 preprocessTargets :: HasEnvConfig env => BuildOptsCLI -> [Text] -> RIO env (Either [Path Abs File] (Map PackageName Target))
 preprocessTargets buildOptsCLI rawTargets = do
@@ -321,12 +344,12 @@ runGhci
     :: HasEnvConfig env
     => GhciOpts
     -> [(PackageName, (Path Abs File, Target))]
-    -> Maybe (Map PackageName Target)
+    -> Maybe (Path Abs File)
     -> [GhciPkgInfo]
     -> [Path Abs File]
     -> [PackageName]
     -> RIO env ()
-runGhci GhciOpts{..} targets mainIsTargets pkgs extraFiles exposePackages = do
+runGhci GhciOpts{..} targets mainFile pkgs extraFiles exposePackages = do
     config <- view configL
     wc <- view $ actualCompilerVersionL.whichCompilerL
     let pkgopts = hidePkgOpts ++ genOpts ++ ghcOpts
@@ -407,8 +430,6 @@ runGhci GhciOpts{..} targets mainIsTargets pkgs extraFiles exposePackages = do
         else do
             checkForDuplicateModules pkgs
             isIntero <- checkIsIntero
-            bopts <- view buildOptsL
-            mainFile <- figureOutMainFile bopts mainIsTargets targets pkgs
             scriptOptions <- writeGhciScript tmpDirectory (renderScript isIntero pkgs mainFile ghciOnlyMain extraFiles)
             execGhci (macrosOptions ++ scriptOptions)
 
@@ -561,41 +582,24 @@ figureOutMainFile bopts mainIsTargets targets0 packages = do
     sampleMainIsArg (pkg,comp,_) =
         "--main-is " <> packageNameText pkg <> ":" <> renderComp comp
 
-getGhciPkgInfos
+loadGhciPkgDescs
     :: HasEnvConfig env
     => BuildOptsCLI
-    -> SourceMap
-    -> [PackageName]
-    -> Maybe (Map PackageName (Set (Path Abs File)))
     -> [(PackageName, (Path Abs File, Target))]
-    -> RIO env [GhciPkgInfo]
-getGhciPkgInfos buildOptsCLI sourceMap addPkgs mfileTargets localTargets = do
-    (installedMap, _, _, _) <- getInstalled
-        GetInstalledOpts
-            { getInstalledProfiling = False
-            , getInstalledHaddock   = False
-            , getInstalledSymbols   = False
-            }
-        sourceMap
-    let localLibs = [name | (name, (_, target)) <- localTargets, hasLocalComp isCLib target]
+    -> RIO env [GhciPkgDesc]
+loadGhciPkgDescs buildOptsCLI localTargets =
     forM localTargets $ \(name, (cabalfp, target)) ->
-        makeGhciPkgInfo buildOptsCLI sourceMap installedMap localLibs addPkgs mfileTargets name cabalfp target
+        loadGhciPkgDesc buildOptsCLI name cabalfp target
 
--- | Make information necessary to load the given package in GHCi.
-makeGhciPkgInfo
+-- | Load package description information for a ghci target.
+loadGhciPkgDesc
     :: HasEnvConfig env
     => BuildOptsCLI
-    -> SourceMap
-    -> InstalledMap
-    -> [PackageName]
-    -> [PackageName]
-    -> Maybe (Map PackageName (Set (Path Abs File)))
     -> PackageName
     -> Path Abs File
     -> Target
-    -> RIO env GhciPkgInfo
-makeGhciPkgInfo buildOptsCLI sourceMap installedMap locals addPkgs mfileTargets name cabalfp target = do
-    bopts <- view buildOptsL
+    -> RIO env GhciPkgDesc
+loadGhciPkgDesc buildOptsCLI name cabalfp target = do
     econfig <- view envConfigL
     bconfig <- view buildConfigL
     compilerVersion <- view actualCompilerVersionL
@@ -633,7 +637,51 @@ makeGhciPkgInfo buildOptsCLI sourceMap installedMap locals addPkgs mfileTargets 
                     (C.updatePackageDescription bi x)
                     (C.updatePackageDescription bi y))
               mbuildinfo
+    return GhciPkgDesc
+      { ghciDescPkg = pkg
+      , ghciDescCabalFp = cabalfp
+      , ghciDescTarget = target
+      }
 
+getGhciPkgInfos
+    :: HasEnvConfig env
+    => SourceMap
+    -> [PackageName]
+    -> Maybe (Map PackageName (Set (Path Abs File)))
+    -> [GhciPkgDesc]
+    -> RIO env [GhciPkgInfo]
+getGhciPkgInfos sourceMap addPkgs mfileTargets localTargets = do
+    (installedMap, _, _, _) <- getInstalled
+        GetInstalledOpts
+            { getInstalledProfiling = False
+            , getInstalledHaddock   = False
+            , getInstalledSymbols   = False
+            }
+        sourceMap
+    let localLibs =
+            [ packageName (ghciDescPkg desc)
+            | desc <- localTargets
+            , hasLocalComp isCLib (ghciDescTarget desc)
+            ]
+    forM localTargets $ \pkgDesc ->
+      makeGhciPkgInfo sourceMap installedMap localLibs addPkgs mfileTargets pkgDesc
+
+-- | Make information necessary to load the given package in GHCi.
+makeGhciPkgInfo
+    :: HasEnvConfig env
+    => SourceMap
+    -> InstalledMap
+    -> [PackageName]
+    -> [PackageName]
+    -> Maybe (Map PackageName (Set (Path Abs File)))
+    -> GhciPkgDesc
+    -> RIO env GhciPkgInfo
+makeGhciPkgInfo sourceMap installedMap locals addPkgs mfileTargets pkgDesc = do
+    bopts <- view buildOptsL
+    let pkg = ghciDescPkg pkgDesc
+        cabalfp = ghciDescCabalFp pkgDesc
+        target = ghciDescTarget pkgDesc
+        name = packageName pkg
     (mods,files,opts) <- getPackageOpts (packageOpts pkg) sourceMap installedMap locals addPkgs cabalfp
     let filteredOpts = filterWanted opts
         filterWanted = M.filterWithKey (\k _ -> k `S.member` allWanted)
@@ -641,7 +689,7 @@ makeGhciPkgInfo buildOptsCLI sourceMap installedMap locals addPkgs mfileTargets 
         setMapMaybe f = S.fromList . mapMaybe f . S.toList
     return
         GhciPkgInfo
-        { ghciPkgName = packageName pkg
+        { ghciPkgName = name
         , ghciPkgOpts = M.toList filteredOpts
         , ghciPkgDir = parent cabalfp
         , ghciPkgModules = unionModuleMaps $

@@ -72,6 +72,8 @@ Other enhancements:
 * [#3685](https://github.com/commercialhaskell/stack/issues/3685)
   Suggestion to add `'allow-newer': true` now shows path to user config
   file where this flag should be put into
+* `stack ghci` now asks which main target to load before doing the build,
+  rather than after
 
 Bug fixes:
 
