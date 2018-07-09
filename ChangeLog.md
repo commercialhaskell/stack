@@ -35,6 +35,9 @@ Behavior changes:
   `cabal-install`, avoids some bugs, and opens up some possible
   optimizations/laziness. See:
   [#4125](https://github.com/commercialhaskell/stack/issues/4125).
+* Mustache templating is not applied to large files (over 50kb) to
+  avoid performance degredation. See:
+  [#4133](https://github.com/commercialhaskell/stack/issues/4133).
 
 Other enhancements:
 
@@ -66,6 +69,9 @@ Other enhancements:
   download from a user other than `commercialstack` on Github, and can be prefixed
   with the service `github:`, `gitlab:`, or `bitbucket:`.
 * Switch to `githash` to include some unmerged bugfixes in `gitrev`
+* [#3685](https://github.com/commercialhaskell/stack/issues/3685)
+  Suggestion to add `'allow-newer': true` now shows path to user config
+  file where this flag should be put into
 
 Bug fixes:
 

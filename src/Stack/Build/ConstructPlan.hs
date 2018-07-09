@@ -225,7 +225,8 @@ constructPlan ls0 baseConfigOpts0 locals extraToBuild0 localDumpPkgs loadPackage
         else do
             planDebug $ show errs
             stackYaml <- view stackYamlL
-            prettyErrorNoIndent $ pprintExceptions errs stackYaml parents (wanted ctx)
+            stackRoot <- view stackRootL
+            prettyErrorNoIndent $ pprintExceptions errs stackYaml stackRoot parents (wanted ctx)
             throwM $ ConstructPlanFailed "Plan construction failed."
   where
     hasBaseInDeps bconfig =
@@ -922,10 +923,11 @@ data BadDependency
 pprintExceptions
     :: [ConstructPlanException]
     -> Path Abs File
+    -> Path Abs Dir
     -> ParentMap
     -> Set PackageName
     -> AnsiDoc
-pprintExceptions exceptions stackYaml parentMap wanted =
+pprintExceptions exceptions stackYaml stackRoot parentMap wanted =
     mconcat $
       [ flow "While constructing the build plan, the following exceptions were encountered:"
       , line <> line
@@ -935,7 +937,7 @@ pprintExceptions exceptions stackYaml parentMap wanted =
       , line <> line
       ] ++
       (if not onlyHasDependencyMismatches then [] else
-         [ "  *" <+> align (flow "Set 'allow-newer: true' to ignore all version constraints and build anyway.")
+         [ "  *" <+> align (flow "Set 'allow-newer: true' in " <+> toAnsiDoc (display (defaultUserConfigPath stackRoot)) <+> "to ignore all version constraints and build anyway.")
          , line <> line
          ]
       ) ++

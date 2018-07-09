@@ -18,15 +18,15 @@ module Stack.New
 
 import           Stack.Prelude
 import           Control.Monad.Trans.Writer.Strict
-import qualified Data.ByteString as SB
 import qualified Data.ByteString.Lazy as LB
 import           Data.Conduit
 import           Data.List
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
 import qualified Data.Text as T
+import qualified Data.Text.Lazy as TL
 import qualified Data.Text.Encoding as T
-import qualified Data.Text.Encoding.Error as T (lenientDecode)
+import qualified Data.Text.Lazy.Encoding as TLE
 import           Data.Time.Calendar
 import           Data.Time.Clock
 import           Network.HTTP.Download
@@ -140,7 +140,7 @@ loadTemplate name logIt = do
                                                 <> "\"")
         exists <- doesFileExist path
         if exists
-            then liftIO (fmap (T.decodeUtf8With T.lenientDecode) (SB.readFile (toFilePath path)))
+            then readFileUtf8 (toFilePath path)
             else throwM (FailedToLoadTemplate name (toFilePath path))
     relRequest :: Path Rel File -> Maybe Request
     relRequest rel = do
@@ -195,17 +195,9 @@ applyTemplate project template nonceParams dir templateText = do
                                     , ("name-as-module", nameAsModule) ]
             configParams = configTemplateParams config
             yearParam = M.singleton "year" currentYear
-        etemplateCompiled = Mustache.compileTemplate (T.unpack (templateName template)) templateText
-    templateCompiled <- case etemplateCompiled of
-      Left e -> throwM $ InvalidTemplate template (show e)
-      Right t -> return t
-    let (substitutionErrors, applied) = Mustache.checkedSubstitute templateCompiled context
-        missingKeys = S.fromList $ concatMap onlyMissingKeys substitutionErrors
-    unless (S.null missingKeys)
-         (logInfo ("\n" <> displayShow (MissingParameters project template missingKeys (configUserConfigPath config)) <> "\n"))
     files :: Map FilePath LB.ByteString <-
         catch (execWriterT $ runConduit $
-               yield (T.encodeUtf8 applied) .|
+               yield (T.encodeUtf8 templateText) .|
                unpackTemplate receiveMem id
               )
               (\(e :: ProjectTemplateException) ->
@@ -217,12 +209,36 @@ applyTemplate project template nonceParams dir templateText = do
     unless (any isPkgSpec . M.keys $ files) $
          throwM (InvalidTemplate template "Template does not contain a .cabal \
                                           \or package.yaml file")
+
+    -- Apply Mustache templating to a single file within the project
+    -- template.
+    let applyMustache bytes
+          -- Workaround for performance problems with mustache and
+          -- large files, applies to Yesod templates with large
+          -- bootstrap CSS files. See
+          -- https://github.com/commercialhaskell/stack/issues/4133.
+          | LB.length bytes < 50000
+          , Right text <- TLE.decodeUtf8' bytes = do
+              let etemplateCompiled = Mustache.compileTemplate (T.unpack (templateName template)) $ TL.toStrict text
+              templateCompiled <- case etemplateCompiled of
+                Left e -> throwM $ InvalidTemplate template (show e)
+                Right t -> return t
+              let (substitutionErrors, applied) = Mustache.checkedSubstitute templateCompiled context
+                  missingKeys = S.fromList $ concatMap onlyMissingKeys substitutionErrors
+              unless (S.null missingKeys)
+                (logInfo ("\n" <> displayShow (MissingParameters project template missingKeys (configUserConfigPath config)) <> "\n"))
+              pure $ LB.fromStrict $ encodeUtf8 applied
+
+          -- Too large or too binary
+          | otherwise = pure bytes
+
     liftM
         M.fromList
         (mapM
              (\(fp,bytes) ->
                    do path <- parseRelFile fp
-                      return (dir </> path, bytes))
+                      bytes' <- applyMustache bytes
+                      return (dir </> path, bytes'))
              (M.toList files))
   where
     onlyMissingKeys (Mustache.VariableNotFound ks) = map T.unpack ks
