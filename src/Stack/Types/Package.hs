@@ -122,8 +122,8 @@ data Package =
           ,packageVersion :: !Version                     -- ^ Version of the package
           ,packageLicense :: !(Either SPDX.License License) -- ^ The license the package was released under.
           ,packageFiles :: !GetPackageFiles               -- ^ Get all files of the package.
-          ,packageDeps :: !(Map PackageName VersionRange) -- ^ Packages that the package depends on.
-          ,packageTools :: !(Map ExeName VersionRange)    -- ^ A build tool name.
+          ,packageDeps :: !(Map PackageName DepValue)     -- ^ Packages that the package depends on, both as libraries and build tools.
+          ,packageUnknownTools :: !(Set ExeName)          -- ^ Build tools specified in the legacy manner (build-tools:) that failed the hard-coded lookup.
           ,packageAllDeps :: !(Set PackageName)           -- ^ Original dependencies (not sieved).
           ,packageGhcOptions :: ![Text]                   -- ^ Ghc options used on package.
           ,packageFlags :: !(Map FlagName Bool)           -- ^ Flags used on package.
@@ -140,6 +140,27 @@ data Package =
                                                           -- ^ If present: custom-setup dependencies
           }
  deriving (Show,Typeable)
+
+-- | The value for a map from dependency name. This contains both the
+-- version range and the type of dependency, and provides a semigroup
+-- instance.
+data DepValue = DepValue
+  { dvVersionRange :: !VersionRange
+  , dvType :: !DepType
+  }
+  deriving (Show,Typeable)
+instance Semigroup DepValue where
+  DepValue a x <> DepValue b y = DepValue (intersectVersionRanges a b) (x <> y)
+
+-- | Is this package being used as a library, or just as a build tool?
+-- If the former, we need to ensure that a library actually
+-- exists. See
+-- <https://github.com/commercialhaskell/stack/issues/2195>
+data DepType = AsLibrary | AsBuildTool
+  deriving (Show, Eq)
+instance Semigroup DepType where
+  AsLibrary <> _ = AsLibrary
+  AsBuildTool <> x = x
 
 packageIdentifier :: Package -> PackageIdentifier
 packageIdentifier pkg =

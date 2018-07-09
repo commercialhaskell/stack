@@ -31,7 +31,6 @@ module Stack.Package
   ,buildLogPath
   ,PackageException (..)
   ,resolvePackageDescription
-  ,packageDescTools
   ,packageDependencies
   ,cabalFilePackageId
   ,gpdPackageIdentifier
@@ -41,7 +40,7 @@ module Stack.Package
 
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy.Char8 as CL8
-import           Data.List (isSuffixOf, isPrefixOf)
+import           Data.List (isSuffixOf, isPrefixOf, unzip)
 import           Data.Maybe (maybe)
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
@@ -264,7 +263,7 @@ packageFromPackageDescription packageConfig pkgFlags (PackageDescriptionPair pkg
     , packageLicense = licenseRaw pkg
     , packageDeps = deps
     , packageFiles = pkgFiles
-    , packageTools = packageDescTools pkg
+    , packageUnknownTools = unknownTools
     , packageGhcOptions = packageConfigGhcOptions packageConfig
     , packageFlags = packageConfigFlags packageConfig
     , packageDefaultFlags = M.fromList
@@ -364,17 +363,27 @@ packageFromPackageDescription packageConfig pkgFlags (PackageDescriptionPair pkg
              return (componentModules, componentFiles, buildFiles <> dataFiles', warnings)
     pkgId = package pkg
     name = fromCabalPackageName (pkgName pkgId)
-    deps = M.filterWithKey (const . not . isMe) (M.union
-        (packageDependencies packageConfig pkg)
+
+    (unknownTools, knownTools) = packageDescTools pkg
+
+    deps = M.filterWithKey (const . not . isMe) (M.unionsWith (<>)
+        [ asLibrary <$> packageDependencies packageConfig pkg
         -- We include all custom-setup deps - if present - in the
         -- package deps themselves. Stack always works with the
         -- invariant that there will be a single installed package
         -- relating to a package name, and this applies at the setup
         -- dependency level as well.
-        (fromMaybe M.empty msetupDeps))
+        , asLibrary <$> fromMaybe M.empty msetupDeps
+        , knownTools
+        ])
     msetupDeps = fmap
         (M.fromList . map (depName &&& depRange) . setupDepends)
         (setupBuildInfo pkg)
+
+    asLibrary range = DepValue
+      { dvVersionRange = range
+      , dvType = AsLibrary
+      }
 
     -- Is the package dependency mentioned here me: either the package
     -- name itself, or the name of one of the sub libraries
@@ -678,17 +687,67 @@ packageDependencies pkgConfig pkg' =
 --
 -- This uses both the new 'buildToolDepends' and old 'buildTools'
 -- information.
-packageDescTools :: PackageDescription -> Map ExeName VersionRange
-packageDescTools =
-  M.fromList . concatMap tools . allBuildInfo'
+packageDescTools
+  :: PackageDescription
+  -> (Set ExeName, Map PackageName DepValue)
+packageDescTools pd =
+    (S.fromList $ concat unknowns, M.fromListWith (<>) $ concat knowns)
   where
-    tools bi = map go1 (buildTools bi) ++ map go2 (buildToolDepends bi)
+    (unknowns, knowns) = unzip $ map perBI $ allBuildInfo' pd
 
-    go1 :: Cabal.LegacyExeDependency -> (ExeName, VersionRange)
-    go1 (Cabal.LegacyExeDependency name range) = (ExeName $ T.pack name, range)
+    perBI :: BuildInfo -> ([ExeName], [(PackageName, DepValue)])
+    perBI bi =
+        (unknownTools, tools)
+      where
+        (unknownTools, knownTools) = partitionEithers $ map go1 (buildTools bi)
 
-    go2 :: Cabal.ExeDependency -> (ExeName, VersionRange)
-    go2 (Cabal.ExeDependency _pkg name range) = (ExeName $ T.pack $ Cabal.unUnqualComponentName name, range)
+        tools = mapMaybe go2 (knownTools ++ buildToolDepends bi)
+
+        -- This is similar to desugarBuildTool from Cabal, however it
+        -- uses our own hard-coded map which drops tools shipped with
+        -- GHC (like hsc2hs), and includes some tools from Stackage.
+        go1 :: Cabal.LegacyExeDependency -> Either ExeName Cabal.ExeDependency
+        go1 (Cabal.LegacyExeDependency name range) =
+          case M.lookup name hardCodedMap of
+            Just pkgName -> Right $ Cabal.ExeDependency pkgName (Cabal.mkUnqualComponentName name) range
+            Nothing -> Left $ ExeName $ T.pack name
+
+        go2 :: Cabal.ExeDependency -> Maybe (PackageName, DepValue)
+        go2 (Cabal.ExeDependency pkg _name range)
+          | pkg `S.member` preInstalledPackages = Nothing
+          | otherwise = Just
+              ( fromCabalPackageName pkg
+              , DepValue
+                  { dvVersionRange = range
+                  , dvType = AsBuildTool
+                  }
+              )
+
+-- | A hard-coded map for tool dependencies
+hardCodedMap :: Map String D.PackageName
+hardCodedMap = M.fromList
+  [ ("alex", Distribution.Package.mkPackageName "alex")
+  , ("happy", Distribution.Package.mkPackageName "happy")
+  , ("cpphs", Distribution.Package.mkPackageName "cpphs")
+  , ("greencard", Distribution.Package.mkPackageName "greencard")
+  , ("c2hs", Distribution.Package.mkPackageName "c2hs")
+  , ("hscolour", Distribution.Package.mkPackageName "hscolour")
+  , ("hspec-discover", Distribution.Package.mkPackageName "hspec-discover")
+  , ("hsx2hs", Distribution.Package.mkPackageName "hsx2hs")
+  , ("gtk2hsC2hs", Distribution.Package.mkPackageName "gtk2hs-buildtools")
+  , ("gtk2hsHookGenerator", Distribution.Package.mkPackageName "gtk2hs-buildtools")
+  , ("gtk2hsTypeGen", Distribution.Package.mkPackageName "gtk2hs-buildtools")
+  ]
+
+-- | Executable-only packages which come pre-installed with GHC and do
+-- not need to be built. Without this exception, we would either end
+-- up unnecessarily rebuilding these packages, or failing because the
+-- packages do not appear in the Stackage snapshot.
+preInstalledPackages :: Set D.PackageName
+preInstalledPackages = S.fromList
+  [ D.mkPackageName "hsc2hs"
+  , D.mkPackageName "haddock"
+  ]
 
 -- | Variant of 'allBuildInfo' from Cabal that, like versions before
 -- 2.2, only includes buildable components.
