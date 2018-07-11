@@ -9,6 +9,7 @@ main = do
   stack ["clean"] -- to make sure we can load the code even after a clean
   copy "src/Lib.v1" "src/Lib.hs"
   copy "src-internal/Internal.v1" "src-internal/Internal.hs"
+  stack ["build"] -- need a build before ghci at the moment, see #4148
   forkIO fileEditingThread
   replThread
 
