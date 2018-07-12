@@ -19,7 +19,7 @@ flags:
 extra-deps:
 - rio-0.1.1.0@rev:0
 - Cabal-2.2.0.1@rev:0
-- hpack-0.28.2
+- hpack-0.29.0@rev:0
 - http-api-data-0.3.8.1@rev:0
 - githash-0.1.0.0@rev:0
 
