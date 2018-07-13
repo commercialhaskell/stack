@@ -830,8 +830,8 @@ execCmd ExecOpts {..} go@GlobalOpts{..} =
                     (ExecCmd cmd, args) -> return (cmd, args)
                     (ExecRun, args) -> getRunCmd args
                     (ExecGhc, args) -> getGhcCmd "" eoPackages args
-                    -- NOTE: this won't currently work for GHCJS, because it doesn't have
-                    -- a runghcjs binary. It probably will someday, though.
+                    -- NOTE: This doesn't work for GHCJS, because it doesn't have
+                    -- a runghcjs binary.
                     (ExecRunGhc, args) ->
                         getGhcCmd "run" eoPackages args
                 munlockFile lk -- Unlock before transferring control away.
