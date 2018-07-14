@@ -74,6 +74,7 @@ Other enhancements:
   file where this flag should be put into
 * `stack ghci` now asks which main target to load before doing the build,
   rather than after
+* Bump to hpack 0.29.0
 
 Bug fixes:
 

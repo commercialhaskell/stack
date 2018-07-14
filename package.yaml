@@ -61,7 +61,7 @@ dependencies:
 - generic-deriving
 - hackage-security
 - hashable
-- hpack
+- hpack >= 0.29
 - hpc
 - http-client
 - http-client-tls
