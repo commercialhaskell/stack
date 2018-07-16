@@ -25,6 +25,7 @@ module Stack.Types.PackageName
   where
 
 import           Stack.Prelude
+import           Pantry
 import           Data.Aeson.Extended
 import           Data.Attoparsec.Combinators
 import           Data.Attoparsec.Text

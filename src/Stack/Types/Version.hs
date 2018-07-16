@@ -36,6 +36,7 @@ module Stack.Types.Version
   where
 
 import           Stack.Prelude hiding (Vector)
+import           Pantry
 import           Data.Aeson.Extended
 import           Data.Attoparsec.Text
 import           Data.Hashable (Hashable (..))

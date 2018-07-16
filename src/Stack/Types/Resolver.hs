@@ -52,6 +52,7 @@ import           Data.Time (Day)
 import           Network.HTTP.StackClient (Request, parseUrlThrow)
 import           Options.Applicative (ReadM)
 import qualified Options.Applicative.Types as OA
+import           Pantry.StaticSHA256
 import           Path
 import           Stack.Prelude
 import           Stack.Types.Compiler

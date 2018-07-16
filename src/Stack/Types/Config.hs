@@ -1965,8 +1965,7 @@ class (HasRunner env, HasPantryConfig env) => HasCabalLoader env where -- FIXME!
 
 data CabalLoader = CabalLoader
   { clPantryConfig :: !PantryConfig
-  , clCache :: !(IORef (Maybe (PackageCache PackageIndex))) -- FIXME remove
-  , clStackRoot :: !(Path Abs Dir) -- FIXME move to PantryConfig
+  , clStackRoot :: !(Path Abs Dir) -- FIXME move to Config
   -- ^ ~/.stack more often than not
   , clUpdateRef :: !(MVar Bool)
   -- ^ Want to try updating the index once during a single run for missing

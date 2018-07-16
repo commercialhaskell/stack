@@ -49,6 +49,7 @@ import qualified Data.Store as Store
 import           Data.Store.VersionTagged
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as TE
+import           Pantry.StaticSHA256
 import           Path
 import           Path.IO
 import           Stack.Constants.Config

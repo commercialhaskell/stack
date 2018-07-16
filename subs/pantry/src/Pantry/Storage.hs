@@ -24,22 +24,22 @@ import Database.Persist
 import Database.Persist.Sqlite -- FIXME allow PostgreSQL too
 import Database.Persist.TH
 import RIO.Orphans ()
-import qualified Crypto.Hash
+import Pantry.StaticSHA256
 
 share [mkPersist sqlSettings, mkMigrate "migrateAll"] [persistLowerCase|
 BlobTable sql=blob
-    hash Text
+    hash BlobKey
     contents ByteString
     UniqueBlobHash hash
 Name sql=package_name
     name Text
     UniquePackageName name
-Version
+VersionTable sql=version
     version Text
     UniqueVersion version
 Hackage
     name NameId
-    version VersionId
+    version VersionTableId
     revision Int
     cabal BlobTableId
     UniqueHackage name version revision
@@ -72,25 +72,24 @@ getNameId = fmap (either entityKey id) . insertBy . Name
 getVersionId
   :: (HasPantryConfig env, HasLogFunc env)
   => Text
-  -> ReaderT SqlBackend (RIO env) VersionId
-getVersionId = fmap (either entityKey id) . insertBy . Version
+  -> ReaderT SqlBackend (RIO env) VersionTableId
+getVersionId = fmap (either entityKey id) . insertBy . VersionTable
 
 storeBlob
   :: (HasPantryConfig env, HasLogFunc env)
   => ByteString
   -> ReaderT SqlBackend (RIO env) (BlobTableId, BlobKey)
 storeBlob bs = do
-  let h = Crypto.Hash.hash bs
-      txt = fromString $ show h
-  keys <- selectKeysList [BlobTableHash ==. txt] []
+  let blobKey = BlobKey $ mkStaticSHA256FromBytes bs
+  keys <- selectKeysList [BlobTableHash ==. blobKey] []
   key <-
     case keys of
       [] -> insert BlobTable
-              { blobTableHash = txt
+              { blobTableHash = blobKey
               , blobTableContents = bs
               }
       key:rest -> assert (null rest) (pure key)
-  pure (key, BlobKey h)
+  pure (key, blobKey)
 
 clearHackageRevisions
   :: (HasPantryConfig env, HasLogFunc env)

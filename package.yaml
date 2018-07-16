@@ -237,7 +237,6 @@ library:
   - Stack.Sig.Sign
   - Stack.Snapshot
   - Stack.Solver
-  - Stack.StaticBytes
   - Stack.Types.Build
   - Stack.Types.BuildPlan
   - Stack.Types.CompilerBuild
@@ -270,6 +269,8 @@ library:
   - Pantry
   other-modules:
   - Pantry.Hackage
+  - Pantry.StaticBytes
+  - Pantry.StaticSHA256
   - Pantry.Storage
   - Pantry.Types
   - Hackage.Security.Client.Repository.HttpLib.HttpClient

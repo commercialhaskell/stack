@@ -6,7 +6,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE NoImplicitPrelude #-}
-module Stack.StaticBytes
+module Pantry.StaticBytes
   ( Bytes8
   , Bytes16
   , Bytes32

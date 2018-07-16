@@ -44,6 +44,7 @@ import           Data.Text.Encoding (encodeUtf8)
 import qualified Distribution.ModuleName as C
 import qualified Distribution.Version as C
 import           Network.HTTP.StackClient (parseRequest)
+import           Pantry.StaticSHA256
 import           Stack.Prelude
 import           Stack.Types.Compiler
 import           Stack.Types.FlagName
@@ -102,7 +103,7 @@ instance Store SnapshotDef
 instance NFData SnapshotDef
 
 snapshotDefVC :: VersionConfig SnapshotDef
-snapshotDefVC = storeVersionConfig "sd-v1" "CKo7nln8EXkw07Gq-4ATxszNZiE="
+snapshotDefVC = storeVersionConfig "sd-v2" "_SAu0TNzLmFssm-W8SyQAnRIWUY="
 
 -- | A relative file path including a unique string for the given
 -- snapshot.
@@ -310,7 +311,7 @@ instance Store LoadedSnapshot
 instance NFData LoadedSnapshot
 
 loadedSnapshotVC :: VersionConfig LoadedSnapshot
-loadedSnapshotVC = storeVersionConfig "ls-v5" "CeSRWh1VU8v0__kwA__msbe6WlU="
+loadedSnapshotVC = storeVersionConfig "ls-v6" "zsq0lg3kp3PUu1FjB8psUB75u20="
 
 -- | Information on a single package for the 'LoadedSnapshot' which
 -- can be installed.

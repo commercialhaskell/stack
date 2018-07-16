@@ -30,6 +30,7 @@ import Data.Text.Encoding (encodeUtf8, decodeUtf8)
 import Distribution.PackageDescription (GenericPackageDescription)
 import Network.HTTP.StackClient (parseUrlThrow)
 import Network.HTTP.Download.Verified
+import Pantry.StaticSHA256
 import Path
 import Path.Extra
 import Path.IO
@@ -77,7 +78,7 @@ resolveSinglePackageLocation projRoot (PLArchive (Archive url subdir msha)) = do
               case msha of
                 Nothing -> return ()
                 Just sha -> do
-                  actualSha <- mkStaticSHA256FromFile file
+                  actualSha <- mkStaticSHA256FromFile $ toFilePath file
                   when (sha /= actualSha) $ error $ concat
                     [ "Invalid SHA256 found for local archive "
                     , show file

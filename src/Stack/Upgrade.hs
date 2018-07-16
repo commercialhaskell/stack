@@ -224,12 +224,11 @@ sourceUpgrade gConfigMonoid mresolver builtHash (SourceOpts gitRepo) =
 #endif
                 return $ Just $ tmp </> $(mkRelDir "stack")
       Nothing -> do
-        updateAllIndices
-        PackageCache caches <- getPackageCaches
+        updateHackageIndex
+        versions0 <- getPackageVersions "stack"
         let versions
                 = filter (/= $(mkVersion "9.9.9")) -- Mistaken upload to Hackage, just ignore it
-                $ maybe [] HashMap.keys
-                $ HashMap.lookup $(mkPackageName "stack") caches
+                $ HashMap.keys versions0
 
         when (null versions) (throwString "No stack found in package indices")
 

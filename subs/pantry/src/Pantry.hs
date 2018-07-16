@@ -8,6 +8,12 @@ module Pantry
   , HasPantryConfig (..)
   , mkPantryConfig
 
+    -- * Types
+  , StaticSHA256
+  , CabalHash (..)
+  -- FIXME , PackageName
+  -- FIXME , Version
+
     -- * Hackage index
   , updateHackageIndex
   , hackageIndexTarballL
@@ -30,6 +36,7 @@ module Pantry
 import RIO
 import RIO.FilePath ((</>))
 import Pantry.Storage (initStorage)
+import Pantry.StaticSHA256
 import Pantry.Types
 import Pantry.Hackage
 

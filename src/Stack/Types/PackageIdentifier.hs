@@ -28,15 +28,7 @@ module Stack.Types.PackageIdentifier
   , packageIdentifierText
   , toCabalPackageIdentifier
   , fromCabalPackageIdentifier
-  , StaticSHA256
-  , mkStaticSHA256FromText
-  , mkStaticSHA256FromFile
-  , mkStaticSHA256FromDigest
-  , staticSHA256ToText
-  , staticSHA256ToBase16
-  , staticSHA256ToRaw
-  )
-  where
+  ) where
 
 import           Stack.Prelude
 import           Crypto.Hash.Conduit (hashFile)
@@ -49,7 +41,8 @@ import qualified Data.ByteString.Lazy as L
 import qualified Data.Text as T
 import           Data.Text.Encoding (decodeUtf8, encodeUtf8)
 import qualified Distribution.Package as C
-import           Stack.StaticBytes
+import           Pantry
+import           Pantry.StaticSHA256
 import           Stack.Types.PackageName
 import           Stack.Types.Version
 
@@ -115,52 +108,6 @@ instance FromJSON PackageIdentifierRevision where
     case parsePackageIdentifierRevision t of
       Left e -> fail $ show (e, t)
       Right x -> return x
-
--- | A cryptographic hash of a Cabal file.
-newtype CabalHash = CabalHash { unCabalHash :: StaticSHA256 }
-    deriving (Generic, Show, Eq, NFData, Data, Typeable, Ord, Store, Hashable)
-
--- | A SHA256 hash, stored in a static size for more efficient
--- serialization with store.
-newtype StaticSHA256 = StaticSHA256 Bytes32
-    deriving (Generic, Show, Eq, NFData, Data, Typeable, Ord, Hashable, Store)
-
--- | Generate a 'StaticSHA256' value from a base16-encoded SHA256 hash.
-mkStaticSHA256FromText :: Text -> Either SomeException StaticSHA256
-mkStaticSHA256FromText t =
-  mapLeft (toException . stringException) (Mem.convertFromBase Mem.Base16 (encodeUtf8 t))
-  >>= either (Left . toE) (Right . StaticSHA256)
-    . toStaticExact
-    . (id :: ByteString -> ByteString)
-  where
-    toE e = toException $ stringException $ concat
-      [ "Unable to convert "
-      , show t
-      , " into SHA256: "
-      , show e
-      ]
-
--- | Generate a 'StaticSHA256' value from the contents of a file.
-mkStaticSHA256FromFile :: MonadIO m => Path Abs File -> m StaticSHA256
-mkStaticSHA256FromFile fp = liftIO $ mkStaticSHA256FromDigest <$> hashFile (toFilePath fp)
-
-mkStaticSHA256FromDigest :: Hash.Digest Hash.SHA256 -> StaticSHA256
-mkStaticSHA256FromDigest digest
-  = StaticSHA256
-  $ either impureThrow id
-  $ toStaticExact
-    (Data.ByteArray.convert digest :: ByteString)
-
--- | Convert a 'StaticSHA256' into a base16-encoded SHA256 hash.
-staticSHA256ToText :: StaticSHA256 -> Text
-staticSHA256ToText = decodeUtf8 . staticSHA256ToBase16
-
--- | Convert a 'StaticSHA256' into a base16-encoded SHA256 hash.
-staticSHA256ToBase16 :: StaticSHA256 -> ByteString
-staticSHA256ToBase16 (StaticSHA256 x) = Mem.convertToBase Mem.Base16 x
-
-staticSHA256ToRaw :: StaticSHA256 -> ByteString
-staticSHA256ToRaw (StaticSHA256 x) = Data.ByteArray.convert x
 
 -- | Generate a 'CabalHash' value from a base16-encoded SHA256 hash.
 mkCabalHashFromSHA256 :: Text -> Either SomeException CabalHash
