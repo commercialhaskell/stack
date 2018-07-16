@@ -25,3 +25,6 @@ tags
 /.git/
 /stack.cabal
 /etc/scripts/stack-scripts.cabal
+.hspec-failures
+better-cache/
+subs/
