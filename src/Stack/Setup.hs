@@ -76,7 +76,7 @@ import              Stack.Build (build)
 import              Stack.Config (loadConfig)
 import              Stack.Constants (stackProgName)
 import              Stack.Constants.Config (distRelativeDir)
-import              Stack.Fetch
+import              Pantry
 import              Stack.GhcPkg (createDatabase, getCabalPkgVer, getGlobalDB, mkGhcPackagePath, ghcPkgPathEnvVar)
 import              Stack.Prelude hiding (Display (..))
 import              Stack.PrettyPrint

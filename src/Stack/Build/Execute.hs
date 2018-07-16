@@ -71,7 +71,7 @@ import           Stack.Config
 import           Stack.Constants
 import           Stack.Constants.Config
 import           Stack.Coverage
-import           Stack.Fetch as Fetch
+import           Pantry
 import           Stack.GhcPkg
 import           Stack.Package
 import           Stack.PackageDump

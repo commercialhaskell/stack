@@ -44,8 +44,8 @@ dependencies:
 - base >=4.10 && < 5
 - base64-bytestring
 - bytestring
-- conduit
-- conduit-extra >= 1.2.3.1
+- conduit >= 1.3
+- conduit-extra >= 1.3
 - containers
 - cryptonite
 - cryptonite-conduit
@@ -90,8 +90,10 @@ dependencies:
 - project-template
 - regex-applicative-text
 - resourcet
+- resource-pool
 - retry
 - rio
+- rio-orphans
 - semigroups
 - split
 - stm
@@ -99,6 +101,7 @@ dependencies:
 - store-core
 - streaming-commons
 - tar
+- tar-conduit
 - template-haskell
 - temporary
 - text
@@ -129,7 +132,9 @@ when:
     - bindings-uname
     - unix
 library:
-  source-dirs: src/
+  source-dirs:
+  - src/
+  - subs/pantry/src
   ghc-options:
   - -fwarn-identities
   verbatim:
@@ -179,7 +184,6 @@ library:
   - Stack.Docker
   - Stack.Docker.GlobalDB
   - Stack.Dot
-  - Stack.Fetch
   - Stack.FileWatch
   - Stack.GhcPkg
   - Stack.Ghci
@@ -218,7 +222,6 @@ library:
   - Stack.Options.Utils
   - Stack.Package
   - Stack.PackageDump
-  - Stack.PackageIndex
   - Stack.PackageLocation
   - Stack.Path
   - Stack.Prelude
@@ -264,7 +267,11 @@ library:
   - Text.PrettyPrint.Leijen.Extended
   - System.Process.PagerEditor
   - System.Terminal
+  - Pantry
   other-modules:
+  - Pantry.Hackage
+  - Pantry.Storage
+  - Pantry.Types
   - Hackage.Security.Client.Repository.HttpLib.HttpClient
   when:
   - condition: 'os(windows)'

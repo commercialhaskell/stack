@@ -51,7 +51,7 @@ import           Stack.Config (getInContainer)
 import           Stack.Constants
 import           Stack.Constants.Config
 import           Stack.Docker.GlobalDB
-import           Stack.PackageIndex
+import           Pantry
 import           Stack.Types.PackageIndex
 import           Stack.Types.Runner
 import           Stack.Types.Version
@@ -758,6 +758,8 @@ entrypoint config@Config{..} DockerEntrypoint{..} =
               unless exists $ do
                 ensureDir (parent destBuildPlan)
                 copyFile srcBuildPlan destBuildPlan
+          error "FIXME clIndices"
+          {-
           forM_ clIndices $ \pkgIdx -> do
             msrcIndex <- runRIO (set stackRootL origStackRoot config) $ do
                srcIndex <- configPackageIndex (indexName pkgIdx)
@@ -774,6 +776,7 @@ entrypoint config@Config{..} DockerEntrypoint{..} =
                   unless exists $ do
                     ensureDir (parent destIndex)
                     copyFile srcIndex destIndex
+          -}
     return True
   where
     CabalLoader {..} = configCabalLoader

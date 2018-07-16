@@ -17,7 +17,7 @@ import qualified Data.Text as T
 import           Path (parseAbsFile)
 import           Path.IO hiding (findExecutable)
 import qualified Stack.Build
-import           Stack.Fetch
+import           Pantry
 import           Stack.Runners
 import           Stack.Types.Config
 import           Stack.Types.PackageIdentifier

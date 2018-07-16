@@ -15,12 +15,12 @@ import qualified Data.Text as T
 import qualified Data.Text.IO as T
 import           Lens.Micro (lens)
 import qualified Options.Applicative as OA
+import           Pantry (HasPantryConfig (..))
 import           Path
 import           Path.Extra
 import           Stack.Constants
 import           Stack.Constants.Config
 import           Stack.GhcPkg as GhcPkg
-import           Stack.PackageIndex (HasCabalLoader (..))
 import           Stack.Types.Config
 import           Stack.Types.Runner
 import qualified System.FilePath as FP
@@ -119,6 +119,8 @@ instance HasLogFunc PathInfo where
 instance HasRunner PathInfo where
     runnerL = configL.runnerL
 instance HasConfig PathInfo
+instance HasPantryConfig PathInfo where
+    pantryConfigL = configL.pantryConfigL
 instance HasCabalLoader PathInfo where
     cabalLoaderL = configL.cabalLoaderL
 instance HasProcessContext PathInfo where

@@ -43,7 +43,7 @@ import           Stack.Build.Source
 import           Stack.Constants
 import           Stack.Package
 import           Stack.PackageDump
-import           Stack.PackageIndex
+import           Pantry
 import           Stack.PrettyPrint
 import           Stack.Types.Build
 import           Stack.Types.BuildPlan
@@ -146,6 +146,8 @@ instance HasLogFunc Ctx where
 instance HasRunner Ctx where
     runnerL = configL.runnerL
 instance HasConfig Ctx
+instance HasPantryConfig Ctx where
+    pantryConfigL = configL.pantryConfigL
 instance HasCabalLoader Ctx where
     cabalLoaderL = configL.cabalLoaderL
 instance HasProcessContext Ctx where

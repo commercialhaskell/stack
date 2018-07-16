@@ -62,7 +62,6 @@ import qualified Stack.Docker as Docker
 import           Stack.Dot
 import           Stack.GhcPkg (findGhcPkgField)
 import qualified Stack.Nix as Nix
-import           Stack.Fetch
 import           Stack.FileWatch
 import           Stack.Ghci
 import           Stack.Hoogle
@@ -86,7 +85,7 @@ import           Stack.Options.ScriptParser
 import           Stack.Options.SDistParser
 import           Stack.Options.SolverParser
 import           Stack.Options.Utils
-import qualified Stack.PackageIndex
+import           Pantry
 import qualified Stack.Path
 import           Stack.PrettyPrint
 import           Stack.Runners
@@ -667,11 +666,11 @@ unpackCmd :: ([String], Maybe Text) -> GlobalOpts -> IO ()
 unpackCmd (names, Nothing) go = unpackCmd (names, Just ".") go
 unpackCmd (names, Just dstPath) go = withConfigAndLock go $ do
     mSnapshotDef <- mapM (makeConcreteResolver Nothing >=> loadResolver) (globalResolver go)
-    Stack.Fetch.unpackPackages mSnapshotDef (T.unpack dstPath) names
+    unpackPackages mSnapshotDef (T.unpack dstPath) names
 
 -- | Update the package index
 updateCmd :: () -> GlobalOpts -> IO ()
-updateCmd () go = withConfigAndLock go Stack.PackageIndex.updateAllIndices
+updateCmd () go = withConfigAndLock go updateAllIndices
 
 upgradeCmd :: UpgradeOpts -> GlobalOpts -> IO ()
 upgradeCmd upgradeOpts' go = withGlobalConfigAndLock go $

@@ -50,7 +50,7 @@ import           Stack.BuildPlan
 import           Stack.Config (getLocalPackages, loadConfigYaml)
 import           Stack.Constants (stackDotYaml, wiredInPackages)
 import           Stack.Package               (readPackageUnresolvedDir, gpdPackageName)
-import           Stack.PackageIndex
+import           Pantry
 import           Stack.PrettyPrint
 import           Stack.Setup
 import           Stack.Setup.Installed
@@ -227,29 +227,22 @@ getCabalConfig :: HasConfig env
                -> Map PackageName Version -- ^ constraints
                -> RIO env [Text]
 getCabalConfig dir constraintType constraints = do
-    indices <- view $ cabalLoaderL.to clIndices
-    remotes <- mapM goIndex indices
-    let cache = T.pack $ "remote-repo-cache: " ++ dir
-    return $ cache : remotes ++ map goConstraint (Map.toList constraints)
-  where
-    goIndex index = do
-        src <- configPackageIndex $ indexName index
-        let dstdir = dir FP.</> T.unpack (indexNameText $ indexName index)
-            -- NOTE: see https://github.com/commercialhaskell/stack/issues/2888
-            -- for why we are pretending that a 01-index.tar is actually a
-            -- 00-index.tar file.
-            dst0 = dstdir FP.</> "00-index.tar"
-            dst1 = dstdir FP.</> "01-index.tar"
-        liftIO $ void $ tryIO $ do
-            D.createDirectoryIfMissing True dstdir
-            D.copyFile (toFilePath src) dst0
-            D.copyFile (toFilePath src) dst1
-        return $ T.concat
-            [ "remote-repo: "
-            , indexNameText $ indexName index
-            , ":http://0.0.0.0/fake-url"
-            ]
+    src <- view hackageIndexTarballL
+    let dstdir = dir FP.</> "hackage"
+        -- NOTE: see https://github.com/commercialhaskell/stack/issues/2888
+        -- for why we are pretending that a 01-index.tar is actually a
+        -- 00-index.tar file.
+        dst0 = dstdir FP.</> "00-index.tar"
+        dst1 = dstdir FP.</> "01-index.tar"
+    liftIO $ void $ tryIO $ do
+        D.createDirectoryIfMissing True dstdir
+        D.copyFile src dst0
+        D.copyFile src dst1
 
+    let cache = T.pack $ "remote-repo-cache: " ++ dir
+        remote = "remote-repo: hackage:http://0.0.0.0/fake-url"
+    return $ cache : remote : map goConstraint (Map.toList constraints)
+  where
     goConstraint (name, version) =
         assert (not . null . versionString $ version) $
             T.concat

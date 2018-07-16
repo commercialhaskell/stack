@@ -80,7 +80,7 @@ import           Path
 import           Path.Extra (rejectMissingDir)
 import           Path.IO
 import           Stack.Config (getLocalPackages)
-import           Stack.PackageIndex
+import           Pantry
 import           Stack.PackageLocation
 import           Stack.Snapshot (calculatePackagePromotion)
 import           Stack.Types.Config

@@ -168,6 +168,9 @@ module Stack.Types.Config
   -- * Lens reexport
   ,view
   ,to
+  -- * FIXME!
+  , CabalLoader (..)
+  , HasCabalLoader (..)
   ) where
 
 import           Control.Monad.Writer (tell)
@@ -207,9 +210,9 @@ import           Options.Applicative (ReadM)
 import qualified Options.Applicative as OA
 import qualified Options.Applicative.Types as OA
 import           Path
+import           Pantry
 import qualified Paths_stack as Meta
 import           Stack.Constants
-import           Stack.PackageIndex (HasCabalLoader (..), CabalLoader (clStackRoot))
 import           Stack.Types.BuildPlan
 import           Stack.Types.Compiler
 import           Stack.Types.CompilerBuild
@@ -1899,6 +1902,15 @@ instance HasProcessContext BuildConfig where
 instance HasProcessContext EnvConfig where
     processContextL = configL.processContextL
 
+instance HasPantryConfig Config where
+    pantryConfigL = cabalLoaderL.pantryConfigL
+instance HasPantryConfig LoadConfig where
+    pantryConfigL = configL.pantryConfigL
+instance HasPantryConfig BuildConfig where
+    pantryConfigL = configL.pantryConfigL
+instance HasPantryConfig EnvConfig where
+    pantryConfigL = configL.pantryConfigL
+
 instance HasCabalLoader Config where
     cabalLoaderL = lens configCabalLoader (\x y -> x { configCabalLoader = y })
 instance HasCabalLoader LoadConfig where
@@ -1947,6 +1959,30 @@ instance HasLogFunc EnvConfig where
 -----------------------------------
 -- Helper lenses
 -----------------------------------
+
+class (HasRunner env, HasPantryConfig env) => HasCabalLoader env where -- FIXME!
+  cabalLoaderL :: Lens' env CabalLoader
+
+data CabalLoader = CabalLoader
+  { clPantryConfig :: !PantryConfig
+  , clCache :: !(IORef (Maybe (PackageCache PackageIndex))) -- FIXME remove
+  , clStackRoot :: !(Path Abs Dir) -- FIXME move to PantryConfig
+  -- ^ ~/.stack more often than not
+  , clUpdateRef :: !(MVar Bool)
+  -- ^ Want to try updating the index once during a single run for missing
+  -- package identifiers. We also want to ensure we only update once at a
+  -- time. Start at @True@.
+  --
+  -- TODO: probably makes sense to move this concern into getPackageCaches
+  , clConnectionCount :: !Int -- FIXME move to PantryConfig
+  -- ^ How many concurrent connections are allowed when downloading
+  , clIgnoreRevisionMismatch :: !Bool -- FIXME hopefully no longer needed at all
+  -- ^ Ignore a revision mismatch when loading up cabal files,
+  -- and fall back to the latest revision. See:
+  -- <https://github.com/commercialhaskell/stack/issues/3520>
+  }
+instance HasPantryConfig CabalLoader where
+  pantryConfigL = lens clPantryConfig (\x y -> x { clPantryConfig = y })
 
 stackRootL :: HasCabalLoader s => Lens' s (Path Abs Dir)
 stackRootL = cabalLoaderL.lens clStackRoot (\x y -> x { clStackRoot = y })

@@ -28,8 +28,7 @@ import           Stack.Config
 #ifdef WINDOWS
 import           Stack.DefaultColorWhen (defaultColorWhen)
 #endif
-import           Stack.Fetch
-import           Stack.PackageIndex
+import           Pantry
 import           Stack.PrettyPrint
 import           Stack.Setup
 import           Stack.Types.PackageIdentifier

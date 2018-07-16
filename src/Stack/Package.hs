@@ -77,8 +77,7 @@ import           Path.IO hiding (findFiles)
 import           Stack.Build.Installed
 import           Stack.Constants
 import           Stack.Constants.Config
-import           Stack.Fetch (loadFromIndex)
-import           Stack.PackageIndex (HasCabalLoader (..))
+import           Pantry
 import           Stack.Prelude hiding (Display (..))
 import           Stack.PrettyPrint
 import           Stack.Types.Build
@@ -111,6 +110,8 @@ instance HasLogFunc Ctx where
 instance HasRunner Ctx where
     runnerL = configL.runnerL
 instance HasConfig Ctx
+instance HasPantryConfig Ctx where
+    pantryConfigL = configL.pantryConfigL
 instance HasCabalLoader Ctx where
     cabalLoaderL = configL.cabalLoaderL
 instance HasProcessContext Ctx where
