@@ -7,6 +7,8 @@ Release notes:
 
 Major changes:
 
+* `GHCJS` support is being deprecated after the next major Stack release. At time of writing the upcoming release is 1.8. A warning notifying the user of the deprecation will be incorporated into 1.8.
+
 Behavior changes:
 
 * `ghc-options` from `stack.yaml` are now appended to `ghc-options` from
