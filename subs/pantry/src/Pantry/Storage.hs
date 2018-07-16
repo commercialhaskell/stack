@@ -32,10 +32,10 @@ BlobTable sql=blob
     contents ByteString
     UniqueBlobHash hash
 Name sql=package_name
-    name Text
+    name PackageNameP
     UniquePackageName name
 VersionTable sql=version
-    version Text
+    version VersionP
     UniqueVersion version
 Hackage
     name NameId
@@ -65,15 +65,15 @@ withStorage action = do
 
 getNameId
   :: (HasPantryConfig env, HasLogFunc env)
-  => Text
+  => PackageName
   -> ReaderT SqlBackend (RIO env) NameId
-getNameId = fmap (either entityKey id) . insertBy . Name
+getNameId = fmap (either entityKey id) . insertBy . Name . PackageNameP
 
 getVersionId
   :: (HasPantryConfig env, HasLogFunc env)
-  => Text
+  => Version
   -> ReaderT SqlBackend (RIO env) VersionTableId
-getVersionId = fmap (either entityKey id) . insertBy . VersionTable
+getVersionId = fmap (either entityKey id) . insertBy . VersionTable . VersionP
 
 storeBlob
   :: (HasPantryConfig env, HasLogFunc env)
@@ -98,8 +98,8 @@ clearHackageRevisions = deleteWhere ([] :: [Filter Hackage])
 
 storeHackageRevision
   :: (HasPantryConfig env, HasLogFunc env)
-  => Text -- ^ name
-  -> Text -- ^ version
+  => PackageName
+  -> Version
   -> BlobTableId
   -> ReaderT SqlBackend (RIO env) ()
 storeHackageRevision name version key = do

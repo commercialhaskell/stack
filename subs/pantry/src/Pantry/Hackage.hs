@@ -19,6 +19,8 @@ import Network.URI (parseURI)
 import Network.HTTP.Client.TLS (getGlobalManager)
 import Data.Time (getCurrentTime)
 import RIO.FilePath ((</>))
+import qualified Distribution.Text
+import Distribution.Types.PackageName (mkPackageName)
 
 import qualified Hackage.Security.Client as HS
 import qualified Hackage.Security.Client.Repository.Cache as HS
@@ -137,11 +139,6 @@ populateCache fp = do
 
         guard (base == name)
 
-        -- FIXME consider validating package name and version
-        -- Then again, Cabal itself barely does that...
-        {-
-        p <- parsePackageName p'
-        v <- parseVersion v'
-        -}
+        version' <- Distribution.Text.simpleParse $ T.unpack version
 
-        Just (name, version)
+        Just (mkPackageName $ T.unpack name, version')
