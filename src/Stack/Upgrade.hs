@@ -13,7 +13,6 @@ module Stack.Upgrade
     ) where
 
 import           Stack.Prelude               hiding (force, Display (..))
-import qualified Data.HashMap.Strict         as HashMap
 import qualified Data.List
 import qualified Data.Map                    as Map
 import qualified Data.Text as T
@@ -32,7 +31,6 @@ import           Pantry
 import           Stack.PrettyPrint
 import           Stack.Setup
 import           Stack.Types.PackageIdentifier
-import           Stack.Types.PackageIndex
 import           Stack.Types.PackageName
 import           Stack.Types.Version
 import           Stack.Types.Config
@@ -228,7 +226,8 @@ sourceUpgrade gConfigMonoid mresolver builtHash (SourceOpts gitRepo) =
         versions0 <- getPackageVersions "stack"
         let versions
                 = filter (/= $(mkVersion "9.9.9")) -- Mistaken upload to Hackage, just ignore it
-                $ HashMap.keys versions0
+                $ map fromCabalVersion
+                $ Map.keys versions0
 
         when (null versions) (throwString "No stack found in package indices")
 

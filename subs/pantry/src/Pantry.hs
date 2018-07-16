@@ -35,8 +35,8 @@ module Pantry
 
 import RIO
 import RIO.FilePath ((</>))
-import Pantry.Storage (initStorage)
 import Pantry.StaticSHA256
+import Pantry.Storage
 import Pantry.Types
 import Pantry.Hackage
 
@@ -73,8 +73,12 @@ defaultHackageSecurityConfig = HackageSecurityConfig
 loadFromIndex :: MonadIO m => a -> m b
 loadFromIndex = undefined
 
-getPackageVersions :: a
-getPackageVersions = undefined
+-- | Returns the versions of the package available on Hackage.
+getPackageVersions
+  :: (HasPantryConfig env, HasLogFunc env)
+  => PackageName -- ^ package name
+  -> RIO env (Map Version CabalHash)
+getPackageVersions = withStorage . loadHackagePackageVersions
 
 fetchPackages :: a
 fetchPackages = undefined

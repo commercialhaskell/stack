@@ -23,7 +23,6 @@
 module Stack.PackageIndex
     ( updateAllIndices
     , getPackageCaches
-    , getPackageVersions
     , lookupPackageVersions
     , CabalLoader (..)
     , HasCabalLoader (..)
@@ -189,21 +188,6 @@ deleteCache indexName' = do
     case eres of
         Left e -> logDebug $ "Could not delete cache: " <> displayShow e
         Right () -> logDebug $ "Deleted index cache at " <> fromString (toFilePath fp)
-
--- | Get the known versions for a given package from the package caches.
---
--- See 'getPackageCaches' for performance notes.
-getPackageVersions :: HasCabalLoader env => PackageName -> RIO env (HashMap Version (Maybe CabalHash))
-getPackageVersions pkgName = lookupPackageVersions pkgName <$> getPackageCaches
-
-lookupPackageVersions :: PackageName -> PackageCache index -> HashMap Version (Maybe CabalHash)
-lookupPackageVersions pkgName (PackageCache m) =
-    maybe HashMap.empty (HashMap.map extractOrigRevHash) $ HashMap.lookup pkgName m
-  where
-    -- Extract the original cabal file hash (the first element of the one or two
-    -- element list currently representing the cabal file hashes).
-    extractOrigRevHash (_,_, neRevHashesAndOffsets) =
-      listToMaybe $ fst (NE.last neRevHashesAndOffsets)
 
 -- | Load the package caches, or create the caches if necessary.
 --

@@ -22,7 +22,6 @@ import           Stack.Prelude hiding (Display (..))
 import           Control.Monad.RWS.Strict hiding ((<>))
 import           Control.Monad.State.Strict (execState)
 import qualified Data.HashSet as HashSet
-import qualified Data.HashMap.Strict as HashMap
 import           Data.List
 import qualified Data.Map.Strict as M
 import qualified Data.Map.Strict as Map
@@ -134,7 +133,7 @@ data Ctx = Ctx
     , ctxEnvConfig   :: !EnvConfig
     , callStack      :: ![PackageName]
     , extraToBuild   :: !(Set PackageName)
-    , getVersions    :: !(PackageName -> IO (HashMap Version (Maybe CabalHash)))
+    , getVersions    :: !(PackageName -> IO (Map Version CabalHash))
     , wanted         :: !(Set PackageName)
     , localNames     :: !(Set PackageName)
     }
@@ -243,7 +242,10 @@ constructPlan ls0 baseConfigOpts0 locals extraToBuild0 localDumpPkgs loadPackage
         , ctxEnvConfig = econfig
         , callStack = []
         , extraToBuild = extraToBuild0
-        , getVersions = runRIO econfig . getPackageVersions
+        , getVersions = fmap (Map.mapKeysMonotonic fromCabalVersion)
+                      . runRIO econfig
+                      . getPackageVersions
+                      . toCabalPackageName
         , wanted = wantedLocalPackages locals <> extraToBuild0
         , localNames = Set.fromList $ map (packageName . lpPackage) locals
         }
@@ -614,11 +616,11 @@ addPackageDeps treatAsDep package = do
         eres <- addDep treatAsDep depname
         let getLatestApplicableVersionAndRev = do
                 vsAndRevs <- liftIO $ getVersions ctx depname
-                let vs = Set.fromList (HashMap.keys vsAndRevs)
+                let vs = Map.keysSet vsAndRevs
                 case latestApplicableVersion range vs of
                   Nothing -> pure Nothing
                   Just lappVer -> do
-                    let mlappRev = join (HashMap.lookup lappVer vsAndRevs)
+                    let mlappRev = Map.lookup lappVer vsAndRevs
                     pure $ (lappVer,) <$> mlappRev
         case eres of
             Left e -> do

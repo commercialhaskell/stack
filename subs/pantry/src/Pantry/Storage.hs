@@ -13,6 +13,7 @@ module Pantry.Storage
   , storeBlob
   , clearHackageRevisions
   , storeHackageRevision
+  , loadHackagePackageVersions
     -- avoid warnings
   , BlobTableId
   , HackageId
@@ -25,6 +26,7 @@ import Database.Persist.Sqlite -- FIXME allow PostgreSQL too
 import Database.Persist.TH
 import RIO.Orphans ()
 import Pantry.StaticSHA256
+import qualified RIO.Map as Map
 
 share [mkPersist sqlSettings, mkMigrate "migrateAll"] [persistLowerCase|
 BlobTable sql=blob
@@ -112,3 +114,20 @@ storeHackageRevision name version key = do
     , hackageRevision = rev
     , hackageCabal = key
     }
+
+loadHackagePackageVersions
+  :: (HasPantryConfig env, HasLogFunc env)
+  => PackageName
+  -> ReaderT SqlBackend (RIO env) (Map Version CabalHash)
+loadHackagePackageVersions name = do
+  nameid <- getNameId name
+  -- would be better with esequeleto
+  (Map.fromList . map go) <$> rawSql
+    "SELECT version.version, blob.hash\n\
+    \FROM hackage, version, blob\n\
+    \WHERE hackage.name=?\n\
+    \AND   hackage.version=version.id\n\
+    \AND   hackage.cabal=blob.id"
+    [toPersistValue nameid]
+  where
+    go (Single (VersionP version), Single key) = (version, CabalHash key)

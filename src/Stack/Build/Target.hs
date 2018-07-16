@@ -71,7 +71,6 @@ module Stack.Build.Target
     ) where
 
 import           Stack.Prelude
-import qualified Data.HashMap.Strict as HashMap
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import qualified Data.Text as T
@@ -319,8 +318,8 @@ resolveRawTarget globals snap deps locals (ri, rt) =
           , rrPackageType = Dependency
           }
       | otherwise = do
-          mversion <- getLatestVersion name
-          return $ case mversion of
+          mversion <- getLatestVersion $ toCabalPackageName name
+          return $ case fromCabalVersion <$> mversion of
             -- This is actually an error case. We _could_ return a
             -- Left value here, but it turns out to be better to defer
             -- this until the ConstructPlan phase, and let it complain
@@ -343,7 +342,7 @@ resolveRawTarget globals snap deps locals (ri, rt) =
               }
       where
         getLatestVersion pn =
-            fmap fst . Set.maxView . Set.fromList . HashMap.keys <$> getPackageVersions pn
+            fmap fst . Set.maxView . Map.keysSet <$> getPackageVersions pn
 
     go (RTPackageIdentifier ident@(PackageIdentifier name version))
       | Map.member name locals = return $ Left $ T.concat
