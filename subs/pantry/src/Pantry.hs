@@ -11,6 +11,7 @@ module Pantry
     -- * Types
   , StaticSHA256
   , CabalHash (..)
+  , CabalFileInfo (..)
   -- FIXME , PackageName
   -- FIXME , Version
 
@@ -35,10 +36,15 @@ module Pantry
 
 import RIO
 import RIO.FilePath ((</>))
+import qualified RIO.Map as Map
+import qualified RIO.Set as Set
+import qualified RIO.Text as T
 import Pantry.StaticSHA256
 import Pantry.Storage
 import Pantry.Types
 import Pantry.Hackage
+import Data.List.NonEmpty (NonEmpty)
+import qualified Data.List.NonEmpty as NE
 
 mkPantryConfig
   :: HasLogFunc env
@@ -47,10 +53,12 @@ mkPantryConfig
   -> RIO env PantryConfig
 mkPantryConfig root hsc = do
   storage <- initStorage $ root </> "pantry.sqlite3"
+  ur <- newMVar True
   pure PantryConfig
     { pcHackageSecurity = hsc
     , pcRootDir = root
     , pcStorage = storage
+    , pcUpdateRef = ur
     }
 
 defaultHackageSecurityConfig :: HackageSecurityConfig
@@ -70,8 +78,117 @@ defaultHackageSecurityConfig = HackageSecurityConfig
   , hscDownloadPrefix = "https://hackage.haskell.org/"
   }
 
-loadFromIndex :: MonadIO m => a -> m b
-loadFromIndex = undefined
+lookupPackageIdentifierExact
+  :: (HasPantryConfig env, HasLogFunc env)
+  => PackageName
+  -> Version
+  -> CabalFileInfo
+  -> RIO env (Maybe ByteString)
+lookupPackageIdentifierExact name version cfi =
+  withStorage $ loadHackageCabalFile name version cfi
+
+loadFromIndex
+  :: (HasPantryConfig env, HasLogFunc env)
+  => PackageName
+  -> Version
+  -> CabalFileInfo
+  -> RIO env (Either () ByteString)
+loadFromIndex name version cfi = do
+  mres <- lookupPackageIdentifierExact name version cfi
+  case mres of
+    Just bs -> return $ Right bs
+    -- Update the cache and try again
+    Nothing -> do
+      pc <- view pantryConfigL
+      join $ modifyMVar (pcUpdateRef pc) $ \toUpdate ->
+        if toUpdate
+          then do
+            logInfo $
+                "Didn't see " <>
+                displayPackageIdentifierRevision name version cfi <>
+                " in your package indices.\n" <>
+                "Updating and trying again."
+            updateHackageIndex
+            pure (False, loadFromIndex name version cfi)
+          else do
+            pure (False, pure $ Left ())
+            {- FIXME
+            fuzzy <- fuzzyLookupCandidates name version cfi
+            let suggestions = case fuzzy of
+                    FRNameNotFound Nothing -> ""
+                    FRNameNotFound (Just cs) ->
+                          "Perhaps you meant " <> orSeparated cs <> "?"
+                    FRVersionNotFound cs -> "Possible candidates: " <>
+                      commaSeparated (NE.map packageIdentifierText cs)
+                      <> "."
+                    FRRevisionNotFound cs ->
+                      "The specified revision was not found.\nPossible candidates: " <>
+                      commaSeparated (NE.map (T.pack . packageIdentifierRevisionString) cs)
+                      <> "."
+            pure (False, Left $ UnknownPackageIdentifiers
+                                  (Set.singleton (name, version, cfi))
+                                  suggestions)
+
+orSeparated :: NonEmpty Text -> Text
+orSeparated xs
+  | NE.length xs == 1 = NE.head xs
+  | NE.length xs == 2 = NE.head xs <> " or " <> NE.last xs
+  | otherwise = T.intercalate ", " (NE.init xs) <> ", or " <> NE.last xs
+
+commaSeparated :: NonEmpty Text -> Text
+commaSeparated = fold . NE.intersperse ", "
+
+data FuzzyResults
+  = FRNameNotFound !(Maybe (NonEmpty Text))
+  | FRVersionNotFound !(NonEmpty (PackageName, Version))
+  | FRRevisionNotFound !(NonEmpty (PackageName, Version, CabalFileInfo))
+
+-- | Given package identifier and package caches, return list of packages
+-- with the same name and the same two first version number components found
+-- in the caches.
+fuzzyLookupCandidates
+  :: (HasPantryConfig env, HasLogFunc env)
+  => PackageName
+  -> Version
+  -> CabalFileInfo
+  -> RIO env FuzzyResults
+fuzzyLookupCandidates name ver _rev =
+  case Map.lookup name caches of
+    Nothing -> FRNameNotFound $ typoCorrectionCandidates name (PackageCache caches)
+    Just m ->
+      case Map.lookup ver m of
+        Nothing ->
+          case NE.nonEmpty $ filter sameMajor $ Map.keys m of
+            Just vers -> FRVersionNotFound $ NE.map (PackageIdentifier name) vers
+            Nothing ->
+              case NE.nonEmpty $ Map.keys m of
+                Nothing -> error "fuzzyLookupCandidates: no versions"
+                Just vers -> FRVersionNotFound $ NE.map (PackageIdentifier name) vers
+        Just (_index, _mpd, revisions) ->
+          let hashes = concatMap fst $ NE.toList revisions
+              pirs = map (PackageIdentifierRevision (PackageIdentifier name ver) . CFIHash Nothing) hashes
+           in case NE.nonEmpty pirs of
+                Nothing -> error "fuzzyLookupCandidates: no revisions"
+                Just pirs' -> FRRevisionNotFound pirs'
+  where
+    sameMajor v = toMajorVersion v == toMajorVersion ver
+
+-- | Try to come up with typo corrections for given package identifier using
+-- package caches. This should be called before giving up, i.e. when
+-- 'fuzzyLookupCandidates' cannot return anything.
+typoCorrectionCandidates
+  :: PackageName
+  -> Maybe (NonEmpty Text)
+typoCorrectionCandidates name' =
+  let name = packageNameText name'
+  in  NE.nonEmpty
+    . take 10
+    . map snd
+    . filter (\(distance, _) -> distance < 4)
+    . map (\k -> (damerauLevenshtein name (packageNameText k), packageNameText k))
+    . Map.keys
+    $ cache
+-}
 
 -- | Returns the versions of the package available on Hackage.
 getPackageVersions

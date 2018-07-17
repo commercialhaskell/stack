@@ -124,25 +124,6 @@ computeCabalHash = CabalHash . mkStaticSHA256FromDigest . Hash.hashlazy
 showCabalHash :: CabalHash -> Text
 showCabalHash = T.append (T.pack "sha256:") . cabalHashToText
 
--- | Information on the contents of a cabal file
-data CabalFileInfo
-  = CFILatest
-  -- ^ Take the latest revision of the cabal file available. This
-  -- isn't reproducible at all, but the running assumption (not
-  -- necessarily true) is that cabal file revisions do not change
-  -- semantics of the build.
-  | CFIHash
-      !(Maybe Int) -- file size in bytes
-      !CabalHash
-  -- ^ Identify by contents of the cabal file itself
-  | CFIRevision !Word
-  -- ^ Identify by revision number, with 0 being the original and
-  -- counting upward.
-    deriving (Generic, Show, Eq, Ord, Data, Typeable)
-instance Store CabalFileInfo
-instance NFData CabalFileInfo
-instance Hashable CabalFileInfo
-
 -- | Convert from a package identifier to a tuple.
 toTuple :: PackageIdentifier -> (PackageName,Version)
 toTuple (PackageIdentifier n v) = (n,v)

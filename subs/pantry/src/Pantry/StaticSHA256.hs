@@ -40,6 +40,9 @@ instance PersistField StaticSHA256 where
 instance PersistFieldSql StaticSHA256 where
   sqlType _ = SqlBlob
 
+instance Display StaticSHA256 where
+  display = display . staticSHA256ToText
+
 -- | Generate a 'StaticSHA256' value from the contents of a file.
 mkStaticSHA256FromFile :: MonadIO m => FilePath -> m StaticSHA256
 mkStaticSHA256FromFile fp = liftIO $ mkStaticSHA256FromDigest <$> hashFile fp

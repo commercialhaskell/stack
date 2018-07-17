@@ -1967,12 +1967,6 @@ data CabalLoader = CabalLoader
   { clPantryConfig :: !PantryConfig
   , clStackRoot :: !(Path Abs Dir) -- FIXME move to Config
   -- ^ ~/.stack more often than not
-  , clUpdateRef :: !(MVar Bool)
-  -- ^ Want to try updating the index once during a single run for missing
-  -- package identifiers. We also want to ensure we only update once at a
-  -- time. Start at @True@.
-  --
-  -- TODO: probably makes sense to move this concern into getPackageCaches
   , clConnectionCount :: !Int -- FIXME move to PantryConfig
   -- ^ How many concurrent connections are allowed when downloading
   , clIgnoreRevisionMismatch :: !Bool -- FIXME hopefully no longer needed at all

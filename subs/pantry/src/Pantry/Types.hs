@@ -12,8 +12,10 @@ module Pantry.Types
   , PackageName
   , Version
   , CabalHash (..)
+  , CabalFileInfo (..)
   , PackageNameP (..)
   , VersionP (..)
+  , displayPackageIdentifierRevision
   ) where
 
 import RIO
@@ -31,12 +33,18 @@ newtype Storage = Storage (Pool SqlBackend)
 
 -- | A cryptographic hash of a Cabal file.
 newtype CabalHash = CabalHash { unCabalHash :: StaticSHA256 }
-    deriving (Generic, Show, Eq, NFData, Data, Typeable, Ord, Hashable, Store)
+    deriving (Generic, Show, Eq, NFData, Data, Typeable, Ord, Hashable, Store, Display)
 
 data PantryConfig = PantryConfig
   { pcHackageSecurity :: !HackageSecurityConfig
   , pcRootDir :: !FilePath
   , pcStorage :: !Storage
+  , pcUpdateRef :: !(MVar Bool)
+  -- ^ Want to try updating the index once during a single run for missing
+  -- package identifiers. We also want to ensure we only update once at a
+  -- time. Start at @True@.
+  --
+  -- TODO: probably makes sense to move this concern into getPackageCaches
   }
 
 data HackageSecurityConfig = HackageSecurityConfig
@@ -72,3 +80,38 @@ instance PersistField VersionP where
       Just ver -> Right $ VersionP ver
 instance PersistFieldSql VersionP where
   sqlType _ = SqlString
+
+-- | Information on the contents of a cabal file
+data CabalFileInfo
+  = CFILatest
+  -- ^ Take the latest revision of the cabal file available. This
+  -- isn't reproducible at all, but the running assumption (not
+  -- necessarily true) is that cabal file revisions do not change
+  -- semantics of the build.
+  | CFIHash
+      !(Maybe Int) -- file size in bytes
+      !CabalHash
+  -- ^ Identify by contents of the cabal file itself
+  | CFIRevision !Word
+  -- ^ Identify by revision number, with 0 being the original and
+  -- counting upward.
+    deriving (Generic, Show, Eq, Ord, Data, Typeable)
+instance Store CabalFileInfo
+instance NFData CabalFileInfo
+instance Hashable CabalFileInfo
+
+instance Display CabalFileInfo where
+  display CFILatest = mempty
+  display (CFIHash msize hash') =
+    "@sha256:" <> display hash' <> maybe mempty (\i -> "," <> display i) msize
+  display (CFIRevision rev) = "@rev:" <> display rev
+
+displayPackageIdentifierRevision
+  :: PackageName
+  -> Version
+  -> CabalFileInfo
+  -> Utf8Builder
+displayPackageIdentifierRevision name version cfi =
+  fromString (Distribution.Text.display name) <> "-" <>
+  fromString (Distribution.Text.display version) <>
+  display cfi

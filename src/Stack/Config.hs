@@ -361,9 +361,6 @@ configFromConfigMonoid
 
      configRunner' <- view runnerL
 
-     clCache <- newIORef Nothing
-     clUpdateRef <- newMVar True
-
      clPantryConfig <- mkPantryConfig
        (toFilePath (clStackRoot </> $(mkRelDir "pantry")))
        (case getFirst configMonoidPackageIndices of

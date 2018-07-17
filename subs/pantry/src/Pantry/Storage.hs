@@ -6,6 +6,7 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE ViewPatterns #-}
 module Pantry.Storage
   ( SqlBackend
   , initStorage
@@ -14,6 +15,7 @@ module Pantry.Storage
   , clearHackageRevisions
   , storeHackageRevision
   , loadHackagePackageVersions
+  , loadHackageCabalFile
     -- avoid warnings
   , BlobTableId
   , HackageId
@@ -42,7 +44,7 @@ VersionTable sql=version
 Hackage
     name NameId
     version VersionTableId
-    revision Int
+    revision Word
     cabal BlobTableId
     UniqueHackage name version revision
 |]
@@ -111,7 +113,7 @@ storeHackageRevision name version key = do
   insert_ Hackage
     { hackageName = nameid
     , hackageVersion = versionid
-    , hackageRevision = rev
+    , hackageRevision = fromIntegral rev
     , hackageCabal = key
     }
 
@@ -131,3 +133,27 @@ loadHackagePackageVersions name = do
     [toPersistValue nameid]
   where
     go (Single (VersionP version), Single key) = (version, CabalHash key)
+
+loadHackageCabalFile
+  :: (HasPantryConfig env, HasLogFunc env)
+  => PackageName
+  -> Version
+  -> CabalFileInfo
+  -> ReaderT SqlBackend (RIO env) (Maybe ByteString)
+loadHackageCabalFile name version cfi = do
+  nameid <- getNameId name
+  versionid <- getVersionId version
+  case cfi of
+    CFILatest -> selectFirst
+      [ HackageName ==. nameid
+      , HackageVersion ==. versionid
+      ]
+      [Desc HackageRevision] >>= withHackEnt
+    CFIRevision rev ->
+      getBy (UniqueHackage nameid versionid rev) >>= withHackEnt
+    CFIHash msize (CabalHash (BlobKey -> blobKey)) ->
+      fmap (blobTableContents . entityVal) <$> getBy (UniqueBlobHash blobKey)
+  where
+    withHackEnt = traverse $ \(Entity _ h) -> do
+      Just blob <- get $ hackageCabal h
+      pure $ blobTableContents blob

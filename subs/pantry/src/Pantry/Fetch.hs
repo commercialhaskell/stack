@@ -26,8 +26,6 @@ module Stack.Fetch
     , resolvePackages
     , resolvePackagesAllowMissing
     , ResolvedPackage (..)
-    , withCabalFiles
-    , loadFromIndex
     ) where
 
 import qualified    Codec.Archive.Tar as Tar
@@ -314,123 +312,6 @@ data ToFetchResult = ToFetchResult
     , tfrAlreadyUnpacked :: !(Map PackageIdentifier (Path Abs Dir))
     }
 
--- | Add the cabal files to a list of idents with their caches.
-withCabalFiles
-    :: HasCabalLoader env
-    => IndexName
-    -> [(ResolvedPackage, a)]
-    -> (PackageIdentifier -> a -> ByteString -> IO b)
-    -> RIO env [b]
-withCabalFiles name pkgs f = do
-    indexPath <- configPackageIndex name
-    withBinaryFile (toFilePath indexPath) ReadMode
-      $ \h -> mapM (goPkg h) pkgs
-  where
-    goPkg h (ResolvedPackage { rpIdent = ident, rpOffsetSize = OffsetSize offset size }, tf) = do
-        -- Did not find warning for tarballs is handled above
-        liftIO $ do
-            hSeek h AbsoluteSeek $ fromIntegral offset
-            cabalBS <- S.hGet h $ fromIntegral size
-            f ident tf cabalBS
-
-loadFromIndex :: HasCabalLoader env => PackageIdentifierRevision -> RIO env ByteString
-loadFromIndex ident = do
-  -- TODO in the future, keep all of the necessary @Handle@s open
-  bothCaches <- getPackageCaches
-  mres <- lookupPackageIdentifierExact ident bothCaches
-  case mres of
-      Just bs -> return bs
-      -- Update the cache and try again
-      Nothing -> do
-          let fuzzy = fuzzyLookupCandidates ident bothCaches
-              suggestions = case fuzzy of
-                  FRNameNotFound Nothing -> ""
-                  FRNameNotFound (Just cs) ->
-                        "Perhaps you meant " <> orSeparated cs <> "?"
-                  FRVersionNotFound cs -> "Possible candidates: " <>
-                    commaSeparated (NE.map packageIdentifierText cs)
-                    <> "."
-                  FRRevisionNotFound cs ->
-                    "The specified revision was not found.\nPossible candidates: " <>
-                    commaSeparated (NE.map (T.pack . packageIdentifierRevisionString) cs)
-                    <> "."
-          cl <- view cabalLoaderL
-          join $ modifyMVar (clUpdateRef cl) $ \toUpdate ->
-              if toUpdate then do
-                  logInfo $
-                      "Didn't see " <>
-                      fromString (packageIdentifierRevisionString ident) <>
-                      " in your package indices.\n" <>
-                      "Updating and trying again."
-                  updateAllIndices
-                  _ <- getPackageCaches
-                  return (False, loadFromIndex ident)
-              else do
-                uses00Index <- getUses00Index
-                return (toUpdate, throwIO $ UnknownPackageIdentifiers
-                             (HashSet.singleton ident) (T.unpack suggestions) uses00Index)
-
-lookupPackageIdentifierExact
-  :: HasCabalLoader env
-  => PackageIdentifierRevision
-  -> PackageCache PackageIndex
-  -> RIO env (Maybe ByteString)
-lookupPackageIdentifierExact identRev cache = do
-  cl <- view cabalLoaderL
-  forM (lookupResolvedPackage cl identRev cache) $ \rp -> do
-    [bs] <- withCabalFiles (indexName (rpIndex rp)) [(rp, ())] $ \_ _ bs -> return bs
-    return bs
-
-data FuzzyResults
-  = FRNameNotFound !(Maybe (NonEmpty T.Text))
-  | FRVersionNotFound !(NonEmpty PackageIdentifier)
-  | FRRevisionNotFound !(NonEmpty PackageIdentifierRevision)
-
--- | Given package identifier and package caches, return list of packages
--- with the same name and the same two first version number components found
--- in the caches.
-fuzzyLookupCandidates
-  :: PackageIdentifierRevision
-  -> PackageCache index
-  -> FuzzyResults
-fuzzyLookupCandidates (PackageIdentifierRevision (PackageIdentifier name ver) _rev) (PackageCache caches) =
-  case HashMap.lookup name caches of
-    Nothing -> FRNameNotFound $ typoCorrectionCandidates name (PackageCache caches)
-    Just m ->
-      case HashMap.lookup ver m of
-        Nothing ->
-          case NE.nonEmpty $ filter sameMajor $ HashMap.keys m of
-            Just vers -> FRVersionNotFound $ NE.map (PackageIdentifier name) vers
-            Nothing ->
-              case NE.nonEmpty $ HashMap.keys m of
-                Nothing -> error "fuzzyLookupCandidates: no versions"
-                Just vers -> FRVersionNotFound $ NE.map (PackageIdentifier name) vers
-        Just (_index, _mpd, revisions) ->
-          let hashes = concatMap fst $ NE.toList revisions
-              pirs = map (PackageIdentifierRevision (PackageIdentifier name ver) . CFIHash Nothing) hashes
-           in case NE.nonEmpty pirs of
-                Nothing -> error "fuzzyLookupCandidates: no revisions"
-                Just pirs' -> FRRevisionNotFound pirs'
-  where
-    sameMajor v = toMajorVersion v == toMajorVersion ver
-
--- | Try to come up with typo corrections for given package identifier using
--- package caches. This should be called before giving up, i.e. when
--- 'fuzzyLookupCandidates' cannot return anything.
-typoCorrectionCandidates
-  :: PackageName
-  -> PackageCache index
-  -> Maybe (NonEmpty T.Text)
-typoCorrectionCandidates name' (PackageCache cache) =
-  let name = packageNameText name'
-  in  NE.nonEmpty
-    . take 10
-    . map snd
-    . filter (\(distance, _) -> distance < 4)
-    . map (\k -> (damerauLevenshtein name (packageNameText k), packageNameText k))
-    . HashMap.keys
-    $ cache
-
 -- | Figure out where to fetch from.
 getToFetch :: HasCabalLoader env
            => Maybe (Path Abs Dir) -- ^ directory to unpack into, @Nothing@ means no unpack
@@ -637,15 +518,6 @@ parMapM_ cnt f xs0 = withRunInIO $ \run -> do
               return $ do
                   run $ f x
                   loop
-
-orSeparated :: NonEmpty T.Text -> T.Text
-orSeparated xs
-  | NE.length xs == 1 = NE.head xs
-  | NE.length xs == 2 = NE.head xs <> " or " <> NE.last xs
-  | otherwise = T.intercalate ", " (NE.init xs) <> ", or " <> NE.last xs
-
-commaSeparated :: NonEmpty T.Text -> T.Text
-commaSeparated = F.fold . NE.intersperse ", "
 
 -- | Location of a package tarball
 configPackageTarball :: HasCabalLoader env => IndexName -> PackageIdentifier -> RIO env (Path Abs File)

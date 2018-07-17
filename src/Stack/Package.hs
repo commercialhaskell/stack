@@ -192,13 +192,17 @@ readPackageUnresolvedIndex
   :: forall env. HasCabalLoader env
   => PackageIdentifierRevision
   -> RIO env GenericPackageDescription
-readPackageUnresolvedIndex pir@(PackageIdentifierRevision pi' _) = do
+readPackageUnresolvedIndex pir@(PackageIdentifierRevision pi' cfi) = do
   ref <- view $ runnerL.to runnerParsedCabalFiles
   (m, _) <- readIORef ref
   case M.lookup pir m of
     Just gpd -> return gpd
     Nothing -> do
-      bs <- loadFromIndex pir
+      let PackageIdentifier pn v = pi'
+      ebs <- loadFromIndex (toCabalPackageName pn) (toCabalVersion v) cfi
+      bs <-
+        case ebs of
+          Right bs -> pure bs
       (_warnings, gpd) <- rawParseGPD (Left pir) bs
       let foundPI =
               fromCabalPackageIdentifier
