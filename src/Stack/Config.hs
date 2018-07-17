@@ -361,7 +361,9 @@ configFromConfigMonoid
 
      configRunner' <- view runnerL
 
-     clPantryConfig <- mkPantryConfig
+     -- Disable logging from mkPantryConfig to silence persistent's
+     -- logging output, otherwise --verbose gets totally flooded
+     clPantryConfig <- runRIO (mempty :: LogFunc) $ mkPantryConfig
        (toFilePath (clStackRoot </> $(mkRelDir "pantry")))
        (case getFirst configMonoidPackageIndices of
           Nothing -> defaultHackageSecurityConfig
