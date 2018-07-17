@@ -687,7 +687,6 @@ upgradeCabal wc upgradeTo = do
     logWarn "Using deprecated --upgrade-cabal feature, this is not recommended"
     logWarn "Manipulating the global Cabal is only for debugging purposes"
     let name = $(mkPackageName "Cabal")
-    rmap <- resolvePackages Nothing mempty (Set.singleton name)
     installed <- getCabalPkgVer wc
     case upgradeTo of
         Specific wantedVersion -> do
@@ -698,9 +697,11 @@ upgradeCabal wc upgradeTo = do
                   "No install necessary. Cabal " <>
                   RIO.display installed <>
                   " is already installed"
-        Latest     -> case map rpIdent rmap of
-            [] -> throwString "No Cabal library found in index, cannot upgrade"
-            [PackageIdentifier name' latestVersion] | name == name' -> do
+        Latest -> do
+          versions <- getPackageVersions $ toCabalPackageName name
+          case fmap (fromCabalVersion . fst) $ Set.maxView $ Map.keysSet versions of
+            Nothing -> throwString "No Cabal library found in index, cannot upgrade"
+            Just latestVersion -> do
                 if installed < latestVersion then
                     doCabalInstall wc installed latestVersion
                 else
@@ -709,7 +710,6 @@ upgradeCabal wc upgradeTo = do
                         RIO.display latestVersion <>
                         " is the same or newer than latest hackage version " <>
                         RIO.display installed
-            x -> error $ "Unexpected results for resolvePackages: " ++ show x
 
 -- Configure and run the necessary commands for a cabal install
 doCabalInstall :: (HasConfig env, HasGHCVariant env)

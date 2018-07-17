@@ -25,9 +25,6 @@ module Pantry
   , fetchPackages
   , unpackPackageIdent
   , unpackPackages
-  , resolvePackages
-  , rpIdent
-  , getPackageCaches
   ) where
 
 import RIO
@@ -204,15 +201,6 @@ unpackPackageIdent
   -> CabalFileInfo
   -> RIO env FilePath
 unpackPackageIdent = undefined
-
-resolvePackages :: Maybe a -> Map Int c -> Set d -> e
-resolvePackages = undefined
-
-rpIdent :: a
-rpIdent = undefined
-
-getPackageCaches :: a
-getPackageCaches = undefined
 
 unpackPackages :: a
 unpackPackages = undefined
