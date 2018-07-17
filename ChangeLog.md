@@ -7,6 +7,9 @@ Release notes:
 
 Major changes:
 
+* Drop support for multiple package indices and legacy `00-index.tar` style
+  indices. See [#4137](https://github.com/commercialhaskell/stack/issues/4137).
+
 Behavior changes:
 
 * `ghc-options` from `stack.yaml` are now appended to `ghc-options` from
