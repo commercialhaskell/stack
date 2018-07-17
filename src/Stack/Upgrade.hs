@@ -237,13 +237,13 @@ sourceUpgrade gConfigMonoid mresolver builtHash (SourceOpts gitRepo) =
                 prettyInfoS "Already at latest version, no upgrade required"
                 return Nothing
             else do
-                let ident = PackageIdentifier $(mkPackageName "stack") version
-                paths <- unpackPackageIdents tmp Nothing
-                    -- accept latest cabal revision
-                    [PackageIdentifierRevision ident CFILatest]
-                case Map.lookup ident paths of
-                    Nothing -> error "Stack.Upgrade.upgrade: invariant violated, unpacked directory not found"
-                    Just path -> return $ Just path
+                dir <- unpackPackageIdent
+                  (toFilePath tmp)
+                  (toCabalPackageName $(mkPackageName "stack"))
+                  (toCabalVersion version)
+                  CFILatest -- accept latest cabal revision
+                dir' <- parseAbsDir dir
+                pure $ Just dir'
 
     forM_ mdir $ \dir -> do
         lc <- loadConfig

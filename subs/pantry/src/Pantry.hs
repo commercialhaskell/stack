@@ -24,7 +24,6 @@ module Pantry
   , getPackageVersions
   , fetchPackages
   , unpackPackageIdent
-  , unpackPackageIdents
   , unpackPackages
   , resolvePackages
   , rpIdent
@@ -197,11 +196,14 @@ getPackageVersions = withStorage . loadHackagePackageVersions
 fetchPackages :: a
 fetchPackages = undefined
 
-unpackPackageIdent :: a
+unpackPackageIdent
+  :: (HasPantryConfig env, HasLogFunc env)
+  => FilePath -- ^ unpack directory
+  -> PackageName
+  -> Version
+  -> CabalFileInfo
+  -> RIO env FilePath
 unpackPackageIdent = undefined
-
-unpackPackageIdents :: a
-unpackPackageIdents = undefined
 
 resolvePackages :: Maybe a -> Map Int c -> Set d -> e
 resolvePackages = undefined

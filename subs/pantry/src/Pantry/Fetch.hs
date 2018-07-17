@@ -415,20 +415,6 @@ fetchPackages' mdistDir toFetchAll = do
             liftIO $ do
                 case mdistDir of
                     Nothing -> return ()
-                    -- See: https://github.com/fpco/stack/issues/157
-                    Just distDir -> do
-                        let inner = parent destDir </> identStrP
-                            oldDist = inner </> $(mkRelDir "dist")
-                            newDist = inner </> distDir
-                        exists <- doesDirExist oldDist
-                        when exists $ do
-                            -- Previously used takeDirectory, but that got confused
-                            -- by trailing slashes, see:
-                            -- https://github.com/commercialhaskell/stack/issues/216
-                            --
-                            -- Instead, use Path which is a bit more resilient
-                            ensureDir $ parent newDist
-                            renameDir oldDist newDist
 
                 let cabalFP =
                         innerDest FP.</>

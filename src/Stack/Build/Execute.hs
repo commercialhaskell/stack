@@ -942,8 +942,27 @@ withSingleContext ActionContext {..} ExecuteEnv {..} task@Task {..} mdeps msuffi
         case taskType of
             TTFiles lp _ -> inner (lpPackage lp) (lpCabalFile lp) (lpDir lp)
             TTIndex package _ pir -> do
-                mdist <- distRelativeDir
-                dir <- unpackPackageIdent eeTempDir mdist pir
+                let PackageIdentifierRevision (PackageIdentifier name' ver) cfi =
+                      pir
+                dir <- unpackPackageIdent
+                  (toFilePath eeTempDir)
+                  (toCabalPackageName name')
+                  (toCabalVersion ver)
+                  cfi >>= parseAbsDir
+
+                -- See: https://github.com/fpco/stack/issues/157
+                distDir <- distRelativeDir
+                let oldDist = dir </> $(mkRelDir "dist")
+                    newDist = dir </> distDir
+                exists <- doesDirExist oldDist
+                when exists $ do
+                  -- Previously used takeDirectory, but that got confused
+                  -- by trailing slashes, see:
+                  -- https://github.com/commercialhaskell/stack/issues/216
+                  --
+                  -- Instead, use Path which is a bit more resilient
+                  ensureDir $ parent newDist
+                  renameDir oldDist newDist
 
                 let name = packageIdentifierName taskProvides
                 cabalfpRel <- parseRelFile $ packageNameString name ++ ".cabal"

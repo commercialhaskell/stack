@@ -729,29 +729,29 @@ doCabalInstall wc installed wantedVersion = do
             " to replace " <>
             RIO.display installed
         let name = $(mkPackageName "Cabal")
-            ident = PackageIdentifier name wantedVersion
-        m <- unpackPackageIdents tmpdir Nothing [PackageIdentifierRevision ident CFILatest]
+        dir <- unpackPackageIdent
+                    (toFilePath tmpdir)
+                    (toCabalPackageName name)
+                    (toCabalVersion wantedVersion)
+                    CFILatest
         compilerPath <- findExecutable (compilerExeName wc)
                     >>= either throwM parseAbsFile
         versionDir <- parseRelDir $ versionString wantedVersion
         let installRoot = toFilePath $ parent (parent compilerPath)
                                     </> $(mkRelDir "new-cabal")
                                     </> versionDir
-        dir <- case Map.lookup ident m of
-            Nothing -> error "upgradeCabal: Invariant violated, dir missing"
-            Just dir -> return dir
-        withWorkingDir (toFilePath dir) $ proc (compilerExeName wc) ["Setup.hs"] runProcess_
+        withWorkingDir dir $ proc (compilerExeName wc) ["Setup.hs"] runProcess_
         platform <- view platformL
-        let setupExe = toFilePath $ dir </> case platform of
-                Platform _ Cabal.Windows -> $(mkRelFile "Setup.exe")
-                _                        -> $(mkRelFile "Setup")
+        let setupExe = dir FP.</> case platform of
+                Platform _ Cabal.Windows -> "Setup.exe"
+                _                        -> "Setup"
             dirArgument name' = concat [ "--"
                                        , name'
                                        , "dir="
                                        , installRoot FP.</> name'
                                        ]
             args = "configure" : map dirArgument (words "lib bin data doc")
-        withWorkingDir (toFilePath dir) $ do
+        withWorkingDir dir $ do
           proc setupExe args runProcess_
           proc setupExe ["build"] runProcess_
           proc setupExe ["install"] runProcess_
