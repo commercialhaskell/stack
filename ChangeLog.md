@@ -7,7 +7,7 @@ Release notes:
 
 Major changes:
 
-* `GHCJS` support is being deprecated after the next major Stack release. At time of writing the upcoming release is 1.8. A warning notifying the user of the deprecation will be incorporated into 1.8.
+* `GHCJS` support is being downgraded to 'experimental'. At time of writing the upcoming release is 1.8. A warning notifying the user of the experimental status of `GHCJS` will be incorporated into 1.8.
 
 Behavior changes:
 
