@@ -16,6 +16,8 @@ module Pantry.Storage
   , storeHackageRevision
   , loadHackagePackageVersions
   , loadHackageCabalFile
+  , loadLatestCacheUpdate
+  , storeCacheUpdate
     -- avoid warnings
   , BlobTableId
   , HackageId
@@ -29,6 +31,7 @@ import Database.Persist.TH
 import RIO.Orphans ()
 import Pantry.StaticSHA256
 import qualified RIO.Map as Map
+import RIO.Time (UTCTime, getCurrentTime)
 
 share [mkPersist sqlSettings, mkMigrate "migrateAll"] [persistLowerCase|
 BlobTable sql=blob
@@ -47,6 +50,10 @@ Hackage
     revision Word
     cabal BlobTableId
     UniqueHackage name version revision
+CacheUpdate
+    time UTCTime
+    size Word
+    hash StaticSHA256
 |]
 
 initStorage
@@ -157,3 +164,31 @@ loadHackageCabalFile name version cfi = do
     withHackEnt = traverse $ \(Entity _ h) -> do
       Just blob <- get $ hackageCabal h
       pure $ blobTableContents blob
+
+    {-
+CacheUpdate
+    time UTCTime
+    size Word
+    hash StaticSHA256
+    -}
+
+loadLatestCacheUpdate
+  :: (HasPantryConfig env, HasLogFunc env)
+  => ReaderT SqlBackend (RIO env) (Maybe (Word, StaticSHA256))
+loadLatestCacheUpdate =
+    fmap go <$> selectFirst [] [Desc CacheUpdateTime]
+  where
+    go (Entity _ cu) = (cacheUpdateSize cu, cacheUpdateHash cu)
+
+storeCacheUpdate
+  :: (HasPantryConfig env, HasLogFunc env)
+  => Word
+  -> StaticSHA256
+  -> ReaderT SqlBackend (RIO env) ()
+storeCacheUpdate size hash' = do
+  now <- getCurrentTime
+  insert_ CacheUpdate
+    { cacheUpdateTime = now
+    , cacheUpdateSize = size
+    , cacheUpdateHash = hash'
+    }

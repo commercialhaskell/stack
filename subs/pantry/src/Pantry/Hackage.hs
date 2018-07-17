@@ -8,6 +8,7 @@ module Pantry.Hackage
 
 import RIO
 import Conduit
+import Crypto.Hash.Conduit (sinkHash)
 import Data.Conduit.Tar
 import qualified RIO.Text as T
 import Data.Text.Unsafe (unsafeTail)
@@ -15,12 +16,14 @@ import qualified RIO.ByteString as B
 import qualified RIO.ByteString.Lazy as BL
 import Pantry.Types
 import Pantry.Storage
+import Pantry.StaticSHA256
 import Network.URI (parseURI)
 import Network.HTTP.Client.TLS (getGlobalManager)
 import Data.Time (getCurrentTime)
 import RIO.FilePath ((</>))
 import qualified Distribution.Text
 import Distribution.Types.PackageName (mkPackageName)
+import System.IO (SeekMode (..))
 
 import qualified Hackage.Security.Client as HS
 import qualified Hackage.Security.Client.Repository.Cache as HS
@@ -78,20 +81,62 @@ updateHackageIndex = do
         HS.HasUpdates -> logInfo "Updated package index downloaded"
 
     withStorage $ do
-      clearHackageRevisions
-      populateCache tarball `onException`
+      -- Alright, here's the story. In theory, we only ever append to
+      -- a tarball. Therefore, we can store the last place we
+      -- populated our cache from, and fast forward to that point. But
+      -- there are two issues with that:
+      --
+      -- 1. Hackage may rebase, in which case we need to recalculate
+      -- everything from the beginning. Unfortunately,
+      -- hackage-security doesn't let us know when that happens.
+      --
+      -- 2. Some paranoia about files on the filesystem getting
+      -- modified out from under us.
+      --
+      -- Therefore, we store both the last read-to index, _and_ the
+      -- SHA256 of all of the contents until that point. When updating
+      -- the cache, we calculate the new SHA256 of the whole file, and
+      -- the SHA256 of the previous read-to point. If the old hashes
+      -- match, we can do an efficient fast forward. Otherwise, we
+      -- clear the old cache and repopulate.
+      minfo <- loadLatestCacheUpdate
+      (offset, newHash, newSize) <- lift $ withBinaryFile tarball ReadMode $ \h -> do
+        logInfo "Calculating hashes to check for hackage-security rebases"
+        newSize <- fromIntegral <$> hFileSize h
+        (offset, newHash) <-
+          case minfo of
+            Nothing -> do
+              logInfo "No old cache found, populating cache from scratch"
+              newHash <- runConduit $ sourceHandle h .| sinkHash
+              pure (0, mkStaticSHA256FromDigest newHash)
+            Just (oldSize, oldHash) -> do
+              (oldHash', newHash) <- runConduit $ sourceHandle h .| getZipSink ((,)
+                <$> ZipSink (takeCE (fromIntegral oldSize) .| sinkHash)
+                <*> ZipSink sinkHash)
+              offset <-
+                if oldHash == mkStaticSHA256FromDigest oldHash'
+                  then oldSize <$ logInfo "Updating preexisting cache, should be quick"
+                  else 0 <$ logInfo "Package index was rebased, forcing a recache"
+              pure (offset, mkStaticSHA256FromDigest newHash)
+        pure (offset, newHash, newSize)
+
+      when (offset == 0) clearHackageRevisions
+      populateCache tarball (fromIntegral offset) `onException`
         lift (logStickyDone "Failed populating package index cache")
+      storeCacheUpdate newSize newHash
     logStickyDone "Package index cache populated"
 
 -- | Populate the SQLite tables with Hackage index information.
 populateCache
   :: (HasPantryConfig env, HasLogFunc env)
   => FilePath -- ^ tarball
+  -> Integer -- ^ where to start processing from
   -> ReaderT SqlBackend (RIO env) ()
-populateCache fp = do
+populateCache fp offset = withBinaryFile fp ReadMode $ \h -> do
   lift $ logInfo "Populating package index cache ..."
   counter <- newIORef (0 :: Int)
-  withSourceFile fp $ \src -> runConduit $ src .| untar (perFile counter)
+  hSeek h AbsoluteSeek offset
+  runConduit $ sourceHandle h .| untar (perFile counter)
   where
 
     perFile counter fi
