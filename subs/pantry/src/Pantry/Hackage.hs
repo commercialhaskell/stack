@@ -101,7 +101,7 @@ updateHackageIndex = do
       -- clear the old cache and repopulate.
       minfo <- loadLatestCacheUpdate
       (offset, newHash, newSize) <- lift $ withBinaryFile tarball ReadMode $ \h -> do
-        logInfo "Calculating hashes to check for hackage-security rebases"
+        logInfo "Calculating hashes to check for hackage-security rebases or filesystem changes"
         newSize <- fromIntegral <$> hFileSize h
         (offset, newHash) <-
           case minfo of
