@@ -29,7 +29,6 @@ module Pantry
   , resolvePackages
   , resolvePackagesAllowMissing
   , rpIdent
-  , updateAllIndices
   , getPackageCaches
   , configPackageIndex
   ) where
@@ -214,9 +213,6 @@ resolvePackagesAllowMissing = undefined
 
 rpIdent :: a
 rpIdent = undefined
-
-updateAllIndices :: (HasPantryConfig env, HasLogFunc env) => RIO env ()
-updateAllIndices = updateHackageIndex -- FIXME remove this wrapper
 
 getPackageCaches :: a
 getPackageCaches = undefined
