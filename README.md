@@ -9,3 +9,7 @@ Stack is a cross-platform program for developing Haskell projects. It is intende
 
 See [haskellstack.org](http://haskellstack.org) or the [doc](./doc) directory for more
 information.
+
+### Subsystem maintainers
+
+* GHJCS - [Matchwood](https://github.com/matchwood)

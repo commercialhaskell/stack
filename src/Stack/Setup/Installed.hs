@@ -95,8 +95,7 @@ warnAboutGHCJS =
 
 ghcjsWarning :: String
 ghcjsWarning = unwords
-     [ "Note that GHCJS support in Stack is DEPRECATED and it will be removed "
-     , "in a future release of Stack."
+     [ "Note that GHCJS support in Stack is EXPERIMENTAL"
      ]
 
 getCompilerVersion
