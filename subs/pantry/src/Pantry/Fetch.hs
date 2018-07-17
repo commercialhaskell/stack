@@ -23,8 +23,6 @@ module Stack.Fetch
     , unpackPackageIdents
     , fetchPackages
     , untar
-    , resolvePackages
-    , resolvePackagesAllowMissing
     , ResolvedPackage (..)
     ) where
 
@@ -64,8 +62,6 @@ import              System.PosixCompat (setFileMode)
 data FetchException
     = Couldn'tReadIndexTarball FilePath Tar.FormatError
     | Couldn'tReadPackageTarball FilePath SomeException
-    | UnpackDirectoryAlreadyExists (Set FilePath)
-    | CouldNotParsePackageSelectors [String]
     | UnknownPackageNames (Set PackageName)
     | UnknownPackageIdentifiers (HashSet PackageIdentifierRevision) String
         Bool -- Do we use any 00-index.tar.gz indices? Just used for more informative error messages
@@ -85,12 +81,6 @@ instance Show FetchException where
         , ": "
         , show err
         ]
-    show (UnpackDirectoryAlreadyExists dirs) = unlines
-        $ "Unable to unpack due to already present directories:"
-        : map ("    " ++) (Set.toList dirs)
-    show (CouldNotParsePackageSelectors strs) =
-        "The following package selectors are not valid package names or identifiers: " ++
-        intercalate ", " strs
     show (UnknownPackageNames names) =
         "The following packages were not found in your indices: " ++
         intercalate ", " (map packageNameString $ Set.toList names)
@@ -112,39 +102,6 @@ fetchPackages idents' = do
     -- Since we're just fetching tarballs and not unpacking cabal files, we can
     -- always provide a CFILatest cabal file info
     idents = map (flip PackageIdentifierRevision CFILatest) $ Set.toList idents'
-
--- | Intended to work for the command line command.
-unpackPackages :: HasCabalLoader env
-               => Maybe SnapshotDef -- ^ when looking up by name, take from this build plan
-               -> FilePath -- ^ destination
-               -> [String] -- ^ names or identifiers
-               -> RIO env ()
-unpackPackages mSnapshotDef dest input = do
-    dest' <- resolveDir' dest
-    (names, idents) <- case partitionEithers $ map parse input of
-        ([], x) -> return $ partitionEithers x
-        (errs, _) -> throwM $ CouldNotParsePackageSelectors errs
-    resolved <- resolvePackages mSnapshotDef idents (Set.fromList names)
-    ToFetchResult toFetch alreadyUnpacked <- getToFetch (Just dest') resolved
-    unless (Map.null alreadyUnpacked) $
-        throwM $ UnpackDirectoryAlreadyExists $ Set.fromList $ map toFilePath $ Map.elems alreadyUnpacked
-    unpacked <- fetchPackages' Nothing toFetch
-    F.forM_ (Map.toList unpacked) $ \(ident, dest'') -> logInfo $
-        "Unpacked " <>
-        fromString (packageIdentifierString ident) <>
-        " to " <>
-        fromString (toFilePath dest'')
-  where
-    -- Possible future enhancement: parse names as name + version range
-    parse s =
-        case parsePackageName t of
-            Right x -> Right $ Left x
-            Left _ ->
-                case parsePackageIdentifierRevision t of
-                    Right x -> Right $ Right x
-                    Left _ -> Left s
-      where
-        t = T.pack s
 
 -- | Same as 'unpackPackageIdents', but for a single package.
 unpackPackageIdent
@@ -184,35 +141,6 @@ data ResolvedPackage = ResolvedPackage
     , rpIndex :: !PackageIndex
     }
     deriving Show
-
--- | Resolve a set of package names and identifiers into @FetchPackage@ values.
-resolvePackages :: HasCabalLoader env
-                => Maybe SnapshotDef -- ^ when looking up by name, take from this build plan
-                -> [PackageIdentifierRevision]
-                -> Set PackageName
-                -> RIO env [ResolvedPackage]
-resolvePackages mSnapshotDef idents0 names0 = do
-    eres <- go
-    case eres of
-        Left _ -> do
-            updateAllIndices
-            go >>= either throwM return
-        Right x -> return x
-  where
-    go = r <$> getUses00Index <*> resolvePackagesAllowMissing mSnapshotDef idents0 names0
-    r uses00Index (missingNames, missingIdents, idents)
-      | not $ Set.null missingNames  = Left $ UnknownPackageNames       missingNames
-      | not $ HashSet.null missingIdents = Left $ UnknownPackageIdentifiers missingIdents "" uses00Index
-      | otherwise                    = Right idents
-
--- | Does the configuration use a 00-index.tar.gz file for indices?
--- See <https://github.com/commercialhaskell/stack/issues/3520>
-getUses00Index :: HasCabalLoader env => RIO env Bool
-getUses00Index =
-    any is00 <$> view (cabalLoaderL.to clIndices)
-  where
-    is00 :: PackageIndex -> Bool
-    is00 index = "00-index.tar.gz" `T.isInfixOf` indexLocation index
 
 -- | Turn package identifiers and package names into a list of
 -- @ResolvedPackage@s. Returns any unresolved names and

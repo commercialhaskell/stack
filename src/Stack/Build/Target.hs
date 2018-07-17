@@ -318,8 +318,8 @@ resolveRawTarget globals snap deps locals (ri, rt) =
           , rrPackageType = Dependency
           }
       | otherwise = do
-          mversion <- getLatestVersion $ toCabalPackageName name
-          return $ case fromCabalVersion <$> mversion of
+          mversion <- getLatestHackageVersion $ toCabalPackageName name
+          return $ case first fromCabalVersion <$> mversion of
             -- This is actually an error case. We _could_ return a
             -- Left value here, but it turns out to be better to defer
             -- this until the ConstructPlan phase, and let it complain
@@ -333,16 +333,13 @@ resolveRawTarget globals snap deps locals (ri, rt) =
               , rrAddedDep = Nothing
               , rrPackageType = Dependency
               }
-            Just version -> Right ResolveResult
+            Just (version, _cabalHash) -> Right ResolveResult
               { rrName = name
               , rrRaw = ri
               , rrComponent = Nothing
               , rrAddedDep = Just version
               , rrPackageType = Dependency
               }
-      where
-        getLatestVersion pn =
-            fmap fst . Set.maxView . Map.keysSet <$> getPackageVersions pn
 
     go (RTPackageIdentifier ident@(PackageIdentifier name version))
       | Map.member name locals = return $ Left $ T.concat

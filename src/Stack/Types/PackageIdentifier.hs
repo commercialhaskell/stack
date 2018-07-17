@@ -183,6 +183,9 @@ parsePackageIdentifierRevision x = go x
 packageIdentifierString :: PackageIdentifier -> String
 packageIdentifierString (PackageIdentifier n v) = show n ++ "-" ++ show v
 
+instance Display PackageIdentifierRevision where
+  display = fromString . packageIdentifierRevisionString
+
 -- | Get a string representation of the package identifier with revision; name-ver[@hashtype:hash[,size]].
 packageIdentifierRevisionString :: PackageIdentifierRevision -> String
 packageIdentifierRevisionString (PackageIdentifierRevision ident cfi) =

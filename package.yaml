@@ -261,6 +261,7 @@ library:
   - Stack.Types.TemplateName
   - Stack.Types.Version
   - Stack.Types.VersionIntervals
+  - Stack.Unpack
   - Stack.Upgrade
   - Stack.Upload
   - Text.PrettyPrint.Leijen.Extended

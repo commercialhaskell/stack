@@ -11,8 +11,6 @@ module Stack.Hoogle
 import           Stack.Prelude
 import qualified Data.ByteString.Lazy.Char8 as BL8
 import           Data.Char (isSpace)
-import qualified Data.Set as Set
-import qualified RIO.Map as Map
 import qualified Data.Text as T
 import           Path (parseAbsFile)
 import           Path.IO hiding (findExecutable)
@@ -85,17 +83,19 @@ hoogleCmd (args,setup,rebuild,startServer) go = withBuildConfig go $ do
     installHoogle :: RIO EnvConfig ()
     installHoogle = do
         hooglePackageIdentifier <- do
-          versions <- getPackageVersions $ toCabalPackageName hooglePackageName
+          mversion <- getLatestHackageVersion $ toCabalPackageName hooglePackageName
 
           -- FIXME For a while, we've been following the logic of
           -- taking the latest Hoogle version available. However, we
           -- may want to instead grab the version of Hoogle present in
           -- the snapshot current being used instead.
           pure $ fromMaybe (Left hoogleMinIdent) $ do
-            (verC, _) <- Set.maxView $ Map.keysSet versions
+            (verC, cabalHash) <- mversion
             let ver = fromCabalVersion verC
             guard $ ver >= hoogleMinVersion
-            Just $ Right $ PackageIdentifier hooglePackageName ver
+            Just $ Right $ PackageIdentifierRevision
+              (PackageIdentifier hooglePackageName ver)
+              (CFIHash Nothing cabalHash) -- FIXME populate this Nothing
 
         case hooglePackageIdentifier of
             Left{} -> logInfo $
@@ -119,11 +119,12 @@ hoogleCmd (args,setup,rebuild,startServer) go = withBuildConfig go $ do
                                 (const (return ()))
                                 lk
                                 defaultBuildOptsCLI
-                                { boptsCLITargets = [ packageIdentifierText
-                                                          (either
-                                                               id
-                                                               id
-                                                               hooglePackageIdentifier)]
+                                { boptsCLITargets =
+                                    pure $
+                                    either
+                                     packageIdentifierText
+                                     (fromString . packageIdentifierRevisionString)
+                                     hooglePackageIdentifier
                                 }))
                  (\(e :: ExitCode) ->
                        case e of

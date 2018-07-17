@@ -698,10 +698,10 @@ upgradeCabal wc upgradeTo = do
                   RIO.display installed <>
                   " is already installed"
         Latest -> do
-          versions <- getPackageVersions $ toCabalPackageName name
-          case fmap (fromCabalVersion . fst) $ Set.maxView $ Map.keysSet versions of
+          mversion <- getLatestHackageVersion $ toCabalPackageName name
+          case mversion of
             Nothing -> throwString "No Cabal library found in index, cannot upgrade"
-            Just latestVersion -> do
+            Just (fromCabalVersion -> latestVersion, _cabalHash) -> do
                 if installed < latestVersion then
                     doCabalInstall wc installed latestVersion
                 else

@@ -100,6 +100,7 @@ import           Stack.Types.Config
 import           Stack.Types.Compiler
 import           Stack.Types.NamedComponent
 import           Stack.Types.Nix
+import           Stack.Unpack
 import           Stack.Upgrade
 import qualified Stack.Upload as Upload
 import qualified System.Directory as D

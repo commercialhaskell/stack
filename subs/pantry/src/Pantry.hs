@@ -18,13 +18,13 @@ module Pantry
     -- * Hackage index
   , updateHackageIndex
   , hackageIndexTarballL
+  , getLatestHackageVersion
 
     -- * FIXME legacy from Stack, to be updated
   , loadFromIndex
   , getPackageVersions
   , fetchPackages
   , unpackPackageIdent
-  , unpackPackages
   ) where
 
 import RIO
@@ -190,6 +190,15 @@ getPackageVersions
   -> RIO env (Map Version CabalHash)
 getPackageVersions = withStorage . loadHackagePackageVersions
 
+-- | Returns the latest version of the given package available from
+-- Hackage.
+getLatestHackageVersion
+  :: (HasPantryConfig env, HasLogFunc env)
+  => PackageName -- ^ package name
+  -> RIO env (Maybe (Version, CabalHash))
+getLatestHackageVersion =
+  fmap (fmap fst . Map.maxViewWithKey) . getPackageVersions
+
 fetchPackages :: a
 fetchPackages = undefined
 
@@ -199,8 +208,5 @@ unpackPackageIdent
   -> PackageName
   -> Version
   -> CabalFileInfo
-  -> RIO env FilePath
+  -> RIO env FilePath -- FIXME remove this FilePath return, make it flat
 unpackPackageIdent = undefined
-
-unpackPackages :: a
-unpackPackages = undefined
