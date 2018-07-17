@@ -27,10 +27,8 @@ module Pantry
   , unpackPackageIdents
   , unpackPackages
   , resolvePackages
-  , resolvePackagesAllowMissing
   , rpIdent
   , getPackageCaches
-  , configPackageIndex
   ) where
 
 import RIO
@@ -208,17 +206,11 @@ unpackPackageIdents = undefined
 resolvePackages :: Maybe a -> Map Int c -> Set d -> e
 resolvePackages = undefined
 
-resolvePackagesAllowMissing :: Maybe a -> Map Int c -> Set d -> e
-resolvePackagesAllowMissing = undefined
-
 rpIdent :: a
 rpIdent = undefined
 
 getPackageCaches :: a
 getPackageCaches = undefined
-
-configPackageIndex :: a
-configPackageIndex = undefined
 
 unpackPackages :: a
 unpackPackages = undefined

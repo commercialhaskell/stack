@@ -11,8 +11,8 @@ module Stack.Hoogle
 import           Stack.Prelude
 import qualified Data.ByteString.Lazy.Char8 as BL8
 import           Data.Char (isSpace)
-import           Data.List (find)
 import qualified Data.Set as Set
+import qualified RIO.Map as Map
 import qualified Data.Text as T
 import           Path (parseAbsFile)
 import           Path.IO hiding (findExecutable)
@@ -84,29 +84,19 @@ hoogleCmd (args,setup,rebuild,startServer) go = withBuildConfig go $ do
         PackageIdentifier hooglePackageName hoogleMinVersion
     installHoogle :: RIO EnvConfig ()
     installHoogle = do
-        hooglePackageIdentifier <-
-            do (_,_,resolved) <-
-                   resolvePackagesAllowMissing
+        hooglePackageIdentifier <- do
+          versions <- getPackageVersions $ toCabalPackageName hooglePackageName
 
-                       -- FIXME this Nothing means "do not follow any
-                       -- specific snapshot", which matches old
-                       -- behavior. However, since introducing the
-                       -- logic to pin a name to a package in a
-                       -- snapshot, we may arguably want to ensure
-                       -- that we're grabbing the version of Hoogle
-                       -- present in the snapshot currently being
-                       -- used.
-                       Nothing
+          -- FIXME For a while, we've been following the logic of
+          -- taking the latest Hoogle version available. However, we
+          -- may want to instead grab the version of Hoogle present in
+          -- the snapshot current being used instead.
+          pure $ fromMaybe (Left hoogleMinIdent) $ do
+            (verC, _) <- Set.maxView $ Map.keysSet versions
+            let ver = fromCabalVersion verC
+            guard $ ver >= hoogleMinVersion
+            Just $ Right $ PackageIdentifier hooglePackageName ver
 
-                       mempty
-                       (Set.fromList [hooglePackageName])
-               return
-                   (case find
-                             ((== hooglePackageName) . packageIdentifierName)
-                             (map rpIdent resolved) of
-                        Just ident@(PackageIdentifier _ ver)
-                          | ver >= hoogleMinVersion -> Right ident
-                        _ -> Left hoogleMinIdent)
         case hooglePackageIdentifier of
             Left{} -> logInfo $
               "Minimum " <>
