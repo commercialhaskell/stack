@@ -12,4 +12,4 @@ information.
 
 ### Subsystem maintainers
 
-* GHJCS - [Matchwood](https://github.com/matchwood)
+* GHCJS - [Matchwood](https://github.com/matchwood)
