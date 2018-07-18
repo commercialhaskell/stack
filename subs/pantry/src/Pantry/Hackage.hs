@@ -109,27 +109,40 @@ updateHackageIndex mreason = gateUpdate $ do
       minfo <- loadLatestCacheUpdate
       (offset, newHash, newSize) <- lift $ withBinaryFile tarball ReadMode $ \h -> do
         logInfo "Calculating hashes to check for hackage-security rebases or filesystem changes"
-        newSize <- fromIntegral <$> hFileSize h
+
+        -- The size of the new index tarball, ignoring the required
+        -- (by the tar spec) 1024 null bytes at the end, which will be
+        -- mutated in the future by other updates.
+        newSize <- (fromIntegral . max 0 . subtract 1024) <$> hFileSize h
+        let sinkSHA256 len = mkStaticSHA256FromDigest <$> (takeCE (fromIntegral len) .| sinkHash)
+
         (offset, newHash) <-
           case minfo of
             Nothing -> do
               logInfo "No old cache found, populating cache from scratch"
-              newHash <- runConduit $ sourceHandle h .| sinkHash
-              pure (0, mkStaticSHA256FromDigest newHash)
+              newHash <- runConduit $ sourceHandle h .| sinkSHA256 newSize
+              pure (0, newHash)
             Just (oldSize, oldHash) -> do
-              (oldHash', newHash) <- runConduit $ sourceHandle h .| getZipSink ((,)
-                <$> ZipSink (mkStaticSHA256FromDigest <$> (takeCE (fromIntegral oldSize) .| sinkHash))
-                <*> ZipSink sinkHash)
+              -- oldSize and oldHash come from the database, and tell
+              -- us what we cached already. Compare against
+              -- oldHashCheck, which assuming the tarball has not been
+              -- rebased will be the same as oldHash. At the same
+              -- time, calculate newHash, which is the hash of the new
+              -- content as well.
+              (oldHashCheck, newHash) <- runConduit $ sourceHandle h .| getZipSink ((,)
+                <$> ZipSink (sinkSHA256 oldSize)
+                <*> ZipSink (sinkSHA256 newSize)
+                                                                               )
               offset <-
-                if oldHash == oldHash'
+                if oldHash == oldHashCheck
                   then oldSize <$ logInfo "Updating preexisting cache, should be quick"
                   else 0 <$ do
-                    logInfo "Package index change detected"
+                    logInfo "Package index change detected, that's pretty unusual"
                     logInfo $ "Old size: " <> display oldSize
-                    logInfo $ "Old hash: " <> display oldHash
-                    logInfo $ "New hash: " <> display oldHash'
+                    logInfo $ "Old hash (orig) : " <> display oldHash
+                    logInfo $ "New hash (check): " <> display oldHashCheck
                     logInfo "Forcing a recache"
-              pure (offset, mkStaticSHA256FromDigest newHash)
+              pure (offset, newHash)
         pure (offset, newHash, newSize)
 
       lift $ logInfo $ "Populating cache from file size " <> display newSize <> ", hash " <> display newHash
