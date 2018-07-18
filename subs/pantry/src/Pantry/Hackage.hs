@@ -8,6 +8,7 @@ module Pantry.Hackage
   ) where
 
 import RIO
+import Data.Aeson
 import Conduit
 import Crypto.Hash.Conduit (sinkHash)
 import Data.Conduit.Tar
@@ -145,7 +146,8 @@ populateCache fp offset = withBinaryFile fp ReadMode $ \h -> do
       , Right path <- decodeUtf8' $ filePath fi
       , Just (name, version, filename) <- parseNameVersionSuffix path =
           if
-            | filename == "package.json" -> undefined
+            | filename == "package.json" ->
+                sinkLazy >>= lift . addJSON name version
             | filename == T.pack (unPackageName name) <> ".cabal" -> do
                 (BL.toStrict <$> sinkLazy) >>= lift . addCabal name version
 
@@ -157,6 +159,16 @@ populateCache fp offset = withBinaryFile fp ReadMode $ \h -> do
                   logSticky $ "Processed " <> display count' <> " cabal files"
             | otherwise -> pure ()
       | otherwise = pure ()
+
+    addJSON name version lbs =
+      case eitherDecode' lbs of
+        Left e -> lift $ logError $
+          "Error processing Hackage security metadata for " <>
+          fromString (Distribution.Text.display name) <> "-" <>
+          fromString (Distribution.Text.display version) <> ": " <>
+          fromString e
+        Right (PackageDownload sha size) ->
+          storeHackageTarballInfo name version sha size
 
     addCabal name version bs = do
       (blobTableId, _blobKey) <- storeBlob bs
@@ -189,3 +201,19 @@ populateCache fp offset = withBinaryFile fp ReadMode $ \h -> do
         version' <- Distribution.Text.simpleParse $ T.unpack version
 
         Just (name', version', filename)
+
+-- | Package download info from Hackage
+data PackageDownload = PackageDownload !StaticSHA256 !Word
+instance FromJSON PackageDownload where
+    parseJSON = withObject "PackageDownload" $ \o1 -> do
+        o2 <- o1 .: "signed"
+        Object o3 <- o2 .: "targets"
+        Object o4:_ <- return $ toList o3
+        len <- o4 .: "length"
+        hashes <- o4 .: "hashes"
+        sha256' <- hashes .: "sha256"
+        sha256 <-
+          case mkStaticSHA256FromText sha256' of
+            Left e -> fail $ "Invalid sha256: " ++ show e
+            Right x -> return x
+        return $ PackageDownload sha256 len

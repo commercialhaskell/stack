@@ -18,9 +18,12 @@ module Pantry.Storage
   , loadHackageCabalFile
   , loadLatestCacheUpdate
   , storeCacheUpdate
+  , storeHackageTarballInfo
     -- avoid warnings
   , BlobTableId
   , HackageCabalId
+  , HackageTarballId
+  , CacheUpdateId
   ) where
 
 import RIO
@@ -210,4 +213,21 @@ storeCacheUpdate size hash' = do
     { cacheUpdateTime = now
     , cacheUpdateSize = size
     , cacheUpdateHash = hash'
+    }
+
+storeHackageTarballInfo
+  :: (HasPantryConfig env, HasLogFunc env)
+  => PackageName
+  -> Version
+  -> StaticSHA256
+  -> Word
+  -> ReaderT SqlBackend (RIO env) ()
+storeHackageTarballInfo name version sha size = do
+  nameid <- getNameId name
+  versionid <- getVersionId version
+  insert_ HackageTarball
+    { hackageTarballName = nameid
+    , hackageTarballVersion = versionid
+    , hackageTarballHash = sha
+    , hackageTarballSize = size
     }
