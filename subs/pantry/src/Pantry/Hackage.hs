@@ -116,34 +116,32 @@ updateHackageIndex mreason = gateUpdate $ do
         newSize <- (fromIntegral . max 0 . subtract 1024) <$> hFileSize h
         let sinkSHA256 len = mkStaticSHA256FromDigest <$> (takeCE (fromIntegral len) .| sinkHash)
 
-        (offset, newHash) <-
-          case minfo of
-            Nothing -> do
-              logInfo "No old cache found, populating cache from scratch"
-              newHash <- runConduit $ sourceHandle h .| sinkSHA256 newSize
-              pure (0, newHash)
-            Just (oldSize, oldHash) -> do
-              -- oldSize and oldHash come from the database, and tell
-              -- us what we cached already. Compare against
-              -- oldHashCheck, which assuming the tarball has not been
-              -- rebased will be the same as oldHash. At the same
-              -- time, calculate newHash, which is the hash of the new
-              -- content as well.
-              (oldHashCheck, newHash) <- runConduit $ sourceHandle h .| getZipSink ((,)
-                <$> ZipSink (sinkSHA256 oldSize)
-                <*> ZipSink (sinkSHA256 newSize)
-                                                                               )
-              offset <-
-                if oldHash == oldHashCheck
-                  then oldSize <$ logInfo "Updating preexisting cache, should be quick"
-                  else 0 <$ do
-                    logInfo "Package index change detected, that's pretty unusual"
-                    logInfo $ "Old size: " <> display oldSize
-                    logInfo $ "Old hash (orig) : " <> display oldHash
-                    logInfo $ "New hash (check): " <> display oldHashCheck
-                    logInfo "Forcing a recache"
-              pure (offset, newHash)
-        pure (offset, newHash, newSize)
+        case minfo of
+          Nothing -> do
+            logInfo "No old cache found, populating cache from scratch"
+            newHash <- runConduit $ sourceHandle h .| sinkSHA256 newSize
+            pure (0, newHash, newSize)
+          Just (oldSize, oldHash) -> do
+            -- oldSize and oldHash come from the database, and tell
+            -- us what we cached already. Compare against
+            -- oldHashCheck, which assuming the tarball has not been
+            -- rebased will be the same as oldHash. At the same
+            -- time, calculate newHash, which is the hash of the new
+            -- content as well.
+            (oldHashCheck, newHash) <- runConduit $ sourceHandle h .| getZipSink ((,)
+              <$> ZipSink (sinkSHA256 oldSize)
+              <*> ZipSink (sinkSHA256 newSize)
+                                                                             )
+            offset <-
+              if oldHash == oldHashCheck
+                then oldSize <$ logInfo "Updating preexisting cache, should be quick"
+                else 0 <$ do
+                  logInfo "Package index change detected, that's pretty unusual"
+                  logInfo $ "Old size: " <> display oldSize
+                  logInfo $ "Old hash (orig) : " <> display oldHash
+                  logInfo $ "New hash (check): " <> display oldHashCheck
+                  logInfo "Forcing a recache"
+            pure (offset, newHash, newSize)
 
       lift $ logInfo $ "Populating cache from file size " <> display newSize <> ", hash " <> display newHash
       when (offset == 0) clearHackageRevisions
