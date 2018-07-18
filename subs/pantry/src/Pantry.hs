@@ -93,19 +93,15 @@ loadFromIndex name version cfi = do
     Just bs -> return $ Right bs
     -- Update the cache and try again
     Nothing -> do
-      pc <- view pantryConfigL
-      join $ modifyMVar (pcUpdateRef pc) $ \toUpdate ->
-        if toUpdate
-          then do
-            logInfo $
+      updated <- updateHackageIndex $ Just $
                 "Didn't see " <>
                 displayPackageIdentifierRevision name version cfi <>
                 " in your package indices.\n" <>
                 "Updating and trying again."
-            updateHackageIndex
-            pure (False, loadFromIndex name version cfi)
-          else do
-            pure (False, pure $ Left ())
+      if updated
+        then loadFromIndex name version cfi
+        else do
+            pure $ Left ()
             {- FIXME
             fuzzy <- fuzzyLookupCandidates name version cfi
             let suggestions = case fuzzy of
@@ -204,8 +200,11 @@ getLatestHackageVersion =
       (rev, ch) <- fst <$> Map.maxViewWithKey m
       pure (version, rev, ch)
 
-fetchPackages :: a
-fetchPackages = undefined
+fetchPackages
+  :: (HasPantryConfig env, HasLogFunc env)
+  => [(PackageName, Version)]
+  -> RIO env ()
+fetchPackages _ = undefined
 
 unpackPackageIdent
   :: (HasPantryConfig env, HasLogFunc env)

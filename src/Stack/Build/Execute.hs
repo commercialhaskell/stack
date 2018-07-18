@@ -108,7 +108,7 @@ preFetch plan
         logDebug $
             "Prefetching: " <>
             mconcat (intersperse ", " (RIO.display <$> Set.toList idents))
-        fetchPackages idents
+        fetchPackages $ ((toCabalPackageName *** toCabalVersion) . toTuple) <$> Set.toList idents
   where
     idents = Set.unions $ map toIdent $ Map.elems $ planTasks plan
 

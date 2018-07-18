@@ -671,7 +671,7 @@ unpackCmd (names, Just dstPath) go = withConfigAndLock go $ do
 
 -- | Update the package index
 updateCmd :: () -> GlobalOpts -> IO ()
-updateCmd () go = withConfigAndLock go updateHackageIndex
+updateCmd () go = withConfigAndLock go (void (updateHackageIndex Nothing))
 
 upgradeCmd :: UpgradeOpts -> GlobalOpts -> IO ()
 upgradeCmd upgradeOpts' go = withGlobalConfigAndLock go $

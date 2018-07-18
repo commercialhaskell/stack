@@ -42,10 +42,15 @@ hackageIndexTarballL = hackageDirL.to (</> "00-index.tar")
 
 -- | Download the most recent 01-index.tar file from Hackage and
 -- update the database tables.
+--
+-- Returns @True@ if an update occurred, @False@ if we've already
+-- updated once.
 updateHackageIndex
   :: (HasPantryConfig env, HasLogFunc env)
-  => RIO env ()
-updateHackageIndex = do
+  => Maybe Utf8Builder -- ^ reason for updating, if any
+  -> RIO env Bool
+updateHackageIndex mreason = gateUpdate $ do
+    for_ mreason logInfo
     pc <- view pantryConfigL
     let HackageSecurityConfig keyIds threshold url = pcHackageSecurity pc
     root <- view hackageDirL
@@ -113,12 +118,17 @@ updateHackageIndex = do
               pure (0, mkStaticSHA256FromDigest newHash)
             Just (oldSize, oldHash) -> do
               (oldHash', newHash) <- runConduit $ sourceHandle h .| getZipSink ((,)
-                <$> ZipSink (takeCE (fromIntegral oldSize) .| sinkHash)
+                <$> ZipSink (mkStaticSHA256FromDigest <$> (takeCE (fromIntegral oldSize) .| sinkHash))
                 <*> ZipSink sinkHash)
               offset <-
-                if oldHash == mkStaticSHA256FromDigest oldHash'
+                if oldHash == oldHash'
                   then oldSize <$ logInfo "Updating preexisting cache, should be quick"
-                  else 0 <$ logInfo "Package index was rebased, forcing a recache"
+                  else 0 <$ do
+                    logInfo "Package index change detected"
+                    logInfo $ "Old size: " <> display oldSize
+                    logInfo $ "Old hash: " <> display oldHash
+                    logInfo $ "New hash: " <> display oldHash'
+                    logInfo "Forcing a recache"
               pure (offset, mkStaticSHA256FromDigest newHash)
         pure (offset, newHash, newSize)
 
@@ -127,6 +137,13 @@ updateHackageIndex = do
         lift (logStickyDone "Failed populating package index cache")
       storeCacheUpdate newSize newHash
     logStickyDone "Package index cache populated"
+  where
+    gateUpdate inner = do
+      pc <- view pantryConfigL
+      join $ modifyMVar (pcUpdateRef pc) $ \toUpdate -> pure $
+        if toUpdate
+          then (False, True <$ inner)
+          else (False, pure False)
 
 -- | Populate the SQLite tables with Hackage index information.
 populateCache

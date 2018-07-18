@@ -222,7 +222,8 @@ sourceUpgrade gConfigMonoid mresolver builtHash (SourceOpts gitRepo) =
 #endif
                 return $ Just $ tmp </> $(mkRelDir "stack")
       Nothing -> do
-        updateHackageIndex
+        void $ updateHackageIndex
+             $ Just "Updating index to make sure we find the latest Stack version"
         versions0 <- getPackageVersions "stack"
         let versions
                 = filter (/= $(mkVersion "9.9.9")) -- Mistaken upload to Hackage, just ignore it
