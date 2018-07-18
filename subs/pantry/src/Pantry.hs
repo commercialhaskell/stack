@@ -213,4 +213,4 @@ unpackPackageIdent
   -> Version
   -> CabalFileInfo
   -> RIO env FilePath -- FIXME remove this FilePath return, make it flat
-unpackPackageIdent = undefined
+unpackPackageIdent fp name ver cfi = error $ show (fp, name, ver, cfi)

@@ -17,10 +17,22 @@ module Pantry.Types
   , PackageNameP (..)
   , VersionP (..)
   , displayPackageIdentifierRevision
+  , FileType (..)
+  , TreeEntry (..)
+  , SafeFilePath
+  , unSafeFilePath
+  , mkSafeFilePath
+  , TreeKey (..)
+  , Tree (..)
+  , renderTree
+  , parseTree
+  , PackageTarball (..)
   ) where
 
 import RIO
 import qualified RIO.Text as T
+import qualified RIO.ByteString.Lazy as BL
+import Data.ByteString.Builder (toLazyByteString)
 import Data.Pool (Pool)
 import Database.Persist
 import Database.Persist.Sql
@@ -67,7 +79,7 @@ class HasPantryConfig env where
   pantryConfigL :: Lens' env PantryConfig
 
 newtype BlobKey = BlobKey StaticSHA256
-  deriving (PersistField, PersistFieldSql)
+  deriving (Show, PersistField, PersistFieldSql)
 
 newtype PackageNameP = PackageNameP PackageName
 instance PersistField PackageNameP where
@@ -123,3 +135,69 @@ displayPackageIdentifierRevision name version cfi =
   fromString (Distribution.Text.display name) <> "-" <>
   fromString (Distribution.Text.display version) <>
   display cfi
+
+data FileType = FTNormal | FTExecutable
+instance PersistField FileType where
+  toPersistValue FTNormal = PersistInt64 1
+  toPersistValue FTExecutable = PersistInt64 2
+
+  fromPersistValue v = do
+    i <- fromPersistValue v
+    case i :: Int64 of
+      1 -> Right FTNormal
+      2 -> Right FTExecutable
+      _ -> Left $ "Invalid FileType: " <> tshow i
+instance PersistFieldSql FileType where
+  sqlType _ = SqlInt32
+
+data TreeEntry = TreeEntry !BlobKey !FileType
+
+newtype SafeFilePath = SafeFilePath Text
+  deriving (Show, Eq, Ord)
+
+instance PersistField SafeFilePath where
+  toPersistValue = toPersistValue . unSafeFilePath
+  fromPersistValue v = do
+    t <- fromPersistValue v
+    maybe (Left $ "Invalid SafeFilePath: " <> t) Right $ mkSafeFilePath t
+instance PersistFieldSql SafeFilePath where
+  sqlType _ = SqlString
+
+unSafeFilePath :: SafeFilePath -> Text
+unSafeFilePath (SafeFilePath t) = t
+
+mkSafeFilePath :: Text -> Maybe SafeFilePath
+mkSafeFilePath = undefined
+
+newtype TreeKey = TreeKey StaticSHA256
+  deriving (Show, Eq, Ord, PersistField, PersistFieldSql)
+
+data Tree
+  = TreeMap !(Map SafeFilePath TreeEntry)
+  | TreeTarball !PackageTarball
+
+renderTree :: Tree -> ByteString
+renderTree _tree = BL.toStrict $ toLazyByteString undefined
+
+parseTree :: ByteString -> Maybe Tree
+parseTree bs1 = do
+  tree <- parseTree' bs1
+  let bs2 = renderTree tree
+  guard $ bs1 == bs2
+  Just tree
+
+parseTree' :: ByteString -> Maybe Tree
+parseTree' = undefined
+
+data PackageTarball = PackageTarball
+  { ptBlob :: !BlobKey
+  -- ^ Contains the tarball itself
+  , ptCabal :: !BlobKey
+  -- ^ Contains the cabal file contents
+  , ptSubdir :: !FilePath
+  -- ^ Subdir containing the files we want for this package.
+  --
+  -- There must be precisely one file with a @.cabal@ file extension
+  -- located there. Thanks to Hackage revisions, its contents will be
+  -- overwritten by the value of @ptCabal@.
+  }

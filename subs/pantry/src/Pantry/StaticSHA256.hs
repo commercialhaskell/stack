@@ -27,7 +27,10 @@ import qualified Data.ByteArray.Encoding as Mem
 -- | A SHA256 hash, stored in a static size for more efficient
 -- serialization with store.
 newtype StaticSHA256 = StaticSHA256 Bytes32
-    deriving (Generic, Show, Eq, NFData, Data, Typeable, Ord, Hashable, Store)
+    deriving (Generic, Eq, NFData, Data, Typeable, Ord, Hashable, Store)
+
+instance Show StaticSHA256 where
+  show s = "StaticSHA256 " ++ show (staticSHA256ToText s)
 
 instance PersistField StaticSHA256 where
   toPersistValue = PersistByteString . staticSHA256ToRaw

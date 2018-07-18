@@ -16,7 +16,7 @@ import qualified RIO.Text as T
 import Data.Text.Unsafe (unsafeTail)
 import qualified RIO.ByteString as B
 import qualified RIO.ByteString.Lazy as BL
-import Pantry.Types
+import Pantry.Types hiding (FileType (..))
 import Pantry.Storage
 import Pantry.StaticSHA256
 import Network.URI (parseURI)
@@ -132,6 +132,7 @@ updateHackageIndex mreason = gateUpdate $ do
               pure (offset, mkStaticSHA256FromDigest newHash)
         pure (offset, newHash, newSize)
 
+      lift $ logInfo $ "Populating cache from file size " <> display newSize <> ", hash " <> display newHash
       when (offset == 0) clearHackageRevisions
       populateCache tarball (fromIntegral offset) `onException`
         lift (logStickyDone "Failed populating package index cache")

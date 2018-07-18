@@ -19,11 +19,16 @@ module Pantry.Storage
   , loadLatestCacheUpdate
   , storeCacheUpdate
   , storeHackageTarballInfo
+  , storeTree
+  , loadTree
     -- avoid warnings
   , BlobTableId
   , HackageCabalId
   , HackageTarballId
   , CacheUpdateId
+  , SfpId
+  , TreeSId
+  , TreeEntrySId
   ) where
 
 import RIO
@@ -36,6 +41,7 @@ import RIO.Orphans ()
 import Pantry.StaticSHA256
 import qualified RIO.Map as Map
 import RIO.Time (UTCTime, getCurrentTime)
+import qualified RIO.Text as T
 
 share [mkPersist sqlSettings, mkMigrate "migrateAll"] [persistLowerCase|
 BlobTable sql=blob
@@ -59,11 +65,27 @@ HackageCabal
     version VersionTableId
     revision Revision
     cabal BlobTableId
+    tree TreeSId Maybe
     UniqueHackage name version revision
 CacheUpdate
     time UTCTime
     size Word
     hash StaticSHA256
+
+Sfp sql=file_path
+    path SafeFilePath
+    UniqueSfp path
+TreeS sql=tree
+    key TreeKey
+    tarball BlobTableId Maybe
+    cabal BlobTableId Maybe
+    subdir Text Maybe
+    UniqueTree key
+TreeEntryS sql=tree_entry
+    tree TreeSId
+    path SfpId
+    blob BlobTableId
+    type FileType
 |]
 
 initStorage
@@ -113,6 +135,17 @@ storeBlob bs = do
       key:rest -> assert (null rest) (pure key)
   pure (key, blobKey)
 
+getBlobKey
+  :: (HasPantryConfig env, HasLogFunc env)
+  => BlobTableId
+  -> ReaderT SqlBackend (RIO env) BlobKey
+getBlobKey bid = do
+  res <- rawSql "SELECT hash FROM blob WHERE id=?" [toPersistValue bid]
+  case res of
+    [] -> error $ "getBlobKey failed due to missing ID: " ++ show bid
+    [Single x] -> pure x
+    _ -> error $ "getBlobKey failed due to non-unique ID: " ++ show (bid, res)
+
 clearHackageRevisions
   :: (HasPantryConfig env, HasLogFunc env)
   => ReaderT SqlBackend (RIO env) ()
@@ -136,7 +169,10 @@ storeHackageRevision name version key = do
     , hackageCabalVersion = versionid
     , hackageCabalRevision = Revision (fromIntegral rev)
     , hackageCabalCabal = key
+    , hackageCabalTree = Nothing
     }
+
+-- FIXME something to update the hackageCabalTree when we have it
 
 loadHackagePackageVersions
   :: (HasPantryConfig env, HasLogFunc env)
@@ -147,7 +183,7 @@ loadHackagePackageVersions name = do
   -- would be better with esequeleto
   (Map.fromListWith Map.union . map go) <$> rawSql
     "SELECT hackage.revision, version.version, blob.hash, blob.size\n\
-    \FROM hackage, version, blob\n\
+    \FROM hackage_cabal as hackage, version, blob\n\
     \WHERE hackage.name=?\n\
     \AND   hackage.version=version.id\n\
     \AND   hackage.cabal=blob.id"
@@ -231,3 +267,40 @@ storeHackageTarballInfo name version sha size = do
     , hackageTarballHash = sha
     , hackageTarballSize = size
     }
+
+storeTree
+  :: (HasPantryConfig env, HasLogFunc env)
+  => Tree
+  -> ReaderT SqlBackend (RIO env) TreeKey
+storeTree = undefined
+
+loadTree
+  :: (HasPantryConfig env, HasLogFunc env)
+  => TreeKey
+  -> ReaderT SqlBackend (RIO env) (Maybe Tree)
+loadTree key = do
+  ment <- getBy $ UniqueTree key
+  case ment of
+    Nothing -> pure Nothing
+    Just (Entity tid t) ->
+      case (treeSTarball t, treeSCabal t, treeSSubdir t) of
+        (Just tarball, Just cabal, Just subdir) -> do
+          tarballkey <- getBlobKey tarball
+          cabalkey <- getBlobKey cabal
+          pure $ Just $ TreeTarball PackageTarball
+            { ptBlob = tarballkey
+            , ptCabal = cabalkey
+            , ptSubdir = T.unpack subdir
+            }
+        (x, y, z) -> assert (isNothing x && isNothing y && isNothing z) $ do
+          entries <- rawSql
+            "SELECT file_path.path, blob.hash, tree_entry.type\n\
+            \FROM tree_entry, blob, file_path\n\
+            \WHERE tree_entry.id=?\n\
+            \AND   tree_entry.blob=blob.id\n\
+            \AND   tree_entry.path=file_path.id"
+            [toPersistValue tid]
+          pure $ Just $ TreeMap $ Map.fromList $ map
+            (\(Single sfp, Single blobKey, Single ft) ->
+                 (sfp, TreeEntry blobKey ft))
+            entries
