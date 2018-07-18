@@ -77,6 +77,7 @@ Other enhancements:
 * `stack ghci` now asks which main target to load before doing the build,
   rather than after
 * Bump to hpack 0.29.0
+* With GHC 8.4 and later, Haddock is given the `--quickjump` flag.
 
 Bug fixes:
 
