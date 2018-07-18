@@ -1496,12 +1496,22 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
                             ("Warning: haddock not generating hyperlinked sources because 'HsColour' not\n" <>
                              "found on PATH (use 'stack install hscolour' to install).")
                         return ["--hyperlink-source" | hscolourExists]
+
+            -- For GHC 8.4 and later, provide the --quickjump option.
+            actualCompiler <- view actualCompilerVersionL
+            let quickjump =
+                  case actualCompiler of
+                    GhcVersion ghcVer
+                      | ghcVer >= $(mkVersion "8.4") -> ["--haddock-option=--quickjump"]
+                    _ -> []
+
             cabal KeepTHLoading $ concat
                 [ ["haddock", "--html", "--hoogle", "--html-location=../$pkg-$version/"]
                 , sourceFlag
                 , ["--internal" | boptsHaddockInternal eeBuildOpts]
                 , [ "--haddock-option=" <> opt
                   | opt <- hoAdditionalArgs (boptsHaddockOpts eeBuildOpts) ]
+                , quickjump
                 ]
 
         let hasLibrary =
