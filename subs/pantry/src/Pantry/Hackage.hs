@@ -1,3 +1,4 @@
+{-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -22,7 +23,7 @@ import Network.HTTP.Client.TLS (getGlobalManager)
 import Data.Time (getCurrentTime)
 import RIO.FilePath ((</>))
 import qualified Distribution.Text
-import Distribution.Types.PackageName (mkPackageName)
+import Distribution.Types.PackageName (unPackageName)
 import System.IO (SeekMode (..))
 
 import qualified Hackage.Security.Client as HS
@@ -142,15 +143,19 @@ populateCache fp offset = withBinaryFile fp ReadMode $ \h -> do
     perFile counter fi
       | FTNormal <- fileType fi
       , Right path <- decodeUtf8' $ filePath fi
-      , Just (name, version) <- parseNameVersionCabal path = do
-          (BL.toStrict <$> sinkLazy) >>= lift . addCabal name version
+      , Just (name, version, filename) <- parseNameVersionSuffix path =
+          if
+            | filename == "package.json" -> undefined
+            | filename == T.pack (unPackageName name) <> ".cabal" -> do
+                (BL.toStrict <$> sinkLazy) >>= lift . addCabal name version
 
-          count <- readIORef counter
-          let count' = count + 1
-          writeIORef counter count'
-          when (count' `mod` 400 == 0) $
-            lift $ lift $
-            logSticky $ "Processed " <> display count' <> " cabal files"
+                count <- readIORef counter
+                let count' = count + 1
+                writeIORef counter count'
+                when (count' `mod` 400 == 0) $
+                  lift $ lift $
+                  logSticky $ "Processed " <> display count' <> " cabal files"
+            | otherwise -> pure ()
       | otherwise = pure ()
 
     addCabal name version bs = do
@@ -176,14 +181,11 @@ populateCache fp offset = withBinaryFile fp ReadMode $ \h -> do
       where
         (y, z) = T.break (== '/') x
 
-    parseNameVersionCabal t1 = do
-        t2 <- T.stripSuffix ".cabal" t1
+    parseNameVersionSuffix t1 = do
+        (name, t2) <- breakSlash t1
+        (version, filename) <- breakSlash t2
 
-        (name, t3) <- breakSlash t2
-        (version, base) <- breakSlash t3
-
-        guard (base == name)
-
+        name' <- Distribution.Text.simpleParse $ T.unpack name
         version' <- Distribution.Text.simpleParse $ T.unpack version
 
-        Just (mkPackageName $ T.unpack name, version')
+        Just (name', version', filename)

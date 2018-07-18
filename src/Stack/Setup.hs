@@ -701,7 +701,7 @@ upgradeCabal wc upgradeTo = do
           mversion <- getLatestHackageVersion $ toCabalPackageName name
           case mversion of
             Nothing -> throwString "No Cabal library found in index, cannot upgrade"
-            Just (fromCabalVersion -> latestVersion, _cabalHash) -> do
+            Just (fromCabalVersion -> latestVersion, _revision, _cabalHash) -> do
                 if installed < latestVersion then
                     doCabalInstall wc installed latestVersion
                 else

@@ -90,12 +90,12 @@ hoogleCmd (args,setup,rebuild,startServer) go = withBuildConfig go $ do
           -- may want to instead grab the version of Hoogle present in
           -- the snapshot current being used instead.
           pure $ fromMaybe (Left hoogleMinIdent) $ do
-            (verC, cabalHash) <- mversion
+            (verC, _revision, cabalHash) <- mversion
             let ver = fromCabalVersion verC
             guard $ ver >= hoogleMinVersion
             Just $ Right $ PackageIdentifierRevision
               (PackageIdentifier hooglePackageName ver)
-              (CFIHash Nothing cabalHash) -- FIXME populate this Nothing
+              (CFIHash cabalHash)
 
         case hooglePackageIdentifier of
             Left{} -> logInfo $

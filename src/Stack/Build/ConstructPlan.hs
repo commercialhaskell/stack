@@ -133,7 +133,7 @@ data Ctx = Ctx
     , ctxEnvConfig   :: !EnvConfig
     , callStack      :: ![PackageName]
     , extraToBuild   :: !(Set PackageName)
-    , getVersions    :: !(PackageName -> IO (Map Version CabalHash))
+    , getVersions    :: !(PackageName -> IO (Map Version (Map Revision CabalHash)))
     , wanted         :: !(Set PackageName)
     , localNames     :: !(Set PackageName)
     }
@@ -614,14 +614,13 @@ addPackageDeps treatAsDep package = do
     deps' <- packageDepsWithTools package
     deps <- forM (Map.toList deps') $ \(depname, DepValue range depType) -> do
         eres <- addDep treatAsDep depname
-        let getLatestApplicableVersionAndRev = do
-                vsAndRevs <- liftIO $ getVersions ctx depname
-                let vs = Map.keysSet vsAndRevs
-                case latestApplicableVersion range vs of
-                  Nothing -> pure Nothing
-                  Just lappVer -> do
-                    let mlappRev = Map.lookup lappVer vsAndRevs
-                    pure $ (lappVer,) <$> mlappRev
+        let getLatestApplicableVersionAndRev :: M (Maybe (Version, CabalHash))
+            getLatestApplicableVersionAndRev =
+              liftIO $ flip fmap (getVersions ctx depname) $ \vsAndRevs -> do
+                lappVer <- latestApplicableVersion range $ Map.keysSet vsAndRevs
+                revs <- Map.lookup lappVer vsAndRevs
+                (cabalHash, _) <- Map.maxView revs
+                Just (lappVer, cabalHash)
         case eres of
             Left e -> do
                 addParent depname range Nothing
@@ -981,7 +980,7 @@ pprintExceptions exceptions stackYaml stackRoot parentMap wanted =
            Map.singleton name (version, cabalHash)
        go _ = Map.empty
     pprintExtra (name, (version, cabalHash)) =
-      let cfInfo = CFIHash Nothing cabalHash
+      let cfInfo = CFIHash cabalHash
           packageId = PackageIdentifier name version
           packageIdRev = PackageIdentifierRevision packageId cfInfo
        in fromString $ packageIdentifierRevisionString packageIdRev

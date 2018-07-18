@@ -319,7 +319,7 @@ resolveRawTarget globals snap deps locals (ri, rt) =
           }
       | otherwise = do
           mversion <- getLatestHackageVersion $ toCabalPackageName name
-          return $ case first fromCabalVersion <$> mversion of
+          return $ case (\(x, y, z) -> (fromCabalVersion x, y, z)) <$> mversion of
             -- This is actually an error case. We _could_ return a
             -- Left value here, but it turns out to be better to defer
             -- this until the ConstructPlan phase, and let it complain
@@ -333,11 +333,11 @@ resolveRawTarget globals snap deps locals (ri, rt) =
               , rrAddedDep = Nothing
               , rrPackageType = Dependency
               }
-            Just (version, _cabalHash) -> Right ResolveResult
+            Just (version, _revision, _cabalHash) -> Right ResolveResult
               { rrName = name
               , rrRaw = ri
               , rrComponent = Nothing
-              , rrAddedDep = Just version
+              , rrAddedDep = Just version -- FIXME retain cabal hash info?
               , rrPackageType = Dependency
               }
 

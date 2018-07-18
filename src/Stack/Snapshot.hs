@@ -46,6 +46,8 @@ import           Network.HTTP.StackClient (Request)
 import           Network.HTTP.Download
 import qualified RIO
 import           Network.URI (isURI)
+import           Pantry
+import           Pantry.StaticSHA256
 import           Path
 import           Path.IO
 import           Stack.Constants
@@ -227,10 +229,10 @@ loadResolver (ResolverStackage name) = do
                   case HashMap.lookup ("SHA256" :: Text) cfiHashes of
                     Nothing -> fail "Could not find SHA256"
                     Just shaText ->
-                      case mkCabalHashFromSHA256 shaText of
+                      case mkStaticSHA256FromText shaText of
                         Left e -> fail $ "Invalid SHA256: " ++ show e
                         Right x -> return x
-                return $ CFIHash msize hash'
+                return $ CFIHash $ CabalHash hash' msize
 
             Object constraints <- o .: "constraints"
 

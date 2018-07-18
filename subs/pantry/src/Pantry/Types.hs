@@ -11,6 +11,7 @@ module Pantry.Types
   , BlobKey (..)
   , PackageName
   , Version
+  , Revision (..)
   , CabalHash (..)
   , CabalFileInfo (..)
   , PackageNameP (..)
@@ -29,11 +30,20 @@ import qualified Distribution.Text
 import Distribution.Types.Version (Version)
 import Data.Store (Store) -- FIXME remove
 
+newtype Revision = Revision Word
+    deriving (Generic, Show, Eq, NFData, Data, Typeable, Ord, Hashable, Store, Display, PersistField, PersistFieldSql)
+
 newtype Storage = Storage (Pool SqlBackend)
 
--- | A cryptographic hash of a Cabal file.
-newtype CabalHash = CabalHash { unCabalHash :: StaticSHA256 }
-    deriving (Generic, Show, Eq, NFData, Data, Typeable, Ord, Hashable, Store, Display)
+-- | A cryptographic hash of a Cabal file and its size, if known.
+data CabalHash = CabalHash
+  { chHash :: !StaticSHA256
+  , chSize :: !(Maybe Word)
+  }
+    deriving (Generic, Show, Eq, Data, Typeable, Ord)
+instance Store CabalHash
+instance NFData CabalHash
+instance Hashable CabalHash
 
 data PantryConfig = PantryConfig
   { pcHackageSecurity :: !HackageSecurityConfig
@@ -88,11 +98,9 @@ data CabalFileInfo
   -- isn't reproducible at all, but the running assumption (not
   -- necessarily true) is that cabal file revisions do not change
   -- semantics of the build.
-  | CFIHash
-      !(Maybe Int) -- file size in bytes
-      !CabalHash
+  | CFIHash !CabalHash
   -- ^ Identify by contents of the cabal file itself
-  | CFIRevision !Word
+  | CFIRevision !Revision
   -- ^ Identify by revision number, with 0 being the original and
   -- counting upward.
     deriving (Generic, Show, Eq, Ord, Data, Typeable)
@@ -102,7 +110,7 @@ instance Hashable CabalFileInfo
 
 instance Display CabalFileInfo where
   display CFILatest = mempty
-  display (CFIHash msize hash') =
+  display (CFIHash (CabalHash hash' msize)) =
     "@sha256:" <> display hash' <> maybe mempty (\i -> "," <> display i) msize
   display (CFIRevision rev) = "@rev:" <> display rev
 

@@ -12,6 +12,7 @@ module Pantry
   , StaticSHA256
   , CabalHash (..)
   , CabalFileInfo (..)
+  , Revision (..)
   -- FIXME , PackageName
   -- FIXME , Version
 
@@ -187,7 +188,7 @@ typoCorrectionCandidates name' =
 getPackageVersions
   :: (HasPantryConfig env, HasLogFunc env)
   => PackageName -- ^ package name
-  -> RIO env (Map Version CabalHash)
+  -> RIO env (Map Version (Map Revision CabalHash))
 getPackageVersions = withStorage . loadHackagePackageVersions
 
 -- | Returns the latest version of the given package available from
@@ -195,9 +196,13 @@ getPackageVersions = withStorage . loadHackagePackageVersions
 getLatestHackageVersion
   :: (HasPantryConfig env, HasLogFunc env)
   => PackageName -- ^ package name
-  -> RIO env (Maybe (Version, CabalHash))
+  -> RIO env (Maybe (Version, Revision, CabalHash))
 getLatestHackageVersion =
-  fmap (fmap fst . Map.maxViewWithKey) . getPackageVersions
+  fmap ((fmap fst . Map.maxViewWithKey) >=> go) . getPackageVersions
+  where
+    go (version, m) = do
+      (rev, ch) <- fst <$> Map.maxViewWithKey m
+      pure (version, rev, ch)
 
 fetchPackages :: a
 fetchPackages = undefined

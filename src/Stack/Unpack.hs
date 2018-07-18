@@ -78,9 +78,9 @@ unpackPackages mSnapshotDef dest input = do
         case mver of
           -- consider updating the index
           Nothing -> Left $ "Could not find package " ++ packageNameString name
-          Just (ver, cabalHash) -> Right $ PackageIdentifierRevision
+          Just (ver, _rev, cabalHash) -> Right $ PackageIdentifierRevision
             (PackageIdentifier name (fromCabalVersion ver))
-            (CFIHash Nothing cabalHash) -- FIXME get the actual size
+            (CFIHash cabalHash)
 
     toPIRSnapshot sd name =
         pure $

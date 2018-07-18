@@ -1,4 +1,5 @@
 {-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveDataTypeable #-}
@@ -13,9 +14,6 @@ module Stack.Types.PackageIdentifier
   ( PackageIdentifier(..)
   , PackageIdentifierRevision(..)
   , CabalHash
-  , mkCabalHashFromSHA256
-  , computeCabalHash
-  , showCabalHash
   , CabalFileInfo(..)
   , toTuple
   , fromTuple
@@ -74,7 +72,7 @@ instance Store PackageIdentifier
 instance Show PackageIdentifier where
   show = show . packageIdentifierString
 instance Display PackageIdentifier where
-  display = fromString . packageIdentifierString
+  display (PackageIdentifier p v) = display p <> "-" <> display v
 
 instance ToJSON PackageIdentifier where
   toJSON = toJSON . packageIdentifierString
@@ -108,21 +106,6 @@ instance FromJSON PackageIdentifierRevision where
     case parsePackageIdentifierRevision t of
       Left e -> fail $ show (e, t)
       Right x -> return x
-
--- | Generate a 'CabalHash' value from a base16-encoded SHA256 hash.
-mkCabalHashFromSHA256 :: Text -> Either SomeException CabalHash
-mkCabalHashFromSHA256 = fmap CabalHash . mkStaticSHA256FromText
-
--- | Convert a 'CabalHash' into a base16-encoded SHA256 hash.
-cabalHashToText :: CabalHash -> Text
-cabalHashToText = staticSHA256ToText . unCabalHash
-
--- | Compute a 'CabalHash' value from a cabal file's contents.
-computeCabalHash :: L.ByteString -> CabalHash
-computeCabalHash = CabalHash . mkStaticSHA256FromDigest . Hash.hashlazy
-
-showCabalHash :: CabalHash -> Text
-showCabalHash = T.append (T.pack "sha256:") . cabalHashToText
 
 -- | Convert from a package identifier to a tuple.
 toTuple :: PackageIdentifier -> (PackageName,Version)
@@ -167,45 +150,32 @@ parsePackageIdentifierRevision x = go x
       _ <- string $ T.pack "@sha256:"
       hash' <- A.takeWhile (/= ',')
       hash'' <- either (\e -> fail $ "Invalid SHA256: " ++ show e) return
-              $ mkCabalHashFromSHA256 hash'
+              $ mkStaticSHA256FromText hash'
       msize <- optional $ do
         _ <- A.char ','
         A.decimal
       A.endOfInput
-      return $ CFIHash msize hash''
+      return $ CFIHash $ CabalHash hash'' msize
 
     cfiRevision = do
       _ <- string $ T.pack "@rev:"
       y <- A.decimal
       A.endOfInput
-      return $ CFIRevision y
+      return $ CFIRevision $ Revision y
 -- | Get a string representation of the package identifier; name-ver.
 packageIdentifierString :: PackageIdentifier -> String
-packageIdentifierString (PackageIdentifier n v) = show n ++ "-" ++ show v
+packageIdentifierString = T.unpack . packageIdentifierText
 
 instance Display PackageIdentifierRevision where
-  display = fromString . packageIdentifierRevisionString
+  display (PackageIdentifierRevision ident cfi) = display ident <> display cfi
 
 -- | Get a string representation of the package identifier with revision; name-ver[@hashtype:hash[,size]].
 packageIdentifierRevisionString :: PackageIdentifierRevision -> String
-packageIdentifierRevisionString (PackageIdentifierRevision ident cfi) =
-  concat $ packageIdentifierString ident : rest
-  where
-    rest =
-      case cfi of
-        CFILatest -> []
-        CFIHash msize hash' ->
-            "@sha256:"
-          : T.unpack (cabalHashToText hash')
-          : showSize msize
-        CFIRevision rev -> ["@rev:", show rev]
-
-    showSize Nothing = []
-    showSize (Just int) = [',' : show int]
+packageIdentifierRevisionString = T.unpack . utf8BuilderToText . display
 
 -- | Get a Text representation of the package identifier; name-ver.
 packageIdentifierText :: PackageIdentifier -> Text
-packageIdentifierText = T.pack .  packageIdentifierString
+packageIdentifierText = utf8BuilderToText . display
 
 toCabalPackageIdentifier :: PackageIdentifier -> C.PackageIdentifier
 toCabalPackageIdentifier x =
