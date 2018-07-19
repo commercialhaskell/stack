@@ -65,7 +65,7 @@ import           Data.Time.Clock
 import           Distribution.PackageDescription (TestSuiteInterface)
 import           Distribution.System             (Arch)
 import qualified Distribution.Text               as C
-import           Path                            (mkRelDir, parseRelDir, (</>))
+import           Path                            (mkRelDir, parseRelDir, (</>), parent)
 import           Path.Extra                      (toFilePathNoTrailingSep)
 import           Stack.Constants
 import           Stack.Types.BuildPlan
@@ -412,7 +412,7 @@ instance Store CachePkgSrc
 instance NFData CachePkgSrc
 
 toCachePkgSrc :: PackageSource -> CachePkgSrc
-toCachePkgSrc (PSFiles lp _) = CacheSrcLocal (toFilePath (lpDir lp))
+toCachePkgSrc (PSFiles lp _) = CacheSrcLocal (toFilePath (parent (lpCabalFile lp)))
 toCachePkgSrc PSIndex{} = CacheSrcUpstream
 
 configCacheVC :: VersionConfig ConfigCache
@@ -469,7 +469,7 @@ data TaskType = TTFiles LocalPackage InstallLocation
     deriving Show
 
 ttPackageLocation :: TaskType -> PackageLocationIndex FilePath
-ttPackageLocation (TTFiles lp _) = PLOther (lpLocation lp)
+ttPackageLocation (TTFiles lp _) = PLOther (PLFilePath (toFilePath (parent (lpCabalFile lp))))
 ttPackageLocation (TTIndex _ _ pir) = PLIndex pir
 
 taskIsTarget :: Task -> Bool

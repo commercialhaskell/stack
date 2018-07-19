@@ -27,6 +27,7 @@ import              Data.List
 import qualified    Data.Map as Map
 import qualified    Data.Map.Strict as M
 import qualified    Data.Set as Set
+import              Path.IO (resolveDir)
 import              Stack.Build.Cache
 import              Stack.Build.Target
 import              Stack.Config (getLocalPackages)
@@ -93,9 +94,10 @@ loadSourceMapFull needTargets boptsCli = do
           case lpiLocation lpi of
             -- NOTE: configOpts includes lpiGhcOptions for now, this may get refactored soon
             PLIndex pir -> return $ PSIndex loc (lpiFlags lpi) configOpts pir
-            PLOther pl -> do
+            PLOther (PLFilePath fp) -> do
               root <- view projectRootL
-              lpv <- parseSingleCabalFile root True pl
+              dir <- resolveDir root fp
+              lpv <- parseSingleCabalFile True dir
               lp' <- loadLocalPackage False boptsCli targets (n, lpv)
               return $ PSFiles lp' loc
     sourceMap' <- Map.unions <$> sequence
@@ -299,7 +301,6 @@ loadLocalPackage isLocal boptsCli targets (name, lpv) = do
                 else Nothing
         , lpNewBuildCaches = newBuildCaches
         , lpCabalFile = lpvCabalFP lpv
-        , lpDir = lpvRoot lpv
         , lpWanted = isWanted
         , lpComponents = nonLibComponents
         -- TODO: refactor this so that it's easier to be sure that these
@@ -312,7 +313,6 @@ loadLocalPackage isLocal boptsCli targets (name, lpv) = do
             (exes `Set.difference` packageExes pkg)
             (tests `Set.difference` Map.keysSet (packageTests pkg))
             (benches `Set.difference` packageBenchmarks pkg)
-        , lpLocation = lpvLoc lpv
         }
 
 -- | Ensure that the flags specified in the stack.yaml file and on the command

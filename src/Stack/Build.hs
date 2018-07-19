@@ -36,6 +36,7 @@ import qualified Data.Text.IO as TIO
 import           Data.Text.Read (decimal)
 import qualified Data.Vector as V
 import qualified Data.Yaml as Yaml
+import           Path (parent)
 import           Stack.Build.ConstructPlan
 import           Stack.Build.Execute
 import           Stack.Build.Haddock
@@ -403,5 +404,5 @@ rawBuildInfo = do
         p = lpPackage lp
         value = object
             [ "version" .= packageVersion p
-            , "path" .= toFilePath (lpDir lp)
+            , "path" .= toFilePath (parent $ lpCabalFile lp)
             ]

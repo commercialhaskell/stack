@@ -136,7 +136,7 @@ initProject whichCmd currDir initOpts mresolver = do
         makeRel = fmap toFilePath . makeRelativeToCurrentDir
 
         pkgs = map toPkg $ Map.elems (fmap (parent . fst) rbundle)
-        toPkg dir = PLFilePath $ makeRelDir dir
+        toPkg dir = makeRelDir dir
         indent t = T.unlines $ fmap ("    " <>) (T.lines t)
 
     logInfo $ "Initialising configuration using resolver: " <> display (sdResolverName sd)

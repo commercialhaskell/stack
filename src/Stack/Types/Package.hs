@@ -23,7 +23,7 @@ import           Distribution.ModuleName (ModuleName)
 import           Distribution.PackageDescription (TestSuiteInterface, BuildType)
 import           Distribution.System (Platform (..))
 import           Path as FL
-import           Stack.Types.BuildPlan (PackageLocation, PackageLocationIndex (..), ExeName)
+import           Stack.Types.BuildPlan (PackageLocation (..), PackageLocationIndex (..), ExeName)
 import           Stack.Types.Compiler
 import           Stack.Types.Config
 import           Stack.Types.FlagName
@@ -268,7 +268,7 @@ piiLocation (PSFiles _ loc) = loc
 piiLocation (PSIndex loc _ _ _) = loc
 
 piiPackageLocation :: PackageSource -> PackageLocationIndex FilePath
-piiPackageLocation (PSFiles lp _) = PLOther (lpLocation lp)
+piiPackageLocation (PSFiles lp _) = PLOther (PLFilePath (toFilePath (parent (lpCabalFile lp))))
 piiPackageLocation (PSIndex _ _ _ pir) = PLIndex pir
 
 -- | Information on a locally available package of source code
@@ -291,8 +291,6 @@ data LocalPackage = LocalPackage
     , lpTestBench     :: !(Maybe Package)
     -- ^ This stores the 'Package' with tests and benchmarks enabled, if
     -- either is asked for by the user.
-    , lpDir           :: !(Path Abs Dir)
-    -- ^ Directory of the package.
     , lpCabalFile     :: !(Path Abs File)
     -- ^ The .cabal file
     , lpForceDirty    :: !Bool
@@ -304,8 +302,6 @@ data LocalPackage = LocalPackage
     -- ^ current state of the files
     , lpComponentFiles :: !(Map NamedComponent (Set (Path Abs File)))
     -- ^ all files used by this package
-    , lpLocation      :: !(PackageLocation FilePath)
-    -- ^ Where this source code came from
     }
     deriving Show
 

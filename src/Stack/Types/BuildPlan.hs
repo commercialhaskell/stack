@@ -1,8 +1,10 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE DataKinds                  #-}
 {-# LANGUAGE DeriveDataTypeable         #-}
+{-# LANGUAGE DeriveFoldable             #-}
 {-# LANGUAGE DeriveFunctor              #-}
 {-# LANGUAGE DeriveGeneric              #-}
+{-# LANGUAGE DeriveTraversable          #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE OverloadedStrings          #-}
 {-# LANGUAGE RecordWildCards            #-}
@@ -44,6 +46,7 @@ import           Data.Text.Encoding (encodeUtf8)
 import qualified Distribution.ModuleName as C
 import qualified Distribution.Version as C
 import           Network.HTTP.StackClient (parseRequest)
+import           Pantry
 import           Pantry.StaticSHA256
 import           Stack.Prelude
 import           Stack.Types.Compiler
@@ -103,7 +106,7 @@ instance Store SnapshotDef
 instance NFData SnapshotDef
 
 snapshotDefVC :: VersionConfig SnapshotDef
-snapshotDefVC = storeVersionConfig "sd-v3" "AX6P1SG4p-cw4rJLgbrqwCLPo6s="
+snapshotDefVC = storeVersionConfig "sd-v3" "gnOY1kMptOLADx6cA-gKjpXofSI="
 
 -- | A relative file path including a unique string for the given
 -- snapshot.
@@ -143,7 +146,7 @@ data PackageLocation subdirs
   | PLArchive !(Archive subdirs)
   | PLRepo !(Repo subdirs)
   -- ^ Stored in a source control repository
-    deriving (Generic, Show, Eq, Ord, Data, Typeable, Functor)
+    deriving (Generic, Show, Eq, Ord, Data, Typeable, Functor, Foldable, Traversable)
 instance (Store a) => Store (PackageLocation a)
 instance (NFData a) => NFData (PackageLocation a)
 
@@ -157,7 +160,7 @@ data PackageLocationIndex subdirs
     -- version and (optional) cabal file info to specify the correct
     -- revision.
   | PLOther !(PackageLocation subdirs)
-    deriving (Generic, Show, Eq, Ord, Data, Typeable, Functor)
+    deriving (Generic, Show, Eq, Ord, Data, Typeable, Functor, Foldable, Traversable)
 instance (Store a) => Store (PackageLocationIndex a)
 instance (NFData a) => NFData (PackageLocationIndex a)
 
@@ -168,8 +171,9 @@ data Archive subdirs = Archive
   { archiveUrl :: !Text
   , archiveSubdirs :: !subdirs
   , archiveHash :: !(Maybe StaticSHA256)
+  , archiveSize :: !(Maybe FileSize)
   }
-    deriving (Generic, Show, Eq, Ord, Data, Typeable, Functor)
+    deriving (Generic, Show, Eq, Ord, Data, Typeable, Functor, Foldable, Traversable)
 instance Store a => Store (Archive a)
 instance NFData a => NFData (Archive a)
 
@@ -195,7 +199,7 @@ data Repo subdirs = Repo
     , repoType :: !RepoType
     , repoSubdirs :: !subdirs
     }
-    deriving (Generic, Show, Eq, Ord, Data, Typeable, Functor)
+    deriving (Generic, Show, Eq, Ord, Data, Typeable, Functor, Foldable, Traversable)
 instance Store a => Store (Repo a)
 instance NFData a => NFData (Repo a)
 
@@ -205,8 +209,8 @@ instance subdirs ~ Subdirs => ToJSON (PackageLocationIndex subdirs) where
 
 instance subdirs ~ Subdirs => ToJSON (PackageLocation subdirs) where
     toJSON (PLFilePath fp) = toJSON fp
-    toJSON (PLArchive (Archive t DefaultSubdirs Nothing)) = toJSON t
-    toJSON (PLArchive (Archive t subdirs msha)) = object $ concat
+    toJSON (PLArchive (Archive t DefaultSubdirs Nothing Nothing)) = toJSON t
+    toJSON (PLArchive (Archive t subdirs msha msize)) = object $ concat
         [ ["location" .= t]
         , case subdirs of
             DefaultSubdirs    -> []
@@ -214,6 +218,9 @@ instance subdirs ~ Subdirs => ToJSON (PackageLocation subdirs) where
         , case msha of
             Nothing -> []
             Just sha -> ["sha256" .= staticSHA256ToText sha]
+        , case msize of
+            Nothing -> []
+            Just size -> ["size" .= size]
         ]
     toJSON (PLRepo (Repo url commit typ subdirs)) = object $ concat
         [ case subdirs of
@@ -244,7 +251,7 @@ instance subdirs ~ Subdirs => FromJSON (WithJSONWarnings (PackageLocation subdir
         http t =
             case parseRequest $ T.unpack t of
                 Left  _ -> fail $ "Could not parse URL: " ++ T.unpack t
-                Right _ -> return $ PLArchive $ Archive t DefaultSubdirs Nothing
+                Right _ -> return $ PLArchive $ Archive t DefaultSubdirs Nothing Nothing
 
         repo = withObjectWarnings "PLRepo" $ \o -> do
           (repoType, repoUrl) <-
@@ -254,31 +261,40 @@ instance subdirs ~ Subdirs => FromJSON (WithJSONWarnings (PackageLocation subdir
           repoSubdirs <- o ..:? "subdirs" ..!= DefaultSubdirs
           return $ PLRepo Repo {..}
 
+        parseSHA o = do
+          msha <- o ..:? "sha256"
+          case msha of
+            Nothing -> return Nothing
+            Just t ->
+              case mkStaticSHA256FromText t of
+                Left e -> fail $ "Invalid SHA256: " ++ T.unpack t ++ ", " ++ show e
+                Right x -> return $ Just x
+
+        parseSize o = o ..:? "size"
+
         archiveObject = withObjectWarnings "PLArchive" $ \o -> do
           url <- o ..: "archive"
           subdirs <- o ..:? "subdirs" ..!= DefaultSubdirs
-          msha <- o ..:? "sha256"
-          msha' <-
-            case msha of
-              Nothing -> return Nothing
-              Just t ->
-                case mkStaticSHA256FromText t of
-                  Left e -> fail $ "Invalid SHA256: " ++ T.unpack t ++ ", " ++ show e
-                  Right x -> return $ Just x
+          msha <- parseSHA o
+          msize <- parseSize o
           return $ PLArchive Archive
             { archiveUrl = url
             , archiveSubdirs = subdirs :: Subdirs
-            , archiveHash = msha'
+            , archiveHash = msha
+            , archiveSize = msize
             }
 
         github = withObjectWarnings "PLArchive:github" $ \o -> do
           GitHubRepo ghRepo <- o ..: "github"
           commit <- o ..: "commit"
           subdirs <- o ..:? "subdirs" ..!= DefaultSubdirs
+          msha <- parseSHA o
+          msize <- parseSize o
           return $ PLArchive Archive
             { archiveUrl = "https://github.com/" <> ghRepo <> "/archive/" <> commit <> ".tar.gz"
             , archiveSubdirs = subdirs
-            , archiveHash = Nothing
+            , archiveHash = msha
+            , archiveSize = msize
             }
 
 -- An unexported newtype wrapper to hang a 'FromJSON' instance off of. Contains
@@ -311,7 +327,7 @@ instance Store LoadedSnapshot
 instance NFData LoadedSnapshot
 
 loadedSnapshotVC :: VersionConfig LoadedSnapshot
-loadedSnapshotVC = storeVersionConfig "ls-v6" "x6HMRzUFlVwinebU5S-VhFGiTvs="
+loadedSnapshotVC = storeVersionConfig "ls-v6" "2V8vr5T-TD5XxOeImkdeFAiSg3Q="
 
 -- | Information on a single package for the 'LoadedSnapshot' which
 -- can be installed.

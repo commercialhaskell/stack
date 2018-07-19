@@ -52,6 +52,7 @@ import           Stack.Prelude
 import           Data.Aeson.Extended
 import qualified Data.ByteString as S
 import           Data.Coerce (coerce)
+import           Data.IORef.RunOnce (runOnce)
 import qualified Data.IntMap as IntMap
 import qualified Data.Map as Map
 import qualified Data.Monoid
@@ -602,11 +603,15 @@ loadBuildConfig mproject maresolver mcompiler = do
 
     extraPackageDBs <- mapM resolveDir' (projectExtraPackageDBs project)
 
+    packages <- for (projectPackages project) $ \fp -> do
+      dir <- resolveDir (parent stackYamlFP) fp
+      (dir,) <$> runOnce (parseSingleCabalFile True dir)
+
     return BuildConfig
         { bcConfig = config
         , bcSnapshotDef = sd
         , bcGHCVariant = configGHCVariantDefault config
-        , bcPackages = projectPackages project
+        , bcPackages = packages
         , bcDependencies = projectDependencies project
         , bcExtraPackageDBs = extraPackageDBs
         , bcStackYaml = stackYamlFP
@@ -650,9 +655,7 @@ getLocalPackages = do
             root <- view projectRootL
             bc <- view buildConfigL
 
-            packages <- do
-              let withName lpv = (lpvName lpv, lpv)
-              map withName . concat <$> mapM (parseMultiCabalFiles root True) (bcPackages bc)
+            packages <- for (bcPackages bc) $ fmap (lpvName &&& id) . liftIO . snd
 
             let wrapGPD (gpd, loc) =
                      let PackageIdentifier name _version =
@@ -664,7 +667,7 @@ getLocalPackages = do
                 <$> mapM (parseMultiCabalFilesIndex root) (bcDependencies bc)
 
             checkDuplicateNames $
-              map (second (PLOther . lpvLoc)) packages ++
+              map (second (PLOther . PLFilePath . toFilePath . lpvRoot)) packages ++
               map (second snd) deps
 
             return LocalPackages

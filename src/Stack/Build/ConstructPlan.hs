@@ -34,6 +34,7 @@ import qualified Distribution.Text as Cabal
 import qualified Distribution.Version as Cabal
 import           Distribution.Types.BuildType (BuildType (Configure))
 import           Generics.Deriving.Monoid (memptydefault, mappenddefault)
+import           Path (parent)
 import qualified RIO
 import           Stack.Build.Cache
 import           Stack.Build.Haddock
@@ -365,7 +366,7 @@ addFinal lp package isAllInOne = do
                 , taskPresent = present
                 , taskType = TTFiles lp Local -- FIXME we can rely on this being Local, right?
                 , taskAllInOne = isAllInOne
-                , taskCachePkgSrc = CacheSrcLocal (toFilePath (lpDir lp))
+                , taskCachePkgSrc = CacheSrcLocal (toFilePath (parent (lpCabalFile lp)))
                 , taskAnyMissing = not $ Set.null missing
                 , taskBuildTypeConfig = packageBuildTypeConfig package
                 }

@@ -176,7 +176,7 @@ displayTask task =
         Local -> "local") <>
     ", source=" <>
     (case taskType task of
-        TTFiles lp _ -> fromString $ toFilePath $ lpDir lp
+        TTFiles lp _ -> fromString $ toFilePath $ parent $ lpCabalFile lp
         TTIndex{} -> "package index") <>
     (if Set.null missing
         then ""
@@ -940,7 +940,7 @@ withSingleContext ActionContext {..} ExecuteEnv {..} task@Task {..} mdeps msuffi
 
     withPackage inner =
         case taskType of
-            TTFiles lp _ -> inner (lpPackage lp) (lpCabalFile lp) (lpDir lp)
+            TTFiles lp _ -> inner (lpPackage lp) (lpCabalFile lp) (parent $ lpCabalFile lp) -- TODO remove this third argument, it's redundant with the second
             TTIndex package _ pir -> do
                 let PackageIdentifierRevision (PackageIdentifier name' ver) cfi =
                       pir

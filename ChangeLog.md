@@ -9,6 +9,7 @@ Major changes:
 
 * Drop support for multiple package indices and legacy `00-index.tar` style
   indices. See [#4137](https://github.com/commercialhaskell/stack/issues/4137).
+* All package types besides local file paths must now be treated as `extra-dep`s.
 
 Behavior changes:
 

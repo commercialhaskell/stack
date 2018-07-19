@@ -518,7 +518,7 @@ parseTargets needTargets boptscli = do
         allLocals = Map.unions
           [ -- project packages
             Map.map
-              (\lpv -> (lpvGPD lpv, PLOther $ lpvLoc lpv, Just lpv))
+              (\lpv -> (lpvGPD lpv, PLOther $ PLFilePath $ toFilePath $ lpvRoot lpv, Just lpv))
               (lpProject lp)
           , -- added deps take precendence over local deps
             addedDeps'

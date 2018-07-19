@@ -25,6 +25,7 @@ import qualified Data.ByteString.Char8 as S8
 import qualified Data.ByteString.Lazy as L
 import           Data.Char (toLower)
 import           Data.Data (cast)
+import           Data.IORef.RunOnce (runOnce)
 import           Data.List
 import           Data.List.NonEmpty (NonEmpty)
 import qualified Data.List.NonEmpty as NE
@@ -53,7 +54,7 @@ import           Stack.Build.Execute
 import           Stack.Build.Installed
 import           Stack.Build.Source (loadSourceMap)
 import           Stack.Build.Target hiding (PackageType (..))
-import           Stack.PackageLocation (resolveMultiPackageLocation)
+import           Stack.PackageLocation (parseSingleCabalFile)
 import           Stack.PrettyPrint
 import           Stack.Constants
 import           Stack.Package
@@ -305,7 +306,6 @@ readLocalPackage pkgDir = do
     return LocalPackage
         { lpPackage = package
         , lpWanted = False -- HACK: makes it so that sdist output goes to a log instead of a file.
-        , lpDir = pkgDir
         , lpCabalFile = cabalfp
         -- NOTE: these aren't the 'correct values, but aren't used in
         -- the usage of this function in this module.
@@ -318,7 +318,6 @@ readLocalPackage pkgDir = do
         , lpComponentFiles = Map.empty
         , lpComponents = Set.empty
         , lpUnbuildable = Set.empty
-        , lpLocation = PLFilePath $ toFilePath pkgDir
         }
 
 -- | Returns a newline-separate list of paths, and the absolute path to the .cabal file.
@@ -349,7 +348,7 @@ getSDistFileList lp =
             }
         , taskPresent = Map.empty
         , taskAllInOne = True
-        , taskCachePkgSrc = CacheSrcLocal (toFilePath (lpDir lp))
+        , taskCachePkgSrc = CacheSrcLocal (toFilePath (parent $ lpCabalFile lp))
         , taskAnyMissing = True
         , taskBuildTypeConfig = False
         }
@@ -443,14 +442,13 @@ buildExtractedTarball pkgDir = do
   projectRoot <- view projectRootL
   envConfig <- view envConfigL
   localPackageToBuild <- readLocalPackage pkgDir
-  let packageEntries = bcPackages (envConfigBuildConfig envConfig)
-      getPaths = resolveMultiPackageLocation projectRoot
-  allPackagePaths <- fmap (map fst . mconcat) (mapM getPaths packageEntries)
+  let allPackagePaths = bcPackages (envConfigBuildConfig envConfig)
   -- We remove the path based on the name of the package
   let isPathToRemove path = do
         localPackage <- readLocalPackage path
         return $ packageName (lpPackage localPackage) == packageName (lpPackage localPackageToBuild)
-  pathsToKeep <- filterM (fmap not . isPathToRemove) allPackagePaths
+  pathsToKeep <- filterM (fmap not . isPathToRemove . fst) allPackagePaths
+  getLPV <- runOnce $ parseSingleCabalFile True pkgDir
   newPackagesRef <- liftIO (newIORef Nothing)
   let adjustEnvForBuild env =
         let updatedEnvConfig = envConfig
@@ -459,7 +457,7 @@ buildExtractedTarball pkgDir = do
               }
         in set envConfigL updatedEnvConfig env
       updatePackageInBuildConfig buildConfig = buildConfig
-        { bcPackages = map (PLFilePath . toFilePath) $ pkgDir : pathsToKeep
+        { bcPackages = (pkgDir, getLPV) : pathsToKeep
         , bcConfig = (bcConfig buildConfig)
                      { configBuild = defaultBuildOpts
                        { boptsTests = True

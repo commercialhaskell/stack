@@ -35,7 +35,7 @@ import qualified RIO.Text as T
 import qualified RIO.ByteString as B
 import qualified RIO.ByteString.Lazy as BL
 import qualified RIO.Map as Map
-import Data.Aeson (FromJSON)
+import Data.Aeson (ToJSON, FromJSON)
 import Data.ByteString.Builder (toLazyByteString, byteString, wordDec)
 import Data.Pool (Pool)
 import Database.Persist
@@ -88,7 +88,7 @@ class HasPantryConfig env where
 
 -- | File size in bytes
 newtype FileSize = FileSize Word
-  deriving (Show, Eq, Ord, Data, Typeable, Generic, Display, Hashable, NFData, Store, PersistField, PersistFieldSql, FromJSON)
+  deriving (Show, Eq, Ord, Data, Typeable, Generic, Display, Hashable, NFData, Store, PersistField, PersistFieldSql, ToJSON, FromJSON)
 
 data BlobKey = BlobKey !StaticSHA256 !FileSize
   deriving (Show, Eq)

@@ -498,7 +498,7 @@ data BuildConfig = BuildConfig
       -- ^ Build plan wanted for this build
     , bcGHCVariant :: !GHCVariant
       -- ^ The variant of GHC used to select a GHC bindist.
-    , bcPackages :: ![PackageLocation Subdirs]
+    , bcPackages :: ![(Path Abs Dir, IO LocalPackageView)]
       -- ^ Local packages
     , bcDependencies :: ![PackageLocationIndex Subdirs]
       -- ^ Extra dependencies specified in configuration.
@@ -559,7 +559,6 @@ data LocalPackages = LocalPackages
 data LocalPackageView = LocalPackageView
     { lpvCabalFP    :: !(Path Abs File)
     , lpvGPD        :: !GenericPackageDescription
-    , lpvLoc        :: !(PackageLocation FilePath)
     }
 
 -- | Root directory for the given 'LocalPackageView'
@@ -648,16 +647,9 @@ data Project = Project
     { projectUserMsg :: !(Maybe String)
     -- ^ A warning message to display to the user when the auto generated
     -- config may have issues.
-    , projectPackages :: ![PackageLocation Subdirs]
+    , projectPackages :: ![FilePath]
     -- ^ Packages which are actually part of the project (as opposed
     -- to dependencies).
-    --
-    -- /NOTE/ Stack has always allowed these packages to be any kind
-    -- of package location, but in reality only @PLFilePath@ really
-    -- makes sense. We could consider replacing @[PackageLocation]@
-    -- with @[FilePath]@ to properly enforce this idea, though it will
-    -- slightly break backwards compatibility if someone really did
-    -- want to treat such things as non-deps.
     , projectDependencies :: ![PackageLocationIndex Subdirs]
     -- ^ Dependencies defined within the stack.yaml file, to be
     -- applied on top of the snapshot.
@@ -1482,7 +1474,9 @@ parseProjectAndConfigMonoid rootDir =
 
         -- Convert the packages/extra-deps/flags approach we use in
         -- the stack.yaml into the internal representation.
-        let (packages, deps) = convert dirs extraDeps
+        let (packages, deps, errs) = convert dirs extraDeps
+
+        unless (null errs) $ fail $ unlines errs
 
         resolver <- (o ..: "resolver")
                 >>= either (fail . show) return
@@ -1504,27 +1498,34 @@ parseProjectAndConfigMonoid rootDir =
       where
         convert :: [PackageEntry]
                 -> [PackageLocationIndex Subdirs] -- extra-deps
-                -> ( [PackageLocation Subdirs] -- project
+                -> ( [FilePath] -- project
                    , [PackageLocationIndex Subdirs] -- dependencies
+                   , [String] -- errors
                    )
         convert entries extraDeps =
-            partitionEithers $ concatMap goEntry entries ++ map Right extraDeps
+            foldMap goEntry entries <> ([], extraDeps, [])
           where
-            goEntry :: PackageEntry -> [Either (PackageLocation Subdirs) (PackageLocationIndex Subdirs)]
-            goEntry (PackageEntry Nothing pl@(PLFilePath _) subdirs) = goEntry' False pl subdirs
-            goEntry (PackageEntry Nothing pl _) = fail $ concat
+            goEntry :: PackageEntry -> ([FilePath], [PackageLocationIndex Subdirs], [String])
+            goEntry (PackageEntry Nothing (PLFilePath root) DefaultSubdirs) = ([root], [], [])
+            goEntry (PackageEntry Nothing (PLFilePath root) (ExplicitSubdirs subdirs)) =
+              (map (root FilePath.</>) subdirs, [], [])
+
+            goEntry (PackageEntry (Just False) pl _) = ([], [], pure $ concat
+              [ "Refusing to treat a non FilePath as a non-extra-dep:\n"
+              , show pl
+              , "\nRecommendation: move to 'extra-deps'."
+              ])
+            goEntry (PackageEntry Nothing pl _) = ([], [], pure $ concat
               [ "Refusing to implicitly treat package location as an extra-dep:\n"
               , show pl
-              , "\nRecommendation: either move to 'extra-deps' or set 'extra-dep: true'."
-              ]
-            goEntry (PackageEntry (Just extraDep) pl subdirs) = goEntry' extraDep pl subdirs
+              , "\nRecommendation: move to 'extra-deps'."
+              ])
+            goEntry (PackageEntry (Just True) pl subdirs) = ([], goEntry' pl subdirs, [])
 
-            goEntry' :: Bool -- ^ extra dep?
-                     -> PackageLocation Subdirs
+            goEntry' :: PackageLocation Subdirs
                      -> Subdirs
-                     -> [Either (PackageLocation Subdirs) (PackageLocationIndex Subdirs)]
-            goEntry' extraDep pl subdirs =
-              map (if extraDep then Right . PLOther else Left) (addSubdirs pl subdirs)
+                     -> [PackageLocationIndex Subdirs]
+            goEntry' pl subdirs = map PLOther (addSubdirs pl subdirs)
 
             combineSubdirs :: [FilePath] -> Subdirs -> Subdirs
             combineSubdirs paths DefaultSubdirs = ExplicitSubdirs paths
