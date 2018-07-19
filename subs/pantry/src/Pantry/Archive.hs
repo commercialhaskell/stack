@@ -34,20 +34,52 @@ getArchive
   -> Maybe FileSize -- ^ size of the raw file
   -> RIO env (TreeKey, Tree)
 -- FIXME add caching in DB
-getArchive url subdir msha msize = withSystemTempFile "archive" $ \fp hout -> do
+getArchive url subdir msha msize = withCache $ withSystemTempFile "archive" $ \fp hout -> do
   req <- parseUrlThrow $ T.unpack url
   logDebug $ "Downloading archive from " <> display url
-  httpSink req $ const $ getZipSink $
-    maybe id (\(FileSize size) -> (ZipSink (checkSize size) *>)) msize $
-    maybe id (\sha -> (ZipSink (checkSha sha) *>)) msha $
-    ZipSink (sinkHandle hout)
+  (sha, size, ()) <- httpSink req $ const $ getZipSink $ (,,)
+    <$> ZipSink (checkSha msha)
+    <*> ZipSink (checkSize $ (\(FileSize w) -> w) <$> msize)
+    <*> ZipSink (sinkHandle hout)
   hClose hout
 
-  parseArchive url fp subdir
+  (tid, key, tree) <- parseArchive url fp subdir
+  pure (tid, sha, FileSize size, key, tree)
   where
-    checkSha expected = do
+    withCache inner =
+      let loop [] = do
+            (tid, sha, size, treeKey, tree) <- inner
+            (treeKey, tree) <$ withStorage (storeArchiveCache url subdir sha size tid)
+          loop ((sha, size, tid):rest) =
+            case msha of
+              Nothing -> do
+                case msize of
+                  Just size' | size /= size' -> loop rest
+                  _ -> do
+                    logWarn $ "Using archive from " <> display url <> "without a specified cryptographic hash"
+                    logWarn $ "Cached hash is " <> display sha <> ", file size " <> display size
+                    logWarn "For security and reproducibility, please add a hash and file size to your configuration"
+                    withStorage $ loadTreeById tid
+              Just sha'
+                | sha == sha' ->
+                    case msize of
+                      Nothing -> do
+                        logWarn $ "Archive from " <> display url <> " does not specify a size"
+                        logWarn $ "To avoid an overflow attack, please add the file size to your configuration: " <> display size
+                        withStorage $ loadTreeById tid
+                      Just size'
+                        | size == size' -> withStorage $ loadTreeById tid
+                        | otherwise -> do
+
+                            logWarn $ "Archive from " <> display url <> " has a matching hash but mismatched size"
+                            logWarn "Please verify that your configuration provides the correct size"
+                            loop rest
+                | otherwise -> loop rest
+       in withStorage (loadArchiveCache url subdir) >>= loop
+
+    checkSha mexpected = do
       actual <- mkStaticSHA256FromDigest <$> sinkHash
-      unless (actual == expected) $ error $ concat
+      for_ mexpected $ \expected -> unless (actual == expected) $ error $ concat
         [ "Invalid SHA256 downloading from "
         , T.unpack url
         , ". Expected: "
@@ -55,15 +87,16 @@ getArchive url subdir msha msize = withSystemTempFile "archive" $ \fp hout -> do
         , ". Actual: "
         , show actual
         ]
-    checkSize expected =
+      pure actual
+    checkSize mexpected =
       loop 0
       where
         loop accum = do
           mbs <- await
           case mbs of
-            Nothing
-              | accum == expected -> pure ()
-              | otherwise -> error $ concat
+            Nothing ->
+              case mexpected of
+                Just expected | expected /= accum -> error $ concat
                     [ "Invalid file size downloading from "
                     , T.unpack url
                     , ". Expected: "
@@ -71,10 +104,12 @@ getArchive url subdir msha msize = withSystemTempFile "archive" $ \fp hout -> do
                     , ". Actual: "
                     , show accum
                     ]
+                _ -> pure accum
             Just bs -> do
               let accum' = accum + fromIntegral (B.length bs)
-              if accum' > expected
-                then error $ concat
+              case mexpected of
+                Just expected
+                  | accum' > expected -> error $ concat
                     [ "Invalid file size downloading from "
                     , T.unpack url
                     , ". Expected: "
@@ -82,7 +117,7 @@ getArchive url subdir msha msize = withSystemTempFile "archive" $ \fp hout -> do
                     , ", but file is at least: "
                     , show accum'
                     ]
-                else loop accum'
+                _ -> loop accum'
 
 data ArchiveType = ATTarGz | ATTar | ATZip
   deriving (Enum, Bounded)
@@ -163,7 +198,7 @@ parseArchive
   => Text -- ^ URL, for error output
   -> FilePath -- ^ file holding the archive
   -> Text -- ^ subdir, besides the single-dir stripping logic
-  -> RIO env (TreeKey, Tree)
+  -> RIO env (TreeSId, TreeKey, Tree)
 parseArchive url fp subdir = do
   let getFiles [] = error $ "Unable to determine archive type of: " ++ T.unpack url
       getFiles (at:ats) = do
@@ -218,8 +253,8 @@ parseArchive url fp subdir = do
             case Map.lookup (seSource se) blobs of
               Nothing -> error $ "Impossible: blob not found for: " ++ seSource se
               Just blobKey -> pure (sfp, TreeEntry blobKey (seType se))
-          (_tid, treeKey) <- withStorage $ storeTree tree
-          pure (treeKey, tree)
+          (tid, treeKey) <- withStorage $ storeTree tree
+          pure (tid, treeKey, tree)
 
 stripCommonPrefix :: [(FilePath, a)] -> [(FilePath, a)]
 stripCommonPrefix [] = []

@@ -25,8 +25,11 @@ module Pantry.Storage
   , loadHackageTarballInfo
   , storeTree
   , loadTree
+  , loadTreeById
   , storeHackageTree
   , loadHackageTree
+  , storeArchiveCache
+  , loadArchiveCache
     -- avoid warnings
   , BlobTableId
   , HackageCabalId
@@ -78,6 +81,13 @@ CacheUpdate
     time UTCTime
     size FileSize
     hash StaticSHA256
+ArchiveCache
+    time UTCTime
+    url Text
+    subdir Text
+    sha StaticSHA256
+    size FileSize
+    tree TreeSId
 
 Sfp sql=file_path
     path SafeFilePath
@@ -454,3 +464,35 @@ loadHackageTree name ver bid = do
       case hackageCabalTree hc of
         Nothing -> assert False $ pure Nothing
         Just x -> Just <$> loadTreeById x
+
+storeArchiveCache
+  :: (HasPantryConfig env, HasLogFunc env)
+  => Text -- ^ URL
+  -> Text -- ^ subdir
+  -> StaticSHA256
+  -> FileSize
+  -> TreeSId
+  -> ReaderT SqlBackend (RIO env) ()
+storeArchiveCache url subdir sha size tid = do
+  now <- getCurrentTime
+  insert_ ArchiveCache
+    { archiveCacheTime = now
+    , archiveCacheUrl = url
+    , archiveCacheSubdir = subdir
+    , archiveCacheSha = sha
+    , archiveCacheSize = size
+    , archiveCacheTree = tid
+    }
+
+loadArchiveCache
+  :: (HasPantryConfig env, HasLogFunc env)
+  => Text -- ^ URL
+  -> Text -- ^ subdir
+  -> ReaderT SqlBackend (RIO env) [(StaticSHA256, FileSize, TreeSId)]
+loadArchiveCache url subdir = map go <$> selectList
+  [ ArchiveCacheUrl ==. url
+  , ArchiveCacheSubdir ==. subdir
+  ]
+  [Desc ArchiveCacheTime]
+  where
+    go (Entity _ ac) = (archiveCacheSha ac, archiveCacheSize ac, archiveCacheTree ac)
