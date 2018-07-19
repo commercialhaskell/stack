@@ -116,7 +116,7 @@ updateHackageIndex mreason = gateUpdate $ do
         -- The size of the new index tarball, ignoring the required
         -- (by the tar spec) 1024 null bytes at the end, which will be
         -- mutated in the future by other updates.
-        newSize <- (fromIntegral . max 0 . subtract 1024) <$> hFileSize h
+        newSize :: Word <- (fromIntegral . max 0 . subtract 1024) <$> hFileSize h
         let sinkSHA256 len = mkStaticSHA256FromDigest <$> (takeCE (fromIntegral len) .| sinkHash)
 
         case minfo of
@@ -124,7 +124,7 @@ updateHackageIndex mreason = gateUpdate $ do
             logInfo "No old cache found, populating cache from scratch"
             newHash <- runConduit $ sourceHandle h .| sinkSHA256 newSize
             pure (0, newHash, newSize)
-          Just (oldSize, oldHash) -> do
+          Just (FileSize oldSize, oldHash) -> do
             -- oldSize and oldHash come from the database, and tell
             -- us what we cached already. Compare against
             -- oldHashCheck, which assuming the tarball has not been
@@ -150,7 +150,7 @@ updateHackageIndex mreason = gateUpdate $ do
       when (offset == 0) clearHackageRevisions
       populateCache tarball (fromIntegral offset) `onException`
         lift (logStickyDone "Failed populating package index cache")
-      storeCacheUpdate newSize newHash
+      storeCacheUpdate (FileSize newSize) newHash
     logStickyDone "Package index cache populated"
   where
     gateUpdate inner = do
@@ -200,7 +200,7 @@ populateCache fp offset = withBinaryFile fp ReadMode $ \h -> do
           fromString (Distribution.Text.display version) <> ": " <>
           fromString e
         Right (PackageDownload sha size) ->
-          storeHackageTarballInfo name version sha size
+          storeHackageTarballInfo name version sha $ FileSize size
 
     addCabal name version bs = do
       (blobTableId, _blobKey) <- storeBlob bs
@@ -268,19 +268,18 @@ resolveCabalFileInfo name ver cfi = do
         Nothing -> error $ T.unpack $ utf8BuilderToText msg -- FIXME proper exception
         Just res -> pure res
   where
-    thd3 (_, _, x) = x
     inner = do
       revs <- withStorage $ loadHackagePackageVersion name ver
       pure $
         case cfi of
           CFIHash (CabalHash sha msize) -> listToMaybe $ mapMaybe
-            (\(sha', size', bid) ->
+            (\(bid, BlobKey sha' size') ->
                if sha' == sha && maybe True (== size') msize
                  then Just bid
                  else Nothing)
             (Map.elems revs)
-          CFIRevision rev -> thd3 <$> Map.lookup rev revs
-          CFILatest -> (thd3 . fst) <$> Map.maxView revs
+          CFIRevision rev -> fst <$> Map.lookup rev revs
+          CFILatest -> (fst . fst) <$> Map.maxView revs
 
 withCachedTree
   :: (HasPantryConfig env, HasLogFunc env)
@@ -306,6 +305,7 @@ getHackageTarball
   -> RIO env (TreeKey, Tree)
 getHackageTarball name ver cfi = do
   cabalFile <- resolveCabalFileInfo name ver cfi
+  cabalFileKey <- withStorage $ getBlobKey cabalFile
   withCachedTree name ver cabalFile $ do
     mpair <- withStorage $ loadHackageTarballInfo name ver
     (sha, size) <-
@@ -333,4 +333,18 @@ getHackageTarball name ver cfi = do
           , T.pack $ Distribution.Text.display ver
           , ".tar.gz"
           ]
-    getArchive url (Just sha) (Just size)
+    (_, tree) <- getArchive url "" (Just sha) (Just size)
+
+    case tree of
+      TreeMap m -> do
+        let isCabalFile (sfp, _) =
+              let txt = unSafeFilePath sfp
+               in not ("/" `T.isInfixOf` txt) && ".cabal" `T.isSuffixOf` txt
+        (key, ft) <-
+          case filter isCabalFile $ Map.toList m of
+            [] -> error $ "Hackage tarball without a cabal file: " ++ show (name, ver)
+            [(key, TreeEntry _origkey ft)] -> pure (key, ft)
+            _:_:_ -> error $ "Hackage tarball with multiple cabal files: " ++ show (name, ver)
+        let tree' = TreeMap $ Map.insert key (TreeEntry cabalFileKey ft) m
+        (tid, treeKey) <- withStorage $ storeTree tree'
+        pure (tid, treeKey, tree')

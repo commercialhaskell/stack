@@ -12,6 +12,7 @@ module Pantry.Storage
   , initStorage
   , withStorage
   , storeBlob
+  , getBlobKey
   , clearHackageRevisions
   , storeHackageRevision
   , loadHackagePackageVersions
@@ -49,8 +50,8 @@ import qualified RIO.Text as T
 
 share [mkPersist sqlSettings, mkMigrate "migrateAll"] [persistLowerCase|
 BlobTable sql=blob
-    hash BlobKey
-    size Word
+    hash StaticSHA256
+    size FileSize
     contents ByteString
     UniqueBlobHash hash
 Name sql=package_name
@@ -63,7 +64,7 @@ HackageTarball
     name NameId
     version VersionTableId
     hash StaticSHA256
-    size Word
+    size FileSize
     UniqueHackageTarball name version
 HackageCabal
     name NameId
@@ -74,14 +75,14 @@ HackageCabal
     UniqueHackage name version revision
 CacheUpdate
     time UTCTime
-    size Word
+    size FileSize
     hash StaticSHA256
 
 Sfp sql=file_path
     path SafeFilePath
     UniqueSfp path
 TreeS sql=tree
-    key TreeKey
+    key BlobTableId
     tarball BlobTableId Maybe
     cabal BlobTableId Maybe
     subdir Text Maybe
@@ -123,33 +124,49 @@ getVersionId
   -> ReaderT SqlBackend (RIO env) VersionTableId
 getVersionId = fmap (either entityKey id) . insertBy . VersionTable . VersionP
 
+getPathId
+  :: (HasPantryConfig env, HasLogFunc env)
+  => SafeFilePath
+  -> ReaderT SqlBackend (RIO env) SfpId
+getPathId = fmap (either entityKey id) . insertBy . Sfp
+
 storeBlob
   :: (HasPantryConfig env, HasLogFunc env)
   => ByteString
   -> ReaderT SqlBackend (RIO env) (BlobTableId, BlobKey)
 storeBlob bs = do
-  let blobKey = BlobKey $ mkStaticSHA256FromBytes bs
-  keys <- selectKeysList [BlobTableHash ==. blobKey] []
+  let sha = mkStaticSHA256FromBytes bs
+      size = FileSize $ fromIntegral $ B.length bs
+  keys <- selectKeysList [BlobTableHash ==. sha] []
   key <-
     case keys of
       [] -> insert BlobTable
-              { blobTableHash = blobKey
-              , blobTableSize = fromIntegral $ B.length bs
+              { blobTableHash = sha
+              , blobTableSize = size
               , blobTableContents = bs
               }
       key:rest -> assert (null rest) (pure key)
-  pure (key, blobKey)
+  pure (key, BlobKey sha size)
 
 getBlobKey
   :: (HasPantryConfig env, HasLogFunc env)
   => BlobTableId
   -> ReaderT SqlBackend (RIO env) BlobKey
 getBlobKey bid = do
-  res <- rawSql "SELECT hash FROM blob WHERE id=?" [toPersistValue bid]
+  res <- rawSql "SELECT hash, size FROM blob WHERE id=?" [toPersistValue bid]
   case res of
     [] -> error $ "getBlobKey failed due to missing ID: " ++ show bid
-    [Single x] -> pure x
+    [(Single sha, Single size)] -> pure $ BlobKey sha size
     _ -> error $ "getBlobKey failed due to non-unique ID: " ++ show (bid, res)
+
+getBlobTableId
+  :: (HasPantryConfig env, HasLogFunc env)
+  => BlobKey
+  -> ReaderT SqlBackend (RIO env) (Maybe BlobTableId)
+getBlobTableId (BlobKey sha size) = do
+  res <- rawSql "SELECT id FROM blob WHERE hash=? AND size=?"
+           [toPersistValue sha, toPersistValue size]
+  pure $ listToMaybe $ map unSingle res
 
 clearHackageRevisions
   :: (HasPantryConfig env, HasLogFunc env)
@@ -201,7 +218,7 @@ loadHackagePackageVersion
   :: (HasPantryConfig env, HasLogFunc env)
   => PackageName
   -> Version
-  -> ReaderT SqlBackend (RIO env) (Map Revision (StaticSHA256, Word, BlobTableId))
+  -> ReaderT SqlBackend (RIO env) (Map Revision (BlobTableId, BlobKey))
 loadHackagePackageVersion name version = do
   nameid <- getNameId name
   versionid <- getVersionId version
@@ -214,8 +231,8 @@ loadHackagePackageVersion name version = do
     \AND   hackage.cabal=blob.id"
     [toPersistValue nameid, toPersistValue versionid]
   where
-    go (Single revision, Single key, Single size, Single bid) =
-      (revision, (key, size, bid))
+    go (Single revision, Single sha, Single size, Single bid) =
+      (revision, (bid, BlobKey sha size))
 
 loadHackageCabalFile
   :: (HasPantryConfig env, HasLogFunc env)
@@ -234,8 +251,8 @@ loadHackageCabalFile name version cfi = do
       [Desc HackageCabalRevision] >>= withHackEnt
     CFIRevision rev ->
       getBy (UniqueHackage nameid versionid rev) >>= withHackEnt
-    CFIHash (CabalHash (BlobKey -> blobKey) msize) -> do
-      ment <- getBy $ UniqueBlobHash blobKey
+    CFIHash (CabalHash sha msize) -> do
+      ment <- getBy $ UniqueBlobHash sha
       pure $ do
         Entity _ bt <- ment
         case msize of
@@ -248,16 +265,9 @@ loadHackageCabalFile name version cfi = do
       Just blob <- get $ hackageCabalCabal h
       pure $ blobTableContents blob
 
-    {-
-CacheUpdate
-    time UTCTime
-    size Word
-    hash StaticSHA256
-    -}
-
 loadLatestCacheUpdate
   :: (HasPantryConfig env, HasLogFunc env)
-  => ReaderT SqlBackend (RIO env) (Maybe (Word, StaticSHA256))
+  => ReaderT SqlBackend (RIO env) (Maybe (FileSize, StaticSHA256))
 loadLatestCacheUpdate =
     fmap go <$> selectFirst [] [Desc CacheUpdateTime]
   where
@@ -265,7 +275,7 @@ loadLatestCacheUpdate =
 
 storeCacheUpdate
   :: (HasPantryConfig env, HasLogFunc env)
-  => Word
+  => FileSize
   -> StaticSHA256
   -> ReaderT SqlBackend (RIO env) ()
 storeCacheUpdate size hash' = do
@@ -281,7 +291,7 @@ storeHackageTarballInfo
   => PackageName
   -> Version
   -> StaticSHA256
-  -> Word
+  -> FileSize
   -> ReaderT SqlBackend (RIO env) ()
 storeHackageTarballInfo name version sha size = do
   nameid <- getNameId name
@@ -297,7 +307,7 @@ loadHackageTarballInfo
   :: (HasPantryConfig env, HasLogFunc env)
   => PackageName
   -> Version
-  -> ReaderT SqlBackend (RIO env) (Maybe (StaticSHA256, Word))
+  -> ReaderT SqlBackend (RIO env) (Maybe (StaticSHA256, FileSize))
 loadHackageTarballInfo name version = do
   nameid <- getNameId name
   versionid <- getVersionId version
@@ -308,18 +318,48 @@ loadHackageTarballInfo name version = do
 storeTree
   :: (HasPantryConfig env, HasLogFunc env)
   => Tree
-  -> ReaderT SqlBackend (RIO env) TreeKey
-storeTree = undefined
+  -> ReaderT SqlBackend (RIO env) (TreeSId, TreeKey)
+storeTree tree = do
+  (bid, blobKey) <- storeBlob $ renderTree tree
+  case tree of
+    TreeMap m -> do
+      etid <- insertBy TreeS
+        { treeSKey = bid
+        , treeSTarball = Nothing
+        , treeSCabal = Nothing -- FIXME maybe fill in some data here?
+        , treeSSubdir = Nothing
+        }
+      case etid of
+        Left (Entity tid _) -> pure (tid, TreeKey blobKey) -- already in database, assume it matches
+        Right tid -> do
+          for_ (Map.toList m) $ \(sfp, TreeEntry blobKey' ft) -> do
+            sfpid <- getPathId sfp
+            mbid <- getBlobTableId blobKey'
+            bid' <-
+              case mbid of
+                Nothing -> error $ "Cannot store tree, contains unknown blob: " ++ show blobKey'
+                Just bid' -> pure bid'
+            insert_ TreeEntryS
+              { treeEntrySTree = tid
+              , treeEntrySPath = sfpid
+              , treeEntrySBlob = bid'
+              , treeEntrySType = ft
+              }
+          pure (tid, TreeKey blobKey)
 
 loadTree
   :: (HasPantryConfig env, HasLogFunc env)
   => TreeKey
   -> ReaderT SqlBackend (RIO env) (Maybe Tree)
-loadTree key = do
-  ment <- getBy $ UniqueTree key
-  case ment of
+loadTree (TreeKey key) = do
+  mbid <- getBlobTableId key
+  case mbid of
     Nothing -> pure Nothing
-    Just ent -> Just <$> loadTreeByEnt ent
+    Just bid -> do
+      ment <- getBy $ UniqueTree bid
+      case ment of
+        Nothing -> pure Nothing
+        Just ent -> Just <$> loadTreeByEnt ent
 
 loadTreeById
   :: (HasPantryConfig env, HasLogFunc env)
@@ -328,7 +368,8 @@ loadTreeById
 loadTreeById tid = do
   Just ts <- get tid
   tree <- loadTreeByEnt $ Entity tid ts
-  pure (treeSKey ts, tree)
+  key <- getBlobKey $ treeSKey ts
+  pure (TreeKey key, tree)
 
 loadTreeByEnt
   :: (HasPantryConfig env, HasLogFunc env)
@@ -346,15 +387,15 @@ loadTreeByEnt (Entity tid t) = do
         }
     (x, y, z) -> assert (isNothing x && isNothing y && isNothing z) $ do
       entries <- rawSql
-        "SELECT file_path.path, blob.hash, tree_entry.type\n\
+        "SELECT file_path.path, blob.hash, blob.size, tree_entry.type\n\
         \FROM tree_entry, blob, file_path\n\
         \WHERE tree_entry.id=?\n\
         \AND   tree_entry.blob=blob.id\n\
         \AND   tree_entry.path=file_path.id"
         [toPersistValue tid]
       pure $ TreeMap $ Map.fromList $ map
-        (\(Single sfp, Single blobKey, Single ft) ->
-             (sfp, TreeEntry blobKey ft))
+        (\(Single sfp, Single sha, Single size, Single ft) ->
+             (sfp, TreeEntry (BlobKey sha size) ft))
         entries
 
 storeHackageTree
@@ -364,7 +405,15 @@ storeHackageTree
   -> BlobTableId
   -> TreeSId
   -> ReaderT SqlBackend (RIO env) ()
-storeHackageTree = undefined
+storeHackageTree name version cabal tid = do
+  nameid <- getNameId name
+  versionid <- getVersionId version
+  updateWhere
+    [ HackageCabalName ==. nameid
+    , HackageCabalVersion ==. versionid
+    , HackageCabalCabal ==. cabal
+    ]
+    [HackageCabalTree =. Just tid]
 
 loadHackageTree
   :: (HasPantryConfig env, HasLogFunc env)

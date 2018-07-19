@@ -103,7 +103,7 @@ instance Store SnapshotDef
 instance NFData SnapshotDef
 
 snapshotDefVC :: VersionConfig SnapshotDef
-snapshotDefVC = storeVersionConfig "sd-v3" "Z0Ys5jPmQKBsdki1zDCKuwmUbjA="
+snapshotDefVC = storeVersionConfig "sd-v3" "AX6P1SG4p-cw4rJLgbrqwCLPo6s="
 
 -- | A relative file path including a unique string for the given
 -- snapshot.
@@ -311,7 +311,7 @@ instance Store LoadedSnapshot
 instance NFData LoadedSnapshot
 
 loadedSnapshotVC :: VersionConfig LoadedSnapshot
-loadedSnapshotVC = storeVersionConfig "ls-v6" "zyKV9oV8-rrgssuP2EYntkJoNvk="
+loadedSnapshotVC = storeVersionConfig "ls-v6" "x6HMRzUFlVwinebU5S-VhFGiTvs="
 
 -- | Information on a single package for the 'LoadedSnapshot' which
 -- can be installed.

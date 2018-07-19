@@ -18,6 +18,7 @@ module Pantry.Types
   , VersionP (..)
   , displayPackageIdentifierRevision
   , FileType (..)
+  , FileSize (..)
   , TreeEntry (..)
   , SafeFilePath
   , unSafeFilePath
@@ -31,8 +32,11 @@ module Pantry.Types
 
 import RIO
 import qualified RIO.Text as T
+import qualified RIO.ByteString as B
 import qualified RIO.ByteString.Lazy as BL
-import Data.ByteString.Builder (toLazyByteString)
+import qualified RIO.Map as Map
+import Data.Aeson (FromJSON)
+import Data.ByteString.Builder (toLazyByteString, byteString, wordDec)
 import Data.Pool (Pool)
 import Database.Persist
 import Database.Persist.Sql
@@ -48,9 +52,13 @@ newtype Revision = Revision Word
 newtype Storage = Storage (Pool SqlBackend)
 
 -- | A cryptographic hash of a Cabal file and its size, if known.
+--
+-- We only keep the size as a @Maybe@ for compatibility with cases
+-- where users may not provide the file size. However, for security,
+-- they should be provided in all cases.
 data CabalHash = CabalHash
   { chHash :: !StaticSHA256
-  , chSize :: !(Maybe Word)
+  , chSize :: !(Maybe FileSize)
   }
     deriving (Generic, Show, Eq, Data, Typeable, Ord)
 instance Store CabalHash
@@ -78,8 +86,12 @@ data HackageSecurityConfig = HackageSecurityConfig
 class HasPantryConfig env where
   pantryConfigL :: Lens' env PantryConfig
 
-newtype BlobKey = BlobKey StaticSHA256
-  deriving (Show, PersistField, PersistFieldSql)
+-- | File size in bytes
+newtype FileSize = FileSize Word
+  deriving (Show, Eq, Ord, Data, Typeable, Generic, Display, Hashable, NFData, Store, PersistField, PersistFieldSql, FromJSON)
+
+data BlobKey = BlobKey !StaticSHA256 !FileSize
+  deriving (Show, Eq)
 
 newtype PackageNameP = PackageNameP PackageName
 instance PersistField PackageNameP where
@@ -137,6 +149,7 @@ displayPackageIdentifierRevision name version cfi =
   display cfi
 
 data FileType = FTNormal | FTExecutable
+  deriving Show
 instance PersistField FileType where
   toPersistValue FTNormal = PersistInt64 1
   toPersistValue FTExecutable = PersistInt64 2
@@ -167,17 +180,47 @@ unSafeFilePath :: SafeFilePath -> Text
 unSafeFilePath (SafeFilePath t) = t
 
 mkSafeFilePath :: Text -> Maybe SafeFilePath
-mkSafeFilePath = undefined
+mkSafeFilePath t = do
+  guard $ not $ "\\" `T.isInfixOf` t
+  guard $ not $ "//" `T.isInfixOf` t
+  guard $ not $ "\n" `T.isInfixOf` t
+  guard $ not $ "\0" `T.isInfixOf` t
 
-newtype TreeKey = TreeKey StaticSHA256
-  deriving (Show, Eq, Ord, PersistField, PersistFieldSql)
+  (c, _) <- T.uncons t
+  guard $ c /= '/'
+
+  guard $ all (not . T.all (== '.')) $ T.split (== '/') t
+
+  Just $ SafeFilePath t
+
+newtype TreeKey = TreeKey BlobKey
+  deriving (Show, Eq)
 
 data Tree
   = TreeMap !(Map SafeFilePath TreeEntry)
   | TreeTarball !PackageTarball
 
 renderTree :: Tree -> ByteString
-renderTree _tree = BL.toStrict $ toLazyByteString undefined
+renderTree = BL.toStrict . toLazyByteString . go
+  where
+    go :: Tree -> Builder
+    go (TreeMap m) = "map:" <> Map.foldMapWithKey goEntry m
+
+    goEntry sfp (TreeEntry (BlobKey sha (FileSize size)) ft) =
+      netstring (unSafeFilePath sfp) <>
+      netstring (staticSHA256ToText sha) <>
+      netword size <>
+      (case ft of
+         FTNormal -> "N"
+         FTExecutable -> "X")
+
+netstring :: Text -> Builder
+netstring t =
+  let bs = encodeUtf8 t
+   in netword (fromIntegral (B.length bs)) <> byteString bs
+
+netword :: Word -> Builder
+netword w = wordDec w <> ":"
 
 parseTree :: ByteString -> Maybe Tree
 parseTree bs1 = do

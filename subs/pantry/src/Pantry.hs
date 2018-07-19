@@ -13,6 +13,7 @@ module Pantry
   , CabalHash (..)
   , CabalFileInfo (..)
   , Revision (..)
+  , FileSize (..)
   -- FIXME , PackageName
   -- FIXME , Version
 

@@ -153,7 +153,7 @@ parsePackageIdentifierRevision x = go x
               $ mkStaticSHA256FromText hash'
       msize <- optional $ do
         _ <- A.char ','
-        A.decimal
+        FileSize <$> A.decimal
       A.endOfInput
       return $ CFIHash $ CabalHash hash'' msize
 
