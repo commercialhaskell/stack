@@ -14,6 +14,7 @@ import Conduit
 import Crypto.Hash.Conduit (sinkHash)
 import Data.Conduit.Tar
 import qualified RIO.Text as T
+import qualified RIO.Map as Map
 import Data.Text.Unsafe (unsafeTail)
 import qualified RIO.ByteString as B
 import qualified RIO.ByteString.Lazy as BL
@@ -249,10 +250,87 @@ instance FromJSON PackageDownload where
             Right x -> return x
         return $ PackageDownload sha256 len
 
+resolveCabalFileInfo
+  :: (HasPantryConfig env, HasLogFunc env)
+  => PackageName
+  -> Version
+  -> CabalFileInfo
+  -> RIO env BlobTableId
+resolveCabalFileInfo name ver cfi = do
+  mres <- inner
+  case mres of
+    Just res -> pure res
+    Nothing -> do
+      let msg = "Could not find cabal file info for " <> displayPackageIdentifierRevision name ver cfi
+      updated <- updateHackageIndex $ Just $ msg <> ", updating"
+      mres' <- if updated then inner else pure Nothing
+      case mres' of
+        Nothing -> error $ T.unpack $ utf8BuilderToText msg -- FIXME proper exception
+        Just res -> pure res
+  where
+    thd3 (_, _, x) = x
+    inner = do
+      revs <- withStorage $ loadHackagePackageVersion name ver
+      pure $
+        case cfi of
+          CFIHash (CabalHash sha msize) -> listToMaybe $ mapMaybe
+            (\(sha', size', bid) ->
+               if sha' == sha && maybe True (== size') msize
+                 then Just bid
+                 else Nothing)
+            (Map.elems revs)
+          CFIRevision rev -> thd3 <$> Map.lookup rev revs
+          CFILatest -> (thd3 . fst) <$> Map.maxView revs
+
+withCachedTree
+  :: (HasPantryConfig env, HasLogFunc env)
+  => PackageName
+  -> Version
+  -> BlobTableId -- ^ cabal file contents
+  -> RIO env (TreeSId, TreeKey, Tree)
+  -> RIO env (TreeKey, Tree)
+withCachedTree name ver bid inner = do
+  mres <- withStorage $ loadHackageTree name ver bid
+  case mres of
+    Just res -> pure res
+    Nothing -> do
+      (tid, treekey, tree) <- inner
+      withStorage $ storeHackageTree name ver bid tid
+      pure (treekey, tree)
+
 getHackageTarball
   :: (HasPantryConfig env, HasLogFunc env)
   => PackageName
   -> Version
   -> CabalFileInfo
   -> RIO env (TreeKey, Tree)
-getHackageTarball name ver cfi = undefined
+getHackageTarball name ver cfi = do
+  cabalFile <- resolveCabalFileInfo name ver cfi
+  withCachedTree name ver cabalFile $ do
+    mpair <- withStorage $ loadHackageTarballInfo name ver
+    (sha, size) <-
+      case mpair of
+        Just pair -> pure pair
+        Nothing -> do
+          let msg = "No cryptographic hash found for Hackage package " <>
+                    fromString (Distribution.Text.display name) <> "-" <>
+                    fromString (Distribution.Text.display ver)
+          updated <- updateHackageIndex $ Just $ msg <> ", updating"
+          mpair2 <-
+            if updated
+              then withStorage $ loadHackageTarballInfo name ver
+              else pure Nothing
+          case mpair2 of
+            Nothing -> error $ T.unpack $ utf8BuilderToText msg -- FIXME nicer exceptions, or return an Either
+            Just pair2 -> pure pair2
+    pc <- view pantryConfigL
+    let urlPrefix = hscDownloadPrefix $ pcHackageSecurity pc
+        url = mconcat
+          [ urlPrefix
+          , "package/"
+          , T.pack $ Distribution.Text.display name
+          , "-"
+          , T.pack $ Distribution.Text.display ver
+          , ".tar.gz"
+          ]
+    getArchive url (Just sha) (Just size)

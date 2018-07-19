@@ -15,12 +15,16 @@ module Pantry.Storage
   , clearHackageRevisions
   , storeHackageRevision
   , loadHackagePackageVersions
+  , loadHackagePackageVersion
   , loadHackageCabalFile
   , loadLatestCacheUpdate
   , storeCacheUpdate
   , storeHackageTarballInfo
+  , loadHackageTarballInfo
   , storeTree
   , loadTree
+  , storeHackageTree
+  , loadHackageTree
     -- avoid warnings
   , BlobTableId
   , HackageCabalId
@@ -60,6 +64,7 @@ HackageTarball
     version VersionTableId
     hash StaticSHA256
     size Word
+    UniqueHackageTarball name version
 HackageCabal
     name NameId
     version VersionTableId
@@ -192,6 +197,26 @@ loadHackagePackageVersions name = do
     go (Single revision, Single (VersionP version), Single key, Single size) =
       (version, Map.singleton revision (CabalHash key (Just size)))
 
+loadHackagePackageVersion
+  :: (HasPantryConfig env, HasLogFunc env)
+  => PackageName
+  -> Version
+  -> ReaderT SqlBackend (RIO env) (Map Revision (StaticSHA256, Word, BlobTableId))
+loadHackagePackageVersion name version = do
+  nameid <- getNameId name
+  versionid <- getVersionId version
+  -- would be better with esequeleto
+  (Map.fromList . map go) <$> rawSql
+    "SELECT hackage.revision, blob.hash, blob.size, blob.id\n\
+    \FROM hackage_cabal as hackage, version, blob\n\
+    \WHERE hackage.name=?\n\
+    \AND   hackage.version=?\n\
+    \AND   hackage.cabal=blob.id"
+    [toPersistValue nameid, toPersistValue versionid]
+  where
+    go (Single revision, Single key, Single size, Single bid) =
+      (revision, (key, size, bid))
+
 loadHackageCabalFile
   :: (HasPantryConfig env, HasLogFunc env)
   => PackageName
@@ -268,6 +293,18 @@ storeHackageTarballInfo name version sha size = do
     , hackageTarballSize = size
     }
 
+loadHackageTarballInfo
+  :: (HasPantryConfig env, HasLogFunc env)
+  => PackageName
+  -> Version
+  -> ReaderT SqlBackend (RIO env) (Maybe (StaticSHA256, Word))
+loadHackageTarballInfo name version = do
+  nameid <- getNameId name
+  versionid <- getVersionId version
+  fmap go <$> getBy (UniqueHackageTarball nameid versionid)
+  where
+    go (Entity _ ht) = (hackageTarballHash ht, hackageTarballSize ht)
+
 storeTree
   :: (HasPantryConfig env, HasLogFunc env)
   => Tree
@@ -282,25 +319,72 @@ loadTree key = do
   ment <- getBy $ UniqueTree key
   case ment of
     Nothing -> pure Nothing
-    Just (Entity tid t) ->
-      case (treeSTarball t, treeSCabal t, treeSSubdir t) of
-        (Just tarball, Just cabal, Just subdir) -> do
-          tarballkey <- getBlobKey tarball
-          cabalkey <- getBlobKey cabal
-          pure $ Just $ TreeTarball PackageTarball
-            { ptBlob = tarballkey
-            , ptCabal = cabalkey
-            , ptSubdir = T.unpack subdir
-            }
-        (x, y, z) -> assert (isNothing x && isNothing y && isNothing z) $ do
-          entries <- rawSql
-            "SELECT file_path.path, blob.hash, tree_entry.type\n\
-            \FROM tree_entry, blob, file_path\n\
-            \WHERE tree_entry.id=?\n\
-            \AND   tree_entry.blob=blob.id\n\
-            \AND   tree_entry.path=file_path.id"
-            [toPersistValue tid]
-          pure $ Just $ TreeMap $ Map.fromList $ map
-            (\(Single sfp, Single blobKey, Single ft) ->
-                 (sfp, TreeEntry blobKey ft))
-            entries
+    Just ent -> Just <$> loadTreeByEnt ent
+
+loadTreeById
+  :: (HasPantryConfig env, HasLogFunc env)
+  => TreeSId
+  -> ReaderT SqlBackend (RIO env) (TreeKey, Tree)
+loadTreeById tid = do
+  Just ts <- get tid
+  tree <- loadTreeByEnt $ Entity tid ts
+  pure (treeSKey ts, tree)
+
+loadTreeByEnt
+  :: (HasPantryConfig env, HasLogFunc env)
+  => Entity TreeS
+  -> ReaderT SqlBackend (RIO env) Tree
+loadTreeByEnt (Entity tid t) = do
+  case (treeSTarball t, treeSCabal t, treeSSubdir t) of
+    (Just tarball, Just cabal, Just subdir) -> do
+      tarballkey <- getBlobKey tarball
+      cabalkey <- getBlobKey cabal
+      pure $ TreeTarball PackageTarball
+        { ptBlob = tarballkey
+        , ptCabal = cabalkey
+        , ptSubdir = T.unpack subdir
+        }
+    (x, y, z) -> assert (isNothing x && isNothing y && isNothing z) $ do
+      entries <- rawSql
+        "SELECT file_path.path, blob.hash, tree_entry.type\n\
+        \FROM tree_entry, blob, file_path\n\
+        \WHERE tree_entry.id=?\n\
+        \AND   tree_entry.blob=blob.id\n\
+        \AND   tree_entry.path=file_path.id"
+        [toPersistValue tid]
+      pure $ TreeMap $ Map.fromList $ map
+        (\(Single sfp, Single blobKey, Single ft) ->
+             (sfp, TreeEntry blobKey ft))
+        entries
+
+storeHackageTree
+  :: (HasPantryConfig env, HasLogFunc env)
+  => PackageName
+  -> Version
+  -> BlobTableId
+  -> TreeSId
+  -> ReaderT SqlBackend (RIO env) ()
+storeHackageTree = undefined
+
+loadHackageTree
+  :: (HasPantryConfig env, HasLogFunc env)
+  => PackageName
+  -> Version
+  -> BlobTableId
+  -> ReaderT SqlBackend (RIO env) (Maybe (TreeKey, Tree))
+loadHackageTree name ver bid = do
+  nameid <- getNameId name
+  versionid <- getVersionId ver
+  ment <- selectFirst
+    [ HackageCabalName ==. nameid
+    , HackageCabalVersion ==. versionid
+    , HackageCabalCabal ==. bid
+    , HackageCabalTree !=. Nothing
+    ]
+    []
+  case ment of
+    Nothing -> pure Nothing
+    Just (Entity _ hc) ->
+      case hackageCabalTree hc of
+        Nothing -> assert False $ pure Nothing
+        Just x -> Just <$> loadTreeById x

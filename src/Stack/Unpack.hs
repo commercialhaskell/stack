@@ -73,7 +73,15 @@ unpackPackages mSnapshotDef dest input = do
     toPIR = maybe toPIRNoSnapshot toPIRSnapshot mSnapshotDef
 
     toPIRNoSnapshot name = do
-      mver <- getLatestHackageVersion $ toCabalPackageName name
+      mver1 <- getLatestHackageVersion $ toCabalPackageName name
+      mver <-
+        case mver1 of
+          Just _ -> pure mver1
+          Nothing -> do
+            updated <- updateHackageIndex $ Just $ "Could not find package " <> display name <> ", updating"
+            if updated
+              then getLatestHackageVersion $ toCabalPackageName name
+              else pure Nothing
       pure $
         case mver of
           -- consider updating the index
