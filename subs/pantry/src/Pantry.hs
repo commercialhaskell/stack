@@ -35,6 +35,7 @@ import qualified RIO.Set as Set
 import qualified RIO.Text as T
 import Pantry.StaticSHA256
 import Pantry.Storage
+import Pantry.Tree
 import Pantry.Types
 import Pantry.Hackage
 import Data.List.NonEmpty (NonEmpty)
@@ -212,5 +213,7 @@ unpackPackageIdent
   -> PackageName
   -> Version
   -> CabalFileInfo
-  -> RIO env FilePath -- FIXME remove this FilePath return, make it flat
-unpackPackageIdent fp name ver cfi = error $ show (fp, name, ver, cfi)
+  -> RIO env ()
+unpackPackageIdent fp name ver cfi = do
+  (_treekey, tree) <- getHackageTarball name ver cfi
+  unpackTree fp tree

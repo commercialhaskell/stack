@@ -5,6 +5,7 @@
 module Pantry.Hackage
   ( updateHackageIndex
   , hackageIndexTarballL
+  , getHackageTarball
   ) where
 
 import RIO
@@ -16,6 +17,7 @@ import qualified RIO.Text as T
 import Data.Text.Unsafe (unsafeTail)
 import qualified RIO.ByteString as B
 import qualified RIO.ByteString.Lazy as BL
+import Pantry.Archive
 import Pantry.Types hiding (FileType (..))
 import Pantry.Storage
 import Pantry.StaticSHA256
@@ -246,3 +248,11 @@ instance FromJSON PackageDownload where
             Left e -> fail $ "Invalid sha256: " ++ show e
             Right x -> return x
         return $ PackageDownload sha256 len
+
+getHackageTarball
+  :: (HasPantryConfig env, HasLogFunc env)
+  => PackageName
+  -> Version
+  -> CabalFileInfo
+  -> RIO env (TreeKey, Tree)
+getHackageTarball name ver cfi = undefined

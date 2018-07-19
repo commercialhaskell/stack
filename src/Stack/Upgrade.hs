@@ -30,7 +30,6 @@ import           Stack.DefaultColorWhen (defaultColorWhen)
 import           Pantry
 import           Stack.PrettyPrint
 import           Stack.Setup
-import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageName
 import           Stack.Types.Version
 import           Stack.Types.Config
@@ -238,13 +237,14 @@ sourceUpgrade gConfigMonoid mresolver builtHash (SourceOpts gitRepo) =
                 prettyInfoS "Already at latest version, no upgrade required"
                 return Nothing
             else do
-                dir <- unpackPackageIdent
-                  (toFilePath tmp)
+                suffix <- parseRelDir $ "stack-" ++ versionString version
+                let dir = tmp </> suffix
+                unpackPackageIdent
+                  (toFilePath dir)
                   (toCabalPackageName $(mkPackageName "stack"))
                   (toCabalVersion version)
                   CFILatest -- accept latest cabal revision
-                dir' <- parseAbsDir dir
-                pure $ Just dir'
+                pure $ Just dir
 
     forM_ mdir $ \dir -> do
         lc <- loadConfig

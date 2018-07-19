@@ -269,10 +269,12 @@ library:
   - System.Terminal
   - Pantry
   other-modules:
+  - Pantry.Archive
   - Pantry.Hackage
   - Pantry.StaticBytes
   - Pantry.StaticSHA256
   - Pantry.Storage
+  - Pantry.Tree
   - Pantry.Types
   - Hackage.Security.Client.Repository.HttpLib.HttpClient
   when:

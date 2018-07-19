@@ -729,11 +729,13 @@ doCabalInstall wc installed wantedVersion = do
             " to replace " <>
             RIO.display installed
         let name = $(mkPackageName "Cabal")
-        dir <- unpackPackageIdent
-                    (toFilePath tmpdir)
-                    (toCabalPackageName name)
-                    (toCabalVersion wantedVersion)
-                    CFILatest
+            suffix = "Cabal-" ++ versionString wantedVersion
+            dir = toFilePath tmpdir FP.</> suffix
+        unpackPackageIdent
+          dir
+          (toCabalPackageName name)
+          (toCabalVersion wantedVersion)
+          CFILatest
         compilerPath <- findExecutable (compilerExeName wc)
                     >>= either throwM parseAbsFile
         versionDir <- parseRelDir $ versionString wantedVersion

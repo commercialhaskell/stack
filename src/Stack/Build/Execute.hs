@@ -944,11 +944,12 @@ withSingleContext ActionContext {..} ExecuteEnv {..} task@Task {..} mdeps msuffi
             TTIndex package _ pir -> do
                 let PackageIdentifierRevision (PackageIdentifier name' ver) cfi =
                       pir
-                dir <- unpackPackageIdent
-                  (toFilePath eeTempDir)
+                    dir = eeTempDir
+                unpackPackageIdent
+                  (toFilePath dir)
                   (toCabalPackageName name')
                   (toCabalVersion ver)
-                  cfi >>= parseAbsDir
+                  cfi
 
                 -- See: https://github.com/fpco/stack/issues/157
                 distDir <- distRelativeDir
