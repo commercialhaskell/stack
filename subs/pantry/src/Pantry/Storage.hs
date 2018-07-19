@@ -12,6 +12,7 @@ module Pantry.Storage
   , initStorage
   , withStorage
   , storeBlob
+  , loadBlob
   , getBlobKey
   , clearHackageRevisions
   , storeHackageRevision
@@ -147,6 +148,22 @@ storeBlob bs = do
               }
       key:rest -> assert (null rest) (pure key)
   pure (key, BlobKey sha size)
+
+loadBlob
+  :: (HasPantryConfig env, HasLogFunc env)
+  => BlobKey
+  -> ReaderT SqlBackend (RIO env) (Maybe ByteString)
+loadBlob (BlobKey sha size) = do
+  ment <- getBy $ UniqueBlobHash sha
+  case ment of
+    Nothing -> pure Nothing
+    Just (Entity _ bt)
+      | blobTableSize bt == size -> pure $ Just $ blobTableContents bt
+      | otherwise ->
+          Nothing <$ lift (logWarn $
+             "Mismatched blob size detected for SHA " <> display sha <>
+             ". Expected size: " <> display size <>
+             ". Actual size: " <> display (blobTableSize bt))
 
 getBlobKey
   :: (HasPantryConfig env, HasLogFunc env)
@@ -389,7 +406,7 @@ loadTreeByEnt (Entity tid t) = do
       entries <- rawSql
         "SELECT file_path.path, blob.hash, blob.size, tree_entry.type\n\
         \FROM tree_entry, blob, file_path\n\
-        \WHERE tree_entry.id=?\n\
+        \WHERE tree_entry.tree=?\n\
         \AND   tree_entry.blob=blob.id\n\
         \AND   tree_entry.path=file_path.id"
         [toPersistValue tid]

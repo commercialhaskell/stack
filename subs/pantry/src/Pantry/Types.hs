@@ -164,6 +164,7 @@ instance PersistFieldSql FileType where
   sqlType _ = SqlInt32
 
 data TreeEntry = TreeEntry !BlobKey !FileType
+  deriving Show
 
 newtype SafeFilePath = SafeFilePath Text
   deriving (Show, Eq, Ord)
@@ -199,6 +200,7 @@ newtype TreeKey = TreeKey BlobKey
 data Tree
   = TreeMap !(Map SafeFilePath TreeEntry)
   | TreeTarball !PackageTarball
+  deriving Show
 
 renderTree :: Tree -> ByteString
 renderTree = BL.toStrict . toLazyByteString . go
@@ -244,3 +246,4 @@ data PackageTarball = PackageTarball
   -- located there. Thanks to Hackage revisions, its contents will be
   -- overwritten by the value of @ptCabal@.
   }
+  deriving Show
